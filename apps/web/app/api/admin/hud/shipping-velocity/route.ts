@@ -16,6 +16,10 @@ export const runtime = 'nodejs';
 export const maxDuration = 60;
 
 const NO_STORE_HEADERS = { 'Cache-Control': 'no-store' } as const;
+const VELOCITY_CACHE_MAX_AGE_MS = 2 * 60 * 1000;
+const VELOCITY_CACHE_STALE_MAX_AGE_MS = 10 * 60 * 1000;
+const velocityInFlight = new Map<string, Promise<ShippingVelocityResponse>>();
+
 type ValidRange = '7d' | '30d' | '1y';
 
 const RANGE_DAYS: Record<ValidRange, number> = {
@@ -41,9 +45,10 @@ export interface DailyBucket {
   /** Median hours from PR creation to merge for PRs merged that day (null when no merges). */
   mergeP50Hours?: number | null;
 }
+
 export type ShippingVelocityObservation = Extract<
   HudObservationState,
-  'fresh' | 'empty' | 'not_configured'
+  'fresh' | 'stale' | 'empty' | 'not_configured'
 >;
 
 export interface ShippingVelocityResponse {
@@ -53,6 +58,7 @@ export interface ShippingVelocityResponse {
   observation: ShippingVelocityObservation;
   errorMessage?: string | null;
 }
+
 interface GitHubPrNode {
   state: string;
   merged: boolean;
@@ -338,6 +344,15 @@ function normalizeVelocityResponse(
         'GitHub is not configured for shipping velocity.',
     };
   }
+  if (result.observation === 'stale') {
+    return {
+      ...result,
+      observation: 'stale',
+      errorMessage:
+        result.errorMessage ??
+        'Refresh unavailable; showing last verified shipping velocity.',
+    };
+  }
   return {
     ...result,
     observation: observationFromShippingVelocityBuckets(result.data),
@@ -348,11 +363,23 @@ function normalizeVelocityResponse(
 async function readCachedVelocity(
   redis: ReturnType<typeof getRedis>,
   cacheKey: string
-): Promise<ShippingVelocityResponse | null> {
+): Promise<{
+  readonly ageMs: number;
+  readonly response: ShippingVelocityResponse;
+} | null> {
   if (!redis) return null;
   try {
     const cached = await redis.get<ShippingVelocityResponse>(cacheKey);
-    return cached ? normalizeVelocityResponse(cached) : null;
+    if (!cached) return null;
+    const ageMs = Date.now() - Date.parse(cached.cachedAt);
+    if (
+      !Number.isFinite(ageMs) ||
+      ageMs < 0 ||
+      ageMs > VELOCITY_CACHE_STALE_MAX_AGE_MS
+    ) {
+      return null;
+    }
+    return { ageMs, response: normalizeVelocityResponse(cached) };
   } catch (redisError) {
     logger.error('[hud/shipping-velocity] Redis get failed', redisError);
     return null;
@@ -366,7 +393,9 @@ async function cacheVelocity(
 ): Promise<void> {
   if (!redis) return;
   try {
-    await redis.set(cacheKey, result, { ex: 20 * 60 });
+    await redis.set(cacheKey, result, {
+      ex: Math.ceil(VELOCITY_CACHE_STALE_MAX_AGE_MS / 1000),
+    });
   } catch (redisError) {
     logger.error('[hud/shipping-velocity] Redis set failed', redisError);
   }
@@ -382,6 +411,35 @@ function notConfiguredVelocityResponse(
     observation: 'not_configured',
     errorMessage: 'GitHub is not configured for shipping velocity.',
   };
+}
+
+async function computeVelocity(
+  token: string,
+  owner: string,
+  repo: string,
+  range: ValidRange,
+  days: number,
+  redis: ReturnType<typeof getRedis>,
+  cacheKey: string
+): Promise<ShippingVelocityResponse> {
+  const sinceDate = new Date();
+  sinceDate.setUTCDate(sinceDate.getUTCDate() - days);
+  const buckets = await fetchBucketsFromGitHub(
+    token,
+    owner,
+    repo,
+    sinceDate.toISOString(),
+    days,
+    RANGE_FETCH_BUDGETS[range]
+  );
+  const result: ShippingVelocityResponse = {
+    data: buckets,
+    range,
+    cachedAt: new Date().toISOString(),
+    observation: observationFromShippingVelocityBuckets(buckets),
+  };
+  await cacheVelocity(redis, cacheKey, result);
+  return result;
 }
 
 export async function GET(request: Request): Promise<Response> {
@@ -404,34 +462,66 @@ export async function GET(request: Request): Promise<Response> {
     }
 
     const redis = getRedis();
-    const cacheKey = `hud:shipping-velocity:v2:${range}`;
+    const deploymentEnv = env.VERCEL_ENV ?? env.NODE_ENV ?? 'development';
+    const cacheKey = `hud:shipping-velocity:v5:${deploymentEnv}:${range}`;
     const cached = await readCachedVelocity(redis, cacheKey);
-    if (cached && cached.observation !== 'not_configured') {
-      return NextResponse.json(cached, {
+    if (
+      cached &&
+      cached.ageMs <= VELOCITY_CACHE_MAX_AGE_MS &&
+      cached.response.observation !== 'not_configured'
+    ) {
+      return NextResponse.json(cached.response, {
         status: 200,
         headers: NO_STORE_HEADERS,
       });
     }
 
-    const sinceDate = new Date();
-    sinceDate.setUTCDate(sinceDate.getUTCDate() - days);
-    const buckets = await fetchBucketsFromGitHub(
-      token,
-      owner,
-      repo,
-      sinceDate.toISOString(),
-      days,
-      RANGE_FETCH_BUDGETS[range]
-    );
-
-    const result: ShippingVelocityResponse = {
-      data: buckets,
-      range,
-      cachedAt: new Date().toISOString(),
-      observation: observationFromShippingVelocityBuckets(buckets),
-    };
-
-    await cacheVelocity(redis, cacheKey, result);
+    let computation = velocityInFlight.get(cacheKey);
+    if (!computation) {
+      computation = computeVelocity(
+        token,
+        owner,
+        repo,
+        range,
+        days,
+        redis,
+        cacheKey
+      );
+      velocityInFlight.set(cacheKey, computation);
+      const clearComputation = () => {
+        if (velocityInFlight.get(cacheKey) === computation) {
+          velocityInFlight.delete(cacheKey);
+        }
+      };
+      void computation.then(clearComputation, clearComputation);
+    }
+    let result: ShippingVelocityResponse;
+    try {
+      result = await computation;
+    } catch (error) {
+      if (cached?.response.observation !== undefined) {
+        const stale = normalizeVelocityResponse({
+          ...cached.response,
+          observation: 'stale',
+          errorMessage:
+            'Refresh unavailable; showing last verified shipping velocity.',
+        });
+        logger.error(
+          '[hud/shipping-velocity] Refresh failed; serving stale cache',
+          error
+        );
+        await captureError('HUD shipping velocity refresh failed', error, {
+          route: '/api/admin/hud/shipping-velocity',
+          method: 'GET',
+          fallback: 'stale-cache',
+        });
+        return NextResponse.json(stale, {
+          status: 200,
+          headers: NO_STORE_HEADERS,
+        });
+      }
+      throw error;
+    }
 
     return NextResponse.json(result, {
       status: 200,

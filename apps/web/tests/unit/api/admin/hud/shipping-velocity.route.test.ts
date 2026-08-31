@@ -210,6 +210,195 @@ describe('GET /api/admin/hud/shipping-velocity', () => {
     expect(get).not.toHaveBeenCalled();
   });
 
+  it('refetches instead of serving velocity older than two minutes', async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date('2026-08-30T12:00:00.000Z'));
+    hoisted.env.HUD_GITHUB_TOKEN = 'test-token';
+    hoisted.env.HUD_GITHUB_OWNER = 'JovieInc';
+    hoisted.env.HUD_GITHUB_REPO = 'jovie';
+    const get = vi.fn().mockResolvedValue({
+      data: [
+        {
+          date: '2026-08-30',
+          merged: 99,
+          opened: 99,
+          closed: 99,
+          mergeP50Hours: 99,
+        },
+      ],
+      range: '7d',
+      cachedAt: '2026-08-30T11:57:59.000Z',
+      observation: 'fresh',
+    });
+    const set = vi.fn();
+    hoisted.getRedis.mockReturnValue({ get, set });
+    const fetchMock = vi.fn().mockResolvedValue(
+      new Response(
+        JSON.stringify({
+          data: {
+            repository: {
+              pullRequests: {
+                nodes: [],
+                pageInfo: { hasNextPage: false, endCursor: null },
+              },
+            },
+          },
+        }),
+        { status: 200 }
+      )
+    );
+    vi.stubGlobal('fetch', fetchMock);
+
+    const { GET } = await import('@/app/api/admin/hud/shipping-velocity/route');
+    const response = await GET(
+      new Request('http://localhost/api/admin/hud/shipping-velocity?range=7d')
+    );
+
+    expect(response.status).toBe(200);
+    const result = await response.json();
+    expect(result.observation).toBe('empty');
+    expect(result.data).not.toContainEqual(
+      expect.objectContaining({ merged: 99 })
+    );
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    expect(set).toHaveBeenCalledWith(
+      'hud:shipping-velocity:v5:development:7d',
+      expect.any(Object),
+      { ex: 600 }
+    );
+  });
+
+  it('serves an explicitly stale last-known snapshot when refresh fails', async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date('2026-08-30T12:00:00.000Z'));
+    hoisted.env.HUD_GITHUB_TOKEN = 'test-token';
+    hoisted.env.HUD_GITHUB_OWNER = 'JovieInc';
+    hoisted.env.HUD_GITHUB_REPO = 'jovie';
+    const cachedAt = '2026-08-30T11:55:00.000Z';
+    hoisted.getRedis.mockReturnValue({
+      get: vi.fn().mockResolvedValue({
+        data: [
+          {
+            date: '2026-08-30',
+            merged: 3,
+            opened: 1,
+            closed: 0,
+            mergeP50Hours: 2,
+          },
+        ],
+        range: '7d',
+        cachedAt,
+        observation: 'fresh',
+      }),
+      set: vi.fn(),
+    });
+    vi.stubGlobal(
+      'fetch',
+      vi.fn().mockResolvedValue(
+        new Response(JSON.stringify({ data: { repository: null } }), {
+          status: 200,
+        })
+      )
+    );
+
+    const { GET } = await import('@/app/api/admin/hud/shipping-velocity/route');
+    const response = await GET(
+      new Request('http://localhost/api/admin/hud/shipping-velocity?range=7d')
+    );
+
+    expect(response.status).toBe(200);
+    await expect(response.json()).resolves.toMatchObject({
+      cachedAt,
+      observation: 'stale',
+      errorMessage:
+        'Refresh unavailable; showing last verified shipping velocity.',
+      data: [expect.objectContaining({ merged: 3 })],
+    });
+    expect(hoisted.captureError).toHaveBeenCalledWith(
+      'HUD shipping velocity refresh failed',
+      expect.any(Error),
+      expect.objectContaining({ fallback: 'stale-cache' })
+    );
+  });
+
+  it('serves a cache entry at the exact two-minute freshness boundary', async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date('2026-08-30T12:00:00.000Z'));
+    hoisted.env.HUD_GITHUB_TOKEN = 'test-token';
+    hoisted.env.HUD_GITHUB_OWNER = 'JovieInc';
+    hoisted.env.HUD_GITHUB_REPO = 'jovie';
+    const get = vi.fn().mockResolvedValue({
+      data: [
+        {
+          date: '2026-08-30',
+          merged: 3,
+          opened: 1,
+          closed: 0,
+          mergeP50Hours: 2,
+        },
+      ],
+      range: '7d',
+      cachedAt: '2026-08-30T11:58:00.000Z',
+      observation: 'fresh',
+    });
+    hoisted.getRedis.mockReturnValue({ get, set: vi.fn() });
+    const fetchMock = vi.fn();
+    vi.stubGlobal('fetch', fetchMock);
+
+    const { GET } = await import('@/app/api/admin/hud/shipping-velocity/route');
+    const response = await GET(
+      new Request('http://localhost/api/admin/hud/shipping-velocity?range=7d')
+    );
+
+    expect(response.status).toBe(200);
+    expect(fetchMock).not.toHaveBeenCalled();
+    expect((await response.json()).observation).toBe('fresh');
+  });
+
+  it.each([
+    ['future', '2026-08-30T12:00:00.001Z'],
+    ['invalid', 'not-a-timestamp'],
+  ])('refetches instead of serving a %s cache timestamp', async (_label, cachedAt) => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date('2026-08-30T12:00:00.000Z'));
+    hoisted.env.HUD_GITHUB_TOKEN = 'test-token';
+    hoisted.env.HUD_GITHUB_OWNER = 'JovieInc';
+    hoisted.env.HUD_GITHUB_REPO = 'jovie';
+    hoisted.getRedis.mockReturnValue({
+      get: vi.fn().mockResolvedValue({
+        data: [],
+        range: '7d',
+        cachedAt,
+        observation: 'empty',
+      }),
+      set: vi.fn(),
+    });
+    const fetchMock = vi.fn().mockResolvedValue(
+      new Response(
+        JSON.stringify({
+          data: {
+            repository: {
+              pullRequests: {
+                nodes: [],
+                pageInfo: { hasNextPage: false, endCursor: null },
+              },
+            },
+          },
+        }),
+        { status: 200 }
+      )
+    );
+    vi.stubGlobal('fetch', fetchMock);
+
+    const { GET } = await import('@/app/api/admin/hud/shipping-velocity/route');
+    const response = await GET(
+      new Request('http://localhost/api/admin/hud/shipping-velocity?range=7d')
+    );
+
+    expect(response.status).toBe(200);
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+  });
+
   it('fails unavailable instead of projecting malformed GitHub data as zero', async () => {
     hoisted.env.HUD_GITHUB_TOKEN = 'test-token';
     hoisted.env.HUD_GITHUB_OWNER = 'JovieInc';
@@ -276,6 +465,47 @@ describe('GET /api/admin/hud/shipping-velocity', () => {
 
     expect(response.status).toBe(500);
     expect(fetchMock).toHaveBeenCalledTimes(expectedFetches);
+  });
+
+  it('coalesces concurrent cold-cache computations for the same range', async () => {
+    hoisted.env.HUD_GITHUB_TOKEN = 'test-token';
+    hoisted.env.HUD_GITHUB_OWNER = 'JovieInc';
+    hoisted.env.HUD_GITHUB_REPO = 'jovie';
+    let releaseFetch!: (response: Response) => void;
+    const pendingFetch = new Promise<Response>(resolve => {
+      releaseFetch = resolve;
+    });
+    const fetchMock = vi.fn(() => pendingFetch);
+    vi.stubGlobal('fetch', fetchMock);
+
+    const { GET } = await import('@/app/api/admin/hud/shipping-velocity/route');
+    const first = GET(
+      new Request('http://localhost/api/admin/hud/shipping-velocity?range=7d')
+    );
+    const second = GET(
+      new Request('http://localhost/api/admin/hud/shipping-velocity?range=7d')
+    );
+    await Promise.resolve();
+    releaseFetch(
+      new Response(
+        JSON.stringify({
+          data: {
+            repository: {
+              pullRequests: {
+                nodes: [],
+                pageInfo: { hasNextPage: false, endCursor: null },
+              },
+            },
+          },
+        }),
+        { status: 200 }
+      )
+    );
+    const [firstResponse, secondResponse] = await Promise.all([first, second]);
+
+    expect(firstResponse.status).toBe(200);
+    expect(secondResponse.status).toBe(200);
+    expect(fetchMock).toHaveBeenCalledTimes(1);
   });
 
   it('fails closed when GitHub pagination exceeds the bounded page budget', async () => {
