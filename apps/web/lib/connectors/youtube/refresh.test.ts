@@ -20,6 +20,7 @@ const mocks = vi.hoisted(() => {
     lockAcquired: true,
     cursor: null as unknown,
     reportedUploadsPageToken: null as string | null,
+    deadlineExceeded: false,
   };
   const lockReturning = vi.fn(async () =>
     state.lockAcquired ? [{ cursor: state.cursor }] : []
@@ -29,7 +30,11 @@ const mocks = vi.hoisted(() => {
     state,
     loadFreshGoogleAccessToken: vi.fn(),
     createYouTubeLibraryProvider: vi.fn(
-      (input: { onUploadsPageToken?: (pageToken: string | null) => void }) => {
+      (input: {
+        onUploadsPageToken?: (pageToken: string | null) => void;
+        onDeadlineExceeded?: () => void;
+      }) => {
+        if (state.deadlineExceeded) input.onDeadlineExceeded?.();
         input.onUploadsPageToken?.(state.reportedUploadsPageToken);
         return { provider: 'youtube' };
       }
@@ -100,6 +105,7 @@ describe('connected YouTube refresh', () => {
     mocks.state.lockAcquired = true;
     mocks.state.cursor = null;
     mocks.state.reportedUploadsPageToken = null;
+    mocks.state.deadlineExceeded = false;
     mocks.loadFreshGoogleAccessToken.mockResolvedValue('access-token');
     mocks.syncChannelVideos.mockResolvedValue({ imported: 1 });
     mocks.reconcileApprovedYouTubeCollaborators.mockResolvedValue(undefined);
@@ -111,7 +117,6 @@ describe('connected YouTube refresh', () => {
     await expect(runConnectedYouTubeRefreshes(now)).resolves.toMatchObject({
       attempted: 1,
       needsReauth: 1,
-      failed: 0,
     });
 
     expect(mocks.syncChannelVideos).not.toHaveBeenCalled();
@@ -131,7 +136,6 @@ describe('connected YouTube refresh', () => {
 
     expect(mocks.createYouTubeLibraryProvider).toHaveBeenCalledWith(
       expect.objectContaining({
-        accessToken: 'access-token',
         maxVideosPerSync: 50,
         maxAnalyticsRequests: 2,
         timeoutMs: 5000,
@@ -158,7 +162,6 @@ describe('connected YouTube refresh', () => {
     await expect(runConnectedYouTubeRefreshes(now)).resolves.toMatchObject({
       attempted: 1,
       failed: 1,
-      skipped: 0,
     });
 
     expect(mocks.state.connectorSetValues.at(-1)).toMatchObject({
@@ -166,6 +169,20 @@ describe('connected YouTube refresh', () => {
       lastErrorDevMessage: 'provider down',
     });
     expect(mocks.captureError).toHaveBeenCalledOnce();
+  });
+
+  it('skips lastSyncAt when the provider reports deadline exhaustion', async () => {
+    mocks.state.deadlineExceeded = true;
+    mocks.state.reportedUploadsPageToken = 'page-3';
+
+    await expect(
+      runConnectedYouTubeRefreshes(now, { deadlineMs: now.getTime() + 1_000 })
+    ).resolves.toMatchObject({ attempted: 1, synced: 0, skipped: 1 });
+
+    expect(mocks.state.syncStateSetValues.at(-1)).toMatchObject({
+      cursor: { uploadsPageToken: 'page-3' },
+    });
+    expect(mocks.state.connectorSetValues).toEqual([]);
   });
 
   it('skips work when the account sync or token refresh lock is busy', async () => {

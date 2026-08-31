@@ -49,6 +49,7 @@ export type ConnectedYouTubeRefreshSource =
 
 export type ConnectedYouTubeRefreshOutcome =
   | { readonly status: 'synced'; readonly result: SyncChannelVideosResult }
+  | { readonly status: 'incomplete'; readonly result: SyncChannelVideosResult }
   | { readonly status: 'needs_reauth' }
   | { readonly status: 'failed'; readonly error: unknown }
   | { readonly status: 'busy' };
@@ -179,6 +180,7 @@ export async function refreshConnectedYouTubeAccount(input: {
   let lockAcquired = false;
   let nextUploadsPageToken: string | null | undefined;
   let observedUpdatedAt = input.observedUpdatedAt;
+  let deadlineExceeded = false;
   const observedConnector = () =>
     connectorAccountStillObserved({ ...input, observedUpdatedAt });
 
@@ -245,6 +247,9 @@ export async function refreshConnectedYouTubeAccount(input: {
             ? MAX_SCHEDULED_ANALYTICS_REQUESTS
             : MAX_MANUAL_ANALYTICS_REQUESTS,
         deadlineMs: input.deadlineMs,
+        onDeadlineExceeded: () => {
+          deadlineExceeded = true;
+        },
       }),
       now,
     });
@@ -255,6 +260,9 @@ export async function refreshConnectedYouTubeAccount(input: {
         nextUploadsPageToken,
         now
       );
+    }
+    if (deadlineExceeded) {
+      return { status: 'incomplete', result };
     }
     await db
       .update(connectorAccounts)
@@ -357,7 +365,7 @@ export async function runConnectedYouTubeRefreshes(
       synced++;
     } else if (outcome.status === 'needs_reauth') {
       needsReauth++;
-    } else if (outcome.status === 'busy') {
+    } else if (outcome.status === 'busy' || outcome.status === 'incomplete') {
       skipped++;
     } else {
       failed++;

@@ -132,6 +132,7 @@ async function listUploadVideoIds(input: {
   readonly pageToken?: string;
   readonly timeoutMs?: number;
   readonly deadlineMs?: number;
+  readonly onDeadlineExceeded?: () => void;
 }): Promise<{
   readonly videoIds: string[];
   readonly nextPageToken: string | null;
@@ -142,6 +143,7 @@ async function listUploadVideoIds(input: {
   const timeoutMs = input.timeoutMs ?? 15_000;
   do {
     if (!hasRequestBudget(timeoutMs, input.deadlineMs)) {
+      input.onDeadlineExceeded?.();
       return { videoIds: ids, nextPageToken: pageToken ?? null };
     }
     const remaining = input.maxVideoIds
@@ -313,13 +315,17 @@ export function createYouTubeLibraryProvider(input: {
   readonly timeoutMs?: number;
   readonly maxAnalyticsRequests?: number;
   readonly deadlineMs?: number;
+  readonly onDeadlineExceeded?: () => void;
 }): YouTubeLibraryProvider {
   const fetcher = input.fetcher ?? serverFetch;
   const now = input.now ?? (() => new Date());
   const timeoutMs = input.timeoutMs ?? 15_000;
   return {
     async listChannelVideos(channelId) {
-      if (!hasRequestBudget(timeoutMs, input.deadlineMs)) return [];
+      if (!hasRequestBudget(timeoutMs, input.deadlineMs)) {
+        input.onDeadlineExceeded?.();
+        return [];
+      }
       const channels = await listOwnedYouTubeChannels({
         accessToken: input.accessToken,
         fetcher,
@@ -340,10 +346,14 @@ export function createYouTubeLibraryProvider(input: {
         pageToken: input.uploadsPageToken,
         timeoutMs: boundedTimeoutMs(timeoutMs, input.deadlineMs),
         deadlineMs: input.deadlineMs,
+        onDeadlineExceeded: input.onDeadlineExceeded,
       });
       const videos: YouTubeChannelVideo[] = [];
       for (const batch of batches(videoIds, MAX_VIDEO_BATCH)) {
-        if (!hasRequestBudget(timeoutMs, input.deadlineMs)) return videos;
+        if (!hasRequestBudget(timeoutMs, input.deadlineMs)) {
+          input.onDeadlineExceeded?.();
+          return videos;
+        }
         const url = new URL(`${YOUTUBE_DATA_API}/videos`);
         url.searchParams.set('part', 'snippet,contentDetails,status');
         url.searchParams.set('id', batch.join(','));
@@ -359,7 +369,12 @@ export function createYouTubeLibraryProvider(input: {
           if (video) videos.push(video);
         }
       }
-      input.onUploadsPageToken?.(nextPageToken);
+      if (
+        videoIds.length > 0 ||
+        hasRequestBudget(timeoutMs, input.deadlineMs)
+      ) {
+        input.onUploadsPageToken?.(nextPageToken);
+      }
       return videos;
     },
 
@@ -385,6 +400,7 @@ export function createYouTubeLibraryProvider(input: {
             return output;
           }
           if (!hasRequestBudget(timeoutMs, input.deadlineMs)) {
+            input.onDeadlineExceeded?.();
             return output;
           }
           requestCount++;
