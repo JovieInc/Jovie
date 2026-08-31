@@ -11,7 +11,9 @@ import {
 
 const map = readDesignSystemAuthorityMap();
 const codes = (candidate, repoRoot = null) =>
-  validateDesignSystemAuthorityMap(candidate, repoRoot).map(issue => issue.code);
+  validateDesignSystemAuthorityMap(candidate, repoRoot).map(
+    issue => issue.code
+  );
 const expectCode = (candidate, code, repoRoot = null) => {
   assert.ok(codes(candidate, repoRoot).includes(code), code);
 };
@@ -57,6 +59,21 @@ test('RED: authority map rejects advisory-only enforced layers', () => {
       classificationReason: '',
     })),
     'missing-classification-reason'
+  );
+  expectCode(
+    mutateEntry('interaction.families', () => ({
+      canonicalSources: [],
+      executableChecks: [],
+      classificationReason: 'Regression fixture.',
+      status: 'missing',
+    })),
+    'invalid-authority-status-floor'
+  );
+  expectCode(
+    mutateEntry('foundation.tokens', () => ({
+      layer: 'legacy',
+    })),
+    'invalid-authority-layer'
   );
 });
 

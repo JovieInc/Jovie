@@ -125,6 +125,23 @@ describe('design-system authority map', () => {
     ).toContain('missing-classification-reason');
     expect(
       authorityCodes(
+        authorityMapWith('interaction.families', () => ({
+          canonicalSources: [],
+          executableChecks: [],
+          classificationReason: 'Regression fixture.',
+          status: 'missing',
+        }))
+      )
+    ).toContain('invalid-authority-status-floor');
+    expect(
+      authorityCodes(
+        authorityMapWith('foundation.tokens', () => ({
+          layer: 'legacy',
+        }))
+      )
+    ).toContain('invalid-authority-layer');
+    expect(
+      authorityCodes(
         authorityMapWith('surface.marketing-routes', () => ({
           owns: [],
         }))

@@ -23,10 +23,25 @@ const AUTHORITY_MAP_LAYER_VALUES = Object.freeze([
   'certification',
   'legacy',
 ]);
+const AUTHORITY_MAP_STATUS_RANK = new Map(
+  [
+    'missing',
+    'duplicated',
+    'partially-migrated',
+    'canonical-unenforced',
+    'canonical-enforced',
+    'obsolete-superseded',
+  ].map((status, index) => [status, index])
+);
+const AUTHORITY_MAP_LAYER_RANK = new Map(
+  AUTHORITY_MAP_LAYER_VALUES.map((layer, index) => [layer, index])
+);
 const isObject = value =>
   value !== null && typeof value === 'object' && !Array.isArray(value);
 const has = value => typeof value === 'string' && value.trim() !== '';
 const add = (issues, code, detail) => issues.push({ code, detail });
+const layerFromId = id =>
+  AUTHORITY_MAP_LAYER_VALUES.find(layer => id.startsWith(`${layer}.`)) ?? null;
 
 function safeRepoPath(value) {
   return (
@@ -90,6 +105,7 @@ export function validateDesignSystemAuthorityMap(map, repoRoot = null) {
     add(issues, 'duplicate-authority-id', 'dependencyOrder');
   }
 
+  let priorLayerRank = -1;
   for (const [index, entry] of map.entries.entries()) {
     if (!isObject(entry) || !has(entry.id)) {
       add(issues, 'missing-authority-entry', `entries[${index}]`);
@@ -103,8 +119,27 @@ export function validateDesignSystemAuthorityMap(map, repoRoot = null) {
     if (!AUTHORITY_MAP_LAYER_VALUES.includes(entry.layer)) {
       add(issues, 'invalid-authority-layer', entry.id);
     }
+    const expectedLayer = layerFromId(entry.id);
+    if (expectedLayer !== null && entry.layer !== expectedLayer) {
+      add(issues, 'invalid-authority-layer', `${entry.id}:${entry.layer}`);
+    }
+    const entryLayerRank = AUTHORITY_MAP_LAYER_RANK.get(entry.layer);
+    if (entryLayerRank !== undefined) {
+      if (entryLayerRank < priorLayerRank) {
+        add(issues, 'invalid-authority-layer', `${entry.id}:layer-order`);
+      }
+      priorLayerRank = Math.max(priorLayerRank, entryLayerRank);
+    }
     if (!AUTHORITY_MAP_STATUS_VALUES.includes(entry.status)) {
       add(issues, 'invalid-authority-status', entry.id);
+    }
+    if (!AUTHORITY_MAP_STATUS_VALUES.includes(entry.statusFloor)) {
+      add(issues, 'invalid-authority-status-floor', entry.id);
+    } else if (
+      (AUTHORITY_MAP_STATUS_RANK.get(entry.status) ?? -1) <
+      (AUTHORITY_MAP_STATUS_RANK.get(entry.statusFloor) ?? -1)
+    ) {
+      add(issues, 'invalid-authority-status-floor', entry.id);
     }
     if (
       !Array.isArray(entry.owns) ||

@@ -14,6 +14,7 @@ export type DesignSystemAuthorityMapIssueCode =
   | 'invalid-authority-layer'
   | 'invalid-authority-schema'
   | 'invalid-authority-status'
+  | 'invalid-authority-status-floor'
   | 'invalid-current-owner'
   | 'invalid-dependency-order'
   | 'invalid-repo-path'
@@ -30,6 +31,21 @@ export interface DesignSystemAuthorityMapIssue {
 }
 
 const has = (value?: string | null): value is string => Boolean(value?.trim());
+const STATUS_RANK = new Map(
+  [
+    'missing',
+    'duplicated',
+    'partially-migrated',
+    'canonical-unenforced',
+    'canonical-enforced',
+    'obsolete-superseded',
+  ].map((status, index) => [status, index] as const)
+);
+const LAYER_RANK = new Map(
+  DESIGN_SYSTEM_AUTHORITY_LAYER_VALUES.map(
+    (layer, index) => [layer, index] as const
+  )
+);
 
 const isSafeRepoPath = (value: string) =>
   has(value) &&
@@ -43,6 +59,10 @@ const add = (
   code: DesignSystemAuthorityMapIssueCode,
   id: string
 ) => issues.push({ code, id });
+const layerFromId = (id: string) =>
+  DESIGN_SYSTEM_AUTHORITY_LAYER_VALUES.find(layer =>
+    id.startsWith(`${layer}.`)
+  ) ?? null;
 
 function validatePathList(
   issues: DesignSystemAuthorityMapIssue[],
@@ -93,6 +113,7 @@ export function validateDesignSystemAuthorityMap({
     add(issues, 'duplicate-authority-id', 'dependencyOrder');
   }
 
+  let priorLayerRank = -1;
   for (const [index, entry] of map.entries.entries()) {
     if (ids.has(entry.id)) add(issues, 'duplicate-authority-id', entry.id);
     ids.add(entry.id);
@@ -103,8 +124,27 @@ export function validateDesignSystemAuthorityMap({
     if (!DESIGN_SYSTEM_AUTHORITY_LAYER_VALUES.includes(entry.layer)) {
       add(issues, 'invalid-authority-layer', entry.id);
     }
+    const expectedLayer = layerFromId(entry.id);
+    if (expectedLayer !== null && entry.layer !== expectedLayer) {
+      add(issues, 'invalid-authority-layer', `${entry.id}:${entry.layer}`);
+    }
+    const entryLayerRank = LAYER_RANK.get(entry.layer);
+    if (entryLayerRank !== undefined) {
+      if (entryLayerRank < priorLayerRank) {
+        add(issues, 'invalid-authority-layer', `${entry.id}:layer-order`);
+      }
+      priorLayerRank = Math.max(priorLayerRank, entryLayerRank);
+    }
     if (!DESIGN_SYSTEM_AUTHORITY_STATUS_VALUES.includes(entry.status)) {
       add(issues, 'invalid-authority-status', entry.id);
+    }
+    if (!DESIGN_SYSTEM_AUTHORITY_STATUS_VALUES.includes(entry.statusFloor)) {
+      add(issues, 'invalid-authority-status-floor', entry.id);
+    } else if (
+      (STATUS_RANK.get(entry.status) ?? -1) <
+      (STATUS_RANK.get(entry.statusFloor) ?? -1)
+    ) {
+      add(issues, 'invalid-authority-status-floor', entry.id);
     }
     if (!entry.owns.length || entry.owns.some(capability => !has(capability))) {
       add(issues, 'missing-owned-capability', entry.id);
