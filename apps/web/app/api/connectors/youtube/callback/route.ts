@@ -164,12 +164,20 @@ export async function GET(request: Request) {
       })
       .returning({ id: connectorAccounts.id });
     if (!account) throw new Error('Failed to upsert YouTube connector account');
-    await storeTokens({
-      connectorAccountId: account.id,
-      accessToken: tokens.access_token,
-      refreshToken: tokens.refresh_token,
-      expiresAt,
-    });
+    await storeTokens(
+      tokens.refresh_token
+        ? {
+            connectorAccountId: account.id,
+            accessToken: tokens.access_token,
+            refreshToken: tokens.refresh_token,
+            expiresAt,
+          }
+        : {
+            connectorAccountId: account.id,
+            accessToken: tokens.access_token,
+            expiresAt,
+          }
+    );
 
     const sync = await syncChannelVideos({
       creatorProfileId: state.creatorProfileId,
