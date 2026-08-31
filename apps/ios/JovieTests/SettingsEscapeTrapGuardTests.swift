@@ -58,6 +58,7 @@ struct SettingsEscapeTrapGuardTests {
     #expect(source.contains("settings-workspace-switch"))
     #expect(source.contains("LabeledContent(\"Workspace\""))
     #expect(source.contains("if isLoggingOut {\n              ProgressView()"))
+    #expect(source.contains(".tint(JovieColor.textPrimary)"))
     #expect(source.contains(".frame(width: 20, height: 20)"))
     #expect(!source.contains("ProgressView()\n            .controlSize(.small)\n            .opacity"))
   }

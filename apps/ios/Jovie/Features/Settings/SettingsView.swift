@@ -178,6 +178,7 @@ struct SettingsView: View {
             if isLoggingOut {
               ProgressView()
                 .controlSize(.small)
+                .tint(JovieColor.textPrimary)
                 .transition(.opacity)
             }
           }
