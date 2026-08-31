@@ -1,7 +1,10 @@
 import { describe, expect, it } from 'vitest';
 import { GET as getCanonical } from '@/app/api/v1/openapi.json/route';
 import { GET as getDiscovery } from '@/app/openapi.json/route';
-import { PUBLIC_ARTIST_API_POLICY_LINK } from '@/lib/api/v1/contract';
+import {
+  PUBLIC_ARTIST_API_POLICY_LINK,
+  PUBLIC_ARTIST_API_VERSIONING_POLICY,
+} from '@/lib/api/v1/contract';
 import {
   API_VERSIONING_POLICY,
   ARTIST_OPENAPI_CACHE_CONTROL,
@@ -120,6 +123,7 @@ describe('public artist OpenAPI contract', () => {
     expect(ARTIST_OPENAPI_DOCUMENT['x-jovie-versioning']).toEqual(
       API_VERSIONING_POLICY
     );
+    expect(API_VERSIONING_POLICY).toBe(PUBLIC_ARTIST_API_VERSIONING_POLICY);
     expect(API_VERSIONING_POLICY).toMatchObject({
       strategy: 'url',
       activeVersion: 'v1',
@@ -185,6 +189,10 @@ describe('public artist OpenAPI contract', () => {
     ).toEqual({ type: 'string', enum: ['artist-profile'] });
     expect(
       ARTIST_OPENAPI_DOCUMENT.components.schemas.ArtistApiIndex.properties
+        ?.versioning?.$ref
+    ).toBe('#/components/schemas/VersioningPolicy');
+    expect(
+      ARTIST_OPENAPI_DOCUMENT.components.schemas.ArtistApiIndex.properties
         ?._links?.properties?.policy?.format
     ).toBe('uri');
     expect(profileOperation.description).not.toContain('timwhite');
@@ -206,8 +214,14 @@ describe('public artist OpenAPI contract', () => {
       expect.objectContaining({ 'Retry-After': expect.any(Object) })
     );
     expect(profileOperation.responses['503'].headers).toEqual(
-      expect.objectContaining({ 'Retry-After': expect.any(Object) })
+      expect.objectContaining({
+        'RateLimit-Policy': expect.any(Object),
+        'Retry-After': expect.any(Object),
+      })
     );
+    expect(
+      profileOperation.responses['503'].headers?.RateLimit
+    ).toBeUndefined();
 
     const indexSchema =
       ARTIST_OPENAPI_DOCUMENT.components.schemas.ArtistApiIndex;

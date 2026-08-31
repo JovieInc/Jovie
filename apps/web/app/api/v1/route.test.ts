@@ -4,6 +4,7 @@ import {
   PUBLIC_ARTIST_API_DISCOVERY_CACHE_CONTROL,
   PUBLIC_ARTIST_API_INDEX,
   PUBLIC_ARTIST_API_POLICY_LINK,
+  PUBLIC_ARTIST_API_VERSIONING_POLICY,
 } from '@/lib/api/v1/contract';
 import { GET } from './route';
 
@@ -26,6 +27,9 @@ describe('GET /api/v1', () => {
     expect(body).toEqual(PUBLIC_ARTIST_API_INDEX);
     expect(body.access).toBe('anonymous');
     expect(body.scope).toBe('read-only');
+    expect(body.versioning).toEqual(PUBLIC_ARTIST_API_VERSIONING_POLICY);
+    expect(body.versioning.lifecycle.deprecation.active).toBe(false);
+    expect(body.versioning.lifecycle.sunset.active).toBe(false);
     expect(body.rateLimit).toEqual({
       appliesTo: 'artist-profile',
       policy: 'public-artist',
