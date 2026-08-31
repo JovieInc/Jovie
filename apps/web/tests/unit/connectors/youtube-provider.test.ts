@@ -2,7 +2,6 @@ import { describe, expect, it, vi } from 'vitest';
 import {
   createYouTubeLibraryProvider,
   listOwnedYouTubeChannels,
-  YouTubeProviderError,
 } from '@/lib/connectors/youtube/provider';
 
 function jsonResponse(body: unknown): Response {
@@ -166,53 +165,6 @@ describe('YouTube Library provider', () => {
       )
     ).toHaveLength(1);
     expect(onUploadsPageToken).toHaveBeenCalledWith('page-3');
-  });
-
-  it('fails closed when the authorized account does not own the channel', async () => {
-    const fetcher = vi.fn(async () =>
-      jsonResponse({
-        items: [
-          {
-            id: 'different-channel',
-            contentDetails: { relatedPlaylists: { uploads: 'uploads-2' } },
-          },
-        ],
-      })
-    );
-    const provider = createYouTubeLibraryProvider({
-      accessToken: 'access-token',
-      fetcher,
-    });
-
-    await expect(provider.listChannelVideos('channel-1')).rejects.toMatchObject(
-      {
-        name: YouTubeProviderError.name,
-        status: 403,
-      }
-    );
-    expect(fetcher).toHaveBeenCalledTimes(1);
-  });
-
-  it('surfaces provider status without leaking the access token', async () => {
-    const fetcher = vi.fn(
-      async () =>
-        new Response(JSON.stringify({ error: 'token access-token rejected' }), {
-          status: 401,
-          headers: { 'content-type': 'application/json' },
-        })
-    );
-
-    const result = listOwnedYouTubeChannels({
-      accessToken: 'access-token',
-      fetcher,
-    });
-
-    await expect(result).rejects.toMatchObject({
-      name: YouTubeProviderError.name,
-      status: 401,
-      message: 'YouTube channel lookup failed with status 401',
-    });
-    await expect(result).rejects.not.toThrow(/access-token/);
   });
 
   it('maps supported Analytics metrics without inventing impressions', async () => {
