@@ -15,6 +15,10 @@ const homepageSource = readFileSync(
   path.resolve(process.cwd(), 'app/(home)/page.tsx'),
   'utf8'
 );
+const homepageCss = readFileSync(
+  path.resolve(process.cwd(), 'app/(home)/home.css'),
+  'utf8'
+);
 
 function normalizedText(value: string): string {
   return value.replace(/\s+/g, ' ').trim();
@@ -41,12 +45,12 @@ describe('HomepageNoScriptContent', () => {
       `<body>${rawMarkup}</body>`,
       'text/html'
     );
-    const fallback = document.querySelector('noscript');
-    // The body wrapper models the no-JavaScript document, where `noscript`
-    // contents are parsed as ordinary HTML and become visible.
-    const fallbackSection = fallback?.querySelector('section');
+    const fallbackSection = document.querySelector(
+      'section.homepage-no-script-content'
+    );
 
     expect(fallbackSection).not.toBeNull();
+    expect(rawMarkup).not.toContain('<noscript');
     expect(fallbackSection?.querySelector('h2')?.textContent).toBe(
       'Jovie for artists'
     );
@@ -60,6 +64,17 @@ describe('HomepageNoScriptContent', () => {
     expect(fallbackSection?.getAttribute('aria-hidden')).toBeNull();
   });
 
+  it('hides only the progressive fallback for scripting-enabled browsers', () => {
+    expect(homepageCss).toMatch(
+      /@media\s*\(scripting:\s*enabled\)[\s\S]*?\.homepage-no-script-content\s*\{[\s\S]*?display:\s*none/
+    );
+    const defaultRule = homepageCss.match(
+      /\.homepage-no-script-content\s*\{[\s\S]*?\}/
+    )?.[0];
+    expect(defaultRule).toBeDefined();
+    expect(defaultRule).not.toContain('display: none');
+  });
+
   it('passes the reported 5% ratio while keeping the old result red', () => {
     const rawMarkup = renderToStaticMarkup(<HomepageNoScriptContent />);
     const document = new DOMParser().parseFromString(
@@ -67,7 +82,8 @@ describe('HomepageNoScriptContent', () => {
       'text/html'
     );
     const fallbackText = normalizedText(
-      document.querySelector('noscript')?.textContent ?? ''
+      document.querySelector('section.homepage-no-script-content')
+        ?.textContent ?? ''
     );
     const fallbackBytes = Buffer.byteLength(rawMarkup, 'utf8');
 
