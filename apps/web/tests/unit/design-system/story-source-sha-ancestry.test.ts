@@ -26,52 +26,179 @@ function sourceShas(source: string): string[] {
   );
 }
 
-describe('story receipt SHA ancestry', () => {
-  it('keeps every literal receipt ancestral and able to replay its story path', () => {
-    const issues: string[] = [];
-    const shallow =
-      execFileSync('git', ['rev-parse', '--is-shallow-repository'], {
-        cwd: repoRoot,
-        encoding: 'utf8',
-      }).trim() === 'true';
+interface StoryReceipt {
+  readonly sourceSha: string;
+  readonly storyPath: string;
+}
 
-    for (const file of listStoryFiles(componentsRoot)) {
-      const storyPath = relative(repoRoot, file).split(sep).join('/');
-      for (const sourceSha of sourceShas(readFileSync(file, 'utf8'))) {
-        try {
-          execFileSync('git', ['cat-file', '-e', `${sourceSha}^{commit}`], {
-            cwd: repoRoot,
-            stdio: 'pipe',
-          });
-        } catch {
-          if (!shallow) {
-            issues.push(`${storyPath}: missing commit ${sourceSha}`);
-          }
-          continue;
-        }
+let gitCommandCount = 0;
 
-        try {
-          execFileSync(
-            'git',
-            ['merge-base', '--is-ancestor', sourceSha, 'HEAD'],
-            { cwd: repoRoot, stdio: 'pipe' }
-          );
-        } catch {
-          issues.push(`${storyPath}: non-ancestral sourceSha ${sourceSha}`);
-          continue;
-        }
+function runGit(args: string[], input?: string): string {
+  gitCommandCount += 1;
+  return execFileSync('git', args, {
+    cwd: repoRoot,
+    encoding: 'utf8',
+    env: { ...process.env, GIT_NO_LAZY_FETCH: '1' },
+    input,
+    maxBuffer: 10 * 1024 * 1024,
+    stdio: ['pipe', 'pipe', 'pipe'],
+  });
+}
 
-        try {
-          execFileSync('git', ['cat-file', '-e', `${sourceSha}:${storyPath}`], {
-            cwd: repoRoot,
-            stdio: 'pipe',
-          });
-        } catch {
-          issues.push(`${storyPath}: sourceSha cannot replay its story path`);
-        }
+function storyReceipts(): StoryReceipt[] {
+  return listStoryFiles(componentsRoot).flatMap(file => {
+    const storyPath = relative(repoRoot, file).split(sep).join('/');
+    return sourceShas(readFileSync(file, 'utf8')).map(sourceSha => ({
+      sourceSha,
+      storyPath,
+    }));
+  });
+}
+
+function batchObjects(expressions: string[]): Map<string, string | null> {
+  const uniqueExpressions = Array.from(new Set(expressions));
+  if (uniqueExpressions.length === 0) return new Map();
+
+  const output = runGit(
+    ['cat-file', '--batch-check=%(objectname) %(objecttype)'],
+    `${uniqueExpressions.join('\n')}\n`
+  );
+  const lines = output.trimEnd().split('\n');
+  if (lines.length !== uniqueExpressions.length) {
+    throw new Error(
+      `git cat-file returned ${lines.length} results for ${uniqueExpressions.length} expressions`
+    );
+  }
+
+  return new Map(
+    uniqueExpressions.map((expression, index) => {
+      const line = lines[index];
+      if (line?.endsWith(' missing')) return [expression, null];
+      const object = line?.match(/^([0-9a-f]{40}) (?:blob|commit|tag|tree)$/);
+      if (object?.[1]) {
+        return [expression, object[1]];
       }
+      throw new Error(`Unexpected git cat-file result: ${line ?? '(none)'}`);
+    })
+  );
+}
+
+function receiptIssues(
+  receipts: StoryReceipt[],
+  objects: ReadonlyMap<string, string | null>,
+  ancestorObjectNames: ReadonlySet<string>,
+  shallow: boolean
+): string[] {
+  const issues: string[] = [];
+  for (const { sourceSha, storyPath } of receipts) {
+    const commitObjectName = objects.get(`${sourceSha}^{commit}`);
+    if (!commitObjectName) {
+      if (!shallow) {
+        issues.push(`${storyPath}: missing commit ${sourceSha}`);
+      }
+      continue;
     }
+    if (!ancestorObjectNames.has(commitObjectName)) {
+      issues.push(`${storyPath}: non-ancestral sourceSha ${sourceSha}`);
+      continue;
+    }
+    if (!objects.get(`${sourceSha}:${storyPath}`)) {
+      issues.push(`${storyPath}: sourceSha cannot replay its story path`);
+    }
+  }
+  return issues;
+}
+
+describe('story receipt SHA ancestry', () => {
+  it('batches present and missing object checks without losing either result', () => {
+    const headExpression = 'HEAD^{commit}';
+    const missingExpression = `${'0'.repeat(40)}^{commit}`;
+    const objects = batchObjects([
+      headExpression,
+      missingExpression,
+      headExpression,
+    ]);
+
+    expect(objects).toHaveLength(2);
+    expect(objects.get(headExpression)).toMatch(/^[0-9a-f]{40}$/);
+    expect(objects.get(missingExpression)).toBeNull();
+  });
+
+  it('preserves missing, non-ancestral, and replay-path diagnostics', () => {
+    const missingSha = '1'.repeat(40);
+    const nonAncestralSha = '2'.repeat(40);
+    const missingPathSha = '3'.repeat(40);
+    const validSha = '4'.repeat(40);
+    const receipts = [
+      { sourceSha: missingSha, storyPath: 'missing.stories.tsx' },
+      { sourceSha: nonAncestralSha, storyPath: 'branch.stories.tsx' },
+      { sourceSha: missingPathSha, storyPath: 'moved.stories.tsx' },
+      { sourceSha: validSha, storyPath: 'valid.stories.tsx' },
+    ];
+    const nonAncestralObjectName = 'a'.repeat(40);
+    const missingPathObjectName = 'b'.repeat(40);
+    const validObjectName = 'c'.repeat(40);
+    const objects = new Map<string, string | null>([
+      [`${missingSha}^{commit}`, null],
+      [`${nonAncestralSha}^{commit}`, nonAncestralObjectName],
+      [`${missingPathSha}^{commit}`, missingPathObjectName],
+      [`${missingPathSha}:moved.stories.tsx`, null],
+      [`${validSha}^{commit}`, validObjectName],
+      [`${validSha}:valid.stories.tsx`, 'd'.repeat(40)],
+    ]);
+
+    expect(
+      receiptIssues(
+        receipts,
+        objects,
+        new Set([missingPathObjectName, validObjectName]),
+        false
+      )
+    ).toEqual([
+      `missing.stories.tsx: missing commit ${missingSha}`,
+      `branch.stories.tsx: non-ancestral sourceSha ${nonAncestralSha}`,
+      'moved.stories.tsx: sourceSha cannot replay its story path',
+    ]);
+    expect(
+      receiptIssues(
+        receipts,
+        objects,
+        new Set([missingPathObjectName, validObjectName]),
+        true
+      )
+    ).toEqual([
+      `branch.stories.tsx: non-ancestral sourceSha ${nonAncestralSha}`,
+      'moved.stories.tsx: sourceSha cannot replay its story path',
+    ]);
+  });
+
+  it('keeps every literal receipt ancestral and able to replay its story path', () => {
+    const commandsBefore = gitCommandCount;
+    const shallow =
+      runGit(['rev-parse', '--is-shallow-repository']).trim() === 'true';
+
+    const receipts = storyReceipts();
+    const receiptShas = Array.from(
+      new Set(receipts.map(receipt => receipt.sourceSha))
+    );
+    const objects = batchObjects([
+      ...receiptShas.map(sourceSha => `${sourceSha}^{commit}`),
+      ...receipts.map(
+        ({ sourceSha, storyPath }) => `${sourceSha}:${storyPath}`
+      ),
+    ]);
+    const ancestorObjectNames = new Set(
+      runGit(['rev-list', 'HEAD']).trim().split('\n')
+    );
+    const issues = receiptIssues(
+      receipts,
+      objects,
+      ancestorObjectNames,
+      shallow
+    );
 
     expect(issues, issues.join('\n')).toEqual([]);
+    expect(receipts.length).toBeGreaterThan(0);
+    expect(gitCommandCount - commandsBefore).toBe(3);
   });
 });
