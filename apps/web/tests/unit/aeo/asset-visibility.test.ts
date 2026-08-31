@@ -718,3 +718,120 @@ describe('asset visibility', () => {
     ).toThrow('asset_visibility_competitor_invalid_position');
   });
 });
+
+import * as aeo from '@/lib/aeo/asset-visibility';
+
+const json = <T>(value: string): T => JSON.parse(value) as T;
+const base = (): aeo.AeoAssetObservation =>
+  json(
+    '{"runId":"r1","observedAt":"2026-08-31T12:00:00.000Z","asset":{"assetId":"m1","kind":"music","creatorScopeId":"c1","title":"Hit","canonicalUrl":"https://jov.ie/x","publicationState":"public"},"provenance":{"querySetId":"aeo-asset-visibility-queries","querySetVersion":"v1","engine":"perplexity","model":"sonar-pro","promptVersion":"p1","market":"US","locale":"en","creatorLifecycle":"releasing"},"queryText":"q","presence":{"status":"appeared","position":2,"context":"recommended_item"},"citedSource":{"status":"known","url":"https://jov.ie/x","platform":"jovie"},"competitors":{"status":"known","items":[{"name":"Rival","url":null,"platform":"spotify","position":1}]}}'
+  );
+const row = (patch = '{}'): aeo.AeoAssetObservation => ({
+  ...base(),
+  ...json<Partial<aeo.AeoAssetObservation>>(patch),
+});
+const rows = (value: string) => value.split('\n').filter(Boolean).map(row);
+const out = (current: string, previous = '') =>
+  aeo.aggregateAssetVisibility(rows(current), { previous: rows(previous) });
+const r = (current: string, previous = '') => out(current, previous).reports[0];
+
+it('covers the AEO asset visibility contract regressions', () => {
+  const scoped = out(
+    '{}\n{"runId":"c2-now","asset":{"assetId":"m1","kind":"music","creatorScopeId":"c2","title":"Hit","canonicalUrl":"https://jov.ie/x","publicationState":"public"},"presence":{"status":"absent"},"citedSource":{"status":"unknown"},"competitors":{"status":"unknown"}}',
+    '{"runId":"c1-prev","presence":{"status":"absent"}}\n{"runId":"c2-prev","asset":{"assetId":"m1","kind":"music","creatorScopeId":"c2","title":"Hit","canonicalUrl":"https://jov.ie/x","publicationState":"public"},"presence":{"status":"appeared","position":1,"context":"cited_source"}}'
+  ).reports;
+  const ranked = r(
+    '{"runId":"r1","competitors":{"status":"known","items":[{"name":"Rival","url":null,"platform":"spotify","position":1},{"name":"Other","url":null,"platform":"spotify","position":4}]}}\n{"runId":"r2","competitors":{"status":"known","items":[{"name":"Rival","url":null,"platform":"spotify","position":6},{"name":"Other","url":null,"platform":"spotify","position":3}]}}'
+  );
+  const duplicateActions = out(
+    '{"runId":"c1-absent","presence":{"status":"absent"}}\n{"runId":"c2-absent","asset":{"assetId":"m1","kind":"music","creatorScopeId":"c2","title":"Hit","canonicalUrl":"https://jov.ie/x","publicationState":"public"},"presence":{"status":"absent"}}'
+  ).reports.map(result => result.actions[0]?.id);
+  const splitEvidenceAction = r(
+    '{"runId":"absent-no-comps","presence":{"status":"absent"},"competitors":{"status":"unknown"}}\n{"runId":"unknown-with-comps","presence":{"status":"unknown"}}'
+  )?.actions.find(a => a.kind === 'prepare_asset_for_recommendation');
+  const thresholdCurrent = Array.from({ length: 219 }, (_, index) =>
+    index < 11
+      ? '{"runId":"threshold-current","presence":{"status":"appeared","position":1,"context":"cited_source"}}'
+      : '{"runId":"threshold-current","presence":{"status":"absent"}}'
+  ).join('\n');
+  const thresholdPrevious = Array.from(
+    { length: 219 },
+    () => '{"runId":"threshold-previous","presence":{"status":"absent"}}'
+  ).join('\n');
+  const thresholdReport = r(thresholdCurrent, thresholdPrevious);
+  const values = [
+    !aeo.parseAeoAssetObservation(
+      row(
+        '{"provenance":{"querySetId":"aeo-asset-visibility-queries","querySetVersion":"v1","engine":"bogus","model":"sonar-pro","promptVersion":"p1","market":"US","locale":"en","creatorLifecycle":"releasing"}}'
+      )
+    ),
+    !aeo.parseAeoAssetObservation(
+      row('{"presence":{"status":"unknown","fanId":"fan-99"}}')
+    ),
+    !aeo.parseAeoAssetObservation(
+      row(
+        '{"competitors":{"status":"known","items":[{"name":"Rival","email":"fan@example.com"}]}}'
+      )
+    ),
+    aeo.recordAssetObservation({
+      observation: row('{"presence":{"status":"unknown","fanId":"fan-99"}}'),
+      consent: null,
+    }).reason,
+    out(
+      '{"asset":{"assetId":"m1","kind":"music","creatorScopeId":"c1","title":"Hit","canonicalUrl":"https://jov.ie/x","publicationState":"private"}}'
+    ).rejected[0]?.reason,
+    aeo.aggregateAssetVisibility(rows('{}'), {
+      previous: rows(
+        '{"runId":"private-prev","asset":{"assetId":"m1","kind":"music","creatorScopeId":"c1","title":"Hit","canonicalUrl":"https://jov.ie/x","publicationState":"private"},"presence":{"status":"absent"}}'
+      ),
+    }).reports[0]?.trend.reason,
+    scoped.map(r => [r.creatorScopeId, r.trend.direction]),
+    duplicateActions,
+    r(
+      '{"runId":"best","presence":{"status":"appeared","position":1,"context":"cited_source"}}\n{"runId":"later","presence":{"status":"appeared","position":5,"context":"mentioned"}}'
+    )?.recommendation,
+    r(
+      '{}\n{"runId":"mixed","provenance":{"querySetId":"aeo-asset-visibility-queries","querySetVersion":"v2","engine":"perplexity","model":"sonar-pro","promptVersion":"p1","market":"GB","locale":"en","creatorLifecycle":"releasing"}}'
+    )?.trend.mismatchedFields,
+    [
+      ranked?.competitorComparison.outrankedBy,
+      ranked?.competitorComparison.outranks,
+    ],
+    r(
+      '{"runId":"seen"}\n{"runId":"unknown","presence":{"status":"unknown"},"citedSource":{"status":"unknown"},"competitors":{"status":"unknown"}}'
+    )?.visibility,
+    aeo.scoreObservationCompleteness(
+      row(
+        '{"presence":{"status":"unknown"},"citedSource":{"status":"unknown"},"competitors":{"status":"unknown"}}'
+      )
+    ),
+    r('{"presence":{"status":"unknown"}}')?.actions.length,
+    r(
+      '{"presence":{"status":"unknown"}}',
+      '{"runId":"prev","presence":{"status":"appeared","position":1,"context":"cited_source"}}'
+    )?.trend.reason,
+    r(
+      '{"runId":"absent","presence":{"status":"absent"}}\n{"runId":"unknown","presence":{"status":"unknown"},"competitors":{"status":"unknown"}}'
+    )?.actions.find(a => a.kind === 'prepare_asset_for_recommendation')
+      ?.sourceEvidence,
+    splitEvidenceAction?.kind ?? null,
+    r(
+      '{"runId":"ranked"}\n{"runId":"uninvolved","competitors":{"status":"unknown"}}'
+    )?.actions.find(a => a.kind === 'prepare_competitive_context')
+      ?.sourceEvidence,
+    r(
+      '{}',
+      '{"runId":"lex-wrong","observedAt":"2026-08-31T00:30:00Z","presence":{"status":"absent"}}\n{"runId":"actual-latest","observedAt":"2026-08-30T23:30:00-02:00","presence":{"status":"appeared","position":1,"context":"cited_source"}}'
+    )?.trend.direction,
+    r('{}', '{"runId":"prev-unknown","presence":{"status":"unknown"}}')?.trend
+      .reason,
+    r(
+      '{"citedSource":{"status":"known","url":"https://jov.ie/x","platform":null}}\n{"citedSource":{"status":"known","url":null,"platform":"youtube"}}'
+    )?.citedSource,
+    thresholdReport?.trend.direction,
+    thresholdReport ? thresholdReport.visibility.appearanceRate > 0.05 : false,
+  ];
+  expect(JSON.stringify(values)).toBe(
+    '[true,true,true,"asset_observation_contains_disallowed_identifier","private_asset_requires_explicit_consent","no_comparable_prior_run",[["c1","up"],["c2","down"]],["c1:m1:prepare_asset_for_recommendation","c2:m1:prepare_asset_for_recommendation"],{"bestPosition":1,"context":"cited_source"},["querySetVersion","market"],[["Rival"],["Other"]],{"appeared":true,"appearanceCount":1,"observationCount":2,"appearanceRate":1},0.2,0,"no_current_presence_measurement",[{"runId":"absent","field":"presence"},{"runId":"absent","field":"competitors"}],null,[{"runId":"ranked","field":"competitors"}],"steady","no_comparable_prior_run",{"url":"https://jov.ie/x","platform":null},"up",true]'
+  );
+});
