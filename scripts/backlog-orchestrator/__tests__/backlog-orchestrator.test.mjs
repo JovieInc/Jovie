@@ -1967,6 +1967,29 @@ print(json.dumps({"behind": behind, "clean": clean, "calls": calls}))
     assert.match(body, /admissionPreflight\(team, current\)/);
   });
 
+  it('rechecks refreshed research receipts before reading fingerprints', async () => {
+    const source = await readFile(
+      resolve(ORCHESTRATOR_DIR, 'backlog-orchestrator.mjs'),
+      'utf8'
+    );
+    const start = source.indexOf('async function evaluateGateCandidate');
+    const end = source.indexOf('async function runTeamGateNext', start);
+    const body = source.slice(start, end);
+    assert.ok(start >= 0 && end > start);
+    assert.match(
+      body,
+      /const researchReceipt = researchGate\.researchGateReceipt\(current\)/
+    );
+    assert.ok(
+      body.indexOf('if (!researchReceipt)') <
+        body.indexOf('fingerprint: researchReceipt.payload.fingerprint')
+    );
+    assert.doesNotMatch(
+      body,
+      /researchGate\.researchGateReceipt\(current\)\.payload/
+    );
+  });
+
   it('rejects synthetic workstream bundles and admits no member', async () => {
     const real = admissionIssue({ identifier: 'JOV-4513' });
     const result = await admitter.selectNextToAdmit(
