@@ -232,5 +232,7 @@ jobs:
       - name: Run check-in HUD and official burrito contracts
         run: |
           set -euo pipefail
+          node --test scripts/backlog-orchestrator/__tests__/symphony-official-route.test.mjs
           python3 scripts/hermes/tests/gem-checkin-hud.test.py
           python3 scripts/hermes/tests/symphony-burrito-workflow.test.py
+          python3 scripts/tests/test_openai_symphony_install.py

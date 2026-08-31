@@ -483,6 +483,9 @@ const GEM_PR_REHABILITATION_PYTHON_TESTS = [
 ];
 const GEM_CHECKIN_HUD_PRIMARY_INPUTS = new Set([
   'scripts/hermes/symphony/WORKFLOW.md',
+  'scripts/hermes/symphony/ROUTING_ROLLOUT.md',
+  'scripts/hermes/symphony-official-codex',
+  'scripts/hermes/symphony-official-route.mjs',
   'scripts/hermes/gem-checkin-hud.py',
   'scripts/hermes/gem-checkin-tty1.sh',
   'scripts/hermes/systemd/symphony-burrito.service',
@@ -491,6 +494,8 @@ const GEM_CHECKIN_HUD_PRIMARY_INPUTS = new Set([
   'scripts/hermes/update-symphony-burrito.sh',
   'scripts/hermes/tests/gem-checkin-hud.test.py',
   'scripts/hermes/tests/symphony-burrito-workflow.test.py',
+  'scripts/backlog-orchestrator/__tests__/symphony-official-route.test.mjs',
+  'scripts/tests/test_openai_symphony_install.py',
 ]);
 const GEM_CHECKIN_HUD_LANE = new Set([
   ...GEM_CHECKIN_HUD_PRIMARY_INPUTS,
@@ -500,6 +505,10 @@ const GEM_CHECKIN_HUD_LANE = new Set([
 const GEM_CHECKIN_HUD_PYTHON_TESTS = [
   'scripts/hermes/tests/gem-checkin-hud.test.py',
   'scripts/hermes/tests/symphony-burrito-workflow.test.py',
+  'scripts/tests/test_openai_symphony_install.py',
+];
+const GEM_CHECKIN_HUD_NODE_TESTS = [
+  'scripts/backlog-orchestrator/__tests__/symphony-official-route.test.mjs',
 ];
 const GEM_PR_REHABILITATION_PRIMARY_INPUTS = new Set([
   'scripts/hermes/config/gem-repo-registry.json',
@@ -933,7 +942,7 @@ export function buildAffectedTestPlan(
       pythonTests: [],
       pythonUnittestTests: GEM_CHECKIN_HUD_PYTHON_TESTS,
       scriptVitestTests: ['scripts/lib/__tests__/automation-verify.test.mjs'],
-      nodeTests: [],
+      nodeTests: GEM_CHECKIN_HUD_NODE_TESTS,
     };
   }
   const isBoundedGemPrRehabilitationChange =

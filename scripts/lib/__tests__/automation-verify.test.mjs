@@ -211,6 +211,9 @@ const AFFECTED_TEST_SELECTOR_MANIFEST = [
 ];
 const GEM_CHECKIN_HUD_LANE = [
   'scripts/hermes/symphony/WORKFLOW.md',
+  'scripts/hermes/symphony/ROUTING_ROLLOUT.md',
+  'scripts/hermes/symphony-official-codex',
+  'scripts/hermes/symphony-official-route.mjs',
   'scripts/hermes/gem-checkin-hud.py',
   'scripts/hermes/gem-checkin-tty1.sh',
   'scripts/hermes/systemd/symphony-burrito.service',
@@ -219,6 +222,8 @@ const GEM_CHECKIN_HUD_LANE = [
   'scripts/hermes/update-symphony-burrito.sh',
   'scripts/hermes/tests/gem-checkin-hud.test.py',
   'scripts/hermes/tests/symphony-burrito-workflow.test.py',
+  'scripts/backlog-orchestrator/__tests__/symphony-official-route.test.mjs',
+  'scripts/tests/test_openai_symphony_install.py',
   '.github/workflows/reusable-ci-lint.yml',
   ...AFFECTED_TEST_SELECTOR_MANIFEST,
 ];
@@ -812,8 +817,12 @@ describe('automation-verify affected scope', () => {
       pythonUnittestTests: [
         'scripts/hermes/tests/gem-checkin-hud.test.py',
         'scripts/hermes/tests/symphony-burrito-workflow.test.py',
+        'scripts/tests/test_openai_symphony_install.py',
       ],
       scriptVitestTests: ['scripts/lib/__tests__/automation-verify.test.mjs'],
+      nodeTests: [
+        'scripts/backlog-orchestrator/__tests__/symphony-official-route.test.mjs',
+      ],
     });
     expect(
       buildAffectedTestPlan([

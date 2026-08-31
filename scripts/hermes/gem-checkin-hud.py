@@ -19,6 +19,7 @@ from pathlib import Path
 from typing import Any
 
 BLUE, PINK, PURPLE = (75, 145, 255), (255, 72, 210), (168, 85, 247)
+GREEN, RED, AMBER = (67, 201, 108), (255, 82, 82), (245, 166, 35)
 DIM, FG = (138, 138, 148), (236, 236, 240)
 BG = (10, 10, 10)
 BARS = "▁▂▃▄▅▆▇█"
@@ -1318,9 +1319,9 @@ def _job_row(row: dict[str, Any], widths: dict[str, int], *, now: datetime) -> s
         ws = ident if ident != "-" else f"pos {dash(row.get('position'))}"
         return _cells(PURPLE, widths, "○", ident, dash(row.get("title")), "-", "-", "-", elapsed_label(row.get("enqueued"), now=now), ws)
     if kind == "retrying":
-        return _cells(PINK, widths, "↻", dash(row.get("id")), dash(row.get("error") or row.get("title")), dash(row.get("attempt")), dash(row.get("turn")), compact_tokens(row.get("tokens_total"), row.get("tokens_in"), row.get("tokens_out")), due_label(row.get("due_at"), now=now), short_path(row.get("workspace")))
+        return _cells(AMBER, widths, "…", dash(row.get("id")), dash(row.get("error") or row.get("title")), dash(row.get("attempt")), dash(row.get("turn")), compact_tokens(row.get("tokens_total"), row.get("tokens_in"), row.get("tokens_out")), due_label(row.get("due_at"), now=now), short_path(row.get("workspace")))
     if kind == "blocked":
-        return _cells(PINK, widths, "✕", dash(row.get("id")), dash(row.get("error") or row.get("title")), dash(row.get("attempt")), dash(row.get("turn")), compact_tokens(row.get("tokens_total"), row.get("tokens_in"), row.get("tokens_out")), elapsed_label(row.get("started"), now=now, seconds=row.get("seconds")), short_path(row.get("workspace")))
+        return _cells(RED, widths, "✕", dash(row.get("id")), dash(row.get("error") or row.get("title")), dash(row.get("attempt")), dash(row.get("turn")), compact_tokens(row.get("tokens_total"), row.get("tokens_in"), row.get("tokens_out")), elapsed_label(row.get("started"), now=now, seconds=row.get("seconds")), short_path(row.get("workspace")))
     return _cells(BLUE, widths, "●", dash(row.get("id")), dash(row.get("title") or row.get("last_message")), dash(row.get("attempt")), dash(row.get("turn")), compact_tokens(row.get("tokens_total"), row.get("tokens_in"), row.get("tokens_out")), elapsed_label(row.get("started"), now=now, seconds=row.get("seconds")), short_path(row.get("workspace") or row.get("url")))
 
 
@@ -1416,7 +1417,11 @@ def _pr_flow_lines(flow: dict[str, Any] | None, width: int, *, now: datetime) ->
 
 
 def _semantic_color(status: str) -> tuple[int, int, int]:
-    return BLUE if status in {"healthy", "success"} else PURPLE if status in {"warning", "pending"} else PINK if status == "failure" else DIM
+    return GREEN if status in {"healthy", "success"} else AMBER if status in {"warning", "pending"} else RED if status == "failure" else DIM
+
+
+def _semantic_marker(status: str) -> str:
+    return "✓" if status in {"healthy", "success"} else "…" if status in {"warning", "pending"} else "✕" if status == "failure" else "?"
 
 
 def _pct0(value: Any) -> str:
@@ -1453,14 +1458,14 @@ def _system_pressure_lines(pressure: dict[str, Any] | None, width: int, *, now: 
     spacer = " " * gap
     heading = _rgb(FG, SHIPPING_DISPLAY_IA["system_pressure"]["label"], bold=True) + _rgb(DIM, f"  ·  host projection  ·  Updated {freshness}")
     labels = spacer.join(pad_visible(_rgb(DIM, clip(label, cell_width), bold=True), cell_width) for (label, _, _, _), cell_width in zip(cells, widths))
-    values = spacer.join(pad_visible(_rgb(_semantic_color(status), clip(value, cell_width), bold=True), cell_width) for (_, value, _, status), cell_width in zip(cells, widths))
+    values = spacer.join(pad_visible(_rgb(_semantic_color(status), clip(f"{_semantic_marker(status)} {value}", cell_width), bold=True), cell_width) for (_, value, _, status), cell_width in zip(cells, widths))
     details = spacer.join(pad_visible(_rgb(DIM, clip(detail, cell_width)), cell_width) for (_, _, detail, _), cell_width in zip(cells, widths))
     return [pad_visible(heading, width), labels, values, details]
 
 
 def _matrix_status(status: Any, width: int) -> str:
     normalized = str(status or "unknown")
-    text = {"success": "✓ PASS", "pending": "… RUN", "failure": "× FAIL", "unknown": "? UNKNOWN"}.get(normalized, "? UNKNOWN")
+    text = {"success": "✓ PASS", "pending": "… WORK", "failure": "✕ FAIL", "unknown": "? UNKNOWN"}.get(normalized, "? UNKNOWN")
     return _rgb(_semantic_color(normalized), _cell(text, width), bold=normalized == "failure")
 
 
@@ -1477,6 +1482,7 @@ def _ci_matrix_lines(flow: dict[str, Any] | None, width: int, *, now: datetime) 
     heading = (
         _rgb(FG, SHIPPING_DISPLAY_IA["ci_matrix"]["label"], bold=True)
         + _rgb(DIM, f"  ·  cached GitHub rollup  ·  {len(rows)}/{dash(total)} rows  ·  {dash(query_ms)}ms  ·  Updated {freshness}")
+        + _rgb(DIM, "  ·  ✓ PASS  ✕ FAIL  … WORKING  ● ACTIVE AGENT  ? UNKNOWN")
     )
     status_width = 10
     gap = 2

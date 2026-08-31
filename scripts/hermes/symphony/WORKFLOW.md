@@ -27,11 +27,13 @@ hooks:
     git -C /tmp/openai-symphony sparse-checkout set .codex/skills
     mkdir -p .codex/skills
     cp -R /tmp/openai-symphony/.codex/skills/commit /tmp/openai-symphony/.codex/skills/push /tmp/openai-symphony/.codex/skills/pull /tmp/openai-symphony/.codex/skills/land /tmp/openai-symphony/.codex/skills/linear .codex/skills/
+  before_run: |
+    node "$HOME/.local/lib/jovie-symphony/symphony-official-route.mjs" prepare --workspace "$PWD" --issue "$(basename "$PWD")"
 agent:
   max_concurrent_agents: 3
   max_turns: 20
 codex:
-  command: codex app-server
+  command: "$HOME/.local/lib/jovie-symphony/symphony-official-codex"
   approval_policy: never
   thread_sandbox: workspace-write
   turn_sandbox_policy:

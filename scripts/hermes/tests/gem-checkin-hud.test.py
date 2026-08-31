@@ -343,10 +343,10 @@ class UltrawideHudTests(unittest.TestCase):
         }
         output = paint(width=430, height=90, pr_flow=matrix, system_pressure=pressure)
         plain = strip(output)
-        for token in ("SYSTEM PRESSURE", "CPU / LOAD", "131%", "MEMORY", "62% available", "DISK / I/O", "9% available", "NETWORK", "rate window pending", "WORKER SLOTS", "32/40", "CI MATRIX", "cached GitHub rollup", "8/103 rows", "412ms", "✓ PASS", "… RUN", "? UNKNOWN", "× FAIL"):
+        for token in ("SYSTEM PRESSURE", "CPU / LOAD", "✕ 131%", "MEMORY", "✓ 62% available", "DISK / I/O", "… 9% available", "NETWORK", "rate window pending", "WORKER SLOTS", "… 32/40", "CI MATRIX", "cached GitHub rollup", "8/103 rows", "412ms", "✓ PASS", "… WORK", "? UNKNOWN", "✕ FAIL", "● ACTIVE AGENT"):
             self.assertIn(token, plain)
         self.assertNotIn("#9 Work 9", plain)
-        self.assertIn("\033[38;2;255;72;210m131%", output)
+        self.assertIn("\033[38;2;255;82;82m✕ 131%", output)
 
     def test_github_flow_is_one_server_aggregate_and_absent_checks_are_unknown(self):
         payload = {

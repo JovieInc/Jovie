@@ -14,14 +14,26 @@ ROOT = Path(__file__).resolve().parents[2]
 
 class OpenAISymphonyInstallTests(unittest.TestCase):
     def test_official_workflow_and_burrito_installer(self) -> None:
-        workflow = (ROOT / "WORKFLOW.md").read_text()
-        self.assertIn('project_slug: "ba6736cbfbb9"', workflow)
+        self.assertFalse((ROOT / "WORKFLOW.md").exists())
+        workflow = (ROOT / "scripts/hermes/symphony/WORKFLOW.md").read_text()
+        self.assertIn(
+            'project_slug: "symphony-ui-pilot-96d6b9c5b2d5"', workflow
+        )
         self.assertIn("api_key: $LINEAR_API_KEY", workflow)
         self.assertIn(
-            "git clone --depth 1 git@github.com:JovieInc/Jovie.git .", workflow
+            "git clone --depth 1 https://github.com/JovieInc/Jovie.git .", workflow
         )
-        self.assertRegex(workflow, re.compile(r"^\s+command: codex .*app-server$", re.M))
+        self.assertRegex(
+            workflow,
+            re.compile(
+                r'^\s+command: "\$HOME/\.local/lib/jovie-symphony/symphony-official-codex"$',
+                re.M,
+            ),
+        )
+        self.assertIn("symphony-official-route.mjs", workflow)
+        self.assertIn('prepare --workspace "$PWD"', workflow)
         self.assertNotIn("symphony-codex-router", workflow)
+        self.assertNotIn("codex-rotate", workflow)
 
         installer = (ROOT / "scripts/install-openai-symphony.sh").read_text()
         self.assertIn('SYMPHONY_VERSION="v0.0.2"', installer)

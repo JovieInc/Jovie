@@ -29,7 +29,17 @@ class OfficialBurritoContractTests(unittest.TestCase):
         self.assertIn("root: ~/symphony-elixir-workspaces", WORKFLOW)
         self.assertIn("max_concurrent_agents: 3", WORKFLOW)
         self.assertIn("api_key: $LINEAR_API_KEY", WORKFLOW)
-        self.assertIn("codex app-server", WORKFLOW)
+        self.assertIn(
+            'command: "$HOME/.local/lib/jovie-symphony/symphony-official-codex"',
+            WORKFLOW,
+        )
+        self.assertIn("before_run:", WORKFLOW)
+        self.assertIn("symphony-official-route.mjs", WORKFLOW)
+        self.assertIn('prepare --workspace "$PWD"', WORKFLOW)
+        self.assertNotIn("symphony-codex-router", WORKFLOW)
+        self.assertNotIn("codex-rotate", WORKFLOW)
+        self.assertIn("install_routing", UPDATER)
+        self.assertIn(".local/lib/jovie-symphony", UPDATER)
         hook = WORKFLOW.split("after_create:", 1)[1].split("agent:", 1)[0]
         self.assertIn("git clone --depth 1 https://github.com/JovieInc/Jovie.git .", hook)
         self.assertTrue("git@" not in hook and "mix " not in hook)
@@ -72,6 +82,12 @@ class OfficialBurritoContractTests(unittest.TestCase):
             good = subprocess.run(["bash", str(updater), "--skip-binary", "--no-restart"], cwd=ROOT, env=env, capture_output=True, text=True)
             self.assertEqual(good.returncode, 0, good.stderr)
             self.assertIn(LIVE_SLUG, existing.read_text())
+            routing_lib = pathlib.Path(tmp) / "home/.local/lib/jovie-symphony"
+            self.assertTrue((routing_lib / "symphony-official-route.mjs").is_file())
+            self.assertTrue((routing_lib / "symphony-official-codex").is_file())
+            self.assertTrue(
+                (routing_lib / "symphony-official-codex").stat().st_mode & 0o111
+            )
 
 
 if __name__ == "__main__":

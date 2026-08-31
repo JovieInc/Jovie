@@ -1,0 +1,17 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+# Official OpenAI Symphony launches this inside the issue workspace. The route
+# is prepared by the official before_run hook while tracker auth is host-side.
+SCRIPT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" >/dev/null 2>&1 && pwd)"
+workspace="${SYMPHONY_WORKSPACE:-$PWD}"
+
+IFS=$'\t' read -r model reasoning_effort < <(
+  node "$SCRIPT_DIR/symphony-official-route.mjs" launch --workspace "$workspace"
+)
+
+exec "${SYMPHONY_CODEX_BIN:-codex}" \
+  --config shell_environment_policy.inherit=all \
+  --config "model=\"${model}\"" \
+  --config "model_reasoning_effort=${reasoning_effort}" \
+  app-server

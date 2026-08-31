@@ -15,6 +15,9 @@ UPDATE_UNIT_SRC="${REPO_ROOT}/scripts/hermes/systemd/symphony-burrito-update.ser
 UPDATE_UNIT_DST="${TARGET_HOME}/.config/systemd/user/symphony-burrito-update.service"
 WORKFLOW_SRC="${SYMPHONY_WORKFLOW_SRC:-${REPO_ROOT}/scripts/hermes/symphony/WORKFLOW.md}"
 WORKFLOW_DST="${TARGET_HOME}/.config/symphony/WORKFLOW.md"
+ROUTING_LIB_DST="${TARGET_HOME}/.local/lib/jovie-symphony"
+ROUTER_SRC="${REPO_ROOT}/scripts/hermes/symphony-official-route.mjs"
+LAUNCHER_SRC="${REPO_ROOT}/scripts/hermes/symphony-official-codex"
 LOG_DIR="${TARGET_HOME}/symphony-burrito-logs"
 RESTART=1
 DRY_RUN=0
@@ -95,8 +98,16 @@ PY
   fi
 }
 
+install_routing() {
+  mkdir -p "$ROUTING_LIB_DST"
+  install -m 0755 "$ROUTER_SRC" "$ROUTING_LIB_DST/symphony-official-route.mjs"
+  install -m 0755 "$LAUNCHER_SRC" "$ROUTING_LIB_DST/symphony-official-codex"
+  echo "INSTALLED $ROUTING_LIB_DST"
+}
+
 if [ "$SKIP_BINARY" -eq 1 ]; then
   echo "SKIP_BINARY"
+  install_routing
   maybe_copy_workflow
   echo "DONE"
   exit 0
@@ -139,6 +150,7 @@ install -m 0644 "$TIMER_SRC" "$TIMER_DST"
 install -m 0644 "$UPDATE_UNIT_SRC" "$UPDATE_UNIT_DST"
 echo "INSTALLED $BIN_DST"
 echo "INSTALLED $UNIT_DST"
+install_routing
 maybe_copy_workflow
 
 if [ "$RESTART" -eq 1 ]; then
