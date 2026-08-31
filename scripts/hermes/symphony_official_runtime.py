@@ -505,7 +505,15 @@ def write_rate_limit_gate(path: pathlib.Path, classification: dict[str, Any]) ->
     path.parent.mkdir(parents=True, exist_ok=True)
     descriptor, tmp_name = tempfile.mkstemp(prefix=f".{path.name}.", dir=path.parent)
     try:
-        with os.fdopen(descriptor, "w", encoding="utf-8") as handle:
+        try:
+            handle = os.fdopen(descriptor, "w", encoding="utf-8")
+        except Exception:
+            try:
+                os.close(descriptor)
+            except OSError:
+                pass
+            raise
+        with handle:
             json.dump(payload, handle, indent=2, sort_keys=True)
             handle.write("\n")
             handle.flush()

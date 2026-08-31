@@ -223,6 +223,43 @@ class OfficialSymphonyContractTests(unittest.TestCase):
             self.assertEqual(payload["schema"], helper.RATE_LIMIT_GATE_SCHEMA)
             self.assertEqual(payload["kind"], "rate_limited")
 
+    def test_rate_limit_gate_closes_descriptor_when_fdopen_fails(self):
+        helper = _load_helper()
+        classified = {
+            "kind": "rate_limited",
+            "status": 429,
+            "source": "linear_transport",
+            "retryAfterSeconds": 3600,
+            "resetAt": "2026-08-31T16:00:00Z",
+            "recordedAt": "2026-08-31T15:00:00Z",
+        }
+        original_fdopen = helper.os.fdopen
+        original_close = helper.os.close
+        attempted = []
+        closed = []
+
+        def fail_fdopen(fd, *args, **kwargs):
+            attempted.append(fd)
+            raise OSError(f"fdopen failed for {fd}")
+
+        def record_close(fd):
+            closed.append(fd)
+            return original_close(fd)
+
+        with tempfile.TemporaryDirectory() as tmp:
+            try:
+                helper.os.fdopen = fail_fdopen
+                helper.os.close = record_close
+                gate = pathlib.Path(tmp) / "linear-rate-limit.json"
+                with self.assertRaises(OSError):
+                    helper.write_rate_limit_gate(gate, classified)
+            finally:
+                helper.os.fdopen = original_fdopen
+                helper.os.close = original_close
+            self.assertFalse(gate.exists())
+            self.assertEqual(len(attempted), 1)
+            self.assertEqual(closed.count(attempted[0]), 1)
+
     def test_official_runtime_wrapper_records_gate_without_terminating_child(self):
         helper = _load_helper()
         self.assertNotIn("_terminate_child", HELPER_PATH.read_text(encoding="utf-8"))
