@@ -150,7 +150,7 @@ class UltrawideHudTests(unittest.TestCase):
         self.assertEqual(state["rows"][1]["attempt"], 2)
         self.assertEqual(state["rows"][1]["turn"], 4)
         plain = strip(paint(state, {"ok": True, "count": 1, "rows": [{"kind": "mq", "number": 16796, "title": "check-in HUD + burrito", "enqueued": STARTED, "position": 5}]}, 11, measured={"ships": {"receipts": [receipt()]}}))
-        for token in ("JOV-5491", "2/4", "3m", "JOV-5488", "in 5m", "1/3", "FAILURES", "QUEUE", "Symphony :4041 up", "hook_failed 1", "totals in 45678 out 23456", "receipted this week"):
+        for token in ("JOV-5491", "2/4", "3m", "JOV-5488", "in 5m", "1/3", "FAILURES", "QUEUE", "Symphony :4041 up", "hook_failed 1", "totals in 45.7K out 23.5K", "receipted this week"):
             self.assertIn(token, plain)
         self.assertNotIn("OpenAI", plain)
         running_line = next(line for line in plain.splitlines() if line.startswith("●") and "JOV-5491" in line)
@@ -189,7 +189,7 @@ class UltrawideHudTests(unittest.TestCase):
         tps = HUD.compute_throughput(state["totals"], [{"at": "2026-08-31T11:59:55Z", "total_tokens": 64134, "seconds_running": 937}], now=NOW)
         self.assertAlmostEqual(tps, 1000.0)
         plain = strip(paint(state, tps=tps, width=430))
-        for token in ("AGENTS", "1/3", "THROUGHPUT", "1,000 tps", "FAILURES", "TOKENS", "69.1k", "Runtime 15m 42s", "claude-sonnet-4.5", "4,950/5,000"):
+        for token in ("AGENTS", "1/3", "THROUGHPUT", "1K tps", "FAILURES", "TOKENS", "69.1K", "Runtime 15m 42s", "claude-sonnet-4.5", "4,950/5,000"):
             self.assertIn(token, plain)
         self.assertAlmostEqual(HUD.compute_throughput(state["totals"], [], now=NOW), 69134 / 942)
 
@@ -302,9 +302,79 @@ class UltrawideHudTests(unittest.TestCase):
         plain = strip(paint(state, width=200, height=40))
         header = next(line for line in plain.splitlines() if "TRY/TURN" in line)
         row = next(line for line in plain.splitlines() if "JOV-5491" in line)
-        self.assertEqual(header.index("TOKENS") + len("TOKENS"), row.index("12.3k") + len("12.3k"))
+        self.assertEqual(header.index("TOKENS") + len("TOKENS"), row.index("12.3K") + len("12.3K"))
         self.assertEqual(header.index("ELAPSED") + len("ELAPSED"), row.index("3m") + len("3m"))
         self.assertNotIn("OpenAI", plain)
+
+    def test_token_notation_boundaries_are_uppercase_and_promote_units(self):
+        cases = (
+            (999, "999"),
+            (1_000, "1K"),
+            (999_900, "999.9K"),
+            (1_000_000, "1M"),
+            (1_000_000_000, "1B"),
+        )
+        for value, expected in cases:
+            with self.subTest(value=value):
+                self.assertEqual(HUD.compact_tokens(value), expected)
+        self.assertEqual(HUD.compact_tokens(None, incoming=500, outgoing=500), "1K")
+
+    def test_token_notation_covers_rows_overview_and_footer(self):
+        state, _ = fetch_state(
+            official_state(
+                codex_totals={
+                    "input_tokens": 999_900,
+                    "output_tokens": 1_000_000,
+                    "total_tokens": 1_000_000_000,
+                    "seconds_running": 1000,
+                },
+                running=[
+                    {
+                        "issue_identifier": "JOV-9000",
+                        "title": "Normalize tokens",
+                        "started_at": STARTED,
+                        "tokens": {"total_tokens": 1_000_000, "input_tokens": 999, "output_tokens": 999_001},
+                    }
+                ],
+            )
+        )
+        plain = strip(paint(state, width=240, height=70, tps=1_000))
+        for token in ("1K tps", "1B", "999.9K in · 1M out", "JOV-9000", "1M", "totals in 999.9K out 1M"):
+            self.assertIn(token, plain)
+        self.assertIsNone(re.search(r"\b[0-9]+(?:,[0-9]{3})+\s+(?:in|out|tps)\b", plain))
+        for token in ("1k", "999.9k", "1m", "1b"):
+            self.assertNotIn(token, plain)
+
+    def test_queue_position_is_own_column_for_pr_and_missing_reference(self):
+        output = paint(
+            symphony={"ok": True, "running": 0, "retrying": 0, "blocked": 0, "cap": 3, "rows": [], "up": True, "totals": None, "rate_limits": None, "seconds_running": None},
+            mq={
+                "ok": True,
+                "count": 2,
+                "rows": [
+                    {"kind": "mq", "number": 16796, "title": "Has PR", "enqueued": STARTED, "position": 5},
+                    {"kind": "mq", "number": None, "title": "Missing PR", "enqueued": STARTED, "position": 6},
+                ],
+            },
+            width=220,
+            height=70,
+        )
+        plain = strip(output)
+        header = next(line for line in plain.splitlines() if "POS" in line and "WORKSPACE / PR" in line)
+        pr_line = next(line for line in plain.splitlines() if "#16796" in line)
+        missing_line = next(line for line in plain.splitlines() if "Missing PR" in line)
+        pos_col = header.index("POS")
+        id_col = header.index("ID")
+        title_col = header.index("TITLE")
+        workspace_col = header.index("WORKSPACE / PR")
+        self.assertEqual(pr_line[pos_col:id_col].strip(), "5")
+        self.assertEqual(pr_line[id_col:title_col].strip(), "#16796")
+        self.assertEqual(pr_line[workspace_col:].strip(), "-")
+        self.assertEqual(missing_line[pos_col:id_col].strip(), "6")
+        self.assertEqual(missing_line[id_col:title_col].strip(), "-")
+        self.assertEqual(missing_line[workspace_col:].strip(), "-")
+        self.assertNotIn("pos 6", plain)
+        self.assertNotIn("pos 5", plain)
 
     def test_pr_flow_uses_explicit_rolling_window_and_truthful_unknowns(self):
         known = strip(
@@ -364,6 +434,17 @@ class UltrawideHudTests(unittest.TestCase):
         self.assertEqual(HUD.aggregate_check_status([]), "unknown")
         self.assertEqual(HUD.aggregate_check_status([{"name": "Visual", "status": "completed", "conclusion": "failure"}]), "failure")
         self.assertEqual(HUD.aggregate_check_status([{"name": "Visual", "status": "in_progress"}]), "pending")
+
+    def test_gem_ship_hud_service_uses_repo_source_renderer(self):
+        template = (ROOT / "scripts/hermes/systemd/gem-ship-hud.service.template").read_text(encoding="utf-8")
+        installer = (ROOT / "scripts/hermes/install-gem-ship-hud.sh").read_text(encoding="utf-8")
+        self.assertIn("{{JOVIE_REPO}}/scripts/hermes/gem-checkin-tty1.sh", template)
+        self.assertIn("WorkingDirectory={{JOVIE_REPO}}", template)
+        self.assertNotIn(".local/bin/gem-ship-hud.py", template)
+        self.assertIn("gem-ship-hud-activation/v1", installer)
+        self.assertIn("GEM_SHIP_HUD_EXPECTED_REVISION", installer)
+        self.assertIn("sourceSha256", installer)
+        self.assertIn("systemdStartTimestamp", installer)
 
 
 if __name__ == "__main__":
