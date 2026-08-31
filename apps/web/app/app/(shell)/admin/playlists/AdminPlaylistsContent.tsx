@@ -49,7 +49,7 @@ export function AdminPlaylistsContent({
     <div className='space-y-3' data-testid='admin-playlists-content'>
       {playlists.map(playlist => (
         <ContentSurfaceCard key={playlist.id} className='overflow-hidden p-0'>
-          <div className='flex flex-col gap-3 px-(--linear-app-header-padding-x) py-3 sm:flex-row sm:items-start sm:justify-between'>
+          <div className='flex flex-col gap-3 px-(--app-shell-header-padding-x) py-3 sm:flex-row sm:items-start sm:justify-between'>
             <div className='min-w-0'>
               <h3 className='truncate text-app font-caption text-primary-token'>
                 {playlist.title}

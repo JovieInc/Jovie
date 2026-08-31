@@ -89,7 +89,7 @@ export function OutreachOverviewPanel({
           actionWidths={['w-16']}
           className='min-h-0 px-app-header py-3'
         />
-        <div className='grid gap-3 px-(--linear-app-content-padding-x) py-(--linear-app-content-padding-y) sm:grid-cols-2 xl:grid-cols-4'>
+        <div className='grid gap-3 px-(--app-shell-content-padding-x) py-(--app-shell-content-padding-y) sm:grid-cols-2 xl:grid-cols-4'>
           {['total', 'email', 'dm', 'review'].map(key => (
             <ContentMetricCardSkeleton key={key} />
           ))}

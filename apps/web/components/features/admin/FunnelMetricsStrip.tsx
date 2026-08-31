@@ -114,7 +114,7 @@ export function FunnelMetricsStrip({
           subtitle='Revenue, runway, and monetization health'
           className='min-h-0 px-app-header py-3'
         />
-        <div className='grid gap-3 px-(--linear-app-content-padding-x) py-(--linear-app-content-padding-y) sm:grid-cols-2 xl:grid-cols-3'>
+        <div className='grid gap-3 px-(--app-shell-content-padding-x) py-(--app-shell-content-padding-y) sm:grid-cols-2 xl:grid-cols-3'>
           <MetricCard
             title='MRR'
             value={mrrDisplay}
@@ -179,7 +179,7 @@ export function FunnelMetricsStrip({
           subtitle='First-week bio-link adoption and activation'
           className='min-h-0 px-app-header py-3'
         />
-        <div className='grid gap-3 px-(--linear-app-content-padding-x) py-(--linear-app-content-padding-y) sm:grid-cols-2 xl:grid-cols-5'>
+        <div className='grid gap-3 px-(--app-shell-content-padding-x) py-(--app-shell-content-padding-y) sm:grid-cols-2 xl:grid-cols-5'>
           <MetricCard
             title='Step Views'
             value={metrics.instagramShareStepViews7d.toLocaleString('en-US')}
@@ -227,7 +227,7 @@ export function FunnelMetricsStrip({
           subtitle='Benchmark gaps and operating signals'
           className='min-h-0 px-app-header py-3'
         />
-        <div className='grid gap-3 px-(--linear-app-content-padding-x) py-(--linear-app-content-padding-y) sm:grid-cols-2 xl:grid-cols-4'>
+        <div className='grid gap-3 px-(--app-shell-content-padding-x) py-(--app-shell-content-padding-y) sm:grid-cols-2 xl:grid-cols-4'>
           <PlaceholderMetricCard
             title='Churn rate'
             description='Customer churn in the trailing 30 days.'

@@ -142,7 +142,7 @@ export const DspPresenceTable = memo(function DspPresenceTable({
         return [
           'rounded-lg transition-[background-color,box-shadow] duration-subtle ease-subtle cursor-pointer',
           'bg-[color-mix(in_oklab,var(--linear-row-selected)_24%,var(--linear-bg-surface-0))]',
-          'shadow-[inset_2px_0_0_0_var(--linear-border-focus),inset_0_0_0_1px_color-mix(in_oklab,var(--linear-border-focus)_14%,var(--linear-app-frame-seam))]',
+          'shadow-[inset_2px_0_0_0_var(--linear-border-focus),inset_0_0_0_1px_color-mix(in_oklab,var(--linear-border-focus)_14%,var(--app-shell-frame-seam))]',
           'hover:bg-[color-mix(in_oklab,var(--linear-row-selected)_28%,var(--linear-bg-surface-0))]',
           'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/55 focus-visible:ring-offset-2 focus-visible:ring-offset-base',
         ].join(' ');
@@ -152,7 +152,7 @@ export const DspPresenceTable = memo(function DspPresenceTable({
         'rounded-lg transition-[background-color,box-shadow] duration-subtle ease-subtle cursor-pointer',
         'bg-transparent',
         'hover:bg-[color-mix(in_oklab,var(--linear-row-hover)_78%,transparent)]',
-        'hover:shadow-[inset_0_0_0_1px_color-mix(in_oklab,var(--linear-app-frame-seam)_72%,transparent)]',
+        'hover:shadow-[inset_0_0_0_1px_color-mix(in_oklab,var(--app-shell-frame-seam)_72%,transparent)]',
         '[&:hover_span]:text-primary-token',
         'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/55 focus-visible:ring-offset-2 focus-visible:ring-offset-base',
       ].join(' ');

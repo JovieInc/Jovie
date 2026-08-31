@@ -242,7 +242,7 @@ export function EmailQueuePanel() {
               aria-label='Toggle campaign emails'
             />
           }
-          className='min-h-0 px-(--linear-app-header-padding-x) py-3'
+          className='min-h-0 px-(--app-shell-header-padding-x) py-3'
           actionsClassName='shrink-0'
         />
       </ContentSurfaceCard>
@@ -278,12 +278,12 @@ export function EmailQueuePanel() {
               </span>
             </div>
           }
-          className='min-h-0 px-(--linear-app-header-padding-x) py-3'
+          className='min-h-0 px-(--app-shell-header-padding-x) py-3'
           actionsClassName='shrink-0'
         />
 
         {(queueMessage || queueError) && (
-          <div className='border-b border-subtle px-(--linear-app-content-padding-x) py-3 text-sm'>
+          <div className='border-b border-subtle px-(--app-shell-content-padding-x) py-3 text-sm'>
             <p
               className={cn(
                 'font-medium',
@@ -315,7 +315,7 @@ export function EmailQueuePanel() {
         />
 
         {totalPages > 1 && (
-          <div className='border-t border-subtle px-(--linear-app-content-padding-x) py-2'>
+          <div className='border-t border-subtle px-(--app-shell-content-padding-x) py-2'>
             <AdminTablePagination
               page={page}
               totalPages={totalPages}

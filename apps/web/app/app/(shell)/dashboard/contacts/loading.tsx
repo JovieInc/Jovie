@@ -152,7 +152,7 @@ export default function ContactsLoading() {
       </div>
 
       {/* Footer matching actual contacts footer */}
-      <div className='shrink-0 flex items-center justify-between border-t border-subtle bg-(--linear-app-content-surface) px-4 py-2'>
+      <div className='shrink-0 flex items-center justify-between border-t border-subtle bg-(--app-shell-content-surface) px-4 py-2'>
         <LoadingSkeleton
           announce={false}
           height='h-4'

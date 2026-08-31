@@ -4129,7 +4129,7 @@
   justify-content: center;
   margin-top: var(--space-0-5);
   border-radius: var(--radius-full);
-  background: var(--linear-app-content-surface);
+  background: var(--app-shell-content-surface);
   color: var(--system-b-chat-activity-color);
 }
 
@@ -4891,20 +4891,20 @@
   /* Sidebar tokens - RGB format for Tailwind opacity modifiers */
   /* Maps to --color-bg-base: #f5f5f5 = rgb(245,245,245) */
   --sidebar-background: 247 248 248;
-  /* Linear: --linear-app-sidebar-background-rgb */
+  /* Maps to --app-shell-sidebar-background-rgb */
   --sidebar-foreground: 12 12 12;
   --sidebar-primary: 12 12 12;
   --sidebar-primary-foreground: 255 255 255;
   --sidebar-accent: 242 243 245;
-  /* Linear: --linear-app-sidebar-accent-rgb */
+  /* Maps to --app-shell-sidebar-accent-rgb */
   --sidebar-accent-active: 236 238 241;
-  /* Linear: --linear-app-sidebar-accent-active-rgb */
+  /* Maps to --app-shell-sidebar-accent-active-rgb */
   --sidebar-accent-foreground: 18 18 20;
   --sidebar-border: 0 0 0 / 0.06;
-  /* Linear: --linear-app-sidebar-border-rgb */
+  /* Maps to --app-shell-sidebar-border-rgb */
   --sidebar-ring: 124 58 237;
   --sidebar-muted: 112 116 124;
-  /* Linear: --linear-app-sidebar-muted-rgb */
+  /* Maps to --app-shell-sidebar-muted-rgb */
   --sidebar-muted-foreground: 112 116 124;
   --sidebar-surface: 247 248 248;
   /* Matches sidebar background */
@@ -4913,16 +4913,16 @@
   --sidebar-input-background: 255 255 255;
   --sidebar-input-border: 0 0 0 / 0.06;
   --sidebar-item-foreground: 88 90 96;
-  /* Linear: --linear-app-sidebar-item-foreground-rgb */
+  /* Maps to --app-shell-sidebar-item-foreground-rgb */
   --sidebar-item-icon: 122 125 132;
-  /* Linear: --linear-app-sidebar-item-icon-rgb */
+  /* Maps to --app-shell-sidebar-item-icon-rgb */
   --sidebar-accent-active: 236 238 241;
-  /* Linear: --linear-app-sidebar-accent-active-rgb */
+  /* Maps to --app-shell-sidebar-accent-active-rgb */
 }
 
 :root.dark {
   /* Sidebar tokens — Noir Ion shell; active uses Ion selection tint */
-  --sidebar-background: var(--linear-app-sidebar-background-rgb);
+  --sidebar-background: var(--app-shell-sidebar-background-rgb);
   --sidebar-foreground: 245 247 251;
   --sidebar-primary: 245 247 251;
   --sidebar-primary-foreground: 2 3 7;
@@ -4933,7 +4933,7 @@
   --sidebar-ring: 17 175 255 / 0.72;
   --sidebar-muted: 125 135 157;
   --sidebar-muted-foreground: 125 135 157;
-  --sidebar-surface: var(--linear-app-sidebar-background-rgb);
+  --sidebar-surface: var(--app-shell-sidebar-background-rgb);
   --sidebar-surface-hover: 168 176 195 / 0.06;
   --sidebar-input-background: 15 20 32 / 1;
   --sidebar-input-border: 168 176 195 / 0.16;
@@ -6105,11 +6105,11 @@
     var(--system-b-release-provider-accent, var(--color-accent)) 15%,
     transparent
   );
-  border-radius: var(--linear-app-radius-item);
+  border-radius: var(--app-shell-radius-item);
   background: color-mix(
     in oklab,
     var(--system-b-release-provider-accent, var(--color-accent)) 4.5%,
-    var(--linear-app-content-surface)
+    var(--app-shell-content-surface)
   );
 }
 

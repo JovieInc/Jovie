@@ -194,7 +194,7 @@ export function InvestorSettingsForm() {
   return (
     <div className='space-y-4'>
       <ContentSurfaceCard className='overflow-hidden p-0'>
-        <div className='divide-y divide-subtle px-(--linear-app-content-padding-x)'>
+        <div className='divide-y divide-subtle px-(--app-shell-content-padding-x)'>
           <SettingRow
             label='Show Progress Bar'
             description='Display a fundraise progress bar in the investor portal sticky bar.'
@@ -262,7 +262,7 @@ export function InvestorSettingsForm() {
           title='Call-to-action URLs'
           subtitle='Configure the buttons that appear in the investor portal sticky bar.'
         />
-        <div className='space-y-4 px-(--linear-app-content-padding-x) py-(--linear-app-content-padding-y)'>
+        <div className='space-y-4 px-(--app-shell-content-padding-x) py-(--app-shell-content-padding-y)'>
           <DrawerFormField
             label='Book A Call URL'
             helperText='Link to your Calendly, Cal.com, or scheduling page.'
@@ -301,7 +301,7 @@ export function InvestorSettingsForm() {
           title='Automation'
           subtitle='Configure follow-up behavior and engagement scoring.'
         />
-        <div className='divide-y divide-subtle px-(--linear-app-content-padding-x)'>
+        <div className='divide-y divide-subtle px-(--app-shell-content-padding-x)'>
           <SettingRow
             label='Follow-up Emails'
             description="Automatically send follow-up emails to investors who view but don't respond."

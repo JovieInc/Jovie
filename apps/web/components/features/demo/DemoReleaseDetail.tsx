@@ -33,7 +33,7 @@ export function DemoReleaseDetail({
   return (
     <div className='flex h-full flex-col'>
       {/* Header */}
-      <div className='flex min-h-10 items-center justify-between border-b border-(--linear-app-frame-seam) px-4 py-2'>
+      <div className='flex min-h-10 items-center justify-between border-b border-(--app-shell-frame-seam) px-4 py-2'>
         <div className='min-w-0 flex-1 text-app font-medium tracking-tight text-secondary-token'>
           REL-{release.id.slice(0, 4).toUpperCase()}
         </div>
@@ -239,7 +239,7 @@ export function DemoReleaseDetail({
         )}
 
         {/* Actions */}
-        <div className='mt-8 grid grid-cols-2 gap-2 border-t border-(--linear-app-frame-seam) pt-3'>
+        <div className='mt-8 grid grid-cols-2 gap-2 border-t border-(--app-shell-frame-seam) pt-3'>
           <DrawerButton
             tone='secondary'
             className='justify-center bg-transparent text-tertiary-token'

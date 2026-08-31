@@ -1111,7 +1111,7 @@ test.describe('Public Profile Home Carousel @smoke @critical', () => {
 
         const surface = document.createElement('div');
         surface.className =
-          'rounded-2xl border border-(--linear-app-frame-seam) bg-surface-1 px-4 py-3 shadow-card';
+          'rounded-2xl border border-(--app-shell-frame-seam) bg-surface-1 px-4 py-3 shadow-card';
         const content = document.createElement('div');
         content.className = 'min-w-0';
         const copy = document.createElement('p');

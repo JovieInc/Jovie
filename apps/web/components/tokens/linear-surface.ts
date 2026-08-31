@@ -2,7 +2,7 @@
  * 3-tier surface elevation system (verified against Linear.app/demo 2026-04-05).
  *
  * Tier 0 — Page bg / sidebar: bg-base / bg-surface-0 (no chrome)
- * Tier 1 — Main content area: bg-(--linear-app-content-surface) (shell border + shadow)
+ * Tier 1 — Main content area: bg-(--app-shell-content-surface) (shell border + shadow)
  * Tier 2 — Elevated cards: bg-surface-1 + border-subtle + shadow-card (10px radius)
  * Tier 3 — Floating UI: bg-surface-1 + shadow-popover
  *
@@ -13,10 +13,10 @@
 export const LINEAR_SURFACE = {
   // Tier 1 — content containers inside <main>
   contentContainer:
-    'rounded-xl border border-(--linear-app-shell-border) bg-(--linear-app-content-surface) shadow-none',
+    'rounded-xl border border-(--app-shell-border) bg-(--app-shell-content-surface) shadow-none',
   stickyHeader:
-    'border-(--linear-app-frame-seam) bg-(--linear-app-content-surface)',
-  toolbar: 'border-(--linear-app-frame-seam) bg-(--linear-app-content-surface)',
+    'border-(--app-shell-frame-seam) bg-(--app-shell-content-surface)',
+  toolbar: 'border-(--app-shell-frame-seam) bg-(--app-shell-content-surface)',
 
   // Tier 2 — elevated cards (drawer cards, standalone cards in content)
   // Drawer/sidebar cards: border-only, no shadow (they sit inside an already-elevated drawer).

@@ -384,7 +384,7 @@ describe('LibrarySurface', () => {
 
     expect(source).toContain('LIBRARY_CONTENT_INSET_CLASS');
     expect(source).toContain(
-      'px-(--linear-app-header-padding-x) py-(--linear-app-content-padding-y)'
+      'px-(--app-shell-header-padding-x) py-(--app-shell-content-padding-y)'
     );
     expect(source).toContain('LIBRARY_GRID_DENSITY_LAYOUT');
     expect(source).toContain('useLibraryGridDensity');
@@ -1120,7 +1120,7 @@ describe('LibrarySurface', () => {
       'focus-visible:ring-2 focus-visible:ring-(--linear-border-focus)/55'
     );
     expect(assetCardButton.className).toContain(
-      'focus-visible:ring-offset-(--linear-app-content-surface)'
+      'focus-visible:ring-offset-(--app-shell-content-surface)'
     );
     expect(assetCardButton.className).not.toContain('focus-visible:shadow');
 
@@ -1146,7 +1146,7 @@ describe('LibrarySurface', () => {
         'focus-visible:ring-2 focus-visible:ring-(--linear-border-focus)/55'
       );
       expect(element.className).toContain(
-        'focus-visible:ring-offset-(--linear-app-content-surface)'
+        'focus-visible:ring-offset-(--app-shell-content-surface)'
       );
       expect(element.className).not.toContain('focus-visible:shadow');
     }

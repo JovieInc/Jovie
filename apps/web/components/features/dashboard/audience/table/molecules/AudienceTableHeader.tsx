@@ -93,7 +93,7 @@ export function AudienceTableHeader({
   return (
     <thead
       className={cn(
-        'sticky top-0 z-20 bg-(--linear-app-content-surface) shadow-inset-divider',
+        'sticky top-0 z-20 bg-(--app-shell-content-surface) shadow-inset-divider',
         headerElevated && 'shadow-inset-divider'
       )}
     >
