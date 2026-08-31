@@ -74,6 +74,19 @@ export interface ElectronAPI {
    * boot watchdog (JOV-3595). Optional — older binaries ignore the channel.
    */
   readonly notifyAppBooted?: () => void;
+  /**
+   * Launch a preflighted Ovie operator control (web origin or SSH TUI).
+   * Optional — older binaries ignore the channel.
+   */
+  readonly launchOperatorControl?: (request: {
+    readonly id: string;
+    readonly kind: 'web' | 'ssh';
+    readonly href?: string;
+    readonly sshHost?: string;
+  }) => Promise<{
+    readonly ok: boolean;
+    readonly reason?: string;
+  }>;
 }
 
 export interface DesktopAuthCompletion {
@@ -632,6 +645,27 @@ export function onDesktopTrayAction(cb: (action: string) => void): () => void {
   return typeof unsubscribe === 'function' ? unsubscribe : noopUnsubscribe;
 }
 
+export async function launchOperatorControl(request: {
+  readonly id: string;
+  readonly kind: 'web' | 'ssh';
+  readonly href?: string;
+  readonly sshHost?: string;
+}): Promise<{ readonly ok: boolean; readonly reason?: string }> {
+  const api = getRawElectronAPI();
+  if (api && typeof api.launchOperatorControl === 'function') {
+    return api.launchOperatorControl(request);
+  }
+  if (request.kind === 'web' && request.href) {
+    if (typeof window === 'undefined') {
+      return { ok: false, reason: 'window-unavailable' };
+    }
+    const opened = window.open(request.href, '_blank', 'noopener,noreferrer');
+    return opened ? { ok: true } : { ok: false, reason: 'popup-blocked' };
+  }
+  if (api) reportMissingBridgeMethod('launchOperatorControl');
+  return { ok: false, reason: 'ovie-desktop-required' };
+}
+
 // Exported for tests only — do not call directly from product code.
 export const __testing = {
   reset: () => {
@@ -648,6 +682,7 @@ export const __testing = {
   consumeDesktopAuthCompletion,
   setDesktopTrayState,
   onDesktopTrayAction,
+  launchOperatorControl,
   notifyDesktopAppBooted,
   RELEASE_DOWNLOAD_URL,
 };
