@@ -80,6 +80,7 @@ export const STALL_EVIDENCE_FAILURES = Object.freeze(
 );
 
 const QUEUE_KEYS = [
+  'repository',
   'issue',
   'issueKey',
   'pr',
@@ -101,15 +102,18 @@ const QUEUE_KEYS = [
 function createApi() {
   const digest = value => createHash('sha256').update(JSON.stringify(value)).digest('hex');
   const text = value => typeof value === 'string' && value.trim() ? value.trim() : null;
+  const repoName = value => { const n = text(value); return n && /^[^/\s]+\/[^/\s]+$/.test(n) ? n : null; };
+  const repositoryName = signal => repoName(signal.repository) || repoName(signal.repo) || repoName(signal.repositoryNameWithOwner) || repoName(signal.repository?.full_name);
   const sha = value => { const n = text(value)?.toLowerCase(); return n && /^[0-9a-f]{40}$/.test(n) ? n : null; };
   const prn = value => Number.isInteger(value) && value > 0 ? value : null;
   const iso = now => typeof now === 'string' ? now : new Date(now).toISOString();
   const workflowName = signal => text(signal.workflowName) || text(signal.workflow) || text(signal.workflow?.name);
-  const identifiedKey = signal => text(signal.issue) || (prn(signal.pr) ? `pr:${prn(signal.pr)}` : null);
-  const anonymousIdentity = signal => digest({ stallClass: text(signal.stallClass) || 'not-proven', workflow: workflowName(signal), issue: text(signal.issue), pr: prn(signal.pr), headSha: sha(signal.headSha) });
-  const issueKey = signal => text(signal.stallClass) === 'draft-stack-policy' ? text(signal.deliveryKey) : identifiedKey(signal) || text(signal.deliveryKey) || anonymousIdentity(signal);
-  const loopKeyFor = classified => digest({ issueKey: classified.issueKey });
-  const leaseKeyFor = classified => digest({ issueKey: classified.issueKey, writer: classified.writer, headSha: classified.headSha });
+  const identifiedKey = signal => { const repo = repositoryName(signal); return repo && (text(signal.issue) || prn(signal.pr)) ? `${repo}:${text(signal.issue) || `pr:${prn(signal.pr)}`}` : null; };
+  const anonymousIdentity = signal => { const repo = repositoryName(signal); return repo ? digest({ repository: repo, stallClass: text(signal.stallClass) || 'not-proven', workflow: workflowName(signal), issue: text(signal.issue), pr: prn(signal.pr), headSha: sha(signal.headSha) }) : null; };
+  const scopedDeliveryKey = signal => { const repo = repositoryName(signal); const key = text(signal.deliveryKey); return repo && key ? `${repo}:${key}` : null; };
+  const issueKey = signal => text(signal.stallClass) === 'draft-stack-policy' ? scopedDeliveryKey(signal) : identifiedKey(signal) || scopedDeliveryKey(signal) || anonymousIdentity(signal);
+  const loopKeyFor = classified => digest({ repository: classified.repository, issueKey: classified.issueKey });
+  const leaseKeyFor = classified => digest({ repository: classified.repository, issueKey: classified.issueKey, writer: classified.writer, headSha: classified.headSha });
   const backoffMs = attempt => Math.min(BACKOFF_MAX_MS, BACKOFF_BASE_MS * 2 ** (Math.max(1, Number.isInteger(attempt) ? attempt : 1) - 1));
   const nextProofAt = (observedAt, attempt) => new Date(Date.parse(observedAt) + backoffMs(attempt)).toISOString();
   function isProvenUnhealthy(signal) {
@@ -154,25 +158,26 @@ function createApi() {
     const headSha = sha(signal.head_sha ?? signal.headSha ?? signal.head);
     const issue = text(signal.issue_identifier) || text(signal.issue);
     const workflow = workflowName(signal);
-    const deliveryKey = text(signal.delivery_key) || text(signal.deliveryKey) || text(signal.event_id) || anonymousIdentity({ stallClass, workflowName: workflow, issue, pr, headSha });
-    return { schema: NO_UNATTENDED_RED_SCHEMA, stallClass, mode, owner: typed.owner, writer: typed.writer, action, issue, pr, headSha, workflow, deliveryKey, issueKey: issueKey({ issue, pr, deliveryKey, stallClass, headSha, workflowName: workflow }), proven, mechanical, observedAt: iso(now), mergeQueueIndependent: true, evidence: signal.evidence && typeof signal.evidence === 'object' ? signal.evidence : {} };
+    const repository = repositoryName(signal);
+    const deliveryKey = text(signal.delivery_key) || text(signal.deliveryKey) || text(signal.event_id) || anonymousIdentity({ repository, stallClass, workflowName: workflow, issue, pr, headSha });
+    return { schema: NO_UNATTENDED_RED_SCHEMA, repository, stallClass, mode, owner: typed.owner, writer: typed.writer, action, issue, pr, headSha, workflow, deliveryKey, issueKey: issueKey({ repository, issue, pr, deliveryKey, stallClass, headSha, workflowName: workflow }), proven, mechanical, observedAt: iso(now), mergeQueueIndependent: true, evidence: signal.evidence && typeof signal.evidence === 'object' ? signal.evidence : {} };
   }
   function assertNoUnattendedRed(records) {
     const silent = (records || []).filter(record => {
       if (record.outcome === 'healthy') return false;
-      if (record.outcome === 'escalated') return !record.reason || !record.escalation?.reason;
-      return record.outcome !== 'open' || !record.owner || !record.leaseKey || !record.nextProofAt || !record.action || !record.writer;
+      if (record.outcome === 'escalated') return !repoName(record.repository) || !record.reason || !record.escalation?.reason;
+      return record.outcome !== 'open' || !repoName(record.repository) || !record.issueKey || !record.owner || !record.leaseKey || !record.nextProofAt || !record.action || !record.writer;
     });
     if (silent.length > 0) throw new Error(`unattended red: ${silent.map(item => item.issueKey || item.loopKey).join(',')}`);
     return true;
   }
   function openLoopRecord(classified, { existing = null, now = classified.observedAt, attempt = 0 } = {}) {
-    if (existing?.schema === NO_UNATTENDED_RED_SCHEMA) {
+    if (existing?.schema === NO_UNATTENDED_RED_SCHEMA && existing.repository === classified.repository) {
       if (existing.outcome === 'healthy' || existing.outcome === 'escalated') return existing;
       return { ...existing, duplicate: true, observedAt: iso(now) };
     }
     const observedAt = iso(now);
-    const record = { schema: NO_UNATTENDED_RED_SCHEMA, loopKey: loopKeyFor(classified), leaseKey: leaseKeyFor(classified), stallClass: classified.stallClass, mode: classified.mode, owner: classified.owner, writer: classified.writer, action: classified.action, issue: classified.issue, issueKey: classified.issueKey, pr: classified.pr, headSha: classified.headSha, workflow: classified.workflow || null, deliveryKey: classified.deliveryKey, proven: classified.proven === true, mechanical: classified.mechanical === true, attempt, attemptBudget: ATTEMPT_BUDGET, authorityBudget: AUTHORITY_BUDGET, backoffMs: backoffMs(Math.max(1, attempt)), nextProofAt: nextProofAt(observedAt, Math.max(1, attempt)), outcome: 'open', dispatchState: 'classified', terminal: false, externalMutations: 0, observedAt, reason: `${classified.stallClass}:${classified.action}`, evidence: classified.evidence };
+    const record = { schema: NO_UNATTENDED_RED_SCHEMA, repository: classified.repository, loopKey: loopKeyFor(classified), leaseKey: leaseKeyFor(classified), stallClass: classified.stallClass, mode: classified.mode, owner: classified.owner, writer: classified.writer, action: classified.action, issue: classified.issue, issueKey: classified.issueKey, pr: classified.pr, headSha: classified.headSha, workflow: classified.workflow || null, deliveryKey: classified.deliveryKey, proven: classified.proven === true, mechanical: classified.mechanical === true, attempt, attemptBudget: ATTEMPT_BUDGET, authorityBudget: AUTHORITY_BUDGET, backoffMs: backoffMs(Math.max(1, attempt)), nextProofAt: nextProofAt(observedAt, Math.max(1, attempt)), outcome: 'open', dispatchState: 'classified', terminal: false, externalMutations: 0, observedAt, reason: `${classified.stallClass}:${classified.action}`, evidence: classified.evidence };
     assertNoUnattendedRed([record]);
     return record;
   }
@@ -189,7 +194,7 @@ function createApi() {
   }
   function markNotProven(record, reason, now) {
     const classified = classifyStall({ ...record, stallClass: 'not-proven', proven: false, failure: 'not-proven' }, { now });
-    return { ...record, stallClass: 'not-proven', mode: 'collect-evidence', owner: classified.owner, writer: classified.writer, action: classified.action, proven: false, dispatchState: 'classified', outcome: 'open', terminal: false, reason, observedAt: iso(now), nextProofAt: nextProofAt(iso(now), Math.max(1, record.attempt || 0)) };
+    return { ...record, repository: classified.repository, issueKey: classified.issueKey, stallClass: 'not-proven', mode: 'collect-evidence', owner: classified.owner, writer: classified.writer, action: classified.action, proven: false, dispatchState: 'classified', outcome: 'open', terminal: false, reason, observedAt: iso(now), nextProofAt: nextProofAt(iso(now), Math.max(1, record.attempt || 0)) };
   }
   function requalifyExactHead(record, liveHead, { now = new Date().toISOString() } = {}) {
     const live = sha(liveHead);
@@ -199,7 +204,7 @@ function createApi() {
   }
   function escalate(record, reason, now = new Date().toISOString()) {
     const exactReason = text(reason) || `escalated:${record.stallClass}`;
-    return { ...record, mode: 'authority-blocker', outcome: 'escalated', terminal: true, dispatchState: 'escalated', owner: 'human', writer: 'human', action: 'visible-actionable-escalation', reason: exactReason, authorityBudget: 0, observedAt: iso(now), escalation: { reason: exactReason, stallClass: record.stallClass, issue: record.issue, pr: record.pr, headSha: record.headSha, attempts: record.attempt } };
+    return { ...record, mode: 'authority-blocker', outcome: 'escalated', terminal: true, dispatchState: 'escalated', owner: 'human', writer: 'human', action: 'visible-actionable-escalation', reason: exactReason, authorityBudget: 0, observedAt: iso(now), escalation: { reason: exactReason, repository: record.repository, stallClass: record.stallClass, issue: record.issue, pr: record.pr, headSha: record.headSha, attempts: record.attempt } };
   }
   function advanceAttempt(record, result, { now = new Date().toISOString() } = {}) {
     if (record.outcome === 'healthy' || record.outcome === 'escalated') return record;
@@ -226,7 +231,7 @@ function createApi() {
   }
   function reconcileMissedEvents(persistedRecords, observedSignals, { now = new Date().toISOString() } = {}) {
     const persisted = new Set((persistedRecords || []).map(record => record.issueKey || record.loopKey));
-    const persistedAnonymous = new Set((persistedRecords || []).filter(record => !identifiedKey(record)).map(record => anonymousIdentity(record)));
+    const persistedAnonymous = new Set((persistedRecords || []).filter(record => !identifiedKey(record)).map(record => anonymousIdentity(record)).filter(Boolean));
     return (observedSignals || []).map(signal => classifyStall(signal, { now })).filter(classified => !persisted.has(classified.issueKey) && (identifiedKey(classified) || !persistedAnonymous.has(anonymousIdentity(classified)))).map(classified => openLoopRecord(classified, { now }));
   }
   function preferQueueRecord(left, right) {
@@ -251,8 +256,9 @@ function createApi() {
     const collapsed = new Map();
     const draftStacks = new Map();
     for (const record of source) {
+      if (!repoName(record.repository)) continue;
       if (record.stallClass === 'draft-stack-policy' && prn(record.pr)) {
-        const key = `draft-stack:${record.pr}`;
+        const key = `draft-stack:${record.repository}:${record.pr}`;
         draftStacks.set(
           key,
           draftStacks.has(key)
@@ -262,7 +268,7 @@ function createApi() {
         continue;
       }
       if (record.outcome === 'healthy') continue;
-      const key = identifiedKey(record) || anonymousIdentity(record);
+      const key = identifiedKey(record) || anonymousIdentity(record) || record.loopKey;
       collapsed.set(key, collapsed.has(key) ? preferQueueRecord(collapsed.get(key), record) : record);
     }
     for (const [key, record] of draftStacks) {
@@ -270,14 +276,14 @@ function createApi() {
     }
     const items = [...collapsed.values()].sort((left, right) => `${left.issueKey}:${left.observedAt}`.localeCompare(`${right.issueKey}:${right.observedAt}`)).map(record => ({ ...Object.fromEntries(QUEUE_KEYS.map(key => [key, record[key]])), issue: record.issue, stallClass: record.stallClass, outcome: record.outcome, escalation: record.escalation || null }));
     const terminalTombstones = [
-      ...source.filter(record => record.stallClass !== 'draft-stack-policy' && record.outcome === 'healthy'),
-      ...[...draftStacks.values()].filter(record => record.outcome === 'healthy'),
+      ...source.filter(record => record.stallClass !== 'draft-stack-policy' && record.outcome === 'healthy' && repoName(record.repository)),
+      ...[...draftStacks.values()].filter(record => record.outcome === 'healthy' && repoName(record.repository)),
     ].map(record => ({ ...Object.fromEntries(QUEUE_KEYS.map(key => [key, record[key]])), issue: record.issue, pr: record.pr, outcome: record.outcome, terminal: record.terminal, observedAt: record.observedAt, reason: record.reason }));
     return { schema: SUMMER_QUEUE_SCHEMA, authority: 'Summer', observedAt: iso(now), items, terminalTombstones, counts: { open: items.filter(item => item.outcome === 'open').length, healthy: 0, escalated: items.filter(item => item.outcome === 'escalated').length, terminalHidden: terminalTombstones.length } };
   }
   function evidenceTaskForRecord(record) {
     if (record.mode !== 'collect-evidence' || record.outcome !== 'open') return null;
-    return { schema: EVIDENCE_TASK_SCHEMA, taskKey: digest({ loopKey: record.loopKey, action: record.action }), createdAt: record.observedAt, loopKey: record.loopKey, owner: record.owner, action: record.action, issue: record.issue, pr: record.pr, headSha: record.headSha, stallClass: record.stallClass, safety: 'missing-evidence-is-not-a-repair-claim' };
+    return { schema: EVIDENCE_TASK_SCHEMA, repository: record.repository, taskKey: digest({ repository: record.repository, loopKey: record.loopKey, action: record.action }), createdAt: record.observedAt, loopKey: record.loopKey, owner: record.owner, action: record.action, issue: record.issue, pr: record.pr, headSha: record.headSha, stallClass: record.stallClass, safety: 'missing-evidence-is-not-a-repair-claim' };
   }
   async function atomicWrite(destination, value, flags) {
     await mkdir(dirname(destination), { recursive: true, mode: 0o700 });
@@ -361,7 +367,7 @@ function createApi() {
       let persisted = await atomicCreate(destination, record);
       if (reactivateDraftStack && persisted.status === 'duplicate') {
         const latest = (await loadLoopRecords(stateDir))
-          .filter(item => item.stallClass === 'draft-stack-policy' && item.pr === record.pr)
+          .filter(item => item.stallClass === 'draft-stack-policy' && item.pr === record.pr && item.repository === record.repository)
           .reduce((current, item) => current ? preferDraftStackRecord(current, item) : item, null);
         if (
           latest &&
@@ -388,7 +394,7 @@ function createApi() {
   }
   async function persistDraftStackResolutions(
     activeRoots,
-    { stateDir = '', dryRun = false, now = new Date().toISOString(), queueLockHeld = false, draftStackAuthority = null } = {}
+    { stateDir = '', dryRun = false, now = new Date().toISOString(), queueLockHeld = false, draftStackAuthority = null, repository = null } = {}
   ) {
     if (activeRoots == null) {
       return { status: 'unobserved', resolved: [], queue: null, queuePath: null };
@@ -406,27 +412,31 @@ function createApi() {
       const records = await loadLoopRecords(stateDir);
       const latest = new Map();
       const visibleLatest = new Map();
+      const scopedRepository = repoName(repository);
       for (const record of records) {
-        if (record.stallClass !== 'draft-stack-policy' || !prn(record.pr)) continue;
+        if (record.stallClass !== 'draft-stack-policy' || !prn(record.pr) || !repoName(record.repository)) continue;
+        if (scopedRepository && record.repository !== scopedRepository) continue;
         const root = prn(record.pr);
+        const key = `${record.repository}:${root}`;
         latest.set(
-          root,
-          latest.has(root)
-            ? preferDraftStackRecord(latest.get(root), record)
+          key,
+          latest.has(key)
+            ? preferDraftStackRecord(latest.get(key), record)
             : record
         );
         if (draftStackRecordVisibleForAuthority(record, draftStackAuthority)) {
           visibleLatest.set(
-            root,
-            visibleLatest.has(root)
-              ? preferDraftStackRecord(visibleLatest.get(root), record)
+            key,
+            visibleLatest.has(key)
+              ? preferDraftStackRecord(visibleLatest.get(key), record)
               : record
           );
         }
       }
       const resolved = [];
-      for (const [root, record] of latest) {
-        const visibleRecord = visibleLatest.get(root);
+      for (const [key, record] of latest) {
+        const root = prn(record.pr);
+        const visibleRecord = visibleLatest.get(key);
         const resolutionRecord = record.outcome === 'healthy' && !draftStackRecordVisibleForAuthority(record, draftStackAuthority)
           ? visibleRecord
           : record;

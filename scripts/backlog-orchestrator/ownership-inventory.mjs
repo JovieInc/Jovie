@@ -16,7 +16,6 @@ export const ADMISSION_TARGET_FIELDS = Object.freeze([
 export const JOVIE_EXECUTION_REPO = 'JovieInc/Jovie';
 export const LOGYOURBODY_EXECUTION_REPO = 'JovieInc/LogYourBody';
 const CONTROL_PLANE_PREFIXES = [
-  '.github/workflows/',
   'canon/',
   'scripts/backlog-orchestrator/',
   'scripts/hermes/',
@@ -97,6 +96,64 @@ function artifactMatches(prefix, path) {
   );
 }
 
+function basename(path) {
+  return (
+    String(path || '')
+      .split('/')
+      .filter(Boolean)
+      .at(-1) || ''
+  );
+}
+
+export function laneForArtifact(artifact) {
+  const normalized = String(artifact || '')
+    .trim()
+    .replace(/\/$/, '');
+  const workflow = basename(normalized).toLowerCase();
+  if (
+    normalized.startsWith('apps/ios/') ||
+    /^ios[-_.]/.test(workflow) ||
+    /\b(?:xcode|fastlane|testflight|app-store)\b/.test(workflow)
+  )
+    return 'ios';
+  if (
+    normalized.startsWith('apps/web/') ||
+    normalized.startsWith('apps/docs/') ||
+    /^web[-_.]/.test(workflow) ||
+    /^next[-_.]/.test(workflow)
+  )
+    return 'web';
+  if (
+    normalized.startsWith('scripts/backlog-orchestrator/') ||
+    normalized.startsWith('scripts/hermes/') ||
+    normalized.startsWith('scripts/lib/ci-') ||
+    normalized.startsWith('scripts/lib/merge-queue') ||
+    normalized.startsWith('scripts/lib/merge-group') ||
+    /^fleet[-_.]/.test(workflow) ||
+    /^merge-queue[-_.]/.test(workflow) ||
+    /^delivery-control[-_.]/.test(workflow)
+  )
+    return 'symphony-control-plane';
+  if (
+    normalized.startsWith('docs/') ||
+    normalized.startsWith('canon/') ||
+    normalized.endsWith('.md') ||
+    normalized.endsWith('.mdx') ||
+    normalized.endsWith('.txt')
+  )
+    return 'docs';
+  return null;
+}
+
+export function resourceForArtifact(artifact) {
+  const normalized = String(artifact || '')
+    .trim()
+    .replace(/\/$/, '');
+  if (!normalized.startsWith('.github/workflows/')) return null;
+  const name = basename(normalized).replace(/\.(?:ya?ml)$/i, '');
+  return name ? `github-actions:${name}` : null;
+}
+
 function longestMatch(paths, prefixes) {
   let winner = null;
   for (const path of paths) {
@@ -140,6 +197,10 @@ export function collisionDomainsForTarget(target) {
   const surface =
     segments.length > 1 ? segments.slice(0, 2).join('/') : artifact;
   const domains = [`artifact:${repo}:${surface}`];
+  const lane = laneForArtifact(artifact);
+  if (lane) domains.push(`lane:${repo}:${lane}`);
+  const resource = resourceForArtifact(artifact);
+  if (resource) domains.push(`resource:${repo}:${resource}`);
   if (
     CONTROL_PLANE_PREFIXES.some(prefix => artifactMatches(prefix, artifact))
   ) {

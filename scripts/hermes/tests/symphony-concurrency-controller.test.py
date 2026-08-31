@@ -38,6 +38,13 @@ def provider(accounts: int = 8, locked: int = 4, available: int = 4) -> dict:
 
 
 RUNTIME = {"running": 4, "retrying": 0, "codexTotals": {"seconds_running": 100}}
+SCOPE = {
+    "kind": "gem-host-provider-accounts-workflow",
+    "host": "gem",
+    "workflow": "/workflows/jovie.md",
+    "runtimeUrl": "http://127.0.0.1:4041/api/v1/state",
+    "leaseGuard": "/bin/symphony-lease-guard",
+}
 
 
 class PressureParsingTests(unittest.TestCase):
@@ -111,6 +118,64 @@ class HysteresisTests(unittest.TestCase):
             now_epoch=1000.0,
         )
         self.assertEqual(target, (1, 0, "integrity-blocked"))
+
+
+class ResourceScopeStateTests(unittest.TestCase):
+    def test_load_state_reuses_only_matching_exact_resource_scope(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            path = pathlib.Path(tmp) / "state.json"
+            path.write_text(
+                MODULE.json.dumps(
+                    {
+                        "schema": MODULE.STATE_SCHEMA,
+                        "resourceScope": SCOPE,
+                        "target": 6,
+                        "lowStreak": 2,
+                        "lastChangeEpoch": 100.0,
+                    }
+                )
+            )
+
+            state = MODULE.load_state(path, current_target=4, scope=SCOPE)
+
+        self.assertEqual(state["resourceScope"], SCOPE)
+        self.assertEqual(state["target"], 6)
+        self.assertEqual(state["lowStreak"], 2)
+
+    def test_load_state_discards_unscoped_or_mismatched_resource_state(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            path = pathlib.Path(tmp) / "state.json"
+            path.write_text(
+                MODULE.json.dumps(
+                    {
+                        "schema": MODULE.STATE_SCHEMA,
+                        "target": 6,
+                        "lowStreak": 2,
+                        "lastChangeEpoch": 100.0,
+                    }
+                )
+            )
+
+            legacy = MODULE.load_state(path, current_target=4, scope=SCOPE)
+            path.write_text(
+                MODULE.json.dumps(
+                    {
+                        "schema": MODULE.STATE_SCHEMA,
+                        "resourceScope": {**SCOPE, "workflow": "/other.md"},
+                        "target": 6,
+                        "lowStreak": 2,
+                        "lastChangeEpoch": 100.0,
+                    }
+                )
+            )
+            mismatched = MODULE.load_state(path, current_target=4, scope=SCOPE)
+
+        self.assertEqual(legacy["resourceScope"], SCOPE)
+        self.assertEqual(legacy["target"], 4)
+        self.assertEqual(legacy["lowStreak"], 0)
+        self.assertEqual(mismatched["resourceScope"], SCOPE)
+        self.assertEqual(mismatched["target"], 4)
+        self.assertEqual(mismatched["lowStreak"], 0)
 
 
 class WorkflowMutationTests(unittest.TestCase):
