@@ -142,6 +142,14 @@ function releaseStampContentViolations({
 }
 
 export function formatReleaseStampFailureDetails(result) {
+  if (
+    !isStampAllowedBranch(result.branch) ||
+    !result.desktopFiles?.includes(DESKTOP_PACKAGE_PATH) ||
+    result.prelandReleaseStateFiles?.length === 0
+  ) {
+    return [];
+  }
+
   const lines = [];
   if (result.releaseStampMissingFiles?.length > 0) {
     lines.push('Release-stamp missing files:');

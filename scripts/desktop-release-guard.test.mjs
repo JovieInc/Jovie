@@ -264,6 +264,7 @@ test('fails when desktop changes include a pre-land version artifact', () => {
 
   assert.equal(result.passed, false);
   assert.deepEqual(result.prelandReleaseStateFiles, ['VERSION']);
+  assert.deepEqual(formatReleaseStampFailureDetails(result), []);
 });
 
 test('passes explicit release deterministic fan-out with desktop package only', () => {
@@ -307,6 +308,7 @@ test('fails deterministic fan-out on a feature branch', () => {
     'CHANGELOG.md',
     'VERSION',
   ]);
+  assert.deepEqual(formatReleaseStampFailureDetails(result), []);
 });
 
 test('fails release fan-out bundled with desktop source changes', () => {
