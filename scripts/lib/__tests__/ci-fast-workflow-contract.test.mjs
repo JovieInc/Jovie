@@ -114,6 +114,21 @@ describe('ci-fast bounded parallel workflow', () => {
     expect(CI_FAST_SOURCE).toContain('files === null || files.length === 0');
   });
 
+  it('runs the official Symphony recovery ownership contract with changed-module coverage', () => {
+    expect(PACKAGE_JSON.scripts['invariants:check']).toContain(
+      'python3 scripts/hermes/tests/symphony-codex-auth-fallback.test.py OfficialServiceOwnershipContract'
+    );
+    expect(CI_FAST_SOURCE).toContain(
+      'COVERAGE_FILE="${RUNNER_TEMP:-/tmp}/jovie-symphony-recovery.coverage"'
+    );
+    expect(CI_FAST_SOURCE).toContain(
+      'python3 -m coverage run --branch scripts/hermes/tests/symphony-codex-auth-fallback.test.py OfficialServiceOwnershipContract'
+    );
+    expect(CI_FAST_SOURCE).toContain(
+      'python3 -m coverage report --include="*/scripts/hermes/symphony-codex-exhausted.py" --fail-under=9'
+    );
+  });
+
   it('maps the exact hosted selector set to dedicated parallel jobs', () => {
     const hostedSelectors = HOSTED_GROUP_JOBS.map(({ jobId, nextJobId }) => {
       const block = jobBlock(jobId, nextJobId);
