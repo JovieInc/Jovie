@@ -28,8 +28,8 @@ import {
   verifyEmailOtp,
 } from '@/lib/notifications/otp-service';
 import { sendNotification } from '@/lib/notifications/service';
-import { isPromoDownloadAvailable } from '@/lib/promo-downloads/rights-attestation';
 import { activeAttestedPromoDownloadsForRelease } from '@/lib/promo-downloads/query-filters';
+import { isPromoDownloadAvailable } from '@/lib/promo-downloads/rights-attestation';
 import { decodeCityHeader } from '../_geo';
 
 export const runtime = 'nodejs';
