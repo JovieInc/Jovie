@@ -17,6 +17,8 @@ const codes = (candidate, repoRoot = null) =>
 const expectCode = (candidate, code, repoRoot = null) => {
   assert.ok(codes(candidate, repoRoot).includes(code), code);
 };
+const expectEntryCode = (id, change, code, repoRoot = null) =>
+  expectCode(mutateEntry(id, change), code, repoRoot);
 const mutateEntry = (id, change) => ({
   ...map,
   entries: map.entries.map(entry =>
@@ -49,120 +51,121 @@ test('design-system authority map is a source-backed dependency ledger', () => {
 });
 
 test('RED: authority map rejects advisory-only enforced layers', () => {
-  expectCode(
-    mutateEntry('interaction.families', () => ({
+  expectEntryCode(
+    'interaction.families',
+    () => ({
       executableChecks: [],
-    })),
+    }),
     'missing-authority-check'
   );
-  expectCode(
-    mutateEntry('interaction.families', () => ({
+  expectEntryCode(
+    'interaction.families',
+    () => ({
       classificationReason: '',
-    })),
+    }),
     'missing-classification-reason'
   );
-  expectCode(
-    mutateEntry('interaction.families', () => ({
+  expectEntryCode(
+    'interaction.families',
+    () => ({
       canonicalSources: [],
       executableChecks: [],
       classificationReason: 'Regression fixture.',
       status: 'missing',
       statusFloor: 'missing',
-    })),
+    }),
     'invalid-authority-status-floor'
   );
-  expectCode(
-    mutateEntry('foundation.tokens', () => ({
+  expectEntryCode(
+    'foundation.tokens',
+    () => ({
       status: 'canonical-enforced',
-    })),
+    }),
     'invalid-authority-status-floor'
   );
-  expectCode(
-    mutateEntry('foundation.tokens', () => ({
+  expectEntryCode(
+    'foundation.tokens',
+    () => ({
       layer: 'legacy',
-    })),
+    }),
     'invalid-authority-layer'
   );
-});
-
-test('RED: authority map rejects empty capability ownership', () => {
-  expectCode(
-    mutateEntry('surface.marketing-routes', () => ({
-      owns: [],
-    })),
-    'missing-owned-capability'
-  );
-  expectCode(
-    mutateEntry('surface.marketing-routes', entry => ({
-      owns: [...entry.owns, entry.owns[0]],
-    })),
-    'duplicate-owned-capability'
-  );
-  expectCode(
-    mutateEntry('interaction.families', entry => ({
-      owns: [...entry.owns, 'button'],
-    })),
-    'duplicate-owned-capability'
-  );
-  expectCode(
-    mutateEntry('surface.marketing-routes', entry => ({
-      owns: [...entry.owns, `${entry.owns[0]} `],
-    })),
-    'missing-owned-capability'
-  );
-  expectCode(
-    mutateEntry('interaction.families', entry => ({
-      owns: [...entry.owns, 'button '],
-    })),
-    'duplicate-owned-capability'
-  );
-});
-
-test('RED: authority map rejects reverse dependency edges', () => {
-  expectCode(
-    mutateEntry('interaction.families', () => ({
-      dependsOn: ['surface.product-routes'],
-    })),
+  expectEntryCode(
+    'interaction.families',
+    () => ({ dependsOn: ['surface.product-routes'] }),
     'invalid-dependency-order'
   );
 });
 
+test('RED: authority map rejects empty capability ownership', () => {
+  expectEntryCode(
+    'surface.marketing-routes',
+    () => ({ owns: [] }),
+    'missing-owned-capability'
+  );
+  expectEntryCode(
+    'surface.marketing-routes',
+    entry => ({
+      owns: [...entry.owns, entry.owns[0]],
+    }),
+    'duplicate-owned-capability'
+  );
+  expectEntryCode(
+    'interaction.families',
+    entry => ({
+      owns: [...entry.owns, 'button'],
+    }),
+    'duplicate-owned-capability'
+  );
+  expectEntryCode(
+    'surface.marketing-routes',
+    entry => ({
+      owns: [...entry.owns, `${entry.owns[0]} `],
+    }),
+    'missing-owned-capability'
+  );
+  expectEntryCode(
+    'interaction.families',
+    entry => ({
+      owns: [...entry.owns, 'button '],
+    }),
+    'duplicate-owned-capability'
+  );
+});
+
 test('RED: authority map rejects unowned gaps and stale evidence paths', () => {
-  expectCode(
-    mutateEntry('surface.marketing-routes', () => ({
-      currentOwners: [],
-    })),
+  expectEntryCode(
+    'surface.marketing-routes',
+    () => ({ currentOwners: [] }),
     'missing-current-owner'
   );
   assert.ok(
     loadAndValidateDesignSystemAuthorityMap(process.cwd()).length === 0,
     `${AUTHORITY_MAP_PATH} paths should resolve on current main`
   );
-  expectCode(
-    mutateEntry('surface.marketing-routes', entry => ({
+  expectEntryCode(
+    'surface.marketing-routes',
+    entry => ({
       canonicalSources: [...entry.canonicalSources, 'missing/source.ts'],
-    })),
+    }),
     'invalid-repo-path',
     process.cwd()
   );
-  expectCode(
-    mutateEntry('surface.marketing-routes', () => ({
-      canonicalSources: ['apps/web'],
-    })),
+  expectEntryCode(
+    'surface.marketing-routes',
+    () => ({ canonicalSources: ['apps/web'] }),
     'invalid-repo-path',
     process.cwd()
   );
-  expectCode(
-    mutateEntry('interaction.families', () => ({
-      executableChecks: ['scripts'],
-    })),
+  expectEntryCode(
+    'interaction.families',
+    () => ({ executableChecks: ['scripts'] }),
     'invalid-repo-path',
     process.cwd()
   );
-  expectCode(
-    mutateEntry('interaction.families', () => ({
-      executableChecks: ['README.md'],
-    })),
+  expectEntryCode(
+    'interaction.families',
+    () => ({ executableChecks: ['README.md'] }),
     'invalid-authority-check-path',
     process.cwd()
   );

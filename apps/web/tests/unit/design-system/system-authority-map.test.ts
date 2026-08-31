@@ -24,6 +24,15 @@ const authorityCodes = (map: DesignSystemAuthorityMap) =>
   validateDesignSystemAuthorityMap({ map, repoRoot: root }).map(
     issue => issue.code
   );
+const expectAuthorityCode = (
+  id: string,
+  change: (
+    entry: DesignSystemAuthorityMap['entries'][number]
+  ) => Partial<DesignSystemAuthorityMap['entries'][number]>,
+  code: string
+) => {
+  expect(authorityCodes(authorityMapWith(id, change))).toContain(code);
+};
 
 describe('design-system authority map', () => {
   it('classifies root design-system layers in dependency order', () => {
@@ -62,123 +71,85 @@ describe('design-system authority map', () => {
   });
 
   it('RED: rejects advisory-only enforcement, status drift, and bad edges', () => {
-    expect(
-      authorityCodes(
-        authorityMapWith('interaction.families', () => ({
-          executableChecks: [],
-        }))
-      )
-    ).toContain('missing-authority-check');
-    expect(
-      authorityCodes(
-        authorityMapWith('interaction.families', () => ({
-          classificationReason: '',
-        }))
-      )
-    ).toContain('missing-classification-reason');
-    expect(
-      authorityCodes(
-        authorityMapWith('interaction.families', () => ({
-          canonicalSources: [],
-          executableChecks: [],
-          classificationReason: 'Regression fixture.',
-          status: 'missing',
-        }))
-      )
-    ).toContain('invalid-authority-status-floor');
-    expect(
-      authorityCodes(
-        authorityMapWith('foundation.tokens', () => ({
-          status: 'canonical-enforced',
-        }))
-      )
-    ).toContain('invalid-authority-status-floor');
-    expect(
-      authorityCodes(
-        authorityMapWith('foundation.tokens', () => ({
-          layer: 'legacy',
-        }))
-      )
-    ).toContain('invalid-authority-layer');
-    expect(
-      authorityCodes(
-        authorityMapWith('surface.marketing-routes', () => ({
-          owns: [],
-        }))
-      )
-    ).toContain('missing-owned-capability');
-    expect(
-      authorityCodes(
-        authorityMapWith('surface.marketing-routes', entry => ({
-          owns: [...entry.owns, entry.owns[0]],
-        }))
-      )
-    ).toContain('duplicate-owned-capability');
-    expect(
-      authorityCodes(
-        authorityMapWith('interaction.families', entry => ({
-          owns: [...entry.owns, 'button'],
-        }))
-      )
-    ).toContain('duplicate-owned-capability');
-    expect(
-      authorityCodes(
-        authorityMapWith('surface.marketing-routes', entry => ({
-          owns: [...entry.owns, `${entry.owns[0]} `],
-        }))
-      )
-    ).toContain('missing-owned-capability');
-    expect(
-      authorityCodes(
-        authorityMapWith('interaction.families', entry => ({
-          owns: [...entry.owns, 'button '],
-        }))
-      )
-    ).toContain('duplicate-owned-capability');
-    expect(
-      authorityCodes(
-        authorityMapWith('interaction.families', () => ({
-          dependsOn: ['surface.product-routes'],
-        }))
-      )
-    ).toContain('invalid-dependency-order');
+    expectAuthorityCode(
+      'interaction.families',
+      () => ({ executableChecks: [] }),
+      'missing-authority-check'
+    );
+    expectAuthorityCode(
+      'interaction.families',
+      () => ({ classificationReason: '' }),
+      'missing-classification-reason'
+    );
+    expectAuthorityCode(
+      'interaction.families',
+      () => ({
+        canonicalSources: [],
+        executableChecks: [],
+        classificationReason: 'Regression fixture.',
+        status: 'missing',
+      }),
+      'invalid-authority-status-floor'
+    );
+    expectAuthorityCode(
+      'surface.marketing-routes',
+      () => ({ owns: [] }),
+      'missing-owned-capability'
+    );
+    expectAuthorityCode(
+      'surface.marketing-routes',
+      entry => ({ owns: [...entry.owns, entry.owns[0]] }),
+      'duplicate-owned-capability'
+    );
+    expectAuthorityCode(
+      'interaction.families',
+      entry => ({ owns: [...entry.owns, 'button'] }),
+      'duplicate-owned-capability'
+    );
+    expectAuthorityCode(
+      'surface.marketing-routes',
+      entry => ({ owns: [...entry.owns, `${entry.owns[0]} `] }),
+      'missing-owned-capability'
+    );
+    expectAuthorityCode(
+      'interaction.families',
+      entry => ({ owns: [...entry.owns, 'button '] }),
+      'duplicate-owned-capability'
+    );
+    expectAuthorityCode(
+      'interaction.families',
+      () => ({ dependsOn: ['surface.product-routes'] }),
+      'invalid-dependency-order'
+    );
   });
 
   it('RED: rejects unowned gaps and stale or non-executable evidence', () => {
-    expect(
-      authorityCodes(
-        authorityMapWith('surface.marketing-routes', () => ({
-          currentOwners: [],
-        }))
-      )
-    ).toContain('missing-current-owner');
-    expect(
-      authorityCodes(
-        authorityMapWith('surface.marketing-routes', entry => ({
-          canonicalSources: [...entry.canonicalSources, 'missing/source.ts'],
-        }))
-      )
-    ).toContain('invalid-repo-path');
-    expect(
-      authorityCodes(
-        authorityMapWith('surface.marketing-routes', () => ({
-          canonicalSources: ['apps/web'],
-        }))
-      )
-    ).toContain('invalid-repo-path');
-    expect(
-      authorityCodes(
-        authorityMapWith('interaction.families', () => ({
-          executableChecks: ['scripts'],
-        }))
-      )
-    ).toContain('invalid-repo-path');
-    expect(
-      authorityCodes(
-        authorityMapWith('interaction.families', () => ({
-          executableChecks: ['README.md'],
-        }))
-      )
-    ).toContain('invalid-authority-check-path');
+    expectAuthorityCode(
+      'surface.marketing-routes',
+      () => ({ currentOwners: [] }),
+      'missing-current-owner'
+    );
+    expectAuthorityCode(
+      'surface.marketing-routes',
+      entry => ({
+        canonicalSources: [...entry.canonicalSources, 'missing/source.ts'],
+      }),
+      'invalid-repo-path'
+    );
+    expectAuthorityCode(
+      'surface.marketing-routes',
+      () => ({ canonicalSources: ['apps/web'] }),
+      'invalid-repo-path'
+    );
+    expectAuthorityCode(
+      'interaction.families',
+      () => ({ executableChecks: ['scripts'] }),
+      'invalid-repo-path'
+    );
+    expectAuthorityCode(
+      'interaction.families',
+      () => ({ executableChecks: ['README.md'] }),
+      'invalid-authority-check-path'
+    );
   });
 });

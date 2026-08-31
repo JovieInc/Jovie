@@ -74,15 +74,12 @@ permanent check:
     typography concepts (`pnpm component-ship-gate` + this audit). Missing or
     unknown benchmark dimensions fail closed. No Shadcn/Typeset implementation
     is imported.
-11. **Design-system authority map** — the machine-readable design-system
-    dependency ledger in `apps/web/data/designSystem/systemAuthorityMap.json`
-    must preserve the canonical layer order, current owners, exactly one owner
-    per capability, source evidence, immutable status floors, executable checks
-    for enforced layers, and shrink-only classification reasons for gaps.
-    Per-entry status floors live in the validators, outside the mutable ledger.
-    The audit delegates to `scripts/design-system-authority-map.mjs`. This is
-    local/weekly-only and is excluded from merge-gated design-conformance audit
-    tests.
+11. **Design-system authority map** —
+    `apps/web/data/designSystem/systemAuthorityMap.json` must preserve layer
+    order, owners, one owner per capability, source evidence, immutable status
+    floors, executable checks, and gap reasons. The audit delegates to
+    `scripts/design-system-authority-map.mjs` and remains local/weekly-only,
+    excluded from merge-gated design-conformance audit tests.
 
 Exit code is non-zero on any FAIL; WARN never blocks. Failures print the
 exact offending values so remediation is mechanical.
