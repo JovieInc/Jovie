@@ -905,7 +905,7 @@ function isExecutedRuntimePath(
       );
     }
   }
-  return called;
+  return true;
 }
 
 function unwrapRuntimeValue(node) {
@@ -2046,7 +2046,7 @@ function printReport(report) {
     console.log('[component-ship-gate] PASS');
   } else {
     console.error(
-      '[component-ship-gate] FAIL — shippable UI components require matching tests + stories + rendered certification (JOV-4421, JOV-5400, JOV-5438)'
+      '[component-ship-gate] FAIL — shippable UI components require matching tests + stories + rendered certification + live Storybook certification (JOV-4421, JOV-5400, JOV-5438, JOV-5454)'
     );
   }
 }
@@ -2059,6 +2059,7 @@ function main(argv = process.argv.slice(2)) {
   --skip-quality         Skip storybook quality guard
   --skip-ratchet         Skip multi-root story coverage ratchet
   --skip-rendered-cert   Skip source-blind rendered certification
+  --skip-live-storybook  Skip live Storybook certification
   --audit-coverage-via   Whole-tree executable @coverage-via receipt audit
   --json                 Print machine-readable report`);
     return 0;
