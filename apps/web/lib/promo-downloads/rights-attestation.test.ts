@@ -11,10 +11,7 @@ describe('promo download rights attestation', () => {
   });
 
   it.each([
-    [
-      'inactive',
-      { isActive: false, rightsControlAttested: true, isPro: true },
-    ],
+    ['inactive', { isActive: false, rightsControlAttested: true, isPro: true }],
     [
       'not attested',
       { isActive: true, rightsControlAttested: false, isPro: true },
