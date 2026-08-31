@@ -1,0 +1,19 @@
+[Unit]
+Description=Official OpenAI Symphony burrito
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+WorkingDirectory=%h
+Environment=HOME=%h
+Environment=PATH=%h/.local/bin:/usr/bin:/bin
+EnvironmentFile=-%h/.config/symphony/linear.env
+ExecStart=%h/.local/bin/symphony --port 4043 --logs-root %h/symphony-burrito-logs %h/.config/symphony/WORKFLOW.md
+Restart=always
+RestartSec=5
+StandardOutput=append:%h/symphony-burrito-logs/stdout.log
+StandardError=append:%h/symphony-burrito-logs/stdout.log
+
+[Install]
+WantedBy=default.target
