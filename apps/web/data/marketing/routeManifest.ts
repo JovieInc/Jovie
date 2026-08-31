@@ -814,6 +814,41 @@ export const MARKETING_ROUTE_MANIFEST: readonly RouteManifestEntry[] = [
       expected: 'page',
     },
   },
+  {
+    glob: '(marketing)/engineering/page.tsx',
+    renderedSections: [],
+    bindingEvidence: {
+      status: 'exempt',
+      source: 'sanctioned route manifest exemption',
+    },
+    exempt: {
+      reason: 'proof-led engineering index - not recipe-composable',
+      linearId: 'JOV-5475',
+      approvedBy: 'tw',
+      prUrl: 'https://github.com/JovieInc/Jovie/pull/TBD',
+    },
+    status: 'active',
+    specVersion: '1.0.0',
+    url: '/engineering',
+  },
+  {
+    glob: '(marketing)/engineering/preview/page.tsx',
+    renderedSections: [],
+    bindingEvidence: {
+      status: 'exempt',
+      source: 'sanctioned route manifest exemption',
+    },
+    exempt: {
+      reason: 'noindex founder preview gallery - drafts stay unpublished',
+      linearId: 'JOV-5475',
+      approvedBy: 'tw',
+      prUrl: 'https://github.com/JovieInc/Jovie/pull/TBD',
+    },
+    status: 'active',
+    specVersion: '1.0.0',
+    url: '/engineering/preview',
+    noindex: true,
+  },
 ] as const;
 
 // ─────────────────────────────────────────────────────────────────────────────

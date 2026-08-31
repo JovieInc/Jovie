@@ -181,6 +181,44 @@ describe('JOV-INV-018 screen-certification/v1', () => {
     ]);
   });
 
+  it('registers the engineering publication surface for changed-surface certification', () => {
+    const source = 'apps/web/app/(marketing)/engineering/';
+    const screen = SCREEN_REGISTRY.find(
+      entry => entry.id === 'web.engineering-publication'
+    );
+
+    assert.deepEqual(screen, {
+      id: 'web.engineering-publication',
+      platform: 'web',
+      owner: 'engineering-publication',
+      sources: [source],
+      viewports: ['desktop', 'mobile'],
+    });
+
+    const result = evaluateChangedScreens({
+      changedFiles: [
+        { path: 'apps/web/app/(marketing)/engineering/page.tsx', status: 'A' },
+        {
+          path: 'apps/web/app/(marketing)/engineering/[slug]/page.tsx',
+          status: 'A',
+        },
+        {
+          path: 'apps/web/app/(marketing)/engineering/preview/page.tsx',
+          status: 'A',
+        },
+        {
+          path: 'apps/web/app/(marketing)/engineering/preview/[slug]/page.tsx',
+          status: 'A',
+        },
+      ],
+      headSha: HEAD,
+    });
+    assert.deepEqual(result.issues, []);
+    assert.deepEqual(result.changedScreens, [
+      { id: 'web.engineering-publication', verdict: 'pass', findings: [] },
+    ]);
+  });
+
   it('retains scheduled whole-system sweeps', () => {
     assert.deepEqual(validateRetainedSweeps(), []);
     for (const workflow of RETAINED_SWEEP_WORKFLOWS) {
