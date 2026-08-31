@@ -217,6 +217,16 @@ test('desktop window fails into a branded Jovie recovery surface', async () => {
     mainSource,
     /localResult\.action === 'retry'[\s\S]*?win\.loadURL\(buildDesktopBootSplashUrl\(\)\)/
   );
+  const localDidFailLoadBlock = mainSource.match(
+    /if \(APP_ENV === 'local'\) \{\s*const retryUrl =[\s\S]*?\n      \}\n\n      console\.error/
+  );
+  assert.ok(localDidFailLoadBlock);
+  assert.equal(
+    localDidFailLoadBlock[0].match(
+      /win\.loadURL\(buildDesktopBootSplashUrl\(\)\)/g
+    )?.length,
+    1
+  );
   assert.match(mainSource, /host-resolver-rules/);
   assert.match(mainSource, /MAP localhost 127\.0\.0\.1/);
   assert.match(mainSource, /if \(!armWatchdogs\) return;/);

@@ -1798,7 +1798,6 @@ function attachRendererRecovery(
           void win.loadURL(buildDesktopBootSplashUrl());
           return;
         }
-        void win.loadURL(buildDesktopBootSplashUrl());
       }
 
       console.error('[Jovie Desktop] Shell load failure (graceful recovery)', {
