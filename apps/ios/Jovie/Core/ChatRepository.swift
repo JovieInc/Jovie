@@ -186,6 +186,67 @@ final class ChatRepository {
     }
   }
 
+  @discardableResult
+  func submitEyesFreeCapture(
+    transcript: String,
+    destination: EyesFreeCaptureDestination,
+    idempotencyKey: String
+  ) async -> String {
+    let trimmed = VoiceMemoActionDraft.make(fromTranscript: transcript)
+    guard VoiceMemoActionDraft.isReady(trimmed), !isSending else {
+      return EyesFreeCaptureGate.transcriptionEmpty.message
+    }
+
+    let clientMessageId = "\(idempotencyKey):msg"
+    timeline.removeAll { $0.clientTurnId == idempotencyKey }
+    timeline.append(
+      MobileChatTimelineItem(
+        id: "user:\(idempotencyKey)",
+        role: .user,
+        content: trimmed,
+        status: .completed,
+        clientTurnId: idempotencyKey,
+        requiresWebHandoff: false,
+        handoffURL: nil
+      )
+    )
+    timeline.append(
+      MobileChatTimelineItem(
+        id: "assistant:\(idempotencyKey)",
+        role: .assistant,
+        content: "",
+        status: .sending,
+        clientTurnId: idempotencyKey,
+        requiresWebHandoff: false,
+        handoffURL: nil
+      )
+    )
+
+    isSending = true
+    defer { isSending = false }
+
+    do {
+      let response = try await client.submitEyesFreeCapture(
+        EyesFreeCaptureAPIRequest(
+          destination: destination.rawValue,
+          transcript: trimmed,
+          clientTurnId: idempotencyKey,
+          clientMessageId: clientMessageId
+        )
+      )
+      let failed = ["failed", "forbidden", "unavailable"].contains(response.status)
+      applyEyesFreeResponse(response, clientTurnId: idempotencyKey, failed: failed)
+      isOffline = response.status == "failed"
+      if !failed { lastErrorMessage = nil }
+      await persistCache()
+      return response.readback
+    } catch {
+      applySendFailure(error, clientTurnId: idempotencyKey)
+      await persistCache()
+      return lastErrorMessage ?? EyesFreeCaptureGate.retryMessage
+    }
+  }
+
   func retry(clientTurnId: String) async {
     guard let userItem = timeline.first(where: {
       $0.clientTurnId == clientTurnId && $0.role == .user
@@ -225,6 +286,25 @@ final class ChatRepository {
       isOffline = true
     } else {
       lastErrorMessage = error.localizedDescription
+    }
+  }
+
+  private func applyEyesFreeResponse(
+    _ response: EyesFreeCaptureAPIResponse,
+    clientTurnId: String,
+    failed: Bool
+  ) {
+    if let conversationId = response.conversationId {
+      activeConversationID = conversationId
+    }
+    updateAssistant(clientTurnId: clientTurnId) { item in
+      var updated = item
+      updated.content = response.readback
+      updated.status = failed ? .failed : .completed
+      return updated
+    }
+    if failed {
+      lastErrorMessage = response.readback
     }
   }
 
