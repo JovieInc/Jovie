@@ -10,8 +10,11 @@ import {
 } from './design-system-authority-map.mjs';
 
 const map = readDesignSystemAuthorityMap();
-const codes = candidate =>
-  validateDesignSystemAuthorityMap(candidate).map(issue => issue.code);
+const codes = (candidate, repoRoot = null) =>
+  validateDesignSystemAuthorityMap(candidate, repoRoot).map(issue => issue.code);
+const expectCode = (candidate, code, repoRoot = null) => {
+  assert.ok(codes(candidate, repoRoot).includes(code), code);
+};
 const mutateEntry = (id, change) => ({
   ...map,
   entries: map.entries.map(entry =>
@@ -43,55 +46,48 @@ test('design-system authority map is a source-backed dependency ledger', () => {
 });
 
 test('RED: authority map rejects advisory-only enforced layers', () => {
-  assert.ok(
-    codes(
-      mutateEntry('interaction.families', () => ({
-        executableChecks: [],
-      }))
-    ).includes('missing-authority-check')
+  expectCode(
+    mutateEntry('interaction.families', () => ({
+      executableChecks: [],
+    })),
+    'missing-authority-check'
   );
 });
 
 test('RED: authority map rejects empty capability ownership', () => {
-  assert.ok(
-    codes(
-      mutateEntry('surface.marketing-routes', () => ({
-        owns: [],
-      }))
-    ).includes('missing-owned-capability')
+  expectCode(
+    mutateEntry('surface.marketing-routes', () => ({
+      owns: [],
+    })),
+    'missing-owned-capability'
   );
 });
 
 test('RED: authority map rejects reverse dependency edges', () => {
-  assert.ok(
-    codes(
-      mutateEntry('interaction.families', () => ({
-        dependsOn: ['surface.product-routes'],
-      }))
-    ).includes('invalid-dependency-order')
+  expectCode(
+    mutateEntry('interaction.families', () => ({
+      dependsOn: ['surface.product-routes'],
+    })),
+    'invalid-dependency-order'
   );
 });
 
 test('RED: authority map rejects unowned gaps and stale evidence paths', () => {
-  assert.ok(
-    codes(
-      mutateEntry('surface.marketing-routes', () => ({
-        currentOwners: [],
-      }))
-    ).includes('missing-current-owner')
+  expectCode(
+    mutateEntry('surface.marketing-routes', () => ({
+      currentOwners: [],
+    })),
+    'missing-current-owner'
   );
   assert.ok(
     loadAndValidateDesignSystemAuthorityMap(process.cwd()).length === 0,
     `${AUTHORITY_MAP_PATH} paths should resolve on current main`
   );
-  assert.ok(
-    validateDesignSystemAuthorityMap(
-      mutateEntry('surface.marketing-routes', entry => ({
-        canonicalSources: [...entry.canonicalSources, 'missing/source.ts'],
-      })),
-      process.cwd()
-    )
-      .map(issue => issue.code)
-      .includes('invalid-repo-path')
+  expectCode(
+    mutateEntry('surface.marketing-routes', entry => ({
+      canonicalSources: [...entry.canonicalSources, 'missing/source.ts'],
+    })),
+    'invalid-repo-path',
+    process.cwd()
   );
 });

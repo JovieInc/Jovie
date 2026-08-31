@@ -69,6 +69,8 @@ const authorityCodes = (map: DesignSystemAuthorityMap) =>
   validateDesignSystemAuthorityMap({ map, repoRoot: root }).map(
     issue => issue.code
   );
+const authorityIssues = (map: DesignSystemAuthorityMap) =>
+  validateDesignSystemAuthorityMap({ map, repoRoot: root });
 
 describe('design-system authority map', () => {
   it('classifies root design-system layers in dependency order', () => {
@@ -128,15 +130,20 @@ describe('design-system authority map', () => {
         }))
       )
     ).toContain('invalid-dependency-order');
+    const unorderedMarketingMap: DesignSystemAuthorityMap = {
+      ...DESIGN_SYSTEM_AUTHORITY_MAP,
+      entries: DESIGN_SYSTEM_AUTHORITY_MAP.entries.map(entry =>
+        entry.id === 'surface.marketing-routes'
+          ? { ...entry, id: 'surface.marketing-routes-unordered' }
+          : entry
+      ),
+    };
     expect(
-      authorityCodes({
-        ...DESIGN_SYSTEM_AUTHORITY_MAP,
-        entries: DESIGN_SYSTEM_AUTHORITY_MAP.entries.map(entry =>
-          entry.id === 'surface.marketing-routes'
-            ? { ...entry, id: 'surface.marketing-routes-unordered' }
-            : entry
-        ),
-      }).filter(code => code === 'missing-authority-entry')
+      authorityIssues(unorderedMarketingMap).filter(
+        issue =>
+          issue.code === 'missing-authority-entry' &&
+          issue.id === 'surface.marketing-routes-unordered'
+      )
     ).toHaveLength(1);
     expect(
       authorityCodes(
