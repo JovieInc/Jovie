@@ -1,7 +1,9 @@
 import {
   EMPTY_CORRELATION,
   type IdentityFields,
+  isExactSha,
   type LastSuccess,
+  MAX_ACCEPTED_SOURCE_SEQUENCE_GAP,
   type ObservationState,
   type SanitizedError,
   SHIPPING_SOURCE_PRODUCERS,
@@ -16,10 +18,14 @@ import {
 } from './contract';
 
 const SECRET_RE =
-  /\b(ghp_[A-Za-z0-9_]{20,}|github_pat_[A-Za-z0-9_]{20,}|sk_(?:live|test)_[A-Za-z0-9]+|Bearer\s+[A-Za-z0-9._\-]+|xox[baprs]-[A-Za-z0-9-]+)\b/gi;
+  /\b(gh[pousr]_[A-Za-z0-9_]{20,}|github_pat_[A-Za-z0-9_]{20,}|sk_(?:live|test)_[A-Za-z0-9]+|Bearer\s+[A-Za-z0-9._\-]+|xox[baprs]-[A-Za-z0-9-]+)\b/gi;
+const SECRET_SHAPED_RE =
+  /(?:gh[pousr]_[A-Za-z0-9_]{20,}|github_pat_[A-Za-z0-9_]{20,}|sk_(?:live|test)_[A-Za-z0-9]+|xox[baprs]-[A-Za-z0-9-]+)/i;
 const PATH_RE =
-  /(?:\/(?:home|Users|root|var\/log|etc)\/[^\s"'`]+|~\/[^\s"'`]+|(?:[A-Za-z]:)?\\Users\\[^\s"'`]+)/g;
+  /(?:\/(?:home|Users|root|private|tmp|opt|usr|Library|var\/log|etc)\/[^\s"'`]+|~\/[^\s"'`]+|(?:[A-Za-z]:)?\\Users\\[^\s"'`]+)/g;
 const PROMPT_RE = /\b(?:system prompt|conversation|chat log)\b/gi;
+const SAFE_IDENTIFIER_RE = /^[A-Za-z0-9][A-Za-z0-9._:@+=-]*$/;
+const MAX_IDENTIFIER_LENGTH = 128;
 
 export function systemClock(): ShippingClock {
   return {
@@ -49,12 +55,57 @@ export function sanitizeErrorMessage(value: unknown): string {
   );
 }
 
+export function sanitizeOpaqueIdentifier(
+  value: unknown,
+  maxLength = MAX_IDENTIFIER_LENGTH
+): string | null {
+  if (
+    typeof value !== 'string' ||
+    value.length === 0 ||
+    value.length > maxLength ||
+    !SAFE_IDENTIFIER_RE.test(value) ||
+    SECRET_SHAPED_RE.test(value)
+  ) {
+    return null;
+  }
+  return value;
+}
+
+function sourceSchema(
+  sourceId: ShippingSourceId,
+  candidate: string | undefined
+): string {
+  const expected = SHIPPING_SOURCE_SCHEMAS[sourceId];
+  if (candidate === expected) return candidate;
+  if (
+    sourceId === 'symphony-runtime' &&
+    candidate === 'symphony-runtime-state/v1'
+  ) {
+    return candidate;
+  }
+  if (
+    sourceId === 'production-controller' &&
+    candidate === 'github-actions-run/v1'
+  ) {
+    return candidate;
+  }
+  return expected;
+}
+
+function safeSequence(value: number, fallback = 1): number {
+  return Number.isSafeInteger(value) && value >= 0 ? value : fallback;
+}
+
 export function sanitizedError(
   at: string,
   code: string,
   value: unknown
 ): SanitizedError {
-  return { at, code, message: sanitizeErrorMessage(value) };
+  return {
+    at: parseTimestamp(at) ?? new Date(0).toISOString(),
+    code: sanitizeOpaqueIdentifier(code, 64) ?? 'source-error',
+    message: sanitizeErrorMessage(value),
+  };
 }
 
 export function cursorFor(sequence: number): string {
@@ -66,7 +117,7 @@ export function eventIdFor(
   sequence: number,
   revision: string | null
 ): string {
-  return `${sourceId}:${sequence}:${revision ?? 'none'}`;
+  return `${sourceId}:${safeSequence(sequence)}:${sanitizeOpaqueIdentifier(revision) ?? 'none'}`;
 }
 
 export function projectionIdFor(sequence: number, revision: string): string {
@@ -84,14 +135,34 @@ export function mergeCorrelation(
   base: ShippingCorrelation,
   extra: Partial<ShippingCorrelation>
 ): ShippingCorrelation {
+  const prNumber =
+    Number.isSafeInteger(extra.prNumber) && Number(extra.prNumber) > 0
+      ? Number(extra.prNumber)
+      : Number.isSafeInteger(base.prNumber) && Number(base.prNumber) > 0
+        ? Number(base.prNumber)
+        : null;
   return {
-    workId: extra.workId ?? base.workId,
-    leaseId: extra.leaseId ?? base.leaseId,
-    prNumber: extra.prNumber ?? base.prNumber,
-    ciRunId: extra.ciRunId ?? base.ciRunId,
-    deploymentId: extra.deploymentId ?? base.deploymentId,
-    buildId: extra.buildId ?? base.buildId,
-    sha: extra.sha ?? base.sha,
+    workId:
+      sanitizeOpaqueIdentifier(extra.workId) ??
+      sanitizeOpaqueIdentifier(base.workId),
+    leaseId:
+      sanitizeOpaqueIdentifier(extra.leaseId) ??
+      sanitizeOpaqueIdentifier(base.leaseId),
+    prNumber,
+    ciRunId:
+      sanitizeOpaqueIdentifier(extra.ciRunId) ??
+      sanitizeOpaqueIdentifier(base.ciRunId),
+    deploymentId:
+      sanitizeOpaqueIdentifier(extra.deploymentId) ??
+      sanitizeOpaqueIdentifier(base.deploymentId),
+    buildId:
+      sanitizeOpaqueIdentifier(extra.buildId) ??
+      sanitizeOpaqueIdentifier(base.buildId),
+    sha: isExactSha(extra.sha)
+      ? extra.sha
+      : isExactSha(base.sha)
+        ? base.sha
+        : null,
   };
 }
 
@@ -109,24 +180,47 @@ export function identityFields(input: {
   readonly producerId?: string;
   readonly schema?: string;
 }): IdentityFields {
-  const sourceRevision = input.sourceRevision ?? null;
+  const sequence = safeSequence(input.sequence);
+  const sourceRevision = sanitizeOpaqueIdentifier(input.sourceRevision);
+  const sourceTimestamp = parseTimestamp(input.sourceTimestamp);
+  const entityId =
+    sanitizeOpaqueIdentifier(input.entityId) ?? `${input.sourceId}:unknown`;
+  const producerId =
+    sanitizeOpaqueIdentifier(input.producerId) ??
+    SHIPPING_SOURCE_PRODUCERS[input.sourceId];
+  const lastSuccess = input.lastSuccess
+    ? {
+        at: parseTimestamp(input.lastSuccess.at) ?? input.observationTimestamp,
+        sequence: safeSequence(input.lastSuccess.sequence, sequence),
+        eventId:
+          sanitizeOpaqueIdentifier(input.lastSuccess.eventId) ??
+          eventIdFor(input.sourceId, sequence, sourceRevision),
+      }
+    : null;
+  const lastError = input.lastError
+    ? sanitizedError(
+        input.lastError.at,
+        input.lastError.code,
+        input.lastError.message
+      )
+    : null;
   return {
-    producerId: input.producerId ?? SHIPPING_SOURCE_PRODUCERS[input.sourceId],
+    producerId,
     producerVersion: SHIPPING_STATE_PRODUCER_VERSION,
     sourceId: input.sourceId,
-    entityId: input.entityId,
-    schema: input.schema ?? SHIPPING_SOURCE_SCHEMAS[input.sourceId],
-    eventId: eventIdFor(input.sourceId, input.sequence, sourceRevision),
-    sequence: input.sequence,
-    cursor: cursorFor(input.sequence),
+    entityId,
+    schema: sourceSchema(input.sourceId, input.schema),
+    eventId: eventIdFor(input.sourceId, sequence, sourceRevision),
+    sequence,
+    cursor: cursorFor(sequence),
     sourceRevision,
-    sourceTimestamp: input.sourceTimestamp ?? null,
+    sourceTimestamp,
     observationTimestamp: input.observationTimestamp,
     emissionTimestamp: input.emissionTimestamp,
     freshnessDeadline: freshnessDeadline(input.observationTimestamp),
     correlation: mergeCorrelation(EMPTY_CORRELATION, input.correlation ?? {}),
-    lastSuccess: input.lastSuccess ?? null,
-    lastError: input.lastError ?? null,
+    lastSuccess,
+    lastError,
   };
 }
 
@@ -135,7 +229,11 @@ export type SourceCursor = {
   readonly lastSequence: number;
   readonly lastAcceptedAt: string | null;
   readonly lastSuccessSequence: number | null;
-  readonly gapSequences: readonly number[];
+  readonly gapCount: number;
+  readonly gapRanges: readonly {
+    readonly from: number;
+    readonly to: number;
+  }[];
   readonly connected: boolean;
 };
 
@@ -145,6 +243,7 @@ export type IngestAction =
   | 'replay'
   | 'out-of-order'
   | 'gap'
+  | 'gap-rejected'
   | 'backfill'
   | 'schema-mismatch'
   | 'reconnect';
@@ -173,7 +272,8 @@ export function emptyCursor(): SourceCursor {
     lastSequence: 0,
     lastAcceptedAt: null,
     lastSuccessSequence: null,
-    gapSequences: [],
+    gapCount: 0,
+    gapRanges: [],
     connected: false,
   };
 }
@@ -191,10 +291,16 @@ export function detectClockSkew(
   );
 }
 
-function range(start: number, endExclusive: number): number[] {
-  const values: number[] = [];
-  for (let n = start; n < endExclusive; n += 1) values.push(n);
-  return values;
+function recordGap(
+  cursor: SourceCursor,
+  from: number,
+  to: number
+): Pick<SourceCursor, 'gapCount' | 'gapRanges'> {
+  const missing = Math.max(0, to - from + 1);
+  return {
+    gapCount: Math.min(Number.MAX_SAFE_INTEGER, cursor.gapCount + missing),
+    gapRanges: [...cursor.gapRanges, { from, to }].slice(-32),
+  };
 }
 
 export function ingestSourceEvent(
@@ -242,6 +348,21 @@ export function ingestSourceEvent(
 
   const expected = cursor.lastSequence + 1;
   const gap = cursor.lastSequence > 0 && input.sequence > expected;
+  const missing = gap ? input.sequence - expected : 0;
+  if (gap && missing > MAX_ACCEPTED_SOURCE_SEQUENCE_GAP) {
+    return {
+      action: 'gap-rejected',
+      cursor: {
+        ...cursor,
+        ...recordGap(cursor, expected, input.sequence - 1),
+        connected: input.reachable,
+      },
+      sequenceGap: true,
+      clockSkew,
+      recovered,
+      replaceCurrent: false,
+    };
+  }
   return {
     action: recovered ? 'reconnect' : gap ? 'gap' : 'accepted',
     cursor: {
@@ -249,9 +370,9 @@ export function ingestSourceEvent(
       lastSequence: input.sequence,
       lastAcceptedAt: input.observationTimestamp,
       lastSuccessSequence: input.sequence,
-      gapSequences: gap
-        ? [...cursor.gapSequences, ...range(expected, input.sequence)]
-        : cursor.gapSequences,
+      ...(gap
+        ? recordGap(cursor, expected, input.sequence - 1)
+        : { gapCount: cursor.gapCount, gapRanges: cursor.gapRanges }),
       connected: input.reachable,
     },
     sequenceGap: gap,
@@ -262,6 +383,7 @@ export function ingestSourceEvent(
 }
 
 const TERMINAL_FRESHNESS = new Set<ObservationState>([
+  'stale',
   'disconnected',
   'unavailable',
   'unauthorized',

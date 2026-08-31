@@ -8,6 +8,7 @@ export {
   FORBIDDEN_QUERY_KEYS,
   isExactSha,
   M1_SOURCE_TO_PROJECTION_BUDGET_MS,
+  MAX_ACCEPTED_SOURCE_SEQUENCE_GAP,
   measuredBoolean,
   measuredCount,
   measuredDuration,
@@ -20,7 +21,9 @@ export {
   SHIP_MEANING_KEYS,
   SHIPPING_SOURCE_IDS,
   SHIPPING_SOURCE_PRODUCERS,
+  SHIPPING_SOURCE_READ_TIMEOUT_MS,
   SHIPPING_SOURCE_SCHEMAS,
+  SHIPPING_SOURCE_SEMANTIC_FRESHNESS_MS,
   SHIPPING_STATE_CLOCK_SKEW_MS,
   SHIPPING_STATE_FRESHNESS_MS,
   SHIPPING_STATE_PRODUCER_ID,
@@ -50,6 +53,7 @@ export {
   type SourceCursor,
   sanitizedError,
   sanitizeErrorMessage,
+  sanitizeOpaqueIdentifier,
   systemClock,
 } from './envelope';
 export {
