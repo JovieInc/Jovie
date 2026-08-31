@@ -1708,6 +1708,10 @@ jobs:
     if: ${{ needs.ci-path-changes.result == 'success' && (github.event_name == 'merge_group' || github.event_name == 'push' || (github.event_name == 'pull_request' && !contains(github.event.pull_request.labels.*.name, 'skip-migration-guard'))) }}
     runs-on: ubuntu-latest
     timeout-minutes: 3
+    permissions:
+      contents: read
+      issues: read
+      pull-requests: read
     outputs:
       run_full_ci: ${{ steps.check_changes.outputs.run_full_ci }}
     steps:
@@ -1738,7 +1742,9 @@ jobs:
           ./scripts/check-migrations.sh
           ./scripts/validate-migrations.sh
         env:
+          GH_TOKEN: ${{ github.token }}
           GITHUB_EVENT_PATH: ${{ github.event_path }}
+          GITHUB_REPOSITORY: ${{ github.repository }}
 
   ci-drizzle-check:
     name: Drizzle Check
