@@ -33,7 +33,7 @@ describe('GET /llms.txt', () => {
     expect(body).toContain('https://jov.ie/openapi.json');
     expect(body).toContain('https://jov.ie/api/v1/openapi.json');
     expect(body).toContain(
-      'General public writes or OAuth — the public artist API and per-artist MCP are anonymous/read-only'
+      'General public writes or OAuth — the public artist API and anonymous MCP tools are read-only; owner-only MCP tools require authenticated profile ownership and explicit confirmation for writes'
     );
     expect(body).toContain(
       '**Founder-only Ovie control**: https://jov.ie/api/ovie/mcp — OAuth 2.1 MCP with scopes `ovie:read, ovie:write`; not public artist API access'
@@ -50,9 +50,13 @@ describe('GET /llms.txt', () => {
     const body = await GET().text();
 
     expect(body).toContain(
-      'the public artist API and per-artist MCP are anonymous/read-only'
+      'the public artist API and anonymous MCP tools are read-only'
     );
     expect(body).toContain('/api/mcp/{username}');
+    expect(body).toContain(
+      'owner-only merch and video tools are listed in the manifest and require authenticated ownership'
+    );
+    expect(body).not.toContain('Instagram: @meetjovie');
     expect(body).toContain('scopes `ovie:read, ovie:write`');
     expect(body).not.toMatch(/public artist API access.*write/i);
     expect(body).not.toMatch(/MCP server for Jovie/i);

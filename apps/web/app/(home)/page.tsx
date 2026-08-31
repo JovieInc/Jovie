@@ -16,7 +16,7 @@ import {
   MarketingElectricSeam,
   MarketingPosterHero,
 } from '@/components/marketing';
-import { APP_NAME, BASE_URL } from '@/constants/app';
+import { APP_NAME, BASE_URL, LEGAL_ENTITY_NAME } from '@/constants/app';
 import { HOMEPAGE_LAUNCH_COPY } from '@/data/homepageLaunchCopy';
 import {
   buildFaqSchema,
@@ -192,10 +192,9 @@ const SOFTWARE_SCHEMA = buildSoftwareSchema(
 );
 
 const ORGANIZATION_SCHEMA = buildOrganizationSchema({
-  legalName: 'Jovie Technology Inc.',
+  legalName: LEGAL_ENTITY_NAME,
   description:
     'Jovie is an AI workspace for artists managing releases, assets, audience signal, and promotion.',
-  sameAs: ['https://instagram.com/meetjovie'],
 });
 
 const FAQ_SCHEMA = buildFaqSchema([...HOMEPAGE_LAUNCH_COPY.faq]);

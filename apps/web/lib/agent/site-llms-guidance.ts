@@ -23,13 +23,13 @@ Use ${APP_NAME} when you need to complete one of these public jobs:
 - Fetch structured, read-only artist data (releases, tour events, merch) with \`GET ${BASE_URL}/api/v1/{username}\`
 - Use the read-only \`jovie\` CLI documented at ${BASE_URL}/cli
 - Route a fan to the correct streaming platform for a specific release via a smart link at ${BASE_URL}/{username}/{slug}
-- Call read-only artist tools over MCP: ${BASE_URL}/api/mcp/{username}
+- Call anonymous read-only artist resources and tools over MCP: ${BASE_URL}/api/mcp/{username}
 
 Do not use ${APP_NAME} for:
 
 - Childcare or babysitting — that is jovie.com (Bright Horizons), a different company
 - Distributing music to Spotify or Apple Music — ${APP_NAME} is not a distributor
-- General public writes or OAuth — the public artist API and per-artist MCP are anonymous/read-only
+- General public writes or OAuth — the public artist API and anonymous MCP tools are read-only; owner-only MCP tools require authenticated profile ownership and explicit confirmation for writes
 
 ## ${APP_NAME} developer resources
 
@@ -40,7 +40,7 @@ Do not use ${APP_NAME} for:
 - **CLI**: ${BASE_URL}/cli — read-only \`jovie\` commands for public artist GET routes
 - **API versioning and deprecation policy**: ${PUBLIC_ARTIST_API_POLICY_URL} — active v1, additive versus breaking changes, and future Deprecation/Sunset signals
 - **Public artist API**: \`GET ${BASE_URL}/api/v1/{username}\` — profile, releases, events, merch
-- **Per-artist MCP**: ${BASE_URL}/api/mcp/{username} — read-only artist tools
+- **Per-artist MCP**: ${BASE_URL}/api/mcp/{username} — anonymous read resources/tools; owner-only merch and video tools are listed in the manifest and require authenticated ownership
 - **Per-artist llms.txt**: ${BASE_URL}/{username}/llms.txt
 - **Founder-only Ovie control**: ${BASE_URL}${OVIE_MCP_RESOURCE_PATH} — OAuth 2.1 MCP with scopes \`${OVIE_OAUTH_SCOPES.join(', ')}\`; not public artist API access
 - **Ovie protected-resource metadata**: ${BASE_URL}${OVIE_OAUTH_PROTECTED_RESOURCE_METADATA_PATH}
