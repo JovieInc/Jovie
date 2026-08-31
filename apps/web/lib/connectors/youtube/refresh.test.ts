@@ -9,8 +9,12 @@ const mocks = vi.hoisted(() => {
     }[],
     setValues: [] as Record<string, unknown>[],
   };
+  const orderBy = vi.fn(() => ({
+    limit: vi.fn(async () => state.accounts),
+  }));
   return {
     ...state,
+    orderBy,
     loadFreshGoogleAccessToken: vi.fn(),
     createYouTubeLibraryProvider: vi.fn(() => ({ provider: 'youtube' })),
     syncChannelVideos: vi.fn(),
@@ -20,9 +24,7 @@ const mocks = vi.hoisted(() => {
       select: vi.fn(() => ({
         from: vi.fn(() => ({
           where: vi.fn(() => ({
-            orderBy: vi.fn(() => ({
-              limit: vi.fn(async () => state.accounts),
-            })),
+            orderBy,
           })),
         })),
       })),
@@ -76,6 +78,12 @@ describe('connected YouTube refresh', () => {
       needsReauth: 0,
       failed: 0,
     });
+  });
+
+  it('prioritizes never-synced channels before stale non-null channels', async () => {
+    await runConnectedYouTubeRefreshes(new Date('2026-08-28T12:00:00.000Z'));
+    expect(mocks.orderBy).toHaveBeenCalledOnce();
+    expect(mocks.orderBy.mock.calls[0]).toHaveLength(2);
   });
 
   it('fails missing access closed to needs reauthorization', async () => {

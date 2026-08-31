@@ -1,6 +1,6 @@
 import 'server-only';
 
-import { and, asc, eq, isNotNull, isNull, lt, or } from 'drizzle-orm';
+import { and, asc, eq, isNotNull, isNull, lt, or, sql } from 'drizzle-orm';
 import { asConnectorStatusSql } from '@/lib/connectors/db-expressions';
 import { loadFreshGoogleAccessToken } from '@/lib/connectors/google-calendar/access-token';
 import { CONNECTOR_PROVIDERS } from '@/lib/connectors/registry';
@@ -129,7 +129,11 @@ export async function runConnectedYouTubeRefreshes(
         )
       )
     )
-    .orderBy(asc(connectorAccounts.lastSyncAt))
+    // PostgreSQL sorts NULL last by default, but never-synced accounts should refresh first.
+    .orderBy(
+      sql`${connectorAccounts.lastSyncAt} is not null`,
+      asc(connectorAccounts.lastSyncAt)
+    )
     .limit(MAX_CHANNELS_PER_RUN);
 
   let synced = 0;
