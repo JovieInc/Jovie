@@ -5,6 +5,7 @@ import { afterEach, describe, expect, it } from 'vitest';
 import {
   auditCoverageViaReceipts,
   checkChangedComponents,
+  resolveRenderedEvaluationSection,
   runComponentShipGate,
 } from '../../component-ship-gate.mjs';
 import {
@@ -341,6 +342,7 @@ describe('diff gate', () => {
       applicable: true,
       ok: true,
       changedComponents: [sourceRel],
+      componentStories: [{ component: sourceRel, story: storyRel }],
     });
   });
 
@@ -363,7 +365,11 @@ describe('diff gate', () => {
   });
 
   it('accepts central evidence only for a changed legacy component', () => {
-    expect(legacyEvidenceResult().ok).toBe(true);
+    const accepted = legacyEvidenceResult();
+    expect(accepted.ok).toBe(true);
+    expect(accepted.componentStories).toEqual([
+      { component: LEGACY_COMPONENT_REL, story: LEGACY_STORY_REL },
+    ]);
 
     const unchangedTest = legacyEvidenceResult({ changedTest: false });
     expect(unchangedTest.ok).toBe(false);
@@ -521,6 +527,140 @@ describe('diff gate', () => {
     expect(result.issues.some(issue => issue.rule === 'missing-story')).toBe(
       true
     );
+  });
+});
+
+describe('live rendered evaluation section', () => {
+  it('skips cleanly when no in-scope components changed', () => {
+    expect(resolveRenderedEvaluationSection()).toEqual({
+      ok: true,
+      section: {
+        ok: true,
+        applicable: false,
+        skipped: true,
+        note: 'no changed in-scope components',
+      },
+    });
+  });
+
+  it('keeps missing Storybook advisory by default during rollout', () => {
+    expect(
+      resolveRenderedEvaluationSection({
+        changedComponents: ['packages/ui/atoms/badge.tsx'],
+      })
+    ).toEqual({
+      ok: true,
+      section: {
+        ok: true,
+        applicable: true,
+        skipped: true,
+        note: 'rendered evaluation not requested (advisory rollout)',
+      },
+    });
+  });
+
+  it('fails closed when rendered evidence is required without Storybook', () => {
+    expect(
+      resolveRenderedEvaluationSection({
+        changedComponents: ['packages/ui/atoms/badge.tsx'],
+        requireRendered: true,
+      })
+    ).toEqual({
+      ok: false,
+      section: {
+        ok: false,
+        applicable: true,
+        skipped: true,
+        note: 'rendered evaluation required but --storybook-url was not provided',
+      },
+    });
+  });
+
+  it('runs rendered evaluation when Storybook evidence is available', () => {
+    const calls = [];
+    const result = resolveRenderedEvaluationSection({
+      changedComponents: ['packages/ui/atoms/badge.tsx'],
+      storybookUrl: 'http://127.0.0.1:6006',
+      captureDir: '/tmp/component-evidence',
+      evaluateRendered: args => {
+        calls.push(args);
+        return {
+          ok: true,
+          status: 0,
+          report: { ok: true, results: [] },
+          output: '{"ok":true}',
+        };
+      },
+    });
+
+    expect(calls).toEqual([
+      {
+        storybookUrl: 'http://127.0.0.1:6006',
+        captureDir: '/tmp/component-evidence',
+        components: ['packages/ui/atoms/badge.tsx'],
+        storyPaths: [],
+      },
+    ]);
+    expect(result).toEqual({
+      ok: true,
+      section: {
+        ok: true,
+        applicable: true,
+        status: 0,
+        report: { ok: true, results: [] },
+        output: '{"ok":true}',
+      },
+    });
+  });
+
+  it('forwards resolved canonical story paths to rendered evaluation', () => {
+    const calls = [];
+    resolveRenderedEvaluationSection({
+      changedComponents: [LEGACY_COMPONENT_REL],
+      componentStories: [
+        { component: LEGACY_COMPONENT_REL, story: LEGACY_STORY_REL },
+        { component: LEGACY_COMPONENT_REL, story: LEGACY_STORY_REL },
+      ],
+      storybookUrl: 'http://127.0.0.1:6006',
+      evaluateRendered: args => {
+        calls.push(args);
+        return {
+          ok: true,
+          status: 0,
+          report: { ok: true },
+          output: '{"ok":true}',
+        };
+      },
+    });
+
+    expect(calls[0]).toMatchObject({
+      components: [LEGACY_COMPONENT_REL],
+      storyPaths: [LEGACY_STORY_REL],
+    });
+  });
+
+  it('propagates rendered evaluation failures from Storybook evidence', () => {
+    expect(
+      resolveRenderedEvaluationSection({
+        changedComponents: ['packages/ui/atoms/badge.tsx'],
+        storybookUrl: 'http://127.0.0.1:6006',
+        evaluateRendered: () => ({
+          ok: false,
+          status: 1,
+          report: { ok: false },
+          output: 'missing rendered contract',
+        }),
+      })
+    ).toEqual({
+      ok: false,
+      section: {
+        ok: false,
+        applicable: true,
+        status: 1,
+        report: { ok: false },
+        output: 'missing rendered contract',
+      },
+    });
   });
 });
 
