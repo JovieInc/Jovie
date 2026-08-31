@@ -249,6 +249,13 @@ store-scoped requests.
 
 Secret used to verify `x-pf-webhook-signature` on `/api/webhooks/printful`.
 
+### `FIRST_SALE_TEXT_LIVE`
+
+Artist first-sale SMS live switch. Unset or `false` is dry-run: the first paid
+merch order is still claimed, but Twilio is not called. Set to `true` only
+after artist phone coverage is ready. Actual provider POSTs still require
+`OUTBOUND_SMS_ENABLED`.
+
 ## Spotify Integration
 
 ### `SPOTIFY_CLIENT_ID`
