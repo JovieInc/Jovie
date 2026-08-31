@@ -64,6 +64,13 @@ source lacks:
    axe, overflow/200% zoom, keyboard gaps, hover layout shift, placeholder
    copy, emoji/checkmarks, and decorative caps. This is the enrolled primitive
    proof path only; it does not certify unenrolled product routes.
+8. **Founder-review rendered-layout claims (JOV-INV-024)** — a line-count,
+   wrap, truncation, or breakpoint claim requires computed browser evidence
+   from a user-accessible route built from the exact reviewed head, after fonts
+   settle, at every declared compact, medium, and wide width. The receipt must
+   preserve the complete authored accessibility name and record exact-head
+   provenance. Local/raw artifacts, source or CSS inspection, and screenshots
+   without both computed geometry and provenance are supporting evidence only.
 
 ### Commands
 
@@ -72,6 +79,13 @@ pnpm component-ship-gate          # diff + match + quality + ratchet + rendered 
 pnpm story-coverage:check         # multi-root ratchet only
 pnpm story-coverage:update        # explicit floor raise (never silent)
 pnpm storybook:quality            # story hygiene only
+
+# Founder-review route certification; fails closed without a public URL and full exact head.
+REVIEW_CERTIFICATION_REQUIRED=1 REVIEW_EXPECTED_HEAD_SHA=<full-sha> \
+  BASE_URL=https://<review-host> E2E_SKIP_WEB_SERVER=1 \
+  pnpm --filter @jovie/web exec playwright test \
+  tests/e2e/homepage-quiet-hero.spec.ts \
+  --config=playwright.config.noauth.ts --project=chromium
 ```
 
 Enforcement: `ci-fast` structural lane (required PR + merge_group check) and

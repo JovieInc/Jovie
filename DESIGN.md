@@ -145,6 +145,14 @@ the marketing wrapper. Everything else on the homepage (subhead, CTAs, body,
 section headings) stays Inter. This supersedes the 2026-04-28 80px poster
 treatment without introducing another type scale.
 
+A founder-review claim that this H1 or any other line-limited text satisfies its
+rendered line-count contract is valid only when a browser measures the
+user-accessible route built from the exact reviewed head after fonts settle at
+the declared compact, medium, and wide widths. The same check must resolve the
+complete authored accessibility name. Source or CSS inspection, a local/raw
+artifact, and a screenshot without computed line-count plus exact-head
+provenance are supporting evidence, not certification.
+
 ### Font Weights
 
 | Name | Value | Usage |

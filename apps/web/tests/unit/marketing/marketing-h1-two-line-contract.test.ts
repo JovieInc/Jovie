@@ -24,9 +24,13 @@ describe('marketing H1 two-visual-line contract', () => {
       path.join(repoRoot, '.github/workflows/ci.yml'),
       'utf8'
     );
+    const homepageRenderedReview = readFileSync(
+      path.join(webRoot, 'tests/e2e/homepage-quiet-hero.spec.ts'),
+      'utf8'
+    );
 
     expect(globals).toMatch(
-      /\.marketing-h1-max-two-lines,[\s\S]*?:where\(\.home-viewport, \.system-b-marketing\) :where\(h1:not\(\.sr-only\)\)[\s\S]*?overflow: hidden;[\s\S]*?-webkit-line-clamp: 2;/
+      /\.marketing-h1-max-two-lines,[\s\S]*?:where\(\.home-viewport, \.system-b-marketing\) :where\(h1:not\(\.sr-only\)\)[\s\S]*?max-block-size: calc\(2 \* 1lh\);[\s\S]*?overflow: hidden;[\s\S]*?-webkit-line-clamp: 2;/
     );
     expect(globals).not.toContain(
       ':where(.home-viewport, .system-b-marketing) h1:not(.sr-only)'
@@ -36,5 +40,11 @@ describe('marketing H1 two-visual-line contract', () => {
     expect(posterHero).not.toContain('aria-label=');
     expect(appPlaywrightConfig).toContain("'**/storybook-*.spec.ts'");
     expect(ciWorkflow).toContain('tests/e2e/storybook-marketing-h1.spec.ts');
+    expect(homepageRenderedReview).toContain(
+      "process.env.REVIEW_CERTIFICATION_REQUIRED === '1'"
+    );
+    expect(homepageRenderedReview).toContain(
+      'REVIEW_EXPECTED_HEAD_SHA must be set in certification mode'
+    );
   });
 });

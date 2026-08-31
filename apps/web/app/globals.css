@@ -889,6 +889,7 @@ body {
   .marketing-h1-max-two-lines,
   :where(.home-viewport, .system-b-marketing) :where(h1:not(.sr-only)) {
     display: -webkit-box;
+    max-block-size: calc(2 * 1lh);
     overflow: hidden;
     -webkit-box-orient: vertical;
     -webkit-line-clamp: 2;
