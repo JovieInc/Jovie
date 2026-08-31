@@ -56,7 +56,7 @@ describe('MarketingHeader', () => {
     );
     expect(screen.getByRole('link', { name: 'Get started' })).toHaveAttribute(
       'href',
-      '/start'
+      'https://jov.ie/waitlist'
     );
   });
 
@@ -94,9 +94,10 @@ describe('MarketingHeader', () => {
       'data-presentation',
       'marketing-glass'
     );
-    expect(
-      screen.getByRole('link', { name: 'Claim your profile' })
-    ).toHaveAttribute('href', 'https://jov.ie/waitlist');
+    expect(screen.getByRole('link', { name: 'Get started' })).toHaveAttribute(
+      'href',
+      'https://jov.ie/waitlist'
+    );
   });
 
   it('keeps the legacy artist-profile alias on the same shared chrome', () => {

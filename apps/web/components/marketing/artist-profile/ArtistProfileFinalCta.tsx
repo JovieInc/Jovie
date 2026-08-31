@@ -16,7 +16,7 @@ export function ArtistProfileFinalCta({
   return (
     <HomepageV2FinalCta
       headline={finalCta.headline}
-      ctaLabel={finalCta.ctaLabel || claimIntent.label}
+      ctaLabel={claimIntent.label}
       ctaHref={ctaHref ?? claimIntent.href}
       sectionTestId='artist-profile-final-cta'
       headingTestId='final-cta-headline'

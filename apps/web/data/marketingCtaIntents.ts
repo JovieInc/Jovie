@@ -1,5 +1,6 @@
 import { APP_ROUTES } from '@/constants/routes';
 import { PUBLIC_WAITLIST_URL } from '@/data/homepageFrontDoorCta';
+import { FEATURE_FLAGS } from '@/lib/flags/marketing-static';
 
 /**
  * Single shared CTA intent registry for public marketing surfaces.
@@ -22,14 +23,24 @@ export interface MarketingCtaIntent {
   readonly support: string;
 }
 
+const CLAIM_PROFILE_WAITLIST_INTENT = {
+  id: 'claim-profile',
+  label: 'Get started',
+  href: PUBLIC_WAITLIST_URL,
+  eventName: 'landing_cta_claim_profile',
+  support: 'Limited prelaunch access. We will email when you are in.',
+} as const satisfies MarketingCtaIntent;
+
+const CLAIM_PROFILE_OPEN_SIGNUP_INTENT = {
+  id: 'claim-profile',
+  label: 'Claim your profile',
+  href: APP_ROUTES.START,
+  eventName: 'landing_cta_claim_profile',
+  support: 'Free to start. No credit card.',
+} as const satisfies MarketingCtaIntent;
+
 export const MARKETING_CTA_INTENTS = {
-  claimProfile: {
-    id: 'claim-profile',
-    label: 'Claim your profile',
-    href: PUBLIC_WAITLIST_URL,
-    eventName: 'landing_cta_claim_profile',
-    support: 'Free to start. No credit card.',
-  },
+  claimProfile: getClaimProfileIntent(),
   seeLiveProfile: {
     id: 'see-live-profile',
     label: 'See a live profile',
@@ -40,12 +51,30 @@ export const MARKETING_CTA_INTENTS = {
 } as const satisfies Record<string, MarketingCtaIntent>;
 
 export type ClaimProfileCtaIntent =
-  (typeof MARKETING_CTA_INTENTS)['claimProfile'];
+  | typeof CLAIM_PROFILE_WAITLIST_INTENT
+  | typeof CLAIM_PROFILE_OPEN_SIGNUP_INTENT;
 
-export function buildClaimProfileStartHref(handle?: string): string {
+function buildOpenClaimProfileStartHref(trimmedHandle: string): string {
+  if (!trimmedHandle) return APP_ROUTES.START;
+
+  const params = new URLSearchParams({
+    starter_prompt: `I want to claim jov.ie/${trimmedHandle}.`,
+    handle: trimmedHandle,
+  });
+  return `${APP_ROUTES.START}?${params.toString()}`;
+}
+
+export function buildClaimProfileStartHref(
+  handle?: string,
+  waitlistEnabled = FEATURE_FLAGS.WAITLIST_ENABLED
+): string {
   const trimmed = handle?.trim().replace(/^@/, '') ?? '';
+  if (!waitlistEnabled) {
+    return buildOpenClaimProfileStartHref(trimmed);
+  }
+
   if (!trimmed) {
-    return MARKETING_CTA_INTENTS.claimProfile.href;
+    return CLAIM_PROFILE_WAITLIST_INTENT.href;
   }
 
   const destination = new URL(PUBLIC_WAITLIST_URL);
@@ -56,6 +85,10 @@ export function buildClaimProfileStartHref(handle?: string): string {
   return destination.toString();
 }
 
-export function getClaimProfileIntent(): ClaimProfileCtaIntent {
-  return MARKETING_CTA_INTENTS.claimProfile;
+export function getClaimProfileIntent(
+  waitlistEnabled = FEATURE_FLAGS.WAITLIST_ENABLED
+): ClaimProfileCtaIntent {
+  return waitlistEnabled
+    ? CLAIM_PROFILE_WAITLIST_INTENT
+    : CLAIM_PROFILE_OPEN_SIGNUP_INTENT;
 }

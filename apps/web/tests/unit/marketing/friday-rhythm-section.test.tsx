@@ -3,7 +3,7 @@ import userEvent from '@testing-library/user-event';
 import type { HTMLAttributes, ReactNode, SVGProps } from 'react';
 import { describe, expect, it, vi } from 'vitest';
 import { FridayRhythmSection } from '@/components/marketing/friday-rhythm-section';
-import { APP_ROUTES } from '@/constants/routes';
+import { PUBLIC_WAITLIST_URL } from '@/data/homepageFrontDoorCta';
 
 vi.mock('motion/react', () => ({
   motion: {
@@ -49,8 +49,9 @@ describe('FridayRhythmSection', () => {
       name: 'Build Your Release Rhythm',
     });
     expect(rhythmCta).toHaveAttribute('href');
-    // Homepage front-door CTA is locked to Get started → /start (JOV-5085).
-    expect(rhythmCta.getAttribute('href')).toBe(APP_ROUTES.START);
+    // Front-door CTA lands on the founder-locked public waitlist (splash-B
+    // waitlist-first handoff), not the in-app /start path.
+    expect(rhythmCta.getAttribute('href')).toBe(PUBLIC_WAITLIST_URL);
     expect(screen.queryByText('Less')).not.toBeInTheDocument();
     expect(screen.queryByText('More')).not.toBeInTheDocument();
   });

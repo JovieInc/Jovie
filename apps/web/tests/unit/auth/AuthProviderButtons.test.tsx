@@ -53,6 +53,12 @@ describe('AuthProviderButtonSlots', () => {
     ).not.toContain('--linear-gap-');
     expect(
       screen.getByRole('button', { name: 'Continue with Google' }).className
+    ).toContain('before:h-11');
+    expect(
+      screen.getByRole('button', { name: 'Continue with Google' }).className
+    ).toContain('before:min-w-11');
+    expect(
+      screen.getByRole('button', { name: 'Continue with Google' }).className
     ).not.toContain('--linear-shadow-button');
     expect(
       screen.getByRole('button', { name: 'Continue with Google' }).className

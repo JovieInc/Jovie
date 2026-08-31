@@ -126,7 +126,7 @@ export function HomepageV2FinalCta({
           </h2>
           <Button
             variant='primary'
-            size='md'
+            size='marketing'
             asChild
             className='homepage-final-cta-action system-b-mounted-home-footer-cta-action'
           >

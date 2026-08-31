@@ -57,6 +57,25 @@ describe('public CTA guard', () => {
     expect(offenders).toEqual([]);
   });
 
+  it('locks the public HeaderNav primary CTA to the marketing ActionButton size', () => {
+    const headerPath = join(ROOT, 'components', 'organisms', 'HeaderNav.tsx');
+    const contents = readFileSync(headerPath, 'utf8');
+    const start = contents.indexOf('function PublicAuthActions(');
+    const end = contents.indexOf('function GlassAuthActions(', start);
+
+    expect(start, 'PublicAuthActions source exists').toBeGreaterThanOrEqual(0);
+    expect(end, 'PublicAuthActions source is bounded').toBeGreaterThan(start);
+
+    const publicAuth = contents.slice(start, end);
+    const primaryCta = publicAuth.slice(publicAuth.lastIndexOf('<Button'));
+
+    // Waitlist-first Get started / Request Access uses the locked 32px pill.
+    // Minimal pill sign-in may stay md; the public primary CTA must not.
+    expect(primaryCta).toContain("size='marketing'");
+    expect(primaryCta).toContain("variant='primary'");
+    expect(primaryCta).not.toMatch(/\bsize='(?:sm|md|lg|xl)'/);
+  });
+
   it('keeps homepage public auth as a labeled text MarketingSignInLink', () => {
     const headerNav = readFileSync(
       join(ROOT, 'components/organisms/HeaderNav.tsx'),

@@ -601,7 +601,7 @@ export const MARKETING_ROUTE_MANIFEST: readonly RouteManifestEntry[] = [
       status: 'unverified',
       source: 'JOV-5376 public waitlist front door',
       notes:
-        'Signed-out visitors render the splash-B auth shell; authenticated states continue through the existing start or receipt flow.',
+        'Unauthenticated visitors get the splash-B waitlist handoff; pending receipts stay on this route.',
     },
     status: 'active',
     specVersion: '1.0.0',

@@ -50,6 +50,14 @@ function extractPricingCss(source: string): string {
   return source.slice(start, end);
 }
 
+function extractFinalCtaComponentSource(source: string): string {
+  const start = source.indexOf('export function HomepageV2FinalCta(');
+
+  expect(start, 'homepage final CTA source exists').toBeGreaterThanOrEqual(0);
+
+  return source.slice(start);
+}
+
 describe('mounted homepage pricing System B source contract', () => {
   it('keeps mounted pricing markup on named System B primitives', () => {
     const source = extractPricingComponentSource(
@@ -114,5 +122,14 @@ describe('mounted homepage pricing System B source contract', () => {
     expect(css).toContain('box-shadow: none;');
     expect(css).toContain('letter-spacing: 0;');
     expect(css).toContain('@media (max-width: 767px)');
+  });
+
+  it('locks the homepage final CTA to the marketing ActionButton size', () => {
+    const source = extractFinalCtaComponentSource(
+      readFileSync(path.join(webRoot, pricingComponentPath), 'utf8')
+    );
+
+    expect(source).toContain("size='marketing'");
+    expect(source).not.toMatch(/\bsize='(?:sm|md|lg|xl)'/);
   });
 });

@@ -1,7 +1,9 @@
+import { headers } from 'next/headers';
 import { notFound, redirect } from 'next/navigation';
 import { WaitlistPublicLanding } from '@/components/features/waitlist/WaitlistPublicLanding';
 import { WaitlistSuccessView } from '@/components/features/waitlist/WaitlistSuccessView';
 import { getWaitlistRouteRedirect } from '@/lib/auth/access-route-redirect';
+import { auth } from '@/lib/auth/better-auth';
 import {
   CanonicalUserState,
   getWaitlistAccess,
@@ -9,9 +11,26 @@ import {
 } from '@/lib/auth/gate';
 import { isWaitlistPendingStatus } from '@/lib/waitlist/state-machine';
 
+function canUseE2ETestAuthFallback(): boolean {
+  return (
+    process.env.E2E_USE_TEST_AUTH_BYPASS === '1' &&
+    process.env.NEXT_PUBLIC_E2E_MODE === '1' &&
+    process.env.VERCEL_ENV !== 'preview'
+  );
+}
+
+async function hasRequestAuthSession(): Promise<boolean> {
+  try {
+    const session = await auth.api.getSession({ headers: await headers() });
+    return Boolean(session?.user?.id);
+  } catch {
+    return false;
+  }
+}
+
 /**
- * /waitlist is the waitlist-first public handoff (JOV-5376) and the durable
- * pending receipt (JOV-5001 / JOV-2132).
+ * /waitlist is the waitlist-first public handoff (JOV-5334 / JOV-5376) and the
+ * durable pending receipt (JOV-5001 / JOV-2132).
  *
  * Unauthenticated visitors get splash-B sign-up. Pre-receipt authenticated
  * states recover to /start chat. They must not render the retired
@@ -28,6 +47,10 @@ export default async function WaitlistPage() {
   // the local E2E auth bypass for other suites. Keep that synthetic actor from
   // turning this anonymous surface into an authenticated /start redirect.
   if (process.env.PUBLIC_NOAUTH_SMOKE === '1') {
+    return <WaitlistPublicLanding />;
+  }
+
+  if (!(await hasRequestAuthSession()) && !canUseE2ETestAuthFallback()) {
     return <WaitlistPublicLanding />;
   }
 

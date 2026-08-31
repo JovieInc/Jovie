@@ -42,7 +42,7 @@ export function ArtistProfileHero({ hero }: Readonly<ArtistProfileHeroProps>) {
         headline={hero.headline}
         subtitle={hero.subhead}
         primaryCta={{
-          label: hero.ctaLabel,
+          label: claimIntent.label,
           href: claimIntent.href,
           eventName: claimIntent.eventName,
           signUp: true,
