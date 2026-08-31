@@ -759,6 +759,11 @@ it('covers the AEO asset visibility contract regressions', () => {
     () => '{"runId":"threshold-previous","presence":{"status":"absent"}}'
   ).join('\n');
   const thresholdReport = r(thresholdCurrent, thresholdPrevious);
+  const duplicateAbsentEvidence = r(
+    '{"runId":"dup-absent","presence":{"status":"absent"}}\n{"runId":"dup-absent","presence":{"status":"absent"}}'
+  )?.actions.find(
+    a => a.kind === 'prepare_asset_for_recommendation'
+  )?.sourceEvidence;
   const values = [
     !aeo.parseAeoAssetObservation(
       row(
@@ -830,8 +835,9 @@ it('covers the AEO asset visibility contract regressions', () => {
     )?.citedSource,
     thresholdReport?.trend.direction,
     thresholdReport ? thresholdReport.visibility.appearanceRate > 0.05 : false,
+    duplicateAbsentEvidence,
   ];
   expect(JSON.stringify(values)).toBe(
-    '[true,true,true,"asset_observation_contains_disallowed_identifier","private_asset_requires_explicit_consent","no_comparable_prior_run",[["c1","up"],["c2","down"]],["c1:m1:prepare_asset_for_recommendation","c2:m1:prepare_asset_for_recommendation"],{"bestPosition":1,"context":"cited_source"},["querySetVersion","market"],[["Rival"],["Other"]],{"appeared":true,"appearanceCount":1,"observationCount":2,"appearanceRate":1},0.2,0,"no_current_presence_measurement",[{"runId":"absent","field":"presence"},{"runId":"absent","field":"competitors"}],null,[{"runId":"ranked","field":"competitors"}],"steady","no_comparable_prior_run",{"url":"https://jov.ie/x","platform":null},"up",true]'
+    '[true,true,true,"asset_observation_contains_disallowed_identifier","private_asset_requires_explicit_consent","no_comparable_prior_run",[["c1","up"],["c2","down"]],["c1:m1:prepare_asset_for_recommendation","c2:m1:prepare_asset_for_recommendation"],{"bestPosition":1,"context":"cited_source"},["querySetVersion","market"],[["Rival"],["Other"]],{"appeared":true,"appearanceCount":1,"observationCount":2,"appearanceRate":1},0.2,0,"no_current_presence_measurement",[{"runId":"absent","field":"presence"},{"runId":"absent","field":"competitors"}],null,[{"runId":"ranked","field":"competitors"}],"steady","no_comparable_prior_run",{"url":"https://jov.ie/x","platform":null},"up",true,[{"runId":"dup-absent","field":"presence"},{"runId":"dup-absent","field":"competitors"}]]'
   );
 });

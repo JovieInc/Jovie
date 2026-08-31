@@ -1196,7 +1196,7 @@ function summarize(
   let src = { url: null as string | null, platform: null as string | null };
   let srcScore = 0;
   const comps: CompetitorCandidate[] = [];
-  const absentWithCompetitorsRunIds: string[] = [];
+  const absentWithCompetitorsRunIds = new Set<string>();
   for (const row of rows) {
     if (row.presence.status === 'appeared') {
       appearedN += 1;
@@ -1214,7 +1214,7 @@ function summarize(
         row.competitors.status === 'known' &&
         row.competitors.items.length > 0
       ) {
-        absentWithCompetitorsRunIds.push(row.runId);
+        absentWithCompetitorsRunIds.add(row.runId);
       }
     }
     const nextSourceScore = citedSourceScore(row.citedSource);
@@ -1322,7 +1322,7 @@ function summarize(
   return {
     ...draft,
     actions: actionsFor(draft, {
-      absentWithCompetitorsRunIds,
+      absentWithCompetitorsRunIds: [...absentWithCompetitorsRunIds],
       outrankedByRunIds,
     }),
   };
