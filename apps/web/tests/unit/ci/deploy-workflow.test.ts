@@ -4223,9 +4223,7 @@ describe('production promotion exact-artifact contract', () => {
     );
     expect(exactGate).toContain('superseded_after_public_bind=false');
     expect(exactGate).toContain('superseded_after_public_bind=true');
-    expect(exactGate).toContain(
-      'not used as proof for the newer main SHA'
-    );
+    expect(exactGate).toContain('not used as proof for the newer main SHA');
     expect(exactGate).toContain(
       'EXPECTED_PRODUCTION_DEPLOYMENT_ID: ${{ needs.production-release.outputs.production_deployment_id }}'
     );
@@ -4251,7 +4249,7 @@ describe('production promotion exact-artifact contract', () => {
     expect(finalize).toContain(
       '[ "${{ steps.verify.outputs.canonical_deployment_id }}" = "$DEPLOYMENT_ID" ]'
     );
-    expect(upload).toContain("production-generation-verified-{0}");
+    expect(upload).toContain('production-generation-verified-{0}');
     expect(notify).toContain("steps.current.outputs.is_current == 'true'");
   });
 
