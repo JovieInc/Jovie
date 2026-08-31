@@ -3,6 +3,7 @@
 import { ArrowLeft } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { useCallback, useEffect, useRef } from 'react';
+import { AUTH_SHELL_KIND } from '@/lib/auth/auth-shell-layout-contract';
 
 interface AuthModalShellProps {
   readonly children: React.ReactNode;
@@ -89,6 +90,7 @@ export function AuthModalShell({
       ref={dialogRef}
       aria-label={ariaLabel}
       data-auth-modal-shell
+      data-auth-shell-kind={AUTH_SHELL_KIND.interceptedModal}
       onMouseDown={onBackdropMouseDown}
       className='jovie-auth-modal fixed inset-0 m-0 h-dvh max-h-dvh w-[100dvw] max-w-none overflow-y-auto overscroll-contain rounded-none border-0 bg-background p-0 text-primary-token shadow-none backdrop:bg-black/70 backdrop:backdrop-blur-sm sm:m-auto sm:h-auto sm:max-h-[min(600px,calc(100svh-32px))] sm:w-[min(calc(100vw-32px),420px)] sm:rounded-[2rem] sm:border sm:border-white/[0.08] sm:bg-background/96 sm:p-4 sm:shadow-[0_36px_100px_rgba(0,0,0,0.5)]'
     >

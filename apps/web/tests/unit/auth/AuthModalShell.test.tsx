@@ -52,6 +52,10 @@ describe('AuthModalShell', () => {
     expect(
       container.querySelector('.auth-showcase-panel')
     ).not.toBeInTheDocument();
+    expect(container.querySelector('[data-auth-modal-shell]')).toHaveAttribute(
+      'data-auth-shell-kind',
+      'intercepted-modal'
+    );
   });
 
   it('dismisses through router.back when the backdrop is clicked', () => {

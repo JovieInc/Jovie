@@ -10,6 +10,7 @@
   background-size: 28px 28px;
 }
 
+/* AUTH_SPLIT_MIN_WIDTH_PX (1024) — keep in sync with auth-shell-layout-contract.ts */
 .auth-desktop-only {
   display: none;
 }
