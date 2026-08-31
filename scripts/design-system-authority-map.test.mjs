@@ -11,9 +11,7 @@ import {
 
 const map = readDesignSystemAuthorityMap();
 const codes = (candidate, repoRoot = null) =>
-  validateDesignSystemAuthorityMap(candidate, repoRoot).map(
-    issue => issue.code
-  );
+  validateDesignSystemAuthorityMap(candidate, repoRoot).map(issue => issue.code);
 const expectCode = (candidate, code, repoRoot = null) => {
   assert.ok(codes(candidate, repoRoot).includes(code), code);
 };
