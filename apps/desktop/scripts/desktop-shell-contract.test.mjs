@@ -197,13 +197,40 @@ test('desktop window fails into a branded Jovie recovery surface', async () => {
   assert.doesNotMatch(mainSource, /'did-start-loading'/);
   // JOV-5339: Jovie Local must not trip packaged recovery on compile/HMR.
   assert.match(mainSource, /shouldArmRendererWatchdogsForAppEnv\(APP_ENV\)/);
-  assert.match(mainSource, /decideLocalMainFrameLoadFailure/);
   assert.match(mainSource, /decideDidFinishLoadRecovery/);
   assert.match(recoverySource, /isChromiumErrorDocument/);
   assert.match(recoverySource, /chrome-error:/);
   assert.match(
     mainSource,
     /webContents\.on\(\s*'did-finish-load'[\s\S]{0,500}?decideDidFinishLoadRecovery/
+  );
+  assert.match(mainSource, /createLocalHostedLoadRetryController/);
+  assert.match(mainSource, /onMainFrameLoadFailure/);
+  assert.match(mainSource, /onHostedNavigationStarted/);
+  assert.match(
+    mainSource,
+    /win\.webContents\.on\('did-start-navigation'[\s\S]*?localHostedLoadRecovery\.onHostedNavigationStarted\(\)/
+  );
+  assert.match(mainSource, /onMainFrameDocumentCommitted/);
+  assert.match(mainSource, /isHostedAppDocument/);
+  assert.match(mainSource, /win\.webContents\.on\('did-navigate'/);
+  assert.doesNotMatch(
+    mainSource,
+    /win\.webContents\.on\('did-finish-load'[\s\S]{0,500}?onMainFrameDocumentCommitted/
+  );
+  assert.match(
+    mainSource,
+    /localResult\.action === 'retry'[\s\S]*?win\.loadURL\(buildDesktopBootSplashUrl\(\)\)/
+  );
+  const localDidFailLoadBlock = mainSource.match(
+    /if \(APP_ENV === 'local'\) \{\s*const retryUrl =[\s\S]*?\n      \}\n\n      console\.error/
+  );
+  assert.ok(localDidFailLoadBlock);
+  assert.equal(
+    localDidFailLoadBlock[0].match(
+      /win\.loadURL\(buildDesktopBootSplashUrl\(\)\)/g
+    )?.length,
+    1
   );
   assert.match(mainSource, /host-resolver-rules/);
   assert.match(mainSource, /MAP localhost 127\.0\.0\.1/);
