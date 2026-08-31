@@ -151,7 +151,7 @@ const category = (asset: CreatorAssetDescriptor, fallback: string) =>
   asset.category?.trim() || fallback;
 type QuerySpec = readonly [intent: AssetVisibilityQueryIntent, text: string];
 export const assetVisibilityQueryIntentSegment = (intent: string) =>
-  intent.replace(/_/g, '-');
+  intent.replaceAll('_', '-');
 
 function specsFor(asset: CreatorAssetDescriptor): QuerySpec[] {
   const { creatorName: creator, name } = asset;
@@ -440,6 +440,30 @@ function compareRankedPositionMovement(
   }
   return average(movements);
 }
+
+type DirectionalTrendStatus = Exclude<
+  AssetVisibilityTrend['status'],
+  'incomparable'
+>;
+
+function directionalStatus(
+  delta: number,
+  threshold: number
+): DirectionalTrendStatus {
+  if (delta > threshold) return 'up';
+  if (delta < -threshold) return 'down';
+  return 'steady';
+}
+
+function combineTrendStatus(
+  rateStatus: DirectionalTrendStatus,
+  rankStatus: DirectionalTrendStatus
+): DirectionalTrendStatus {
+  if (rateStatus === 'down' || rankStatus === 'down') return 'down';
+  if (rateStatus === 'up' || rankStatus === 'up') return 'up';
+  return 'steady';
+}
+
 const combineRankMovement = (
   averagePositionDelta: number | null,
   rankCoverageDelta: number
@@ -500,20 +524,9 @@ function compareRuns(
     compareRankedPositionMovement(current, previous),
     compareRankCoverage(current, previous)
   );
-  const rateStatus =
-    rateDelta > 0.05 ? 'up' : rateDelta < -0.05 ? 'down' : 'steady';
-  const rankStatus =
-    (positionDelta ?? 0) > 0.5
-      ? 'up'
-      : (positionDelta ?? 0) < -0.5
-        ? 'down'
-        : 'steady';
-  const status =
-    rateStatus === 'down' || rankStatus === 'down'
-      ? 'down'
-      : rateStatus === 'up' || rankStatus === 'up'
-        ? 'up'
-        : 'steady';
+  const rateStatus = directionalStatus(rateDelta, 0.05);
+  const rankStatus = directionalStatus(positionDelta ?? 0, 0.5);
+  const status = combineTrendStatus(rateStatus, rankStatus);
   return trend(true, status, null, rateDelta, positionDelta);
 }
 
