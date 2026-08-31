@@ -962,7 +962,16 @@ ${selectedGateScript}`,
 
     expect(verified).toContain("github.event.workflow_run.event == 'push'");
     expect(verified).toContain(
-      "needs.authorize-production.outputs.authorized == 'true'"
+      "needs.authorize-production.result == 'success'"
+    );
+    expect(verified).toContain(
+      "needs.authorize-production.outputs.already_verified != 'true'"
+    );
+    expect(verified).not.toContain(
+      "needs.authorize-production.outputs.authorized == 'true' &&"
+    );
+    expect(verified).toContain(
+      '[ "${{ needs.authorize-production.outputs.authorized }}" != "true" ]'
     );
     expect(verified).not.toContain('concurrency:');
     expect(CI_WORKFLOW).not.toContain('  deploy-notify:');
