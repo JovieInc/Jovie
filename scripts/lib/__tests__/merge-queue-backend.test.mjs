@@ -421,6 +421,24 @@ describe('merge queue backend resolution', () => {
     ).rejects.toMatchObject({ code: 'native_mutation_unauthorized' });
     expect(runner).not.toHaveBeenCalled();
   });
+
+  it('refuses a live drain without a dedicated GitHub App mutation token', () => {
+    const result = spawnSync('bash', ['scripts/drain-pr-queue.sh'], {
+      cwd: REPO_ROOT,
+      encoding: 'utf8',
+      env: {
+        ...process.env,
+        DRAIN_MUTATION_AUTHORIZATION: 'merge-queue-autoenroll',
+        GH_MUTATION_TOKEN: '',
+        GH_TOKEN: 'read-token-fixture',
+      },
+    });
+
+    expect(result.status).toBe(2);
+    expect(result.stderr).toContain(
+      'Refusing live drain without GH_MUTATION_TOKEN'
+    );
+  });
 });
 
 describe('queue workflow mutation safety', () => {
@@ -534,12 +552,19 @@ describe('queue workflow mutation safety', () => {
     );
     const scope = workflowStep(workflow, 'Resolve exact admission scope');
     const enroll = workflowStep(workflow, 'Enroll clean PRs');
+    const fleetPolicy = workflowStep(workflow, 'Evaluate fresh fleet policy');
     const drain = readRepoFile('scripts/drain-pr-queue.sh');
 
     expect(workflow).toContain('types: [reopened, labeled, unlabeled]');
     expect(workflow).not.toContain('ready_for_review, reopened');
 
+    expect(fleetPolicy).toContain('github-token: ${{ github.token }}');
     expect(scope).toContain('case "$EVENT_NAME" in');
+    expect(scope).toContain('GH_TOKEN: ${{ github.token }}');
+    expect(enroll).toContain('GH_TOKEN: ${{ github.token }}');
+    expect(enroll).toContain(
+      'GH_MUTATION_TOKEN: ${{ steps.app-token.outputs.token }}'
+    );
     expect(scope).toContain('pull_request)');
     expect(scope).toContain('workflow_run)');
     expect(scope).toContain('workflow_dispatch)');
@@ -857,9 +882,16 @@ describe('queue workflow mutation safety', () => {
       expect(job).not.toContain('secrets.GITHUB_TOKEN');
     }
     for (const step of [enroll, rebasePreflight, rebaseMutation]) {
-      expect(step).toContain('GH_TOKEN: ${{ steps.app-token.outputs.token }}');
       expect(step).not.toContain('secrets.GITHUB_TOKEN');
     }
+    expect(enroll).toContain('GH_TOKEN: ${{ github.token }}');
+    expect(enroll).toContain(
+      'GH_MUTATION_TOKEN: ${{ steps.app-token.outputs.token }}'
+    );
+    expect(rebasePreflight).toContain('GH_TOKEN: ${{ github.token }}');
+    expect(rebaseMutation).toContain(
+      'GH_TOKEN: ${{ steps.app-token.outputs.token }}'
+    );
     expect(enroll).toContain('if [[ "$MERGE_QUEUE_BACKEND" != "native" ]]');
     expect(enroll).toContain('bash scripts/drain-pr-queue.sh');
     expect(rebasePreflight).toContain(
@@ -870,9 +902,6 @@ describe('queue workflow mutation safety', () => {
     );
     expect(rebasePreflight).toContain(
       'MERGE_QUEUE_NATIVE_AUTHORIZATION: merge-queue-autoenroll'
-    );
-    expect(rebasePreflight).toContain(
-      'GH_TOKEN: ${{ steps.app-token.outputs.token }}'
     );
     expect(
       drain.indexOf('node scripts/merge-queue-backend.mjs preflight')
@@ -1347,6 +1376,80 @@ describe('native live preflight', () => {
 });
 
 describe('native mutation actor boundary', () => {
+  it('reserves the App runner for actor proof and GraphQL mutations', async () => {
+    const readRunner = createNativeRunner({
+      states: [
+        prState(),
+        prState({
+          isInMergeQueue: true,
+          mergeQueueEntry: QUEUE_ENTRY,
+        }),
+      ],
+    });
+    const mutationRunner = createNativeRunner();
+
+    await expect(
+      enrollPullRequest(
+        nativeOptions(readRunner, {
+          expectedHeadOid: HEAD,
+          mutationRunner,
+        })
+      )
+    ).resolves.toMatchObject({ changed: true });
+
+    expect(invokedMutationActorCheck(readRunner)).toBe(false);
+    expect(invokedNativeMutation(readRunner)).toBe(false);
+    expect(invokedMutationActorCheck(mutationRunner)).toBe(true);
+    expect(invokedEnrollment(mutationRunner)).toBe(true);
+    expect(
+      mutationRunner.mock.calls.every(([args]) => {
+        const query = queryText(args);
+        return (
+          query.includes('MergeQueueNativeMutationActor') ||
+          query.includes('enablePullRequestAutoMerge')
+        );
+      })
+    ).toBe(true);
+  });
+
+  it('keeps dequeue reads on the workflow runner and mutations on the App runner', async () => {
+    const queued = prState({
+      isInMergeQueue: true,
+      mergeQueueEntry: QUEUE_ENTRY,
+      autoMergeRequest: AUTO_MERGE,
+    });
+    const autoMergeOnly = prState({
+      autoMergeRequest: AUTO_MERGE,
+    });
+    const readRunner = createNativeRunner({
+      states: [queued, autoMergeOnly, prState()],
+    });
+    const mutationRunner = createNativeRunner();
+
+    await expect(
+      dequeuePullRequest(
+        nativeOptions(readRunner, {
+          mutationRunner,
+        })
+      )
+    ).resolves.toMatchObject({ changed: true });
+
+    expect(invokedMutationActorCheck(readRunner)).toBe(false);
+    expect(invokedNativeMutation(readRunner)).toBe(false);
+    expect(invokedMutationActorCheck(mutationRunner)).toBe(true);
+    expect(invokedNativeMutation(mutationRunner)).toBe(true);
+    expect(
+      mutationRunner.mock.calls.every(([args]) => {
+        const query = queryText(args);
+        return (
+          query.includes('MergeQueueNativeMutationActor') ||
+          query.includes('dequeuePullRequest') ||
+          query.includes('disablePullRequestAutoMerge')
+        );
+      })
+    ).toBe(true);
+  });
+
   it('rejects an authorized CLI intent when GitHub identifies the Tim user', async () => {
     const runner = createNativeRunner({
       viewerPayload: { data: { viewer: { login: 'itstimwhite' } } },
