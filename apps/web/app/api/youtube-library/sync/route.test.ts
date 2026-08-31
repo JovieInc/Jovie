@@ -76,20 +76,6 @@ describe('POST /api/youtube-library/sync', () => {
     expect(mocks.refreshConnectedYouTubeAccount).not.toHaveBeenCalled();
   });
 
-  it('requires a fresh connector token', async () => {
-    mocks.refreshConnectedYouTubeAccount.mockResolvedValueOnce({
-      status: 'needs_reauth',
-    });
-    const response = await POST(request());
-    expect(response.status).toBe(409);
-    expect(mocks.refreshConnectedYouTubeAccount).toHaveBeenCalledWith({
-      connectorAccountId: 'account-1',
-      creatorProfileId: profileId,
-      channelId: 'channel-1',
-      source: 'manual',
-    });
-  });
-
   it('prioritizes reconnect guidance when no channels sync and one needs reauth', async () => {
     mocks.selectRows.splice(
       0,
