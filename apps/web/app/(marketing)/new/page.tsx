@@ -1,6 +1,6 @@
 import type { Metadata } from 'next';
 import { HomepageV2Route } from '@/components/marketing/homepage-v2/HomepageV2Route';
-import { APP_NAME, BASE_URL } from '@/constants/app';
+import { APP_NAME, BASE_URL, LEGAL_ENTITY_NAME } from '@/constants/app';
 import { APP_ROUTES } from '@/constants/routes';
 import { HOMEPAGE_V2_COPY } from '@/data/homepageV2Copy';
 import {
@@ -63,10 +63,9 @@ const SOFTWARE_SCHEMA = buildSoftwareSchema(
 );
 
 const ORGANIZATION_SCHEMA = buildOrganizationSchema({
-  legalName: 'Jovie Technology Inc.',
+  legalName: LEGAL_ENTITY_NAME,
   description:
     'Jovie builds artist profiles, release surfaces, smart links, and fan intelligence for independent artists.',
-  sameAs: ['https://instagram.com/meetjovie'],
 });
 
 export default function NewLandingPage() {
