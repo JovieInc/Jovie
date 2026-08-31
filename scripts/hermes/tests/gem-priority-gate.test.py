@@ -595,7 +595,7 @@ class ConcurrencyObservationTests(unittest.TestCase):
         receipt = MODULE.evaluate(signals, MODULE.isoformat(now))
         self.assertEqual(receipt["signals"]["main"]["sha"], MAIN_SHA)
         self.assertFalse(receipt["workAdmission"]["newIssueLeaseAllowed"])
-        self.assertEqual(receipt["remediationAdmission"]["maxConcurrent"], 0)
+        self.assertEqual(receipt["remediationAdmission"]["maxConcurrent"], 1)
 
 
 class PersistedRefreshTests(unittest.TestCase):
@@ -750,7 +750,7 @@ class DeploymentBindingTests(unittest.TestCase):
             "expected-head-pr-update", receipt["remediationAdmission"]["activities"]
         )
 
-    def test_stale_capacity_preserves_runtime_floor_but_blocks_new_and_remote_mutation(self):
+    def test_stale_capacity_preserves_one_local_repair_but_blocks_new_and_remote_mutation(self):
         signals = dict(GREEN_SIGNALS)
         signals["concurrencyEvidence"] = {
             **GREEN_SIGNALS["concurrencyEvidence"],
@@ -766,7 +766,7 @@ class DeploymentBindingTests(unittest.TestCase):
         self.assertTrue(receipt["remediationAdmission"]["allowed"])
         self.assertTrue(receipt["remediationAdmission"]["localAllowed"])
         self.assertFalse(receipt["remediationAdmission"]["pushAllowed"])
-        self.assertEqual(receipt["remediationAdmission"]["maxConcurrent"], 0)
+        self.assertEqual(receipt["remediationAdmission"]["maxConcurrent"], 1)
         self.assertNotIn(
             "expected-head-pr-update", receipt["remediationAdmission"]["activities"]
         )
@@ -778,7 +778,7 @@ class DeploymentBindingTests(unittest.TestCase):
         )
         self.assertNotIn("draft-pr", receipt["workAdmission"]["activities"])
 
-    def test_missing_or_malformed_capacity_normalizes_to_zero_remote_capacity(self):
+    def test_missing_or_malformed_capacity_normalizes_to_local_only_receipt(self):
         for evidence in (None, {"schema": "malformed"}):
             with self.subTest(evidence=evidence):
                 signals = dict(GREEN_SIGNALS)
@@ -790,7 +790,7 @@ class DeploymentBindingTests(unittest.TestCase):
                 self.assertFalse(receipt["workAdmission"]["newIssueLeaseAllowed"])
                 self.assertFalse(receipt["workAdmission"]["newImplementationAllowed"])
                 self.assertFalse(receipt["remediationAdmission"]["pushAllowed"])
-                self.assertEqual(receipt["remediationAdmission"]["maxConcurrent"], 0)
+                self.assertEqual(receipt["remediationAdmission"]["maxConcurrent"], 1)
                 self.assertEqual(receipt["concurrency"]["gem"]["maxConcurrent"], 0)
                 self.assertEqual(receipt["concurrency"]["gem"]["runtimeFloor"], 1)
 
@@ -831,7 +831,7 @@ class DeploymentBindingTests(unittest.TestCase):
                 self.assertFalse(receipt["workAdmission"]["newIssueLeaseAllowed"])
                 self.assertFalse(receipt["workAdmission"]["newImplementationAllowed"])
                 self.assertFalse(receipt["remediationAdmission"]["pushAllowed"])
-                self.assertEqual(receipt["remediationAdmission"]["maxConcurrent"], 0)
+                self.assertEqual(receipt["remediationAdmission"]["maxConcurrent"], 1)
                 self.assertEqual(receipt["concurrency"]["gem"]["runtimeFloor"], 1)
 
     def test_missing_closure_health_fails_new_intake_closed_without_stopping_promotion(self):
@@ -862,7 +862,7 @@ class DeploymentBindingTests(unittest.TestCase):
         self.assertTrue(receipt["remediationAdmission"]["allowed"])
         self.assertTrue(receipt["remediationAdmission"]["localAllowed"])
         self.assertFalse(receipt["remediationAdmission"]["pushAllowed"])
-        self.assertEqual(receipt["remediationAdmission"]["maxConcurrent"], 0)
+        self.assertEqual(receipt["remediationAdmission"]["maxConcurrent"], 1)
         self.assertEqual(receipt["concurrency"]["gem"]["maxConcurrent"], 0)
         self.assertEqual(receipt["concurrency"]["gem"]["runtimeFloor"], 1)
         self.assertFalse(receipt["concurrency"]["gem"]["evidenceAccepted"])
