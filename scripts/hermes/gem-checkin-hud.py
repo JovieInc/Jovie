@@ -30,7 +30,7 @@ LIVE_SLUG = "symphony-ui-pilot-96d6b9c5b2d5"
 LIVE_PROJECT_ID = "440ea404-041f-461e-ae45-dd6a2e98e4a1"
 DEFAULT_MEASURED = Path.home() / ".local/state/gem-checkin-hud/measured.json"
 DEFAULT_TPS_STATE = Path.home() / ".local/state/gem-checkin-hud/symphony-tps.json"
-DEFAULT_SYMPHONY = os.environ.get("SYMPHONY_STATE_URL", "http://127.0.0.1:4043/api/v1/state")
+DEFAULT_SYMPHONY = os.environ.get("SYMPHONY_STATE_URL", "http://127.0.0.1:4041/api/v1/state")
 DEFAULT_WORKFLOW = Path(
     os.environ.get("SYMPHONY_WORKFLOW_PATH", str(Path.home() / ".config/symphony/WORKFLOW.md"))
 )
@@ -65,6 +65,19 @@ PR_READY_NAMES = frozenset({"PR Ready"})
 CHECK_PENDING = frozenset({"queued", "in_progress", "pending", "waiting", "requested"})
 MIN_WIDTH = 120
 TARGET_WIDTH = 430
+MIN_HEIGHT = 32
+TARGET_HEIGHT = 90
+PRODUCT_DESCRIPTION = "Autonomous work from Todo to merged."
+SHIPPING_DISPLAY_IA = {
+    "capacity": {"label": "AGENTS", "representation": "active-over-limit"},
+    "throughput": {"label": "THROUGHPUT", "representation": "token-rate"},
+    "failures": {"label": "FAILURES", "representation": "count-and-list"},
+    "tokens": {"label": "TOKENS", "representation": "total-and-per-work-item"},
+    "queue": {"label": "QUEUE", "representation": "count"},
+    "shipping_path": {"label": "SHIP", "representation": "segmented-stage-bar"},
+    "current_work": {"label": "CURRENT WORK", "representation": "receipt-table"},
+    "freshness": {"label": "Updated", "representation": "relative-local-time"},
+}
 
 
 def _now() -> datetime:
@@ -140,11 +153,46 @@ def pad_visible(text: str, width: int) -> str:
     return text if extra <= 0 else text + (" " * extra)
 
 
+def terminal_size(
+    width: int | None = None,
+    height: int | None = None,
+) -> tuple[int, int]:
+    size = shutil.get_terminal_size((TARGET_WIDTH, TARGET_HEIGHT))
+    cols = width if isinstance(width, int) and width > 0 else int(size.columns or TARGET_WIDTH)
+    rows = height if isinstance(height, int) and height > 0 else int(size.lines or TARGET_HEIGHT)
+    return max(MIN_WIDTH, cols), max(MIN_HEIGHT, rows)
+
+
 def terminal_width(override: int | None = None) -> int:
-    if isinstance(override, int) and override > 0:
-        return max(MIN_WIDTH, override)
-    size = shutil.get_terminal_size((TARGET_WIDTH, 40))
-    return max(MIN_WIDTH, int(size.columns or TARGET_WIDTH))
+    """Compatibility wrapper for callers that only need the terminal width."""
+    return terminal_size(width=override)[0]
+
+
+def natural_time(value: Any, *, now: datetime | None = None) -> str:
+    """Human freshness label without exposing UTC or machine timestamp syntax."""
+    stamp = _iso(value) if not isinstance(value, datetime) else value
+    if stamp is None:
+        return "freshness unknown"
+    seconds = int(((now or _now()) - stamp).total_seconds())
+    if seconds < -10:
+        return f"updates in {_duration(seconds)}"
+    seconds = max(0, seconds)
+    if seconds < 10:
+        return "just now"
+    if seconds < 60:
+        return f"{seconds} seconds ago"
+    minutes = seconds // 60
+    if minutes == 1:
+        return "1 minute ago"
+    if minutes < 60:
+        return f"{minutes} minutes ago"
+    hours = minutes // 60
+    if hours == 1:
+        return "1 hour ago"
+    if hours < 24:
+        return f"{hours} hours ago"
+    days = hours // 24
+    return "yesterday" if days == 1 else f"{days} days ago"
 
 
 def _duration(seconds: int) -> str:
@@ -318,10 +366,10 @@ def _receipt(item: Any) -> dict[str, str] | None:
     return {"receiptAt": receipt}
 
 
-def count_ships_this_week(ships: Any, *, now: datetime | None = None) -> dict[str, int]:
+def count_ships_this_week(ships: Any, *, now: datetime | None = None) -> dict[str, int | None]:
     receipts = ships.get("receipts") if isinstance(ships, dict) else None
     if not isinstance(receipts, list):
-        receipts = []
+        return {"thisWeek": None}
     clock = now or _now()
     week_ago = clock - timedelta(days=7)
     counted = 0
@@ -571,7 +619,7 @@ def build_ship_path(
     return {"ok": True, "stages": stages, "bottleneck": ship_bottleneck(stages)}
 
 
-def bottleneck(alive: dict[str, Any], wow: dict[str, Any], ships: dict[str, int], symphony: dict[str, Any]) -> str:
+def bottleneck(alive: dict[str, Any], wow: dict[str, Any], ships: dict[str, int | None], symphony: dict[str, Any]) -> str:
     if alive["status"] == "DEAD":
         return "cash or profit-before-zero is dead"
     if alive["status"] == UNKNOWN:
@@ -580,13 +628,15 @@ def bottleneck(alive: dict[str, Any], wow: dict[str, Any], ships: dict[str, int]
         return "WOW unmeasured — revenue first, else active users"
     if wow["rate"] < 0.05:
         return "WOW below 5–7%/wk YC bar"
+    if ships["thisWeek"] is None:
+        return "SHIPS unmeasured — receipts unavailable"
     if ships["thisWeek"] == 0:
         return "no receipted ships this week"
     retrying = symphony.get("retrying")
     if symphony.get("ok") and isinstance(retrying, int) and retrying > 0:
         return f"Symphony retrying {retrying}"
     if not symphony.get("ok"):
-        return "official Symphony :4043 unreachable"
+        return "official Symphony :4041 unreachable"
     return "keep shipping receipted work"
 
 
@@ -666,7 +716,7 @@ def fetch_symphony(url: str, *, timeout: float = 1.5, cap: int | None = None) ->
     empty = {
         "ok": False, "running": None, "retrying": None, "blocked": None, "cap": cap,
         "rows": [], "totals": None, "seconds_running": None, "rate_limits": None,
-        "hook_failed": None, "last_event": None, "up": False,
+        "hook_failed": None, "last_event": None, "generated_at": None, "up": False,
     }
     try:
         with urllib.request.urlopen(url, timeout=timeout) as response:
@@ -709,7 +759,7 @@ def fetch_symphony(url: str, *, timeout: float = 1.5, cap: int | None = None) ->
         "blocked": _count("blocked", blocked_items), "cap": cap, "rows": rows, "totals": totals,
         "seconds_running": _int(totals.get("seconds_running")) if totals else None,
         "rate_limits": payload.get("rate_limits") if isinstance(payload.get("rate_limits"), dict) else None,
-        "hook_failed": hook, "last_event": last_event, "up": True,
+        "hook_failed": hook, "last_event": last_event, "generated_at": payload.get("generated_at"), "up": True,
     }
 
 
@@ -918,46 +968,29 @@ def fetch_sha() -> str | None:
         return None
 
 
-def _bucket(label: str, value: int | None, color: tuple[int, int, int]) -> str | None:
-    if value == 0:
-        return None
-    return _rgb(color, f"{label} {dash(value)}")
-
-
 def _header(
     *,
-    running: int | None,
-    cap: int | None,
-    retrying: int | None,
-    mq: int | None,
-    review: int | None,
     sha: str | None,
+    freshness: str,
     width: int,
 ) -> str:
-    parts = [_rgb(BLUE, "JOVIE", bold=True), _rgb(PINK, "main")]
+    parts = [_rgb(FG, "● JOVIE", bold=True), _rgb(DIM, "shipping cockpit"), _rgb(FG, "main")]
     if sha:
         parts.append(_rgb(DIM, sha))
-    run = None if running == 0 else f"RUN {dash(running)}/{dash(cap)}"
-    if run:
-        parts.append(_rgb(BLUE, run, bold=True))
-    for label, value, color in (("RETRY", retrying, PINK), ("MQ", mq, PURPLE), ("Review", review, PINK)):
-        pill = _bucket(label, value, color)
-        if pill:
-            parts.append(pill)
-    line = f" {_rgb(DIM, '|')} ".join(parts)
-    return pad_visible(line, width)
+    left = f" {_rgb(DIM, '·')} ".join(parts)
+    right = _rgb(DIM, f"Updated {freshness}")
+    gap = max(2, width - visible_len(left) - visible_len(right))
+    return pad_visible(left + (" " * gap) + right, width)
 
 
 def _tile(title: str, headline: str, detail: str, spark: str, color: tuple[int, int, int], width: int) -> list[str]:
-    inner = max(8, width - 2)
-    top = _rgb(color, f"┌ {clip(title, inner - 2)}", bold=True)
-    body = [
-        _rgb(FG, clip(headline, inner), bold=True),
-        _rgb(DIM, clip(detail, inner)),
-        _rgb(color, clip(spark, inner)),
+    inner = max(8, width)
+    return [
+        pad_visible(_rgb(DIM, clip(title, inner), bold=True), width),
+        pad_visible(_rgb(FG, clip(headline, inner), bold=True), width),
+        pad_visible(_rgb(DIM, clip(detail, inner)), width),
+        pad_visible(_rgb(color, clip(spark, inner)), width),
     ]
-    bottom = _rgb(DIM, "└" + ("─" * (inner - 1)))
-    return [pad_visible(top, width), *[pad_visible(f"│ {line}", width) for line in body], pad_visible(bottom, width)]
 
 
 def _tiles_row(tiles: list[list[str]], width: int) -> list[str]:
@@ -1016,7 +1049,13 @@ def _job_row(row: dict[str, Any], widths: dict[str, int], *, now: datetime) -> s
     return _cells(BLUE, widths, "●", dash(row.get("id")), dash(row.get("title") or row.get("last_message")), dash(row.get("attempt")), dash(row.get("turn")), compact_tokens(row.get("tokens_total"), row.get("tokens_in"), row.get("tokens_out")), elapsed_label(row.get("started"), now=now, seconds=row.get("seconds")), short_path(row.get("workspace") or row.get("url")))
 
 
-def _status_strip(symphony: dict[str, Any], tps: float | None, width: int) -> str:
+def _status_strip(
+    symphony: dict[str, Any],
+    tps: float | None,
+    mq: int | None,
+    review: int | None,
+    width: int,
+) -> str:
     running = symphony.get("running") if symphony.get("ok") else None
     cap = symphony.get("cap") if symphony.get("ok") else symphony.get("cap")
     totals = symphony.get("totals") if isinstance(symphony.get("totals"), dict) else {}
@@ -1028,16 +1067,21 @@ def _status_strip(symphony: dict[str, Any], tps: float | None, width: int) -> st
         seconds = totals.get("seconds_running")
     throughput = "-" if tps is None else f"{tps:,.0f} tps"
     agents = f"{dash(running)}/{dash(cap)}"
+    retrying = _int(symphony.get("retrying"))
+    blocked = _int(symphony.get("blocked"))
+    failures = None if not symphony.get("ok") or retrying is None or blocked is None else retrying + blocked
     limits = format_rate_limits(symphony.get("rate_limits"))
-    title = _rgb(BLUE, "SYMPHONY STATUS", bold=True)
     fields = [
-        _rgb(BLUE, f"Agents {agents}"),
-        _rgb(PINK, f"Throughput {throughput}"),
-        _rgb(PURPLE, f"Runtime {runtime_label(seconds)}"),
-        _rgb(FG, f"Tokens in {incoming} | out {outgoing} | total {total}"),
+        _rgb(BLUE if running else DIM, f"{SHIPPING_DISPLAY_IA['capacity']['label']} {agents}", bold=True),
+        _rgb(FG, f"{SHIPPING_DISPLAY_IA['throughput']['label']} {throughput}", bold=True),
+        _rgb(PINK if failures else DIM, f"{SHIPPING_DISPLAY_IA['failures']['label']} {dash(failures)}", bold=True),
+        _rgb(PURPLE if mq else DIM, f"{SHIPPING_DISPLAY_IA['queue']['label']} {dash(mq)}", bold=True),
+        _rgb(PINK if review else DIM, f"REVIEW {dash(review)}"),
+        _rgb(FG, f"{SHIPPING_DISPLAY_IA['tokens']['label']} {total}", bold=True),
+        _rgb(DIM, f"RUNTIME {runtime_label(seconds)}"),
         _rgb(DIM, f"Rate Limits {limits}"),
     ]
-    line = f"{_rgb(BLUE, '╭')} {title}  " + f"  {_rgb(DIM, '│')}  ".join(fields)
+    line = f"  {_rgb(DIM, '·')}  ".join(fields)
     return pad_visible(line, width) if visible_len(line) <= width else line
 
 
@@ -1072,7 +1116,7 @@ def _ship_path_lines(ship_path: dict[str, Any] | None, width: int) -> list[str]:
     spacer = "  "
     named = f"#1 {bottleneck['reason']}" if bottleneck and bottleneck.get("reason") else "-"
     heading = pad_visible(
-        _rgb(PURPLE, clip("SHIP", 4), bold=True)
+        _rgb(FG, clip(SHIPPING_DISPLAY_IA["shipping_path"]["label"], 4), bold=True)
         + _rgb(DIM, clip("  Todo/pickup → agent running → PR open → ci-fast → PR Ready → merge queue → merge_group CI → merged", max(0, width - 4))),
         width,
     )
@@ -1092,7 +1136,7 @@ def named_number_one(
     return bottleneck(alive, wow, ships, symphony)
 
 
-def _footer(symphony: dict[str, Any], width: int) -> str:
+def _footer(symphony: dict[str, Any], width: int, *, now: datetime) -> str:
     up = "up" if symphony.get("up") else "down"
     hook = symphony.get("hook_failed")
     if hook is True:
@@ -1104,10 +1148,12 @@ def _footer(symphony: dict[str, Any], width: int) -> str:
     totals = symphony.get("totals") if isinstance(symphony.get("totals"), dict) else {}
     incoming = dash(_int(totals.get("input_tokens")) if totals else None)
     outgoing = dash(_int(totals.get("output_tokens")) if totals else None)
+    last_event = symphony.get("last_event")
+    event_text = natural_time(last_event, now=now) if _iso(last_event) else dash(last_event)
     parts = [
-        f"burrito :4043 {up}",
+        f"OpenAI Symphony :4041 {up}",
         f"hook_failed {hook_text}",
-        f"last event {dash(symphony.get('last_event'))}",
+        f"last event {event_text}",
         f"totals in {incoming} out {outgoing}",
     ]
     return pad_visible(_rgb(DIM, " | ".join(parts)), width)
@@ -1121,12 +1167,13 @@ def render(
     measured: dict[str, Any] | None = None,
     now: datetime | None = None,
     width: int | None = None,
+    height: int | None = None,
     sha: str | None = None,
     ship_path: dict[str, Any] | None = None,
     tps: float | None = None,
 ) -> str:
     clock = now or _now()
-    cols = terminal_width(width)
+    cols, rows = terminal_size(width=width, height=height)
     measured = measured if isinstance(measured, dict) else {}
     alive = compute_alive(measured.get("alive"))
     wow = compute_wow(measured.get("wow"))
@@ -1142,47 +1189,67 @@ def render(
     col = (cols - gap * 3) // 4
     leftover = cols - (col * 4 + gap * 3)
     tile_widths = [col, col, col, col + leftover]
+    alive_color = DIM if alive["status"] == UNKNOWN else BLUE if alive["status"] == "DEFAULT ALIVE" else PINK
+    wow_color = DIM if wow["rate"] is None else BLUE if wow["rate"] >= 0 else PINK
+    ships_color = BLUE if isinstance(ships["thisWeek"], int) and ships["thisWeek"] > 0 else DIM
+    ships_headline = UNKNOWN if ships["thisWeek"] is None else str(ships["thisWeek"])
+    ships_detail = UNMEASURED if ships["thisWeek"] is None else "receipted this week"
     tiles = _tiles_row(
         [
-            _tile("ALIVE", alive["status"], alive_detail, sparkline(alive_spark) if alive_spark else "-", BLUE, tile_widths[0]),
-            _tile("WOW", UNKNOWN if wow["rate"] is None else _pct(wow["rate"]), wow_detail, sparkline(wow_spark) if wow_spark else "-", PINK, tile_widths[1]),
-            _tile("SHIPS", str(ships["thisWeek"]), "receipted this week", sparkline(ships_spark) if ships_spark else "-", PURPLE, tile_widths[2]),
-            _tile("#1", named, f"symphony run {dash(symphony.get('running'))} retry {dash(symphony.get('retrying'))}", "-", BLUE, tile_widths[3]),
+            _tile("ALIVE", alive["status"], alive_detail, sparkline(alive_spark) if alive_spark else "-", alive_color, tile_widths[0]),
+            _tile("WOW", UNKNOWN if wow["rate"] is None else _pct(wow["rate"]), wow_detail, sparkline(wow_spark) if wow_spark else "-", wow_color, tile_widths[1]),
+            _tile("SHIPS", ships_headline, ships_detail, sparkline(ships_spark) if ships_spark else "-", ships_color, tile_widths[2]),
+            _tile("#1", named, f"symphony run {dash(symphony.get('running'))} retry {dash(symphony.get('retrying'))}", "-", PINK if named != "-" else DIM, tile_widths[3]),
         ],
         cols,
     )
-    running_n = symphony.get("running") if symphony.get("ok") else None
-    retrying_n = symphony.get("retrying") if symphony.get("ok") else None
-    cap = symphony.get("cap") if symphony.get("ok") else symphony.get("cap")
     mq_n = mq.get("count") if mq.get("ok") else None
-    header = _header(running=running_n, cap=cap, retrying=retrying_n, mq=mq_n, review=review, sha=sha, width=cols)
+    header = _header(
+        sha=sha,
+        freshness=natural_time(symphony.get("generated_at"), now=clock),
+        width=cols,
+    )
     widths = _col_widths(cols)
     tps_value = tps if tps is not None else compute_throughput(symphony.get("totals"), [], now=clock)
     lines = [
         header,
+        _rgb(DIM, PRODUCT_DESCRIPTION),
         "",
-        _status_strip(symphony, tps_value, cols),
+        _status_strip(symphony, tps_value, mq_n, review, cols),
         "",
         *_ship_path_lines(path, cols),
         "",
         *tiles,
         "",
+        _rgb(FG, SHIPPING_DISPLAY_IA["current_work"]["label"], bold=True),
         _table_header(widths),
         _rgb(DIM, "─" * cols),
     ]
-    for row in symphony.get("rows") or []:
-        lines.append(_job_row(row, widths, now=clock))
-    for row in mq.get("rows") or []:
-        lines.append(_job_row(row, widths, now=clock))
+    work_rows = [_job_row(row, widths, now=clock) for row in (symphony.get("rows") or [])]
+    work_rows.extend(_job_row(row, widths, now=clock) for row in (mq.get("rows") or []))
     if review is None:
-        lines.append(_rgb(PINK, clip("v  Review -", cols)))
+        work_rows.append(_rgb(PINK, clip("v  Review -", cols)))
     elif review > 0:
-        lines.append(_rgb(PINK, clip(f"v  Review {review}", cols)))
-    lines.extend(["", _footer(symphony, cols)])
+        work_rows.append(_rgb(PINK, clip(f"v  Review {review}", cols)))
+    footer = ["", _footer(symphony, cols, now=clock)]
+    available = max(1, rows - len(lines) - len(footer))
+    if len(work_rows) > available:
+        hidden = len(work_rows) - available + 1
+        work_rows = [*work_rows[: max(0, available - 1)], _rgb(DIM, clip(f"… {hidden} more active receipts", cols))]
+    lines.extend(work_rows)
+    lines.extend([""] * max(0, available - len(work_rows)))
+    lines.extend(footer)
+    lines = lines[:rows]
     return f"\033[48;2;{BG[0]};{BG[1]};{BG[2]}m" + "\n".join(lines) + "\033[0m\n"
 
 
-def frame(*, measured_path: Path, symphony_url: str, width: int | None = None) -> str:
+def frame(
+    *,
+    measured_path: Path,
+    symphony_url: str,
+    width: int | None = None,
+    height: int | None = None,
+) -> str:
     cap = read_workflow_cap()
     symphony = fetch_symphony(symphony_url, cap=cap)
     mq = fetch_mq()
@@ -1199,6 +1266,7 @@ def frame(*, measured_path: Path, symphony_url: str, width: int | None = None) -
         review=linear.get("review") if linear.get("ok") else fetch_review(),
         measured=measured,
         width=width,
+        height=height,
         sha=fetch_sha(),
         ship_path=build_ship_path(symphony=symphony, mq=mq, linear=linear, github=github, measured=measured),
         tps=tps,
@@ -1212,6 +1280,7 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     parser.add_argument("--symphony-url", default=DEFAULT_SYMPHONY)
     parser.add_argument("--interval", type=float, default=5.0)
     parser.add_argument("--width", type=int, default=None)
+    parser.add_argument("--height", type=int, default=None)
     return parser.parse_args(argv)
 
 
@@ -1219,11 +1288,11 @@ def main(argv: list[str] | None = None) -> int:
     args = parse_args(argv)
     path = Path(args.measured)
     if args.once:
-        sys.stdout.write(frame(measured_path=path, symphony_url=args.symphony_url, width=args.width))
+        sys.stdout.write(frame(measured_path=path, symphony_url=args.symphony_url, width=args.width, height=args.height))
         return 0
     while True:
         sys.stdout.write("\033[2J\033[H")
-        sys.stdout.write(frame(measured_path=path, symphony_url=args.symphony_url, width=args.width))
+        sys.stdout.write(frame(measured_path=path, symphony_url=args.symphony_url, width=args.width, height=args.height))
         sys.stdout.flush()
         time.sleep(max(0.5, args.interval))
 
