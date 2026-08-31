@@ -451,6 +451,8 @@ jobs:
           patch_sha=''
           printf '' > "$artifact_dir/repair.patch"
 
+          git config user.name 'jovie-conflict-preparer'
+          git config user.email 'jovie-conflict-preparer@users.noreply.github.com'
           git config merge.conflictstyle zdiff3
           set +e
           git merge --no-commit --no-ff "$BASE_HEAD" > "$artifact_dir/merge.log" 2>&1
@@ -1063,6 +1065,8 @@ jobs:
           if ! git cat-file -e "$BASE_HEAD^{commit}" 2>/dev/null; then
             git fetch --no-tags origin "$BASE_HEAD"
           fi
+          git config user.name 'jovie-bot[bot]'
+          git config user.email 'jovie-bot[bot]@users.noreply.github.com'
 
           # Reproduce the exact merge independently and freeze every
           # non-conflicting index entry. The model may choose content only for
@@ -1142,8 +1146,6 @@ jobs:
           expected_tree=$(jq -r '.resolvedTreeOid' "$receipt")
           test "$resolved_tree" = "$expected_tree"
 
-          git config user.name 'jovie-bot[bot]'
-          git config user.email 'jovie-bot[bot]@users.noreply.github.com'
           message=$(printf 'chore(ci): resolve PR #%s conflict\n\nJOV-INV-021\nConflict-FX-Source: %s\nConflict-FX-Base: %s\nConflict-FX-Attempt: %s/%s\n' \
             "$PR_NUMBER" "$SOURCE_HEAD" "$BASE_HEAD" "$ATTEMPT" "$MAX_ATTEMPTS")
           resolved_commit=$(printf '%s' "$message" \
