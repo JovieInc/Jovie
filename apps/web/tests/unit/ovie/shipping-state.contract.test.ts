@@ -28,6 +28,7 @@ import {
   createLiveShippingStateReaders,
   isAllowlistedAuthorityPath,
   NAMED_AUTHORITY_PATHS,
+  readMergeQueue,
   resolveNamedAuthorityPath,
 } from '@/lib/ovie/shipping-state/live';
 
@@ -850,33 +851,277 @@ describe('zero, states, ordering, meanings, cadence', () => {
 });
 
 describe('live symphony-task reader', () => {
-  it('overrides the shared runtime payload schema so task observations stay fresh', async () => {
+  it('does not relabel the runtime endpoint as an official task receipt', async () => {
+    const fetchMock = vi.fn();
     const readers = createLiveShippingStateReaders({
       readFile: vi.fn(async () => {
         throw Object.assign(new Error('missing'), { code: 'ENOENT' });
       }),
-      fetch: vi.fn(
-        async () =>
-          new Response(
-            JSON.stringify({
-              schema: SHIPPING_SOURCE_SCHEMAS['symphony-runtime'],
-              running: [],
-              retrying: [],
-              blocked: [],
-            }),
-            { status: 200, headers: { 'content-type': 'application/json' } }
-          )
-      ),
+      fetch: fetchMock,
     });
     const read = await readers['symphony-task']();
     expect(read).toMatchObject({
       sourceId: 'symphony-task',
-      status: 'ok',
-      schema: SHIPPING_SOURCE_SCHEMAS['symphony-task'],
+      status: 'unavailable',
+      schema: null,
+      errorCode: 'not-configured',
     });
     const projection = await publish({ 'symphony-task': read });
-    expect(projection.sources['symphony-task'].state).toBe('fresh');
-    expect(projection.sources['symphony-task'].lastError).toBeNull();
+    expect(projection.sources['symphony-task'].state).toBe('unavailable');
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+});
+
+describe('live GitHub shipping reader', () => {
+  function mergeQueueResponse(
+    options: {
+      readonly hasNextPage?: boolean;
+      readonly nodes?: unknown;
+      readonly totalCount?: unknown;
+    } = {}
+  ) {
+    return new Response(
+      JSON.stringify({
+        data: {
+          repository: {
+            pullRequests: { totalCount: options.totalCount ?? 126 },
+            mergeQueue: {
+              entries: {
+                pageInfo: { hasNextPage: options.hasNextPage ?? false },
+                nodes: options.nodes ?? [
+                  {
+                    id: 'mq-1',
+                    position: 1,
+                    state: 'QUEUED',
+                    pullRequest: { number: 16797, headRefOid: SHA },
+                  },
+                ],
+              },
+            },
+          },
+        },
+      }),
+      { status: 200, headers: { 'content-type': 'application/json' } }
+    );
+  }
+
+  it('reads total open PRs separately from native merge-queue membership', async () => {
+    const fetchMock = vi.fn(async () => mergeQueueResponse());
+    const read = await readMergeQueue({
+      readFile: vi.fn(),
+      fetch: fetchMock,
+      githubToken: 'test-token',
+      githubOwner: 'JovieInc',
+      githubRepo: 'Jovie',
+    });
+
+    expect(read).toMatchObject({
+      status: 'ok',
+      payload: {
+        openPullRequests: 126,
+        entries: [{ id: 'mq-1', position: 1, state: 'QUEUED' }],
+      },
+    });
+    const request = fetchMock.mock.calls[0]?.[1] as RequestInit;
+    expect(String(request.body)).toContain('pullRequests(states:OPEN,first:1)');
+  });
+
+  it.each([
+    ['HTTP failure', () => new Response('{}', { status: 502 })],
+    [
+      'GraphQL failure',
+      () =>
+        new Response(JSON.stringify({ errors: [{ message: 'denied' }] }), {
+          status: 200,
+        }),
+    ],
+    ['malformed payload', () => mergeQueueResponse({ nodes: 'invalid' })],
+    [
+      'invalid queue entry',
+      () =>
+        mergeQueueResponse({
+          nodes: [
+            {
+              id: 'mq-1',
+              position: 0,
+              state: 'QUEUED',
+              pullRequest: { number: 16797, headRefOid: SHA },
+            },
+          ],
+        }),
+    ],
+    ['invalid open PR count', () => mergeQueueResponse({ totalCount: '126' })],
+    [
+      'empty truncated page',
+      () => mergeQueueResponse({ hasNextPage: true, nodes: [] }),
+    ],
+    ['invalid JSON', () => new Response('{', { status: 200 })],
+    [
+      'transport rejection',
+      () => {
+        throw new Error('offline');
+      },
+    ],
+  ])('fails unavailable on %s', async (_label, responseFactory) => {
+    const read = await readMergeQueue({
+      readFile: vi.fn(),
+      fetch: vi.fn(async () => responseFactory()),
+      githubToken: 'test-token',
+      githubOwner: 'JovieInc',
+      githubRepo: 'Jovie',
+    });
+
+    expect(read).toMatchObject({
+      sourceId: 'github-native-merge-queue',
+      status: 'unavailable',
+    });
+  });
+
+  it('distinguishes GitHub rate limiting from authorization failure', async () => {
+    const read = await readMergeQueue({
+      readFile: vi.fn(),
+      fetch: vi.fn(
+        async () =>
+          new Response('{}', {
+            status: 403,
+            headers: {
+              'x-ratelimit-remaining': '0',
+              'x-ratelimit-reset': '1788144000',
+            },
+          })
+      ),
+      githubToken: 'test-token',
+      githubOwner: 'JovieInc',
+      githubRepo: 'Jovie',
+    });
+
+    expect(read).toMatchObject({
+      status: 'unavailable',
+      errorCode: 'rate-limited',
+      errorMessage: 'GitHub request rate limited',
+    });
+  });
+
+  it('backs off repeated GitHub reads on the same configured transport', async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date('2026-08-30T12:00:00.000Z'));
+    const fetchMock = vi.fn(
+      async () =>
+        new Response('{}', {
+          status: 429,
+          headers: { 'retry-after': '120' },
+        })
+    );
+    const io = {
+      readFile: vi.fn(),
+      fetch: fetchMock,
+      githubToken: 'test-token',
+      githubOwner: 'JovieInc',
+      githubRepo: 'Jovie',
+    };
+
+    const first = await readMergeQueue(io);
+    const second = await readMergeQueue(io);
+
+    expect(first.errorCode).toBe('rate-limited');
+    expect(second.errorCode).toBe('rate-limited');
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+  });
+
+  it('does not turn a truncated queue page into an exact count', async () => {
+    const read = await readMergeQueue({
+      readFile: vi.fn(),
+      fetch: vi.fn(async () => mergeQueueResponse({ hasNextPage: true })),
+      githubToken: 'test-token',
+      githubOwner: 'JovieInc',
+      githubRepo: 'Jovie',
+    });
+    expect(read).toMatchObject({ status: 'ok', truncated: true });
+
+    const projection = await publish({ 'github-native-merge-queue': read });
+    expect(
+      projection.sources['github-native-merge-queue'].counts.queued
+    ).toEqual({ state: 'not-measured', value: null });
+    expect(
+      projection.sources['github-native-merge-queue'].counts.openPullRequests
+    ).toEqual({ state: 'measured-nonzero', value: 126 });
+  });
+
+  it('reads live state only from the official OpenAI Symphony port', async () => {
+    const readFile = vi.fn();
+    const fetchMock = vi.fn(async () =>
+      Promise.resolve(
+        new Response(
+          JSON.stringify({
+            generated_at: T0,
+            running: [{ issue_identifier: 'JOV-1' }],
+            retrying: [],
+            blocked: [],
+          }),
+          { status: 200 }
+        )
+      )
+    );
+    const readers = createLiveShippingStateReaders({
+      readFile,
+      fetch: fetchMock,
+    });
+
+    const read = await readers['symphony-runtime']();
+
+    expect(read).toMatchObject({
+      status: 'ok',
+      sourceTimestamp: T0,
+      payload: { running: [{ issue_identifier: 'JOV-1' }] },
+    });
+    expect(fetchMock.mock.calls[0]?.[0]).toBe(
+      'http://127.0.0.1:4043/api/v1/state'
+    );
+    expect(readFile).not.toHaveBeenCalled();
+  });
+
+  it('projects lease capacity from the canonical Gem fleet receipt', async () => {
+    const observedAt = '2026-08-22T00:00:03.000Z';
+    const readFile = vi.fn(async () =>
+      JSON.stringify({
+        schema: 'jovie-fleet-gate/v1',
+        observedAt,
+        signals: {
+          main: { sha: SHA },
+          lease: {
+            observedAt,
+            status: 'ok',
+            capacity: {
+              accounts: 4,
+              available: 2,
+              locked: 1,
+              cooldown: 1,
+            },
+          },
+        },
+      })
+    );
+    const readers = createLiveShippingStateReaders({
+      readFile,
+      fetch: vi.fn(),
+    });
+
+    const read = await readers['lease-guard-capacity']();
+    const projection = await publish({ 'lease-guard-capacity': read });
+
+    expect(read).toMatchObject({
+      status: 'ok',
+      sourceTimestamp: observedAt,
+      sourceRevision: SHA,
+      payload: { capacity: { available: 2 } },
+    });
+    expect(projection.capacityAvailable).toEqual({
+      state: 'measured-nonzero',
+      value: 2,
+    });
+    expect(readFile).toHaveBeenCalledWith(
+      resolveNamedAuthorityPath('fleet-receipt')
+    );
   });
 });
 
