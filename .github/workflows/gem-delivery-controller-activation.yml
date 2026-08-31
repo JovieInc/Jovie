@@ -66,9 +66,9 @@ jobs:
           set -euo pipefail
           bash scripts/hermes/install-gem-fleet-controller.sh
           bash scripts/hermes/install-gem-pr-rehabilitation.sh
-          main_pid="$(systemctl --user show symphony-ui-pilot.service --property=MainPID --value)"
-          bash scripts/hermes/install-symphony-ui-pilot.sh
-          after_pid="$(systemctl --user show symphony-ui-pilot.service --property=MainPID --value)"
+          main_pid="$(systemctl --user show symphony-elixir.service --property=MainPID --value)"
+          bash scripts/hermes/update-symphony-burrito.sh --skip-binary --no-restart
+          after_pid="$(systemctl --user show symphony-elixir.service --property=MainPID --value)"
           test "$main_pid" = "$after_pid"
       - name: Verify runtime identity after reload
         env:
@@ -97,7 +97,7 @@ jobs:
           ' "$GEM_WORKSPACE/state/gem-pr-rehabilitation-attestation.json" >/dev/null
           systemctl --user is-enabled --quiet gem-pr-drain.timer
           systemctl --user is-active --quiet gem-pr-drain.timer
-          bash scripts/hermes/install-symphony-ui-pilot.sh --check
+          bash scripts/hermes/update-symphony-burrito.sh --check
           SYMPHONY_RUNTIME_SOURCE_ROOT="$PWD/scripts/hermes" \
             SYMPHONY_MODEL_ROUTER="$HOME/.local/lib/symphony-reconciler/model-router.py" \
             SYMPHONY_MODEL_REGISTRY="$HOME/.local/lib/symphony-reconciler/model-registry.json" \

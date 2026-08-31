@@ -475,7 +475,7 @@ def _start_jov_primary() -> bool:
 
 
 def _services_active() -> bool:
-    """JOV Symphony UI is the required owner. LYB is best-effort."""
+    """JOV official Symphony is the required owner. LYB is best-effort."""
     return _jov_active()
 
 
@@ -1828,7 +1828,7 @@ def _continue_exhausted_reconcile(reason: str) -> int:
 
     # Exclusive implementation is the fallback lease flock; the Codex launcher
     # exits 78 when that lock is held. Do not stop JOV: fleet-gate observes
-    # :4041 on Gem, and a stopped UI freezes promotion (zero merge-queue slots).
+    # :4041 on Gem, and a stopped scheduler freezes promotion (zero merge-queue slots).
     launched_units, _capacity_used = _launch_fallback_workers(
         identifiers, active, executable, bundle_revision, selection, limit
     )

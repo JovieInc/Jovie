@@ -411,12 +411,13 @@ class FleetControllerInstallerContractTests(unittest.TestCase):
             "consumer": gem / "scripts/gem-pr-drain.py",
             "registry_module": gem / "scripts/gem_repo_registry.py",
             "registry_config": gem / "config/gem-repo-registry.json",
-            "workflow": symphony / "WORKFLOW.jovie-ui-pilot.md",
+            "workflow": home / ".config/symphony/WORKFLOW.md",
             "attestation": gem / "state/gem-service-attestation.json",
         }
         (gem / "scripts").mkdir(parents=True)
         (gem / "config").mkdir(parents=True)
         symphony.mkdir(parents=True)
+        (home / ".config/symphony").mkdir(parents=True)
         (home / ".config/systemd/user").mkdir(parents=True)
         fake_bin.mkdir()
         paths["gate"].write_text("old gate\n", encoding="utf-8")
@@ -441,25 +442,24 @@ case "$*" in
   *"show-environment"*) exit 0 ;;
   *"is-active --quiet gem-pr-drain.timer"*) exit 1 ;;
   *"is-active --quiet gem-pr-drain.service"*) exit 1 ;;
-  *"restart symphony-ui-pilot.service"*)
-    if { [ -n "${FAKE_WORKFLOW_OVERLAY_VALUE:-}" ] || [ "${FAKE_WORKFLOW_UNRELATED_DRIFT:-false}" = true ]; } &&
-       [ ! -e "$FAKE_WORKFLOW_MUTATION_MARKER" ]; then
-      if [ -n "${FAKE_WORKFLOW_OVERLAY_VALUE:-}" ]; then
-        sed "s/max_concurrent_agents: [1-8]$/max_concurrent_agents: ${FAKE_WORKFLOW_OVERLAY_VALUE}/" \
-          "$FAKE_WORKFLOW_OVERLAY_TARGET" > "$FAKE_WORKFLOW_OVERLAY_TARGET.fake"
-        mv "$FAKE_WORKFLOW_OVERLAY_TARGET.fake" "$FAKE_WORKFLOW_OVERLAY_TARGET"
-      fi
+	  *"is-active --quiet symphony-elixir.service"*)
+	    if { [ -n "${FAKE_WORKFLOW_OVERLAY_VALUE:-}" ] || [ "${FAKE_WORKFLOW_UNRELATED_DRIFT:-false}" = true ]; } &&
+	       [ ! -e "$FAKE_WORKFLOW_MUTATION_MARKER" ]; then
+	      if [ -n "${FAKE_WORKFLOW_OVERLAY_VALUE:-}" ]; then
+	        sed "s/max_concurrent_agents: [1-9][0-9]*$/max_concurrent_agents: ${FAKE_WORKFLOW_OVERLAY_VALUE}/" \
+	          "$FAKE_WORKFLOW_OVERLAY_TARGET" > "$FAKE_WORKFLOW_OVERLAY_TARGET.fake"
+	        mv "$FAKE_WORKFLOW_OVERLAY_TARGET.fake" "$FAKE_WORKFLOW_OVERLAY_TARGET"
+	      fi
       if [ "${FAKE_WORKFLOW_UNRELATED_DRIFT:-false}" = true ]; then
         printf '\n# unrelated runtime drift\n' >> "$FAKE_WORKFLOW_OVERLAY_TARGET"
       fi
-      : > "$FAKE_WORKFLOW_MUTATION_MARKER"
-    fi
-    [ "${FAKE_RESTART_FAILURE:-false}" != true ]
-    exit
-    ;;
-  *"is-active --quiet symphony-ui-pilot.service"*) exit 0 ;;
-esac
-exit 0
+	      : > "$FAKE_WORKFLOW_MUTATION_MARKER"
+	    fi
+	    [ "${FAKE_RESTART_FAILURE:-false}" != true ]
+	    exit
+	    ;;
+	esac
+	exit 0
 """,
             encoding="utf-8",
         )
@@ -582,8 +582,8 @@ exit 0
             attestation["policy"]["installedSha256"],
         )
         self.assertEqual(attestation["workflow"]["matchMode"], "exact")
-        self.assertEqual(attestation["workflow"]["sourceMaxConcurrentAgents"], 4)
-        self.assertEqual(attestation["workflow"]["installedMaxConcurrentAgents"], 4)
+        self.assertEqual(attestation["workflow"]["sourceMaxConcurrentAgents"], 40)
+        self.assertEqual(attestation["workflow"]["installedMaxConcurrentAgents"], 40)
 
     def test_install_attests_controller_owned_bounded_concurrency_overlay(self):
         with tempfile.TemporaryDirectory() as directory:
@@ -599,7 +599,7 @@ exit 0
         self.assertEqual(
             attestation["workflow"]["matchMode"], "bounded_concurrency_overlay"
         )
-        self.assertEqual(attestation["workflow"]["sourceMaxConcurrentAgents"], 4)
+        self.assertEqual(attestation["workflow"]["sourceMaxConcurrentAgents"], 40)
         self.assertEqual(attestation["workflow"]["installedMaxConcurrentAgents"], 1)
         self.assertNotEqual(
             attestation["workflow"]["sourceSha256"],
@@ -610,7 +610,7 @@ exit 0
         with tempfile.TemporaryDirectory() as directory:
             fixture = self._fixture(directory)
             paths, env = self._runtime(directory)
-            process = self._install(fixture, env, workflow_overlay="9")
+            process = self._install(fixture, env, workflow_overlay="80")
             restored_workflow = paths["workflow"].read_text(encoding="utf-8")
             attestation_exists = paths["attestation"].exists()
 

@@ -1,7 +1,9 @@
 [Unit]
-Description=Official OpenAI Symphony burrito
+Description=Official OpenAI Symphony elixir
 After=network-online.target
 Wants=network-online.target
+StartLimitIntervalSec=3600
+StartLimitBurst=5
 
 [Service]
 Type=simple
@@ -10,9 +12,9 @@ Environment=HOME=%h
 Environment=PATH=%h/.local/bin:%h/.hermes/bin:%h/.npm-global/bin:/usr/bin:/bin
 Environment=CODEX_HOME=%h/.codex-accounts/meetjovie
 EnvironmentFile=-%h/.config/symphony/linear.env
-ExecStart=%h/.local/bin/symphony --port 4043 --logs-root %h/symphony-burrito-logs %h/.config/symphony/WORKFLOW.md
+ExecStart=%h/.local/bin/symphony-official-runtime run --gate-file %h/.local/state/symphony-elixir/linear-rate-limit.json -- %h/.local/bin/symphony --port 4041 --logs-root %h/symphony-elixir-logs %h/.config/symphony/WORKFLOW.md
 Restart=always
-RestartSec=5
+RestartSec=60
 StandardOutput=journal
 StandardError=journal
 

@@ -1,71 +1,52 @@
 #!/usr/bin/env bash
-# Download latest openai/symphony linux_x86_64 burrito, sha256-check, install, restart.
+# Compatibility entrypoint for the source-owned official OpenAI Symphony runtime.
+#
+# Historical name retained so existing automation has one migration point, but
+# this installs symphony-elixir.service on 4041, not the obsolete burrito unit.
 set -euo pipefail
 
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
-TARGET_HOME="${SYMPHONY_BURRITO_HOME:-$HOME}"
-RELEASE_API="${SYMPHONY_RELEASE_API:-https://api.github.com/repos/openai/symphony/releases/latest}"
+TARGET_HOME="${SYMPHONY_ELIXIR_HOME:-${SYMPHONY_BURRITO_HOME:-$HOME}}"
+SYMPHONY_VERSION="${SYMPHONY_VERSION:-v0.0.2}"
 ASSET_NAME_NEEDLE="${SYMPHONY_ASSET_NEEDLE:-linux_x86_64}"
+RELEASE_URL="${SYMPHONY_RELEASE_URL:-https://github.com/openai/symphony/releases/download/${SYMPHONY_VERSION}}"
+BIN_NAME="symphony-${SYMPHONY_VERSION}-${ASSET_NAME_NEEDLE}"
+SUM_NAME="${BIN_NAME}.sha256"
 BIN_DST="${TARGET_HOME}/.local/bin/symphony"
-UNIT_SRC="${REPO_ROOT}/scripts/hermes/systemd/symphony-burrito.service"
-UNIT_DST="${TARGET_HOME}/.config/systemd/user/symphony-burrito.service"
-TIMER_SRC="${REPO_ROOT}/scripts/hermes/systemd/symphony-burrito-update.timer"
-TIMER_DST="${TARGET_HOME}/.config/systemd/user/symphony-burrito-update.timer"
-UPDATE_UNIT_SRC="${REPO_ROOT}/scripts/hermes/systemd/symphony-burrito-update.service"
-UPDATE_UNIT_DST="${TARGET_HOME}/.config/systemd/user/symphony-burrito-update.service"
+SERVICE_NAME="${SYMPHONY_SERVICE_NAME:-symphony-elixir.service}"
+UNIT_SRC="${REPO_ROOT}/scripts/hermes/systemd/symphony-elixir.service"
+UNIT_DST="${TARGET_HOME}/.config/systemd/user/${SERVICE_NAME}"
 WORKFLOW_SRC="${SYMPHONY_WORKFLOW_SRC:-${REPO_ROOT}/scripts/hermes/symphony/WORKFLOW.md}"
 WORKFLOW_DST="${TARGET_HOME}/.config/symphony/WORKFLOW.md"
-LOG_DIR="${TARGET_HOME}/symphony-burrito-logs"
-RUNTIME_STATE_URL="${SYMPHONY_BURRITO_STATE_URL:-http://127.0.0.1:4043/api/v1/state}"
+HELPER_SRC="${REPO_ROOT}/scripts/hermes/symphony_official_runtime.py"
+HELPER_DST="${TARGET_HOME}/.local/bin/symphony-official-runtime"
+LOG_DIR="${TARGET_HOME}/symphony-elixir-logs"
+STATE_DIR="${TARGET_HOME}/.local/state/symphony-elixir"
+STATE_URL="${SYMPHONY_STATE_URL:-http://127.0.0.1:4041/api/v1/state}"
+LYB_STATE_URL="${SYMPHONY_LYB_STATE_URL:-http://127.0.0.1:4042/api/v1/state}"
 RESTART=1
 DRY_RUN=0
 SKIP_BINARY=0
+CHECK_ONLY=0
+RUNTIME_READBACK=0
 
-usage() { echo "usage: $0 [--dry-run] [--no-restart] [--skip-binary]" >&2; }
+usage() { echo "usage: $0 [--dry-run] [--check] [--no-restart] [--skip-binary] [--runtime-readback]" >&2; }
 
 for arg in "$@"; do
   case "$arg" in
     --dry-run) DRY_RUN=1 ;;
+    --check) CHECK_ONLY=1 ;;
     --no-restart) RESTART=0 ;;
     --skip-binary) SKIP_BINARY=1 ;;
+    --runtime-readback) RUNTIME_READBACK=1 ;;
     -h|--help) usage; exit 0 ;;
     *) usage; exit 2 ;;
   esac
 done
 
-pick_asset() {
-  python3 - "$ASSET_NAME_NEEDLE" <<'PY'
-import json, sys
-needle = sys.argv[1]
-payload = json.load(sys.stdin)
-assets = payload.get("assets") or []
-binary = checksum = None
-for asset in assets:
-    name = str(asset.get("name") or "")
-    url = asset.get("browser_download_url") or ""
-    if not name or not url:
-        continue
-    if name.endswith(".sha256") and needle in name:
-        checksum = {"name": name, "url": url}
-    elif needle in name and not name.endswith(".sha256"):
-        binary = {"name": name, "url": url}
-if not binary or not checksum:
-    raise SystemExit("missing linux_x86_64 burrito asset or sha256 sidecar")
-print(binary["name"])
-print(binary["url"])
-print(checksum["name"])
-print(checksum["url"])
-print(payload.get("tag_name") or "")
-PY
-}
-
-fetch_json() {
-  curl -fsSL -H "Accept: application/vnd.github+json" -H "User-Agent: jovie-symphony-burrito-updater" "$1"
-}
-
 download() {
   local url="$1" dest="$2"
-  curl -fsSL -H "User-Agent: jovie-symphony-burrito-updater" -o "$dest" "$url"
+  curl -fsSL -H "User-Agent: jovie-symphony-elixir-updater" -o "$dest" "$url"
 }
 
 verify_sha256() {
@@ -83,104 +64,184 @@ print(digest)
 PY
 }
 
-maybe_copy_workflow() {
-  mkdir -p "$(dirname "$WORKFLOW_DST")"
-  if python3 - "$WORKFLOW_SRC" <<'PY'
-import pathlib, sys
-t = pathlib.Path(sys.argv[1]).read_text()
-h = t.split("after_create:", 1)[-1].split("agent:", 1)[0]
-raise SystemExit(0 if ('project_slug: "symphony-ui-pilot-96d6b9c5b2d5"' in t and "git clone --depth 1 https://github.com/JovieInc/Jovie.git ." in t and "symphony-elixir-workspaces" in t and "git@" not in h and "max_concurrent_agents: 3" in t and "symphony-codex-router app-server" in t and "gh CLI" in t and "create_branch" in t and "76869538009648d5b282a4bb21c3d157" in t and "jovie-ba6736cbfbb9" not in t and "timeout_ms: 900000" in t and "before_remove:" in t and "symphony-nvme-package-cache.sh after-create" in t and "pnpm install --offline --frozen-lockfile --ignore-scripts" in t) else 1)
+validate_source() {
+  python3 "$HELPER_SRC" validate-source \
+    --repo-root "$REPO_ROOT" \
+    --workflow "$WORKFLOW_SRC" \
+    --unit "$UNIT_SRC" \
+    --service-name "$SERVICE_NAME"
+}
+
+install_one() {
+  local src="$1" dst="$2" mode="${3:-0644}"
+  if [ ! -f "$src" ]; then
+    echo "MISSING_SOURCE $src" >&2
+    return 1
+  fi
+  mkdir -p "$(dirname "$dst")"
+  install -m "$mode" "$src" "$dst"
+  echo "INSTALLED $dst"
+}
+
+check_one() {
+  local src="$1" dst="$2" rc=0
+  if [ ! -f "$dst" ]; then
+    echo "MISSING $dst"
+    return 1
+  fi
+  if cmp -s "$src" "$dst"; then
+    echo "OK $dst"
+  else
+    echo "DRIFT $dst"
+    rc=1
+  fi
+  return "$rc"
+}
+
+runtime_readback() {
+  local rc=0
+  echo "SERVICE $SERVICE_NAME"
+  if systemctl --user is-active --quiet "$SERVICE_NAME"; then
+    echo "STATE active"
+  else
+    echo "STATE inactive-or-unavailable"
+    rc=1
+  fi
+  local pid
+  pid="$(systemctl --user show "$SERVICE_NAME" --property=MainPID --value 2>/dev/null || true)"
+  echo "PID ${pid:-unknown}"
+  if curl -fsS --max-time 5 "$STATE_URL" >/dev/null; then
+    echo "API_OK $STATE_URL"
+  else
+    echo "API_RED $STATE_URL"
+    rc=1
+  fi
+  if systemctl --user is-active --quiet symphony-lyb.service; then
+    echo "LYB_ACTIVE symphony-lyb.service 127.0.0.1:4042"
+  else
+    echo "LYB_RED symphony-lyb.service 127.0.0.1:4042"
+    rc=1
+  fi
+  if curl -fsS --max-time 5 "$LYB_STATE_URL" >/dev/null; then
+    echo "LYB_API_OK $LYB_STATE_URL"
+  else
+    echo "LYB_API_RED $LYB_STATE_URL"
+    rc=1
+  fi
+  for legacy in symphony-ui-pilot.service symphony-burrito.service symphony-burrito-update.timer symphony-burrito-update.service; do
+    if systemctl --user is-enabled --quiet "$legacy" 2>/dev/null; then
+      echo "LEGACY_ENABLED $legacy"
+      rc=1
+    else
+      echo "LEGACY_DISABLED $legacy"
+    fi
+  done
+  echo "SOURCE_HASH workflow=$(python3 - "$WORKFLOW_SRC" <<'PY'
+import hashlib, pathlib, sys
+print(hashlib.sha256(pathlib.Path(sys.argv[1]).read_bytes()).hexdigest())
 PY
-  then install -m 0644 "$WORKFLOW_SRC" "$WORKFLOW_DST" && echo "INSTALLED $WORKFLOW_DST"
-  else echo "CONFIG_COPY_RED repo WORKFLOW does not match live slug+HTTPS+git/gh; leaving $WORKFLOW_DST untouched"
-  fi
+)"
+  echo "SOURCE_HASH unit=$(python3 - "$UNIT_SRC" <<'PY'
+import hashlib, pathlib, sys
+print(hashlib.sha256(pathlib.Path(sys.argv[1]).read_bytes()).hexdigest())
+PY
+)"
+  return "$rc"
 }
 
-assert_restart_safe() {
-  if ! command -v systemctl >/dev/null 2>&1; then
-    return
-  fi
-  if ! systemctl --user is-active --quiet symphony-burrito.service; then
-    return
-  fi
-  local payload
-  if ! payload="$(curl --fail --silent --show-error --max-time 5 "$RUNTIME_STATE_URL")"; then
-    echo "RESTART_REFUSED_STATE_UNREADABLE $RUNTIME_STATE_URL" >&2
-    exit 75
-  fi
-  local status=0
-  local active
-  active="$(printf '%s' "$payload" | python3 -c '
-import json, sys
-payload = json.load(sys.stdin)
-running = payload.get("running")
-if not isinstance(running, list):
-    raise SystemExit(2)
-if running:
-    for item in running[:5]:
-        print(item.get("issue_identifier") or item.get("identifier") or item.get("id") or "unknown")
-    raise SystemExit(1)
-' 2>&1)" || status=$?
-  if [ "$status" -eq 1 ]; then
-    [ -z "$active" ] || printf '%s\n' "$active" >&2
-    echo "RESTART_REFUSED_ACTIVE_LEASES symphony-burrito.service" >&2
-    exit 75
-  fi
-  if [ "$status" -ne 0 ]; then
-    echo "RESTART_REFUSED_STATE_MALFORMED $RUNTIME_STATE_URL" >&2
-    exit 75
-  fi
+running_agent_count() {
+  python3 - "$STATE_URL" <<'PY' || true
+import json, sys, urllib.request
+try:
+    with urllib.request.urlopen(sys.argv[1], timeout=5) as response:
+        data = json.load(response)
+except Exception:
+    print(0)
+    raise SystemExit(0)
+running = data.get("running")
+print(len(running) if isinstance(running, list) else 0)
+PY
 }
 
-restart_service() {
-  if ! command -v systemctl >/dev/null 2>&1; then
-    echo "RESTART_REFUSED_SYSTEMCTL_MISSING" >&2
-    exit 75
+assert_no_active_agents_interrupted() {
+  local running
+  running="$(running_agent_count)"
+  if [ "${running:-0}" -gt 0 ]; then
+    echo "PROMOTION_RED active official agents would be interrupted: $running" >&2
+    return 6
   fi
-  assert_restart_safe
+  echo "PROMOTION_OK no active official agents reported on $STATE_URL"
+}
+
+prepare_systemd_context() {
   if [ -z "${XDG_RUNTIME_DIR:-}" ]; then
     XDG_RUNTIME_DIR="/run/user/$(id -u)"
     export XDG_RUNTIME_DIR
   fi
-  systemctl --user daemon-reload
-  systemctl --user enable symphony-burrito.service symphony-burrito-update.timer
-  systemctl --user restart symphony-burrito.service
-  systemctl --user start symphony-burrito-update.timer
-  echo "RESTARTED symphony-burrito.service"
 }
+
+disable_legacy_runtime_now() {
+  systemctl --user disable --now \
+    symphony-ui-pilot.service \
+    symphony-burrito.service \
+    symphony-burrito-update.timer \
+    symphony-burrito-update.service >/dev/null 2>&1 || true
+  echo "LEGACY_DISABLED symphony-ui-pilot.service symphony-burrito.service symphony-burrito-update.timer symphony-burrito-update.service"
+}
+
+if [ "$RUNTIME_READBACK" -eq 1 ]; then
+  runtime_readback
+  exit "$?"
+fi
+
+if ! validate_source; then
+  echo "SOURCE_INVALID refusing obsolete or over-budget Symphony config" >&2
+  exit 4
+fi
+
+BIN_URL="${RELEASE_URL}/${BIN_NAME}"
+SUM_URL="${RELEASE_URL}/${SUM_NAME}"
+
+if [ "$DRY_RUN" -eq 1 ]; then
+  echo "DRY_RUN official OpenAI Symphony"
+  echo "RELEASE ${SYMPHONY_VERSION}"
+  echo "ASSET ${BIN_NAME}"
+  echo "SHA256 ${SUM_NAME}"
+  echo "DRY_RUN $BIN_URL"
+  echo "DRY_RUN $SUM_URL"
+  echo "INSTALL $BIN_DST"
+  echo "HELPER $HELPER_DST"
+  echo "UNIT $UNIT_DST"
+  echo "WORKFLOW $WORKFLOW_DST"
+  echo "SERVICE $SERVICE_NAME"
+  echo "PORT 4041"
+  echo "UNTOUCHED symphony-lyb.service $LYB_STATE_URL"
+  echo "LEGACY_DISABLE_NOW symphony-ui-pilot.service symphony-burrito.service symphony-burrito-update.timer symphony-burrito-update.service"
+  exit 0
+fi
+
+if [ "$CHECK_ONLY" -eq 1 ]; then
+  rc=0
+  check_one "$WORKFLOW_SRC" "$WORKFLOW_DST" || rc=1
+  check_one "$UNIT_SRC" "$UNIT_DST" || rc=1
+  check_one "$HELPER_SRC" "$HELPER_DST" || rc=1
+  exit "$rc"
+fi
 
 if [ "$SKIP_BINARY" -eq 1 ]; then
   echo "SKIP_BINARY"
-  maybe_copy_workflow
-  if [ "$RESTART" -eq 1 ]; then
-    restart_service
-  fi
+  install_one "$HELPER_SRC" "$HELPER_DST" 0755
+  install_one "$UNIT_SRC" "$UNIT_DST"
+  install_one "$WORKFLOW_SRC" "$WORKFLOW_DST"
   echo "DONE"
   exit 0
 fi
 
-release_json="$(fetch_json "$RELEASE_API")"
-mapfile -t ASSET_META < <(printf '%s' "$release_json" | pick_asset)
-BIN_NAME="${ASSET_META[0]}"
-BIN_URL="${ASSET_META[1]}"
-SUM_NAME="${ASSET_META[2]}"
-SUM_URL="${ASSET_META[3]}"
-TAG="${ASSET_META[4]}"
-
-echo "RELEASE ${TAG}"
+echo "RELEASE ${SYMPHONY_VERSION}"
 echo "ASSET ${BIN_NAME}"
 echo "SHA256 ${SUM_NAME}"
 
-if [ "$DRY_RUN" -eq 1 ]; then
-  echo "DRY_RUN $BIN_URL"
-  echo "DRY_RUN $SUM_URL"
-  echo "INSTALL $BIN_DST"
-  echo "UNIT $UNIT_DST"
-  echo "WORKFLOW $WORKFLOW_DST"
-  exit 0
-fi
-
-tmpdir="$(mktemp -d "${TMPDIR:-/tmp}/symphony-burrito.XXXXXX")"
+tmpdir="$(mktemp -d "${TMPDIR:-/tmp}/symphony-elixir.XXXXXX")"
 cleanup() { rm -rf "$tmpdir"; }
 trap cleanup EXIT
 
@@ -189,17 +250,25 @@ download "$SUM_URL" "${tmpdir}/${SUM_NAME}"
 DIGEST="$(verify_sha256 "${tmpdir}/${BIN_NAME}" "${tmpdir}/${SUM_NAME}")"
 echo "VERIFIED $DIGEST"
 
-mkdir -p "$(dirname "$BIN_DST")" "$(dirname "$UNIT_DST")" "$(dirname "$WORKFLOW_DST")" "$LOG_DIR"
+if [ "$RESTART" -eq 1 ]; then
+  prepare_systemd_context
+  assert_no_active_agents_interrupted
+  disable_legacy_runtime_now
+fi
+
+mkdir -p "$(dirname "$BIN_DST")" "$(dirname "$UNIT_DST")" "$(dirname "$WORKFLOW_DST")" "$LOG_DIR" "$STATE_DIR"
 install -m 0755 "${tmpdir}/${BIN_NAME}" "$BIN_DST"
-install -m 0644 "$UNIT_SRC" "$UNIT_DST"
-install -m 0644 "$TIMER_SRC" "$TIMER_DST"
-install -m 0644 "$UPDATE_UNIT_SRC" "$UPDATE_UNIT_DST"
 echo "INSTALLED $BIN_DST"
-echo "INSTALLED $UNIT_DST"
-maybe_copy_workflow
+install_one "$HELPER_SRC" "$HELPER_DST" 0755
+install_one "$UNIT_SRC" "$UNIT_DST"
+install_one "$WORKFLOW_SRC" "$WORKFLOW_DST"
 
 if [ "$RESTART" -eq 1 ]; then
-  restart_service
+  systemctl --user daemon-reload
+  systemctl --user enable "$SERVICE_NAME"
+  systemctl --user restart "$SERVICE_NAME"
+  echo "RESTARTED $SERVICE_NAME"
+  runtime_readback
 fi
 
 echo "DONE"

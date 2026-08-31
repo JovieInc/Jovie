@@ -72,7 +72,7 @@ def fetch_state(payload):
     fake.__enter__ = mock.Mock(return_value=fake)
     fake.__exit__ = mock.Mock(return_value=False)
     with mock.patch.object(HUD.urllib.request, "urlopen", return_value=fake) as opener:
-        return HUD.fetch_symphony("http://127.0.0.1:4043/api/v1/state", cap=3), opener
+        return HUD.fetch_symphony("http://127.0.0.1:4041/api/v1/state", cap=40), opener
 
 
 class UltrawideHudTests(unittest.TestCase):
@@ -141,7 +141,7 @@ class UltrawideHudTests(unittest.TestCase):
         del payload["rate_limits"]
         payload["codex_totals"] = {"input_tokens": 45678, "output_tokens": 23456, "total_tokens": 69134}
         state, opener = fetch_state(payload)
-        self.assertIn("4043", opener.call_args.args[0])
+        self.assertIn("4041", opener.call_args.args[0])
         self.assertIn("4041", HUD.DEFAULT_SYMPHONY)
         self.assertEqual(state["running"], 1)
         self.assertEqual(state["retrying"], 1)
@@ -150,7 +150,7 @@ class UltrawideHudTests(unittest.TestCase):
         self.assertEqual(state["rows"][1]["attempt"], 2)
         self.assertEqual(state["rows"][1]["turn"], 4)
         plain = strip(paint(state, {"ok": True, "count": 1, "rows": [{"kind": "mq", "number": 16796, "title": "check-in HUD + burrito", "enqueued": STARTED, "position": 5}]}, 11, measured={"ships": {"receipts": [receipt()]}}))
-        for token in ("JOV-5491", "2/4", "3m", "JOV-5488", "in 5m", "1/3", "FAILURES", "QUEUE", "Symphony :4041 up", "hook_failed 1", "totals in 45.7K out 23.5K", "receipted this week"):
+        for token in ("JOV-5491", "2/4", "3m", "JOV-5488", "in 5m", "1/40", "FAILURES", "QUEUE", "Symphony :4041 up", "hook_failed 1", "totals in 45.7K out 23.5K", "receipted this week"):
             self.assertIn(token, plain)
         self.assertNotIn("OpenAI", plain)
         running_line = next(line for line in plain.splitlines() if line.startswith("●") and "JOV-5491" in line)
@@ -180,7 +180,7 @@ class UltrawideHudTests(unittest.TestCase):
         self.assertNotIn("receipted this week", plain)
 
     def test_workflow_cap_reads_max_concurrent_agents(self):
-        self.assertEqual(HUD.read_workflow_cap(ROOT / "scripts/hermes/symphony/WORKFLOW.md"), 3)
+        self.assertEqual(HUD.read_workflow_cap(ROOT / "scripts/hermes/symphony/WORKFLOW.md"), 40)
 
     def test_official_state_totals_render_tps_runtime_in_out(self):
         state, _ = fetch_state(official_state())
@@ -189,7 +189,7 @@ class UltrawideHudTests(unittest.TestCase):
         tps = HUD.compute_throughput(state["totals"], [{"at": "2026-08-31T11:59:55Z", "total_tokens": 64134, "seconds_running": 937}], now=NOW)
         self.assertAlmostEqual(tps, 1000.0)
         plain = strip(paint(state, tps=tps, width=430))
-        for token in ("AGENTS", "1/3", "THROUGHPUT", "1K tps", "FAILURES", "TOKENS", "69.1K", "Runtime 15m 42s", "claude-sonnet-4.5", "4,950/5,000"):
+        for token in ("AGENTS", "1/40", "THROUGHPUT", "1K tps", "FAILURES", "TOKENS", "69.1K", "Runtime 15m 42s", "claude-sonnet-4.5", "4,950/5,000"):
             self.assertIn(token, plain)
         self.assertAlmostEqual(HUD.compute_throughput(state["totals"], [], now=NOW), 69134 / 942)
 

@@ -599,7 +599,7 @@ class FallbackTests(unittest.TestCase):
         events = self.events.read_text().splitlines()
         launch_index = next(i for i, line in enumerate(events) if line.startswith("systemd-run"))
         self.assertNotIn(
-            "systemctl --user stop symphony-ui-pilot.service symphony-lyb.service",
+            "systemctl --user stop symphony-elixir.service symphony-lyb.service",
             events,
         )
         self.assertGreaterEqual(launch_index, 0, events)
@@ -763,7 +763,7 @@ class FallbackTests(unittest.TestCase):
                     self.assertTrue(
                         any(
                             command[:4] == ["systemctl", "--user", "is-active", "--quiet"]
-                            and "symphony-ui-pilot.service" in command
+                            and "symphony-elixir.service" in command
                             for command in controls
                         ),
                         controls,
@@ -883,7 +883,7 @@ class FallbackTests(unittest.TestCase):
             self.assertEqual(module.reconcile(), module.EXIT_SAFE_FAIL_CLOSED)
 
         self.assertIn("model-router", events)
-        self.assertNotIn("systemctl --user stop symphony-ui-pilot.service symphony-lyb.service", events)
+        self.assertNotIn("systemctl --user stop symphony-elixir.service symphony-lyb.service", events)
 
     def test_live_canary_requires_luna_and_exact_marker(self):
         canary = self.command("codex-rotate", "printf '%s\\n' \"$*\" > \"$GEM_EVENTS\"; printf 'GEM_MODEL_READY\\n'")
@@ -927,9 +927,9 @@ class FallbackTests(unittest.TestCase):
         self.assertEqual(result.returncode, 0, result.stderr)
         self.assertEqual(self.events.read_text().splitlines(), [
             "systemctl --user list-units --type=service --state=active grok-ship-*.service fallback-ship-*.service --no-legend --no-pager",
-            "systemctl --user start symphony-ui-pilot.service",
+            "systemctl --user start symphony-elixir.service",
             "systemctl --user start symphony-lyb.service",
-            "systemctl --user is-active --quiet symphony-ui-pilot.service",
+            "systemctl --user is-active --quiet symphony-elixir.service",
         ])
         self.assertIn("idle", result.stderr)
 
@@ -980,7 +980,7 @@ class FallbackTests(unittest.TestCase):
         first_launch = next(i for i, line in enumerate(events) if line.startswith("systemd-run"))
         self.assertGreaterEqual(first_launch, 0, events)
         self.assertNotIn(
-            "systemctl --user stop symphony-ui-pilot.service symphony-lyb.service",
+            "systemctl --user stop symphony-elixir.service symphony-lyb.service",
             events,
         )
         self.assertEqual(len([line for line in events if line.startswith("systemd-run")]), 2)
@@ -1272,7 +1272,7 @@ class FallbackTests(unittest.TestCase):
         events = self.events.read_text() if self.events.exists() else ""
         self.assertNotIn("systemd-run", events)
         self.assertNotIn("systemctl --user stop", events)
-        self.assertIn("systemctl --user start symphony-ui-pilot.service", events)
+        self.assertIn("systemctl --user start symphony-elixir.service", events)
         self.assertIn("symphony_restored", result.stderr)
 
     def test_zero_grok_capacity_preserves_symphony(self):
@@ -1375,7 +1375,7 @@ class FallbackTests(unittest.TestCase):
         self.assertFalse(
             any(
                 command[:3] == ["systemctl", "--user", "stop"]
-                and "symphony-ui-pilot.service" in command
+                and "symphony-elixir.service" in command
                 for command in controls
             )
         )
@@ -1521,7 +1521,7 @@ class FallbackTests(unittest.TestCase):
         self.assertFalse(
             any(
                 command[:3] == ["systemctl", "--user", "stop"]
-                and "symphony-ui-pilot.service" in command
+                and "symphony-elixir.service" in command
                 for command in controls
             )
         )
@@ -1550,7 +1550,7 @@ class FallbackTests(unittest.TestCase):
         self.assertFalse(
             any(
                 command[:3] == ["systemctl", "--user", "stop"]
-                and "symphony-ui-pilot.service" in command
+                and "symphony-elixir.service" in command
                 for command in controls
             )
         )
@@ -1605,7 +1605,7 @@ class FallbackTests(unittest.TestCase):
 
         self.assertTrue(
             any(
-                "is-active" in command and "symphony-ui-pilot.service" in command
+                "is-active" in command and "symphony-elixir.service" in command
                 for command in controls
             ),
             controls,

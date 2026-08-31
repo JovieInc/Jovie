@@ -1,6 +1,6 @@
 [Unit]
 Description=Durable Symphony stopped-work reconciler
-After=symphony-ui-pilot.service
+After=symphony-elixir.service
 
 [Service]
 Type=oneshot
