@@ -3,17 +3,12 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 const mocks = vi.hoisted(() => {
   const state = {
     selectRows: [] as { id: string; channelId: string }[],
-    setValues: [] as Record<string, unknown>[],
   };
   return {
     ...state,
     getCachedAuth: vi.fn(),
     getExactProfileAccess: vi.fn(),
-    loadFreshGoogleAccessToken: vi.fn(),
-    createYouTubeLibraryProvider: vi.fn(() => ({ provider: 'youtube' })),
-    syncChannelVideos: vi.fn(),
-    reconcileApprovedYouTubeCollaborators: vi.fn(),
-    captureError: vi.fn(),
+    refreshConnectedYouTubeAccount: vi.fn(),
     dbMock: {
       select: vi.fn(() => ({
         from: vi.fn(() => ({
@@ -21,12 +16,6 @@ const mocks = vi.hoisted(() => {
             limit: vi.fn(async () => state.selectRows),
           })),
         })),
-      })),
-      update: vi.fn(() => ({
-        set: vi.fn((values: Record<string, unknown>) => {
-          state.setValues.push(values);
-          return { where: vi.fn(async () => undefined) };
-        }),
       })),
     },
   };
@@ -36,21 +25,10 @@ vi.mock('@/lib/auth/cached', () => ({ getCachedAuth: mocks.getCachedAuth }));
 vi.mock('@/lib/auth/profile-access', () => ({
   getExactProfileAccess: mocks.getExactProfileAccess,
 }));
-vi.mock('@/lib/connectors/google-calendar/access-token', () => ({
-  loadFreshGoogleAccessToken: mocks.loadFreshGoogleAccessToken,
-}));
-vi.mock('@/lib/connectors/youtube/provider', () => ({
-  createYouTubeLibraryProvider: mocks.createYouTubeLibraryProvider,
+vi.mock('@/lib/connectors/youtube/refresh', () => ({
+  refreshConnectedYouTubeAccount: mocks.refreshConnectedYouTubeAccount,
 }));
 vi.mock('@/lib/db', () => ({ db: mocks.dbMock }));
-vi.mock('@/lib/error-tracking', () => ({ captureError: mocks.captureError }));
-vi.mock('@/lib/library/graph-store', () => ({
-  reconcileApprovedYouTubeCollaborators:
-    mocks.reconcileApprovedYouTubeCollaborators,
-}));
-vi.mock('@/lib/youtube-library/sync', () => ({
-  syncChannelVideos: mocks.syncChannelVideos,
-}));
 
 import { POST } from './route';
 
@@ -70,56 +48,64 @@ describe('POST /api/youtube-library/sync', () => {
       id: 'account-1',
       channelId: 'channel-1',
     });
-    mocks.setValues.splice(0);
     mocks.getCachedAuth.mockResolvedValue({ userId: 'user-1' });
     mocks.getExactProfileAccess.mockResolvedValue({ ok: true });
-    mocks.loadFreshGoogleAccessToken.mockResolvedValue('access-token');
-    mocks.syncChannelVideos.mockResolvedValue({ imported: 12 });
-    mocks.reconcileApprovedYouTubeCollaborators.mockResolvedValue(undefined);
+    mocks.refreshConnectedYouTubeAccount.mockResolvedValue({
+      status: 'synced',
+      result: { imported: 12 },
+    });
   });
 
   it('requires exact profile access', async () => {
     mocks.getExactProfileAccess.mockResolvedValueOnce({ ok: false });
     const response = await POST(request());
     expect(response.status).toBe(403);
-    expect(mocks.syncChannelVideos).not.toHaveBeenCalled();
+    expect(mocks.refreshConnectedYouTubeAccount).not.toHaveBeenCalled();
+  });
+
+  it('requires a connected YouTube channel', async () => {
+    mocks.selectRows.splice(0);
+    const response = await POST(request());
+    expect(response.status).toBe(409);
+    expect(await response.json()).toEqual({
+      error: 'Connect YouTube before importing videos',
+    });
+    expect(mocks.refreshConnectedYouTubeAccount).not.toHaveBeenCalled();
   });
 
   it('requires a fresh connector token', async () => {
-    mocks.loadFreshGoogleAccessToken.mockResolvedValueOnce(null);
+    mocks.refreshConnectedYouTubeAccount.mockResolvedValueOnce({
+      status: 'needs_reauth',
+    });
     const response = await POST(request());
     expect(response.status).toBe(409);
-    expect(mocks.syncChannelVideos).not.toHaveBeenCalled();
+    expect(mocks.refreshConnectedYouTubeAccount).toHaveBeenCalledWith({
+      connectorAccountId: 'account-1',
+      creatorProfileId: profileId,
+      channelId: 'channel-1',
+      source: 'manual',
+    });
   });
 
-  it('syncs the owned channel and refreshes collaborator edges', async () => {
+  it('syncs the owned channel through the shared refresh helper', async () => {
     const response = await POST(request());
     expect(response.status).toBe(200);
     expect(await response.json()).toEqual({ imported: 12 });
-    expect(mocks.syncChannelVideos).toHaveBeenCalledWith(
-      expect.objectContaining({
-        creatorProfileId: profileId,
-        channelId: 'channel-1',
-      })
-    );
-    expect(mocks.reconcileApprovedYouTubeCollaborators).toHaveBeenCalledWith(
-      profileId
-    );
-    expect(mocks.setValues.at(-1)).toMatchObject({
-      lastErrorCode: null,
-      lastErrorUserMessage: null,
+    expect(mocks.refreshConnectedYouTubeAccount).toHaveBeenCalledWith({
+      connectorAccountId: 'account-1',
+      creatorProfileId: profileId,
+      channelId: 'channel-1',
+      source: 'manual',
     });
   });
 
-  it('records a bounded error without leaking provider details', async () => {
-    mocks.syncChannelVideos.mockRejectedValueOnce(new Error('provider detail'));
+  it('returns a bounded error without leaking provider details', async () => {
+    mocks.refreshConnectedYouTubeAccount.mockResolvedValueOnce({
+      status: 'failed',
+      error: new Error('provider detail'),
+    });
     const response = await POST(request());
     expect(response.status).toBe(502);
     expect(await response.json()).toEqual({ error: 'YouTube sync failed' });
-    expect(mocks.setValues.at(-1)).toMatchObject({
-      lastErrorCode: 'youtube_sync_failed',
-      lastErrorDevMessage: 'provider detail',
-    });
-    expect(mocks.captureError).toHaveBeenCalledOnce();
   });
 });
