@@ -116,7 +116,7 @@ describe('ci-fast bounded parallel workflow', () => {
 
   it('runs the official Symphony recovery ownership contract with exact changed-line coverage', () => {
     expect(PACKAGE_JSON.scripts['invariants:check']).toContain(
-      'python3 scripts/hermes/tests/symphony-codex-auth-fallback.test.py OfficialServiceOwnershipContract'
+      'python3 scripts/hermes/tests/symphony-codex-auth-fallback.test.py OfficialServiceOwnershipContract OfficialServiceCoverageContract'
     );
     expect(CI_FAST_SOURCE).toContain(
       'COVERAGE_FILE="${RUNNER_TEMP:-/tmp}/jovie-symphony-recovery.coverage"'
@@ -128,10 +128,7 @@ describe('ci-fast bounded parallel workflow', () => {
       'python3 -m coverage json -o "${RUNNER_TEMP:-/tmp}/jovie-symphony-recovery.json"'
     );
     expect(CI_FAST_SOURCE).toContain(
-      'required={72,73,74}; missing=required-set('
-    );
-    expect(CI_FAST_SOURCE).toContain(
-      'uncovered official Symphony ownership lines'
+      'python3 scripts/hermes/tests/symphony-codex-auth-fallback.test.py --verify-ownership-coverage "${RUNNER_TEMP:-/tmp}/jovie-symphony-recovery.json"'
     );
   });
 
