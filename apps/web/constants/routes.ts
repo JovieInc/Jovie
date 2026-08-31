@@ -219,6 +219,27 @@ export const APP_ROUTES = {
 
 export type AppRoute = (typeof APP_ROUTES)[keyof typeof APP_ROUTES];
 
+const SPOTIFY_CATALOG_CONNECTION_PARAM = 'connect';
+const SPOTIFY_CATALOG_CONNECTION_VALUE = 'spotify';
+
+export function buildSpotifyCatalogConnectionRoute(): string {
+  const params = new URLSearchParams({
+    [SPOTIFY_CATALOG_CONNECTION_PARAM]: SPOTIFY_CATALOG_CONNECTION_VALUE,
+  });
+
+  // The Spotify connection dialog is still owned by the shell releases route.
+  return `${APP_ROUTES.DASHBOARD_RELEASES}?${params.toString()}`;
+}
+
+export function shouldOpenSpotifyCatalogConnection(
+  searchParams: Pick<URLSearchParams, 'get'>
+): boolean {
+  return (
+    searchParams.get(SPOTIFY_CATALOG_CONNECTION_PARAM) ===
+    SPOTIFY_CATALOG_CONNECTION_VALUE
+  );
+}
+
 function normalizeLyricsReturnRoute(
   candidate: string | null | undefined
 ): string | null {

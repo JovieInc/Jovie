@@ -1,10 +1,11 @@
 'use client';
 
-import { useRouter } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 import {
   type RefObject,
   Suspense,
   useCallback,
+  useEffect,
   useMemo,
   useRef,
   useState,
@@ -29,6 +30,7 @@ import type {
   FilterField,
   FilterPill,
 } from '@/components/shell/pill-search.types';
+import { shouldOpenSpotifyCatalogConnection } from '@/constants/routes';
 import {
   useRegisterHeaderActions,
   useRegisterHeaderSearch,
@@ -368,6 +370,9 @@ export function ShellReleasesView({
   initialTotalCount = 0,
 }: ShellReleasesViewProps) {
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const shouldOpenSpotifyConnect =
+    shouldOpenSpotifyCatalogConnection(searchParams);
   const {
     postCreateRelease,
     isPostCreatePlanModalOpen,
@@ -387,7 +392,9 @@ export function ShellReleasesView({
     initialArtistName ?? null
   );
   const [isImporting, setIsImporting] = useState(initialImporting);
-  const [spotifySearchOpen, setSpotifySearchOpen] = useState(false);
+  const [spotifySearchOpen, setSpotifySearchOpen] = useState(
+    shouldOpenSpotifyConnect
+  );
   const [addReleaseOpen, setAddReleaseOpen] = useState(false);
   const [isAmConnected, setIsAmConnected] = useState(appleMusicConnected);
   const [amPaletteOpen, setAmPaletteOpen] = useState(false);
@@ -426,6 +433,12 @@ export function ShellReleasesView({
     providerConfig,
     primaryProviders,
   });
+
+  useEffect(() => {
+    if (shouldOpenSpotifyConnect) {
+      setSpotifySearchOpen(true);
+    }
+  }, [shouldOpenSpotifyConnect]);
   const {
     deleteTarget,
     isDeleting,
