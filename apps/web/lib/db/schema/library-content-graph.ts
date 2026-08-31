@@ -59,18 +59,15 @@ export const libraryEntityTypeEnum = pgEnum('library_entity_type', [
   'provider_placement',
 ]);
 
-export const libraryRelationshipKindEnum = pgEnum(
-  'library_relationship_kind',
-  [
-    'release_context',
-    'collaborator_credit',
-    'features_merch',
-    'mentions_brand',
-    'uses_tracked_link',
-    'promotes_offer',
-    'youtube_product_placement',
-  ]
-);
+export const libraryRelationshipKindEnum = pgEnum('library_relationship_kind', [
+  'release_context',
+  'collaborator_credit',
+  'features_merch',
+  'mentions_brand',
+  'uses_tracked_link',
+  'promotes_offer',
+  'youtube_product_placement',
+]);
 
 export const libraryRelationshipStatusEnum = pgEnum(
   'library_relationship_status',
@@ -169,7 +166,10 @@ export const creatorBrands = pgTable(
     normalizedName: text('normalized_name').notNull(),
     displayName: text('display_name').notNull(),
     websiteUrl: text('website_url'),
-    metadata: jsonb('metadata').$type<LibraryJsonPayload>().default({}).notNull(),
+    metadata: jsonb('metadata')
+      .$type<LibraryJsonPayload>()
+      .default({})
+      .notNull(),
     createdAt: timestamp('created_at', { withTimezone: true })
       .defaultNow()
       .notNull(),
@@ -383,7 +383,8 @@ export type CreatorOffer = typeof creatorOffers.$inferSelect;
 export type NewCreatorOffer = typeof creatorOffers.$inferInsert;
 export type LibraryRelationship = typeof libraryRelationships.$inferSelect;
 export type NewLibraryRelationship = typeof libraryRelationships.$inferInsert;
-export type OptimizationExperiment = typeof optimizationExperiments.$inferSelect;
+export type OptimizationExperiment =
+  typeof optimizationExperiments.$inferSelect;
 export type NewOptimizationExperiment =
   typeof optimizationExperiments.$inferInsert;
 export type ArtistRuleException = typeof artistRuleExceptions.$inferSelect;
