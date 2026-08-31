@@ -277,6 +277,8 @@ struct AppShellRightRail: View {
 
         Button("Talk", action: onTalk)
           .buttonStyle(JoviePillButtonStyle(filled: true))
+          .accessibilityElement(children: .ignore)
+          .accessibilityLabel("Talk")
           .accessibilityIdentifier("shell-rail-talk")
       }
 
