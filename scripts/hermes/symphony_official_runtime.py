@@ -43,6 +43,7 @@ TOOL_REQUESTS_PER_HOUR = 300
 RESET_CANARY_REQUESTS_PER_HOUR = 100
 RATE_LIMIT_GATE_SCHEMA = "symphony-linear-rate-limit-gate/v1"
 RATE_LIMIT_EXIT_CODE = 75
+FALLBACK_RETRY_AFTER_SECONDS = 3_600
 DEFAULT_MAX_GATE_SLEEP_SECONDS = 3_900
 DEFAULT_RATE_LIMIT_GATE = (
     pathlib.Path.home() / ".local/state/symphony-elixir/linear-rate-limit.json"
@@ -451,6 +452,8 @@ def classify_linear_response(
     retry_after = _parse_retry_after(headers.get("retry-after"), now=observed_at)
     graphql_rate_limited = _graphql_ratelimited(body)
     rate_limited = status == 429 or (status == 400 and graphql_rate_limited)
+    if rate_limited and retry_after is None:
+        retry_after = FALLBACK_RETRY_AFTER_SECONDS
     reset_at = _iso(observed_at + dt.timedelta(seconds=retry_after)) if retry_after is not None else None
     if rate_limited:
         return {

@@ -342,6 +342,7 @@ def test_activation_exports_user_systemd_before_both_installers() -> None:
 def test_activation_requires_official_runtime_and_retires_custom_automation() -> None:
     activation = ACTIVATION_WORKFLOW.read_text()
     assert "symphony-elixir.service" in activation
+    assert 'DEFAULT_WORKSPACES = "~/symphony-elixir-workspaces"' in RECONCILER.read_text()
     assert (
         "update-symphony-burrito.sh --skip-binary --no-restart --retire-legacy"
         in activation

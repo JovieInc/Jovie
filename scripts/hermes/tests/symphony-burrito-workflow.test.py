@@ -143,6 +143,15 @@ class OfficialSymphonyContractTests(unittest.TestCase):
         )
         self.assertEqual(ordinary["kind"], "bad_request")
         self.assertIsNone(ordinary["resetAt"])
+        missing_retry_after = helper.classify_linear_response(
+            status=429,
+            headers={},
+            body="",
+            now=now,
+        )
+        self.assertEqual(missing_retry_after["kind"], "rate_limited")
+        self.assertEqual(missing_retry_after["retryAfterSeconds"], 3600)
+        self.assertEqual(missing_retry_after["resetAt"], "2026-08-31T16:00:00Z")
         original_parser = helper.parsedate_to_datetime
         try:
             helper.parsedate_to_datetime = lambda _value: (_ for _ in ()).throw(
@@ -157,8 +166,8 @@ class OfficialSymphonyContractTests(unittest.TestCase):
         finally:
             helper.parsedate_to_datetime = original_parser
         self.assertEqual(malformed_retry_after["kind"], "rate_limited")
-        self.assertIsNone(malformed_retry_after["retryAfterSeconds"])
-        self.assertIsNone(malformed_retry_after["resetAt"])
+        self.assertEqual(malformed_retry_after["retryAfterSeconds"], 3600)
+        self.assertEqual(malformed_retry_after["resetAt"], "2026-08-31T16:00:00Z")
         with tempfile.TemporaryDirectory() as tmp:
             gate = pathlib.Path(tmp) / "linear-rate-limit.json"
             self.assertTrue(helper.write_rate_limit_gate(gate, classified))
