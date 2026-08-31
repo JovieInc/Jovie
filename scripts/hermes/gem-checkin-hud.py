@@ -10,6 +10,7 @@ import re
 import shutil
 import subprocess
 import sys
+import threading
 import time
 import urllib.error
 import urllib.request
@@ -30,6 +31,8 @@ LIVE_SLUG = "symphony-ui-pilot-96d6b9c5b2d5"
 LIVE_PROJECT_ID = "440ea404-041f-461e-ae45-dd6a2e98e4a1"
 DEFAULT_MEASURED = Path.home() / ".local/state/gem-checkin-hud/measured.json"
 DEFAULT_TPS_STATE = Path.home() / ".local/state/gem-checkin-hud/symphony-tps.json"
+DEFAULT_PRESSURE_STATE = Path.home() / ".local/state/gem-checkin-hud/system-pressure.json"
+DEFAULT_GITHUB_STATE = Path.home() / ".local/state/gem-checkin-hud/github-projection.json"
 DEFAULT_SYMPHONY = os.environ.get("SYMPHONY_STATE_URL", "http://127.0.0.1:4041/api/v1/state")
 DEFAULT_WORKFLOW = Path(
     os.environ.get("SYMPHONY_WORKFLOW_PATH", str(Path.home() / ".config/symphony/WORKFLOW.md"))
@@ -63,6 +66,8 @@ SHIP_STAGES = (
 CI_FAST_NAMES = frozenset({"ci-fast"})
 PR_READY_NAMES = frozenset({"PR Ready"})
 CHECK_PENDING = frozenset({"queued", "in_progress", "pending", "waiting", "requested"})
+CHECK_FAILURE = frozenset({"failure", "failed", "error", "cancelled", "timed_out", "action_required"})
+CHECK_SUCCESS = frozenset({"success", "successful", "neutral", "skipped"})
 MIN_WIDTH = 120
 TARGET_WIDTH = 430
 MIN_HEIGHT = 32
@@ -74,10 +79,14 @@ SHIPPING_DISPLAY_IA = {
     "failures": {"label": "FAILURES", "representation": "count-and-list"},
     "tokens": {"label": "TOKENS", "representation": "total-and-per-work-item"},
     "queue": {"label": "QUEUE", "representation": "count"},
+    "pr_flow": {"label": "PR FLOW", "representation": "open-and-rolling-24h"},
+    "system_pressure": {"label": "SYSTEM PRESSURE", "representation": "thresholded-host-projection"},
+    "ci_matrix": {"label": "CI MATRIX", "representation": "bounded-server-aggregate"},
     "shipping_path": {"label": "SHIP", "representation": "segmented-stage-bar"},
     "current_work": {"label": "CURRENT WORK", "representation": "receipt-table"},
     "freshness": {"label": "Updated", "representation": "relative-local-time"},
 }
+_GITHUB_REFRESH_THREAD: threading.Thread | None = None
 
 
 def _now() -> datetime:
@@ -461,6 +470,138 @@ def compute_throughput(totals: Any, snapshots: list[dict[str, Any]] | None, *, n
     return None
 
 
+def _psi(path: Path) -> dict[str, float | None]:
+    try:
+        text = path.read_text(encoding="utf-8")
+    except OSError:
+        return {"some": None, "full": None}
+    result: dict[str, float | None] = {"some": None, "full": None}
+    for line in text.splitlines():
+        parts = line.split()
+        if not parts:
+            continue
+        for token in parts[1:]:
+            if token.startswith("avg10="):
+                try:
+                    result[parts[0]] = float(token.split("=", 1)[1])
+                except ValueError:
+                    pass
+    return result
+
+
+def _pressure_status(value: float | None, warning: float, failure: float) -> str:
+    if value is None:
+        return "unknown"
+    if value >= failure:
+        return "failure"
+    if value >= warning:
+        return "warning"
+    return "healthy"
+
+
+def _net_sample() -> dict[str, Any] | None:
+    try:
+        lines = Path("/proc/net/dev").read_text(encoding="utf-8").splitlines()[2:]
+    except OSError:
+        return None
+    interfaces = []
+    for line in lines:
+        if ":" not in line:
+            continue
+        name, raw = line.split(":", 1)
+        name = name.strip()
+        if name == "lo":
+            continue
+        sysfs = Path("/sys/class/net") / name
+        try:
+            if (sysfs / "operstate").read_text(encoding="utf-8").strip() != "up":
+                continue
+            speed = _int((sysfs / "speed").read_text(encoding="utf-8").strip())
+        except OSError:
+            speed = None
+        values = raw.split()
+        if len(values) < 9:
+            continue
+        interfaces.append({"name": name, "rx": int(values[0]), "tx": int(values[8]), "speed_mbps": speed})
+    if not interfaces:
+        return None
+    return {
+        "rx": sum(item["rx"] for item in interfaces),
+        "tx": sum(item["tx"] for item in interfaces),
+        "speed_mbps": max((item["speed_mbps"] for item in interfaces if item["speed_mbps"]), default=None),
+    }
+
+
+def fetch_system_pressure(
+    symphony: dict[str, Any],
+    *,
+    state_path: Path = DEFAULT_PRESSURE_STATE,
+    now: datetime | None = None,
+) -> dict[str, Any]:
+    clock = now or _now()
+    cpu_count = os.cpu_count() or None
+    try:
+        load1 = float(os.getloadavg()[0])
+    except (OSError, AttributeError):
+        load1 = None
+    cpu_psi = _psi(Path("/proc/pressure/cpu"))
+    memory_psi = _psi(Path("/proc/pressure/memory"))
+    io_psi = _psi(Path("/proc/pressure/io"))
+    disk_used_pct = disk_available_pct = None
+    try:
+        disk = shutil.disk_usage("/")
+        disk_used_pct = None if disk.total <= 0 else (disk.used / disk.total) * 100
+        disk_available_pct = None if disk.total <= 0 else (disk.free / disk.total) * 100
+    except OSError:
+        pass
+    memory_total = memory_available = None
+    try:
+        memory = {}
+        for line in Path("/proc/meminfo").read_text(encoding="utf-8").splitlines():
+            key, _, raw = line.partition(":")
+            if key in {"MemTotal", "MemAvailable"}:
+                memory[key] = int(raw.strip().split()[0]) * 1024
+        memory_total, memory_available = memory.get("MemTotal"), memory.get("MemAvailable")
+    except (OSError, ValueError, IndexError):
+        pass
+    available_pct = None if not memory_total or memory_available is None else (memory_available / memory_total) * 100
+    load_pct = None if load1 is None or cpu_count is None else (load1 / cpu_count) * 100
+    cpu_signal = max(value for value in (load_pct, cpu_psi.get("some")) if value is not None) if any(value is not None for value in (load_pct, cpu_psi.get("some"))) else None
+    memory_signal = max(value for value in (memory_psi.get("some"), None if available_pct is None else 100 - available_pct) if value is not None) if any(value is not None for value in (memory_psi.get("some"), available_pct)) else None
+    io_signal = max(value for value in (io_psi.get("some"), io_psi.get("full")) if value is not None) if any(value is not None for value in (io_psi.get("some"), io_psi.get("full"))) else None
+    current_net = _net_sample()
+    prior = load_json_dict(state_path)
+    prior_at = _iso(prior.get("at"))
+    network_pct = network_mbps = None
+    if current_net is not None and prior_at is not None:
+        seconds = (clock - prior_at).total_seconds()
+        if 0.5 <= seconds <= 120:
+            rx_bps = max(0.0, (current_net["rx"] - (_int(prior.get("rx")) or 0)) * 8 / seconds)
+            tx_bps = max(0.0, (current_net["tx"] - (_int(prior.get("tx")) or 0)) * 8 / seconds)
+            network_mbps = max(rx_bps, tx_bps) / 1_000_000
+            speed = _int(current_net.get("speed_mbps"))
+            network_pct = None if not speed else (network_mbps / speed) * 100
+    if current_net is not None:
+        write_json(state_path, {"at": clock.isoformat(), **current_net})
+    running, cap = _int(symphony.get("running")), _int(symphony.get("cap"))
+    slots_pct = None if running is None or not cap else (running / cap) * 100
+    return {
+        "ok": any(value is not None for value in (cpu_signal, memory_signal, io_signal, network_pct, slots_pct)),
+        "generated_at": clock.isoformat(),
+        "cpu": {"status": _pressure_status(cpu_signal, 75, 125), "signal_pct": cpu_signal, "load1": load1, "cores": cpu_count, "psi": cpu_psi.get("some")},
+        "memory": {"status": "failure" if available_pct is not None and available_pct < 10 else "warning" if available_pct is not None and available_pct < 20 else _pressure_status(memory_psi.get("some"), 10, 30), "available_pct": available_pct, "psi": memory_psi.get("some")},
+        "io": {
+            "status": "failure" if disk_available_pct is not None and disk_available_pct < 5 else "warning" if disk_available_pct is not None and disk_available_pct < 15 else _pressure_status(io_signal, 10, 30),
+            "used_pct": disk_used_pct,
+            "available_pct": disk_available_pct,
+            "psi": io_psi.get("some"),
+            "full": io_psi.get("full"),
+        },
+        "network": {"status": _pressure_status(network_pct, 60, 85), "util_pct": network_pct, "mbps": network_mbps, "speed_mbps": None if current_net is None else current_net.get("speed_mbps")},
+        "slots": {"status": _pressure_status(slots_pct, 75, 95), "util_pct": slots_pct, "running": running, "cap": cap},
+    }
+
+
 def format_rate_window(window: Any) -> str:
     if not isinstance(window, dict):
         return "-"
@@ -538,6 +679,35 @@ def named_checks(rollups: Any, names: frozenset[str]) -> list[dict[str, Any]]:
     if not isinstance(rollups, list):
         return []
     return [item for item in rollups if isinstance(item, dict) and _check_name(item) in names]
+
+
+def aggregate_check_status(rollups: Any, *, names: frozenset[str] | None = None, contains: tuple[str, ...] = ()) -> str:
+    if not isinstance(rollups, list):
+        return "unknown"
+    selected = []
+    for item in rollups:
+        if not isinstance(item, dict):
+            continue
+        name = _check_name(item)
+        if names is not None and name not in names:
+            continue
+        if contains and not any(fragment in name.lower() for fragment in contains):
+            continue
+        selected.append(item)
+    if not selected:
+        return "unknown"
+    outcomes: list[str] = []
+    for item in selected:
+        conclusion = str(item.get("conclusion") or "").strip().lower()
+        status = _check_status(item)
+        outcomes.append(conclusion or status)
+    if any(value in CHECK_FAILURE for value in outcomes):
+        return "failure"
+    if any(value in CHECK_PENDING or value in {"", "completed"} for value in outcomes):
+        return "pending" if any(value in CHECK_PENDING for value in outcomes) else "unknown"
+    if all(value in CHECK_SUCCESS for value in outcomes):
+        return "success"
+    return "unknown"
 
 
 def stage_from_source(
@@ -688,6 +858,10 @@ def _normalize_row(item: dict[str, Any], kind: str) -> dict[str, Any]:
     if incoming is None and outgoing is None and total is None:
         incoming, outgoing, total = _tokens_from(running)
     error = _text(item, ("error", "last_error")) or _text(retry, ("error", "last_error"))
+    if error:
+        error = error.splitlines()[0].strip()
+        for marker in ("}, [{", " [{SymphonyElixir", "[file:"):
+            error = error.split(marker, 1)[0].rstrip()
     return {
         "kind": kind, "id": ident, "title": title, "url": url,
         "attempt": _int(item.get("attempt") or running.get("attempt") or retry.get("attempt")),
@@ -699,7 +873,7 @@ def _normalize_row(item: dict[str, Any], kind: str) -> dict[str, Any]:
         "workspace": _workspace(item) or _workspace(running) or _workspace(issue),
         "last_message": _text(item, ("last_message",)) or _text(running, ("last_message",)),
         "last_event": _text(item, ("last_event",)) or _text(running, ("last_event",)),
-        "error": error.splitlines()[0].strip() if error else error,
+        "error": error,
         "owner": _text(item, ("owner", "agent", "account")) or _text(running, ("owner", "agent")),
     }
 
@@ -712,7 +886,7 @@ def _as_list(value: Any) -> list[dict[str, Any]]:
     return [item for item in value if isinstance(item, dict)]
 
 
-def fetch_symphony(url: str, *, timeout: float = 1.5, cap: int | None = None) -> dict[str, Any]:
+def fetch_symphony(url: str, *, timeout: float = 3.0, cap: int | None = None) -> dict[str, Any]:
     empty = {
         "ok": False, "running": None, "retrying": None, "blocked": None, "cap": cap,
         "rows": [], "totals": None, "seconds_running": None, "rate_limits": None,
@@ -861,11 +1035,64 @@ def _check_durs(rollups: Any, names: frozenset[str]) -> list[float]:
     return [d for item in named_checks(rollups, names) if (d := check_duration_seconds(item)) is not None]
 
 
-def fetch_github_ship(*, timeout: float = 12.0) -> dict[str, Any]:
-    open_prs = _pr_list("open", "number,title,createdAt,isDraft,statusCheckRollup,mergeStateStatus", "40", timeout=timeout)
-    merged_prs = _pr_list("merged", "number,title,createdAt,mergedAt,statusCheckRollup", "30", timeout=timeout)
+def _github_flow_counts(window_started_at: datetime, *, timeout: float) -> dict[str, int] | None:
+    window = window_started_at.astimezone(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
+    query = (
+        "query { repository(owner: \"JovieInc\", name: \"Jovie\") { "
+        "pullRequests(states: OPEN) { totalCount } } "
+        f"opened: search(query: \"repo:JovieInc/Jovie is:pr created:>={window}\", type: ISSUE) {{ issueCount }} "
+        f"merged: search(query: \"repo:JovieInc/Jovie is:pr merged:>={window}\", type: ISSUE) {{ issueCount }} }}"
+    )
+    payload = _gh_json(["api", "graphql", "-f", f"query={query}"], timeout=timeout)
+    data = payload.get("data") if isinstance(payload, dict) else None
+    if not isinstance(data, dict):
+        return None
+    open_count = ((((data.get("repository") or {}).get("pullRequests") or {}).get("totalCount")))
+    opened = ((data.get("opened") or {}).get("issueCount"))
+    merged = ((data.get("merged") or {}).get("issueCount"))
+    if not all(isinstance(value, int) for value in (open_count, opened, merged)):
+        return None
+    return {"open_count": open_count, "opened_24h": opened, "merged_24h": merged}
+
+
+def fetch_github_ship(
+    *,
+    timeout: float = 12.0,
+    cache_path: Path | None = DEFAULT_GITHUB_STATE,
+    max_age_seconds: float = 60.0,
+    allow_background: bool = True,
+) -> dict[str, Any]:
+    global _GITHUB_REFRESH_THREAD
+    clock = _now()
+    cached = load_json_dict(cache_path) if cache_path is not None else {}
+    cached_at = _iso(cached.get("generated_at"))
+    cache_age = None if cached_at is None else max(0.0, (clock - cached_at).total_seconds())
+    if cached.get("ok") is True and cache_age is not None and cache_age <= max_age_seconds:
+        return {**cached, "cache_hit": True, "cache_age_seconds": cache_age}
+    if allow_background:
+        if _GITHUB_REFRESH_THREAD is None or not _GITHUB_REFRESH_THREAD.is_alive():
+            _GITHUB_REFRESH_THREAD = threading.Thread(
+                target=fetch_github_ship,
+                kwargs={
+                    "timeout": timeout,
+                    "cache_path": cache_path,
+                    "max_age_seconds": -1.0,
+                    "allow_background": False,
+                },
+                name="hud-github-projection-refresh",
+                daemon=True,
+            )
+            _GITHUB_REFRESH_THREAD.start()
+        if cached.get("ok") is True and cache_age is not None and cache_age <= 300:
+            return {**cached, "cache_hit": True, "cache_age_seconds": cache_age, "stale": True, "refreshing": True}
+        return {"ok": False, "refreshing": True, "generated_at": None, "query_ms": None, "ci_matrix": []}
+    query_started = time.perf_counter()
+    open_prs = _pr_list("open", "number,title,createdAt,isDraft,statusCheckRollup,mergeStateStatus", "10", timeout=timeout)
+    merged_prs = _pr_list("merged", "number,title,createdAt,mergedAt,statusCheckRollup", "10", timeout=timeout)
     merge_group = _gh_json(["api", "repos/JovieInc/Jovie/actions/runs?event=merge_group&per_page=20"], timeout=timeout)
     if not isinstance(open_prs, list) or not isinstance(merged_prs, list):
+        if cached.get("ok") is True and cache_age is not None and cache_age <= 300:
+            return {**cached, "cache_hit": True, "cache_age_seconds": cache_age, "stale": True}
         return {"ok": False}
     mq_numbers = {
         row.get("number")
@@ -873,6 +1100,7 @@ def fetch_github_ship(*, timeout: float = 12.0) -> dict[str, Any]:
         if isinstance(row, dict) and isinstance(row.get("number"), int)
     }
     pr_open = ci_fast = pr_ready = 0
+    ci_matrix: list[dict[str, Any]] = []
     ci_fast_queued = pr_ready_queued = False
     pr_open_durations: list[float] = []
     ci_fast_durations: list[float] = []
@@ -885,6 +1113,18 @@ def fetch_github_ship(*, timeout: float = 12.0) -> dict[str, Any]:
         fast_pending = any(_check_status(item) in CHECK_PENDING for item in fast)
         ready_pending = any(_check_status(item) in CHECK_PENDING for item in ready)
         in_mq = isinstance(pr.get("number"), int) and pr.get("number") in mq_numbers
+        if len(ci_matrix) < 10:
+            ci_matrix.append(
+                {
+                    "number": pr.get("number") if isinstance(pr.get("number"), int) else None,
+                    "title": _text(pr, ("title",)),
+                    "fast": aggregate_check_status(rollups, names=CI_FAST_NAMES),
+                    "ready": aggregate_check_status(rollups, names=PR_READY_NAMES),
+                    "security": aggregate_check_status(rollups, contains=("secret", "security", "gitleaks", "truffle")),
+                    "visual": aggregate_check_status(rollups, contains=("visual", "playwright", "golden path")),
+                    "all": aggregate_check_status(rollups),
+                }
+            )
         if fast_pending:
             ci_fast += 1
             ci_fast_queued = True
@@ -900,15 +1140,17 @@ def fetch_github_ship(*, timeout: float = 12.0) -> dict[str, Any]:
             pr_open_durations.append((first_fast - created).total_seconds())
         ci_fast_durations.extend(_check_durs(rollups, CI_FAST_NAMES))
         pr_ready_durations.extend(_check_durs(rollups, PR_READY_NAMES))
-    merged_count = 0
+    queried_at = _now()
+    window_started_at = queried_at - timedelta(hours=24)
+    flow_counts = _github_flow_counts(window_started_at, timeout=timeout)
+    open_count = None if flow_counts is None else flow_counts["open_count"]
+    opened_24h = None if flow_counts is None else flow_counts["opened_24h"]
+    merged_count = None if flow_counts is None else flow_counts["merged_24h"]
     merged_durations: list[float] = []
-    week_ago = _now() - timedelta(days=1)
     for pr in merged_prs:
         if not isinstance(pr, dict):
             continue
         merged_at, created = _iso(pr.get("mergedAt")), _iso(pr.get("createdAt"))
-        if merged_at is not None and merged_at >= week_ago:
-            merged_count += 1
         if created is not None and merged_at is not None and (merged_at - created).total_seconds() > 0:
             merged_durations.append((merged_at - created).total_seconds())
         ci_fast_durations.extend(_check_durs(pr.get("statusCheckRollup"), CI_FAST_NAMES))
@@ -935,8 +1177,15 @@ def fetch_github_ship(*, timeout: float = 12.0) -> dict[str, Any]:
                 )
                 if duration is not None:
                     merge_group_durations.append(duration)
-    return {
+    result = {
         "ok": True,
+        "open_count": open_count,
+        "opened_24h": opened_24h,
+        "merged_24h": merged_count,
+        "window_started_at": window_started_at.isoformat(),
+        "generated_at": queried_at.isoformat(),
+        "query_ms": round((time.perf_counter() - query_started) * 1000),
+        "ci_matrix": ci_matrix,
         "pr_open": pr_open,
         "pr_open_durations": pr_open_durations or None,
         "ci_fast": ci_fast,
@@ -951,6 +1200,9 @@ def fetch_github_ship(*, timeout: float = 12.0) -> dict[str, Any]:
         "merged_durations": merged_durations or None,
         "mq_durations": None,
     }
+    if cache_path is not None:
+        write_json(cache_path, result)
+    return result
 
 
 def fetch_sha() -> str | None:
@@ -1012,26 +1264,49 @@ def _tiles_row(tiles: list[list[str]], width: int) -> list[str]:
     return [spacer.join(column[index] for column in padded) for index in range(height)]
 
 
+def _cell(value: Any, width: int, *, right: bool = False, tail: bool = False) -> str:
+    rendered = clip(dash(value), width, tail=tail).rstrip()
+    return rendered.rjust(width) if right else rendered.ljust(width)
+
+
 def _table_header(widths: dict[str, int]) -> str:
-    return _rgb(DIM, "  ".join(clip(name, widths[key]) for name, key in (("ST", "st"), ("ID", "id"), ("TITLE", "title"), ("ATTEMPT", "attempt"), ("TURN", "turn"), ("TOKENS", "tokens"), ("ELAPSED", "elapsed"), ("WS/PR", "ws"))))
+    columns = (
+        ("ST", "st", False),
+        ("ID", "id", False),
+        ("TITLE", "title", False),
+        ("TRY/TURN", "run", True),
+        ("TOKENS", "tokens", True),
+        ("ELAPSED", "elapsed", True),
+        ("WORKSPACE / PR", "ws", False),
+    )
+    return _rgb(DIM, "  ".join(_cell(name, widths[key], right=right) for name, key, right in columns))
 
 
 def _col_widths(width: int) -> dict[str, int]:
-    st, ident, attempt, turn, tokens, elapsed, ws = 2, 12, 7, 4, 10, 7, 16
-    return {"st": st, "id": ident, "title": max(16, width - (st + ident + attempt + turn + tokens + elapsed + ws + 14)), "attempt": attempt, "turn": turn, "tokens": tokens, "elapsed": elapsed, "ws": ws}
+    st, ident, run, tokens, elapsed, ws = 2, 12, 9, 10, 8, 24
+    remaining = width - (st + ident + run + tokens + elapsed + ws + 12)
+    return {
+        "st": st,
+        "id": ident,
+        "title": min(180, max(20, remaining)),
+        "run": run,
+        "tokens": tokens,
+        "elapsed": elapsed,
+        "ws": ws,
+    }
 
 
 def _cells(color: tuple[int, int, int], widths: dict[str, int], glyph: str, ident: str, title: str, attempt: str, turn: str, tokens: str, elapsed: str, ws: str) -> str:
+    run = "-" if attempt == "-" and turn == "-" else f"{attempt}/{turn}"
     return "  ".join(
         [
-            _rgb(color, clip(glyph, widths["st"])),
-            _rgb(FG, clip(ident, widths["id"]), bold=True),
-            _rgb(FG, clip(title, widths["title"])),
-            _rgb(DIM, clip(attempt, widths["attempt"])),
-            _rgb(DIM, clip(turn, widths["turn"])),
-            _rgb(DIM, clip(tokens, widths["tokens"])),
-            _rgb(color, clip(elapsed, widths["elapsed"])),
-            _rgb(DIM, clip(ws, widths["ws"], tail=True)),
+            _rgb(color, _cell(glyph, widths["st"])),
+            _rgb(FG, _cell(ident, widths["id"]), bold=True),
+            _rgb(FG, _cell(title, widths["title"])),
+            _rgb(DIM, _cell(run, widths["run"], right=True)),
+            _rgb(DIM, _cell(tokens, widths["tokens"], right=True)),
+            _rgb(color, _cell(elapsed, widths["elapsed"], right=True)),
+            _rgb(DIM, _cell(ws, widths["ws"], tail=True)),
         ]
     )
 
@@ -1049,19 +1324,19 @@ def _job_row(row: dict[str, Any], widths: dict[str, int], *, now: datetime) -> s
     return _cells(BLUE, widths, "●", dash(row.get("id")), dash(row.get("title") or row.get("last_message")), dash(row.get("attempt")), dash(row.get("turn")), compact_tokens(row.get("tokens_total"), row.get("tokens_in"), row.get("tokens_out")), elapsed_label(row.get("started"), now=now, seconds=row.get("seconds")), short_path(row.get("workspace") or row.get("url")))
 
 
-def _status_strip(
+def _hero_metrics(
     symphony: dict[str, Any],
     tps: float | None,
     mq: int | None,
     review: int | None,
     width: int,
-) -> str:
+) -> list[str]:
     running = symphony.get("running") if symphony.get("ok") else None
     cap = symphony.get("cap") if symphony.get("ok") else symphony.get("cap")
     totals = symphony.get("totals") if isinstance(symphony.get("totals"), dict) else {}
-    incoming = comma_int(totals.get("input_tokens") if totals else None)
-    outgoing = comma_int(totals.get("output_tokens") if totals else None)
-    total = comma_int(totals.get("total_tokens") if totals else None)
+    incoming = compact_tokens(totals.get("input_tokens") if totals else None)
+    outgoing = compact_tokens(totals.get("output_tokens") if totals else None)
+    total = compact_tokens(totals.get("total_tokens") if totals else None)
     seconds = symphony.get("seconds_running")
     if seconds is None and totals:
         seconds = totals.get("seconds_running")
@@ -1071,18 +1346,25 @@ def _status_strip(
     blocked = _int(symphony.get("blocked"))
     failures = None if not symphony.get("ok") or retrying is None or blocked is None else retrying + blocked
     limits = format_rate_limits(symphony.get("rate_limits"))
-    fields = [
-        _rgb(BLUE if running else DIM, f"{SHIPPING_DISPLAY_IA['capacity']['label']} {agents}", bold=True),
-        _rgb(FG, f"{SHIPPING_DISPLAY_IA['throughput']['label']} {throughput}", bold=True),
-        _rgb(PINK if failures else DIM, f"{SHIPPING_DISPLAY_IA['failures']['label']} {dash(failures)}", bold=True),
-        _rgb(PURPLE if mq else DIM, f"{SHIPPING_DISPLAY_IA['queue']['label']} {dash(mq)}", bold=True),
-        _rgb(PINK if review else DIM, f"REVIEW {dash(review)}"),
-        _rgb(FG, f"{SHIPPING_DISPLAY_IA['tokens']['label']} {total}", bold=True),
-        _rgb(DIM, f"RUNTIME {runtime_label(seconds)}"),
-        _rgb(DIM, f"Rate Limits {limits}"),
+    metrics = [
+        (SHIPPING_DISPLAY_IA["capacity"]["label"], agents, f"{dash(None if running is None or cap is None else max(0, cap - running))} slots open", BLUE if running else DIM),
+        (SHIPPING_DISPLAY_IA["throughput"]["label"], throughput, "live token rate", FG),
+        (SHIPPING_DISPLAY_IA["failures"]["label"], dash(failures), f"{dash(retrying)} retrying · {dash(blocked)} blocked", PINK if failures else DIM),
+        (SHIPPING_DISPLAY_IA["tokens"]["label"], total, f"{incoming} in · {outgoing} out", FG),
+        (SHIPPING_DISPLAY_IA["queue"]["label"], dash(mq), f"{dash(review)} awaiting review", PURPLE if mq else DIM),
     ]
-    line = f"  {_rgb(DIM, '·')}  ".join(fields)
-    return pad_visible(line, width) if visible_len(line) <= width else line
+    gap = 3
+    col = max(12, (width - gap * (len(metrics) - 1)) // len(metrics))
+    leftover = width - (col * len(metrics) + gap * (len(metrics) - 1))
+    widths = [col] * (len(metrics) - 1) + [col + leftover]
+    labels, values, details = [], [], []
+    for (label, value, detail, color), col_width in zip(metrics, widths):
+        labels.append(pad_visible(_rgb(DIM, clip(label, col_width), bold=True), col_width))
+        values.append(pad_visible(_rgb(color, clip(value, col_width), bold=True), col_width))
+        details.append(pad_visible(_rgb(DIM, clip(detail, col_width)), col_width))
+    spacer = " " * gap
+    context = f"Runtime {runtime_label(seconds)}  ·  Rate limits {limits}"
+    return [spacer.join(labels), spacer.join(values), spacer.join(details), _rgb(DIM, clip(context, width))]
 
 
 def _stage_bar(stage: dict[str, Any], max_p95: float | None, width: int) -> str:
@@ -1095,6 +1377,137 @@ def _stage_bar(stage: dict[str, Any], max_p95: float | None, width: int) -> str:
     last = len(BARS) - 1
     height = max(0, min(last, int(round((float(p95) / max_p95) * last))))
     return BARS[height] * max(1, min(8, width))
+
+
+def _pr_flow_lines(flow: dict[str, Any] | None, width: int, *, now: datetime) -> list[str]:
+    payload = flow if isinstance(flow, dict) else {}
+    known = payload.get("ok") is True
+    opened = _int(payload.get("opened_24h")) if known else None
+    merged = _int(payload.get("merged_24h")) if known else None
+    net = opened - merged if opened is not None and merged is not None else None
+    net_text = "-" if net is None else f"{net:+d}"
+    freshness = natural_time(payload.get("generated_at"), now=now) if known else "source unavailable"
+    if payload.get("stale") is True:
+        freshness = f"STALE · {freshness}"
+    heading = (
+        _rgb(FG, SHIPPING_DISPLAY_IA["pr_flow"]["label"], bold=True)
+        + _rgb(DIM, f"  ·  rolling prior 24h  ·  GitHub  ·  Updated {freshness}")
+    )
+    cells = [
+        ("OPEN NOW", dash(_int(payload.get("open_count")) if known else None), FG),
+        ("OPENED 24H", dash(opened), BLUE if opened else DIM),
+        ("MERGED 24H", dash(merged), BLUE if merged else DIM),
+        ("NET FLOW", net_text, PINK if net is not None and net > 0 else BLUE if net is not None and net < 0 else DIM),
+    ]
+    gap = 4
+    col = max(12, (width - gap * (len(cells) - 1)) // len(cells))
+    leftover = width - (col * len(cells) + gap * (len(cells) - 1))
+    widths = [col] * (len(cells) - 1) + [col + leftover]
+    spacer = " " * gap
+    label_line = spacer.join(
+        pad_visible(_rgb(DIM, clip(label, cell_width), bold=True), cell_width)
+        for (label, _, _), cell_width in zip(cells, widths)
+    )
+    value_line = spacer.join(
+        pad_visible(_rgb(color, clip(value, cell_width), bold=True), cell_width)
+        for (_, value, color), cell_width in zip(cells, widths)
+    )
+    return [pad_visible(heading, width), label_line, value_line]
+
+
+def _semantic_color(status: str) -> tuple[int, int, int]:
+    return BLUE if status in {"healthy", "success"} else PURPLE if status in {"warning", "pending"} else PINK if status == "failure" else DIM
+
+
+def _pct0(value: Any) -> str:
+    number = _num(value)
+    return "-" if number is None else f"{number:.0f}%"
+
+
+def _system_pressure_lines(pressure: dict[str, Any] | None, width: int, *, now: datetime) -> list[str]:
+    payload = pressure if isinstance(pressure, dict) else {}
+    known = payload.get("ok") is True
+    freshness = natural_time(payload.get("generated_at"), now=now) if known else "source unavailable"
+    if payload.get("stale") is True:
+        freshness = f"STALE · {freshness}"
+    cpu = payload.get("cpu") if isinstance(payload.get("cpu"), dict) else {}
+    memory = payload.get("memory") if isinstance(payload.get("memory"), dict) else {}
+    io = payload.get("io") if isinstance(payload.get("io"), dict) else {}
+    network = payload.get("network") if isinstance(payload.get("network"), dict) else {}
+    slots = payload.get("slots") if isinstance(payload.get("slots"), dict) else {}
+    net_mbps = _num(network.get("mbps"))
+    net_speed = _int(network.get("speed_mbps"))
+    load1 = _num(cpu.get("load1"))
+    load_text = "-" if load1 is None else f"{load1:.1f}"
+    cells = [
+        ("CPU / LOAD", _pct0(cpu.get("signal_pct")), f"load {load_text}/{dash(cpu.get('cores'))} · PSI {_pct0(cpu.get('psi'))}", str(cpu.get("status") or "unknown")),
+        ("MEMORY", f"{_pct0(memory.get('available_pct'))} available", f"PSI {_pct0(memory.get('psi'))}", str(memory.get("status") or "unknown")),
+        ("DISK / I/O", f"{_pct0(io.get('available_pct'))} available", f"{_pct0(io.get('used_pct'))} used · PSI {_pct0(io.get('psi'))}", str(io.get("status") or "unknown")),
+        ("NETWORK", "-" if net_mbps is None else f"{net_mbps:.1f} Mbps", "rate window pending" if net_mbps is None else f"{dash(net_speed)} Mbps link · {_pct0(network.get('util_pct'))}", str(network.get("status") or "unknown")),
+        ("WORKER SLOTS", f"{dash(slots.get('running'))}/{dash(slots.get('cap'))}", f"{_pct0(slots.get('util_pct'))} used", str(slots.get("status") or "unknown")),
+    ]
+    gap = 3
+    col = max(12, (width - gap * (len(cells) - 1)) // len(cells))
+    leftover = width - (col * len(cells) + gap * (len(cells) - 1))
+    widths = [col] * (len(cells) - 1) + [col + leftover]
+    spacer = " " * gap
+    heading = _rgb(FG, SHIPPING_DISPLAY_IA["system_pressure"]["label"], bold=True) + _rgb(DIM, f"  ·  host projection  ·  Updated {freshness}")
+    labels = spacer.join(pad_visible(_rgb(DIM, clip(label, cell_width), bold=True), cell_width) for (label, _, _, _), cell_width in zip(cells, widths))
+    values = spacer.join(pad_visible(_rgb(_semantic_color(status), clip(value, cell_width), bold=True), cell_width) for (_, value, _, status), cell_width in zip(cells, widths))
+    details = spacer.join(pad_visible(_rgb(DIM, clip(detail, cell_width)), cell_width) for (_, _, detail, _), cell_width in zip(cells, widths))
+    return [pad_visible(heading, width), labels, values, details]
+
+
+def _matrix_status(status: Any, width: int) -> str:
+    normalized = str(status or "unknown")
+    text = {"success": "✓ PASS", "pending": "… RUN", "failure": "× FAIL", "unknown": "? UNKNOWN"}.get(normalized, "? UNKNOWN")
+    return _rgb(_semantic_color(normalized), _cell(text, width), bold=normalized == "failure")
+
+
+def _ci_matrix_lines(flow: dict[str, Any] | None, width: int, *, now: datetime) -> list[str]:
+    payload = flow if isinstance(flow, dict) else {}
+    rows = payload.get("ci_matrix") if isinstance(payload.get("ci_matrix"), list) else []
+    rows = [row for row in rows if isinstance(row, dict)][:8]
+    known = payload.get("ok") is True
+    freshness = natural_time(payload.get("generated_at"), now=now) if known else "source unavailable"
+    if payload.get("stale") is True:
+        freshness = f"STALE · {freshness}"
+    query_ms = _int(payload.get("query_ms")) if known else None
+    total = _int(payload.get("open_count")) if known else None
+    heading = (
+        _rgb(FG, SHIPPING_DISPLAY_IA["ci_matrix"]["label"], bold=True)
+        + _rgb(DIM, f"  ·  cached GitHub rollup  ·  {len(rows)}/{dash(total)} rows  ·  {dash(query_ms)}ms  ·  Updated {freshness}")
+    )
+    status_width = 10
+    gap = 2
+    item_width = max(30, width - (status_width * 5 + gap * 5))
+    header = "  ".join(
+        [
+            _cell("PR / WORK ITEM", item_width),
+            *(_cell(label, status_width) for label in ("FAST", "READY", "SECURITY", "VISUAL", "ALL")),
+        ]
+    )
+    result = [pad_visible(heading, width), _rgb(DIM, header), _rgb(DIM, "─" * width)]
+    if not known:
+        return [*result, _rgb(DIM, clip("? CI projection unavailable", width))]
+    if not rows:
+        return [*result, _rgb(DIM, clip("No open PR rows in cached projection", width))]
+    for row in rows:
+        number = f"#{row['number']} " if isinstance(row.get("number"), int) else ""
+        item = _cell(number + dash(row.get("title")), item_width)
+        result.append(
+            "  ".join(
+                [
+                    _rgb(FG, item),
+                    _matrix_status(row.get("fast"), status_width),
+                    _matrix_status(row.get("ready"), status_width),
+                    _matrix_status(row.get("security"), status_width),
+                    _matrix_status(row.get("visual"), status_width),
+                    _matrix_status(row.get("all"), status_width),
+                ]
+            )
+        )
+    return result
 
 
 def _ship_path_lines(ship_path: dict[str, Any] | None, width: int) -> list[str]:
@@ -1151,7 +1564,7 @@ def _footer(symphony: dict[str, Any], width: int, *, now: datetime) -> str:
     last_event = symphony.get("last_event")
     event_text = natural_time(last_event, now=now) if _iso(last_event) else dash(last_event)
     parts = [
-        f"OpenAI Symphony :4041 {up}",
+        f"Symphony :4041 {up}",
         f"hook_failed {hook_text}",
         f"last event {event_text}",
         f"totals in {incoming} out {outgoing}",
@@ -1171,6 +1584,8 @@ def render(
     sha: str | None = None,
     ship_path: dict[str, Any] | None = None,
     tps: float | None = None,
+    pr_flow: dict[str, Any] | None = None,
+    system_pressure: dict[str, Any] | None = None,
 ) -> str:
     clock = now or _now()
     cols, rows = terminal_size(width=width, height=height)
@@ -1215,9 +1630,15 @@ def render(
         header,
         _rgb(DIM, PRODUCT_DESCRIPTION),
         "",
-        _status_strip(symphony, tps_value, mq_n, review, cols),
+        *_hero_metrics(symphony, tps_value, mq_n, review, cols),
+        "",
+        *_system_pressure_lines(system_pressure, cols, now=clock),
+        "",
+        *_pr_flow_lines(pr_flow, cols, now=clock),
         "",
         *_ship_path_lines(path, cols),
+        "",
+        *_ci_matrix_lines(pr_flow, cols, now=clock),
         "",
         *tiles,
         "",
@@ -1254,12 +1675,18 @@ def frame(
     symphony = fetch_symphony(symphony_url, cap=cap)
     mq = fetch_mq()
     linear = fetch_linear_project()
-    github = fetch_github_ship()
+    github_path = Path(os.environ.get("HUD_GITHUB_PATH", str(DEFAULT_GITHUB_STATE)))
+    github = fetch_github_ship(
+        cache_path=github_path,
+        allow_background=os.environ.get("HUD_GITHUB_BLOCKING") != "1",
+    )
     measured = load_measured(measured_path)
     tps_path = Path(os.environ.get("HUD_TPS_PATH", str(DEFAULT_TPS_STATE)))
     snapshots = load_tps_snapshots(tps_path)
     tps = compute_throughput(symphony.get("totals"), snapshots)
     persist_tps_snapshot(tps_path, symphony.get("totals"))
+    pressure_path = Path(os.environ.get("HUD_PRESSURE_PATH", str(DEFAULT_PRESSURE_STATE)))
+    pressure = fetch_system_pressure(symphony, state_path=pressure_path)
     return render(
         symphony=symphony,
         mq=mq,
@@ -1270,6 +1697,8 @@ def frame(
         sha=fetch_sha(),
         ship_path=build_ship_path(symphony=symphony, mq=mq, linear=linear, github=github, measured=measured),
         tps=tps,
+        pr_flow=github,
+        system_pressure=pressure,
     )
 
 

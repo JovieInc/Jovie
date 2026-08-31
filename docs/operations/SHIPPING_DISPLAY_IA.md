@@ -15,6 +15,9 @@ authorize a second meaning for any field.
 | Remediation failure | Failures | Count plus inspectable list | Issue ID, attempt, error, retry timing |
 | Token use | Tokens | Total scalar | Per-work-item token count in current work |
 | Merge queue | Queue | Count | Pull-request identity and queue age where space permits |
+| Pull-request flow | PR flow | Open now plus opened and merged in the rolling prior 24 hours | GitHub freshness and collection cost |
+| System pressure | System pressure | Thresholded CPU/load, memory, I/O, network, and worker-slot projection | Source freshness and explicit healthy, constrained, failure, or unknown state |
+| CI state | CI matrix | Bounded work-item rows by meaningful check-group columns | Cached server-side aggregate freshness, query cost, and drill-down authority |
 | Shipping latency | Ship | Segmented stage bar | Count and p95 for each measured stage |
 | Active execution | Current work | Receipt table or semantically equivalent list | Issue ID, title/state, tokens, elapsed time |
 | Source freshness | Updated | Natural relative local time | Exact source receipt remains available in drill-down |
@@ -38,6 +41,36 @@ authorize a second meaning for any field.
    but must not substitute a conflicting meaning.
 7. Ovie may add founder decisions and authorization-aware actions. The Gem HUD
    remains read-only and shipping-heavy.
+8. Ovie consumes the same authenticated cached pressure and CI projection with
+   the same labels, status colors, and matrix grammar. It must not duplicate
+   provider polling, expose host-private diagnostics, or import collector
+   machinery; founder summary and drill-down are a separate bounded consumer.
+
+## Pressure thresholds
+
+The Gem collector evaluates sources independently, then renders the worst
+relevant status. A single process is never treated as host health.
+
+| Signal | Healthy | Constrained | Failure |
+|---|---:|---:|---:|
+| CPU | max(load per core, CPU PSI some avg10) < 75% | 75–124% | >= 125% |
+| Memory | available >= 20% and PSI some avg10 < 10% | available 10–19% or PSI 10–29% | available < 10% or PSI >= 30% |
+| Disk / I/O | available >= 15% and PSI avg10 < 10% | available 5–14% or PSI 10–29% | available < 5% or PSI >= 30% |
+| Network | measured link utilization < 60% | 60–84% | >= 85% |
+| Worker slots | active/configured < 75% | 75–94% | >= 95% |
+
+Network remains unknown until two host-counter samples create a bounded rate
+window and link speed is available. Blank pressure and CI cells are unknown,
+never healthy. The GitHub projection is cached for 60 seconds, may serve a
+clearly marked stale result for at most five minutes, records collection cost,
+and uses one server-side aggregate plus bounded rollups for at most ten recent
+open and ten recent merged PRs. The HUD renders at most eight rows; deeper
+detail remains a drill-down.
+
+The Ovie consumer is intentionally not part of the collector slice. It starts
+only after the cached projection has an authenticated API boundary with
+freshness and authorization contract tests; Ovie must consume that projection
+rather than poll GitHub or Gem directly.
 
 ## Review rubric
 
