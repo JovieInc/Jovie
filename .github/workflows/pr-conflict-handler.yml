@@ -191,7 +191,14 @@ jobs:
               expected_auto_merge=$(jq -r '.autoMergeEnabled' <<<"$item")
               expected_draft=$(jq -r '.draftState' <<<"$item")
               live=$(GH_TOKEN="$GH_MUTATION_TOKEN" gh api "repos/$REPOSITORY/pulls/$pr" \
-                --jq '{state:.state,draft:.draft,head:.head.sha,base:.base.sha,baseRef:.base.ref,ref:.head.ref,autoMerge:(.auto_merge != null),sameRepo:(.head.repo.full_name == .base.repo.full_name),fork:(.head.repo.fork // false)}')
+                --jq '{state:.state,draft:.draft,head:.head.sha,baseRef:.base.ref,ref:.head.ref,autoMerge:(.auto_merge != null),sameRepo:(.head.repo.full_name == .base.repo.full_name),fork:(.head.repo.fork // false)}')
+              # shellcheck disable=SC2016
+              live_base=$(GH_TOKEN="$GH_QUEUE_TOKEN" gh api graphql \
+                -f query='query($owner:String!,$name:String!,$qualifiedName:String!){repository(owner:$owner,name:$name){ref(qualifiedName:$qualifiedName){target{oid}}}}' \
+                -f owner="${REPOSITORY%%/*}" -f name="${REPOSITORY#*/}" \
+                -f qualifiedName="refs/heads/$expected_base_ref" \
+                --jq '.data.repository.ref.target.oid // ""')
+              live=$(jq --arg base "$live_base" '. + {base:$base}' <<<"$live")
               if ! jq -e --arg head "$expected_head" --arg base "$expected_base" --arg baseRef "$expected_base_ref" --arg ref "$expected_ref" \
                 --argjson draft "$expected_draft" --argjson autoMerge "$expected_auto_merge" \
                 '.state == "open" and .draft == $draft and .sameRepo == true and .fork == false and .head == $head and .base == $base and .baseRef == $baseRef and .ref == $ref and .autoMerge == $autoMerge' \
@@ -282,6 +289,7 @@ jobs:
       - name: Upsert exact typed exception and terminal status
         env:
           GH_TOKEN: ${{ steps.app-token.outputs.token }}
+          GH_QUEUE_TOKEN: ${{ github.token }}
           REPOSITORY: ${{ github.repository }}
           PR_NUMBER: ${{ matrix.prNumber }}
           SOURCE_HEAD: ${{ matrix.headRefOid }}
@@ -295,7 +303,14 @@ jobs:
         run: |
           set -euo pipefail
           live=$(gh api "repos/$REPOSITORY/pulls/$PR_NUMBER" \
-            --jq '{state:.state,head:.head.sha,base:.base.sha,baseRef:.base.ref}')
+            --jq '{state:.state,head:.head.sha,baseRef:.base.ref}')
+          # shellcheck disable=SC2016
+          live_base=$(GH_TOKEN="$GH_QUEUE_TOKEN" gh api graphql \
+            -f query='query($owner:String!,$name:String!,$qualifiedName:String!){repository(owner:$owner,name:$name){ref(qualifiedName:$qualifiedName){target{oid}}}}' \
+            -f owner="${REPOSITORY%%/*}" -f name="${REPOSITORY#*/}" \
+            -f qualifiedName="refs/heads/$BASE_REF" \
+            --jq '.data.repository.ref.target.oid // ""')
+          live=$(jq --arg base "$live_base" '. + {base:$base}' <<<"$live")
           if ! jq -e --arg head "$SOURCE_HEAD" --arg base "$BASE_HEAD" --arg baseRef "$BASE_REF" \
             '.state == "open" and .head == $head and .base == $base and .baseRef == $baseRef' \
             <<<"$live" >/dev/null; then
@@ -1141,7 +1156,14 @@ jobs:
 
           # Exact live identity is read immediately before the sole branch push.
           live=$(gh api "repos/$REPOSITORY/pulls/$PR_NUMBER" \
-            --jq '{state:.state,draft:.draft,head:.head.sha,base:.base.sha,baseRef:.base.ref,ref:.head.ref,autoMerge:(.auto_merge != null),sameRepo:(.head.repo.full_name == .base.repo.full_name),fork:(.head.repo.fork // false)}')
+            --jq '{state:.state,draft:.draft,head:.head.sha,baseRef:.base.ref,ref:.head.ref,autoMerge:(.auto_merge != null),sameRepo:(.head.repo.full_name == .base.repo.full_name),fork:(.head.repo.fork // false)}')
+          # shellcheck disable=SC2016
+          live_base=$(GH_TOKEN="$GH_QUEUE_TOKEN" gh api graphql \
+            -f query='query($owner:String!,$name:String!,$qualifiedName:String!){repository(owner:$owner,name:$name){ref(qualifiedName:$qualifiedName){target{oid}}}}' \
+            -f owner="${REPOSITORY%%/*}" -f name="${REPOSITORY#*/}" \
+            -f qualifiedName="refs/heads/$BASE_REF" \
+            --jq '.data.repository.ref.target.oid // ""')
+          live=$(jq --arg base "$live_base" '. + {base:$base}' <<<"$live")
           # shellcheck disable=SC2016
           queue_before=$(GH_TOKEN="$GH_QUEUE_TOKEN" gh api graphql \
             -f query='query($owner:String!,$name:String!,$number:Int!){repository(owner:$owner,name:$name){pullRequest(number:$number){autoMergeRequest{enabledAt} isInMergeQueue mergeQueueEntry{position}}}}' \
@@ -1165,7 +1187,14 @@ jobs:
             push "https://github.com/$REPOSITORY.git" "HEAD:refs/heads/$HEAD_REF"
 
           live_after=$(gh api "repos/$REPOSITORY/pulls/$PR_NUMBER" \
-            --jq '{state:.state,draft:.draft,head:.head.sha,base:.base.sha,baseRef:.base.ref,ref:.head.ref,autoMerge:(.auto_merge != null),sameRepo:(.head.repo.full_name == .base.repo.full_name),fork:(.head.repo.fork // false)}')
+            --jq '{state:.state,draft:.draft,head:.head.sha,baseRef:.base.ref,ref:.head.ref,autoMerge:(.auto_merge != null),sameRepo:(.head.repo.full_name == .base.repo.full_name),fork:(.head.repo.fork // false)}')
+          # shellcheck disable=SC2016
+          live_base_after=$(GH_TOKEN="$GH_QUEUE_TOKEN" gh api graphql \
+            -f query='query($owner:String!,$name:String!,$qualifiedName:String!){repository(owner:$owner,name:$name){ref(qualifiedName:$qualifiedName){target{oid}}}}' \
+            -f owner="${REPOSITORY%%/*}" -f name="${REPOSITORY#*/}" \
+            -f qualifiedName="refs/heads/$BASE_REF" \
+            --jq '.data.repository.ref.target.oid // ""')
+          live_after=$(jq --arg base "$live_base_after" '. + {base:$base}' <<<"$live_after")
           # shellcheck disable=SC2016
           queue_after=$(GH_TOKEN="$GH_QUEUE_TOKEN" gh api graphql \
             -f query='query($owner:String!,$name:String!,$number:Int!){repository(owner:$owner,name:$name){pullRequest(number:$number){autoMergeRequest{enabledAt} isInMergeQueue mergeQueueEntry{position}}}}' \

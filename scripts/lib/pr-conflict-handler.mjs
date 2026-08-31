@@ -23,6 +23,61 @@ export const CONFLICT_FX_MAX_HEALTHY_CI_LATENCY_MS = 12 * 60 * 1000;
 export const CONFLICT_FX_MAX_CI_LATENCY_REGRESSION_RATIO = 1.5;
 export const CONFLICT_FX_COHORT_REPOSITORY_READ_LIMIT = 1000;
 
+function uniqueBaseRefNames(prs) {
+  const names = [];
+  const seen = new Set();
+  for (const pr of prs ?? []) {
+    const name = String(pr?.baseRefName ?? '');
+    if (!name || /[\u0000-\u001f\u007f]/u.test(name)) {
+      throw new Error(`PR #${pr?.number ?? 'unknown'} has an invalid base ref`);
+    }
+    if (!seen.has(name)) {
+      seen.add(name);
+      names.push(name);
+    }
+  }
+  return names;
+}
+
+/**
+ * PullRequest.baseRefOid is the base snapshot attached to that PR, not the
+ * current repository branch tip. Conflict repair must merge the live branch
+ * tip, so resolve every distinct base ref from Repository.ref in one bounded
+ * GraphQL read before planning any mutation.
+ */
+export function buildLiveBaseRefQuery(prs) {
+  const names = uniqueBaseRefNames(prs);
+  const selections = names
+    .map(
+      (name, index) =>
+        `b${index}:ref(qualifiedName:${JSON.stringify(`refs/heads/${name}`)}){target{oid}}`
+    )
+    .join(' ');
+  return `query($owner:String!,$name:String!){repository(owner:$owner,name:$name){${selections}}}`;
+}
+
+export function bindOpenPrsToLiveBaseRefs({ prs, response }) {
+  const names = uniqueBaseRefNames(prs);
+  const repository = response?.data?.repository;
+  if (!repository || typeof repository !== 'object') {
+    throw new Error('live base-ref query omitted repository data');
+  }
+  const liveByName = new Map();
+  names.forEach((name, index) => {
+    const oid = repository[`b${index}`]?.target?.oid;
+    if (!/^[0-9a-f]{40}$/u.test(oid ?? '')) {
+      throw new Error(`live base ref refs/heads/${name} is unavailable`);
+    }
+    liveByName.set(name, oid);
+  });
+  return (prs ?? []).map(pr => ({
+    ...pr,
+    reportedBaseRefOid: pr.baseRefOid ?? null,
+    baseRefOid: liveByName.get(pr.baseRefName),
+    baseRefOidSource: 'live_repository_ref',
+  }));
+}
+
 function validateCohortCandidates(candidates, maxCohortSize = 40) {
   if (!Array.isArray(candidates) || candidates.length > maxCohortSize) {
     throw new Error(

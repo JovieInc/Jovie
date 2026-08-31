@@ -671,7 +671,8 @@ def test_conflict_paths_preserve_native_queue_and_use_only_non_force_delivery() 
     for exact_identity_check in (
         'pulls/$PR_NUMBER',
         ".head.sha",
-        ".base.sha",
+        "ref(qualifiedName:$qualifiedName)",
+        ".data.repository.ref.target.oid",
         '.state == "open"',
         ".draft == $draft",
         ".autoMerge == $autoMerge",
@@ -679,6 +680,7 @@ def test_conflict_paths_preserve_native_queue_and_use_only_non_force_delivery() 
         ".ref == $ref",
     ):
         assert exact_identity_check in workflow
+    assert ".base.sha" not in workflow
     assert re.search(
         r'push\s+"https://github\.com/\$REPOSITORY\.git"\s+'
         r'"(?:HEAD|\$[A-Z_]*(?:HEAD|COMMIT)):refs/heads/\$HEAD_REF"',

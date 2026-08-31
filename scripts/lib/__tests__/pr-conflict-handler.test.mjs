@@ -2,10 +2,12 @@ import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { describe, expect, it } from 'vitest';
 import {
+  bindOpenPrsToLiveBaseRefs,
   buildConflictCohortLiveHeadQuery,
   buildConflictFxCohortMarker,
   buildConflictFxPrompt,
   buildConflictFxStatusDescription,
+  buildLiveBaseRefQuery,
   buildPlan,
   buildSteeringExceptionReceipt,
   CONFLICT_CLOSED_LOOP_INVARIANT_ID,
@@ -33,6 +35,7 @@ const BASE = 'b'.repeat(40);
 const OTHER_BASE_WITH_SAME_PREFIX = `${BASE.slice(0, 12)}${'c'.repeat(28)}`;
 const TRUSTED_APP_LOGIN = 'jovie-bot[bot]';
 const NOW = Date.parse('2026-08-30T18:00:00Z');
+const LIVE_BASE = 'd'.repeat(40);
 const WORKFLOW = readFileSync(
   resolve(
     import.meta.dirname,
@@ -168,6 +171,78 @@ function cohort(overrides = {}) {
     ...overrides,
   };
 }
+
+describe('live base-ref binding', () => {
+  it('deduplicates base refs and replaces stale PR snapshot OIDs with live tips', () => {
+    const prs = [
+      pr({ number: 41, baseRefOid: BASE }),
+      pr({
+        number: 42,
+        baseRefName: 'release/next',
+        baseRefOid: OTHER_BASE_WITH_SAME_PREFIX,
+      }),
+      pr({ number: 43, baseRefOid: OTHER_BASE_WITH_SAME_PREFIX }),
+    ];
+    const query = buildLiveBaseRefQuery(prs);
+
+    expect(query.match(/refs\/heads\/main/gu)).toHaveLength(1);
+    expect(query.match(/refs\/heads\/release\/next/gu)).toHaveLength(1);
+    const bound = bindOpenPrsToLiveBaseRefs({
+      prs,
+      response: {
+        data: {
+          repository: {
+            b0: { target: { oid: LIVE_BASE } },
+            b1: { target: { oid: HEAD } },
+          },
+        },
+      },
+    });
+
+    expect(bound[0]).toMatchObject({
+      baseRefOid: LIVE_BASE,
+      reportedBaseRefOid: BASE,
+      baseRefOidSource: 'live_repository_ref',
+    });
+    expect(bound[1].baseRefOid).toBe(HEAD);
+    expect(bound[2].baseRefOid).toBe(LIVE_BASE);
+
+    const [conflicted] = bindOpenPrsToLiveBaseRefs({
+      prs: [
+        pr({
+          number: 44,
+          mergeable: 'CONFLICTING',
+          mergeStateStatus: 'DIRTY',
+          baseRefOid: BASE,
+        }),
+      ],
+      response: {
+        data: { repository: { b0: { target: { oid: LIVE_BASE } } } },
+      },
+    });
+    const plan = buildPlan([conflicted], {
+      runnerCapacity: 120,
+      maxConcurrent: 40,
+      cohortId: 'live-base',
+    });
+    expect(plan.fxMatrix[0].baseRefOid).toBe(LIVE_BASE);
+    expect(plan.fxMatrix[0].baseRefOid).not.toBe(BASE);
+    expect(conflicted.reportedBaseRefOid).toBe(BASE);
+  });
+
+  it('fails closed when any live base ref is missing or malformed', () => {
+    const prs = [pr({ number: 41, baseRefOid: BASE })];
+    expect(() =>
+      bindOpenPrsToLiveBaseRefs({
+        prs,
+        response: { data: { repository: { b0: null } } },
+      })
+    ).toThrow('live base ref refs/heads/main is unavailable');
+    expect(() =>
+      buildLiveBaseRefQuery([pr({ baseRefName: 'bad\nref' })])
+    ).toThrow('has an invalid base ref');
+  });
+});
 
 const greenRequired = [
   {
@@ -1227,7 +1302,9 @@ describe('conflict workflow contract', () => {
     expect(liveReadIndex).toBeGreaterThan(-1);
     const prePush = WORKFLOW.slice(liveReadIndex, pushIndex);
     expect(prePush).toContain('.head.sha');
-    expect(prePush).toContain('.base.sha');
+    expect(prePush).not.toContain('.base.sha');
+    expect(prePush).toContain('ref(qualifiedName:$qualifiedName)');
+    expect(prePush).toContain('.data.repository.ref.target.oid');
     expect(prePush).toMatch(/\.state|isDraft|\.draft/u);
     expect(prePush).toMatch(/same_repo|full_name/u);
     expect(WORKFLOW).toMatch(/rev-parse HEAD|HEAD\^\{commit\}/u);
@@ -1237,6 +1314,23 @@ describe('conflict workflow contract', () => {
     );
     expect(WORKFLOW).not.toContain('force-with-lease');
     expect(WORKFLOW).not.toMatch(/\bgh\s+pr\s+merge\b/u);
+    expect(WORKFLOW).not.toContain('.base.sha');
+    const claim = workflowStep('Build plan and claim exact heads');
+    const exception = workflowStep(
+      'Upsert exact typed exception and terminal status'
+    );
+    const delivery = workflowStep('Validate, reread, and deliver once');
+    for (const step of [claim, exception, delivery]) {
+      expect(step).toContain('ref(qualifiedName:$qualifiedName)');
+      expect(step).toContain('GH_TOKEN="$GH_QUEUE_TOKEN" gh api graphql');
+      expect(step).not.toContain('.base.sha');
+    }
+    expect(
+      delivery.match(/ref\(qualifiedName:\$qualifiedName\)/gu)
+    ).toHaveLength(2);
+    expect(WORKFLOW).not.toContain(
+      'GH_TOKEN="$GH_MUTATION_TOKEN" gh api graphql'
+    );
   });
 
   it('preserves native auto-merge without a ready-for-review or dequeue side flight', () => {
@@ -1254,9 +1348,9 @@ describe('conflict workflow contract', () => {
     expect(WORKFLOW).toContain('mergeQueueEntry');
     expect(
       WORKFLOW.match(/GH_QUEUE_TOKEN: \$\{\{ github\.token \}\}/gu)
-    ).toHaveLength(3);
+    ).toHaveLength(4);
     expect(
       WORKFLOW.match(/GH_TOKEN="\$GH_QUEUE_TOKEN" gh api graphql/gu)
-    ).toHaveLength(2);
+    ).toHaveLength(6);
   });
 });
