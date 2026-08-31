@@ -60,6 +60,30 @@ scan() {
 
 echo "iOS best-practices lint → ${TARGET_DIR}"
 
+# 0. Foundation APIs (URL, Date, UUID, Data, JSON*, ...) are only visible in a
+#    Swift file when that file imports Foundation — directly or transitively.
+#    Transitive visibility (via SwiftUI/UIKit) is toolchain-dependent and has
+#    already broken a merge-queue build, so the import must be explicit. This
+#    check scans the test targets (`apps/ios/JovieTests`, `JovieUITests`) that
+#    the production scans below skip: a missing import there fails compilation.
+#    Only files that import nothing but Testing/XCTest are flagged — UIKit /
+#    SwiftUI / AVFoundation / XCTest files already get Foundation transitively
+#    on every toolchain Jovie targets, and the regression this guards (a
+#    Testing-only file gaining Foundation API references) can only recur in
+#    that bucket.
+for tests_root in "$(dirname "$TARGET_DIR")/JovieTests" "$(dirname "$TARGET_DIR")/JovieUITests"; do
+  [[ -d "$tests_root" ]] || continue
+  while IFS= read -r swift_file; do
+    [[ -z "${swift_file:-}" ]] && continue
+    grep -qE '^import (Foundation|UIKit|SwiftUI|AVFoundation|XCTest)' "$swift_file" && continue
+    if grep -qE '(^|[^A-Za-z0-9_.])(URL|Data|Date|UUID|JSONDecoder|JSONEncoder|DateFormatter|TimeInterval|ProcessInfo|Bundle|Calendar|Locale)\(' "$swift_file" \
+      || grep -qE '(^|[^A-Za-z0-9_.])(ProcessInfo|Calendar|Locale)\.' "$swift_file"; then
+      report "$swift_file" 1 'require-explicit-foundation-import' \
+        'Test file references Foundation APIs without `import Foundation`. Transitive visibility is toolchain-dependent; add the explicit import.'
+    fi
+  done < <(find "$tests_root" -name '*.swift' -type f | LC_ALL=C sort)
+done
+
 # 1. Raw AsyncImage drops to its placeholder on every appearance (flicker) and
 #    shares no decoded-image cache across instances.
 scan 'AsyncImage\(' 'no-raw-asyncimage' \

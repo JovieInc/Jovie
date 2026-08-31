@@ -16,6 +16,7 @@ The guardrail lint runs in `ios-ci.yml` and via `pnpm run ios:lint`. It scans pr
 | `no-userdefaults-synchronize` | `.synchronize()` | Deprecated; forces a blocking disk flush | Delete it; `UserDefaults` persists automatically |
 | `no-print` | `print(` | Invisible in production, ships noise | Use the `Observability` layer |
 | `no-force-try` | `try!` | Crashes the whole app on any thrown error | `try?` or `do`/`catch` |
+| `require-explicit-foundation-import` | Foundation APIs (`URL(`, `Date(`, `UUID(`, `Data(`, `JSON*`, …) in `JovieTests`/`JovieUITests` files that import only `Testing` | Foundation visibility via transitive imports is toolchain-dependent and has broken the merge queue | Add `import Foundation` to the file |
 
 Do **not** add an inline-ignore escape hatch to this lint (same spirit as the web `no biome-ignore` rule). If a rule is genuinely wrong for a case, fix the rule with review and don't suppress it.
 
