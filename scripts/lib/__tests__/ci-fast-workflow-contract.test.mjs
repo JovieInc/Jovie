@@ -320,10 +320,13 @@ describe('ci-fast bounded parallel workflow', () => {
       "node --test --test-name-pattern='keeps the Gem drain on typed fleet admission' scripts/backlog-orchestrator/__tests__/backlog-orchestrator.test.mjs"
     );
     for (const gemContractCommand of [
+      'python3 scripts/hermes/tests/closure-health.test.py',
       'python3 scripts/hermes/tests/gem-pr-drain.test.py',
       'python3 scripts/hermes/tests/gem-pr-rehabilitation-contract.test.py',
       'python3 scripts/hermes/tests/gem-priority-gate.test.py',
+      'python3 scripts/hermes/tests/symphony-reconciler.test.py',
       'python3 scripts/hermes/tests/test_evaluate_fleet_gate.py',
+      'python3 scripts/hermes/tests/test_fleet_admission_receipt.py',
       'python3 scripts/hermes/tests/test-model-router.py',
     ]) {
       expect(CI_FAST_SOURCE).toContain(gemContractCommand);
