@@ -2435,6 +2435,168 @@ describe('canary health gate workflow', () => {
     );
   });
 
+  it('reasserts a private exact preview and emits the only green staging receipt', () => {
+    const release = readFileSync(productionReleaseWorkflowPath, 'utf8');
+    const receiptJob = getJobBlock(release, 'staging-deployment-receipt');
+    const reassert = getStepBlock(
+      receiptJob,
+      'Reassert the exact preview after production settles'
+    );
+    const prove = getStepBlock(
+      receiptJob,
+      'Prove exact staging identity, privacy, and representative routes'
+    );
+    const writeReceipt = getStepBlock(
+      receiptJob,
+      'Write typed staging deployment receipt'
+    );
+    const uploadReceipt = getStepBlock(
+      receiptJob,
+      'Upload exact staging deployment receipt'
+    );
+    const releaseResult = getJobBlock(release, 'release-result');
+
+    expect(receiptJob).toContain(
+      'needs: [deploy-staging, alias-staging, promote-production, rollback-production]'
+    );
+    expect(receiptJob).toContain(
+      "needs.rollback-production.result == 'skipped' || needs.rollback-production.result == 'success'"
+    );
+    expect(receiptJob).toContain(
+      'superseded: ${{ steps.receipt.outputs.superseded || steps.reassert.outputs.superseded }}'
+    );
+    expect(receiptJob).toContain(
+      'superseded_sha: ${{ steps.receipt.outputs.superseded_sha || steps.reassert.outputs.superseded_sha }}'
+    );
+    expect(receiptJob).toContain("needs.alias-staging.result == 'success'");
+    expect(receiptJob).toContain(
+      "needs.alias-staging.outputs.is_current == 'true'"
+    );
+    expect(reassert).toContain('id: reassert');
+    expect(reassert).toContain(
+      'vercel alias set "$deployment_url" staging.jov.ie'
+    );
+    expect(reassert).toContain(
+      'gh api "repos/$GITHUB_REPOSITORY/commits/main" --jq \'.sha\''
+    );
+    expect(reassert).toContain(
+      '[[ "$current_main" != "$EXPECTED_COMMIT_SHA" ]]'
+    );
+    expect(reassert).toContain(
+      'Could not resolve exact main before staging receipt reassertion.'
+    );
+    expect(reassert).toContain(
+      'Release $EXPECTED_COMMIT_SHA was superseded by $current_main before staging receipt reassertion; neutral.'
+    );
+    expect(reassert).toContain('echo "superseded=true" >> "$GITHUB_OUTPUT"');
+    expect(reassert).toContain('echo "superseded_sha=$current_main"');
+    expect(reassert).toContain('exit 0');
+    expect(reassert).toContain('needs.deploy-staging.outputs.deploy_url_b64');
+    expect(prove).toContain(
+      "if: ${{ steps.reassert.outputs.superseded != 'true' }}"
+    );
+    expect(prove).toContain('EXPECTED_DEPLOYMENT_ID:');
+    expect(prove).toContain('EXPECTED_COMMIT_SHA:');
+    expect(prove).toContain(
+      'EXPECTED_VERCEL_ALIAS_ORIGIN: https://staging.jov.ie'
+    );
+    expect(prove).toContain('EXPECTED_VERCEL_ENVIRONMENT: preview');
+    expect(prove).toContain('for attempt in $(seq 1 15); do');
+    expect(prove).toContain('if [ "$attempt" -eq 15 ]; then');
+    expect(prove).toContain(
+      'staging.jov.ie did not converge to the exact READY preview'
+    );
+    expect(prove).toContain('(.target | ascii_downcase) == "preview"');
+    expect(prove).toContain('bootstrapAliasBoundAccess');
+    expect(prove).toContain('assertExactProbeResponse');
+    expect(prove).toContain('async function bootstrapConvergedAccess()');
+    expect(prove).toContain(
+      'for (let attempt = 1; attempt <= 15; attempt += 1)'
+    );
+    expect(prove).toContain(
+      'await new Promise(resolve => setTimeout(resolve, 4000));'
+    );
+    expect(prove).toContain(
+      'staging.jov.ie HTTP identity did not converge to ${expectedSha}'
+    );
+    expect(prove).toContain('const access = await bootstrapConvergedAccess();');
+    expect(prove).toContain("'https://staging.jov.ie/'");
+    expect(prove).toContain(
+      "expectedAliasOrigin: requireEnv('EXPECTED_VERCEL_ALIAS_ORIGIN')"
+    );
+    expect(prove).toContain('result.buildInfo.commitSha === expectedSha');
+    expect(prove).toContain("result.buildInfo.environment === 'preview'");
+    expect(prove).toContain("fetchStagingPath('/', 'text/html')");
+    expect(prove).toContain("fetchStagingPath('/robots.txt', 'text/plain')");
+    expect(prove).toContain("homepage.headers.get('x-robots-tag')");
+    expect(prove).toContain(
+      "robotsText.includes('User-Agent: *\\nDisallow: /')"
+    );
+    expect(prove).toContain("robotsText.includes('Sitemap:')");
+    expect(prove).not.toContain('curl_args');
+    expect(prove).not.toContain('curl ');
+    expect(prove).not.toContain('x-vercel-protection-bypass');
+    expect(writeReceipt).toContain("'jovie-staging-deployment/v1'");
+    expect(writeReceipt).toContain(
+      'gh api "repos/$GITHUB_REPOSITORY/commits/main" --jq \'.sha\''
+    );
+    expect(writeReceipt).toContain(
+      "if: ${{ steps.reassert.outputs.superseded != 'true' }}"
+    );
+    expect(writeReceipt).toContain(
+      '[[ "$current_main" != "$EXPECTED_COMMIT_SHA" ]]'
+    );
+    expect(writeReceipt).toContain(
+      'Could not resolve exact main before writing staging receipt.'
+    );
+    expect(writeReceipt).toContain(
+      'Release $EXPECTED_COMMIT_SHA was superseded by $current_main before writing staging receipt; neutral.'
+    );
+    expect(writeReceipt).toContain(
+      'echo "superseded=true" >> "$GITHUB_OUTPUT"'
+    );
+    expect(writeReceipt).toContain(
+      'echo "superseded=false" >> "$GITHUB_OUTPUT"'
+    );
+    expect(writeReceipt).toContain('currentMainSha: $currentMainSha');
+    expect(writeReceipt).toContain(
+      'ROLLBACK_RESULT: ${{ needs.rollback-production.result }}'
+    );
+    expect(writeReceipt).toContain('rollbackResult: $rollbackResult');
+    expect(writeReceipt).toContain('state: "deployed"');
+    expect(writeReceipt).toContain('terminal: true');
+    expect(writeReceipt).toContain(
+      'privacy: "robots-block-all-and-http-noindex"'
+    );
+    expect(uploadReceipt).toContain(
+      "if: ${{ steps.receipt.outputs.deployed == 'true' }}"
+    );
+    expect(receiptJob).toContain(
+      'name: staging-deployment-${{ inputs.expected_sha }}'
+    );
+    expect(receiptJob).not.toContain('vercel promote');
+    expect(receiptJob).not.toContain('vercel rollback');
+    expect(releaseResult).toContain('staging-deployment-receipt,');
+    expect(releaseResult).toContain(
+      'staging-deployment-receipt:${{ needs.staging-deployment-receipt.result }}'
+    );
+    expect(releaseResult).toContain(
+      'staging_receipt_superseded="${{ needs.staging-deployment-receipt.outputs.superseded }}"'
+    );
+    expect(releaseResult).toContain(
+      'Staging receipt superseded without exact current-main evidence.'
+    );
+    expect(releaseResult).toContain(
+      'Superseded before staging deployment receipt by $staging_receipt_superseded_sha; neutral.'
+    );
+    expect(releaseResult.indexOf('staging_receipt_superseded=')).toBeLessThan(
+      releaseResult.indexOf('for gate in')
+    );
+    expect(release.indexOf('  promote-production:')).toBeLessThan(
+      release.indexOf('  staging-deployment-receipt:')
+    );
+  });
+
   it('retries a safe OAuth test failure with clean artifacts and shared guard state', () => {
     const release = readFileSync(productionReleaseWorkflowPath, 'utf8');
     const oauthStep = getStepBlock(
@@ -4418,10 +4580,10 @@ describe('production promotion exact-artifact contract', () => {
         'ref: ${{ needs.authorize-production.outputs.expected_sha }}'
       );
     }
-    expect(reusable.match(/actions\/checkout/g)).toHaveLength(8);
+    expect(reusable.match(/actions\/checkout/g)).toHaveLength(9);
     expect(
       reusable.match(/ref: \$\{\{ inputs\.expected_sha \}\}/g)
-    ).toHaveLength(8);
+    ).toHaveLength(9);
   });
 
   it('keeps rollback centralized behind confirmed structured gate failures', () => {

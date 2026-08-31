@@ -140,6 +140,17 @@ function terminalizeDispatch(dispatch, receipt) {
   if (failure) {
     failure.terminalReceipt = receipt;
   }
+  if (next.state?.failures) {
+    const selectedFailure = next.state.failures[fingerprint];
+    next.state.failures = selectedFailure
+      ? { [fingerprint]: selectedFailure }
+      : {};
+  }
+  if (Array.isArray(next.state?.deliveries)) {
+    next.state.deliveries = next.state.deliveries.filter(delivery =>
+      String(delivery).endsWith(`:${fingerprint}`)
+    );
+  }
   if (next.state?.claim?.fingerprint === fingerprint) {
     next.state.claim.status = 'terminal';
     next.state.claim.reason = receipt.result;

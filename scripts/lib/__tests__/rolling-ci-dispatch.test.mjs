@@ -503,6 +503,106 @@ describe('rolling CI failure dispatch', () => {
     expect(next.state.deliveries).toHaveLength(1);
   });
 
+  it('keeps merge_group FX claim and comment pinned to the first failure', () => {
+    const firstFingerprint = failureFingerprint({
+      check: 'a-first',
+      failedSteps: ['Typecheck'],
+    });
+    const secondFingerprint = failureFingerprint({
+      check: 'b-second',
+      failedSteps: ['Unit tests'],
+    });
+    const next = runDispatch(
+      dispatchInput({
+        source: { ...trustedSource, producerEvent: 'merge_group' },
+        writer: 'fx',
+        failedJobs: [
+          { name: 'a-first', steps: ['Typecheck'] },
+          { name: 'b-second', steps: ['Unit tests'] },
+        ],
+        checks: [
+          {
+            name: 'a-first',
+            conclusion: 'failure',
+            headSha: head,
+            checkSuiteId: 44,
+          },
+          {
+            name: 'b-second',
+            conclusion: 'failure',
+            headSha: head,
+            checkSuiteId: 44,
+          },
+        ],
+      })
+    );
+
+    expect(next).toMatchObject({
+      action: 'dispatch_implementer',
+      mutate: true,
+      state: { claim: { fingerprint: firstFingerprint } },
+    });
+    expect(next.state.failures[firstFingerprint]?.deliveryCount).toBe(1);
+    expect(next.state.failures[secondFingerprint]?.deliveryCount).toBe(1);
+    expect(next.state.deliveries).toHaveLength(2);
+    expect(next.body).toContain(
+      `- Failure fingerprint: \`${next.state.claim.fingerprint}\``
+    );
+    expect(next.body).not.toContain(secondFingerprint);
+  });
+
+  it('rejects duplicate regular PR redeliveries before admitting siblings', () => {
+    const firstFingerprint = failureFingerprint({
+      check: 'a-first',
+      failedSteps: ['Typecheck'],
+    });
+    const secondFingerprint = failureFingerprint({
+      check: 'b-second',
+      failedSteps: ['Unit tests'],
+    });
+    const failedJobs = [
+      { name: 'a-first', steps: ['Typecheck'] },
+      { name: 'b-second', steps: ['Unit tests'] },
+    ];
+    const checks = [
+      {
+        name: 'a-first',
+        conclusion: 'failure',
+        headSha: head,
+        checkSuiteId: 44,
+      },
+      {
+        name: 'b-second',
+        conclusion: 'failure',
+        headSha: head,
+        checkSuiteId: 44,
+      },
+    ];
+    const first = runDispatch(
+      dispatchInput({
+        failedJobs,
+        checks,
+      })
+    );
+
+    const redelivery = runDispatch(
+      dispatchInput({
+        failedJobs,
+        checks,
+        priorCommentBody: first.body,
+      })
+    );
+
+    expect(redelivery).toMatchObject({
+      action: 'deduplicate_delivery',
+      mutate: false,
+      state: { claim: { fingerprint: firstFingerprint } },
+    });
+    expect(redelivery.state.failures[firstFingerprint]?.deliveryCount).toBe(1);
+    expect(redelivery.state.failures[secondFingerprint]).toBeUndefined();
+    expect(redelivery.body).toBe('');
+  });
+
   it('successful current-head rerun supersedes active repairs', () => {
     const recovered = planGreenRecovery({
       headSha: head,

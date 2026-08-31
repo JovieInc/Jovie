@@ -1194,6 +1194,297 @@ jobs:
           path: apps/web/.next/cache
           key: ${{ steps.production-next-cache-restore.outputs.cache-primary-key }}
 
+  staging-deployment-receipt:
+    name: Preserve exact staging deployment receipt
+    needs: [deploy-staging, alias-staging, promote-production, rollback-production]
+    # controller-hop-exception: jovie-controller-hop/v1
+    # accountable-writer: Gem
+    # necessary-trust-boundary: GitHub main is the authoritative supersession boundary while this job executes pinned runner source.
+    # removal-trigger: Remove when production-controller passes a typed current-main output into this receipt job.
+    # The initial alias is exact and current. Wait for every production routing
+    # mutation, including a possible rollback, to settle before reasserting the
+    # preview because Vercel may retarget project domains such as staging.jov.ie.
+    if: ${{ always() && needs.deploy-staging.result == 'success' && needs.alias-staging.result == 'success' && needs.alias-staging.outputs.is_current == 'true' && (needs.rollback-production.result == 'skipped' || needs.rollback-production.result == 'success') }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    permissions:
+      contents: read
+    outputs:
+      deployed: ${{ steps.receipt.outputs.deployed || steps.reassert.outputs.deployed }}
+      deployment_id: ${{ steps.receipt.outputs.deployment_id }}
+      superseded: ${{ steps.receipt.outputs.superseded || steps.reassert.outputs.superseded }}
+      superseded_sha: ${{ steps.receipt.outputs.superseded_sha || steps.reassert.outputs.superseded_sha }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ inputs.expected_sha }}
+          persist-credentials: false
+      - uses: ./.github/actions/setup-node-pnpm
+      - name: Reassert the exact preview after production settles
+        id: reassert
+        env:
+          DEPLOYMENT_URL_B64: ${{ needs.deploy-staging.outputs.deploy_url_b64 }}
+          EXPECTED_COMMIT_SHA: ${{ inputs.expected_sha }}
+          GH_TOKEN: ${{ github.token }}
+          GITHUB_REPOSITORY: ${{ github.repository }}
+          VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
+          VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          current_main="$(gh api "repos/$GITHUB_REPOSITORY/commits/main" --jq '.sha')"
+          [[ "$current_main" =~ ^[0-9a-f]{40}$ ]] || {
+            echo "::error::Could not resolve exact main before staging receipt reassertion."
+            exit 1
+          }
+          if [[ "$current_main" != "$EXPECTED_COMMIT_SHA" ]]; then
+            echo "::notice::Release $EXPECTED_COMMIT_SHA was superseded by $current_main before staging receipt reassertion; neutral."
+            echo "deployed=false" >> "$GITHUB_OUTPUT"
+            echo "superseded=true" >> "$GITHUB_OUTPUT"
+            echo "superseded_sha=$current_main" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          echo "superseded=false" >> "$GITHUB_OUTPUT"
+          deployment_url="$(printf '%s' "$DEPLOYMENT_URL_B64" | base64 --decode)"
+          [[ "$deployment_url" =~ ^https://jovie-[a-z0-9-]+-jovie\.vercel\.app$ ]] || {
+            echo "::error::Exact staging deployment URL is missing or malformed."
+            exit 1
+          }
+          ./node_modules/.bin/vercel alias set "$deployment_url" staging.jov.ie \
+            --scope "$VERCEL_ORG_ID"
+
+      - name: Prove exact staging identity, privacy, and representative routes
+        if: ${{ steps.reassert.outputs.superseded != 'true' }}
+        env:
+          DEPLOYMENT_URL_B64: ${{ needs.deploy-staging.outputs.deploy_url_b64 }}
+          EXPECTED_COMMIT_SHA: ${{ inputs.expected_sha }}
+          EXPECTED_DEPLOYMENT_ID: ${{ needs.deploy-staging.outputs.deploy_id }}
+          VERCEL_AUTOMATION_BYPASS_SECRET: ${{ secrets.VERCEL_AUTOMATION_BYPASS_SECRET }}
+          VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
+          VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
+          VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
+          EXPECTED_VERCEL_ALIAS_ORIGIN: https://staging.jov.ie
+          EXPECTED_VERCEL_ENVIRONMENT: preview
+          VERCEL_PROBE_TIMEOUT_MS: '120000'
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -n "$VERCEL_AUTOMATION_BYPASS_SECRET" || {
+            echo "::error::Staging receipt requires the scoped automation bypass."
+            exit 1
+          }
+          deployment_url="$(printf '%s' "$DEPLOYMENT_URL_B64" | base64 --decode)"
+          exact_json="$(
+            VERCEL_CANDIDATE_DEPLOYMENT_URL="$deployment_url" \
+            VERCEL_CANDIDATE_DEPLOYMENT_ID="$EXPECTED_DEPLOYMENT_ID" \
+            VERCEL_DEPLOYMENT_MAX_PAGES=5 \
+            VERCEL_API_TIMEOUT_MS=120000 \
+            VERCEL_DEPLOYMENT_POLL_INTERVAL_MS=3000 \
+              node apps/web/scripts/vercel-protected-origin.cjs resolve-deployment
+          )"
+          jq -e --arg id "$EXPECTED_DEPLOYMENT_ID" '
+            .id == $id and
+            (.readyState | ascii_upcase) == "READY"
+          ' >/dev/null <<<"$exact_json" || {
+            echo "::error::Exact staging deployment is not READY."
+            exit 1
+          }
+
+          for attempt in $(seq 1 15); do
+            alias_json="$(./node_modules/.bin/vercel inspect staging.jov.ie \
+              --format=json --scope "$VERCEL_ORG_ID" 2>/dev/null || true)"
+            if jq -e --arg id "$EXPECTED_DEPLOYMENT_ID" '
+              type == "object" and
+              .id == $id and
+              (.readyState | ascii_upcase) == "READY" and
+              (.target | ascii_downcase) == "preview"
+            ' >/dev/null 2>&1 <<<"$alias_json"; then
+              echo "staging.jov.ie owns exact READY preview $EXPECTED_DEPLOYMENT_ID at $EXPECTED_COMMIT_SHA."
+              break
+            fi
+            if [ "$attempt" -eq 15 ]; then
+              echo "::error::staging.jov.ie did not converge to the exact READY preview."
+              exit 1
+            fi
+            sleep 4
+          done
+
+          node <<'NODE'
+          const {
+            assertExactProbeResponse,
+            bootstrapAliasBoundAccess,
+          } = require('./apps/web/scripts/vercel-protected-origin.cjs');
+
+          function requireEnv(name) {
+            const value = process.env[name]?.trim();
+            if (!value) throw new Error(`${name} is required.`);
+            return value;
+          }
+
+          async function fetchStagingPath(path, accept) {
+            const url = new URL(path, 'https://staging.jov.ie');
+            url.searchParams.set('_cb', `${Date.now()}-${Math.random()}`);
+            const controller = new AbortController();
+            const timeout = setTimeout(() => controller.abort(), 20_000);
+            try {
+              const response = await fetch(url, {
+                headers: {
+                  Accept: accept,
+                  'Cache-Control': 'no-cache, no-store, must-revalidate',
+                  Cookie: access.cookieHeader,
+                  Pragma: 'no-cache',
+                  'User-Agent':
+                    'Mozilla/5.0 (compatible; JovieCI/1.0; +https://jov.ie)',
+                },
+                redirect: 'manual',
+                signal: controller.signal,
+              });
+              assertExactProbeResponse(response, url);
+              return response;
+            } finally {
+              clearTimeout(timeout);
+            }
+          }
+
+          const expectedSha = requireEnv('EXPECTED_COMMIT_SHA');
+
+          async function bootstrapConvergedAccess() {
+            let lastError;
+            for (let attempt = 1; attempt <= 15; attempt += 1) {
+              try {
+                const result = await bootstrapAliasBoundAccess(
+                  'https://staging.jov.ie/',
+                  {
+                    expectedAliasOrigin: requireEnv('EXPECTED_VERCEL_ALIAS_ORIGIN'),
+                    expectedCommitSha: expectedSha,
+                    expectedEnvironment: requireEnv('EXPECTED_VERCEL_ENVIRONMENT'),
+                    timeoutMs: requireEnv('VERCEL_PROBE_TIMEOUT_MS'),
+                  }
+                );
+                if (
+                  result.buildInfo.commitSha === expectedSha &&
+                  result.buildInfo.environment === 'preview'
+                ) {
+                  return result;
+                }
+                lastError = new Error(
+                  `observed ${result.buildInfo.commitSha}/${result.buildInfo.environment}`
+                );
+              } catch (error) {
+                lastError =
+                  error instanceof Error ? error : new Error(String(error));
+              }
+              if (attempt < 15) {
+                await new Promise(resolve => setTimeout(resolve, 4000));
+              }
+            }
+            throw new Error(
+              `staging.jov.ie HTTP identity did not converge to ${expectedSha}: ${lastError?.message ?? 'unknown error'}`
+            );
+          }
+
+          const access = await bootstrapConvergedAccess();
+          const homepage = await fetchStagingPath('/', 'text/html');
+          if (homepage.status !== 200) {
+            throw new Error(`Staging homepage returned HTTP ${homepage.status}.`);
+          }
+          const robotsHeader = homepage.headers.get('x-robots-tag') ?? '';
+          if (!/\bnoindex\b/i.test(robotsHeader)) {
+            throw new Error('Staging homepage is missing the HTTP noindex policy.');
+          }
+          await homepage.arrayBuffer();
+
+          const robots = await fetchStagingPath('/robots.txt', 'text/plain');
+          if (robots.status !== 200) {
+            throw new Error(`Staging robots.txt returned HTTP ${robots.status}.`);
+          }
+          const robotsText = await robots.text();
+          if (
+            !robotsText.includes('User-Agent: *\nDisallow: /') ||
+            robotsText.includes('Sitemap:')
+          ) {
+            throw new Error('Staging robots policy is not private/noindex.');
+          }
+          NODE
+
+      - name: Write typed staging deployment receipt
+        if: ${{ steps.reassert.outputs.superseded != 'true' }}
+        id: receipt
+        env:
+          DEPLOYMENT_URL_B64: ${{ needs.deploy-staging.outputs.deploy_url_b64 }}
+          EXPECTED_COMMIT_SHA: ${{ inputs.expected_sha }}
+          EXPECTED_DEPLOYMENT_ID: ${{ needs.deploy-staging.outputs.deploy_id }}
+          GH_TOKEN: ${{ github.token }}
+          GITHUB_REPOSITORY: ${{ github.repository }}
+          PROMOTION_RESULT: ${{ needs.promote-production.result }}
+          ROLLBACK_RESULT: ${{ needs.rollback-production.result }}
+          SOURCE_CI_RUN_ATTEMPT: ${{ github.event.workflow_run.run_attempt }}
+          SOURCE_CI_RUN_ID: ${{ github.event.workflow_run.id }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          current_main="$(gh api "repos/$GITHUB_REPOSITORY/commits/main" --jq '.sha')"
+          [[ "$current_main" =~ ^[0-9a-f]{40}$ ]] || {
+            echo "::error::Could not resolve exact main before writing staging receipt."
+            exit 1
+          }
+          if [[ "$current_main" != "$EXPECTED_COMMIT_SHA" ]]; then
+            echo "::notice::Release $EXPECTED_COMMIT_SHA was superseded by $current_main before writing staging receipt; neutral."
+            echo "deployed=false" >> "$GITHUB_OUTPUT"
+            echo "superseded=true" >> "$GITHUB_OUTPUT"
+            echo "superseded_sha=$current_main" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          deployment_url="$(printf '%s' "$DEPLOYMENT_URL_B64" | base64 --decode)"
+          jq -n \
+            --arg schema 'jovie-staging-deployment/v1' \
+            --arg repository '${{ github.repository }}' \
+            --arg sha "$EXPECTED_COMMIT_SHA" \
+            --arg currentMainSha "$current_main" \
+            --arg deploymentId "$EXPECTED_DEPLOYMENT_ID" \
+            --arg deploymentUrl "$deployment_url" \
+            --arg sourceCiRunId "$SOURCE_CI_RUN_ID" \
+            --arg sourceCiRunAttempt "$SOURCE_CI_RUN_ATTEMPT" \
+            --arg controllerRunId '${{ github.run_id }}' \
+            --arg controllerRunAttempt '${{ github.run_attempt }}' \
+            --arg promotionResult "$PROMOTION_RESULT" \
+            --arg rollbackResult "$ROLLBACK_RESULT" \
+            --arg observedAt "$(date -u +%Y-%m-%dT%H:%M:%SZ)" \
+            '{
+              schema: $schema,
+              state: "deployed",
+              terminal: true,
+              repository: $repository,
+              sha: $sha,
+              currentMainSha: $currentMainSha,
+              deploymentId: $deploymentId,
+              deploymentUrl: $deploymentUrl,
+              alias: "staging.jov.ie",
+              environment: "preview",
+              sourceCiRunId: $sourceCiRunId,
+              sourceCiRunAttempt: $sourceCiRunAttempt,
+              controllerRunId: $controllerRunId,
+              controllerRunAttempt: $controllerRunAttempt,
+              promotionResult: $promotionResult,
+              rollbackResult: $rollbackResult,
+              exactIdentity: "passed",
+              routeSmoke: "passed",
+              privacy: "robots-block-all-and-http-noindex",
+              observedAt: $observedAt
+            }' > "$RUNNER_TEMP/staging-deployment-receipt.json"
+          echo "deployed=true" >> "$GITHUB_OUTPUT"
+          echo "deployment_id=$EXPECTED_DEPLOYMENT_ID" >> "$GITHUB_OUTPUT"
+          echo "superseded=false" >> "$GITHUB_OUTPUT"
+
+      - name: Upload exact staging deployment receipt
+        if: ${{ steps.receipt.outputs.deployed == 'true' }}
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: staging-deployment-${{ inputs.expected_sha }}
+          path: ${{ runner.temp }}/staging-deployment-receipt.json
+          if-no-files-found: error
+          retention-days: 30
+
   production-public-profile-alias-gate:
     name: Production public-profile alias usable-result gate
     needs: [promote-production]
@@ -1638,6 +1929,7 @@ jobs:
         canary-health-gate,
         staging-head,
         alias-staging,
+        staging-deployment-receipt,
         production-head,
         promote-production,
         production-public-profile-alias-gate,
@@ -1742,6 +2034,17 @@ jobs:
             exit 1
           fi
 
+          staging_receipt_superseded="${{ needs.staging-deployment-receipt.outputs.superseded }}"
+          if [ "$staging_receipt_superseded" = "true" ]; then
+            staging_receipt_superseded_sha="${{ needs.staging-deployment-receipt.outputs.superseded_sha }}"
+            [[ "$staging_receipt_superseded_sha" =~ ^[0-9a-f]{40}$ ]] || {
+              echo "::error::Staging receipt superseded without exact current-main evidence."
+              exit 1
+            }
+            echo "Superseded before staging deployment receipt by $staging_receipt_superseded_sha; neutral."
+            exit 0
+          fi
+
           for gate in \
             "migrate-production:${{ needs.migrate-production.result }}" \
             "deploy-staging:${{ needs.deploy-staging.result }}" \
@@ -1749,6 +2052,7 @@ jobs:
             "canary-health-gate:${{ needs.canary-health-gate.result }}" \
             "staging-head:${{ needs.staging-head.result }}" \
             "alias-staging:${{ needs.alias-staging.result }}" \
+            "staging-deployment-receipt:${{ needs.staging-deployment-receipt.result }}" \
             "production-head:${{ needs.production-head.result }}" \
             "promote-production:${{ needs.promote-production.result }}" \
             "production-public-profile-alias-gate:${{ needs.production-public-profile-alias-gate.result }}" \

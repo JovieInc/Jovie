@@ -443,6 +443,8 @@ export function runDispatch(input) {
   let finalPlan = null;
   let actionablePlan = null;
   let actionableEvent = null;
+  const preserveSiblingFailures =
+    input.source?.producerEvent === 'merge_group' && input.writer === 'fx';
   for (const event of events) {
     finalPlan = planFailureDispatch({
       event,
@@ -450,11 +452,26 @@ export function runDispatch(input) {
       writer: input.writer,
       priorState: state,
     });
+    if (!finalPlan.mutate) {
+      if (
+        !preserveSiblingFailures &&
+        finalPlan.action === 'deduplicate_delivery'
+      ) {
+        break;
+      }
+      continue;
+    }
     if (finalPlan.mutate) {
       state = finalPlan.state;
-      actionablePlan = finalPlan;
-      actionableEvent = event;
-      break;
+      if (!actionablePlan) {
+        actionablePlan = finalPlan;
+        actionableEvent = event;
+        if (!preserveSiblingFailures) break;
+      } else if (preserveSiblingFailures && state.claim) {
+        state.claim = actionablePlan.state.claim;
+      } else {
+        break;
+      }
     }
   }
   const selectedPlan = actionablePlan ?? finalPlan;
