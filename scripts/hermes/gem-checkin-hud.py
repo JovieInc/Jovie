@@ -124,6 +124,13 @@ def _int(value: Any) -> int | None:
     return int(number)
 
 
+def _rounded_int(value: Any) -> int | None:
+    number = _num(value)
+    if number is None:
+        return None
+    return int(round(number))
+
+
 def _text(record: dict[str, Any], keys: tuple[str, ...]) -> str | None:
     for key in keys:
         value = record.get(key)
@@ -266,17 +273,22 @@ def due_label(due: Any, *, now: datetime | None = None) -> str:
 
 
 def compact_tokens(total: Any, incoming: Any = None, outgoing: Any = None) -> str:
-    count = _int(total)
+    count = _rounded_int(total)
     if count is None:
-        inn, out = _int(incoming), _int(outgoing)
+        inn, out = _rounded_int(incoming), _rounded_int(outgoing)
         if inn is None and out is None:
             return "-"
         count = (inn or 0) + (out or 0)
     if count < 1000:
         return str(count)
-    if count < 1_000_000:
-        return f"{count / 1000:.1f}k"
-    return f"{count / 1_000_000:.1f}m"
+    if count < 999_950:
+        value, suffix = count / 1000, "K"
+    elif count < 999_950_000:
+        value, suffix = count / 1_000_000, "M"
+    else:
+        value, suffix = count / 1_000_000_000, "B"
+    rendered = f"{value:.1f}".rstrip("0").rstrip(".")
+    return f"{rendered}{suffix}"
 
 
 def short_path(value: Any) -> str:
@@ -1272,6 +1284,7 @@ def _cell(value: Any, width: int, *, right: bool = False, tail: bool = False) ->
 def _table_header(widths: dict[str, int]) -> str:
     columns = (
         ("ST", "st", False),
+        ("POS", "pos", True),
         ("ID", "id", False),
         ("TITLE", "title", False),
         ("TRY/TURN", "run", True),
@@ -1283,10 +1296,11 @@ def _table_header(widths: dict[str, int]) -> str:
 
 
 def _col_widths(width: int) -> dict[str, int]:
-    st, ident, run, tokens, elapsed, ws = 2, 12, 9, 10, 8, 24
-    remaining = width - (st + ident + run + tokens + elapsed + ws + 12)
+    st, pos, ident, run, tokens, elapsed, ws = 2, 4, 12, 9, 10, 8, 24
+    remaining = width - (st + pos + ident + run + tokens + elapsed + ws + 14)
     return {
         "st": st,
+        "pos": pos,
         "id": ident,
         "title": min(180, max(20, remaining)),
         "run": run,
@@ -1296,11 +1310,24 @@ def _col_widths(width: int) -> dict[str, int]:
     }
 
 
-def _cells(color: tuple[int, int, int], widths: dict[str, int], glyph: str, ident: str, title: str, attempt: str, turn: str, tokens: str, elapsed: str, ws: str) -> str:
+def _cells(
+    color: tuple[int, int, int],
+    widths: dict[str, int],
+    glyph: str,
+    position: str,
+    ident: str,
+    title: str,
+    attempt: str,
+    turn: str,
+    tokens: str,
+    elapsed: str,
+    ws: str,
+) -> str:
     run = "-" if attempt == "-" and turn == "-" else f"{attempt}/{turn}"
     return "  ".join(
         [
             _rgb(color, _cell(glyph, widths["st"])),
+            _rgb(DIM, _cell(position, widths["pos"], right=True)),
             _rgb(FG, _cell(ident, widths["id"]), bold=True),
             _rgb(FG, _cell(title, widths["title"])),
             _rgb(DIM, _cell(run, widths["run"], right=True)),
@@ -1315,13 +1342,12 @@ def _job_row(row: dict[str, Any], widths: dict[str, int], *, now: datetime) -> s
     kind = row.get("kind")
     if kind == "mq":
         ident = f"#{row['number']}" if isinstance(row.get("number"), int) else "-"
-        ws = ident if ident != "-" else f"pos {dash(row.get('position'))}"
-        return _cells(PURPLE, widths, "○", ident, dash(row.get("title")), "-", "-", "-", elapsed_label(row.get("enqueued"), now=now), ws)
+        return _cells(PURPLE, widths, "○", dash(row.get("position")), ident, dash(row.get("title")), "-", "-", "-", elapsed_label(row.get("enqueued"), now=now), "-")
     if kind == "retrying":
-        return _cells(PINK, widths, "↻", dash(row.get("id")), dash(row.get("error") or row.get("title")), dash(row.get("attempt")), dash(row.get("turn")), compact_tokens(row.get("tokens_total"), row.get("tokens_in"), row.get("tokens_out")), due_label(row.get("due_at"), now=now), short_path(row.get("workspace")))
+        return _cells(PINK, widths, "↻", "-", dash(row.get("id")), dash(row.get("error") or row.get("title")), dash(row.get("attempt")), dash(row.get("turn")), compact_tokens(row.get("tokens_total"), row.get("tokens_in"), row.get("tokens_out")), due_label(row.get("due_at"), now=now), short_path(row.get("workspace")))
     if kind == "blocked":
-        return _cells(PINK, widths, "✕", dash(row.get("id")), dash(row.get("error") or row.get("title")), dash(row.get("attempt")), dash(row.get("turn")), compact_tokens(row.get("tokens_total"), row.get("tokens_in"), row.get("tokens_out")), elapsed_label(row.get("started"), now=now, seconds=row.get("seconds")), short_path(row.get("workspace")))
-    return _cells(BLUE, widths, "●", dash(row.get("id")), dash(row.get("title") or row.get("last_message")), dash(row.get("attempt")), dash(row.get("turn")), compact_tokens(row.get("tokens_total"), row.get("tokens_in"), row.get("tokens_out")), elapsed_label(row.get("started"), now=now, seconds=row.get("seconds")), short_path(row.get("workspace") or row.get("url")))
+        return _cells(PINK, widths, "✕", "-", dash(row.get("id")), dash(row.get("error") or row.get("title")), dash(row.get("attempt")), dash(row.get("turn")), compact_tokens(row.get("tokens_total"), row.get("tokens_in"), row.get("tokens_out")), elapsed_label(row.get("started"), now=now, seconds=row.get("seconds")), short_path(row.get("workspace")))
+    return _cells(BLUE, widths, "●", "-", dash(row.get("id")), dash(row.get("title") or row.get("last_message")), dash(row.get("attempt")), dash(row.get("turn")), compact_tokens(row.get("tokens_total"), row.get("tokens_in"), row.get("tokens_out")), elapsed_label(row.get("started"), now=now, seconds=row.get("seconds")), short_path(row.get("workspace") or row.get("url")))
 
 
 def _hero_metrics(
@@ -1340,7 +1366,7 @@ def _hero_metrics(
     seconds = symphony.get("seconds_running")
     if seconds is None and totals:
         seconds = totals.get("seconds_running")
-    throughput = "-" if tps is None else f"{tps:,.0f} tps"
+    throughput = "-" if tps is None else f"{compact_tokens(tps)} tps"
     agents = f"{dash(running)}/{dash(cap)}"
     retrying = _int(symphony.get("retrying"))
     blocked = _int(symphony.get("blocked"))
@@ -1559,8 +1585,8 @@ def _footer(symphony: dict[str, Any], width: int, *, now: datetime) -> str:
     else:
         hook_text = str(hook).splitlines()[0][:40]
     totals = symphony.get("totals") if isinstance(symphony.get("totals"), dict) else {}
-    incoming = dash(_int(totals.get("input_tokens")) if totals else None)
-    outgoing = dash(_int(totals.get("output_tokens")) if totals else None)
+    incoming = compact_tokens(totals.get("input_tokens") if totals else None)
+    outgoing = compact_tokens(totals.get("output_tokens") if totals else None)
     last_event = symphony.get("last_event")
     event_text = natural_time(last_event, now=now) if _iso(last_event) else dash(last_event)
     parts = [
