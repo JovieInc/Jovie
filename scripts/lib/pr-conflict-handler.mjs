@@ -1009,9 +1009,14 @@ export function buildPlan(
     1,
     Number.parseInt(String(maxConcurrent), 10) || 1
   );
+  // Generic PRs with checks in flight are already represented by activeCi and
+  // queuedCi when adaptive capacity is computed. Subtracting every UNSTABLE PR
+  // again can permanently deadlock a small remediation canary on a busy repo.
+  // Actual conflict-remediation claims are accounted by pendingRemediations in
+  // the durable cohort history, so keep currentCiInFlight as telemetry only.
   const availableRemediationSlots = Math.max(
     0,
-    Math.min(adaptive.cap, requestedLimit) - currentCiInFlight
+    Math.min(adaptive.cap, requestedLimit)
   );
   let plannedRebaseTriggers = 0;
   let plannedFxTriggers = 0;
