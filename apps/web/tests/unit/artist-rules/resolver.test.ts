@@ -4,7 +4,7 @@ import {
   validateArtistRuleActivation,
   validateArtistRuleException,
 } from '@/lib/artist-rules/resolver';
-import type { ArtistRule } from '@/lib/db/schema/library-graph';
+import type { ArtistRule } from '@/lib/db/schema/library-content-graph';
 
 function rule(overrides: Partial<ArtistRule> = {}): ArtistRule {
   return {
