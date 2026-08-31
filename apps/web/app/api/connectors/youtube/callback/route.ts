@@ -113,15 +113,12 @@ export async function GET(request: Request) {
     const channels = await listOwnedYouTubeChannels({
       accessToken: tokens.access_token,
     });
-    if (channels.length !== 1) {
+    const [channel] = channels;
+    if (!channel || channels.length !== 1) {
       return redirectWith(url.origin, returnTo, {
-        error:
-          channels.length === 0
-            ? 'youtube_no_channel'
-            : 'youtube_channel_choice',
+        error: !channel ? 'youtube_no_channel' : 'youtube_channel_choice',
       });
     }
-    const channel = channels[0];
     const grantedScopes = tokens.scope.split(' ').filter(Boolean);
     const expiresAt = new Date(Date.now() + tokens.expires_in * 1000);
 
