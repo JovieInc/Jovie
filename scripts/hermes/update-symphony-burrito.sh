@@ -18,6 +18,7 @@ UNIT_SRC="${REPO_ROOT}/scripts/hermes/systemd/symphony-elixir.service"
 UNIT_DST="${TARGET_HOME}/.config/systemd/user/${SERVICE_NAME}"
 WORKFLOW_SRC="${SYMPHONY_WORKFLOW_SRC:-${REPO_ROOT}/scripts/hermes/symphony/WORKFLOW.md}"
 WORKFLOW_DST="${TARGET_HOME}/.config/symphony/WORKFLOW.md"
+ACCOUNT_ENV="${TARGET_HOME}/.config/symphony/codex-account.env"
 HELPER_SRC="${REPO_ROOT}/scripts/hermes/symphony_official_runtime.py"
 HELPER_DST="${TARGET_HOME}/.local/bin/symphony-official-runtime"
 LOG_DIR="${TARGET_HOME}/symphony-elixir-logs"
@@ -29,8 +30,19 @@ DRY_RUN=0
 SKIP_BINARY=0
 CHECK_ONLY=0
 RUNTIME_READBACK=0
+RETIRE_LEGACY=0
+LEGACY_UNITS=(
+  symphony-ui-pilot.service
+  symphony-reconciler.service
+  symphony-grok-sidecar.service
+  symphony-reconciler.timer
+  symphony-grok-sidecar.timer
+  symphony-burrito.service
+  symphony-burrito-update.service
+  symphony-burrito-update.timer
+)
 
-usage() { echo "usage: $0 [--dry-run] [--check] [--no-restart] [--skip-binary] [--runtime-readback]" >&2; }
+usage() { echo "usage: $0 [--dry-run] [--check] [--no-restart] [--skip-binary] [--retire-legacy] [--runtime-readback]" >&2; }
 
 for arg in "$@"; do
   case "$arg" in
@@ -38,11 +50,16 @@ for arg in "$@"; do
     --check) CHECK_ONLY=1 ;;
     --no-restart) RESTART=0 ;;
     --skip-binary) SKIP_BINARY=1 ;;
+    --retire-legacy) RETIRE_LEGACY=1 ;;
     --runtime-readback) RUNTIME_READBACK=1 ;;
     -h|--help) usage; exit 0 ;;
     *) usage; exit 2 ;;
   esac
 done
+
+if [ "$RESTART" -eq 1 ]; then
+  RETIRE_LEGACY=1
+fi
 
 download() {
   local url="$1" dest="$2"
@@ -73,13 +90,15 @@ validate_source() {
 }
 
 install_one() {
-  local src="$1" dst="$2" mode="${3:-0644}"
+  local src="$1" dst="$2" mode="${3:-0644}" temporary
   if [ ! -f "$src" ]; then
     echo "MISSING_SOURCE $src" >&2
     return 1
   fi
   mkdir -p "$(dirname "$dst")"
-  install -m "$mode" "$src" "$dst"
+  temporary="${dst}.tmp.$$"
+  install -m "$mode" "$src" "$temporary"
+  mv "$temporary" "$dst"
   echo "INSTALLED $dst"
 }
 
@@ -96,6 +115,37 @@ check_one() {
     rc=1
   fi
   return "$rc"
+}
+
+check_workflow() {
+  local src="$1" dst="$2"
+  if [ ! -f "$dst" ]; then
+    echo "MISSING $dst"
+    return 1
+  fi
+  if python3 - "$src" "$dst" <<'PY'
+import pathlib, re, sys
+
+pattern = re.compile(r"^(\s*max_concurrent_agents:\s*)(\d+)(\s*)$", re.MULTILINE)
+
+def normalized(path):
+    text = pathlib.Path(path).read_text(encoding="utf-8")
+    matches = pattern.findall(text)
+    if len(matches) != 1:
+        return None
+    value = int(matches[0][1])
+    if not 1 <= value <= 40:
+        return None
+    return pattern.sub(r"\g<1>__RUNTIME_OVERLAY__\g<3>", text)
+
+raise SystemExit(0 if normalized(sys.argv[1]) == normalized(sys.argv[2]) else 1)
+PY
+  then
+    echo "OK $dst (bounded max_concurrent_agents overlay accepted)"
+  else
+    echo "DRIFT $dst"
+    return 1
+  fi
 }
 
 runtime_readback() {
@@ -128,12 +178,15 @@ runtime_readback() {
     echo "LYB_API_RED $LYB_STATE_URL"
     rc=1
   fi
-  for legacy in symphony-ui-pilot.service symphony-burrito.service symphony-burrito-update.timer symphony-burrito-update.service; do
-    if systemctl --user is-enabled --quiet "$legacy" 2>/dev/null; then
+  for legacy in "${LEGACY_UNITS[@]}"; do
+    if [ "$(systemctl --user show "$legacy" --property=LoadState --value 2>/dev/null || true)" = masked ]; then
+      echo "LEGACY_MASKED $legacy"
+    elif systemctl --user is-enabled --quiet "$legacy" 2>/dev/null; then
       echo "LEGACY_ENABLED $legacy"
       rc=1
     else
-      echo "LEGACY_DISABLED $legacy"
+      echo "LEGACY_NOT_MASKED $legacy"
+      rc=1
     fi
   done
   echo "SOURCE_HASH workflow=$(python3 - "$WORKFLOW_SRC" <<'PY'
@@ -150,27 +203,69 @@ PY
 }
 
 running_agent_count() {
-  python3 - "$STATE_URL" <<'PY' || true
+  python3 - "$STATE_URL" <<'PY'
 import json, sys, urllib.request
 try:
     with urllib.request.urlopen(sys.argv[1], timeout=5) as response:
         data = json.load(response)
-except Exception:
-    print(0)
-    raise SystemExit(0)
+except Exception as exc:
+    print(f"state API unavailable: {exc}", file=sys.stderr)
+    raise SystemExit(1)
+counts = data.get("counts")
+running_count = counts.get("running") if isinstance(counts, dict) else None
+if not isinstance(running_count, int) or isinstance(running_count, bool) or running_count < 0:
+    print("state API response has invalid counts.running", file=sys.stderr)
+    raise SystemExit(2)
 running = data.get("running")
-print(len(running) if isinstance(running, list) else 0)
+if isinstance(running, list) and len(running) != running_count:
+    print("state API running list disagrees with counts.running", file=sys.stderr)
+    raise SystemExit(3)
+print(running_count)
 PY
 }
 
 assert_no_active_agents_interrupted() {
   local running
-  running="$(running_agent_count)"
-  if [ "${running:-0}" -gt 0 ]; then
+  if ! running="$(running_agent_count)"; then
+    echo "PROMOTION_RED cannot prove the official runtime is idle" >&2
+    return 6
+  fi
+  case "$running" in
+    ''|*[!0-9]*)
+      echo "PROMOTION_RED invalid running-agent count: ${running:-empty}" >&2
+      return 6
+      ;;
+  esac
+  if [ "$running" -gt 0 ]; then
     echo "PROMOTION_RED active official agents would be interrupted: $running" >&2
     return 6
   fi
   echo "PROMOTION_OK no active official agents reported on $STATE_URL"
+}
+
+assert_account_environment_ready() {
+  local account_name configured_home mode
+  if [ ! -f "$ACCOUNT_ENV" ]; then
+    echo "PROMOTION_RED host-owned Codex account selection is missing: $ACCOUNT_ENV" >&2
+    return 8
+  fi
+  configured_home="$(sed -n 's/^CODEX_HOME=//p' "$ACCOUNT_ENV")"
+  account_name="${configured_home#"${TARGET_HOME}/.codex-accounts/"}"
+  if [ "$(grep -c '^CODEX_HOME=' "$ACCOUNT_ENV")" -ne 1 ] ||
+     [ "$account_name" = "$configured_home" ] ||
+     ! [[ "$account_name" =~ ^[A-Za-z0-9._-]+$ ]] ||
+     [ ! -d "$configured_home" ]; then
+    echo "PROMOTION_RED invalid host-owned Codex account selection: $ACCOUNT_ENV" >&2
+    return 8
+  fi
+  if ! mode="$(stat -c '%a' "$ACCOUNT_ENV" 2>/dev/null)"; then
+    mode="$(stat -f '%Lp' "$ACCOUNT_ENV")"
+  fi
+  if [ $((8#$mode & 022)) -ne 0 ]; then
+    echo "PROMOTION_RED Codex account selection must not be group/world writable: $ACCOUNT_ENV" >&2
+    return 8
+  fi
+  echo "ACCOUNT_ENV_OK host-owned selection present"
 }
 
 prepare_systemd_context() {
@@ -178,15 +273,42 @@ prepare_systemd_context() {
     XDG_RUNTIME_DIR="/run/user/$(id -u)"
     export XDG_RUNTIME_DIR
   fi
+  if [ -z "${DBUS_SESSION_BUS_ADDRESS:-}" ]; then
+    DBUS_SESSION_BUS_ADDRESS="unix:path=${XDG_RUNTIME_DIR}/bus"
+    export DBUS_SESSION_BUS_ADDRESS
+  fi
+  test -S "${XDG_RUNTIME_DIR}/bus"
+  systemctl --user show-environment >/dev/null
 }
 
-disable_legacy_runtime_now() {
-  systemctl --user disable --now \
-    symphony-ui-pilot.service \
-    symphony-burrito.service \
-    symphony-burrito-update.timer \
-    symphony-burrito-update.service >/dev/null 2>&1 || true
-  echo "LEGACY_DISABLED symphony-ui-pilot.service symphony-burrito.service symphony-burrito-update.timer symphony-burrito-update.service"
+retire_legacy_units() {
+  local backup_dir legacy load_state stamp unit_path
+  stamp="$(date -u +%Y%m%dT%H%M%SZ)"
+  backup_dir="${STATE_DIR}/legacy-unit-backups/${stamp}"
+  mkdir -p "$backup_dir"
+  for legacy in "${LEGACY_UNITS[@]}"; do
+    systemctl --user disable --now "$legacy" >/dev/null 2>&1 || true
+    unit_path="${TARGET_HOME}/.config/systemd/user/${legacy}"
+    if [ -e "$unit_path" ] && [ ! -L "$unit_path" ]; then
+      cp -p "$unit_path" "${backup_dir}/${legacy}"
+      rm -f "$unit_path"
+    fi
+  done
+  systemctl --user daemon-reload
+  systemctl --user mask --now "${LEGACY_UNITS[@]}" >/dev/null
+  systemctl --user daemon-reload
+  for legacy in "${LEGACY_UNITS[@]}"; do
+    load_state="$(systemctl --user show "$legacy" --property=LoadState --value)"
+    if [ "$load_state" != masked ]; then
+      echo "PROMOTION_RED legacy unit is not masked: $legacy load_state=$load_state" >&2
+      return 9
+    fi
+    if systemctl --user is-active --quiet "$legacy"; then
+      echo "PROMOTION_RED legacy unit is still active: $legacy" >&2
+      return 9
+    fi
+  done
+  echo "LEGACY_MASKED ${LEGACY_UNITS[*]} backup=$backup_dir"
 }
 
 if [ "$RUNTIME_READBACK" -eq 1 ]; then
@@ -216,59 +338,136 @@ if [ "$DRY_RUN" -eq 1 ]; then
   echo "SERVICE $SERVICE_NAME"
   echo "PORT 4041"
   echo "UNTOUCHED symphony-lyb.service $LYB_STATE_URL"
-  echo "LEGACY_DISABLE_NOW symphony-ui-pilot.service symphony-burrito.service symphony-burrito-update.timer symphony-burrito-update.service"
+  echo "LEGACY_MASKED ${LEGACY_UNITS[*]}"
   exit 0
 fi
 
 if [ "$CHECK_ONLY" -eq 1 ]; then
   rc=0
-  check_one "$WORKFLOW_SRC" "$WORKFLOW_DST" || rc=1
+  check_workflow "$WORKFLOW_SRC" "$WORKFLOW_DST" || rc=1
   check_one "$UNIT_SRC" "$UNIT_DST" || rc=1
   check_one "$HELPER_SRC" "$HELPER_DST" || rc=1
   exit "$rc"
-fi
-
-if [ "$SKIP_BINARY" -eq 1 ]; then
-  echo "SKIP_BINARY"
-  install_one "$HELPER_SRC" "$HELPER_DST" 0755
-  install_one "$UNIT_SRC" "$UNIT_DST"
-  install_one "$WORKFLOW_SRC" "$WORKFLOW_DST"
-  echo "DONE"
-  exit 0
 fi
 
 echo "RELEASE ${SYMPHONY_VERSION}"
 echo "ASSET ${BIN_NAME}"
 echo "SHA256 ${SUM_NAME}"
 
-tmpdir="$(mktemp -d "${TMPDIR:-/tmp}/symphony-elixir.XXXXXX")"
-cleanup() { rm -rf "$tmpdir"; }
+tmpdir=""
+rollback_dir=""
+promotion_started=0
+promotion_complete=0
+official_was_active=0
+official_pid_before=""
+
+backup_target() {
+  local key="$1" target="$2"
+  if [ -e "$target" ] || [ -L "$target" ]; then
+    cp -p "$target" "${rollback_dir}/${key}"
+  else
+    : > "${rollback_dir}/${key}.missing"
+  fi
+}
+
+restore_target() {
+  local key="$1" target="$2" mode="$3"
+  if [ -f "${rollback_dir}/${key}" ]; then
+    install_one "${rollback_dir}/${key}" "$target" "$mode" >/dev/null
+  elif [ -f "${rollback_dir}/${key}.missing" ]; then
+    rm -f "$target"
+  fi
+}
+
+cleanup() {
+  local status="$?"
+  if [ "$status" -ne 0 ] && [ "$promotion_started" -eq 1 ] && [ "$promotion_complete" -eq 0 ]; then
+    restore_target binary "$BIN_DST" 0755
+    restore_target helper "$HELPER_DST" 0755
+    restore_target unit "$UNIT_DST" 0644
+    restore_target workflow "$WORKFLOW_DST" 0644
+    if [ "$RESTART" -eq 1 ] || [ "$RETIRE_LEGACY" -eq 1 ]; then
+      systemctl --user daemon-reload >/dev/null 2>&1 || true
+      if [ "$RESTART" -eq 1 ] && [ "$official_was_active" -eq 1 ]; then
+        systemctl --user restart "$SERVICE_NAME" >/dev/null 2>&1 || true
+      fi
+    fi
+    echo "PROMOTION_ROLLED_BACK official files restored; legacy units remain fail-closed" >&2
+  fi
+  [ -z "$tmpdir" ] || rm -rf "$tmpdir"
+  [ -z "$rollback_dir" ] || rm -rf "$rollback_dir"
+  trap - EXIT
+  exit "$status"
+}
 trap cleanup EXIT
 
-download "$BIN_URL" "${tmpdir}/${BIN_NAME}"
-download "$SUM_URL" "${tmpdir}/${SUM_NAME}"
-DIGEST="$(verify_sha256 "${tmpdir}/${BIN_NAME}" "${tmpdir}/${SUM_NAME}")"
-echo "VERIFIED $DIGEST"
+if [ "$SKIP_BINARY" -eq 0 ]; then
+  tmpdir="$(mktemp -d "${TMPDIR:-/tmp}/symphony-elixir.XXXXXX")"
+  download "$BIN_URL" "${tmpdir}/${BIN_NAME}"
+  download "$SUM_URL" "${tmpdir}/${SUM_NAME}"
+  DIGEST="$(verify_sha256 "${tmpdir}/${BIN_NAME}" "${tmpdir}/${SUM_NAME}")"
+  echo "VERIFIED $DIGEST"
+else
+  echo "SKIP_BINARY"
+fi
 
+assert_account_environment_ready
 if [ "$RESTART" -eq 1 ]; then
-  prepare_systemd_context
   assert_no_active_agents_interrupted
-  disable_legacy_runtime_now
+fi
+if [ "$RESTART" -eq 1 ] || [ "$RETIRE_LEGACY" -eq 1 ]; then
+  prepare_systemd_context
+  if systemctl --user is-active --quiet "$SERVICE_NAME" 2>/dev/null; then
+    official_was_active=1
+    official_pid_before="$(systemctl --user show "$SERVICE_NAME" --property=MainPID --value)"
+  fi
+fi
+if [ "$RESTART" -eq 0 ] && [ "$RETIRE_LEGACY" -eq 1 ] && [ "$official_was_active" -ne 1 ]; then
+  echo "PROMOTION_RED --no-restart retirement requires an already-active $SERVICE_NAME" >&2
+  exit 7
 fi
 
 mkdir -p "$(dirname "$BIN_DST")" "$(dirname "$UNIT_DST")" "$(dirname "$WORKFLOW_DST")" "$LOG_DIR" "$STATE_DIR"
-install -m 0755 "${tmpdir}/${BIN_NAME}" "$BIN_DST"
-echo "INSTALLED $BIN_DST"
+rollback_dir="$(mktemp -d "${STATE_DIR}/promotion-rollback.XXXXXX")"
+backup_target binary "$BIN_DST"
+backup_target helper "$HELPER_DST"
+backup_target unit "$UNIT_DST"
+backup_target workflow "$WORKFLOW_DST"
+promotion_started=1
+
+if [ "$SKIP_BINARY" -eq 0 ]; then
+  install_one "${tmpdir}/${BIN_NAME}" "$BIN_DST" 0755
+fi
 install_one "$HELPER_SRC" "$HELPER_DST" 0755
 install_one "$UNIT_SRC" "$UNIT_DST"
 install_one "$WORKFLOW_SRC" "$WORKFLOW_DST"
 
-if [ "$RESTART" -eq 1 ]; then
-  systemctl --user daemon-reload
-  systemctl --user enable "$SERVICE_NAME"
-  systemctl --user restart "$SERVICE_NAME"
-  echo "RESTARTED $SERVICE_NAME"
-  runtime_readback
+if [ "$RETIRE_LEGACY" -eq 1 ]; then
+  retire_legacy_units
 fi
 
+if [ "$RESTART" -eq 1 ] || [ "$RETIRE_LEGACY" -eq 1 ]; then
+  systemctl --user daemon-reload
+fi
+if [ "$RESTART" -eq 1 ]; then
+  systemctl --user enable "$SERVICE_NAME"
+  systemctl --user restart "$SERVICE_NAME"
+  for _ in $(seq 1 45); do
+    if systemctl --user is-active --quiet "$SERVICE_NAME" && curl -fsS --max-time 3 "$STATE_URL" >/dev/null; then
+      break
+    fi
+    sleep 2
+  done
+  systemctl --user is-active --quiet "$SERVICE_NAME"
+  curl -fsS --max-time 5 "$STATE_URL" >/dev/null
+  echo "RESTARTED $SERVICE_NAME"
+elif [ "$RETIRE_LEGACY" -eq 1 ]; then
+  systemctl --user is-active --quiet "$SERVICE_NAME"
+  curl -fsS --max-time 5 "$STATE_URL" >/dev/null
+  after_pid="$(systemctl --user show "$SERVICE_NAME" --property=MainPID --value)"
+  test "$official_pid_before" = "$after_pid"
+  echo "HOT_RELOAD_OK $SERVICE_NAME pid=$after_pid"
+fi
+
+promotion_complete=1
 echo "DONE"

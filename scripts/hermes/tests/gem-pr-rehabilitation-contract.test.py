@@ -411,7 +411,7 @@ class FleetControllerInstallerContractTests(unittest.TestCase):
             "consumer": gem / "scripts/gem-pr-drain.py",
             "registry_module": gem / "scripts/gem_repo_registry.py",
             "registry_config": gem / "config/gem-repo-registry.json",
-            "workflow": home / ".config/symphony/WORKFLOW.md",
+            "workflow": symphony / "WORKFLOW.md",
             "attestation": gem / "state/gem-service-attestation.json",
         }
         (gem / "scripts").mkdir(parents=True)
@@ -442,29 +442,39 @@ case "$*" in
   *"show-environment"*) exit 0 ;;
   *"is-active --quiet gem-pr-drain.timer"*) exit 1 ;;
   *"is-active --quiet gem-pr-drain.service"*) exit 1 ;;
-	  *"is-active --quiet symphony-elixir.service"*)
-	    if { [ -n "${FAKE_WORKFLOW_OVERLAY_VALUE:-}" ] || [ "${FAKE_WORKFLOW_UNRELATED_DRIFT:-false}" = true ]; } &&
-	       [ ! -e "$FAKE_WORKFLOW_MUTATION_MARKER" ] &&
-	       grep -q 'max_concurrent_agents: [1-9][0-9]*$' "$FAKE_WORKFLOW_OVERLAY_TARGET"; then
-	      if [ -n "${FAKE_WORKFLOW_OVERLAY_VALUE:-}" ]; then
-	        sed "s/max_concurrent_agents: [1-9][0-9]*$/max_concurrent_agents: ${FAKE_WORKFLOW_OVERLAY_VALUE}/" \
-	          "$FAKE_WORKFLOW_OVERLAY_TARGET" > "$FAKE_WORKFLOW_OVERLAY_TARGET.fake"
-	        mv "$FAKE_WORKFLOW_OVERLAY_TARGET.fake" "$FAKE_WORKFLOW_OVERLAY_TARGET"
-	      fi
+  *"daemon-reload"*)
+    if { [ -n "${FAKE_WORKFLOW_OVERLAY_VALUE:-}" ] || [ "${FAKE_WORKFLOW_UNRELATED_DRIFT:-false}" = true ]; } &&
+       [ ! -e "$FAKE_WORKFLOW_MUTATION_MARKER" ]; then
+      if [ -n "${FAKE_WORKFLOW_OVERLAY_VALUE:-}" ]; then
+        sed "s/max_concurrent_agents: [0-9][0-9]*$/max_concurrent_agents: ${FAKE_WORKFLOW_OVERLAY_VALUE}/" \
+          "$FAKE_WORKFLOW_OVERLAY_TARGET" > "$FAKE_WORKFLOW_OVERLAY_TARGET.fake"
+        mv "$FAKE_WORKFLOW_OVERLAY_TARGET.fake" "$FAKE_WORKFLOW_OVERLAY_TARGET"
+      fi
       if [ "${FAKE_WORKFLOW_UNRELATED_DRIFT:-false}" = true ]; then
         printf '\n# unrelated runtime drift\n' >> "$FAKE_WORKFLOW_OVERLAY_TARGET"
       fi
-	      : > "$FAKE_WORKFLOW_MUTATION_MARKER"
-	    fi
-	    [ "${FAKE_RESTART_FAILURE:-false}" != true ]
-	    exit
-	    ;;
-	esac
-	exit 0
+      : > "$FAKE_WORKFLOW_MUTATION_MARKER"
+    fi
+    exit 0
+    ;;
+  *"is-active --quiet symphony-elixir.service"*)
+    [ "${FAKE_RUNTIME_FAILURE:-false}" != true ]
+    exit
+    ;;
+  *"show symphony-elixir.service --property=MainPID"*) printf '4242\n'; exit 0 ;;
+  *"show symphony-elixir.service --property=ControlGroup"*)
+    printf '/user.slice/user-1000.slice/user@1000.service/app.slice/symphony-elixir.service\n'
+    exit 0
+    ;;
+esac
+exit 0
 """,
             encoding="utf-8",
         )
         systemctl.chmod(0o755)
+        sleep = fake_bin / "sleep"
+        sleep.write_text("#!/bin/sh\nexit 0\n", encoding="utf-8")
+        sleep.chmod(0o755)
         curl = fake_bin / "curl"
         curl.write_text(
             "#!/bin/sh\n"
@@ -473,12 +483,27 @@ case "$*" in
             encoding="utf-8",
         )
         curl.chmod(0o755)
+        ss = fake_bin / "ss"
+        ss.write_text(
+            "#!/bin/sh\n"
+            "[ \"${FAKE_RUNTIME_FAILURE:-false}\" != true ] || exit 1\n"
+            "printf 'LISTEN 0 128 127.0.0.1:4041 0.0.0.0:* users:((\\\"beam.smp\\\",pid=4242,fd=42))\\n'\n",
+            encoding="utf-8",
+        )
+        ss.chmod(0o755)
+        proc_root = root / "proc"
+        (proc_root / "4242").mkdir(parents=True)
+        (proc_root / "4242/cgroup").write_text(
+            "0::/user.slice/user-1000.slice/user@1000.service/app.slice/symphony-elixir.service\n",
+            encoding="utf-8",
+        )
         env = {
             "HOME": str(home),
             "GEM_WORKSPACE": str(gem),
             "SYMPHONY_RUNTIME": str(symphony),
             "FAKE_WORKFLOW_MUTATION_MARKER": str(root / "workflow-mutated"),
             "FAKE_WORKFLOW_OVERLAY_TARGET": str(paths["workflow"]),
+            "GEM_PROC_ROOT": str(proc_root),
             "PATH": f"{fake_bin}:/usr/bin:/bin:/usr/sbin:/sbin",
         }
         return paths, env
@@ -496,7 +521,7 @@ case "$*" in
             ["bash", str(fixture / FLEET_INSTALLER.relative_to(ROOT)), str(fixture)],
             env={
                 **env,
-                "FAKE_RESTART_FAILURE": "true" if fail_restart else "false",
+                "FAKE_RUNTIME_FAILURE": "true" if fail_restart else "false",
                 "FAKE_WORKFLOW_OVERLAY_VALUE": workflow_overlay,
                 "FAKE_WORKFLOW_UNRELATED_DRIFT": (
                     "true" if unrelated_workflow_drift else "false"
@@ -611,7 +636,7 @@ case "$*" in
         with tempfile.TemporaryDirectory() as directory:
             fixture = self._fixture(directory)
             paths, env = self._runtime(directory)
-            process = self._install(fixture, env, workflow_overlay="80")
+            process = self._install(fixture, env, workflow_overlay="41")
             restored_workflow = paths["workflow"].read_text(encoding="utf-8")
             attestation_exists = paths["attestation"].exists()
 

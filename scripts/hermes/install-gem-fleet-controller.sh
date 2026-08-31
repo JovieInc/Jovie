@@ -3,11 +3,13 @@ set -euo pipefail
 
 readonly SOURCE_ROOT="${1:-$(git rev-parse --show-toplevel)}"
 readonly GEM_ROOT="${GEM_WORKSPACE:-/home/timwhite/gem-workspace}"
+readonly SYMPHONY_ROOT="${SYMPHONY_RUNTIME:-${HOME}/.config/symphony}"
 readonly TIMER="gem-pr-drain.timer"
 readonly SERVICE="symphony-elixir.service"
 readonly VERIFY_ONLY="${FLEET_INSTALL_VERIFY_ONLY:-false}"
 readonly PREFLIGHT_ONLY="${FLEET_INSTALL_PREFLIGHT_ONLY:-false}"
 readonly EXPECTED_SOURCE_REVISION="${GEM_CONTROLLER_EXPECTED_REVISION:-}"
+readonly PROC_ROOT="${GEM_PROC_ROOT:-/proc}"
 STAMP="$(date -u +%Y%m%dT%H%M%SZ)"
 readonly STAMP
 readonly BACKUP_DIR="${GEM_ROOT}/state/backups/fleet-controller-${STAMP}"
@@ -28,9 +30,10 @@ readonly CONSUMER_TARGET="${GEM_ROOT}/scripts/gem-pr-drain.py"
 readonly REGISTRY_MODULE_TARGET="${GEM_ROOT}/scripts/gem_repo_registry.py"
 readonly REGISTRY_CONFIG_TARGET="${GEM_ROOT}/config/gem-repo-registry.json"
 readonly POLICY_TARGET="${GEM_ROOT}/scripts/gem_rehabilitation_policy.py"
-readonly WORKFLOW_TARGET="${HOME}/.config/symphony/WORKFLOW.md"
+readonly WORKFLOW_TARGET="${SYMPHONY_ROOT}/WORKFLOW.md"
 readonly SERVICE_UNIT_TARGET="${HOME}/.config/systemd/user/symphony-elixir.service"
 # shellcheck source=lib/user-systemd-context.sh
+# shellcheck disable=SC1091
 source "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/lib/user-systemd-context.sh"
 
 smoke_consumer_import() {
@@ -284,6 +287,12 @@ smoke_consumer_import "${CONSUMER_TARGET}"
 
 systemctl --user daemon-reload
 assert_official_service_ready
+SERVICE_PID="$(systemctl --user show "${SERVICE}" --property=MainPID --value)"
+SERVICE_CONTROL_GROUP="$(systemctl --user show "${SERVICE}" --property=ControlGroup --value)"
+[[ "${SERVICE_PID}" =~ ^[1-9][0-9]*$ ]]
+[[ "${SERVICE_CONTROL_GROUP}" == */symphony-elixir.service ]]
+grep -Fq "${SERVICE_CONTROL_GROUP}" "${PROC_ROOT}/${SERVICE_PID}/cgroup"
+ss -ltnp 'sport = :4041' | grep -Fq "pid=${SERVICE_PID},"
 
 # File writes are not runtime proof. Attest the exact source revision and both
 # deployed configuration surfaces only after daemon-reload, service activation,
@@ -309,6 +318,8 @@ export \
   GATE_TARGET_SHA \
   CLOSURE_SOURCE_SHA \
   CLOSURE_TARGET_SHA \
+  SERVICE_PID \
+  SERVICE_CONTROL_GROUP \
   GEM_ROOT
 python3 - <<'PY'
 import hashlib
@@ -324,11 +335,10 @@ destination.parent.mkdir(parents=True, exist_ok=True)
 temporary = destination.with_suffix(".json.tmp")
 
 # The pressure controller owns exactly one bounded runtime overlay. It may
-# update this value while the service restart is becoming healthy, so attest
-# the same semantic contract as update-symphony-burrito.sh --check instead
-# of racing it with a byte-exact workflow hash.
+# update this value while the official workflow hot-reloads, so attest that
+# semantic overlay without restarting or replacing the running Elixir process.
 concurrency_pattern = re.compile(
-    r"^(\s*max_concurrent_agents:\s*)([1-9][0-9]?)(\s*)$",
+    r"^(\s*max_concurrent_agents:\s*)([1-9]|[1-3][0-9]|40)(\s*)$",
     re.MULTILINE,
 )
 workflow_source_bytes = pathlib.Path(os.environ["WORKFLOW_SOURCE"]).read_bytes()
@@ -369,6 +379,12 @@ receipt = {
     "service": "symphony-elixir.service",
     "active": True,
     "healthy": True,
+    "listener": {
+        "port": 4041,
+        "pid": int(os.environ["SERVICE_PID"]),
+        "controlGroup": os.environ["SERVICE_CONTROL_GROUP"],
+        "boundToService": True,
+    },
     "workflow": {
         "sourceSha256": hashlib.sha256(workflow_source_bytes).hexdigest(),
         "installedSha256": hashlib.sha256(workflow_installed_bytes).hexdigest(),

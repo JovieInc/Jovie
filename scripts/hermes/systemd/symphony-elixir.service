@@ -1,8 +1,8 @@
 [Unit]
-Description=Official OpenAI Symphony elixir
+Description=Official OpenAI Elixir Symphony burrito v0.0.2
 After=network-online.target
 Wants=network-online.target
-StartLimitIntervalSec=3600
+StartLimitIntervalSec=600
 StartLimitBurst=5
 
 [Service]
@@ -10,11 +10,12 @@ Type=simple
 WorkingDirectory=%h
 Environment=HOME=%h
 Environment=PATH=%h/.local/bin:%h/.hermes/bin:%h/.npm-global/bin:/usr/bin:/bin
-Environment=CODEX_HOME=%h/.codex-accounts/meetjovie
+EnvironmentFile=%h/.config/symphony/codex-account.env
 EnvironmentFile=-%h/.config/symphony/linear.env
-ExecStart=%h/.local/bin/symphony-official-runtime run --gate-file %h/.local/state/symphony-elixir/linear-rate-limit.json --max-gate-sleep-seconds 3900 -- %h/.local/bin/symphony --port 4041 --logs-root %h/symphony-elixir-logs %h/.config/symphony/WORKFLOW.md
+ExecStart=%h/.local/bin/symphony-official-runtime run --gate-file %h/.local/state/symphony-elixir/linear-rate-limit.json --max-gate-sleep-seconds 3900 -- %h/.local/bin/symphony --i-understand-that-this-will-be-running-without-the-usual-guardrails --logs-root %h/symphony-elixir-logs --port 4041 %h/.config/symphony/WORKFLOW.md
+SuccessExitStatus=0 1
 Restart=always
-RestartSec=60
+RestartSec=20
 StandardOutput=journal
 StandardError=journal
 

@@ -155,6 +155,9 @@ def test_activation_requires_exact_production_revision_and_attestation() -> None
     assert "immutable successful" in activation
     assert "GEM_CONTROLLER_EXPECTED_REVISION" in activation
     assert 'gem-service-attestation/v1' in activation
+    assert "ss -ltnp 'sport = :4041'" in installer
+    assert '"boundToService": True' in installer
+    assert ".listener.boundToService == true" in activation
 
 
 def test_activation_uses_the_provisioned_gem_host_runner_contract() -> None:
@@ -312,11 +315,12 @@ def test_user_systemd_lib_fail_closes_on_missing_bus_socket(tmp_path: Path) -> N
 def test_activation_exports_user_systemd_before_both_installers() -> None:
     activation = ACTIVATION_WORKFLOW.read_text()
     establish = activation.index("Establish lingering user-systemd session")
-    cutover = activation.index("bash scripts/hermes/update-symphony-burrito.sh --skip-binary")
+    official = activation.index(
+        "update-symphony-burrito.sh --skip-binary --no-restart --retire-legacy"
+    )
     install = activation.index("bash scripts/hermes/install-gem-fleet-controller.sh")
     rehab = activation.index("bash scripts/hermes/install-gem-pr-rehabilitation.sh")
-    assert establish < cutover < install < rehab
-    assert "bash scripts/hermes/update-symphony-burrito.sh --skip-binary --no-restart" not in activation
+    assert establish < official < install < rehab
     assert "GITHUB_ENV" in activation
     assert "XDG_RUNTIME_DIR" in activation
     assert "DBUS_SESSION_BUS_ADDRESS" in activation
@@ -335,22 +339,22 @@ def test_activation_exports_user_systemd_before_both_installers() -> None:
     assert 'has("running") and has("retrying") and has("blocked")' in activation
 
 
-def test_activation_requires_reconciler_runtime_preflight_and_timer() -> None:
+def test_activation_requires_official_runtime_and_retires_custom_automation() -> None:
     activation = ACTIVATION_WORKFLOW.read_text()
-    installer = INSTALLER.read_text()
-    assert "update-symphony-burrito.sh --check" in activation
-    assert "runtime-preflight" in activation
-    assert "is-enabled --quiet symphony-reconciler.timer" in activation
-    assert "is-active --quiet symphony-reconciler.timer" in activation
-    assert "symphony-runtime-receipt/v1" in RECONCILER.read_text()
-    assert "enable --now symphony-reconciler.timer" in installer
-    assert "restart symphony-ui-pilot.service" not in installer
-    assert "start symphony-ui-pilot.service" not in installer
-    assert "stop symphony-ui-pilot.service" not in installer
-    check = activation.index("update-symphony-burrito.sh --check")
-    preflight = activation.index("runtime-preflight")
-    timer = activation.index("is-enabled --quiet symphony-reconciler.timer")
-    assert check < preflight < timer
+    assert "symphony-elixir.service" in activation
+    assert (
+        "update-symphony-burrito.sh --skip-binary --no-restart --retire-legacy"
+        in activation
+    )
+    assert "install-symphony-ui-pilot.sh" not in activation
+    assert "runtime-preflight" not in activation
+    assert "LoadState --value" in activation
+    assert "symphony-ui-pilot.service" in activation
+    assert "symphony-reconciler.timer" in activation
+    assert "symphony-grok-sidecar.timer" in activation
+    assert "ControlGroup --value" in activation
+    assert "pid=${pid}," in activation
+    assert "ss -H -ltn 'sport = :4043'" in activation
 
 
 def test_workflow_server_and_workspace() -> None:

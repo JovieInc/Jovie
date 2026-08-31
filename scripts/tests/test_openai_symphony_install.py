@@ -13,7 +13,7 @@ ROOT = Path(__file__).resolve().parents[2]
 
 
 class OpenAISymphonyInstallTests(unittest.TestCase):
-    def test_official_workflow_and_burrito_installer(self) -> None:
+    def test_official_workflow_and_elixir_installer(self) -> None:
         self.assertFalse((ROOT / "WORKFLOW.md").exists())
         workflow = (ROOT / "scripts/hermes/symphony/WORKFLOW.md").read_text()
         self.assertIn('project_slug: "symphony-ui-pilot-96d6b9c5b2d5"', workflow)

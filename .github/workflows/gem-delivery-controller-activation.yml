@@ -64,8 +64,9 @@ jobs:
           GEM_CONTROLLER_EXPECTED_REVISION: ${{ github.event.workflow_run.head_sha }}
         run: |
           set -euo pipefail
-          bash scripts/hermes/update-symphony-burrito.sh --skip-binary
           main_pid="$(systemctl --user show symphony-elixir.service --property=MainPID --value)"
+          test "${main_pid}" -gt 0
+          bash scripts/hermes/update-symphony-burrito.sh --skip-binary --no-restart --retire-legacy
           bash scripts/hermes/install-gem-fleet-controller.sh
           bash scripts/hermes/install-gem-pr-rehabilitation.sh
           after_pid="$(systemctl --user show symphony-elixir.service --property=MainPID --value)"
@@ -80,8 +81,12 @@ jobs:
             .schema == "gem-service-attestation/v1" and
             .sourceRevision == $sha and
             .daemonReloaded == true and
+            .service == "symphony-elixir.service" and
             .active == true and
             .healthy == true and
+            .listener.port == 4041 and
+            .listener.pid > 0 and
+            .listener.boundToService == true and
             .workflow.matches == true and
             .unit.matches == true
           ' "$GEM_WORKSPACE/state/gem-service-attestation.json" >/dev/null
@@ -98,14 +103,33 @@ jobs:
           systemctl --user is-enabled --quiet gem-pr-drain.timer
           systemctl --user is-active --quiet gem-pr-drain.timer
           bash scripts/hermes/update-symphony-burrito.sh --check
-          SYMPHONY_RUNTIME_SOURCE_ROOT="$PWD/scripts/hermes" \
-            SYMPHONY_MODEL_ROUTER="$HOME/.local/lib/symphony-reconciler/model-router.py" \
-            SYMPHONY_MODEL_REGISTRY="$HOME/.local/lib/symphony-reconciler/model-registry.json" \
-            SYMPHONY_RUNTIME_CAPABILITY_MANIFEST="$HOME/.local/lib/symphony-reconciler/symphony-reconciler-capabilities.json" \
-            SYMPHONY_RUNTIME_RECEIPT="$HOME/.local/lib/symphony-reconciler/runtime-receipt.json" \
-            python3 "$HOME/.local/bin/symphony-reconciler" runtime-preflight \
-            | jq -e '.status == "ready"' >/dev/null
-          systemctl --user is-enabled --quiet symphony-reconciler.timer
-          systemctl --user is-active --quiet symphony-reconciler.timer
-          test "$(systemctl --user show symphony-reconciler.timer --property=FragmentPath --value)" \
-            = "$HOME/.config/systemd/user/symphony-reconciler.timer"
+          systemctl --user is-enabled --quiet symphony-elixir.service
+          systemctl --user is-active --quiet symphony-elixir.service
+          test "$(systemctl --user show symphony-elixir.service --property=FragmentPath --value)" \
+            = "$HOME/.config/systemd/user/symphony-elixir.service"
+          for unit in \
+            symphony-ui-pilot.service \
+            symphony-reconciler.service \
+            symphony-grok-sidecar.service \
+            symphony-reconciler.timer \
+            symphony-grok-sidecar.timer \
+            symphony-burrito.service \
+            symphony-burrito-update.service \
+            symphony-burrito-update.timer; do
+            test "$(systemctl --user show "$unit" --property=LoadState --value)" = masked
+            if systemctl --user is-active --quiet "$unit"; then
+              printf 'legacy Symphony unit is still active: %s\n' "$unit" >&2
+              exit 1
+            fi
+          done
+          systemctl --user is-active --quiet symphony-lyb.service
+          test -z "$(ss -H -ltn 'sport = :4043')"
+          pid="$(systemctl --user show symphony-elixir.service --property=MainPID --value)"
+          cmdline="$(tr '\0' ' ' < "/proc/${pid}/cmdline")"
+          control_group="$(systemctl --user show symphony-elixir.service --property=ControlGroup --value)"
+          [[ "$control_group" == */symphony-elixir.service ]]
+          grep -Fq "$control_group" "/proc/${pid}/cgroup"
+          ss -ltnp 'sport = :4041' | grep -Fq "pid=${pid},"
+          grep -Fq '.burrito/symphony_erts-' <<<"$cmdline"
+          grep -Fq -- '--port 4041' <<<"$cmdline"
+          ! grep -Fq 'symphony-ui-pilot' <<<"$cmdline"

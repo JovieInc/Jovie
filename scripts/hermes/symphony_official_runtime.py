@@ -2,8 +2,9 @@
 """Source-owned checks for the official OpenAI Symphony runtime.
 
 This module deliberately stays outside the upstream Symphony binary. Jovie owns
-the deployed service unit, workflow shape, request-budget math, and reset gate
-used by wrapper/systemd preflight; OpenAI owns the binary itself.
+the deployed service unit, workflow shape, request-budget math, and rate-limit
+classification artifacts; OpenAI owns the binary itself. The selected Codex
+account remains host-owned configuration and is never pinned by this source.
 """
 
 from __future__ import annotations
@@ -318,6 +319,17 @@ def validate_source(
             errors.append("unit_missing_rate_limit_sleep_bound")
         if "ExecStartPre=%h/.local/bin/symphony-official-runtime reset-gate" in unit:
             errors.append("unit_uses_tight_restart_rate_limit_gate")
+        if (
+            "--i-understand-that-this-will-be-running-without-the-usual-guardrails"
+            not in unit
+        ):
+            errors.append("unit_missing_official_unsafe_guard_acknowledgement")
+        if "EnvironmentFile=%h/.config/symphony/codex-account.env" not in unit:
+            errors.append("unit_missing_host_owned_codex_account_environment")
+        if "Environment=CODEX_HOME=" in unit:
+            errors.append("unit_hardcodes_codex_account")
+        if "SuccessExitStatus=0 1" not in unit:
+            errors.append("unit_missing_clean_beam_stop_status")
         for token in OBSOLETE_TOKENS:
             if token in unit:
                 errors.append(f"unit_obsolete_token:{token}")

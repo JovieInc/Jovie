@@ -76,11 +76,20 @@ class OfficialSymphonyContractTests(unittest.TestCase):
         self.assertIn("symphony-official-runtime run", UNIT)
         self.assertIn("--max-gate-sleep-seconds 3900", UNIT)
         self.assertNotIn("ExecStartPre=%h/.local/bin/symphony-official-runtime reset-gate", UNIT)
+        self.assertIn(
+            "--i-understand-that-this-will-be-running-without-the-usual-guardrails",
+            UNIT,
+        )
         self.assertNotIn("--port 4043", UNIT)
         self.assertNotIn("symphony-burrito", UNIT)
         self.assertNotIn("symphony-lyb.service", UNIT)
         self.assertIn("Restart=always", UNIT)
-        self.assertIn("CODEX_HOME=%h/.codex-accounts/meetjovie", UNIT)
+        self.assertIn(
+            "EnvironmentFile=%h/.config/symphony/codex-account.env", UNIT
+        )
+        self.assertNotIn("Environment=CODEX_HOME=", UNIT)
+        self.assertNotIn("ExecStartPre=", UNIT)
+        self.assertIn("SuccessExitStatus=0 1", UNIT)
         self.assertIn("StandardOutput=journal", UNIT)
         self.assertNotIn("tty1", UNIT)
         result = helper.validate_source(
@@ -241,13 +250,23 @@ class OfficialSymphonyContractTests(unittest.TestCase):
         self.assertEqual(obsolete.returncode, 4)
         self.assertIn("obsolete_service_name:symphony-burrito.service", obsolete.stdout)
         with tempfile.TemporaryDirectory() as tmp:
+            target_home = pathlib.Path(tmp) / "home"
             dest = pathlib.Path(tmp) / "home/.config/symphony"
             dest.mkdir(parents=True)
+            account_home = target_home / ".codex-accounts/meetjovie"
+            account_home.mkdir(parents=True)
+            account_env = dest / "codex-account.env"
+            account_env.write_text(f"CODEX_HOME={account_home}\n")
+            account_env.chmod(0o600)
             existing = dest / "WORKFLOW.md"
             existing.write_text("LIVE gem WORKFLOW — do not overwrite\n")
             wrong = pathlib.Path(tmp) / "wrong.md"
             wrong.write_text(WORKFLOW.replace("interval_ms: 30000", "interval_ms: 5000"))
-            env = {**os.environ, "SYMPHONY_ELIXIR_HOME": str(pathlib.Path(tmp) / "home"), "SYMPHONY_WORKFLOW_SRC": str(wrong)}
+            env = {
+                **os.environ,
+                "SYMPHONY_ELIXIR_HOME": str(target_home),
+                "SYMPHONY_WORKFLOW_SRC": str(wrong),
+            }
             red = subprocess.run(["bash", str(updater), "--skip-binary", "--no-restart"], cwd=ROOT, env=env, capture_output=True, text=True)
             self.assertEqual(red.returncode, 4)
             self.assertIn("poll_interval_too_low:5000", red.stdout)
@@ -261,15 +280,142 @@ class OfficialSymphonyContractTests(unittest.TestCase):
             self.assertTrue(unit.is_file())
             self.assertTrue(helper.is_file())
             self.assertFalse((pathlib.Path(tmp) / "home/.config/systemd/user/symphony-burrito.service").exists())
+            existing.write_text(
+                existing.read_text().replace(
+                    "max_concurrent_agents: 40", "max_concurrent_agents: 20"
+                )
+            )
+            overlay = subprocess.run(
+                ["bash", str(updater), "--check", "--no-restart"],
+                cwd=ROOT,
+                env=env,
+                capture_output=True,
+                text=True,
+            )
+            self.assertEqual(overlay.returncode, 0, overlay.stdout + overlay.stderr)
+            self.assertIn("bounded max_concurrent_agents overlay accepted", overlay.stdout)
+            existing.write_text(
+                existing.read_text().replace("interval_ms: 30000", "interval_ms: 31000")
+            )
+            drift = subprocess.run(
+                ["bash", str(updater), "--check", "--no-restart"],
+                cwd=ROOT,
+                env=env,
+                capture_output=True,
+                text=True,
+            )
+            self.assertEqual(drift.returncode, 1, drift.stdout + drift.stderr)
+            self.assertIn(f"DRIFT {existing}", drift.stdout)
+
+    def test_deliberate_red_promotion_gates_before_mutation_and_masks_legacy(self):
+        promotion_guard = UPDATER.index("  assert_no_active_agents_interrupted\n")
+        account_guard = UPDATER.index("assert_account_environment_ready\n")
+        first_install = UPDATER.index('install_one "$HELPER_SRC" "$HELPER_DST" 0755')
+        retirement = UPDATER.index("  retire_legacy_units\n")
+        restart = UPDATER.index(
+            '  systemctl --user restart "$SERVICE_NAME"', retirement
+        )
+        self.assertLess(promotion_guard, first_install)
+        self.assertLess(account_guard, first_install)
+        self.assertNotIn('> "$ACCOUNT_ENV"', UPDATER)
+        self.assertNotIn('install_one "$ACCOUNT_ENV"', UPDATER)
+        self.assertLess(retirement, restart)
+        self.assertIn('systemctl --user mask --now "${LEGACY_UNITS[@]}"', UPDATER)
+        for unit in (
+            "symphony-ui-pilot.service",
+            "symphony-reconciler.service",
+            "symphony-grok-sidecar.service",
+            "symphony-reconciler.timer",
+            "symphony-grok-sidecar.timer",
+            "symphony-burrito.service",
+            "symphony-burrito-update.service",
+            "symphony-burrito-update.timer",
+        ):
+            self.assertIn(unit, UPDATER)
+        self.assertIn('temporary="${dst}.tmp.$$"', UPDATER)
+        self.assertIn('mv "$temporary" "$dst"', UPDATER)
+        self.assertIn("PROMOTION_ROLLED_BACK", UPDATER)
+        self.assertIn(
+            'if [ "$RESTART" -eq 1 ] || [ "$RETIRE_LEGACY" -eq 1 ]; then',
+            UPDATER,
+        )
+
+    def test_deliberate_red_promotion_fails_closed_when_state_api_is_unavailable(self):
+        self.assertNotIn("<<'PY' || true", UPDATER)
+        self.assertIn("cannot prove the official runtime is idle", UPDATER)
+        self.assertIn("state API response has invalid counts.running", UPDATER)
+        with tempfile.TemporaryDirectory() as tmp:
+            target_home = pathlib.Path(tmp) / "home"
+            account_home = target_home / ".codex-accounts/meetjovie"
+            account_home.mkdir(parents=True)
+            account_env = target_home / ".config/symphony/codex-account.env"
+            account_env.parent.mkdir(parents=True)
+            account_env.write_text(f"CODEX_HOME={account_home}\n")
+            account_env.chmod(0o600)
+            result = subprocess.run(
+                [
+                    "bash",
+                    str(ROOT / "scripts/hermes/update-symphony-burrito.sh"),
+                    "--skip-binary",
+                ],
+                cwd=ROOT,
+                env={
+                    **os.environ,
+                    "SYMPHONY_ELIXIR_HOME": str(target_home),
+                    "SYMPHONY_STATE_URL": "http://127.0.0.1:9/api/v1/state",
+                },
+                capture_output=True,
+                text=True,
+            )
+            self.assertEqual(result.returncode, 6, result.stderr)
+            self.assertIn("cannot prove the official runtime is idle", result.stderr)
+            self.assertFalse(
+                (target_home / ".config/systemd/user/symphony-elixir.service").exists()
+            )
+
+    def test_deliberate_red_promotion_requires_host_owned_account_selection(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            target_home = pathlib.Path(tmp) / "home"
+            result = subprocess.run(
+                [
+                    "bash",
+                    str(ROOT / "scripts/hermes/update-symphony-burrito.sh"),
+                    "--skip-binary",
+                    "--no-restart",
+                ],
+                cwd=ROOT,
+                env={**os.environ, "SYMPHONY_ELIXIR_HOME": str(target_home)},
+                capture_output=True,
+                text=True,
+            )
+            self.assertEqual(result.returncode, 8, result.stderr)
+            self.assertIn("host-owned Codex account selection is missing", result.stderr)
+            self.assertFalse(
+                (target_home / ".config/systemd/user/symphony-elixir.service").exists()
+            )
+
+    def test_deliberate_red_activation_cannot_reinstall_custom_runtime(self):
+        activation = (
+            ROOT / ".github/workflows/gem-delivery-controller-activation.yml"
+        ).read_text(encoding="utf-8")
+        fleet = (ROOT / "scripts/hermes/install-gem-fleet-controller.sh").read_text(
+            encoding="utf-8"
+        )
+        self.assertNotIn("install-symphony-ui-pilot.sh", activation)
+        self.assertIn(
+            "update-symphony-burrito.sh --skip-binary --no-restart --retire-legacy",
+            activation,
+        )
+        self.assertIn('readonly SERVICE="symphony-elixir.service"', fleet)
+        self.assertIn("scripts/hermes/systemd/symphony-elixir.service", fleet)
+        self.assertNotIn("scripts/hermes/systemd/symphony-ui-pilot.service", fleet)
+        self.assertIn('"service": "symphony-elixir.service"', fleet)
+        self.assertIn('ss -ltnp \'sport = :4041\'', fleet)
+        self.assertIn("symphony-elixir.service", activation)
+        self.assertIn("LoadState --value", activation)
+        self.assertIn("test -z \"$(ss -H -ltn 'sport = :4043')\"", activation)
 
     def test_runtime_readback_reports_pid_api_lyb_and_legacy_disabled(self):
-        active_agent_check = UPDATER.index("\n  assert_no_active_agents_interrupted\n")
-        install_binary = UPDATER.index('install -m 0755 "${tmpdir}/${BIN_NAME}" "$BIN_DST"')
-        legacy_disable = UPDATER.index("\n  disable_legacy_runtime_now\n")
-        restart = UPDATER.index('systemctl --user restart "$SERVICE_NAME"')
-        self.assertLess(active_agent_check, install_binary)
-        self.assertLess(legacy_disable, install_binary)
-        self.assertLess(install_binary, restart)
         with tempfile.TemporaryDirectory() as tmp:
             bin_dir = pathlib.Path(tmp) / "bin"
             bin_dir.mkdir()
@@ -277,6 +423,7 @@ class OfficialSymphonyContractTests(unittest.TestCase):
             fake_systemctl.write_text(
                 "#!/usr/bin/env bash\n"
                 "case \"$*\" in\n"
+                "  *\"show symphony-\"*\"LoadState\"*) printf 'masked\\n'; exit 0 ;;\n"
                 "  *\"is-active --quiet symphony-elixir.service\"*) exit 0 ;;\n"
                 "  *\"show symphony-elixir.service\"*) printf '4242\\n'; exit 0 ;;\n"
                 "  *\"is-active --quiet symphony-lyb.service\"*) exit 0 ;;\n"
@@ -304,8 +451,8 @@ class OfficialSymphonyContractTests(unittest.TestCase):
                 "API_OK http://127.0.0.1:4041/api/v1/state",
                 "LYB_ACTIVE symphony-lyb.service 127.0.0.1:4042",
                 "LYB_API_OK http://127.0.0.1:4042/api/v1/state",
-                "LEGACY_DISABLED symphony-ui-pilot.service",
-                "LEGACY_DISABLED symphony-burrito.service",
+                "LEGACY_MASKED symphony-ui-pilot.service",
+                "LEGACY_MASKED symphony-burrito.service",
                 "SOURCE_HASH workflow=",
                 "SOURCE_HASH unit=",
             ):
