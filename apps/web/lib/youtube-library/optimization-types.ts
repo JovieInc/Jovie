@@ -26,7 +26,7 @@ export interface YouTubeExperimentView {
   readonly objective: string;
   readonly status: 'draft' | 'running' | 'paused' | 'decided' | 'cancelled';
   readonly winnerVariantKey: string | null;
-  readonly variants: readonly Record<string, unknown>[];
+  readonly variants: Record<string, unknown>;
   readonly decisionEvidence: Record<string, unknown> | null;
 }
 
