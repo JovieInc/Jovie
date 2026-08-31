@@ -1076,7 +1076,7 @@ describe('live GitHub shipping reader', () => {
       payload: { running: [{ issue_identifier: 'JOV-1' }] },
     });
     expect(fetchMock.mock.calls[0]?.[0]).toBe(
-      'http://127.0.0.1:4043/api/v1/state'
+      'http://127.0.0.1:4041/api/v1/state'
     );
     expect(readFile).not.toHaveBeenCalled();
   });

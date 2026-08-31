@@ -444,7 +444,8 @@ case "$*" in
   *"is-active --quiet gem-pr-drain.service"*) exit 1 ;;
 	  *"is-active --quiet symphony-elixir.service"*)
 	    if { [ -n "${FAKE_WORKFLOW_OVERLAY_VALUE:-}" ] || [ "${FAKE_WORKFLOW_UNRELATED_DRIFT:-false}" = true ]; } &&
-	       [ ! -e "$FAKE_WORKFLOW_MUTATION_MARKER" ]; then
+	       [ ! -e "$FAKE_WORKFLOW_MUTATION_MARKER" ] &&
+	       grep -q 'max_concurrent_agents: [1-9][0-9]*$' "$FAKE_WORKFLOW_OVERLAY_TARGET"; then
 	      if [ -n "${FAKE_WORKFLOW_OVERLAY_VALUE:-}" ]; then
 	        sed "s/max_concurrent_agents: [1-9][0-9]*$/max_concurrent_agents: ${FAKE_WORKFLOW_OVERLAY_VALUE}/" \
 	          "$FAKE_WORKFLOW_OVERLAY_TARGET" > "$FAKE_WORKFLOW_OVERLAY_TARGET.fake"
@@ -632,7 +633,7 @@ case "$*" in
         self.assertFalse(attestation_exists)
         self.assertIn("refusing stale Gem service attestation", process.stderr)
 
-    def test_failed_install_removes_a_new_policy_during_atomic_rollback(self):
+    def test_install_refuses_unhealthy_official_service_before_writes(self):
         with tempfile.TemporaryDirectory() as directory:
             fixture = self._fixture(directory)
             paths, env = self._runtime(directory)
@@ -642,6 +643,7 @@ case "$*" in
                 for name in ("gate", "closure", "consumer", "workflow", "registry_module", "registry_config")
             }
             policy_exists = paths["policy"].exists()
+            backup_root_exists = (pathlib.Path(directory) / "gem/state/backups").exists()
 
         self.assertNotEqual(process.returncode, 0)
         self.assertEqual(restored["gate"], "old gate\n")
@@ -651,7 +653,8 @@ case "$*" in
         self.assertIn("FileNotFoundError", restored["registry_module"])
         self.assertEqual(restored["registry_config"], "{}\n")
         self.assertFalse(policy_exists)
-        self.assertIn("fleet controller install rolled back", process.stderr)
+        self.assertFalse(backup_root_exists)
+        self.assertIn("official Symphony service symphony-elixir.service is not active", process.stderr)
 
     def test_fleet_installer_replaces_stale_registry_before_target_smoke(self):
         installer = FLEET_INSTALLER.read_text(encoding="utf-8")

@@ -312,12 +312,11 @@ def test_user_systemd_lib_fail_closes_on_missing_bus_socket(tmp_path: Path) -> N
 def test_activation_exports_user_systemd_before_both_installers() -> None:
     activation = ACTIVATION_WORKFLOW.read_text()
     establish = activation.index("Establish lingering user-systemd session")
+    cutover = activation.index("bash scripts/hermes/update-symphony-burrito.sh --skip-binary")
     install = activation.index("bash scripts/hermes/install-gem-fleet-controller.sh")
     rehab = activation.index("bash scripts/hermes/install-gem-pr-rehabilitation.sh")
-    reconciler = activation.index(
-        "bash scripts/hermes/update-symphony-burrito.sh --skip-binary --no-restart"
-    )
-    assert establish < install < rehab < reconciler
+    assert establish < cutover < install < rehab
+    assert "bash scripts/hermes/update-symphony-burrito.sh --skip-binary --no-restart" not in activation
     assert "GITHUB_ENV" in activation
     assert "XDG_RUNTIME_DIR" in activation
     assert "DBUS_SESSION_BUS_ADDRESS" in activation

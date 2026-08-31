@@ -54,6 +54,20 @@ if missing:
 PY
 }
 
+assert_official_service_ready() {
+  for _ in $(seq 1 45); do
+    if systemctl --user is-active --quiet "${SERVICE}" && \
+      curl --fail --silent --show-error --max-time 3 \
+        http://127.0.0.1:4041/api/v1/state >/dev/null; then
+      return 0
+    fi
+    sleep 2
+  done
+  printf 'official Symphony service %s is not active and healthy on 4041; run update-symphony-burrito.sh first\n' \
+    "${SERVICE}" >&2
+  return 4
+}
+
 if [[ "${PREFLIGHT_ONLY}" == true ]]; then
   prepare_user_systemd_context
   printf 'Gem user systemd preflight passed (XDG_RUNTIME_DIR=%s)\n' "${XDG_RUNTIME_DIR}"
@@ -134,6 +148,7 @@ if [[ "${VERIFY_ONLY}" == true ]]; then
   exit 0
 fi
 prepare_user_systemd_context
+assert_official_service_ready
 mkdir -p "${BACKUP_DIR}" "${GEM_ROOT}/scripts" "${GEM_ROOT}/config" "$(dirname "${WORKFLOW_TARGET}")"
 cp -p "${GATE_TARGET}" "${BACKUP_DIR}/gem-priority-gate.py"
 [[ ! -e "${CLOSURE_TARGET}" ]] || cp -p "${CLOSURE_TARGET}" "${BACKUP_DIR}/closure_health.py"
@@ -268,15 +283,7 @@ python3 -m json.tool "${REGISTRY_CONFIG_TARGET}" >/dev/null
 smoke_consumer_import "${CONSUMER_TARGET}"
 
 systemctl --user daemon-reload
-for _ in $(seq 1 45); do
-  if systemctl --user is-active --quiet "${SERVICE}" && curl --fail --silent --show-error --max-time 3 \
-    http://127.0.0.1:4041/api/v1/state >/dev/null; then
-    break
-  fi
-  sleep 2
-done
-systemctl --user is-active --quiet "${SERVICE}"
-curl --fail --silent --show-error --max-time 5 http://127.0.0.1:4041/api/v1/state >/dev/null
+assert_official_service_ready
 
 # File writes are not runtime proof. Attest the exact source revision and both
 # deployed configuration surfaces only after daemon-reload, service activation,

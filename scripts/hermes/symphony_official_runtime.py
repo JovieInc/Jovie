@@ -42,10 +42,11 @@ TOOL_REQUESTS_PER_HOUR = 300
 RESET_CANARY_REQUESTS_PER_HOUR = 100
 RATE_LIMIT_GATE_SCHEMA = "symphony-linear-rate-limit-gate/v1"
 RATE_LIMIT_EXIT_CODE = 75
+DEFAULT_MAX_GATE_SLEEP_SECONDS = 3_900
 DEFAULT_RATE_LIMIT_GATE = (
     pathlib.Path.home() / ".local/state/symphony-elixir/linear-rate-limit.json"
 )
-ACTIVE_STATES = ("Todo", "In Progress", "Merging", "Rework")
+ACTIVE_STATES = ("Todo", "In Progress", "Rework")
 TERMINAL_STATES = ("Done", "Canceled", "Cancelled", "Duplicate", "Closed")
 OBSOLETE_TOKENS = (
     "symphony-burrito.service",
@@ -313,6 +314,8 @@ def validate_source(
             errors.append("unit_not_using_official_binary_path")
         if "symphony-official-runtime run" not in unit:
             errors.append("unit_missing_rate_limit_runtime_wrapper")
+        if "--max-gate-sleep-seconds" not in unit:
+            errors.append("unit_missing_rate_limit_sleep_bound")
         if "ExecStartPre=%h/.local/bin/symphony-official-runtime reset-gate" in unit:
             errors.append("unit_uses_tight_restart_rate_limit_gate")
         for token in OBSOLETE_TOKENS:
@@ -353,7 +356,12 @@ def _parse_retry_after(value: str | None, *, now: dt.datetime) -> int | None:
     stripped = value.strip()
     if re.fullmatch(r"\d+", stripped):
         return max(0, int(stripped))
-    parsed = parsedate_to_datetime(stripped)
+    try:
+        parsed = parsedate_to_datetime(stripped)
+    except (TypeError, ValueError, IndexError, OverflowError):
+        return None
+    if parsed is None:
+        return None
     if parsed.tzinfo is None:
         parsed = parsed.replace(tzinfo=dt.timezone.utc)
     return max(0, math.ceil((parsed - now).total_seconds()))
@@ -494,13 +502,13 @@ def write_rate_limit_gate(path: pathlib.Path, classification: dict[str, Any]) ->
     return True
 
 
-def _sleep_gate(gate: dict[str, Any], max_sleep_seconds: int | None) -> bool:
+def _sleep_gate(gate: dict[str, Any], max_sleep_seconds: int | None) -> int:
     seconds = int(gate.get("retryAfterSeconds") or 0)
     if seconds <= 0:
-        return False
+        return 0
     if max_sleep_seconds is not None:
         if max_sleep_seconds <= 0:
-            return False
+            return 0
         seconds = min(seconds, max_sleep_seconds)
     print(
         json.dumps(
@@ -514,7 +522,21 @@ def _sleep_gate(gate: dict[str, Any], max_sleep_seconds: int | None) -> bool:
         flush=True,
     )
     time.sleep(seconds)
-    return True
+    return seconds
+
+
+def _print_gate_wait_exhausted(gate: dict[str, Any], max_sleep_seconds: int) -> None:
+    print(
+        json.dumps(
+            {
+                "kind": "rate_limit_gate_wait_exhausted",
+                "resetAt": gate.get("resetAt"),
+                "maxGateSleepSeconds": max_sleep_seconds,
+            },
+            sort_keys=True,
+        ),
+        flush=True,
+    )
 
 
 def _terminate_child(process: subprocess.Popen[str]) -> None:
@@ -556,14 +578,28 @@ def run_official_binary(
     command: list[str],
     *,
     gate_file: pathlib.Path,
-    max_gate_sleep_seconds: int | None = None,
+    max_gate_sleep_seconds: int | None = DEFAULT_MAX_GATE_SLEEP_SECONDS,
 ) -> int:
     if not command:
         raise ValueError("missing official Symphony command after --")
+    gate_sleep_used = 0
     while True:
         gate = read_rate_limit_gate(gate_file)
         if gate["active"]:
-            if not _sleep_gate(gate, max_gate_sleep_seconds):
+            remaining_sleep = (
+                None
+                if max_gate_sleep_seconds is None
+                else max_gate_sleep_seconds - gate_sleep_used
+            )
+            slept = _sleep_gate(gate, remaining_sleep)
+            if slept <= 0:
+                return RATE_LIMIT_EXIT_CODE
+            gate_sleep_used += slept
+            if (
+                max_gate_sleep_seconds is not None
+                and gate_sleep_used >= max_gate_sleep_seconds
+            ):
+                _print_gate_wait_exhausted(gate, max_gate_sleep_seconds)
                 return RATE_LIMIT_EXIT_CODE
             continue
         returncode = run_official_binary_once(command, gate_file=gate_file)
@@ -572,7 +608,20 @@ def run_official_binary(
         gate = read_rate_limit_gate(gate_file)
         if not gate["active"]:
             return RATE_LIMIT_EXIT_CODE
-        if not _sleep_gate(gate, max_gate_sleep_seconds):
+        remaining_sleep = (
+            None
+            if max_gate_sleep_seconds is None
+            else max_gate_sleep_seconds - gate_sleep_used
+        )
+        slept = _sleep_gate(gate, remaining_sleep)
+        if slept <= 0:
+            return RATE_LIMIT_EXIT_CODE
+        gate_sleep_used += slept
+        if (
+            max_gate_sleep_seconds is not None
+            and gate_sleep_used >= max_gate_sleep_seconds
+        ):
+            _print_gate_wait_exhausted(gate, max_gate_sleep_seconds)
             return RATE_LIMIT_EXIT_CODE
 
 
@@ -676,7 +725,11 @@ def main(argv: list[str] | None = None) -> int:
 
     run_parser = sub.add_parser("run")
     run_parser.add_argument("--gate-file", type=pathlib.Path, default=DEFAULT_RATE_LIMIT_GATE)
-    run_parser.add_argument("--max-gate-sleep-seconds", type=int)
+    run_parser.add_argument(
+        "--max-gate-sleep-seconds",
+        type=int,
+        default=DEFAULT_MAX_GATE_SLEEP_SECONDS,
+    )
     run_parser.add_argument("binary_command", nargs=argparse.REMAINDER)
 
     args = parser.parse_args(argv)

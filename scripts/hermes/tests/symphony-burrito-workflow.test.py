@@ -68,11 +68,13 @@ class OfficialSymphonyContractTests(unittest.TestCase):
         self.assertIn("76869538009648d5b282a4bb21c3d157", WORKFLOW)
         self.assertIn("enabled=false", WORKFLOW)
         self.assertIn("create_branch", WORKFLOW)
+        self.assertNotIn("- Merging", WORKFLOW)
         self.assertNotIn("team:JOV", WORKFLOW)
         self.assertIsNone(TOKEN_RE.search(WORKFLOW))
         self.assertIn("--port 4041", UNIT)
         self.assertIn("symphony-elixir-logs", UNIT)
         self.assertIn("symphony-official-runtime run", UNIT)
+        self.assertIn("--max-gate-sleep-seconds 3900", UNIT)
         self.assertNotIn("ExecStartPre=%h/.local/bin/symphony-official-runtime reset-gate", UNIT)
         self.assertNotIn("--port 4043", UNIT)
         self.assertNotIn("symphony-burrito", UNIT)
@@ -132,6 +134,22 @@ class OfficialSymphonyContractTests(unittest.TestCase):
         )
         self.assertEqual(ordinary["kind"], "bad_request")
         self.assertIsNone(ordinary["resetAt"])
+        original_parser = helper.parsedate_to_datetime
+        try:
+            helper.parsedate_to_datetime = lambda _value: (_ for _ in ()).throw(
+                IndexError("malformed date")
+            )
+            malformed_retry_after = helper.classify_linear_response(
+                status=400,
+                headers={"retry-after": "Thu, definitely not a date GMT"},
+                body=body,
+                now=now,
+            )
+        finally:
+            helper.parsedate_to_datetime = original_parser
+        self.assertEqual(malformed_retry_after["kind"], "rate_limited")
+        self.assertIsNone(malformed_retry_after["retryAfterSeconds"])
+        self.assertIsNone(malformed_retry_after["resetAt"])
         with tempfile.TemporaryDirectory() as tmp:
             gate = pathlib.Path(tmp) / "linear-rate-limit.json"
             self.assertTrue(helper.write_rate_limit_gate(gate, classified))
