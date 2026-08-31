@@ -855,6 +855,7 @@ jobs:
           # and the exact head still matches.
           bash scripts/lib/upsert-pr-comment.sh "$PR_NUMBER" "queue-deferral" \
             "$(node scripts/lib/queue-deferral-receipt.mjs render \
+              --repository "${{ github.repository }}" \
               --pr "$PR_NUMBER" --head "$PR_HEAD_SHA" \
               --reason queue-pressure --source agent-pipeline \
               --note "merge-ready PRs ahead: $READY_COUNT (threshold $READY_THRESHOLD)")"

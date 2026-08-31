@@ -1077,8 +1077,9 @@ enroll_if_still_eligible() {  # enroll_if_still_eligible <num> [authorized-pr au
   elif [[ "$DRAIN_PROMOTION_MODE" == "deferred-release-only" ]]; then
     local release_receipt
     release_receipt="$(deferred_release_receipt_for_pr "$n")"
-    if ! jq -e --arg head "$expected_head" --argjson pr "$n" '
+    if ! jq -e --arg repo "$REPO" --arg head "$expected_head" --argjson pr "$n" '
       .schema == "jovie-queue-deferred-release/v1" and
+      .repository == $repo and
       .pr == $pr and
       .head == $head and
       .mode == "deferred-release-only"
@@ -1156,9 +1157,9 @@ enroll_if_still_eligible() {  # enroll_if_still_eligible <num> [authorized-pr au
     fi
     if [[ "$DRAIN_PROMOTION_MODE" == "deferred-release-only" ]]; then
       release_receipt="$(deferred_release_receipt_for_pr "$n")"
-      if ! jq -e --arg head "$expected_head" --argjson pr "$n" '
+      if ! jq -e --arg repo "$REPO" --arg head "$expected_head" --argjson pr "$n" '
         .schema == "jovie-queue-deferred-release/v1" and
-        .pr == $pr and .head == $head and .mode == "deferred-release-only"
+        .repository == $repo and .pr == $pr and .head == $head and .mode == "deferred-release-only"
       ' <<<"$release_receipt" >/dev/null 2>&1; then
         echo "    ⏸ controller release evidence changed during native enrollment for #$n; compensating"
         dequeue_strict "$n" || return 1
