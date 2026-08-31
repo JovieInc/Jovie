@@ -1,19 +1,17 @@
 import { describe, expect, it } from 'vitest';
 import { authClerkLocalization } from '@/components/providers/clerkLocalization';
 import { APP_ROUTES } from '@/constants/routes';
-import {
-  getHomepageFrontDoorCtaContract,
-  PUBLIC_WAITLIST_URL,
-} from '@/data/homepageFrontDoorCta';
+import { getHomepageFrontDoorCtaContract } from '@/data/homepageFrontDoorCta';
 
 describe('auth front-door contract', () => {
-  it('keeps waitlist-on homepage CTAs in request-access mode', () => {
+  it('locks waitlist-on homepage CTA to Get started → /start (JOV-5085 / JOV-5479)', () => {
     const contract = getHomepageFrontDoorCtaContract(true);
 
     expect(contract.primary).toEqual({
       label: 'Get started',
-      href: PUBLIC_WAITLIST_URL,
+      href: APP_ROUTES.START,
     });
+    expect(contract.primary.href).not.toMatch(/waitlist/i);
     expect(contract.secondary).toBeNull();
     expect(contract.fallbackSupport).toBe(
       'Limited prelaunch access. We will email when you are in.'
