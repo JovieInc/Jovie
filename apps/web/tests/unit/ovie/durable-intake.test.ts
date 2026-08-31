@@ -337,4 +337,34 @@ describe('durable Eve intake (JOV-5215)', () => {
     expect(stored?.destination).toBe(DEST_LINEAR);
     expect(stored?.receipts[0]?.ack).toBe(OVIE_LINEAR_QUEUED_ACK);
   });
+
+  it('preserves unavailable Linear records outside receipt-only recovery', async () => {
+    const store = new MemoryOperatingStore();
+    const text = 'Jovie signup returns 500 on /start';
+    const [queued] = await applyOvieDump([text], { store });
+    if (!queued?.workId) throw new Error('expected engineering receipt');
+    const stored = await store.getInitiative(queued.workId);
+    if (!stored) throw new Error('expected stored initiative');
+    await store.putInitiative({
+      ...stored,
+      status: 'failed',
+      routingState: 'unavailable',
+      routingReason: 'linear-intake-paused',
+      receipts: stored.receipts.map(receipt => ({
+        ...receipt,
+        ack: OVIE_UNAVAILABLE_ACK,
+        routingState: 'unavailable',
+      })),
+    });
+
+    const [retry] = await applyOvieDump([text], { store });
+    expect(retry?.workId).toBe(queued.workId);
+    expect(retry?.destination).toBe(DEST_LINEAR);
+    expect(retry?.routingState).toBe('unavailable');
+    expect(retry?.ack).toBe(OVIE_UNAVAILABLE_ACK);
+
+    const after = await store.getInitiative(queued.workId);
+    expect(after?.routingState).toBe('unavailable');
+    expect(after?.routingReason).toBe('linear-intake-paused');
+  });
 });

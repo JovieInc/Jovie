@@ -1,5 +1,11 @@
 import { beforeEach, describe, expect, it } from 'vitest';
-import { OVIE_LINEAR_QUEUED_ACK, resetOvieIngestLog } from '@/lib/ovie/ingest';
+import {
+  DEST_KANBAN,
+  DEST_LINEAR,
+  OVIE_LINEAR_QUEUED_ACK,
+  OVIE_QUEUED_ACK,
+  resetOvieIngestLog,
+} from '@/lib/ovie/ingest';
 import {
   respondToOvieLanded,
   respondToOviePending,
@@ -13,6 +19,7 @@ import {
   MemoryOperatingStore,
   memoryRecordBackend,
 } from '@/lib/ovie/mcp/store';
+import type { OvieInitiative } from '@/lib/ovie/mcp/types';
 import {
   applyOvieDump,
   applyOvieDumpBeforeModel,
@@ -23,6 +30,62 @@ import {
   ovieIdempotencyKey,
   persistReceiptAsInitiative,
 } from '@/lib/ovie/persist';
+
+class LegacyMigrationFailingStore extends MemoryOperatingStore {
+  failLegacyLinearMigrationPuts = false;
+
+  override async putInitiative(record: OvieInitiative): Promise<void> {
+    if (
+      this.failLegacyLinearMigrationPuts &&
+      record.destination === DEST_LINEAR &&
+      record.routingState !== 'landed'
+    ) {
+      throw new Error('legacy migration write failed');
+    }
+    await super.putInitiative(record);
+  }
+}
+
+function legacyEngineeringRecord(id: string): OvieInitiative {
+  const now = new Date().toISOString();
+  return {
+    id,
+    kind: 'initiative',
+    status: 'accepted',
+    confidence: 'medium',
+    handoff: {
+      title: 'Legacy signup bug',
+      intent: 'Fix a production signup bug',
+      priority: 'engineering',
+    },
+    lane: 'engineering',
+    destination: DEST_KANBAN,
+    receipts: [
+      {
+        text: 'legacy signup bug',
+        lane: 'engineering',
+        destination: DEST_KANBAN,
+        ack: OVIE_QUEUED_ACK,
+        destinationHandle: null,
+        workerSpawned: false,
+        workId: id,
+        idempotencyKey: `ovie-dump:v1:${id}`,
+      },
+    ],
+    workerSpawned: false,
+    destinationHandle: null,
+    idempotencyKey: `ovie-dump:v1:${id}`,
+    createdAt: now,
+    updatedAt: now,
+    evidence: [
+      {
+        kind: 'receipt',
+        summary: OVIE_QUEUED_ACK,
+        ref: DEST_KANBAN,
+      },
+    ],
+  };
+}
 
 describe('Ovie durable dump persist', () => {
   beforeEach(() => {
@@ -202,6 +265,24 @@ describe('Ovie durable dump persist', () => {
     expect(body.initiative.destinationHandle).toBe('JOV-5735');
     expect(body.initiative.ack).toBe('landed:JOV-5735');
     expect(await listPendingInitiatives(store)).toEqual([]);
+  });
+
+  it('lands legacy engineering initiatives when normalization persistence is best-effort', async () => {
+    const store = new LegacyMigrationFailingStore();
+    await store.putInitiative(legacyEngineeringRecord('ini_legacy_landed'));
+    store.failLegacyLinearMigrationPuts = true;
+
+    const landed = await markInitiativeLanded(store, {
+      id: 'ini_legacy_landed',
+      linear_id: 'JOV-5735',
+    });
+    expect(landed?.destination).toBe(DEST_LINEAR);
+    expect(landed?.destinationHandle).toBe('JOV-5735');
+    expect(landed?.routingState).toBe('landed');
+
+    const stored = await store.getInitiative('ini_legacy_landed');
+    expect(stored?.destination).toBe(DEST_LINEAR);
+    expect(stored?.destinationHandle).toBe('JOV-5735');
   });
 
   it('persists a classified receipt and skips empty chat dumps', async () => {

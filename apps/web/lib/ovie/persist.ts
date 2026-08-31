@@ -251,7 +251,10 @@ async function finishCompanyRoute(
   routeCompany: OvieDumpOptions['routeCompany']
 ): Promise<OvieInitiative> {
   if (record.destination !== DEST_KANBAN || !isSummerKanbanLane(record.lane)) {
-    if (record.routingState === 'unavailable') {
+    if (
+      record.routingState === 'unavailable' &&
+      record.routingReason === 'receipt-only fail-closed'
+    ) {
       return restoreQueued(store, record);
     }
     return record;
@@ -480,7 +483,8 @@ export async function markInitiativeLanded(
   if (!storedCurrent) return undefined;
   const current = await normalizeLegacyEngineeringInitiativeForStore(
     store,
-    storedCurrent
+    storedCurrent,
+    { persistence: 'best-effort' }
   );
   const landedRef = resolveLandedHandleForInitiative(current, input);
   if (!landedRef) throw new Error('linear_id is required');
