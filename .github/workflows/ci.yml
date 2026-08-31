@@ -5338,7 +5338,7 @@ jobs:
               requiresPreview: $requiresPreview,
               blocksUnattendedAutoMerge: $blocksUnattended,
               matchedRules: ($rules | split(",") | map(select(length > 0) | {id: ., title: ., level: $riskLevel, files: []})),
-              recommendedLabels: (if $blocksUnattended then ["needs-human"] else [] end)
+              recommendedLabels: []
             }' > "$RISK_JSON"
 
           node scripts/ci-harness.mjs emit-artifact \

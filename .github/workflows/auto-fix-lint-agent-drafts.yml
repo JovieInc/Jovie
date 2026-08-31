@@ -1,11 +1,12 @@
 name: Auto-Fix Lint on Agent Drafts
 
 # When an agent-owned draft PR has a failing Lint/Biome check, this workflow
-# checks out the PR head, runs `pnpm biome check --write .` on changed files,
-# and pushes the mechanical fixes back. If typecheck fails (semantic error),
-# it skips and comments instead.
+# checks out the same-repo PR head, runs `pnpm biome check --write .` on
+# changed files, and pushes the mechanical fixes back. If typecheck fails
+# (semantic error), it skips and comments instead.
 #
-# Only fires on agent branches. Human PRs are left alone.
+# Same-repo agent branches only. Fork heads are never installed. Human PRs
+# are left alone.
 
 on:
   schedule:
@@ -26,6 +27,10 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          # Policy code only. Never persist credentials into the trusted checkout;
+          # the script authenticates git push with GH_TOKEN for same-repo heads.
+          persist-credentials: false
 
       - name: Auto-fix biome lint on agent drafts
         env:
