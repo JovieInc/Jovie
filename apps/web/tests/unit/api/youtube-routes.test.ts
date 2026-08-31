@@ -229,6 +229,27 @@ describe('YouTube connector routes', () => {
     );
   });
 
+  it('rejects active cross-profile channel reassignment before upsert', async () => {
+    mocks.db.select.mockReturnValueOnce({
+      from: () => ({
+        where: () => ({
+          limit: async () => [
+            {
+              creatorProfileId: '33333333-3333-4333-8333-333333333333',
+              status: 'connected',
+            },
+          ],
+        }),
+      }),
+    });
+
+    expect(
+      await callbackLocation({ code: 'auth-code', state: state() })
+    ).toContain('youtube_channel_already_connected');
+    expect(mocks.db.insert).not.toHaveBeenCalled();
+    expect(mocks.store).not.toHaveBeenCalled();
+  });
+
   it('idempotently upserts one owned channel, stores vault input, and fails closed on persistence errors', async () => {
     expect(
       await callbackLocation({

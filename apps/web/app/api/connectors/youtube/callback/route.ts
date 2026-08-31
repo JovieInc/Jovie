@@ -1,4 +1,4 @@
-import { eq } from 'drizzle-orm';
+import { and, eq } from 'drizzle-orm';
 import { NextResponse } from 'next/server';
 import { z } from 'zod';
 import { APP_ROUTES } from '@/constants/routes';
@@ -115,6 +115,33 @@ async function chooseOwnedYouTubeChannel(
     : { ok: false, error: 'youtube_no_channel' };
 }
 
+async function isYouTubeChannelLinkedToAnotherProfile(input: {
+  readonly userId: string;
+  readonly profileId: string;
+  readonly channelId: string;
+}): Promise<boolean> {
+  const [existing] = await db
+    .select({
+      creatorProfileId: connectorAccounts.creatorProfileId,
+      status: connectorAccounts.status,
+    })
+    .from(connectorAccounts)
+    .where(
+      and(
+        eq(connectorAccounts.userId, input.userId),
+        eq(connectorAccounts.provider, CONNECTOR_PROVIDERS.youtube),
+        eq(connectorAccounts.providerAccountId, input.channelId)
+      )
+    )
+    .limit(1);
+
+  return Boolean(
+    existing?.status === 'connected' &&
+      existing.creatorProfileId &&
+      existing.creatorProfileId !== input.profileId
+  );
+}
+
 async function upsertYouTubeConnectorAccount(input: {
   readonly userId: string;
   readonly profileId: string;
@@ -227,10 +254,20 @@ export async function GET(request: Request) {
     const channelChoice = await chooseOwnedYouTubeChannel(accessToken);
     if (!channelChoice.ok) return fail(channelChoice.error);
 
+    const channel = channelChoice.channel;
+    if (
+      await isYouTubeChannelLinkedToAnotherProfile({
+        userId: session.userId,
+        profileId,
+        channelId: channel.id,
+      })
+    )
+      return fail('youtube_channel_already_connected');
+
     accountId = await upsertYouTubeConnectorAccount({
       userId: session.userId,
       profileId,
-      channel: channelChoice.channel,
+      channel,
       grantedScopes,
     });
     await storeTokens({
