@@ -38,8 +38,11 @@ describe('continuous optimization decision gate', () => {
   });
 
   it('rejects winner decisions unless the experiment is running', () => {
-    expect(validateOptimizationDecision({ ...valid, status: 'paused' })).toEqual(
-      { ok: false, reason: 'experiment_not_running' }
-    );
+    expect(
+      validateOptimizationDecision({ ...valid, status: 'paused' })
+    ).toEqual({
+      ok: false,
+      reason: 'experiment_not_running',
+    });
   });
 });
