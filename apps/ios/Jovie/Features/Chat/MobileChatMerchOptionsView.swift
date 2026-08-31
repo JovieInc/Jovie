@@ -129,9 +129,6 @@ struct MobileChatMerchOptionsView: View {
         }
       }
       .simultaneousGesture(horizontalMerchScrollGesture)
-      .onDisappear {
-        railSwipeSuppression?.wrappedValue = false
-      }
     }
   }
 

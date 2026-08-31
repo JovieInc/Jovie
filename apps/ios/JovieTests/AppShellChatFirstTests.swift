@@ -252,6 +252,7 @@ struct AppShellChatFirstTests {
     #expect(source.contains("@State private var isRailSwipeSuppressedBySubview = false"))
     #expect(source.contains(#".environment(\.appShellRailSwipeSuppression, $isRailSwipeSuppressedBySubview)"#))
     #expect(source.contains("guard !isRailSwipeSuppressedBySubview else"))
+    #expect(source.contains("isRailSwipeSuppressedBySubview = false"))
     #expect(source.contains("private func resetRailDragOffsets()"))
     #expect(source.contains("followLeadingRailDrag(translationX:"))
     #expect(source.contains("followTrailingRailDrag(translationX:"))
@@ -282,5 +283,6 @@ struct AppShellChatFirstTests {
     #expect(source.contains(".simultaneousGesture(horizontalMerchScrollGesture)"))
     #expect(source.contains("AppShellGesturePolicy.isHorizontalDragIntent("))
     #expect(source.contains("railSwipeSuppression?.wrappedValue = false"))
+    #expect(!source.contains(".onDisappear {\n        railSwipeSuppression?.wrappedValue = false"))
   }
 }

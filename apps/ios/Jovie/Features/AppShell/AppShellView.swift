@@ -969,6 +969,7 @@ struct AppShellView<
         }
 
         guard !isRailSwipeSuppressedBySubview else {
+          isRailSwipeSuppressedBySubview = false
           resetRailDragOffsets()
           return
         }
