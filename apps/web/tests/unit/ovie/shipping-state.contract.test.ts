@@ -18,6 +18,7 @@ import {
   OBSERVATION_STATES as SHIPPING_STATES,
   type ShippingClock,
   type ShippingSourceId,
+  sanitizeOpaqueIdentifier,
   snapshotReaders,
   stopPublishingShippingState,
 } from '@/lib/ovie/shipping-state';
@@ -141,6 +142,7 @@ async function publish(
 }
 
 afterEach(() => {
+  vi.useRealTimers();
   resetShippingStatePublisher();
 });
 
@@ -158,6 +160,8 @@ describe('ovie.shipping-state.v1 contract', () => {
       'fleet-receipt',
     ]);
     expect(BUDGET).toBe(10_000);
+    expect(measuredCount(-1)).toEqual({ state: 'not-measured', value: null });
+    expect(measuredCount(1.5)).toEqual({ state: 'not-measured', value: null });
     for (const state of OPERATIONAL_TRUTH_STATES) {
       if (state === 'failure') expect(SHIPPING_STATES).toContain('error');
       else if (state !== 'recovery') expect(SHIPPING_STATES).toContain(state);
@@ -223,6 +227,100 @@ describe('zero, states, ordering, meanings, cadence', () => {
     expect(missing.capacityAvailable.state).toBe('not-measured');
     expect(missing.meanings.merged.state).toBe('not-measured');
     expect(missing.timeToShipSeconds.state).toBe('not-measured');
+  });
+
+  it('measures repository PR inventory, native queue, and completed CI timing', async () => {
+    const projection = await publish(
+      baseline({
+        'github-native-merge-queue': ok('github-native-merge-queue', {
+          entries: [{ id: 'mq-1', state: 'QUEUED', position: 1 }],
+          openPullRequests: 126,
+        }),
+        'exact-sha-ci': ok(
+          'exact-sha-ci',
+          {
+            status: 'completed',
+            conclusion: 'success',
+            created_at: '2026-08-21T23:50:00.000Z',
+            run_started_at: '2026-08-21T23:55:47.000Z',
+            updated_at: '2026-08-21T23:56:48.000Z',
+          },
+          {
+            correlation: { ciRunId: '1', sha: SHA },
+            measuredMeanings: { ciGreen: true },
+          }
+        ),
+      })
+    );
+
+    expect(
+      projection.sources['github-native-merge-queue'].counts.openPullRequests
+    ).toEqual({ state: 'measured-nonzero', value: 126 });
+    expect(
+      projection.sources['github-native-merge-queue'].counts.queued
+    ).toEqual({ state: 'measured-nonzero', value: 1 });
+    expect(projection.sources['exact-sha-ci'].durations).toEqual({
+      queueWaitMs: { state: 'measured-nonzero', value: 347_000 },
+      runDurationMs: { state: 'measured-nonzero', value: 61_000 },
+    });
+  });
+
+  it.each([
+    undefined,
+    null,
+  ])('does not infer CI timing when run_started_at is %s', async runStartedAt => {
+    const projection = await publish(
+      baseline({
+        'exact-sha-ci': ok('exact-sha-ci', {
+          status: 'completed',
+          conclusion: 'success',
+          created_at: '2026-08-21T23:50:00.000Z',
+          run_started_at: runStartedAt,
+          updated_at: '2026-08-21T23:56:48.000Z',
+        }),
+      })
+    );
+
+    expect(projection.sources['exact-sha-ci'].durations).toEqual({
+      queueWaitMs: { state: 'not-measured', value: null },
+      runDurationMs: { state: 'not-measured', value: null },
+    });
+  });
+
+  it.each([
+    { liveSha: null, deployedSha: SHA },
+    { liveSha: 'invalid', deployedSha: SHA },
+    { liveSha: SHA, deployedSha: null },
+    { liveSha: SHA, deployedSha: 'invalid' },
+  ])('does not synthesize exact-build false from $liveSha / $deployedSha', async ({
+    liveSha,
+    deployedSha,
+  }) => {
+    const projection = await publish(
+      baseline({
+        'production-controller': ok(
+          'production-controller',
+          { conclusion: 'success' },
+          {
+            correlation: { sha: deployedSha },
+            measuredMeanings: { productionVerified: true },
+          }
+        ),
+        'live-build-info': ok(
+          'live-build-info',
+          { commitSha: liveSha },
+          {
+            correlation: { sha: liveSha },
+            measuredMeanings: { exactLiveBuild: false },
+          }
+        ),
+      })
+    );
+
+    expect(projection.meanings.exactLiveBuild).toEqual({
+      state: 'not-measured',
+      value: null,
+    });
   });
 
   it('covers each observation state without synthesizing current truth', async () => {
@@ -317,7 +415,7 @@ describe('zero, states, ordering, meanings, cadence', () => {
     expect(gap).toMatchObject({
       action: 'gap',
       sequenceGap: true,
-      cursor: { gapSequences: [2, 3] },
+      cursor: { gapCount: 2, gapRanges: [{ from: 2, to: 3 }] },
     });
     expect(ingest(gap.cursor, 'evt-2', 2).replaceCurrent).toBe(false);
     expect(
@@ -330,6 +428,37 @@ describe('zero, states, ordering, meanings, cadence', () => {
         reachable: true,
       }).clockSkew
     ).toBe(true);
+  });
+
+  it('rejects excessive sequence gaps without enumerating or accepting them', () => {
+    const first = ingestSourceEvent(emptyCursor(), {
+      eventId: 'evt-1',
+      sequence: 1,
+      sourceTimestamp: T0,
+      observationTimestamp: T0,
+      schemaOk: true,
+      reachable: true,
+    });
+
+    const rejected = ingestSourceEvent(first.cursor, {
+      eventId: 'evt-million',
+      sequence: 1_000_001,
+      sourceTimestamp: T0,
+      observationTimestamp: T0,
+      schemaOk: true,
+      reachable: true,
+    });
+
+    expect(rejected).toMatchObject({
+      action: 'gap-rejected',
+      replaceCurrent: false,
+      sequenceGap: true,
+      cursor: {
+        lastSequence: 1,
+        gapCount: 999_999,
+        gapRanges: [{ from: 2, to: 1_000_000 }],
+      },
+    });
   });
 
   it('reconnects after disconnect and keeps meanings distinct', async () => {
@@ -477,11 +606,73 @@ describe('shipping-state security', () => {
     ).toBe(true);
     expect(resolveNamedAuthorityPath('exact-sha-ci')).toBeNull();
     const { sanitizeErrorMessage } = await import('@/lib/ovie/shipping-state');
-    expect(
-      sanitizeErrorMessage(
-        'failed ghp_abcdefghijklmnopqrstuvwxyz012345 /home/timwhite/.ssh/id_rsa Bearer abcdef'
-      )
-    ).not.toMatch(/ghp_|Bearer abcdef|\/home\/timwhite/);
+    const githubTokens = ['ghp_', 'gho_', 'ghu_', 'ghs_', 'ghr_'].map(
+      prefix => `${prefix}abcdefghijklmnopqrstuvwxyz012345`
+    );
+    const sensitiveMessage = `failed ${githubTokens.join(' ')} github_pat_abcdefghijklmnopqrstuvwxyz012345 /home/timwhite/.ssh/id_rsa Bearer abcdef`;
+    expect(sanitizeErrorMessage(sensitiveMessage)).not.toMatch(
+      /gh[pousr]_|github_pat_|Bearer abcdef|\/home\/timwhite/
+    );
+    for (const unsafe of [
+      ...githubTokens,
+      'github_pat_abcdefghijklmnopqrstuvwxyz012345',
+      '/Users/timwhite/private.json',
+      'contains whitespace',
+      'a'.repeat(129),
+    ]) {
+      expect(sanitizeOpaqueIdentifier(unsafe)).toBeNull();
+    }
+    expect(sanitizeOpaqueIdentifier('JOV-5248:attempt_2')).toBe(
+      'JOV-5248:attempt_2'
+    );
+
+    const taintedProjection = await publish(
+      baseline({
+        'symphony-runtime': ok(
+          'symphony-runtime',
+          { running: [], retrying: [], blocked: [] },
+          {
+            schema: githubTokens[0],
+            sourceRevision: githubTokens[1],
+            eventId: '/Users/timwhite/private.json',
+            sequence: -1,
+            correlation: {
+              workId: githubTokens[2],
+              leaseId: '/private/tmp/lease',
+              prNumber: -1,
+              ciRunId: githubTokens[3],
+              deploymentId: githubTokens[4],
+              buildId: 'contains whitespace',
+              sha: 'not-an-exact-sha',
+            },
+            errorCode: githubTokens[0],
+            errorMessage: sensitiveMessage,
+          }
+        ),
+      })
+    );
+    const serialized = JSON.stringify(taintedProjection);
+    expect(serialized).not.toMatch(
+      /gh[pousr]_|github_pat_|Bearer abcdef|timwhite|private\.json/
+    );
+    expect(taintedProjection.sources['symphony-runtime']).toMatchObject({
+      schema: SHIPPING_SOURCE_SCHEMAS['symphony-runtime'],
+      sequence: 1,
+      sourceRevision: null,
+      correlation: {
+        workId: null,
+        leaseId: null,
+        prNumber: null,
+        ciRunId: null,
+        deploymentId: null,
+        buildId: null,
+        sha: null,
+      },
+      lastError: { code: 'source-error' },
+    });
+    expect(taintedProjection.sources['symphony-runtime'].eventId).not.toContain(
+      'timwhite'
+    );
     const readFile = vi.fn(async (path: string) => {
       throw Object.assign(new Error(`refused ${path}`), { code: 'ENOENT' });
     });
