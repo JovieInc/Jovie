@@ -103,6 +103,15 @@
       "remediation": "The locked homepage → /start first-message → waitlist-after-auth path broke. Fix the product regression; this gate never skips because secrets are missing and never accepts a stub receipt."
     },
     {
+      "id": "ci-visual-snapshot-compare",
+      "name": "Visual Snapshot Compare",
+      "tier": "fast-gate",
+      "mergeGate": true,
+      "gateStage": "merge-group",
+      "nextLocalCommand": "node scripts/visual-snapshot-compare.mjs compare",
+      "remediation": "A missing visual baseline is a hard failure. Restore or commit the snapshot file. Do not pass --update-snapshots on the compare path; scheduled visual-regression.yml remains the refresh lane."
+    },
+    {
       "id": "drizzle-migration-guard",
       "name": "Migration Guard",
       "tier": "fast-gate",

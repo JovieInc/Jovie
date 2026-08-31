@@ -674,12 +674,14 @@ def test_main_autofix_waits_for_rerun_and_exact_sha_repair_ownership() -> None:
 
 
 def test_auto_ready_compensates_live_hold_race(tmp_path: Path) -> None:
-    """A hold arriving after promotion restores the exact PR to draft."""
+    """A hold racing in after an FX-provenance promotion restores draft."""
     fake_bin = tmp_path / "bin"
     fake_bin.mkdir()
     state_file = tmp_path / "state"
     state_file.write_text("draft", encoding="utf-8")
     call_log = tmp_path / "calls.log"
+    fx_child_head = "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+    fx_source_head = "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
     fake_gh = fake_bin / "gh"
     fake_gh.write_text(
         textwrap.dedent(
@@ -688,15 +690,15 @@ def test_auto_ready_compensates_live_hold_race(tmp_path: Path) -> None:
             set -euo pipefail
             printf '%s\\n' "$*" >> {call_log}
             if [[ "$1 $2" == "pr list" ]]; then
-              printf '%s\\n' '[{{"n":42,"t":"race guard","draft":true,"m":"MERGEABLE","ms":"CLEAN","head":"codex/race","oid":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","L":[]}}]'
+              printf '%s\\n' '[{{"n":42,"t":"race guard","draft":true,"m":"MERGEABLE","ms":"CLEAN","head":"codex/race","oid":"{fx_child_head}","author":"itstimwhite","L":[]}}]'
             elif [[ "$1 $2" == "pr view" ]]; then
               phase="$(cat {state_file})"
               if [[ "$phase" == "ready" ]]; then
-                printf '%s\\n' '{{"draft":false,"head":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","branch":"codex/race","labels":["gated"],"mergeable":"MERGEABLE","state":"OPEN"}}'
+                printf '%s\\n' '{{"draft":false,"head":"{fx_child_head}","branch":"codex/race","labels":["gated"],"mergeable":"MERGEABLE","state":"OPEN"}}'
               elif [[ "$phase" == "restored" ]]; then
-                printf '%s\\n' '{{"draft":true,"head":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","branch":"codex/race","labels":["gated"],"mergeable":"MERGEABLE","state":"OPEN"}}'
+                printf '%s\\n' '{{"draft":true,"head":"{fx_child_head}","branch":"codex/race","labels":["gated"],"mergeable":"MERGEABLE","state":"OPEN"}}'
               else
-                printf '%s\\n' '{{"draft":true,"head":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","branch":"codex/race","labels":[],"mergeable":"MERGEABLE","state":"OPEN"}}'
+                printf '%s\\n' '{{"draft":true,"head":"{fx_child_head}","branch":"codex/race","labels":[],"mergeable":"MERGEABLE","state":"OPEN"}}'
               fi
             elif [[ "$1 $2" == "pr checks" ]]; then
               printf '%s\\n' '[{{"bucket":"pass","state":"SUCCESS","name":"PR Ready"}},{{"bucket":"pass","state":"SUCCESS","name":"Migration Guard"}},{{"bucket":"pass","state":"SUCCESS","name":"Fork PR Gate"}},{{"bucket":"pass","state":"SUCCESS","name":"PR Size Guard"}}]'
@@ -707,7 +709,17 @@ def test_auto_ready_compensates_live_hold_race(tmp_path: Path) -> None:
                 printf '%s\\n' ready > {state_file}
               fi
             elif [[ "$1" == "api" ]]; then
-              :
+              case "$2" in
+                repos/*/commits/*)
+                  printf '%s\\n' '{{"sha":"{fx_child_head}","message":"fix(ci): fx repair\\n\\nFX-Source-Head: {fx_source_head}\\n","parentShas":["{fx_source_head}"],"authorName":"jovie-fx[bot]","authorEmail":"jovie-fx[bot]@users.noreply.github.com","authorLogin":"jovie-bot[bot]","committerName":"jovie-fx[bot]","committerEmail":"jovie-fx[bot]@users.noreply.github.com","committerLogin":"jovie-bot[bot]","verified":true}}'
+                  ;;
+                repos/*/actions/workflows/rolling-ci-dispatch.yml/runs*)
+                  printf '%s\\n' '{{"workflowPath":".github/workflows/rolling-ci-dispatch.yml","workflowName":"Rolling CI Dispatch","conclusion":"success","event":"workflow_run","actorLogin":"jovie-bot[bot]","headSha":"{fx_source_head}"}}'
+                  ;;
+                *)
+                  :
+                  ;;
+              esac
             elif [[ "$1 $2" == "pr comment" ]]; then
               :
             else
@@ -746,6 +758,76 @@ def test_auto_ready_compensates_live_hold_race(tmp_path: Path) -> None:
     calls = call_log.read_text(encoding="utf-8")
     assert "pr ready 42 -R JovieInc/Jovie" in calls
     assert "pr ready 42 -R JovieInc/Jovie --undo" in calls
+
+
+def test_auto_ready_leaves_human_head_without_fx_provenance_draft(
+    tmp_path: Path,
+) -> None:
+    """A human-authored draft on an agent branch must never be promoted."""
+    fake_bin = tmp_path / "bin"
+    fake_bin.mkdir()
+    call_log = tmp_path / "calls.log"
+    human_head = "cccccccccccccccccccccccccccccccccccccccc"
+    fake_gh = fake_bin / "gh"
+    fake_gh.write_text(
+        textwrap.dedent(
+            f"""\
+            #!/usr/bin/env bash
+            set -euo pipefail
+            printf '%s\\n' "$*" >> {call_log}
+            if [[ "$1 $2" == "pr list" ]]; then
+              printf '%s\\n' '[{{"n":7,"t":"human draft","draft":true,"m":"MERGEABLE","ms":"CLEAN","head":"codex/human","oid":"{human_head}","author":"itstimwhite","L":[]}}]'
+            elif [[ "$1 $2" == "pr view" ]]; then
+              printf '%s\\n' '{{"draft":true,"head":"{human_head}","branch":"codex/human","labels":[],"mergeable":"MERGEABLE","state":"OPEN"}}'
+            elif [[ "$1 $2" == "pr checks" ]]; then
+              printf '%s\\n' '[{{"bucket":"pass","state":"SUCCESS","name":"PR Ready"}},{{"bucket":"pass","state":"SUCCESS","name":"Migration Guard"}},{{"bucket":"pass","state":"SUCCESS","name":"Fork PR Gate"}},{{"bucket":"pass","state":"SUCCESS","name":"PR Size Guard"}}]'
+            elif [[ "$1 $2" == "pr ready" ]]; then
+              printf 'fake gh must never promote a human-authored head\\n' >&2
+              exit 2
+            elif [[ "$1" == "api" ]]; then
+              case "$2" in
+                repos/*/commits/*)
+                  printf '%s\\n' '{{"sha":"{human_head}","message":"fix: human patch","parentShas":["dddddddddddddddddddddddddddddddddddddddd"],"authorName":"Tim White","authorEmail":"tim@example.com","authorLogin":"itstimwhite","committerName":"Tim White","committerEmail":"tim@example.com","committerLogin":"itstimwhite","verified":false}}'
+                  ;;
+                *)
+                  :
+                  ;;
+              esac
+            elif [[ "$1 $2" == "pr comment" ]]; then
+              :
+            else
+              printf 'unexpected fake gh invocation: %s\\n' "$*" >&2
+              exit 2
+            fi
+            """
+        ),
+        encoding="utf-8",
+    )
+    fake_gh.chmod(0o755)
+
+    env = os.environ.copy()
+    env.update(
+        {
+            "PATH": f"{fake_bin}:{env['PATH']}",
+            "REPO": "JovieInc/Jovie",
+            "GH_RETRY_ATTEMPTS": "1",
+            "ATTEMPT_COOLDOWN_HOURS": "0",
+            "JOVIE_AGENT_PROFILE": "coder",
+        }
+    )
+    result = subprocess.run(
+        ["bash", str(REPO_ROOT / "scripts/auto-ready-agent-drafts.sh")],
+        cwd=REPO_ROOT,
+        env=env,
+        text=True,
+        capture_output=True,
+        check=False,
+        timeout=20,
+    )
+
+    assert result.returncode == 0, result.stderr
+    assert "leaving draft" in result.stdout
+    assert "pr ready" not in call_log.read_text(encoding="utf-8")
 
 
 def test_scheduled_synthetic_alerts_before_preserving_failure() -> None:
@@ -1006,6 +1088,9 @@ def test_fleet_gate_refresh_skips_cancelled_ci_and_ignored_labels() -> None:
 
     assert "schedule:" not in trigger
     assert "workflows: [CI, Production Controller]" in trigger
+    assert "opened" in trigger
+    assert "edited" in trigger
+    assert "synchronize" in trigger
     assert "Production Marker Recovery]" not in trigger
     assert "workflows: [CI, Production Controller, Queue-Deferred Release]" not in trigger
     assert "group: fleet-gate-event-admission" in workflow
@@ -1018,6 +1103,9 @@ def test_fleet_gate_refresh_skips_cancelled_ci_and_ignored_labels() -> None:
     assert "github.event.label.name == 'needs-human'" in block
     assert "github.event.label.name == 'duplicate'" in block
     assert "runs-on: [self-hosted, Linux, X64, jovie-fixed]" in block
+    assert "Persist stack policy repair actions" in block
+    assert "--closure-health-file=" in block
+    assert "delivery-state-machine.mjs" in block
 
 
 def test_heartbeat_is_the_only_scheduled_generic_fixed_runner_consumer() -> None:

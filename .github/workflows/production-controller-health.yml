@@ -90,7 +90,10 @@ jobs:
               ;;
             superseded)
               echo "recovery_reason=policy_generation_superseded" >> "$GITHUB_OUTPUT"
-              echo "::notice::Health policy $checked_out_sha does not match current main $current_sha; neutral."
+              echo "::warning::Health policy $checked_out_sha does not match current main $current_sha; proving live jov.ie bind before skip-success."
+              trap - EXIT
+              node .github/scripts/assert-live-production-bind.mjs --main-sha "$current_sha"
+              echo "Live production is bound to current main; superseded health policy is non-mutating."
               exit 0
               ;;
             current) ;;
@@ -443,6 +446,13 @@ jobs:
                   ;;
                 none) ;;
               esac
+
+              # Skip-promote / superseded controller success cannot go green
+              # while live jov.ie is still on a prior SHA (JOV-5458). Marker
+              # grace is only bookkeeping after live already matches main.
+              trap - EXIT
+              node .github/scripts/assert-live-production-bind.mjs --main-sha "$current_sha"
+              trap on_exit EXIT
 
               # Post-success grace: artifact listing / upload can lag job
               # completion. Event recovery owns the immediate path; the daily

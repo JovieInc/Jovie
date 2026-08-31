@@ -12,6 +12,7 @@ type PackageManifest = {
   readonly bin?: { readonly jovie?: unknown };
   readonly engines?: { readonly node?: unknown };
   readonly files?: readonly unknown[];
+  readonly homepage?: unknown;
   readonly license?: unknown;
   readonly name?: unknown;
   readonly private?: unknown;
@@ -37,6 +38,7 @@ describe('public CLI publication metadata', () => {
       name: '@jovie/cli',
       private: false,
       license: 'Apache-2.0',
+      homepage: 'https://jov.ie/cli',
       publishConfig: {
         access: 'public',
         provenance: true,
@@ -61,6 +63,8 @@ describe('public CLI publication metadata', () => {
     expect(readme).toContain('jovie --help');
     expect(readme).toContain('jovie --version');
     expect(readme).toContain('artist get <username>');
+    expect(readme).toContain('https://jov.ie/cli');
+    expect(readme).toContain('not published from this branch');
   });
 
   it('leaves CI-injected singleton test flags to the caller', () => {

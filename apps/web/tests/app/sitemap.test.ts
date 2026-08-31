@@ -180,6 +180,8 @@ describe('sitemap', () => {
         'https://jov.ie',
         'https://jov.ie/blog',
         'https://jov.ie/developers',
+        'https://jov.ie/cli',
+        'https://jov.ie/api-versioning',
         'https://jov.ie/openapi.json',
         'https://jov.ie/llms.txt',
         'https://jov.ie/llms-full.txt',

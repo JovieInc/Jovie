@@ -1,3 +1,5 @@
+import { readFileSync } from 'node:fs';
+import { resolve } from 'node:path';
 import { fireEvent, render, screen } from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { MobileNav } from './MobileNav';
@@ -45,5 +47,11 @@ describe('MobileNav', () => {
       '/start'
     );
     expect(document.body).toHaveStyle({ overflow: 'hidden' });
+  });
+
+  it('uses the canonical button shadow token', () => {
+    const source = readFileSync(resolve(__dirname, './MobileNav.tsx'), 'utf8');
+    expect(source).toContain('var(--shadow-button)');
+    expect(source).not.toContain('--linear-shadow-button');
   });
 });

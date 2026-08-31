@@ -118,6 +118,7 @@ describe('PUBLIC_SKILL_REGISTRY partial-catalog boundary (JOV-3013)', () => {
       'submitFeedback',
       'showAccountStatus',
       'voicePromo',
+      'inspectPressSource',
       'updateMerchCard',
     ] as const;
 

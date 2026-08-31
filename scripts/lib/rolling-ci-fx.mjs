@@ -16,6 +16,7 @@ import {
 
 export const CURSOR_AGENTS_URL = 'https://api.cursor.com/v1/agents';
 export const FX_EXECUTION_RECEIPT_SCHEMA = 'jovie-fx-execution-receipt/v1';
+export const FX_GITHUB_RUNNER_EXECUTOR = 'github-actions-runner';
 export const FX_NAMED_OUTCOMES = Object.freeze([
   'launched',
   'repaired',
@@ -256,12 +257,17 @@ export function resolveFxNamedOutcome(input = {}) {
   const action = input.launch?.action;
   const reason = String(input.launch?.reason ?? '');
   const dispatchAction = String(input.dispatch?.action ?? '');
-  if (action === 'launch' || action === 'dedup') return 'launched';
+  if (action === 'launch_local' || action === 'launch' || action === 'dedup') {
+    return 'launched';
+  }
   if (action === 'configuration_incident' || reason === 'fx-auth-missing') {
     if (reason === 'fx-safe-executor-unavailable') return 'blocked_executor';
     return 'no_key';
   }
   if (action === 'writer_missing') return 'writer_missing';
+  if (action === 'skip' && reason === 'implementer_lease_live') {
+    return 'implementer_owned';
+  }
   if (
     (action === 'skip' && /stale/.test(reason)) ||
     /stale/.test(dispatchAction)
@@ -308,6 +314,7 @@ export function buildFxPrompt(input = {}) {
     failedChecks = [],
     producerEvent,
     runnerClass = null,
+    runnerLocal = false,
   } = input;
   const mergeGroup = producerEvent === 'merge_group';
   return [
@@ -329,6 +336,9 @@ export function buildFxPrompt(input = {}) {
       ? 'The failure reproduced on the combined queue head versus current main. Fix the source PR so the next merge_group succeeds. Do not waive ratchet growth.'
       : '',
     'Add or update the smallest regression test. Do not skip drafts. Do not merge.',
+    runnerLocal
+      ? 'You are running on an ephemeral GitHub Actions runner checked out at the source PR head. Read .fx-ci/failure.log for the exact failed-run evidence. Modify and test the working tree only; do not commit, push, open a pull request, merge, or access credentials. The trusted controller performs delivery after independently verifying your diff.'
+      : 'Work on the current source pull-request branch at the exact failed head. Add the smallest tested repair; do not open a sibling pull request, merge, or weaken gates.',
     'Do not invent a second fleet hold. Area collision holds only.',
   ]
     .filter(Boolean)
@@ -346,10 +356,47 @@ export function planFxLaunch(input = {}) {
     failedChecks = [],
     cursorAgents = [],
     cursorApiKey,
+    fxAuthConfigured = false,
+    runnerLocalAvailable = false,
     remoteMutationAllowed = false,
     producerEvent,
     runnerClass = null,
   } = input;
+  if (runnerLocalAvailable === true) {
+    if (fxAuthConfigured !== true) {
+      return {
+        action: 'configuration_incident',
+        reason: 'fx-auth-missing',
+        incident: fxConfigurationIncident(),
+      };
+    }
+    return {
+      action: 'launch_local',
+      reason: 'ci-failed-after-webhook',
+      executor: FX_GITHUB_RUNNER_EXECUTOR,
+      request: {
+        prompt: {
+          text: buildFxPrompt({
+            repository,
+            prNumber,
+            headSha,
+            sourceHead,
+            fingerprint,
+            failedChecks,
+            producerEvent,
+            runnerClass,
+            runnerLocal: true,
+          }),
+        },
+        name: `Jovie CI repair ${fingerprint}`.slice(0, 100),
+        repository,
+        prNumber,
+        headSha,
+        sourceHead,
+        fingerprint,
+      },
+    };
+  }
   if (typeof cursorApiKey !== 'string' || cursorApiKey.trim().length === 0) {
     return {
       action: 'configuration_incident',
@@ -421,6 +468,8 @@ export function planFxWebhookRemediation(input = {}) {
     fxAdapter,
     cursorAgents = [],
     cursorApiKey = '',
+    fxAuthConfigured = false,
+    runnerLocalAvailable = false,
     remoteMutationAllowed = false,
     now,
     repository,
@@ -438,7 +487,8 @@ export function planFxWebhookRemediation(input = {}) {
     implementer,
     fxAdapter: fxAdapter ?? {
       name: FX_ADAPTER_NAME,
-      authConfigured: Boolean(String(cursorApiKey ?? '').trim()),
+      authConfigured:
+        fxAuthConfigured || Boolean(String(cursorApiKey ?? '').trim()),
     },
     now,
   });
@@ -512,6 +562,8 @@ export function planFxWebhookRemediation(input = {}) {
       failedChecks: (dispatch?.events ?? []).map(event => event.check),
       cursorAgents,
       cursorApiKey,
+      fxAuthConfigured,
+      runnerLocalAvailable,
       remoteMutationAllowed,
       runnerClass,
     }),
@@ -574,6 +626,9 @@ async function main() {
     parseHandoffReceipt(input.handoffCommentBody ?? '') ??
     null;
   const cursorApiKey = input.cursorApiKey ?? process.env.CURSOR_API_KEY ?? '';
+  const fxAuthConfigured =
+    input.fxAuthConfigured === true ||
+    Boolean(String(process.env.AI_GATEWAY_API_KEY ?? '').trim());
   let cursorAgents = Array.isArray(input.cursorAgents)
     ? input.cursorAgents
     : [];
@@ -595,7 +650,7 @@ async function main() {
     implementer: input.writer,
     fxAdapter: input.fxAdapter ?? {
       name: FX_ADAPTER_NAME,
-      authConfigured: Boolean(String(cursorApiKey).trim()),
+      authConfigured: fxAuthConfigured || Boolean(String(cursorApiKey).trim()),
     },
     now: input.now,
   });
@@ -634,6 +689,8 @@ async function main() {
     fxAdapter: input.fxAdapter,
     cursorAgents,
     cursorApiKey,
+    fxAuthConfigured,
+    runnerLocalAvailable: input.runnerLocalAvailable === true,
     remoteMutationAllowed: input.remoteMutationAllowed === true,
     now: input.now,
     repository: input.repository,

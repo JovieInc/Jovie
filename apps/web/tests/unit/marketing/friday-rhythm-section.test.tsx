@@ -3,6 +3,7 @@ import userEvent from '@testing-library/user-event';
 import type { HTMLAttributes, ReactNode, SVGProps } from 'react';
 import { describe, expect, it, vi } from 'vitest';
 import { FridayRhythmSection } from '@/components/marketing/friday-rhythm-section';
+import { APP_ROUTES } from '@/constants/routes';
 
 vi.mock('motion/react', () => ({
   motion: {
@@ -48,8 +49,8 @@ describe('FridayRhythmSection', () => {
       name: 'Build Your Release Rhythm',
     });
     expect(rhythmCta).toHaveAttribute('href');
-    // Front-door CTA uses the shared homepage start path (no starter_prompt).
-    expect(rhythmCta.getAttribute('href')).toMatch(/^\/start(\?|$)/);
+    // Homepage front-door CTA is locked to Get started → /start (JOV-5085).
+    expect(rhythmCta.getAttribute('href')).toBe(APP_ROUTES.START);
     expect(screen.queryByText('Less')).not.toBeInTheDocument();
     expect(screen.queryByText('More')).not.toBeInTheDocument();
   });

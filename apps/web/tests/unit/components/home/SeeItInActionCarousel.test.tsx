@@ -1,3 +1,5 @@
+import { readFileSync } from 'node:fs';
+import { resolve } from 'node:path';
 import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { describe, expect, it, vi } from 'vitest';
@@ -100,5 +102,17 @@ describe('SeeItInActionCarousel', () => {
     expect(
       screen.getByRole('link', { name: /All platforms/i })
     ).toHaveAttribute('href', '/tim/never-say-a-word?noredirect=1');
+  });
+
+  it('uses canonical duration tokens instead of --linear-duration-*', () => {
+    const source = readFileSync(
+      resolve(
+        __dirname,
+        '../../../../components/features/home/SeeItInActionCarousel.tsx'
+      ),
+      'utf8'
+    );
+    expect(source).toContain('duration-(--duration-normal)');
+    expect(source).not.toMatch(/--linear-duration-/);
   });
 });

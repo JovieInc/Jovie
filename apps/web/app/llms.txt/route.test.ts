@@ -22,7 +22,11 @@ describe('GET /llms.txt', () => {
     expect(body).toContain('GET https://jov.ie/api/v1/{username}');
     expect(body).toContain('GET https://jov.ie/api/v1');
     expect(body).toContain('https://jov.ie/developers');
+    expect(body).toContain('https://jov.ie/cli');
     expect(body).toContain('active v1 lifecycle boundary');
+    expect(body).toContain(
+      '**API versioning and deprecation policy**: https://jov.ie/api-versioning'
+    );
     expect(body).toContain('https://jov.ie/{username}/llms.txt');
     expect(body).toContain('https://jov.ie/{username}/{slug}');
     expect(body).toContain('https://jov.ie/llms.txt');

@@ -18,6 +18,7 @@ export const HEADER_VARIANTS: readonly SectionVariant[] = [
       '/blog/[slug]',
       '/changelog',
       '/support',
+      '/cli',
       'most landings',
     ],
     status: 'canonical',

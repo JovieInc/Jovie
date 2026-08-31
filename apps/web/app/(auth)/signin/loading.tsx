@@ -8,7 +8,8 @@ export default function SignInLoading() {
     <AuthPageSkeleton
       formTitle='Sign in'
       showFormTitle={false}
-      layoutVariant='split'
+      layoutVariant='stack'
+      chrome='splash-b'
     />
   );
 }
