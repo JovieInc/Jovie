@@ -131,6 +131,7 @@ async function listUploadVideoIds(input: {
   readonly maxVideoIds?: number;
   readonly pageToken?: string;
   readonly timeoutMs?: number;
+  readonly deadlineMs?: number;
 }): Promise<{
   readonly videoIds: string[];
   readonly nextPageToken: string | null;
@@ -138,7 +139,11 @@ async function listUploadVideoIds(input: {
   const ids: string[] = [];
   const seen = new Set<string>();
   let pageToken: string | undefined = input.pageToken;
+  const timeoutMs = input.timeoutMs ?? 15_000;
   do {
+    if (!hasRequestBudget(timeoutMs, input.deadlineMs)) {
+      return { videoIds: ids, nextPageToken: pageToken ?? null };
+    }
     const remaining = input.maxVideoIds
       ? input.maxVideoIds - ids.length
       : MAX_VIDEO_BATCH;
@@ -155,7 +160,7 @@ async function listUploadVideoIds(input: {
       input.accessToken,
       input.fetcher,
       'YouTube uploads page',
-      input.timeoutMs
+      boundedTimeoutMs(timeoutMs, input.deadlineMs)
     );
     for (const item of page.items ?? []) {
       const videoId = item.contentDetails?.videoId?.trim();
@@ -314,6 +319,7 @@ export function createYouTubeLibraryProvider(input: {
   const timeoutMs = input.timeoutMs ?? 15_000;
   return {
     async listChannelVideos(channelId) {
+      if (!hasRequestBudget(timeoutMs, input.deadlineMs)) return [];
       const channels = await listOwnedYouTubeChannels({
         accessToken: input.accessToken,
         fetcher,
@@ -333,10 +339,12 @@ export function createYouTubeLibraryProvider(input: {
         maxVideoIds: input.maxVideosPerSync,
         pageToken: input.uploadsPageToken,
         timeoutMs: boundedTimeoutMs(timeoutMs, input.deadlineMs),
+        deadlineMs: input.deadlineMs,
       });
       input.onUploadsPageToken?.(nextPageToken);
       const videos: YouTubeChannelVideo[] = [];
       for (const batch of batches(videoIds, MAX_VIDEO_BATCH)) {
+        if (!hasRequestBudget(timeoutMs, input.deadlineMs)) return videos;
         const url = new URL(`${YOUTUBE_DATA_API}/videos`);
         url.searchParams.set('part', 'snippet,contentDetails,status');
         url.searchParams.set('id', batch.join(','));
