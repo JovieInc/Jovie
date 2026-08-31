@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Gem tty1 ultrawide HUD. Official SYMPHONY STATUS + check-in tiles + table."""
+"""Gem tty1 ultrawide HUD. Official SYMPHONY STATUS + ship-path p95 + check-in tiles."""
 from __future__ import annotations
 
 import argparse
@@ -45,8 +45,26 @@ LINEAR_QUERY = (
     "query($id: String!) { project(id: $id) { issues(filter: { state: { name: { eq: \"In Review\" } } }) "
     "{ totalCount } } }"
 )
+LINEAR_STAGES_QUERY = (
+    "query($id: String!) { project(id: $id) { issues(first: 100, filter: { "
+    "state: { name: { in: [\"Todo\", \"In Progress\", \"In Review\"] } } }) "
+    "{ nodes { createdAt startedAt completedAt state { name } } } } }"
+)
+SHIP_STAGES = (
+    ("todo", "Todo/pickup"),
+    ("running", "agent running"),
+    ("pr_open", "PR open"),
+    ("ci_fast", "ci-fast"),
+    ("pr_ready", "PR Ready"),
+    ("mq", "merge queue"),
+    ("merge_group", "merge_group CI"),
+    ("merged", "merged"),
+)
+CI_FAST_NAMES = frozenset({"ci-fast"})
+PR_READY_NAMES = frozenset({"PR Ready"})
+CHECK_PENDING = frozenset({"queued", "in_progress", "pending", "waiting", "requested"})
 MIN_WIDTH = 120
-TARGET_WIDTH = 200
+TARGET_WIDTH = 430
 
 
 def _now() -> datetime:
@@ -138,6 +156,38 @@ def _duration(seconds: int) -> str:
     return f"{value // 3600}h"
 
 
+def runtime_label(seconds: Any) -> str:
+    value = _int(seconds)
+    if value is None:
+        return "-"
+    value = max(0, value)
+    hours, rem = divmod(value, 3600)
+    mins, secs = divmod(rem, 60)
+    parts: list[str] = []
+    if hours:
+        parts.append(f"{hours}h")
+    if mins or hours:
+        parts.append(f"{mins}m")
+    if secs or not parts:
+        parts.append(f"{secs}s")
+    return " ".join(parts)
+
+
+def comma_int(value: Any) -> str:
+    number = _int(value)
+    return "-" if number is None else f"{number:,}"
+
+
+def p95_seconds(values: list[float] | None) -> float | None:
+    if not values:
+        return None
+    ordered = sorted(value for value in values if value == value and value > 0)
+    if not ordered:
+        return None
+    index = max(0, min(len(ordered) - 1, math.ceil(0.95 * len(ordered)) - 1))
+    return ordered[index]
+
+
 def elapsed_label(started: Any, *, now: datetime | None = None, seconds: Any = None) -> str:
     direct = _int(seconds)
     if direct is not None:
@@ -172,125 +222,6 @@ def compact_tokens(total: Any, incoming: Any = None, outgoing: Any = None) -> st
     return f"{count / 1_000_000:.1f}m"
 
 
-def runtime_label(seconds: Any) -> str:
-    value = _int(seconds)
-    if value is None:
-        return "-"
-    value = max(0, value)
-    hours, rem = divmod(value, 3600)
-    mins, secs = divmod(rem, 60)
-    parts: list[str] = []
-    if hours:
-        parts.append(f"{hours}h")
-    if mins or hours:
-        parts.append(f"{mins}m")
-    if secs or not parts:
-        parts.append(f"{secs}s")
-    return " ".join(parts)
-
-
-def comma_int(value: Any) -> str:
-    number = _int(value)
-    return "-" if number is None else f"{number:,}"
-
-
-def format_rate_limits(rate_limits: Any) -> str:
-    if not isinstance(rate_limits, dict) or not rate_limits:
-        return "-"
-    parts: list[str] = []
-    limit_id = rate_limits.get("limit_id")
-    if isinstance(limit_id, str) and limit_id.strip():
-        parts.append(limit_id.strip())
-    primary = rate_limits.get("primary")
-    if isinstance(primary, dict):
-        remaining, limit = _int(primary.get("remaining")), _int(primary.get("limit"))
-        if remaining is None or limit is None:
-            parts.append("primary -")
-        else:
-            text = f"{remaining:,}/{limit:,}"
-            reset = _int(primary.get("reset_in_seconds"))
-            if reset is not None:
-                text += f" reset {reset}s"
-            parts.append(f"primary {text}")
-    if "secondary" in rate_limits:
-        secondary = rate_limits.get("secondary")
-        if not isinstance(secondary, dict):
-            parts.append("secondary n/a")
-        else:
-            remaining, limit = _int(secondary.get("remaining")), _int(secondary.get("limit"))
-            parts.append("secondary -" if remaining is None or limit is None else f"secondary {remaining:,}/{limit:,}")
-    credits = rate_limits.get("credits")
-    if isinstance(credits, dict):
-        if credits.get("unlimited") is True:
-            parts.append("credits unlimited")
-        elif credits.get("balance") is not None:
-            parts.append(f"credits {credits['balance']}")
-        elif credits.get("has_credits") is True:
-            parts.append("credits yes")
-        else:
-            parts.append("credits -")
-    return " | ".join(parts) if parts else "-"
-
-
-def load_tps_snapshots(path: Path) -> list[dict[str, Any]]:
-    if not path.is_file():
-        return []
-    try:
-        payload = json.loads(path.read_text(encoding="utf-8"))
-    except (OSError, json.JSONDecodeError):
-        return []
-    raw = payload.get("snapshots") if isinstance(payload, dict) else None
-    return [item for item in raw if isinstance(item, dict)] if isinstance(raw, list) else []
-
-
-def persist_tps_snapshot(path: Path, totals: Any, *, now: datetime | None = None) -> None:
-    if not isinstance(totals, dict):
-        return
-    tokens, seconds = _int(totals.get("total_tokens")), _int(totals.get("seconds_running"))
-    if tokens is None and seconds is None:
-        return
-    clock = now or _now()
-    snapshots = [item for item in load_tps_snapshots(path) if _iso(item.get("at"))]
-    snapshots.append({"at": clock.isoformat(), "total_tokens": tokens, "seconds_running": seconds})
-    cutoff = clock - timedelta(seconds=90)
-    kept = [item for item in snapshots if (stamp := _iso(item.get("at"))) is not None and stamp >= cutoff]
-    try:
-        path.parent.mkdir(parents=True, exist_ok=True)
-        path.write_text(json.dumps({"snapshots": kept[-20:]}), encoding="utf-8")
-    except OSError:
-        return
-
-
-def compute_throughput(totals: Any, snapshots: list[dict[str, Any]] | None, *, now: datetime | None = None) -> float | None:
-    if not isinstance(totals, dict):
-        return None
-    tokens, seconds = _int(totals.get("total_tokens")), _int(totals.get("seconds_running"))
-    clock = now or _now()
-    window_hit = fallback_hit = None
-    for item in snapshots or []:
-        stamp = _iso(item.get("at"))
-        prev_tokens = _int(item.get("total_tokens"))
-        if stamp is None or prev_tokens is None:
-            continue
-        age = (clock - stamp).total_seconds()
-        prev_seconds = _int(item.get("seconds_running"))
-        if 4.0 <= age <= 8.0:
-            window_hit = (stamp, prev_tokens, prev_seconds)
-        elif 0.4 < age <= 15.0 and fallback_hit is None:
-            fallback_hit = (stamp, prev_tokens, prev_seconds)
-    chosen = window_hit or fallback_hit
-    if chosen is not None and tokens is not None:
-        stamp, prev_tokens, prev_seconds = chosen
-        wall = (clock - stamp).total_seconds()
-        running_delta = None if seconds is None or prev_seconds is None else seconds - prev_seconds
-        denom = running_delta if running_delta is not None and running_delta > 0 else wall
-        if denom > 0:
-            return max(0.0, (tokens - prev_tokens) / denom)
-    if tokens is not None and seconds is not None and seconds > 0:
-        return tokens / seconds
-    return None
-
-
 def short_path(value: Any) -> str:
     text = dash(value)
     if text == "-":
@@ -298,7 +229,7 @@ def short_path(value: Any) -> str:
     return text.replace(str(Path.home()), "~")[-28:]
 
 
-def load_measured(path: Path) -> dict[str, Any]:
+def load_json_dict(path: Path) -> dict[str, Any]:
     if not path.is_file():
         return {}
     try:
@@ -306,6 +237,10 @@ def load_measured(path: Path) -> dict[str, Any]:
     except (OSError, json.JSONDecodeError):
         return {}
     return payload if isinstance(payload, dict) else {}
+
+
+def load_measured(path: Path) -> dict[str, Any]:
+    return load_json_dict(path)
 
 
 def read_workflow_cap(path: Path | None = None) -> int | None:
@@ -422,6 +357,220 @@ def series_values(measured: dict[str, Any], key: str) -> list[float] | None:
     return values or None
 
 
+def write_json(path: Path, payload: Any) -> None:
+    try:
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text(json.dumps(payload), encoding="utf-8")
+    except OSError:
+        return
+
+
+def load_tps_snapshots(path: Path) -> list[dict[str, Any]]:
+    payload = load_json_dict(path)
+    raw = payload.get("snapshots")
+    if not isinstance(raw, list):
+        return []
+    return [item for item in raw if isinstance(item, dict)]
+
+
+def persist_tps_snapshot(path: Path, totals: Any, *, now: datetime | None = None) -> None:
+    if not isinstance(totals, dict):
+        return
+    tokens, seconds = _int(totals.get("total_tokens")), _int(totals.get("seconds_running"))
+    if tokens is None and seconds is None:
+        return
+    clock = now or _now()
+    cutoff = clock - timedelta(seconds=90)
+    kept = [item for item in load_tps_snapshots(path) if (stamp := _iso(item.get("at"))) is not None and stamp >= cutoff]
+    kept.append({"at": clock.isoformat(), "total_tokens": tokens, "seconds_running": seconds})
+    write_json(path, {"snapshots": kept[-20:]})
+
+
+def compute_throughput(totals: Any, snapshots: list[dict[str, Any]] | None, *, now: datetime | None = None) -> float | None:
+    if not isinstance(totals, dict):
+        return None
+    tokens, seconds, clock = _int(totals.get("total_tokens")), _int(totals.get("seconds_running")), now or _now()
+    window_hit = fallback_hit = None
+    for item in snapshots or []:
+        stamp, prev_tokens = _iso(item.get("at")), _int(item.get("total_tokens"))
+        if stamp is None or prev_tokens is None:
+            continue
+        age = (clock - stamp).total_seconds()
+        hit = (stamp, prev_tokens, _int(item.get("seconds_running")))
+        if 4.0 <= age <= 8.0:
+            window_hit = hit
+        elif 0.4 < age <= 15.0 and fallback_hit is None:
+            fallback_hit = hit
+    chosen = window_hit or fallback_hit
+    if chosen is not None and tokens is not None:
+        stamp, prev_tokens, prev_seconds = chosen
+        running_delta = None if seconds is None or prev_seconds is None else seconds - prev_seconds
+        denom = running_delta if running_delta is not None and running_delta > 0 else (clock - stamp).total_seconds()
+        if denom > 0:
+            return max(0.0, (tokens - prev_tokens) / denom)
+    if tokens is not None and seconds is not None and seconds > 0:
+        return tokens / seconds
+    return None
+
+
+def format_rate_window(window: Any) -> str:
+    if not isinstance(window, dict):
+        return "-"
+    remaining, limit = _int(window.get("remaining")), _int(window.get("limit"))
+    if remaining is None or limit is None:
+        return "-"
+    text = f"{remaining:,}/{limit:,}"
+    reset = _int(window.get("reset_in_seconds"))
+    if reset is not None:
+        text += f" reset {reset}s"
+    return text
+
+
+def format_rate_limits(rate_limits: Any) -> str:
+    if not isinstance(rate_limits, dict) or not rate_limits:
+        return "-"
+    parts: list[str] = []
+    limit_id = rate_limits.get("limit_id")
+    if isinstance(limit_id, str) and limit_id.strip():
+        parts.append(limit_id.strip())
+    if rate_limits.get("primary") is not None:
+        parts.append(f"primary {format_rate_window(rate_limits.get('primary'))}")
+    if "secondary" in rate_limits:
+        secondary = rate_limits.get("secondary")
+        parts.append("secondary n/a" if secondary is None else f"secondary {format_rate_window(secondary)}")
+    credits = rate_limits.get("credits")
+    if isinstance(credits, dict):
+        if credits.get("unlimited") is True:
+            parts.append("credits unlimited")
+        elif credits.get("balance") is not None:
+            parts.append(f"credits {credits['balance']}")
+        else:
+            parts.append("credits yes" if credits.get("has_credits") is True else "credits -")
+    return " | ".join(parts) if parts else "-"
+
+
+def check_duration_seconds(record: dict[str, Any]) -> float | None:
+    timing = record.get("timing") if isinstance(record.get("timing"), dict) else {}
+    millis = _int(record.get("run_duration_ms") or timing.get("run_duration_ms"))
+    if millis is not None and millis > 0:
+        return millis / 1000.0
+    started = _iso(record.get("startedAt") or record.get("started_at") or record.get("run_started_at"))
+    completed = _iso(record.get("completedAt") or record.get("completed_at") or record.get("updated_at"))
+    if started is None or completed is None:
+        return None
+    delta = (completed - started).total_seconds()
+    return delta if delta > 0 else None
+
+
+def empty_stage(stage_id: str, label: str) -> dict[str, Any]:
+    return {"id": stage_id, "label": label, "count": None, "p95": None, "queued": False, "queue_reason": None, "series": None}
+
+
+def empty_ship_path() -> dict[str, Any]:
+    return {"ok": False, "stages": [empty_stage(stage_id, label) for stage_id, label in SHIP_STAGES], "bottleneck": None}
+
+
+def _check_name(item: Any) -> str:
+    if not isinstance(item, dict):
+        return ""
+    return str(item.get("name") or item.get("context") or "").strip()
+
+
+def _check_status(item: Any) -> str:
+    if not isinstance(item, dict):
+        return ""
+    status = str(item.get("status") or "").strip().lower()
+    if status:
+        return status
+    state = str(item.get("state") or "").strip().lower()
+    return state
+
+
+def named_checks(rollups: Any, names: frozenset[str]) -> list[dict[str, Any]]:
+    if not isinstance(rollups, list):
+        return []
+    return [item for item in rollups if isinstance(item, dict) and _check_name(item) in names]
+
+
+def stage_from_source(
+    stage_id: str,
+    label: str,
+    *,
+    ok: bool,
+    count: int | None,
+    durations: list[float] | None,
+    queued: bool = False,
+    queue_reason: str | None = None,
+    series: list[float] | None = None,
+) -> dict[str, Any]:
+    if not ok:
+        return empty_stage(stage_id, label)
+    return {
+        "id": stage_id,
+        "label": label,
+        "count": count,
+        "p95": p95_seconds(durations),
+        "queued": bool(queued),
+        "queue_reason": queue_reason,
+        "series": series if series else None,
+    }
+
+
+def ship_bottleneck(stages: list[dict[str, Any]]) -> dict[str, Any] | None:
+    queued = next((s for s in stages if s.get("queued") and s.get("queue_reason")), None)
+    if queued:
+        return {"id": queued["id"], "label": queued["label"], "reason": queued["queue_reason"]}
+    measured = [s for s in stages if s.get("p95") is not None]
+    if not measured:
+        return None
+    worst = max(measured, key=lambda stage: float(stage["p95"]))
+    return {"id": worst["id"], "label": worst["label"], "reason": f"{worst['label']} p95 {runtime_label(worst['p95'])}"}
+
+
+def build_ship_path(
+    *,
+    symphony: dict[str, Any],
+    mq: dict[str, Any],
+    linear: dict[str, Any] | None,
+    github: dict[str, Any] | None,
+    measured: dict[str, Any] | None = None,
+) -> dict[str, Any]:
+    linear = linear if isinstance(linear, dict) else {}
+    github = github if isinstance(github, dict) else {}
+    series_root = measured.get("series") if isinstance(measured, dict) else None
+    series_map = series_root if isinstance(series_root, dict) else {}
+
+    def series_for(key: str) -> list[float] | None:
+        return series_values(measured if isinstance(measured, dict) else {}, key) or series_values(
+            {"series": series_map.get("ci") if isinstance(series_map.get("ci"), dict) else series_map},
+            key,
+        )
+
+    retrying = symphony.get("retrying") if symphony.get("ok") else None
+    retry_q = isinstance(retrying, int) and retrying > 0
+    mq_ok = bool(mq.get("ok"))
+    mq_count = mq.get("count") if mq_ok else None
+    mq_awaiting = mq_ok and isinstance(mq_count, int) and mq_count > 0
+    gh_ok = bool(github.get("ok"))
+    merge_in = github.get("merge_group_in") if gh_ok else None
+    merge_wait = isinstance(merge_in, int) and merge_in > 0
+    specs = (
+        ("todo", "Todo/pickup", bool(linear.get("ok")), linear.get("todo"), linear.get("pickup_durations"), False, None),
+        ("running", "agent running", bool(symphony.get("ok")), symphony.get("running") if symphony.get("ok") else None, None, retry_q, f"retrying agents {retrying}" if retry_q else None),
+        ("pr_open", "PR open", gh_ok, github.get("pr_open"), github.get("pr_open_durations"), False, None),
+        ("ci_fast", "ci-fast", gh_ok, github.get("ci_fast"), github.get("ci_fast_durations"), bool(github.get("ci_fast_queued")), "ci-fast awaiting checks" if github.get("ci_fast_queued") else None),
+        ("pr_ready", "PR Ready", gh_ok, github.get("pr_ready"), github.get("pr_ready_durations"), bool(github.get("pr_ready_queued")), "PR Ready awaiting checks" if github.get("pr_ready_queued") else None),
+        ("mq", "merge queue", mq_ok, mq_count, github.get("mq_durations") if gh_ok else None, mq_awaiting and not merge_wait, "MQ awaiting checks" if mq_awaiting and not merge_wait else None),
+        ("merge_group", "merge_group CI", gh_ok, merge_in, github.get("merge_group_durations"), merge_wait, "merge_group CI running" if merge_wait else None),
+        ("merged", "merged", gh_ok, github.get("merged"), github.get("merged_durations"), False, None),
+    )
+    stages = [
+        stage_from_source(sid, label, ok=ok, count=count, durations=durs, queued=queued, queue_reason=reason, series=series_for(sid))
+        for sid, label, ok, count, durs, queued, reason in specs
+    ]
+    return {"ok": True, "stages": stages, "bottleneck": ship_bottleneck(stages)}
+
+
 def bottleneck(alive: dict[str, Any], wow: dict[str, Any], ships: dict[str, int], symphony: dict[str, Any]) -> str:
     if alive["status"] == "DEAD":
         return "cash or profit-before-zero is dead"
@@ -489,25 +638,18 @@ def _normalize_row(item: dict[str, Any], kind: str) -> dict[str, Any]:
     if incoming is None and outgoing is None and total is None:
         incoming, outgoing, total = _tokens_from(running)
     error = _text(item, ("error", "last_error")) or _text(retry, ("error", "last_error"))
-    if error:
-        error = error.splitlines()[0].strip()
     return {
-        "kind": kind,
-        "id": ident,
-        "title": title,
-        "url": url,
+        "kind": kind, "id": ident, "title": title, "url": url,
         "attempt": _int(item.get("attempt") or running.get("attempt") or retry.get("attempt")),
         "turn": _int(item.get("turn_count") or running.get("turn_count")),
-        "tokens_in": incoming,
-        "tokens_out": outgoing,
-        "tokens_total": total,
+        "tokens_in": incoming, "tokens_out": outgoing, "tokens_total": total,
         "started": item.get("started_at") or item.get("startedAt") or running.get("started_at") or running.get("startedAt"),
         "seconds": _int(item.get("seconds") or item.get("elapsed") or running.get("seconds")),
         "due_at": item.get("due_at") or item.get("dueAt") or retry.get("due_at"),
         "workspace": _workspace(item) or _workspace(running) or _workspace(issue),
         "last_message": _text(item, ("last_message",)) or _text(running, ("last_message",)),
         "last_event": _text(item, ("last_event",)) or _text(running, ("last_event",)),
-        "error": error,
+        "error": error.splitlines()[0].strip() if error else error,
         "owner": _text(item, ("owner", "agent", "account")) or _text(running, ("owner", "agent")),
     }
 
@@ -522,18 +664,9 @@ def _as_list(value: Any) -> list[dict[str, Any]]:
 
 def fetch_symphony(url: str, *, timeout: float = 1.5, cap: int | None = None) -> dict[str, Any]:
     empty = {
-        "ok": False,
-        "running": None,
-        "retrying": None,
-        "blocked": None,
-        "cap": cap,
-        "rows": [],
-        "totals": None,
-        "seconds_running": None,
-        "rate_limits": None,
-        "hook_failed": None,
-        "last_event": None,
-        "up": False,
+        "ok": False, "running": None, "retrying": None, "blocked": None, "cap": cap,
+        "rows": [], "totals": None, "seconds_running": None, "rate_limits": None,
+        "hook_failed": None, "last_event": None, "up": False,
     }
     try:
         with urllib.request.urlopen(url, timeout=timeout) as response:
@@ -561,40 +694,22 @@ def fetch_symphony(url: str, *, timeout: float = 1.5, cap: int | None = None) ->
         + [_normalize_row(item, "blocked") for item in blocked_items]
         + [_normalize_row(item, "running") for item in running_items]
     )
-    running_n = counts.get("running")
-    retrying_n = counts.get("retrying")
-    blocked_n = counts.get("blocked")
-    if not isinstance(running_n, int):
-        running_n = len(running_items) if running_items or payload.get("running") is not None else None
-    if not isinstance(retrying_n, int):
-        retrying_n = len(retrying_items) if retrying_items or payload.get("retrying") is not None else None
-    if not isinstance(blocked_n, int):
-        blocked_n = len(blocked_items) if blocked_items or payload.get("blocked") is not None else None
+    def _count(key: str, items: list[dict[str, Any]]) -> int | None:
+        value = counts.get(key)
+        return value if isinstance(value, int) else (len(items) if items or payload.get(key) is not None else None)
+
     totals = payload.get("codex_totals") if isinstance(payload.get("codex_totals"), dict) else None
-    seconds_running = _int(totals.get("seconds_running")) if totals else None
-    raw_limits = payload.get("rate_limits")
-    rate_limits = raw_limits if isinstance(raw_limits, dict) else None
     hook = payload.get("hook_failed")
     if hook is None and isinstance(counts.get("hook_failed"), (str, int, bool)):
         hook = counts.get("hook_failed")
     last_event = _text(payload, ("last_event", "generated_at"))
-    for row in rows:
-        if row.get("last_event"):
-            last_event = row["last_event"]
-            break
+    last_event = next((row["last_event"] for row in rows if row.get("last_event")), last_event)
     return {
-        "ok": True,
-        "running": running_n,
-        "retrying": retrying_n,
-        "blocked": blocked_n,
-        "cap": cap,
-        "rows": rows,
-        "totals": totals,
-        "seconds_running": seconds_running,
-        "rate_limits": rate_limits,
-        "hook_failed": hook,
-        "last_event": last_event,
-        "up": True,
+        "ok": True, "running": _count("running", running_items), "retrying": _count("retrying", retrying_items),
+        "blocked": _count("blocked", blocked_items), "cap": cap, "rows": rows, "totals": totals,
+        "seconds_running": _int(totals.get("seconds_running")) if totals else None,
+        "rate_limits": payload.get("rate_limits") if isinstance(payload.get("rate_limits"), dict) else None,
+        "hook_failed": hook, "last_event": last_event, "up": True,
     }
 
 
@@ -620,35 +735,172 @@ def fetch_mq(*, timeout: float = 8.0) -> dict[str, Any]:
             continue
         pr = node.get("pullRequest") if isinstance(node.get("pullRequest"), dict) else {}
         number = pr.get("number")
-        rows.append(
-            {
-                "kind": "mq",
-                "number": number if isinstance(number, int) else None,
-                "title": _text(pr, ("title",)),
-                "enqueued": node.get("enqueuedAt"),
-                "position": node.get("position"),
-            }
-        )
+        rows.append({"kind": "mq", "number": number if isinstance(number, int) else None, "title": _text(pr, ("title",)), "enqueued": node.get("enqueuedAt"), "position": node.get("position")})
     return {"ok": True, "count": len(rows), "rows": rows}
 
 
-def fetch_review(*, timeout: float = 8.0) -> int | None:
+def _linear_request(query: str, *, timeout: float) -> dict[str, Any] | None:
     key = os.environ.get("LINEAR_API_KEY")
     if not key:
         return None
     request = urllib.request.Request(
         LINEAR_API,
-        data=json.dumps({"query": LINEAR_QUERY, "variables": {"id": LIVE_PROJECT_ID}}).encode(),
+        data=json.dumps({"query": query, "variables": {"id": LIVE_PROJECT_ID}}).encode(),
         headers={"Authorization": key, "Content-Type": "application/json", "User-Agent": "gem-checkin-hud/3"},
         method="POST",
     )
     try:
         with urllib.request.urlopen(request, timeout=timeout) as response:
             payload = json.loads(response.read().decode("utf-8"))
-        count = (((payload.get("data") or {}).get("project") or {}).get("issues") or {}).get("totalCount")
-        return count if isinstance(count, int) else None
     except (urllib.error.URLError, TimeoutError, json.JSONDecodeError, OSError, ValueError):
         return None
+    return payload if isinstance(payload, dict) else None
+
+
+def fetch_review(*, timeout: float = 8.0) -> int | None:
+    payload = _linear_request(LINEAR_QUERY, timeout=timeout)
+    if payload is None:
+        return None
+    count = (((payload.get("data") or {}).get("project") or {}).get("issues") or {}).get("totalCount")
+    return count if isinstance(count, int) else None
+
+
+def fetch_linear_project(*, timeout: float = 8.0) -> dict[str, Any]:
+    payload = _linear_request(LINEAR_STAGES_QUERY, timeout=timeout)
+    project = (payload.get("data") or {}).get("project") if payload else None
+    if not isinstance(project, dict):
+        review = fetch_review(timeout=timeout)
+        return {"ok": review is not None, "review": review, "todo": None, "pickup_durations": None}
+    todo = review = 0
+    pickup: list[float] = []
+    for node in (project.get("issues") or {}).get("nodes") or []:
+        if not isinstance(node, dict):
+            continue
+        state = ((node.get("state") or {}).get("name") if isinstance(node.get("state"), dict) else None) or ""
+        todo += state == "Todo"
+        review += state == "In Review"
+        created, started = _iso(node.get("createdAt")), _iso(node.get("startedAt"))
+        if created is not None and started is not None and (started - created).total_seconds() > 0:
+            pickup.append((started - created).total_seconds())
+    return {"ok": True, "review": review, "todo": todo, "pickup_durations": pickup or None}
+
+
+def _gh_json(args: list[str], *, timeout: float) -> Any | None:
+    try:
+        completed = subprocess.run(
+            ["gh", *args],
+            check=True,
+            capture_output=True,
+            text=True,
+            timeout=timeout,
+            env={**os.environ, "GH_PAGER": "cat", "PAGER": "cat"},
+        )
+        return json.loads(completed.stdout)
+    except (OSError, subprocess.SubprocessError, json.JSONDecodeError, TypeError, ValueError):
+        return None
+
+
+def _pr_list(state: str, fields: str, limit: str, *, timeout: float) -> Any:
+    return _gh_json(
+        ["pr", "list", "--repo", "JovieInc/Jovie", "--state", state, "--limit", limit, "--json", fields],
+        timeout=timeout,
+    )
+
+
+def _check_durs(rollups: Any, names: frozenset[str]) -> list[float]:
+    return [d for item in named_checks(rollups, names) if (d := check_duration_seconds(item)) is not None]
+
+
+def fetch_github_ship(*, timeout: float = 12.0) -> dict[str, Any]:
+    open_prs = _pr_list("open", "number,title,createdAt,isDraft,statusCheckRollup,mergeStateStatus", "40", timeout=timeout)
+    merged_prs = _pr_list("merged", "number,title,createdAt,mergedAt,statusCheckRollup", "30", timeout=timeout)
+    merge_group = _gh_json(["api", "repos/JovieInc/Jovie/actions/runs?event=merge_group&per_page=20"], timeout=timeout)
+    if not isinstance(open_prs, list) or not isinstance(merged_prs, list):
+        return {"ok": False}
+    mq_numbers = {
+        row.get("number")
+        for row in (fetch_mq(timeout=min(8.0, timeout)).get("rows") or [])
+        if isinstance(row, dict) and isinstance(row.get("number"), int)
+    }
+    pr_open = ci_fast = pr_ready = 0
+    ci_fast_queued = pr_ready_queued = False
+    pr_open_durations: list[float] = []
+    ci_fast_durations: list[float] = []
+    pr_ready_durations: list[float] = []
+    for pr in open_prs:
+        if not isinstance(pr, dict):
+            continue
+        rollups = pr.get("statusCheckRollup")
+        fast, ready = named_checks(rollups, CI_FAST_NAMES), named_checks(rollups, PR_READY_NAMES)
+        fast_pending = any(_check_status(item) in CHECK_PENDING for item in fast)
+        ready_pending = any(_check_status(item) in CHECK_PENDING for item in ready)
+        in_mq = isinstance(pr.get("number"), int) and pr.get("number") in mq_numbers
+        if fast_pending:
+            ci_fast += 1
+            ci_fast_queued = True
+        elif ready_pending:
+            pr_ready += 1
+            pr_ready_queued = True
+        elif not in_mq:
+            pr_open += 1
+        created = _iso(pr.get("createdAt"))
+        started_ats = [_iso(item.get("startedAt") or item.get("started_at")) for item in fast]
+        first_fast = min((stamp for stamp in started_ats if stamp is not None), default=None)
+        if created is not None and first_fast is not None and (first_fast - created).total_seconds() > 0:
+            pr_open_durations.append((first_fast - created).total_seconds())
+        ci_fast_durations.extend(_check_durs(rollups, CI_FAST_NAMES))
+        pr_ready_durations.extend(_check_durs(rollups, PR_READY_NAMES))
+    merged_count = 0
+    merged_durations: list[float] = []
+    week_ago = _now() - timedelta(days=1)
+    for pr in merged_prs:
+        if not isinstance(pr, dict):
+            continue
+        merged_at, created = _iso(pr.get("mergedAt")), _iso(pr.get("createdAt"))
+        if merged_at is not None and merged_at >= week_ago:
+            merged_count += 1
+        if created is not None and merged_at is not None and (merged_at - created).total_seconds() > 0:
+            merged_durations.append((merged_at - created).total_seconds())
+        ci_fast_durations.extend(_check_durs(pr.get("statusCheckRollup"), CI_FAST_NAMES))
+        pr_ready_durations.extend(_check_durs(pr.get("statusCheckRollup"), PR_READY_NAMES))
+    merge_group_in = None
+    merge_group_durations: list[float] = []
+    runs = merge_group.get("workflow_runs") if isinstance(merge_group, dict) else None
+    if isinstance(runs, list):
+        merge_group_in = 0
+        for run in runs:
+            if not isinstance(run, dict):
+                continue
+            status = str(run.get("status") or "").lower()
+            if status in CHECK_PENDING:
+                merge_group_in += 1
+            if status == "completed":
+                duration = check_duration_seconds(
+                    {
+                        "startedAt": run.get("run_started_at") or run.get("created_at"),
+                        "completedAt": run.get("updated_at"),
+                        "timing": run.get("timing") if isinstance(run.get("timing"), dict) else {},
+                        "run_duration_ms": run.get("run_duration_ms"),
+                    }
+                )
+                if duration is not None:
+                    merge_group_durations.append(duration)
+    return {
+        "ok": True,
+        "pr_open": pr_open,
+        "pr_open_durations": pr_open_durations or None,
+        "ci_fast": ci_fast,
+        "ci_fast_queued": ci_fast_queued,
+        "ci_fast_durations": ci_fast_durations or None,
+        "pr_ready": pr_ready,
+        "pr_ready_queued": pr_ready_queued,
+        "pr_ready_durations": pr_ready_durations or None,
+        "merge_group_in": merge_group_in,
+        "merge_group_durations": merge_group_durations or None,
+        "merged": merged_count,
+        "merged_durations": merged_durations or None,
+        "mq_durations": None,
+    }
 
 
 def fetch_sha() -> str | None:
@@ -728,86 +980,45 @@ def _tiles_row(tiles: list[list[str]], width: int) -> list[str]:
 
 
 def _table_header(widths: dict[str, int]) -> str:
-    cells = [
-        clip("ST", widths["st"]),
-        clip("ID", widths["id"]),
-        clip("TITLE", widths["title"]),
-        clip("ATTEMPT", widths["attempt"]),
-        clip("TURN", widths["turn"]),
-        clip("TOKENS", widths["tokens"]),
-        clip("ELAPSED", widths["elapsed"]),
-        clip("WS/PR", widths["ws"]),
-    ]
-    return _rgb(DIM, "  ".join(cells))
+    return _rgb(DIM, "  ".join(clip(name, widths[key]) for name, key in (("ST", "st"), ("ID", "id"), ("TITLE", "title"), ("ATTEMPT", "attempt"), ("TURN", "turn"), ("TOKENS", "tokens"), ("ELAPSED", "elapsed"), ("WS/PR", "ws"))))
 
 
 def _col_widths(width: int) -> dict[str, int]:
     st, ident, attempt, turn, tokens, elapsed, ws = 2, 12, 7, 4, 10, 7, 16
-    fixed = st + ident + attempt + turn + tokens + elapsed + ws + (7 * 2)
-    title = max(16, width - fixed)
-    return {
-        "st": st,
-        "id": ident,
-        "title": title,
-        "attempt": attempt,
-        "turn": turn,
-        "tokens": tokens,
-        "elapsed": elapsed,
-        "ws": ws,
-    }
+    return {"st": st, "id": ident, "title": max(16, width - (st + ident + attempt + turn + tokens + elapsed + ws + 14)), "attempt": attempt, "turn": turn, "tokens": tokens, "elapsed": elapsed, "ws": ws}
+
+
+def _cells(color: tuple[int, int, int], widths: dict[str, int], glyph: str, ident: str, title: str, attempt: str, turn: str, tokens: str, elapsed: str, ws: str) -> str:
+    return "  ".join(
+        [
+            _rgb(color, clip(glyph, widths["st"])),
+            _rgb(FG, clip(ident, widths["id"]), bold=True),
+            _rgb(FG, clip(title, widths["title"])),
+            _rgb(DIM, clip(attempt, widths["attempt"])),
+            _rgb(DIM, clip(turn, widths["turn"])),
+            _rgb(DIM, clip(tokens, widths["tokens"])),
+            _rgb(color, clip(elapsed, widths["elapsed"])),
+            _rgb(DIM, clip(ws, widths["ws"], tail=True)),
+        ]
+    )
 
 
 def _job_row(row: dict[str, Any], widths: dict[str, int], *, now: datetime) -> str:
     kind = row.get("kind")
-    if kind == "retrying":
-        glyph, color = "↻", PINK
-        elapsed = due_label(row.get("due_at"), now=now)
-        ws = short_path(row.get("workspace"))
-        title = dash(row.get("error") or row.get("title"))
-    elif kind == "blocked":
-        glyph, color = "✕", PINK
-        elapsed = elapsed_label(row.get("started"), now=now, seconds=row.get("seconds"))
-        ws = short_path(row.get("workspace"))
-        title = dash(row.get("error") or row.get("title"))
-    elif kind == "mq":
-        glyph, color = "○", PURPLE
-        elapsed = elapsed_label(row.get("enqueued"), now=now)
-        ws = f"#{row['number']}" if isinstance(row.get("number"), int) else dash(row.get("position"))
-        title = dash(row.get("title"))
+    if kind == "mq":
         ident = f"#{row['number']}" if isinstance(row.get("number"), int) else "-"
-        cells = [
-            _rgb(color, clip(glyph, widths["st"])),
-            _rgb(FG, clip(ident, widths["id"]), bold=True),
-            _rgb(FG, clip(title, widths["title"])),
-            _rgb(DIM, clip("-", widths["attempt"])),
-            _rgb(DIM, clip("-", widths["turn"])),
-            _rgb(DIM, clip("-", widths["tokens"])),
-            _rgb(color, clip(elapsed, widths["elapsed"])),
-            _rgb(DIM, clip(ws if ws.startswith("#") else f"pos {dash(row.get('position'))}", widths["ws"])),
-        ]
-        return "  ".join(cells)
-    else:
-        glyph, color = "●", BLUE
-        elapsed = elapsed_label(row.get("started"), now=now, seconds=row.get("seconds"))
-        ws = short_path(row.get("workspace") or row.get("url"))
-        title = dash(row.get("title") or row.get("last_message"))
-    ident = dash(row.get("id"))
-    cells = [
-        _rgb(color, clip(glyph, widths["st"])),
-        _rgb(FG, clip(ident, widths["id"]), bold=True),
-        _rgb(FG, clip(title, widths["title"])),
-        _rgb(DIM, clip(dash(row.get("attempt")), widths["attempt"])),
-        _rgb(DIM, clip(dash(row.get("turn")), widths["turn"])),
-        _rgb(DIM, clip(compact_tokens(row.get("tokens_total"), row.get("tokens_in"), row.get("tokens_out")), widths["tokens"])),
-        _rgb(color, clip(elapsed, widths["elapsed"])),
-        _rgb(DIM, clip(ws, widths["ws"], tail=True)),
-    ]
-    return "  ".join(cells)
+        ws = ident if ident != "-" else f"pos {dash(row.get('position'))}"
+        return _cells(PURPLE, widths, "○", ident, dash(row.get("title")), "-", "-", "-", elapsed_label(row.get("enqueued"), now=now), ws)
+    if kind == "retrying":
+        return _cells(PINK, widths, "↻", dash(row.get("id")), dash(row.get("error") or row.get("title")), dash(row.get("attempt")), dash(row.get("turn")), compact_tokens(row.get("tokens_total"), row.get("tokens_in"), row.get("tokens_out")), due_label(row.get("due_at"), now=now), short_path(row.get("workspace")))
+    if kind == "blocked":
+        return _cells(PINK, widths, "✕", dash(row.get("id")), dash(row.get("error") or row.get("title")), dash(row.get("attempt")), dash(row.get("turn")), compact_tokens(row.get("tokens_total"), row.get("tokens_in"), row.get("tokens_out")), elapsed_label(row.get("started"), now=now, seconds=row.get("seconds")), short_path(row.get("workspace")))
+    return _cells(BLUE, widths, "●", dash(row.get("id")), dash(row.get("title") or row.get("last_message")), dash(row.get("attempt")), dash(row.get("turn")), compact_tokens(row.get("tokens_total"), row.get("tokens_in"), row.get("tokens_out")), elapsed_label(row.get("started"), now=now, seconds=row.get("seconds")), short_path(row.get("workspace") or row.get("url")))
 
 
 def _status_strip(symphony: dict[str, Any], tps: float | None, width: int) -> str:
     running = symphony.get("running") if symphony.get("ok") else None
-    cap = symphony.get("cap")
+    cap = symphony.get("cap") if symphony.get("ok") else symphony.get("cap")
     totals = symphony.get("totals") if isinstance(symphony.get("totals"), dict) else {}
     incoming = comma_int(totals.get("input_tokens") if totals else None)
     outgoing = comma_int(totals.get("output_tokens") if totals else None)
@@ -816,15 +1027,69 @@ def _status_strip(symphony: dict[str, Any], tps: float | None, width: int) -> st
     if seconds is None and totals:
         seconds = totals.get("seconds_running")
     throughput = "-" if tps is None else f"{tps:,.0f} tps"
+    agents = f"{dash(running)}/{dash(cap)}"
+    limits = format_rate_limits(symphony.get("rate_limits"))
+    title = _rgb(BLUE, "SYMPHONY STATUS", bold=True)
     fields = [
-        _rgb(BLUE, f"Agents {dash(running)}/{dash(cap)}"),
+        _rgb(BLUE, f"Agents {agents}"),
         _rgb(PINK, f"Throughput {throughput}"),
         _rgb(PURPLE, f"Runtime {runtime_label(seconds)}"),
         _rgb(FG, f"Tokens in {incoming} | out {outgoing} | total {total}"),
-        _rgb(DIM, f"Rate Limits {format_rate_limits(symphony.get('rate_limits'))}"),
+        _rgb(DIM, f"Rate Limits {limits}"),
     ]
-    line = f"{_rgb(BLUE, '╭')} {_rgb(BLUE, 'SYMPHONY STATUS', bold=True)}  " + f"  {_rgb(DIM, '│')}  ".join(fields)
+    line = f"{_rgb(BLUE, '╭')} {title}  " + f"  {_rgb(DIM, '│')}  ".join(fields)
     return pad_visible(line, width) if visible_len(line) <= width else line
+
+
+def _stage_bar(stage: dict[str, Any], max_p95: float | None, width: int) -> str:
+    series = stage.get("series")
+    if isinstance(series, list) and series:
+        return sparkline(series)[: max(1, width)]
+    p95 = stage.get("p95")
+    if p95 is None or max_p95 is None or max_p95 <= 0:
+        return "-"
+    last = len(BARS) - 1
+    height = max(0, min(last, int(round((float(p95) / max_p95) * last))))
+    return BARS[height] * max(1, min(8, width))
+
+
+def _ship_path_lines(ship_path: dict[str, Any] | None, width: int) -> list[str]:
+    payload = ship_path if isinstance(ship_path, dict) and isinstance(ship_path.get("stages"), list) else empty_ship_path()
+    stages = payload.get("stages") or empty_ship_path()["stages"]
+    count = max(1, len(SHIP_STAGES))
+    col = max(12, (max(MIN_WIDTH, width) - 2 * (count - 1)) // count)
+    leftover = max(MIN_WIDTH, width) - (col * count + 2 * (count - 1))
+    widths = [col] * (count - 1) + [col + leftover]
+    max_p95 = max((float(stage["p95"]) for stage in stages if stage.get("p95") is not None), default=None)
+    bottleneck = payload.get("bottleneck") if isinstance(payload.get("bottleneck"), dict) else None
+    labels, stats, bars = [], [], []
+    for stage, col_width in zip(stages, widths):
+        color = PINK if (bottleneck and bottleneck.get("id") == stage.get("id")) or stage.get("queued") else BLUE if stage.get("p95") is not None else DIM
+        p95_text = "-" if stage.get("p95") is None else runtime_label(stage.get("p95"))
+        labels.append(pad_visible(_rgb(color, clip(str(stage.get("label") or "-"), col_width), bold=True), col_width))
+        stats.append(pad_visible(_rgb(DIM, clip(f"n={dash(stage.get('count'))} p95 {p95_text}", col_width)), col_width))
+        bars.append(pad_visible(_rgb(color, clip(_stage_bar(stage, max_p95, col_width), col_width)), col_width))
+    spacer = "  "
+    named = f"#1 {bottleneck['reason']}" if bottleneck and bottleneck.get("reason") else "-"
+    heading = pad_visible(
+        _rgb(PURPLE, clip("SHIP", 4), bold=True)
+        + _rgb(DIM, clip("  Todo/pickup → agent running → PR open → ci-fast → PR Ready → merge queue → merge_group CI → merged", max(0, width - 4))),
+        width,
+    )
+    return [heading, spacer.join(labels), spacer.join(stats), spacer.join(bars), pad_visible(_rgb(PINK if named != "-" else DIM, clip(named, width)), width)]
+
+
+def named_number_one(
+    alive: dict[str, Any],
+    wow: dict[str, Any],
+    ships: dict[str, int],
+    symphony: dict[str, Any],
+    ship_path: dict[str, Any] | None,
+) -> str:
+    bottleneck_row = ship_path.get("bottleneck") if isinstance(ship_path, dict) else None
+    if isinstance(bottleneck_row, dict) and bottleneck_row.get("reason"):
+        return str(bottleneck_row["reason"])
+    return bottleneck(alive, wow, ships, symphony)
 
 
 def _footer(symphony: dict[str, Any], width: int) -> str:
@@ -857,6 +1122,7 @@ def render(
     now: datetime | None = None,
     width: int | None = None,
     sha: str | None = None,
+    ship_path: dict[str, Any] | None = None,
     tps: float | None = None,
 ) -> str:
     clock = now or _now()
@@ -865,20 +1131,13 @@ def render(
     alive = compute_alive(measured.get("alive"))
     wow = compute_wow(measured.get("wow"))
     ships = count_ships_this_week(measured.get("ships"), now=clock)
-    named = bottleneck(alive, wow, ships, symphony)
+    path = ship_path if isinstance(ship_path, dict) else empty_ship_path()
+    named = named_number_one(alive, wow, ships, symphony, path)
     alive_spark = series_values(measured, "alive")
     wow_spark = series_values(measured, "wow")
     ships_spark = series_values(measured, "ships")
-    alive_detail = (
-        UNMEASURED
-        if alive["status"] == UNKNOWN
-        else f"cash {_money(alive['cashUsd'])}  burn {_money(alive['weeklyBurnUsd'])}  rev {_money(alive['weeklyRevenueUsd'])}"
-    )
-    wow_detail = (
-        UNMEASURED
-        if wow["rate"] is None
-        else f"{wow['basis']}  this {_money(wow['thisWeekRevenueUsd'])} / last {_money(wow['lastWeekRevenueUsd'])}"
-    )
+    alive_detail = UNMEASURED if alive["status"] == UNKNOWN else f"cash {_money(alive['cashUsd'])}  burn {_money(alive['weeklyBurnUsd'])}  rev {_money(alive['weeklyRevenueUsd'])}"
+    wow_detail = UNMEASURED if wow["rate"] is None else f"{wow['basis']}  this {_money(wow['thisWeekRevenueUsd'])} / last {_money(wow['lastWeekRevenueUsd'])}"
     gap = 2
     col = (cols - gap * 3) // 4
     leftover = cols - (col * 4 + gap * 3)
@@ -886,14 +1145,7 @@ def render(
     tiles = _tiles_row(
         [
             _tile("ALIVE", alive["status"], alive_detail, sparkline(alive_spark) if alive_spark else "-", BLUE, tile_widths[0]),
-            _tile(
-                "WOW",
-                UNKNOWN if wow["rate"] is None else _pct(wow["rate"]),
-                wow_detail,
-                sparkline(wow_spark) if wow_spark else "-",
-                PINK,
-                tile_widths[1],
-            ),
+            _tile("WOW", UNKNOWN if wow["rate"] is None else _pct(wow["rate"]), wow_detail, sparkline(wow_spark) if wow_spark else "-", PINK, tile_widths[1]),
             _tile("SHIPS", str(ships["thisWeek"]), "receipted this week", sparkline(ships_spark) if ships_spark else "-", PURPLE, tile_widths[2]),
             _tile("#1", named, f"symphony run {dash(symphony.get('running'))} retry {dash(symphony.get('retrying'))}", "-", BLUE, tile_widths[3]),
         ],
@@ -906,7 +1158,18 @@ def render(
     header = _header(running=running_n, cap=cap, retrying=retrying_n, mq=mq_n, review=review, sha=sha, width=cols)
     widths = _col_widths(cols)
     tps_value = tps if tps is not None else compute_throughput(symphony.get("totals"), [], now=clock)
-    lines = [header, "", _status_strip(symphony, tps_value, cols), "", *tiles, "", _table_header(widths), _rgb(DIM, "─" * cols)]
+    lines = [
+        header,
+        "",
+        _status_strip(symphony, tps_value, cols),
+        "",
+        *_ship_path_lines(path, cols),
+        "",
+        *tiles,
+        "",
+        _table_header(widths),
+        _rgb(DIM, "─" * cols),
+    ]
     for row in symphony.get("rows") or []:
         lines.append(_job_row(row, widths, now=clock))
     for row in mq.get("rows") or []:
@@ -922,16 +1185,22 @@ def render(
 def frame(*, measured_path: Path, symphony_url: str, width: int | None = None) -> str:
     cap = read_workflow_cap()
     symphony = fetch_symphony(symphony_url, cap=cap)
+    mq = fetch_mq()
+    linear = fetch_linear_project()
+    github = fetch_github_ship()
+    measured = load_measured(measured_path)
     tps_path = Path(os.environ.get("HUD_TPS_PATH", str(DEFAULT_TPS_STATE)))
-    tps = compute_throughput(symphony.get("totals"), load_tps_snapshots(tps_path))
+    snapshots = load_tps_snapshots(tps_path)
+    tps = compute_throughput(symphony.get("totals"), snapshots)
     persist_tps_snapshot(tps_path, symphony.get("totals"))
     return render(
         symphony=symphony,
-        mq=fetch_mq(),
-        review=fetch_review(),
-        measured=load_measured(measured_path),
+        mq=mq,
+        review=linear.get("review") if linear.get("ok") else fetch_review(),
+        measured=measured,
         width=width,
         sha=fetch_sha(),
+        ship_path=build_ship_path(symphony=symphony, mq=mq, linear=linear, github=github, measured=measured),
         tps=tps,
     )
 
