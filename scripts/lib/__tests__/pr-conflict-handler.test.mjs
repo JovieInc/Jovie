@@ -324,7 +324,7 @@ describe('dependency-aware ordering and Neon capacity', () => {
     ).toEqual([9, 10, 11]);
   });
 
-  it('caps CI-heavy re-triggers by subtracting in-flight CI from max concurrency', () => {
+  it('does not double-count unrelated in-flight CI against remediation capacity', () => {
     const plan = buildPlan(
       [
         pr({
@@ -347,11 +347,12 @@ describe('dependency-aware ordering and Neon capacity', () => {
     );
 
     expect(plan.capacity.currentCiInFlight).toBe(1);
+    expect(plan.capacity.availableCiSlots).toBe(2);
     expect(plan.items.find(item => item.number === 2).action).toBe(
       'request_github_rebase'
     );
     expect(plan.items.find(item => item.number === 3).action).toBe(
-      'wait_capacity'
+      'request_github_rebase'
     );
   });
 
