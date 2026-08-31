@@ -424,13 +424,27 @@ def capacity_state() -> dict:
         cooldowns = stored.get("cooldowns") if isinstance(stored, dict) else None
     except (OSError, TypeError, ValueError):
         return {"state": "unknown", "reason": "account_state_unreadable"}
+    readiness = stored.get("readiness") if isinstance(stored, dict) else None
+    fresh_readiness = 0
     cooling = 0
     for name in accounts:
         try:
             until = int((cooldowns or {}).get(name) or 0)
         except (TypeError, ValueError):
             until = 0
-        if until > now:
+        receipt = readiness.get(name) if isinstance(readiness, dict) else None
+        try:
+            ready = (
+                isinstance(receipt, dict)
+                and receipt.get("source") == "authenticated_completion_probe/v1"
+                and int(receipt.get("checkedAt")) <= now
+                and int(receipt.get("expiresAt")) > now
+            )
+        except (TypeError, ValueError):
+            ready = False
+        if until > now and ready:
+            fresh_readiness += 1
+        elif until > now:
             cooling += 1
     locked = 0
     locks_dir = root / "locks"
@@ -459,6 +473,7 @@ def capacity_state() -> dict:
         "locked": locked,
         "cooldown": cooling,
         "available": available,
+        "freshReadiness": fresh_readiness,
     }
 
 

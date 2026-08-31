@@ -241,13 +241,11 @@ describe('DashboardHeader', () => {
     expect(header).toHaveAttribute('data-grid-anchor', 'desktop-content');
     expect(header).toHaveAttribute('data-top-spacing-owner', 'shell-header');
     expect(
-      container.querySelector('.sm\\:px-\\(--linear-app-header-padding-x\\)')
+      container.querySelector('.sm\\:px-\\(--app-shell-header-padding-x\\)')
     ).not.toBeNull();
     // Layout is unchanged — the desktop row keeps the compact header height.
     expect(
-      container.querySelector(
-        '.sm\\:h-\\(--linear-app-header-height-compact\\)'
-      )
+      container.querySelector('.sm\\:h-\\(--app-shell-header-height-compact\\)')
     ).not.toBeNull();
   });
 });

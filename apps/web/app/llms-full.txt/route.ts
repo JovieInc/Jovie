@@ -25,7 +25,6 @@ export function GET() {
 - **Alternate domain**: meetjovie.com (301 redirects to jov.ie)
 - **Founded**: 2024 by Tim White
 - **Industry**: Music Technology / SaaS
-- **Instagram**: @meetjovie
 
 ## Brand Disambiguation
 
@@ -142,7 +141,6 @@ Tim White is the founder of ${APP_NAME}. Background:
 
 - Website: ${BASE_URL}
 - Support: ${BASE_URL}/support
-- Instagram: @meetjovie
 `;
 
   return new Response(content, {

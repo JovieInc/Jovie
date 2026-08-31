@@ -1,3 +1,5 @@
+import { readFileSync } from 'node:fs';
+import { resolve } from 'node:path';
 import { fireEvent, render, screen } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
 import { InstallBanner } from './InstallBanner';
@@ -61,5 +63,15 @@ describe('InstallBanner', () => {
     fireEvent.click(screen.getByText('Install'));
     expect(screen.getByText('Install')).toBeDisabled();
     expect(onCta).not.toHaveBeenCalled();
+  });
+});
+
+describe('JOV-5466 token retire', () => {
+  it('does not keep retired --linear-app-* tokens', () => {
+    const source = readFileSync(
+      resolve(__dirname, './InstallBanner.tsx'),
+      'utf8'
+    );
+    expect(source).not.toMatch(/--linear-app-/);
   });
 });

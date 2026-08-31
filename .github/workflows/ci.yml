@@ -2,10 +2,9 @@ name: CI
 
 on:
   pull_request:
-    # An unchanged head can be synchronized while its PR is still a draft.
-    # Re-run the required contexts when that PR becomes reviewable so it can
-    # enter the native queue without a synthetic close/reopen.
-    types: [opened, synchronize, reopened, ready_for_review]
+    # Source CI runs once per source revision. Marking an unchanged draft ready
+    # must never launch a second copy of the same validation flight.
+    types: [opened, synchronize, reopened]
     branches: [main, 'integration/**']
   # GitHub native merge queue validates the exact synthetic combined head.
   merge_group:
@@ -486,6 +485,7 @@ jobs:
           # any blob that is actually needed is lazy-fetched on demand.
           fetch-depth: 0
           filter: blob:none
+          persist-credentials: false
       - name: Run deterministic brand safety scan
         if: ${{ github.event_name != 'workflow_dispatch' }}
         shell: bash
@@ -516,6 +516,8 @@ jobs:
           esac
 
           BRAND_CANDIDATES="$RUNNER_TEMP/brand-scrub-candidates.txt"
+          TRUSTED_BRAND_SCRUBBER="$RUNNER_TEMP/brand-scrub.py"
+          git show "${DIFF_BASE}:scripts/brand-scrub.py" > "$TRUSTED_BRAND_SCRUBBER"
           # Materialize the diff before filtering so a Git failure cannot be
           # hidden by a no-match grep exit status.
           git diff --name-only --diff-filter=d "$DIFF_BASE" HEAD > "$BRAND_CANDIDATES"
@@ -526,7 +528,7 @@ jobs:
             ' "$BRAND_CANDIDATES"
           )
           if (( ${#brand_files[@]} > 0 )); then
-            python3 scripts/brand-scrub.py "${brand_files[@]}"
+            python3 "$TRUSTED_BRAND_SCRUBBER" "${brand_files[@]}"
           else
             echo "No brand-scrub paths changed."
           fi
@@ -537,12 +539,16 @@ jobs:
           set -euo pipefail
           emit_ci_lanes() {
             local mode="${1:-}"
+            if [[ -z "${TRUSTED_CI_REPO_LANES:-}" ]]; then
+              echo "::error::Trusted repo-lane classifier is unavailable"
+              exit 1
+            fi
             if [[ "$mode" == "all" ]]; then
-              node scripts/lib/ci-repo-lanes.mjs --emit-github-output --all
+              node "$TRUSTED_CI_REPO_LANES" --emit-github-output --all
             elif [[ "$mode" == "none" ]]; then
-              node scripts/lib/ci-repo-lanes.mjs --emit-github-output --none
+              node "$TRUSTED_CI_REPO_LANES" --emit-github-output --none
             else
-              printf '%s\n' "${CHANGED_FILES:-}" | node scripts/lib/ci-repo-lanes.mjs --emit-github-output
+              printf '%s\n' "${CHANGED_FILES:-}" | node "$TRUSTED_CI_REPO_LANES" --emit-github-output
             fi
           }
           IS_FORK="${{ github.event_name == 'pull_request' && github.event.pull_request.head.repo.fork }}"
@@ -567,13 +573,29 @@ jobs:
             # A valid head never hard-fails on an empty event-base diff.
             PATH_DIFF_DIR="$RUNNER_TEMP/merge-group-path-diff"
             mkdir -p "$PATH_DIFF_DIR"
-            node scripts/lib/resolve-merge-group-path-diff.mjs \
+            TRUSTED_PATH_DIFF_RESOLVER="$PATH_DIFF_DIR/resolve-merge-group-path-diff.mjs"
+            git show "${MERGE_GROUP_BASE_SHA}:scripts/lib/resolve-merge-group-path-diff.mjs" \
+              > "$TRUSTED_PATH_DIFF_RESOLVER"
+            node "$TRUSTED_PATH_DIFF_RESOLVER" \
               --base "$MERGE_GROUP_BASE_SHA" \
               --head "$MERGE_GROUP_HEAD_SHA" \
               --files-out "$PATH_DIFF_DIR/files.txt" \
               --meta-out "$PATH_DIFF_DIR/meta.env"
-            # shellcheck disable=SC1091
-            source "$PATH_DIFF_DIR/meta.env"
+            IS_NOOP=$(sed -n 's/^IS_NOOP=//p' "$PATH_DIFF_DIR/meta.env")
+            SOURCE=$(sed -n 's/^SOURCE=//p' "$PATH_DIFF_DIR/meta.env")
+            PATH_DIFF_BASE_SHA=$(sed -n 's/^PATH_DIFF_BASE_SHA=//p' "$PATH_DIFF_DIR/meta.env")
+            PATH_DIFF_HEAD_SHA=$(sed -n 's/^PATH_DIFF_HEAD_SHA=//p' "$PATH_DIFF_DIR/meta.env")
+            [[ "$IS_NOOP" == "true" || "$IS_NOOP" == "false" ]] || {
+              echo "::error::Trusted merge-group resolver emitted an invalid no-op flag"
+              exit 1
+            }
+            [[ "$SOURCE" =~ ^(event_base|live_main_merge_base|noop)$ ]] || {
+              echo "::error::Trusted merge-group resolver emitted an invalid source"
+              exit 1
+            }
+            TRUSTED_CI_REPO_LANES="$PATH_DIFF_DIR/ci-repo-lanes.mjs"
+            git show "${MERGE_GROUP_BASE_SHA}:scripts/lib/ci-repo-lanes.mjs" \
+              > "$TRUSTED_CI_REPO_LANES"
             CHANGED_FILES=$(cat "$PATH_DIFF_DIR/files.txt")
             if [[ "${IS_NOOP:-}" == "true" ]]; then
               # Path Changes succeeds with every optional lane disabled, while
@@ -589,6 +611,27 @@ jobs:
               emit_ci_lanes none
               exit 0
             fi
+            # Compatibility for the one landing where the trusted base resolver
+            # predates explicit SHA metadata. Future bases emit these directly.
+            if [[ -z "$PATH_DIFF_BASE_SHA" ]]; then
+              if [[ "$SOURCE" == "event_base" ]]; then
+                PATH_DIFF_BASE_SHA="$MERGE_GROUP_BASE_SHA"
+              else
+                PATH_DIFF_BASE_SHA=$(git merge-base "$MERGE_GROUP_HEAD_SHA" refs/remotes/origin/main)
+              fi
+            fi
+            PATH_DIFF_HEAD_SHA="${PATH_DIFF_HEAD_SHA:-$MERGE_GROUP_HEAD_SHA}"
+            if [[ ! "$PATH_DIFF_BASE_SHA" =~ ^[0-9a-f]{40}$ ]] ||
+              [[ ! "$PATH_DIFF_HEAD_SHA" =~ ^[0-9a-f]{40}$ ]] ||
+              [[ "$PATH_DIFF_HEAD_SHA" != "$MERGE_GROUP_HEAD_SHA" ]]; then
+              echo "::error::Trusted merge-group resolver emitted invalid diff provenance"
+              exit 1
+            fi
+            git cat-file -e "${PATH_DIFF_BASE_SHA}^{commit}"
+            git cat-file -e "${PATH_DIFF_HEAD_SHA}^{commit}"
+            git merge-base --is-ancestor "$PATH_DIFF_BASE_SHA" "$PATH_DIFF_HEAD_SHA"
+            CLASSIFICATION_BASE_REF="$PATH_DIFF_BASE_SHA"
+            CLASSIFICATION_HEAD_REF="$PATH_DIFF_HEAD_SHA"
           elif [[ "${{ github.event_name }}" == "pull_request" ]]; then
             # Fail closed on base resolution: a failed fetch used to leave an
             # empty CHANGED_FILES list that looked like docs-only and skip-
@@ -598,6 +641,11 @@ jobs:
               echo "::error::Could not resolve origin/${{ github.base_ref }} after fetch"
               exit 1
             fi
+            CLASSIFICATION_BASE_REF="origin/${{ github.base_ref }}"
+            CLASSIFICATION_HEAD_REF="HEAD"
+            TRUSTED_CI_REPO_LANES="$RUNNER_TEMP/ci-repo-lanes.mjs"
+            git show "${CLASSIFICATION_BASE_REF}:scripts/lib/ci-repo-lanes.mjs" \
+              > "$TRUSTED_CI_REPO_LANES"
             CHANGED_FILES=$(git diff --no-renames --name-only "origin/${{ github.base_ref }}" HEAD)
             if [[ -z "${CHANGED_FILES//[$'\t\r\n' ]/}" ]]; then
               echo "::error::Empty changed-file list vs origin/${{ github.base_ref }}; refusing a false docs-only classification."
@@ -606,6 +654,7 @@ jobs:
           elif [[ "${{ github.event_name }}" == "workflow_dispatch" ]]; then
             # Manual dispatch: run everything
             echo "Manual dispatch: running all checks"
+            TRUSTED_CI_REPO_LANES="scripts/lib/ci-repo-lanes.mjs"
             for t in run_build run_test run_test_performance run_storybook_a11y run_public_lighthouse run_dashboard_lighthouse run_onboarding_lighthouse run_admin_lighthouse run_chat_lighthouse run_promptfoo_evals run_golden_eval_set run_e2e run_golden_path run_drizzle run_neon run_ios run_macos run_web run_operations run_cross_product has_code_changes; do
               echo "$t=true" >> "$GITHUB_OUTPUT"
             done
@@ -621,6 +670,11 @@ jobs:
               exit 1
             fi
             git cat-file -e "${PUSH_BASE_SHA}^{commit}"
+            CLASSIFICATION_BASE_REF="$PUSH_BASE_SHA"
+            CLASSIFICATION_HEAD_REF="HEAD"
+            TRUSTED_CI_REPO_LANES="$RUNNER_TEMP/ci-repo-lanes.mjs"
+            git show "${CLASSIFICATION_BASE_REF}:scripts/lib/ci-repo-lanes.mjs" \
+              > "$TRUSTED_CI_REPO_LANES"
             CHANGED_FILES=$(git diff --no-renames --name-only "$PUSH_BASE_SHA" HEAD)
           else
             echo "::error::Unsupported event for path change detection: ${{ github.event_name }}"
@@ -630,8 +684,13 @@ jobs:
           PRODUCT_LANE_DIR="$RUNNER_TEMP/product-lane-classification"
           mkdir -p "$PRODUCT_LANE_DIR"
           printf '%s\n' "$CHANGED_FILES" > "$PRODUCT_LANE_DIR/changed-paths.txt"
-          node scripts/lib/product-lane-classifier.mjs \
+          TRUSTED_PRODUCT_LANE_CLASSIFIER="$PRODUCT_LANE_DIR/product-lane-classifier.mjs"
+          git show "${CLASSIFICATION_BASE_REF}:scripts/lib/product-lane-classifier.mjs" \
+            > "$TRUSTED_PRODUCT_LANE_CLASSIFIER"
+          node "$TRUSTED_PRODUCT_LANE_CLASSIFIER" \
             --files-from "$PRODUCT_LANE_DIR/changed-paths.txt" \
+            --base-ref "$CLASSIFICATION_BASE_REF" \
+            --head-ref "$CLASSIFICATION_HEAD_REF" \
             --json-out "$PRODUCT_LANE_DIR/receipt.json" \
             --summary-out "$PRODUCT_LANE_DIR/summary.md" \
             --github-output "$GITHUB_OUTPUT"

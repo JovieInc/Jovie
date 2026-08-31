@@ -12,6 +12,7 @@ import { join, resolve } from 'node:path';
 import { afterEach, describe, expect, it } from 'vitest';
 import {
   createGitRunner,
+  formatMetaEnv,
   LIVE_MAIN_FETCH_REF,
   resolveMergeGroupPathDiff,
 } from '../resolve-merge-group-path-diff.mjs';
@@ -129,6 +130,27 @@ function parseExactCiFastFailureOperands(script) {
   return operands;
 }
 
+function workflowDeclaresReadyForReviewType(source) {
+  const lines = source.split('\n');
+  for (let index = 0; index < lines.length; index += 1) {
+    const match = lines[index].match(/^(\s*)types:\s*(.*?)\s*$/);
+    if (!match) continue;
+
+    const indentation = match[1].length;
+    const declaration = [match[2].replace(/\s+#.*$/, '')];
+    for (let next = index + 1; next < lines.length; next += 1) {
+      const line = lines[next];
+      if (line.trim() === '' || /^\s*#/.test(line)) continue;
+      const nextIndentation = line.match(/^\s*/)?.[0].length ?? 0;
+      if (nextIndentation <= indentation) break;
+      declaration.push(line.replace(/\s+#.*$/, '').trim());
+    }
+
+    if (/\bready_for_review\b/.test(declaration.join(' '))) return true;
+  }
+  return false;
+}
+
 describe('merge_group workflow contract', () => {
   it('accepts reordered exact ci-fast failure operands', () => {
     expect(
@@ -163,8 +185,18 @@ describe('merge_group workflow contract', () => {
       'MERGE_GROUP_HEAD_SHA="${{ github.event.merge_group.head_sha }}"'
     );
     expect(CI_WORKFLOW).toContain(
-      'node scripts/lib/resolve-merge-group-path-diff.mjs'
+      'git show "${MERGE_GROUP_BASE_SHA}:scripts/lib/resolve-merge-group-path-diff.mjs"'
     );
+    expect(CI_WORKFLOW).toContain('node "$TRUSTED_PATH_DIFF_RESOLVER"');
+    expect(CI_WORKFLOW).not.toContain(
+      'node scripts/lib/resolve-merge-group-path-diff.mjs \\'
+    );
+    expect(CI_WORKFLOW).not.toContain('source "$PATH_DIFF_DIR/meta.env"');
+    expect(CI_WORKFLOW).toContain(
+      'git show "${MERGE_GROUP_BASE_SHA}:scripts/lib/ci-repo-lanes.mjs"'
+    );
+    expect(CI_WORKFLOW).toContain('node "$TRUSTED_CI_REPO_LANES"');
+    expect(CI_WORKFLOW).not.toContain('node scripts/lib/ci-repo-lanes.mjs');
     expect(CI_WORKFLOW).toContain('--base "$MERGE_GROUP_BASE_SHA"');
     expect(CI_WORKFLOW).toContain('--head "$MERGE_GROUP_HEAD_SHA"');
     expect(PATH_DIFF_HELPER).toContain(
@@ -174,21 +206,58 @@ describe('merge_group workflow contract', () => {
     expect(CI_WORKFLOW).not.toContain('steps.graphite');
   });
 
-  it('re-emits every required source context when a draft becomes reviewable', () => {
-    const readyForReviewTrigger =
-      'types: [opened, synchronize, reopened, ready_for_review]';
+  it('runs source checks once per revision and never on ready_for_review', () => {
+    const sourceRevisionTrigger = 'types: [opened, synchronize, reopened]';
 
-    // A synchronize that occurs while a PR is still a draft cannot be reused
-    // for branch protection. Every source producer must therefore subscribe
-    // to the ready_for_review event on the exact unchanged head.
-    expect(CI_WORKFLOW).toContain(readyForReviewTrigger);
-    expect(SIZE_GUARD_WORKFLOW).toContain(readyForReviewTrigger);
+    // Draft state does not change the source SHA. The original source checks
+    // remain authoritative when the owner pairs ready with native auto-merge.
+    expect(CI_WORKFLOW).toContain(sourceRevisionTrigger);
+    expect(SIZE_GUARD_WORKFLOW).toContain(sourceRevisionTrigger);
     expect(FORK_GATE_WORKFLOW).toContain(
-      `pull_request:\n    ${readyForReviewTrigger}`
+      `pull_request:\n    ${sourceRevisionTrigger}`
     );
     expect(FORK_GATE_WORKFLOW).toContain(
-      `pull_request_target:\n    ${readyForReviewTrigger}`
+      `pull_request_target:\n    ${sourceRevisionTrigger}`
     );
+    expect(CI_WORKFLOW).not.toContain('ready_for_review');
+    expect(SIZE_GUARD_WORKFLOW).not.toContain('ready_for_review');
+    expect(FORK_GATE_WORKFLOW).not.toContain('ready_for_review');
+    expect(CI_WORKFLOW).toMatch(/merge_group:\n\s+types: \[checks_requested\]/);
+    expect(SIZE_GUARD_WORKFLOW).toMatch(
+      /merge_group:\n\s+types: \[checks_requested\]/
+    );
+    expect(FORK_GATE_WORKFLOW).toMatch(
+      /merge_group:\n\s+types: \[checks_requested\]/
+    );
+  });
+
+  it('does not launch any workflow from an unchanged ready transition', () => {
+    const workflowDir = resolve(REPO_ROOT, '.github/workflows');
+    const offenders = readdirSync(workflowDir)
+      .filter(file => file.endsWith('.yml') || file.endsWith('.yaml'))
+      .filter(file => {
+        const source = readFileSync(resolve(workflowDir, file), 'utf8');
+        return workflowDeclaresReadyForReviewType(source);
+      });
+
+    expect(offenders).toEqual([]);
+  });
+
+  it('rejects every valid YAML spelling of a ready_for_review type', () => {
+    const unsafeDeclarations = [
+      'types: [opened, ready_for_review]',
+      'types: ready_for_review',
+      'types:\n  - opened\n  - ready_for_review',
+      'types: [\n  opened,\n  ready_for_review\n]',
+    ];
+    for (const declaration of unsafeDeclarations) {
+      expect(workflowDeclaresReadyForReviewType(declaration)).toBe(true);
+    }
+    expect(
+      workflowDeclaresReadyForReviewType(
+        'types:\n  - opened\n  - synchronize\n  - reopened'
+      )
+    ).toBe(false);
   });
 
   it('quarantines fixed unit capacity until all named warm receipts exist', () => {
@@ -437,9 +506,7 @@ describe('merge_group workflow contract', () => {
 
     const macos = getJobBlock(CI_WORKFLOW, 'ci-macos');
     expect(macos).toContain('runs-on: macos-26');
-    expect(CI_WORKFLOW).toContain(
-      'node scripts/lib/product-lane-classifier.mjs'
-    );
+    expect(CI_WORKFLOW).toContain('node "$TRUSTED_PRODUCT_LANE_CLASSIFIER"');
     expect(CI_WORKFLOW).not.toContain('.github/workflows/macos-ci.yml');
     expect(macos).toContain("github.event_name == 'merge_group'");
     expect(macos).not.toContain("github.event_name == 'pull_request'");
@@ -513,9 +580,7 @@ describe('merge_group workflow contract', () => {
     expect(pathChanges).toContain(
       'MERGE_GROUP_HEAD_SHA="${{ github.event.merge_group.head_sha }}"'
     );
-    expect(pathChanges).toContain(
-      'node scripts/lib/resolve-merge-group-path-diff.mjs'
-    );
+    expect(pathChanges).toContain('node "$TRUSTED_PATH_DIFF_RESOLVER"');
     expect(pathChanges).toContain('--base "$MERGE_GROUP_BASE_SHA"');
     expect(pathChanges).toContain('--head "$MERGE_GROUP_HEAD_SHA"');
     expect(PATH_DIFF_HELPER).toContain(
@@ -538,7 +603,7 @@ describe('merge_group workflow contract', () => {
       "run_summer_ops: ${{ steps.detect.outputs.run_summer_ops || 'false' }}"
     );
     expect(pathChanges).toContain(
-      'node scripts/lib/ci-repo-lanes.mjs --emit-github-output'
+      'node "$TRUSTED_CI_REPO_LANES" --emit-github-output'
     );
     expect(pathChanges).toContain(
       'echo "is_noop_merge_group=true" >> "$GITHUB_OUTPUT"'
@@ -629,6 +694,34 @@ describe('merge_group workflow contract', () => {
       "is_noop_merge_group: ${{ steps.detect.outputs.is_noop_merge_group || 'false' }}"
     );
     expect(pathChanges).toContain('product-lane-classifier.mjs');
+    expect(pathChanges).toContain('persist-credentials: false');
+    expect(pathChanges).toContain(
+      'git show "${DIFF_BASE}:scripts/brand-scrub.py"'
+    );
+    expect(pathChanges).toContain('python3 "$TRUSTED_BRAND_SCRUBBER"');
+    expect(pathChanges).not.toContain('python3 scripts/brand-scrub.py');
+    expect(pathChanges).toContain(
+      'git show "${CLASSIFICATION_BASE_REF}:scripts/lib/product-lane-classifier.mjs"'
+    );
+    expect(pathChanges).toContain('node "$TRUSTED_PRODUCT_LANE_CLASSIFIER"');
+    expect(pathChanges).not.toContain(
+      'node scripts/lib/product-lane-classifier.mjs \\'
+    );
+    expect(pathChanges).toContain('--base-ref "$CLASSIFICATION_BASE_REF"');
+    expect(pathChanges).toContain('--head-ref "$CLASSIFICATION_HEAD_REF"');
+    expect(pathChanges).toContain(
+      'CLASSIFICATION_BASE_REF="$PATH_DIFF_BASE_SHA"'
+    );
+    expect(pathChanges).toContain(
+      'CLASSIFICATION_HEAD_REF="$PATH_DIFF_HEAD_SHA"'
+    );
+    expect(pathChanges).toContain(
+      'git merge-base --is-ancestor "$PATH_DIFF_BASE_SHA" "$PATH_DIFF_HEAD_SHA"'
+    );
+    expect(pathChanges).toContain(
+      'CLASSIFICATION_BASE_REF="origin/${{ github.base_ref }}"'
+    );
+    expect(pathChanges).toContain('CLASSIFICATION_BASE_REF="$PUSH_BASE_SHA"');
     expect(pathChanges).toContain(
       "run_web: ${{ steps.detect.outputs.run_web || 'false' }}"
     );
@@ -1458,8 +1551,11 @@ describe('resolveMergeGroupPathDiff coalesced heads (JOV-4905)', () => {
       source: 'live_main_merge_base',
       isNoop: false,
       files: ['apps/web/product.ts'],
+      baseSha: rootSha,
       headSha,
     });
+    expect(formatMetaEnv(result)).toContain(`PATH_DIFF_BASE_SHA=${rootSha}`);
+    expect(formatMetaEnv(result)).toContain(`PATH_DIFF_HEAD_SHA=${headSha}`);
   });
 
   it('treats a valid empty live-main range as a typed no-op', () => {

@@ -198,6 +198,16 @@ range_is_complete() {
   shallow_file="$($GIT_BIN rev-parse --git-path shallow)"
   [[ -f "$shallow_file" ]] || return 0
 
+  # TruffleHog's go-git merge-base walk loads the base commit's parents before
+  # it can stop at --since-commit. A depth-limited checkout can therefore look
+  # complete to `git merge-base --is-ancestor` while the base itself is still
+  # a shallow boundary. Refuse that state so the bounded fetch below obtains at
+  # least the base's direct parent objects before any scanner runs.
+  if grep -qxF "$BASE_SHA" "$shallow_file" \
+    && "$GIT_BIN" cat-file commit "$BASE_SHA" | grep -q '^parent '; then
+    return 1
+  fi
+
   # The range is complete when every shallow boundary reachable from HEAD is
   # also reachable from the excluded base. A boundary on the PR/queue/push side
   # would hide an introduced-then-removed secret from both scanners.
@@ -212,6 +222,7 @@ range_is_complete() {
 
 prepare_pull_request_scan_head() {
   local event_tree scan_head scan_parents scan_tree
+  local base_epoch source_epoch scan_epoch scan_date
 
   [[ "$PULL_REQUEST_MODE" == true ]] || return 0
   [[ "$SCAN_HEAD_SHA" == "$HEAD_SHA" ]] || return 0
@@ -222,16 +233,31 @@ prepare_pull_request_scan_head() {
 
   event_tree="$($GIT_BIN rev-parse "${HEAD_SHA}^{tree}")"
 
+  base_epoch="$($GIT_BIN show -s --format='%ct' "$BASE_SHA")"
+  source_epoch="$($GIT_BIN show -s --format='%ct' "$CURRENT_SHA")"
+  [[ "$base_epoch" =~ ^[0-9]+$ ]] && [[ "$source_epoch" =~ ^[0-9]+$ ]] \
+    || fail "pull request scan parents do not have valid committer timestamps"
+  if (( source_epoch > base_epoch )); then
+    scan_epoch=$(( source_epoch + 1 ))
+  else
+    scan_epoch=$(( base_epoch + 1 ))
+  fi
+  scan_date="@${scan_epoch} +0000"
+
   # The checked-out GitHub merge object can become unadvertised while its tree
   # remains the valid event result. Re-anchor that exact tree to the already
-  # verified base/source parents in a local, non-shallow scan-only commit.
+  # verified base/source parents in a local, non-shallow scan-only commit. Its
+  # timestamp follows both parents so go-git's date-ordered merge-base walk
+  # cannot descend below the exact base before visiting the scan head.
   scan_head="$(
     printf 'Local CI secret-scan merge for %s\n' "$HEAD_SHA" \
       | env \
           GIT_AUTHOR_NAME='Jovie CI' \
           GIT_AUTHOR_EMAIL='ci@jov.ie' \
+          GIT_AUTHOR_DATE="$scan_date" \
           GIT_COMMITTER_NAME='Jovie CI' \
           GIT_COMMITTER_EMAIL='ci@jov.ie' \
+          GIT_COMMITTER_DATE="$scan_date" \
           "$GIT_BIN" commit-tree "$event_tree" -p "$BASE_SHA" -p "$CURRENT_SHA"
   )"
   [[ "$scan_head" != "$HEAD_SHA" ]] \
@@ -249,6 +275,57 @@ prepare_pull_request_scan_head() {
 
   SCAN_HEAD_SHA="$scan_head"
   "$GIT_BIN" update-ref --no-deref HEAD "$SCAN_HEAD_SHA" "$HEAD_SHA"
+}
+
+prepare_time_ordered_scan_head() {
+  local original_scan_head base_epoch head_epoch anchor_epoch anchor_date
+  local scan_tree anchor_head anchor_tree anchor_parents anchor_timestamp
+
+  base_epoch="$($GIT_BIN show -s --format='%ct' "$BASE_SHA")"
+  head_epoch="$($GIT_BIN show -s --format='%ct' "$SCAN_HEAD_SHA")"
+  [[ "$base_epoch" =~ ^[0-9]+$ ]] && [[ "$head_epoch" =~ ^[0-9]+$ ]] \
+    || fail "secret scan range commits do not have valid committer timestamps"
+  (( head_epoch <= base_epoch )) || return 0
+
+  original_scan_head="$SCAN_HEAD_SHA"
+  scan_tree="$($GIT_BIN rev-parse "${original_scan_head}^{tree}")"
+  anchor_epoch=$(( base_epoch + 1 ))
+  (( anchor_epoch > base_epoch )) \
+    || fail "secret scan timestamp anchor overflowed the base timestamp"
+  anchor_date="@${anchor_epoch} +0000"
+
+  # TruffleHog 3.97.1's go-git merge-base traversal can visit a newer queue
+  # base before an older-dated synthetic child, walk into a shallow boundary,
+  # and then exit zero after scanning zero bytes. Add one local-only empty
+  # commit whose sole parent is the exact prepared event head. The tree and
+  # full base..event history remain unchanged and reachable; only the scanner's
+  # traversal order is made unambiguous. Nothing is pushed to the PR or queue.
+  anchor_head="$(
+    printf 'Local CI secret-scan timestamp anchor for %s\n' "$original_scan_head" \
+      | env \
+          GIT_AUTHOR_NAME='Jovie CI' \
+          GIT_AUTHOR_EMAIL='ci@jov.ie' \
+          GIT_AUTHOR_DATE="$anchor_date" \
+          GIT_COMMITTER_NAME='Jovie CI' \
+          GIT_COMMITTER_EMAIL='ci@jov.ie' \
+          GIT_COMMITTER_DATE="$anchor_date" \
+          "$GIT_BIN" commit-tree "$scan_tree" -p "$original_scan_head"
+  )"
+  anchor_tree="$($GIT_BIN rev-parse "${anchor_head}^{tree}")"
+  anchor_parents="$($GIT_BIN show -s --format='%P' "$anchor_head")"
+  anchor_timestamp="$($GIT_BIN show -s --format='%ct' "$anchor_head")"
+  [[ "$anchor_head" != "$original_scan_head" ]] \
+    || fail "local timestamp anchor did not create a distinct scan commit"
+  [[ "$anchor_tree" == "$scan_tree" ]] \
+    || fail "local timestamp anchor did not preserve the exact event tree"
+  [[ "$anchor_parents" == "$original_scan_head" ]] \
+    || fail "local timestamp anchor did not preserve the exact event head as its sole parent"
+  [[ "$anchor_timestamp" == "$anchor_epoch" ]] \
+    || fail "local timestamp anchor did not preserve the required scanner ordering"
+
+  SCAN_HEAD_SHA="$anchor_head"
+  "$GIT_BIN" update-ref --no-deref HEAD "$SCAN_HEAD_SHA" "$original_scan_head"
+  echo "Anchored older-dated scan head $original_scan_head at local commit $SCAN_HEAD_SHA (base timestamp ${base_epoch}; anchor timestamp ${anchor_epoch})."
 }
 
 verify_pull_request_semantics() {
@@ -378,6 +455,9 @@ fi
 
 remaining_deadline_seconds >/dev/null \
   || fail "the ${DEADLINE_SECONDS}s absolute range-preparation deadline was exhausted"
+prepare_time_ordered_scan_head
+range_is_complete \
+  || fail "local timestamp anchor did not preserve the complete base..head history"
 "$GIT_BIN" update-ref "$HEAD_REF" "$SCAN_HEAD_SHA"
 "$GIT_BIN" update-ref "$BASE_REF" "$BASE_SHA"
 

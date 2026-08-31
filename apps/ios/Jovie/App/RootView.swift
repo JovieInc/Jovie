@@ -121,6 +121,7 @@ private struct AppContentView: View {
             chatRepository?.startNewConversation()
           },
           onAutoSendMessage: handleAutoSendMessage,
+          onEyesFreeSubmit: handleEyesFreeSubmit,
           onLogout: onLogout,
           showsWorkspaceSwitch: showsWorkspaceSwitch,
           workspaceMode: workspaceMode,
@@ -205,6 +206,7 @@ private struct AppContentView: View {
             chatRepository?.startNewConversation()
           },
           onAutoSendMessage: handleAutoSendMessage,
+          onEyesFreeSubmit: handleEyesFreeSubmit,
           onLogout: onLogout,
           showsWorkspaceSwitch: showsWorkspaceSwitch,
           workspaceMode: workspaceMode,
@@ -361,6 +363,19 @@ private struct AppContentView: View {
 
   private func handleAutoSendMessage(_ text: String) {
     Task { await chatRepository?.send(text: text) }
+  }
+
+  private func handleEyesFreeSubmit(_ launch: EyesFreeCaptureLaunch, _ transcript: String) {
+    Task {
+      let readback = await chatRepository?.submitEyesFreeCapture(
+        transcript: transcript,
+        destination: launch.destination,
+        idempotencyKey: launch.idempotencyKey
+      )
+      if let readback, !readback.isEmpty {
+        EyesFreeReadback.speak(readback)
+      }
+    }
   }
 
   private var showsWorkspaceSwitch: Bool {

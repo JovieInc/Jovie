@@ -25,7 +25,7 @@ describe('AppShellFrame', () => {
       'ease-cinematic',
       'motion-reduce:transition-none'
     );
-    expect(mainContent).toHaveClass('lg:shadow-(--linear-app-shell-shadow)');
+    expect(mainContent).toHaveClass('lg:shadow-(--app-shell-shadow)');
     expect(mainContent).toHaveClass('bg-(--app-shell-content-surface)');
     expect(mainContent).not.toHaveClass('bg-(--color-bg-surface-0)/90');
     // #main-content keeps its full rounded shell radius — no Electron override

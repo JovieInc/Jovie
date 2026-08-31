@@ -214,10 +214,10 @@ export function LeadKeywordsManager({
         title='Discovery keywords'
         subtitle={`Google CSE queries used to find new Linktree leads. ${keywords.length} keyword${keywords.length === 1 ? '' : 's'} configured.`}
         actions={seedButton}
-        className='min-h-0 px-(--linear-app-header-padding-x) py-3'
+        className='min-h-0 px-(--app-shell-header-padding-x) py-3'
         actionsClassName='shrink-0'
       />
-      <div className='space-y-3 px-(--linear-app-content-padding-x) py-(--linear-app-content-padding-y)'>
+      <div className='space-y-3 px-(--app-shell-content-padding-x) py-(--app-shell-content-padding-y)'>
         {keywordContent}
       </div>
     </ContentSurfaceCard>

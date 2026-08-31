@@ -45,7 +45,11 @@ const SYMPHONY_THROUGHPUT_CONTROL_MANIFEST = [
   'scripts/backlog-orchestrator/deterministic-gates.mjs',
   'scripts/backlog-orchestrator/gate-next-hold.mjs',
   'scripts/hermes/codex-rotate',
+  'scripts/hermes/codex-account-probe.sh',
+  'scripts/hermes/symphony-lease-guard',
+  'scripts/hermes/tests/codex-account-probe.test.py',
   'scripts/hermes/tests/codex-rotate.test.py',
+  'scripts/hermes/tests/symphony-lease-guard.test.py',
   'scripts/lib/__tests__/automation-verify.test.mjs',
   'scripts/lib/__tests__/pre-push-gate.test.mjs',
   'scripts/run-affected-tests.mjs',
@@ -204,6 +208,19 @@ const VERCEL_CONGESTION_CONTROL_MANIFEST = [
 const AFFECTED_TEST_SELECTOR_MANIFEST = [
   'scripts/run-affected-tests.mjs',
   'scripts/lib/__tests__/automation-verify.test.mjs',
+];
+const GEM_CHECKIN_HUD_LANE = [
+  'scripts/hermes/symphony/WORKFLOW.md',
+  'scripts/hermes/gem-checkin-hud.py',
+  'scripts/hermes/gem-checkin-tty1.sh',
+  'scripts/hermes/systemd/symphony-burrito.service',
+  'scripts/hermes/systemd/symphony-burrito-update.service',
+  'scripts/hermes/systemd/symphony-burrito-update.timer',
+  'scripts/hermes/update-symphony-burrito.sh',
+  'scripts/hermes/tests/gem-checkin-hud.test.py',
+  'scripts/hermes/tests/symphony-burrito-workflow.test.py',
+  '.github/workflows/reusable-ci-lint.yml',
+  ...AFFECTED_TEST_SELECTOR_MANIFEST,
 ];
 const SENTRY_AUTOFIX_RECURRENCE_LANE = [
   '.github/workflows/sentry-autofix-recurrence.yml',
@@ -598,7 +615,10 @@ describe('automation-verify affected scope', () => {
         'scripts/lib/__tests__/eval-main-health-action.test.mjs',
         'scripts/lib/__tests__/pr-check-failures.test.mjs',
         'scripts/lib/__tests__/pr-conflict-handler.test.mjs',
+        'scripts/lib/__tests__/github-open-prs-rest.test.mjs',
+        'scripts/lib/__tests__/github-merge-queue.test.mjs',
         'scripts/lib/__tests__/ci-fast-workflow-contract.test.mjs',
+        'scripts/lib/__tests__/design-exception-registry.test.mjs',
         'scripts/lib/__tests__/design-system-source-ratchet.test.mjs',
         'scripts/lib/__tests__/ci-repo-lanes.test.mjs',
         'scripts/lib/__tests__/merge-group-workflow-contract.test.mjs',
@@ -697,11 +717,42 @@ describe('automation-verify affected scope', () => {
         'scripts/lib/__tests__/automation-verify.test.mjs',
         'scripts/lib/__tests__/pre-push-gate.test.mjs',
       ],
-      pythonUnittestTests: ['scripts/hermes/tests/codex-rotate.test.py'],
+      pythonUnittestTests: [
+        'scripts/hermes/tests/codex-account-probe.test.py',
+        'scripts/hermes/tests/codex-rotate.test.py',
+        'scripts/hermes/tests/symphony-lease-guard.test.py',
+      ],
     });
     expect(
       buildAffectedTestPlan([
         ...SYMPHONY_THROUGHPUT_CONTROL_MANIFEST,
+        'scripts/backlog-orchestrator/unknown.mjs',
+      ]).mode
+    ).toBe('full');
+  });
+
+  it('selects the official Symphony backlog remediation lane', () => {
+    expect(
+      buildAffectedTestPlan([
+        'scripts/backlog-orchestrator/backlog-remediation.mjs',
+      ])
+    ).toMatchObject({
+      mode: 'selected',
+      nodeTests: [
+        'scripts/backlog-orchestrator/__tests__/backlog-remediation.test.mjs',
+      ],
+      scriptVitestTests: ['scripts/lib/__tests__/automation-verify.test.mjs'],
+    });
+    expect(
+      buildAffectedTestPlan([
+        'scripts/backlog-orchestrator/backlog-remediation.mjs',
+        '.github/workflows/fleet-gate-refresh.yml',
+        'scripts/run-affected-tests.mjs',
+      ]).mode
+    ).toBe('selected');
+    expect(
+      buildAffectedTestPlan([
+        'scripts/backlog-orchestrator/backlog-remediation.mjs',
         'scripts/backlog-orchestrator/unknown.mjs',
       ]).mode
     ).toBe('full');
@@ -749,6 +800,24 @@ describe('automation-verify affected scope', () => {
       buildAffectedTestPlan([
         'scripts/hermes/gem-priority-gate.py',
         'scripts/hermes/unknown-fleet-peer.py',
+      ]).mode
+    ).toBe('full');
+  });
+
+  it('selects the bounded Gem check-in HUD + burrito contracts and fails closed on unrelated files', () => {
+    expect(buildAffectedTestPlan(GEM_CHECKIN_HUD_LANE)).toMatchObject({
+      mode: 'selected',
+      selectedTests: [],
+      pythonUnittestTests: [
+        'scripts/hermes/tests/gem-checkin-hud.test.py',
+        'scripts/hermes/tests/symphony-burrito-workflow.test.py',
+      ],
+      scriptVitestTests: ['scripts/lib/__tests__/automation-verify.test.mjs'],
+    });
+    expect(
+      buildAffectedTestPlan([
+        ...GEM_CHECKIN_HUD_LANE,
+        'apps/ios/Jovie/RootView.swift',
       ]).mode
     ).toBe('full');
   });

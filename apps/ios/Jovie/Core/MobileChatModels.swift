@@ -300,6 +300,22 @@ struct MobileChatTurnRequest: Encodable, Sendable {
   }
 }
 
+struct EyesFreeCaptureAPIRequest: Encodable, Sendable {
+  let destination: String
+  let transcript: String
+  let clientTurnId: String
+  let clientMessageId: String
+}
+
+struct EyesFreeCaptureAPIResponse: Decodable, Equatable, Sendable {
+  let destination: String
+  let status: String
+  let conversationId: String?
+  let turnId: String?
+  let readback: String
+  let errorCode: String?
+}
+
 enum MobileChatStreamEvent: Equatable, Sendable {
   case turnReserved(conversationId: String, turnId: String, clientTurnId: String)
   case assistantDelta(clientTurnId: String, text: String)

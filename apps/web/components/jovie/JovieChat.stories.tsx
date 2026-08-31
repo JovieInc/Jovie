@@ -19,7 +19,7 @@ function StoryComposerDock() {
 }
 
 const meta = {
-  title: 'Chat/JovieChat',
+  title: 'Jovie/JovieChat',
   component: JovieChat,
   parameters: {
     layout: 'fullscreen',

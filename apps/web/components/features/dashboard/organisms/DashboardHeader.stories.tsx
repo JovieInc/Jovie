@@ -2,9 +2,14 @@ import type { Meta, StoryObj } from '@storybook/nextjs-vite';
 import { DashboardHeader } from './DashboardHeader';
 
 const meta = {
-  title: 'Dashboard/Organisms/DashboardHeader',
+  title: 'Features/Dashboard/Organisms/DashboardHeader',
   component: DashboardHeader,
-  parameters: { layout: 'fullscreen' },
+  parameters: {
+    layout: 'fullscreen',
+    jovie: {
+      uncoveredProps: ['breadcrumbs'],
+    },
+  },
   args: {
     breadcrumbs: [{ label: 'New Chat', href: '/app/chat' }],
   },

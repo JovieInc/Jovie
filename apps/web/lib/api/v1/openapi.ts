@@ -4,13 +4,14 @@ import {
   PUBLIC_ARTIST_API_INDEX_URL,
   PUBLIC_ARTIST_API_OPENAPI_URL,
   PUBLIC_ARTIST_API_POLICY_LINK,
-  PUBLIC_ARTIST_API_POLICY_URL,
   PUBLIC_ARTIST_API_PROFILE_TEMPLATE_URL,
   PUBLIC_ARTIST_API_RATE_LIMIT,
   PUBLIC_ARTIST_API_RATE_LIMIT_POLICY,
+  PUBLIC_ARTIST_API_RATE_LIMIT_POLICY_VALUE,
   PUBLIC_ARTIST_API_RATE_LIMIT_WINDOW_SECONDS,
   PUBLIC_ARTIST_API_REFERENCE_URL,
   PUBLIC_ARTIST_API_VERSION,
+  PUBLIC_ARTIST_API_VERSIONING_POLICY,
 } from './contract';
 
 type JsonSchema = {
@@ -55,7 +56,7 @@ const API_RATE_LIMIT_HEADERS: Readonly<Record<string, OpenApiHeader>> = {
     description:
       'Current IETF HTTPAPI RateLimit draft policy: public-artist permits 100 requests in a 60-second window.',
     schema: { type: 'string' },
-    example: '"public-artist";q=100;w=60',
+    example: PUBLIC_ARTIST_API_RATE_LIMIT_POLICY_VALUE,
   },
   RateLimit: {
     description:
@@ -97,6 +98,12 @@ const API_PROFILE_HEADERS: Readonly<Record<string, OpenApiHeader>> = {
 
 const API_SERVICE_HEADERS: Readonly<Record<string, OpenApiHeader>> = {
   ...API_LIFECYCLE_HEADERS,
+  'RateLimit-Policy': {
+    description:
+      'Configured profile quota policy. RateLimit and legacy remaining/reset fields are omitted while durable limiter state is unavailable.',
+    schema: { type: 'string' },
+    example: PUBLIC_ARTIST_API_RATE_LIMIT_POLICY_VALUE,
+  },
   'Retry-After': {
     description:
       'Integer seconds before retrying after a temporary rate-limit backend outage.',
@@ -128,29 +135,7 @@ type OpenApiParameter = {
  * not carry Deprecation or Sunset headers. Those headers become applicable
  * only to a genuinely retired version after a dated migration decision.
  */
-export const API_VERSIONING_POLICY = {
-  strategy: 'url',
-  activeVersion: 'v1',
-  additiveChanges: 'remain-within-active-version',
-  breakingChanges: 'publish-a-new-url-version',
-  policyUrl: PUBLIC_ARTIST_API_POLICY_URL,
-  lifecycle: {
-    deprecation: {
-      header: 'Deprecation',
-      standard: 'RFC 9745',
-      active: false,
-      trigger:
-        'Only when a version is genuinely deprecated and migration guidance is published.',
-    },
-    sunset: {
-      header: 'Sunset',
-      standard: 'RFC 8594',
-      active: false,
-      trigger:
-        'Only when a dated retirement window is announced for a deprecated version.',
-    },
-  },
-} as const;
+export const API_VERSIONING_POLICY = PUBLIC_ARTIST_API_VERSIONING_POLICY;
 
 /**
  * Canonical OpenAPI 3.1 document for the public artist API.
@@ -205,7 +190,7 @@ export const ARTIST_OPENAPI_DOCUMENT: ArtistOpenApiDocument = {
         operationId: 'getArtistApiIndex',
         summary: 'Discover public artist API capabilities',
         description:
-          'Stable, non-enumerating capability document. It identifies the anonymous read-only scope, supported GET resources, profile rate-limit metadata, and canonical discovery links without depending on a particular artist handle.',
+          'Stable, non-enumerating capability document. It identifies the anonymous read-only scope, supported GET resources, profile rate-limit metadata, active version/lifecycle policy, and canonical discovery links without depending on a particular artist handle.',
         parameters: [
           {
             name: 'Accept',
@@ -297,6 +282,7 @@ export const ARTIST_OPENAPI_DOCUMENT: ArtistOpenApiDocument = {
           'access',
           'scope',
           'methods',
+          'versioning',
           'rateLimit',
           'endpoints',
           '_links',
@@ -311,6 +297,7 @@ export const ARTIST_OPENAPI_DOCUMENT: ArtistOpenApiDocument = {
             type: 'array',
             items: { type: 'string', enum: ['GET'] },
           },
+          versioning: { $ref: '#/components/schemas/VersioningPolicy' },
           rateLimit: {
             type: 'object',
             required: ['appliesTo', 'policy', 'limit', 'windowSeconds', 'key'],
@@ -369,6 +356,56 @@ export const ARTIST_OPENAPI_DOCUMENT: ArtistOpenApiDocument = {
               openapi: { type: 'string', format: 'uri' },
               developers: { type: 'string', format: 'uri' },
               sitemap: { type: 'string', format: 'uri' },
+            },
+          },
+        },
+      },
+      VersioningPolicy: {
+        type: 'object',
+        required: [
+          'strategy',
+          'activeVersion',
+          'additiveChanges',
+          'breakingChanges',
+          'policyUrl',
+          'lifecycle',
+        ],
+        properties: {
+          strategy: { type: 'string', enum: ['url'] },
+          activeVersion: { type: 'string', examples: ['v1'] },
+          additiveChanges: {
+            type: 'string',
+            enum: ['remain-within-active-version'],
+          },
+          breakingChanges: {
+            type: 'string',
+            enum: ['publish-a-new-url-version'],
+          },
+          policyUrl: { type: 'string', format: 'uri' },
+          lifecycle: {
+            type: 'object',
+            required: ['deprecation', 'sunset'],
+            properties: {
+              deprecation: {
+                type: 'object',
+                required: ['header', 'standard', 'active', 'trigger'],
+                properties: {
+                  header: { type: 'string', examples: ['Deprecation'] },
+                  standard: { type: 'string', examples: ['RFC 9745'] },
+                  active: { type: 'boolean', examples: [false] },
+                  trigger: { type: 'string' },
+                },
+              },
+              sunset: {
+                type: 'object',
+                required: ['header', 'standard', 'active', 'trigger'],
+                properties: {
+                  header: { type: 'string', examples: ['Sunset'] },
+                  standard: { type: 'string', examples: ['RFC 8594'] },
+                  active: { type: 'boolean', examples: [false] },
+                  trigger: { type: 'string' },
+                },
+              },
             },
           },
         },

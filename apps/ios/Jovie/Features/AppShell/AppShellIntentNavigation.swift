@@ -5,6 +5,9 @@ struct AppShellIntentNavigationState: Equatable {
   var chatDraft: String
   var autoSendMessage: String?
   var shouldStartVoiceCapture = false
+  var talkAutoSubmit = false
+  var eyesFreeLaunch: EyesFreeCaptureLaunch?
+  var unavailableMessage: String?
   var shouldOpenSettings = false
   var openConversationID: String?
   var pendingRequest: IntentNavigationRequest?
@@ -49,6 +52,8 @@ enum AppShellIntentNavigation {
   @discardableResult
   static func applyPendingRequest(
     chatEnabled: Bool,
+    canUseSummer: Bool = false,
+    isOffline: Bool = false,
     state: inout AppShellIntentNavigationState
   ) -> Bool {
     guard let request = state.pendingRequest else { return false }
@@ -59,14 +64,41 @@ enum AppShellIntentNavigation {
       return true
     }
 
-    guard chatEnabled else { return true }
+    guard chatEnabled else {
+      switch request {
+      case .startVoiceCapture, .startEyesFreeCapture:
+        state.unavailableMessage = EyesFreeCaptureGate.unavailableMessage
+      default:
+        break
+      }
+      return true
+    }
+
+    if isOffline {
+      switch request {
+      case .startVoiceCapture, .startEyesFreeCapture:
+        state.unavailableMessage = EyesFreeCaptureGate.offlineMessage
+        return true
+      default:
+        break
+      }
+    }
 
     switch request {
     case .openChat, .continueLastConversation:
       state.selectedTab = .chat
     case .startVoiceCapture:
-      state.selectedTab = .chat
-      state.shouldStartVoiceCapture = true
+      applyEyesFreeLaunch(
+        EyesFreeCaptureLaunch(
+          destination: .jovie,
+          spokenText: nil,
+          idempotencyKey: UUID().uuidString
+        ),
+        canUseSummer: canUseSummer,
+        to: &state
+      )
+    case let .startEyesFreeCapture(launch):
+      applyEyesFreeLaunch(launch, canUseSummer: canUseSummer, to: &state)
     case let .sendMessage(text, autoSend):
       state.selectedTab = .chat
       if autoSend {
@@ -83,5 +115,33 @@ enum AppShellIntentNavigation {
     }
 
     return true
+  }
+
+  private static func applyEyesFreeLaunch(
+    _ launch: EyesFreeCaptureLaunch,
+    canUseSummer: Bool,
+    to state: inout AppShellIntentNavigationState
+  ) {
+    let gate = EyesFreeCaptureGate.resolve(
+      isSignedIn: true,
+      chatEnabled: true,
+      isOffline: false,
+      destination: launch.destination,
+      canUseSummer: canUseSummer
+    )
+    if gate != .ready {
+      state.unavailableMessage = gate.message
+      return
+    }
+
+    state.selectedTab = .chat
+    state.eyesFreeLaunch = launch
+    state.talkAutoSubmit = true
+    let spoken = VoiceMemoActionDraft.make(fromTranscript: launch.spokenText ?? "")
+    if VoiceMemoActionDraft.isReady(spoken) {
+      state.autoSendMessage = spoken
+    } else {
+      state.shouldStartVoiceCapture = true
+    }
   }
 }

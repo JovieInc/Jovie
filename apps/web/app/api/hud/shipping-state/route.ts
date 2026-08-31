@@ -1,16 +1,9 @@
 import type { NextRequest } from 'next/server';
 import { NextResponse } from 'next/server';
 import { authorizeHud } from '@/lib/auth/hud';
-import { env } from '@/lib/env-server';
 import { captureError } from '@/lib/error-tracking';
-import {
-  FORBIDDEN_QUERY_KEYS,
-  publishShippingState,
-} from '@/lib/ovie/shipping-state';
-import {
-  createLiveShippingStateReaders,
-  defaultLiveIo,
-} from '@/lib/ovie/shipping-state/live';
+import { FORBIDDEN_QUERY_KEYS } from '@/lib/ovie/shipping-state';
+import { publishConfiguredShippingState } from '@/lib/ovie/shipping-state/configured.server';
 import { logger } from '@/lib/utils/logger';
 
 export const runtime = 'nodejs';
@@ -47,15 +40,7 @@ export async function GET(request: NextRequest) {
       );
     }
 
-    const projection = await publishShippingState({
-      readers: createLiveShippingStateReaders(
-        defaultLiveIo({
-          githubToken: env.HUD_GITHUB_TOKEN,
-          githubOwner: env.HUD_GITHUB_OWNER,
-          githubRepo: env.HUD_GITHUB_REPO,
-        })
-      ),
-    });
+    const projection = await publishConfiguredShippingState();
 
     return NextResponse.json(projection, { headers: NO_STORE_HEADERS });
   } catch (error) {

@@ -249,7 +249,10 @@ const CI_CONTROL_SCRIPT_TESTS = [
   'scripts/lib/__tests__/eval-main-health-action.test.mjs',
   'scripts/lib/__tests__/pr-check-failures.test.mjs',
   'scripts/lib/__tests__/pr-conflict-handler.test.mjs',
+  'scripts/lib/__tests__/github-open-prs-rest.test.mjs',
+  'scripts/lib/__tests__/github-merge-queue.test.mjs',
   'scripts/lib/__tests__/ci-fast-workflow-contract.test.mjs',
+  'scripts/lib/__tests__/design-exception-registry.test.mjs',
   'scripts/lib/__tests__/design-system-source-ratchet.test.mjs',
   'scripts/lib/__tests__/ci-repo-lanes.test.mjs',
   'scripts/lib/__tests__/merge-group-workflow-contract.test.mjs',
@@ -363,7 +366,11 @@ const SYMPHONY_THROUGHPUT_CONTROL_MANIFEST = new Set([
   'scripts/backlog-orchestrator/deterministic-gates.mjs',
   'scripts/backlog-orchestrator/gate-next-hold.mjs',
   'scripts/hermes/codex-rotate',
+  'scripts/hermes/codex-account-probe.sh',
+  'scripts/hermes/symphony-lease-guard',
+  'scripts/hermes/tests/codex-account-probe.test.py',
   'scripts/hermes/tests/codex-rotate.test.py',
+  'scripts/hermes/tests/symphony-lease-guard.test.py',
   'scripts/lib/__tests__/automation-verify.test.mjs',
   'scripts/lib/__tests__/pre-push-gate.test.mjs',
   'scripts/run-affected-tests.mjs',
@@ -378,7 +385,32 @@ const SYMPHONY_THROUGHPUT_SCRIPT_TESTS = [
   'scripts/lib/__tests__/pre-push-gate.test.mjs',
 ];
 const SYMPHONY_THROUGHPUT_PYTHON_TESTS = [
+  'scripts/hermes/tests/codex-account-probe.test.py',
   'scripts/hermes/tests/codex-rotate.test.py',
+  'scripts/hermes/tests/symphony-lease-guard.test.py',
+];
+const BACKLOG_REMEDIATION_PRIMARY_INPUTS = new Set([
+  'scripts/backlog-orchestrator/backlog-remediation.mjs',
+  'scripts/backlog-orchestrator/__tests__/backlog-remediation.test.mjs',
+]);
+const BACKLOG_REMEDIATION_LANE = new Set([
+  ...BACKLOG_REMEDIATION_PRIMARY_INPUTS,
+  'scripts/backlog-orchestrator/admission-disposition.mjs',
+  'scripts/backlog-orchestrator/admission-policy.mjs',
+  'scripts/backlog-orchestrator/backlog-orchestrator.mjs',
+  'scripts/backlog-orchestrator/backlog-reduction.mjs',
+  'scripts/backlog-orchestrator/config.json',
+  'scripts/backlog-orchestrator/linear-client.mjs',
+  'scripts/backlog-orchestrator/ownership-inventory.mjs',
+  '.github/workflows/fleet-gate-refresh.yml',
+  'scripts/lib/__tests__/automation-verify.test.mjs',
+  'scripts/run-affected-tests.mjs',
+]);
+const BACKLOG_REMEDIATION_NODE_TESTS = [
+  'scripts/backlog-orchestrator/__tests__/backlog-remediation.test.mjs',
+];
+const BACKLOG_REMEDIATION_SCRIPT_TESTS = [
+  'scripts/lib/__tests__/automation-verify.test.mjs',
 ];
 const FLEET_PROMOTION_GATE_INPUTS = new Set([
   'scripts/hermes/gem-priority-gate.py',
@@ -447,6 +479,26 @@ const GEM_PR_REHABILITATION_PYTHON_TESTS = [
   'scripts/hermes/tests/gem-rehabilitation-policy.test.py',
   'scripts/hermes/tests/symphony-reconciler.test.py',
   'scripts/hermes/tests/test-model-router.py',
+];
+const GEM_CHECKIN_HUD_PRIMARY_INPUTS = new Set([
+  'scripts/hermes/symphony/WORKFLOW.md',
+  'scripts/hermes/gem-checkin-hud.py',
+  'scripts/hermes/gem-checkin-tty1.sh',
+  'scripts/hermes/systemd/symphony-burrito.service',
+  'scripts/hermes/systemd/symphony-burrito-update.service',
+  'scripts/hermes/systemd/symphony-burrito-update.timer',
+  'scripts/hermes/update-symphony-burrito.sh',
+  'scripts/hermes/tests/gem-checkin-hud.test.py',
+  'scripts/hermes/tests/symphony-burrito-workflow.test.py',
+]);
+const GEM_CHECKIN_HUD_LANE = new Set([
+  ...GEM_CHECKIN_HUD_PRIMARY_INPUTS,
+  ...AFFECTED_TEST_SELECTOR_MANIFEST,
+  '.github/workflows/reusable-ci-lint.yml',
+]);
+const GEM_CHECKIN_HUD_PYTHON_TESTS = [
+  'scripts/hermes/tests/gem-checkin-hud.test.py',
+  'scripts/hermes/tests/symphony-burrito-workflow.test.py',
 ];
 const GEM_PR_REHABILITATION_PRIMARY_INPUTS = new Set([
   'scripts/hermes/config/gem-repo-registry.json',
@@ -767,6 +819,22 @@ export function buildAffectedTestPlan(
   if (files.some(file => GLOBAL_TEST_INPUTS.has(file))) {
     return { mode: 'full', relatedFiles: [], mandatoryTests: [] };
   }
+  const isBoundedBacklogRemediationChange =
+    files.some(file => BACKLOG_REMEDIATION_PRIMARY_INPUTS.has(file)) &&
+    files.every(file => BACKLOG_REMEDIATION_LANE.has(file));
+  if (isBoundedBacklogRemediationChange) {
+    return {
+      mode: 'selected',
+      relatedFiles: [],
+      mandatoryTests: [],
+      selectedTests: [],
+      rootVitestTests: [],
+      pythonTests: [],
+      pythonUnittestTests: [],
+      scriptVitestTests: BACKLOG_REMEDIATION_SCRIPT_TESTS,
+      nodeTests: BACKLOG_REMEDIATION_NODE_TESTS,
+    };
+  }
   const isBoundedProductLaneFoundation =
     files.some(file => PRODUCT_LANE_FOUNDATION_PRIMARY_INPUTS.has(file)) &&
     files.every(file => PRODUCT_LANE_FOUNDATION_LANE.has(file));
@@ -849,6 +917,22 @@ export function buildAffectedTestPlan(
       pythonUnittestTests: [],
       scriptVitestTests: SAFE_PR_REMEDIATION_SCRIPT_TESTS,
       nodeTests: SAFE_PR_REMEDIATION_NODE_TESTS,
+    };
+  }
+  const isBoundedGemCheckinHudChange =
+    files.some(file => GEM_CHECKIN_HUD_PRIMARY_INPUTS.has(file)) &&
+    files.every(file => GEM_CHECKIN_HUD_LANE.has(file));
+  if (isBoundedGemCheckinHudChange) {
+    return {
+      mode: 'selected',
+      relatedFiles: [],
+      mandatoryTests: [],
+      selectedTests: [],
+      rootVitestTests: [],
+      pythonTests: [],
+      pythonUnittestTests: GEM_CHECKIN_HUD_PYTHON_TESTS,
+      scriptVitestTests: ['scripts/lib/__tests__/automation-verify.test.mjs'],
+      nodeTests: [],
     };
   }
   const isBoundedGemPrRehabilitationChange =
@@ -1445,7 +1529,8 @@ export function buildAffectedTestPlan(
   const hasIncompleteEventDrivenShipper =
     hasManifestInputBeyondDirectTests(EVENT_DRIVEN_SHIPPER_PRIMARY_MANIFEST) &&
     !isExactEventDrivenShipper &&
-    !isBoundedFleetPromotionGateChange;
+    !isBoundedFleetPromotionGateChange &&
+    !isBoundedBacklogRemediationChange;
   const hasIncompletePrSizeGuard =
     hasManifestInputBeyondDirectTests(PR_SIZE_GUARD_MANIFEST) &&
     !isExactPrSizeGuard &&
@@ -1553,6 +1638,9 @@ export function buildAffectedTestPlan(
     !isExactRunnerPrerequisiteRepair &&
     !isExactLayoutGuardContract &&
     !isExactPrSizeGuardWithSelector;
+  const hasUnboundedBacklogRemediationChange =
+    files.some(file => BACKLOG_REMEDIATION_PRIMARY_INPUTS.has(file)) &&
+    !isBoundedBacklogRemediationChange;
   const hasUncoveredSource =
     !isExactEventDrivenShipper &&
     (relatedFiles.some(file => !isCoveredSource(file)) ||
@@ -1561,6 +1649,7 @@ export function buildAffectedTestPlan(
         !isExactScannerLoadRepairPrimary &&
         !isExactScannerLoadRepairWithSelector) ||
       hasUnboundedFleetPromotionGateChange ||
+      hasUnboundedBacklogRemediationChange ||
       hasUnknownCiCancellationHealerPeer ||
       hasStandaloneCiFastLanesChange ||
       hasIncompletePrerequisiteTrain ||

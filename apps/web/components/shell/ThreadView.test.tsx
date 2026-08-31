@@ -94,3 +94,10 @@ describe('ThreadView shell contract', () => {
     expect(source).not.toContain('transition-all');
   });
 });
+
+describe('JOV-5466 token retire', () => {
+  it('does not keep retired --linear-app-* tokens', () => {
+    const source = readFileSync(resolve(__dirname, './ThreadView.tsx'), 'utf8');
+    expect(source).not.toMatch(/--linear-app-/);
+  });
+});

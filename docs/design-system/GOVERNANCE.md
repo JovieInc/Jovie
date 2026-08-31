@@ -93,6 +93,9 @@ is a ~100ms filesystem count of apps/web arbitrary Tailwind values and
 and UNMERGEABLE an ALLGREEN group. It does not expand `design-conformance:gate`,
 unit tests, or e2e.
 
+Exception (JOV-5447): `design-exception-registry` compares inventoried
+design-debt registries to the trusted ci-fast base and fails closed on growth.
+
 Do not add a heavy new required workflow for design governance. The weekly
 workflow is the standing safety net for drift that no PR happened to touch.
 

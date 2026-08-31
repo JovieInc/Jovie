@@ -57,7 +57,7 @@ function formatRate(numerator: number, denominator: number): string {
 function EmptyFunnel() {
   return (
     <ContentSurfaceCard
-      className='px-(--linear-app-content-padding-x) py-6'
+      className='px-(--app-shell-content-padding-x) py-6'
       data-testid='gtm-pipeline-status'
     >
       <p className='text-center text-app font-book text-secondary-token'>
@@ -69,7 +69,7 @@ function EmptyFunnel() {
 
 export function GtmFunnelSkeleton() {
   return (
-    <ContentSurfaceCard className='px-(--linear-app-content-padding-x) py-4'>
+    <ContentSurfaceCard className='px-(--app-shell-content-padding-x) py-4'>
       <div className='flex gap-6'>
         {['sk-discovered', 'sk-qualified', 'sk-approved', 'sk-ingested'].map(
           id => (
@@ -106,7 +106,7 @@ export async function GtmFunnel({ counts }: GtmFunnelProps) {
 
   return (
     <ContentSurfaceCard
-      className='overflow-hidden px-(--linear-app-content-padding-x) py-4'
+      className='overflow-hidden px-(--app-shell-content-padding-x) py-4'
       data-testid='gtm-pipeline-status'
     >
       <div className='mb-3 flex flex-wrap items-end justify-between gap-3'>

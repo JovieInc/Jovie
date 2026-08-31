@@ -24,11 +24,6 @@ const fxWorkflow = readFileSync(
   resolve(repoRoot, '.github/workflows/rolling-ci-dispatch.yml'),
   'utf8'
 );
-const classifier = readFileSync(
-  resolve(repoRoot, 'scripts/lib/pr-check-failures.mjs'),
-  'utf8'
-);
-
 const parent = 'a'.repeat(40);
 const child = 'b'.repeat(40);
 const other = 'c'.repeat(40);
@@ -74,36 +69,71 @@ function promotion(overrides = {}) {
 }
 
 describe('Auto-Ready fleet live-state guard', () => {
-  it('uses the canonical queue proof without the retired Verify Draft gate', () => {
-    expect(fleetScript).toContain('--classify-auto-ready');
-    expect(fleetScript).not.toContain('Verify Draft Agent PR');
-    expect(classifier).toContain(
-      '`--classify-auto-ready` is a compatibility alias for the canonical queue'
+  it('does not wait for checks or mergeability before paired promotion', () => {
+    expect(fleetScript).not.toContain('check_failures_for_pr');
+    expect(fleetScript).not.toContain('gh pr checks');
+    expect(fleetScript).not.toContain('--classify-auto-ready');
+    expect(fleetScript).not.toContain('.mergeable == "MERGEABLE"');
+    expect(fleetScript).toContain(
+      'Existing source checks may still be pending'
     );
-    expect(classifier).not.toContain('requireVerifyDraft');
-    expect(classifier).toContain("'Verify Draft Agent PR',");
   });
 
   it('pins promotion to the exact live head and hold-label snapshot', () => {
     expect(fleetScript).toContain(
-      '--json isDraft,headRefOid,headRefName,labels,mergeable,state'
+      'autoMergeRequest{enabledAt} isInMergeQueue mergeQueueEntry{id}'
     );
+    expect(fleetScript).toContain('labels(first:100){nodes{name}}');
     expect(fleetScript).toContain('HOLD_LABEL_RE=');
     expect(fleetScript).toContain('.head == $expected_head');
     expect(fleetScript).toContain('.branch == $expected_branch');
     expect(fleetScript).toContain('before_mutation="$(read_state "$n"');
     expect(fleetScript.indexOf('before_mutation="$(read_state')).toBeLessThan(
-      fleetScript.indexOf('if ! mark_ready "$n"')
+      fleetScript.indexOf(
+        'promote_with_auto_merge "$n" "$expected_head" || pair_status=$?'
+      )
     );
   });
 
-  it('re-reads after promotion and compensates a racing hold or head change', () => {
+  it('pairs ready and auto-merge, then compensates any incomplete pair', () => {
+    const ready = 'gh_retry pr ready "$n" -R "$REPO"';
+    const autoMerge = 'gh_retry pr merge "$n" -R "$REPO" --auto --squash';
+    expect(fleetScript).toContain(ready);
+    expect(fleetScript).toContain(autoMerge);
+    expect(fleetScript.indexOf(ready)).toBeLessThan(
+      fleetScript.indexOf(autoMerge)
+    );
+    expect(fleetScript).toContain('auto-merge request failed after ready');
+    expect(fleetScript).toContain('--match-head-commit "$expected_head"');
+    expect(fleetScript).toContain(
+      'gh_retry pr merge "$n" -R "$REPO" --disable-auto'
+    );
+    expect(fleetScript).toContain('if ! undo_ready "$n"; then');
     expect(fleetScript).toContain('after="$(read_state "$n"');
+    expect(fleetScript).toContain('auto_merge_after=');
+    expect(fleetScript).toContain('queued_after=');
+    expect(fleetScript).toContain(
+      '( "$auto_merge_after" == "true" || "$queued_after" == "true" )'
+    );
     expect(fleetScript).toContain('held_after=');
     expect(fleetScript).toContain('gh_retry pr ready "$n" -R "$REPO" --undo');
     expect(fleetScript).toContain('restored="$(read_state "$n"');
     expect(fleetScript.indexOf('after="$(read_state')).toBeGreaterThan(
-      fleetScript.indexOf('if ! mark_ready "$n"')
+      fleetScript.indexOf(
+        'promote_with_auto_merge "$n" "$expected_head" || pair_status=$?'
+      )
+    );
+  });
+
+  it('reconciles an interrupted ready-without-auto-merge state', () => {
+    expect(fleetScript).toContain('recover_ready_without_auto_merge');
+    expect(fleetScript).toContain('state_needs_pairing');
+    expect(fleetScript).toContain(
+      '.draft == false and .autoMerge == false and .queued == false'
+    );
+    expect(fleetScript).not.toContain('undo_ready "$n" || true');
+    expect(fleetScript).toContain(
+      'stopping: #$n could not be returned to a closed-loop state'
     );
   });
 });
@@ -111,7 +141,7 @@ describe('Auto-Ready fleet live-state guard', () => {
 describe('Auto-Ready provenance selector', () => {
   it('discovers PR author and exact head instead of trusting branch prefixes', () => {
     expect(fleetScript).toContain(
-      '--json number,title,isDraft,mergeable,mergeStateStatus,labels,headRefName,headRefOid,author'
+      '--json number,title,isDraft,labels,headRefName,headRefOid,author'
     );
     expect(fleetScript).toContain('author: (.author.login // "")');
     expect(fleetScript).toContain('auto-ready-provenance.mjs');
@@ -126,10 +156,14 @@ describe('Auto-Ready provenance selector', () => {
     expect(fleetScript).toContain('mutation_verdict="$(resolve_promotion');
     expect(
       fleetScript.indexOf('mutation_verdict="$(resolve_promotion')
-    ).toBeLessThan(fleetScript.indexOf('if ! mark_ready "$n"'));
+    ).toBeLessThan(
+      fleetScript.indexOf(
+        'promote_with_auto_merge "$n" "$expected_head" || pair_status=$?'
+      )
+    );
     expect(fleetScript).toContain('READY_ATTEMPTED_FOR=');
-    expect(fleetScript).toContain('refusing a second gh pr ready');
-    expect(fleetScript).toContain('pr ready --undo');
+    expect(fleetScript).toContain('refusing a second paired promotion');
+    expect(fleetScript).toContain('gh_retry pr ready "$n" -R "$REPO" --undo');
   });
 
   it('allows an allowlisted bot author on any branch', () => {
@@ -243,5 +277,11 @@ describe('Auto-Ready App-token workflow', () => {
     expect(workflow).not.toContain('secrets.GITHUB_TOKEN');
     expect(workflow).toContain('ref: main');
     expect(workflow).toContain('persist-credentials: false');
+  });
+
+  it('runs on source changes but never on the ready transition', () => {
+    expect(workflow).toContain('types: [opened, synchronize, reopened]');
+    expect(workflow).not.toContain('types: [ready_for_review');
+    expect(workflow).not.toContain('ready_for_review/CI cascade');
   });
 });

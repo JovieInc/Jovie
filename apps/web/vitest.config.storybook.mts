@@ -4,6 +4,10 @@ import { storybookTest } from '@storybook/addon-vitest/vitest-plugin';
 import { playwright } from '@vitest/browser-playwright';
 import type { Plugin } from 'vite';
 import { defineConfig } from 'vitest/config';
+import {
+  createStorybookVitestOwnerToken,
+  STORYBOOK_VITEST_OWNER_ARG,
+} from '../../scripts/component-live-storybook-lifecycle.mjs';
 
 const dirname = path.dirname(fileURLToPath(import.meta.url));
 // Absolute configDir used by @storybook/addon-vitest when it filters projects as
@@ -11,6 +15,7 @@ const dirname = path.dirname(fileURLToPath(import.meta.url));
 // and the Storybook UI a11y/test panel fails with:
 //   No projects matched the filter "storybook:/…/.storybook"
 const storybookConfigDir = path.join(dirname, '.storybook');
+const storybookVitestOwnerToken = createStorybookVitestOwnerToken();
 
 /**
  * Next's compiled React (next/dist/compiled/react*) is CJS without a default
@@ -70,9 +75,19 @@ export default defineConfig({
   ],
   test: {
     name: `storybook:${storybookConfigDir}`,
+    globalSetup: [
+      path.join(
+        dirname,
+        '../../scripts/component-live-storybook-lifecycle.mjs'
+      ),
+    ],
     browser: {
       enabled: true,
-      provider: playwright(),
+      provider: playwright({
+        launchOptions: {
+          args: [`${STORYBOOK_VITEST_OWNER_ARG}${storybookVitestOwnerToken}`],
+        },
+      }),
       headless: true,
       instances: [{ browser: 'chromium' }],
     },

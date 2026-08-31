@@ -17,7 +17,7 @@ describe('JovieChatSections', () => {
     expect(CHAT_EMPTY_TOP_SPACING_OWNER).toBe('chat-empty-viewport');
     expect(CHAT_EMPTY_VIEWPORT_CLASSNAME).toContain('pt-0');
     expect(CHAT_EMPTY_VIEWPORT_CLASSNAME).toContain(
-      'px-(--linear-app-header-padding-x)'
+      'px-(--app-shell-header-padding-x)'
     );
   });
 

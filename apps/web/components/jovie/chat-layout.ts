@@ -27,4 +27,4 @@ export const CHAT_EMPTY_TOP_SPACING_OWNER = 'chat-empty-viewport';
 
 /** Horizontal inset shared with the desktop header grid. */
 export const CHAT_EMPTY_VIEWPORT_CLASSNAME =
-  'flex flex-col px-(--linear-app-header-padding-x) pt-0 pb-5';
+  'flex flex-col px-(--app-shell-header-padding-x) pt-0 pb-5';

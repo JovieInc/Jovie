@@ -1644,7 +1644,7 @@ class WorkflowContractTests(unittest.TestCase):
         self.assertIn(".deploymentAdmission.allowed", wrapper)
         self.assertIn("EXPECTED_SHA", wrapper)
 
-    def test_refresh_is_event_driven_and_bounds_one_admission(self):
+    def test_refresh_is_event_driven_without_homemade_symphony_admission(self):
         content = (self.WORKFLOWS / "fleet-gate-refresh.yml").read_text(encoding="utf-8")
         self.assertNotIn("schedule:", content)
         self.assertNotIn("cron:", content)
@@ -1670,10 +1670,10 @@ class WorkflowContractTests(unittest.TestCase):
         self.assertIn("github.event.label.name == 'gated'", content)
         self.assertIn("github.event.label.name == 'queue-deferred'", content)
         self.assertIn("github.event.label.name == 'needs-human'", content)
-        self.assertIn("JOVIE_AGENT_PROFILE: no_agent", content)
-        self.assertIn("timeout 180s scripts/backlog-orchestrator/run-backlog.sh reconcile", content)
-        self.assertIn("timeout 60s scripts/backlog-orchestrator/run-backlog.sh gate-next", content)
-        self.assertIn("symphony-event-admission-heartbeat/v1", content)
+        self.assertNotIn("JOVIE_AGENT_PROFILE: no_agent", content)
+        self.assertNotIn("scripts/backlog-orchestrator/run-backlog.sh", content)
+        self.assertNotIn("symphony-event-admission-heartbeat/v1", content)
+        self.assertIn("upstream OpenAI Symphony polling Linear directly", content)
 
     def test_stale_window_matches_the_consumer_fail_closed_window(self):
         gate_source = GATE.read_text(encoding="utf-8")

@@ -35,8 +35,8 @@ describe('desktop New Chat grid anchors', () => {
 
     expect(header).toContain("data-grid-anchor='desktop-content'");
     expect(header).toContain("data-top-spacing-owner='shell-header'");
-    expect(header).toContain('sm:px-(--linear-app-header-padding-x)');
-    expect(layout).toContain('px-(--linear-app-header-padding-x)');
+    expect(header).toContain('sm:px-(--app-shell-header-padding-x)');
+    expect(layout).toContain('px-(--app-shell-header-padding-x)');
     expect(layout).toContain('pt-0');
     expect(chat).toContain('DESKTOP_CONTENT_GRID_ANCHOR');
     expect(chat).toContain('CHAT_EMPTY_TOP_SPACING_OWNER');

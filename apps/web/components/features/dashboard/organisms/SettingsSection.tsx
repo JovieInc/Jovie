@@ -50,7 +50,7 @@ export function SettingsSection({
       </div>
       <div
         className={cn(
-          'space-y-4 px-(--linear-app-content-padding-x) py-(--linear-app-content-padding-y)',
+          'space-y-4 px-(--app-shell-content-padding-x) py-(--app-shell-content-padding-y)',
           descriptionClassName
         )}
       >

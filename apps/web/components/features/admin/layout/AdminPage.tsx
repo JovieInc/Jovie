@@ -80,7 +80,7 @@ export function AdminPage<
       <PageContent noPadding>
         <div
           className={cn(
-            'space-y-6 px-(--linear-app-content-padding-x) py-(--linear-app-content-padding-y)',
+            'space-y-6 px-(--app-shell-content-padding-x) py-(--app-shell-content-padding-y)',
             className
           )}
           data-testid={testId}

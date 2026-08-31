@@ -22,6 +22,10 @@ vi.mock('@/lib/ovie/shipping-state', async importOriginal => {
   };
 });
 
+vi.mock('@/lib/ovie/shipping-state/configured.server', () => ({
+  publishConfiguredShippingState: mockPublish,
+}));
+
 vi.mock('@/lib/ovie/shipping-state/live', async importOriginal => {
   const actual =
     await importOriginal<typeof import('@/lib/ovie/shipping-state/live')>();

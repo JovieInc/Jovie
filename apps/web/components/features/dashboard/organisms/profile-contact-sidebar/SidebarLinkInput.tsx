@@ -188,7 +188,7 @@ export function SidebarLinkInput({
           <div
             ref={refs.setFloating}
             style={floatingStyles}
-            className='z-100 max-h-60 overflow-y-auto overflow-x-hidden overscroll-contain rounded-lg border border-subtle bg-(--linear-app-content-surface) py-1 shadow-popover'
+            className='z-100 max-h-60 overflow-y-auto overflow-x-hidden overscroll-contain rounded-lg border border-subtle bg-(--app-shell-content-surface) py-1 shadow-popover'
             onMouseDown={e => e.preventDefault()}
             aria-hidden='true'
           >

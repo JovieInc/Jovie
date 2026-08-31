@@ -33,10 +33,9 @@ function darkBlockContaining(css: string, marker: string): string {
 describe('Noir Ion — approved dark anchors', () => {
   // Surface/accent anchors live in the large Noir Ion :root.dark block.
   const dsDark = darkBlockContaining(designSystem, '--noir-ion-canvas');
-  const linearDark = darkBlockContaining(
-    linearTokens,
-    '--linear-app-content-surface: #0a0d16'
-  );
+  // linear-tokens.css still owns --linear-bg-* and --linear-border-* / --linear-row-*.
+  // App-shell tokens (--app-shell-*) migrated to design-system.css (JOV-5466).
+  const linearDark = darkBlockContaining(linearTokens, '--linear-bg-page');
 
   it('defines Noir Ion surface anchors and maps product tokens to them', () => {
     expect(dsDark).toContain('--noir-ion-canvas: #030407;');
@@ -55,11 +54,9 @@ describe('Noir Ion — approved dark anchors', () => {
 
   it('maps shell canvas + sidebar to Noir Ion shell ladder', () => {
     expect(linearDark).toContain('--linear-bg-page: #06080d;');
-    expect(linearDark).toContain('--linear-app-content-surface: #0a0d16;');
+    expect(dsDark).toContain('--app-shell-content-surface: #0a0d16;');
     expect(linearDark).toContain('--linear-bg-surface-1: #0f1420;');
-    expect(linearDark).toContain(
-      '--linear-app-sidebar-background-rgb: 6 8 13;'
-    );
+    expect(dsDark).toContain('--app-shell-sidebar-background-rgb: 6 8 13;');
   });
 
   it('uses Ion electric blue for routine action, focus, and selection', () => {
