@@ -7,6 +7,7 @@ const mocks = vi.hoisted(() => ({
   getLibraryAssetShareMapForProfile: vi.fn(),
   getLibraryMerchCardsForProfile: vi.fn(),
   getLibraryProfileStateMapForProfile: vi.fn(),
+  listArtistRulesForProfile: vi.fn(),
   listCreatorDocuments: vi.fn(),
   loadAppShellRouteContext: vi.fn(),
   loadArchivedReleaseMatrixForProfile: vi.fn(),
@@ -17,6 +18,9 @@ const mocks = vi.hoisted(() => ({
 
 vi.mock('@/lib/creator-documents/access', () => ({
   requireCreatorDocumentAccess: mocks.requireCreatorDocumentAccess,
+}));
+vi.mock('@/lib/artist-rules/store', () => ({
+  listArtistRulesForProfile: mocks.listArtistRulesForProfile,
 }));
 vi.mock('@/lib/db/creator-documents/store', () => ({
   listCreatorDocuments: mocks.listCreatorDocuments,
@@ -67,6 +71,20 @@ const privateDocument = {
   plainText: 'Private body',
   updatedAt: '2026-08-18T00:00:00.000Z',
 };
+const artistRule = {
+  id: '33333333-3333-4333-8333-333333333333',
+  category: 'visual',
+  ruleKey: 'palette',
+  instruction: 'never use yellow',
+  strength: 'hard_constraint' as const,
+  scope: 'artist' as const,
+  scopeValue: null,
+  allowOverride: false,
+  status: 'active' as const,
+  provenanceSource: 'artist' as const,
+  confirmedAt: '2026-08-28T12:00:00.000Z',
+  createdAt: '2026-08-28T12:00:00.000Z',
+};
 
 function getClientProps(result: Awaited<ReturnType<typeof LibraryPage>>) {
   const hydrate = result as ReactElement<{
@@ -105,6 +123,7 @@ describe('LibraryPage private document boundary', () => {
     mocks.loadArchivedReleaseMatrixForProfile.mockResolvedValue([]);
     mocks.getLibraryMerchCardsForProfile.mockResolvedValue([]);
     mocks.getLibraryProfileStateMapForProfile.mockResolvedValue(new Map());
+    mocks.listArtistRulesForProfile.mockResolvedValue([]);
     mocks.loadArtistHandleForProfile.mockResolvedValue(null);
     mocks.getLibraryAssetShareMapForProfile.mockResolvedValue(new Map());
     mocks.listVideosForProfile.mockResolvedValue([]);
@@ -154,6 +173,17 @@ describe('LibraryPage private document boundary', () => {
     expect(mocks.getLibraryMerchCardsForProfile).toHaveBeenCalled();
     expect(mocks.listVideosForProfile).toHaveBeenCalledWith({
       creatorProfileId: profileId,
+    });
+  });
+
+  it('passes artist rules into the library client', async () => {
+    mocks.listArtistRulesForProfile.mockResolvedValueOnce([artistRule]);
+
+    const result = await renderLibraryPage();
+
+    expect(mocks.listArtistRulesForProfile).toHaveBeenCalledWith(profileId);
+    expect(getClientProps(result)).toMatchObject({
+      initialArtistRules: [artistRule],
     });
   });
 });

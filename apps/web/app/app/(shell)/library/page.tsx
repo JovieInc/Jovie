@@ -1,4 +1,6 @@
 import { APP_ROUTES } from '@/constants/routes';
+import { listArtistRulesForProfile } from '@/lib/artist-rules/store';
+import type { ArtistRuleView } from '@/lib/artist-rules/types';
 import { requireCreatorDocumentAccess } from '@/lib/creator-documents/access';
 import type { CreatorDocumentListItem } from '@/lib/creator-documents/types';
 import { listCreatorDocuments } from '@/lib/db/creator-documents/store';
@@ -72,6 +74,7 @@ export default async function LibraryPage({
   let creatorDocuments: CreatorDocumentListItem[] = [];
   let creatorDocumentsNextCursor: string | null = null;
   let creatorDocumentsLoadFailed = false;
+  let artistRules: ArtistRuleView[] = [];
   let youtubeVideos: PublicVideoListItem[] = [];
   if (profileId && selectedProfile) {
     {
@@ -91,6 +94,13 @@ export default async function LibraryPage({
         );
         creatorDocumentsLoadFailed = true;
       }
+    }
+    try {
+      artistRules = await listArtistRulesForProfile(profileId);
+    } catch (error) {
+      void captureError('Artist rules load failed on library page', error, {
+        route: APP_ROUTES.LIBRARY,
+      });
     }
     {
       const queryClient = getQueryClient();
@@ -186,6 +196,7 @@ export default async function LibraryPage({
         creatorDocuments={creatorDocuments}
         creatorDocumentsNextCursor={creatorDocumentsNextCursor}
         creatorDocumentsLoadFailed={creatorDocumentsLoadFailed}
+        initialArtistRules={artistRules}
         youtubeVideos={youtubeVideos}
       />
     </HydrateClient>

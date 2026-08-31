@@ -3,6 +3,7 @@
 import { Button, ConfirmDialog } from '@jovie/ui';
 import { usePathname, useRouter, useSearchParams } from 'next/navigation';
 import { type KeyboardEvent, useRef, useState } from 'react';
+import type { ArtistRuleView } from '@/lib/artist-rules/types';
 import type { CreatorDocumentListItem } from '@/lib/creator-documents/types';
 import type { ReleaseViewModel } from '@/lib/discography/types';
 import type { LibraryAssetShareViewModel } from '@/lib/library/asset-share';
@@ -16,6 +17,7 @@ import type { LibraryProfileVisibility } from '@/lib/library/profile-visibility'
 import type { LibraryMerchCard } from '@/lib/merch/types';
 import type { PublicVideoListItem } from '@/lib/youtube-library/queries';
 import { ReleaseCatalogPageClient } from '../dashboard/releases/ReleaseCatalogPageClient';
+import { ArtistRulesSheet } from './ArtistRulesSheet';
 import { CreatorDocumentsWorkspace } from './CreatorDocumentsWorkspace';
 
 const STAGE_TABS = ['all', ...LIBRARY_LIFECYCLE_STAGES] as const;
@@ -32,6 +34,7 @@ export function LibraryPageClient({
   creatorDocuments = [],
   creatorDocumentsNextCursor = null,
   creatorDocumentsLoadFailed = false,
+  initialArtistRules = [],
   youtubeVideos = [],
 }: {
   readonly creatorProfileId: string;
@@ -49,6 +52,7 @@ export function LibraryPageClient({
   readonly creatorDocuments?: readonly CreatorDocumentListItem[];
   readonly creatorDocumentsNextCursor?: string | null;
   readonly creatorDocumentsLoadFailed?: boolean;
+  readonly initialArtistRules?: readonly ArtistRuleView[];
   readonly youtubeVideos?: readonly PublicVideoListItem[];
 }) {
   const pathname = usePathname();
@@ -109,30 +113,36 @@ export function LibraryPageClient({
   };
   return (
     <div className='flex min-h-0 flex-1 flex-col'>
-      <div
-        role='tablist'
-        aria-label='Library Stages'
-        data-testid='library-stage-tabs'
-        className='flex h-10 shrink-0 items-center gap-1 border-b border-subtle px-3'
-      >
-        {STAGE_TABS.map(tab => (
-          <Button
-            key={tab}
-            type='button'
-            size='sm'
-            variant='ghost'
-            id={`library-stage-${tab}-tab`}
-            role='tab'
-            aria-selected={stage === tab}
-            aria-controls='library-catalog-panel'
-            tabIndex={stage === tab ? 0 : -1}
-            onKeyDown={handleTabKeyDown}
-            onClick={() => setMode(tab)}
-            className='rounded-md px-3 py-1 text-sm text-secondary-token aria-selected:bg-surface-1 aria-selected:text-primary-token'
-          >
-            {LIBRARY_STAGE_LABELS[tab]}
-          </Button>
-        ))}
+      <div className='flex h-10 shrink-0 items-center justify-between gap-2 border-b border-subtle px-3'>
+        <div
+          role='tablist'
+          aria-label='Library Stages'
+          data-testid='library-stage-tabs'
+          className='flex min-w-0 flex-1 items-center gap-1 overflow-x-auto'
+        >
+          {STAGE_TABS.map(tab => (
+            <Button
+              key={tab}
+              type='button'
+              size='sm'
+              variant='ghost'
+              id={`library-stage-${tab}-tab`}
+              role='tab'
+              aria-selected={stage === tab}
+              aria-controls='library-catalog-panel'
+              tabIndex={stage === tab ? 0 : -1}
+              onKeyDown={handleTabKeyDown}
+              onClick={() => setMode(tab)}
+              className='rounded-md px-3 py-1 text-sm text-secondary-token aria-selected:bg-surface-1 aria-selected:text-primary-token'
+            >
+              {LIBRARY_STAGE_LABELS[tab]}
+            </Button>
+          ))}
+        </div>
+        <ArtistRulesSheet
+          creatorProfileId={creatorProfileId}
+          initialRules={initialArtistRules}
+        />
       </div>
       {documentId ? (
         <div
