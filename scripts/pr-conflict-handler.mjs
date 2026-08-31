@@ -6,7 +6,7 @@ import {
   annotateNativeMergeQueue,
   fetchNativeMergeQueue,
 } from './lib/github-merge-queue.mjs';
-import { fetchOpenPrsRest } from './lib/github-open-prs-rest.mjs';
+import { hydrateOpenPrStatusContexts } from './lib/github-open-prs-rest.mjs';
 import { tryGitHubRebase } from './lib/github-update-branch.mjs';
 import {
   buildPlan,
@@ -14,6 +14,7 @@ import {
   DEFAULT_REQUIRED_CHECKS,
   formatPlan,
   parseConflictFxCohortComments,
+  requireSuccessfulMutationResults,
 } from './lib/pr-conflict-handler.mjs';
 
 const execFileAsync = promisify(execFile);
@@ -207,19 +208,64 @@ async function ghJson(args, { retries = 3, token } = {}) {
 }
 
 async function fetchOpenPrs(options) {
-  const request = endpoint =>
+  const fields = [
+    'number',
+    'title',
+    'url',
+    'author',
+    'createdAt',
+    'updatedAt',
+    'isDraft',
+    'autoMergeRequest',
+    'mergeable',
+    'mergeStateStatus',
+    'baseRefName',
+    'baseRefOid',
+    'headRefName',
+    'headRefOid',
+    'headRepository',
+    'headRepositoryOwner',
+    'isCrossRepository',
+    'labels',
+    'changedFiles',
+    'additions',
+    'deletions',
+    'maintainerCanModify',
+  ];
+  const request = ({ owner, name, query }) =>
     ghJson([
       'api',
-      '--method',
-      'GET',
-      '-H',
-      'Accept: application/vnd.github+json',
-      endpoint,
+      'graphql',
+      '-f',
+      `query=${query}`,
+      '-F',
+      `owner=${owner}`,
+      '-F',
+      `name=${name}`,
     ]);
-  const prs = await fetchOpenPrsRest({
+  // Metadata without statusCheckRollup is a small paginated GraphQL query.
+  // Hydrate only the trusted commit-status receipts needed for actual
+  // conflicts, with bounded parallelism. This avoids the former 3*N REST
+  // inventory fanout while preserving exact head/base identity.
+  const metadata = await ghJson([
+    'pr',
+    'list',
+    '--repo',
+    options.repo,
+    '--state',
+    'open',
+    '--limit',
+    String(options.limit),
+    '--json',
+    fields.join(','),
+  ]);
+  const prs = await hydrateOpenPrStatusContexts({
     repo: options.repo,
-    limit: options.limit,
+    prs: metadata,
     request,
+    includeStatuses: pr =>
+      pr.mergeable === 'CONFLICTING' || pr.mergeStateStatus === 'DIRTY',
+    batchSize: 40,
   });
   const [owner, name] = options.repo.split('/');
   const queueToken = process.env.GH_QUEUE_TOKEN || process.env.GH_TOKEN;
@@ -245,7 +291,7 @@ async function fetchOpenPrs(options) {
     },
   });
   annotateNativeMergeQueue(prs, queuePositions);
-  return { prs, degradedChecks: false };
+  return { prs, degradedChecks: true };
 }
 
 async function fetchCohortHistory(options) {
@@ -261,57 +307,36 @@ async function fetchCohortHistory(options) {
   return parseConflictFxCohortComments(comments);
 }
 
-async function ensureLabel(repo, label, color, description) {
-  try {
-    await execFileAsync(
-      'gh',
-      [
-        'label',
-        'create',
-        label,
-        '--repo',
-        repo,
-        '--color',
-        color,
-        '--description',
-        description,
-      ],
-      { encoding: 'utf8' }
+async function withMutationToken(run) {
+  const token = process.env.GH_MUTATION_TOKEN;
+  if (!token) {
+    throw new Error(
+      'GH_MUTATION_TOKEN is required for conflict-controller mutations'
     );
-  } catch (error) {
-    const stderr = `${error.stderr ?? ''}${error.stdout ?? ''}`;
-    if (/already exists/i.test(stderr)) return;
-    throw error;
   }
-}
-
-async function addLabel(repo, number, label) {
-  await execFileAsync(
-    'gh',
-    ['pr', 'edit', String(number), '--repo', repo, '--add-label', label],
-    {
-      encoding: 'utf8',
-    }
-  );
+  const hadToken = Object.hasOwn(process.env, 'GH_TOKEN');
+  const priorToken = process.env.GH_TOKEN;
+  process.env.GH_TOKEN = token;
+  try {
+    return await run();
+  } finally {
+    if (hadToken) process.env.GH_TOKEN = priorToken;
+    else delete process.env.GH_TOKEN;
+  }
 }
 
 async function executePlan(plan, options) {
   if (options.dryRun) return [];
-  const results = [];
-  await ensureLabel(
-    options.repo,
-    options.blockedLabel,
-    'D93F0B',
-    'Required checks are failing; fix CI before freshness updates'
+  const mutableItems = plan.items.filter(
+    item => item.action === 'request_github_rebase'
   );
+  if (mutableItems.length === 0) return [];
 
-  for (const item of plan.items) {
-    logDecision(item, { phase: 'execute' });
-    try {
-      if (item.action === 'flag_blocked_checks' && item.label) {
-        await addLabel(options.repo, item.number, item.label);
-        results.push({ pr: item.number, ok: true, action: item.action });
-      } else if (item.action === 'request_github_rebase') {
+  return withMutationToken(async () => {
+    const results = [];
+    for (const item of mutableItems) {
+      logDecision(item, { phase: 'execute' });
+      try {
         const result = await tryGitHubRebase({
           repo: options.repo,
           pr: item.pr,
@@ -321,25 +346,25 @@ async function executePlan(plan, options) {
           dryRun: false,
         });
         results.push({ pr: item.number, action: item.action, ...result });
-      }
-    } catch (error) {
-      results.push({
-        pr: item.number,
-        ok: false,
-        action: item.action,
-        error: error.message,
-      });
-      console.error(
-        JSON.stringify({
-          ts: new Date().toISOString(),
+      } catch (error) {
+        results.push({
           pr: item.number,
+          ok: false,
           action: item.action,
           error: error.message,
-        })
-      );
+        });
+        console.error(
+          JSON.stringify({
+            ts: new Date().toISOString(),
+            pr: item.number,
+            action: item.action,
+            error: error.message,
+          })
+        );
+      }
     }
-  }
-  return results;
+    return results;
+  });
 }
 
 async function main() {
@@ -377,6 +402,7 @@ async function main() {
       JSON.stringify({ ts: new Date().toISOString(), results }, null, 2)
     );
   }
+  requireSuccessfulMutationResults(results);
 }
 
 main().catch(error => {

@@ -2,6 +2,7 @@ import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { describe, expect, it } from 'vitest';
 import {
+  buildConflictCohortLiveHeadQuery,
   buildConflictFxCohortMarker,
   buildConflictFxPrompt,
   buildConflictFxStatusDescription,
@@ -17,9 +18,13 @@ import {
   CONFLICT_STEERING_EXCEPTION_SCHEMA,
   classifyPr,
   computeAdaptiveConcurrency,
+  computeConflictCohortReadBudget,
+  indexLatestConflictCohortCiRuns,
   orderPrsDependencyAware,
   parseConflictFxCohortComments,
   parseConflictFxReceipt,
+  reconcileConflictCohortLiveHeads,
+  requireSuccessfulMutationResults,
   summarizeChecks,
 } from '../pr-conflict-handler.mjs';
 
@@ -234,6 +239,26 @@ describe('PR freshness classification', () => {
 
     expect(result.state).toBe('BLOCKED');
     expect(result.reason).toContain('PR Ready:FAILURE');
+  });
+
+  it('does not falsely claim first-fail FX ownership for a generic BLOCKED state', () => {
+    const plan = buildPlan(
+      [
+        pr({
+          mergeStateStatus: 'BLOCKED',
+          statusCheckRollup: [],
+        }),
+      ],
+      { requiredChecks: [] }
+    );
+
+    expect(plan.items[0]).toMatchObject({
+      action: 'skip_non_conflict_blocker',
+      triggersCi: false,
+      label: undefined,
+    });
+    expect(plan.items[0].actionReason).toContain('not a merge conflict');
+    expect(plan.items[0].actionReason).not.toContain('owns this exact head');
   });
 
   it('classifies mergeable stale branches as BEHIND for update-branch', () => {
@@ -728,6 +753,115 @@ describe('trusted exact-head conflict receipts', () => {
   });
 });
 
+describe('mutation result gate', () => {
+  it('fails closed when any planned rebase mutation is not proven successful', () => {
+    expect(() =>
+      requireSuccessfulMutationResults([
+        { pr: 41, ok: true, action: 'request_github_rebase' },
+        {
+          pr: 42,
+          ok: false,
+          action: 'request_github_rebase',
+          category: 'auth',
+        },
+      ])
+    ).toThrow('conflict-controller mutations failed closed (1/2): #42:auth');
+  });
+
+  it('accepts an empty or entirely successful mutation receipt', () => {
+    expect(requireSuccessfulMutationResults([])).toEqual([]);
+    expect(
+      requireSuccessfulMutationResults([
+        { pr: 43, ok: true, action: 'request_github_rebase' },
+      ])
+    ).toHaveLength(1);
+  });
+});
+
+describe('conflict cohort repository-read budget', () => {
+  const candidates = Array.from({ length: 40 }, (_, index) => ({
+    pr: 17000 + index,
+    sourceHead: `${index.toString(16).padStart(2, '0')}${'a'.repeat(38)}`,
+    resolvedHead: `${index.toString(16).padStart(2, '0')}${'b'.repeat(38)}`,
+  }));
+
+  it('keeps the maximum 40-PR cohort below the repository token budget', () => {
+    const budget = computeConflictCohortReadBudget({ cohortSize: 40 });
+
+    expect(budget).toMatchObject({
+      pollIterations: 40,
+      fixedReadCeiling: 220,
+      worstCaseReads: 460,
+      repositoryReadLimit: 1000,
+      withinRepositoryReadLimit: true,
+    });
+    const oldPerCandidatePolling =
+      budget.fixedReadCeiling + budget.pollIterations * candidates.length;
+    expect(oldPerCandidatePolling).toBeGreaterThan(1000);
+    expect(() => computeConflictCohortReadBudget({ cohortSize: 41 })).toThrow(
+      /exceeds cap 40/u
+    );
+  });
+
+  it('batches exact live heads and marks changed or missing PRs terminal', () => {
+    const query = buildConflictCohortLiveHeadQuery(candidates);
+    expect(query.match(/pullRequest\(number:/gu)).toHaveLength(40);
+    expect(query).not.toContain(candidates[0].resolvedHead);
+
+    const repository = Object.fromEntries(
+      candidates.map((candidate, index) => [
+        `p${index}`,
+        {
+          number: candidate.pr,
+          state: 'OPEN',
+          headRefOid:
+            index === 3 ? `${'f'.repeat(40)}` : candidate.resolvedHead,
+        },
+      ])
+    );
+    delete repository.p4;
+    const live = reconcileConflictCohortLiveHeads({
+      candidates,
+      response: { data: { repository } },
+    });
+
+    expect(live[0]).toMatchObject({ healthy: true, reason: 'exact_head' });
+    expect(live[3]).toMatchObject({ healthy: false, reason: 'stale_head' });
+    expect(live[4]).toMatchObject({
+      healthy: false,
+      reason: 'live_pr_missing_or_closed',
+    });
+  });
+
+  it('indexes the newest exact-head CI run across five shared pages', () => {
+    const pages = Array.from({ length: 5 }, (_, page) => ({
+      workflow_runs: Array.from({ length: 100 }, (_, index) => ({
+        id: page * 100 + index,
+        event: 'pull_request',
+        head_sha: `${'f'.repeat(38)}${page}${index % 10}`,
+        created_at: `2026-08-30T${String(10 + page).padStart(2, '0')}:00:${String(index % 60).padStart(2, '0')}Z`,
+      })),
+    }));
+    pages[0].workflow_runs[0] = {
+      id: 1,
+      event: 'pull_request',
+      head_sha: candidates[0].resolvedHead,
+      created_at: '2026-08-30T10:00:00Z',
+    };
+    pages[4].workflow_runs[99] = {
+      id: 2,
+      event: 'pull_request_target',
+      head_sha: candidates[0].resolvedHead,
+      created_at: '2026-08-30T14:00:00Z',
+    };
+
+    const indexed = indexLatestConflictCohortCiRuns({ candidates, pages });
+    expect(indexed[candidates[0].resolvedHead]?.id).toBe(2);
+    expect(indexed[candidates[1].resolvedHead]).toBeUndefined();
+    expect(Object.keys(indexed)).toEqual([candidates[0].resolvedHead]);
+  });
+});
+
 describe('adaptive conflict capacity', () => {
   const capacityInput = {
     runnerCapacity: 120,
@@ -952,6 +1086,9 @@ describe('conflict workflow contract', () => {
   });
 
   it('persists trusted adaptive cohort evidence after the repair matrix settles', () => {
+    const cohortStep = workflowStep(
+      'Reconcile exact outcomes and persist trusted cohort receipt'
+    );
     expect(WORKFLOW).toMatch(
       new RegExp(
         `(?:buildConflictFxCohortMarker|${CONFLICT_FX_COHORT_SCHEMA.replaceAll('/', '\\/')})`,
@@ -974,7 +1111,14 @@ describe('conflict workflow contract', () => {
     expect(WORKFLOW).toMatch(
       /gh\s+api\s+-X\s+POST[^\n]*(?:issues\/[^\s"']+\/comments|issues\/\$[A-Z_]+\/comments)/iu
     );
-    expect(WORKFLOW).toContain('head_sha=$resolved_head');
+    expect(WORKFLOW).toContain('buildConflictCohortLiveHeadQuery');
+    expect(WORKFLOW).toContain('indexLatestConflictCohortCiRuns');
+    expect(WORKFLOW).toContain('page <= max_ci_run_pages');
+    expect(WORKFLOW).not.toContain(
+      'actions/workflows/ci.yml/runs?head_sha=$resolved_head'
+    );
+    expect(cohortStep).toContain('--paginate --slurp');
+    expect(cohortStep).not.toContain('| head -1 || true');
     expect(WORKFLOW).toContain('ci-latencies.txt');
     expect(WORKFLOW).toContain('latest_check("PR Ready")');
     expect(WORKFLOW).toContain('latest_check("Migration Guard")');

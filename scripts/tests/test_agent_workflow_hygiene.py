@@ -541,6 +541,67 @@ def test_conflict_handler_coalesces_audits_without_cancelling_manual_apply() -> 
     assert 'MODE="--apply"' in block
 
 
+def test_conflict_handler_reserves_app_token_for_bounded_mutations() -> None:
+    """Fleet reads cannot consume the App installation's writer budget."""
+    block = _job_block("pr-conflict-handler.yml", "plan")
+    ledger = _job_block("pr-conflict-handler.yml", "record_cohort")
+
+    assert "GH_TOKEN: ${{ github.token }}" in block
+    assert "GH_QUEUE_TOKEN: ${{ github.token }}" in block
+    assert "GH_MUTATION_TOKEN: ${{ steps.app-token.outputs.token }}" in block
+    assert 'GH_TOKEN="$GH_MUTATION_TOKEN" gh api -X POST' in block
+    fleet = (
+        REPO_ROOT / "scripts/pr-conflict-handler.mjs"
+    ).read_text(encoding="utf-8")
+    assert "hydrateOpenPrStatusContexts" in fleet
+    assert "statusCheckRollup'].join" not in fleet
+    assert "GH_TOKEN: ${{ github.token }}" in ledger
+    assert "GH_LEDGER_TOKEN: ${{ steps.app-token.outputs.token }}" in ledger
+    assert 'GH_TOKEN="$GH_LEDGER_TOKEN" gh api -X POST' in ledger
+    assert 'GH_TOKEN="$GH_LEDGER_TOKEN" gh api -X PATCH' in ledger
+
+
+def test_conflict_cohort_batches_poll_reads_and_fails_closed_on_ledger_lookup() -> None:
+    """A 40-PR cohort must stay under the workflow token's read budget."""
+    ledger = _job_block("pr-conflict-handler.yml", "record_cohort")
+    assignments = {}
+    for name in (
+        "poll_interval_seconds",
+        "poll_deadline_seconds",
+        "max_ci_run_pages",
+        "max_cohort_size",
+    ):
+        match = re.search(rf"^\s*{name}=(\d+)$", ledger, re.MULTILINE)
+        assert match, name
+        assignments[name] = int(match.group(1))
+
+    polls = (
+        assignments["poll_deadline_seconds"]
+        + assignments["poll_interval_seconds"]
+        - 1
+    ) // assignments["poll_interval_seconds"]
+    fixed_read_ceiling = 5 * assignments["max_cohort_size"] + 20
+    worst_case_reads = fixed_read_ceiling + polls * (
+        1 + assignments["max_ci_run_pages"]
+    )
+    assert worst_case_reads == 460
+    assert worst_case_reads < 1000
+
+    poll = ledger.split(
+        "deadline=$((SECONDS + poll_deadline_seconds))", 1
+    )[1].split("timed_out=", 1)[0]
+    assert 'repos/$REPOSITORY/pulls/$pr' not in poll
+    assert "actions/workflows/ci.yml/runs?head_sha" not in poll
+    assert "buildConflictCohortLiveHeadQuery" in poll
+    assert "indexLatestConflictCohortCiRuns" in poll
+    assert "gh api graphql" in poll
+    assert "page <= max_ci_run_pages" in poll
+
+    assert "--paginate --slurp" in ledger
+    assert "duplicate cohort receipts" in ledger
+    assert "| head -1 || true" not in ledger
+
+
 def test_workflow_run_controllers_ignore_non_pr_and_stale_runs() -> None:
     """Main/merge-group completions must not wake PR fleet controllers."""
     for workflow, job_name in (

@@ -21,6 +21,158 @@ export const CONFLICT_PERMISSION_EXCEPTION_SCHEMA =
 export const CONFLICT_FX_TRUSTED_ACTORS = Object.freeze(['jovie-bot[bot]']);
 export const CONFLICT_FX_MAX_HEALTHY_CI_LATENCY_MS = 12 * 60 * 1000;
 export const CONFLICT_FX_MAX_CI_LATENCY_REGRESSION_RATIO = 1.5;
+export const CONFLICT_FX_COHORT_REPOSITORY_READ_LIMIT = 1000;
+
+function validateCohortCandidates(candidates, maxCohortSize = 40) {
+  if (!Array.isArray(candidates) || candidates.length > maxCohortSize) {
+    throw new Error(
+      `conflict cohort must contain at most ${maxCohortSize} candidates`
+    );
+  }
+  const seen = new Set();
+  return candidates.map((candidate, index) => {
+    const pr = Number(candidate?.pr);
+    const resolvedHead = String(candidate?.resolvedHead ?? '');
+    if (!Number.isSafeInteger(pr) || pr < 1 || seen.has(pr)) {
+      throw new Error(`conflict cohort candidate ${index} has invalid PR`);
+    }
+    if (!/^[0-9a-f]{40}$/u.test(resolvedHead)) {
+      throw new Error(`conflict cohort PR #${pr} has invalid resolved head`);
+    }
+    seen.add(pr);
+    return { ...candidate, pr, resolvedHead };
+  });
+}
+
+export function computeConflictCohortReadBudget({
+  cohortSize,
+  pollIntervalSeconds = 30,
+  pollDeadlineSeconds = 1200,
+  maxCiRunPages = 5,
+  maxCohortSize = 40,
+  repositoryReadLimit = CONFLICT_FX_COHORT_REPOSITORY_READ_LIMIT,
+}) {
+  for (const [name, value] of Object.entries({
+    cohortSize,
+    pollIntervalSeconds,
+    pollDeadlineSeconds,
+    maxCiRunPages,
+    maxCohortSize,
+    repositoryReadLimit,
+  })) {
+    if (!Number.isSafeInteger(value) || value < 1) {
+      throw new Error(`${name} must be a positive integer`);
+    }
+  }
+  if (cohortSize > maxCohortSize) {
+    throw new Error(
+      `conflict cohort size ${cohortSize} exceeds cap ${maxCohortSize}`
+    );
+  }
+  const pollIterations = Math.ceil(pollDeadlineSeconds / pollIntervalSeconds);
+  // Five one-time reads per candidate cover source/resolved receipts and
+  // final required checks. Twenty more cover the after-audit and ledger.
+  const fixedReadCeiling = 5 * maxCohortSize + 20;
+  const worstCaseReads =
+    fixedReadCeiling + pollIterations * (1 + maxCiRunPages);
+  return {
+    cohortSize,
+    maxCohortSize,
+    pollIterations,
+    fixedReadCeiling,
+    worstCaseReads,
+    repositoryReadLimit,
+    withinRepositoryReadLimit: worstCaseReads < repositoryReadLimit,
+  };
+}
+
+export function buildConflictCohortLiveHeadQuery(candidates) {
+  const normalized = validateCohortCandidates(candidates);
+  const selections = normalized
+    .map(
+      (candidate, index) =>
+        `p${index}:pullRequest(number:${candidate.pr}){number state headRefOid}`
+    )
+    .join(' ');
+  return `query($owner:String!,$name:String!){repository(owner:$owner,name:$name){${selections}}}`;
+}
+
+export function reconcileConflictCohortLiveHeads({ candidates, response }) {
+  const normalized = validateCohortCandidates(candidates);
+  const repository = response?.data?.repository;
+  if (!repository || typeof repository !== 'object') {
+    throw new Error('conflict cohort live-head query omitted repository data');
+  }
+  return normalized.map((candidate, index) => {
+    const live = repository[`p${index}`];
+    if (
+      !live ||
+      live.number !== candidate.pr ||
+      live.state !== 'OPEN' ||
+      !/^[0-9a-f]{40}$/u.test(live.headRefOid ?? '')
+    ) {
+      return {
+        pr: candidate.pr,
+        resolvedHead: candidate.resolvedHead,
+        healthy: false,
+        reason: 'live_pr_missing_or_closed',
+      };
+    }
+    if (live.headRefOid !== candidate.resolvedHead) {
+      return {
+        pr: candidate.pr,
+        resolvedHead: candidate.resolvedHead,
+        liveHead: live.headRefOid,
+        healthy: false,
+        reason: 'stale_head',
+      };
+    }
+    return {
+      pr: candidate.pr,
+      resolvedHead: candidate.resolvedHead,
+      liveHead: live.headRefOid,
+      healthy: true,
+      reason: 'exact_head',
+    };
+  });
+}
+
+export function indexLatestConflictCohortCiRuns({ candidates, pages }) {
+  const normalized = validateCohortCandidates(candidates);
+  if (!Array.isArray(pages) || pages.length > 5) {
+    throw new Error('conflict cohort CI pages must be an array of at most 5');
+  }
+  const candidateHeads = new Set(
+    normalized.map(candidate => candidate.resolvedHead)
+  );
+  const latest = new Map();
+  for (const page of pages) {
+    if (!Array.isArray(page?.workflow_runs)) {
+      throw new Error('conflict cohort CI page omitted workflow_runs');
+    }
+    for (const run of page.workflow_runs) {
+      if (
+        !candidateHeads.has(run?.head_sha) ||
+        !['pull_request', 'pull_request_target'].includes(run?.event)
+      ) {
+        continue;
+      }
+      const createdAt = Date.parse(run.created_at ?? '');
+      if (!Number.isFinite(createdAt)) {
+        throw new Error(
+          `conflict cohort CI run for ${run.head_sha} has invalid created_at`
+        );
+      }
+      const existing = latest.get(run.head_sha);
+      if (!existing || createdAt > existing.createdAt) {
+        latest.set(run.head_sha, { createdAt, run });
+      }
+    }
+  }
+  return Object.fromEntries(
+    [...latest].map(([head, value]) => [head, value.run])
+  );
+}
 
 const TERMINAL_FAILURES = new Set([
   'FAILURE',
@@ -812,7 +964,6 @@ export function orderPrsDependencyAware(prs) {
 
 export function decideAction(classification, context = {}) {
   const {
-    blockedLabel = DEFAULT_BLOCKED_LABEL,
     availableCiSlots = 0,
     plannedCiTriggers = 0,
     availableRebaseSlots = availableCiSlots,
@@ -851,11 +1002,10 @@ export function decideAction(classification, context = {}) {
 
   if (classification.state === 'BLOCKED') {
     return {
-      action: 'flag_blocked_checks',
-      label: blockedLabel,
+      action: 'skip_non_conflict_blocker',
       triggersCi: false,
       reason:
-        'required checks are failing or absent; do not rebase and waste CI',
+        'this is not a merge conflict; preserve the exact head for its event-driven check or admission controller without claiming a human or FX owner here',
     };
   }
 
@@ -1126,6 +1276,22 @@ export function summarizePlan(items) {
       .filter(item => item.action === 'emit_steering_exception')
       .map(item => item.number),
   };
+}
+
+export function requireSuccessfulMutationResults(results = []) {
+  const failures = results.filter(result => result?.ok !== true);
+  if (failures.length > 0) {
+    const summary = failures
+      .map(
+        result =>
+          `#${result.pr}:${result.category ?? result.error ?? 'unknown_failure'}`
+      )
+      .join(', ');
+    throw new Error(
+      `conflict-controller mutations failed closed (${failures.length}/${results.length}): ${summary}`
+    );
+  }
+  return results;
 }
 
 export function formatPlan(plan, { dryRun = true } = {}) {
