@@ -41,35 +41,61 @@ describe('PR visual review workflow', () => {
     expect(workflow).not.toContain('--jq --arg marker');
   });
 
-  it('keeps capture and screenshot review visibly advisory without terminal queue failures', () => {
+  // JOV-5459 (Tim lock 2026-08-30): Visual ENOENT is FAIL, not advisory.
+  it('fails the capture job closed when visual evidence is missing (JOV-5459)', () => {
     const workflow = readFileSync(workflowPath, 'utf8');
     const capture = jobBlock(workflow, 'capture', 'review');
     const review = jobBlock(workflow, 'review');
 
+    expect(capture).toContain('name: Capture changed UI (desktop + mobile)');
+    // The capture JOB must not swallow its own failure. Individual stages keep
+    // continue-on-error so the single fail-closed gate step is the enforcement
+    // point after evidence is recorded.
+    expect(capture).not.toMatch(/^    continue-on-error: true/m);
+    expect(capture).toContain('name: Enforce visual evidence (fail-closed)');
     expect(capture).toContain(
-      'name: Capture changed UI (desktop + mobile) (advisory)'
+      'run: node .github/scripts/pr-visual-evidence-gate.mjs'
     );
-    expect(capture).toContain('continue-on-error: true');
-    expect(capture).toMatch(
-      /id: build\n        if: steps\.route\.outputs\.should_review == 'true'\n        continue-on-error: true/
-    );
-    expect(capture).toMatch(
-      /id: server\n        if: steps\.route\.outputs\.should_review == 'true' && steps\.build\.outcome == 'success'\n        continue-on-error: true/
-    );
-    expect(capture).toMatch(
-      /id: routed_capture\n        if: steps\.route\.outputs\.should_review == 'true' && steps\.build\.outcome == 'success' && steps\.server\.outcome == 'success'\n        continue-on-error: true/
-    );
-    expect(capture).toContain('name: Record advisory capture outcome');
-    expect(capture).toContain('advisory-outcome.json');
-    expect(capture).toContain(
-      "status: failedStages.length ? 'unavailable' : 'completed'"
-    );
+    // The old warning-and-continue advisory outcome is banned.
+    expect(capture).not.toContain('Record advisory capture outcome');
+    expect(capture).not.toContain('does not block merging');
     expect(capture).toContain('name: Upload visual evidence');
     expect(capture).toMatch(
       /id: upload\n        if: always\(\)\n        continue-on-error: true/
     );
-    expect(capture).toContain('name: Report artifact upload advisory outcome');
-    expect(capture).toContain('if: always()');
+    // A failed evidence upload is missing evidence, so it must exit non-zero.
+    expect(capture).toContain('name: Fail on missing evidence upload');
+    expect(capture).toContain('exit 1');
+    // The AI product-findings review stays advisory; the evidence gate above
+    // is the fail-closed surface.
     expect(review).toContain('continue-on-error: true');
+  });
+
+  it('fails the baseline refresh on self-healed missing baselines (JOV-5459)', () => {
+    const refreshWorkflow = readFileSync(
+      resolve(repoRoot, '.github/workflows/visual-regression.yml'),
+      'utf8'
+    );
+
+    const guardStart = refreshWorkflow.indexOf(
+      'name: Fail on self-healed missing baselines (ENOENT is FAIL)'
+    );
+    expect(guardStart, 'missing ENOENT guard step').toBeGreaterThanOrEqual(0);
+    const prCreationStart = refreshWorkflow.indexOf(
+      'name: Create or update baseline PR (refresh only)'
+    );
+    expect(
+      guardStart,
+      'ENOENT guard must run before the baseline auto-PR'
+    ).toBeLessThan(prCreationStart);
+
+    const guardBlock = refreshWorkflow.slice(guardStart, prCreationStart);
+    expect(guardBlock).toContain(
+      'git ls-files --others --exclude-standard "$SNAPSHOT_DIR"'
+    );
+    expect(guardBlock).toContain('exit 1');
+    expect(guardBlock).toContain(
+      'Visual ENOENT is FAIL, not advisory (JOV-5459)'
+    );
   });
 });

@@ -243,6 +243,18 @@ jobs:
             git status --short "$SNAPSHOT_DIR"
           fi
 
+      - name: Fail on self-healed missing baselines (ENOENT is FAIL)
+        if: env.REFRESH_MODE == 'true' && steps.visual.outcome == 'success'
+        run: |
+          set -euo pipefail
+          missing_baselines="$(git ls-files --others --exclude-standard "$SNAPSHOT_DIR")"
+          if [ -n "$missing_baselines" ]; then
+            echo "::error::Visual ENOENT is FAIL, not advisory (JOV-5459). Missing baseline files were generated during refresh:"
+            printf '%s\n' "$missing_baselines"
+            exit 1
+          fi
+          echo "No self-healed missing baselines detected."
+
       - name: Generate Jovie Bot token (refresh only)
         id: app-token
         if: env.REFRESH_MODE == 'true' && steps.diff.outputs.changed == 'true'
