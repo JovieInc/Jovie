@@ -20,7 +20,7 @@ function assertPublishWorkflowContract(source: string): void {
     'actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1'
   );
   expect(source).toContain(
-    'pnpm/action-setup@fc06bc1257f339d1d5d8b3a19a8cae5388b55320'
+    'pnpm/action-setup@0977fd99725f1db4007ccb2928dbb4e90d06cc86'
   );
   expect(source).toContain(
     'actions/setup-node@820762786026740c76f36085b0efc47a31fe5020'
