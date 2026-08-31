@@ -89,7 +89,9 @@ describe('Auto-Ready fleet live-state guard', () => {
     expect(fleetScript).toContain('.branch == $expected_branch');
     expect(fleetScript).toContain('before_mutation="$(read_state "$n"');
     expect(fleetScript.indexOf('before_mutation="$(read_state')).toBeLessThan(
-      fleetScript.indexOf('if ! promote_with_auto_merge "$n" "$expected_head"')
+      fleetScript.indexOf(
+        'promote_with_auto_merge "$n" "$expected_head" || pair_status=$?'
+      )
     );
   });
 
@@ -106,7 +108,7 @@ describe('Auto-Ready fleet live-state guard', () => {
     expect(fleetScript).toContain(
       'gh_retry pr merge "$n" -R "$REPO" --disable-auto'
     );
-    expect(fleetScript).toContain('undo_ready "$n" || true');
+    expect(fleetScript).toContain('if ! undo_ready "$n"; then');
     expect(fleetScript).toContain('after="$(read_state "$n"');
     expect(fleetScript).toContain('auto_merge_after=');
     expect(fleetScript).toContain('queued_after=');
@@ -117,7 +119,21 @@ describe('Auto-Ready fleet live-state guard', () => {
     expect(fleetScript).toContain('gh_retry pr ready "$n" -R "$REPO" --undo');
     expect(fleetScript).toContain('restored="$(read_state "$n"');
     expect(fleetScript.indexOf('after="$(read_state')).toBeGreaterThan(
-      fleetScript.indexOf('if ! promote_with_auto_merge "$n" "$expected_head"')
+      fleetScript.indexOf(
+        'promote_with_auto_merge "$n" "$expected_head" || pair_status=$?'
+      )
+    );
+  });
+
+  it('reconciles an interrupted ready-without-auto-merge state', () => {
+    expect(fleetScript).toContain('recover_ready_without_auto_merge');
+    expect(fleetScript).toContain('state_needs_pairing');
+    expect(fleetScript).toContain(
+      '.draft == false and .autoMerge == false and .queued == false'
+    );
+    expect(fleetScript).not.toContain('undo_ready "$n" || true');
+    expect(fleetScript).toContain(
+      'stopping: #$n could not be returned to a closed-loop state'
     );
   });
 });
@@ -141,7 +157,9 @@ describe('Auto-Ready provenance selector', () => {
     expect(
       fleetScript.indexOf('mutation_verdict="$(resolve_promotion')
     ).toBeLessThan(
-      fleetScript.indexOf('if ! promote_with_auto_merge "$n" "$expected_head"')
+      fleetScript.indexOf(
+        'promote_with_auto_merge "$n" "$expected_head" || pair_status=$?'
+      )
     );
     expect(fleetScript).toContain('READY_ATTEMPTED_FOR=');
     expect(fleetScript).toContain('refusing a second paired promotion');

@@ -845,8 +845,83 @@ def test_auto_ready_leaves_human_head_without_fx_provenance_draft(
     )
 
     assert result.returncode == 0, result.stderr
-    assert "leaving draft" in result.stdout
+    assert "leaving PR unchanged" in result.stdout
     assert "pr ready" not in call_log.read_text(encoding="utf-8")
+
+
+def test_auto_ready_recovers_interrupted_ready_without_auto_merge(
+    tmp_path: Path,
+) -> None:
+    """A later pass closes the interruption gap between ready and auto-merge."""
+    fake_bin = tmp_path / "bin"
+    fake_bin.mkdir()
+    state_file = tmp_path / "state"
+    state_file.write_text("orphan-ready", encoding="utf-8")
+    call_log = tmp_path / "calls.log"
+    head = "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee"
+    fake_gh = fake_bin / "gh"
+    fake_gh.write_text(
+        textwrap.dedent(
+            f"""\
+            #!/usr/bin/env bash
+            set -euo pipefail
+            printf '%s\n' "$*" >> {call_log}
+            if [[ "$1 $2" == "pr list" ]]; then
+              printf '%s\n' '[{{"n":88,"t":"interrupted pair","draft":false,"head":"codex/interrupted","oid":"{head}","author":"jovie-bot[bot]","L":[]}}]'
+            elif [[ "$1 $2" == "pr ready" ]]; then
+              printf 'recovery must not repeat the ready mutation\n' >&2
+              exit 2
+            elif [[ "$1 $2" == "pr merge" ]]; then
+              if [[ " $* " == *" --auto "* ]]; then
+                printf '%s\n' auto-enabled > {state_file}
+              else
+                printf 'unexpected merge mutation: %s\n' "$*" >&2
+                exit 2
+              fi
+            elif [[ "$1" == "api" && "$2" == "graphql" ]]; then
+              if [[ "$(cat {state_file})" == "auto-enabled" ]]; then
+                printf '%s\n' '{{"draft":false,"head":"{head}","branch":"codex/interrupted","labels":[],"state":"OPEN","autoMerge":true,"queued":false}}'
+              else
+                printf '%s\n' '{{"draft":false,"head":"{head}","branch":"codex/interrupted","labels":[],"state":"OPEN","autoMerge":false,"queued":false}}'
+              fi
+            else
+              printf 'unexpected fake gh invocation: %s\n' "$*" >&2
+              exit 2
+            fi
+            """
+        ),
+        encoding="utf-8",
+    )
+    fake_gh.chmod(0o755)
+
+    env = os.environ.copy()
+    env.update(
+        {
+            "PATH": f"{fake_bin}:{env['PATH']}",
+            "REPO": "JovieInc/Jovie",
+            "GH_RETRY_ATTEMPTS": "1",
+            "JOVIE_AGENT_PROFILE": "coder",
+        }
+    )
+    result = subprocess.run(
+        ["bash", str(REPO_ROOT / "scripts/auto-ready-agent-drafts.sh")],
+        cwd=REPO_ROOT,
+        env=env,
+        text=True,
+        capture_output=True,
+        check=False,
+        timeout=20,
+    )
+
+    assert result.returncode == 0, result.stderr
+    assert "recovered ready #88 by enabling native auto-merge" in result.stdout
+    assert state_file.read_text(encoding="utf-8").strip() == "auto-enabled"
+    calls = call_log.read_text(encoding="utf-8")
+    assert "pr ready" not in calls
+    assert (
+        f"pr merge 88 -R JovieInc/Jovie --auto --squash "
+        f"--match-head-commit {head}"
+    ) in calls
 
 
 def test_scheduled_synthetic_alerts_before_preserving_failure() -> None:

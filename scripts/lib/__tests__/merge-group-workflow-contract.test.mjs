@@ -129,6 +129,27 @@ function parseExactCiFastFailureOperands(script) {
   return operands;
 }
 
+function workflowDeclaresReadyForReviewType(source) {
+  const lines = source.split('\n');
+  for (let index = 0; index < lines.length; index += 1) {
+    const match = lines[index].match(/^(\s*)types:\s*(.*?)\s*$/);
+    if (!match) continue;
+
+    const indentation = match[1].length;
+    const declaration = [match[2].replace(/\s+#.*$/, '')];
+    for (let next = index + 1; next < lines.length; next += 1) {
+      const line = lines[next];
+      if (line.trim() === '' || /^\s*#/.test(line)) continue;
+      const nextIndentation = line.match(/^\s*/)?.[0].length ?? 0;
+      if (nextIndentation <= indentation) break;
+      declaration.push(line.replace(/\s+#.*$/, '').trim());
+    }
+
+    if (/\bready_for_review\b/.test(declaration.join(' '))) return true;
+  }
+  return false;
+}
+
 describe('merge_group workflow contract', () => {
   it('accepts reordered exact ci-fast failure operands', () => {
     expect(
@@ -205,10 +226,27 @@ describe('merge_group workflow contract', () => {
       .filter(file => file.endsWith('.yml') || file.endsWith('.yaml'))
       .filter(file => {
         const source = readFileSync(resolve(workflowDir, file), 'utf8');
-        return /types:\s*\[[^\]]*\bready_for_review\b[^\]]*\]/.test(source);
+        return workflowDeclaresReadyForReviewType(source);
       });
 
     expect(offenders).toEqual([]);
+  });
+
+  it('rejects every valid YAML spelling of a ready_for_review type', () => {
+    const unsafeDeclarations = [
+      'types: [opened, ready_for_review]',
+      'types: ready_for_review',
+      'types:\n  - opened\n  - ready_for_review',
+      'types: [\n  opened,\n  ready_for_review\n]',
+    ];
+    for (const declaration of unsafeDeclarations) {
+      expect(workflowDeclaresReadyForReviewType(declaration)).toBe(true);
+    }
+    expect(
+      workflowDeclaresReadyForReviewType(
+        'types:\n  - opened\n  - synchronize\n  - reopened'
+      )
+    ).toBe(false);
   });
 
   it('quarantines fixed unit capacity until all named warm receipts exist', () => {
