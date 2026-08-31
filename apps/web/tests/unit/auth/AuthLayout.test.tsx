@@ -137,6 +137,14 @@ describe('AuthLayout', () => {
     );
 
     expect(document.querySelector('.auth-showcase-panel')).not.toBeNull();
+    expect(
+      document.querySelector('[data-auth-editorial-card="desktop-only"]')
+    ).not.toBeNull();
+    expect(document.querySelector('[data-auth-shell]')).toHaveAttribute(
+      'data-auth-shell-kind',
+      'desktop-split-route'
+    );
+    expect(document.querySelector('.auth-desktop-only')).not.toBeNull();
   });
 
   it('keeps legal disclosure in document flow so it cannot overlay Need help', async () => {

@@ -15,6 +15,7 @@ import { APP_ROUTES } from '@/constants/routes';
 import { AUTH_FORM_MAX_WIDTH_CLASS } from '@/features/auth/constants';
 import { useAuthSafe } from '@/hooks/useClerkSafe';
 import { useMobileKeyboard } from '@/hooks/useMobileKeyboard';
+import { AUTH_SHELL_KIND } from '@/lib/auth/auth-shell-layout-contract';
 import { cn } from '@/lib/utils';
 import { AuthBrandPanel } from './AuthBrandPanel';
 
@@ -138,7 +139,10 @@ function SplitLayoutContent(props: AuthLayoutInnerProps) {
         <AuthFormColumn {...props} className='lg:max-w-120 lg:px-10' />
 
         {props.showLogo ? (
-          <div className='auth-desktop-only h-full w-full lg:flex lg:min-h-full'>
+          <div
+            className='auth-desktop-only h-full w-full lg:flex lg:min-h-full'
+            data-auth-editorial-card='desktop-only'
+          >
             <AuthBrandPanel className='h-full w-full' />
           </div>
         ) : null}
@@ -204,6 +208,11 @@ export function AuthLayout({
   return (
     <div
       data-auth-shell
+      data-auth-shell-kind={
+        isSplitVariant
+          ? AUTH_SHELL_KIND.desktopSplitRoute
+          : AUTH_SHELL_KIND.stackRoute
+      }
       data-auth-layout-variant={isSplitVariant ? 'split' : 'stack'}
       data-auth-chrome={chrome}
       className={cn(
