@@ -3,8 +3,11 @@ import { describe, it } from 'node:test';
 
 import {
   buildRoutingReceipt,
+  classifyAppServerObservation,
   parseRoutingReceipt,
+  planOfficialSymphonyRoute,
   selectSymphonyRoute,
+  settleOfficialSymphonyRoute,
   verifyRoutingReceipt,
 } from '../symphony-routing.mjs';
 
@@ -16,7 +19,7 @@ const models = {
   },
   'codex-sol': {
     model: 'gpt-5.6-sol',
-    capabilities: ['architecture', 'root-cause'],
+    capabilities: ['architecture', 'root-cause', 'code'],
   },
 };
 const issue = (title, description = '') => ({
@@ -26,16 +29,16 @@ const issue = (title, description = '') => ({
   labels: { nodes: [] },
   comments: { nodes: [] },
 });
-
 describe('Symphony routing receipts', () => {
   it('routes mechanical work to Luna and standard code to Luna', () => {
-    assert.equal(
-      selectSymphonyRoute({
-        issue: issue('Fix README typo'),
-        availableModels: models,
-      }).route.model,
-      'gpt-5.6-luna'
-    );
+    const mechanical = selectSymphonyRoute({
+      issue: issue('Fix README typo'),
+      availableModels: models,
+    }).route;
+    assert.equal(mechanical.model, 'gpt-5.6-luna');
+    assert.equal(mechanical.modelTier, 'economical');
+    assert.equal(mechanical.usageClass, 'economical-included');
+    assert.equal(mechanical.qualityThreshold, 70);
     assert.equal(
       selectSymphonyRoute({
         issue: issue('Add profile validation'),
@@ -62,6 +65,24 @@ describe('Symphony routing receipts', () => {
     );
   });
 
+  it('deliberate red: keeps protected and founder-review work off the economical tier', () => {
+    for (const title of [
+      'Rotate production credentials safely',
+      'Ship irreversible database migration',
+      'Prepare founder review for the release',
+      'Repair authentication security regression',
+    ]) {
+      const decision = selectSymphonyRoute({
+        issue: issue(title),
+        availableModels: models,
+      });
+      assert.equal(decision.status, 'selected');
+      assert.equal(decision.route.modelTier, 'premium');
+      assert.equal(decision.route.model, 'gpt-5.6-sol');
+      assert.match(decision.route.reason, /risk|ambiguity|root-cause/);
+    }
+  });
+
   it('escalates on unavailable or cooldown candidates and fails closed', () => {
     const escalated = selectSymphonyRoute({
       issue: issue('Add normal code'),
@@ -77,6 +98,7 @@ describe('Symphony routing receipts', () => {
         ...models,
         'codex-luna': { ...models['codex-luna'], available: false },
         'codex-terra': { ...models['codex-terra'], available: false },
+        'codex-sol': { ...models['codex-sol'], available: false },
       },
     });
     assert.equal(blocked.status, 'blocked');
@@ -208,5 +230,200 @@ describe('Symphony routing receipts', () => {
     });
     current.comments.nodes.push({ body: buildRoutingReceipt(second.route) });
     assert.equal(parseRoutingReceipt(current).model, 'gpt-5.6-terra');
+  });
+
+  it('deliberate red: escalates monotonically after test and process failures, then stops spend', () => {
+    const current = issue('Apply a bounded formatting repair');
+    const first = planOfficialSymphonyRoute({
+      issue: current,
+      availableModels: models,
+      now: 1_000,
+    });
+    assert.equal(first.status, 'selected');
+    assert.equal(first.receipt.modelTier, 'economical');
+    assert.equal(first.receipt.attemptCount, 1);
+
+    const afterTests = settleOfficialSymphonyRoute({
+      state: first.state,
+      issueState: 'In Progress',
+      processOutcome: { kind: 'test_failure' },
+      now: 2_000,
+    });
+    const second = planOfficialSymphonyRoute({
+      issue: current,
+      state: afterTests.state,
+      availableModels: models,
+      now: 3_000,
+    });
+    assert.equal(second.receipt.modelTier, 'standard');
+    assert.equal(second.receipt.model, 'gpt-5.6-terra');
+    assert.equal(second.receipt.attemptCount, 2);
+    assert.equal(second.receipt.escalation.transitionCount, 1);
+
+    const afterProcess = settleOfficialSymphonyRoute({
+      state: second.state,
+      issueState: 'In Progress',
+      processOutcome: { kind: 'process_failure' },
+      now: 4_000,
+    });
+    const third = planOfficialSymphonyRoute({
+      issue: current,
+      state: afterProcess.state,
+      availableModels: models,
+      now: 5_000,
+    });
+    assert.equal(third.receipt.modelTier, 'premium');
+    assert.equal(third.receipt.model, 'gpt-5.6-sol');
+    assert.equal(third.receipt.escalation.transitionCount, 2);
+
+    const exhausted = planOfficialSymphonyRoute({
+      issue: current,
+      state: settleOfficialSymphonyRoute({
+        state: third.state,
+        issueState: 'In Progress',
+        processOutcome: { kind: 'process_failure' },
+        now: 6_000,
+      }).state,
+      availableModels: models,
+      now: 7_000,
+    });
+    assert.equal(exhausted.status, 'blocked');
+    assert.equal(exhausted.reason, 'attempt-budget-exhausted');
+    assert.equal(exhausted.state.attemptCount, 3);
+    assert.equal(exhausted.state.terminal, true);
+  });
+
+  it('deliberate red: reuses one prepared attempt instead of duplicating spend', () => {
+    const current = issue('Fix README typo');
+    const first = planOfficialSymphonyRoute({
+      issue: current,
+      availableModels: models,
+      now: 1_000,
+    });
+    const duplicate = planOfficialSymphonyRoute({
+      issue: current,
+      state: first.state,
+      availableModels: models,
+      now: 1_001,
+    });
+    assert.equal(duplicate.status, 'reused');
+    assert.equal(duplicate.receipt.attemptId, first.receipt.attemptId);
+    assert.equal(duplicate.state.attemptCount, 1);
+
+    const claimed = planOfficialSymphonyRoute({
+      issue: current,
+      state: {
+        ...first.state,
+        execution: {
+          attemptId: first.receipt.attemptId,
+          status: 'finished',
+        },
+      },
+      availableModels: models,
+      now: 1_002,
+    });
+    assert.equal(claimed.status, 'blocked');
+    assert.equal(claimed.reason, 'attempt-awaiting-finalize');
+    assert.equal(claimed.state.attemptCount, 1);
+  });
+
+  it('deliberate red: reports account unavailability without escalating or spending again', () => {
+    const current = issue('Fix README typo');
+    const first = planOfficialSymphonyRoute({
+      issue: current,
+      availableModels: models,
+      now: 1_000,
+    });
+    const unavailable = settleOfficialSymphonyRoute({
+      state: first.state,
+      issueState: 'In Progress',
+      processOutcome: { kind: 'account_unavailable' },
+      now: 2_000,
+    });
+    const blocked = planOfficialSymphonyRoute({
+      issue: current,
+      state: unavailable.state,
+      availableModels: models,
+      now: 3_000,
+    });
+    assert.equal(blocked.status, 'blocked');
+    assert.equal(blocked.reason, 'account-unavailable');
+    assert.equal(blocked.state.attemptCount, 1);
+    assert.equal(blocked.state.modelTier, 'economical');
+  });
+
+  it('deliberate red: escalates a tier-specific unavailable model without ping-pong', () => {
+    const current = issue('Fix README typo');
+    const first = planOfficialSymphonyRoute({
+      issue: current,
+      availableModels: models,
+      now: 1_000,
+    });
+    const unavailable = settleOfficialSymphonyRoute({
+      state: first.state,
+      issueState: 'In Progress',
+      processOutcome: { kind: 'model_unavailable' },
+      now: 2_000,
+    });
+    const second = planOfficialSymphonyRoute({
+      issue: current,
+      state: unavailable.state,
+      availableModels: models,
+      now: 3_000,
+    });
+    assert.equal(second.receipt.modelTier, 'standard');
+    assert.equal(second.receipt.model, 'gpt-5.6-terra');
+    assert.equal(second.receipt.escalation.fromTier, 'economical');
+    assert.equal(second.receipt.escalation.toTier, 'standard');
+  });
+
+  it('deliberate red: terminalizes a routing registry with no compatible model', () => {
+    const unavailableModels = Object.fromEntries(
+      Object.entries(models).map(([id, model]) => [
+        id,
+        { ...model, available: false },
+      ])
+    );
+    const blocked = planOfficialSymphonyRoute({
+      issue: issue('Fix README typo'),
+      availableModels: unavailableModels,
+      now: 1_000,
+    });
+    assert.equal(blocked.status, 'blocked');
+    assert.equal(blocked.reason, 'no-compatible-model-available');
+    assert.equal(blocked.state.terminal, true);
+    const repeated = planOfficialSymphonyRoute({
+      issue: issue('Fix README typo'),
+      state: blocked.state,
+      availableModels: unavailableModels,
+      now: 2_000,
+    });
+    assert.equal(repeated.reason, 'no-compatible-model-available');
+    assert.equal(repeated.state.attemptCount, 0);
+  });
+
+  it('deliberate red: classifies app-server failures without retaining raw output', () => {
+    assert.deepEqual(
+      classifyAppServerObservation({
+        exitCode: 1,
+        output:
+          'command=pnpm test exitCode=1 authorization=must-not-be-retained',
+      }),
+      { kind: 'test_failure' }
+    );
+    assert.deepEqual(
+      classifyAppServerObservation({
+        exitCode: 1,
+        output: 'HTTP 429 rate limit',
+      }),
+      { kind: 'rate_limited' }
+    );
+    assert.deepEqual(
+      classifyAppServerObservation({
+        exitCode: 1,
+        output: 'model gpt-5.6-luna is unavailable',
+      }),
+      { kind: 'model_unavailable' }
+    );
   });
 });
