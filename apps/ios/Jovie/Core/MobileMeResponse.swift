@@ -1,5 +1,78 @@
 import Foundation
 
+struct MobileAppShellContract: Codable, Equatable, Sendable {
+  enum WorkspaceID: String, Codable, Sendable {
+    case customer
+    case ov
+  }
+
+  enum WorkspaceRole: String, Codable, Sendable {
+    case primary
+    case secondary
+  }
+
+  enum WorkspaceAccess: String, Codable, Sendable {
+    case authenticated
+    case admin
+  }
+
+  struct Workspace: Codable, Equatable, Sendable {
+    let id: WorkspaceID
+    let label: String
+    let href: String
+    let role: WorkspaceRole
+    let access: WorkspaceAccess
+    let shellOwner: String
+    let chatOwner: String
+    let chatMode: String?
+    let selectedAgent: String
+    let dataScope: String
+    let navigationDivergenceReason: String?
+  }
+
+  let launchWorkspaceID: WorkspaceID
+  let primaryWorkspaceID: WorkspaceID
+  let shellOwner: String
+  let chatOwner: String
+  let workspaces: [Workspace]
+
+  enum CodingKeys: String, CodingKey {
+    case launchWorkspaceID = "launchWorkspaceId"
+    case primaryWorkspaceID = "primaryWorkspaceId"
+    case shellOwner
+    case chatOwner
+    case workspaces
+  }
+
+  var canAccessOvie: Bool {
+    workspaces.contains { workspace in
+      workspace.id == .ov && workspace.role == .secondary && workspace.access == .admin
+    }
+  }
+
+  static let jovieOnly = MobileAppShellContract(
+    launchWorkspaceID: .customer,
+    primaryWorkspaceID: .customer,
+    shellOwner: "jovie",
+    chatOwner: "jovie-chat",
+    workspaces: [
+      Workspace(
+        id: .customer,
+        label: "Jovie",
+        href: "/app",
+        role: .primary,
+        access: .authenticated,
+        shellOwner: "jovie",
+        chatOwner: "jovie-chat",
+        chatMode: nil,
+        selectedAgent: "jovie",
+        dataScope: "customer",
+        navigationDivergenceReason: nil
+      )
+    ]
+  )
+}
+
 struct MobileMeResponse: Codable, Equatable, Sendable {
   enum State: String, Codable, Sendable {
     case ready
@@ -16,6 +89,7 @@ struct MobileMeResponse: Codable, Equatable, Sendable {
   let appleWalletProfilePassAvailable: Bool
   let chatEnabled: Bool
   let continueOnWebURL: String
+  let appShell: MobileAppShellContract
   /// Missing `isAdmin` must hide the Settings switch.
   /// `var` is required: synthesized Codable skips a `let` that already has a
   /// default, so `"isAdmin": true` would never decode.
@@ -31,7 +105,53 @@ struct MobileMeResponse: Codable, Equatable, Sendable {
     case appleWalletProfilePassAvailable
     case chatEnabled
     case continueOnWebURL = "continueOnWebUrl"
+    case appShell
     case isAdmin
+  }
+
+  init(
+    state: State,
+    displayName: String?,
+    username: String?,
+    publicProfileURL: String?,
+    qrPayload: String?,
+    avatarURL: String?,
+    appleWalletProfilePassAvailable: Bool,
+    chatEnabled: Bool,
+    continueOnWebURL: String,
+    appShell: MobileAppShellContract = .jovieOnly,
+    isAdmin: Bool? = nil
+  ) {
+    self.state = state
+    self.displayName = displayName
+    self.username = username
+    self.publicProfileURL = publicProfileURL
+    self.qrPayload = qrPayload
+    self.avatarURL = avatarURL
+    self.appleWalletProfilePassAvailable = appleWalletProfilePassAvailable
+    self.chatEnabled = chatEnabled
+    self.continueOnWebURL = continueOnWebURL
+    self.appShell = appShell
+    self.isAdmin = isAdmin
+  }
+
+  init(from decoder: Decoder) throws {
+    let container = try decoder.container(keyedBy: CodingKeys.self)
+    state = try container.decode(State.self, forKey: .state)
+    displayName = try container.decodeIfPresent(String.self, forKey: .displayName)
+    username = try container.decodeIfPresent(String.self, forKey: .username)
+    publicProfileURL = try container.decodeIfPresent(String.self, forKey: .publicProfileURL)
+    qrPayload = try container.decodeIfPresent(String.self, forKey: .qrPayload)
+    avatarURL = try container.decodeIfPresent(String.self, forKey: .avatarURL)
+    appleWalletProfilePassAvailable = try container.decode(
+      Bool.self,
+      forKey: .appleWalletProfilePassAvailable
+    )
+    chatEnabled = try container.decode(Bool.self, forKey: .chatEnabled)
+    continueOnWebURL = try container.decode(String.self, forKey: .continueOnWebURL)
+    appShell = try container.decodeIfPresent(MobileAppShellContract.self, forKey: .appShell)
+      ?? .jovieOnly
+    isAdmin = try container.decodeIfPresent(Bool.self, forKey: .isAdmin)
   }
 
   var showsAdminWorkspaceSwitch: Bool {
