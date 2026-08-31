@@ -237,10 +237,13 @@ describe('YouTube Library provider', () => {
     await provider.fetchVideoMetrics(
       'channel-1',
       Array.from({ length: 7 }, (_, index) => `video-${index + 1}`),
-      ['lifetime']
+      ['day_7', 'day_28', 'lifetime']
     );
 
     expect(fetcher).toHaveBeenCalledTimes(1);
+    expect(
+      new URL(String(fetcher.mock.calls[0][0])).searchParams.get('startDate')
+    ).toBe('2005-02-14');
     expect(
       fetcher.mock.calls.map(([input]) =>
         new URL(String(input)).searchParams

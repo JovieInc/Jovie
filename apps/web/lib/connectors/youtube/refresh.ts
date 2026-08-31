@@ -178,6 +178,9 @@ export async function refreshConnectedYouTubeAccount(input: {
   const now = input.now ?? new Date();
   let lockAcquired = false;
   let nextUploadsPageToken: string | null | undefined;
+  let observedUpdatedAt = input.observedUpdatedAt;
+  const observedConnector = () =>
+    connectorAccountStillObserved({ ...input, observedUpdatedAt });
 
   try {
     const syncCursor = await acquireYouTubeLibrarySyncLock(
@@ -190,7 +193,12 @@ export async function refreshConnectedYouTubeAccount(input: {
     lockAcquired = true;
 
     const accessToken = await loadFreshGoogleAccessToken(
-      input.connectorAccountId
+      input.connectorAccountId,
+      {
+        onStoreTokens: updatedAt => {
+          observedUpdatedAt = updatedAt;
+        },
+      }
     );
     if (!accessToken) {
       try {
@@ -204,7 +212,7 @@ export async function refreshConnectedYouTubeAccount(input: {
               'Reconnect YouTube to keep the Library in sync.',
             updatedAt: now,
           })
-          .where(connectorAccountStillObserved(input));
+          .where(observedConnector());
       } catch (error) {
         await captureError('YouTube reauth status update failed', error, {
           connectorAccountId: input.connectorAccountId,
@@ -257,7 +265,7 @@ export async function refreshConnectedYouTubeAccount(input: {
         lastErrorUserMessage: null,
         updatedAt: now,
       })
-      .where(connectorAccountStillObserved(input));
+      .where(observedConnector());
     return { status: 'synced', result };
   } catch (error) {
     if (isRefreshLockBusyError(error)) {
@@ -272,7 +280,7 @@ export async function refreshConnectedYouTubeAccount(input: {
           'YouTube could not be synced. Reconnect the channel and try again.',
         updatedAt: now,
       })
-      .where(connectorAccountStillObserved(input));
+      .where(observedConnector());
     await captureError(FAILURE_CAPTURE_MESSAGES[input.source], error, {
       connectorAccountId: input.connectorAccountId,
       creatorProfileId: input.creatorProfileId,

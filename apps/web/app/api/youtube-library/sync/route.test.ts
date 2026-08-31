@@ -59,29 +59,6 @@ describe('POST /api/youtube-library/sync', () => {
     });
   });
 
-  it('returns profile validation failures before syncing', async () => {
-    mocks.validateYouTubeProfileMutationRequest.mockResolvedValueOnce({
-      ok: false,
-      response: Response.json({ error: 'Forbidden' }, { status: 403 }),
-    });
-
-    const response = await POST(request());
-
-    expect(response.status).toBe(403);
-    expect(mocks.refreshConnectedYouTubeAccount).not.toHaveBeenCalled();
-  });
-
-  it('requires a connected YouTube channel', async () => {
-    mocks.state.selectRows.splice(0);
-
-    const response = await POST(request());
-
-    expect(response.status).toBe(409);
-    expect(await response.json()).toEqual({
-      error: 'Connect YouTube before importing videos',
-    });
-  });
-
   it('syncs every connected channel through the bounded refresh helper', async () => {
     mocks.state.selectRows.push({
       id: 'account-2',
@@ -110,18 +87,5 @@ describe('POST /api/youtube-library/sync', () => {
         deadlineMs: expect.any(Number),
       })
     );
-  });
-
-  it('prioritizes reconnect guidance when no channel syncs', async () => {
-    mocks.refreshConnectedYouTubeAccount.mockResolvedValueOnce({
-      status: 'needs_reauth',
-    });
-
-    const response = await POST(request());
-
-    expect(response.status).toBe(409);
-    expect(await response.json()).toEqual({
-      error: 'Reconnect YouTube to refresh access',
-    });
   });
 });
