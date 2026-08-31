@@ -1,11 +1,13 @@
 #!/usr/bin/env bash
 # Auto-Ready Agent Drafts
 #
-# Finds agent-owned draft PRs that are MERGEABLE with zero failing terminal
-# checks and flips them to "ready for review". The merge-queue autoenroll
-# workflow then picks them up.
+# Promotes only trusted bot-created drafts, or exact current heads produced
+# by the trusted FX writer, once they are MERGEABLE with zero failing
+# required checks. Branch-name prefixes are discovery noise, never
+# authorization. Native merge-queue autoenroll is the only enrollment owner.
 #
-# Opt out per-PR with any of: needs-human, hold, gated, queue-deferred, fast.
+# Opt out per-PR with taste/security/hold labels, controlled-proof/canary
+# markers, or any of: needs-human, hold, gated, queue-deferred, fast.
 #
 # Env:
 #   DRY_RUN=1                 classify and print only; flip no PRs
@@ -17,22 +19,33 @@ source "$(dirname "${BASH_SOURCE[0]}")/lib/gh-retry.sh"
 
 REPO="${REPO:-JovieInc/Jovie}"
 DRY_RUN="${DRY_RUN:-0}"
+SCRIPT_DIR="$(dirname "${BASH_SOURCE[0]}")"
+PROVENANCE_LIB="$SCRIPT_DIR/lib/auto-ready-provenance.mjs"
 # Idempotency guard (#13342): one marker comment per PR, edited in place, and a
 # hard cap of one flip attempt per PR per ATTEMPT_COOLDOWN_HOURS. Without this,
 # a PR the token cannot actually flip (see #13122) gets an identical
 # "Enrolling in merge queue" comment every cron cycle — 221 in 12h observed.
 READY_MARKER="auto-ready"
 ATTEMPT_COOLDOWN_HOURS="${ATTEMPT_COOLDOWN_HOURS:-6}"
-HOLD_LABEL_RE='^(needs-human|hold|gated|queue-deferred|fast)$'
+HOLD_LABEL_RE="$(node "$PROVENANCE_LIB" hold-re)"
 now_epoch="$(date -u +%s)"
 
+# Mutation budget: `gh pr ready` runs at most once per PR per controller pass.
+# A raced hold/head change is compensated with `pr ready --undo`, never a
+# second ready transition on the same number.
 mark_ready() {  # mark_ready <num> — returns non-zero when the flip call failed
-  [[ "$DRY_RUN" == "1" ]] && { echo "    [dry-run] would mark #$1 ready"; return 0; }
-  if gh_retry pr ready "$1" -R "$REPO" >/dev/null 2>&1; then
-    echo "    ✓ marked #$1 ready"
+  local n="$1"
+  if [[ "${READY_ATTEMPTED_FOR:-}" == "$n" ]]; then
+    echo "    !! refusing a second gh pr ready for #$n in this pass"
+    return 1
+  fi
+  READY_ATTEMPTED_FOR="$n"
+  [[ "$DRY_RUN" == "1" ]] && { echo "    [dry-run] would mark #$n ready"; return 0; }
+  if gh_retry pr ready "$n" -R "$REPO" >/dev/null 2>&1; then
+    echo "    ✓ marked #$n ready"
     return 0
   fi
-  echo "    !! failed to mark #$1 ready"
+  echo "    !! failed to mark #$n ready"
   return 1
 }
 
@@ -63,7 +76,7 @@ last_attempt_age_hours() {  # last_attempt_age_hours <num>
 read_state() {  # read_state <num>
   gh_retry pr view "$1" -R "$REPO" \
     --json isDraft,headRefOid,headRefName,labels,mergeable,state \
-    --jq '{draft: .isDraft, head: .headRefOid, branch: .headRefName, labels: [.labels[].name], mergeable: .mergeable, state: .state}'
+    --jq '{draft: .isDraft, head: ((.headRefOid // "") | ascii_downcase), branch: .headRefName, labels: [.labels[].name], mergeable: .mergeable, state: .state}'
 }
 
 state_is_eligible_draft() {  # state_is_eligible_draft <json> <expected-head> <expected-branch>
@@ -148,33 +161,125 @@ check_failures_for_pr() {  # check_failures_for_pr <num>
   jq -cn --arg reason "required check status unavailable" '[$reason]'
 }
 
-echo "=== AUTO-READY: scanning for green agent drafts ==="
+fetch_head_commit() {  # fetch_head_commit <sha>
+  gh_retry api "repos/${REPO}/commits/${1}" --jq '{
+    sha: (.sha // "" | ascii_downcase),
+    message: (.commit.message // ""),
+    parentShas: [(.parents // [])[].sha | ascii_downcase],
+    authorName: (.commit.author.name // ""),
+    authorEmail: (.commit.author.email // ""),
+    authorLogin: (.author.login // ""),
+    committerName: (.commit.committer.name // ""),
+    committerEmail: (.commit.committer.email // ""),
+    committerLogin: (.committer.login // ""),
+    verified: (.commit.verification.verified // false)
+  }'
+}
+
+fetch_fx_run() {  # fetch_fx_run <parent-sha>
+  gh_retry api "repos/${REPO}/actions/workflows/rolling-ci-dispatch.yml/runs?head_sha=${1}&status=completed&per_page=10" --jq '
+    [.workflow_runs[]
+      | select(.conclusion == "success")
+      | select((.path // "") | test("rolling-ci-dispatch\\.yml$"))
+      | {
+          workflowPath: (.path // ""),
+          workflowName: (.name // ""),
+          conclusion: .conclusion,
+          event: (.event // ""),
+          actorLogin: (.actor.login // ""),
+          headSha: ((.head_sha // "") | ascii_downcase)
+        }
+    ] | first // null'
+}
+
+classify_promotion() {  # classify_promotion <json>
+  node "$PROVENANCE_LIB" classify <<<"$1"
+}
+
+build_promotion_input() {  # build_promotion_input <author> <title> <branch> <labels-json> <head> [commit-json] [fx-run-json]
+  local author="$1" title="$2" branch="$3" labels_json="$4" head="$5"
+  local commit_json="${6:-null}"
+  local fx_run_json="${7:-null}"
+  jq -nc \
+    --arg author "$author" \
+    --arg title "$title" \
+    --arg branch "$branch" \
+    --argjson labels "$labels_json" \
+    --arg head "$head" \
+    --argjson commit "$commit_json" \
+    --argjson fxRun "$fx_run_json" \
+    '{
+      authorLogin: $author,
+      title: $title,
+      branch: $branch,
+      labels: $labels,
+      headSha: $head,
+      commit: $commit,
+      fxRun: $fxRun
+    }'
+}
+
+resolve_promotion() {  # resolve_promotion <author> <title> <branch> <labels-json> <head>
+  local author="$1" title="$2" branch="$3" labels_json="$4" head="$5"
+  local input verdict reason commit_json fx_run_json trailer
+  input="$(build_promotion_input "$author" "$title" "$branch" "$labels_json" "$head")"
+  verdict="$(classify_promotion "$input")"
+  reason="$(jq -r '.reason' <<<"$verdict")"
+  if [[ "$(jq -r '.eligible' <<<"$verdict")" == "true" || "$reason" != "commit-provenance-required" ]]; then
+    echo "$verdict"
+    return 0
+  fi
+  if ! commit_json="$(fetch_head_commit "$head" 2>/dev/null)"; then
+    jq -nc '{eligible:false, reason:"commit-unavailable"}'
+    return 0
+  fi
+  trailer="$(jq -r '.message // ""' <<<"$commit_json" | node "$PROVENANCE_LIB" trailer | tr -d '[:space:]')"
+  fx_run_json="null"
+  if [[ -n "$trailer" ]]; then
+    fx_run_json="$(fetch_fx_run "$trailer" 2>/dev/null || echo null)"
+    [[ -z "$fx_run_json" ]] && fx_run_json="null"
+  fi
+  input="$(build_promotion_input "$author" "$title" "$branch" "$labels_json" "$head" "$commit_json" "$fx_run_json")"
+  classify_promotion "$input"
+}
+
+echo "=== AUTO-READY: scanning for green trusted-bot or FX-repaired drafts ==="
 
 SNAP="$(gh_retry pr list -R "$REPO" --state open --limit 200 \
-  --json number,title,isDraft,mergeable,mergeStateStatus,labels,headRefName,headRefOid --jq '
+  --json number,title,isDraft,mergeable,mergeStateStatus,labels,headRefName,headRefOid,author --jq '
   [ .[] | {
     n: .number,
-    t: (.title[0:48]),
+    t: .title,
     draft: .isDraft,
     m: .mergeable,
     ms: (.mergeStateStatus // "UNKNOWN"),
     head: .headRefName,
-    oid: .headRefOid,
+    oid: ((.headRefOid // "") | ascii_downcase),
+    author: (.author.login // ""),
     L: [.labels[].name]
   } ]')"
 
-# Flip green agent drafts to ready
-echo "=== FLIP: draft + agent + mergeable + 0 failing checks → ready ==="
-echo "$SNAP" | jq -c '.[]
+# Flip only provenance-authorized green drafts to ready. Branch prefixes never
+# authorize; the Node classifier owns bot-author and FX-child admission.
+echo "=== FLIP: draft + trusted provenance + mergeable + 0 failing checks → ready ==="
+echo "$SNAP" | jq -c --arg hold_re "$HOLD_LABEL_RE" '.[]
   | select(.draft)
   | select(.m == "MERGEABLE")
-  | select((.head | test("^(tim/|codex/|agent/|claude/|linear/|codegen-bot/)")))
-  | select([.L[]] | any(. == "needs-human" or . == "hold" or . == "gated" or . == "queue-deferred" or . == "fast") | not)' \
+  | select([.L[] | select(test($hold_re))] | length == 0)' \
   | while read -r pr; do
+    READY_ATTEMPTED_FOR=""
     n=$(jq -r '.n' <<<"$pr"); t=$(jq -r '.t' <<<"$pr")
     expected_head=$(jq -r '.oid' <<<"$pr")
     expected_branch=$(jq -r '.head' <<<"$pr")
-    echo "  #$n  $t"
+    author_login=$(jq -r '.author' <<<"$pr")
+    labels_json=$(jq -c '.L' <<<"$pr")
+    echo "  #$n  ${t:0:48}"
+
+    snapshot_verdict="$(resolve_promotion "$author_login" "$t" "$expected_branch" "$labels_json" "$expected_head")"
+    if [[ "$(jq -r '.eligible' <<<"$snapshot_verdict")" != "true" ]]; then
+      echo "    ~ provenance $(jq -r '.reason' <<<"$snapshot_verdict"); leaving draft"
+      continue
+    fi
 
     # Idempotency guard (#13342): at most one attempt per PR per cooldown window.
     attempt_age_h="$(last_attempt_age_hours "$n")"
@@ -193,6 +298,12 @@ echo "$SNAP" | jq -c '.[]
       echo "    ~ live state no longer matches the eligible draft snapshot; leaving draft"
       continue
     fi
+    live_labels="$(jq -c '.labels' <<<"$before")"
+    live_verdict="$(resolve_promotion "$author_login" "$t" "$expected_branch" "$live_labels" "$expected_head")"
+    if [[ "$(jq -r '.eligible' <<<"$live_verdict")" != "true" ]]; then
+      echo "    ~ live provenance $(jq -r '.reason' <<<"$live_verdict"); leaving draft"
+      continue
+    fi
 
     fail="$(check_failures_for_pr "$n")"
     if [[ "$(jq 'length' <<<"$fail")" -ne 0 ]]; then
@@ -200,14 +311,20 @@ echo "$SNAP" | jq -c '.[]
       continue
     fi
 
-    # Checks and labels can change while the API call above is in flight. This
-    # second snapshot is the actual mutation precondition.
+    # Checks, labels, and head provenance can change while the API call above
+    # is in flight. This second snapshot is the actual mutation precondition.
     if ! before_mutation="$(read_state "$n" 2>/dev/null)"; then
       echo "    ~ could not re-read live PR state before mutation; leaving draft"
       continue
     fi
     if ! state_is_eligible_draft "$before_mutation" "$expected_head" "$expected_branch"; then
       echo "    ~ head, labels, or draft state changed before mutation; leaving draft"
+      continue
+    fi
+    mutation_labels="$(jq -c '.labels' <<<"$before_mutation")"
+    mutation_verdict="$(resolve_promotion "$author_login" "$t" "$expected_branch" "$mutation_labels" "$expected_head")"
+    if [[ "$(jq -r '.eligible' <<<"$mutation_verdict")" != "true" ]]; then
+      echo "    ~ provenance changed before mutation ($(jq -r '.reason' <<<"$mutation_verdict")); leaving draft"
       continue
     fi
 

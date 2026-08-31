@@ -8,10 +8,12 @@
  * the JSON floor must not fail the group and UNMERGEABLE source-green
  * changelog/UI members (JOV-5300, actions 32602957421).
  *
- * Source `PR Ready` does not run unit tests. Fail-closed baseline updates
- * therefore cannot be required at enrollment time without expanding that gate.
- * merge_group allows the shrink; local / pull_request still fail closed so the
- * PR that changed the count updates the floor when the test actually runs.
+ * Source `PR Ready` does not run unit tests. Growth is blocked at enrollment
+ * by the cheap `design-system-source-ratchet` ci-fast lane (JOV-5301).
+ * Fail-closed baseline updates for unbaselined shrink still cannot be required
+ * at enrollment without expanding that gate. merge_group allows the shrink;
+ * local / pull_request still fail closed so the PR that changed the count
+ * updates the floor when the unit test actually runs.
  */
 
 export const SHRINK_ONLY_COUNT_EVENTS = Object.freeze({

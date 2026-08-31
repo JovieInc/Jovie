@@ -44,6 +44,7 @@ export const RESERVED_USERNAMES = [
   'clerk',
   'mail',
   'changelog',
+  'engineering',
   'engagement-engine',
   'artist-profiles',
 
@@ -128,6 +129,7 @@ export const RESERVED_USERNAMES = [
   'customer',
   'customers',
   'client',
+  'cli',
 
   // Music specific
   'artist',

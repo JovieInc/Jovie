@@ -1215,12 +1215,16 @@ function runRatchet() {
 
 export function runComponentShipGate(options = {}) {
   const flags = {
-    // Distinguish an explicit null (skip the diff gate) from undefined
-    // (auto-resolve a base). The CLI entry already pre-resolves null via
-    // resolveDiffBase, so this only affects programmatic callers that pass
-    // diffBase: null to run the non-diff sections in isolation.
+    // Honor an explicit null/empty diffBase as "no diff base" instead of
+    // re-resolving origin/main behind the caller's back. In CI origin/main is
+    // always present, so re-resolving turned an explicit opt-out into a diff
+    // scan against main and produced false missing-test/story failures for
+    // components unrelated to the caller (JOV-5454 live-cert contract test).
+    // Only auto-resolve when diffBase is omitted entirely.
     diffBase:
-      options.diffBase === undefined ? resolveDiffBase(null) : options.diffBase,
+      options.diffBase === undefined
+        ? resolveDiffBase(null)
+        : (options.diffBase ?? undefined),
     skipQuality: options.skipQuality ?? false,
     skipRatchet: options.skipRatchet ?? false,
     skipRenderedCert: options.skipRenderedCert ?? false,

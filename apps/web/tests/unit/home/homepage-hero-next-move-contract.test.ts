@@ -17,6 +17,9 @@ describe('homepage hero next-move contract (JOV-4475)', () => {
 
   it('keeps Get started as the sole primary conversion path', () => {
     expect(HOMEPAGE_LAUNCH_COPY.hero.primaryCta.label).toBe('Get started');
+    expect(HOMEPAGE_LAUNCH_COPY.hero.primaryCta.href).toBe(
+      'https://jov.ie/waitlist'
+    );
     expect(HOMEPAGE_LAUNCH_COPY.hero.secondaryCta.label).toBe(
       'See a live profile'
     );

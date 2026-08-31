@@ -203,6 +203,7 @@ apps/desktop/*
 apps/desktop/src/*
 !apps/desktop/src/system-b-tokens.ts
 !apps/desktop/src/desktop-auth-security.ts
+!apps/desktop/src/desktop-auto-update.ts
 !apps/desktop/src/desktop-csp-watchdog.ts
 !apps/desktop/src/desktop-permissions.ts
 !apps/desktop/src/desktop-security-reporting.ts
@@ -211,6 +212,7 @@ apps/desktop/src/*
 !apps/desktop/src/tray.ts
 !apps/desktop/src/ovie-door.ts
 !apps/desktop/src/summer-runtime-bridge.ts
+!apps/desktop/src/build-identity.ts
 !apps/desktop/scripts/desktop-tray-contract.test.mjs
 !apps/desktop/scripts/
 !apps/desktop/scripts/desktop-csp-watchdog.test.ts
