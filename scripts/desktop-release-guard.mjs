@@ -141,6 +141,29 @@ function releaseStampContentViolations({
   return violations;
 }
 
+export function formatReleaseStampFailureDetails(result) {
+  const lines = [];
+  if (result.releaseStampMissingFiles?.length > 0) {
+    lines.push('Release-stamp missing files:');
+    for (const file of result.releaseStampMissingFiles) {
+      lines.push(`- ${file}`);
+    }
+  }
+  if (result.releaseStampExtraFiles?.length > 0) {
+    lines.push('Release-stamp extra files:');
+    for (const file of result.releaseStampExtraFiles) {
+      lines.push(`- ${file}`);
+    }
+  }
+  if (result.releaseStampContentViolations?.length > 0) {
+    lines.push('Release-stamp content violations:');
+    for (const violation of result.releaseStampContentViolations) {
+      lines.push(`- ${violation}`);
+    }
+  }
+  return lines;
+}
+
 function isCompleteReleaseStamp({
   normalizedFiles,
   versionedManifests,
@@ -222,15 +245,27 @@ function getArgValue(name) {
 }
 
 function git(args) {
+  return gitRaw(args).trim();
+}
+
+function gitRaw(args) {
   return execFileSync('git', args, {
     encoding: 'utf8',
     stdio: ['ignore', 'pipe', 'pipe'],
-  }).trim();
+  });
 }
 
 function tryGit(args) {
   try {
     return git(args);
+  } catch {
+    return undefined;
+  }
+}
+
+export function readGitObjectContent(ref, path) {
+  try {
+    return gitRaw(['show', `${ref}:${path}`]);
   } catch {
     return undefined;
   }
@@ -282,7 +317,7 @@ function main() {
     process.exit(1);
   }
 
-  const readAt = ref => path => tryGit(['show', `${ref}:${path}`]);
+  const readAt = ref => path => readGitObjectContent(ref, path);
   const readWorkingTree = path => {
     try {
       return readFileSync(join(ROOT, path), 'utf-8');
@@ -322,6 +357,12 @@ function main() {
   console.error('Pre-land release state:');
   for (const file of result.prelandReleaseStateFiles) {
     console.error(`- ${file}`);
+  }
+  const releaseStampFailureDetails = formatReleaseStampFailureDetails(result);
+  if (releaseStampFailureDetails.length > 0) {
+    for (const line of releaseStampFailureDetails) {
+      console.error(line);
+    }
   }
   process.exit(1);
 }
