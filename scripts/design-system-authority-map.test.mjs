@@ -52,6 +52,12 @@ test('RED: authority map rejects advisory-only enforced layers', () => {
     })),
     'missing-authority-check'
   );
+  expectCode(
+    mutateEntry('interaction.families', () => ({
+      classificationReason: '',
+    })),
+    'missing-classification-reason'
+  );
 });
 
 test('RED: authority map rejects empty capability ownership', () => {

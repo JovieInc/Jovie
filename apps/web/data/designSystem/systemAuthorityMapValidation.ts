@@ -5,7 +5,6 @@ import {
   DESIGN_SYSTEM_AUTHORITY_MAP,
   DESIGN_SYSTEM_AUTHORITY_MAP_SCHEMA,
   DESIGN_SYSTEM_AUTHORITY_STATUS_VALUES,
-  type DesignSystemAuthorityEntry,
   type DesignSystemAuthorityMap,
 } from './systemAuthorityMap';
 
@@ -29,14 +28,6 @@ export interface DesignSystemAuthorityMapIssue {
   readonly code: DesignSystemAuthorityMapIssueCode;
   readonly id: string;
 }
-
-const GAP_STATUSES = new Set<DesignSystemAuthorityEntry['status']>([
-  'canonical-unenforced',
-  'partially-migrated',
-  'duplicated',
-  'missing',
-  'obsolete-superseded',
-]);
 
 const has = (value?: string | null): value is string => Boolean(value?.trim());
 
@@ -118,7 +109,7 @@ export function validateDesignSystemAuthorityMap({
     if (!entry.owns.length || entry.owns.some(capability => !has(capability))) {
       add(issues, 'missing-owned-capability', entry.id);
     }
-    if (GAP_STATUSES.has(entry.status) && !has(entry.classificationReason)) {
+    if (!has(entry.classificationReason)) {
       add(issues, 'missing-classification-reason', entry.id);
     }
     if (entry.status !== 'missing' && !entry.canonicalSources.length) {

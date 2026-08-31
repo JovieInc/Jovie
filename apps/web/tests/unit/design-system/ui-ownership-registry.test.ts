@@ -118,6 +118,13 @@ describe('design-system authority map', () => {
     ).toContain('missing-authority-check');
     expect(
       authorityCodes(
+        authorityMapWith('interaction.families', () => ({
+          classificationReason: '',
+        }))
+      )
+    ).toContain('missing-classification-reason');
+    expect(
+      authorityCodes(
         authorityMapWith('surface.marketing-routes', () => ({
           owns: [],
         }))

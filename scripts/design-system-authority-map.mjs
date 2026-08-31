@@ -23,14 +23,6 @@ const AUTHORITY_MAP_LAYER_VALUES = Object.freeze([
   'certification',
   'legacy',
 ]);
-const GAP_STATUSES = new Set([
-  'canonical-unenforced',
-  'partially-migrated',
-  'duplicated',
-  'missing',
-  'obsolete-superseded',
-]);
-
 const isObject = value =>
   value !== null && typeof value === 'object' && !Array.isArray(value);
 const has = value => typeof value === 'string' && value.trim() !== '';
@@ -121,7 +113,7 @@ export function validateDesignSystemAuthorityMap(map, repoRoot = null) {
     ) {
       add(issues, 'missing-owned-capability', entry.id);
     }
-    if (GAP_STATUSES.has(entry.status) && !has(entry.classificationReason)) {
+    if (!has(entry.classificationReason)) {
       add(issues, 'missing-classification-reason', entry.id);
     }
     if (
