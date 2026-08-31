@@ -102,7 +102,7 @@ jobs:
       - name: Measure hosted CI pressure
         id: capacity
         env:
-          GH_TOKEN: ${{ steps.app-token.outputs.token }}
+          GH_TOKEN: ${{ github.token }}
           REPOSITORY: ${{ github.repository }}
           # Unknown capacity is not authority to stampede CI. The repository
           # variable may raise this after measurement; absence fails low.
@@ -130,10 +130,11 @@ jobs:
       - name: Build plan and claim exact heads
         id: plan
         env:
-          GH_TOKEN: ${{ steps.app-token.outputs.token }}
-          # Keep low-cost native queue inventory on the workflow-scoped read
-          # budget; reserve the App installation token for trusted mutations.
+          # All fleet inventory stays on the workflow-scoped read budget. The
+          # App installation token is reserved for the bounded mutation set.
+          GH_TOKEN: ${{ github.token }}
           GH_QUEUE_TOKEN: ${{ github.token }}
+          GH_MUTATION_TOKEN: ${{ steps.app-token.outputs.token }}
           REPOSITORY: ${{ github.repository }}
           MAX_CONCURRENT: ${{ inputs.max_concurrent || '40' }}
           RUNNER_CAPACITY: ${{ steps.capacity.outputs.runner_capacity }}
@@ -189,7 +190,7 @@ jobs:
               max_attempts=$(jq -r '.maxAttempts' <<<"$item")
               expected_auto_merge=$(jq -r '.autoMergeEnabled' <<<"$item")
               expected_draft=$(jq -r '.draftState' <<<"$item")
-              live=$(gh api "repos/$REPOSITORY/pulls/$pr" \
+              live=$(GH_TOKEN="$GH_MUTATION_TOKEN" gh api "repos/$REPOSITORY/pulls/$pr" \
                 --jq '{state:.state,draft:.draft,head:.head.sha,base:.base.sha,baseRef:.base.ref,ref:.head.ref,autoMerge:(.auto_merge != null),sameRepo:(.head.repo.full_name == .base.repo.full_name),fork:(.head.repo.fork // false)}')
               if ! jq -e --arg head "$expected_head" --arg base "$expected_base" --arg baseRef "$expected_base_ref" --arg ref "$expected_ref" \
                 --argjson draft "$expected_draft" --argjson autoMerge "$expected_auto_merge" \
@@ -203,7 +204,7 @@ jobs:
               safe_cohort=$(printf '%s' "$cohort_id" | tr -cd 'A-Za-z0-9_.-' | head -c 32)
               description="jovie-conflict-fx/v1 cohort=${safe_cohort:-unknown} cap=$adaptive_cap try=$attempt/$max_attempts result=pending base=$expected_base"
               status_url="$run_url?base_ref=$(jq -nr --arg value "$expected_base_ref" '$value | @uri')"
-              gh api -X POST "repos/$REPOSITORY/statuses/$expected_head" \
+              GH_TOKEN="$GH_MUTATION_TOKEN" gh api -X POST "repos/$REPOSITORY/statuses/$expected_head" \
                 -f state=pending -f context='Jovie Conflict FX' \
                 -f description="${description:0:140}" -f target_url="$status_url" >/dev/null
               jq --argjson item "$item" '. + [$item]' "$RUNNER_TEMP/claimed-fx.json" \
@@ -1234,15 +1235,12 @@ jobs:
         with:
           app-id: ${{ vars.JOVIE_BOT_APP_ID }}
           private-key: ${{ secrets.JOVIE_BOT_PRIVATE_KEY }}
-          permission-actions: read
-          permission-contents: read
           permission-issues: write
-          permission-pull-requests: read
-          permission-statuses: read
 
       - name: Reconcile exact outcomes and persist trusted cohort receipt
         env:
-          GH_TOKEN: ${{ steps.app-token.outputs.token }}
+          GH_TOKEN: ${{ github.token }}
+          GH_LEDGER_TOKEN: ${{ steps.app-token.outputs.token }}
           GH_QUEUE_TOKEN: ${{ github.token }}
           REPOSITORY: ${{ github.repository }}
           TRACKING_ISSUE: '16794'
@@ -1265,8 +1263,31 @@ jobs:
           successes=0
           failures=0
           stale_head_skips=0
+          poll_interval_seconds=30
+          poll_deadline_seconds=1200
+          max_ci_run_pages=5
+          max_cohort_size=40
           printf '[]\n' > "$RUNNER_TEMP/ci-candidates.json"
           : > "$RUNNER_TEMP/ci-latencies.txt"
+
+          COHORT_SIZE="$attempted" \
+          POLL_INTERVAL_SECONDS="$poll_interval_seconds" \
+          POLL_DEADLINE_SECONDS="$poll_deadline_seconds" \
+          MAX_CI_RUN_PAGES="$max_ci_run_pages" \
+          MAX_COHORT_SIZE="$max_cohort_size" \
+          node --input-type=module <<'NODE' > "$RUNNER_TEMP/conflict-cohort-read-budget.json"
+          import { computeConflictCohortReadBudget } from './scripts/lib/pr-conflict-handler.mjs';
+          const budget = computeConflictCohortReadBudget({
+            cohortSize: Number(process.env.COHORT_SIZE),
+            pollIntervalSeconds: Number(process.env.POLL_INTERVAL_SECONDS),
+            pollDeadlineSeconds: Number(process.env.POLL_DEADLINE_SECONDS),
+            maxCiRunPages: Number(process.env.MAX_CI_RUN_PAGES),
+            maxCohortSize: Number(process.env.MAX_COHORT_SIZE),
+          });
+          process.stdout.write(`${JSON.stringify(budget)}\n`);
+          NODE
+          jq -e '.withinRepositoryReadLimit == true' \
+            "$RUNNER_TEMP/conflict-cohort-read-budget.json" >/dev/null
 
           conflict_status_for_sha() {
             local sha="$1" base_ref="$2" encoded_base target
@@ -1319,24 +1340,72 @@ jobs:
           # Wait only for the exact repaired heads' CI. This reporter does not
           # gate delivery and does not introduce the retired ready-for-review
           # flight; it converts those already-running checks into cohort data.
-          deadline=$((SECONDS + 1200))
+          deadline=$((SECONDS + poll_deadline_seconds))
           while [[ "$(jq 'length' "$RUNNER_TEMP/ci-candidates.json")" -gt 0 && "$SECONDS" -lt "$deadline" ]]; do
+            CANDIDATES_FILE="$RUNNER_TEMP/ci-candidates.json" \
+              node --input-type=module <<'NODE' > "$RUNNER_TEMP/conflict-cohort-live-heads.graphql"
+          import { readFileSync } from 'node:fs';
+          import { buildConflictCohortLiveHeadQuery } from './scripts/lib/pr-conflict-handler.mjs';
+          const candidates = JSON.parse(readFileSync(process.env.CANDIDATES_FILE, 'utf8'));
+          process.stdout.write(`${buildConflictCohortLiveHeadQuery(candidates)}\n`);
+          NODE
+            owner="${REPOSITORY%%/*}"
+            name="${REPOSITORY#*/}"
+            live_query=$(<"$RUNNER_TEMP/conflict-cohort-live-heads.graphql")
+            gh api graphql -f query="$live_query" -F owner="$owner" -F name="$name" \
+              > "$RUNNER_TEMP/conflict-cohort-live-heads-response.json"
+            CANDIDATES_FILE="$RUNNER_TEMP/ci-candidates.json" \
+            RESPONSE_FILE="$RUNNER_TEMP/conflict-cohort-live-heads-response.json" \
+              node --input-type=module <<'NODE' > "$RUNNER_TEMP/conflict-cohort-live-heads.json"
+          import { readFileSync } from 'node:fs';
+          import { reconcileConflictCohortLiveHeads } from './scripts/lib/pr-conflict-handler.mjs';
+          const candidates = JSON.parse(readFileSync(process.env.CANDIDATES_FILE, 'utf8'));
+          const response = JSON.parse(readFileSync(process.env.RESPONSE_FILE, 'utf8'));
+          process.stdout.write(`${JSON.stringify(reconcileConflictCohortLiveHeads({ candidates, response }))}\n`);
+          NODE
+
+            printf '[]\n' > "$RUNNER_TEMP/conflict-cohort-ci-pages.json"
+            for ((page = 1; page <= max_ci_run_pages; page++)); do
+              gh api "repos/$REPOSITORY/actions/workflows/ci.yml/runs?per_page=100&page=$page" \
+                > "$RUNNER_TEMP/conflict-cohort-ci-page.json"
+              jq -e '.workflow_runs | type == "array"' \
+                "$RUNNER_TEMP/conflict-cohort-ci-page.json" >/dev/null
+              jq -s '.[0] + [.[1]]' \
+                "$RUNNER_TEMP/conflict-cohort-ci-pages.json" \
+                "$RUNNER_TEMP/conflict-cohort-ci-page.json" \
+                > "$RUNNER_TEMP/conflict-cohort-ci-pages.next.json"
+              mv "$RUNNER_TEMP/conflict-cohort-ci-pages.next.json" \
+                "$RUNNER_TEMP/conflict-cohort-ci-pages.json"
+              if [[ "$(jq '.workflow_runs | length' "$RUNNER_TEMP/conflict-cohort-ci-page.json")" -lt 100 ]]; then
+                break
+              fi
+            done
+            CANDIDATES_FILE="$RUNNER_TEMP/ci-candidates.json" \
+            PAGES_FILE="$RUNNER_TEMP/conflict-cohort-ci-pages.json" \
+              node --input-type=module <<'NODE' > "$RUNNER_TEMP/conflict-cohort-ci-runs-by-head.json"
+          import { readFileSync } from 'node:fs';
+          import { indexLatestConflictCohortCiRuns } from './scripts/lib/pr-conflict-handler.mjs';
+          const candidates = JSON.parse(readFileSync(process.env.CANDIDATES_FILE, 'utf8'));
+          const pages = JSON.parse(readFileSync(process.env.PAGES_FILE, 'utf8'));
+          process.stdout.write(`${JSON.stringify(indexLatestConflictCohortCiRuns({ candidates, pages }))}\n`);
+          NODE
+
             printf '[]\n' > "$RUNNER_TEMP/ci-candidates.next.json"
             while IFS= read -r candidate; do
               [[ -n "$candidate" ]] || continue
               pr=$(jq -r '.pr' <<<"$candidate")
               resolved_head=$(jq -r '.resolvedHead' <<<"$candidate")
-              live_head=$(gh api "repos/$REPOSITORY/pulls/$pr" --jq '.head.sha' 2>/dev/null || true)
-              if [[ "$live_head" != "$resolved_head" ]]; then
+              live=$(jq -c --argjson pr "$pr" \
+                '[.[] | select(.pr == $pr)] | first // {}' \
+                "$RUNNER_TEMP/conflict-cohort-live-heads.json")
+              if [[ "$(jq -r '.healthy // false' <<<"$live")" != 'true' ]]; then
                 failures=$((failures + 1))
                 stale_head_skips=$((stale_head_skips + 1))
                 continue
               fi
 
-              ci_runs=$(gh api "repos/$REPOSITORY/actions/workflows/ci.yml/runs?head_sha=$resolved_head&per_page=20")
-              ci_run=$(jq -c --arg head "$resolved_head" '
-                [.workflow_runs[] | select(.head_sha == $head and (.event == "pull_request" or .event == "pull_request_target"))]
-                | sort_by(.created_at) | last // {}' <<<"$ci_runs")
+              ci_run=$(jq -c --arg head "$resolved_head" '.[$head] // {}' \
+                "$RUNNER_TEMP/conflict-cohort-ci-runs-by-head.json")
               if [[ "$(jq -r '.status // "missing"' <<<"$ci_run")" != 'completed' ]]; then
                 jq --argjson item "$candidate" '. + [$item]' \
                   "$RUNNER_TEMP/ci-candidates.next.json" > "$RUNNER_TEMP/ci-candidates.append.json"
@@ -1384,7 +1453,7 @@ jobs:
             done < <(jq -c '.[]' "$RUNNER_TEMP/ci-candidates.json")
             mv "$RUNNER_TEMP/ci-candidates.next.json" "$RUNNER_TEMP/ci-candidates.json"
             if [[ "$(jq 'length' "$RUNNER_TEMP/ci-candidates.json")" -gt 0 && "$SECONDS" -lt "$deadline" ]]; then
-              sleep 30
+              sleep "$poll_interval_seconds"
             fi
           done
 
@@ -1474,12 +1543,18 @@ jobs:
             --argjson before "$BEFORE_REPORT" \
             --argjson after "$after_report" \
             '[$hidden,"## Closed-loop conflict cohort `"+$cohort+"`","","- Tier / attempted: `"+($receipt.cap|tostring)+"` / `"+($receipt.attempted|tostring)+"`","- Success / failure / stale: `"+($receipt.successes|tostring)+"` / `"+($receipt.failures|tostring)+"` / `"+($receipt.staleHeadSkips|tostring)+"`","- CI p95 / baseline ms: `"+($receipt.p95CiLatencyMs|tostring)+"` / `"+($receipt.baselineP95CiLatencyMs|tostring)+"`","- Hosted capacity / active / queued: `"+($receipt.runnerCapacity|tostring)+"` / `"+($receipt.activeCi|tostring)+"` / `"+($receipt.queuedCi|tostring)+"`","- Clean: `"+($receipt.clean|tostring)+"`","","Before: `"+($before|tojson)+"`","","After: `"+($after|tojson)+"`","",$marker] | join("\n")')
-          existing=$(gh api "repos/$REPOSITORY/issues/$TRACKING_ISSUE/comments?per_page=100" --paginate \
-            --jq ".[] | select(.body | contains(\"$hidden\")) | .id" | head -1 || true)
+          comments=$(gh api "repos/$REPOSITORY/issues/$TRACKING_ISSUE/comments?per_page=100" \
+            --paginate --slurp)
+          existing=$(jq -er --arg hidden "$hidden" '
+            [.[][]? | select((.body // "") | contains($hidden)) | .id]
+            | if length > 1 then error("duplicate cohort receipts")
+              elif length == 1 then (.[0] | tostring)
+              else ""
+              end' <<<"$comments")
           if [[ -n "$existing" ]]; then
-            gh api -X PATCH "repos/$REPOSITORY/issues/comments/$existing" -f body="$body" >/dev/null
+            GH_TOKEN="$GH_LEDGER_TOKEN" gh api -X PATCH "repos/$REPOSITORY/issues/comments/$existing" -f body="$body" >/dev/null
           else
-            gh api -X POST "repos/$REPOSITORY/issues/$TRACKING_ISSUE/comments" -f body="$body" >/dev/null
+            GH_TOKEN="$GH_LEDGER_TOKEN" gh api -X POST "repos/$REPOSITORY/issues/$TRACKING_ISSUE/comments" -f body="$body" >/dev/null
           fi
           {
             echo '## Durable conflict cohort receipt'

@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
   fetchOpenPrsRest,
+  hydrateOpenPrStatusContexts,
   normalizeRestPullRequest,
 } from '../github-open-prs-rest.mjs';
 
@@ -157,6 +158,93 @@ describe('REST open PR inventory', () => {
 
     expect(pr.statusCheckRollup).toHaveLength(101);
     expect(calls.filter(call => call.includes('/check-runs'))).toHaveLength(2);
+  });
+
+  it('hydrates conflict status receipts in GraphQL batches without check-run fanout', async () => {
+    const calls = [];
+    const request = async input => {
+      calls.push(input);
+      expect(input.query).not.toContain('statusCheckRollup');
+      return {
+        data: {
+          repository: {
+            c0: {
+              oid: 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa',
+              status: {
+                contexts: [
+                  {
+                    context: 'Jovie Conflict FX',
+                    state: 'PENDING',
+                    createdAt: '2026-07-12T00:01:00Z',
+                    creator: {
+                      login: 'jovie-bot[bot]',
+                      __typename: 'Bot',
+                    },
+                  },
+                ],
+              },
+            },
+          },
+        },
+      };
+    };
+
+    const prs = await hydrateOpenPrStatusContexts({
+      repo: 'JovieInc/Jovie',
+      prs: [
+        {
+          number: 21,
+          headRefOid: 'bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb',
+          mergeable: 'MERGEABLE',
+          mergeStateStatus: 'CLEAN',
+        },
+        {
+          number: 22,
+          headRefOid: 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa',
+          mergeable: 'CONFLICTING',
+          mergeStateStatus: 'DIRTY',
+        },
+      ],
+      request,
+      includeStatuses: pr => pr.mergeable === 'CONFLICTING',
+      batchSize: 2,
+    });
+
+    expect(calls).toHaveLength(1);
+    expect(prs[0].statusCheckRollup).toEqual([]);
+    expect(prs[1].statusCheckRollup).toEqual([
+      expect.objectContaining({
+        context: 'Jovie Conflict FX',
+        state: 'PENDING',
+        creator: { login: 'jovie-bot[bot]', type: 'Bot' },
+      }),
+    ]);
+  });
+
+  it('fails closed when bounded status hydration omits exact head identity', async () => {
+    await expect(
+      hydrateOpenPrStatusContexts({
+        repo: 'JovieInc/Jovie',
+        prs: [{ number: 23, mergeable: 'CONFLICTING' }],
+        request: async () => ({ data: { repository: {} } }),
+      })
+    ).rejects.toThrow('PR #23 is missing exact headRefOid');
+  });
+
+  it('fails closed when a GraphQL status batch omits an exact commit', async () => {
+    await expect(
+      hydrateOpenPrStatusContexts({
+        repo: 'JovieInc/Jovie',
+        prs: [
+          {
+            number: 24,
+            mergeable: 'CONFLICTING',
+            headRefOid: 'cccccccccccccccccccccccccccccccccccccccc',
+          },
+        ],
+        request: async () => ({ data: { repository: { c0: null } } }),
+      })
+    ).rejects.toThrow('GraphQL statuses for PR #24 omitted the exact head');
   });
 
   it('fails closed when check-run total_count is missing', async () => {
