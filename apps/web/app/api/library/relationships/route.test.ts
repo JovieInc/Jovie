@@ -41,6 +41,26 @@ describe('library relationships route', () => {
     });
   });
 
+  it('rejects unauthenticated relationship writes', async () => {
+    mocks.getCachedAuth.mockResolvedValue({ userId: null });
+    const response = await POST(request('POST'));
+    expect(response.status).toBe(401);
+    expect(mocks.getExactProfileAccess).not.toHaveBeenCalled();
+    expect(mocks.tagYouTubeVideoWithMerch).not.toHaveBeenCalled();
+  });
+
+  it('rejects invalid relationship payloads', async () => {
+    const response = await POST(
+      new Request('http://localhost/api/library/relationships', {
+        method: 'POST',
+        body: JSON.stringify({ creatorProfileId, videoId }),
+      })
+    );
+    expect(response.status).toBe(400);
+    expect(mocks.getExactProfileAccess).not.toHaveBeenCalled();
+    expect(mocks.tagYouTubeVideoWithMerch).not.toHaveBeenCalled();
+  });
+
   it('does not write relationships across profiles', async () => {
     mocks.getExactProfileAccess.mockResolvedValue({
       ok: false,
@@ -65,6 +85,12 @@ describe('library relationships route', () => {
     });
   });
 
+  it('returns not found when the requested relationship target is absent', async () => {
+    mocks.tagYouTubeVideoWithMerch.mockResolvedValue(null);
+    const response = await POST(request('POST'));
+    expect(response.status).toBe(404);
+  });
+
   it('soft-removes an existing video to merch relationship', async () => {
     mocks.removeYouTubeVideoMerchTag.mockResolvedValue(true);
     const response = await DELETE(request('DELETE'));
@@ -74,5 +100,11 @@ describe('library relationships route', () => {
       videoId,
       merchCardId,
     });
+  });
+
+  it('returns not found when there is no active relationship to remove', async () => {
+    mocks.removeYouTubeVideoMerchTag.mockResolvedValue(false);
+    const response = await DELETE(request('DELETE'));
+    expect(response.status).toBe(404);
   });
 });
