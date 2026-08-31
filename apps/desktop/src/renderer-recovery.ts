@@ -122,6 +122,76 @@ export function decideLocalMainFrameLoadFailure(input: {
   return 'failure-page';
 }
 
+export type LocalHostedLoadFailureResult =
+  | { readonly action: 'retry'; readonly attempt: number }
+  | { readonly action: 'failure-page'; readonly attempt: number };
+
+export type LocalHostedDocumentAction =
+  | 'ignore'
+  | 'preserve-retry'
+  | 'complete-retry';
+
+export interface LocalHostedLoadRetryController {
+  readonly onMainFrameLoadFailure: (input: {
+    readonly errorCode: number;
+    readonly retryUrl: string;
+  }) => LocalHostedLoadFailureResult;
+  readonly onMainFrameDocumentCommitted: (input: {
+    readonly isHostedAppDocument: boolean;
+  }) => LocalHostedDocumentAction;
+  readonly reset: () => void;
+  readonly dispose: () => void;
+}
+
+export function createLocalHostedLoadRetryController(input: {
+  readonly retry: (url: string) => void;
+  readonly isWindowDestroyed: () => boolean;
+}): LocalHostedLoadRetryController {
+  let retryCount = 0;
+  let retryTimer: ReturnType<typeof setTimeout> | null = null;
+  let recoveryActive = false;
+
+  const clearPendingRetry = (): void => {
+    if (retryTimer === null) return;
+    clearTimeout(retryTimer);
+    retryTimer = null;
+  };
+
+  const reset = (): void => {
+    retryCount = 0;
+    recoveryActive = false;
+    clearPendingRetry();
+  };
+
+  return {
+    onMainFrameLoadFailure: ({ errorCode, retryUrl }) => {
+      recoveryActive = true;
+      const action = decideLocalMainFrameLoadFailure({ errorCode, retryCount });
+      if (action === 'failure-page') {
+        clearPendingRetry();
+        return { action, attempt: retryCount };
+      }
+
+      retryCount += 1;
+      clearPendingRetry();
+      retryTimer = setTimeout(() => {
+        retryTimer = null;
+        if (input.isWindowDestroyed()) return;
+        input.retry(retryUrl);
+      }, LOCAL_HOSTED_LOAD_RETRY_DELAY_MS);
+      return { action, attempt: retryCount };
+    },
+    onMainFrameDocumentCommitted: ({ isHostedAppDocument }) => {
+      if (!recoveryActive) return 'ignore';
+      if (!isHostedAppDocument) return 'preserve-retry';
+      reset();
+      return 'complete-retry';
+    },
+    reset,
+    dispose: reset,
+  };
+}
+
 export type RendererWatchdogExpiryAction = 'ignore' | 'failure-page';
 
 export type DesktopLoadFailureKind =
