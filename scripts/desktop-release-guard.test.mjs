@@ -9,6 +9,7 @@ import {
   validateReleaseAssets,
 } from './desktop-release-assets.mjs';
 import { evaluateDesktopReleaseGuard } from './desktop-release-guard.mjs';
+import { discoverVersionedManifests, planStamp } from './version-stamp.mjs';
 
 const desktopRequire = createRequire(
   new URL('../apps/desktop/package.json', import.meta.url)
@@ -98,6 +99,66 @@ function desktopReleaseFixture() {
     })),
   };
   return { buffers, release, releaseSha, version };
+}
+
+const releaseStampManifests = discoverVersionedManifests();
+const deterministicReleaseStampFiles = [
+  'CHANGELOG.md',
+  'VERSION',
+  'version.json',
+  ...releaseStampManifests,
+];
+const releaseStampBaseVersion = '26.8.1';
+const releaseStampNextVersion = '26.8.2';
+const releaseStampDateISO = '2026-08-31';
+
+function releaseManifest(path, version = releaseStampBaseVersion) {
+  return `${JSON.stringify(
+    {
+      name: path === 'package.json' ? 'jovie-monorepo' : path.split('/')[1],
+      version,
+      private: true,
+      scripts: { test: 'node --test' },
+    },
+    null,
+    2
+  )}\n`;
+}
+
+function releaseStampContents(headOverrides = {}) {
+  const base = {
+    'CHANGELOG.md':
+      '# Changelog\n\n## [Unreleased]\n\n### Fixed\n- Guard repair.\n\n## [26.8.1] - 2026-08-30\n',
+    VERSION: `${releaseStampBaseVersion}\n`,
+    'version.json': `${JSON.stringify(
+      { version: releaseStampBaseVersion },
+      null,
+      2
+    )}\n`,
+  };
+  for (const manifest of releaseStampManifests) {
+    base[manifest] = releaseManifest(manifest);
+  }
+
+  const head = { ...base };
+  for (const write of planStamp({
+    currentVersion: releaseStampBaseVersion,
+    nextVersion: releaseStampNextVersion,
+    manifests: releaseStampManifests.map(path => ({
+      content: base[path],
+      path,
+    })),
+    versionFile: base.VERSION,
+    changelog: base['CHANGELOG.md'],
+    dateISO: releaseStampDateISO,
+  })) {
+    head[write.path] = write.content;
+  }
+
+  return {
+    getBaseContent: path => base[path],
+    getHeadContent: path => ({ ...head, ...headOverrides })[path],
+  };
 }
 
 test('desktop builder can parse Electron macOS property lists', () => {
@@ -199,6 +260,84 @@ test('fails when desktop changes include a pre-land version artifact', () => {
 
   assert.equal(result.passed, false);
   assert.deepEqual(result.prelandReleaseStateFiles, ['VERSION']);
+});
+
+test('passes explicit release deterministic fan-out with desktop package only', () => {
+  const result = evaluateDesktopReleaseGuard({
+    branch: 'release/2026-08-31',
+    changedFiles: deterministicReleaseStampFiles,
+    versionedManifests: releaseStampManifests,
+    ...releaseStampContents(),
+  });
+
+  assert.equal(result.passed, true);
+  assert.equal(result.releaseStampAuthorized, true);
+  assert.deepEqual(result.releaseStampContentViolations, []);
+  assert.deepEqual(result.desktopFiles, ['apps/desktop/package.json']);
+  assert.deepEqual(result.releaseStampMissingFiles, []);
+  assert.deepEqual(result.releaseStampExtraFiles, []);
+});
+
+test('fails deterministic fan-out on a feature branch', () => {
+  const result = evaluateDesktopReleaseGuard({
+    branch: 'tim/jov-5748-release-stamp',
+    changedFiles: deterministicReleaseStampFiles,
+    versionedManifests: releaseStampManifests,
+    ...releaseStampContents(),
+  });
+
+  assert.equal(result.passed, false);
+  assert.equal(result.releaseStampAuthorized, false);
+  assert.deepEqual(result.desktopFiles, ['apps/desktop/package.json']);
+  assert.deepEqual(result.prelandReleaseStateFiles, [
+    'CHANGELOG.md',
+    'VERSION',
+  ]);
+});
+
+test('fails release fan-out bundled with desktop source changes', () => {
+  const result = evaluateDesktopReleaseGuard({
+    branch: 'release/2026-08-31',
+    changedFiles: [
+      ...deterministicReleaseStampFiles,
+      'apps/desktop/src/main.ts',
+    ],
+    versionedManifests: releaseStampManifests,
+    ...releaseStampContents(),
+  });
+
+  assert.equal(result.passed, false);
+  assert.equal(result.releaseStampAuthorized, false);
+  assert.deepEqual(result.desktopFiles, [
+    'apps/desktop/package.json',
+    'apps/desktop/src/main.ts',
+  ]);
+  assert.deepEqual(result.releaseStampExtraFiles, ['apps/desktop/src/main.ts']);
+});
+
+test('fails release fan-out when desktop package changes more than version', () => {
+  const desktopPackage = JSON.parse(
+    releaseStampContents().getHeadContent('apps/desktop/package.json')
+  );
+  desktopPackage.scripts.build = 'electron-builder';
+  const result = evaluateDesktopReleaseGuard({
+    branch: 'release/2026-08-31',
+    changedFiles: deterministicReleaseStampFiles,
+    versionedManifests: releaseStampManifests,
+    ...releaseStampContents({
+      'apps/desktop/package.json': `${JSON.stringify(
+        desktopPackage,
+        null,
+        2
+      )}\n`,
+    }),
+  });
+
+  assert.equal(result.passed, false);
+  assert.equal(result.releaseStampAuthorized, false);
+  assert.deepEqual(result.releaseStampContentViolations, [
+    'apps/desktop/package.json changed more than the version field',
+  ]);
 });
 
 test('desktop publishing follows verified production instead of raw main pushes', () => {
