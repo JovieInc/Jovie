@@ -1,6 +1,10 @@
-import { type HandleUploadBody, handleUpload } from '@vercel/blob/client';
+import {
+  type HandleUploadPresignedBody,
+  handleUploadPresigned,
+} from '@vercel/blob/client';
 import { NextRequest, NextResponse } from 'next/server';
 import { requireAuth } from '@/lib/auth/require-auth';
+import { issueBlobPutUploadToken } from '@/lib/blob-presigned';
 import { NO_STORE_HEADERS } from '@/lib/http/headers';
 import {
   WORKFLOW_CAPTURE_ALLOWED_CONTENT_TYPES,
@@ -24,11 +28,11 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
   if (error) return error;
   const { id } = await params;
   try {
-    const body = (await request.json()) as HandleUploadBody;
-    const response = await handleUpload({
+    const body = (await request.json()) as HandleUploadPresignedBody;
+    const response = await handleUploadPresigned({
       body,
       request,
-      onBeforeGenerateToken: async pathname => {
+      getSignedToken: async pathname => {
         const capture = await loadOwnedWorkflowCapture(id, userId);
         if (
           capture.status !== 'pending' ||
@@ -40,14 +44,11 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
         if (!pathname.startsWith(workflowCaptureBlobPrefix(userId, id))) {
           throw new WorkflowCaptureError('invalid-capture-path', 422);
         }
-        return {
-          allowedContentTypes: [...WORKFLOW_CAPTURE_ALLOWED_CONTENT_TYPES],
+        return issueBlobPutUploadToken({
+          pathname,
+          allowedContentTypes: WORKFLOW_CAPTURE_ALLOWED_CONTENT_TYPES,
           maximumSizeInBytes: WORKFLOW_CAPTURE_MAX_BYTES,
-          tokenPayload: JSON.stringify({ captureId: id, userId }),
-        };
-      },
-      onUploadCompleted: async () => {
-        // Client confirm attaches the verified hash and duration.
+        });
       },
     });
     return NextResponse.json(response, { headers: NO_STORE_HEADERS });

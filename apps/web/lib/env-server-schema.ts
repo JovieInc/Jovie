@@ -128,8 +128,12 @@ export const ServerEnvSchema = z.object({
   // Bandsintown configuration
   BANDSINTOWN_APP_ID: z.string().optional(),
 
-  // Vercel Blob
+  // Vercel Blob — production/preview authenticate via OIDC
+  // (VERCEL_OIDC_TOKEN + BLOB_STORE_ID); the static token is the local-dev
+  // fallback only.
   BLOB_READ_WRITE_TOKEN: z.string().optional(),
+  BLOB_STORE_ID: z.string().optional(),
+  BLOB_WEBHOOK_PUBLIC_KEY: z.string().optional(),
 
   // Telegram Bot (for asset ingestion webhook)
   TELEGRAM_BOT_TOKEN: z.string().optional(),
@@ -482,6 +486,8 @@ export const ENV_KEYS = [
   'APPLE_WALLET_APNS_PRODUCTION',
   'BANDSINTOWN_APP_ID',
   'BLOB_READ_WRITE_TOKEN',
+  'BLOB_STORE_ID',
+  'BLOB_WEBHOOK_PUBLIC_KEY',
   'TELEGRAM_BOT_TOKEN',
   'TELEGRAM_WEBHOOK_SECRET',
   'STRIPE_SECRET_KEY',
