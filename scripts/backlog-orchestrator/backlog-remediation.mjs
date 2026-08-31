@@ -592,6 +592,7 @@ export function assertOfficialSymphonyFeed(url) {
   return target;
 }
 
+/** @param {{ url?: string, fetchImpl?: (input: string, init?: RequestInit) => Promise<{ ok?: boolean, status?: number, json: () => Promise<unknown> }> }} [args] */
 export async function feedOfficialSymphony({
   url = OFFICIAL_SYMPHONY_REFRESH_URL,
   fetchImpl = globalThis.fetch,
@@ -673,6 +674,7 @@ export function buildRemediationWorkpad(receipt) {
   return lines.join('\n');
 }
 
+/** @param {{ issues?: any[], pullRequests?: any[], mainSha?: string | null, capacitySignals?: any, previousCleanStreak?: number, previousCohortSize?: number, now?: string }} [args] */
 export function buildRemediationReceipt({
   issues,
   pullRequests,
