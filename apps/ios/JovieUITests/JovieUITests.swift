@@ -16,11 +16,11 @@ final class JovieUITests: XCTestCase {
   }
 
   func testSignedOutLaunchShowsAuthScreen() {
-    let app = launchMockApp(launchArgument: "-ui-testing-signed-out", expectedElementDescription: "\"Continue in Browser\"") {
-      $0.buttons["Continue in Browser"]
+    let app = launchMockApp(launchArgument: "-ui-testing-signed-out", expectedElementDescription: "\"Continue to Jovie\"") {
+      $0.buttons["Continue to Jovie"]
     }
 
-    XCTAssertTrue(app.buttons["Continue in Browser"].exists)
+    XCTAssertTrue(app.buttons["Continue to Jovie"].exists)
     XCTAssertFalse(app.buttons["Continue with Google"].exists)
     XCTAssertFalse(app.buttons["Continue with Apple"].exists)
     XCTAssertFalse(app.staticTexts["Email"].exists)
@@ -75,7 +75,7 @@ final class JovieUITests: XCTestCase {
     measure(metrics: [XCTApplicationLaunchMetric(waitUntilResponsive: true)]) {
       app.launch()
       XCTAssertTrue(
-        app.buttons["Continue in Browser"].waitForExistence(timeout: timeoutSeconds),
+        app.buttons["Continue to Jovie"].waitForExistence(timeout: timeoutSeconds),
         "Signed-out shell did not become responsive within \(timeoutSeconds) seconds.\n\(app.debugDescription)"
       )
       app.terminate()
@@ -242,7 +242,7 @@ final class JovieUITests: XCTestCase {
     let switchAccount = app.buttons["waitlist-use-different-account"]
     switchAccount.tap()
     XCTAssertTrue(
-      app.buttons["Continue in Browser"].waitForExistence(timeout: 10),
+      app.buttons["Continue to Jovie"].waitForExistence(timeout: 10),
       "Waitlist account switch did not return to signed-out account selection.\n\(app.debugDescription)"
     )
   }
@@ -310,7 +310,7 @@ final class JovieUITests: XCTestCase {
     app.buttons["profile-completion-submit"].tap()
 
     XCTAssertTrue(
-      app.buttons["Continue in Browser"].waitForExistence(timeout: 3),
+      app.buttons["Continue to Jovie"].waitForExistence(timeout: 3),
       "An expired onboarding session must return to native sign-in.\n\(app.debugDescription)"
     )
     XCTAssertFalse(app.staticTexts["Finish Your Profile"].exists)
@@ -346,7 +346,7 @@ final class JovieUITests: XCTestCase {
     app.buttons["Confirm Log Out"].tap()
 
     XCTAssertTrue(
-      app.buttons["Continue in Browser"].waitForExistence(timeout: 5),
+      app.buttons["Continue to Jovie"].waitForExistence(timeout: 5),
       "Logout did not return to signed-out state.\n\(app.debugDescription)"
     )
   }
@@ -1526,7 +1526,7 @@ final class JovieUITests: XCTestCase {
     app.launch()
 
     XCTAssertTrue(
-      app.buttons["Continue in Browser"].waitForExistence(timeout: 10),
+      app.buttons["Continue to Jovie"].waitForExistence(timeout: 10),
       "Browser auth entry button did not appear.\n\(app.debugDescription)"
     )
   }
@@ -1571,7 +1571,7 @@ final class JovieUITests: XCTestCase {
       return
     }
 
-    if app.buttons["Continue in Browser"].waitForExistence(timeout: 2) {
+    if app.buttons["Continue to Jovie"].waitForExistence(timeout: 2) {
       attachScreenshot(named: "live-chat-signed-out", app: app)
       XCTFail("Live auth stayed signed out.\n\(app.debugDescription)")
       return
@@ -1653,11 +1653,11 @@ final class JovieUITests: XCTestCase {
     app.launch()
 
     XCTAssertTrue(
-      app.buttons["Continue in Browser"].waitForExistence(timeout: 10),
+      app.buttons["Continue to Jovie"].waitForExistence(timeout: 10),
       "Browser auth entry button did not appear.\n\(app.debugDescription)"
     )
 
-    app.buttons["Continue in Browser"].tap()
+    app.buttons["Continue to Jovie"].tap()
     acceptSystemAuthPromptIfNeeded()
 
     let copyURLButton = app.buttons["Copy URL"]
@@ -1742,9 +1742,9 @@ final class JovieUITests: XCTestCase {
   func testAuthCallbackProviderErrorShowsAuthError() throws {
     let app = launchMockApp(
       launchArgument: "-ui-testing-auth-callback",
-      expectedElementDescription: "\"Continue in Browser\""
+      expectedElementDescription: "\"Continue to Jovie\""
     ) {
-      $0.buttons["Continue in Browser"]
+      $0.buttons["Continue to Jovie"]
     }
 
     try openAuthCallbackURL(
