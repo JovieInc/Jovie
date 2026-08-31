@@ -173,6 +173,64 @@ describe('YouTube Library provider', () => {
     );
   });
 
+  it('resumes capped upload pagination from a stored page token', async () => {
+    const onUploadsPageToken = vi.fn();
+    const fetcher = vi.fn(async (input: RequestInfo | URL) => {
+      const url = new URL(String(input));
+      if (url.pathname.endsWith('/channels')) {
+        return jsonResponse({
+          items: [
+            {
+              id: 'channel-1',
+              snippet: { title: 'Artist channel' },
+              contentDetails: { relatedPlaylists: { uploads: 'uploads-1' } },
+            },
+          ],
+        });
+      }
+      if (url.pathname.endsWith('/playlistItems')) {
+        expect(url.searchParams.get('pageToken')).toBe('page-2');
+        expect(url.searchParams.get('maxResults')).toBe('1');
+        return jsonResponse({
+          items: [{ contentDetails: { videoId: 'video-2' } }],
+          nextPageToken: 'page-3',
+        });
+      }
+      return jsonResponse({
+        items: [
+          {
+            id: 'video-2',
+            snippet: {
+              channelId: 'channel-1',
+              title: 'Video 2',
+              thumbnails: {},
+            },
+            contentDetails: { duration: 'PT1M' },
+            status: { privacyStatus: 'public' },
+          },
+        ],
+      });
+    });
+    const provider = createYouTubeLibraryProvider({
+      accessToken: 'access-token',
+      fetcher,
+      maxVideosPerSync: 1,
+      uploadsPageToken: 'page-2',
+      onUploadsPageToken,
+    });
+
+    const videos = await provider.listChannelVideos('channel-1');
+
+    expect(videos.map(video => video.videoId)).toEqual(['video-2']);
+    expect(onUploadsPageToken).toHaveBeenCalledWith('page-3');
+    const detailCall = fetcher.mock.calls.find(([input]) =>
+      String(input).includes('/videos')
+    );
+    expect(new URL(String(detailCall?.[0])).searchParams.get('id')).toBe(
+      'video-2'
+    );
+  });
+
   it('fails closed when the authorized account does not own the channel', async () => {
     const fetcher = vi.fn(async () =>
       jsonResponse({

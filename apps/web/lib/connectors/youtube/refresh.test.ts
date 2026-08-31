@@ -8,11 +8,14 @@ const mocks = vi.hoisted(() => {
       channelId: string;
     }[],
     connectorSetValues: [] as Record<string, unknown>[],
+    syncStateSetValues: [] as Record<string, unknown>[],
     lockSetValues: [] as Record<string, unknown>[],
     lockAcquired: true,
+    cursor: null as unknown,
+    reportedUploadsPageToken: null as string | null,
   };
   const lockReturning = vi.fn(async () =>
-    state.lockAcquired ? [{ id: 'lock-1' }] : []
+    state.lockAcquired ? [{ cursor: state.cursor }] : []
   );
   const where = vi.fn(() => ({
     returning: lockReturning,
@@ -25,7 +28,12 @@ const mocks = vi.hoisted(() => {
     state,
     orderBy,
     loadFreshGoogleAccessToken: vi.fn(),
-    createYouTubeLibraryProvider: vi.fn(() => ({ provider: 'youtube' })),
+    createYouTubeLibraryProvider: vi.fn(
+      (input: { onUploadsPageToken?: (pageToken: string | null) => void }) => {
+        input.onUploadsPageToken?.(state.reportedUploadsPageToken);
+        return { provider: 'youtube' };
+      }
+    ),
     syncChannelVideos: vi.fn(),
     reconcileApprovedYouTubeCollaborators: vi.fn(),
     captureError: vi.fn(),
@@ -41,6 +49,12 @@ const mocks = vi.hoisted(() => {
         set: vi.fn((values: Record<string, unknown>) => {
           if ('tokenRefreshLockedUntil' in values) {
             state.lockSetValues.push(values);
+          } else if (
+            'cursor' in values ||
+            'lastFullSyncAt' in values ||
+            'lastIncrementalSyncAt' in values
+          ) {
+            state.syncStateSetValues.push(values);
           } else {
             state.connectorSetValues.push(values);
           }
@@ -83,8 +97,11 @@ describe('connected YouTube refresh', () => {
       channelId: 'channel-1',
     });
     mocks.connectorSetValues.splice(0);
+    mocks.syncStateSetValues.splice(0);
     mocks.lockSetValues.splice(0);
     mocks.state.lockAcquired = true;
+    mocks.state.cursor = null;
+    mocks.state.reportedUploadsPageToken = null;
     mocks.loadFreshGoogleAccessToken.mockResolvedValue('access-token');
     mocks.syncChannelVideos.mockResolvedValue({ imported: 1 });
     mocks.reconcileApprovedYouTubeCollaborators.mockResolvedValue(undefined);
@@ -132,10 +149,13 @@ describe('connected YouTube refresh', () => {
       failed: 0,
       skipped: 0,
     });
-    expect(mocks.createYouTubeLibraryProvider).toHaveBeenCalledWith({
-      accessToken: 'access-token',
-      maxVideosPerSync: 50,
-    });
+    expect(mocks.createYouTubeLibraryProvider).toHaveBeenCalledWith(
+      expect.objectContaining({
+        accessToken: 'access-token',
+        maxVideosPerSync: 50,
+        uploadsPageToken: undefined,
+      })
+    );
     expect(mocks.syncChannelVideos).toHaveBeenCalledWith(
       expect.objectContaining({ channelId: 'channel-1', now })
     );
@@ -147,6 +167,35 @@ describe('connected YouTube refresh', () => {
       lastSyncAt: now,
       lastErrorCode: null,
       lastErrorUserMessage: null,
+    });
+    expect(mocks.syncStateSetValues.at(-1)).toMatchObject({
+      cursor: null,
+      lastFullSyncAt: now,
+      lastIncrementalSyncAt: now,
+    });
+  });
+
+  it('resumes the scheduled upload scan from the stored page cursor', async () => {
+    const now = new Date('2026-08-28T12:00:00.000Z');
+    mocks.state.cursor = { uploadsPageToken: 'page-2' };
+    mocks.state.reportedUploadsPageToken = 'page-3';
+
+    await expect(runConnectedYouTubeRefreshes(now)).resolves.toEqual({
+      attempted: 1,
+      synced: 1,
+      needsReauth: 0,
+      failed: 0,
+      skipped: 0,
+    });
+
+    expect(mocks.createYouTubeLibraryProvider).toHaveBeenCalledWith(
+      expect.objectContaining({
+        uploadsPageToken: 'page-2',
+      })
+    );
+    expect(mocks.syncStateSetValues.at(-1)).toMatchObject({
+      cursor: { uploadsPageToken: 'page-3' },
+      lastIncrementalSyncAt: now,
     });
   });
 

@@ -29,6 +29,10 @@ const FAILURE_CAPTURE_MESSAGES = {
   scheduled: 'Connected YouTube refresh failed',
 } as const;
 
+interface YouTubeRefreshCursor {
+  readonly uploadsPageToken?: string;
+}
+
 export interface ConnectedYouTubeRefreshResult {
   readonly attempted: number;
   readonly synced: number;
@@ -50,10 +54,20 @@ function getErrorMessage(error: unknown): string {
   return error instanceof Error ? error.message : 'Unknown YouTube sync error';
 }
 
+function readYouTubeRefreshCursor(cursor: unknown): YouTubeRefreshCursor {
+  if (!cursor || typeof cursor !== 'object' || Array.isArray(cursor)) {
+    return {};
+  }
+  const uploadsPageToken = (cursor as Record<string, unknown>).uploadsPageToken;
+  return typeof uploadsPageToken === 'string' && uploadsPageToken.trim()
+    ? { uploadsPageToken }
+    : {};
+}
+
 async function acquireYouTubeLibrarySyncLock(
   connectorAccountId: string,
   now: Date
-): Promise<boolean> {
+): Promise<YouTubeRefreshCursor | null> {
   await db
     .insert(connectorSyncStates)
     .values({
@@ -77,9 +91,10 @@ async function acquireYouTubeLibrarySyncLock(
         )
       )
     )
-    .returning({ id: connectorSyncStates.id });
+    .returning({ cursor: connectorSyncStates.cursor });
 
-  return acquired.length > 0;
+  const row = acquired[0];
+  return row ? readYouTubeRefreshCursor(row.cursor) : null;
 }
 
 async function releaseYouTubeLibrarySyncLock(
@@ -100,6 +115,33 @@ async function releaseYouTubeLibrarySyncLock(
   }
 }
 
+async function persistYouTubeRefreshCursor(
+  connectorAccountId: string,
+  pageToken: string | null,
+  now: Date
+): Promise<void> {
+  const values = pageToken
+    ? {
+        cursor: { uploadsPageToken: pageToken },
+        lastIncrementalSyncAt: now,
+      }
+    : {
+        cursor: null,
+        lastFullSyncAt: now,
+        lastIncrementalSyncAt: now,
+      };
+
+  await db
+    .update(connectorSyncStates)
+    .set(values)
+    .where(
+      and(
+        eq(connectorSyncStates.connectorAccountId, connectorAccountId),
+        eq(connectorSyncStates.resourceKind, SYNC_LOCK_RESOURCE_KIND)
+      )
+    );
+}
+
 export async function refreshConnectedYouTubeAccount(input: {
   readonly connectorAccountId: string;
   readonly creatorProfileId: string;
@@ -109,15 +151,17 @@ export async function refreshConnectedYouTubeAccount(input: {
 }): Promise<ConnectedYouTubeRefreshOutcome> {
   const now = input.now ?? new Date();
   let lockAcquired = false;
+  let nextUploadsPageToken: string | null | undefined;
 
   try {
-    lockAcquired = await acquireYouTubeLibrarySyncLock(
+    const syncCursor = await acquireYouTubeLibrarySyncLock(
       input.connectorAccountId,
       now
     );
-    if (!lockAcquired) {
+    if (!syncCursor) {
       return { status: 'busy' };
     }
+    lockAcquired = true;
 
     const accessToken = await loadFreshGoogleAccessToken(
       input.connectorAccountId
@@ -144,10 +188,27 @@ export async function refreshConnectedYouTubeAccount(input: {
         accessToken,
         maxVideosPerSync:
           input.source === 'scheduled' ? MAX_SCHEDULED_VIDEO_IDS : undefined,
+        uploadsPageToken:
+          input.source === 'scheduled'
+            ? syncCursor.uploadsPageToken
+            : undefined,
+        onUploadsPageToken:
+          input.source === 'scheduled'
+            ? pageToken => {
+                nextUploadsPageToken = pageToken;
+              }
+            : undefined,
       }),
       now,
     });
     await reconcileApprovedYouTubeCollaborators(input.creatorProfileId, now);
+    if (input.source === 'scheduled' && nextUploadsPageToken !== undefined) {
+      await persistYouTubeRefreshCursor(
+        input.connectorAccountId,
+        nextUploadsPageToken,
+        now
+      );
+    }
     await db
       .update(connectorAccounts)
       .set({
