@@ -87,9 +87,7 @@
       "layer": "primitive",
       "status": "partially-migrated",
       "classificationReason": "The core public atom registry is source-bound, while the full required primitive catalog still has active convergence work and compatibility consumers.",
-      "dependsOn": [
-        "foundation.tokens"
-      ],
+      "dependsOn": ["foundation.tokens"],
       "owns": [
         "text",
         "link",
@@ -143,9 +141,7 @@
       "layer": "interaction",
       "status": "canonical-enforced",
       "classificationReason": "JOV-5429 landed closed-world interaction ownership and projects it through the cross-surface UI ownership registry.",
-      "dependsOn": [
-        "primitive.components"
-      ],
+      "dependsOn": ["primitive.components"],
       "owns": [
         "menu",
         "tooltip",
@@ -181,9 +177,7 @@
       "layer": "composition",
       "status": "partially-migrated",
       "classificationReason": "The UI ownership registry binds shared owners, states, adapters, and duplicate aliases, but several composition families remain backlog leaves under JOV-3570.",
-      "dependsOn": [
-        "interaction.families"
-      ],
+      "dependsOn": ["interaction.families"],
       "owns": [
         "section",
         "settings-row",
@@ -233,9 +227,7 @@
       "layer": "archetype",
       "status": "canonical-enforced",
       "classificationReason": "JOV-5424 landed the eight selectable app-screen archetypes and fail-closed registry validation.",
-      "dependsOn": [
-        "composition.shared-owners"
-      ],
+      "dependsOn": ["composition.shared-owners"],
       "owns": [
         "dashboard",
         "detail",
@@ -280,9 +272,7 @@
       "layer": "recipe",
       "status": "canonical-enforced",
       "classificationReason": "Marketing recipes, sections, route manifest, and registry gates are typed and executable; JOV-5745 owns public shell convergence around them.",
-      "dependsOn": [
-        "composition.shared-owners"
-      ],
+      "dependsOn": ["composition.shared-owners"],
       "owns": [
         "homepage",
         "feature",
@@ -315,9 +305,7 @@
       "layer": "surface",
       "status": "partially-migrated",
       "classificationReason": "Authenticated route screens are closed-world in the app-screen registry, but the flagship JOV-3561 acquisition funnel has not shipped end-to-end through canonical owners.",
-      "dependsOn": [
-        "archetype.product-screens"
-      ],
+      "dependsOn": ["archetype.product-screens"],
       "owns": [
         "dashboard-route",
         "detail-route",
@@ -356,9 +344,7 @@
       "layer": "surface",
       "status": "duplicated",
       "classificationReason": "Marketing route recipes are registered, while navigation, footer, and long-form public content still have active public-shell consolidation work in JOV-5745.",
-      "dependsOn": [
-        "recipe.marketing-pages"
-      ],
+      "dependsOn": ["recipe.marketing-pages"],
       "owns": [
         "homepage-route",
         "feature-route",
@@ -394,10 +380,7 @@
       "layer": "certification",
       "status": "partially-migrated",
       "classificationReason": "Source and visual evidence gates exist, but the single certification admission kernel and exact changed-surface proof are still active work.",
-      "dependsOn": [
-        "surface.product-routes",
-        "surface.marketing-routes"
-      ],
+      "dependsOn": ["surface.product-routes", "surface.marketing-routes"],
       "owns": [
         "changed-surface-discovery",
         "viewport-evidence",
@@ -451,17 +434,13 @@
         "composition.shared-owners",
         "recipe.marketing-pages"
       ],
-      "owns": [
-        "provenance-only"
-      ],
+      "owns": ["provenance-only"],
       "canonicalSources": [
         "docs/design-system/component-inventory.md",
         "docs/design-system/public-surface-consolidation.md",
         "docs/design-system/token-inventory.md"
       ],
-      "executableChecks": [
-        "scripts/design-authority-guard.mjs"
-      ],
+      "executableChecks": ["scripts/design-authority-guard.mjs"],
       "currentOwners": [
         {
           "issue": "JOV-3570",

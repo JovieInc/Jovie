@@ -45,7 +45,9 @@ test('design-system authority map is a source-backed dependency ledger', () => {
 test('RED: authority map rejects advisory-only enforced layers', () => {
   assert.ok(
     codes(
-      mutateEntry('interaction.families', () => ({ executableChecks: [] }))
+      mutateEntry('interaction.families', () => ({
+        executableChecks: [],
+      }))
     ).includes('missing-authority-check')
   );
 });

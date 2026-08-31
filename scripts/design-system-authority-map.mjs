@@ -117,10 +117,7 @@ export function validateDesignSystemAuthorityMap(map, repoRoot = null) {
     if (!Array.isArray(entry.owns) || entry.owns.some(item => !has(item))) {
       add(issues, 'missing-owned-capability', entry.id);
     }
-    if (
-      GAP_STATUSES.has(entry.status) &&
-      !has(entry.classificationReason)
-    ) {
+    if (GAP_STATUSES.has(entry.status) && !has(entry.classificationReason)) {
       add(issues, 'missing-classification-reason', entry.id);
     }
     if (

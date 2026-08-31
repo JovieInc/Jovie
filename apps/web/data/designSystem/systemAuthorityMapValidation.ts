@@ -127,7 +127,10 @@ export function validateDesignSystemAuthorityMap({
     if (entry.status !== 'missing' && !entry.canonicalSources.length) {
       add(issues, 'missing-authority-source', entry.id);
     }
-    if (entry.status === 'canonical-enforced' && !entry.executableChecks.length) {
+    if (
+      entry.status === 'canonical-enforced' &&
+      !entry.executableChecks.length
+    ) {
       add(issues, 'missing-authority-check', entry.id);
     }
     if (!entry.currentOwners.length) {
@@ -152,7 +155,11 @@ export function validateDesignSystemAuthorityMap({
     for (const dependency of entry.dependsOn) {
       const dependencyOrder = order.get(dependency);
       if (dependencyOrder === undefined || dependency === entry.id) {
-        add(issues, 'invalid-authority-dependency', `${entry.id}:${dependency}`);
+        add(
+          issues,
+          'invalid-authority-dependency',
+          `${entry.id}:${dependency}`
+        );
         continue;
       }
       if (entryOrder !== undefined && dependencyOrder >= entryOrder) {
