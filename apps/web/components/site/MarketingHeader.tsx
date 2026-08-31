@@ -101,8 +101,7 @@ export function MarketingHeader({
     FEATURE_FLAGS.SHOW_MARKETING_CENTER_NAV &&
     (!usesHomepageChrome || (isHomepage && showHomepageCenterNav));
   const useCanonicalSimpleNav = isHomepage || navLinks !== undefined;
-  const hasSimpleNav =
-    isMinimal || (centerNavEnabled && useCanonicalSimpleNav);
+  const hasSimpleNav = isMinimal || (centerNavEnabled && useCanonicalSimpleNav);
   const centerNavDisabled = !centerNavEnabled;
   const hideCenterNav = isMinimal || centerNavDisabled;
   const navConfig = resolveNavConfig(

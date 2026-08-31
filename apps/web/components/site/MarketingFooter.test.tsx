@@ -1,3 +1,5 @@
+import { readFileSync } from 'node:fs';
+import { resolve } from 'node:path';
 import { render, screen } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { MarketingFooter } from '@/components/site/MarketingFooter';
@@ -120,5 +122,15 @@ describe('MarketingFooter', () => {
 
     expect(screen.getByTestId('marketing-footer-cta')).toBeInTheDocument();
     expect(screen.getByRole('heading', { name: 'Product' })).toBeVisible();
+  });
+
+  it('uses the canonical public content width for the footer shell', () => {
+    const source = readFileSync(
+      resolve(__dirname, './MarketingFooter.tsx'),
+      'utf8'
+    );
+
+    expect(source).toContain('max-w-public-content px-5 sm:px-6 lg:px-8');
+    expect(source).not.toContain('max-w-linear-content px-[clamp(');
   });
 });
