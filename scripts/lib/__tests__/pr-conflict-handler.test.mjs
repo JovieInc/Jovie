@@ -1,5 +1,13 @@
-import { readFileSync } from 'node:fs';
-import { resolve } from 'node:path';
+import { spawnSync } from 'node:child_process';
+import {
+  mkdirSync,
+  mkdtempSync,
+  readFileSync,
+  rmSync,
+  writeFileSync,
+} from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join, resolve } from 'node:path';
 import { describe, expect, it } from 'vitest';
 import {
   bindOpenPrsToLiveBaseRefs,
@@ -71,6 +79,49 @@ function workflowRunBodies() {
     bodies.push(body.join('\n'));
   }
   return bodies;
+}
+
+function workflowRunScript(name) {
+  const step = workflowStep(name);
+  const marker = '        run: |\n';
+  const start = step.indexOf(marker);
+  expect(start).toBeGreaterThan(-1);
+  return step
+    .slice(start + marker.length)
+    .split('\n')
+    .map(line => (line.startsWith('          ') ? line.slice(10) : line))
+    .join('\n')
+    .trimEnd();
+}
+
+function runGit(cwd, args) {
+  const result = spawnSync('git', args, { cwd, encoding: 'utf8' });
+  expect(result.status, result.stderr).toBe(0);
+  return result.stdout.trim();
+}
+
+function workflowRejectsConflictPaths(paths) {
+  const prepare = workflowStep(
+    'Prepare exact conflict manifest without credentials'
+  );
+  const match = /elif jq -e '([\s\S]*?)'\s+<<<"\$conflict_files"/u.exec(
+    prepare
+  );
+  expect(match).not.toBeNull();
+  const result = spawnSync('jq', ['-e', match[1]], {
+    input: JSON.stringify(paths),
+    encoding: 'utf8',
+  });
+  expect([0, 1]).toContain(result.status);
+  return result.status === 0;
+}
+
+function rawPathBytesAreValidUtf8(input) {
+  const result = spawnSync('iconv', ['-f', 'UTF-8', '-t', 'UTF-8'], {
+    input,
+  });
+  expect([0, 1]).toContain(result.status);
+  return result.status === 0;
 }
 
 function pr(overrides) {
@@ -1140,6 +1191,344 @@ describe('adaptive conflict capacity', () => {
 });
 
 describe('conflict workflow contract', () => {
+  it('allows ordinary literal conflict paths while rejecting protected or unsafe paths', () => {
+    expect(
+      workflowRejectsConflictPaths([
+        'packages/ui/atoms/button.tsx',
+        'scripts/desktop-release-guard.mjs',
+      ])
+    ).toBe(false);
+    expect(workflowRejectsConflictPaths(['.github/workflows/ci.yml'])).toBe(
+      true
+    );
+    expect(workflowRejectsConflictPaths(['.github/workflows'])).toBe(true);
+    expect(
+      workflowRejectsConflictPaths(['scripts/pr-conflict-handler.mjs'])
+    ).toBe(true);
+    expect(workflowRejectsConflictPaths(['packages/ui/../secrets'])).toBe(true);
+    expect(
+      workflowRejectsConflictPaths(['packages/ui/atoms/\u0000button.tsx'])
+    ).toBe(true);
+    expect(
+      workflowRejectsConflictPaths(['packages/ui/atoms/\u007fbutton.tsx'])
+    ).toBe(true);
+  });
+
+  it('fails closed on raw invalid-UTF-8 conflict paths before lossy JSON or Node decoding', () => {
+    const prepare = workflowStep(
+      'Prepare exact conflict manifest without credentials'
+    );
+    const delivery = workflowStep('Validate, reread, and deliver once');
+    const safePaths = Buffer.from(
+      'packages/ui/atoms/button.tsx\0scripts/desktop-release-guard.mjs\0',
+      'utf8'
+    );
+    const replacementAlias = Buffer.concat([
+      Buffer.from([0xff]),
+      Buffer.from('bad\0�bad\0', 'utf8'),
+    ]);
+
+    expect(rawPathBytesAreValidUtf8(safePaths)).toBe(true);
+    expect(rawPathBytesAreValidUtf8(replacementAlias)).toBe(false);
+    expect(prepare).toContain('iconv -f UTF-8 -t UTF-8 "$raw_conflict_paths"');
+    expect(prepare.indexOf('iconv -f UTF-8 -t UTF-8')).toBeLessThan(
+      prepare.indexOf("jq -Rs 'split")
+    );
+    expect(delivery).toContain(
+      'iconv -f UTF-8 -t UTF-8 "$live_conflict_paths"'
+    );
+    const manifestValidator = delivery.indexOf(
+      'iconv -f UTF-8 -t UTF-8 "$raw_file"'
+    );
+    expect(manifestValidator).toBeGreaterThan(-1);
+    expect(manifestValidator).toBeLessThan(
+      delivery.indexOf('node --input-type=module')
+    );
+  });
+
+  const linuxIt = process.platform === 'linux' ? it : it.skip;
+  linuxIt(
+    'routes a real invalid-byte Git conflict to protected_conflict before FX',
+    () => {
+      const root = mkdtempSync(join(tmpdir(), 'jovie-conflict-utf8-'));
+      const repository = join(root, 'repository');
+      const runnerTemp = join(root, 'runner');
+      mkdirSync(repository);
+      mkdirSync(join(runnerTemp, 'fx-home'), { recursive: true });
+      const invalidPath = Buffer.concat([
+        Buffer.from(`${repository}/`),
+        Buffer.from([0xff]),
+        Buffer.from('conflict.txt'),
+      ]);
+
+      try {
+        runGit(repository, ['init', '-b', 'main']);
+        runGit(repository, ['config', 'user.name', 'Conflict Test']);
+        runGit(repository, ['config', 'user.email', 'conflict@example.test']);
+        writeFileSync(invalidPath, 'root\n');
+        runGit(repository, ['add', '--all']);
+        runGit(repository, ['commit', '-m', 'root']);
+        const rootHead = runGit(repository, ['rev-parse', 'HEAD']);
+
+        runGit(repository, ['switch', '-c', 'source']);
+        writeFileSync(invalidPath, 'source\n');
+        runGit(repository, ['commit', '-am', 'source']);
+        const sourceHead = runGit(repository, ['rev-parse', 'HEAD']);
+
+        runGit(repository, ['switch', '-c', 'base', rootHead]);
+        writeFileSync(invalidPath, 'base\n');
+        runGit(repository, ['commit', '-am', 'base']);
+        const baseHead = runGit(repository, ['rev-parse', 'HEAD']);
+        runGit(repository, ['switch', 'source']);
+
+        const githubOutput = join(root, 'github-output');
+        const result = spawnSync(
+          'bash',
+          [
+            '-c',
+            workflowRunScript(
+              'Prepare exact conflict manifest without credentials'
+            ),
+          ],
+          {
+            cwd: repository,
+            encoding: 'utf8',
+            env: {
+              ...process.env,
+              ATTEMPT: '1',
+              BASE_HEAD: baseHead,
+              BASE_REF: 'main',
+              COHORT_ID: 'invalid-byte-test',
+              FX_AUTO_UPGRADE: '0',
+              FX_MODEL: 'openai/gpt-5.6-sol',
+              FX_PERMISSION_MODE: 'ask',
+              GITHUB_OUTPUT: githubOutput,
+              HEAD_REF: 'source',
+              HOME: join(runnerTemp, 'fx-home'),
+              MAX_ATTEMPTS: '3',
+              PR_NUMBER: '1',
+              REPOSITORY: 'JovieInc/Jovie',
+              RUNNER_TEMP: runnerTemp,
+              SOURCE_HEAD: sourceHead,
+            },
+          }
+        );
+
+        expect(result.status, result.stderr).toBe(0);
+        const receipt = JSON.parse(
+          readFileSync(
+            join(runnerTemp, 'conflict-fx-artifact', 'receipt.json'),
+            'utf8'
+          )
+        );
+        expect(receipt).toMatchObject({
+          conflictFiles: [],
+          outcome: 'protected_conflict',
+        });
+        expect(receipt.detail).toContain('invalid UTF-8');
+        expect(readFileSync(githubOutput, 'utf8')).toContain(
+          'model_required=false'
+        );
+      } finally {
+        rmSync(root, { recursive: true, force: true });
+      }
+    }
+  );
+
+  it('routes a real valid UTF-8 Git conflict to the credential-isolated FX step', () => {
+    const root = mkdtempSync(join(tmpdir(), 'jovie-conflict-valid-utf8-'));
+    const repository = join(root, 'repository');
+    const runnerTemp = join(root, 'runner');
+    const fxHome = join(runnerTemp, 'fx-home');
+    const mockBin = join(root, 'bin');
+    const conflictPath = join(repository, 'safe.txt');
+    mkdirSync(repository);
+    mkdirSync(join(fxHome, '.fx'), { recursive: true });
+    mkdirSync(mockBin);
+
+    try {
+      runGit(repository, ['init', '-b', 'main']);
+      runGit(repository, ['config', 'user.name', 'Conflict Test']);
+      runGit(repository, ['config', 'user.email', 'conflict@example.test']);
+      writeFileSync(conflictPath, 'root\n');
+      runGit(repository, ['add', '--all']);
+      runGit(repository, ['commit', '-m', 'root']);
+      const rootHead = runGit(repository, ['rev-parse', 'HEAD']);
+
+      runGit(repository, ['switch', '-c', 'source']);
+      writeFileSync(conflictPath, 'source\n');
+      runGit(repository, ['commit', '-am', 'source']);
+      const sourceHead = runGit(repository, ['rev-parse', 'HEAD']);
+
+      runGit(repository, ['switch', '-c', 'base', rootHead]);
+      writeFileSync(conflictPath, 'base\n');
+      runGit(repository, ['commit', '-am', 'base']);
+      const baseHead = runGit(repository, ['rev-parse', 'HEAD']);
+      runGit(repository, ['switch', 'source']);
+
+      writeFileSync(
+        join(mockBin, 'fx'),
+        `#!/usr/bin/env bash
+set -euo pipefail
+test "$1" = permissions
+test "$2" = --json
+printf '%s\n' '{"mode":"ask","rules":[{"permission":"*","pattern":"*","action":"deny"},{"permission":"read","pattern":"*","action":"deny"},{"permission":"edit","pattern":"*","action":"deny"},{"permission":"read","pattern":"safe.txt","action":"allow"},{"permission":"edit","pattern":"safe.txt","action":"allow"}]}'
+`,
+        { mode: 0o755 }
+      );
+      const githubOutput = join(root, 'github-output');
+      const result = spawnSync(
+        'bash',
+        [
+          '-c',
+          workflowRunScript(
+            'Prepare exact conflict manifest without credentials'
+          ),
+        ],
+        {
+          cwd: repository,
+          encoding: 'utf8',
+          env: {
+            ...process.env,
+            ATTEMPT: '1',
+            BASE_HEAD: baseHead,
+            BASE_REF: 'main',
+            COHORT_ID: 'valid-utf8-test',
+            FX_AUTO_UPGRADE: '0',
+            FX_MODEL: 'openai/gpt-5.6-sol',
+            FX_PERMISSION_MODE: 'ask',
+            GITHUB_OUTPUT: githubOutput,
+            HEAD_REF: 'source',
+            HOME: fxHome,
+            MAX_ATTEMPTS: '3',
+            PATH: `${mockBin}:${process.env.PATH ?? ''}`,
+            PR_NUMBER: '1',
+            REPOSITORY: 'JovieInc/Jovie',
+            RUNNER_TEMP: runnerTemp,
+            SOURCE_HEAD: sourceHead,
+          },
+        }
+      );
+
+      expect(result.status, result.stderr).toBe(0);
+      const artifactDir = join(runnerTemp, 'conflict-fx-artifact');
+      const receipt = JSON.parse(
+        readFileSync(join(artifactDir, 'receipt.json'), 'utf8')
+      );
+      expect(receipt).toMatchObject({
+        conflictFiles: ['safe.txt'],
+        outcome: 'model_required',
+      });
+      expect(readFileSync(githubOutput, 'utf8')).toContain(
+        'model_required=true'
+      );
+      expect(readFileSync(join(artifactDir, 'prompt.txt'), 'utf8')).toContain(
+        'Conflicting files: safe.txt'
+      );
+    } finally {
+      rmSync(root, { recursive: true, force: true });
+    }
+  });
+
+  it('executes the exact trusted-writer UTF-8 guard before accepting live conflict paths', () => {
+    const delivery = workflowStep('Validate, reread, and deliver once');
+    const match =
+      /(if ! iconv -f UTF-8 -t UTF-8 "\$live_conflict_paths"[\s\S]*?^\s+fi)/mu.exec(
+        delivery
+      );
+    expect(match).not.toBeNull();
+    const root = mkdtempSync(join(tmpdir(), 'jovie-writer-utf8-'));
+    const rawPaths = join(root, 'live-conflict-paths.z');
+
+    try {
+      writeFileSync(rawPaths, Buffer.from([0xff, 0x00]));
+      const rejected = spawnSync(
+        'bash',
+        [
+          '-c',
+          `set -euo pipefail\nlive_conflict_paths="$1"\n${match?.[1]}\necho accepted`,
+          'writer-guard',
+          rawPaths,
+        ],
+        { encoding: 'utf8' }
+      );
+      expect(rejected.status).toBe(1);
+      expect(rejected.stdout).toContain(
+        'Live conflict path set contains invalid UTF-8 bytes.'
+      );
+
+      writeFileSync(rawPaths, Buffer.from('safe.txt\0', 'utf8'));
+      const accepted = spawnSync(
+        'bash',
+        [
+          '-c',
+          `set -euo pipefail\nlive_conflict_paths="$1"\n${match?.[1]}\necho accepted`,
+          'writer-guard',
+          rawPaths,
+        ],
+        { encoding: 'utf8' }
+      );
+      expect(accepted.status, accepted.stderr).toBe(0);
+      expect(accepted.stdout).toContain('accepted');
+    } finally {
+      rmSync(root, { recursive: true, force: true });
+    }
+  });
+
+  it('executes the exact index-manifest validator and propagates invalid bytes as failure', () => {
+    const delivery = workflowStep('Validate, reread, and deliver once');
+    const functionStart = delivery.indexOf(
+      '          build_index_manifest() {'
+    );
+    const functionEnd = delivery.indexOf(
+      '\n\n          git ls-files --stage -z',
+      functionStart
+    );
+    expect(functionStart).toBeGreaterThan(-1);
+    expect(functionEnd).toBeGreaterThan(functionStart);
+    const manifestFunction = delivery
+      .slice(functionStart, functionEnd)
+      .replace(/^ {10}/gmu, '');
+    const root = mkdtempSync(join(tmpdir(), 'jovie-index-utf8-'));
+    const rawManifest = join(root, 'index.raw');
+    const outputManifest = join(root, 'index.json');
+    const script = `set -euo pipefail\nconflict_files='[]'\n${manifestFunction}\nbuild_index_manifest "$1" "$2" false`;
+
+    try {
+      writeFileSync(rawManifest, Buffer.from([0xff, 0x00]));
+      const rejected = spawnSync(
+        'bash',
+        ['-c', script, 'manifest-guard', rawManifest, outputManifest],
+        { encoding: 'utf8' }
+      );
+      expect(rejected.status).toBe(1);
+      expect(rejected.stdout).toContain(
+        'Git index manifest contains invalid UTF-8 path bytes.'
+      );
+
+      writeFileSync(
+        rawManifest,
+        Buffer.from(`100644 ${'a'.repeat(40)} 0\tREADME.md\0`, 'utf8')
+      );
+      const accepted = spawnSync(
+        'bash',
+        ['-c', script, 'manifest-guard', rawManifest, outputManifest],
+        { encoding: 'utf8' }
+      );
+      expect(accepted.status, accepted.stderr).toBe(0);
+      expect(JSON.parse(readFileSync(outputManifest, 'utf8'))).toEqual([
+        {
+          mode: '100644',
+          oid: 'a'.repeat(40),
+          path: Buffer.from('README.md', 'utf8').toString('base64url'),
+          stage: '0',
+        },
+      ]);
+    } finally {
+      rmSync(root, { recursive: true, force: true });
+    }
+  });
+
   it('computes the FX matrix from live runner and CI pressure instead of a fixed fleet number', () => {
     expect(WORKFLOW).toContain(CONFLICT_CLOSED_LOOP_INVARIANT_ID);
     expect(WORKFLOW).toMatch(

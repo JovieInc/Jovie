@@ -463,76 +463,83 @@ jobs:
             outcome='candidate'
             detail='Git produced a clean exact-pair integration candidate without model judgment'
           else
-            conflict_files=$(git diff --name-only --diff-filter=U -z \
-              | jq -Rs 'split("\u0000") | map(select(length > 0))')
-            competing_changes=$(git ls-files -u \
-              | jq -Rsc '
-                  split("\n")
-                  | map(select(length > 0) | capture("^(?<mode>[0-9]+) (?<blob>[0-9a-f]{40}) (?<stage>[23])\\t(?<file>.*)$"))
-                  | group_by(.file)
-                  | map({file:.[0].file,oursBlob:((map(select(.stage == "2"))[0].blob) // null),theirsBlob:((map(select(.stage == "3"))[0].blob) // null)})
-                ')
-            conflict_count=$(jq 'length' <<<"$conflict_files")
-            if [[ "$conflict_count" -eq 0 ]]; then
-              detail='git failed before producing a typed conflict set'
-            elif jq -e 'any(
-              startswith(".github/workflows/") or
-              . == "scripts/pr-conflict-handler.mjs" or
-              . == "scripts/lib/pr-conflict-handler.mjs" or
-              . == "scripts/run-affected-tests.mjs" or
-              . == "canon/invariants.jsonl" or
-              startswith("/") or . == ".." or startswith("../") or
-              contains("/../") or endswith("/..") or
-              test("[\\u0000-\\u001f\\u007f]") or
-              test("(^|/)\\.git(/|$)") or
-              contains("*") or contains("?") or contains("[") or
-              contains("]") or contains("{") or contains("}") or contains("\\")
-            )' <<<"$conflict_files" >/dev/null || \
-              git ls-files -u | awk '$1 != "100644" && $1 != "100755" { unsafe=1 } END { exit(unsafe ? 0 : 1) }'; then
+            raw_conflict_paths="$artifact_dir/conflict-paths.z"
+            git diff --name-only --diff-filter=U -z > "$raw_conflict_paths"
+            if ! iconv -f UTF-8 -t UTF-8 "$raw_conflict_paths" >/dev/null; then
               outcome='protected_conflict'
-              detail='the conflict touches the controller trust boundary or cannot be represented by a literal FX edit rule'
+              detail='the conflict path set contains invalid UTF-8 and cannot be represented by a literal FX edit rule'
             else
-              # Profile-owned rules override any project .fx.json. Only the
-              # exact typed conflict paths may be edited; terminal, network,
-              # MCP, deletion, rename, and every non-conflict path stay denied.
-              jq -n --argjson conflicts "$conflict_files" '
-                {
-                  permission_mode:"ask",
-                  auto_upgrade:false,
-                  permission:{
-                    "*":"deny",
-                    read:(reduce $conflicts[] as $path ({"*":"deny"}; .[$path]="allow")),
-                    edit:(reduce $conflicts[] as $path ({"*":"deny"}; .[$path]="allow"))
+              conflict_files=$(jq -Rs 'split("\u0000") | map(select(length > 0))' \
+                < "$raw_conflict_paths")
+              competing_changes=$(git ls-files -u \
+                | jq -Rsc '
+                    split("\n")
+                    | map(select(length > 0) | capture("^(?<mode>[0-9]+) (?<blob>[0-9a-f]{40}) (?<stage>[23])\\t(?<file>.*)$"))
+                    | group_by(.file)
+                    | map({file:.[0].file,oursBlob:((map(select(.stage == "2"))[0].blob) // null),theirsBlob:((map(select(.stage == "3"))[0].blob) // null)})
+                  ')
+              conflict_count=$(jq 'length' <<<"$conflict_files")
+              if [[ "$conflict_count" -eq 0 ]]; then
+                detail='git failed before producing a typed conflict set'
+              elif jq -e 'any(
+                . == ".github/workflows" or startswith(".github/workflows/") or
+                . == "scripts/pr-conflict-handler.mjs" or
+                . == "scripts/lib/pr-conflict-handler.mjs" or
+                . == "scripts/run-affected-tests.mjs" or
+                . == "canon/invariants.jsonl" or
+                startswith("/") or . == ".." or startswith("../") or
+                contains("/../") or endswith("/..") or
+                (explode | any(. < 32 or . == 127)) or
+                test("(^|/)\\.git(/|$)") or
+                contains("*") or contains("?") or contains("[") or
+                contains("]") or contains("{") or contains("}") or contains("\\")
+              )' <<<"$conflict_files" >/dev/null || \
+                git ls-files -u | awk '$1 != "100644" && $1 != "100755" { unsafe=1 } END { exit(unsafe ? 0 : 1) }'; then
+                outcome='protected_conflict'
+                detail='the conflict touches the controller trust boundary or cannot be represented by a literal FX edit rule'
+              else
+                # Profile-owned rules override any project .fx.json. Only the
+                # exact typed conflict paths may be edited; terminal, network,
+                # MCP, deletion, rename, and every non-conflict path stay denied.
+                jq -n --argjson conflicts "$conflict_files" '
+                  {
+                    permission_mode:"ask",
+                    auto_upgrade:false,
+                    permission:{
+                      "*":"deny",
+                      read:(reduce $conflicts[] as $path ({"*":"deny"}; .[$path]="allow")),
+                      edit:(reduce $conflicts[] as $path ({"*":"deny"}; .[$path]="allow"))
+                    }
                   }
-                }
-              ' > "$HOME/.fx/settings.json"
-              fx permissions --json > "$RUNNER_TEMP/fx-permissions-conflicts.json"
-              jq -e --argjson conflicts "$conflict_files" '
-                .mode == "ask" and
-                any(.rules[]; .permission == "*" and .pattern == "*" and .action == "deny") and
-                any(.rules[]; .permission == "read" and .pattern == "*" and .action == "deny") and
-                any(.rules[]; .permission == "edit" and .pattern == "*" and .action == "deny") and
-                ([.rules[] | select(.action == "allow") | .permission] | all(. == "read" or . == "edit")) and
-                ([.rules[] | select(.permission == "read" and .action == "allow") | .pattern] | sort) == ($conflicts | sort) and
-                ([.rules[] | select(.permission == "edit" and .action == "allow") | .pattern] | sort) == ($conflicts | sort)
-              ' "$RUNNER_TEMP/fx-permissions-conflicts.json" >/dev/null
-              printf '%s\n' \
-                'Resolve the current Git merge conflicts in this ephemeral checkout.' \
-                'Invariant: JOV-INV-021' \
-                "Repository: $REPOSITORY" \
-                "PR: #$PR_NUMBER" \
-                "Exact source head: $SOURCE_HEAD" \
-                "Exact base head: $BASE_HEAD" \
-                "Attempt: $ATTEMPT/$MAX_ATTEMPTS" \
-                "Conflicting files: $(jq -r 'join(", ")' <<<"$conflict_files")" \
-                'Preserve the objective behavior of both sides and add only directly required tests.' \
-                'Do not commit, push, edit controller policy, weaken tests, add a hold, change PR state, or access credentials.' \
-                'Terminal, network, MCP, deletion, rename, and non-conflict edits are denied by trusted profile policy.' \
-                'Subjective taste is not a shipping gate; leave optional taste changes for a separate follow-up.' \
-                'Finish with a coherent working tree. The trusted writer independently constructs and delivers the commit.' \
-                > "$artifact_dir/prompt.txt"
-              outcome='model_required'
-              detail='exact typed conflict manifest is ready for credential-isolated FX'
+                ' > "$HOME/.fx/settings.json"
+                fx permissions --json > "$RUNNER_TEMP/fx-permissions-conflicts.json"
+                jq -e --argjson conflicts "$conflict_files" '
+                  .mode == "ask" and
+                  any(.rules[]; .permission == "*" and .pattern == "*" and .action == "deny") and
+                  any(.rules[]; .permission == "read" and .pattern == "*" and .action == "deny") and
+                  any(.rules[]; .permission == "edit" and .pattern == "*" and .action == "deny") and
+                  ([.rules[] | select(.action == "allow") | .permission] | all(. == "read" or . == "edit")) and
+                  ([.rules[] | select(.permission == "read" and .action == "allow") | .pattern] | sort) == ($conflicts | sort) and
+                  ([.rules[] | select(.permission == "edit" and .action == "allow") | .pattern] | sort) == ($conflicts | sort)
+                ' "$RUNNER_TEMP/fx-permissions-conflicts.json" >/dev/null
+                printf '%s\n' \
+                  'Resolve the current Git merge conflicts in this ephemeral checkout.' \
+                  'Invariant: JOV-INV-021' \
+                  "Repository: $REPOSITORY" \
+                  "PR: #$PR_NUMBER" \
+                  "Exact source head: $SOURCE_HEAD" \
+                  "Exact base head: $BASE_HEAD" \
+                  "Attempt: $ATTEMPT/$MAX_ATTEMPTS" \
+                  "Conflicting files: $(jq -r 'join(", ")' <<<"$conflict_files")" \
+                  'Preserve the objective behavior of both sides and add only directly required tests.' \
+                  'Do not commit, push, edit controller policy, weaken tests, add a hold, change PR state, or access credentials.' \
+                  'Terminal, network, MCP, deletion, rename, and non-conflict edits are denied by trusted profile policy.' \
+                  'Subjective taste is not a shipping gate; leave optional taste changes for a separate follow-up.' \
+                  'Finish with a coherent working tree. The trusted writer independently constructs and delivers the commit.' \
+                  > "$artifact_dir/prompt.txt"
+                outcome='model_required'
+                detail='exact typed conflict manifest is ready for credential-isolated FX'
+              fi
             fi
           fi
 
@@ -1079,13 +1086,23 @@ jobs:
           git merge --no-commit --no-ff "$BASE_HEAD" > "$RUNNER_TEMP/writer-merge.log" 2>&1
           writer_merge_rc=$?
           set -e
-          live_conflict_files=$(git diff --name-only --diff-filter=U -z \
-            | jq -Rs 'split("\u0000") | map(select(length > 0))')
+          live_conflict_paths="$RUNNER_TEMP/live-conflict-paths.z"
+          git diff --name-only --diff-filter=U -z > "$live_conflict_paths"
+          if ! iconv -f UTF-8 -t UTF-8 "$live_conflict_paths" >/dev/null; then
+            echo "::error::Live conflict path set contains invalid UTF-8 bytes."
+            exit 1
+          fi
+          live_conflict_files=$(jq -Rs 'split("\u0000") | map(select(length > 0))' \
+            < "$live_conflict_paths")
           jq -e --argjson expected "$conflict_files" \
             'sort == ($expected | sort)' <<<"$live_conflict_files" >/dev/null
 
           build_index_manifest() {
             local raw_file="$1" output_file="$2" reject_unsafe="$3"
+            if ! iconv -f UTF-8 -t UTF-8 "$raw_file" >/dev/null; then
+              echo "::error::Git index manifest contains invalid UTF-8 path bytes."
+              return 1
+            fi
             RAW_MANIFEST="$raw_file" OUTPUT_MANIFEST="$output_file" \
               CONFLICT_FILES="$conflict_files" REJECT_UNSAFE="$reject_unsafe" \
               node --input-type=module <<'NODE'
