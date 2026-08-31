@@ -252,6 +252,7 @@ const CI_CONTROL_SCRIPT_TESTS = [
   'scripts/lib/__tests__/github-open-prs-rest.test.mjs',
   'scripts/lib/__tests__/github-merge-queue.test.mjs',
   'scripts/lib/__tests__/ci-fast-workflow-contract.test.mjs',
+  'scripts/lib/__tests__/codeql-workflow-contract.test.mjs',
   'scripts/lib/__tests__/design-exception-registry.test.mjs',
   'scripts/lib/__tests__/design-system-source-ratchet.test.mjs',
   'scripts/lib/__tests__/ci-repo-lanes.test.mjs',
