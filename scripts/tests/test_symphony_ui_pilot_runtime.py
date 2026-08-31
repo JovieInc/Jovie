@@ -319,7 +319,7 @@ def test_activation_exports_user_systemd_before_both_installers() -> None:
     activation = ACTIVATION_WORKFLOW.read_text()
     establish = activation.index("Establish lingering user-systemd session")
     official = activation.index(
-        "update-symphony-burrito.sh --skip-binary --no-restart --retire-legacy"
+        "update-symphony-burrito.sh --skip-binary"
     )
     install = activation.index("bash scripts/hermes/install-gem-fleet-controller.sh")
     rehab = activation.index("bash scripts/hermes/install-gem-pr-rehabilitation.sh")
@@ -347,9 +347,11 @@ def test_activation_requires_official_runtime_and_retires_custom_automation() ->
     assert "symphony-elixir.service" in activation
     assert 'DEFAULT_WORKSPACES = "~/symphony-elixir-workspaces"' in RECONCILER.read_text()
     assert (
-        "update-symphony-burrito.sh --skip-binary --no-restart --retire-legacy"
+        "update-symphony-burrito.sh --skip-binary"
         in activation
     )
+    assert "--no-restart --retire-legacy" not in activation
+    assert 'test "$main_pid" = "$after_pid"' not in activation
     assert "install-symphony-ui-pilot.sh" not in activation
     assert "runtime-preflight" not in activation
     assert "LoadState --value" in activation

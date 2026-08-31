@@ -67,6 +67,10 @@ SUMMER_QUEUE_PATH = Path(
         "/home/timwhite/gem-workspace/state/jovie-delivery-controller/summer-queue.json",
     )
 ).expanduser()
+DEFAULT_WORKFLOW = Path(
+    os.environ.get("SYMPHONY_WORKFLOW_PATH", str(Path.home() / ".config/symphony/WORKFLOW.md"))
+).expanduser()
+REPO_WORKFLOW = Path(__file__).resolve().parent / "symphony" / "WORKFLOW.md"
 WORKFLOWS = {
     "CI",
     "Production Controller",
@@ -667,13 +671,18 @@ def error_kind(text: Any) -> str:
     return "other"
 
 
-def configured_slots() -> int | None:
-    path = Path("/home/timwhite/symphony-runtime/elixir/WORKFLOW.jovie-ui-pilot.md")
-    try:
-        match = re.search(r"^\s*max_concurrent_agents:\s*([1-9][0-9]*)\s*$", path.read_text(), re.MULTILINE)
-        return int(match.group(1)) if match else None
-    except OSError:
-        return None
+def configured_slots(path: Path | None = None) -> int | None:
+    for candidate in (path, DEFAULT_WORKFLOW, REPO_WORKFLOW):
+        if candidate is None or not candidate.is_file():
+            continue
+        try:
+            text = candidate.read_text(encoding="utf-8")
+        except OSError:
+            continue
+        match = re.search(r"^\s*max_concurrent_agents:\s*([1-9][0-9]*)\s*$", text, re.MULTILINE)
+        if match:
+            return int(match.group(1))
+    return None
 
 
 def duration_text(seconds: float | int | None) -> str:

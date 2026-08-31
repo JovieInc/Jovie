@@ -5,6 +5,7 @@ After=symphony-elixir.service
 [Service]
 Type=oneshot
 ExecStart=%h/.local/bin/symphony-reconciler
+Environment=SYMPHONY_WORKSPACE_ROOT=%h/symphony-elixir-workspaces
 Environment=SYMPHONY_MODEL_ROUTER=%h/.local/lib/symphony-reconciler/model-router.py
 Environment=SYMPHONY_MODEL_REGISTRY=%h/.local/lib/symphony-reconciler/model-registry.json
 Environment=SYMPHONY_RUNTIME_CAPABILITY_MANIFEST=%h/.local/lib/symphony-reconciler/symphony-reconciler-capabilities.json

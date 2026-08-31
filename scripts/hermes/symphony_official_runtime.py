@@ -17,10 +17,13 @@ import math
 import os
 import pathlib
 import re
+import signal
 import subprocess
 import sys
 import tempfile
 import time
+import urllib.error
+import urllib.request
 from dataclasses import asdict, dataclass
 from email.utils import parsedate_to_datetime
 from typing import Any
@@ -28,6 +31,7 @@ from typing import Any
 
 OFFICIAL_SERVICE_NAME = "symphony-elixir.service"
 OFFICIAL_PORT = 4041
+OFFICIAL_PROJECT_ID = "440ea404-041f-461e-ae45-dd6a2e98e4a1"
 OFFICIAL_PROJECT_SLUG = "symphony-ui-pilot-96d6b9c5b2d5"
 OFFICIAL_WORKSPACE_ROOT = "~/symphony-elixir-workspaces"
 OFFICIAL_WORKFLOW_TARGET = "%h/.config/symphony/WORKFLOW.md"
@@ -36,6 +40,8 @@ OFFICIAL_MAX_CONCURRENT_AGENTS = 8
 MIN_POLL_INTERVAL_MS = 30_000
 LINEAR_HOURLY_REQUEST_BUDGET = 2_500
 LINEAR_PAGE_SIZE = 50
+LINEAR_COUNT_PAGE_SIZE = 100
+LINEAR_COUNT_MAX_PAGES = 100
 MEASURED_ACTIVE_ISSUES = 110
 PER_AGENT_REQUESTS_PER_HOUR = 30
 RETRY_REFRESH_REQUESTS_PER_HOUR = 100
@@ -48,8 +54,9 @@ DEFAULT_MAX_GATE_SLEEP_SECONDS = 3_900
 DEFAULT_RATE_LIMIT_GATE = (
     pathlib.Path.home() / ".local/state/symphony-elixir/linear-rate-limit.json"
 )
-ACTIVE_STATES = ("Todo", "In Progress", "Rework")
+ACTIVE_STATES = ("Todo", "In Progress")
 TERMINAL_STATES = ("Done", "Canceled", "Cancelled", "Duplicate", "Closed")
+LINEAR_API_URL = "https://api.linear.app/graphql"
 OBSOLETE_TOKENS = (
     "symphony-burrito.service",
     "symphony-burrito-update.timer",
@@ -60,6 +67,21 @@ OBSOLETE_TOKENS = (
     "symphony-runtime/elixir",
     "WORKFLOW.jovie-ui-pilot.md",
 )
+LINEAR_ELIGIBLE_COUNT_QUERY = """
+query SymphonyLinearEligibleCount($projectId: String!, $first: Int!, $after: String) {
+  project(id: $projectId) {
+    issues(first: $first, after: $after) {
+      nodes {
+        state { name }
+      }
+      pageInfo {
+        hasNextPage
+        endCursor
+      }
+    }
+  }
+}
+"""
 
 
 @dataclass(frozen=True)
@@ -165,6 +187,47 @@ def _int_scalar(body: list[str], key: str) -> int:
         raise ValueError(f"{key} must be an integer") from exc
 
 
+def _non_negative_int(value: str, *, name: str) -> int:
+    try:
+        parsed = int(value, 10)
+    except (TypeError, ValueError) as exc:
+        raise ValueError(f"{name} must be a non-negative integer") from exc
+    if parsed < 0:
+        raise ValueError(f"{name} must be a non-negative integer")
+    return parsed
+
+
+def _dotenv_values(path: pathlib.Path) -> dict[str, str]:
+    values: dict[str, str] = {}
+    try:
+        text = path.read_text(encoding="utf-8")
+    except OSError:
+        return values
+    for raw in text.splitlines():
+        line = raw.strip()
+        if not line or line.startswith("#") or "=" not in line:
+            continue
+        if line.startswith("export "):
+            line = line[len("export ") :].strip()
+        name, value = line.split("=", 1)
+        name = name.strip()
+        value = value.strip().strip('"').strip("'")
+        if name:
+            values[name] = value
+    return values
+
+
+def _linear_api_key(linear_env_file: pathlib.Path | None) -> str:
+    value = os.environ.get("LINEAR_API_KEY")
+    if value and value.strip():
+        return value.strip()
+    if linear_env_file is not None:
+        value = _dotenv_values(linear_env_file).get("LINEAR_API_KEY")
+        if value and value.strip():
+            return value.strip()
+    raise RuntimeError("linear_eligible_count_missing_api_key")
+
+
 def parse_workflow(path: pathlib.Path) -> WorkflowContract:
     front = _front_matter(_read_text(path))
     lines = front.splitlines()
@@ -238,13 +301,133 @@ def compute_budget(inputs: BudgetInputs) -> dict[str, int | bool]:
     }
 
 
+def fetch_linear_eligible_issue_count(
+    *,
+    api_key: str,
+    project_id: str = OFFICIAL_PROJECT_ID,
+    active_states: tuple[str, ...] = ACTIVE_STATES,
+    api_url: str = LINEAR_API_URL,
+    page_size: int = LINEAR_COUNT_PAGE_SIZE,
+) -> int:
+    if not active_states:
+        return 0
+    if page_size <= 0:
+        raise ValueError("page_size must be positive")
+
+    active = set(active_states)
+    count = 0
+    after: str | None = None
+    pages = 0
+    while True:
+        payload = json.dumps(
+            {
+                "query": LINEAR_ELIGIBLE_COUNT_QUERY,
+                "variables": {
+                    "projectId": project_id,
+                    "first": page_size,
+                    "after": after,
+                },
+            },
+            separators=(",", ":"),
+        ).encode("utf-8")
+        request = urllib.request.Request(
+            api_url,
+            data=payload,
+            headers={
+                "Authorization": api_key,
+                "Content-Type": "application/json",
+                "User-Agent": "jovie-symphony-elixir-budget/1",
+            },
+            method="POST",
+        )
+        try:
+            with urllib.request.urlopen(request, timeout=10) as response:
+                status = int(getattr(response, "status", 200))
+                headers = {key.lower(): value for key, value in response.headers.items()}
+                body = response.read().decode("utf-8", errors="replace")
+        except urllib.error.HTTPError as exc:
+            body = exc.read().decode("utf-8", errors="replace")
+            headers = {key.lower(): value for key, value in exc.headers.items()}
+            classification = classify_linear_response(
+                status=exc.code,
+                headers=headers,
+                body=body,
+            )
+            if classification["kind"] == "rate_limited":
+                raise RuntimeError(
+                    "linear_eligible_count_rate_limited:"
+                    f"retryAfterSeconds={classification['retryAfterSeconds']}:"
+                    f"resetAt={classification['resetAt']}"
+                ) from exc
+            raise RuntimeError(f"linear_eligible_count_http_status:{exc.code}") from exc
+        except urllib.error.URLError as exc:
+            raise RuntimeError(f"linear_eligible_count_request_failed:{exc.reason}") from exc
+
+        classification = classify_linear_response(status=status, headers=headers, body=body)
+        if classification["kind"] == "rate_limited":
+            raise RuntimeError(
+                "linear_eligible_count_rate_limited:"
+                f"retryAfterSeconds={classification['retryAfterSeconds']}:"
+                f"resetAt={classification['resetAt']}"
+            )
+        if status < 200 or status >= 300:
+            raise RuntimeError(f"linear_eligible_count_http_status:{status}")
+        try:
+            decoded = json.loads(body)
+        except json.JSONDecodeError as exc:
+            raise RuntimeError("linear_eligible_count_invalid_json") from exc
+        if _graphql_ratelimited(body):
+            raise RuntimeError("linear_eligible_count_rate_limited")
+        errors = decoded.get("errors") if isinstance(decoded, dict) else None
+        if errors:
+            raise RuntimeError("linear_eligible_count_graphql_errors")
+        project = decoded.get("data", {}).get("project") if isinstance(decoded, dict) else None
+        issues = project.get("issues") if isinstance(project, dict) else None
+        nodes = issues.get("nodes") if isinstance(issues, dict) else None
+        page_info = issues.get("pageInfo") if isinstance(issues, dict) else None
+        if not isinstance(nodes, list) or not isinstance(page_info, dict):
+            raise RuntimeError("linear_eligible_count_missing_project_issues")
+        for node in nodes:
+            state = node.get("state") if isinstance(node, dict) else None
+            state_name = state.get("name") if isinstance(state, dict) else None
+            if state_name in active:
+                count += 1
+        if page_info.get("hasNextPage") is not True:
+            return count
+        after_value = page_info.get("endCursor")
+        if not isinstance(after_value, str) or not after_value:
+            raise RuntimeError("linear_eligible_count_missing_page_cursor")
+        after = after_value
+        pages += 1
+        if pages >= LINEAR_COUNT_MAX_PAGES:
+            raise RuntimeError("linear_eligible_count_page_limit_exceeded")
+
+
+def resolve_linear_eligible_issue_count(
+    *,
+    linear_env_file: pathlib.Path | None,
+    project_id: str = OFFICIAL_PROJECT_ID,
+    active_states: tuple[str, ...] = ACTIVE_STATES,
+    api_url: str = LINEAR_API_URL,
+) -> int:
+    override = os.environ.get("SYMPHONY_LINEAR_ACTIVE_ISSUES")
+    if override is not None and override.strip():
+        return _non_negative_int(override.strip(), name="SYMPHONY_LINEAR_ACTIVE_ISSUES")
+    return fetch_linear_eligible_issue_count(
+        api_key=_linear_api_key(linear_env_file),
+        project_id=project_id,
+        active_states=active_states,
+        api_url=api_url,
+    )
+
+
 def validate_source(
     *,
     repo_root: pathlib.Path,
     workflow_path: pathlib.Path,
     unit_path: pathlib.Path,
     service_name: str,
-    active_issues: int = MEASURED_ACTIVE_ISSUES,
+    active_issues: int | None = None,
 ) -> dict[str, Any]:
     errors: list[str] = []
     root_workflow = repo_root / "WORKFLOW.md"
@@ -285,18 +468,22 @@ def validate_source(
             errors.append("workflow_after_create_uses_ssh")
         if "mix " in workflow.after_create:
             errors.append("workflow_after_create_uses_elixir_build")
-        budget = compute_budget(
-            BudgetInputs(
-                active_issues=active_issues,
-                poll_interval_ms=workflow.poll_interval_ms,
-                max_concurrent_agents=workflow.max_concurrent_agents,
+        if active_issues is None:
+            budget = None
+            errors.append("linear_active_issue_count_missing")
+        else:
+            budget = compute_budget(
+                BudgetInputs(
+                    active_issues=active_issues,
+                    poll_interval_ms=workflow.poll_interval_ms,
+                    max_concurrent_agents=workflow.max_concurrent_agents,
+                )
             )
-        )
-        if not budget["withinBudget"]:
-            errors.append(
-                "linear_request_budget_exceeded:"
-                f"{budget['steadyStateRequestsPerHour']}>{budget['hourlyBudget']}"
-            )
+            if not budget["withinBudget"]:
+                errors.append(
+                    "linear_request_budget_exceeded:"
+                    f"{budget['steadyStateRequestsPerHour']}>{budget['hourlyBudget']}"
+                )
     else:
         budget = None
 
@@ -454,7 +641,11 @@ def classify_linear_response(
     rate_limited = status == 429 or (status == 400 and graphql_rate_limited)
     if rate_limited and retry_after is None:
         retry_after = FALLBACK_RETRY_AFTER_SECONDS
-    reset_at = _iso(observed_at + dt.timedelta(seconds=retry_after)) if retry_after is not None else None
+    reset_at = (
+        _iso(observed_at + dt.timedelta(seconds=retry_after))
+        if retry_after is not None
+        else None
+    )
     if rate_limited:
         return {
             "kind": "rate_limited",
@@ -562,8 +753,31 @@ def _print_gate_wait_exhausted(gate: dict[str, Any], max_sleep_seconds: int) -> 
     )
 
 
+def _pause_child_for_gate(
+    process: subprocess.Popen[str],
+    gate: dict[str, Any],
+    max_gate_sleep_seconds: int | None,
+) -> int:
+    if process.poll() is not None or not gate.get("active"):
+        return 0
+    if not isinstance(process.pid, int) or process.pid <= 0:
+        return 0
+    os.kill(process.pid, signal.SIGSTOP)
+    try:
+        return _sleep_gate(gate, max_gate_sleep_seconds)
+    finally:
+        if process.poll() is None:
+            try:
+                os.kill(process.pid, signal.SIGCONT)
+            except ProcessLookupError:
+                pass
+
+
 def run_official_binary_once(
-    command: list[str], *, gate_file: pathlib.Path
+    command: list[str],
+    *,
+    gate_file: pathlib.Path,
+    max_gate_sleep_seconds: int | None,
 ) -> int:
     process = subprocess.Popen(
         command,
@@ -580,8 +794,11 @@ def run_official_binary_once(
         classification = classify_linear_log_line(line)
         if classification and write_rate_limit_gate(gate_file, classification):
             # The official scheduler may be supervising active agents. Record the
-            # reset gate for restarts without killing the child process here.
+            # reset gate and suspend only the scheduler process; do not
+            # terminate the process tree that may contain active Codex jobs.
             rate_limited = True
+            gate = read_rate_limit_gate(gate_file)
+            _pause_child_for_gate(process, gate, max_gate_sleep_seconds)
     returncode = process.wait()
     return RATE_LIMIT_EXIT_CODE if rate_limited else returncode
 
@@ -614,7 +831,11 @@ def run_official_binary(
                 _print_gate_wait_exhausted(gate, max_gate_sleep_seconds)
                 return RATE_LIMIT_EXIT_CODE
             continue
-        returncode = run_official_binary_once(command, gate_file=gate_file)
+        returncode = run_official_binary_once(
+            command,
+            gate_file=gate_file,
+            max_gate_sleep_seconds=max_gate_sleep_seconds,
+        )
         if returncode != RATE_LIMIT_EXIT_CODE:
             return returncode
         gate = read_rate_limit_gate(gate_file)
@@ -719,8 +940,18 @@ def main(argv: list[str] | None = None) -> int:
     validate_parser.add_argument("--workflow", type=pathlib.Path, required=True)
     validate_parser.add_argument("--unit", type=pathlib.Path, required=True)
     validate_parser.add_argument("--service-name", default=OFFICIAL_SERVICE_NAME)
-    validate_parser.add_argument("--active-issues", type=int, default=MEASURED_ACTIVE_ISSUES)
+    validate_parser.add_argument("--active-issues", type=int)
     validate_parser.add_argument("--json", action="store_true")
+
+    count_parser = sub.add_parser("linear-eligible-count")
+    count_parser.add_argument(
+        "--linear-env-file",
+        type=pathlib.Path,
+        default=pathlib.Path.home() / ".config/symphony/linear.env",
+    )
+    count_parser.add_argument("--project-id", default=OFFICIAL_PROJECT_ID)
+    count_parser.add_argument("--api-url", default=LINEAR_API_URL)
+    count_parser.add_argument("--active-state", action="append")
 
     classify_parser = sub.add_parser("classify-response")
     classify_parser.add_argument("--status", type=int, required=True)
@@ -778,6 +1009,17 @@ def main(argv: list[str] | None = None) -> int:
         )
         _print_result(result, json_output=args.json)
         return 0 if result["ok"] else 1
+
+    if args.command == "linear-eligible-count":
+        active_states = tuple(args.active_state or ACTIVE_STATES)
+        count = resolve_linear_eligible_issue_count(
+            linear_env_file=args.linear_env_file,
+            project_id=args.project_id,
+            active_states=active_states,
+            api_url=args.api_url,
+        )
+        print(count)
+        return 0
 
     if args.command == "classify-response":
         body = args.body_file.read_text(encoding="utf-8") if args.body_file else args.body

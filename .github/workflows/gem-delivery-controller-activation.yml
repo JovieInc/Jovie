@@ -64,13 +64,9 @@ jobs:
           GEM_CONTROLLER_EXPECTED_REVISION: ${{ github.event.workflow_run.head_sha }}
         run: |
           set -euo pipefail
-          main_pid="$(systemctl --user show symphony-elixir.service --property=MainPID --value)"
-          test "${main_pid}" -gt 0
-          bash scripts/hermes/update-symphony-burrito.sh --skip-binary --no-restart --retire-legacy
+          bash scripts/hermes/update-symphony-burrito.sh --skip-binary
           bash scripts/hermes/install-gem-fleet-controller.sh
           bash scripts/hermes/install-gem-pr-rehabilitation.sh
-          after_pid="$(systemctl --user show symphony-elixir.service --property=MainPID --value)"
-          test "$main_pid" = "$after_pid"
       - name: Verify runtime identity after reload
         env:
           GEM_WORKSPACE: /home/timwhite/gem-workspace

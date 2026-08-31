@@ -19,6 +19,7 @@ UNIT_DST="${TARGET_HOME}/.config/systemd/user/${SERVICE_NAME}"
 WORKFLOW_SRC="${SYMPHONY_WORKFLOW_SRC:-${REPO_ROOT}/scripts/hermes/symphony/WORKFLOW.md}"
 WORKFLOW_DST="${TARGET_HOME}/.config/symphony/WORKFLOW.md"
 ACCOUNT_ENV="${TARGET_HOME}/.config/symphony/codex-account.env"
+LINEAR_ENV="${TARGET_HOME}/.config/symphony/linear.env"
 HELPER_SRC="${REPO_ROOT}/scripts/hermes/symphony_official_runtime.py"
 HELPER_DST="${TARGET_HOME}/.local/bin/symphony-official-runtime"
 LOG_DIR="${TARGET_HOME}/symphony-elixir-logs"
@@ -31,6 +32,7 @@ SKIP_BINARY=0
 CHECK_ONLY=0
 RUNTIME_READBACK=0
 RETIRE_LEGACY=0
+MIN_RESTART_NEXT_POLL_MS="${SYMPHONY_MIN_RESTART_NEXT_POLL_MS:-5000}"
 LEGACY_UNITS=(
   symphony-ui-pilot.service
   symphony-reconciler.service
@@ -82,11 +84,21 @@ PY
 }
 
 validate_source() {
+  local active_issues
+  active_issues="$(python3 "$HELPER_SRC" linear-eligible-count --linear-env-file "$LINEAR_ENV")"
+  case "$active_issues" in
+    ''|*[!0-9]*)
+      echo "SOURCE_INVALID invalid Linear active issue count: ${active_issues:-empty}" >&2
+      return 4
+      ;;
+  esac
+  echo "ACTIVE_ISSUES $active_issues"
   python3 "$HELPER_SRC" validate-source \
     --repo-root "$REPO_ROOT" \
     --workflow "$WORKFLOW_SRC" \
     --unit "$UNIT_SRC" \
-    --service-name "$SERVICE_NAME"
+    --service-name "$SERVICE_NAME" \
+    --active-issues "$active_issues"
 }
 
 install_one() {
@@ -202,7 +214,7 @@ PY
   return "$rc"
 }
 
-running_agent_count() {
+promotion_idle_snapshot() {
   python3 - "$STATE_URL" <<'PY'
 import json, sys, urllib.request
 try:
@@ -220,27 +232,59 @@ running = data.get("running")
 if isinstance(running, list) and len(running) != running_count:
     print("state API running list disagrees with counts.running", file=sys.stderr)
     raise SystemExit(3)
-print(running_count)
+polling = data.get("polling")
+if not isinstance(polling, dict):
+    print("state API response is missing polling state", file=sys.stderr)
+    raise SystemExit(4)
+checking = polling.get("checking?")
+if checking is None:
+    checking = polling.get("checking")
+if not isinstance(checking, bool):
+    print("state API response has invalid polling.checking", file=sys.stderr)
+    raise SystemExit(4)
+next_poll_ms = polling.get("next_poll_in_ms")
+if isinstance(next_poll_ms, bool) or not isinstance(next_poll_ms, int) or next_poll_ms < 0:
+    print("state API response has invalid polling.next_poll_in_ms", file=sys.stderr)
+    raise SystemExit(4)
+print(f"{running_count} {1 if checking else 0} {next_poll_ms}")
 PY
 }
 
-assert_no_active_agents_interrupted() {
-  local running
-  if ! running="$(running_agent_count)"; then
-    echo "PROMOTION_RED cannot prove the official runtime is idle" >&2
-    return 6
-  fi
-  case "$running" in
-    ''|*[!0-9]*)
-      echo "PROMOTION_RED invalid running-agent count: ${running:-empty}" >&2
+stop_idle_official_for_restart() {
+  local snapshot running checking next_poll_ms
+  for _ in $(seq 1 45); do
+    if ! snapshot="$(promotion_idle_snapshot)"; then
+      echo "PROMOTION_RED cannot prove the official runtime is idle" >&2
       return 6
-      ;;
-  esac
-  if [ "$running" -gt 0 ]; then
-    echo "PROMOTION_RED active official agents would be interrupted: $running" >&2
-    return 6
-  fi
-  echo "PROMOTION_OK no active official agents reported on $STATE_URL"
+    fi
+    read -r running checking next_poll_ms <<< "$snapshot"
+    case "$running:$checking:$next_poll_ms" in
+      *[!0-9:]*)
+        echo "PROMOTION_RED invalid runtime idle snapshot: $snapshot" >&2
+        return 6
+        ;;
+    esac
+    if [ "$running" -gt 0 ]; then
+      echo "PROMOTION_RED active official agents would be interrupted: $running" >&2
+      return 6
+    fi
+    if [ "$checking" -eq 0 ] && [ "$next_poll_ms" -ge "$MIN_RESTART_NEXT_POLL_MS" ]; then
+      if systemctl --user is-active --quiet "$SERVICE_NAME" 2>/dev/null; then
+        if ! systemctl --user stop "$SERVICE_NAME"; then
+          echo "PROMOTION_RED failed to stop idle $SERVICE_NAME before file promotion" >&2
+          return 6
+        fi
+        official_stopped_for_promotion=1
+        echo "PROMOTION_OK stopped idle $SERVICE_NAME before file promotion; next poll was in ${next_poll_ms}ms on $STATE_URL"
+      else
+        echo "PROMOTION_OK no active official agents; $SERVICE_NAME is not active before restart promotion"
+      fi
+      return 0
+    fi
+    sleep 1
+  done
+  echo "PROMOTION_RED official runtime did not expose a safe idle restart window" >&2
+  return 6
 }
 
 assert_account_environment_ready() {
@@ -359,6 +403,7 @@ rollback_dir=""
 promotion_started=0
 promotion_complete=0
 official_was_active=0
+official_stopped_for_promotion=0
 official_pid_before=""
 
 backup_target() {
@@ -381,18 +426,24 @@ restore_target() {
 
 cleanup() {
   local status="$?"
-  if [ "$status" -ne 0 ] && [ "$promotion_started" -eq 1 ] && [ "$promotion_complete" -eq 0 ]; then
-    restore_target binary "$BIN_DST" 0755
-    restore_target helper "$HELPER_DST" 0755
-    restore_target unit "$UNIT_DST" 0644
-    restore_target workflow "$WORKFLOW_DST" 0644
+  if [ "$status" -ne 0 ] && [ "$promotion_complete" -eq 0 ]; then
+    if [ "$promotion_started" -eq 1 ]; then
+      restore_target binary "$BIN_DST" 0755
+      restore_target helper "$HELPER_DST" 0755
+      restore_target unit "$UNIT_DST" 0644
+      restore_target workflow "$WORKFLOW_DST" 0644
+    fi
     if [ "$RESTART" -eq 1 ] || [ "$RETIRE_LEGACY" -eq 1 ]; then
       systemctl --user daemon-reload >/dev/null 2>&1 || true
-      if [ "$RESTART" -eq 1 ] && [ "$official_was_active" -eq 1 ]; then
+      if [ "$RESTART" -eq 1 ] && [ "$official_stopped_for_promotion" -eq 1 ]; then
         systemctl --user restart "$SERVICE_NAME" >/dev/null 2>&1 || true
       fi
     fi
-    echo "PROMOTION_ROLLED_BACK official files restored; legacy units remain fail-closed" >&2
+    if [ "$promotion_started" -eq 1 ]; then
+      echo "PROMOTION_ROLLED_BACK official files restored; legacy units remain fail-closed" >&2
+    elif [ "$official_stopped_for_promotion" -eq 1 ]; then
+      echo "PROMOTION_ROLLED_BACK official service restarted before file promotion" >&2
+    fi
   fi
   [ -z "$tmpdir" ] || rm -rf "$tmpdir"
   [ -z "$rollback_dir" ] || rm -rf "$rollback_dir"
@@ -412,15 +463,15 @@ else
 fi
 
 assert_account_environment_ready
-if [ "$RESTART" -eq 1 ]; then
-  assert_no_active_agents_interrupted
-fi
 if [ "$RESTART" -eq 1 ] || [ "$RETIRE_LEGACY" -eq 1 ]; then
   prepare_systemd_context
   if systemctl --user is-active --quiet "$SERVICE_NAME" 2>/dev/null; then
     official_was_active=1
     official_pid_before="$(systemctl --user show "$SERVICE_NAME" --property=MainPID --value)"
   fi
+fi
+if [ "$RESTART" -eq 1 ]; then
+  stop_idle_official_for_restart
 fi
 if [ "$RESTART" -eq 0 ] && [ "$RETIRE_LEGACY" -eq 1 ] && [ "$official_was_active" -ne 1 ]; then
   echo "PROMOTION_RED --no-restart retirement requires an already-active $SERVICE_NAME" >&2

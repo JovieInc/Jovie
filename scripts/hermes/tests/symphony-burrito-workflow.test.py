@@ -5,12 +5,14 @@ from __future__ import annotations
 import os
 import pathlib
 import re
+import socket
 import subprocess
 import tempfile
 import unittest
 import importlib.util
 import json
 import sys
+from unittest import mock
 
 ROOT = pathlib.Path(__file__).resolve().parents[3]
 WORKFLOW_PATH = ROOT / "scripts/hermes/symphony/WORKFLOW.md"
@@ -69,6 +71,7 @@ class OfficialSymphonyContractTests(unittest.TestCase):
         self.assertIn("enabled=false", WORKFLOW)
         self.assertIn("create_branch", WORKFLOW)
         self.assertNotIn("- Merging", WORKFLOW)
+        self.assertNotIn("- Rework", WORKFLOW)
         self.assertNotIn("team:JOV", WORKFLOW)
         self.assertIsNone(TOKEN_RE.search(WORKFLOW))
         self.assertIn("--port 4041", UNIT)
@@ -97,12 +100,21 @@ class OfficialSymphonyContractTests(unittest.TestCase):
             workflow_path=WORKFLOW_PATH,
             unit_path=UNIT_PATH,
             service_name="symphony-elixir.service",
+            active_issues=helper.MEASURED_ACTIVE_ISSUES,
         )
         self.assertTrue(result["ok"], result)
         budget = result["budget"]
         self.assertEqual(budget["pagesPerPoll"], 3)
         self.assertEqual(budget["schedulerRequestsPerHour"], 360)
         self.assertLessEqual(budget["steadyStateRequestsPerHour"], 2500)
+        missing_count = helper.validate_source(
+            repo_root=ROOT,
+            workflow_path=WORKFLOW_PATH,
+            unit_path=UNIT_PATH,
+            service_name="symphony-elixir.service",
+        )
+        self.assertFalse(missing_count["ok"], missing_count)
+        self.assertIn("linear_active_issue_count_missing", missing_count["errors"])
 
     def test_budget_fails_for_five_second_polling_or_unbounded_concurrency(self):
         helper = _load_helper()
@@ -121,6 +133,24 @@ class OfficialSymphonyContractTests(unittest.TestCase):
             helper.BudgetInputs(poll_interval_ms=30000, max_concurrent_agents=55)
         )
         self.assertFalse(unsafe_concurrency["withinBudget"])
+        live_queue_edge = helper.compute_budget(
+            helper.BudgetInputs(
+                active_issues=701,
+                poll_interval_ms=30000,
+                max_concurrent_agents=8,
+            )
+        )
+        self.assertFalse(live_queue_edge["withinBudget"], live_queue_edge)
+        self.assertEqual(live_queue_edge["steadyStateRequestsPerHour"], 2540)
+        measured_safe_edge = helper.compute_budget(
+            helper.BudgetInputs(
+                active_issues=700,
+                poll_interval_ms=30000,
+                max_concurrent_agents=8,
+            )
+        )
+        self.assertTrue(measured_safe_edge["withinBudget"], measured_safe_edge)
+        self.assertEqual(measured_safe_edge["steadyStateRequestsPerHour"], 2420)
 
     def test_linear_graphql_ratelimited_400_records_retry_after_gate(self):
         helper = _load_helper()
@@ -223,6 +253,78 @@ class OfficialSymphonyContractTests(unittest.TestCase):
             self.assertEqual(payload["schema"], helper.RATE_LIMIT_GATE_SCHEMA)
             self.assertEqual(payload["kind"], "rate_limited")
 
+    def test_linear_eligible_count_uses_project_id_pagination(self):
+        helper = _load_helper()
+        calls = []
+
+        class FakeResponse:
+            status = 200
+            headers = {}
+
+            def __init__(self, payload):
+                self.payload = payload
+
+            def __enter__(self):
+                return self
+
+            def __exit__(self, *_args):
+                return False
+
+            def read(self):
+                return json.dumps(self.payload).encode("utf-8")
+
+        def fake_urlopen(request, timeout):
+            del timeout
+            payload = json.loads(request.data.decode("utf-8"))
+            calls.append(payload)
+            after = payload["variables"]["after"]
+            if after is None:
+                return FakeResponse(
+                    {
+                        "data": {
+                            "project": {
+                                "issues": {
+                                    "nodes": [
+                                        {"state": {"name": "Todo"}},
+                                        {"state": {"name": "Backlog"}},
+                                        {"state": {"name": "In Progress"}},
+                                    ],
+                                    "pageInfo": {
+                                        "hasNextPage": True,
+                                        "endCursor": "cursor-1",
+                                    },
+                                }
+                            }
+                        }
+                    }
+                )
+            return FakeResponse(
+                {
+                    "data": {
+                        "project": {
+                            "issues": {
+                                "nodes": [
+                                    {"state": {"name": "Todo"}},
+                                    {"state": {"name": "In Review"}},
+                                ],
+                                "pageInfo": {
+                                    "hasNextPage": False,
+                                    "endCursor": None,
+                                },
+                            }
+                        }
+                    }
+                }
+            )
+
+        with mock.patch.object(helper.urllib.request, "urlopen", side_effect=fake_urlopen):
+            count = helper.fetch_linear_eligible_issue_count(api_key="lin_test")
+
+        self.assertEqual(count, 3)
+        self.assertEqual(len(calls), 2)
+        self.assertEqual(calls[0]["variables"]["projectId"], helper.OFFICIAL_PROJECT_ID)
+        self.assertNotIn("projectSlug", calls[0]["variables"])
+
     def test_rate_limit_gate_closes_descriptor_when_fdopen_fails(self):
         helper = _load_helper()
         classified = {
@@ -262,7 +364,10 @@ class OfficialSymphonyContractTests(unittest.TestCase):
 
     def test_official_runtime_wrapper_records_gate_without_terminating_child(self):
         helper = _load_helper()
-        self.assertNotIn("_terminate_child", HELPER_PATH.read_text(encoding="utf-8"))
+        source = HELPER_PATH.read_text(encoding="utf-8")
+        self.assertIn("signal.SIGSTOP", source)
+        self.assertIn("signal.SIGCONT", source)
+        self.assertNotIn("_terminate_child", source)
         line = (
             'status=400 retry-after: 3600 '
             '{"errors":[{"message":"request budget exhausted",'
@@ -299,6 +404,64 @@ class OfficialSymphonyContractTests(unittest.TestCase):
             self.assertIn("child-drained-after-rate-limit", result.stdout)
             self.assertTrue(gate.is_file())
 
+    def test_official_runtime_wrapper_pauses_live_scheduler_without_terminating_child(self):
+        helper = _load_helper()
+        process = subprocess.Popen(
+            ["python3", "-c", "import time; time.sleep(30)"],
+            cwd=ROOT,
+            text=True,
+        )
+        kills = []
+        sleeps = []
+
+        def fake_kill(pid, sig):
+            kills.append((pid, sig))
+
+        def fake_sleep(seconds):
+            sleeps.append(seconds)
+
+        original_sleep = helper.time.sleep
+        try:
+            helper.time.sleep = fake_sleep
+            with mock.patch.object(helper.os, "kill", side_effect=fake_kill):
+                slept = helper._pause_child_for_gate(
+                    process,
+                    {
+                        "active": True,
+                        "retryAfterSeconds": 3600,
+                        "resetAt": "2026-08-31T16:00:00Z",
+                    },
+                    20,
+                )
+        finally:
+            helper.time.sleep = original_sleep
+            process.terminate()
+            process.wait(timeout=5)
+
+        self.assertEqual(slept, 20)
+        self.assertEqual(sleeps, [20])
+        self.assertEqual(kills, [(process.pid, helper.signal.SIGSTOP), (process.pid, helper.signal.SIGCONT)])
+
+    def test_linear_eligible_count_override_is_dependency_free_and_validated(self):
+        result = subprocess.run(
+            ["python3", str(HELPER_PATH), "linear-eligible-count"],
+            cwd=ROOT,
+            env={**os.environ, "SYMPHONY_LINEAR_ACTIVE_ISSUES": "110"},
+            capture_output=True,
+            text=True,
+        )
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertEqual(result.stdout.strip(), "110")
+        invalid = subprocess.run(
+            ["python3", str(HELPER_PATH), "linear-eligible-count"],
+            cwd=ROOT,
+            env={**os.environ, "SYMPHONY_LINEAR_ACTIVE_ISSUES": "not-a-number"},
+            capture_output=True,
+            text=True,
+        )
+        self.assertNotEqual(invalid.returncode, 0)
+        self.assertIn("SYMPHONY_LINEAR_ACTIVE_ISSUES", invalid.stderr)
+
     def test_updater_dry_run_and_config_copy_refuse_obsolete_shape(self):
         self.assertIn("linux_x86_64", UPDATER)
         self.assertIn('SYMPHONY_VERSION="${SYMPHONY_VERSION:-v0.0.2}"', UPDATER)
@@ -314,9 +477,11 @@ class OfficialSymphonyContractTests(unittest.TestCase):
         self.assertIn("gem-checkin-hud.py", tty1)
         self.assertNotIn("until a pickup has a PR", tty1)
         updater = ROOT / "scripts/hermes/update-symphony-burrito.sh"
+        budget_env = {**os.environ, "SYMPHONY_LINEAR_ACTIVE_ISSUES": "110"}
         dry = subprocess.run(
             ["bash", str(updater), "--dry-run", "--no-restart"],
             cwd=ROOT,
+            env=budget_env,
             capture_output=True,
             text=True,
         )
@@ -329,7 +494,7 @@ class OfficialSymphonyContractTests(unittest.TestCase):
         obsolete = subprocess.run(
             ["bash", str(updater), "--dry-run", "--no-restart"],
             cwd=ROOT,
-            env={**os.environ, "SYMPHONY_SERVICE_NAME": "symphony-burrito.service"},
+            env={**budget_env, "SYMPHONY_SERVICE_NAME": "symphony-burrito.service"},
             capture_output=True,
             text=True,
         )
@@ -349,7 +514,7 @@ class OfficialSymphonyContractTests(unittest.TestCase):
             wrong = pathlib.Path(tmp) / "wrong.md"
             wrong.write_text(WORKFLOW.replace("interval_ms: 30000", "interval_ms: 5000"))
             env = {
-                **os.environ,
+                **budget_env,
                 "SYMPHONY_ELIXIR_HOME": str(target_home),
                 "SYMPHONY_WORKFLOW_SRC": str(wrong),
             }
@@ -394,18 +559,23 @@ class OfficialSymphonyContractTests(unittest.TestCase):
             self.assertIn(f"DRIFT {existing}", drift.stdout)
 
     def test_deliberate_red_promotion_gates_before_mutation_and_masks_legacy(self):
-        promotion_guard = UPDATER.index("  assert_no_active_agents_interrupted\n")
         account_guard = UPDATER.index("assert_account_environment_ready\n")
+        stop = UPDATER.index("  stop_idle_official_for_restart\n")
         first_install = UPDATER.index('install_one "$HELPER_SRC" "$HELPER_DST" 0755')
         retirement = UPDATER.index("  retire_legacy_units\n")
         restart = UPDATER.index(
             '  systemctl --user restart "$SERVICE_NAME"', retirement
         )
-        self.assertLess(promotion_guard, first_install)
         self.assertLess(account_guard, first_install)
+        self.assertLess(stop, first_install)
+        self.assertNotIn("assert_no_active_agents_interrupted", UPDATER)
+        self.assertIn("stop_idle_official_for_restart()", UPDATER)
         self.assertNotIn('> "$ACCOUNT_ENV"', UPDATER)
         self.assertNotIn('install_one "$ACCOUNT_ENV"', UPDATER)
         self.assertLess(retirement, restart)
+        self.assertIn("MIN_RESTART_NEXT_POLL_MS", UPDATER)
+        self.assertIn("polling.next_poll_in_ms", UPDATER)
+        self.assertIn('systemctl --user stop "$SERVICE_NAME"', UPDATER)
         self.assertIn('systemctl --user mask --now "${LEGACY_UNITS[@]}"', UPDATER)
         for unit in (
             "symphony-ui-pilot.service",
@@ -431,6 +601,23 @@ class OfficialSymphonyContractTests(unittest.TestCase):
         self.assertIn("cannot prove the official runtime is idle", UPDATER)
         self.assertIn("state API response has invalid counts.running", UPDATER)
         with tempfile.TemporaryDirectory() as tmp:
+            bin_dir = pathlib.Path(tmp) / "bin"
+            bin_dir.mkdir()
+            fake_systemctl = bin_dir / "systemctl"
+            fake_systemctl.write_text(
+                "#!/usr/bin/env bash\n"
+                "case \"$*\" in\n"
+                "  *\"show-environment\"*) exit 0 ;;\n"
+                "esac\n"
+                "exit 1\n",
+                encoding="utf-8",
+            )
+            fake_systemctl.chmod(0o755)
+            runtime_dir = pathlib.Path(tmp) / "runtime"
+            runtime_dir.mkdir()
+            bus = socket.socket(socket.AF_UNIX)
+            bus.bind(str(runtime_dir / "bus"))
+            bus.listen(1)
             target_home = pathlib.Path(tmp) / "home"
             account_home = target_home / ".codex-accounts/meetjovie"
             account_home.mkdir(parents=True)
@@ -438,21 +625,28 @@ class OfficialSymphonyContractTests(unittest.TestCase):
             account_env.parent.mkdir(parents=True)
             account_env.write_text(f"CODEX_HOME={account_home}\n")
             account_env.chmod(0o600)
-            result = subprocess.run(
-                [
-                    "bash",
-                    str(ROOT / "scripts/hermes/update-symphony-burrito.sh"),
-                    "--skip-binary",
-                ],
-                cwd=ROOT,
-                env={
-                    **os.environ,
-                    "SYMPHONY_ELIXIR_HOME": str(target_home),
-                    "SYMPHONY_STATE_URL": "http://127.0.0.1:9/api/v1/state",
-                },
-                capture_output=True,
-                text=True,
-            )
+            try:
+                result = subprocess.run(
+                    [
+                        "bash",
+                        str(ROOT / "scripts/hermes/update-symphony-burrito.sh"),
+                        "--skip-binary",
+                    ],
+                    cwd=ROOT,
+                    env={
+                        **os.environ,
+                        "PATH": f"{bin_dir}:{os.environ['PATH']}",
+                        "XDG_RUNTIME_DIR": str(runtime_dir),
+                        "DBUS_SESSION_BUS_ADDRESS": f"unix:path={runtime_dir / 'bus'}",
+                        "SYMPHONY_LINEAR_ACTIVE_ISSUES": "110",
+                        "SYMPHONY_ELIXIR_HOME": str(target_home),
+                        "SYMPHONY_STATE_URL": "http://127.0.0.1:9/api/v1/state",
+                    },
+                    capture_output=True,
+                    text=True,
+                )
+            finally:
+                bus.close()
             self.assertEqual(result.returncode, 6, result.stderr)
             self.assertIn("cannot prove the official runtime is idle", result.stderr)
             self.assertFalse(
@@ -470,7 +664,11 @@ class OfficialSymphonyContractTests(unittest.TestCase):
                     "--no-restart",
                 ],
                 cwd=ROOT,
-                env={**os.environ, "SYMPHONY_ELIXIR_HOME": str(target_home)},
+                env={
+                    **os.environ,
+                    "SYMPHONY_LINEAR_ACTIVE_ISSUES": "110",
+                    "SYMPHONY_ELIXIR_HOME": str(target_home),
+                },
                 capture_output=True,
                 text=True,
             )
@@ -489,9 +687,11 @@ class OfficialSymphonyContractTests(unittest.TestCase):
         )
         self.assertNotIn("install-symphony-ui-pilot.sh", activation)
         self.assertIn(
-            "update-symphony-burrito.sh --skip-binary --no-restart --retire-legacy",
+            "update-symphony-burrito.sh --skip-binary",
             activation,
         )
+        self.assertNotIn("--no-restart --retire-legacy", activation)
+        self.assertNotIn('test "$main_pid" = "$after_pid"', activation)
         self.assertIn('readonly SERVICE="symphony-elixir.service"', fleet)
         self.assertIn("scripts/hermes/systemd/symphony-elixir.service", fleet)
         self.assertNotIn("scripts/hermes/systemd/symphony-ui-pilot.service", fleet)

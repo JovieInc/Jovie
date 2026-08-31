@@ -9,7 +9,6 @@ tracker:
   active_states:
     - Todo
     - In Progress
-    - Rework
   terminal_states:
     - Done
     - Canceled

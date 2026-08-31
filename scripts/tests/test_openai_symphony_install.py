@@ -26,6 +26,7 @@ class OpenAISymphonyInstallTests(unittest.TestCase):
         self.assertIn("interval_ms: 30000", workflow)
         self.assertIn("max_concurrent_agents: 8", workflow)
         self.assertIn("port: 4041", workflow)
+        self.assertNotIn("- Rework", workflow)
 
         installer = (ROOT / "scripts/install-openai-symphony.sh").read_text()
         self.assertIn('SYMPHONY_VERSION="v0.0.2"', installer)
