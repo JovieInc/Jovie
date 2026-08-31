@@ -1291,6 +1291,8 @@ function summarize(
         : []
     )
   );
+  const recommendationContext: AeoRecommendationContext =
+    ctx === 'absent' ? 'unknown' : ctx;
   const draft = {
     variantIdentity: AEO_ASSET_VISIBILITY_VARIANT_IDENTITY,
     assetId: first?.asset.assetId ?? '',
@@ -1302,7 +1304,7 @@ function summarize(
       observationCount: n,
       appearanceRate,
     },
-    recommendation: { bestPosition: best, context: ctx },
+    recommendation: { bestPosition: best, context: recommendationContext },
     citedSource: src,
     competitorComparison: {
       items: competitors.map(c => c.item),
