@@ -35,7 +35,10 @@ export async function validateYouTubeProfileMutationRequest(
   if (!parsed.success) {
     return {
       ok: false,
-      response: NextResponse.json({ error: 'Invalid payload' }, { status: 400 }),
+      response: NextResponse.json(
+        { error: 'Invalid payload' },
+        { status: 400 }
+      ),
     };
   }
 
