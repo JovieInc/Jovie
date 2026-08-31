@@ -19,11 +19,7 @@ import {
 } from '@/contexts/RightPanelContext';
 import type { ReleaseViewModel } from '@/lib/discography/types';
 
-const {
-  mockUseDspMatchesQuery,
-  mockUsePlanGate,
-  navigationState,
-} = vi.hoisted(
+const { mockUseDspMatchesQuery, mockUsePlanGate, navigationState } = vi.hoisted(
   () => ({
     mockUseDspMatchesQuery: vi.fn(() => ({ data: [], isLoading: false })),
     mockUsePlanGate: vi.fn(() => ({
