@@ -9,9 +9,9 @@
  * section ids ∈ section registry; anchor parity docs⇔registry.
  *
  * Per codebase-baseline §1: the live homepage lives at (home)/page.tsx NOT
- * app/(marketing)/ — manifest must include (home). Also app/waitlist/page.tsx
- * lives outside (marketing) entirely — manifest must include it for the
- * waitlist recipe (currently stub tier).
+ * app/(marketing)/ — manifest must include (home). Also app/waitlist/* lives
+ * outside (marketing) entirely — manifest must include those public waitlist
+ * surfaces or sanction an exemption.
  */
 
 import type { ProposedSectionId } from './designGaps';
@@ -135,9 +135,9 @@ export interface RouteManifestEntry {
 }
 
 /**
- * The route manifest. Per JOV-4508 — 25 page.tsx under (marketing)/ after
- * retiring the legacy launch pricing visual fork, plus (home)/page.tsx and
- * app/waitlist/page.tsx = 28 entries.
+ * The route manifest. Per JOV-5650 — 32 page.tsx under (marketing)/ after
+ * adding API policy, changelog detail, and profile-admission fixtures, plus
+ * (home)/page.tsx and app/waitlist/* = 35 entries.
  *
  * Exemptions are sanctioned (carry linearId + approvedBy + prUrl) per DX2.
  * The baseline exemption count for the ratchet = current sanctioned count.
@@ -474,6 +474,30 @@ export const MARKETING_ROUTE_MANIFEST: readonly RouteManifestEntry[] = [
     },
   },
   {
+    glob: '(marketing)/api-versioning/page.tsx',
+    renderedSections: [],
+    bindingEvidence: {
+      status: 'exempt',
+      source: 'JOV-5650 route manifest sweep',
+      notes:
+        'Public API lifecycle policy uses marketing primitives but is prose documentation rather than a recipe-composable page.',
+    },
+    exempt: {
+      reason:
+        'public API policy documentation page - prose lifecycle reference; not recipe-composable',
+      linearId: 'JOV-5650',
+      approvedBy: 'tw',
+      prUrl: 'https://github.com/JovieInc/Jovie/pull/16742',
+    },
+    status: 'active',
+    specVersion: '1.0.0',
+    url: '/api-versioning',
+    healthCheck: {
+      path: '/api-versioning',
+      expected: 'page',
+    },
+  },
+  {
     glob: '(marketing)/cli/page.tsx',
     recipeId: 'seo',
     renderedSections: [
@@ -616,6 +640,29 @@ export const MARKETING_ROUTE_MANIFEST: readonly RouteManifestEntry[] = [
 
   // ── Exemptions (sanctioned per DX2 — linearId + approvedBy + prUrl required) ──
   {
+    glob: 'waitlist/invite/page.tsx',
+    renderedSections: [],
+    bindingEvidence: {
+      status: 'exempt',
+      source: 'sanctioned route manifest exemption',
+    },
+    exempt: {
+      reason:
+        'secure invite redemption flow — auth/token outcome page, not marketing page chrome or section-composable content',
+      linearId: 'JOV-5650',
+      approvedBy: 'tw',
+      prUrl: 'https://github.com/JovieInc/Jovie/pull/16742',
+    },
+    status: 'active',
+    specVersion: '1.0.0',
+    url: '/waitlist/invite',
+    healthCheck: {
+      path: '/waitlist/invite',
+      expected: 'page',
+      requiresSharedChrome: false,
+    },
+  },
+  {
     glob: '(marketing)/ai/page.tsx',
     renderedSections: [],
     bindingEvidence: {
@@ -695,6 +742,30 @@ export const MARKETING_ROUTE_MANIFEST: readonly RouteManifestEntry[] = [
     status: 'active',
     specVersion: '1.0.0',
     url: '/changelog',
+  },
+  {
+    glob: '(marketing)/changelog/[version]/page.tsx',
+    renderedSections: [],
+    bindingEvidence: {
+      status: 'exempt',
+      source: 'JOV-5650 route manifest sweep',
+      notes:
+        'Generated release detail page is backed by CHANGELOG.md content and ChangelogTimeline, not a recipe-composable marketing page.',
+    },
+    exempt: {
+      reason:
+        'generated changelog detail page - release body comes from CHANGELOG.md; not recipe-composable',
+      linearId: 'JOV-5650',
+      approvedBy: 'tw',
+      prUrl: 'https://github.com/JovieInc/Jovie/pull/16742',
+    },
+    status: 'active',
+    specVersion: '1.0.0',
+    url: '/changelog/*',
+    healthCheck: {
+      path: '/changelog/26.8.1',
+      expected: 'page',
+    },
   },
   {
     glob: '(marketing)/demo/video/page.tsx',
@@ -791,6 +862,31 @@ export const MARKETING_ROUTE_MANIFEST: readonly RouteManifestEntry[] = [
       path: '/renders/catalog',
       expected: 'page',
     },
+  },
+  {
+    glob: '(marketing)/renders/profile-admission/page.tsx',
+    renderedSections: [],
+    bindingEvidence: {
+      status: 'exempt',
+      source: 'JOV-5650 route manifest sweep',
+      notes:
+        'E2E-only fixture is guarded by the profile-admission runtime flag and exists to render synthetic profile admission states.',
+    },
+    exempt: {
+      reason:
+        'internal E2E profile-admission fixture - synthetic render target; not recipe-composable',
+      linearId: 'JOV-5650',
+      approvedBy: 'tw',
+      prUrl: 'https://github.com/JovieInc/Jovie/pull/16742',
+    },
+    status: 'active',
+    specVersion: '1.0.0',
+    url: '/renders/profile-admission',
+    healthCheck: {
+      path: '/renders/profile-admission',
+      expected: 'page',
+    },
+    noindex: true,
   },
   {
     glob: '(marketing)/renders/surfaces/[surface]/page.tsx',
