@@ -97,7 +97,8 @@ export async function POST(request: Request) {
         lastErrorUserMessage: null,
         updatedAt: now,
       })
-      .where(eq(connectorAccounts.id, accountId));
+      .where(eq(connectorAccounts.id, accountId))
+      .catch(() => undefined);
     return NextResponse.json(result);
   } catch (error) {
     if (error instanceof RefreshLockBusyError) {

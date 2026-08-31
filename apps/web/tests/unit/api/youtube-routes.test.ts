@@ -275,6 +275,31 @@ describe('YouTube connector routes', () => {
     });
   });
 
+  it('manual sync preserves success when last-sync metadata persistence fails', async () => {
+    mocks.db.update.mockImplementationOnce(() => ({
+      set: (values: Record<string, unknown>) => ({
+        where: async () => {
+          mocks.writes.push(values);
+          throw new Error('last sync metadata failed');
+        },
+      }),
+    }));
+
+    const response = await sync(
+      postRequest(paths.sync, { creatorProfileId: profileId })
+    );
+
+    expect(response.status).toBe(200);
+    expect(mocks.sync).toHaveBeenCalledWith(
+      expect.objectContaining({
+        creatorProfileId: profileId,
+        channelId: 'channel-1',
+      })
+    );
+    expect(mocks.writes.at(-1)).toMatchObject({ lastSyncAt: expect.any(Date) });
+    expect(mocks.capture).not.toHaveBeenCalled();
+  });
+
   it('manual sync requires current scopes/fresh vault tokens and records safe outcomes', async () => {
     mocks.rows.splice(0, 1, {
       id: 'account-1',
