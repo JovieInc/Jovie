@@ -126,6 +126,7 @@ export function receiptToInitiative(
     id,
     kind: 'initiative',
     status: routingState === 'unavailable' ? 'failed' : 'accepted',
+    confidence: 'medium',
     handoff: {
       title: receipt.text.slice(0, 120) || receipt.ack,
       intent: receipt.text,
