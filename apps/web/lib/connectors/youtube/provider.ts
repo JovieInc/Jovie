@@ -125,6 +125,7 @@ async function listUploadVideoIds(input: {
   readonly uploadsPlaylistId: string;
   readonly accessToken: string;
   readonly fetcher: ProviderFetch;
+  readonly maxVideoIds?: number;
 }): Promise<string[]> {
   const ids: string[] = [];
   let pageToken: string | undefined;
@@ -143,6 +144,9 @@ async function listUploadVideoIds(input: {
     for (const item of page.items ?? []) {
       const videoId = item.contentDetails?.videoId?.trim();
       if (videoId) ids.push(videoId);
+      if (input.maxVideoIds && ids.length >= input.maxVideoIds) {
+        return [...new Set(ids)].slice(0, input.maxVideoIds);
+      }
     }
     pageToken = page.nextPageToken;
   } while (pageToken);
@@ -266,6 +270,7 @@ export function createYouTubeLibraryProvider(input: {
   readonly accessToken: string;
   readonly now?: () => Date;
   readonly fetcher?: ProviderFetch;
+  readonly maxVideosPerSync?: number;
 }): YouTubeLibraryProvider {
   const fetcher = input.fetcher ?? serverFetch;
   const now = input.now ?? (() => new Date());
@@ -286,6 +291,7 @@ export function createYouTubeLibraryProvider(input: {
         uploadsPlaylistId: channel.uploadsPlaylistId,
         accessToken: input.accessToken,
         fetcher,
+        maxVideoIds: input.maxVideosPerSync,
       });
       const videos: YouTubeChannelVideo[] = [];
       for (const batch of batches(videoIds, MAX_VIDEO_BATCH)) {
