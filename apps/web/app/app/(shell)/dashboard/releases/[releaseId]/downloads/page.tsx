@@ -23,6 +23,10 @@ import {
   resolveAudioUploadMime,
   SUPPORTED_AUDIO_FORMAT_LABELS,
 } from '@/lib/audio/constants';
+import {
+  PROMO_DOWNLOAD_RIGHTS_ATTESTATION_LABEL,
+  PROMO_DOWNLOAD_RIGHTS_REQUIRED_ERROR,
+} from '@/lib/promo-downloads/rights-attestation';
 import { cn } from '@/lib/utils';
 import {
   type PromoDownloadFile,
@@ -77,9 +81,7 @@ export default function PromoDownloadsPage() {
   const uploadFile = useCallback(
     async (file: File) => {
       if (!rightsControlAttested) {
-        setUploadError(
-          'Confirm that you control the recording and may give this file away.'
-        );
+        setUploadError(PROMO_DOWNLOAD_RIGHTS_REQUIRED_ERROR);
         return;
       }
       const uploadMime = resolveAudioUploadMime({
@@ -295,10 +297,7 @@ export default function PromoDownloadsPage() {
               onChange={event => setRightsControlAttested(event.target.checked)}
               className='mt-0.5 h-4 w-4 rounded border-subtle'
             />
-            <span>
-              I attest that I control 100% of this recording and have the right
-              to give this file away. An email address is not a rights grant.
-            </span>
+            <span>{PROMO_DOWNLOAD_RIGHTS_ATTESTATION_LABEL}</span>
           </label>
           <output
             className='block min-h-9 border-t border-transparent px-3 py-2.5 text-xs sm:px-4'

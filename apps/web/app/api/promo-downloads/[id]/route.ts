@@ -13,6 +13,7 @@ import { db } from '@/lib/db';
 import { promoDownloads } from '@/lib/db/schema/promo-downloads';
 import { captureError } from '@/lib/error-tracking';
 import { NO_STORE_HEADERS } from '@/lib/http/headers';
+import { PROMO_DOWNLOAD_RIGHTS_ACTIVATION_ERROR } from '@/lib/promo-downloads/rights-attestation';
 
 export const runtime = 'nodejs';
 
@@ -72,8 +73,7 @@ export async function PATCH(
       if (!download?.rightsControlAttested) {
         return NextResponse.json(
           {
-            error:
-              'Confirm full recording control before making this download active.',
+            error: PROMO_DOWNLOAD_RIGHTS_ACTIVATION_ERROR,
           },
           { status: 409, headers: NO_STORE_HEADERS }
         );
