@@ -222,6 +222,12 @@ export function PostReleasePanel({
     () => findingsForAsset(asset, findings),
     [asset, findings]
   );
+  const openFindingCount = relevantFindings.filter(
+    finding => finding.status === 'open'
+  ).length;
+  const draftedFindingCount = relevantFindings.filter(
+    finding => finding.status === 'drafted'
+  ).length;
   const relevantRightsholders = useMemo(
     () => rightsholdersForAsset(asset, bundle.rightsholders),
     [asset, bundle.rightsholders]
@@ -336,7 +342,8 @@ export function PostReleasePanel({
             Presence
           </h3>
           <span className='text-2xs tabular-nums text-tertiary-token'>
-            {relevantFindings.length} open
+            {openFindingCount} open
+            {draftedFindingCount > 0 ? ` · ${draftedFindingCount} drafted` : ''}
           </span>
         </div>
         {relevantFindings.length > 0 ? (
