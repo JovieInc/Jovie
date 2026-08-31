@@ -205,6 +205,16 @@ const AFFECTED_TEST_SELECTOR_MANIFEST = [
   'scripts/run-affected-tests.mjs',
   'scripts/lib/__tests__/automation-verify.test.mjs',
 ];
+const GEM_CHECKIN_HUD_LANE = [
+  'WORKFLOW.md',
+  'scripts/hermes/gem-checkin-hud.py',
+  'scripts/hermes/systemd/symphony-burrito.service',
+  'scripts/hermes/update-symphony-burrito.sh',
+  'scripts/hermes/tests/gem-checkin-hud.test.py',
+  'scripts/hermes/tests/symphony-burrito-workflow.test.py',
+  '.github/workflows/reusable-ci-lint.yml',
+  ...AFFECTED_TEST_SELECTOR_MANIFEST,
+];
 const SENTRY_AUTOFIX_RECURRENCE_LANE = [
   '.github/workflows/sentry-autofix-recurrence.yml',
   '.github/workflows/sentry-autofix.yml',
@@ -749,6 +759,24 @@ describe('automation-verify affected scope', () => {
       buildAffectedTestPlan([
         'scripts/hermes/gem-priority-gate.py',
         'scripts/hermes/unknown-fleet-peer.py',
+      ]).mode
+    ).toBe('full');
+  });
+
+  it('selects the bounded Gem check-in HUD + burrito contracts and fails closed on unrelated files', () => {
+    expect(buildAffectedTestPlan(GEM_CHECKIN_HUD_LANE)).toMatchObject({
+      mode: 'selected',
+      selectedTests: [],
+      pythonUnittestTests: [
+        'scripts/hermes/tests/gem-checkin-hud.test.py',
+        'scripts/hermes/tests/symphony-burrito-workflow.test.py',
+      ],
+      scriptVitestTests: ['scripts/lib/__tests__/automation-verify.test.mjs'],
+    });
+    expect(
+      buildAffectedTestPlan([
+        ...GEM_CHECKIN_HUD_LANE,
+        'apps/ios/Jovie/RootView.swift',
       ]).mode
     ).toBe('full');
   });
