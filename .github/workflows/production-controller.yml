@@ -756,7 +756,6 @@ jobs:
         always() &&
         github.event.workflow_run.event == 'push' &&
         needs.authorize-production.result == 'success' &&
-        needs.authorize-production.outputs.authorized == 'true' &&
         needs.authorize-production.outputs.already_verified != 'true'
       }}
     # The workflow-level production lease is still held here. Every probe
@@ -933,6 +932,10 @@ jobs:
               echo "::error::Main advanced to $boundary_sha before finalization without exact public bind proof for $EXPECTED_SHA."
               exit 1
             fi
+          fi
+          if [ "${{ needs.authorize-production.outputs.authorized }}" != "true" ]; then
+            echo "::error::Exact source CI authorization is required before finalizing production verification."
+            exit 1
           fi
 
           if [ "$RUN_WEB" != true ]; then
