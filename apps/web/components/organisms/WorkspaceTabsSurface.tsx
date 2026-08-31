@@ -150,7 +150,7 @@ export function WorkspaceTabsSurface<
             actionsClassName='shrink-0'
           />
           {shouldShowTabControls ? (
-            <div className='border-t border-subtle px-(--linear-app-content-padding-x) py-3'>
+            <div className='border-t border-subtle px-(--app-shell-content-padding-x) py-3'>
               <div className='flex flex-col gap-3'>
                 {shouldShowPrimaryControl ? (
                   <LinkedTabBar

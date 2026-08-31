@@ -112,7 +112,7 @@ export function DashboardHeader({
         className={cn(
           'relative flex w-full items-center gap-2',
           MOBILE_HEADER_PADDING,
-          'sm:h-(--linear-app-header-height-compact) sm:px-3 sm:py-0'
+          'sm:h-(--app-shell-header-height-compact) sm:px-3 sm:py-0'
         )}
       >
         {leading ? (

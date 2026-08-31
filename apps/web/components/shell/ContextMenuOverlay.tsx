@@ -118,7 +118,7 @@ export function ContextMenuOverlay({
       <div
         ref={ref}
         role='menu'
-        className='absolute min-w-50 max-w-70 rounded-xl border border-(--linear-app-shell-border) bg-(--linear-app-content-surface)/95 backdrop-blur-xl shadow-[0_12px_40px_rgba(0,0,0,0.32)] p-1'
+        className='absolute min-w-50 max-w-70 rounded-xl border border-(--app-shell-border) bg-(--app-shell-content-surface)/95 backdrop-blur-xl shadow-[0_12px_40px_rgba(0,0,0,0.32)] p-1'
         style={{ left: pos.left, top: pos.top }}
       >
         {state.items.map((item, index) => {
@@ -127,7 +127,7 @@ export function ContextMenuOverlay({
               <div
                 // biome-ignore lint/suspicious/noArrayIndexKey: each menu state is rendered fresh; items array does not reorder mid-render
                 key={`${groupId}-sep-${index}`}
-                className='my-1 border-t border-(--linear-app-shell-border)/60'
+                className='my-1 border-t border-(--app-shell-border)/60'
                 aria-hidden='true'
               />
             );
@@ -170,7 +170,7 @@ export function ContextMenuOverlay({
               )}
               <span className='flex-1 truncate'>{item.label}</span>
               {sc && (
-                <kbd className='ml-auto inline-flex items-center h-4 min-w-4 px-1 rounded-xs text-3xs font-caption uppercase tracking-[0.04em] text-tertiary-token bg-surface-0/80 border border-(--linear-app-shell-border)/60 leading-none'>
+                <kbd className='ml-auto inline-flex items-center h-4 min-w-4 px-1 rounded-xs text-3xs font-caption uppercase tracking-[0.04em] text-tertiary-token bg-surface-0/80 border border-(--app-shell-border)/60 leading-none'>
                   {sc.keys}
                 </kbd>
               )}

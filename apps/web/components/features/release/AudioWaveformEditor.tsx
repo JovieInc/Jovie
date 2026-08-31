@@ -341,7 +341,7 @@ export function AudioWaveformEditor({
           }
           className={cn(
             'inline-flex h-8 w-8 items-center justify-center rounded-md border border-subtle bg-surface-1 text-primary-token transition-[background-color,border-color] duration-subtle hover:border-default hover:bg-surface-2',
-            'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-(--linear-border-focus)/55 focus-visible:ring-offset-2 focus-visible:ring-offset-(--linear-app-content-surface)'
+            'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-(--linear-border-focus)/55 focus-visible:ring-offset-2 focus-visible:ring-offset-(--app-shell-content-surface)'
           )}
         >
           {isPlaying ? (

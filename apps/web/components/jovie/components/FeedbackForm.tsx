@@ -50,7 +50,7 @@ export function FeedbackForm({ onClose }: FeedbackFormProps) {
 
   if (feedbackMutation.isSuccess) {
     return (
-      <div className='mx-auto max-w-md rounded-xl border border-(--linear-app-frame-seam) bg-(--linear-app-content-surface) p-6 text-center'>
+      <div className='mx-auto max-w-md rounded-xl border border-(--app-shell-frame-seam) bg-(--app-shell-content-surface) p-6 text-center'>
         <div className='mx-auto flex h-12 w-12 items-center justify-center rounded-lg border border-emerald-500/20 bg-emerald-500/10 text-emerald-500'>
           <CheckCircle2 className='h-5 w-5' />
         </div>
@@ -79,7 +79,7 @@ export function FeedbackForm({ onClose }: FeedbackFormProps) {
   }
 
   return (
-    <div className='mx-auto max-w-md rounded-xl border border-(--linear-app-frame-seam) bg-(--linear-app-content-surface) p-6'>
+    <div className='mx-auto max-w-md rounded-xl border border-(--app-shell-frame-seam) bg-(--app-shell-content-surface) p-6'>
       <div className='space-y-1'>
         <p className='text-2xs font-medium text-secondary-token'>
           Share feedback
@@ -101,7 +101,7 @@ export function FeedbackForm({ onClose }: FeedbackFormProps) {
         maxLength={2000}
         disabled={feedbackMutation.isPending}
         className={cn(
-          'mt-4 w-full resize-none rounded-lg border border-(--linear-app-frame-seam) bg-surface-0 px-3.5 py-3',
+          'mt-4 w-full resize-none rounded-lg border border-(--app-shell-frame-seam) bg-surface-0 px-3.5 py-3',
           'text-sm text-primary-token placeholder:text-tertiary-token',
           'focus:border-default focus:outline-none',
           'disabled:opacity-50'

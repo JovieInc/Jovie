@@ -131,6 +131,9 @@ jobs:
         id: plan
         env:
           GH_TOKEN: ${{ steps.app-token.outputs.token }}
+          # Keep low-cost native queue inventory on the workflow-scoped read
+          # budget; reserve the App installation token for trusted mutations.
+          GH_QUEUE_TOKEN: ${{ github.token }}
           REPOSITORY: ${{ github.repository }}
           MAX_CONCURRENT: ${{ inputs.max_concurrent || '40' }}
           RUNNER_CAPACITY: ${{ steps.capacity.outputs.runner_capacity }}
@@ -945,6 +948,7 @@ jobs:
         if: always() && steps.app-token.outcome == 'success'
         env:
           GH_TOKEN: ${{ steps.app-token.outputs.token }}
+          GH_QUEUE_TOKEN: ${{ github.token }}
           REPOSITORY: ${{ github.repository }}
           PR_NUMBER: ${{ matrix.prNumber }}
           SOURCE_HEAD: ${{ matrix.headRefOid }}
@@ -1138,7 +1142,7 @@ jobs:
           live=$(gh api "repos/$REPOSITORY/pulls/$PR_NUMBER" \
             --jq '{state:.state,draft:.draft,head:.head.sha,base:.base.sha,baseRef:.base.ref,ref:.head.ref,autoMerge:(.auto_merge != null),sameRepo:(.head.repo.full_name == .base.repo.full_name),fork:(.head.repo.fork // false)}')
           # shellcheck disable=SC2016
-          queue_before=$(gh api graphql \
+          queue_before=$(GH_TOKEN="$GH_QUEUE_TOKEN" gh api graphql \
             -f query='query($owner:String!,$name:String!,$number:Int!){repository(owner:$owner,name:$name){pullRequest(number:$number){autoMergeRequest{enabledAt} isInMergeQueue mergeQueueEntry{position}}}}' \
             -f owner="${REPOSITORY%%/*}" -f name="${REPOSITORY#*/}" -F number="$PR_NUMBER" \
             --jq '.data.repository.pullRequest | {autoMergeEnabled:(.autoMergeRequest != null),isInMergeQueue,mergeQueueEntryPresent:(.mergeQueueEntry != null)}')
@@ -1162,7 +1166,7 @@ jobs:
           live_after=$(gh api "repos/$REPOSITORY/pulls/$PR_NUMBER" \
             --jq '{state:.state,draft:.draft,head:.head.sha,base:.base.sha,baseRef:.base.ref,ref:.head.ref,autoMerge:(.auto_merge != null),sameRepo:(.head.repo.full_name == .base.repo.full_name),fork:(.head.repo.fork // false)}')
           # shellcheck disable=SC2016
-          queue_after=$(gh api graphql \
+          queue_after=$(GH_TOKEN="$GH_QUEUE_TOKEN" gh api graphql \
             -f query='query($owner:String!,$name:String!,$number:Int!){repository(owner:$owner,name:$name){pullRequest(number:$number){autoMergeRequest{enabledAt} isInMergeQueue mergeQueueEntry{position}}}}' \
             -f owner="${REPOSITORY%%/*}" -f name="${REPOSITORY#*/}" -F number="$PR_NUMBER" \
             --jq '.data.repository.pullRequest | {autoMergeEnabled:(.autoMergeRequest != null),isInMergeQueue,mergeQueueEntryPresent:(.mergeQueueEntry != null)}')
@@ -1239,6 +1243,7 @@ jobs:
       - name: Reconcile exact outcomes and persist trusted cohort receipt
         env:
           GH_TOKEN: ${{ steps.app-token.outputs.token }}
+          GH_QUEUE_TOKEN: ${{ github.token }}
           REPOSITORY: ${{ github.repository }}
           TRACKING_ISSUE: '16794'
           COHORT_ID: ${{ needs.plan.outputs.cohort_id }}

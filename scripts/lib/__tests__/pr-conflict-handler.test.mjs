@@ -1107,5 +1107,11 @@ describe('conflict workflow contract', () => {
     expect(autoMergeReads.length).toBeGreaterThanOrEqual(2);
     expect(WORKFLOW).toContain('isInMergeQueue');
     expect(WORKFLOW).toContain('mergeQueueEntry');
+    expect(
+      WORKFLOW.match(/GH_QUEUE_TOKEN: \$\{\{ github\.token \}\}/gu)
+    ).toHaveLength(3);
+    expect(
+      WORKFLOW.match(/GH_TOKEN="\$GH_QUEUE_TOKEN" gh api graphql/gu)
+    ).toHaveLength(2);
   });
 });

@@ -38,7 +38,7 @@ export function ChatAnalyticsCard({ result }: ChatAnalyticsCardProps) {
 
   return (
     <section
-      className='w-full max-w-3xl border-t border-(--linear-app-frame-seam) pt-4'
+      className='w-full max-w-3xl border-t border-(--app-shell-frame-seam) pt-4'
       data-testid='chat-analytics-card'
       aria-label={result.title}
     >
@@ -62,7 +62,7 @@ export function ChatAnalyticsCard({ result }: ChatAnalyticsCardProps) {
         {hasMoreSignals ? (
           <Link
             href={APP_ROUTES.INSIGHTS}
-            className='inline-flex shrink-0 items-center gap-1 rounded-lg border border-transparent px-1.5 py-1 text-2xs font-caption text-secondary-token transition-[background-color,border-color,color] duration-subtle hover:border-(--linear-app-frame-seam) hover:bg-surface-0 hover:text-primary-token'
+            className='inline-flex shrink-0 items-center gap-1 rounded-lg border border-transparent px-1.5 py-1 text-2xs font-caption text-secondary-token transition-[background-color,border-color,color] duration-subtle hover:border-(--app-shell-frame-seam) hover:bg-surface-0 hover:text-primary-token'
           >
             <span>View all</span>
             <ChevronRight className='h-3 w-3' aria-hidden='true' />

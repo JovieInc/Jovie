@@ -95,9 +95,9 @@ export function ReliabilityCard({ summary }: Readonly<ReliabilityCardProps>) {
             {tone.label}
           </span>
         }
-        className='px-(--linear-app-header-padding-x) py-3'
+        className='px-(--app-shell-header-padding-x) py-3'
       />
-      <div className='space-y-3 px-(--linear-app-content-padding-x) py-(--linear-app-content-padding-y) text-xs leading-[17px] text-secondary-token'>
+      <div className='space-y-3 px-(--app-shell-content-padding-x) py-(--app-shell-content-padding-y) text-xs leading-[17px] text-secondary-token'>
         <ContentMetricRow
           label='Error Rate'
           value={errorRateLabel}

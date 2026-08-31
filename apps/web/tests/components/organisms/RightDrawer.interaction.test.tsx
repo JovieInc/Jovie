@@ -52,7 +52,7 @@ describe('RightDrawer', () => {
       'rounded-(--app-shell-radius)',
       'border-(--app-shell-frame-seam)',
       'bg-surface-1',
-      'shadow-(--linear-app-drawer-shadow)'
+      'shadow-(--app-shell-drawer-shadow)'
     );
     expect(aside).toHaveClass('outline-none', 'focus:outline-none');
   });
@@ -176,9 +176,7 @@ describe('RightDrawer', () => {
       'opacity-100'
     );
     expect(desktopAside).not.toHaveClass('lg:border');
-    expect(desktopAside).not.toHaveClass(
-      'lg:rounded-(--linear-app-shell-radius)'
-    );
+    expect(desktopAside).not.toHaveClass('lg:rounded-(--app-shell-radius)');
     expect(desktopAside).toHaveStyle({ width: '420px' });
     expect(mockUseBreakpointDown).toHaveBeenCalledWith('lg');
   });

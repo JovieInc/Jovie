@@ -52,7 +52,7 @@ export function AudienceTableLoadingShell() {
         />
       }
     >
-      <div className='flex-1 min-h-0 overflow-hidden bg-(--linear-app-content-surface)'>
+      <div className='flex-1 min-h-0 overflow-hidden bg-(--app-shell-content-surface)'>
         <div className='flex h-full min-h-0 flex-col'>
           <div className='flex-1 min-h-0 overflow-hidden sm:hidden'>
             <div className='divide-y divide-subtle'>

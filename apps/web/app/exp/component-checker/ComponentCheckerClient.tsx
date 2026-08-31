@@ -119,7 +119,7 @@ export function ComponentCheckerClient() {
   const status = STATUS_BADGE[variant.status];
 
   return (
-    <div className='relative min-h-screen w-full overflow-x-hidden bg-(--linear-app-content-surface)'>
+    <div className='relative min-h-screen w-full overflow-x-hidden bg-(--app-shell-content-surface)'>
       <Toolbar
         variant={variant}
         onCategoryChange={navigateCategory}

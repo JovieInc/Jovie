@@ -1218,13 +1218,14 @@ export function runComponentShipGate(options = {}) {
     // Honor an explicit null/empty diffBase as "no diff base" instead of
     // re-resolving origin/main behind the caller's back. In CI origin/main is
     // always present, so re-resolving turned an explicit opt-out into a diff
-    // scan against main and produced false missing-test/story failures for
-    // components unrelated to the caller (JOV-5454 live-cert contract test).
-    // Only auto-resolve when diffBase is omitted entirely.
-    diffBase:
-      options.diffBase === undefined
-        ? resolveDiffBase(null)
-        : (options.diffBase ?? undefined),
+    // scan against main (JOV-5454 live-cert contract). `??` would also treat
+    // explicit null as missing and fall through to TURBO_SCM_BASE, which
+    // times out the 5s control tests on large mechanical PRs (JOV-5466).
+    // Only auto-resolve when diffBase is omitted entirely; preserve explicit
+    // null so report.diffBase stays null and the skip note is recorded.
+    diffBase: Object.hasOwn(options, 'diffBase')
+      ? options.diffBase
+      : resolveDiffBase(null),
     skipQuality: options.skipQuality ?? false,
     skipRatchet: options.skipRatchet ?? false,
     skipRenderedCert: options.skipRenderedCert ?? false,

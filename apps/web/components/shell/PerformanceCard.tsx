@@ -132,7 +132,7 @@ export function PerformanceCard({
           <div
             role='tablist'
             aria-label={`${title} range`}
-            className='flex items-center gap-0.5 p-0.5 rounded-full bg-(--surface-0)/70 border border-(--linear-app-shell-border)/70'
+            className='flex items-center gap-0.5 p-0.5 rounded-full bg-(--surface-0)/70 border border-(--app-shell-border)/70'
           >
             {surfacedRanges.map(r => {
               const on = r.key === range;
