@@ -2224,13 +2224,20 @@ describe('native merge-queue cohort (JOV-5047)', () => {
 
   it('converts GraphQL checkResponseTimeout seconds onto REST minutes (JOV-5315)', () => {
     expect(mapGraphqlCheckResponseTimeoutToMinutes(3600)).toBe(60);
-    expect(mapGraphqlCheckResponseTimeoutToMinutes(60)).toBe(60);
+    expect(mapGraphqlCheckResponseTimeoutToMinutes(60)).toBe(1);
+    expect(mapGraphqlCheckResponseTimeoutToMinutes(120)).toBe(2);
+    expect(mapGraphqlCheckResponseTimeoutToMinutes(360)).toBe(6);
     expect(mapGraphqlCheckResponseTimeoutToMinutes(1800)).toBe(30);
     expect(
       normalizeNativeQueuePolicyParameters({ checkResponseTimeout: 3600 })
     ).toMatchObject({ check_response_timeout_minutes: 60 });
     expect(
-      normalizeNativeQueuePolicyParameters({ checkResponseTimeout: 60 })
+      normalizeNativeQueuePolicyParameters({ checkResponseTimeout: 120 })
+    ).toMatchObject({ check_response_timeout_minutes: 2 });
+    expect(
+      normalizeNativeQueuePolicyParameters({
+        check_response_timeout_minutes: 60,
+      })
     ).toMatchObject({ check_response_timeout_minutes: 60 });
     expect(
       mergeNativeQueuePolicyObservations(

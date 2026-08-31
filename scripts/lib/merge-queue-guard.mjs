@@ -160,16 +160,10 @@ export const CHANGELOG_COLLISION_PATH = 'CHANGELOG.md';
 const ENUM_POLICY_FIELDS = new Set(['merge_method', 'grouping_strategy']);
 
 /**
- * REST `check_response_timeout_minutes` max is 360. Live GraphQL
- * `checkResponseTimeout` returns seconds (3600 for a 60-minute ruleset).
- * Docs claim minutes; Auto-Enroll fail-closed on that mismatch (JOV-5315).
- */
-export const REST_CHECK_RESPONSE_TIMEOUT_MAX_MINUTES = 360;
-
-/**
  * Map GraphQL `checkResponseTimeout` onto REST minutes. Values inside the
- * REST minute range stay as minutes so docs-shaped fixtures keep working.
- * Values above that range that are whole minutes-in-seconds convert.
+ * REST minute range are still seconds when they come from GraphQL, so whole
+ * minute second values convert. Non-minute values stay unchanged so drift is
+ * still visible instead of rounded away.
  *
  * @param {unknown} value
  * @returns {unknown}
@@ -178,7 +172,7 @@ export function mapGraphqlCheckResponseTimeoutToMinutes(value) {
   if (typeof value !== 'number' || !Number.isFinite(value) || value < 0) {
     return value;
   }
-  if (value > REST_CHECK_RESPONSE_TIMEOUT_MAX_MINUTES && value % 60 === 0) {
+  if (Number.isInteger(value) && value >= 60 && value % 60 === 0) {
     return value / 60;
   }
   return value;
