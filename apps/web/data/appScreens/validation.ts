@@ -7,10 +7,16 @@ import {
   type AppScreenArchetypeRegistryEntry,
 } from './archetypes';
 import {
+  APP_SCREEN_CANVAS_EXCEPTIONS,
+  APP_SCREEN_NESTED_SURFACE_ROLES,
+  type AppScreenCanvasContract,
+} from './canvas';
+import {
   APP_SCREEN_COMPONENT_REGISTRY,
   APP_SCREEN_LEGACY_BODY_SOURCES,
   APP_SCREEN_RECIPE_REGISTRY,
   APP_SCREEN_REGISTRY,
+  APP_SCREEN_SOURCES,
   type AppScreenComponentRegistryEntry,
   type AppScreenRecipeRegistryEntry,
   type AppScreenRegistryEntry,
@@ -50,7 +56,17 @@ export type AppScreenValidationCode =
   | 'missing-slot'
   | 'missing-state'
   | 'stale-representative-story'
-  | 'unmapped-design-reference';
+  | 'unmapped-design-reference'
+  | 'canvas-exception-unknown-source'
+  | 'screen-canvas-owner-without-sources'
+  | 'shell-canvas-owner-with-nested-sources'
+  | 'canvas-nested-source-not-tsx'
+  | 'canvas-owner-invalid'
+  | 'canvas-nested-role-invalid'
+  | 'canvas-nested-role-duplicate'
+  | 'canvas-nested-component-invalid'
+  | 'canvas-nested-function-invalid'
+  | 'canvas-nested-allowance-duplicate';
 
 export interface AppScreenValidationIssue {
   readonly code: AppScreenValidationCode;
@@ -62,6 +78,7 @@ export interface AppScreenValidationInput {
   readonly recipes?: readonly AppScreenRecipeRegistryEntry[];
   readonly screens?: readonly AppScreenRegistryEntry[];
   readonly archetypes?: readonly AppScreenArchetypeRegistryEntry[];
+  readonly canvasExceptions?: Readonly<Record<string, AppScreenCanvasContract>>;
 }
 
 const duplicates = (values: readonly string[]): readonly string[] => {
@@ -98,6 +115,7 @@ export function validateAppScreenSystem({
   recipes = APP_SCREEN_RECIPE_REGISTRY,
   screens = APP_SCREEN_REGISTRY,
   archetypes = APP_SCREEN_ARCHETYPE_REGISTRY,
+  canvasExceptions = APP_SCREEN_CANVAS_EXCEPTIONS,
 }: AppScreenValidationInput = {}): readonly AppScreenValidationIssue[] {
   const issues: AppScreenValidationIssue[] = [];
   const add = (code: AppScreenValidationCode, message: string) =>
@@ -425,6 +443,119 @@ export function validateAppScreenSystem({
         'stale-representative-story',
         `archetype ${id} has no representative design-reference screen or story`
       );
+    }
+  }
+
+  const knownSources: ReadonlySet<string> = new Set(APP_SCREEN_SOURCES);
+  const allowedNestedRoles: ReadonlySet<string> = new Set(
+    APP_SCREEN_NESTED_SURFACE_ROLES
+  );
+  const allowedCanvasComponents: ReadonlySet<string> = new Set([
+    'PageShell',
+    'AppShellContentPanel',
+  ]);
+  for (const [source, contract] of Object.entries(canvasExceptions)) {
+    const runtimeContract = contract as unknown as {
+      readonly canvasOwner?: unknown;
+      readonly nestedSurfaceRoles?: unknown;
+      readonly nestedCanvasAllowances?: unknown;
+    };
+    const canvasOwner = runtimeContract.canvasOwner;
+    const nestedSurfaceRoles = Array.isArray(runtimeContract.nestedSurfaceRoles)
+      ? runtimeContract.nestedSurfaceRoles
+      : [];
+    const nestedCanvasAllowances = Array.isArray(
+      runtimeContract.nestedCanvasAllowances
+    )
+      ? runtimeContract.nestedCanvasAllowances
+      : [];
+    if (!knownSources.has(source)) {
+      add(
+        'canvas-exception-unknown-source',
+        `canvas exception ${source} is not a registered app screen source`
+      );
+    }
+    if (canvasOwner !== 'shell' && canvasOwner !== 'screen') {
+      add(
+        'canvas-owner-invalid',
+        `canvas exception ${source} has invalid owner ${String(canvasOwner)}`
+      );
+    }
+    if (canvasOwner === 'screen' && nestedCanvasAllowances.length === 0) {
+      add(
+        'screen-canvas-owner-without-sources',
+        `canvas exception ${source} owns a nested canvas without declaring precise implementation allowances`
+      );
+    }
+    if (canvasOwner === 'shell' && nestedCanvasAllowances.length > 0) {
+      add(
+        'shell-canvas-owner-with-nested-sources',
+        `canvas exception ${source} is shell-owned but declares nested canvas allowances`
+      );
+    }
+    const seenRoles = new Set<string>();
+    for (const role of nestedSurfaceRoles) {
+      if (typeof role !== 'string' || !allowedNestedRoles.has(role)) {
+        add(
+          'canvas-nested-role-invalid',
+          `canvas exception ${source} has invalid nested surface role ${String(role)}`
+        );
+        continue;
+      }
+      if (seenRoles.has(role)) {
+        add(
+          'canvas-nested-role-duplicate',
+          `canvas exception ${source} repeats nested surface role ${role}`
+        );
+      }
+      seenRoles.add(role);
+    }
+    const allowanceKeys = new Set<string>();
+    for (const rawAllowance of nestedCanvasAllowances) {
+      const allowance = (rawAllowance ?? {}) as {
+        readonly source?: unknown;
+        readonly component?: unknown;
+        readonly enclosingFunction?: unknown;
+      };
+      if (
+        typeof allowance.source !== 'string' ||
+        !/^apps\/web\/.+\.tsx$/.test(allowance.source)
+      ) {
+        add(
+          'canvas-nested-source-not-tsx',
+          `canvas exception ${source} nested source ${String(allowance.source)} is not a plausible apps/web .tsx path`
+        );
+      }
+      if (
+        typeof allowance.component !== 'string' ||
+        !allowedCanvasComponents.has(allowance.component)
+      ) {
+        add(
+          'canvas-nested-component-invalid',
+          `canvas exception ${source} nested component ${String(allowance.component)} is not a canvas primitive`
+        );
+      }
+      if (
+        typeof allowance.enclosingFunction !== 'string' ||
+        !/^[A-Za-z_$][\w$]*$/.test(allowance.enclosingFunction)
+      ) {
+        add(
+          'canvas-nested-function-invalid',
+          `canvas exception ${source} nested function ${allowance.enclosingFunction} is not a stable identifier`
+        );
+      }
+      const allowanceKey = [
+        String(allowance.source),
+        String(allowance.component),
+        String(allowance.enclosingFunction),
+      ].join(':');
+      if (allowanceKeys.has(allowanceKey)) {
+        add(
+          'canvas-nested-allowance-duplicate',
+          `canvas exception ${source} duplicates allowance ${allowanceKey}`
+        );
+      }
+      allowanceKeys.add(allowanceKey);
     }
   }
 

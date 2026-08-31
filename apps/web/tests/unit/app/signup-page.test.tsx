@@ -103,7 +103,8 @@ describe('signup page', () => {
         formTitle: 'Create your account',
         showFormTitle: false,
         showFooterPrompt: false,
-        layoutVariant: 'split',
+        layoutVariant: 'stack',
+        chrome: 'splash-b',
       })
     );
     expect(

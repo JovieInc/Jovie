@@ -287,24 +287,16 @@ export async function handleProxyRequest(
         return NextResponse.redirect(url);
       }
 
-      // Anonymous waitlist visitors start in chat onboarding. Keep this in
-      // middleware so local/dev auth outages do not expose a 503 or legacy
-      // view.
-      if (isNavigationMethod && pathname === APP_ROUTES.WAITLIST) {
-        return NextResponse.redirect(new URL(APP_ROUTES.START, req.url));
-      }
+      // Anonymous /waitlist is the public waitlist-first handoff (JOV-5376).
+      // Authenticated pre-receipt recovery stays on the page helper.
 
       // Check if path requires authentication
       const needsAuth = pathInfo.isProtectedPath;
 
       if (needsAuth) {
-        if (pathname === APP_ROUTES.WAITLIST) {
-          return NextResponse.redirect(new URL(APP_ROUTES.START, req.url));
-        }
-        const authPage = pathname === '/waitlist' ? '/signup' : '/signin';
         const authUrl = new URL(
           buildProtectedAuthRedirectUrl(
-            authPage,
+            '/signin',
             req.nextUrl.pathname,
             req.nextUrl.search
           ),

@@ -35,7 +35,13 @@ describe('support route header contract', () => {
     expect(registrySource).not.toContain('marketing-header-content');
     expect(landingStart).toBeGreaterThanOrEqual(0);
     expect(minimalStart).toBeGreaterThan(landingStart);
-    for (const route of ['/blog', '/blog/[slug]', '/changelog', '/support']) {
+    for (const route of [
+      '/blog',
+      '/blog/[slug]',
+      '/changelog',
+      '/support',
+      '/cli',
+    ]) {
       expect(
         landingRegistration,
         `${route} must use the landing header`

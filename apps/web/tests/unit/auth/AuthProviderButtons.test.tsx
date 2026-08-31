@@ -41,6 +41,15 @@ describe('AuthProviderButtonSlots', () => {
     ).toContain('shadow-button');
     expect(
       screen.getByRole('button', { name: 'Continue with Google' }).className
+    ).toContain('h-8');
+    expect(
+      screen.getByRole('button', { name: 'Continue with Google' }).className
+    ).toContain('min-h-8');
+    expect(
+      screen.getByRole('button', { name: 'Continue with Google' }).className
     ).not.toContain('--linear-shadow-button');
+    expect(
+      screen.getByRole('button', { name: 'Continue with Google' }).className
+    ).not.toContain('--linear-button-height-md');
   });
 });

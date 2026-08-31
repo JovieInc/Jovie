@@ -87,7 +87,9 @@ async function assertPageHealth(
     );
   }
   await expect(page.locator(BOUNDARY_SELECTORS)).toHaveCount(0);
-  await expect(page.locator(AUTH_SELECTORS)).toHaveCount(0);
+  if (!target.allowsAuthShell) {
+    await expect(page.locator(AUTH_SELECTORS)).toHaveCount(0);
+  }
   expect(AUTH_PATH.test(finalPath), `${target.glob} ended on auth path`).toBe(
     false
   );

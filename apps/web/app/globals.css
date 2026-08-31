@@ -122,8 +122,7 @@ html[data-desktop-runtime="electron"]
    p-[--linear-app-shell-gap] on all sides, so the sidebar column starts at
    gap offset from the left edge. Mirror that offset in the titlebar so the
    sidebar-cell left edge aligns with the sidebar rail. */
-html[data-desktop-runtime="electron"]
-  [data-app-shell-frame="true"]
+html[data-desktop-runtime="electron"] [data-app-shell-frame="true"]
   [data-electron-titlebar="true"] {
   padding-left: var(--linear-app-shell-gap);
   grid-template-columns: var(--electron-sidebar-width) minmax(0, 1fr);

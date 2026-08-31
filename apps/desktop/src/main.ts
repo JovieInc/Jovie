@@ -23,6 +23,14 @@ import {
 } from './tray';
 import { autoUpdater } from 'electron-updater';
 import {
+  bindPendingDesktopAuthCompletion,
+  DESKTOP_AUTH_FLOW_PARAM,
+  type PendingDesktopAuthPkce,
+  parseAuthReturnDeepLink,
+  reportDesktopAuthBindingFailure,
+} from './desktop-auth-security';
+import {
+  buildDesktopUpdateMenuItem,
   desktopBundlePathFromExecutable,
   hasNightlyUpdateFlag,
   NIGHTLY_UPDATE_HOUR,
@@ -33,13 +41,6 @@ import {
   shouldInstallDownloadedUpdateNow,
   shouldScheduleDesktopAutoUpdate,
 } from './desktop-auto-update';
-import {
-  bindPendingDesktopAuthCompletion,
-  DESKTOP_AUTH_FLOW_PARAM,
-  type PendingDesktopAuthPkce,
-  parseAuthReturnDeepLink,
-  reportDesktopAuthBindingFailure,
-} from './desktop-auth-security';
 import { installDesktopCspWatchdog } from './desktop-csp-watchdog';
 import {
   isDesktopCaptureRouteUrl,
@@ -2097,8 +2098,15 @@ function refreshApplicationMenu(): void {
   Menu.setApplicationMenu(buildApplicationMenu());
 }
 
+function desktopUpdatesSupported(): boolean {
+  return shouldScheduleDesktopAutoUpdate({
+    appEnv: APP_ENV,
+    platform: process.platform,
+  });
+}
+
 function checkForUpdatesFromMenu(): void {
-  if (!desktopAutoUpdateEnabled()) {
+  if (!desktopUpdatesSupported()) {
     return;
   }
 
@@ -2110,16 +2118,8 @@ function checkForUpdatesFromMenu(): void {
   runDesktopUpdateCheck('notify');
 }
 
-function desktopAutoUpdateEnabled(): boolean {
-  // apps/desktop/SIGNING.md
-  return shouldScheduleDesktopAutoUpdate({
-    appEnv: APP_ENV,
-    platform: process.platform,
-  });
-}
-
 function configureDesktopAutoUpdater(): void {
-  if (!desktopAutoUpdateEnabled()) {
+  if (!desktopUpdatesSupported()) {
     return;
   }
 
@@ -2129,7 +2129,7 @@ function configureDesktopAutoUpdater(): void {
 }
 
 function runDesktopUpdateCheck(mode: 'silent' | 'notify'): void {
-  if (!desktopAutoUpdateEnabled()) {
+  if (!desktopUpdatesSupported()) {
     return;
   }
 
@@ -2160,7 +2160,7 @@ function installNightlyUpdateLaunchAgent(): void {
     nightlyUpdateLaunch ||
     !app.isPackaged ||
     process.platform !== 'darwin' ||
-    !desktopAutoUpdateEnabled()
+    !desktopUpdatesSupported()
   ) {
     return;
   }
@@ -2216,9 +2216,11 @@ function scheduleHudBuildAutoReload(): void {
 
 function buildUpdateMenuItem(): MenuItemConstructorOptions {
   return {
-    label: updateReadyToInstall
-      ? 'Restart to install update…'
-      : 'Check for updates…',
+    ...buildDesktopUpdateMenuItem({
+      appEnv: APP_ENV,
+      platform: process.platform,
+      updateReadyToInstall,
+    }),
     click: checkForUpdatesFromMenu,
   };
 }

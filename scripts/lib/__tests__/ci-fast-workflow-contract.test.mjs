@@ -53,6 +53,7 @@ describe('ci-fast bounded parallel workflow', () => {
     expect([...laneIds].sort()).toEqual([
       'biome',
       'design-conformance',
+      'design-system-source-ratchet',
       'eslint-server-boundaries',
       'guardrails',
       'ios-fast',
@@ -92,6 +93,9 @@ describe('ci-fast bounded parallel workflow', () => {
     );
     expect(CI_FAST_SOURCE).toContain(
       'Design conformance skipped (no Jovie product files changed)'
+    );
+    expect(CI_FAST_SOURCE).toContain(
+      'Design-system source ratchet skipped (no Jovie product files changed)'
     );
     expect(CI_FAST_SOURCE).toContain(
       'Public-profile admission skipped (no Jovie product files changed)'
@@ -138,6 +142,7 @@ describe('ci-fast bounded parallel workflow', () => {
       'typecheck',
       'scripts-typecheck',
       'guardrails',
+      'design-system-source-ratchet',
       'design-conformance',
       'ios-fast',
       'profile-admission',
@@ -162,6 +167,7 @@ describe('ci-fast bounded parallel workflow', () => {
       typecheck: 'pnpm run typecheck',
       'scripts-typecheck': 'pnpm run typecheck:scripts',
       guardrails: 'pnpm next:proxy-guard',
+      'design-system-source-ratchet': 'pnpm design:source-count-ratchet',
       'ios-fast': 'pnpm run ios:lint',
       'profile-admission':
         'pnpm --filter @jovie/web exec vitest run --config=vitest.config.mts lib/profile/capture-dismissal-client.test.ts components/features/release/SmartLinkProviderButton.test.tsx tests/unit/api/profile/capture-dismissal.test.ts tests/unit/api/profile/pac-event.test.ts tests/unit/lib/rate-limit/config.test.ts tests/unit/lib/rate-limit/limiters.test.ts tests/unit/profile/ProfileHomeRail.test.tsx tests/unit/cookie-banner-fixes.test.tsx tests/unit/tracking/pac-events.test.ts',
@@ -184,8 +190,15 @@ describe('ci-fast bounded parallel workflow', () => {
     );
 
     expect(LANE_GROUPS.remaining).toContain('design-conformance');
+    expect(LANE_GROUPS.remaining).toContain('design-system-source-ratchet');
     expect(LANE_COMMANDS['design-conformance']).toBe(
       'pnpm design:conformance:gate'
+    );
+    expect(LANE_COMMANDS['design-system-source-ratchet']).toBe(
+      'pnpm design:source-count-ratchet'
+    );
+    expect(LANE_COMMANDS['design-system-source-ratchet']).not.toMatch(
+      /vitest|playwright|e2e/i
     );
     expect(LANE_COMMANDS['design-conformance']).not.toMatch(
       /backlog|hermes|symphony|systemd/i
@@ -202,6 +215,9 @@ describe('ci-fast bounded parallel workflow', () => {
     expect(structuralDecision).toContain('scripts/invariants/');
     expect(CI_FAST_SOURCE).toMatch(
       /function runDesignConformance\(\)[\s\S]*LANE_COMMANDS\['design-conformance'\]/
+    );
+    expect(CI_FAST_SOURCE).toMatch(
+      /function runDesignSystemSourceRatchet\(\)[\s\S]*LANE_COMMANDS\['design-system-source-ratchet'\]/
     );
   });
 

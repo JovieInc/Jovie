@@ -1,7 +1,10 @@
 import { describe, expect, it } from 'vitest';
 import { authClerkLocalization } from '@/components/providers/clerkLocalization';
 import { APP_ROUTES } from '@/constants/routes';
-import { getHomepageFrontDoorCtaContract } from '@/data/homepageFrontDoorCta';
+import {
+  getHomepageFrontDoorCtaContract,
+  PUBLIC_WAITLIST_URL,
+} from '@/data/homepageFrontDoorCta';
 
 describe('auth front-door contract', () => {
   it('keeps waitlist-on homepage CTAs in request-access mode', () => {
@@ -9,7 +12,7 @@ describe('auth front-door contract', () => {
 
     expect(contract.primary).toEqual({
       label: 'Get started',
-      href: `${APP_ROUTES.START}?starter_prompt=Hey%2C+I+want+to+get+access+to+Jovie.`,
+      href: PUBLIC_WAITLIST_URL,
     });
     expect(contract.secondary).toBeNull();
     expect(contract.fallbackSupport).toBe(

@@ -496,9 +496,11 @@ test('desktop bridge exposes bounded dictation support', async () => {
   assert.match(mainSource, /from '\.\/desktop-auto-update'/);
   assert.match(mainSource, /hasNightlyUpdateFlag/);
   assert.match(mainSource, /installNightlyUpdateLaunchAgent/);
+  assert.match(mainSource, /shouldScheduleDesktopAutoUpdate\(/);
+  assert.match(mainSource, /if \(APP_ENV === 'local'/);
   assert.match(mainSource, /autoUpdater\.allowDowngrade = false/);
   assert.match(mainSource, /autoUpdater\.autoInstallOnAppQuit = true/);
-  assert.match(mainSource, /if \(!desktopAutoUpdateEnabled\(\)\)/);
+  assert.match(mainSource, /if \(!desktopUpdatesSupported\(\)\)/);
   assert.match(autoUpdateSource, /export const NIGHTLY_UPDATE_FLAG/);
   assert.match(autoUpdateSource, /\/usr\/bin\/open/);
   assert.match(autoUpdateSource, /app\.jov\.ie\.nightly-update/);
@@ -512,6 +514,26 @@ test('desktop bridge exposes bounded dictation support', async () => {
   assert.match(
     preloadSource,
     /ipcRenderer\.invoke\(DICTATION_STATUS_CHANNEL\)/
+  );
+});
+
+test('desktop update menu item is disabled when auto-update is unsupported', async () => {
+  const mainSource = await readFile(join(desktopRoot, 'src/main.ts'), 'utf8');
+  const updateSource = await readFile(
+    join(desktopRoot, 'src/desktop-auto-update.ts'),
+    'utf8'
+  );
+
+  assert.match(mainSource, /function buildUpdateMenuItem\(\)/);
+  assert.match(mainSource, /\.\.\.buildDesktopUpdateMenuItem\(/);
+  assert.match(
+    updateSource,
+    /enabled: shouldScheduleDesktopAutoUpdate\(input\)/
+  );
+  // Old contract: always-enabled "Check for updates…" click handler.
+  assert.doesNotMatch(
+    mainSource,
+    /label: updateReadyToInstall[\s\S]{0,120}click: checkForUpdatesFromMenu/
   );
 });
 
@@ -709,6 +731,10 @@ test('native auth smoke keeps browser callbacks on the browser auth origin', asy
 
 test('desktop main-window hub regression contracts (desktop QA)', async () => {
   const mainSource = await readFile(join(desktopRoot, 'src/main.ts'), 'utf8');
+  const updateSource = await readFile(
+    join(desktopRoot, 'src/desktop-auto-update.ts'),
+    'utf8'
+  );
 
   // Fix: the auth handoff's deny-all permission handlers on the shared default
   // session are reverted for the main window when the handoff closes.
@@ -786,7 +812,8 @@ test('desktop main-window hub regression contracts (desktop QA)', async () => {
 
   // Fix: doc references must point at files that exist.
   assert.doesNotMatch(mainSource, /BUILDS\.md/);
-  assert.match(mainSource, /apps\/desktop\/SIGNING\.md/);
+  assert.doesNotMatch(updateSource, /BUILDS\.md/);
+  assert.match(updateSource, /apps\/desktop\/SIGNING\.md/);
 });
 
 test('hud layout pings the desktop boot watchdog', async () => {

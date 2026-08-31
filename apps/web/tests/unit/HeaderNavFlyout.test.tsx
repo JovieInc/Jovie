@@ -58,7 +58,7 @@ describe('HeaderNav flyout interactions', () => {
     const publicCta = screen.getByRole('link', { name: 'Request Access' });
     expect(publicCta).not.toHaveAttribute('data-pen-contract');
     expect(publicCta).toHaveAttribute('data-variant', 'primary');
-    expect(publicCta).toHaveAttribute('data-size', 'md');
+    expect(publicCta).toHaveAttribute('data-size', 'marketing');
   });
 
   it('uses the canonical Button for the minimal pill sign-in action', () => {

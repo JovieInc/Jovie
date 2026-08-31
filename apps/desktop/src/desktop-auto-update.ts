@@ -5,18 +5,51 @@ export const PRODUCTION_NIGHTLY_UPDATE_MINUTE = 17;
 export const STAGING_NIGHTLY_UPDATE_MINUTE = 41;
 
 export type DesktopAppEnv = 'production' | 'staging' | 'local';
+
+export interface DesktopAutoUpdateSupportInput {
+  readonly appEnv: DesktopAppEnv;
+  readonly platform: NodeJS.Platform;
+}
+
+export interface DesktopUpdateMenuItem {
+  readonly label: string;
+  readonly enabled: boolean;
+}
+
 export function hasNightlyUpdateFlag(argv: readonly string[]): boolean {
   return argv.includes(NIGHTLY_UPDATE_FLAG);
 }
-export function shouldScheduleDesktopAutoUpdate(input: {
-  readonly appEnv: DesktopAppEnv;
-  readonly platform: NodeJS.Platform;
-}): boolean {
+
+/**
+ * Local shells never auto-update. Linux has no published electron-updater
+ * channel. Production and staging publish to GitHub updater feeds. See
+ * apps/desktop/SIGNING.md.
+ */
+export function shouldScheduleDesktopAutoUpdate(
+  input: DesktopAutoUpdateSupportInput
+): boolean {
   if (input.appEnv === 'local' || input.platform === 'linux') {
     return false;
   }
 
   return input.platform === 'darwin' || input.platform === 'win32';
+}
+
+/**
+ * An enabled menu command must yield visible pending or terminal feedback.
+ * Unsupported channels disable the item instead of leaving a silent no-op.
+ */
+export function buildDesktopUpdateMenuItem(input: {
+  readonly appEnv: DesktopAppEnv;
+  readonly platform: NodeJS.Platform;
+  readonly updateReadyToInstall: boolean;
+}): DesktopUpdateMenuItem {
+  return {
+    label: input.updateReadyToInstall
+      ? 'Restart to install update…'
+      : 'Check for updates…',
+    enabled: shouldScheduleDesktopAutoUpdate(input),
+  };
 }
 
 export function nightlyUpdateLaunchAgentLabel(
