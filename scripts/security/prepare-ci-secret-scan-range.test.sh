@@ -168,6 +168,62 @@ QUEUE_HEAD="$(git -C "$SEED" rev-parse HEAD)"
 QUEUE_REF='refs/heads/gh-readonly-queue/main/pr-1-test'
 git -C "$SEED" push -q origin "$QUEUE_HEAD:$QUEUE_REF"
 
+# GitHub can recompose a cumulative queue by parenting an older source commit
+# onto a newer queue head. The resulting child can therefore have an earlier
+# committer timestamp than its direct parent. Keep enough history below the
+# exact event base for a depth-32 checkout to remain shallow, matching the
+# hosted failure that made TruffleHog's date-sorted merge-base walk past base.
+git -C "$SEED" switch -q -c recomposed-queue-base "$BASE_SHA"
+for revision in $(seq 1 40); do
+  git -C "$SEED" commit -q --allow-empty -m "recomposed history $revision"
+done
+printf 'previous queue head\n' >"$SEED/recomposed-queue.txt"
+git -C "$SEED" add recomposed-queue.txt
+GIT_AUTHOR_DATE='2037-01-02T00:00:00Z' \
+  GIT_COMMITTER_DATE='2037-01-02T00:00:00Z' \
+  git -C "$SEED" commit -q -m 'previous cumulative queue head'
+RECOMPOSED_QUEUE_BASE_SHA="$(git -C "$SEED" rev-parse HEAD)"
+RECOMPOSED_QUEUE_BASE_PARENT_SHA="$(git -C "$SEED" rev-parse HEAD^)"
+printf 'recomposed source commit\n' >>"$SEED/recomposed-queue.txt"
+GIT_AUTHOR_DATE='2037-01-01T00:00:00Z' \
+  GIT_COMMITTER_DATE='2037-01-01T00:00:00Z' \
+  git -C "$SEED" commit -qam 'recomposed cumulative queue child'
+RECOMPOSED_QUEUE_HEAD="$(git -C "$SEED" rev-parse HEAD)"
+RECOMPOSED_QUEUE_REF='refs/heads/gh-readonly-queue/main/pr-2-recomposed'
+git -C "$SEED" push -q origin \
+  "$RECOMPOSED_QUEUE_HEAD:$RECOMPOSED_QUEUE_REF"
+
+# A normally ordered non-PR range must retain the exact event head. Explicit
+# dates keep this assertion independent of test runtime and filesystem clocks.
+git -C "$SEED" switch -q -c monotonic-queue "$BASE_SHA"
+printf 'monotonic queue base\n' >"$SEED/monotonic-queue.txt"
+git -C "$SEED" add monotonic-queue.txt
+GIT_AUTHOR_DATE='2036-01-01T00:00:00Z' \
+  GIT_COMMITTER_DATE='2036-01-01T00:00:00Z' \
+  git -C "$SEED" commit -q -m 'monotonic queue base'
+MONOTONIC_QUEUE_BASE_SHA="$(git -C "$SEED" rev-parse HEAD)"
+printf 'monotonic queue head\n' >>"$SEED/monotonic-queue.txt"
+GIT_AUTHOR_DATE='2036-01-02T00:00:00Z' \
+  GIT_COMMITTER_DATE='2036-01-02T00:00:00Z' \
+  git -C "$SEED" commit -qam 'monotonic queue head'
+MONOTONIC_QUEUE_HEAD="$(git -C "$SEED" rev-parse HEAD)"
+MONOTONIC_QUEUE_REF='refs/heads/gh-readonly-queue/main/pr-3-monotonic'
+git -C "$SEED" push -q origin \
+  "$MONOTONIC_QUEUE_HEAD:$MONOTONIC_QUEUE_REF"
+
+# Equal endpoint timestamps trigger the same ambiguous go-git ordering and
+# therefore require an anchor exactly one second above the shared timestamp.
+git -C "$SEED" switch -q -c equal-time-queue "$MONOTONIC_QUEUE_BASE_SHA"
+printf 'equal-time queue head\n' >"$SEED/equal-time-queue.txt"
+git -C "$SEED" add equal-time-queue.txt
+GIT_AUTHOR_DATE='2036-01-01T00:00:00Z' \
+  GIT_COMMITTER_DATE='2036-01-01T00:00:00Z' \
+  git -C "$SEED" commit -q -m 'equal-time queue head'
+EQUAL_TIME_QUEUE_HEAD="$(git -C "$SEED" rev-parse HEAD)"
+EQUAL_TIME_QUEUE_REF='refs/heads/gh-readonly-queue/main/pr-4-equal-time'
+git -C "$SEED" push -q origin \
+  "$EQUAL_TIME_QUEUE_HEAD:$EQUAL_TIME_QUEUE_REF"
+
 # Direct-main fallback scans every commit since push.before.
 git -C "$SEED" switch -q -C main "$BASE_SHA"
 printf 'direct one\n' >"$SEED/direct.txt"
@@ -196,18 +252,28 @@ assert_complete_range() {
   local checkout="$1"
   local base_sha="$2"
   local head_sha="$3"
-  local boundary shallow_file
+  local base_parent boundary shallow_file
 
   git -C "$checkout" cat-file -e "${base_sha}^{commit}" \
     || fail "base commit was not fetched"
   git -C "$checkout" merge-base --is-ancestor "$base_sha" "$head_sha" \
     || fail "base is not an ancestor of head"
+  while IFS= read -r base_parent; do
+    [[ -n "$base_parent" ]] || continue
+    git -C "$checkout" cat-file -e "${base_parent}^{commit}" \
+      || fail "base parent was not materialized for go-git: $base_parent"
+  done < <(
+    git -C "$checkout" cat-file commit "$base_sha" \
+      | sed -n -e '/^$/q' -e 's/^parent //p'
+  )
   shallow_file="$(git -C "$checkout" rev-parse --git-path shallow)"
   [[ -f "$checkout/$shallow_file" ]] || return 0
   while IFS= read -r boundary; do
-    if git -C "$checkout" merge-base --is-ancestor "$boundary" "$head_sha" \
-      && ! git -C "$checkout" merge-base --is-ancestor "$boundary" "$base_sha"; then
-      fail "range still has a non-base shallow boundary: $boundary"
+    if git -C "$checkout" merge-base --is-ancestor "$boundary" "$head_sha"; then
+      [[ "$boundary" != "$base_sha" ]] \
+        || fail "exact base remained the shallow boundary"
+      git -C "$checkout" merge-base --is-ancestor "$boundary" "$base_sha" \
+        || fail "range still has a non-base shallow boundary: $boundary"
     fi
   done <"$checkout/$shallow_file"
 }
@@ -401,6 +467,180 @@ git -C "$SCENARIO_DIR" cat-file -e "${QUEUE_TWO_SHA}^{commit}" \
 # queue head); the prepared range may never silently widen below it (JOV-4333).
 [[ "$(git -C "$SCENARIO_DIR" rev-parse refs/secret-scan/exact-base)" == "$BASE_SHA" ]] \
   || fail 'merge-group scan base did not resolve to the exact event base_sha'
+
+checkout_range \
+  recomposed-merge-group \
+  "$RECOMPOSED_QUEUE_REF" \
+  "$RECOMPOSED_QUEUE_BASE_SHA" \
+  "$RECOMPOSED_QUEUE_HEAD" \
+  "$RECOMPOSED_QUEUE_REF" \
+  "$RECOMPOSED_QUEUE_HEAD" \
+  ''
+RECOMPOSED_QUEUE_DIR="$SCENARIO_DIR"
+RECOMPOSED_SCAN_HEAD="$(git -C "$RECOMPOSED_QUEUE_DIR" rev-parse HEAD)"
+[[ "$RECOMPOSED_SCAN_HEAD" != "$RECOMPOSED_QUEUE_HEAD" ]] \
+  || fail 'inverted-time merge-group scan head was not compatibility-anchored'
+[[ "$(git -C "$RECOMPOSED_QUEUE_DIR" rev-parse "${RECOMPOSED_SCAN_HEAD}^{tree}")" == \
+  "$(git -C "$RECOMPOSED_QUEUE_DIR" rev-parse "${RECOMPOSED_QUEUE_HEAD}^{tree}")" ]] \
+  || fail 'timestamp anchor did not preserve the exact event tree'
+[[ "$(git -C "$RECOMPOSED_QUEUE_DIR" show -s --format='%P' "$RECOMPOSED_SCAN_HEAD")" == \
+  "$RECOMPOSED_QUEUE_HEAD" ]] \
+  || fail 'timestamp anchor does not have the exact event head as its sole parent'
+[[ "$(git -C "$RECOMPOSED_QUEUE_DIR" show -s --format='%ct' "$RECOMPOSED_SCAN_HEAD")" -gt \
+  "$(git -C "$RECOMPOSED_QUEUE_DIR" show -s --format='%ct' "$RECOMPOSED_QUEUE_BASE_SHA")" ]] \
+  || fail 'timestamp anchor is not newer than the exact event base'
+[[ "$(git -C "$RECOMPOSED_QUEUE_DIR" show -s --format='%ct' "$RECOMPOSED_SCAN_HEAD")" -eq \
+  "$(( $(git -C "$RECOMPOSED_QUEUE_DIR" show -s --format='%ct' "$RECOMPOSED_QUEUE_BASE_SHA") + 1 ))" ]] \
+  || fail 'timestamp anchor was not exactly base timestamp plus one'
+git -C "$RECOMPOSED_QUEUE_DIR" diff --exit-code \
+  "$RECOMPOSED_QUEUE_HEAD" "$RECOMPOSED_SCAN_HEAD" \
+  || fail 'timestamp anchor changed the event tree'
+git -C "$RECOMPOSED_QUEUE_DIR" cat-file -e \
+  "${RECOMPOSED_QUEUE_BASE_PARENT_SHA}^{commit}" \
+  || fail 'timestamp-anchor range did not materialize the exact base parent'
+[[ "$(git -C "$RECOMPOSED_QUEUE_DIR" rev-list --count \
+  "${RECOMPOSED_QUEUE_BASE_SHA}..${RECOMPOSED_QUEUE_HEAD}")" -eq 1 ]] \
+  || fail 'recomposed merge-group fixture is not the observed one-commit delta'
+[[ "$(git -C "$RECOMPOSED_QUEUE_DIR" rev-list --count \
+  "${RECOMPOSED_QUEUE_BASE_SHA}..${RECOMPOSED_SCAN_HEAD}")" -eq 2 ]] \
+  || fail 'timestamp anchor did not retain the complete event range'
+[[ "$(git -C "$RECOMPOSED_QUEUE_DIR" rev-parse refs/secret-scan/exact-base)" == \
+  "$RECOMPOSED_QUEUE_BASE_SHA" ]] \
+  || fail 'timestamp anchor changed the exact event base'
+[[ "$(git -C "$RECOMPOSED_QUEUE_DIR" rev-parse refs/secret-scan/exact-head)" == \
+  "$RECOMPOSED_SCAN_HEAD" ]] \
+  || fail 'timestamp anchor was not published as the exact scan head'
+grep -q 'Added local secret-scan timestamp anchor' \
+  "$TEST_ROOT/recomposed-merge-group.output" \
+  || fail 'timestamp anchor lacks an explicit compatibility classification'
+
+if [[ -n "${TRUFFLEHOG_BIN:-$(command -v trufflehog || true)}" ]]; then
+  RECOMPOSED_TRUFFLEHOG_BIN="${TRUFFLEHOG_BIN:-$(command -v trufflehog)}"
+  "$RECOMPOSED_TRUFFLEHOG_BIN" git "file://$RECOMPOSED_QUEUE_DIR" \
+    --since-commit "$RECOMPOSED_QUEUE_BASE_SHA" \
+    --branch HEAD \
+    --no-verification \
+    --fail >"$TEST_ROOT/recomposed-trufflehog.output" 2>&1 \
+    || fail 'trufflehog could not scan the inverted-time merge-group range'
+  if grep -q 'encountered errors during scan' \
+    "$TEST_ROOT/recomposed-trufflehog.output"; then
+    fail 'trufflehog aborted the inverted-time merge-group scan'
+  fi
+  grep -Eq '"chunks":[[:space:]]*[1-9][0-9]*' \
+    "$TEST_ROOT/recomposed-trufflehog.output" \
+    || fail 'trufflehog reported no positive scan work for the timestamp-anchor range'
+  echo 'PASS: trufflehog scanned the inverted-time merge-group range'
+else
+  echo 'SKIP: trufflehog binary unavailable for inverted-time merge-group assertion'
+fi
+
+# Anchor construction is part of the security boundary. A non-distinct commit,
+# wrong tree, or wrong parent must stop preparation without changing HEAD.
+BROKEN_ANCHOR_GIT="$TEST_ROOT/broken-timestamp-anchor-git"
+BROKEN_ANCHOR_REAL_GIT="$(command -v git)"
+BROKEN_ANCHOR_WRONG_TREE="$(git -C "$SEED" rev-parse "${BASE_SHA}^{tree}")"
+cat >"$BROKEN_ANCHOR_GIT" <<'EOF'
+#!/usr/bin/env bash
+set -euo pipefail
+if [[ "${1:-}" == 'commit-tree' ]]; then
+  case "$BROKEN_ANCHOR_MODE" in
+    same-head)
+      printf '%s\n' "$BROKEN_ANCHOR_EVENT_HEAD"
+      exit 0
+      ;;
+    wrong-tree)
+      exec "$BROKEN_ANCHOR_REAL_GIT" commit-tree \
+        "$BROKEN_ANCHOR_WRONG_TREE" -p "$BROKEN_ANCHOR_EVENT_HEAD"
+      ;;
+    wrong-parent)
+      exec "$BROKEN_ANCHOR_REAL_GIT" commit-tree \
+        "$2" -p "$BROKEN_ANCHOR_WRONG_PARENT"
+      ;;
+  esac
+fi
+exec "$BROKEN_ANCHOR_REAL_GIT" "$@"
+EOF
+chmod +x "$BROKEN_ANCHOR_GIT"
+
+assert_broken_anchor() {
+  local mode="$1" expected="$2"
+  local checkout="$TEST_ROOT/broken-timestamp-anchor-$mode"
+  local output="$TEST_ROOT/broken-timestamp-anchor-$mode.output"
+  local status=0
+
+  git init -q "$checkout"
+  git -C "$checkout" remote add origin "file://$ORIGIN"
+  git -C "$checkout" fetch -q --depth=1 origin "$RECOMPOSED_QUEUE_REF"
+  git -C "$checkout" checkout -q --detach FETCH_HEAD
+  (
+    cd "$checkout"
+    BROKEN_ANCHOR_MODE="$mode" \
+      BROKEN_ANCHOR_EVENT_HEAD="$RECOMPOSED_QUEUE_HEAD" \
+      BROKEN_ANCHOR_WRONG_TREE="$BROKEN_ANCHOR_WRONG_TREE" \
+      BROKEN_ANCHOR_WRONG_PARENT="$RECOMPOSED_QUEUE_BASE_SHA" \
+      BROKEN_ANCHOR_REAL_GIT="$BROKEN_ANCHOR_REAL_GIT" \
+      SECRET_SCAN_GIT_BIN="$BROKEN_ANCHOR_GIT" \
+      "$RANGE_SCRIPT" "$RECOMPOSED_QUEUE_BASE_SHA" \
+        "$RECOMPOSED_QUEUE_HEAD" "$RECOMPOSED_QUEUE_REF" \
+        "$RECOMPOSED_QUEUE_HEAD" ''
+  ) >"$output" 2>&1 || status=$?
+  [[ $status -ne 0 ]] \
+    || fail "invalid $mode timestamp anchor construction returned success"
+  grep -q "$expected" "$output" \
+    || fail "invalid $mode timestamp anchor lacks fail-closed classification"
+  [[ "$(git -C "$checkout" rev-parse HEAD)" == "$RECOMPOSED_QUEUE_HEAD" ]] \
+    || fail "invalid $mode timestamp anchor changed HEAD before validation"
+}
+
+assert_broken_anchor \
+  same-head 'timestamp anchor did not create a distinct scan head'
+assert_broken_anchor \
+  wrong-tree 'timestamp anchor changed the exact event tree'
+assert_broken_anchor \
+  wrong-parent 'timestamp anchor did not preserve the exact event head as its sole parent'
+
+checkout_range \
+  monotonic-merge-group \
+  "$MONOTONIC_QUEUE_REF" \
+  "$MONOTONIC_QUEUE_BASE_SHA" \
+  "$MONOTONIC_QUEUE_HEAD" \
+  "$MONOTONIC_QUEUE_REF" \
+  "$MONOTONIC_QUEUE_HEAD" \
+  ''
+[[ "$(git -C "$SCENARIO_DIR" rev-parse HEAD)" == "$MONOTONIC_QUEUE_HEAD" ]] \
+  || fail 'monotonic merge-group range unexpectedly replaced the event head'
+[[ "$(git -C "$SCENARIO_DIR" rev-parse refs/secret-scan/exact-head)" == \
+  "$MONOTONIC_QUEUE_HEAD" ]] \
+  || fail 'monotonic merge-group exact-head ref did not preserve the event head'
+[[ "$(git -C "$SCENARIO_DIR" rev-parse refs/secret-scan/exact-base)" == \
+  "$MONOTONIC_QUEUE_BASE_SHA" ]] \
+  || fail 'monotonic merge-group exact-base ref changed'
+if grep -q 'Added local secret-scan timestamp anchor' \
+  "$TEST_ROOT/monotonic-merge-group.output"; then
+  fail 'monotonic merge-group range created an unnecessary timestamp anchor'
+fi
+
+checkout_range \
+  equal-time-merge-group \
+  "$EQUAL_TIME_QUEUE_REF" \
+  "$MONOTONIC_QUEUE_BASE_SHA" \
+  "$EQUAL_TIME_QUEUE_HEAD" \
+  "$EQUAL_TIME_QUEUE_REF" \
+  "$EQUAL_TIME_QUEUE_HEAD" \
+  ''
+EQUAL_TIME_SCAN_HEAD="$(git -C "$SCENARIO_DIR" rev-parse HEAD)"
+[[ "$(git -C "$SCENARIO_DIR" show -s --format='%P' "$EQUAL_TIME_SCAN_HEAD")" == \
+  "$EQUAL_TIME_QUEUE_HEAD" ]] \
+  || fail 'equal-time timestamp anchor did not preserve the event head as sole parent'
+[[ "$(git -C "$SCENARIO_DIR" show -s --format='%ct' "$EQUAL_TIME_SCAN_HEAD")" -eq \
+  "$(( $(git -C "$SCENARIO_DIR" show -s --format='%ct' "$MONOTONIC_QUEUE_BASE_SHA") + 1 ))" ]] \
+  || fail 'equal-time timestamp anchor was not exactly base timestamp plus one'
+[[ "$(git -C "$SCENARIO_DIR" rev-parse refs/secret-scan/exact-head)" == \
+  "$EQUAL_TIME_SCAN_HEAD" ]] \
+  || fail 'equal-time exact-head ref did not publish the timestamp anchor'
+grep -q 'Added local secret-scan timestamp anchor' \
+  "$TEST_ROOT/equal-time-merge-group.output" \
+  || fail 'equal-time range lacks explicit timestamp-anchor classification'
 
 # A merge_group event without an exact base_sha (empty, malformed, or zero)
 # must fail closed with an explicit classification. Substituting any other ref

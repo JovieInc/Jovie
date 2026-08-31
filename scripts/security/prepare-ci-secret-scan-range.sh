@@ -186,7 +186,7 @@ pull_request_lineage_is_complete() {
 }
 
 range_is_complete() {
-  local boundary shallow_file
+  local base_parent boundary shallow_file
   if ! "$GIT_BIN" cat-file -e "${BASE_SHA}^{commit}" 2>/dev/null; then
     return 1
   fi
@@ -195,17 +195,33 @@ range_is_complete() {
   fi
   pull_request_lineage_is_complete || return 1
 
+  # go-git's breadth-first walker materializes a commit's direct parents before
+  # yielding that commit to the callback that recognizes the excluded base.
+  # Native base..head commands do not need those objects, but TruffleHog does.
+  while IFS= read -r base_parent; do
+    [[ -n "$base_parent" ]] || continue
+    "$GIT_BIN" cat-file -e "${base_parent}^{commit}" 2>/dev/null || return 1
+  done < <(
+    "$GIT_BIN" cat-file commit "$BASE_SHA" \
+      | sed -n -e '/^$/q' -e 's/^parent //p'
+  )
+
   shallow_file="$($GIT_BIN rev-parse --git-path shallow)"
   [[ -f "$shallow_file" ]] || return 0
 
   # The range is complete when every shallow boundary reachable from HEAD is
-  # also reachable from the excluded base. A boundary on the PR/queue/push side
-  # would hide an introduced-then-removed secret from both scanners.
+  # a proper ancestor of the excluded base. The base itself cannot be the
+  # boundary because go-git needs the direct-parent objects checked above. A
+  # boundary on the PR/queue/push side would hide an introduced-then-removed
+  # secret from both scanners.
   while IFS= read -r boundary; do
     [[ -n "$boundary" ]] || continue
     if "$GIT_BIN" merge-base --is-ancestor "$boundary" "$SCAN_HEAD_SHA" 2>/dev/null \
-      && ! "$GIT_BIN" merge-base --is-ancestor "$boundary" "$BASE_SHA" 2>/dev/null; then
-      return 1
+      && {
+        [[ "$boundary" == "$BASE_SHA" ]] \
+          || ! "$GIT_BIN" merge-base --is-ancestor "$boundary" "$BASE_SHA" 2>/dev/null
+      }; then
+        return 1
     fi
   done <"$shallow_file"
 }
@@ -249,6 +265,68 @@ prepare_pull_request_scan_head() {
 
   SCAN_HEAD_SHA="$scan_head"
   "$GIT_BIN" update-ref --no-deref HEAD "$SCAN_HEAD_SHA" "$HEAD_SHA"
+}
+
+prepare_timestamp_ordered_scan_head() {
+  local current_scan_head base_time scan_time scan_tree anchor_time
+  local anchor_head anchor_tree anchor_parents anchor_timestamp
+
+  # TruffleHog's go-git merge-base walk orders the two endpoints by commit
+  # timestamp. Recomposed queues and synthetic pull-request commits can both
+  # violate that heuristic, so check the final local scan head for every event.
+
+  current_scan_head="$SCAN_HEAD_SHA"
+  base_time="$("$GIT_BIN" show -s --format='%ct' "$BASE_SHA")" \
+    || fail "could not read the exact base timestamp"
+  scan_time="$("$GIT_BIN" show -s --format='%ct' "$current_scan_head")" \
+    || fail "could not read the exact scan-head timestamp"
+  [[ "$base_time" =~ ^[0-9]+$ ]] \
+    || fail "exact base timestamp was not an integer"
+  [[ "$scan_time" =~ ^[0-9]+$ ]] \
+    || fail "exact scan-head timestamp was not an integer"
+  (( scan_time <= base_time )) || return 0
+
+  scan_tree="$("$GIT_BIN" rev-parse "${current_scan_head}^{tree}")" \
+    || fail "could not read the exact scan-head tree"
+  anchor_time=$(( base_time + 1 ))
+  anchor_head="$(
+    printf 'Local CI secret-scan timestamp anchor for %s\n' "$HEAD_SHA" \
+      | env \
+          GIT_AUTHOR_NAME='Jovie CI' \
+          GIT_AUTHOR_EMAIL='ci@jov.ie' \
+          GIT_COMMITTER_NAME='Jovie CI' \
+          GIT_COMMITTER_EMAIL='ci@jov.ie' \
+          GIT_AUTHOR_DATE="@${anchor_time} +0000" \
+          GIT_COMMITTER_DATE="@${anchor_time} +0000" \
+          "$GIT_BIN" commit-tree "$scan_tree" -p "$current_scan_head"
+  )" || fail "could not create the timestamp-ordered local scan head"
+  [[ "$anchor_head" != "$current_scan_head" ]] \
+    || fail "timestamp anchor did not create a distinct scan head"
+
+  anchor_tree="$("$GIT_BIN" rev-parse "${anchor_head}^{tree}")" \
+    || fail "could not read the timestamp-anchor tree"
+  anchor_parents="$(
+    "$GIT_BIN" cat-file commit "$anchor_head" \
+      | sed -n -e '/^$/q' -e 's/^parent //p' \
+      | paste -sd ' ' -
+  )"
+  anchor_timestamp="$("$GIT_BIN" show -s --format='%ct' "$anchor_head")" \
+    || fail "could not read the timestamp-anchor timestamp"
+  [[ "$anchor_tree" == "$scan_tree" ]] \
+    || fail "timestamp anchor changed the exact event tree"
+  [[ "$anchor_parents" == "$current_scan_head" ]] \
+    || fail "timestamp anchor did not preserve the exact event head as its sole parent"
+  [[ "$anchor_timestamp" =~ ^[0-9]+$ ]] \
+    || fail "timestamp-anchor timestamp was not an integer"
+  (( anchor_timestamp > base_time && anchor_timestamp > scan_time )) \
+    || fail "timestamp anchor was not newer than both scan endpoints"
+
+  SCAN_HEAD_SHA="$anchor_head"
+  range_is_complete \
+    || fail "timestamp-ordered local scan head no longer covers the exact base..head range"
+  "$GIT_BIN" update-ref --no-deref HEAD "$SCAN_HEAD_SHA" "$current_scan_head" \
+    || fail "could not install the timestamp-ordered local scan head"
+  echo "Added local secret-scan timestamp anchor ${SCAN_HEAD_SHA} above ${current_scan_head} because scan-head time ${scan_time} was not newer than base time ${base_time}."
 }
 
 verify_pull_request_semantics() {
@@ -376,6 +454,7 @@ else
     || fail "base..head history remains shallow after bounded exact-range fetches"
 fi
 
+prepare_timestamp_ordered_scan_head
 remaining_deadline_seconds >/dev/null \
   || fail "the ${DEADLINE_SECONDS}s absolute range-preparation deadline was exhausted"
 "$GIT_BIN" update-ref "$HEAD_REF" "$SCAN_HEAD_SHA"
