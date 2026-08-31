@@ -5,6 +5,7 @@ import { getCachedAuth } from '@/lib/auth/cached';
 import { getExactProfileAccess } from '@/lib/auth/profile-access';
 import { asConnectorStatusSql } from '@/lib/connectors/db-expressions';
 import { loadFreshGoogleAccessToken } from '@/lib/connectors/google-calendar/access-token';
+import { RefreshLockBusyError } from '@/lib/connectors/token-vault';
 import { CONNECTOR_PROVIDERS } from '@/lib/connectors/registry';
 import { createYouTubeLibraryProvider } from '@/lib/connectors/youtube/provider';
 import { YOUTUBE_OAUTH_SCOPES } from '@/lib/connectors/youtube/scopes';
@@ -17,6 +18,7 @@ export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
 
 const bodySchema = z.object({ creatorProfileId: z.string().uuid() });
+const REFRESH_BUSY_RETRY_AFTER_SECONDS = 5;
 
 export async function POST(request: Request) {
   const { userId } = await getCachedAuth();
@@ -98,6 +100,18 @@ export async function POST(request: Request) {
       .where(eq(connectorAccounts.id, accountId));
     return NextResponse.json(result);
   } catch (error) {
+    if (error instanceof RefreshLockBusyError) {
+      return NextResponse.json(
+        { error: 'YouTube token refresh is already in progress' },
+        {
+          status: 503,
+          headers: {
+            'Retry-After': String(REFRESH_BUSY_RETRY_AFTER_SECONDS),
+          },
+        }
+      );
+    }
+
     const message =
       error instanceof Error ? error.message : 'Unknown YouTube sync error';
     const safe = accessToken

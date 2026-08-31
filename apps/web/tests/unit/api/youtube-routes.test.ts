@@ -22,6 +22,17 @@ const mocks = vi.hoisted(() => ({
   store: vi.fn(),
   loadToken: vi.fn(),
   lock: vi.fn(),
+  RefreshLockBusyError: class RefreshLockBusyError extends Error {
+    readonly connectorAccountId: string;
+
+    constructor(connectorAccountId: string) {
+      super(
+        `Token refresh lock is held by another caller for account ${connectorAccountId}`
+      );
+      this.name = 'RefreshLockBusyError';
+      this.connectorAccountId = connectorAccountId;
+    }
+  },
   sync: vi.fn(),
   capture: vi.fn(),
   env: {
@@ -45,6 +56,7 @@ vi.mock('@/lib/connectors/token-vault', () => ({
   loadDecryptedToken: mocks.loadToken,
   storeTokens: mocks.store,
   withRefreshLock: mocks.lock,
+  RefreshLockBusyError: mocks.RefreshLockBusyError,
 }));
 vi.mock('@/lib/connectors/youtube/provider', () => ({
   createYouTubeLibraryProvider: vi.fn(),
@@ -273,6 +285,16 @@ describe('YouTube connector routes', () => {
       await postStatus(sync, paths.sync, { creatorProfileId: profileId })
     ).toBe(409);
     mocks.rows[0].scopes = [...YOUTUBE_OAUTH_SCOPES];
+    mocks.loadToken.mockRejectedValueOnce(
+      new mocks.RefreshLockBusyError('account-1')
+    );
+    const busy = await sync(
+      postRequest(paths.sync, { creatorProfileId: profileId })
+    );
+    expect(busy.status).toBe(503);
+    expect(busy.headers.get('retry-after')).toBe('5');
+    expect(mocks.writes).toHaveLength(0);
+    expect(mocks.capture).not.toHaveBeenCalled();
     mocks.loadToken.mockRejectedValueOnce(new Error('refresh failed'));
     expect(
       await postStatus(sync, paths.sync, { creatorProfileId: profileId })
