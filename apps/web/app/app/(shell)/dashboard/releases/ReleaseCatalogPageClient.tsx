@@ -20,11 +20,11 @@ import {
   type LibraryApprovalStatus,
 } from '@/lib/library/approval-status';
 import type { LibraryAssetShareViewModel } from '@/lib/library/asset-share';
+import type { LibraryPostReleaseBundle } from '@/lib/library/post-release-types';
 import {
   isLibraryProfileVisibility,
   type LibraryProfileVisibility,
 } from '@/lib/library/profile-visibility';
-import type { LibraryPostReleaseBundle } from '@/lib/library/post-release-types';
 import type { LibraryMerchCard } from '@/lib/merch/types';
 import { useReleasesQuery } from '@/lib/queries/useReleasesQuery';
 import type { PublicVideoListItem } from '@/lib/youtube-library/queries';
