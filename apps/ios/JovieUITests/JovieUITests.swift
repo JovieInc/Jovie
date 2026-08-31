@@ -1406,7 +1406,8 @@ final class JovieUITests: XCTestCase {
       $0.buttons["Copy URL"]
     }
 
-    app.buttons["Open navigation drawer"].tap()
+    let drawerSettings = app.buttons["shell-drawer-settings"]
+    openDrawerAndWaitForControl(drawerSettings, in: app)
     XCTAssertTrue(
       app.descendants(matching: .any)["shell-drawer"].waitForExistence(timeout: 3),
       "Shell navigation did not reveal the left drawer.\n\(app.debugDescription)"
@@ -1430,9 +1431,13 @@ final class JovieUITests: XCTestCase {
       app.buttons["Copy URL"].waitForExistence(timeout: 3),
       "Tapping the exposed content card did not close the drawer.\n\(app.debugDescription)"
     )
+    XCTAssertTrue(
+      waitForHittable(app.buttons["shell-drawer-open"], timeout: 6),
+      "Drawer open control did not settle into a tappable closed state after closing the drawer.\n\(app.debugDescription)"
+    )
 
-    app.buttons["Open navigation drawer"].tap()
-    app.buttons["Settings"].tap()
+    openDrawerAndWaitForControl(drawerSettings, in: app)
+    drawerSettings.tap()
     XCTAssertTrue(
       app.staticTexts["Settings"].waitForExistence(timeout: 3),
       "Shell navigation did not open settings from the drawer.\n\(app.debugDescription)"
@@ -1989,6 +1994,41 @@ final class JovieUITests: XCTestCase {
     }
 
     return element.exists && element.isHittable
+  }
+
+  private func openDrawerAndWaitForControl(
+    _ drawerControl: XCUIElement,
+    in app: XCUIApplication,
+    timeout: TimeInterval = 6,
+    file: StaticString = #filePath,
+    line: UInt = #line
+  ) {
+    let drawerOpenButton = app.buttons["shell-drawer-open"]
+    XCTAssertTrue(
+      waitForHittable(drawerOpenButton, timeout: timeout),
+      "Drawer open control did not become hittable before opening the drawer.\n\(app.debugDescription)",
+      file: file,
+      line: line
+    )
+
+    drawerOpenButton.tap()
+
+    XCTAssertTrue(
+      app.descendants(matching: .any)["shell-drawer"].waitForExistence(timeout: timeout),
+      "Shell navigation did not reveal the left drawer.\n\(app.debugDescription)",
+      file: file,
+      line: line
+    )
+    XCTAssertTrue(
+      waitForDrawerSurfaceToBeUncovered(
+        drawerControl,
+        contentPlaneMarker: drawerOpenButton,
+        timeout: timeout
+      ),
+      "Drawer control stayed covered by the opening content plane.\n\(app.debugDescription)",
+      file: file,
+      line: line
+    )
   }
 
   /// SwiftUI reports recessed drawer controls hittable before the animated
