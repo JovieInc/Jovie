@@ -1,4 +1,4 @@
-import type { ArtistRule } from '@/lib/db/schema/library-graph';
+import type { ArtistRule } from '@/lib/db/schema/library-content-graph';
 
 export interface ArtistRuleContext {
   readonly channel?: string;
