@@ -247,7 +247,7 @@
     "@radix-ui/react-toggle-group": "^1.1.19",
     "@radix-ui/react-tooltip": "^1.2.16",
     "@sentry/nextjs": "^10.70.0",
-    "@statsig/statsig-node-core": "^0.19.3",
+    "@statsig/statsig-node-core": "^0.22.0",
     "@tanstack/react-pacer": "^0.21.1",
     "@tanstack/react-query": "^5.101.0",
     "@tanstack/react-table": "^8.21.3",
