@@ -234,6 +234,7 @@
     "design:oklch-palette:check": "node scripts/oklch-palette-guard.mjs",
     "design:shared-ui-visual-arbitrary:check": "node scripts/shared-ui-visual-arbitrary-audit.mjs",
     "design:shared-ui-visual-arbitrary:update": "node scripts/shared-ui-visual-arbitrary-audit.mjs --update-baseline",
+    "design:source-count-ratchet": "node scripts/design-system-source-ratchet.mjs",
     "design:authority:check": "node scripts/design-authority-guard.mjs",
     "design:conformance:check": "node scripts/design-conformance-check.mjs",
     "design:conformance:test": "node --test scripts/design-conformance-check.test.mjs scripts/generate-design-tokens-export.test.mjs scripts/design-governance-audit.test.mjs scripts/invariant-stewardship/audit.test.mjs scripts/oklch-palette-guard.test.mjs scripts/shared-ui-visual-arbitrary-audit.test.mjs && pnpm --filter web exec vitest run --config vitest.config.minimal.mts tests/unit/design-system/ui-ownership-registry.test.ts",

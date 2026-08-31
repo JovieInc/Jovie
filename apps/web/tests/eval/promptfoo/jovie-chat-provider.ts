@@ -361,6 +361,12 @@ const ADVANCED_TOOL_SCHEMAS = {
       url: z.string().url(),
     }),
   },
+  inspectPressSource: {
+    description: 'Inspect a public https article or press-release URL.',
+    inputSchema: z.object({
+      url: z.string().url(),
+    }),
+  },
   checkCanvasStatus: {
     description:
       "Check which of the artist's releases have Spotify Canvas videos set and which are missing them.",
@@ -556,6 +562,7 @@ const PROFILE_RELEASE_TOOL_NAMES = [
 const ALWAYS_PAID_TOOL_NAMES = [
   'proposeProfileEdit',
   'importBioFromUrl',
+  'inspectPressSource',
   'checkCanvasStatus',
   'suggestRelatedArtists',
   'writeWorldClassBio',
@@ -751,6 +758,15 @@ const TOOL_RESULT_REQUIRED_KEYS: Record<string, readonly string[]> = {
     'summary',
   ],
   importBioFromUrl: ['ok', 'candidateBio', 'sourceUrl', 'sourceTitle'],
+  inspectPressSource: [
+    'ok',
+    'sourceUrl',
+    'freshness',
+    'factualVerification',
+    'contentTrust',
+    'headline',
+    'bodyEvidence',
+  ],
   markCanvasUploaded: ['success', 'action', 'releaseTitle', 'summary'],
   openBillingPortal: ['success', 'portalUrl', 'fallbackUrl'],
   optimizeMerchCards: ['success', 'action', 'optimized'],
@@ -4107,6 +4123,18 @@ function defaultToolResult(toolName: string, input: unknown): unknown {
         sourceUrl: args.url,
         sourceTitle: 'Luna Waves press kit',
       };
+    case 'inspectPressSource':
+      return {
+        ok: true,
+        sourceUrl: args.url,
+        contentTrust: 'untrusted',
+        factualVerification: false,
+        freshness: 'fresh',
+        headline:
+          '<untrusted-source url="https://lunawaves.example/press">Tour dates announced</untrusted-source>',
+        bodyEvidence:
+          '<untrusted-source url="https://lunawaves.example/press">North American dates start in October.</untrusted-source>',
+      };
     case 'checkCanvasStatus':
       return {
         success: true,
@@ -4845,7 +4873,7 @@ function semanticToolInputErrors(toolName: string, input: unknown): string[] {
     }
   }
 
-  if (toolName === 'importBioFromUrl') {
+  if (toolName === 'importBioFromUrl' || toolName === 'inspectPressSource') {
     const url = typeof args.url === 'string' ? args.url.trim() : '';
     try {
       const parsed = new URL(url);
@@ -4955,6 +4983,8 @@ function sampleToolInput(toolName: string): Record<string, unknown> {
       };
     case 'importBioFromUrl':
       return { url: 'https://lunawaves.example/press-kit' };
+    case 'inspectPressSource':
+      return { url: 'https://lunawaves.example/press' };
     case 'checkCanvasStatus':
       return { includeAll: true };
     case 'suggestRelatedArtists':

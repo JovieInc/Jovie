@@ -1215,9 +1215,14 @@ function runRatchet() {
 
 export function runComponentShipGate(options = {}) {
   const flags = {
-    // Explicit null must skip the diff scan. `??` would treat it as missing and
-    // fall through to TURBO_SCM_BASE / origin/main, which times out the 5s
-    // control tests on large mechanical PRs (JOV-5466).
+    // Honor an explicit null/empty diffBase as "no diff base" instead of
+    // re-resolving origin/main behind the caller's back. In CI origin/main is
+    // always present, so re-resolving turned an explicit opt-out into a diff
+    // scan against main (JOV-5454 live-cert contract). `??` would also treat
+    // explicit null as missing and fall through to TURBO_SCM_BASE, which
+    // times out the 5s control tests on large mechanical PRs (JOV-5466).
+    // Only auto-resolve when diffBase is omitted entirely; preserve explicit
+    // null so report.diffBase stays null and the skip note is recorded.
     diffBase: Object.hasOwn(options, 'diffBase')
       ? options.diffBase
       : resolveDiffBase(null),

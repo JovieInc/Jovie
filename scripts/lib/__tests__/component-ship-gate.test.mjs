@@ -217,6 +217,61 @@ describe('story match checks', () => {
 });
 
 describe('diff gate', () => {
+  it('honors an explicit null diffBase instead of re-resolving origin/main', () => {
+    // Regression for JOV-5454 contract failure: in CI origin/main is always
+    // present, so re-resolving an explicit opt-out turned into a diff scan
+    // against main and reported false missing-test/story issues for unrelated
+    // changed components. With an explicit null base and quality/ratchet
+    // skipped, the report must be green and skip the diff section.
+    const report = runComponentShipGate({
+      diffBase: null,
+      skipQuality: true,
+      skipRatchet: true,
+      skipRenderedCert: true,
+      skipLiveStorybook: true,
+    });
+    expect(report.ok).toBe(true);
+    expect(report.sections.diff.applicable).toBe(false);
+  });
+
+  it('still auto-resolves a base when diffBase is omitted', () => {
+    // When diffBase is not provided at all, the gate may fall back to
+    // origin/main; the diff section then reflects a real scan.
+    const report = runComponentShipGate({
+      skipQuality: true,
+      skipRatchet: true,
+      skipRenderedCert: true,
+      skipLiveStorybook: true,
+    });
+    // An omitted base must not be treated as an explicit opt-out: the gate
+    // auto-resolves a base (origin/main is present in CI and locally), so
+    // report.diffBase is set. `applicable` additionally requires the resolved
+    // diff to contain an in-scope component, so it is not asserted here.
+    expect(report.diffBase).toBeTruthy();
+    expect(report.sections.diff.note).toBeUndefined();
+  });
+
+  it('treats a resolved base with no in-scope changes as scanned but not applicable', () => {
+    // Regression for ci:f4bd9bc60a2c6c3c188d: screenshots/manifest-only PRs
+    // resolve a diff base yet contain no ship-scope component changes, so
+    // `applicable` is false even though the scan ran. `applicable` must never
+    // be conflated with "a base resolved" — only the skip note marks an
+    // explicit opt-out.
+    const report = runComponentShipGate({
+      diffBase: 'origin/main',
+      skipQuality: true,
+      skipRatchet: true,
+      skipRenderedCert: true,
+      skipLiveStorybook: true,
+    });
+    expect(report.diffBase).toBe('origin/main');
+    expect(report.sections.diff.note).toBeUndefined();
+    expect(report.sections.diff.ok).toBe(true);
+    expect(report.sections.diff.applicable).toBe(
+      report.sections.diff.changedComponents.length > 0
+    );
+  });
+
   it('fails closed without test and story', () => {
     const root = fixtureRepo({
       'apps/web/components/atoms/NewThing.tsx':

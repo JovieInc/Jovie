@@ -56,7 +56,7 @@ describe('MarketingHeader', () => {
     );
     expect(screen.getByRole('link', { name: 'Get started' })).toHaveAttribute(
       'href',
-      '/start?starter_prompt=Hey%2C+I+want+to+get+access+to+Jovie.'
+      'https://jov.ie/waitlist'
     );
   });
 
@@ -96,10 +96,7 @@ describe('MarketingHeader', () => {
     );
     expect(
       screen.getByRole('link', { name: 'Claim your profile' })
-    ).toHaveAttribute(
-      'href',
-      '/start?starter_prompt=Hey%2C+I+want+to+get+access+to+Jovie.'
-    );
+    ).toHaveAttribute('href', 'https://jov.ie/waitlist');
   });
 
   it('keeps the legacy artist-profile alias on the same shared chrome', () => {

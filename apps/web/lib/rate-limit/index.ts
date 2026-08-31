@@ -92,6 +92,8 @@ export {
   handleCheckLimiter,
   headerSearchLimiter,
   healthLimiter,
+  inspectPressSourceHourlyLimiter,
+  inspectPressSourceLimiter,
   isrcRescanLimiter,
   merchCheckoutLimiter,
   musicBrainzLookupLimiter,

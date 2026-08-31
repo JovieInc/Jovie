@@ -864,6 +864,26 @@ export const RATE_LIMITERS = {
     algorithm: 'sliding-window',
     trafficClass: 'authenticated',
   } satisfies RateLimitConfig,
+
+  inspectPressSource: {
+    name: 'Inspect Press Source',
+    limit: 5,
+    window: '1 m',
+    prefix: 'inspect_press_source',
+    analytics: true,
+    algorithm: 'sliding-window',
+    trafficClass: 'authenticated',
+  } satisfies RateLimitConfig,
+
+  inspectPressSourceHourly: {
+    name: 'Inspect Press Source Hourly',
+    limit: 20,
+    window: '1 h',
+    prefix: 'inspect_press_source_hourly',
+    analytics: true,
+    algorithm: 'sliding-window',
+    trafficClass: 'authenticated',
+  } satisfies RateLimitConfig,
 } as const;
 
 export type RateLimiterName = keyof typeof RATE_LIMITERS;

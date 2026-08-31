@@ -2,6 +2,7 @@ import { expect, test } from 'vitest';
 import {
   classifyDesktopLoadFailure,
   decideAbortedMainFrameRecovery,
+  decideDidFinishLoadRecovery,
   decideHostedLoadRetry,
   decideLocalMainFrameLoadFailure,
   decideRecoveryUnlatch,
@@ -11,6 +12,7 @@ import {
   decideRendererWatchdogExpiry,
   describeDesktopLoadFailure,
   hostedUrlCandidates,
+  isChromiumErrorDocument,
   isLocalDevSiblingOrigin,
   isLoopbackAppUrl,
   LOCAL_HOSTED_LOAD_RETRY_DELAY_MS,
@@ -125,6 +127,9 @@ test('boot watchdog arms only for real hosted app-origin navigations', () => {
   expect(
     shouldArmRendererBootWatchdog('devtools://devtools/bundled', appOrigin)
   ).toBe(false);
+  expect(
+    shouldArmRendererBootWatchdog('chrome-error://chromewebdata/', appOrigin)
+  ).toBe(false);
   expect(shouldArmRendererBootWatchdog('file:///tmp/x.html', appOrigin)).toBe(
     false
   );
@@ -159,6 +164,67 @@ test('local connection-refused retries until the budget is exhausted', () => {
   expect(
     decideLocalMainFrameLoadFailure({ errorCode: -2, retryCount: 0 })
   ).toBe('failure-page');
+});
+
+test('a Chromium error document must not cancel a pending local retry (JOV-5474)', () => {
+  expect(isChromiumErrorDocument('chrome-error://chromewebdata/')).toBe(true);
+  expect(isChromiumErrorDocument('http://localhost:3100/app/chat')).toBe(false);
+  expect(isChromiumErrorDocument('data:text/html;charset=utf-8,recovery')).toBe(
+    false
+  );
+
+  let retryCount = 0;
+  let retryTimerArmed = false;
+
+  const onDidFailLoad = (errorCode: number): void => {
+    const action = decideLocalMainFrameLoadFailure({
+      errorCode,
+      retryCount,
+    });
+    if (action === 'retry') {
+      retryCount += 1;
+      retryTimerArmed = true;
+    }
+  };
+
+  const onDidFinishLoad = (url: string): void => {
+    // Deliberate-red on current main: unconditional did-finish-load resets
+    // localHostedLoadRetryCount and clearAllWatchdogs() cancels the timer.
+    if (decideDidFinishLoadRecovery({ url }) === 'ignore') return;
+    retryCount = 0;
+    retryTimerArmed = false;
+  };
+
+  // Exact-current Jovie Local event order: localhost:3100 refuses, then
+  // Chromium commits chrome-error://chromewebdata/.
+  onDidFailLoad(-102);
+  onDidFinishLoad('chrome-error://chromewebdata/');
+
+  expect(retryCount).toBe(1);
+  expect(retryTimerArmed).toBe(true);
+  expect(decideLocalMainFrameLoadFailure({ errorCode: -102, retryCount })).toBe(
+    'retry'
+  );
+
+  // Cmd-R reproduces the same chrome-error finish without a hosted load.
+  onDidFinishLoad('chrome-error://chromewebdata/');
+  expect(retryCount).toBe(1);
+  expect(retryTimerArmed).toBe(true);
+
+  // A verified hosted finish still clears the local retry budget.
+  onDidFinishLoad('http://localhost:3100/app/chat');
+  expect(retryCount).toBe(0);
+  expect(retryTimerArmed).toBe(false);
+  expect(
+    decideDidFinishLoadRecovery({
+      url: 'http://localhost:3100/app/chat',
+    })
+  ).toBe('hosted-finished');
+  expect(
+    decideDidFinishLoadRecovery({
+      url: 'data:text/html;charset=utf-8,recovery',
+    })
+  ).toBe('hosted-finished');
 });
 
 test('load watchdog covers hung navigation before did-finish-load', () => {

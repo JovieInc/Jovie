@@ -67,6 +67,14 @@ export const TOOL_UI_REGISTRY = {
     successTitle: 'Bio imported',
     errorTitle: "Couldn't import that bio",
   },
+  inspectPressSource: {
+    label: 'Press source',
+    uiHint: 'status',
+    renderer: 'status',
+    loadingTitle: 'Inspecting that source…',
+    successTitle: 'Source inspected',
+    errorTitle: "Couldn't inspect that source",
+  },
   checkCanvasStatus: {
     label: 'Canvas',
     uiHint: 'status',

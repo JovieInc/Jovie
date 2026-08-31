@@ -1548,6 +1548,7 @@ tests:
           - generateCanvasPlan
           - generateReleasePitch
           - importBioFromUrl
+          - inspectPressSource
           - findMerchSources
           - manageTasks
           - markCanvasUploaded
@@ -2983,6 +2984,27 @@ tests:
       input: "Import my bio from this press kit."
       target: tool-contract
       toolName: importBioFromUrl
+      mode: app
+      plan: pro
+      toolInput:
+        url: https://lunawaves.example/press
+    assert:
+      - type: javascript
+        value: file://assertions.cjs:assertDeterministicNoSpend
+      - type: javascript
+        value: file://assertions.cjs:assertToolAvailable
+      - type: javascript
+        value: file://assertions.cjs:assertToolSchemaValid
+      - type: javascript
+        value: file://assertions.cjs:assertToolExecuted
+
+  - description: Tool contract accepts paid press source inspection
+    metadata:
+      cost: deterministic
+    vars:
+      input: "Look at this press release URL and tell me if it is recent."
+      target: tool-contract
+      toolName: inspectPressSource
       mode: app
       plan: pro
       toolInput:

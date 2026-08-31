@@ -3,6 +3,24 @@ import { APP_ROUTES } from '@/constants/routes';
 export const HOMEPAGE_REQUEST_ACCESS_STARTER_PROMPT =
   'Hey, I want to get access to Jovie.';
 
+/** Founder-locked public waitlist destination for the prelaunch front door. */
+export const PUBLIC_WAITLIST_URL = 'https://jov.ie/waitlist';
+
+/** Stable variant identity for the splash-B waitlist-first handoff. */
+export const WAITLIST_FRONT_DOOR_VARIANT_ID =
+  'waitlist-front-door:splash-b:v1' as const;
+
+export const WAITLIST_FRONT_DOOR_EVENTS = {
+  PAGE_VIEW: 'waitlist_front_door_viewed',
+  CTA_EXPOSED: 'waitlist_front_door_cta_exposed',
+} as const;
+
+export const WAITLIST_FRONT_DOOR_CONTEXT = {
+  variantIdentity: WAITLIST_FRONT_DOOR_VARIANT_ID,
+  platform: 'web',
+  contentVariant: 'splash-b',
+} as const;
+
 export function buildHomepageStartHref(starterPrompt?: string): string {
   if (!starterPrompt) return APP_ROUTES.START;
   const params = new URLSearchParams({ starter_prompt: starterPrompt });
@@ -28,7 +46,7 @@ export function getHomepageFrontDoorCtaContract(
     return {
       primary: {
         label: 'Get started',
-        href: buildHomepageStartHref(HOMEPAGE_REQUEST_ACCESS_STARTER_PROMPT),
+        href: PUBLIC_WAITLIST_URL,
       },
       secondary: null,
       fallbackSupport:
