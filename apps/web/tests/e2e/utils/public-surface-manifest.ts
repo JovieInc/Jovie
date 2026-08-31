@@ -225,6 +225,18 @@ const MARKETING_SURFACES = [
     interactions: GLOBAL_INTERACTIONS,
   },
   {
+    id: 'marketing-cli',
+    family: 'marketing',
+    expectedState: 'ok',
+    path: APP_ROUTES.CLI,
+    readySelectors: ['h1', 'main'],
+    mainSelector: 'main',
+    minMainTextLength: 120,
+    lighthouse: false,
+    perfGroups: ['marketing-public'],
+    interactions: GLOBAL_INTERACTIONS,
+  },
+  {
     id: 'marketing-api-versioning',
     family: 'marketing',
     expectedState: 'ok',

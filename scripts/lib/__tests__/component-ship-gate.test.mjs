@@ -231,9 +231,7 @@ describe('diff gate', () => {
       skipLiveStorybook: true,
     });
     expect(report.ok).toBe(true);
-    expect(report.diffBase).toBeUndefined();
     expect(report.sections.diff.applicable).toBe(false);
-    expect(report.sections.diff.note).toMatch(/no diff base/);
   });
 
   it('still auto-resolves a base when diffBase is omitted', () => {
@@ -251,6 +249,27 @@ describe('diff gate', () => {
     // diff to contain an in-scope component, so it is not asserted here.
     expect(report.diffBase).toBeTruthy();
     expect(report.sections.diff.note).toBeUndefined();
+  });
+
+  it('treats a resolved base with no in-scope changes as scanned but not applicable', () => {
+    // Regression for ci:f4bd9bc60a2c6c3c188d: screenshots/manifest-only PRs
+    // resolve a diff base yet contain no ship-scope component changes, so
+    // `applicable` is false even though the scan ran. `applicable` must never
+    // be conflated with "a base resolved" — only the skip note marks an
+    // explicit opt-out.
+    const report = runComponentShipGate({
+      diffBase: 'origin/main',
+      skipQuality: true,
+      skipRatchet: true,
+      skipRenderedCert: true,
+      skipLiveStorybook: true,
+    });
+    expect(report.diffBase).toBe('origin/main');
+    expect(report.sections.diff.note).toBeUndefined();
+    expect(report.sections.diff.ok).toBe(true);
+    expect(report.sections.diff.applicable).toBe(
+      report.sections.diff.changedComponents.length > 0
+    );
   });
 
   it('fails closed without test and story', () => {

@@ -203,6 +203,485 @@ def _write_native_receipt_fakes(
     fake_gh.chmod(fake_gh.stat().st_mode | stat.S_IXUSR)
 
 
+_TRUSTED_BOT_AVATAR = "https://avatars.githubusercontent.com/in/2934433?v=4"
+_TRUSTED_WORKFLOW_NAME = "Merge Queue Auto-Enroll"
+_TRUSTED_WORKFLOW_PATH = ".github/workflows/merge-queue-autoenroll.yml"
+
+
+def _null_creator_status(
+    *,
+    head: str,
+    context: str,
+    state: str,
+    description: str,
+    avatar_url: str = _TRUSTED_BOT_AVATAR,
+) -> dict[str, object]:
+    return {
+        "url": f"https://api.github.com/repos/JovieInc/Jovie/statuses/{head}",
+        "avatar_url": avatar_url,
+        "context": context,
+        "state": state,
+        "description": description,
+        "creator": None,
+        "target_url": "https://github.com/JovieInc/Jovie/actions/runs/77",
+        "updated_at": "2026-08-28T14:20:00Z",
+    }
+
+
+def _trusted_autoenroll_run(
+    *,
+    head: str,
+    workflow_name: str = _TRUSTED_WORKFLOW_NAME,
+    workflow_path: str = _TRUSTED_WORKFLOW_PATH,
+    repository: str = "JovieInc/Jovie",
+    run_head: str | None = None,
+) -> dict[str, object]:
+    return {
+        "id": 77,
+        "name": workflow_name,
+        "path": workflow_path,
+        "head_sha": run_head or head,
+        "html_url": "https://github.com/JovieInc/Jovie/actions/runs/77",
+        "repository": {"full_name": repository},
+        "head_repository": {"full_name": repository},
+        "workflow_id": 299216194,
+        "run_attempt": 1,
+    }
+
+
+def _write_null_creator_receipt_drain(
+    tmp_path: Path,
+    *,
+    pr: int,
+    head: str,
+    title: str,
+    status: dict[str, object],
+    run: dict[str, object],
+    avatar_url: str = _TRUSTED_BOT_AVATAR,
+    queued: bool = False,
+    queue_entry_state: str | None = None,
+    labels: list[str] | None = None,
+    front_churn: str = "forbid",
+    allow_enroll: bool = False,
+) -> dict[str, Path]:
+    logs = {
+        "api": tmp_path / "api-calls",
+        "post": tmp_path / "status-posts",
+        "front_churn": tmp_path / "front-churn",
+        "enroll": tmp_path / "enroll",
+        "dequeue": tmp_path / "dequeue",
+        "jobs": tmp_path / "jobs-scans",
+    }
+    for path in logs.values():
+        path.write_text("", encoding="utf-8")
+    status_file = tmp_path / "combined-status.json"
+    status_file.write_text(
+        json.dumps({"statuses": [status]}, separators=(",", ":")),
+        encoding="utf-8",
+    )
+    run_file = tmp_path / "workflow-run.json"
+    run_file.write_text(json.dumps(run, separators=(",", ":")), encoding="utf-8")
+    identity_file = tmp_path / "bot-identity.json"
+    identity_file.write_text(
+        json.dumps(
+            {
+                "login": "jovie-bot[bot]",
+                "type": "Bot",
+                "avatar_url": avatar_url,
+            },
+            separators=(",", ":"),
+        ),
+        encoding="utf-8",
+    )
+    label_names = labels or (["merge-queue"] if queued else [])
+    label_json = json.dumps(label_names)
+    view_labels = json.dumps([{"name": name} for name in label_names])
+    queued_json = "true" if queued else "false"
+    if queued:
+        entry_state = queue_entry_state or "AWAITING_CHECKS"
+        list_state = (
+            f'{{"{pr}":{{"headRefOid":"{head}","queued":true,'
+            f'"isInMergeQueue":true,'
+            f'"mergeQueueEntry":{{"state":"{entry_state}","position":1}}}}}}'
+        )
+    else:
+        list_state = (
+            f'{{"{pr}":{{"headRefOid":"{head}","queued":false,'
+            f'"isInMergeQueue":false,"mergeQueueEntry":null}}}}'
+        )
+    if allow_enroll:
+        enroll_case = (
+            f'enroll) printf \'%s\\n\' "${{3:-}}" >>\'{logs["enroll"]}\'; '
+            f'echo \'{{"state":{{"state":"OPEN","isDraft":false,"headRefOid":"{head}",'
+            f'"mergeQueueEntry":{{"id":"MQE_{pr}","state":"AWAITING_CHECKS","position":1}}}}}}\' ;;'
+        )
+    else:
+        enroll_case = (
+            f'enroll) printf \'%s\\n\' "${{3:-}}" >>\'{logs["enroll"]}\'; '
+            'echo "null-creator fixture must not enroll" >&2; exit 91 ;;'
+        )
+    if front_churn == "allow":
+        front_churn_case = (
+            f'front-churn) printf \'front-churn\\n\' >>\'{logs["front_churn"]}\'; '
+            "echo '{\"action\":\"allow\",\"reason\":\"no classified failure\"}' ;;"
+        )
+    else:
+        front_churn_case = (
+            f'front-churn) printf \'front-churn\\n\' >>\'{logs["front_churn"]}\'; '
+            'echo "Actions history must not be required after a trusted creator:null receipt" >&2; exit 92 ;;'
+        )
+    fake_node = tmp_path / "node"
+    fake_node.write_text(
+        textwrap.dedent(
+            f"""\
+            #!/usr/bin/env bash
+            set -euo pipefail
+            case "${{2:-}}" in
+              preflight) exit 0 ;;
+              list-state) echo '{list_state}' ;;
+              explain-selector) cat >/dev/null; echo '{{"observed":true,"queued":{queued_json},"eligible":true,"reason":"eligible"}}' ;;
+              prove-receipt) echo '{{"ok":false,"state":{{"queued":false}},"explanation":{{"reason":"not-queued"}}}}' ;;
+              {enroll_case}
+              dequeue) printf 'dequeue\\n' >>'{logs["dequeue"]}'; echo '{{"state":{{"queued":false}}}}' ;;
+              max-queue-depth) echo 16 ;;
+              {front_churn_case}
+              unmergeable-eject) echo '{{"action":"keep","reason":"not-queued"}}' ;;
+              unmergeable-reenqueue)
+                if [[ "${{UNMERGEABLE_REENQUEUE_JSON:-}}" == *'"ejectReceiptHeadSha":"{head}"'* ]]; then
+                  echo '{{"action":"block","reason":"unchanged-head-eject-receipt"}}'
+                else
+                  echo '{{"action":"allow","reason":"no-eject-receipt"}}'
+                fi
+                ;;
+              changelog-collision) echo '{{"action":"allow","reason":"candidate-omits-changelog"}}' ;;
+              changelog-inventory) echo '{{"schema":"jovie-pre-land-changelog/v1","ok":true,"reason":"explicit","prs":[],"count":0}}' ;;
+              changelog-drain) echo '{{"action":"keep","reason":"omits-changelog","reenqueue":false}}' ;;
+              --classify-queue) echo '[]' ;;
+              *) echo "unexpected node args: $*" >&2; exit 93 ;;
+            esac
+            """
+        ),
+        encoding="utf-8",
+    )
+    fake_node.chmod(fake_node.stat().st_mode | stat.S_IXUSR)
+    fake_gh = tmp_path / "gh"
+    fake_gh.write_text(
+        textwrap.dedent(
+            f"""\
+            #!/usr/bin/env bash
+            set -euo pipefail
+            if [[ "$1 $2" == "pr list" ]]; then
+              echo '[{{"n":{pr},"t":"{title}","draft":false,"m":"MERGEABLE","ms":"CLEAN","head":"codex/null-creator","headOid":"{head}","base":"main","body":"","L":{label_json},"fail":[]}}]'
+              exit 0
+            fi
+            if [[ "$1 $2" == "pr checks" ]]; then
+              echo '[{{"name":"PR Ready","bucket":"pass","state":"SUCCESS"}},{{"name":"Migration Guard","bucket":"pass","state":"SUCCESS"}},{{"name":"Fork PR Gate","bucket":"pass","state":"SUCCESS"}},{{"name":"PR Size Guard","bucket":"pass","state":"SUCCESS"}}]'
+              exit 0
+            fi
+            if [[ "$1 $2" == "pr view" ]]; then
+              echo '{{"state":"OPEN","isDraft":false,"mergeable":"MERGEABLE","labels":{view_labels},"headRefOid":"{head}","baseRefName":"main","body":""}}'
+              exit 0
+            fi
+            if [[ "$1" == "api" ]]; then
+              printf '%s\\n' "$2" >>'{logs["api"]}'
+              if [[ "$2" == *"/git/ref/heads/main"* ]]; then echo '{"9" * 40}'; exit 0; fi
+              if [[ "$2" == *"/actions/workflows/ci.yml/runs"* ]]; then echo '[]'; exit 0; fi
+              if [[ "$2" == *"/commits/{head}/status"* ]]; then cat '{status_file}'; exit 0; fi
+              if [[ "$2" == "users/jovie-bot%5Bbot%5D" ]]; then cat '{identity_file}'; exit 0; fi
+              if [[ "$2" == "repos/JovieInc/Jovie/actions/runs/77" ]]; then cat '{run_file}'; exit 0; fi
+              if [[ "$2" == *"/actions/runs/"*"/jobs"* ]]; then printf '%s\\n' "$2" >>'{logs["jobs"]}'; echo '[]'; exit 0; fi
+              if [[ "$2" == *"/commits/{head}" && "$2" != *"/status"* ]]; then echo '2026-08-28T13:00:00Z'; exit 0; fi
+              if [[ " $* " == *" -X POST "* && " $* " == *"/statuses/{head} "* ]]; then
+                printf '%s\\n' "$*" >>'{logs["post"]}'
+                exit 0
+              fi
+              echo "unexpected gh api: $*" >&2
+              exit 94
+            fi
+            echo "unexpected gh args: $*" >&2
+            exit 94
+            """
+        ),
+        encoding="utf-8",
+    )
+    fake_gh.chmod(fake_gh.stat().st_mode | stat.S_IXUSR)
+    return logs
+
+
+class TestNullCreatorQueueReceiptProvenance:
+    def test_trusted_product_failure_creator_null_skips_scan_post_dequeue_and_enroll(
+        self, tmp_path: Path
+    ) -> None:
+        head = "8" * 40
+        logs = _write_null_creator_receipt_drain(
+            tmp_path,
+            pr=16068,
+            head=head,
+            title="Trusted product-failure creator null",
+            status=_null_creator_status(
+                head=head,
+                context="jovie-queue-product-failure/v1",
+                state="success",
+                description="blocked:merge-group-product-failure",
+            ),
+            run=_trusted_autoenroll_run(head=head),
+        )
+
+        result = _run_bash(
+            _drain_command(
+                tmp_path,
+                backend="native",
+                extra_env=(
+                    f"DRAIN_ADMISSION_PR=16068 DRAIN_ADMISSION_HEAD={head} "
+                    "GITHUB_RUN_ID=77 GITHUB_SERVER_URL=https://github.com "
+                    "GITHUB_API_URL=https://api.github.com"
+                ),
+            )
+        )
+
+        assert result.returncode == 0, f"stdout={result.stdout}\nstderr={result.stderr}"
+        assert "product-failure-tombstone" in result.stdout
+        assert "+jovie-queue-product-failure/v1" not in result.stdout
+        assert logs["front_churn"].read_text(encoding="utf-8") == ""
+        assert logs["jobs"].read_text(encoding="utf-8") == ""
+        assert logs["post"].read_text(encoding="utf-8") == ""
+        assert logs["enroll"].read_text(encoding="utf-8") == ""
+        assert logs["dequeue"].read_text(encoding="utf-8") == ""
+        assert "Actions history must not be required" not in result.stderr
+        assert "null-creator fixture must not enroll" not in result.stderr
+
+    def test_second_pass_over_trusted_product_failure_receipt_makes_zero_writes(
+        self, tmp_path: Path
+    ) -> None:
+        head = "8" * 40
+        logs = _write_null_creator_receipt_drain(
+            tmp_path,
+            pr=16068,
+            head=head,
+            title="Second-pass product-failure creator null",
+            status=_null_creator_status(
+                head=head,
+                context="jovie-queue-product-failure/v1",
+                state="success",
+                description="blocked:merge-group-product-failure",
+            ),
+            run=_trusted_autoenroll_run(head=head),
+        )
+        command = _drain_command(
+            tmp_path,
+            backend="native",
+            extra_env=(
+                f"DRAIN_ADMISSION_PR=16068 DRAIN_ADMISSION_HEAD={head} "
+                "GITHUB_RUN_ID=77 GITHUB_SERVER_URL=https://github.com "
+                "GITHUB_API_URL=https://api.github.com"
+            ),
+        )
+
+        first = _run_bash(command)
+        second = _run_bash(command)
+
+        assert first.returncode == 0, f"stdout={first.stdout}\nstderr={first.stderr}"
+        assert second.returncode == 0, f"stdout={second.stdout}\nstderr={second.stderr}"
+        assert logs["post"].read_text(encoding="utf-8") == ""
+        assert "+jovie-queue-product-failure/v1" not in first.stdout
+        assert "+jovie-queue-product-failure/v1" not in second.stdout
+
+    @pytest.mark.parametrize(
+        ("mutation", "label"),
+        [
+            (
+                lambda head: {
+                    "status": _null_creator_status(
+                        head=head,
+                        context="jovie-queue-product-failure/v1",
+                        state="success",
+                        description="blocked:merge-group-product-failure",
+                        avatar_url="https://avatars.githubusercontent.com/u/1?v=4",
+                    ),
+                    "run": _trusted_autoenroll_run(head=head),
+                    "avatar_url": _TRUSTED_BOT_AVATAR,
+                },
+                "avatar",
+            ),
+            (
+                lambda head: {
+                    "status": _null_creator_status(
+                        head=head,
+                        context="jovie-queue-product-failure/v1",
+                        state="success",
+                        description="blocked:merge-group-product-failure",
+                    ),
+                    "run": _trusted_autoenroll_run(
+                        head=head, workflow_name="Unrelated Workflow"
+                    ),
+                },
+                "run",
+            ),
+            (
+                lambda head: {
+                    "status": _null_creator_status(
+                        head=head,
+                        context="jovie-queue-product-failure/v1",
+                        state="success",
+                        description="blocked:merge-group-product-failure",
+                    ),
+                    "run": _trusted_autoenroll_run(
+                        head=head,
+                        workflow_path=".github/workflows/ci.yml",
+                    ),
+                },
+                "path",
+            ),
+            (
+                lambda head: {
+                    "status": _null_creator_status(
+                        head=head,
+                        context="jovie-queue-product-failure/v1",
+                        state="success",
+                        description="blocked:merge-group-product-failure",
+                    ),
+                    "run": _trusted_autoenroll_run(
+                        head=head, repository="JovieInc/NotJovie"
+                    ),
+                },
+                "repository",
+            ),
+            (
+                lambda head: {
+                    "status": _null_creator_status(
+                        head=head,
+                        context="jovie-queue-product-failure/v1",
+                        state="success",
+                        description="blocked:merge-group-product-failure",
+                    ),
+                    "run": _trusted_autoenroll_run(head=head, run_head="e" * 40),
+                },
+                "head",
+            ),
+        ],
+    )
+    def test_untrusted_product_failure_creator_null_fails_closed(
+        self,
+        tmp_path: Path,
+        mutation,
+        label: str,
+    ) -> None:
+        head = "8" * 40
+        fixture = mutation(head)
+        logs = _write_null_creator_receipt_drain(
+            tmp_path,
+            pr=16068,
+            head=head,
+            title=f"Untrusted product-failure {label}",
+            status=fixture["status"],
+            run=fixture["run"],
+            avatar_url=fixture.get("avatar_url", _TRUSTED_BOT_AVATAR),
+            front_churn="allow",
+        )
+
+        result = _run_bash(
+            _drain_command(
+                tmp_path,
+                backend="native",
+                extra_env=(
+                    f"DRY_RUN=1 DRAIN_ADMISSION_PR=16068 DRAIN_ADMISSION_HEAD={head} "
+                    "GITHUB_RUN_ID=77 GITHUB_SERVER_URL=https://github.com "
+                    "GITHUB_API_URL=https://api.github.com"
+                ),
+            )
+        )
+
+        assert result.returncode == 0, f"stdout={result.stdout}\nstderr={result.stderr}"
+        assert "product-failure-tombstone" not in result.stdout
+        assert logs["front_churn"].read_text(encoding="utf-8") == "front-churn\n"
+        assert "+jovie-queue-product-failure/v1" not in result.stdout
+
+    def test_trusted_queue_reentry_creator_null_recovers_without_duplicate_status(
+        self, tmp_path: Path
+    ) -> None:
+        head = "a" * 40
+        logs = _write_null_creator_receipt_drain(
+            tmp_path,
+            pr=1001,
+            head=head,
+            title="Trusted queue-reentry creator null",
+            status=_null_creator_status(
+                head=head,
+                context="jovie-queue-reentry/v1",
+                state="success",
+                description="Native queue admission recorded at exact head",
+            ),
+            run=_trusted_autoenroll_run(head=head),
+            front_churn="allow",
+            allow_enroll=True,
+        )
+
+        result = _run_bash(
+            _drain_command(
+                tmp_path,
+                backend="native",
+                extra_env=(
+                    "DRAIN_RECONCILE_QUEUE_REENTRY=1 "
+                    "DRAIN_QUEUE_REENTRY_MAX_PER_RUN=2 "
+                    "GITHUB_RUN_ID=77 GITHUB_SERVER_URL=https://github.com "
+                    "GITHUB_API_URL=https://api.github.com"
+                ),
+            )
+        )
+
+        assert result.returncode == 0, f"stdout={result.stdout}\nstderr={result.stderr}"
+        assert "exact native re-entry at " + head in result.stdout
+        assert logs["enroll"].read_text(encoding="utf-8").splitlines() == ["1001"]
+        assert logs["post"].read_text(encoding="utf-8") == ""
+        assert "+jovie-queue-reentry/v1" not in result.stdout
+        assert f"=jovie-queue-reentry/v1 on #1001 at {head} (already recorded)" in result.stdout
+
+    def test_trusted_unmergeable_eject_creator_null_blocks_enroll_without_rewrite(
+        self, tmp_path: Path
+    ) -> None:
+        head = "b" * 40
+        logs = _write_null_creator_receipt_drain(
+            tmp_path,
+            pr=16072,
+            head=head,
+            title="Trusted unmergeable creator null",
+            status=_null_creator_status(
+                head=head,
+                context="jovie-native-unmergeable/v1",
+                state="success",
+                description="ejected:changelog-collision",
+            ),
+            run=_trusted_autoenroll_run(head=head),
+            front_churn="allow",
+        )
+
+        result = _run_bash(
+            _drain_command(
+                tmp_path,
+                backend="native",
+                extra_env=(
+                    f"DRAIN_ADMISSION_PR=16072 DRAIN_ADMISSION_HEAD={head} "
+                    "GITHUB_RUN_ID=77 GITHUB_SERVER_URL=https://github.com "
+                    "GITHUB_API_URL=https://api.github.com"
+                ),
+            )
+        )
+
+        assert result.returncode == 3, f"stdout={result.stdout}\nstderr={result.stderr}"
+        assert "unmergeable-tombstone" in result.stdout
+        assert (
+            "queue-noop: classified-skip: exact admission #16072 at "
+            + head
+            + " (unmergeable-tombstone; native admission refused, hard gate preserved)"
+            in result.stderr
+        )
+        assert logs["enroll"].read_text(encoding="utf-8") == ""
+        assert logs["post"].read_text(encoding="utf-8") == ""
+        assert logs["dequeue"].read_text(encoding="utf-8") == ""
+        assert "+jovie-native-unmergeable/v1" not in result.stdout
+        assert "null-creator fixture must not enroll" not in result.stderr
+
+
 class TestExactHeadQueueReceipt:
     def test_pre_land_changelog_exact_target_fails_without_native_receipt(
         self, tmp_path: Path

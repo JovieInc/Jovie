@@ -1927,6 +1927,9 @@ describe('merge-group front-item churn guard (JOV-5030)', () => {
     expect(drain).toContain(
       'PRODUCT_FAILURE_CONTEXT="jovie-queue-product-failure/v1"'
     );
+    expect(drain).toContain('null_creator_receipt_has_provenance');
+    expect(drain).toContain('receipt_actor_is_trusted');
+    expect(drain).not.toContain('fleet_hold_null_creator_has_provenance');
     expect(drain).toContain('block-product');
     expect(drain).toContain('block-transient');
   });

@@ -21,6 +21,7 @@ describe('GET /llms.txt', () => {
     expect(body).toContain('https://jov.ie/llms.txt');
     expect(body).toContain('/openapi.json');
     expect(body).toContain('https://jov.ie/developers');
+    expect(body).toContain('https://jov.ie/cli');
     expect(body).toContain('/api/v1/openapi.json');
     expect(body).toContain('/api/mcp/{username}');
     expect(body).toContain('https://docs.jov.ie');

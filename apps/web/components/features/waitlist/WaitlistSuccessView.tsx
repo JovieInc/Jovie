@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect } from 'react';
+import { WAITLIST_FRONT_DOOR_CONTEXT } from '@/data/homepageFrontDoorCta';
 import { AuthLayout } from '@/features/auth';
 import { track } from '@/lib/analytics';
 import {
@@ -30,6 +31,7 @@ export function WaitlistSuccessView({
       track(ONBOARDING_FUNNEL_EVENTS.WAITLIST_CONFIRMATION_VIEWED, {
         surface: 'waitlist_receipt',
         outcome,
+        ...WAITLIST_FRONT_DOOR_CONTEXT,
       });
 
       const syntheticRunId = globalThis.sessionStorage?.getItem(
@@ -53,6 +55,8 @@ export function WaitlistSuccessView({
       formTitle='Request Access'
       showFormTitle={false}
       showFooterPrompt={false}
+      layoutVariant='stack'
+      chrome='splash-b'
     >
       <WaitlistOutcomeView outcome={outcome} onRetry={onRetry} email={email} />
     </AuthLayout>

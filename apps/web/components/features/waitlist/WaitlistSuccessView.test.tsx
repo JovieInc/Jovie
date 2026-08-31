@@ -9,8 +9,11 @@ import storyMeta, {
 
 describe('WaitlistSuccessView', () => {
   it('renders the truthful persisted-pending receipt used by /waitlist', () => {
-    render(<WaitlistSuccessView />);
+    const { container } = render(<WaitlistSuccessView />);
 
+    expect(
+      container.querySelector('[data-auth-chrome="splash-b"]')
+    ).not.toBeNull();
     expect(
       screen.getByRole('heading', { level: 1, name: "You're on the list" })
     ).toBeVisible();

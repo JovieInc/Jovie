@@ -129,6 +129,7 @@ export const RESERVED_USERNAMES = [
   'customer',
   'customers',
   'client',
+  'cli',
 
   // Music specific
   'artist',
