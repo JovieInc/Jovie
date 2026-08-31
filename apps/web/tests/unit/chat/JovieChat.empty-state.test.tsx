@@ -1,21 +1,9 @@
-import { fireEvent, screen, within } from '@testing-library/react';
+import { fireEvent, screen } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-import type { FeatureIntroCatalog } from '@/components/jovie/feature-intro-contract';
 import { JovieChat } from '@/components/jovie/JovieChat';
+import { CHAT_STARTER_CONVERSATIONS } from '@/lib/chat/new-chat-entry-contract';
 import { renderWithQueryClient } from '@/tests/utils/test-utils';
-
-const featureIntroCatalog: FeatureIntroCatalog = {
-  highlight: null,
-  whatsNewID: 'changelog:26.8.1',
-  whatsNewItems: [
-    {
-      id: '26.8.1:fixed:0',
-      text: 'Canceled sign-in stays recoverable.',
-      accent: 'accent',
-    },
-  ],
-};
 
 const mockChatState = {
   input: '',
@@ -215,12 +203,7 @@ describe('JovieChat empty state', () => {
 
   it('renders a stable docked composer with the centered welcome when no skill is featured', () => {
     const { container, getByTestId, queryByTestId, queryByText } =
-      renderWithQueryClient(
-        <JovieChat
-          profileId='profile-1'
-          featureIntroCatalog={featureIntroCatalog}
-        />
-      );
+      renderWithQueryClient(<JovieChat profileId='profile-1' />);
 
     expect(queryByTestId('chat-empty-state-top-signals')).toBeNull();
     expect(queryByTestId('chat-empty-thread-ornament')).toBeNull();
@@ -231,24 +214,15 @@ describe('JovieChat empty state', () => {
     expect(emptyViewport.className).toContain('flex-1');
     expect(emptyViewport).toHaveAttribute('data-empty-affordance', 'none');
     expect(getByTestId('chat-empty-state-composer-region')).toBeTruthy();
-    // Clean start screen (JOV-5319): one locked rotating greeting, no mark.
+    // Clean start screen: one role-neutral heading, no mark or marketing card.
     expect(getByTestId('chat-empty-state-welcome')).toBeTruthy();
     expect(queryByTestId('chat-empty-state-logo')).toBeNull();
     expect(getByTestId('chat-empty-state-greeting').textContent).toBe(
-      "Let's get it"
+      'Just ask'
     );
-    expect(queryByText("What's next?")).toBeNull();
     expect(getByTestId('chat-empty-state-centered-composer')).toBeTruthy();
-    expect(getByTestId('feature-intro-card')).toHaveAttribute(
-      'data-mode',
-      'whatsNew'
-    );
-    expect(getByTestId('feature-intro-card')).toHaveAttribute(
-      'data-source-id',
-      'changelog:26.8.1'
-    );
-    // No action cards and no featured skills: welcome + intro card + docked composer.
-    expect(queryByTestId('chat-empty-state-action-card-slot')).toBeNull();
+    expect(queryByTestId('feature-intro-card')).toBeNull();
+    expect(queryByTestId('chat-empty-state-conversation-slot')).toBeNull();
     expect(queryByTestId('chat-composer-dock')).toBeNull();
     expect(queryByTestId('chat-empty-state-soft-suggestions-slot')).toBeNull();
     expect(queryByTestId('suggested-prompts-rail')).toBeNull();
@@ -284,54 +258,34 @@ describe('JovieChat empty state', () => {
     expect(queryByText('Ask Jovie to plan your next release...')).toBeNull();
   });
 
-  it('renders the canonical starter-actions rail without the legacy card map', () => {
+  it('renders rotating conversation bubbles on the canonical composer grid', () => {
     renderWithQueryClient(
       <JovieChat
         profileId='profile-1'
-        actionCards={[
-          {
-            id: 'build-artist-profile',
-            title: 'Build Artist Profile',
-            body: 'Add Spotify, Apple Music, or YouTube Music so Jovie can plan from real releases.',
-            actionLabel: 'Build Profile',
-            prompt: 'Help me connect my music catalog.',
-          },
-          {
-            id: 'plan-release',
-            title: 'Plan a Release',
-            body: 'Map the next release.',
-            actionLabel: 'Start Planning',
-            prompt: 'Help me plan my next release.',
-          },
-          {
-            id: 'review-signals',
-            title: 'Review Signals',
-            body: 'Surface traction signals.',
-            actionLabel: 'Review Signals',
-            prompt: "What's working for me right now?",
-          },
-        ]}
+        starterConversations={CHAT_STARTER_CONVERSATIONS}
       />
     );
 
-    expect(screen.getByText('Build Artist Profile')).toBeTruthy();
-    expect(screen.getByText(/Add Spotify/)).toBeTruthy();
     expect(
-      screen.getByTestId('chat-empty-state-action-card-slot')
+      screen.getByText(CHAT_STARTER_CONVERSATIONS[0].userPrompt)
     ).toBeTruthy();
-    expect(screen.getByTestId('chat-starter-actions-rail')).toBeTruthy();
+    expect(
+      screen.getByText(CHAT_STARTER_CONVERSATIONS[0].assistantReply)
+    ).toBeTruthy();
+    expect(
+      screen.getByTestId('chat-empty-state-conversation-slot')
+    ).toHaveClass('items-start', 'pt-4', 'sm:pt-6');
+    expect(
+      screen.getByTestId('chat-starter-conversation-rail')
+    ).toHaveAttribute('data-chat-grid-anchor', 'starter');
     expect(screen.getByTestId('chat-empty-state-viewport')).toHaveAttribute(
       'data-empty-affordance',
-      'starter-actions'
+      'starter-conversations'
     );
     expect(
       screen.getByTestId('chat-empty-state-centered-composer')
     ).toBeTruthy();
-    expect(screen.getByTestId('chat-empty-state-action-card-slot')).toHaveClass(
-      'items-start',
-      'sm:items-center'
-    );
-    // Docked layout: cards scroll above, composer at bottom of usable area.
+    // Docked layout: samples scroll above, composer stays at the bottom.
     const region = screen.getByTestId('chat-empty-state-composer-region');
     expect(region.getAttribute('data-layout')).toBe('docked');
     expect(screen.getByTestId('chat-empty-state-above-scroll')).toBeTruthy();
@@ -341,22 +295,10 @@ describe('JovieChat empty state', () => {
         .getAttribute('data-dock')
     ).toBe('bottom');
     expect(screen.queryByTestId('suggested-prompts-rail')).toBeNull();
-    expect(screen.getAllByTestId('chat-action-card')).toHaveLength(1);
-    expect(
-      within(screen.getByTestId('chat-starter-actions-rail')).getByRole(
-        'button',
-        { name: 'Show More Starter Actions' }
-      )
-    ).toBeInTheDocument();
-    expect(
-      within(screen.getByTestId('chat-starter-actions-rail')).getAllByRole(
-        'button',
-        { name: /Show Starter Action/ }
-      )
-    ).toHaveLength(3);
+    expect(screen.queryByTestId('feature-intro-card')).toBeNull();
   });
 
-  it('does not resurrect dismissed primary actions as chips or recenter the composer', () => {
+  it('launches the exact visible user prompt from the selected sample', () => {
     const gtag = vi.fn();
     Object.defineProperty(globalThis.window, 'gtag', {
       configurable: true,
@@ -366,70 +308,26 @@ describe('JovieChat empty state', () => {
     renderWithQueryClient(
       <JovieChat
         profileId='profile-1'
-        isProfileComplete
-        actionCards={[
-          {
-            id: 'plan-release',
-            title: 'Plan a Release',
-            body: 'Map the next release.',
-            actionLabel: 'Start Planning',
-            prompt: 'Help me plan my next release.',
-          },
-          {
-            id: 'generate-album-art',
-            title: 'Generate Album Art',
-            body: 'Draft cover concepts.',
-            actionLabel: 'Generate Art',
-            prompt: 'Generate album art for my latest release.',
-          },
-          {
-            id: 'review-signals',
-            title: 'Review Signals',
-            body: 'Surface traction signals.',
-            actionLabel: 'Review Signals',
-            prompt: 'Help me see what is gaining traction.',
-          },
-        ]}
+        starterConversations={CHAT_STARTER_CONVERSATIONS}
       />
     );
 
-    fireEvent.click(screen.getByRole('button', { name: 'Plan a Release' }));
     fireEvent.click(
-      screen.getByRole('button', { name: 'Dismiss Plan a Release' })
-    );
-    fireEvent.click(
-      screen.getByRole('button', { name: 'Dismiss Generate Album Art' })
-    );
-    fireEvent.click(
-      screen.getByRole('button', { name: 'Dismiss Review Signals' })
+      screen.getByRole('button', {
+        name: `Start conversation: ${CHAT_STARTER_CONVERSATIONS[0].userPrompt}`,
+      })
     );
 
-    expect(screen.queryAllByTestId('chat-action-card')).toHaveLength(0);
-    expect(
-      screen.queryByTestId('chat-empty-state-action-card-slot')
-    ).toBeNull();
-    expect(
-      screen.queryByTestId('chat-empty-state-soft-suggestions-slot')
-    ).toBeNull();
-    expect(screen.getByTestId('chat-empty-state-viewport')).toHaveAttribute(
-      'data-empty-affordance',
-      'none'
-    );
-    expect(
-      screen.getByTestId('chat-empty-state-composer-region')
-    ).toHaveAttribute('data-layout', 'docked');
-    expect(screen.queryByLabelText('Plan a Release')).toBeNull();
-    expect(screen.queryByLabelText('Generate Album Art')).toBeNull();
-    expect(screen.queryByLabelText('Review Signals')).toBeNull();
-    expect(gtag).toHaveBeenCalledWith(
-      'event',
-      'chat_starter_action_selected',
-      expect.objectContaining({ action: 'plan_release', surface: 'card' })
+    expect(mockChatState.handleSuggestedPrompt).toHaveBeenCalledWith(
+      CHAT_STARTER_CONVERSATIONS[0].userPrompt
     );
     expect(gtag).toHaveBeenCalledWith(
       'event',
-      'chat_starter_action_dismissed',
-      expect.objectContaining({ action: 'review_signals', surface: 'card' })
+      'chat_starter_conversation_selected',
+      expect.objectContaining({
+        sample: CHAT_STARTER_CONVERSATIONS[0].id,
+        surface: 'conversation-bubbles',
+      })
     );
   });
 
@@ -439,20 +337,12 @@ describe('JovieChat empty state', () => {
     const { getByTestId, queryByTestId, queryByText } = renderWithQueryClient(
       <JovieChat
         profileId='profile-1'
-        actionCards={[
-          {
-            id: 'build-artist-profile',
-            title: 'Build Artist Profile',
-            body: 'Add Spotify, Apple Music, or YouTube Music so Jovie can plan from real releases.',
-            actionLabel: 'Build Profile',
-            prompt: 'Help me connect my music catalog.',
-          },
-        ]}
+        starterConversations={CHAT_STARTER_CONVERSATIONS}
       />
     );
 
     expect(getByTestId('chat-empty-state-composer-region')).toBeTruthy();
-    expect(queryByTestId('chat-empty-state-action-card-slot')).toBeNull();
+    expect(queryByTestId('chat-empty-state-conversation-slot')).toBeNull();
     expect(queryByTestId('chat-composer-dock')).toBeNull();
     expect(queryByTestId('chat-empty-state-top-signals')).toBeNull();
     // Typing gives the composer full focus: welcome + logo hide too.

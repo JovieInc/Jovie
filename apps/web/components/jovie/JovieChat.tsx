@@ -14,6 +14,10 @@ import { useOptionalChatEntityPanel } from '@/app/app/(shell)/chat/ChatEntityPan
 import { ChatThreadNavigationRail } from '@/components/features/chat/navigation-rail';
 import { track } from '@/lib/analytics';
 import { AUDIO_FILE_ACCEPT } from '@/lib/audio/constants';
+import {
+  type ChatStarterConversation,
+  validateChatStarterConversation,
+} from '@/lib/chat/new-chat-entry-contract';
 import type { OpportunityInboxCardViewModel } from '@/lib/connectors/opportunity-inbox-types';
 import { useAppFlag } from '@/lib/flags/client';
 import { usePendingOpportunityCardsQuery, usePlanGate } from '@/lib/queries';
@@ -25,9 +29,8 @@ import { ChatEmptyStateWelcome } from './components/ChatEmptyStateComposerRegion
 import { ChatEmptyStateOpportunityCards } from './components/ChatEmptyStateOpportunityCards';
 import { ChatPinnedOpportunityHeader } from './components/ChatPinnedOpportunityHeader';
 import { ChatProvidersRegistrar } from './components/ChatProvidersRegistrar';
-import { ChatStarterActionsRail } from './components/ChatStarterActionsRail';
+import { ChatStarterConversationRail } from './components/ChatStarterConversationRail';
 import { EntityResolutionProvider } from './components/EntityResolutionProvider';
-import { FeatureIntroHost } from './components/FeatureIntroCard';
 import {
   FEATURED_SKILL_SUGGESTIONS,
   SuggestedPrompts,
@@ -48,11 +51,7 @@ import {
   ChatLoadingConversationSkeleton,
   ChatThreadMessages,
 } from './JovieChatSections';
-import { CHAT_STARTER_ACTIONS } from './starter-actions';
-import type {
-  ChatActionCard as ChatActionCardModel,
-  JovieChatProps,
-} from './types';
+import type { JovieChatProps } from './types';
 
 /** Window long threads early so short-but-growing chats stay at 60fps. */
 const VIRTUALIZATION_THRESHOLD = 8;
@@ -83,8 +82,7 @@ export function JovieChat({
   isFirstSession = false,
   isProfileComplete = false,
   chatMode,
-  actionCards,
-  featureIntroCatalog,
+  starterConversations,
   ambientOwnedByShell = false,
 }: JovieChatProps) {
   const initialQuerySubmitted = useRef(false);
@@ -92,10 +90,6 @@ export function JovieChat({
   const fileInputRef = useRef<HTMLInputElement>(null);
   const audioFileInputRef = useRef<HTMLInputElement>(null);
   const [composerPickerOpen, setComposerPickerOpen] = useState(false);
-  /** Local dismiss ledger for empty-state action cards (session-scoped). */
-  const [dismissedActionCardIds, setDismissedActionCardIds] = useState<
-    ReadonlySet<ChatActionCardModel['id']>
-  >(() => new Set());
   /**
    * Pinned opportunity card for empty-thread → card-open mode
    * (GH #13177 / #13174 / JOV-3933). Declared before useJovieChat so the
@@ -138,39 +132,21 @@ export function JovieChat({
     chatMode,
   });
 
-  const visibleActionCards = useMemo(() => {
-    if (!actionCards || actionCards.length === 0) return [];
-    return actionCards.filter(card => !dismissedActionCardIds.has(card.id));
-  }, [actionCards, dismissedActionCardIds]);
   const featuredSkillSuggestionCount = FEATURED_SKILL_SUGGESTIONS.length;
 
-  // A configured primary card owns its action for the whole empty-state
-  // session, including after dismissal. Do not resurrect it as a lower-context
-  // secondary chip with a potentially conflicting capability state.
-  const promptRailExcludeActionIds = useMemo(
-    () => actionCards?.map(card => card.id) ?? [],
-    [actionCards]
-  );
-
-  const handleDismissActionCard = useCallback((card: ChatActionCardModel) => {
-    track('chat_starter_action_dismissed', {
-      action: CHAT_STARTER_ACTIONS[card.id].telemetryKey,
-      surface: 'card',
-    });
-    setDismissedActionCardIds(prev => {
-      const next = new Set(prev);
-      next.add(card.id);
-      return next;
-    });
-  }, []);
-
-  const handleActOnActionCard = useCallback(
-    (card: ChatActionCardModel) => {
-      track('chat_starter_action_selected', {
-        action: CHAT_STARTER_ACTIONS[card.id].telemetryKey,
-        surface: 'card',
+  const handleSelectStarterConversation = useCallback(
+    (sample: ChatStarterConversation) => {
+      const violations = validateChatStarterConversation({
+        sample,
+        launchedPrompt: sample.userPrompt,
       });
-      handleSuggestedPrompt(card.prompt);
+      if (violations.length > 0) return;
+
+      track('chat_starter_conversation_selected', {
+        sample: sample.id,
+        surface: 'conversation-bubbles',
+      });
+      handleSuggestedPrompt(sample.userPrompt);
     },
     [handleSuggestedPrompt]
   );
@@ -467,7 +443,7 @@ export function JovieChat({
   const deepLinkOpportunityId = searchParams.get('opportunityId');
 
   // Empty-thread opportunity cards (GH #13177): only when there is no active
-  // conversation content yet. Zero pending → restore actionCards + prompt rail
+  // conversation content yet. Zero pending → restore conversation samples + prompt rail
   // first-run scaffolding (JOV-3547) instead of a bare composer.
   // Also load when deep-linking a pin from the inbox (JOV-3933).
   const conversationExists = Boolean(
@@ -532,10 +508,11 @@ export function JovieChat({
     opportunityCardCount: showEmptyOpportunityCards
       ? pendingOpportunityCards.length
       : 0,
-    starterActionCount: visibleActionCards.length,
+    starterConversationCount: starterConversations?.length ?? 0,
     suggestionCount: featuredSkillSuggestionCount,
   });
-  const showEmptyActionCards = emptyStateAffordance === 'starter-actions';
+  const showStarterConversations =
+    emptyStateAffordance === 'starter-conversations';
   const showEmptyPromptRail = emptyStateAffordance === 'suggestion-pills';
   // Clean start screen (JOV-4878): when the stage is otherwise bare, fill the
   // scroll region above the docked composer with the centered welcome (ambient
@@ -740,10 +717,10 @@ export function JovieChat({
         />
 
         {/* Persistent scroll viewport (flex-1) + morphing upper content.
-            Empty chat docks the composer; the feature-intro card sits above
-            it. Thread state owns the message viewport and the persistent
-            bottom dock. The drop overlay is clipped to this workspace so it
-            cannot cover the header, composer, sidebar, or entity rail. */}
+            Empty chat docks the composer beneath executable conversation
+            samples. Thread state owns the message viewport and persistent dock.
+            The drop overlay is clipped to this workspace so it cannot cover
+            the header, composer, sidebar, or entity rail. */}
         <div
           ref={dropZoneRef}
           className='relative flex flex-1 flex-col overflow-hidden'
@@ -777,15 +754,14 @@ export function JovieChat({
                         cards={pendingOpportunityCards}
                         onSelect={handleSelectOpportunityCard}
                       />
-                    ) : showEmptyActionCards ? (
+                    ) : showStarterConversations ? (
                       <div
-                        className='mx-auto flex min-h-full w-full max-w-[46rem] items-start py-2 sm:items-center sm:py-3'
-                        data-testid='chat-empty-state-action-card-slot'
+                        className='flex min-h-full w-full items-start pt-4 sm:pt-6'
+                        data-testid='chat-empty-state-conversation-slot'
                       >
-                        <ChatStarterActionsRail
-                          cards={visibleActionCards}
-                          onAct={handleActOnActionCard}
-                          onDismiss={handleDismissActionCard}
+                        <ChatStarterConversationRail
+                          samples={starterConversations ?? []}
+                          onSelect={handleSelectStarterConversation}
                         />
                       </div>
                     ) : showEmptyPromptRail ? (
@@ -803,20 +779,11 @@ export function JovieChat({
                           layout='rail'
                           featuredOnly
                           dimmed={composerPickerOpen}
-                          excludeActionIds={promptRailExcludeActionIds}
                         />
                       </div>
                     ) : undefined
                   }
                 >
-                  {!composerHasIntent ? (
-                    <FeatureIntroHost
-                      catalog={featureIntroCatalog}
-                      onHighlightCTA={() => {
-                        inputRef.current?.focus();
-                      }}
-                    />
-                  ) : null}
                   {composerSurface}
                   {inlineChatError ? (
                     <div className='mt-3 w-full'>{inlineChatError}</div>

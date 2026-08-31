@@ -49,7 +49,7 @@ describe('DashboardNav interactions', () => {
     }
   });
 
-  it('keeps New Chat a compact create CTA with a larger utility-to-navigation gap', () => {
+  it('keeps New Chat a compact, available primary CTA with a larger utility-to-navigation gap', () => {
     const { container } = renderDashboardNav({
       renderFn: render,
       navChildren: <button type='button'>Search</button>,
@@ -63,8 +63,13 @@ describe('DashboardNav interactions', () => {
 
     expect(newChat).toHaveClass('w-fit', 'rounded-full');
     expect(newChat).not.toHaveClass('bg-sidebar-accent/40');
-    expect(newChat).not.toHaveClass('bg-sidebar-accent-active', 'w-full');
-    expect(newChat.querySelector('svg')).toHaveClass('text-sidebar-muted/70');
+    expect(newChat).toHaveClass('bg-sidebar-accent/70', 'text-primary-token');
+    expect(newChat).not.toHaveClass(
+      'opacity-50',
+      'cursor-not-allowed',
+      'w-full'
+    );
+    expect(newChat.querySelector('svg')).toHaveClass('text-accent-teal!');
     expect(searchSlot).toHaveClass('mt-1.5', 'mb-4', 'h-7', 'shrink-0');
     expect(screen.getAllByRole('button', { name: 'Search' })).toHaveLength(1);
     expect(

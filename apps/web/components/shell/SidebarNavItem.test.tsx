@@ -44,4 +44,17 @@ describe('SidebarNavItem active chrome', () => {
     expect(label.className).not.toContain('justify-self-start');
     expect(label.className).toContain('mask-image:linear-gradient');
   });
+
+  it('renders primary tone as an available filled action', () => {
+    const row = getSidebarNavRowClassName({ tone: 'primary' });
+    const icon = getSidebarNavIconClassName({ tone: 'primary' });
+
+    expect(row).toContain('w-fit');
+    expect(row).toContain('bg-sidebar-accent/70');
+    expect(row).toContain('text-primary-token');
+    expect(row).toContain('hover:bg-sidebar-accent-active');
+    expect(row).not.toContain('opacity-');
+    expect(row).not.toContain('cursor-not-allowed');
+    expect(icon).toContain('text-accent-teal!');
+  });
 });

@@ -3,13 +3,13 @@ import {
   CHAT_COMPOSER_ATTACH_ARIA_LABEL,
   CHAT_COMPOSER_SEND_ARIA_LABEL,
 } from '@/components/jovie/chat-composer-copy';
-import { CHAT_EMPTY_STILL_GREETING } from '@/components/jovie/chat-empty-greeting';
 import { CHAT_CONTENT_SHELL_CLASSNAME } from '@/components/jovie/chat-layout';
 import { LoadingSkeleton } from '@/components/molecules/LoadingSkeleton';
+import { CHAT_HOME_HEADING } from '@/lib/chat/new-chat-entry-contract';
 
 /**
  * Chat page loading skeleton.
- * Matches the JovieChat empty state layout: rotating-greeting slot and empty composer.
+ * Matches the JovieChat empty state layout: role-neutral heading and empty composer.
  */
 export default function ChatLoading() {
   return (
@@ -29,12 +29,15 @@ export default function ChatLoading() {
               aria-hidden='true'
               data-testid='chat-empty-state-greeting'
             >
-              {CHAT_EMPTY_STILL_GREETING}
+              {CHAT_HOME_HEADING}
             </h2>
           </div>
 
           {/* Reserve the loaded route's bottom composer allocation. */}
-          <div className={`${CHAT_CONTENT_SHELL_CLASSNAME} relative z-10`}>
+          <div
+            className={`${CHAT_CONTENT_SHELL_CLASSNAME} relative z-10`}
+            data-chat-grid-anchor='composer'
+          >
             {/* Decorative only — parent is aria-busy; hide control stubs from AT. */}
             <div className='system-b-shell-loading-composer' aria-hidden='true'>
               <div className='relative flex items-end gap-2 px-3 py-2.5'>
