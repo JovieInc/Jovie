@@ -108,8 +108,8 @@ export function buildConflictFxStatusDescription({
         .replace(/[^A-Za-z0-9_.-]/gu, '')
         .slice(0, 32) || 'unknown'
     }`,
-    `cap=${Math.max(0, Number.parseInt(cap, 10) || 0)}`,
-    `try=${Math.max(0, Number.parseInt(attempt, 10) || 0)}/${Math.max(1, Number.parseInt(maxAttempts, 10) || CONFLICT_FX_MAX_ATTEMPTS)}`,
+    `cap=${Math.max(0, Number.parseInt(String(cap), 10) || 0)}`,
+    `try=${Math.max(0, Number.parseInt(String(attempt), 10) || 0)}/${Math.max(1, Number.parseInt(String(maxAttempts), 10) || CONFLICT_FX_MAX_ATTEMPTS)}`,
     `result=${String(outcome ?? 'unknown')
       .replace(/[^a-z_]/gu, '')
       .slice(0, 20)}`,
@@ -413,10 +413,13 @@ export function computeAdaptiveConcurrency({
   recentCohorts = [],
   now = Date.now(),
 } = {}) {
-  const capacity = Math.max(0, Number.parseInt(runnerCapacity, 10) || 0);
-  const active = Math.max(0, Number.parseInt(activeCi, 10) || 0);
-  const queued = Math.max(0, Number.parseInt(queuedCi, 10) || 0);
-  const openBacklog = Math.max(0, Number.parseInt(backlog, 10) || 0);
+  const capacity = Math.max(
+    0,
+    Number.parseInt(String(runnerCapacity), 10) || 0
+  );
+  const active = Math.max(0, Number.parseInt(String(activeCi), 10) || 0);
+  const queued = Math.max(0, Number.parseInt(String(queuedCi), 10) || 0);
+  const openBacklog = Math.max(0, Number.parseInt(String(backlog), 10) || 0);
   const availableRunners = Math.max(0, capacity - active - queued);
   const saturation = capacity > 0 ? (active + queued) / capacity : 1;
   const completed = recentCohorts
@@ -1002,7 +1005,10 @@ export function buildPlan(
     recentCohorts,
     now,
   });
-  const requestedLimit = Math.max(1, Number.parseInt(maxConcurrent, 10) || 1);
+  const requestedLimit = Math.max(
+    1,
+    Number.parseInt(String(maxConcurrent), 10) || 1
+  );
   const availableRemediationSlots = Math.max(
     0,
     Math.min(adaptive.cap, requestedLimit) - currentCiInFlight

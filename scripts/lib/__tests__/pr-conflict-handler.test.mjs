@@ -88,6 +88,21 @@ function pr(overrides) {
   };
 }
 
+/**
+ * @param {{
+ *   baseOid?: string,
+ *   baseRefName?: string,
+ *   cap?: number,
+ *   attempt?: number,
+ *   maxAttempts?: number,
+ *   outcome?: string,
+ *   cohortId?: string,
+ *   createdAt?: string,
+ *   creator?: {login: string, type: string},
+ *   typename?: string,
+ *   targetUrl?: string,
+ * }} [options]
+ */
 function conflictStatus({
   baseOid = BASE,
   baseRefName = 'main',
@@ -450,7 +465,6 @@ describe('conflict mutation policy', () => {
       prNumber: 1,
       headOid: HEAD,
       baseOid: BASE,
-      baseRefName: 'main',
       conflictFiles: ['scripts/conflicted.mjs'],
       attempt: 1,
     });
