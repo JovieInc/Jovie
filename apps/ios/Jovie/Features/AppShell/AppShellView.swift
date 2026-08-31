@@ -59,11 +59,21 @@ func resolveShellInitialTab(_ initialTab: AppShellTab, chatEnabled: Bool) -> App
 }
 
 // GH-12949: the recessed drawer base plane must be fully invisible while closed.
+func appShellDrawerIsPresented(
+  isShowingDrawer: Bool,
+  drawerDragOffset: CGFloat
+) -> Bool {
+  isShowingDrawer || drawerDragOffset != 0
+}
+
 func appShellDrawerBasePlaneOpacity(
   isShowingDrawer: Bool,
   drawerDragOffset: CGFloat
 ) -> Double {
-  (isShowingDrawer || drawerDragOffset != 0) ? 1 : 0
+  appShellDrawerIsPresented(
+    isShowingDrawer: isShowingDrawer,
+    drawerDragOffset: drawerDragOffset
+  ) ? 1 : 0
 }
 
 // File-level so unit tests can assert the shipped keep-mounted policy.
@@ -270,12 +280,15 @@ struct AppShellView<
     NavigationStack {
       GeometryReader { proxy in
         let openOffset = drawerOpenOffset(safeAreaLeading: proxy.safeAreaInsets.leading)
-        let isDrawerBasePlaneVisible = isShowingDrawer || drawerDragOffset != 0
+        let isDrawerPresented = appShellDrawerIsPresented(
+          isShowingDrawer: isShowingDrawer,
+          drawerDragOffset: drawerDragOffset
+        )
 
         // Layer stack (bottom → top): drawer rail → home → right rail → overlays.
         ZStack(alignment: .leading) {
           AppShellLeftDrawer(
-            isPresented: isShowingDrawer,
+            isPresented: isDrawerPresented,
             profile: profile,
             chatEnabled: chatEnabled,
             audienceEnabled: audienceEnabled,
@@ -319,7 +332,7 @@ struct AppShellView<
           )
           .animation(drawerAnimation, value: isShowingDrawer)
           .animation(reduceMotion ? nil : drawerAnimation, value: drawerDragOffset)
-          .accessibilityHidden(!isDrawerBasePlaneVisible)
+          .accessibilityHidden(!isDrawerPresented)
 
           shellContent
             .frame(maxWidth: .infinity, maxHeight: .infinity)

@@ -257,6 +257,21 @@ struct AppShellChatFirstTests {
     #expect(source.contains("followTrailingRailDrag(translationX:"))
   }
 
+  @Test func drawerRowsRevealDuringInteractiveLeadingDrag() throws {
+    #expect(appShellDrawerIsPresented(isShowingDrawer: false, drawerDragOffset: 32))
+    #expect(appShellDrawerIsPresented(isShowingDrawer: true, drawerDragOffset: 0))
+    #expect(appShellDrawerIsPresented(isShowingDrawer: false, drawerDragOffset: 0) == false)
+
+    let sourceURL = URL(fileURLWithPath: #filePath)
+      .deletingLastPathComponent()
+      .deletingLastPathComponent()
+      .appendingPathComponent("Jovie/Features/AppShell/AppShellView.swift")
+    let source = try String(contentsOf: sourceURL, encoding: .utf8)
+    #expect(source.contains("let isDrawerPresented = appShellDrawerIsPresented("))
+    #expect(source.contains("isPresented: isDrawerPresented"))
+    #expect(!source.contains("isPresented: isShowingDrawer"))
+  }
+
   @Test func merchHorizontalScrollSuppressesShellRailSwipe() throws {
     let sourceURL = URL(fileURLWithPath: #filePath)
       .deletingLastPathComponent()
