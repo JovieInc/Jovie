@@ -99,7 +99,7 @@ describe('InfoBox semantic color ownership', () => {
     const container = getRootFromTitle('Information');
     expect(screen.getByText('Information')).toBeInTheDocument();
     expect(screen.getByText('Test content')).toBeInTheDocument();
-    expect(container).toHaveAttribute('role', 'status');
+    expect(container).not.toHaveAttribute('role');
     expect(container).toHaveAttribute('aria-live', 'polite');
     expect(container).toHaveAttribute('data-presentation', 'box');
     expect(container).toHaveClass(
@@ -146,10 +146,11 @@ describe('InfoBox semantic color ownership', () => {
         ...INFOBOX_CONTENT_GEOMETRY_CLASS.split(' '),
         INFOBOX_SEMANTIC_FOREGROUND[variant]
       );
-      expect(container).toHaveAttribute(
-        'role',
-        variant === 'error' ? 'alert' : 'status'
-      );
+      if (variant === 'error') {
+        expect(container).toHaveAttribute('role', 'alert');
+      } else {
+        expect(container).not.toHaveAttribute('role');
+      }
       expect(container).toHaveAttribute(
         'aria-live',
         variant === 'error' ? 'assertive' : 'polite'
@@ -196,7 +197,7 @@ describe('InfoBox semantic color ownership', () => {
     );
 
     const successNotice = screen.getByTestId('inline-notice');
-    expect(successNotice).toHaveAttribute('role', 'status');
+    expect(successNotice).not.toHaveAttribute('role');
     expect(successNotice).toHaveAttribute('aria-live', 'polite');
     expect(successNotice).toHaveClass(
       ...INFOBOX_INLINE_GEOMETRY_CLASS.split(' '),

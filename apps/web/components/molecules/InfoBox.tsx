@@ -34,11 +34,12 @@ export function InfoBox({
   const semanticSurfaceClassName = isInline
     ? INFOBOX_INLINE_SEMANTIC_SURFACE[variant]
     : INFOBOX_SEMANTIC_SURFACE[variant];
+  const isError = variant === 'error';
 
   return (
     <div
-      role={variant === 'error' ? 'alert' : 'status'}
-      aria-live={variant === 'error' ? 'assertive' : 'polite'}
+      role={isError ? 'alert' : undefined}
+      aria-live={isError ? 'assertive' : 'polite'}
       data-presentation={presentation}
       data-testid={testId}
       data-variant={variant}
