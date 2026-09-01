@@ -21,17 +21,8 @@ function armFactoryWrite(turn: EvePilotBoundTurn): EvePilotBoundTurn {
 }
 
 describe('eve identity instruction packs', () => {
-  it('keeps the initial Summer governor inexpensive and session-bounded', () => {
-    expect(eveAgent).toMatchObject({
-      model: 'zai/glm-5.3-flash',
-      modelContextWindowTokens: 1_000_000,
-      reasoning: 'minimal',
-      limits: {
-        maxInputTokensPerSession: 30_000,
-        maxOutputTokensPerSession: 6_000,
-        sessionTimeoutMs: 86_400_000,
-      },
-    });
+  it('keeps the shared Jovie and Ovie agent model unchanged', () => {
+    expect(eveAgent).toEqual({ model: 'openai/gpt-5.4-mini' });
   });
 
   it('denies Jovie privileged gbrain write and Symphony heal at the Eve entry', () => {
@@ -112,10 +103,13 @@ describe('eve identity instruction packs', () => {
     }
   });
 
-  it('keeps Photon on Ovie even when a Summer runtime default is configured', () => {
+  it('refuses a Summer runtime default outside the explicit shadow route', () => {
     const previous = process.env.EVE_IDENTITY;
     process.env.EVE_IDENTITY = 'summer';
-    expect(eveIdentityForRuntime().pack.id).toBe('summer');
+    expect(eveIdentityForRuntime().pack.id).toBe('jovie');
+    expect(eveIdentityForChannel('jovie-core-chat').pack.id).toBe('jovie');
+    expect(eveIdentityForChannel('unknown-source').pack.id).toBe('jovie');
+    expect(eveIdentityForChannel('ovie-summer-shadow').pack.id).toBe('summer');
     expect(eveIdentityForChannel('photon').pack.id).toBe('ovie');
     if (previous === undefined) {
       delete process.env.EVE_IDENTITY;

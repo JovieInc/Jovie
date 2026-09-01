@@ -126,11 +126,10 @@ export type EvePilotChannelSource =
   | string;
 
 /**
- * Telegram and iMessage are always the Ovie founder pack. Other sources
- * follow EVE_IDENTITY (default Jovie) so the artist runtime cannot inherit
- * founder mail. The explicit Summer shadow source is the only channel path
- * allowed to bind Summer during the reversible Vercel pilot; Photon remains
- * Ovie until a separately proven cutover.
+ * Telegram and iMessage are always the Ovie founder pack. Other sources may
+ * use the Ovie runtime default, but Summer is bound only by its explicit
+ * shadow source during the reversible Vercel pilot. Photon remains Ovie until
+ * a separately proven cutover.
  */
 export function eveIdentityIdForChannel(
   source?: EvePilotChannelSource
@@ -140,7 +139,6 @@ export function eveIdentityIdForChannel(
   }
   if (source === 'ovie-summer-shadow') return 'summer';
   if (process.env.EVE_IDENTITY === 'ovie') return 'ovie';
-  if (process.env.EVE_IDENTITY === 'summer') return 'summer';
   return 'jovie';
 }
 
