@@ -1,6 +1,6 @@
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { SettingsPaymentsSection } from '@/features/dashboard/organisms/SettingsPaymentsSection';
+import { SettingsPaymentsSection } from '@/components/features/dashboard/organisms/SettingsPaymentsSection';
 
 const fetchMock = vi.fn();
 
