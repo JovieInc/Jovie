@@ -427,6 +427,51 @@ describe('delivery state machine', () => {
     }
   });
 
+  it('keeps legacy closure health without repair actions bounded and unobserved', async () => {
+    const fallback = await persistClosureHealthActions(
+      {
+        schema: 'jovie-fleet-gate/v1',
+        signals: {
+          closureHealth: {
+            schema: 'jovie-closure-health/v1',
+            authority: 'Summer',
+            status: 'red',
+            observedAt: '2026-09-01T02:20:00.000Z',
+            newIssueIntakeAllowed: false,
+            promotionContinues: true,
+            remediationContinues: true,
+            reasons: ['gate-evaluation-failed'],
+          },
+        },
+      },
+      { dryRun: true }
+    );
+    assert.equal(fallback.actionCount, 0);
+    assert.equal(fallback.evidenceCount, 0);
+    assert.equal(fallback.resolution.status, 'unobserved');
+
+    const activeViolation = await persistClosureHealthActions(
+      {
+        schema: 'jovie-closure-health/v1',
+        authority: 'Summer',
+        status: 'red',
+        observedAt: '2026-09-01T02:25:00.000Z',
+        newIssueIntakeAllowed: false,
+        promotionContinues: true,
+        remediationContinues: true,
+        reasons: ['draft-stack-policy-violation'],
+        stackHealth: {
+          violations: [{ rootPr: 16514 }],
+        },
+      },
+      { dryRun: true }
+    );
+    assert.equal(activeViolation.actionCount, 0);
+    assert.equal(activeViolation.evidenceCount, 1);
+    assert.equal(activeViolation.evidence[0].rootPr, 16514);
+    assert.equal(activeViolation.evidence[0].loop.mode, 'collect-evidence');
+  });
+
   it('writes handed-off repair work as one exact-head Gem-to-FX task', async () => {
     const directory = await mkdtemp(join(tmpdir(), 'jovie-delivery-fx-'));
     try {

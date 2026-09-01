@@ -1975,7 +1975,7 @@ printf 'https://jovie-argv-contract-jovie.vercel.app\\n'
     expect(verified).toContain(
       'exact production bind will be proven before marker preservation'
     );
-    expect(verified).not.toContain(
+    expect(verified).toContain(
       'node .github/scripts/assert-live-production-bind.mjs'
     );
     expect(verified).not.toContain('neutral with no notification');
@@ -4183,7 +4183,7 @@ describe('production promotion exact-artifact contract', () => {
     expect(verified).toContain(
       'exact production bind will be proven before marker preservation'
     );
-    expect(verified).not.toContain(
+    expect(verified).toContain(
       'node .github/scripts/assert-live-production-bind.mjs'
     );
     expect(verified).not.toContain('neutral with no notification');
@@ -4233,7 +4233,7 @@ describe('production promotion exact-artifact contract', () => {
     expect(current).toContain(
       'exact production bind will be proven before marker preservation'
     );
-    expect(current).not.toContain(
+    expect(current).toContain(
       'assert-live-production-bind.mjs --main-sha "$current_sha"'
     );
     expect(verified).toContain(
