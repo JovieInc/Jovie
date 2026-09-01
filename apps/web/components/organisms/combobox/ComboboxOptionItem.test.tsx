@@ -50,25 +50,28 @@ vi.mock('@headlessui/react', () => ({
 }));
 
 describe('ComboboxOptionItem', () => {
-  it('uses shared option tokens for focus state without selected indicators', () => {
-    optionState.current = { focus: true, selected: false };
+  it(
+    'uses shared option tokens for focus state without selected indicators',
+    () => {
+      optionState.current = { focus: true, selected: false };
 
-    render(
-      <ComboboxOptionItem
-        option={{ id: 'one', name: 'First Artist' }}
-        index={0}
-      />
-    );
+      render(
+        <ComboboxOptionItem
+          option={{ id: 'one', name: 'First Artist' }}
+          index={0}
+        />
+      );
 
-    const option = screen.getByRole('option', { name: 'First Artist' });
-    expect(option.className).toContain('bg-surface-1');
-    expect(option.className).toContain('text-primary-token');
-    expect(option.className).not.toContain(legacyBgAccentClass);
-    expect(option.className).not.toContain(legacyTextAccentForegroundClass);
-    expect(
-      screen.queryByTestId('combobox-option-selected-indicator')
-    ).not.toBeInTheDocument();
-  });
+      const option = screen.getByRole('option', { name: 'First Artist' });
+      expect(option.className).toContain('bg-surface-1');
+      expect(option.className).toContain('text-primary-token');
+      expect(option.className).not.toContain(legacyBgAccentClass);
+      expect(option.className).not.toContain(legacyTextAccentForegroundClass);
+      expect(
+        screen.queryByTestId('combobox-option-selected-indicator')
+      ).not.toBeInTheDocument();
+    }
+  );
 
   it('shows the selected check only for selected options', () => {
     optionState.current = { focus: false, selected: true };
