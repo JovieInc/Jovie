@@ -402,7 +402,24 @@ class UltrawideHudTests(unittest.TestCase):
             "generated_at": "2026-08-31T11:58:00Z",
             "cpu": {"status": "failure", "signal_pct": 131, "load1": 49.0, "cores": 16, "psi": 74},
             "memory": {"status": "healthy", "available_pct": 62, "psi": 1},
-            "io": {"status": "warning", "used_pct": 91, "available_pct": 9, "psi": 12, "full": 1},
+            "disk": {
+                "status": "warning",
+                "state": "fresh",
+                "available_pct": 9,
+                "used_pct": 91,
+                "source": "shutil.disk_usage('/')",
+                "unit": "capacity percent",
+                "sampled_at": "2026-08-31T11:58:00Z",
+            },
+            "io": {
+                "status": "warning",
+                "state": "fresh",
+                "some_avg10_pct": 24,
+                "full_avg10_pct": 12,
+                "source": "/proc/pressure/io",
+                "unit": "stall percent over 10s",
+                "sampled_at": "2026-08-31T11:58:00Z",
+            },
             "network": {"status": "unknown", "util_pct": None, "mbps": None, "speed_mbps": 1000},
             "slots": {"status": "warning", "util_pct": 80, "running": 32, "cap": 40},
         }
@@ -420,10 +437,242 @@ class UltrawideHudTests(unittest.TestCase):
         }
         output = paint(width=430, height=90, pr_flow=matrix, system_pressure=pressure)
         plain = strip(output)
-        for token in ("SYSTEM PRESSURE", "CPU / LOAD", "131%", "MEMORY", "62% available", "DISK / I/O", "9% available", "NETWORK", "rate window pending", "WORKER SLOTS", "32/40", "CI MATRIX", "cached GitHub rollup", "8/103 rows", "412ms", "✓ PASS", "… RUN", "? UNKNOWN", "× FAIL"):
+        for token in ("SYSTEM PRESSURE", "CPU / LOAD", "131%", "MEMORY", "62% available", "ROOT DISK FREE", "9% free", "I/O FULL PSI", "12% full", "NETWORK", "rate window pending", "WORKER SLOTS", "32/40", "CI MATRIX", "cached GitHub rollup", "8/103 rows", "412ms", "✓ PASS", "… RUN", "? UNKNOWN", "× FAIL"):
             self.assertIn(token, plain)
+        self.assertNotIn("DISK / I/O", plain)
         self.assertNotIn("#9 Work 9", plain)
         self.assertIn("\033[38;2;255;72;210m131%", output)
+
+    def test_disk_capacity_and_io_pressure_are_separate_source_metrics(self):
+        psi_samples = (
+            {"some": 2.0, "full": None, "error": None},
+            {"some": 1.0, "full": 0.0, "error": None},
+            {"some": 24.0, "full": 12.0, "error": None},
+        )
+        disk_usage = mock.Mock(total=100, used=77, free=23)
+        with (
+            mock.patch.object(HUD.os, "cpu_count", return_value=16),
+            mock.patch.object(HUD.os, "getloadavg", return_value=(8.0, 0.0, 0.0)),
+            mock.patch.object(HUD, "_psi", side_effect=psi_samples),
+            mock.patch.object(HUD.shutil, "disk_usage", return_value=disk_usage),
+            mock.patch.object(HUD.Path, "read_text", return_value="MemTotal: 100 kB\nMemAvailable: 50 kB\n"),
+            mock.patch.object(HUD, "_net_sample", return_value=None),
+            mock.patch.object(HUD, "load_json_dict", return_value={}),
+        ):
+            pressure = HUD.fetch_system_pressure(
+                {"running": 1, "cap": 4},
+                state_path=ROOT / ".tmp-system-pressure.json",
+                now=NOW,
+            )
+
+        disk = pressure["disk"]
+        io = pressure["io"]
+        self.assertEqual(disk["available_pct"], 23)
+        self.assertEqual(disk["status"], "healthy")
+        self.assertEqual(disk["source"], "shutil.disk_usage('/')")
+        self.assertEqual(disk["unit"], "capacity percent")
+        self.assertEqual(disk["state"], "fresh")
+        self.assertEqual(io["some_avg10_pct"], 24)
+        self.assertEqual(io["full_avg10_pct"], 12)
+        self.assertEqual(io["status"], "warning")
+        self.assertEqual(io["source"], "/proc/pressure/io")
+        self.assertEqual(io["unit"], "stall percent over 10s")
+        self.assertEqual(io["state"], "fresh")
+        self.assertNotIn("available_pct", io)
+        self.assertNotIn("used_pct", io)
+
+        plain = strip(paint(width=430, height=90, system_pressure=pressure))
+        lines = plain.splitlines()
+        label_index = next(index for index, line in enumerate(lines) if "ROOT DISK FREE" in line and "I/O FULL PSI" in line)
+        labels, values = lines[label_index], lines[label_index + 1]
+        disk_column = labels.index("ROOT DISK FREE")
+        io_column = labels.index("I/O FULL PSI")
+        network_column = labels.index("NETWORK")
+        self.assertIn("23% free", values[disk_column:io_column])
+        self.assertNotIn("23%", values[io_column:network_column])
+        self.assertIn("12% full", values[io_column:network_column])
+
+    def test_disk_and_io_render_unknown_stale_and_error_without_invented_numbers(self):
+        base = {
+            "ok": True,
+            "generated_at": "2026-08-31T11:58:00Z",
+            "cpu": {},
+            "memory": {},
+            "network": {},
+            "slots": {},
+        }
+        unknown = strip(
+            paint(
+                width=430,
+                height=90,
+                system_pressure={
+                    **base,
+                    "disk": {"status": "unknown", "state": "unknown", "available_pct": None, "used_pct": None, "source": "shutil.disk_usage('/')", "unit": "capacity percent", "sampled_at": None},
+                    "io": {"status": "unknown", "state": "unknown", "some_avg10_pct": None, "full_avg10_pct": None, "source": "/proc/pressure/io", "unit": "stall percent over 10s", "sampled_at": None},
+                },
+            )
+        )
+        self.assertGreaterEqual(unknown.count("UNKNOWN"), 2)
+        self.assertNotIn("0% free", unknown)
+        self.assertNotIn("0% some", unknown)
+
+        stale = strip(
+            paint(
+                width=430,
+                height=90,
+                system_pressure={
+                    **base,
+                    "stale": True,
+                    "disk": {"status": "healthy", "state": "fresh", "available_pct": 23, "used_pct": 77, "source": "shutil.disk_usage('/')", "unit": "capacity percent", "sampled_at": "2026-08-31T11:58:00Z"},
+                    "io": {"status": "warning", "state": "fresh", "some_avg10_pct": 24, "full_avg10_pct": 12, "source": "/proc/pressure/io", "unit": "stall percent over 10s", "sampled_at": "2026-08-31T11:58:00Z"},
+                },
+            )
+        )
+        self.assertIn("STALE · 23% free", stale)
+        self.assertIn("STALE · 12% full", stale)
+
+        errored = strip(
+            paint(
+                width=430,
+                height=90,
+                system_pressure={
+                    **base,
+                    "disk": {"status": "unknown", "state": "error", "available_pct": None, "used_pct": None, "source": "shutil.disk_usage('/')", "unit": "capacity percent", "sampled_at": None, "error": "unavailable"},
+                    "io": {"status": "unknown", "state": "error", "some_avg10_pct": None, "full_avg10_pct": None, "source": "/proc/pressure/io", "unit": "stall percent over 10s", "sampled_at": None, "error": "unavailable"},
+                },
+            )
+        )
+        self.assertGreaterEqual(errored.count("ERROR"), 2)
+        self.assertNotIn("0% free", errored)
+        self.assertNotIn("0% full", errored)
+
+    def test_pressure_collection_reports_source_errors_instead_of_false_healthy(self):
+        with mock.patch.object(HUD.Path, "read_text", return_value="some avg10=4.00 avg60=1.00 total=1\nfull avg10=2.00 avg60=1.00 total=1\n"):
+            self.assertEqual(HUD._psi(HUD.Path("/proc/pressure/io")), {"some": 4.0, "full": 2.0, "error": None})
+        with mock.patch.object(HUD.Path, "read_text", side_effect=OSError("unavailable")):
+            self.assertEqual(HUD._psi(HUD.Path("/proc/pressure/io")), {"some": None, "full": None, "error": "unavailable"})
+
+        with (
+            mock.patch.object(HUD.os, "cpu_count", return_value=16),
+            mock.patch.object(HUD.os, "getloadavg", return_value=(8.0, 0.0, 0.0)),
+            mock.patch.object(
+                HUD,
+                "_psi",
+                side_effect=(
+                    {"some": 2.0, "full": None, "error": None},
+                    {"some": 1.0, "full": 0.0, "error": None},
+                    {"some": 4.0, "full": 2.0, "error": None},
+                ),
+            ),
+            mock.patch.object(HUD.shutil, "disk_usage", side_effect=OSError("unavailable")),
+            mock.patch.object(HUD.Path, "read_text", side_effect=OSError("unavailable")),
+            mock.patch.object(HUD, "_net_sample", return_value=None),
+            mock.patch.object(HUD, "load_json_dict", return_value={}),
+        ):
+            pressure = HUD.fetch_system_pressure(
+                {"running": 1, "cap": 4},
+                state_path=ROOT / ".tmp-system-pressure.json",
+                now=NOW,
+            )
+
+        self.assertEqual(pressure["disk"]["state"], "error")
+        self.assertEqual(pressure["disk"]["error"], "unavailable")
+        self.assertEqual(pressure["memory"]["state"], "error")
+        self.assertEqual(pressure["memory"]["error"], "unavailable")
+        plain = strip(paint(width=430, height=90, system_pressure=pressure))
+        self.assertGreaterEqual(plain.count("ERROR"), 2)
+        self.assertNotIn("0% free", plain)
+
+    def test_each_health_metric_has_sourced_exact_normal_amber_red_boundaries(self):
+        cases = (
+            ("cpu", HUD.cpu_health_status, ((74.99, "healthy"), (75, "warning"), (124.99, "warning"), (125, "failure"), (None, "unknown"))),
+            ("disk", HUD.disk_health_status, ((15, "healthy"), (14.99, "warning"), (5, "warning"), (4.99, "failure"), (None, "unknown"))),
+            ("io", HUD.io_health_status, ((10, "healthy"), (10.01, "warning"), (19.99, "warning"), (20, "failure"), (None, "unknown"))),
+            ("network", HUD.network_health_status, ((59.99, "healthy"), (60, "warning"), (84.99, "warning"), (85, "failure"), (None, "unknown"))),
+            ("worker slots", HUD.worker_slot_health_status, ((74.99, "healthy"), (75, "warning"), (94.99, "warning"), (95, "failure"), (None, "unknown"))),
+        )
+        for metric, classifier, boundaries in cases:
+            for value, expected in boundaries:
+                with self.subTest(metric=metric, value=value):
+                    self.assertEqual(classifier(value), expected)
+
+        memory_cases = (
+            (20, 9.99, "healthy"),
+            (19.99, 9.99, "warning"),
+            (10, 10, "warning"),
+            (9.99, 0, "failure"),
+            (50, 30, "failure"),
+            (None, None, "unknown"),
+        )
+        for available_pct, psi_pct, expected in memory_cases:
+            with self.subTest(metric="memory", available_pct=available_pct, psi_pct=psi_pct):
+                self.assertEqual(HUD.memory_health_status(available_pct, psi_pct), expected)
+
+    def test_legitimate_healthy_pressure_has_visible_text_cues_and_metric_contracts(self):
+        sampled_at = "2026-08-31T12:00:00Z"
+        pressure = {
+            "ok": True,
+            "generated_at": sampled_at,
+            "cpu": {"status": "healthy", "state": "fresh", "signal_pct": 50, "load1": 8, "cores": 16, "psi": 2, "source": "getloadavg + /proc/pressure/cpu", "unit": "load/PSI percent", "sampled_at": sampled_at},
+            "memory": {"status": "healthy", "state": "fresh", "available_pct": 50, "psi": 2, "source": "/proc/meminfo + /proc/pressure/memory", "unit": "free/PSI percent", "sampled_at": sampled_at},
+            "disk": {"status": "healthy", "state": "fresh", "available_pct": 23, "used_pct": 77, "source": "shutil.disk_usage('/')", "unit": "capacity percent", "sampled_at": sampled_at},
+            "io": {"status": "healthy", "state": "fresh", "some_avg10_pct": 8, "full_avg10_pct": 4, "source": "/proc/pressure/io", "unit": "stall percent over 10s", "sampled_at": sampled_at},
+            "network": {"status": "healthy", "state": "fresh", "util_pct": 20, "mbps": 200, "speed_mbps": 1000, "source": "/proc/net/dev + /sys/class/net", "unit": "Mbps/link percent", "sampled_at": sampled_at},
+            "slots": {"status": "healthy", "state": "fresh", "util_pct": 50, "running": 2, "cap": 4, "source": "Symphony state", "unit": "agents/capacity percent", "sampled_at": sampled_at},
+        }
+        plain = strip(paint(width=430, height=90, system_pressure=pressure))
+        self.assertEqual(plain.count("✓ NORMAL"), 6)
+        self.assertNotIn("× RED", plain)
+        self.assertNotIn("! AMBER", plain)
+        for metric in ("cpu", "memory", "disk", "io", "network", "slots"):
+            with self.subTest(metric=metric):
+                self.assertTrue(pressure[metric]["source"])
+                self.assertTrue(pressure[metric]["unit"])
+                self.assertEqual(pressure[metric]["sampled_at"], sampled_at)
+
+    def test_queue_age_reaches_same_class_fresh_p95_is_red_at_exact_boundary(self):
+        durations = [float(minutes * 60) for minutes in range(1, 21)]
+        stage = HUD.stage_from_source(
+            "mq",
+            "merge queue",
+            ok=True,
+            count=1,
+            durations=durations,
+            sampled_at=NOW.isoformat(),
+            stale=False,
+        )
+        self.assertEqual(stage["sample_count"], 20)
+        self.assertEqual(stage["p95"], 19 * 60)
+        at_boundary = HUD.queue_age_health(
+            {"kind": "mq", "enqueued": (NOW - dt.timedelta(minutes=19)).isoformat()},
+            stage,
+            now=NOW,
+        )
+        self.assertEqual(at_boundary["status"], "failure")
+        self.assertEqual(at_boundary["state"], "fresh")
+        self.assertIn("× RED", at_boundary["label"])
+
+        below = HUD.queue_age_health(
+            {"kind": "mq", "enqueued": (NOW - dt.timedelta(minutes=18, seconds=59)).isoformat()},
+            stage,
+            now=NOW,
+        )
+        self.assertEqual(below["status"], "healthy")
+        self.assertIn("✓ NORMAL", below["label"])
+
+    def test_queue_age_is_unknown_when_baseline_is_insufficient_stale_or_wrong_class(self):
+        row = {"kind": "mq", "enqueued": (NOW - dt.timedelta(hours=1)).isoformat()}
+        insufficient = HUD.stage_from_source("mq", "merge queue", ok=True, count=1, durations=[60.0] * 19, sampled_at=NOW.isoformat(), stale=False)
+        stale = HUD.stage_from_source("mq", "merge queue", ok=True, count=1, durations=[60.0] * 20, sampled_at=(NOW - dt.timedelta(seconds=301)).isoformat(), stale=False)
+        fresh_at_boundary = HUD.stage_from_source("mq", "merge queue", ok=True, count=1, durations=[60.0] * 20, sampled_at=(NOW - dt.timedelta(seconds=300)).isoformat(), stale=False)
+        wrong_class = HUD.stage_from_source("ci_fast", "ci-fast", ok=True, count=1, durations=[60.0] * 20, sampled_at=NOW.isoformat(), stale=False)
+
+        self.assertEqual(HUD.queue_age_health(row, insufficient, now=NOW)["state"], "unknown")
+        self.assertEqual(HUD.queue_age_health(row, stale, now=NOW)["state"], "stale")
+        self.assertEqual(HUD.queue_age_health(row, wrong_class, now=NOW)["state"], "unknown")
+        self.assertEqual(HUD.queue_age_health(row, fresh_at_boundary, now=NOW)["status"], "failure")
+        self.assertIn("? UNMEASURED", HUD.queue_age_health(row, insufficient, now=NOW)["label"])
+        self.assertIn("? STALE", HUD.queue_age_health(row, stale, now=NOW)["label"])
 
     def test_github_flow_is_one_server_aggregate_and_absent_checks_are_unknown(self):
         payload = {

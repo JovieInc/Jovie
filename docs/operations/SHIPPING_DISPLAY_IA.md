@@ -14,9 +14,9 @@ authorize a second meaning for any field.
 | Token throughput | Throughput | Token rate | Measurement window or unavailable state |
 | Remediation failure | Failures | Count plus inspectable list | Issue ID, attempt, error, retry timing |
 | Token use | Tokens | Total scalar | Per-work-item token count in current work |
-| Merge queue | Queue | Count | Pull-request identity and queue age where space permits |
+| Merge queue | Queue | Count | Pull-request identity and queue age with a same-class p95 cue where space permits |
 | Pull-request flow | PR flow | Open now plus opened and merged in the rolling prior 24 hours | GitHub freshness and collection cost |
-| System pressure | System pressure | Thresholded CPU/load, memory, I/O, network, and worker-slot projection | Source freshness and explicit healthy, constrained, failure, or unknown state |
+| System pressure | System pressure | Thresholded CPU/load, memory, root-disk capacity, I/O, network, and worker-slot projection | Per-metric source, unit, freshness, and explicit normal, amber, red, stale, error, or unknown state |
 | CI state | CI matrix | Bounded work-item rows by meaningful check-group columns | Cached server-side aggregate freshness, query cost, and drill-down authority |
 | Shipping latency | Ship | Segmented stage bar | Count and p95 for each measured stage |
 | Active execution | Current work | Receipt table or semantically equivalent list | Issue ID, title/state, tokens, elapsed time |
@@ -48,16 +48,19 @@ authorize a second meaning for any field.
 
 ## Pressure thresholds
 
-The Gem collector evaluates sources independently, then renders the worst
-relevant status. A single process is never treated as host health.
+The Gem collector evaluates sources independently. Disk capacity and I/O stall
+pressure are separate metrics and never share a status. A single process is
+never treated as host health. Each value carries its source, unit, sample time,
+and a text or glyph cue in addition to color.
 
-| Signal | Healthy | Constrained | Failure |
-|---|---:|---:|---:|
-| CPU | max(load per core, CPU PSI some avg10) < 75% | 75–124% | >= 125% |
-| Memory | available >= 20% and PSI some avg10 < 10% | available 10–19% or PSI 10–29% | available < 10% or PSI >= 30% |
-| Disk / I/O | available >= 15% and PSI avg10 < 10% | available 5–14% or PSI 10–29% | available < 5% or PSI >= 30% |
-| Network | measured link utilization < 60% | 60–84% | >= 85% |
-| Worker slots | active/configured < 75% | 75–94% | >= 95% |
+| Signal | Source and unit | Normal | Amber | Red | Unknown / stale |
+|---|---|---:|---:|---:|---|
+| CPU | `getloadavg` plus `/proc/pressure/cpu`; load/PSI percent | max(load per core, CPU PSI some avg10) < 75% | 75–124% | >= 125% | Neither source measured, or the source errored |
+| Memory | `/proc/meminfo` plus `/proc/pressure/memory`; available/PSI percent | available >= 20% and PSI some avg10 < 10% | available 10–19% or PSI 10–29% | available < 10% or PSI >= 30% | Neither source measured, or the source errored |
+| Root disk capacity | `shutil.disk_usage('/')`; capacity percent | available >= 15% | available 5–14% | available < 5% | Capacity unavailable or source errored |
+| I/O pressure | `/proc/pressure/io`; full avg10 stall percent | full avg10 <= 10% | full avg10 > 10% and < 20% | full avg10 >= 20% | Full PSI unavailable or source errored; some PSI remains informational |
+| Network | `/proc/net/dev` plus `/sys/class/net`; Mbps/link percent | measured link utilization < 60% | 60–84% | >= 85% | Fewer than two bounded samples or link speed unavailable |
+| Worker slots | Symphony state; active/configured percent | < 75% | 75–94% | >= 95% | Active count or positive configured capacity unavailable |
 
 Network remains unknown until two host-counter samples create a bounded rate
 window and link speed is available. Blank pressure and CI cells are unknown,
@@ -66,6 +69,17 @@ clearly marked stale result for at most five minutes, records collection cost,
 and uses one server-side aggregate plus bounded rollups for at most ten recent
 open and ten recent merged PRs. The HUD renders at most eight rows; deeper
 detail remains a drill-down.
+
+## Queue-age baseline
+
+Queue age is compared only with the historical p95 for the same stage and work
+class. A merge-queue row may show a normal or red cue only when the baseline has
+at least 20 positive observations, includes a sample timestamp, and is no more
+than five minutes old. Age below the verified p95 is normal; age at or above
+the verified p95 is red. Insufficient, missing, wrong-class, or stale baselines
+render `UNMEASURED` or `STALE`, never a favorable state. The current collector
+does not synthesize merge-queue duration history; until a qualifying receipt is
+present, merge-queue age remains explicitly unmeasured.
 
 The Ovie consumer is intentionally not part of the collector slice. It starts
 only after the cached projection has an authenticated API boundary with

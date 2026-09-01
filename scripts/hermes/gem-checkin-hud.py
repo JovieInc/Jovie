@@ -68,6 +68,8 @@ PR_READY_NAMES = frozenset({"PR Ready"})
 CHECK_PENDING = frozenset({"queued", "in_progress", "pending", "waiting", "requested"})
 CHECK_FAILURE = frozenset({"failure", "failed", "error", "cancelled", "timed_out", "action_required"})
 CHECK_SUCCESS = frozenset({"success", "successful", "neutral", "skipped"})
+P95_MIN_SAMPLES = 20
+P95_BASELINE_MAX_AGE_SECONDS = 300
 MIN_WIDTH = 120
 TARGET_WIDTH = 430
 MIN_HEIGHT = 32
@@ -482,12 +484,12 @@ def compute_throughput(totals: Any, snapshots: list[dict[str, Any]] | None, *, n
     return None
 
 
-def _psi(path: Path) -> dict[str, float | None]:
+def _psi(path: Path) -> dict[str, Any]:
     try:
         text = path.read_text(encoding="utf-8")
     except OSError:
-        return {"some": None, "full": None}
-    result: dict[str, float | None] = {"some": None, "full": None}
+        return {"some": None, "full": None, "error": "unavailable"}
+    result: dict[str, Any] = {"some": None, "full": None, "error": None}
     for line in text.splitlines():
         parts = line.split()
         if not parts:
@@ -509,6 +511,56 @@ def _pressure_status(value: float | None, warning: float, failure: float) -> str
     if value >= warning:
         return "warning"
     return "healthy"
+
+
+def cpu_health_status(value: float | None) -> str:
+    return _pressure_status(value, 75, 125)
+
+
+def disk_health_status(available_pct: float | None) -> str:
+    if available_pct is None:
+        return "unknown"
+    if available_pct < 5:
+        return "failure"
+    if available_pct < 15:
+        return "warning"
+    return "healthy"
+
+
+def io_health_status(full_avg10_pct: float | None) -> str:
+    if full_avg10_pct is None:
+        return "unknown"
+    if full_avg10_pct >= 20:
+        return "failure"
+    if full_avg10_pct > 10:
+        return "warning"
+    return "healthy"
+
+
+def network_health_status(value: float | None) -> str:
+    return _pressure_status(value, 60, 85)
+
+
+def worker_slot_health_status(value: float | None) -> str:
+    return _pressure_status(value, 75, 95)
+
+
+def memory_health_status(available_pct: float | None, psi_pct: float | None) -> str:
+    statuses: list[str] = []
+    if available_pct is not None:
+        statuses.append("failure" if available_pct < 10 else "warning" if available_pct < 20 else "healthy")
+    if psi_pct is not None:
+        statuses.append(_pressure_status(psi_pct, 10, 30))
+    if not statuses:
+        return "unknown"
+    return max(statuses, key={"unknown": 0, "healthy": 1, "warning": 2, "failure": 3}.get)
+
+
+def _metric_state(*values: Any, error: str | None = None, require_all: bool = False) -> str:
+    if error:
+        return "error"
+    measured = all(value is not None for value in values) if require_all else any(value is not None for value in values)
+    return "fresh" if measured else "unknown"
 
 
 def _net_sample() -> dict[str, Any] | None:
@@ -559,13 +611,15 @@ def fetch_system_pressure(
     cpu_psi = _psi(Path("/proc/pressure/cpu"))
     memory_psi = _psi(Path("/proc/pressure/memory"))
     io_psi = _psi(Path("/proc/pressure/io"))
+    disk_error = None
     disk_used_pct = disk_available_pct = None
     try:
         disk = shutil.disk_usage("/")
         disk_used_pct = None if disk.total <= 0 else (disk.used / disk.total) * 100
         disk_available_pct = None if disk.total <= 0 else (disk.free / disk.total) * 100
     except OSError:
-        pass
+        disk_error = "unavailable"
+    memory_error = None
     memory_total = memory_available = None
     try:
         memory = {}
@@ -575,12 +629,10 @@ def fetch_system_pressure(
                 memory[key] = int(raw.strip().split()[0]) * 1024
         memory_total, memory_available = memory.get("MemTotal"), memory.get("MemAvailable")
     except (OSError, ValueError, IndexError):
-        pass
+        memory_error = "unavailable"
     available_pct = None if not memory_total or memory_available is None else (memory_available / memory_total) * 100
     load_pct = None if load1 is None or cpu_count is None else (load1 / cpu_count) * 100
     cpu_signal = max(value for value in (load_pct, cpu_psi.get("some")) if value is not None) if any(value is not None for value in (load_pct, cpu_psi.get("some"))) else None
-    memory_signal = max(value for value in (memory_psi.get("some"), None if available_pct is None else 100 - available_pct) if value is not None) if any(value is not None for value in (memory_psi.get("some"), available_pct)) else None
-    io_signal = max(value for value in (io_psi.get("some"), io_psi.get("full")) if value is not None) if any(value is not None for value in (io_psi.get("some"), io_psi.get("full"))) else None
     current_net = _net_sample()
     prior = load_json_dict(state_path)
     prior_at = _iso(prior.get("at"))
@@ -597,20 +649,78 @@ def fetch_system_pressure(
         write_json(state_path, {"at": clock.isoformat(), **current_net})
     running, cap = _int(symphony.get("running")), _int(symphony.get("cap"))
     slots_pct = None if running is None or not cap else (running / cap) * 100
+    sampled_at = clock.isoformat()
+    cpu_state = _metric_state(load_pct, cpu_psi.get("some"), error=cpu_psi.get("error"), require_all=True)
+    memory_state = _metric_state(available_pct, memory_psi.get("some"), error=memory_error or memory_psi.get("error"), require_all=True)
+    disk_state = _metric_state(disk_available_pct, disk_used_pct, error=disk_error, require_all=True)
+    io_state = _metric_state(io_psi.get("full"), error=io_psi.get("error"))
+    network_state = _metric_state(network_pct)
+    slots_state = _metric_state(slots_pct)
     return {
-        "ok": any(value is not None for value in (cpu_signal, memory_signal, io_signal, network_pct, slots_pct)),
-        "generated_at": clock.isoformat(),
-        "cpu": {"status": _pressure_status(cpu_signal, 75, 125), "signal_pct": cpu_signal, "load1": load1, "cores": cpu_count, "psi": cpu_psi.get("some")},
-        "memory": {"status": "failure" if available_pct is not None and available_pct < 10 else "warning" if available_pct is not None and available_pct < 20 else _pressure_status(memory_psi.get("some"), 10, 30), "available_pct": available_pct, "psi": memory_psi.get("some")},
-        "io": {
-            "status": "failure" if disk_available_pct is not None and disk_available_pct < 5 else "warning" if disk_available_pct is not None and disk_available_pct < 15 else _pressure_status(io_signal, 10, 30),
+        "ok": any(state == "fresh" for state in (cpu_state, memory_state, disk_state, io_state, network_state, slots_state)),
+        "generated_at": sampled_at,
+        "cpu": {
+            "status": cpu_health_status(cpu_signal),
+            "state": cpu_state,
+            "signal_pct": cpu_signal,
+            "load1": load1,
+            "cores": cpu_count,
+            "psi": cpu_psi.get("some"),
+            "source": "getloadavg + /proc/pressure/cpu",
+            "unit": "load/PSI percent",
+            "sampled_at": sampled_at if cpu_state == "fresh" else None,
+            "error": cpu_psi.get("error") if cpu_state == "error" else None,
+        },
+        "memory": {
+            "status": memory_health_status(available_pct, memory_psi.get("some")),
+            "state": memory_state,
+            "available_pct": available_pct,
+            "psi": memory_psi.get("some"),
+            "source": "/proc/meminfo + /proc/pressure/memory",
+            "unit": "free/PSI percent",
+            "sampled_at": sampled_at if memory_state == "fresh" else None,
+            "error": (memory_error or memory_psi.get("error")) if memory_state == "error" else None,
+        },
+        "disk": {
+            "status": disk_health_status(disk_available_pct),
+            "state": disk_state,
             "used_pct": disk_used_pct,
             "available_pct": disk_available_pct,
-            "psi": io_psi.get("some"),
-            "full": io_psi.get("full"),
+            "source": "shutil.disk_usage('/')",
+            "unit": "capacity percent",
+            "sampled_at": sampled_at if disk_state == "fresh" else None,
+            "error": disk_error if disk_state == "error" else None,
         },
-        "network": {"status": _pressure_status(network_pct, 60, 85), "util_pct": network_pct, "mbps": network_mbps, "speed_mbps": None if current_net is None else current_net.get("speed_mbps")},
-        "slots": {"status": _pressure_status(slots_pct, 75, 95), "util_pct": slots_pct, "running": running, "cap": cap},
+        "io": {
+            "status": io_health_status(io_psi.get("full")),
+            "state": io_state,
+            "some_avg10_pct": io_psi.get("some"),
+            "full_avg10_pct": io_psi.get("full"),
+            "source": "/proc/pressure/io",
+            "unit": "stall percent over 10s",
+            "sampled_at": sampled_at if io_state == "fresh" else None,
+            "error": io_psi.get("error") if io_state == "error" else None,
+        },
+        "network": {
+            "status": network_health_status(network_pct),
+            "state": network_state,
+            "util_pct": network_pct,
+            "mbps": network_mbps,
+            "speed_mbps": None if current_net is None else current_net.get("speed_mbps"),
+            "source": "/proc/net/dev + /sys/class/net",
+            "unit": "Mbps/link percent",
+            "sampled_at": sampled_at if network_state == "fresh" else None,
+        },
+        "slots": {
+            "status": worker_slot_health_status(slots_pct),
+            "state": slots_state,
+            "util_pct": slots_pct,
+            "running": running,
+            "cap": cap,
+            "source": "Symphony state",
+            "unit": "agents/capacity percent",
+            "sampled_at": sampled_at if slots_state == "fresh" else None,
+        },
     }
 
 
@@ -664,7 +774,18 @@ def check_duration_seconds(record: dict[str, Any]) -> float | None:
 
 
 def empty_stage(stage_id: str, label: str) -> dict[str, Any]:
-    return {"id": stage_id, "label": label, "count": None, "p95": None, "queued": False, "queue_reason": None, "series": None}
+    return {
+        "id": stage_id,
+        "label": label,
+        "count": None,
+        "p95": None,
+        "sample_count": 0,
+        "sampled_at": None,
+        "stale": False,
+        "queued": False,
+        "queue_reason": None,
+        "series": None,
+    }
 
 
 def empty_ship_path() -> dict[str, Any]:
@@ -732,18 +853,49 @@ def stage_from_source(
     queued: bool = False,
     queue_reason: str | None = None,
     series: list[float] | None = None,
+    sampled_at: Any = None,
+    stale: bool = False,
 ) -> dict[str, Any]:
     if not ok:
         return empty_stage(stage_id, label)
+    valid_durations = [value for value in (durations or []) if value == value and value > 0]
     return {
         "id": stage_id,
         "label": label,
         "count": count,
-        "p95": p95_seconds(durations),
+        "p95": p95_seconds(valid_durations),
+        "sample_count": len(valid_durations),
+        "sampled_at": sampled_at,
+        "stale": bool(stale),
         "queued": bool(queued),
         "queue_reason": queue_reason,
         "series": series if series else None,
     }
+
+
+def queue_age_health(row: dict[str, Any], stage: dict[str, Any] | None, *, now: datetime) -> dict[str, Any]:
+    age_stamp = _iso(row.get("enqueued"))
+    age_seconds = None if age_stamp is None else max(0.0, (now - age_stamp).total_seconds())
+    age_label = "-" if age_seconds is None else _duration(int(age_seconds))
+    contract = {
+        "source": "same-class merge queue rolling 24h",
+        "unit": "seconds",
+        "sampled_at": stage.get("sampled_at") if isinstance(stage, dict) else None,
+        "age_seconds": age_seconds,
+    }
+    if row.get("kind") != "mq" or not isinstance(stage, dict) or stage.get("id") != "mq":
+        return {**contract, "status": "unknown", "state": "unknown", "label": f"? UNMEASURED {age_label}"}
+    baseline = _num(stage.get("p95"))
+    sample_count = _int(stage.get("sample_count")) or 0
+    baseline_at = _iso(stage.get("sampled_at"))
+    if baseline is None or sample_count < P95_MIN_SAMPLES or baseline_at is None or age_seconds is None:
+        return {**contract, "status": "unknown", "state": "unknown", "label": f"? UNMEASURED {age_label}"}
+    baseline_age = (now - baseline_at).total_seconds()
+    if stage.get("stale") is True or baseline_age > P95_BASELINE_MAX_AGE_SECONDS:
+        return {**contract, "status": "unknown", "state": "stale", "label": f"? STALE {age_label}"}
+    if age_seconds >= baseline:
+        return {**contract, "status": "failure", "state": "fresh", "label": f"× RED {age_label}"}
+    return {**contract, "status": "healthy", "state": "fresh", "label": f"✓ NORMAL {age_label}"}
 
 
 def ship_bottleneck(stages: list[dict[str, Any]]) -> dict[str, Any] | None:
@@ -785,18 +937,29 @@ def build_ship_path(
     merge_in = github.get("merge_group_in") if gh_ok else None
     merge_wait = isinstance(merge_in, int) and merge_in > 0
     specs = (
-        ("todo", "Todo/pickup", bool(linear.get("ok")), linear.get("todo"), linear.get("pickup_durations"), False, None),
-        ("running", "agent running", bool(symphony.get("ok")), symphony.get("running") if symphony.get("ok") else None, None, retry_q, f"retrying agents {retrying}" if retry_q else None),
-        ("pr_open", "PR open", gh_ok, github.get("pr_open"), github.get("pr_open_durations"), False, None),
-        ("ci_fast", "ci-fast", gh_ok, github.get("ci_fast"), github.get("ci_fast_durations"), bool(github.get("ci_fast_queued")), "ci-fast awaiting checks" if github.get("ci_fast_queued") else None),
-        ("pr_ready", "PR Ready", gh_ok, github.get("pr_ready"), github.get("pr_ready_durations"), bool(github.get("pr_ready_queued")), "PR Ready awaiting checks" if github.get("pr_ready_queued") else None),
-        ("mq", "merge queue", mq_ok, mq_count, github.get("mq_durations") if gh_ok else None, mq_awaiting and not merge_wait, "MQ awaiting checks" if mq_awaiting and not merge_wait else None),
-        ("merge_group", "merge_group CI", gh_ok, merge_in, github.get("merge_group_durations"), merge_wait, "merge_group CI running" if merge_wait else None),
-        ("merged", "merged", gh_ok, github.get("merged"), github.get("merged_durations"), False, None),
+        ("todo", "Todo/pickup", bool(linear.get("ok")), linear.get("todo"), linear.get("pickup_durations"), False, None, linear.get("generated_at"), bool(linear.get("stale"))),
+        ("running", "agent running", bool(symphony.get("ok")), symphony.get("running") if symphony.get("ok") else None, None, retry_q, f"retrying agents {retrying}" if retry_q else None, symphony.get("generated_at"), False),
+        ("pr_open", "PR open", gh_ok, github.get("pr_open"), github.get("pr_open_durations"), False, None, github.get("generated_at"), bool(github.get("stale"))),
+        ("ci_fast", "ci-fast", gh_ok, github.get("ci_fast"), github.get("ci_fast_durations"), bool(github.get("ci_fast_queued")), "ci-fast awaiting checks" if github.get("ci_fast_queued") else None, github.get("generated_at"), bool(github.get("stale"))),
+        ("pr_ready", "PR Ready", gh_ok, github.get("pr_ready"), github.get("pr_ready_durations"), bool(github.get("pr_ready_queued")), "PR Ready awaiting checks" if github.get("pr_ready_queued") else None, github.get("generated_at"), bool(github.get("stale"))),
+        ("mq", "merge queue", mq_ok, mq_count, github.get("mq_durations") if gh_ok else None, mq_awaiting and not merge_wait, "MQ awaiting checks" if mq_awaiting and not merge_wait else None, github.get("generated_at"), bool(github.get("stale"))),
+        ("merge_group", "merge_group CI", gh_ok, merge_in, github.get("merge_group_durations"), merge_wait, "merge_group CI running" if merge_wait else None, github.get("generated_at"), bool(github.get("stale"))),
+        ("merged", "merged", gh_ok, github.get("merged"), github.get("merged_durations"), False, None, github.get("generated_at"), bool(github.get("stale"))),
     )
     stages = [
-        stage_from_source(sid, label, ok=ok, count=count, durations=durs, queued=queued, queue_reason=reason, series=series_for(sid))
-        for sid, label, ok, count, durs, queued, reason in specs
+        stage_from_source(
+            sid,
+            label,
+            ok=ok,
+            count=count,
+            durations=durs,
+            queued=queued,
+            queue_reason=reason,
+            series=series_for(sid),
+            sampled_at=sampled_at,
+            stale=stale,
+        )
+        for sid, label, ok, count, durs, queued, reason, sampled_at, stale in specs
     ]
     return {"ok": True, "stages": stages, "bottleneck": ship_bottleneck(stages)}
 
@@ -1296,7 +1459,7 @@ def _table_header(widths: dict[str, int]) -> str:
 
 
 def _col_widths(width: int) -> dict[str, int]:
-    st, pos, ident, run, tokens, elapsed, ws = 2, 4, 12, 9, 10, 8, 24
+    st, pos, ident, run, tokens, elapsed, ws = 2, 4, 12, 9, 10, 20, 24
     remaining = width - (st + pos + ident + run + tokens + elapsed + ws + 14)
     return {
         "st": st,
@@ -1338,11 +1501,20 @@ def _cells(
     )
 
 
-def _job_row(row: dict[str, Any], widths: dict[str, int], *, now: datetime) -> str:
+def _job_row(
+    row: dict[str, Any],
+    widths: dict[str, int],
+    *,
+    now: datetime,
+    stage_baselines: dict[str, dict[str, Any]] | None = None,
+) -> str:
     kind = row.get("kind")
     if kind == "mq":
         ident = f"#{row['number']}" if isinstance(row.get("number"), int) else "-"
-        return _cells(PURPLE, widths, "○", dash(row.get("position")), ident, dash(row.get("title")), "-", "-", "-", elapsed_label(row.get("enqueued"), now=now), "-")
+        health = queue_age_health(row, (stage_baselines or {}).get("mq"), now=now)
+        color = _semantic_color(str(health.get("status") or "unknown"))
+        glyph = "×" if health.get("status") == "failure" else "✓" if health.get("status") == "healthy" else "?"
+        return _cells(color, widths, glyph, dash(row.get("position")), ident, dash(row.get("title")), "-", "-", "-", str(health["label"]), "-")
     if kind == "retrying":
         return _cells(PINK, widths, "↻", "-", dash(row.get("id")), dash(row.get("error") or row.get("title")), dash(row.get("attempt")), dash(row.get("turn")), compact_tokens(row.get("tokens_total"), row.get("tokens_in"), row.get("tokens_out")), due_label(row.get("due_at"), now=now), short_path(row.get("workspace")))
     if kind == "blocked":
@@ -1450,6 +1622,26 @@ def _pct0(value: Any) -> str:
     return "-" if number is None else f"{number:.0f}%"
 
 
+def _metric_value(metric: dict[str, Any], raw: str, *, stale: bool) -> tuple[str, str]:
+    state = str(metric.get("state") or ("fresh" if raw != "-" else "unknown"))
+    status = str(metric.get("status") or "unknown")
+    if stale:
+        return (f"? STALE · {raw}" if raw != "-" else "? STALE", "unknown")
+    if state == "error":
+        return ("× ERROR", "failure")
+    if state != "fresh" or status == "unknown":
+        return (f"? UNKNOWN · {raw}" if raw != "-" else "? UNKNOWN", "unknown")
+    cue = {"healthy": "✓ NORMAL", "warning": "! AMBER", "failure": "× RED"}.get(status, "? UNKNOWN")
+    return (f"{raw} · {cue}", status)
+
+
+def _metric_detail(metric: dict[str, Any], prefix: str, *, now: datetime) -> str:
+    source = str(metric.get("source") or "source unknown")
+    unit = str(metric.get("unit") or "unit unknown")
+    stamp = natural_time(metric.get("sampled_at"), now=now) if metric.get("sampled_at") else "not sampled"
+    return " · ".join(part for part in (prefix, source, unit, stamp) if part)
+
+
 def _system_pressure_lines(pressure: dict[str, Any] | None, width: int, *, now: datetime) -> list[str]:
     payload = pressure if isinstance(pressure, dict) else {}
     known = payload.get("ok") is True
@@ -1458,6 +1650,7 @@ def _system_pressure_lines(pressure: dict[str, Any] | None, width: int, *, now: 
         freshness = f"STALE · {freshness}"
     cpu = payload.get("cpu") if isinstance(payload.get("cpu"), dict) else {}
     memory = payload.get("memory") if isinstance(payload.get("memory"), dict) else {}
+    disk = payload.get("disk") if isinstance(payload.get("disk"), dict) else {}
     io = payload.get("io") if isinstance(payload.get("io"), dict) else {}
     network = payload.get("network") if isinstance(payload.get("network"), dict) else {}
     slots = payload.get("slots") if isinstance(payload.get("slots"), dict) else {}
@@ -1465,13 +1658,16 @@ def _system_pressure_lines(pressure: dict[str, Any] | None, width: int, *, now: 
     net_speed = _int(network.get("speed_mbps"))
     load1 = _num(cpu.get("load1"))
     load_text = "-" if load1 is None else f"{load1:.1f}"
-    cells = [
-        ("CPU / LOAD", _pct0(cpu.get("signal_pct")), f"load {load_text}/{dash(cpu.get('cores'))} · PSI {_pct0(cpu.get('psi'))}", str(cpu.get("status") or "unknown")),
-        ("MEMORY", f"{_pct0(memory.get('available_pct'))} available", f"PSI {_pct0(memory.get('psi'))}", str(memory.get("status") or "unknown")),
-        ("DISK / I/O", f"{_pct0(io.get('available_pct'))} available", f"{_pct0(io.get('used_pct'))} used · PSI {_pct0(io.get('psi'))}", str(io.get("status") or "unknown")),
-        ("NETWORK", "-" if net_mbps is None else f"{net_mbps:.1f} Mbps", "rate window pending" if net_mbps is None else f"{dash(net_speed)} Mbps link · {_pct0(network.get('util_pct'))}", str(network.get("status") or "unknown")),
-        ("WORKER SLOTS", f"{dash(slots.get('running'))}/{dash(slots.get('cap'))}", f"{_pct0(slots.get('util_pct'))} used", str(slots.get("status") or "unknown")),
+    stale = payload.get("stale") is True
+    raw_cells = [
+        ("CPU / LOAD", _pct0(cpu.get("signal_pct")), _metric_detail(cpu, f"load {load_text}/{dash(cpu.get('cores'))} · PSI {_pct0(cpu.get('psi'))}", now=now), cpu),
+        ("MEMORY", f"{_pct0(memory.get('available_pct'))} available", _metric_detail(memory, f"PSI {_pct0(memory.get('psi'))}", now=now), memory),
+        ("ROOT DISK FREE", f"{_pct0(disk.get('available_pct'))} free", _metric_detail(disk, f"{_pct0(disk.get('used_pct'))} used", now=now), disk),
+        ("I/O FULL PSI", f"{_pct0(io.get('full_avg10_pct'))} full", _metric_detail(io, f"{_pct0(io.get('some_avg10_pct'))} some", now=now), io),
+        ("NETWORK", "rate window pending" if net_mbps is None else f"{net_mbps:.1f} Mbps", _metric_detail(network, f"{dash(net_speed)} Mbps link · {_pct0(network.get('util_pct'))}", now=now), network),
+        ("WORKER SLOTS", f"{dash(slots.get('running'))}/{dash(slots.get('cap'))}", _metric_detail(slots, f"{_pct0(slots.get('util_pct'))} used", now=now), slots),
     ]
+    cells = [(label, *_metric_value(metric, raw, stale=stale), detail) for label, raw, detail, metric in raw_cells]
     gap = 3
     col = max(12, (width - gap * (len(cells) - 1)) // len(cells))
     leftover = width - (col * len(cells) + gap * (len(cells) - 1))
@@ -1479,8 +1675,8 @@ def _system_pressure_lines(pressure: dict[str, Any] | None, width: int, *, now: 
     spacer = " " * gap
     heading = _rgb(FG, SHIPPING_DISPLAY_IA["system_pressure"]["label"], bold=True) + _rgb(DIM, f"  ·  host projection  ·  Updated {freshness}")
     labels = spacer.join(pad_visible(_rgb(DIM, clip(label, cell_width), bold=True), cell_width) for (label, _, _, _), cell_width in zip(cells, widths))
-    values = spacer.join(pad_visible(_rgb(_semantic_color(status), clip(value, cell_width), bold=True), cell_width) for (_, value, _, status), cell_width in zip(cells, widths))
-    details = spacer.join(pad_visible(_rgb(DIM, clip(detail, cell_width)), cell_width) for (_, _, detail, _), cell_width in zip(cells, widths))
+    values = spacer.join(pad_visible(_rgb(_semantic_color(status), clip(value, cell_width), bold=True), cell_width) for (_, value, status, _), cell_width in zip(cells, widths))
+    details = spacer.join(pad_visible(_rgb(DIM, clip(detail, cell_width)), cell_width) for (_, _, _, detail), cell_width in zip(cells, widths))
     return [pad_visible(heading, width), labels, values, details]
 
 
@@ -1672,8 +1868,13 @@ def render(
         _table_header(widths),
         _rgb(DIM, "─" * cols),
     ]
-    work_rows = [_job_row(row, widths, now=clock) for row in (symphony.get("rows") or [])]
-    work_rows.extend(_job_row(row, widths, now=clock) for row in (mq.get("rows") or []))
+    stage_baselines = {
+        str(stage.get("id")): stage
+        for stage in (path.get("stages") or [])
+        if isinstance(stage, dict) and stage.get("id")
+    }
+    work_rows = [_job_row(row, widths, now=clock, stage_baselines=stage_baselines) for row in (symphony.get("rows") or [])]
+    work_rows.extend(_job_row(row, widths, now=clock, stage_baselines=stage_baselines) for row in (mq.get("rows") or []))
     if review is None:
         work_rows.append(_rgb(PINK, clip("v  Review -", cols)))
     elif review > 0:
