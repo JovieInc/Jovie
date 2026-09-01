@@ -210,6 +210,7 @@ async function exerciseKeyboardActivation(page, target) {
 async function clearInteractionState(page) {
   await page.mouse.move(-10, -10);
   await page.evaluate(() => {
+    const { HTMLElement } = /** @type {any} */ (globalThis);
     const active = document.activeElement;
     if (active instanceof HTMLElement) active.blur();
   });
@@ -313,6 +314,16 @@ async function collectSnapshots(
           const dark = Math.min(luminance(foreground), luminance(background));
           return (bright + 0.05) / (dark + 0.05);
         };
+        const {
+          CSS,
+          HTMLAnchorElement,
+          HTMLButtonElement,
+          HTMLElement,
+          HTMLInputElement,
+          HTMLSelectElement,
+          HTMLTextAreaElement,
+          getComputedStyle,
+        } = /** @type {any} */ (globalThis);
         const composite = (source, backdrop) => {
           if (!source) return null;
           if (!backdrop || source.a >= 1) return source;
@@ -718,6 +729,7 @@ async function collectSnapshots(
           return wrapper;
         };
         const rootRect = element.getBoundingClientRect();
+        const viewportWidth = /** @type {any} */ (globalThis).window.innerWidth;
         const documentOverflowX =
           document.documentElement.scrollWidth -
             document.documentElement.clientWidth >
@@ -725,7 +737,7 @@ async function collectSnapshots(
         const rootOverflowX =
           element.scrollWidth - element.clientWidth > 1 ||
           rootRect.left < -1 ||
-          rootRect.right - window.innerWidth > 1 ||
+          rootRect.right - viewportWidth > 1 ||
           documentOverflowX;
         const variants = [
           ...element.querySelectorAll('[data-jovie-eval-variant]'),
