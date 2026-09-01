@@ -11,8 +11,11 @@ import { WorkflowCaptureInboxCard } from './WorkflowCaptureInboxCard';
 
 export interface OpportunityInboxFeedProps {
   readonly cards: readonly OpportunityInboxCardViewModel[];
-  readonly onApprove: (id: string) => void;
-  readonly onDismiss: (id: string) => void;
+  readonly onApprove: (id: string) => void | Promise<void>;
+  readonly onDismiss: (id: string) => void | Promise<void>;
+  readonly onRecordedApprove?: (id: string) => Promise<void>;
+  readonly onRecordedDismiss?: (id: string) => Promise<void>;
+  readonly onRecordedNextStep?: (id: string) => Promise<void>;
   readonly onOpen?: (id: string) => void;
   readonly onFeedback: (
     id: string,
@@ -49,6 +52,9 @@ export function OpportunityInboxFeed({
   cards,
   onApprove,
   onDismiss,
+  onRecordedApprove,
+  onRecordedDismiss,
+  onRecordedNextStep,
   onOpen,
   onFeedback: _onFeedback,
   onNextStep,
@@ -89,14 +95,19 @@ export function OpportunityInboxFeed({
             onStackActionInitiated?.(id);
             const card = stackCards.find(candidate => candidate.id === id);
             if (card?.category === 'report') {
-              (onStackNextStep ?? onNextStep ?? onApprove)(id);
+              return (
+                onRecordedNextStep ??
+                onStackNextStep ??
+                onNextStep ??
+                onApprove
+              )(id);
             } else {
-              onApprove(id);
+              return (onRecordedApprove ?? onApprove)(id);
             }
           }}
           onReject={id => {
             onStackActionInitiated?.(id);
-            onDismiss(id);
+            return (onRecordedDismiss ?? onDismiss)(id);
           }}
           onOpen={onOpen}
           pendingActionId={pendingActionId}

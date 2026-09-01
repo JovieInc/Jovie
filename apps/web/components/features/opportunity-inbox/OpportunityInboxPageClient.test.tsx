@@ -1,9 +1,16 @@
-import { act, fireEvent, render, screen } from '@testing-library/react';
+import {
+  act,
+  fireEvent,
+  render,
+  screen,
+  waitFor,
+} from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { OpportunityInboxPageClient } from './OpportunityInboxPageClient';
 
 const mutateMock = vi.fn();
+const mutateAsyncMock = vi.fn().mockResolvedValue({ ok: true });
 let inboxHomeEnabled = false;
 
 vi.mock('next/navigation', () => ({
@@ -26,7 +33,33 @@ vi.mock('@/lib/founder-review/client', () => ({
   createFounderReviewClient: vi.fn().mockImplementation(async review => ({
     id: review.segmentId,
     target: review.target,
+    decision: review.decision,
     recording: { mediaAvailable: false },
+    actionOutcome: {
+      status:
+        review.decision === 'approved' || review.decision === 'rejected'
+          ? 'pending'
+          : 'not-applicable',
+      updatedAt: '2026-09-01T18:00:08.000Z',
+      errorCode: null,
+    },
+  })),
+  updateFounderReviewActionOutcome: vi.fn().mockImplementation(async input => ({
+    id: input.receiptId,
+    target: {
+      type: 'inbox-card',
+      id: 'card-1',
+      title: 'Saved founder review',
+      sourceKind: 'test.suggestion',
+      category: 'suggestion',
+    },
+    decision: 'approved',
+    recording: { mediaAvailable: false },
+    actionOutcome: {
+      status: input.status,
+      updatedAt: '2026-09-01T18:00:08.000Z',
+      errorCode: input.errorCode,
+    },
   })),
 }));
 
@@ -58,21 +91,25 @@ vi.mock('@/lib/queries/useOpportunityInboxMutations', () => ({
       isPending: false,
       variables: undefined,
       mutate: mutateMock,
+      mutateAsync: mutateAsyncMock,
     },
     dismissMutation: {
       isPending: false,
       variables: undefined,
       mutate: mutateMock,
+      mutateAsync: mutateAsyncMock,
     },
     feedbackMutation: {
       isPending: false,
       variables: undefined,
       mutate: mutateMock,
+      mutateAsync: mutateAsyncMock,
     },
     nextStepMutation: {
       isPending: false,
       variables: undefined,
       mutate: mutateMock,
+      mutateAsync: mutateAsyncMock,
     },
   }),
 }));
@@ -114,6 +151,8 @@ describe('OpportunityInboxPageClient', () => {
   afterEach(() => {
     inboxHomeEnabled = false;
     mutateMock.mockReset();
+    mutateAsyncMock.mockReset();
+    mutateAsyncMock.mockResolvedValue({ ok: true });
     tourDateMutateMock.mockReset();
   });
 
@@ -637,6 +676,7 @@ describe('OpportunityInboxPageClient', () => {
     mutateMock.mockImplementation((_id, options) => {
       options?.onError?.();
     });
+    mutateAsyncMock.mockRejectedValueOnce(new Error('next step failed'));
 
     render(
       <OpportunityInboxPageClient
@@ -690,6 +730,7 @@ describe('OpportunityInboxPageClient', () => {
     mutateMock.mockImplementation((_id, options) => {
       options?.onError?.();
     });
+    mutateAsyncMock.mockRejectedValueOnce(new Error('decision failed'));
 
     render(
       <OpportunityInboxPageClient
@@ -726,9 +767,12 @@ describe('OpportunityInboxPageClient', () => {
     const user = userEvent.setup();
     inboxHomeEnabled = true;
     let rejectAction: (() => void) | undefined;
-    mutateMock.mockImplementation((_id, options) => {
-      rejectAction = options?.onError;
-    });
+    mutateAsyncMock.mockImplementationOnce(
+      () =>
+        new Promise((_resolve, reject) => {
+          rejectAction = () => reject(new Error('decision failed'));
+        })
+    );
 
     render(
       <OpportunityInboxPageClient
@@ -760,9 +804,11 @@ describe('OpportunityInboxPageClient', () => {
       rejectAction?.();
     });
 
-    expect(
-      screen.getByRole('button', { name: 'Review Current Opportunity' })
-    ).toHaveFocus();
+    await waitFor(() =>
+      expect(
+        screen.getByRole('button', { name: 'Review Current Opportunity' })
+      ).toHaveFocus()
+    );
   });
 
   it('renders pending tour-date cards and confirms optimistically', () => {

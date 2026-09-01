@@ -33,10 +33,45 @@ describe('founder review retained audio route', () => {
         },
       }),
       blob: { contentType: 'audio/webm', etag: 'etag-1' },
+      headers: new Headers(),
     });
     hoisted.deleteMedia.mockResolvedValue({
       id: 'review-1',
       recording: { mediaAvailable: false },
+    });
+  });
+
+  it('preserves byte-range semantics for private audio playback', async () => {
+    hoisted.getMedia.mockResolvedValueOnce({
+      stream: new ReadableStream({
+        start(controller) {
+          controller.enqueue(new TextEncoder().encode('private'));
+          controller.close();
+        },
+      }),
+      blob: { contentType: 'audio/webm', etag: 'etag-1' },
+      headers: new Headers({
+        'accept-ranges': 'bytes',
+        'content-length': '7',
+        'content-range': 'bytes 0-6/13',
+      }),
+    });
+
+    const response = await GET(
+      new Request('https://jov.ie/api/inbox/founder-reviews/review-1/media', {
+        headers: { Range: 'bytes=0-6' },
+      }),
+      params
+    );
+
+    expect(response.status).toBe(206);
+    expect(response.headers.get('Accept-Ranges')).toBe('bytes');
+    expect(response.headers.get('Content-Length')).toBe('7');
+    expect(response.headers.get('Content-Range')).toBe('bytes 0-6/13');
+    expect(hoisted.getMedia).toHaveBeenCalledWith({
+      id: 'review-1',
+      userIdentity: 'user-1',
+      range: 'bytes=0-6',
     });
   });
 

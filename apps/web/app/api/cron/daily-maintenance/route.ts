@@ -27,6 +27,7 @@ import { runDataRetentionCleanup } from '@/lib/analytics/data-retention';
 import { verifyCronRequest } from '@/lib/cron/auth';
 import { sweepUnderEnrichedProfilesForCron } from '@/lib/discography/re-enrich';
 import { captureError } from '@/lib/error-tracking';
+import { cleanupFounderReviewUploadLeases } from '@/lib/founder-review/server';
 import { runOnboardingScriptAggregation } from '@/lib/onboarding/script-aggregation';
 import { runProfileSearchMonitoring } from '@/lib/profile-search/runner';
 import { reconcileReleaseWorkflowRunOutcomes } from '@/lib/release-to-revenue/outcome-reconciliation';
@@ -157,7 +158,21 @@ export async function GET(request: Request) {
     }
   );
 
-  // 11. Data retention — Sundays only (heavy operation)
+  // 11. Expired founder-review audio uploads that never bound to a receipt.
+  results.founderReviewUploadLeases = await runSubJob(
+    'founderReviewUploadLeases',
+    async () => {
+      const summary = await cleanupFounderReviewUploadLeases();
+      if (summary.failed > 0) {
+        throw new Error(
+          `${summary.failed} founder-review upload lease${summary.failed === 1 ? '' : 's'} quarantined for manual cleanup`
+        );
+      }
+      return summary;
+    }
+  );
+
+  // 12. Data retention — Sundays only (heavy operation)
   const isSunday = new Date().getDay() === 0;
   results.dataRetention = isSunday
     ? await runSubJob('dataRetention', runDataRetentionCleanup)

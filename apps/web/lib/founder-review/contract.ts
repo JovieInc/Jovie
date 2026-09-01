@@ -2,8 +2,11 @@ import { z } from 'zod';
 
 export const FOUNDER_REVIEW_SCHEMA_VERSION = 1 as const;
 export const FOUNDER_REVIEW_SOURCE = 'founder-inbox-review' as const;
+export const FOUNDER_REVIEW_UPLOAD_LEASE_SOURCE =
+  'founder-inbox-review-upload-lease' as const;
 export const FOUNDER_REVIEW_DISCLOSURE_VERSION = 1 as const;
 export const FOUNDER_REVIEW_MAX_AUDIO_BYTES = 25 * 1024 * 1024;
+export const FOUNDER_REVIEW_UPLOAD_LEASE_TTL_MS = 24 * 60 * 60 * 1_000;
 
 export const FOUNDER_REVIEW_AUDIO_TYPES = [
   'audio/webm',
@@ -35,6 +38,28 @@ export const FounderReviewMediaSchema = z.object({
 });
 
 export type FounderReviewMedia = z.infer<typeof FounderReviewMediaSchema>;
+
+export const FounderReviewUploadTokenPayloadSchema = z.object({
+  userId: z.string().uuid(),
+  sessionId: z.string().uuid(),
+  segmentId: z.string().uuid(),
+  targetType: z.enum(['inbox-card', 'founder-note']),
+  targetId: z.string().trim().min(1).max(200),
+  sourceKind: z.string().trim().min(1).max(120),
+});
+
+export const StoredFounderReviewUploadLeaseSchema = z.object({
+  schemaVersion: z.literal(FOUNDER_REVIEW_SCHEMA_VERSION),
+  kind: z.literal('founder-review-upload-lease'),
+  reviewId: z.string().uuid(),
+  token: FounderReviewUploadTokenPayloadSchema,
+  blob: z.object({
+    url: z.string().url().startsWith('https://'),
+    pathname: z.string().trim().min(1).max(1_000),
+    contentType: z.enum(FOUNDER_REVIEW_AUDIO_TYPES),
+  }),
+  uploadedAt: z.string().datetime({ offset: true }),
+});
 
 const FounderReviewTranscriptionSchema = z.object({
   provider: z.enum(['web-speech', 'typed', 'mixed', 'none']),
@@ -107,6 +132,41 @@ export const CreateFounderReviewSchema = z
         message: 'Transcript-only reviews cannot retain audio metadata.',
       });
     }
+    if (
+      value.recording.status === 'captured-retained' &&
+      (value.recording.retention !== 'audio-and-transcript' ||
+        !value.recording.media)
+    ) {
+      context.addIssue({
+        code: 'custom',
+        path: ['recording', 'status'],
+        message: 'Retained recordings require retained media.',
+      });
+    }
+    if (
+      value.recording.status !== 'captured-retained' &&
+      value.recording.media
+    ) {
+      context.addIssue({
+        code: 'custom',
+        path: ['recording', 'media'],
+        message: 'Only retained recordings can include media.',
+      });
+    }
+    if (value.target.type === 'founder-note' && value.decision !== 'note') {
+      context.addIssue({
+        code: 'custom',
+        path: ['decision'],
+        message: 'Founder notes must use the note decision.',
+      });
+    }
+    if (value.target.type === 'inbox-card' && value.decision === 'note') {
+      context.addIssue({
+        code: 'custom',
+        path: ['decision'],
+        message: 'Inbox cards cannot use the note decision.',
+      });
+    }
   });
 
 export type CreateFounderReviewInput = z.infer<
@@ -127,6 +187,11 @@ export const StoredFounderReviewContextSchema = z.object({
   }),
   consent: FounderReviewConsentSchema,
   rationaleExtractionStatus: z.enum(['pending', 'not-requested']),
+  actionOutcome: z.object({
+    status: z.enum(['not-applicable', 'pending', 'applied', 'failed']),
+    updatedAt: z.string().datetime({ offset: true }),
+    errorCode: z.string().trim().max(120).nullable(),
+  }),
   provenance: z.object({
     surface: z.literal('opportunity-inbox'),
     sourceBinding: z.string().min(1),
@@ -172,6 +237,7 @@ export interface FounderReviewReceipt {
   };
   readonly consent: CreateFounderReviewInput['consent'];
   readonly rationaleExtractionStatus: 'pending' | 'not-requested';
+  readonly actionOutcome: StoredFounderReviewContext['actionOutcome'];
   readonly provenance: StoredFounderReviewContext['provenance'];
   readonly authority: StoredFounderReviewContext['authority'];
   readonly createdAt: string;
@@ -207,7 +273,10 @@ export function buildStoredFounderReviewContext(input: {
   readonly userAgent: string | null;
   readonly capturedAt: string;
 }): StoredFounderReviewContext {
-  const text = `${input.review.transcript} ${input.review.typedText}`.trim();
+  const actionPending =
+    input.review.target.type === 'inbox-card' &&
+    (input.review.decision === 'approved' ||
+      input.review.decision === 'rejected');
   return {
     schemaVersion: FOUNDER_REVIEW_SCHEMA_VERSION,
     sessionId: input.review.sessionId,
@@ -222,7 +291,12 @@ export function buildStoredFounderReviewContext(input: {
       deletedAt: null,
     },
     consent: input.review.consent,
-    rationaleExtractionStatus: text ? 'pending' : 'not-requested',
+    rationaleExtractionStatus: 'not-requested',
+    actionOutcome: {
+      status: actionPending ? 'pending' : 'not-applicable',
+      updatedAt: input.capturedAt,
+      errorCode: null,
+    },
     provenance: {
       surface: 'opportunity-inbox',
       sourceBinding: `${input.review.target.type}:${input.review.target.id}:${input.review.target.sourceKind}`,
@@ -272,6 +346,7 @@ export function buildFounderReviewReceipt(input: {
     },
     consent: input.context.consent,
     rationaleExtractionStatus: input.context.rationaleExtractionStatus,
+    actionOutcome: input.context.actionOutcome,
     provenance: input.context.provenance,
     authority: input.context.authority,
     createdAt:

@@ -23,13 +23,19 @@ export async function GET(request: Request, { params }: RouteParams) {
       userIdentity: userId,
       range: request.headers.get('range'),
     });
+    const headers = new Headers({
+      'Cache-Control': 'private, no-store',
+      'Content-Disposition': 'inline',
+      'Content-Type': blob.blob.contentType,
+      ETag: blob.blob.etag,
+    });
+    for (const header of ['accept-ranges', 'content-length', 'content-range']) {
+      const value = blob.headers.get(header);
+      if (value) headers.set(header, value);
+    }
     return new Response(blob.stream, {
-      headers: {
-        'Cache-Control': 'private, no-store',
-        'Content-Disposition': 'inline',
-        'Content-Type': blob.blob.contentType,
-        ETag: blob.blob.etag,
-      },
+      headers,
+      status: headers.has('content-range') ? 206 : 200,
     });
   } catch (caught) {
     return founderReviewErrorResponse(
