@@ -9,7 +9,6 @@ import {
   type LibraryReleaseAsset,
 } from '@/app/app/(shell)/library/library-data';
 import { libraryWaveformPeaks } from '@/app/app/(shell)/library/library-waveform-peaks';
-import { ArtworkFrame } from '@/components/atoms/ArtworkFrame';
 import { alignment } from '@/components/organisms/table/table.styles';
 import {
   type DspAvatarItem,
@@ -83,12 +82,11 @@ export const LibraryCatalogArtworkCell = memo(
     readonly asset: LibraryReleaseAsset;
   }) {
     return (
-      <ArtworkFrame
-        size='thumbnail'
+      <LibraryMediaThumbnail
+        asset={asset}
+        size='row'
         className='system-b-library-artwork-shell block h-9 w-9'
-      >
-        <LibraryMediaThumbnail asset={asset} size='row' />
-      </ArtworkFrame>
+      />
     );
   }
 );

@@ -1,4 +1,4 @@
-import { fireEvent, render, screen } from '@testing-library/react';
+import { render, screen } from '@testing-library/react';
 import type { ComponentProps } from 'react';
 import { describe, expect, it, vi } from 'vitest';
 import { LibraryMediaThumbnail } from '@/app/app/(shell)/library/LibraryMediaThumbnail';
@@ -29,6 +29,9 @@ function buildAsset(
     releaseDate: '2026-04-28T00:00:00.000Z',
     releaseType: 'single',
     status: 'released',
+    approvalStatus: 'draft',
+    profileVisibility: 'visible',
+    lifecycleStatus: 'active',
     trackCount: 1,
     providerCount: 1,
     providers: [],
@@ -98,28 +101,31 @@ describe('LibraryMediaThumbnail', () => {
   it.each([
     ['card', 'rounded-[7%]'],
     ['drawer', 'rounded-[10%]'],
-  ] as const)('maps the %s fallback to the appropriate artwork corner radius', (size, expectedRadius) => {
-    const { container } = render(
-      <LibraryMediaThumbnail
-        asset={buildAsset({
-          artworkUrl: null,
-          previewUrl: null,
-          videoUrl: null,
-        })}
-        size={size}
-      />
-    );
+  ] as const)(
+    'maps the %s fallback to the appropriate artwork corner radius',
+    (size, expectedRadius) => {
+      const { container } = render(
+        <LibraryMediaThumbnail
+          asset={buildAsset({
+            artworkUrl: null,
+            previewUrl: null,
+            videoUrl: null,
+          })}
+          size={size}
+        />
+      );
 
-    expect(
-      container.querySelector('[data-artwork-fallback-sleeve="true"]')
-    ).toHaveClass(expectedRadius);
-    expect(
-      screen.getByTestId('library-media-thumbnail-release-1')
-    ).toHaveAttribute(
-      'data-artwork-frame',
-      size === 'drawer' ? 'hero' : 'default'
-    );
-  });
+      expect(
+        container.querySelector('[data-artwork-fallback-sleeve="true"]')
+      ).toHaveClass(expectedRadius);
+      expect(
+        screen.getByTestId('library-media-thumbnail-release-1')
+      ).toHaveAttribute(
+        'data-artwork-frame',
+        size === 'drawer' ? 'hero' : 'default'
+      );
+    }
+  );
 
   it('uses a flat, subtly rounded fallback for row thumbnails', () => {
     render(
@@ -149,18 +155,19 @@ describe('LibraryMediaThumbnail', () => {
     ).toBeNull();
   });
 
-  it('preserves the real artwork image for row thumbnails', () => {
+  it('preserves the real artwork image inside the caller-owned row frame', () => {
     const { container } = render(
       <LibraryMediaThumbnail
         asset={buildAsset({ previewUrl: null, videoUrl: null })}
         size='row'
+        className='h-9 w-9'
       />
     );
 
-    expect(container.querySelector('img')).toHaveAttribute(
-      'src',
-      'https://cdn.example.com/artwork.jpg'
-    );
+    const image = container.querySelector('img');
+    expect(image).toHaveAttribute('src', 'https://cdn.example.com/artwork.jpg');
+    expect(image).toHaveClass('h-full', 'w-full', 'object-contain');
+    expect(image).not.toHaveClass('h-10', 'w-10', 'object-cover');
     expect(
       screen
         .queryByTestId('library-media-thumbnail-release-1')
@@ -168,46 +175,53 @@ describe('LibraryMediaThumbnail', () => {
     ).toBeNull();
   });
 
-  it('reveals an audio waveform scrub overlay on hover', () => {
+  it('rejects the deliberate-red cropped media-card thumbnail recipe', () => {
+    const { container } = render(
+      <>
+        <div data-testid='cropped-library-thumbnail-fixture'>
+          <img
+            alt=''
+            data-testid='cropped-library-thumbnail-fixture-image'
+            className='h-10 w-10 object-cover'
+          />
+        </div>
+        <LibraryMediaThumbnail
+          asset={buildAsset({
+            id: 'merch-1',
+            itemKind: 'merch',
+            title: 'Never Say A Word Hoodie',
+            previewUrl: null,
+            videoUrl: null,
+          })}
+          size='card'
+        />
+      </>
+    );
+
+    expect(
+      screen.getByTestId('cropped-library-thumbnail-fixture-image')
+    ).toHaveClass('object-cover');
+    const productionImage = container.querySelector(
+      '[data-testid="library-media-thumbnail-merch-1"] img'
+    );
+    expect(productionImage).toHaveClass('object-contain', 'h-full', 'w-full');
+    expect(productionImage).not.toHaveClass('object-cover');
+  });
+
+  it('keeps verified audio thumbnails static while playback is owned by card actions', () => {
     render(<LibraryMediaThumbnail asset={buildAsset()} size='card' />);
 
     const thumbnail = screen.getByTestId('library-media-thumbnail-release-1');
-    const scrubSurface = screen.getByTestId(
-      'library-media-scrub-surface-release-1'
-    );
-    expect(thumbnail).toHaveAttribute('data-preview-mode', 'audio');
-
-    vi.spyOn(scrubSurface, 'getBoundingClientRect').mockReturnValue({
-      x: 0,
-      y: 0,
-      top: 0,
-      left: 0,
-      right: 200,
-      bottom: 200,
-      width: 200,
-      height: 200,
-      toJSON: () => ({}),
-    });
-
-    fireEvent.mouseEnter(scrubSurface, { clientX: 100 });
-    fireEvent.mouseMove(scrubSurface, { clientX: 100 });
-
-    const overlay = screen.getByTestId('library-audio-waveform-thumbnail');
-    expect(overlay).toHaveAttribute('aria-hidden', 'false');
-    expect(screen.getByText('1:46')).toBeInTheDocument();
+    expect(thumbnail).toHaveAttribute('data-preview-mode', 'static');
+    expect(
+      screen.queryByTestId('library-media-scrub-surface-release-1')
+    ).not.toBeInTheDocument();
+    expect(
+      screen.queryByTestId('library-audio-waveform-thumbnail')
+    ).not.toBeInTheDocument();
   });
 
-  it('enables artwork hover zoom for merch and image assets', () => {
-    Object.defineProperty(globalThis, 'matchMedia', {
-      writable: true,
-      value: vi.fn().mockImplementation((query: string) => ({
-        matches: false,
-        media: query,
-        addEventListener: vi.fn(),
-        removeEventListener: vi.fn(),
-      })),
-    });
-
+  it('keeps merch and image thumbnails free of hover zoom chrome', () => {
     render(
       <LibraryMediaThumbnail
         asset={buildAsset({
@@ -219,29 +233,15 @@ describe('LibraryMediaThumbnail', () => {
       />
     );
 
-    const zoomSurface = screen.getByTestId(
-      'library-artwork-hover-zoom-surface'
-    );
-    vi.spyOn(zoomSurface, 'getBoundingClientRect').mockReturnValue({
-      x: 0,
-      y: 0,
-      top: 0,
-      left: 0,
-      right: 200,
-      bottom: 200,
-      width: 200,
-      height: 200,
-      toJSON: () => ({}),
-    });
-    fireEvent.mouseEnter(zoomSurface, { clientX: 40, clientY: 40 });
-    fireEvent.mouseMove(zoomSurface, { clientX: 60, clientY: 80 });
-
     expect(
-      screen.getByTestId('library-artwork-hover-zoom-popover')
-    ).toBeInTheDocument();
+      screen.queryByTestId('library-artwork-hover-zoom-surface')
+    ).not.toBeInTheDocument();
+    expect(
+      screen.queryByTestId('library-artwork-hover-zoom-popover')
+    ).not.toBeInTheDocument();
   });
 
-  it('prefers video scrub previews when a canvas video URL exists', () => {
+  it('keeps video thumbnails static while playback is owned by card actions', () => {
     render(
       <LibraryMediaThumbnail
         asset={buildAsset({
@@ -252,18 +252,13 @@ describe('LibraryMediaThumbnail', () => {
     );
 
     const thumbnail = screen.getByTestId('library-media-thumbnail-release-1');
-    const scrubSurface = screen.getByTestId(
-      'library-media-scrub-surface-release-1'
-    );
-    expect(thumbnail).toHaveAttribute('data-preview-mode', 'video');
-
-    fireEvent.mouseEnter(scrubSurface, { clientX: 40 });
-    fireEvent.mouseMove(scrubSurface, { clientX: 80 });
-
-    expect(screen.getByTestId('library-video-scrub-thumbnail')).toHaveAttribute(
-      'aria-hidden',
-      'false'
-    );
+    expect(thumbnail).toHaveAttribute('data-preview-mode', 'static');
+    expect(
+      screen.queryByTestId('library-media-scrub-surface-release-1')
+    ).not.toBeInTheDocument();
+    expect(
+      screen.queryByTestId('library-video-scrub-thumbnail')
+    ).not.toBeInTheDocument();
     expect(
       screen.queryByTestId('library-audio-waveform-thumbnail')
     ).not.toBeInTheDocument();

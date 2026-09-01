@@ -1445,34 +1445,6 @@ const AssetCard = memo(function AssetCard({
             )}
           >
             <LibraryMediaThumbnail asset={asset} size='card' />
-            {/*
-              Two status axes, always reserved in a fixed stack so card layout
-              never shifts between draft/approved states (#10384 / JOV-3333).
-            */}
-            <div className='absolute left-2 top-2 flex max-w-[calc(100%-3.5rem)] flex-col items-start gap-1'>
-              <span
-                role='status'
-                className={cn(
-                  'system-b-library-card-status inline-flex max-w-full truncate rounded-full border px-1.5 py-0.5 leading-4',
-                  releaseStatusClasses(asset.status)
-                )}
-                data-testid={`library-release-status-${asset.id}`}
-                aria-label={`Release Status: ${formatLibraryStatus(asset)}`}
-              >
-                {formatLibraryStatus(asset)}
-              </span>
-              <span
-                role='status'
-                className={cn(
-                  'system-b-library-card-status inline-flex max-w-full truncate rounded-full border px-1.5 py-0.5 leading-4',
-                  libraryApprovalStatusClasses(asset.approvalStatus)
-                )}
-                data-testid={`library-approval-status-${asset.id}`}
-                aria-label={`Approval Status: ${formatLibraryApprovalStatus(asset.approvalStatus)}`}
-              >
-                {formatLibraryApprovalStatus(asset.approvalStatus)}
-              </span>
-            </div>
           </div>
           <div className='min-w-0 p-3'>
             <div className='flex min-w-0 items-start justify-between gap-2'>
@@ -1498,6 +1470,38 @@ const AssetCard = memo(function AssetCard({
                   {formatCompactCount(asset.providerCount)}
                 </span>
               )}
+            </div>
+            {/*
+              Two status axes, always reserved in a fixed stack so card layout
+              never shifts between draft/approved states (#10384 / JOV-3333).
+              Keep them off the media frame; only playback belongs on artwork.
+            */}
+            <div
+              className='mt-2 flex min-h-11 max-w-full flex-col items-start gap-1'
+              data-testid={`library-card-status-stack-${asset.id}`}
+            >
+              <span
+                role='status'
+                className={cn(
+                  'system-b-library-card-status inline-flex max-w-full truncate rounded-full border px-1.5 py-0.5 leading-4',
+                  releaseStatusClasses(asset.status)
+                )}
+                data-testid={`library-release-status-${asset.id}`}
+                aria-label={`Release Status: ${formatLibraryStatus(asset)}`}
+              >
+                {formatLibraryStatus(asset)}
+              </span>
+              <span
+                role='status'
+                className={cn(
+                  'system-b-library-card-status inline-flex max-w-full truncate rounded-full border px-1.5 py-0.5 leading-4',
+                  libraryApprovalStatusClasses(asset.approvalStatus)
+                )}
+                data-testid={`library-approval-status-${asset.id}`}
+                aria-label={`Approval Status: ${formatLibraryApprovalStatus(asset.approvalStatus)}`}
+              >
+                {formatLibraryApprovalStatus(asset.approvalStatus)}
+              </span>
             </div>
             <div className='system-b-library-card-summary mt-2 flex min-w-0 items-center gap-1.5'>
               {getLibraryItemKind(asset) === 'merch' ? (
