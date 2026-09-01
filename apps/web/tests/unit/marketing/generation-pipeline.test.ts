@@ -368,6 +368,15 @@ describe('marketing generation pipeline', () => {
     ).toContain('missing-reflection-source');
 
     expect(
+      auditJovieImageColorDecision({
+        control: 'source-reflection',
+        subject: 'motivated Ion reflection awaiting source review',
+        sourceColor: ionScene,
+        reflectedColor: { lightness: 70, chroma: 0.12, hue: 246 },
+      })
+    ).toEqual([]);
+
+    expect(
       codes(
         auditJovieImageColorDecision({
           control: 'source-reflection',

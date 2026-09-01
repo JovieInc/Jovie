@@ -539,7 +539,7 @@ export function auditJovieImageColorDecision(
   }
 
   if (decision.control === 'source-reflection') {
-    if (!decision.reflectionSourcePresent) {
+    if (decision.reflectionSourcePresent === false) {
       findings.push(
         finding(
           'missing-reflection-source',
