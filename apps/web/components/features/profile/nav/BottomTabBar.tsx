@@ -31,6 +31,7 @@ import {
   type BottomTabKey,
   getPermittedPublicProfileNavigation,
 } from '@/lib/profile/route-config';
+import { TAB_BAR_INTERNAL_SAFE_AREA_PADDING } from '@/lib/profile/nav-constants';
 import { cn } from '@/lib/utils';
 import type { ProfilePrimaryTab } from '../contracts';
 
@@ -112,7 +113,8 @@ export function BottomTabBar({
   return (
     <div
       className={cn(
-        'profile-floating-tab-bar shrink-0 pb-[max(env(safe-area-inset-bottom),10px)] pt-2',
+        'profile-floating-tab-bar shrink-0 pt-2',
+        TAB_BAR_INTERNAL_SAFE_AREA_PADDING,
         className
       )}
       data-testid='profile-tab-bar'
