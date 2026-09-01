@@ -1,13 +1,8 @@
 import { mkdir, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import AxeBuilder from '@axe-core/playwright';
-import {
-  expect,
-  type Locator,
-  type Page,
-  type TestInfo,
-  test,
-} from '@playwright/test';
+import type { Locator, Page, TestInfo } from '@playwright/test';
+import { expect, test } from '@playwright/test';
 
 const INPUT_MATRIX_STORY_ID = 'ui-atoms-input--conformance-matrix';
 const INPUT_FOCUS_STORY_ID = 'ui-atoms-input--keyboard-focus';
