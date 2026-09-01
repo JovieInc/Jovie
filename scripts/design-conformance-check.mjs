@@ -378,7 +378,9 @@ export function validateDesignConformance({
     }
     if (
       component.penRootId === null &&
-      (entry.referenceEligible || entry.hasPenRoot || !entry.hasPenIdentityReason)
+      (entry.referenceEligible ||
+        entry.hasPenRoot ||
+        !entry.hasPenIdentityReason)
     ) {
       add('registry-pen-binding-missing', component.id);
     } else if (

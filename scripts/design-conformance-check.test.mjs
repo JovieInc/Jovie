@@ -76,7 +76,10 @@ test('atom.input is source-bound without claiming unavailable Pen evidence', () 
 
   assert.equal(component?.state, 'source-bound');
   assert.equal(component?.penRootId, null);
-  assert.equal(issueCodes(input).includes('registry-pen-binding-missing'), false);
+  assert.equal(
+    issueCodes(input).includes('registry-pen-binding-missing'),
+    false
+  );
 });
 
 test('atom.input fails closed when its registry entry is missing', () => {

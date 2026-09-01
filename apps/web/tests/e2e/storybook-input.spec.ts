@@ -3,8 +3,8 @@ import {
   expect,
   type Locator,
   type Page,
-  test,
   type TestInfo,
+  test,
 } from '@playwright/test';
 
 const INPUT_MATRIX_STORY_ID = 'ui-atoms-input--conformance-matrix';
