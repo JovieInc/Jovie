@@ -2343,6 +2343,8 @@ html[data-profile-initial-mode]
   --color-border-subtle: rgba(168, 176, 195, 0.1);
   --color-border-default: rgba(168, 176, 195, 0.16);
   --color-border-strong: rgba(199, 237, 255, 0.26);
+  background-color: var(--color-bg-base);
+  color: var(--color-text-primary-token);
   color-scheme: dark;
 }
 
