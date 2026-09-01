@@ -27,8 +27,7 @@ export async function GET(): Promise<Response> {
     if (!entitlements.isAdmin) {
       return NextResponse.json(
         {
-          error:
-            'Reverify with an admin Ovie account to load the Taste Inbox.',
+          error: 'Reverify with an admin Ovie account to load the Taste Inbox.',
           code: 'ovie_taste_inbox_forbidden',
           action: 'reverify_admin',
         },

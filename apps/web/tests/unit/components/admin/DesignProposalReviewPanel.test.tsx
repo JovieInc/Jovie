@@ -110,7 +110,9 @@ describe('DesignProposalReviewPanel', () => {
       })
     );
 
-    await user.click(within(rejectCard).getByRole('button', { name: 'Reject' }));
+    await user.click(
+      within(rejectCard).getByRole('button', { name: 'Reject' })
+    );
     const dialog = await screen.findByRole('dialog', {
       name: 'Reject taste proposal',
     });
@@ -140,18 +142,18 @@ describe('DesignProposalReviewPanel', () => {
   });
 
   it('renders an actionable authorization failure instead of an empty inbox', async () => {
-	    const fetchMock = vi
-	      .fn()
-	      .mockResolvedValueOnce(
-	        jsonResponse(
-	          {
-	            error:
-	              'Reverify with an admin Ovie account to load the Taste Inbox.',
-	            code: 'ovie_taste_inbox_forbidden',
-	            action: 'reverify_admin',
-	          },
-	          { status: 403 }
-	        )
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValueOnce(
+        jsonResponse(
+          {
+            error:
+              'Reverify with an admin Ovie account to load the Taste Inbox.',
+            code: 'ovie_taste_inbox_forbidden',
+            action: 'reverify_admin',
+          },
+          { status: 403 }
+        )
       )
       .mockResolvedValueOnce(
         jsonResponse({
@@ -163,13 +165,13 @@ describe('DesignProposalReviewPanel', () => {
 
     const user = userEvent.setup();
     render(<DesignProposalReviewPanel />);
-	
-	    const alert = await screen.findByRole('alert');
-	    expect(alert).toHaveTextContent('Admin Access Required');
-	    expect(alert).toHaveTextContent('Reverify with an admin Ovie account');
-	    expect(
-	      screen.queryByText('No pending taste proposals.')
-	    ).not.toBeInTheDocument();
+
+    const alert = await screen.findByRole('alert');
+    expect(alert).toHaveTextContent('Admin Access Required');
+    expect(alert).toHaveTextContent('Reverify with an admin Ovie account');
+    expect(
+      screen.queryByText('No pending taste proposals.')
+    ).not.toBeInTheDocument();
 
     await user.click(screen.getByRole('button', { name: 'Retry Taste Inbox' }));
 

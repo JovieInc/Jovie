@@ -84,8 +84,7 @@ function loadErrorFromResponse(
 
   return {
     title: 'Taste Inbox Unavailable',
-    detail:
-      payload.error ?? `Taste Inbox could not load (${response.status}).`,
+    detail: payload.error ?? `Taste Inbox could not load (${response.status}).`,
   };
 }
 
@@ -113,7 +112,9 @@ function reviewErrorMessage(
   }
 
   if (response.status === 409) {
-    return payload.error ?? 'This proposal was already reviewed. Retry loading.';
+    return (
+      payload.error ?? 'This proposal was already reviewed. Retry loading.'
+    );
   }
 
   return payload.error ?? `Review failed (${response.status})`;
@@ -301,7 +302,9 @@ function notesDialogHeading(decision: PendingNotesState['decision']): string {
   return decision === 'no' ? 'Rejection Notes' : 'Approval Notes';
 }
 
-function notesDialogDescription(decision: PendingNotesState['decision']): string {
+function notesDialogDescription(
+  decision: PendingNotesState['decision']
+): string {
   if (decision === 'no') {
     return 'Capture the rejected direction so Ovie does not resurface the same version.';
   }
@@ -309,7 +312,9 @@ function notesDialogDescription(decision: PendingNotesState['decision']): string
   return 'Amendments are injected into the D5 dispatch payload.';
 }
 
-function notesDialogSubmitLabel(decision: PendingNotesState['decision']): string {
+function notesDialogSubmitLabel(
+  decision: PendingNotesState['decision']
+): string {
   return decision === 'no' ? 'Reject' : 'Approve With Notes';
 }
 

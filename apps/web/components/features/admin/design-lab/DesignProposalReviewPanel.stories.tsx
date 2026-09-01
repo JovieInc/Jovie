@@ -108,7 +108,10 @@ function MockTasteInboxFetch({
         return originalFetch(input, init);
       }
 
-      return jsonResponse({ error: 'Unhandled story request' }, { status: 404 });
+      return jsonResponse(
+        { error: 'Unhandled story request' },
+        { status: 404 }
+      );
     };
 
     return () => {
