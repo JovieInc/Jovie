@@ -61,7 +61,7 @@ function MockTasteInboxFetch({
   mode,
 }: Readonly<{
   readonly children: ReactNode;
-  readonly mode: 'pending' | 'forbidden';
+  readonly mode: 'pending' | 'forbidden' | 'loading';
 }>) {
   useEffect(() => {
     const originalFetch = globalThis.fetch;
@@ -77,10 +77,15 @@ function MockTasteInboxFetch({
         : rawUrl;
 
       if (path === '/api/admin/design-lab/proposals') {
+        if (mode === 'loading') {
+          return new Promise<Response>(() => {});
+        }
+
         if (mode === 'forbidden') {
           return jsonResponse(
             {
-              error: 'Reverify with an admin Ovie account to load the Taste Inbox.',
+              error:
+                'Reverify with an admin Ovie account to load the Taste Inbox.',
               code: 'ovie_taste_inbox_forbidden',
               action: 'reverify_admin',
             },
@@ -143,6 +148,14 @@ type Story = StoryObj<typeof meta>;
 export const Pending: Story = {
   render: () => (
     <MockTasteInboxFetch mode='pending'>
+      <DesignProposalReviewPanel />
+    </MockTasteInboxFetch>
+  ),
+};
+
+export const Loading: Story = {
+  render: () => (
+    <MockTasteInboxFetch mode='loading'>
       <DesignProposalReviewPanel />
     </MockTasteInboxFetch>
   ),
