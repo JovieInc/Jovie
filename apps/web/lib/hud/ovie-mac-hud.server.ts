@@ -123,8 +123,7 @@ export function parseOvieMacHudInFlightPullRequestsResponse(
   }
 
   const data = isRecord(payload.data) ? payload.data : null;
-  const repository =
-    data && isRecord(data.repository) ? data.repository : null;
+  const repository = data && isRecord(data.repository) ? data.repository : null;
   const pullRequests =
     repository && isRecord(repository.pullRequests)
       ? repository.pullRequests
