@@ -127,9 +127,13 @@ export const PUBLIC_ICON_RULES = [
   'Give an interactive icon an accessible name; hide a redundant decorative icon from assistive technology.',
 ] as const;
 
+const PUBLIC_SCENE_HUE_SUMMARY = JOVIE_IMAGE_COLOR_POLICY.scenePalette
+  .map(entry => `${entry.role} ${entry.sceneReference.hex}`)
+  .join(', ');
+
 export const PUBLIC_IMAGERY_RULES = [
   `${JOVIE_IMAGE_COLOR_POLICY.invariant} Jovie-owned generated brand imagery uses Scene Palette v1 before capture or generation.`,
-  `Scene hues are ${JOVIE_IMAGE_COLOR_POLICY.scenePalette.map(entry => `${entry.role} ${entry.sceneReference.hex}`).join(', ')} plus low-chroma neutrals.`,
+  `Scene hues are ${PUBLIC_SCENE_HUE_SUMMARY} plus low-chroma neutrals.`,
   'Protected real-world, biological, cultural, safety, trademark, creator-owned, and identity-bearing colors stay truthful.',
   'Conflicting protected objects are reframed, replaced, removed, reduced in salience, or rejected. They are never recolored into brand harmony.',
   'Reflections, spill, haze, glass, chrome, and puddles must agree with one physically plausible source.',
