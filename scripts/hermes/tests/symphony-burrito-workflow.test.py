@@ -8,10 +8,12 @@ import re
 import socket
 import subprocess
 import tempfile
+import threading
 import unittest
 import importlib.util
 import json
 import sys
+from http.server import BaseHTTPRequestHandler, HTTPServer
 from unittest import mock
 
 ROOT = pathlib.Path(__file__).resolve().parents[3]
@@ -745,36 +747,85 @@ class OfficialSymphonyContractTests(unittest.TestCase):
                 self.assertIn(token, result.stdout)
 
     def test_restart_refuses_active_leases(self):
-        updater = ROOT / "scripts/hermes/update-symphony-burrito.sh"
-        with tempfile.TemporaryDirectory() as tmp:
-            fake_bin = pathlib.Path(tmp) / "bin"
-            fake_bin.mkdir()
-            (fake_bin / "systemctl").write_text(
-                "#!/usr/bin/env bash\n"
-                "if [ \"$1\" = --user ] && [ \"$2\" = is-active ]; then exit 0; fi\n"
-                "echo unexpected systemctl \"$@\" >&2\n"
-                "exit 9\n"
-            )
-            (fake_bin / "curl").write_text(
-                "#!/usr/bin/env bash\n"
-                "printf '%s\\n' '{\"running\":[{\"issue_identifier\":\"JOV-1\"}],\"retrying\":[],\"blocked\":[]}'\n"
-            )
-            os.chmod(fake_bin / "systemctl", 0o755)
-            os.chmod(fake_bin / "curl", 0o755)
-            env = {
-                **os.environ,
-                "PATH": f"{fake_bin}:{os.environ['PATH']}",
-                "SYMPHONY_BURRITO_HOME": str(pathlib.Path(tmp) / "home"),
-            }
-            result = subprocess.run(
-                ["bash", str(updater), "--skip-binary"],
-                cwd=ROOT,
-                env=env,
-                capture_output=True,
-                text=True,
-            )
-            self.assertEqual(result.returncode, 75)
-            self.assertIn("RESTART_REFUSED_ACTIVE_LEASES", result.stderr)
+        class Handler(BaseHTTPRequestHandler):
+            def do_GET(self):
+                body = json.dumps(
+                    {
+                        "counts": {"running": 1, "retrying": 0, "blocked": 0},
+                        "running": [{"issue_identifier": "JOV-1"}],
+                        "polling": {"checking": False, "next_poll_in_ms": 25000},
+                    }
+                ).encode()
+                self.send_response(200)
+                self.send_header("Content-Type", "application/json")
+                self.send_header("Content-Length", str(len(body)))
+                self.end_headers()
+                self.wfile.write(body)
+
+            def log_message(self, format, *args):
+                return
+
+        server = HTTPServer(("127.0.0.1", 0), Handler)
+        thread = threading.Thread(target=server.serve_forever, daemon=True)
+        thread.start()
+        try:
+            with tempfile.TemporaryDirectory() as tmp:
+                bin_dir = pathlib.Path(tmp) / "bin"
+                bin_dir.mkdir()
+                fake_systemctl = bin_dir / "systemctl"
+                fake_systemctl.write_text(
+                    "#!/usr/bin/env bash\n"
+                    "case \"$*\" in\n"
+                    "  *\"show-environment\"*) exit 0 ;;\n"
+                    "  *\"is-active --quiet symphony-elixir.service\"*) exit 0 ;;\n"
+                    "  *\"show symphony-elixir.service\"*) printf '4242\\n'; exit 0 ;;\n"
+                    "esac\n"
+                    "exit 1\n",
+                    encoding="utf-8",
+                )
+                fake_systemctl.chmod(0o755)
+                runtime_dir = pathlib.Path(tmp) / "runtime"
+                runtime_dir.mkdir()
+                bus = socket.socket(socket.AF_UNIX)
+                bus.bind(str(runtime_dir / "bus"))
+                bus.listen(1)
+                target_home = pathlib.Path(tmp) / "home"
+                account_home = target_home / ".codex-accounts/meetjovie"
+                account_home.mkdir(parents=True)
+                account_env = target_home / ".config/symphony/codex-account.env"
+                account_env.parent.mkdir(parents=True)
+                account_env.write_text(f"CODEX_HOME={account_home}\n")
+                account_env.chmod(0o600)
+                try:
+                    result = subprocess.run(
+                        [
+                            "bash",
+                            str(ROOT / "scripts/hermes/update-symphony-burrito.sh"),
+                            "--skip-binary",
+                        ],
+                        cwd=ROOT,
+                        env={
+                            **os.environ,
+                            "PATH": f"{bin_dir}:{os.environ['PATH']}",
+                            "XDG_RUNTIME_DIR": str(runtime_dir),
+                            "DBUS_SESSION_BUS_ADDRESS": f"unix:path={runtime_dir / 'bus'}",
+                            "SYMPHONY_LINEAR_ACTIVE_ISSUES": "110",
+                            "SYMPHONY_ELIXIR_HOME": str(target_home),
+                            "SYMPHONY_STATE_URL": f"http://127.0.0.1:{server.server_address[1]}/api/v1/state",
+                        },
+                        capture_output=True,
+                        text=True,
+                    )
+                finally:
+                    bus.close()
+                self.assertEqual(result.returncode, 6, result.stderr)
+                self.assertIn("active official agents would be interrupted", result.stderr)
+                self.assertFalse(
+                    (target_home / ".config/systemd/user/symphony-elixir.service").exists()
+                )
+        finally:
+            server.shutdown()
+            server.server_close()
 
 
 if __name__ == "__main__":
