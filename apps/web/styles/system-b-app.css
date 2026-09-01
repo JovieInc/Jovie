@@ -17,12 +17,6 @@
   padding-bottom: var(--space-5);
 }
 
-:where(.system-b-onboarding-inline-notice) {
-  border-bottom: 1px solid
-    color-mix(in oklab, var(--color-error) 28%, transparent);
-  padding-bottom: var(--space-4);
-}
-
 :where(.system-b-onboarding-empty-state) {
   border-bottom: 1px solid
     color-mix(in oklab, var(--system-b-app-frame-seam) 58%, transparent);
