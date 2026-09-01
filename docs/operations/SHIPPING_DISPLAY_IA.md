@@ -4,9 +4,12 @@ The Gem ultrawide HUD and Ovie Ops are different presentations of the same
 shipping system. They may differ in density and diagnostics, but they must not
 rename or visually reinterpret the shared operational concepts below.
 
-The source contract remains `ovie.shipping-state.v1`. The Gem HUD may read the
-official Symphony API directly for higher-cadence worker detail; that does not
-authorize a second meaning for any field.
+The source contract remains `ovie.shipping-state.v1`. Its `operationalTasks`
+feed is the one task projection: stable `linear:JOV-*` identity, shared workflow
+states and deltas, and explicit local-cache freshness. Ovie and the Gem terminal
+board are presentation adapters. A Gem adapter may ingest the official Symphony
+API at higher cadence, but it must publish or consume this task contract rather
+than invent a second task model.
 
 | Concept | Canonical label | Default representation | Context that travels with it |
 |---|---|---|---|
@@ -45,6 +48,11 @@ authorize a second meaning for any field.
    the same labels, status colors, and matrix grammar. It must not duplicate
    provider polling, expose host-private diagnostics, or import collector
    machinery; founder summary and drill-down are a separate bounded consumer.
+9. Linear is canonical for operational tasks. Ovie never waits on a live Linear
+   request: it renders the latest locally reconciled projection immediately,
+   retains it through sync failures, and labels `fresh`, `stale`, `syncing`, or
+   `failed`. Terminal-only workspace and attempt details are adapter additions,
+   not changes to task identity or workflow meaning.
 
 ## Pressure thresholds
 
