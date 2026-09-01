@@ -232,7 +232,7 @@ export function inspectAuthShellHelperSourceIssues(
     return issues;
   }
 
-  if (/\b(?:sm:|md:|lg:|xl):(?:block|flex|grid|hidden)\b/.test(source)) {
+  if (/\b(?:sm|md|lg|xl):(?:block|flex|grid|hidden)\b/.test(source)) {
     issues.push('branding-owns-breakpoint');
   }
 
