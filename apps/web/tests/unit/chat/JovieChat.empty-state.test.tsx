@@ -2,7 +2,20 @@ import { fireEvent, screen, within } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { JovieChat } from '@/components/jovie/JovieChat';
+import type { FeatureIntroCatalog } from '@/components/jovie/feature-intro-contract';
 import { renderWithQueryClient } from '@/tests/utils/test-utils';
+
+const featureIntroCatalog: FeatureIntroCatalog = {
+  highlight: null,
+  whatsNewID: 'changelog:26.8.1',
+  whatsNewItems: [
+    {
+      id: '26.8.1:fixed:0',
+      text: 'Canceled sign-in stays recoverable.',
+      accent: 'accent',
+    },
+  ],
+};
 
 const mockChatState = {
   input: '',
@@ -202,7 +215,12 @@ describe('JovieChat empty state', () => {
 
   it('renders a stable docked composer with the centered welcome when no skill is featured', () => {
     const { container, getByTestId, queryByTestId, queryByText } =
-      renderWithQueryClient(<JovieChat profileId='profile-1' />);
+      renderWithQueryClient(
+        <JovieChat
+          profileId='profile-1'
+          featureIntroCatalog={featureIntroCatalog}
+        />
+      );
 
     expect(queryByTestId('chat-empty-state-top-signals')).toBeNull();
     expect(queryByTestId('chat-empty-thread-ornament')).toBeNull();
@@ -223,7 +241,11 @@ describe('JovieChat empty state', () => {
     expect(getByTestId('chat-empty-state-centered-composer')).toBeTruthy();
     expect(getByTestId('feature-intro-card')).toHaveAttribute(
       'data-mode',
-      'highlight'
+      'whatsNew'
+    );
+    expect(getByTestId('feature-intro-card')).toHaveAttribute(
+      'data-source-id',
+      'changelog:26.8.1'
     );
     // No action cards and no featured skills: welcome + intro card + docked composer.
     expect(queryByTestId('chat-empty-state-action-card-slot')).toBeNull();

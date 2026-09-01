@@ -84,6 +84,7 @@ export function JovieChat({
   isProfileComplete = false,
   chatMode,
   actionCards,
+  featureIntroCatalog,
   ambientOwnedByShell = false,
 }: JovieChatProps) {
   const initialQuerySubmitted = useRef(false);
@@ -810,6 +811,7 @@ export function JovieChat({
                 >
                   {!composerHasIntent ? (
                     <FeatureIntroHost
+                      catalog={featureIntroCatalog}
                       onHighlightCTA={() => {
                         inputRef.current?.focus();
                       }}

@@ -11,6 +11,7 @@ import {
   type ChatStarterActionId,
   starterActionToSuggestion,
 } from './starter-actions';
+import type { FeatureIntroCatalog } from './feature-intro-contract';
 
 export interface ArtistContext {
   readonly displayName: string;
@@ -70,6 +71,8 @@ export interface JovieChatProps {
   readonly isProfileComplete?: boolean;
   /** Contextual, production-backed actions surfaced in an empty thread */
   readonly actionCards?: readonly ChatActionCard[];
+  /** Source-bound What's New card catalog derived by a server route. */
+  readonly featureIntroCatalog?: FeatureIntroCatalog;
   /**
    * When the app shell owns the ambient gradient (chat routes render it at
    * the shell frame level so it bleeds behind the header to the top of the

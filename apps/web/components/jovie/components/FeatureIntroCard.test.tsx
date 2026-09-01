@@ -3,6 +3,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { APP_ROUTES } from '@/constants/routes';
 import {
   FEATURE_INTRO_STORAGE,
+  type FeatureIntroCatalog,
   type FeatureIntroKind,
 } from '../feature-intro-contract';
 import { FeatureIntroCard, FeatureIntroHost } from './FeatureIntroCard';
@@ -19,7 +20,7 @@ const highlightPresentation: FeatureIntroKind = {
 
 const whatsNewPresentation: FeatureIntroKind = {
   kind: 'whatsNew',
-  id: 'wave-1',
+  id: 'changelog:26.8.1',
   rows: [
     {
       kind: 'bullet',
@@ -41,6 +42,23 @@ const whatsNewPresentation: FeatureIntroKind = {
   ],
 };
 
+const hostCatalog: FeatureIntroCatalog = {
+  highlight: {
+    id: 'catalog-in-chat',
+    title: 'Your Catalog Is Already In Chat',
+    oneLine: 'Ask about a release, a show, or the next move.',
+    ctaTitle: 'Ask Something',
+  },
+  whatsNewID: 'changelog:26.8.1',
+  whatsNewItems: [
+    {
+      id: 'one',
+      text: 'Ask Jovie to plan the next release.',
+      accent: 'accent',
+    },
+  ],
+};
+
 describe('FeatureIntroCard', () => {
   it('renders highlight mode with a dismiss control and one primary CTA', () => {
     const onDismiss = vi.fn();
@@ -58,6 +76,10 @@ describe('FeatureIntroCard', () => {
     expect(screen.getByTestId('feature-intro-card')).toHaveAttribute(
       'data-mode',
       'highlight'
+    );
+    expect(screen.getByTestId('feature-intro-card')).toHaveAttribute(
+      'data-source-id',
+      'catalog-in-chat'
     );
     expect(
       screen.getByText('Your Catalog Is Already In Chat')
@@ -83,6 +105,10 @@ describe('FeatureIntroCard', () => {
       'data-mode',
       'whatsNew'
     );
+    expect(screen.getByTestId('feature-intro-card')).toHaveAttribute(
+      'data-source-id',
+      'changelog:26.8.1'
+    );
     expect(screen.getByText('What’s New')).toBeInTheDocument();
     expect(
       screen.getByText('Ask Jovie to plan the next release.')
@@ -101,7 +127,10 @@ describe('FeatureIntroHost', () => {
   it('persists highlight dismiss and then shows what’s new without nagging the same id', () => {
     const onHighlightCTA = vi.fn();
     const { unmount } = render(
-      <FeatureIntroHost onHighlightCTA={onHighlightCTA} />
+      <FeatureIntroHost
+        catalog={hostCatalog}
+        onHighlightCTA={onHighlightCTA}
+      />
     );
 
     expect(screen.getByTestId('feature-intro-card')).toHaveAttribute(
@@ -111,14 +140,19 @@ describe('FeatureIntroHost', () => {
     fireEvent.click(screen.getByTestId('feature-intro-dismiss'));
     expect(
       window.localStorage.getItem(FEATURE_INTRO_STORAGE.dismissedHighlightIDKey)
-    ).toBe('web-catalog-in-chat');
+    ).toBe('catalog-in-chat');
     expect(screen.getByTestId('feature-intro-card')).toHaveAttribute(
       'data-mode',
       'whatsNew'
     );
 
     unmount();
-    render(<FeatureIntroHost onHighlightCTA={onHighlightCTA} />);
+    render(
+      <FeatureIntroHost
+        catalog={hostCatalog}
+        onHighlightCTA={onHighlightCTA}
+      />
+    );
     expect(screen.getByTestId('feature-intro-card')).toHaveAttribute(
       'data-mode',
       'whatsNew'
@@ -127,7 +161,9 @@ describe('FeatureIntroHost', () => {
   });
 
   it('stays gone after both the highlight and what’s new wave are dismissed', () => {
-    const { unmount } = render(<FeatureIntroHost onHighlightCTA={vi.fn()} />);
+    const { unmount } = render(
+      <FeatureIntroHost catalog={hostCatalog} onHighlightCTA={vi.fn()} />
+    );
 
     fireEvent.click(screen.getByTestId('feature-intro-dismiss'));
     fireEvent.click(screen.getByTestId('feature-intro-dismiss'));
@@ -135,10 +171,12 @@ describe('FeatureIntroHost', () => {
     expect(screen.queryByTestId('feature-intro-card')).toBeNull();
     expect(
       window.localStorage.getItem(FEATURE_INTRO_STORAGE.dismissedWhatsNewIDKey)
-    ).toBe('web-2026-08');
+    ).toBe('changelog:26.8.1');
 
     unmount();
-    render(<FeatureIntroHost onHighlightCTA={vi.fn()} />);
+    render(
+      <FeatureIntroHost catalog={hostCatalog} onHighlightCTA={vi.fn()} />
+    );
     expect(screen.queryByTestId('feature-intro-card')).toBeNull();
   });
 });
