@@ -6,11 +6,13 @@ import {
   annotateNativeMergeQueue,
   fetchNativeMergeQueue,
 } from './lib/github-merge-queue.mjs';
-import { hydrateOpenPrStatusContexts } from './lib/github-open-prs-rest.mjs';
+import {
+  fetchOpenPrSummariesRest,
+  hydrateOpenPrGraphqlMetadata,
+  hydrateOpenPrStatusContexts,
+} from './lib/github-open-prs-rest.mjs';
 import { tryGitHubRebase } from './lib/github-update-branch.mjs';
 import {
-  bindOpenPrsToLiveBaseRefs,
-  buildLiveBaseRefQuery,
   buildPlan,
   DEFAULT_BLOCKED_LABEL,
   DEFAULT_REQUIRED_CHECKS,
@@ -210,30 +212,6 @@ async function ghJson(args, { retries = 3, token } = {}) {
 }
 
 async function fetchOpenPrs(options) {
-  const fields = [
-    'number',
-    'title',
-    'url',
-    'author',
-    'createdAt',
-    'updatedAt',
-    'isDraft',
-    'autoMergeRequest',
-    'mergeable',
-    'mergeStateStatus',
-    'baseRefName',
-    'baseRefOid',
-    'headRefName',
-    'headRefOid',
-    'headRepository',
-    'headRepositoryOwner',
-    'isCrossRepository',
-    'labels',
-    'changedFiles',
-    'additions',
-    'deletions',
-    'maintainerCanModify',
-  ];
   const request = ({ owner, name, query }) =>
     ghJson([
       'api',
@@ -245,34 +223,23 @@ async function fetchOpenPrs(options) {
       '-F',
       `name=${name}`,
     ]);
-  // Metadata without statusCheckRollup is a small paginated GraphQL query.
-  // Hydrate only the trusted commit-status receipts needed for actual
-  // conflicts, with bounded parallelism. This avoids the former 3*N REST
-  // inventory fanout while preserving exact head/base identity.
-  const metadata = await ghJson([
-    'pr',
-    'list',
-    '--repo',
-    options.repo,
-    '--state',
-    'open',
-    '--limit',
-    String(options.limit),
-    '--json',
-    fields.join(','),
-  ]);
+  const restRequest = endpoint => ghJson(['api', '--method', 'GET', endpoint]);
+  // Enumerate with REST so fleet size and large PR bodies cannot turn one
+  // generated `gh pr list` GraphQL connection into a controller-wide 502.
+  // REST omits mergeability and diff totals, so hydrate those exact-identity
+  // fields in small GraphQL batches before any classification or mutation.
+  const summaries = await fetchOpenPrSummariesRest({
+    repo: options.repo,
+    limit: options.limit,
+    request: restRequest,
+  });
+  const liveMetadata = await hydrateOpenPrGraphqlMetadata({
+    repo: options.repo,
+    prs: summaries,
+    request,
+    batchSize: 25,
+  });
   const [owner, name] = options.repo.split('/');
-  const liveMetadata =
-    metadata.length === 0
-      ? []
-      : bindOpenPrsToLiveBaseRefs({
-          prs: metadata,
-          response: await request({
-            owner,
-            name,
-            query: buildLiveBaseRefQuery(metadata),
-          }),
-        });
   const prs = await hydrateOpenPrStatusContexts({
     repo: options.repo,
     prs: liveMetadata,

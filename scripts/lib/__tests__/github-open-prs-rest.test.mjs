@@ -1,6 +1,8 @@
 import { describe, expect, it } from 'vitest';
 import {
+  fetchOpenPrSummariesRest,
   fetchOpenPrsRest,
+  hydrateOpenPrGraphqlMetadata,
   hydrateOpenPrStatusContexts,
   normalizeRestPullRequest,
 } from '../github-open-prs-rest.mjs';
@@ -44,12 +46,93 @@ function detail(number, sha = `sha-${number}`) {
 }
 
 describe('REST open PR inventory', () => {
+  it('uses REST for enumeration and bounded GraphQL batches for omitted metadata', async () => {
+    const restCalls = [];
+    const graphqlCalls = [];
+    const exactSha = number => number.toString(16).padStart(40, '0');
+    const restRequest = async endpoint => {
+      restCalls.push(endpoint);
+      if (endpoint.includes('page=1')) {
+        return Array.from({ length: 26 }, (_, index) =>
+          detail(index + 1, exactSha(index + 1))
+        );
+      }
+      return [];
+    };
+    const summaries = await fetchOpenPrSummariesRest({
+      repo: 'JovieInc/Jovie',
+      limit: 200,
+      request: restRequest,
+    });
+    const request = async ({ query }) => {
+      graphqlCalls.push(query);
+      const repository = {};
+      for (const match of query.matchAll(
+        /p(\d+):pullRequest\(number:(\d+)\)/gu
+      )) {
+        const alias = `p${match[1]}`;
+        const number = Number(match[2]);
+        repository[alias] = {
+          number,
+          baseRefName: 'main',
+          baseRefOid: 'f'.repeat(40),
+          headRefName: `codex/pr-${number}`,
+          headRefOid: exactSha(number),
+          headRepository: {
+            name: 'Jovie',
+            nameWithOwner: 'JovieInc/Jovie',
+          },
+          headRepositoryOwner: { login: 'JovieInc' },
+          isCrossRepository: false,
+          mergeable: 'MERGEABLE',
+          mergeStateStatus: 'CLEAN',
+          autoMergeRequest: null,
+          changedFiles: number,
+          additions: number * 2,
+          deletions: number,
+          maintainerCanModify: true,
+        };
+      }
+      return { data: { repository } };
+    };
+
+    const hydrated = await hydrateOpenPrGraphqlMetadata({
+      repo: 'JovieInc/Jovie',
+      prs: summaries,
+      request,
+      batchSize: 25,
+    });
+
+    expect(restCalls).toHaveLength(1);
+    expect(graphqlCalls).toHaveLength(2);
+    expect(graphqlCalls.every(query => !query.includes('body'))).toBe(true);
+    expect(hydrated).toHaveLength(26);
+    expect(hydrated[25]).toMatchObject({
+      number: 26,
+      mergeable: 'MERGEABLE',
+      mergeStateStatus: 'CLEAN',
+      changedFiles: 26,
+      headRefOid: exactSha(26),
+      baseRefOid: 'f'.repeat(40),
+    });
+  });
+
+  it('fails closed when exact GraphQL metadata omits an enumerated PR', async () => {
+    await expect(
+      hydrateOpenPrGraphqlMetadata({
+        repo: 'JovieInc/Jovie',
+        prs: [{ number: 99 }],
+        request: async () => ({ data: { repository: { p0: null } } }),
+      })
+    ).rejects.toThrow('GraphQL open-PR metadata omitted PR #99');
+  });
+
   it('paginates without GraphQL and hydrates exact-head checks', async () => {
     const calls = [];
     const request = async endpoint => {
       calls.push(endpoint);
       if (endpoint.includes('/pulls?')) {
-        return endpoint.includes('page=1')
+        return endpoint.endsWith('&page=1')
           ? Array.from({ length: 100 }, (_, index) => ({ number: index + 1 }))
           : [{ number: 101 }];
       }

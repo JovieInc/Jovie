@@ -197,7 +197,17 @@ jobs:
                 admission_reason='ci-not-successful'
                 head_sha=''
               else
-                prs_json="$(gh pr list -R "$REPO" --state open --limit 200 --json number,headRefOid,baseRefName,isDraft)"
+                prs_pages="$(gh api --method GET --paginate --slurp \
+                  "repos/$REPO/pulls?state=open&per_page=100")"
+                prs_json="$(jq -ce '
+                  (if length == 0 then [] elif (.[0] | type) == "array" then add else . end)
+                  | map({
+                    number,
+                    headRefOid: .head.sha,
+                    baseRefName: .base.ref,
+                    isDraft: (.draft == true)
+                  })
+                ' <<<"$prs_pages")"
                 matching_prs=()
                 while IFS= read -r matching_pr; do
                   [[ -n "$matching_pr" ]] && matching_prs+=("$matching_pr")
