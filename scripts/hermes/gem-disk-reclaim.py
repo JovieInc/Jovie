@@ -816,9 +816,14 @@ def default_path_from_env(name: str, fallback: pathlib.Path) -> pathlib.Path:
 def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     pre_parser = argparse.ArgumentParser(add_help=False)
     pre_parser.add_argument("--home", type=pathlib.Path, default=pathlib.Path.home())
+    pre_parser.add_argument("--gem-workspace", type=pathlib.Path)
     pre_args, _ = pre_parser.parse_known_args(argv)
     home = pre_args.home.expanduser()
-    gem_workspace = default_path_from_env(GEM_WORKSPACE_ENV, home / "gem-workspace")
+    gem_workspace = (
+        pre_args.gem_workspace.expanduser()
+        if pre_args.gem_workspace is not None
+        else default_path_from_env(GEM_WORKSPACE_ENV, home / "gem-workspace")
+    )
     receipt_root = gem_workspace / "state/gem-disk-reclaim"
     parser = argparse.ArgumentParser()
     mode = parser.add_mutually_exclusive_group()

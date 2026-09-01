@@ -162,6 +162,7 @@ class GemDiskReclaimTests(unittest.TestCase):
     def test_default_paths_follow_home_and_env_overrides(self) -> None:
         module = load_reclaim_module()
         parsed_home = self.root / "parsed-home"
+        cli_gem = self.root / "cli-gem-workspace"
         env_home = self.root / "env-gem"
         env_receipt = self.root / "receipts/latest.json"
         env_disk_receipt = self.root / "receipts/capacity.json"
@@ -182,6 +183,16 @@ class GemDiskReclaimTests(unittest.TestCase):
         self.assertEqual(args.receipt, parsed_home / "gem-workspace/state/gem-disk-reclaim/latest.json")
         self.assertEqual(args.disk_receipt, parsed_home / "gem-workspace/state/gem-disk-reclaim/capacity.json")
         self.assertEqual(args.capacity_receipt, parsed_home / "gem-workspace/state/concurrency.json")
+
+        with mock.patch("pathlib.Path.home", return_value=self.home), mock.patch.dict(
+            os.environ, clean_env, clear=True
+        ):
+            args = module.parse_args(["--dry-run", "--home", str(parsed_home), "--gem-workspace", str(cli_gem)])
+
+        self.assertEqual(args.gem_workspace, cli_gem)
+        self.assertEqual(args.receipt, cli_gem / "state/gem-disk-reclaim/latest.json")
+        self.assertEqual(args.disk_receipt, cli_gem / "state/gem-disk-reclaim/capacity.json")
+        self.assertEqual(args.capacity_receipt, cli_gem / "state/concurrency.json")
 
         env = {
             **clean_env,
