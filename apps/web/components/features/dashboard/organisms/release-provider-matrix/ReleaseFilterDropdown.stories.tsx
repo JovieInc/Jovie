@@ -42,7 +42,7 @@ const meta: Meta<typeof ReleaseFilterDropdown> = {
   parameters: {
     layout: 'centered',
     jovie: {
-      uncoveredProps: ['buttonClassName', 'iconOnly'],
+      uncoveredProps: ['buttonClassName', 'iconOnly', 'options'],
     },
   },
 };

@@ -1,5 +1,7 @@
 'use client';
 
+// @coverage-via apps/web/tests/unit/app/outreach-admin-table-normalization.test.ts
+
 import { Button, Input, Switch } from '@jovie/ui';
 import { type ColumnDef, createColumnHelper } from '@tanstack/react-table';
 import { useCallback, useEffect, useState } from 'react';

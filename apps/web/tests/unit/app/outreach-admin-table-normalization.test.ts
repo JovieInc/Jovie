@@ -33,4 +33,16 @@ describe('outreach admin table normalization', () => {
     expect(source).not.toContain("header: 'Fit score'");
     expect(source).not.toContain('@jovie/canonical-ui-label-casing');
   });
+
+  it('keeps email queue aria labels in canonical Title Case', () => {
+    const source = readSource(
+      'components/features/admin/outreach/EmailQueuePanel.tsx'
+    );
+
+    expect(source).toContain("aria-label='Toggle Campaign Emails'");
+    expect(source).toContain("aria-label='Queue Outreach Count'");
+    expect(source).not.toContain("aria-label='Toggle campaign emails'");
+    expect(source).not.toContain("aria-label='Queue outreach count'");
+    expect(source).not.toContain('@jovie/canonical-ui-label-casing');
+  });
 });
