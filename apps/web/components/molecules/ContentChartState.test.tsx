@@ -35,7 +35,9 @@ describe('ContentChartState', () => {
     );
     expect(screen.getByRole('status')).toHaveAttribute('data-state', 'empty');
     expect(screen.getByText('No usage data')).toBeInTheDocument();
-    expect(screen.getByText('No usage data available yet.')).toBeInTheDocument();
+    expect(
+      screen.getByText('No usage data available yet.')
+    ).toBeInTheDocument();
   });
 
   it('renders error chart copy with an alert and recovery action slot', () => {
