@@ -30,9 +30,7 @@ describe('FilterCheckboxItem', () => {
       />
     );
 
-    const row = screen.getByRole('menuitemcheckbox', {
-      name: 'Needs Review',
-    });
+    const row = screen.getByRole('menuitemcheckbox', { name: 'Needs Review' });
 
     expect(row).toHaveAttribute('aria-checked', 'false');
   });
@@ -48,12 +46,9 @@ describe('FilterCheckboxItem', () => {
       />
     );
 
-    fireEvent.keyDown(
-      screen.getByRole('menuitemcheckbox', { name: 'Todo' }),
-      {
-        key: 'Enter',
-      }
-    );
+    fireEvent.keyDown(screen.getByRole('menuitemcheckbox', { name: 'Todo' }), {
+      key: 'Enter',
+    });
 
     expect(onCheckedChange).toHaveBeenCalledTimes(1);
   });

@@ -1,5 +1,7 @@
 'use client';
 
+// @coverage-via apps/web/tests/unit/dashboard/ReleaseTaskRow.test.tsx
+
 import { Checkbox } from '@jovie/ui';
 import type { CSSProperties, ReactNode } from 'react';
 import type { ReleaseTaskView } from '@/lib/release-tasks/types';
