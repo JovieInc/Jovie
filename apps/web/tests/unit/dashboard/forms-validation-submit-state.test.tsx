@@ -3,26 +3,17 @@ import type { FormEvent, ImgHTMLAttributes } from 'react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type { Artist } from '@/types/db';
 
-const { mockProfileFormState, mockMusicLinksFormState } = vi.hoisted(() => {
+const {
+  mockLegacyProfileMutationState,
+  mockMusicLinksFormState,
+  mockProfileFormState,
+} = vi.hoisted(() => {
   const mockHandleSubmit = vi.fn((event: FormEvent) => event.preventDefault());
   const mockSetFormData = vi.fn();
   return {
-    mockProfileFormState: {
-      formRef: { current: null },
-      nameInputRef: { current: null },
-      loading: false as boolean,
-      error: undefined as string | undefined,
-      success: false as boolean,
-      formSubmitted: false as boolean,
-      validationErrors: {} as Record<string, string>,
-      formData: {
-        name: 'Test Artist',
-        tagline: 'Producer and DJ',
-        imageUrl: '',
-      },
-      formErrors: {} as Record<string, string>,
-      setFormData: mockSetFormData,
-      handleSubmit: mockHandleSubmit,
+    mockLegacyProfileMutationState: {
+      mutate: vi.fn(),
+      isPending: false as boolean,
     },
     mockMusicLinksFormState: {
       primaryFields: {
@@ -46,6 +37,23 @@ const { mockProfileFormState, mockMusicLinksFormState } = vi.hoisted(() => {
       error: undefined as string | undefined,
       success: false as boolean,
     },
+    mockProfileFormState: {
+      formRef: { current: null },
+      nameInputRef: { current: null },
+      loading: false as boolean,
+      error: undefined as string | undefined,
+      success: false as boolean,
+      formSubmitted: false as boolean,
+      validationErrors: {} as Record<string, string>,
+      formData: {
+        name: 'Test Artist',
+        tagline: 'Producer and DJ',
+        imageUrl: '',
+      },
+      formErrors: {} as Record<string, string>,
+      setFormData: mockSetFormData,
+      handleSubmit: mockHandleSubmit,
+    },
   };
 });
 
@@ -57,7 +65,7 @@ vi.mock(
 );
 
 vi.mock(
-  '@/features/dashboard/organisms/listen-now-form/useMusicLinksForm',
+  '@/components/features/dashboard/organisms/listen-now-form/useMusicLinksForm',
   () => ({
     useMusicLinksForm: () => mockMusicLinksFormState,
   })
@@ -77,7 +85,12 @@ vi.mock('@/components/organisms/artist-search-palette', () => ({
   ArtistSearchCommandPalette: () => null,
 }));
 
-import { ListenNowForm } from '@/features/dashboard/organisms/listen-now-form';
+vi.mock('@/lib/queries', () => ({
+  useProfileMutation: () => mockLegacyProfileMutationState,
+}));
+
+import { ListenNowForm as DashboardListenNowForm } from '@/components/features/dashboard/organisms/listen-now-form/ListenNowForm';
+import { ListenNowForm as LegacyListenNowForm } from '@/components/features/dashboard/organisms/ListenNowForm';
 import { ProfileForm } from '@/components/features/dashboard/organisms/profile-form/ProfileForm';
 
 const artist: Artist = {
@@ -108,6 +121,7 @@ describe('dashboard form validation consolidation', () => {
     mockProfileFormState.formSubmitted = false;
     mockProfileFormState.validationErrors = {};
     mockProfileFormState.formErrors = {};
+    mockLegacyProfileMutationState.isPending = false;
     mockMusicLinksFormState.loading = false;
     mockMusicLinksFormState.success = false;
     mockMusicLinksFormState.error = undefined;
@@ -161,7 +175,7 @@ describe('dashboard form validation consolidation', () => {
     mockMusicLinksFormState.error = 'Failed to save music links';
 
     const { container } = render(
-      <ListenNowForm artist={artist} onUpdate={vi.fn()} />
+      <DashboardListenNowForm artist={artist} onUpdate={vi.fn()} />
     );
 
     const submitButton = container.querySelector('button[type="submit"]');
@@ -170,6 +184,22 @@ describe('dashboard form validation consolidation', () => {
     expect(screen.getByRole('alert')).toHaveTextContent(
       'Failed to save music links'
     );
+    expect(container.querySelector('[data-slot="form-status"]')).toHaveClass(
+      'min-h-5'
+    );
+  });
+
+  it('renders legacy ListenNowForm submit progress through Button loading', () => {
+    mockLegacyProfileMutationState.isPending = true;
+
+    const { container } = render(
+      <LegacyListenNowForm artist={artist} onUpdate={vi.fn()} />
+    );
+
+    const submitButton = container.querySelector('button[type="submit"]');
+    expect(submitButton).toHaveAttribute('data-state', 'loading');
+    expect(submitButton).toHaveAttribute('aria-busy', 'true');
+    expect(screen.getByText('Update Links')).toBeInTheDocument();
     expect(container.querySelector('[data-slot="form-status"]')).toHaveClass(
       'min-h-5'
     );
