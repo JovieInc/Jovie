@@ -1,5 +1,7 @@
 'use client';
 
+// @coverage-via apps/web/tests/unit/components/admin/WaitlistSettingsPanel.test.tsx
+
 import { Button, Input } from '@jovie/ui';
 import { Hash, Loader2, ShieldCheck, UserPlus } from 'lucide-react';
 import { useEffect, useState } from 'react';

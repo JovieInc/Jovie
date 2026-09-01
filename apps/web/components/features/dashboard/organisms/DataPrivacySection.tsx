@@ -1,5 +1,7 @@
 'use client';
 
+// @coverage-via apps/web/tests/unit/dashboard/DataPrivacySection.test.tsx
+
 import { Button, ConfirmDialog, Input } from '@jovie/ui';
 import { Download, Trash2 } from 'lucide-react';
 import { useCallback, useState } from 'react';
