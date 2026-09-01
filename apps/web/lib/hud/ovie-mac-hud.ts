@@ -189,17 +189,16 @@ function normalizePullRequestNode(
   const updatedAtIso = normalizeIso(value.updatedAt);
   if (!number || !title || !url || !updatedAtIso) return null;
 
-  const author =
-    isRecord(value.author) && nonEmptyString(value.author.login)
-      ? value.author.login
-      : null;
+  const authorLogin = isRecord(value.author)
+    ? nonEmptyString(value.author.login)
+    : null;
 
   return {
     number,
     title,
     url,
     headRefName: nonEmptyString(value.headRefName) ?? 'unknown',
-    authorLogin: author,
+    authorLogin,
     updatedAtIso,
     isDraft: value.isDraft === true,
     reviewDecision: nonEmptyString(value.reviewDecision),
