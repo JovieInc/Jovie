@@ -37,9 +37,9 @@ export async function GET(request: Request, { params }: RouteParams) {
       headers,
       status: headers.has('content-range') ? 206 : 200,
     });
-  } catch (caught) {
+  } catch (error_) {
     return founderReviewErrorResponse(
-      caught,
+      error_,
       '/api/inbox/founder-reviews/[id]/media'
     );
   }
@@ -58,9 +58,9 @@ export async function DELETE(_request: Request, { params }: RouteParams) {
       { ok: true, receipt },
       { headers: NO_STORE_HEADERS }
     );
-  } catch (caught) {
+  } catch (error_) {
     return founderReviewErrorResponse(
-      caught,
+      error_,
       '/api/inbox/founder-reviews/[id]/media'
     );
   }

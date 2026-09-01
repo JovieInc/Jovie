@@ -29,8 +29,8 @@ export async function GET() {
       },
       { headers: NO_STORE_HEADERS }
     );
-  } catch (caught) {
-    return founderReviewErrorResponse(caught, '/api/inbox/founder-reviews');
+  } catch (error_) {
+    return founderReviewErrorResponse(error_, '/api/inbox/founder-reviews');
   }
 }
 
@@ -60,7 +60,7 @@ export async function POST(request: Request) {
       { ok: true, receipt },
       { status: 201, headers: NO_STORE_HEADERS }
     );
-  } catch (caught) {
-    return founderReviewErrorResponse(caught, '/api/inbox/founder-reviews');
+  } catch (error_) {
+    return founderReviewErrorResponse(error_, '/api/inbox/founder-reviews');
   }
 }

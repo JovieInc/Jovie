@@ -112,8 +112,13 @@ async function verifyRetainedMedia(input: {
     access: 'private',
     useCache: false,
   });
+  if (!blob) {
+    throw new FounderReviewError(
+      'founder-review-media-verification-failed',
+      422
+    );
+  }
   if (
-    !blob ||
     blob.statusCode !== 200 ||
     !blob.stream ||
     blob.blob.pathname !== media.pathname ||
@@ -204,7 +209,7 @@ export async function recordFounderReviewUploadLease(input: {
     .onConflictDoNothing();
   try {
     await resolveFounderReviewUserId(token.userId);
-  } catch (caught) {
+  } catch (error_) {
     try {
       await del(input.blob.url);
     } catch {
@@ -219,7 +224,7 @@ export async function recordFounderReviewUploadLease(input: {
           eq(feedbackItems.source, FOUNDER_REVIEW_UPLOAD_LEASE_SOURCE)
         )
       );
-    throw caught;
+    throw error_;
   }
 }
 
@@ -612,7 +617,10 @@ export async function getFounderReviewMedia(input: {
     useCache: false,
     ...(input.range ? { headers: { Range: input.range } } : {}),
   });
-  if (!blob || blob.statusCode !== 200 || !blob.stream) {
+  if (!blob) {
+    throw new FounderReviewError('founder-review-media-unavailable', 404);
+  }
+  if (blob.statusCode !== 200 || !blob.stream) {
     throw new FounderReviewError('founder-review-media-unavailable', 404);
   }
   return blob;

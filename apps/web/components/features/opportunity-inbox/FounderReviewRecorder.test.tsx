@@ -191,7 +191,7 @@ describe('FounderReviewRecorder', () => {
       ref.current?.reject();
     });
 
-    expect(hoisted.createReview).toHaveBeenCalledTimes(1);
+    await waitFor(() => expect(hoisted.createReview).toHaveBeenCalledTimes(1));
     expect(hoisted.createReview).toHaveBeenCalledWith(
       expect.objectContaining({ decision: 'approved' })
     );

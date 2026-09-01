@@ -317,13 +317,9 @@ export function OpportunityInboxPageClient({
   const handleRecordedNextStep = useCallback(
     async (id: string) => {
       latestStackActionIdRef.current = id;
-      try {
-        await nextStepMutation.mutateAsync(id);
-        setCards(current => current.filter(card => card.id !== id));
-        scheduleStackFocusRecovery(id);
-      } catch (error) {
-        throw error;
-      }
+      await nextStepMutation.mutateAsync(id);
+      setCards(current => current.filter(card => card.id !== id));
+      scheduleStackFocusRecovery(id);
     },
     [nextStepMutation, scheduleStackFocusRecovery]
   );
