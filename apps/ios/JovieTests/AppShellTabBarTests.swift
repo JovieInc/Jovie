@@ -327,7 +327,7 @@ struct LibraryItemScreenTests {
     #expect(LibraryItemScreenMetrics.backAccessibilityIdentifier == "library-item-back")
     #expect(LibraryItemScreenMetrics.titleAccessibilityIdentifier == "library-item-title")
     #expect(LibraryItemScreenMetrics.coverSize == 72)
-    #expect(LibraryItemScreenMetrics.videoAspect == 16.0 / 9.0)
+    #expect(abs(LibraryItemScreenMetrics.videoAspect - (16.0 / 9.0)) < 0.000_001)
   }
 
   @Test func screenIdentifierDoesNotClobberChildIdentifiers() {
