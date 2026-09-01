@@ -1,5 +1,6 @@
 'use client';
 
+import { Checkbox } from '@jovie/ui';
 import type { CSSProperties, ReactNode } from 'react';
 import type { ReleaseTaskView } from '@/lib/release-tasks/types';
 import { cn } from '@/lib/utils';
@@ -40,15 +41,11 @@ export function ReleaseTaskCheckbox({
   const isAutomated = isReleaseTaskAutomated(task);
 
   return (
-    <input
-      type='checkbox'
+    <Checkbox
       checked={isDone}
       disabled={isAutomated}
-      onChange={() => onToggle(task.id, !isDone)}
-      className={cn(
-        'flex-shrink-0 rounded accent-accent cursor-pointer disabled:cursor-default disabled:opacity-60 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/55 focus-visible:ring-offset-1 focus-visible:ring-offset-base outline-none transition-[box-shadow] duration-subtle ease-subtle',
-        className
-      )}
+      onCheckedChange={checked => onToggle(task.id, checked === true)}
+      className={cn('flex-shrink-0', className)}
       aria-label={`Mark "${task.title}" as ${isDone ? 'incomplete' : 'complete'}`}
     />
   );

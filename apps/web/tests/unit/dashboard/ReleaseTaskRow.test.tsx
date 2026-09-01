@@ -57,6 +57,27 @@ describe('ReleaseTaskRow', () => {
     expect(onToggle).toHaveBeenCalledWith('task_1', true);
   });
 
+  it('renders the full row checkbox through the canonical control state contract', () => {
+    render(
+      <ReleaseTaskRow
+        task={createTask({ status: 'done' })}
+        onToggle={vi.fn()}
+      />
+    );
+
+    const checkbox = screen.getByRole('checkbox', {
+      name: 'Mark "Pitch playlist editors" as incomplete',
+    });
+
+    expect(checkbox.tagName).toBe('BUTTON');
+    expect(checkbox).toHaveAttribute('data-state', 'checked');
+    expect(checkbox.className).toContain(
+      'data-[state=checked]:bg-btn-primary'
+    );
+    expect(checkbox.className).toContain('before:h-11');
+    expect(checkbox.className).not.toContain('accent-accent');
+  });
+
   it('disables the shared checkbox for automated tasks', () => {
     render(
       <ReleaseTaskRow
