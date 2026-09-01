@@ -14,24 +14,33 @@ const defaultSettings: WaitlistSettingsResponse = {
   autoAcceptResetsAt: '2026-09-02T00:00:00.000Z',
 };
 
-function createStoryQueryClient(settings: WaitlistSettingsResponse) {
+function createStoryQueryClient(
+  settings: WaitlistSettingsResponse,
+  isLoading: boolean
+) {
   const client = new QueryClient({
     defaultOptions: {
       queries: { retry: false, staleTime: Infinity },
       mutations: { retry: false },
     },
   });
-  client.setQueryData(queryKeys.admin.waitlistSettings(), settings);
+  if (!isLoading) {
+    client.setQueryData(queryKeys.admin.waitlistSettings(), settings);
+  }
   return client;
 }
 
 function createWaitlistSettingsFetchMock(
   settings: WaitlistSettingsResponse,
-  originalFetch: typeof fetch
+  originalFetch: typeof fetch,
+  isLoading: boolean
 ): typeof fetch {
   return ((input: RequestInfo | URL, init?: RequestInit) => {
     const url = typeof input === 'string' ? input : input.toString();
     if (url.includes(APP_ROUTES.ADMIN_WAITLIST_SETTINGS)) {
+      if (isLoading) {
+        return new Promise<Response>(() => undefined);
+      }
       return Promise.resolve(
         new Response(JSON.stringify({ settings }), { status: 200 })
       );
@@ -41,13 +50,15 @@ function createWaitlistSettingsFetchMock(
 }
 
 function WaitlistSettingsStory({
+  isLoading = false,
   settings = defaultSettings,
 }: {
+  readonly isLoading?: boolean;
   readonly settings?: WaitlistSettingsResponse;
 }) {
   const queryClient = React.useMemo(
-    () => createStoryQueryClient(settings),
-    [settings]
+    () => createStoryQueryClient(settings, isLoading),
+    [isLoading, settings]
   );
   const originalFetchRef = React.useRef<typeof fetch | null>(null);
 
@@ -55,14 +66,15 @@ function WaitlistSettingsStory({
     originalFetchRef.current = globalThis.fetch;
     globalThis.fetch = createWaitlistSettingsFetchMock(
       settings,
-      globalThis.fetch
+      globalThis.fetch,
+      isLoading
     );
     return () => {
       if (originalFetchRef.current) {
         globalThis.fetch = originalFetchRef.current;
       }
     };
-  }, [settings]);
+  }, [isLoading, settings]);
 
   return (
     <QueryClientProvider client={queryClient}>
@@ -99,4 +111,8 @@ export const ManualGateOnly: Story = {
       }}
     />
   ),
+};
+
+export const Loading: Story = {
+  render: () => <WaitlistSettingsStory isLoading />,
 };

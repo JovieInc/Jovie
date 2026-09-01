@@ -2,18 +2,22 @@ import { fireEvent, render, screen } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { DataPrivacySection } from '@/components/features/dashboard/organisms/DataPrivacySection';
 
-const { deleteMutationState, exportMutationState, mutateExport, signOut } =
-  vi.hoisted(() => ({
-    deleteMutationState: {
-      isPending: false,
-      mutateAsync: vi.fn(),
-    },
-    exportMutationState: {
-      isPending: false,
-    },
-    mutateExport: vi.fn(),
-    signOut: vi.fn(),
-  }));
+const {
+  deleteMutationState,
+  exportMutationState,
+  mutateExport,
+  signOut,
+} = vi.hoisted(() => ({
+  deleteMutationState: {
+    isPending: false,
+    mutateAsync: vi.fn(),
+  },
+  exportMutationState: {
+    isPending: false,
+  },
+  mutateExport: vi.fn(),
+  signOut: vi.fn(),
+}));
 
 vi.mock('@/hooks/useClerkSafe', () => ({
   useAuthSafe: () => ({
