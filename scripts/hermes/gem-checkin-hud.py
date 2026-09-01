@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import argparse
+import copy
 import json
 import math
 import os
@@ -18,7 +19,11 @@ from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import Any
 
-BLUE, PINK, PURPLE = (75, 145, 255), (255, 72, 210), (168, 85, 247)
+BLUE, PURPLE = (17, 175, 255), (169, 130, 255)
+MINT, ORANGE, RED = (57, 229, 140), (255, 200, 87), (255, 103, 125)
+# Compatibility alias for existing failure call sites. Pulse pink is not a
+# danger color in the Jovie system; failures use the canonical danger red.
+PINK = RED
 DIM, FG = (138, 138, 148), (236, 236, 240)
 BG = (10, 10, 10)
 BARS = "▁▂▃▄▅▆▇█"
@@ -70,9 +75,9 @@ CHECK_FAILURE = frozenset({"failure", "failed", "error", "cancelled", "timed_out
 CHECK_SUCCESS = frozenset({"success", "successful", "neutral", "skipped"})
 P95_MIN_SAMPLES = 20
 P95_BASELINE_MAX_AGE_SECONDS = 300
-MIN_WIDTH = 120
+MIN_WIDTH = 80
 TARGET_WIDTH = 430
-MIN_HEIGHT = 32
+MIN_HEIGHT = 24
 TARGET_HEIGHT = 90
 PRODUCT_DESCRIPTION = "Autonomous work from Todo to merged."
 SHIPPING_DISPLAY_IA = {
@@ -89,6 +94,8 @@ SHIPPING_DISPLAY_IA = {
     "freshness": {"label": "Updated", "representation": "relative-local-time"},
 }
 _GITHUB_REFRESH_THREAD: threading.Thread | None = None
+FRAME_SOURCE_CACHE: dict[str, dict[str, Any]] = {}
+PRESSURE_METRICS = ("cpu", "memory", "disk", "io", "network", "slots")
 
 
 def _now() -> datetime:
@@ -184,6 +191,62 @@ def terminal_size(
 def terminal_width(override: int | None = None) -> int:
     """Compatibility wrapper for callers that only need the terminal width."""
     return terminal_size(width=override)[0]
+
+
+def retain_last_good_source(
+    key: str,
+    current: dict[str, Any],
+    *,
+    now: datetime,
+) -> dict[str, Any]:
+    """Keep the latest good source visible when a refresh source fails."""
+    if current.get("ok") is True:
+        if key == "pressure":
+            previous = FRAME_SOURCE_CACHE.get(key) if isinstance(FRAME_SOURCE_CACHE.get(key), dict) else {}
+            baseline = copy.deepcopy(current)
+            display = copy.deepcopy(current)
+            partial_failure = False
+            for metric_key in PRESSURE_METRICS:
+                metric = current.get(metric_key) if isinstance(current.get(metric_key), dict) else {}
+                previous_metric = previous.get(metric_key) if isinstance(previous.get(metric_key), dict) else {}
+                if metric.get("state") == "fresh":
+                    continue
+                if previous_metric.get("state") != "fresh":
+                    continue
+                retained_metric = copy.deepcopy(previous_metric)
+                retained_metric.update(
+                    {
+                        "state": "stale",
+                        "source_error": str(metric.get("error") or metric.get("state") or "source unavailable"),
+                    }
+                )
+                display[metric_key] = retained_metric
+                baseline[metric_key] = copy.deepcopy(previous_metric)
+                partial_failure = True
+            FRAME_SOURCE_CACHE[key] = baseline
+            if partial_failure:
+                display["partial_stale"] = True
+                display["source_error"] = "partial metric source failure"
+            return display
+        if current.get("stale") is not True and current.get("source_error") is None:
+            FRAME_SOURCE_CACHE[key] = copy.deepcopy(current)
+        return current
+    previous = FRAME_SOURCE_CACHE.get(key)
+    if not isinstance(previous, dict):
+        return current
+    retained = copy.deepcopy(previous)
+    retained.update(
+        {
+            "ok": True,
+            "stale": True,
+            "source_error": str(current.get("error") or "source unavailable"),
+            "source_error_at": now.isoformat(),
+            "retained_all": True,
+        }
+    )
+    if key == "symphony":
+        retained["up"] = False
+    return retained
 
 
 def natural_time(value: Any, *, now: datetime | None = None) -> str:
@@ -636,10 +699,11 @@ def fetch_system_pressure(
     current_net = _net_sample()
     prior = load_json_dict(state_path)
     prior_at = _iso(prior.get("at"))
-    network_pct = network_mbps = None
+    network_pct = network_mbps = network_window_seconds = None
     if current_net is not None and prior_at is not None:
         seconds = (clock - prior_at).total_seconds()
         if 0.5 <= seconds <= 120:
+            network_window_seconds = seconds
             rx_bps = max(0.0, (current_net["rx"] - (_int(prior.get("rx")) or 0)) * 8 / seconds)
             tx_bps = max(0.0, (current_net["tx"] - (_int(prior.get("tx")) or 0)) * 8 / seconds)
             network_mbps = max(rx_bps, tx_bps) / 1_000_000
@@ -668,6 +732,8 @@ def fetch_system_pressure(
             "psi": cpu_psi.get("some"),
             "source": "getloadavg + /proc/pressure/cpu",
             "unit": "load/PSI percent",
+            "window": "load1 + PSI avg10",
+            "denominator": f"{dash(cpu_count)} cores; red at 125%",
             "sampled_at": sampled_at if cpu_state == "fresh" else None,
             "error": cpu_psi.get("error") if cpu_state == "error" else None,
         },
@@ -678,6 +744,8 @@ def fetch_system_pressure(
             "psi": memory_psi.get("some"),
             "source": "/proc/meminfo + /proc/pressure/memory",
             "unit": "free/PSI percent",
+            "window": "point + PSI avg10",
+            "denominator": "100% memory; PSI red at 30%",
             "sampled_at": sampled_at if memory_state == "fresh" else None,
             "error": (memory_error or memory_psi.get("error")) if memory_state == "error" else None,
         },
@@ -688,6 +756,8 @@ def fetch_system_pressure(
             "available_pct": disk_available_pct,
             "source": "shutil.disk_usage('/')",
             "unit": "capacity percent",
+            "window": "point",
+            "denominator": "100% root volume",
             "sampled_at": sampled_at if disk_state == "fresh" else None,
             "error": disk_error if disk_state == "error" else None,
         },
@@ -697,7 +767,9 @@ def fetch_system_pressure(
             "some_avg10_pct": io_psi.get("some"),
             "full_avg10_pct": io_psi.get("full"),
             "source": "/proc/pressure/io",
-            "unit": "stall percent over 10s",
+            "unit": "stall percent",
+            "window": "avg10",
+            "denominator": "red at 20% full stall",
             "sampled_at": sampled_at if io_state == "fresh" else None,
             "error": io_psi.get("error") if io_state == "error" else None,
         },
@@ -709,6 +781,8 @@ def fetch_system_pressure(
             "speed_mbps": None if current_net is None else current_net.get("speed_mbps"),
             "source": "/proc/net/dev + /sys/class/net",
             "unit": "Mbps/link percent",
+            "window": None if network_window_seconds is None else f"{network_window_seconds:.1f} seconds",
+            "denominator": "link speed unknown" if current_net is None or current_net.get("speed_mbps") is None else f"{current_net['speed_mbps']} Mbps link",
             "sampled_at": sampled_at if network_state == "fresh" else None,
         },
         "slots": {
@@ -719,6 +793,8 @@ def fetch_system_pressure(
             "cap": cap,
             "source": "Symphony state",
             "unit": "agents/capacity percent",
+            "window": "point",
+            "denominator": f"{dash(cap)} configured agents",
             "sampled_at": sampled_at if slots_state == "fresh" else None,
         },
     }
@@ -1089,8 +1165,8 @@ def fetch_symphony(url: str, *, timeout: float = 3.0, cap: int | None = None) ->
             elif status not in {"queued", "done", "canceled", "cancelled"}:
                 running_items.append(item)
     rows = (
-        [_normalize_row(item, "retrying") for item in retrying_items]
-        + [_normalize_row(item, "blocked") for item in blocked_items]
+        [_normalize_row(item, "blocked") for item in blocked_items]
+        + [_normalize_row(item, "retrying") for item in retrying_items]
         + [_normalize_row(item, "running") for item in running_items]
     )
     def _count(key: str, items: list[dict[str, Any]]) -> int | None:
@@ -1127,7 +1203,7 @@ def fetch_mq(*, timeout: float = 8.0) -> dict[str, Any]:
             (((payload.get("data") or {}).get("repository") or {}).get("mergeQueue") or {}).get("entries") or {}
         ).get("nodes") or []
     except (OSError, subprocess.SubprocessError, json.JSONDecodeError, TypeError, AttributeError):
-        return {"ok": False, "count": None, "rows": []}
+        return {"ok": False, "count": None, "rows": [], "generated_at": None}
     rows = []
     for node in nodes:
         if not isinstance(node, dict):
@@ -1135,7 +1211,7 @@ def fetch_mq(*, timeout: float = 8.0) -> dict[str, Any]:
         pr = node.get("pullRequest") if isinstance(node.get("pullRequest"), dict) else {}
         number = pr.get("number")
         rows.append({"kind": "mq", "number": number if isinstance(number, int) else None, "title": _text(pr, ("title",)), "enqueued": node.get("enqueuedAt"), "position": node.get("position")})
-    return {"ok": True, "count": len(rows), "rows": rows}
+    return {"ok": True, "count": len(rows), "rows": rows, "generated_at": _now().isoformat()}
 
 
 def _linear_request(query: str, *, timeout: float) -> dict[str, Any] | None:
@@ -1401,13 +1477,131 @@ def _header(
     freshness: str,
     width: int,
 ) -> str:
-    parts = [_rgb(FG, "● JOVIE", bold=True), _rgb(DIM, "shipping cockpit"), _rgb(FG, "main")]
+    brand = "● JOVIE" if width < 120 else "● JOVIE · SYMPHONY"
+    parts = [_rgb(FG, brand, bold=True), _rgb(DIM, "shipping cockpit"), _rgb(FG, "main")]
     if sha:
         parts.append(_rgb(DIM, sha))
     left = f" {_rgb(DIM, '·')} ".join(parts)
     right = _rgb(DIM, f"Updated {freshness}")
     gap = max(2, width - visible_len(left) - visible_len(right))
     return pad_visible(left + (" " * gap) + right, width)
+
+
+def _operator_health(
+    *,
+    symphony: dict[str, Any],
+    pressure: dict[str, Any] | None,
+    mq: dict[str, Any],
+    ship_path: dict[str, Any],
+    pr_flow: dict[str, Any] | None,
+    now: datetime,
+) -> tuple[str, list[str]]:
+    events: list[tuple[int, str]] = []
+    if symphony.get("source_error"):
+        events.append((3, "SYMPHONY SOURCE ERROR · LAST GOOD RETAINED"))
+    elif not symphony.get("ok"):
+        events.append((3, "SYMPHONY SOURCE UNAVAILABLE"))
+    blocked = _int(symphony.get("blocked"))
+    retrying = _int(symphony.get("retrying"))
+    if blocked:
+        events.append((3, f"STALLED/BLOCKED {blocked}"))
+    if retrying:
+        events.append((2, f"RETRYING {retrying}"))
+    if symphony.get("hook_failed") not in {None, False, "", 0}:
+        events.append((3, "HOOK FAILURE"))
+
+    payload = pressure if isinstance(pressure, dict) else {}
+    metric_names = {
+        "cpu": "CPU / LOAD",
+        "memory": "MEMORY",
+        "disk": "ROOT DISK",
+        "io": "I/O FULL PSI",
+        "network": "NETWORK",
+        "slots": "WORKER SLOTS",
+    }
+    if payload.get("source_error"):
+        events.append((2, "PRESSURE SOURCE ERROR · LAST GOOD RETAINED"))
+    elif payload.get("stale") is True:
+        events.append((1, "PRESSURE SOURCE STALE"))
+    for key, label in metric_names.items():
+        metric = payload.get(key) if isinstance(payload.get(key), dict) else {}
+        state, status = str(metric.get("state") or "unknown"), str(metric.get("status") or "unknown")
+        if state == "error":
+            events.append((3, f"{label} ERROR"))
+        elif status == "failure":
+            events.append((3, f"{label} RED"))
+        elif status == "warning":
+            events.append((2, f"{label} AMBER"))
+        elif state != "fresh" or status == "unknown":
+            events.append((1, f"{label} UNKNOWN"))
+
+    stage_map = {
+        str(stage.get("id")): stage
+        for stage in (ship_path.get("stages") or [])
+        if isinstance(stage, dict) and stage.get("id")
+    }
+    if any(stage.get("stale") is True for stage in stage_map.values()):
+        events.append((1, "SHIP SOURCE STALE · LAST GOOD RETAINED"))
+    for row in (mq.get("rows") or []):
+        if not isinstance(row, dict):
+            continue
+        health = queue_age_health(row, stage_map.get("mq"), now=now)
+        if health.get("status") == "failure":
+            events.append((3, f"MQ AGE RED {health.get('label', '').split()[-1]}"))
+            break
+
+    if mq.get("source_error"):
+        events.append((2, "MQ SOURCE ERROR · LAST GOOD RETAINED"))
+
+    flow = pr_flow if isinstance(pr_flow, dict) else {}
+    failing_prs = [
+        row
+        for row in (flow.get("ci_matrix") or [])
+        if isinstance(row, dict) and row.get("all") == "failure"
+    ]
+    if failing_prs:
+        number = failing_prs[0].get("number")
+        events.append((3, f"CI FAILURE {f'#{number}' if isinstance(number, int) else ''}".rstrip()))
+
+    events.sort(key=lambda item: item[0], reverse=True)
+    if not events:
+        return "healthy", ["ALL OBSERVED SOURCES WITHIN THRESHOLDS"]
+    severity = events[0][0]
+    status = "failure" if severity == 3 else "warning" if severity == 2 else "unknown"
+    unique = list(dict.fromkeys(text for _, text in events))
+    visible = unique[:6]
+    if len(unique) > len(visible):
+        visible.append(f"+{len(unique) - len(visible)} MORE")
+    return status, visible
+
+
+def _operator_health_lines(
+    *,
+    symphony: dict[str, Any],
+    pressure: dict[str, Any] | None,
+    mq: dict[str, Any],
+    ship_path: dict[str, Any],
+    pr_flow: dict[str, Any] | None,
+    now: datetime,
+    width: int,
+) -> list[str]:
+    status, events = _operator_health(
+        symphony=symphony,
+        pressure=pressure,
+        mq=mq,
+        ship_path=ship_path,
+        pr_flow=pr_flow,
+        now=now,
+    )
+    cue = {"healthy": "✓ NORMAL", "warning": "! AMBER", "failure": "× CRITICAL"}.get(status, "? UNKNOWN")
+    color = _semantic_color(status)
+    top_text = f"┌─ {cue} · OPERATOR HEALTH "
+    top = top_text + ("─" * max(0, width - len(top_text) - 1)) + "┐"
+    inner = max(0, width - 4)
+    summary = clip(" · ".join(events), inner)
+    middle = "│ " + summary + " │"
+    bottom = "└" + ("─" * max(0, width - 2)) + "┘"
+    return [_rgb(color, top, bold=True), _rgb(color, middle, bold=status == "failure"), _rgb(color, bottom)]
 
 
 def _tile(title: str, headline: str, detail: str, spark: str, color: tuple[int, int, int], width: int) -> list[str]:
@@ -1522,12 +1716,66 @@ def _job_row(
     return _cells(BLUE, widths, "●", "-", dash(row.get("id")), dash(row.get("title") or row.get("last_message")), dash(row.get("attempt")), dash(row.get("turn")), compact_tokens(row.get("tokens_total"), row.get("tokens_in"), row.get("tokens_out")), elapsed_label(row.get("started"), now=now, seconds=row.get("seconds")), short_path(row.get("workspace") or row.get("url")))
 
 
+def _compact_work_header(width: int) -> list[str]:
+    ident, age = 12, 20
+    title = max(12, width - ident - age - 8)
+    heading = _rgb(FG, clip("CURRENT WORK · critical and stalled receipts first", width), bold=True)
+    columns = "  ".join((_cell("ST", 2), _cell("ID / POS", ident), _cell("TITLE", title), _cell("AGE / HEALTH", age, right=True)))
+    return [heading, _rgb(DIM, clip(columns, width))]
+
+
+def _compact_job_row(
+    row: dict[str, Any],
+    width: int,
+    *,
+    now: datetime,
+    stage_baselines: dict[str, dict[str, Any]],
+) -> str:
+    ident_width, age_width = 12, 20
+    title_width = max(12, width - ident_width - age_width - 8)
+    kind = str(row.get("kind") or "running")
+    ident = dash(row.get("id"))
+    title = dash(row.get("title") or row.get("error") or row.get("last_message"))
+    if kind == "mq":
+        ident = f"#{row['number']}" if isinstance(row.get("number"), int) else "-"
+        if row.get("position") is not None:
+            ident = f"{ident}/p{row['position']}"
+        health = queue_age_health(row, stage_baselines.get("mq"), now=now)
+        status = str(health.get("status") or "unknown")
+        glyph = "×" if status == "failure" else "✓" if status == "healthy" else "?"
+        age = str(health.get("label") or "? UNMEASURED")
+    elif kind == "blocked":
+        status, glyph = "failure", "×"
+        title = f"BLOCKED · {title}"
+        age = elapsed_label(row.get("started"), now=now, seconds=row.get("seconds"))
+    elif kind == "retrying":
+        status, glyph = "warning", "!"
+        title = f"RETRYING · {title}"
+        age = due_label(row.get("due_at"), now=now)
+    else:
+        status, glyph = "healthy", "●"
+        age = elapsed_label(row.get("started"), now=now, seconds=row.get("seconds"))
+    color = _semantic_color(status)
+    columns = "  ".join(
+        (
+            _cell(glyph, 2),
+            _cell(ident, ident_width),
+            _cell(title, title_width),
+            _cell(age, age_width, right=True),
+        )
+    )
+    return _rgb(color, clip(columns, width), bold=status == "failure")
+
+
 def _hero_metrics(
     symphony: dict[str, Any],
     tps: float | None,
-    mq: int | None,
+    mq: dict[str, Any],
+    pr_flow: dict[str, Any] | None,
     review: int | None,
     width: int,
+    *,
+    now: datetime,
 ) -> list[str]:
     running = symphony.get("running") if symphony.get("ok") else None
     cap = symphony.get("cap") if symphony.get("ok") else symphony.get("cap")
@@ -1538,31 +1786,82 @@ def _hero_metrics(
     seconds = symphony.get("seconds_running")
     if seconds is None and totals:
         seconds = totals.get("seconds_running")
-    throughput = "-" if tps is None else f"{compact_tokens(tps)} tps"
     agents = f"{dash(running)}/{dash(cap)}"
     retrying = _int(symphony.get("retrying"))
     blocked = _int(symphony.get("blocked"))
     failures = None if not symphony.get("ok") or retrying is None or blocked is None else retrying + blocked
     limits = format_rate_limits(symphony.get("rate_limits"))
+    mq_count = mq.get("count") if mq.get("ok") else None
+    symphony_freshness = natural_time(symphony.get("generated_at"), now=now) if symphony.get("generated_at") else "unknown"
+    mq_freshness = natural_time(mq.get("generated_at"), now=now) if mq.get("generated_at") else "unknown"
+    slots_open = dash(None if running is None or cap is None else max(0, cap - running))
+    if symphony.get("stale") is True:
+        symphony_freshness = f"STALE/ERROR · {symphony_freshness}"
+    if mq.get("stale") is True:
+        mq_freshness = f"STALE/ERROR · {mq_freshness}"
+    flow = pr_flow if isinstance(pr_flow, dict) else {}
+    flow_rows = [row for row in (flow.get("ci_matrix") or []) if isinstance(row, dict)]
+    ci_failures = sum(row.get("all") == "failure" for row in flow_rows) if flow.get("ok") is True else None
+    flow_freshness = natural_time(flow.get("generated_at"), now=now) if flow.get("generated_at") else "unknown"
     metrics = [
-        (SHIPPING_DISPLAY_IA["capacity"]["label"], agents, f"{dash(None if running is None or cap is None else max(0, cap - running))} slots open", BLUE if running else DIM),
-        (SHIPPING_DISPLAY_IA["throughput"]["label"], throughput, "live token rate", FG),
-        (SHIPPING_DISPLAY_IA["failures"]["label"], dash(failures), f"{dash(retrying)} retrying · {dash(blocked)} blocked", PINK if failures else DIM),
-        (SHIPPING_DISPLAY_IA["tokens"]["label"], total, f"{incoming} in · {outgoing} out", FG),
-        (SHIPPING_DISPLAY_IA["queue"]["label"], dash(mq), f"{dash(review)} awaiting review", PURPLE if mq else DIM),
+        (
+            SHIPPING_DISPLAY_IA["capacity"]["label"],
+            agents + (" ? STALE/ERROR" if symphony.get("stale") is True else ""),
+            f"{slots_open} open · active/configured",
+            f"Symphony :4041 · agents · point · / {dash(cap)} configured · Updated {symphony_freshness}",
+            _semantic_color(worker_slot_health_status(None if running is None or not cap else (running / cap) * 100)),
+        ),
+        (
+            SHIPPING_DISPLAY_IA["failures"]["label"],
+            f"{dash(failures)}" + (" × ACTION" if failures else " ✓ CLEAR" if failures == 0 else " ? UNKNOWN"),
+            f"{dash(blocked)} stalled/blocked · {dash(retrying)} retrying",
+            f"Symphony counts · agents · point · / {dash(cap)} configured · Updated {symphony_freshness}",
+            RED if failures else MINT if failures == 0 else DIM,
+        ),
+        (
+            SHIPPING_DISPLAY_IA["queue"]["label"],
+            f"{dash(mq_count)}"
+            + (" … WAITING" if mq_count else " ✓ CLEAR" if mq_count == 0 else " ? UNKNOWN")
+            + (" ? STALE/ERROR" if mq.get("stale") is True else ""),
+            "merge-queue entries awaiting checks",
+            f"GitHub merge queue · PRs · point · / queue entries · Updated {mq_freshness}",
+            PURPLE if mq_count else MINT if mq_count == 0 else DIM,
+        ),
+        (
+            "CI FAILURES",
+            f"{dash(ci_failures)}" + (" × ACTION" if ci_failures else " ✓ CLEAR" if ci_failures == 0 else " ? UNKNOWN"),
+            f"{len(flow_rows)} bounded open-PR rows",
+            f"GitHub cached rollup · PRs · 60s cache · / open rows · Updated {flow_freshness}",
+            RED if ci_failures else MINT if ci_failures == 0 else DIM,
+        ),
     ]
     gap = 3
     col = max(12, (width - gap * (len(metrics) - 1)) // len(metrics))
     leftover = width - (col * len(metrics) + gap * (len(metrics) - 1))
     widths = [col] * (len(metrics) - 1) + [col + leftover]
-    labels, values, details = [], [], []
-    for (label, value, detail, color), col_width in zip(metrics, widths):
-        labels.append(pad_visible(_rgb(DIM, clip(label, col_width), bold=True), col_width))
-        values.append(pad_visible(_rgb(color, clip(value, col_width), bold=True), col_width))
-        details.append(pad_visible(_rgb(DIM, clip(detail, col_width)), col_width))
+    tops, values, details, contracts, bottoms = [], [], [], [], []
+    for (label, value, detail, contract, color), col_width in zip(metrics, widths):
+        top = f"┏━ {label} " + ("━" * max(0, col_width - len(label) - 5)) + "┓"
+        bottom = "┗" + ("━" * max(0, col_width - 2)) + "┛"
+        inner = max(0, col_width - 4)
+        tops.append(pad_visible(_rgb(color, clip(top, col_width), bold=True), col_width))
+        values.append(_rgb(color, f"┃ {clip(value, inner)} ┃", bold=True))
+        details.append(_rgb(FG, f"┃ {clip(detail, inner)} ┃"))
+        contracts.append(_rgb(DIM, f"┃ {clip(contract, inner)} ┃"))
+        bottoms.append(pad_visible(_rgb(color, clip(bottom, col_width)), col_width))
     spacer = " " * gap
-    context = f"Runtime {runtime_label(seconds)}  ·  Rate limits {limits}"
-    return [spacer.join(labels), spacer.join(values), spacer.join(details), _rgb(DIM, clip(context, width))]
+    throughput = "-" if tps is None else f"{compact_tokens(tps)} tps"
+    context = f"TELEMETRY · THROUGHPUT {throughput} · TOKENS {total} ({incoming} in · {outgoing} out) · Runtime {runtime_label(seconds)} · Rate limits {limits} · Symphony account limits · provider windows"
+    if isinstance(review, int) and review > 0:
+        context += f" · Review {review}"
+    return [
+        spacer.join(tops),
+        spacer.join(values),
+        spacer.join(details),
+        spacer.join(contracts),
+        spacer.join(bottoms),
+        _rgb(DIM, clip(context, width)),
+    ]
 
 
 def _stage_bar(stage: dict[str, Any], max_p95: float | None, width: int) -> str:
@@ -1614,12 +1913,30 @@ def _pr_flow_lines(flow: dict[str, Any] | None, width: int, *, now: datetime) ->
 
 
 def _semantic_color(status: str) -> tuple[int, int, int]:
-    return BLUE if status in {"healthy", "success"} else PURPLE if status in {"warning", "pending"} else PINK if status == "failure" else DIM
+    if status in {"healthy", "success"}:
+        return MINT
+    if status == "warning":
+        return ORANGE
+    if status == "pending":
+        return PURPLE
+    if status == "failure":
+        return RED
+    return DIM
 
 
 def _pct0(value: Any) -> str:
     number = _num(value)
     return "-" if number is None else f"{number:.0f}%"
+
+
+def metric_gauge(value: Any, denominator: Any, *, width: int = 10) -> str:
+    number, maximum = _num(value), _num(denominator)
+    if width <= 0:
+        return "[]"
+    if number is None or maximum is None or maximum <= 0:
+        return "[" + ("?" * width) + "]"
+    filled = max(0, min(width, int(round((number / maximum) * width))))
+    return "[" + ("█" * filled) + ("░" * (width - filled)) + "]"
 
 
 def _metric_value(metric: dict[str, Any], raw: str, *, stale: bool) -> tuple[str, str]:
@@ -1635,18 +1952,30 @@ def _metric_value(metric: dict[str, Any], raw: str, *, stale: bool) -> tuple[str
     return (f"{raw} · {cue}", status)
 
 
-def _metric_detail(metric: dict[str, Any], prefix: str, *, now: datetime) -> str:
+def _metric_contract(metric: dict[str, Any], *, now: datetime, compact: bool = False) -> str:
     source = str(metric.get("source") or "source unknown")
     unit = str(metric.get("unit") or "unit unknown")
+    window = str(metric.get("window") or "window unknown")
+    denominator = str(metric.get("denominator") or "denominator unknown")
     stamp = natural_time(metric.get("sampled_at"), now=now) if metric.get("sampled_at") else "not sampled"
-    return " · ".join(part for part in (prefix, source, unit, stamp) if part)
+    if compact:
+        source = source.replace(" + ", "+").replace(" ", "")
+        unit = unit.replace(" percent", "%").replace(" ", "")
+        window = window.replace(" + ", "+").replace(" ", "")
+        denominator = denominator.replace(" configured agents", " agents").replace("; ", ",")
+        freshness = "now" if stamp == "just now" else stamp
+        return f"{source} · {unit} · {window} · /{denominator} · @{freshness}"
+    return f"{source} · {unit} · {window} · / {denominator} · Updated {stamp}"
 
 
 def _system_pressure_lines(pressure: dict[str, Any] | None, width: int, *, now: datetime) -> list[str]:
     payload = pressure if isinstance(pressure, dict) else {}
     known = payload.get("ok") is True
     freshness = natural_time(payload.get("generated_at"), now=now) if known else "source unavailable"
-    if payload.get("stale") is True:
+    if payload.get("source_error"):
+        prefix = "STALE/ERROR" if payload.get("retained_all") is True else "DEGRADED/ERROR"
+        freshness = f"{prefix} · {freshness}"
+    elif payload.get("stale") is True:
         freshness = f"STALE · {freshness}"
     cpu = payload.get("cpu") if isinstance(payload.get("cpu"), dict) else {}
     memory = payload.get("memory") if isinstance(payload.get("memory"), dict) else {}
@@ -1658,26 +1987,48 @@ def _system_pressure_lines(pressure: dict[str, Any] | None, width: int, *, now: 
     net_speed = _int(network.get("speed_mbps"))
     load1 = _num(cpu.get("load1"))
     load_text = "-" if load1 is None else f"{load1:.1f}"
-    stale = payload.get("stale") is True
+    stale = payload.get("retained_all") is True or (
+        payload.get("stale") is True and payload.get("partial_stale") is not True
+    )
     raw_cells = [
-        ("CPU / LOAD", _pct0(cpu.get("signal_pct")), _metric_detail(cpu, f"load {load_text}/{dash(cpu.get('cores'))} · PSI {_pct0(cpu.get('psi'))}", now=now), cpu),
-        ("MEMORY", f"{_pct0(memory.get('available_pct'))} available", _metric_detail(memory, f"PSI {_pct0(memory.get('psi'))}", now=now), memory),
-        ("ROOT DISK FREE", f"{_pct0(disk.get('available_pct'))} free", _metric_detail(disk, f"{_pct0(disk.get('used_pct'))} used", now=now), disk),
-        ("I/O FULL PSI", f"{_pct0(io.get('full_avg10_pct'))} full", _metric_detail(io, f"{_pct0(io.get('some_avg10_pct'))} some", now=now), io),
-        ("NETWORK", "rate window pending" if net_mbps is None else f"{net_mbps:.1f} Mbps", _metric_detail(network, f"{dash(net_speed)} Mbps link · {_pct0(network.get('util_pct'))}", now=now), network),
-        ("WORKER SLOTS", f"{dash(slots.get('running'))}/{dash(slots.get('cap'))}", _metric_detail(slots, f"{_pct0(slots.get('util_pct'))} used", now=now), slots),
+        ("CPU / LOAD", _pct0(cpu.get("signal_pct")), f"load {load_text}/{dash(cpu.get('cores'))} · PSI {_pct0(cpu.get('psi'))}", cpu, cpu.get("signal_pct"), 125),
+        ("MEMORY", f"{_pct0(memory.get('available_pct'))} available", f"PSI {_pct0(memory.get('psi'))}", memory, memory.get("available_pct"), 100),
+        ("ROOT DISK FREE", f"{_pct0(disk.get('available_pct'))} free", f"{_pct0(disk.get('used_pct'))} used", disk, disk.get("available_pct"), 100),
+        ("I/O FULL PSI", f"{_pct0(io.get('full_avg10_pct'))} full", f"{_pct0(io.get('some_avg10_pct'))} some", io, io.get("full_avg10_pct"), 20),
+        ("NETWORK", "rate window pending" if net_mbps is None else f"{net_mbps:.1f} Mbps", f"{dash(net_speed)} Mbps link · {_pct0(network.get('util_pct'))}", network, network.get("util_pct"), 100),
+        ("WORKER SLOTS", f"{dash(slots.get('running'))}/{dash(slots.get('cap'))}", f"{_pct0(slots.get('util_pct'))} used", slots, slots.get("util_pct"), 100),
     ]
-    cells = [(label, *_metric_value(metric, raw, stale=stale), detail) for label, raw, detail, metric in raw_cells]
+    cells = [
+        (
+            label,
+            *_metric_value(metric, raw, stale=stale or metric.get("state") == "stale"),
+            detail,
+            _metric_contract(metric, now=now),
+            metric_gauge(gauge_value, gauge_denominator),
+        )
+        for label, raw, detail, metric, gauge_value, gauge_denominator in raw_cells
+    ]
+    heading_text = f"PRIMARY CAPACITY / PRESSURE · SYSTEM PRESSURE · host projection · Updated {freshness}"
+    if width < 160:
+        result = [_rgb(FG, clip(heading_text, width), bold=True)]
+        label_width = 18
+        for (label, value, status, detail, _, gauge), (_, _, _, metric, _, _) in zip(cells, raw_cells):
+            headline = f"{_cell(label, label_width)}  {value} {gauge}"
+            result.append(_rgb(_semantic_color(status), clip(headline, width), bold=status == "failure"))
+            contract = f"  {detail} · {_metric_contract(metric, now=now, compact=True)}"
+            result.append(_rgb(DIM, clip(contract, width)))
+        return result
     gap = 3
     col = max(12, (width - gap * (len(cells) - 1)) // len(cells))
     leftover = width - (col * len(cells) + gap * (len(cells) - 1))
     widths = [col] * (len(cells) - 1) + [col + leftover]
     spacer = " " * gap
-    heading = _rgb(FG, SHIPPING_DISPLAY_IA["system_pressure"]["label"], bold=True) + _rgb(DIM, f"  ·  host projection  ·  Updated {freshness}")
-    labels = spacer.join(pad_visible(_rgb(DIM, clip(label, cell_width), bold=True), cell_width) for (label, _, _, _), cell_width in zip(cells, widths))
-    values = spacer.join(pad_visible(_rgb(_semantic_color(status), clip(value, cell_width), bold=True), cell_width) for (_, value, status, _), cell_width in zip(cells, widths))
-    details = spacer.join(pad_visible(_rgb(DIM, clip(detail, cell_width)), cell_width) for (_, _, _, detail), cell_width in zip(cells, widths))
-    return [pad_visible(heading, width), labels, values, details]
+    heading = _rgb(FG, heading_text, bold=True)
+    labels = spacer.join(pad_visible(_rgb(DIM, clip(label, cell_width), bold=True), cell_width) for (label, _, _, _, _, _), cell_width in zip(cells, widths))
+    values = spacer.join(pad_visible(_rgb(_semantic_color(status), clip(f"{value} {gauge}", cell_width), bold=True), cell_width) for (_, value, status, _, _, gauge), cell_width in zip(cells, widths))
+    details = spacer.join(pad_visible(_rgb(DIM, clip(detail, cell_width)), cell_width) for (_, _, _, detail, _, _), cell_width in zip(cells, widths))
+    contracts = spacer.join(pad_visible(_rgb(DIM, clip(contract, cell_width)), cell_width) for (_, _, _, _, contract, _), cell_width in zip(cells, widths))
+    return [pad_visible(heading, width), labels, values, details, contracts]
 
 
 def _matrix_status(status: Any, width: int) -> str:
@@ -1735,16 +2086,25 @@ def _ci_matrix_lines(flow: dict[str, Any] | None, width: int, *, now: datetime) 
 def _ship_path_lines(ship_path: dict[str, Any] | None, width: int) -> list[str]:
     payload = ship_path if isinstance(ship_path, dict) and isinstance(ship_path.get("stages"), list) else empty_ship_path()
     stages = payload.get("stages") or empty_ship_path()["stages"]
+    bottleneck = payload.get("bottleneck") if isinstance(payload.get("bottleneck"), dict) else None
+    if width < 120:
+        short_labels = {"todo": "T", "running": "R", "pr_open": "P", "ci_fast": "F", "pr_ready": "Y", "mq": "Q", "merge_group": "G", "merged": "M"}
+        path_line = "SHIP  " + " → ".join(f"{short_labels.get(str(stage.get('id')), '?')}:{dash(stage.get('count'))}" for stage in stages)
+        p95_line = "P95   " + " · ".join(
+            f"{short_labels.get(str(stage.get('id')), '?')}:{'STALE' if stage.get('stale') is True else '-' if stage.get('p95') is None else runtime_label(stage.get('p95'))}"
+            for stage in stages
+        )
+        named = f"#1 {bottleneck['reason']}" if bottleneck and bottleneck.get("reason") else "#1 unmeasured"
+        return [_rgb(FG, clip(path_line, width), bold=True), _rgb(DIM, clip(p95_line, width)), _rgb(RED if bottleneck else DIM, clip(named, width))]
     count = max(1, len(SHIP_STAGES))
     col = max(12, (max(MIN_WIDTH, width) - 2 * (count - 1)) // count)
     leftover = max(MIN_WIDTH, width) - (col * count + 2 * (count - 1))
     widths = [col] * (count - 1) + [col + leftover]
     max_p95 = max((float(stage["p95"]) for stage in stages if stage.get("p95") is not None), default=None)
-    bottleneck = payload.get("bottleneck") if isinstance(payload.get("bottleneck"), dict) else None
     labels, stats, bars = [], [], []
     for stage, col_width in zip(stages, widths):
-        color = PINK if (bottleneck and bottleneck.get("id") == stage.get("id")) or stage.get("queued") else BLUE if stage.get("p95") is not None else DIM
-        p95_text = "-" if stage.get("p95") is None else runtime_label(stage.get("p95"))
+        color = ORANGE if stage.get("stale") is True else PINK if (bottleneck and bottleneck.get("id") == stage.get("id")) or stage.get("queued") else BLUE if stage.get("p95") is not None else DIM
+        p95_text = "STALE" if stage.get("stale") is True else "-" if stage.get("p95") is None else runtime_label(stage.get("p95"))
         labels.append(pad_visible(_rgb(color, clip(str(stage.get("label") or "-"), col_width), bold=True), col_width))
         stats.append(pad_visible(_rgb(DIM, clip(f"n={dash(stage.get('count'))} p95 {p95_text}", col_width)), col_width))
         bars.append(pad_visible(_rgb(color, clip(_stage_bar(stage, max_p95, col_width), col_width)), col_width))
@@ -1791,7 +2151,7 @@ def _footer(symphony: dict[str, Any], width: int, *, now: datetime) -> str:
         f"last event {event_text}",
         f"totals in {incoming} out {outgoing}",
     ]
-    return pad_visible(_rgb(DIM, " | ".join(parts)), width)
+    return pad_visible(_rgb(DIM, clip(" | ".join(parts), width)), width)
 
 
 def render(
@@ -1810,7 +2170,9 @@ def render(
     system_pressure: dict[str, Any] | None = None,
 ) -> str:
     clock = now or _now()
-    cols, rows = terminal_size(width=width, height=height)
+    # Direct render callers get the canonical full canvas unless they request a
+    # height. The live frame path always supplies the detected terminal size.
+    cols, rows = terminal_size(width=width, height=height if height is not None else TARGET_HEIGHT)
     measured = measured if isinstance(measured, dict) else {}
     alive = compute_alive(measured.get("alive"))
     wow = compute_wow(measured.get("wow"))
@@ -1826,9 +2188,9 @@ def render(
     col = (cols - gap * 3) // 4
     leftover = cols - (col * 4 + gap * 3)
     tile_widths = [col, col, col, col + leftover]
-    alive_color = DIM if alive["status"] == UNKNOWN else BLUE if alive["status"] == "DEFAULT ALIVE" else PINK
-    wow_color = DIM if wow["rate"] is None else BLUE if wow["rate"] >= 0 else PINK
-    ships_color = BLUE if isinstance(ships["thisWeek"], int) and ships["thisWeek"] > 0 else DIM
+    alive_color = DIM if alive["status"] == UNKNOWN else MINT if alive["status"] == "DEFAULT ALIVE" else RED
+    wow_color = DIM if wow["rate"] is None else MINT if wow["rate"] >= 0 else RED
+    ships_color = MINT if isinstance(ships["thisWeek"], int) and ships["thisWeek"] > 0 else DIM
     ships_headline = UNKNOWN if ships["thisWeek"] is None else str(ships["thisWeek"])
     ships_detail = UNMEASURED if ships["thisWeek"] is None else "receipted this week"
     tiles = _tiles_row(
@@ -1840,7 +2202,6 @@ def render(
         ],
         cols,
     )
-    mq_n = mq.get("count") if mq.get("ok") else None
     header = _header(
         sha=sha,
         freshness=natural_time(symphony.get("generated_at"), now=clock),
@@ -1848,46 +2209,100 @@ def render(
     )
     widths = _col_widths(cols)
     tps_value = tps if tps is not None else compute_throughput(symphony.get("totals"), [], now=clock)
-    lines = [
-        header,
-        _rgb(DIM, PRODUCT_DESCRIPTION),
-        "",
-        *_hero_metrics(symphony, tps_value, mq_n, review, cols),
-        "",
-        *_system_pressure_lines(system_pressure, cols, now=clock),
-        "",
-        *_pr_flow_lines(pr_flow, cols, now=clock),
-        "",
-        *_ship_path_lines(path, cols),
-        "",
-        *_ci_matrix_lines(pr_flow, cols, now=clock),
-        "",
-        *tiles,
-        "",
-        _rgb(FG, SHIPPING_DISPLAY_IA["current_work"]["label"], bold=True),
-        _table_header(widths),
-        _rgb(DIM, "─" * cols),
-    ]
     stage_baselines = {
         str(stage.get("id")): stage
         for stage in (path.get("stages") or [])
         if isinstance(stage, dict) and stage.get("id")
     }
-    work_rows = [_job_row(row, widths, now=clock, stage_baselines=stage_baselines) for row in (symphony.get("rows") or [])]
-    work_rows.extend(_job_row(row, widths, now=clock, stage_baselines=stage_baselines) for row in (mq.get("rows") or []))
-    if review is None:
-        work_rows.append(_rgb(PINK, clip("v  Review -", cols)))
-    elif review > 0:
-        work_rows.append(_rgb(PINK, clip(f"v  Review {review}", cols)))
-    footer = ["", _footer(symphony, cols, now=clock)]
-    available = max(1, rows - len(lines) - len(footer))
+    compact = cols < 160
+    health_band = _operator_health_lines(
+        symphony=symphony,
+        pressure=system_pressure,
+        mq=mq,
+        ship_path=path,
+        pr_flow=pr_flow,
+        now=clock,
+        width=cols,
+    )
+    pressure_lines = _system_pressure_lines(system_pressure, cols, now=clock)
+    if compact:
+        lines = [header, *health_band, *pressure_lines, *_compact_work_header(cols)]
+        work_rows = [
+            _compact_job_row(row, cols, now=clock, stage_baselines=stage_baselines)
+            for row in [*(symphony.get("rows") or []), *(mq.get("rows") or [])]
+            if isinstance(row, dict)
+        ]
+        footer = [*_ship_path_lines(path, cols)]
+        if rows >= 32:
+            footer.extend(_pr_flow_lines(pr_flow, cols, now=clock))
+        footer.append(_footer(symphony, cols, now=clock))
+    elif rows < 48:
+        lines = [
+            header,
+            _rgb(DIM, PRODUCT_DESCRIPTION),
+            "",
+            *health_band,
+            "",
+            *_hero_metrics(symphony, tps_value, mq, pr_flow, review, cols, now=clock),
+            "",
+            *pressure_lines,
+            "",
+            _rgb(FG, "CURRENT WORK · critical and stalled receipts first", bold=True),
+            _table_header(widths),
+            _rgb(DIM, "─" * cols),
+        ]
+        work_rows = [_job_row(row, widths, now=clock, stage_baselines=stage_baselines) for row in (symphony.get("rows") or [])]
+        work_rows.extend(_job_row(row, widths, now=clock, stage_baselines=stage_baselines) for row in (mq.get("rows") or []))
+        if review is not None and review > 0:
+            work_rows.append(_rgb(ORANGE, clip(f"!  REVIEW QUEUE {review}", cols)))
+        footer = ["", *_ship_path_lines(path, cols), _footer(symphony, cols, now=clock)]
+    else:
+        lines = [
+            header,
+            _rgb(DIM, PRODUCT_DESCRIPTION),
+            "",
+            *health_band,
+            "",
+            *_hero_metrics(symphony, tps_value, mq, pr_flow, review, cols, now=clock),
+            "",
+            *pressure_lines,
+            "",
+            _rgb(FG, "CURRENT WORK · critical and stalled receipts first", bold=True),
+            _table_header(widths),
+            _rgb(DIM, "─" * cols),
+        ]
+        work_rows = [_job_row(row, widths, now=clock, stage_baselines=stage_baselines) for row in (symphony.get("rows") or [])]
+        work_rows.extend(_job_row(row, widths, now=clock, stage_baselines=stage_baselines) for row in (mq.get("rows") or []))
+        if review is not None and review > 0:
+            work_rows.append(_rgb(ORANGE, clip(f"!  REVIEW QUEUE {review}", cols)))
+        footer = [
+            "",
+            *_ship_path_lines(path, cols),
+            "",
+            *_pr_flow_lines(pr_flow, cols, now=clock),
+            "",
+            *_ci_matrix_lines(pr_flow, cols, now=clock),
+            "",
+            _rgb(FG, "BUSINESS SIGNALS · measured receipt file · weekly windows · receipt-backed", bold=True),
+            *tiles,
+            "",
+            _footer(symphony, cols, now=clock),
+        ]
+    available = max(0, rows - len(lines) - len(footer))
+    if not work_rows and available > 0:
+        work_rows = [_rgb(DIM, clip("· No active work receipts", cols))]
     if len(work_rows) > available:
-        hidden = len(work_rows) - available + 1
-        work_rows = [*work_rows[: max(0, available - 1)], _rgb(DIM, clip(f"… {hidden} more active receipts", cols))]
+        hidden = len(work_rows) - available
+        if available <= 1:
+            work_rows = work_rows[:available]
+        else:
+            work_rows = [*work_rows[: available - 1], _rgb(DIM, clip(f"… {hidden + 1} more active receipts", cols))]
     lines.extend(work_rows)
     lines.extend([""] * max(0, available - len(work_rows)))
     lines.extend(footer)
     lines = lines[:rows]
+    lines.extend([""] * max(0, rows - len(lines)))
+    lines = [pad_visible(line, cols) for line in lines]
     return f"\033[48;2;{BG[0]};{BG[1]};{BG[2]}m" + "\n".join(lines) + "\033[0m\n"
 
 
@@ -1898,10 +2313,12 @@ def frame(
     width: int | None = None,
     height: int | None = None,
 ) -> str:
+    cols, rows = terminal_size(width=width, height=height)
+    clock = _now()
     cap = read_workflow_cap()
-    symphony = fetch_symphony(symphony_url, cap=cap)
-    mq = fetch_mq()
-    linear = fetch_linear_project()
+    symphony = retain_last_good_source("symphony", fetch_symphony(symphony_url, cap=cap), now=clock)
+    mq = retain_last_good_source("mq", fetch_mq(), now=clock)
+    linear = retain_last_good_source("linear", fetch_linear_project(), now=clock)
     github_path = Path(os.environ.get("HUD_GITHUB_PATH", str(DEFAULT_GITHUB_STATE)))
     github = fetch_github_ship(
         cache_path=github_path,
@@ -1913,14 +2330,18 @@ def frame(
     tps = compute_throughput(symphony.get("totals"), snapshots)
     persist_tps_snapshot(tps_path, symphony.get("totals"))
     pressure_path = Path(os.environ.get("HUD_PRESSURE_PATH", str(DEFAULT_PRESSURE_STATE)))
-    pressure = fetch_system_pressure(symphony, state_path=pressure_path)
+    pressure = retain_last_good_source(
+        "pressure",
+        fetch_system_pressure(symphony, state_path=pressure_path, now=clock),
+        now=clock,
+    )
     return render(
         symphony=symphony,
         mq=mq,
         review=linear.get("review") if linear.get("ok") else fetch_review(),
         measured=measured,
-        width=width,
-        height=height,
+        width=cols,
+        height=rows,
         sha=fetch_sha(),
         ship_path=build_ship_path(symphony=symphony, mq=mq, linear=linear, github=github, measured=measured),
         tps=tps,
@@ -1935,9 +2356,16 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     parser.add_argument("--measured", default=os.environ.get("HUD_MEASURED_PATH", str(DEFAULT_MEASURED)))
     parser.add_argument("--symphony-url", default=DEFAULT_SYMPHONY)
     parser.add_argument("--interval", type=float, default=5.0)
+    parser.add_argument("--receipt-every", type=int, default=12)
     parser.add_argument("--width", type=int, default=None)
     parser.add_argument("--height", type=int, default=None)
     return parser.parse_args(argv)
+
+
+def refresh_prefix(*, size_changed: bool) -> str:
+    """Hide the cursor and repaint in place; clear only when geometry changes."""
+    clear = "\033[2J" if size_changed else ""
+    return f"\033[?25l{clear}\033[H"
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -1946,11 +2374,39 @@ def main(argv: list[str] | None = None) -> int:
     if args.once:
         sys.stdout.write(frame(measured_path=path, symphony_url=args.symphony_url, width=args.width, height=args.height))
         return 0
-    while True:
-        sys.stdout.write("\033[2J\033[H")
-        sys.stdout.write(frame(measured_path=path, symphony_url=args.symphony_url, width=args.width, height=args.height))
+    previous_size: tuple[int, int] | None = None
+    refresh_count = 0
+    try:
+        while True:
+            size = terminal_size(width=args.width, height=args.height)
+            render_started = time.perf_counter()
+            next_frame = frame(
+                measured_path=path,
+                symphony_url=args.symphony_url,
+                width=size[0],
+                height=size[1],
+            )
+            render_ms = (time.perf_counter() - render_started) * 1000
+            size_changed = size != previous_size
+            payload = refresh_prefix(size_changed=size_changed) + next_frame
+            write_started = time.perf_counter()
+            sys.stdout.write(payload)
+            sys.stdout.flush()
+            write_ms = (time.perf_counter() - write_started) * 1000
+            previous_size = size
+            refresh_count += 1
+            if refresh_count == 1 or (args.receipt_every > 0 and refresh_count % args.receipt_every == 0):
+                sys.stderr.write(
+                    "gem-ship-hud refresh "
+                    f"frame={refresh_count} render_ms={render_ms:.1f} write_ms={write_ms:.1f} "
+                    f"size={size[0]}x{size[1]} clear={'yes' if size_changed else 'no'} "
+                    "continuity=last-good-visible\n"
+                )
+                sys.stderr.flush()
+            time.sleep(max(0.5, args.interval))
+    finally:
+        sys.stdout.write("\033[?25h")
         sys.stdout.flush()
-        time.sleep(max(0.5, args.interval))
 
 
 if __name__ == "__main__":

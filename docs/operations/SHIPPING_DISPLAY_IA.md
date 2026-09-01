@@ -30,8 +30,9 @@ authorize a second meaning for any field.
 2. Missing measurement is unknown, never zero. Stale, disconnected, degraded,
    and unauthorized states remain explicit.
 3. Status color is semantic and redundant with text or glyph: active is Ion,
-   failures and blockers are Pulse, queued work is purple, and neutral or
-   unknown data is gray. Color never decorates borders or brand chrome.
+   healthy is Mint, warnings are Orange, failures and blockers are Red,
+   pending work is Ultra, and neutral or unknown data is gray. Color never
+   decorates borders or brand chrome.
 4. Dynamic states reserve their geometry. Worker, retry, blocked, empty, and
    overflow states must not move the top metrics, shipping path, or footer.
 5. Human-facing timestamps use natural relative local language. Exact machine
@@ -46,12 +47,63 @@ authorize a second meaning for any field.
    provider polling, expose host-private diagnostics, or import collector
    machinery; founder summary and drill-down are a separate bounded consumer.
 
+## Operator hierarchy and responsive frames
+
+The Gem HUD is a scan-first operator console. Its vertical order is stable:
+
+1. `OPERATOR HEALTH` — one bounded band that names the highest-severity
+   actionable conditions. Critical and stalled work is named in text, never by
+   color alone.
+2. Operator-action heroes — `AGENTS`, `FAILURES`, `QUEUE`, and `CI FAILURES`
+   receive the strongest bounded block treatment. Throughput, token totals,
+   runtime, and provider limits remain a secondary telemetry line because they
+   do not independently determine the next operator action.
+3. `PRIMARY CAPACITY / PRESSURE` — CPU/load, memory, root-disk capacity, I/O
+   full PSI, network, and worker slots with fixed-width gauges and visible
+   source/unit/window/denominator/freshness contracts.
+4. `CURRENT WORK` — blocked, retrying, running, and queued receipts in that
+   severity order.
+5. `SHIP`, `PR FLOW`, and `CI MATRIX` — delivery progress and bounded
+   diagnostics.
+6. `BUSINESS SIGNALS` — lower-frequency receipts that never displace operator
+   health or current work.
+
+The 430×90 frame renders the full hierarchy. Medium-height wide frames retain
+the health band, heroes, pressure, full receipt columns, and ship path while
+omitting lower-priority CI and business diagnostics. Frames narrower than 160
+columns use the compact receipt grammar; 120×40 retains PR flow, while 80×24
+retains operator health, every primary pressure metric, current work, and ship
+state. Every supported frame is exactly padded to its requested width and
+height across unavailable, constrained, critical, empty, and overflow states.
+
+The top corner uses the public product label `JOVIE · SYMPHONY`; below 120
+columns it collapses to `JOVIE` before it can displace operational content.
+
+Live refresh assembles the complete next frame off-screen, then emits
+cursor-home plus the frame in one flush. A full terminal clear occurs only on
+the first frame or after a geometry change, so a five-second data refresh does
+not flash the tty. If Symphony, merge-queue, Linear, or pressure collection
+fails after a good sample, the in-process source cache retains the last good
+values, preserves their original freshness age, and marks the source
+`STALE/ERROR` in text. The previous frame remains visible throughout the slow
+or failed collection attempt. The service emits a bounded refresh receipt on
+the first frame and every twelfth frame with render latency, terminal-write
+latency, geometry, whether a clear was required, and the continuity contract.
+
+The focused structural/golden contract is repeatable with:
+
+```bash
+python3 scripts/hermes/tests/gem-checkin-hud.test.py
+```
+
 ## Pressure thresholds
 
 The Gem collector evaluates sources independently. Disk capacity and I/O stall
 pressure are separate metrics and never share a status. A single process is
 never treated as host health. Each value carries its source, unit, sample time,
-and a text or glyph cue in addition to color.
+and a text or glyph cue in addition to color. If one pressure metric fails
+while the others remain fresh, only that metric retains its last good value and
+is marked stale; fresh sibling metrics continue updating.
 
 | Signal | Source and unit | Normal | Amber | Red | Unknown / stale |
 |---|---|---:|---:|---:|---|

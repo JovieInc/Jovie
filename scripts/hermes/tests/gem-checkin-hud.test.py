@@ -263,7 +263,7 @@ class UltrawideHudTests(unittest.TestCase):
     def test_header_has_quiet_identity_description_and_natural_freshness(self):
         state, _ = fetch_state(official_state(generated_at="2026-08-31T11:58:00Z"))
         plain = strip(paint(state, width=200, height=40))
-        self.assertIn("● JOVIE", plain)
+        self.assertIn("● JOVIE · SYMPHONY", plain)
         self.assertIn(HUD.PRODUCT_DESCRIPTION, plain)
         self.assertIn("Updated 2 minutes ago", plain)
         self.assertNotIn("2026-08-31T", plain)
@@ -295,7 +295,7 @@ class UltrawideHudTests(unittest.TestCase):
         self.assertIn("FAILURES", strip(unavailable))
         self.assertNotIn("FAILURES 0", strip(unavailable))
         self.assertIn("FAILURES", strip(failing))
-        self.assertIn("\033[38;2;255;72;210m3", failing)
+        self.assertIn("\033[38;2;255;103;125m┃ 3 × ACTION", failing)
 
     def test_numeric_work_columns_are_right_aligned_and_vendor_is_hidden(self):
         state, _ = fetch_state(official_state())
@@ -441,7 +441,7 @@ class UltrawideHudTests(unittest.TestCase):
             self.assertIn(token, plain)
         self.assertNotIn("DISK / I/O", plain)
         self.assertNotIn("#9 Work 9", plain)
-        self.assertIn("\033[38;2;255;72;210m131%", output)
+        self.assertIn("\033[38;2;255;103;125m131%", output)
 
     def test_disk_capacity_and_io_pressure_are_separate_source_metrics(self):
         psi_samples = (
@@ -476,7 +476,7 @@ class UltrawideHudTests(unittest.TestCase):
         self.assertEqual(io["full_avg10_pct"], 12)
         self.assertEqual(io["status"], "warning")
         self.assertEqual(io["source"], "/proc/pressure/io")
-        self.assertEqual(io["unit"], "stall percent over 10s")
+        self.assertEqual(io["unit"], "stall percent")
         self.assertEqual(io["state"], "fresh")
         self.assertNotIn("available_pct", io)
         self.assertNotIn("used_pct", io)
@@ -621,7 +621,7 @@ class UltrawideHudTests(unittest.TestCase):
             "slots": {"status": "healthy", "state": "fresh", "util_pct": 50, "running": 2, "cap": 4, "source": "Symphony state", "unit": "agents/capacity percent", "sampled_at": sampled_at},
         }
         plain = strip(paint(width=430, height=90, system_pressure=pressure))
-        self.assertEqual(plain.count("✓ NORMAL"), 6)
+        self.assertEqual(plain.count("✓ NORMAL"), 7)
         self.assertNotIn("× RED", plain)
         self.assertNotIn("! AMBER", plain)
         for metric in ("cpu", "memory", "disk", "io", "network", "slots"):
@@ -629,6 +629,406 @@ class UltrawideHudTests(unittest.TestCase):
                 self.assertTrue(pressure[metric]["source"])
                 self.assertTrue(pressure[metric]["unit"])
                 self.assertEqual(pressure[metric]["sampled_at"], sampled_at)
+
+    def test_operator_hierarchy_is_stable_and_critical_dominates_without_color(self):
+        sampled_at = "2026-08-31T12:00:00Z"
+        pressure = {
+            "ok": True,
+            "generated_at": sampled_at,
+            "cpu": {"status": "failure", "state": "fresh", "signal_pct": 125, "load1": 20, "cores": 16, "psi": 125, "source": "getloadavg + /proc/pressure/cpu", "unit": "load/PSI percent", "window": "load1 + PSI avg10", "denominator": "16 cores; red at 125%", "sampled_at": sampled_at},
+            "memory": {"status": "healthy", "state": "fresh", "available_pct": 50, "psi": 2, "source": "/proc/meminfo + /proc/pressure/memory", "unit": "free/PSI percent", "window": "point + PSI avg10", "denominator": "100% memory; PSI red at 30%", "sampled_at": sampled_at},
+            "disk": {"status": "warning", "state": "fresh", "available_pct": 10, "used_pct": 90, "source": "shutil.disk_usage('/')", "unit": "capacity percent", "window": "point", "denominator": "100% root volume", "sampled_at": sampled_at},
+            "io": {"status": "healthy", "state": "fresh", "some_avg10_pct": 8, "full_avg10_pct": 4, "source": "/proc/pressure/io", "unit": "stall percent", "window": "avg10", "denominator": "red at 20% full stall", "sampled_at": sampled_at},
+            "network": {"status": "healthy", "state": "fresh", "util_pct": 20, "mbps": 200, "speed_mbps": 1000, "source": "/proc/net/dev + /sys/class/net", "unit": "Mbps/link percent", "window": "5 seconds", "denominator": "1000 Mbps link", "sampled_at": sampled_at},
+            "slots": {"status": "healthy", "state": "fresh", "util_pct": 50, "running": 2, "cap": 4, "source": "Symphony state", "unit": "agents/capacity percent", "window": "point", "denominator": "4 configured agents", "sampled_at": sampled_at},
+        }
+        critical_state = {
+            "ok": True,
+            "running": 2,
+            "retrying": 1,
+            "blocked": 1,
+            "cap": 4,
+            "rows": [
+                {"kind": "blocked", "id": "JOV-1", "title": "Blocked release", "started": STARTED},
+                {"kind": "running", "id": "JOV-2", "title": "Healthy worker", "started": STARTED},
+            ],
+            "up": True,
+            "generated_at": sampled_at,
+        }
+        path = HUD.empty_ship_path()
+        path["stages"][5].update({"count": 1, "queued": True, "queue_reason": "MQ awaiting checks"})
+        path["bottleneck"] = {"id": "mq", "label": "merge queue", "reason": "MQ awaiting checks"}
+        plain = strip(
+            paint(
+                symphony=critical_state,
+                width=430,
+                height=90,
+                system_pressure=pressure,
+                ship_path=path,
+                pr_flow={"ok": True, "open_count": 1, "opened_24h": 1, "merged_24h": 0, "generated_at": sampled_at, "query_ms": 10, "ci_matrix": []},
+            )
+        )
+        self.assertIn("┌─ × CRITICAL · OPERATOR HEALTH", plain)
+        self.assertIn("STALLED/BLOCKED 1", plain)
+        self.assertIn("CPU / LOAD RED", plain)
+        order = ["OPERATOR HEALTH", "AGENTS", "PRIMARY CAPACITY / PRESSURE", "CURRENT WORK", "SHIP", "PR FLOW", "CI MATRIX", "BUSINESS SIGNALS"]
+        for before, after in zip(order, order[1:]):
+            self.assertLess(plain.index(before), plain.index(after))
+        self.assertLess(plain.index("JOV-1"), plain.index("JOV-2"))
+
+    def test_only_operator_action_metrics_receive_hero_blocks(self):
+        output = strip(
+            paint(
+                width=430,
+                height=90,
+                pr_flow={
+                    "ok": True,
+                    "open_count": 2,
+                    "generated_at": NOW.isoformat(),
+                    "ci_matrix": [{"number": 1, "all": "failure"}, {"number": 2, "all": "success"}],
+                },
+            )
+        )
+        for label in ("┏━ AGENTS", "┏━ FAILURES", "┏━ QUEUE", "┏━ CI FAILURES"):
+            self.assertIn(label, output)
+        self.assertNotIn("┏━ THROUGHPUT", output)
+        self.assertNotIn("┏━ TOKENS", output)
+        self.assertIn("TELEMETRY · THROUGHPUT", output)
+        self.assertLess(output.index("┏━ AGENTS"), output.index("PRIMARY CAPACITY / PRESSURE"))
+        hero_top = next(line for line in output.splitlines() if "┏━ AGENTS" in line)
+        self.assertEqual(hero_top.count("┓"), 4)
+        self.assertNotIn("…", hero_top)
+
+    def test_supported_terminal_layouts_are_exact_no_overflow_and_state_stable(self):
+        fixtures = (
+            {"ok": False, "running": None, "retrying": None, "blocked": None, "cap": None, "rows": [], "up": False},
+            {"ok": True, "running": 1, "retrying": 1, "blocked": 0, "cap": 4, "rows": [{"kind": "retrying", "id": "JOV-1", "title": "Retrying"}], "up": True},
+            {"ok": True, "running": 1, "retrying": 0, "blocked": 0, "cap": 4, "rows": [{"kind": "running", "id": "JOV-2", "title": "Running"}], "up": True},
+        )
+        for width, height in ((430, 90), (120, 40), (80, 24)):
+            geometries = []
+            for state in fixtures:
+                plain = strip(paint(symphony=state, width=width, height=height))
+                lines = plain.splitlines()
+                geometries.append(tuple(len(line) for line in lines))
+                with self.subTest(width=width, height=height, state=state.get("ok")):
+                    self.assertEqual(len(lines), height)
+                    self.assertTrue(all(len(line) == width for line in lines))
+                    self.assertIn("OPERATOR HEALTH", plain)
+                    self.assertIn("CURRENT WORK", plain)
+                    self.assertIn("SHIP", plain)
+            self.assertEqual(geometries[0], geometries[1])
+            self.assertEqual(geometries[1], geometries[2])
+
+        narrow = strip(paint(width=80, height=24))
+        self.assertIn("PRIMARY CAPACITY / PRESSURE", narrow)
+        self.assertNotIn("CI MATRIX", narrow)
+        self.assertNotIn("BUSINESS SIGNALS", narrow)
+
+    def test_metric_gauges_and_contracts_are_fixed_width_and_source_visible(self):
+        self.assertEqual(HUD.metric_gauge(50, 100), "[█████░░░░░]")
+        self.assertEqual(HUD.metric_gauge(None, 100), "[??????????]")
+        self.assertEqual(len(HUD.metric_gauge(200, 100)), len(HUD.metric_gauge(0, 100)))
+        pressure = {
+            "ok": True,
+            "generated_at": NOW.isoformat(),
+            "cpu": {"status": "healthy", "state": "fresh", "signal_pct": 50, "load1": 8, "cores": 16, "psi": 2, "source": "getloadavg + /proc/pressure/cpu", "unit": "load/PSI percent", "window": "load1 + PSI avg10", "denominator": "16 cores; red at 125%", "sampled_at": NOW.isoformat()},
+            "memory": {"status": "healthy", "state": "fresh", "available_pct": 50, "psi": 2, "source": "/proc/meminfo + /proc/pressure/memory", "unit": "free/PSI percent", "window": "point + PSI avg10", "denominator": "100% memory; PSI red at 30%", "sampled_at": NOW.isoformat()},
+            "disk": {"status": "healthy", "state": "fresh", "available_pct": 23, "used_pct": 77, "source": "shutil.disk_usage('/')", "unit": "capacity percent", "window": "point", "denominator": "100% root volume", "sampled_at": NOW.isoformat()},
+            "io": {"status": "healthy", "state": "fresh", "some_avg10_pct": 8, "full_avg10_pct": 4, "source": "/proc/pressure/io", "unit": "stall percent", "window": "avg10", "denominator": "red at 20% full stall", "sampled_at": NOW.isoformat()},
+            "network": {"status": "healthy", "state": "fresh", "util_pct": 20, "mbps": 200, "speed_mbps": 1000, "source": "/proc/net/dev + /sys/class/net", "unit": "Mbps/link percent", "window": "5 seconds", "denominator": "1000 Mbps link", "sampled_at": NOW.isoformat()},
+            "slots": {"status": "healthy", "state": "fresh", "util_pct": 50, "running": 2, "cap": 4, "source": "Symphony state", "unit": "agents/capacity percent", "window": "point", "denominator": "4 configured agents", "sampled_at": NOW.isoformat()},
+        }
+        plain = strip(paint(width=430, height=90, system_pressure=pressure))
+        for token in ("getloadavg + /proc/pressure/cpu", "shutil.disk_usage('/')", "/proc/pressure/io", "avg10", "red at 20% full stall", "1000 Mbps link"):
+            self.assertIn(token, plain)
+        self.assertEqual(plain.count("["), 6)
+
+    def test_refresh_uses_in_place_home_cursor_between_equal_size_frames(self):
+        self.assertEqual(HUD.refresh_prefix(size_changed=False), "\033[?25l\033[H")
+        self.assertEqual(HUD.refresh_prefix(size_changed=True), "\033[?25l\033[2J\033[H")
+        self.assertNotIn("\033[2J", HUD.refresh_prefix(size_changed=False))
+        self.assertEqual(HUD.metric_gauge(50, 100, width=0), "[]")
+
+    def test_network_window_and_merge_queue_receipts_keep_source_time(self):
+        prior_at = (NOW - dt.timedelta(seconds=5)).isoformat()
+        disk_usage = mock.Mock(total=100, used=50, free=50)
+        with (
+            mock.patch.object(HUD.os, "cpu_count", return_value=4),
+            mock.patch.object(HUD.os, "getloadavg", return_value=(1.0, 0.0, 0.0)),
+            mock.patch.object(
+                HUD,
+                "_psi",
+                side_effect=(
+                    {"some": 1.0, "full": None, "error": None},
+                    {"some": 1.0, "full": 0.0, "error": None},
+                    {"some": 1.0, "full": 1.0, "error": None},
+                ),
+            ),
+            mock.patch.object(HUD.shutil, "disk_usage", return_value=disk_usage),
+            mock.patch.object(HUD.Path, "read_text", return_value="MemTotal: 100 kB\nMemAvailable: 50 kB\n"),
+            mock.patch.object(HUD, "_net_sample", return_value={"rx": 10_000_000, "tx": 1_000_000, "speed_mbps": 100}),
+            mock.patch.object(HUD, "load_json_dict", return_value={"at": prior_at, "rx": 0, "tx": 0}),
+            mock.patch.object(HUD, "write_json") as write_json,
+        ):
+            pressure = HUD.fetch_system_pressure(
+                {"running": 1, "cap": 4},
+                state_path=ROOT / ".tmp-system-pressure.json",
+                now=NOW,
+            )
+        self.assertEqual(pressure["network"]["window"], "5.0 seconds")
+        self.assertEqual(pressure["network"]["mbps"], 16)
+        self.assertEqual(pressure["network"]["util_pct"], 16)
+        write_json.assert_called_once()
+
+        payload = {
+            "data": {
+                "repository": {
+                    "mergeQueue": {
+                        "entries": {
+                            "nodes": [
+                                {"position": 3, "enqueuedAt": STARTED, "pullRequest": {"number": 17, "title": "Measured queue"}}
+                            ]
+                        }
+                    }
+                }
+            }
+        }
+        completed = mock.Mock(stdout=json.dumps(payload))
+        with mock.patch.object(HUD.subprocess, "run", return_value=completed), mock.patch.object(HUD, "_now", return_value=NOW):
+            queue = HUD.fetch_mq()
+        self.assertEqual(queue["rows"][0]["position"], 3)
+        self.assertEqual(queue["generated_at"], NOW.isoformat())
+        with mock.patch.object(HUD.subprocess, "run", side_effect=OSError("offline")):
+            self.assertIsNone(HUD.fetch_mq()["generated_at"])
+
+    def test_operator_health_includes_queue_tail_and_ci_failure_receipts(self):
+        path = HUD.empty_ship_path()
+        path["stages"][5].update(
+            {
+                "p95": 60,
+                "sample_count": 20,
+                "sampled_at": NOW.isoformat(),
+                "stale": False,
+            }
+        )
+        pressure = {
+            "ok": True,
+            **{
+                key: {"status": "healthy", "state": "fresh"}
+                for key in ("cpu", "memory", "disk", "io", "network", "slots")
+            },
+        }
+        status, events = HUD._operator_health(
+            symphony={"ok": True, "running": 1, "retrying": 0, "blocked": 0},
+            pressure=pressure,
+            mq={
+                "rows": [
+                    "invalid",
+                    {"kind": "mq", "number": 17, "enqueued": (NOW - dt.timedelta(seconds=120)).isoformat()},
+                ]
+            },
+            ship_path=path,
+            pr_flow={"ci_matrix": [{"number": 9, "all": "failure"}]},
+            now=NOW,
+        )
+        self.assertEqual(status, "failure")
+        self.assertTrue(any(event.startswith("MQ AGE RED") for event in events))
+        self.assertIn("CI FAILURE #9", events)
+
+    def test_partial_pressure_failure_retains_only_that_metrics_last_good_value(self):
+        HUD.FRAME_SOURCE_CACHE.clear()
+        first_partial = HUD.retain_last_good_source(
+            "pressure",
+            {"ok": True, "disk": {"status": "unknown", "state": "error", "error": "unavailable"}},
+            now=NOW,
+        )
+        self.assertNotIn("partial_stale", first_partial)
+        sampled_at = (NOW - dt.timedelta(seconds=30)).isoformat()
+        good = {
+            "ok": True,
+            "generated_at": sampled_at,
+            "cpu": {"status": "healthy", "state": "fresh", "signal_pct": 50, "source": "cpu", "unit": "%", "window": "avg10", "denominator": "125", "sampled_at": sampled_at},
+            "memory": {"status": "healthy", "state": "fresh", "available_pct": 50, "source": "memory", "unit": "%", "window": "point", "denominator": "100", "sampled_at": sampled_at},
+            "disk": {"status": "healthy", "state": "fresh", "available_pct": 23, "used_pct": 77, "source": "disk", "unit": "%", "window": "point", "denominator": "100", "sampled_at": sampled_at},
+            "io": {"status": "healthy", "state": "fresh", "full_avg10_pct": 4, "source": "io", "unit": "%", "window": "avg10", "denominator": "20", "sampled_at": sampled_at},
+            "network": {"status": "healthy", "state": "fresh", "util_pct": 20, "mbps": 200, "speed_mbps": 1000, "source": "network", "unit": "%", "window": "5s", "denominator": "1000", "sampled_at": sampled_at},
+            "slots": {"status": "healthy", "state": "fresh", "util_pct": 50, "running": 2, "cap": 4, "source": "slots", "unit": "%", "window": "point", "denominator": "4", "sampled_at": sampled_at},
+        }
+        HUD.retain_last_good_source("pressure", good, now=NOW)
+        partial = json.loads(json.dumps(good))
+        partial["generated_at"] = NOW.isoformat()
+        partial["cpu"].update({"signal_pct": 60, "sampled_at": NOW.isoformat()})
+        partial["disk"] = {
+            "status": "unknown",
+            "state": "error",
+            "available_pct": None,
+            "used_pct": None,
+            "error": "unavailable",
+        }
+        retained = HUD.retain_last_good_source("pressure", partial, now=NOW)
+        self.assertEqual(retained["cpu"]["signal_pct"], 60)
+        self.assertEqual(retained["disk"]["available_pct"], 23)
+        self.assertEqual(retained["disk"]["state"], "stale")
+        self.assertEqual(retained["disk"]["sampled_at"], sampled_at)
+        plain = strip(paint(width=430, height=90, system_pressure=retained))
+        self.assertIn("DEGRADED/ERROR", plain)
+        self.assertIn("? STALE · 23% free", plain)
+        self.assertIn("60% · ✓ NORMAL", plain)
+
+    def test_compact_critical_rows_and_medium_review_are_visible(self):
+        path = HUD.empty_ship_path()
+        path["stages"][5].update(
+            {
+                "p95": 60,
+                "sample_count": 20,
+                "sampled_at": NOW.isoformat(),
+                "stale": False,
+            }
+        )
+        compact = strip(
+            paint(
+                symphony={
+                    "ok": True,
+                    "running": 0,
+                    "retrying": 0,
+                    "blocked": 1,
+                    "cap": 4,
+                    "rows": [{"kind": "blocked", "id": "JOV-8", "title": "Release held", "started": STARTED}],
+                    "up": True,
+                },
+                mq={"ok": True, "count": 1, "rows": [{"kind": "mq", "number": 17, "position": 3, "title": "Queue tail", "enqueued": STARTED}]},
+                ship_path=path,
+                width=120,
+                height=40,
+            )
+        )
+        self.assertIn("BLOCKED · Release held", compact)
+        self.assertIn("#17/p3", compact)
+
+        medium = strip(paint(review=3, width=200, height=40))
+        self.assertIn("!  REVIEW QUEUE 3", medium)
+        crowded = strip(
+            paint(
+                symphony={
+                    "ok": True,
+                    "running": 30,
+                    "retrying": 0,
+                    "blocked": 0,
+                    "cap": 40,
+                    "rows": [{"kind": "running", "id": f"JOV-{index}", "title": "Work"} for index in range(30)],
+                    "up": True,
+                },
+                width=200,
+                height=24,
+            )
+        )
+        self.assertEqual(len(crowded.splitlines()), 24)
+
+    def test_frame_resolves_geometry_and_refresh_loop_only_clears_on_resize(self):
+        HUD.FRAME_SOURCE_CACHE.clear()
+        good = {"ok": True, "count": 4, "generated_at": STARTED}
+        self.assertEqual(HUD.retain_last_good_source("mq", good, now=NOW), good)
+        retained = HUD.retain_last_good_source("mq", {"ok": False}, now=NOW)
+        self.assertEqual(retained["count"], 4)
+        self.assertTrue(retained["stale"])
+        self.assertEqual(retained["source_error"], "source unavailable")
+        symphony_good = {
+            "ok": True,
+            "running": 1,
+            "retrying": 0,
+            "blocked": 0,
+            "cap": 4,
+            "rows": [],
+            "up": True,
+            "generated_at": STARTED,
+        }
+        HUD.retain_last_good_source("symphony", symphony_good, now=NOW)
+        symphony_retained = HUD.retain_last_good_source("symphony", {"ok": False}, now=NOW)
+        self.assertFalse(symphony_retained["up"])
+        pressure_retained = {"ok": True, "stale": True, "source_error": "offline"}
+        stale_path = HUD.empty_ship_path()
+        stale_path["stages"][0].update({"count": 4, "p95": 60, "stale": True})
+        status, events = HUD._operator_health(
+            symphony=symphony_retained,
+            pressure=pressure_retained,
+            mq=retained,
+            ship_path=stale_path,
+            pr_flow=None,
+            now=NOW,
+        )
+        self.assertEqual(status, "failure")
+        self.assertIn("SYMPHONY SOURCE ERROR · LAST GOOD RETAINED", events)
+        self.assertIn("PRESSURE SOURCE ERROR · LAST GOOD RETAINED", events)
+        self.assertIn("MQ SOURCE ERROR · LAST GOOD RETAINED", events)
+        self.assertIn("n=4 p95 STALE", strip("\n".join(HUD._ship_path_lines(stale_path, 200))))
+        _, stale_events = HUD._operator_health(
+            symphony=symphony_good,
+            pressure={
+                "ok": True,
+                **{
+                    key: {"status": "healthy", "state": "fresh"}
+                    for key in ("cpu", "memory", "disk", "io", "network", "slots")
+                },
+            },
+            mq={"ok": True, "count": 0, "rows": []},
+            ship_path=stale_path,
+            pr_flow=None,
+            now=NOW,
+        )
+        self.assertIn("SHIP SOURCE STALE · LAST GOOD RETAINED", stale_events)
+        stale_hero = strip(
+            paint(
+                symphony=symphony_retained,
+                mq=retained,
+                width=200,
+                height=40,
+                system_pressure=pressure_retained,
+            )
+        )
+        self.assertIn("STALE/ERROR", stale_hero)
+
+        symphony = {"ok": True, "running": 0, "retrying": 0, "blocked": 0, "cap": 4, "rows": [], "up": True}
+        with (
+            mock.patch.object(HUD, "read_workflow_cap", return_value=4),
+            mock.patch.object(HUD, "fetch_symphony", return_value=symphony),
+            mock.patch.object(HUD, "fetch_mq", return_value={"ok": True, "count": 0, "rows": []}),
+            mock.patch.object(HUD, "fetch_linear_project", return_value={"ok": True, "review": 0, "todo": 0}),
+            mock.patch.object(HUD, "fetch_github_ship", return_value={"ok": False}),
+            mock.patch.object(HUD, "load_measured", return_value={}),
+            mock.patch.object(HUD, "load_tps_snapshots", return_value=[]),
+            mock.patch.object(HUD, "persist_tps_snapshot"),
+            mock.patch.object(HUD, "fetch_system_pressure", return_value={"ok": False}),
+            mock.patch.object(HUD, "fetch_sha", return_value="abcdef0"),
+        ):
+            rendered = strip(
+                HUD.frame(
+                    measured_path=ROOT / ".tmp-measured.json",
+                    symphony_url="http://127.0.0.1:4041/api/v1/state",
+                    width=80,
+                    height=24,
+                )
+            )
+        self.assertEqual(len(rendered.splitlines()), 24)
+        self.assertTrue(all(len(line) == 80 for line in rendered.splitlines()))
+
+        output = mock.Mock()
+        diagnostics = mock.Mock()
+        with (
+            mock.patch.object(HUD.sys, "stdout", output),
+            mock.patch.object(HUD.sys, "stderr", diagnostics),
+            mock.patch.object(HUD, "terminal_size", return_value=(80, 24)),
+            mock.patch.object(HUD, "frame", return_value="FRAME"),
+            mock.patch.object(HUD.time, "sleep", side_effect=(None, KeyboardInterrupt)),
+            self.assertRaises(KeyboardInterrupt),
+        ):
+            HUD.main(["--interval", "0.5"])
+        writes = [call.args[0] for call in output.write.call_args_list]
+        self.assertEqual(writes[0], "\033[?25l\033[2J\033[HFRAME")
+        self.assertEqual(writes[1], "\033[?25l\033[HFRAME")
+        self.assertEqual(writes[-1], "\033[?25h")
+        self.assertIn("continuity=last-good-visible", diagnostics.write.call_args_list[0].args[0])
+        self.assertIn("clear=yes", diagnostics.write.call_args_list[0].args[0])
 
     def test_queue_age_reaches_same_class_fresh_p95_is_red_at_exact_boundary(self):
         durations = [float(minutes * 60) for minutes in range(1, 21)]
