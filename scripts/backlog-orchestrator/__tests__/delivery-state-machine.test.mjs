@@ -383,6 +383,50 @@ describe('delivery state machine', () => {
     }
   });
 
+  it('accepts a fail-closed fleet gate receipt with no stack repair work', async () => {
+    const directory = await mkdtemp(
+      join(tmpdir(), 'jovie-empty-stack-actions-')
+    );
+    try {
+      const result = await persistClosureHealthActions(
+        {
+          schema: 'jovie-fleet-gate/v1',
+          signals: {
+            closureHealth: {
+              schema: 'jovie-closure-health/v1',
+              status: 'red',
+              authority: 'Summer',
+              observedAt: '2026-09-01T01:23:29.000Z',
+              newIssueIntakeAllowed: false,
+              promotionContinues: true,
+              remediationContinues: true,
+              blockedActivities: [
+                'new-issue-lease',
+                'new-implementation',
+                'fallback-pr-generation',
+              ],
+              reasons: ['gate-evaluation-failed'],
+              stackHealth: {
+                maxDepth: 4,
+                roots: [],
+                violations: [],
+                repairActions: [],
+              },
+              repairActions: [],
+            },
+          },
+        },
+        { stateDir: directory }
+      );
+
+      assert.equal(result.actionCount, 0);
+      assert.equal(result.evidenceCount, 0);
+      assert.equal(result.status, 'none');
+    } finally {
+      await rm(directory, { recursive: true, force: true });
+    }
+  });
+
   it('writes handed-off repair work as one exact-head Gem-to-FX task', async () => {
     const directory = await mkdtemp(join(tmpdir(), 'jovie-delivery-fx-'));
     try {
