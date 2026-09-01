@@ -344,7 +344,6 @@ export function DesignProposalReviewPanel() {
         {isLoading ? (
           <div
             className='flex min-h-20 items-center gap-2 text-app text-secondary-token'
-            aria-labelledby='taste-inbox-heading'
           >
             <Loader2 className='h-4 w-4 animate-spin' aria-hidden='true' />
             Loading Taste Inbox...

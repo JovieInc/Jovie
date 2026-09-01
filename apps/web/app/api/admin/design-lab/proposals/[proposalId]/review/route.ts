@@ -26,9 +26,7 @@ async function canReviewTasteProposal(
     return false;
   }
 
-  return (
-    entitlements.isAdmin || (await checkAdminRole(entitlements.userId))
-  );
+  return entitlements.isAdmin || (await checkAdminRole(entitlements.userId));
 }
 
 export async function POST(
