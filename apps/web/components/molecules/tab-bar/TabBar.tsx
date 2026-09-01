@@ -248,10 +248,7 @@ export function TabBar<T extends string>({
               ref={moreButtonRef}
               hasActiveOverflow={false}
               variant={variant}
-              className={cn(
-                'invisible absolute',
-                overflowTriggerClassName
-              )}
+              className={cn('invisible absolute', overflowTriggerClassName)}
               aria-hidden='true'
               tabIndex={-1}
             />
