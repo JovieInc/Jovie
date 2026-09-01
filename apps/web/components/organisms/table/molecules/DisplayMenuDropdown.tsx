@@ -1,9 +1,9 @@
 'use client';
 
-import { Popover, PopoverContent, PopoverTrigger } from '@jovie/ui';
+import { Popover, PopoverContent, PopoverTrigger, Switch } from '@jovie/ui';
 import * as PopoverPrimitive from '@radix-ui/react-popover';
 import { LayoutGrid, LayoutList, Settings2, X } from 'lucide-react';
-import { memo, type ReactNode, useCallback } from 'react';
+import { memo, type ReactNode, useCallback, useId } from 'react';
 import { cn } from '@/lib/utils';
 import { PAGE_TOOLBAR_ACTION_BUTTON_CLASS } from './PageToolbar';
 
@@ -28,30 +28,25 @@ function ToggleSwitch({
   checked: boolean;
   onToggle: () => void;
 }>) {
+  const id = useId();
+  const labelId = `${id}-label`;
+
   return (
-    <button
-      type='button'
-      role='switch'
-      aria-checked={checked}
-      onClick={onToggle}
-      className='flex w-full items-center justify-between gap-2 rounded px-1.5 py-1 transition-[background-color] duration-subtle hover:bg-surface-1 focus-visible:bg-surface-1 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring'
-    >
-      <span className='text-app text-secondary-token'>{label}</span>
-      <span
-        className={cn(
-          'flex h-4 w-7 shrink-0 items-center rounded-full p-0.5 transition-colors',
-          checked ? 'bg-btn-primary' : 'bg-surface-2'
-        )}
+    <div className='flex w-full items-center justify-between gap-2 rounded px-1.5 py-1 transition-[background-color] duration-subtle hover:bg-surface-1 focus-within:bg-surface-1'>
+      <label
+        id={labelId}
+        htmlFor={id}
+        className='cursor-pointer text-app text-secondary-token'
       >
-        <span
-          className={cn(
-            'h-3 w-3 rounded-full transition-[background-color,transform]',
-            checked ? 'bg-btn-primary-foreground' : 'bg-white dark:bg-white',
-            checked && 'translate-x-3'
-          )}
-        />
-      </span>
-    </button>
+        {label}
+      </label>
+      <Switch
+        id={id}
+        checked={checked}
+        onCheckedChange={onToggle}
+        aria-labelledby={labelId}
+      />
+    </div>
   );
 }
 
