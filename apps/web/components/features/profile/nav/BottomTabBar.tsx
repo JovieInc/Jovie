@@ -27,11 +27,11 @@ import {
   Music2,
   UserRound,
 } from 'lucide-react';
+import { TAB_BAR_INTERNAL_SAFE_AREA_PADDING } from '@/lib/profile/nav-constants';
 import {
   type BottomTabKey,
   getPermittedPublicProfileNavigation,
 } from '@/lib/profile/route-config';
-import { TAB_BAR_INTERNAL_SAFE_AREA_PADDING } from '@/lib/profile/nav-constants';
 import { cn } from '@/lib/utils';
 import type { ProfilePrimaryTab } from '../contracts';
 

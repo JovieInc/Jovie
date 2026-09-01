@@ -2,8 +2,8 @@ import { describe, expect, it } from 'vitest';
 import {
   CONTENT_SAFE_AREA_BOTTOM_PADDING,
   TAB_BAR_HEIGHT_REM,
-  TAB_BAR_INTERNAL_SAFE_AREA_PADDING,
   TAB_BAR_INTERNAL_SAFE_AREA_MIN_PX,
+  TAB_BAR_INTERNAL_SAFE_AREA_PADDING,
 } from './nav-constants';
 
 describe('public profile nav constants', () => {
