@@ -1,8 +1,15 @@
 import { TooltipProvider } from '@jovie/ui';
-import { fireEvent, render, screen, within } from '@testing-library/react';
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import {
+  fireEvent,
+  render,
+  screen,
+  waitFor,
+  within,
+} from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import type { ReactElement } from 'react';
-import { describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import {
   HeaderActionsProvider,
   useHeaderActions,
@@ -11,6 +18,25 @@ import { useRegisterRightPanel } from '@/hooks/useRegisterRightPanel';
 import { classifyConnectionInput } from './AddConnectionRail';
 import type { ProfilesWorkspaceData } from './data';
 import { ProfilesWorkspace } from './ProfilesWorkspace';
+
+const navigationMock = vi.hoisted(() => ({
+  push: vi.fn(),
+  replace: vi.fn(),
+  refresh: vi.fn(),
+  searchParams: new URLSearchParams(),
+}));
+
+vi.mock('next/navigation', () => ({
+  useRouter: () => ({
+    push: navigationMock.push,
+    replace: navigationMock.replace,
+    refresh: navigationMock.refresh,
+    back: vi.fn(),
+    forward: vi.fn(),
+    prefetch: vi.fn(),
+  }),
+  useSearchParams: () => navigationMock.searchParams,
+}));
 
 describe('classifyConnectionInput', () => {
   it('normalizes and classifies a bare provider domain', () => {
@@ -71,6 +97,7 @@ vi.mock('@/hooks/useRegisterRightPanel', () => ({
 }));
 
 const data: ProfilesWorkspaceData = {
+  profileId: '11111111-1111-4111-8111-111111111111',
   artist: {
     name: 'Tim White',
     username: 'tim',
@@ -153,14 +180,124 @@ const dataWithConnector: ProfilesWorkspaceData = {
   ],
 };
 
+type SuggestionFixture = {
+  readonly id: string;
+  readonly type:
+    | 'dsp_match'
+    | 'social_link'
+    | 'avatar'
+    | 'playlist_fallback'
+    | 'profile_ready';
+  readonly platform: string;
+  readonly platformLabel: string;
+  readonly title: string;
+  readonly subtitle: string;
+  readonly imageUrl: string | null;
+  readonly externalUrl: string | null;
+  readonly confidence: number | null;
+};
+
+function createQueryClient() {
+  return new QueryClient({
+    defaultOptions: {
+      queries: { retry: false },
+      mutations: { retry: false },
+    },
+  });
+}
+
+function jsonResponse(body: unknown, init: ResponseInit = {}) {
+  return new Response(JSON.stringify(body), {
+    status: 200,
+    headers: { 'Content-Type': 'application/json' },
+    ...init,
+  });
+}
+
+function suggestionsResponse(suggestions: readonly SuggestionFixture[]) {
+  return {
+    success: true,
+    suggestions,
+    starterContext: null,
+  };
+}
+
+function socialSuggestion(
+  id: string,
+  platform: string,
+  handle: string,
+  confidence = 0.92
+): SuggestionFixture {
+  return {
+    id,
+    type: 'social_link',
+    platform,
+    platformLabel: platform === 'tiktok' ? 'TikTok' : 'YouTube',
+    title: handle,
+    subtitle: 'Found via Spotify',
+    imageUrl: null,
+    externalUrl:
+      platform === 'tiktok'
+        ? `https://tiktok.com/${handle}`
+        : `https://youtube.com/${handle}`,
+    confidence,
+  };
+}
+
+function dspSuggestion(
+  id: string,
+  title: string,
+  confidence = 0.88
+): SuggestionFixture {
+  return {
+    id,
+    type: 'dsp_match',
+    platform: 'spotify',
+    platformLabel: 'Spotify',
+    title,
+    subtitle: 'Matched from catalog data',
+    imageUrl: null,
+    externalUrl: `https://open.spotify.com/artist/${id}`,
+    confidence,
+  };
+}
+
+function mockPersistedSuggestions(
+  initialSuggestions: readonly SuggestionFixture[],
+  options: { readonly failMutation?: boolean } = {}
+) {
+  let suggestions = [...initialSuggestions];
+  const fetchMock = vi.mocked(globalThis.fetch);
+  fetchMock.mockImplementation(async (input, init) => {
+    const method = init?.method ?? 'GET';
+    const url = String(input);
+    if (method === 'POST') {
+      if (options.failMutation) {
+        return jsonResponse(
+          { success: false, error: 'Mutation failed' },
+          { status: 400, statusText: 'Bad Request' }
+        );
+      }
+      suggestions = suggestions.filter(
+        suggestion => !url.includes(encodeURIComponent(suggestion.id))
+      );
+      return jsonResponse({ success: true });
+    }
+
+    return jsonResponse(suggestionsResponse(suggestions));
+  });
+}
+
 function renderWorkspace(workspaceData: ProfilesWorkspaceData | null) {
   return render(
-    <HeaderActionsProvider>
-      <TooltipProvider>
-        <RegisteredHeaderActions />
-        <ProfilesWorkspace data={workspaceData} />
-      </TooltipProvider>
-    </HeaderActionsProvider>
+    <QueryClientProvider client={createQueryClient()}>
+      <HeaderActionsProvider>
+        <TooltipProvider>
+          <RegisteredHeaderActions />
+          <ProfilesWorkspace data={workspaceData} />
+        </TooltipProvider>
+      </HeaderActionsProvider>
+    </QueryClientProvider>
   );
 }
 
@@ -170,6 +307,18 @@ function RegisteredHeaderActions() {
 }
 
 describe('ProfilesWorkspace', { timeout: 15_000 }, () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    navigationMock.searchParams = new URLSearchParams();
+    vi.spyOn(globalThis, 'fetch').mockResolvedValue(
+      jsonResponse(suggestionsResponse([]))
+    );
+  });
+
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
+
   it('uses the canonical empty state with a direct artist-profile action', () => {
     renderWorkspace(null);
 
@@ -276,6 +425,198 @@ describe('ProfilesWorkspace', { timeout: 15_000 }, () => {
     expect(
       screen.getByRole('button', { name: 'Connectors' })
     ).toBeInTheDocument();
+  });
+
+  it('renders persisted suggestions without fabricating profile surface suggestions', async () => {
+    const user = userEvent.setup();
+    mockPersistedSuggestions([
+      socialSuggestion('social-tiktok', 'tiktok', '@timwhite', 0.96),
+      socialSuggestion('social-youtube', 'youtube', '@timwhite', 0.91),
+    ]);
+    renderWorkspace({
+      ...data,
+      rows: [
+        ...data.rows,
+        {
+          id: 'fan-wiki',
+          rowType: 'surface',
+          kind: 'authority',
+          platform: 'wikipedia',
+          label: 'Fan Wiki',
+          handle: null,
+          url: 'https://example.com/wiki/tim',
+          trackedUrl: null,
+          qualificationStatus: 'suggested',
+          isOfficial: false,
+          monitoringState: 'unavailable',
+          rank: null,
+          previousRank: null,
+          lastObservedAt: null,
+        },
+      ],
+    });
+
+    await waitFor(() =>
+      expect(globalThis.fetch).toHaveBeenCalledWith(
+        `/api/suggestions?profileId=${encodeURIComponent(data.profileId)}`,
+        expect.objectContaining({ signal: expect.any(AbortSignal) })
+      )
+    );
+    await user.click(screen.getByRole('button', { name: 'Suggested' }));
+
+    expect(
+      await screen.findAllByTestId('suggested-connection-row')
+    ).toHaveLength(2);
+    expect(screen.getAllByTestId('suggested-connection-group')).toHaveLength(1);
+    expect(screen.getByTestId('suggested-connections-review')).toHaveClass(
+      'min-w-0'
+    );
+    expect(
+      screen.getAllByTestId('suggested-connection-row')[0]?.className
+    ).toContain('sm:grid-cols-[minmax(0,1fr)_auto]');
+    expect(screen.getByText('TikTok')).toBeInTheDocument();
+    expect(screen.getByText('YouTube')).toBeInTheDocument();
+    expect(screen.queryByText('Fan Wiki')).not.toBeInTheDocument();
+
+    await user.click(
+      within(screen.getByTestId('registered-header-actions')).getByRole(
+        'button',
+        { name: 'Add Profile Or Site' }
+      )
+    );
+    const panel = vi.mocked(useRegisterRightPanel).mock.calls.at(-1)?.[0];
+    expect(panel).not.toBeNull();
+
+    render(<TooltipProvider>{panel as ReactElement}</TooltipProvider>);
+    expect(screen.getByText('Review Suggestions')).toBeInTheDocument();
+    expect(
+      screen.getByText('2 suggested profiles to review.')
+    ).toBeInTheDocument();
+  });
+
+  it('accepts a persisted suggestion, removes review actions, and shows a normal connection row', async () => {
+    const user = userEvent.setup();
+    mockPersistedSuggestions([
+      socialSuggestion('social-tiktok', 'tiktok', '@timwhite', 0.96),
+    ]);
+    renderWorkspace(data);
+
+    await user.click(screen.getByRole('button', { name: 'Suggested' }));
+    expect(await screen.findByText('TikTok')).toBeInTheDocument();
+
+    await user.click(screen.getByRole('button', { name: 'Add' }));
+
+    await waitFor(() =>
+      expect(
+        vi
+          .mocked(globalThis.fetch)
+          .mock.calls.some(
+            ([url, init]) =>
+              String(url) ===
+                '/api/suggestions/social-links/social-tiktok/approve' &&
+              init?.method === 'POST' &&
+              init.body === JSON.stringify({ profileId: data.profileId })
+          )
+      ).toBe(true)
+    );
+    await waitFor(() =>
+      expect(
+        screen.queryByTestId('suggested-connection-row')
+      ).not.toBeInTheDocument()
+    );
+    await waitFor(() =>
+      expect(screen.getByTestId('suggested-connections-review')).toHaveFocus()
+    );
+    expect(navigationMock.refresh).toHaveBeenCalledTimes(1);
+
+    await user.click(screen.getByRole('button', { name: 'Social' }));
+    expect(screen.getByText('TikTok')).toBeInTheDocument();
+    const acceptedRow = screen.getByText('TikTok').closest('tr');
+    expect(acceptedRow).not.toBeNull();
+    expect(
+      within(acceptedRow as HTMLElement).getByRole('button', {
+        name: 'Actions for TikTok',
+      })
+    ).toBeInTheDocument();
+    expect(
+      within(acceptedRow as HTMLElement).queryByRole('button', {
+        name: 'Not me',
+      })
+    ).not.toBeInTheDocument();
+  });
+
+  it('rejects a persisted DSP suggestion from the keyboard and moves focus to the next action', async () => {
+    const user = userEvent.setup();
+    mockPersistedSuggestions([
+      dspSuggestion('spotify-alpha', 'Alpha Artist', 0.89),
+      socialSuggestion('social-beta', 'tiktok', '@beta', 0.84),
+    ]);
+    renderWorkspace(data);
+
+    await user.click(screen.getByRole('button', { name: 'Suggested' }));
+    expect(await screen.findByText('Alpha Artist')).toBeInTheDocument();
+
+    const notMeButtons = screen.getAllByRole('button', { name: 'Not me' });
+    notMeButtons[0]?.focus();
+    await user.keyboard('{Enter}');
+
+    await waitFor(() =>
+      expect(
+        vi
+          .mocked(globalThis.fetch)
+          .mock.calls.some(
+            ([url, init]) =>
+              String(url) === '/api/dsp/matches/spotify-alpha/reject' &&
+              init?.method === 'POST' &&
+              init.body === JSON.stringify({ profileId: data.profileId })
+          )
+      ).toBe(true)
+    );
+    expect(screen.queryByText('Alpha Artist')).not.toBeInTheDocument();
+    expect(screen.getByText('@beta')).toBeInTheDocument();
+    await waitFor(() =>
+      expect(screen.getByRole('button', { name: 'Add' })).toHaveFocus()
+    );
+  });
+
+  it('rolls back optimistic removal and restores focus when a suggestion mutation fails', async () => {
+    const user = userEvent.setup();
+    mockPersistedSuggestions(
+      [socialSuggestion('social-tiktok', 'tiktok', '@timwhite', 0.96)],
+      { failMutation: true }
+    );
+    renderWorkspace(data);
+
+    await user.click(screen.getByRole('button', { name: 'Suggested' }));
+    expect(await screen.findByText('TikTok')).toBeInTheDocument();
+    await user.click(screen.getByRole('button', { name: 'Add' }));
+
+    expect(await screen.findByRole('alert')).toHaveTextContent(
+      'Could not add. Try again.'
+    );
+    expect(screen.getByText('TikTok')).toBeInTheDocument();
+    expect(navigationMock.refresh).not.toHaveBeenCalled();
+    await waitFor(() =>
+      expect(screen.getByRole('button', { name: 'Add' })).toHaveFocus()
+    );
+  });
+
+  it('opens the persisted Suggested review queue from the legacy add service launch path', async () => {
+    navigationMock.searchParams = new URLSearchParams('add=service');
+    mockPersistedSuggestions([
+      socialSuggestion('social-tiktok', 'tiktok', '@timwhite', 0.96),
+    ]);
+    renderWorkspace(data);
+
+    expect(await screen.findByText('TikTok')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Suggested' })).toHaveAttribute(
+      'aria-pressed',
+      'true'
+    );
+    expect(navigationMock.replace).toHaveBeenCalledWith('/app/profiles');
+    expect(navigationMock.replace).not.toHaveBeenCalledWith(
+      '/app/settings/connectors'
+    );
   });
 
   it('exposes connector rows through a dedicated filter', async () => {
