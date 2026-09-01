@@ -1190,10 +1190,13 @@ def fetch_delivery() -> dict[str, Any]:
     production_completions: int | str = len(production_successes)
     if len(production_successes) == 30:
         production_completions = "30+"
+    ci_page_size = 30
     ci_payload = run_json(
-        ["gh", "api", f"repos/{REPO}/actions/workflows/ci.yml/runs?per_page=30"]
+        ["gh", "api", f"repos/{REPO}/actions/workflows/ci.yml/runs?per_page={ci_page_size}"]
     )
-    ci_runs = ci_payload.get("workflow_runs", [])
+    ci_raw_runs = ci_payload.get("workflow_runs")
+    ci_runs = ci_raw_runs if isinstance(ci_raw_runs, list) else []
+    ci_counts_complete = isinstance(ci_raw_runs, list) and len(ci_runs) < ci_page_size
     ci_durations = []
     for run in ci_runs:
         if run.get("conclusion") != "success":
@@ -1244,7 +1247,7 @@ def fetch_delivery() -> dict[str, Any]:
         },
         "workflow_counts_complete": {
             **{workflow: actions_sample_complete for workflow in WORKFLOWS},
-            "CI": True,
+            "CI": ci_counts_complete,
         },
         "success_window_hours": 24,
         "merged_recent": len(merged_recent),
@@ -3228,6 +3231,13 @@ def _render_ultrawide(state: dict[str, Any], width: int, height: int, details: b
 def _render_compact(state: dict[str, Any], width: int, height: int, details: bool) -> str:
     body_width = width - 4
     if details:
+        target_rows = max(20, height - 1)
+        standard = target_rows >= 38
+        roomy = target_rows >= 46
+        issue_height = 6 if standard else 3
+        exception_height = 6 if standard else 3
+        primary_height = 4 if standard else 3
+        primary_limit = max(1, primary_height - 2)
         sections: list[tuple[str, list[str], int]] = [
             (
                 "DECISION HEADER · GEM OPERATIONS · READ ONLY",
@@ -3244,73 +3254,78 @@ def _render_compact(state: dict[str, Any], width: int, height: int, details: boo
                 _issue_queue_rows(
                     state,
                     body_width,
-                    limit=4,
+                    limit=max(1, issue_height - 2),
                     expanded=True,
                     overflow_detail="tail shown; larger terminal shows remaining rows",
                 ),
-                6,
+                issue_height,
             ),
             (
                 "EXCEPTIONS / RECOVERY · DETAILS",
                 _limit_compact_rows(
                     _exception_rows(state, body_width, expanded=True),
                     body_width,
-                    4,
+                    max(1, exception_height - 2),
                     "larger terminal shows remaining exception rows",
                 ),
-                6,
+                exception_height,
             ),
             (
                 "BUSINESS PULSE",
                 _limit_compact_rows(
                     _primary_signal_rows(_business_pulse_rows(state, body_width)),
                     body_width,
-                    2,
+                    primary_limit,
                     "larger terminal shows remaining business rows",
                 ),
-                4,
+                primary_height,
             ),
             (
                 "DELIVERY SPEED · ISSUE OPEN → LANDED",
                 _limit_compact_rows(
                     _primary_signal_rows(_delivery_speed_rows(state, body_width)),
                     body_width,
-                    2,
+                    primary_limit,
                     "larger terminal shows remaining delivery rows",
                 ),
-                4,
+                primary_height,
             ),
             (
                 "CURRENT LARGEST BOTTLENECK",
                 _limit_compact_rows(
                     _primary_signal_rows(_bottleneck_region_rows(state, body_width)),
                     body_width,
-                    2,
+                    primary_limit,
                     "larger terminal shows remaining bottleneck rows",
                 ),
-                4,
-            ),
-            (
-                "RECENT DELIVERY LOG",
-                _limit_compact_rows(
-                    _log_rows(state, body_width),
-                    body_width,
-                    2,
-                    "larger terminal shows remaining delivery-log rows",
-                ),
-                4,
-            ),
-            (
-                "SECONDARY CAPACITY / OWNERS / ALL DETAIL",
-                _limit_compact_rows(
-                    _secondary_rows(state, body_width, expanded=True),
-                    body_width,
-                    2,
-                    "larger terminal shows remaining detail rows",
-                ),
-                4,
+                primary_height,
             ),
         ]
+        if roomy:
+            sections.extend(
+                [
+                    (
+                        "RECENT DELIVERY LOG",
+                        _limit_compact_rows(
+                            _log_rows(state, body_width),
+                            body_width,
+                            2,
+                            "larger terminal shows remaining delivery-log rows",
+                        ),
+                        4,
+                    ),
+                    (
+                        "SECONDARY CAPACITY / OWNERS / ALL DETAIL",
+                        _limit_compact_rows(
+                            _secondary_rows(state, body_width, expanded=True),
+                            body_width,
+                            2,
+                            "larger terminal shows remaining detail rows",
+                        ),
+                        4,
+                    ),
+                ]
+            )
         lines: list[str] = []
         for title, rows, section_height in sections:
             lines += _box(title, rows, width, section_height)

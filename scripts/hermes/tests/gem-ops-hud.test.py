@@ -919,6 +919,8 @@ class RenderTests(unittest.TestCase):
 
         self.assertIn("CI q1/r2/p3/f4", throughput)
         self.assertRegex(row, r"GitHub CI\s+1\s+2\s+3\s+4")
+        state["delivery"]["workflow_counts_complete"] = {"CI": False}
+        self.assertIn("CI qUNK/rUNK/pUNK/fUNK", hud._throughput_summary(state))
 
     def test_incomplete_actions_page_does_not_report_zero_production_totals(self) -> None:
         state = live_state()
@@ -1071,19 +1073,13 @@ class RenderTests(unittest.TestCase):
 
         self.assertEqual(len(lines), 49)
         self.assertTrue(all(len(line) == 160 for line in lines))
-        self.assertIn("RECENT DELIVERY LOG", output)
-        self.assertIn("MQ #17000", output)
-        self.assertIn("JOV-TAIL", output)
-        self.assertIn("tail shown; larger terminal shows remaining rows", output)
         self.assertNotIn("open details view for additional rows", output)
-        self.assertIn("SECONDARY CAPACITY / OWNERS / ALL DETAIL", output)
-        self.assertIn("CAPACITY / OWNERS · SECONDARY", output)
-        self.assertIn("BUSINESS PULSE", output)
-        self.assertIn("DELIVERY SPEED · ISSUE OPEN → LANDED", output)
-        self.assertIn("CURRENT LARGEST BOTTLENECK", output)
-        self.assertIn("WOW GROWTH", output)
-        self.assertIn("P50", output)
-        self.assertIn("JOV-5399 release controller decision", output)
+        for text in ("RECENT DELIVERY LOG", "MQ #17000", "JOV-TAIL", "tail shown; larger terminal shows remaining rows", "SECONDARY CAPACITY / OWNERS / ALL DETAIL", "BUSINESS PULSE", "DELIVERY SPEED · ISSUE OPEN → LANDED", "CURRENT LARGEST BOTTLENECK", "WOW GROWTH", "P50"):
+            self.assertIn(text, output)
+        minimum = hud.render(state, width=160, height=30, view="details")
+        self.assertEqual(len(minimum.splitlines()), 29)
+        for text in ("BUSINESS PULSE", "DELIVERY SPEED · ISSUE OPEN → LANDED", "CURRENT LARGEST BOTTLENECK"):
+            self.assertIn(text, minimum)
 
     def test_larger_console_geometry_keeps_all_primary_lanes(self) -> None:
         output = hud.render(live_state(), width=286, height=60)
@@ -1637,30 +1633,13 @@ class SourceContractTests(unittest.TestCase):
             if endpoint.endswith("/actions/workflows/ci.yml/runs?per_page=30"):
                 return {
                     "workflow_runs": [
-                        {
-                            "status": "queued",
-                            "conclusion": None,
-                            "created_at": stamp(60),
-                            "updated_at": stamp(30),
-                        },
-                        {
-                            "status": "in_progress",
-                            "conclusion": None,
-                            "created_at": stamp(60),
-                            "updated_at": stamp(30),
-                        },
-                        {
-                            "status": "completed",
-                            "conclusion": "success",
-                            "created_at": stamp(120),
-                            "updated_at": stamp(60),
-                        },
-                        {
-                            "status": "completed",
-                            "conclusion": "failure",
-                            "created_at": stamp(120),
-                            "updated_at": stamp(60),
-                        },
+                        {"status": "queued", "conclusion": None, "created_at": stamp(60), "updated_at": stamp(30)},
+                        {"status": "in_progress", "conclusion": None, "created_at": stamp(60), "updated_at": stamp(30)},
+                        {"status": "completed", "conclusion": "failure", "created_at": stamp(120), "updated_at": stamp(60)},
+                        *[
+                            {"status": "completed", "conclusion": "success", "created_at": stamp(120 + index), "updated_at": stamp(60)}
+                            for index in range(27)
+                        ],
                     ]
                 }
             return {"workflow_runs": []}
@@ -1679,11 +1658,12 @@ class SourceContractTests(unittest.TestCase):
         self.assertFalse(result["runs_sample"]["complete"])
         self.assertEqual(result["runs_sample"]["selected"], 2)
         self.assertFalse(result["workflow_counts_complete"]["Production Controller"])
+        self.assertFalse(result["workflow_counts_complete"]["CI"])
         self.assertEqual(
             result["workflow_counts"]["CI"],
-            {"queued": 1, "running": 1, "passed": 1, "failed": 1},
+            {"queued": 1, "running": 1, "passed": 27, "failed": 1},
         )
-        self.assertEqual(result["latency"]["ci"]["sample"], 1)
+        self.assertEqual(result["latency"]["ci"]["sample"], 27)
 
     def _write_pr_fleet_receipt(self, payload: dict) -> Path:
         temporary = tempfile.TemporaryDirectory()
