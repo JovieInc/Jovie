@@ -2,7 +2,7 @@ import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import type { ReactNode } from 'react';
 import { describe, expect, it, vi } from 'vitest';
-import { ReleasesEmptyState } from '@/features/dashboard/organisms/release-provider-matrix/ReleasesEmptyState';
+import { ReleasesEmptyState } from '@/components/features/dashboard/organisms/release-provider-matrix/ReleasesEmptyState';
 
 vi.mock('@/components/molecules/drawer', () => ({
   DrawerButton: ({
