@@ -31,6 +31,7 @@ if HERMES_DIR not in sys.path:
 
 from closure_health import (  # noqa: E402 - sibling executable module
     AUTHORITY as CLOSURE_HEALTH_AUTHORITY,
+    STACK_MAX_DEPTH,
 )
 from closure_health import SCHEMA as CLOSURE_HEALTH_SCHEMA  # noqa: E402
 from closure_health import observe_closure_health  # noqa: E402
@@ -148,6 +149,15 @@ def previous_closure_health(state_dir: Path) -> dict[str, Any] | None:
     return candidate
 
 
+def empty_stack_health() -> dict[str, Any]:
+    return {
+        "maxDepth": STACK_MAX_DEPTH,
+        "roots": [],
+        "violations": [],
+        "repairActions": [],
+    }
+
+
 def validate_closure_health(candidate: object) -> dict[str, Any]:
     """Fail new intake closed without converting closure debt into a queue hold."""
     valid = (
@@ -180,6 +190,8 @@ def validate_closure_health(candidate: object) -> dict[str, Any]:
             "fallback-pr-generation",
         ],
         "reasons": ["closure-health-receipt-missing-or-malformed"],
+        "stackHealth": empty_stack_health(),
+        "repairActions": [],
     }
 
 
@@ -1446,9 +1458,10 @@ def failed_evaluation_receipt(
     carry observedAt, signals, isolatedPromotionAdmission, and promotionMode.
     """
     promotion_mode = "blocked"
+    observed = observed_at or isoformat(utc_now())
     return {
         "schema": SCHEMA,
-        "observedAt": observed_at or isoformat(utc_now()),
+        "observedAt": observed,
         "state": "RED",
         "promotionMode": promotion_mode,
         "alreadyAdmittedCohort": already_admitted_cohort_semantics(promotion_mode),
@@ -1462,10 +1475,18 @@ def failed_evaluation_receipt(
                 "schema": CLOSURE_HEALTH_SCHEMA,
                 "status": "red",
                 "authority": CLOSURE_HEALTH_AUTHORITY,
+                "observedAt": observed,
                 "newIssueIntakeAllowed": False,
                 "promotionContinues": True,
                 "remediationContinues": True,
+                "blockedActivities": [
+                    "new-issue-lease",
+                    "new-implementation",
+                    "fallback-pr-generation",
+                ],
                 "reasons": ["gate-evaluation-failed"],
+                "stackHealth": empty_stack_health(),
+                "repairActions": [],
             },
             "independentReview": {
                 "schema": INDEPENDENT_REVIEW_SCHEMA,

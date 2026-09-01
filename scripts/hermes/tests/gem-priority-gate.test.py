@@ -852,6 +852,16 @@ class DeploymentBindingTests(unittest.TestCase):
             receipt["signals"]["closureHealth"]["schema"],
             "jovie-closure-health/v1",
         )
+        self.assertEqual(
+            receipt["signals"]["closureHealth"]["stackHealth"],
+            {
+                "maxDepth": MODULE.STACK_MAX_DEPTH,
+                "roots": [],
+                "violations": [],
+                "repairActions": [],
+            },
+        )
+        self.assertEqual(receipt["signals"]["closureHealth"]["repairActions"], [])
 
     def test_severe_gate_failure_keeps_diagnosis_live_but_blocks_remote_push(self):
         receipt = MODULE.failed_evaluation_receipt(ValueError("integrity unknown"))
@@ -867,6 +877,16 @@ class DeploymentBindingTests(unittest.TestCase):
         self.assertEqual(receipt["concurrency"]["gem"]["runtimeFloor"], 1)
         self.assertFalse(receipt["concurrency"]["gem"]["evidenceAccepted"])
         self.assertIn("diagnose-pr", receipt["remediationAdmission"]["activities"])
+        self.assertEqual(
+            receipt["signals"]["closureHealth"]["stackHealth"],
+            {
+                "maxDepth": MODULE.STACK_MAX_DEPTH,
+                "roots": [],
+                "violations": [],
+                "repairActions": [],
+            },
+        )
+        self.assertEqual(receipt["signals"]["closureHealth"]["repairActions"], [])
         sys.path.insert(0, str(GATE.parent))
         from gem_gate_contract import validate_gate_result
 
@@ -1746,6 +1766,11 @@ class AutoEnrollStubReceiptTests(unittest.TestCase):
         self.assertTrue(jq_accepts_autoenroll_receipt(receipt))
         self.assertEqual(receipt["signals"]["main"]["sha"], MODULE.UNKNOWN_MAIN_SHA)
         self.assertEqual(receipt["signals"]["integrity"]["status"], "invalid")
+        self.assertEqual(
+            receipt["signals"]["closureHealth"]["stackHealth"]["repairActions"],
+            [],
+        )
+        self.assertEqual(receipt["signals"]["closureHealth"]["repairActions"], [])
 
     def test_malformed_main_sha_is_rejected_without_a_jq_runtime_error(self):
         jq = shutil.which("jq")

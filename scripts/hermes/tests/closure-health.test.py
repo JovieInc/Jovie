@@ -963,6 +963,16 @@ class ClosureObservationTests(unittest.TestCase):
         self.assertEqual(failed["status"], "red")
         self.assertFalse(failed["newIssueIntakeAllowed"])
         self.assertEqual(failed["reasons"], ["closure-observation-unknown"])
+        self.assertEqual(
+            failed["stackHealth"],
+            {
+                "maxDepth": MODULE.STACK_MAX_DEPTH,
+                "roots": [],
+                "violations": [],
+                "repairActions": [],
+            },
+        )
+        self.assertEqual(failed["repairActions"], [])
         self.assertIn("bad snapshot", failed["error"])
 
 
