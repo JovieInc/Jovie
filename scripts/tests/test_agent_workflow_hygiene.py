@@ -1212,6 +1212,12 @@ def test_product_screenshot_budget_covers_capture_and_publication() -> None:
         "E2E_CLERK_USER_ID",
     ):
         assert f"-u {capture_only_variable}" in publication
+    assert "hold_screenshot_merge_queue()" in publication
+    assert "production-controller.yml/runs?status=in_progress&per_page=100" in publication
+    assert "production-controller.yml/runs?status=queued&per_page=100" in publication
+    assert "hold-screenshot-mq-during-controller.mjs" in publication
+    assert publication.count('gh pr edit --add-label "merge-queue"') == 2
+    assert publication.count("if hold_screenshot_merge_queue; then") == 2
 
 
 def test_cost_monitoring_docs_match_activation_gated_observer() -> None:

@@ -1979,6 +1979,21 @@ printf 'https://jovie-argv-contract-jovie.vercel.app\\n'
       'node .github/scripts/assert-live-production-bind.mjs'
     );
     expect(verified).not.toContain('neutral with no notification');
+    expect(verified).toContain(
+      "needs.authorize-production.result == 'success'"
+    );
+    expect(verified).toContain(
+      "needs.authorize-production.outputs.already_verified != 'true'"
+    );
+    expect(verified).not.toContain(
+      "needs.authorize-production.outputs.authorized == 'true' &&"
+    );
+    expect(verified).toContain(
+      '[ "${{ needs.authorize-production.outputs.authorized }}" != "true" ]'
+    );
+    expect(verified).toContain(
+      'Exact source CI authorization is required before finalizing production verification.'
+    );
     expect(verified).toContain("steps.current.outputs.is_current == 'true'");
     expect(verified).toContain(
       "steps.verify.outputs.canonical_verified == 'true'"
@@ -4181,6 +4196,9 @@ describe('production promotion exact-artifact contract', () => {
       'Finalize exact current release generation'
     );
     expect(finalizeStep).toContain('production-generation-verified.json');
+    expect(finalizeStep).toContain(
+      '[ "${{ needs.authorize-production.outputs.authorized }}" != "true" ]'
+    );
     expect(finalizeStep).toContain('verified=true');
     expect(verified).not.toContain('Write exact verified-generation marker');
     expect(verified).toContain('Preserve exact verified-generation marker');
