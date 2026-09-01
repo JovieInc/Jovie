@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import * as aeo from '@/lib/aeo/asset-visibility';
 import {
   ASSET_VISIBILITY_QUERY_SET_VERSION,
   type AssetVisibilityObservation,
@@ -718,8 +719,6 @@ describe('asset visibility', () => {
     ).toThrow('asset_visibility_competitor_invalid_position');
   });
 });
-
-import * as aeo from '@/lib/aeo/asset-visibility';
 
 const json = <T>(value: string): T => JSON.parse(value) as T;
 const base = (): aeo.AeoAssetObservation =>

@@ -2,8 +2,8 @@ import { computeRatePercent } from '@/lib/analytics/metrics';
 import { canonicalizeSurfaceUrl } from '@/lib/profile-surfaces/contracts';
 import {
   CITATION_ENGINES,
-  classifyCitationTrend,
   type CitationEngine,
+  classifyCitationTrend,
 } from './citation-monitor';
 
 // Collectors own provider I/O, consent hydration, excerpt bounds, and persistence.
