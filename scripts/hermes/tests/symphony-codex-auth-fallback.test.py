@@ -928,7 +928,6 @@ class FallbackTests(unittest.TestCase):
         self.assertEqual(self.events.read_text().splitlines(), [
             "systemctl --user list-units --type=service --state=active grok-ship-*.service fallback-ship-*.service --no-legend --no-pager",
             "systemctl --user start symphony-elixir.service",
-            "systemctl --user start symphony-lyb.service",
             "systemctl --user is-active --quiet symphony-elixir.service",
         ])
         self.assertIn("idle", result.stderr)

@@ -21,8 +21,11 @@ class OpenAISymphonyInstallTests(unittest.TestCase):
         self.assertIn(
             "git clone --depth 1 https://github.com/JovieInc/Jovie.git .", workflow
         )
-        self.assertRegex(workflow, re.compile(r"^\s+command: codex .*app-server$", re.M))
-        self.assertNotIn("symphony-codex-router", workflow)
+        self.assertRegex(
+            workflow,
+            re.compile(r"^\s+command: \./scripts/hermes/symphony-codex-router app-server$", re.M),
+        )
+        self.assertIn("symphony-codex-router", workflow)
         self.assertIn("interval_ms: 30000", workflow)
         self.assertIn("max_concurrent_agents: 8", workflow)
         self.assertIn("port: 4041", workflow)
