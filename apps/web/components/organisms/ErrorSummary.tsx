@@ -1,5 +1,6 @@
 'use client';
 
+// @coverage-via apps/web/tests/components/forms.test.tsx
 import { useEffect, useId, useRef } from 'react';
 import { cn } from '@/lib/utils';
 

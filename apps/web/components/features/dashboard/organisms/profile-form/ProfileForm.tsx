@@ -1,5 +1,6 @@
 'use client';
 
+// @coverage-via apps/web/tests/unit/dashboard/forms-validation-submit-state.test.tsx
 import { Button, Input } from '@jovie/ui';
 import { FormField } from '@/components/molecules/FormField';
 import { FormStatus } from '@/components/molecules/FormStatus';

@@ -4,14 +4,12 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type { Artist } from '@/types/db';
 
 const {
-  mockHandleSubmit,
   mockProfileFormState,
   mockMusicLinksFormState,
 } = vi.hoisted(() => {
   const mockHandleSubmit = vi.fn((event: FormEvent) => event.preventDefault());
   const mockSetFormData = vi.fn();
   return {
-    mockHandleSubmit,
     mockProfileFormState: {
       formRef: { current: null },
       nameInputRef: { current: null },
@@ -70,10 +68,9 @@ vi.mock('next-themes', () => ({
 }));
 
 vi.mock('next/image', () => ({
-  default: ({
-    alt,
-    ...props
-  }: ImgHTMLAttributes<HTMLImageElement>) => <img alt={alt} {...props} />,
+  default: ({ alt, ...props }: ImgHTMLAttributes<HTMLImageElement>) => (
+    <img alt={alt} {...props} />
+  ),
 }));
 
 vi.mock('@/components/organisms/artist-search-palette', () => ({

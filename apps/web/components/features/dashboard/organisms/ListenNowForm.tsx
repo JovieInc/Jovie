@@ -7,9 +7,9 @@ import { FormStatus } from '@/components/molecules/FormStatus';
 import { useProfileMutation } from '@/lib/queries';
 import { normalizeUrl } from '@/lib/utils/platform-detection';
 import {
-  convertCreatorProfileToArtist,
   type Artist,
   type CreatorProfile,
+  convertCreatorProfileToArtist,
 } from '@/types/db';
 
 interface ListenNowFormProps {
