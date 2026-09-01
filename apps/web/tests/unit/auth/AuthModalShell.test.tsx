@@ -41,7 +41,11 @@ describe('AuthModalShell', () => {
   beforeEach(() => {
     mockBack.mockReset();
     // jsdom doesn't implement the native dialog API used by showModal().
-    HTMLDialogElement.prototype.showModal = vi.fn();
+    HTMLDialogElement.prototype.showModal = vi.fn(function showModalMock(
+      this: HTMLDialogElement
+    ) {
+      this.querySelector<HTMLElement>('button')?.focus();
+    });
     HTMLDialogElement.prototype.close = vi.fn();
   });
 

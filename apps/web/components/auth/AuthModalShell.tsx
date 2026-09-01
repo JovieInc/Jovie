@@ -37,16 +37,16 @@ export function AuthModalShell({
     router.back();
   }, [router]);
 
+  useModalFocusBoundary(dialogRef, true, {
+    lockScroll: true,
+    onDismiss: dismiss,
+  });
+
   useEffect(() => {
     const dialog = dialogRef.current;
     if (!dialog) return;
     if (!dialog.open) dialog.showModal();
   }, []);
-
-  useModalFocusBoundary(dialogRef, true, {
-    lockScroll: true,
-    onDismiss: dismiss,
-  });
 
   useEffect(() => {
     const dialog = dialogRef.current;
