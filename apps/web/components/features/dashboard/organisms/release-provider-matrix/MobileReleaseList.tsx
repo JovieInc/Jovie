@@ -1,5 +1,7 @@
 'use client';
 
+// @coverage-via apps/web/tests/components/release-provider-matrix/MobileReleaseList.test.tsx
+
 import { memo, useCallback, useMemo } from 'react';
 import { Icon } from '@/components/atoms/Icon';
 import {
@@ -7,7 +9,10 @@ import {
   SwipeToRevealGroup,
 } from '@/components/atoms/SwipeToReveal';
 import { TruncatedText } from '@/components/atoms/TruncatedText';
-import { ShellListRowButton } from '@/components/organisms/table';
+import {
+  ShellListRowButton,
+  ShellListRowDisclosureIcon,
+} from '@/components/organisms/table';
 import { TypeBadge } from '@/components/shell/TypeBadge';
 import { mobileReleaseTokens } from '@/features/dashboard/tokens';
 import { formatCompactReleaseArtistLine } from '@/lib/discography/formatting';
@@ -250,7 +255,8 @@ const MobileReleaseRow = memo(function MobileReleaseRow({
       <ShellListRowButton
         type='button'
         onClick={() => onEdit(release)}
-        className='flex h-14 w-full items-center gap-3 px-4 text-left'
+        density='spacious'
+        className='flex w-full items-center gap-3 px-4 text-left'
         data-testid={`mobile-release-row-${release.id}`}
       >
         {/* Title + subtitle stacked — artwork hidden on mobile for density */}
@@ -278,10 +284,8 @@ const MobileReleaseRow = memo(function MobileReleaseRow({
         </div>
 
         {/* Chevron indicator */}
-        <Icon
-          name='ChevronRight'
+        <ShellListRowDisclosureIcon
           className={mobileReleaseTokens.row.chevron}
-          aria-hidden='true'
         />
       </ShellListRowButton>
     </SwipeToReveal>

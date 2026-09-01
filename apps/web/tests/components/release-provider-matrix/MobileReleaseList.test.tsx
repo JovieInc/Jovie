@@ -102,6 +102,10 @@ describe('MobileReleaseList', () => {
     expect(row).toHaveAttribute('data-shell-list-row', 'true');
     expect(row.className).toContain('system-b-table-row-hover');
     expect(row.className).toContain('system-b-table-row-focus-visible');
+    expect(row.className).toContain('h-14');
+    expect(
+      row.querySelector('[data-shell-list-row-disclosure="true"]')
+    ).toBeInTheDocument();
 
     await user.click(row);
 

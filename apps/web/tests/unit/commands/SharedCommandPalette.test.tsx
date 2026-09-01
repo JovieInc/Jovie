@@ -250,6 +250,8 @@ describe('SharedCommandPalette (cmd+k surface)', () => {
       name: 'Connections Manage account integrations and authorized services. ⌘1',
     });
     expect(selected).toHaveClass('system-b-table-row-shell');
+    expect(selected).toHaveClass('min-h-11');
+    expect(selected).toHaveClass('py-1.5');
     expect(selected).toHaveClass('system-b-table-row-selected');
     expect(selected).not.toHaveClass('system-b-picker-row');
     expect(selected.querySelector('.system-b-picker-art')).toBeNull();

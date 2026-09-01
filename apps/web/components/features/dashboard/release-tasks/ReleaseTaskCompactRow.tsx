@@ -34,7 +34,10 @@ export const ReleaseTaskCompactRow = React.memo(function ReleaseTaskCompactRow({
   const isAi = isReleaseTaskAutomated(task);
 
   return (
-    <ShellListRowFrame className='flex min-h-7 items-center gap-2 px-3 py-0.5'>
+    <ShellListRowFrame
+      density='compact'
+      className='flex items-center gap-2 px-3'
+    >
       <ReleaseTaskCheckbox
         task={task}
         isDone={isDone}

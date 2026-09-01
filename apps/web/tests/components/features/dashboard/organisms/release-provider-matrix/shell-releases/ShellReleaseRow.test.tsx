@@ -76,6 +76,33 @@ describe('ShellReleaseRow audio affordance', () => {
     expect(row?.className).toContain('system-b-table-row-focus-visible');
   });
 
+  it('mounts trailing actions in the shared contextual action slot', () => {
+    const { container } = render(
+      <ShellReleaseRow
+        release={fakeRelease({
+          id: 'r1',
+          title: 'Lost in the Light',
+          previewUrl: null,
+        })}
+        isSelected={false}
+        onSelect={() => undefined}
+        actionMenuItems={[{ id: 'copy', label: 'Copy' }]}
+      />
+    );
+
+    const row = container.querySelector('[data-shell-release-row]');
+    const slot = screen.getByTestId('shell-release-row-actions');
+    const trigger = screen.getByRole('button', {
+      name: 'Release actions for Lost in the Light',
+    });
+
+    expect(row?.className).toContain('system-b-table-row-shell');
+    expect(row?.className).toContain('h-14');
+    expect(slot).toHaveClass('system-b-table-contextual-action');
+    expect(slot.className).not.toContain('group-hover/row');
+    expect(trigger.className).not.toContain('group-hover/row');
+  });
+
   it('uses the shell typography tokens for the release title and subtitle', () => {
     render(
       <ShellReleaseRow
