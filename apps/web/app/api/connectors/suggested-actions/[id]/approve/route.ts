@@ -22,6 +22,7 @@ import { requireAuth } from '@/lib/auth/require-auth';
 import { CACHE_TAGS } from '@/lib/cache/tags';
 import { recordInboxDecision } from '@/lib/connectors/inbox-decision';
 import { resolveSuggestedActionDispatch } from '@/lib/connectors/suggested-action-dispatch';
+import { YOUTUBE_THUMBNAIL_CANDIDATE_KIND } from '@/lib/connectors/suggested-action-kinds';
 import {
   enqueueApprovedActionWorkflow,
   recoverOrphanedApprovedAction,
@@ -30,11 +31,40 @@ import { db } from '@/lib/db';
 import { suggestedActions } from '@/lib/db/schema/connectors';
 import { captureError } from '@/lib/error-tracking';
 import { logger } from '@/lib/utils/logger';
+import {
+  reconcileThumbnailCandidateDecision,
+  YouTubeThumbnailDecisionError,
+} from '@/lib/youtube-library';
 
 const NO_STORE_HEADERS = { 'Cache-Control': 'no-store' } as const;
 
 interface RouteParams {
   params: Promise<{ id: string }>;
+}
+
+async function reconcileYoutubeApproval(input: {
+  readonly id: string;
+  readonly userId: string;
+  readonly payload: unknown;
+  readonly approvedAt?: Date;
+}) {
+  try {
+    return await reconcileThumbnailCandidateDecision({
+      suggestedActionId: input.id,
+      userId: input.userId,
+      payload: input.payload,
+      decision: 'approved',
+      decidedAt: input.approvedAt,
+    });
+  } catch (error) {
+    if (error instanceof YouTubeThumbnailDecisionError) {
+      return NextResponse.json(
+        { error: error.code },
+        { status: 422, headers: NO_STORE_HEADERS }
+      );
+    }
+    throw error;
+  }
 }
 
 export async function POST(_request: Request, { params }: RouteParams) {
@@ -90,18 +120,6 @@ export async function POST(_request: Request, { params }: RouteParams) {
       .set({
         status: 'approved',
         approvedAt,
-        ...(dispatch.mode === 'decision-only' &&
-        dispatch.family === 'youtube-thumbnail'
-          ? {
-              executionResult: {
-                schemaVersion: 1,
-                state: 'approved',
-                actionKind: candidate.kind,
-                approvedAt: approvedAt.toISOString(),
-                youtubeMutationPerformed: false,
-              },
-            }
-          : {}),
       })
       .where(
         and(
@@ -124,6 +142,14 @@ export async function POST(_request: Request, { params }: RouteParams) {
       });
 
       if (recovery === 'decision-only') {
+        if (candidate.kind === YOUTUBE_THUMBNAIL_CANDIDATE_KIND) {
+          const receipt = await reconcileYoutubeApproval({
+            id,
+            userId,
+            payload: candidate.payload,
+          });
+          if (receipt instanceof NextResponse) return receipt;
+        }
         revalidateTag(CACHE_TAGS.DASHBOARD_DATA, 'max');
         return NextResponse.json(
           {
@@ -132,7 +158,9 @@ export async function POST(_request: Request, { params }: RouteParams) {
             status:
               dispatch.mode === 'decision-only' &&
               dispatch.family === 'youtube-thumbnail'
-                ? 'approved-for-generation'
+                ? candidate.kind === YOUTUBE_THUMBNAIL_CANDIDATE_KIND
+                  ? 'approved-publication-blocked'
+                  : 'approved-for-generation'
                 : 'approved-for-preparation',
           },
           { status: 200, headers: NO_STORE_HEADERS }
@@ -203,6 +231,15 @@ export async function POST(_request: Request, { params }: RouteParams) {
     const approvedKind = updated[0].kind;
 
     if (dispatch.mode === 'decision-only') {
+      if (candidate.kind === YOUTUBE_THUMBNAIL_CANDIDATE_KIND) {
+        const receipt = await reconcileYoutubeApproval({
+          id,
+          userId,
+          payload: candidate.payload,
+          approvedAt,
+        });
+        if (receipt instanceof NextResponse) return receipt;
+      }
       logger.info('[approve] decision-only suggested_action approved', {
         approvalId: id,
         userId,
@@ -224,7 +261,9 @@ export async function POST(_request: Request, { params }: RouteParams) {
           status:
             dispatch.family === 'brand-deal'
               ? 'approved-for-preparation'
-              : 'approved-for-generation',
+              : candidate.kind === YOUTUBE_THUMBNAIL_CANDIDATE_KIND
+                ? 'approved-publication-blocked'
+                : 'approved-for-generation',
         },
         { status: 200, headers: NO_STORE_HEADERS }
       );
