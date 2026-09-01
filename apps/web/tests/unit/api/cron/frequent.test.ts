@@ -19,6 +19,7 @@ const {
   mockWithSystemIngestionSession,
   mockProcessOutreachBatch,
   mockReconcileOrphanedAcceptedActions,
+  mockRunConnectedYouTubeRefreshes,
   mockProbeRedisOperability,
   mockCaptureError,
 } = vi.hoisted(() => ({
@@ -40,8 +41,13 @@ const {
   mockWithSystemIngestionSession: vi.fn(),
   mockProcessOutreachBatch: vi.fn(),
   mockReconcileOrphanedAcceptedActions: vi.fn(),
+  mockRunConnectedYouTubeRefreshes: vi.fn(),
   mockProbeRedisOperability: vi.fn(),
   mockCaptureError: vi.fn(),
+}));
+
+vi.mock('@/lib/connectors/youtube/refresh', () => ({
+  runConnectedYouTubeRefreshes: mockRunConnectedYouTubeRefreshes,
 }));
 
 vi.mock(
@@ -210,6 +216,13 @@ describe('GET /api/cron/frequent', () => {
       scanned: 0,
       enqueued: 0,
     });
+    mockRunConnectedYouTubeRefreshes.mockResolvedValue({
+      attempted: 0,
+      synced: 0,
+      needsReauth: 0,
+      failed: 0,
+      skipped: 0,
+    });
     mockProbeRedisOperability.mockResolvedValue({
       status: 'healthy',
       latencyMs: 5,
@@ -239,6 +252,16 @@ describe('GET /api/cron/frequent', () => {
     expect(data.results.workflowApprovalRecovery).toEqual({
       success: true,
       data: { scanned: 0, enqueued: 0 },
+    });
+    expect(data.results.youtubeLibraryRefresh).toEqual({
+      success: true,
+      data: {
+        attempted: 0,
+        synced: 0,
+        needsReauth: 0,
+        failed: 0,
+        skipped: 0,
+      },
     });
     expect(data.results.outreach).toEqual({
       success: true,
