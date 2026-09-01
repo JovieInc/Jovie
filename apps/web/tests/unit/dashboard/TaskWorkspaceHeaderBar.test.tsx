@@ -1,3 +1,5 @@
+import { readFileSync } from 'node:fs';
+import { resolve } from 'node:path';
 import { fireEvent, render, screen } from '@testing-library/react';
 import type { ComponentProps, FormEvent, ReactNode } from 'react';
 import { describe, expect, it, vi } from 'vitest';
@@ -129,6 +131,39 @@ function createBaseProps() {
 }
 
 describe('TaskWorkspaceHeaderBar', () => {
+  it('keeps Tasks toolbar and filter controls at 32px on desktop', () => {
+    const headerSource = readFileSync(
+      resolve(
+        __dirname,
+        '../../../components/features/dashboard/tasks/TaskWorkspaceHeaderBar.tsx'
+      ),
+      'utf8'
+    );
+    const tabBarSource = readFileSync(
+      resolve(__dirname, '../../../components/molecules/tab-bar/TabBar.tsx'),
+      'utf8'
+    );
+
+    expect(headerSource).toContain('const TASK_FILTER_TAB_CLASSNAME = cn(');
+    expect(headerSource).toContain("'relative h-8 gap-1.5 px-2 text-xs'");
+    expect(headerSource).toContain('sm:before:h-8 sm:before:min-w-0');
+    expect(headerSource).toContain(
+      'triggerClassName={TASK_FILTER_TAB_CLASSNAME}'
+    );
+    expect(headerSource).toContain(
+      'const TASK_TOOLBAR_ICON_BUTTON_CLASSNAME = cn('
+    );
+    expect(headerSource).toContain("'h-8 w-8 px-0'");
+    expect(headerSource).toContain("'sm:before:w-8'");
+    expect(headerSource).toContain(
+      'buttonClassName={TASK_TOOLBAR_ICON_BUTTON_CLASSNAME}'
+    );
+    expect(tabBarSource).toContain(
+      'const TAB_BAR_SEGMENT_OVERFLOW_TRIGGER_CLASSNAME'
+    );
+    expect(tabBarSource).toContain("'h-8 w-8 sm:before:h-8 sm:before:w-8'");
+  });
+
   it('renders a flat default shell with task actions', () => {
     render(<TaskWorkspaceHeaderBar {...createBaseProps()} mode='default' />);
 

@@ -1,3 +1,5 @@
+import { readFileSync } from 'node:fs';
+import { resolve } from 'node:path';
 import { TooltipProvider } from '@jovie/ui';
 import { act, fireEvent, render, screen, within } from '@testing-library/react';
 import React from 'react';
@@ -754,6 +756,28 @@ function getLatestTableProps() {
 }
 
 describe('TasksPageClient', () => {
+  it('keeps task stage and priority metadata controls at 32px on desktop', () => {
+    const source = readFileSync(
+      resolve(
+        __dirname,
+        '../../../components/features/dashboard/tasks/TasksPageClient.tsx'
+      ),
+      'utf8'
+    );
+
+    expect(source).toContain(
+      '-mx-1 relative inline-flex h-8 min-w-0 items-center rounded-full px-2'
+    );
+    expect(source).toContain('before:h-11 before:min-w-11 before:w-full');
+    expect(source).toContain('sm:before:h-8 sm:before:min-w-0');
+    expect(source).toContain(
+      "<TaskMetaTrigger ariaLabel='Change Task Status'>"
+    );
+    expect(source).toContain(
+      "<TaskMetaTrigger ariaLabel='Change Task Priority'>"
+    );
+  });
+
   beforeEach(() => {
     vi.useFakeTimers();
     latestHeaderSearchAdapter = null;
