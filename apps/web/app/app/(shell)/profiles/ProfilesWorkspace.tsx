@@ -1,6 +1,6 @@
 'use client';
 
-import { type CommonDropdownItem, Button, SimpleTooltip } from '@jovie/ui';
+import { Button, type CommonDropdownItem, SimpleTooltip } from '@jovie/ui';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { type ColumnDef, createColumnHelper } from '@tanstack/react-table';
 import {
@@ -82,8 +82,8 @@ import { buildConnectionActions } from './connection-actions';
 import type {
   ProfilesWorkspaceData,
   ProfilesWorkspaceFilter,
-  ProfileWorkspaceSurfaceRow,
   ProfileWorkspaceRow,
+  ProfileWorkspaceSurfaceRow,
 } from './data';
 
 const columnHelper = createColumnHelper<ProfileWorkspaceRow>();
@@ -149,6 +149,11 @@ const CONNECTION_SUGGESTION_PLATFORM_PRIORITY: Readonly<
 };
 
 const SUGGESTED_QUEUE_FOCUS_TARGET = 'suggested-connections-region';
+const SUGGESTED_CONNECTION_SKELETON_IDS = [
+  'suggested-connection-loading-1',
+  'suggested-connection-loading-2',
+  'suggested-connection-loading-3',
+] as const;
 
 function connectionSuggestionsQueryKey(profileId: string) {
   return [...queryKeys.suggestions.list(profileId), 'connections-review'];
@@ -828,14 +833,14 @@ function SuggestedConnectionsLoading() {
   return (
     <div
       aria-busy='true'
-      aria-label='Loading Suggested Connections'
       aria-live='polite'
       className='min-h-55'
     >
+      <span className='sr-only'>Loading Suggested Connections</span>
       <div className='overflow-hidden rounded-lg border border-subtle bg-surface-1'>
-        {Array.from({ length: 3 }, (_, index) => (
+        {SUGGESTED_CONNECTION_SKELETON_IDS.map(id => (
           <div
-            key={index}
+            key={id}
             className='flex min-h-16 items-center gap-3 border-b border-subtle px-3 py-2.5 last:border-b-0'
           >
             <div className='h-8 w-8 shrink-0 rounded-md bg-surface-2' />
