@@ -4,7 +4,11 @@ import { describe, expect, it, vi } from 'vitest';
 import { ComboboxOptionItem } from './ComboboxOptionItem';
 
 const legacyBgAccentClass = ['bg', 'accent'].join('-');
-const legacyTextAccentForegroundClass = ['text', 'accent', 'foreground'].join('-');
+const legacyTextAccentForegroundClass = [
+  'text',
+  'accent',
+  'foreground',
+].join('-');
 const legacyTextIndigoClass = ['text', 'indigo', '600'].join('-');
 
 const optionState = vi.hoisted(() => ({

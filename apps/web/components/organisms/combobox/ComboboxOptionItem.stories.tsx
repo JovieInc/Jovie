@@ -1,6 +1,6 @@
 import {
-  Combobox as HeadlessCombobox,
   ComboboxOptions,
+  Combobox as HeadlessCombobox,
 } from '@headlessui/react';
 import type { Meta, StoryObj } from '@storybook/nextjs-vite';
 import { ComboboxOptionItem } from './ComboboxOptionItem';
@@ -20,7 +20,11 @@ const meta: Meta<typeof ComboboxOptionItem> = {
 export default meta;
 type Story = StoryObj<typeof ComboboxOptionItem>;
 
-function OptionItemStory({ selected = false }: { readonly selected?: boolean }) {
+function OptionItemStory({
+  selected = false,
+}: {
+  readonly selected?: boolean;
+}) {
   return (
     <div className='w-80 bg-neutral-950 p-4'>
       <HeadlessCombobox
