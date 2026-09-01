@@ -41,7 +41,30 @@ jobs:
         run: bash apps/ios/scripts/ensure-configuration.sh
 
       - name: Show Xcode version
-        run: xcodebuild -version
+        id: xcode-version
+        shell: bash
+        run: |
+          set -euo pipefail
+          xcodebuild -version
+          printf 'cache_key=%s\n' "$(xcodebuild -version | shasum -a 256 | cut -d ' ' -f 1)" >> "$GITHUB_OUTPUT"
+
+      # GitHub-hosted macOS jobs are isolated VMs. Cache only immutable SwiftPM
+      # resolution/checkouts, never the mutable build products in DerivedData.
+      # The Xcode version and Package.resolved are both part of the key so a
+      # toolchain or dependency change cannot restore an incompatible cache.
+      - name: Restore Swift package cache
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: |
+            .build/ios-ci/SourcePackages
+            ~/Library/Caches/org.swift.swiftpm
+          key: >-
+            ${{ runner.os }}-swiftpm-
+            ${{ steps.xcode-version.outputs.cache_key }}-
+            ${{ hashFiles('apps/ios/Jovie.xcodeproj/project.xcworkspace/xcshareddata/swiftpm/Package.resolved') }}-
+            ${{ hashFiles('apps/ios/Jovie.xcodeproj/project.pbxproj') }}
+          restore-keys: |
+            ${{ runner.os }}-swiftpm-
 
       - name: Validate app icon
         run: bash apps/ios/scripts/validate-app-icon.sh
