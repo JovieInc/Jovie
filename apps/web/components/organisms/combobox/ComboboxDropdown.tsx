@@ -1,11 +1,11 @@
 'use client';
 
 import { ComboboxOptions } from '@headlessui/react';
+import { Spinner as LoadingSpinner } from '@jovie/ui';
 import {
   OVERLAY_CONTENT_RADIUS,
   OVERLAY_SURFACE_BASE,
-  Spinner as LoadingSpinner,
-} from '@jovie/ui';
+} from '@jovie/ui/lib/dropdown-styles';
 import { forwardRef } from 'react';
 import { cn } from '@/lib/utils';
 import { ComboboxOptionItem } from './ComboboxOptionItem';

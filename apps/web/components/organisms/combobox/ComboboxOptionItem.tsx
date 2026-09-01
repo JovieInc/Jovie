@@ -4,7 +4,7 @@ import { ComboboxOption as HeadlessComboboxOption } from '@headlessui/react';
 import {
   MENU_ITEM_BASE,
   MENU_ITEM_SELECTED,
-} from '@jovie/ui';
+} from '@jovie/ui/lib/dropdown-styles';
 import { Check } from 'lucide-react';
 import Image from 'next/image';
 import { useEffect, useState } from 'react';

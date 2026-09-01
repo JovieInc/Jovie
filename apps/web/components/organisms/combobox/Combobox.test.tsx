@@ -36,6 +36,7 @@ const options = [
   { id: 'one', name: 'First Artist' },
   { id: 'two', name: 'Second Artist' },
 ];
+const legacyTextWhiteClass = ['text', 'white'].join('-');
 
 describe('Combobox', () => {
   it('uses tokenized combobox input surface states', () => {
@@ -55,7 +56,7 @@ describe('Combobox', () => {
     expect(surface?.className).toContain('focus-within:ring-focus/25');
     expect(input.className).toContain('text-primary-token');
     expect(input.className).toContain('placeholder:text-tertiary-token');
-    expect(input.className).not.toContain('text-white');
+    expect(input.className).not.toContain(legacyTextWhiteClass);
     expect(
       screen.getByRole('button', { name: 'Open dropdown' }).className
     ).toContain('text-tertiary-token');

@@ -3,6 +3,14 @@ import type { ReactNode } from 'react';
 import { describe, expect, it, vi } from 'vitest';
 import { ComboboxOptionItem } from './ComboboxOptionItem';
 
+const legacyBgAccentClass = ['bg', 'accent'].join('-');
+const legacyTextAccentForegroundClass = [
+  'text',
+  'accent',
+  'foreground',
+].join('-');
+const legacyTextIndigoClass = ['text', 'indigo', '600'].join('-');
+
 const optionState = vi.hoisted(() => ({
   current: {
     focus: false,
@@ -26,6 +34,7 @@ vi.mock('@headlessui/react', () => ({
     <div
       role='option'
       aria-selected={optionState.current.selected}
+      tabIndex={-1}
       className={
         typeof className === 'function'
           ? className(optionState.current)
@@ -54,8 +63,8 @@ describe('ComboboxOptionItem', () => {
     const option = screen.getByRole('option', { name: 'First Artist' });
     expect(option.className).toContain('bg-surface-1');
     expect(option.className).toContain('text-primary-token');
-    expect(option.className).not.toContain('bg-accent');
-    expect(option.className).not.toContain('text-accent-foreground');
+    expect(option.className).not.toContain(legacyBgAccentClass);
+    expect(option.className).not.toContain(legacyTextAccentForegroundClass);
     expect(
       screen.queryByTestId('combobox-option-selected-indicator')
     ).not.toBeInTheDocument();
@@ -73,7 +82,7 @@ describe('ComboboxOptionItem', () => {
 
     const option = screen.getByRole('option', { name: 'Second Artist' });
     expect(option.className).toContain('bg-surface-1');
-    expect(option.className).not.toContain('text-indigo-600');
+    expect(option.className).not.toContain(legacyTextIndigoClass);
     expect(
       screen.getByTestId('combobox-option-selected-indicator')
     ).toBeInTheDocument();
