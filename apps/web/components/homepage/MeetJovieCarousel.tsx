@@ -85,9 +85,11 @@ export function ArtistProfileCardRow({
         </Button>
       </nav>
       <div
+        aria-label='Jovie Artist Profile Previews'
         className='homepage-artist-profiles__row'
         onScroll={updateScrollState}
         ref={railRef}
+        tabIndex={0}
       >
         <ul
           aria-label='Jovie Artist Profile Previews'

@@ -80,3 +80,23 @@
 .system-b-root-not-found-page.dark {
   color-scheme: dark;
 }
+
+.system-b-marketing.dark {
+  --color-bg-base: #030407;
+  --color-bg-surface-0: #06080d;
+  --color-bg-surface-1: #0f1420;
+  --color-bg-surface-2: #151b2a;
+  --color-bg-surface-3: #1b2436;
+  --color-bg-page: #030407;
+  --color-bg-hover: rgba(168, 176, 195, 0.06);
+  --color-bg-elevated: #0a0d16;
+  --color-bg-input: #0f1420;
+  --color-bg-active: #151b2a;
+  --color-text-primary-token: #f5f7fb;
+  --color-text-secondary-token: #d7dce8;
+  --color-text-tertiary-token: #a8b0c3;
+  --color-text-quaternary-token: #7d879d;
+  --color-border-subtle: rgba(168, 176, 195, 0.1);
+  --color-border-default: rgba(168, 176, 195, 0.16);
+  --color-border-strong: rgba(199, 237, 255, 0.26);
+}

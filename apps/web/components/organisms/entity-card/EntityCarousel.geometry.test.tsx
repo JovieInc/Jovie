@@ -185,7 +185,7 @@ describe('EntityCarousel profile geometry', () => {
     );
   });
 
-  it('keeps only the active card exposed to assistive technology and focus', () => {
+  it('keeps landscape cards keyboard reachable and syncs focus to the rail', () => {
     render(
       <EntityCarousel
         items={items}
@@ -196,26 +196,28 @@ describe('EntityCarousel profile geometry', () => {
     );
 
     const carousel = screen.getByTestId('entity-carousel');
-    carousel.scrollTo = vi.fn();
+    const scrollTo = vi.fn();
+    carousel.scrollTo = scrollTo;
     const footprints = [
       ...carousel.querySelectorAll<HTMLElement>(':scope > li'),
     ];
     expect(footprints[0]).toHaveAttribute('data-carousel-active', 'true');
-    expect(footprints[0]).not.toHaveAttribute('aria-hidden');
-    expect(footprints[0]).not.toHaveAttribute('inert');
-    for (const footprint of footprints.slice(1)) {
-      expect(footprint).toHaveAttribute('data-carousel-active', 'false');
-      expect(footprint).toHaveAttribute('aria-hidden', 'true');
-      expect(footprint).toHaveAttribute('inert');
+    for (const [index, footprint] of footprints.entries()) {
+      Object.defineProperty(footprint, 'offsetLeft', {
+        configurable: true,
+        value: index * 320,
+      });
+      expect(footprint).not.toHaveAttribute('aria-hidden');
+      expect(footprint).not.toHaveAttribute('inert');
     }
 
-    fireEvent.click(screen.getByRole('button', { name: 'Next Item' }));
+    fireEvent.focus(screen.getByRole('button', { name: 'Updates' }));
 
-    expect(footprints[0]).toHaveAttribute('aria-hidden', 'true');
-    expect(footprints[0]).toHaveAttribute('inert');
-    expect(footprints[1]).toHaveAttribute('data-carousel-active', 'true');
-    expect(footprints[1]).not.toHaveAttribute('aria-hidden');
-    expect(footprints[1]).not.toHaveAttribute('inert');
+    expect(scrollTo).toHaveBeenCalledWith({
+      left: 960,
+      behavior: 'smooth',
+    });
+    expect(footprints[3]).toHaveAttribute('data-carousel-active', 'true');
   });
 
   it('keeps every portrait card available during native horizontal scrolling', () => {

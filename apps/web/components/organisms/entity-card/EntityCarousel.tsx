@@ -237,6 +237,17 @@ export function EntityCarousel({
     };
   }, [prefersReducedMotion, items, leading, trailing]);
 
+  const handleSlotFocus = useCallback(
+    (slotIndex: number) => {
+      if (!showsProfileControls) {
+        return;
+      }
+
+      scrollToIndex(slotIndex);
+    },
+    [scrollToIndex, showsProfileControls]
+  );
+
   if (items.length === 0 && !leading && !trailing) {
     return null;
   }
@@ -246,7 +257,6 @@ export function EntityCarousel({
   // exactly outside the viewport at rest. Portrait keeps a smaller gap for its
   // intentional card preview.
   const isProfileLandscape = layout === 'profile-landscape';
-  const hidesInactiveSlots = isProfileLandscape;
   const cardItemClassName = cn(
     CARD_ITEM_CLASSNAME,
     isProfileLandscape && 'w-full'
@@ -280,11 +290,8 @@ export function EntityCarousel({
             data-carousel-slot='leading'
             data-layout={layout}
             data-carousel-active={currentIndex === 0 ? 'true' : 'false'}
-            aria-hidden={
-              hidesInactiveSlots && currentIndex !== 0 ? true : undefined
-            }
-            inert={hidesInactiveSlots && currentIndex !== 0 ? true : undefined}
             className={cardItemClassName}
+            onFocus={() => handleSlotFocus(0)}
           >
             {leading}
           </li>
@@ -301,9 +308,8 @@ export function EntityCarousel({
               data-carousel-index={index}
               data-layout={layout}
               data-carousel-active={isActive ? 'true' : 'false'}
-              aria-hidden={hidesInactiveSlots && !isActive ? true : undefined}
-              inert={hidesInactiveSlots && !isActive ? true : undefined}
               className={cardItemClassName}
+              onFocus={() => handleSlotFocus(slotIndex)}
             >
               <EntityCard
                 model={model}
@@ -331,17 +337,8 @@ export function EntityCarousel({
             data-carousel-active={
               currentIndex === slotCount - 1 ? 'true' : 'false'
             }
-            aria-hidden={
-              hidesInactiveSlots && currentIndex !== slotCount - 1
-                ? true
-                : undefined
-            }
-            inert={
-              hidesInactiveSlots && currentIndex !== slotCount - 1
-                ? true
-                : undefined
-            }
             className={cardItemClassName}
+            onFocus={() => handleSlotFocus(slotCount - 1)}
           >
             {trailing}
           </li>

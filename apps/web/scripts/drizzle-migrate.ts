@@ -35,6 +35,11 @@ const NEON_URL_PATTERN = /(postgres)(|ql)(\+neon)(.*)/;
 const CI_CONNECT_RETRY_LIMIT = 12;
 const CI_CONNECT_RETRY_DELAY_MS = 5_000;
 const CONNECT_BOOTSTRAP_TIMEOUT_MS = 15_000;
+const MIGRATION_LOCK_NAMESPACE = 'jovie';
+const MIGRATION_LOCK_RESOURCE = 'drizzle:migrate';
+const CI_MIGRATION_LOCK_RETRY_LIMIT = 120;
+const LOCAL_MIGRATION_LOCK_RETRY_LIMIT = 1;
+const MIGRATION_LOCK_RETRY_DELAY_MS = 2_000;
 
 const scriptDir = path.dirname(fileURLToPath(import.meta.url));
 const webRootDir = path.resolve(scriptDir, '..');
@@ -177,6 +182,51 @@ function getConnectionRetryDelayMs(error: unknown, attempt: number) {
   }
 
   return CI_CONNECT_RETRY_DELAY_MS;
+}
+
+function getMigrationLockRetryLimit() {
+  return process.env.CI === 'true'
+    ? CI_MIGRATION_LOCK_RETRY_LIMIT
+    : LOCAL_MIGRATION_LOCK_RETRY_LIMIT;
+}
+
+async function acquireMigrationAdvisoryLock(client: PoolClient) {
+  const maxAttempts = getMigrationLockRetryLimit();
+
+  for (let attempt = 1; attempt <= maxAttempts; attempt += 1) {
+    const result = await client.query(
+      'SELECT pg_try_advisory_lock(hashtext($1), hashtext($2)) AS locked',
+      [MIGRATION_LOCK_NAMESPACE, MIGRATION_LOCK_RESOURCE]
+    );
+    const locked = result.rows.some(row => row.locked === true);
+    if (locked) {
+      return;
+    }
+
+    if (attempt === maxAttempts) {
+      throw new Error(
+        `Timed out waiting for Drizzle migration advisory lock after ${maxAttempts} attempt(s).`
+      );
+    }
+
+    if (attempt === 1 || attempt % 10 === 0) {
+      log.warning(
+        `Another migration runner holds the Drizzle advisory lock; waiting ${MIGRATION_LOCK_RETRY_DELAY_MS / 1000}s before retry ${attempt + 1}/${maxAttempts}.`
+      );
+    }
+    await sleep(MIGRATION_LOCK_RETRY_DELAY_MS);
+  }
+}
+
+async function releaseMigrationAdvisoryLock(client: PoolClient) {
+  const result = await client.query(
+    'SELECT pg_advisory_unlock(hashtext($1), hashtext($2)) AS unlocked',
+    [MIGRATION_LOCK_NAMESPACE, MIGRATION_LOCK_RESOURCE]
+  );
+  const unlocked = result.rows.some(row => row.unlocked === true);
+  if (!unlocked) {
+    log.warning('Drizzle migration advisory lock was not held at release time.');
+  }
 }
 
 async function connectClientWithRetryableBootstrap(pool: Pool) {
@@ -438,7 +488,18 @@ async function runMigrations() {
   }
 
   // Run migrations
+  let migrationLockAcquired = false;
+  let migrationError: unknown = null;
   try {
+    if (!client) {
+      throw new Error('Migration client unavailable after database connection.');
+    }
+
+    log.info('Acquiring migration advisory lock...');
+    await acquireMigrationAdvisoryLock(client);
+    migrationLockAcquired = true;
+    log.success('Migration advisory lock acquired');
+
     log.info('Running migrations...');
 
     const start = Date.now();
@@ -451,6 +512,7 @@ async function runMigrations() {
 
     log.success(`Migrations completed successfully in ${duration}s`);
   } catch (error) {
+    migrationError = error;
     const err = error as unknown;
     const details = (() => {
       if (!err || typeof err !== 'object') return undefined;
@@ -519,21 +581,35 @@ async function runMigrations() {
     if (details) {
       log.error(`Postgres details: ${JSON.stringify(details)}`);
     }
-    process.exit(1);
   } finally {
-    try {
-      client?.release();
-    } catch {
-      // ignore
+    if (migrationLockAcquired && client) {
+      try {
+        await releaseMigrationAdvisoryLock(client);
+        log.success('Migration advisory lock released');
+      } catch (error) {
+        log.warning(
+          `Failed to release migration advisory lock explicitly: ${flattenErrorMessages(error).join(' ')}`
+        );
+      }
     }
+  }
 
-    // Close database connection
-    try {
-      await pool.end();
-      log.info('Database connection closed');
-    } catch {
-      // Ignore close errors
-    }
+  try {
+    client?.release();
+  } catch {
+    // ignore
+  }
+
+  // Close database connection
+  try {
+    await pool.end();
+    log.info('Database connection closed');
+  } catch {
+    // Ignore close errors
+  }
+
+  if (migrationError) {
+    process.exit(1);
   }
 
   log.section('Migration Complete');
@@ -547,4 +623,9 @@ if (require.main === module) {
   });
 }
 
-export { getConnectionRetryDelayMs, isRetryableConnectionError, runMigrations };
+export {
+  getConnectionRetryDelayMs,
+  getMigrationLockRetryLimit,
+  isRetryableConnectionError,
+  runMigrations,
+};

@@ -4176,6 +4176,11 @@ body:has(.home-viewport)::-webkit-scrollbar {
   scrollbar-width: none;
 }
 
+.homepage-artist-profiles__row:focus-visible {
+  outline: var(--space-px) solid var(--system-b-text-primary);
+  outline-offset: var(--space-2);
+}
+
 .homepage-artist-profiles__row::-webkit-scrollbar {
   display: none;
 }
