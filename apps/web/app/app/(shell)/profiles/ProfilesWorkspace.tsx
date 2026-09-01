@@ -1,6 +1,6 @@
 'use client';
 
-import { Button, type CommonDropdownItem, SimpleTooltip } from '@jovie/ui';
+import { type CommonDropdownItem, Button, SimpleTooltip } from '@jovie/ui';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { type ColumnDef, createColumnHelper } from '@tanstack/react-table';
 import {
@@ -26,12 +26,12 @@ import {
 import Link from 'next/link';
 import { useRouter, useSearchParams } from 'next/navigation';
 import {
+  type RefObject,
   useCallback,
   useEffect,
   useMemo,
   useRef,
   useState,
-  type RefObject,
 } from 'react';
 import type { ProfileSuggestion } from '@/app/api/suggestions/route';
 import { BrandLogo } from '@/components/atoms/BrandLogo';
@@ -185,8 +185,7 @@ function compactUrlDisplay(value: string): string {
     const url = new URL(value);
     const path = url.pathname
       .split('/')
-      .filter(Boolean)
-      .at(-1)
+      .findLast(segment => segment.length > 0)
       ?.replace(/^@/, '');
     if (path) return `@${path}`;
     return url.hostname.replace(/^www\./, '');
@@ -197,7 +196,7 @@ function compactUrlDisplay(value: string): string {
 
 function suggestionIdentity(suggestion: ConnectionSuggestion): string {
   const title = suggestion.title.trim();
-  if (title) return title.startsWith('@') ? title : title;
+  if (title) return title;
   if (suggestion.externalUrl) return compactUrlDisplay(suggestion.externalUrl);
   return suggestion.platformLabel;
 }
@@ -830,8 +829,8 @@ function SuggestedConnectionsLoading() {
     <div
       aria-busy='true'
       aria-label='Loading Suggested Connections'
+      aria-live='polite'
       className='min-h-55'
-      role='status'
     >
       <div className='overflow-hidden rounded-lg border border-subtle bg-surface-1'>
         {Array.from({ length: 3 }, (_, index) => (
@@ -906,8 +905,7 @@ function SuggestedConnectionRow({
   const context = hasError ? actionError.message : suggestionContext(suggestion);
 
   return (
-    <div
-      role='listitem'
+    <li
       data-testid='suggested-connection-row'
       className='grid min-h-16 min-w-0 gap-2 px-3 py-2.5 sm:grid-cols-[minmax(0,1fr)_auto] sm:items-center'
     >
@@ -960,7 +958,7 @@ function SuggestedConnectionRow({
           <CircleX className='h-3.5 w-3.5' aria-hidden /> Not me
         </Button>
       </div>
-    </div>
+    </li>
   );
 }
 
@@ -1011,31 +1009,34 @@ function SuggestedConnectionsReview({
         />
       ) : null}
       {!isLoading && groups.length > 0 ? (
-        <div
-          role='list'
+        <ul
           aria-label='Suggested Connection Review Queue'
           className='min-w-0 overflow-hidden rounded-lg border border-subtle bg-surface-1'
         >
           {groups.map(group => (
-            <div
+            <li
               key={group.id}
               data-testid='suggested-connection-group'
               data-suggestion-identity={group.id}
-              aria-label={`${group.identity} suggestions`}
-              className='min-w-0 divide-y divide-subtle border-b border-subtle last:border-b-0'
+              className='min-w-0 border-b border-subtle last:border-b-0'
             >
-              {group.suggestions.map(suggestion => (
-                <SuggestedConnectionRow
-                  key={suggestion.id}
-                  suggestion={suggestion}
-                  actionError={actionError}
-                  onAction={onAction}
-                  registerActionRef={registerActionRef}
-                />
-              ))}
-            </div>
+              <ul
+                aria-label={`${group.identity} suggestions`}
+                className='min-w-0 divide-y divide-subtle'
+              >
+                {group.suggestions.map(suggestion => (
+                  <SuggestedConnectionRow
+                    key={suggestion.id}
+                    suggestion={suggestion}
+                    actionError={actionError}
+                    onAction={onAction}
+                    registerActionRef={registerActionRef}
+                  />
+                ))}
+              </ul>
+            </li>
           ))}
-        </div>
+        </ul>
       ) : null}
     </section>
   );

@@ -320,6 +320,13 @@ export function AddConnectionRail({
 
   const title =
     view === 'profile' ? 'Add Public Profile' : 'Add Profile Or Site';
+  let suggestionDescription = 'No suggested profiles are waiting for review.';
+  if (suggestionsLoading) {
+    suggestionDescription = 'Checking saved suggestions.';
+  } else if (suggestedCount > 0) {
+    const suggestionLabel = suggestedCount === 1 ? 'profile' : 'profiles';
+    suggestionDescription = `${suggestedCount} suggested ${suggestionLabel} to review.`;
+  }
 
   return (
     <EntitySidebarShell
@@ -391,15 +398,7 @@ export function AddConnectionRail({
           <ChoiceRow
             icon={<ReviewIcon />}
             title='Review Suggestions'
-            description={
-              suggestionsLoading
-                ? 'Checking saved suggestions.'
-                : suggestedCount > 0
-                  ? `${suggestedCount} suggested ${
-                      suggestedCount === 1 ? 'profile' : 'profiles'
-                    } to review.`
-                  : 'No suggested profiles are waiting for review.'
-            }
+            description={suggestionDescription}
             onClick={onReviewSuggestions}
           />
         </DrawerSection>
