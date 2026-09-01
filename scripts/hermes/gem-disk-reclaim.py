@@ -40,6 +40,10 @@ PROTECTED_DIR_NAMES = frozenset(
 )
 WORKSPACE_METADATA_FILES = frozenset({".symphony-routing.json"})
 ISSUE_IDENTIFIER = re.compile(r"^(?:JOV|LYB)-[0-9]+$")
+GEM_WORKSPACE_ENV = "GEM_DISK_RECLAIM_GEM_WORKSPACE"
+RECEIPT_ENV = "GEM_DISK_RECLAIM_RECEIPT"
+DISK_RECEIPT_ENV = "GEM_DISK_RECLAIM_DISK_RECEIPT"
+CAPACITY_RECEIPT_ENV = "GEM_DISK_RECLAIM_CAPACITY_RECEIPT"
 
 
 class ReclaimTimeout(TimeoutError):
@@ -805,8 +809,17 @@ def positive_int(value: str) -> int:
     return parsed
 
 
+def default_path_from_env(name: str, fallback: pathlib.Path) -> pathlib.Path:
+    return pathlib.Path(os.environ.get(name, str(fallback))).expanduser()
+
+
 def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
-    home = pathlib.Path.home()
+    pre_parser = argparse.ArgumentParser(add_help=False)
+    pre_parser.add_argument("--home", type=pathlib.Path, default=pathlib.Path.home())
+    pre_args, _ = pre_parser.parse_known_args(argv)
+    home = pre_args.home.expanduser()
+    gem_workspace = default_path_from_env(GEM_WORKSPACE_ENV, home / "gem-workspace")
+    receipt_root = gem_workspace / "state/gem-disk-reclaim"
     parser = argparse.ArgumentParser()
     mode = parser.add_mutually_exclusive_group()
     mode.add_argument("--dry-run", dest="mode", action="store_const", const="dry-run")
@@ -814,16 +827,24 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     parser.set_defaults(mode="dry-run")
     parser.add_argument("--timeout-seconds", type=float, default=600.0)
     parser.add_argument("--home", type=pathlib.Path, default=home)
-    parser.add_argument("--gem-workspace", type=pathlib.Path, default=pathlib.Path("/home/timwhite/gem-workspace"))
+    parser.add_argument("--gem-workspace", type=pathlib.Path, default=gem_workspace)
     parser.add_argument("--workspace-root", action="append", default=[])
     parser.add_argument("--runner-root", action="append", default=[])
     parser.add_argument("--symphony-state-url", default="http://127.0.0.1:4041/api/v1/state")
     parser.add_argument("--symphony-state-file", type=pathlib.Path)
     parser.add_argument("--ps-fixture", type=pathlib.Path)
     parser.add_argument("--disk-fixture", type=pathlib.Path)
-    parser.add_argument("--receipt", type=pathlib.Path, default=pathlib.Path("/home/timwhite/gem-workspace/state/gem-disk-reclaim/latest.json"))
-    parser.add_argument("--disk-receipt", type=pathlib.Path, default=pathlib.Path("/home/timwhite/gem-workspace/state/gem-disk-reclaim/capacity.json"))
-    parser.add_argument("--capacity-receipt", type=pathlib.Path, default=pathlib.Path("/home/timwhite/gem-workspace/state/concurrency.json"))
+    parser.add_argument("--receipt", type=pathlib.Path, default=default_path_from_env(RECEIPT_ENV, receipt_root / "latest.json"))
+    parser.add_argument(
+        "--disk-receipt",
+        type=pathlib.Path,
+        default=default_path_from_env(DISK_RECEIPT_ENV, receipt_root / "capacity.json"),
+    )
+    parser.add_argument(
+        "--capacity-receipt",
+        type=pathlib.Path,
+        default=default_path_from_env(CAPACITY_RECEIPT_ENV, gem_workspace / "state/concurrency.json"),
+    )
     parser.add_argument("--log-path", type=pathlib.Path, default=home / "symphony-ui-pilot-logs/stdout.log")
     parser.add_argument("--log-max-bytes", type=positive_int, default=64 * 1024 * 1024)
     parser.add_argument("--log-retention", type=positive_int, default=5)
