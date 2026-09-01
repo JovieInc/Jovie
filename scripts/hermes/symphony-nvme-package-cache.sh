@@ -455,7 +455,7 @@ write_teardown_receipt() {
   local workspace_mount archive_mount
   workspace_mount="$(mount_source_for "$workspace")"
   archive_mount="$(mount_source_for "$archive_path")"
-  python3 - "$receipt" "$removed_json" "$preserved_json" <<PY
+  python3 - "$receipt" "$removed_json" "$preserved_json" "$archive_sha" <<PY
 import json
 import pathlib
 import sys
@@ -463,6 +463,7 @@ from datetime import datetime, timezone
 
 removed = json.loads(sys.argv[2])
 preserved = json.loads(sys.argv[3])
+archive_sha = sys.argv[4] or None
 payload = {
     "schema": "$TEARDOWN_RECEIPT_SCHEMA",
     "recordedAt": datetime.now(timezone.utc).isoformat().replace("+00:00", "Z"),
@@ -476,7 +477,7 @@ payload = {
     "archive": {
         "path": "$archive_path",
         "mountSource": "$archive_mount",
-        "sha256": "$archive_sha",
+        "sha256": archive_sha,
         "ownership": $(ownership_json "$archive_path"),
     },
     "removed": removed,

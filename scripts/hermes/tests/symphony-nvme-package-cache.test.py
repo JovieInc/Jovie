@@ -216,6 +216,7 @@ class SymphonyNvmePackageCacheTests(unittest.TestCase):
         self.assertFalse((fx.workspace / "node_modules").exists())
         receipt = json.loads((fx.workspace / ".symphony/package-cache/teardown-receipt.json").read_text())
         self.assertEqual(receipt["archive"]["path"], "unknown")
+        self.assertIsNone(receipt["archive"]["sha256"])
         self.assertIsNone(receipt["archive"]["ownership"])
         self.assertIsNone(receipt["preserved"]["immutableArchiveExists"])
 
@@ -225,6 +226,7 @@ class SymphonyNvmePackageCacheTests(unittest.TestCase):
         self.assertEqual(teardown.returncode, 0, teardown.stderr)
         receipt = json.loads((fx.workspace / ".symphony/package-cache/teardown-receipt.json").read_text())
         self.assertEqual(receipt["removed"], [])
+        self.assertIsNone(receipt["archive"]["sha256"])
         self.assertTrue(receipt["preserved"]["workspaceExists"])
 
     def test_node_mismatch_fails_before_install(self) -> None:
