@@ -37,7 +37,7 @@ export function OpportunityInboxEmptyState({
 
   return (
     <section
-      className='rounded-lg border border-subtle bg-surface-0 p-5 sm:p-6'
+      className='rounded-lg border border-subtle bg-surface-0 p-4 sm:p-5'
       data-testid='opportunity-inbox-empty-state'
       aria-labelledby='founder-brain-dump-title'
     >
@@ -55,7 +55,7 @@ export function OpportunityInboxEmptyState({
         and provenance without treating it as permission to publish.
       </p>
       <FounderReviewRecorder
-        className='mt-5'
+        className='mt-4'
         target={{
           type: 'founder-note',
           id: 'founder-brain-dump',

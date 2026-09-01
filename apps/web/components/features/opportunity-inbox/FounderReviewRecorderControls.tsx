@@ -113,7 +113,7 @@ export function FounderReviewRecorderControls({
       <textarea
         id={`founder-note-${target.id}`}
         value={typedText}
-        rows={3}
+        rows={target.type === 'founder-note' ? 2 : 3}
         disabled={saving}
         className='mt-1 w-full resize-y rounded-md border border-subtle bg-surface-0 px-3 py-2 text-sm text-primary-token outline-none placeholder:text-quaternary-token focus-visible:ring-2 focus-visible:ring-ring/50'
         placeholder='Add context, even when the microphone is unavailable'
