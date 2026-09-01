@@ -502,6 +502,60 @@ describe('SharedCommandPalette (cmd+k surface)', () => {
     expect(pushMock).not.toHaveBeenCalled();
   });
 
+  it('searches injected command descriptions and keeps the matched row keyboard-committable', () => {
+    pushMock.mockClear();
+    const onAdditionalSelect = vi.fn();
+    render(
+      <CmdKPalette
+        profileId='profile-1'
+        open
+        onOpenChange={vi.fn()}
+        additionalSectionsAfter={[
+          {
+            id: 'workspace-actions',
+            label: 'Workspace',
+            items: [
+              {
+                kind: 'nav',
+                nav: {
+                  kind: 'nav',
+                  id: 'switch-workspace',
+                  label: 'Switch workspace',
+                  description: 'Change the active workspace.',
+                  iconName: 'Columns2',
+                  surfaces: ['cmdk'],
+                  href: '/app/ov',
+                },
+              },
+            ],
+          },
+        ]}
+        onAdditionalSelect={onAdditionalSelect}
+      />
+    );
+
+    const input = screen.getByRole('combobox', {
+      name: 'Command Palette Search',
+    });
+    fireEvent.change(input, { target: { value: 'zzzz-not-found' } });
+
+    expect(screen.getByText('No matches.')).toBeVisible();
+    expect(input).not.toHaveAttribute('aria-activedescendant');
+
+    fireEvent.change(input, { target: { value: 'active workspace' } });
+
+    const action = screen.getByRole('option', {
+      name: 'Switch workspace Change the active workspace. ⌘1',
+    });
+    expect(action).toHaveAttribute('aria-selected', 'true');
+    expect(input).toHaveAttribute('aria-activedescendant', action.id);
+
+    fireEvent.keyDown(input, { key: 'Enter' });
+
+    expect(onAdditionalSelect).toHaveBeenCalledWith('switch-workspace');
+    expect(pushMock).not.toHaveBeenCalled();
+  });
+
   it('bounds recent-chat defaults and reveals every matching chat after input', () => {
     const onAdditionalSelect = vi.fn();
     render(
