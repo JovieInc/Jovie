@@ -1,8 +1,10 @@
 # Desktop App Signing & Auto-Update Setup
 
-> One-time setup. Once these 6 GitHub secrets are added, every push to `main`
-> that bumps `VERSION` (or changes `desktop-release.yml`) will produce a
-> signed, notarized macOS DMG that the existing app can auto-update to.
+> One-time setup. Once these 6 GitHub secrets are added, production-impacting
+> desktop changes on verified `main` open one deterministic post-land version
+> stamp PR. When that stamp clears normal CI and the native merge queue, the
+> exact verified generation produces a signed, notarized macOS DMG that the
+> existing app can auto-update to.
 > Notarization uses the modern App Store Connect API key flow — no
 > app-specific passwords to rotate.
 
