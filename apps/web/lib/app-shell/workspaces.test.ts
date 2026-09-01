@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import { APP_ROUTES } from '@/constants/routes';
 import {
   APP_SHELL_WORKSPACES,
   type AppShellWorkspace,
@@ -89,6 +90,7 @@ describe('app shell workspaces', () => {
     const ov = contract.workspaces.find(workspace => workspace.id === 'ov');
 
     expect(ov).toMatchObject({
+      href: APP_ROUTES.ADMIN_CHAT,
       role: 'secondary',
       access: 'admin',
       selectedAgent: 'summer',
