@@ -195,18 +195,24 @@ describe('InlineChatArea tool invocation rendering', () => {
   });
 
   it('keeps inline transcript bubbles on the canonical ChatMessage owner', () => {
-    const source = readFileSync(
+    const inlineChatAreaSource = readFileSync(
       resolve(
         appRoot,
         'components/features/dashboard/organisms/InlineChatArea.tsx'
       ),
       'utf8'
     );
+    const chatMessageSource = readFileSync(
+      resolve(appRoot, 'components/jovie/components/ChatMessage.tsx'),
+      'utf8'
+    );
 
-    expect(source).toContain('ChatMessage');
-    expect(source).not.toContain('const InlineChatMessage');
-    expect(source).not.toContain('max-w-[85%]');
-    expect(source).not.toContain('rounded-xl px-3 py-2');
+    expect(inlineChatAreaSource).toContain('ChatMessage');
+    expect(inlineChatAreaSource).not.toContain('const InlineChatMessage');
+    expect(inlineChatAreaSource).not.toContain('max-w-[85%]');
+    expect(inlineChatAreaSource).not.toContain('rounded-xl px-3 py-2');
+    expect(chatMessageSource).toContain('toolVariant');
+    expect(chatMessageSource).toContain('showAssistantActions');
   });
 
   it('renders ProfileEditPreviewCard for proposeProfileEdit result', () => {

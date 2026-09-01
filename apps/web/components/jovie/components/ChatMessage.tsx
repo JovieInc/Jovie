@@ -1,5 +1,7 @@
 'use client';
 
+// @coverage-via apps/web/tests/unit/chat/InlineChatArea.tool-rendering.test.tsx
+
 import { Button, SimpleTooltip } from '@jovie/ui';
 import { Check, Copy } from 'lucide-react';
 import { motion, useReducedMotion } from 'motion/react';

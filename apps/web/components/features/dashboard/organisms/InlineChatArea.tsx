@@ -23,7 +23,7 @@ import { BrandLogo } from '@/components/atoms/BrandLogo';
 import { ChatMessage } from '@/components/jovie/components/ChatMessage';
 import { ErrorDisplay } from '@/components/jovie/components/ErrorDisplay';
 import { useJovieChat } from '@/components/jovie/hooks';
-import { type ArtistContext, type MessagePart } from '@/components/jovie/types';
+import type { ArtistContext } from '@/components/jovie/types';
 import { ContentSurfaceCard } from '@/components/molecules/ContentSurfaceCard';
 
 interface InlineChatAreaProps {
@@ -51,6 +51,8 @@ function getChatMessageRole(role: string): 'user' | 'assistant' | 'system' {
 
   return 'system';
 }
+
+const ASSISTANT_MESSAGE_ROLE = getChatMessageRole('assistant');
 
 export const InlineChatArea = forwardRef<
   InlineChatAreaRef,
@@ -222,12 +224,12 @@ export const InlineChatArea = forwardRef<
               </div>
             )}
 
-            {/* Loading indicator — rendered outside virtualizer */}
+            {/* Loading indicator - rendered outside virtualizer */}
             {isLoading && messages.at(-1)?.role === 'user' && (
               <div className='pb-4'>
                 <ChatMessage
                   id='inline-chat-loading'
-                  role='assistant'
+                  role={ASSISTANT_MESSAGE_ROLE}
                   parts={[]}
                   isThinking
                   profileId={profileId}
