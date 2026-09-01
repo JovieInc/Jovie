@@ -35,9 +35,11 @@ interface TasteInboxLoadError {
   readonly detail: string;
 }
 
+type ReviewDecision = 'yes' | 'no' | 'yes-with-notes';
+
 interface PendingNotesState {
   readonly proposal: DesignProposal;
-  readonly decision: 'no' | 'yes-with-notes';
+  readonly decision: Extract<ReviewDecision, 'no' | 'yes-with-notes'>;
 }
 
 function formatCreatedAt(value: string): string {
@@ -208,6 +210,109 @@ function ProposalCard({
   );
 }
 
+function TasteInboxBody({
+  isLoading,
+  loadError,
+  proposals,
+  submittingId,
+  onRetry,
+  onApprove,
+  onReject,
+  onApproveWithNotes,
+}: Readonly<{
+  readonly isLoading: boolean;
+  readonly loadError: TasteInboxLoadError | null;
+  readonly proposals: readonly DesignProposal[];
+  readonly submittingId: string | null;
+  readonly onRetry: () => void;
+  readonly onApprove: (proposal: DesignProposal) => void;
+  readonly onReject: (proposal: DesignProposal) => void;
+  readonly onApproveWithNotes: (proposal: DesignProposal) => void;
+}>) {
+  if (isLoading) {
+    return (
+      <div className='flex min-h-20 items-center gap-2 text-app text-secondary-token'>
+        <Loader2 className='h-4 w-4 animate-spin' aria-hidden='true' />
+        Loading Taste Inbox...
+      </div>
+    );
+  }
+
+  if (loadError) {
+    return (
+      <div
+        className='grid min-h-20 gap-3 rounded-lg border border-warning/30 bg-warning/10 p-3'
+        role='alert'
+        data-testid='taste-inbox-error'
+      >
+        <div className='space-y-1'>
+          <p className='text-app font-[560] text-primary-token'>
+            {loadError.title}
+          </p>
+          <p className='text-xs text-secondary-token'>{loadError.detail}</p>
+        </div>
+        <div className='flex flex-wrap gap-2'>
+          <DrawerButton
+            type='button'
+            tone='secondary'
+            className='justify-center gap-1.5'
+            aria-label='Retry Taste Inbox'
+            onClick={onRetry}
+          >
+            <RefreshCw className='h-3.5 w-3.5' aria-hidden='true' />
+            Retry
+          </DrawerButton>
+        </div>
+      </div>
+    );
+  }
+
+  if (proposals.length === 0) {
+    return (
+      <p className='text-app text-secondary-token'>
+        No pending taste proposals.
+      </p>
+    );
+  }
+
+  return (
+    <div className='grid gap-3'>
+      {proposals.map(proposal => (
+        <ProposalCard
+          key={`${proposal.dayBucket ?? 'unknown'}:${proposal.id}`}
+          proposal={proposal}
+          isSubmitting={submittingId === proposal.id}
+          onApprove={onApprove}
+          onReject={onReject}
+          onApproveWithNotes={onApproveWithNotes}
+        />
+      ))}
+    </div>
+  );
+}
+
+function notesDialogTitle(decision: PendingNotesState['decision']): string {
+  return decision === 'no'
+    ? 'Reject taste proposal'
+    : 'Approve taste proposal with notes';
+}
+
+function notesDialogHeading(decision: PendingNotesState['decision']): string {
+  return decision === 'no' ? 'Rejection Notes' : 'Approval Notes';
+}
+
+function notesDialogDescription(decision: PendingNotesState['decision']): string {
+  if (decision === 'no') {
+    return 'Capture the rejected direction so Ovie does not resurface the same version.';
+  }
+
+  return 'Amendments are injected into the D5 dispatch payload.';
+}
+
+function notesDialogSubmitLabel(decision: PendingNotesState['decision']): string {
+  return decision === 'no' ? 'Reject' : 'Approve With Notes';
+}
+
 export function DesignProposalReviewPanel() {
   const [proposals, setProposals] = useState<readonly DesignProposal[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -250,7 +355,7 @@ export function DesignProposalReviewPanel() {
   const submitReview = useCallback(
     async (
       proposal: DesignProposal,
-      decision: 'yes' | 'no' | 'yes-with-notes',
+      decision: ReviewDecision,
       notes: string | null
     ) => {
       if (!proposal.dayBucket) {
@@ -333,7 +438,8 @@ export function DesignProposalReviewPanel() {
               Taste Inbox
             </p>
             <p className='text-xs text-secondary-token'>
-              Review agent-generated taste proposals before Summer ships or discards them.
+              Review agent-generated taste proposals before Summer ships or
+              discards them.
             </p>
           </div>
           <span className='text-2xs tabular-nums text-tertiary-token'>
@@ -341,71 +447,29 @@ export function DesignProposalReviewPanel() {
           </span>
         </div>
 
-        {isLoading ? (
-          <div
-            className='flex min-h-20 items-center gap-2 text-app text-secondary-token'
-          >
-            <Loader2 className='h-4 w-4 animate-spin' aria-hidden='true' />
-            Loading Taste Inbox...
-          </div>
-        ) : loadError ? (
-          <div
-            className='grid min-h-20 gap-3 rounded-lg border border-warning/30 bg-warning/10 p-3'
-            role='alert'
-            data-testid='taste-inbox-error'
-          >
-            <div className='space-y-1'>
-              <p className='text-app font-[560] text-primary-token'>
-                {loadError.title}
-              </p>
-              <p className='text-xs text-secondary-token'>
-                {loadError.detail}
-              </p>
-            </div>
-            <div className='flex flex-wrap gap-2'>
-              <DrawerButton
-                type='button'
-                tone='secondary'
-                className='justify-center gap-1.5'
-                aria-label='Retry Taste Inbox'
-                onClick={() => {
-                  void loadProposals();
-                }}
-              >
-                <RefreshCw className='h-3.5 w-3.5' aria-hidden='true' />
-                Retry
-              </DrawerButton>
-            </div>
-          </div>
-        ) : proposals.length > 0 ? (
-          <div className='grid gap-3'>
-            {proposals.map(proposal => (
-              <ProposalCard
-                key={`${proposal.dayBucket ?? 'unknown'}:${proposal.id}`}
-                proposal={proposal}
-                isSubmitting={submittingId === proposal.id}
-                onApprove={next => {
-                  void submitReview(next, 'yes', null);
-                }}
-                onReject={next => {
-                  setPendingNotes({ proposal: next, decision: 'no' });
-                  setNotesDraft('');
-                }}
-                onApproveWithNotes={next => {
-                  setPendingNotes({
-                    proposal: next,
-                    decision: 'yes-with-notes',
-                  });
-                  setNotesDraft('');
-                }}
-              />
-            ))}
-          </div>
-        ) : (
-          <p className='text-app text-secondary-token'>
-            No pending taste proposals.
-          </p>
-        )}
+        <TasteInboxBody
+          isLoading={isLoading}
+          loadError={loadError}
+          proposals={proposals}
+          submittingId={submittingId}
+          onRetry={() => {
+            void loadProposals();
+          }}
+          onApprove={next => {
+            void submitReview(next, 'yes', null);
+          }}
+          onReject={next => {
+            setPendingNotes({ proposal: next, decision: 'no' });
+            setNotesDraft('');
+          }}
+          onApproveWithNotes={next => {
+            setPendingNotes({
+              proposal: next,
+              decision: 'yes-with-notes',
+            });
+            setNotesDraft('');
+          }}
+        />
       </ContentSurfaceCard>
 
       {pendingNotes ? (
@@ -413,11 +477,7 @@ export function DesignProposalReviewPanel() {
           className='fixed inset-0 z-50 flex items-end justify-center bg-black/40 p-4 sm:items-center'
           role='dialog'
           aria-modal='true'
-          aria-label={
-            pendingNotes.decision === 'no'
-              ? 'Reject taste proposal'
-              : 'Approve taste proposal with notes'
-          }
+          aria-label={notesDialogTitle(pendingNotes.decision)}
         >
           <Button
             type='button'
@@ -439,14 +499,10 @@ export function DesignProposalReviewPanel() {
           >
             <div className='space-y-1'>
               <p className='text-sm font-[560] text-primary-token'>
-                {pendingNotes.decision === 'no'
-                  ? 'Rejection Notes'
-                  : 'Approval Notes'}
+                {notesDialogHeading(pendingNotes.decision)}
               </p>
               <p className='text-xs text-secondary-token'>
-                {pendingNotes.decision === 'no'
-                  ? 'Capture the rejected direction so Ovie does not resurface the same version.'
-                  : 'Amendments are injected into the D5 dispatch payload.'}
+                {notesDialogDescription(pendingNotes.decision)}
               </p>
             </div>
 
@@ -487,9 +543,7 @@ export function DesignProposalReviewPanel() {
                   );
                 }}
               >
-                {pendingNotes.decision === 'no'
-                  ? 'Reject'
-                  : 'Approve With Notes'}
+                {notesDialogSubmitLabel(pendingNotes.decision)}
               </DrawerButton>
             </div>
           </ContentSurfaceCard>

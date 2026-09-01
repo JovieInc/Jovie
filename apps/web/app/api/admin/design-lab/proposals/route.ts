@@ -1,7 +1,6 @@
 import 'server-only';
 
 import { NextResponse } from 'next/server';
-import { isAdmin as checkAdminRole } from '@/lib/admin/roles';
 import { listPendingDesignProposals } from '@/lib/agent-os/design-lab/proposals';
 import { getCurrentUserEntitlements } from '@/lib/entitlements/server';
 import { captureError } from '@/lib/error-tracking';
@@ -11,16 +10,6 @@ export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
 
 const NO_STORE_HEADERS = { 'Cache-Control': 'no-store' } as const;
-
-async function canUseTasteInbox(
-  entitlements: Awaited<ReturnType<typeof getCurrentUserEntitlements>>
-): Promise<boolean> {
-  if (!entitlements.isAuthenticated || !entitlements.userId) {
-    return false;
-  }
-
-  return entitlements.isAdmin || (await checkAdminRole(entitlements.userId));
-}
 
 export async function GET(): Promise<Response> {
   try {
@@ -35,12 +24,13 @@ export async function GET(): Promise<Response> {
         { status: 401, headers: NO_STORE_HEADERS }
       );
     }
-    if (!(await canUseTasteInbox(entitlements))) {
+    if (!entitlements.isAdmin) {
       return NextResponse.json(
         {
-          error: 'Use an admin Ovie account to load the Taste Inbox.',
+          error:
+            'Reverify with an admin Ovie account to load the Taste Inbox.',
           code: 'ovie_taste_inbox_forbidden',
-          action: 'use_admin_account',
+          action: 'reverify_admin',
         },
         { status: 403, headers: NO_STORE_HEADERS }
       );

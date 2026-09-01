@@ -4,15 +4,10 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 vi.mock('server-only', () => ({}));
 
 const hoisted = vi.hoisted(() => ({
-  checkAdminRole: vi.fn(),
   getCurrentUserEntitlements: vi.fn(),
   listPendingDesignProposals: vi.fn(),
   reviewDesignProposal: vi.fn(),
   captureError: vi.fn(),
-}));
-
-vi.mock('@/lib/admin/roles', () => ({
-  isAdmin: hoisted.checkAdminRole,
 }));
 
 vi.mock('@/lib/entitlements/server', () => ({
@@ -62,8 +57,9 @@ function reviewRequest(body: unknown): NextRequest {
 describe('Taste Inbox design proposal API', () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    hoisted.getCurrentUserEntitlements.mockResolvedValue(entitlements({}));
-    hoisted.checkAdminRole.mockResolvedValue(true);
+    hoisted.getCurrentUserEntitlements.mockResolvedValue(
+      entitlements({ isAdmin: true })
+    );
     hoisted.listPendingDesignProposals.mockResolvedValue([]);
     hoisted.reviewDesignProposal.mockResolvedValue({
       proposal: { id: 'proposal-1' },
@@ -74,7 +70,7 @@ describe('Taste Inbox design proposal API', () => {
     });
   });
 
-  it('lists pending proposals for a database admin when entitlement admin is false', async () => {
+  it('lists pending proposals for a recently reverified admin', async () => {
     hoisted.listPendingDesignProposals.mockResolvedValue([
       { id: 'proposal-1', status: 'pending' },
     ]);
@@ -83,14 +79,13 @@ describe('Taste Inbox design proposal API', () => {
     const response = await GET();
 
     expect(response.status).toBe(200);
-    expect(hoisted.checkAdminRole).toHaveBeenCalledWith('admin-1');
     await expect(response.json()).resolves.toMatchObject({
       proposals: [{ id: 'proposal-1', status: 'pending' }],
     });
   });
 
-  it('returns an actionable forbidden response for authenticated non-admins', async () => {
-    hoisted.checkAdminRole.mockResolvedValue(false);
+  it('returns an actionable forbidden response when admin reverification is stale', async () => {
+    hoisted.getCurrentUserEntitlements.mockResolvedValue(entitlements({}));
 
     const { GET } = await import('@/app/api/admin/design-lab/proposals/route');
     const response = await GET();
@@ -98,12 +93,12 @@ describe('Taste Inbox design proposal API', () => {
     expect(response.status).toBe(403);
     await expect(response.json()).resolves.toMatchObject({
       code: 'ovie_taste_inbox_forbidden',
-      action: 'use_admin_account',
+      action: 'reverify_admin',
     });
     expect(hoisted.listPendingDesignProposals).not.toHaveBeenCalled();
   });
 
-  it('reviews a proposal through the role fallback and preserves receipt inputs', async () => {
+  it('reviews a proposal for a reverified admin and preserves receipt inputs', async () => {
     const { POST } = await import(
       '@/app/api/admin/design-lab/proposals/[proposalId]/review/route'
     );

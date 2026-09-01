@@ -3,7 +3,6 @@ import 'server-only';
 import type { NextRequest } from 'next/server';
 import { NextResponse } from 'next/server';
 import { z } from 'zod';
-import { isAdmin as checkAdminRole } from '@/lib/admin/roles';
 import { reviewDesignProposal } from '@/lib/agent-os/design-lab/review';
 import { DesignProposalReviewRequestSchema } from '@/lib/agent-os/design-lab/types';
 import { getCurrentUserEntitlements } from '@/lib/entitlements/server';
@@ -18,16 +17,6 @@ const NO_STORE_HEADERS = { 'Cache-Control': 'no-store' } as const;
 const ProposalParamsSchema = z.object({
   proposalId: z.string().trim().min(1).max(120),
 });
-
-async function canReviewTasteProposal(
-  entitlements: Awaited<ReturnType<typeof getCurrentUserEntitlements>>
-): Promise<boolean> {
-  if (!entitlements.isAuthenticated || !entitlements.userId) {
-    return false;
-  }
-
-  return entitlements.isAdmin || (await checkAdminRole(entitlements.userId));
-}
 
 export async function POST(
   request: NextRequest,
@@ -45,12 +34,13 @@ export async function POST(
         { status: 401, headers: NO_STORE_HEADERS }
       );
     }
-    if (!(await canReviewTasteProposal(entitlements))) {
+    if (!entitlements.isAdmin) {
       return NextResponse.json(
         {
-          error: 'Use an admin Ovie account to review Taste Inbox proposals.',
+          error:
+            'Reverify with an admin Ovie account to review Taste Inbox proposals.',
           code: 'ovie_taste_inbox_forbidden',
-          action: 'use_admin_account',
+          action: 'reverify_admin',
         },
         { status: 403, headers: NO_STORE_HEADERS }
       );
