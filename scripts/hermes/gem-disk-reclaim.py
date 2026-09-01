@@ -1,14 +1,5 @@
 #!/usr/bin/env python3
-"""Bounded Gem disk and log reclaim for fixed runners and Symphony workspaces.
-
-This command intentionally cleans only reproducible artifacts:
-- idle GitHub runner _work contents under exact runner roots;
-- node_modules, .next, .turbo, and coverage directories in inactive,
-  provenance-owned Symphony workspaces.
-
-It writes typed receipts for every run. Unsafe or unknown state preserves data
-and records the reason instead of deleting.
-"""
+"""Bounded Gem disk/log reclaim for exact runner and Symphony workspace roots."""
 
 from __future__ import annotations
 
@@ -840,16 +831,8 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     parser.add_argument("--ps-fixture", type=pathlib.Path)
     parser.add_argument("--disk-fixture", type=pathlib.Path)
     parser.add_argument("--receipt", type=pathlib.Path, default=default_path_from_env(RECEIPT_ENV, receipt_root / "latest.json"))
-    parser.add_argument(
-        "--disk-receipt",
-        type=pathlib.Path,
-        default=default_path_from_env(DISK_RECEIPT_ENV, receipt_root / "capacity.json"),
-    )
-    parser.add_argument(
-        "--capacity-receipt",
-        type=pathlib.Path,
-        default=default_path_from_env(CAPACITY_RECEIPT_ENV, gem_workspace / "state/concurrency.json"),
-    )
+    parser.add_argument("--disk-receipt", type=pathlib.Path, default=default_path_from_env(DISK_RECEIPT_ENV, receipt_root / "capacity.json"))
+    parser.add_argument("--capacity-receipt", type=pathlib.Path, default=default_path_from_env(CAPACITY_RECEIPT_ENV, gem_workspace / "state/concurrency.json"))
     parser.add_argument("--log-path", type=pathlib.Path, default=home / "symphony-ui-pilot-logs/stdout.log")
     parser.add_argument("--log-max-bytes", type=positive_int, default=64 * 1024 * 1024)
     parser.add_argument("--log-retention", type=positive_int, default=5)

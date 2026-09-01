@@ -161,55 +161,40 @@ class GemDiskReclaimTests(unittest.TestCase):
 
     def test_default_paths_follow_home_and_env_overrides(self) -> None:
         module = load_reclaim_module()
-        parsed_home = self.root / "parsed-home"
-        cli_gem = self.root / "cli-gem-workspace"
-        env_home = self.root / "env-gem"
-        env_receipt = self.root / "receipts/latest.json"
-        env_disk_receipt = self.root / "receipts/capacity.json"
-        env_capacity_receipt = self.root / "state/concurrency.json"
         clean_env = {
             key: value
             for key, value in os.environ.items()
             if not key.startswith("GEM_DISK_RECLAIM_")
         }
+        def parse(extra: list[str], env: dict[str, str] = clean_env) -> object:
+            with mock.patch("pathlib.Path.home", return_value=self.home), mock.patch.dict(os.environ, env, clear=True):
+                return module.parse_args(["--dry-run", *extra])
 
-        with mock.patch("pathlib.Path.home", return_value=self.home), mock.patch.dict(
-            os.environ, clean_env, clear=True
-        ):
-            args = module.parse_args(["--dry-run", "--home", str(parsed_home)])
+        def default_receipts(gem_workspace: pathlib.Path) -> tuple[pathlib.Path, pathlib.Path, pathlib.Path, pathlib.Path]:
+            return (
+                gem_workspace,
+                gem_workspace / "state/gem-disk-reclaim/latest.json",
+                gem_workspace / "state/gem-disk-reclaim/capacity.json",
+                gem_workspace / "state/concurrency.json",
+            )
 
-        self.assertEqual(args.home, parsed_home)
-        self.assertEqual(args.gem_workspace, parsed_home / "gem-workspace")
-        self.assertEqual(args.receipt, parsed_home / "gem-workspace/state/gem-disk-reclaim/latest.json")
-        self.assertEqual(args.disk_receipt, parsed_home / "gem-workspace/state/gem-disk-reclaim/capacity.json")
-        self.assertEqual(args.capacity_receipt, parsed_home / "gem-workspace/state/concurrency.json")
+        def parsed_receipts(args: object) -> tuple[pathlib.Path, pathlib.Path, pathlib.Path, pathlib.Path]:
+            return (args.gem_workspace, args.receipt, args.disk_receipt, args.capacity_receipt)
 
-        with mock.patch("pathlib.Path.home", return_value=self.home), mock.patch.dict(
-            os.environ, clean_env, clear=True
-        ):
-            args = module.parse_args(["--dry-run", "--home", str(parsed_home), "--gem-workspace", str(cli_gem)])
-
-        self.assertEqual(args.gem_workspace, cli_gem)
-        self.assertEqual(args.receipt, cli_gem / "state/gem-disk-reclaim/latest.json")
-        self.assertEqual(args.disk_receipt, cli_gem / "state/gem-disk-reclaim/capacity.json")
-        self.assertEqual(args.capacity_receipt, cli_gem / "state/concurrency.json")
-
+        parsed_home = self.root / "parsed-home"
+        cli_gem = self.root / "cli-gem-workspace"
+        env_paths = default_receipts(self.root / "env-gem")
         env = {
             **clean_env,
-            "GEM_DISK_RECLAIM_GEM_WORKSPACE": str(env_home),
-            "GEM_DISK_RECLAIM_RECEIPT": str(env_receipt),
-            "GEM_DISK_RECLAIM_DISK_RECEIPT": str(env_disk_receipt),
-            "GEM_DISK_RECLAIM_CAPACITY_RECEIPT": str(env_capacity_receipt),
+            "GEM_DISK_RECLAIM_GEM_WORKSPACE": str(env_paths[0]),
+            "GEM_DISK_RECLAIM_RECEIPT": str(env_paths[1]),
+            "GEM_DISK_RECLAIM_DISK_RECEIPT": str(env_paths[2]),
+            "GEM_DISK_RECLAIM_CAPACITY_RECEIPT": str(env_paths[3]),
         }
-        with mock.patch("pathlib.Path.home", return_value=self.home), mock.patch.dict(
-            os.environ, env, clear=True
-        ):
-            args = module.parse_args(["--dry-run"])
 
-        self.assertEqual(args.gem_workspace, env_home)
-        self.assertEqual(args.receipt, env_receipt)
-        self.assertEqual(args.disk_receipt, env_disk_receipt)
-        self.assertEqual(args.capacity_receipt, env_capacity_receipt)
+        self.assertEqual(parsed_receipts(parse(["--home", str(parsed_home)])), default_receipts(parsed_home / "gem-workspace"))
+        self.assertEqual(parsed_receipts(parse(["--home", str(parsed_home), "--gem-workspace", str(cli_gem)])), default_receipts(cli_gem))
+        self.assertEqual(parsed_receipts(parse([], env)), env_paths)
 
     def test_active_workspace_is_preserved_from_official_state(self) -> None:
         workspace = self.make_workspace()
