@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import eveAgent from '../agent/agent';
 import {
   assertEvePilotFactoryLock,
   bindEvePilotIdentity,
@@ -7,7 +8,6 @@ import {
   eveIdentityForChannel,
   eveIdentityForRuntime,
 } from '../agent/select-identity';
-import eveAgent from '../agent/agent';
 
 function armFactoryWrite(turn: EvePilotBoundTurn): EvePilotBoundTurn {
   return {
