@@ -127,81 +127,93 @@ describe('dashboard form validation consolidation', () => {
     mockMusicLinksFormState.error = undefined;
   });
 
-  it('renders ProfileForm submit progress through the Button loading contract', () => {
-    mockProfileFormState.loading = true;
+  it(
+    'renders ProfileForm submit progress through the Button loading contract',
+    () => {
+      mockProfileFormState.loading = true;
 
-    const { container } = render(
-      <ProfileForm artist={artist} onUpdate={vi.fn()} />
-    );
+      const { container } = render(
+        <ProfileForm artist={artist} onUpdate={vi.fn()} />
+      );
 
-    const submitButton = container.querySelector('button[type="submit"]');
-    expect(submitButton).toHaveAttribute('data-state', 'loading');
-    expect(submitButton).toHaveAttribute('aria-busy', 'true');
-    expect(submitButton).toBeDisabled();
-    expect(screen.getByText('Update Profile')).toBeInTheDocument();
-  });
+      const submitButton = container.querySelector('button[type="submit"]');
+      expect(submitButton).toHaveAttribute('data-state', 'loading');
+      expect(submitButton).toHaveAttribute('aria-busy', 'true');
+      expect(submitButton).toBeDisabled();
+      expect(screen.getByText('Update Profile')).toBeInTheDocument();
+    }
+  );
 
-  it('renders ProfileForm validation with the summary and reserved field feedback slots', () => {
-    mockProfileFormState.formSubmitted = true;
-    mockProfileFormState.validationErrors = {
-      name: 'Artist name is required',
-    };
-    mockProfileFormState.formErrors = {
-      name: 'Artist name is required',
-    };
+  it(
+    'renders ProfileForm validation with the summary and reserved field feedback slots',
+    () => {
+      mockProfileFormState.formSubmitted = true;
+      mockProfileFormState.validationErrors = {
+        name: 'Artist name is required',
+      };
+      mockProfileFormState.formErrors = {
+        name: 'Artist name is required',
+      };
 
-    const { container } = render(
-      <ProfileForm artist={artist} onUpdate={vi.fn()} />
-    );
+      const { container } = render(
+        <ProfileForm artist={artist} onUpdate={vi.fn()} />
+      );
 
-    expect(
-      screen
-        .getAllByRole('alert')
-        .some(alert =>
-          /artist name is required/i.test(alert.textContent ?? '')
-        )
-    ).toBe(true);
-    expect(screen.getByLabelText('Artist Name')).toHaveAttribute(
-      'aria-invalid',
-      'true'
-    );
-    expect(
-      container.querySelectorAll('[data-slot="field-feedback"]')
-    ).toHaveLength(2);
-  });
+      expect(
+        screen
+          .getAllByRole('alert')
+          .some(alert =>
+            /artist name is required/i.test(alert.textContent ?? '')
+          )
+      ).toBe(true);
+      expect(screen.getByLabelText('Artist Name')).toHaveAttribute(
+        'aria-invalid',
+        'true'
+      );
+      expect(
+        container.querySelectorAll('[data-slot="field-feedback"]')
+      ).toHaveLength(2);
+    }
+  );
 
-  it('renders ListenNowForm submit outcomes through Button loading and FormStatus', () => {
-    mockMusicLinksFormState.loading = true;
-    mockMusicLinksFormState.error = 'Failed to save music links';
+  it(
+    'renders ListenNowForm submit outcomes through Button loading and FormStatus',
+    () => {
+      mockMusicLinksFormState.loading = true;
+      mockMusicLinksFormState.error = 'Failed to save music links';
 
-    const { container } = render(
-      <DashboardListenNowForm artist={artist} onUpdate={vi.fn()} />
-    );
+      const { container } = render(
+        <DashboardListenNowForm artist={artist} onUpdate={vi.fn()} />
+      );
 
-    const submitButton = container.querySelector('button[type="submit"]');
-    expect(submitButton).toHaveAttribute('data-state', 'loading');
-    expect(submitButton).toHaveAttribute('aria-busy', 'true');
-    expect(screen.getByRole('alert')).toHaveTextContent(
-      'Failed to save music links'
-    );
-    expect(container.querySelector('[data-slot="form-status"]')).toHaveClass(
-      'min-h-5'
-    );
-  });
+      const submitButton = container.querySelector('button[type="submit"]');
+      expect(submitButton).toHaveAttribute('data-state', 'loading');
+      expect(submitButton).toHaveAttribute('aria-busy', 'true');
+      expect(screen.getByRole('alert')).toHaveTextContent(
+        'Failed to save music links'
+      );
+      expect(container.querySelector('[data-slot="form-status"]')).toHaveClass(
+        'min-h-5'
+      );
+    }
+  );
 
-  it('renders legacy ListenNowForm submit progress through Button loading', () => {
-    mockLegacyProfileMutationState.isPending = true;
+  it(
+    'renders legacy ListenNowForm submit progress through Button loading',
+    () => {
+      mockLegacyProfileMutationState.isPending = true;
 
-    const { container } = render(
-      <LegacyListenNowForm artist={artist} onUpdate={vi.fn()} />
-    );
+      const { container } = render(
+        <LegacyListenNowForm artist={artist} onUpdate={vi.fn()} />
+      );
 
-    const submitButton = container.querySelector('button[type="submit"]');
-    expect(submitButton).toHaveAttribute('data-state', 'loading');
-    expect(submitButton).toHaveAttribute('aria-busy', 'true');
-    expect(screen.getByText('Update Links')).toBeInTheDocument();
-    expect(container.querySelector('[data-slot="form-status"]')).toHaveClass(
-      'min-h-5'
-    );
-  });
+      const submitButton = container.querySelector('button[type="submit"]');
+      expect(submitButton).toHaveAttribute('data-state', 'loading');
+      expect(submitButton).toHaveAttribute('aria-busy', 'true');
+      expect(screen.getByText('Update Links')).toBeInTheDocument();
+      expect(container.querySelector('[data-slot="form-status"]')).toHaveClass(
+        'min-h-5'
+      );
+    }
+  );
 });
