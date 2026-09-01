@@ -1,3 +1,4 @@
+// @coverage-via apps/web/tests/unit/auth/auth-shell-layout-contract.test.tsx
 import { AuthBrandPanel } from './AuthBrandPanel';
 
 interface AuthBrandingProps {

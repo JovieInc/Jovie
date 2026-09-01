@@ -1,3 +1,4 @@
+// @coverage-via apps/web/tests/unit/auth/auth-shell-layout-contract.test.tsx
 import type { ReactNode } from 'react';
 import { cn } from '@/lib/utils';
 

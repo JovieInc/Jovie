@@ -5,9 +5,9 @@ import type { ReactNode } from 'react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { AUTH_FORM_MAX_WIDTH_CLASS } from '@/features/auth/constants';
 import {
+  AUTH_BRANDING_RELATIVE_PATH,
   AUTH_DESKTOP_ONLY_CLASS,
   AUTH_EDITORIAL_CARD_TEST_ID,
-  AUTH_BRANDING_RELATIVE_PATH,
   AUTH_FORM_CONTAINER_RELATIVE_PATH,
   AUTH_LAYOUT_CSS_RELATIVE_PATH,
   AUTH_LAYOUT_VIEWPORTS,

@@ -157,9 +157,7 @@ function StackLayoutContent(props: AuthLayoutInnerProps) {
   return (
     <AuthFormColumn
       {...props}
-      className={cn(
-        props.contentPlacement === 'center' && 'flex-1'
-      )}
+      className={cn(props.contentPlacement === 'center' && 'flex-1')}
     />
   );
 }

@@ -1,6 +1,6 @@
 import type { Meta, StoryObj } from '@storybook/nextjs-vite';
-import { AuthLayout } from './AuthLayout';
 import { AuthFormContainer } from './AuthFormContainer';
+import { AuthLayout } from './AuthLayout';
 
 const meta: Meta<typeof AuthFormContainer> = {
   title: 'Auth/AuthFormContainer',
