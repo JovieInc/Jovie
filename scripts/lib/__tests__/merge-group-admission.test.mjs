@@ -3,15 +3,20 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { describe, expect, it, vi } from 'vitest';
 import {
+  buildLiveQueueAdmissionReceipt,
   classifyRequiredCheckPage,
+  normalizeLiveQueueEntriesPage,
+  parseQueueHeadPullRequestNumber,
   runAdmissionFromEnv,
   validateMergeGroupAdmissionEvent,
   validateQueueRef,
   waitForMergeGroupAdmission,
 } from '../merge-group-admission.mjs';
 
+const BASE = '1'.repeat(40);
 const HEAD = '2'.repeat(40);
 const HEAD_REF = 'refs/heads/gh-readonly-queue/main/pr-123-deadbeef';
+const SOURCE_HEAD = '4'.repeat(40);
 
 function event(overrides = {}) {
   return {
@@ -19,12 +24,55 @@ function event(overrides = {}) {
     repository: { full_name: 'JovieInc/Jovie' },
     merge_group: {
       base_ref: 'refs/heads/main',
-      base_sha: '1'.repeat(40),
+      base_sha: BASE,
       head_commit: { id: HEAD },
       head_ref: HEAD_REF,
       head_sha: HEAD,
       ...overrides,
     },
+  };
+}
+
+function liveEntry(overrides = {}) {
+  return {
+    baseCommitOid: BASE,
+    baseRefName: 'main',
+    headCommitOid: HEAD,
+    position: 1,
+    prNumber: 123,
+    sourceHeadSha: SOURCE_HEAD,
+    state: 'AWAITING_CHECKS',
+    ...overrides,
+  };
+}
+
+function liveQueuePayload(nodes, pageInfo = {}) {
+  return {
+    data: {
+      repository: {
+        mergeQueue: {
+          entries: {
+            nodes,
+            pageInfo: { endCursor: null, hasNextPage: false, ...pageInfo },
+          },
+        },
+      },
+    },
+  };
+}
+
+function liveQueueNode(overrides = {}) {
+  return {
+    baseCommit: { oid: BASE },
+    headCommit: { oid: HEAD },
+    position: 1,
+    pullRequest: {
+      baseRefName: 'main',
+      headRefOid: SOURCE_HEAD,
+      number: 123,
+    },
+    state: 'AWAITING_CHECKS',
+    ...overrides,
   };
 }
 
@@ -79,6 +127,11 @@ describe('merge-group admission evidence', () => {
         expectedHeadSha: '3'.repeat(40),
       })
     ).toThrow(/does not match GITHUB_SHA/);
+    expect(() =>
+      parseQueueHeadPullRequestNumber(
+        'refs/heads/gh-readonly-queue/main/not-a-pr'
+      )
+    ).toThrow(/does not expose a queue PR number/);
   });
 
   it('requires the exact live queue ref and head SHA', () => {
@@ -91,6 +144,108 @@ describe('merge-group admission evidence', () => {
         { headRef: HEAD_REF, headSha: HEAD }
       )
     ).toThrow(/no longer at head_sha/);
+  });
+
+  it('normalizes complete live merge-queue pages and rejects partial inventory', () => {
+    expect(
+      normalizeLiveQueueEntriesPage(liveQueuePayload([liveQueueNode()])).entries
+    ).toEqual([liveEntry()]);
+
+    for (const payload of [
+      { data: {} },
+      { data: { repository: { mergeQueue: null } } },
+      liveQueuePayload([liveQueueNode()], {
+        endCursor: null,
+        hasNextPage: true,
+      }),
+      liveQueuePayload([
+        liveQueueNode({
+          headCommit: null,
+          state: 'AWAITING_CHECKS',
+        }),
+      ]),
+      liveQueuePayload([liveQueueNode({ state: 'UNKNOWN' })]),
+    ]) {
+      expect(() => normalizeLiveQueueEntriesPage(payload)).toThrow();
+    }
+  });
+
+  it('builds an admitted receipt only for the exact live AWAITING_CHECKS head', () => {
+    const evidence = validateMergeGroupAdmissionEvent(event());
+    expect(
+      buildLiveQueueAdmissionReceipt({
+        entries: [liveEntry()],
+        evidence,
+        runContext: { runAttempt: '2', runId: '123456789' },
+      })
+    ).toMatchObject({
+      admitted: true,
+      currentQueueState: 'AWAITING_CHECKS',
+      outcome: 'admitted',
+      pr: 123,
+      replacementCombinedHead: null,
+      runAttempt: '2',
+      runId: '123456789',
+      syntheticSha: HEAD,
+    });
+  });
+
+  it('marks an old synthetic head obsolete with replacement queue evidence', () => {
+    const oldHead = '5'.repeat(40);
+    const currentHead = '6'.repeat(40);
+    const evidence = validateMergeGroupAdmissionEvent(
+      event({
+        head_commit: { id: oldHead },
+        head_sha: oldHead,
+      })
+    );
+
+    expect(
+      buildLiveQueueAdmissionReceipt({
+        entries: [liveEntry({ headCommitOid: currentHead })],
+        evidence,
+        runContext: { runId: '33452088142' },
+      })
+    ).toMatchObject({
+      admitted: false,
+      currentQueueState: 'AWAITING_CHECKS',
+      obsoleteSyntheticSha: oldHead,
+      outcome: 'obsolete',
+      pr: 123,
+      replacementCombinedHead: currentHead,
+      runId: '33452088142',
+      syntheticSha: oldHead,
+    });
+  });
+
+  it('marks a synthetic head obsolete when the PR has fallen back to QUEUED', () => {
+    const oldHead = '7'.repeat(40);
+    const evidence = validateMergeGroupAdmissionEvent(
+      event({
+        head_commit: { id: oldHead },
+        head_sha: oldHead,
+      })
+    );
+
+    expect(
+      buildLiveQueueAdmissionReceipt({
+        entries: [
+          liveEntry({
+            headCommitOid: null,
+            state: 'QUEUED',
+          }),
+        ],
+        evidence,
+      })
+    ).toMatchObject({
+      admitted: false,
+      currentQueueState: 'QUEUED',
+      obsoleteSyntheticSha: oldHead,
+      outcome: 'obsolete',
+      pr: 123,
+      replacementCombinedHead: null,
+      syntheticSha: oldHead,
+    });
   });
 
   it('classifies only one exact GitHub Actions check run', () => {
@@ -147,6 +302,7 @@ describe('merge-group admission evidence', () => {
   it('polls pending gates, rechecks the ref, then admits success', async () => {
     let round = 0;
     const loadQueueRef = vi.fn(async () => queueRef());
+    const loadLiveQueueEntries = vi.fn(async () => [liveEntry()]);
     const loadCheckRuns = vi.fn(async ({ checkName }) =>
       checkPage(
         checkName,
@@ -159,6 +315,7 @@ describe('merge-group admission evidence', () => {
     await waitForMergeGroupAdmission({
       event: event(),
       loadCheckRuns,
+      loadLiveQueueEntries,
       loadQueueRef,
       maxWaitMs: 10,
       now: () => round * 3,
@@ -169,6 +326,7 @@ describe('merge-group admission evidence', () => {
       },
     });
 
+    expect(loadLiveQueueEntries).toHaveBeenCalledTimes(3);
     expect(loadQueueRef).toHaveBeenCalledTimes(3);
     expect(loadCheckRuns).toHaveBeenCalledTimes(4);
     expect(statuses).toHaveLength(2);
@@ -177,6 +335,7 @@ describe('merge-group admission evidence', () => {
 
   it('stops immediately on a terminal gate failure', async () => {
     const loadQueueRef = vi.fn(async () => queueRef());
+    const loadLiveQueueEntries = vi.fn(async () => [liveEntry()]);
     const loadCheckRuns = vi.fn(async ({ checkName }) =>
       checkPage(
         checkName,
@@ -189,12 +348,48 @@ describe('merge-group admission evidence', () => {
       waitForMergeGroupAdmission({
         event: event(),
         loadCheckRuns,
+        loadLiveQueueEntries,
         loadQueueRef,
         maxWaitMs: 10,
         pollIntervalMs: 3,
       })
     ).rejects.toThrow(/Fork PR Gate completed with failure/);
+    expect(loadLiveQueueEntries).toHaveBeenCalledTimes(1);
     expect(loadQueueRef).toHaveBeenCalledTimes(1);
+  });
+
+  it('neutralizes an obsolete head before polling queue refs or checks', async () => {
+    const oldHead = '8'.repeat(40);
+    const currentHead = '9'.repeat(40);
+    const loadQueueRef = vi.fn();
+    const loadCheckRuns = vi.fn();
+
+    const result = await waitForMergeGroupAdmission({
+      event: event({
+        head_commit: { id: oldHead },
+        head_sha: oldHead,
+      }),
+      loadCheckRuns,
+      loadLiveQueueEntries: async () => [
+        liveEntry({ headCommitOid: currentHead }),
+      ],
+      loadQueueRef,
+      maxWaitMs: 10,
+      pollIntervalMs: 3,
+    });
+
+    expect(result).toMatchObject({
+      admitted: false,
+      receipt: {
+        currentQueueState: 'AWAITING_CHECKS',
+        obsoleteSyntheticSha: oldHead,
+        outcome: 'obsolete',
+        pr: 123,
+        replacementCombinedHead: currentHead,
+      },
+    });
+    expect(loadQueueRef).not.toHaveBeenCalled();
+    expect(loadCheckRuns).not.toHaveBeenCalled();
   });
 
   it('fails when the queue ref disappears and never polls checks', async () => {
@@ -203,6 +398,7 @@ describe('merge-group admission evidence', () => {
       waitForMergeGroupAdmission({
         event: event(),
         loadCheckRuns,
+        loadLiveQueueEntries: async () => [liveEntry()],
         loadQueueRef: async () => null,
         maxWaitMs: 10,
         pollIntervalMs: 3,
@@ -216,6 +412,7 @@ describe('merge-group admission evidence', () => {
       .fn()
       .mockResolvedValueOnce(queueRef())
       .mockResolvedValueOnce(null);
+    const loadLiveQueueEntries = vi.fn(async () => [liveEntry()]);
     const loadCheckRuns = vi.fn(async ({ checkName }) =>
       checkPage(checkName, 'completed', 'success')
     );
@@ -224,17 +421,51 @@ describe('merge-group admission evidence', () => {
       waitForMergeGroupAdmission({
         event: event(),
         loadCheckRuns,
+        loadLiveQueueEntries,
         loadQueueRef,
         maxWaitMs: 10,
         pollIntervalMs: 3,
       })
     ).rejects.toThrow(/queue ref is missing/);
+    expect(loadLiveQueueEntries).toHaveBeenCalledTimes(1);
     expect(loadQueueRef).toHaveBeenCalledTimes(2);
+  });
+
+  it('rechecks live queue membership after external gates pass', async () => {
+    const loadQueueRef = vi.fn(async () => queueRef());
+    const loadLiveQueueEntries = vi
+      .fn()
+      .mockResolvedValueOnce([liveEntry()])
+      .mockResolvedValueOnce([liveEntry({ headCommitOid: '9'.repeat(40) })]);
+    const loadCheckRuns = vi.fn(async ({ checkName }) =>
+      checkPage(checkName, 'completed', 'success')
+    );
+
+    const result = await waitForMergeGroupAdmission({
+      event: event(),
+      loadCheckRuns,
+      loadLiveQueueEntries,
+      loadQueueRef,
+      maxWaitMs: 10,
+      pollIntervalMs: 3,
+    });
+
+    expect(result).toMatchObject({
+      admitted: false,
+      receipt: {
+        obsoleteSyntheticSha: HEAD,
+        outcome: 'obsolete',
+        replacementCombinedHead: '9'.repeat(40),
+      },
+    });
+    expect(loadQueueRef).toHaveBeenCalledTimes(2);
+    expect(loadLiveQueueEntries).toHaveBeenCalledTimes(2);
   });
 
   it('times out within the configured bound when checks never appear', async () => {
     let elapsed = 0;
     const loadQueueRef = vi.fn(async () => queueRef());
+    const loadLiveQueueEntries = vi.fn(async () => [liveEntry()]);
     const loadCheckRuns = vi.fn(async ({ checkName }) =>
       checkPage(checkName, 'missing')
     );
@@ -243,6 +474,7 @@ describe('merge-group admission evidence', () => {
       waitForMergeGroupAdmission({
         event: event(),
         loadCheckRuns,
+        loadLiveQueueEntries,
         loadQueueRef,
         maxWaitMs: 6,
         now: () => elapsed,

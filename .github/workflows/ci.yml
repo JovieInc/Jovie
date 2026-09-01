@@ -895,10 +895,17 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 2
     outputs:
+      admitted: ${{ steps.admission.outputs.admitted || 'false' }}
+      obsolete: ${{ steps.admission.outputs.obsolete || 'false' }}
       pr_number: ${{ steps.admission.outputs.pr_number || '' }}
+      synthetic_head_sha: ${{ steps.admission.outputs.synthetic_head_sha || '' }}
+      current_queue_state: ${{ steps.admission.outputs.current_queue_state || '' }}
+      replacement_combined_head: ${{ steps.admission.outputs.replacement_combined_head || '' }}
+      receipt_b64: ${{ steps.admission.outputs.receipt_b64 || '' }}
     permissions:
       checks: read
       contents: read
+      pull-requests: read
     steps:
       - name: Check out trusted admission policy
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -911,7 +918,7 @@ jobs:
           persist-credentials: false
           sparse-checkout: scripts/lib/merge-group-admission.mjs
           sparse-checkout-cone-mode: false
-      - name: Require live queue ref and external admission checks
+      - name: Require live queue membership and external admission checks
         id: admission
         env:
           GH_TOKEN: ${{ github.token }}
@@ -1213,7 +1220,10 @@ jobs:
       needs.ci-path-changes.result == 'success' &&
       (
         github.event_name != 'merge_group' ||
-        needs.ci-merge-group-admission.result == 'success'
+        (
+          needs.ci-merge-group-admission.result == 'success' &&
+          needs.ci-merge-group-admission.outputs.admitted == 'true'
+        )
       )
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -1276,7 +1286,10 @@ jobs:
       needs.ci-path-changes.result == 'success' &&
       (
         github.event_name != 'merge_group' ||
-        needs.ci-merge-group-admission.result == 'success'
+        (
+          needs.ci-merge-group-admission.result == 'success' &&
+          needs.ci-merge-group-admission.outputs.admitted == 'true'
+        )
       )
     env:
       # Match prior Structural Contract job so actionlint/shellcheck is hermetic.
@@ -1371,7 +1384,10 @@ jobs:
       needs.ci-path-changes.result == 'success' &&
       (
         github.event_name != 'merge_group' ||
-        needs.ci-merge-group-admission.result == 'success'
+        (
+          needs.ci-merge-group-admission.result == 'success' &&
+          needs.ci-merge-group-admission.outputs.admitted == 'true'
+        )
       )
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -1467,7 +1483,10 @@ jobs:
       needs.ci-path-changes.result == 'success' &&
       (
         github.event_name != 'merge_group' ||
-        needs.ci-merge-group-admission.result == 'success'
+        (
+          needs.ci-merge-group-admission.result == 'success' &&
+          needs.ci-merge-group-admission.outputs.admitted == 'true'
+        )
       )
     runs-on: ubuntu-latest
     timeout-minutes: 3
@@ -1497,7 +1516,10 @@ jobs:
       needs.ci-path-changes.result == 'success' &&
       (
         github.event_name != 'merge_group' ||
-        needs.ci-merge-group-admission.result == 'success'
+        (
+          needs.ci-merge-group-admission.result == 'success' &&
+          needs.ci-merge-group-admission.outputs.admitted == 'true'
+        )
       ) &&
       (
         github.event_name == 'workflow_dispatch' ||
@@ -1537,7 +1559,10 @@ jobs:
       needs.ci-path-changes.result == 'success' &&
       (
         github.event_name != 'merge_group' ||
-        needs.ci-merge-group-admission.result == 'success'
+        (
+          needs.ci-merge-group-admission.result == 'success' &&
+          needs.ci-merge-group-admission.outputs.admitted == 'true'
+        )
       ) &&
       (
         github.event_name == 'workflow_dispatch' ||
@@ -1850,7 +1875,10 @@ jobs:
       needs.ci-path-changes.result == 'success' &&
       (
         github.event_name != 'merge_group' ||
-        needs.ci-merge-group-admission.result == 'success'
+        (
+          needs.ci-merge-group-admission.result == 'success' &&
+          needs.ci-merge-group-admission.outputs.admitted == 'true'
+        )
       ) &&
       (
         github.event_name == 'workflow_dispatch' ||
@@ -2007,7 +2035,10 @@ jobs:
       needs.ci-path-changes.result == 'success' &&
       (
         github.event_name != 'merge_group' ||
-        needs.ci-merge-group-admission.result == 'success'
+        (
+          needs.ci-merge-group-admission.result == 'success' &&
+          needs.ci-merge-group-admission.outputs.admitted == 'true'
+        )
       ) &&
       needs.ci-path-changes.outputs.run_ios == 'true' &&
       (
@@ -2030,7 +2061,10 @@ jobs:
       needs.ci-path-changes.result == 'success' &&
       (
         github.event_name != 'merge_group' ||
-        needs.ci-merge-group-admission.result == 'success'
+        (
+          needs.ci-merge-group-admission.result == 'success' &&
+          needs.ci-merge-group-admission.outputs.admitted == 'true'
+        )
       ) &&
       needs.ci-path-changes.outputs.run_macos == 'true' &&
       (
@@ -2100,7 +2134,10 @@ jobs:
       needs.ci-path-changes.outputs.run_cross_product == 'true' &&
       (
         github.event_name != 'merge_group' ||
-        needs.ci-merge-group-admission.result == 'success'
+        (
+          needs.ci-merge-group-admission.result == 'success' &&
+          needs.ci-merge-group-admission.outputs.admitted == 'true'
+        )
       ) &&
       (
         github.event_name == 'workflow_dispatch' ||
@@ -3535,7 +3572,10 @@ jobs:
       needs.ci-path-changes.result == 'success' &&
       (
         github.event_name != 'merge_group' ||
-        needs.ci-merge-group-admission.result == 'success'
+        (
+          needs.ci-merge-group-admission.result == 'success' &&
+          needs.ci-merge-group-admission.outputs.admitted == 'true'
+        )
       ) &&
       (
         (
@@ -5068,6 +5108,12 @@ jobs:
           set -euo pipefail
           PATH_RESULT="${{ needs.ci-path-changes.result }}"
           ADMISSION_RESULT="${{ needs.ci-merge-group-admission.result }}"
+          ADMISSION_ADMITTED="${{ needs.ci-merge-group-admission.outputs.admitted }}"
+          ADMISSION_OBSOLETE="${{ needs.ci-merge-group-admission.outputs.obsolete }}"
+          ADMISSION_PR="${{ needs.ci-merge-group-admission.outputs.pr_number }}"
+          ADMISSION_SYNTHETIC_HEAD="${{ needs.ci-merge-group-admission.outputs.synthetic_head_sha }}"
+          ADMISSION_QUEUE_STATE="${{ needs.ci-merge-group-admission.outputs.current_queue_state }}"
+          ADMISSION_REPLACEMENT_HEAD="${{ needs.ci-merge-group-admission.outputs.replacement_combined_head }}"
           RISK_RESULT="${{ needs.ci-risk-classifier.result }}"
           FAST_RESULT="${{ needs.ci-fast.result }}"
           UNIT_RESULT="${{ needs.ci-unit-tests.result }}"
@@ -5106,6 +5152,10 @@ jobs:
             echo "| Selected product lanes | $SELECTED_LANES |"
             echo "| Shared-contract impact | $SHARED_IMPACT |"
             echo "| Merge Group Admission | $ADMISSION_RESULT |"
+            echo "| Live queue admitted | ${ADMISSION_ADMITTED:-false} |"
+            echo "| Admission PR | ${ADMISSION_PR:-unknown} |"
+            echo "| Admission queue state | ${ADMISSION_QUEUE_STATE:-unknown} |"
+            echo "| Replacement combined head | ${ADMISSION_REPLACEMENT_HEAD:-none} |"
             echo "| CI Risk Classifier | $RISK_RESULT |"
             echo "| ci-fast | $FAST_RESULT |"
             echo "| Unit Tests | $UNIT_RESULT |"
@@ -5123,6 +5173,11 @@ jobs:
             echo
             echo "Preview/A11y evidence is explicit opt-in or post-merge; merge groups do not provision Neon."
           } >> "$GITHUB_STEP_SUMMARY"
+
+          if [[ "$ADMISSION_RESULT" == "success" && "$ADMISSION_ADMITTED" != "true" ]]; then
+            echo "::notice::Obsolete merge-group neutralized before selected product lanes: pr=${ADMISSION_PR:-unknown} synthetic=${ADMISSION_SYNTHETIC_HEAD:-unknown} state=${ADMISSION_QUEUE_STATE:-unknown} replacement=${ADMISSION_REPLACEMENT_HEAD:-none} obsolete=${ADMISSION_OBSOLETE:-false}"
+            exit 0
+          fi
 
           for gate in \
             "Path Changes:$PATH_RESULT" \

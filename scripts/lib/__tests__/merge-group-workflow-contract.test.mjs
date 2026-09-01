@@ -297,11 +297,15 @@ describe('merge_group workflow contract', () => {
     expect(admission).toContain("github.event_name == 'merge_group'");
     expect(admission).toContain('runs-on: ubuntu-latest');
     expect(admission).toContain('timeout-minutes: 2');
+    expect(admission).toContain(
+      "admitted: ${{ steps.admission.outputs.admitted || 'false' }}"
+    );
     expect(admission).toContain('checks: read');
     expect(admission).toContain('contents: read');
     expect(admission).toContain(
       "pr_number: ${{ steps.admission.outputs.pr_number || '' }}"
     );
+    expect(admission).toContain('pull-requests: read');
     expect(admission).toContain('ref: main');
     expect(admission).not.toContain(
       'ref: ${{ github.event.merge_group.base_sha }}'
@@ -322,6 +326,9 @@ describe('merge_group workflow contract', () => {
       expect(job, jobId).toContain("github.event_name != 'merge_group'");
       expect(job, jobId).toContain(
         "needs.ci-merge-group-admission.result == 'success'"
+      );
+      expect(job, jobId).toContain(
+        "needs.ci-merge-group-admission.outputs.admitted == 'true'"
       );
     }
 
@@ -356,6 +363,9 @@ describe('merge_group workflow contract', () => {
       expect(job, jobId).toContain(
         "needs.ci-merge-group-admission.result == 'success'"
       );
+      expect(job, jobId).toContain(
+        "needs.ci-merge-group-admission.outputs.admitted == 'true'"
+      );
     }
 
     const ciFast = getJobBlock(CI_WORKFLOW, 'ci-fast');
@@ -366,6 +376,9 @@ describe('merge_group workflow contract', () => {
     expect(ciFast).toContain("github.event_name != 'merge_group'");
     expect(ciFast).toContain(
       "needs.ci-merge-group-admission.result == 'success'"
+    );
+    expect(ciFast).toContain(
+      "needs.ci-merge-group-admission.outputs.admitted == 'true'"
     );
     expect(ciFast).toContain('TYPECHECK_RESULT');
     expect(ciFast).toContain('REMAINING_RESULT');
@@ -422,6 +435,12 @@ describe('merge_group workflow contract', () => {
     expect(aggregate).toContain('ci-golden-path-lock');
     expect(aggregate).toContain('ci-visual-snapshot-compare');
     expect(aggregate).toContain('drizzle-migration-guard');
+    expect(aggregate).toContain('ADMISSION_ADMITTED=');
+    expect(aggregate).toContain('ADMISSION_OBSOLETE=');
+    expect(aggregate).toContain('ADMISSION_QUEUE_STATE=');
+    expect(aggregate).toContain(
+      'Obsolete merge-group neutralized before selected product lanes'
+    );
     expect(aggregate).toContain('BUILD_LAYOUT_RESULT');
     expect(aggregate).toContain('RUN_PROMPTFOO');
     expect(aggregate).toContain('RUN_GOLDEN_EVAL');
