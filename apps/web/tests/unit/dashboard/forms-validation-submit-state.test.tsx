@@ -89,8 +89,8 @@ vi.mock('@/lib/queries', () => ({
   useProfileMutation: () => mockLegacyProfileMutationState,
 }));
 
-import { ListenNowForm as DashboardListenNowForm } from '@/components/features/dashboard/organisms/listen-now-form/ListenNowForm';
 import { ListenNowForm as LegacyListenNowForm } from '@/components/features/dashboard/organisms/ListenNowForm';
+import { ListenNowForm as DashboardListenNowForm } from '@/components/features/dashboard/organisms/listen-now-form/ListenNowForm';
 import { ProfileForm } from '@/components/features/dashboard/organisms/profile-form/ProfileForm';
 
 const artist: Artist = {
