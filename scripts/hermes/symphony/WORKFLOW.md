@@ -4,6 +4,8 @@ tracker:
   provider:
     project_slug: "symphony-ui-pilot-96d6b9c5b2d5"
     api_key: $LINEAR_API_KEY
+  required_labels:
+    - symphony
   active_states:
     - Todo
     - In Progress
@@ -31,7 +33,7 @@ agent:
   max_concurrent_agents: 3
   max_turns: 20
 codex:
-  command: codex app-server
+  command: ./scripts/hermes/symphony-codex-router app-server
   approval_policy: never
   thread_sandbox: workspace-write
   turn_sandbox_policy:
@@ -52,6 +54,8 @@ URL: {{ issue.url }}
 {{ issue.description }}
 
 Before work: `gbrain search` / `gbrain query`. After: `gbrain put` learnings. No secrets in git. Use official `.codex/skills` only (`commit`, `push`, `pull`, `land`, `linear`) — do not invent a second skill tree. after_create is HTTPS clone only; never SSH. No mix/elixir hooks on this Jovie workspace.
+
+The app-server command is the repository routing launcher. It verifies the durable `symphony-routing/v1` receipt and launches the selected model instead of a fixed default.
 
 Unattended git uses git + gh CLI only. Never GitHub MCP, never Codex Apps `create_branch`, never connector `76869538009648d5b282a4bb21c3d157` (meetjovie has `[apps.connector_76869538009648d5b282a4bb21c3d157] enabled=false`).
 
