@@ -98,6 +98,7 @@ vi.mock('@/lib/desktop/electron-bridge', () => ({
 }));
 
 import { AuthModalShell } from '@/components/auth/AuthModalShell';
+import { AuthFormContainer } from '@/components/features/auth/AuthFormContainer';
 import { AuthLayout } from '@/components/features/auth/AuthLayout';
 import { DesktopAuthRouteHandoff } from '../../../app/(auth)/DesktopAuthRouteHandoff';
 
@@ -138,6 +139,11 @@ describe('auth shell layout contract', () => {
   });
 
   it('keeps helper components from owning auth shell geometry or breakpoints', () => {
+    const { container, unmount } = render(
+      <AuthFormContainer>Auth form body</AuthFormContainer>
+    );
+
+    expect(container.firstChild).toHaveClass('w-full');
     expect(
       inspectAuthShellHelperSourceIssues(
         'form-container',
@@ -150,6 +156,8 @@ describe('auth shell layout contract', () => {
         readWebSource(AUTH_BRANDING_RELATIVE_PATH)
       )
     ).toEqual([]);
+
+    unmount();
   });
 
   it('binds each sign-in surface to its documented shell', () => {
