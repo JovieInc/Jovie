@@ -3,6 +3,7 @@ import 'server-only';
 import type { NextRequest } from 'next/server';
 import { NextResponse } from 'next/server';
 import { z } from 'zod';
+import { isAdmin as checkAdminRole } from '@/lib/admin/roles';
 import { reviewDesignProposal } from '@/lib/agent-os/design-lab/review';
 import { DesignProposalReviewRequestSchema } from '@/lib/agent-os/design-lab/types';
 import { getCurrentUserEntitlements } from '@/lib/entitlements/server';
@@ -18,6 +19,18 @@ const ProposalParamsSchema = z.object({
   proposalId: z.string().trim().min(1).max(120),
 });
 
+async function canReviewTasteProposal(
+  entitlements: Awaited<ReturnType<typeof getCurrentUserEntitlements>>
+): Promise<boolean> {
+  if (!entitlements.isAuthenticated || !entitlements.userId) {
+    return false;
+  }
+
+  return (
+    entitlements.isAdmin || (await checkAdminRole(entitlements.userId))
+  );
+}
+
 export async function POST(
   request: NextRequest,
   context: { params: Promise<{ proposalId: string }> }
@@ -26,13 +39,21 @@ export async function POST(
     const entitlements = await getCurrentUserEntitlements();
     if (!entitlements.isAuthenticated) {
       return NextResponse.json(
-        { error: 'Unauthorized' },
+        {
+          error: 'Sign in to Ovie to review Taste Inbox proposals.',
+          code: 'ovie_taste_inbox_unauthorized',
+          action: 'sign_in',
+        },
         { status: 401, headers: NO_STORE_HEADERS }
       );
     }
-    if (!entitlements.isAdmin) {
+    if (!(await canReviewTasteProposal(entitlements))) {
       return NextResponse.json(
-        { error: 'Forbidden' },
+        {
+          error: 'Use an admin Ovie account to review Taste Inbox proposals.',
+          code: 'ovie_taste_inbox_forbidden',
+          action: 'use_admin_account',
+        },
         { status: 403, headers: NO_STORE_HEADERS }
       );
     }

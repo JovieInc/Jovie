@@ -2,7 +2,14 @@
 
 import { Button } from '@jovie/ui';
 
-import { ExternalLink, Loader2 } from 'lucide-react';
+import {
+  Check,
+  ExternalLink,
+  Loader2,
+  MessageSquareText,
+  RefreshCw,
+  X,
+} from 'lucide-react';
 import { useCallback, useEffect, useState } from 'react';
 import { toast } from '@/components/feedback';
 import { ContentSurfaceCard } from '@/components/molecules/ContentSurfaceCard';
@@ -15,6 +22,17 @@ const FETCH_URL = '/api/admin/design-lab/proposals';
 interface DesignProposalsResponse {
   readonly proposals: readonly DesignProposal[];
   readonly fetchedAt: string;
+}
+
+interface ApiErrorResponse {
+  readonly error?: string;
+  readonly code?: string;
+  readonly action?: string;
+}
+
+interface TasteInboxLoadError {
+  readonly title: string;
+  readonly detail: string;
 }
 
 interface PendingNotesState {
@@ -31,6 +49,72 @@ function formatCreatedAt(value: string): string {
     timeZone: 'UTC',
     timeZoneName: 'short',
   }).format(new Date(value));
+}
+
+async function readApiError(response: Response): Promise<ApiErrorResponse> {
+  try {
+    return (await response.json()) as ApiErrorResponse;
+  } catch {
+    return {};
+  }
+}
+
+function loadErrorFromResponse(
+  response: Response,
+  payload: ApiErrorResponse
+): TasteInboxLoadError {
+  if (response.status === 401) {
+    return {
+      title: 'Sign In Required',
+      detail:
+        payload.error ?? 'Sign in with an admin Ovie account, then retry.',
+    };
+  }
+
+  if (response.status === 403) {
+    return {
+      title: 'Admin Access Required',
+      detail:
+        payload.error ??
+        'Use an admin Ovie account or re-open Ovie after re-authentication, then retry.',
+    };
+  }
+
+  return {
+    title: 'Taste Inbox Unavailable',
+    detail:
+      payload.error ?? `Taste Inbox could not load (${response.status}).`,
+  };
+}
+
+function loadErrorFromUnknown(error: unknown): TasteInboxLoadError {
+  return {
+    title: 'Taste Inbox Unavailable',
+    detail:
+      error instanceof Error ? error.message : 'Taste Inbox could not load.',
+  };
+}
+
+function reviewErrorMessage(
+  response: Response,
+  payload: ApiErrorResponse
+): string {
+  if (response.status === 401) {
+    return payload.error ?? 'Sign in to Ovie, then retry this decision.';
+  }
+
+  if (response.status === 403) {
+    return (
+      payload.error ??
+      'Admin authorization failed. Re-open Ovie after re-authentication, then retry this decision.'
+    );
+  }
+
+  if (response.status === 409) {
+    return payload.error ?? 'This proposal was already reviewed. Retry loading.';
+  }
+
+  return payload.error ?? `Review failed (${response.status})`;
 }
 
 function ProposalCard({
@@ -93,28 +177,31 @@ function ProposalCard({
           type='button'
           tone='primary'
           disabled={isSubmitting}
-          className='justify-center'
+          className='justify-center gap-1.5'
           onClick={() => onApprove(proposal)}
         >
-          Yes
+          <Check className='h-3.5 w-3.5' aria-hidden='true' />
+          Approve
         </DrawerButton>
         <DrawerButton
           type='button'
           tone='secondary'
           disabled={isSubmitting}
-          className='justify-center'
+          className='justify-center gap-1.5'
           onClick={() => onApproveWithNotes(proposal)}
         >
-          Yes with notes
+          <MessageSquareText className='h-3.5 w-3.5' aria-hidden='true' />
+          Approve With Notes
         </DrawerButton>
         <DrawerButton
           type='button'
           tone='secondary'
           disabled={isSubmitting}
-          className='justify-center text-destructive'
+          className='justify-center gap-1.5 text-destructive'
           onClick={() => onReject(proposal)}
         >
-          No
+          <X className='h-3.5 w-3.5' aria-hidden='true' />
+          Reject
         </DrawerButton>
       </div>
     </ContentSurfaceCard>
@@ -124,6 +211,7 @@ function ProposalCard({
 export function DesignProposalReviewPanel() {
   const [proposals, setProposals] = useState<readonly DesignProposal[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [loadError, setLoadError] = useState<TasteInboxLoadError | null>(null);
   const [submittingId, setSubmittingId] = useState<string | null>(null);
   const [pendingNotes, setPendingNotes] = useState<PendingNotesState | null>(
     null
@@ -132,19 +220,24 @@ export function DesignProposalReviewPanel() {
 
   const loadProposals = useCallback(async () => {
     setIsLoading(true);
+    setLoadError(null);
     try {
       const response = await fetch(FETCH_URL, { cache: 'no-store' });
       if (!response.ok) {
-        throw new Error(`Failed to load proposals (${response.status})`);
+        const nextError = loadErrorFromResponse(
+          response,
+          await readApiError(response)
+        );
+        setLoadError(nextError);
+        toast.error(nextError.detail);
+        return;
       }
       const payload = (await response.json()) as DesignProposalsResponse;
       setProposals(payload.proposals);
     } catch (error) {
-      toast.error(
-        error instanceof Error
-          ? error.message
-          : 'Failed to load design proposals'
-      );
+      const nextError = loadErrorFromUnknown(error);
+      setLoadError(nextError);
+      toast.error(nextError.detail);
     } finally {
       setIsLoading(false);
     }
@@ -182,6 +275,8 @@ export function DesignProposalReviewPanel() {
 
         const payload = (await response.json()) as {
           error?: string;
+          code?: string;
+          action?: string;
           result?: {
             dispatchTriggered: boolean;
             linearUpdated: boolean;
@@ -189,9 +284,7 @@ export function DesignProposalReviewPanel() {
         };
 
         if (!response.ok) {
-          throw new Error(
-            payload.error ?? `Review failed (${response.status})`
-          );
+          throw new Error(reviewErrorMessage(response, payload));
         }
 
         setProposals(current =>
@@ -201,11 +294,11 @@ export function DesignProposalReviewPanel() {
         if (decision === 'yes' || decision === 'yes-with-notes') {
           toast.success(
             payload.result?.dispatchTriggered
-              ? 'Proposal approved and D5 dispatch triggered.'
-              : 'Proposal approved.'
+              ? 'Taste proposal approved and D5 dispatch triggered.'
+              : 'Taste proposal approved.'
           );
         } else {
-          toast.success('Proposal rejected and taste memory updated.');
+          toast.success('Taste proposal rejected and taste memory updated.');
         }
 
         if (payload.result?.linearUpdated === false) {
@@ -224,41 +317,68 @@ export function DesignProposalReviewPanel() {
     []
   );
 
-  if (isLoading) {
-    return (
-      <ContentSurfaceCard
-        surface='details'
-        className='flex items-center gap-2 p-3 text-app text-secondary-token'
-        data-testid='design-proposal-review-panel'
-      >
-        <Loader2 className='h-4 w-4 animate-spin' aria-hidden='true' />
-        Loading design proposals...
-      </ContentSurfaceCard>
-    );
-  }
-
   return (
     <>
       <ContentSurfaceCard
         surface='details'
-        className='space-y-3 p-3'
+        className='min-h-36 space-y-3 p-3'
         data-testid='design-proposal-review-panel'
       >
         <div className='flex items-center justify-between gap-3'>
           <div>
-            <p className='text-xs font-[560] text-primary-token'>
-              Design proposals
+            <p
+              id='taste-inbox-heading'
+              className='text-xs font-[560] text-primary-token'
+            >
+              Taste Inbox
             </p>
             <p className='text-xs text-secondary-token'>
-              Review pending Design Lab proposals before dispatch.
+              Review agent-generated taste proposals before Summer ships or discards them.
             </p>
           </div>
           <span className='text-2xs tabular-nums text-tertiary-token'>
-            {proposals.length}
+            {isLoading ? '...' : proposals.length}
           </span>
         </div>
 
-        {proposals.length > 0 ? (
+        {isLoading ? (
+          <div
+            className='flex min-h-20 items-center gap-2 text-app text-secondary-token'
+            aria-labelledby='taste-inbox-heading'
+          >
+            <Loader2 className='h-4 w-4 animate-spin' aria-hidden='true' />
+            Loading Taste Inbox...
+          </div>
+        ) : loadError ? (
+          <div
+            className='grid min-h-20 gap-3 rounded-lg border border-warning/30 bg-warning/10 p-3'
+            role='alert'
+            data-testid='taste-inbox-error'
+          >
+            <div className='space-y-1'>
+              <p className='text-app font-[560] text-primary-token'>
+                {loadError.title}
+              </p>
+              <p className='text-xs text-secondary-token'>
+                {loadError.detail}
+              </p>
+            </div>
+            <div className='flex flex-wrap gap-2'>
+              <DrawerButton
+                type='button'
+                tone='secondary'
+                className='justify-center gap-1.5'
+                aria-label='Retry Taste Inbox'
+                onClick={() => {
+                  void loadProposals();
+                }}
+              >
+                <RefreshCw className='h-3.5 w-3.5' aria-hidden='true' />
+                Retry
+              </DrawerButton>
+            </div>
+          </div>
+        ) : proposals.length > 0 ? (
           <div className='grid gap-3'>
             {proposals.map(proposal => (
               <ProposalCard
@@ -284,7 +404,7 @@ export function DesignProposalReviewPanel() {
           </div>
         ) : (
           <p className='text-app text-secondary-token'>
-            No pending design proposals.
+            No pending taste proposals.
           </p>
         )}
       </ContentSurfaceCard>
@@ -296,8 +416,8 @@ export function DesignProposalReviewPanel() {
           aria-modal='true'
           aria-label={
             pendingNotes.decision === 'no'
-              ? 'Reject design proposal'
-              : 'Approve design proposal with notes'
+              ? 'Reject taste proposal'
+              : 'Approve taste proposal with notes'
           }
         >
           <Button
@@ -321,12 +441,12 @@ export function DesignProposalReviewPanel() {
             <div className='space-y-1'>
               <p className='text-sm font-[560] text-primary-token'>
                 {pendingNotes.decision === 'no'
-                  ? 'Rejection notes'
-                  : 'Approval notes'}
+                  ? 'Rejection Notes'
+                  : 'Approval Notes'}
               </p>
               <p className='text-xs text-secondary-token'>
                 {pendingNotes.decision === 'no'
-                  ? 'Capture the direction to reject so Design Lab does not regenerate it.'
+                  ? 'Capture the rejected direction so Ovie does not resurface the same version.'
                   : 'Amendments are injected into the D5 dispatch payload.'}
               </p>
             </div>
@@ -370,7 +490,7 @@ export function DesignProposalReviewPanel() {
               >
                 {pendingNotes.decision === 'no'
                   ? 'Reject'
-                  : 'Approve with notes'}
+                  : 'Approve With Notes'}
               </DrawerButton>
             </div>
           </ContentSurfaceCard>
