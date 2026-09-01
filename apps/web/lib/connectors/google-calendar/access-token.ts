@@ -15,8 +15,32 @@ interface RefreshResponse {
   readonly expires_in: number;
 }
 
+interface RefreshErrorResponse {
+  readonly error?: string;
+}
+
+const GOOGLE_OAUTH_REAUTH_ERRORS = new Set([
+  'invalid_grant',
+  'admin_policy_enforced',
+  'invalid_scope',
+  'unauthorized_client',
+]);
+
+export class GoogleAccessTokenRefreshError extends Error {
+  readonly status: number;
+  readonly providerError: string | null;
+
+  constructor(status: number, providerError: string | null) {
+    super(`Google OAuth token refresh failed with status ${status}`);
+    this.name = 'GoogleAccessTokenRefreshError';
+    this.status = status;
+    this.providerError = providerError;
+  }
+}
+
 export async function loadFreshGoogleAccessToken(
-  connectorAccountId: string
+  connectorAccountId: string,
+  options?: { readonly onStoreTokens?: (updatedAt: Date) => void }
 ): Promise<string | null> {
   const current = await loadDecryptedToken(connectorAccountId);
   if (!current) return null;
@@ -45,15 +69,29 @@ export async function loadFreshGoogleAccessToken(
       timeoutMs: 10_000,
       context: 'Google OAuth token refresh',
     });
-    if (!response.ok) return null;
+    if (!response.ok) {
+      const payload = (await response
+        .json()
+        .catch(() => null)) as RefreshErrorResponse | null;
+      const providerError =
+        typeof payload?.error === 'string' ? payload.error : null;
+      if (
+        providerError !== null &&
+        GOOGLE_OAUTH_REAUTH_ERRORS.has(providerError)
+      ) {
+        return null;
+      }
+      throw new GoogleAccessTokenRefreshError(response.status, providerError);
+    }
     const refreshed = (await response.json()) as RefreshResponse;
     const expiresAt = new Date(Date.now() + refreshed.expires_in * 1000);
-    await storeTokens({
+    const updatedAt = await storeTokens({
       connectorAccountId,
       accessToken: refreshed.access_token,
       refreshToken: reloaded.refreshToken,
       expiresAt,
     });
+    options?.onStoreTokens?.(updatedAt);
     return refreshed.access_token;
   });
 }

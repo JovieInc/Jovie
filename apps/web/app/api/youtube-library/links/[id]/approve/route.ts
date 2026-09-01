@@ -12,6 +12,7 @@ import { NextResponse } from 'next/server';
 import { db } from '@/lib/db';
 import { youtubeVideoReleaseLinks } from '@/lib/db/schema/youtube-library';
 import { captureError } from '@/lib/error-tracking';
+import { reconcileApprovedYouTubeCollaborators } from '@/lib/library/graph-store';
 import { validateLinkOwnership } from '../shared';
 
 export async function POST(
@@ -20,20 +21,25 @@ export async function POST(
 ) {
   try {
     const { id: linkId } = await params;
-    const validation = await validateLinkOwnership(linkId);
+    const validation = await validateLinkOwnership(linkId, {
+      allowedStatuses: ['pending_review', 'approved'],
+    });
     if ('error' in validation) return validation.error;
-    const { userId } = validation;
+    const { userId, link } = validation;
 
     const now = new Date();
-    await db
-      .update(youtubeVideoReleaseLinks)
-      .set({
-        status: 'approved',
-        approvedBy: userId,
-        approvedAt: now,
-        updatedAt: now,
-      })
-      .where(eq(youtubeVideoReleaseLinks.id, linkId));
+    if (link.status !== 'approved') {
+      await db
+        .update(youtubeVideoReleaseLinks)
+        .set({
+          status: 'approved',
+          approvedBy: userId,
+          approvedAt: now,
+          updatedAt: now,
+        })
+        .where(eq(youtubeVideoReleaseLinks.id, linkId));
+    }
+    await reconcileApprovedYouTubeCollaborators(link.creatorProfileId, now);
 
     return NextResponse.json({
       success: true,

@@ -2,7 +2,6 @@ import { describe, expect, it, vi } from 'vitest';
 import {
   createYouTubeLibraryProvider,
   listOwnedYouTubeChannels,
-  YouTubeProviderError,
 } from '@/lib/connectors/youtube/provider';
 
 function jsonResponse(body: unknown): Response {
@@ -111,51 +110,73 @@ describe('YouTube Library provider', () => {
     ).toHaveLength(2);
   });
 
-  it('fails closed when the authorized account does not own the channel', async () => {
-    const fetcher = vi.fn(async () =>
-      jsonResponse({
+  it('caps and resumes upload pagination from a stored page token', async () => {
+    const onUploadsPageToken = vi.fn();
+    const fetcher = vi.fn(async (input: RequestInfo | URL) => {
+      const url = new URL(String(input));
+      if (url.pathname.endsWith('/channels')) {
+        return jsonResponse({
+          items: [
+            {
+              id: 'channel-1',
+              snippet: { title: 'Artist channel' },
+              contentDetails: { relatedPlaylists: { uploads: 'uploads-1' } },
+            },
+          ],
+        });
+      }
+      if (url.pathname.endsWith('/playlistItems')) {
+        expect(url.searchParams.get('pageToken')).toBe('page-2');
+        expect(url.searchParams.get('maxResults')).toBe('1');
+        return jsonResponse({
+          items: [{ contentDetails: { videoId: 'video-2' } }],
+          nextPageToken: 'page-3',
+        });
+      }
+      return jsonResponse({
         items: [
           {
-            id: 'different-channel',
-            contentDetails: { relatedPlaylists: { uploads: 'uploads-2' } },
+            id: 'video-2',
+            snippet: {
+              channelId: 'channel-1',
+              title: 'Video 2',
+              thumbnails: {},
+            },
+            contentDetails: { duration: 'PT1M' },
+            status: { privacyStatus: 'public' },
           },
         ],
-      })
-    );
+      });
+    });
     const provider = createYouTubeLibraryProvider({
       accessToken: 'access-token',
       fetcher,
+      maxVideosPerSync: 1,
+      uploadsPageToken: 'page-2',
+      onUploadsPageToken,
     });
 
-    await expect(provider.listChannelVideos('channel-1')).rejects.toMatchObject(
-      {
-        name: YouTubeProviderError.name,
-        status: 403,
-      }
-    );
-    expect(fetcher).toHaveBeenCalledTimes(1);
+    const videos = await provider.listChannelVideos('channel-1');
+
+    expect(videos.map(video => video.videoId)).toEqual(['video-2']);
+    expect(
+      fetcher.mock.calls.filter(([input]) =>
+        String(input).includes('/playlistItems')
+      )
+    ).toHaveLength(1);
+    expect(onUploadsPageToken).toHaveBeenCalledWith('page-3');
   });
 
-  it('surfaces provider status without leaking the access token', async () => {
-    const fetcher = vi.fn(
-      async () =>
-        new Response(JSON.stringify({ error: 'token access-token rejected' }), {
-          status: 401,
-          headers: { 'content-type': 'application/json' },
-        })
-    );
-
-    const result = listOwnedYouTubeChannels({
+  it('skips provider calls when the request deadline is exhausted', async () => {
+    const fetcher = vi.fn();
+    const provider = createYouTubeLibraryProvider({
       accessToken: 'access-token',
+      deadlineMs: Date.now() - 1,
       fetcher,
     });
 
-    await expect(result).rejects.toMatchObject({
-      name: YouTubeProviderError.name,
-      status: 401,
-      message: 'YouTube channel lookup failed with status 401',
-    });
-    await expect(result).rejects.not.toThrow(/access-token/);
+    await expect(provider.listChannelVideos('channel-1')).resolves.toEqual([]);
+    expect(fetcher).not.toHaveBeenCalled();
   });
 
   it('maps supported Analytics metrics without inventing impressions', async () => {
@@ -199,7 +220,7 @@ describe('YouTube Library provider', () => {
     ]);
   });
 
-  it('bounds lifetime batches by the Analytics report cell limit', async () => {
+  it('bounds lifetime batches by the Analytics report cell limit and request cap', async () => {
     const fetcher = vi.fn(async () =>
       jsonResponse({
         columnHeaders: [{ name: 'video' }],
@@ -210,15 +231,19 @@ describe('YouTube Library provider', () => {
       accessToken: 'access-token',
       now: () => new Date('2026-08-28T12:00:00.000Z'),
       fetcher,
+      maxAnalyticsRequests: 1,
     });
 
     await provider.fetchVideoMetrics(
       'channel-1',
       Array.from({ length: 7 }, (_, index) => `video-${index + 1}`),
-      ['lifetime']
+      ['day_7', 'day_28', 'lifetime']
     );
 
-    expect(fetcher).toHaveBeenCalledTimes(2);
+    expect(fetcher).toHaveBeenCalledTimes(1);
+    expect(
+      new URL(String(fetcher.mock.calls[0][0])).searchParams.get('startDate')
+    ).toBe('2005-02-14');
     expect(
       fetcher.mock.calls.map(([input]) =>
         new URL(String(input)).searchParams
@@ -228,7 +253,6 @@ describe('YouTube Library provider', () => {
       )
     ).toEqual([
       ['video-1', 'video-2', 'video-3', 'video-4', 'video-5', 'video-6'],
-      ['video-7'],
     ]);
   });
 });

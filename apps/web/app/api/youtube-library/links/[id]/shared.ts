@@ -20,10 +20,12 @@ import {
 export interface ValidatedLink {
   readonly id: string;
   readonly status: string;
+  readonly creatorProfileId: string;
 }
 
 export async function validateLinkOwnership(
-  linkId: string
+  linkId: string,
+  options: { readonly allowedStatuses?: readonly string[] } = {}
 ): Promise<{ error: NextResponse } | { userId: string; link: ValidatedLink }> {
   const { userId } = await getCachedAuth();
   if (!userId) {
@@ -72,7 +74,8 @@ export async function validateLinkOwnership(
     };
   }
 
-  if (link.status !== 'pending_review') {
+  const allowedStatuses = options.allowedStatuses ?? ['pending_review'];
+  if (!allowedStatuses.includes(link.status)) {
     return {
       error: NextResponse.json(
         { success: false, error: `Link is already ${link.status}` },
@@ -81,5 +84,12 @@ export async function validateLinkOwnership(
     };
   }
 
-  return { userId, link: { id: link.id, status: link.status } };
+  return {
+    userId,
+    link: {
+      id: link.id,
+      status: link.status,
+      creatorProfileId: link.creatorProfileId,
+    },
+  };
 }

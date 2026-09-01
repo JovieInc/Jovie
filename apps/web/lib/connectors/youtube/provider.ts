@@ -79,11 +79,12 @@ async function authorizedJson<T>(
   url: URL,
   accessToken: string,
   fetcher: ProviderFetch,
-  context: string
+  context: string,
+  timeoutMs = 15_000
 ): Promise<T> {
   const response = await fetcher(url, {
     headers: { Authorization: `Bearer ${accessToken}` },
-    timeoutMs: 15_000,
+    timeoutMs,
     context,
   });
   if (!response.ok) {
@@ -98,6 +99,7 @@ async function authorizedJson<T>(
 export async function listOwnedYouTubeChannels(input: {
   readonly accessToken: string;
   readonly fetcher?: ProviderFetch;
+  readonly timeoutMs?: number;
 }): Promise<OwnedYouTubeChannel[]> {
   const url = new URL(`${YOUTUBE_DATA_API}/channels`);
   url.searchParams.set('part', 'id,snippet,contentDetails');
@@ -106,7 +108,8 @@ export async function listOwnedYouTubeChannels(input: {
     url,
     input.accessToken,
     input.fetcher ?? serverFetch,
-    'YouTube channel lookup'
+    'YouTube channel lookup',
+    input.timeoutMs
   );
   return (data.items ?? []).flatMap(item => {
     const uploadsPlaylistId = item.contentDetails?.relatedPlaylists?.uploads;
@@ -125,28 +128,58 @@ async function listUploadVideoIds(input: {
   readonly uploadsPlaylistId: string;
   readonly accessToken: string;
   readonly fetcher: ProviderFetch;
-}): Promise<string[]> {
+  readonly maxVideoIds?: number;
+  readonly pageToken?: string;
+  readonly timeoutMs?: number;
+  readonly deadlineMs?: number;
+  readonly onDeadlineExceeded?: () => void;
+}): Promise<{
+  readonly videoIds: string[];
+  readonly nextPageToken: string | null;
+}> {
   const ids: string[] = [];
-  let pageToken: string | undefined;
+  const seen = new Set<string>();
+  let pageToken: string | undefined = input.pageToken;
+  const timeoutMs = input.timeoutMs ?? 15_000;
   do {
+    if (!hasRequestBudget(timeoutMs, input.deadlineMs)) {
+      input.onDeadlineExceeded?.();
+      return { videoIds: ids, nextPageToken: pageToken ?? null };
+    }
+    const remaining = input.maxVideoIds
+      ? input.maxVideoIds - ids.length
+      : MAX_VIDEO_BATCH;
     const url = new URL(`${YOUTUBE_DATA_API}/playlistItems`);
     url.searchParams.set('part', 'contentDetails');
     url.searchParams.set('playlistId', input.uploadsPlaylistId);
-    url.searchParams.set('maxResults', '50');
+    url.searchParams.set(
+      'maxResults',
+      String(Math.max(1, Math.min(MAX_VIDEO_BATCH, remaining)))
+    );
     if (pageToken) url.searchParams.set('pageToken', pageToken);
     const page = await authorizedJson<PlaylistItemsResponse>(
       url,
       input.accessToken,
       input.fetcher,
-      'YouTube uploads page'
+      'YouTube uploads page',
+      boundedTimeoutMs(timeoutMs, input.deadlineMs)
     );
     for (const item of page.items ?? []) {
       const videoId = item.contentDetails?.videoId?.trim();
-      if (videoId) ids.push(videoId);
+      if (videoId && !seen.has(videoId)) {
+        ids.push(videoId);
+        seen.add(videoId);
+      }
+      if (input.maxVideoIds && ids.length >= input.maxVideoIds) {
+        return {
+          videoIds: ids.slice(0, input.maxVideoIds),
+          nextPageToken: page.nextPageToken ?? null,
+        };
+      }
     }
     pageToken = page.nextPageToken;
   } while (pageToken);
-  return [...new Set(ids)];
+  return { videoIds: ids, nextPageToken: null };
 }
 
 function batches<T>(items: readonly T[], size: number): T[][] {
@@ -183,6 +216,16 @@ function toChannelVideo(
 
 function dateOnly(date: Date): string {
   return date.toISOString().slice(0, 10);
+}
+
+function boundedTimeoutMs(timeoutMs: number, deadlineMs?: number): number {
+  return deadlineMs === undefined
+    ? timeoutMs
+    : Math.max(1_000, Math.min(timeoutMs, deadlineMs - Date.now()));
+}
+
+function hasRequestBudget(timeoutMs: number, deadlineMs?: number): boolean {
+  return deadlineMs === undefined || Date.now() + timeoutMs <= deadlineMs;
 }
 
 function analyticsBatchSize(start: Date, end: Date): number {
@@ -266,14 +309,27 @@ export function createYouTubeLibraryProvider(input: {
   readonly accessToken: string;
   readonly now?: () => Date;
   readonly fetcher?: ProviderFetch;
+  readonly maxVideosPerSync?: number;
+  readonly uploadsPageToken?: string;
+  readonly onUploadsPageToken?: (pageToken: string | null) => void;
+  readonly timeoutMs?: number;
+  readonly maxAnalyticsRequests?: number;
+  readonly deadlineMs?: number;
+  readonly onDeadlineExceeded?: () => void;
 }): YouTubeLibraryProvider {
   const fetcher = input.fetcher ?? serverFetch;
   const now = input.now ?? (() => new Date());
+  const timeoutMs = input.timeoutMs ?? 15_000;
   return {
     async listChannelVideos(channelId) {
+      if (!hasRequestBudget(timeoutMs, input.deadlineMs)) {
+        input.onDeadlineExceeded?.();
+        return [];
+      }
       const channels = await listOwnedYouTubeChannels({
         accessToken: input.accessToken,
         fetcher,
+        timeoutMs: boundedTimeoutMs(timeoutMs, input.deadlineMs),
       });
       const channel = channels.find(item => item.id === channelId);
       if (!channel) {
@@ -282,13 +338,22 @@ export function createYouTubeLibraryProvider(input: {
           403
         );
       }
-      const videoIds = await listUploadVideoIds({
+      const { videoIds, nextPageToken } = await listUploadVideoIds({
         uploadsPlaylistId: channel.uploadsPlaylistId,
         accessToken: input.accessToken,
         fetcher,
+        maxVideoIds: input.maxVideosPerSync,
+        pageToken: input.uploadsPageToken,
+        timeoutMs: boundedTimeoutMs(timeoutMs, input.deadlineMs),
+        deadlineMs: input.deadlineMs,
+        onDeadlineExceeded: input.onDeadlineExceeded,
       });
       const videos: YouTubeChannelVideo[] = [];
       for (const batch of batches(videoIds, MAX_VIDEO_BATCH)) {
+        if (!hasRequestBudget(timeoutMs, input.deadlineMs)) {
+          input.onDeadlineExceeded?.();
+          return videos;
+        }
         const url = new URL(`${YOUTUBE_DATA_API}/videos`);
         url.searchParams.set('part', 'snippet,contentDetails,status');
         url.searchParams.set('id', batch.join(','));
@@ -296,21 +361,49 @@ export function createYouTubeLibraryProvider(input: {
           url,
           input.accessToken,
           fetcher,
-          'YouTube video details'
+          'YouTube video details',
+          boundedTimeoutMs(timeoutMs, input.deadlineMs)
         );
         for (const item of data.items ?? []) {
           const video = toChannelVideo(item, channelId);
           if (video) videos.push(video);
         }
       }
+      if (
+        videoIds.length > 0 ||
+        hasRequestBudget(timeoutMs, input.deadlineMs)
+      ) {
+        input.onUploadsPageToken?.(nextPageToken);
+      }
       return videos;
     },
 
     async fetchVideoMetrics(channelId, videoIds, windows) {
       const output: YouTubeVideoMetrics[] = [];
-      for (const window of windows) {
-        const { start, end } = metricRange(window, now());
+      let requestCount = 0;
+      const referenceNow = now();
+      const offset =
+        input.maxAnalyticsRequests === undefined || windows.length === 0
+          ? 0
+          : Math.floor(referenceNow.getTime() / DAY_MS) % windows.length;
+      const orderedWindows = [
+        ...windows.slice(offset),
+        ...windows.slice(0, offset),
+      ];
+      for (const window of orderedWindows) {
+        const { start, end } = metricRange(window, referenceNow);
         for (const batch of batches(videoIds, analyticsBatchSize(start, end))) {
+          if (
+            input.maxAnalyticsRequests !== undefined &&
+            requestCount >= input.maxAnalyticsRequests
+          ) {
+            return output;
+          }
+          if (!hasRequestBudget(timeoutMs, input.deadlineMs)) {
+            input.onDeadlineExceeded?.();
+            return output;
+          }
+          requestCount++;
           const url = new URL(YOUTUBE_ANALYTICS_API);
           url.searchParams.set('ids', `channel==${channelId}`);
           url.searchParams.set('startDate', dateOnly(start));
@@ -325,7 +418,8 @@ export function createYouTubeLibraryProvider(input: {
             url,
             input.accessToken,
             fetcher,
-            'YouTube analytics report'
+            'YouTube analytics report',
+            boundedTimeoutMs(timeoutMs, input.deadlineMs)
           );
           output.push(...analyticsRows({ data, window, start, end }));
         }

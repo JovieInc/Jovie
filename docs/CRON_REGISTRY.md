@@ -82,7 +82,7 @@ Source of truth: `apps/web/vercel.json`. The Vercel project's Root Directory is 
 | 9 | ingestionFallback | If elapsed < 50s | Claims/processes up to 2 ingestion jobs as fallback for dedicated cron |
 | 10 | redisOperability | Hourly (`minute < 15`) | Runs a namespaced `SET` / `GETDEL` / `DEL` canary with a 60-second TTL; emits a stable Sentry failure class on quota exhaustion, mismatch, or unavailability |
 | 11 | workflowApprovalRecovery | Every invocation | Recovers accepted suggested_actions missing workflow_runs enqueue |
-| 12 | youtubeLibraryRefresh | Every invocation | JOV-5136: re-syncs YouTube channels stale >24h via `runScheduledRefreshes`. No-op (`provider: null`) until the OAuth connector lands with JOV-3189 |
+| 12 | youtubeLibraryRefresh | Every invocation | Re-syncs at most one connected YouTube channel stale >24h via `runConnectedYouTubeRefreshes`; uses a durable per-account sync lock, resumes capped scheduled upload scans with the sync-state cursor, backs off recent failures, refreshes OAuth tokens, and reconciles approved catalog collaborator edges |
 
 Source: `apps/web/app/api/cron/frequent/route.ts`
 
