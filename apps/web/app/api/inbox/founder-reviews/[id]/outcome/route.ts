@@ -40,9 +40,9 @@ export async function PATCH(request: Request, { params }: RouteParams) {
       { ok: true, receipt },
       { headers: NO_STORE_HEADERS }
     );
-  } catch (caught) {
+  } catch (error_) {
     return founderReviewErrorResponse(
-      caught,
+      error_,
       '/api/inbox/founder-reviews/[id]/outcome'
     );
   }

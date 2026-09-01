@@ -108,9 +108,9 @@ export async function POST(request: NextRequest) {
       },
     });
     return NextResponse.json(response, { headers: NO_STORE_HEADERS });
-  } catch (caught) {
+  } catch (error_) {
     return founderReviewErrorResponse(
-      caught,
+      error_,
       '/api/inbox/founder-reviews/upload-token'
     );
   }
