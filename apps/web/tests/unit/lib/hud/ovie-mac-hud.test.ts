@@ -232,6 +232,19 @@ describe('Ovie Mac HUD derivation', () => {
     expect(result.truncated).toBe(true);
   });
 
+  it('does not mark the list truncated for dropped malformed rows', () => {
+    const result = composeOvieMacHudInFlightPullRequests({
+      totalOpen: 2,
+      limit: 8,
+      pullRequests: [prNode({ number: 31 }), { number: 'not-valid' }],
+      mergeQueueEntries: [],
+    });
+
+    expect(result.items).toHaveLength(1);
+    expect(result.totalOpen).toBe(1);
+    expect(result.truncated).toBe(false);
+  });
+
   it('defaults snapshots to an unconfigured in-flight PR signal', () => {
     const snapshot = composeOvieMacHudSnapshot({
       alive: {

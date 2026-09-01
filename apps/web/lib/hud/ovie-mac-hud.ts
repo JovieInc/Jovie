@@ -334,15 +334,16 @@ export function composeOvieMacHudInFlightPullRequests(input: {
     })
     .sort(comparePullRequests);
 
+  const sourceTruncated = input.sourceTruncated === true;
+  const displayTotalOpen = sourceTruncated
+    ? Math.max(input.totalOpen, items.length)
+    : items.length;
   const shownItems = items.slice(0, limit);
   return {
     availability: 'available',
-    totalOpen: input.totalOpen,
+    totalOpen: Math.max(displayTotalOpen, shownItems.length),
     items: shownItems,
-    truncated:
-      input.sourceTruncated === true ||
-      shownItems.length < items.length ||
-      shownItems.length < input.totalOpen,
+    truncated: sourceTruncated || shownItems.length < items.length,
     errorMessage: null,
   };
 }
