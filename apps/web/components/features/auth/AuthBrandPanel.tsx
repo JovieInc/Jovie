@@ -1,5 +1,6 @@
 'use client';
 
+// @coverage-via apps/web/tests/unit/auth/AuthBrandPanel.test.tsx
 import Image from 'next/image';
 import { ProductScreenshotFrame } from '@/components/marketing/ProductScreenshotFrame';
 import { cn } from '@/lib/utils';
