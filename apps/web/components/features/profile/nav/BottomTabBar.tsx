@@ -120,10 +120,10 @@ export function BottomTabBar({
       <nav
         aria-label='Profile Navigation'
         data-testid='profile-bottom-nav'
-        className='profile-liquid-glass-nav h-12 rounded-full border p-1 shadow-(--profile-dock-shadow) backdrop-blur-xl backdrop-saturate-150'
+        className='profile-liquid-glass-nav h-8 rounded-full border px-1 shadow-(--profile-dock-shadow) backdrop-blur-xl backdrop-saturate-150'
       >
         <div
-          className='profile-liquid-glass-nav__grid -my-0.5 grid h-11 items-center gap-1'
+          className='profile-liquid-glass-nav__grid -my-1.5 grid h-11 items-center gap-1'
           style={{
             gridTemplateColumns: `repeat(${columnCount}, minmax(0, 1fr))`,
           }}
@@ -151,7 +151,7 @@ export function BottomTabBar({
               >
                 <Icon
                   className={cn(
-                    'profile-liquid-glass-nav__icon h-5 w-5 shrink-0 transition-[color,stroke-width] duration-subtle',
+                    'profile-liquid-glass-nav__icon h-4 w-4 shrink-0 transition-[color,stroke-width] duration-subtle',
                     isActive ? 'text-white dark:text-white' : 'text-white/52'
                   )}
                   strokeWidth={isActive ? 2.35 : 1.8}

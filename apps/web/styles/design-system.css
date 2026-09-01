@@ -49,14 +49,13 @@
   --page-pad: clamp(16px, 4vw, 32px);
   --cover-height: clamp(220px, 34svh, 400px);
   --content-max: 720px;
-  /* Extra --space-8 keeps the last Music/catalog row above the floating tab
+  /* Extra --space-6 keeps the last Music/catalog row above the floating tab
      bar. Home/Events/Alerts share this inset so the shell stays aligned. */
   --profile-bottom-nav-height: calc(
-    var(--space-12) +
-    var(--space-2-5) +
+    var(--space-8) +
     max(10px, env(safe-area-inset-bottom)) +
     var(--space-2) +
-    var(--space-8)
+    var(--space-6)
   );
 
   /* DS_FOUNDATION_V1: canonical semantic aliases (do not redefine downstream) */
@@ -1428,7 +1427,8 @@ html[data-profile-initial-mode]
 }
 
 :where(.profile-liquid-glass-nav) {
-  height: calc(var(--space-12) + var(--space-2-5));
+  height: var(--space-8);
+  overflow: visible;
   pointer-events: auto;
   border-color: var(--profile-dock-border);
   border-radius: var(--radius-full);
@@ -1437,51 +1437,46 @@ html[data-profile-initial-mode]
 }
 
 :where(.profile-liquid-glass-nav__grid) {
-  height: calc(var(--space-10) + var(--space-2-5));
-  margin-block: 0;
+  height: var(--space-11);
+  margin-block: calc(var(--space-1-5) * -1);
 }
 
 :where(.profile-liquid-glass-nav__item) {
   flex-direction: column;
   gap: var(--space-0-5);
-  border: var(--space-px) solid transparent;
   border-radius: var(--radius-full);
   color: var(--profile-dock-inactive-fg);
+}
+
+:where(.profile-liquid-glass-nav__item)::before {
+  position: absolute;
+  inset-inline: 0;
+  top: 50%;
+  height: var(--space-8);
+  transform: translateY(-50%);
+  border: var(--space-px) solid transparent;
+  border-radius: var(--radius-full);
+  content: "";
   transition:
-    color var(--duration-subtle) var(--ease-subtle),
     background-color var(--duration-subtle) var(--ease-subtle),
     border-color var(--duration-subtle) var(--ease-subtle),
     box-shadow var(--duration-subtle) var(--ease-subtle);
 }
 
 :where(.profile-liquid-glass-nav__item[aria-current="page"]) {
+  color: var(--profile-dock-active-fg);
+}
+
+:where(.profile-liquid-glass-nav__item[aria-current="page"])::before {
   border-color: var(--profile-dock-active-border);
   background: var(--profile-dock-active-bg);
-  color: var(--profile-dock-active-fg);
   box-shadow: var(--profile-dock-active-shadow);
 }
 
 :where(.profile-liquid-glass-nav__icon) {
+  position: relative;
+  z-index: 1;
   color: inherit;
-}
-
-/* Deliberately overrides the retained sr-only utility: visible labels make the
-   four navigation destinations immediate while their accessible names remain
-   unchanged. */
-:where(.profile-liquid-glass-nav__label) {
-  position: static;
-  width: auto;
-  height: auto;
-  padding: 0;
-  margin: 0;
-  overflow: visible;
-  clip: auto;
-  clip-path: none;
-  border: 0;
-  color: inherit;
-  font-size: var(--text-2xs);
-  line-height: 1;
-  white-space: nowrap;
 }
 
 @media (hover: hover) {
@@ -1543,10 +1538,13 @@ html[data-profile-initial-mode]
   }
 
   :where(.profile-liquid-glass-nav__item[aria-current="page"]) {
-    border-color: Highlight;
-    background: Highlight;
     color: HighlightText;
     box-shadow: none;
+  }
+
+  :where(.profile-liquid-glass-nav__item[aria-current="page"])::before {
+    border-color: Highlight;
+    background: Highlight;
   }
 }
 
@@ -1555,7 +1553,8 @@ html[data-profile-initial-mode]
     .profile-liquid-glass-nav,
     .profile-liquid-glass-nav__item,
     .profile-liquid-glass-nav__icon
-  ) {
+  ),
+  :where(.profile-liquid-glass-nav__item)::before {
     transition: none;
   }
 }
