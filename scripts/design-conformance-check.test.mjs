@@ -68,6 +68,39 @@ test('source changes require an explicit source digest revision', () => {
   assert.ok(issueCodes(input).includes('source-digest-drift'));
 });
 
+test('atom.input is source-bound without claiming unavailable Pen evidence', () => {
+  const input = fixture();
+  const component = input.manifest.components.find(
+    entry => entry.id === 'atom.input'
+  );
+
+  assert.equal(component?.state, 'source-bound');
+  assert.equal(component?.penRootId, null);
+  assert.equal(
+    issueCodes(input).includes('registry-pen-binding-missing'),
+    false
+  );
+});
+
+test('atom.input fails closed when its registry entry is missing', () => {
+  const input = fixture();
+  input.componentRegistrySource = input.componentRegistrySource
+    .replace("  'atom.input',\n", '')
+    .replace(/\n  \{\n    id: 'atom\.input',[\s\S]*?\n  \},/, '');
+
+  assert.ok(issueCodes(input).includes('stale-manifest-component'));
+});
+
+test('atom.input source binding requires an explicit unresolved Pen reason', () => {
+  const input = fixture();
+  input.componentRegistrySource = input.componentRegistrySource.replace(
+    /\n    penIdentityReason:\n      'No committed canonical Pen save\/readback export maps an Input root; source binding remains authoritative until Pen promotion\.',/,
+    ''
+  );
+
+  assert.ok(issueCodes(input).includes('registry-pen-binding-missing'));
+});
+
 test('legacy Pen debt is shrink-only and cannot admit a new unresolved component', () => {
   const input = fixture();
   input.manifest.legacy.unboundComponentIds.push('atom.new-unbound');
