@@ -98,6 +98,7 @@ vi.mock('@/lib/desktop/electron-bridge', () => ({
 }));
 
 import { AuthModalShell } from '@/components/auth/AuthModalShell';
+import { AuthBranding } from '@/components/features/auth/AuthBranding';
 import { AuthFormContainer } from '@/components/features/auth/AuthFormContainer';
 import { AuthLayout } from '@/components/features/auth/AuthLayout';
 import { DesktopAuthRouteHandoff } from '../../../app/(auth)/DesktopAuthRouteHandoff';
@@ -139,11 +140,23 @@ describe('auth shell layout contract', () => {
   });
 
   it('keeps helper components from owning auth shell geometry or breakpoints', () => {
-    const { container, unmount } = render(
+    const formContainerRender = render(
       <AuthFormContainer>Auth form body</AuthFormContainer>
     );
 
-    expect(container.firstChild).toHaveClass('w-full');
+    expect(formContainerRender.container.firstChild).toHaveClass('w-full');
+    formContainerRender.unmount();
+
+    const brandingRender = render(
+      <AuthBranding
+        title='Built For Artists.'
+        description='Manage releases, links, and audience signals from one focused workspace.'
+      />
+    );
+
+    expect(screen.getByTestId(AUTH_EDITORIAL_CARD_TEST_ID)).toBeInTheDocument();
+    brandingRender.unmount();
+
     expect(
       inspectAuthShellHelperSourceIssues(
         'form-container',
@@ -156,8 +169,6 @@ describe('auth shell layout contract', () => {
         readWebSource(AUTH_BRANDING_RELATIVE_PATH)
       )
     ).toEqual([]);
-
-    unmount();
   });
 
   it('binds each sign-in surface to its documented shell', () => {
