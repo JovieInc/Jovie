@@ -187,6 +187,12 @@ const LIBRARY_CARD_FOCUS_CLASS =
   'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-(--linear-border-focus)/55 focus-visible:ring-offset-2 focus-visible:ring-offset-(--app-shell-content-surface) outline-none';
 const LIBRARY_BUTTON_FOCUS_CLASS =
   'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-(--linear-border-focus)/55 focus-visible:ring-offset-2 focus-visible:ring-offset-(--app-shell-content-surface) outline-none';
+const LIBRARY_DESKTOP_CONTROL_DENSITY_CLASS =
+  'h-8 min-h-8 lg:before:h-8 lg:before:min-w-0';
+const LIBRARY_DESKTOP_ICON_CONTROL_DENSITY_CLASS = cn(
+  LIBRARY_DESKTOP_CONTROL_DENSITY_CLASS,
+  'w-8 min-w-8'
+);
 const LIBRARY_TABLE_SKELETON_CONFIG: Array<{
   readonly width?: string;
   readonly variant?:
@@ -715,7 +721,7 @@ export function LibraryLoadingState() {
               {LIBRARY_VIEW_FILTER_CHIP_KEYS.map(key => (
                 <span
                   key={key}
-                  className='inline-block h-7 w-16 rounded-full skeleton motion-reduce:animate-none'
+                  className='inline-block h-8 w-16 rounded-full skeleton motion-reduce:animate-none'
                   aria-hidden='true'
                 />
               ))}
@@ -764,6 +770,7 @@ function LibraryViewFilterChips({
           }
           active={preset === view.id}
           onClick={() => onPreset(view.id)}
+          className={LIBRARY_DESKTOP_CONTROL_DENSITY_CLASS}
         />
       ))}
     </div>
@@ -1139,6 +1146,7 @@ function LibraryFiltersControl({
       ariaLabel={ariaLabel}
       active={open}
       iconOnly
+      className={LIBRARY_DESKTOP_ICON_CONTROL_DENSITY_CLASS}
     />
   );
 
@@ -1212,6 +1220,7 @@ function SortDropdown({
               }
               ariaLabel={`Sort by ${SORT_LABELS[sort]}`}
               iconOnly
+              className={LIBRARY_DESKTOP_ICON_CONTROL_DENSITY_CLASS}
             />
           </DropdownMenuTrigger>
         </TooltipTrigger>
@@ -1255,6 +1264,7 @@ function ViewToggle({
         onClick={() => onView('grid')}
         iconOnly
         tooltipLabel='Grid View'
+        className={LIBRARY_DESKTOP_ICON_CONTROL_DENSITY_CLASS}
       />
       <PageToolbarActionButton
         label='List View'
@@ -1263,6 +1273,7 @@ function ViewToggle({
         onClick={() => onView('list')}
         iconOnly
         tooltipLabel='List View'
+        className={LIBRARY_DESKTOP_ICON_CONTROL_DENSITY_CLASS}
       />
       <PageToolbarActionButton
         label='Table View'
@@ -1271,6 +1282,7 @@ function ViewToggle({
         onClick={() => onView('table')}
         iconOnly
         tooltipLabel='Table View'
+        className={LIBRARY_DESKTOP_ICON_CONTROL_DENSITY_CLASS}
       />
     </div>
   );
@@ -1297,6 +1309,7 @@ function GridDensityToggle({
           onClick={() => onDensity(option.value)}
           tooltipLabel={option.tooltip}
           ariaLabel={`${option.tooltip} card size`}
+          className={LIBRARY_DESKTOP_ICON_CONTROL_DENSITY_CLASS}
         />
       ))}
     </fieldset>
