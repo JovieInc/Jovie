@@ -206,7 +206,7 @@ vi.mock(
 // ── Import after mocks ──
 
 const { ReleaseFilterDropdown } = await import(
-  '@/features/dashboard/organisms/release-provider-matrix/ReleaseFilterDropdown'
+  '@/components/features/dashboard/organisms/release-provider-matrix/ReleaseFilterDropdown'
 );
 
 // ── Helpers ──
