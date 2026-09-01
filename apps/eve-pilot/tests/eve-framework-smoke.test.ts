@@ -153,6 +153,12 @@ describe('Eve framework smoke', () => {
             urlPath: '/ovie/v1/summer-shadow/events',
           },
           {
+            name: 'summer-shadow',
+            kind: 'defineChannel',
+            method: 'GET',
+            urlPath: '/ovie/v1/summer-shadow/sessions/:sessionId/stream',
+          },
+          {
             name: 'telegram',
             kind: 'telegram',
             method: 'POST',
