@@ -3368,6 +3368,12 @@ body:has(.home-viewport)::-webkit-scrollbar {
   letter-spacing: var(--ds-marketing-eyebrow-tracking);
 }
 
+.system-b-marketing.dark
+  .system-b-mounted-home-trust-strip
+  .system-b-mounted-home-trust-strip-label {
+  color: var(--color-text-secondary-token);
+}
+
 .homepage-trust-editorial-copy {
   display: grid;
   max-width: 42rem;
