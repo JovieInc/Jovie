@@ -3,6 +3,10 @@
  */
 
 export {
+  type AuthorizedYouTubeChannelWorkspace,
+  loadAuthorizedYouTubeChannelWorkspace,
+} from './channel-workspace';
+export {
   type ClassificationResult,
   type ClassifyInput,
   classifyYouTubeVideo,
@@ -24,11 +28,13 @@ export {
   resolveReleaseLink,
 } from './isrc';
 export {
+  type ChannelVideoLedgerItem,
   type GetVideoMetricsInput,
   getThumbnailHistory,
   getVideoMetricsForProfile,
   getVideoPkForProfile,
   type ListVideosForProfileInput,
+  listChannelVideoLedgerForProfile,
   listPendingReleaseLinksForUser,
   listVideosForLibraryProjection,
   listVideosForProfile,
