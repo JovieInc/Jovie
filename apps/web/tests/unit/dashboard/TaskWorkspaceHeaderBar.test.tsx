@@ -1,9 +1,15 @@
 import { readFileSync } from 'node:fs';
-import { resolve } from 'node:path';
+import { join } from 'node:path';
 import { fireEvent, render, screen } from '@testing-library/react';
 import type { ComponentProps, FormEvent, ReactNode } from 'react';
 import { describe, expect, it, vi } from 'vitest';
 import { TaskWorkspaceHeaderBar } from '@/components/features/dashboard/tasks/TaskWorkspaceHeaderBar';
+
+const WEB_ROOT = join(__dirname, '../../..');
+
+function readSource(relativePath: string): string {
+  return readFileSync(join(WEB_ROOT, relativePath), 'utf8');
+}
 
 vi.mock('@jovie/ui', () => ({
   Button: ({
@@ -132,17 +138,10 @@ function createBaseProps() {
 
 describe('TaskWorkspaceHeaderBar', () => {
   it('keeps Tasks toolbar and filter controls at 32px on desktop', () => {
-    const headerSource = readFileSync(
-      resolve(
-        __dirname,
-        '../../../components/features/dashboard/tasks/TaskWorkspaceHeaderBar.tsx'
-      ),
-      'utf8'
+    const headerSource = readSource(
+      'components/features/dashboard/tasks/TaskWorkspaceHeaderBar.tsx'
     );
-    const tabBarSource = readFileSync(
-      resolve(__dirname, '../../../components/molecules/tab-bar/TabBar.tsx'),
-      'utf8'
-    );
+    const tabBarSource = readSource('components/molecules/tab-bar/TabBar.tsx');
 
     expect(headerSource).toContain('const TASK_FILTER_TAB_CLASSNAME = cn(');
     expect(headerSource).toContain("'relative h-8 gap-1.5 px-2 text-xs'");
