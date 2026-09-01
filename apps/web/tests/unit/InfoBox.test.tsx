@@ -5,6 +5,8 @@ import { describe, expect, it } from 'vitest';
 import { InfoBox } from '@/components/molecules/InfoBox';
 import {
   INFOBOX_CONTENT_GEOMETRY_CLASS,
+  INFOBOX_INLINE_GEOMETRY_CLASS,
+  INFOBOX_INLINE_SEMANTIC_SURFACE,
   INFOBOX_SEMANTIC_FOREGROUND,
   INFOBOX_SEMANTIC_SURFACE,
   INFOBOX_SHARED_GEOMETRY_CLASS,
@@ -35,6 +37,10 @@ const infoBoxSourcePath = path.join(
 const contractSourcePath = path.join(
   webRoot,
   'components/molecules/info-box-semantic-contract.ts'
+);
+const chatUsageAlertSourcePath = path.join(
+  webRoot,
+  'components/jovie/components/ChatUsageAlert.tsx'
 );
 const fixtureSourcePath = path.join(
   __dirname,
@@ -93,6 +99,9 @@ describe('InfoBox semantic color ownership', () => {
     const container = getRootFromTitle('Information');
     expect(screen.getByText('Information')).toBeInTheDocument();
     expect(screen.getByText('Test content')).toBeInTheDocument();
+    expect(container).toHaveAttribute('role', 'status');
+    expect(container).toHaveAttribute('aria-live', 'polite');
+    expect(container).toHaveAttribute('data-presentation', 'box');
     expect(container).toHaveClass(
       ...INFOBOX_SHARED_GEOMETRY_CLASS.split(' '),
       ...INFOBOX_SEMANTIC_SURFACE.info.split(' ')
@@ -134,8 +143,16 @@ describe('InfoBox semantic color ownership', () => {
         INFOBOX_SEMANTIC_FOREGROUND[variant]
       );
       expect(content).toHaveClass(
-        INFOBOX_CONTENT_GEOMETRY_CLASS,
+        ...INFOBOX_CONTENT_GEOMETRY_CLASS.split(' '),
         INFOBOX_SEMANTIC_FOREGROUND[variant]
+      );
+      expect(container).toHaveAttribute(
+        'role',
+        variant === 'error' ? 'alert' : 'status'
+      );
+      expect(container).toHaveAttribute(
+        'aria-live',
+        variant === 'error' ? 'assertive' : 'polite'
       );
       expect(container.className).not.toMatch(/hover:bg-blue/);
       expect(container.className).not.toMatch(
@@ -153,6 +170,50 @@ describe('InfoBox semantic color ownership', () => {
 
     expect(screen.queryByRole('heading')).not.toBeInTheDocument();
     expect(screen.getByText('Content only')).toBeInTheDocument();
+  });
+
+  it('renders inline notices with semantic status ownership and stable inline geometry', () => {
+    const { rerender } = render(
+      <InfoBox presentation='inline' variant='error' testId='inline-notice'>
+        Import failed. Try again.
+      </InfoBox>
+    );
+
+    const notice = screen.getByTestId('inline-notice');
+    expect(notice).toHaveAttribute('role', 'alert');
+    expect(notice).toHaveAttribute('aria-live', 'assertive');
+    expect(notice).toHaveAttribute('data-presentation', 'inline');
+    expect(notice).toHaveClass(
+      ...INFOBOX_INLINE_GEOMETRY_CLASS.split(' '),
+      ...INFOBOX_INLINE_SEMANTIC_SURFACE.error.split(' ')
+    );
+    expect(notice).not.toHaveClass(...INFOBOX_SHARED_GEOMETRY_CLASS.split(' '));
+
+    rerender(
+      <InfoBox presentation='inline' variant='success' testId='inline-notice'>
+        Import complete.
+      </InfoBox>
+    );
+
+    const successNotice = screen.getByTestId('inline-notice');
+    expect(successNotice).toHaveAttribute('role', 'status');
+    expect(successNotice).toHaveAttribute('aria-live', 'polite');
+    expect(successNotice).toHaveClass(
+      ...INFOBOX_INLINE_GEOMETRY_CLASS.split(' '),
+      ...INFOBOX_INLINE_SEMANTIC_SURFACE.success.split(' ')
+    );
+  });
+
+  it('prevents InfoBox callers from overriding warning/error semantic surfaces', () => {
+    const chatUsageAlertSource = readSource(chatUsageAlertSourcePath);
+
+    expect(chatUsageAlertSource).toContain('InfoBox');
+    expect(chatUsageAlertSource).not.toContain(
+      'bg-(--app-shell-content-surface)'
+    );
+    expect(chatUsageAlertSource).not.toContain(
+      'border-(--app-shell-frame-seam)'
+    );
   });
 
   it('merges custom className into the container', () => {
