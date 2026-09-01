@@ -1,6 +1,6 @@
 import { render, screen } from '@testing-library/react';
 import { describe, expect, it } from 'vitest';
-import { SettingsActionRow } from '@/components/features/dashboard/molecules/SettingsActionRow';
+import { SettingsActionRow } from '@/components/molecules/settings/SettingsActionRow';
 
 describe('SettingsActionRow', () => {
   it('renders the shared settings row structure', () => {
