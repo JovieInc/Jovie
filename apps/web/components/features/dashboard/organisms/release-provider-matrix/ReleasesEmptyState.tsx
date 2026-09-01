@@ -1,5 +1,7 @@
 'use client';
 
+// @coverage-via apps/web/tests/components/release-provider-matrix/ReleasesEmptyState.test.tsx
+
 import { Disc3, Loader2, SearchX } from 'lucide-react';
 import {
   TableEmptyState,
