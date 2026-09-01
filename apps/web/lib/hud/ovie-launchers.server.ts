@@ -15,6 +15,7 @@ import {
   publicHref,
   rankLaunchers,
   resolveLauncherDestination,
+  SYMPHONY_SSH_TEMPLATE_HOST,
 } from '@/lib/hud/ovie-launchers';
 import { logger } from '@/lib/utils/logger';
 
@@ -116,6 +117,14 @@ export async function preflightLauncherDestinations(
       const destination = destinations[definition.id];
       if (definition.agentCliOnly || !destination) {
         return [definition.id, 'not_configured' as const] as const;
+      }
+      if (
+        definition.id === 'symphony' &&
+        destination.sshHost === SYMPHONY_SSH_TEMPLATE_HOST
+      ) {
+        // The hosted HUD cannot attest the Mac's SSH agent. The renderer gates
+        // this control to Electron and the main process owns the fixed launch.
+        return [definition.id, 'ready' as const] as const;
       }
       if (destination.sshHost) {
         const result = await preflightSshDestination(destination.sshHost);

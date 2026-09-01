@@ -75,8 +75,9 @@ import {
 } from './ovie-door';
 import {
   decideOperatorLaunch,
+  isAllowedGemTerminalSenderUrl,
+  launchGemTerminal,
   parseOperatorLaunchRequest,
-  terminalLaunchSpec,
 } from './operator-launch';
 import { evaluateRemoteDebuggingGuard } from './remote-debugging-guard';
 import {
@@ -205,6 +206,7 @@ const TRAY_ACTION_CHANNEL = 'tray-action';
 /** Renderer → main: first successful React paint of the hosted app (JOV-3595). */
 const APP_BOOTED_CHANNEL = 'app-booted';
 const LAUNCH_OPERATOR_CONTROL_CHANNEL = 'launch-operator-control';
+const OPEN_GEM_TERMINAL_CHANNEL = 'open-gem-terminal';
 type UpdateChannel =
   | typeof UPDATE_AVAILABLE_CHANNEL
   | typeof UPDATE_DOWNLOADED_CHANNEL;
@@ -2662,24 +2664,30 @@ ipcMain.handle(
     if (!request) return { ok: false, reason: 'invalid-payload' };
     const decision = decideOperatorLaunch(request);
     if (!decision.ok) return { ok: false, reason: decision.reason };
-    if (decision.action === 'open-external') {
-      try {
-        await shell.openExternal(decision.url);
-        return { ok: true };
-      } catch {
-        return { ok: false, reason: 'open-external-failed' };
-      }
-    }
-    const spec = terminalLaunchSpec(process.platform, decision.command);
-    if (!spec) return { ok: false, reason: 'unsupported-platform' };
     try {
-      spawn(spec.command, [...spec.args], {
-        detached: true,
-        stdio: 'ignore',
-      }).unref();
+      await shell.openExternal(decision.url);
       return { ok: true };
     } catch {
-      return { ok: false, reason: 'open-terminal-failed' };
+      return { ok: false, reason: 'open-external-failed' };
     }
+  }
+);
+
+ipcMain.handle(
+  OPEN_GEM_TERMINAL_CHANNEL,
+  (event: IpcMainInvokeEvent, ...args: unknown[]) => {
+    if (
+      args.length !== 0 ||
+      !isAllowedGemTerminalSenderUrl(getIpcSenderUrl(event), APP_ORIGIN)
+    ) {
+      return { ok: false, reason: 'invalid-request' };
+    }
+
+    return launchGemTerminal(process.platform, (command, commandArgs) =>
+      spawn(command, [...commandArgs], {
+        detached: true,
+        stdio: 'ignore',
+      })
+    );
   }
 );

@@ -5,8 +5,13 @@
 import { Button, Input } from '@jovie/ui';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { HudObservationStatus } from '@/components/features/admin/hud/HudObservationStatus';
+import { toast } from '@/components/feedback';
 import { ContentSurfaceCard } from '@/components/molecules/ContentSurfaceCard';
-import { launchOperatorControl } from '@/lib/desktop/electron-bridge';
+import {
+  launchOperatorControl,
+  openGemTerminal,
+  useIsElectronRuntime,
+} from '@/lib/desktop/electron-bridge';
 import {
   filterLaunchers,
   type OvieLauncherControl,
@@ -24,35 +29,89 @@ const STATUS_LABEL: Record<OvieLauncherStatus, string> = {
   not_configured: 'Not configured', error: 'Error',
 };
 
+type LaunchState = 'idle' | 'opening' | 'opened' | 'error';
+
+const GEM_TERMINAL_ERROR =
+  "Ovie couldn't open Terminal. Check that Terminal is available and try again.";
+
 function LaunchControl({
   control,
-}: Readonly<{ readonly control: OvieLauncherControl }>) {
-  const disabled = control.status !== 'ready';
+  isElectron,
+}: Readonly<{
+  readonly control: OvieLauncherControl;
+  readonly isElectron: boolean;
+}>) {
+  const [launchState, setLaunchState] = useState<LaunchState>('idle');
+  const isGemTerminal = control.id === 'symphony' && control.kind === 'ssh';
+  const isPlatformUnavailable = isGemTerminal && !isElectron;
+  const disabled =
+    control.status !== 'ready' ||
+    isPlatformUnavailable ||
+    launchState === 'opening';
+  const statusLabel = isPlatformUnavailable
+    ? 'Unavailable'
+    : launchState === 'opening'
+      ? 'Opening…'
+      : launchState === 'opened'
+        ? 'Opened'
+        : launchState === 'error'
+          ? 'Error'
+          : STATUS_LABEL[control.status];
+  const title = isPlatformUnavailable
+    ? 'Open Gem Terminal is available in the Ovie Mac app.'
+    : launchState === 'error'
+      ? GEM_TERMINAL_ERROR
+      : `${control.label}. ${control.why}`;
+
+  const launch = async () => {
+    if (disabled) return;
+    if (!isGemTerminal) {
+      if (control.kind === 'web' && control.href) {
+        void launchOperatorControl({
+          id: control.id,
+          kind: 'web',
+          href: control.href,
+        });
+      }
+      return;
+    }
+
+    setLaunchState('opening');
+    try {
+      const result = await openGemTerminal();
+      if (!result.ok) {
+        setLaunchState('error');
+        toast.error(GEM_TERMINAL_ERROR);
+        return;
+      }
+      setLaunchState('opened');
+    } catch {
+      setLaunchState('error');
+      toast.error(GEM_TERMINAL_ERROR);
+    }
+  };
+
   return (
     <Button
       type='button'
       variant='secondary'
       size='sm'
       disabled={disabled}
-      aria-label={`${control.label}, ${STATUS_LABEL[control.status]}`}
-      title={`${control.label}. ${control.why}`}
+      aria-label={`${control.label}, ${statusLabel}`}
+      title={title}
       data-testid={`ovie-launcher-${control.id}`}
       data-group={control.group}
       data-status={control.status}
+      data-launch-state={launchState}
       className='min-h-8 justify-start'
-      onClick={() => {
-        if (disabled) return;
-        void launchOperatorControl({
-          id: control.id,
-          kind: control.kind,
-          href: control.href,
-          sshHost: control.sshHost,
-        });
-      }}
+      onClick={() => void launch()}
     >
       <span className='truncate'>{control.label}</span>
-      <span className='ml-auto shrink-0 text-2xs text-tertiary-token'>
-        {STATUS_LABEL[control.status]}
+      <span
+        className='ml-auto min-w-14 shrink-0 text-right text-2xs text-tertiary-token'
+        aria-live='polite'
+      >
+        {statusLabel}
       </span>
     </Button>
   );
@@ -61,9 +120,11 @@ function LaunchControl({
 function LauncherGroup({
   group,
   controls,
+  isElectron,
 }: Readonly<{
   readonly group: OvieLauncherGroup;
   readonly controls: readonly OvieLauncherControl[];
+  readonly isElectron: boolean;
 }>) {
   if (controls.length === 0) return null;
   const label = group === 'internal' ? 'Local / SSH' : 'Web';
@@ -77,7 +138,11 @@ function LauncherGroup({
       </legend>
       <div className='grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-4'>
         {controls.map(control => (
-          <LaunchControl key={control.id} control={control} />
+          <LaunchControl
+            key={control.id}
+            control={control}
+            isElectron={isElectron}
+          />
         ))}
       </div>
     </fieldset>
@@ -119,6 +184,7 @@ function AllToolsList({
 }
 
 export function OvieLauncherRail() {
+  const isElectron = useIsElectronRuntime();
   const [inventory, setInventory] = useState<OvieLauncherInventory | null>(
     null
   );
@@ -193,8 +259,16 @@ export function OvieLauncherRail() {
       ) : null}
       {inventory ? (
         <div className='flex flex-col gap-3 lg:flex-row'>
-          <LauncherGroup group='internal' controls={primaryInternal} />
-          <LauncherGroup group='external' controls={primaryExternal} />
+          <LauncherGroup
+            group='internal'
+            controls={primaryInternal}
+            isElectron={isElectron}
+          />
+          <LauncherGroup
+            group='external'
+            controls={primaryExternal}
+            isElectron={isElectron}
+          />
         </div>
       ) : null}
       {observation === 'unavailable' ? (

@@ -5,25 +5,43 @@ export const OPERATOR_WEB_ORIGINS = [
   'https://github.com',
 ] as const;
 
-export const OPERATOR_SSH_HOSTS = ['gem'] as const;
-
-export type OperatorLaunchKind = 'web' | 'ssh';
+export const GEM_SSH_COMMAND = 'ssh gem' as const;
 
 // biome-ignore format: compact request
 export interface OperatorLaunchRequest {
-  readonly id: string; readonly kind: OperatorLaunchKind;
-  readonly href?: string; readonly sshHost?: string;
+  readonly id: string; readonly kind: 'web'; readonly href: string;
 }
 
-// biome-ignore format: compact decision union
 export type OperatorLaunchDecision =
-  | { readonly ok: true; readonly action: 'open-external'; readonly url: string }
   | {
-      readonly ok: true; readonly action: 'open-ssh';
-      readonly host: string; readonly command: string;
-      readonly argv: readonly string[];
+      readonly ok: true;
+      readonly action: 'open-external';
+      readonly url: string;
     }
   | { readonly ok: false; readonly reason: string };
+
+export type GemTerminalLaunchResult =
+  | { readonly ok: true }
+  | {
+      readonly ok: false;
+      readonly reason: 'unsupported-platform' | 'open-terminal-failed';
+    };
+
+export interface TerminalLaunchSpec {
+  readonly command: string;
+  readonly args: readonly string[];
+}
+
+interface DetachedTerminalProcess {
+  once(event: 'error', listener: () => void): this;
+  once(event: 'exit', listener: (code: number | null) => void): this;
+  unref(): void;
+}
+
+export type SpawnTerminalProcess = (
+  command: string,
+  args: readonly string[]
+) => DetachedTerminalProcess;
 
 const TAILSCALE_CGNAT = /^100\.(6[4-9]|[7-9]\d|1[01]\d|12[0-7])\./;
 
@@ -48,75 +66,95 @@ export function isAllowedOperatorWebUrl(urlString: string): boolean {
   return OPERATOR_WEB_ORIGINS.some(origin => parsed.origin === origin);
 }
 
-export function isAllowedOperatorSshHost(host: string): boolean {
-  return (OPERATOR_SSH_HOSTS as readonly string[]).includes(host);
-}
-
-export function buildSymphonySshArgv(host: string): readonly string[] {
-  return ['ssh', '-t', host];
-}
-
 export function parseOperatorLaunchRequest(
   value: unknown
 ): OperatorLaunchRequest | null {
   if (value === null || typeof value !== 'object') return null;
   const record = value as Partial<OperatorLaunchRequest>;
   if (typeof record.id !== 'string' || record.id.length === 0) return null;
-  if (record.kind !== 'web' && record.kind !== 'ssh') return null;
-  if (record.href !== undefined && typeof record.href !== 'string') return null;
-  if (record.sshHost !== undefined && typeof record.sshHost !== 'string') {
-    return null;
-  }
+  if (record.kind !== 'web' || typeof record.href !== 'string') return null;
   return {
     id: record.id,
-    kind: record.kind,
+    kind: 'web',
     href: record.href,
-    sshHost: record.sshHost,
   };
 }
 
 export function decideOperatorLaunch(
   request: OperatorLaunchRequest
 ): OperatorLaunchDecision {
-  if (request.kind === 'ssh') {
-    const host = request.sshHost ?? '';
-    if (!isAllowedOperatorSshHost(host)) {
-      return { ok: false, reason: 'blocked-ssh-host' };
-    }
-    const argv = buildSymphonySshArgv(host);
-    return {
-      ok: true,
-      action: 'open-ssh',
-      host,
-      command: argv.join(' '),
-      argv,
-    };
-  }
-  const url = request.href ?? '';
-  if (!isAllowedOperatorWebUrl(url)) {
+  if (!isAllowedOperatorWebUrl(request.href)) {
     return { ok: false, reason: 'blocked-url' };
   }
-  return { ok: true, action: 'open-external', url };
+  return { ok: true, action: 'open-external', url: request.href };
 }
 
-export function terminalLaunchSpec(
+export function isAllowedGemTerminalSenderUrl(
+  urlString: string,
+  appOrigin: string
+): boolean {
+  try {
+    const parsed = new URL(urlString);
+    return (
+      parsed.origin === appOrigin &&
+      parsed.pathname === '/hud' &&
+      parsed.searchParams.get('ovie') === 'mac'
+    );
+  } catch {
+    return false;
+  }
+}
+
+export function gemTerminalLaunchSpec(
+  platform: NodeJS.Platform
+): TerminalLaunchSpec | null {
+  if (platform !== 'darwin') return null;
+  return {
+    command: 'osascript',
+    args: [
+      '-e',
+      [
+        'tell application "Terminal"',
+        'activate',
+        `do script ${JSON.stringify(GEM_SSH_COMMAND)}`,
+        'end tell',
+      ].join('\n'),
+    ],
+  };
+}
+
+export function launchGemTerminal(
   platform: NodeJS.Platform,
-  sshCommand: string
-): { readonly command: string; readonly args: readonly string[] } | null {
-  if (platform === 'darwin') {
-    return {
-      command: 'osascript',
-      args: [
-        '-e',
-        `tell application "Terminal" to do script ${JSON.stringify(sshCommand)}`,
-      ],
-    };
+  spawnProcess: SpawnTerminalProcess
+): Promise<GemTerminalLaunchResult> {
+  const spec = gemTerminalLaunchSpec(platform);
+  if (!spec) {
+    return Promise.resolve({ ok: false, reason: 'unsupported-platform' });
   }
-  if (platform === 'linux') {
-    return {
-      command: 'x-terminal-emulator',
-      args: ['-e', 'bash', '-lc', sshCommand],
+
+  return new Promise(resolve => {
+    let settled = false;
+    const settle = (result: GemTerminalLaunchResult) => {
+      if (settled) return;
+      settled = true;
+      resolve(result);
     };
-  }
-  return null;
+
+    try {
+      const child = spawnProcess(spec.command, spec.args);
+      child.once('error', () => {
+        settle({ ok: false, reason: 'open-terminal-failed' });
+      });
+      child.once('exit', code => {
+        settle(
+          code === 0
+            ? { ok: true }
+            : { ok: false, reason: 'open-terminal-failed' }
+        );
+      });
+      child.unref();
+    } catch {
+      settle({ ok: false, reason: 'open-terminal-failed' });
+    }
+  });
 }

@@ -92,15 +92,18 @@ describe('ovie-launchers.server', () => {
       issues: [{ id: '1' }],
       observation: 'ok',
     });
-    const child = new FakeSsh();
-    hoisted.spawn.mockImplementation(() => {
-      queueMicrotask(() => child.emit('exit', 0));
-      return child as never;
-    });
     const inventory = await loadOvieLauncherInventory();
     expect(inventory.primary.map(item => item.id)).toEqual(
       expect.arrayContaining(['gbrain', 'hermes', 'symphony'])
     );
+    expect(
+      inventory.primary.find(item => item.id === 'symphony')
+    ).toMatchObject({
+      label: 'Open Gem Terminal',
+      status: 'ready',
+      sshHost: 'gem',
+    });
+    expect(hoisted.spawn).not.toHaveBeenCalled();
     expect(inventory.primary.some(item => item.agentCliOnly)).toBe(false);
     expect(JSON.stringify(inventory)).not.toMatch(
       /api[_-]?key|token=|secret|bearer /i

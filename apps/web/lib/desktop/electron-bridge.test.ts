@@ -398,6 +398,33 @@ describe('electron-bridge — defensive guards', () => {
     });
   });
 
+  it('opens Gem Terminal through a zero-argument desktop bridge method', async () => {
+    const openGemTerminal = vi.fn().mockResolvedValue({ ok: true });
+    setElectronAPI({ openGemTerminal });
+
+    await expect(__testing.openGemTerminal()).resolves.toEqual({ ok: true });
+    expect(openGemTerminal).toHaveBeenCalledTimes(1);
+    expect(openGemTerminal).toHaveBeenCalledWith();
+  });
+
+  it('fails closed when Gem Terminal is requested outside the desktop bridge', async () => {
+    await expect(__testing.openGemTerminal()).resolves.toEqual({
+      ok: false,
+      reason: 'ovie-desktop-required',
+    });
+
+    setElectronAPI({ versions: { app: '0.1.0' } });
+    await expect(__testing.openGemTerminal()).resolves.toEqual({
+      ok: false,
+      reason: 'ovie-desktop-required',
+    });
+    expect(captureWarningMock).toHaveBeenCalledWith(
+      expect.stringContaining('openGemTerminal'),
+      expect.any(String),
+      expect.objectContaining({ bridgeMethod: 'openGemTerminal' })
+    );
+  });
+
   describe('setDesktopTrayState / onDesktopTrayAction — tray bridge', () => {
     it('setDesktopTrayState silently no-ops when electronAPI is absent', async () => {
       await expect(

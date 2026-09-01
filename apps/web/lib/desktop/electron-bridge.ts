@@ -13,8 +13,7 @@ import { captureWarning } from '@/lib/error-tracking';
 
 // biome-ignore format: compact request
 export interface OperatorLaunchRequest {
-  readonly id: string; readonly kind: 'web' | 'ssh';
-  readonly href?: string; readonly sshHost?: string;
+  readonly id: string; readonly kind: 'web'; readonly href: string;
 }
 
 export interface ElectronAPI {
@@ -80,10 +79,15 @@ export interface ElectronAPI {
    * boot watchdog (JOV-3595). Optional — older binaries ignore the channel.
    */
   readonly notifyAppBooted?: () => void;
-  /** Launch a preflighted Ovie web origin or SSH TUI. Optional on older binaries. */
+  /** Launch a preflighted Ovie web origin. Optional on older binaries. */
   readonly launchOperatorControl?: (
     request: OperatorLaunchRequest
   ) => Promise<{ readonly ok: boolean; readonly reason?: string }>;
+  /** Open macOS Terminal with the fixed `ssh gem` command. */
+  readonly openGemTerminal?: () => Promise<{
+    readonly ok: boolean;
+    readonly reason?: string;
+  }>;
 }
 
 export interface DesktopAuthCompletion {
@@ -657,6 +661,18 @@ export async function launchOperatorControl(
   return { ok: false, reason: 'ovie-desktop-required' };
 }
 
+export async function openGemTerminal(): Promise<{
+  readonly ok: boolean;
+  readonly reason?: string;
+}> {
+  const api = getRawElectronAPI();
+  if (api && typeof api.openGemTerminal === 'function') {
+    return api.openGemTerminal();
+  }
+  if (api) reportMissingBridgeMethod('openGemTerminal');
+  return { ok: false, reason: 'ovie-desktop-required' };
+}
+
 // Exported for tests only — do not call directly from product code.
 export const __testing = {
   reset: () => {
@@ -674,6 +690,7 @@ export const __testing = {
   setDesktopTrayState,
   onDesktopTrayAction,
   launchOperatorControl,
+  openGemTerminal,
   notifyDesktopAppBooted,
   RELEASE_DOWNLOAD_URL,
 };

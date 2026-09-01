@@ -48,7 +48,7 @@ function parseCatalogRow(line: string): OvieLauncherDefinition {
 export const OVIE_LAUNCHER_CATALOG: readonly OvieLauncherDefinition[] = `
 gbrain|GBrain|internal|web|observe|human|1|0|gbrain memory wiki|GBrain web from GBRAIN_API_URL
 hermes|Hermes|internal|web|observe|human|1|0|hermes gateway air|Hermes web from Air gateway template
-symphony|Symphony|internal|ssh|recover|human|1|0|symphony gem tui elixir|Official Elixir Symphony TUI on Gem via SSH
+symphony|Open Gem Terminal|internal|ssh|recover|human|1|0|symphony gem terminal ssh tui elixir|Local macOS Terminal session using the fixed Gem SSH alias
 mercury|Mercury|external|web|observe|human|1|0|mercury bank cash runway|Official Mercury app
 gmail|Gmail|external|web|communicate|human|1|0|gmail mail email|Official Gmail web app
 github-prs|GitHub PRs|external|web|review|human|1|0|github pull pr review|Configured GitHub repo pull request list
@@ -264,6 +264,9 @@ export function whyForControl(input: {
   const { definition, status, destination, timActionCount } = input;
   if (definition.agentCliOnly) {
     return 'Agent-owned CLI. Kept in diagnostics so it cannot crowd the human rail.';
+  }
+  if (definition.id === 'symphony' && status === 'ready') {
+    return 'Opens macOS Terminal with the fixed ssh gem command. SSH keeps normal key and host verification.';
   }
   const statusWhy =
     status === 'ready'

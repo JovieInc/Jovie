@@ -17,6 +17,7 @@ const TRAY_SET_STATE_CHANNEL = 'tray-set-state';
 const TRAY_ACTION_CHANNEL = 'tray-action';
 const APP_BOOTED_CHANNEL = 'app-booted';
 const LAUNCH_OPERATOR_CONTROL_CHANNEL = 'launch-operator-control';
+const OPEN_GEM_TERMINAL_CHANNEL = 'open-gem-terminal';
 
 interface MinimalDocument {
   readonly documentElement?: {
@@ -195,11 +196,17 @@ contextBridge.exposeInMainWorld('electronAPI', {
 
     launchOperatorControl: (request: {
       id: string;
-      kind: 'web' | 'ssh';
-      href?: string;
-      sshHost?: string;
+      kind: 'web';
+      href: string;
     }) =>
       ipcRenderer.invoke(LAUNCH_OPERATOR_CONTROL_CHANNEL, request) as Promise<{
+        ok: boolean;
+        reason?: string;
+      }>,
+
+    /** Open macOS Terminal and run the fixed, local SSH alias `ssh gem`. */
+    openGemTerminal: () =>
+      ipcRenderer.invoke(OPEN_GEM_TERMINAL_CHANNEL) as Promise<{
         ok: boolean;
         reason?: string;
       }>,
