@@ -10,9 +10,16 @@ import {
   Sparkles,
   Workflow,
 } from 'lucide-react';
-import Link from 'next/link';
 import { memo, type ReactNode } from 'react';
-import { ActivityFeedSkeleton } from '@/components/molecules/ActivityFeed';
+import {
+  ACTIVITY_TIMELINE_LIST_CLASSNAME,
+  ACTIVITY_TIMELINE_PRIMARY_TEXT_CLASSNAME,
+  ActivityFeedSkeleton,
+  ActivityTimelineIcon,
+  ActivityTimelineMeta,
+  ActivityTimelineRow,
+  ActivityTimelineTimestamp,
+} from '@/components/molecules/ActivityFeed';
 import { EmptyState } from '@/components/molecules/EmptyState';
 import { PageErrorState } from '@/features/feedback/PageErrorState';
 import type {
@@ -51,7 +58,7 @@ const countFormatter = new Intl.NumberFormat('en-US');
 function JovieWorkGlyph({ icon }: { readonly icon: JovieWorkIcon }) {
   const Icon = JOVIE_WORK_ICONS[icon] ?? Sparkles;
 
-  return <Icon className='h-4 w-4 text-tertiary-token' aria-hidden='true' />;
+  return <Icon className='h-3 w-3 text-tertiary-token' aria-hidden='true' />;
 }
 
 function JovieWorkEmptyState({
@@ -156,69 +163,41 @@ const JovieWorkItemRow = memo(function JovieWorkItemRow({
 }: {
   readonly item: JovieWorkItem;
 }) {
-  const content = (
-    <>
-      <span
-        aria-hidden='true'
-        className='relative z-10 flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-surface-0 text-base'
-      >
-        <JovieWorkGlyph icon={item.icon} />
-      </span>
-      <div className='min-w-0 flex-1'>
-        <div className='flex flex-wrap items-center gap-2'>
-          <p className='text-app font-caption tracking-tight text-primary-token'>
-            {item.title}
-          </p>
-          <span
-            className={cn(
-              'inline-flex rounded-full px-2 py-0.5 text-2xs font-caption',
-              PHASE_STYLES[item.phase]
-            )}
-          >
-            {item.statusLabel}
-          </span>
-        </div>
-        <p className='mt-0.5 text-app leading-5 tracking-tight text-secondary-token'>
-          <span className='tabular-nums text-tertiary-token'>
-            {formatTimeAgo(item.timestamp)}
-          </span>
-          <span className='text-tertiary-token'> - </span>
-          <span>{item.description}</span>
-        </p>
-        {item.outcomeSlot ? (
-          <JovieWorkOutcomeSlot outcome={item.outcome} />
-        ) : null}
-      </div>
-    </>
-  );
-
-  if (item.href) {
-    return (
-      <li className='relative'>
-        <div
-          aria-hidden='true'
-          className='absolute left-3 top-0 bottom-0 w-px bg-subtle'
-        />
-        <Link
-          href={item.href}
-          className='group relative flex items-start gap-2.5 rounded-md px-1.5 py-1.5 transition-[background-color] duration-subtle ease-subtle hover:bg-surface-1 focus-visible:bg-surface-1 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/55 focus-visible:ring-offset-2 focus-visible:ring-offset-base'
-        >
-          {content}
-        </Link>
-      </li>
-    );
-  }
-
   return (
-    <li className='relative'>
-      <div
-        aria-hidden='true'
-        className='absolute left-3 top-0 bottom-0 w-px bg-subtle'
-      />
-      <div className='group relative flex items-start gap-2.5 rounded-md px-1.5 py-1.5'>
-        {content}
+    <ActivityTimelineRow
+      as='li'
+      href={item.href}
+      leading={
+        <ActivityTimelineIcon>
+          <JovieWorkGlyph icon={item.icon} />
+        </ActivityTimelineIcon>
+      }
+    >
+      <div className='flex flex-wrap items-center gap-2'>
+        <p className='text-app font-caption tracking-tight text-primary-token'>
+          {item.title}
+        </p>
+        <span
+          className={cn(
+            'inline-flex rounded-full px-2 py-0.5 text-2xs font-caption',
+            PHASE_STYLES[item.phase]
+          )}
+        >
+          {item.statusLabel}
+        </span>
       </div>
-    </li>
+      <p
+        className={`${ACTIVITY_TIMELINE_PRIMARY_TEXT_CLASSNAME} mt-0.5 text-secondary-token`}
+      >
+        {item.description}
+      </p>
+      <ActivityTimelineMeta>
+        <ActivityTimelineTimestamp dateTime={item.timestamp}>
+          {formatTimeAgo(item.timestamp)}
+        </ActivityTimelineTimestamp>
+      </ActivityTimelineMeta>
+      {item.outcomeSlot ? <JovieWorkOutcomeSlot outcome={item.outcome} /> : null}
+    </ActivityTimelineRow>
   );
 });
 
@@ -295,7 +274,7 @@ export function JovieWorkFeed({
                 isRefreshing ? 'opacity-70 transition-opacity' : undefined
               }
             >
-              <ul className='space-y-0.5'>
+              <ul className={ACTIVITY_TIMELINE_LIST_CLASSNAME}>
                 {items.map(item => (
                   <JovieWorkItemRow key={item.id} item={item} />
                 ))}

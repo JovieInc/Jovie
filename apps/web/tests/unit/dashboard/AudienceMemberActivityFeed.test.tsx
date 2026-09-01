@@ -80,6 +80,37 @@ describe('AudienceMemberActivityFeed', () => {
     expect(items).toHaveLength(2);
   });
 
+  it('uses the shared activity timeline row contract for compact drawer activity', async () => {
+    const ActivityFeed = await loadComponent();
+    const member: AudienceMember = {
+      ...baseMember,
+      latestActions: [
+        {
+          label: 'profile_view',
+          sourceLabel: 'Instagram',
+          timestamp: '2026-03-20T10:00:00Z',
+        },
+      ],
+    };
+
+    render(<ActivityFeed member={member} />);
+
+    expect(screen.getByTestId('activity-timeline-row-shell')).toHaveClass(
+      'gap-3',
+      'px-1.5',
+      'py-1'
+    );
+    expect(screen.getByTestId('activity-timeline-leading')).toHaveClass(
+      'h-6',
+      'w-6',
+      'rounded-full'
+    );
+    expect(screen.getByTestId('activity-timeline-timestamp')).toHaveAttribute(
+      'dateTime',
+      '2026-03-20T10:00:00Z'
+    );
+  });
+
   it('caps displayed actions at 10', async () => {
     const ActivityFeed = await loadComponent();
     const actions = Array.from({ length: 15 }, (_, i) => ({
