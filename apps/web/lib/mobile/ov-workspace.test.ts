@@ -7,7 +7,11 @@ import {
 
 const h = vi.hoisted(() => ({
   canUseOvChatMode: vi.fn(),
+  resolveChatAccountContext: vi.fn(),
+  checkAiChatRateLimitForPlan: vi.fn(),
   reserveChatTurn: vi.fn(),
+  resumeStaleChatTurn: vi.fn(),
+  resumeTerminalChatTurn: vi.fn(),
   prepareOvieChatTurn: vi.fn(),
   markChatTurnStreaming: vi.fn(),
   markChatTurnTerminal: vi.fn(),
@@ -19,8 +23,16 @@ const h = vi.hoisted(() => ({
 }));
 
 vi.mock('@/lib/chat/ov-mode', () => ({ canUseOvChatMode: h.canUseOvChatMode }));
+vi.mock('@/lib/chat/account-context', () => ({
+  resolveChatAccountContext: h.resolveChatAccountContext,
+}));
+vi.mock('@/lib/rate-limit', () => ({
+  checkAiChatRateLimitForPlan: h.checkAiChatRateLimitForPlan,
+}));
 vi.mock('@/lib/chat/turns', () => ({
   reserveChatTurn: h.reserveChatTurn,
+  resumeStaleChatTurn: h.resumeStaleChatTurn,
+  resumeTerminalChatTurn: h.resumeTerminalChatTurn,
   markChatTurnStreaming: h.markChatTurnStreaming,
   markChatTurnTerminal: h.markChatTurnTerminal,
   persistTerminalAssistantMessageWithReceipt:
@@ -101,9 +113,13 @@ describe('mobile Ovie workspace', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     h.canUseOvChatMode.mockResolvedValue(true);
+    h.resolveChatAccountContext.mockResolvedValue({ plan: 'pro' });
+    h.checkAiChatRateLimitForPlan.mockResolvedValue({ success: true });
     h.isSummerTransportEnabled.mockReturnValue(true);
     h.markChatTurnStreaming.mockResolvedValue(undefined);
     h.markChatTurnTerminal.mockResolvedValue(true);
+    h.resumeStaleChatTurn.mockResolvedValue('resumed');
+    h.resumeTerminalChatTurn.mockResolvedValue('resumed');
     h.getMobileConversationDetail.mockResolvedValue(null);
     h.persistTerminalAssistantMessageWithReceipt.mockResolvedValue({
       message: { id: 'a1' },
