@@ -36,7 +36,7 @@ jobs:
           fi
           base="${{ github.event.pull_request.base.ref }}"
           if [[ "$base" != "main" ]]; then
-            echo "::error::PRs must target main. Base '$base' is forbidden. Retarget: gh pr edit --base main && git fetch origin main && git rebase origin/main"
+            echo "::error::PRs must target main. Base '$base' is forbidden. Retarget the pull request base to main, fetch origin/main, and rebase."
             exit 1
           fi
           echo "PR targets main"
