@@ -101,31 +101,28 @@ describe('LibraryMediaThumbnail', () => {
   it.each([
     ['card', 'rounded-[7%]'],
     ['drawer', 'rounded-[10%]'],
-  ] as const)(
-    'maps the %s fallback to the appropriate artwork corner radius',
-    (size, expectedRadius) => {
-      const { container } = render(
-        <LibraryMediaThumbnail
-          asset={buildAsset({
-            artworkUrl: null,
-            previewUrl: null,
-            videoUrl: null,
-          })}
-          size={size}
-        />
-      );
+  ] as const)('maps the %s fallback to the appropriate artwork corner radius', (size, expectedRadius) => {
+    const { container } = render(
+      <LibraryMediaThumbnail
+        asset={buildAsset({
+          artworkUrl: null,
+          previewUrl: null,
+          videoUrl: null,
+        })}
+        size={size}
+      />
+    );
 
-      expect(
-        container.querySelector('[data-artwork-fallback-sleeve="true"]')
-      ).toHaveClass(expectedRadius);
-      expect(
-        screen.getByTestId('library-media-thumbnail-release-1')
-      ).toHaveAttribute(
-        'data-artwork-frame',
-        size === 'drawer' ? 'hero' : 'default'
-      );
-    }
-  );
+    expect(
+      container.querySelector('[data-artwork-fallback-sleeve="true"]')
+    ).toHaveClass(expectedRadius);
+    expect(
+      screen.getByTestId('library-media-thumbnail-release-1')
+    ).toHaveAttribute(
+      'data-artwork-frame',
+      size === 'drawer' ? 'hero' : 'default'
+    );
+  });
 
   it('uses a flat, subtly rounded fallback for row thumbnails', () => {
     render(

@@ -1,5 +1,7 @@
 'use client';
 
+// @coverage-via apps/web/tests/unit/library/LibraryCatalogWaveformCell.test.tsx
+
 import { type ColumnDef, createColumnHelper } from '@tanstack/react-table';
 import { memo, useMemo } from 'react';
 import { LibraryMediaThumbnail } from '@/app/app/(shell)/library/LibraryMediaThumbnail';
