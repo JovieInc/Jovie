@@ -46,7 +46,7 @@ export default function ApiVersioningPage() {
         <p className='text-sm font-medium text-tertiary-token'>
           Public API policy
         </p>
-        <h1 className='system-b-marketing-route-title mt-6 max-w-3xl text-primary-token'>
+        <h1 className='system-b-marketing-route-title mt-6 max-w-3xl text-primary-token line-clamp-2'>
           API Versioning And Deprecation Policy
         </h1>
         <p className='mt-6 max-w-2xl text-lg leading-relaxed text-secondary-token'>
@@ -61,7 +61,7 @@ export default function ApiVersioningPage() {
           <section aria-labelledby='versioning-heading'>
             <h2
               id='versioning-heading'
-              className='text-2xl font-semibold tracking-tight text-primary-token'
+              className='text-2xl font-semibold tracking-tight text-primary-token line-clamp-2'
             >
               Versioning
             </h2>
@@ -78,7 +78,7 @@ export default function ApiVersioningPage() {
           <section aria-labelledby='lifecycle-heading'>
             <h2
               id='lifecycle-heading'
-              className='text-2xl font-semibold tracking-tight text-primary-token'
+              className='text-2xl font-semibold tracking-tight text-primary-token line-clamp-2'
             >
               Deprecation And Sunset Signals
             </h2>
@@ -103,7 +103,7 @@ export default function ApiVersioningPage() {
           <section aria-labelledby='contract-heading'>
             <h2
               id='contract-heading'
-              className='text-2xl font-semibold tracking-tight text-primary-token'
+              className='text-2xl font-semibold tracking-tight text-primary-token line-clamp-2'
             >
               Machine-readable Contract
             </h2>

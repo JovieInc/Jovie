@@ -97,7 +97,7 @@ function HomepageV2Hero() {
             <h1
               id='homepage-v2-hero-heading'
               data-testid='homepage-v2-hero'
-              className='homepage-v2-hero__headline text-4xl font-semibold tracking-tight text-balance text-primary-token sm:text-5xl lg:text-6xl'
+              className='homepage-v2-hero__headline text-4xl font-semibold tracking-tight text-balance text-primary-token sm:text-5xl lg:text-6xl line-clamp-2'
             >
               {HOMEPAGE_V2_COPY.hero.headline}
             </h1>
@@ -242,7 +242,7 @@ export function HomepageV2Spotlight() {
         <div className='mx-auto grid max-w-6xl gap-10 lg:grid-cols-[minmax(16rem,0.36fr)_minmax(0,0.64fr)] lg:items-center xl:gap-16'>
           <div className='homepage-v2-spotlight__copy lg:self-center'>
             <div className='homepage-v2-spotlight__copy'>
-              <h2 className='homepage-story-heading homepage-v2-spotlight__heading'>
+              <h2 className='homepage-story-heading homepage-v2-spotlight__heading line-clamp-2'>
                 <span className='block'>One Link.</span>
                 <span className='block whitespace-nowrap'>Always In Sync.</span>
               </h2>
