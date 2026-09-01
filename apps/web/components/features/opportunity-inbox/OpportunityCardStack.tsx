@@ -12,6 +12,7 @@ import { OpportunityRow } from '@/components/organisms/opportunity-card/Opportun
 import type { OpportunityInboxCardViewModel } from '@/lib/connectors/opportunity-inbox-types';
 import { cn } from '@/lib/utils';
 import { OpportunityInboxReportCard } from './OpportunityInboxReportCard';
+import { OpportunityInboxYoutubeThumbnailCard } from './OpportunityInboxYoutubeThumbnailCard';
 
 const COMMIT_OFFSET_PX = 120;
 
@@ -159,7 +160,15 @@ export function OpportunityCardStack({
             }}
             style={{ touchAction: 'pan-y' }}
           >
-            {topCard.category === 'report' && topCard.report ? (
+            {topCard.category === 'youtube_thumbnail' &&
+            topCard.youtubeThumbnail ? (
+              <OpportunityInboxYoutubeThumbnailCard
+                card={topCard}
+                onApprove={onAccept}
+                onReject={onReject}
+                isBusy={pendingActionId === topCard.id}
+              />
+            ) : topCard.category === 'report' && topCard.report ? (
               <OpportunityInboxReportCard
                 card={topCard}
                 onNextStep={onNextStep ?? onAccept}
