@@ -210,7 +210,7 @@ async function exerciseKeyboardActivation(page, target) {
 async function clearInteractionState(page) {
   await page.mouse.move(-10, -10);
   await page.evaluate(() => {
-    const { HTMLElement } = /** @type {any} */ (globalThis);
+    const { document, HTMLElement } = /** @type {any} */ (globalThis);
     const active = document.activeElement;
     if (active instanceof HTMLElement) active.blur();
   });
@@ -242,14 +242,16 @@ async function collectSnapshots(
     .first()
     .waitFor({ state: 'visible', timeout: 15_000 });
   await page.waitForFunction(
-    () =>
-      [...document.querySelectorAll('[data-jovie-eval-family]')].every(
+    () => {
+      const { document } = /** @type {any} */ (globalThis);
+      return [...document.querySelectorAll('[data-jovie-eval-family]')].every(
         element =>
           element.getAttribute('data-jovie-eval-theme') ===
           (document.documentElement.classList.contains('dark')
             ? 'dark'
             : 'light')
-      ),
+      );
+    },
     undefined,
     { timeout: 5_000 }
   );
@@ -266,7 +268,9 @@ async function collectSnapshots(
     await root.evaluate((element, id) => {
       element.setAttribute('data-jovie-eval-instance', id);
     }, instanceId);
-    await page.evaluate(() => Reflect.deleteProperty(window, 'axe'));
+    await page.evaluate(() =>
+      Reflect.deleteProperty(/** @type {any} */ (globalThis).window, 'axe')
+    );
     const axe = await new AxeBuilder({ page })
       .include(`[data-jovie-eval-instance="${instanceId}"]`)
       .withTags(['wcag2a', 'wcag2aa', 'wcag21a', 'wcag21aa', 'wcag22aa'])
@@ -316,6 +320,7 @@ async function collectSnapshots(
         };
         const {
           CSS,
+          document,
           HTMLAnchorElement,
           HTMLButtonElement,
           HTMLElement,
@@ -728,8 +733,9 @@ async function collectSnapshots(
             return wrapper.firstElementChild;
           return wrapper;
         };
+        const { document, window } = /** @type {any} */ (globalThis);
         const rootRect = element.getBoundingClientRect();
-        const viewportWidth = /** @type {any} */ (globalThis).window.innerWidth;
+        const viewportWidth = window.innerWidth;
         const documentOverflowX =
           document.documentElement.scrollWidth -
             document.documentElement.clientWidth >
