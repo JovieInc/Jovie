@@ -75,4 +75,29 @@ describe('SettingsPaymentsSection', () => {
     });
     expect(fetchMock).toHaveBeenCalledTimes(2);
   });
+
+  it('renders platform profile unavailable as a disabled settings action row', async () => {
+    fetchMock.mockImplementationOnce(() =>
+      jsonResponse({
+        connected: false,
+        onboardingComplete: false,
+        payoutsEnabled: false,
+        email: null,
+        onboardingAvailable: false,
+      })
+    );
+
+    render(<SettingsPaymentsSection />);
+
+    const title = await screen.findByText(
+      'Payout setup temporarily unavailable'
+    );
+    const row = title.closest('[data-state="disabled"]');
+
+    expect(row).toHaveAttribute('data-tone', 'default');
+    expect(row).toHaveAttribute('aria-disabled', 'true');
+    expect(
+      screen.getByRole('button', { name: 'Connect Stripe' })
+    ).toBeDisabled();
+  });
 });

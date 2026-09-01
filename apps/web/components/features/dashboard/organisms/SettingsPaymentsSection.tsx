@@ -1,3 +1,4 @@
+// @coverage-via apps/web/tests/unit/settings/SettingsPaymentsSection.test.tsx
 'use client';
 
 import { Button } from '@jovie/ui';
