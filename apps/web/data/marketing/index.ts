@@ -111,36 +111,6 @@ export type {
 } from './designGaps';
 export { getProposedSection, PROPOSED_SECTIONS } from './designGaps';
 export type {
-  JovieForbiddenControllableHue,
-  JovieHueCorridor,
-  JovieImageColorControl,
-  JovieImageColorDecision,
-  JovieImageColorFailureAction,
-  JovieImageColorFinding,
-  JovieImageColorPolicy,
-  JovieImageColorRequestedAction,
-  JovieImageColorSalience,
-  JovieImageProtectedColorClass,
-  JovieImageSceneColorRole,
-  JovieImageSkinMaterialEvaluation,
-  JovieImageSubjectSeparationEvaluation,
-  JovieOklchColorReference,
-  JovieOklchColorSample,
-  JovieScenePaletteReference,
-  JovieSubjectSeparationRequirement,
-  JovieUiColorAnchor,
-} from './imageColorPolicy';
-export {
-  auditJovieImageColorDecision,
-  formatJovieImageColorPolicyForPrompt,
-  isForbiddenControllableSceneColor,
-  isHueInCorridor,
-  JOVIE_IMAGE_COLOR_POLICY,
-  JOVIE_IMAGE_COLOR_POLICY_SCHEMA,
-  JOVIE_IMAGE_COLOR_POLICY_VERSION,
-  resolveJovieSceneColorRole,
-} from './imageColorPolicy';
-export type {
   MarketingCreativeRole,
   MarketingGateReceipt,
   MarketingGenerationFinding,
@@ -209,6 +179,36 @@ export {
   STAGED_HOMEPAGE_SOURCE_FILES,
   START_GOLDEN_PATH_ROUTE,
 } from './homepageRedesign';
+export type {
+  JovieForbiddenControllableHue,
+  JovieHueCorridor,
+  JovieImageColorControl,
+  JovieImageColorDecision,
+  JovieImageColorFailureAction,
+  JovieImageColorFinding,
+  JovieImageColorPolicy,
+  JovieImageColorRequestedAction,
+  JovieImageColorSalience,
+  JovieImageProtectedColorClass,
+  JovieImageSceneColorRole,
+  JovieImageSkinMaterialEvaluation,
+  JovieImageSubjectSeparationEvaluation,
+  JovieOklchColorReference,
+  JovieOklchColorSample,
+  JovieScenePaletteReference,
+  JovieSubjectSeparationRequirement,
+  JovieUiColorAnchor,
+} from './imageColorPolicy';
+export {
+  auditJovieImageColorDecision,
+  formatJovieImageColorPolicyForPrompt,
+  isForbiddenControllableSceneColor,
+  isHueInCorridor,
+  JOVIE_IMAGE_COLOR_POLICY,
+  JOVIE_IMAGE_COLOR_POLICY_SCHEMA,
+  JOVIE_IMAGE_COLOR_POLICY_VERSION,
+  resolveJovieSceneColorRole,
+} from './imageColorPolicy';
 export type { MarketingPenContractId } from './penContracts';
 export {
   MARKETING_CONTAINER_PEN_CONTRACT_BY_WIDTH,

@@ -2,6 +2,11 @@ import { readFileSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
+import type {
+  MarketingGateReceipt,
+  MarketingModelCandidate,
+  MarketingNarrativePlan,
+} from '@/data/marketing';
 import {
   auditJovieImageColorDecision,
   auditMarketingNarrativePlan,
@@ -16,11 +21,6 @@ import {
   MARKETING_VISUAL_REVIEW_COLOR_CONTRACT,
   resolveJovieSceneColorRole,
   selectMarketingModelCandidate,
-} from '@/data/marketing';
-import type {
-  MarketingGateReceipt,
-  MarketingModelCandidate,
-  MarketingNarrativePlan,
 } from '@/data/marketing';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
@@ -205,9 +205,7 @@ describe('marketing generation pipeline', () => {
   });
 
   it('canonizes Scene Palette v1 without changing production UI anchors', () => {
-    expect(JOVIE_IMAGE_COLOR_POLICY.schema).toBe(
-      'jovie-image-color-policy/v1'
-    );
+    expect(JOVIE_IMAGE_COLOR_POLICY.schema).toBe('jovie-image-color-policy/v1');
     expect(JOVIE_IMAGE_COLOR_POLICY.version).toBe('scene-palette-v1');
     expect(JOVIE_IMAGE_COLOR_POLICY.invariant).toBe(
       'The camera must find the palette.'
@@ -477,9 +475,7 @@ describe('marketing generation pipeline', () => {
     for (const sourcePath of activeSources) {
       const source = readRepoSource(sourcePath);
       for (const pattern of forbidden) {
-        expect(source, `${sourcePath} matched ${pattern}`).not.toMatch(
-          pattern
-        );
+        expect(source, `${sourcePath} matched ${pattern}`).not.toMatch(pattern);
       }
     }
   });

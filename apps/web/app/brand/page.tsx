@@ -466,8 +466,8 @@ function ImagerySection() {
           Jovie-owned generated imagery follows Scene Palette v1.
         </p>
         <p className={prose}>
-          Set color is chosen before capture or generation. Reality,
-          identity, and artist-owned material stay truthful.
+          Set color is chosen before capture or generation. Reality, identity,
+          and artist-owned material stay truthful.
         </p>
         <ColorList title='Imagery rules' items={PUBLIC_IMAGERY_RULES} />
       </div>
@@ -492,8 +492,8 @@ function TypeSection() {
           type carries the work.
         </p>
         <p className={proseStrong}>
-          Satoshi for display. Inter for body and product UI. Two languages.
-          One system.
+          Satoshi for display. Inter for body and product UI. Two languages. One
+          system.
         </p>
         <div className='system-b-brand-type-stack'>
           {TYPE_SAMPLES.map(sample => (

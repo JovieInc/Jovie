@@ -184,7 +184,8 @@ export const JOVIE_IMAGE_COLOR_POLICY = {
   invariant: 'The camera must find the palette.',
   founderApproval: {
     approvedAt: '2026-08-21',
-    decisionRef: 'gbrain:design/jovie-imagery-color-harmony-proposal-2026-08-21',
+    decisionRef:
+      'gbrain:design/jovie-imagery-color-harmony-proposal-2026-08-21',
   },
   scope: {
     appliesTo: [
@@ -364,7 +365,8 @@ export const JOVIE_IMAGE_COLOR_POLICY = {
     ],
   },
   grade: {
-    allowed: 'restrained finishing that preserves set design and material response',
+    allowed:
+      'restrained finishing that preserves set design and material response',
     forbidden:
       'post-hoc recoloring, global orange-teal looks, literal triads, or material-response rewrites',
   },
@@ -641,7 +643,8 @@ export function auditJovieImageColorDecision(
       );
     } else {
       const hasSeparation =
-        separation.lightnessDelta >= policy.subjectSeparation.minLightnessDelta ||
+        separation.lightnessDelta >=
+          policy.subjectSeparation.minLightnessDelta ||
         separation.chromaDelta >= policy.subjectSeparation.minChromaDelta ||
         separation.hueDelta >= policy.subjectSeparation.minHueDelta ||
         separation.wardrobeContrast === true ||
