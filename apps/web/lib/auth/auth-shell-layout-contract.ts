@@ -55,6 +55,10 @@ export type AuthShellSurface = keyof typeof AUTH_SHELL_LAYOUT_CONTRACT;
 export const AUTH_DESKTOP_ONLY_CLASS = 'auth-desktop-only';
 export const AUTH_EDITORIAL_CARD_TEST_ID = 'auth-brand-panel';
 export const AUTH_LAYOUT_CSS_RELATIVE_PATH = 'styles/theme.css';
+export const AUTH_FORM_CONTAINER_RELATIVE_PATH =
+  'components/features/auth/AuthFormContainer.tsx';
+export const AUTH_BRANDING_RELATIVE_PATH =
+  'components/features/auth/AuthBranding.tsx';
 
 export interface AuthDesktopOnlyCssInspection {
   readonly defaultDisplay: string | null;
@@ -68,6 +72,16 @@ export type AuthDesktopOnlyCssIssue =
   | 'desktop-not-shown'
   | 'missing-default-hide'
   | 'missing-desktop-media';
+
+export type AuthShellHelperKind = 'form-container' | 'branding';
+
+export type AuthShellHelperSourceIssue =
+  | 'form-container-owns-shell-padding'
+  | 'form-container-owns-form-width'
+  | 'branding-owns-breakpoint'
+  | 'branding-owns-gradient-shell'
+  | 'branding-owns-decorative-orbs'
+  | 'branding-bypasses-auth-brand-panel';
 
 function displayOfAuthDesktopOnly(block: string): string | null {
   const match = block.match(/\.auth-desktop-only\s*\{\s*display:\s*([^;}]+)/);
@@ -191,5 +205,57 @@ export function inspectAuthLayoutSourceIssues(
   ) {
     issues.push('editorial-unwrapped');
   }
+  return issues;
+}
+
+export function inspectAuthShellHelperSourceIssues(
+  helper: AuthShellHelperKind,
+  source: string
+): readonly AuthShellHelperSourceIssue[] {
+  const issues: AuthShellHelperSourceIssue[] = [];
+
+  if (helper === 'form-container') {
+    if (
+      /\b(?:sm:|md:|lg:|xl:)?px-\d+\b/.test(source) ||
+      source.includes('safe-area-inset')
+    ) {
+      issues.push('form-container-owns-shell-padding');
+    }
+
+    if (
+      source.includes('AUTH_FORM_MAX_WIDTH_CLASS') ||
+      /\b(?:sm:|md:|lg:|xl:)?max-w-/.test(source)
+    ) {
+      issues.push('form-container-owns-form-width');
+    }
+
+    return issues;
+  }
+
+  if (/\b(?:sm:|md:|lg:|xl):(?:block|flex|grid|hidden)\b/.test(source)) {
+    issues.push('branding-owns-breakpoint');
+  }
+
+  if (
+    source.includes('gradientVariants') ||
+    source.includes('bg-gradient-to-') ||
+    source.includes('bg-linear-to-')
+  ) {
+    issues.push('branding-owns-gradient-shell');
+  }
+
+  if (
+    source.includes('rounded-full') ||
+    source.includes('blur-xl') ||
+    source.includes('blur-3xl') ||
+    source.includes('animate-pulse')
+  ) {
+    issues.push('branding-owns-decorative-orbs');
+  }
+
+  if (!source.includes('AuthBrandPanel')) {
+    issues.push('branding-bypasses-auth-brand-panel');
+  }
+
   return issues;
 }
