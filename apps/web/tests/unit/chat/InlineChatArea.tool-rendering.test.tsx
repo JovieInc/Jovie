@@ -2,12 +2,12 @@ import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { fireEvent, screen } from '@testing-library/react';
 import {
-  cloneElement,
-  createElement,
-  isValidElement,
   type ComponentProps,
   type ReactElement,
   type ReactNode,
+  cloneElement,
+  createElement,
+  isValidElement,
 } from 'react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type { ChatError } from '@/components/jovie/types';
