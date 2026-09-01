@@ -35,7 +35,7 @@ export type TableEmptyStateProps = TableEmptyStateActionProps & {
   /** Optional icon to display */
   readonly icon?: React.ReactNode;
   /** Empty-state semantic variant from the canonical molecule */
-  readonly variant?: EmptyStateProps['variant'];
+  readonly variant?: NonNullable<EmptyStateProps['variant']>;
   /** Optional structured secondary action (rendered as a link-style Button) */
   readonly secondaryAction?: NonNullable<EmptyStateProps['secondaryAction']>;
   /** Additional CSS classes */
