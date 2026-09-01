@@ -268,8 +268,8 @@ function statusDetail(
   if (hasBlockingPrLabel(pr.labels)) return 'Blocking label';
   if (pr.reviewDecision === 'CHANGES_REQUESTED') return 'Changes requested';
   if (pr.mergeable === 'CONFLICTING') return 'Merge conflict';
-  if (pr.reviewDecision === 'APPROVED') return 'Approved';
   if (pr.reviewRequestCount > 0) return 'Review requested';
+  if (pr.reviewDecision === 'APPROVED') return 'Approved';
   if (pr.reviewDecision === 'REVIEW_REQUIRED') return 'Review required';
   if (pr.isDraft) return 'Draft';
   return 'Ready';

@@ -174,6 +174,7 @@ describe('Ovie Mac HUD derivation', () => {
           number: 11,
           title: 'Needs review',
           updatedAt: '2026-08-21T00:00:00.000Z',
+          reviewDecision: 'APPROVED',
           reviewRequests: { totalCount: 1 },
         }),
         prNode({
@@ -216,6 +217,10 @@ describe('Ovie Mac HUD derivation', () => {
       statusLabel: 'MQ',
       statusDetail: 'Position 1',
       mergeQueuePosition: 1,
+    });
+    expect(result.items[2]).toMatchObject({
+      number: 11,
+      statusDetail: 'Review requested',
     });
   });
 
