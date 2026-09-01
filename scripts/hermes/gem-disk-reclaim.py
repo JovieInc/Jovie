@@ -232,7 +232,7 @@ def cleanup_runners(args: argparse.Namespace, deadline: float) -> dict[str, Any]
             continue
         candidates = []
         preserved = []
-        for child in sorted(work.iterdir(), key=lambda item: item.name):
+        for child in sorted(work_resolved.iterdir(), key=lambda item: item.name):
             if child.name not in RUNNER_ARTIFACT_NAMES:
                 preserved.append(
                     {

@@ -215,6 +215,27 @@ class GemDiskReclaimTests(unittest.TestCase):
         self.assertEqual(root_report["preserved"][0]["reason"], "runner_work_child_not_allowlisted")
         self.assertEqual(self.receipt_json()["summary"]["mutated"], 0)
 
+    def test_runner_preserved_child_under_symlinked_ancestor_is_reported(self) -> None:
+        actual = self.root / "actual"
+        actual.mkdir()
+        linked = self.root / "linked"
+        linked.symlink_to(actual, target_is_directory=True)
+        runner = actual / "actions-runner"
+        runner.mkdir()
+        (runner / ".runner").write_text("configured\n", encoding="utf-8")
+        (runner / "run.sh").write_text("#!/bin/sh\n", encoding="utf-8")
+        checkout = runner / "_work" / "Jovie"
+        checkout.mkdir(parents=True)
+        (checkout / "README.md").write_text("source\n", encoding="utf-8")
+
+        result = self.reclaim("--apply", "--runner-root", str(linked / "actions-runner"))
+
+        self.assertEqual(result.returncode, 0, result.stderr)
+        root_report = next(
+            report for report in self.receipt_json()["runners"]["roots"] if report.get("reason") == "idle_runner"
+        )
+        self.assertEqual(root_report["preserved"][0]["relative"], "Jovie")
+
     def test_runner_allowlisted_artifact_with_git_history_fails_closed(self) -> None:
         artifact = self.make_runner_artifact()
         protected = artifact / ".git"
