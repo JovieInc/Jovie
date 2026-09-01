@@ -33,6 +33,9 @@ export const TAB_BAR_SEGMENT_TRIGGER_CLASSNAME =
 export const TAB_BAR_SEGMENT_TRIGGER_ACTIVE_CLASSNAME =
   'bg-surface-0 font-semibold text-primary-token';
 
+const TAB_BAR_SEGMENT_OVERFLOW_TRIGGER_CLASSNAME =
+  'h-8 w-8 sm:before:h-8 sm:before:w-8';
+
 export interface TabBarProps<T extends string> {
   readonly value: T;
   readonly onValueChange: (value: T) => void;
@@ -204,6 +207,11 @@ export function TabBar<T extends string>({
                       ref={moreButtonRef}
                       hasActiveOverflow={activeInOverflow}
                       variant={variant}
+                      className={
+                        variant === 'segment'
+                          ? TAB_BAR_SEGMENT_OVERFLOW_TRIGGER_CLASSNAME
+                          : undefined
+                      }
                     />
                   </DropdownMenuTrigger>
                 </TooltipTrigger>
@@ -237,7 +245,11 @@ export function TabBar<T extends string>({
               ref={moreButtonRef}
               hasActiveOverflow={false}
               variant={variant}
-              className='invisible absolute'
+              className={cn(
+                'invisible absolute',
+                variant === 'segment' &&
+                  TAB_BAR_SEGMENT_OVERFLOW_TRIGGER_CLASSNAME
+              )}
               aria-hidden='true'
               tabIndex={-1}
             />
