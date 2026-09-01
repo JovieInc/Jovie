@@ -942,6 +942,26 @@ describe('canonical shared source atom registry', () => {
         size: BUTTON_SIZE_NAMES,
       },
     });
+    expect(
+      DESIGN_SYSTEM_COMPONENT_REGISTRY.find(entry => entry.id === 'atom.input')
+    ).toMatchObject({
+      penRootId: null,
+      referenceEligible: false,
+      variantAxes: {
+        inputSize: ['sm', 'md', 'lg'],
+        state: [
+          'default',
+          'focus-visible',
+          'disabled',
+          'error',
+          'success',
+          'loading',
+          'pending',
+          'long-placeholder',
+        ],
+        type: ['text', 'password', 'search', 'number'],
+      },
+    });
     expect(DESIGN_SYSTEM_COMPONENT_REGISTRY.map(entry => entry.id)).toEqual(
       DESIGN_SYSTEM_COMPONENT_IDS
     );

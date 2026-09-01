@@ -98,6 +98,8 @@ function registryEntries(source) {
       body.match(/\n\s+penRootId:\s+([^,\n]+),/)?.[1]?.trim() ?? null;
     const familyMapExpression =
       body.match(/\n\s+penRootByVariantKey:\s+([^,\n]+),/)?.[1]?.trim() ?? null;
+    const hasPenIdentityReason =
+      /\n\s+penIdentityReason:\s*(?:\n\s*)?['"`][^'"`]+['"`]/.test(body);
     entries.push({
       id: match[1],
       source: body.match(/\n\s+source:\s+'([^']+)'/)?.[1] ?? null,
@@ -106,6 +108,7 @@ function registryEntries(source) {
       hasPenRoot:
         (penRootExpression !== null && penRootExpression !== 'null') ||
         (familyMapExpression !== null && familyMapExpression !== 'null'),
+      hasPenIdentityReason,
     });
   }
   return entries;
@@ -122,7 +125,7 @@ function declaredRegistryIds(source) {
 function sourceDigestPaths(component) {
   return [
     component.source,
-    component.contractSource,
+    ...(component.contractSource ? [component.contractSource] : []),
     ...(component.tokenSources ?? []),
   ].sort();
 }
@@ -255,12 +258,13 @@ export function validateDesignConformance({
     if (!Number.isInteger(component.revision) || component.revision < 1) {
       add('invalid-component-revision', component.id);
     }
-    if (!PEN_ROOT_PATTERN.test(component.penRootId ?? '')) {
+    const penRootId = component.penRootId ?? null;
+    if (penRootId !== null && !PEN_ROOT_PATTERN.test(penRootId)) {
       add('invalid-pen-root', component.id);
-    } else if (penRoots.has(component.penRootId)) {
-      add('duplicate-pen-root', component.penRootId);
-    } else {
-      penRoots.add(component.penRootId);
+    } else if (penRootId !== null && penRoots.has(penRootId)) {
+      add('duplicate-pen-root', penRootId);
+    } else if (penRootId !== null) {
+      penRoots.add(penRootId);
     }
     for (const key of [
       'platforms',
@@ -274,7 +278,7 @@ export function validateDesignConformance({
     }
     const evidencePaths = [
       component.source,
-      component.contractSource,
+      ...(component.contractSource ? [component.contractSource] : []),
       ...(component.tokenSources ?? []),
       ...(component.storySources ?? []),
       ...(component.testSources ?? []),
@@ -319,7 +323,7 @@ export function validateDesignConformance({
       const contractRoots = [
         ...contractSource.matchAll(/\brootId:\s*'([^']+)'/g),
       ].map(item => item[1]);
-      if (!contractRoots.includes(component.penRootId)) {
+      if (penRootId !== null && !contractRoots.includes(penRootId)) {
         add('contract-pen-root-mismatch', component.id);
       }
     }
@@ -372,7 +376,15 @@ export function validateDesignConformance({
     if (entry.source !== component.source) {
       add('registry-source-mismatch', component.id);
     }
-    if (!entry.referenceEligible || !entry.hasPenRoot) {
+    if (
+      component.penRootId === null &&
+      (entry.referenceEligible || entry.hasPenRoot || !entry.hasPenIdentityReason)
+    ) {
+      add('registry-pen-binding-missing', component.id);
+    } else if (
+      component.penRootId !== null &&
+      (!entry.referenceEligible || !entry.hasPenRoot)
+    ) {
       add('registry-pen-binding-missing', component.id);
     }
   }
