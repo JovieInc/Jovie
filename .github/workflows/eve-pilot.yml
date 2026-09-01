@@ -51,7 +51,7 @@ jobs:
     runs-on: ubuntu-24.04
     timeout-minutes: 15
     concurrency:
-      group: eve-shadow-production
+      group: eve-shadow-non-production
       cancel-in-progress: true
     defaults:
       run:
@@ -78,11 +78,18 @@ jobs:
             --project jovie-eve-shadow \
             --scope jovie \
             --token "$VERCEL_TOKEN"
-      - name: Deploy exact main source to production
+      - name: Deploy exact main source disabled to the preview shadow endpoint
         run: |
-          pnpm exec vercel deploy \
-            --prod \
+          deployment_url="$(pnpm exec vercel deploy \
             --yes \
             --scope jovie \
             --token "$VERCEL_TOKEN" \
-            --meta "githubCommitSha=$GITHUB_SHA"
+            --meta "githubCommitSha=$GITHUB_SHA")"
+          case "$deployment_url" in
+            https://*.vercel.app) ;;
+            *) exit 1 ;;
+          esac
+          pnpm exec vercel alias set "$deployment_url" \
+            jovie-eve-shadow-staging.vercel.app \
+            --scope jovie \
+            --token "$VERCEL_TOKEN"

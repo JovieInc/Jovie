@@ -100,7 +100,7 @@ describe('POST /api/internal/ovie/summer-shadow', () => {
     expect(call).toBeDefined();
     const [url, init] = call as Parameters<typeof globalThis.fetch>;
     expect(String(url)).toBe(
-      'https://jovie-eve-shadow.vercel.app/ovie/v1/summer-shadow/events'
+      'https://jovie-eve-shadow-staging.vercel.app/ovie/v1/summer-shadow/events'
     );
     expect(init).toMatchObject({
       method: 'POST',

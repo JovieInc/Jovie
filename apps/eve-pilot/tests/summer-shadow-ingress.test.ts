@@ -1,7 +1,8 @@
 import type { SessionAuthContext } from 'eve/context';
-import { describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import {
   createSummerShadowIngressHandler,
+  isSummerShadowEnabled,
   type ShadowRecord,
 } from '../agent/lib/summer-shadow-ingress';
 
@@ -66,6 +67,19 @@ function dependencies(
 }
 
 describe('Summer shadow ingress', () => {
+  beforeEach(() => {
+    vi.stubEnv('SUMMER_SHADOW_ENABLED', 'true');
+    vi.stubEnv('VERCEL_ENV', 'preview');
+  });
+
+  afterEach(() => vi.unstubAllEnvs());
+
+  it('enables only an explicit Preview deployment', () => {
+    expect(isSummerShadowEnabled(process.env)).toBe(true);
+    vi.stubEnv('VERCEL_ENV', 'production');
+    expect(isSummerShadowEnabled(process.env)).toBe(false);
+  });
+
   it('authenticates before parsing and rejects unsigned input without side effects', async () => {
     const persistImmutable = vi.fn();
     const dispatch = vi.fn();

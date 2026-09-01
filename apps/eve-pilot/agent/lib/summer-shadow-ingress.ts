@@ -99,6 +99,15 @@ function eventKey(eventId: string): string {
   return createHash('sha256').update(eventId).digest('hex');
 }
 
+export function isSummerShadowEnabled(
+  environment: Readonly<Record<string, string | undefined>> = process.env
+): boolean {
+  return (
+    environment.SUMMER_SHADOW_ENABLED?.trim() === 'true' &&
+    environment.VERCEL_ENV === 'preview'
+  );
+}
+
 function deploymentFromEnvironment(): ShadowDeployment {
   const hostname = process.env.VERCEL_URL?.trim();
   return {
@@ -140,6 +149,9 @@ export function createSummerShadowIngressHandler(
   return async request => {
     const auth = await dependencies.authenticate(request);
     if (auth instanceof Response) return auth;
+    if (!isSummerShadowEnabled()) {
+      return jsonResponse(503, { ok: false, code: 'shadow_disabled' });
+    }
 
     let rawBody: string;
     try {

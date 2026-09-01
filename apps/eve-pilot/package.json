@@ -12,7 +12,6 @@
     "build": "eve build",
     "deploy": "eve deploy",
     "dev": "eve dev",
-    "probe:summer-shadow": "node scripts/ovie-summer-shadow-probe.mjs",
     "smoke": "vitest run --config vitest.config.ts tests/eve-framework-smoke.test.ts",
     "start": "eve start",
     "test": "vitest run --config vitest.config.ts",

@@ -7,7 +7,7 @@ import { logger } from '@/lib/utils/logger';
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
 
-const EVE_SHADOW_ORIGIN = 'https://jovie-eve-shadow.vercel.app';
+const EVE_SHADOW_ORIGIN = 'https://jovie-eve-shadow-staging.vercel.app';
 const MAX_BODY_BYTES = 32 * 1024;
 const NO_STORE_HEADERS = { 'Cache-Control': 'no-store' } as const;
 

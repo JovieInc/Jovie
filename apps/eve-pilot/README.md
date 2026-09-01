@@ -34,8 +34,10 @@ Tim always talks through Ovie.
 Summer begins as an explicit `ovie-summer-shadow` identity in this Eve app.
 It can observe and report engineering throughput from Ovie, but it has no
 write capability during this phase. Photon, Telegram, and iMessage remain
-bound to Ovie. The dedicated `jovie-eve-shadow` Vercel deployment accepts only
-Jovie production OIDC at `POST /ovie/v1/summer-shadow/events`. It writes a
+bound to Ovie. The dedicated non-production `jovie-eve-shadow-staging` Preview
+deployment accepts only Jovie production OIDC at
+`POST /ovie/v1/summer-shadow/events`. It remains disabled unless the Preview
+deployment has `SUMMER_SHADOW_ENABLED=true`. It writes a
 private immutable Vercel Blob receipt/outbox before Eve dispatch and a second
 terminal receipt before returning `202`. Duplicate event IDs, unsigned calls,
 stale events, and persistence uncertainty fail closed. The binding conveys
@@ -62,9 +64,7 @@ with its existing cron authentication. That production Function obtains its
 short-lived Vercel OIDC token from the request context and signs the Eve call.
 The script never prints either credential:
 
-    vercel env run -e production --project jovie -- \
-      pnpm --dir apps/eve-pilot run probe:summer-shadow -- \
-      --via-ovie --url https://jov.ie
+    # The bounded dogfood probe ships in the dependent safety PR.
 
 Telegram and iMessage fail closed without an allowlist. Groups and unknown
 senders are dropped.
