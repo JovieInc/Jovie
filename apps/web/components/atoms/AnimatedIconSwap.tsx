@@ -1,7 +1,7 @@
 'use client';
 
 import { AnimatePresence, motion, useReducedMotion } from 'motion/react';
-import type { ReactNode } from 'react';
+import { type ReactNode, useEffect, useState } from 'react';
 import {
   ICON_SWAP_TRANSITION,
   ICON_SWAP_VARIANTS,
@@ -41,10 +41,15 @@ export function AnimatedIconSwap({
   readonly children: ReactNode;
   readonly className?: string;
 }) {
+  const [hasHydrated, setHasHydrated] = useState(false);
   const reducedMotion = useReducedMotion();
   const variants = reducedMotion
     ? ICON_SWAP_VARIANTS_REDUCED
     : ICON_SWAP_VARIANTS;
+
+  useEffect(() => {
+    setHasHydrated(true);
+  }, []);
 
   return (
     <span
@@ -58,7 +63,7 @@ export function AnimatedIconSwap({
           key={activeKey}
           className='inline-flex items-center justify-center'
           variants={variants}
-          initial='hidden'
+          initial={hasHydrated ? 'hidden' : false}
           animate='visible'
           exit='hidden'
           transition={ICON_SWAP_TRANSITION}

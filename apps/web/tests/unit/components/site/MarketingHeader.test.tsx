@@ -37,19 +37,24 @@ describe('MarketingHeader', () => {
     });
   });
 
-  it('renders marketing center navigation when the center-nav flag is enabled', () => {
+  it('renders the canonical public navigation when the center-nav flag is enabled', () => {
     render(<MarketingHeader />);
 
-    expect(screen.getByRole('button', { name: /Features/ })).toBeVisible();
-    expect(screen.getByRole('button', { name: /Resources/ })).toBeVisible();
+    expect(screen.getByRole('link', { name: 'Customers' })).toHaveAttribute(
+      'href',
+      '/artists'
+    );
+    expect(screen.getByRole('link', { name: 'Product' })).toHaveAttribute(
+      'href',
+      '/artist-profiles'
+    );
     expect(screen.getByRole('link', { name: 'Pricing' })).toHaveAttribute(
       'href',
       '/pricing'
     );
-    expect(screen.getByRole('link', { name: 'Contact' })).toHaveAttribute(
-      'href',
-      '/support'
-    );
+    expect(screen.queryByRole('button', { name: /Features/ })).toBeNull();
+    expect(screen.queryByRole('button', { name: /Resources/ })).toBeNull();
+    expect(screen.queryByRole('link', { name: 'Contact' })).toBeNull();
     expect(screen.getByRole('link', { name: 'Log in' })).toHaveAttribute(
       'href',
       '/signin'
@@ -60,14 +65,14 @@ describe('MarketingHeader', () => {
     );
   });
 
-  it('shows flyout menu triggers when center navigation is enabled', () => {
+  it('shows canonical desktop links instead of flyout menu triggers', () => {
     render(<MarketingHeader />);
 
     const navItems = Array.from(
       document.querySelector('.marketing-glass-header__nav')?.children ?? []
     ).map(item => item.textContent);
 
-    expect(navItems).toEqual(['Jovie', 'Features', 'Resources', 'Pricing']);
+    expect(navItems).toEqual(['Jovie', 'Customers', 'Product', 'Pricing']);
     expect(
       document.querySelector(
         '.marketing-glass-header__nav .marketing-glass-header__brand-wordmark'
@@ -78,8 +83,8 @@ describe('MarketingHeader', () => {
         .getByTestId('site-logo-link')
         .querySelector('[data-brand-variant="jovie"]')
     ).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: /Features/ })).toBeVisible();
-    expect(screen.getByRole('button', { name: /Resources/ })).toBeVisible();
+    expect(screen.queryByRole('button', { name: /Features/ })).toBeNull();
+    expect(screen.queryByRole('button', { name: /Resources/ })).toBeNull();
   });
 
   it('scopes homepage-style header overrides to the artist-profiles route', () => {
@@ -112,18 +117,35 @@ describe('MarketingHeader', () => {
   it('does not leak artist-profile header overrides onto the homepage', () => {
     mockUsePathname.mockReturnValue('/');
 
-    render(
-      <MarketingHeader variant='homepage' showHomepageCenterNav={false} />
-    );
+    render(<MarketingHeader variant='homepage' />);
 
+    expect(screen.getByTestId('header-nav')).toHaveAttribute(
+      'data-presentation',
+      'homepage-embedded'
+    );
     expect(screen.getByTestId('header-nav')).not.toHaveClass(
       'artist-profiles-home-header'
+    );
+    expect(screen.getByRole('link', { name: 'Customers' })).toHaveAttribute(
+      'href',
+      '/artists'
+    );
+    expect(screen.getByRole('link', { name: 'Product' })).toHaveAttribute(
+      'href',
+      '/artist-profiles'
+    );
+    expect(screen.getByRole('link', { name: 'Pricing' })).toHaveAttribute(
+      'href',
+      '/pricing'
     );
     expect(screen.getByRole('link', { name: 'Log in' })).toHaveAttribute(
       'href',
       '/signin'
     );
-    expect(screen.queryByRole('link', { name: 'Get started' })).toBeNull();
+    expect(screen.getByRole('link', { name: 'Get started' })).toHaveAttribute(
+      'href',
+      '/start'
+    );
   });
 
   it('applies and cleans up homepage-style scroll treatment', () => {

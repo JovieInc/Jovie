@@ -84,7 +84,7 @@ test.describe('Homepage', () => {
     await expect(hero.getByPlaceholder('Ask Jovie...')).toHaveCount(0);
   });
 
-  test('header uses compact homepage presentation and text-only login', async ({
+  test('header uses canonical homepage navigation and public actions', async ({
     page,
   }) => {
     const header = page.getByTestId('header-nav');
@@ -95,20 +95,55 @@ test.describe('Homepage', () => {
       'homepage-embedded'
     );
     await expect(header.locator('a[href="/"]').first()).toBeVisible();
+    await expect(
+      header.getByRole('link', { name: 'Customers' })
+    ).toHaveAttribute('href', '/artists');
+    await expect(header.getByRole('link', { name: 'Product' })).toHaveAttribute(
+      'href',
+      '/artist-profiles'
+    );
+    await expect(header.getByRole('link', { name: 'Pricing' })).toHaveAttribute(
+      'href',
+      '/pricing'
+    );
     await expect(header.getByRole('button', { name: 'Features' })).toHaveCount(
       0
     );
     await expect(header.getByRole('button', { name: 'Resources' })).toHaveCount(
       0
     );
-    await expect(header.getByRole('link', { name: 'Pricing' })).toHaveCount(0);
     await expect(header.getByRole('link', { name: 'Contact' })).toHaveCount(0);
     await expect(header.getByRole('link', { name: 'Log in' })).toHaveAttribute(
       'href',
       '/signin'
     );
-    await expect(header.getByRole('link', { name: 'Get started' })).toHaveCount(
-      0
+    await expect(
+      header.getByRole('link', { name: 'Get started' })
+    ).toHaveAttribute('href', '/start');
+
+    await page.setViewportSize({ width: 390, height: 844 });
+    await page.getByRole('button', { name: 'Open menu' }).click();
+    const mobileNav = page.getByRole('navigation', {
+      name: 'Mobile Navigation',
+    });
+    await expect(
+      mobileNav.getByRole('link', { name: 'Customers' })
+    ).toHaveAttribute('href', '/artists');
+    await expect(
+      mobileNav.getByRole('link', { name: 'Log in' })
+    ).toHaveAttribute('href', '/signin');
+    await expect(
+      mobileNav.getByRole('link', { name: 'Get started' })
+    ).toHaveAttribute('href', '/start');
+    await page.getByRole('button', { name: 'Close menu' }).click();
+    await page.setViewportSize({ width: 1280, height: 720 });
+
+    await expect(
+      header.getByRole('link', { name: 'Get started' })
+    ).toHaveAttribute('href', '/start');
+    await expect(header.getByRole('link', { name: 'Pricing' })).toHaveAttribute(
+      'href',
+      '/pricing'
     );
 
     await page.evaluate(() =>

@@ -25,10 +25,9 @@ export const MARKETING_CLI_LINK: MarketingFooterLink = {
 };
 
 export const MARKETING_NAV_LINKS: readonly MarketingNavLink[] = [
+  { href: APP_ROUTES.ARTISTS, label: 'Customers' },
   { href: APP_ROUTES.ARTIST_PROFILES, label: 'Product' },
-  { href: APP_ROUTES.ARTIST_NOTIFICATIONS, label: 'Solutions' },
   { href: APP_ROUTES.PRICING, label: 'Pricing' },
-  { href: APP_ROUTES.BLOG, label: 'Resources' },
 ] as const;
 
 export const MARKETING_FOOTER_COLUMNS: readonly MarketingFooterColumn[] = [

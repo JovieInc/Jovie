@@ -1,3 +1,5 @@
+import { readFileSync } from 'node:fs';
+import { resolve } from 'node:path';
 import { render } from '@testing-library/react';
 import { describe, expect, it } from 'vitest';
 import { AnimatedIconSwap } from './AnimatedIconSwap';
@@ -53,5 +55,16 @@ describe('AnimatedIconSwap', () => {
     );
     const wrapper = container.firstElementChild;
     expect(wrapper?.getAttribute('class')).toContain('size-5');
+  });
+
+  it('keeps the server and first client render visible before hydrated swaps animate', () => {
+    const source = readFileSync(
+      resolve(__dirname, './AnimatedIconSwap.tsx'),
+      'utf8'
+    );
+
+    expect(source).toContain('setHasHydrated(true)');
+    expect(source).toContain("initial={hasHydrated ? 'hidden' : false}");
+    expect(source).not.toContain("initial='hidden'");
   });
 });

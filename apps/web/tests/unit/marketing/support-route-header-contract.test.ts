@@ -49,16 +49,19 @@ describe('support route header contract', () => {
     }
   });
 
-  it('keeps the homepage header as Log in text without a second Get started', () => {
+  it('keeps the homepage header on canonical nav plus one primary CTA', () => {
     const headerSource = readFileSync(
       resolve(process.cwd(), 'components/site/MarketingHeader.tsx'),
       'utf8'
     );
 
-    expect(headerSource).toContain('minimalAuth={isMinimal || isHomepage}');
     expect(headerSource).toContain(
-      "minimalAuthLabel={isHomepage ? 'Log in' : 'Sign in'}"
+      'const useCanonicalSimpleNav = isHomepage || navLinks !== undefined;'
     );
+    expect(headerSource).toContain('minimalAuth={isMinimal}');
+    expect(headerSource).toContain("minimalAuthLabel='Sign in'");
+    expect(headerSource).toContain('showContactLink={false}');
+    expect(headerSource).not.toContain('MARKETING_GLASS_FLYOUTS');
     expect(headerSource).not.toContain('HOMEPAGE_LAUNCH_COPY.hero.primaryCta');
   });
 
