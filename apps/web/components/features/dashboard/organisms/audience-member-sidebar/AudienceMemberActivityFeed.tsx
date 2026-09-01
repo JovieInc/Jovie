@@ -1,5 +1,6 @@
 'use client';
 
+// @coverage-via apps/web/tests/unit/dashboard/AudienceMemberActivityFeed.test.tsx
 import { Icon } from '@/components/atoms/Icon';
 import {
   ACTIVITY_TIMELINE_LIST_CLASSNAME,

@@ -92,10 +92,7 @@ describe('JovieWorkFeed', () => {
     );
 
     const timestamp = screen.getByTestId('activity-timeline-timestamp');
-    expect(timestamp).toHaveAttribute(
-      'dateTime',
-      '2026-06-23T00:00:00.000Z'
-    );
+    expect(timestamp).toHaveAttribute('dateTime', '2026-06-23T00:00:00.000Z');
     expect(timestamp.parentElement).toHaveClass(
       'mt-0.5',
       'flex',
@@ -123,9 +120,7 @@ describe('JovieWorkFeed', () => {
     expect(
       screen.getByText(/Jovie has not shipped autonomous work/i)
     ).toBeInTheDocument();
-    expect(screen.getByTestId('jovie-work-empty-state').tagName).toBe(
-      'OUTPUT'
-    );
+    expect(screen.getByTestId('jovie-work-empty-state').tagName).toBe('OUTPUT');
   });
 
   it('can hide the duplicate feed heading inside the full workspace', () => {

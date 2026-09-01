@@ -273,7 +273,9 @@ export function JovieWorkFeed({
 
           return (
             <div
-              className={isRefreshing ? 'opacity-70 transition-opacity' : undefined}
+              className={
+                isRefreshing ? 'opacity-70 transition-opacity' : undefined
+              }
             >
               <ul className={ACTIVITY_TIMELINE_LIST_CLASSNAME}>
                 {items.map(item => (
@@ -288,8 +290,7 @@ export function JovieWorkFeed({
         {items.length > 0 &&
           `${items.length} ${items.length === 1 ? 'item' : 'items'} loaded`}
         {isRefreshing && 'Refreshing Jovie work feed'}
-        {error &&
-          `Error: ${error.message || 'Failed to load Jovie work feed'}`}
+        {error && `Error: ${error.message || 'Failed to load Jovie work feed'}`}
       </div>
     </div>
   );
