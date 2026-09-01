@@ -233,7 +233,9 @@ async function releaseMigrationAdvisoryLock(client: PoolClient) {
   );
   const unlocked = result.rows.some(row => row.unlocked === true);
   if (!unlocked) {
-    log.warning('Drizzle migration advisory lock was not held at release time.');
+    log.warning(
+      'Drizzle migration advisory lock was not held at release time.'
+    );
   }
 }
 
@@ -500,7 +502,9 @@ async function runMigrations() {
   let migrationError: unknown = null;
   try {
     if (!client) {
-      throw new Error('Migration client unavailable after database connection.');
+      throw new Error(
+        'Migration client unavailable after database connection.'
+      );
     }
 
     log.info('Acquiring migration advisory lock...');
