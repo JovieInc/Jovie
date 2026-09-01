@@ -2064,6 +2064,12 @@ html[data-profile-initial-mode]
   /* 80px */
   --space-24: 6rem;
   /* 96px */
+  --space-28: 7rem;
+  /* 112px */
+  --space-32: 8rem;
+  /* 128px */
+  --space-40: 10rem;
+  /* 160px */
 }
 
 /* ============================================

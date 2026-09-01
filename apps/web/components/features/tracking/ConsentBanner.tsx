@@ -126,7 +126,7 @@ export function ConsentBanner({ className }: ConsentBannerProps) {
 
         <div
           className='flex items-center shrink-0'
-          style={{ gap: 'var(--linear-space-2)' }}
+          style={{ gap: 'var(--space-2)' }}
         >
           <button
             type='button'
