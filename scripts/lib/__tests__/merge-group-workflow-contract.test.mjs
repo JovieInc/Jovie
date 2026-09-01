@@ -1457,6 +1457,23 @@ ${selectedGateScript}`,
   });
 });
 
+describe('PR targets main (no stacked bases)', () => {
+  const workflow = readFileSync(
+    resolve(REPO_ROOT, '.github/workflows/pr-targets-main.yml'),
+    'utf8'
+  );
+
+  it('fails closed on any pull_request base other than main and passes merge_group', () => {
+    expect(workflow).toContain('name: PR targets main');
+    expect(workflow).toMatch(/^on:\n  pull_request:\n    types:/m);
+    expect(workflow).not.toMatch(/branches:\s*\[main/);
+    expect(workflow).toContain('merge_group:');
+    expect(workflow).toContain("base != \"main\"");
+    expect(workflow).toContain('PRs must target main');
+    expect(workflow).toContain('gh pr edit --base main');
+  });
+});
+
 describe('resolveMergeGroupPathDiff coalesced heads (JOV-4905)', () => {
   const tempRoots = [];
 

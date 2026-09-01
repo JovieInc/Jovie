@@ -14,19 +14,18 @@ landing**. The queue, not this command, keeps `main` green.
 
 - **Never manually run `gh pr merge` / `--auto` / `--admin`.** The authorized
   native controller owns queue mutation and postcondition checks.
-- **Enrollment intent = add `merge-queue`.** The label wakes the native
-  controller; GitHub's authoritative queue state determines membership.
+- **Do not add, read, or retain the `merge-queue` label.** Native queue
+  membership (`isInMergeQueue`) is the only enrollment signal.
 - **`fast` is emergency/hotfix-only.** Ordinary generated PRs on `codex/*`,
   `claude/*`, `agent/*`, or similar branches must not use `fast` unless the PR
-  is explicitly classified as emergency/hotfix/incident; otherwise the guard
-  removes `fast` and gates the PR for human review.
-- **Dequeue hard gates through the controller.** A PR with `needs-human`,
-  `hold`, or `gated` must not occupy native queue slots; remove the intent label
-  only after authoritative dequeue succeeds.
-- **Never retarget to `integration/loop-*`.** That model is dormant; agents go to `main`.
-- **Never close a PR you didn't open.** Surface superseded/stale ones to the human.
-- **Opt-outs:** `needs-human`, `hold`, `gated` → leave the PR for a human after
-  removing `merge-queue` if it was already enrolled.
+  is explicitly classified as emergency/hotfix/incident.
+- **Nothing is gated on a human.** `needs-human`, `hold`, and `gated` are not
+  enrollment blockers. Conflicts are repaired in worktrees. Fleet `blocked`
+  from an observation gap is auto-resolved, not left in limbo.
+- **PRs must target `main`.** Non-main bases are a factory failure; retarget
+  to `main` and rebase. Never retarget to `integration/loop-*`.
+- **Never close a PR you didn't open.** Drafts and `queue-deferred` are
+  reported, not closed.
 
 ## Phase 0 — Classify + enroll the clean bucket
 
