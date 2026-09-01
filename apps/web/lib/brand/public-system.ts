@@ -1,3 +1,5 @@
+import { JOVIE_IMAGE_COLOR_POLICY } from '@/data/marketing/imageColorPolicy';
+
 export const PUBLIC_BRAND_SECTION_IDS = [
   'hero',
   'system',
@@ -126,9 +128,12 @@ export const PUBLIC_ICON_RULES = [
 ] as const;
 
 export const PUBLIC_IMAGERY_RULES = [
-  'Start with an independently useful product-led static composition.',
-  'Use editorial media only when it adds truthful context the interface cannot provide.',
-  'Use video only after the static and editorial tiers work on their own.',
+  `${JOVIE_IMAGE_COLOR_POLICY.invariant} Jovie-owned generated brand imagery uses Scene Palette v1 before capture or generation.`,
+  `Scene hues are ${JOVIE_IMAGE_COLOR_POLICY.scenePalette.map(entry => `${entry.role} ${entry.sceneReference.hex}`).join(', ')} plus low-chroma neutrals.`,
+  'Protected real-world, biological, cultural, safety, trademark, creator-owned, and identity-bearing colors stay truthful.',
+  'Conflicting protected objects are reframed, replaced, removed, reduced in salience, or rejected. They are never recolored into brand harmony.',
+  'Reflections, spill, haze, glass, chrome, and puddles must agree with one physically plausible source.',
+  'Product screenshots, customer evidence, documentary material, album art, merch artwork, and creator identity remain truthful source material.',
   'Keep selection and governance metadata private; publish only reviewed alt text and coarse provenance and rights status.',
 ] as const;
 

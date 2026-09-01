@@ -1,4 +1,6 @@
 import { describe, expect, it } from 'vitest';
+import { JOVIE_IMAGE_COLOR_POLICY } from '@/data/marketing';
+import { PUBLIC_IMAGERY_RULES } from '@/lib/brand/public-system';
 import {
   assertPublicMediaProjection,
   assertPublicSafeProjection,
@@ -27,6 +29,18 @@ describe('public Brand System projection', () => {
     expect(() =>
       assertPublicMediaProjection({ ...reviewedMedia, alt: ' ' })
     ).toThrow(/human-reviewed and non-empty/);
+  });
+
+  it('projects scene-first imagery guidance from the canonical policy', () => {
+    const guidance = PUBLIC_IMAGERY_RULES.join('\n');
+
+    expect(guidance).toContain(JOVIE_IMAGE_COLOR_POLICY.invariant);
+    for (const entry of JOVIE_IMAGE_COLOR_POLICY.scenePalette) {
+      expect(guidance).toContain(entry.sceneReference.hex);
+    }
+    expect(guidance).toContain('never recolored into brand harmony');
+    expect(guidance).not.toMatch(/\/Users\//);
+    expect(guidance).not.toMatch(/\bJOV-\d+\b/);
   });
 
   it.each([
