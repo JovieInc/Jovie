@@ -1,6 +1,9 @@
 import { render, screen } from '@testing-library/react';
 import type { FormEvent, ImgHTMLAttributes } from 'react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { ListenNowForm as LegacyListenNowForm } from '@/components/features/dashboard/organisms/ListenNowForm';
+import { ListenNowForm as DashboardListenNowForm } from '@/components/features/dashboard/organisms/listen-now-form/ListenNowForm';
+import { ProfileForm } from '@/components/features/dashboard/organisms/profile-form/ProfileForm';
 import type { Artist } from '@/types/db';
 
 const {
@@ -88,10 +91,6 @@ vi.mock('@/components/organisms/artist-search-palette', () => ({
 vi.mock('@/lib/queries', () => ({
   useProfileMutation: () => mockLegacyProfileMutationState,
 }));
-
-import { ListenNowForm as LegacyListenNowForm } from '@/components/features/dashboard/organisms/ListenNowForm';
-import { ListenNowForm as DashboardListenNowForm } from '@/components/features/dashboard/organisms/listen-now-form/ListenNowForm';
-import { ProfileForm } from '@/components/features/dashboard/organisms/profile-form/ProfileForm';
 
 const artist: Artist = {
   id: 'artist-1',
