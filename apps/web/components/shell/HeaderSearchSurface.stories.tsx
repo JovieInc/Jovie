@@ -133,7 +133,9 @@ export const RemoteError: Story = {
     adapter: null,
     catalog: emptyCatalog,
     remoteSearchScopeKey: 'story-profile',
-    searchLibraryAssets: async (_query: string, _signal: AbortSignal) => {
+    searchLibraryAssets: async (query: string, signal: AbortSignal) => {
+      void query;
+      void signal;
       throw new Error('Storybook remote search failure');
     },
   },
