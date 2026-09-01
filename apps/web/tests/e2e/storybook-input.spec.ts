@@ -45,11 +45,7 @@ async function attachScreenshot(
   await writeFile(join(EVIDENCE_DIR, name), screenshot);
 }
 
-async function attachA11yResult(
-  page: Page,
-  testInfo: TestInfo,
-  name: string
-) {
+async function attachA11yResult(page: Page, testInfo: TestInfo, name: string) {
   const results = await new AxeBuilder({ page })
     .include('#storybook-root')
     .withTags(['wcag2a', 'wcag2aa', 'wcag21a', 'wcag21aa'])
@@ -143,25 +139,20 @@ test.describe('Input atom Storybook conformance', () => {
     });
   }
 
-  test(
-    'keyboard focus remains visible at 200% text zoom without overflow',
-    async ({ page }, testInfo) => {
-      await page.setViewportSize({ width: 390, height: 844 });
-      const root = await openStory(page, INPUT_FOCUS_STORY_ID);
-      await page.addStyleTag({ content: 'html { font-size: 200%; }' });
+  test('keyboard focus remains visible at 200% text zoom without overflow', async ({
+    page,
+  }, testInfo) => {
+    await page.setViewportSize({ width: 390, height: 844 });
+    const root = await openStory(page, INPUT_FOCUS_STORY_ID);
+    await page.addStyleTag({ content: 'html { font-size: 200%; }' });
 
-      const input = page.getByLabel('Keyboard Focus');
-      await input.focus();
-      await expect(input).toBeFocused();
-      await expect(input).toHaveClass(/focus-visible:ring-focus\/25/);
+    const input = page.getByLabel('Keyboard Focus');
+    await input.focus();
+    await expect(input).toBeFocused();
+    await expect(input).toHaveClass(/focus-visible:ring-focus\/25/);
 
-      await assertNoHorizontalOverflow(page, '200% text zoom');
-      await attachA11yResult(page, testInfo, 'input-a11y-200-zoom.json');
-      await attachScreenshot(
-        testInfo,
-        'input-keyboard-focus-200-zoom.png',
-        root
-      );
-    }
-  );
+    await assertNoHorizontalOverflow(page, '200% text zoom');
+    await attachA11yResult(page, testInfo, 'input-a11y-200-zoom.json');
+    await attachScreenshot(testInfo, 'input-keyboard-focus-200-zoom.png', root);
+  });
 });
