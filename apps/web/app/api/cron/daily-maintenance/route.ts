@@ -15,6 +15,7 @@
  * - Under-enriched discography sweep: every day (bounded batch)
  * - AI crawler analytics sync: every day (Cloudflare GraphQL, GH-12748)
  * - Release outcome reconciliation: every day (bounded 30-day snapshots)
+ * - Founder-review upload lease cleanup: every day (private Blob orphans)
  *
  * Each sub-job runs in an independent try-catch so one failure
  * doesn't block the others.
