@@ -282,8 +282,8 @@ struct VoiceCaptureServiceTests {
     #expect(VoiceCaptureError.emptyTranscript.errorDescription == "Nothing heard.")
   }
 
-  @Test func voiceMemoInsertIsDraftNotAutoSend() {
-    // Contract: Talk overlay → AppShell uses shellHandoff (draft only, never auto-send).
+  @Test func failedVoiceCompletionCanPreserveARecoveryDraftWithoutAutoSend() {
+    // Recovery contract: a direct-completion failure preserves editable text.
     let handoff = VoiceMemoActionDraft.shellHandoff(
       fromTranscript: "  schedule release next Friday  "
     )

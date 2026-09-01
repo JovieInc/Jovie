@@ -364,14 +364,14 @@ struct AppShellView<
                 eyesFreeLaunch = nil
               },
               onInsertDraft: { transcript in
-                // Voice memo → editable action draft (not auto-send). User
-                // reviews/edits in composer, then sends when ready (#10380).
+                // Recovery-only handoff: a failed direct completion may preserve
+                // the transcript as an editable composer draft (#10380).
                 let handoff = VoiceMemoActionDraft.shellHandoff(fromTranscript: transcript)
                 isShowingTalkOverlay = false
                 talkAutoSubmit = false
                 selectTab(.chat)
                 chatDraft = handoff.chatDraft
-                // handoff.autoSendMessage is always nil — intentional.
+                // Recovery drafts never auto-send.
               },
               autoSubmit: talkAutoSubmit,
               unavailableMessage: talkUnavailableMessage,
@@ -599,8 +599,8 @@ struct AppShellView<
 
     if state.shouldStartVoiceCapture {
       // Present the overlay directly. Incrementing `voiceCaptureTrigger` would
-      // call `openTalkOverlay()`, which resets auto-submit back to the in-app
-      // draft-only FAB path.
+      // call `openTalkOverlay()`, which would replace the Shortcut launch
+      // metadata with an ordinary in-app launch.
       dismissKeyboardIfNeeded()
       isShowingTalkOverlay = true
     }
@@ -644,7 +644,8 @@ struct AppShellView<
   private func openTalkOverlay() {
     guard chatEnabled else { return }
     dismissKeyboardIfNeeded()
-    talkAutoSubmit = false
+    talkAutoSubmit = FrequentActionInteractionBudget.inAppVoiceSubmit
+      .completesOnFinalActivation
     talkUnavailableMessage = nil
     eyesFreeLaunch = nil
     isShowingTalkOverlay = true

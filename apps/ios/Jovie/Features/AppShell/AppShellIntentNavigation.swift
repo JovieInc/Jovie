@@ -1,5 +1,69 @@
 import Foundation
 
+enum FrequentActionExceptionReason: String, CaseIterable, Equatable, Sendable {
+  case review
+  case safety
+  case ambiguity
+  case irreversibleImpact
+  case recovery
+}
+
+struct FrequentActionException: Equatable, Sendable {
+  let reason: FrequentActionExceptionReason
+  /// Visible or documented product copy explaining why the extra step exists.
+  let explanation: String
+}
+
+struct FrequentActionInteractionContract: Equatable, Sendable {
+  let id: String
+  let deliberateActivationCount: Int
+  let completesOnFinalActivation: Bool
+  let exception: FrequentActionException?
+
+  var satisfiesBudget: Bool {
+    guard deliberateActivationCount > 0, completesOnFinalActivation else { return false }
+    guard deliberateActivationCount > FrequentActionInteractionBudget.maximumActivations else {
+      return true
+    }
+    guard let exception else { return false }
+    return !exception.explanation.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+  }
+}
+
+enum FrequentActionInteractionBudget {
+  static let maximumActivations = 2
+
+  static let inAppVoiceSubmit = FrequentActionInteractionContract(
+    id: "ios.chat.voice-submit",
+    deliberateActivationCount: 2,
+    completesOnFinalActivation: true,
+    exception: nil
+  )
+
+  static let shortcutVoiceSubmit = FrequentActionInteractionContract(
+    id: "ios.shortcut.voice-submit",
+    deliberateActivationCount: 2,
+    completesOnFinalActivation: true,
+    exception: nil
+  )
+
+  static let registeredContracts = [
+    inAppVoiceSubmit,
+    shortcutVoiceSubmit,
+  ]
+
+  static var violations: [FrequentActionInteractionContract] {
+    let duplicateIDs = Set(
+      Dictionary(grouping: registeredContracts, by: \.id)
+        .filter { $0.value.count > 1 }
+        .keys
+    )
+    return registeredContracts.filter {
+      !$0.satisfiesBudget || duplicateIDs.contains($0.id)
+    }
+  }
+}
+
 struct AppShellIntentNavigationState: Equatable {
   var selectedTab: AppShellTab
   var chatDraft: String
@@ -136,7 +200,8 @@ enum AppShellIntentNavigation {
 
     state.selectedTab = .chat
     state.eyesFreeLaunch = launch
-    state.talkAutoSubmit = true
+    state.talkAutoSubmit = FrequentActionInteractionBudget.shortcutVoiceSubmit
+      .completesOnFinalActivation
     let spoken = VoiceMemoActionDraft.make(fromTranscript: launch.spokenText ?? "")
     if VoiceMemoActionDraft.isReady(spoken) {
       state.autoSendMessage = spoken
