@@ -89,6 +89,12 @@ const STAGES = new Set([
   'external-blocked',
 ]);
 
+const NON_AUTHORITATIVE_CLOSURE_REASONS = new Set([
+  'closure-health-receipt-missing-or-malformed',
+  'closure-observation-unknown',
+  'gate-evaluation-failed',
+]);
+
 function digest(value) {
   return createHash('sha256').update(JSON.stringify(value)).digest('hex');
 }
@@ -572,10 +578,14 @@ export async function persistClosureHealthActions(
   if (!candidate || typeof candidate !== 'object' || Array.isArray(candidate)) {
     throw new Error('closure health action source is missing or malformed');
   }
-  const actions = candidate.repairActions;
-  if (!Array.isArray(actions) || actions.length > 100) {
+  const rawActions = candidate.repairActions;
+  if (
+    rawActions != null &&
+    (!Array.isArray(rawActions) || rawActions.length > 100)
+  ) {
     throw new Error('closure health repair actions are missing or unbounded');
   }
+  const actions = Array.isArray(rawActions) ? rawActions : [];
   const boundedActions = actions.map(boundedStackHealthAction);
   const observedAtInput = nonEmpty(candidate.observedAt) || now;
   if (!Number.isFinite(Date.parse(observedAtInput))) {
@@ -597,11 +607,12 @@ export async function persistClosureHealthActions(
         'closure health stack violations are malformed or unbounded'
       );
     }
+    const reasons = Array.isArray(candidate.reasons) ? candidate.reasons : [];
     const stackObservationAuthoritative =
       candidate.schema === 'jovie-closure-health/v1' &&
       candidate.authority === 'Summer' &&
       Array.isArray(candidate.reasons) &&
-      !candidate.reasons.includes('closure-observation-unknown');
+      !reasons.some(reason => NON_AUTHORITATIVE_CLOSURE_REASONS.has(reason));
     const violationRoots = violations.map(violation =>
       exactPositiveInteger(violation?.rootPr)
     );
