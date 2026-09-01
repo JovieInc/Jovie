@@ -630,11 +630,66 @@ describe('ci-fast bounded parallel workflow', () => {
       expect(block).toContain(
         'CI_FAST_LANES_OUT: ${{ runner.temp }}/ci-fast-lanes.json'
       );
-      expect(block).toContain('path: ${{ runner.temp }}/ci-fast-lanes.json');
+      expect(block).toContain('${{ runner.temp }}/ci-fast-lanes.json');
       expect(block).toContain('if-no-files-found: warn');
       expect(block).toMatch(
         /github\.event_name == 'merge_group' && github\.event\.merge_group\.base_sha/
       );
+    }
+  });
+
+  it('defers structural Playwright/Python until cheap remaining lanes pass', () => {
+    const remaining = jobBlock(
+      'ci-fast-remaining',
+      'ci-profile-admission-browser'
+    );
+    const cheapLanes = remaining.indexOf('- name: Run ci-fast lanes');
+    const playwright = remaining.indexOf('Setup Playwright (Chromium)');
+    const structuralLane = remaining.indexOf(
+      '- name: Run structural ci-fast lane'
+    );
+    expect(cheapLanes).toBeGreaterThan(0);
+    expect(playwright).toBeGreaterThan(cheapLanes);
+    expect(structuralLane).toBeGreaterThan(playwright);
+    expect(remaining).toContain("CI_FAST_SKIP_STRUCTURAL: 'true'");
+    expect(remaining).toContain("CI_FAST_ONLY_STRUCTURAL: 'true'");
+    expect(remaining).toContain(
+      "if: ${{ success() && steps.structural.outputs.skip != 'true' }}"
+    );
+  });
+
+  it('fail-fast skips later remaining lanes after the first failure', () => {
+    const repo = mkdtempSync(join(tmpdir(), 'ci-fast-fail-fast-'));
+    const outPath = join(repo, 'ci-fast-lanes.json');
+    try {
+      const result = spawnSync(
+        process.execPath,
+        [resolve(REPO_ROOT, 'scripts/ci-fast-lanes.mjs')],
+        {
+          cwd: repo,
+          encoding: 'utf8',
+          env: {
+            ...process.env,
+            CI_FAST_LANE_GROUP: 'remaining',
+            CI_FAST_LANES_OUT: outPath,
+            CI_FAST_SKIP_STRUCTURAL: 'true',
+            PATH: '/usr/bin:/bin',
+          },
+        }
+      );
+      expect(result.status).not.toBe(0);
+      const payload = JSON.parse(readFileSync(outPath, 'utf8'));
+      const failed = payload.lanes.filter(lane => lane.status === 'failure');
+      const skipped = payload.lanes.filter(
+        lane =>
+          lane.status === 'skipped' &&
+          String(lane.logExcerpt).includes('fail-fast')
+      );
+      expect(failed.length).toBe(1);
+      expect(skipped.length).toBeGreaterThan(0);
+      expect(payload.lanes.at(-1).status).toBe('skipped');
+    } finally {
+      rmSync(repo, { recursive: true, force: true });
     }
   });
 
