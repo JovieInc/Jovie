@@ -55,6 +55,10 @@ export {
   type ThumbnailSyncPlan,
 } from './sync';
 export {
+  reconcileThumbnailCandidateDecision,
+  YouTubeThumbnailDecisionError,
+} from './thumbnail-decision';
+export {
   deriveThumbnailExperimentWinner,
   promoteThumbnailWinner,
   type ThumbnailExperimentState,
