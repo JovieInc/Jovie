@@ -1,5 +1,7 @@
 'use client';
 
+// @coverage-via apps/web/tests/unit/app/campaign-admin-table-normalization.test.ts
+
 import {
   AlertDialog,
   AlertDialogAction,

@@ -1,5 +1,7 @@
 'use client';
 
+// @coverage-via apps/web/tests/unit/app/admin-releases-table-normalization.test.ts
+
 import { Avatar, AvatarFallback, AvatarImage } from '@jovie/ui';
 import { type ColumnDef, createColumnHelper } from '@tanstack/react-table';
 import {
