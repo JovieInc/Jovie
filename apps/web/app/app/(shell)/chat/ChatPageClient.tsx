@@ -22,6 +22,7 @@ import {
 import { AppIconButton } from '@/components/atoms/AppIconButton';
 import { NavigationDestinationReady } from '@/components/features/dashboard/NavigationDestinationReady';
 import { ChatWorkspaceSurface } from '@/components/jovie/ChatWorkspaceSurface';
+import type { FeatureIntroCatalog } from '@/components/jovie/feature-intro-contract';
 import { JovieChat } from '@/components/jovie/JovieChat';
 import {
   CHAT_STARTER_ACTIONS,
@@ -61,6 +62,7 @@ interface ChatPageClientProps {
   readonly conversationId?: string;
   readonly initialConversationTitle?: string | null;
   readonly isFirstSession?: boolean;
+  readonly featureIntroCatalog?: FeatureIntroCatalog;
 }
 
 const WELCOME_CHAT_BOOTSTRAP_RETRY_DELAYS_MS = [1500, 3000, 5000] as const;
@@ -319,6 +321,7 @@ export function ChatPageClient({
   conversationId,
   initialConversationTitle = null,
   isFirstSession = false,
+  featureIntroCatalog,
 }: ChatPageClientProps) {
   const {
     selectedProfile,
@@ -978,6 +981,7 @@ export function ChatPageClient({
             isFirstSession={isFirstSession || dashboardIsFirstSession || false}
             isProfileComplete={profileCompletion.percentage >= 100}
             actionCards={chatActionCards}
+            featureIntroCatalog={featureIntroCatalog}
             chatMode={chatMode}
             ambientOwnedByShell
           />
