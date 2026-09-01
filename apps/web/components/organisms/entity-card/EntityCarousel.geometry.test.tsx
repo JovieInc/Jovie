@@ -211,7 +211,7 @@ describe('EntityCarousel profile geometry', () => {
       expect(footprint).not.toHaveAttribute('inert');
     }
 
-    fireEvent.focus(screen.getByRole('button', { name: 'Updates' }));
+    fireEvent.focusIn(screen.getByRole('button', { name: 'Updates' }));
 
     expect(scrollTo).toHaveBeenCalledWith({
       left: 960,

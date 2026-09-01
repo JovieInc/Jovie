@@ -4171,14 +4171,30 @@ body:has(.home-viewport)::-webkit-scrollbar {
 .homepage-artist-profiles__row {
   overflow-x: auto;
   overscroll-behavior-x: contain;
+  position: relative;
   scroll-behavior: smooth;
   scroll-snap-type: x mandatory;
   scrollbar-width: none;
 }
 
-.homepage-artist-profiles__row:focus-visible {
+.homepage-artist-profiles__keyboard-scroll-control:focus-visible {
+  background: var(--system-b-bg-surface-0);
+  border: var(--space-px) solid var(--system-b-border-strong);
+  border-radius: var(--radius-full);
+  clip: auto;
+  clip-path: none;
+  color: var(--system-b-text-primary);
+  height: auto;
+  left: var(--space-2);
+  margin: 0;
   outline: var(--space-px) solid var(--system-b-text-primary);
   outline-offset: var(--space-2);
+  overflow: visible;
+  padding: var(--space-2) var(--space-3);
+  top: var(--space-2);
+  white-space: normal;
+  width: auto;
+  z-index: 2;
 }
 
 .homepage-artist-profiles__row::-webkit-scrollbar {

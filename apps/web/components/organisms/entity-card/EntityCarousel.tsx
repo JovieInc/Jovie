@@ -237,16 +237,34 @@ export function EntityCarousel({
     };
   }, [prefersReducedMotion, items, leading, trailing]);
 
-  const handleSlotFocus = useCallback(
-    (slotIndex: number) => {
-      if (!showsProfileControls) {
+  useEffect(() => {
+    const track = trackRef.current;
+    if (!showsProfileControls || !track) {
+      return;
+    }
+
+    const handleFocusIn = (event: FocusEvent) => {
+      const { target } = event;
+      if (!(target instanceof Element)) {
+        return;
+      }
+
+      const slot = target.closest<HTMLElement>('[data-carousel-slot-index]');
+      if (!slot || !track.contains(slot)) {
+        return;
+      }
+
+      const slotIndex = Number(slot.dataset.carouselSlotIndex);
+      if (!Number.isInteger(slotIndex)) {
         return;
       }
 
       scrollToIndex(slotIndex);
-    },
-    [scrollToIndex, showsProfileControls]
-  );
+    };
+
+    track.addEventListener('focusin', handleFocusIn);
+    return () => track.removeEventListener('focusin', handleFocusIn);
+  }, [scrollToIndex, showsProfileControls]);
 
   if (items.length === 0 && !leading && !trailing) {
     return null;
@@ -288,10 +306,10 @@ export function EntityCarousel({
         {leading ? (
           <li
             data-carousel-slot='leading'
+            data-carousel-slot-index={0}
             data-layout={layout}
             data-carousel-active={currentIndex === 0 ? 'true' : 'false'}
             className={cardItemClassName}
-            onFocus={() => handleSlotFocus(0)}
           >
             {leading}
           </li>
@@ -306,10 +324,10 @@ export function EntityCarousel({
                 itemRefs.current[index] = node;
               }}
               data-carousel-index={index}
+              data-carousel-slot-index={slotIndex}
               data-layout={layout}
               data-carousel-active={isActive ? 'true' : 'false'}
               className={cardItemClassName}
-              onFocus={() => handleSlotFocus(slotIndex)}
             >
               <EntityCard
                 model={model}
@@ -333,12 +351,12 @@ export function EntityCarousel({
         {trailing ? (
           <li
             data-carousel-slot='trailing'
+            data-carousel-slot-index={slotCount - 1}
             data-layout={layout}
             data-carousel-active={
               currentIndex === slotCount - 1 ? 'true' : 'false'
             }
             className={cardItemClassName}
-            onFocus={() => handleSlotFocus(slotCount - 1)}
           >
             {trailing}
           </li>
