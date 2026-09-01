@@ -80,9 +80,9 @@ function MockTasteInboxFetch({
         if (mode === 'forbidden') {
           return jsonResponse(
             {
-              error: 'Use an admin Ovie account to load the Taste Inbox.',
+              error: 'Reverify with an admin Ovie account to load the Taste Inbox.',
               code: 'ovie_taste_inbox_forbidden',
-              action: 'use_admin_account',
+              action: 'reverify_admin',
             },
             { status: 403 }
           );
