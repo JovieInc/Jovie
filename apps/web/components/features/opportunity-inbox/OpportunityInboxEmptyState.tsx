@@ -41,9 +41,7 @@ export function OpportunityInboxEmptyState({
       data-testid='opportunity-inbox-empty-state'
       aria-labelledby='founder-brain-dump-title'
     >
-      <p className='text-2xs font-medium uppercase tracking-wide text-tertiary-token'>
-        Inbox Clear
-      </p>
+      <p className='text-2xs font-medium text-tertiary-token'>Inbox Clear</p>
       <h2
         id='founder-brain-dump-title'
         className='mt-2 text-xl font-semibold tracking-tight text-primary-token'

@@ -133,3 +133,22 @@ export async function deleteFounderReviewAudio(
   if (!response.receipt) throw new Error('Founder review receipt missing');
   return response.receipt;
 }
+
+export async function updateFounderReviewActionOutcome(input: {
+  readonly receiptId: string;
+  readonly status: 'applied' | 'failed';
+  readonly errorCode: string | null;
+}): Promise<FounderReviewReceipt> {
+  const response = await readResponse(
+    await fetch(`/api/inbox/founder-reviews/${input.receiptId}/outcome`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        status: input.status,
+        errorCode: input.errorCode,
+      }),
+    })
+  );
+  if (!response.receipt) throw new Error('Founder review receipt missing');
+  return response.receipt;
+}

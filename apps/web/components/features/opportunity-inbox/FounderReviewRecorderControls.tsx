@@ -93,7 +93,7 @@ export function FounderReviewRecorderControls({
       </div>
 
       <div className='mt-4 min-h-20 rounded-md border border-subtle bg-surface-0 p-3'>
-        <p className='mb-1 text-2xs font-medium uppercase tracking-wide text-tertiary-token'>
+        <p className='mb-1 text-2xs font-medium text-tertiary-token'>
           Live Transcript
         </p>
         <p
@@ -145,38 +145,37 @@ export function FounderReviewRecorderControls({
         authorizes publishing or another external action.
       </p>
 
-      {error ? (
-        <p
-          className='mt-3 min-h-9 rounded-md border border-status-error/30 bg-status-error/5 px-3 py-2 text-xs text-status-error'
-          role='alert'
-        >
-          {error}
-        </p>
-      ) : (
-        <div className='mt-3 min-h-9' aria-live='polite'>
-          {latestReceipt ? (
-            <div className='flex items-center justify-between gap-3 rounded-md bg-surface-1 px-3 py-2 text-xs text-secondary-token'>
-              <span>
-                Saved · {latestReceipt.target.title} ·{' '}
-                {latestReceipt.recording.mediaAvailable
-                  ? 'private audio retained'
-                  : 'transcript only'}
-              </span>
-              {latestReceipt.recording.mediaAvailable ? (
-                <Button
-                  type='button'
-                  variant='ghost'
-                  size='sm'
-                  disabled={saving}
-                  onClick={onDeleteAudio}
-                >
-                  <Trash2 className='mr-1.5 size-3.5' /> Delete Audio
-                </Button>
-              ) : null}
-            </div>
-          ) : null}
-        </div>
-      )}
+      <div className='mt-3 min-h-12' aria-live='polite'>
+        {error ? (
+          <p
+            className='min-h-12 rounded-md border border-status-error/30 bg-status-error/5 px-3 py-2 text-xs text-status-error'
+            role='alert'
+          >
+            {error}
+          </p>
+        ) : latestReceipt ? (
+          <div className='flex min-h-12 items-center justify-between gap-3 rounded-md bg-surface-1 px-3 py-2 text-xs text-secondary-token'>
+            <span>
+              Saved · {latestReceipt.target.title} ·{' '}
+              {latestReceipt.recording.mediaAvailable
+                ? 'private audio retained'
+                : 'transcript only'}{' '}
+              · action {latestReceipt.actionOutcome.status.replace('-', ' ')}
+            </span>
+            {latestReceipt.recording.mediaAvailable ? (
+              <Button
+                type='button'
+                variant='ghost'
+                size='sm'
+                disabled={saving}
+                onClick={onDeleteAudio}
+              >
+                <Trash2 className='mr-1.5 size-3.5' /> Delete Audio
+              </Button>
+            ) : null}
+          </div>
+        ) : null}
+      </div>
 
       <div className='mt-4 flex min-h-10 items-center justify-end gap-2'>
         {target.type === 'founder-note' ? (

@@ -17,6 +17,7 @@ import {
   createFounderReviewClient,
   deleteFounderReviewAudio,
   listFounderReviewReceipts,
+  updateFounderReviewActionOutcome,
   uploadFounderReviewAudio,
 } from '@/lib/founder-review/client';
 import {
@@ -42,8 +43,8 @@ interface ActiveSegment {
 
 export interface FounderReviewRecorderProps {
   readonly target: FounderReviewTarget;
-  readonly onApprove?: () => void;
-  readonly onReject?: () => void;
+  readonly onApprove?: () => void | Promise<void>;
+  readonly onReject?: () => void | Promise<void>;
   readonly className?: string;
 }
 
@@ -120,11 +121,17 @@ export const FounderReviewRecorder = forwardRef<
   const streamRef = useRef<MediaStream | null>(null);
   const activeSegmentRef = useRef<ActiveSegment | null>(null);
   const sessionActiveRef = useRef(false);
+  const acquiringStreamRef = useRef(false);
+  const disposedRef = useRef(false);
   const transcriptRef = useRef('');
   const typedTextRef = useRef('');
+  const transcriberErrorRef = useRef<TranscriberErrorCode | null>(null);
   const pendingReviewRef = useRef<
     Parameters<typeof createFounderReviewClient>[0] | null
   >(null);
+  const savingRef = useRef(false);
+  const retryOutcomeReceiptRef = useRef<FounderReviewReceipt | null>(null);
+  const appliedOutcomeReceiptRef = useRef<FounderReviewReceipt | null>(null);
   const targetRef = useRef(target);
   const [sessionActive, setSessionActive] = useState(false);
   const [transcript, setTranscript] = useState('');
@@ -143,8 +150,10 @@ export const FounderReviewRecorder = forwardRef<
   const resetDraft = useCallback(() => {
     transcriptRef.current = '';
     typedTextRef.current = '';
+    transcriberErrorRef.current = null;
     setTranscript('');
     setTypedText('');
+    setKeepAudio(false);
     setAllowContentUse(false);
     setError(null);
   }, []);
@@ -168,15 +177,36 @@ export const FounderReviewRecorder = forwardRef<
           recorder = null;
         }
       }
+      let committedTranscript = '';
+      let recognitionTranscript = '';
       let transcriber: Transcriber;
       transcriber = createWebSpeechTranscriber({
         onTranscript: text => {
-          transcriptRef.current = text;
-          setTranscript(text);
+          if (activeSegmentRef.current?.id !== id) return;
+          recognitionTranscript = text;
+          const cumulativeTranscript = [
+            committedTranscript,
+            recognitionTranscript,
+          ]
+            .filter(Boolean)
+            .join(' ')
+            .trim();
+          transcriptRef.current = cumulativeTranscript;
+          setTranscript(cumulativeTranscript);
         },
-        onError: code => setError(permissionMessage(code)),
+        onError: code => {
+          if (activeSegmentRef.current?.id === id) {
+            transcriberErrorRef.current = code;
+            setError(permissionMessage(code));
+          }
+        },
         onEnd: () => {
           if (sessionActiveRef.current && activeSegmentRef.current?.id === id) {
+            committedTranscript = [committedTranscript, recognitionTranscript]
+              .filter(Boolean)
+              .join(' ')
+              .trim();
+            recognitionTranscript = '';
             transcriber.start();
           }
         },
@@ -208,26 +238,38 @@ export const FounderReviewRecorder = forwardRef<
 
   const startSession = useCallback(
     async (initiatedBy: InitiatedBy = 'button') => {
-      if (sessionActiveRef.current || saving) return;
-      if (pendingReviewRef.current) {
+      if (
+        sessionActiveRef.current ||
+        acquiringStreamRef.current ||
+        savingRef.current
+      )
+        return;
+      if (pendingReviewRef.current || retryOutcomeReceiptRef.current) {
         setError('Retry the pending receipt before starting a new session.');
         return;
       }
+      acquiringStreamRef.current = true;
       setError(null);
       try {
         const stream = await navigator.mediaDevices.getUserMedia({
           audio: true,
           video: false,
         });
+        if (disposedRef.current || sessionActiveRef.current) {
+          stream.getTracks().forEach(track => track.stop());
+          return;
+        }
         streamRef.current = stream;
         sessionActiveRef.current = true;
         setSessionActive(true);
         startSegment(stream, initiatedBy);
       } catch {
         setError(permissionMessage('permission-denied'));
+      } finally {
+        acquiringStreamRef.current = false;
       }
     },
-    [saving, startSegment]
+    [startSegment]
   );
 
   const stopStream = useCallback(() => {
@@ -239,25 +281,60 @@ export const FounderReviewRecorder = forwardRef<
 
   const persistDecision = useCallback(
     async (decision: Decision, stopAfter = false) => {
-      if (saving) return;
+      if (savingRef.current) return;
+      savingRef.current = true;
       setSaving(true);
       setError(null);
       const segment = activeSegmentRef.current;
       try {
+        const appliedOutcomeReceipt = appliedOutcomeReceiptRef.current;
+        if (appliedOutcomeReceipt) {
+          const reconciled = await updateFounderReviewActionOutcome({
+            receiptId: appliedOutcomeReceipt.id,
+            status: 'applied',
+            errorCode: null,
+          });
+          if (reconciled.actionOutcome.status !== 'applied') {
+            throw new Error('Prior receipt outcome remained pending');
+          }
+          appliedOutcomeReceiptRef.current = null;
+          pendingReviewRef.current = null;
+          retryOutcomeReceiptRef.current = null;
+          setLatestReceipt(reconciled);
+          setError('Prior action receipt reconciled. Choose this card again.');
+          return;
+        }
         let review = pendingReviewRef.current;
-        if (review && review.decision !== decision) {
+        let receipt = retryOutcomeReceiptRef.current;
+        if (
+          receipt &&
+          (receipt.decision !== decision ||
+            receipt.target.type !== targetRef.current.type ||
+            receipt.target.id !== targetRef.current.id)
+        ) {
           throw new Error(
-            `Retry the pending ${review.decision} receipt before choosing another decision.`
+            `Reconcile the pending receipt for ${receipt.target.title} before reviewing this card.`
           );
         }
-        if (!review) {
+        if (
+          review &&
+          (review.decision !== decision ||
+            review.target.type !== targetRef.current.type ||
+            review.target.id !== targetRef.current.id)
+        ) {
+          throw new Error(
+            `Retry the pending ${review.decision} receipt for ${review.target.title} before choosing another decision.`
+          );
+        }
+        if (!review && !receipt) {
           const endedAt = new Date();
           const durationMs = segment
             ? Math.max(0, Date.now() - segment.startedMs)
             : null;
+          activeSegmentRef.current = null;
           segment?.transcriber.stop();
           const blob = segment ? await stopRecorder(segment) : null;
-          activeSegmentRef.current = null;
+          segment?.transcriber.dispose();
           const media =
             keepAudio && blob && segment?.contentType && durationMs !== null
               ? await uploadFounderReviewAudio({
@@ -290,10 +367,13 @@ export const FounderReviewRecorder = forwardRef<
                 ? 'complete'
                 : hasTyped
                   ? 'typed-only'
-                  : segment?.transcriber.isSupported
-                    ? 'failed'
-                    : 'unsupported',
-              errorCode: null,
+                  : transcriberErrorRef.current === 'not-allowed' ||
+                      transcriberErrorRef.current === 'service-not-allowed'
+                    ? 'permission-denied'
+                    : segment?.transcriber.isSupported
+                      ? 'failed'
+                      : 'unsupported',
+              errorCode: transcriberErrorRef.current,
             },
             recording: {
               startedAt: segment?.startedAt ?? null,
@@ -318,13 +398,80 @@ export const FounderReviewRecorder = forwardRef<
           };
           pendingReviewRef.current = review;
         }
-        const receipt = await createFounderReviewClient(review);
+        if (!receipt) {
+          if (!review) throw new Error('Founder review draft missing');
+          receipt = await createFounderReviewClient(review);
+          if (receipt.decision !== decision) {
+            throw new Error('Saved receipt does not match this decision');
+          }
+        }
+        setLatestReceipt(receipt);
+        const action =
+          decision === 'approved'
+            ? onApprove
+            : decision === 'rejected'
+              ? onReject
+              : undefined;
+        if (
+          receipt.actionOutcome.status !== 'applied' &&
+          receipt.actionOutcome.status !== 'not-applicable'
+        ) {
+          if (!action) {
+            const failedReceipt = await updateFounderReviewActionOutcome({
+              receiptId: receipt.id,
+              status: 'failed',
+              errorCode: 'canonical-action-handler-missing',
+            });
+            retryOutcomeReceiptRef.current = failedReceipt;
+            setLatestReceipt(failedReceipt);
+            throw new Error('The canonical action handler is unavailable.');
+          }
+          let actionSucceeded = false;
+          try {
+            await action();
+            actionSucceeded = true;
+          } catch (caught) {
+            const failedReceipt = await updateFounderReviewActionOutcome({
+              receiptId: receipt.id,
+              status: 'failed',
+              errorCode: 'canonical-action-failed',
+            });
+            setLatestReceipt(failedReceipt);
+            if (failedReceipt.actionOutcome.status !== 'applied') {
+              retryOutcomeReceiptRef.current = failedReceipt;
+              throw caught;
+            }
+            receipt = failedReceipt;
+          }
+          if (actionSucceeded) {
+            try {
+              receipt = await updateFounderReviewActionOutcome({
+                receiptId: receipt.id,
+                status: 'applied',
+                errorCode: null,
+              });
+              if (receipt.actionOutcome.status !== 'applied') {
+                throw new Error('Receipt outcome remained pending');
+              }
+            } catch {
+              appliedOutcomeReceiptRef.current = receipt;
+              pendingReviewRef.current = null;
+              retryOutcomeReceiptRef.current = receipt;
+              throw new Error(
+                'The action applied, but its receipt outcome still needs reconciliation.'
+              );
+            }
+          }
+        }
         pendingReviewRef.current = null;
+        retryOutcomeReceiptRef.current = null;
         setLatestReceipt(receipt);
         resetDraft();
-        if (stopAfter) stopStream();
-        if (decision === 'approved') onApprove?.();
-        if (decision === 'rejected') onReject?.();
+        if (stopAfter) {
+          stopStream();
+        } else if (sessionActiveRef.current && streamRef.current) {
+          startSegment(streamRef.current);
+        }
       } catch (caught) {
         setError(
           caught instanceof Error
@@ -333,6 +480,7 @@ export const FounderReviewRecorder = forwardRef<
         );
         stopStream();
       } finally {
+        savingRef.current = false;
         setSaving(false);
       }
     },
@@ -342,7 +490,7 @@ export const FounderReviewRecorder = forwardRef<
       onApprove,
       onReject,
       resetDraft,
-      saving,
+      startSegment,
       stopStream,
     ]
   );
@@ -377,7 +525,18 @@ export const FounderReviewRecorder = forwardRef<
 
   useEffect(() => {
     void listFounderReviewReceipts()
-      .then(receipts => setLatestReceipt(receipts[0] ?? null))
+      .then(receipts => {
+        const latest = receipts[0] ?? null;
+        setLatestReceipt(latest);
+        retryOutcomeReceiptRef.current =
+          receipts.find(
+            receipt =>
+              receipt.target.type === targetRef.current.type &&
+              receipt.target.id === targetRef.current.id &&
+              (receipt.actionOutcome.status === 'pending' ||
+                receipt.actionOutcome.status === 'failed')
+          ) ?? null;
+      })
       .catch(() => undefined);
   }, []);
 
@@ -400,6 +559,7 @@ export const FounderReviewRecorder = forwardRef<
 
   useEffect(
     () => () => {
+      disposedRef.current = true;
       activeSegmentRef.current?.transcriber.dispose();
       if (activeSegmentRef.current?.recorder?.state === 'recording') {
         activeSegmentRef.current.recorder.stop();
@@ -410,7 +570,8 @@ export const FounderReviewRecorder = forwardRef<
   );
 
   const deleteLatestAudio = async () => {
-    if (!latestReceipt?.recording.mediaAvailable || saving) return;
+    if (!latestReceipt?.recording.mediaAvailable || savingRef.current) return;
+    savingRef.current = true;
     setSaving(true);
     try {
       setLatestReceipt(await deleteFounderReviewAudio(latestReceipt.id));
@@ -419,6 +580,7 @@ export const FounderReviewRecorder = forwardRef<
         caught instanceof Error ? caught.message : 'Audio deletion failed'
       );
     } finally {
+      savingRef.current = false;
       setSaving(false);
     }
   };

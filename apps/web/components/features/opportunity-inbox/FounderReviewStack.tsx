@@ -14,8 +14,8 @@ export interface FounderReviewStackProps {
   readonly cards: readonly (OpportunityInboxCardViewModel & {
     readonly sourceKind: string;
   })[];
-  readonly onApprove: (id: string) => void;
-  readonly onReject: (id: string) => void;
+  readonly onApprove: (id: string) => void | Promise<void>;
+  readonly onReject: (id: string) => void | Promise<void>;
   readonly onOpen?: (id: string) => void;
   readonly pendingActionId?: string | null;
   readonly keyboardControlRef?: RefObject<HTMLButtonElement | null>;
@@ -99,7 +99,7 @@ export function FounderReviewStack({
           )}
         </div>
         <div className='p-5 sm:p-6'>
-          <div className='flex min-h-5 items-center justify-between gap-3 text-2xs font-medium uppercase tracking-wide text-tertiary-token'>
+          <div className='flex min-h-5 items-center justify-between gap-3 text-2xs font-medium text-tertiary-token'>
             <span>{card.typeLabel}</span>
             <span>{card.sourceKind.replaceAll(/[._]/g, ' ')}</span>
           </div>

@@ -6,6 +6,7 @@ const hoisted = vi.hoisted(() => ({
   handleUpload: vi.fn(),
   resolveUserId: vi.fn(),
   assertTargetOwnership: vi.fn(),
+  recordLease: vi.fn(),
 }));
 
 vi.mock('@/lib/auth/require-auth', () => ({
@@ -17,6 +18,7 @@ vi.mock('@vercel/blob/client', () => ({ handleUpload: hoisted.handleUpload }));
 vi.mock('@/lib/founder-review/server', () => ({
   resolveFounderReviewUserId: hoisted.resolveUserId,
   assertFounderReviewTargetOwnership: hoisted.assertTargetOwnership,
+  recordFounderReviewUploadLease: hoisted.recordLease,
   FounderReviewError: class FounderReviewError extends Error {
     constructor(
       public readonly code: string,
@@ -100,5 +102,40 @@ describe('founder review private upload token', () => {
     expect(await response.json()).toEqual({
       error: 'invalid-founder-review-media-path',
     });
+  });
+
+  it('records a durable upload lease from the signed completion callback', async () => {
+    const upload = {
+      blob: {
+        url: 'https://store.private.blob.vercel-storage.com/review.webm',
+        pathname: `founder-inbox-reviews/app-user/${SESSION}/${SEGMENT}/${TARGET_PATH}`,
+        contentType: 'audio/webm',
+      },
+      tokenPayload: JSON.stringify({
+        userId: 'app-user',
+        sessionId: SESSION,
+        segmentId: SEGMENT,
+        targetType: 'inbox-card',
+        targetId: 'card-1',
+        sourceKind: 'youtube.thumbnail_candidate',
+      }),
+    };
+    hoisted.handleUpload.mockImplementationOnce(async options => {
+      await options.onUploadCompleted(upload);
+      return { type: 'blob.upload-completed', response: 'ok' };
+    });
+    const response = await POST(
+      new NextRequest('https://jov.ie/api/inbox/founder-reviews/upload-token', {
+        method: 'POST',
+        body: JSON.stringify({
+          type: 'blob.upload-completed',
+          payload: upload,
+        }),
+      })
+    );
+
+    expect(response.status).toBe(200);
+    expect(hoisted.requireAuth).not.toHaveBeenCalled();
+    expect(hoisted.recordLease).toHaveBeenCalledWith(upload);
   });
 });

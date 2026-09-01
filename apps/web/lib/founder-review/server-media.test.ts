@@ -10,6 +10,8 @@ const hoisted = vi.hoisted(() => ({
   get: vi.fn(),
   del: vi.fn(),
   update: vi.fn(),
+  updateKind: null as 'media' | 'outcome' | null,
+  actionStatus: 'approved',
 }));
 
 vi.mock('@/lib/db/queries/shared', () => ({
@@ -24,35 +26,74 @@ vi.mock('@vercel/blob', () => ({
 
 vi.mock('@/lib/db', () => ({
   db: {
-    select: vi.fn(() => ({
-      from: vi.fn(() => ({
-        where: vi.fn(() => ({
-          limit: vi.fn(async () => [
-            {
-              id: '44444444-4444-4444-8444-444444444444',
-              context: hoisted.context,
-              createdAt: new Date('2026-09-01T18:00:08.000Z'),
-            },
-          ]),
-        })),
-      })),
-    })),
+    select: vi.fn((projection: Record<string, unknown>) => {
+      const result =
+        'status' in projection
+          ? [
+              {
+                id: '33333333-3333-4333-8333-333333333333',
+                status: hoisted.actionStatus,
+              },
+            ]
+          : [
+              {
+                id: '44444444-4444-4444-8444-444444444444',
+                context: hoisted.context,
+                createdAt: new Date('2026-09-01T18:00:08.000Z'),
+              },
+            ];
+      const terminal = {
+        limit: vi.fn(async () => result),
+        orderBy: vi.fn(),
+        then: (resolve: (value: typeof result) => void) =>
+          Promise.resolve(result).then(resolve),
+      };
+      terminal.orderBy.mockReturnValue(terminal);
+      return {
+        from: vi.fn(() => ({ where: vi.fn(() => terminal) })),
+      };
+    }),
     update: vi.fn(() => ({
-      set: vi.fn((value: { context: StoredFounderReviewContext }) => ({
-        where: vi.fn(() => ({
-          returning: vi.fn(async () => {
-            hoisted.context = value.context;
-            hoisted.update(value.context);
-            return [{ id: '44444444-4444-4444-8444-444444444444' }];
-          }),
-        })),
+      set: vi.fn((_value: { context: StoredFounderReviewContext }) => ({
+        where: vi.fn(() => {
+          const current = hoisted.context;
+          if (current && hoisted.updateKind === 'media') {
+            hoisted.context = {
+              ...current,
+              recording: {
+                ...current.recording,
+                deletedAt: new Date().toISOString(),
+              },
+            };
+          } else if (current && hoisted.updateKind === 'outcome') {
+            hoisted.context = {
+              ...current,
+              actionOutcome: {
+                status: 'applied',
+                updatedAt: new Date().toISOString(),
+                errorCode: null,
+              },
+            };
+          }
+          hoisted.update(hoisted.context);
+          return {
+            returning: vi.fn(async () => [
+              { id: '44444444-4444-4444-8444-444444444444' },
+            ]),
+          };
+        }),
       })),
     })),
   },
 }));
 
-const { deleteFounderReviewMedia, FounderReviewError, getFounderReviewMedia } =
-  await import('./server');
+const {
+  deleteFounderReviewMedia,
+  FounderReviewError,
+  getFounderReviewMedia,
+  listFounderReviews,
+  updateFounderReviewActionOutcome,
+} = await import('./server');
 
 const REVIEW_ID = '44444444-4444-4444-8444-444444444444';
 const MEDIA_URL =
@@ -113,6 +154,8 @@ describe('founder review private media', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     hoisted.context = retainedContext();
+    hoisted.updateKind = null;
+    hoisted.actionStatus = 'approved';
     hoisted.getUserByIdentity.mockResolvedValue({
       id: 'app-user',
       deletedAt: null,
@@ -157,6 +200,7 @@ describe('founder review private media', () => {
   });
 
   it('deletes the private blob before marking audio unavailable', async () => {
+    hoisted.updateKind = 'media';
     hoisted.del.mockResolvedValue(undefined);
 
     const receipt = await deleteFounderReviewMedia({
@@ -169,5 +213,53 @@ describe('founder review private media', () => {
     expect(receipt.recording.mediaAvailable).toBe(false);
     expect(receipt.recording.mediaPath).toBeNull();
     expect(receipt.recording.deletedAt).not.toBeNull();
+  });
+
+  it('persists the canonical action outcome on the same durable receipt', async () => {
+    hoisted.updateKind = 'outcome';
+    const receipt = await updateFounderReviewActionOutcome({
+      id: REVIEW_ID,
+      userIdentity: 'auth-user',
+      status: 'applied',
+      errorCode: null,
+    });
+
+    expect(receipt.actionOutcome.status).toBe('applied');
+    expect(hoisted.update).toHaveBeenCalledWith(
+      expect.objectContaining({
+        actionOutcome: expect.objectContaining({
+          status: 'applied',
+          errorCode: null,
+        }),
+      })
+    );
+  });
+
+  it('refuses to claim an applied outcome before the canonical action changes', async () => {
+    hoisted.actionStatus = 'pending';
+
+    await expect(
+      updateFounderReviewActionOutcome({
+        id: REVIEW_ID,
+        userIdentity: 'auth-user',
+        status: 'applied',
+        errorCode: null,
+      })
+    ).rejects.toMatchObject({
+      code: 'canonical-action-not-applied',
+      status: 409,
+    });
+    expect(hoisted.update).not.toHaveBeenCalled();
+  });
+
+  it('reconciles a removed card receipt from canonical state on reload', async () => {
+    hoisted.updateKind = 'outcome';
+
+    const receipts = await listFounderReviews({
+      userIdentity: 'auth-user',
+    });
+
+    expect(receipts[0]?.actionOutcome.status).toBe('applied');
+    expect(hoisted.update).toHaveBeenCalledOnce();
   });
 });

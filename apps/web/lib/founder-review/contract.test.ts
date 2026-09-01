@@ -51,7 +51,11 @@ describe('founder review contract', () => {
       capturedAt: '2026-09-01T18:00:08.000Z',
     });
 
-    expect(context.rationaleExtractionStatus).toBe('pending');
+    expect(context.rationaleExtractionStatus).toBe('not-requested');
+    expect(context.actionOutcome).toMatchObject({
+      status: 'pending',
+      errorCode: null,
+    });
     expect(context.provenance).toEqual({
       surface: 'opportunity-inbox',
       sourceBinding:
@@ -83,6 +87,24 @@ describe('founder review contract', () => {
     });
 
     expect(parsed.success).toBe(false);
+  });
+
+  it('rejects contradictory target decisions and recording states', () => {
+    expect(
+      CreateFounderReviewSchema.safeParse({
+        ...REVIEW,
+        target: { ...REVIEW.target, type: 'founder-note' },
+      }).success
+    ).toBe(false);
+    expect(
+      CreateFounderReviewSchema.safeParse({
+        ...REVIEW,
+        recording: {
+          ...REVIEW.recording,
+          status: 'captured-retained',
+        },
+      }).success
+    ).toBe(false);
   });
 
   it('builds a restart-safe receipt and owner-scoped media path', () => {

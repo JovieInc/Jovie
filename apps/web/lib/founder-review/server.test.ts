@@ -1,10 +1,12 @@
+import { createHash } from 'node:crypto';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 const hoisted = vi.hoisted(() => ({
   selectCount: 0,
   inserted: null as Record<string, unknown> | null,
   getUserByIdentity: vi.fn(),
-  head: vi.fn(),
+  get: vi.fn(),
+  del: vi.fn(),
 }));
 
 vi.mock('@/lib/db/queries/shared', () => ({
@@ -12,9 +14,8 @@ vi.mock('@/lib/db/queries/shared', () => ({
 }));
 
 vi.mock('@vercel/blob', () => ({
-  head: hoisted.head,
-  get: vi.fn(),
-  del: vi.fn(),
+  get: hoisted.get,
+  del: hoisted.del,
 }));
 
 vi.mock('@/lib/db', () => ({
@@ -46,10 +47,15 @@ vi.mock('@/lib/db', () => ({
         return { onConflictDoNothing: vi.fn(async () => undefined) };
       }),
     })),
+    delete: vi.fn(() => ({ where: vi.fn(async () => undefined) })),
   },
 }));
 
-const { createFounderReview, FounderReviewError } = await import('./server');
+const {
+  createFounderReview,
+  FounderReviewError,
+  recordFounderReviewUploadLease,
+} = await import('./server');
 
 const REVIEW = {
   sessionId: '11111111-1111-4111-8111-111111111111',
@@ -90,6 +96,7 @@ describe('founder review server persistence', () => {
     vi.clearAllMocks();
     hoisted.selectCount = 0;
     hoisted.inserted = null;
+    hoisted.del.mockResolvedValue(undefined);
     hoisted.getUserByIdentity.mockResolvedValue({
       id: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',
       deletedAt: null,
@@ -178,7 +185,146 @@ describe('founder review server persistence', () => {
         status: 422,
       })
     );
-    expect(hoisted.head).not.toHaveBeenCalled();
+    expect(hoisted.get).not.toHaveBeenCalled();
     expect(hoisted.inserted).toBeNull();
+  });
+
+  it('verifies the private audio digest before storing its receipt', async () => {
+    const audio = new TextEncoder().encode('private founder audio');
+    const blobUrl = 'https://store.private.blob.vercel-storage.com/review.webm';
+    const pathname = `founder-inbox-reviews/aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa/${REVIEW.sessionId}/${REVIEW.segmentId}/inbox-card/${REVIEW.target.id}/youtube.thumbnail_candidate/review.webm`;
+    hoisted.get.mockResolvedValue({
+      statusCode: 200,
+      stream: new ReadableStream({
+        start(controller) {
+          controller.enqueue(audio);
+          controller.close();
+        },
+      }),
+      blob: {
+        url: blobUrl,
+        pathname,
+        size: audio.byteLength,
+        contentType: 'audio/webm',
+      },
+    });
+
+    const receipt = await createFounderReview({
+      userIdentity: 'auth-user',
+      review: {
+        ...REVIEW,
+        recording: {
+          ...REVIEW.recording,
+          status: 'captured-retained',
+          retention: 'audio-and-transcript',
+          media: {
+            blobUrl,
+            pathname,
+            contentType: 'audio/webm',
+            sha256: createHash('sha256').update(audio).digest('hex'),
+            byteSize: audio.byteLength,
+            durationMs: 8_000,
+          },
+        },
+      },
+      pathname: '/app',
+      userAgent: null,
+    });
+
+    expect(receipt.recording.sha256).toBe(
+      createHash('sha256').update(audio).digest('hex')
+    );
+  });
+
+  it('records an expiring upload lease from the blob completion payload', async () => {
+    const pathname = `founder-inbox-reviews/aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa/${REVIEW.sessionId}/${REVIEW.segmentId}/inbox-card/${REVIEW.target.id}/youtube.thumbnail_candidate/review.webm`;
+    await recordFounderReviewUploadLease({
+      tokenPayload: JSON.stringify({
+        userId: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',
+        sessionId: REVIEW.sessionId,
+        segmentId: REVIEW.segmentId,
+        targetType: REVIEW.target.type,
+        targetId: REVIEW.target.id,
+        sourceKind: REVIEW.target.sourceKind,
+      }),
+      blob: {
+        url: 'https://store.private.blob.vercel-storage.com/review.webm',
+        pathname,
+        contentType: 'audio/webm',
+      },
+    });
+
+    expect(hoisted.inserted).toMatchObject({
+      userId: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',
+      source: 'founder-inbox-review-upload-lease',
+      context: {
+        kind: 'founder-review-upload-lease',
+        token: { segmentId: REVIEW.segmentId },
+        blob: { pathname },
+      },
+    });
+  });
+
+  it('deletes a completed upload when account erasure wins the callback race', async () => {
+    const pathname = `founder-inbox-reviews/aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa/${REVIEW.sessionId}/${REVIEW.segmentId}/inbox-card/${REVIEW.target.id}/youtube.thumbnail_candidate/raced.webm`;
+    hoisted.getUserByIdentity.mockResolvedValue({
+      id: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',
+      deletedAt: new Date(),
+    });
+
+    await expect(
+      recordFounderReviewUploadLease({
+        tokenPayload: JSON.stringify({
+          userId: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',
+          sessionId: REVIEW.sessionId,
+          segmentId: REVIEW.segmentId,
+          targetType: REVIEW.target.type,
+          targetId: REVIEW.target.id,
+          sourceKind: REVIEW.target.sourceKind,
+        }),
+        blob: {
+          url: 'https://store.private.blob.vercel-storage.com/raced.webm',
+          pathname,
+          contentType: 'audio/webm',
+        },
+      })
+    ).rejects.toMatchObject({ code: 'founder-review-user-not-found' });
+    expect(hoisted.del).toHaveBeenCalledWith(
+      'https://store.private.blob.vercel-storage.com/raced.webm'
+    );
+  });
+
+  it('retains the cleanup lease when post-erasure blob deletion fails', async () => {
+    const pathname = `founder-inbox-reviews/aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa/${REVIEW.sessionId}/${REVIEW.segmentId}/inbox-card/${REVIEW.target.id}/youtube.thumbnail_candidate/late.webm`;
+    hoisted.getUserByIdentity.mockResolvedValue({
+      id: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',
+      deletedAt: new Date(),
+    });
+    hoisted.del.mockRejectedValue(new Error('blob unavailable'));
+
+    await expect(
+      recordFounderReviewUploadLease({
+        tokenPayload: JSON.stringify({
+          userId: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',
+          sessionId: REVIEW.sessionId,
+          segmentId: REVIEW.segmentId,
+          targetType: REVIEW.target.type,
+          targetId: REVIEW.target.id,
+          sourceKind: REVIEW.target.sourceKind,
+        }),
+        blob: {
+          url: 'https://store.private.blob.vercel-storage.com/late.webm',
+          pathname,
+          contentType: 'audio/webm',
+        },
+      })
+    ).rejects.toMatchObject({
+      code: 'founder-review-media-deletion-failed',
+      status: 502,
+    });
+    expect(hoisted.inserted).toMatchObject({
+      source: 'founder-inbox-review-upload-lease',
+      context: { blob: { pathname } },
+    });
   });
 });
