@@ -1186,6 +1186,32 @@ def test_deep_lanes_are_staggered_and_bounded() -> None:
     assert "'0 9 * * 2'" in harness
 
 
+def test_nightly_unit_suite_fetches_storybook_provenance_history() -> None:
+    """Storybook provenance receipts need more than the depth-1 HEAD commit."""
+    job = _job_block("nightly-tests.yml", "unit-tests")
+
+    assert "name: Full Unit Test Suite" in job
+    assert "fetch-depth: 0" in job
+    assert "fetch-depth: 1" not in job
+    assert "pnpm --filter=@jovie/web run test" in job
+
+
+def test_nightly_notifications_skip_when_slack_credentials_are_absent() -> None:
+    """Missing Slack credentials must not make the notification job fail."""
+    job = _job_block("nightly-tests.yml", "notify")
+
+    assert "SLACK_BOT_TOKEN: ${{ secrets.SLACK_BOT_TOKEN }}" in job
+    assert "SLACK_CI_CHANNEL_ID: ${{ vars.SLACK_CI_CHANNEL_ID }}" in job
+    assert "SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}" in job
+    assert "env.SLACK_BOT_TOKEN != ''" in job
+    assert "env.SLACK_CI_CHANNEL_ID != ''" in job
+    assert job.count("env.SLACK_WEBHOOK_URL != ''") == 2
+    assert "channel-id:" not in job
+    assert job.count("method: chat.postMessage") == 2
+    assert job.count("token: ${{ env.SLACK_BOT_TOKEN }}") == 2
+    assert job.count('"channel": "${{ env.SLACK_CI_CHANNEL_ID }}"') == 2
+
+
 def test_product_screenshot_budget_covers_capture_and_publication() -> None:
     """The screenshot publisher must outlive capture plus the normal push gate."""
     job = _job_block("screenshots.yml", "generate")
