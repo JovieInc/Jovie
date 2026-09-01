@@ -104,7 +104,9 @@ describe('FormField', () => {
       </FormField>
     );
 
-    const feedbackSlot = container.querySelector('[data-slot="field-feedback"]');
+    const feedbackSlot = container.querySelector(
+      '[data-slot="field-feedback"]'
+    );
     expect(feedbackSlot).toHaveClass('min-h-5');
     expect(feedbackSlot).toBeEmptyDOMElement();
 

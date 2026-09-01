@@ -3,10 +3,7 @@ import type { FormEvent, ImgHTMLAttributes } from 'react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type { Artist } from '@/types/db';
 
-const {
-  mockProfileFormState,
-  mockMusicLinksFormState,
-} = vi.hoisted(() => {
+const { mockProfileFormState, mockMusicLinksFormState } = vi.hoisted(() => {
   const mockHandleSubmit = vi.fn((event: FormEvent) => event.preventDefault());
   const mockSetFormData = vi.fn();
   return {
@@ -52,9 +49,12 @@ const {
   };
 });
 
-vi.mock('@/features/dashboard/organisms/profile-form/useProfileForm', () => ({
-  useProfileForm: () => mockProfileFormState,
-}));
+vi.mock(
+  '@/components/features/dashboard/organisms/profile-form/useProfileForm',
+  () => ({
+    useProfileForm: () => mockProfileFormState,
+  })
+);
 
 vi.mock(
   '@/features/dashboard/organisms/listen-now-form/useMusicLinksForm',
@@ -78,7 +78,7 @@ vi.mock('@/components/organisms/artist-search-palette', () => ({
 }));
 
 import { ListenNowForm } from '@/features/dashboard/organisms/listen-now-form';
-import { ProfileForm } from '@/features/dashboard/organisms/profile-form/ProfileForm';
+import { ProfileForm } from '@/components/features/dashboard/organisms/profile-form/ProfileForm';
 
 const artist: Artist = {
   id: 'artist-1',
@@ -143,7 +143,9 @@ describe('dashboard form validation consolidation', () => {
     expect(
       screen
         .getAllByRole('alert')
-        .some(alert => /artist name is required/i.test(alert.textContent ?? ''))
+        .some(alert =>
+          /artist name is required/i.test(alert.textContent ?? '')
+        )
     ).toBe(true);
     expect(screen.getByLabelText('Artist Name')).toHaveAttribute(
       'aria-invalid',

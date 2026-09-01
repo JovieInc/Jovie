@@ -68,9 +68,7 @@ export function FormStatus({
       )}
 
       {trimmedSuccess && (
-        <output className='font-medium text-success'>
-          {trimmedSuccess}
-        </output>
+        <output className='font-medium text-success'>{trimmedSuccess}</output>
       )}
     </div>
   );
