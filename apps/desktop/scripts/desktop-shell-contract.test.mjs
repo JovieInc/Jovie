@@ -490,6 +490,26 @@ test('preload marks the hosted app as Electron after the document root is ready'
   assert.match(preloadSource, /markElectronRuntime\(\)/);
   assert.match(preloadSource, /DOMContentLoaded/);
   assert.match(preloadSource, /dataset\.desktopRuntime = 'electron'/);
+  assert.match(
+    preloadSource,
+    /import \{ BAKED_DESKTOP_BUILD_IDENTITY \} from '\.\/build-identity\.generated';/
+  );
+  assert.match(
+    preloadSource,
+    /dataset\.desktopChannel = BAKED_DESKTOP_BUILD_IDENTITY\.channel/
+  );
+  assert.match(
+    preloadSource,
+    /dataset\.desktopVersion = BAKED_DESKTOP_BUILD_IDENTITY\.version/
+  );
+  assert.match(
+    preloadSource,
+    /dataset\.desktopSourceRevision =\s*BAKED_DESKTOP_BUILD_IDENTITY\.sourceRevision/
+  );
+  assert.match(
+    preloadSource,
+    /dataset\.desktopBuiltAt = BAKED_DESKTOP_BUILD_IDENTITY\.builtAt/
+  );
   assert.match(preloadSource, /startDesktopAuthHandoff/);
   assert.match(preloadSource, /openDesktopAuthUrl/);
   assert.match(preloadSource, /closeDesktopAuthWindow/);
