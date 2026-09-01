@@ -1,11 +1,11 @@
 import { describe, expect, it } from 'vitest';
 import { JOVIE_IMAGE_COLOR_POLICY } from '@/data/marketing';
-import { PUBLIC_IMAGERY_RULES } from '@/lib/brand/public-system';
 import {
   assertPublicMediaProjection,
   assertPublicSafeProjection,
   type PublicMediaProjection,
 } from '@/lib/brand/public-projection';
+import { PUBLIC_IMAGERY_RULES } from '@/lib/brand/public-system';
 
 const reviewedMedia = {
   url: '/brand/editorial.jpg',

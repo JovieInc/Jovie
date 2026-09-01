@@ -111,6 +111,8 @@ export type {
 } from './designGaps';
 export { getProposedSection, PROPOSED_SECTIONS } from './designGaps';
 export type {
+  JovieForbiddenControllableHue,
+  JovieHueCorridor,
   JovieImageColorControl,
   JovieImageColorDecision,
   JovieImageColorFailureAction,
@@ -122,10 +124,8 @@ export type {
   JovieImageSceneColorRole,
   JovieImageSkinMaterialEvaluation,
   JovieImageSubjectSeparationEvaluation,
-  JovieForbiddenControllableHue,
-  JovieHueCorridor,
-  JovieOklchColorSample,
   JovieOklchColorReference,
+  JovieOklchColorSample,
   JovieScenePaletteReference,
   JovieSubjectSeparationRequirement,
   JovieUiColorAnchor,

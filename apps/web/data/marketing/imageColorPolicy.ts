@@ -1,5 +1,4 @@
-export const JOVIE_IMAGE_COLOR_POLICY_SCHEMA =
-  'jovie-image-color-policy/v1';
+export const JOVIE_IMAGE_COLOR_POLICY_SCHEMA = 'jovie-image-color-policy/v1';
 export const JOVIE_IMAGE_COLOR_POLICY_VERSION = 'scene-palette-v1';
 
 export type JovieImageSceneColorRole = 'ion' | 'ultra' | 'pulse';
@@ -685,7 +684,9 @@ export function formatJovieImageColorPolicyForPrompt(
     ...paletteLines,
     `Neutral exception: OKLCH chroma <= ${policy.neutralRule.maxChroma}. ${policy.neutralRule.guidance}`,
     `Controllable elements: choose ${policy.controllableSceneElements.join(', ')} in a scene hue or neutral before capture/generation.`,
-    `Forbidden decorative controllable hues: ${policy.forbiddenControllableHues.map(hue => `${hue.name} at chroma >= ${hue.minChroma}`).join(', ')}.`,
+    `Forbidden decorative controllable hues: ${policy.forbiddenControllableHues
+      .map(hue => `${hue.name} at chroma >= ${hue.minChroma}`)
+      .join(', ')}.`,
     `Protected truth: ${policy.protectedClasses.join(', ')} stay truthful. A conflict is reframed, replaced, removed, reduced in salience, or rejected.`,
     `Source/reflection consistency: ${policy.sourceReflectionConsistency.materials.join(', ')} must agree with one physically plausible source.`,
     `Subject separation: use OKLCH lightness, chroma, hue, wardrobe, edge light, focus, or composition. Do not use blanket material bans.`,

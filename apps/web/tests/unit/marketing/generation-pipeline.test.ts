@@ -15,10 +15,12 @@ import {
   MARKETING_TASTE_GATE_IDS,
   MARKETING_VISUAL_REVIEW_COLOR_CONTRACT,
   resolveJovieSceneColorRole,
-  type MarketingGateReceipt,
-  type MarketingModelCandidate,
-  type MarketingNarrativePlan,
   selectMarketingModelCandidate,
+} from '@/data/marketing';
+import type {
+  MarketingGateReceipt,
+  MarketingModelCandidate,
+  MarketingNarrativePlan,
 } from '@/data/marketing';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
