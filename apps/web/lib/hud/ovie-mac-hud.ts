@@ -242,6 +242,7 @@ export function classifyOvieMacHudPullRequest(input: {
   readonly mergeQueuePosition: number | null;
 }): OvieMacHudInFlightPrStatus {
   if (input.mergeQueuePosition != null) return 'merge_queue';
+  if (input.isDraft) return 'open';
   if (
     hasBlockingPrLabel(input.labels) ||
     input.reviewDecision === 'CHANGES_REQUESTED' ||
@@ -249,7 +250,6 @@ export function classifyOvieMacHudPullRequest(input: {
   ) {
     return 'blocked';
   }
-  if (input.isDraft) return 'open';
   if (
     input.reviewRequestCount > 0 ||
     input.reviewDecision === 'REVIEW_REQUIRED' ||

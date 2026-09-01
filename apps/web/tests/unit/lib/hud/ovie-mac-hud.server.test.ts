@@ -237,6 +237,51 @@ describe('getOvieMacHudSnapshot', () => {
     });
   });
 
+  it('keeps PR data from partial GraphQL responses without merge queue data', async () => {
+    const { parseOvieMacHudInFlightPullRequestsResponse } = await import(
+      '@/lib/hud/ovie-mac-hud.server'
+    );
+
+    const result = parseOvieMacHudInFlightPullRequestsResponse({
+      data: {
+        repository: {
+          pullRequests: {
+            totalCount: 1,
+            pageInfo: { hasNextPage: false },
+            nodes: [
+              {
+                number: 16949,
+                title: 'available PR data',
+                url: 'https://github.com/JovieInc/Jovie/pull/16949',
+                headRefName: 'tim/jov-16949',
+                updatedAt: '2026-08-22T03:00:00.000Z',
+                isDraft: false,
+                reviewDecision: null,
+                mergeable: 'MERGEABLE',
+                author: { login: 'codex' },
+                labels: { nodes: [] },
+                reviewRequests: { totalCount: 0 },
+              },
+            ],
+          },
+          mergeQueue: null,
+        },
+      },
+      errors: [{ message: 'mergeQueue is unavailable for this branch' }],
+    });
+
+    expect(result).toMatchObject({
+      availability: 'available',
+      totalOpen: 1,
+      truncated: false,
+    });
+    expect(result.items).toHaveLength(1);
+    expect(result.items[0]).toMatchObject({
+      number: 16949,
+      status: 'open',
+    });
+  });
+
   it('fails closed when the GitHub PR source errors', async () => {
     mockEnv.HUD_GITHUB_TOKEN = 'hud-token';
     mockEnv.HUD_GITHUB_OWNER = 'JovieInc';

@@ -115,14 +115,15 @@ function hasNextPage(value: unknown): boolean {
 export function parseOvieMacHudInFlightPullRequestsResponse(
   payload: unknown
 ): OvieMacHudInFlightPullRequests {
-  if (
-    !isRecord(payload) ||
-    (Array.isArray(payload.errors) && payload.errors.length > 0)
-  ) {
+  if (!isRecord(payload)) {
     throw new Error('GitHub in-flight PR response was unavailable');
   }
 
   const data = isRecord(payload.data) ? payload.data : null;
+  if (Array.isArray(payload.errors) && payload.errors.length > 0 && !data) {
+    throw new Error('GitHub in-flight PR response was unavailable');
+  }
+
   const repository = data && isRecord(data.repository) ? data.repository : null;
   const pullRequests =
     repository && isRecord(repository.pullRequests)

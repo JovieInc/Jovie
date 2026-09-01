@@ -127,9 +127,9 @@ describe('Ovie Mac HUD derivation', () => {
     expect(
       classifyOvieMacHudPullRequest({
         isDraft: true,
-        reviewDecision: null,
-        mergeable: 'MERGEABLE',
-        labels: [],
+        reviewDecision: 'CHANGES_REQUESTED',
+        mergeable: 'CONFLICTING',
+        labels: ['hold'],
         reviewRequestCount: 0,
         mergeQueuePosition: null,
       })
