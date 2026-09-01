@@ -291,9 +291,12 @@ class GemDiskReclaimTests(unittest.TestCase):
 
     def test_log_rotation_compresses_duplicate_lines_and_enforces_retention(self) -> None:
         self.log_path.write_text(("same line\n" * 6) + "other line\n", encoding="utf-8")
-        old = self.log_path.with_name("stdout.log.2.gz")
-        with gzip.open(old, "wb") as handle:
-            handle.write(b"old\n")
+        previous = self.log_path.with_name("stdout.log.1.gz")
+        with gzip.open(previous, "wb") as handle:
+            handle.write(b"previous\n")
+        oldest = self.log_path.with_name("stdout.log.2.gz")
+        with gzip.open(oldest, "wb") as handle:
+            handle.write(b"oldest\n")
 
         result = self.reclaim("--apply", "--log-max-bytes", "10", "--log-retention", "2")
 
@@ -303,7 +306,9 @@ class GemDiskReclaimTests(unittest.TestCase):
             rotated = handle.read()
         self.assertIn("same line\n", rotated)
         self.assertIn("repeated previous line 5 time(s)", rotated)
-        self.assertFalse(old.exists())
+        with gzip.open(oldest, "rt", encoding="utf-8") as handle:
+            self.assertEqual(handle.read(), "previous\n")
+        self.assertFalse(self.log_path.with_name("stdout.log.3.gz").exists())
 
     def test_protected_credential_directories_are_not_scanned_or_deleted(self) -> None:
         workspace = self.make_workspace()

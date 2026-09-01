@@ -631,7 +631,6 @@ def rotate_log(args: argparse.Namespace, deadline: float) -> dict[str, Any]:
         if index == args.log_retention and archive.exists():
             archive.unlink()
             report["removedArchives"].append(str(archive))
-            continue
         previous = log.with_name(f"{log.name}.{index - 1}.gz")
         if previous.exists():
             previous.replace(archive)
