@@ -19,6 +19,26 @@ vi.mock('@/lib/flags/client', () => ({
   useAppFlag: () => inboxHomeEnabled,
 }));
 
+vi.mock('@/lib/founder-review/client', () => ({
+  listFounderReviewReceipts: vi.fn().mockResolvedValue([]),
+  deleteFounderReviewAudio: vi.fn(),
+  uploadFounderReviewAudio: vi.fn(),
+  createFounderReviewClient: vi.fn().mockImplementation(async review => ({
+    id: review.segmentId,
+    target: review.target,
+    recording: { mediaAvailable: false },
+  })),
+}));
+
+vi.mock('@/lib/chat/transcriber', () => ({
+  createWebSpeechTranscriber: () => ({
+    isSupported: false,
+    start: vi.fn(),
+    stop: vi.fn(),
+    dispose: vi.fn(),
+  }),
+}));
+
 vi.mock('@/features/dashboard/organisms/PreviewDataHydrator', () => ({
   PreviewDataHydrator: ({
     initialLinks,
@@ -142,6 +162,7 @@ describe('OpportunityInboxPageClient', () => {
           cards: [
             {
               id: 'card-1',
+              sourceKind: 'test.suggestion',
               signalType: 'other' as const,
               typeLabel: 'Suggestion',
               createdAt: '2026-06-28T10:00:00.000Z',
@@ -171,6 +192,7 @@ describe('OpportunityInboxPageClient', () => {
           cards: [
             {
               id: 'brand-deal-1',
+              sourceKind: 'test.suggestion',
               signalType: 'brand_deal',
               typeLabel: 'Brand Deal',
               createdAt: '2026-07-29T10:00:00.000Z',
@@ -182,6 +204,7 @@ describe('OpportunityInboxPageClient', () => {
             },
             {
               id: 'song-1',
+              sourceKind: 'test.suggestion',
               signalType: 'new_song',
               typeLabel: 'New Song',
               createdAt: '2026-07-29T09:00:00.000Z',
@@ -247,6 +270,7 @@ describe('OpportunityInboxPageClient', () => {
           cards: [
             {
               id: 'song-1',
+              sourceKind: 'test.suggestion',
               signalType: 'new_song' as const,
               typeLabel: 'New Song',
               createdAt: '2026-06-28T10:00:00.000Z',
@@ -258,6 +282,7 @@ describe('OpportunityInboxPageClient', () => {
             },
             {
               id: 'event-1',
+              sourceKind: 'test.suggestion',
               signalType: 'new_event' as const,
               typeLabel: 'New Event',
               createdAt: '2026-06-28T10:00:00.000Z',
@@ -306,6 +331,7 @@ describe('OpportunityInboxPageClient', () => {
           cards: [
             {
               id: 'song-1',
+              sourceKind: 'test.suggestion',
               signalType: 'new_song' as const,
               typeLabel: 'New Song',
               createdAt: '2026-06-28T10:00:00.000Z',
@@ -317,6 +343,7 @@ describe('OpportunityInboxPageClient', () => {
             },
             {
               id: 'event-1',
+              sourceKind: 'test.suggestion',
               signalType: 'new_event' as const,
               typeLabel: 'New Event',
               createdAt: '2026-06-28T10:00:00.000Z',
@@ -377,6 +404,7 @@ describe('OpportunityInboxPageClient', () => {
           cards: [
             {
               id: 'card-1',
+              sourceKind: 'test.suggestion',
               signalType: 'other' as const,
               typeLabel: 'Suggestion',
               createdAt: '2026-06-28T10:00:00.000Z',
@@ -410,6 +438,7 @@ describe('OpportunityInboxPageClient', () => {
             cards: [
               {
                 id: 'card-1',
+                sourceKind: 'test.suggestion',
                 signalType: 'other' as const,
                 typeLabel: 'Suggestion',
                 createdAt: '2026-06-28T10:00:00.000Z',
@@ -447,6 +476,7 @@ describe('OpportunityInboxPageClient', () => {
           cards: [
             {
               id: 'card-1',
+              sourceKind: 'test.suggestion',
               signalType: 'other' as const,
               typeLabel: 'Suggestion',
               createdAt: '2026-06-28T10:00:00.000Z',
@@ -478,6 +508,7 @@ describe('OpportunityInboxPageClient', () => {
           cards: [
             {
               id: 'song-1',
+              sourceKind: 'test.suggestion',
               signalType: 'new_song' as const,
               typeLabel: 'New Song',
               createdAt: '2026-06-28T10:00:00.000Z',
@@ -489,6 +520,7 @@ describe('OpportunityInboxPageClient', () => {
             },
             {
               id: 'event-1',
+              sourceKind: 'test.suggestion',
               signalType: 'new_event' as const,
               typeLabel: 'New Event',
               createdAt: '2026-06-28T10:00:00.000Z',
@@ -524,6 +556,7 @@ describe('OpportunityInboxPageClient', () => {
           cards: [
             {
               id: 'card-1',
+              sourceKind: 'test.suggestion',
               signalType: 'other' as const,
               typeLabel: 'Suggestion',
               createdAt: '2026-06-28T10:00:00.000Z',
@@ -545,7 +578,7 @@ describe('OpportunityInboxPageClient', () => {
     expect(
       screen.getByTestId('opportunity-inbox-empty-state')
     ).toBeInTheDocument();
-    expect(screen.getByRole('link', { name: 'Start A Chat' })).toHaveFocus();
+    expect(screen.getByRole('button', { name: 'Start Session' })).toHaveFocus();
   });
 
   it('returns focus to recovery after completing the last report next step', async () => {
@@ -561,6 +594,7 @@ describe('OpportunityInboxPageClient', () => {
           cards: [
             {
               id: 'report-1',
+              sourceKind: 'test.suggestion',
               signalType: 'other' as const,
               typeLabel: 'Report',
               createdAt: '2026-07-04T10:00:00.000Z',
@@ -589,12 +623,12 @@ describe('OpportunityInboxPageClient', () => {
       />
     );
 
-    await user.click(screen.getByTestId('opportunity-inbox-report-next-step'));
+    await user.click(screen.getByRole('button', { name: 'Approve' }));
 
     expect(
       screen.getByTestId('opportunity-inbox-empty-state')
     ).toBeInTheDocument();
-    expect(screen.getByRole('link', { name: 'Start A Chat' })).toHaveFocus();
+    expect(screen.getByRole('button', { name: 'Start Session' })).toHaveFocus();
   });
 
   it('does not restore stack focus after a failed report next step', async () => {
@@ -610,6 +644,7 @@ describe('OpportunityInboxPageClient', () => {
           cards: [
             {
               id: 'report-1',
+              sourceKind: 'test.suggestion',
               signalType: 'other' as const,
               typeLabel: 'Report',
               createdAt: '2026-07-04T10:00:00.000Z',
@@ -638,7 +673,7 @@ describe('OpportunityInboxPageClient', () => {
       />
     );
 
-    await user.click(screen.getByTestId('opportunity-inbox-report-next-step'));
+    await user.click(screen.getByRole('button', { name: 'Approve' }));
     const songs = screen.getByRole('button', { name: 'Songs' });
     await user.click(songs);
 
@@ -662,6 +697,7 @@ describe('OpportunityInboxPageClient', () => {
           cards: [
             {
               id: 'card-1',
+              sourceKind: 'test.suggestion',
               signalType: 'other' as const,
               typeLabel: 'Suggestion',
               createdAt: '2026-06-28T10:00:00.000Z',
@@ -700,6 +736,7 @@ describe('OpportunityInboxPageClient', () => {
           cards: [
             {
               id: 'card-1',
+              sourceKind: 'test.suggestion',
               signalType: 'other' as const,
               typeLabel: 'Suggestion',
               createdAt: '2026-06-28T10:00:00.000Z',
@@ -717,7 +754,7 @@ describe('OpportunityInboxPageClient', () => {
 
     screen.getByRole('button', { name: 'Review Current Opportunity' }).focus();
     await user.keyboard('{ArrowRight}');
-    expect(screen.getByRole('link', { name: 'Start A Chat' })).toHaveFocus();
+    expect(screen.getByRole('button', { name: 'Start Session' })).toHaveFocus();
 
     act(() => {
       rejectAction?.();
