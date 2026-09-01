@@ -132,6 +132,9 @@ const meta = {
   component: DesignProposalReviewPanel,
   parameters: {
     layout: 'centered',
+    jovie: {
+      uncoveredProps: ['isLoading'],
+    },
   },
   decorators: [
     Story => (
