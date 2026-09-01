@@ -70,7 +70,9 @@ vi.mock('@/features/admin/table/AdminDataTable', () => ({
     return (
       <div data-testid='admin-data-table'>
         {data.map(row => (
-          <div key={getRowId(row)}>{artistColumn?.cell?.({ row: { original: row } })}</div>
+          <div key={getRowId(row)}>
+            {artistColumn?.cell?.({ row: { original: row } })}
+          </div>
         ))}
       </div>
     );
