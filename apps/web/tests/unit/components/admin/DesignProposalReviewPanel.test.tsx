@@ -1,6 +1,7 @@
 import { render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { toast } from '@/components/feedback';
 import { DesignProposalReviewPanel } from '@/components/features/admin/design-lab/DesignProposalReviewPanel';
 import type { DesignProposal } from '@/lib/agent-os/design-lab/types';
 
@@ -178,6 +179,42 @@ describe('DesignProposalReviewPanel', () => {
     await waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(2));
     expect(
       await screen.findByText('No pending taste proposals.')
+    ).toBeInTheDocument();
+  });
+
+  it('shows an actionable review error when a failed review returns non-JSON', async () => {
+    const approveProposal = proposal({ id: 'proposal-approve' });
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValueOnce(
+        jsonResponse({
+          proposals: [approveProposal],
+          fetchedAt: '2026-09-01T12:01:00.000Z',
+        })
+      )
+      .mockResolvedValueOnce(
+        new Response('<html>proxy failure</html>', {
+          status: 500,
+          headers: { 'content-type': 'text/html' },
+        })
+      );
+    vi.stubGlobal('fetch', fetchMock);
+
+    const user = userEvent.setup();
+    render(<DesignProposalReviewPanel />);
+
+    const approveCard = await screen.findByTestId(
+      'design-proposal-card-proposal-approve'
+    );
+    await user.click(
+      within(approveCard).getByRole('button', { name: 'Approve' })
+    );
+
+    await waitFor(() => {
+      expect(toast.error).toHaveBeenCalledWith('Review failed (500)');
+    });
+    expect(
+      screen.getByTestId('design-proposal-card-proposal-approve')
     ).toBeInTheDocument();
   });
 });

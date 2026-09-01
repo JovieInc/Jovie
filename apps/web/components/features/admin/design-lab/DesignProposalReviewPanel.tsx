@@ -35,6 +35,13 @@ interface TasteInboxLoadError {
   readonly detail: string;
 }
 
+interface ReviewResponsePayload extends ApiErrorResponse {
+  readonly result?: {
+    readonly dispatchTriggered: boolean;
+    readonly linearUpdated: boolean;
+  };
+}
+
 type ReviewDecision = 'yes' | 'no' | 'yes-with-notes';
 
 interface PendingNotesState {
@@ -338,6 +345,7 @@ export function DesignProposalReviewPanel() {
           response,
           await readApiError(response)
         );
+        setProposals([]);
         setLoadError(nextError);
         toast.error(nextError.detail);
         return;
@@ -346,6 +354,7 @@ export function DesignProposalReviewPanel() {
       setProposals(payload.proposals);
     } catch (error) {
       const nextError = loadErrorFromUnknown(error);
+      setProposals([]);
       setLoadError(nextError);
       toast.error(nextError.detail);
     } finally {
@@ -383,19 +392,12 @@ export function DesignProposalReviewPanel() {
           }
         );
 
-        const payload = (await response.json()) as {
-          error?: string;
-          code?: string;
-          action?: string;
-          result?: {
-            dispatchTriggered: boolean;
-            linearUpdated: boolean;
-          };
-        };
-
         if (!response.ok) {
+          const payload = await readApiError(response);
           throw new Error(reviewErrorMessage(response, payload));
         }
+
+        const payload = (await response.json()) as ReviewResponsePayload;
 
         setProposals(current =>
           current.filter(item => item.id !== proposal.id)
