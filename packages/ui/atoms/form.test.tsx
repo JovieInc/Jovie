@@ -320,8 +320,8 @@ describe('Form', () => {
       expect(message.className).toContain('text-app');
       expect(message.className).toContain('font-medium');
       expect(message).toHaveAttribute('role', 'alert');
-      expect(message).toHaveAttribute('aria-live', 'polite');
-      expect(message).toHaveAttribute('aria-atomic', 'true');
+      expect(message).not.toHaveAttribute('aria-live');
+      expect(message).not.toHaveAttribute('aria-atomic');
       expect(message).toHaveAttribute('data-slot', 'form-message');
     });
 

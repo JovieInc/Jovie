@@ -119,7 +119,7 @@ describe('FormStatus', () => {
     );
     expect(
       screen.getByText('Error message').closest('[data-slot]')
-    ).toHaveAttribute('aria-atomic', 'true');
+    ).not.toHaveAttribute('aria-atomic');
   });
 
   it('maintains proper spacing between elements', () => {

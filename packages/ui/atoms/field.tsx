@@ -112,19 +112,12 @@ const Field = React.forwardRef<HTMLDivElement, FieldProps>(
           </p>
         )}
 
-        <div
-          className='min-h-5'
-          data-slot='field-feedback'
-          aria-live='polite'
-          aria-atomic='true'
-        >
+        <div className='min-h-5' data-slot='field-feedback'>
           {hasError && (
             <p
               id={errorId}
               className='text-xs font-medium text-destructive'
               role='alert'
-              aria-live='polite'
-              aria-atomic='true'
             >
               {error}
             </p>

@@ -47,8 +47,6 @@ export function ErrorSummary({
       )}
       tabIndex={-1}
       role='alert'
-      aria-live='assertive'
-      aria-atomic='true'
       aria-labelledby={titleId}
     >
       <h2 id={titleId} className='text-app font-medium text-error'>

@@ -42,8 +42,8 @@ describe('Form Accessibility and Validation', () => {
       expect(screen.getByText('Please fix the errors')).toBeInTheDocument();
       const summary = screen.getByRole('alert');
       expect(summary).toHaveClass('bg-error-subtle', 'border-error/20');
-      expect(summary).toHaveAttribute('aria-live', 'assertive');
-      expect(summary).toHaveAttribute('aria-atomic', 'true');
+      expect(summary).not.toHaveAttribute('aria-live');
+      expect(summary).not.toHaveAttribute('aria-atomic');
       expect(summary.className).not.toMatch(/\b(?:bg|border|text|ring)-red-/);
 
       // Check error messages are rendered

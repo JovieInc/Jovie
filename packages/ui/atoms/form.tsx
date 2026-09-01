@@ -165,12 +165,7 @@ const FormMessage = React.forwardRef<
   const body = error ? String(error?.message) : children;
 
   return (
-    <div
-      className='min-h-5'
-      data-slot='form-message-feedback'
-      aria-live='polite'
-      aria-atomic='true'
-    >
+    <div className='min-h-5' data-slot='form-message-feedback'>
       {body ? (
         <p
           ref={ref}
@@ -178,8 +173,6 @@ const FormMessage = React.forwardRef<
           className={cn('text-app font-medium text-destructive', className)}
           data-slot='form-message'
           role={error ? 'alert' : undefined}
-          aria-live={error ? 'polite' : undefined}
-          aria-atomic={error ? 'true' : undefined}
           {...props}
         >
           {body}

@@ -51,8 +51,8 @@ export function FormStatus({
       className={cn('min-h-5 space-y-1 text-app', className)}
       data-slot='form-status'
       data-state={state}
-      aria-live='polite'
-      aria-atomic='true'
+      aria-live={trimmedError ? undefined : 'polite'}
+      aria-atomic={trimmedError ? undefined : 'true'}
     >
       {loading && (
         <div className='flex items-center gap-2 text-app text-tertiary-token'>
