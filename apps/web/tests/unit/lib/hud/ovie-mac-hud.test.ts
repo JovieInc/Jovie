@@ -245,6 +245,27 @@ describe('Ovie Mac HUD derivation', () => {
     expect(result.truncated).toBe(false);
   });
 
+  it('keeps zero-position merge queue entries classified as MQ', () => {
+    const result = composeOvieMacHudInFlightPullRequests({
+      totalOpen: 1,
+      pullRequests: [prNode({ number: 32 })],
+      mergeQueueEntries: [
+        {
+          position: 0,
+          state: 'AWAITING_CHECKS',
+          pullRequest: prNode({ number: 32 }),
+        },
+      ],
+    });
+
+    expect(result.items[0]).toMatchObject({
+      number: 32,
+      status: 'merge_queue',
+      mergeQueuePosition: 0,
+      statusDetail: 'Position 0',
+    });
+  });
+
   it('defaults snapshots to an unconfigured in-flight PR signal', () => {
     const snapshot = composeOvieMacHudSnapshot({
       alive: {

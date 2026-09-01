@@ -152,6 +152,10 @@ function positiveInteger(value: unknown): number | null {
   return Number.isInteger(value) && Number(value) > 0 ? Number(value) : null;
 }
 
+function nonNegativeInteger(value: unknown): number | null {
+  return Number.isInteger(value) && Number(value) >= 0 ? Number(value) : null;
+}
+
 function nonEmptyString(value: unknown): string | null {
   return typeof value === 'string' && value.trim().length > 0
     ? value.trim()
@@ -215,8 +219,8 @@ function normalizeMergeQueueMemberships(
   for (const entry of entries) {
     if (!isRecord(entry) || !isRecord(entry.pullRequest)) continue;
     const number = positiveInteger(entry.pullRequest.number);
-    const position = positiveInteger(entry.position);
-    if (!number || !position) continue;
+    const position = nonNegativeInteger(entry.position);
+    if (number === null || position === null) continue;
     memberships.set(number, {
       position,
       state: nonEmptyString(entry.state) ?? 'QUEUED',
