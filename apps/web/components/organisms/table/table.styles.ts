@@ -5,8 +5,7 @@
 
 // Typography Scale - Visual Hierarchy
 export const typography = {
-  tableHeader:
-    'text-app font-caption text-secondary-token tracking-normal line-clamp-1',
+  tableHeader: 'text-app font-caption text-secondary-token tracking-normal',
   cellPrimary: 'text-app font-caption text-primary-token', // Main content
   cellSecondary: 'text-app text-secondary-token', // Supporting info
   cellTertiary: 'text-xs text-tertiary-token', // Metadata, timestamps

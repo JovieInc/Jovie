@@ -57,6 +57,11 @@ export function TableHeaderCell<TData>({
   ) : (
     flexRender(header.column.columnDef.header, header.getContext())
   );
+  const visibleHeaderContent = isSemanticOnlyHeader ? (
+    headerContent
+  ) : (
+    <span className='min-w-0 truncate'>{headerContent}</span>
+  );
 
   return (
     <th
@@ -90,7 +95,7 @@ export function TableHeaderCell<TData>({
                 'focus-visible:outline-none focus-visible:border-(--linear-border-focus) focus-visible:bg-surface-1 focus-visible:ring-2 focus-visible:ring-ring/20'
               )}
             >
-              {headerContent}
+              {visibleHeaderContent}
               {sortDirection && (
                 <Icon
                   name={sortDirection === 'asc' ? 'ArrowUp' : 'ArrowDown'}
@@ -103,7 +108,13 @@ export function TableHeaderCell<TData>({
           );
         }
         return (
-          <div className={cn(tableHeaderClass, tableAlignment.text[align])}>
+          <div
+            className={cn(
+              tableHeaderClass,
+              'line-clamp-1',
+              tableAlignment.text[align]
+            )}
+          >
             {headerContent}
           </div>
         );

@@ -79,6 +79,7 @@ describe('table System B style exports', () => {
     expect(presets.tableRow).toContain('system-b-table-row-shell');
     expect(presets.tableHeaderRow).toBe('h-8');
     expect(presets.tableHeaderCell).toContain(alignment.headerPadding);
+    expect(presets.tableHeaderCell).not.toContain('line-clamp-1');
     expect(tableAlignment.text.right).toBe('text-right');
     expect(tableAlignment.headerButton.right).toContain('justify-end');
   });
