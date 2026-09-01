@@ -226,12 +226,12 @@ function SubjectText({
 }>) {
   return (
     <div className='min-w-0'>
-      <p className='truncate text-sm font-semibold leading-tight text-primary-token'>
+      <span className='block truncate text-sm font-semibold leading-tight text-primary-token'>
         {title}
-      </p>
-      <p className='entity-card-meta mt-0.5 truncate text-xs text-tertiary-token'>
+      </span>
+      <span className='entity-card-meta mt-0.5 block truncate text-xs text-tertiary-token'>
         {meta}
-      </p>
+      </span>
     </div>
   );
 }
@@ -686,10 +686,10 @@ export function ProfilePacCard({
       );
       status =
         fieldError || state.kind === 'error' ? (
-          <p className='text-xs text-white/80'>
+          <span className='block text-xs text-white/80'>
             {fieldError ??
               "That didn't go through — check your email and try again."}
-          </p>
+          </span>
         ) : null;
       break;
     }
@@ -915,10 +915,10 @@ export function ProfilePacCard({
             below never moves and never clips (zero-CLS contract). */}
         <div className='flex min-h-0 min-w-0 flex-1 flex-col gap-1.5 overflow-hidden'>
           <div className='flex items-center justify-between gap-2'>
-            <p className='entity-card-eyebrow inline-flex min-w-0 items-center gap-1.5 truncate text-3xs font-semibold leading-none text-tertiary-token'>
+            <span className='entity-card-eyebrow inline-flex min-w-0 items-center gap-1.5 truncate text-3xs font-semibold leading-none text-tertiary-token'>
               <ContextIcon className='h-3 w-3 shrink-0' aria-hidden='true' />
               <span className='truncate'>{contextLabel}</span>
-            </p>
+            </span>
             {contextAside}
           </div>
 

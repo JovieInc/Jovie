@@ -61,7 +61,7 @@ export function TableHeaderCell<TData>({
       key={header.id}
       scope='col'
       aria-sort={ariaSort}
-      className={cn(stickyHeaderClass, metaClassName)}
+      className={cn(stickyHeaderClass, metaClassName, 'whitespace-nowrap')}
       style={{
         width:
           header.getSize() >= 9999 || header.getSize() === 150

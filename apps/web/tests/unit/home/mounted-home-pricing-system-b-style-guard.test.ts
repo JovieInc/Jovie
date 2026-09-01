@@ -70,6 +70,7 @@ describe('mounted homepage pricing System B source contract', () => {
     expect(source).not.toContain('emphasizedPlanId');
     expect(source).toContain('homepage-pricing-shell');
     expect(source).toContain('homepage-pricing-copy');
+    expect(source).toContain('homepage-story-heading line-clamp-2');
     for (const className of [
       'system-b-mounted-home-pricing',
       'system-b-mounted-home-pricing-container',
@@ -79,6 +80,16 @@ describe('mounted homepage pricing System B source contract', () => {
     ]) {
       expect(source).toContain(className);
     }
+  });
+
+  it('keeps mounted homepage CTA headings explicitly clamped', () => {
+    const source = readFileSync(
+      path.join(webRoot, pricingComponentPath),
+      'utf8'
+    );
+
+    expect(source).toContain('homepage-story-heading line-clamp-2');
+    expect(source).toContain('text-balance line-clamp-2');
   });
 
   it('keeps mounted pricing CSS tokenized and stable', () => {

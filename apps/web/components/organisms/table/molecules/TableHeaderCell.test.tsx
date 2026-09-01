@@ -66,4 +66,9 @@ describe('TableHeaderCell (molecule)', () => {
     fireEvent.click(screen.getByRole('button', { name: /Title/i }));
     expect(onToggleSort).toHaveBeenCalled();
   });
+
+  it('keeps column heading cells bounded to one line', () => {
+    const { container } = renderCell();
+    expect(container.querySelector('th')).toHaveClass('whitespace-nowrap');
+  });
 });

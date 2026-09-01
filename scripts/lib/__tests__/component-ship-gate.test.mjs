@@ -88,7 +88,7 @@ const renderedPass = {
 const renderedFailure = {
   ok: false,
   status: 1,
-  report: { ok: false },
+  report: { ok: false, results: [] },
   output: 'missing rendered contract',
 };
 
@@ -592,13 +592,50 @@ describe('diff gate', () => {
 function renderedSection(options = {}, response = renderedPass) { const calls = []; const result = resolveRenderedEvaluationSection({ changedComponents: [BADGE_COMPONENT_REL], storybookUrl: STORYBOOK_URL, evaluateRendered: args => { calls.push(args); return response; }, ...options }); return { calls, result }; }
 
 describe('live rendered evaluation section', () => {
-  // biome-ignore format: compact matrix keeps this source-PR under the hard size cap
-  it.each([['empty', {}, true, { applicable: false, skipped: true }], ['advisory without Storybook', { storybookUrl: null }, true, { skipped: true }], ['required without Storybook', { requireRendered: true, storybookUrl: null }, false, { ok: false, skipped: true }], ['advisory failure', {}, true, { ok: false, status: 1 }, renderedFailure], ['required failure', { requireRendered: true }, false, { ok: false, status: 1 }, renderedFailure]])('handles %s', (_name, options, ok, section, response) => {
-    const result =
-      _name === 'empty'
-        ? resolveRenderedEvaluationSection()
-        : renderedSection(options, response).result;
-    expect(result).toMatchObject({ ok, section });
+  it('handles empty input', () => {
+    const result = resolveRenderedEvaluationSection();
+    expect(result).toMatchObject({
+      ok: true,
+      section: { applicable: false, skipped: true },
+    });
+  });
+
+  it('handles advisory mode without Storybook', () => {
+    const result = renderedSection({ storybookUrl: null }).result;
+    expect(result).toMatchObject({
+      ok: true,
+      section: { skipped: true },
+    });
+  });
+
+  it('handles required mode without Storybook', () => {
+    const result = renderedSection({
+      requireRendered: true,
+      storybookUrl: null,
+    }).result;
+    expect(result).toMatchObject({
+      ok: false,
+      section: { ok: false, skipped: true },
+    });
+  });
+
+  it('handles advisory rendered failures without blocking', () => {
+    const result = renderedSection({}, renderedFailure).result;
+    expect(result).toMatchObject({
+      ok: true,
+      section: { ok: false, status: 1 },
+    });
+  });
+
+  it('handles required rendered failures as blocking', () => {
+    const result = renderedSection(
+      { requireRendered: true },
+      renderedFailure
+    ).result;
+    expect(result).toMatchObject({
+      ok: false,
+      section: { ok: false, status: 1 },
+    });
   });
 
   it('runs rendered evaluation for adjacent component evidence', () => {

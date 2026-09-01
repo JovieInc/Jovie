@@ -210,8 +210,10 @@ async function exerciseKeyboardActivation(page, target) {
 async function clearInteractionState(page) {
   await page.mouse.move(-10, -10);
   await page.evaluate(() => {
-    const active = document.activeElement;
-    if (active instanceof HTMLElement) active.blur();
+    const { document: browserDocument, HTMLElement: BrowserHTMLElement } =
+      /** @type {Record<string, any>} */ (globalThis);
+    const active = browserDocument.activeElement;
+    if (active instanceof BrowserHTMLElement) active.blur();
   });
   await page.waitForTimeout(20);
 }
@@ -241,14 +243,20 @@ async function collectSnapshots(
     .first()
     .waitFor({ state: 'visible', timeout: 15_000 });
   await page.waitForFunction(
-    () =>
-      [...document.querySelectorAll('[data-jovie-eval-family]')].every(
+    () => {
+      const { document: browserDocument } = /** @type {Record<string, any>} */ (
+        globalThis
+      );
+      return [
+        ...browserDocument.querySelectorAll('[data-jovie-eval-family]'),
+      ].every(
         element =>
           element.getAttribute('data-jovie-eval-theme') ===
-          (document.documentElement.classList.contains('dark')
+          (browserDocument.documentElement.classList.contains('dark')
             ? 'dark'
             : 'light')
-      ),
+      );
+    },
     undefined,
     { timeout: 5_000 }
   );
@@ -265,7 +273,7 @@ async function collectSnapshots(
     await root.evaluate((element, id) => {
       element.setAttribute('data-jovie-eval-instance', id);
     }, instanceId);
-    await page.evaluate(() => Reflect.deleteProperty(window, 'axe'));
+    await page.evaluate(() => Reflect.deleteProperty(globalThis, 'axe'));
     const axe = await new AxeBuilder({ page })
       .include(`[data-jovie-eval-instance="${instanceId}"]`)
       .withTags(['wcag2a', 'wcag2aa', 'wcag21a', 'wcag21aa', 'wcag22aa'])
@@ -273,10 +281,22 @@ async function collectSnapshots(
 
     const snapshot = await root.evaluate(
       (element, context) => {
+        const {
+          CSS: BrowserCSS,
+          document: browserDocument,
+          HTMLElement: BrowserHTMLElement,
+          HTMLInputElement: BrowserHTMLInputElement,
+          HTMLAnchorElement: BrowserHTMLAnchorElement,
+          HTMLButtonElement: BrowserHTMLButtonElement,
+          HTMLSelectElement: BrowserHTMLSelectElement,
+          HTMLTextAreaElement: BrowserHTMLTextAreaElement,
+          getComputedStyle: getBrowserComputedStyle,
+        } = /** @type {Record<string, any>} */ (globalThis);
+        const getStyle = node => getBrowserComputedStyle(node);
         const parseColor = value => {
-          if (!value || !globalThis.CSS?.supports?.('color', value.trim()))
+          if (!value || !BrowserCSS?.supports?.('color', value.trim()))
             return null;
-          const canvas = document.createElement('canvas');
+          const canvas = browserDocument.createElement('canvas');
           canvas.width = 1;
           canvas.height = 1;
           const ctx = canvas.getContext('2d', { willReadFrequently: true });
@@ -331,23 +351,24 @@ async function collectSnapshots(
             a: alpha,
           };
         };
+        const px = value => Number.parseFloat(value) || 0;
         const tokenColor = token => {
-          const value = getComputedStyle(document.documentElement)
+          const value = getStyle(browserDocument.documentElement)
             .getPropertyValue(token)
             .trim();
           if (!value) return null;
           return parseColor(value);
         };
-        const px = value => Number.parseFloat(value) || 0;
         const tokenLength = token => {
           if (!token) return Number.NaN;
-          const probe = document.createElement('div');
+          const probe = browserDocument.createElement('div');
           probe.style.cssText = `position:fixed;visibility:hidden;width:var(${token});`;
-          document.body.append(probe);
-          const value = px(getComputedStyle(probe).width);
+          browserDocument.body.append(probe);
+          const value = px(getStyle(probe).width);
           probe.remove();
           return value;
         };
+        const cssEscape = value => BrowserCSS.escape(value);
         const anatomy = node => {
           const children = [...node.children]
             .map(child => anatomy(child))
@@ -357,14 +378,17 @@ async function collectSnapshots(
         const focusableSelector =
           'a[href],button,input,select,textarea,[tabindex],[contenteditable=""],[contenteditable="true"]';
         const isSequentiallyFocusable = node => {
-          if (!(node instanceof HTMLElement)) return false;
+          if (!(node instanceof BrowserHTMLElement)) return false;
           if (node.closest('[hidden],[inert]')) return false;
-          const style = getComputedStyle(node);
+          const style = getStyle(node);
           if (style.display === 'none' || style.visibility === 'hidden') {
             return false;
           }
           if (node.matches(':disabled')) return false;
-          if (node instanceof HTMLInputElement && node.type === 'hidden') {
+          if (
+            node instanceof BrowserHTMLInputElement &&
+            node.type === 'hidden'
+          ) {
             return false;
           }
           const tabindex = node.getAttribute('tabindex');
@@ -372,13 +396,13 @@ async function collectSnapshots(
             const parsed = Number.parseInt(tabindex, 10);
             return Number.isFinite(parsed) && parsed >= 0;
           }
-          if (node instanceof HTMLAnchorElement)
+          if (node instanceof BrowserHTMLAnchorElement)
             return node.hasAttribute('href');
           return (
-            node instanceof HTMLButtonElement ||
-            node instanceof HTMLInputElement ||
-            node instanceof HTMLSelectElement ||
-            node instanceof HTMLTextAreaElement ||
+            node instanceof BrowserHTMLButtonElement ||
+            node instanceof BrowserHTMLInputElement ||
+            node instanceof BrowserHTMLSelectElement ||
+            node instanceof BrowserHTMLTextAreaElement ||
             node.isContentEditable
           );
         };
@@ -388,7 +412,7 @@ async function collectSnapshots(
             ...node.querySelectorAll('svg, svg *'),
           ];
           for (const candidate of candidates) {
-            const candidateStyle = getComputedStyle(candidate);
+            const candidateStyle = getStyle(candidate);
             for (const property of ['fill', 'stroke']) {
               const rawValue = candidateStyle[property];
               if (!rawValue || rawValue === 'none') continue;
@@ -422,9 +446,9 @@ async function collectSnapshots(
           return wrapper;
         };
         const isRenderedVisible = node => {
-          if (!(node instanceof HTMLElement)) return false;
+          if (!(node instanceof BrowserHTMLElement)) return false;
           if (node.closest('[hidden],[inert]')) return false;
-          const style = getComputedStyle(node);
+          const style = getStyle(node);
           if (
             style.display === 'none' ||
             style.visibility === 'hidden' ||
@@ -435,10 +459,12 @@ async function collectSnapshots(
           const rect = node.getBoundingClientRect();
           return rect.width > 0 && rect.height > 0;
         };
-        const actualTheme = document.documentElement.classList.contains('dark')
+        const actualTheme = browserDocument.documentElement.classList.contains(
+          'dark'
+        )
           ? 'dark'
           : 'light';
-        const surfaceStyle = getComputedStyle(element);
+        const surfaceStyle = getStyle(element);
         const surfaceToken = element.dataset.jovieEvalSurfaceToken ?? '';
         const mapping = JSON.parse(element.dataset.jovieEvalMapping || '{}');
         const owner = element.dataset.jovieEvalOwner ?? '';
@@ -451,7 +477,7 @@ async function collectSnapshots(
           return counts;
         }, new Map());
         const bodyBackground = parseColor(
-          getComputedStyle(document.body).backgroundColor
+          getStyle(browserDocument.body).backgroundColor
         ) ?? {
           r: 255,
           g: 255,
@@ -473,7 +499,7 @@ async function collectSnapshots(
             'data-jovie-eval-target-instance',
             targetInstanceId
           );
-          const style = getComputedStyle(target);
+          const style = getStyle(target);
           const paddingXToken = wrapper.dataset.jovieEvalPaddingX ?? '';
           const paddingYToken = wrapper.dataset.jovieEvalPaddingY ?? '';
           const radiusToken = wrapper.dataset.jovieEvalRadius ?? '';
@@ -574,7 +600,7 @@ async function collectSnapshots(
             concentricRadius: [
               ...target.querySelectorAll('[data-jovie-eval-inner-edge]'),
             ].every(child => {
-              const childStyle = getComputedStyle(child);
+              const childStyle = getStyle(child);
               const childCorners = {
                 topLeft: px(childStyle.borderTopLeftRadius),
                 topRight: px(childStyle.borderTopRightRadius),
@@ -619,10 +645,10 @@ async function collectSnapshots(
               width: rect.width,
               height: rect.height,
             },
-            selector: `[data-jovie-eval-variant-instance="${CSS.escape(variantInstanceId)}"]`,
-            targetSelector: `[data-jovie-eval-target-instance="${CSS.escape(targetInstanceId)}"]`,
+            selector: `[data-jovie-eval-variant-instance="${cssEscape(variantInstanceId)}"]`,
+            targetSelector: `[data-jovie-eval-target-instance="${cssEscape(targetInstanceId)}"]`,
             keyboardTargetSelector: keyboardTargetInstanceId
-              ? `[data-jovie-eval-keyboard-target-instance="${CSS.escape(keyboardTargetInstanceId)}"]`
+              ? `[data-jovie-eval-keyboard-target-instance="${cssEscape(keyboardTargetInstanceId)}"]`
               : null,
           };
         });
@@ -696,8 +722,11 @@ async function collectSnapshots(
   await page.waitForTimeout(50);
   const zoomSnapshots = await page
     .locator('[data-jovie-eval-family]')
-    .evaluateAll(elements =>
-      elements.map(element => {
+    .evaluateAll(elements => {
+      const { document: browserDocument } = /** @type {Record<string, any>} */ (
+        globalThis
+      );
+      return elements.map(element => {
         const belongsToFamily = node =>
           node.closest('[data-jovie-eval-family]') === element;
         const findScopedTarget = wrapper => {
@@ -719,13 +748,15 @@ async function collectSnapshots(
         };
         const rootRect = element.getBoundingClientRect();
         const documentOverflowX =
-          document.documentElement.scrollWidth -
-            document.documentElement.clientWidth >
+          browserDocument.documentElement.scrollWidth -
+            browserDocument.documentElement.clientWidth >
           1;
         const rootOverflowX =
           element.scrollWidth - element.clientWidth > 1 ||
           rootRect.left < -1 ||
-          rootRect.right - window.innerWidth > 1 ||
+          rootRect.right -
+            /** @type {Record<string, any>} */ (globalThis).innerWidth >
+            1 ||
           documentOverflowX;
         const variants = [
           ...element.querySelectorAll('[data-jovie-eval-variant]'),
@@ -749,8 +780,8 @@ async function collectSnapshots(
           overflowX: rootOverflowX,
           variants,
         };
-      })
-    );
+      });
+    });
 
   for (const snapshot of snapshots) {
     const zoom =

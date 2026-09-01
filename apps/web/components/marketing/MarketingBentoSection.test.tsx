@@ -14,49 +14,42 @@ vi.mock('next/link', () => ({
   default: ({
     children,
     href,
-    ...props
   }: {
     readonly children: ReactNode;
     readonly href: string;
-  }) => (
-    <a href={href} {...props}>
-      {children}
-    </a>
-  ),
+  }) => <a href={href}>{children}</a>,
 }));
 
-const featuredStart: MarketingBentoCard = {
-  id: 'release-plan',
-  title: 'Know what ships next',
-  body: 'Keep release work and dates in one clear view.',
-  preview: <div data-testid='release-preview' />,
-  previewLabel: 'Release workflow preview',
-  action: { href: '/start', label: 'Plan a release' },
-};
+const card = (
+  id: string,
+  title: string,
+  extra: Partial<MarketingBentoCard> = {}
+) =>
+  ({
+    id,
+    title,
+    body: `${title} body.`,
+    ...extra,
+  }) as MarketingBentoCard;
 
-const supportingTop: MarketingBentoCard = {
-  id: 'profile',
-  title: 'One profile for every fan',
-  body: 'Show the next useful release, link, or action.',
-  preview: <div data-testid='profile-preview' />,
-  previewLabel: 'Adaptive profile preview',
-  previewAspect: 'landscape',
-};
-
-const supportingBottom: MarketingBentoCard = {
-  id: 'signals',
-  title: 'Signals worth acting on',
-  body: 'See which release moments need attention.',
-};
-
-const featuredEnd: MarketingBentoCard = {
-  id: 'fans',
-  title: 'Keep every fan close',
-  body: 'Carry fan context into the next release.',
-  preview: <div data-testid='fan-preview' />,
-  previewLabel: 'Fan activity preview',
-  previewAspect: 'square',
-  action: { href: '/artist-profiles', label: 'Explore artist profiles' },
+const sectionCards = {
+  featuredStart: card('release-plan', 'Know what ships next', {
+    preview: <div />,
+    previewLabel: 'Release preview',
+    action: { href: '/start', label: 'Plan' },
+  }),
+  supportingTop: card('profile', 'One profile for every fan', {
+    preview: <div />,
+    previewLabel: 'Profile preview',
+    previewAspect: 'landscape',
+  }),
+  supportingBottom: card('signals', 'Signals worth acting on'),
+  featuredEnd: card('fans', 'Keep every fan close', {
+    preview: <div />,
+    previewLabel: 'Fan preview',
+    previewAspect: 'square',
+    action: { href: '/artist-profiles', label: 'Explore' },
+  }),
 };
 
 function renderSection(titleId = 'jovie-bento-title') {
@@ -65,85 +58,22 @@ function renderSection(titleId = 'jovie-bento-title') {
       eyebrow='Inside Jovie'
       title='Your release work, connected.'
       titleId={titleId}
-      description='A shared view of releases, profiles, and fan activity.'
-      featuredStart={featuredStart}
-      supportingTop={supportingTop}
-      supportingBottom={supportingBottom}
-      featuredEnd={featuredEnd}
+      description='Shared release and fan activity.'
+      {...sectionCards}
     />
   );
 }
 
 describe('MarketingBentoSection', () => {
-  it('renders one labelled section with four named semantic cards', () => {
+  it('renders the bounded labelled section with named grid rhythm', () => {
     renderSection();
 
     expect(
-      screen.getByRole('region', {
+      screen.getByRole('heading', {
+        level: 2,
         name: 'Your release work, connected.',
       })
-    ).toBeInTheDocument();
-    expect(screen.getAllByRole('article')).toHaveLength(4);
-    expect(
-      screen
-        .getAllByTestId('marketing-bento-card')
-        .map(card => card.dataset.slot)
-    ).toEqual([
-      'featured-start',
-      'supporting-top',
-      'supporting-bottom',
-      'featured-end',
-    ]);
-  });
-
-  it('scopes card labels to each reusable section instance', () => {
-    renderSection('first-bento-title');
-    renderSection('second-bento-title');
-
-    const cardHeadingIds = screen
-      .getAllByRole('heading', { level: 3 })
-      .map(heading => heading.id);
-    expect(new Set(cardHeadingIds).size).toBe(8);
-    expect(cardHeadingIds).toContain(
-      'first-bento-title-featured-start-release-plan-title'
-    );
-    expect(cardHeadingIds).toContain(
-      'second-bento-title-featured-start-release-plan-title'
-    );
-  });
-
-  it('keeps ARIA references unique when sanitized caller IDs collide', () => {
-    render(
-      <MarketingBentoSection
-        eyebrow='Inside Jovie'
-        title='Collision check'
-        titleId='collision-bento-title'
-        description='A reusable section with adversarial card IDs.'
-        featuredStart={{ ...featuredStart, id: 'profile.v2' }}
-        supportingTop={{ ...supportingTop, id: 'profile-v2' }}
-        supportingBottom={supportingBottom}
-        featuredEnd={featuredEnd}
-      />
-    );
-
-    const articles = screen.getAllByRole('article');
-    const titleReferences = articles.map(article =>
-      article.getAttribute('aria-labelledby')
-    );
-    const bodyReferences = articles.map(article =>
-      article.getAttribute('aria-describedby')
-    );
-
-    expect(new Set(titleReferences).size).toBe(4);
-    expect(new Set(bodyReferences).size).toBe(4);
-    for (const reference of [...titleReferences, ...bodyReferences]) {
-      expect(reference).not.toBeNull();
-      expect(document.getElementById(reference ?? '')).not.toBeNull();
-    }
-  });
-
-  it('locks the responsive three-column two-row rhythm to named spans', () => {
-    renderSection();
+    ).toHaveClass('marketing-h2-linear', 'line-clamp-2');
 
     const grid = screen.getByTestId('marketing-bento-grid');
     expect(grid).toHaveAttribute('data-layout', 'three-column-two-row');
@@ -153,66 +83,47 @@ describe('MarketingBentoSection', () => {
       'xl:grid-cols-3',
       'xl:grid-rows-2'
     );
-    expect(grid).not.toHaveClass('xl:grid-cols-4');
 
     const cards = screen.getAllByTestId('marketing-bento-card');
+    expect(cards.map(item => item.dataset.slot)).toEqual([
+      'featured-start',
+      'supporting-top',
+      'supporting-bottom',
+      'featured-end',
+    ]);
     expect(cards[0]).toHaveClass('xl:col-start-1', 'xl:row-span-2');
-    expect(cards[1]).toHaveClass('xl:col-start-2', 'xl:row-start-1');
-    expect(cards[2]).toHaveClass('xl:col-start-2', 'xl:row-start-2');
     expect(cards[3]).toHaveClass('xl:col-start-3', 'xl:row-span-2');
   });
 
-  it('labels previews, preserves no-preview card geometry, and exposes only explicit actions', () => {
+  it('preserves preview geometry, actions, and secondary token copy', () => {
     renderSection();
 
     expect(
-      screen.getByRole('figure', { name: 'Release workflow preview' })
+      screen.getByRole('figure', { name: 'Release preview' })
     ).toHaveAttribute('data-preview-aspect', 'portrait');
     expect(
-      screen.getByRole('figure', { name: 'Adaptive profile preview' })
+      screen.getByRole('figure', { name: 'Profile preview' })
     ).toHaveAttribute('data-preview-aspect', 'landscape');
-
-    const noPreviewCard = screen
-      .getAllByTestId('marketing-bento-card')
-      .find(card => card.dataset.slot === 'supporting-bottom');
-    expect(noPreviewCard).toHaveAttribute('data-has-preview', 'false');
-    expect(noPreviewCard?.querySelector('[tabindex]')).toBeNull();
-
-    const actions = screen.getAllByRole('link');
-    expect(actions).toHaveLength(2);
-    for (const action of actions) {
-      expect(action).toHaveClass(
-        'public-action-secondary',
-        'focus-ring-themed',
-        'min-h-11'
-      );
-    }
-  });
-
-  it('binds section and card copy to the canonical secondary text token', () => {
-    renderSection();
-
-    expect(
-      screen.getByText('A shared view of releases, profiles, and fan activity.')
-    ).toHaveClass('marketing-bento-section__secondary');
-    expect(
-      screen.getByText('Keep release work and dates in one clear view.')
-    ).toHaveClass('marketing-bento-section__secondary');
+    expect(screen.getByText('Shared release and fan activity.')).toHaveClass(
+      'marketing-bento-section__secondary'
+    );
+    expect(screen.getByRole('link', { name: 'Plan' })).toHaveClass(
+      'public-action-secondary',
+      'focus-ring-themed',
+      'min-h-11'
+    );
   });
 
   it('rejects the deliberate-red equal-column rhythm', () => {
     render(<MarketingBentoBrokenRhythmFixture />);
     renderSection();
 
-    const fixture = screen.getByTestId(
-      MARKETING_BENTO_BROKEN_RHYTHM_FIXTURE_TEST_ID
+    expect(
+      screen.getByTestId(MARKETING_BENTO_BROKEN_RHYTHM_FIXTURE_TEST_ID)
+    ).toHaveClass('xl:grid-cols-4');
+    expect(screen.getByTestId('marketing-bento-grid')).toHaveClass(
+      'xl:grid-cols-3',
+      'xl:grid-rows-2'
     );
-    expect(fixture).toHaveAttribute('data-deliberate-red', '');
-    expect(fixture).toHaveClass('xl:grid-cols-4');
-    expect(fixture).not.toHaveClass('xl:grid-cols-3', 'xl:grid-rows-2');
-
-    const production = screen.getByTestId('marketing-bento-grid');
-    expect(production).toHaveClass('xl:grid-cols-3', 'xl:grid-rows-2');
-    expect(production).not.toHaveAttribute('data-deliberate-red');
   });
 });

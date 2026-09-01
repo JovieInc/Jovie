@@ -31,7 +31,7 @@ export function HomepageStoryHeader({
       className={cn(centered ? 'mx-auto text-center' : 'max-w-xl', className)}
     >
       <h2
-        className={cn('homepage-story-heading', headlineClassName)}
+        className={cn('homepage-story-heading line-clamp-2', headlineClassName)}
         data-testid={headlineTestId}
       >
         {headline}
@@ -120,7 +120,7 @@ export function HomepageV2FinalCta({
           <h2
             data-homepage-section-heading
             data-testid={headingTestId}
-            className='homepage-final-cta-heading system-b-mounted-home-footer-cta-heading text-balance'
+            className='homepage-final-cta-heading system-b-mounted-home-footer-cta-heading text-balance line-clamp-2'
           >
             {headline}
           </h2>

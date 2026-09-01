@@ -464,6 +464,7 @@ describe('canonical marketing component registry', () => {
     expect(source).toContain("import { Button } from '@jovie/ui'");
     expect(source).toContain('function MarketingTerminalCtaAction');
     expect(source.match(/<MarketingTerminalCtaAction[\s>]/g)).toHaveLength(2);
+    expect(source).toContain('line-clamp-2');
     expect(source).toContain("variant='primary'");
     expect(source).toContain("variant='tertiary'");
     expect(source).toContain("size='lg'");

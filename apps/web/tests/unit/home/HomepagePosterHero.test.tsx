@@ -47,6 +47,10 @@ describe('MarketingPosterHero', () => {
 
     const heading = screen.getByRole('heading', { level: 1 });
     expect(screen.getAllByRole('heading', { level: 1 })).toHaveLength(1);
+    expect(heading).toHaveClass(
+      'homepage-poster-hero__headline',
+      'line-clamp-2'
+    );
     expect(screen.getByTestId('homepage-hero-shell')).toHaveAttribute(
       'aria-labelledby',
       heading.id

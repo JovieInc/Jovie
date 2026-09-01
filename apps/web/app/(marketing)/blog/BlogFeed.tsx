@@ -22,7 +22,7 @@ export function BlogFeed({ entries }: Readonly<BlogFeedProps>) {
       <div className='min-h-screen'>
         <MarketingHero variant='left'>
           <p className='mb-0 text-sm font-medium text-tertiary-token'>Blog</p>
-          <h1 className='mb-6 mt-6 max-w-2xl text-4xl font-semibold tracking-tight text-balance text-primary-token sm:text-5xl'>
+          <h1 className='mb-6 mt-6 max-w-2xl text-4xl font-semibold tracking-tight text-balance text-primary-token sm:text-5xl line-clamp-2'>
             Blog
           </h1>
           <p className='max-w-xl text-lg leading-relaxed text-secondary-token'>
@@ -37,7 +37,7 @@ export function BlogFeed({ entries }: Readonly<BlogFeedProps>) {
     <div className='min-h-screen'>
       <MarketingHero variant='left'>
         <p className='mb-0 text-sm font-medium text-tertiary-token'>Blog</p>
-        <h1 className='mb-6 mt-6 max-w-2xl text-4xl font-semibold tracking-tight text-balance text-primary-token sm:text-5xl'>
+        <h1 className='mb-6 mt-6 max-w-2xl text-4xl font-semibold tracking-tight text-balance text-primary-token sm:text-5xl line-clamp-2'>
           Blog
         </h1>
         <p className='max-w-xl text-lg leading-relaxed text-secondary-token'>

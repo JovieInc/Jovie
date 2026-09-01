@@ -152,7 +152,7 @@ export function YoutubeThumbnailsLanding() {
               </p>
               <h2
                 id='approval-loop-heading'
-                className='mt-3 text-balance text-2xl font-semibold tracking-tight sm:text-3xl'
+                className='mt-3 text-balance text-2xl font-semibold tracking-tight sm:text-3xl line-clamp-2'
               >
                 {copy.workflow.title}
               </h2>
@@ -191,7 +191,7 @@ export function YoutubeThumbnailsLanding() {
               </p>
               <h2
                 id='thumbnail-safeguards-heading'
-                className='mt-3 text-balance text-2xl font-semibold tracking-tight sm:text-3xl'
+                className='mt-3 text-balance text-2xl font-semibold tracking-tight sm:text-3xl line-clamp-2'
               >
                 {copy.safeguards.title}
               </h2>
@@ -210,7 +210,7 @@ export function YoutubeThumbnailsLanding() {
               <p className='homepage-section-eyebrow'>{copy.plans.eyebrow}</p>
               <h2
                 id='thumbnail-plans-heading'
-                className='mt-3 text-balance text-2xl font-semibold tracking-tight sm:text-3xl'
+                className='mt-3 text-balance text-2xl font-semibold tracking-tight sm:text-3xl line-clamp-2'
               >
                 {copy.plans.title}
               </h2>

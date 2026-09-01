@@ -111,7 +111,7 @@ export function MarketingTerminalCta({
 
   const content = (
     <div className={variantStyles.content}>
-      <h2 className={variantStyles.title}>{title}</h2>
+      <h2 className={`${variantStyles.title} line-clamp-2`}>{title}</h2>
       {body ? <p className={variantStyles.body}>{body}</p> : null}
       <div className={variantStyles.actions}>
         <MarketingTerminalCtaAction

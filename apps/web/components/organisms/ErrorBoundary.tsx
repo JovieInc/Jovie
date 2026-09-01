@@ -1,3 +1,4 @@
+// @coverage-via apps/web/tests/unit/ErrorBoundary.test.tsx
 'use client';
 
 import { Button } from '@jovie/ui';
@@ -54,6 +55,15 @@ export default function ErrorBoundary({
   const displayMessage = isSkewError
     ? 'The app was just updated. Reload to continue.'
     : message;
+  const primaryAction = isSkewError
+    ? {
+        label: 'Reload',
+        onClick: () => globalThis.location.reload(),
+      }
+    : {
+        label: 'Try Again',
+        onClick: reset,
+      };
 
   return (
     <div
@@ -76,19 +86,9 @@ export default function ErrorBoundary({
         </div>
 
         <div className='flex justify-center gap-3'>
-          {isSkewError ? (
-            <Button
-              variant='primary'
-              size='sm'
-              onClick={() => globalThis.location.reload()}
-            >
-              Reload
-            </Button>
-          ) : (
-            <Button variant='primary' size='sm' onClick={reset}>
-              Try Again
-            </Button>
-          )}
+          <Button variant='primary' size='sm' onClick={primaryAction.onClick}>
+            {primaryAction.label}
+          </Button>
           <Button
             variant='secondary'
             size='sm'
