@@ -59,9 +59,9 @@ export function ContentChartSkeleton({
       role='status'
       aria-busy='true'
       aria-live='polite'
-      aria-label={label}
       data-testid={testId}
     >
+      <span className='sr-only'>{label}</span>
       <svg
         aria-hidden='true'
         className='h-full w-full text-tertiary-token'

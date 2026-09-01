@@ -1,9 +1,6 @@
 import { render, screen } from '@testing-library/react';
 import { describe, expect, it } from 'vitest';
-import {
-  ContentChartSkeleton,
-  ContentChartState,
-} from './ContentChartState';
+import { ContentChartSkeleton, ContentChartState } from './ContentChartState';
 
 describe('ContentChartState', () => {
   it('renders a stable chart loading frame with a named status', () => {
@@ -15,12 +12,11 @@ describe('ContentChartState', () => {
       />
     );
 
-    const status = screen.getByRole('status', {
-      name: 'Loading revenue chart',
-    });
+    const status = screen.getByRole('status');
     expect(status).toHaveAttribute('aria-busy', 'true');
     expect(status).toHaveClass('h-50', 'bg-surface-0');
     expect(screen.getByTestId('chart-loading')).toBe(status);
+    expect(screen.getByText('Loading revenue chart')).toHaveClass('sr-only');
   });
 
   it('keeps empty chart copy inside the same stable frame', () => {

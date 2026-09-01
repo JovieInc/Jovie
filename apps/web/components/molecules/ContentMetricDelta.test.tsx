@@ -19,4 +19,21 @@ describe('ContentMetricDelta', () => {
     expect(screen.getByText('-4.0%')).toBeInTheDocument();
     expect(screen.getByText('+0.0%')).toBeInTheDocument();
   });
+
+  it('uses hidden descriptive text instead of unsupported aria labeling', () => {
+    render(
+      <ContentMetricDelta
+        direction='up'
+        value='+12.5%'
+        aria-label='Daily active users changed by 12.5%'
+        data-testid='delta'
+      />
+    );
+
+    expect(screen.getByTestId('delta')).not.toHaveAttribute('aria-label');
+    expect(
+      screen.getByText('Daily active users changed by 12.5%')
+    ).toHaveClass('sr-only');
+    expect(screen.getByText('+12.5%')).toHaveAttribute('aria-hidden', 'true');
+  });
 });

@@ -40,14 +40,15 @@ const OVERVIEW_METRIC_KEYS = ['profile-views', 'unique-visitors'] as const;
 function OverviewMetricGrid({
   children,
   role,
-  ariaLabel,
+  statusLabel,
 }: Readonly<{
   children: ReactNode;
   role?: string;
-  ariaLabel?: string;
+  statusLabel?: string;
 }>) {
   return (
-    <div className='grid grid-cols-2 gap-2' role={role} aria-label={ariaLabel}>
+    <div className='grid grid-cols-2 gap-2' role={role}>
+      {statusLabel ? <span className='sr-only'>{statusLabel}</span> : null}
       {children}
     </div>
   );
@@ -55,7 +56,7 @@ function OverviewMetricGrid({
 
 function DashboardAnalyticsOverviewLoading() {
   return (
-    <OverviewMetricGrid role='status' ariaLabel='Loading Analytics Overview'>
+    <OverviewMetricGrid role='status' statusLabel='Loading Analytics Overview'>
       {OVERVIEW_METRIC_KEYS.map(key => (
         <ContentMetricCardSkeleton key={key} className='py-3.5' />
       ))}
@@ -65,7 +66,10 @@ function DashboardAnalyticsOverviewLoading() {
 
 function DashboardAnalyticsOverviewError() {
   return (
-    <OverviewMetricGrid role='alert' ariaLabel='Analytics Overview Unavailable'>
+    <OverviewMetricGrid
+      role='alert'
+      statusLabel='Analytics Overview Unavailable'
+    >
       <ContentMetricCard
         as='section'
         label='Profile views'
