@@ -58,7 +58,9 @@ const countFormatter = new Intl.NumberFormat('en-US');
 function JovieWorkGlyph({ icon }: { readonly icon: JovieWorkIcon }) {
   const Icon = JOVIE_WORK_ICONS[icon] ?? Sparkles;
 
-  return <Icon className='h-3 w-3 text-tertiary-token' aria-hidden='true' />;
+  return (
+    <Icon className='h-3 w-3 text-tertiary-token' aria-hidden='true' />
+  );
 }
 
 function JovieWorkEmptyState({
@@ -67,7 +69,9 @@ function JovieWorkEmptyState({
   readonly isRefreshing: boolean;
 }) {
   return (
-    <div className={isRefreshing ? 'opacity-70 transition-opacity' : undefined}>
+    <div
+      className={isRefreshing ? 'opacity-70 transition-opacity' : undefined}
+    >
       <EmptyState
         heading='Jovie has not shipped autonomous work in this window yet.'
         description='Release autopilot, fan notifications, and agent runs will show up here.'
@@ -196,7 +200,9 @@ const JovieWorkItemRow = memo(function JovieWorkItemRow({
           {formatTimeAgo(item.timestamp)}
         </ActivityTimelineTimestamp>
       </ActivityTimelineMeta>
-      {item.outcomeSlot ? <JovieWorkOutcomeSlot outcome={item.outcome} /> : null}
+      {item.outcomeSlot ? (
+        <JovieWorkOutcomeSlot outcome={item.outcome} />
+      ) : null}
     </ActivityTimelineRow>
   );
 });
@@ -287,7 +293,8 @@ export function JovieWorkFeed({
         {items.length > 0 &&
           `${items.length} ${items.length === 1 ? 'item' : 'items'} loaded`}
         {isRefreshing && 'Refreshing Jovie work feed'}
-        {error && `Error: ${error.message || 'Failed to load Jovie work feed'}`}
+        {error &&
+          `Error: ${error.message || 'Failed to load Jovie work feed'}`}
       </div>
     </div>
   );

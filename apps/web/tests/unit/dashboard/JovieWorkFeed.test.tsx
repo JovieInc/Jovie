@@ -123,7 +123,9 @@ describe('JovieWorkFeed', () => {
     expect(
       screen.getByText(/Jovie has not shipped autonomous work/i)
     ).toBeInTheDocument();
-    expect(screen.getByTestId('jovie-work-empty-state').tagName).toBe('OUTPUT');
+    expect(screen.getByTestId('jovie-work-empty-state').tagName).toBe(
+      'OUTPUT'
+    );
   });
 
   it('can hide the duplicate feed heading inside the full workspace', () => {

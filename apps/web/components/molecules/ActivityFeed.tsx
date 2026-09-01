@@ -33,7 +33,10 @@ function formatRelativeTime(date: Date): string {
   if (diffDays === 1) return 'yesterday';
   if (diffDays < 7) return `${diffDays}d ago`;
   if (diffDays < 30) return `${Math.floor(diffDays / 7)}w ago`;
-  return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+  return date.toLocaleDateString('en-US', {
+    month: 'short',
+    day: 'numeric',
+  });
 }
 
 const ACTION_ICONS: Record<ActivityAction, typeof Plus> = {
@@ -187,7 +190,10 @@ export function ActivityTimelineRow({
           {content}
         </Link>
       ) : (
-        <div className={shellClassName} data-testid='activity-timeline-row-shell'>
+        <div
+          className={shellClassName}
+          data-testid='activity-timeline-row-shell'
+        >
           {content}
         </div>
       )}
@@ -214,11 +220,7 @@ export function ActivityFeedSkeleton({ rows = 4 }: { readonly rows?: number }) {
   return (
     <div className={ACTIVITY_TIMELINE_LIST_CLASSNAME} aria-busy='true'>
       {skeletonKeys.map(skeletonKey => (
-        <div
-          key={skeletonKey}
-          className='group relative'
-          aria-hidden='true'
-        >
+        <div key={skeletonKey} className='group relative' aria-hidden='true'>
           <ActivityTimelineLine testId='activity-timeline-skeleton-line' />
           <div className={ACTIVITY_TIMELINE_ROW_SHELL_CLASSNAME}>
             <div className='relative z-10 h-6 w-6 shrink-0 rounded-full bg-surface-0 skeleton' />
