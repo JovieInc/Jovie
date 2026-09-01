@@ -11,6 +11,10 @@ import {
 import { extname, resolve } from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { validateControllerHopChanges } from './invariants/controller-hop-contract.mjs';
+import {
+  isRegularGitMode,
+  REPOSITORY_MAX_TRACKED_BYTES,
+} from './lib/repository-size-policy.mjs';
 
 const MiB = 1024 * 1024;
 
@@ -22,7 +26,7 @@ export const HYGIENE_LIMITS = Object.freeze({
   maxChangedBinaryFiles: 120,
   maxSnapshotBytes: 12 * MiB,
   maxSnapshotFiles: 100,
-  maxTrackedBytes: 180 * MiB,
+  maxTrackedBytes: REPOSITORY_MAX_TRACKED_BYTES,
   maxTrackedBinaryBytes: 96 * MiB,
 });
 
@@ -846,7 +850,6 @@ function gitPaths(args) {
     .filter(Boolean);
 }
 
-const REGULAR_GIT_MODES = new Set(['100644', '100755']);
 function gitPathModes(args, indexFormat) {
   const modes = new Map();
   for (const record of gitPaths(args)) {
@@ -871,15 +874,14 @@ function pathDelta(base, current) {
     addedRegularPaths: [...current]
       .filter(
         ([path, mode]) =>
-          REGULAR_GIT_MODES.has(mode) && !REGULAR_GIT_MODES.has(base.get(path))
+          isRegularGitMode(mode) && !isRegularGitMode(base.get(path))
       )
       .map(([path]) => path),
     deletedPaths,
     deletedRegularPaths: [...base]
       .filter(
         ([path, mode]) =>
-          REGULAR_GIT_MODES.has(mode) &&
-          !REGULAR_GIT_MODES.has(current.get(path))
+          isRegularGitMode(mode) && !isRegularGitMode(current.get(path))
       )
       .map(([path]) => path),
   };

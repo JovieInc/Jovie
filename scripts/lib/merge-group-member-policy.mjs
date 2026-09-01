@@ -1,6 +1,7 @@
 import { readFile } from 'node:fs/promises';
 import { pathToFileURL } from 'node:url';
 import { evaluatePrSizePolicy } from './pr-size-guard-policy.mjs';
+import { evaluateGitTreeRepositorySize } from './repository-size-policy.mjs';
 
 const SHA_PATTERN = /^[0-9a-f]{40}$/;
 const GENERATED_PR_TRAILER_PATTERN = /\(#(\d+)\)$/;
@@ -379,6 +380,22 @@ async function fetchComparison(repository, baseSha, headSha, token) {
   return result.data;
 }
 
+async function fetchExactHeadTree(repository, headSha, token) {
+  const commit = await githubRequest(
+    `/repos/${repository}/git/commits/${headSha}`,
+    { token }
+  );
+  if (commit.data?.sha !== headSha) {
+    fail('Git Commits API did not return the exact synthetic head');
+  }
+  const treeSha = requireSha(commit.data?.tree?.sha, 'synthetic head tree sha');
+  const tree = await githubRequest(
+    `/repos/${repository}/git/trees/${treeSha}?recursive=1`,
+    { token }
+  );
+  return { tree: tree.data, treeSha };
+}
+
 function parsePolicy(argv) {
   const argument = argv.find(value => value.startsWith('--policy='));
   const policy = argument?.slice('--policy='.length);
@@ -407,6 +424,7 @@ async function runPolicy() {
   );
 
   let results;
+  let repositorySize = null;
   if (policy === 'fork') {
     const reviews = await Promise.all(
       pullRequests.map(pr =>
@@ -445,6 +463,11 @@ async function runPolicy() {
         maxFiles,
       })
     );
+    const exactTree = await fetchExactHeadTree(repository, headSha, token);
+    repositorySize = evaluateGitTreeRepositorySize({
+      expectedTreeSha: exactTree.treeSha,
+      tree: exactTree.tree,
+    });
   }
 
   for (let index = 0; index < members.length; index += 1) {
@@ -456,6 +479,14 @@ async function runPolicy() {
   const failed = results.findIndex(result => !result.passed);
   if (failed >= 0) {
     fail(`PR #${members[failed].number} failed ${policy} merge-group policy`);
+  }
+  if (repositorySize) {
+    console.log(
+      `Combined head repository: ${repositorySize.trackedBytes} tracked regular bytes across ${repositorySize.trackedFiles} files (cap ${repositorySize.maxTrackedBytes}).`
+    );
+    if (!repositorySize.passed) {
+      fail('exact merge-group head exceeds the repository byte budget');
+    }
   }
   console.log(
     `Validated ${members.length} merge-group member(s) for ${policy} policy.`

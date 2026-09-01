@@ -1199,6 +1199,7 @@ ${selectedGateScript}`,
     expect(sizeGuard).toContain(
       'node scripts/lib/merge-group-member-policy.mjs --policy=size'
     );
+    expect(sizeGuard).toContain('scripts/lib/repository-size-policy.mjs');
     expect(sizeGuard).toContain("MAX_LINES: ${{ vars.PR_MAX_LINES || '800' }}");
     expect(sizeGuard).not.toContain('members were size-checked as source PRs');
     expect(getJobBlock(SIZE_GUARD_WORKFLOW, 'size')).toContain(
@@ -1206,6 +1207,7 @@ ${selectedGateScript}`,
     );
     expect(MEMBER_POLICY).toContain('fetchComparison');
     expect(MEMBER_POLICY).toContain('fetchPullRequest');
+    expect(MEMBER_POLICY).toContain('fetchExactHeadTree');
     expect(MEMBER_POLICY).not.toContain("githubRequest('/graphql'");
     expect(MEMBER_POLICY).not.toContain('mergeQueue(');
     const maxMembers = BRANCH_RULESET.match(

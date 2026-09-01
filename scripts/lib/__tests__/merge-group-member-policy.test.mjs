@@ -5,6 +5,10 @@ import {
   evaluateSizeMemberPolicy,
   resolveMergeGroupMembers,
 } from '../merge-group-member-policy.mjs';
+import {
+  evaluateGitTreeRepositorySize,
+  REPOSITORY_MAX_TRACKED_BYTES,
+} from '../repository-size-policy.mjs';
 
 const BASE = '1'.repeat(40);
 const FIRST = '2'.repeat(40);
@@ -307,5 +311,84 @@ describe('merge-group size policy', () => {
         maxFiles: 40,
       })
     ).toMatchObject({ passed: false, policy: 'standard' });
+  });
+});
+
+describe('exact merge-group tree repository budget', () => {
+  const TREE = '4'.repeat(40);
+
+  function tree(entries, overrides = {}) {
+    return {
+      sha: TREE,
+      tree: entries,
+      truncated: false,
+      ...overrides,
+    };
+  }
+
+  it('counts only regular blobs and rejects an over-budget combined head', () => {
+    const result = evaluateGitTreeRepositorySize({
+      expectedTreeSha: TREE,
+      tree: tree([
+        { path: 'src/index.ts', mode: '100644', type: 'blob', size: 100 },
+        { path: 'scripts/run.sh', mode: '100755', type: 'blob', size: 50 },
+        { path: 'linked', mode: '120000', type: 'blob', size: 9_999 },
+        { path: 'vendor/module', mode: '160000', type: 'commit' },
+        { path: 'src', mode: '040000', type: 'tree' },
+      ]),
+      maxTrackedBytes: 149,
+    });
+
+    expect(result).toMatchObject({
+      maxTrackedBytes: 149,
+      passed: false,
+      trackedBytes: 150,
+      trackedFiles: 2,
+    });
+  });
+
+  it('uses the same hard byte limit as source repository hygiene', () => {
+    const result = evaluateGitTreeRepositorySize({
+      expectedTreeSha: TREE,
+      tree: tree([
+        {
+          path: 'payload.bin',
+          mode: '100644',
+          type: 'blob',
+          size: REPOSITORY_MAX_TRACKED_BYTES,
+        },
+      ]),
+    });
+
+    expect(result).toMatchObject({
+      maxTrackedBytes: REPOSITORY_MAX_TRACKED_BYTES,
+      passed: true,
+      trackedBytes: REPOSITORY_MAX_TRACKED_BYTES,
+    });
+  });
+
+  it('fails closed on truncated, mismatched, duplicate, or malformed evidence', () => {
+    const valid = {
+      path: 'src/index.ts',
+      mode: '100644',
+      type: 'blob',
+      size: 100,
+    };
+
+    for (const malformed of [
+      tree([valid], { truncated: true }),
+      tree([valid], { sha: '5'.repeat(40) }),
+      tree([valid, valid]),
+      tree([{ ...valid, size: undefined }]),
+      tree([{ ...valid, type: 'tree' }]),
+      tree([{ ...valid, mode: '999999' }]),
+    ]) {
+      expect(() =>
+        evaluateGitTreeRepositorySize({
+          expectedTreeSha: TREE,
+          tree: malformed,
+        })
+      ).toThrow();
+    }
   });
 });

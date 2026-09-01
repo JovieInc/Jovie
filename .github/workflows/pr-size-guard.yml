@@ -67,6 +67,7 @@ jobs:
           sparse-checkout: |
             scripts/lib/merge-group-member-policy.mjs
             scripts/lib/pr-size-guard-policy.mjs
+            scripts/lib/repository-size-policy.mjs
           sparse-checkout-cone-mode: false
 
       - name: Revalidate every merge-group member's size policy

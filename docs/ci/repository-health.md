@@ -78,6 +78,8 @@ File count, checkout/history size, dependency/build complexity, and organization
 
 The 10,000-file failure is retired, not raised. `scripts/repo-health-baseline.json` records the 10,014 exact-main total, 9,945 old compatibility count, and legacy findings by rule/area. Receipts show the current total and delta. Existing PR-size, generated-placement, payload, binary, and visual gates still fail normally; there is no `continue-on-error`.
 
+Source PR hygiene measures the checked-out candidate tree. The native merge queue independently resolves the exact synthetic head commit and recursive tree through GitHub's Git Data API, rejects truncated or malformed evidence, sums only regular `100644` and `100755` blobs, and enforces the same 180 MiB constant. Per-member line/file exemptions never bypass this aggregate combined-head budget.
+
 ### Candidate rules: shadow first
 
 | Candidate | Advisory threshold | Evidence |
