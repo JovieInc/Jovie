@@ -3,9 +3,9 @@ name: Merge Queue Auto-Enroll
 # Event-driven, with ownerless recovery admitted only after exact main/head
 # validation. The existing ownerless-recovery-sweep cron remains the heartbeat.
 # controller-hop-exception: jovie-controller-hop/v1
-# accountable-writer: Shipping-Control
-# necessary-trust-boundary: Ownerless recovery dispatch is admitted only after exact main/head validation by this controller.
-# revisit-trigger: Revisit when native merge queue exposes durable exact-head admission for recovered PRs.
+# accountable-writer: Gem
+# necessary-trust-boundary: GitHub-hosted admission reads with the workflow token while the Jovie Bot token stays isolated to native queue mutations; ownerless recovery dispatch is admitted only after exact main/head validation by this controller.
+# revisit-trigger: Remove REST-to-GraphQL hydration when GitHub exposes mergeability and exact refs through one bounded paginated REST contract.
 #
 # Eligibility changes wake one repo-wide writer mutex. GitHub may replace an
 # older pending run in that mutex, so every surviving clean-admitting pass also
