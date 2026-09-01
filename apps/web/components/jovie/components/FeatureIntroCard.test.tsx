@@ -127,10 +127,7 @@ describe('FeatureIntroHost', () => {
   it('persists highlight dismiss and then shows what’s new without nagging the same id', () => {
     const onHighlightCTA = vi.fn();
     const { unmount } = render(
-      <FeatureIntroHost
-        catalog={hostCatalog}
-        onHighlightCTA={onHighlightCTA}
-      />
+      <FeatureIntroHost catalog={hostCatalog} onHighlightCTA={onHighlightCTA} />
     );
 
     expect(screen.getByTestId('feature-intro-card')).toHaveAttribute(
@@ -148,10 +145,7 @@ describe('FeatureIntroHost', () => {
 
     unmount();
     render(
-      <FeatureIntroHost
-        catalog={hostCatalog}
-        onHighlightCTA={onHighlightCTA}
-      />
+      <FeatureIntroHost catalog={hostCatalog} onHighlightCTA={onHighlightCTA} />
     );
     expect(screen.getByTestId('feature-intro-card')).toHaveAttribute(
       'data-mode',
