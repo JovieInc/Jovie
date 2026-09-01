@@ -189,6 +189,7 @@ export function SettingsPaymentsSection() {
       <SettingsActionRow
         icon={<AlertTriangle className='h-4 w-4' aria-hidden />}
         title='Payout setup temporarily unavailable'
+        disabled
         description='Stripe payout onboarding is paused while jovie finishes platform setup. Your account is safe — try again later.'
         action={
           <Button variant='secondary' size='sm' disabled>

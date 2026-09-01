@@ -59,6 +59,7 @@ export function DataPrivacySection() {
           <SettingsActionRow
             icon={<Trash2 className='h-4 w-4' aria-hidden />}
             title='Delete your account'
+            tone='destructive'
             description='Permanently remove your account, profile, contacts, and all associated data. This action cannot be undone.'
             action={
               <Button

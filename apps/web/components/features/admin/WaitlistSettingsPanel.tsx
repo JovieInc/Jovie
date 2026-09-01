@@ -146,6 +146,7 @@ export function WaitlistSettingsPanel() {
             icon={<Hash className='h-4 w-4' aria-hidden />}
             title='Auto-accept after'
             description='Minimum days on the waitlist before scheduled approval'
+            disabled={saving}
             action={
               <Input
                 type='number'
@@ -177,6 +178,7 @@ export function WaitlistSettingsPanel() {
             icon={<Hash className='h-4 w-4' aria-hidden />}
             title='Daily limit'
             description={`Today: ${settings.autoAcceptedToday} people auto-approved`}
+            disabled={saving}
             action={
               <Input
                 type='number'
