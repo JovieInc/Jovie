@@ -77,8 +77,7 @@ export function ContentChartSkeleton({
         {CHART_SKELETON_LINE_KEYS.map((key, index) => {
           const yOffset = 60 + index * 40;
           const amplitude = 15 - index * 4;
-          const path =
-            `M0,${yOffset} Q50,${yOffset - amplitude} 100,${yOffset} T200,${yOffset} T300,${yOffset} T400,${yOffset}`;
+          const path = `M0,${yOffset} Q50,${yOffset - amplitude} 100,${yOffset} T200,${yOffset} T300,${yOffset} T400,${yOffset}`;
 
           return (
             <path

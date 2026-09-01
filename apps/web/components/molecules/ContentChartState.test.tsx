@@ -53,8 +53,6 @@ describe('ContentChartState', () => {
 
     expect(screen.getByTestId('chart-error')).toHaveClass('h-64');
     expect(screen.getByRole('alert')).toHaveAttribute('data-state', 'error');
-    expect(
-      screen.getByRole('button', { name: 'Retry' })
-    ).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Retry' })).toBeInTheDocument();
   });
 });

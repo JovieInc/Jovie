@@ -94,6 +94,9 @@ const meta = {
   component: DashboardAnalytics,
   parameters: {
     layout: 'fullscreen',
+    jovie: {
+      uncoveredProps: ['loading'],
+    },
   },
   decorators: [
     Story => (

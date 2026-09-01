@@ -43,10 +43,7 @@ export function ContentMetricDelta({
       )}
       data-testid={testId}
     >
-      <Icon
-        className={cn('h-4 w-4 shrink-0', iconClassName)}
-        aria-hidden
-      />
+      <Icon className={cn('h-4 w-4 shrink-0', iconClassName)} aria-hidden />
       {ariaLabel ? <span className='sr-only'>{ariaLabel}</span> : null}
       <span aria-hidden={ariaLabel ? true : undefined}>{value}</span>
     </div>

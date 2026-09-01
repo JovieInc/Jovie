@@ -7,16 +7,8 @@ describe('ContentMetricDelta', () => {
     render(
       <div>
         <ContentMetricDelta direction='up' value='+12.5%' data-testid='up' />
-        <ContentMetricDelta
-          direction='down'
-          value='-4.0%'
-          data-testid='down'
-        />
-        <ContentMetricDelta
-          direction='flat'
-          value='+0.0%'
-          data-testid='flat'
-        />
+        <ContentMetricDelta direction='down' value='-4.0%' data-testid='down' />
+        <ContentMetricDelta direction='flat' value='+0.0%' data-testid='flat' />
       </div>
     );
 
@@ -39,12 +31,9 @@ describe('ContentMetricDelta', () => {
     );
 
     expect(screen.getByTestId('delta')).not.toHaveAttribute('aria-label');
-    expect(
-      screen.getByText('Daily active users changed by 12.5%')
-    ).toHaveClass('sr-only');
-    expect(screen.getByText('+12.5%')).toHaveAttribute(
-      'aria-hidden',
-      'true'
+    expect(screen.getByText('Daily active users changed by 12.5%')).toHaveClass(
+      'sr-only'
     );
+    expect(screen.getByText('+12.5%')).toHaveAttribute('aria-hidden', 'true');
   });
 });

@@ -20,6 +20,9 @@ const meta = {
   component: MetricsChartClient,
   parameters: {
     layout: 'centered',
+    jovie: {
+      uncoveredProps: ['loading'],
+    },
   },
   decorators: [
     Story => (
