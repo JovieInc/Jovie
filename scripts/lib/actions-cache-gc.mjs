@@ -49,6 +49,11 @@ function evictRecord(cache, reason) {
   };
 }
 
+function cacheSizeBytes(cache) {
+  const size = Number(cache?.size_in_bytes ?? 0);
+  return Number.isFinite(size) && size > 0 ? size : 0;
+}
+
 /** @param {Record<string, any>} [input] */
 export function buildOpenCacheRefs(input = {}) {
   const { mainRef = 'refs/heads/main', pullRequests = [] } = input;
@@ -126,7 +131,7 @@ export function planCacheGc(input = {}) {
     }
   }
 
-  const keep = [];
+  let keep = [];
   for (const cache of afterTurbo) {
     const stale = nowMs - accessedAtMs(cache) > PROTECTED_MAX_AGE_MS;
     if (overBudget && isProtectedCacheKey(cache.key) && stale) {
@@ -136,9 +141,30 @@ export function planCacheGc(input = {}) {
     keep.push(cache);
   }
 
+  let keepBytes = keep.reduce(
+    (total, cache) => total + cacheSizeBytes(cache),
+    0
+  );
+  if (overBudget && keepBytes > CACHE_BYTES_SOFT_LIMIT) {
+    const budgetEvictions = new Set();
+    const leastRecentlyUsed = [...keep].sort(
+      (left, right) =>
+        accessedAtMs(left) - accessedAtMs(right) ||
+        cacheSizeBytes(right) - cacheSizeBytes(left)
+    );
+    for (const cache of leastRecentlyUsed) {
+      if (keepBytes <= CACHE_BYTES_SOFT_LIMIT) break;
+      budgetEvictions.add(cache.id);
+      keepBytes -= cacheSizeBytes(cache);
+      evict.push(evictRecord(cache, 'budget_lru'));
+    }
+    keep = keep.filter(cache => !budgetEvictions.has(cache.id));
+  }
+
   return {
     evict,
     keep,
+    keepBytes,
     overBudget,
     turboKeep,
     protectedRetained: keep.filter(cache => isProtectedCacheKey(cache.key))
@@ -250,6 +276,7 @@ async function main() {
     cacheCount: snapshot.caches.length,
     evictCount: plan.evict.length,
     keepCount: plan.keep.length,
+    keepBytes: plan.keepBytes,
     overBudget: plan.overBudget,
     turboKeep: plan.turboKeep,
     protectedRetained: plan.protectedRetained,
