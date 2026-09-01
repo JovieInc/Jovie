@@ -1,5 +1,6 @@
 name: PR targets main
 
+# JOV-INV-023: stacked/feature bases are a factory failure.
 # Fail-closed: every Jovie PR targets main. Stacked/feature bases are a
 # repeat factory failure (Graphite is dead; integration/loop-* is dormant).
 # This job is a required context on main and also runs on every other PR

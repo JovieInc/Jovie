@@ -5,6 +5,7 @@
 # Autonomous shipping (2026-07-06): taste and human labels are advisory.
 # Durable mechanical holds are queue-deferred and the no-auto tombstone family.
 # needs-human / hold / gated do not skip enrollment. Conflicts are repaired.
+# JOV-INV-023: retarget every PR onto main; do not freeze on observation gaps.
 #
 # It deliberately does NOT:
 #   - directly merge a PR (native enrollment uses `gh pr merge --auto`; the

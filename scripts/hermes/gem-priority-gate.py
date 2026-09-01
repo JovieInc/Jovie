@@ -234,6 +234,8 @@ def select_main_release_ready(attempts: list[dict[str, Any]]) -> dict[str, Any]:
 def observe_main_release_ready_jobs(repo: str, sha: object) -> list[dict[str, Any]]:
     """Read Main Release Ready from the exact-SHA CI push run.
 
+    JOV-INV-023: check-run flood must not freeze a bound-green factory.
+
     Commit check-runs on this repo are flooded by controller/agent suites, so
     the named source gate can be missing from the first 1k check-runs while
     the CI workflow job itself succeeded. That observation gap must not freeze

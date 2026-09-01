@@ -525,7 +525,13 @@ export function evaluateFleetGate(
       Number.isInteger(queueTarget) &&
       queueTarget > 0;
 
-    if (!queueShapeValid) {
+    // JOV-INV-023: a bound-green factory with a missing queue snapshot is an
+    // observation gap, not a promotion hold.
+    const boundGreenFactory =
+      mainStatus === 'green' &&
+      productionStatus === 'green' &&
+      deploymentBound(evidence?.main?.sha, evidence?.production?.deployedSha);
+    if (!queueShapeValid && !boundGreenFactory) {
       reasons.push(
         typedReason(
           FLEET_GATE_REASON.QUEUE_UNKNOWN,
@@ -536,9 +542,8 @@ export function evaluateFleetGate(
       );
     }
     // Queue pressure is demand for the promotion controller, not a reason to
-    // disable it. Freezing promotion above target deadlocks the only path that
-    // can drain the backlog. The count and target remain in evidence.queue for
-    // alerting; malformed or unknown queue evidence still fails closed above.
+    // disable it. A bound-green factory with a missing queue snapshot is an
+    // observation gap, not a promotion hold.
   }
 
   const state = redReasons.length

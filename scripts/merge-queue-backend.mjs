@@ -53,6 +53,7 @@ export const NO_AUTO_HOLD_LABELS = Object.freeze([
   'no-auto-merge',
   'no-automerge',
 ]);
+// JOV-INV-023: human labels are not enrollment holds.
 export const HARD_HOLD_LABELS = new Set([
   'queue-deferred',
   'needs-conflict-resolution',

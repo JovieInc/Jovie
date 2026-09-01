@@ -1,0 +1,72 @@
+import { readFileSync } from 'node:fs';
+import { resolve } from 'node:path';
+import { fileURLToPath } from 'node:url';
+
+const DEFAULT_ROOT = fileURLToPath(new URL('../../', import.meta.url));
+
+const PATHS = Object.freeze({
+  gate: 'scripts/hermes/gem-priority-gate.py',
+  drain: 'scripts/drain-pr-queue.sh',
+  backend: 'scripts/merge-queue-backend.mjs',
+  workflow: '.github/workflows/pr-targets-main.yml',
+  admitter: 'scripts/backlog-orchestrator/admitter.mjs',
+});
+
+const HUMAN_ENROLL_BLOCK =
+  /needs-human" or \. == "hold" or \. == "gated"/;
+const HUMAN_SELECTOR =
+  /'needs-human',\s*'hold',\s*'gated'/;
+
+/** JOV-INV-023: fleet observation gaps and non-main PR bases must not freeze shipping. */
+export function validateFleetAutonomy(
+  repoRoot = DEFAULT_ROOT,
+  { readFile = (path) => readFileSync(resolve(repoRoot, path), 'utf8') } = {}
+) {
+  const errors = [];
+  const gate = readFile(PATHS.gate);
+  const drain = readFile(PATHS.drain);
+  const backend = readFile(PATHS.backend);
+  const workflow = readFile(PATHS.workflow);
+  const admitter = readFile(PATHS.admitter);
+
+  if (!gate.includes('def observe_main_release_ready_jobs')) {
+    errors.push(
+      'gem-priority-gate.py must observe Main Release Ready from the CI workflow job when check-runs omit it'
+    );
+  }
+  if (!gate.includes('bound_green_factory')) {
+    errors.push(
+      'gem-priority-gate.py must not freeze a bound-green factory on a missing queue snapshot'
+    );
+  }
+  if (!admitter.includes('boundGreenFactory')) {
+    errors.push(
+      'admitter.mjs must not freeze a bound-green factory on a missing queue snapshot'
+    );
+  }
+  if (!drain.includes('RETARGET (base must be main)')) {
+    errors.push('drain-pr-queue.sh must retarget non-main PRs onto main');
+  }
+  if (HUMAN_ENROLL_BLOCK.test(drain)) {
+    errors.push(
+      'drain-pr-queue.sh must not skip enrollment for needs-human/hold/gated'
+    );
+  }
+  if (HUMAN_SELECTOR.test(backend)) {
+    errors.push(
+      'merge-queue-backend.mjs must not treat needs-human/hold/gated as selector hard holds'
+    );
+  }
+  if (!workflow.includes('name: PR targets main')) {
+    errors.push('pr-targets-main.yml must exist as a fail-closed base check');
+  }
+  if (/branches:\s*\[\s*main/.test(workflow)) {
+    errors.push(
+      'pr-targets-main.yml must run on every pull_request base, not only main'
+    );
+  }
+  if (!workflow.includes('PRs must target main')) {
+    errors.push('pr-targets-main.yml must fail closed when base is not main');
+  }
+  return errors;
+}

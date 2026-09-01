@@ -1409,12 +1409,12 @@ describe('deterministic Symphony admission boundary', () => {
         reason => reason.code === 'invalid-integrity-receipt'
       )
     );
-    assert.equal(invalidQueue.state, 'AMBER');
+    assert.equal(invalidQueue.state, 'GREEN');
+    assert.equal(invalidQueue.promotionMode, 'normal');
     assert.equal(invalidQueue.workAdmission.allowed, true);
-    assert.equal(invalidQueue.workAdmission.newIssueLeaseAllowed, true);
-    assert.equal(invalidQueue.promotionAdmission.allowed, false);
+    assert.equal(invalidQueue.promotionAdmission.allowed, true);
     assert.ok(
-      invalidQueue.reasons.some(reason => reason.code === 'queue-unknown')
+      !invalidQueue.reasons.some(reason => reason.code === 'queue-unknown')
     );
   });
 
