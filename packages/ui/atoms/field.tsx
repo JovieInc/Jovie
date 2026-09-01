@@ -43,7 +43,7 @@ export interface FieldProps {
   /**
    * Additional className for the container
    */
-  className?: string;
+  readonly className?: string;
 }
 
 const Field = React.forwardRef<HTMLDivElement, FieldProps>(
@@ -112,17 +112,24 @@ const Field = React.forwardRef<HTMLDivElement, FieldProps>(
           </p>
         )}
 
-        {hasError && (
-          <p
-            id={errorId}
-            className='text-xs font-medium text-destructive'
-            role='alert'
-            aria-live='polite'
-            aria-atomic='true'
-          >
-            {error}
-          </p>
-        )}
+        <div
+          className='min-h-5'
+          data-slot='field-feedback'
+          aria-live='polite'
+          aria-atomic='true'
+        >
+          {hasError && (
+            <p
+              id={errorId}
+              className='text-xs font-medium text-destructive'
+              role='alert'
+              aria-live='polite'
+              aria-atomic='true'
+            >
+              {error}
+            </p>
+          )}
+        </div>
       </div>
     );
   }

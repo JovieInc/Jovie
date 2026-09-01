@@ -11,16 +11,20 @@ vi.mock('@jovie/ui', () => ({
 }));
 
 describe('FormStatus', () => {
-  it('renders nothing when no props are provided', () => {
+  it('reserves a stable status slot when no props are provided', () => {
     const { container } = render(<FormStatus />);
-    expect(container.firstChild).toBeNull();
+    const status = container.firstChild as HTMLElement;
+    expect(status).toHaveAttribute('data-slot', 'form-status');
+    expect(status).toHaveAttribute('data-state', 'idle');
+    expect(status).toHaveClass('min-h-5');
+    expect(status).toBeEmptyDOMElement();
   });
 
-  it('renders nothing when all values are falsy', () => {
+  it('keeps the status slot when all values are falsy', () => {
     const { container } = render(
       <FormStatus loading={false} error='' success='' />
     );
-    expect(container.firstChild).toBeNull();
+    expect(container.firstChild).toHaveAttribute('data-state', 'idle');
   });
 
   it('displays loading state with spinner and text', () => {
@@ -32,6 +36,9 @@ describe('FormStatus', () => {
       'sm'
     );
     expect(screen.getByText('Processing...')).toBeInTheDocument();
+    expect(
+      screen.getByText('Processing...').closest('[data-slot]')
+    ).toHaveAttribute('data-state', 'loading');
   });
 
   it('displays error message with correct styling', () => {
@@ -40,7 +47,8 @@ describe('FormStatus', () => {
 
     const errorElement = screen.getByText(errorMessage);
     expect(errorElement).toBeInTheDocument();
-    expect(errorElement).toHaveClass('text-sm', 'text-destructive');
+    expect(errorElement).toHaveClass('font-medium', 'text-error');
+    expect(errorElement).toHaveAttribute('role', 'alert');
     expect(errorElement.tagName.toLowerCase()).toBe('p');
   });
 
@@ -50,18 +58,21 @@ describe('FormStatus', () => {
 
     const successElement = screen.getByText(successMessage);
     expect(successElement).toBeInTheDocument();
-    expect(successElement).toHaveClass('text-sm', 'text-success');
+    expect(successElement).toHaveClass('font-medium', 'text-success');
+    expect(successElement).toHaveAttribute('role', 'status');
     expect(successElement.tagName.toLowerCase()).toBe('p');
   });
 
-  it('does not render error when error is only whitespace', () => {
+  it('does not render error copy when error is only whitespace', () => {
     const { container } = render(<FormStatus error='   ' />);
-    expect(container.firstChild).toBeNull();
+    expect(container.firstChild).toHaveAttribute('data-state', 'idle');
+    expect(container).not.toHaveTextContent(/\S/);
   });
 
-  it('does not render success when success is only whitespace', () => {
+  it('does not render success copy when success is only whitespace', () => {
     const { container } = render(<FormStatus success='   ' />);
-    expect(container.firstChild).toBeNull();
+    expect(container.firstChild).toHaveAttribute('data-state', 'idle');
+    expect(container).not.toHaveTextContent(/\S/);
   });
 
   it('can display multiple states simultaneously', () => {
@@ -85,7 +96,7 @@ describe('FormStatus', () => {
 
     const container = screen.getByTestId('loading-spinner').parentElement
       ?.parentElement as HTMLElement;
-    expect(container).toHaveClass(customClass, 'space-y-2');
+    expect(container).toHaveClass(customClass, 'space-y-1');
   });
 
   it('has proper semantic structure for accessibility', () => {
@@ -99,11 +110,14 @@ describe('FormStatus', () => {
 
     // Check that loading state is in a div with proper content structure
     const loadingContainer = screen.getByText('Processing...').closest('div');
-    expect(loadingContainer).toHaveClass('flex', 'items-center', 'space-x-2');
+    expect(loadingContainer).toHaveClass('flex', 'items-center', 'gap-2');
 
     // Check that error and success are paragraph elements
     expect(screen.getByText('Error message').tagName.toLowerCase()).toBe('p');
     expect(screen.getByText('Success message').tagName.toLowerCase()).toBe('p');
+    expect(
+      screen.getByText('Error message').closest('[data-slot]')
+    ).toHaveAttribute('aria-atomic', 'true');
   });
 
   it('maintains proper spacing between elements', () => {
@@ -117,6 +131,6 @@ describe('FormStatus', () => {
 
     const container = screen.getByTestId('loading-spinner').parentElement
       ?.parentElement as HTMLElement;
-    expect(container).toHaveClass('space-y-2');
+    expect(container).toHaveClass('space-y-1', 'min-h-5');
   });
 });

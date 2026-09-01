@@ -3,12 +3,13 @@
 import { Button, Input } from '@jovie/ui';
 import { useEffect, useRef, useState } from 'react';
 import { FormField } from '@/components/molecules/FormField';
+import { FormStatus } from '@/components/molecules/FormStatus';
 import { useProfileMutation } from '@/lib/queries';
 import { normalizeUrl } from '@/lib/utils/platform-detection';
 import {
-  Artist,
-  CreatorProfile,
   convertCreatorProfileToArtist,
+  type Artist,
+  type CreatorProfile,
 } from '@/types/db';
 
 interface ListenNowFormProps {
@@ -97,7 +98,7 @@ export function ListenNowForm({ artist, onUpdate }: ListenNowFormProps) {
       className='space-y-4'
       data-testid='listen-now-form'
     >
-      <FormField label='Spotify URL' error={error}>
+      <FormField label='Spotify URL'>
         <Input
           type='url'
           value={formData.spotifyUrl}
@@ -153,18 +154,17 @@ export function ListenNowForm({ artist, onUpdate }: ListenNowFormProps) {
 
       <Button
         type='submit'
-        disabled={loading}
+        loading={loading}
         variant='primary'
         className='w-full'
       >
-        {loading ? 'Updating...' : 'Update Links'}
+        Update Links
       </Button>
 
-      {success && (
-        <div className='bg-green-500/10 border border-green-500/20 rounded-lg p-3'>
-          <p className='text-app text-success'>Links updated!</p>
-        </div>
-      )}
+      <FormStatus
+        error={error}
+        success={success ? 'Links updated!' : undefined}
+      />
     </form>
   );
 }

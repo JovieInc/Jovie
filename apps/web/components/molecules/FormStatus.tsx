@@ -16,25 +16,39 @@ export function FormStatus({
 }: FormStatusProps) {
   const trimmedError = error?.trim() ?? '';
   const trimmedSuccess = success?.trim() ?? '';
-
-  // Render nothing when there's no loading state and no meaningful messages
-  if (!loading && !trimmedError && !trimmedSuccess) return null;
+  const state = loading
+    ? 'loading'
+    : trimmedError
+      ? 'error'
+      : trimmedSuccess
+        ? 'success'
+        : 'idle';
 
   return (
-    <div className={cn('space-y-2', className)}>
+    <div
+      className={cn('min-h-5 space-y-1 text-app', className)}
+      data-slot='form-status'
+      data-state={state}
+      aria-live='polite'
+      aria-atomic='true'
+    >
       {loading && (
-        <div className='flex items-center space-x-2 text-sm text-tertiary-token'>
+        <div className='flex items-center gap-2 text-app text-tertiary-token'>
           <LoadingSpinner size='sm' tone='muted' />
           <span>Processing...</span>
         </div>
       )}
 
       {trimmedError && (
-        <p className='text-sm text-destructive'>{trimmedError}</p>
+        <p className='font-medium text-error' role='alert'>
+          {trimmedError}
+        </p>
       )}
 
       {trimmedSuccess && (
-        <p className='text-sm text-success'>{trimmedSuccess}</p>
+        <p className='font-medium text-success' role='status'>
+          {trimmedSuccess}
+        </p>
       )}
     </div>
   );

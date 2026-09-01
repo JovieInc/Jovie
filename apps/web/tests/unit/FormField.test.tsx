@@ -73,16 +73,16 @@ describe('FormField', () => {
     expect(screen.getByText('Custom content')).toBeInTheDocument();
   });
 
-  it('handles multiple children', () => {
+  it('preserves child-owned describedby ids', () => {
     render(
-      <FormField label='Multiple'>
-        <Input placeholder='First input' />
-        <Input placeholder='Second input' />
+      <FormField label='Multiple IDs' helpText='External help' id='field-id'>
+        <Input placeholder='Input with external help' aria-describedby='hint' />
       </FormField>
     );
 
-    expect(screen.getByPlaceholderText('First input')).toBeInTheDocument();
-    expect(screen.getByPlaceholderText('Second input')).toBeInTheDocument();
+    expect(
+      screen.getByPlaceholderText('Input with external help')
+    ).toHaveAttribute('aria-describedby', 'hint field-id-description');
   });
 
   it('applies proper spacing classes', () => {
@@ -93,6 +93,30 @@ describe('FormField', () => {
     );
 
     const fieldContainer = screen.getByText('Test').closest('div');
-    expect(fieldContainer).toHaveClass('space-y-2');
+    expect(fieldContainer).toHaveClass('grid', 'gap-1.5');
+    expect(fieldContainer).toHaveAttribute('data-slot', 'field');
+  });
+
+  it('reserves feedback space before and after an inline error appears', () => {
+    const { container, rerender } = render(
+      <FormField label='Email' id='email'>
+        <Input placeholder='Enter email' />
+      </FormField>
+    );
+
+    const feedbackSlot = container.querySelector('[data-slot="field-feedback"]');
+    expect(feedbackSlot).toHaveClass('min-h-5');
+    expect(feedbackSlot).toBeEmptyDOMElement();
+
+    rerender(
+      <FormField label='Email' id='email' error='This field is required'>
+        <Input placeholder='Enter email' />
+      </FormField>
+    );
+
+    const error = screen.getByRole('alert');
+    expect(error).toHaveTextContent('This field is required');
+    expect(error.parentElement).toHaveAttribute('aria-live', 'polite');
+    expect(error.parentElement).toHaveAttribute('aria-atomic', 'true');
   });
 });

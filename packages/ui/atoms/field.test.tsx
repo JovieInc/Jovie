@@ -119,6 +119,28 @@ describe('Field', () => {
       expect(error).toHaveAttribute('aria-atomic', 'true');
     });
 
+    it('reserves the feedback slot before an error appears', () => {
+      const { container, rerender } = render(
+        <Field label='Email'>
+          <Input />
+        </Field>
+      );
+
+      const feedbackSlot = container.querySelector(
+        '[data-slot="field-feedback"]'
+      );
+      expect(feedbackSlot).toHaveClass('min-h-5');
+      expect(feedbackSlot).toBeEmptyDOMElement();
+
+      rerender(
+        <Field label='Email' error='Invalid email'>
+          <Input />
+        </Field>
+      );
+
+      expect(feedbackSlot).toContainElement(screen.getByRole('alert'));
+    });
+
     it('sets aria-invalid on input when error is present', () => {
       // Use a simple input element to test Field's aria-invalid injection
       // (Input component has internal validation logic that may override)

@@ -1,16 +1,15 @@
 'use client';
 
-import React, { cloneElement, isValidElement, useId } from 'react';
-import { cn } from '@/lib/utils';
+import { Field, type FieldProps } from '@jovie/ui';
 
 interface FormFieldProps {
-  readonly label?: string;
+  readonly label?: FieldProps['label'];
   readonly error?: string;
   readonly required?: boolean;
   readonly className?: string;
-  readonly children: React.ReactNode;
+  readonly children: FieldProps['children'];
   readonly id?: string;
-  readonly helpText?: string;
+  readonly helpText?: FieldProps['description'];
 }
 
 export function FormField({
@@ -22,68 +21,16 @@ export function FormField({
   id: providedId,
   helpText,
 }: Readonly<FormFieldProps>) {
-  // Generate unique IDs for accessibility connections
-  const uniqueId = useId();
-  const id = providedId || `field-${uniqueId}`;
-  const errorId = `${id}-error`;
-  const helpTextId = `${id}-help`;
-
-  // Determine which description elements to connect via aria-describedby
-  const getDescribedByIds = () => {
-    const ids = [];
-    if (helpText) ids.push(helpTextId);
-    if (error) ids.push(errorId);
-    return ids.length > 0 ? ids.join(' ') : undefined;
-  };
-
-  // Clone the child element to add accessibility attributes
-  const childrenWithProps = React.Children.map(children, child => {
-    if (isValidElement(child)) {
-      return cloneElement(child, {
-        id,
-        'aria-invalid': error ? 'true' : undefined,
-        'aria-describedby': getDescribedByIds(),
-        'aria-required': required ? 'true' : undefined,
-      } as Record<string, unknown>);
-    }
-    return child;
-  });
-
   return (
-    <div className={cn('space-y-2', className)}>
-      {label && (
-        <label
-          htmlFor={id}
-          className='text-sm font-medium text-secondary-token'
-        >
-          {label}
-          {required && (
-            <span className='text-destructive ml-1' aria-hidden='true'>
-              *
-            </span>
-          )}
-          {required && <span className='sr-only'>(required)</span>}
-        </label>
-      )}
-
-      {helpText && (
-        <p id={helpTextId} className='text-xs text-tertiary-token'>
-          {helpText}
-        </p>
-      )}
-
-      {childrenWithProps}
-
-      {error && (
-        <p
-          id={errorId}
-          className='text-sm text-destructive'
-          role='alert'
-          aria-live='polite'
-        >
-          {error}
-        </p>
-      )}
-    </div>
+    <Field
+      label={label}
+      description={helpText}
+      error={error}
+      required={required}
+      id={providedId}
+      className={className}
+    >
+      {children}
+    </Field>
   );
 }

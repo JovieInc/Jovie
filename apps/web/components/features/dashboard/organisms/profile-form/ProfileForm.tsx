@@ -1,8 +1,8 @@
 'use client';
 
-import { Button, Input, Spinner as LoadingSpinner } from '@jovie/ui';
-import { ContentSurfaceCard } from '@/components/molecules/ContentSurfaceCard';
+import { Button, Input } from '@jovie/ui';
 import { FormField } from '@/components/molecules/FormField';
+import { FormStatus } from '@/components/molecules/FormStatus';
 import { ErrorSummary } from '@/components/organisms/ErrorSummary';
 import type { ProfileFormProps } from './types';
 import { useProfileForm } from './useProfileForm';
@@ -93,32 +93,14 @@ export function ProfileForm({ artist, onUpdate }: ProfileFormProps) {
 
       <Button
         type='submit'
-        disabled={loading}
+        loading={loading}
         variant='primary'
         className='w-full'
-        aria-busy={loading}
       >
-        {loading ? (
-          <div className='flex items-center justify-center space-x-2'>
-            <LoadingSpinner size='sm' tone='inverse' label='Updating' />
-            <span>Updating...</span>
-          </div>
-        ) : (
-          'Update Profile'
-        )}
+        Update Profile
       </Button>
 
-      {success && (
-        <ContentSurfaceCard
-          className='block border-emerald-500/20 bg-emerald-500/5 p-3'
-          aria-live='polite'
-          as='output'
-        >
-          <p className='text-app text-emerald-600 dark:text-emerald-400'>
-            Profile updated!
-          </p>
-        </ContentSurfaceCard>
-      )}
+      <FormStatus success={success ? 'Profile updated!' : undefined} />
     </form>
   );
 }
