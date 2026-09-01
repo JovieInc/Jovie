@@ -1,4 +1,5 @@
 name: Production Controller Health
+# clock-class: production-liveness
 
 on:
   # Production Controller completion is the primary reconciliation signal.

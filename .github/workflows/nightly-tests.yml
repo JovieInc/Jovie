@@ -9,6 +9,7 @@
 # 90-minute buffer before the fixed 09:00 UTC screenshot and Tuesday harness.
 
 name: Nightly Tests
+# clock-class: skip-if-unchanged
 
 on:
   schedule:
@@ -132,11 +133,13 @@ jobs:
   # ==========================================================================
   e2e-tests:
     name: Nightly E2E Suite
+    needs: unchanged
     if: >-
+      needs.unchanged.outputs.skip != 'true' && (
       github.event_name == 'schedule' ||
       github.event.inputs.suite == 'all' ||
       github.event.inputs.suite == 'e2e' ||
-      github.event.inputs.suite == 'design-v1'
+      github.event.inputs.suite == 'design-v1')
     environment: Preview – jovie
     runs-on: ubuntu-latest
     timeout-minutes: 45

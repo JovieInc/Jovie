@@ -1,4 +1,5 @@
 name: Runner Health Monitor
+# clock-class: production-liveness
 
 # Hosted observer for the self-hosted OrbStack runner heartbeat. Queue unit
 # routing is selected independently inside each CI run from the same evidence;

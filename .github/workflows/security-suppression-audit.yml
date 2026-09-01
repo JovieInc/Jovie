@@ -1,4 +1,5 @@
 name: Security Suppression Audit
+# clock-class: skip-if-unchanged
 
 on:
   pull_request_review:

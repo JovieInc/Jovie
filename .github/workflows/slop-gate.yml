@@ -11,6 +11,7 @@
 #
 # Zero cost: pure Python, no API keys, no network calls.
 name: Slop Gate
+# clock-class: skip-if-unchanged
 
 on:
   schedule:

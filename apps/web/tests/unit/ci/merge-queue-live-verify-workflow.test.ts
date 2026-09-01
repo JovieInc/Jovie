@@ -15,7 +15,7 @@ describe('merge queue live verify workflow', () => {
   it('is the scheduled/main-push caller of live ruleset verify', () => {
     const workflow = readFileSync(workflowPath, 'utf8');
 
-    expect(workflow).toContain('cron: ');
+    expect(workflow).not.toContain('cron:');
     expect(workflow).toContain('push:');
     expect(workflow).toContain('branches: [main]');
     expect(workflow).toContain('node scripts/ci-merge-queue-check.mjs verify');

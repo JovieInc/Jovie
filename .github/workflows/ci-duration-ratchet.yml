@@ -1,4 +1,5 @@
 name: CI Duration Ratchet
+# clock-class: skip-if-unchanged
 
 # Nightly p95 gate-duration measurement + SLO guard.
 # Measures the rolling p95 wall-clock of recent PR merge-gate CI runs and

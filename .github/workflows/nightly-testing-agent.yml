@@ -1,4 +1,5 @@
 name: Nightly Testing Agent
+# clock-class: skip-if-unchanged
 
 on:
   schedule:

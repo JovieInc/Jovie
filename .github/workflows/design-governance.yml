@@ -1,4 +1,5 @@
 name: Design Governance
+# clock-class: skip-if-unchanged
 
 # Standing governance reconciliation. Reuses one weekly scheduler for design and
 # invariant stewardship; founder-decision, registry-change, and enforcement-failure
