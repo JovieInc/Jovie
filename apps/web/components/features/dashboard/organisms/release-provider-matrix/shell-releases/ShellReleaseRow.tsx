@@ -15,12 +15,16 @@ import {
   memo,
   useCallback,
   useMemo,
+  useState,
 } from 'react';
 import { TableActionMenu } from '@/components/atoms/table-action-menu/TableActionMenu';
 import type { TableActionMenuItem } from '@/components/atoms/table-action-menu/types';
 import { toast } from '@/components/feedback';
 import { useTrackAudioPlayer } from '@/components/organisms/release-sidebar/useTrackAudioPlayer';
-import { ShellListRowFrame } from '@/components/organisms/table';
+import {
+  contextualAction,
+  ShellListRowFrame,
+} from '@/components/organisms/table';
 import { AgentPulse } from '@/components/shell/AgentPulse';
 import { ArtworkThumb } from '@/components/shell/ArtworkThumb';
 import { DropDateChip } from '@/components/shell/DropDateChip';
@@ -318,6 +322,7 @@ export const ShellReleaseRow = memo(function ShellReleaseRow({
   const smartLinkPath = release.smartLinkPath || `/${release.slug}`;
   const { playbackState } = useTrackAudioPlayer();
   const isActiveTrack = playbackState.activeTrackId === release.id;
+  const [actionsOpen, setActionsOpen] = useState(false);
 
   const releaseEntity: EntityPopoverData = {
     kind: 'release',
@@ -351,9 +356,11 @@ export const ShellReleaseRow = memo(function ShellReleaseRow({
       data-shell-release-row
       data-release-id={release.id}
       data-release-active={isActiveTrack ? 'true' : undefined}
+      chrome='shell'
+      density='spacious'
       isSelected={isSelected}
       interactive
-      className='group/row flex h-14 items-center gap-3 px-3'
+      className='group/row flex items-center gap-3 px-3'
     >
       <ArtworkCell release={release} isSyncing={syncLabel !== null} />
 
@@ -411,10 +418,17 @@ export const ShellReleaseRow = memo(function ShellReleaseRow({
 
       {actionMenuItems && actionMenuItems.length > 0 ? (
         <div
-          className='h-7 w-7 shrink-0'
+          className={cn('h-7 w-7 shrink-0', contextualAction.slot)}
+          data-menu-open={actionsOpen || undefined}
           data-testid='shell-release-row-actions'
         >
-          <TableActionMenu items={actionMenuItems} trigger='custom' align='end'>
+          <TableActionMenu
+            items={actionMenuItems}
+            trigger='custom'
+            align='end'
+            open={actionsOpen}
+            onOpenChange={setActionsOpen}
+          >
             <button
               type='button'
               onClick={e => e.stopPropagation()}
@@ -422,8 +436,7 @@ export const ShellReleaseRow = memo(function ShellReleaseRow({
               aria-label={`Release actions for ${release.title}`}
               className={cn(
                 'shrink-0 h-7 w-7 rounded-md grid place-items-center text-quaternary-token hover:text-primary-token hover:bg-surface-2/70 transition-[opacity,color,background-color] duration-subtle ease-subtle',
-                'opacity-0 group-hover/row:opacity-100 focus-visible:opacity-100 data-[state=open]:opacity-100',
-                isSelected && 'opacity-100'
+                'focus-visible:opacity-100'
               )}
             >
               <MoreHorizontal className='h-3 w-3' strokeWidth={2.25} />

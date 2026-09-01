@@ -36,7 +36,7 @@ export const ReleaseTaskCompactRow = React.memo(function ReleaseTaskCompactRow({
   return (
     <ShellListRowFrame
       density='compact'
-      className='flex items-center gap-2 px-3 py-0.5'
+      className='flex items-center gap-2 px-3'
     >
       <ReleaseTaskCheckbox
         task={task}
