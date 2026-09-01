@@ -3,11 +3,6 @@ import { join } from 'node:path';
 import { render, screen } from '@testing-library/react';
 import type { ReactNode } from 'react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { AuthModalShell } from '@/components/auth/AuthModalShell';
-import { AuthBranding } from '@/components/features/auth/AuthBranding';
-import { AuthFormContainer } from '@/components/features/auth/AuthFormContainer';
-import { AuthLayout } from '@/components/features/auth/AuthLayout';
-import { AUTH_FORM_MAX_WIDTH_CLASS } from '@/features/auth/constants';
 import {
   AUTH_BRANDING_RELATIVE_PATH,
   AUTH_DESKTOP_ONLY_CLASS,
@@ -33,7 +28,15 @@ import {
   SWAPPED_GRID_BREAKPOINT_LAYOUT_SOURCE,
   UNWRAPPED_EDITORIAL_LAYOUT_SOURCE,
 } from './auth-shell-layout-red-fixtures';
-import { DesktopAuthRouteHandoff } from '../../../app/(auth)/DesktopAuthRouteHandoff';
+
+const webRoot = process.cwd();
+
+function readWebSource(relativePath: string): string {
+  return readFileSync(join(webRoot, relativePath), 'utf8');
+}
+
+const productionCss = readWebSource(AUTH_LAYOUT_CSS_RELATIVE_PATH);
+const productionCssInspection = inspectAuthDesktopOnlyCss(productionCss);
 
 vi.mock('@clerk/nextjs', () => ({
   SignOutButton: ({ children }: { readonly children: ReactNode }) => children,
@@ -93,14 +96,12 @@ vi.mock('@/lib/desktop/electron-bridge', () => ({
   openDesktopAuthUrl: vi.fn(),
 }));
 
-const webRoot = process.cwd();
-
-function readWebSource(relativePath: string): string {
-  return readFileSync(join(webRoot, relativePath), 'utf8');
-}
-
-const productionCss = readWebSource(AUTH_LAYOUT_CSS_RELATIVE_PATH);
-const productionCssInspection = inspectAuthDesktopOnlyCss(productionCss);
+import { AuthModalShell } from '@/components/auth/AuthModalShell';
+import { AuthBranding } from '@/components/features/auth/AuthBranding';
+import { AuthFormContainer } from '@/components/features/auth/AuthFormContainer';
+import { AuthLayout } from '@/components/features/auth/AuthLayout';
+import { AUTH_FORM_MAX_WIDTH_CLASS } from '@/features/auth/constants';
+import { DesktopAuthRouteHandoff } from '../../../app/(auth)/DesktopAuthRouteHandoff';
 
 const originalShowModal = HTMLDialogElement.prototype.showModal;
 const originalClose = HTMLDialogElement.prototype.close;
