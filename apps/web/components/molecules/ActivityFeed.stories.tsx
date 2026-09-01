@@ -1,5 +1,5 @@
-import { CheckCircle2 } from 'lucide-react';
 import type { Meta, StoryObj } from '@storybook/nextjs-vite';
+import { CheckCircle2 } from 'lucide-react';
 import type { ActivityEvent } from '@/lib/activity/types';
 import {
   ActivityFeed,

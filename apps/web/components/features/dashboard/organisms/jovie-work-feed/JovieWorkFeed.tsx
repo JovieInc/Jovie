@@ -1,5 +1,6 @@
 'use client';
 
+// @coverage-via apps/web/tests/unit/dashboard/JovieWorkFeed.test.tsx
 import {
   Bell,
   Bot,
@@ -58,9 +59,7 @@ const countFormatter = new Intl.NumberFormat('en-US');
 function JovieWorkGlyph({ icon }: { readonly icon: JovieWorkIcon }) {
   const Icon = JOVIE_WORK_ICONS[icon] ?? Sparkles;
 
-  return (
-    <Icon className='h-3 w-3 text-tertiary-token' aria-hidden='true' />
-  );
+  return <Icon className='h-3 w-3 text-tertiary-token' aria-hidden='true' />;
 }
 
 function JovieWorkEmptyState({
@@ -69,9 +68,7 @@ function JovieWorkEmptyState({
   readonly isRefreshing: boolean;
 }) {
   return (
-    <div
-      className={isRefreshing ? 'opacity-70 transition-opacity' : undefined}
-    >
+    <div className={isRefreshing ? 'opacity-70 transition-opacity' : undefined}>
       <EmptyState
         heading='Jovie has not shipped autonomous work in this window yet.'
         description='Release autopilot, fan notifications, and agent runs will show up here.'
@@ -276,9 +273,7 @@ export function JovieWorkFeed({
 
           return (
             <div
-              className={
-                isRefreshing ? 'opacity-70 transition-opacity' : undefined
-              }
+              className={isRefreshing ? 'opacity-70 transition-opacity' : undefined}
             >
               <ul className={ACTIVITY_TIMELINE_LIST_CLASSNAME}>
                 {items.map(item => (

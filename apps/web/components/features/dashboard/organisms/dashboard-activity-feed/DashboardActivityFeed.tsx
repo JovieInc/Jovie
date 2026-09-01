@@ -1,5 +1,6 @@
 'use client';
 
+// @coverage-via apps/web/tests/unit/dashboard/DashboardActivityFeed.test.tsx
 import {
   Camera,
   DollarSign,

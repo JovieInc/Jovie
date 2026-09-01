@@ -9,7 +9,7 @@ vi.mock('@/lib/queries', () => ({
   useActivityFeedQuery: useActivityFeedQueryMock,
 }));
 
-import { DashboardActivityFeed } from '@/features/dashboard/organisms/dashboard-activity-feed';
+import { DashboardActivityFeed } from '@/components/features/dashboard/organisms/dashboard-activity-feed/DashboardActivityFeed';
 
 describe('DashboardActivityFeed', () => {
   beforeEach(() => {

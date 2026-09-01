@@ -10,7 +10,7 @@ vi.mock('@/lib/queries/useJovieWorkFeedQuery', () => ({
   useJovieWorkFeedQuery: useJovieWorkFeedQueryMock,
 }));
 
-import { JovieWorkFeed } from '@/components/features/dashboard/organisms/jovie-work-feed';
+import { JovieWorkFeed } from '@/components/features/dashboard/organisms/jovie-work-feed/JovieWorkFeed';
 
 describe('JovieWorkFeed', () => {
   beforeEach(() => {
