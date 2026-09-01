@@ -1,25 +1,59 @@
 import { readdirSync, readFileSync } from 'node:fs';
 import { join, relative, resolve } from 'node:path';
-import { render, screen } from '@testing-library/react';
+import { render, screen, within } from '@testing-library/react';
 import { Search } from 'lucide-react';
 import type { ComponentProps, ReactNode } from 'react';
 import { describe, expect, it, vi } from 'vitest';
 import {
   PAGE_TOOLBAR_ACTION_BUTTON_CLASS,
+  PAGE_TOOLBAR_BACK_LINK_CLASS,
+  PAGE_TOOLBAR_BACK_LINK_LABEL_CLASS,
   PAGE_TOOLBAR_TAB_ACTIVE_CLASS,
   PAGE_TOOLBAR_TAB_BUTTON_CLASS,
   PageToolbar,
   PageToolbarActionButton,
+  PageToolbarBackLink,
   PageToolbarTabButton,
 } from '@/components/organisms/table/molecules/PageToolbar';
 import { findPageToolbarPrimaryCtaViolations } from '../../app/app-ia-static-guard';
 
+type MockButtonProps = ComponentProps<'button'> & {
+  readonly asChild?: boolean;
+};
+
 vi.mock('@jovie/ui', () => ({
-  Button: ({ children, ...props }: ComponentProps<'button'>) => (
-    <button type='button' {...props}>
-      {children}
-    </button>
-  ),
+  Button: ({ children, asChild, className, ...props }: MockButtonProps) => {
+    const mergeClassNames = (...classNames: Array<string | undefined>) =>
+      classNames.filter(Boolean).join(' ');
+
+    if (asChild && children && typeof children === 'object' && 'props' in children) {
+      const childProps = (
+        children as {
+          readonly props?: {
+            readonly children?: ReactNode;
+            readonly className?: string;
+            readonly href?: string;
+          };
+        }
+      ).props;
+
+      return (
+        <a
+          {...props}
+          href={childProps?.href}
+          className={mergeClassNames(className, childProps?.className)}
+        >
+          {childProps?.children}
+        </a>
+      );
+    }
+
+    return (
+      <button type='button' className={className} {...props}>
+        {children}
+      </button>
+    );
+  },
   TooltipShortcut: ({
     children,
     contentVariant,
@@ -115,6 +149,52 @@ describe('PageToolbar buttons', () => {
       'data-tooltip-content-variant',
       'compact'
     );
+  });
+
+  it('renders back links as real navigation with a mobile-collapsed label', () => {
+    render(
+      <PageToolbarBackLink
+        href='/app/releases'
+        label='Releases'
+        ariaLabel='Back to releases'
+      />
+    );
+
+    const link = screen.getByRole('link', { name: 'Back to releases' });
+    const label = within(link).getByText('Releases');
+
+    expect(link).toHaveAttribute('href', '/app/releases');
+    expect(link).toHaveClass(...PAGE_TOOLBAR_BACK_LINK_CLASS.split(' '));
+    expect(label).toHaveClass(...PAGE_TOOLBAR_BACK_LINK_LABEL_CLASS.split(' '));
+    expect(link.querySelector('[aria-hidden="true"]')).not.toBeNull();
+  });
+
+  it('rejects the deliberate-red fake breadcrumb fixture without navigation', () => {
+    render(
+      <PageToolbar
+        start={
+          <div
+            data-testid='fake-release-task-breadcrumb'
+            data-deliberate-red='release-task-toolbar-breadcrumb'
+          >
+            <span>Releases</span>
+            <span aria-hidden='true'>/</span>
+            <span>A release title that only looks truncated</span>
+            <span aria-hidden='true'>/</span>
+            <span>Tasks</span>
+          </div>
+        }
+      />
+    );
+
+    const fakeBreadcrumb = screen.getByTestId('fake-release-task-breadcrumb');
+    expect(fakeBreadcrumb).toHaveAttribute(
+      'data-deliberate-red',
+      'release-task-toolbar-breadcrumb'
+    );
+    expect(
+      within(fakeBreadcrumb).queryByRole('link', { name: /back to releases/i })
+    ).toBeNull();
   });
 });
 

@@ -1,16 +1,18 @@
 'use client';
 
-import { ChevronRight } from 'lucide-react';
 import { useMemo } from 'react';
 import { ContentSurfaceCard } from '@/components/molecules/ContentSurfaceCard';
 import { PageShell } from '@/components/organisms/PageShell';
 import {
   PAGE_TOOLBAR_META_TEXT_CLASS,
   PageToolbar,
+  PageToolbarBackLink,
 } from '@/components/organisms/table';
+import { APP_ROUTES } from '@/constants/routes';
 import { useTaskToggleMutation } from '@/lib/queries/useReleaseTaskMutations';
 import { useReleaseTasksQuery } from '@/lib/queries/useReleaseTasksQuery';
 import type { ReleaseTaskView } from '@/lib/release-tasks/types';
+import { cn } from '@/lib/utils';
 import { MetadataAgentPanel } from './MetadataAgentPanel';
 import { ReleaseTaskChecklist } from './ReleaseTaskChecklist';
 import { ReleaseTaskRow } from './ReleaseTaskRow';
@@ -43,26 +45,25 @@ function getUpNextTasks(tasks: ReleaseTaskView[]): ReleaseTaskView[] {
     .slice(0, 3);
 }
 
-function ReleaseTaskBreadcrumbs({
+function ReleaseTaskToolbarStart({
   releaseTitle,
 }: Readonly<{ releaseTitle: string }>) {
   return (
-    <div className='flex min-w-0 items-center gap-1.5'>
-      <span className='shrink-0 text-tertiary-token'>Releases</span>
-      <ChevronRight
-        className='h-3 w-3 shrink-0 text-quaternary-token'
-        strokeWidth={2}
-        aria-hidden='true'
+    <div
+      className='flex min-w-0 flex-1 items-center gap-2'
+      data-testid='release-task-toolbar-context'
+    >
+      <PageToolbarBackLink
+        href={APP_ROUTES.RELEASES}
+        label='Releases'
+        ariaLabel='Back to releases'
       />
-      <span className='max-w-[min(46vw,20rem)] truncate text-secondary-token'>
+      <span
+        className={cn(PAGE_TOOLBAR_META_TEXT_CLASS, 'min-w-0 truncate')}
+        title={releaseTitle}
+      >
         {releaseTitle}
       </span>
-      <ChevronRight
-        className='h-3 w-3 shrink-0 text-quaternary-token'
-        strokeWidth={2}
-        aria-hidden='true'
-      />
-      <span className='shrink-0 text-primary-token'>Tasks</span>
     </div>
   );
 }
@@ -99,9 +100,7 @@ export function ReleaseTaskPage({
       toolbar={
         <PageToolbar
           start={
-            <div className={PAGE_TOOLBAR_META_TEXT_CLASS}>
-              <ReleaseTaskBreadcrumbs releaseTitle={releaseTitle} />
-            </div>
+            <ReleaseTaskToolbarStart releaseTitle={releaseTitle} />
           }
         />
       }
@@ -162,12 +161,9 @@ export function ReleaseTaskPageSkeleton() {
       toolbar={
         <PageToolbar
           start={
-            <div className='flex items-center gap-1.5'>
-              <div className='skeleton h-3 w-14 rounded' />
-              <div className='skeleton h-3 w-3 rounded' />
-              <div className='skeleton h-3 w-28 rounded' />
-              <div className='skeleton h-3 w-3 rounded' />
-              <div className='skeleton h-3 w-10 rounded' />
+            <div className='flex min-w-0 flex-1 items-center gap-2'>
+              <div className='skeleton h-7 w-24 shrink-0 rounded-full' />
+              <div className='skeleton h-3 min-w-0 flex-1 rounded' />
             </div>
           }
         />
