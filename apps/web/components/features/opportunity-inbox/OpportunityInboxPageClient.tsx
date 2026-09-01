@@ -496,7 +496,10 @@ export function OpportunityInboxPageClient({
           ) : null}
 
           {!hasReviewableItems ? (
-            <OpportunityInboxEmptyState actionCards={inbox.emptyActionCards} />
+            <OpportunityInboxEmptyState
+              actionCards={inbox.emptyActionCards}
+              founderMode={inboxHomeEnabled}
+            />
           ) : null}
 
           <OpportunityInboxConfirmedTourDates items={confirmedTourDates} />
