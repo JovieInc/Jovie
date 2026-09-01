@@ -11,10 +11,14 @@ import argparse
 import importlib.util
 import json
 import pathlib
+import subprocess
 import sys
 from datetime import datetime, timezone
 
 HERE = pathlib.Path(__file__).resolve()
+ROOT = HERE.parents[2]
+CANONICAL_REGISTRY = HERE.parent / "config" / "model-registry.json"
+INVARIANT_AUDIT = ROOT / "scripts" / "invariants" / "model-audit.mjs"
 _SPEC = importlib.util.spec_from_file_location("model_router", HERE.parent / "model-router.py")
 model_router = importlib.util.module_from_spec(_SPEC)
 assert _SPEC.loader is not None
@@ -32,6 +36,7 @@ ALLOWED_UPDATE_FIELDS = (
     "notes",
 )
 SNAPSHOT_SCHEMA = "model-research/v1"
+# Production consumer binding for the event-first audit contract: JOV-INV-026.
 
 
 def _now():
@@ -108,6 +113,25 @@ def harvest_dir(directory):
     return snapshots[-1]
 
 
+def run_invariant_audit(trigger):
+    completed = subprocess.run(
+        ["node", str(INVARIANT_AUDIT), "--trigger", trigger],
+        cwd=ROOT,
+        text=True,
+        capture_output=True,
+        check=True,
+        timeout=1800,
+    )
+    payload = json.loads(completed.stdout)
+    return {
+        "runId": payload["runId"],
+        "trigger": payload["trigger"],
+        "plannedCells": payload["plannedCells"],
+        "completedCells": payload["completedCells"],
+        "partialCells": payload["partialCells"],
+    }
+
+
 def main():
     ap = argparse.ArgumentParser()
     sub = ap.add_subparsers(dest="cmd", required=True)
@@ -130,8 +154,14 @@ def main():
     snapshot = load_snapshot(snapshot_path)
     cfg, path = model_router.load(args.config)
     result = apply_snapshot(cfg, snapshot)
+    invariant_audit = None
     if args.write:
         write_registry(path, result["registry"])
+        if pathlib.Path(path).resolve() == CANONICAL_REGISTRY.resolve():
+            requested_trigger = (
+                "scheduled-backstop" if args.cmd == "harvest" else "model-registry-write"
+            )
+            invariant_audit = run_invariant_audit(requested_trigger)
     print(json.dumps({
         "ok": True,
         "snapshot": str(snapshot_path),
@@ -139,6 +169,7 @@ def main():
         "applied": result["applied"],
         "rejected": result["rejected"],
         "wrote": bool(args.write),
+        "invariantAudit": invariant_audit,
     }, indent=2))
     return 0
 

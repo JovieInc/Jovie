@@ -1,10 +1,12 @@
 #!/usr/bin/env python3
+import importlib.util
 import json
 import os
 import pathlib
 import subprocess
 import tempfile
 import unittest
+from unittest import mock
 
 ROOT = pathlib.Path(__file__).resolve().parents[3]
 RESEARCH = ROOT / "scripts/hermes/model-registry-research.py"
@@ -12,6 +14,11 @@ ROUTER = ROOT / "scripts/hermes/model-router.py"
 CONFIG = ROOT / "scripts/hermes/config/model-registry.json"
 SNAPSHOT = ROOT / "scripts/hermes/config/model-research/2026-08-17-central-registry.json"
 EVALS = ROOT / "scripts/hermes/tests/fixtures/model-routing-evals.json"
+
+_SPEC = importlib.util.spec_from_file_location("model_registry_research", RESEARCH)
+model_registry_research = importlib.util.module_from_spec(_SPEC)
+assert _SPEC.loader is not None
+_SPEC.loader.exec_module(model_registry_research)
 
 
 class ResearchAndEvalTests(unittest.TestCase):
@@ -86,6 +93,26 @@ class ResearchAndEvalTests(unittest.TestCase):
                 ).stdout
             )
             self.assertEqual(out["rejected"][0]["reason"], "unknown_model")
+
+    def test_registry_write_invokes_bounded_invariant_catch_up(self):
+        event = {
+            "runId": "audit-1",
+            "trigger": "model-catalog-change",
+            "plannedCells": 12,
+            "completedCells": 10,
+            "partialCells": 2,
+        }
+        completed = subprocess.CompletedProcess([], 0, json.dumps(event), "")
+        with mock.patch.object(
+            model_registry_research.subprocess, "run", return_value=completed
+        ) as run:
+            receipt = model_registry_research.run_invariant_audit(
+                "model-registry-write"
+            )
+        self.assertEqual(receipt, event)
+        command = run.call_args.args[0]
+        self.assertEqual(command[-2:], ["--trigger", "model-registry-write"])
+        self.assertEqual(run.call_args.kwargs["timeout"], 1800)
 
     def test_eval_cases_match_research_backed_choices(self):
         cases = json.loads(EVALS.read_text())["cases"]

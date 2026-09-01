@@ -35,6 +35,32 @@ describe('canonical invariant registry', () => {
     });
   });
 
+  it('keeps the three economic directions distinct and binds model-audit cadence', () => {
+    const customerValue = getInvariant(canonical, 'JOV-INV-023');
+    const deliveryCost = getInvariant(canonical, 'JOV-INV-024');
+    const contributionProfit = getInvariant(canonical, 'JOV-INV-025');
+    const modelAudit = getInvariant(canonical, 'JOV-INV-026');
+    assert.deepEqual(
+      [customerValue, deliveryCost, contributionProfit].map(
+        invariant => invariant.policy.key
+      ),
+      [
+        'economics.customer-value.direction',
+        'economics.delivery-unit-cost.direction',
+        'economics.contribution-profit.direction',
+      ]
+    );
+    assert.deepEqual(
+      [customerValue, deliveryCost, contributionProfit].map(
+        invariant => invariant.policy.value.direction
+      ),
+      ['increase', 'decrease', 'increase']
+    );
+    assert.equal(contributionProfit.policy.value.icp, 'wedge-not-ceiling');
+    assert.equal(modelAudit.policy.value.trigger, 'model-catalog-change');
+    assert.equal(modelAudit.policy.value.schedule, 'backstop-only');
+  });
+
   it('resolves the canonical registry independently of process cwd', () => {
     const originalCwd = process.cwd();
     process.chdir('scripts/backlog-orchestrator');
