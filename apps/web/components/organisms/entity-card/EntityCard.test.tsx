@@ -476,4 +476,37 @@ describe('ProfilePacCard landscape states', () => {
     expect(compactContent).toHaveClass('gap-1', 'py-1.5');
     expect(screen.getByRole('link', { name: /listen/i })).toHaveClass('h-11');
   });
+
+  it('uses the shared footer anchor contract for landscape PAC actions', () => {
+    mockUseTrackAudioPlayer.mockReturnValue({
+      playbackState: {
+        activeTrackId: null,
+        currentTime: 0,
+        duration: 0,
+        isPlaying: false,
+      },
+      toggleTrack: vi.fn(),
+      seek: vi.fn(),
+    });
+
+    render(
+      <ProfilePacCard
+        artist={pacArtist}
+        release={{
+          title: 'Release',
+          slug: 'release',
+          artworkUrl: '/release.jpg',
+          previewUrl: null,
+          releaseType: 'Single',
+          releaseDate: '2026-08-02',
+        }}
+        assignment={DEFAULT_PROFILE_PAC_ASSIGNMENT}
+        layout='profile-landscape'
+        renderMode='preview'
+      />
+    );
+
+    const action = screen.getByRole('link', { name: /listen/i });
+    expect(action.parentElement).toHaveClass('mt-auto', 'shrink-0');
+  });
 });
