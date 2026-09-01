@@ -124,9 +124,17 @@ class Fixture:
             "printf '%s\\n' " + repr(network_trace) + " > \"${out}.1\"\n"
             "exit $status\n"
         )
+        (self.bin / "flock").write_text("#!/usr/bin/env bash\nexit 0\n")
+        (self.bin / "date").write_text(
+            "#!/usr/bin/env bash\n"
+            "if [ \"${1:-}\" = '+%s%3N' ]; then printf '1000\\n'; exit 0; fi\n"
+            "exec /bin/date \"$@\"\n"
+        )
         os.chmod(self.bin / "node", 0o755)
         os.chmod(self.bin / "pnpm", 0o755)
         os.chmod(self.bin / "strace", 0o755)
+        os.chmod(self.bin / "flock", 0o755)
+        os.chmod(self.bin / "date", 0o755)
 
     def build_archive(self, tamper: bool = False, manifest_overrides: dict[str, str] | None = None) -> pathlib.Path:
         source = subprocess.check_output(["git", "rev-parse", "HEAD"], cwd=self.workspace, text=True).strip()
@@ -261,6 +269,15 @@ class SymphonyNvmePackageCacheTests(unittest.TestCase):
         result = fx.run("after-create", extra_env={"PNPM_LOG": str(fx.pnpm_log)})
         self.assertEqual(result.returncode, 78)
         self.assertIn("network-access-detected", result.stderr)
+
+    def test_test_root_override_rejects_workspace_outside_system_temp(self) -> None:
+        with tempfile.TemporaryDirectory(dir=pathlib.Path.home()) as root:
+            fx = Fixture(pathlib.Path(root))
+            fx.build_archive()
+            result = fx.run("after-create", extra_env={"PNPM_LOG": str(fx.pnpm_log)})
+            self.assertEqual(result.returncode, 78)
+            self.assertIn("test-root-override-outside-tmp", result.stderr)
+            self.assertFalse(fx.pnpm_log.exists())
 
 
 if __name__ == "__main__":

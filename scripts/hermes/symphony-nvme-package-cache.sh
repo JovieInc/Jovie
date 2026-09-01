@@ -162,7 +162,7 @@ assert_nvme_archive_path() {
   local archive_path="$1"
   if [ "$allow_test_root" = "1" ]; then
     case "$workspace" in
-      /tmp/*) ;;
+      /tmp/*|/private/tmp/*|/private/var/folders/*/*/T/*) ;;
       *) fail "test-root-override-outside-tmp" "$workspace" ;;
     esac
     return
