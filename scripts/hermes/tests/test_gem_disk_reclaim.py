@@ -314,6 +314,7 @@ class GemDiskReclaimTests(unittest.TestCase):
         self.assertTrue((workspace / "node_modules").is_symlink())
         receipt = self.receipt_json()
         self.assertEqual(receipt["status"], "error")
+        self.assertEqual(receipt["workspaces"]["roots"][0]["status"], "error")
         self.assertIn("refusing workspace artifact symlink", receipt["summary"]["violations"][0])
 
     def test_symlinked_exact_roots_fail_closed(self) -> None:

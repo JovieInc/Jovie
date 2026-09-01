@@ -558,7 +558,7 @@ def cleanup_workspaces(args: argparse.Namespace, deadline: float) -> dict[str, A
                     report["reason"] = "unexpected_workspace_candidate_path"
                     break
             root_report["workspaces"].append(report)
-        root_report["status"] = "ok"
+        root_report["status"] = "error" if any(item.get("status") == "error" for item in root_report["workspaces"]) else "ok"
         root_reports.append(root_report)
 
     return {
