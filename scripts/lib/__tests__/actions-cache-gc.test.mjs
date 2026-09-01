@@ -75,6 +75,7 @@ describe('Actions cache GC', () => {
     expect(isProtectedCacheKey('Linux-playwright-chromium-v1')).toBe(true);
     expect(isProtectedCacheKey('macOS-swiftpm-xcode-abc')).toBe(true);
     expect(isProtectedCacheKey('Linux-pip-pytest-abc')).toBe(true);
+    expect(isProtectedCacheKey('macOS-electron-downloads-abc')).toBe(true);
     expect(turboFamily('Linux-turbo-aaa')).toBe('Linux-turbo');
   });
 

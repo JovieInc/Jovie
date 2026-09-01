@@ -3,7 +3,8 @@ import { pathToFileURL } from 'node:url';
 
 export const CACHE_COUNT_SOFT_LIMIT = 400;
 export const CACHE_BYTES_SOFT_LIMIT = 8 * 1024 * 1024 * 1024;
-export const PROTECTED_KEY = /pnpm|node-cache|playwright|setup-node|swiftpm|pip/i;
+export const PROTECTED_KEY =
+  /pnpm|node-cache|playwright|setup-node|swiftpm|pip|electron-downloads/i;
 export const PROTECTED_MAX_AGE_MS = 14 * 24 * 60 * 60 * 1000;
 export const TURBO_KEEP_UNDER_BUDGET = 2;
 export const TURBO_KEEP_OVER_BUDGET = 1;

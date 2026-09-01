@@ -64,7 +64,7 @@ jobs:
             ${{ hashFiles('apps/ios/Jovie.xcodeproj/project.xcworkspace/xcshareddata/swiftpm/Package.resolved') }}-
             ${{ hashFiles('apps/ios/Jovie.xcodeproj/project.pbxproj') }}
           restore-keys: |
-            ${{ runner.os }}-swiftpm-
+            ${{ runner.os }}-swiftpm-${{ steps.xcode-version.outputs.cache_key }}-${{ hashFiles('apps/ios/Jovie.xcodeproj/project.xcworkspace/xcshareddata/swiftpm/Package.resolved') }}-
 
       - name: Validate app icon
         run: bash apps/ios/scripts/validate-app-icon.sh
