@@ -379,31 +379,9 @@ function runTypecheck() {
 }
 
 function runScriptsTypecheck() {
-  // JOV-4327: scripts/ tree typecheck vs shrink-only baseline. Exclusive
-  // Jovie product PRs skip this Symphony/control-plane suite (JOV-5288).
-  const event = process.env.GITHUB_EVENT_NAME || '';
-  if (event !== 'workflow_dispatch' && !repoLanes().runSymphonyControl) {
-    return {
-      code: 0,
-      output:
-        'Scripts typecheck skipped (no Symphony/control-plane files changed)\n',
-      skipped: true,
-    };
-  }
-  const files = changedFiles([
-    'scripts/**/*.ts',
-    'scripts/**/*.mts',
-    'scripts/**/*.mjs',
-    'scripts/**/*.cts',
-    'scripts/tsconfig*.json',
-  ]);
-  if (files && files.length === 0) {
-    return {
-      code: 0,
-      output: 'No scripts typecheck paths changed\n',
-      skipped: true,
-    };
-  }
+  // JOV-4327: run the shrink-only scripts ratchet on every hydrated remaining
+  // job. The TypeScript project imports files outside scripts/, and baseline or
+  // resolver changes can alter its diagnostics without touching a path filter.
   return shell('pnpm run typecheck:scripts');
 }
 

@@ -210,6 +210,7 @@ async function exerciseKeyboardActivation(page, target) {
 async function clearInteractionState(page) {
   await page.mouse.move(-10, -10);
   await page.evaluate(() => {
+    const { document, HTMLElement } = /** @type {any} */ (globalThis);
     const active = document.activeElement;
     if (active instanceof HTMLElement) active.blur();
   });
@@ -241,14 +242,16 @@ async function collectSnapshots(
     .first()
     .waitFor({ state: 'visible', timeout: 15_000 });
   await page.waitForFunction(
-    () =>
-      [...document.querySelectorAll('[data-jovie-eval-family]')].every(
+    () => {
+      const { document } = /** @type {any} */ (globalThis);
+      return [...document.querySelectorAll('[data-jovie-eval-family]')].every(
         element =>
           element.getAttribute('data-jovie-eval-theme') ===
           (document.documentElement.classList.contains('dark')
             ? 'dark'
             : 'light')
-      ),
+      );
+    },
     undefined,
     { timeout: 5_000 }
   );
@@ -265,7 +268,10 @@ async function collectSnapshots(
     await root.evaluate((element, id) => {
       element.setAttribute('data-jovie-eval-instance', id);
     }, instanceId);
-    await page.evaluate(() => Reflect.deleteProperty(window, 'axe'));
+    await page.evaluate(() => {
+      const { window } = /** @type {any} */ (globalThis);
+      return Reflect.deleteProperty(window, 'axe');
+    });
     const axe = await new AxeBuilder({ page })
       .include(`[data-jovie-eval-instance="${instanceId}"]`)
       .withTags(['wcag2a', 'wcag2aa', 'wcag21a', 'wcag21aa', 'wcag22aa'])
@@ -273,6 +279,17 @@ async function collectSnapshots(
 
     const snapshot = await root.evaluate(
       (element, context) => {
+        const {
+          CSS,
+          document,
+          getComputedStyle,
+          HTMLAnchorElement,
+          HTMLButtonElement,
+          HTMLElement,
+          HTMLInputElement,
+          HTMLSelectElement,
+          HTMLTextAreaElement,
+        } = /** @type {any} */ (globalThis);
         const parseColor = value => {
           if (!value || !globalThis.CSS?.supports?.('color', value.trim()))
             return null;
@@ -698,6 +715,7 @@ async function collectSnapshots(
     .locator('[data-jovie-eval-family]')
     .evaluateAll(elements =>
       elements.map(element => {
+        const { document, window } = /** @type {any} */ (globalThis);
         const belongsToFamily = node =>
           node.closest('[data-jovie-eval-family]') === element;
         const findScopedTarget = wrapper => {
