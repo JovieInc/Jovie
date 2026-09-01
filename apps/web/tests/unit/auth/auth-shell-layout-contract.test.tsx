@@ -378,8 +378,12 @@ describe('auth shell layout contract', () => {
   });
 
   it('keeps AuthLayout as the only production auth form width owner', () => {
-    const layoutSource = readWebSource('components/features/auth/AuthLayout.tsx');
-    const formContainerSource = readWebSource(AUTH_FORM_CONTAINER_RELATIVE_PATH);
+    const layoutSource = readWebSource(
+      'components/features/auth/AuthLayout.tsx'
+    );
+    const formContainerSource = readWebSource(
+      AUTH_FORM_CONTAINER_RELATIVE_PATH
+    );
 
     expect(layoutSource).toContain('AUTH_FORM_MAX_WIDTH_CLASS');
     expect(layoutSource).toContain(AUTH_FORM_MAX_WIDTH_CLASS);
