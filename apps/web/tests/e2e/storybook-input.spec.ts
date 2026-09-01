@@ -1,3 +1,5 @@
+import { mkdir, writeFile } from 'node:fs/promises';
+import { join } from 'node:path';
 import AxeBuilder from '@axe-core/playwright';
 import {
   expect,
@@ -10,6 +12,7 @@ import {
 const INPUT_MATRIX_STORY_ID = 'ui-atoms-input--conformance-matrix';
 const INPUT_FOCUS_STORY_ID = 'ui-atoms-input--keyboard-focus';
 const STORYBOOK_RENDER_TIMEOUT_MS = 60_000;
+const EVIDENCE_DIR = join('test-results', 'storybook-input-evidence');
 
 const VIEWPORTS = [
   { id: 'desktop', width: 1280, height: 800 },
@@ -31,10 +34,15 @@ async function attachScreenshot(
   name: string,
   root: Locator
 ) {
+  const screenshot = await root.screenshot({ animations: 'disabled' });
+
   await testInfo.attach(name, {
-    body: await root.screenshot({ animations: 'disabled' }),
+    body: screenshot,
     contentType: 'image/png',
   });
+
+  await mkdir(EVIDENCE_DIR, { recursive: true });
+  await writeFile(join(EVIDENCE_DIR, name), screenshot);
 }
 
 async function attachA11yResult(
@@ -46,21 +54,25 @@ async function attachA11yResult(
     .include('#storybook-root')
     .withTags(['wcag2a', 'wcag2aa', 'wcag21a', 'wcag21aa'])
     .analyze();
+  const evidence = JSON.stringify(
+    {
+      violations: results.violations.map(violation => ({
+        id: violation.id,
+        impact: violation.impact,
+        nodes: violation.nodes.length,
+      })),
+    },
+    null,
+    2
+  );
 
   await testInfo.attach(name, {
-    body: JSON.stringify(
-      {
-        violations: results.violations.map(violation => ({
-          id: violation.id,
-          impact: violation.impact,
-          nodes: violation.nodes.length,
-        })),
-      },
-      null,
-      2
-    ),
+    body: evidence,
     contentType: 'application/json',
   });
+
+  await mkdir(EVIDENCE_DIR, { recursive: true });
+  await writeFile(join(EVIDENCE_DIR, name), evidence);
 
   expect(results.violations, `${name} accessibility violations`).toEqual([]);
 }
