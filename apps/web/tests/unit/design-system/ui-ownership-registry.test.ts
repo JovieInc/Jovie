@@ -108,30 +108,6 @@ describe('cross-surface UI ownership registry', () => {
       expect.arrayContaining(['OverflowMenuTrigger', 'RailToggleButton'])
     );
     expect(iconButton.requiredStates).toContain('pressed');
-    const input = item('atom.input');
-    expect(input.sourceAuthority).toEqual({
-      registry: 'design-system',
-      id: 'atom.input',
-    });
-    expect(input.canonicalOwner).toEqual({
-      sourcePath: 'packages/ui/atoms/input.tsx',
-      exportName: 'Input',
-      registryId: 'atom.input',
-    });
-    expect(input.pen).toMatchObject({
-      status: 'unresolved',
-      identity: null,
-      sourceBacked: true,
-    });
-    expect(input.requiredStates).toEqual([
-      'default',
-      'focus-visible',
-      'disabled',
-      'loading',
-      'pending',
-      'success',
-      'error',
-    ]);
     const nativeButtonBindings = item('atom.button').platformAdapters.find(
       adapter => adapter.platform === 'ios'
     )?.nativeBindings;

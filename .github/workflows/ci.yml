@@ -1948,7 +1948,6 @@ jobs:
               node "$GITHUB_WORKSPACE/.github/scripts/guard-playwright-artifacts.mjs" --run -- \
                 pnpm exec playwright test \
                   tests/e2e/storybook-elevation.spec.ts \
-                  tests/e2e/storybook-input.spec.ts \
                   tests/e2e/storybook-marketing-faq.spec.ts \
                   tests/e2e/storybook-skeleton.spec.ts \
                   --config=playwright.config.storybook.ts --project=chromium --reporter=line
@@ -1961,7 +1960,6 @@ jobs:
         env:
           STORYBOOK_BASE_URL: http://localhost:6006
           CI: true
-          PLAYWRIGHT_ARTIFACT_ALLOW_IMAGES: 'true'
       - name: Upload combined layout failure evidence
         if: ${{ failure() && hashFiles('apps/web/test-results/**') != '' }}
         continue-on-error: true
@@ -1970,14 +1968,6 @@ jobs:
           name: combined-layout-report-${{ github.run_id }}-${{ github.run_attempt }}
           path: apps/web/test-results/
           retention-days: 3
-      - name: Upload input Storybook evidence
-        if: ${{ success() && hashFiles('apps/web/test-results/storybook-input-evidence/**') != '' }}
-        uses: ./.github/actions/upload-safe-playwright-artifact
-        with:
-          name: storybook-input-evidence-${{ github.run_id }}-${{ github.run_attempt }}
-          path: apps/web/test-results/storybook-input-evidence/
-          allow-images: 'true'
-          retention-days: 7
 
   # Full Xcode work belongs on the synthetic combined head, never the source
   # PR. The same reusable lane is the fail-closed fallback for direct/admin

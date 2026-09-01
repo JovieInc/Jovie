@@ -41,18 +41,6 @@
       "testSources": ["packages/ui/atoms/button.test.tsx"],
       "penRootId": "g3IC1",
       "sourceDigest": "47659029e6bf5710e49d7e9b13c17aff3ac03bad5a17c3006871839ce210411a"
-    },
-    {
-      "id": "atom.input",
-      "state": "source-bound",
-      "revision": 1,
-      "platforms": ["web"],
-      "source": "packages/ui/atoms/input.tsx",
-      "tokenSources": ["packages/ui/theme/tokens.ts"],
-      "storySources": ["packages/ui/atoms/input.stories.tsx"],
-      "testSources": ["packages/ui/atoms/input.test.tsx"],
-      "penRootId": null,
-      "sourceDigest": "f244d5e43b26b5d8ee7668eb45933a955cd51781e9a4a9e144eee7cdd4e4dff2"
     }
   ],
   "legacy": {
