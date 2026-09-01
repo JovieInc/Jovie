@@ -1,5 +1,10 @@
 name: Merge Queue Auto-Enroll
 
+# controller-hop-exception: jovie-controller-hop/v1
+# accountable-writer: Gem
+# necessary-trust-boundary: GitHub-hosted admission reads with the workflow token while the Jovie Bot token stays isolated to native queue mutations.
+# revisit-trigger: Remove REST-to-GraphQL hydration when GitHub exposes mergeability and exact refs through one bounded paginated REST contract.
+
 # Fully event-driven — zero polling crons.
 #
 # Eligibility changes wake one repo-wide writer mutex. GitHub may replace an
