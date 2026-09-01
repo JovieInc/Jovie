@@ -60,36 +60,39 @@ const hostCatalog: FeatureIntroCatalog = {
 };
 
 describe('FeatureIntroCard', () => {
-  it('renders highlight mode with a dismiss control and one primary CTA', () => {
-    const onDismiss = vi.fn();
-    const onPrimaryCTA = vi.fn();
+  it(
+    'renders highlight mode with a dismiss control and one primary CTA',
+    () => {
+      const onDismiss = vi.fn();
+      const onPrimaryCTA = vi.fn();
 
-    render(
-      <FeatureIntroCard
-        changelogHref={APP_ROUTES.CHANGELOG}
-        onDismiss={onDismiss}
-        onPrimaryCTA={onPrimaryCTA}
-        presentation={highlightPresentation}
-      />
-    );
+      render(
+        <FeatureIntroCard
+          changelogHref={APP_ROUTES.CHANGELOG}
+          onDismiss={onDismiss}
+          onPrimaryCTA={onPrimaryCTA}
+          presentation={highlightPresentation}
+        />
+      );
 
-    expect(screen.getByTestId('feature-intro-card')).toHaveAttribute(
-      'data-mode',
-      'highlight'
-    );
-    expect(screen.getByTestId('feature-intro-card')).toHaveAttribute(
-      'data-source-id',
-      'catalog-in-chat'
-    );
-    expect(
-      screen.getByText('Your Catalog Is Already In Chat')
-    ).toBeInTheDocument();
-    fireEvent.click(screen.getByTestId('feature-intro-cta'));
-    expect(onPrimaryCTA).toHaveBeenCalledTimes(1);
-    fireEvent.click(screen.getByTestId('feature-intro-dismiss'));
-    expect(onDismiss).toHaveBeenCalledTimes(1);
-    expect(screen.queryByTestId('feature-intro-and-more')).toBeNull();
-  });
+      expect(screen.getByTestId('feature-intro-card')).toHaveAttribute(
+        'data-mode',
+        'highlight'
+      );
+      expect(screen.getByTestId('feature-intro-card')).toHaveAttribute(
+        'data-source-id',
+        'catalog-in-chat'
+      );
+      expect(
+        screen.getByText('Your Catalog Is Already In Chat')
+      ).toBeInTheDocument();
+      fireEvent.click(screen.getByTestId('feature-intro-cta'));
+      expect(onPrimaryCTA).toHaveBeenCalledTimes(1);
+      fireEvent.click(screen.getByTestId('feature-intro-dismiss'));
+      expect(onDismiss).toHaveBeenCalledTimes(1);
+      expect(screen.queryByTestId('feature-intro-and-more')).toBeNull();
+    }
+  );
 
   it('renders what’s new bullets and links And more to the changelog', () => {
     render(
@@ -124,53 +127,69 @@ describe('FeatureIntroHost', () => {
     window.localStorage.clear();
   });
 
-  it('persists highlight dismiss and then shows what’s new without nagging the same id', () => {
-    const onHighlightCTA = vi.fn();
-    const { unmount } = render(
-      <FeatureIntroHost catalog={hostCatalog} onHighlightCTA={onHighlightCTA} />
-    );
+  it(
+    'persists highlight dismiss and then shows what’s new without nagging the same id',
+    () => {
+      const onHighlightCTA = vi.fn();
+      const { unmount } = render(
+        <FeatureIntroHost
+          catalog={hostCatalog}
+          onHighlightCTA={onHighlightCTA}
+        />
+      );
 
-    expect(screen.getByTestId('feature-intro-card')).toHaveAttribute(
-      'data-mode',
-      'highlight'
-    );
-    fireEvent.click(screen.getByTestId('feature-intro-dismiss'));
-    expect(
-      window.localStorage.getItem(FEATURE_INTRO_STORAGE.dismissedHighlightIDKey)
-    ).toBe('catalog-in-chat');
-    expect(screen.getByTestId('feature-intro-card')).toHaveAttribute(
-      'data-mode',
-      'whatsNew'
-    );
+      expect(screen.getByTestId('feature-intro-card')).toHaveAttribute(
+        'data-mode',
+        'highlight'
+      );
+      fireEvent.click(screen.getByTestId('feature-intro-dismiss'));
+      expect(
+        window.localStorage.getItem(
+          FEATURE_INTRO_STORAGE.dismissedHighlightIDKey
+        )
+      ).toBe('catalog-in-chat');
+      expect(screen.getByTestId('feature-intro-card')).toHaveAttribute(
+        'data-mode',
+        'whatsNew'
+      );
 
-    unmount();
-    render(
-      <FeatureIntroHost catalog={hostCatalog} onHighlightCTA={onHighlightCTA} />
-    );
-    expect(screen.getByTestId('feature-intro-card')).toHaveAttribute(
-      'data-mode',
-      'whatsNew'
-    );
-    expect(screen.queryByTestId('feature-intro-cta')).toBeNull();
-  });
+      unmount();
+      render(
+        <FeatureIntroHost
+          catalog={hostCatalog}
+          onHighlightCTA={onHighlightCTA}
+        />
+      );
+      expect(screen.getByTestId('feature-intro-card')).toHaveAttribute(
+        'data-mode',
+        'whatsNew'
+      );
+      expect(screen.queryByTestId('feature-intro-cta')).toBeNull();
+    }
+  );
 
-  it('stays gone after both the highlight and what’s new wave are dismissed', () => {
-    const { unmount } = render(
-      <FeatureIntroHost catalog={hostCatalog} onHighlightCTA={vi.fn()} />
-    );
+  it(
+    'stays gone after both the highlight and what’s new wave are dismissed',
+    () => {
+      const { unmount } = render(
+        <FeatureIntroHost catalog={hostCatalog} onHighlightCTA={vi.fn()} />
+      );
 
-    fireEvent.click(screen.getByTestId('feature-intro-dismiss'));
-    fireEvent.click(screen.getByTestId('feature-intro-dismiss'));
+      fireEvent.click(screen.getByTestId('feature-intro-dismiss'));
+      fireEvent.click(screen.getByTestId('feature-intro-dismiss'));
 
-    expect(screen.queryByTestId('feature-intro-card')).toBeNull();
-    expect(
-      window.localStorage.getItem(FEATURE_INTRO_STORAGE.dismissedWhatsNewIDKey)
-    ).toBe('changelog:26.8.1');
+      expect(screen.queryByTestId('feature-intro-card')).toBeNull();
+      expect(
+        window.localStorage.getItem(
+          FEATURE_INTRO_STORAGE.dismissedWhatsNewIDKey
+        )
+      ).toBe('changelog:26.8.1');
 
-    unmount();
-    render(
-      <FeatureIntroHost catalog={hostCatalog} onHighlightCTA={vi.fn()} />
-    );
-    expect(screen.queryByTestId('feature-intro-card')).toBeNull();
-  });
+      unmount();
+      render(
+        <FeatureIntroHost catalog={hostCatalog} onHighlightCTA={vi.fn()} />
+      );
+      expect(screen.queryByTestId('feature-intro-card')).toBeNull();
+    }
+  );
 });
