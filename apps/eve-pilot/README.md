@@ -34,10 +34,35 @@ Tim always talks through Ovie.
 Summer begins as an explicit `ovie-summer-shadow` identity in this Eve app.
 It can observe and report engineering throughput from Ovie, but it has no
 write capability during this phase. Photon, Telegram, and iMessage remain
-bound to Ovie. Before Summer may orchestrate mutations, land the durable
-receipt/outbox and rate-limit replay path with event-replay tests; Linear is
-the coordination projection, not delivery truth. Hermes remains available as
+bound to Ovie. The dedicated `jovie-eve-shadow` Vercel deployment accepts only
+Jovie production OIDC at `POST /ovie/v1/summer-shadow/events`. It writes a
+private immutable Vercel Blob receipt/outbox before Eve dispatch and a second
+terminal receipt before returning `202`. Duplicate event IDs, unsigned calls,
+stale events, and persistence uncertainty fail closed. The binding conveys
+`dispatchAuthority: none`; it does not expose Linear, Symphony, GitHub, GBrain,
+deployment, or permission mutations. Before Summer may orchestrate mutations,
+the separately gated rate-limit replay path must also pass. Linear remains the
+coordination projection, not delivery truth. Hermes remains available as
 rollback until that proof is complete.
+
+The accepted event contract is strict:
+
+```json
+{
+  "schema": "jovie.ovie-summer-shadow.event/v1",
+  "eventId": "evt_unique_identifier",
+  "occurredAt": "2026-08-31T20:00:00.000Z",
+  "message": "Read-only observation",
+  "evidence": []
+}
+```
+
+For an Ovie-originated production probe, inject the short-lived token from the
+existing Jovie Vercel project. The script never prints the token:
+
+    vercel env run -e production --project jovie -- \
+      pnpm --dir apps/eve-pilot run probe:summer-shadow -- \
+      --url https://jovie-eve-shadow.vercel.app
 
 Telegram and iMessage fail closed without an allowlist. Groups and unknown
 senders are dropped.

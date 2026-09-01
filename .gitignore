@@ -31,6 +31,7 @@ scripts/backlog-orchestrator/shadow-report-latest.txt
 /coverage
 apps/web/coverage/
 packages/ui/coverage/
+apps/eve-pilot/coverage/
 
 # playwright
 /playwright-report/

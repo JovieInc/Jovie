@@ -41,5 +41,42 @@ jobs:
       # dependencies instead of the monorepo root graph.
       - run: pnpm install --ignore-workspace --frozen-lockfile
       - run: pnpm run typecheck
-      - run: pnpm run test
+      - run: pnpm run test:coverage
       - run: pnpm run build
+
+  deploy-shadow:
+    name: Deploy existing Eve shadow pilot
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    needs: verify
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    concurrency:
+      group: eve-shadow-production
+      cancel-in-progress: true
+    defaults:
+      run:
+        working-directory: apps/eve-pilot
+    env:
+      VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: pnpm/action-setup@0977fd99725f1db4007ccb2928dbb4e90d06cc86 # v6.0.10
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: '24'
+          cache: pnpm
+          cache-dependency-path: apps/eve-pilot/pnpm-lock.yaml
+      - run: pnpm install --ignore-workspace --frozen-lockfile
+      - name: Bind the existing pilot to its dedicated Vercel project
+        run: |
+          if [ -z "$VERCEL_TOKEN" ]; then
+            echo 'VERCEL_TOKEN is required for the Eve shadow deployment.' >&2
+            exit 1
+          fi
+          pnpm exec vercel link \
+            --yes \
+            --project jovie-eve-shadow \
+            --scope jovie \
+            --token "$VERCEL_TOKEN"
+      - name: Deploy exact main source to production
+        run: pnpm run deploy
