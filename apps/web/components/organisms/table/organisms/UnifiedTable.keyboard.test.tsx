@@ -20,9 +20,7 @@ const columns: ColumnDef<TestRow, unknown>[] = [
   },
 ];
 
-const alignedData: AlignedTestRow[] = [
-  { id: 'one', name: 'One', count: 42 },
-];
+const alignedData: AlignedTestRow[] = [{ id: 'one', name: 'One', count: 42 }];
 
 const alignedColumns: ColumnDef<AlignedTestRow, unknown>[] = [
   {

@@ -34,7 +34,9 @@ describe('TableCell', () => {
   });
 
   it('lets consumer tone overrides replace the canonical cell tone', () => {
-    renderInTable(<TableCell className='text-secondary-token'>Muted</TableCell>);
+    renderInTable(
+      <TableCell className='text-secondary-token'>Muted</TableCell>
+    );
 
     const cell = screen.getByRole('cell');
     expect(cell).toHaveClass('text-secondary-token');
