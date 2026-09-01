@@ -11,6 +11,12 @@ export interface ContentMetricStatProps {
   readonly subtitleClassName?: string;
 }
 
+export interface ContentMetricStatSkeletonProps {
+  readonly className?: string;
+  readonly labelWidthClassName?: string;
+  readonly valueWidthClassName?: string;
+}
+
 export function ContentMetricStat({
   label,
   value,
@@ -48,6 +54,19 @@ export function ContentMetricStat({
           {subtitle}
         </p>
       ) : null}
+    </div>
+  );
+}
+
+export function ContentMetricStatSkeleton({
+  className,
+  labelWidthClassName = 'w-20',
+  valueWidthClassName = 'w-16',
+}: Readonly<ContentMetricStatSkeletonProps>) {
+  return (
+    <div className={cn('min-w-0 space-y-2', className)} aria-hidden='true'>
+      <div className={cn('h-3 rounded skeleton', labelWidthClassName)} />
+      <div className={cn('h-8 rounded skeleton', valueWidthClassName)} />
     </div>
   );
 }
