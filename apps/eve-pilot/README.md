@@ -57,12 +57,14 @@ The accepted event contract is strict:
 }
 ```
 
-For an Ovie-originated production probe, inject the short-lived token from the
-existing Jovie Vercel project. The script never prints the token:
+For an Ovie-originated production probe, invoke the narrow Jovie server bridge
+with its existing cron authentication. That production Function obtains its
+short-lived Vercel OIDC token from the request context and signs the Eve call.
+The script never prints either credential:
 
     vercel env run -e production --project jovie -- \
       pnpm --dir apps/eve-pilot run probe:summer-shadow -- \
-      --url https://jovie-eve-shadow.vercel.app
+      --via-ovie --url https://jov.ie
 
 Telegram and iMessage fail closed without an allowlist. Groups and unknown
 senders are dropped.

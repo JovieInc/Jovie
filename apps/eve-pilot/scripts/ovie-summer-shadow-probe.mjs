@@ -8,6 +8,7 @@ const { values } = parseArgs({
     message: { type: 'string' },
     unsigned: { type: 'boolean', default: false },
     url: { type: 'string' },
+    'via-ovie': { type: 'boolean', default: false },
   },
   strict: true,
 });
@@ -21,23 +22,34 @@ if (!Number.isInteger(expectedStatus)) {
 }
 
 const eventId = values['event-id'] ?? `evt_${randomUUID().replaceAll('-', '')}`;
-const token = process.env.VERCEL_OIDC_TOKEN;
+const token = values['via-ovie']
+  ? process.env.CRON_SECRET
+  : process.env.VERCEL_OIDC_TOKEN;
 if (!values.unsigned && !token) {
-  throw new Error('VERCEL_OIDC_TOKEN is required unless --unsigned is used');
+  throw new Error(
+    `${values['via-ovie'] ? 'CRON_SECRET' : 'VERCEL_OIDC_TOKEN'} is required unless --unsigned is used`
+  );
 }
 
 const headers = { 'content-type': 'application/json' };
 if (!values.unsigned) headers.authorization = `Bearer ${token}`;
 
 const response = await fetch(
-  new URL('/ovie/v1/summer-shadow/events', baseUrl),
+  new URL(
+    values['via-ovie']
+      ? '/api/internal/ovie/summer-shadow'
+      : '/ovie/v1/summer-shadow/events',
+    baseUrl
+  ),
   {
     method: 'POST',
     headers,
     body: JSON.stringify({
-      schema: 'jovie.ovie-summer-shadow.event/v1',
+      ...(values['via-ovie']
+        ? {}
+        : { schema: 'jovie.ovie-summer-shadow.event/v1' }),
       eventId,
-      occurredAt: new Date().toISOString(),
+      ...(values['via-ovie'] ? {} : { occurredAt: new Date().toISOString() }),
       message:
         values.message ??
         'Acknowledge this signed Ovie-to-Summer shadow binding test only.',

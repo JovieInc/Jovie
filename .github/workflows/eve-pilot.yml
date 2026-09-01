@@ -79,4 +79,10 @@ jobs:
             --scope jovie \
             --token "$VERCEL_TOKEN"
       - name: Deploy exact main source to production
-        run: pnpm run deploy
+        run: |
+          pnpm exec vercel deploy \
+            --prod \
+            --yes \
+            --scope jovie \
+            --token "$VERCEL_TOKEN" \
+            --meta "githubCommitSha=$GITHUB_SHA"
