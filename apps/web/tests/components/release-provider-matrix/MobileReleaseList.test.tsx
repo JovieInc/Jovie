@@ -1,9 +1,21 @@
+import { readFileSync } from 'node:fs';
+import { resolve } from 'node:path';
 import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import type { ReactNode } from 'react';
 import { describe, expect, it, vi } from 'vitest';
 import { MobileReleaseList } from '@/features/dashboard/organisms/release-provider-matrix/MobileReleaseList';
 import type { ReleaseViewModel } from '@/lib/discography/types';
+
+const mobileReleaseListSourcePath =
+  'components/features/dashboard/organisms/release-provider-matrix/MobileReleaseList.tsx';
+
+function readWebSource(sourcePath: string): string {
+  const webRoot = process.cwd().endsWith('/apps/web')
+    ? process.cwd()
+    : resolve(process.cwd(), 'apps/web');
+  return readFileSync(resolve(webRoot, sourcePath), 'utf8');
+}
 
 vi.mock('@/components/atoms/SwipeToReveal', () => ({
   SwipeToReveal: ({
@@ -58,6 +70,13 @@ function createRelease(
 }
 
 describe('MobileReleaseList', () => {
+  it('keeps row disclosure on the shared list-row primitive', () => {
+    const source = readWebSource(mobileReleaseListSourcePath);
+
+    expect(source).toContain('ShellListRowDisclosureIcon');
+    expect(source).toContain("density='spacious'");
+  });
+
   it('renders grouped year sections including the unknown-year fallback', () => {
     render(
       <MobileReleaseList
