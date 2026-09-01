@@ -88,7 +88,7 @@ const renderedPass = {
 const renderedFailure = {
   ok: false,
   status: 1,
-  report: { ok: false },
+  report: { ok: false, results: [] },
   output: 'missing rendered contract',
 };
 
@@ -593,7 +593,7 @@ function renderedSection(options = {}, response = renderedPass) { const calls = 
 
 describe('live rendered evaluation section', () => {
   // biome-ignore format: compact matrix keeps this source-PR under the hard size cap
-  it.each([['empty', {}, true, { applicable: false, skipped: true }], ['advisory without Storybook', { storybookUrl: null }, true, { skipped: true }], ['required without Storybook', { requireRendered: true, storybookUrl: null }, false, { ok: false, skipped: true }], ['advisory failure', {}, true, { ok: false, status: 1 }, renderedFailure], ['required failure', { requireRendered: true }, false, { ok: false, status: 1 }, renderedFailure]])('handles %s', (_name, options, ok, section, response) => {
+  it.each([['empty', {}, true, { applicable: false, skipped: true }, renderedPass], ['advisory without Storybook', { storybookUrl: null }, true, { skipped: true }, renderedPass], ['required without Storybook', { requireRendered: true, storybookUrl: null }, false, { ok: false, skipped: true }, renderedPass], ['advisory failure', {}, true, { ok: false, status: 1 }, renderedFailure], ['required failure', { requireRendered: true }, false, { ok: false, status: 1 }, renderedFailure]])('handles %s', (_name, options, ok, section, response) => {
     const result =
       _name === 'empty'
         ? resolveRenderedEvaluationSection()
