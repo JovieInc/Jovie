@@ -205,23 +205,46 @@ class RenderTests(unittest.TestCase):
         lines = output.splitlines()
         self.assertEqual(len(lines), 89)
         self.assertTrue(all(len(line) == 430 for line in lines))
+        self.assertIn("DECISION HEADER · GEM OPERATIONS · READ ONLY", lines[0])
         titles = (
-            "IMMEDIATE ATTENTION · #1 BOTTLENECK FIRST",
-            "CURRENT WORK",
-            "RECENT DELIVERY LOG",
-            "SYSTEM HEALTH / ADMISSION",
-            "SECONDARY CAPACITY / OWNERS / DETAIL",
+            "DECISION HEADER · GEM OPERATIONS · READ ONLY",
+            "ACTIVE BOTTLENECK",
+            "THROUGHPUT",
+            "HEALTH",
+            "NEXT ACTION",
+            "SOURCE-HOST",
+            "LIFECYCLE MATRIX · FIXED STATES",
+            "QUEUED",
+            "RUNNING",
+            "PASSED",
+            "FAILED",
+            "ISSUES / QUEUE · STABLE COLUMNS",
+            "POS",
+            "REF",
+            "LABEL / ACTION",
+            "EXCEPTIONS / RECOVERY · OVERVIEW ONLY",
             "BUSINESS PULSE",
             "DELIVERY SPEED · ISSUE OPEN → LANDED",
             "CURRENT LARGEST BOTTLENECK",
         )
         for title in titles:
             self.assertIn(title, output)
-        offsets = [output.index(title) for title in titles]
+        ordered_titles = (
+            "DECISION HEADER · GEM OPERATIONS · READ ONLY",
+            "LIFECYCLE MATRIX · FIXED STATES",
+            "ISSUES / QUEUE · STABLE COLUMNS",
+            "EXCEPTIONS / RECOVERY · OVERVIEW ONLY",
+            "BUSINESS PULSE",
+            "DELIVERY SPEED · ISSUE OPEN → LANDED",
+            "CURRENT LARGEST BOTTLENECK",
+        )
+        offsets = [output.index(title) for title in ordered_titles]
         self.assertEqual(offsets, sorted(offsets))
-        self.assertIn("localhost 4041/4042", output)
-        self.assertIn("mergeQueueEntry · GitHub", output)
-        self.assertIn("missing receipt timestamps; not inferred", output)
+        self.assertIn("host gem / Ubuntu tty1", output)
+        self.assertIn("main aaaaa... -> prod aaaaa... EXACT", output)
+        self.assertRegex(output, r"\n│\s+1\s+PR #16490\s+PENDING\s+queue\s+Repair source freshness")
+        self.assertIn("authoritative issue-open → landed receipts", output)
+        self.assertNotIn("DEEP DETAIL", output)
 
     def test_bottom_strip_has_exactly_three_operator_primary_regions(self) -> None:
         state = live_state()
@@ -267,16 +290,287 @@ class RenderTests(unittest.TestCase):
         ):
             self.assertIn(text, output)
 
-    def test_short_ultrawide_keeps_secondary_capacity_rows_visible(self) -> None:
+    def test_short_ultrawide_reserves_full_metrics_strip(self) -> None:
+        output = hud.render(live_state(), width=430, height=50)
+        lines = output.splitlines()
+        bottom = "\n".join(lines[-12:])
+
+        self.assertEqual(len(lines), 49)
+        self.assertTrue(all(len(line) == 430 for line in lines))
+        for text in (
+            "BUSINESS PULSE",
+            "WOW GROWTH",
+            "DEFAULT ALIVE",
+            "DELIVERY SPEED · ISSUE OPEN → LANDED",
+            "SOURCE · n=21",
+            "CURRENT LARGEST BOTTLENECK",
+            "OPEN unknown",
+        ):
+            self.assertIn(text, bottom)
+
+    def test_details_short_ultrawide_preserves_primary_strip(self) -> None:
+        output = hud.render(live_state(), width=286, height=60, view="details")
+        lines = output.splitlines()
+        bottom = "\n".join(lines[-12:])
+
+        self.assertEqual(len(lines), 59)
+        self.assertTrue(all(len(line) == 286 for line in lines))
+        for text in (
+            "BUSINESS PULSE",
+            "DELIVERY SPEED · ISSUE OPEN → LANDED",
+            "CURRENT LARGEST BOTTLENECK",
+        ):
+            self.assertIn(text, bottom)
+        if "RECENT DELIVERY LOG" in output:
+            detail_section = output[
+                output.index("RECENT DELIVERY LOG") : output.index("BUSINESS PULSE")
+            ]
+            self.assertIn("MQ #16490", detail_section)
+
+    def test_short_ultrawide_keeps_lifecycle_and_issue_rows_visible(self) -> None:
         output = hud.render(live_state(), width=430, height=76)
-        secondary = output[
-            output.index("SECONDARY CAPACITY / OWNERS / DETAIL") : output.index(
-                "BUSINESS PULSE"
-            )
+        lifecycle = output[
+            output.index("LIFECYCLE MATRIX") : output.index("ISSUES / QUEUE")
+        ]
+        issues = output[
+            output.index("ISSUES / QUEUE") : output.index("EXCEPTIONS / RECOVERY")
         ]
 
-        for text in ("Owner input", "Execution slots", "Runner jobs", "Linear open"):
-            self.assertIn(text, secondary)
+        for text in ("QUEUED", "RUNNING", "PASSED", "FAILED", "Symphony work", "PR fleet"):
+            self.assertIn(text, lifecycle)
+        for text in ("POS", "REF", "STATE", "PR #16490", "JOV-5400"):
+            self.assertIn(text, issues)
+        self.assertNotIn("SECONDARY CAPACITY / OWNERS / DETAIL", output)
+
+    def test_lifecycle_matrix_includes_retry_wait_in_queued_total(self) -> None:
+        state = live_state()
+        state["symphony"]["counts"] = {
+            "implementing": 0,
+            "retrying": 3,
+            "queued": 0,
+            "blocked": 0,
+        }
+
+        row = next(
+            line
+            for line in hud._lifecycle_matrix_rows(state, 210)
+            if line.startswith("Symphony work")
+        )
+
+        self.assertRegex(row, r"Symphony work\s+3\s+0\s+-\s+0")
+        self.assertIn("queued 0 + retry 3 wait", row)
+
+    def test_stable_issue_row_uses_full_available_label_width(self) -> None:
+        label = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ"
+
+        row = hud._stable_issue_row("1", "PR #16490", "PENDING", "queue", label, 80)
+
+        self.assertEqual(len(row), 80)
+        self.assertIn(hud.compact(label, 43), row)
+
+    def test_health_summary_includes_pr_fleet_audit_evidence(self) -> None:
+        state = live_state()
+        state["delivery"].pop("pr_fleet")
+
+        summary = hud._health_summary(state)
+
+        self.assertIn("UNKNOWN", summary)
+        self.assertIn("PR fleet audit", summary)
+        self.assertIn("pr-fleet-closure-audit-missing", summary)
+
+    def test_health_summary_includes_summer_queue_evidence(self) -> None:
+        state = live_state()
+        state["delivery"]["summer_queue"] = {
+            "schema": "jovie-summer-red-queue/v2",
+            "authority": "Summer",
+            "observedAt": stamp(),
+            "terminalTombstones": [],
+            "items": [],
+            "error": "summer-queue-stale",
+        }
+
+        summary = hud._health_summary(state)
+
+        self.assertIn("DEGRADED", summary)
+        self.assertIn("Summer red queue", summary)
+        self.assertIn("summer-queue-stale", summary)
+
+    def test_health_summary_includes_incomplete_workflow_count_evidence(self) -> None:
+        state = live_state()
+        state["delivery"]["workflow_counts_complete"] = {"CI": True, "Production Controller": False}
+
+        summary = hud._health_summary(state)
+
+        for text in ("UNKNOWN", "Workflow counts", "Production Controller", "counts unknown"):
+            self.assertIn(text, summary)
+
+    def test_stale_delivery_header_does_not_claim_exact_lineage(self) -> None:
+        state = live_state()
+        state["delivery"]["updated"] = "2026-01-01T00:00:00Z"
+
+        rows = hud._decision_header_rows(state, 426, 430, 90)
+        source_host = next(row for row in rows if "SOURCE-HOST" in row)
+
+        self.assertIn("NOT PROVEN", source_host)
+        self.assertIn("STALE last-known", source_host)
+        self.assertNotIn(" EXACT", source_host)
+
+    def test_missing_pr_fleet_receipt_queue_rows_fail_closed(self) -> None:
+        state = live_state()
+        state["delivery"].pop("pr_fleet")
+        state["delivery"]["queue"] = []
+        state["symphony"]["jobs"] = []
+        state["symphony"]["blockers"] = []
+        state["symphony"]["counts"] = {
+            "implementing": 0,
+            "retrying": 0,
+            "queued": 0,
+            "blocked": 0,
+        }
+
+        rows = "\n".join(hud._issue_queue_rows(state, 210))
+
+        self.assertIn("PR fleet", rows)
+        self.assertIn("UNKNOWN", rows)
+        self.assertIn("pr-fleet-closure-audit-missing", rows)
+        self.assertNotIn("CLEAR", rows)
+
+    def test_retrying_blocker_queue_row_is_pending_not_owner_input(self) -> None:
+        state = live_state()
+        state["delivery"]["pr_fleet"]["queue"] = []
+        state["delivery"]["queue"] = []
+        state["symphony"]["jobs"] = []
+        state["symphony"]["blockers"] = [
+            {
+                "id": "JOV-RETRY",
+                "attempt": 2,
+                "reason": "timeout",
+                "next": "automatic retry",
+                "owner": "Symphony/JOV",
+            }
+        ]
+
+        rows = "\n".join(hud._issue_queue_rows(state, 210))
+        line = next(row for row in rows.splitlines() if "JOV-RETRY" in row)
+
+        self.assertIn("PENDING", line)
+        self.assertIn("automatic retry", line)
+        self.assertNotIn("OWNER INPUT", line)
+
+    def test_details_view_expands_issue_rows_hidden_by_overview_more(self) -> None:
+        state = live_state()
+        state["delivery"]["pr_fleet"]["queue"] = [
+            {"number": 17000 + index, "position": index + 1, "title": f"Queue {index + 1}"}
+            for index in range(6)
+        ]
+        state["delivery"]["queue"] = list(state["delivery"]["pr_fleet"]["queue"])
+        state["symphony"]["jobs"] = [
+            {"id": f"JOV-JOB-{index}", "started": stamp(60 * index), "title": f"Job {index}"}
+            for index in range(8)
+        ]
+        state["symphony"]["blockers"] = [
+            {
+                "id": f"JOV-BLOCK-{index}",
+                "attempt": index,
+                "reason": "ownership_input",
+                "next": "operator review",
+                "owner": "Summer",
+            }
+            for index in range(4)
+        ]
+
+        overview = hud.render(state, width=430, height=90)
+        details = hud.render(state, width=430, height=90, view="details")
+
+        self.assertIn("MORE", overview)
+        self.assertNotIn("JOV-BLOCK-3", overview)
+        self.assertIn("JOV-BLOCK-3", details)
+
+    def test_details_more_row_remains_visible_when_issue_rows_still_overflow(self) -> None:
+        state = live_state()
+        state["delivery"]["pr_fleet"]["queue"] = [
+            {"number": 17000 + index, "position": index + 1, "title": f"Queue {index + 1}"}
+            for index in range(12)
+        ]
+        state["delivery"]["queue"] = list(state["delivery"]["pr_fleet"]["queue"])
+        state["symphony"]["jobs"] = [
+            {"id": f"JOV-JOB-{index}", "started": stamp(60 * index), "title": f"Job {index}"}
+            for index in range(16)
+        ]
+        state["symphony"]["blockers"] = [
+            {
+                "id": f"JOV-BLOCK-{index}",
+                "attempt": index,
+                "reason": "ownership_input",
+                "next": "operator review",
+                "owner": "Summer",
+            }
+            for index in range(8)
+        ]
+
+        details = hud.render(state, width=430, height=90, view="details")
+        issues = details[
+            details.index("ISSUES / QUEUE") : details.index("EXCEPTIONS / RECOVERY")
+        ]
+
+        self.assertIn("MORE", issues)
+        self.assertIn("larger terminal shows additional rows", issues)
+        self.assertIn("JOV-BLOCK-7", issues)
+        self.assertNotIn("open details view for additional rows", issues)
+
+    def test_queued_prs_beyond_overview_limit_surface_more_and_expand(self) -> None:
+        state = live_state()
+        state["delivery"]["pr_fleet"]["queue"] = [
+            {"number": 17000 + index, "position": index + 1, "title": f"Queue {index + 1}"}
+            for index in range(20)
+        ]
+        state["symphony"]["jobs"] = []
+        state["symphony"]["blockers"] = []
+
+        overview = "\n".join(hud._issue_queue_rows(state, 210, limit=12))
+        details = "\n".join(
+            hud._issue_queue_rows(state, 210, limit=24, expanded=True)
+        )
+
+        self.assertIn("MORE", overview)
+        self.assertIn("+10", overview)
+        self.assertIn("PR #17019", details)
+        self.assertNotIn("MORE", details)
+
+    def test_details_view_shows_all_exception_actions(self) -> None:
+        state = live_state()
+        attention = [
+            ("DEGRADED", f"Exception {index}", f"action {index}")
+            for index in range(8)
+        ]
+
+        with mock.patch.object(hud, "_attention_items", return_value=attention):
+            overview = hud.render(state, width=430, height=90)
+            details = hud.render(state, width=430, height=90, view="details")
+
+        self.assertIn("More", overview)
+        self.assertNotIn("Exception 7", overview)
+        self.assertIn("Exception 7", details)
+        self.assertNotIn("More", details)
+
+    def test_details_view_preserves_every_summer_queue_action(self) -> None:
+        state = live_state()
+        state["delivery"]["summer_queue"] = {
+            "observedAt": stamp(),
+            "error": None,
+            "items": [
+                {"issue": f"JOV-SUMMER-{index}", "action": f"recover action {index}"}
+                for index in range(1, 9)
+            ],
+        }
+
+        overview = "\n".join(hud._exception_rows(state, 210))
+        details = "\n".join(hud._exception_rows(state, 210, expanded=True))
+
+        self.assertIn("More", overview)
+        self.assertNotIn("JOV-SUMMER-8", overview)
+        self.assertIn("JOV-SUMMER-8", details)
+        self.assertIn("recover action 8", details)
 
     def test_active_user_fallback_growth_names_series_in_primary_pulse(self) -> None:
         state = live_state()
@@ -426,7 +720,9 @@ class RenderTests(unittest.TestCase):
     def test_verified_queue_and_workflow_states_render_as_pending(self) -> None:
         state = live_state()
         output = hud.render(state, width=430, height=90)
-        self.assertIn("First-run queue", output)
+        self.assertIn("LIFECYCLE MATRIX", output)
+        self.assertIn("Symphony work", output)
+        self.assertIn("PR #16490", output)
         self.assertIn("PENDING", output)
         self.assertNotIn("WAITING", output)
         self.assertNotIn("IN_PROGRESS", output)
@@ -566,6 +862,96 @@ class RenderTests(unittest.TestCase):
         self.assertIn("FAILED", rows)
         self.assertNotIn("HEALTHY", rows)
 
+    def test_capped_workflow_sample_does_not_report_zero_ci_totals(self) -> None:
+        state = live_state()
+        state["delivery"]["runs"] = [
+            {
+                "name": "Production Controller",
+                "sha": f"{index:08x}",
+                "status": "completed",
+                "conclusion": "success",
+                "updated": stamp(index),
+            }
+            for index in range(10)
+        ]
+        state["delivery"]["runs_sample"] = {
+            "selected": 10,
+            "complete": False,
+            "source": "actions/runs?per_page=40",
+        }
+        state["delivery"].pop("workflow_counts", None)
+
+        throughput = hud._throughput_summary(state)
+        lifecycle = "\n".join(hud._lifecycle_matrix_rows(state, 210))
+
+        self.assertIn("CI qUNK/rUNK/pUNK/fUNK", throughput)
+        self.assertNotIn("CI q0/r0/p0/f0", throughput)
+        self.assertIn("GitHub CI", lifecycle)
+        self.assertIn("UNK", lifecycle)
+
+    def test_ci_workflow_counts_override_capped_run_sample(self) -> None:
+        state = live_state()
+        state["delivery"]["runs"] = [
+            {
+                "name": "Production Controller",
+                "sha": f"{index:08x}",
+                "status": "completed",
+                "conclusion": "success",
+                "updated": stamp(index),
+            }
+            for index in range(10)
+        ]
+        state["delivery"]["runs_sample"] = {
+            "selected": 10,
+            "complete": False,
+            "source": "actions/runs?per_page=40",
+        }
+        state["delivery"]["workflow_counts"] = {
+            "CI": {"queued": 1, "running": 2, "passed": 3, "failed": 4}
+        }
+
+        throughput = hud._throughput_summary(state)
+        row = next(
+            line
+            for line in hud._lifecycle_matrix_rows(state, 210)
+            if line.startswith("GitHub CI")
+        )
+
+        self.assertIn("CI q1/r2/p3/f4", throughput)
+        self.assertRegex(row, r"GitHub CI\s+1\s+2\s+3\s+4")
+        state["delivery"]["workflow_counts_complete"] = {"CI": False}
+        self.assertIn("CI qUNK/rUNK/pUNK/fUNK", hud._throughput_summary(state))
+
+    def test_incomplete_actions_page_does_not_report_zero_production_totals(self) -> None:
+        state = live_state()
+        state["delivery"]["production_completions"] = 0
+        state["delivery"]["runs"] = []
+        state["delivery"]["runs_sample"] = {
+            "selected": 0,
+            "complete": False,
+            "source": "actions/runs?per_page=40",
+        }
+        state["delivery"]["workflow_counts"] = {
+            "Production Controller": {"queued": 0, "running": 0, "passed": 0, "failed": 0},
+            "Queue-Deferred Release": {"queued": 0, "running": 0, "passed": 0, "failed": 0},
+            "Delivery Control Receipts": {"queued": 0, "running": 0, "passed": 0, "failed": 0},
+        }
+        state["delivery"]["workflow_counts_complete"] = {
+            "Production Controller": False,
+            "Queue-Deferred Release": False,
+            "Delivery Control Receipts": False,
+        }
+
+        row = next(
+            line
+            for line in hud._lifecycle_matrix_rows(state, 210)
+            if line.startswith("Production")
+        )
+
+        self.assertIn("UNK", row)
+        self.assertIn("workflow count receipt incomplete", row)
+        self.assertNotRegex(row, r"Production\s+0\s+0\s+0\s+0")
+
     def test_degraded_delivery_marks_cached_workflow_log_entries_last_known(self) -> None:
         state = live_state()
         state["delivery"]["error"] = "TimeoutError"
@@ -630,8 +1016,9 @@ class RenderTests(unittest.TestCase):
         lines = output.splitlines()
         self.assertEqual(len(lines), 49)
         self.assertTrue(all(len(line) == 100 for line in lines))
-        self.assertIn("ATTENTION / ACTION", output)
-        self.assertIn("CURRENT WORK", output)
+        self.assertIn("DECISION HEADER", output)
+        self.assertIn("LIFECYCLE MATRIX", output)
+        self.assertIn("ISSUES / QUEUE", output)
 
     def test_compact_terminal_keeps_primary_regions_before_truncation(self) -> None:
         output = hud.render(live_state(), width=160, height=50)
@@ -640,11 +1027,59 @@ class RenderTests(unittest.TestCase):
         self.assertEqual(len(lines), 49)
         self.assertTrue(all(len(line) == 160 for line in lines))
         for title in (
+            "DECISION HEADER",
+            "ACTIVE BOTTLENECK",
+            "THROUGHPUT",
+            "LIFECYCLE MATRIX",
+            "ISSUES / QUEUE",
             "BUSINESS PULSE",
             "DELIVERY SPEED · ISSUE OPEN → LANDED",
-            "CURRENT LARGEST BOTTLENECK",
         ):
             self.assertIn(title, output)
+
+    def test_compact_details_sections_are_visible_within_frame(self) -> None:
+        state = live_state()
+        state["delivery"]["pr_fleet"]["queue"] = [
+            {"number": 17000 + index, "position": index + 1, "title": f"Queue {index + 1}"}
+            for index in range(12)
+        ]
+        state["delivery"]["queue"] = list(state["delivery"]["pr_fleet"]["queue"])
+        state["delivery"]["runs"] = [
+            {
+                "name": f"Workflow {index}",
+                "sha": f"{index:08x}",
+                "status": "in_progress",
+                "conclusion": "-",
+                "updated": stamp(30 * index),
+            }
+            for index in range(10)
+        ]
+        state["symphony"]["jobs"] = [
+            {"id": f"JOV-JOB-{index}", "started": stamp(60 * index), "title": f"Job {index}"}
+            for index in range(12)
+        ]
+        state["symphony"]["blockers"] = [
+            {
+                "id": "JOV-TAIL",
+                "attempt": 5,
+                "reason": "ownership_input",
+                "next": "operator review",
+                "owner": "Summer",
+            }
+        ]
+
+        output = hud.render(state, width=160, height=50, view="details")
+        lines = output.splitlines()
+
+        self.assertEqual(len(lines), 49)
+        self.assertTrue(all(len(line) == 160 for line in lines))
+        self.assertNotIn("open details view for additional rows", output)
+        for text in ("RECENT DELIVERY LOG", "MQ #17000", "JOV-TAIL", "tail shown; larger terminal shows remaining rows", "SECONDARY CAPACITY / OWNERS / ALL DETAIL", "BUSINESS PULSE", "DELIVERY SPEED · ISSUE OPEN → LANDED", "CURRENT LARGEST BOTTLENECK", "WOW GROWTH", "P50"):
+            self.assertIn(text, output)
+        minimum = hud.render(state, width=160, height=30, view="details")
+        self.assertEqual(len(minimum.splitlines()), 29)
+        for text in ("BUSINESS PULSE", "DELIVERY SPEED · ISSUE OPEN → LANDED", "CURRENT LARGEST BOTTLENECK"):
+            self.assertIn(text, minimum)
 
     def test_larger_console_geometry_keeps_all_primary_lanes(self) -> None:
         output = hud.render(live_state(), width=286, height=60)
@@ -652,16 +1087,16 @@ class RenderTests(unittest.TestCase):
         self.assertEqual(len(lines), 59)
         self.assertTrue(all(len(line) == 286 for line in lines))
         for title in (
-            "IMMEDIATE ATTENTION · #1 BOTTLENECK FIRST",
-            "CURRENT WORK",
-            "RECENT DELIVERY LOG",
-            "SYSTEM HEALTH / ADMISSION",
-            "SECONDARY CAPACITY / OWNERS / DETAIL",
+            "DECISION HEADER",
+            "LIFECYCLE MATRIX",
+            "ISSUES / QUEUE",
+            "EXCEPTIONS / RECOVERY",
             "BUSINESS PULSE",
             "DELIVERY SPEED · ISSUE OPEN → LANDED",
             "CURRENT LARGEST BOTTLENECK",
         ):
             self.assertIn(title, output)
+        self.assertNotIn("DEEP DETAIL", output)
 
     def test_stale_sources_are_prominent_and_last_known_is_not_zeroed(self) -> None:
         state = live_state()
@@ -669,7 +1104,7 @@ class RenderTests(unittest.TestCase):
         state["delivery"]["pr_fleet"]["total"] = 17
         output = hud.render(state, width=430, height=90)
         self.assertIn("STALE", output)
-        self.assertIn("GitHub/public health", output)
+        self.assertIn("values are last-known", output)
         self.assertIn("17", output)
 
     def test_unconfigured_linear_source_reports_unavailable_not_last_known(self) -> None:
@@ -782,11 +1217,12 @@ class RenderTests(unittest.TestCase):
 
         output = hud.render(state, width=430, height=76)
         attention = output[
-            output.index("IMMEDIATE ATTENTION") : output.index("CURRENT WORK")
+            output.index("EXCEPTIONS / RECOVERY") : output.index("BUSINESS PULSE")
         ]
 
         self.assertIn("Summer red queue", attention)
         self.assertIn("JOV-SUMMER", attention)
+        self.assertNotIn("PR #None", attention)
 
     def test_cached_summer_queue_items_inherit_delivery_evidence(self) -> None:
         state = live_state()
@@ -1152,6 +1588,82 @@ class SourceContractTests(unittest.TestCase):
         self.assertEqual(result["prs"]["total"], 117)
         self.assertEqual(result["prs"]["ready"], 15)
         self.assertEqual(result["pr_fleet"]["counts"]["conflict"], 28)
+
+    def test_delivery_fetch_records_ci_lifecycle_counts_from_ci_workflow(self) -> None:
+        pr_fleet = hud.load_pr_fleet_closure_audit(
+            self._write_pr_fleet_receipt(pr_fleet_audit())
+        )
+
+        def fake_run_json(args):
+            if args[:3] == ["gh", "api", "graphql"]:
+                return {
+                    "data": {
+                        "repository": {
+                            "defaultBranchRef": {"target": {"oid": "a" * 40}},
+                            "merged": {"nodes": []},
+                        }
+                    }
+                }
+            endpoint = args[-1]
+            if endpoint.endswith("/actions/runs?per_page=40"):
+                return {
+                    "workflow_runs": [
+                        {
+                            "id": index,
+                            "name": "Production Controller",
+                            "status": "completed",
+                            "conclusion": "success",
+                            "head_sha": f"{index:040x}",
+                            "updated_at": stamp(index),
+                        }
+                        for index in range(2)
+                    ]
+                    + [
+                        {
+                            "id": index,
+                            "name": "Untracked Workflow",
+                            "status": "queued",
+                            "conclusion": None,
+                            "head_sha": f"{index:040x}",
+                            "updated_at": stamp(index),
+                        }
+                        for index in range(2, 40)
+                    ],
+                }
+            if endpoint.endswith("/actions/workflows/ci.yml/runs?per_page=30"):
+                return {
+                    "workflow_runs": [
+                        {"status": "queued", "conclusion": None, "created_at": stamp(60), "updated_at": stamp(30)},
+                        {"status": "in_progress", "conclusion": None, "created_at": stamp(60), "updated_at": stamp(30)},
+                        {"status": "completed", "conclusion": "failure", "created_at": stamp(120), "updated_at": stamp(60)},
+                        *[
+                            {"status": "completed", "conclusion": "success", "created_at": stamp(120 + index), "updated_at": stamp(60)}
+                            for index in range(27)
+                        ],
+                    ]
+                }
+            return {"workflow_runs": []}
+
+        with mock.patch.object(hud, "run_json", side_effect=fake_run_json), mock.patch.object(
+            hud,
+            "http_json",
+            side_effect=[{"commitSha": "a" * 40}, {"status": "healthy"}],
+        ), mock.patch.object(
+            hud, "load_summer_queue", return_value={"items": [], "error": None}
+        ), mock.patch.object(
+            hud, "load_pr_fleet_closure_audit", return_value=pr_fleet
+        ):
+            result = hud.fetch_delivery()
+
+        self.assertFalse(result["runs_sample"]["complete"])
+        self.assertEqual(result["runs_sample"]["selected"], 2)
+        self.assertFalse(result["workflow_counts_complete"]["Production Controller"])
+        self.assertFalse(result["workflow_counts_complete"]["CI"])
+        self.assertEqual(
+            result["workflow_counts"]["CI"],
+            {"queued": 1, "running": 1, "passed": 27, "failed": 1},
+        )
+        self.assertEqual(result["latency"]["ci"]["sample"], 27)
 
     def _write_pr_fleet_receipt(self, payload: dict) -> Path:
         temporary = tempfile.TemporaryDirectory()

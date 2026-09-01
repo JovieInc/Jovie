@@ -770,6 +770,10 @@ def colorize_line(line: str) -> str:
     if line.startswith("┌─") or "GEM OPERATIONS" in line:
         strong_titles = (
             "GEM OPERATIONS",
+            "DECISION HEADER",
+            "LIFECYCLE MATRIX",
+            "ISSUES / QUEUE",
+            "EXCEPTIONS / RECOVERY",
             "IMMEDIATE ATTENTION",
             "#1 BOTTLENECK",
             "RECENT DELIVERY LOG",
@@ -1145,11 +1149,23 @@ def fetch_delivery() -> dict[str, Any]:
     window_start = now() - dt.timedelta(hours=24)
     merged_recent = [pr for pr in merged if (parse_time(pr.get("mergedAt")) or dt.datetime.min.replace(tzinfo=dt.timezone.utc)) >= window_start]
     queue = pr_fleet.get("queue") or []
-    runs_payload = run_json(["gh", "api", f"repos/{REPO}/actions/runs?per_page=40"])
+    actions_page_size = 40
+    runs_payload = run_json(
+        ["gh", "api", f"repos/{REPO}/actions/runs?per_page={actions_page_size}"]
+    )
+    raw_runs = (
+        runs_payload.get("workflow_runs")
+        if isinstance(runs_payload.get("workflow_runs"), list)
+        else []
+    )
+    actions_sample_complete = len(raw_runs) < actions_page_size
+    selected_runs = [
+        item
+        for item in raw_runs
+        if isinstance(item, dict) and item.get("name") in WORKFLOWS
+    ]
     runs = []
-    for item in runs_payload.get("workflow_runs", []):
-        if item.get("name") not in WORKFLOWS:
-            continue
+    for item in selected_runs:
         runs.append(
             {
                 "id": item.get("id"),
@@ -1174,11 +1190,17 @@ def fetch_delivery() -> dict[str, Any]:
     production_completions: int | str = len(production_successes)
     if len(production_successes) == 30:
         production_completions = "30+"
+    ci_page_size = 30
     ci_payload = run_json(
-        ["gh", "api", f"repos/{REPO}/actions/workflows/ci.yml/runs?per_page=30&status=success"]
+        ["gh", "api", f"repos/{REPO}/actions/workflows/ci.yml/runs?per_page={ci_page_size}"]
     )
+    ci_raw_runs = ci_payload.get("workflow_runs")
+    ci_runs = ci_raw_runs if isinstance(ci_raw_runs, list) else []
+    ci_counts_complete = isinstance(ci_raw_runs, list) and len(ci_runs) < ci_page_size
     ci_durations = []
-    for run in ci_payload.get("workflow_runs", []):
+    for run in ci_runs:
+        if run.get("conclusion") != "success":
+            continue
         created = parse_time(run.get("created_at"))
         updated = parse_time(run.get("updated_at"))
         if created and updated and updated >= window_start and updated >= created:
@@ -1205,6 +1227,28 @@ def fetch_delivery() -> dict[str, Any]:
         "queue": queue[:8],
         "summer_queue": summer_queue,
         "runs": runs,
+        "runs_sample": {
+            "selected": len(runs),
+            "complete": actions_sample_complete,
+            "source": f"actions/runs?per_page={actions_page_size}",
+        },
+        "workflow_counts": {
+            **{
+                workflow: _workflow_lifecycle_counts(
+                    [
+                        run
+                        for run in selected_runs
+                        if isinstance(run, dict) and run.get("name") == workflow
+                    ]
+                )
+                for workflow in WORKFLOWS
+            },
+            "CI": _workflow_lifecycle_counts(ci_runs),
+        },
+        "workflow_counts_complete": {
+            **{workflow: actions_sample_complete for workflow in WORKFLOWS},
+            "CI": ci_counts_complete,
+        },
         "success_window_hours": 24,
         "merged_recent": len(merged_recent),
         "production_completions": production_completions,
@@ -1777,7 +1821,59 @@ def pr_fleet_evidence(receipt: dict[str, Any]) -> tuple[str, str]:
     )
 
 
-def _attention_rows(state: dict[str, Any], width: int) -> list[str]:
+def summer_queue_evidence(receipt: dict[str, Any]) -> tuple[str, str]:
+    if not isinstance(receipt, dict) or not receipt:
+        return ("HEALTHY", "Summer red queue receipt absent; no persisted item source")
+    error = receipt.get("error")
+    if error:
+        return (
+            "DEGRADED",
+            f"{error}; refresh typed {SUMMER_QUEUE_SCHEMA}; queue evidence degraded",
+        )
+    stamp = parse_time(receipt.get("updated") or receipt.get("observedAt"))
+    if stamp is None or stamp.tzinfo is None or stamp.utcoffset() is None:
+        return (
+            "DEGRADED",
+            f"missing freshness; refresh typed {SUMMER_QUEUE_SCHEMA}; queue evidence degraded",
+        )
+    age_seconds = (now() - stamp).total_seconds()
+    if age_seconds < -FLEET_RECEIPT_FUTURE_SKEW_SECONDS:
+        return (
+            "DEGRADED",
+            f"future freshness; refresh typed {SUMMER_QUEUE_SCHEMA}; queue evidence degraded",
+        )
+    if age_seconds > SUMMER_QUEUE_STALE_SECONDS:
+        return (
+            "STALE",
+            f"{age_text(receipt.get('updated') or receipt.get('observedAt'))} old; refresh typed {SUMMER_QUEUE_SCHEMA}",
+        )
+    return (
+        "HEALTHY",
+        f"Summer red queue receipt · age {age_text(receipt.get('updated') or receipt.get('observedAt'))}",
+    )
+
+
+def workflow_counts_evidence(delivery: dict[str, Any]) -> tuple[str, str]:
+    complete = delivery.get("workflow_counts_complete")
+    if not isinstance(complete, dict):
+        return ("HEALTHY", "workflow count completeness not reported")
+    incomplete = sorted(
+        str(name) for name, is_complete in complete.items() if is_complete is False
+    )
+    if not incomplete:
+        return ("HEALTHY", "workflow count receipts complete")
+    names = ", ".join(compact(name, 26) for name in incomplete[:3])
+    if len(incomplete) > 3:
+        names = f"{names}, +{len(incomplete) - 3}"
+    return (
+        "UNKNOWN",
+        f"workflow count receipt incomplete ({names}); counts unknown",
+    )
+
+
+def _attention_items(
+    state: dict[str, Any], include_all_summer: bool = False
+) -> list[tuple[str, str, str]]:
     local = state.get("symphony") or {}
     fleet = state.get("fleet") or {}
     delivery = state.get("delivery") or {}
@@ -1815,8 +1911,13 @@ def _attention_rows(state: dict[str, Any], width: int) -> list[str]:
                     detail_with_delivery_evidence(str(summer_queue.get("error"))),
                 )
             )
-        for item in summer_items[:3]:
-            identity = item.get("issue") or f"PR #{item.get('pr', '?')}"
+        selected_summer_items = summer_items if include_all_summer else summer_items[:3]
+        for item in selected_summer_items:
+            pr_number = item.get("pr")
+            identity = (
+                item.get("issue")
+                or (f"PR #{pr_number}" if isinstance(pr_number, int) else "Summer queue item")
+            )
             outcome = str(item.get("outcome") or "open").upper()
             status = "OWNER INPUT" if outcome == "ESCALATED" else "PENDING"
             detail = item.get("reason") or item.get("action") or item.get("stallClass")
@@ -1896,6 +1997,11 @@ def _attention_rows(state: dict[str, Any], width: int) -> list[str]:
         items.append(("NOT PROVEN", "current main at production", "await or inspect release-controller receipt · GitHub/public health"))
     if not items:
         items.append(("CLEAR", "no source-backed action", "all configured sources current; no blocked/retry signal"))
+    return items
+
+
+def _attention_rows(state: dict[str, Any], width: int) -> list[str]:
+    items = _attention_items(state)
     status_width = min(14, max(9, width // 12))
     available = max(2, width - status_width - 4)
     longest_subject = max(len(subject) for _status, subject, _action in items)
@@ -2415,6 +2521,578 @@ def _bottleneck_region_rows(state: dict[str, Any], width: int) -> list[str]:
     ]
 
 
+def _throughput_summary(state: dict[str, Any]) -> str:
+    delivery = state.get("delivery") or {}
+    pr_fleet = _pr_fleet_receipt(delivery)
+    pr_counts = pr_fleet.get("counts") or {}
+    ci_counts = _run_lifecycle_counts(delivery, {"CI"})
+    delivery_evidence, delivery_detail = section_evidence(state, "delivery")
+    pr_status, pr_detail = pr_fleet_evidence(pr_fleet)
+    delivery_pieces = [
+        f"merged {delivery.get('merged_recent', '?')}/24h",
+        f"CI q{ci_counts['queued']}/r{ci_counts['running']}/p{ci_counts['passed']}/f{ci_counts['failed']}",
+    ]
+    if pr_status == "HEALTHY" and delivery_evidence != "UNAVAILABLE":
+        pieces = [
+            f"open {pr_fleet.get('total')}",
+            f"ready {pr_counts.get('ready')}",
+            f"queue {pr_counts.get('queued')}",
+            *delivery_pieces,
+        ]
+        if delivery_evidence != "HEALTHY":
+            pieces.append(delivery_evidence)
+        return " · ".join(pieces)
+    if delivery_evidence == "UNAVAILABLE":
+        return f"open UNKNOWN · {delivery_detail}"
+    return " · ".join(["open UNKNOWN", *delivery_pieces, pr_detail])
+
+
+def _health_summary(state: dict[str, Any]) -> str:
+    ranked = {
+        "FAILING": 70,
+        "FAILED": 70,
+        "BLOCKED": 65,
+        "UNAVAILABLE": 60,
+        "STALE": 50,
+        "DEGRADED": 40,
+        "NOT PROVEN": 30,
+        "UNKNOWN": 30,
+        "PENDING": 20,
+        "HEALTHY": 0,
+        "CLEAR": 0,
+    }
+    candidates: list[tuple[int, str, str, str]] = []
+    for key, label in (
+        ("symphony", "Symphony"),
+        ("fleet", "Fleet gate"),
+        ("delivery", "Delivery"),
+        ("issues", "Issue source"),
+        ("ops", "Business pulse"),
+    ):
+        evidence, detail = section_evidence(state, key)
+        candidates.append((ranked.get(evidence, 10), evidence, label, detail))
+
+    delivery = state.get("delivery") or {}
+    pr_fleet_status, pr_fleet_detail = pr_fleet_evidence(
+        _pr_fleet_receipt(delivery)
+    )
+    if pr_fleet_status != "HEALTHY":
+        candidates.append(
+            (
+                ranked.get(pr_fleet_status, 30),
+                pr_fleet_status,
+                "PR fleet audit",
+                pr_fleet_detail,
+            )
+        )
+
+    summer_queue_status, summer_queue_detail = summer_queue_evidence(
+        delivery.get("summer_queue") or {}
+    )
+    if summer_queue_status != "HEALTHY":
+        candidates.append(
+            (
+                ranked.get(summer_queue_status, 40),
+                summer_queue_status,
+                "Summer red queue",
+                summer_queue_detail,
+            )
+        )
+
+    workflow_status, workflow_detail = workflow_counts_evidence(delivery)
+    if workflow_status != "HEALTHY":
+        candidates.append(
+            (
+                ranked.get(workflow_status, 30),
+                workflow_status,
+                "Workflow counts",
+                workflow_detail,
+            )
+        )
+
+    fleet = state.get("fleet") or {}
+    fleet_evidence = section_evidence(state, "fleet")[0]
+    if fleet_evidence == "HEALTHY" and fleet.get("state") != "GREEN":
+        state_value = str(fleet.get("state") or "UNKNOWN")
+        status = "FAILING" if state_value == "RED" else "DEGRADED"
+        mode = fleet.get("promotionMode") or "mode unavailable"
+        candidates.append(
+            (
+                ranked[status],
+                status,
+                "Fleet policy",
+                f"{state_value} · {mode}",
+            )
+        )
+
+    if section_evidence(state, "delivery")[0] == "HEALTHY" and delivery.get("exact") is False:
+        candidates.append(
+            (
+                ranked["NOT PROVEN"],
+                "NOT PROVEN",
+                "Runtime lineage",
+                "current main not proven at production",
+            )
+        )
+
+    _rank, status, label, detail = max(candidates, key=lambda item: item[0])
+    if status == "HEALTHY":
+        return "HEALTHY · all configured sources current"
+    return f"{status} · {label}: {detail}"
+
+
+def _lineage_proof_status(delivery: dict[str, Any], delivery_evidence: str) -> str:
+    if delivery_evidence == "HEALTHY" and delivery.get("exact") is True:
+        return "EXACT"
+    if delivery.get("exact") is True and delivery_evidence != "UNAVAILABLE":
+        return f"NOT PROVEN · {delivery_evidence} last-known"
+    return "NOT PROVEN"
+
+
+def _workflow_lifecycle_counts(runs: list[Any]) -> dict[str, int]:
+    buckets = {"queued": 0, "running": 0, "passed": 0, "failed": 0}
+    for run in runs:
+        if not isinstance(run, dict):
+            continue
+        status = str(run.get("status") or "").lower()
+        conclusion = str(run.get("conclusion") or "").lower()
+        if status == "completed":
+            if conclusion == "success":
+                buckets["passed"] += 1
+            elif conclusion in {
+                "failure",
+                "timed_out",
+                "startup_failure",
+                "action_required",
+                "error",
+            }:
+                buckets["failed"] += 1
+        elif status in {"queued", "pending", "requested", "waiting"}:
+            buckets["queued"] += 1
+        elif status == "in_progress":
+            buckets["running"] += 1
+    return buckets
+
+
+def _active_bottleneck_summary(state: dict[str, Any]) -> str:
+    ops = state.get("ops") or {}
+    ops_evidence, _ops_detail = section_evidence(state, "ops")
+    bottleneck = str(ops.get("bottleneck") or "").strip()
+    if bottleneck and ops_evidence != "UNAVAILABLE":
+        return f"{ops_evidence} · {bottleneck}"
+    status, subject, _action = _attention_items(state)[0]
+    return f"{status} · {subject}"
+
+
+def _decision_header_rows(
+    state: dict[str, Any], width: int, canvas_width: int, canvas_height: int
+) -> list[str]:
+    delivery = state.get("delivery") or {}
+    delivery_evidence, _delivery_detail = section_evidence(state, "delivery")
+    status, subject, action = _attention_items(state)[0]
+    main = compact(delivery.get("main_sha") or "????????", 8)
+    prod = compact(delivery.get("prod_sha") or "????????", 8)
+    exact = _lineage_proof_status(delivery, delivery_evidence)
+    source_host = (
+        f"UTC {iso()} · host gem / Ubuntu tty1 · canvas {canvas_width}x{canvas_height} "
+        f"· main {main} -> prod {prod} {exact}"
+    )
+    return [
+        _primary_region_row("ACTIVE BOTTLENECK", _active_bottleneck_summary(state), width),
+        _primary_region_row("THROUGHPUT", _throughput_summary(state), width),
+        _primary_region_row("HEALTH", _health_summary(state), width),
+        _primary_region_row("NEXT ACTION", f"{status} · {subject} · {action}", width),
+        _primary_region_row("SOURCE-HOST", source_host, width),
+    ]
+
+
+def _run_lifecycle_counts(
+    delivery: dict[str, Any], names: set[str] | None = None
+) -> dict[str, Any]:
+    empty = {"queued": 0, "running": 0, "passed": 0, "failed": 0}
+    unknown = {key: "UNK" for key in empty}
+    workflow_counts = delivery.get("workflow_counts")
+    workflow_counts_complete = delivery.get("workflow_counts_complete")
+    if names and isinstance(workflow_counts, dict):
+        if any(
+            isinstance(workflow_counts_complete, dict)
+            and workflow_counts_complete.get(name) is False
+            for name in names
+        ):
+            return unknown
+        if all(isinstance(workflow_counts.get(name), dict) for name in names):
+            buckets = dict(empty)
+            for name in names:
+                counts = workflow_counts.get(name) or {}
+                for key in buckets:
+                    value = counts.get(key)
+                    buckets[key] += value if isinstance(value, int) else 0
+            return buckets
+
+    runs = delivery.get("runs") or []
+    sample = delivery.get("runs_sample")
+    if names is not None and isinstance(sample, dict) and sample.get("complete") is False:
+        return unknown
+
+    buckets = dict(empty)
+    for run in runs:
+        if not isinstance(run, dict):
+            continue
+        name = str(run.get("name") or "")
+        if names is not None and name not in names:
+            continue
+        run_counts = _workflow_lifecycle_counts([run])
+        for key in buckets:
+            buckets[key] += run_counts[key]
+    return buckets
+
+
+def _matrix_value(value: Any, evidence: str) -> str:
+    if evidence == "UNAVAILABLE":
+        return "UNK"
+    if value is None:
+        return "-"
+    return str(value)
+
+
+def _lifecycle_matrix_row(
+    lane: Any,
+    queued: Any,
+    running: Any,
+    passed: Any,
+    failed: Any,
+    detail: Any,
+    width: int,
+) -> str:
+    lane_width = min(20, max(12, width // 7))
+    cell_width = min(9, max(7, width // 18))
+    detail_width = max(1, width - lane_width - (cell_width * 4) - 10)
+    return (
+        f"{compact(lane, lane_width):<{lane_width}}  "
+        f"{compact(queued, cell_width):>{cell_width}}  "
+        f"{compact(running, cell_width):>{cell_width}}  "
+        f"{compact(passed, cell_width):>{cell_width}}  "
+        f"{compact(failed, cell_width):>{cell_width}}  "
+        f"{compact(detail, detail_width):<{detail_width}}"
+    )
+
+
+def _lifecycle_matrix_rows(state: dict[str, Any], width: int) -> list[str]:
+    local = state.get("symphony") or {}
+    delivery = state.get("delivery") or {}
+    counts = local.get("counts") or {}
+    pr_fleet = _pr_fleet_receipt(delivery)
+    pr_counts = pr_fleet.get("counts") or {}
+    local_evidence, local_detail = section_evidence(state, "symphony")
+    delivery_evidence, delivery_detail = section_evidence(state, "delivery")
+    pr_status, pr_detail = pr_fleet_evidence(pr_fleet)
+    ci_counts = _run_lifecycle_counts(delivery, {"CI"})
+    production_counts = _run_lifecycle_counts(
+        delivery,
+        {"Production Controller", "Queue-Deferred Release", "Delivery Control Receipts"},
+    )
+
+    def count_int(value: Any) -> int | None:
+        if isinstance(value, int) and not isinstance(value, bool):
+            return value
+        if isinstance(value, str) and value.isdigit():
+            return int(value)
+        return None
+
+    queued_count = count_int(counts.get("queued"))
+    retrying_count = count_int(counts.get("retrying"))
+    queued_pending: Any = None
+    if queued_count is not None or retrying_count is not None:
+        queued_pending = (queued_count or 0) + (retrying_count or 0)
+    local_detail_text = (
+        local_detail if local_evidence != "HEALTHY" else "local runtime counts"
+    )
+    if local_evidence == "HEALTHY" and retrying_count:
+        local_detail_text = (
+            f"queued {queued_count or 0} + retry {retrying_count} wait · local runtime counts"
+        )
+
+    def local_value(value: Any) -> str:
+        return _matrix_value(value, local_evidence)
+
+    def delivery_value(value: Any) -> str:
+        return _matrix_value(value, delivery_evidence)
+
+    def pr_value(value: Any) -> str:
+        return _matrix_value(
+            value,
+            "UNAVAILABLE" if pr_status != "HEALTHY" else delivery_evidence,
+        )
+
+    def counts_unknown(values: dict[str, Any]) -> bool:
+        return any(value == "UNK" for value in values.values())
+
+    ci_detail = delivery_detail if delivery_evidence != "HEALTHY" else "current workflow runs"
+    if delivery_evidence == "HEALTHY" and counts_unknown(ci_counts):
+        ci_detail = "workflow count receipt incomplete; counts unknown"
+    production_detail = (
+        delivery_detail if delivery_evidence != "HEALTHY" else "controller receipts"
+    )
+    if delivery_evidence == "HEALTHY" and counts_unknown(production_counts):
+        production_detail = "workflow count receipt incomplete; counts unknown"
+
+    failed_prs: Any = None
+    if pr_status == "HEALTHY":
+        failed_prs = (
+            int(pr_counts.get("blocked") or 0)
+            + int(pr_counts.get("conflict") or 0)
+            + int(pr_counts.get("ownerless") or 0)
+        )
+    return [
+        _lifecycle_matrix_row("LANE", "QUEUED", "RUNNING", "PASSED", "FAILED", "NEXT / SOURCE", width),
+        _lifecycle_matrix_row(
+            "Symphony work",
+            local_value(queued_pending),
+            local_value(counts.get("implementing")),
+            "-",
+            local_value(counts.get("blocked")),
+            local_detail_text,
+            width,
+        ),
+        _lifecycle_matrix_row(
+            "PR fleet",
+            pr_value(pr_counts.get("queued")),
+            pr_value(pr_counts.get("remediating")),
+            pr_value(pr_counts.get("ready")),
+            pr_value(failed_prs),
+            pr_detail if pr_status != "HEALTHY" else "typed closure audit",
+            width,
+        ),
+        _lifecycle_matrix_row(
+            "GitHub CI",
+            delivery_value(ci_counts["queued"]),
+            delivery_value(ci_counts["running"]),
+            delivery_value(ci_counts["passed"]),
+            delivery_value(ci_counts["failed"]),
+            ci_detail,
+            width,
+        ),
+        _lifecycle_matrix_row(
+            "Production",
+            delivery_value(production_counts["queued"]),
+            delivery_value(production_counts["running"]),
+            delivery_value(delivery.get("production_completions", production_counts["passed"])),
+            delivery_value(production_counts["failed"]),
+            production_detail,
+            width,
+        ),
+    ]
+
+
+def _stable_issue_row(
+    position: Any, ref: Any, state: Any, age: Any, label: Any, width: int
+) -> str:
+    position_width = min(6, max(4, width // 28))
+    ref_width = min(14, max(10, width // 10))
+    state_width = min(13, max(9, width // 10))
+    age_width = min(9, max(6, width // 18))
+    label_width = max(
+        1,
+        width - position_width - ref_width - state_width - age_width - 8,
+    )
+    return (
+        f"{compact(position, position_width):>{position_width}}  "
+        f"{compact(ref, ref_width):<{ref_width}}  "
+        f"{compact(state, state_width):<{state_width}}  "
+        f"{compact(age, age_width):>{age_width}}  "
+        f"{compact(label, label_width):<{label_width}}"
+    )
+
+
+def _issue_queue_rows(
+    state: dict[str, Any],
+    width: int,
+    limit: int = 12,
+    expanded: bool = False,
+    overflow_detail: str | None = None,
+) -> list[str]:
+    local = state.get("symphony") or {}
+    delivery = state.get("delivery") or {}
+    pr_fleet = _pr_fleet_receipt(delivery)
+    local_evidence, local_detail = section_evidence(state, "symphony")
+    delivery_evidence, delivery_detail = section_evidence(state, "delivery")
+    pr_status, pr_detail = pr_fleet_evidence(pr_fleet)
+    rows = [_stable_issue_row("POS", "REF", "STATE", "AGE", "LABEL / ACTION", width)]
+
+    queue_cap = 20
+    job_cap = 16 if expanded else 8
+    blocker_cap = 8 if expanded else 4
+
+    def pr_queue_state(status: str) -> str:
+        if pr_status != "HEALTHY":
+            return pr_status
+        return status if delivery_evidence == "HEALTHY" else delivery_evidence
+
+    def pr_queue_detail(title: Any) -> str:
+        title_text = str(title or "queue entry")
+        if pr_status != "HEALTHY":
+            return f"{pr_detail} · last-known {title_text}"
+        if delivery_evidence == "HEALTHY":
+            return title_text
+        return f"{delivery_detail} · last-known {title_text}"
+
+    def local_state(status: str) -> str:
+        return status if local_evidence == "HEALTHY" else local_evidence
+
+    def blocker_state(blocker: dict[str, Any]) -> str:
+        if local_evidence != "HEALTHY":
+            return local_evidence
+        reason = str(blocker.get("reason") or "").lower()
+        next_action = str(blocker.get("next") or "").lower()
+        if "automatic retry" in next_action:
+            return "PENDING"
+        if reason == "ownership_input" or "operator" in next_action:
+            return "OWNER INPUT"
+        return "ATTENTION"
+
+    pr_queue = pr_fleet.get("queue") if isinstance(pr_fleet.get("queue"), list) else []
+    if pr_status != "HEALTHY" and not pr_queue:
+        rows.append(_stable_issue_row("-", "PR fleet", pr_status, "UNK", pr_detail, width))
+    for item in pr_queue[:queue_cap]:
+        position = item.get("position") if isinstance(item, dict) else None
+        number = item.get("number") if isinstance(item, dict) else None
+        title = item.get("title") if isinstance(item, dict) else None
+        rows.append(
+            _stable_issue_row(
+                position if position is not None else "-",
+                f"PR #{number}" if number is not None else "PR ?",
+                pr_queue_state("PENDING"),
+                "queue",
+                pr_queue_detail(title),
+                width,
+            )
+        )
+    for job in (local.get("jobs") or [])[:job_cap]:
+        rows.append(
+            _stable_issue_row(
+                "-",
+                job.get("id", "job"),
+                local_state("RUNNING"),
+                "UNK" if local_evidence == "UNAVAILABLE" else elapsed_text(job.get("started")),
+                job.get("title", "title unavailable")
+                if local_evidence == "HEALTHY"
+                else f"{local_detail} · last-known {job.get('title', 'title unavailable')}",
+                width,
+            )
+        )
+    for blocker in (local.get("blockers") or [])[:blocker_cap]:
+        rows.append(
+            _stable_issue_row(
+                "-",
+                blocker.get("id", "blocker"),
+                blocker_state(blocker),
+                f"try {blocker.get('attempt', 0)}",
+                f"{blocker.get('next', '?')} · {blocker.get('owner', '?')}",
+                width,
+            )
+        )
+    if len(rows) == 1:
+        healthy = (
+            local_evidence == "HEALTHY"
+            and delivery_evidence == "HEALTHY"
+            and pr_status == "HEALTHY"
+        )
+        status = "CLEAR" if healthy else (
+            pr_status if pr_status != "HEALTHY" else (
+                delivery_evidence if delivery_evidence != "HEALTHY" else local_evidence
+            )
+        )
+        if healthy:
+            detail = "no queued PRs, running jobs, or owner blockers"
+        else:
+            detail = "; ".join(
+                part
+                for evidence, part in (
+                    (local_evidence, local_detail),
+                    (delivery_evidence, delivery_detail),
+                    (pr_status, pr_detail),
+                )
+                if evidence != "HEALTHY"
+            )
+        rows.append(_stable_issue_row("-", "none", status, "-", detail, width))
+    if len(rows) > limit:
+        visible_limit = max(1, limit - 1)
+        if expanded and limit >= 4:
+            header = rows[0]
+            body = rows[1:]
+            data_slots = max(1, limit - 2)
+            head_count = max(1, data_slots // 2)
+            tail_count = max(0, data_slots - head_count)
+            selected_body = body[:head_count]
+            if tail_count:
+                for row in body[-tail_count:]:
+                    if row not in selected_body:
+                        selected_body.append(row)
+            omitted = len(body) - len(selected_body)
+            rows = [header, *selected_body]
+        else:
+            omitted = len(rows) - visible_limit
+            rows = rows[:visible_limit]
+        rows.append(
+            _stable_issue_row(
+                "...",
+                f"+{omitted}",
+                "MORE",
+                "-",
+                overflow_detail
+                or (
+                    "larger terminal shows additional rows"
+                    if expanded
+                    else "open details view for additional rows"
+                ),
+                width,
+            )
+        )
+    return rows
+
+
+def _exception_rows(
+    state: dict[str, Any], width: int, expanded: bool = False
+) -> list[str]:
+    attention = [
+        item
+        for item in _attention_items(state, include_all_summer=True)
+        if item[0] != "CLEAR"
+    ]
+    if not attention:
+        rows = [_metric("Exceptions", "none", "CLEAR", "normal overview has no recovery detail", width)]
+    else:
+        visible_attention = attention if expanded else attention[:6]
+        rows = [
+            _metric(status, subject, "ACTION", action, width)
+            for status, subject, action in visible_attention
+        ]
+        if not expanded and len(attention) > 6:
+            rows.append(_metric("More", len(attention) - 6, "DETAILS", "open details view for remaining exception rows", width))
+    return rows
+
+
+def _limit_compact_rows(
+    rows: list[str], width: int, limit: int, detail: str
+) -> list[str]:
+    if len(rows) <= limit:
+        return rows
+    if limit <= 0:
+        return []
+    visible_limit = max(0, limit - 1)
+    return [
+        *rows[:visible_limit],
+        _metric("More", len(rows) - visible_limit, "DETAILS", detail, width),
+    ]
+
+
+def _primary_signal_rows(rows: list[str]) -> list[str]:
+    signal_rows = [
+        row for row in rows if not str(row).lstrip().startswith("EVIDENCE")
+    ]
+    return signal_rows or rows
+
+
 def _metrics_strip(state: dict[str, Any], width: int, height: int) -> list[str]:
     gap = 2
     panel_width = (width - (gap * 2)) // 3
@@ -2484,66 +3162,204 @@ def _render_ultrawide(state: dict[str, Any], width: int, height: int, details: b
     gap = 2
     halves = (width - gap) // 2
     half_widths = [halves, width - gap - halves]
-    heartbeat = iso()
-    expanded_heights = (13, 24, 29, 14)
-    expanded_frame_rows = 3 + 4 + sum(expanded_heights)
-    if height - 1 >= expanded_frame_rows:
-        attention_height, middle_height, lower_height, strip_height = 13, 24, 29, 14
-    else:
-        attention_height, middle_height, lower_height, strip_height = 8, 18, 13, 12
-    header = _box(
-        "GEM OPERATIONS · READ ONLY · NO CONTROL-PLANE WRITES",
-        [
-            f"UTC {heartbeat}   host gem / Ubuntu tty1   3440×1440   canvas {width}×{height}",
-        ],
+    screen_rows = max(20, height - 1)
+    metrics = _metrics_strip(state, width, 12)
+    metrics_gap = 1
+    metrics_rows = len(metrics)
+    content_rows = max(0, screen_rows - metrics_rows - metrics_gap)
+    decision = _box(
+        "DECISION HEADER · GEM OPERATIONS · READ ONLY",
+        _decision_header_rows(state, width - 4, width, height),
         width,
-        3,
+        7,
     )
-    attention = _box(
-        "IMMEDIATE ATTENTION · #1 BOTTLENECK FIRST",
-        _attention_rows(state, width - 4),
+    lifecycle = _box(
+        "LIFECYCLE MATRIX · FIXED STATES",
+        _lifecycle_matrix_rows(state, width - 4),
         width,
-        attention_height,
+        8,
     )
-    middle = _join_panels(
-        [
-            _box("CURRENT WORK", _work_rows(state, half_widths[0] - 4), half_widths[0], middle_height),
-            _box("RECENT DELIVERY LOG", _log_rows(state, half_widths[1] - 4), half_widths[1], middle_height),
-        ],
-        gap,
+    exception_body = _exception_rows(state, width - 4, expanded=details)
+    exception_height = 10
+    if details:
+        exception_height = max(exception_height, len(exception_body) + 2)
+    issue_height = 16
+    if details:
+        rows_without_issue = (
+            len(decision)
+            + 1
+            + len(lifecycle)
+            + 1
+            + 1
+            + exception_height
+        )
+        issue_height = min(24, max(8, content_rows - rows_without_issue))
+    issue_limit = min(24 if details else 12, max(1, issue_height - 2))
+    issue_rows = _box(
+        "ISSUES / QUEUE · STABLE COLUMNS",
+        _issue_queue_rows(state, width - 4, limit=issue_limit, expanded=details),
+        width,
+        issue_height,
     )
-    detail_title = (
-        "SECONDARY CAPACITY / OWNERS / ALL DETAIL"
-        if details
-        else "SECONDARY CAPACITY / OWNERS / DETAIL"
+    exceptions = _box(
+        "EXCEPTIONS / RECOVERY · DETAILS" if details else "EXCEPTIONS / RECOVERY · OVERVIEW ONLY",
+        exception_body,
+        width,
+        exception_height,
     )
-    lower = _join_panels(
-        [
-            _box("SYSTEM HEALTH / ADMISSION", _health_rows(state, half_widths[0] - 4), half_widths[0], lower_height),
-            _box(detail_title, _secondary_rows(state, half_widths[1] - 4, expanded=details), half_widths[1], lower_height),
-        ],
-        gap,
-    )
-    metrics = _metrics_strip(state, width, strip_height)
-    lines = header + [""] + attention + [""] + middle + [""] + lower + [""] + metrics
+    lines = decision + [""] + lifecycle + [""] + issue_rows + [""] + exceptions
+    if details:
+        detail_height = min(14, content_rows - len(lines) - 1)
+        if detail_height >= 6:
+            detail_title = "SECONDARY CAPACITY / OWNERS / ALL DETAIL"
+            detail = _join_panels(
+                [
+                    _box("RECENT DELIVERY LOG", _log_rows(state, half_widths[0] - 4), half_widths[0], detail_height),
+                    _box(detail_title, _secondary_rows(state, half_widths[1] - 4, expanded=True), half_widths[1], detail_height),
+                ],
+                gap,
+            )
+            lines += [""] + detail
+    lines = lines[:content_rows]
+    padding = screen_rows - len(lines) - metrics_rows
+    if padding > 0:
+        lines += [""] * padding
+    lines += metrics
     return _screen(lines, width, height)
 
 
 def _render_compact(state: dict[str, Any], width: int, height: int, details: bool) -> str:
     body_width = width - 4
-    lines = _box("GEM OPERATIONS · READ ONLY", [f"UTC {iso()} · compact {width}×{height}"], width)
-    sections = [
-        ("ATTENTION / ACTION", _attention_rows(state, body_width)),
-        ("CURRENT WORK", _work_rows(state, body_width)),
-        ("BUSINESS PULSE", _business_pulse_rows(state, body_width)),
-        ("DELIVERY SPEED · ISSUE OPEN → LANDED", _delivery_speed_rows(state, body_width)),
-        ("CURRENT LARGEST BOTTLENECK", _bottleneck_region_rows(state, body_width)),
-        ("DELIVERY LOG", _log_rows(state, body_width)),
-        ("SYSTEM HEALTH / ADMISSION", _health_rows(state, body_width)),
-        ("SECONDARY CAPACITY / OWNERS / DETAIL", _secondary_rows(state, body_width, expanded=details)),
+    if details:
+        target_rows = max(20, height - 1)
+        standard = target_rows >= 38
+        roomy = target_rows >= 46
+        issue_height = 6 if standard else 3
+        exception_height = 6 if standard else 3
+        primary_height = 4 if standard else 3
+        primary_limit = max(1, primary_height - 2)
+        sections: list[tuple[str, list[str], int]] = [
+            (
+                "DECISION HEADER · GEM OPERATIONS · READ ONLY",
+                _decision_header_rows(state, body_width, width, height),
+                7,
+            ),
+            (
+                "LIFECYCLE MATRIX · FIXED STATES",
+                _lifecycle_matrix_rows(state, body_width),
+                7,
+            ),
+            (
+                "ISSUES / QUEUE · STABLE COLUMNS",
+                _issue_queue_rows(
+                    state,
+                    body_width,
+                    limit=max(1, issue_height - 2),
+                    expanded=True,
+                    overflow_detail="tail shown; larger terminal shows remaining rows",
+                ),
+                issue_height,
+            ),
+            (
+                "EXCEPTIONS / RECOVERY · DETAILS",
+                _limit_compact_rows(
+                    _exception_rows(state, body_width, expanded=True),
+                    body_width,
+                    max(1, exception_height - 2),
+                    "larger terminal shows remaining exception rows",
+                ),
+                exception_height,
+            ),
+            (
+                "BUSINESS PULSE",
+                _limit_compact_rows(
+                    _primary_signal_rows(_business_pulse_rows(state, body_width)),
+                    body_width,
+                    primary_limit,
+                    "larger terminal shows remaining business rows",
+                ),
+                primary_height,
+            ),
+            (
+                "DELIVERY SPEED · ISSUE OPEN → LANDED",
+                _limit_compact_rows(
+                    _primary_signal_rows(_delivery_speed_rows(state, body_width)),
+                    body_width,
+                    primary_limit,
+                    "larger terminal shows remaining delivery rows",
+                ),
+                primary_height,
+            ),
+            (
+                "CURRENT LARGEST BOTTLENECK",
+                _limit_compact_rows(
+                    _primary_signal_rows(_bottleneck_region_rows(state, body_width)),
+                    body_width,
+                    primary_limit,
+                    "larger terminal shows remaining bottleneck rows",
+                ),
+                primary_height,
+            ),
+        ]
+        if roomy:
+            sections.extend(
+                [
+                    (
+                        "RECENT DELIVERY LOG",
+                        _limit_compact_rows(
+                            _log_rows(state, body_width),
+                            body_width,
+                            2,
+                            "larger terminal shows remaining delivery-log rows",
+                        ),
+                        4,
+                    ),
+                    (
+                        "SECONDARY CAPACITY / OWNERS / ALL DETAIL",
+                        _limit_compact_rows(
+                            _secondary_rows(state, body_width, expanded=True),
+                            body_width,
+                            2,
+                            "larger terminal shows remaining detail rows",
+                        ),
+                        4,
+                    ),
+                ]
+            )
+        lines: list[str] = []
+        for title, rows, section_height in sections:
+            lines += _box(title, rows, width, section_height)
+        return _screen(lines, width, height)
+
+    sections: list[tuple[str, list[str]]] = [
+        (
+            "DECISION HEADER · GEM OPERATIONS · READ ONLY",
+            _decision_header_rows(state, body_width, width, height),
+        ),
+        ("LIFECYCLE MATRIX · FIXED STATES", _lifecycle_matrix_rows(state, body_width)),
+        (
+            "ISSUES / QUEUE · STABLE COLUMNS",
+            _issue_queue_rows(
+                state,
+                body_width,
+                limit=8,
+                expanded=False,
+            ),
+        ),
+        ("EXCEPTIONS / RECOVERY · OVERVIEW ONLY", _exception_rows(state, body_width)),
     ]
+    sections.extend(
+        [
+            ("BUSINESS PULSE", _business_pulse_rows(state, body_width)),
+            ("DELIVERY SPEED · ISSUE OPEN → LANDED", _delivery_speed_rows(state, body_width)),
+            ("CURRENT LARGEST BOTTLENECK", _bottleneck_region_rows(state, body_width)),
+        ]
+    )
+    lines: list[str] = []
     for title, rows in sections:
-        lines += [""] + _box(title, rows, width)
+        if lines:
+            lines.append("")
+        lines += _box(title, rows, width)
     return _screen(lines, width, height)
 
 
