@@ -39,4 +39,3 @@ export const SpotifyStep: Story = {
     initialResumeStep: 'spotify',
   },
 };
-

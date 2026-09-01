@@ -59,4 +59,3 @@ export const DismissibleWithAction: Story = {
     onDismiss: fn(),
   },
 };
-
