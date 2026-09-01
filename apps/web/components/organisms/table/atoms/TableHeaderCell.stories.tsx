@@ -30,7 +30,11 @@ export const Sortable: Story = {
     <table>
       <thead>
         <tr>
-          <TableHeaderCell sortable sortDirection='asc' onSort={() => undefined}>
+          <TableHeaderCell
+            sortable
+            sortDirection='asc'
+            onSort={() => undefined}
+          >
             Release Date
           </TableHeaderCell>
         </tr>
