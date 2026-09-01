@@ -182,6 +182,7 @@ describe('Ovie Mac HUD derivation', () => {
           title: 'Draftable open work',
           updatedAt: '2026-08-20T00:00:00.000Z',
           isDraft: true,
+          labels: { nodes: [{ name: 'hold' }] },
         }),
         prNode({
           number: 13,
@@ -221,6 +222,11 @@ describe('Ovie Mac HUD derivation', () => {
     expect(result.items[2]).toMatchObject({
       number: 11,
       statusDetail: 'Review requested',
+    });
+    expect(result.items[3]).toMatchObject({
+      number: 12,
+      status: 'open',
+      statusDetail: 'Draft',
     });
   });
 
