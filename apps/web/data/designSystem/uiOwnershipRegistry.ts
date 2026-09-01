@@ -30,7 +30,7 @@ export type UIOwnershipPlatform = (typeof UI_OWNERSHIP_PLATFORMS)[number];
 export const UI_OWNERSHIP_BREAKPOINTS = ['compact', 'medium', 'wide'] as const;
 export type UIOwnershipBreakpoint = (typeof UI_OWNERSHIP_BREAKPOINTS)[number];
 export const UI_OWNERSHIP_STATES = words(
-  'default hover focus-visible pressed visited selected disabled loading pending empty partial success error offline recovery collapsed expanded'
+  'default hover focus-visible pressed visited selected disabled loading pending empty partial success warning error offline recovery collapsed expanded'
 );
 export type UIOwnershipState = (typeof UI_OWNERSHIP_STATES)[number];
 export type UIOwnershipLayer = 'atom' | 'interaction' | 'molecule' | 'organism';
