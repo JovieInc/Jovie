@@ -1212,6 +1212,28 @@ def test_nightly_notifications_skip_when_slack_credentials_are_absent() -> None:
     assert job.count('"channel": "${{ env.SLACK_CI_CHANNEL_ID }}"') == 2
 
 
+def test_pitch_static_assets_do_not_keep_large_unreferenced_files() -> None:
+    """Large public pitch assets must be referenced by the checked-in deck."""
+    pitch_dir = REPO_ROOT / "apps" / "web" / "public" / "pitch"
+    assets_dir = pitch_dir / "assets"
+    deck_sources = "\n".join(
+        path.read_text(encoding="utf-8")
+        for path in pitch_dir.iterdir()
+        if path.is_file() and path.suffix in {".css", ".html", ".js"}
+    )
+    referenced_assets = set(re.findall(r"assets/([^\"')\s>]+)", deck_sources))
+
+    large_unreferenced = sorted(
+        path.name
+        for path in assets_dir.iterdir()
+        if path.is_file()
+        and path.stat().st_size > 250_000
+        and path.name not in referenced_assets
+    )
+
+    assert large_unreferenced == []
+
+
 def test_product_screenshot_budget_covers_capture_and_publication() -> None:
     """The screenshot publisher must outlive capture plus the normal push gate."""
     job = _job_block("screenshots.yml", "generate")
