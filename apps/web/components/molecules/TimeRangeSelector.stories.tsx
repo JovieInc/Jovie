@@ -65,6 +65,7 @@ export const AnalyticsTabs: Story = {
 };
 
 export const RetentionDisabled: Story = {
+  name: 'Retention disabled',
   render: () => (
     <TimeRangeSelector
       value='7d'
