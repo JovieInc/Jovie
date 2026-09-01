@@ -1,10 +1,16 @@
 import 'server-only';
 
 import { eq } from 'drizzle-orm';
+import { resolveChatAccountContext } from '@/lib/chat/account-context';
 import { canUseOvChatMode } from '@/lib/chat/ov-mode';
 import {
-  persistTerminalAssistantMessage,
+  markChatTurnStreaming,
+  markChatTurnTerminal,
+  persistTerminalAssistantMessageWithReceipt,
   reserveChatTurn,
+  resumeStaleChatTurn,
+  resumeTerminalChatTurn,
+  type TerminalChatTurnStatus,
   TURN_IN_PROGRESS_ERROR_CODE,
 } from '@/lib/chat/turns';
 import { db } from '@/lib/db';
@@ -24,7 +30,25 @@ import { prepareOvieChatTurn } from '@/lib/ovie/chat-entry';
 import { getOvieOperatingStore } from '@/lib/ovie/mcp/runtime-store';
 import { assertModelMustNotSelfIdentifyAsOvie } from '@/lib/ovie/program';
 import { bindCurrentSummerQueueSpeaker } from '@/lib/ovie/summer-queue-speaker';
-import { isSummerTransportEnabled } from '@/lib/ovie/summer-transport';
+import {
+  isSummerTransportEnabled,
+  runOvieSummerTurn,
+  type SummerSpeaker,
+} from '@/lib/ovie/summer-transport';
+import { checkAiChatRateLimitForPlan } from '@/lib/rate-limit';
+
+type ReservedOvTurn = Extract<
+  Awaited<ReturnType<typeof reserveChatTurn>>,
+  { readonly outcome: 'reserved' }
+>;
+
+const RETRYABLE_SUMMER_ERROR_CODES = new Set([
+  'SUMMER_ADMISSION_UNAVAILABLE',
+  'SUMMER_TURN_CANCELED',
+  'SUMMER_TEMPORARILY_UNAVAILABLE',
+  'SUMMER_TRANSPORT_UNAVAILABLE',
+]);
+const STALE_OVIE_TURN_MS = 60_000;
 
 function ndjson(
   events: readonly MobileChatNdjsonEvent[],
@@ -42,6 +66,242 @@ function ndjsonError(
   message: string
 ): Response {
   return ndjson([{ type: 'error', errorCode, message }], status);
+}
+
+function reservedError(
+  reservation: ReservedOvTurn,
+  parsed: ParsedMobileChatTurnRequest,
+  errorCode: string,
+  message: string
+): Response {
+  return ndjson([
+    {
+      type: 'turn.reserved',
+      conversationId: reservation.conversationId,
+      turnId: reservation.turn.id,
+      clientTurnId: parsed.clientTurnId,
+    },
+    { type: 'error', errorCode, message },
+  ]);
+}
+
+async function persistFailureReceipt(input: {
+  readonly turnId: string;
+  readonly status: TerminalChatTurnStatus;
+  readonly errorCode: string;
+  readonly message: string;
+}): Promise<{ readonly errorCode: string; readonly message: string }> {
+  const persisted = await markChatTurnTerminal({
+    turnId: input.turnId,
+    status: input.status,
+    errorCode: input.errorCode,
+    errorMessage: input.message,
+  });
+  if (persisted) {
+    return { errorCode: input.errorCode, message: input.message };
+  }
+  return {
+    errorCode: 'SUMMER_DURABILITY_FAILED',
+    message:
+      'Summer could not confirm the durable turn state. Retry with the same identifier after the service recovers.',
+  };
+}
+
+function isInFlightStatus(
+  status: string
+): status is 'reserved' | 'running' | 'streaming' {
+  return (
+    status === 'reserved' || status === 'running' || status === 'streaming'
+  );
+}
+
+function streamSummerTurn(input: {
+  readonly reservation: ReservedOvTurn;
+  readonly parsed: ParsedMobileChatTurnRequest;
+  readonly receipts: Awaited<
+    ReturnType<typeof prepareOvieChatTurn>
+  >['receipts'];
+  readonly speaker: SummerSpeaker;
+  readonly store: ReturnType<typeof getOvieOperatingStore>;
+  readonly signal: AbortSignal;
+}): Response {
+  const { reservation, parsed } = input;
+  const stream = new ReadableStream<Uint8Array>({
+    async start(controller) {
+      const encoder = new TextEncoder();
+      const enqueue = (event: MobileChatNdjsonEvent) => {
+        if (input.signal.aborted) return;
+        controller.enqueue(encoder.encode(encodeMobileChatNdjsonEvent(event)));
+      };
+
+      enqueue({
+        type: 'turn.reserved',
+        conversationId: reservation.conversationId,
+        turnId: reservation.turn.id,
+        clientTurnId: parsed.clientTurnId,
+      });
+
+      let assistantText = '';
+      let toolSummary = '';
+      let terminalState:
+        | 'completed'
+        | 'canceled'
+        | 'failed_tool'
+        | 'failure'
+        | 'unavailable' = 'unavailable';
+      let durableCompletion = false;
+
+      try {
+        await markChatTurnStreaming(reservation.turn.id);
+        for await (const event of runOvieSummerTurn({
+          receipts: input.receipts,
+          userText: parsed.text,
+          speaker: input.speaker,
+          store: input.store,
+          signal: input.signal,
+          clientTurnId: parsed.clientTurnId,
+        })) {
+          if (event.type === 'state') {
+            if (
+              event.state === 'completed' ||
+              event.state === 'canceled' ||
+              event.state === 'failed_tool' ||
+              event.state === 'failure' ||
+              event.state === 'unavailable'
+            ) {
+              terminalState = event.state;
+            }
+            continue;
+          }
+          if (event.type === 'text-delta') {
+            assistantText += event.text;
+            continue;
+          }
+          if (event.type === 'tool') {
+            if (event.receipt.ok) {
+              toolSummary = event.receipt.summary;
+              continue;
+            }
+            terminalState = 'failed_tool';
+            continue;
+          }
+        }
+
+        if (input.signal.aborted) {
+          terminalState = 'canceled';
+        }
+
+        const completedText = assistantText.trim() || toolSummary.trim();
+        if (terminalState === 'completed' && completedText) {
+          assertModelMustNotSelfIdentifyAsOvie(completedText);
+          const receipt = await persistTerminalAssistantMessageWithReceipt({
+            conversationId: reservation.conversationId,
+            turnId: reservation.turn.id,
+            status: 'completed',
+            content: completedText,
+          });
+          if (!receipt.persisted) {
+            enqueue({
+              type: 'error',
+              errorCode: 'SUMMER_DURABILITY_FAILED',
+              message:
+                'Summer replied, but the durable turn could not be confirmed. No completion was recorded.',
+            });
+            return;
+          }
+          durableCompletion = true;
+          enqueue({
+            type: 'assistant.delta',
+            clientTurnId: parsed.clientTurnId,
+            text: completedText,
+          });
+          enqueue({
+            type: 'assistant.completed',
+            clientTurnId: parsed.clientTurnId,
+            conversationId: reservation.conversationId,
+            turnId: reservation.turn.id,
+            text: completedText,
+          });
+          return;
+        }
+
+        const failure =
+          terminalState === 'canceled'
+            ? {
+                status: 'canceled' as const,
+                errorCode: 'SUMMER_TURN_CANCELED',
+                message: 'Summer turn was canceled before completion.',
+              }
+            : terminalState === 'failed_tool'
+              ? {
+                  status: 'failed_tool_unavailable' as const,
+                  errorCode: 'SUMMER_TOOL_FAILED',
+                  message:
+                    'Summer could not complete the requested tool action.',
+                }
+              : terminalState === 'failure'
+                ? {
+                    status: 'failed_model_error' as const,
+                    errorCode: 'SUMMER_TRANSPORT_FAILED',
+                    message:
+                      'Summer could not complete this turn. No command was run.',
+                  }
+                : {
+                    status: 'failed_timeout' as const,
+                    errorCode: 'SUMMER_TEMPORARILY_UNAVAILABLE',
+                    message:
+                      'Summer is temporarily unavailable. This durable turn can be resumed with the same identifier.',
+                  };
+        const terminalReceipt = await persistFailureReceipt({
+          turnId: reservation.turn.id,
+          status: failure.status,
+          errorCode: failure.errorCode,
+          message: failure.message,
+        });
+        if (input.signal.aborted) return;
+        enqueue({
+          type: 'error',
+          errorCode: terminalReceipt.errorCode,
+          message: terminalReceipt.message,
+        });
+      } catch {
+        if (durableCompletion) return;
+        const aborted = input.signal.aborted;
+        const message = aborted
+          ? 'Summer turn was canceled before completion.'
+          : 'Summer is temporarily unavailable. No command was run. Send a new message to retry.';
+        const terminalReceipt = await persistFailureReceipt({
+          turnId: reservation.turn.id,
+          status: aborted ? 'canceled' : 'failed_network',
+          errorCode: aborted
+            ? 'SUMMER_TURN_CANCELED'
+            : 'SUMMER_TRANSPORT_FAILED',
+          message,
+        });
+        if (aborted) return;
+        enqueue({
+          type: 'error',
+          errorCode: terminalReceipt.errorCode,
+          message: terminalReceipt.message,
+        });
+      } finally {
+        try {
+          controller.close();
+        } catch {
+          // The durable terminal state is authoritative after disconnect.
+        }
+      }
+    },
+  });
+
+  return new Response(stream, {
+    status: 200,
+    headers: {
+      ...MOBILE_CHAT_NDJSON_HEADERS,
+      'x-ovie-door': '1',
+      'x-ovie-summer-speaker': 'summer',
+    },
+  });
 }
 
 async function tagOvConversationTitle(conversationId: string): Promise<void> {
@@ -98,7 +358,7 @@ export async function handleMobileOvChatTurn(input: {
     }
   }
 
-  const reservation = await reserveChatTurn({
+  let reservation = await reserveChatTurn({
     conversationId: parsed.conversationId ?? null,
     clientTurnId: parsed.clientTurnId,
     clientMessageId: parsed.clientMessageId,
@@ -109,6 +369,104 @@ export async function handleMobileOvChatTurn(input: {
   });
 
   if (reservation.outcome === 'duplicate_in_progress') {
+    const updatedAt = reservation.turn.updatedAt;
+    const stale =
+      updatedAt instanceof Date &&
+      Date.now() - updatedAt.getTime() >= STALE_OVIE_TURN_MS &&
+      isInFlightStatus(reservation.turn.status);
+    if (stale) {
+      const resumed = await resumeStaleChatTurn({
+        turnId: reservation.turn.id,
+        status: reservation.turn.status as 'reserved' | 'running' | 'streaming',
+        updatedAt,
+      });
+      if (resumed === 'resumed') {
+        reservation = {
+          outcome: 'reserved',
+          conversationId: reservation.conversationId,
+          turn: {
+            ...reservation.turn,
+            status: 'reserved',
+            errorCode: null,
+            errorMessage: null,
+          },
+        };
+      } else if (resumed === 'error') {
+        return ndjsonError(
+          503,
+          'SUMMER_DURABILITY_FAILED',
+          'Summer could not reclaim the durable turn. Retry after the service recovers.'
+        );
+      }
+    }
+    if (reservation.outcome === 'duplicate_in_progress') {
+      return ndjsonError(
+        409,
+        TURN_IN_PROGRESS_ERROR_CODE,
+        'This chat action is still in progress.'
+      );
+    }
+  }
+
+  if (reservation.outcome === 'duplicate_completed') {
+    const errorCode = reservation.turn.errorCode;
+    if (errorCode && RETRYABLE_SUMMER_ERROR_CODES.has(errorCode)) {
+      const resumed = await resumeTerminalChatTurn({
+        turnId: reservation.turn.id,
+        status: reservation.turn.status as TerminalChatTurnStatus,
+        errorCode,
+        errorMessage: reservation.turn.errorMessage ?? '',
+      });
+      if (resumed === 'resumed') {
+        reservation = {
+          outcome: 'reserved',
+          conversationId: reservation.conversationId,
+          turn: {
+            ...reservation.turn,
+            status: 'reserved',
+            errorCode: null,
+            errorMessage: null,
+          },
+        };
+      } else if (resumed === 'error') {
+        return ndjsonError(
+          503,
+          'SUMMER_DURABILITY_FAILED',
+          'Summer could not reclaim the durable turn. Retry after the service recovers.'
+        );
+      } else {
+        return ndjsonError(
+          409,
+          TURN_IN_PROGRESS_ERROR_CODE,
+          'This chat action is already being resumed.'
+        );
+      }
+    } else if (reservation.turn.status !== 'completed') {
+      return ndjsonError(
+        200,
+        errorCode ?? 'SUMMER_TURN_FAILED',
+        reservation.turn.errorMessage ??
+          'Summer could not complete this turn. Send a new message to retry.'
+      );
+    } else {
+      const assistantMessage = [...reservation.messages]
+        .reverse()
+        .find(message => message.role === 'assistant');
+      return ndjson([
+        {
+          type: 'assistant.completed',
+          clientTurnId: parsed.clientTurnId,
+          conversationId: reservation.conversationId,
+          turnId: reservation.turn.id,
+          text:
+            assistantMessage?.content ??
+            'This chat action already finished. Send a new message if you need anything else.',
+        },
+      ]);
+    }
+  }
+
+  if (reservation.outcome !== 'reserved') {
     return ndjsonError(
       409,
       TURN_IN_PROGRESS_ERROR_CODE,
@@ -116,73 +474,99 @@ export async function handleMobileOvChatTurn(input: {
     );
   }
 
-  if (reservation.outcome === 'duplicate_completed') {
-    const assistantMessage = [...reservation.messages]
-      .reverse()
-      .find(message => message.role === 'assistant');
-    return ndjson([
-      {
-        type: 'assistant.completed',
-        clientTurnId: parsed.clientTurnId,
-        conversationId: reservation.conversationId,
-        turnId: reservation.turn.id,
-        text:
-          assistantMessage?.content ??
-          'This chat action already finished. Send a new message if you need anything else.',
-      },
-    ]);
+  const accountContext = await resolveChatAccountContext({ userId });
+  const rateLimitResult = await checkAiChatRateLimitForPlan(
+    userId,
+    accountContext.plan
+  );
+  if (
+    !rateLimitResult.success ||
+    rateLimitResult.degraded ||
+    rateLimitResult.unavailable
+  ) {
+    const admissionUnavailable =
+      rateLimitResult.success &&
+      (rateLimitResult.degraded === true ||
+        rateLimitResult.unavailable === true);
+    const message = admissionUnavailable
+      ? 'Summer admission control is temporarily unavailable. Please try again later.'
+      : (rateLimitResult.reason ??
+        'Summer is temporarily rate limited. Please try again later.');
+    const errorCode = admissionUnavailable
+      ? 'SUMMER_ADMISSION_UNAVAILABLE'
+      : 'RATE_LIMITED';
+    const terminalReceipt = await persistFailureReceipt({
+      turnId: reservation.turn.id,
+      status: 'failed_model_error',
+      errorCode,
+      message,
+    });
+    return reservedError(
+      reservation,
+      parsed,
+      terminalReceipt.errorCode,
+      terminalReceipt.message
+    );
   }
 
   await tagOvConversationTitle(reservation.conversationId);
 
   const ovieStore = getOvieOperatingStore();
+  let speaker: SummerSpeaker | null = null;
   if (isSummerTransportEnabled()) {
-    bindCurrentSummerQueueSpeaker(ovieStore);
+    speaker = bindCurrentSummerQueueSpeaker(ovieStore);
   }
 
-  const { generation } = await prepareOvieChatTurn('ov', parsed.text, {
-    store: ovieStore,
-  });
-
-  const completed = (text: string) =>
-    ndjson([
-      {
-        type: 'turn.reserved',
-        conversationId: reservation.conversationId,
-        turnId: reservation.turn.id,
-        clientTurnId: parsed.clientTurnId,
-      },
-      {
-        type: 'assistant.completed',
-        clientTurnId: parsed.clientTurnId,
-        conversationId: reservation.conversationId,
-        turnId: reservation.turn.id,
-        text,
-      },
-    ]);
+  const { generation, receipts } = await prepareOvieChatTurn(
+    'ov',
+    parsed.text,
+    {
+      store: ovieStore,
+    }
+  );
 
   if (generation.kind !== 'summer-transport') {
     const message =
       'Ovie chat cannot fall through to artist Jovie. Summer is the speaker.';
-    await persistTerminalAssistantMessage({
-      conversationId: reservation.conversationId,
+    const terminalReceipt = await persistFailureReceipt({
       turnId: reservation.turn.id,
       status: 'failed_model_error',
-      content: message,
       errorCode: 'OVIE_DOOR_ARTIST_FALLTHROUGH',
+      message,
     });
-    return completed(message);
+    return reservedError(
+      reservation,
+      parsed,
+      terminalReceipt.errorCode,
+      terminalReceipt.message
+    );
   }
 
-  const replyText =
-    generation.text ||
-    'Conversation with the current Summer is unavailable on this door.';
-  assertModelMustNotSelfIdentifyAsOvie(replyText);
-  await persistTerminalAssistantMessage({
-    conversationId: reservation.conversationId,
-    turnId: reservation.turn.id,
-    status: 'completed',
-    content: replyText,
+  if (!speaker || generation.state !== 'fresh') {
+    const replyText =
+      generation.text ||
+      'Conversation with the current Summer is unavailable on this door.';
+    assertModelMustNotSelfIdentifyAsOvie(replyText);
+    const terminalReceipt = await persistFailureReceipt({
+      turnId: reservation.turn.id,
+      status: 'failed_network',
+      errorCode: 'SUMMER_TRANSPORT_UNAVAILABLE',
+      message: replyText,
+    });
+    return reservedError(
+      reservation,
+      parsed,
+      terminalReceipt.errorCode,
+      terminalReceipt.message
+    );
+  }
+
+  return streamSummerTurn({
+    reservation,
+    parsed,
+    receipts,
+    speaker,
+    store: ovieStore,
+    signal: input.signal,
   });
-  return completed(replyText);
 }
