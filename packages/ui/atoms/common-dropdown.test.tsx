@@ -206,6 +206,7 @@ describe('CommonDropdown', () => {
         .getByText('Disabled Item')
         .closest('[role="menuitem"]');
       expect(item).toHaveAttribute('data-disabled');
+      expect(item?.className).toContain('data-[disabled]:cursor-not-allowed');
     });
 
     it('renders selected action state with a trailing check', () => {
@@ -225,6 +226,7 @@ describe('CommonDropdown', () => {
         .closest('[role="menuitem"]');
 
       expect(item).toHaveAttribute('data-selected', 'true');
+      expect(item?.className).toContain('data-[selected=true]:bg-surface-1');
     });
 
     it('renders danger state as a destructive item variant', () => {
@@ -314,6 +316,25 @@ describe('CommonDropdown', () => {
       const separators = screen.getAllByRole('separator');
       expect(separators.length).toBeGreaterThan(0);
     });
+
+    it('normalizes leading, repeated, and trailing separators before rendering', () => {
+      const items: CommonDropdownItem[] = [
+        { type: 'separator', id: 'leading' },
+        { type: 'action', id: 'edit', label: 'Edit', onClick: vi.fn() },
+        { type: 'separator', id: 'section-a' },
+        { type: 'separator', id: 'section-b' },
+        { type: 'action', id: 'delete', label: 'Delete', onClick: vi.fn() },
+        { type: 'separator', id: 'trailing' },
+      ];
+
+      render(<CommonDropdown items={items} open={true} />);
+
+      const menu = screen.getByRole('menu');
+      expect(screen.getAllByRole('separator')).toHaveLength(1);
+      expect(
+        Array.from(menu.children).map(child => child.getAttribute('role'))
+      ).toEqual(['menuitem', 'separator', 'menuitem']);
+    });
   });
 
   describe('Labels', () => {
@@ -367,6 +388,9 @@ describe('CommonDropdown', () => {
       expect(screen.getByRole('menuitemcheckbox')).toHaveAttribute(
         'data-state',
         'checked'
+      );
+      expect(screen.getByRole('menuitemcheckbox').className).toContain(
+        'data-[state=checked]:bg-surface-1'
       );
     });
 
@@ -454,6 +478,9 @@ describe('CommonDropdown', () => {
       expect(
         screen.getByRole('menuitemradio', { name: 'Medium' })
       ).toHaveAttribute('data-state', 'checked');
+      expect(
+        screen.getByRole('menuitemradio', { name: 'Medium' }).className
+      ).toContain('data-[state=checked]:bg-surface-1');
     });
   });
 

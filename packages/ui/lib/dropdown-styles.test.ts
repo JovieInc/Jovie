@@ -20,6 +20,7 @@ import {
   MENU_ITEM_COMPACT,
   MENU_ITEM_COMPACT_DESTRUCTIVE,
   MENU_ITEM_DESTRUCTIVE,
+  MENU_ITEM_SELECTED,
   MENU_LABEL_BASE,
   MENU_SEARCH_CLEAR_BUTTON_BASE,
   MENU_SEARCH_ICON_BASE,
@@ -178,6 +179,36 @@ describe('dropdown-styles', () => {
       expect(MENU_ITEM_COMPACT).toContain(OVERLAY_ITEM_FOCUS);
       expect(CHECKBOX_RADIO_ITEM_BASE).toContain(OVERLAY_ITEM_FOCUS);
       expect(SELECT_ITEM_BASE).toContain(OVERLAY_ITEM_FOCUS);
+    });
+
+    it('shares selected, checked, and disabled state styles across row bases', () => {
+      expect(MENU_ITEM_SELECTED).toContain('bg-surface-1');
+
+      const selectedStateClasses = [
+        'data-[selected=true]:bg-surface-1',
+        'data-[selected=true]:text-primary-token',
+        'data-[state=checked]:bg-surface-1',
+        'data-[state=checked]:text-primary-token',
+      ];
+      const disabledStateClasses = [
+        'data-[disabled]:pointer-events-none',
+        'data-[disabled]:cursor-not-allowed',
+        'data-[disabled]:opacity-50',
+      ];
+
+      for (const rowBase of [
+        MENU_ITEM_BASE,
+        MENU_ITEM_COMPACT,
+        CHECKBOX_RADIO_ITEM_BASE,
+        SELECT_ITEM_BASE,
+      ]) {
+        for (const className of selectedStateClasses) {
+          expect(rowBase).toContain(className);
+        }
+        for (const className of disabledStateClasses) {
+          expect(rowBase).toContain(className);
+        }
+      }
     });
 
     it('MENU_ITEM_COMPACT uses smaller sizing', () => {
