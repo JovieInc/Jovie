@@ -560,6 +560,48 @@ describe('LibrarySurface', () => {
     expect(portraitCard?.className).toContain('aspect-[9/16]');
   });
 
+  it('keeps grid-card status chrome off the media frame', () => {
+    const { container } = renderLibrary([
+      buildAsset({
+        status: 'draft',
+        approvalStatus: 'needs_review',
+      }),
+    ]);
+    clickGridView();
+
+    const redFixture = document.createElement('article');
+    redFixture.innerHTML = [
+      '<div class="system-b-library-card-artwork">',
+      '<span class="system-b-library-card-status">Draft</span>',
+      '</div>',
+    ].join('');
+    expect(
+      redFixture.querySelector(
+        '.system-b-library-card-artwork .system-b-library-card-status'
+      )
+    ).not.toBeNull();
+
+    const cardButton = screen.getByRole('button', {
+      name: /View Take Me Over/u,
+    });
+    const artwork = cardButton.querySelector('.system-b-library-card-artwork');
+    const statusStack = screen.getByTestId(
+      'library-card-status-stack-release-1'
+    );
+
+    expect(artwork?.querySelector('.system-b-library-card-status')).toBeNull();
+    expect(statusStack).toContainElement(
+      screen.getByTestId('library-release-status-release-1')
+    );
+    expect(statusStack).toContainElement(
+      screen.getByTestId('library-approval-status-release-1')
+    );
+    expect(statusStack).toHaveClass('min-h-11');
+    expect(container.querySelector('.system-b-library-card')).toContainElement(
+      statusStack
+    );
+  });
+
   it('surfaces Approval Status on list rows, grid cards, and filter chips (#10384)', async () => {
     renderLibrary([
       buildAsset({
