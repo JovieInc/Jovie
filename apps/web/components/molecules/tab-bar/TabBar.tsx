@@ -1,7 +1,5 @@
 'use client';
 
-// @coverage-via apps/web/tests/unit/dashboard/TaskWorkspaceHeaderBar.test.tsx
-
 import {
   DropdownMenu,
   DropdownMenuContent,
