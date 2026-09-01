@@ -1,5 +1,7 @@
 'use client';
 
+// @coverage-via apps/web/tests/components/release-provider-matrix/ReleaseFilterDropdown.test.tsx
+
 import {
   Button,
   DropdownMenu,

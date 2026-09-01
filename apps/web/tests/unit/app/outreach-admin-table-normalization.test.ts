@@ -23,4 +23,14 @@ describe('outreach admin table normalization', () => {
       expect(source).not.toMatch(/<table\b/);
     }
   });
+
+  it('keeps review queue labels in canonical Title Case', () => {
+    const source = readSource(
+      'components/features/admin/outreach/ReviewQueuePanel.tsx'
+    );
+
+    expect(source).toContain("header: 'Fit Score'");
+    expect(source).not.toContain("header: 'Fit score'");
+    expect(source).not.toContain('@jovie/canonical-ui-label-casing');
+  });
 });

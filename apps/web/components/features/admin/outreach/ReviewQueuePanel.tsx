@@ -1,5 +1,7 @@
 'use client';
 
+// @coverage-via apps/web/tests/unit/app/outreach-admin-table-normalization.test.ts
+
 import { Badge, Spinner as LoadingSpinner } from '@jovie/ui';
 import {
   type CellContext,
