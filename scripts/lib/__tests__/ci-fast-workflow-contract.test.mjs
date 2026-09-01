@@ -458,10 +458,10 @@ describe('ci-fast bounded parallel workflow', () => {
     );
 
     expect(remaining).toContain(
-      'scripts/hermes/(closure_health\\.py$|config/(gem-repo-registry|model-registry)\\.json$|evaluate-fleet-gate\\.sh$|fleet_admission_receipt\\.py$|gem-|gem_|install-gem-(fleet-controller|pr-rehabilitation)\\.sh$|model-router\\.py$|symphony-reconciler\\.py$|systemd/gem-pr-drain\\.(service|timer)$)'
+      'scripts/hermes/(closure_health\\.py$|config/(gem-repo-registry|model-registry)\\.json$|evaluate-fleet-gate\\.sh$|fleet_admission_receipt\\.py$|gem-|gem_|install-(gem-(fleet-controller|pr-rehabilitation)|symphony-ui-pilot)\\.sh$|model-router\\.py$|symphony-reconciler\\.py$|systemd/gem-(disk-reclaim|pr-drain)\\.(service|timer)$)'
     );
     expect(remaining).toContain(
-      'scripts/hermes/tests/(closure-health\\.test\\.py$|gem-(pr-drain|ops-hud|pr-rehabilitation-contract|priority-gate|rehabilitation-policy)\\.test\\.py$|symphony-reconciler\\.test\\.py$|test(-model-router|_evaluate_fleet_gate|_fleet_admission_receipt)\\.py$)'
+      'scripts/hermes/tests/(closure-health\\.test\\.py$|gem-(disk-reclaim|pr-drain|ops-hud|pr-rehabilitation-contract|priority-gate|rehabilitation-policy)\\.test\\.py$|symphony-reconciler\\.test\\.py$|test(-model-router|_evaluate_fleet_gate|_fleet_admission_receipt|_gem_disk_reclaim)\\.py$)'
     );
     expect(CI_FAST_SOURCE).toContain(
       'coverage run --branch scripts/hermes/tests/gem-rehabilitation-policy.test.py'
@@ -473,6 +473,7 @@ describe('ci-fast bounded parallel workflow', () => {
       "node --test --test-name-pattern='keeps the Gem drain on typed fleet admission' scripts/backlog-orchestrator/__tests__/backlog-orchestrator.test.mjs"
     );
     for (const gemContractCommand of [
+      'python3 scripts/hermes/tests/test_gem_disk_reclaim.py',
       'python3 scripts/hermes/tests/gem-pr-drain.test.py',
       'python3 scripts/hermes/tests/gem-pr-rehabilitation-contract.test.py',
       'python3 scripts/hermes/tests/gem-priority-gate.test.py',
@@ -708,9 +709,13 @@ describe('ci-fast bounded parallel workflow', () => {
       'scripts/hermes/config/model-registry.json',
       'scripts/hermes/evaluate-fleet-gate.sh',
       'scripts/hermes/fleet_admission_receipt.py',
+      'scripts/hermes/gem-disk-reclaim.py',
       'scripts/hermes/install-gem-fleet-controller.sh',
+      'scripts/hermes/install-symphony-ui-pilot.sh',
       'scripts/hermes/model-router.py',
       'scripts/hermes/symphony-reconciler.py',
+      'scripts/hermes/systemd/gem-disk-reclaim.service',
+      'scripts/hermes/systemd/gem-disk-reclaim.timer',
       'scripts/hermes/systemd/gem-pr-drain.service',
       'scripts/hermes/systemd/gem-pr-drain.timer',
       'scripts/hermes/tests/closure-health.test.py',
@@ -720,6 +725,7 @@ describe('ci-fast bounded parallel workflow', () => {
       'scripts/hermes/tests/gem-priority-gate.test.py',
       'scripts/hermes/tests/gem-rehabilitation-policy.test.py',
       'scripts/hermes/tests/symphony-reconciler.test.py',
+      'scripts/hermes/tests/test_gem_disk_reclaim.py',
       'scripts/hermes/tests/test-model-router.py',
       'scripts/hermes/tests/test_evaluate_fleet_gate.py',
       'scripts/hermes/tests/test_fleet_admission_receipt.py',

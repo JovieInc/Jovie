@@ -3,16 +3,19 @@
 # Symphony UI pilot runtime on gem (JOV-4962).
 #
 # The repo is the source of truth for the versioned workflow, the systemd
-# user units, lease guard (JOV-5031), and durable stopped-work reconciler. This script materializes them
-# onto the host with timestamped backups and reloads the user systemd manager.
+# user units, lease guard (JOV-5031), durable stopped-work reconciler, and
+# bounded Gem disk/log reclaim monitor. This script materializes them onto the
+# host with timestamped backups and reloads the user systemd manager.
 # It NEVER starts, stops, or restarts symphony-ui-pilot.service and never kills
 # a running process. After daemon-reload it enables and starts only
-# symphony-reconciler.timer so stopped-work reconciliation is active without
-# touching the healthy main Symphony listener.
+# symphony-reconciler.timer and gem-disk-reclaim.timer so stopped-work
+# reconciliation and disk-floor monitoring are active without touching the
+# healthy main Symphony listener.
 #
 # Modes:
-#   (default)          install workflow + unit + lease guard + reconciler,
-#                      daemon-reload, then enable --now symphony-reconciler.timer
+#   (default)          install workflow + unit + lease guard + reconciler +
+#                      disk reclaim monitor, daemon-reload, then enable --now
+#                      symphony-reconciler.timer and gem-disk-reclaim.timer
 #   --check            verify installed files match the repo sources, allowing
 #                      only the controller-owned 1..8 concurrency overlay; no writes
 #   --no-daemon-reload install files but skip systemctl --user daemon-reload
@@ -35,6 +38,9 @@ MODEL_REGISTRY_SRC="$REPO_ROOT/scripts/hermes/config/model-registry.json"
 CAPABILITY_MANIFEST_SRC="$REPO_ROOT/scripts/hermes/config/symphony-reconciler-capabilities.json"
 RECONCILER_SERVICE_SRC="$REPO_ROOT/scripts/hermes/systemd/symphony-reconciler.service"
 RECONCILER_TIMER_SRC="$REPO_ROOT/scripts/hermes/systemd/symphony-reconciler.timer"
+DISK_RECLAIM_SRC="$REPO_ROOT/scripts/hermes/gem-disk-reclaim.py"
+DISK_RECLAIM_SERVICE_SRC="$REPO_ROOT/scripts/hermes/systemd/gem-disk-reclaim.service"
+DISK_RECLAIM_TIMER_SRC="$REPO_ROOT/scripts/hermes/systemd/gem-disk-reclaim.timer"
 WORKFLOW_DST="$TARGET_HOME/symphony-runtime/elixir/WORKFLOW.jovie-ui-pilot.md"
 UNIT_DST="$TARGET_HOME/.config/systemd/user/symphony-ui-pilot.service"
 GUARD_DST="$TARGET_HOME/.local/bin/symphony-lease-guard"
@@ -45,6 +51,9 @@ CAPABILITY_MANIFEST_DST="$TARGET_HOME/.local/lib/symphony-reconciler/symphony-re
 RUNTIME_RECEIPT_DST="$TARGET_HOME/.local/lib/symphony-reconciler/runtime-receipt.json"
 RECONCILER_SERVICE_DST="$TARGET_HOME/.config/systemd/user/symphony-reconciler.service"
 RECONCILER_TIMER_DST="$TARGET_HOME/.config/systemd/user/symphony-reconciler.timer"
+DISK_RECLAIM_DST="$TARGET_HOME/.local/bin/gem-disk-reclaim"
+DISK_RECLAIM_SERVICE_DST="$TARGET_HOME/.config/systemd/user/gem-disk-reclaim.service"
+DISK_RECLAIM_TIMER_DST="$TARGET_HOME/.config/systemd/user/gem-disk-reclaim.timer"
 
 CHECK_ONLY=0
 DAEMON_RELOAD=1
@@ -120,6 +129,9 @@ if [ "$CHECK_ONLY" -eq 1 ]; then
     check_one "$CAPABILITY_MANIFEST_SRC" "$CAPABILITY_MANIFEST_DST" || rc=1
     check_one "$RECONCILER_SERVICE_SRC" "$RECONCILER_SERVICE_DST" || rc=1
     check_one "$RECONCILER_TIMER_SRC" "$RECONCILER_TIMER_DST" || rc=1
+    check_one "$DISK_RECLAIM_SRC" "$DISK_RECLAIM_DST" || rc=1
+    check_one "$DISK_RECLAIM_SERVICE_SRC" "$DISK_RECLAIM_SERVICE_DST" || rc=1
+    check_one "$DISK_RECLAIM_TIMER_SRC" "$DISK_RECLAIM_TIMER_DST" || rc=1
     if [ -f "$RUNTIME_RECEIPT_DST" ]; then
       if ! SYMPHONY_MODEL_ROUTER="$MODEL_ROUTER_DST" \
         SYMPHONY_MODEL_REGISTRY="$MODEL_REGISTRY_DST" \
@@ -147,6 +159,7 @@ if [ "$LEASE_GUARD_ONLY" -eq 0 ]; then
   install_one "$MODEL_ROUTER_SRC" "$MODEL_ROUTER_DST" 0755
   install_one "$MODEL_REGISTRY_SRC" "$MODEL_REGISTRY_DST"
   install_one "$CAPABILITY_MANIFEST_SRC" "$CAPABILITY_MANIFEST_DST"
+  install_one "$DISK_RECLAIM_SRC" "$DISK_RECLAIM_DST" 0755
   SYMPHONY_RUNTIME_SOURCE_ROOT="$REPO_ROOT/scripts/hermes" \
     SYMPHONY_MODEL_ROUTER="$MODEL_ROUTER_DST" \
     SYMPHONY_MODEL_REGISTRY="$MODEL_REGISTRY_DST" \
@@ -156,6 +169,8 @@ if [ "$LEASE_GUARD_ONLY" -eq 0 ]; then
   echo "INSTALLED $RUNTIME_RECEIPT_DST"
   install_one "$RECONCILER_SERVICE_SRC" "$RECONCILER_SERVICE_DST"
   install_one "$RECONCILER_TIMER_SRC" "$RECONCILER_TIMER_DST"
+  install_one "$DISK_RECLAIM_SERVICE_SRC" "$DISK_RECLAIM_SERVICE_DST"
+  install_one "$DISK_RECLAIM_TIMER_SRC" "$DISK_RECLAIM_TIMER_DST"
 fi
 install_one "$GUARD_SRC" "$GUARD_DST" 0755
 
@@ -170,6 +185,8 @@ if [ "$DAEMON_RELOAD" -eq 1 ]; then
     # One timer owner. Do not start/stop/restart the healthy main service.
     systemctl --user enable --now symphony-reconciler.timer
     echo "TIMER_ENABLED symphony-reconciler.timer"
+    systemctl --user enable --now gem-disk-reclaim.timer
+    echo "TIMER_ENABLED gem-disk-reclaim.timer"
   fi
 fi
 

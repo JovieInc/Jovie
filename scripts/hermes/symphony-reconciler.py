@@ -38,6 +38,7 @@ DEFAULT_WORKSPACES = "~/symphony-workspaces"
 DEFAULT_STATE = "~/.local/state/symphony-reconciler"
 DEFAULT_CAPABILITY_MANIFEST = "config/symphony-reconciler-capabilities.json"
 DEFAULT_FLEET_GATE_RECEIPT = "/home/timwhite/gem-workspace/state/gem-priority-gate/latest.json"
+FLEET_GATE_RECEIPT_ENV = "SYMPHONY_FLEET_GATE_RECEIPT"
 MODEL_ID = "qwen-coder-local"
 MODEL_TIMEOUT_SECONDS = 12 * 60
 RETRY_MINUTES = 15
@@ -70,7 +71,9 @@ def _stale_capacity_local_remediation_limit(
     receipt_path: pathlib.Path | None = None,
 ) -> tuple[int, str]:
     """Admit only the fail-closed, local-only stale-capacity recovery lane."""
-    path = receipt_path or pathlib.Path(DEFAULT_FLEET_GATE_RECEIPT)
+    path = receipt_path or pathlib.Path(
+        os.environ.get(FLEET_GATE_RECEIPT_ENV, DEFAULT_FLEET_GATE_RECEIPT)
+    )
     try:
         receipt = json.loads(path.read_text(encoding="utf-8"))
     except (OSError, TypeError, ValueError):

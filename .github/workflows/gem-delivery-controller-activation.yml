@@ -97,6 +97,8 @@ jobs:
           ' "$GEM_WORKSPACE/state/gem-pr-rehabilitation-attestation.json" >/dev/null
           systemctl --user is-enabled --quiet gem-pr-drain.timer
           systemctl --user is-active --quiet gem-pr-drain.timer
+          systemctl --user is-enabled --quiet gem-disk-reclaim.timer
+          systemctl --user is-active --quiet gem-disk-reclaim.timer
           bash scripts/hermes/install-symphony-ui-pilot.sh --check
           SYMPHONY_RUNTIME_SOURCE_ROOT="$PWD/scripts/hermes" \
             SYMPHONY_MODEL_ROUTER="$HOME/.local/lib/symphony-reconciler/model-router.py" \
@@ -105,7 +107,14 @@ jobs:
             SYMPHONY_RUNTIME_RECEIPT="$HOME/.local/lib/symphony-reconciler/runtime-receipt.json" \
             python3 "$HOME/.local/bin/symphony-reconciler" runtime-preflight \
             | jq -e '.status == "ready"' >/dev/null
+          python3 "$HOME/.local/bin/gem-disk-reclaim" --dry-run --timeout-seconds 60 \
+            --receipt "$RUNNER_TEMP/gem-disk-reclaim-dry-run.json" \
+            --disk-receipt "$RUNNER_TEMP/gem-disk-capacity-dry-run.json" \
+            --capacity-receipt "$RUNNER_TEMP/gem-concurrency-dry-run.json" \
+            | jq -e '.schema == "gem-disk-reclaim/v1" and (.status | IN("ok", "warning", "critical"))' >/dev/null
           systemctl --user is-enabled --quiet symphony-reconciler.timer
           systemctl --user is-active --quiet symphony-reconciler.timer
           test "$(systemctl --user show symphony-reconciler.timer --property=FragmentPath --value)" \
             = "$HOME/.config/systemd/user/symphony-reconciler.timer"
+          test "$(systemctl --user show gem-disk-reclaim.timer --property=FragmentPath --value)" \
+            = "$HOME/.config/systemd/user/gem-disk-reclaim.timer"

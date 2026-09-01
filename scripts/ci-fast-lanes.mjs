@@ -622,6 +622,7 @@ function runStructural() {
     'python3 .github/scripts/test-security-suppression-audit.py',
     // The Gem contract is embedded in the broader Symphony controller suite.
     "node --test --test-name-pattern='keeps the Gem drain on typed fleet admission' scripts/backlog-orchestrator/__tests__/backlog-orchestrator.test.mjs",
+    'python3 scripts/hermes/tests/test_gem_disk_reclaim.py',
     'python3 scripts/hermes/tests/gem-pr-drain.test.py',
     'python3 scripts/hermes/tests/gem-pr-rehabilitation-contract.test.py',
     'python3 scripts/hermes/tests/gem-priority-gate.test.py',
