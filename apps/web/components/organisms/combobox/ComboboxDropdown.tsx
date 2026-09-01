@@ -1,9 +1,13 @@
 'use client';
 
 import { ComboboxOptions } from '@headlessui/react';
-import { Spinner as LoadingSpinner } from '@jovie/ui';
-import { clsx } from 'clsx';
+import {
+  OVERLAY_CONTENT_RADIUS,
+  OVERLAY_SURFACE_BASE,
+  Spinner as LoadingSpinner,
+} from '@jovie/ui';
 import { forwardRef } from 'react';
+import { cn } from '@/lib/utils';
 import { ComboboxOptionItem } from './ComboboxOptionItem';
 import type { ComboboxOption } from './types';
 
@@ -26,10 +30,10 @@ export const ComboboxDropdown = forwardRef<
     <ComboboxOptions
       ref={ref}
       id={listboxId}
-      className={clsx(
-        'absolute z-50 mt-2 max-h-60 w-full overflow-auto',
-        'rounded-xl bg-white/95 backdrop-blur-xl shadow-xl ring-1 ring-white/20',
-        'focus-visible:outline-none'
+      className={cn(
+        'absolute z-50 mt-2 max-h-60 w-full overflow-y-auto overflow-x-hidden p-1 focus-visible:outline-none',
+        OVERLAY_CONTENT_RADIUS,
+        OVERLAY_SURFACE_BASE
       )}
       static={isOpen}
     >

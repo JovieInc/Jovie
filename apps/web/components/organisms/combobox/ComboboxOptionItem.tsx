@@ -1,7 +1,11 @@
 'use client';
 
 import { ComboboxOption as HeadlessComboboxOption } from '@headlessui/react';
-import { clsx } from 'clsx';
+import {
+  MENU_ITEM_BASE,
+  MENU_ITEM_SELECTED,
+} from '@jovie/ui';
+import { Check } from 'lucide-react';
 import Image from 'next/image';
 import { useEffect, useState } from 'react';
 import { cn } from '@/lib/utils';
@@ -72,50 +76,28 @@ function OptionImage({
 export function ComboboxOptionItem({ option, index }: ComboboxOptionItemProps) {
   return (
     <HeadlessComboboxOption
-      className={({ active }) =>
-        clsx(
-          'relative cursor-pointer select-none px-4 py-3 transition-colors',
-          'focus-visible:outline-none',
-          active
-            ? 'bg-accent text-accent-foreground'
-            : 'text-primary-token hover:bg-surface-1'
+      className={({ focus, selected }) =>
+        cn(
+          MENU_ITEM_BASE,
+          'w-full pr-8',
+          (focus || selected) && MENU_ITEM_SELECTED
         )
       }
       value={option}
       data-index={index}
       id={`option-${option.id}`}
     >
-      {({ active, selected }) => (
-        <div className='flex items-center space-x-3'>
+      {({ selected }) => (
+        <div className='flex min-w-0 flex-1 items-center gap-3'>
           <OptionImage imageUrl={option.imageUrl} name={option.name} />
-          <span
-            className={clsx(
-              'truncate text-sm',
-              active || selected ? 'font-semibold' : 'font-normal'
-            )}
-          >
-            {option.name}
-          </span>
-          {(active || selected) && (
+          <span className='truncate text-app font-normal'>{option.name}</span>
+          {selected && (
             <span
-              className={clsx(
-                'absolute inset-y-0 right-0 flex items-center pr-4',
-                active ? 'text-white dark:text-white' : 'text-indigo-600'
-              )}
+              className='absolute inset-y-0 right-2 flex items-center justify-center text-primary-token'
               aria-hidden='true'
+              data-testid='combobox-option-selected-indicator'
             >
-              <svg
-                className='h-4 w-4'
-                fill='currentColor'
-                viewBox='0 0 20 20'
-                aria-hidden='true'
-              >
-                <path
-                  fillRule='evenodd'
-                  d='M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z'
-                  clipRule='evenodd'
-                />
-              </svg>
+              <Check className='h-4 w-4' aria-hidden='true' />
             </span>
           )}
         </div>

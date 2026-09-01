@@ -157,12 +157,14 @@ export const Combobox = forwardRef<HTMLDivElement, ComboboxProps>(
             return (
               <>
                 <div
+                  data-combobox-surface=''
                   className={clsx(
                     'relative flex w-full overflow-hidden',
-                    'rounded-xl bg-white/5 backdrop-blur-xl shadow-lg ring-1 ring-white/10',
-                    'focus-within:ring-2 focus-within:ring-white/20',
+                    'rounded-xl border border-subtle bg-surface-0',
+                    'focus-within:border-focus focus-within:ring-2 focus-within:ring-focus/25',
                     'flex-col sm:flex-row',
-                    error && 'ring-red-500/50 focus-within:ring-red-500/50',
+                    error &&
+                      'border-error focus-within:border-error focus-within:ring-error/25',
                     disabled && 'opacity-50 cursor-not-allowed'
                   )}
                 >
@@ -182,10 +184,10 @@ export const Combobox = forwardRef<HTMLDivElement, ComboboxProps>(
                       }
                       className={clsx(
                         'w-full border-0 bg-transparent outline-none ring-0 focus-visible:ring-0',
-                        'px-4 py-3.5 text-sm/6 text-white dark:text-white placeholder-white/70',
+                        'px-4 py-3.5 text-sm/6 text-primary-token placeholder:text-tertiary-token',
                         'h-12 sm:h-11',
                         'rounded-xl sm:rounded-l-xl sm:rounded-r-none',
-                        'focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white/50',
+                        'focus-visible:outline-none',
                         disabled && 'cursor-not-allowed'
                       )}
                       placeholder={placeholder}
@@ -199,18 +201,22 @@ export const Combobox = forwardRef<HTMLDivElement, ComboboxProps>(
                     <ComboboxButton
                       className={clsx(
                         'absolute inset-y-0 right-0 flex items-center justify-center w-10',
-                        'focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white/50',
+                        'text-tertiary-token transition-colors duration-fast ease-interactive hover:text-primary-token',
+                        'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus/35',
                         disabled && 'cursor-not-allowed'
                       )}
                       disabled={disabled}
                       aria-label={open ? 'Close dropdown' : 'Open dropdown'}
                     >
                       {isLoading ? (
-                        <LoadingSpinner size='sm' className='text-white/50' />
+                        <LoadingSpinner
+                          size='sm'
+                          className='text-tertiary-token'
+                        />
                       ) : (
                         <ChevronDown
                           className={clsx(
-                            'h-4 w-4 text-white/50 transition-transform',
+                            'h-4 w-4 transition-transform duration-fast ease-interactive',
                             open && 'rotate-180'
                           )}
                           aria-hidden='true'
@@ -221,7 +227,7 @@ export const Combobox = forwardRef<HTMLDivElement, ComboboxProps>(
 
                   {showCta && (
                     <div
-                      className='max-sm:hidden w-px bg-white/10'
+                      className='max-sm:hidden w-px bg-surface-2'
                       aria-hidden='true'
                     />
                   )}
@@ -232,17 +238,17 @@ export const Combobox = forwardRef<HTMLDivElement, ComboboxProps>(
                       onClick={handleSubmit}
                       disabled={disabled || !isValidSelection}
                       className={clsx(
-                        'border-0 shadow-none ring-0',
+                        'border border-btn-primary bg-btn-primary text-btn-primary-foreground shadow-button-inset',
                         'h-12 sm:h-11 rounded-xl sm:rounded-l-none sm:rounded-r-xl',
-                        'px-4 sm:px-6 flex items-center justify-center',
-                        'text-sm font-medium',
-                        'bg-white dark:bg-surface-1 text-gray-900 hover:bg-white/90 transition-colors',
-                        'disabled:bg-white/50 disabled:text-gray-500 disabled:cursor-not-allowed',
-                        'focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white'
+                        'px-4 sm:px-6 flex items-center justify-center gap-2',
+                        'text-sm font-medium transition-colors duration-fast ease-interactive',
+                        'hover:border-btn-primary-hover hover:bg-btn-primary-hover',
+                        'disabled:pointer-events-none disabled:opacity-[var(--state-disabled-opacity)] disabled:text-(--color-text-disabled-token)',
+                        'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus/55 focus-visible:ring-offset-2 focus-visible:ring-offset-surface-page'
                       )}
                       aria-label={`${ctaText} for ${value?.name || 'selected artist'}`}
                     >
-                      <Search className='h-4 w-4 mr-2' aria-hidden='true' />
+                      <Search className='h-4 w-4' aria-hidden='true' />
                       {ctaText}
                     </button>
                   )}

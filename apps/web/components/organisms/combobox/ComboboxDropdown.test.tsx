@@ -33,6 +33,19 @@ function renderDropdown({
 }
 
 describe('ComboboxDropdown', () => {
+  it('uses the shared select/listbox overlay surface tokens', () => {
+    renderDropdown({ query: 'missing' });
+
+    const listbox = document.getElementById('artist-results');
+    expect(listbox?.className).toContain(
+      'rounded-(--system-b-radius-overlay)'
+    );
+    expect(listbox?.className).toContain('bg-surface-elevated');
+    expect(listbox?.className).toContain('border-default');
+    expect(listbox?.className).not.toContain('bg-white');
+    expect(listbox?.className).not.toContain('ring-white');
+  });
+
   it('renders the canonical spinner for an active search', () => {
     renderDropdown({ isLoading: true, query: 'first' });
 
