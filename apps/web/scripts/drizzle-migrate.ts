@@ -205,13 +205,21 @@ async function acquireMigrationAdvisoryLock(client: PoolClient) {
 
     if (attempt === maxAttempts) {
       throw new Error(
-        `Timed out waiting for Drizzle migration advisory lock after ${maxAttempts} attempt(s).`
+        [
+          'Timed out waiting for Drizzle migration advisory lock after',
+          `${maxAttempts} attempt(s).`,
+        ].join(' ')
       );
     }
 
     if (attempt === 1 || attempt % 10 === 0) {
+      const delaySeconds = MIGRATION_LOCK_RETRY_DELAY_MS / 1000;
+      const nextAttempt = attempt + 1;
       log.warning(
-        `Another migration runner holds the Drizzle advisory lock; waiting ${MIGRATION_LOCK_RETRY_DELAY_MS / 1000}s before retry ${attempt + 1}/${maxAttempts}.`
+        [
+          'Another migration runner holds the Drizzle advisory lock;',
+          `waiting ${delaySeconds}s before retry ${nextAttempt}/${maxAttempts}.`,
+        ].join(' ')
       );
     }
     await sleep(MIGRATION_LOCK_RETRY_DELAY_MS);
@@ -587,8 +595,12 @@ async function runMigrations() {
         await releaseMigrationAdvisoryLock(client);
         log.success('Migration advisory lock released');
       } catch (error) {
+        const releaseError = flattenErrorMessages(error).join(' ');
         log.warning(
-          `Failed to release migration advisory lock explicitly: ${flattenErrorMessages(error).join(' ')}`
+          [
+            'Failed to release migration advisory lock explicitly:',
+            releaseError,
+          ].join(' ')
         );
       }
     }
