@@ -8,14 +8,55 @@ import {
   presets,
   rowState,
   selection,
+  tableAlignment,
 } from './table.styles';
 
 const TABLE_STYLE_SOURCE = readFileSync(
   join(process.cwd(), 'components/organisms/table/table.styles.ts'),
   'utf8'
 );
+const SORTABLE_HEADER_BUTTON_SOURCE = readFileSync(
+  join(process.cwd(), 'components/organisms/table/SortableHeaderButton.tsx'),
+  'utf8'
+);
 const SHELL_LIST_ROW_SOURCE = readFileSync(
   join(process.cwd(), 'components/organisms/table/atoms/ShellListRowFrame.tsx'),
+  'utf8'
+);
+const TABLE_CELL_SOURCE = readFileSync(
+  join(process.cwd(), 'components/organisms/table/atoms/TableCell.tsx'),
+  'utf8'
+);
+const TABLE_HEADER_CELL_SOURCE = readFileSync(
+  join(process.cwd(), 'components/organisms/table/atoms/TableHeaderCell.tsx'),
+  'utf8'
+);
+const TABLE_HEADER_ROW_SOURCE = readFileSync(
+  join(
+    process.cwd(),
+    'components/organisms/table/molecules/TableHeaderRow.tsx'
+  ),
+  'utf8'
+);
+const MOLECULE_TABLE_HEADER_CELL_SOURCE = readFileSync(
+  join(
+    process.cwd(),
+    'components/organisms/table/molecules/TableHeaderCell.tsx'
+  ),
+  'utf8'
+);
+const UNIFIED_TABLE_HEADER_SOURCE = readFileSync(
+  join(
+    process.cwd(),
+    'components/organisms/table/organisms/UnifiedTableHeader.tsx'
+  ),
+  'utf8'
+);
+const VIRTUALIZED_TABLE_ROW_SOURCE = readFileSync(
+  join(
+    process.cwd(),
+    'components/organisms/table/organisms/VirtualizedTableRow.tsx'
+  ),
   'utf8'
 );
 const SKELETON_CELL_SOURCE = readFileSync(
@@ -36,16 +77,29 @@ describe('table System B style exports', () => {
     expect(columnWidths.actions).toBe('system-b-table-column-actions');
     expect(presets.stickyHeader).toContain('system-b-table-sticky-header');
     expect(presets.tableRow).toContain('system-b-table-row-shell');
+    expect(presets.tableHeaderRow).toBe('h-8');
+    expect(presets.tableHeaderCell).toContain(alignment.headerPadding);
+    expect(tableAlignment.text.right).toBe('text-right');
+    expect(tableAlignment.headerButton.right).toContain('justify-end');
   });
 
   it('keeps shared table primitives free of local visual literals', () => {
     const source = [
       TABLE_STYLE_SOURCE,
+      SORTABLE_HEADER_BUTTON_SOURCE,
       SHELL_LIST_ROW_SOURCE,
+      TABLE_CELL_SOURCE,
+      TABLE_HEADER_CELL_SOURCE,
+      TABLE_HEADER_ROW_SOURCE,
+      MOLECULE_TABLE_HEADER_CELL_SOURCE,
+      UNIFIED_TABLE_HEADER_SOURCE,
+      VIRTUALIZED_TABLE_ROW_SOURCE,
       SKELETON_CELL_SOURCE,
     ].join('\n');
 
     expect(source).not.toMatch(/\b(?:bg|shadow|ring|border|w|min-w|h)-\[/);
+    expect(source).not.toContain('leading-[');
+    expect(source).not.toContain('h-12');
     expect(source).not.toMatch(/color-mix\(|rgba?\(|#[0-9a-fA-F]{3,8}\b/);
     expect(source).not.toMatch(/group-(?:hover|focus-visible)\/task-row:bg-/);
   });

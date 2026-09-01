@@ -2,6 +2,7 @@
 
 import { cn } from '@/lib/utils';
 import { SortableHeaderButton } from '../SortableHeaderButton';
+import { borders, presets, tableAlignment } from '../table.styles';
 import type { TableCellProps } from './TableCell';
 
 export interface TableHeaderCellProps extends Omit<TableCellProps, 'as'> {
@@ -24,12 +25,6 @@ export function TableHeaderCell({
   sticky = true,
   stickyTop = 0,
 }: TableHeaderCellProps) {
-  const alignmentClasses = {
-    left: 'text-left',
-    center: 'text-center',
-    right: 'text-right',
-  };
-
   // Map sort direction without nested ternary
   const sortButtonDirection =
     sortDirection === 'asc' || sortDirection === 'desc'
@@ -42,9 +37,12 @@ export function TableHeaderCell({
         label={typeof children === 'string' ? children : String(children)}
         direction={sortButtonDirection}
         onClick={onSort}
+        className={tableAlignment.headerButton[align]}
       />
     ) : (
-      <span className='text-app font-caption tracking-normal text-secondary-token'>
+      <span
+        className={cn('block w-full line-clamp-1', tableAlignment.text[align])}
+      >
         {children}
       </span>
     );
@@ -52,12 +50,11 @@ export function TableHeaderCell({
   return (
     <th
       className={cn(
-        // Base styles
-        'border-b border-subtle px-3 py-1 align-middle text-2xs font-caption text-secondary-token',
+        presets.tableHeaderCell,
         // Sticky positioning
-        sticky && 'sticky z-20 bg-(--app-shell-content-surface)',
+        sticky ? presets.stickyHeader : borders.header,
         // Alignment
-        alignmentClasses[align],
+        tableAlignment.text[align],
         // Width
         width,
         // Responsive hiding

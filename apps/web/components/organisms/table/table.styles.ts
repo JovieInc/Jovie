@@ -95,6 +95,19 @@ export const layoutStability = {
   skeletonRowHeight: '40px', // Must match rowHeight
 } as const;
 
+export const tableAlignment = {
+  text: {
+    left: 'text-left',
+    center: 'text-center',
+    right: 'text-right',
+  },
+  headerButton: {
+    left: 'justify-start text-left',
+    center: 'justify-center text-center',
+    right: 'justify-end text-right',
+  },
+} as const;
+
 // Border Styles
 export const borders = {
   cell: 'border-b border-subtle',
@@ -157,6 +170,11 @@ export const presets = {
     rowState.focusWithin,
     'last:border-b-0'
   ),
+  tableHeaderRow: 'h-8',
   tableCell: cn(alignment.cellPadding, typography.cellPrimary, 'align-middle'),
-  tableHeader: cn(alignment.headerPadding, typography.tableHeader, 'text-left'),
+  tableHeaderCell: cn(
+    alignment.headerPadding,
+    typography.tableHeader,
+    'align-middle'
+  ),
 } as const;

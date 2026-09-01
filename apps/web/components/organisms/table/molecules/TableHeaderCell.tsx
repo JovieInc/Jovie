@@ -3,8 +3,9 @@
 import type { Header } from '@tanstack/react-table';
 import { flexRender } from '@tanstack/react-table';
 import { Icon } from '@/components/atoms/Icon';
+import { cn } from '@/lib/utils';
 import '../table.types';
-import { cn, iconColors } from '../table.styles';
+import { iconColors, tableAlignment } from '../table.styles';
 
 interface TableHeaderCellProps<TData>
   extends Readonly<{
@@ -46,6 +47,7 @@ export function TableHeaderCell<TData>({
 
   const meta = header.column.columnDef.meta;
   const metaClassName = meta?.className;
+  const align = meta?.align ?? 'left';
   const isSemanticOnlyHeader = meta?.headerVisibility === 'sr-only';
 
   const headerContent = isSemanticOnlyHeader ? (
@@ -61,7 +63,11 @@ export function TableHeaderCell<TData>({
       key={header.id}
       scope='col'
       aria-sort={ariaSort}
-      className={cn(stickyHeaderClass, metaClassName)}
+      className={cn(
+        stickyHeaderClass,
+        tableAlignment.text[align],
+        metaClassName
+      )}
       style={{
         width:
           header.getSize() >= 9999 || header.getSize() === 150
@@ -79,6 +85,7 @@ export function TableHeaderCell<TData>({
               className={cn(
                 tableHeaderClass,
                 'flex w-full items-center gap-2',
+                tableAlignment.headerButton[align],
                 'rounded-full border border-transparent px-1.5 transition-[background-color,border-color,box-shadow] duration-subtle hover:border-subtle hover:bg-surface-1',
                 'focus-visible:outline-none focus-visible:border-(--linear-border-focus) focus-visible:bg-surface-1 focus-visible:ring-2 focus-visible:ring-ring/20'
               )}
@@ -95,7 +102,11 @@ export function TableHeaderCell<TData>({
             </button>
           );
         }
-        return <div className={cn(tableHeaderClass)}>{headerContent}</div>;
+        return (
+          <div className={cn(tableHeaderClass, tableAlignment.text[align])}>
+            {headerContent}
+          </div>
+        );
       })()}
     </th>
   );

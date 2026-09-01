@@ -1,4 +1,5 @@
 import { cn } from '@/lib/utils';
+import { borders, presets, tableAlignment } from '../table.styles';
 
 export interface TableCellProps {
   readonly children: React.ReactNode;
@@ -17,22 +18,16 @@ export function TableCell({
   hideOnMobile = false,
   as: Component = 'td',
 }: TableCellProps) {
-  const alignmentClasses = {
-    left: 'text-left',
-    center: 'text-center',
-    right: 'text-right',
-  };
-
   return (
     <Component
       className={cn(
-        // Base styles with line-clamp instead of truncate
-        'border-b border-subtle px-3 py-0.5 align-middle text-app leading-[1.35] text-secondary-token',
+        borders.cell,
+        presets.tableCell,
         'line-clamp-1 overflow-hidden text-ellipsis',
         // Width
         width,
         // Alignment
-        alignmentClasses[align],
+        tableAlignment.text[align],
         // Responsive hiding
         hideOnMobile && 'max-md:hidden md:table-cell',
         // Custom classes
