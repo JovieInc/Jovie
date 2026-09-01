@@ -73,6 +73,8 @@ describe('Actions cache GC', () => {
     expect(plan.evict.map(item => item.id).sort()).toEqual([1, 3]);
     expect(plan.keep.map(item => item.id).sort()).toEqual([2, 4]);
     expect(isProtectedCacheKey('Linux-playwright-chromium-v1')).toBe(true);
+    expect(isProtectedCacheKey('macOS-swiftpm-xcode-abc')).toBe(true);
+    expect(isProtectedCacheKey('Linux-pip-pytest-abc')).toBe(true);
     expect(turboFamily('Linux-turbo-aaa')).toBe('Linux-turbo');
   });
 
