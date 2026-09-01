@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import eveAgent from '../agent/agent';
 import {
   assertEvePilotFactoryLock,
   bindEvePilotIdentity,
@@ -20,6 +21,10 @@ function armFactoryWrite(turn: EvePilotBoundTurn): EvePilotBoundTurn {
 }
 
 describe('eve identity instruction packs', () => {
+  it('keeps the shared Jovie and Ovie agent model unchanged', () => {
+    expect(eveAgent).toEqual({ model: 'openai/gpt-5.4-mini' });
+  });
+
   it('denies Jovie privileged gbrain write and Symphony heal at the Eve entry', () => {
     const turn = bindEvePilotIdentity('jovie');
     expect(turn.instructions.includes('artist-facing')).toBe(true);
@@ -53,6 +58,24 @@ describe('eve identity instruction packs', () => {
     expect(() => assertEvePilotFactoryLock(turn)).not.toThrow();
   });
 
+  it('binds a read-only Summer shadow only through the explicit Ovie route', () => {
+    const turn = eveIdentityForChannel('ovie-summer-shadow');
+    expect(turn.pack).toMatchObject({
+      id: 'summer',
+      role: 'company-operator',
+      canIngestAck: false,
+      canReadGbrain: false,
+    });
+    expect(turn.instructions).toContain('Read-only');
+    expect(() => turn.require('ingest-ack')).toThrow(
+      EvePilotCapabilityDeniedError
+    );
+    expect(() => turn.require('gbrain-read')).toThrow(
+      EvePilotCapabilityDeniedError
+    );
+    expect(() => assertEvePilotFactoryLock(turn)).not.toThrow();
+  });
+
   it('binds the runtime pack at Eve load (default Jovie)', () => {
     const previous = process.env.EVE_IDENTITY;
     delete process.env.EVE_IDENTITY;
@@ -73,6 +96,21 @@ describe('eve identity instruction packs', () => {
     expect(turn.pack.id).toBe('ovie');
     expect(() => turn.require('ingest-ack')).not.toThrow();
     expect(() => assertEvePilotFactoryLock(turn)).not.toThrow();
+    if (previous === undefined) {
+      delete process.env.EVE_IDENTITY;
+    } else {
+      process.env.EVE_IDENTITY = previous;
+    }
+  });
+
+  it('refuses a Summer runtime default outside the explicit shadow route', () => {
+    const previous = process.env.EVE_IDENTITY;
+    process.env.EVE_IDENTITY = 'summer';
+    expect(eveIdentityForRuntime().pack.id).toBe('jovie');
+    expect(eveIdentityForChannel('jovie-core-chat').pack.id).toBe('jovie');
+    expect(eveIdentityForChannel('unknown-source').pack.id).toBe('jovie');
+    expect(eveIdentityForChannel('ovie-summer-shadow').pack.id).toBe('summer');
+    expect(eveIdentityForChannel('photon').pack.id).toBe('ovie');
     if (previous === undefined) {
       delete process.env.EVE_IDENTITY;
     } else {

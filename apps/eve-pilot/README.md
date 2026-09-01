@@ -7,7 +7,7 @@ behind the door. Symphony orchestrates code on Gem Ubuntu.
 Canonical program: [`docs/OVIE_PROGRAM.md`](../../docs/OVIE_PROGRAM.md)
 (JOV-5214).
 
-`Tim -> Ovie -> Eve intake/ack -> durable Kanban -> Summer -> Symphony -> identified coding worker on Gem Ubuntu`
+`Tim -> Ovie -> Eve/Summer -> durable receipt/outbox -> Linear projection -> Symphony -> identified coding worker on Gem Ubuntu`
 
 ## Split
 
@@ -16,7 +16,8 @@ Tim always talks through Ovie.
 - Creator work and dogfood → this door drives Jovie on the same product path.
 - Jovie cannot do it → Eve admits a build (engineering). No second chat.
 - Feeling the product → Tim opens the Jovie app. That is taste, not talk.
-- Conversational authority is Summer. Eve does not answer as Summer or as Ovie.
+- Conversational authority is Summer. Ovie is Tim's interface to Summer, not
+  a second persona.
 - Jovie-on-iMessage is later.
 
 ## Channels
@@ -27,6 +28,16 @@ Tim always talks through Ovie.
 | Telegram | Ovie door | Dedicated bot. Do not reuse Hermes |
 | iMessage (Photon) | Ovie door | Portable Photon creds. No Vercel Connect |
 | Jovie product chat | Jovie | Artist identity only |
+
+## Summer Vercel migration
+
+Summer begins as an explicit `ovie-summer-shadow` identity in this Eve app.
+It can observe and report engineering throughput from Ovie, but it has no
+write capability during this phase. Photon, Telegram, and iMessage remain
+bound to Ovie. Before Summer may orchestrate mutations, land the durable
+receipt/outbox and rate-limit replay path with event-replay tests; Linear is
+the coordination projection, not delivery truth. Hermes remains available as
+rollback until that proof is complete.
 
 Telegram and iMessage fail closed without an allowlist. Groups and unknown
 senders are dropped.
