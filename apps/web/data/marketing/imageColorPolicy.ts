@@ -558,10 +558,12 @@ export function auditJovieImageColorDecision(
         decision.reflectedColor,
         policy
       );
+      const sameResolvedSceneRole =
+        sourceRole !== null && sourceRole === reflectedRole;
       if (
         hueDistance(decision.sourceColor.hue, decision.reflectedColor.hue) >
           policy.sourceReflectionConsistency.maxHueDelta &&
-        sourceRole !== reflectedRole
+        !sameResolvedSceneRole
       ) {
         findings.push(
           finding(

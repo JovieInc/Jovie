@@ -389,6 +389,18 @@ describe('marketing generation pipeline', () => {
     ).toContain('reflection-source-mismatch');
 
     expect(
+      codes(
+        auditJovieImageColorDecision({
+          control: 'source-reflection',
+          subject: 'unmotivated red reflection from green spill',
+          sourceColor: saturatedGreen,
+          reflectedColor: saturatedRed,
+          reflectionSourcePresent: true,
+        })
+      )
+    ).toContain('reflection-source-mismatch');
+
+    expect(
       auditJovieImageColorDecision({
         control: 'source-reflection',
         subject: 'Ion puddle reflection from visible Ion tube',
