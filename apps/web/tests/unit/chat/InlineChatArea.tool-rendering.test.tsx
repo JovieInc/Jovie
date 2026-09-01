@@ -1,10 +1,16 @@
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { fireEvent, screen } from '@testing-library/react';
-import React, { type ComponentProps, type ReactNode } from 'react';
+import {
+  cloneElement,
+  createElement,
+  isValidElement,
+  type ComponentProps,
+  type ReactElement,
+  type ReactNode,
+} from 'react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type { ChatError } from '@/components/jovie/types';
-
 import { fastRender } from '@/tests/utils/fast-render';
 
 const appRoot = resolve(__dirname, '../../..');
@@ -66,9 +72,9 @@ vi.mock('@jovie/ui', () => ({
     unstyled: _unstyled,
     ...props
   }: ComponentProps<'div'> & { asChild?: boolean; unstyled?: boolean }) => {
-    if (asChild && React.isValidElement(children)) {
-      const child = children as React.ReactElement<{ className?: string }>;
-      return React.cloneElement(child, {
+    if (asChild && isValidElement(children)) {
+      const child = children as ReactElement<{ className?: string }>;
+      return cloneElement(child, {
         ...props,
         className: [className, child.props.className]
           .filter(Boolean)
@@ -140,12 +146,12 @@ vi.mock('@/components/jovie/hooks', () => ({
 }));
 
 vi.mock('@/components/atoms/BrandLogo', () => ({
-  BrandLogo: () => React.createElement('span', { 'data-testid': 'brand-logo' }),
+  BrandLogo: () => createElement('span', { 'data-testid': 'brand-logo' }),
 }));
 
 vi.mock('@/features/dashboard/organisms/ProfileEditPreviewCard', () => ({
   ProfileEditPreviewCard: (props: { preview: { field: string } }) =>
-    React.createElement('div', {
+    createElement('div', {
       'data-testid': 'profile-edit-preview-card',
       'data-field': props.preview.field,
     }),
@@ -153,12 +159,12 @@ vi.mock('@/features/dashboard/organisms/ProfileEditPreviewCard', () => ({
 
 vi.mock('@/components/jovie/components/ChatAvatarUploadCard', () => ({
   ChatAvatarUploadCard: () =>
-    React.createElement('div', { 'data-testid': 'avatar-upload-card' }),
+    createElement('div', { 'data-testid': 'avatar-upload-card' }),
 }));
 
 vi.mock('@/components/jovie/components/ChatAnalyticsCard', () => ({
   ChatAnalyticsCard: (props: { result: { title: string } }) =>
-    React.createElement('div', {
+    createElement('div', {
       'data-testid': 'chat-analytics-card',
       'data-title': props.result.title,
     }),
@@ -166,7 +172,7 @@ vi.mock('@/components/jovie/components/ChatAnalyticsCard', () => ({
 
 vi.mock('@/components/jovie/components/ChatLinkConfirmationCard', () => ({
   ChatLinkConfirmationCard: (props: { normalizedUrl: string }) =>
-    React.createElement('div', {
+    createElement('div', {
       'data-testid': 'link-confirmation-card',
       'data-url': props.normalizedUrl,
     }),

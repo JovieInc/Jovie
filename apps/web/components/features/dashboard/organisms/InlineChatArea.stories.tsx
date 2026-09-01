@@ -6,6 +6,9 @@ const meta = {
   component: InlineChatArea,
   parameters: {
     layout: 'centered',
+    jovie: {
+      uncoveredProps: ['isLoading'],
+    },
   },
   args: {
     profileId: 'storybook-profile',
