@@ -238,8 +238,7 @@ export function EmailQueuePanel() {
               checked={campaignsEnabled}
               onCheckedChange={toggleCampaignsEnabled}
               disabled={togglingCampaigns}
-              // eslint-disable-next-line @jovie/canonical-ui-label-casing -- Pre-existing aria label; copy change is out of JOV-4869 scope.
-              aria-label='Toggle campaign emails'
+              aria-label='Toggle Campaign Emails'
             />
           }
           className='min-h-0 px-(--app-shell-header-padding-x) py-3'
@@ -261,8 +260,7 @@ export function EmailQueuePanel() {
                 onChange={event => setQueueLimit(event.target.value)}
                 disabled={queueing}
                 className='h-8 w-20'
-                // eslint-disable-next-line @jovie/canonical-ui-label-casing -- Pre-existing aria label; copy change is out of JOV-4869 scope.
-                aria-label='Queue outreach count'
+                aria-label='Queue Outreach Count'
               />
               <Button
                 size='sm'

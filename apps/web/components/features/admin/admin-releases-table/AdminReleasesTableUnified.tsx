@@ -89,15 +89,13 @@ function IssuesPills({ row }: { readonly row: AdminReleaseRow }) {
 
   if (row.missingArtwork) {
     issues.push({
-      // eslint-disable-next-line @jovie/canonical-ui-label-casing -- Pre-existing pill label; copy change is out of JOV-4869 scope.
-      label: 'No artwork',
+      label: 'No Artwork',
       icon: <ImageIcon className='size-2.5' />,
     });
   }
   if (row.noProviders) {
     issues.push({
-      // eslint-disable-next-line @jovie/canonical-ui-label-casing -- Pre-existing pill label; copy change is out of JOV-4869 scope.
-      label: 'No providers',
+      label: 'No Providers',
       icon: <Link2Off className='size-2.5' />,
     });
   }
@@ -106,8 +104,7 @@ function IssuesPills({ row }: { readonly row: AdminReleaseRow }) {
   }
   if (row.zeroTracks) {
     issues.push({
-      // eslint-disable-next-line @jovie/canonical-ui-label-casing -- Pre-existing pill label; copy change is out of JOV-4869 scope.
-      label: '0 tracks',
+      label: '0 Tracks',
       icon: <Music className='size-2.5' />,
     });
   }
@@ -259,8 +256,7 @@ function getContextMenuItems(release: AdminReleaseRow) {
   const items = [
     {
       id: 'view-release',
-      // eslint-disable-next-line @jovie/canonical-ui-label-casing -- Pre-existing menu label; copy change is out of JOV-4869 scope.
-      label: 'View on Jovie',
+      label: 'View On Jovie',
       icon: <ExternalLink className='size-3.5' />,
       onClick: () => {
         globalThis.open(`/${release.artistUsername}/${release.slug}`, '_blank');
@@ -268,8 +264,7 @@ function getContextMenuItems(release: AdminReleaseRow) {
     },
     {
       id: 'view-profile',
-      // eslint-disable-next-line @jovie/canonical-ui-label-casing -- Pre-existing menu label; copy change is out of JOV-4869 scope.
-      label: 'View profile',
+      label: 'View Profile',
       icon: <User className='size-3.5' />,
       onClick: () => {
         globalThis.open(

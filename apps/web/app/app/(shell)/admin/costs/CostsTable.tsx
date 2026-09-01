@@ -47,8 +47,7 @@ export function CostsTable({ items, lastRefreshedLabel }: CostsTableProps) {
           meta: { className: 'min-w-70' },
         }),
         columnHelper.accessor('observed30dUsd', {
-          // eslint-disable-next-line @jovie/canonical-ui-label-casing -- Pre-existing label; numeric-leading "30d" suggestion is identical. Out of JOV-4869 scope.
-          header: '30d Spend (USD)',
+          header: '30D Spend (USD)',
           cell: info => {
             const v = info.getValue();
             const n = Number(v ?? 0);
