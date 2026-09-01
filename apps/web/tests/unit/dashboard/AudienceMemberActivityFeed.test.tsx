@@ -24,7 +24,7 @@ vi.mock('@/lib/utils/audience', () => ({
   formatTimeAgo: (ts: string) => ts,
 }));
 
-import { AudienceMemberActivityFeed } from '@/features/dashboard/organisms/audience-member-sidebar/AudienceMemberActivityFeed';
+import { AudienceMemberActivityFeed } from '@/components/features/dashboard/organisms/audience-member-sidebar/AudienceMemberActivityFeed';
 
 const baseMember: AudienceMember = {
   id: 'test-1',
