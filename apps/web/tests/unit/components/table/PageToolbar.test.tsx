@@ -19,14 +19,31 @@ import { findPageToolbarPrimaryCtaViolations } from '../../app/app-ia-static-gua
 
 type MockButtonProps = ComponentProps<'button'> & {
   readonly asChild?: boolean;
+  readonly size?: string;
+  readonly variant?: string;
 };
 
 vi.mock('@jovie/ui', () => ({
-  Button: ({ children, asChild, className, ...props }: MockButtonProps) => {
+  Button: ({
+    children,
+    asChild,
+    className,
+    'aria-label': ariaLabel,
+    'aria-labelledby': ariaLabelledBy,
+    title,
+    size: _size,
+    variant: _variant,
+    ...props
+  }: MockButtonProps) => {
     const mergeClassNames = (...classNames: Array<string | undefined>) =>
       classNames.filter(Boolean).join(' ');
 
-    if (asChild && children && typeof children === 'object' && 'props' in children) {
+    if (
+      asChild &&
+      children &&
+      typeof children === 'object' &&
+      'props' in children
+    ) {
       const childProps = (
         children as {
           readonly props?: {
@@ -39,7 +56,9 @@ vi.mock('@jovie/ui', () => ({
 
       return (
         <a
-          {...props}
+          aria-label={ariaLabel}
+          aria-labelledby={ariaLabelledBy}
+          title={title}
           href={childProps?.href}
           className={mergeClassNames(className, childProps?.className)}
         >
@@ -49,7 +68,14 @@ vi.mock('@jovie/ui', () => ({
     }
 
     return (
-      <button type='button' className={className} {...props}>
+      <button
+        type='button'
+        className={className}
+        aria-label={ariaLabel}
+        aria-labelledby={ariaLabelledBy}
+        title={title}
+        {...props}
+      >
         {children}
       </button>
     );

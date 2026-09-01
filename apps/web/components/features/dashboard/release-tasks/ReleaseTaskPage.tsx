@@ -99,9 +99,7 @@ export function ReleaseTaskPage({
       data-testid='release-task-page'
       toolbar={
         <PageToolbar
-          start={
-            <ReleaseTaskToolbarStart releaseTitle={releaseTitle} />
-          }
+          start={<ReleaseTaskToolbarStart releaseTitle={releaseTitle} />}
         />
       }
     >
