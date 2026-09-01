@@ -2,6 +2,7 @@ export const YC_EXCEPTIONAL_GROWTH = 0.1;
 export const YC_GOOD_GROWTH_MIN = 0.05;
 const WEEK_MS = 7 * 24 * 60 * 60 * 1000;
 const PROD_SHA_RE = /^[0-9a-f]{7,40}$/i;
+export const OVIE_MAC_HUD_IN_FLIGHT_PR_LIMIT = 8;
 const SHIPPING_DETAIL =
   'Dogfood-receipted ships (Linear → Symphony → native MQ → prod SHA → receipt). Merges without receipts do not count.';
 
@@ -46,12 +47,306 @@ export type OvieMacHudShippingMetric = {
   detail: string;
 };
 
+export type OvieMacHudInFlightPrStatus =
+  | 'open'
+  | 'in_review'
+  | 'merge_queue'
+  | 'blocked';
+
+export type OvieMacHudInFlightPrAvailability =
+  | 'available'
+  | 'not_configured'
+  | 'error';
+
+export type OvieMacHudInFlightPullRequest = {
+  number: number;
+  title: string;
+  url: string;
+  headRefName: string;
+  authorLogin: string | null;
+  updatedAtIso: string;
+  status: OvieMacHudInFlightPrStatus;
+  statusLabel: string;
+  statusDetail: string;
+  mergeQueuePosition: number | null;
+};
+
+export type OvieMacHudInFlightPullRequests = {
+  availability: OvieMacHudInFlightPrAvailability;
+  totalOpen: number;
+  items: readonly OvieMacHudInFlightPullRequest[];
+  truncated: boolean;
+  errorMessage: string | null;
+};
+
 export type OvieMacHudSnapshot = {
   alive: OvieMacHudAliveMetric;
   growth: OvieMacHudGrowthMetric;
   shipping: OvieMacHudShippingMetric;
+  inFlightPullRequests: OvieMacHudInFlightPullRequests;
   generatedAtIso: string;
 };
+
+type NormalizedGithubPullRequest = {
+  readonly number: number;
+  readonly title: string;
+  readonly url: string;
+  readonly headRefName: string;
+  readonly authorLogin: string | null;
+  readonly updatedAtIso: string;
+  readonly isDraft: boolean;
+  readonly reviewDecision: string | null;
+  readonly mergeable: string | null;
+  readonly labels: readonly string[];
+  readonly reviewRequestCount: number;
+};
+
+type MergeQueueMembership = {
+  readonly position: number;
+  readonly state: string;
+};
+
+const BLOCKING_PR_LABELS = new Set([
+  'blocked',
+  'do-not-merge',
+  'do not merge',
+  'gated',
+  'hold',
+  'human-review-required',
+  'needs-human',
+  'needs-human-taste',
+]);
+
+const PR_STATUS_LABELS: Record<OvieMacHudInFlightPrStatus, string> = {
+  open: 'Open',
+  in_review: 'In Review',
+  merge_queue: 'MQ',
+  blocked: 'Blocked',
+};
+
+const PR_STATUS_PRIORITY: Record<OvieMacHudInFlightPrStatus, number> = {
+  merge_queue: 0,
+  blocked: 1,
+  in_review: 2,
+  open: 3,
+};
+
+export function emptyOvieMacHudInFlightPullRequests(
+  availability: Exclude<OvieMacHudInFlightPrAvailability, 'available'>,
+  errorMessage: string | null = null
+): OvieMacHudInFlightPullRequests {
+  return {
+    availability,
+    totalOpen: 0,
+    items: [],
+    truncated: false,
+    errorMessage,
+  };
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null;
+}
+
+function positiveInteger(value: unknown): number | null {
+  return Number.isInteger(value) && Number(value) > 0 ? Number(value) : null;
+}
+
+function nonEmptyString(value: unknown): string | null {
+  return typeof value === 'string' && value.trim().length > 0
+    ? value.trim()
+    : null;
+}
+
+function normalizeIso(value: unknown): string | null {
+  const source = nonEmptyString(value);
+  if (!source) return null;
+  const parsed = Date.parse(source);
+  return Number.isNaN(parsed) ? null : new Date(parsed).toISOString();
+}
+
+function normalizeLabels(value: unknown): string[] {
+  if (!isRecord(value) || !Array.isArray(value.nodes)) return [];
+  return value.nodes
+    .map(label => (isRecord(label) ? nonEmptyString(label.name) : null))
+    .filter((label): label is string => label !== null);
+}
+
+function reviewRequestCount(value: unknown): number {
+  if (!isRecord(value)) return 0;
+  return Number.isInteger(value.totalCount) && Number(value.totalCount) >= 0
+    ? Number(value.totalCount)
+    : 0;
+}
+
+function normalizePullRequestNode(
+  value: unknown
+): NormalizedGithubPullRequest | null {
+  if (!isRecord(value)) return null;
+  const number = positiveInteger(value.number);
+  const title = nonEmptyString(value.title);
+  const url = nonEmptyString(value.url);
+  const updatedAtIso = normalizeIso(value.updatedAt);
+  if (!number || !title || !url || !updatedAtIso) return null;
+
+  const author =
+    isRecord(value.author) && nonEmptyString(value.author.login)
+      ? value.author.login
+      : null;
+
+  return {
+    number,
+    title,
+    url,
+    headRefName: nonEmptyString(value.headRefName) ?? 'unknown',
+    authorLogin: author,
+    updatedAtIso,
+    isDraft: value.isDraft === true,
+    reviewDecision: nonEmptyString(value.reviewDecision),
+    mergeable: nonEmptyString(value.mergeable),
+    labels: normalizeLabels(value.labels),
+    reviewRequestCount: reviewRequestCount(value.reviewRequests),
+  };
+}
+
+function normalizeMergeQueueMemberships(
+  entries: readonly unknown[]
+): Map<number, MergeQueueMembership> {
+  const memberships = new Map<number, MergeQueueMembership>();
+  for (const entry of entries) {
+    if (!isRecord(entry) || !isRecord(entry.pullRequest)) continue;
+    const number = positiveInteger(entry.pullRequest.number);
+    const position = positiveInteger(entry.position);
+    if (!number || !position) continue;
+    memberships.set(number, {
+      position,
+      state: nonEmptyString(entry.state) ?? 'QUEUED',
+    });
+  }
+  return memberships;
+}
+
+function hasBlockingPrLabel(labels: readonly string[]): boolean {
+  return labels.some(label => BLOCKING_PR_LABELS.has(label.toLowerCase()));
+}
+
+export function classifyOvieMacHudPullRequest(input: {
+  readonly isDraft: boolean;
+  readonly reviewDecision: string | null;
+  readonly mergeable: string | null;
+  readonly labels: readonly string[];
+  readonly reviewRequestCount: number;
+  readonly mergeQueuePosition: number | null;
+}): OvieMacHudInFlightPrStatus {
+  if (input.mergeQueuePosition != null) return 'merge_queue';
+  if (
+    hasBlockingPrLabel(input.labels) ||
+    input.reviewDecision === 'CHANGES_REQUESTED' ||
+    input.mergeable === 'CONFLICTING'
+  ) {
+    return 'blocked';
+  }
+  if (input.isDraft) return 'open';
+  if (
+    input.reviewRequestCount > 0 ||
+    input.reviewDecision === 'REVIEW_REQUIRED' ||
+    input.reviewDecision === 'APPROVED'
+  ) {
+    return 'in_review';
+  }
+  return 'open';
+}
+
+function statusDetail(
+  pr: NormalizedGithubPullRequest,
+  membership: MergeQueueMembership | null
+): string {
+  if (membership) return `Position ${membership.position}`;
+  if (hasBlockingPrLabel(pr.labels)) return 'Blocking label';
+  if (pr.reviewDecision === 'CHANGES_REQUESTED') return 'Changes requested';
+  if (pr.mergeable === 'CONFLICTING') return 'Merge conflict';
+  if (pr.reviewDecision === 'APPROVED') return 'Approved';
+  if (pr.reviewRequestCount > 0) return 'Review requested';
+  if (pr.reviewDecision === 'REVIEW_REQUIRED') return 'Review required';
+  if (pr.isDraft) return 'Draft';
+  return 'Ready';
+}
+
+function comparePullRequests(
+  a: OvieMacHudInFlightPullRequest,
+  b: OvieMacHudInFlightPullRequest
+): number {
+  const priorityDelta =
+    PR_STATUS_PRIORITY[a.status] - PR_STATUS_PRIORITY[b.status];
+  if (priorityDelta !== 0) return priorityDelta;
+  if (a.mergeQueuePosition != null && b.mergeQueuePosition != null) {
+    return a.mergeQueuePosition - b.mergeQueuePosition;
+  }
+  return Date.parse(b.updatedAtIso) - Date.parse(a.updatedAtIso);
+}
+
+export function composeOvieMacHudInFlightPullRequests(input: {
+  readonly pullRequests: readonly unknown[];
+  readonly mergeQueueEntries: readonly unknown[];
+  readonly totalOpen: number;
+  readonly sourceTruncated?: boolean;
+  readonly limit?: number;
+}): OvieMacHudInFlightPullRequests {
+  const limit = input.limit ?? OVIE_MAC_HUD_IN_FLIGHT_PR_LIMIT;
+  const memberships = normalizeMergeQueueMemberships(input.mergeQueueEntries);
+  const byNumber = new Map<number, NormalizedGithubPullRequest>();
+
+  for (const node of input.pullRequests) {
+    const pr = normalizePullRequestNode(node);
+    if (pr) byNumber.set(pr.number, pr);
+  }
+
+  for (const entry of input.mergeQueueEntries) {
+    if (!isRecord(entry) || !isRecord(entry.pullRequest)) continue;
+    const pr = normalizePullRequestNode(entry.pullRequest);
+    if (pr && !byNumber.has(pr.number)) byNumber.set(pr.number, pr);
+  }
+
+  const items = [...byNumber.values()]
+    .map((pr): OvieMacHudInFlightPullRequest => {
+      const membership = memberships.get(pr.number) ?? null;
+      const mergeQueuePosition = membership?.position ?? null;
+      const status = classifyOvieMacHudPullRequest({
+        isDraft: pr.isDraft,
+        reviewDecision: pr.reviewDecision,
+        mergeable: pr.mergeable,
+        labels: pr.labels,
+        reviewRequestCount: pr.reviewRequestCount,
+        mergeQueuePosition,
+      });
+
+      return {
+        number: pr.number,
+        title: pr.title,
+        url: pr.url,
+        headRefName: pr.headRefName,
+        authorLogin: pr.authorLogin,
+        updatedAtIso: pr.updatedAtIso,
+        status,
+        statusLabel: PR_STATUS_LABELS[status],
+        statusDetail: statusDetail(pr, membership),
+        mergeQueuePosition,
+      };
+    })
+    .sort(comparePullRequests);
+
+  const shownItems = items.slice(0, limit);
+  return {
+    availability: 'available',
+    totalOpen: input.totalOpen,
+    items: shownItems,
+    truncated:
+      input.sourceTruncated === true ||
+      shownItems.length < items.length ||
+      shownItems.length < input.totalOpen,
+    errorMessage: null,
+  };
+}
 
 export function monthlyToWeeklyUsd(monthlyUsd: number): number {
   return (monthlyUsd * 12) / 52;
@@ -274,6 +569,7 @@ export function composeOvieMacHudSnapshot(input: {
   growth: OvieMacHudGrowthInput;
   shippingEntries: readonly unknown[];
   shippingAvailable?: boolean;
+  inFlightPullRequests?: OvieMacHudInFlightPullRequests;
   generatedAtIso: string;
   nowMs?: number;
 }): OvieMacHudSnapshot {
@@ -285,6 +581,9 @@ export function composeOvieMacHudSnapshot(input: {
       input.nowMs ?? Date.parse(input.generatedAtIso),
       input.shippingAvailable ?? true
     ),
+    inFlightPullRequests:
+      input.inFlightPullRequests ??
+      emptyOvieMacHudInFlightPullRequests('not_configured'),
     generatedAtIso: input.generatedAtIso,
   };
 }
