@@ -8,6 +8,30 @@ interface FormStatusProps {
   readonly className?: string;
 }
 
+function getStatusState({
+  loading,
+  error,
+  success,
+}: {
+  readonly loading: boolean;
+  readonly error: string;
+  readonly success: string;
+}) {
+  if (loading) {
+    return 'loading';
+  }
+
+  if (error) {
+    return 'error';
+  }
+
+  if (success) {
+    return 'success';
+  }
+
+  return 'idle';
+}
+
 export function FormStatus({
   loading = false,
   error,
@@ -16,13 +40,11 @@ export function FormStatus({
 }: FormStatusProps) {
   const trimmedError = error?.trim() ?? '';
   const trimmedSuccess = success?.trim() ?? '';
-  const state = loading
-    ? 'loading'
-    : trimmedError
-      ? 'error'
-      : trimmedSuccess
-        ? 'success'
-        : 'idle';
+  const state = getStatusState({
+    loading,
+    error: trimmedError,
+    success: trimmedSuccess,
+  });
 
   return (
     <div
@@ -46,9 +68,9 @@ export function FormStatus({
       )}
 
       {trimmedSuccess && (
-        <p className='font-medium text-success' role='status'>
+        <output className='font-medium text-success'>
           {trimmedSuccess}
-        </p>
+        </output>
       )}
     </div>
   );

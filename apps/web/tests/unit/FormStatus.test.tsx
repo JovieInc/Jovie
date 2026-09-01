@@ -59,8 +59,8 @@ describe('FormStatus', () => {
     const successElement = screen.getByText(successMessage);
     expect(successElement).toBeInTheDocument();
     expect(successElement).toHaveClass('font-medium', 'text-success');
-    expect(successElement).toHaveAttribute('role', 'status');
-    expect(successElement.tagName.toLowerCase()).toBe('p');
+    expect(successElement).not.toHaveAttribute('role');
+    expect(successElement.tagName.toLowerCase()).toBe('output');
   });
 
   it('does not render error copy when error is only whitespace', () => {
@@ -112,9 +112,11 @@ describe('FormStatus', () => {
     const loadingContainer = screen.getByText('Processing...').closest('div');
     expect(loadingContainer).toHaveClass('flex', 'items-center', 'gap-2');
 
-    // Check that error and success are paragraph elements
+    // Check that error is announced immediately and success uses output semantics
     expect(screen.getByText('Error message').tagName.toLowerCase()).toBe('p');
-    expect(screen.getByText('Success message').tagName.toLowerCase()).toBe('p');
+    expect(screen.getByText('Success message').tagName.toLowerCase()).toBe(
+      'output'
+    );
     expect(
       screen.getByText('Error message').closest('[data-slot]')
     ).toHaveAttribute('aria-atomic', 'true');
