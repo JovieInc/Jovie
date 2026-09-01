@@ -25,10 +25,8 @@ describe('SortableHeaderButton alignment', () => {
   it('uses a consistent icon+label gap in shared tables', () => {
     render(<TableSortableHeaderButton label='Status' onClick={vi.fn()} />);
 
-    expect(
-      screen
-        .getByRole('button', { name: /status/i })
-        .querySelector('span.gap-2')
-    ).toBeInTheDocument();
+    const button = screen.getByRole('button', { name: /status/i });
+    expect(button).toHaveClass('justify-start');
+    expect(button.querySelector('span.gap-2')).toBeInTheDocument();
   });
 });

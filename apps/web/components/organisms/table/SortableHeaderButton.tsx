@@ -31,7 +31,7 @@ export function SortableHeaderButton({
       size='md'
       onClick={onClick}
       className={cn(
-        'inline-flex h-auto w-full items-center text-left text-app font-caption tracking-normal',
+        'inline-flex h-auto w-full items-center justify-start text-left text-app font-caption tracking-normal',
         'rounded-full px-1.5 py-1 transition-[background-color,color,box-shadow] duration-subtle',
         'text-secondary-token hover:bg-surface-1 hover:text-primary-token',
         'active:bg-surface-0',
