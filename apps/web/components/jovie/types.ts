@@ -6,12 +6,12 @@ import {
 } from 'ai';
 import { TOOL_UI_REGISTRY } from '@/lib/chat/tool-ui-registry';
 import type { ChatInsightSummary } from '@/types/insights';
+import type { FeatureIntroCatalog } from './feature-intro-contract';
 import {
   CHAT_STARTER_ACTION_ORDER,
   type ChatStarterActionId,
   starterActionToSuggestion,
 } from './starter-actions';
-import type { FeatureIntroCatalog } from './feature-intro-contract';
 
 export interface ArtistContext {
   readonly displayName: string;

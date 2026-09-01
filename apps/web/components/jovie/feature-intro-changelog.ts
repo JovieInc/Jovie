@@ -1,7 +1,7 @@
 import {
-  changelogInlineText,
   type ChangelogRelease,
   type ChangelogSection,
+  changelogInlineText,
 } from '@/lib/changelog-parser';
 import { FEATURE_INTRO_CATALOG } from './feature-intro-catalog';
 import type {

@@ -1,8 +1,8 @@
 import { fireEvent, screen, within } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-import { JovieChat } from '@/components/jovie/JovieChat';
 import type { FeatureIntroCatalog } from '@/components/jovie/feature-intro-contract';
+import { JovieChat } from '@/components/jovie/JovieChat';
 import { renderWithQueryClient } from '@/tests/utils/test-utils';
 
 const featureIntroCatalog: FeatureIntroCatalog = {
