@@ -2,8 +2,8 @@ import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { fireEvent, screen } from '@testing-library/react';
 import {
-  cloneElement,
   type ComponentProps,
+  cloneElement,
   createElement,
   isValidElement,
   type ReactElement,
@@ -76,9 +76,7 @@ vi.mock('@jovie/ui', () => ({
       const child = children as ReactElement<{ className?: string }>;
       return cloneElement(child, {
         ...props,
-        className: [className, child.props.className]
-          .filter(Boolean)
-          .join(' '),
+        className: [className, child.props.className].filter(Boolean).join(' '),
       });
     }
 
