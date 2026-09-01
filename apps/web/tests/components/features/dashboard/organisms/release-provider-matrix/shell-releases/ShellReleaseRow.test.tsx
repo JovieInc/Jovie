@@ -101,6 +101,7 @@ describe('ShellReleaseRow audio affordance', () => {
     expect(slot).toHaveClass('system-b-table-contextual-action');
     expect(slot.className).not.toContain('group-hover/row');
     expect(trigger.className).not.toContain('group-hover/row');
+    expect(trigger.className).not.toContain('focus-visible:opacity-100');
   });
 
   it('uses the shell typography tokens for the release title and subtitle', () => {
