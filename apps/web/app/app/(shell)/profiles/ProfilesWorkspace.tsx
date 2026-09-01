@@ -207,10 +207,7 @@ function suggestionIdentity(suggestion: ConnectionSuggestion): string {
 }
 
 function suggestionIdentityKey(suggestion: ConnectionSuggestion): string {
-  return suggestionIdentity(suggestion)
-    .trim()
-    .toLowerCase()
-    .replace(/^@/, '');
+  return suggestionIdentity(suggestion).trim().toLowerCase().replace(/^@/, '');
 }
 
 function formatConfidence(confidence: number | null): string | null {
@@ -831,11 +828,7 @@ function PresenceOutcomeStrip({
 
 function SuggestedConnectionsLoading() {
   return (
-    <div
-      aria-busy='true'
-      aria-live='polite'
-      className='min-h-55'
-    >
+    <div aria-busy='true' aria-live='polite' className='min-h-55'>
       <span className='sr-only'>Loading Suggested Connections</span>
       <div className='overflow-hidden rounded-lg border border-subtle bg-surface-1'>
         {SUGGESTED_CONNECTION_SKELETON_IDS.map(id => (
@@ -899,7 +892,10 @@ function SuggestedConnectionRow({
 }: Readonly<{
   suggestion: ConnectionSuggestion;
   actionError: SuggestionActionError | null;
-  onAction: (suggestion: ConnectionSuggestion, action: SuggestionAction) => void;
+  onAction: (
+    suggestion: ConnectionSuggestion,
+    action: SuggestionAction
+  ) => void;
   registerActionRef: (
     suggestionId: string,
     action: SuggestionAction
@@ -907,7 +903,9 @@ function SuggestedConnectionRow({
 }>) {
   const hasError = actionError?.suggestionId === suggestion.id;
   const identity = suggestionIdentity(suggestion);
-  const context = hasError ? actionError.message : suggestionContext(suggestion);
+  const context = hasError
+    ? actionError.message
+    : suggestionContext(suggestion);
 
   return (
     <li
@@ -981,7 +979,10 @@ function SuggestedConnectionsReview({
   isLoading: boolean;
   isError: boolean;
   actionError: SuggestionActionError | null;
-  onAction: (suggestion: ConnectionSuggestion, action: SuggestionAction) => void;
+  onAction: (
+    suggestion: ConnectionSuggestion,
+    action: SuggestionAction
+  ) => void;
   onRetry: () => void;
   registerActionRef: (
     suggestionId: string,
@@ -1074,7 +1075,8 @@ export function ProfilesWorkspace({
   const connectionSuggestionsQuery = useQuery({
     ...STANDARD_CACHE,
     queryKey: connectionSuggestionKey,
-    queryFn: ({ signal }) => fetchConnectionSuggestions(profileId ?? '', signal),
+    queryFn: ({ signal }) =>
+      fetchConnectionSuggestions(profileId ?? '', signal),
     enabled: Boolean(profileId),
   });
   const connectionSuggestions = connectionSuggestionsQuery.data ?? [];
@@ -1145,10 +1147,9 @@ export function ProfilesWorkspace({
 
       setSuggestionActionError(null);
       await queryClient.cancelQueries({ queryKey: connectionSuggestionKey });
-      const previousSuggestions =
-        queryClient.getQueryData<ConnectionSuggestion[]>(
-          connectionSuggestionKey
-        );
+      const previousSuggestions = queryClient.getQueryData<
+        ConnectionSuggestion[]
+      >(connectionSuggestionKey);
       pendingSuggestionFocusTargetRef.current = findNextSuggestionFocusTarget(
         connectionSuggestions,
         suggestion.id
@@ -1184,7 +1185,10 @@ export function ProfilesWorkspace({
         });
       } catch {
         if (previousSuggestions) {
-          queryClient.setQueryData(connectionSuggestionKey, previousSuggestions);
+          queryClient.setQueryData(
+            connectionSuggestionKey,
+            previousSuggestions
+          );
         } else {
           await queryClient.invalidateQueries({
             queryKey: connectionSuggestionKey,
