@@ -2,7 +2,10 @@ import {
   APP_ROUTES,
   buildSpotifyCatalogConnectionRoute,
 } from '@/constants/routes';
-import { WORKFLOW_CAPTURE_REQUEST_KIND } from '@/lib/connectors/suggested-action-kinds';
+import {
+  WORKFLOW_CAPTURE_REQUEST_KIND,
+  YOUTUBE_THUMBNAIL_CANDIDATE_KIND,
+} from '@/lib/connectors/suggested-action-kinds';
 import {
   WorkflowCaptureExecutionResultSchema,
   WorkflowCaptureRequestPayloadSchema,
@@ -27,6 +30,7 @@ import type {
   OpportunityInboxEmptyActionCard,
   OpportunityInboxTourDates,
 } from './opportunity-inbox-types';
+import { parseYouTubeThumbnailCandidate } from './youtube-thumbnail-candidate';
 
 interface SuggestedActionRow {
   readonly id: string;
@@ -103,14 +107,20 @@ export function mapSuggestedActionToInboxCard(
   const workflowCaptureResult = WorkflowCaptureExecutionResultSchema.safeParse(
     row.executionResult
   );
+  const youtubeThumbnail = parseYouTubeThumbnailCandidate(
+    row.kind,
+    row.payload
+  );
   const signalType = classifyOpportunitySignalType(row);
   const category: OpportunityInboxCardCategory = report
     ? 'report'
     : brandDeal
       ? 'brand_deal'
-      : workflowCapturePayload?.success
-        ? 'workflow_capture'
-        : classifySuggestedActionCategory(row);
+      : youtubeThumbnail
+        ? 'youtube_thumbnail'
+        : workflowCapturePayload?.success
+          ? 'workflow_capture'
+          : classifySuggestedActionCategory(row);
   return {
     id: row.id,
     signalType,
@@ -121,16 +131,20 @@ export function mapSuggestedActionToInboxCard(
         ? 'Report'
         : category === 'workflow_capture'
           ? 'Workflow'
-          : category === 'brand_deal'
-            ? 'Brand Deal'
-            : OPPORTUNITY_SIGNAL_TYPE_META[signalType].label,
+          : category === 'youtube_thumbnail'
+            ? 'YouTube Thumbnail'
+            : category === 'brand_deal'
+              ? 'Brand Deal'
+              : OPPORTUNITY_SIGNAL_TYPE_META[signalType].label,
     createdAt: row.createdAt.toISOString(),
     title: titleFromPayload(row.payload, category),
     why: brandDeal
       ? formatBrandDealOpportunityMetadata(brandDeal)
-      : whyFromRow(row, category),
+      : youtubeThumbnail
+        ? `YouTube API snapshot captured ${youtubeThumbnail.apiMetrics.capturedAt}. Approval records intent; publication stays blocked pending a native Studio experiment and provider readback.`
+        : whyFromRow(row, category),
     primaryActionLabel:
-      report?.nextStep?.label ??
+      (youtubeThumbnail ? 'Approve Candidate' : report?.nextStep?.label) ??
       (workflowCaptureResult.success &&
       workflowCaptureResult.data.state === 'uploaded_needs_review'
         ? 'Send Recording'
@@ -150,6 +164,25 @@ export function mapSuggestedActionToInboxCard(
               workflowCaptureResult.data.state === 'uploaded_needs_review'
                 ? ('uploaded_needs_review' as const)
                 : ('pending' as const),
+          },
+        }
+      : {}),
+    ...(youtubeThumbnail
+      ? {
+          youtubeThumbnail: {
+            channelId: youtubeThumbnail.channelId,
+            youtubeVideoId: youtubeThumbnail.youtubeVideoId,
+            currentThumbnailUrl: youtubeThumbnail.currentThumbnailUrl,
+            candidateImageUrl: youtubeThumbnail.candidateImageUrl,
+            artifactSha256: youtubeThumbnail.artifactSha256,
+            apiMetrics: {
+              capturedAt: youtubeThumbnail.apiMetrics.capturedAt,
+              views: youtubeThumbnail.apiMetrics.views,
+              watchTimeMinutes: youtubeThumbnail.apiMetrics.watchTimeMinutes,
+              avgViewDurationSeconds:
+                youtubeThumbnail.apiMetrics.avgViewDurationSeconds,
+            },
+            publicationBlockedReason: youtubeThumbnail.publicationGate.reason,
           },
         }
       : {}),
@@ -189,6 +222,12 @@ export function buildOpportunityInboxData(
     if (
       row.kind === WORKFLOW_CAPTURE_REQUEST_KIND &&
       !WorkflowCaptureRequestPayloadSchema.safeParse(row.payload).success
+    ) {
+      return [];
+    }
+    if (
+      row.kind === YOUTUBE_THUMBNAIL_CANDIDATE_KIND &&
+      !parseYouTubeThumbnailCandidate(row.kind, row.payload)
     ) {
       return [];
     }
