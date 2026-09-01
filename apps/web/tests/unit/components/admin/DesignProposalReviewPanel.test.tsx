@@ -1,8 +1,8 @@
 import { render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { toast } from '@/components/feedback';
 import { DesignProposalReviewPanel } from '@/components/features/admin/design-lab/DesignProposalReviewPanel';
+import { toast } from '@/components/feedback';
 import type { DesignProposal } from '@/lib/agent-os/design-lab/types';
 
 vi.mock('@/components/feedback', () => ({
