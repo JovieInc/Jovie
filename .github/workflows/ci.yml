@@ -4222,6 +4222,7 @@ jobs:
           export TURNSTILE_SECRET_KEY="1x0000000000000000000000000000000AA"
           export CLERK_SECRET_KEY="${{ secrets.CLERK_SECRET_KEY }}"
           export NEXT_PUBLIC_E2E_MODE=1
+          export E2E_TEST_MODE=1
           export NEXT_DISABLE_TOOLBAR=1
           export CHAT_LLM_FAILURE_INJECTION=1
           export E2E_CLERK_USER_ID="${{ secrets.E2E_CLERK_USER_ID }}"
@@ -5804,6 +5805,7 @@ jobs:
           export UPSTASH_REDIS_REST_URL="${{ secrets.UPSTASH_REDIS_REST_URL }}"
           export UPSTASH_REDIS_REST_TOKEN="${{ secrets.UPSTASH_REDIS_REST_TOKEN }}"
           export NEXT_PUBLIC_E2E_MODE=1
+          export E2E_TEST_MODE=1
           export NEXT_DISABLE_TOOLBAR=1
           export NEXT_PUBLIC_CLERK_MOCK=1
           export NEXT_PUBLIC_CLERK_PROXY_DISABLED=1

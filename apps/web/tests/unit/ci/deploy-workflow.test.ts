@@ -3355,7 +3355,7 @@ describe('CI E2E smoke workflow', () => {
 
     expect(smokeManifest).toContain("'golden-path.spec.ts'");
     expect(smokeStep).toContain('export E2E_USE_TEST_AUTH_BYPASS=1');
-    expect(smokeStep).not.toContain('export E2E_TEST_MODE=1');
+    expect(smokeStep).toContain('export E2E_TEST_MODE=1');
     expect(smokeStep).not.toContain('export PUBLIC_NOAUTH_SMOKE=1');
     expect(goldenPathStep).toContain('export E2E_TEST_MODE=1');
     expect(goldenPathStep).toContain('export E2E_FAST_ONBOARDING=1');
@@ -3582,6 +3582,7 @@ describe('CI E2E smoke workflow', () => {
     }
 
     for (const { step } of [standaloneSteps[0], standaloneSteps[2]]) {
+      expect(step).toContain('export E2E_TEST_MODE=1');
       expect(step).toContain(
         'export UPSTASH_REDIS_REST_URL="${{ secrets.UPSTASH_REDIS_REST_URL }}"'
       );
