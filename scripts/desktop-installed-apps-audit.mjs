@@ -7,10 +7,20 @@
  */
 
 import { execFileSync, spawnSync } from 'node:child_process';
-import { existsSync, readdirSync, readFileSync } from 'node:fs';
+import {
+  existsSync,
+  mkdirSync,
+  readdirSync,
+  readFileSync,
+  writeFileSync,
+} from 'node:fs';
 import path from 'node:path';
 
 const APPLICATIONS_DIR = '/Applications';
+export const DESKTOP_UPDATE_STALE_AFTER_MS = 24 * 60 * 60 * 1000;
+export const STAGING_DESKTOP_RELEASE_TAG = 'desktop-staging';
+const GITHUB_API = 'https://api.github.com';
+const GITHUB_REPO = 'JovieInc/Jovie';
 const BUILD_IDENTITY_RESOURCE_NAME = 'build-identity.json';
 const FULL_SHA = /^[0-9a-f]{40}$/;
 const SEMVER = /^\d+\.\d+\.\d+$/;
@@ -126,7 +136,16 @@ export function listJovieApplicationBundles(applicationsDir) {
 /**
  * @param {string} appPath
  * @param {{
- *   readonly runCodesign?: typeof spawnSync;
+ *   readonly runCodesign?: (
+ *     command: string,
+ *     args: readonly string[],
+ *     options: { readonly encoding: string }
+ *   ) => {
+ *     readonly error?: Error;
+ *     readonly status?: number | null;
+ *     readonly stderr?: string | null;
+ *     readonly stdout?: string | null;
+ *   };
  *   readonly readVersion?: (appPath: string) => string | null;
  * }} dependencies
  * @returns {{ readonly identifier: string | null; readonly version: string | null }}
@@ -217,6 +236,120 @@ export function commandRunsJovieDesktopShell(command) {
  */
 export function commandExposesRemoteDebugging(command) {
   return /--remote-debugging-port=\d+/.test(command);
+}
+
+/** @param {string} appPath */
+export function readBundleShortVersion(appPath) {
+  try {
+    return execFileSync(
+      'plutil',
+      [
+        '-extract',
+        'CFBundleShortVersionString',
+        'raw',
+        path.join(appPath, 'Contents/Info.plist'),
+      ],
+      { encoding: 'utf8' }
+    ).trim();
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * @param {{
+ *   readonly channel: string;
+ *   readonly installedVersion: string | null;
+ *   readonly latestVersion: string | null;
+ *   readonly latestPublishedAt: string | null;
+ *   readonly now?: Date;
+ *   readonly staleAfterMs?: number;
+ * }} input
+ */
+export function evaluateDesktopUpdateFreshness(input) {
+  const installed = input.installedVersion?.trim() || null;
+  const channel = input.channel;
+  if (!installed) {
+    return { channel, status: 'not-installed', red: false, reason: null };
+  }
+  if (!input.latestVersion || !input.latestPublishedAt) {
+    return {
+      channel,
+      status: 'unknown',
+      red: true,
+      reason: `${channel}: latest shipped version is unknown.`,
+    };
+  }
+  if (installed === input.latestVersion) {
+    return { channel, status: 'current', red: false, reason: null };
+  }
+  const publishedAt = new Date(input.latestPublishedAt);
+  if (Number.isNaN(publishedAt.getTime())) {
+    return {
+      channel,
+      status: 'unknown',
+      red: true,
+      reason: `${channel}: latest published_at is invalid.`,
+    };
+  }
+  const lagMs = (input.now ?? new Date()).getTime() - publishedAt.getTime();
+  const staleAfterMs = input.staleAfterMs ?? DESKTOP_UPDATE_STALE_AFTER_MS;
+  if (lagMs <= staleAfterMs) {
+    return {
+      channel,
+      status: 'updating',
+      red: false,
+      reason: `${channel}: installed ${installed} is behind ${input.latestVersion} for less than 24h.`,
+    };
+  }
+  return {
+    channel,
+    status: 'stale',
+    red: true,
+    reason: `${channel}: installed ${installed} is behind ${input.latestVersion} for more than 24h.`,
+  };
+}
+
+/** @returns {Promise<{ readonly name?: unknown; readonly published_at?: unknown }>} */
+async function githubJson(url, fetchImpl = fetch) {
+  const headers = {
+    Accept: 'application/vnd.github+json',
+    'User-Agent': 'jovie-desktop-update-freshness',
+  };
+  const token = process.env.GH_TOKEN || process.env.GITHUB_TOKEN;
+  if (token) headers.Authorization = `Bearer ${token}`;
+  const response = await fetchImpl(url, {
+    headers,
+    signal: AbortSignal.timeout(30_000),
+  });
+  if (!response.ok) throw new Error(`GitHub ${response.status} for ${url}`);
+  return /** @type {Promise<{ readonly name?: unknown; readonly published_at?: unknown }>} */ (
+    response.json()
+  );
+}
+
+function shippedVersion(release, prefix) {
+  const name = typeof release?.name === 'string' ? release.name : null;
+  return {
+    version: prefix && name ? name.replace(prefix, '') : name,
+    publishedAt:
+      typeof release?.published_at === 'string' ? release.published_at : null,
+  };
+}
+
+export async function fetchShippedDesktopVersions(fetchImpl = fetch) {
+  const production = await githubJson(
+    `${GITHUB_API}/repos/${GITHUB_REPO}/releases/latest`,
+    fetchImpl
+  );
+  const staging = await githubJson(
+    `${GITHUB_API}/repos/${GITHUB_REPO}/releases/tags/${STAGING_DESKTOP_RELEASE_TAG}`,
+    fetchImpl
+  ).catch(() => null);
+  return {
+    production: shippedVersion(production),
+    staging: shippedVersion(staging, /^Desktop staging\s+/i),
+  };
 }
 
 /**
@@ -411,11 +544,65 @@ function isMainModule() {
   );
 }
 
+async function maybeEvaluateFreshness(result) {
+  const shipped = await fetchShippedDesktopVersions();
+  const freshness = result.bundles.flatMap(bundle => {
+    const role =
+      bundle.identifier && KNOWN_DESKTOP_BUNDLE_IDS[bundle.identifier]?.role;
+    if (role !== 'production' && role !== 'staging') return [];
+    const latest = shipped[role];
+    return [
+      evaluateDesktopUpdateFreshness({
+        channel: role,
+        installedVersion: readBundleShortVersion(bundle.path) || bundle.version,
+        latestVersion: latest.version,
+        latestPublishedAt: latest.publishedAt,
+      }),
+    ];
+  });
+  const red = freshness.filter(item => item.red);
+  const hermesHome = process.env.HERMES_HOME;
+  if (hermesHome) {
+    const statePath = path.join(
+      hermesHome,
+      'state',
+      'desktop-update-freshness.json'
+    );
+    mkdirSync(path.dirname(statePath), { recursive: true });
+    writeFileSync(
+      statePath,
+      `${JSON.stringify({ generatedAt: new Date().toISOString(), red: red.length > 0, channels: freshness })}\n`
+    );
+  }
+  const rows = freshness.map(
+    item =>
+      `- ${item.channel}: ${item.status}${item.reason ? ` (${item.reason})` : ''}`
+  );
+  return {
+    report: `\nUpdate freshness:\n${rows.join('\n') || '- no production or staging shells installed'}`,
+    red,
+  };
+}
+
 if (isMainModule()) {
-  const failOnFindings = process.argv.includes('--fail-on-findings');
   const result = runDesktopInstalledAppsAudit();
   console.log(result.report);
-  if (failOnFindings && !result.ok) {
+  const run = async () => {
+    if (process.argv.includes('--freshness')) {
+      const evaluated = await maybeEvaluateFreshness(result);
+      console.log(evaluated.report);
+      if (process.argv.includes('--fail-on-stale') && evaluated.red.length) {
+        process.exit(1);
+      }
+    }
+    if (process.argv.includes('--fail-on-findings') && !result.ok) {
+      process.exit(1);
+    }
+  };
+  run().catch(error => {
+    console.error(
+      `[desktop-installed-apps-audit] ${error instanceof Error ? error.message : String(error)}`
+    );
     process.exit(1);
-  }
+  });
 }

@@ -550,11 +550,22 @@ test('desktop bridge exposes bounded dictation support', async () => {
   assert.match(mainSource, /shouldGrantTrustedAudioPermissionCheck/);
   assert.match(mainSource, /backgroundThrottling: false/);
   assert.match(mainSource, /installDesktopCspWatchdog/);
+  const autoUpdateSource = await readFile(
+    join(desktopRoot, 'src/desktop-auto-update.ts'),
+    'utf8'
+  );
   assert.match(mainSource, /from '\.\/desktop-auto-update'/);
+  assert.match(mainSource, /hasNightlyUpdateFlag/);
+  assert.match(mainSource, /installNightlyUpdateLaunchAgent/);
   assert.match(mainSource, /shouldScheduleDesktopAutoUpdate\(/);
   assert.match(mainSource, /if \(APP_ENV === 'local'/);
   assert.match(mainSource, /autoUpdater\.allowDowngrade = false/);
+  assert.match(mainSource, /autoUpdater\.autoInstallOnAppQuit = true/);
   assert.match(mainSource, /if \(!desktopUpdatesSupported\(\)\)/);
+  assert.match(autoUpdateSource, /export const NIGHTLY_UPDATE_FLAG/);
+  assert.match(autoUpdateSource, /\/usr\/bin\/open/);
+  assert.match(autoUpdateSource, /app\.jov\.ie\.nightly-update/);
+  assert.match(autoUpdateSource, /appEnv === 'local'/);
   assert.match(mainSource, /autoUpdater\.allowPrerelease = true/);
   assert.match(mainSource, /sanitizeWindowState/);
   assert.match(mainSource, /bindPendingDesktopAuthCompletion/);
