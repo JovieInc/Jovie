@@ -1,4 +1,5 @@
 import assert from 'node:assert/strict';
+import { createHash } from 'node:crypto';
 import { readFile } from 'node:fs/promises';
 import path from 'node:path';
 import { test } from 'node:test';
@@ -7,6 +8,7 @@ import {
   buildCoveragePlan,
   buildPilotReport,
   computeFindingFingerprint,
+  executionManifestDigest,
   normalizeFindings,
   validateCoverageMap,
   validateFinding,
@@ -83,6 +85,29 @@ function qualificationReceipt(provider, model) {
   };
 }
 
+function deterministicProbeResults() {
+  const probe = {
+    id: 'native-queue-snapshot',
+    command:
+      'MERGE_QUEUE_BACKEND=native node scripts/merge-queue-backend.mjs list-state',
+    status: 'observed',
+    summary: 'Fixture queue snapshot completed successfully.',
+    observedAt: '2026-09-02T03:59:00Z',
+    exitCode: 0,
+    outputDigest: createHash('sha256')
+      .update('fixture queue output')
+      .digest('hex'),
+  };
+  return [
+    {
+      ...probe,
+      receiptDigest: createHash('sha256')
+        .update(JSON.stringify(probe))
+        .digest('hex'),
+    },
+  ];
+}
+
 function makeFinding({
   claim = 'The queue depth exceeds the bounded threshold.',
   provider = null,
@@ -90,6 +115,7 @@ function makeFinding({
   model = null,
   evidence = null,
 } = {}) {
+  const [probe] = deterministicProbeResults();
   const finding = {
     familyId: 'ci-merge-throughput',
     partitionId: 'delivery-control',
@@ -114,11 +140,18 @@ function makeFinding({
       ? {
           kind: 'model',
           provider,
-          providerFamily: providerFamily ?? provider,
+          providerFamily:
+            providerFamily ??
+            ({ codex: 'gpt-5.6', grok: 'grok-4.6' }[provider] || provider),
           model,
           qualificationReceipt: qualificationReceipt(provider, model),
         }
-      : { kind: 'deterministic', tool: 'fixture-probe' },
+      : {
+          kind: 'deterministic',
+          probeId: probe.id,
+          command: probe.command,
+          executionReceiptDigest: probe.receiptDigest,
+        },
     acceptance: {
       state: 'validated',
       validatedBy: 'fixture-validator',
@@ -148,14 +181,25 @@ test('canonical registry and coverage map validate every required family', async
 });
 
 test('coverage planner weights changed high-risk partitions without a full scan', async () => {
-  const { coverageMap } = await loadContracts();
+  const { registry, coverageMap } = await loadContracts();
   const plan = buildCoveragePlan(coverageMap, {
     asOf: '2026-09-03T00:00:00Z',
     changedFiles: ['apps/web/proxy.ts'],
+    selectionPolicy: registry.selectionPolicy,
   });
   assert.equal(plan[0].partitionId, 'trust-boundaries');
   assert.equal(plan[0].changed, true);
   assert.ok(plan[0].score > plan.at(-1).score);
+  const strongerPolicy = {
+    ...registry.selectionPolicy,
+    changedPathMultiplier: registry.selectionPolicy.changedPathMultiplier * 2,
+  };
+  const strongerPlan = buildCoveragePlan(coverageMap, {
+    asOf: '2026-09-03T00:00:00Z',
+    changedFiles: ['apps/web/proxy.ts'],
+    selectionPolicy: strongerPolicy,
+  });
+  assert.equal(strongerPlan[0].score, plan[0].score * 2);
 });
 
 test('tracked coverage inventory fails closed on an unmapped code path', async () => {
@@ -185,7 +229,8 @@ test('finding normalization deduplicates direct evidence by canonical fingerprin
   const normalized = normalizeFindings(
     [finding, duplicate],
     registry,
-    coverageMap
+    coverageMap,
+    deterministicProbeResults()
   );
   assert.equal(normalized.findings.length, 1);
   assert.equal(normalized.findings[0].sourceRuns.length, 2);
@@ -196,13 +241,13 @@ test('qualified different-provider findings expose disagreements', async () => {
   const { registry, coverageMap } = await loadContracts();
   const codex = makeFinding({
     provider: 'codex',
-    providerFamily: 'openai',
+    providerFamily: 'gpt-5.6',
     model: 'gpt-5.6-sol',
     claim: 'The queue depth exceeds the bounded threshold.',
   });
   const grok = makeFinding({
     provider: 'grok',
-    providerFamily: 'xai',
+    providerFamily: 'grok-4.6',
     model: 'grok-4.6',
     claim:
       'The queue depth is expected and does not exceed the bounded threshold.',
@@ -217,12 +262,12 @@ test('model claims fail without direct evidence', async () => {
   const { registry, coverageMap } = await loadContracts();
   const finding = makeFinding({
     provider: 'codex',
-    providerFamily: 'openai',
+    providerFamily: 'gpt-5.6',
     model: 'gpt-5.6-sol',
     evidence: [
       {
         tier: 'source',
-        kind: 'model-opinion',
+        kind: 'queue-snapshot',
         direct: false,
         locator: 'fixture:model-output',
         observedAt: '2026-09-02T04:00:00Z',
@@ -231,8 +276,53 @@ test('model claims fail without direct evidence', async () => {
     ],
   });
   assert.throws(
-    () => validateFinding(finding, registry, coverageMap),
+    () =>
+      validateFinding(
+        finding,
+        registry,
+        coverageMap,
+        deterministicProbeResults()
+      ),
     /lacks direct evidence/
+  );
+});
+
+test('finding evidence kinds must be allowed by the selected family', async () => {
+  const { registry, coverageMap } = await loadContracts();
+  const finding = makeFinding();
+  finding.evidence[0].kind = 'arbitrary-claim';
+  assert.throws(
+    () =>
+      validateFinding(
+        finding,
+        registry,
+        coverageMap,
+        deterministicProbeResults()
+      ),
+    /evidence kind arbitrary-claim is not allowed/
+  );
+});
+
+test('deterministic findings require an executed registered probe receipt', async () => {
+  const { registry, coverageMap } = await loadContracts();
+  const finding = makeFinding();
+  finding.source.probeId = 'not-a-real-probe';
+  assert.throws(
+    () =>
+      validateFinding(
+        finding,
+        registry,
+        coverageMap,
+        deterministicProbeResults()
+      ),
+    /did not execute successfully/
+  );
+
+  const [tampered] = deterministicProbeResults();
+  tampered.command = 'node arbitrary-unregistered-probe.mjs';
+  assert.throws(
+    () => validateFinding(finding, registry, coverageMap, [tampered]),
+    /is not registered/
   );
 });
 
@@ -240,7 +330,7 @@ test('model qualification enforces family capabilities and quality', async () =>
   const { registry, coverageMap } = await loadContracts();
   const finding = makeFinding({
     provider: 'codex',
-    providerFamily: 'openai',
+    providerFamily: 'gpt-5.6',
     model: 'gpt-5.6-luna',
   });
   assert.throws(
@@ -253,7 +343,7 @@ test('model qualification binds identity and zero-cost cap to the checked-in reg
   const { registry, coverageMap } = await loadContracts();
   const finding = makeFinding({
     provider: 'codex',
-    providerFamily: 'openai',
+    providerFamily: 'gpt-5.6',
     model: 'gpt-5.6-sol',
   });
   finding.source.qualificationReceipt.modelRegistryEntryId = 'invented-model';
@@ -266,6 +356,45 @@ test('model qualification binds identity and zero-cost cap to the checked-in reg
   assert.throws(
     () => validateFinding(finding, registry, coverageMap),
     /cost cap is invalid/
+  );
+});
+
+test('provider-family independence is derived from the model registry', async () => {
+  const { registry, coverageMap } = await loadContracts();
+  const finding = makeFinding({
+    provider: 'codex',
+    providerFamily: 'invented-independent-family',
+    model: 'gpt-5.6-sol',
+  });
+  assert.throws(
+    () => validateFinding(finding, registry, coverageMap),
+    /provider family does not match the model registry/
+  );
+});
+
+test('critical model findings require an independent provider-family cross-check', async () => {
+  const { registry, coverageMap } = await loadContracts();
+  const codex = makeFinding({
+    provider: 'codex',
+    providerFamily: 'gpt-5.6',
+    model: 'gpt-5.6-sol',
+  });
+  codex.severity = 'critical';
+  codex.riskScore = 95;
+  assert.throws(
+    () => normalizeFindings([codex], registry, coverageMap),
+    /requires 2 independent provider families/
+  );
+  const grok = makeFinding({
+    provider: 'grok',
+    providerFamily: 'grok-4.6',
+    model: 'grok-4.6',
+  });
+  grok.severity = 'critical';
+  grok.riskScore = 95;
+  assert.equal(
+    normalizeFindings([codex, grok], registry, coverageMap).findings.length,
+    1
   );
 });
 
@@ -326,6 +455,43 @@ test('pilot proof and safety receipts fail closed on unsupported claims', async 
     () => buildPilotReport(unsafeInput, registry, coverageMap),
     /unsafe pilot safety field externalJobsCreated/
   );
+  const unboundInput = await readJson(
+    'audits/continuous/pilots/2026-09-02-ci-merge-throughput/pilot-input.json'
+  );
+  unboundInput.safetyReceipt.executionManifestDigest = '0'.repeat(64);
+  assert.throws(
+    () => buildPilotReport(unboundInput, registry, coverageMap),
+    /not bound to the execution manifest/
+  );
+
+  const arbitraryProbeInput = await readJson(
+    'audits/continuous/pilots/2026-09-02-ci-merge-throughput/pilot-input.json'
+  );
+  arbitraryProbeInput.deterministicProbeResults[0].command =
+    'node arbitrary-unregistered-probe.mjs';
+  assert.throws(
+    () => buildPilotReport(arbitraryProbeInput, registry, coverageMap),
+    /is not registered/
+  );
+});
+
+test('the safety manifest digest includes findings and model receipts', async () => {
+  const input = await readJson(
+    'audits/continuous/pilots/2026-09-02-ci-merge-throughput/pilot-input.json'
+  );
+  const before = executionManifestDigest(input);
+  input.findings.push(
+    makeFinding({
+      provider: 'codex',
+      model: 'gpt-5.6-sol',
+      claim: 'A newly added qualified model finding changes the manifest.',
+    })
+  );
+  const afterFinding = executionManifestDigest(input);
+  assert.notEqual(afterFinding, before);
+  input.findings.at(-1).source.qualificationReceipt.receiptLocator =
+    'fixture:changed-invocation-receipt';
+  assert.notEqual(executionManifestDigest(input), afterFinding);
 });
 
 test('registry rejects deterministic probes outside the executable allowlist', async () => {

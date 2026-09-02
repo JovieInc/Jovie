@@ -12,34 +12,34 @@
   },
   "deterministicProbeResults": [
     {
-      "id": "registry-contract",
-      "command": "node scripts/continuous-audit.mjs validate",
-      "status": "passed",
-      "summary": "Validated 13 audit families and 27 coverage partitions; the tracked auditable inventory had zero unmapped files. Hyperagent remained fail-closed and scheduling remained proposal-only."
-    },
-    {
-      "id": "workflow-reference-contract",
-      "command": "node scripts/verify-workflow-references.mjs",
-      "status": "passed",
-      "summary": "Workflow reference validation passed against the pilot source checkout."
-    },
-    {
-      "id": "exact-main-ci-receipt",
-      "command": "gh run view 33591655643 --json databaseId,headSha,event,status,conclusion,createdAt,updatedAt,url,jobs",
+      "id": "ci-duration-ratchet",
+      "command": "node scripts/ci-duration-ratchet.mjs",
       "status": "observed",
-      "summary": "Exact-main CI run 33591655643 completed successfully for ccb8868d9916b183e545abdd3ad67cb7cd850fe9; Main Queue Provenance, Lockfile Specifier Preflight, and Main Release Ready passed while change-selected source and merge-group lanes were skipped on the direct-main event."
-    },
-    {
-      "id": "ci-duration-ratchet-receipts",
-      "command": "gh run list --workflow 'CI Duration Ratchet' --branch main --limit 5",
-      "status": "observed",
-      "summary": "The five latest CI Duration Ratchet scheduled runs completed successfully from 2026-08-28 through 2026-09-01."
+      "summary": "Registered CI duration ratchet probe completed for the bounded pilot receipt.",
+      "observedAt": "2026-09-02T04:45:58Z",
+      "exitCode": 0,
+      "outputDigest": "bd428d3ed629e8877e272aa16cfcd0cbba68238f53917b5fabe8f65ee3dcc1f1",
+      "receiptDigest": "95e626d209c0f757e3c994c947d7c703385265dce242e38ac37444174816f79a"
     },
     {
       "id": "native-queue-snapshot",
       "command": "MERGE_QUEUE_BACKEND=native node scripts/merge-queue-backend.mjs list-state",
       "status": "observed",
-      "summary": "Native queue snapshot contained 76 entries across positions 1 through 76; 153 pull requests were open."
+      "summary": "Registered native queue probe observed 76 queued entries across positions 1 through 76.",
+      "observedAt": "2026-09-02T04:45:58Z",
+      "exitCode": 0,
+      "outputDigest": "827f0af97b84db769d8e462f0a40fe14b4d0208b0c25220c450c1953133625e5",
+      "receiptDigest": "96a2251633caf7aebe263da6642c3dada0ad5ce84155e000564a0a7178fcd818"
+    },
+    {
+      "id": "workflow-reference-contract",
+      "command": "node scripts/verify-workflow-references.mjs",
+      "status": "passed",
+      "summary": "Registered workflow reference validation passed against the pilot source checkout.",
+      "observedAt": "2026-09-02T04:45:58Z",
+      "exitCode": 0,
+      "outputDigest": "5402d2114f5a16d5dface6f4962f96c02d7814f831be0028859f614d9ec81bec",
+      "receiptDigest": "2aa559c6c3a8ecc5885924d03d18a56da28781dc4f617c9a5e25d95f0e31e7ea"
     }
   ],
   "proofTiers": {
@@ -140,12 +140,13 @@
   },
   "safetyReceipt": {
     "observedAt": "2026-09-02T04:45:58Z",
+    "executionManifestDigest": "b07c3da025c01e732b1e2694d0e9eac5f27b236cf1559ae9259d7cc0758040bd",
     "evidence": [
       {
         "tier": "source",
-        "kind": "execution-boundary",
+        "kind": "execution-manifest",
         "direct": true,
-        "locator": "pilot:2026-09-02-ci-merge-throughput:declared-boundary",
+        "locator": "sha256:b07c3da025c01e732b1e2694d0e9eac5f27b236cf1559ae9259d7cc0758040bd",
         "observedAt": "2026-09-02T04:45:58Z",
         "summary": "The recorded pilot used read-only repository and public metadata probes with no model invocation or external mutation."
       }
@@ -182,7 +183,7 @@
         },
         {
           "tier": "source",
-          "kind": "repository-metadata",
+          "kind": "queue-snapshot",
           "direct": true,
           "locator": "command:gh pr list --state open --limit 200 --json number",
           "observedAt": "2026-09-02T04:45:58Z",
@@ -191,7 +192,9 @@
       ],
       "source": {
         "kind": "deterministic",
-        "tool": "scripts/merge-queue-backend.mjs"
+        "probeId": "native-queue-snapshot",
+        "command": "MERGE_QUEUE_BACKEND=native node scripts/merge-queue-backend.mjs list-state",
+        "executionReceiptDigest": "96a2251633caf7aebe263da6642c3dada0ad5ce84155e000564a0a7178fcd818"
       },
       "acceptance": {
         "state": "validated",

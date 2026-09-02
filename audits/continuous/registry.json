@@ -450,8 +450,7 @@
       },
       "deterministicProbes": [
         "bash scripts/ci-health-check.sh",
-        "node scripts/lib/policy-gate-liveness.mjs",
-        "bash scripts/ci-health-check.sh"
+        "node scripts/lib/policy-gate-liveness.mjs"
       ],
       "evidenceSchema": {
         "schemaRef": "continuous-audit-finding/v1",
@@ -523,7 +522,6 @@
       },
       "deterministicProbes": [
         "node scripts/dependabot-update-policy.mjs",
-        "pnpm audit --audit-level high",
         "pnpm audit --audit-level high"
       ],
       "evidenceSchema": {
@@ -605,8 +603,7 @@
       },
       "deterministicProbes": [
         "pnpm run boundaries:check",
-        "node scripts/invariant-stewardship/audit.mjs",
-        "pnpm run boundaries:check"
+        "node scripts/invariant-stewardship/audit.mjs"
       ],
       "evidenceSchema": {
         "schemaRef": "continuous-audit-finding/v1",
@@ -681,7 +678,6 @@
         "maxSpendCents": 0
       },
       "deterministicProbes": [
-        "pnpm --filter @jovie/web run drizzle:check",
         "pnpm --filter @jovie/web run drizzle:check",
         "pnpm run test:fast"
       ],
@@ -843,8 +839,7 @@
       },
       "deterministicProbes": [
         "pnpm --filter @jovie/web run test:budgets",
-        "node scripts/ci-duration-ratchet.mjs",
-        "pnpm --filter @jovie/web run test:budgets"
+        "node scripts/ci-duration-ratchet.mjs"
       ],
       "evidenceSchema": {
         "schemaRef": "continuous-audit-finding/v1",
@@ -926,7 +921,6 @@
       },
       "deterministicProbes": [
         "pnpm --filter @jovie/web run a11y:axe",
-        "node scripts/design-governance-audit.mjs",
         "node scripts/design-governance-audit.mjs"
       ],
       "evidenceSchema": {
@@ -1167,7 +1161,7 @@
       "deterministicProbes": [
         "node scripts/lib/policy-gate-liveness.mjs",
         "bash scripts/automation-verify.sh affected",
-        "node scripts/lib/policy-gate-liveness.mjs"
+        "node scripts/verify-workflow-references.mjs"
       ],
       "evidenceSchema": {
         "schemaRef": "continuous-audit-finding/v1",

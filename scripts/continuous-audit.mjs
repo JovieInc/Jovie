@@ -205,6 +205,52 @@ function validateProviderCatalog(registry) {
   return providerIds;
 }
 
+function validateSelectionPolicy(policy) {
+  invariant(isRecord(policy), 'selectionPolicy must be an object');
+  assertExactUniqueStrings(
+    Object.keys(policy),
+    [
+      'baseWeight',
+      'changedPathMultiplier',
+      'highRiskMultiplier',
+      'recentIncidentMultiplier',
+      'overdueMultiplier',
+      'crossModelSampleRate',
+      'crossModelMinimumForCritical',
+      'sameProviderFamilyCountsAsIndependent',
+    ],
+    'selectionPolicy keys'
+  );
+  const multiplierFields = [
+    'baseWeight',
+    'changedPathMultiplier',
+    'highRiskMultiplier',
+    'recentIncidentMultiplier',
+    'overdueMultiplier',
+  ];
+  for (const field of multiplierFields) {
+    invariant(
+      finiteNonNegative(policy[field]) && policy[field] >= 1,
+      `selectionPolicy ${field} must be at least 1`
+    );
+  }
+  invariant(
+    finiteNonNegative(policy.crossModelSampleRate) &&
+      policy.crossModelSampleRate <= 1,
+    'selectionPolicy crossModelSampleRate must be between 0 and 1'
+  );
+  invariant(
+    Number.isSafeInteger(policy.crossModelMinimumForCritical) &&
+      policy.crossModelMinimumForCritical >= 1,
+    'selectionPolicy crossModelMinimumForCritical must be positive'
+  );
+  invariant(
+    policy.sameProviderFamilyCountsAsIndependent === false,
+    'same provider family may not count as independent'
+  );
+  return policy;
+}
+
 function validateFamily(family, registry, providerIds) {
   const prefix = `audit family ${family?.id ?? '<unknown>'}`;
   invariant(isRecord(family), 'audit family entries must be objects');
@@ -281,6 +327,8 @@ function validateFamily(family, registry, providerIds) {
   invariant(
     Array.isArray(family.deterministicProbes) &&
       family.deterministicProbes.length > 0 &&
+      new Set(family.deterministicProbes).size ===
+        family.deterministicProbes.length &&
       family.deterministicProbes.every(probe =>
         DETERMINISTIC_PROBE_COMMANDS.has(probe)
       ),
@@ -359,6 +407,7 @@ export function validateRegistry(registry) {
     registry.findingSchema?.id === 'continuous-audit-finding/v1',
     'canonical finding schema is missing'
   );
+  validateSelectionPolicy(registry.selectionPolicy);
   const providerIds = validateProviderCatalog(registry);
   invariant(
     Array.isArray(registry.auditFamilies),
@@ -554,8 +603,14 @@ export function validateTrackedCoverage(trackedFiles, coverageMap) {
 
 export function buildCoveragePlan(
   coverageMap,
-  { asOf = new Date().toISOString(), changedFiles = [], familyId = null } = {}
+  {
+    asOf = new Date().toISOString(),
+    changedFiles = [],
+    familyId = null,
+    selectionPolicy,
+  } = {}
 ) {
+  validateSelectionPolicy(selectionPolicy);
   const asOfTimestamp = parseTimestamp(asOf, 'plan asOf');
   return coverageMap.partitions
     .filter(partition => !familyId || partition.familyIds.includes(familyId))
@@ -567,15 +622,25 @@ export function buildCoveragePlan(
         ? (asOfTimestamp - Date.parse(partition.lastAuditedAt)) / 86_400_000
         : Number.POSITIVE_INFINITY;
       const overdue = daysSinceAudit >= partition.intervalDays;
-      const dueWeight = overdue ? 2 : 1;
-      const changeWeight = changed ? 4 : 1;
-      const incidentWeight = partition.recentIncident === true ? 3 : 1;
+      const dueWeight = overdue
+        ? selectionPolicy.overdueMultiplier
+        : selectionPolicy.baseWeight;
+      const changeWeight = changed
+        ? selectionPolicy.changedPathMultiplier
+        : selectionPolicy.baseWeight;
+      const incidentWeight = partition.recentIncident
+        ? selectionPolicy.recentIncidentMultiplier
+        : selectionPolicy.baseWeight;
+      const highRiskWeight = partition.highRiskReasons.length
+        ? selectionPolicy.highRiskMultiplier
+        : selectionPolicy.baseWeight;
       const score =
         partition.baseWeight *
         partition.riskWeight *
         dueWeight *
         changeWeight *
-        incidentWeight;
+        incidentWeight *
+        highRiskWeight;
       return {
         partitionId: partition.id,
         familyIds: partition.familyIds,
@@ -700,6 +765,84 @@ function validateQualificationReceipt(
     ageHours <= registry.providerQualificationSchema.maximumReceiptAgeHours,
     'qualification receipt is stale'
   );
+  return modelEntry;
+}
+
+function deterministicProbeReceiptDigest(probe) {
+  return createHash('sha256')
+    .update(
+      JSON.stringify({
+        id: probe.id,
+        command: probe.command,
+        status: probe.status,
+        summary: probe.summary,
+        observedAt: probe.observedAt,
+        exitCode: probe.exitCode,
+        outputDigest: probe.outputDigest,
+      })
+    )
+    .digest('hex');
+}
+
+function validateDeterministicProbeResults(results, family) {
+  invariant(
+    Array.isArray(results),
+    'deterministic probe results must be an array'
+  );
+  const byId = new Map();
+  const commands = new Set();
+  for (const probe of results) {
+    invariant(isRecord(probe), 'deterministic probe result must be an object');
+    assertExactUniqueStrings(
+      Object.keys(probe),
+      [
+        'id',
+        'command',
+        'status',
+        'summary',
+        'observedAt',
+        'exitCode',
+        'outputDigest',
+        'receiptDigest',
+      ],
+      'deterministic probe result keys'
+    );
+    invariant(nonEmptyString(probe.id), 'probe id is required');
+    invariant(!byId.has(probe.id), `duplicate probe id ${probe.id}`);
+    invariant(nonEmptyString(probe.command), 'probe command is required');
+    invariant(
+      family.deterministicProbes.includes(probe.command),
+      `probe ${probe.id} is not registered for ${family.id}`
+    );
+    invariant(
+      !commands.has(probe.command),
+      `duplicate probe command ${probe.command}`
+    );
+    invariant(
+      ['passed', 'failed', 'observed'].includes(probe.status),
+      `probe ${probe.id} has invalid status`
+    );
+    invariant(nonEmptyString(probe.summary), `probe ${probe.id} needs summary`);
+    parseTimestamp(probe.observedAt, `probe ${probe.id} observedAt`);
+    invariant(
+      Number.isInteger(probe.exitCode) &&
+        (probe.status === 'failed'
+          ? probe.exitCode !== 0
+          : probe.exitCode === 0),
+      `probe ${probe.id} exit code does not match its status`
+    );
+    invariant(
+      /^[a-f0-9]{64}$/.test(probe.outputDigest),
+      `probe ${probe.id} output digest is invalid`
+    );
+    invariant(
+      probe.receiptDigest === deterministicProbeReceiptDigest(probe),
+      `probe ${probe.id} receipt digest is invalid`
+    );
+    byId.set(probe.id, probe);
+    commands.add(probe.command);
+  }
+  return byId;
 }
 
 function validateResolution(resolution, observedAt) {
@@ -732,7 +875,12 @@ function validateResolution(resolution, observedAt) {
   }
 }
 
-export function validateFinding(finding, registry, coverageMap) {
+export function validateFinding(
+  finding,
+  registry,
+  coverageMap,
+  deterministicProbeResults = []
+) {
   invariant(isRecord(finding), 'finding must be an object');
   for (const field of registry.findingSchema.requiredFields) {
     invariant(finding[field] !== undefined, `finding is missing ${field}`);
@@ -787,7 +935,10 @@ export function validateFinding(finding, registry, coverageMap) {
       registry.policy.proofTiers.includes(evidence.tier),
       `invalid evidence tier ${evidence.tier}`
     );
-    invariant(nonEmptyString(evidence.kind), 'evidence kind is required');
+    invariant(
+      family.evidenceSchema.requiredKinds.includes(evidence.kind),
+      `evidence kind ${evidence.kind} is not allowed for ${family.id}`
+    );
     invariant(
       typeof evidence.direct === 'boolean',
       'evidence direct is required'
@@ -808,7 +959,37 @@ export function validateFinding(finding, registry, coverageMap) {
     ['deterministic', 'model'].includes(finding.source.kind),
     'finding source kind must be deterministic or model'
   );
-  if (finding.source.kind === 'model') {
+  if (finding.source.kind === 'deterministic') {
+    assertExactUniqueStrings(
+      Object.keys(finding.source),
+      ['kind', 'probeId', 'command', 'executionReceiptDigest'],
+      'deterministic finding source keys'
+    );
+    const probeResults = validateDeterministicProbeResults(
+      deterministicProbeResults,
+      family
+    );
+    const probe = probeResults.get(finding.source.probeId);
+    invariant(
+      probe && ['passed', 'observed'].includes(probe.status),
+      `deterministic source probe ${finding.source.probeId} did not execute successfully`
+    );
+    invariant(
+      finding.source.command === probe.command &&
+        finding.source.executionReceiptDigest === probe.receiptDigest,
+      'deterministic finding source does not match its execution receipt'
+    );
+    invariant(
+      parseTimestamp(probe.observedAt, 'probe observedAt') <=
+        parseTimestamp(finding.observedAt, 'finding observedAt'),
+      'deterministic probe is newer than the finding'
+    );
+  } else {
+    assertExactUniqueStrings(
+      Object.keys(finding.source),
+      ['kind', 'provider', 'providerFamily', 'model', 'qualificationReceipt'],
+      'model finding source keys'
+    );
     const provider = registry.providerCatalog.find(
       candidate => candidate.id === finding.source.provider
     );
@@ -821,12 +1002,16 @@ export function validateFinding(finding, registry, coverageMap) {
       finding.source.model === finding.source.qualificationReceipt?.model,
       'finding model does not match qualification receipt'
     );
-    validateQualificationReceipt(
+    const modelEntry = validateQualificationReceipt(
       finding.source.qualificationReceipt,
       provider,
       family,
       registry,
       finding.observedAt
+    );
+    invariant(
+      finding.source.providerFamily === modelEntry.family,
+      'finding provider family does not match the model registry'
     );
     invariant(
       directEvidence > 0,
@@ -875,11 +1060,16 @@ function comparisonKey(finding) {
   ].join(':');
 }
 
-export function normalizeFindings(findings, registry, coverageMap) {
+export function normalizeFindings(
+  findings,
+  registry,
+  coverageMap,
+  deterministicProbeResults = []
+) {
   invariant(Array.isArray(findings), 'findings must be an array');
   const deduped = new Map();
   for (const finding of findings) {
-    validateFinding(finding, registry, coverageMap);
+    validateFinding(finding, registry, coverageMap, deterministicProbeResults);
     const existing = deduped.get(finding.fingerprint);
     if (!existing) {
       deduped.set(finding.fingerprint, {
@@ -904,7 +1094,9 @@ export function normalizeFindings(findings, registry, coverageMap) {
     };
     comparison.providers.add(finding.source.provider);
     comparison.providerFamilies.add(
-      finding.source.providerFamily ?? finding.source.provider
+      modelRegistryEntries.get(
+        finding.source.qualificationReceipt.modelRegistryEntryId
+      ).family
     );
     comparison.claims.add(normalizedClaim(finding.claim));
     comparison.fingerprints.add(finding.fingerprint);
@@ -912,7 +1104,10 @@ export function normalizeFindings(findings, registry, coverageMap) {
   }
 
   const comparisons = [...comparisonsByKey.values()].map(comparison => {
-    const independentProviders = comparison.providerFamilies.size;
+    const independentProviders = registry.selectionPolicy
+      .sameProviderFamilyCountsAsIndependent
+      ? comparison.providers.size
+      : comparison.providerFamilies.size;
     return {
       comparisonKey: comparison.comparisonKey,
       providers: [...comparison.providers].sort(),
@@ -926,6 +1121,25 @@ export function normalizeFindings(findings, registry, coverageMap) {
             : 'disagreement',
     };
   });
+
+  const comparisonsById = new Map(
+    comparisons.map(comparison => [comparison.comparisonKey, comparison])
+  );
+  for (const finding of deduped.values()) {
+    if (
+      finding.severity !== 'critical' ||
+      !finding.sourceRuns.some(source => source.kind === 'model')
+    ) {
+      continue;
+    }
+    const comparison = comparisonsById.get(comparisonKey(finding));
+    const requiredProviders =
+      1 + registry.selectionPolicy.crossModelMinimumForCritical;
+    invariant(
+      comparison?.independentProviderFamilies >= requiredProviders,
+      `critical model finding requires ${requiredProviders} independent provider families`
+    );
+  }
 
   return {
     findings: [...deduped.values()],
@@ -992,7 +1206,20 @@ function validateProofTiers(proofTiers, registry) {
   }
 }
 
-function validateSafetyReceipt(receipt, registry, observedAt) {
+export function executionManifestDigest(input) {
+  return createHash('sha256')
+    .update(
+      JSON.stringify({
+        pilot: input.pilot,
+        deterministicProbeResults: input.deterministicProbeResults,
+        proofTiers: input.proofTiers,
+        findings: input.findings ?? [],
+      })
+    )
+    .digest('hex');
+}
+
+function validateSafetyReceipt(receipt, registry, input) {
   invariant(isRecord(receipt), 'pilot safetyReceipt must be an object');
   const safetyFields = [
     'externalJobsCreated',
@@ -1006,12 +1233,12 @@ function validateSafetyReceipt(receipt, registry, observedAt) {
   ];
   assertExactUniqueStrings(
     Object.keys(receipt),
-    [...safetyFields, 'observedAt', 'evidence'],
+    [...safetyFields, 'observedAt', 'executionManifestDigest', 'evidence'],
     'pilot safety receipt keys'
   );
   invariant(
     parseTimestamp(receipt.observedAt, 'safety receipt observedAt') <=
-      parseTimestamp(observedAt, 'pilot observedAt'),
+      parseTimestamp(input.pilot.observedAt, 'pilot observedAt'),
     'safety receipt cannot be newer than the pilot'
   );
   invariant(
@@ -1021,6 +1248,16 @@ function validateSafetyReceipt(receipt, registry, observedAt) {
   for (const evidence of receipt.evidence) {
     validateEvidenceReceipt(evidence, registry, 'source');
   }
+  const expectedDigest = executionManifestDigest(input);
+  invariant(
+    receipt.executionManifestDigest === expectedDigest &&
+      receipt.evidence.some(
+        evidence =>
+          evidence.kind === 'execution-manifest' &&
+          evidence.locator === `sha256:${expectedDigest}`
+      ),
+    'safety receipt is not bound to the execution manifest'
+  );
   for (const field of safetyFields.filter(
     field => field !== 'incrementalModelSpendCents'
   )) {
@@ -1030,7 +1267,10 @@ function validateSafetyReceipt(receipt, registry, observedAt) {
     receipt.incrementalModelSpendCents === 0,
     'pilot safety receipt must prove zero incremental model spend'
   );
-  return Object.fromEntries(safetyFields.map(field => [field, receipt[field]]));
+  return {
+    executionManifestDigest: expectedDigest,
+    ...Object.fromEntries(safetyFields.map(field => [field, receipt[field]])),
+  };
 }
 
 export function buildPilotReport(input, registry, coverageMap) {
@@ -1055,25 +1295,17 @@ export function buildPilotReport(input, registry, coverageMap) {
       input.deterministicProbeResults.length > 0,
     'pilot must include deterministic probe results'
   );
-  for (const probe of input.deterministicProbeResults) {
-    invariant(nonEmptyString(probe.id), 'probe id is required');
-    invariant(nonEmptyString(probe.command), 'probe command is required');
-    invariant(
-      ['passed', 'failed', 'observed'].includes(probe.status),
-      `probe ${probe.id} has invalid status`
-    );
-    invariant(nonEmptyString(probe.summary), `probe ${probe.id} needs summary`);
-  }
-  validateProofTiers(input.proofTiers, registry);
-  const safety = validateSafetyReceipt(
-    input.safetyReceipt,
-    registry,
-    input.pilot.observedAt
+  const family = registry.auditFamilies.find(
+    candidate => candidate.id === input.pilot.familyId
   );
+  validateDeterministicProbeResults(input.deterministicProbeResults, family);
+  validateProofTiers(input.proofTiers, registry);
+  const safety = validateSafetyReceipt(input.safetyReceipt, registry, input);
   const normalized = normalizeFindings(
     input.findings ?? [],
     registry,
-    coverageMap
+    coverageMap,
+    input.deterministicProbeResults
   );
   return {
     schemaVersion: 1,
@@ -1166,6 +1398,7 @@ async function runCli() {
       asOf: values['as-of'] ?? new Date().toISOString(),
       changedFiles: values.changed,
       familyId: values.family ?? null,
+      selectionPolicy: registry.selectionPolicy,
     }).slice(0, limit);
     process.stdout.write(`${JSON.stringify({ plan }, null, 2)}\n`);
     return;
