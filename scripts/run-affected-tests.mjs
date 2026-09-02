@@ -525,8 +525,10 @@ const GEM_PR_REHABILITATION_PRIMARY_INPUTS = new Set([
   'scripts/hermes/tests/symphony-reconciler.test.py',
 ]);
 const NO_UNATTENDED_RED_PRIMARY_INPUTS = new Set([
+  'scripts/backlog-orchestrator/computer-use-fallback.mjs',
   'scripts/backlog-orchestrator/no-unattended-red.mjs',
   'scripts/backlog-orchestrator/delivery-state-machine.mjs',
+  'scripts/backlog-orchestrator/__tests__/computer-use-fallback.test.mjs',
   'scripts/backlog-orchestrator/__tests__/no-unattended-red.test.mjs',
   'scripts/backlog-orchestrator/__tests__/delivery-state-machine.test.mjs',
 ]);
@@ -548,6 +550,7 @@ const NO_UNATTENDED_RED_LANE = new Set([
   'scripts/tests/test_agent_workflow_hygiene.py',
 ]);
 const NO_UNATTENDED_RED_NODE_TESTS = [
+  'scripts/backlog-orchestrator/__tests__/computer-use-fallback.test.mjs',
   'scripts/backlog-orchestrator/__tests__/delivery-state-machine.test.mjs',
   'scripts/backlog-orchestrator/__tests__/no-unattended-red.test.mjs',
   'scripts/invariants/registry.test.mjs',
