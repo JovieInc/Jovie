@@ -1,0 +1,11 @@
+[Unit]
+Description=Reconcile deferred Jovie Symphony workspace cleanup every minute
+
+[Timer]
+OnBootSec=1min
+OnUnitActiveSec=1min
+Persistent=true
+Unit=jovie-symphony-workspace-cleanup.service
+
+[Install]
+WantedBy=timers.target
