@@ -3,7 +3,7 @@
 **Compose/extend.** Reuse `scripts/lib/github-update-branch.mjs` for exact-head, exact-base, semantic-tree, deadline, and post-update proof; compose it with a
 four-slot manual matrix. Build only the trusted-plan and receipt boundary.
 Rejected: fleet handlers and a new queue writer compete with the three-build
-queue; Graphite labels never authorize this canary.
+queue; retired queue labels never authorize this canary.
 ## Safety and operation
 The live-`main` plan expires within 24 hours and pins at most four PR numbers, authors, same-repository owners, refs, and head OIDs. Apply requires its SHA-256.
 Every PR is rechecked as open, ready, exact-base/head, internal, unqueued,

@@ -140,7 +140,7 @@ The connector enrichment pipeline (#10806) needs agent-native CLIs for official 
 | **cli-printing-press** (unpublished API sniffing) | Would accelerate build | Does not solve auth gates or ToS risk | **Block until legal go-ahead** |
 | **Hand-crafted Node.js CLI per connector** | Stays in monorepo language | Slow to build; inconsistent token profiles; no SQLite mirror | Not recommended for new connectors |
 | **Direct API calls in Eve sweep** | No extra tooling | Linear API round-trips are slow + costly at sweep cadence | Already the blocker — replaced by linear-pp-cli |
-| **Graphite/Linear built-in views** | Zero engineering | Cannot answer compound relational queries across issue graph | Insufficient for Eve's query patterns |
+| **Linear built-in views** | Zero engineering | Cannot answer compound relational queries across issue graph | Insufficient for Eve's query patterns |
 
 ---
 

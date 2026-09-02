@@ -266,9 +266,7 @@ jobs:
             if hold_screenshot_merge_queue; then
               exit 0
             fi
-            # Re-apply native queue intent after the screenshot update.
-            # The native auto-enroll controller owns authoritative admission.
-            gh pr edit --add-label "merge-queue" "$EXISTING_PR" || { echo "::error::Failed to add merge-queue label to $EXISTING_PR"; exit 1; }
+            echo "Native autoenroll owns queue mutation; the merge-queue label is retired."
           else
             PR_URL=$(gh pr create \
               --title "chore: update product screenshots" \
@@ -276,6 +274,5 @@ jobs:
             if hold_screenshot_merge_queue; then
               exit 0
             fi
-            # The label records intent; the native auto-enroll controller owns admission.
-            gh pr edit --add-label "merge-queue" "$PR_URL" || { echo "::error::Failed to add merge-queue label to $PR_URL"; exit 1; }
+            echo "Opened $PR_URL. Native autoenroll owns queue mutation; the merge-queue label is retired."
           fi
