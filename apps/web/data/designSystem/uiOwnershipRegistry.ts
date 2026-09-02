@@ -303,6 +303,7 @@ const nativeBindingsByEntry: Partial<
         'apps/ios/Jovie/Features/Dashboard/PublicProfileBrowserView.swift',
         'apps/ios/Jovie/Features/Dashboard/VenueModeView.swift',
         'apps/ios/Jovie/Features/Inbox/InboxSurfaceView.swift',
+        'apps/ios/Jovie/Features/Library/LibrarySurfaceView.swift',
         'apps/ios/Jovie/Features/NeedsOnboarding/NeedsOnboardingView.swift',
         'apps/ios/Jovie/Features/Settings/SettingsView.swift',
         'apps/ios/Jovie/Features/Teleprompter/TeleprompterProposal.swift',

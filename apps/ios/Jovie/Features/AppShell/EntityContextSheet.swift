@@ -10,6 +10,17 @@ struct EntityContextItem: Identifiable, Equatable, Hashable, Sendable {
 
   var id: String { "\(kind.rawValue):\(entityID)" }
 
+  static func fromLibraryAsset(_ asset: LibraryAsset) -> EntityContextItem {
+    let kind: MobileChatEntityKind
+    switch asset.type {
+    case .release:
+      kind = .release
+    case .merch, .smartLink, .photo, .press, .video:
+      kind = .track
+    }
+    return EntityContextItem(kind: kind, entityID: asset.id, label: asset.name)
+  }
+
   var title: String { label }
 
   var kindTitle: String {
