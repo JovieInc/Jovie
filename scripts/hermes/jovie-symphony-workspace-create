@@ -4,6 +4,7 @@ set -euo pipefail
 logical="${1:-}"
 helper="/usr/local/sbin/jovie-symphony-workspace"
 clone_tool="/home/timwhite/.local/bin/jovie-workspace-clone"
+cache_hook="/home/timwhite/.local/bin/symphony-nvme-package-cache"
 node_bin="/home/timwhite/.nvm/versions/node/v22.23.2/bin"
 cache_receipts="/srv/git/receipts/workspace-mounts"
 
@@ -28,7 +29,6 @@ if "$clone_tool" "$logical"; then
 else
   cleanup_on_error "$?"
 fi
-cache_hook="$logical/scripts/hermes/symphony-nvme-package-cache.sh"
 if [[ ! -f "$cache_hook" || -L "$cache_hook" ]]; then
   echo "trusted cache hook missing: $cache_hook" >&2
   cleanup_on_error 70

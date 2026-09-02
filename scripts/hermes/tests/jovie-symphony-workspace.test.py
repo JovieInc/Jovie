@@ -51,6 +51,7 @@ class JovieSymphonyWorkspaceTests(unittest.TestCase):
         log = root / "events.log"
         helper = root / "helper"
         clone = root / "clone"
+        cache = root / "cache"
         wrapper = root / "wrapper"
 
         (bin_dir / "node").write_text("#!/usr/bin/env bash\nprintf 'v22.23.2\\n'\n")
@@ -65,19 +66,20 @@ class JovieSymphonyWorkspaceTests(unittest.TestCase):
         clone.write_text(
             "#!/usr/bin/env bash\n"
             "printf 'clone\\n' >> \"$EVENT_LOG\"\n"
-            "mkdir -p \"$1/.git\" \"$1/scripts/hermes\"\n"
-            "cat > \"$1/scripts/hermes/symphony-nvme-package-cache.sh\" <<'EOF'\n"
+            "mkdir -p \"$1/.git\"\n"
+        )
+        cache.write_text(
             "#!/usr/bin/env bash\n"
             "printf 'cache:%s:%s\\n' \"$SYMPHONY_TRUSTED_HOOK_PHASE\" \"$SYMPHONY_ISSUE_IDENTIFIER\" >> \"$EVENT_LOG\"\n"
             f"exit {cache_exit}\n"
-            "EOF\n"
         )
         wrapper_source = WRAPPER.read_text()
         wrapper_source = wrapper_source.replace('/usr/local/sbin/jovie-symphony-workspace', str(helper))
         wrapper_source = wrapper_source.replace('/home/timwhite/.local/bin/jovie-workspace-clone', str(clone))
+        wrapper_source = wrapper_source.replace('/home/timwhite/.local/bin/symphony-nvme-package-cache', str(cache))
         wrapper_source = wrapper_source.replace('/home/timwhite/.nvm/versions/node/v22.23.2/bin', str(bin_dir))
         wrapper.write_text(wrapper_source)
-        for path in (bin_dir / "node", bin_dir / "pnpm", bin_dir / "realpath", bin_dir / "sudo", helper, clone, wrapper):
+        for path in (bin_dir / "node", bin_dir / "pnpm", bin_dir / "realpath", bin_dir / "sudo", helper, clone, cache, wrapper):
             path.chmod(0o755)
         return temp, wrapper, log
 
