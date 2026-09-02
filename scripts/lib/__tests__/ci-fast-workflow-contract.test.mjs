@@ -687,6 +687,9 @@ describe('ci-fast bounded parallel workflow', () => {
         'scripts/lib/__tests__/merge-group-workflow-contract.test.mjs'
       )
     ).toBe(true);
+    expect(
+      selectsStructural.test('scripts/verification/admission-shadow.mjs')
+    ).toBe(true);
     for (const mergeQueueControllerPath of [
       'scripts/automation-verify.sh',
       'scripts/run-affected-tests.mjs',
@@ -735,6 +738,10 @@ describe('ci-fast bounded parallel workflow', () => {
     }
     expect(selectsStructural.test('.github/workflows/ci.yml')).toBe(true);
     expect(selectsStructural.test('.claude/rules/ci-branching.md')).toBe(true);
+    expect(CI_FAST_SOURCE).toContain(
+      "--test-coverage-include='scripts/verification/*.mjs'"
+    );
+    expect(CI_FAST_SOURCE).toContain('--test-coverage-branches=98');
     expect(selectsStructural.test('apps/web/components/atoms/Button.tsx')).toBe(
       true
     );
