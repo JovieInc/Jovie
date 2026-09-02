@@ -309,8 +309,12 @@ const MERGE_GROUP_ADMISSION_LANE = new Set([
   ...AFFECTED_TEST_SELECTOR_MANIFEST,
   '.github/workflows/ci.yml',
   '.github/workflows/ios-ci.yml',
+  'apps/web/tests/unit/ci/deploy-workflow.test.ts',
   'scripts/lib/__tests__/merge-group-workflow-contract.test.mjs',
 ]);
+const MERGE_GROUP_ADMISSION_WEB_TESTS = [
+  'apps/web/tests/unit/ci/deploy-workflow.test.ts',
+];
 const MERGE_GROUP_ADMISSION_SCRIPT_TESTS = [
   'scripts/lib/__tests__/automation-verify.test.mjs',
   'scripts/lib/__tests__/merge-group-admission.test.mjs',
@@ -1083,7 +1087,7 @@ export function buildAffectedTestPlan(
       mode: 'selected',
       relatedFiles: [],
       mandatoryTests: [],
-      selectedTests: [],
+      selectedTests: MERGE_GROUP_ADMISSION_WEB_TESTS,
       rootVitestTests: [],
       pythonTests: [],
       pythonUnittestTests: [],

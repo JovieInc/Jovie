@@ -307,6 +307,19 @@ describe('merge_group workflow contract', () => {
     );
     expect(admission).toContain('pull-requests: read');
     expect(admission).toContain('ref: main');
+    expect(admission).toContain('node "$policy" --print-contract-version');
+    expect(admission).toContain("admitted_value=\"$(sed -n 's/^admitted=//p'");
+    expect(admission).toContain("$admitted_value\" != 'true'");
+    expect(admission).toContain("$admitted_value\" != 'false'");
+    expect(admission).toContain("echo 'admitted=true'");
+    expect(admission).toContain(
+      'refs/heads/gh-readonly-queue/main/pr-([1-9][0-9]*)-[0-9a-f]{40}'
+    );
+    expect(admission).toContain('echo "pr_number=${BASH_REMATCH[1]}"');
+    expect(admission).toContain('echo "synthetic_head_sha=$GITHUB_SHA"');
+    expect(admission).toContain(
+      "echo 'current_queue_state=LEGACY_EXACT_REF_BOOTSTRAP'"
+    );
     expect(admission).not.toContain(
       'ref: ${{ github.event.merge_group.base_sha }}'
     );
@@ -314,8 +327,9 @@ describe('merge_group workflow contract', () => {
     expect(admission).toContain('id: admission');
     expect(admission).toContain('GH_TOKEN: ${{ github.token }}');
     expect(admission).toContain(
-      'run: node scripts/lib/merge-group-admission.mjs'
+      "policy='scripts/lib/merge-group-admission.mjs'"
     );
+    expect(admission).toContain('node "$policy"');
     expect(admission).not.toContain('secrets.');
 
     for (const jobId of ['ci-fast-typecheck', 'ci-fast-remaining']) {
@@ -440,6 +454,12 @@ describe('merge_group workflow contract', () => {
     expect(aggregate).toContain('ADMISSION_QUEUE_STATE=');
     expect(aggregate).toContain(
       'Obsolete merge-group neutralized before selected product lanes'
+    );
+    expect(aggregate).toContain(
+      '"$ADMISSION_ADMITTED" == "false" && "$ADMISSION_OBSOLETE" == "true"'
+    );
+    expect(aggregate).toContain(
+      'Merge-group admission succeeded without a valid admitted/obsolete disposition'
     );
     expect(aggregate).toContain('BUILD_LAYOUT_RESULT');
     expect(aggregate).toContain('RUN_PROMPTFOO');

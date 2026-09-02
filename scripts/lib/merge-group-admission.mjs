@@ -5,10 +5,10 @@ const SHA_PATTERN = /^[0-9a-f]{40}$/;
 const QUEUE_HEAD_PR_PATTERN =
   /^refs\/heads\/gh-readonly-queue\/main\/pr-([1-9][0-9]*)-[0-9a-f]+$/;
 const REQUIRED_CHECKS = Object.freeze(['Fork PR Gate', 'PR Size Guard']);
-const LIVE_QUEUE_REQUIRED_STATE = 'AWAITING_CHECKS';
+const QUEUE_STATE_AWAITING_CHECKS = 'AWAITING_CHECKS';
 const LIVE_QUEUE_ENTRY_STATES = new Set([
   'QUEUED',
-  'AWAITING_CHECKS',
+  QUEUE_STATE_AWAITING_CHECKS,
   'MERGEABLE',
   'UNMERGEABLE',
   'LOCKED',
@@ -60,6 +60,7 @@ const LIVE_QUEUE_QUERY = `query MergeGroupAdmissionLiveQueue(
 }`;
 const REQUIRED_ENV_MESSAGE =
   'GITHUB_EVENT_PATH, GH_TOKEN, GITHUB_SHA, and GITHUB_REPOSITORY are required';
+export const ADMISSION_CONTRACT_VERSION = 'jovie-merge-group-live-admission/v1';
 
 export class MergeGroupAdmissionError extends Error {
   constructor(message) {
@@ -210,11 +211,14 @@ export function normalizeLiveQueueEntriesPage(
     if (!LIVE_QUEUE_ENTRY_STATES.has(state)) {
       fail(`live merge queue state for PR #${prNumber} is unrecognized`);
     }
+    if (node?.pullRequest?.baseRefName !== branch) {
+      fail(`live merge queue base for PR #${prNumber} is not ${branch}`);
+    }
     const headCommitOid = requireNullableSha(
       node?.headCommit?.oid,
       `live merge queue headCommit for PR #${prNumber}`
     );
-    if (state === LIVE_QUEUE_REQUIRED_STATE && headCommitOid === null) {
+    if (state === QUEUE_STATE_AWAITING_CHECKS && headCommitOid === null) {
       fail(
         [
           `live merge queue AWAITING_CHECKS entry for PR #${prNumber}`,
@@ -227,10 +231,6 @@ export function normalizeLiveQueueEntriesPage(
         node?.baseCommit?.oid,
         `live merge queue baseCommit for PR #${prNumber}`
       ),
-      baseRefName:
-        typeof node?.pullRequest?.baseRefName === 'string'
-          ? node.pullRequest.baseRefName
-          : null,
       headCommitOid,
       position,
       prNumber,
@@ -251,7 +251,7 @@ export function normalizeLiveQueueEntriesPage(
 
 function queueSnapshot(entries) {
   return entries
-    .filter(entry => entry.state === LIVE_QUEUE_REQUIRED_STATE)
+    .filter(entry => entry.state === QUEUE_STATE_AWAITING_CHECKS)
     .map(entry => ({
       baseSha: entry.baseCommitOid,
       position: entry.position,
@@ -302,9 +302,9 @@ export function buildLiveQueueAdmissionReceipt({
   if (exactMatches.length > 1) {
     fail(`live merge queue repeats synthetic head ${evidence.headSha}`);
   }
-  const matchingPrEntries = entries
-    .filter(entry => entry.prNumber === evidence.prNumber)
-    .sort((left, right) => left.position - right.position);
+  const matchingPrEntries = entries.filter(
+    entry => entry.prNumber === evidence.prNumber
+  );
   if (matchingPrEntries.length > 1) {
     fail(`live merge queue repeats PR #${evidence.prNumber}`);
   }
@@ -326,7 +326,10 @@ export function buildLiveQueueAdmissionReceipt({
         entry.headCommitOid !== evidence.headSha
     ) ?? null;
   const current = exact ?? matchingPrEntries[0] ?? null;
-  const admitted = Boolean(exact?.state === LIVE_QUEUE_REQUIRED_STATE);
+  // Queue state advances while required checks are running. The synthetic head
+  // is current whenever the live queue still binds this PR to the exact SHA;
+  // only absence or a different SHA proves that this event is obsolete.
+  const admitted = Boolean(exact);
   const replacementCombinedHead = admitted
     ? null
     : (replacement?.headCommitOid ?? null);
@@ -346,7 +349,7 @@ export function buildLiveQueueAdmissionReceipt({
     runAttempt: normalizedRunContext.runAttempt,
     runId: normalizedRunContext.runId,
     runUrl: normalizedRunContext.runUrl,
-    schema: 'jovie-merge-group-live-admission/v1',
+    schema: ADMISSION_CONTRACT_VERSION,
     syntheticSha: evidence.headSha,
   };
 }
@@ -662,7 +665,6 @@ function createRunContextFromEnv(env = process.env) {
 }
 
 async function writeAdmissionOutputs(receipt, env = process.env) {
-  const receiptB64 = Buffer.from(JSON.stringify(receipt)).toString('base64');
   if (env.GITHUB_OUTPUT) {
     await appendFile(
       env.GITHUB_OUTPUT,
@@ -673,7 +675,6 @@ async function writeAdmissionOutputs(receipt, env = process.env) {
         `synthetic_head_sha=${receipt.syntheticSha}`,
         `current_queue_state=${receipt.currentQueueState}`,
         `replacement_combined_head=${receipt.replacementCombinedHead ?? ''}`,
-        `receipt_b64=${receiptB64}`,
         '',
       ].join('\n'),
       'utf8'
@@ -734,17 +735,21 @@ export async function runAdmissionFromEnv(
   });
   await writeAdmissionOutputs(result.receipt, env);
   console.log(JSON.stringify(result.receipt));
-  return result;
+  return result.receipt;
 }
 
 if (
   process.argv[1] &&
   import.meta.url === pathToFileURL(process.argv[1]).href
 ) {
-  runAdmissionFromEnv().catch(error => {
-    console.error(
-      `::error::${error instanceof Error ? error.message : String(error)}`
-    );
-    process.exitCode = 1;
-  });
+  if (process.argv.includes('--print-contract-version')) {
+    console.log(ADMISSION_CONTRACT_VERSION);
+  } else {
+    runAdmissionFromEnv().catch(error => {
+      console.error(
+        `::error::${error instanceof Error ? error.message : String(error)}`
+      );
+      process.exitCode = 1;
+    });
+  }
 }

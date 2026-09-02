@@ -901,7 +901,6 @@ jobs:
       synthetic_head_sha: ${{ steps.admission.outputs.synthetic_head_sha || '' }}
       current_queue_state: ${{ steps.admission.outputs.current_queue_state || '' }}
       replacement_combined_head: ${{ steps.admission.outputs.replacement_combined_head || '' }}
-      receipt_b64: ${{ steps.admission.outputs.receipt_b64 || '' }}
     permissions:
       checks: read
       contents: read
@@ -922,7 +921,35 @@ jobs:
         id: admission
         env:
           GH_TOKEN: ${{ github.token }}
-        run: node scripts/lib/merge-group-admission.mjs
+        run: |
+          set -euo pipefail
+          policy='scripts/lib/merge-group-admission.mjs'
+          policy_contract="$(node "$policy" --print-contract-version)"
+          if [[ "$policy_contract" == 'jovie-merge-group-live-admission/v1' ]]; then
+            node "$policy"
+            admitted_value="$(sed -n 's/^admitted=//p' "$GITHUB_OUTPUT")"
+            if [[ "$admitted_value" != 'true' && "$admitted_value" != 'false' ]]; then
+              echo '::error::Live queue admission policy emitted an invalid admitted value'
+              exit 1
+            fi
+            exit 0
+          fi
+
+          # One-release bootstrap: the trusted main helper predates typed live
+          # queue outputs but has already proved the exact queue ref and both
+          # external admission checks. This path disappears automatically as
+          # soon as this helper version lands on main.
+          if [[ ! "${GITHUB_REF:-}" =~ ^refs/heads/gh-readonly-queue/main/pr-([1-9][0-9]*)-[0-9a-f]{40}$ ]]; then
+            echo '::error::Legacy admission bootstrap could not bind the queue PR'
+            exit 1
+          fi
+          {
+            echo 'admitted=true'
+            echo 'obsolete=false'
+            echo "pr_number=${BASH_REMATCH[1]}"
+            echo "synthetic_head_sha=$GITHUB_SHA"
+            echo 'current_queue_state=LEGACY_EXACT_REF_BOOTSTRAP'
+          } >> "$GITHUB_OUTPUT"
 
   ci-risk-classifier:
     # Dependency-free so fork PRs classify without waiting on a trusted job or
@@ -5175,8 +5202,12 @@ jobs:
           } >> "$GITHUB_STEP_SUMMARY"
 
           if [[ "$ADMISSION_RESULT" == "success" && "$ADMISSION_ADMITTED" != "true" ]]; then
-            echo "::notice::Obsolete merge-group neutralized before selected product lanes: pr=${ADMISSION_PR:-unknown} synthetic=${ADMISSION_SYNTHETIC_HEAD:-unknown} state=${ADMISSION_QUEUE_STATE:-unknown} replacement=${ADMISSION_REPLACEMENT_HEAD:-none} obsolete=${ADMISSION_OBSOLETE:-false}"
-            exit 0
+            if [[ "$ADMISSION_ADMITTED" == "false" && "$ADMISSION_OBSOLETE" == "true" ]]; then
+              echo "::notice::Obsolete merge-group neutralized before selected product lanes: pr=${ADMISSION_PR:-unknown} synthetic=${ADMISSION_SYNTHETIC_HEAD:-unknown} state=${ADMISSION_QUEUE_STATE:-unknown} replacement=${ADMISSION_REPLACEMENT_HEAD:-none}"
+              exit 0
+            fi
+            echo "::error::Merge-group admission succeeded without a valid admitted/obsolete disposition"
+            exit 1
           fi
 
           for gate in \
