@@ -3,6 +3,7 @@
 Issue: JOV-5853
 Registry: `scripts/summer-commissioning/registry.json`
 Acceptance harness: `scripts/summer-commissioning/commissioning.mjs`
+Access audit: `scripts/summer-commissioning/capability-access-registry.json`
 
 Summer is **not commissioned**. The 2026-09-01 audit found a split runtime and
 authority model: Ovie desktop invokes the local Hermes Summer profile, the Eve
@@ -37,6 +38,45 @@ orchestration platform.
 
 The JSON registry is the machine-readable source for evidence, invalidation
 conditions, owner/remediation references, and probe versions.
+
+## Direct capability access audit
+
+The companion access registry records provider access independently from the
+16 behavior probes. It distinguishes five gates for the exact Summer principal:
+configured, authenticated, authorized, live-probed, and safe for autonomous
+use. Host binaries, host credentials, and another agent's successful query are
+recorded only as host evidence and can never satisfy a Summer gate.
+
+| Packet | Configured | Authenticated | Authorized | Live-probed | Autonomous-safe | Smallest boundary |
+| --- | --- | --- | --- | --- | --- | --- |
+| GBrain | yes | no | read only | no | no | Company namespace search/page read; keep writes and personal state denied. |
+| Sentry | no | no | no | no | no | Allowlisted-project issue/event read through a redacted server projection. |
+| Neon/Postgres | no | no | no | no | no | Dedicated `transaction_read_only` role over redacted diagnostic views only. |
+| Stripe | no | no | no | no | no | Restricted server credential over test fixtures or redacted account/customer/subscription health. |
+| GitHub/Linear | no | no | no | no | no | App/OAuth read projection for Jovie PR, check, queue, project, and issue state. |
+| Deployment/CI | no | no | no | no | no | Existing shipping-state projection, exposed read-only with exact source/CI/queue/deploy receipts. |
+| Ovie escalation | yes | no | read-only escalation | no | no | Privacy-safe blocker, evidence, owner, gate, and founder decision projection. |
+
+The 2026-09-02 host comparison found authenticated GitHub and Vercel CLIs,
+but no exact Summer receipt. Sentry and Neon clients were absent; the Stripe
+binary had no named credential in the current environment. These observations
+do not authorize Summer and no customer or provider content was queried.
+
+Validate the access registry without contacting a provider:
+
+```bash
+node scripts/summer-commissioning/capability-access.mjs
+```
+
+The validator requires exactly the seven packets above, forbids host evidence
+from counting as Summer evidence, and rejects `autonomousSafe: true` unless all
+four prior gates are true and the least-privilege packet is `existing`. A live
+access probe must use the normal signed commissioning receipt plus an
+`accessClaim` binding the Summer principal, current safe-tool manifest digest,
+current policy digest, all five true gates, and `hostEvidenceUsed: false`.
+Every deterministic fixture and re-evaluation trigger is defined in the access
+registry. The audit grants no permissions and all seven packets currently fail
+closed.
 
 ## Proof-tier ledger
 
