@@ -6,6 +6,9 @@ import Image from 'next/image';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { Avatar } from '@/components/molecules/Avatar';
 
+const avatarHasWrapperSizingClass = (source: string) =>
+  /<Avatar\b[^>]*\bclassName=['"][^'"]*\b(?:size|h|w)-/.test(source);
+
 // Mock Next.js Image component with proper event handling
 vi.mock('next/image', () => ({
   default: vi
@@ -372,10 +375,19 @@ describe('Avatar Component', () => {
         const source = readFileSync(path.resolve(process.cwd(), sourcePath), {
           encoding: 'utf8',
         });
-        expect(source).not.toMatch(
-          /<Avatar[\s\S]{0,240}className=['"][^'"]*\b(?:size|h|w)-/
-        );
+        expect(avatarHasWrapperSizingClass(source)).toBe(false);
       }
+    });
+
+    it('binds wrapper sizing detection to the Avatar opening tag', () => {
+      expect(
+        avatarHasWrapperSizingClass(
+          "<Avatar className='shrink-0' />\n<div className='min-w-0' />"
+        )
+      ).toBe(false);
+      expect(
+        avatarHasWrapperSizingClass("<Avatar className='shrink-0 h-8' />")
+      ).toBe(true);
     });
 
     it('hides loading shimmer after image loads', () => {
