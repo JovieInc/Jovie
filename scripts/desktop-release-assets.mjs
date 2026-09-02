@@ -92,7 +92,7 @@ function compareTuples(left, right) {
 }
 
 export function assertStagingVersionTransition({
-  currentFeedVersion,
+  currentFeedVersion = null,
   installedVersion,
   version,
 }) {
