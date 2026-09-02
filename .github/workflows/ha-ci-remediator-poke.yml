@@ -1,4 +1,8 @@
 name: HA CI remediator poke
+# controller-hop-exception: jovie-controller-hop/v1
+# accountable-writer: Rush
+# necessary-trust-boundary: Repo webhook secret stays in GitHub Actions; Hyperagent only receives slim CI-failure JSON.
+# removal-trigger: Delete when Hyperagent ingests GitHub CI workflow_run failures natively.
 on:
   workflow_run:
     workflows: ['CI']
