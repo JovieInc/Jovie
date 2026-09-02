@@ -259,6 +259,7 @@ const CI_CONTROL_SCRIPT_TESTS = [
   'scripts/lib/__tests__/design-exception-registry.test.mjs',
   'scripts/lib/__tests__/design-system-source-ratchet.test.mjs',
   'scripts/lib/__tests__/ci-repo-lanes.test.mjs',
+  'scripts/lib/__tests__/merge-group-admission.test.mjs',
   'scripts/lib/__tests__/merge-group-workflow-contract.test.mjs',
   'scripts/lib/__tests__/lockfile-specifier-preflight.test.mjs',
   'scripts/lib/__tests__/sentry-autofix-workflow-contract.test.mjs',
@@ -299,6 +300,22 @@ const PRODUCT_LANE_FOUNDATION_LANE = new Set([
   'scripts/lib/merge-queue-guard.mjs',
   'scripts/lib/resolve-merge-group-path-diff.mjs',
 ]);
+const MERGE_GROUP_ADMISSION_PRIMARY_INPUTS = new Set([
+  'scripts/lib/merge-group-admission.mjs',
+  'scripts/lib/__tests__/merge-group-admission.test.mjs',
+]);
+const MERGE_GROUP_ADMISSION_LANE = new Set([
+  ...MERGE_GROUP_ADMISSION_PRIMARY_INPUTS,
+  ...AFFECTED_TEST_SELECTOR_MANIFEST,
+  '.github/workflows/ci.yml',
+  '.github/workflows/ios-ci.yml',
+  'scripts/lib/__tests__/merge-group-workflow-contract.test.mjs',
+]);
+const MERGE_GROUP_ADMISSION_SCRIPT_TESTS = [
+  'scripts/lib/__tests__/automation-verify.test.mjs',
+  'scripts/lib/__tests__/merge-group-admission.test.mjs',
+  'scripts/lib/__tests__/merge-group-workflow-contract.test.mjs',
+];
 const MERGE_QUEUE_CONTROLLER_INPUTS = new Set([
   '.github/actions/evaluate-fleet-gate/action.yml',
   '.github/workflows/merge-queue-autoenroll.yml',
@@ -1010,6 +1027,28 @@ export function buildAffectedTestPlan(
       scriptVitestTests: CI_UI_DRIFT_GUARDRAIL_SCRIPT_TESTS,
       nodeTests: CI_UI_DRIFT_GUARDRAIL_NODE_TESTS,
     };
+  }
+  const hasMergeGroupAdmissionPrimaryInput = files.some(file =>
+    MERGE_GROUP_ADMISSION_PRIMARY_INPUTS.has(file)
+  );
+  const isBoundedMergeGroupAdmissionChange =
+    hasMergeGroupAdmissionPrimaryInput &&
+    files.every(file => MERGE_GROUP_ADMISSION_LANE.has(file));
+  if (isBoundedMergeGroupAdmissionChange) {
+    return {
+      mode: 'selected',
+      relatedFiles: [],
+      mandatoryTests: [],
+      selectedTests: [],
+      rootVitestTests: [],
+      pythonTests: [],
+      pythonUnittestTests: [],
+      scriptVitestTests: MERGE_GROUP_ADMISSION_SCRIPT_TESTS,
+      nodeTests: [],
+    };
+  }
+  if (hasMergeGroupAdmissionPrimaryInput) {
+    return { mode: 'full', relatedFiles: [], mandatoryTests: [] };
   }
   const deliveryLivenessInputCount = files.filter(file =>
     DELIVERY_LIVENESS_LANE.has(file)

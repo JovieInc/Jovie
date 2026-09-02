@@ -22,6 +22,10 @@ const CI_WORKFLOW = readFileSync(
   resolve(REPO_ROOT, '.github/workflows/ci.yml'),
   'utf8'
 );
+const IOS_CI_WORKFLOW = readFileSync(
+  resolve(REPO_ROOT, '.github/workflows/ios-ci.yml'),
+  'utf8'
+);
 const PRODUCTION_RELEASE_WORKFLOW = readFileSync(
   resolve(REPO_ROOT, '.github/workflows/production-release.yml'),
   'utf8'
@@ -293,11 +297,15 @@ describe('merge_group workflow contract', () => {
     expect(admission).toContain('timeout-minutes: 2');
     expect(admission).toContain('checks: read');
     expect(admission).toContain('contents: read');
+    expect(admission).toContain(
+      "pr_number: ${{ steps.admission.outputs.pr_number || '' }}"
+    );
     expect(admission).toContain('ref: main');
     expect(admission).not.toContain(
       'ref: ${{ github.event.merge_group.base_sha }}'
     );
     expect(admission).toContain('persist-credentials: false');
+    expect(admission).toContain('id: admission');
     expect(admission).toContain('GH_TOKEN: ${{ github.token }}');
     expect(admission).toContain(
       'run: node scripts/lib/merge-group-admission.mjs'
@@ -888,6 +896,27 @@ ${selectedGateScript}`,
       'Combined-head standalone server failed to start'
     );
     expect(buildLayout).not.toContain('actions/download-artifact');
+  });
+
+  it('supersedes stale iOS flights by stable queue PR identity (JOV-5800)', () => {
+    const workflowHeader = IOS_CI_WORKFLOW.slice(
+      0,
+      IOS_CI_WORKFLOW.indexOf('\njobs:')
+    );
+    const iosCaller = getJobBlock(CI_WORKFLOW, 'ci-ios');
+
+    expect(workflowHeader).toContain('concurrency-key:');
+    expect(workflowHeader).toContain('required: false');
+    expect(workflowHeader).toContain('type: string');
+    expect(workflowHeader).toContain(
+      'group: ios-ci-${{ github.workflow }}-${{ inputs.concurrency-key || github.ref }}'
+    );
+    expect(workflowHeader).toContain(
+      "cancel-in-progress: ${{ inputs.concurrency-key != '' || github.ref != 'refs/heads/main' }}"
+    );
+    expect(iosCaller).toContain(
+      "concurrency-key: ${{ github.event_name == 'merge_group' && needs.ci-merge-group-admission.outputs.pr_number != '' && format('pr-{0}', needs.ci-merge-group-admission.outputs.pr_number) || '' }}"
+    );
   });
 
   it('coalesces a short release wave before exact authorization and mutation', () => {
