@@ -44,6 +44,21 @@ describe('JOV-5288 CI repo lanes', () => {
     ]);
   });
 
+  it('runs scripts typecheck for component certification harness scripts', () => {
+    const plan = classifyCiRepoLanes([
+      'scripts/component-rendered-evaluator.mjs',
+      'scripts/lib/__tests__/component-ship-gate.test.mjs',
+    ]);
+    expect(plan.runJovieProduct).toBe(true);
+    expect(plan.runSymphonyControl).toBe(true);
+    expect(plan.runJovieTypecheck).toBe(false);
+    expect(plan.runSummerOps).toBe(false);
+    expect(plan.lanes).toEqual([
+      CI_LANES.JOVIE_PRODUCT,
+      CI_LANES.SYMPHONY_CONTROL,
+    ]);
+  });
+
   it('selects the product typecheck only for exact TypeScript graph inputs', () => {
     for (const path of [
       'apps/web/app/page.tsx',
