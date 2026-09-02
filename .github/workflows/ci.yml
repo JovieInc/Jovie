@@ -1288,6 +1288,8 @@ jobs:
           fetch-depth: 0
           filter: blob:none
       - uses: ./.github/actions/setup-node-pnpm
+      - name: Run continuous audit contract tests
+        run: pnpm run test:continuous-audit
       - name: Validate CI/release incident prevention contract
         # This is intentionally outside the path-gated Structural Contract.
         # The required prevention receipt must exist for every source PR and

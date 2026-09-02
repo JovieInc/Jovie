@@ -1,6 +1,6 @@
 {
   "name": "jovie-monorepo",
-  "version": "26.8.2",
+  "version": "26.8.1",
   "private": true,
   "config": {
     "commitizen": {
@@ -194,6 +194,10 @@
     "qa:swarm:list": "node scripts/qa-swarm/cli.mjs list",
     "qa:swarm:propose": "node scripts/qa-swarm/cli.mjs propose",
     "qa:swarm:test": "vitest --root scripts --config vitest.config.mts run lib/__tests__/qa-swarm.test.mjs",
+    "audit:continuous:validate": "node scripts/continuous-audit.mjs validate",
+    "audit:continuous:plan": "node scripts/continuous-audit.mjs plan",
+    "audit:continuous:pilot": "node scripts/continuous-audit.mjs pilot",
+    "test:continuous-audit": "node --test scripts/continuous-audit.test.mjs",
     "test:observability-pipeline": "node --test scripts/lib/observability-fingerprint.test.mjs scripts/observability-issue-sync.test.mjs scripts/observability-issue-github.test.mjs && node --experimental-strip-types --test workers/observability-ingest/src/index.test.mjs",
     "commit": "cz",
     "clean": "node scripts/turbo-local.mjs clean && rm -rf node_modules",
