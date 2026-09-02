@@ -26,8 +26,6 @@ on:
       - 'packages/ui/**'
       - '!apps/web/public/product-screenshots/**'
       - '!apps/web/screenshot-catalog/current/**'
-  schedule:
-    - cron: '0 9 * * *'
   workflow_dispatch:
 
 permissions: {}
