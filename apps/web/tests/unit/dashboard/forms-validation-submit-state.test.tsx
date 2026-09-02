@@ -158,10 +158,9 @@ describe('dashboard form validation consolidation', () => {
         .getAllByRole('alert')
         .some(alert => /artist name is required/i.test(alert.textContent ?? ''))
     ).toBe(true);
-    expect(screen.getByLabelText('Artist Name')).toHaveAttribute(
-      'aria-invalid',
-      'true'
-    );
+    expect(
+      screen.getByRole('textbox', { name: /Artist Name/i })
+    ).toHaveAttribute('aria-invalid', 'true');
     expect(
       container.querySelectorAll('[data-slot="field-feedback"]')
     ).toHaveLength(2);
