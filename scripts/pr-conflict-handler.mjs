@@ -109,8 +109,12 @@ function parseArgs(argv) {
   if (!Number.isInteger(options.maxConcurrent) || options.maxConcurrent < 1) {
     throw new Error('--max-concurrent must be a positive integer');
   }
-  if (!Number.isInteger(options.limit) || options.limit < 1) {
-    throw new Error('--limit must be a positive integer');
+  if (
+    !Number.isInteger(options.limit) ||
+    options.limit < 1 ||
+    options.limit > 500
+  ) {
+    throw new Error('--limit must be an integer between 1 and 500');
   }
   for (const key of ['runnerCapacity', 'activeCi', 'queuedCi']) {
     if (!Number.isInteger(options[key]) || options[key] < 0) {
@@ -135,7 +139,7 @@ Options:
   --apply                      Execute safe mutations (labels, exact-head GitHub rebase)
   --repo OWNER/REPO            Repository (default: JovieInc/Jovie)
   --max-concurrent N           Operator ceiling above adaptive 2→10→40 cohorts (default: 40)
-  --limit N                    Max open PRs to inspect (default: 200)
+  --limit N                    Max open PRs to inspect, 1-500 (default: 200)
   --runner-capacity N          Observed GitHub-hosted runner pool size (fail-low default: 2)
   --active-ci N                Current in-progress Actions runs (default: 0)
   --queued-ci N                Current queued Actions runs (default: 0)
@@ -186,9 +190,8 @@ async function ghJson(args, { retries = 3, token } = {}) {
       return JSON.parse(stdout);
     } catch (error) {
       const stderr = error.stderr ?? '';
-      // Retry transient API failures, not just rate limits: the bulk
-      // `gh pr list --json statusCheckRollup` GraphQL query times out or
-      // errors under load at blitz-scale open-PR counts (#13347).
+      // Retry transient API failures, not just rate limits: even bounded REST
+      // pages and GraphQL metadata batches can fail during provider incidents.
       const transient =
         /rate limit|secondary rate|abuse|something went wrong|timeout|timed out|502|503|504|connection reset|unexpected end of JSON/i.test(
           `${stderr}${error.message ?? ''}`
