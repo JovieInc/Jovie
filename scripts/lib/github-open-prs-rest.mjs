@@ -134,58 +134,76 @@ export async function hydrateOpenPrGraphqlMetadata({
   prs,
   request,
   batchSize = 25,
+  maxConcurrency = 2,
 }) {
   if (!Number.isSafeInteger(batchSize) || batchSize < 1 || batchSize > 50) {
     throw new Error('metadata hydration batchSize must be between 1 and 50');
+  }
+  if (
+    !Number.isSafeInteger(maxConcurrency) ||
+    maxConcurrency < 1 ||
+    maxConcurrency > 4
+  ) {
+    throw new Error(
+      'metadata hydration maxConcurrency must be between 1 and 4'
+    );
   }
   const [owner, name] = repo.split('/');
   if (!owner || !name) throw new Error('repo must be OWNER/NAME');
   const hydrated = prs.map(pr => ({ ...pr }));
 
+  const offsets = [];
   for (let offset = 0; offset < hydrated.length; offset += batchSize) {
-    const batch = hydrated.slice(offset, offset + batchSize);
-    const selections = batch
-      .map((pr, index) => {
-        if (!Number.isSafeInteger(pr.number) || pr.number < 1) {
-          throw new Error('open PR metadata is missing a PR number');
+    offsets.push(offset);
+  }
+  for (let wave = 0; wave < offsets.length; wave += maxConcurrency) {
+    await Promise.all(
+      offsets.slice(wave, wave + maxConcurrency).map(async offset => {
+        const batch = hydrated.slice(offset, offset + batchSize);
+        const selections = batch
+          .map((pr, index) => {
+            if (!Number.isSafeInteger(pr.number) || pr.number < 1) {
+              throw new Error('open PR metadata is missing a PR number');
+            }
+            return `p${index}:pullRequest(number:${pr.number}){number baseRefName baseRefOid headRefName headRefOid headRepository{name nameWithOwner} headRepositoryOwner{login} isCrossRepository mergeable mergeStateStatus autoMergeRequest{enabledAt enabledBy{login} mergeMethod} changedFiles additions deletions maintainerCanModify}`;
+          })
+          .join(' ');
+        const response = await request({
+          owner,
+          name,
+          query: `query($owner:String!,$name:String!){repository(owner:$owner,name:$name){${selections}}}`,
+        });
+        const repository = response?.data?.repository;
+        if (!repository || typeof repository !== 'object') {
+          throw new Error('GraphQL open-PR metadata omitted repository data');
         }
-        return `p${index}:pullRequest(number:${pr.number}){number baseRefName baseRefOid headRefName headRefOid headRepository{name nameWithOwner} headRepositoryOwner{login} isCrossRepository mergeable mergeStateStatus autoMergeRequest{enabledAt enabledBy{login} mergeMethod} changedFiles additions deletions maintainerCanModify}`;
-      })
-      .join(' ');
-    const response = await request({
-      owner,
-      name,
-      query: `query($owner:String!,$name:String!){repository(owner:$owner,name:$name){${selections}}}`,
-    });
-    const repository = response?.data?.repository;
-    if (!repository || typeof repository !== 'object') {
-      throw new Error('GraphQL open-PR metadata omitted repository data');
-    }
 
-    for (let index = 0; index < batch.length; index += 1) {
-      const expected = batch[index];
-      const metadata = repository[`p${index}`];
-      if (!metadata || metadata.number !== expected.number) {
-        throw new Error(
-          `GraphQL open-PR metadata omitted PR #${expected.number}`
-        );
-      }
-      if (
-        !/^[0-9a-f]{40}$/u.test(metadata.headRefOid ?? '') ||
-        !/^[0-9a-f]{40}$/u.test(metadata.baseRefOid ?? '') ||
-        !metadata.headRefName ||
-        !metadata.baseRefName
-      ) {
-        throw new Error(
-          `GraphQL open-PR metadata for PR #${expected.number} omitted exact refs`
-        );
-      }
-      hydrated[offset + index] = {
-        ...expected,
-        ...metadata,
-        statusCheckRollup: expected.statusCheckRollup ?? [],
-      };
-    }
+        for (let index = 0; index < batch.length; index += 1) {
+          const expected = batch[index];
+          const metadata = repository[`p${index}`];
+          if (!metadata || metadata.number !== expected.number) {
+            throw new Error(
+              `GraphQL open-PR metadata omitted PR #${expected.number}`
+            );
+          }
+          if (
+            !/^[0-9a-f]{40}$/u.test(metadata.headRefOid ?? '') ||
+            !/^[0-9a-f]{40}$/u.test(metadata.baseRefOid ?? '') ||
+            !metadata.headRefName ||
+            !metadata.baseRefName
+          ) {
+            throw new Error(
+              `GraphQL open-PR metadata for PR #${expected.number} omitted exact refs`
+            );
+          }
+          hydrated[offset + index] = {
+            ...expected,
+            ...metadata,
+            statusCheckRollup: expected.statusCheckRollup ?? [],
+          };
+        }
+      })
+    );
   }
   return hydrated;
 }

@@ -49,11 +49,13 @@ describe('REST open PR inventory', () => {
   it('uses REST for enumeration and bounded GraphQL batches for omitted metadata', async () => {
     const restCalls = [];
     const graphqlCalls = [];
+    let activeGraphql = 0;
+    let maxActiveGraphql = 0;
     const exactSha = number => number.toString(16).padStart(40, '0');
     const restRequest = async endpoint => {
       restCalls.push(endpoint);
       if (endpoint.includes('page=1')) {
-        return Array.from({ length: 26 }, (_, index) =>
+        return Array.from({ length: 76 }, (_, index) =>
           detail(index + 1, exactSha(index + 1))
         );
       }
@@ -65,7 +67,10 @@ describe('REST open PR inventory', () => {
       request: restRequest,
     });
     const request = async ({ query }) => {
+      activeGraphql += 1;
+      maxActiveGraphql = Math.max(maxActiveGraphql, activeGraphql);
       graphqlCalls.push(query);
+      await Promise.resolve();
       const repository = {};
       for (const match of query.matchAll(
         /p(\d+):pullRequest\(number:(\d+)\)/gu
@@ -93,6 +98,7 @@ describe('REST open PR inventory', () => {
           maintainerCanModify: true,
         };
       }
+      activeGraphql -= 1;
       return { data: { repository } };
     };
 
@@ -101,18 +107,20 @@ describe('REST open PR inventory', () => {
       prs: summaries,
       request,
       batchSize: 25,
+      maxConcurrency: 3,
     });
 
     expect(restCalls).toHaveLength(1);
-    expect(graphqlCalls).toHaveLength(2);
+    expect(graphqlCalls).toHaveLength(4);
+    expect(maxActiveGraphql).toBe(3);
     expect(graphqlCalls.every(query => !query.includes('body'))).toBe(true);
-    expect(hydrated).toHaveLength(26);
-    expect(hydrated[25]).toMatchObject({
-      number: 26,
+    expect(hydrated).toHaveLength(76);
+    expect(hydrated[75]).toMatchObject({
+      number: 76,
       mergeable: 'MERGEABLE',
       mergeStateStatus: 'CLEAN',
-      changedFiles: 26,
-      headRefOid: exactSha(26),
+      changedFiles: 76,
+      headRefOid: exactSha(76),
       baseRefOid: 'f'.repeat(40),
     });
   });
@@ -125,6 +133,19 @@ describe('REST open PR inventory', () => {
         request: async () => ({ data: { repository: { p0: null } } }),
       })
     ).rejects.toThrow('GraphQL open-PR metadata omitted PR #99');
+  });
+
+  it('rejects unbounded GraphQL hydration concurrency', async () => {
+    await expect(
+      hydrateOpenPrGraphqlMetadata({
+        repo: 'JovieInc/Jovie',
+        prs: [],
+        request: async () => ({ data: { repository: {} } }),
+        maxConcurrency: 5,
+      })
+    ).rejects.toThrow(
+      'metadata hydration maxConcurrency must be between 1 and 4'
+    );
   });
 
   it('paginates without GraphQL and hydrates exact-head checks', async () => {
