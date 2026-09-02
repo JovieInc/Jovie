@@ -1271,16 +1271,31 @@ jobs:
             exit 1
           }
 
-          alias_json="$(./node_modules/.bin/vercel inspect staging.jov.ie \
-            --format=json --scope "$VERCEL_ORG_ID")"
-          jq -e --arg id "$EXPECTED_DEPLOYMENT_ID" '
-            .id == $id and
-            (.readyState | ascii_upcase) == "READY" and
-            (.target | ascii_downcase) == "preview"
-          ' >/dev/null <<<"$alias_json" || {
-            echo "::error::staging.jov.ie does not own the exact READY preview."
-            exit 1
-          }
+          for attempt in $(seq 1 15); do
+            alias_json="$(./node_modules/.bin/vercel inspect staging.jov.ie \
+              --format=json --scope "$VERCEL_ORG_ID" 2>/dev/null || true)"
+            if jq -e '
+              type == "object" and
+              (.id | type == "string") and
+              (.readyState | type == "string") and
+              (.target | type == "string")
+            ' >/dev/null 2>&1 <<<"$alias_json"; then
+              alias_id="$(jq -r '.id' <<<"$alias_json")"
+              alias_state="$(jq -r '.readyState | ascii_upcase' <<<"$alias_json")"
+              alias_target="$(jq -r '.target | ascii_downcase' <<<"$alias_json")"
+              if [ "$alias_id" = "$EXPECTED_DEPLOYMENT_ID" ] &&
+                [ "$alias_state" = "READY" ] &&
+                [ "$alias_target" = "preview" ]; then
+                echo "staging.jov.ie owns exact READY preview $alias_id."
+                break
+              fi
+            fi
+            if [ "$attempt" -eq 15 ]; then
+              echo "::error::staging.jov.ie did not converge to the exact READY preview."
+              exit 1
+            fi
+            sleep 4
+          done
 
           curl_args=(
             --fail --silent --show-error
