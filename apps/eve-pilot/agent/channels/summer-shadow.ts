@@ -1,4 +1,4 @@
-import { defineChannel, POST } from 'eve/channels';
+import { defineChannel, GET, POST } from 'eve/channels';
 import type { AuthFn } from 'eve/channels/auth';
 import {
   extractBearerToken,
@@ -7,7 +7,10 @@ import {
   verifyVercelOidc,
   withAuthChallenges,
 } from 'eve/channels/auth';
-import { createSummerShadowIngressHandler } from '../lib/summer-shadow-ingress';
+import {
+  createSummerShadowIngressHandler,
+  summerShadowKey,
+} from '../lib/summer-shadow-ingress';
 import { persistImmutableShadowRecord } from '../lib/vercel-blob-shadow-store';
 
 export const JOVIE_PRODUCTION_OIDC_SUBJECT = vercelSubject({
@@ -73,8 +76,8 @@ export default defineChannel<SummerShadowChannelState>({
       const handler = createSummerShadowIngressHandler({
         authenticate: incoming => routeAuth(incoming, ovieSummerShadowOidcAuth),
         persistImmutable: persistImmutableShadowRecord,
-        async dispatch({ auth, event, eventKey, message, receiptPath }) {
-          const session = await from(eventKey).send(message, {
+        async dispatch({ auth, event, conversationKey, message, receiptPath }) {
+          const session = await from(conversationKey).send(message, {
             auth,
             state: {
               dispatchAuthority: 'none',
@@ -91,5 +94,49 @@ export default defineChannel<SummerShadowChannelState>({
 
       return handler(request);
     }),
+    GET(
+      '/ovie/v1/summer-shadow/sessions/:sessionId/stream',
+      async (request, { attachSession, params, resolveSession }) => {
+        const auth = await routeAuth(request, ovieSummerShadowOidcAuth);
+        if (auth instanceof Response) return auth;
+
+        const requestUrl = new URL(request.url);
+        const conversationId = requestUrl.searchParams.get('conversationId');
+        const startIndexValue = requestUrl.searchParams.get('startIndex');
+        const startIndex =
+          startIndexValue === null ? 0 : Number(startIndexValue);
+        if (
+          !conversationId ||
+          !/^[A-Za-z0-9][A-Za-z0-9_-]{7,127}$/u.test(conversationId) ||
+          !Number.isSafeInteger(startIndex) ||
+          startIndex < 0
+        ) {
+          return Response.json(
+            { ok: false, code: 'invalid_stream_request' },
+            { status: 400 }
+          );
+        }
+
+        const boundSession = await resolveSession(
+          summerShadowKey(conversationId)
+        );
+        if (!boundSession || boundSession.id !== params.sessionId) {
+          return Response.json(
+            { ok: false, code: 'shadow_session_not_found' },
+            { status: 404 }
+          );
+        }
+
+        const stream = await attachSession(params.sessionId).getEventStream({
+          startIndex,
+        });
+        return new Response(stream, {
+          headers: {
+            'cache-control': 'no-store',
+            'content-type': 'application/x-ndjson',
+          },
+        });
+      }
+    ),
   ],
 });

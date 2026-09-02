@@ -87,9 +87,13 @@ jobs:
             --meta "githubCommitSha=$GITHUB_SHA")"
           case "$deployment_url" in
             https://*.vercel.app) ;;
-            *) exit 1 ;;
+            *)
+              echo 'Vercel did not return a valid preview deployment URL.' >&2
+              exit 1
+              ;;
           esac
-          pnpm exec vercel alias set "$deployment_url" \
+          pnpm exec vercel alias set \
+            "$deployment_url" \
             jovie-eve-shadow-staging.vercel.app \
             --scope jovie \
             --token "$VERCEL_TOKEN"
