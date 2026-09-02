@@ -13,9 +13,16 @@ import unittest
 ROOT = pathlib.Path(__file__).resolve().parents[3]
 HELPER = ROOT / "scripts/hermes/jovie-symphony-workspace"
 WRAPPER = ROOT / "scripts/hermes/jovie-symphony-workspace-create"
+INSTALLER = ROOT / "scripts/hermes/install-gem-symphony-storage.sh"
 
 
 class JovieSymphonyWorkspaceTests(unittest.TestCase):
+    def test_installer_pins_offline_user_corepack_for_root_preflight(self) -> None:
+        source = INSTALLER.read_text()
+        self.assertIn('corepack_home="/home/$owner/.cache/node/corepack"', source)
+        self.assertIn('COREPACK_ENABLE_NETWORK=0', source)
+        self.assertIn('"$("${tool_env[@]}" pnpm --version)"', source)
+
     def test_declared_roots_and_known_bucket_mapping(self) -> None:
         source = HELPER.read_text()
         prefix = source.split("\nrequire_root\ninit_state\n", 1)[0]
