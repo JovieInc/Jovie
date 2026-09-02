@@ -33,6 +33,7 @@ orchestration platform.
 | Duplicate/idempotency | already works | passing | Immutable/dedupe source contracts exist; intended-environment receipt is still required. |
 | Dependency degradation | already works | passing | Fail-closed source tests exist; intended-environment receipt is still required. |
 | Permission refusal | already works | passing | Read-only and isolation boundaries exist; intended-environment refusal receipt is still required. |
+| Product Quality Governor | in flight | blocked | A bounded `/start` contract composes existing Journey Auditor, pstack verification, certification/Ovie review, Eve triggers, and Symphony dispatch. Source deliberate-red coverage exists; no event-driven exact-runtime repair loop has passed. |
 
 The JSON registry is the machine-readable source for evidence, invalidation
 conditions, owner/remediation references, and probe versions.
@@ -51,7 +52,7 @@ conditions, owner/remediation references, and probe versions.
 | Eve-native ownership | No Eve-owned scheduler/no-op/remediation receipt across restart. | **Blocked** — owner: Eve / Summer liveness. Re-evaluate only when Eve owns the schedule and emits signed terminal receipts; any ownership, cadence, state-fingerprint, cost-budget, restart, or escalation-route change invalidates proof. |
 
 These receipts are incorporated as evidence rather than duplicated as new
-implementation. They do not turn the canonical 15-probe gate green and do not
+implementation. They do not turn the canonical 16-probe gate green and do not
 create another task or overlap the CI/queue lane.
 
 ## Runtime convergence sequence
@@ -72,7 +73,7 @@ runtime has actually won.
 4. **Authority completion:** land or replace the existing Linear/Symphony and
    operations-truth work in PRs #16396 and #16406, then add least-privilege
    read/query adapters for the explicitly blocked Neon and Stripe fixtures.
-5. **Deterministic proof:** run all 15 versioned probes against the exact intended
+5. **Deterministic proof:** run all 16 versioned probes against the exact intended
    runtime version. Any red probe remains a blocker with its registry owner and
    remediation references.
 6. **Burn-in and soak:** run the bounded 1–2 hour workload, then the 24-hour soak.
@@ -85,7 +86,7 @@ passing receipt must include:
 
 - `schema`: `jovie.summer-commissioning.probe-receipt/v1`
 - exact `probeId` and `probeVersion`
-- exact SHA-256 `registryDigest` for the canonical 15-capability registry
+- exact SHA-256 `registryDigest` for the canonical 16-capability registry
 - exact fixture and expected/actual state
 - a safe correlation identifier
 - intended environment and exact environment/deploy version
