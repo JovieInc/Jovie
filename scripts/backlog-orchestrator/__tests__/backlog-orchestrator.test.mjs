@@ -1521,7 +1521,13 @@ describe('deterministic Symphony admission boundary', () => {
       accepted: true,
       target: 4,
       measuredTarget: 6,
-      provider: { state: 'available', accounts: 8, locked: 2, available: 4, cooldown: 2 },
+      provider: {
+        state: 'available',
+        accounts: 8,
+        locked: 2,
+        available: 4,
+        cooldown: 2,
+      },
       runtime: { running: 1, retrying: 0 },
       observedAt: '2026-09-02T18:39:00.000Z',
     };
