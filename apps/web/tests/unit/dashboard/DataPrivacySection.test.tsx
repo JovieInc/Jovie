@@ -1,24 +1,21 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { render, screen } from '@testing-library/react';
-import type { ReactElement } from 'react';
 import { describe, expect, it } from 'vitest';
 import { DataPrivacySection } from '@/components/features/dashboard/organisms/DataPrivacySection';
 
-function renderWithQueryClient(ui: ReactElement) {
-  const queryClient = new QueryClient({
-    defaultOptions: {
-      queries: { retry: false },
-      mutations: { retry: false },
-    },
-  });
-  return render(
-    <QueryClientProvider client={queryClient}>{ui}</QueryClientProvider>
-  );
-}
-
 describe('DataPrivacySection', () => {
   it('owns destructive settings-row tone for account deletion', () => {
-    renderWithQueryClient(<DataPrivacySection />);
+    const queryClient = new QueryClient({
+      defaultOptions: {
+        queries: { retry: false },
+        mutations: { retry: false },
+      },
+    });
+    render(
+      <QueryClientProvider client={queryClient}>
+        <DataPrivacySection />
+      </QueryClientProvider>
+    );
 
     const title = screen.getByText('Delete your account');
     const row = title.closest('[data-tone="destructive"]');

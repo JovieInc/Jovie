@@ -1,4 +1,4 @@
-import { cn } from '@/lib/utils';
+import { cn } from '@jovie/ui/lib/utils';
 
 export type SettingsRowTone = 'default' | 'destructive';
 export type SettingsRowDataState = 'idle' | 'disabled' | 'gated';
