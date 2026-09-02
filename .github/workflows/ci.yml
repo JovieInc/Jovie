@@ -5789,6 +5789,87 @@ jobs:
 
   # Homepage smoke is a blocking probe of the immutable production deployment.
 
+  continuous-audit-pilot:
+    name: Continuous audit pilot
+    if: ${{ github.event_name == 'push' && github.ref == 'refs/heads/main' }}
+    runs-on: [self-hosted, Linux, X64, jovie-fixed]
+    timeout-minutes: 3
+    continue-on-error: true
+    concurrency:
+      group: continuous-audit-pilot-gem
+      cancel-in-progress: false
+    env:
+      TURBO_TOKEN: ''
+      TURBO_TEAM: ''
+      TURBO_CACHE: local:rw
+    steps:
+      - name: Confirm exact current main
+        id: current-main
+        uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
+        with:
+          script: |
+            const { data } = await github.rest.git.getRef({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              ref: 'heads/main',
+            });
+            if (data.object.sha !== context.sha) {
+              core.setFailed(`Stale main run: expected ${data.object.sha}, got ${context.sha}`);
+              return;
+            }
+            core.setOutput('sha', data.object.sha);
+      - name: Checkout exact main source
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.sha }}
+          fetch-depth: 1
+          persist-credentials: false
+      - name: Setup Node.js
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version-file: '.nvmrc'
+      - name: Evaluate continuous audit pilot
+        id: continuous-audit
+        env:
+          GEM_WORKSPACE: /home/timwhite/gem-workspace
+          GITHUB_CURRENT_MAIN_SHA: ${{ steps.current-main.outputs.sha }}
+        run: |
+          node scripts/continuous-audit-pilot.mjs run \
+            --policy=audits/continuous/activation.json \
+            --state-dir="$GEM_WORKSPACE/state/continuous-audit-pilot" \
+            --receipt-file="$RUNNER_TEMP/continuous-audit-pilot/receipt.json"
+      - name: Preserve bounded pilot receipt
+        id: preserve-receipt
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: continuous-audit-pilot-${{ github.sha }}-${{ github.run_attempt }}
+          path: ${{ runner.temp }}/continuous-audit-pilot/receipt.json
+          if-no-files-found: error
+          retention-days: 3
+      - name: Attest preserved host receipt
+        id: continuous-audit-attestation
+        if: ${{ always() && steps.continuous-audit.outcome == 'success' && steps.preserve-receipt.outcome == 'success' }}
+        env:
+          GEM_WORKSPACE: /home/timwhite/gem-workspace
+          GITHUB_CURRENT_MAIN_SHA: ${{ steps.current-main.outputs.sha }}
+        run: |
+          node scripts/continuous-audit-pilot.mjs attest \
+            --policy=audits/continuous/activation.json \
+            --state-dir="$GEM_WORKSPACE/state/continuous-audit-pilot" \
+            --receipt-file="$RUNNER_TEMP/continuous-audit-pilot/receipt.json"
+      - name: Disable pilot after a terminal failure
+        if: ${{ always() && (steps.continuous-audit.outcome != 'success' || steps.preserve-receipt.outcome != 'success' || steps.continuous-audit-attestation.outcome != 'success') }}
+        env:
+          GEM_WORKSPACE: /home/timwhite/gem-workspace
+          GITHUB_CURRENT_MAIN_SHA: ${{ steps.current-main.outputs.sha }}
+        run: |
+          node scripts/continuous-audit-pilot.mjs disable \
+            --policy=audits/continuous/activation.json \
+            --state-dir="$GEM_WORKSPACE/state/continuous-audit-pilot" \
+            --receipt-file="$RUNNER_TEMP/continuous-audit-pilot/receipt.json" \
+            --reason=runner-error
+
   main-release-ready:
     name: Main Release Ready
     needs:

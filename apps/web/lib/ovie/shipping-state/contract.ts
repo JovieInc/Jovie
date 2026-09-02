@@ -21,6 +21,7 @@ export const SHIPPING_SOURCE_IDS = [
   'lease-guard-capacity',
   'github-native-merge-queue',
   'exact-sha-ci',
+  'continuous-audit-pilot',
   'production-controller',
   'live-build-info',
   'fleet-receipt',
@@ -30,9 +31,9 @@ export type ShippingSourceId = (typeof SHIPPING_SOURCE_IDS)[number];
 
 /**
  * Producer-event validity is distinct from successful observation freshness.
- * Current GitHub/runtime reads are identity-bound and therefore have no
- * elapsed-time expiry here. Heartbeat and persisted fleet producers retain
- * their own documented semantic windows.
+ * Current GitHub/runtime reads are identity-bound and therefore normally have
+ * no elapsed-time expiry here. The bounded audit pilot mirrors its host lease;
+ * heartbeat and persisted fleet producers retain their documented windows.
  */
 export const SHIPPING_SOURCE_SEMANTIC_FRESHNESS_MS = {
   'symphony-runtime': 10_000,
@@ -40,6 +41,7 @@ export const SHIPPING_SOURCE_SEMANTIC_FRESHNESS_MS = {
   'lease-guard-capacity': 10 * 60_000,
   'github-native-merge-queue': null,
   'exact-sha-ci': null,
+  'continuous-audit-pilot': 5 * 60_000,
   'production-controller': null,
   'live-build-info': null,
   'fleet-receipt': 10 * 60_000,
@@ -51,6 +53,7 @@ export const SHIPPING_SOURCE_SCHEMAS = {
   'lease-guard-capacity': 'symphony-lease-guard-report/v1',
   'github-native-merge-queue': 'github-merge-queue-entry/v1',
   'exact-sha-ci': 'github-actions-run/v1',
+  'continuous-audit-pilot': 'github-actions-step/v1',
   'production-controller': 'jovie-controller-snapshot/v1',
   'live-build-info': 'jovie-build-info/v1',
   'fleet-receipt': 'jovie-fleet-gate/v1',
@@ -62,6 +65,7 @@ export const SHIPPING_SOURCE_PRODUCERS = {
   'lease-guard-capacity': 'symphony-lease-guard',
   'github-native-merge-queue': 'github-native-merge-queue',
   'exact-sha-ci': 'github-actions-ci',
+  'continuous-audit-pilot': 'github-actions-ci',
   'production-controller': 'production-controller',
   'live-build-info': 'live-build-info',
   'fleet-receipt': 'gem-priority-gate',

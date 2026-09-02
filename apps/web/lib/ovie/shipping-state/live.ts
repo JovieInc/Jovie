@@ -405,18 +405,19 @@ export async function readMergeQueue(io: LiveIo): Promise<AuthorityRead> {
 
 export async function readWorkflow(
   io: LiveIo,
-  sourceId: 'exact-sha-ci' | 'production-controller',
+  sourceId: 'exact-sha-ci' | 'continuous-audit-pilot' | 'production-controller',
   workflow: string
 ): Promise<AuthorityRead> {
   const repositoryUrl = `${GITHUB_API_URL}/repos/${encodeURIComponent(io.githubOwner ?? '')}/${encodeURIComponent(io.githubRepo ?? '')}`;
-  const query =
-    sourceId === 'exact-sha-ci'
-      ? 'branch=main&event=push&per_page=5&exclude_pull_requests=true'
-      : 'per_page=5&exclude_pull_requests=true';
+  const mainBound =
+    sourceId === 'exact-sha-ci' || sourceId === 'continuous-audit-pilot';
+  const query = mainBound
+    ? 'branch=main&event=push&per_page=5&exclude_pull_requests=true'
+    : 'per_page=5&exclude_pull_requests=true';
   const url = `${repositoryUrl}/actions/workflows/${encodeURIComponent(workflow)}/runs?${query}`;
   try {
     let currentMainSha: string | null = null;
-    if (sourceId === 'exact-sha-ci') {
+    if (mainBound) {
       const mainResponse = await githubFetch(
         io,
         sourceId,
@@ -471,17 +472,16 @@ export async function readWorkflow(
       );
     }
     const runs = body.workflow_runs;
-    const latest =
-      sourceId === 'exact-sha-ci'
-        ? (runs.find(
-            run =>
-              run.event === 'push' &&
-              run.head_branch === 'main' &&
-              run.head_sha === currentMainSha
-          ) ?? null)
-        : (runs[0] ?? null);
+    const latest = mainBound
+      ? (runs.find(
+          run =>
+            run.event === 'push' &&
+            run.head_branch === 'main' &&
+            run.head_sha === currentMainSha
+        ) ?? null)
+      : (runs[0] ?? null);
     if (latest == null) {
-      if (sourceId === 'exact-sha-ci' && currentMainSha) {
+      if (mainBound && currentMainSha) {
         return failedRead(
           sourceId,
           'unavailable',
@@ -509,6 +509,148 @@ export async function readWorkflow(
     const conclusion =
       typeof latest.conclusion === 'string' ? latest.conclusion : null;
     const green = conclusion === 'success';
+
+    if (sourceId === 'continuous-audit-pilot') {
+      const runId =
+        typeof latest.id === 'string' || typeof latest.id === 'number'
+          ? String(latest.id)
+          : null;
+      const runAttempt = latest.run_attempt;
+      if (
+        !runId ||
+        !Number.isInteger(runAttempt) ||
+        Number(runAttempt) < 1 ||
+        !isExactSha(sha)
+      ) {
+        return failedRead(
+          sourceId,
+          'unavailable',
+          'Continuous audit CI identity was malformed',
+          { errorCode: 'malformed' }
+        );
+      }
+      const jobsUrl = `${GITHUB_API_URL}/repos/${encodeURIComponent(io.githubOwner ?? '')}/${encodeURIComponent(io.githubRepo ?? '')}/actions/runs/${encodeURIComponent(runId)}/attempts/${String(runAttempt)}/jobs?per_page=100`;
+      const jobsResponse = await githubFetch(io, sourceId, jobsUrl, {});
+      if (!('ok' in jobsResponse)) return jobsResponse;
+      if (!jobsResponse.ok) {
+        return failedRead(
+          sourceId,
+          'unavailable',
+          `Continuous audit jobs returned ${jobsResponse.status}`,
+          { errorCode: `http-${jobsResponse.status}` }
+        );
+      }
+      const jobsBody: unknown = await jobsResponse.json();
+      if (
+        !isRecord(jobsBody) ||
+        !Number.isInteger(jobsBody.total_count) ||
+        Number(jobsBody.total_count) < 0 ||
+        !Array.isArray(jobsBody.jobs) ||
+        !jobsBody.jobs.every(isRecord) ||
+        jobsBody.total_count !== jobsBody.jobs.length
+      ) {
+        return failedRead(
+          sourceId,
+          'unavailable',
+          'Continuous audit jobs response was malformed or incomplete',
+          { errorCode: 'malformed' }
+        );
+      }
+      const pilotJobs = jobsBody.jobs.filter(
+        job => job.name === 'Continuous audit pilot'
+      );
+      if (pilotJobs.length !== 1) {
+        return failedRead(
+          sourceId,
+          'unavailable',
+          pilotJobs.length === 0
+            ? 'Continuous audit pilot job is missing'
+            : 'Continuous audit pilot job is duplicated',
+          { errorCode: 'malformed', sourceRevision: sha }
+        );
+      }
+      const pilotJob = pilotJobs[0];
+      if (
+        String(pilotJob.run_id) !== runId ||
+        pilotJob.run_attempt !== runAttempt ||
+        pilotJob.head_sha !== sha ||
+        !Array.isArray(pilotJob.steps) ||
+        !pilotJob.steps.every(isRecord)
+      ) {
+        return failedRead(
+          sourceId,
+          'unavailable',
+          'Continuous audit pilot job did not match its CI run',
+          { errorCode: 'identity-mismatch', sourceRevision: sha }
+        );
+      }
+      const attestationSteps = pilotJob.steps.filter(
+        step => step.name === 'Attest preserved host receipt'
+      );
+      const receiptSteps = pilotJob.steps.filter(
+        step => step.name === 'Preserve bounded pilot receipt'
+      );
+      if (attestationSteps.length !== 1 || receiptSteps.length !== 1) {
+        return failedRead(
+          sourceId,
+          'unavailable',
+          'Continuous audit terminal receipt steps are missing or duplicated',
+          { errorCode: 'malformed', sourceRevision: sha }
+        );
+      }
+      const attestationStep = attestationSteps[0];
+      const receiptStep = receiptSteps[0];
+      const sourceTimestamp =
+        parseTimestamp(attestationStep.completed_at) ??
+        parseTimestamp(pilotJob.completed_at) ??
+        parseTimestamp(latest.updated_at);
+      const identity = {
+        sourceTimestamp,
+        sourceRevision: sha,
+        sequence:
+          typeof latest.run_number === 'number' ? latest.run_number : null,
+        eventId: `${runId}:${runAttempt}:continuous-audit-pilot`,
+        correlation: { sha, ciRunId: runId, deploymentId: null },
+      };
+      if (
+        pilotJob.status !== 'completed' ||
+        typeof pilotJob.conclusion !== 'string' ||
+        typeof attestationStep.conclusion !== 'string' ||
+        typeof receiptStep.conclusion !== 'string'
+      ) {
+        return failedRead(
+          sourceId,
+          'unknown',
+          'Continuous audit pilot has not completed',
+          { ...identity, errorCode: 'pending' }
+        );
+      }
+      if (
+        pilotJob.conclusion !== 'success' ||
+        attestationStep.conclusion !== 'success' ||
+        receiptStep.conclusion !== 'success'
+      ) {
+        return failedRead(
+          sourceId,
+          'error',
+          `Continuous audit pilot is disabled (${pilotJob.conclusion}/${receiptStep.conclusion}/${attestationStep.conclusion})`,
+          { ...identity, errorCode: 'continuous-audit-disabled' }
+        );
+      }
+      return {
+        sourceId,
+        status: 'ok',
+        schema: SHIPPING_SOURCE_SCHEMAS[sourceId],
+        payload: {
+          run: latest,
+          job: pilotJob,
+          receiptStep,
+          attestationStep,
+        },
+        truncated: false,
+        ...identity,
+      };
+    }
 
     if (sourceId === 'production-controller') {
       const runId =
@@ -745,6 +887,8 @@ export function createLiveShippingStateReaders(
     },
     'github-native-merge-queue': () => readMergeQueue(io),
     'exact-sha-ci': () => readWorkflow(io, 'exact-sha-ci', 'ci.yml'),
+    'continuous-audit-pilot': () =>
+      readWorkflow(io, 'continuous-audit-pilot', 'ci.yml'),
     'production-controller': () =>
       readWorkflow(io, 'production-controller', 'production-controller.yml'),
     'live-build-info': () =>

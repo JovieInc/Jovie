@@ -16,6 +16,7 @@ import {
   SHIPPING_SOURCE_IDS,
   SHIPPING_SOURCE_READ_TIMEOUT_MS,
   SHIPPING_SOURCE_SCHEMAS,
+  SHIPPING_SOURCE_SEMANTIC_FRESHNESS_MS,
   SHIPPING_STATE_SCHEMA,
   OBSERVATION_STATES as SHIPPING_STATES,
   type ShippingClock,
@@ -110,6 +111,9 @@ function baseline(
         measuredMeanings: { ciGreen: true },
       }
     ),
+    'continuous-audit-pilot': ok('continuous-audit-pilot', {
+      conclusion: 'success',
+    }),
     'production-controller': ok(
       'production-controller',
       { conclusion: 'success' },
@@ -159,11 +163,15 @@ describe('ovie.shipping-state.v1 contract', () => {
       'lease-guard-capacity',
       'github-native-merge-queue',
       'exact-sha-ci',
+      'continuous-audit-pilot',
       'production-controller',
       'live-build-info',
       'fleet-receipt',
     ]);
     expect(BUDGET).toBe(10_000);
+    expect(
+      SHIPPING_SOURCE_SEMANTIC_FRESHNESS_MS['continuous-audit-pilot']
+    ).toBe(5 * 60_000);
     expect(measuredCount(-1)).toEqual({ state: 'not-measured', value: null });
     expect(measuredCount(1.5)).toEqual({ state: 'not-measured', value: null });
     for (const state of OPERATIONAL_TRUTH_STATES) {
@@ -1281,6 +1289,13 @@ describe('live GitHub shipping reader', () => {
     });
   }
 
+  function ciJobsResponse(jobs: unknown[]) {
+    return new Response(JSON.stringify({ total_count: jobs.length, jobs }), {
+      status: 200,
+      headers: { 'content-type': 'application/json' },
+    });
+  }
+
   it('binds exact-SHA CI to the current main push run', async () => {
     const exactRun = {
       id: 91,
@@ -1374,6 +1389,78 @@ describe('live GitHub shipping reader', () => {
       sourceRevision: SHA_B,
       correlation: { sha: SHA_B },
     });
+  });
+
+  it.each([
+    ['success', 'ok', undefined],
+    ['failure', 'error', 'continuous-audit-disabled'],
+  ])('projects the continuous audit terminal attestation %s into Ovie as %s', async (conclusion, status, errorCode) => {
+    const exactRun = {
+      id: 91,
+      run_attempt: 2,
+      run_number: 10,
+      event: 'push',
+      head_branch: 'main',
+      head_sha: SHA,
+      status: 'completed',
+      conclusion: 'success',
+      updated_at: T0,
+    };
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValueOnce(currentMainResponse())
+      .mockResolvedValueOnce(ciRunsResponse([exactRun]))
+      .mockResolvedValueOnce(
+        ciJobsResponse([
+          {
+            id: 92,
+            name: 'Continuous audit pilot',
+            run_id: 91,
+            run_attempt: 2,
+            head_sha: SHA,
+            status: 'completed',
+            conclusion,
+            completed_at: T0,
+            steps: [
+              {
+                name: 'Preserve bounded pilot receipt',
+                status: 'completed',
+                conclusion: 'success',
+                completed_at: T0,
+              },
+              {
+                name: 'Attest preserved host receipt',
+                status: 'completed',
+                conclusion,
+                completed_at: T0,
+              },
+            ],
+          },
+        ])
+      );
+
+    const read = await readWorkflow(
+      {
+        readFile: vi.fn(),
+        fetch: fetchMock,
+        githubToken: 'test-token',
+        githubOwner: 'JovieInc',
+        githubRepo: 'Jovie',
+      },
+      'continuous-audit-pilot',
+      'ci.yml'
+    );
+
+    expect(read).toMatchObject({
+      sourceId: 'continuous-audit-pilot',
+      status,
+      sourceRevision: SHA,
+      correlation: { ciRunId: '91', sha: SHA },
+      ...(errorCode ? { errorCode } : {}),
+    });
+    expect(fetchMock.mock.calls[2]?.[0]).toContain(
+      '/actions/runs/91/attempts/2/jobs?per_page=100'
+    );
   });
 
   it('uses the exact Production Verified job from the latest run attempt', async () => {

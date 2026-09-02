@@ -1,7 +1,8 @@
 # Continuous audit scheduling proposal
 
-Status: **proposal only**. No workflow, cron, Codex automation, provider
-credential, or production setting was created or changed.
+Status: **family schedules remain proposal only**. One bounded registry and
+coverage-integrity pilot is active on trusted `main` push events through the
+existing CI workflow. It is not a daily, weekly, monthly, or model schedule.
 
 ## Event lane
 
@@ -47,7 +48,14 @@ longer cover a live risk. Rebalance weights from incidents and code churn.
 
 ## Activation gate
 
-Activation requires one explicit authorization naming the chosen host and
-schedule. The activation change must show the exact workflow or automation,
-permissions, concurrency, cost cap, artifact retention, failure notification,
-and rollback. Approval of this proposal is not authorization to create the job.
+The founder authorized the integrity pilot on Gem with event-driven triggers,
+zero external model calls and spend, three-day evidence retention, Ovie-only
+notification, and automatic disable on a bad or malformed receipt. The exact
+machine-readable boundary is `activation.json`. Its five-minute lease becomes a
+latched disable on the next event if the runner disappears; successful terminal
+attestation closes the lease to `idle`, and Ovie accepts only that attestation
+after the exact-current-main receipt has been preserved.
+
+Every deeper family schedule above remains unapproved. Expanding cadence,
+permissions, providers, spend, retention, data egress, notification destination,
+or production behavior requires another reviewed activation decision.

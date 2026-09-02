@@ -1,0 +1,38 @@
+{
+  "schemaVersion": 1,
+  "pilotId": "jovie-continuous-audit-pilot",
+  "status": "active",
+  "scope": "registry-and-coverage-integrity",
+  "host": "gem",
+  "stateDirectory": "/home/timwhite/gem-workspace/state/continuous-audit-pilot",
+  "trigger": {
+    "workflow": "CI",
+    "event": "push",
+    "branch": "main",
+    "cadence": "event-driven-only"
+  },
+  "runnerLabels": ["self-hosted", "Linux", "X64", "jovie-fixed"],
+  "limits": {
+    "timeoutMinutes": 3,
+    "leaseMinutes": 5,
+    "concurrency": 1,
+    "artifactRetentionDays": 3,
+    "externalModelCalls": 0,
+    "incrementalModelSpendCents": 0
+  },
+  "dataBoundary": {
+    "customerDataAllowed": false,
+    "secretMaterialAllowed": false,
+    "externalCodeEgressAllowed": false
+  },
+  "notification": {
+    "channel": "ovie",
+    "sourceId": "continuous-audit-pilot",
+    "externalDestinationsAllowed": false
+  },
+  "rollback": {
+    "mode": "automatic-disable",
+    "disableOn": ["audit-failed", "invalid-receipt", "runner-error"],
+    "automaticReenable": false
+  }
+}
