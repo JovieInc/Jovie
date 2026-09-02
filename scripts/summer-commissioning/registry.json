@@ -1,0 +1,755 @@
+{
+  "schema": "jovie.summer-commissioning.registry/v1",
+  "registryVersion": "2026-09-01.4",
+  "certificationContract": "jovie.certification/v1",
+  "issue": "JOV-5853",
+  "intendedEnvironment": "production-like",
+  "trustedAttestationKeyFingerprints": [],
+  "auditedAt": "2026-09-01T23:52:00Z",
+  "sourceSnapshot": {
+    "repository": "JovieInc/Jovie",
+    "ref": "origin/main",
+    "sha": "6599a876fde20da8482f4280c79e82889de391e9"
+  },
+  "capabilities": [
+    {
+      "id": "SUMMER-COMM-001",
+      "capability": "Ovie desktop round trip",
+      "canonicalPath": [
+        "Ovie desktop -> /api/ovie/summer -> claimed turn -> local Summer runtime -> persisted response",
+        "apps/desktop/src/summer-runtime-bridge.ts",
+        "apps/web/lib/ovie/summer-transport.ts"
+      ],
+      "implementationState": "already_works",
+      "status": "degraded",
+      "critical": true,
+      "evidence": [
+        {
+          "kind": "source",
+          "ref": "apps/desktop/src/summer-runtime-bridge.ts",
+          "summary": "Current main binds the desktop worker to the local Hermes Summer profile."
+        },
+        {
+          "kind": "in_flight",
+          "ref": "https://github.com/JovieInc/Jovie/pull/16370",
+          "summary": "Canceled-turn, tool-only, and acceptance proof remain unlanded."
+        },
+        {
+          "kind": "runtime",
+          "ref": "local-mac:2026-09-01",
+          "summary": "ai.hermes.gateway-summer is live, but Hermes reports 2,347 upstream commits of drift and the installed Jovie app predates current main."
+        },
+        {
+          "kind": "exact_packaged_runtime",
+          "ref": "source:b31537204a4a8dfeaeb8c55061bd1c1cfeecc470:/app/ov/chat",
+          "summary": "A signed package was dogfooded through real /app/ov/chat; Summer claimed and completed the worker job and the persisted UI rendered the expected SUMMER_LOOP_OK bottleneck reply. This predates the canonical receipt schema and does not certify current source."
+        },
+        {
+          "kind": "in_flight",
+          "ref": "https://github.com/JovieInc/Jovie/pull/16962",
+          "summary": "Packaged /app/ov workspace targeting and raw-admin Summer session gating are fixed in an unlanded PR; root source PRs #16960, #16955, and #16958 are also unlanded."
+        },
+        {
+          "kind": "runtime",
+          "ref": "docs/operations/evidence/summer-mac-production-dogfood-2026-09-01.json",
+          "summary": "Fresh production Mac observation: the authorized existing owner session loaded jov.ie/hud on signed app.jov.ie 26.8.1, but the Aug-16 shell has no Talk door or /app/ov/chat route. A bounded launcher Retry returned to Unavailable, so request, response, persistence, and chat recovery remain unproven."
+        }
+      ],
+      "lastVerified": "2026-09-02T00:12:30.278Z",
+      "invalidationCondition": "Desktop build, Summer route, Hermes version, installed application build, or acceptance probe version changes.",
+      "ownerRemediation": {
+        "owner": "Summer runtime / Ovie desktop",
+        "refs": ["JOV-5212", "PR-16370", "PR-16962", "JOV-5853"]
+      },
+      "probe": {
+        "id": "summer.ovie.desktop-round-trip",
+        "version": "1.0.0",
+        "fixture": "ovie-desktop-five-turn-safe-tool-relaunch/v1",
+        "expectedState": "durable_round_trip_observed",
+        "requiresRuntimeReceipt": true,
+        "sourceAssertions": [
+          {
+            "kind": "file_contains",
+            "path": "apps/desktop/src/summer-runtime-bridge.ts",
+            "value": "'.hermes', 'bin', 'hermes'"
+          },
+          {
+            "kind": "file_contains",
+            "path": "apps/web/lib/ovie/summer-transport.ts",
+            "value": "readonly runtime: 'mac'"
+          }
+        ]
+      }
+    },
+    {
+      "id": "SUMMER-COMM-002",
+      "capability": "Photon or Spectrum iMessage round trip",
+      "canonicalPath": [
+        "Photon/Spectrum -> Eve channel -> Summer identity -> reply receipt",
+        "apps/eve-pilot/agent/channels/photon.ts"
+      ],
+      "implementationState": "conflicting",
+      "status": "blocked",
+      "critical": true,
+      "evidence": [
+        {
+          "kind": "source",
+          "ref": "apps/eve-pilot/agent/channels/photon.ts",
+          "summary": "Current main binds iMessage to Ovie, not Summer."
+        },
+        {
+          "kind": "coordination",
+          "ref": "JOV-5853",
+          "summary": "Hermes versus Spectrum routing is explicitly held for the separate coordinator."
+        },
+        {
+          "kind": "runtime",
+          "ref": "local-mac:2026-09-01",
+          "summary": "No Spectrum or Photon process was observed."
+        }
+      ],
+      "lastVerified": "2026-09-01T22:57:22Z",
+      "invalidationCondition": "Photon/Spectrum identity binding, allowlist, credential boundary, or routing decision changes.",
+      "ownerRemediation": {
+        "owner": "Photon/Spectrum coordinator",
+        "refs": ["JOV-5853"]
+      },
+      "probe": {
+        "id": "summer.imessage.round-trip",
+        "version": "1.0.0",
+        "fixture": "allowlisted-company-imessage-five-turn/v1",
+        "expectedState": "summer_reply_observed",
+        "requiresRuntimeReceipt": true,
+        "sourceAssertions": [
+          {
+            "kind": "file_contains",
+            "path": "apps/eve-pilot/agent/channels/photon.ts",
+            "value": "bindEvePilotIdentity('summer')"
+          }
+        ]
+      }
+    },
+    {
+      "id": "SUMMER-COMM-003",
+      "capability": "Canonical GBrain and Supabase context query",
+      "canonicalPath": [
+        "Summer safe tool -> Ovie MCP gbrain client -> canonical GBrain/Supabase store",
+        "apps/web/lib/ovie/mcp/tools.ts",
+        "apps/web/lib/wiki/gbrain-client.ts"
+      ],
+      "implementationState": "already_works",
+      "status": "degraded",
+      "critical": true,
+      "evidence": [
+        {
+          "kind": "source",
+          "ref": "apps/web/lib/ovie/mcp/tools.ts",
+          "summary": "Read-only search_gbrain and get_gbrain_page tools are present."
+        },
+        {
+          "kind": "runtime",
+          "ref": "gbrain-cli:2026-09-01",
+          "summary": "Targeted ownership/readiness queries timed out while the daemon remained present."
+        }
+      ],
+      "lastVerified": "2026-09-01T22:57:22Z",
+      "invalidationCondition": "GBrain client, Supabase backing store, Summer safe-tool allowlist, or runtime health changes.",
+      "ownerRemediation": {
+        "owner": "GBrain runtime",
+        "refs": ["JOV-5853", "gbrain-unavailable"]
+      },
+      "probe": {
+        "id": "summer.context.gbrain-supabase-query",
+        "version": "1.0.0",
+        "fixture": "company-context-known-page/v1",
+        "expectedState": "authenticated_canonical_result_observed",
+        "requiresRuntimeReceipt": true,
+        "sourceAssertions": [
+          {
+            "kind": "file_contains",
+            "path": "apps/web/lib/ovie/mcp/tools.ts",
+            "value": "case 'search_gbrain'"
+          },
+          {
+            "kind": "file_contains",
+            "path": "apps/web/lib/ovie/isolation.ts",
+            "value": "'search_gbrain'"
+          }
+        ]
+      }
+    },
+    {
+      "id": "SUMMER-COMM-004",
+      "capability": "Canonical Neon and application-data query",
+      "canonicalPath": [
+        "Summer least-privilege read tool -> application query layer -> Neon"
+      ],
+      "implementationState": "missing",
+      "status": "blocked",
+      "critical": true,
+      "evidence": [
+        {
+          "kind": "source_gap",
+          "ref": "apps/web/lib/ovie/isolation.ts",
+          "summary": "No Summer-safe application-data query capability is exposed."
+        }
+      ],
+      "lastVerified": "2026-09-01T22:57:22Z",
+      "invalidationCondition": "A least-privilege Summer application-data query is added or the intended canonical source changes.",
+      "ownerRemediation": {
+        "owner": "Summer data access",
+        "refs": ["JOV-5853"]
+      },
+      "probe": {
+        "id": "summer.data.neon-application-query",
+        "version": "1.0.0",
+        "fixture": "application-readonly-known-record/v1",
+        "expectedState": "authorized_application_result_observed",
+        "requiresRuntimeReceipt": true,
+        "sourceAssertions": [
+          {
+            "kind": "file_contains",
+            "path": "apps/web/lib/ovie/isolation.ts",
+            "value": "'query_application_data'"
+          }
+        ]
+      }
+    },
+    {
+      "id": "SUMMER-COMM-005",
+      "capability": "Authorized Stripe customer and business query",
+      "canonicalPath": [
+        "Summer read-only business tool -> server Stripe singleton -> restricted aggregate query"
+      ],
+      "implementationState": "missing",
+      "status": "blocked",
+      "critical": true,
+      "evidence": [
+        {
+          "kind": "source_gap",
+          "ref": "apps/web/lib/ovie/isolation.ts",
+          "summary": "No Summer-safe Stripe or business aggregate query is exposed."
+        }
+      ],
+      "lastVerified": "2026-09-01T22:57:22Z",
+      "invalidationCondition": "A read-only Stripe/business capability, its least-privilege policy, or sandbox fixture changes.",
+      "ownerRemediation": {
+        "owner": "Summer business data access",
+        "refs": ["JOV-5853"]
+      },
+      "probe": {
+        "id": "summer.data.stripe-business-query",
+        "version": "1.0.0",
+        "fixture": "stripe-testmode-readonly-customer-aggregate/v1",
+        "expectedState": "authorized_business_result_observed",
+        "requiresRuntimeReceipt": true,
+        "sourceAssertions": [
+          {
+            "kind": "file_contains",
+            "path": "apps/web/lib/ovie/isolation.ts",
+            "value": "'get_business_metrics'"
+          }
+        ]
+      }
+    },
+    {
+      "id": "SUMMER-COMM-006",
+      "capability": "Linear read and explicit durable work update",
+      "canonicalPath": [
+        "explicit founder intent -> Summer policy -> Linear durable issue mutation -> readback receipt",
+        "apps/web/app/api/webhooks/linear/route.ts"
+      ],
+      "implementationState": "in_flight",
+      "status": "blocked",
+      "critical": true,
+      "evidence": [
+        {
+          "kind": "in_flight",
+          "ref": "https://github.com/JovieInc/Jovie/pull/16396",
+          "summary": "Durable provider delivery and bounded Linear-to-Symphony dispatch remain open."
+        },
+        {
+          "kind": "policy",
+          "ref": "apps/eve-pilot/identities/summer/instructions.md",
+          "summary": "Eve Summer currently refuses Linear writes."
+        }
+      ],
+      "lastVerified": "2026-09-01T22:57:22Z",
+      "invalidationCondition": "Linear mutation policy, delivery identity, explicit-intent gate, or durable readback contract changes.",
+      "ownerRemediation": {
+        "owner": "Summer durable intake",
+        "refs": ["JOV-5313", "PR-16396", "JOV-5853"]
+      },
+      "probe": {
+        "id": "summer.work.linear-read-update",
+        "version": "1.0.0",
+        "fixture": "linear-explicit-update-reversible-fixture/v1",
+        "expectedState": "durable_linear_readback_observed",
+        "requiresRuntimeReceipt": true,
+        "sourceAssertions": [
+          {
+            "kind": "file_contains",
+            "path": "apps/web/lib/ovie/isolation.ts",
+            "value": "'create_or_update_linear_issue'"
+          },
+          {
+            "kind": "file_contains",
+            "path": "apps/web/app/api/webhooks/linear/route.ts",
+            "value": "providerDeliveryId"
+          }
+        ]
+      }
+    },
+    {
+      "id": "SUMMER-COMM-007",
+      "capability": "Repository, PR, queue, and deploy-state lookup",
+      "canonicalPath": [
+        "Summer read tool -> Ovie shipping-state source projection -> GitHub and production-controller receipts",
+        "apps/web/lib/ovie/shipping-state/sources.ts"
+      ],
+      "implementationState": "in_flight",
+      "status": "blocked",
+      "critical": true,
+      "evidence": [
+        {
+          "kind": "source",
+          "ref": "apps/web/lib/ovie/shipping-state/sources.ts",
+          "summary": "Shipping-state sources exist but are not exposed in the Summer safe-tool manifest."
+        },
+        {
+          "kind": "in_flight",
+          "ref": "https://github.com/JovieInc/Jovie/pull/16406",
+          "summary": "CEO operations truth projection remains open and lacks runtime certification."
+        }
+      ],
+      "lastVerified": "2026-09-01T22:57:22Z",
+      "invalidationCondition": "Shipping-state projection, GitHub queue contract, production controller schema, or Summer tool exposure changes.",
+      "ownerRemediation": {
+        "owner": "Ovie operations truth",
+        "refs": ["JOV-5310", "PR-16406", "JOV-5853"]
+      },
+      "probe": {
+        "id": "summer.operations.repo-pr-deploy-lookup",
+        "version": "1.0.0",
+        "fixture": "known-pr-and-exact-deploy/v1",
+        "expectedState": "exact_source_queue_deploy_result_observed",
+        "requiresRuntimeReceipt": true,
+        "sourceAssertions": [
+          {
+            "kind": "file_exists",
+            "path": "apps/web/lib/ovie/shipping-state/sources.ts"
+          },
+          {
+            "kind": "file_contains",
+            "path": "apps/web/lib/ovie/isolation.ts",
+            "value": "'get_shipping_state'"
+          }
+        ]
+      }
+    },
+    {
+      "id": "SUMMER-COMM-008",
+      "capability": "Intent to dispatch to observed execution outcome",
+      "canonicalPath": [
+        "explicit intent -> durable Linear state -> repository_dispatch -> Symphony -> terminal delivery state",
+        "apps/web/app/api/webhooks/linear/route.ts",
+        "scripts/backlog-orchestrator/delivery-state-machine.mjs"
+      ],
+      "implementationState": "in_flight",
+      "status": "degraded",
+      "critical": true,
+      "evidence": [
+        {
+          "kind": "source",
+          "ref": "apps/web/app/api/webhooks/linear/route.ts",
+          "summary": "Durable delivery identity and ambiguous-dispatch reconciliation are present on current main."
+        },
+        {
+          "kind": "in_flight",
+          "ref": "https://github.com/JovieInc/Jovie/pull/16396",
+          "summary": "Verified Symphony wake and remaining workflow contracts are still open."
+        },
+        {
+          "kind": "exact_packaged_runtime",
+          "ref": "source:b31537204a4a8dfeaeb8c55061bd1c1cfeecc470:/app/ov/chat",
+          "summary": "Summer claimed and completed one real worker job and the persisted UI rendered: SUMMER_LOOP_OK The number-one shipping bottleneck is Symphony stay-up on Gem — idle factory means Linear work does not land."
+        },
+        {
+          "kind": "in_flight",
+          "ref": "https://github.com/JovieInc/Jovie/pull/16960",
+          "summary": "The root source PR and companion PRs #16955/#16958 remain unlanded, so the exact packaged receipt is evidence for source b315372 only, not current-main delivery."
+        }
+      ],
+      "lastVerified": "2026-09-01T22:57:22Z",
+      "invalidationCondition": "Intent gate, Linear delivery identity, repository dispatch, Symphony lease, or terminal evidence schema changes.",
+      "ownerRemediation": {
+        "owner": "Summer to Symphony dispatch",
+        "refs": ["JOV-5313", "PR-16396", "JOV-5853"]
+      },
+      "probe": {
+        "id": "summer.execution.dispatch-observe",
+        "version": "1.0.0",
+        "fixture": "bounded-noop-execution/v1",
+        "expectedState": "terminal_execution_receipt_observed",
+        "requiresRuntimeReceipt": true,
+        "sourceAssertions": [
+          {
+            "kind": "file_contains",
+            "path": "apps/web/app/api/webhooks/linear/route.ts",
+            "value": "event_type: 'linear_plan_ready'"
+          },
+          {
+            "kind": "file_exists",
+            "path": "scripts/backlog-orchestrator/delivery-state-machine.mjs"
+          }
+        ]
+      }
+    },
+    {
+      "id": "SUMMER-COMM-009",
+      "capability": "Execution failure remediation and escalation",
+      "canonicalPath": [
+        "terminal failure -> delivery state machine -> bounded remediation or human-required blocker",
+        "scripts/backlog-orchestrator/delivery-state-machine.mjs",
+        "scripts/hermes/jobs/delivery-liveness-watchdog.ts"
+      ],
+      "implementationState": "already_works",
+      "status": "untested",
+      "critical": true,
+      "evidence": [
+        {
+          "kind": "source",
+          "ref": "scripts/backlog-orchestrator/delivery-state-machine.mjs",
+          "summary": "Closed-loop terminal and repair state primitives exist."
+        },
+        {
+          "kind": "gap",
+          "ref": "JOV-5853",
+          "summary": "No production-like Summer-owned failure-to-escalation receipt is recorded."
+        }
+      ],
+      "lastVerified": "2026-09-01T22:57:22Z",
+      "invalidationCondition": "Delivery failure taxonomy, remediation policy, autonomy envelope, or escalation destination changes.",
+      "ownerRemediation": {
+        "owner": "Summer delivery governor",
+        "refs": ["JOV-5852", "JOV-5853"]
+      },
+      "probe": {
+        "id": "summer.execution.failure-escalation",
+        "version": "1.0.0",
+        "fixture": "forced-bounded-execution-failure/v1",
+        "expectedState": "durable_remediation_or_escalation_observed",
+        "requiresRuntimeReceipt": true,
+        "sourceAssertions": [
+          {
+            "kind": "file_contains",
+            "path": "scripts/backlog-orchestrator/delivery-state-machine.mjs",
+            "value": "repair"
+          },
+          {
+            "kind": "file_contains",
+            "path": "scripts/hermes/jobs/delivery-liveness-watchdog.ts",
+            "value": "linear_in_progress_liveness_checked"
+          }
+        ]
+      }
+    },
+    {
+      "id": "SUMMER-COMM-010",
+      "capability": "Canonical soul, invariants, autonomy, and version consistency",
+      "canonicalPath": [
+        "Versioned Summer identity manifest -> runtime-bound identity -> receipt reports matching digest",
+        "apps/eve-pilot/identities/summer/instructions.md"
+      ],
+      "implementationState": "conflicting",
+      "status": "blocked",
+      "critical": true,
+      "evidence": [
+        {
+          "kind": "source",
+          "ref": "apps/eve-pilot/identities/summer/instructions.md",
+          "summary": "The Eve shadow pack is explicit and read-only but has no version/digest declaration."
+        },
+        {
+          "kind": "runtime",
+          "ref": "local-mac:ai.hermes.gateway-summer",
+          "summary": "The live local Hermes profile is a separate runtime and no equality receipt exists."
+        },
+        {
+          "kind": "in_flight",
+          "ref": "https://github.com/JovieInc/Jovie/pull/16863",
+          "summary": "The generic certification admission kernel remains open."
+        }
+      ],
+      "lastVerified": "2026-09-01T22:57:22Z",
+      "invalidationCondition": "Any Summer instruction, invariant, autonomy policy, runtime profile, or certification contract version changes.",
+      "ownerRemediation": {
+        "owner": "Summer identity governor",
+        "refs": ["JOV-5753", "PR-16863", "JOV-5853"]
+      },
+      "probe": {
+        "id": "summer.identity.version-consistency",
+        "version": "1.0.0",
+        "fixture": "summer-identity-digest-parity/v1",
+        "expectedState": "all_runtime_identity_digests_match",
+        "requiresRuntimeReceipt": true,
+        "sourceAssertions": [
+          {
+            "kind": "file_contains",
+            "path": "apps/eve-pilot/identities/summer/instructions.md",
+            "value": "Version:"
+          },
+          {
+            "kind": "file_contains",
+            "path": "scripts/summer-commissioning/registry.json",
+            "value": "\"certificationContract\": \"jovie.certification/v1\""
+          }
+        ]
+      }
+    },
+    {
+      "id": "SUMMER-COMM-011",
+      "capability": "Cheap heartbeat, liveness, and no-op reconciliation",
+      "canonicalPath": [
+        "low-cadence heartbeat -> state fingerprint -> no-op or targeted reconciliation -> observable receipt",
+        "scripts/hermes/launchd/co.jovie.hermes.watchdog.plist.template"
+      ],
+      "implementationState": "conflicting",
+      "status": "blocked",
+      "critical": true,
+      "evidence": [
+        {
+          "kind": "source",
+          "ref": "scripts/hermes/launchd/co.jovie.hermes.watchdog.plist.template",
+          "summary": "A watchdog exists, but no canonical Summer heartbeat/no-op receipt contract is present."
+        },
+        {
+          "kind": "runtime",
+          "ref": "codex-turn:01a05f69-5b89-7db0-81fe-96fe21aae443",
+          "summary": "After the five-minute heartbeat was updated to require a non-empty terminal receipt, this scheduled turn completed in 9.873 seconds with no assistant message, tool marker, or receipt. Scheduling recurrence exists, but the completed empty turn fails closed as Summer identification/remediation evidence."
+        },
+        {
+          "kind": "blocker",
+          "ref": "JOV-5853:eve-native-continuous-loop",
+          "summary": "The continuous bottleneck-remediation loop remains blocked until a later scheduled turn emits a non-empty signed terminal no-op/remediation receipt and Eve owns that schedule across restart; the existing Codex heartbeat and its completed empty turn cannot satisfy either boundary."
+        }
+      ],
+      "lastVerified": "2026-09-01T23:56:56Z",
+      "invalidationCondition": "Re-evaluate only after a later scheduled turn emits a non-empty signed no-op/remediation receipt and Eve natively owns that five-minute schedule across restart; invalidate on an empty completed turn, cadence, state fingerprint, cost budget, scheduler ownership, or escalation-route changes.",
+      "ownerRemediation": {
+        "owner": "Eve / Summer liveness",
+        "refs": ["JOV-5852", "JOV-5853"]
+      },
+      "probe": {
+        "id": "summer.liveness.heartbeat-noop",
+        "version": "1.1.0",
+        "fixture": "scheduled-heartbeat-nonempty-receipt-across-restart/v2",
+        "expectedState": "eve_owned_non_empty_terminal_noop_or_remediation_receipt",
+        "requiresRuntimeReceipt": true,
+        "sourceAssertions": [
+          {
+            "kind": "file_exists",
+            "path": "scripts/hermes/launchd/co.jovie.hermes.watchdog.plist.template"
+          },
+          {
+            "kind": "file_contains",
+            "path": "scripts/hermes/launchd/co.jovie.hermes.watchdog.plist.template",
+            "value": "jovie.summer-heartbeat/v1"
+          }
+        ]
+      }
+    },
+    {
+      "id": "SUMMER-COMM-012",
+      "capability": "Missed-event recovery",
+      "canonicalPath": [
+        "ambiguous or missed delivery -> retained idempotency lock -> reconciliation -> one terminal state",
+        "apps/web/app/api/webhooks/linear/route.ts",
+        "scripts/backlog-orchestrator/reconcile.mjs"
+      ],
+      "implementationState": "already_works",
+      "status": "untested",
+      "critical": true,
+      "evidence": [
+        {
+          "kind": "source",
+          "ref": "apps/web/app/api/webhooks/linear/route.ts",
+          "summary": "Ambiguous dispatch keeps the dedupe lock and requests reconciliation."
+        },
+        {
+          "kind": "gap",
+          "ref": "JOV-5853",
+          "summary": "No production-like missed-event recovery receipt is recorded."
+        }
+      ],
+      "lastVerified": "2026-09-01T22:57:22Z",
+      "invalidationCondition": "Provider delivery identity, ambiguity handling, lock retention, or reconciliation algorithm changes.",
+      "ownerRemediation": {
+        "owner": "Summer event reconciliation",
+        "refs": ["JOV-5313", "JOV-5853"]
+      },
+      "probe": {
+        "id": "summer.recovery.missed-event",
+        "version": "1.0.0",
+        "fixture": "ambiguous-dispatch-then-reconcile/v1",
+        "expectedState": "single_terminal_state_after_reconcile",
+        "requiresRuntimeReceipt": true,
+        "sourceAssertions": [
+          {
+            "kind": "file_contains",
+            "path": "apps/web/app/api/webhooks/linear/route.ts",
+            "value": "reconcileRequired: true"
+          },
+          {
+            "kind": "file_exists",
+            "path": "scripts/backlog-orchestrator/reconcile.mjs"
+          }
+        ]
+      }
+    },
+    {
+      "id": "SUMMER-COMM-013",
+      "capability": "Duplicate-event and execution idempotency",
+      "canonicalPath": [
+        "provider event ID -> durable dedupe key -> immutable receipt -> one execution",
+        "apps/eve-pilot/agent/lib/summer-shadow-ingress.ts",
+        "apps/web/app/api/webhooks/linear/route.ts"
+      ],
+      "implementationState": "already_works",
+      "status": "passing",
+      "critical": true,
+      "evidence": [
+        {
+          "kind": "source",
+          "ref": "apps/eve-pilot/agent/lib/summer-shadow-ingress.ts",
+          "summary": "Shadow ingress derives an immutable event key and rejects duplicates."
+        },
+        {
+          "kind": "source",
+          "ref": "apps/web/app/api/webhooks/linear/route.ts",
+          "summary": "Linear delivery identity is retained in the six-hour dedupe lock."
+        }
+      ],
+      "lastVerified": "2026-09-01T22:57:22Z",
+      "invalidationCondition": "Event ID, dedupe TTL, immutable receipt path, lock semantics, or execution key changes.",
+      "ownerRemediation": {
+        "owner": "Summer event protocol",
+        "refs": ["JOV-5852", "JOV-5853"]
+      },
+      "probe": {
+        "id": "summer.reliability.duplicate-idempotency",
+        "version": "1.0.0",
+        "fixture": "same-event-twice/v1",
+        "expectedState": "one_execution_one_terminal_receipt",
+        "requiresRuntimeReceipt": true,
+        "sourceAssertions": [
+          {
+            "kind": "file_contains",
+            "path": "apps/eve-pilot/agent/lib/summer-shadow-ingress.ts",
+            "value": "persistImmutable"
+          },
+          {
+            "kind": "file_contains",
+            "path": "apps/web/app/api/webhooks/linear/route.ts",
+            "value": "acquireRecentDispatch"
+          }
+        ]
+      }
+    },
+    {
+      "id": "SUMMER-COMM-014",
+      "capability": "Dependency degradation",
+      "canonicalPath": [
+        "dependency unavailable -> typed failure or degraded state -> no invented success -> retry/escalation receipt"
+      ],
+      "implementationState": "already_works",
+      "status": "passing",
+      "critical": true,
+      "evidence": [
+        {
+          "kind": "source",
+          "ref": "apps/eve-pilot/tests/summer-shadow-ingress.test.ts",
+          "summary": "Ingress covers authentication, persistence, and dispatch failures."
+        },
+        {
+          "kind": "source",
+          "ref": "apps/web/lib/ovie/summer-transport.ts",
+          "summary": "Unavailable transport is explicit and has no persona fallback."
+        }
+      ],
+      "lastVerified": "2026-09-01T22:57:22Z",
+      "invalidationCondition": "Dependency error taxonomy, retry policy, fallback policy, or observability contract changes.",
+      "ownerRemediation": {
+        "owner": "Summer reliability",
+        "refs": ["JOV-5212", "JOV-5853"]
+      },
+      "probe": {
+        "id": "summer.reliability.dependency-degradation",
+        "version": "1.0.0",
+        "fixture": "gbrain-linear-github-timeout-matrix/v1",
+        "expectedState": "typed_degradation_without_false_success",
+        "requiresRuntimeReceipt": true,
+        "sourceAssertions": [
+          {
+            "kind": "file_exists",
+            "path": "apps/eve-pilot/tests/summer-shadow-ingress.test.ts"
+          },
+          {
+            "kind": "file_contains",
+            "path": "apps/web/lib/ovie/summer-transport.ts",
+            "value": "no Jovie, Eve, Ovie persona, Zoe, OpenClaw, or mock fallback"
+          }
+        ]
+      }
+    },
+    {
+      "id": "SUMMER-COMM-015",
+      "capability": "Permission refusal outside the autonomy envelope",
+      "canonicalPath": [
+        "request -> identity and principal authorization -> refuse or hold consequential mutation -> auditable reason",
+        "apps/eve-pilot/identities/summer/instructions.md",
+        "apps/web/lib/ovie/isolation.ts"
+      ],
+      "implementationState": "already_works",
+      "status": "passing",
+      "critical": true,
+      "evidence": [
+        {
+          "kind": "source",
+          "ref": "apps/eve-pilot/identities/summer/instructions.md",
+          "summary": "The Eve Summer shadow explicitly refuses Linear, GitHub, GBrain, Symphony, deployment, and permission writes."
+        },
+        {
+          "kind": "source",
+          "ref": "apps/web/lib/ovie/isolation.ts",
+          "summary": "Summer and customer Jovie tools and memory namespaces fail closed."
+        }
+      ],
+      "lastVerified": "2026-09-01T22:57:22Z",
+      "invalidationCondition": "Autonomy policy, principal authorization, tool allowlist, or identity metadata changes.",
+      "ownerRemediation": {
+        "owner": "Summer autonomy policy",
+        "refs": ["JOV-5852", "JOV-5853"]
+      },
+      "probe": {
+        "id": "summer.policy.permission-refusal",
+        "version": "1.0.0",
+        "fixture": "unauthorized-consequential-write-matrix/v1",
+        "expectedState": "mutation_refused_with_auditable_reason",
+        "requiresRuntimeReceipt": true,
+        "sourceAssertions": [
+          {
+            "kind": "file_contains",
+            "path": "apps/eve-pilot/identities/summer/instructions.md",
+            "value": "Read-only. Do not write Linear, GitHub, GBrain, Symphony"
+          },
+          {
+            "kind": "file_contains",
+            "path": "apps/web/lib/ovie/isolation.ts",
+            "value": "Summer cannot execute artist Jovie tools"
+          }
+        ]
+      }
+    }
+  ]
+}
