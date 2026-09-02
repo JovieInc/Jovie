@@ -124,9 +124,12 @@ describe('ReleaseTaskPage', () => {
       'rounded-lg',
       'border',
       'border-(--app-shell-border)',
-      'bg-surface-1',
+      'bg-surface-0',
       'p-1',
       'shadow-app-control'
+    );
+    expect(screen.getByTestId('release-task-up-next-card')).not.toHaveClass(
+      'bg-surface-1'
     );
   });
 
@@ -236,9 +239,12 @@ describe('ReleaseTaskPage', () => {
       'rounded-lg',
       'border',
       'border-(--app-shell-border)',
-      'bg-surface-1',
+      'bg-surface-0',
       'p-3',
       'shadow-app-control'
     );
+    expect(
+      screen.getByTestId('release-task-skeleton-summary-card')
+    ).not.toHaveClass('bg-surface-1');
   });
 });
