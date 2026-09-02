@@ -1,6 +1,7 @@
 {
   "name": "@jovie/eve-pilot",
   "type": "module",
+  "packageManager": "pnpm@9.15.4",
   "engines": {
     "node": ">=24"
   },
