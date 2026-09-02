@@ -398,6 +398,16 @@ export function validateNativePreflightEvidence({
   };
 }
 
+/**
+ * @param {{
+ *   backend?: string,
+ *   repository?: string,
+ *   rulesetId?: string,
+ *   baseBranch?: string,
+ *   allowUnavailableBypassActors?: boolean,
+ *   runner?: (args: any) => Promise<{ code: number, stdout: string, stderr: string }>,
+ * }} [input]
+ */
 export async function preflightMergeQueue({
   backend,
   repository = DEFAULT_REPOSITORY,
@@ -579,6 +589,14 @@ async function readNativePullRequestState({ runner, repository, number }) {
   return normalizeNativePullRequest(pr);
 }
 
+/**
+ * @param {{
+ *   backend?: string,
+ *   repository?: string,
+ *   number?: string | number,
+ *   runner?: (args: any) => Promise<{ code: number, stdout: string, stderr: string }>,
+ * }} [input]
+ */
 export async function readPullRequestQueueState({
   backend,
   repository = DEFAULT_REPOSITORY,
@@ -1020,6 +1038,22 @@ async function pollEnrollmentPostcondition({
   return { attempts, state };
 }
 
+/**
+ * @param {{
+ *   backend?: string,
+ *   repository?: string,
+ *   rulesetId?: string,
+ *   baseBranch?: string,
+ *   allowUnavailableBypassActors?: boolean,
+ *   number?: string | number,
+ *   expectedHeadOid?: string,
+ *   runner?: (args: any) => Promise<{ code: number, stdout: string, stderr: string }>,
+ *   mutationRunner?: (args: any) => Promise<{ code: number, stdout: string, stderr: string }>,
+ *   postconditionAttempts?: number,
+ *   postconditionDelayMs?: number,
+ *   wait?: (milliseconds: number) => Promise<void>,
+ * }} [input]
+ */
 export async function enrollPullRequest({
   backend,
   repository = DEFAULT_REPOSITORY,
@@ -1118,6 +1152,15 @@ async function runGraphqlMutation(runner, query, variables, description) {
   );
 }
 
+/**
+ * @param {{
+ *   backend?: string,
+ *   repository?: string,
+ *   number?: string | number,
+ *   runner?: (args: any) => Promise<{ code: number, stdout: string, stderr: string }>,
+ *   mutationRunner?: (args: any) => Promise<{ code: number, stdout: string, stderr: string }>,
+ * }} [input]
+ */
 export async function dequeuePullRequest({
   backend,
   repository = DEFAULT_REPOSITORY,
