@@ -21,6 +21,10 @@ export const TODO_STATE_ID = 'c6c00506-dc9f-4910-8ff7-3874dd77174c';
 export const ADMISSION_RECEIPT_PREFIX = '<!-- symphony-admission:v1 ';
 export const FLEET_GATE_SCHEMA = 'jovie-fleet-gate/v1';
 export const GEM_CONCURRENCY_EVIDENCE_SCHEMA = 'gem-concurrency-evidence/v1';
+// JOV-INV-007: live measurement emitted by gem-priority-gate.py at evaluation
+// time (provider accounts + Symphony runtime + host pressure + integrity).
+// Bounded to the canon baseline; only the approved clean-run receipt exceeds it.
+export const GEM_MEASURED_CAPACITY_SCHEMA = 'gem-measured-capacity/v1';
 export const INDEPENDENT_REVIEW_RECEIPT_SCHEMA = 'jovie-independent-review/v1';
 export const INDEPENDENT_REVIEW_AUTHORITY = 'Gem';
 export const INDEPENDENT_REVIEWER = 'Gem';
@@ -342,7 +346,7 @@ export function resolveGemConcurrency(
     measuredTarget > DEFAULT_GEM_CONCURRENCY
       ? CAPACITY_POLICY.cleanRunsForMaximum
       : 1;
-  const evidenceAccepted =
+  const approvedAccepted =
     evidence?.schema === GEM_CONCURRENCY_EVIDENCE_SCHEMA &&
     Number.isInteger(measuredTarget) &&
     measuredTarget >= CAPACITY_POLICY.minimum &&
@@ -352,6 +356,26 @@ export function resolveGemConcurrency(
     evidence.cleanRuns >= requiredCleanRuns &&
     evidence?.severeIncidents === 0 &&
     isFreshTimestamp(evidence?.observedAt, nowMs, maxAgeMs);
+  // A live measurement is only as fresh as the controller receipt that
+  // carries it, so it shares the controller freshness window rather than the
+  // approval receipt's longer one. It never exceeds the canon baseline.
+  const liveMeasurementAccepted =
+    evidence?.schema === GEM_MEASURED_CAPACITY_SCHEMA &&
+    evidence?.source === 'measured-live' &&
+    evidence?.accepted === true &&
+    Number.isInteger(measuredTarget) &&
+    measuredTarget >= CAPACITY_POLICY.minimum &&
+    measuredTarget <= DEFAULT_GEM_CONCURRENCY &&
+    evidence?.provider !== null &&
+    typeof evidence?.provider === 'object' &&
+    evidence?.runtime !== null &&
+    typeof evidence?.runtime === 'object' &&
+    isFreshTimestamp(
+      evidence?.observedAt,
+      nowMs,
+      Math.min(maxAgeMs, CONTROLLER_RECEIPT_MAX_AGE_MS)
+    );
+  const evidenceAccepted = approvedAccepted || liveMeasurementAccepted;
 
   return {
     maxConcurrent: evidenceAccepted ? measuredTarget : 0,
@@ -360,9 +384,11 @@ export function resolveGemConcurrency(
     evidenceAccepted,
     newMutationAllowed: evidenceAccepted,
     preserveQueuedWork: CAPACITY_POLICY.preserveQueuedWork,
-    reason: evidenceAccepted
+    reason: approvedAccepted
       ? 'recent-approved-measured-capacity'
-      : 'capacity-evidence-missing-malformed-or-stale',
+      : liveMeasurementAccepted
+        ? 'live-measured-capacity'
+        : 'capacity-evidence-missing-malformed-or-stale',
   };
 }
 

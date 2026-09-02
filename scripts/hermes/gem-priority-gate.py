@@ -13,6 +13,7 @@ from __future__ import annotations
 
 import argparse
 import fcntl
+import importlib.util
 import json
 import os
 import subprocess
@@ -40,6 +41,11 @@ from closure_health import observe_closure_health  # noqa: E402
 SCHEMA = "jovie-fleet-gate/v1"
 INTEGRITY_SCHEMA = "jovie-integrity/v1"
 CONCURRENCY_SCHEMA = "gem-concurrency-evidence/v1"
+# JOV-INV-007: capacity measured live at evaluation time from the pressure
+# controller's own telemetry (PSI, provider accounts, Symphony runtime,
+# integrity). Never synthesized from a file; bounded to the canon baseline.
+MEASURED_CAPACITY_SCHEMA = "gem-measured-capacity/v1"
+CONCURRENCY_CONTROLLER_SOURCE = Path(__file__).resolve().parent / "symphony-concurrency-controller.py"
 INDEPENDENT_REVIEW_SCHEMA = "jovie-independent-review/v1"
 INDEPENDENT_REVIEW_AUTHORITY = "Gem"
 INDEPENDENT_REVIEWER = "Gem"
@@ -561,7 +567,13 @@ def observe_integrity(path: Path) -> dict[str, Any]:
     }
 
 
-def observe_concurrency(path: Path, now: datetime) -> dict[str, Any]:
+def observe_approved_concurrency(path: Path, now: datetime) -> dict[str, Any]:
+    """Read the founder-approved clean-run capacity receipt, when one exists.
+
+    This receipt is the only path above the canon baseline (JOV-INV-007
+    cleanRunsForMaximum). It is optional: when absent, live measurement
+    (``observe_measured_concurrency``) governs up to the baseline.
+    """
     if not path.exists():
         return {
             "schema": CONCURRENCY_SCHEMA,
@@ -598,6 +610,131 @@ def observe_concurrency(path: Path, now: datetime) -> dict[str, Any]:
         and timedelta(0) <= now - observed_at <= timedelta(hours=24)
     )
     return {**receipt, "accepted": eligible}
+
+
+def load_concurrency_controller() -> Any:
+    """Import the sibling pressure controller (hyphenated filename) once."""
+    spec = importlib.util.spec_from_file_location(
+        "symphony_concurrency_controller", CONCURRENCY_CONTROLLER_SOURCE
+    )
+    if spec is None or spec.loader is None:
+        raise ImportError(f"could not load {CONCURRENCY_CONTROLLER_SOURCE}")
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    return module
+
+
+MEASUREMENT_UNAVAILABLE_REASONS = {
+    "required-telemetry-unavailable",
+    "integrity-blocked",
+    "severe-pressure",
+}
+
+
+def observe_measured_concurrency(
+    *,
+    lease_guard_bin: str,
+    symphony_url: str,
+    integrity_path: Path,
+    now: datetime,
+    proc_root: Path = Path("/proc"),
+) -> dict[str, Any]:
+    """Measure Gem mutation capacity live at evaluation time (JOV-INV-007).
+
+    Reuses the pressure controller's own telemetry readers and policy so the
+    gate and the runtime overlay agree: provider account capacity from the
+    lease guard, Symphony runtime load, host PSI/memory, and the integrity
+    receipt. Any missing input fails closed as unaccepted — capacity is never
+    synthesized. Accepted measurements are bounded to the canon baseline;
+    only the approved clean-run receipt may exceed it.
+    """
+    observed = {
+        "schema": MEASURED_CAPACITY_SCHEMA,
+        "source": "measured-live",
+        "observedAt": isoformat(now),
+        "baselineCap": DEFAULT_GEM_CONCURRENCY,
+    }
+    try:
+        controller = load_concurrency_controller()
+    except (ImportError, OSError, SyntaxError) as error:
+        return {**observed, "accepted": False, "reason": f"controller-module-unavailable: {error}"}
+    try:
+        provider = controller.read_provider_capacity(Path(lease_guard_bin))
+        runtime = controller.read_runtime_state(symphony_url)
+        integrity_allowed, integrity_status = controller.integrity_allows_scale(integrity_path)
+        sample = {
+            "cpuCount": controller.read_cpu_count(),
+            "cpuSomeAvg10": controller.read_pressure(proc_root, "cpu", "some"),
+            "memoryFullAvg10": controller.read_pressure(proc_root, "memory", "full"),
+            "ioFullAvg10": controller.read_pressure(proc_root, "io", "full"),
+            "availableMemoryBytes": controller.read_available_memory(proc_root),
+        }
+    except (OSError, ValueError, TypeError) as error:
+        return {**observed, "accepted": False, "reason": f"measurement-failed: {error}"}
+    pressure = controller.classify_pressure(sample)
+    telemetry = {
+        "provider": provider,
+        "runtime": runtime,
+        "host": {"pressure": pressure, "cpuCount": sample.get("cpuCount")},
+        "integrity": {"allowed": integrity_allowed, "status": integrity_status},
+    }
+    if provider is None:
+        return {**observed, **telemetry, "accepted": False, "reason": "provider-capacity-unavailable"}
+    if runtime is None:
+        return {**observed, **telemetry, "accepted": False, "reason": "runtime-state-unavailable"}
+    cpu_count = sample.get("cpuCount")
+    if not isinstance(cpu_count, int) or cpu_count <= 0:
+        return {**observed, **telemetry, "accepted": False, "reason": "required-telemetry-unavailable"}
+    provider_ceiling = provider["locked"] + provider["available"]
+    host_ceiling = max(
+        controller.MIN_CONCURRENCY, min(controller.MAX_CONCURRENCY, cpu_count - 1)
+    )
+    ceiling = max(
+        controller.MIN_CONCURRENCY,
+        min(controller.MAX_CONCURRENCY, provider_ceiling, host_ceiling),
+    )
+    # Evaluate the controller policy at the measured ceiling: severe or
+    # unknown pressure fails closed, high pressure contracts by one, and
+    # normal/low pressure holds the ceiling. No hysteresis state is invented.
+    target, _low_streak, reason = controller.choose_target(
+        current=ceiling,
+        state={"lowStreak": 0, "lastChangeEpoch": 0.0},
+        sample=sample,
+        provider=provider,
+        runtime=runtime,
+        integrity_allowed=integrity_allowed,
+        now_epoch=now.timestamp(),
+    )
+    if reason in MEASUREMENT_UNAVAILABLE_REASONS:
+        return {**observed, **telemetry, "accepted": False, "reason": reason, "ceiling": ceiling}
+    bounded = max(controller.MIN_CONCURRENCY, min(DEFAULT_GEM_CONCURRENCY, target))
+    return {
+        **observed,
+        **telemetry,
+        "accepted": True,
+        "target": bounded,
+        "measuredTarget": target,
+        "ceiling": ceiling,
+        "reason": reason,
+    }
+
+
+def observe_concurrency(
+    path: Path, now: datetime, measured: dict[str, Any] | None = None
+) -> dict[str, Any]:
+    """Approved clean-run receipt first; otherwise live measurement.
+
+    Hermes no longer writes ``concurrency.json``; a missing approval file must
+    not zero the factory when capacity can be measured honestly right now.
+    """
+    approved = observe_approved_concurrency(path, now)
+    if approved.get("accepted") is True:
+        return {**approved, "source": "approved-receipt"}
+    if isinstance(measured, dict) and measured.get("accepted") is True:
+        return {**measured, "approvedReceipt": approved}
+    if isinstance(measured, dict):
+        return {**approved, "measured": measured}
+    return approved
 
 
 def validate_independent_review(
@@ -1756,7 +1893,16 @@ def observe_signals(args: argparse.Namespace, now: datetime) -> dict[str, Any]:
     integrity_path = args.integrity_receipt or args.state_dir.parent / "integrity.json"
     concurrency_path = args.concurrency_evidence or args.state_dir.parent / "concurrency.json"
     main = observe_main(args.repo)
-    concurrency = observe_concurrency(concurrency_path, now)
+    concurrency = observe_concurrency(
+        concurrency_path,
+        now,
+        measured=observe_measured_concurrency(
+            lease_guard_bin=args.lease_guard_bin,
+            symphony_url=args.symphony_url,
+            integrity_path=integrity_path,
+            now=now,
+        ),
+    )
     measured_target = concurrency.get("target")
     default_lane_budget = (
         measured_target

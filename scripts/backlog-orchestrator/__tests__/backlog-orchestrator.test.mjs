@@ -1513,6 +1513,55 @@ describe('deterministic Symphony admission boundary', () => {
     );
   });
 
+  it('accepts a fresh live measurement up to the baseline without an approval file', () => {
+    const now = '2026-09-02T18:40:00.000Z';
+    const measured = {
+      schema: admitter.GEM_MEASURED_CAPACITY_SCHEMA,
+      source: 'measured-live',
+      accepted: true,
+      target: 4,
+      measuredTarget: 6,
+      provider: { state: 'available', accounts: 8, locked: 2, available: 4, cooldown: 2 },
+      runtime: { running: 1, retrying: 0 },
+      observedAt: '2026-09-02T18:39:00.000Z',
+    };
+    const live = admitter.resolveGemConcurrency(measured, { now });
+    assert.equal(live.maxConcurrent, 4);
+    assert.equal(live.newMutationAllowed, true);
+    assert.equal(live.reason, 'live-measured-capacity');
+    // Above baseline still needs the approved clean-run receipt.
+    assert.equal(
+      admitter.resolveGemConcurrency({ ...measured, target: 5 }, { now })
+        .maxConcurrent,
+      0
+    );
+    // Measurement freshness is the controller window, not the 24h approval one.
+    assert.equal(
+      admitter.resolveGemConcurrency(
+        { ...measured, observedAt: '2026-09-02T18:00:00.000Z' },
+        { now }
+      ).maxConcurrent,
+      0
+    );
+    // Missing telemetry or an unaccepted measurement never grants capacity.
+    assert.equal(
+      admitter.resolveGemConcurrency({ ...measured, provider: null }, { now })
+        .maxConcurrent,
+      0
+    );
+    assert.equal(
+      admitter.resolveGemConcurrency({ ...measured, accepted: false }, { now })
+        .maxConcurrent,
+      0
+    );
+    const gate = admitter.evaluateFleetGate(
+      fleetEvidence({ concurrencyEvidence: measured }),
+      { now }
+    );
+    assert.equal(gate.workAdmission.newIssueLeaseAllowed, true);
+    assert.equal(gate.concurrency.gem.maxConcurrent, 4);
+  });
+
   it('versions the Gem controller and mechanically holds AMBER drafts from promotion', async () => {
     const controller = resolve(
       ORCHESTRATOR_DIR,

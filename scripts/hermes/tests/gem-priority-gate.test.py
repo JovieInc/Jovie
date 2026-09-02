@@ -628,14 +628,15 @@ class ConcurrencyObservationTests(unittest.TestCase):
             ):
                 signals = MODULE.observe_signals(args, now)
 
-        self.assertEqual(
-            signals["concurrencyEvidence"],
-            {
-                "schema": MODULE.CONCURRENCY_SCHEMA,
-                "accepted": False,
-                "reason": "capacity-evidence-missing",
-            },
-        )
+        evidence = signals["concurrencyEvidence"]
+        self.assertEqual(evidence["schema"], MODULE.CONCURRENCY_SCHEMA)
+        self.assertFalse(evidence["accepted"])
+        self.assertEqual(evidence["reason"], "capacity-evidence-missing")
+        # Live measurement ran and failed closed (no lease guard on this host)
+        # instead of being skipped; its typed reason is preserved for the HUD.
+        self.assertEqual(evidence["measured"]["schema"], MODULE.MEASURED_CAPACITY_SCHEMA)
+        self.assertFalse(evidence["measured"]["accepted"])
+        self.assertIsInstance(evidence["measured"]["reason"], str)
         self.assertEqual(queue_observer.call_args.args[2], 0)
         receipt = MODULE.evaluate(signals, MODULE.isoformat(now))
         self.assertEqual(receipt["signals"]["main"]["sha"], MAIN_SHA)
@@ -1922,6 +1923,136 @@ class LeaseSignalTests(unittest.TestCase):
             observed = MODULE.observe_lease(guard)
         self.assertEqual(observed["status"], "unknown")
         self.assertEqual(observed["reason"], "lease-report-schema-mismatch")
+
+
+class MeasuredCapacityTests(unittest.TestCase):
+    """JOV-INV-007: capacity is measured live, never synthesized from a file."""
+
+    PROVIDER = {"state": "available", "accounts": 8, "locked": 2, "available": 4, "cooldown": 2}
+    RUNTIME = {"running": 1, "retrying": 0, "codexTotals": None}
+
+    def controller(self, **overrides):
+        module = MODULE.load_concurrency_controller()
+        fake = mock.Mock(wraps=module)
+        fake.MIN_CONCURRENCY = module.MIN_CONCURRENCY
+        fake.MAX_CONCURRENCY = module.MAX_CONCURRENCY
+        fake.read_provider_capacity = mock.Mock(return_value=overrides.get("provider", self.PROVIDER))
+        fake.read_runtime_state = mock.Mock(return_value=overrides.get("runtime", self.RUNTIME))
+        fake.integrity_allows_scale = mock.Mock(
+            return_value=overrides.get("integrity", (True, "no-active-receipt"))
+        )
+        fake.read_cpu_count = mock.Mock(return_value=overrides.get("cpu_count", 8))
+        pressures = overrides.get("pressures", {"cpu": 0.0, "memory": 0.0, "io": 0.0})
+        fake.read_pressure = mock.Mock(
+            side_effect=lambda _root, resource, _kind: pressures.get(resource)
+        )
+        fake.read_available_memory = mock.Mock(
+            return_value=overrides.get("memory", 55 * 1024**3)
+        )
+        return fake
+
+    def measure(self, controller):
+        with mock.patch.object(MODULE, "load_concurrency_controller", return_value=controller):
+            return MODULE.observe_measured_concurrency(
+                lease_guard_bin="/usr/local/bin/symphony-lease-guard",
+                symphony_url="http://127.0.0.1:4041/api/v1/state",
+                integrity_path=pathlib.Path("/nonexistent/integrity.json"),
+                now=MODULE.utc_now(),
+            )
+
+    def test_live_measurement_is_accepted_and_bounded_to_baseline(self):
+        evidence = self.measure(self.controller())
+        self.assertEqual(evidence["schema"], MODULE.MEASURED_CAPACITY_SCHEMA)
+        self.assertTrue(evidence["accepted"])
+        # provider ceiling 6, host ceiling 7 -> measured 6, bounded to baseline 4
+        self.assertEqual(evidence["measuredTarget"], 6)
+        self.assertEqual(evidence["target"], MODULE.DEFAULT_GEM_CONCURRENCY)
+        self.assertEqual(evidence["source"], "measured-live")
+        self.assertEqual(evidence["provider"], self.PROVIDER)
+        self.assertEqual(evidence["runtime"], self.RUNTIME)
+
+    def test_exhausted_provider_measures_one_not_zero(self):
+        provider = {**self.PROVIDER, "locked": 0, "available": 0, "cooldown": 8}
+        evidence = self.measure(self.controller(provider=provider))
+        self.assertTrue(evidence["accepted"])
+        self.assertEqual(evidence["target"], 1)
+
+    def test_missing_provider_or_runtime_fails_closed(self):
+        for overrides, reason in (
+            ({"provider": None}, "provider-capacity-unavailable"),
+            ({"runtime": None}, "runtime-state-unavailable"),
+        ):
+            with self.subTest(reason=reason):
+                evidence = self.measure(self.controller(**overrides))
+                self.assertFalse(evidence["accepted"])
+                self.assertEqual(evidence["reason"], reason)
+                self.assertNotIn("target", evidence)
+
+    def test_severe_pressure_and_integrity_block_fail_closed(self):
+        severe = self.measure(self.controller(memory=1 * 1024**3))
+        self.assertFalse(severe["accepted"])
+        self.assertEqual(severe["reason"], "severe-pressure")
+        blocked = self.measure(self.controller(integrity=(False, "integrity-active")))
+        self.assertFalse(blocked["accepted"])
+        self.assertEqual(blocked["reason"], "integrity-blocked")
+
+    def test_unknown_pressure_fails_closed(self):
+        evidence = self.measure(self.controller(pressures={"cpu": None, "memory": 0.0, "io": 0.0}))
+        self.assertFalse(evidence["accepted"])
+        self.assertEqual(evidence["reason"], "required-telemetry-unavailable")
+
+    def test_high_pressure_contracts_by_one(self):
+        evidence = self.measure(self.controller(pressures={"cpu": 25.0, "memory": 0.0, "io": 0.0}))
+        self.assertTrue(evidence["accepted"])
+        self.assertEqual(evidence["reason"], "measured-saturation")
+        self.assertEqual(evidence["measuredTarget"], 5)
+        self.assertEqual(evidence["target"], 4)
+
+    def test_measured_evidence_opens_new_issue_lease_in_evaluate(self):
+        signals = dict(GREEN_SIGNALS)
+        signals["concurrencyEvidence"] = {
+            **self.measure(self.controller()),
+        }
+        receipt = MODULE.evaluate(signals, MODULE.isoformat(MODULE.utc_now()))
+        self.assertTrue(receipt["signals"]["concurrencyEvidence"]["accepted"])
+        self.assertTrue(receipt["workAdmission"]["newIssueLeaseAllowed"])
+        self.assertTrue(receipt["remediationAdmission"]["pushAllowed"])
+        self.assertEqual(receipt["concurrency"]["gem"]["maxConcurrent"], 4)
+
+    def test_observe_concurrency_prefers_approved_receipt_then_measurement(self):
+        now = MODULE.utc_now()
+        measured = self.measure(self.controller())
+        with tempfile.TemporaryDirectory() as tmp:
+            missing = pathlib.Path(tmp) / "concurrency.json"
+            evidence = MODULE.observe_concurrency(missing, now, measured=measured)
+            self.assertTrue(evidence["accepted"])
+            self.assertEqual(evidence["schema"], MODULE.MEASURED_CAPACITY_SCHEMA)
+            self.assertEqual(evidence["approvedReceipt"]["reason"], "capacity-evidence-missing")
+
+            approved_path = pathlib.Path(tmp) / "approved.json"
+            approved_path.write_text(
+                json.dumps(
+                    {
+                        "schema": MODULE.CONCURRENCY_SCHEMA,
+                        "target": 8,
+                        "approved": True,
+                        "cleanRuns": 20,
+                        "severeIncidents": 0,
+                        "observedAt": MODULE.isoformat(now),
+                    }
+                ),
+                encoding="utf-8",
+            )
+            evidence = MODULE.observe_concurrency(approved_path, now, measured=measured)
+            self.assertTrue(evidence["accepted"])
+            self.assertEqual(evidence["source"], "approved-receipt")
+            self.assertEqual(evidence["target"], 8)
+
+            unaccepted = {**measured, "accepted": False, "reason": "provider-capacity-unavailable"}
+            evidence = MODULE.observe_concurrency(missing, now, measured=unaccepted)
+            self.assertFalse(evidence["accepted"])
+            self.assertEqual(evidence["reason"], "capacity-evidence-missing")
+            self.assertEqual(evidence["measured"]["reason"], "provider-capacity-unavailable")
 
 
 if __name__ == "__main__":
