@@ -600,6 +600,17 @@ describe('queue workflow mutation safety', () => {
       'admission scope: maintenance-only (no new enrollment)'
     );
     expect(drain).toContain('scripts/github-open-prs-snapshot.mjs');
+    // One occurrence is unreachable behind the disabled deferred-release
+    // return; the other is the isolated fixture adapter. Production snapshot
+    // and post-retarget refresh both use the bounded loader below.
+    expect(drain.match(/gh_retry pr list/gu)).toHaveLength(2);
+    expect(drain).toContain('load_open_pr_snapshot initial-snapshot');
+    expect(drain).toContain('load_open_pr_snapshot post-retarget-refresh');
+    expect(drain).toContain('stage=native-preflight source=graphql');
+    expect(drain).toContain(
+      'stage=native-queue-state source=paginated-graphql'
+    );
+    expect(drain).toContain('stage=native-coverage-check');
     expect(drain).not.toContain(
       'gh_retry node scripts/github-open-prs-snapshot.mjs'
     );
