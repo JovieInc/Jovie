@@ -7,9 +7,10 @@
 # install before the coding agent starts.
 set -euo pipefail
 
-readonly SCHEMA="symphony-nvme-package-cache/v1"
+readonly SCHEMA="symphony-nvme-package-cache/v2"
 readonly RESTORE_RECEIPT_SCHEMA="symphony-nvme-package-cache-restore/v1"
 readonly TEARDOWN_RECEIPT_SCHEMA="symphony-nvme-package-cache-teardown/v1"
+readonly WARM_RECEIPT_SCHEMA="symphony-nvme-package-cache-warm/v1"
 readonly REQUIRED_NODE_VERSION="22.23.2"
 readonly REQUIRED_PNPM_VERSION="9.15.4"
 readonly DEFAULT_CACHE_ROOT="/srv/git/symphony-package-cache/jovie"
@@ -117,25 +118,41 @@ source_sha() {
 }
 
 cache_key_for() {
-  local source="$1"
-  local lock_sha="$2"
-  python3 - "$SCHEMA" "$REPO" "$source" "$REQUIRED_NODE_VERSION" "$REQUIRED_PNPM_VERSION" "$lock_sha" <<'PY'
+  local lock_sha="$1"
+  local workspace_sha="$2"
+  local platform="$3"
+  local arch="$4"
+  python3 - "$SCHEMA" "$REPO" "$REQUIRED_NODE_VERSION" "$REQUIRED_PNPM_VERSION" "$lock_sha" "$workspace_sha" "$platform" "$arch" <<'PY'
 import hashlib
 import json
 import sys
 
-schema, repo, source, node, pnpm, lock = sys.argv[1:]
+schema, repo, node, pnpm, lock, workspace, platform, arch = sys.argv[1:]
 payload = {
     "schema": schema,
     "repo": repo,
-    "sourceSha": source,
     "nodeVersion": node,
     "pnpmVersion": pnpm,
     "lockfileSha256": lock,
+    "workspaceFileSha256": workspace,
+    "platform": platform,
+    "arch": arch,
 }
 raw = json.dumps(payload, sort_keys=True, separators=(",", ":")).encode()
 print(hashlib.sha256(raw).hexdigest())
 PY
+}
+
+workspace_file_sha() {
+  if [ -f pnpm-workspace.yaml ]; then
+    sha256_file pnpm-workspace.yaml
+  else
+    printf 'none\n'
+  fi
+}
+
+platform_name() {
+  uname -s | tr '[:upper:]' '[:lower:]'
 }
 
 archive_path_for() {
@@ -240,28 +257,34 @@ assert_manifest() {
   local manifest_path="$1"
   local archive_path="$2"
   local archive_sha="$3"
-  local source="$4"
-  local lock_sha="$5"
-  local cache_key="$6"
+  local lock_sha="$4"
+  local workspace_sha="$5"
+  local platform="$6"
+  local arch="$7"
+  local cache_key="$8"
 
   [ -f "$manifest_path" ] || fail "cache-manifest-missing" "$manifest_path"
-  local schema repo manifest_source manifest_node manifest_pnpm manifest_lock manifest_key manifest_archive manifest_hash
+  local schema repo manifest_node manifest_pnpm manifest_lock manifest_workspace manifest_platform manifest_arch manifest_key manifest_archive manifest_hash
   schema="$(read_json_field "$manifest_path" schema)" || fail "cache-manifest-malformed" "$manifest_path"
   repo="$(read_json_field "$manifest_path" repo)" || fail "cache-manifest-malformed" "$manifest_path"
-  manifest_source="$(read_json_field "$manifest_path" sourceSha)" || fail "cache-manifest-malformed" "$manifest_path"
   manifest_node="$(read_json_field "$manifest_path" nodeVersion)" || fail "cache-manifest-malformed" "$manifest_path"
   manifest_pnpm="$(read_json_field "$manifest_path" pnpmVersion)" || fail "cache-manifest-malformed" "$manifest_path"
   manifest_lock="$(read_json_field "$manifest_path" lockfileSha256)" || fail "cache-manifest-malformed" "$manifest_path"
+  manifest_workspace="$(read_json_field "$manifest_path" workspaceFileSha256)" || fail "cache-manifest-malformed" "$manifest_path"
+  manifest_platform="$(read_json_field "$manifest_path" platform)" || fail "cache-manifest-malformed" "$manifest_path"
+  manifest_arch="$(read_json_field "$manifest_path" arch)" || fail "cache-manifest-malformed" "$manifest_path"
   manifest_key="$(read_json_field "$manifest_path" cacheKey)" || fail "cache-manifest-malformed" "$manifest_path"
   manifest_archive="$(read_json_field "$manifest_path" archivePath)" || fail "cache-manifest-malformed" "$manifest_path"
   manifest_hash="$(read_json_field "$manifest_path" archiveSha256)" || fail "cache-manifest-malformed" "$manifest_path"
 
   [ "$schema" = "$SCHEMA" ] || fail "cache-schema-mismatch" "$schema"
   [ "$repo" = "$REPO" ] || fail "cache-repo-mismatch" "$repo"
-  [ "$manifest_source" = "$source" ] || fail "source-sha-mismatch" "$manifest_source expected $source"
   [ "$manifest_node" = "$REQUIRED_NODE_VERSION" ] || fail "node-version-mismatch" "$manifest_node"
   [ "$manifest_pnpm" = "$REQUIRED_PNPM_VERSION" ] || fail "pnpm-version-mismatch" "$manifest_pnpm"
   [ "$manifest_lock" = "$lock_sha" ] || fail "lockfile-hash-mismatch" "$manifest_lock expected $lock_sha"
+  [ "$manifest_workspace" = "$workspace_sha" ] || fail "workspace-file-hash-mismatch" "$manifest_workspace expected $workspace_sha"
+  [ "$manifest_platform" = "$platform" ] || fail "platform-mismatch" "$manifest_platform expected $platform"
+  [ "$manifest_arch" = "$arch" ] || fail "arch-mismatch" "$manifest_arch expected $arch"
   [ "$manifest_key" = "$cache_key" ] || fail "cache-key-mismatch" "$manifest_key expected $cache_key"
   [ "$manifest_archive" = "$archive_path" ] || fail "archive-path-mismatch" "$manifest_archive expected $archive_path"
   [ "$manifest_hash" = "$archive_sha" ] || fail "archive-hash-mismatch" "$manifest_hash expected $archive_sha"
@@ -387,9 +410,12 @@ write_restore_receipt() {
   local archive_sha="$3"
   local source="$4"
   local lock_sha="$5"
-  local cache_key="$6"
-  local elapsed_ms="$7"
-  local trace_dir="$8"
+  local workspace_sha="$6"
+  local platform="$7"
+  local arch="$8"
+  local cache_key="$9"
+  local elapsed_ms="${10}"
+  local trace_dir="${11}"
   local workspace_mount archive_mount
   workspace_mount="$(mount_source_for "$workspace")"
   archive_mount="$(mount_source_for "$archive_path")"
@@ -419,6 +445,9 @@ payload = {
         "nodeVersion": "$REQUIRED_NODE_VERSION",
         "pnpmVersion": "$REQUIRED_PNPM_VERSION",
         "lockfileSha256": "$lock_sha",
+        "workspaceFileSha256": "$workspace_sha",
+        "platform": "$platform",
+        "arch": "$arch",
         "cacheKey": "$cache_key",
     },
     "restore": {
@@ -496,6 +525,148 @@ copy_receipt() {
   install -m 0644 "$receipt" "$receipt_dir/$name"
 }
 
+write_cache_manifest() {
+  local path="$1" source="$2" lock_sha="$3" workspace_sha="$4" platform="$5" arch="$6" cache_key="$7" archive_path="$8" archive_sha="$9"
+  python3 - "$path" "$source" "$lock_sha" "$workspace_sha" "$platform" "$arch" "$cache_key" "$archive_path" "$archive_sha" <<PY
+import json
+import pathlib
+import sys
+from datetime import datetime, timezone
+
+path, source, lock_sha, workspace_sha, platform, arch, cache_key, archive_path, archive_sha = sys.argv[1:]
+payload = {
+    "schema": "$SCHEMA",
+    "repo": "$REPO",
+    "warmedAt": datetime.now(timezone.utc).isoformat().replace("+00:00", "Z"),
+    "warmedFromSourceSha": source,
+    "nodeVersion": "$REQUIRED_NODE_VERSION",
+    "pnpmVersion": "$REQUIRED_PNPM_VERSION",
+    "lockfileSha256": lock_sha,
+    "workspaceFileSha256": workspace_sha,
+    "platform": platform,
+    "arch": arch,
+    "cacheKey": cache_key,
+    "archivePath": archive_path,
+    "archiveSha256": archive_sha,
+}
+pathlib.Path(path).write_text(json.dumps(payload, indent=2, sort_keys=True) + "\n", encoding="utf-8")
+PY
+}
+
+write_warm_receipt() {
+  local path="$1" source="$2" lock_sha="$3" workspace_sha="$4" platform="$5" arch="$6" cache_key="$7" archive_path="$8" archive_sha="$9" cache_hit="${10}"
+  python3 - "$path" "$source" "$lock_sha" "$workspace_sha" "$platform" "$arch" "$cache_key" "$archive_path" "$archive_sha" "$cache_hit" <<PY
+import json
+import pathlib
+import sys
+from datetime import datetime, timezone
+
+path, source, lock_sha, workspace_sha, platform, arch, cache_key, archive_path, archive_sha, cache_hit = sys.argv[1:]
+payload = {
+    "schema": "$WARM_RECEIPT_SCHEMA",
+    "recordedAt": datetime.now(timezone.utc).isoformat().replace("+00:00", "Z"),
+    "repo": "$REPO",
+    "sourceSha": source,
+    "toolchain": {
+        "nodeVersion": "$REQUIRED_NODE_VERSION",
+        "pnpmVersion": "$REQUIRED_PNPM_VERSION",
+        "lockfileSha256": lock_sha,
+        "workspaceFileSha256": workspace_sha,
+        "platform": platform,
+        "arch": arch,
+        "cacheKey": cache_key,
+    },
+    "archive": {
+        "path": archive_path,
+        "sha256": archive_sha,
+        "immutable": True,
+        "cacheHit": cache_hit == "true",
+    },
+}
+pathlib.Path(path).write_text(json.dumps(payload, indent=2, sort_keys=True) + "\n", encoding="utf-8")
+PY
+}
+
+warm_cache() {
+  assert_trusted_hook_phase "cache_warm"
+  if [ "$allow_test_root" != "1" ] && [ "$(id -u)" -ne 0 ]; then
+    fail "cache-warm-requires-root"
+  fi
+  [ -f package.json ] || fail "package-json-missing" "$workspace"
+  [ -f pnpm-lock.yaml ] || fail "lockfile-missing" "$workspace"
+  assert_file_value .nvmrc "$REQUIRED_NODE_VERSION"
+  assert_file_value .node-version "$REQUIRED_NODE_VERSION"
+  if ! assert_package_contract; then
+    fail "package-contract-mismatch"
+  fi
+  [ "$(actual_node_version)" = "$REQUIRED_NODE_VERSION" ] || fail "node-version-mismatch" "$(actual_node_version) expected $REQUIRED_NODE_VERSION"
+  [ "$(actual_pnpm_version)" = "$REQUIRED_PNPM_VERSION" ] || fail "pnpm-version-mismatch" "$(actual_pnpm_version) expected $REQUIRED_PNPM_VERSION"
+
+  local source lock_sha workspace_sha platform arch cache_key archive_path manifest_path checksum_path
+  local archive_sha lock_path tmp_dir store_dir tmp_archive tmp_manifest tmp_checksum receipt cache_hit=false
+  source="$(source_sha)"
+  lock_sha="$(sha256_file pnpm-lock.yaml)"
+  workspace_sha="$(workspace_file_sha)"
+  platform="$(platform_name)"
+  arch="$(uname -m)"
+  cache_key="$(cache_key_for "$lock_sha" "$workspace_sha" "$platform" "$arch")"
+  archive_path="$(archive_path_for "$cache_key" "$lock_sha")"
+  manifest_path="${archive_path}.json"
+  checksum_path="${archive_path}.sha256"
+  install -d -m 0755 "$cache_root" "$receipt_dir"
+  assert_nvme_archive_path "$cache_root"
+  command -v flock >/dev/null 2>&1 || fail "flock-missing"
+  lock_path="$cache_root/.warm.lock"
+  exec 8>"$lock_path"
+  flock -x 8
+
+  if [ -f "$archive_path" ] && [ -f "$manifest_path" ] && [ -f "$checksum_path" ]; then
+    archive_sha="$(sha256_file "$archive_path")"
+    assert_checksum_sidecar "$checksum_path" "$archive_path" "$archive_sha" || fail "archive-checksum-mismatch" "$checksum_path"
+    assert_manifest "$manifest_path" "$archive_path" "$archive_sha" "$lock_sha" "$workspace_sha" "$platform" "$arch" "$cache_key"
+    assert_immutable_file "$archive_path"
+    assert_immutable_file "$manifest_path"
+    assert_immutable_file "$checksum_path"
+    cache_hit=true
+  elif [ -e "$archive_path" ] || [ -e "$manifest_path" ] || [ -e "$checksum_path" ]; then
+    fail "partial-cache-entry" "$archive_path"
+  else
+    tmp_dir="$(mktemp -d "$cache_root/.warm-${cache_key}.XXXXXX")"
+    store_dir="$tmp_dir/store"
+    tmp_archive="$tmp_dir/$(basename "$archive_path")"
+    tmp_manifest="$tmp_dir/$(basename "$manifest_path")"
+    tmp_checksum="$tmp_dir/$(basename "$checksum_path")"
+    cleanup_warm_tmp() { rm -rf -- "$tmp_dir"; }
+    trap cleanup_warm_tmp EXIT
+    install -d -m 0755 "$store_dir"
+    COREPACK_ENABLE_NETWORK=0 pnpm fetch --frozen-lockfile --store-dir "$store_dir"
+    tar -cf "$tmp_archive" -C "$store_dir" .
+    archive_sha="$(sha256_file "$tmp_archive")"
+    printf '%s  %s\n' "$archive_sha" "$(basename "$archive_path")" >"$tmp_checksum"
+    write_cache_manifest "$tmp_manifest" "$source" "$lock_sha" "$workspace_sha" "$platform" "$arch" "$cache_key" "$archive_path" "$archive_sha"
+    chmod 0444 "$tmp_archive" "$tmp_manifest" "$tmp_checksum"
+    mv "$tmp_archive" "$archive_path"
+    mv "$tmp_manifest" "$manifest_path"
+    mv "$tmp_checksum" "$checksum_path"
+    trap - EXIT
+    cleanup_warm_tmp
+    assert_archive_entries_safe "$archive_path" || fail "archive-entry-unsafe" "$archive_path"
+    assert_checksum_sidecar "$checksum_path" "$archive_path" "$archive_sha" || fail "archive-checksum-mismatch" "$checksum_path"
+    assert_manifest "$manifest_path" "$archive_path" "$archive_sha" "$lock_sha" "$workspace_sha" "$platform" "$arch" "$cache_key"
+    if [ "$allow_test_root" != "1" ]; then
+      chattr +i "$archive_path" "$manifest_path" "$checksum_path" || fail "cache-immutability-seal-failed" "$archive_path"
+    fi
+    assert_immutable_file "$archive_path"
+    assert_immutable_file "$manifest_path"
+    assert_immutable_file "$checksum_path"
+  fi
+
+  receipt="$receipt_dir/cache-warm-${source}-${cache_key:0:16}-$(date -u +%Y%m%dT%H%M%SZ).json"
+  write_warm_receipt "$receipt" "$source" "$lock_sha" "$workspace_sha" "$platform" "$arch" "$cache_key" "$archive_path" "$archive_sha" "$cache_hit"
+  printf 'SYMPHONY_NVME_PACKAGE_CACHE_WARM schema=%s source=%s cache_key=%s cache_hit=%s archive=%s receipt=%s\n' \
+    "$WARM_RECEIPT_SCHEMA" "$source" "$cache_key" "$cache_hit" "$archive_path" "$receipt"
+}
+
 after_create() {
   assert_trusted_hook_phase "after_create"
   assert_private_state_inside_workspace || fail "private-state-escapes-workspace"
@@ -507,14 +678,17 @@ after_create() {
     fail "package-contract-mismatch"
   fi
 
-  local node_version pnpm_version source lock_sha cache_key archive_path manifest_path checksum_path archive_sha
+  local node_version pnpm_version source lock_sha workspace_sha platform arch cache_key archive_path manifest_path checksum_path archive_sha
   node_version="$(actual_node_version)"
   [ "$node_version" = "$REQUIRED_NODE_VERSION" ] || fail "node-version-mismatch" "$node_version expected $REQUIRED_NODE_VERSION"
   pnpm_version="$(actual_pnpm_version)"
   [ "$pnpm_version" = "$REQUIRED_PNPM_VERSION" ] || fail "pnpm-version-mismatch" "$pnpm_version expected $REQUIRED_PNPM_VERSION"
   source="$(source_sha)"
   lock_sha="$(sha256_file pnpm-lock.yaml)"
-  cache_key="$(cache_key_for "$source" "$lock_sha")"
+  workspace_sha="$(workspace_file_sha)"
+  platform="$(platform_name)"
+  arch="$(uname -m)"
+  cache_key="$(cache_key_for "$lock_sha" "$workspace_sha" "$platform" "$arch")"
   archive_path="$(archive_path_for "$cache_key" "$lock_sha")"
   manifest_path="${archive_path}.json"
   checksum_path="${archive_path}.sha256"
@@ -526,7 +700,7 @@ after_create() {
   assert_archive_entries_safe "$archive_path" || fail "archive-entry-unsafe" "$archive_path"
   archive_sha="$(sha256_file "$archive_path")"
   assert_checksum_sidecar "$checksum_path" "$archive_path" "$archive_sha" || fail "archive-checksum-mismatch" "$checksum_path"
-  assert_manifest "$manifest_path" "$archive_path" "$archive_sha" "$source" "$lock_sha" "$cache_key"
+  assert_manifest "$manifest_path" "$archive_path" "$archive_sha" "$lock_sha" "$workspace_sha" "$platform" "$arch" "$cache_key"
   assert_no_existing_mutable_package_state
 
   local lock_path start end elapsed trace_dir
@@ -544,7 +718,7 @@ after_create() {
   elapsed=$((end - start))
 
   [ -f "$workspace/node_modules/.modules.yaml" ] || fail "node-modules-proof-missing" "$workspace/node_modules/.modules.yaml"
-  write_restore_receipt "$restore_receipt" "$archive_path" "$archive_sha" "$source" "$lock_sha" "$cache_key" "$elapsed" "$trace_dir"
+  write_restore_receipt "$restore_receipt" "$archive_path" "$archive_sha" "$source" "$lock_sha" "$workspace_sha" "$platform" "$arch" "$cache_key" "$elapsed" "$trace_dir"
   copy_receipt "$restore_receipt" "${issue}-${source}-${cache_key:0:16}-restore.json"
   printf 'SYMPHONY_NVME_PACKAGE_CACHE_OK schema=%s issue=%s cache_key=%s elapsed_ms=%s archive=%s\n' \
     "$RESTORE_RECEIPT_SCHEMA" "$issue" "$cache_key" "$elapsed" "$archive_path"
@@ -616,6 +790,9 @@ PY
 }
 
 case "$mode" in
+  warm)
+    warm_cache
+    ;;
   after-create|after_create)
     after_create
     ;;
@@ -623,7 +800,7 @@ case "$mode" in
     before_remove
     ;;
   *)
-    printf 'usage: %s [after-create|before-remove]\n' "$0" >&2
+    printf 'usage: %s [warm|after-create|before-remove]\n' "$0" >&2
     exit 64
     ;;
 esac
