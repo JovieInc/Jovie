@@ -37,6 +37,23 @@ const AUTHENTICATED_SHELL_CAPTURE_FILE =
 
 /** @typedef {{ apiKey?: string, baseUrl?: string, model?: string }} ReviewBackend */
 
+export function buildCaptureArtifactPaths({ outDir, route, viewportName }) {
+  const safeRoute =
+    String(route)
+      .replace(/[^a-z0-9]+/gi, '-')
+      .replace(/^-|-$/g, '') || 'home';
+  const safeViewport = String(viewportName)
+    .replace(/[^a-z0-9]+/gi, '-')
+    .replace(/^-|-$/g, '');
+  if (!safeViewport) throw new Error('Capture viewport name is required');
+
+  const artifactPath = `${safeRoute}-${safeViewport}.png`;
+  return {
+    artifactPath,
+    outputPath: join(outDir, artifactPath),
+  };
+}
+
 export function sanitizeForPrompt(value) {
   return String(value ?? '')
     .replace(
