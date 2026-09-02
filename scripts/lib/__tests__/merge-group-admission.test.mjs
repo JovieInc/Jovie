@@ -1,13 +1,17 @@
+import { mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 import { describe, expect, it, vi } from 'vitest';
 import {
   classifyRequiredCheckPage,
+  runAdmissionFromEnv,
   validateMergeGroupAdmissionEvent,
   validateQueueRef,
   waitForMergeGroupAdmission,
 } from '../merge-group-admission.mjs';
 
 const HEAD = '2'.repeat(40);
-const HEAD_REF = `refs/heads/gh-readonly-queue/main/pr-123-${'1'.repeat(40)}`;
+const HEAD_REF = 'refs/heads/gh-readonly-queue/main/pr-123-deadbeef';
 
 function event(overrides = {}) {
   return {
@@ -63,12 +67,13 @@ describe('merge-group admission evidence', () => {
     ).toEqual({
       headRef: HEAD_REF,
       headSha: HEAD,
+      prNumber: 123,
       repository: 'JovieInc/Jovie',
     });
 
     expect(() =>
       validateMergeGroupAdmissionEvent(event({ head_ref: 'refs/heads/main' }))
-    ).toThrow(/not a main queue ref/);
+    ).toThrow(/does not expose a queue PR number/);
     expect(() =>
       validateMergeGroupAdmissionEvent(event(), {
         expectedHeadSha: '3'.repeat(40),
@@ -249,5 +254,98 @@ describe('merge-group admission evidence', () => {
       })
     ).rejects.toThrow(/within 6ms/);
     expect(elapsed).toBe(6);
+  });
+
+  it('runs the GitHub adapter and serializes typed admission outputs', async () => {
+    const tempDir = await mkdtemp(join(tmpdir(), 'merge-group-admission-'));
+    const eventPath = join(tempDir, 'event.json');
+    const outputPath = join(tempDir, 'output.txt');
+    const summaryPath = join(tempDir, 'summary.md');
+    await writeFile(eventPath, JSON.stringify(event()), 'utf8');
+
+    const fetchImpl = vi.fn(async url => {
+      const requestUrl = new URL(url);
+      if (requestUrl.pathname.includes('/git/ref/')) {
+        return Response.json(queueRef());
+      }
+      const checkName = requestUrl.searchParams.get('check_name');
+      return Response.json(checkPage(checkName, 'completed', 'success').data);
+    });
+
+    try {
+      const admitted = await runAdmissionFromEnv(
+        {
+          GH_TOKEN: 'test-token',
+          GITHUB_API_URL: 'https://api.github.test',
+          GITHUB_EVENT_PATH: eventPath,
+          GITHUB_OUTPUT: outputPath,
+          GITHUB_REPOSITORY: 'JovieInc/Jovie',
+          GITHUB_SHA: HEAD,
+          GITHUB_STEP_SUMMARY: summaryPath,
+        },
+        { fetchImpl }
+      );
+
+      expect(admitted).toMatchObject({ headSha: HEAD, prNumber: 123 });
+      expect(fetchImpl).toHaveBeenCalledTimes(4);
+      expect(fetchImpl.mock.calls.map(([url]) => url)).toEqual([
+        'https://api.github.test/repos/JovieInc/Jovie/git/ref/heads/gh-readonly-queue/main/pr-123-deadbeef',
+        `https://api.github.test/repos/JovieInc/Jovie/commits/${HEAD}/check-runs?check_name=Fork+PR+Gate&filter=latest&page=1&per_page=100`,
+        `https://api.github.test/repos/JovieInc/Jovie/commits/${HEAD}/check-runs?check_name=PR+Size+Guard&filter=latest&page=1&per_page=100`,
+        'https://api.github.test/repos/JovieInc/Jovie/git/ref/heads/gh-readonly-queue/main/pr-123-deadbeef',
+      ]);
+      for (const [, options] of fetchImpl.mock.calls) {
+        expect(options).toMatchObject({
+          cache: 'no-store',
+          headers: {
+            Accept: 'application/vnd.github+json',
+            Authorization: 'Bearer test-token',
+            'Cache-Control': 'no-cache',
+            'X-GitHub-Api-Version': '2022-11-28',
+          },
+        });
+      }
+      await expect(readFile(outputPath, 'utf8')).resolves.toBe(
+        'pr_number=123\n'
+      );
+      await expect(readFile(summaryPath, 'utf8')).resolves.toBe(
+        [
+          '### Merge-group exact-ref admission',
+          '',
+          '- PR: #123',
+          `- Synthetic head: \`${HEAD}\``,
+          '- Queue state: `EXACT_REF_ADMITTED`',
+          '',
+        ].join('\n')
+      );
+    } finally {
+      await rm(tempDir, { force: true, recursive: true });
+    }
+  });
+
+  it('fails closed when the GitHub adapter receives an HTTP error', async () => {
+    const tempDir = await mkdtemp(join(tmpdir(), 'merge-group-admission-'));
+    const eventPath = join(tempDir, 'event.json');
+    await writeFile(eventPath, JSON.stringify(event()), 'utf8');
+
+    try {
+      await expect(
+        runAdmissionFromEnv(
+          {
+            GH_TOKEN: 'test-token',
+            GITHUB_API_URL: 'https://api.github.test',
+            GITHUB_EVENT_PATH: eventPath,
+            GITHUB_REPOSITORY: 'JovieInc/Jovie',
+            GITHUB_SHA: HEAD,
+          },
+          {
+            fetchImpl: async () =>
+              Response.json({ message: 'forbidden' }, { status: 403 }),
+          }
+        )
+      ).rejects.toThrow(/GitHub API 403/);
+    } finally {
+      await rm(tempDir, { force: true, recursive: true });
+    }
   });
 });

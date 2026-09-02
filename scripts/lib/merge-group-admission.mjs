@@ -1,8 +1,9 @@
-import { readFile } from 'node:fs/promises';
+import { appendFile, readFile } from 'node:fs/promises';
 import { pathToFileURL } from 'node:url';
 
 const SHA_PATTERN = /^[0-9a-f]{40}$/;
-const QUEUE_HEAD_PREFIX = 'refs/heads/gh-readonly-queue/main/';
+const QUEUE_HEAD_PR_PATTERN =
+  /^refs\/heads\/gh-readonly-queue\/main\/pr-([1-9][0-9]*)-[0-9a-f]+$/;
 const REQUIRED_CHECKS = Object.freeze(['Fork PR Gate', 'PR Size Guard']);
 const NONTERMINAL_CHECK_STATUSES = new Set([
   'in_progress',
@@ -52,6 +53,14 @@ function splitRepository(repository) {
   return parts;
 }
 
+export function parseQueueHeadPullRequestNumber(headRef) {
+  const match = QUEUE_HEAD_PR_PATTERN.exec(String(headRef ?? ''));
+  if (!match) {
+    fail('merge_group head_ref does not expose a queue PR number');
+  }
+  return Number.parseInt(match[1], 10);
+}
+
 export function validateMergeGroupAdmissionEvent(
   event,
   { expectedHeadSha, expectedRepository } = {}
@@ -78,17 +87,17 @@ export function validateMergeGroupAdmissionEvent(
   if (expectedHeadSha && headSha !== expectedHeadSha) {
     fail('merge_group head_sha does not match GITHUB_SHA');
   }
-  if (
-    typeof group.head_ref !== 'string' ||
-    !group.head_ref.startsWith(QUEUE_HEAD_PREFIX)
-  ) {
-    fail('merge_group head_ref is not a main queue ref');
-  }
+  const prNumber = parseQueueHeadPullRequestNumber(group.head_ref);
   if (group.head_commit?.id && group.head_commit.id !== headSha) {
     fail('merge_group head_commit does not match head_sha');
   }
 
-  return { headRef: group.head_ref, headSha, repository };
+  return {
+    headRef: group.head_ref,
+    headSha,
+    prNumber,
+    repository,
+  };
 }
 
 function linkHasNext(link) {
@@ -242,14 +251,14 @@ function encodePathParts(value) {
 
 async function githubRequest(
   path,
-  { deadlineMs, fetchImpl = fetch, now = Date.now, token }
+  { deadlineMs, env = process.env, fetchImpl = fetch, now = Date.now, token }
 ) {
   const remainingMs = deadlineMs - now();
   if (remainingMs <= 0) {
     fail('merge-group admission API deadline expired');
   }
 
-  const apiUrl = process.env.GITHUB_API_URL || 'https://api.github.com';
+  const apiUrl = env.GITHUB_API_URL || 'https://api.github.com';
   let response;
   try {
     response = await fetchImpl(`${apiUrl}${path}`, {
@@ -285,14 +294,20 @@ async function githubRequest(
   return { data, link: response.headers.get('link') };
 }
 
-function createGitHubAdmissionApi({ headRef, repository, token }) {
+function createGitHubAdmissionApi({
+  env,
+  fetchImpl,
+  headRef,
+  repository,
+  token,
+}) {
   const encodedRepository = encodePathParts(repository);
   const encodedHeadRef = encodePathParts(headRef.slice('refs/'.length));
   return {
     async loadQueueRef({ deadlineMs }) {
       const result = await githubRequest(
         `/repos/${encodedRepository}/git/ref/${encodedHeadRef}`,
-        { deadlineMs, token }
+        { deadlineMs, env, fetchImpl, token }
       );
       return result.data;
     },
@@ -305,17 +320,44 @@ function createGitHubAdmissionApi({ headRef, repository, token }) {
       });
       return githubRequest(
         `/repos/${encodedRepository}/commits/${headSha}/check-runs?${query}`,
-        { deadlineMs, token }
+        { deadlineMs, env, fetchImpl, token }
       );
     },
   };
 }
 
-async function run() {
-  const eventPath = process.env.GITHUB_EVENT_PATH;
-  const token = process.env.GH_TOKEN || process.env.GITHUB_TOKEN;
-  const expectedHeadSha = process.env.GITHUB_SHA;
-  const expectedRepository = process.env.GITHUB_REPOSITORY;
+async function writeAdmissionOutputs(evidence, env) {
+  if (env.GITHUB_OUTPUT) {
+    await appendFile(
+      env.GITHUB_OUTPUT,
+      `pr_number=${evidence.prNumber}\n`,
+      'utf8'
+    );
+  }
+  if (env.GITHUB_STEP_SUMMARY) {
+    await appendFile(
+      env.GITHUB_STEP_SUMMARY,
+      [
+        '### Merge-group exact-ref admission',
+        '',
+        `- PR: #${evidence.prNumber}`,
+        `- Synthetic head: \`${evidence.headSha}\``,
+        '- Queue state: `EXACT_REF_ADMITTED`',
+        '',
+      ].join('\n'),
+      'utf8'
+    );
+  }
+}
+
+export async function runAdmissionFromEnv(
+  env = process.env,
+  { fetchImpl = fetch } = {}
+) {
+  const eventPath = env.GITHUB_EVENT_PATH;
+  const token = env.GH_TOKEN || env.GITHUB_TOKEN;
+  const expectedHeadSha = env.GITHUB_SHA;
+  const expectedRepository = env.GITHUB_REPOSITORY;
   if (!eventPath || !token || !expectedHeadSha || !expectedRepository) {
     fail(
       'GITHUB_EVENT_PATH, GH_TOKEN, GITHUB_SHA, and GITHUB_REPOSITORY are required'
@@ -327,15 +369,22 @@ async function run() {
     expectedHeadSha,
     expectedRepository,
   });
-  const api = createGitHubAdmissionApi({ ...evidence, token });
-  await waitForMergeGroupAdmission({ event, ...api });
+  const api = createGitHubAdmissionApi({
+    ...evidence,
+    env,
+    fetchImpl,
+    token,
+  });
+  const admitted = await waitForMergeGroupAdmission({ event, ...api });
+  await writeAdmissionOutputs(admitted, env);
+  return admitted;
 }
 
 if (
   process.argv[1] &&
   import.meta.url === pathToFileURL(process.argv[1]).href
 ) {
-  run().catch(error => {
+  runAdmissionFromEnv().catch(error => {
     console.error(
       `::error::${error instanceof Error ? error.message : String(error)}`
     );

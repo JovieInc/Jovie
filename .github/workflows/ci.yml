@@ -890,6 +890,8 @@ jobs:
     if: ${{ needs.ci-path-changes.result == 'success' && github.event_name == 'merge_group' }}
     runs-on: ubuntu-latest
     timeout-minutes: 2
+    outputs:
+      pr_number: ${{ steps.admission.outputs.pr_number || '' }}
     permissions:
       checks: read
       contents: read
@@ -906,6 +908,7 @@ jobs:
           sparse-checkout: scripts/lib/merge-group-admission.mjs
           sparse-checkout-cone-mode: false
       - name: Require live queue ref and external admission checks
+        id: admission
         env:
           GH_TOKEN: ${{ github.token }}
         run: node scripts/lib/merge-group-admission.mjs
@@ -2005,6 +2008,8 @@ jobs:
         (github.event_name == 'push' && github.ref == 'refs/heads/main')
       )
     uses: ./.github/workflows/ios-ci.yml
+    with:
+      concurrency-key: ${{ github.event_name == 'merge_group' && needs.ci-merge-group-admission.outputs.pr_number != '' && format('pr-{0}', needs.ci-merge-group-admission.outputs.pr_number) || '' }}
 
   # Mac product evidence stays on the synthetic combined head or direct-main
   # fallback. It covers both the MenuMonitor Swift package and the packaged

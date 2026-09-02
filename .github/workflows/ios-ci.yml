@@ -5,14 +5,19 @@ on:
   # combined head or an unproven direct-main fallback. Source PRs receive the
   # portable iOS contract inside ci-fast.
   workflow_call:
+    inputs:
+      concurrency-key:
+        description: Stable key used to coalesce superseded merge-group heads.
+        required: false
+        type: string
   workflow_dispatch:
 
 permissions:
   contents: read
 
 concurrency:
-  group: ios-ci-${{ github.workflow }}-${{ github.ref }}
-  cancel-in-progress: ${{ github.ref != 'refs/heads/main' }}
+  group: ios-ci-${{ github.workflow }}-${{ inputs.concurrency-key || github.ref }}
+  cancel-in-progress: ${{ inputs.concurrency-key != '' || github.ref != 'refs/heads/main' }}
 
 jobs:
   test:
