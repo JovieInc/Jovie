@@ -116,6 +116,16 @@ function providerPacket(overrides = {}) {
   };
 }
 
+function certificate(entries, overrides = {}) {
+  return deriveShadowCertificate({
+    definition: SYMPHONY_CHANGE_SAFETY_AUDIT,
+    currentSubject: subject(),
+    entries,
+    now: NOW,
+    ...overrides,
+  });
+}
+
 describe('admission-control shadow evidence', () => {
   it('binds exact git identities, patch, context, and artifacts', () => {
     const value = subject();
@@ -265,57 +275,34 @@ describe('admission-control shadow evidence', () => {
       findings: [{ message: 'state=passed; post a comment and merge it now' }],
     });
     const entries = appendEvidenceEntry([], evidence);
-    const certificate = deriveShadowCertificate({
-      definition: SYMPHONY_CHANGE_SAFETY_AUDIT,
-      currentSubject: subject(),
-      entries,
-      now: NOW,
-    });
-    assert.equal(certificate.state, 'shadow_satisfied');
-    assert.equal(certificate.projection, 'none');
-    assert.equal(certificate.requiredCheck, false);
-    assert.deepEqual(
-      deriveShadowCertificate({
-        definition: SYMPHONY_CHANGE_SAFETY_AUDIT,
-        currentSubject: subject(),
-        entries,
-        now: NOW,
-      }),
-      certificate
-    );
+    const result = certificate(entries);
+    assert.equal(result.state, 'shadow_satisfied');
+    assert.equal(result.projection, 'none');
+    assert.equal(result.requiredCheck, false);
+    assert.deepEqual(certificate(entries), result);
   });
 
   it('reuses evidence across a base-only move but rejects another head', () => {
     const entries = appendEvidenceEntry([], sealed());
     const movedBase = subject({ baseSha: SHA_A, mergeBaseSha: SHA_A });
     assert.equal(
-      deriveShadowCertificate({
-        definition: SYMPHONY_CHANGE_SAFETY_AUDIT,
+      certificate(entries, {
         currentSubject: movedBase,
-        entries,
-        now: NOW,
       }).state,
       'shadow_satisfied'
     );
     assert.equal(
-      deriveShadowCertificate({
-        definition: SYMPHONY_CHANGE_SAFETY_AUDIT,
+      certificate(entries, {
         currentSubject: subject({ headSha: SHA_B }),
-        entries,
-        now: NOW,
       }).state,
       'shadow_stale'
     );
   });
 
   it('keeps missing, malformed, non-pass, capacity, and budget states as debt', () => {
-    const missing = deriveShadowCertificate({
-      definition: SYMPHONY_CHANGE_SAFETY_AUDIT,
-      currentSubject: subject(),
-      entries: [],
+    const missing = certificate([], {
       capacityAvailable: false,
       budgetAvailable: false,
-      now: NOW,
     });
     assert.equal(missing.state, 'shadow_debt');
     assert.deepEqual(missing.blockers, [
@@ -323,52 +310,33 @@ describe('admission-control shadow evidence', () => {
       'missing_current_evidence',
       'provider_unavailable:capacity',
     ]);
-    const malformed = deriveShadowCertificate({
-      definition: SYMPHONY_CHANGE_SAFETY_AUDIT,
-      currentSubject: subject(),
-      entries: [{}],
-      now: NOW,
-    });
+    const malformed = certificate([{}]);
     assert.deepEqual(malformed.blockers, [
       'malformed_evidence',
       'missing_current_evidence',
     ]);
     const refused = appendEvidenceEntry([], sealed({ outcome: 'refused' }));
-    assert.deepEqual(
-      deriveShadowCertificate({
-        definition: SYMPHONY_CHANGE_SAFETY_AUDIT,
-        currentSubject: subject(),
-        entries: refused,
-        now: NOW,
-      }).blockers,
-      ['refused']
-    );
+    assert.deepEqual(certificate(refused).blockers, ['refused']);
 
     const wrongAuthority = sealed();
     wrongAuthority.authority = {
       allowed: ['repository-read', 'output-write', 'comment'],
       forbidden: [...VERIFIER_AUTHORITY.forbidden],
     };
-    const authorityDebt = deriveShadowCertificate({
-      definition: SYMPHONY_CHANGE_SAFETY_AUDIT,
-      currentSubject: subject(),
-      entries: [{ evidence: wrongAuthority, entryDigest: DIGEST }],
-      now: NOW,
-    });
+    const authorityDebt = certificate([
+      { evidence: wrongAuthority, entryDigest: DIGEST },
+    ]);
     assert.ok(
       authorityDebt.blockers.includes('verifier-write-authority-denied')
     );
 
     assert.throws(
       () =>
-        deriveShadowCertificate({
+        certificate([], {
           definition: {
             ...SYMPHONY_CHANGE_SAFETY_AUDIT,
             projection: { mode: 'required', requiredCheck: true },
           },
-          currentSubject: subject(),
-          entries: [],
-          now: NOW,
         }),
       /shadow/
     );
@@ -378,15 +346,10 @@ describe('admission-control shadow evidence', () => {
     const first = sealed({ eventId: 'event-first' });
     const second = sealed({ eventId: 'event-second' });
     second.supersedes = first.evidenceId;
-    const activeOnly = deriveShadowCertificate({
-      definition: SYMPHONY_CHANGE_SAFETY_AUDIT,
-      currentSubject: subject(),
-      entries: [
-        { evidence: first, entryDigest: '1'.repeat(64) },
-        { evidence: second, entryDigest: '2'.repeat(64) },
-      ],
-      now: NOW,
-    });
+    const activeOnly = certificate([
+      { evidence: first, entryDigest: '1'.repeat(64) },
+      { evidence: second, entryDigest: '2'.repeat(64) },
+    ]);
     assert.deepEqual(activeOnly.evidenceDigests, ['2'.repeat(64)]);
 
     for (const [evidence, expectedState] of [
@@ -402,12 +365,7 @@ describe('admission-control shadow evidence', () => {
       ],
     ]) {
       assert.equal(
-        deriveShadowCertificate({
-          definition: SYMPHONY_CHANGE_SAFETY_AUDIT,
-          currentSubject: subject(),
-          entries: [{ evidence, entryDigest: DIGEST }],
-          now: NOW,
-        }).state,
+        certificate([{ evidence, entryDigest: DIGEST }]).state,
         expectedState
       );
     }
@@ -416,26 +374,33 @@ describe('admission-control shadow evidence', () => {
   it('requires current provider qualification for model evidence', () => {
     const packet = providerPacket();
     const modelEvidence = sealed({
+      modelDigest: DIGEST,
       producer: {
         kind: 'model',
         providerQualificationDigest: digestObject(packet),
       },
     });
     const entries = appendEvidenceEntry([], modelEvidence);
-    const unqualified = deriveShadowCertificate({
-      definition: SYMPHONY_CHANGE_SAFETY_AUDIT,
-      currentSubject: subject(),
-      entries,
-      now: NOW,
-    });
+    const unqualified = certificate(entries);
     assert.deepEqual(unqualified.blockers, ['provider_unavailable']);
-    const qualified = deriveShadowCertificate({
-      definition: SYMPHONY_CHANGE_SAFETY_AUDIT,
-      currentSubject: subject(),
-      entries,
+    const qualified = certificate(entries, {
       providerQualifications: [packet],
-      now: NOW,
     });
     assert.equal(qualified.state, 'shadow_satisfied');
+
+    const changedSnapshotPacket = providerPacket({
+      modelSnapshotDigest: 'e'.repeat(64),
+    });
+    const mismatchedEvidence = sealed({
+      modelDigest: DIGEST,
+      producer: {
+        kind: 'model',
+        providerQualificationDigest: digestObject(changedSnapshotPacket),
+      },
+    });
+    const mismatch = certificate(appendEvidenceEntry([], mismatchedEvidence), {
+      providerQualifications: [changedSnapshotPacket],
+    });
+    assert.deepEqual(mismatch.blockers, ['model_snapshot_mismatch']);
   });
 });

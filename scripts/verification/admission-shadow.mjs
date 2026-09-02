@@ -277,7 +277,10 @@ export function deriveShadowCertificate({
   const providerStates = new Map(
     providerQualifications.map(packet => {
       const state = evaluateProviderQualification(packet, { now });
-      return [state.digest, state];
+      return [
+        state.digest,
+        { ...state, modelSnapshotDigest: packet?.modelSnapshotDigest },
+      ];
     })
   );
   const validEntries = [];
@@ -313,6 +316,9 @@ export function deriveShadowCertificate({
         latest.producer.providerQualificationDigest
       );
       if (!qualification?.qualified) blockers.push('provider_unavailable');
+      else if (latest.modelDigest !== qualification.modelSnapshotDigest) {
+        blockers.push('model_snapshot_mismatch');
+      }
     }
   }
   const hasStaleAuditEvidence = entries.some(
