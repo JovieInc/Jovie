@@ -975,9 +975,15 @@ describe('queue workflow mutation safety', () => {
       drain.indexOf('inventory_native_queue_state "$DRAIN_ADMISSION_PR"')
     );
     expect(drain).toContain('SNAP (exact-head #$DRAIN_ADMISSION_PR)');
-    expect(drain).toContain('inventory_native_queue_state "$DRAIN_ADMISSION_PR"');
+    expect(drain).toContain(
+      'inventory_native_queue_state "$DRAIN_ADMISSION_PR"'
+    );
+    expect(drain).toContain('native_state_to_snap');
     expect(drain).toContain('GH_INVENTORY_RETRY_ATTEMPTS:-3');
     expect(drain).toContain('=== RETARGET (base must be main) ===');
+    expect(drain).toContain(
+      '(.n | type == "number") and (.base | type == "string") and .base != "main"'
+    );
     expect(drain).not.toContain(
       'SNAP="$(gh_retry pr list -R "$REPO" --state open --limit 200'
     );
@@ -2317,9 +2323,9 @@ describe('authoritative native state listing', () => {
       16909: { backend: 'native', queued: true, number: 16909 },
     });
     const queries = runner.mock.calls.map(call => queryText(call[0]));
-    expect(queries.some(query => query.includes('MergeQueuePullRequestState'))).toBe(
-      true
-    );
+    expect(
+      queries.some(query => query.includes('MergeQueuePullRequestState'))
+    ).toBe(true);
     expect(
       queries.some(query => query.includes('MergeQueueOpenPullRequestStates'))
     ).toBe(false);

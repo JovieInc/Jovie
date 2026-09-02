@@ -95,6 +95,27 @@ gh_inventory_retry() {
     gh_retry "$@"
 }
 
+native_state_to_snap() {
+  jq -c '
+    [ to_entries[] | .key as $k | .value | {
+      n: (.number // (try ($k | tonumber) catch empty) // null),
+      t: ((.title // "")[0:48]),
+      draft: (.isDraft == true),
+      m: .mergeable,
+      ms: (.mergeStateStatus // "UNKNOWN"),
+      head: .headRefName,
+      headOid: ((.headRefOid // "") | ascii_downcase),
+      base: (.baseRefName // "main"),
+      body: (.body // ""),
+      L: [((.labels.nodes // [])[] | .name)],
+      fail: [],
+      q: (.queued == true),
+      qs: (.mergeQueueEntry.state // null),
+      oid: .headRefOid
+    } | select(.n | type == "number") ]
+  '
+}
+
 inventory_native_queue_state() {
   local attempts="${GH_INVENTORY_RETRY_ATTEMPTS:-3}"
   local base_delay="${GH_RETRY_BASE_DELAY:-2}"
@@ -1406,24 +1427,7 @@ if [[ "$MERGE_QUEUE_BACKEND" == "native" ]]; then
       exit 1
     fi
   fi
-  SNAP="$(jq -c '
-    [ to_entries[] | .value | {
-      n: .number,
-      t: ((.title // "")[0:48]),
-      draft: (.isDraft == true),
-      m: .mergeable,
-      ms: (.mergeStateStatus // "UNKNOWN"),
-      head: .headRefName,
-      headOid: ((.headRefOid // "") | ascii_downcase),
-      base: .baseRefName,
-      body: (.body // ""),
-      L: [((.labels.nodes // [])[] | .name)],
-      fail: [],
-      q: (.queued == true),
-      qs: (.mergeQueueEntry.state // null),
-      oid: .headRefOid
-    } ]
-  ' <<<"$NATIVE_QUEUE_STATE")"
+  SNAP="$(native_state_to_snap <<<"$NATIVE_QUEUE_STATE")"
 else
   SNAP="$(gh_inventory_retry pr list -R "$REPO" --state open --limit 200 \
     --json number,title,body,isDraft,mergeable,mergeStateStatus,labels,headRefName,headRefOid,baseRefName --jq '
@@ -1451,6 +1455,9 @@ while IFS= read -r pr; do
   n="$(jq -r '.n' <<<"$pr")"
   base="$(jq -r '.base' <<<"$pr")"
   t="$(jq -r '.t' <<<"$pr")"
+  if [[ ! "$n" =~ ^[1-9][0-9]*$ || -z "$base" || "$base" == "null" ]]; then
+    continue
+  fi
   echo "  #$n  $t  $base → main"
   if [[ "$DRY_RUN" == "1" ]]; then
     echo "    [dry-run] would gh pr edit $n --base main"
@@ -1461,7 +1468,10 @@ while IFS= read -r pr; do
     fi
   fi
   retargeted=$((retargeted + 1))
-done < <(jq -c '.[] | select(.base != "main")' <<<"$SNAP")
+done < <(jq -c '
+  .[]
+  | select((.n | type == "number") and (.base | type == "string") and .base != "main")
+' <<<"$SNAP")
 if [[ "$retargeted" -eq 0 ]]; then
   echo "  (none)"
 elif [[ "$DRY_RUN" != "1" ]]; then
@@ -1477,24 +1487,7 @@ elif [[ "$DRY_RUN" != "1" ]]; then
         exit 1
       fi
     fi
-    SNAP="$(jq -c '
-      [ to_entries[] | .value | {
-        n: .number,
-        t: ((.title // "")[0:48]),
-        draft: (.isDraft == true),
-        m: .mergeable,
-        ms: (.mergeStateStatus // "UNKNOWN"),
-        head: .headRefName,
-        headOid: ((.headRefOid // "") | ascii_downcase),
-        base: .baseRefName,
-        body: (.body // ""),
-        L: [((.labels.nodes // [])[] | .name)],
-        fail: [],
-        q: (.queued == true),
-        qs: (.mergeQueueEntry.state // null),
-        oid: .headRefOid
-      } ]
-    ' <<<"$NATIVE_QUEUE_STATE")"
+    SNAP="$(native_state_to_snap <<<"$NATIVE_QUEUE_STATE")"
   else
     SNAP="$(gh_inventory_retry pr list -R "$REPO" --state open --limit 200 \
       --json number,title,body,isDraft,mergeable,mergeStateStatus,labels,headRefName,headRefOid,baseRefName --jq '

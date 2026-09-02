@@ -605,6 +605,14 @@ function indexPullRequestStates(states, prs, normalize, missingMessage) {
   return states;
 }
 
+/**
+ * @param {{
+ *   backend?: string,
+ *   repository?: string,
+ *   runner?: (args: any) => Promise<{ code: number, stdout: string, stderr: string }>,
+ *   exactPullRequestNumber?: string | number,
+ * }} [input]
+ */
 export async function listPullRequestQueueStates({
   backend,
   repository = DEFAULT_REPOSITORY,
