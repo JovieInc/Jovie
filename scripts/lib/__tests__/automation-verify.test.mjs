@@ -885,9 +885,7 @@ describe('automation-verify affected scope', () => {
         'scripts/hermes/tests/symphony-additive-router.test.py',
         'scripts/hermes/tests/test-model-router.py',
       ],
-      scriptVitestTests: [
-        'scripts/lib/__tests__/automation-verify.test.mjs',
-      ],
+      scriptVitestTests: ['scripts/lib/__tests__/automation-verify.test.mjs'],
     });
   });
 

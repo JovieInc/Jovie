@@ -859,7 +859,6 @@ class FallbackTests(unittest.TestCase):
         self.assertEqual(
             result, "drain_started=1 pool=kimi model=kimi-k3"
         )
-
     def test_targeted_drain_refuses_absent_issue_before_provider_probe(self):
         module = self.load_controller_module()
         selection = mock.Mock(return_value=({"selected": {}}, "ready"))
@@ -874,7 +873,6 @@ class FallbackTests(unittest.TestCase):
             result = module._drain_included_pools([], "JOV-2")
         self.assertEqual(result, "drain_skipped=target_not_eligible:JOV-2")
         selection.assert_not_called()
-
     def test_targeted_drain_refuses_when_another_worker_owns_capacity(self):
         module = self.load_controller_module()
         selection = {"selected": {"id": "kimi-k3", "pool": "kimi"}}
@@ -898,7 +896,6 @@ class FallbackTests(unittest.TestCase):
                 ["fallback-ship-JOV-1-aaaaaaaaaaaa.service"], "JOV-2"
             )
         self.assertEqual(result, "drain_skipped=target_not_started:JOV-2")
-
     def test_ready_targeted_reconcile_fails_when_exact_issue_does_not_start(self):
         module = self.load_controller_module()
         stderr = io.StringIO()
@@ -918,7 +915,6 @@ class FallbackTests(unittest.TestCase):
             result = module.reconcile("JOV-2")
         self.assertEqual(result, module.EXIT_SAFE_FAIL_CLOSED)
         self.assertIn("target=JOV-2", stderr.getvalue())
-
     def test_ready_targeted_reconcile_refuses_any_preexisting_fallback_worker(self):
         module = self.load_controller_module()
         start_primary = mock.Mock(return_value=True)
@@ -941,7 +937,6 @@ class FallbackTests(unittest.TestCase):
         self.assertIn("target_not_started=JOV-2 grok_ship_active", stderr.getvalue())
         start_primary.assert_not_called()
         drain.assert_not_called()
-
     def test_ready_targeted_reconcile_succeeds_only_on_exact_start(self):
         module = self.load_controller_module()
         target_unit = "fallback-ship-JOV-2-aaaaaaaaaaaa.service"
