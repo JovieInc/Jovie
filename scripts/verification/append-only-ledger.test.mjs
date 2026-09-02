@@ -74,6 +74,20 @@ describe('append-only audit evidence', () => {
     assert.throws(() => appendEvidenceEntry([], {}), /audit evidence schema/);
   });
 
+  it('detaches and freezes accepted evidence from caller-owned objects', () => {
+    const row = evidence({ outcome: 'failed' });
+    const entries = appendEvidenceEntry([], row);
+    row.outcome = 'satisfied';
+    row.subject.artifactDigests.push(DIGEST);
+    assert.equal(entries[0].evidence.outcome, 'failed');
+    assert.deepEqual(entries[0].evidence.subject.artifactDigests, []);
+    assert.equal(Object.isFrozen(entries[0].evidence.subject), true);
+    assert.throws(
+      () => appendEvidenceEntry(entries, row),
+      /evidence-row-mutation-denied/
+    );
+  });
+
   it('accepts only forward supersession to an existing row', () => {
     const once = appendEvidenceEntry([], evidence());
     assert.equal(
@@ -175,6 +189,24 @@ describe('append-only audit evidence', () => {
             evidence({ evidenceId: 'evidence-2' })
           ),
         /append-only-ledger-integrity-failure/
+      );
+    } finally {
+      rmSync(directory, { recursive: true, force: true });
+    }
+  });
+
+  it('fails closed while another writer owns the ledger lease', () => {
+    const directory = mkdtempSync(join(tmpdir(), 'jovie-audit-ledger-lock-'));
+    const ledgerPath = join(directory, 'evidence.jsonl');
+    try {
+      writeFileSync(`${ledgerPath}.lock`, 'other-writer\n');
+      assert.throws(
+        () => appendEvidenceFile(ledgerPath, evidence()),
+        /append-only-ledger-writer-lock-unavailable/
+      );
+      assert.equal(
+        readFileSync(`${ledgerPath}.lock`, 'utf8'),
+        'other-writer\n'
       );
     } finally {
       rmSync(directory, { recursive: true, force: true });

@@ -1,4 +1,12 @@
-import { appendFileSync, existsSync, readFileSync } from 'node:fs';
+import {
+  closeSync,
+  existsSync,
+  fsyncSync,
+  openSync,
+  readFileSync,
+  unlinkSync,
+  writeSync,
+} from 'node:fs';
 import { validateAuditEvidenceShape } from './audit-registry.mjs';
 import { AUDIT_LEDGER_ENTRY_SCHEMA, digestObject } from './contracts.mjs';
 
@@ -8,47 +16,15 @@ function entryDigest(entry) {
   return digestObject(unsigned);
 }
 
-export function appendEvidenceEntry(entries, evidence) {
-  const errors = validateAuditEvidenceShape(evidence);
-  if (errors.length > 0) throw new Error(errors.join('\n'));
-
-  const existing = entries.find(
-    entry => entry.evidence.evidenceId === evidence.evidenceId
-  );
-  if (existing) {
-    if (digestObject(existing.evidence) === digestObject(evidence))
-      return entries;
-    throw new Error('evidence-row-mutation-denied');
+function deepFreeze(value) {
+  if (value && typeof value === 'object' && !Object.isFrozen(value)) {
+    Object.freeze(value);
+    for (const child of Object.values(value)) deepFreeze(child);
   }
-  if (
-    evidence.supersedes &&
-    !entries.some(entry => entry.evidence.evidenceId === evidence.supersedes)
-  ) {
-    throw new Error('supersession-target-missing');
-  }
-
-  const previousDigest = entries.at(-1)?.entryDigest ?? null;
-  const entry = {
-    schema: AUDIT_LEDGER_ENTRY_SCHEMA,
-    sequence: entries.length + 1,
-    previousDigest,
-    evidence,
-  };
-  return [...entries, { ...entry, entryDigest: entryDigest(entry) }];
+  return value;
 }
 
-export function serializeEvidenceLedger(entries) {
-  return (
-    entries.map(entry => JSON.stringify(entry)).join('\n') +
-    (entries.length > 0 ? '\n' : '')
-  );
-}
-
-export function readEvidenceLedger(text) {
-  const entries = text
-    .split('\n')
-    .filter(Boolean)
-    .map(line => JSON.parse(line));
+function validateEntries(entries) {
   let previousDigest = null;
   const evidenceIds = new Set();
   for (const [index, entry] of entries.entries()) {
@@ -74,7 +50,56 @@ export function readEvidenceLedger(text) {
     evidenceIds.add(entry.evidence.evidenceId);
     previousDigest = entry.entryDigest;
   }
-  return entries;
+}
+
+export function appendEvidenceEntry(entries, evidence) {
+  validateEntries(entries);
+  const errors = validateAuditEvidenceShape(evidence);
+  if (errors.length > 0) throw new Error(errors.join('\n'));
+
+  const existing = entries.find(
+    entry => entry.evidence.evidenceId === evidence.evidenceId
+  );
+  if (existing) {
+    if (digestObject(existing.evidence) === digestObject(evidence))
+      return entries;
+    throw new Error('evidence-row-mutation-denied');
+  }
+  if (
+    evidence.supersedes &&
+    !entries.some(entry => entry.evidence.evidenceId === evidence.supersedes)
+  ) {
+    throw new Error('supersession-target-missing');
+  }
+
+  const previousDigest = entries.at(-1)?.entryDigest ?? null;
+  const entry = {
+    schema: AUDIT_LEDGER_ENTRY_SCHEMA,
+    sequence: entries.length + 1,
+    previousDigest,
+    evidence: structuredClone(evidence),
+  };
+  const sealedEntry = deepFreeze({
+    ...entry,
+    entryDigest: entryDigest(entry),
+  });
+  return Object.freeze([...entries, sealedEntry]);
+}
+
+export function serializeEvidenceLedger(entries) {
+  return (
+    entries.map(entry => JSON.stringify(entry)).join('\n') +
+    (entries.length > 0 ? '\n' : '')
+  );
+}
+
+export function readEvidenceLedger(text) {
+  const entries = text
+    .split('\n')
+    .filter(Boolean)
+    .map(line => JSON.parse(line));
+  validateEntries(entries);
+  return deepFreeze(entries);
 }
 
 export function readEvidenceLedgerFile(path) {
@@ -82,10 +107,33 @@ export function readEvidenceLedgerFile(path) {
 }
 
 export function appendEvidenceFile(path, evidence) {
-  const current = readEvidenceLedgerFile(path);
-  const next = appendEvidenceEntry(current, evidence);
-  if (next.length > current.length) {
-    appendFileSync(path, `${JSON.stringify(next.at(-1))}\n`, 'utf8');
+  const lockPath = `${path}.lock`;
+  let lock;
+  try {
+    lock = openSync(lockPath, 'wx', 0o600);
+  } catch (error) {
+    if (error?.code === 'EEXIST') {
+      throw new Error('append-only-ledger-writer-lock-unavailable');
+    }
+    throw error;
   }
-  return next;
+  try {
+    writeSync(lock, `${process.pid}\n`);
+    fsyncSync(lock);
+    const current = readEvidenceLedgerFile(path);
+    const next = appendEvidenceEntry(current, evidence);
+    if (next.length > current.length) {
+      const ledger = openSync(path, 'a', 0o600);
+      try {
+        writeSync(ledger, `${JSON.stringify(next.at(-1))}\n`);
+        fsyncSync(ledger);
+      } finally {
+        closeSync(ledger);
+      }
+    }
+    return next;
+  } finally {
+    closeSync(lock);
+    unlinkSync(lockPath);
+  }
 }
