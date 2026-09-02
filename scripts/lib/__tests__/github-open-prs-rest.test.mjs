@@ -148,6 +148,16 @@ describe('REST open PR inventory', () => {
     );
   });
 
+  it('rejects an unbounded open PR inventory limit', async () => {
+    await expect(
+      fetchOpenPrSummariesRest({
+        repo: 'JovieInc/Jovie',
+        limit: 501,
+        request: async () => [],
+      })
+    ).rejects.toThrow('open PR limit must be between 1 and 500');
+  });
+
   it('paginates without GraphQL and hydrates exact-head checks', async () => {
     const calls = [];
     const request = async endpoint => {

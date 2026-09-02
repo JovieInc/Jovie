@@ -599,22 +599,17 @@ describe('queue workflow mutation safety', () => {
     expect(drain).toContain(
       'admission scope: maintenance-only (no new enrollment)'
     );
-    expect(drain).toContain('scripts/github-open-prs-snapshot.mjs');
-    // One occurrence is unreachable behind the disabled deferred-release
-    // return; the other is the isolated fixture adapter. Production snapshot
-    // and post-retarget refresh both use the bounded loader below.
-    expect(drain.match(/gh_retry pr list/gu)).toHaveLength(2);
-    expect(drain).toContain('load_open_pr_snapshot initial-snapshot');
-    expect(drain).toContain('load_open_pr_snapshot post-retarget-refresh');
-    expect(drain).toContain('--batch-size 25 --concurrency 3');
-    expect(drain).toContain('stage=native-preflight source=graphql');
+    expect(drain).not.toContain('scripts/github-open-prs-snapshot.mjs');
     expect(drain).toContain(
-      'stage=native-queue-state source=paginated-graphql'
+      'inventory_native_queue_state "$DRAIN_ADMISSION_PR"'
     );
-    expect(drain).toContain('stage=native-coverage-check');
-    expect(drain).not.toContain(
-      'gh_retry node scripts/github-open-prs-snapshot.mjs'
-    );
+    expect(drain).toContain('inventory_native_queue_state');
+    expect(drain).toContain('native_state_to_snap');
+    // The remaining call is an isolated recovery/fixture path. Production
+    // inventory uses exact-target or paginated native queue state above.
+    expect(drain.match(/gh_retry pr list/gu)).toHaveLength(1);
+    expect(enroll).toContain('GH_INVENTORY_RETRY_ATTEMPTS: 3');
+    expect(enroll).toContain('GH_INVENTORY_RETRY_MAX_DELAY: 15');
     expect(drain).toContain(
       'admission scope: no primary target (bounded missed-admission recovery enabled)'
     );
