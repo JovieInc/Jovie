@@ -26,7 +26,8 @@ function authorFrom(message: unknown): PhotonAuthor | undefined {
  */
 export const PHOTON_WEBHOOK_SECRET_UNCONFIGURED =
   'imessage-webhook-secret-unconfigured';
-export const PHOTON_PROJECT_ID_UNCONFIGURED = 'imessage-project-id-unconfigured';
+export const PHOTON_PROJECT_ID_UNCONFIGURED =
+  'imessage-project-id-unconfigured';
 export const PHOTON_PROJECT_SECRET_UNCONFIGURED =
   'imessage-project-secret-unconfigured';
 
