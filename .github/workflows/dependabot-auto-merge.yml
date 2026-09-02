@@ -1,5 +1,10 @@
 name: Dependabot Auto-Merge
 
+# controller-hop-exception: jovie-controller-hop/v1
+# accountable-writer: Gem
+# necessary-trust-boundary: pull_request_target reads trusted base policy before reconciling Dependabot-authored PR state.
+# revisit-trigger: Remove this hop when Dependabot exposes equivalent exact-head recreate and native-admission policy hooks.
+
 # Keeps safe Dependabot work durable until native merge-queue admission. The
 # event actor is not the authority: maintainer and controller synchronizations
 # must preserve policy derived from the PR author and Dependabot metadata.
