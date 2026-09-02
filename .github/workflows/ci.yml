@@ -2099,6 +2099,11 @@ jobs:
         github.event_name == 'merge_group' ||
         (github.event_name == 'push' && github.ref == 'refs/heads/main')
       )
+    concurrency:
+      # A regenerated merge-group head supersedes the prior Mac flight for the
+      # same PR. Direct-main and manual runs keep exact, non-canceling groups.
+      group: ${{ github.event_name == 'merge_group' && needs.ci-merge-group-admission.outputs.pr_number != '' && format('ci-macos-pr-{0}', needs.ci-merge-group-admission.outputs.pr_number) || format('ci-macos-{0}-{1}', github.run_id, github.run_attempt) }}
+      cancel-in-progress: ${{ github.event_name == 'merge_group' && needs.ci-merge-group-admission.outputs.pr_number != '' }}
     runs-on: macos-26
     timeout-minutes: 45
     steps:

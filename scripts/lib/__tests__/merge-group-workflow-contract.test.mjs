@@ -555,6 +555,15 @@ describe('merge_group workflow contract', () => {
 
     const macos = getJobBlock(CI_WORKFLOW, 'ci-macos');
     expect(macos).toContain('runs-on: macos-26');
+    expect(macos).toContain(
+      "format('ci-macos-pr-{0}', needs.ci-merge-group-admission.outputs.pr_number)"
+    );
+    expect(macos).toContain(
+      "format('ci-macos-{0}-{1}', github.run_id, github.run_attempt)"
+    );
+    expect(macos).toContain(
+      "cancel-in-progress: ${{ github.event_name == 'merge_group' && needs.ci-merge-group-admission.outputs.pr_number != '' }}"
+    );
     expect(CI_WORKFLOW).toContain('node "$TRUSTED_PRODUCT_LANE_CLASSIFIER"');
     expect(CI_WORKFLOW).not.toContain('.github/workflows/macos-ci.yml');
     expect(macos).toContain("github.event_name == 'merge_group'");

@@ -430,7 +430,11 @@ reconcile_resolved_conflict_label() {  # <num> <expected-head>
     echo "    ~ exact head is not positively mergeable for #$n; preserving conflict label"
     return 1
   fi
-  unlabel "$n" needs-conflict-resolution
+  if unlabel "$n" needs-conflict-resolution; then
+    return 0
+  fi
+  echo "    ~ needs-conflict-resolution remains active on #$n; preserving current queue state until retry"
+  return 1
 }
 
 fleet_hold_target_url() {
