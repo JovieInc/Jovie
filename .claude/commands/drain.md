@@ -26,6 +26,8 @@ landing**. The queue, not this command, keeps `main` green.
   to `main` and rebase. Never retarget to `integration/loop-*`.
 - **Never close a PR you didn't open.** Drafts and `queue-deferred` are
   reported, not closed.
+- **Graphite and Cursor are gone.** Do not run `gt`, restore Graphite, or treat
+  Cursor as a landing path. Native GitHub merge queue is the only transport.
 
 ## Phase 0 — Classify + enroll the clean bucket
 
@@ -46,10 +48,10 @@ and **NATIVE QUEUE**.
 ## Phase 1 — Kill systemic blockers first
 
 If the same required check fails on **3+ PRs**, it's broken on `main`, not in the
-branches. Fix it once on `main` via a single PR, then add `merge-queue` so
-the native controller can enroll it ahead of downstream work. Add `fast` only
-when the PR is explicitly emergency/hotfix/incident-classified. Do not use an
-alternate merge path or fix the same thing on N branches.
+branches. Fix it once on `main` via a single PR, then let native autoenroll
+pick it up ahead of downstream work. Add `fast` only when the PR is explicitly
+emergency/hotfix/incident-classified. Do not use an alternate merge path or
+fix the same thing on N branches.
 
 ```bash
 # failing-check histogram across open PRs

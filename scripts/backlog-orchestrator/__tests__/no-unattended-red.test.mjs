@@ -56,6 +56,8 @@ describe('no unattended red loop', () => {
       'missing-owner-lease': 'typed-remediation',
       'dropped-controller-event': 'typed-remediation',
       'draft-stack-policy': 'typed-remediation',
+      'fleet-observation-gap': 'typed-remediation',
+      'base-not-main': 'typed-remediation',
       'not-proven': 'collect-evidence',
     };
     for (const stallClass of STALL_CLASSES) {
@@ -80,6 +82,25 @@ describe('no unattended red loop', () => {
     assert.equal(
       inferStallClass({ workflowName: 'CI', conclusion: 'failure' }),
       'missing-failing-checks'
+    );
+    assert.equal(
+      inferStallClass({
+        workflowName: 'PR targets main',
+        conclusion: 'failure',
+      }),
+      'base-not-main'
+    );
+    assert.equal(
+      inferStallClass({ baseRefName: 'feat/stacked' }),
+      'base-not-main'
+    );
+    assert.equal(
+      inferStallClass({ failure: 'main-unknown' }),
+      'fleet-observation-gap'
+    );
+    assert.equal(
+      inferStallClass({ observationGap: true }),
+      'fleet-observation-gap'
     );
     const empty = dispatchOpenRecords([open('queue-eviction')], {
       capacity: 1,

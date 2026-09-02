@@ -1345,7 +1345,7 @@ class DeploymentBindingTests(unittest.TestCase):
             {reason["code"] for reason in receipt["reasons"]},
         )
 
-    def test_malformed_queue_blocks_when_production_is_unbound(self):
+    def test_malformed_queue_keeps_unbound_production_in_hold_intake(self):
         signals = dict(GREEN_SIGNALS)
         signals["production"] = {"status": "green", "deployedSha": "b" * 40}
         signals["queue"] = {"status": "known"}
@@ -1353,10 +1353,14 @@ class DeploymentBindingTests(unittest.TestCase):
         receipt = self.evaluate(signals)
 
         self.assertEqual(receipt["state"], "AMBER")
-        self.assertEqual(receipt["promotionMode"], "blocked")
-        self.assertIn(
+        self.assertEqual(receipt["promotionMode"], "hold-intake")
+        self.assertNotIn(
             "queue-unknown",
             {reason["code"] for reason in receipt["reasons"]},
+        )
+        self.assertEqual(
+            {reason["code"] for reason in receipt["reasons"]},
+            {"production-deployment-unbound"},
         )
 
     def test_controller_failure_blocks_deployment(self):
@@ -1376,14 +1380,18 @@ class DeploymentBindingTests(unittest.TestCase):
         self.assertFalse(receipt["isolatedPromotionAdmission"]["deploymentsAllowed"])
         self.assertFalse(receipt["deploymentAdmission"]["allowed"])
 
-    def test_unbound_production_plus_queue_unknown_stays_blocked(self):
+    def test_unbound_production_plus_queue_gap_stays_hold_intake(self):
         signals = dict(GREEN_SIGNALS)
         signals["production"] = {"status": "green", "deployedSha": "b" * 7}
         signals["queue"] = {"status": "known"}
         receipt = self.evaluate(signals)
         self.assertEqual(receipt["state"], "AMBER")
-        self.assertEqual(receipt["promotionMode"], "blocked")
-        self.assertFalse(receipt["alreadyAdmittedCohort"]["preserve"])
+        self.assertEqual(receipt["promotionMode"], "hold-intake")
+        self.assertTrue(receipt["alreadyAdmittedCohort"]["preserve"])
+        self.assertNotIn(
+            "queue-unknown",
+            {reason["code"] for reason in receipt["reasons"]},
+        )
 
 
 class IndependentReviewTests(unittest.TestCase):

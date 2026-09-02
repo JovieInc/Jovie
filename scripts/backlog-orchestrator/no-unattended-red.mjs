@@ -36,6 +36,8 @@ const ROUTE_TABLE = [
   ['missing-owner-lease', 'symphony', 'reconcile-exact-head-lease', 'typed-remediation'],
   ['dropped-controller-event', 'gem', 'restore-event-trigger-and-reconcile', 'typed-remediation'],
   ['draft-stack-policy', 'symphony', 'split-or-retarget-draft-stack', 'typed-remediation'], // JOV-INV-020
+  ['fleet-observation-gap', 'gem', 'restore-fleet-observation', 'typed-remediation'], // JOV-INV-023
+  ['base-not-main', 'gem', 'retarget-pr-base-to-main', 'typed-remediation'], // JOV-INV-023
   ['not-proven', 'controller', 'collect-missing-evidence', 'collect-evidence'],
 ];
 // biome-ignore format: compact stall tables for the PR size guard
@@ -43,6 +45,7 @@ const WORKFLOW_STALLS = {
   'PR Size Guard': 'size-guard', CI: 'missing-failing-checks',
   'Production Controller': 'production-deployment-unbound',
   'Merge Queue Auto-Enroll': 'queue-eviction', 'Delivery Control Receipts': 'dropped-controller-event',
+  'PR targets main': 'base-not-main',
 };
 // biome-ignore format: compact stall tables for the PR size guard
 const FAILURE_STALLS = {
@@ -50,6 +53,8 @@ const FAILURE_STALLS = {
   'workflow-cancelled': 'dropped-controller-event', 'queue-noop': 'queue-eviction',
   'lease-ambiguous': 'missing-owner-lease', 'stale-config': 'dropped-controller-event',
   'missing-trigger': 'dropped-controller-event', 'fx-auth-missing': 'provider-unavailable',
+  'main-unknown': 'fleet-observation-gap', 'queue-unknown': 'fleet-observation-gap',
+  'base-not-main': 'base-not-main',
 };
 // biome-ignore format: compact stall tables for the PR size guard
 export const DELIVERY_WORKFLOW_FAILURES = {
@@ -131,6 +136,9 @@ function createApi() {
       if (signal.conclusion === 'failure' || signal.conclusion === 'timed_out') return WORKFLOW_STALLS[workflow];
     }
     const mergeState = text(signal.mergeStateStatus)?.toLowerCase();
+    const baseRef = text(signal.baseRefName) || text(signal.base);
+    if (baseRef && baseRef !== 'main') return 'base-not-main';
+    if (signal.observationGap === true) return 'fleet-observation-gap';
     if (mergeState === 'dirty' || mergeState === 'behind') return 'stale-conflicted-head';
     if (signal.queueState === 'UNMERGEABLE' || signal.evicted === true) return 'queue-eviction';
     if (signal.ownerMissing === true || signal.leaseMissing === true) return 'missing-owner-lease';

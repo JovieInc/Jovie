@@ -10,17 +10,19 @@ const PATHS = Object.freeze({
   backend: 'scripts/merge-queue-backend.mjs',
   workflow: '.github/workflows/pr-targets-main.yml',
   admitter: 'scripts/backlog-orchestrator/admitter.mjs',
+  command: '.claude/commands/drain.md',
+  nur: 'scripts/backlog-orchestrator/no-unattended-red.mjs',
 });
 
-const HUMAN_ENROLL_BLOCK =
-  /needs-human" or \. == "hold" or \. == "gated"/;
-const HUMAN_SELECTOR =
-  /'needs-human',\s*'hold',\s*'gated'/;
+const HUMAN_ENROLL_BLOCK = /needs-human" or \. == "hold" or \. == "gated"/;
+const HUMAN_SELECTOR = /'needs-human',\s*'hold',\s*'gated'/;
+const GRAPHITE_LIVE_TRANSPORT = /\bgt\s+(mq|stack|submit|merge)\b/;
+const RETIRED_QUEUE_LABEL = /then add `merge-queue`/;
 
 /** JOV-INV-023: fleet observation gaps and non-main PR bases must not freeze shipping. */
 export function validateFleetAutonomy(
   repoRoot = DEFAULT_ROOT,
-  { readFile = (path) => readFileSync(resolve(repoRoot, path), 'utf8') } = {}
+  { readFile = path => readFileSync(resolve(repoRoot, path), 'utf8') } = {}
 ) {
   const errors = [];
   const gate = readFile(PATHS.gate);
@@ -28,20 +30,30 @@ export function validateFleetAutonomy(
   const backend = readFile(PATHS.backend);
   const workflow = readFile(PATHS.workflow);
   const admitter = readFile(PATHS.admitter);
+  const command = readFile(PATHS.command);
+  const nur = readFile(PATHS.nur);
 
   if (!gate.includes('def observe_main_release_ready_jobs')) {
     errors.push(
       'gem-priority-gate.py must observe Main Release Ready from the CI workflow job when check-runs omit it'
     );
   }
-  if (!gate.includes('bound_green_factory')) {
+  if (
+    !gate.includes('queue-observation-gap') ||
+    !gate.includes('bound_green_factory')
+  ) {
     errors.push(
-      'gem-priority-gate.py must not freeze a bound-green factory on a missing queue snapshot'
+      'gem-priority-gate.py must treat a missing queue snapshot as an observation gap, not a hold'
     );
   }
   if (!admitter.includes('boundGreenFactory')) {
     errors.push(
       'admitter.mjs must not freeze a bound-green factory on a missing queue snapshot'
+    );
+  }
+  if (/typedReason\(\s*FLEET_GATE_REASON\.QUEUE_UNKNOWN/.test(admitter)) {
+    errors.push(
+      'admitter.mjs must not treat a queue snapshot gap as a promotion hold'
     );
   }
   if (!drain.includes('RETARGET (base must be main)')) {
@@ -67,6 +79,33 @@ export function validateFleetAutonomy(
   }
   if (!workflow.includes('PRs must target main')) {
     errors.push('pr-targets-main.yml must fail closed when base is not main');
+  }
+  if (
+    GRAPHITE_LIVE_TRANSPORT.test(drain) ||
+    GRAPHITE_LIVE_TRANSPORT.test(backend) ||
+    GRAPHITE_LIVE_TRANSPORT.test(command)
+  ) {
+    errors.push(
+      'Graphite CLI must not be a landing transport; native GitHub merge queue is the only path'
+    );
+  }
+  if (!command.includes('Graphite and Cursor are gone')) {
+    errors.push(
+      'drain.md must record that Graphite and Cursor apps are removed'
+    );
+  }
+  if (RETIRED_QUEUE_LABEL.test(command)) {
+    errors.push(
+      'drain.md must not instruct adding the retired merge-queue label'
+    );
+  }
+  if (
+    !nur.includes("['fleet-observation-gap'") ||
+    !nur.includes("['base-not-main'")
+  ) {
+    errors.push(
+      'no-unattended-red.mjs must classify fleet-observation-gap and base-not-main so they cannot go undetected'
+    );
   }
   return errors;
 }

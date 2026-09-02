@@ -1127,40 +1127,36 @@ def evaluate(signals: dict[str, Any], observed_at: str) -> dict[str, Any]:
             and deployment_bound(main.get("sha"), production.get("deployedSha"))
         )
         if not queue_shape_valid:
-            if bound_green_factory:
-                # GraphQL 502 / missing snapshot must not freeze a live SHA
-                # that production already runs. Drain classifies PRs itself.
-                queue = {
-                    **queue,
-                    "status": "known",
-                    "eligiblePrs": 0
-                    if not isinstance(queue.get("eligiblePrs"), int)
-                    else queue["eligiblePrs"],
-                    "greenReadyPrs": 0
-                    if not isinstance(queue.get("greenReadyPrs"), int)
-                    else queue["greenReadyPrs"],
-                    "target": queue_target
-                    if isinstance(queue_target, int)
-                    and not isinstance(queue_target, bool)
-                    and queue_target > 0
-                    else 15,
-                    "source": queue.get("source") or "bound-green-observation-gap",
-                }
-                normalized_signals["queue"] = queue
-            else:
-                reasons.append(
-                    typed_reason(
-                        "queue-unknown",
-                        "promotion",
-                        "warning",
-                        "Promotion queue is missing, unknown, or malformed.",
-                    )
-                )
+            # JOV-INV-023: GraphQL 502 / missing snapshot is an observation
+            # gap, never a promotion hold. Coerce a usable shape so unbound
+            # production can still enter hold-intake (one typed reason) and a
+            # bound-green factory can stay GREEN. Drain classifies PRs itself.
+            queue = {
+                **queue,
+                "status": "known",
+                "eligiblePrs": 0
+                if not isinstance(queue.get("eligiblePrs"), int)
+                else queue["eligiblePrs"],
+                "greenReadyPrs": 0
+                if not isinstance(queue.get("greenReadyPrs"), int)
+                else queue["greenReadyPrs"],
+                "target": queue_target
+                if isinstance(queue_target, int)
+                and not isinstance(queue_target, bool)
+                and queue_target > 0
+                else 15,
+                "source": queue.get("source")
+                or (
+                    "bound-green-observation-gap"
+                    if bound_green_factory
+                    else "queue-observation-gap"
+                ),
+            }
+            normalized_signals["queue"] = queue
         # Queue pressure is demand for the promotion controller, not a reason
         # to disable it. Freezing promotion when green_ready_prs reaches the
-        # target deadlocks the only path that can drain the backlog. A bound
-        # green factory with a missing queue snapshot is an observation gap,
-        # not a promotion hold.
+        # target deadlocks the only path that can drain the backlog. A missing
+        # queue snapshot is an observation gap, not a promotion hold.
 
     critical = any(reason["severity"] == "critical" for reason in reasons)
     if not critical and not review_allowed:

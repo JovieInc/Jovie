@@ -1161,11 +1161,28 @@ describe('deterministic Symphony admission boundary', () => {
     assert.equal(fleetGate.workAdmission.newIssueLeaseAllowed, true);
   });
 
-  it('blocks already-admitted cohort preservation when unbound production has extra amber reasons', () => {
+  it('keeps hold-intake when unbound production only has a queue snapshot gap', () => {
     const fleetGate = admitter.evaluateFleetGate(
       fleetEvidence({
         production: { status: 'green', deployedSha: 'bda0d88' },
         queue: { status: 'known' },
+      }),
+      { now: '2026-08-09T05:01:00.000Z' }
+    );
+
+    assert.equal(fleetGate.state, 'AMBER');
+    assert.equal(fleetGate.promotionMode, 'hold-intake');
+    assert.equal(fleetGate.alreadyAdmittedCohort.preserve, true);
+    assert.ok(
+      !fleetGate.reasons.some(reason => reason.code === 'queue-unknown')
+    );
+  });
+
+  it('blocks already-admitted cohort preservation when unbound production has extra amber reasons', () => {
+    const fleetGate = admitter.evaluateFleetGate(
+      fleetEvidence({
+        production: { status: 'green', deployedSha: 'bda0d88' },
+        controller: { status: 'failed' },
       }),
       { now: '2026-08-09T05:01:00.000Z' }
     );
@@ -1607,9 +1624,9 @@ describe('deterministic Symphony admission boundary', () => {
       )
     );
     assert.equal(invalidQueue.exitCode, 0);
-    assert.equal(invalidQueue.receipt.state, 'AMBER');
+    assert.equal(invalidQueue.receipt.state, 'GREEN');
     assert.equal(invalidQueue.receipt.workAdmission.allowed, true);
-    assert.equal(invalidQueue.receipt.promotionAdmission.allowed, false);
+    assert.equal(invalidQueue.receipt.promotionAdmission.allowed, true);
     assert.equal(recovered.exitCode, 0);
     assert.equal(recovered.receipt.state, 'GREEN');
     assert.equal(recovered.receipt.promotionAdmission.allowed, true);
