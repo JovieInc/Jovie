@@ -136,7 +136,16 @@ export function listJovieApplicationBundles(applicationsDir) {
 /**
  * @param {string} appPath
  * @param {{
- *   readonly runCodesign?: typeof spawnSync;
+ *   readonly runCodesign?: (
+ *     command: string,
+ *     args: readonly string[],
+ *     options: { readonly encoding: string }
+ *   ) => {
+ *     readonly error?: Error;
+ *     readonly status?: number | null;
+ *     readonly stderr?: string | null;
+ *     readonly stdout?: string | null;
+ *   };
  *   readonly readVersion?: (appPath: string) => string | null;
  * }} dependencies
  * @returns {{ readonly identifier: string | null; readonly version: string | null }}
