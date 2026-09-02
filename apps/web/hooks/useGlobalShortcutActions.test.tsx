@@ -102,7 +102,7 @@ describe('useGlobalShortcutActions (JOV-1827)', () => {
       shiftKey: true,
     });
 
-    expect(push).toHaveBeenCalledWith('/app/ov');
+    expect(push).toHaveBeenCalledWith('/app/ov/chat');
   });
 
   it('switches an admin from OV back to Jovie', () => {
@@ -133,7 +133,7 @@ describe('useGlobalShortcutActions (JOV-1827)', () => {
       shiftKey: true,
     });
 
-    expect(push).toHaveBeenCalledWith('/app/ov');
+    expect(push).toHaveBeenCalledWith('/app/ov/chat');
   });
 
   it('does not expose workspace switching to non-admins', () => {
