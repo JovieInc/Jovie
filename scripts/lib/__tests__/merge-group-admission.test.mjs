@@ -263,7 +263,7 @@ describe('merge-group admission evidence', () => {
     const summaryPath = join(tempDir, 'summary.md');
     await writeFile(eventPath, JSON.stringify(event()), 'utf8');
 
-    const fetchImpl = vi.fn(async url => {
+    const fetchImpl = vi.fn(async (url, _options) => {
       const requestUrl = new URL(url);
       if (requestUrl.pathname.includes('/git/ref/')) {
         return Response.json(queueRef());
