@@ -200,10 +200,10 @@ describe('shadow audit registry', () => {
       'redactionManifestDigest must be sha256',
       'authority is required',
       'model producer qualification digest must be sha256',
-      'modelDigest must be null or sha256',
+      'model producer modelDigest must be sha256',
       'findings must be a list',
       'supersedes must be null or an evidence id',
-      'timestamps are required',
+      'timestamps must be canonical RFC3339 UTC',
     ]);
     assert.deepEqual(
       validateAuditEvidenceShape(evidence({ subject: { repository: '' } })),
@@ -214,6 +214,40 @@ describe('shadow audit registry', () => {
         evidence({ producer: { kind: 'unqualified' } })
       ),
       ['producer kind must be deterministic or model']
+    );
+    assert.deepEqual(
+      validateAuditEvidenceShape(
+        evidence({
+          producer: {
+            kind: 'model',
+            providerQualificationDigest: DIGEST,
+          },
+          modelDigest: null,
+        })
+      ),
+      ['model producer modelDigest must be sha256']
+    );
+    assert.deepEqual(
+      validateAuditEvidenceShape(evidence({ modelDigest: DIGEST })),
+      ['deterministic producer modelDigest must be null']
+    );
+    assert.deepEqual(
+      validateAuditEvidenceShape(
+        evidence({
+          startedAt: 'not-a-date',
+          completedAt: '2026-09-02T00:00:01Z',
+        })
+      ),
+      ['timestamps must be canonical RFC3339 UTC']
+    );
+    assert.deepEqual(
+      validateAuditEvidenceShape(
+        evidence({
+          startedAt: '2026-09-02T00:00:02.000Z',
+          completedAt: '2026-09-02T00:00:01.000Z',
+        })
+      ),
+      ['completedAt must not precede startedAt']
     );
   });
 

@@ -52,6 +52,14 @@ function optionalStringList(value) {
   );
 }
 
+function isCanonicalTimestamp(value) {
+  return (
+    isNonEmptyString(value) &&
+    Number.isFinite(Date.parse(value)) &&
+    new Date(value).toISOString() === value
+  );
+}
+
 function matchesPattern(path, pattern) {
   const escaped = pattern.replace(/[.+?^${}()|[\]\\]/g, '\\$&');
   const expression = escaped
@@ -200,12 +208,12 @@ export function validateAuditEvidenceShape(evidence) {
   ) {
     errors.push('model producer qualification digest must be sha256');
   }
-  if (
-    evidence.modelDigest !== null &&
-    evidence.modelDigest !== undefined &&
-    !isSha256(evidence.modelDigest)
-  ) {
-    errors.push('modelDigest must be null or sha256');
+  if (evidence.producer?.kind === 'model') {
+    if (!isSha256(evidence.modelDigest)) {
+      errors.push('model producer modelDigest must be sha256');
+    }
+  } else if (evidence.modelDigest !== null) {
+    errors.push('deterministic producer modelDigest must be null');
   }
   if (!Array.isArray(evidence.findings)) errors.push('findings must be a list');
   if (
@@ -216,10 +224,14 @@ export function validateAuditEvidenceShape(evidence) {
     errors.push('supersedes must be null or an evidence id');
   }
   if (
-    !isNonEmptyString(evidence.startedAt) ||
-    !isNonEmptyString(evidence.completedAt)
+    !isCanonicalTimestamp(evidence.startedAt) ||
+    !isCanonicalTimestamp(evidence.completedAt)
   ) {
-    errors.push('timestamps are required');
+    errors.push('timestamps must be canonical RFC3339 UTC');
+  } else if (
+    Date.parse(evidence.completedAt) < Date.parse(evidence.startedAt)
+  ) {
+    errors.push('completedAt must not precede startedAt');
   }
   return errors;
 }
