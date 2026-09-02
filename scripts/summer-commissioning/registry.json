@@ -780,6 +780,11 @@
         },
         {
           "kind": "dependency",
+          "ref": "branch://codex/jov-5853-quality-signal-privacy@efbf4984d5736c9e743e79ebc5e55cb2463b6676",
+          "summary": "The provider-neutral signal-discovery owner supplies privacy-safe aggregate /start signals. Real-conversation sampling remains blocked without verified purpose-bound access receipts."
+        },
+        {
+          "kind": "dependency",
           "ref": "branch://codex/jov-5753-governed-certification-loop@cd1d1ba5a2e0969a09adb22e749ac31016bfcaa5",
           "summary": "The certification owner supplies machine eligibility, hard-boundary policy, automatic landing evaluation, and Ovie founder projection."
         }

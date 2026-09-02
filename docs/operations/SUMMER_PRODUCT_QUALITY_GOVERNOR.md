@@ -33,6 +33,11 @@ The pilot uses one anonymous/disposable `/start` fixture and at most one
 synthetic turn. It retains no credentials, account identity, personal
 conversation, arbitrary page content, or external messages and performs no
 production write. Runtime is capped at 120 seconds; LLM visual reviews are zero.
+Provider-neutral signal discovery is owned by
+`jovie.product-quality.onboarding-signal-discovery-receipt/v1`. Synthetic
+signals may pass its bounded projection; real-conversation-derived sampling
+remains blocked without a purpose-bound access/policy/consent/audit/deletion
+receipt verified before first read. The Governor does not duplicate that gate.
 
 Machine evidence binds the exact source and environment to:
 
@@ -74,16 +79,21 @@ artifacts.
 
 ## Current proof and blockers
 
-Source tests cover the passing synthetic loop plus wrong build, fictional or
-untrusted receipt, stale certification, failed Cleanup, extra route, cross-build
-evidence, privacy/cost/sweep violations, Ovie routing, derived improvement,
-claim binding, and distinct red/green/neighbor proof. This is not runtime proof.
+Source tests prove that a complete synthetic candidate stays blocked, plus wrong
+build, fictional or untrusted receipt, stale certification, failed Cleanup,
+extra route, cross-build evidence, privacy/cost/sweep violations, Ovie routing,
+derived improvement, claim binding, and distinct red/green/neighbor proof.
 
 Commissioning remains blocked on the two dependency branches landing; a native
 `public-onboarding` pstack packet; an authorized disposable exact-runtime
 fixture; a durable Eve trigger; one real bounded Symphony request; trusted
 producer-store integration; exact repaired-build evidence; measured improvement;
 and recurrence proof.
+
+Anonymous `/start` observation is currently green for shell rendering, mobile
+Axe, and synthetic initialization, but its public response exposed no source or
+deployment SHA. Search/selection/preview transitions remain untested without an
+approved disposable profile fixture. Neither observation is commissioning proof.
 
 The certification integration must use a producer-owned resolver or signed
 store, resolve the latest post-invalidation view, bind the full subject and
