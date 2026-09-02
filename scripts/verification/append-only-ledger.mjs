@@ -16,6 +16,12 @@ function entryDigest(entry) {
   return digestObject(unsigned);
 }
 
+function evidenceContentId(evidence) {
+  const unsigned = { ...evidence };
+  delete unsigned.evidenceId;
+  return `evidence-${digestObject(unsigned)}`;
+}
+
 function deepFreeze(value) {
   if (value && typeof value === 'object' && !Object.isFrozen(value)) {
     Object.freeze(value);
@@ -38,6 +44,9 @@ function validateEntries(entries) {
     }
     const errors = validateAuditEvidenceShape(entry.evidence);
     if (errors.length > 0) throw new Error(errors.join('\n'));
+    if (entry.evidence.evidenceId !== evidenceContentId(entry.evidence)) {
+      throw new Error('evidence-content-address-mismatch');
+    }
     if (evidenceIds.has(entry.evidence.evidenceId)) {
       throw new Error('duplicate-evidence-id');
     }
@@ -56,6 +65,9 @@ export function appendEvidenceEntry(entries, evidence) {
   validateEntries(entries);
   const errors = validateAuditEvidenceShape(evidence);
   if (errors.length > 0) throw new Error(errors.join('\n'));
+  if (evidence.evidenceId !== evidenceContentId(evidence)) {
+    throw new Error('evidence-content-address-mismatch');
+  }
 
   const existing = entries.find(
     entry => entry.evidence.evidenceId === evidence.evidenceId

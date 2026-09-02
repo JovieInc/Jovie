@@ -25,7 +25,7 @@ const SHA = 'a'.repeat(40);
 const DIGEST = 'd'.repeat(64);
 
 function evidence(overrides = {}) {
-  return {
+  const value = {
     schema: AUDIT_EVIDENCE_SCHEMA,
     evidenceId: 'evidence-1',
     eventId: 'event-1',
@@ -54,6 +54,12 @@ function evidence(overrides = {}) {
     completedAt: '2026-09-02T12:00:00.000Z',
     ...overrides,
   };
+  const unsigned = { ...value };
+  delete unsigned.evidenceId;
+  return {
+    ...value,
+    evidenceId: `evidence-${digestObject(unsigned)}`,
+  };
 }
 
 function reseal(entry) {
@@ -69,7 +75,7 @@ describe('append-only audit evidence', () => {
     assert.equal(appendEvidenceEntry(once, row), once);
     assert.throws(
       () => appendEvidenceEntry(once, { ...row, outcome: 'failed' }),
-      /evidence-row-mutation-denied/
+      /evidence-content-address-mismatch/
     );
     assert.throws(() => appendEvidenceEntry([], {}), /audit evidence schema/);
   });
@@ -84,19 +90,28 @@ describe('append-only audit evidence', () => {
     assert.equal(Object.isFrozen(entries[0].evidence.subject), true);
     assert.throws(
       () => appendEvidenceEntry(entries, row),
-      /evidence-row-mutation-denied/
+      /evidence-content-address-mismatch/
+    );
+  });
+
+  it('rejects caller-selected evidence identities', () => {
+    const row = evidence();
+    row.evidenceId = 'evidence-1';
+    assert.throws(
+      () => appendEvidenceEntry([], row),
+      /evidence-content-address-mismatch/
     );
   });
 
   it('accepts only forward supersession to an existing row', () => {
-    const once = appendEvidenceEntry([], evidence());
+    const first = evidence();
+    const once = appendEvidenceEntry([], first);
     assert.equal(
       appendEvidenceEntry(
         once,
         evidence({
-          evidenceId: 'evidence-2',
           eventId: 'event-2',
-          supersedes: 'evidence-1',
+          supersedes: first.evidenceId,
         })
       ).length,
       2
@@ -105,7 +120,7 @@ describe('append-only audit evidence', () => {
       () =>
         appendEvidenceEntry(
           [],
-          evidence({ evidenceId: 'evidence-2', supersedes: 'missing' })
+          evidence({ eventId: 'event-2', supersedes: 'missing' })
         ),
       /supersession-target-missing/
     );
@@ -141,7 +156,7 @@ describe('append-only audit evidence', () => {
     );
     const missingTarget = reseal({
       ...duplicate,
-      evidence: evidence({ evidenceId: 'evidence-2', supersedes: 'missing' }),
+      evidence: evidence({ eventId: 'event-2', supersedes: 'missing' }),
     });
     assert.throws(
       () => readEvidenceLedger(serializeEvidenceLedger([first, missingTarget])),
@@ -183,11 +198,7 @@ describe('append-only audit evidence', () => {
         readFileSync(ledgerPath, 'utf8').replace('satisfied', 'failed')
       );
       assert.throws(
-        () =>
-          appendEvidenceFile(
-            ledgerPath,
-            evidence({ evidenceId: 'evidence-2' })
-          ),
+        () => appendEvidenceFile(ledgerPath, evidence({ eventId: 'event-2' })),
         /append-only-ledger-integrity-failure/
       );
     } finally {
