@@ -21,10 +21,13 @@ Before implementation, write the following in the feature plan, issue, or PR
 description for every user-facing behavior change:
 
 1. **Primary task and direct action:** what the user is trying to finish, the
-   visible control that starts it, and the observable outcome. A frequent,
-   reversible action should complete from the current context in one direct
-   activation. An extra step needs a named reason, such as destructive impact,
-   missing information, or a platform-required permission.
+   visible control that starts it, and the observable outcome. A frequent action
+   normally completes end-to-end within two deliberate activations, and in one
+   when the input is already complete. Starting and finishing a capture may use
+   the two-activation budget. Three or more requires one named exception:
+   review, safety, ambiguity, irreversible impact, or recovery. The exception
+   reason must be visible or documented and covered by an executable interaction
+   contract or focused behavior test when the surface has a test substrate.
 2. **Context contract:** what focus, selection, text/caret, scroll position,
    and open context remain stable, and the explicit user action that may change
    each one.

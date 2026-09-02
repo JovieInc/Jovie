@@ -692,6 +692,14 @@ These are surface-side aliases of `--ds-motion-*` tokens (DS_FOUNDATION_V1).
 
 ### Interaction feedback
 
+- Frequent actions normally finish end-to-end within two deliberate
+  activations, and in one when their input is already complete. A capture may
+  use one activation to start and one to finish and submit. A third step is an
+  exception, never an unexamined default: name review, safety, ambiguity,
+  irreversible impact, or recovery, make that reason visible or documented,
+  and encode it in the surface's executable interaction contract or focused
+  behavior test. Editing after voice capture is a recovery path; successful
+  capture submits on its finishing activation.
 - Press feedback uses the shared `--scale-press` token. The canonical value is
   `0.98`: enough tactile response to register without visible shrink or jump.
 - Press compression is opt-in. Use it only when an action has no immediate
