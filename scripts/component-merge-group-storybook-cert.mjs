@@ -57,6 +57,9 @@ export function runMergeGroupStorybookCertification({
     );
   }
 
+  // Advisory rendered eval only: do not pass --require-rendered.
+  // Combined-queue heads change sibling components without their stories, which
+  // is not a merge-group product failure.
   const args = [
     'component-ship-gate',
     `--diff-base=${baseSha}`,
@@ -64,7 +67,6 @@ export function runMergeGroupStorybookCertification({
     '--skip-ratchet',
     '--skip-rendered-cert',
     '--skip-live-storybook',
-    '--require-rendered',
     `--storybook-url=${storybookUrl}`,
   ];
   const gate = spawn('pnpm', args, {
