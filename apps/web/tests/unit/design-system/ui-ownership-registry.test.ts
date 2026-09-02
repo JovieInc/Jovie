@@ -151,6 +151,21 @@ describe('cross-surface UI ownership registry', () => {
         binding => binding.swiftType === 'JoviePillButtonStyle'
       )?.consumerPaths
     ).toContain('apps/ios/Jovie/Features/Library/LibrarySurfaceView.swift');
+    expect(
+      nativeButtonBindings?.find(
+        binding => binding.swiftType === 'JoviePillButtonStyle'
+      )?.consumerPaths
+    ).not.toContain('apps/ios/Jovie/Features/Settings/SettingsView.swift');
+    expect(
+      nativeButtonBindings?.find(
+        binding => binding.swiftType === 'JoviePressFeedbackButtonStyle'
+      )?.consumerPaths
+    ).toEqual(['apps/ios/Jovie/Features/AppShell/AppShellLeftDrawer.swift']);
+    expect(
+      nativeIconBindings?.find(
+        binding => binding.swiftType === 'JovieIconButtonStyle'
+      )?.consumerPaths
+    ).not.toContain('apps/ios/Jovie/Features/Settings/SettingsView.swift');
     expect(nativeButtonBindings).toMatchObject([
       {
         sourcePath: 'apps/ios/Jovie/DesignSystem/JovieTheme.swift',
