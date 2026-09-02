@@ -50,6 +50,11 @@ the separately gated rate-limit replay path must also pass. Linear remains the
 coordination projection, not delivery truth. Hermes remains available as
 rollback until that proof is complete.
 
+`agent/lib/summer-photon-offline-proof.ts` is a test-only, zero-outbound safety
+proof. It is not registered as an Eve channel and cannot reach Photon or an
+iMessage recipient. Live routing remains unchanged until both existing Photon
+projects and their distinct assigned lines are verified.
+
 The accepted event contract is strict:
 
 ```json
