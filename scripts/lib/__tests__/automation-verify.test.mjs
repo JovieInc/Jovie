@@ -38,12 +38,15 @@ describe('Summer commissioning affected-test lane', () => {
   it('selects the fail-closed commissioning suite for every contract input', () => {
     const plan = buildAffectedTestPlan([
       'docs/operations/SUMMER_COMMISSIONING.md',
+      'docs/operations/SUMMER_PRODUCT_QUALITY_GOVERNOR.md',
       'docs/operations/evidence/summer-mac-production-dogfood-2026-09-01.json',
       'scripts/summer-commissioning/canonical-registry.test.mjs',
       'scripts/summer-commissioning/commissioning.mjs',
       'scripts/summer-commissioning/commissioning.test.mjs',
       'scripts/summer-commissioning/contracts.mjs',
       'scripts/summer-commissioning/contracts.test.mjs',
+      'scripts/summer-commissioning/product-quality-governor.mjs',
+      'scripts/summer-commissioning/product-quality-governor.test.mjs',
       'scripts/summer-commissioning/receipt-trust.mjs',
       'scripts/summer-commissioning/receipt-trust.test.mjs',
       'scripts/summer-commissioning/registry.json',
@@ -56,6 +59,7 @@ describe('Summer commissioning affected-test lane', () => {
       'scripts/summer-commissioning/canonical-registry.test.mjs',
       'scripts/summer-commissioning/commissioning.test.mjs',
       'scripts/summer-commissioning/contracts.test.mjs',
+      'scripts/summer-commissioning/product-quality-governor.test.mjs',
       'scripts/summer-commissioning/receipt-trust.test.mjs',
     ]);
     expect(plan.scriptVitestTests).toContain(

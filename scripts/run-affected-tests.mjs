@@ -144,12 +144,15 @@ const AFFECTED_TEST_SELECTOR_TESTS = [
 ];
 const SUMMER_COMMISSIONING_PRIMARY_INPUTS = new Set([
   'docs/operations/SUMMER_COMMISSIONING.md',
+  'docs/operations/SUMMER_PRODUCT_QUALITY_GOVERNOR.md',
   'docs/operations/evidence/summer-mac-production-dogfood-2026-09-01.json',
   'scripts/summer-commissioning/canonical-registry.test.mjs',
   'scripts/summer-commissioning/commissioning.mjs',
   'scripts/summer-commissioning/commissioning.test.mjs',
   'scripts/summer-commissioning/contracts.mjs',
   'scripts/summer-commissioning/contracts.test.mjs',
+  'scripts/summer-commissioning/product-quality-governor.mjs',
+  'scripts/summer-commissioning/product-quality-governor.test.mjs',
   'scripts/summer-commissioning/receipt-trust.mjs',
   'scripts/summer-commissioning/receipt-trust.test.mjs',
   'scripts/summer-commissioning/registry.json',
@@ -162,6 +165,7 @@ const SUMMER_COMMISSIONING_NODE_TESTS = [
   'scripts/summer-commissioning/canonical-registry.test.mjs',
   'scripts/summer-commissioning/commissioning.test.mjs',
   'scripts/summer-commissioning/contracts.test.mjs',
+  'scripts/summer-commissioning/product-quality-governor.test.mjs',
   'scripts/summer-commissioning/receipt-trust.test.mjs',
 ];
 const SENTRY_AUTOFIX_RECURRENCE_PRIMARY_INPUTS = new Set([
