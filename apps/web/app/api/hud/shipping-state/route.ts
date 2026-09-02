@@ -2,8 +2,12 @@ import type { NextRequest } from 'next/server';
 import { NextResponse } from 'next/server';
 import { authorizeHud } from '@/lib/auth/hud';
 import { captureError } from '@/lib/error-tracking';
+import { scheduleAfter } from '@/lib/next/schedule-after';
 import { FORBIDDEN_QUERY_KEYS } from '@/lib/ovie/shipping-state';
-import { publishConfiguredShippingState } from '@/lib/ovie/shipping-state/configured.server';
+import {
+  publishConfiguredShippingState,
+  readCachedConfiguredShippingState,
+} from '@/lib/ovie/shipping-state/configured.server';
 import { logger } from '@/lib/utils/logger';
 
 export const runtime = 'nodejs';
@@ -40,7 +44,32 @@ export async function GET(request: NextRequest) {
       );
     }
 
-    const projection = await publishConfiguredShippingState();
+    const projection = readCachedConfiguredShippingState();
+    scheduleAfter(
+      async () => {
+        try {
+          await publishConfiguredShippingState();
+        } catch (error) {
+          logger.error(
+            '[hud/shipping-state] Background reconciliation failed',
+            error
+          );
+          await captureError(
+            'HUD shipping-state reconciliation failed',
+            error,
+            {
+              route: '/api/hud/shipping-state',
+              method: 'GET',
+            }
+          );
+        }
+      },
+      {
+        // Local packaged dogfood has no Vercel request helper. Start the
+        // reconciliation on the same tick while returning cached state first.
+        fallback: 'inline',
+      }
+    );
 
     return NextResponse.json(projection, { headers: NO_STORE_HEADERS });
   } catch (error) {
