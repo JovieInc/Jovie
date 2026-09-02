@@ -2,6 +2,7 @@
 
 import { execFile } from 'node:child_process';
 import { createHash } from 'node:crypto';
+import { readFileSync } from 'node:fs';
 import { mkdir, readFile, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -25,6 +26,44 @@ const defaultCoveragePath = path.join(
   'continuous',
   'coverage-map.json'
 );
+const modelRegistry = JSON.parse(
+  readFileSync(
+    path.join(repoRoot, 'scripts', 'hermes', 'config', 'model-registry.json'),
+    'utf8'
+  )
+);
+const modelRegistryEntries = new Map(
+  modelRegistry.models.map(entry => [entry.id, entry])
+);
+
+const DETERMINISTIC_PROBE_COMMANDS = new Set([
+  'bash scripts/security/verify-gitleaks-coverage.sh',
+  'pnpm run skill-governance:check',
+  'python3 .github/scripts/test-security-suppression-audit.py',
+  'pnpm run test:fast',
+  'pnpm run test:bug-to-test',
+  'pnpm --filter @jovie/web run test:nightly-agent:select',
+  'node scripts/ci-duration-ratchet.mjs',
+  'MERGE_QUEUE_BACKEND=native node scripts/merge-queue-backend.mjs list-state',
+  'node scripts/verify-workflow-references.mjs',
+  'bash scripts/ci-health-check.sh',
+  'node scripts/lib/policy-gate-liveness.mjs',
+  'node scripts/dependabot-update-policy.mjs',
+  'pnpm audit --audit-level high',
+  'pnpm run boundaries:check',
+  'node scripts/invariant-stewardship/audit.mjs',
+  'pnpm --filter @jovie/web run drizzle:check',
+  'pnpm --filter @jovie/web run test:budgets',
+  'pnpm --filter @jovie/web run a11y:axe',
+  'node scripts/design-governance-audit.mjs',
+  'pnpm run test:coverage:diff',
+  'pnpm --filter @jovie/web run test:mutation:hotspots',
+  'pnpm run evals',
+  'pnpm run test:quarantine-ledger',
+  'node scripts/doc-freshness-lint.mjs',
+  'node scripts/skill-catalog.mjs',
+  'bash scripts/automation-verify.sh affected',
+]);
 
 const REQUIRED_FAMILY_IDS = [
   'security',
@@ -242,7 +281,9 @@ function validateFamily(family, registry, providerIds) {
   invariant(
     Array.isArray(family.deterministicProbes) &&
       family.deterministicProbes.length > 0 &&
-      family.deterministicProbes.every(nonEmptyString),
+      family.deterministicProbes.every(probe =>
+        DETERMINISTIC_PROBE_COMMANDS.has(probe)
+      ),
     `${prefix} must define deterministic probes`
   );
   invariant(
@@ -600,14 +641,20 @@ function validateQualificationReceipt(
     receipt.provider === provider.id,
     'qualification provider mismatch'
   );
-  invariant(nonEmptyString(receipt.model), 'qualification model is missing');
+  const modelEntry = modelRegistryEntries.get(receipt.modelRegistryEntryId);
+  invariant(modelEntry, 'qualification model registry entry is unknown');
   invariant(
-    nonEmptyString(receipt.modelRegistryEntryId),
-    'qualification model registry entry is missing'
+    modelEntry.provider === provider.id,
+    'qualification model provider mismatch'
   );
   invariant(
-    Array.isArray(receipt.modelCapabilities),
-    'qualification model capabilities are missing'
+    receipt.model === modelEntry.model,
+    'qualification model identity mismatch'
+  );
+  invariant(
+    JSON.stringify(receipt.modelCapabilities) ===
+      JSON.stringify(modelEntry.capabilities),
+    'qualification model capabilities do not match the registry'
   );
   for (const capability of family.providerEligibility
     .requiredModelCapabilities) {
@@ -617,12 +664,13 @@ function validateQualificationReceipt(
     );
   }
   invariant(
-    finiteNonNegative(receipt.modelQuality) &&
+    receipt.modelQuality === modelEntry.quality &&
       receipt.modelQuality >= family.providerEligibility.minimumQuality,
     `model ${receipt.model} is below the ${family.id} quality threshold`
   );
   invariant(
-    ['subscription-included', 'free-local'].includes(receipt.costTier),
+    receipt.costTier === modelEntry.cost_tier &&
+      ['subscription-included', 'free-local'].includes(receipt.costTier),
     `model ${receipt.model} cost tier is not eligible for zero-spend audits`
   );
   invariant(
@@ -634,7 +682,8 @@ function validateQualificationReceipt(
     `provider ${provider.id} qualification did not pass every fail-closed gate`
   );
   invariant(
-    finiteNonNegative(receipt.costCapCents),
+    finiteNonNegative(receipt.costCapCents) &&
+      receipt.costCapCents <= family.costBudget.maxSpendCents,
     'qualification cost cap is invalid'
   );
   invariant(
@@ -884,6 +933,29 @@ export function normalizeFindings(findings, registry, coverageMap) {
   };
 }
 
+function validateEvidenceReceipt(evidence, registry, expectedTier) {
+  invariant(isRecord(evidence), 'evidence item must be an object');
+  invariant(
+    evidence.tier === expectedTier,
+    `proof evidence tier must be ${expectedTier}`
+  );
+  invariant(nonEmptyString(evidence.kind), 'proof evidence kind is required');
+  invariant(evidence.direct === true, 'proof evidence must be direct');
+  invariant(
+    nonEmptyString(evidence.locator),
+    'proof evidence locator is required'
+  );
+  invariant(
+    nonEmptyString(evidence.summary),
+    'proof evidence summary is required'
+  );
+  parseTimestamp(evidence.observedAt, 'proof evidence observedAt');
+  invariant(
+    registry.policy.proofTiers.includes(evidence.tier),
+    `invalid proof evidence tier ${evidence.tier}`
+  );
+}
+
 function validateProofTiers(proofTiers, registry) {
   invariant(isRecord(proofTiers), 'pilot proofTiers must be an object');
   assertExactUniqueStrings(
@@ -913,8 +985,52 @@ function validateProofTiers(proofTiers, registry) {
         receipt.evidence.length > 0,
         `proof tier ${tier} status ${receipt.status} needs evidence`
       );
+      for (const evidence of receipt.evidence) {
+        validateEvidenceReceipt(evidence, registry, tier);
+      }
     }
   }
+}
+
+function validateSafetyReceipt(receipt, registry, observedAt) {
+  invariant(isRecord(receipt), 'pilot safetyReceipt must be an object');
+  const safetyFields = [
+    'externalJobsCreated',
+    'providerCredentialsChanged',
+    'productionSettingsChanged',
+    'customerDataTransferred',
+    'secretMaterialTransferred',
+    'incrementalModelSpendCents',
+    'hyperagentUsed',
+    'providerSubstitutionOccurred',
+  ];
+  assertExactUniqueStrings(
+    Object.keys(receipt),
+    [...safetyFields, 'observedAt', 'evidence'],
+    'pilot safety receipt keys'
+  );
+  invariant(
+    parseTimestamp(receipt.observedAt, 'safety receipt observedAt') <=
+      parseTimestamp(observedAt, 'pilot observedAt'),
+    'safety receipt cannot be newer than the pilot'
+  );
+  invariant(
+    Array.isArray(receipt.evidence) && receipt.evidence.length > 0,
+    'safety receipt needs direct evidence'
+  );
+  for (const evidence of receipt.evidence) {
+    validateEvidenceReceipt(evidence, registry, 'source');
+  }
+  for (const field of safetyFields.filter(
+    field => field !== 'incrementalModelSpendCents'
+  )) {
+    invariant(receipt[field] === false, `unsafe pilot safety field ${field}`);
+  }
+  invariant(
+    receipt.incrementalModelSpendCents === 0,
+    'pilot safety receipt must prove zero incremental model spend'
+  );
+  return Object.fromEntries(safetyFields.map(field => [field, receipt[field]]));
 }
 
 export function buildPilotReport(input, registry, coverageMap) {
@@ -949,6 +1065,11 @@ export function buildPilotReport(input, registry, coverageMap) {
     invariant(nonEmptyString(probe.summary), `probe ${probe.id} needs summary`);
   }
   validateProofTiers(input.proofTiers, registry);
+  const safety = validateSafetyReceipt(
+    input.safetyReceipt,
+    registry,
+    input.pilot.observedAt
+  );
   const normalized = normalizeFindings(
     input.findings ?? [],
     registry,
@@ -971,16 +1092,7 @@ export function buildPilotReport(input, registry, coverageMap) {
     deterministicProbeResults: input.deterministicProbeResults,
     findings: normalized.findings,
     modelComparisons: normalized.comparisons,
-    safety: {
-      externalJobsCreated: false,
-      providerCredentialsChanged: false,
-      productionSettingsChanged: false,
-      customerDataTransferred: false,
-      secretMaterialTransferred: false,
-      incrementalModelSpendCents: 0,
-      hyperagentUsed: false,
-      providerSubstitutionOccurred: false,
-    },
+    safety,
   };
 }
 

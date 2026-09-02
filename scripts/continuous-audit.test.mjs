@@ -35,12 +35,41 @@ async function loadContracts() {
 }
 
 function qualificationReceipt(provider, model) {
+  const entries = {
+    'codex:gpt-5.6-sol': {
+      id: 'codex-sol',
+      capabilities: ['architecture', 'root-cause', 'code'],
+      quality: 88,
+    },
+    'codex:gpt-5.6-luna': {
+      id: 'codex-luna',
+      capabilities: ['code', 'review', 'mechanical', 'tests'],
+      quality: 74,
+    },
+    'grok:grok-4.6': {
+      id: 'grok-4.6',
+      capabilities: [
+        'mechanical',
+        'code',
+        'review',
+        'semantic',
+        'architecture',
+        'root-cause',
+      ],
+      quality: 100,
+    },
+  };
+  const entry = entries[`${provider}:${model}`] ?? {
+    id: `${provider}-unregistered-fixture`,
+    capabilities: ['review', 'architecture', 'root-cause'],
+    quality: 100,
+  };
   return {
     provider,
     model,
-    modelRegistryEntryId: `${provider}-fixture-model`,
-    modelCapabilities: ['review', 'architecture', 'root-cause'],
-    modelQuality: 100,
+    modelRegistryEntryId: entry.id,
+    modelCapabilities: entry.capabilities,
+    modelQuality: entry.quality,
     costTier: 'subscription-included',
     authenticatedAt: '2026-09-02T03:00:00Z',
     modelIdentityVerified: true,
@@ -214,11 +243,29 @@ test('model qualification enforces family capabilities and quality', async () =>
     providerFamily: 'openai',
     model: 'gpt-5.6-luna',
   });
-  finding.source.qualificationReceipt.modelCapabilities = ['review'];
-  finding.source.qualificationReceipt.modelQuality = 74;
   assert.throws(
     () => validateFinding(finding, registry, coverageMap),
     /lacks required capability architecture/
+  );
+});
+
+test('model qualification binds identity and zero-cost cap to the checked-in registry', async () => {
+  const { registry, coverageMap } = await loadContracts();
+  const finding = makeFinding({
+    provider: 'codex',
+    providerFamily: 'openai',
+    model: 'gpt-5.6-sol',
+  });
+  finding.source.qualificationReceipt.modelRegistryEntryId = 'invented-model';
+  finding.source.qualificationReceipt.costCapCents = 999;
+  assert.throws(
+    () => validateFinding(finding, registry, coverageMap),
+    /model registry entry is unknown/
+  );
+  finding.source.qualificationReceipt.modelRegistryEntryId = 'codex-sol';
+  assert.throws(
+    () => validateFinding(finding, registry, coverageMap),
+    /cost cap is invalid/
   );
 });
 
@@ -259,4 +306,33 @@ test('bounded pilot report validates proof-tier separation and terminal finding 
   assert.equal(report.proofTiers.runtime.status, 'availability-only');
   assert.equal(report.safety.incrementalModelSpendCents, 0);
   assert.equal(report.safety.externalJobsCreated, false);
+});
+
+test('pilot proof and safety receipts fail closed on unsupported claims', async () => {
+  const { registry, coverageMap } = await loadContracts();
+  const input = await readJson(
+    'audits/continuous/pilots/2026-09-02-ci-merge-throughput/pilot-input.json'
+  );
+  input.proofTiers.ci.evidence = [{}];
+  assert.throws(
+    () => buildPilotReport(input, registry, coverageMap),
+    /proof evidence tier must be ci/
+  );
+  const unsafeInput = await readJson(
+    'audits/continuous/pilots/2026-09-02-ci-merge-throughput/pilot-input.json'
+  );
+  unsafeInput.safetyReceipt.externalJobsCreated = true;
+  assert.throws(
+    () => buildPilotReport(unsafeInput, registry, coverageMap),
+    /unsafe pilot safety field externalJobsCreated/
+  );
+});
+
+test('registry rejects deterministic probes outside the executable allowlist', async () => {
+  const registry = await readJson('audits/continuous/registry.json');
+  registry.auditFamilies[0].deterministicProbes = ['review it somehow'];
+  assert.throws(
+    () => validateRegistry(registry),
+    /must define deterministic probes/
+  );
 });

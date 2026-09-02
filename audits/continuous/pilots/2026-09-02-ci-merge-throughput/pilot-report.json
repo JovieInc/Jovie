@@ -24,11 +24,19 @@
       "summary": "Pilot checkout and exact current origin/main were identified separately.",
       "evidence": [
         {
+          "tier": "source",
+          "kind": "git-revision",
+          "direct": true,
           "locator": "git:worktree:94e9e19c119603071948bcfc70ae80e25783256b",
+          "observedAt": "2026-09-02T04:45:58Z",
           "summary": "Pilot implementation checkout."
         },
         {
+          "tier": "source",
+          "kind": "git-revision",
+          "direct": true,
           "locator": "git:origin/main:ccb8868d9916b183e545abdd3ad67cb7cd850fe9",
+          "observedAt": "2026-09-02T04:45:58Z",
           "summary": "Current main at observation time."
         }
       ]
@@ -38,11 +46,19 @@
       "summary": "Current-main CI release authorization completed successfully, with its direct-main skip pattern retained rather than misreported as full test execution.",
       "evidence": [
         {
+          "tier": "ci",
+          "kind": "workflow-run",
+          "direct": true,
           "locator": "https://github.com/JovieInc/Jovie/actions/runs/33591655643",
+          "observedAt": "2026-09-02T04:45:58Z",
           "summary": "CI success for exact main ccb8868d9916b183e545abdd3ad67cb7cd850fe9."
         },
         {
+          "tier": "ci",
+          "kind": "workflow-run",
+          "direct": true,
           "locator": "https://github.com/JovieInc/Jovie/actions/runs/33504704282",
+          "observedAt": "2026-09-02T04:45:58Z",
           "summary": "Latest observed CI Duration Ratchet success."
         }
       ]
@@ -52,7 +68,11 @@
       "summary": "Native merge queue contained 76 entries at the bounded snapshot.",
       "evidence": [
         {
+          "tier": "queue",
+          "kind": "queue-snapshot",
+          "direct": true,
           "locator": "command:MERGE_QUEUE_BACKEND=native node scripts/merge-queue-backend.mjs list-state",
+          "observedAt": "2026-09-02T04:45:58Z",
           "summary": "Compact projection: queuedCount=76, minPosition=1, maxPosition=76."
         }
       ]
@@ -62,11 +82,19 @@
       "summary": "Current-main Production Controller run was queued; the prior four observed controller runs were terminal failures. This is not a Production Verified receipt.",
       "evidence": [
         {
+          "tier": "deploy",
+          "kind": "workflow-run",
+          "direct": true,
           "locator": "https://github.com/JovieInc/Jovie/actions/runs/33591730953",
+          "observedAt": "2026-09-02T04:45:58Z",
           "summary": "Production Controller for current main was queued at observation time."
         },
         {
+          "tier": "deploy",
+          "kind": "workflow-run",
+          "direct": true,
           "locator": "https://github.com/JovieInc/Jovie/actions/runs/33590762284",
+          "observedAt": "2026-09-02T04:45:58Z",
           "summary": "Prior Production Controller run completed with failure."
         }
       ]
@@ -76,7 +104,11 @@
       "summary": "GET https://jov.ie/api/health returned HTTP 200 from Vercel. No immutable deployment identity or source-SHA parity was present in the observed headers, so this proves availability only.",
       "evidence": [
         {
+          "tier": "runtime",
+          "kind": "http-availability",
+          "direct": true,
           "locator": "https://jov.ie/api/health",
+          "observedAt": "2026-09-02T04:44:56Z",
           "summary": "HTTP/2 200 at 2026-09-02T04:44:56Z; cache-control no-store; server Vercel."
         }
       ]
