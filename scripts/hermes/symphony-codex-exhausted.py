@@ -510,6 +510,14 @@ def _unit_not_loaded(unit: str) -> bool:
     )
 
 
+def _cleanup_launched_units(units: set[str]) -> bool:
+    stopped = _control(_systemctl("stop", *sorted(units))) or all(
+        _unit_not_loaded(unit) for unit in units
+    )
+    active = _active_grok_units()
+    return stopped and active is not None and not units.intersection(active)
+
+
 def _identifier_from_unit(unit: str) -> str | None:
     match = FALLBACK_UNIT_RE.fullmatch(unit)
     return match.group(1) if match else None
@@ -1680,7 +1688,7 @@ def _grok_command(
     ]
 
 
-def reconcile() -> int:
+def reconcile(target_identifier: str | None = None) -> int:
     gc_fallback_locks()
     ready, reason = codex_canary_ready()
     if ready:
@@ -1689,6 +1697,13 @@ def reconcile() -> int:
             print("codex_not_exhausted grok_state_query_failed", file=sys.stderr)
             return EXIT_SAFE_FAIL_CLOSED
         if active:
+            if target_identifier is not None:
+                print(
+                    "codex_not_exhausted recovery_deferred "
+                    f"target_not_started={target_identifier} grok_ship_active",
+                    file=sys.stderr,
+                )
+                return EXIT_SAFE_FAIL_CLOSED
             print("codex_not_exhausted recovery_deferred grok_ship_active", file=sys.stderr)
             return 0
         if not _start_jov_primary():
@@ -1697,14 +1712,53 @@ def reconcile() -> int:
         if not _services_active():
             print("codex_not_exhausted symphony_not_active", file=sys.stderr)
             return EXIT_DEGRADED
-        drain_reason = _drain_included_pools(active)
+        launched_units: set[str] = set()
+        drain_reason = _drain_included_pools(
+            active, target_identifier, launched_units
+        )
+        if target_identifier is not None and not drain_reason.startswith(
+            "drain_started=1 "
+        ):
+            print(
+                f"codex_not_exhausted symphony_active target={target_identifier} "
+                f"{drain_reason}",
+                file=sys.stderr,
+            )
+            return EXIT_SAFE_FAIL_CLOSED
+        if target_identifier is not None:
+            survived = _grok_units_after_survival_window()
+            if survived is None:
+                print(
+                    "codex_not_exhausted symphony_active "
+                    f"target_survival_query_failed={target_identifier}",
+                    file=sys.stderr,
+                )
+                return EXIT_DEGRADED
+            if set(survived) != launched_units:
+                if not _cleanup_launched_units(launched_units):
+                    print(
+                        "codex_not_exhausted symphony_active "
+                        f"target_cleanup_failed={target_identifier}",
+                        file=sys.stderr,
+                    )
+                    return EXIT_DEGRADED
+                print(
+                    "codex_not_exhausted symphony_active "
+                    f"target_not_survived={target_identifier}",
+                    file=sys.stderr,
+                )
+                return EXIT_SAFE_FAIL_CLOSED
         idle = "idle " if drain_reason.startswith("drain_skipped=") or drain_reason.startswith("drain_idle") else ""
         print(f"codex_not_exhausted symphony_active {idle}{drain_reason}", file=sys.stderr)
         return 0
-    return _continue_exhausted_reconcile(reason)
+    return _continue_exhausted_reconcile(reason, target_identifier)
 
 
-def _drain_included_pools(active: list[str]) -> str:
+def _drain_included_pools(
+    active: list[str],
+    target_identifier: str | None = None,
+    launched_out: set[str] | None = None,
+) -> str:
     """Use leftover included Cursor/Grok/Kimi quota while Codex still owns Symphony.
 
     One issue still has one implementation owner: grok-ship-one and
@@ -1716,6 +1770,15 @@ def _drain_included_pools(active: list[str]) -> str:
     gate_ready, gate_reason = _fleet_gate_allows_isolated()
     if not gate_ready:
         return f"drain_skipped={gate_reason}"
+    identifiers = _admitted_or_remount_identifiers()
+    if identifiers is None:
+        return "drain_skipped=linear_query_failed"
+    if target_identifier is not None:
+        if target_identifier not in identifiers:
+            return f"drain_skipped=target_not_eligible:{target_identifier}"
+        identifiers = [target_identifier]
+    if not identifiers:
+        return "drain_idle pool=unselected"
     selection, selection_reason = _model_router_selection()
     if selection is None:
         return f"drain_skipped={selection_reason}"
@@ -1725,23 +1788,24 @@ def _drain_included_pools(active: list[str]) -> str:
     bundle_revision = _bundle_revision()
     if bundle_revision is None:
         return "drain_skipped=bundle_revision_unavailable"
-    identifiers = _admitted_or_remount_identifiers()
-    if identifiers is None:
-        return "drain_skipped=linear_query_failed"
-    if not identifiers:
-        return f"drain_idle pool={pool}"
-    limit = _grok_limit()
+    limit = 1 if target_identifier is not None else _grok_limit()
     if limit <= 0:
         return "drain_skipped=grok_capacity_zero"
     launched, _used = _launch_fallback_workers(
         identifiers, active, executable, bundle_revision, selection, limit
     )
+    if launched_out is not None:
+        launched_out.update(launched)
     if not launched:
+        if target_identifier is not None:
+            return f"drain_skipped=target_not_started:{target_identifier}"
         return f"drain_idle pool={pool}"
     return f"drain_started={len(launched)} pool={pool} model={selection['selected'].get('id')}"
 
 
-def _continue_exhausted_reconcile(reason: str) -> int:
+def _continue_exhausted_reconcile(
+    reason: str, target_identifier: str | None = None
+) -> int:
     # A failed readiness probe is not proof that Codex is exhausted. Only the
     # typed cooldown state authorizes the destructive primary-to-fallback
     # handoff. Preserve the running services on missing state, missing binaries,
@@ -1770,6 +1834,15 @@ def _continue_exhausted_reconcile(reason: str) -> int:
             file=sys.stderr,
         )
         return EXIT_SAFE_FAIL_CLOSED
+    if target_identifier is not None:
+        if target_identifier not in identifiers:
+            print(
+                f"codex_exhausted {reason} target_not_eligible={target_identifier} "
+                "symphony_unchanged",
+                file=sys.stderr,
+            )
+            return EXIT_SAFE_FAIL_CLOSED
+        identifiers = [target_identifier]
     active = _active_grok_units()
     if active is None:
         print(
@@ -1795,7 +1868,7 @@ def _continue_exhausted_reconcile(reason: str) -> int:
             file=sys.stderr,
         )
         return 0
-    limit = _grok_limit()
+    limit = 1 if target_identifier is not None else _grok_limit()
     if limit <= 0 and not active:
         print(
             f"codex_exhausted {reason} grok_capacity_zero symphony_unchanged",
@@ -1832,6 +1905,13 @@ def _continue_exhausted_reconcile(reason: str) -> int:
     launched_units, _capacity_used = _launch_fallback_workers(
         identifiers, active, executable, bundle_revision, selection, limit
     )
+    if target_identifier is not None and not launched_units:
+        print(
+            f"codex_exhausted {reason} target_not_started={target_identifier} "
+            "symphony_unchanged",
+            file=sys.stderr,
+        )
+        return EXIT_SAFE_FAIL_CLOSED
     started = 0
     final_active = _active_grok_units()
     if final_active is None:
@@ -1854,6 +1934,28 @@ def _continue_exhausted_reconcile(reason: str) -> int:
             return EXIT_DEGRADED
         if survived:
             started = len(launched_units.intersection(survived))
+            if target_identifier is not None and set(survived) != launched_units:
+                if not _cleanup_launched_units(launched_units):
+                    print(
+                        f"codex_exhausted {reason} "
+                        f"target_cleanup_failed={target_identifier} symphony_active",
+                        file=sys.stderr,
+                    )
+                    return EXIT_DEGRADED
+                if not _jov_active() and not _start_jov_primary():
+                    print(
+                        f"codex_exhausted {reason} "
+                        f"target_not_survived={target_identifier} "
+                        "symphony_api_restore_failed",
+                        file=sys.stderr,
+                    )
+                    return EXIT_DEGRADED
+                print(
+                    f"codex_exhausted {reason} "
+                    f"target_not_survived={target_identifier} symphony_active",
+                    file=sys.stderr,
+                )
+                return EXIT_SAFE_FAIL_CLOSED
             if not _jov_active() and not _start_jov_primary():
                 print(
                     f"codex_exhausted {reason} grok_started={started} grok_survived={len(survived)} symphony_api_restore_failed",
@@ -2119,7 +2221,10 @@ def main() -> int:
     if args.command == "install":
         return install(args.destination_root)
     if args.command == "reconcile":
-        return reconcile()
+        if args.identifier and not re.fullmatch(r"(?:JOV|LYB)-\d+", args.identifier):
+            print("reconcile identifier must be JOV-<n> or LYB-<n>", file=sys.stderr)
+            return 2
+        return reconcile(args.identifier)
     if args.command == "check-admission":
         if not args.identifier:
             print("check-admission requires an issue identifier", file=sys.stderr)

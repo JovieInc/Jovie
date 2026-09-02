@@ -521,8 +521,25 @@ const GEM_CHECKIN_HUD_PYTHON_TESTS = [
   'scripts/hermes/tests/gem-checkin-hud.test.py',
   'scripts/hermes/tests/symphony-burrito-workflow.test.py',
 ];
+const SYMPHONY_ADDITIVE_ROUTER_PRIMARY_INPUTS = new Set([
+  'scripts/hermes/symphony-codex-exhausted.py',
+  'scripts/hermes/tests/symphony-additive-router.test.py',
+]);
+const SYMPHONY_ADDITIVE_ROUTER_LANE = new Set([
+  ...SYMPHONY_ADDITIVE_ROUTER_PRIMARY_INPUTS,
+  'scripts/hermes/config/model-registry.json',
+  'scripts/hermes/model-router.py',
+  'scripts/hermes/tests/symphony-codex-auth-fallback.test.py',
+  'scripts/hermes/tests/test-model-router.py',
+  ...AFFECTED_TEST_SELECTOR_MANIFEST,
+]);
+const SYMPHONY_ADDITIVE_ROUTER_PYTHON_TESTS = [
+  'scripts/hermes/tests/symphony-additive-router.test.py',
+  'scripts/hermes/tests/test-model-router.py',
+];
 const GEM_PR_REHABILITATION_PRIMARY_INPUTS = new Set([
   'scripts/hermes/config/gem-repo-registry.json',
+  'scripts/hermes/config/model-registry.json',
   'scripts/hermes/closure_health.py',
   'scripts/hermes/gem-pr-drain.py',
   'scripts/hermes/gem-ops-hud.py',
@@ -532,12 +549,14 @@ const GEM_PR_REHABILITATION_PRIMARY_INPUTS = new Set([
   'scripts/hermes/symphony-reconciler.py',
   'scripts/hermes/install-gem-fleet-controller.sh',
   'scripts/hermes/install-gem-pr-rehabilitation.sh',
+  'scripts/hermes/model-router.py',
   'scripts/hermes/systemd/gem-pr-drain.service',
   'scripts/hermes/systemd/gem-pr-drain.timer',
   'scripts/hermes/tests/gem-pr-drain.test.py',
   'scripts/hermes/tests/gem-ops-hud.test.py',
   'scripts/hermes/tests/gem-pr-rehabilitation-contract.test.py',
   'scripts/hermes/tests/gem-rehabilitation-policy.test.py',
+  'scripts/hermes/tests/test-model-router.py',
   'scripts/hermes/tests/closure-health.test.py',
   'scripts/hermes/tests/symphony-reconciler.test.py',
 ]);
@@ -965,6 +984,31 @@ export function buildAffectedTestPlan(
       pythonTests: [],
       pythonUnittestTests: GEM_CHECKIN_HUD_PYTHON_TESTS,
       scriptVitestTests: ['scripts/lib/__tests__/automation-verify.test.mjs'],
+      nodeTests: [],
+    };
+  }
+  const hasLegacySymphonyTestChange = files.includes(
+    'scripts/hermes/tests/symphony-codex-auth-fallback.test.py'
+  );
+  const hasAdditiveSymphonyTestAnchor = files.includes(
+    'scripts/hermes/tests/symphony-additive-router.test.py'
+  );
+  if (hasLegacySymphonyTestChange && !hasAdditiveSymphonyTestAnchor) {
+    return { mode: 'full', relatedFiles: [], mandatoryTests: [] };
+  }
+  const isBoundedSymphonyAdditiveRouterChange =
+    files.some(file => SYMPHONY_ADDITIVE_ROUTER_PRIMARY_INPUTS.has(file)) &&
+    files.every(file => SYMPHONY_ADDITIVE_ROUTER_LANE.has(file));
+  if (isBoundedSymphonyAdditiveRouterChange) {
+    return {
+      mode: 'selected',
+      relatedFiles: [],
+      mandatoryTests: [],
+      selectedTests: [],
+      rootVitestTests: [],
+      pythonTests: [],
+      pythonUnittestTests: SYMPHONY_ADDITIVE_ROUTER_PYTHON_TESTS,
+      scriptVitestTests: AFFECTED_TEST_SELECTOR_TESTS,
       nodeTests: [],
     };
   }
