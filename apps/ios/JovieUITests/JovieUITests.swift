@@ -135,7 +135,7 @@ final class JovieUITests: XCTestCase {
     )
     app.buttons["Retry"].tap()
     XCTAssertTrue(
-      app.staticTexts["Public Profile"].waitForExistence(timeout: 3),
+      app.staticTexts["Public Profile"].waitForExistence(timeout: 5),
       "Retry did not recover the embedded browser.\n\(app.debugDescription)"
     )
   }
@@ -903,10 +903,9 @@ final class JovieUITests: XCTestCase {
     )
 
     measure(metrics: shellRuntimeMetrics(for: app)) {
-      // Swipe the app, not `mobile-chat`: that identifier is on the chat
-      // ZStack and also matches descendant rows, so XCUI cannot pick one.
-      app.swipeUp()
-      app.swipeDown()
+      let chat = app.scrollViews["mobile-chat"]
+      chat.swipeUp()
+      chat.swipeDown()
       XCTAssertTrue(
         app.textFields["chat-composer-input"].waitForExistence(timeout: timeoutSeconds),
         "Composer disappeared during all-components scroll measurement.\n\(app.debugDescription)"

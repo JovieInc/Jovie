@@ -144,7 +144,6 @@ struct MobileChatView: View {
       }
     }
     .accessibilityElement(children: .contain)
-    .accessibilityIdentifier("mobile-chat")
     .contentShape(Rectangle())
     .onTapGesture {
       isComposerFocused = false
@@ -216,6 +215,7 @@ struct MobileChatView: View {
           .onAppear { isAtBottom = true }
           .onDisappear { isAtBottom = false }
       }
+      .accessibilityIdentifier("mobile-chat")
       .defaultScrollAnchor(.bottom)
       .scrollDismissesKeyboard(.interactively)
       .contentShape(Rectangle())

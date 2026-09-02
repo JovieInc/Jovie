@@ -204,10 +204,10 @@ struct AppShellChatFirstTests {
   }
 
   // Regression: the empty right rail must expose a resolvable Talk button to
-  // XCTest. The rail container carries `shell-right-rail`; without an explicit
-  // accessibility element + label on the Talk button its `shell-rail-talk`
-  // identifier is masked by the inherited container id, so
-  // `app.buttons["shell-rail-talk"]` never resolves (merge_queue JOV-5201).
+  // XCTest. The rail container carries `shell-right-rail`; assigning the Talk
+  // identifier to the styled view exposes an `Other` with an untagged Button,
+  // so the button needs an explicit semantic representation for
+  // `app.buttons["shell-rail-talk"]` to resolve (merge_queue JOV-5201).
   @Test func emptyRightRailTalkButtonKeepsOwnAccessibilityIdentifier() throws {
     let sourceURL = URL(fileURLWithPath: #filePath)
       .deletingLastPathComponent()
@@ -217,12 +217,12 @@ struct AppShellChatFirstTests {
     #expect(source.contains(#".accessibilityIdentifier("shell-right-rail")"#))
     #expect(source.contains(#".accessibilityIdentifier("shell-rail-talk")"#))
     #expect(
-      source.contains(".accessibilityElement(children: .ignore)"),
-      "shell-rail-talk must be its own accessibility element so the container id does not mask it."
+      source.contains(".accessibilityElement(children: .contain)"),
+      "shell-right-rail must contain child accessibility elements instead of replacing their identifiers."
     )
     #expect(
-      source.contains(#".accessibilityLabel("Talk")"#),
-      "shell-rail-talk must set an explicit label so XCTest resolves it as a Talk button."
+      source.contains(".accessibilityRepresentation"),
+      "shell-rail-talk must replace the styled wrapper with Button semantics for XCTest."
     )
   }
 
