@@ -787,10 +787,15 @@
           "kind": "dependency",
           "ref": "branch://codex/jov-5753-governed-certification-loop@cd1d1ba5a2e0969a09adb22e749ac31016bfcaa5",
           "summary": "The certification owner supplies machine eligibility, hard-boundary policy, automatic landing evaluation, and Ovie founder projection."
+        },
+        {
+          "kind": "runtime_blocker",
+          "ref": "gbrain://jovie/marketing-public-certification-profile-claim-contract-drift-2026-09-01",
+          "summary": "Exact staging main 40a22c61 passed 56/57 public surfaces. Protected testartist correctly redirects to root; certification needs separate positive allowed-fixture preview and negative protected-fixture redirect invariants without weakening identity policy."
         }
       ],
       "lastVerified": null,
-      "invalidationCondition": "The /start journey, trigger policy, privacy or cost budget, pstack verification contract, certification policy, Symphony capability boundary, Ovie review contract, acceptance budget, or invariant selector changes.",
+      "invalidationCondition": "The /start journey, trigger policy, privacy or cost budget, profile identity or claim-manifest policy, pstack verification contract, certification policy, Symphony capability boundary, Ovie review contract, acceptance budget, or invariant selector changes.",
       "ownerRemediation": {
         "owner": "Summer Product Quality Governor",
         "refs": ["JOV-5853"]

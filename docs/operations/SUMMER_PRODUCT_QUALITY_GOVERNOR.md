@@ -95,6 +95,19 @@ Axe, and synthetic initialization, but its public response exposed no source or
 deployment SHA. Search/selection/preview transitions remain untested without an
 approved disposable profile fixture. Neither observation is commissioning proof.
 
+An adjacent exact-staging certification blocker is attached without expanding
+this first `/start` pilot. On main `40a22c61a27431abf87ff9e42475577caff97d95`,
+the 57-surface sweep passed 56 surfaces; protected legacy fixture `testartist`
+correctly redirected `/testartist/claim` to `/`, while the manifest incorrectly
+expected `/testartist?claim=1`. Do not relax the protected-identity policy.
+
+Before exhaustive Playwright/Axe/performance certification, one stable allowed,
+non-reserved, unclaimed fixture must reach exact `/<handle>?claim=1`, while the
+protected fixture must redirect to `/` without verified token context. Deliberate
+reds reject positive-to-root and protected-to-preview. Both proofs bind fixture
+provenance, exact route, source, environment/deployment, and runtime selector.
+This remains separate from route-recipe consolidation and founder taste review.
+
 The certification integration must use a producer-owned resolver or signed
 store, resolve the latest post-invalidation view, bind the full subject and
 environment, consume the canonical automatic-landing decision and every hard
