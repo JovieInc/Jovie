@@ -1,0 +1,589 @@
+{
+  "schemaVersion": 1,
+  "registryId": "jovie-continuous-audit-registry",
+  "coverageIntervalDays": 90,
+  "selectionRule": "score = baseWeight * riskWeight * dueWeight * changeWeight * incidentWeight; audit the highest bounded score that fits the family budget",
+  "inventoryPolicy": {
+    "auditedExtensions": [
+      ".ts",
+      ".tsx",
+      ".js",
+      ".jsx",
+      ".mjs",
+      ".cjs",
+      ".py",
+      ".sh",
+      ".swift",
+      ".sql",
+      ".json",
+      ".jsonl",
+      ".md",
+      ".mdx",
+      ".yml",
+      ".yaml",
+      ".toml",
+      ".css",
+      ".scss",
+      ".html",
+      ".xml",
+      ".plist"
+    ],
+    "alwaysAuditGlobs": ["*", ".*", "Dockerfile*", "Makefile", "Procfile"],
+    "requireEveryTrackedMatch": true
+  },
+  "partitions": [
+    {
+      "id": "trust-boundaries",
+      "includeGlobs": [
+        "apps/web/proxy.ts",
+        "apps/web/app/api/**",
+        "apps/web/lib/auth/**",
+        "apps/web/lib/entitlements/**",
+        "apps/web/lib/security/**"
+      ],
+      "familyIds": [
+        "security",
+        "privacy-access-boundaries",
+        "correctness-regression"
+      ],
+      "baseWeight": 5,
+      "riskWeight": 5,
+      "intervalDays": 14,
+      "lastAuditedAt": null,
+      "highRiskReasons": ["auth", "payments", "cross-tenant access", "webhooks"]
+    },
+    {
+      "id": "web-product",
+      "includeGlobs": [
+        "apps/web/**",
+        "apps/web/app/**",
+        "apps/web/components/**",
+        "apps/web/lib/**"
+      ],
+      "familyIds": ["correctness-regression", "performance-cost"],
+      "baseWeight": 4,
+      "riskWeight": 4,
+      "intervalDays": 30,
+      "lastAuditedAt": null,
+      "highRiskReasons": ["primary customer surface", "revenue paths"]
+    },
+    {
+      "id": "web-ui",
+      "includeGlobs": [
+        "apps/web/app/**",
+        "apps/web/components/**",
+        "apps/web/stories/**"
+      ],
+      "familyIds": ["ux-accessibility-visual-drift"],
+      "baseWeight": 3,
+      "riskWeight": 3,
+      "intervalDays": 21,
+      "lastAuditedAt": null,
+      "highRiskReasons": ["customer-visible", "accessibility"]
+    },
+    {
+      "id": "native-clients",
+      "includeGlobs": [
+        "apps/ios/**",
+        "apps/macos/**",
+        "apps/desktop/**",
+        "apps/extension/**"
+      ],
+      "familyIds": ["correctness-regression", "runtime-production-health"],
+      "baseWeight": 4,
+      "riskWeight": 4,
+      "intervalDays": 30,
+      "lastAuditedAt": null,
+      "highRiskReasons": ["packaged runtime", "auth handoff", "update path"]
+    },
+    {
+      "id": "native-ui",
+      "includeGlobs": ["apps/ios/**", "apps/desktop/**"],
+      "familyIds": ["ux-accessibility-visual-drift"],
+      "baseWeight": 3,
+      "riskWeight": 3,
+      "intervalDays": 30,
+      "lastAuditedAt": null,
+      "highRiskReasons": ["packaged visual surface"]
+    },
+    {
+      "id": "shared-packages",
+      "includeGlobs": [
+        "packages/**",
+        "lib/**",
+        "apps/console/**",
+        "apps/eve-pilot/**"
+      ],
+      "familyIds": ["correctness-regression", "architecture-ownership-drift"],
+      "baseWeight": 3,
+      "riskWeight": 4,
+      "intervalDays": 30,
+      "lastAuditedAt": null,
+      "highRiskReasons": ["cross-product blast radius"]
+    },
+    {
+      "id": "database-and-migrations",
+      "includeGlobs": [
+        "apps/web/drizzle/**",
+        "apps/web/lib/db/**",
+        "apps/web/tests/integration/**"
+      ],
+      "familyIds": ["data-migration-safety", "privacy-access-boundaries"],
+      "baseWeight": 5,
+      "riskWeight": 5,
+      "intervalDays": 14,
+      "lastAuditedAt": null,
+      "highRiskReasons": ["irreversible state", "RLS", "tenant isolation"]
+    },
+    {
+      "id": "data-lifecycle",
+      "includeGlobs": [
+        "apps/web/app/api/cron/**",
+        "apps/web/lib/**retention**",
+        "apps/web/lib/**privacy**",
+        "docs/privacy.md"
+      ],
+      "familyIds": ["data-migration-safety", "privacy-access-boundaries"],
+      "baseWeight": 4,
+      "riskWeight": 5,
+      "intervalDays": 30,
+      "lastAuditedAt": null,
+      "highRiskReasons": ["retention", "deletion", "consent"]
+    },
+    {
+      "id": "integrations",
+      "includeGlobs": [
+        "apps/web/lib/integrations/**",
+        "apps/web/app/api/webhooks/**",
+        "apps/web/app/api/**oauth**",
+        "docs/WEBHOOK_MAP.md",
+        "docs/API_ROUTE_MAP.md"
+      ],
+      "familyIds": [
+        "security",
+        "privacy-access-boundaries",
+        "correctness-regression"
+      ],
+      "baseWeight": 4,
+      "riskWeight": 4,
+      "intervalDays": 30,
+      "lastAuditedAt": null,
+      "highRiskReasons": ["external data flow", "credentials", "webhooks"]
+    },
+    {
+      "id": "dependencies",
+      "includeGlobs": [
+        "package.json",
+        "pnpm-lock.yaml",
+        "apps/*/package.json",
+        "packages/*/package.json",
+        ".github/dependabot.yml",
+        "scripts/dependabot-update-policy.mjs"
+      ],
+      "familyIds": ["security", "dependency-upgrade"],
+      "baseWeight": 3,
+      "riskWeight": 4,
+      "intervalDays": 14,
+      "lastAuditedAt": null,
+      "highRiskReasons": ["supply chain", "runtime compatibility"]
+    },
+    {
+      "id": "runtime-toolchains",
+      "includeGlobs": [
+        ".nvmrc",
+        "package.json",
+        "pnpm-workspace.yaml",
+        ".github/actions/setup-node-pnpm/**",
+        "scripts/version-*.mjs",
+        "docs/engineering/NODE_RUNTIME_LIFECYCLE.md"
+      ],
+      "familyIds": ["dependency-upgrade", "performance-cost"],
+      "baseWeight": 2,
+      "riskWeight": 3,
+      "intervalDays": 30,
+      "lastAuditedAt": null,
+      "highRiskReasons": ["fleet compatibility", "CI consistency"]
+    },
+    {
+      "id": "workflows-and-actions",
+      "includeGlobs": [
+        ".github/workflows/**",
+        ".github/actions/**",
+        ".github/scripts/**",
+        "scripts/ci-*.mjs",
+        "scripts/rolling-ci-*.mjs"
+      ],
+      "familyIds": [
+        "security",
+        "ci-merge-throughput",
+        "operational-automation-liveness"
+      ],
+      "baseWeight": 5,
+      "riskWeight": 5,
+      "intervalDays": 7,
+      "lastAuditedAt": "2026-09-02T04:45:58Z",
+      "highRiskReasons": [
+        "merge authority",
+        "secret boundary",
+        "fleet throughput"
+      ]
+    },
+    {
+      "id": "delivery-control",
+      "includeGlobs": [
+        "scripts/backlog-orchestrator/**",
+        "scripts/hermes/**",
+        "scripts/merge-queue-backend.mjs",
+        ".github/workflows/production-controller*.yml",
+        ".github/workflows/merge-queue-*.yml",
+        ".github/workflows/delivery-control-receipts.yml"
+      ],
+      "familyIds": [
+        "ci-merge-throughput",
+        "runtime-production-health",
+        "architecture-ownership-drift",
+        "operational-automation-liveness"
+      ],
+      "baseWeight": 5,
+      "riskWeight": 5,
+      "intervalDays": 7,
+      "lastAuditedAt": "2026-09-02T04:45:58Z",
+      "highRiskReasons": [
+        "mutation authority",
+        "queue ownership",
+        "production writer"
+      ]
+    },
+    {
+      "id": "production-runtime",
+      "includeGlobs": [
+        ".github/workflows/production-*.yml",
+        ".github/workflows/postdeploy-probes.yml",
+        "docs/ci/production-deployment-probes.md",
+        "apps/web/app/api/health/**",
+        "docs/SYNTHETIC_MONITORING.md"
+      ],
+      "familyIds": ["runtime-production-health", "performance-cost"],
+      "baseWeight": 5,
+      "riskWeight": 5,
+      "intervalDays": 7,
+      "lastAuditedAt": null,
+      "highRiskReasons": ["live customer impact", "exact-build parity"]
+    },
+    {
+      "id": "native-runtime",
+      "includeGlobs": [
+        "apps/desktop/scripts/**",
+        "apps/ios/scripts/**",
+        "docs/macos/**",
+        ".github/workflows/desktop-release.yml",
+        ".github/workflows/ios-*.yml"
+      ],
+      "familyIds": ["runtime-production-health", "correctness-regression"],
+      "baseWeight": 4,
+      "riskWeight": 4,
+      "intervalDays": 21,
+      "lastAuditedAt": null,
+      "highRiskReasons": ["packaged exact-build proof"]
+    },
+    {
+      "id": "tests-and-evals",
+      "includeGlobs": [
+        "apps/**/tests/**",
+        "packages/**/test*",
+        "scripts/**/*.test.*",
+        "apps/web/tests/eval/**",
+        "apps/web/scripts/*eval*",
+        ".github/workflows/eval*.yml"
+      ],
+      "familyIds": ["test-eval-quality", "correctness-regression"],
+      "baseWeight": 4,
+      "riskWeight": 4,
+      "intervalDays": 14,
+      "lastAuditedAt": null,
+      "highRiskReasons": ["false-green prevention", "model behavior"]
+    },
+    {
+      "id": "risk-register",
+      "includeGlobs": [
+        "docs/TEST_RISK_REGISTER.md",
+        "docs/TEST_COVERAGE_HEATMAP.md",
+        "scripts/audit-test-coverage.ts",
+        "apps/web/stryker.config.mjs",
+        "apps/web/tests/quarantine/**"
+      ],
+      "familyIds": ["test-eval-quality"],
+      "baseWeight": 4,
+      "riskWeight": 5,
+      "intervalDays": 14,
+      "lastAuditedAt": null,
+      "highRiskReasons": ["coverage allocation", "mutation quality"]
+    },
+    {
+      "id": "design-system",
+      "includeGlobs": [
+        "DESIGN.md",
+        "canon/DESIGN.md",
+        "docs/design-system/**",
+        "packages/ui/**",
+        "scripts/design-*.mjs",
+        "scripts/component-*.mjs"
+      ],
+      "familyIds": [
+        "ux-accessibility-visual-drift",
+        "architecture-ownership-drift"
+      ],
+      "baseWeight": 3,
+      "riskWeight": 3,
+      "intervalDays": 21,
+      "lastAuditedAt": null,
+      "highRiskReasons": ["shared visual primitives", "cross-surface drift"]
+    },
+    {
+      "id": "canon-and-ownership",
+      "includeGlobs": [
+        "AGENTS.md",
+        "CLAUDE.md",
+        "CODEX.md",
+        "canon/**",
+        ".claude/rules/**",
+        "architecture/**",
+        "docs/PR_FLOW.md"
+      ],
+      "familyIds": [
+        "architecture-ownership-drift",
+        "documentation-skill-context-freshness"
+      ],
+      "baseWeight": 4,
+      "riskWeight": 5,
+      "intervalDays": 30,
+      "lastAuditedAt": null,
+      "highRiskReasons": ["instruction authority", "ownership policy"]
+    },
+    {
+      "id": "docs-and-skills",
+      "includeGlobs": [
+        "docs/**",
+        "audits/**",
+        ".agents/skills/**",
+        ".claude/skills/**",
+        ".claude/commands/**",
+        "scripts/skill-*.mjs",
+        "scripts/doc-*.mjs"
+      ],
+      "familyIds": ["documentation-skill-context-freshness"],
+      "baseWeight": 2,
+      "riskWeight": 3,
+      "intervalDays": 30,
+      "lastAuditedAt": null,
+      "highRiskReasons": ["agent execution context", "stale instructions"]
+    },
+    {
+      "id": "scheduled-automation",
+      "includeGlobs": [
+        ".github/workflows/**",
+        "apps/web/vercel.json",
+        "docs/CRON_REGISTRY.md",
+        "scripts/hermes/launchd/**",
+        "scripts/hermes/jobs/**"
+      ],
+      "familyIds": ["operational-automation-liveness"],
+      "baseWeight": 4,
+      "riskWeight": 5,
+      "intervalDays": 7,
+      "lastAuditedAt": null,
+      "highRiskReasons": ["silent failure", "recurrence", "external effects"]
+    },
+    {
+      "id": "operator-runtime",
+      "includeGlobs": [
+        "scripts/hermes/**",
+        "docs/HERMES_AIR.md",
+        "docs/operations/**",
+        "canon/FLEET.md"
+      ],
+      "familyIds": [
+        "operational-automation-liveness",
+        "runtime-production-health"
+      ],
+      "baseWeight": 4,
+      "riskWeight": 5,
+      "intervalDays": 7,
+      "lastAuditedAt": null,
+      "highRiskReasons": ["fleet liveness", "terminal ownership"]
+    },
+    {
+      "id": "engineering-tooling",
+      "includeGlobs": [
+        "scripts/**",
+        "tools/**",
+        "config/**",
+        "github/**",
+        "patches/**",
+        ".github/scripts/**",
+        ".github/**",
+        ".husky/**",
+        ".neon/**",
+        ".no-mistakes/**",
+        ".sonarlint/**",
+        ".vscode/**",
+        ".zap/**",
+        ".codex/**",
+        "*",
+        ".*",
+        "*.json",
+        "*.jsonl",
+        "*.mjs",
+        "*.cjs",
+        "*.js",
+        "*.ts",
+        "*.yml",
+        "*.yaml",
+        "*.toml",
+        "*.md"
+      ],
+      "familyIds": [
+        "architecture-ownership-drift",
+        "test-eval-quality",
+        "documentation-skill-context-freshness",
+        "operational-automation-liveness"
+      ],
+      "baseWeight": 2,
+      "riskWeight": 3,
+      "intervalDays": 60,
+      "lastAuditedAt": null,
+      "highRiskReasons": ["developer control plane", "generated contracts"]
+    },
+    {
+      "id": "agent-control-plane",
+      "includeGlobs": [
+        ".agents/**",
+        ".claude/**",
+        ".codex/**",
+        ".conductor/**",
+        ".context/**",
+        ".cursor/**",
+        ".design-sync/**",
+        ".design-sync-marketing/**",
+        ".grok/**",
+        ".hermes/**",
+        ".lavish/**",
+        ".orchestrator/**",
+        ".windsurf/**",
+        "agentos/**",
+        "prompts/**",
+        "trigger/**",
+        "skills-lock.json"
+      ],
+      "familyIds": [
+        "security",
+        "architecture-ownership-drift",
+        "documentation-skill-context-freshness",
+        "operational-automation-liveness"
+      ],
+      "baseWeight": 4,
+      "riskWeight": 5,
+      "intervalDays": 30,
+      "lastAuditedAt": null,
+      "highRiskReasons": [
+        "agent instructions",
+        "tool authority",
+        "context privacy"
+      ]
+    },
+    {
+      "id": "secondary-apps-workers",
+      "includeGlobs": [
+        "apps/docs/**",
+        "apps/should-i-make/**",
+        "workers/**",
+        "tests/**",
+        "examples/**",
+        "templates/**"
+      ],
+      "familyIds": [
+        "security",
+        "correctness-regression",
+        "architecture-ownership-drift",
+        "test-eval-quality"
+      ],
+      "baseWeight": 2,
+      "riskWeight": 3,
+      "intervalDays": 60,
+      "lastAuditedAt": null,
+      "highRiskReasons": ["secondary execution surfaces", "worker isolation"]
+    },
+    {
+      "id": "web-assets-content",
+      "includeGlobs": [
+        "apps/web/public/**",
+        "apps/web/content/**",
+        "content/**",
+        "creator_profiles/**",
+        "public/**",
+        "assets/**"
+      ],
+      "familyIds": [
+        "security",
+        "correctness-regression",
+        "ux-accessibility-visual-drift",
+        "documentation-skill-context-freshness"
+      ],
+      "baseWeight": 2,
+      "riskWeight": 2,
+      "intervalDays": 60,
+      "lastAuditedAt": null,
+      "highRiskReasons": ["public content", "asset provenance"]
+    },
+    {
+      "id": "legacy-secondary-surfaces",
+      "includeGlobs": ["app/**", "infra/**", "fastlane/**", "ideation/**"],
+      "familyIds": [
+        "security",
+        "correctness-regression",
+        "architecture-ownership-drift",
+        "documentation-skill-context-freshness",
+        "operational-automation-liveness"
+      ],
+      "baseWeight": 2,
+      "riskWeight": 3,
+      "intervalDays": 90,
+      "lastAuditedAt": null,
+      "highRiskReasons": ["legacy execution path", "ownership drift"]
+    }
+  ],
+  "excludedPaths": [
+    {
+      "glob": "node_modules/**",
+      "reason": "third-party installed artifacts; dependency metadata is audited instead"
+    },
+    {
+      "glob": ".next/**",
+      "reason": "generated build output; build receipts are audited instead"
+    },
+    {
+      "glob": "coverage/**",
+      "reason": "generated coverage output; normalized coverage reports are audited instead"
+    },
+    {
+      "glob": "apps/**/test-results/**",
+      "reason": "ephemeral test output; sanitized normalized receipts are audited instead"
+    },
+    {
+      "glob": "**/*.png",
+      "reason": "binary assets are sampled through visual and provenance audits"
+    },
+    {
+      "glob": "**/*.jpg",
+      "reason": "binary assets are sampled through visual and provenance audits"
+    },
+    {
+      "glob": "**/*.mov",
+      "reason": "binary media is sampled through asset and visual audits"
+    },
+    {
+      "glob": "apps/web/drizzle/migrations/meta/*_snapshot.json",
+      "reason": "generated schema snapshots; migration SQL and journal are authoritative audit inputs"
+    }
+  ]
+}

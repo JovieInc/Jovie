@@ -1,0 +1,181 @@
+{
+  "schemaVersion": 1,
+  "generatedAt": "2026-09-02T04:45:58Z",
+  "pilot": {
+    "id": "2026-09-02-ci-merge-throughput",
+    "familyId": "ci-merge-throughput",
+    "partitionId": "delivery-control",
+    "observedAt": "2026-09-02T04:45:58Z",
+    "scope": "Read-only exact-main CI, native merge-queue, production-controller, and public health receipts. No log bodies, provider calls, queue mutation, deployment mutation, or customer data.",
+    "sourceRepository": "JovieInc/Jovie",
+    "worktreeSha": "94e9e19c119603071948bcfc70ae80e25783256b",
+    "mainSha": "ccb8868d9916b183e545abdd3ad67cb7cd850fe9"
+  },
+  "summary": {
+    "deterministicProbeCount": 5,
+    "rawFindingCount": 1,
+    "deduplicatedFindingCount": 1,
+    "disagreementCount": 0,
+    "unresolvedRawModelClaimCount": 0
+  },
+  "proofTiers": {
+    "source": {
+      "status": "verified",
+      "summary": "Pilot checkout and exact current origin/main were identified separately.",
+      "evidence": [
+        {
+          "locator": "git:worktree:94e9e19c119603071948bcfc70ae80e25783256b",
+          "summary": "Pilot implementation checkout."
+        },
+        {
+          "locator": "git:origin/main:ccb8868d9916b183e545abdd3ad67cb7cd850fe9",
+          "summary": "Current main at observation time."
+        }
+      ]
+    },
+    "ci": {
+      "status": "verified",
+      "summary": "Current-main CI release authorization completed successfully, with its direct-main skip pattern retained rather than misreported as full test execution.",
+      "evidence": [
+        {
+          "locator": "https://github.com/JovieInc/Jovie/actions/runs/33591655643",
+          "summary": "CI success for exact main ccb8868d9916b183e545abdd3ad67cb7cd850fe9."
+        },
+        {
+          "locator": "https://github.com/JovieInc/Jovie/actions/runs/33504704282",
+          "summary": "Latest observed CI Duration Ratchet success."
+        }
+      ]
+    },
+    "queue": {
+      "status": "verified",
+      "summary": "Native merge queue contained 76 entries at the bounded snapshot.",
+      "evidence": [
+        {
+          "locator": "command:MERGE_QUEUE_BACKEND=native node scripts/merge-queue-backend.mjs list-state",
+          "summary": "Compact projection: queuedCount=76, minPosition=1, maxPosition=76."
+        }
+      ]
+    },
+    "deploy": {
+      "status": "observed",
+      "summary": "Current-main Production Controller run was queued; the prior four observed controller runs were terminal failures. This is not a Production Verified receipt.",
+      "evidence": [
+        {
+          "locator": "https://github.com/JovieInc/Jovie/actions/runs/33591730953",
+          "summary": "Production Controller for current main was queued at observation time."
+        },
+        {
+          "locator": "https://github.com/JovieInc/Jovie/actions/runs/33590762284",
+          "summary": "Prior Production Controller run completed with failure."
+        }
+      ]
+    },
+    "runtime": {
+      "status": "availability-only",
+      "summary": "GET https://jov.ie/api/health returned HTTP 200 from Vercel. No immutable deployment identity or source-SHA parity was present in the observed headers, so this proves availability only.",
+      "evidence": [
+        {
+          "locator": "https://jov.ie/api/health",
+          "summary": "HTTP/2 200 at 2026-09-02T04:44:56Z; cache-control no-store; server Vercel."
+        }
+      ]
+    }
+  },
+  "deterministicProbeResults": [
+    {
+      "id": "registry-contract",
+      "command": "node scripts/continuous-audit.mjs validate",
+      "status": "passed",
+      "summary": "Validated 13 audit families and 27 coverage partitions; the tracked auditable inventory had zero unmapped files. Hyperagent remained fail-closed and scheduling remained proposal-only."
+    },
+    {
+      "id": "workflow-reference-contract",
+      "command": "node scripts/verify-workflow-references.mjs",
+      "status": "passed",
+      "summary": "Workflow reference validation passed against the pilot source checkout."
+    },
+    {
+      "id": "exact-main-ci-receipt",
+      "command": "gh run view 33591655643 --json databaseId,headSha,event,status,conclusion,createdAt,updatedAt,url,jobs",
+      "status": "observed",
+      "summary": "Exact-main CI run 33591655643 completed successfully for ccb8868d9916b183e545abdd3ad67cb7cd850fe9; Main Queue Provenance, Lockfile Specifier Preflight, and Main Release Ready passed while change-selected source and merge-group lanes were skipped on the direct-main event."
+    },
+    {
+      "id": "ci-duration-ratchet-receipts",
+      "command": "gh run list --workflow 'CI Duration Ratchet' --branch main --limit 5",
+      "status": "observed",
+      "summary": "The five latest CI Duration Ratchet scheduled runs completed successfully from 2026-08-28 through 2026-09-01."
+    },
+    {
+      "id": "native-queue-snapshot",
+      "command": "MERGE_QUEUE_BACKEND=native node scripts/merge-queue-backend.mjs list-state",
+      "status": "observed",
+      "summary": "Native queue snapshot contained 76 entries across positions 1 through 76; 153 pull requests were open."
+    }
+  ],
+  "findings": [
+    {
+      "fingerprint": "8e0940f0a8030b14f1eada85",
+      "familyId": "ci-merge-throughput",
+      "partitionId": "delivery-control",
+      "ruleId": "queue-depth-budget",
+      "title": "Native merge queue depth exceeds the bounded pilot threshold",
+      "claim": "The native merge queue contains 76 queued entries, exceeding the pilot review threshold of 50.",
+      "severity": "high",
+      "riskScore": 78,
+      "primaryLocation": "github:JovieInc/Jovie:merge-queue/main",
+      "observedAt": "2026-09-02T04:45:58Z",
+      "evidence": [
+        {
+          "tier": "queue",
+          "kind": "queue-snapshot",
+          "direct": true,
+          "locator": "command:MERGE_QUEUE_BACKEND=native node scripts/merge-queue-backend.mjs list-state",
+          "observedAt": "2026-09-02T04:45:58Z",
+          "summary": "Compact native queue projection reported queuedCount=76 with positions 1 through 76."
+        },
+        {
+          "tier": "source",
+          "kind": "repository-metadata",
+          "direct": true,
+          "locator": "command:gh pr list --state open --limit 200 --json number",
+          "observedAt": "2026-09-02T04:45:58Z",
+          "summary": "Repository had 153 open pull requests at the same bounded observation."
+        }
+      ],
+      "source": {
+        "kind": "deterministic",
+        "tool": "scripts/merge-queue-backend.mjs"
+      },
+      "acceptance": {
+        "state": "validated",
+        "validatedBy": "continuous-audit-pilot:queue-depth-threshold",
+        "validatedAt": "2026-09-02T04:45:58Z"
+      },
+      "resolution": {
+        "state": "blocked",
+        "owner": "Summer/Symphony",
+        "reason": "The backlog is directly evidenced, but the read-only pilot does not establish which controller, runner, check, or PR disposition is the controlling bottleneck and grants no queue mutation authority.",
+        "blocker": "A bounded live disposition and controller-capacity audit must identify the bottleneck before any admission, reorder, close, or drain action."
+      },
+      "sourceRuns": [
+        {
+          "kind": "deterministic",
+          "tool": "scripts/merge-queue-backend.mjs"
+        }
+      ]
+    }
+  ],
+  "modelComparisons": [],
+  "safety": {
+    "externalJobsCreated": false,
+    "providerCredentialsChanged": false,
+    "productionSettingsChanged": false,
+    "customerDataTransferred": false,
+    "secretMaterialTransferred": false,
+    "incrementalModelSpendCents": 0,
+    "hyperagentUsed": false,
+    "providerSubstitutionOccurred": false
+  }
+}
