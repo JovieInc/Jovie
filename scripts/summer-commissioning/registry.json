@@ -1,117 +1,102 @@
 {
   "schema": "jovie.summer-commissioning.registry/v1",
-  "registryVersion": "2026-09-01.5",
+  "registryVersion": "2026-09-02.1",
   "certificationContract": "jovie.certification/v1",
   "issue": "JOV-5853",
   "intendedEnvironment": "production-like",
   "trustedAttestationKeyFingerprints": [],
-  "auditedAt": "2026-09-01T23:52:00Z",
+  "auditedAt": "2026-09-02T04:32:56Z",
   "sourceSnapshot": {
     "repository": "JovieInc/Jovie",
-    "ref": "origin/main",
-    "sha": "6599a876fde20da8482f4280c79e82889de391e9"
+    "ref": "codex/jov-5853-product-quality-governor-registry",
+    "sha": "45bd2fd459ae233adbc80ee77581d131f1909fde"
   },
   "capabilities": [
     {
       "id": "SUMMER-COMM-001",
       "capability": "Ovie desktop round trip",
       "canonicalPath": [
-        "Ovie desktop -> /api/ovie/summer -> claimed turn -> local Summer runtime -> persisted response",
+        "Ovie desktop -> Eve Summer identity -> durable session -> persisted response",
         "apps/desktop/src/summer-runtime-bridge.ts",
-        "apps/web/lib/ovie/summer-transport.ts"
+        "apps/eve-pilot/README.md"
       ],
-      "implementationState": "already_works",
-      "status": "degraded",
+      "implementationState": "obsolete",
+      "status": "blocked",
       "critical": true,
       "evidence": [
         {
           "kind": "source",
           "ref": "apps/desktop/src/summer-runtime-bridge.ts",
-          "summary": "Current main binds the desktop worker to the local Hermes Summer profile."
-        },
-        {
-          "kind": "in_flight",
-          "ref": "https://github.com/JovieInc/Jovie/pull/16370",
-          "summary": "Canceled-turn, tool-only, and acceptance proof remain unlanded."
+          "summary": "The desktop bridge now fails closed with summer-local-runtime-retired-eve-unavailable and never spawns a local runtime."
         },
         {
           "kind": "runtime",
-          "ref": "local-mac:2026-09-01",
-          "summary": "ai.hermes.gateway-summer is live, but Hermes reports 2,347 upstream commits of drift and the installed Jovie app predates current main."
+          "ref": "docs/operations/evidence/summer-hermes-retirement-2026-09-02.json",
+          "summary": "The three positively identified Summer launch labels are disabled and the local profile is archived without deletion."
         },
         {
-          "kind": "exact_packaged_runtime",
-          "ref": "source:b31537204a4a8dfeaeb8c55061bd1c1cfeecc470:/app/ov/chat",
-          "summary": "A signed package was dogfooded through real /app/ov/chat; Summer claimed and completed the worker job and the persisted UI rendered the expected SUMMER_LOOP_OK bottleneck reply. This predates the canonical receipt schema and does not certify current source."
-        },
-        {
-          "kind": "in_flight",
-          "ref": "https://github.com/JovieInc/Jovie/pull/16962",
-          "summary": "Packaged /app/ov workspace targeting and raw-admin Summer session gating are fixed in an unlanded PR; root source PRs #16960, #16955, and #16958 are also unlanded."
-        },
-        {
-          "kind": "runtime",
-          "ref": "docs/operations/evidence/summer-mac-production-dogfood-2026-09-01.json",
-          "summary": "Fresh production Mac observation: the authorized existing owner session loaded jov.ie/hud on signed app.jov.ie 26.8.1, but the Aug-16 shell has no Talk door or /app/ov/chat route. A bounded launcher Retry returned to Unavailable, so request, response, persistence, and chat recovery remain unproven."
+          "kind": "source_gap",
+          "ref": "docs/operations/SUMMER_RUNTIME_RETIREMENT.md",
+          "summary": "Eve is the target, but no exact deployed Summer identity, durable session, failure, or recurrence receipt exists."
         }
       ],
-      "lastVerified": "2026-09-02T00:12:30.278Z",
-      "invalidationCondition": "Desktop build, Summer route, Hermes version, installed application build, or acceptance probe version changes.",
+      "lastVerified": "2026-09-02T04:32:56Z",
+      "invalidationCondition": "Eve deployment, Summer identity binding, durable session contract, or acceptance probe version changes.",
       "ownerRemediation": {
-        "owner": "Summer runtime / Ovie desktop",
-        "refs": ["JOV-5212", "PR-16370", "PR-16962", "JOV-5853"]
+        "owner": "Summer runtime / Eve integration",
+        "refs": ["JOV-5853"]
       },
       "probe": {
         "id": "summer.ovie.desktop-round-trip",
-        "version": "1.0.0",
-        "fixture": "ovie-desktop-five-turn-safe-tool-relaunch/v1",
-        "expectedState": "durable_round_trip_observed",
+        "version": "2.0.0",
+        "fixture": "eve-summer-five-turn-safe-tool-relaunch/v2",
+        "expectedState": "eve_durable_round_trip_observed",
         "requiresRuntimeReceipt": true,
         "sourceAssertions": [
           {
             "kind": "file_contains",
             "path": "apps/desktop/src/summer-runtime-bridge.ts",
-            "value": "'.hermes', 'bin', 'hermes'"
+            "value": "summer-local-runtime-retired-eve-unavailable"
           },
           {
             "kind": "file_contains",
-            "path": "apps/web/lib/ovie/summer-transport.ts",
-            "value": "readonly runtime: 'mac'"
+            "path": "apps/eve-pilot/README.md",
+            "value": "Hermes is retired"
           }
         ]
       }
     },
     {
       "id": "SUMMER-COMM-002",
-      "capability": "Photon or Spectrum iMessage round trip",
+      "capability": "Photon iMessage round trip",
       "canonicalPath": [
-        "Photon/Spectrum -> Eve channel -> Summer identity -> reply receipt",
+        "Photon -> Eve channel -> Summer identity -> reply receipt",
         "apps/eve-pilot/agent/channels/photon.ts"
       ],
-      "implementationState": "conflicting",
+      "implementationState": "missing",
       "status": "blocked",
       "critical": true,
       "evidence": [
         {
           "kind": "source",
           "ref": "apps/eve-pilot/agent/channels/photon.ts",
-          "summary": "Current main binds iMessage to Ovie, not Summer."
+          "summary": "The current source binds iMessage to Ovie, not Summer; this cannot count as a Summer receipt."
         },
         {
-          "kind": "coordination",
-          "ref": "JOV-5853",
-          "summary": "Hermes versus Spectrum routing is explicitly held for the separate coordinator."
+          "kind": "source_gap",
+          "ref": "docs/operations/SUMMER_RUNTIME_RETIREMENT.md",
+          "summary": "Photon credentials, a Summer identity mapping, account/thread boundaries, and signed inbound/outbound-denial receipts are missing."
         },
         {
           "kind": "runtime",
-          "ref": "local-mac:2026-09-01",
-          "summary": "No Spectrum or Photon process was observed."
+          "ref": "local-mac:2026-09-02",
+          "summary": "No Photon credential, linked Eve project, sender activation, or external message receipt was observed."
         }
       ],
-      "lastVerified": "2026-09-01T22:57:22Z",
-      "invalidationCondition": "Photon/Spectrum identity binding, allowlist, credential boundary, or routing decision changes.",
+      "lastVerified": "2026-09-02T04:32:56Z",
+      "invalidationCondition": "Photon identity binding, allowlist, credential boundary, or routing decision changes.",
       "ownerRemediation": {
-        "owner": "Photon/Spectrum coordinator",
+        "owner": "Photon / Eve integration",
         "refs": ["JOV-5853"]
       },
       "probe": {
@@ -461,7 +446,7 @@
         "Versioned Summer identity manifest -> runtime-bound identity -> receipt reports matching digest",
         "apps/eve-pilot/identities/summer/instructions.md"
       ],
-      "implementationState": "conflicting",
+      "implementationState": "missing",
       "status": "blocked",
       "critical": true,
       "evidence": [
@@ -472,8 +457,8 @@
         },
         {
           "kind": "runtime",
-          "ref": "local-mac:ai.hermes.gateway-summer",
-          "summary": "The live local Hermes profile is a separate runtime and no equality receipt exists."
+          "ref": "docs/operations/evidence/summer-hermes-retirement-2026-09-02.json",
+          "summary": "The former local profile is retired and archived; it cannot satisfy Eve identity parity."
         },
         {
           "kind": "in_flight",
@@ -481,7 +466,7 @@
           "summary": "The generic certification admission kernel remains open."
         }
       ],
-      "lastVerified": "2026-09-01T22:57:22Z",
+      "lastVerified": "2026-09-02T04:32:56Z",
       "invalidationCondition": "Any Summer instruction, invariant, autonomy policy, runtime profile, or certification contract version changes.",
       "ownerRemediation": {
         "owner": "Summer identity governor",

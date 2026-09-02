@@ -4,12 +4,13 @@ Issue: JOV-5853
 Registry: `scripts/summer-commissioning/registry.json`
 Acceptance harness: `scripts/summer-commissioning/commissioning.mjs`
 Access audit: `scripts/summer-commissioning/capability-access-registry.json`
+Architecture freshness: `scripts/summer-commissioning/architecture-freshness-registry.json`
 
-Summer is **not commissioned**. The 2026-09-01 audit found a split runtime and
-authority model: Ovie desktop invokes the local Hermes Summer profile, the Eve
-Summer identity is read-only, and Photon/iMessage still binds Ovie. This page
-records the commissioning boundary; it does not choose whether Hermes should be
-retired for Spectrum.
+Summer is **not commissioned**. Founder direction on 2026-09-02 retired Hermes
+and Trigger.dev. The local Summer profile is archived and offline, the desktop
+bridge fails closed, the Eve Summer identity remains read-only and unproven in
+a live deployment, and Photon/iMessage still binds Ovie. This page records the
+commissioning boundary for the Eve target; retired tooling is not a fallback.
 
 The registry consumes the pending `jovie.certification/v1` contract from
 JOV-5753. It does not define another lifecycle, event bus, scheduler, or
@@ -19,8 +20,8 @@ orchestration platform.
 
 | Capability | Implementation | Readiness | Canonical path or blocker |
 | --- | --- | --- | --- |
-| Ovie desktop round trip | already works | degraded | Fresh production observation reached the authorized owner session at `jov.ie/hud`, but the signed Aug-16 shell has no Talk door or `/app/ov/chat` route. A bounded launcher Retry returned to Unavailable; request, response, persistence, and chat recovery remain unproven. |
-| Photon/Spectrum iMessage round trip | conflicting | blocked | Photon binds Ovie; no Spectrum/Photon runtime was observed. Routing decision belongs to the separate coordinator. |
+| Ovie desktop round trip | obsolete | blocked | The local runtime is retired and archived. Desktop fails closed with `summer-local-runtime-retired-eve-unavailable`; Eve must provide a new exact-runtime receipt. |
+| Photon iMessage round trip | missing | blocked | Photon binds Ovie; no Summer Photon credential, identity mapping, account/thread boundary, or runtime receipt exists. |
 | GBrain/Supabase query | already works | degraded | Read-only Ovie tools exist; live GBrain queries timed out. |
 | Neon/application query | missing | blocked | No least-privilege Summer tool exists. |
 | Stripe/business query | missing | blocked | No read-only Summer business tool or safe fixture exists. |
@@ -28,7 +29,7 @@ orchestration platform.
 | Repo/PR/deploy lookup | in flight | blocked | Shipping-state sources exist but are not in the Summer safe-tool manifest. |
 | Intent → dispatch → observed result | in flight | degraded | One exact packaged source (`b315372…`) claimed/completed a real worker job and persisted the expected reply, but its root PRs are unlanded and it predates this receipt contract. |
 | Execution failure escalation | already works | untested | State and watchdog primitives exist; Summer-owned runtime proof is absent. |
-| Soul/invariants/autonomy/version | conflicting | blocked | Eve and local Hermes are separate identities without a shared version digest. |
+| Soul/invariants/autonomy/version | missing | blocked | The Eve Summer pack has no certified version/digest declaration or exact-runtime receipt. The retired local profile cannot satisfy this gate. |
 | Heartbeat/no-op/reconciliation | conflicting | blocked | Scheduled turn `01a05f69-5b89-7db0-81fe-96fe21aae443` completed in 9.873s after the heartbeat was updated to require a terminal receipt, but emitted no assistant message, tool marker, or receipt. Empty completed turns fail closed. |
 | Missed-event recovery | already works | untested | Ambiguous dispatch reconciliation exists without runtime proof. |
 | Duplicate/idempotency | already works | passing | Immutable/dedupe source contracts exist; intended-environment receipt is still required. |
@@ -38,6 +39,26 @@ orchestration platform.
 
 The JSON registry is the machine-readable source for evidence, invalidation
 conditions, owner/remediation references, and probe versions.
+
+## Architecture freshness gate
+
+The current canonical record is
+`jovie/architecture/summer-runtime-retirement-eve-cutover-2026-09-02` in
+GBrain, mirrored by [`SUMMER_RUNTIME_RETIREMENT.md`](./SUMMER_RUNTIME_RETIREMENT.md).
+The freshness registry binds that decision to its owner, environment, source
+revision, effective time, refresh deadline, evidence tier, and superseded
+sources. Retrieval must prefer the one fresh current record and flag expired or
+conflicting records.
+
+Validate the registry and every declared current/historical context surface:
+
+```bash
+node --test scripts/summer-commissioning/architecture-freshness.test.mjs
+```
+
+The validator deliberately fails if a current context reactivates Hermes or
+Trigger.dev, if a historical page lacks its retirement notice, or if current
+records are expired or conflicting. Historical evidence remains intact.
 
 ## Direct capability access audit
 
@@ -97,9 +118,8 @@ create another task or overlap the CI/queue lane.
 
 ## Runtime convergence sequence
 
-This sequence does not decide Hermes versus Spectrum. That routing choice stays
-with the coordinator; the commissioning gate only records whether one canonical
-runtime has actually won.
+This sequence commissions Eve as the intended runtime and Photon as the intended
+iMessage adapter. It does not preserve a fallback to retired tooling.
 
 1. **Canonical runtime gate:** the coordinator selects the runtime that owns the
    Summer principal and version digest. Success is one runtime identity, one
