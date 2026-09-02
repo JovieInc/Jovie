@@ -99,6 +99,21 @@ test('a valid audit closes its host lease after terminal attestation', async () 
   assert.equal(closedControl.leaseExpiresAt, null);
 });
 
+test('the active lease exists before audit execution can crash', async () => {
+  const input = await fixture();
+  await runPilot({
+    ...input,
+    executeAudit: async () => {
+      const control = JSON.parse(
+        await readFile(path.join(input.stateDir, 'control.json'), 'utf8')
+      );
+      assert.equal(control.status, 'active');
+      assert.equal(isControlActive(control, input.policy, NOW), true);
+      return auditResult();
+    },
+  });
+});
+
 test('a bad audit receipt disables the pilot without retaining raw output', async () => {
   const input = await fixture();
   const receipt = await runPilot({
@@ -152,6 +167,24 @@ test('an expired in-flight lease disables the next event without auditing', asyn
   assert.equal(receipt.reason, 'runner-error');
   assert.equal(control.status, 'disabled');
   assert.equal(control.leaseExpiresAt, null);
+});
+
+test('a live abandoned lease also disables its successor without auditing', async () => {
+  const input = await fixture();
+  await runPilot({ ...input, executeAudit: async () => auditResult() });
+  let called = false;
+  const receipt = await runPilot({
+    ...input,
+    env: { ...ENV, GITHUB_RUN_ID: '124', GITHUB_RUN_ATTEMPT: '1' },
+    now: () => '2026-09-02T12:01:00.000Z',
+    executeAudit: async () => {
+      called = true;
+      return auditResult();
+    },
+  });
+  assert.equal(called, false);
+  assert.equal(receipt.status, 'disabled');
+  assert.equal(receipt.reason, 'runner-error');
 });
 
 test('an execution failure disables the pilot as audit-failed', async () => {
@@ -245,10 +278,11 @@ test('attestation rejects altered artifact receipts and expired leases', async (
   await writeFile(input.receiptFile, JSON.stringify(receipt));
   await assert.rejects(attestPilot(input), /policy digest is stale/);
 
-  await runPilot({ ...input, executeAudit: async () => auditResult() });
+  const expiredInput = await fixture();
+  await runPilot({ ...expiredInput, executeAudit: async () => auditResult() });
   await assert.rejects(
     attestPilot({
-      ...input,
+      ...expiredInput,
       now: () => '2026-09-02T12:05:00.000Z',
     }),
     /lease is not active/
@@ -282,6 +316,7 @@ test('CI activates the pilot only on trusted main without gating production', as
     job,
     /steps\.continuous-audit-attestation\.outcome != 'success'/
   );
+  assert.match(job, /id: continuous-audit-disable/);
   assert.ok(
     job.indexOf('name: Disable pilot after a terminal failure') >
       job.indexOf('name: Attest preserved host receipt')

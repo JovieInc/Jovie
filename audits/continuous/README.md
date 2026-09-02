@@ -25,9 +25,10 @@ The host-local control and latest receipt live under
 `/home/timwhite/gem-workspace/state/continuous-audit-pilot`. A failed audit,
 malformed result, or runner error atomically marks the pilot disabled. Later
 events stay disabled; reactivation is never automatic and requires a reviewed
-operator action. A successful run holds only a five-minute host lease. An
-expired in-flight lease disables the next event without running another audit,
-while successful terminal attestation closes the control to `idle`. Each run
+operator action. Each run writes a five-minute host lease before audit
+execution. An expired in-flight lease disables the next event without running
+another audit, while successful terminal attestation closes the control to
+`idle`. Each run
 must match current `main`, advance the stored run identity monotonically,
 preserve its bounded receipt, and pass a terminal host/receipt attestation
 before Ovie reports it healthy. The pilot job is intentionally non-gating, so

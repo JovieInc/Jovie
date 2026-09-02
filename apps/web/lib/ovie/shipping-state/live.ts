@@ -590,7 +590,14 @@ export async function readWorkflow(
       const receiptSteps = pilotJob.steps.filter(
         step => step.name === 'Preserve bounded pilot receipt'
       );
-      if (attestationSteps.length !== 1 || receiptSteps.length !== 1) {
+      const disableSteps = pilotJob.steps.filter(
+        step => step.name === 'Disable pilot after a terminal failure'
+      );
+      if (
+        attestationSteps.length !== 1 ||
+        receiptSteps.length !== 1 ||
+        disableSteps.length !== 1
+      ) {
         return failedRead(
           sourceId,
           'unavailable',
@@ -600,6 +607,7 @@ export async function readWorkflow(
       }
       const attestationStep = attestationSteps[0];
       const receiptStep = receiptSteps[0];
+      const disableStep = disableSteps[0];
       const sourceTimestamp =
         parseTimestamp(attestationStep.completed_at) ??
         parseTimestamp(pilotJob.completed_at) ??
@@ -616,7 +624,8 @@ export async function readWorkflow(
         pilotJob.status !== 'completed' ||
         typeof pilotJob.conclusion !== 'string' ||
         typeof attestationStep.conclusion !== 'string' ||
-        typeof receiptStep.conclusion !== 'string'
+        typeof receiptStep.conclusion !== 'string' ||
+        typeof disableStep.conclusion !== 'string'
       ) {
         return failedRead(
           sourceId,
@@ -625,11 +634,20 @@ export async function readWorkflow(
           { ...identity, errorCode: 'pending' }
         );
       }
-      if (
+      const terminalFailed =
         pilotJob.conclusion !== 'success' ||
         attestationStep.conclusion !== 'success' ||
-        receiptStep.conclusion !== 'success'
-      ) {
+        receiptStep.conclusion !== 'success' ||
+        disableStep.conclusion !== 'skipped';
+      if (terminalFailed && disableStep.conclusion !== 'success') {
+        return failedRead(
+          sourceId,
+          'error',
+          `Continuous audit disable is unverified (${disableStep.conclusion})`,
+          { ...identity, errorCode: 'continuous-audit-disable-unverified' }
+        );
+      }
+      if (terminalFailed) {
         return failedRead(
           sourceId,
           'error',
@@ -646,6 +664,7 @@ export async function readWorkflow(
           job: pilotJob,
           receiptStep,
           attestationStep,
+          disableStep,
         },
         truncated: false,
         ...identity,

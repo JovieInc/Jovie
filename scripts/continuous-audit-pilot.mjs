@@ -557,10 +557,7 @@ export async function runPilot({
     await atomicWrite(path.join(stateDir, 'latest.json'), receipt);
     return receipt;
   }
-  if (
-    existing?.status === 'active' &&
-    !isControlActive(existing, policy, observedAt)
-  ) {
+  if (existing?.status === 'active') {
     const receipt = receiptFor({
       policy,
       source,
@@ -581,6 +578,8 @@ export async function runPilot({
     await atomicWrite(path.join(stateDir, 'latest.json'), receipt);
     return receipt;
   }
+
+  await writeControl(stateDir, policy, source, 'active', null, observedAt);
 
   let auditOutput;
   try {
@@ -603,7 +602,6 @@ export async function runPilot({
     });
     await atomicWrite(receiptFile, receipt);
     await atomicWrite(path.join(stateDir, 'latest.json'), receipt);
-    await writeControl(stateDir, policy, source, 'active', null, observedAt);
     return receipt;
   } catch (error) {
     const reason =

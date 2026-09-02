@@ -5859,6 +5859,7 @@ jobs:
             --state-dir="$GEM_WORKSPACE/state/continuous-audit-pilot" \
             --receipt-file="$RUNNER_TEMP/continuous-audit-pilot/receipt.json"
       - name: Disable pilot after a terminal failure
+        id: continuous-audit-disable
         if: ${{ always() && (steps.continuous-audit.outcome != 'success' || steps.preserve-receipt.outcome != 'success' || steps.continuous-audit-attestation.outcome != 'success') }}
         env:
           GEM_WORKSPACE: /home/timwhite/gem-workspace

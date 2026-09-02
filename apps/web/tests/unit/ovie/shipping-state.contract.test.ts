@@ -1392,9 +1392,10 @@ describe('live GitHub shipping reader', () => {
   });
 
   it.each([
-    ['success', 'ok', undefined],
-    ['failure', 'error', 'continuous-audit-disabled'],
-  ])('projects the continuous audit terminal attestation %s into Ovie as %s', async (conclusion, status, errorCode) => {
+    ['success', 'skipped', 'ok', undefined],
+    ['failure', 'success', 'error', 'continuous-audit-disabled'],
+    ['failure', 'failure', 'error', 'continuous-audit-disable-unverified'],
+  ])('projects audit %s with disable %s into Ovie as %s', async (conclusion, disableConclusion, status, errorCode) => {
     const exactRun = {
       id: 91,
       run_attempt: 2,
@@ -1432,6 +1433,12 @@ describe('live GitHub shipping reader', () => {
                 name: 'Attest preserved host receipt',
                 status: 'completed',
                 conclusion,
+                completed_at: T0,
+              },
+              {
+                name: 'Disable pilot after a terminal failure',
+                status: 'completed',
+                conclusion: disableConclusion,
                 completed_at: T0,
               },
             ],
