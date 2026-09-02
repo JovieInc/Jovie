@@ -2,7 +2,10 @@ import * as Sentry from '@sentry/nextjs';
 import { eq } from 'drizzle-orm';
 import { NextResponse } from 'next/server';
 import { z } from 'zod';
-import { stripUntrustedSourceFence } from '@/lib/ai/tools/untrusted-source-fence';
+import {
+  isMalformedUntrustedSourceFence,
+  stripUntrustedSourceFence,
+} from '@/lib/ai/tools/untrusted-source-fence';
 import { getCachedAuth } from '@/lib/auth/cached';
 import { chatToolSchema } from '@/lib/chat/strict-schema';
 import { db } from '@/lib/db';
@@ -61,6 +64,13 @@ export async function POST(req: Request) {
 
   const { profileId, field, newValue, conversationId, messageId } =
     parseResult.data;
+
+  if (field === 'bio' && isMalformedUntrustedSourceFence(newValue)) {
+    return NextResponse.json(
+      { error: 'Invalid untrusted source boundary' },
+      { status: 400, headers: NO_CACHE_HEADERS }
+    );
+  }
 
   try {
     // Fetch the profile and verify ownership
