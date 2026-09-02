@@ -42,6 +42,12 @@ describe('JOV-5288 CI repo lanes', () => {
     expect(classifyChangedFile('scripts/lib/ci-repo-lanes.mjs')).toEqual([
       CI_LANES.SYMPHONY_CONTROL,
     ]);
+    const verificationPlan = classifyCiRepoLanes([
+      'scripts/verification/contracts.mjs',
+    ]);
+    expect(verificationPlan.runJovieProduct).toBe(false);
+    expect(verificationPlan.runSymphonyControl).toBe(true);
+    expect(verificationPlan.lanes).toEqual([CI_LANES.SYMPHONY_CONTROL]);
   });
 
   it('runs scripts typecheck for component certification harness scripts', () => {

@@ -134,6 +134,7 @@ describe('shadow audit registry', () => {
         'scope.exclude must be a string list when present',
       ]);
       assert.throws(
+        // @ts-expect-error deliberate malformed runtime contract fixture
         () => resolveOwedAudits(['scripts/example.mjs'], [badScope]),
         /scope\.exclude/
       );
