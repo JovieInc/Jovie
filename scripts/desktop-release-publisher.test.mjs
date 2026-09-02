@@ -358,7 +358,8 @@ test('staging proof rejects a stable envelope and wrong channel', () => {
 test('published staging preflight rejects malformed, duplicate, and unrepairable state', async t => {
   const local = await localRelease(t, 'staging', NEXT_VERSION);
   const duplicate = expectedDesktopAssetNames(NEXT_VERSION, 'staging')[0];
-  for (const [configure, error] of [
+  /** @type {Array<[(client: ReturnType<typeof stagingClient>) => void, RegExp]>} */
+  const corruptions = [
     [client => (client.release.name = 'malformed'), /malformed provenance/],
     [
       client => {
@@ -367,7 +368,8 @@ test('published staging preflight rejects malformed, duplicate, and unrepairable
       },
       /Duplicate staging asset/,
     ],
-  ]) {
+  ];
+  for (const [configure, error] of corruptions) {
     const client = stagingClient();
     configure(client);
     await assert.rejects(uploadAndPublish(stagingInput(client, local)), error);
@@ -383,8 +385,10 @@ test('published staging rolls binaries first, feed last, retains one rollback ge
   await uploadAndPublish(input);
   const feedDelete = client.events.indexOf('delete:staging-mac.yml');
   const feedUpload = client.events.indexOf('upload:staging-mac.yml');
-  const binaryUpload = client.events.findLastIndex(event =>
-    event.startsWith('upload:Jovie-Staging')
+  const binaryUpload = client.events.reduce(
+    (lastIndex, event, index) =>
+      event.startsWith('upload:Jovie-Staging') ? index : lastIndex,
+    -1
   );
   const tagUpdate = client.events.indexOf(`update-tag:${NEXT_SHA}`);
   const retarget = client.events.indexOf(
@@ -431,6 +435,7 @@ test('partial staging uploads resume matching binaries and failed starters', asy
 });
 
 test('published roll failures remain safe and rerunnable', async t => {
+  /** @type {Array<[string, Record<string, unknown>, RegExp, string]>} */
   const scenarios = [
     ['tag update', { failTagUpdateAt: 1 }, /injected tag update/, 'old'],
     [
