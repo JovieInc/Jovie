@@ -153,6 +153,28 @@ const AFFECTED_TEST_SELECTOR_MANIFEST = new Set([
 const AFFECTED_TEST_SELECTOR_TESTS = [
   'scripts/lib/__tests__/automation-verify.test.mjs',
 ];
+const SUMMER_COMMISSIONING_PRIMARY_INPUTS = new Set([
+  'docs/operations/SUMMER_COMMISSIONING.md',
+  'docs/operations/evidence/summer-mac-production-dogfood-2026-09-01.json',
+  'scripts/summer-commissioning/canonical-registry.test.mjs',
+  'scripts/summer-commissioning/commissioning.mjs',
+  'scripts/summer-commissioning/commissioning.test.mjs',
+  'scripts/summer-commissioning/contracts.mjs',
+  'scripts/summer-commissioning/contracts.test.mjs',
+  'scripts/summer-commissioning/receipt-trust.mjs',
+  'scripts/summer-commissioning/receipt-trust.test.mjs',
+  'scripts/summer-commissioning/registry.json',
+]);
+const SUMMER_COMMISSIONING_LANE = new Set([
+  ...SUMMER_COMMISSIONING_PRIMARY_INPUTS,
+  ...AFFECTED_TEST_SELECTOR_MANIFEST,
+]);
+const SUMMER_COMMISSIONING_NODE_TESTS = [
+  'scripts/summer-commissioning/canonical-registry.test.mjs',
+  'scripts/summer-commissioning/commissioning.test.mjs',
+  'scripts/summer-commissioning/contracts.test.mjs',
+  'scripts/summer-commissioning/receipt-trust.test.mjs',
+];
 const SENTRY_AUTOFIX_RECURRENCE_PRIMARY_INPUTS = new Set([
   '.github/workflows/sentry-autofix-recurrence.yml',
   '.github/workflows/sentry-autofix.yml',
@@ -893,6 +915,25 @@ export function buildAffectedTestPlan(
 ) {
   const files = unique(changedFiles.filter(Boolean)).sort();
   if (files.some(file => GLOBAL_TEST_INPUTS.has(file))) {
+    return { mode: 'full', relatedFiles: [], mandatoryTests: [] };
+  }
+  const isBoundedSummerCommissioningChange =
+    files.some(file => SUMMER_COMMISSIONING_PRIMARY_INPUTS.has(file)) &&
+    files.every(file => SUMMER_COMMISSIONING_LANE.has(file));
+  if (isBoundedSummerCommissioningChange) {
+    return {
+      mode: 'selected',
+      relatedFiles: [],
+      mandatoryTests: [],
+      selectedTests: [],
+      rootVitestTests: [],
+      pythonTests: [],
+      pythonUnittestTests: [],
+      scriptVitestTests: AFFECTED_TEST_SELECTOR_TESTS,
+      nodeTests: SUMMER_COMMISSIONING_NODE_TESTS,
+    };
+  }
+  if (files.some(file => SUMMER_COMMISSIONING_PRIMARY_INPUTS.has(file))) {
     return { mode: 'full', relatedFiles: [], mandatoryTests: [] };
   }
   const isBoundedBacklogRemediationChange =
