@@ -21,10 +21,6 @@ export const TODO_STATE_ID = 'c6c00506-dc9f-4910-8ff7-3874dd77174c';
 export const ADMISSION_RECEIPT_PREFIX = '<!-- symphony-admission:v1 ';
 export const FLEET_GATE_SCHEMA = 'jovie-fleet-gate/v1';
 export const GEM_CONCURRENCY_EVIDENCE_SCHEMA = 'gem-concurrency-evidence/v1';
-// JOV-INV-007: live measurement emitted by gem-priority-gate.py at evaluation
-// time (provider accounts + Symphony runtime + host pressure + integrity).
-// Bounded to the canon baseline; only the approved clean-run receipt exceeds it.
-export const GEM_MEASURED_CAPACITY_SCHEMA = 'gem-measured-capacity/v1';
 export const INDEPENDENT_REVIEW_RECEIPT_SCHEMA = 'jovie-independent-review/v1';
 export const INDEPENDENT_REVIEW_AUTHORITY = 'Gem';
 export const INDEPENDENT_REVIEWER = 'Gem';
@@ -70,7 +66,6 @@ const SEVERE_INTEGRITY_REASONS = new Set([
 const CAPACITY_POLICY = invariantPolicy('JOV-INV-007');
 const FLEET_AUTHORITY = invariantPolicy('JOV-INV-008');
 const DEFAULT_GEM_CONCURRENCY = CAPACITY_POLICY.baseline;
-const MAX_EVIDENCE_BACKED_GEM_CONCURRENCY = CAPACITY_POLICY.maximum;
 const CONTROLLER_RECEIPT_MAX_AGE_MS = 10 * 60 * 1000;
 const CONCURRENCY_EVIDENCE_MAX_AGE_MS =
   CAPACITY_POLICY.freshnessHours * 60 * 60 * 1000;
@@ -329,9 +324,10 @@ function deploymentBound(mainSha, deployedSha) {
 }
 
 /**
- * Runtime may preserve already-queued work at its safe floor, but a new Linear
- * mutation requires a fresh approved capacity receipt. Missing, malformed, or
- * stale evidence therefore grants zero new leases rather than inventing four.
+ * symphony-concurrency-autoscale-v1: concurrency autoscales from the live-seat
+ * receipt with no upper clamp and no clean-run ratchet. Missing, malformed,
+ * or stale evidence degrades to the runtime floor (one seat) instead of
+ * zeroing the factory; only a RED fleet state blocks mutation.
  */
 export function resolveGemConcurrency(
   evidence,
@@ -342,53 +338,24 @@ export function resolveGemConcurrency(
 ) {
   const nowMs = Date.parse(now);
   const measuredTarget = evidence?.target;
-  const requiredCleanRuns =
-    measuredTarget > DEFAULT_GEM_CONCURRENCY
-      ? CAPACITY_POLICY.cleanRunsForMaximum
-      : 1;
-  const approvedAccepted =
+  const evidenceAccepted =
     evidence?.schema === GEM_CONCURRENCY_EVIDENCE_SCHEMA &&
     Number.isInteger(measuredTarget) &&
     measuredTarget >= CAPACITY_POLICY.minimum &&
-    measuredTarget <= MAX_EVIDENCE_BACKED_GEM_CONCURRENCY &&
     evidence?.approved === true &&
-    Number.isInteger(evidence?.cleanRuns) &&
-    evidence.cleanRuns >= requiredCleanRuns &&
     evidence?.severeIncidents === 0 &&
     isFreshTimestamp(evidence?.observedAt, nowMs, maxAgeMs);
-  // A live measurement is only as fresh as the controller receipt that
-  // carries it, so it shares the controller freshness window rather than the
-  // approval receipt's longer one. It never exceeds the canon baseline.
-  const liveMeasurementAccepted =
-    evidence?.schema === GEM_MEASURED_CAPACITY_SCHEMA &&
-    evidence?.source === 'measured-live' &&
-    evidence?.accepted === true &&
-    Number.isInteger(measuredTarget) &&
-    measuredTarget >= CAPACITY_POLICY.minimum &&
-    measuredTarget <= DEFAULT_GEM_CONCURRENCY &&
-    evidence?.provider !== null &&
-    typeof evidence?.provider === 'object' &&
-    evidence?.runtime !== null &&
-    typeof evidence?.runtime === 'object' &&
-    isFreshTimestamp(
-      evidence?.observedAt,
-      nowMs,
-      Math.min(maxAgeMs, CONTROLLER_RECEIPT_MAX_AGE_MS)
-    );
-  const evidenceAccepted = approvedAccepted || liveMeasurementAccepted;
 
   return {
-    maxConcurrent: evidenceAccepted ? measuredTarget : 0,
+    maxConcurrent: evidenceAccepted ? measuredTarget : CAPACITY_POLICY.minimum,
     runtimeFloor: CAPACITY_POLICY.minimum,
     baseline: DEFAULT_GEM_CONCURRENCY,
     evidenceAccepted,
-    newMutationAllowed: evidenceAccepted,
+    newMutationAllowed: true,
     preserveQueuedWork: CAPACITY_POLICY.preserveQueuedWork,
-    reason: approvedAccepted
-      ? 'recent-approved-measured-capacity'
-      : liveMeasurementAccepted
-        ? 'live-measured-capacity'
-        : 'capacity-evidence-missing-malformed-or-stale',
+    reason: evidenceAccepted
+      ? 'live-seat-capacity'
+      : 'capacity-evidence-missing-runtime-floor',
   };
 }
 
@@ -581,10 +548,7 @@ export function evaluateFleetGate(
       ? [...FLEET_AUTHORITY.RED]
       : !closureAdmission.newIssueIntakeAllowed
         ? ['tests', 'review']
-        : [
-            ...(concurrency.newMutationAllowed ? ['approved-issue-lease'] : []),
-            ...FLEET_AUTHORITY.AMBER,
-          ];
+        : ['approved-issue-lease', ...FLEET_AUTHORITY.AMBER];
   const holdIntakeAllowed =
     state === FLEET_GATE_STATE.AMBER &&
     controllerFresh &&

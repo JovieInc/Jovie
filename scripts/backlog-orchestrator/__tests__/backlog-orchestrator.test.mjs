@@ -1461,13 +1461,14 @@ describe('deterministic Symphony admission boundary', () => {
     assert.ok(stale.reasons.some(reason => reason.code === 'controller-stale'));
   });
 
-  it('blocks a new lease when capacity evidence is missing or stale', () => {
+  it('runs at the runtime floor when capacity evidence is missing or stale', () => {
+    // symphony-concurrency-autoscale-v1: missing evidence never zeroes the
+    // factory; one seat stays open for leases and remediation.
     const now = '2026-08-09T05:01:00.000Z';
     const approved = {
       schema: admitter.GEM_CONCURRENCY_EVIDENCE_SCHEMA,
       target: 8,
       approved: true,
-      cleanRuns: 20,
       severeIncidents: 0,
       observedAt: '2026-08-09T05:00:00.000Z',
     };
@@ -1476,96 +1477,62 @@ describe('deterministic Symphony admission boundary', () => {
       { ...approved, observedAt: '2026-08-07T05:00:00.000Z' },
       { now }
     );
-    assert.equal(missing.maxConcurrent, 0);
-    assert.equal(missing.newMutationAllowed, false);
+    assert.equal(missing.maxConcurrent, 1);
+    assert.equal(missing.evidenceAccepted, false);
+    assert.equal(missing.newMutationAllowed, true);
+    assert.equal(missing.reason, 'capacity-evidence-missing-runtime-floor');
     assert.equal(missing.preserveQueuedWork, true);
-    assert.equal(stale.maxConcurrent, 0);
-    assert.equal(stale.newMutationAllowed, false);
+    assert.equal(stale.maxConcurrent, 1);
+    assert.equal(stale.evidenceAccepted, false);
     const gate = admitter.evaluateFleetGate(
       fleetEvidence({ concurrencyEvidence: null }),
       { now }
     );
     assert.equal(gate.workAdmission.allowed, true);
-    assert.equal(gate.workAdmission.newIssueLeaseAllowed, false);
+    assert.equal(gate.workAdmission.newIssueLeaseAllowed, true);
+    assert.equal(gate.concurrency.gem.maxConcurrent, 1);
     assert.ok(
       gate.workAdmission.activities.includes('isolated-implementation')
     );
   });
 
-  it('accepts only fresh measured capacity and requires twenty clean runs above baseline', () => {
-    const now = '2026-08-09T05:01:00.000Z';
-    const approved = {
+  it('accepts live-seat capacity as-is without a clamp or clean-run ratchet', () => {
+    const now = '2026-09-02T19:20:00.000Z';
+    const seats = {
       schema: admitter.GEM_CONCURRENCY_EVIDENCE_SCHEMA,
-      target: 8,
+      source: 'live-oauth-cli-seats',
+      target: 2,
       approved: true,
-      cleanRuns: 20,
       severeIncidents: 0,
-      observedAt: '2026-08-09T05:00:00.000Z',
+      observedAt: '2026-09-02T19:19:00.000Z',
     };
     assert.equal(
-      admitter.resolveGemConcurrency({ ...approved, cleanRuns: 19 }, { now })
-        .maxConcurrent,
-      0
+      admitter.resolveGemConcurrency(seats, { now }).maxConcurrent,
+      2
     );
     assert.equal(
-      admitter.resolveGemConcurrency(approved, { now }).maxConcurrent,
-      8
+      admitter.resolveGemConcurrency(seats, { now }).reason,
+      'live-seat-capacity'
     );
-  });
-
-  it('accepts a fresh live measurement up to the baseline without an approval file', () => {
-    const now = '2026-09-02T18:40:00.000Z';
-    const measured = {
-      schema: admitter.GEM_MEASURED_CAPACITY_SCHEMA,
-      source: 'measured-live',
-      accepted: true,
-      target: 4,
-      measuredTarget: 6,
-      provider: {
-        state: 'available',
-        accounts: 8,
-        locked: 2,
-        available: 4,
-        cooldown: 2,
-      },
-      runtime: { running: 1, retrying: 0 },
-      observedAt: '2026-09-02T18:39:00.000Z',
-    };
-    const live = admitter.resolveGemConcurrency(measured, { now });
-    assert.equal(live.maxConcurrent, 4);
-    assert.equal(live.newMutationAllowed, true);
-    assert.equal(live.reason, 'live-measured-capacity');
-    // Above baseline still needs the approved clean-run receipt.
-    assert.equal(
-      admitter.resolveGemConcurrency({ ...measured, target: 5 }, { now })
-        .maxConcurrent,
-      0
-    );
-    // Measurement freshness is the controller window, not the 24h approval one.
-    assert.equal(
-      admitter.resolveGemConcurrency(
-        { ...measured, observedAt: '2026-09-02T18:00:00.000Z' },
+    for (const target of [8, 12, 40]) {
+      const live = admitter.resolveGemConcurrency(
+        { ...seats, target, cleanRuns: 0 },
         { now }
-      ).maxConcurrent,
-      0
-    );
-    // Missing telemetry or an unaccepted measurement never grants capacity.
+      );
+      assert.equal(live.maxConcurrent, target);
+      assert.equal(live.evidenceAccepted, true);
+    }
+    // A severe incident or an unapproved receipt still degrades to the floor.
     assert.equal(
-      admitter.resolveGemConcurrency({ ...measured, provider: null }, { now })
+      admitter.resolveGemConcurrency({ ...seats, severeIncidents: 1 }, { now })
         .maxConcurrent,
-      0
+      1
     );
     assert.equal(
-      admitter.resolveGemConcurrency({ ...measured, accepted: false }, { now })
+      admitter.resolveGemConcurrency({ ...seats, approved: false }, { now })
         .maxConcurrent,
-      0
+      1
     );
-    const gate = admitter.evaluateFleetGate(
-      fleetEvidence({ concurrencyEvidence: measured }),
-      { now }
-    );
-    assert.equal(gate.workAdmission.newIssueLeaseAllowed, true);
-    assert.equal(gate.concurrency.gem.maxConcurrent, 4);
   });
 
   it('versions the Gem controller and mechanically holds AMBER drafts from promotion', async () => {

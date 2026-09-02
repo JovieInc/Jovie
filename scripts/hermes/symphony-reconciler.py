@@ -95,26 +95,31 @@ def _stale_capacity_local_remediation_limit(
         age = _now() - observed_at if observed_at is not None else None
     except TypeError:
         age = None
-    safe_stale_lane = (
+    # symphony-concurrency-autoscale-v1: a receipt without accepted capacity
+    # evidence runs at the runtime floor (one seat) instead of zero. The local
+    # alternate-repair lane stays bounded to one attempt regardless of how
+    # many seats the floor or live evidence grants.
+    safe_floor_lane = (
         receipt.get("schema") == "jovie-fleet-gate/v1"
         and receipt.get("state") in {"GREEN", "AMBER"}
         and remediation.get("allowed") is True
         and remediation.get("localAllowed") is True
-        and remediation.get("pushAllowed") is False
-        and remediation.get("maxConcurrent") == LOCAL_REPAIR_MAX_ATTEMPTS
+        and work.get("allowed") is True
+        and isinstance(remediation.get("maxConcurrent"), int)
+        and not isinstance(remediation.get("maxConcurrent"), bool)
+        and remediation.get("maxConcurrent") >= LOCAL_REPAIR_MAX_ATTEMPTS
         and gem.get("runtimeFloor") == 1
         and evidence.get("accepted") is False
         and gem.get("evidenceAccepted") is False
-        and gem.get("newMutationAllowed") is False
-        and gem.get("maxConcurrent") == 0
-        and work.get("newIssueLeaseAllowed") is False
-        and work.get("newImplementationAllowed") is False
+        and isinstance(gem.get("maxConcurrent"), int)
+        and not isinstance(gem.get("maxConcurrent"), bool)
+        and gem.get("maxConcurrent") >= 1
         and age is not None
         and dt.timedelta(0) <= age <= FLEET_GATE_RECEIPT_MAX_AGE
     )
-    if not safe_stale_lane:
+    if not safe_floor_lane:
         return 0, "fleet_gate_local_remediation_not_admitted"
-    return 1, "fleet_gate_stale_capacity_local_only"
+    return LOCAL_REPAIR_MAX_ATTEMPTS, "fleet_gate_stale_capacity_local_only"
 
 
 def _acquire_local_remediation_lease():
