@@ -3,21 +3,6 @@ import Testing
 @testable import Jovie
 
 struct AppShellTabBarTests {
-  @Test func primaryBottomTabsAreUnused() {
-    #expect(AppShellPanePolicy.primaryBottomTabs().isEmpty)
-    #expect(AppShellPanePolicy.showsBottomTabBar() == false)
-    #expect(AppShellPrimaryTab.allCases.map(\.shellTab) == [.chat, .library, .calendar, .inbox])
-  }
-
-  @Test func noSurfaceIsABottomBarPrimaryTab() {
-    #expect(AppShellTab.profile.isPrimaryTab == false)
-    #expect(AppShellTab.audience.isPrimaryTab == false)
-    #expect(AppShellTab.chat.isPrimaryTab == false)
-    #expect(AppShellTab.library.isPrimaryTab == false)
-    #expect(AppShellTab.calendar.isPrimaryTab == false)
-    #expect(AppShellTab.inbox.isPrimaryTab == false)
-  }
-
   @Test func accessibilityIDsAreStable() {
     #expect(AppShellTab.chat.accessibilityID == "shell-tab-chat")
     #expect(AppShellTab.library.accessibilityID == "shell-tab-library")
@@ -29,10 +14,21 @@ struct AppShellTabBarTests {
     #expect(AppShellGesturePolicy.shouldSwitchTabFromHorizontalSwipe() == false)
   }
 
-  @Test func reservedTabBarHeightStaysThumbSized() {
-    #expect(AppShellTabBarLayout.barHeight == 56)
-    #expect(AppShellTabBarLayout.talkFabSize == 58)
-    #expect(AppShellTabBarLayout.talkFabLift == 18)
+  @Test func reduceMotionSkipsInteractiveRailProgress() {
+    #expect(AppShellGesturePolicy.showsInteractiveRailProgress(reduceMotion: false))
+    #expect(AppShellGesturePolicy.showsInteractiveRailProgress(reduceMotion: true) == false)
+    #expect(
+      AppShellGesturePolicy.effectiveReduceMotion(
+        environmentValue: false,
+        arguments: ["-ui-testing-reduce-motion"]
+      )
+    )
+    #expect(
+      AppShellGesturePolicy.effectiveReduceMotion(environmentValue: true, arguments: [])
+    )
+    #expect(
+      AppShellGesturePolicy.effectiveReduceMotion(environmentValue: false, arguments: []) == false
+    )
   }
 
   @Test func edgeRailDragLocksWhileComposerKeyboardIsVisible() {
@@ -58,7 +54,7 @@ struct AppShellTabBarTests {
         isKeyboardVisible: false,
         isShowingTalkOverlay: false,
         hasTeleprompterProposal: false
-      ) == false
+      )
     )
     #expect(
       AppShellGesturePolicy.allowsEdgeRailDrag(
@@ -85,6 +81,197 @@ struct AppShellTabBarTests {
     #expect(
       AppShellGesturePolicy.isLeftEdgeOpen(startX: 80, translationX: 90, predictedX: 100)
         == false
+    )
+  }
+
+  @Test func chatHomeLeadingPanOpensSidebarFromTheCenter() {
+    #expect(AppShellGesturePolicy.allowsFullWidthRailSwipe(selectedTab: .chat))
+    #expect(AppShellGesturePolicy.allowsFullWidthRailSwipe(selectedTab: .inbox) == false)
+    #expect(
+      AppShellGesturePolicy.isLeadingSwipeOpen(
+        selectedTab: .chat,
+        startX: 200,
+        translationX: 90,
+        predictedX: 130,
+        translationY: 8
+      )
+    )
+    #expect(
+      AppShellGesturePolicy.isLeadingSwipeOpen(
+        selectedTab: .inbox,
+        startX: 200,
+        translationX: 90,
+        predictedX: 130,
+        translationY: 8
+      ) == false
+    )
+    #expect(
+      AppShellGesturePolicy.isLeadingSwipeOpen(
+        selectedTab: .chat,
+        startX: 200,
+        translationX: 90,
+        predictedX: 130,
+        translationY: 140
+      ) == false
+    )
+  }
+
+  @Test func chatHomeTrailingPanOpensRightRailFromTheCenter() {
+    #expect(
+      AppShellGesturePolicy.isTrailingSwipeOpen(
+        selectedTab: .chat,
+        startX: 200,
+        containerWidth: 400,
+        translationX: -90,
+        predictedX: -130,
+        translationY: 6
+      )
+    )
+    #expect(
+      AppShellGesturePolicy.isTrailingSwipeOpen(
+        selectedTab: .library,
+        startX: 200,
+        containerWidth: 400,
+        translationX: -90,
+        predictedX: -130,
+        translationY: 6
+      ) == false
+    )
+  }
+
+  @Test func inboxKeepsEdgeOnlyRailDrags() {
+    #expect(
+      AppShellGesturePolicy.shouldFollowLeadingDrag(
+        selectedTab: .inbox,
+        startX: 12,
+        translationX: 40,
+        translationY: 4
+      )
+    )
+    #expect(
+      AppShellGesturePolicy.shouldFollowLeadingDrag(
+        selectedTab: .inbox,
+        startX: 80,
+        translationX: 40,
+        translationY: 4
+      ) == false
+    )
+    #expect(
+      AppShellGesturePolicy.shouldFollowTrailingDrag(
+        selectedTab: .inbox,
+        startX: 320,
+        containerWidth: 400,
+        translationX: -40,
+        translationY: 4
+      ) == false
+    )
+    #expect(
+      AppShellGesturePolicy.shouldFollowTrailingDrag(
+        selectedTab: .inbox,
+        startX: 380,
+        containerWidth: 400,
+        translationX: -40,
+        translationY: 4
+      )
+    )
+  }
+
+  @Test func chatHomeFollowsFullWidthHorizontalDrags() {
+    #expect(
+      AppShellGesturePolicy.shouldFollowLeadingDrag(
+        selectedTab: .chat,
+        startX: 200,
+        translationX: 40,
+        translationY: 4
+      )
+    )
+    #expect(
+      AppShellGesturePolicy.shouldFollowLeadingDrag(
+        selectedTab: .chat,
+        startX: 200,
+        translationX: 40,
+        translationY: 35
+      ) == false
+    )
+    #expect(
+      AppShellGesturePolicy.isLeadingSwipeOpen(
+        selectedTab: .chat,
+        startX: 200,
+        translationX: 40,
+        predictedX: 40,
+        translationY: 35
+      ) == false
+    )
+    #expect(
+      AppShellGesturePolicy.shouldFollowTrailingDrag(
+        selectedTab: .chat,
+        startX: 200,
+        containerWidth: 400,
+        translationX: -40,
+        translationY: 4
+      )
+    )
+    #expect(
+      AppShellGesturePolicy.shouldFollowTrailingDrag(
+        selectedTab: .chat,
+        startX: 200,
+        containerWidth: 400,
+        translationX: -18,
+        translationY: 40
+      ) == false
+    )
+  }
+
+  @Test func directionReversalCannotCommitTheOppositeRail() {
+    #expect(
+      AppShellGesturePolicy.isLeadingSwipeOpen(
+        selectedTab: .chat,
+        startX: 200,
+        translationX: -12,
+        predictedX: 180,
+        translationY: 2
+      ) == false
+    )
+    #expect(
+      AppShellGesturePolicy.isTrailingSwipeOpen(
+        selectedTab: .chat,
+        startX: 200,
+        containerWidth: 400,
+        translationX: 12,
+        predictedX: -180,
+        translationY: 2
+      ) == false
+    )
+  }
+
+  @Test func subviewExclusionOnlyAppliesToClosedChatHome() {
+    #expect(
+      AppShellGesturePolicy.appliesSubviewExclusion(
+        selectedTab: .chat,
+        isShowingDrawer: false,
+        isShowingRightRail: false
+      )
+    )
+    #expect(
+      AppShellGesturePolicy.appliesSubviewExclusion(
+        selectedTab: .library,
+        isShowingDrawer: false,
+        isShowingRightRail: false
+      ) == false
+    )
+    #expect(
+      AppShellGesturePolicy.appliesSubviewExclusion(
+        selectedTab: .chat,
+        isShowingDrawer: true,
+        isShowingRightRail: false
+      ) == false
+    )
+    #expect(
+      AppShellGesturePolicy.appliesSubviewExclusion(
+        selectedTab: .chat,
+        isShowingDrawer: false,
+        isShowingRightRail: true
+      ) == false
     )
   }
 
@@ -170,7 +357,6 @@ struct SharedPressFeedbackStyleTests {
     #expect(JovieIconButtonStyle.pressedOpacity == 0.72)
     #expect(JovieIconButtonStyle.targetSize == 44)
     #expect(JoviePressFeedbackButtonStyle.defaultPressedOpacity == 0.72)
-    #expect(SettingsInteraction.rowPressedOpacity == 0.7)
   }
 }
 
@@ -280,7 +466,6 @@ struct LibraryItemScreenTests {
     #expect(LibraryItemPresentationPolicy.presentation(for: asset) == .dedicatedScreen)
     #expect(LibraryItemPresentationPolicy.shouldOpenSheet(for: asset) == false)
     #expect(LibraryItemPresentationPolicy.usesExistingRails())
-    #expect(AppShellPanePolicy.showsBottomTabBar() == false)
   }
 
   @Test func localVideoOpensDedicatedScreenNotPlayerSheet() {
