@@ -2,9 +2,9 @@
  * Ovie dump-path classify (JOV-5215).
  *
  * One durable receipt per item. Never spawn a worker per item. Company
- * work (flash/heavy/engineering) goes to the Summer-owned Kanban. Personal
- * never goes to company Kanban or Linear. Taste stays Taste. Eve does not
- * route Linear→Symphony. Destination writer is ovie-intake-to-kanban.py.
+ * operations work (flash/heavy) goes to the Summer-owned Kanban. Engineering
+ * is queued for Summer's Linear intake; Eve never creates Linear work or
+ * dispatches Symphony. Personal and Taste stay isolated.
  */
 
 import { denyEveAction } from '@/lib/ovie/eve-authority';
@@ -35,6 +35,8 @@ export type SpawnFn = (goal: string) => void;
 
 /** Incomplete until the Mac lander writes a Kanban task id or Linear identifier. */
 export const OVIE_QUEUED_ACK = 'stored and queued for Summer lander';
+export const OVIE_LINEAR_QUEUED_ACK =
+  'stored and queued for Summer Linear intake';
 export const OVIE_UNAVAILABLE_ACK = 'stored; routing unavailable (fail-closed)';
 export const OVIE_BLOCKED_ACK = 'stored; routing blocked';
 
@@ -128,7 +130,12 @@ export function classifyOvieItem(text: string): OvieLane {
 export function destinationForOvieLane(lane: OvieLane): OvieDestination {
   if (lane === 'personal') return DEST_PERSONAL;
   if (lane === 'taste') return DEST_TASTE;
+  if (lane === 'engineering') return DEST_LINEAR;
   return DEST_KANBAN;
+}
+
+export function queuedAckForDestination(destination: OvieDestination): string {
+  return destination === DEST_LINEAR ? OVIE_LINEAR_QUEUED_ACK : OVIE_QUEUED_ACK;
 }
 
 export function ingestOvieItem(
@@ -142,7 +149,7 @@ export function ingestOvieItem(
     text,
     lane,
     destination,
-    ack: OVIE_QUEUED_ACK,
+    ack: queuedAckForDestination(destination),
     destinationHandle: null,
     workerSpawned: false,
   };

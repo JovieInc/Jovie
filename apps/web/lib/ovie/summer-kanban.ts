@@ -1,22 +1,19 @@
 /**
  * Summer-owned company Kanban (JOV-5215).
  *
- * Company items (flash/heavy/engineering) share durable work IDs with Eve
- * receipts. Personal and taste never enter this board. Eve cannot rank or
- * dispatch Symphony from here; Summer transitions the same IDs.
+ * Operations items (flash/heavy) share durable work IDs with Eve receipts.
+ * Engineering ships through Linear; personal and taste remain isolated.
  */
 
 import { denyEveAction } from '@/lib/ovie/eve-authority';
 import { DEST_KANBAN, type OvieLane } from '@/lib/ovie/ingest';
+import { normalizeLegacyEngineeringInitiativeForStore } from '@/lib/ovie/legacy-routing';
 import type { OperatingStore } from '@/lib/ovie/mcp/store';
 import type { OvieInitiative, OvieRoutingState } from '@/lib/ovie/mcp/types';
 
 export const SUMMER_KANBAN_OWNER = 'summer' as const;
 
-export type SummerKanbanLane = Extract<
-  OvieLane,
-  'flash' | 'heavy' | 'engineering'
->;
+export type SummerKanbanLane = Extract<OvieLane, 'flash' | 'heavy'>;
 
 export type SummerKanbanCard = {
   readonly workId: string;
@@ -29,7 +26,7 @@ export type SummerKanbanCard = {
 };
 
 export function isSummerKanbanLane(lane: OvieLane): lane is SummerKanbanLane {
-  return lane === 'flash' || lane === 'heavy' || lane === 'engineering';
+  return lane === 'flash' || lane === 'heavy';
 }
 
 export function toSummerKanbanCard(
@@ -52,7 +49,14 @@ export async function listSummerKanban(
   store: OperatingStore
 ): Promise<readonly SummerKanbanCard[]> {
   const rows = await store.listInitiatives();
-  return rows.flatMap(row => {
+  const normalized = await Promise.all(
+    rows.map(row =>
+      normalizeLegacyEngineeringInitiativeForStore(store, row, {
+        persistence: 'best-effort',
+      })
+    )
+  );
+  return normalized.flatMap(row => {
     const card = toSummerKanbanCard(row);
     return card ? [card] : [];
   });
@@ -64,7 +68,12 @@ export async function inspectSummerCard(
 ): Promise<SummerKanbanCard | undefined> {
   const row = await store.getInitiative(workId);
   if (!row) return undefined;
-  return toSummerKanbanCard(row) ?? undefined;
+  const normalized = await normalizeLegacyEngineeringInitiativeForStore(
+    store,
+    row,
+    { persistence: 'best-effort' }
+  );
+  return toSummerKanbanCard(normalized) ?? undefined;
 }
 
 export async function transitionSummerCard(
