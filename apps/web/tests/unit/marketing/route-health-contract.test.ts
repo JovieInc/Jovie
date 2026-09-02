@@ -64,4 +64,16 @@ describe('marketing route health contract', () => {
       requiresSharedChrome: false,
     });
   });
+
+  it('records an exact not-found probe when no published dynamic fixture exists', () => {
+    expect(
+      MARKETING_ROUTE_HEALTH_TARGETS.find(
+        target => target.glob === '(marketing)/engineering/[slug]/page.tsx'
+      )
+    ).toMatchObject({
+      path: '/engineering/verified-changelog',
+      expected: 'not-found',
+      requiresSharedChrome: false,
+    });
+  });
 });

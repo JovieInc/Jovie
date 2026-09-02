@@ -38,8 +38,10 @@ import {
   type MarketingSectionId,
   PROPOSED_SECTIONS,
   type RecipeId,
+  type RouteManifestEntry,
   resolveComposition,
 } from '@/data/marketing';
+import { SANCTIONED_EXEMPTION_BASELINE } from './fixtures/route-exemption-baseline';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const ROOT = resolve(__dirname, '../../../../../..'); // apps/web/tests/unit/marketing → repo root
@@ -51,6 +53,12 @@ const BRIEFS_DIR = resolve(__dirname, 'fixtures/briefs');
 // ─────────────────────────────────────────────────────────────────────────────
 
 const KEBAB_REGEX = /^[a-z][a-z0-9-]*$/;
+const LINEAR_ID_REGEX = /^JOV-[1-9]\d*$/;
+const JOVIE_PR_URL_REGEX =
+  /^https:\/\/github\.com\/JovieInc\/Jovie\/pull\/[1-9]\d*$/;
+const ISO_EXPIRY_REGEX =
+  /^\d{4}-\d{2}-\d{2}(?:T\d{2}:\d{2}:\d{2}(?:\.\d{3})?Z)?$/;
+const APPROVER_PLACEHOLDERS = new Set(['tbd', 'unknown', 'n/a', 'none']);
 const fail = (
   problem: string,
   cause: string,
@@ -61,6 +69,53 @@ const fail = (
     `\nPROBLEM: ${problem}\nCAUSE: ${cause}\nFIX: ${fix}\nDOCS: ${docs}`
   );
 };
+
+function exemptionMetadataIssues(
+  exemption: NonNullable<RouteManifestEntry['exempt']>,
+  nowMs = Date.now()
+): readonly string[] {
+  const issues: string[] = [];
+  if (!LINEAR_ID_REGEX.test(exemption.linearId)) {
+    issues.push('linearId must match JOV-NNNN');
+  }
+  if (
+    !exemption.approvedBy.trim() ||
+    APPROVER_PLACEHOLDERS.has(exemption.approvedBy.trim().toLowerCase())
+  ) {
+    issues.push('approvedBy must identify the approver');
+  }
+  if (!JOVIE_PR_URL_REGEX.test(exemption.prUrl)) {
+    issues.push('prUrl must be an exact numeric Jovie pull request URL');
+  }
+  if (exemption.expires !== undefined) {
+    const expiresAt = Date.parse(exemption.expires);
+    const normalizedExpiry = exemption.expires.includes('T')
+      ? exemption.expires.replace(/(?<!\.\d{3})Z$/, '.000Z')
+      : `${exemption.expires}T00:00:00.000Z`;
+    if (
+      !ISO_EXPIRY_REGEX.test(exemption.expires) ||
+      !Number.isFinite(expiresAt) ||
+      new Date(expiresAt).toISOString() !== normalizedExpiry
+    ) {
+      issues.push('expires must be a valid ISO date or UTC timestamp');
+    } else if (expiresAt <= nowMs) {
+      issues.push('exemption is expired');
+    }
+  }
+  return issues;
+}
+
+function exemptionLedgerIssues(exemptGlobs: readonly string[]) {
+  const admittedGlobs = new Set<string>(SANCTIONED_EXEMPTION_BASELINE);
+  const exemptGlobSet = new Set(exemptGlobs);
+  return {
+    countMismatch: exemptGlobs.length !== SANCTIONED_EXEMPTION_BASELINE.length,
+    unadmittedGlobs: exemptGlobs.filter(glob => !admittedGlobs.has(glob)),
+    staleBaselineGlobs: SANCTIONED_EXEMPTION_BASELINE.filter(
+      glob => !exemptGlobSet.has(glob)
+    ),
+  };
+}
 
 // ─────────────────────────────────────────────────────────────────────────────
 // 1. Registry integrity
@@ -326,23 +381,69 @@ describe('marketing route manifest integrity', () => {
     }
   });
 
-  it('every exempt entry carries linearId + approvedBy + prUrl (DX2 sanctioned exemption)', () => {
+  it('every exempt entry carries valid, current governance metadata', () => {
     for (const entry of MARKETING_ROUTE_MANIFEST) {
       if (entry.exempt) {
-        if (
-          !entry.exempt.linearId ||
-          !entry.exempt.approvedBy ||
-          !entry.exempt.prUrl
-        ) {
+        const issues = exemptionMetadataIssues(entry.exempt);
+        if (issues.length > 0) {
           fail(
-            `exempt entry "${entry.glob}" missing linearId/approvedBy/prUrl`,
-            'DX2 escape hatch: sanctioned exemptions require all three fields',
-            `add linearId, approvedBy, prUrl to exempt on ${entry.glob} in apps/web/data/marketing/routeManifest.ts`,
+            `exempt entry "${entry.glob}" has invalid governance metadata: ${issues.join('; ')}`,
+            'DX2 escape hatch requires a real Linear ID, named approver, exact numeric Jovie PR URL, and unexpired ISO expiry when present',
+            `repair the exemption metadata on ${entry.glob} in apps/web/data/marketing/routeManifest.ts`,
             'docs/marketing/AGENT_GUIDE.md §Deviating from the system'
           );
         }
       }
     }
+  });
+
+  it('rejects placeholder, malformed, and expired exemption metadata', () => {
+    const valid = {
+      reason: 'fixture',
+      linearId: 'JOV-5475',
+      approvedBy: 'tw',
+      prUrl: 'https://github.com/JovieInc/Jovie/pull/16779',
+    } satisfies NonNullable<RouteManifestEntry['exempt']>;
+
+    expect(exemptionMetadataIssues(valid, Date.parse('2026-09-01'))).toEqual(
+      []
+    );
+    expect(
+      exemptionMetadataIssues(
+        { ...valid, linearId: 'JOV-TBD' },
+        Date.parse('2026-09-01')
+      )
+    ).toContain('linearId must match JOV-NNNN');
+    expect(
+      exemptionMetadataIssues(
+        { ...valid, approvedBy: 'TBD' },
+        Date.parse('2026-09-01')
+      )
+    ).toContain('approvedBy must identify the approver');
+    expect(
+      exemptionMetadataIssues(
+        { ...valid, prUrl: 'https://github.com/JovieInc/Jovie/pull/TBD' },
+        Date.parse('2026-09-01')
+      )
+    ).toContain('prUrl must be an exact numeric Jovie pull request URL');
+    expect(
+      exemptionMetadataIssues(
+        { ...valid, expires: '2026-08-31' },
+        Date.parse('2026-09-01')
+      )
+    ).toContain('exemption is expired');
+    expect(
+      exemptionMetadataIssues(
+        { ...valid, expires: 'next Tuesday' },
+        Date.parse('2026-09-01')
+      )
+    ).toContain('expires must be a valid ISO date or UTC timestamp');
+    expect(
+      exemptionMetadataIssues(
+        { ...valid, expires: '2026-02-30' },
+        Date.parse('2026-09-01')
+      )
+    ).toContain('expires must be a valid ISO date or UTC timestamp');
   });
 
   it('exemption ratchet: unsanctioned count is decrease-only vs baseline', () => {
@@ -361,6 +462,47 @@ describe('marketing route manifest integrity', () => {
         'docs/marketing/AGENT_GUIDE.md §Deviating from the system'
       );
     }
+  });
+
+  it('exemption ratchet: total exemption count cannot grow', () => {
+    const exemptGlobs = MARKETING_ROUTE_MANIFEST.filter(
+      entry => entry.exempt !== undefined
+    ).map(entry => entry.glob);
+    const issues = exemptionLedgerIssues(exemptGlobs);
+    if (
+      issues.countMismatch ||
+      issues.unadmittedGlobs.length > 0 ||
+      issues.staleBaselineGlobs.length > 0
+    ) {
+      fail(
+        `exemption ledger drift: ${exemptGlobs.length}/${SANCTIONED_EXEMPTION_BASELINE.length}; unadmitted: ${issues.unadmittedGlobs.join(', ') || 'none'}; stale baseline: ${issues.staleBaselineGlobs.join(', ') || 'none'}`,
+        'complete exemption records are still debt; the independently reviewed ledger must exactly match the live exemption set',
+        'update the manifest and governed baseline together when admitting or retiring an exemption',
+        'docs/marketing/AGENT_GUIDE.md §Deviating from the system'
+      );
+    }
+  });
+
+  it('rejects an unadmitted exemption even when another exemption is retired', () => {
+    const replacement = [
+      ...SANCTIONED_EXEMPTION_BASELINE.slice(1),
+      '(marketing)/new-exemption/page.tsx',
+    ];
+    expect(exemptionLedgerIssues(replacement)).toEqual({
+      countMismatch: false,
+      unadmittedGlobs: ['(marketing)/new-exemption/page.tsx'],
+      staleBaselineGlobs: [SANCTIONED_EXEMPTION_BASELINE[0]],
+    });
+  });
+
+  it('rejects a retired exemption until its baseline admission is removed', () => {
+    expect(
+      exemptionLedgerIssues(SANCTIONED_EXEMPTION_BASELINE.slice(1))
+    ).toEqual({
+      countMismatch: true,
+      unadmittedGlobs: [],
+      staleBaselineGlobs: [SANCTIONED_EXEMPTION_BASELINE[0]],
+    });
   });
 
   it('manifest glob-count floor (catches route-group rename — silent-failure guard)', () => {
