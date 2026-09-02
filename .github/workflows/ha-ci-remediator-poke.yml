@@ -1,0 +1,166 @@
+# HA CI remediator poke
+#
+# Control-plane poke for Hyperagent when CI fails. No checkout, no Node.
+# Does not enable rolling-ci-dispatch. Skips #16419. Ops enrolls when green.
+
+name: HA CI remediator poke
+
+on:
+  workflow_run:
+    workflows: ['CI']
+    types: [completed]
+  workflow_dispatch:
+    inputs:
+      pr_number:
+        description: 'PR number to include in the poke payload'
+        required: false
+        type: string
+      run_url:
+        description: 'Failed CI run URL to include in the poke payload'
+        required: false
+        type: string
+
+permissions: {}
+
+jobs:
+  poke:
+    name: Poke Hyperagent remediator
+    if: >-
+      github.event_name == 'workflow_dispatch' ||
+      (
+        github.event.workflow_run.conclusion == 'failure' &&
+        (
+          github.event.workflow_run.event == 'pull_request' ||
+          github.event.workflow_run.event == 'merge_group'
+        )
+      )
+    runs-on: ubuntu-latest
+    timeout-minutes: 2
+    steps:
+      - name: POST slim CI-failure poke
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+          WEBHOOK_URL: ${{ secrets.HYPERAGENT_CI_WEBHOOK_URL }}
+          WEBHOOK_SECRET: ${{ secrets.HYPERAGENT_CI_WEBHOOK_SECRET }}
+          POKE_RUN_ID: ${{ github.run_id }}
+          POKE_RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+          POKE_HEAD_SHA: ${{ github.sha }}
+          POKE_HEAD_BRANCH: ${{ github.ref_name }}
+          DISPATCH_PR_NUMBER: ${{ inputs.pr_number }}
+          DISPATCH_RUN_URL: ${{ inputs.run_url }}
+          WORKFLOW_RUN_ID: ${{ github.event.workflow_run.id }}
+          WORKFLOW_RUN_HTML_URL: ${{ github.event.workflow_run.html_url }}
+          WORKFLOW_RUN_CONCLUSION: ${{ github.event.workflow_run.conclusion }}
+          WORKFLOW_RUN_HEAD_SHA: ${{ github.event.workflow_run.head_sha }}
+          WORKFLOW_RUN_HEAD_BRANCH: ${{ github.event.workflow_run.head_branch }}
+          WORKFLOW_RUN_EVENT: ${{ github.event.workflow_run.event }}
+          WORKFLOW_RUN_PULL_REQUESTS: ${{ toJSON(github.event.workflow_run.pull_requests) }}
+        run: |
+          set -euo pipefail
+          if [[ -z "${WEBHOOK_URL:-}" ]]; then
+            echo "HYPERAGENT_CI_WEBHOOK_URL is not set" >&2
+            exit 1
+          fi
+          python3 <<'PY'
+          import json
+          import os
+          import sys
+
+          skip_path = os.path.join(os.environ["RUNNER_TEMP"], "ha-ci-poke.skip")
+          payload_path = os.path.join(os.environ["RUNNER_TEMP"], "ha-ci-poke.json")
+          event_name = os.environ.get("EVENT_NAME", "")
+
+          def parse_pr_numbers(raw):
+              if raw is None:
+                  return None
+              text = str(raw).strip()
+              if text in ("", "null"):
+                  return None
+              try:
+                  parsed = json.loads(text)
+              except json.JSONDecodeError:
+                  return None
+              if parsed is None:
+                  return None
+              numbers = []
+              if isinstance(parsed, list):
+                  items = parsed
+              else:
+                  items = [parsed]
+              for item in items:
+                  if isinstance(item, bool):
+                      return None
+                  if isinstance(item, int):
+                      numbers.append(item)
+                      continue
+                  if isinstance(item, dict) and "number" in item:
+                      try:
+                          numbers.append(int(item["number"]))
+                          continue
+                      except (TypeError, ValueError):
+                          return None
+                  return None
+              return numbers
+
+          if event_name == "workflow_dispatch":
+              run_id = int(os.environ["POKE_RUN_ID"])
+              html_url = (os.environ.get("DISPATCH_RUN_URL") or "").strip() or os.environ["POKE_RUN_URL"]
+              conclusion = "failure"
+              head_sha = os.environ.get("POKE_HEAD_SHA") or ""
+              head_branch = os.environ.get("POKE_HEAD_BRANCH") or ""
+              event = "workflow_dispatch"
+              raw_pr = (os.environ.get("DISPATCH_PR_NUMBER") or "").strip()
+              if raw_pr:
+                  try:
+                      pr_numbers = [int(raw_pr)]
+                  except ValueError:
+                      pr_numbers = None
+              else:
+                  pr_numbers = None
+          else:
+              run_id = int(os.environ["WORKFLOW_RUN_ID"])
+              html_url = os.environ.get("WORKFLOW_RUN_HTML_URL") or ""
+              conclusion = os.environ.get("WORKFLOW_RUN_CONCLUSION") or "failure"
+              head_sha = os.environ.get("WORKFLOW_RUN_HEAD_SHA") or ""
+              head_branch = os.environ.get("WORKFLOW_RUN_HEAD_BRANCH") or ""
+              event = os.environ.get("WORKFLOW_RUN_EVENT") or ""
+              pr_numbers = parse_pr_numbers(os.environ.get("WORKFLOW_RUN_PULL_REQUESTS"))
+
+          if pr_numbers == [16419]:
+              print("Skipping Hyperagent poke: only PR is #16419")
+              open(skip_path, "w", encoding="utf-8").write("16419\n")
+              sys.exit(0)
+
+          payload = {
+              "id": run_id,
+              "html_url": html_url,
+              "conclusion": conclusion,
+              "head_sha": head_sha,
+              "head_branch": head_branch,
+              "event": event,
+              "pr_numbers": pr_numbers if pr_numbers is not None else [],
+          }
+          raw = json.dumps(payload, separators=(",", ":")).encode("utf-8")
+          if len(raw) >= 1000000:
+              print("Hyperagent poke payload exceeds 1MB", file=sys.stderr)
+              sys.exit(1)
+          with open(payload_path, "wb") as handle:
+              handle.write(raw)
+          print(f"Prepared poke payload ({len(raw)} bytes)")
+          PY
+          if [[ -f "$RUNNER_TEMP/ha-ci-poke.skip" ]]; then
+            exit 0
+          fi
+          http_code="$(
+            curl -sS -o "$RUNNER_TEMP/ha-ci-poke.out" -w '%{http_code}' \
+              -X POST \
+              -H 'Content-Type: application/json' \
+              -H "X-Hyperagent-Webhook-Secret: ${WEBHOOK_SECRET}" \
+              --data-binary @"$RUNNER_TEMP/ha-ci-poke.json" \
+              "$WEBHOOK_URL"
+          )"
+          if [[ "$http_code" != "202" ]]; then
+            echo "Hyperagent poke failed: HTTP ${http_code}" >&2
+            exit 1
+          fi
+          echo "Hyperagent poke accepted (HTTP 202)"
