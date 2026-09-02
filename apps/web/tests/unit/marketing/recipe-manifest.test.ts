@@ -619,10 +619,18 @@ describe('marketing route manifest integrity', () => {
     expect(artistReport.matches).toBe(false);
   });
 
-  it('does not claim parity for unaudited route bodies', () => {
-    const pay = MARKETING_ROUTE_MANIFEST.find(entry => entry.url === '/pay');
-    expect(pay).toBeDefined();
-    expect(getRouteRecipeParity(pay!).matches).toBeNull();
+  it('keeps source-verified route bodies explicit even when recipe parity is incomplete', () => {
+    for (const [url, expectedParity] of [
+      ['/pay', false],
+      ['/support', true],
+      ['/waitlist', false],
+    ] as const) {
+      const entry = MARKETING_ROUTE_MANIFEST.find(item => item.url === url);
+      expect(entry, url).toBeDefined();
+      expect(entry?.bindingEvidence.status, url).toBe('verified');
+      expect(entry?.renderedSections.length, url).toBeGreaterThan(0);
+      expect(getRouteRecipeParity(entry!).matches, url).toBe(expectedParity);
+    }
   });
 });
 

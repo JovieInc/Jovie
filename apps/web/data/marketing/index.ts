@@ -242,6 +242,11 @@ export {
   MARKETING_RECIPES,
 } from './recipes';
 export type {
+  MarketingExactPublicRouteTarget,
+  MarketingRouteCaptureState,
+  MarketingRouteCaptureViewport,
+  MarketingRouteDisposition,
+  MarketingRouteDispositionLedgerEntry,
   MarketingRouteHealthTarget,
   RouteManifestEntry,
   RouteRecipeParityReport,
@@ -254,6 +259,8 @@ export {
   getRouteRecipeParity,
   isExempt,
   isRecipeRoute,
+  MARKETING_EXACT_PUBLIC_ROUTE_TARGETS,
+  MARKETING_ROUTE_DISPOSITION_LEDGER,
   MARKETING_ROUTE_HEALTH_TARGETS,
   MARKETING_ROUTE_MANIFEST,
 } from './routeManifest';

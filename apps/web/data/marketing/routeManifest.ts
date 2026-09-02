@@ -114,6 +114,7 @@ export interface RouteManifestEntry {
   readonly healthCheck?: {
     readonly path: string;
     readonly expected: 'page' | 'redirect' | 'not-found';
+    readonly waitFor?: string;
     readonly allowedFinalPaths?: readonly string[];
     readonly allowsAuthShell?: boolean;
     readonly requiresSharedChrome?: boolean;
@@ -138,7 +139,9 @@ export interface RouteManifestEntry {
  * The route manifest. Per JOV-5650 — every recursive page.tsx under
  * (marketing), (home), and waitlist is represented exactly once. Dynamic
  * engineering article routes are explicit exemptions rather than being hidden
- * behind their index-route entries.
+ * behind their index-route entries. This array is the current source authority;
+ * generated ledgers and capture catalogs derive their counts instead of copying
+ * a prose inventory that can drift.
  *
  * Exemptions are sanctioned (carry linearId + approvedBy + prUrl) per DX2.
  * The baseline exemption count for the ratchet = current sanctioned count.
@@ -317,16 +320,28 @@ export const MARKETING_ROUTE_MANIFEST: readonly RouteManifestEntry[] = [
   {
     glob: '(marketing)/pay/page.tsx',
     recipeId: 'feature',
-    renderedSections: [],
+    renderedSections: approvedBindings(
+      'apps/web/components/features/pay/PayLanding.tsx',
+      'hero',
+      'how-it-works',
+      'feature-grid',
+      'feature-grid',
+      'cta'
+    ),
     bindingEvidence: {
-      status: 'unverified',
-      source: 'route audit 2026-07-11',
+      status: 'verified',
+      source: 'source binding audit 2026-09-01',
       notes:
-        'PayLanding body was outside the bounded route audit; no parity is asserted.',
+        'PayLanding uses MarketingHero, two feature-card sections, a use-case feature grid, and a terminal claim form. This records source reality without asserting full feature-recipe parity.',
     },
     status: 'active',
     specVersion: '1.0.0',
     url: '/pay',
+    healthCheck: {
+      path: '/pay',
+      expected: 'page',
+      waitFor: '[data-testid="pay-hero"]',
+    },
   },
   {
     glob: '(marketing)/voice/page.tsx',
@@ -441,14 +456,19 @@ export const MARKETING_ROUTE_MANIFEST: readonly RouteManifestEntry[] = [
       'cta'
     ),
     bindingEvidence: {
-      status: 'unverified',
-      source: 'route audit 2026-07-11',
+      status: 'verified',
+      source: 'source binding audit 2026-09-01',
       notes:
-        'SupportChannels maps conceptually to content-prose or feature-grid; exact section type requires migration review.',
+        'SupportPageContent renders MarketingHero, SupportChannels as the prose/help body, FaqSection, and SupportCta in that order.',
     },
     status: 'active',
     specVersion: '1.0.0',
     url: '/support',
+    healthCheck: {
+      path: '/support',
+      expected: 'page',
+      waitFor: '[data-testid="support-hero"]',
+    },
   },
   {
     glob: '(marketing)/developers/page.tsx',
@@ -621,12 +641,22 @@ export const MARKETING_ROUTE_MANIFEST: readonly RouteManifestEntry[] = [
   {
     glob: 'waitlist/page.tsx',
     recipeId: 'waitlist',
-    renderedSections: [],
+    renderedSections: [
+      approvedBinding(
+        'apps/web/components/features/auth/AuthLayout.tsx',
+        'hero'
+      ),
+      approvedBinding(
+        'apps/web/components/features/auth/AuthShell.tsx',
+        'capture'
+      ),
+    ],
     bindingEvidence: {
-      status: 'unverified',
-      source: 'JOV-5376 public waitlist front door',
+      status: 'verified',
+      source:
+        'source binding audit 2026-09-01; JOV-5376 public waitlist front door',
       notes:
-        'Signed-out visitors render the splash-B auth shell; authenticated states continue through the existing start or receipt flow.',
+        'WaitlistPublicLanding composes the splash-B AuthLayout and sign-up AuthShell capture form for the signed-out public state. The stub recipe remains intentionally incomplete.',
     },
     status: 'active',
     specVersion: '1.0.0',
@@ -634,6 +664,7 @@ export const MARKETING_ROUTE_MANIFEST: readonly RouteManifestEntry[] = [
     healthCheck: {
       path: '/waitlist',
       expected: 'page',
+      waitFor: '#auth-form',
       allowsAuthShell: true,
       requiresSharedChrome: false,
     },
@@ -996,6 +1027,108 @@ export const MARKETING_ROUTE_MANIFEST: readonly RouteManifestEntry[] = [
     noindex: true,
   },
 ] as const;
+
+export type MarketingRouteDisposition =
+  | 'active-verified'
+  | 'active-unverified'
+  | 'explicit-exempt'
+  | 'noindex'
+  | 'internal'
+  | 'deprecated'
+  | 'unknown';
+
+export interface MarketingRouteDispositionLedgerEntry {
+  readonly key: string;
+  readonly url: string;
+  readonly sourcePath: string;
+  readonly fixturePath: string;
+  readonly disposition: MarketingRouteDisposition;
+  readonly evidenceSource: string;
+  readonly notes?: string;
+}
+
+function getRouteDisposition(
+  entry: RouteManifestEntry
+): MarketingRouteDisposition {
+  if (entry.status === 'deprecated' || entry.status === 'removed') {
+    return 'deprecated';
+  }
+  if (entry.url === '/renders' || entry.url.startsWith('/renders/')) {
+    return 'internal';
+  }
+  if (entry.noindex) {
+    return 'noindex';
+  }
+  if (entry.exempt) {
+    return 'explicit-exempt';
+  }
+  if (entry.status === 'active') {
+    if (entry.bindingEvidence.status === 'verified') {
+      return 'active-verified';
+    }
+    if (entry.bindingEvidence.status === 'unverified') {
+      return 'active-unverified';
+    }
+  }
+  return 'unknown';
+}
+
+/** Generated route inventory; the canonical manifest remains its only input. */
+export const MARKETING_ROUTE_DISPOSITION_LEDGER: readonly MarketingRouteDispositionLedgerEntry[] =
+  MARKETING_ROUTE_MANIFEST.map(entry => ({
+    key: entry.glob,
+    url: entry.url,
+    sourcePath: `apps/web/app/${entry.glob}`,
+    fixturePath: entry.healthCheck?.path ?? entry.url,
+    disposition: getRouteDisposition(entry),
+    evidenceSource: entry.bindingEvidence.source,
+    ...(entry.bindingEvidence.notes
+      ? { notes: entry.bindingEvidence.notes }
+      : entry.exempt?.reason
+        ? { notes: entry.exempt.reason }
+        : {}),
+  }));
+
+export type MarketingRouteCaptureViewport = 'desktop' | 'mobile';
+export type MarketingRouteCaptureState =
+  | 'anonymous-default'
+  | 'anonymous-public';
+
+export interface MarketingExactPublicRouteTarget {
+  readonly url: string;
+  readonly glob: string;
+  readonly fixturePath: string;
+  readonly expectedPath: string;
+  readonly sourcePath: string;
+  readonly disposition: MarketingRouteDisposition;
+  readonly viewports: readonly MarketingRouteCaptureViewport[];
+  readonly stateMatrix: readonly MarketingRouteCaptureState[];
+  readonly expectedRuntimeSelector: string;
+  readonly sourceSha: 'capture-time-git-sha';
+}
+
+/** Exact, non-internal active page routes consumed by both capture systems. */
+export const MARKETING_EXACT_PUBLIC_ROUTE_TARGETS: readonly MarketingExactPublicRouteTarget[] =
+  MARKETING_ROUTE_MANIFEST.filter(
+    entry =>
+      entry.status === 'active' &&
+      (entry.healthCheck?.expected ?? 'page') === 'page' &&
+      !entry.url.includes('*') &&
+      entry.url !== '/renders' &&
+      !entry.url.startsWith('/renders/')
+  ).map(entry => ({
+    url: entry.url,
+    glob: entry.glob,
+    fixturePath: entry.healthCheck?.path ?? entry.url,
+    expectedPath: entry.healthCheck?.path ?? entry.url,
+    sourcePath: `apps/web/app/${entry.glob}`,
+    disposition: getRouteDisposition(entry),
+    viewports: ['desktop', 'mobile'],
+    stateMatrix:
+      entry.url === '/waitlist' ? ['anonymous-public'] : ['anonymous-default'],
+    expectedRuntimeSelector: entry.healthCheck?.waitFor ?? 'main',
+    sourceSha: 'capture-time-git-sha',
+  }));
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Lookup helpers (used by the manifest gate)
