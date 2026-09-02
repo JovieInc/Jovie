@@ -1959,15 +1959,16 @@ JSON
                   exit 0
                 fi
                 if [[ "$1 $2" == "pr view" ]]; then
+                  mergeable=MERGEABLE
                   case "$3" in
                     1001) head="{heads["1001"]}"; labels='[{{"name":"merge-queue"}}]' ;;
                     1002) head="{heads["1002"]}"; labels='[{{"name":"merge-queue"}}]' ;;
-                    1003) head="{heads["1003"]}"; labels='[{{"name":"merge-queue"}},{{"name":"needs-conflict-resolution"}}]' ;;
+                    1003) head="{heads["1003"]}"; labels='[{{"name":"merge-queue"}},{{"name":"needs-conflict-resolution"}}]'; mergeable=CONFLICTING ;;
                     1004) head="{heads["1004"]}"; labels='[{{"name":"merge-queue"}}]' ;;
                     1005) head="{heads["1005"]}"; labels='[{{"name":"merge-queue"}}]' ;;
                     *) echo "unexpected PR view: $*" >&2; exit 2 ;;
                   esac
-                  echo "{{\\"state\\":\\"OPEN\\",\\"isDraft\\":false,\\"mergeable\\":\\"MERGEABLE\\",\\"labels\\":$labels,\\"headRefOid\\":\\"$head\\",\\"baseRefName\\":\\"main\\",\\"body\\":\\"\\"}}"
+                  echo "{{\\"state\\":\\"OPEN\\",\\"isDraft\\":false,\\"mergeable\\":\\"$mergeable\\",\\"labels\\":$labels,\\"headRefOid\\":\\"$head\\",\\"baseRefName\\":\\"main\\",\\"body\\":\\"\\"}}"
                   exit 0
                 fi
                 if [[ "$1 $2" == "pr edit" ]]; then
@@ -2846,6 +2847,48 @@ JSON
         assert "[dry-run] would -merge-queue on #16263" in result.stdout
         assert "would +merge-queue on #16263" not in result.stdout
         assert "{no-auto,merge-queue}" in result.stdout
+
+    def test_positive_mergeable_reread_clears_stale_conflict_label_without_dequeue(
+        self, tmp_path: Path
+    ) -> None:
+        head = "e4ddf77efb91c80665f10dece11836130c1a286a"
+        fake_gh = tmp_path / "gh"
+        fake_gh.write_text(
+            textwrap.dedent(
+                f"""\
+                #!/usr/bin/env bash
+                set -euo pipefail
+                if [[ "$1 $2" == "pr list" ]]; then
+                  echo '[{{"n":16898,"t":"Active exact merge group","draft":false,"m":"MERGEABLE","ms":"CLEAN","head":"tim/jov-5800-fix","headOid":"{head}","base":"main","body":"","L":["merge-queue","needs-conflict-resolution"],"fail":[]}}]'
+                  exit 0
+                fi
+                if [[ "$1 $2" == "pr checks" ]]; then
+                  echo '[{{"name":"PR Ready","bucket":"pass","state":"SUCCESS"}},{{"name":"Migration Guard","bucket":"pass","state":"SUCCESS"}},{{"name":"Fork PR Gate","bucket":"pass","state":"SUCCESS"}},{{"name":"PR Size Guard","bucket":"pass","state":"SUCCESS"}}]'
+                  exit 0
+                fi
+                if [[ "$1 $2" == "pr view" ]]; then
+                  echo '{{"headRefOid":"{head}","mergeable":"MERGEABLE","labels":[{{"name":"merge-queue"}},{{"name":"needs-conflict-resolution"}}]}}'
+                  exit 0
+                fi
+                if [[ "$1" == "api" ]]; then exit 1; fi
+                echo "unexpected gh args: $*" >&2
+                exit 2
+                """
+            ),
+            encoding="utf-8",
+        )
+        fake_gh.chmod(
+            fake_gh.stat().st_mode | stat.S_IXUSR | stat.S_IXGRP | stat.S_IXOTH
+        )
+
+        result = _run_bash(_drain_command(tmp_path, extra_env="DRY_RUN=1"))
+
+        assert result.returncode == 0, f"stdout={result.stdout}\nstderr={result.stderr}"
+        assert "[dry-run] would -needs-conflict-resolution on #16898" in result.stdout
+        assert "[dry-run] would -merge-queue on #16898" not in result.stdout
+        assert "needs-conflict-resolution" not in result.stdout.split(
+            "=== SURFACE", maxsplit=1
+        )[-1]
 
     def test_draft_only_enrolls_clean_unrelated_pr(self, tmp_path: Path) -> None:
         head = "c" * 40
