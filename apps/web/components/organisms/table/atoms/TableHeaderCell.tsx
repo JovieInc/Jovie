@@ -1,6 +1,6 @@
 'use client';
 
-import { cn } from '@/lib/utils';
+import { cn } from '@jovie/ui/lib/utils';
 import { SortableHeaderButton } from '../SortableHeaderButton';
 import { borders, presets, tableAlignment } from '../table.styles';
 import type { TableCellProps } from './TableCell';

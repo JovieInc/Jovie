@@ -1,4 +1,4 @@
-import { cn } from '@/lib/utils';
+import { cn } from '@jovie/ui/lib/utils';
 import { borders, presets, tableAlignment } from '../table.styles';
 
 export interface TableCellProps {
