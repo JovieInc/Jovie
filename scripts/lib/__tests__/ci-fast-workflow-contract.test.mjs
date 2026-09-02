@@ -127,10 +127,11 @@ describe('ci-fast bounded parallel workflow', () => {
             CI_FAST_LANE_GROUP: 'typecheck',
             CI_FAST_LANES_OUT: outPath,
             CI_FAST_RUN_JOVIE_TYPECHECK: 'false',
+            CI_FAST_ONLY_STRUCTURAL: 'false',
             GITHUB_EVENT_NAME: 'pull_request',
             GITHUB_BASE_REF: 'main',
             TURBO_SCM_BASE: 'origin/main',
-            PATH: '/usr/bin:/bin',
+            PATH: repo,
           },
         }
       );
@@ -269,12 +270,13 @@ describe('ci-fast bounded parallel workflow', () => {
             ...process.env,
             CI_FAST_LANE_GROUP: 'typecheck',
             CI_FAST_LANES_OUT: outPath,
+            CI_FAST_ONLY_STRUCTURAL: 'false',
             GITHUB_EVENT_NAME: 'pull_request',
             GITHUB_BASE_REF: 'main',
             TURBO_SCM_BASE: baseSha,
             // Model a false-negative preselector: setup was skipped, so pnpm
             // is intentionally unavailable. The lane must execute and fail.
-            PATH: '/usr/bin:/bin',
+            PATH: repo,
           },
         }
       );
@@ -673,7 +675,8 @@ describe('ci-fast bounded parallel workflow', () => {
             CI_FAST_LANE_GROUP: 'remaining',
             CI_FAST_LANES_OUT: outPath,
             CI_FAST_SKIP_STRUCTURAL: 'true',
-            PATH: '/usr/bin:/bin',
+            CI_FAST_ONLY_STRUCTURAL: 'false',
+            PATH: repo,
           },
         }
       );
