@@ -6,18 +6,22 @@
  * ask canonical questions about an artist.
  *
  * Pure logic — no DB access. Storage is caller's responsibility.
+ * Asset-scoped observations live in `./asset-visibility` (JOV-5607).
  */
 
 import { computeRatePercent } from '@/lib/analytics/metrics';
 
 /** Known answer engines to query */
-export type CitationEngine =
-  | 'perplexity'
-  | 'chatgpt'
-  | 'gemini'
-  | 'bing_copilot'
-  | 'claude'
-  | 'you';
+export const CITATION_ENGINES = [
+  'perplexity',
+  'chatgpt',
+  'gemini',
+  'bing_copilot',
+  'claude',
+  'you',
+] as const;
+
+export type CitationEngine = (typeof CITATION_ENGINES)[number];
 
 /** A single citation check result */
 export interface CitationResult {
