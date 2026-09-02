@@ -19,9 +19,11 @@ describe('TimeRangeSelector (tabs variant)', () => {
     const tablist = screen.getByRole('tablist', {
       name: 'Select Analytics Range',
     });
+    const shell = tablist.parentElement;
     const activeTab = screen.getByRole('tab', { name: '7D' });
 
-    expect(tablist.className).toContain('rounded-full');
+    expect(shell).toHaveClass('rounded-full');
+    expect(shell).toHaveAttribute('data-variant', 'default');
     expect(activeTab.className).toContain('rounded-full');
     expect(activeTab).toHaveAttribute('aria-selected', 'true');
   });
