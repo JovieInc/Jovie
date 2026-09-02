@@ -15,8 +15,6 @@ describe('workspace page optical seam contract', () => {
     'components/molecules/ContentSectionHeader.tsx',
     'components/organisms/table/molecules/PageToolbar.tsx',
     'components/organisms/table/table.styles.ts',
-    'components/organisms/table/atoms/TableCell.tsx',
-    'components/organisms/table/atoms/TableHeaderCell.tsx',
     'components/organisms/table/atoms/TableCheckboxCell.tsx',
     'app/app/(shell)/library/LibrarySurface.tsx',
   ])('%s uses the shared workspace seam', relativePath => {
@@ -32,6 +30,15 @@ describe('workspace page optical seam contract', () => {
     expect(pageToolbar).not.toContain('px-3.5 py-2');
     expect(tableStyles).toContain("cellPadding: 'px-3 py-1'");
     expect(tableStyles).toContain("headerPadding: 'px-3 py-1.5'");
+  });
+
+  it('routes table cell seams through the canonical table presets', () => {
+    expect(read('components/organisms/table/atoms/TableCell.tsx')).toContain(
+      'presets.tableCell'
+    );
+    expect(
+      read('components/organisms/table/atoms/TableHeaderCell.tsx')
+    ).toContain('presets.tableHeaderCell');
   });
 
   it('keeps Library leading columns on the shared table seam', () => {
