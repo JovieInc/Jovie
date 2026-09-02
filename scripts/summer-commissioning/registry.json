@@ -1,6 +1,6 @@
 {
   "schema": "jovie.summer-commissioning.registry/v1",
-  "registryVersion": "2026-09-01.4",
+  "registryVersion": "2026-09-01.5",
   "certificationContract": "jovie.certification/v1",
   "issue": "JOV-5853",
   "intendedEnvironment": "production-like",
@@ -747,6 +747,70 @@
             "kind": "file_contains",
             "path": "apps/web/lib/ovie/isolation.ts",
             "value": "Summer cannot execute artist Jovie tools"
+          }
+        ]
+      }
+    },
+    {
+      "id": "SUMMER-COMM-016",
+      "capability": "Bounded Product Quality Governor",
+      "canonicalPath": [
+        "release or user-visible signal -> Eve trigger -> privacy-safe /start journey -> pstack evidence -> Summer classification -> certification -> bounded Symphony request or Ovie review -> exact-build verification -> measured outcome -> invariant",
+        "scripts/summer-commissioning/product-quality-governor.mjs",
+        "docs/operations/SUMMER_PRODUCT_QUALITY_GOVERNOR.md"
+      ],
+      "implementationState": "in_flight",
+      "status": "blocked",
+      "critical": true,
+      "evidence": [
+        {
+          "kind": "source",
+          "ref": "apps/web/tests/journey-auditor/README.md",
+          "summary": "The existing Journey Auditor owns privacy-safe /start reproduction, evidence packets, and defect-to-invariant conversion."
+        },
+        {
+          "kind": "contract",
+          "ref": "scripts/summer-commissioning/product-quality-governor.mjs",
+          "summary": "The commissioning adapter resolves producer-attested native receipts, digest-binds quality claims, and enforces pilot budgets, privacy, exact-build proof, and founder-review routing."
+        },
+        {
+          "kind": "dependency",
+          "ref": "branch://codex/pstack-verification-port@21568893dbd0af295dc81258e7bb755210e094a9",
+          "summary": "The provider-neutral verification owner supplies Launch/Doctor/Drive/Evidence/Cleanup receipts; this capability does not duplicate them."
+        },
+        {
+          "kind": "dependency",
+          "ref": "branch://codex/jov-5753-governed-certification-loop@cd1d1ba5a2e0969a09adb22e749ac31016bfcaa5",
+          "summary": "The certification owner supplies machine eligibility, hard-boundary policy, automatic landing evaluation, and Ovie founder projection."
+        }
+      ],
+      "lastVerified": null,
+      "invalidationCondition": "The /start journey, trigger policy, privacy or cost budget, pstack verification contract, certification policy, Symphony capability boundary, Ovie review contract, acceptance budget, or invariant selector changes.",
+      "ownerRemediation": {
+        "owner": "Summer Product Quality Governor",
+        "refs": ["JOV-5853"]
+      },
+      "probe": {
+        "id": "summer.quality.public-onboarding-governor",
+        "version": "1.0.0",
+        "fixture": "public-onboarding-quality-loop/v1",
+        "expectedState": "privacy_safe_signal_to_measured_exact_build_repair_and_invariant",
+        "requiresRuntimeReceipt": true,
+        "sourceAssertions": [
+          {
+            "kind": "file_contains",
+            "path": "scripts/summer-commissioning/product-quality-governor.mjs",
+            "value": "PUBLIC_ONBOARDING_PILOT"
+          },
+          {
+            "kind": "file_contains",
+            "path": "docs/operations/SUMMER_PRODUCT_QUALITY_GOVERNOR.md",
+            "value": "Status: **contract proposed; not commissioned**"
+          },
+          {
+            "kind": "file_contains",
+            "path": "apps/web/tests/journey-auditor/README.md",
+            "value": "production bug → scout reproduction → product promise → deterministic test → fix"
           }
         ]
       }
