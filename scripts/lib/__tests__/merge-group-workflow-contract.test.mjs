@@ -1468,7 +1468,7 @@ describe('PR targets main (no stacked bases)', () => {
     expect(workflow).toMatch(/^on:\n  pull_request:\n    types:/m);
     expect(workflow).not.toMatch(/branches:\s*\[main/);
     expect(workflow).toContain('merge_group:');
-    expect(workflow).toContain('base != "main"');
+    expect(workflow).toContain('"$base" != "main"');
     expect(workflow).toContain('PRs must target main');
     expect(workflow).toContain('Retarget the pull request base to main');
   });
