@@ -1,9 +1,5 @@
 import SwiftUI
 
-enum SettingsInteraction {
-  static let rowPressedOpacity: Double = 0.7
-}
-
 struct AppBuildInfo: Equatable {
   let version: String
   let build: String
@@ -16,19 +12,12 @@ struct AppBuildInfo: Equatable {
   }
 }
 
-/// Settings uses system grouped List + toolbar chrome (JOV-5201). Liquid Glass
-/// comes from the system materials on iOS 26+, not custom cards.
-enum SettingsChromePolicy {
-  static func usesSystemGroupedList() -> Bool { true }
-  static func usesNativeNavigationChrome() -> Bool { true }
-}
-
 struct SettingsView: View {
   let profile: AppShellProfile
   let buildInfo: AppBuildInfo
   let accountURL: URL
   let billingURL: URL
-  var onClose: (() -> Void)?
+  let onClose: () -> Void
   let onLogout: @MainActor () async -> Void
   var showsWorkspaceSwitch: Bool = false
   var workspaceMode: MobileWorkspaceMode = .jovie
@@ -50,11 +39,9 @@ struct SettingsView: View {
     .navigationTitle("Settings")
     .navigationBarTitleDisplayMode(.large)
     .toolbar {
-      if let onClose {
-        ToolbarItem(placement: .topBarTrailing) {
-          Button("Done", action: onClose)
-            .accessibilityLabel("Close Settings")
-        }
+      ToolbarItem(placement: .topBarTrailing) {
+        Button("Done", action: onClose)
+          .accessibilityLabel("Close Settings")
       }
     }
     .toolbarBackground(.automatic, for: .navigationBar)
@@ -197,6 +184,11 @@ struct SettingsView: View {
     isLoggingOut = true
 
     Task {
+      #if DEBUG
+        if ProcessInfo.processInfo.arguments.contains("-ui-testing-delayed-logout") {
+          try? await Task.sleep(for: .seconds(5))
+        }
+      #endif
       await onLogout()
       isLoggingOut = false
     }

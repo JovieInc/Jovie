@@ -42,10 +42,6 @@ enum AppShellTab: Equatable, Hashable {
     }
   }
 
-  /// Bottom-bar destinations are unused. Every surface is sidebar or rail.
-  var isPrimaryTab: Bool {
-    false
-  }
 }
 
 // File-level so unit tests can call it without importing SwiftUI.
@@ -173,7 +169,9 @@ struct AppShellView<
   @State private var drawerDragOffset: CGFloat = 0
   @State private var isShowingRightRail = false
   @State private var railDragOffset: CGFloat = 0
-  @State private var isRailSwipeSuppressedBySubview = false
+  @State private var railSwipeExclusionStore = AppShellRailSwipeExclusionStore()
+  @State private var isRailGestureBlockedForCurrentDrag = false
+  @GestureState private var isRailGestureActive = false
   @State private var isKeyboardVisible = false
   @State private var didOpenLaunchSettings = false
   @State private var chatDraft = ""
@@ -193,6 +191,9 @@ struct AppShellView<
   @State private var lastEntityContext: EntityContextItem?
   @State private var intentStore = IntentNavigationStore.shared
   @Environment(\.accessibilityReduceMotion) private var reduceMotion
+#if DEBUG
+  @State private var didExposeInteractiveRailProgressForUITest = false
+#endif
 
   init(
     profile: AppShellProfile,
@@ -297,6 +298,7 @@ struct AppShellView<
             isLoadingConversations: isLoadingConversations,
             activeConversationID: activeConversationID,
             drawerWidth: drawerWidth,
+            reduceMotion: isReduceMotionEnabled,
             onSelectTab: { tab in
               closeDrawerThenSelect(tab)
             },
@@ -311,7 +313,12 @@ struct AppShellView<
             },
             onOpenSettings: {
               closeDrawer()
-              isShowingSettings = true
+              // Commit the pane dismissal before asking SwiftUI to present
+              // the full-screen cover. Presenting in the same transaction as
+              // the animated drawer close can drop the cover request.
+              DispatchQueue.main.async {
+                isShowingSettings = true
+              }
             },
             onTalk: {
               closeDrawer()
@@ -331,21 +338,13 @@ struct AppShellView<
             )
           )
           .animation(drawerAnimation, value: isShowingDrawer)
-          .animation(reduceMotion ? nil : drawerAnimation, value: drawerDragOffset)
           .accessibilityHidden(!isDrawerPresented)
 
           shellContent
             .frame(maxWidth: .infinity, maxHeight: .infinity)
-            .offset(
-              x: reduceMotion
-                ? 0
-                : contentOffset(openOffset: openOffset, railOpenOffset: railWidth)
-            )
-            .opacity(reduceMotion && isShowingDrawer ? 0 : 1)
-            .animation(drawerAnimation, value: isShowingDrawer)
-            .animation(drawerAnimation, value: isShowingRightRail)
-            .animation(reduceMotion ? nil : drawerAnimation, value: drawerDragOffset)
-            .animation(reduceMotion ? nil : drawerAnimation, value: railDragOffset)
+            .offset(x: contentOffset(openOffset: openOffset, railOpenOffset: railWidth))
+            .animation(isReduceMotionEnabled ? nil : drawerAnimation, value: isShowingDrawer)
+            .animation(isReduceMotionEnabled ? nil : drawerAnimation, value: isShowingRightRail)
 
           AppShellRightRail(
             item: lastEntityContext,
@@ -359,9 +358,14 @@ struct AppShellView<
           )
           .frame(width: railWidth)
           .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .trailing)
-          .offset(x: reduceMotion ? 0 : rightRailOffset(railOpenOffset: railWidth))
-          .opacity(appShellRightRailOpacity(isShowing: isShowingRightRail, dragOffset: railDragOffset))
-          .animation(drawerAnimation, value: isShowingRightRail)
+          .offset(x: rightRailOffset(railOpenOffset: railWidth))
+          .opacity(
+            appShellRightRailOpacity(
+              isShowing: isShowingRightRail,
+              dragOffset: isReduceMotionEnabled ? 0 : railDragOffset
+            )
+          )
+          .animation(isReduceMotionEnabled ? nil : drawerAnimation, value: isShowingRightRail)
           .accessibilityHidden(!isShowingRightRail && railDragOffset == 0)
           .allowsHitTesting(isShowingRightRail)
 
@@ -415,6 +419,22 @@ struct AppShellView<
             .transition(.opacity)
             .zIndex(11)
           }
+
+#if DEBUG
+          if isReduceMotionUITest {
+            Text("Reduce Motion Active")
+              .font(.system(size: 1))
+              .frame(width: 1, height: 1)
+              .clipped()
+              .accessibilityIdentifier("shell-reduce-motion-status")
+              .accessibilityValue(
+                didExposeInteractiveRailProgressForUITest
+                  ? "Interactive progress exposed"
+                  : "Interactive progress hidden"
+              )
+              .allowsHitTesting(false)
+          }
+#endif
         }
         .simultaneousGesture(
           edgeRailGesture(
@@ -422,6 +442,26 @@ struct AppShellView<
             containerWidth: proxy.size.width
           )
         )
+        .coordinateSpace(name: "app-shell")
+        .onPreferenceChange(AppShellRailSwipeExclusionFramesKey.self) { frames in
+          railSwipeExclusionStore.frames = frames
+        }
+        .onChange(of: isRailGestureActive) { _, isActive in
+          guard !isActive else { return }
+          // GestureState resets on both completion and cancellation. Defer the
+          // cleanup so onEnded can still inspect the latched eligibility bit.
+          DispatchQueue.main.async {
+            guard !isRailGestureActive else { return }
+            isRailGestureBlockedForCurrentDrag = false
+            resetRailDragOffsets()
+          }
+        }
+        .onChange(of: drawerDragOffset) { _, offset in
+          recordInteractiveRailProgressForUITest(offset)
+        }
+        .onChange(of: railDragOffset) { _, offset in
+          recordInteractiveRailProgressForUITest(offset)
+        }
       }
       .navigationBarHidden(true)
     }
@@ -518,21 +558,9 @@ struct AppShellView<
           .transition(pageTransition)
           .frame(maxWidth: .infinity, maxHeight: .infinity)
           .clipped()
-          .environment(\.appShellRailSwipeSuppression, $isRailSwipeSuppressedBySubview)
       }
       .safeAreaInset(edge: .top, spacing: 0) {
         shellToolbar
-      }
-      .safeAreaInset(edge: .bottom, spacing: 0) {
-        if AppShellPanePolicy.showsBottomTabBar(), chatEnabled {
-          AppShellTabBar(
-            selectedTab: selectedTab,
-            onSelect: { primary in
-              selectTab(primary.shellTab)
-            },
-            onTalk: openTalkOverlay
-          )
-        }
       }
       .allowsHitTesting(!isElevated && !isShowingTalkOverlay && teleprompterProposal == nil)
       .accessibilityHidden(isElevated || isShowingTalkOverlay || teleprompterProposal != nil)
@@ -750,7 +778,33 @@ struct AppShellView<
   }
 
   private var drawerAnimation: Animation {
-    reduceMotion ? JovieMotion.subtle : JovieMotion.cinematic
+    isReduceMotionEnabled ? JovieMotion.subtle : JovieMotion.cinematic
+  }
+
+  private var isReduceMotionEnabled: Bool {
+    #if DEBUG
+      AppShellGesturePolicy.effectiveReduceMotion(
+        environmentValue: reduceMotion,
+        arguments: ProcessInfo.processInfo.arguments
+      )
+    #else
+      reduceMotion
+    #endif
+  }
+
+  private var isReduceMotionUITest: Bool {
+    #if DEBUG
+      ProcessInfo.processInfo.arguments.contains("-ui-testing-reduce-motion")
+    #else
+      false
+    #endif
+  }
+
+  private func recordInteractiveRailProgressForUITest(_ offset: CGFloat) {
+    #if DEBUG
+      guard isReduceMotionUITest, offset != 0 else { return }
+      didExposeInteractiveRailProgressForUITest = true
+    #endif
   }
 
   private func drawerOpenOffset(safeAreaLeading: CGFloat) -> CGFloat {
@@ -912,22 +966,54 @@ struct AppShellView<
     railDragOffset = 0
   }
 
+  private func settleRailDragOffsets() {
+    withAnimation(isReduceMotionEnabled ? nil : drawerAnimation) {
+      resetRailDragOffsets()
+    }
+  }
+
+  private func isRailSwipeExcluded(at startLocation: CGPoint) -> Bool {
+    guard AppShellGesturePolicy.appliesSubviewExclusion(
+      selectedTab: selectedTab,
+      isShowingDrawer: isShowingDrawer,
+      isShowingRightRail: isShowingRightRail
+    ) else { return false }
+    return railSwipeExclusionStore.frames.contains(where: { $0.contains(startLocation) })
+  }
+
   /// Chat-home pans open rails (JOV-5201). Other surfaces keep edge drags.
   /// Horizontal pans never page between tabs.
   private func edgeRailGesture(openOffset: CGFloat, containerWidth: CGFloat) -> some Gesture {
-    DragGesture(minimumDistance: 8, coordinateSpace: .global)
+    DragGesture(minimumDistance: 8, coordinateSpace: .named("app-shell"))
+      .updating($isRailGestureActive) { _, isActive, _ in
+        isActive = true
+      }
       .onChanged { value in
+        guard !isRailGestureBlockedForCurrentDrag else {
+          resetRailDragOffsets()
+          return
+        }
+
         guard AppShellGesturePolicy.allowsEdgeRailDrag(
-          reduceMotion: reduceMotion,
+          reduceMotion: isReduceMotionEnabled,
           isKeyboardVisible: isKeyboardVisible,
           isShowingTalkOverlay: isShowingTalkOverlay,
           hasTeleprompterProposal: teleprompterProposal != nil
+        ) else {
+          isRailGestureBlockedForCurrentDrag = true
+          resetRailDragOffsets()
+          return
+        }
+
+        guard AppShellGesturePolicy.showsInteractiveRailProgress(
+          reduceMotion: isReduceMotionEnabled
         ) else {
           resetRailDragOffsets()
           return
         }
 
-        guard !isRailSwipeSuppressedBySubview else {
+        guard !isRailSwipeExcluded(at: value.startLocation) else {
+          isRailGestureBlockedForCurrentDrag = true
           resetRailDragOffsets()
           return
         }
@@ -958,19 +1044,25 @@ struct AppShellView<
         }
       }
       .onEnded { value in
+        defer { isRailGestureBlockedForCurrentDrag = false }
+
+        guard !isRailGestureBlockedForCurrentDrag else {
+          settleRailDragOffsets()
+          return
+        }
+
         guard AppShellGesturePolicy.allowsEdgeRailDrag(
-          reduceMotion: reduceMotion,
+          reduceMotion: isReduceMotionEnabled,
           isKeyboardVisible: isKeyboardVisible,
           isShowingTalkOverlay: isShowingTalkOverlay,
           hasTeleprompterProposal: teleprompterProposal != nil
         ) else {
-          resetRailDragOffsets()
+          settleRailDragOffsets()
           return
         }
 
-        guard !isRailSwipeSuppressedBySubview else {
-          isRailSwipeSuppressedBySubview = false
-          resetRailDragOffsets()
+        guard !isRailSwipeExcluded(at: value.startLocation) else {
+          settleRailDragOffsets()
           return
         }
 
@@ -981,7 +1073,7 @@ struct AppShellView<
           {
             applyOpenPane(AppShellPanePolicy.paneAfterDismiss())
           } else {
-            resetRailDragOffsets()
+            settleRailDragOffsets()
           }
           return
         }
@@ -994,7 +1086,7 @@ struct AppShellView<
           ) {
             applyOpenPane(AppShellPanePolicy.paneAfterDismiss())
           } else {
-            resetRailDragOffsets()
+            settleRailDragOffsets()
           }
           return
         }
@@ -1021,7 +1113,7 @@ struct AppShellView<
           applyOpenPane(AppShellPanePolicy.paneAfterTrailingSwipe(current: .none))
           return
         }
-        resetRailDragOffsets()
+        settleRailDragOffsets()
       }
   }
 

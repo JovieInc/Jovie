@@ -94,9 +94,6 @@ enum MobileChatTranscriptMotion {
     reduceMotion ? nil : JovieMotion.easeOut(duration: JovieMotion.slowDuration)
   }
 
-  static func scrollToLatest(reduceMotion: Bool) -> Animation? {
-    jumpToLatest(reduceMotion: reduceMotion)
-  }
 }
 
 struct MobileChatView: View {
@@ -225,7 +222,7 @@ struct MobileChatView: View {
         }
       )
       .onChange(of: repository.timeline.count) {
-        scrollToBottomIfPinned(using: proxy, animated: true)
+        scrollToBottomIfPinned(using: proxy)
       }
       .onChange(of: repository.timeline.last?.status) {
         guard repository.timeline.last?.status == .streaming else { return }
@@ -235,13 +232,13 @@ struct MobileChatView: View {
         isComposerFocused = false
       }
       .onChange(of: isComposerFocused) {
-        scrollToBottomIfPinned(using: proxy, animated: true)
+        scrollToBottomIfPinned(using: proxy)
       }
       .overlay(alignment: .bottom) {
         if MobileChatScrollPolicy.shouldShowJumpToLatest(isAtBottom: isAtBottom) {
           Button {
             isAtBottom = true
-            scrollToBottomIfPinned(using: proxy, animated: true)
+            scrollToBottomIfPinned(using: proxy)
           } label: {
             Image(systemName: "arrow.down")
           }
@@ -301,14 +298,9 @@ struct MobileChatView: View {
     .background(JovieColor.backgroundBase)
   }
 
-  private func scrollToBottomIfPinned(
-    using proxy: ScrollViewProxy,
-    animated: Bool
-  ) {
+  private func scrollToBottomIfPinned(using proxy: ScrollViewProxy) {
     guard MobileChatScrollPolicy.shouldAutoScrollToLatest(isAtBottom: isAtBottom) else { return }
-    if animated, let animation = MobileChatTranscriptMotion.scrollToLatest(
-      reduceMotion: reduceMotion
-    ) {
+    if let animation = MobileChatTranscriptMotion.jumpToLatest(reduceMotion: reduceMotion) {
       withAnimation(animation) {
         proxy.scrollTo("chat-bottom", anchor: .bottom)
       }

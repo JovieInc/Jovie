@@ -46,9 +46,6 @@ struct SettingsEscapeTrapGuardTests {
   }
 
   @Test func settingsUsesNativeGroupedListAndToolbar() throws {
-    #expect(SettingsChromePolicy.usesSystemGroupedList())
-    #expect(SettingsChromePolicy.usesNativeNavigationChrome())
-
     let source = try settingsSource
     #expect(source.contains("List {"))
     #expect(source.contains(".listStyle(.insetGrouped)"))
