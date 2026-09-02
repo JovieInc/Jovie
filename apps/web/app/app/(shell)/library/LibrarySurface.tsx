@@ -2127,7 +2127,7 @@ function YouTubeMerchRelationshipEditor({
             return (
               <div
                 key={relationship.id}
-                className='flex min-h-8 items-center justify-between gap-2 rounded-md bg-surface-1 px-2'
+                className='flex min-h-8 items-center justify-between gap-2 rounded-xs bg-surface-1 px-2'
               >
                 <span className='system-b-library-drawer-panel-copy truncate text-primary-token'>
                   {product?.title ?? 'Merch product'}
@@ -2283,7 +2283,7 @@ function YouTubeExperimentHistory({
       {snapshot.experiments.map(experiment => (
         <div
           key={experiment.id}
-          className='rounded-md bg-surface-1 px-2 py-1.5'
+          className='rounded-xs bg-surface-1 px-2 py-1.5'
         >
           <div className='system-b-library-drawer-panel-copy flex items-center justify-between gap-2'>
             <span className='truncate text-primary-token'>
@@ -2629,19 +2629,6 @@ function AssetDrawer({
                       disabled={!open}
                       initialShare={current.share}
                       onShareChange={onShareChange}
-                    />
-                  </DrawerSection>
-
-                  <DrawerSection
-                    sectionId='post-release'
-                    surface='card'
-                    title='Post Release'
-                  >
-                    <PostReleasePanel
-                      asset={current}
-                      creatorProfileId={profileId}
-                      bundle={postReleaseBundle}
-                      disabled={!open}
                     />
                   </DrawerSection>
 

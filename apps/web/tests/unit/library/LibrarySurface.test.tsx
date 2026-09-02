@@ -162,6 +162,7 @@ function buildAsset(
 ): LibraryReleaseAsset {
   return {
     id: 'release-1',
+    source: { provider: 'discography', canonicalId: 'release-1' },
     title: 'Take Me Over',
     artist: 'Tim White',
     artworkUrl: 'https://cdn.example.com/artwork.jpg',
