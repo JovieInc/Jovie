@@ -266,6 +266,24 @@ function clickGridView() {
   fireEvent.click(screen.getByRole('button', { name: 'Grid View' }));
 }
 
+function expectDesktop32Control(
+  control: HTMLElement,
+  { square = false }: { readonly square?: boolean } = {}
+) {
+  expect(control).toHaveClass(
+    'h-8',
+    'min-h-8',
+    'lg:before:h-8',
+    'lg:before:min-w-0'
+  );
+  expect(control).not.toHaveClass('h-7');
+  expect(control).not.toHaveClass('h-7.5');
+  if (square) {
+    expect(control).toHaveClass('w-8', 'min-w-8');
+    expect(control).not.toHaveClass('w-7');
+  }
+}
+
 describe('LibrarySurface', () => {
   const baseMatchMedia = window.matchMedia;
   const baseScrollYDescriptor = Object.getOwnPropertyDescriptor(
@@ -524,6 +542,54 @@ describe('LibrarySurface', () => {
     expect(window.localStorage.getItem('jovie:library-grid-density')).toBe(
       'spacious'
     );
+  });
+
+  it('keeps desktop Library toolbar controls at 32px without desktop 44px hit targets', () => {
+    window.matchMedia = vi.fn().mockImplementation(query => ({
+      matches: query === '(min-width: 1024px)',
+      media: query,
+      onchange: null,
+      addListener: vi.fn(),
+      removeListener: vi.fn(),
+      addEventListener: vi.fn(),
+      removeEventListener: vi.fn(),
+      dispatchEvent: vi.fn(),
+    }));
+    window.localStorage.setItem(LIBRARY_VIEW_MODE_STORAGE_KEY, 'grid');
+
+    renderLibrary([buildAsset()]);
+
+    expectDesktop32Control(screen.getByRole('button', { name: /^All/u }));
+    expectDesktop32Control(screen.getByRole('button', { name: /Audio/u }));
+    expectDesktop32Control(
+      screen.getByRole('button', { name: 'Show filters' }),
+      { square: true }
+    );
+    expectDesktop32Control(
+      screen.getByRole('button', { name: 'Sort by Release Date' }),
+      { square: true }
+    );
+    expectDesktop32Control(
+      screen.getByRole('button', { name: /Small cards/u }),
+      { square: true }
+    );
+    expectDesktop32Control(
+      screen.getByRole('button', { name: /Medium cards/u }),
+      { square: true }
+    );
+    expectDesktop32Control(
+      screen.getByRole('button', { name: /Large cards/u }),
+      { square: true }
+    );
+    expectDesktop32Control(screen.getByRole('button', { name: 'Grid View' }), {
+      square: true,
+    });
+    expectDesktop32Control(screen.getByRole('button', { name: 'List View' }), {
+      square: true,
+    });
+    expectDesktop32Control(screen.getByRole('button', { name: 'Table View' }), {
+      square: true,
+    });
   });
 
   it('renders aspect-ratio-aware artwork frames in grid cards', () => {
@@ -1715,7 +1781,7 @@ describe('LibrarySurface', () => {
     const filterTrigger = screen.getByRole('button', {
       name: 'Show filters',
     });
-    expect(filterTrigger).toHaveClass('h-7', 'w-7');
+    expectDesktop32Control(filterTrigger, { square: true });
     expect(
       screen.queryByTestId('library-filter-active-indicator')
     ).not.toBeInTheDocument();
@@ -1825,7 +1891,7 @@ describe('LibrarySurface', () => {
     const contentFrame = screen.getByTestId('library-content-frame');
     const before = contentFrame.getBoundingClientRect();
     const trigger = screen.getByRole('button', { name: 'Show filters' });
-    expect(trigger).toHaveClass('h-7', 'w-7');
+    expectDesktop32Control(trigger, { square: true });
     expect(trigger.className).toContain('before:h-11');
     expect(trigger.className).toContain('before:min-w-11');
     expect(trigger.className).not.toMatch(/(?:^|\s)min-h-11(?:\s|$)/);
