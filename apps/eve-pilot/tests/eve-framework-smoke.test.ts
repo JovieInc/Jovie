@@ -4,6 +4,7 @@ import {
   cpSync,
   existsSync,
   mkdtempSync,
+  readFileSync,
   rmSync,
   symlinkSync,
 } from 'node:fs';
@@ -32,6 +33,14 @@ interface EveInfo {
 const pilotRoot = process.cwd();
 
 describe('Eve framework smoke', () => {
+  it('pins the deployment CLI used by the isolated pilot workflow', () => {
+    const manifest = JSON.parse(
+      readFileSync(resolve(pilotRoot, 'package.json'), 'utf8')
+    ) as { devDependencies?: Record<string, string> };
+
+    expect(manifest.devDependencies?.vercel).toBe('56.3.2');
+  });
+
   it('discovers Eve with Ovie Telegram and iMessage channels', () => {
     const isolatedRoot = mkdtempSync(join(tmpdir(), 'jovie-eve-smoke-'));
     const networkSentinel = join(isolatedRoot, 'network-blocked');
