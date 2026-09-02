@@ -7,8 +7,6 @@ and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 
 ## [Unreleased]
 
-- [internal] **Gem Symphony composes four-drive workspaces with the immutable NVMe package cache:** newly created issue workspaces are bind-mounted from a deterministic SATA bucket before clone, then a trusted pre-agent hook restores a lockfile/toolchain-keyed archive and performs one serialized offline install under Node 22.23.2. Agents still cannot install or fetch dependencies. Existing workspaces are never moved, terminal cleanup remains exact-manifest-bound, and boot restores declared mounts before Symphony starts.
-
 ## [26.8.2] - 2026-08-31
 
 - **Library is one catalog with Ideas, In Progress, and Out:** documents, YouTube videos, releases, and merch share stage, type, and release filters. Ideas is a stage, not a separate destination.
