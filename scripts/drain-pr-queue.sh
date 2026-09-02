@@ -407,8 +407,34 @@ label() {  # label <num> <label>
 
 unlabel() {  # unlabel <num> <label>
   [[ "$DRY_RUN" == "1" ]] && { echo "    [dry-run] would -$2 on #$1"; return 0; }
-  gh_mutate_retry pr edit "$1" -R "$REPO" --remove-label "$2" >/dev/null 2>&1 \
-    && echo "    -$2 on #$1" || echo "    !! failed to remove $2 on #$1"
+  if gh_mutate_retry pr edit "$1" -R "$REPO" --remove-label "$2" >/dev/null 2>&1; then
+    echo "    -$2 on #$1"
+    return 0
+  fi
+  echo "    !! failed to remove $2 on #$1"
+  return 1
+}
+
+reconcile_resolved_conflict_label() {  # <num> <expected-head>
+  local n="$1" expected_head="$2" current
+  if ! current="$(gh_retry pr view "$n" -R "$REPO" \
+    --json headRefOid,mergeable,labels 2>/dev/null)"; then
+    echo "    ~ could not verify stale conflict label for #$n; leaving it in place"
+    return 1
+  fi
+  if ! jq -e --arg head "$expected_head" '
+    ((.headRefOid // "") | ascii_downcase) == $head
+    and .mergeable == "MERGEABLE"
+    and ([.labels[].name] | index("needs-conflict-resolution")) != null
+  ' <<<"$current" >/dev/null; then
+    echo "    ~ exact head is not positively mergeable for #$n; preserving conflict label"
+    return 1
+  fi
+  if unlabel "$n" needs-conflict-resolution; then
+    return 0
+  fi
+  echo "    ~ needs-conflict-resolution remains active on #$n; preserving current queue state until retry"
+  return 1
 }
 
 fleet_hold_target_url() {
@@ -1705,6 +1731,26 @@ while IFS= read -r pr; do
 done < <(jq -c '.[]' <<<"$SNAP")
 SNAP="$ENRICHED"
 
+# A source-head push can make GitHub briefly report CONFLICTING while it
+# recomputes mergeability. The conflict label outlives that transient and used
+# to eject an exact active merge-group head even after GitHub returned the same
+# source SHA to MERGEABLE. Re-read the exact head before clearing the label and
+# update this run's snapshot so admission and dequeue consume the same positive
+# evidence. Unknown or changed-head evidence never mutates.
+echo "=== RECONCILE (resolved exact-head conflict labels) ==="
+while read -r pr; do
+  n="$(jq -r '.n' <<<"$pr")"
+  head_oid="$(jq -r '.headOid // ""' <<<"$pr" | tr '[:upper:]' '[:lower:]')"
+  [[ "$head_oid" =~ ^[0-9a-f]{40}$ ]] || continue
+  if reconcile_resolved_conflict_label "$n" "$head_oid"; then
+    SNAP="$(jq -c --argjson n "$n" '
+      map(if .n == $n then .L = [.L[] | select(. != "needs-conflict-resolution")] else . end)
+    ' <<<"$SNAP")"
+  fi
+done < <(echo "$SNAP" | jq -c '.[]
+  | select(.m == "MERGEABLE")
+  | select([.L[]] | any(. == "needs-conflict-resolution"))')
+
 # isolated-only (production-red) may keep one freshly proven isolated entry
 # and dequeues ordinary members. Waiting lanes — hold-intake, draft-only /
 # main-not-green, and blocked-unknown — must not dequeue CLEAN unrelated PRs
@@ -1891,7 +1937,7 @@ echo "$SNAP" | jq -c --arg promotion_mode "$DRAIN_PROMOTION_MODE" --arg freeze "
   | select(.q == true)
   | select(([.L[]] | any(.=="queue-deferred" or '"$NO_AUTO_HOLD_JQ"')) | not)
   | select(
-      ([.L[]] | any(.=="needs-conflict-resolution"))
+      (([.L[]] | any(.=="needs-conflict-resolution")) and .m != "MERGEABLE")
       or (.m == "CONFLICTING")
       or (
         (.fail|length>0)
@@ -1905,7 +1951,7 @@ echo "$SNAP" | jq -c --arg promotion_mode "$DRAIN_PROMOTION_MODE" --arg freeze "
     n=$(jq -r '.n' <<<"$pr"); t=$(jq -r '.t' <<<"$pr")
     reason=$(jq -r '
       [
-        (if ([.L[]] | any(.=="needs-conflict-resolution")) then "needs-conflict-resolution" else empty end),
+        (if ([.L[]] | any(.=="needs-conflict-resolution")) and .m != "MERGEABLE" then "needs-conflict-resolution" else empty end),
         (if .m == "CONFLICTING" then "mergeable=CONFLICTING" else empty end),
         (if (.fail|length)>0 then "checks=" + (.fail|join(",")) else empty end)
       ] | join("; ")

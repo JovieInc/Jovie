@@ -153,7 +153,11 @@ const MERGE_GROUP_ADMISSION_INPUTS = [
 const MERGE_GROUP_ADMISSION_COMPANIONS = [
   '.github/workflows/ci.yml',
   '.github/workflows/ios-ci.yml',
+  'apps/web/tests/unit/ci/deploy-workflow.test.ts',
   'scripts/lib/__tests__/merge-group-workflow-contract.test.mjs',
+];
+const MERGE_GROUP_ADMISSION_WEB_TESTS = [
+  'apps/web/tests/unit/ci/deploy-workflow.test.ts',
 ];
 const MERGE_GROUP_ADMISSION_SCRIPT_TESTS = [
   'scripts/lib/__tests__/automation-verify.test.mjs',
@@ -1291,7 +1295,7 @@ describe('automation-verify affected scope', () => {
     expect(plan.mode).toBe('selected');
     expect(plan.scriptVitestTests).toEqual(MERGE_GROUP_ADMISSION_SCRIPT_TESTS);
     expect(plan.pythonTests).toEqual([]);
-    expect(plan.selectedTests).toEqual([]);
+    expect(plan.selectedTests).toEqual(MERGE_GROUP_ADMISSION_WEB_TESTS);
   });
 
   it.each(
@@ -1302,6 +1306,7 @@ describe('automation-verify affected scope', () => {
     expect(plan.mode).toBe('selected');
     expect(plan.scriptVitestTests).toEqual(MERGE_GROUP_ADMISSION_SCRIPT_TESTS);
     expect(plan.pythonTests).toEqual([]);
+    expect(plan.selectedTests).toEqual(MERGE_GROUP_ADMISSION_WEB_TESTS);
   });
 
   it('fails closed when merge-group admission changes include unknown automation', () => {

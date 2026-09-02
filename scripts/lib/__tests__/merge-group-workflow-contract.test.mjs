@@ -297,12 +297,29 @@ describe('merge_group workflow contract', () => {
     expect(admission).toContain("github.event_name == 'merge_group'");
     expect(admission).toContain('runs-on: ubuntu-latest');
     expect(admission).toContain('timeout-minutes: 2');
+    expect(admission).toContain(
+      "admitted: ${{ steps.admission.outputs.admitted || 'false' }}"
+    );
     expect(admission).toContain('checks: read');
     expect(admission).toContain('contents: read');
     expect(admission).toContain(
       "pr_number: ${{ steps.admission.outputs.pr_number || '' }}"
     );
+    expect(admission).toContain('pull-requests: read');
     expect(admission).toContain('ref: main');
+    expect(admission).toContain('node "$policy" --print-contract-version');
+    expect(admission).toContain("admitted_value=\"$(sed -n 's/^admitted=//p'");
+    expect(admission).toContain("$admitted_value\" != 'true'");
+    expect(admission).toContain("$admitted_value\" != 'false'");
+    expect(admission).toContain("echo 'admitted=true'");
+    expect(admission).toContain(
+      'refs/heads/gh-readonly-queue/main/pr-([1-9][0-9]*)-[0-9a-f]{40}'
+    );
+    expect(admission).toContain('echo "pr_number=${BASH_REMATCH[1]}"');
+    expect(admission).toContain('echo "synthetic_head_sha=$GITHUB_SHA"');
+    expect(admission).toContain(
+      "echo 'current_queue_state=LEGACY_EXACT_REF_BOOTSTRAP'"
+    );
     expect(admission).not.toContain(
       'ref: ${{ github.event.merge_group.base_sha }}'
     );
@@ -310,8 +327,9 @@ describe('merge_group workflow contract', () => {
     expect(admission).toContain('id: admission');
     expect(admission).toContain('GH_TOKEN: ${{ github.token }}');
     expect(admission).toContain(
-      'run: node scripts/lib/merge-group-admission.mjs'
+      "policy='scripts/lib/merge-group-admission.mjs'"
     );
+    expect(admission).toContain('node "$policy"');
     expect(admission).not.toContain('secrets.');
 
     for (const jobId of ['ci-fast-typecheck', 'ci-fast-remaining']) {
@@ -322,6 +340,9 @@ describe('merge_group workflow contract', () => {
       expect(job, jobId).toContain("github.event_name != 'merge_group'");
       expect(job, jobId).toContain(
         "needs.ci-merge-group-admission.result == 'success'"
+      );
+      expect(job, jobId).toContain(
+        "needs.ci-merge-group-admission.outputs.admitted == 'true'"
       );
     }
 
@@ -356,6 +377,9 @@ describe('merge_group workflow contract', () => {
       expect(job, jobId).toContain(
         "needs.ci-merge-group-admission.result == 'success'"
       );
+      expect(job, jobId).toContain(
+        "needs.ci-merge-group-admission.outputs.admitted == 'true'"
+      );
     }
 
     const ciFast = getJobBlock(CI_WORKFLOW, 'ci-fast');
@@ -366,6 +390,9 @@ describe('merge_group workflow contract', () => {
     expect(ciFast).toContain("github.event_name != 'merge_group'");
     expect(ciFast).toContain(
       "needs.ci-merge-group-admission.result == 'success'"
+    );
+    expect(ciFast).toContain(
+      "needs.ci-merge-group-admission.outputs.admitted == 'true'"
     );
     expect(ciFast).toContain('TYPECHECK_RESULT');
     expect(ciFast).toContain('REMAINING_RESULT');
@@ -422,6 +449,18 @@ describe('merge_group workflow contract', () => {
     expect(aggregate).toContain('ci-golden-path-lock');
     expect(aggregate).toContain('ci-visual-snapshot-compare');
     expect(aggregate).toContain('drizzle-migration-guard');
+    expect(aggregate).toContain('ADMISSION_ADMITTED=');
+    expect(aggregate).toContain('ADMISSION_OBSOLETE=');
+    expect(aggregate).toContain('ADMISSION_QUEUE_STATE=');
+    expect(aggregate).toContain(
+      'Obsolete merge-group neutralized before selected product lanes'
+    );
+    expect(aggregate).toContain(
+      '"$ADMISSION_ADMITTED" == "false" && "$ADMISSION_OBSOLETE" == "true"'
+    );
+    expect(aggregate).toContain(
+      'Merge-group admission succeeded without a valid admitted/obsolete disposition'
+    );
     expect(aggregate).toContain('BUILD_LAYOUT_RESULT');
     expect(aggregate).toContain('RUN_PROMPTFOO');
     expect(aggregate).toContain('RUN_GOLDEN_EVAL');
@@ -516,6 +555,15 @@ describe('merge_group workflow contract', () => {
 
     const macos = getJobBlock(CI_WORKFLOW, 'ci-macos');
     expect(macos).toContain('runs-on: macos-26');
+    expect(macos).toContain(
+      "format('ci-macos-pr-{0}', needs.ci-merge-group-admission.outputs.pr_number)"
+    );
+    expect(macos).toContain(
+      "format('ci-macos-{0}-{1}', github.run_id, github.run_attempt)"
+    );
+    expect(macos).toContain(
+      "cancel-in-progress: ${{ github.event_name == 'merge_group' && needs.ci-merge-group-admission.outputs.pr_number != '' }}"
+    );
     expect(CI_WORKFLOW).toContain('node "$TRUSTED_PRODUCT_LANE_CLASSIFIER"');
     expect(CI_WORKFLOW).not.toContain('.github/workflows/macos-ci.yml');
     expect(macos).toContain("github.event_name == 'merge_group'");

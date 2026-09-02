@@ -5,6 +5,16 @@ const SHA_PATTERN = /^[0-9a-f]{40}$/;
 const QUEUE_HEAD_PR_PATTERN =
   /^refs\/heads\/gh-readonly-queue\/main\/pr-([1-9][0-9]*)-[0-9a-f]+$/;
 const REQUIRED_CHECKS = Object.freeze(['Fork PR Gate', 'PR Size Guard']);
+const QUEUE_STATE_AWAITING_CHECKS = 'AWAITING_CHECKS';
+const LIVE_QUEUE_ENTRY_STATES = new Set([
+  'QUEUED',
+  QUEUE_STATE_AWAITING_CHECKS,
+  'MERGEABLE',
+  'UNMERGEABLE',
+  'LOCKED',
+]);
+const LIVE_QUEUE_PAGE_SIZE = 100;
+const MAX_LIVE_QUEUE_PAGES = 10;
 const NONTERMINAL_CHECK_STATUSES = new Set([
   'in_progress',
   'pending',
@@ -26,6 +36,31 @@ const TERMINAL_CHECK_CONCLUSIONS = new Set([
 const MAX_WAIT_MS = 60_000;
 const POLL_INTERVAL_MS = 3_000;
 const MAX_API_REQUEST_MS = 10_000;
+const LIVE_QUEUE_QUERY = `query MergeGroupAdmissionLiveQueue(
+  $owner:String!,
+  $name:String!,
+  $branch:String!,
+  $cursor:String,
+  $pageSize:Int!
+){
+  repository(owner:$owner,name:$name){
+    mergeQueue(branch:$branch){
+      entries(first:$pageSize,after:$cursor){
+        nodes{
+          position
+          state
+          headCommit{oid}
+          baseCommit{oid}
+          pullRequest{number headRefOid baseRefName}
+        }
+        pageInfo{hasNextPage endCursor}
+      }
+    }
+  }
+}`;
+const REQUIRED_ENV_MESSAGE =
+  'GITHUB_EVENT_PATH, GH_TOKEN, GITHUB_SHA, and GITHUB_REPOSITORY are required';
+export const ADMISSION_CONTRACT_VERSION = 'jovie-merge-group-live-admission/v1';
 
 export class MergeGroupAdmissionError extends Error {
   constructor(message) {
@@ -45,6 +80,13 @@ function requireSha(value, field) {
   return value;
 }
 
+function requirePositiveInteger(value, field) {
+  if (!Number.isInteger(value) || value < 1) {
+    fail(`${field} is not a positive integer`);
+  }
+  return value;
+}
+
 function splitRepository(repository) {
   const parts = String(repository ?? '').split('/');
   if (parts.length !== 2 || parts.some(part => !part)) {
@@ -58,7 +100,10 @@ export function parseQueueHeadPullRequestNumber(headRef) {
   if (!match) {
     fail('merge_group head_ref does not expose a queue PR number');
   }
-  return Number.parseInt(match[1], 10);
+  return requirePositiveInteger(
+    Number.parseInt(match[1], 10),
+    'merge_group queue PR number'
+  );
 }
 
 export function validateMergeGroupAdmissionEvent(
@@ -91,7 +136,6 @@ export function validateMergeGroupAdmissionEvent(
   if (group.head_commit?.id && group.head_commit.id !== headSha) {
     fail('merge_group head_commit does not match head_sha');
   }
-
   return {
     headRef: group.head_ref,
     headSha,
@@ -113,6 +157,201 @@ export function validateQueueRef(response, { headRef, headSha }) {
   ) {
     fail('merge queue ref is missing, malformed, or no longer at head_sha');
   }
+}
+
+function requireNullableSha(value, field) {
+  if (value === null || value === undefined) return null;
+  return requireSha(String(value).toLowerCase(), field);
+}
+
+export function normalizeLiveQueueEntriesPage(
+  payload,
+  { branch = 'main' } = {}
+) {
+  if (Array.isArray(payload?.errors) && payload.errors.length > 0) {
+    fail(
+      `live merge queue GraphQL returned errors: ${payload.errors
+        .map(error => error?.message ?? String(error))
+        .join('; ')}`
+    );
+  }
+
+  const repository = payload?.data?.repository;
+  if (!repository) {
+    fail(`live merge queue inventory omitted repository for ${branch}`);
+  }
+  if (repository.mergeQueue === null) {
+    fail(`live merge queue is not configured for ${branch}`);
+  }
+
+  const connection = repository.mergeQueue?.entries;
+  if (
+    !Array.isArray(connection?.nodes) ||
+    typeof connection?.pageInfo?.hasNextPage !== 'boolean'
+  ) {
+    fail(`live merge queue inventory is incomplete for ${branch}`);
+  }
+  if (
+    connection.pageInfo.hasNextPage &&
+    typeof connection.pageInfo.endCursor !== 'string'
+  ) {
+    fail(`live merge queue inventory omitted its cursor for ${branch}`);
+  }
+
+  const entries = connection.nodes.map(node => {
+    const prNumber = requirePositiveInteger(
+      node?.pullRequest?.number,
+      'live merge queue PR number'
+    );
+    const position = requirePositiveInteger(
+      node?.position,
+      `live merge queue position for PR #${prNumber}`
+    );
+    const state = node?.state;
+    if (!LIVE_QUEUE_ENTRY_STATES.has(state)) {
+      fail(`live merge queue state for PR #${prNumber} is unrecognized`);
+    }
+    if (node?.pullRequest?.baseRefName !== branch) {
+      fail(`live merge queue base for PR #${prNumber} is not ${branch}`);
+    }
+    const headCommitOid = requireNullableSha(
+      node?.headCommit?.oid,
+      `live merge queue headCommit for PR #${prNumber}`
+    );
+    if (state === QUEUE_STATE_AWAITING_CHECKS && headCommitOid === null) {
+      fail(
+        [
+          `live merge queue AWAITING_CHECKS entry for PR #${prNumber}`,
+          'has no headCommit',
+        ].join(' ')
+      );
+    }
+    return {
+      baseCommitOid: requireNullableSha(
+        node?.baseCommit?.oid,
+        `live merge queue baseCommit for PR #${prNumber}`
+      ),
+      headCommitOid,
+      position,
+      prNumber,
+      sourceHeadSha: requireNullableSha(
+        node?.pullRequest?.headRefOid,
+        `live merge queue source head for PR #${prNumber}`
+      ),
+      state,
+    };
+  });
+
+  return {
+    entries,
+    endCursor: connection.pageInfo.endCursor ?? null,
+    hasNextPage: connection.pageInfo.hasNextPage,
+  };
+}
+
+function queueSnapshot(entries) {
+  return entries
+    .filter(entry => entry.state === QUEUE_STATE_AWAITING_CHECKS)
+    .map(entry => ({
+      baseSha: entry.baseCommitOid,
+      position: entry.position,
+      pr: entry.prNumber,
+      syntheticSha: entry.headCommitOid,
+    }));
+}
+
+function entryForReceipt(entry) {
+  return entry
+    ? {
+        baseSha: entry.baseCommitOid,
+        position: entry.position,
+        pr: entry.prNumber,
+        sourceHeadSha: entry.sourceHeadSha,
+        state: entry.state,
+        syntheticSha: entry.headCommitOid,
+      }
+    : null;
+}
+
+/**
+ * @param {{
+ *   runAttempt?: string | null,
+ *   runId?: string | null,
+ *   runUrl?: string | null,
+ * } | null | undefined} runContext
+ */
+function normalizeRunContext(runContext) {
+  return {
+    runAttempt: runContext?.runAttempt ?? null,
+    runId: runContext?.runId ?? null,
+    runUrl: runContext?.runUrl ?? null,
+  };
+}
+
+export function buildLiveQueueAdmissionReceipt({
+  entries,
+  evidence,
+  runContext = undefined,
+}) {
+  if (!Array.isArray(entries)) {
+    fail('live merge queue entries are malformed');
+  }
+  const exactMatches = entries.filter(
+    entry => entry.headCommitOid === evidence.headSha
+  );
+  if (exactMatches.length > 1) {
+    fail(`live merge queue repeats synthetic head ${evidence.headSha}`);
+  }
+  const matchingPrEntries = entries.filter(
+    entry => entry.prNumber === evidence.prNumber
+  );
+  if (matchingPrEntries.length > 1) {
+    fail(`live merge queue repeats PR #${evidence.prNumber}`);
+  }
+
+  const exact = exactMatches[0] ?? null;
+  if (exact && exact.prNumber !== evidence.prNumber) {
+    fail(
+      [
+        `live merge queue synthetic head ${evidence.headSha} belongs to`,
+        `PR #${exact.prNumber}, not PR #${evidence.prNumber}`,
+      ].join(' ')
+    );
+  }
+
+  const replacement =
+    matchingPrEntries.find(
+      entry =>
+        typeof entry.headCommitOid === 'string' &&
+        entry.headCommitOid !== evidence.headSha
+    ) ?? null;
+  const current = exact ?? matchingPrEntries[0] ?? null;
+  // Queue state advances while required checks are running. The synthetic head
+  // is current whenever the live queue still binds this PR to the exact SHA;
+  // only absence or a different SHA proves that this event is obsolete.
+  const admitted = Boolean(exact);
+  const replacementCombinedHead = admitted
+    ? null
+    : (replacement?.headCommitOid ?? null);
+  const normalizedRunContext = normalizeRunContext(runContext);
+
+  return {
+    admitted,
+    currentQueueState: current?.state ?? 'ABSENT',
+    headRef: evidence.headRef,
+    liveEntry: entryForReceipt(exact),
+    liveQueueAwaitingChecks: queueSnapshot(entries),
+    obsoleteSyntheticSha: admitted ? null : evidence.headSha,
+    outcome: admitted ? 'admitted' : 'obsolete',
+    pr: evidence.prNumber,
+    replacementCombinedHead,
+    repository: evidence.repository,
+    runAttempt: normalizedRunContext.runAttempt,
+    runId: normalizedRunContext.runId,
+    runUrl: normalizedRunContext.runUrl,
+    schema: ADMISSION_CONTRACT_VERSION,
+    syntheticSha: evidence.headSha,
+  };
 }
 
 export function classifyRequiredCheckPage(page, { checkName, headSha }) {
@@ -174,16 +413,19 @@ function defaultSleep(delayMs) {
 export async function waitForMergeGroupAdmission({
   event,
   loadCheckRuns,
+  loadLiveQueueEntries,
   loadQueueRef,
   maxWaitMs = MAX_WAIT_MS,
   now = Date.now,
   onStatus = message => console.log(message),
   pollIntervalMs = POLL_INTERVAL_MS,
+  runContext = undefined,
   sleep = defaultSleep,
 }) {
   const evidence = validateMergeGroupAdmissionEvent(event);
   if (
     typeof loadCheckRuns !== 'function' ||
+    typeof loadLiveQueueEntries !== 'function' ||
     typeof loadQueueRef !== 'function'
   ) {
     fail('merge_group admission loaders are required');
@@ -193,10 +435,34 @@ export async function waitForMergeGroupAdmission({
 
   const deadlineMs = now() + maxWaitMs;
   let attempt = 0;
+  const readLiveReceipt = async () => {
+    const liveEntries = await loadLiveQueueEntries({ ...evidence, deadlineMs });
+    const receipt = buildLiveQueueAdmissionReceipt({
+      entries: liveEntries,
+      evidence,
+      runContext,
+    });
+    if (!receipt.admitted) {
+      onStatus(
+        `Merge-group admission neutralized obsolete synthetic head ${
+          receipt.syntheticSha
+        }: PR #${receipt.pr} queueState=${
+          receipt.currentQueueState
+        } replacement=${receipt.replacementCombinedHead ?? 'none'}`
+      );
+    }
+    return receipt;
+  };
+
   while (true) {
     attempt += 1;
     if (attempt > 1 && now() >= deadlineMs) {
       fail(`required merge-group checks did not pass within ${maxWaitMs}ms`);
+    }
+
+    const liveReceipt = await readLiveReceipt();
+    if (!liveReceipt.admitted) {
+      return { ...evidence, admitted: false, receipt: liveReceipt };
     }
 
     const queueRef = await loadQueueRef({ ...evidence, deadlineMs });
@@ -219,27 +485,36 @@ export async function waitForMergeGroupAdmission({
     );
     if (terminalFailure >= 0) {
       fail(
-        `${REQUIRED_CHECKS[terminalFailure]} completed with ${states[terminalFailure].detail}`
+        `${REQUIRED_CHECKS[terminalFailure]} completed with ${
+          states[terminalFailure].detail
+        }`
       );
     }
 
     if (states.every(state => state.state === 'success')) {
       const finalQueueRef = await loadQueueRef({ ...evidence, deadlineMs });
       validateQueueRef(finalQueueRef, evidence);
+      const finalLiveReceipt = await readLiveReceipt();
+      if (!finalLiveReceipt.admitted) {
+        return { ...evidence, admitted: false, receipt: finalLiveReceipt };
+      }
       onStatus(
-        `Merge-group admission passed for ${evidence.headSha}: ${REQUIRED_CHECKS.join(', ')}`
+        `Merge-group admission passed for ${
+          evidence.headSha
+        }: ${REQUIRED_CHECKS.join(', ')}`
       );
-      return evidence;
+      return { ...evidence, admitted: true, receipt: finalLiveReceipt };
     }
 
     const remainingMs = deadlineMs - now();
     if (remainingMs <= 0) {
       fail(`required merge-group checks did not pass within ${maxWaitMs}ms`);
     }
+    const gateStatus = REQUIRED_CHECKS.map(
+      (name, index) => `${name}=${states[index].detail}`
+    ).join(', ');
     onStatus(
-      `Merge-group admission pending (attempt ${attempt}): ${REQUIRED_CHECKS.map(
-        (name, index) => `${name}=${states[index].detail}`
-      ).join(', ')}`
+      `Merge-group admission pending (attempt ${attempt}): ${gateStatus}`
     );
     await sleep(Math.min(pollIntervalMs, remainingMs));
   }
@@ -251,7 +526,15 @@ function encodePathParts(value) {
 
 async function githubRequest(
   path,
-  { deadlineMs, env = process.env, fetchImpl = fetch, now = Date.now, token }
+  {
+    body = undefined,
+    deadlineMs,
+    env = process.env,
+    fetchImpl = fetch,
+    method = 'GET',
+    now = Date.now,
+    token,
+  }
 ) {
   const remainingMs = deadlineMs - now();
   if (remainingMs <= 0) {
@@ -263,19 +546,24 @@ async function githubRequest(
   try {
     response = await fetchImpl(`${apiUrl}${path}`, {
       cache: 'no-store',
+      method,
       headers: {
         Accept: 'application/vnd.github+json',
         Authorization: `Bearer ${token}`,
         'Cache-Control': 'no-cache',
+        ...(body ? { 'Content-Type': 'application/json' } : {}),
         'X-GitHub-Api-Version': '2022-11-28',
       },
+      body: body ? JSON.stringify(body) : undefined,
       signal: AbortSignal.timeout(
         Math.max(1, Math.min(MAX_API_REQUEST_MS, remainingMs))
       ),
     });
   } catch (error) {
     fail(
-      `GitHub API request failed for ${path}: ${error instanceof Error ? error.message : String(error)}`
+      `GitHub API request failed for ${path}: ${
+        error instanceof Error ? error.message : String(error)
+      }`
     );
   }
 
@@ -287,11 +575,19 @@ async function githubRequest(
     fail(`GitHub API returned non-JSON for ${path}`);
   }
   if (!response.ok) {
-    fail(
-      `GitHub API ${response.status} for ${path}: ${data?.message ?? 'unknown error'}`
-    );
+    const message = data?.message ?? 'unknown error';
+    fail(`GitHub API ${response.status} for ${path}: ${message}`);
   }
   return { data, link: response.headers.get('link') };
+}
+
+async function githubGraphqlRequest(query, variables, options) {
+  const result = await githubRequest('/graphql', {
+    ...options,
+    body: { query, variables },
+    method: 'POST',
+  });
+  return result.data;
 }
 
 function createGitHubAdmissionApi({
@@ -301,9 +597,32 @@ function createGitHubAdmissionApi({
   repository,
   token,
 }) {
+  const [owner, name] = splitRepository(repository);
   const encodedRepository = encodePathParts(repository);
   const encodedHeadRef = encodePathParts(headRef.slice('refs/'.length));
   return {
+    async loadLiveQueueEntries({ deadlineMs }) {
+      const entries = [];
+      let cursor = null;
+      for (let page = 1; page <= MAX_LIVE_QUEUE_PAGES; page += 1) {
+        const payload = await githubGraphqlRequest(
+          LIVE_QUEUE_QUERY,
+          {
+            branch: 'main',
+            cursor,
+            name,
+            owner,
+            pageSize: LIVE_QUEUE_PAGE_SIZE,
+          },
+          { deadlineMs, env, fetchImpl, token }
+        );
+        const parsed = normalizeLiveQueueEntriesPage(payload);
+        entries.push(...parsed.entries);
+        if (!parsed.hasNextPage) return entries;
+        cursor = parsed.endCursor;
+      }
+      fail(`live merge queue inventory exceeded ${MAX_LIVE_QUEUE_PAGES} pages`);
+    },
     async loadQueueRef({ deadlineMs }) {
       const result = await githubRequest(
         `/repos/${encodedRepository}/git/ref/${encodedHeadRef}`,
@@ -326,11 +645,38 @@ function createGitHubAdmissionApi({
   };
 }
 
-async function writeAdmissionOutputs(evidence, env) {
+function nullableEnv(value) {
+  const text = String(value ?? '').trim();
+  return text.length > 0 ? text : null;
+}
+
+function createRunContextFromEnv(env = process.env) {
+  const runId = nullableEnv(env.GITHUB_RUN_ID);
+  return {
+    runAttempt: nullableEnv(env.GITHUB_RUN_ATTEMPT),
+    runId,
+    runUrl:
+      runId && nullableEnv(env.GITHUB_REPOSITORY)
+        ? `${
+            nullableEnv(env.GITHUB_SERVER_URL) ?? 'https://github.com'
+          }/${env.GITHUB_REPOSITORY}/actions/runs/${runId}`
+        : null,
+  };
+}
+
+async function writeAdmissionOutputs(receipt, env = process.env) {
   if (env.GITHUB_OUTPUT) {
     await appendFile(
       env.GITHUB_OUTPUT,
-      `pr_number=${evidence.prNumber}\n`,
+      [
+        `admitted=${receipt.admitted ? 'true' : 'false'}`,
+        `obsolete=${receipt.outcome === 'obsolete' ? 'true' : 'false'}`,
+        `pr_number=${receipt.pr}`,
+        `synthetic_head_sha=${receipt.syntheticSha}`,
+        `current_queue_state=${receipt.currentQueueState}`,
+        `replacement_combined_head=${receipt.replacementCombinedHead ?? ''}`,
+        '',
+      ].join('\n'),
       'utf8'
     );
   }
@@ -338,11 +684,20 @@ async function writeAdmissionOutputs(evidence, env) {
     await appendFile(
       env.GITHUB_STEP_SUMMARY,
       [
-        '### Merge-group exact-ref admission',
+        '### Merge-group live queue admission',
         '',
-        `- PR: #${evidence.prNumber}`,
-        `- Synthetic head: \`${evidence.headSha}\``,
-        '- Queue state: `EXACT_REF_ADMITTED`',
+        `Receipt schema: \`${receipt.schema}\``,
+        '',
+        '| Field | Value |',
+        '| --- | --- |',
+        `| Outcome | \`${receipt.outcome}\` |`,
+        `| PR | #${receipt.pr} |`,
+        `| Synthetic head | \`${receipt.syntheticSha}\` |`,
+        `| Current queue state | \`${receipt.currentQueueState}\` |`,
+        `| Replacement combined head | \`${
+          receipt.replacementCombinedHead ?? 'none'
+        }\` |`,
+        `| Run id | \`${receipt.runId ?? 'unknown'}\` |`,
         '',
       ].join('\n'),
       'utf8'
@@ -359,9 +714,7 @@ export async function runAdmissionFromEnv(
   const expectedHeadSha = env.GITHUB_SHA;
   const expectedRepository = env.GITHUB_REPOSITORY;
   if (!eventPath || !token || !expectedHeadSha || !expectedRepository) {
-    fail(
-      'GITHUB_EVENT_PATH, GH_TOKEN, GITHUB_SHA, and GITHUB_REPOSITORY are required'
-    );
+    fail(REQUIRED_ENV_MESSAGE);
   }
 
   const event = JSON.parse(await readFile(eventPath, 'utf8'));
@@ -375,19 +728,28 @@ export async function runAdmissionFromEnv(
     fetchImpl,
     token,
   });
-  const admitted = await waitForMergeGroupAdmission({ event, ...api });
-  await writeAdmissionOutputs(admitted, env);
-  return admitted;
+  const result = await waitForMergeGroupAdmission({
+    event,
+    ...api,
+    runContext: createRunContextFromEnv(env),
+  });
+  await writeAdmissionOutputs(result.receipt, env);
+  console.log(JSON.stringify(result.receipt));
+  return result.receipt;
 }
 
 if (
   process.argv[1] &&
   import.meta.url === pathToFileURL(process.argv[1]).href
 ) {
-  runAdmissionFromEnv().catch(error => {
-    console.error(
-      `::error::${error instanceof Error ? error.message : String(error)}`
-    );
-    process.exitCode = 1;
-  });
+  if (process.argv.includes('--print-contract-version')) {
+    console.log(ADMISSION_CONTRACT_VERSION);
+  } else {
+    runAdmissionFromEnv().catch(error => {
+      console.error(
+        `::error::${error instanceof Error ? error.message : String(error)}`
+      );
+      process.exitCode = 1;
+    });
+  }
 }
