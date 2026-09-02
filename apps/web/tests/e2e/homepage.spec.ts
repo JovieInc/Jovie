@@ -57,31 +57,39 @@ test.describe('Homepage', () => {
     await gotoHomepage(page);
   });
 
-  test('renders the System B poster hero and CTA', async ({ page }) => {
+  test('renders the editorial hero with the name search as the only control', async ({
+    page,
+  }) => {
     const hero = page.getByTestId('homepage-hero-shell');
 
     await expect(hero).toBeVisible();
     await expect(hero.getByText('operating system')).toHaveCount(0);
     await expect(
       hero.getByRole('heading', {
-        name: 'Jovie helps you move your music forward.',
+        name: 'Control how the world sees you.',
       })
     ).toBeVisible();
     await expect(
       hero.getByText(
-        'It uses your catalog, audience, and artist presence to surface the one action most likely to pay off.'
+        'Find what the internet knows. Turn it into relationships.'
       )
     ).toBeVisible();
+    await expect(hero.getByPlaceholder('Search your name')).toBeVisible();
     await expect(
-      hero.getByRole('link', { name: 'Get started', exact: true })
-    ).toHaveAttribute('href', '/start');
-    await expect(
-      hero.getByRole('link', {
-        name: 'See a live profile',
-        exact: true,
-      })
-    ).toHaveAttribute('href', '/artist-profiles');
+      hero.getByRole('button', { name: 'Find me', exact: true })
+    ).toBeEnabled();
+    await expect(hero.getByRole('link')).toHaveCount(0);
+    await expect(hero.getByRole('button')).toHaveCount(1);
+    await expect(hero.getByText('Get started')).toHaveCount(0);
     await expect(hero.getByPlaceholder('Ask Jovie...')).toHaveCount(0);
+
+    // The hero owns the first viewport.
+    const heroBox = await hero.boundingBox();
+    const viewport = page.viewportSize();
+    expect(heroBox?.y ?? 1).toBeLessThanOrEqual(0);
+    expect(heroBox?.height ?? 0).toBeGreaterThanOrEqual(
+      (viewport?.height ?? 0) - 1
+    );
   });
 
   test('header uses compact homepage presentation and text-only login', async ({
@@ -135,67 +143,45 @@ test.describe('Homepage', () => {
     await expect(toolsFlyout).toHaveCount(0);
   });
 
-  test('hero exposes one centered artist dashboard at source quality', async ({
+  test('hero backdrop is one decorative full-bleed photo that loads first', async ({
     page,
   }) => {
-    const commandCenter = page.getByTestId('homepage-hero-command-center');
+    const backdrop = page.getByTestId('homepage-editorial-hero-backdrop');
 
-    await expect(commandCenter).toBeVisible();
-    await expect(
-      commandCenter.getByAltText('Jovie authenticated releases workspace')
-    ).toBeVisible();
-    await expect(commandCenter.locator('img')).toHaveCount(1);
-    await expect(commandCenter.getByRole('button')).toHaveCount(0);
+    await expect(backdrop).toHaveAttribute('aria-hidden', 'true');
+    await expect(backdrop.locator('img')).toHaveCount(1);
+    await expect(backdrop.locator('img')).toHaveAttribute('alt', '');
+    await expect(backdrop.locator('img')).toHaveAttribute(
+      'fetchpriority',
+      'high'
+    );
     await page.waitForFunction(() => {
-      const commandCenterEl = document.querySelector(
-        '[data-testid="homepage-hero-command-center"]'
+      const image = document.querySelector<HTMLImageElement>(
+        '[data-testid="homepage-editorial-hero-backdrop"] img'
       );
-      const image = commandCenterEl?.querySelector<HTMLImageElement>('img');
       if (!image) return false;
       const rect = image.getBoundingClientRect();
-      const imageCenter = rect.left + rect.width / 2;
       return (
         image.complete &&
         image.naturalWidth > 0 &&
-        Math.abs(imageCenter - window.innerWidth / 2) < 12
+        rect.width >= window.innerWidth - 1 &&
+        rect.height >= window.innerHeight - 1
       );
     });
+    await expect(backdrop.locator('img')).toHaveJSProperty(
+      'currentSrc',
+      /night-desk/
+    );
 
-    const visibleImageQuality = await commandCenter
-      .locator('img')
-      .evaluateAll(images =>
-        images
-          .map(img => {
-            const rect = img.getBoundingClientRect();
-            const sourceWidth =
-              Number(
-                new URL(img.currentSrc, window.location.href).searchParams.get(
-                  'w'
-                )
-              ) || img.naturalWidth;
-            return {
-              alt: img.alt,
-              clientWidth: rect.width,
-              naturalWidth: img.naturalWidth,
-              sourceWidth,
-              visible:
-                rect.width > 0 && rect.right > 0 && rect.left < innerWidth,
-              requiredWidth: Math.ceil(rect.width * devicePixelRatio),
-            };
-          })
-          .filter(image => image.visible)
-      );
-
-    expect(visibleImageQuality).toHaveLength(1);
-    for (const image of visibleImageQuality) {
-      expect(
-        image.sourceWidth,
-        `${image.alt} should be loaded at device pixel ratio quality`
-      ).toBeGreaterThanOrEqual(image.requiredWidth);
-    }
-    await expect(commandCenter.locator('img')).toHaveAttribute(
-      'src',
-      /releases-dashboard-sidebar/
+    // Type sits on top of the photo, inside the viewport.
+    const heading = page.getByRole('heading', {
+      name: 'Control how the world sees you.',
+    });
+    const headingBox = await heading.boundingBox();
+    const viewport = page.viewportSize();
+    expect(headingBox?.y ?? -1).toBeGreaterThan(0);
+    expect((headingBox?.y ?? 0) + (headingBox?.height ?? 0)).toBeLessThan(
+      viewport?.height ?? 0
     );
   });
 
@@ -243,7 +229,7 @@ test.describe('Homepage', () => {
   test('hero reveal is geometry-safe, interactive, and static under reduced motion', async ({
     page,
   }) => {
-    const copy = page.locator('.homepage-poster-hero__copy');
+    const copy = page.locator('.homepage-editorial-hero__copy');
     const before = await copy.boundingBox();
     expect(
       await copy.evaluate(element => {
@@ -574,7 +560,7 @@ test.describe('Homepage', () => {
       await page.evaluate(() => document.fonts.ready);
       const headingLines = await page
         .locator(
-          '.homepage-poster-hero__headline, [data-homepage-section-heading]'
+          '.homepage-editorial-hero__headline, [data-homepage-section-heading]'
         )
         .evaluateAll(headings =>
           headings.map(heading => {
@@ -617,23 +603,37 @@ test.describe('Homepage', () => {
     await page.setViewportSize({ width: 390, height: 844 });
     await gotoHomepage(page);
 
-    await expect(
-      page.getByRole('heading', {
-        name: 'Jovie helps you move your music forward.',
-      })
-    ).toBeVisible({
+    const heading = page.getByRole('heading', {
+      name: 'Control how the world sees you.',
+    });
+    await expect(heading).toBeVisible({
       timeout: SMOKE_TIMEOUTS.VISIBILITY,
     });
     await expect(page.getByTestId('header-nav')).toBeVisible();
 
-    const heroProductRail = page.getByTestId('homepage-hero-command-center');
-    const heroShotBounds = await heroProductRail.boundingBox();
+    // One sentence never wraps onto three lines, even on a phone.
+    await page.evaluate(() => document.fonts.ready);
+    const headingLines = await heading.evaluate(element => {
+      const style = getComputedStyle(element);
+      return Math.ceil(
+        element.getBoundingClientRect().height /
+          Number.parseFloat(style.lineHeight) -
+          0.05
+      );
+    });
+    expect(headingLines).toBeLessThanOrEqual(2);
+
+    const search = page.getByTestId('homepage-editorial-hero-search');
+    const searchBounds = await search.boundingBox();
     const viewportWidth = page.viewportSize()?.width ?? 0;
 
-    expect(heroShotBounds?.x ?? -1).toBeGreaterThanOrEqual(0);
+    expect(searchBounds?.x ?? -1).toBeGreaterThanOrEqual(0);
     expect(
-      (heroShotBounds?.x ?? 0) + (heroShotBounds?.width ?? 0)
+      (searchBounds?.x ?? 0) + (searchBounds?.width ?? 0)
     ).toBeLessThanOrEqual(viewportWidth + 1);
+    await expect(
+      page.getByRole('button', { name: 'Find me', exact: true })
+    ).toBeVisible();
 
     await page.evaluate(() => {
       const closeDevTools = document.querySelector<HTMLButtonElement>(

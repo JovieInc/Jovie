@@ -11,7 +11,7 @@ export default function HomeLayout({
   children: React.ReactNode;
 }>) {
   // The homepage composes the shared PublicPageShell as an intentional
-  // variant: homepage header chrome (icon logo, no center nav), minimal
+  // variant: homepage header chrome (wordmark only, no center nav), minimal
   // footer, and no fixed-header main offset.
   // Dual min-h-svh is intentional (Lovable-style hero shell): the outer
   // container is at least viewport height, AND main holds the hero at full
@@ -24,7 +24,7 @@ export default function HomeLayout({
       footerVariant='minimal'
       headerVariant='homepage'
       logoSize='sm'
-      logoVariant='icon'
+      logoVariant='word'
       mainClassName='min-h-svh'
       mainOffset={false}
       showHomepageCenterNav={false}

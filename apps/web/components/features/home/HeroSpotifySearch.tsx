@@ -1,5 +1,6 @@
 'use client';
 
+import { Button } from '@jovie/ui/atoms/button';
 import { BadgeCheck, Link2, Search } from 'lucide-react';
 import Image from 'next/image';
 import { useRouter } from 'next/navigation';
@@ -39,13 +40,37 @@ function isSpotifyUrl(value: string): boolean {
   );
 }
 
+export interface HeroSpotifySearchProps {
+  /**
+   * `default` keeps the Spotify-badged field. `editorial` renders the same
+   * search as a single pill with an always-visible submit action, styled by
+   * the homepage stylesheet (`homepage-name-search*`).
+   */
+  readonly appearance?: 'default' | 'editorial';
+  readonly inputId?: string;
+  readonly placeholder?: string;
+  readonly submitLabel?: string;
+  readonly submitTestId?: string;
+}
+
+const DEFAULT_PLACEHOLDER = 'Search your artist name or paste a Spotify link';
+const DEFAULT_SUBMIT_LABEL = 'Claim Artist';
+
 /**
  * HeroSpotifySearch - Spotify artist search for the homepage hero.
  *
  * Adapts patterns from WaitlistSpotifySearch for the homepage context.
  * On artist selection, routes into /start with a Spotify-first starter prompt.
  */
-export function HeroSpotifySearch() {
+export function HeroSpotifySearch({
+  appearance = 'default',
+  inputId = 'hero-spotify-search',
+  placeholder = DEFAULT_PLACEHOLDER,
+  submitLabel = DEFAULT_SUBMIT_LABEL,
+  submitTestId,
+}: HeroSpotifySearchProps = {}) {
+  const isEditorial = appearance === 'editorial';
+  const resultsId = `${inputId}-results`;
   const router = useRouter();
   const [searchQuery, setSearchQuery] = useState('');
   const [showResults, setShowResults] = useState(false);
@@ -242,37 +267,86 @@ export function HeroSpotifySearch() {
 
   const trimmedQuery = searchQuery.trim();
   const isLoading = state === 'loading';
-  // Show button when user has typed something; disable while loading
-  const showClaimButton = Boolean(trimmedQuery);
+  // Default: show the button once the user has typed; disable while loading.
+  // Editorial: the submit pill is the hero's one primary action, so it stays
+  // visible and enabled — an empty submit just focuses the field.
+  const showClaimButton = isEditorial || Boolean(trimmedQuery);
   const claimButtonDisabled =
     isNavigating ||
-    (isLoading && !isSpotifyUrl(trimmedQuery)) ||
-    (!isSpotifyUrl(trimmedQuery) && results.length === 0);
+    (!isEditorial &&
+      ((isLoading && !isSpotifyUrl(trimmedQuery)) ||
+        (!isSpotifyUrl(trimmedQuery) && results.length === 0)));
+
+  const fieldClassName = isEditorial
+    ? cn(
+        'homepage-name-search__field relative flex w-full items-center',
+        shouldShowDropdown && 'homepage-name-search__field--open'
+      )
+    : cn(
+        'relative w-full flex items-center gap-3 rounded-xl border px-4 py-3 min-h-12 bg-surface-0',
+        'transition-colors duration-subtle ease-subtle',
+        shouldShowDropdown
+          ? 'border-focus ring-2 ring-focus/20'
+          : 'border-strong hover:border-focus'
+      );
+
+  const submitControl = isEditorial ? (
+    <Button
+      type='button'
+      size='marketing'
+      variant='primary'
+      loading={isLoading && Boolean(trimmedQuery)}
+      onClick={handleClaimArtist}
+      className='homepage-name-search__submit shrink-0'
+      data-testid={submitTestId}
+    >
+      {submitLabel}
+    </Button>
+  ) : (
+    <button
+      type='button'
+      disabled={claimButtonDisabled}
+      onClick={handleClaimArtist}
+      data-testid={submitTestId}
+      className={cn(
+        'shrink-0 inline-flex items-center justify-center gap-1.5 h-8 px-3 rounded-md text-xs font-semibold transition-colors focus-ring-themed',
+        claimButtonDisabled
+          ? 'bg-btn-primary/50 text-btn-primary-foreground/60 cursor-not-allowed'
+          : 'bg-btn-primary text-btn-primary-foreground'
+      )}
+    >
+      {isLoading && (
+        <div className='w-3 h-3 border-[1.5px] border-current border-t-transparent rounded-full animate-spin motion-reduce:animate-none' />
+      )}
+      {submitLabel}
+    </button>
+  );
 
   return (
-    <div ref={containerRef} className='relative mx-auto w-full max-w-120'>
-      <label htmlFor='hero-spotify-search' className='sr-only'>
+    <div
+      ref={containerRef}
+      className={cn(
+        'relative mx-auto w-full',
+        isEditorial ? 'homepage-name-search' : 'max-w-120'
+      )}
+      data-appearance={appearance}
+    >
+      <label htmlFor={inputId} className='sr-only'>
         Search Spotify artists or paste a link
       </label>
-      <InputAuraFrame>
-        <div
-          className={cn(
-            'relative w-full flex items-center gap-3 rounded-xl border px-4 py-3 min-h-12 bg-surface-0',
-            'transition-colors duration-subtle ease-subtle',
-            shouldShowDropdown
-              ? 'border-focus ring-2 ring-focus/20'
-              : 'border-strong hover:border-focus'
+      <InputAuraFrame className={isEditorial ? 'rounded-full' : undefined}>
+        <div className={fieldClassName}>
+          {isEditorial ? null : (
+            <div className='flex items-center justify-center size-6 rounded-full shrink-0 bg-brand-spotify-subtle'>
+              <SocialIcon
+                platform='spotify'
+                className='w-3.5 h-3.5 text-brand-spotify'
+              />
+            </div>
           )}
-        >
-          <div className='flex items-center justify-center size-6 rounded-full shrink-0 bg-brand-spotify-subtle'>
-            <SocialIcon
-              platform='spotify'
-              className='w-3.5 h-3.5 text-brand-spotify'
-            />
-          </div>
           <input
             ref={inputRef}
-            id='hero-spotify-search'
+            id={inputId}
             type='text'
             value={searchQuery}
             onChange={handleSearchInputChange}
@@ -292,35 +366,23 @@ export function HeroSpotifySearch() {
               setShowResults(false);
               setActiveIndex(-1);
             }}
-            placeholder='Search your artist name or paste a Spotify link'
+            placeholder={placeholder}
             autoCapitalize='none'
             autoCorrect='off'
             autoComplete='off'
-            className='min-w-0 flex-1 bg-transparent text-sm text-primary-token focus-visible:outline-none'
+            className={cn(
+              'min-w-0 flex-1 bg-transparent text-primary-token focus-visible:outline-none',
+              isEditorial ? 'homepage-name-search__input' : 'text-sm'
+            )}
             role='combobox'
             aria-expanded={shouldShowDropdown}
-            aria-controls='hero-spotify-results'
+            aria-controls={resultsId}
             aria-activedescendant={
               activeIndex >= 0 ? `hero-result-${activeIndex}` : undefined
             }
           />
           {showClaimButton ? (
-            <button
-              type='button'
-              disabled={claimButtonDisabled}
-              onClick={handleClaimArtist}
-              className={cn(
-                'shrink-0 inline-flex items-center justify-center gap-1.5 h-8 px-3 rounded-md text-xs font-semibold transition-colors focus-ring-themed',
-                claimButtonDisabled
-                  ? 'bg-btn-primary/50 text-btn-primary-foreground/60 cursor-not-allowed'
-                  : 'bg-btn-primary text-btn-primary-foreground'
-              )}
-            >
-              {isLoading && (
-                <div className='w-3 h-3 border-[1.5px] border-current border-t-transparent rounded-full animate-spin motion-reduce:animate-none' />
-              )}
-              Claim Artist
-            </button>
+            submitControl
           ) : (
             <Search className='w-4 h-4 shrink-0 text-tertiary-token' />
           )}
@@ -328,9 +390,14 @@ export function HeroSpotifySearch() {
 
         {/* Dropdown results — inside InputAuraFrame so group-focus-within stays active while interacting */}
         {shouldShowDropdown && (
-          <div className='absolute z-50 w-full mt-2 rounded-xl border border-default overflow-hidden bg-surface-0 shadow-lg'>
+          <div
+            className={cn(
+              'absolute z-50 w-full mt-2 rounded-xl border border-default overflow-hidden bg-surface-0 shadow-lg',
+              isEditorial && 'homepage-name-search__results text-left'
+            )}
+          >
             <select
-              id='hero-spotify-results'
+              id={resultsId}
               className='sr-only'
               size={Math.min(totalItems, 6)}
               aria-label='Spotify Artist Results'

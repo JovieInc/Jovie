@@ -6,16 +6,11 @@ import {
   HomepageArtistProfiles,
 } from '@/components/homepage/HomepageArtistProfiles';
 import { HomepageClosedLoop } from '@/components/homepage/HomepageClosedLoop';
-import { HomepageHeroCommandCenter } from '@/components/homepage/HomepageHeroCommandCenter';
+import { HomepageEditorialHero } from '@/components/homepage/HomepageEditorialHero';
 import { HomepageMeetJovie } from '@/components/homepage/HomepageMeetJovie';
 import { HomepageNoScriptContent } from '@/components/homepage/HomepageNoScriptContent';
-import { HomepageTrackedLink } from '@/components/homepage/HomepageTrackedLink';
 import { HERO_COPY } from '@/components/homepage/intent';
-import {
-  FaqSection,
-  MarketingElectricSeam,
-  MarketingPosterHero,
-} from '@/components/marketing';
+import { FaqSection } from '@/components/marketing';
 import { APP_NAME, BASE_URL, LEGAL_ENTITY_NAME } from '@/constants/app';
 import { HOMEPAGE_LAUNCH_COPY } from '@/data/homepageLaunchCopy';
 import {
@@ -44,12 +39,16 @@ const HomepageV2FinalCta = dynamic(
     })),
   { ssr: true }
 );
-const HERO_PRODUCT_IMAGES = {
-  // Use the canonical populated workspace state so the first product proof
-  // shows a real decision surface (including the detail rail), not an empty
-  // demo canvas.
-  product: getMarketingExportImage('dashboard-releases-sidebar-desktop'),
-};
+// Night editorial still behind the hero copy. Two art-directed crops of the
+// same photograph: landscape for desktop, a tighter portrait crop for phones.
+const HERO_BACKDROP = {
+  desktopSrc: '/images/hero/night-desk.webp',
+  desktopWidth: 1536,
+  desktopHeight: 1024,
+  mobileSrc: '/images/hero/night-desk-mobile.webp',
+  mobileWidth: 737,
+  mobileHeight: 1024,
+} as const;
 const ARTIST_PROFILE_PREVIEWS = [
   {
     id: 'tour',
@@ -202,37 +201,12 @@ const FAQ_SCHEMA = buildFaqSchema([...HOMEPAGE_LAUNCH_COPY.faq]);
 function HomepageHero() {
   return (
     <>
-      <MarketingPosterHero
+      <HomepageEditorialHero
         headingId='home-hero-heading'
         headline={HERO_COPY.headline}
-        subtitle={HERO_COPY.subhead}
-        trackedLinkComponent={HomepageTrackedLink}
-        primaryCta={{
-          label: HERO_COPY.primaryCta.label,
-          href: HERO_COPY.primaryCta.href,
-          signUp: true,
-          eventName: 'homepage_hero_cta_clicked',
-          eventProperties: {
-            cta: 'primary',
-            label: HERO_COPY.primaryCta.label,
-          },
-        }}
-        secondaryCta={{
-          label: HERO_COPY.secondaryCta.label,
-          href: HERO_COPY.secondaryCta.href,
-          eventName: 'homepage_hero_secondary_cta_clicked',
-          eventProperties: {
-            cta: 'secondary',
-            label: HERO_COPY.secondaryCta.label,
-          },
-        }}
-        seam={
-          <MarketingElectricSeam
-            idSeed='homepage-hero-electric-seam'
-            className='homepage-poster-hero__electric-seam'
-          />
-        }
-        media={<HomepageHeroCommandCenter images={HERO_PRODUCT_IMAGES} />}
+        support={HERO_COPY.subhead}
+        search={HERO_COPY.search}
+        backdrop={HERO_BACKDROP}
       />
       <div className='homepage-trust-section system-b-mounted-home-trust-strip-shell'>
         <HomeTrustSection presentation='inline-strip' />
