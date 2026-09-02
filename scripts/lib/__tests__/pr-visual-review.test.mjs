@@ -121,6 +121,21 @@ describe('bounded PR visual review contract', () => {
       'Test-auth 303 did not include a redirect location.'
     );
     expect(capture).toContain('Test-auth handoff ended at');
+    expect(capture).toContain("waitUntil: route.startsWith('/app/')");
+    expect(capture).toContain("'domcontentloaded'");
+    expect(capture).toContain('page.waitForFunction(');
+    expect(capture).toContain('/Inbox|Library|New Chat/');
+    expect(capture).toContain('failed.png');
+  });
+
+  it('skips postgres on the secretless visual-capture shell path', () => {
+    const dashboard = readFileSync(
+      'apps/web/app/app/(shell)/dashboard/actions/dashboard-data.ts',
+      'utf8'
+    );
+    expect(dashboard).toContain('shouldUseVisualCaptureSyntheticDashboard');
+    expect(dashboard).toContain('isVisualCaptureSyntheticAuthEnabled');
+    expect(dashboard).toContain('createE2EDashboardCoreData(clerkUserId)');
   });
 
   it('uses the canonical test-auth environment in the capture workflow', () => {

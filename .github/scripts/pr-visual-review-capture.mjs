@@ -85,7 +85,11 @@ try {
           }
         }
         const response = await page.goto(url, {
-          waitUntil: 'networkidle',
+          // App-shell RSC streams after the first paint. networkidle can fire
+          // on the skeleton (or hang on chat sockets) before chrome exists.
+          waitUntil: route.startsWith('/app/')
+            ? 'domcontentloaded'
+            : 'networkidle',
           timeout: 45_000,
         });
         if (!response || !response.ok())
@@ -100,6 +104,13 @@ try {
             throw new Error(
               `Test-auth handoff ended at ${page.url()}, expected ${expected.toString()}.`
             );
+          await page.waitForFunction(
+            () =>
+              /Inbox|Library|New Chat/.test(
+                (document.body && document.body.innerText) || ''
+              ),
+            { timeout: 45_000 }
+          );
         }
         const pageText = (await page.locator('body').innerText()).trim();
         if (!pageText || /\b404\b|content not found/i.test(pageText))
@@ -129,10 +140,20 @@ try {
           status: 'captured',
         });
       } catch (error) {
+        const failurePath = join(
+          outDir,
+          `${safeRoute}-${viewportName}-failed.png`
+        );
+        try {
+          await page.screenshot({ path: failurePath, fullPage: true });
+        } catch {
+          // Keep the original capture error if the page never loaded.
+        }
         manifest.push({
           route,
           viewport: viewportName,
           status: 'failed',
+          path: failurePath,
           error: String(error.message ?? error),
         });
       } finally {
