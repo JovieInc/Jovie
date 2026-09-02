@@ -2,7 +2,7 @@
   "schemaVersion": 1,
   "tool": "scripts/typecheck-scripts.mjs",
   "generatedAt": "2026-08-31T01:24:07.836Z",
-  "totalErrors": 167,
+  "totalErrors": 178,
   "files": {
     ".github/scripts/verify-main-release-readiness.mjs": {
       "TS2339": 3
@@ -29,6 +29,9 @@
     },
     "scripts/ci/neon-orphan-reaper.mjs": {
       "TS2339": 2
+    },
+    "scripts/component-rendered-evaluator.mjs": {
+      "TS2304": 11
     },
     "scripts/doc-freshness-lint.mjs": {
       "TS2339": 10
