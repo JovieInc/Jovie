@@ -2,6 +2,7 @@ import { readFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
+import { JOVIE_IMAGE_COLOR_POLICY } from '@/data/marketing';
 
 /**
  * Jovie Noir Ion dark-mode contract (JOV-4635 / #15244).
@@ -33,10 +34,9 @@ function darkBlockContaining(css: string, marker: string): string {
 describe('Noir Ion — approved dark anchors', () => {
   // Surface/accent anchors live in the large Noir Ion :root.dark block.
   const dsDark = darkBlockContaining(designSystem, '--noir-ion-canvas');
-  const linearDark = darkBlockContaining(
-    linearTokens,
-    '--linear-app-content-surface: #0a0d16'
-  );
+  // linear-tokens.css still owns --linear-bg-* and --linear-border-* / --linear-row-*.
+  // App-shell tokens (--app-shell-*) migrated to design-system.css (JOV-5466).
+  const linearDark = darkBlockContaining(linearTokens, '--linear-bg-page');
 
   it('defines Noir Ion surface anchors and maps product tokens to them', () => {
     expect(dsDark).toContain('--noir-ion-canvas: #030407;');
@@ -55,11 +55,9 @@ describe('Noir Ion — approved dark anchors', () => {
 
   it('maps shell canvas + sidebar to Noir Ion shell ladder', () => {
     expect(linearDark).toContain('--linear-bg-page: #06080d;');
-    expect(linearDark).toContain('--linear-app-content-surface: #0a0d16;');
+    expect(dsDark).toContain('--app-shell-content-surface: #0a0d16;');
     expect(linearDark).toContain('--linear-bg-surface-1: #0f1420;');
-    expect(linearDark).toContain(
-      '--linear-app-sidebar-background-rgb: 6 8 13;'
-    );
+    expect(dsDark).toContain('--app-shell-sidebar-background-rgb: 6 8 13;');
   });
 
   it('uses Ion electric blue for routine action, focus, and selection', () => {
@@ -76,6 +74,26 @@ describe('Noir Ion — approved dark anchors', () => {
     expect(linearDark).toContain(
       '--linear-row-selected: rgba(17, 175, 255, 0.1);'
     );
+  });
+
+  it('keeps generated-scene references separate from shipped UI anchors', () => {
+    const sceneByRole = new Map(
+      JOVIE_IMAGE_COLOR_POLICY.scenePalette.map(entry => [entry.role, entry])
+    );
+
+    expect(sceneByRole.get('ion')?.uiAnchor.hex).toBe('#11AFFF');
+    expect(sceneByRole.get('ultra')?.uiAnchor.hex).toBe('#A982FF');
+    expect(sceneByRole.get('pulse')?.uiAnchor.hex).toBe('#FF48D2');
+    expect(sceneByRole.get('ion')?.sceneReference.hex).toBe('#3FAFF3');
+    expect(sceneByRole.get('ultra')?.sceneReference.hex).toBe('#A789F0');
+    expect(sceneByRole.get('pulse')?.sceneReference.hex).toBe('#EB6AC6');
+
+    expect(designSystem.toLowerCase()).not.toContain('#3faff3');
+    expect(designSystem.toLowerCase()).not.toContain('#a789f0');
+    expect(designSystem.toLowerCase()).not.toContain('#eb6ac6');
+    expect(linearTokens.toLowerCase()).not.toContain('#3faff3');
+    expect(linearTokens.toLowerCase()).not.toContain('#a789f0');
+    expect(linearTokens.toLowerCase()).not.toContain('#eb6ac6');
   });
 
   it('keeps accent semantics for Ultra, Pulse, Aqua, Mint, Orange, Red', () => {

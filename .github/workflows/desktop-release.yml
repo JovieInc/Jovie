@@ -1,11 +1,17 @@
 name: desktop-release
 run-name: Desktop release ${{ github.event.workflow_run.head_sha || github.sha }}
 
+# controller-hop-exception: jovie-controller-hop/v1
+# accountable-writer: DesktopRelease
+# necessary-trust-boundary: GitHub Actions reads exact CI and current-main state through the scoped repository token before this workflow mutates a release.
+# removal-trigger: Remove the shell GitHub API hop when a native Actions release primitive can bind publication to exact successful CI and current main.
+
 # Triggers:
 # - Auto after Production Controller verifies exact current main, only when
 #   VERSION changed since the last proven publish.
-# - Manual dispatch uploads a short-lived staging artifact, or rebuilds
-#   production after the same Production Verified proof.
+# - Manual dispatch publishes a signed staging prerelease from exact green
+#   current main, or rebuilds production after the same Production Verified
+#   proof.
 #
 # Signing & notarization:
 # - Requires GH secrets: MAC_CERTIFICATE_BASE64, MAC_CERTIFICATE_PASSWORD,
@@ -14,9 +20,9 @@ run-name: Desktop release ${{ github.event.workflow_run.head_sha || github.sha }
 # - Notarization uses the modern App Store Connect API key flow (no
 #   app-specific password). The cert still imports into a temp keychain
 #   for codesigning.
-# - When secrets are absent (e.g. a fork PR), the macOS build skips signing
-#   gracefully and produces an unsigned DMG. Auto-update will not work for
-#   unsigned builds; that's by design — they're for sanity checks only.
+# - Production keeps its existing unsigned sanity-build fallback when secrets
+#   are absent. Staging publication fails closed unless signing and
+#   notarization credentials are both available.
 # - See apps/desktop/SIGNING.md for one-time setup.
 # - Canonical prod/staging/local shell matrix: apps/desktop/SIGNING.md (GH-12900).
 
@@ -198,8 +204,40 @@ jobs:
             exit 0
           fi
 
-          # Staging can only upload an Actions artifact from current main.
+          # Staging publishes only an exact current-main generation whose main
+          # CI run is already green. The release job revalidates current main
+          # again immediately before packaging and publication.
           if [ "$environment" = "staging" ]; then
+            ci_workflow="$(gh api \
+              "repos/$REPOSITORY/actions/workflows/ci.yml")"
+            jq -e '
+              type == "object" and
+              (.id | type == "number" and . >= 1) and
+              .name == "CI" and
+              .path == ".github/workflows/ci.yml"
+            ' >/dev/null <<<"$ci_workflow" || {
+              echo "::error::CI workflow identity is malformed."
+              exit 1
+            }
+            ci_workflow_id="$(jq -r '.id' <<<"$ci_workflow")"
+            ci_runs="$(gh api \
+              "repos/$REPOSITORY/actions/workflows/$ci_workflow_id/runs?branch=main&head_sha=$release_sha&status=completed&per_page=100")"
+            jq -e --arg repo "$REPOSITORY" --arg sha "$release_sha" '
+              type == "object" and
+              (.workflow_runs | type == "array") and
+              ([.workflow_runs[]? | select(
+                .head_sha == $sha and
+                .head_branch == "main" and
+                .head_repository.full_name == $repo and
+                .event == "push" and
+                .path == ".github/workflows/ci.yml" and
+                .status == "completed" and
+                .conclusion == "success"
+              )] | length) >= 1
+            ' >/dev/null <<<"$ci_runs" || {
+              echo "::error::Current main lacks an exact successful CI run for staging publication."
+              exit 1
+            }
             echo "release_sha=$release_sha" >> "$GITHUB_OUTPUT"
             echo "authorized=true" >> "$GITHUB_OUTPUT"
             exit 0
@@ -801,10 +839,10 @@ jobs:
           fi
 
   build:
-    name: ${{ needs.authorize-release.outputs.environment == 'staging' && 'Build staging desktop package' || 'Publish production desktop release' }}
+    name: ${{ needs.authorize-release.outputs.environment == 'staging' && 'Publish staging desktop prerelease' || 'Publish production desktop release' }}
     needs: [authorize-release]
     if: ${{ needs.authorize-release.result == 'success' && needs.authorize-release.outputs.should_release == 'true' }}
-    timeout-minutes: 75
+    timeout-minutes: 45
     # macOS-only for now. Windows/Linux were removed because we don't ship
     # those binaries today and building them on every release wastes runner
     # time. To re-enable, restore the matrix strategy with the desired OSes.
@@ -814,11 +852,13 @@ jobs:
     outputs:
       published_sha: ${{ steps.publisher-identity.outputs.published_sha }}
       publisher_attempt: ${{ steps.publisher-identity.outputs.publisher_attempt }}
+      staging_version: ${{ steps.staging-version.outputs.version }}
     env:
       ENVIRONMENT: ${{ needs.authorize-release.outputs.environment }}
       RELEASE_SHA: ${{ needs.authorize-release.outputs.release_sha }}
       HAS_MAC_SIGNING_CREDENTIALS: ${{ secrets.MAC_CERTIFICATE_BASE64 != '' && secrets.MAC_CERTIFICATE_PASSWORD != '' }}
       HAS_APPLE_API_CREDENTIALS: ${{ secrets.APPLE_API_KEY != '' && secrets.APPLE_API_KEY_ID != '' && secrets.APPLE_API_ISSUER != '' }}
+      HAS_APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID != '' }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -857,6 +897,41 @@ jobs:
           set -euo pipefail
           node scripts/desktop-release-assets.mjs prepare \
             --sha "$RELEASE_SHA"
+
+      - name: Compute monotonic staging release version
+        id: staging-version
+        if: env.ENVIRONMENT == 'staging'
+        shell: bash
+        run: |
+          set -euo pipefail
+          version="$(node apps/desktop/scripts/sync-version.mjs \
+            --staging-version "$GITHUB_RUN_ID" "$GITHUB_RUN_ATTEMPT")"
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+          echo "DESKTOP_VERSION=$version" >> "$GITHUB_ENV"
+
+      - name: Require staging signing and notarization credentials
+        if: env.ENVIRONMENT == 'staging'
+        shell: bash
+        run: |
+          set -euo pipefail
+          [ "$HAS_MAC_SIGNING_CREDENTIALS" = "true" ] &&
+            [ "$HAS_APPLE_API_CREDENTIALS" = "true" ] &&
+            [ "$HAS_APPLE_TEAM_ID" = "true" ] || {
+            echo "::error::Staging publication requires the existing macOS signing certificate, App Store Connect API key, and Apple team ID secrets."
+            exit 1
+          }
+
+      - name: Validate rolling staging prerelease
+        if: env.ENVIRONMENT == 'staging'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          node scripts/desktop-release-assets.mjs prepare \
+            --environment staging \
+            --sha "$RELEASE_SHA" \
+            --version "${{ steps.staging-version.outputs.version }}"
 
       - name: Generate staging icon
         if: env.ENVIRONMENT == 'staging'
@@ -934,6 +1009,7 @@ jobs:
       - name: Package staging desktop app
         if: env.ENVIRONMENT == 'staging'
         env:
+          JOVIE_DESKTOP_SOURCE_REVISION: ${{ env.RELEASE_SHA }}
           ELECTRON_ENV: ${{ env.ENVIRONMENT }}
           # Apple notarization via App Store Connect API key. All three are
           # required by @electron/notarize when notarize: true is set; if any
@@ -954,9 +1030,9 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          release_version="$(tr -d '[:space:]' < VERSION)"
-          [[ "$release_version" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]] || {
-            echo "::error::VERSION is not a valid desktop semver."
+          release_version="${{ steps.staging-version.outputs.version }}"
+          [[ "$release_version" =~ ^[0-9]+\.[0-9]+\.[0-9]+-staging\.[1-9][0-9]*\.[1-9][0-9]*$ ]] || {
+            echo "::error::Staging version is not valid prerelease semver."
             exit 1
           }
           staging_files=(
@@ -964,7 +1040,7 @@ jobs:
             "apps/desktop/dist/Jovie-Staging-${release_version}-universal.dmg.blockmap"
             "apps/desktop/dist/Jovie-Staging-${release_version}-universal.zip"
             "apps/desktop/dist/Jovie-Staging-${release_version}-universal.zip.blockmap"
-            "apps/desktop/dist/latest-mac.yml"
+            "apps/desktop/dist/staging-mac.yml"
           )
           for staging_file in "${staging_files[@]}"; do
             [ -f "$staging_file" ] || {
@@ -973,19 +1049,84 @@ jobs:
             }
           done
 
+          staging_app="apps/desktop/dist/mac-universal/Jovie Staging.app"
+          [ -d "$staging_app" ] || {
+            echo "::error::Packaged staging app bundle is missing."
+            exit 1
+          }
+          codesign --verify --deep --strict "$staging_app"
+          spctl --assess --type execute --verbose=2 "$staging_app"
+          xcrun stapler validate "$staging_app"
+
+          identity_file="$staging_app/Contents/Resources/build-identity.json"
+          cmp apps/desktop/build/build-identity.json "$identity_file"
+          node -e '
+            const fs = require("fs");
+            const [file, version, sha] = process.argv.slice(1);
+            const record = JSON.parse(fs.readFileSync(file, "utf8"));
+            const exact = Object.keys(record).sort().join(",") === "builtAt,channel,sourceRevision,version" &&
+              record.channel === "staging" && record.version === version &&
+              record.sourceRevision === sha &&
+              new Date(record.builtAt).toISOString() === record.builtAt;
+            if (!exact) throw new Error("Packaged staging build identity is not exact.");
+          ' "$identity_file" "$release_version" "$RELEASE_SHA"
+          runtime_identity="$("$staging_app/Contents/MacOS/Jovie Staging" --print-build-identity | tail -n 1)"
+          node -e '
+            const fs = require("fs");
+            const expected = {...JSON.parse(fs.readFileSync(process.argv[1], "utf8")), provenance: "verified"};
+            if (JSON.stringify(JSON.parse(process.argv[2])) !== JSON.stringify(expected))
+              throw new Error("Runtime staging build identity is not exact.");
+          ' "$identity_file" "$runtime_identity"
+          embedded_version="$(/usr/libexec/PlistBuddy \
+            -c 'Print :CFBundleShortVersionString' \
+            "$staging_app/Contents/Info.plist")"
+          [ "$embedded_version" = "$release_version" ] || {
+            echo "::error::Staging app embedded version is not exact."
+            exit 1
+          }
+          update_config="$staging_app/Contents/Resources/app-update.yml"
+          grep -Eq '^provider:[[:space:]]*generic[[:space:]]*$' "$update_config"
+          grep -Eq '^url:[[:space:]]*https://github.com/JovieInc/Jovie/releases/download/desktop-staging[[:space:]]*$' "$update_config"
+          grep -Eq '^channel:[[:space:]]*staging[[:space:]]*$' "$update_config"
+
+          staging_dmg="apps/desktop/dist/Jovie-Staging-${release_version}-universal.dmg"
+          xcrun stapler validate "$staging_dmg"
+          spctl --assess --type open --context context:primary-signature \
+            --verbose=2 "$staging_dmg"
+
       - name: Upload staging desktop package
         if: env.ENVIRONMENT == 'staging'
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
-          name: desktop-staging-${{ needs.authorize-release.outputs.release_sha }}
+          name: desktop-staging-${{ steps.staging-version.outputs.version }}-attempt-${{ github.run_attempt }}
           path: |
             apps/desktop/dist/Jovie-Staging-*-universal.dmg
             apps/desktop/dist/Jovie-Staging-*-universal.dmg.blockmap
             apps/desktop/dist/Jovie-Staging-*-universal.zip
             apps/desktop/dist/Jovie-Staging-*-universal.zip.blockmap
+            apps/desktop/dist/staging-mac.yml
           if-no-files-found: error
           compression-level: 0
           retention-days: 7
+
+      - name: Publish staging desktop prerelease
+        id: publish-staging
+        if: env.ENVIRONMENT == 'staging'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          current_main_sha="$(gh api "repos/${{ github.repository }}/commits/main" --jq '.sha // empty')"
+          [ "$current_main_sha" = "$RELEASE_SHA" ] || {
+            echo "::error::Desktop generation $RELEASE_SHA was superseded by $current_main_sha before staging publication."
+            exit 1
+          }
+          node scripts/desktop-release-assets.mjs upload-and-publish \
+            --environment staging \
+            --sha "$RELEASE_SHA" \
+            --version "${{ steps.staging-version.outputs.version }}" \
+            --dist "apps/desktop/dist"
 
       - name: Package production desktop app
         if: env.ENVIRONMENT == 'production'
@@ -1035,40 +1176,16 @@ jobs:
 
       - name: Capture production publisher identity
         id: publisher-identity
-        if: env.ENVIRONMENT == 'production'
+        if: env.ENVIRONMENT == 'production' || env.ENVIRONMENT == 'staging'
+        env:
+          PUBLISHED_SHA: ${{ steps.publish-staging.outputs.release_sha || steps.publish-production.outputs.release_sha }}
         run: |
-          [ "${{ steps.publish-production.outputs.release_sha }}" = "$RELEASE_SHA" ] || {
+          [ "$PUBLISHED_SHA" = "$RELEASE_SHA" ] || {
             echo "::error::Published release proof does not match the authorized commit."
             exit 1
           }
           echo "published_sha=$RELEASE_SHA" >> "$GITHUB_OUTPUT"
           echo "publisher_attempt=$GITHUB_RUN_ATTEMPT" >> "$GITHUB_OUTPUT"
-
-      - name: Generate staging icon for updater feed
-        if: env.ENVIRONMENT == 'production'
-        run: node apps/desktop/scripts/gen-staging-icon.mjs
-
-      - name: Package staging desktop updater feed
-        if: env.ENVIRONMENT == 'production'
-        env:
-          ELECTRON_ENV: staging
-          APPLE_API_KEY: ${{ env.APPLE_API_KEY }}
-          APPLE_API_KEY_ID: ${{ secrets.APPLE_API_KEY_ID }}
-          APPLE_API_ISSUER: ${{ secrets.APPLE_API_ISSUER }}
-          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
-          CSC_KEYCHAIN: ${{ env.KEYCHAIN_PATH }}
-        run: pnpm --filter @jovie/desktop package:staging
-
-      - name: Publish staging desktop update feed
-        if: env.ENVIRONMENT == 'production' || env.ENVIRONMENT == 'staging'
-        env:
-          GH_TOKEN: ${{ github.token }}
-        shell: bash
-        run: |
-          set -euo pipefail
-          node scripts/desktop-release-assets.mjs publish-staging \
-            --sha "$RELEASE_SHA" \
-            --dist "apps/desktop/dist"
 
       - name: Clean up keychain
         if: always() && env.KEYCHAIN_PATH != ''

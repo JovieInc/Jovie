@@ -107,7 +107,7 @@ export function ProductScreenshotFrame({
         .join(' ')}
       style={{
         boxShadow:
-          '0 0 0 1px var(--linear-app-shell-border), 0 28px 70px rgba(0,0,0,0.28), 0 10px 22px rgba(0,0,0,0.18)',
+          '0 0 0 1px var(--app-shell-border), 0 28px 70px rgba(0,0,0,0.28), 0 10px 22px rgba(0,0,0,0.18)',
       }}
     >
       <div

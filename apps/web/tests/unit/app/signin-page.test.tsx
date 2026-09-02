@@ -80,13 +80,10 @@ describe('signin page', () => {
         formTitle: 'Sign in',
         showFormTitle: false,
         showFooterPrompt: false,
-        layoutVariant: 'stack',
-        chrome: 'splash-b',
+        layoutVariant: 'split',
       })
     );
-    expect(
-      screen.queryByText('Welcome back to Jovie.')
-    ).not.toBeInTheDocument();
+    expect(authLayoutMock.mock.calls[0]?.[0].chrome).not.toBe('splash-b');
     expect(routerPrefetchMock).toHaveBeenCalledWith(APP_ROUTES.SIGNUP);
     expect(authShellMock).toHaveBeenCalledWith(
       expect.objectContaining({
@@ -216,5 +213,19 @@ describe('signin page', () => {
     expect(routerPrefetchMock).toHaveBeenCalledWith(
       '/signup?mobile_return=%2Fapp%2Fsettings'
     );
+  });
+
+  it('renders the desktop-return handoff instead of the split auth shell', () => {
+    searchParamsState.value = 'runtime=electron';
+
+    render(<SignInPageClient />);
+
+    expect(
+      screen.getByTestId('desktop-auth-route-handoff')
+    ).toBeInTheDocument();
+    expect(authLayoutMock).not.toHaveBeenCalled();
+    expect(authShellMock).not.toHaveBeenCalled();
+    expect(screen.queryByTestId('auth-shell')).not.toBeInTheDocument();
+    expect(screen.queryByTestId('auth-brand-panel')).not.toBeInTheDocument();
   });
 });

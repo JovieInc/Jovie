@@ -11,8 +11,8 @@ describe('OpportunityInboxEmptyState', () => {
             id: 'connect-spotify',
             title: 'Connect Spotify',
             body: 'Link your catalog so Jovie can spot releases.',
-            actionLabel: 'Connect catalog',
-            href: '/app/profiles',
+            actionLabel: 'Connect Spotify',
+            href: '/app/dashboard/releases?connect=spotify',
           },
         ]}
       />
@@ -26,8 +26,8 @@ describe('OpportunityInboxEmptyState', () => {
       'tracking-tight'
     );
     expect(
-      screen.getByRole('link', { name: 'Connect catalog' })
-    ).toHaveAttribute('href', '/app/profiles');
+      screen.getByRole('link', { name: 'Connect Spotify' })
+    ).toHaveAttribute('href', '/app/dashboard/releases?connect=spotify');
   });
 
   it('keeps the chat fallback when no catalog action is available', () => {

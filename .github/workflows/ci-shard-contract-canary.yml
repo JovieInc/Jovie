@@ -1,0 +1,133 @@
+name: CI Shard Contract Canary
+
+on:
+  pull_request:
+    paths:
+      - '.github/workflows/ci-shard-contract-canary.yml'
+      - 'scripts/ci-shard-contract-canary.mjs'
+
+permissions:
+  contents: read
+
+jobs:
+  contract-adapter:
+    name: CI shard contract / Jovie adapter proof
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version-file: '.nvmrc'
+
+      - name: Fixture missing receipt
+        id: missing_receipt
+        run: node scripts/ci-shard-contract-canary.mjs missing_receipt
+      - name: Assert missing receipt fails closed
+        uses: JovieInc/ci/actions/ci-shard-contract@796862259a45f5b95aee9b0d546da0378275f5ce
+        with:
+          operation: ${{ steps.missing_receipt.outputs.operation }}
+          payload: ${{ steps.missing_receipt.outputs.payload }}
+          expect: ${{ steps.missing_receipt.outputs.expect }}
+
+      - name: Fixture canceled as green
+        id: canceled_as_green
+        run: node scripts/ci-shard-contract-canary.mjs canceled_as_green
+      - name: Assert cancellation cannot aggregate green
+        uses: JovieInc/ci/actions/ci-shard-contract@796862259a45f5b95aee9b0d546da0378275f5ce
+        with:
+          operation: ${{ steps.canceled_as_green.outputs.operation }}
+          payload: ${{ steps.canceled_as_green.outputs.payload }}
+          expect: ${{ steps.canceled_as_green.outputs.expect }}
+
+      - name: Fixture infrastructure failure
+        id: infrastructure_not_product_red
+        run: node scripts/ci-shard-contract-canary.mjs infrastructure_not_product_red
+      - name: Assert infrastructure is not product red
+        uses: JovieInc/ci/actions/ci-shard-contract@796862259a45f5b95aee9b0d546da0378275f5ce
+        with:
+          operation: ${{ steps.infrastructure_not_product_red.outputs.operation }}
+          payload: ${{ steps.infrastructure_not_product_red.outputs.payload }}
+          expect: ${{ steps.infrastructure_not_product_red.outputs.expect }}
+
+      - name: Fixture nondeterministic duration
+        id: nondeterministic_duration_excluded
+        run: node scripts/ci-shard-contract-canary.mjs nondeterministic_duration_excluded
+      - name: Assert nondeterministic duration is excluded
+        uses: JovieInc/ci/actions/ci-shard-contract@796862259a45f5b95aee9b0d546da0378275f5ce
+        with:
+          operation: ${{ steps.nondeterministic_duration_excluded.outputs.operation }}
+          payload: ${{ steps.nondeterministic_duration_excluded.outputs.payload }}
+          expect: ${{ steps.nondeterministic_duration_excluded.outputs.expect }}
+
+      - name: Fixture cancellation before evidence
+        id: cancellation_before_evidence
+        run: node scripts/ci-shard-contract-canary.mjs cancellation_before_evidence
+      - name: Assert cancellation waits for actionable evidence
+        uses: JovieInc/ci/actions/ci-shard-contract@796862259a45f5b95aee9b0d546da0378275f5ce
+        with:
+          operation: ${{ steps.cancellation_before_evidence.outputs.operation }}
+          payload: ${{ steps.cancellation_before_evidence.outputs.payload }}
+          expect: ${{ steps.cancellation_before_evidence.outputs.expect }}
+
+      - name: Fixture stale receipt
+        id: stale_receipt
+        run: node scripts/ci-shard-contract-canary.mjs stale_receipt
+      - name: Assert exact identity invalidates stale receipt
+        uses: JovieInc/ci/actions/ci-shard-contract@796862259a45f5b95aee9b0d546da0378275f5ce
+        with:
+          operation: ${{ steps.stale_receipt.outputs.operation }}
+          payload: ${{ steps.stale_receipt.outputs.payload }}
+          expect: ${{ steps.stale_receipt.outputs.expect }}
+
+      - name: Fixture deterministic early stop
+        id: deterministic_early_stop
+        run: node scripts/ci-shard-contract-canary.mjs deterministic_early_stop
+      - name: Assert deterministic early stop
+        uses: JovieInc/ci/actions/ci-shard-contract@796862259a45f5b95aee9b0d546da0378275f5ce
+        with:
+          operation: ${{ steps.deterministic_early_stop.outputs.operation }}
+          payload: ${{ steps.deterministic_early_stop.outputs.payload }}
+          expect: ${{ steps.deterministic_early_stop.outputs.expect }}
+
+      - name: Fixture bounded infrastructure retry
+        id: bounded_infrastructure_retry
+        run: node scripts/ci-shard-contract-canary.mjs bounded_infrastructure_retry
+      - name: Assert bounded infrastructure retry
+        uses: JovieInc/ci/actions/ci-shard-contract@796862259a45f5b95aee9b0d546da0378275f5ce
+        with:
+          operation: ${{ steps.bounded_infrastructure_retry.outputs.operation }}
+          payload: ${{ steps.bounded_infrastructure_retry.outputs.payload }}
+          expect: ${{ steps.bounded_infrastructure_retry.outputs.expect }}
+
+      - name: Fixture diagnostic quorum
+        id: diagnostic_quorum
+        run: node scripts/ci-shard-contract-canary.mjs diagnostic_quorum
+      - name: Assert diagnostic quorum
+        uses: JovieInc/ci/actions/ci-shard-contract@796862259a45f5b95aee9b0d546da0378275f5ce
+        with:
+          operation: ${{ steps.diagnostic_quorum.outputs.operation }}
+          payload: ${{ steps.diagnostic_quorum.outputs.payload }}
+          expect: ${{ steps.diagnostic_quorum.outputs.expect }}
+
+      - name: Fixture exact aggregation
+        id: exact_aggregation
+        run: node scripts/ci-shard-contract-canary.mjs exact_aggregation
+      - name: Assert exact aggregation
+        uses: JovieInc/ci/actions/ci-shard-contract@796862259a45f5b95aee9b0d546da0378275f5ce
+        with:
+          operation: ${{ steps.exact_aggregation.outputs.operation }}
+          payload: ${{ steps.exact_aggregation.outputs.payload }}
+          expect: ${{ steps.exact_aggregation.outputs.expect }}
+
+      - name: Fixture typed not-selected receipt
+        id: typed_not_selected
+        run: node scripts/ci-shard-contract-canary.mjs typed_not_selected
+      - name: Assert typed not-selected receipt
+        uses: JovieInc/ci/actions/ci-shard-contract@796862259a45f5b95aee9b0d546da0378275f5ce
+        with:
+          operation: ${{ steps.typed_not_selected.outputs.operation }}
+          payload: ${{ steps.typed_not_selected.outputs.payload }}
+          expect: ${{ steps.typed_not_selected.outputs.expect }}

@@ -29,9 +29,13 @@ test('CI prevention verifier runs for every source PR and exact merge-group head
       ciFastChildBlock,
       /name: Validate CI\/release incident prevention contract/
     );
-    assert.match(ciFastChildBlock, /run: pnpm ci:incident-contract:validate/);
     assert.match(ciFastChildBlock, /github\.event_name != 'merge_group'/);
   }
+  assert.match(
+    ciFastTypecheckBlock,
+    /run: node scripts\/ci-release-incident-contract\.mjs/
+  );
+  assert.match(ciFastRemainingBlock, /run: pnpm ci:incident-contract:validate/);
   assert.match(
     ciFastRemainingBlock,
     /if \[\[ "\$\{\{ github\.event_name \}\}" != "pull_request" \]\]; then\n            echo "skip=false"/
@@ -59,6 +63,6 @@ test('CI prevention verifier runs for every source PR and exact merge-group head
   assert.match(ciFastAggregateBlock, /exit 1/);
   assert.doesNotMatch(
     ciFastAggregateBlock,
-    /name: Validate CI\/release incident prevention contract|run: pnpm ci:incident-contract:validate/
+    /name: Validate CI\/release incident prevention contract|ci-release-incident-contract/
   );
 });

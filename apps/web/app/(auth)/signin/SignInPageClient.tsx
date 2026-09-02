@@ -80,6 +80,10 @@ function SignInOauthErrorBanner() {
 /**
  * Sign-in page using the canonical AuthShell (JOV-2064).
  *
+ * Full-route shell is the desktop split layout: editorial card at ≥1024px,
+ * intentionally excluded on mobile/tablet. Intercepted modal and desktop-return
+ * handoff use their own shells. See `auth-shell-layout-contract.ts`.
+ *
  * Both the full-page route and the intercepted modal route render the same
  * AuthShell content model, so the typography, links, and provider list stay
  * in lockstep. Provider buttons are gated by `lib/auth/oauth-providers.ts`.
@@ -200,8 +204,7 @@ export function SignInPageClient() {
         formTitle='Sign in'
         showFormTitle={false}
         showFooterPrompt={false}
-        layoutVariant='stack'
-        chrome='splash-b'
+        layoutVariant='split'
       >
         <AuthRoutePrefetch href={signUpUrl} />
         <SignInOauthErrorBanner />

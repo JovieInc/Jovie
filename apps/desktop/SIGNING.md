@@ -117,6 +117,18 @@ spctl --assess -vv /Volumes/Jovie/Jovie.app
 # Expected: "accepted" + "source=Notarized Developer ID"
 ```
 
+To publish staging from exact current `main` after its `CI` run is green:
+
+```bash
+gh workflow run desktop-release.yml --ref main -f environment=staging
+```
+
+The workflow derives the next-patch
+`X.Y.(Z+1)-staging.<run-id>.<attempt>` version, updates only the
+`desktop-staging` rolling prerelease and `staging-mac.yml`, and binds its exact
+version, source revision, channel, and build time into the signed app's
+verifiable build identity. Production remains stable and unchanged.
+
 ## Recovering an existing installed (unsigned) app
 
 Existing users who installed an unsigned build (pre-signing setup) cannot

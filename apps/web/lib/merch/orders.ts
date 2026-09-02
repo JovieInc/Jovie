@@ -28,6 +28,10 @@ import {
 import { stripe } from '@/lib/stripe/client';
 import { logger } from '@/lib/utils/logger';
 import {
+  isPriorMerchSaleStatus,
+  notifyFirstMerchSaleBestEffort,
+} from './first-sale-text';
+import {
   estimateStripeFeeCents,
   MERCH_DEFAULT_REFUND_RESERVE_CENTS,
 } from './pricing';
@@ -381,6 +385,12 @@ export async function handleMerchCheckoutCompleted(
     existing.order.status !== 'checkout_created' &&
     existing.order.status !== 'paid'
   ) {
+    if (isPriorMerchSaleStatus(existing.order.status)) {
+      await notifyFirstMerchSaleBestEffort({
+        creatorProfileId: existing.order.creatorProfileId,
+        merchOrderId: existing.order.id,
+      });
+    }
     return;
   }
 
@@ -420,6 +430,10 @@ export async function handleMerchCheckoutCompleted(
       orderId,
       merchCardId: existing.card.id,
       reasons: safetyReasons,
+    });
+    await notifyFirstMerchSaleBestEffort({
+      creatorProfileId: existing.order.creatorProfileId,
+      merchOrderId: existing.order.id,
     });
     return;
   }
@@ -481,6 +495,11 @@ export async function handleMerchCheckoutCompleted(
       updatedAt: paidAt,
     })
     .where(eq(merchOrders.id, orderId));
+
+  await notifyFirstMerchSaleBestEffort({
+    creatorProfileId: existing.order.creatorProfileId,
+    merchOrderId: existing.order.id,
+  });
 }
 
 export async function handleMerchChargeRefunded(

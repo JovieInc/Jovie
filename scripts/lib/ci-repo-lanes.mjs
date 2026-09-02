@@ -55,6 +55,10 @@ const LANE_PREFIXES = Object.freeze([
     lanes: [CI_LANES.SYMPHONY_CONTROL],
   },
   {
+    prefix: 'scripts/verification/',
+    lanes: [CI_LANES.SYMPHONY_CONTROL],
+  },
+  {
     prefix: 'scripts/lib/ci-',
     lanes: [CI_LANES.SYMPHONY_CONTROL],
   },
@@ -93,6 +97,14 @@ const LANE_PREFIXES = Object.freeze([
   {
     prefix: 'scripts/tests/test_symphony',
     lanes: [CI_LANES.SYMPHONY_CONTROL],
+  },
+  {
+    prefix: 'scripts/lib/__tests__/component-',
+    lanes: [CI_LANES.JOVIE_PRODUCT, CI_LANES.SYMPHONY_CONTROL],
+  },
+  {
+    prefix: 'scripts/component-',
+    lanes: [CI_LANES.JOVIE_PRODUCT, CI_LANES.SYMPHONY_CONTROL],
   },
   {
     prefix: 'docs/company/',
@@ -139,6 +151,23 @@ const SHARED_ROOT_FILES = new Set([
   'turbo.json',
   'tsconfig.json',
 ]);
+
+const TYPECHECK_ROOT_FILES = new Set([
+  'package.json',
+  'pnpm-lock.yaml',
+  'pnpm-workspace.yaml',
+  'turbo.json',
+]);
+
+/** Exact graph inputs mirrored by the source-PR guard in ci-fast-lanes.mjs. */
+export function affectsJovieTypecheck(file) {
+  const normalized = normalizeFile(file);
+  if (!normalized) return false;
+  if (TYPECHECK_ROOT_FILES.has(normalized)) return true;
+  if (normalized.endsWith('/package.json')) return true;
+  if (/(?:^|\/)tsconfig[^/]*\.json$/i.test(normalized)) return true;
+  return /\.(?:ts|tsx|mts|cts)$/i.test(normalized);
+}
 
 function normalizeFile(file) {
   return String(file || '')
@@ -195,6 +224,9 @@ export function classifyCiRepoLanes(files) {
     files: changed,
     lanes: [...lanes].sort(),
     runJovieProduct: lanes.has(CI_LANES.JOVIE_PRODUCT),
+    runJovieTypecheck:
+      lanes.has(CI_LANES.JOVIE_PRODUCT) &&
+      changed.some(file => affectsJovieTypecheck(file)),
     runSymphonyControl: lanes.has(CI_LANES.SYMPHONY_CONTROL),
     runSummerOps: lanes.has(CI_LANES.SUMMER_OPS),
   };
@@ -226,11 +258,13 @@ export function githubLaneOutputs(
   { forceAll = false, forceNone = false } = {}
 ) {
   const runJovieProduct = forceAll || (!forceNone && plan.runJovieProduct);
+  const runJovieTypecheck = forceAll || (!forceNone && plan.runJovieTypecheck);
   const runSymphonyControl =
     forceAll || (!forceNone && plan.runSymphonyControl);
   const runSummerOps = forceAll || (!forceNone && plan.runSummerOps);
   return [
     `run_jovie_product=${githubBoolean(runJovieProduct)}`,
+    `run_jovie_typecheck=${githubBoolean(runJovieTypecheck)}`,
     `run_symphony_control=${githubBoolean(runSymphonyControl)}`,
     `run_summer_ops=${githubBoolean(runSummerOps)}`,
   ];

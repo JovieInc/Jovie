@@ -72,4 +72,22 @@ describe('TableEmptyState', () => {
 
     expect(container.firstElementChild).toHaveClass('min-h-55');
   });
+
+  it('places the test id on the stable table surface and keeps status semantics inside', () => {
+    render(
+      <TableEmptyState
+        heading='No Releases Yet'
+        variant='error'
+        testId='release-empty'
+      />
+    );
+
+    const surface = screen.getByTestId('release-empty');
+    expect(surface).toHaveClass('min-h-55');
+    expect(surface).toHaveAttribute('data-variant', 'card');
+    expect(screen.getByRole('status')).toHaveAttribute(
+      'data-content-state',
+      'error'
+    );
+  });
 });

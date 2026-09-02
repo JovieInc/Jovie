@@ -1,4 +1,4 @@
-import { eq } from 'drizzle-orm';
+import { sql as drizzleSql, eq } from 'drizzle-orm';
 import { withDbSession } from '@/lib/auth/session';
 import { db } from '@/lib/db';
 import { users } from '@/lib/db/schema/auth';
@@ -18,6 +18,11 @@ type NotificationSettings = {
     preferredChannel?: NotificationDeliveryChannel;
   };
   marketing_emails?: boolean;
+};
+
+type PersistedNotificationSettings = {
+  marketing_emails: boolean;
+  notifications: NonNullable<NotificationSettings['notifications']>;
 };
 
 const DEFAULT_CHANNELS: Record<NotificationDeliveryChannel, boolean> = {
@@ -53,6 +58,32 @@ const normalizeDismissed = (settings?: {
   if (Array.isArray(settings.dismissedIds)) return settings.dismissedIds;
   if (Array.isArray(settings.dismissed_ids)) return settings.dismissed_ids;
   return [];
+};
+
+const getExistingNotifications = (
+  settings: Record<string, unknown>
+): NonNullable<NotificationSettings['notifications']> => {
+  const notifications = (settings as NotificationSettings).notifications;
+  return isRecord(notifications)
+    ? (notifications as NonNullable<NotificationSettings['notifications']>)
+    : {};
+};
+
+const buildNotificationSettingsPatch = (
+  settings: PersistedNotificationSettings
+) => {
+  const marketingEmailsJson = JSON.stringify(settings.marketing_emails);
+  const notificationsJson = JSON.stringify(settings.notifications);
+
+  return drizzleSql`jsonb_set(
+    jsonb_set(
+      COALESCE(${creatorProfiles.settings}, '{}'::jsonb),
+      '{marketing_emails}',
+      ${marketingEmailsJson}::jsonb
+    ),
+    '{notifications}',
+    ${notificationsJson}::jsonb
+  )`;
 };
 
 const normalizePreferences = (
@@ -204,8 +235,7 @@ export const markNotificationDismissed = async (
   if (!storedPreferences || !creatorProfileId) return;
 
   const baseSettings = isRecord(settings) ? settings : {};
-  const existingNotifications =
-    (baseSettings as NotificationSettings).notifications ?? {};
+  const existingNotifications = getExistingNotifications(baseSettings);
 
   const dismissed = new Set([
     ...normalizeDismissed(existingNotifications),
@@ -213,7 +243,7 @@ export const markNotificationDismissed = async (
   ]);
   dismissed.add(notificationId);
 
-  const nextSettings: NotificationSettings = {
+  const nextSettings: PersistedNotificationSettings = {
     marketing_emails: storedPreferences.marketingEmails,
     notifications: {
       channels:
@@ -231,14 +261,13 @@ export const markNotificationDismissed = async (
     await db
       .update(creatorProfiles)
       .set({
-        settings: {
-          ...baseSettings,
+        settings: buildNotificationSettingsPatch({
           ...nextSettings,
           notifications: {
             ...existingNotifications,
             ...nextSettings.notifications,
           },
-        } as Record<string, unknown>,
+        }),
         updatedAt: new Date(),
       })
       .where(eq(creatorProfiles.id, creatorProfileId));
@@ -266,10 +295,9 @@ export const updateNotificationPreferences = async (
   };
   const mergedPreferences = mergePreferences(basePreferences, updates);
   const baseSettings = isRecord(settings) ? settings : {};
-  const existingNotifications =
-    (baseSettings as NotificationSettings).notifications ?? {};
+  const existingNotifications = getExistingNotifications(baseSettings);
 
-  const nextSettings: NotificationSettings = {
+  const nextSettings: PersistedNotificationSettings = {
     marketing_emails: mergedPreferences.marketingEmails,
     notifications: {
       channels: mergedPreferences.channels,
@@ -283,14 +311,13 @@ export const updateNotificationPreferences = async (
     await db
       .update(creatorProfiles)
       .set({
-        settings: {
-          ...baseSettings,
+        settings: buildNotificationSettingsPatch({
           ...nextSettings,
           notifications: {
             ...existingNotifications,
             ...nextSettings.notifications,
           },
-        } as Record<string, unknown>,
+        }),
         updatedAt: new Date(),
       })
       .where(eq(creatorProfiles.id, creatorProfileId));

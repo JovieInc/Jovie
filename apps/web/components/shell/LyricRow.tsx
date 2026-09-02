@@ -114,7 +114,7 @@ export const LyricRow = React.memo(function LyricRow({
           'shrink-0 h-6 px-1.5 rounded text-3xs tabular-nums font-caption transition-colors duration-subtle ease-subtle focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/55',
           isActive
             ? 'bg-cyan-500/15 text-cyan-300 border border-cyan-500/30'
-            : 'text-tertiary-token bg-surface-1 border border-(--linear-app-shell-border) hover:text-primary-token hover:border-cyan-500/40'
+            : 'text-tertiary-token bg-surface-1 border border-(--app-shell-border) hover:text-primary-token hover:border-cyan-500/40'
         )}
         title='Stamp this line to the current playhead (Enter)'
       >

@@ -1,57 +1,36 @@
 import { render, screen } from '@testing-library/react';
-import { describe, expect, it, vi } from 'vitest';
+import { describe, expect, it } from 'vitest';
 import { LogoLoader } from '@/components/atoms/LogoLoader';
 import { expectNoA11yViolations } from '@/tests/utils/a11y';
 
-vi.mock('@/components/atoms/BrandLogo', () => ({
-  BrandLogo: ({ size, tone, alt, className }: any) => (
-    <img
-      src='/logo'
-      alt={alt}
-      data-size={size}
-      data-tone={tone}
-      className={className}
-    />
-  ),
-}));
-
 describe('LogoLoader', () => {
-  it('renders an output element', () => {
-    const { container } = render(<LogoLoader />);
-    expect(container.querySelector('output')).toBeInTheDocument();
-  });
-
-  it('has aria-live="polite" on the output element', () => {
-    const { container } = render(<LogoLoader />);
-    const output = container.querySelector('output');
-    expect(output).toHaveAttribute('aria-live', 'polite');
-  });
-
-  it('has default aria-label="Loading"', () => {
-    const { container } = render(<LogoLoader />);
-    const output = container.querySelector('output');
-    expect(output).toHaveAttribute('aria-label', 'Loading');
-  });
-
-  it('renders with custom aria-label', () => {
-    const { container } = render(<LogoLoader aria-label='Processing' />);
-    const output = container.querySelector('output');
-    expect(output).toHaveAttribute('aria-label', 'Processing');
-  });
-
-  it('uses muted tone for loading context', () => {
+  it('renders a polite status output', () => {
     render(<LogoLoader />);
-    expect(screen.getByRole('img')).toHaveAttribute('data-tone', 'muted');
+    const status = screen.getByRole('status', { name: 'Loading' });
+    expect(status.tagName.toLowerCase()).toBe('output');
+    expect(status).toHaveAttribute('aria-live', 'polite');
   });
 
-  it('uses size 32 by default', () => {
-    render(<LogoLoader />);
-    expect(screen.getByRole('img')).toHaveAttribute('data-size', '32');
+  it('renders with a custom aria-label', () => {
+    render(<LogoLoader aria-label='Processing' />);
+    expect(
+      screen.getByRole('status', { name: 'Processing' })
+    ).toBeInTheDocument();
   });
 
-  it('applies animate-pulse class', () => {
-    render(<LogoLoader />);
-    expect(screen.getByRole('img').className).toContain('animate-pulse');
+  it('uses the muted brand mark at the default size', () => {
+    const { container } = render(<LogoLoader />);
+    const mark = container.querySelector('[data-brand-variant="jovie"]');
+    const svg = mark?.querySelector('svg');
+    expect(mark?.getAttribute('class')).toContain('text-muted-foreground/50');
+    expect(mark?.getAttribute('class')).toContain('animate-pulse');
+    expect(mark).toHaveAttribute('aria-hidden', 'true');
+    expect(svg).toHaveAttribute('width', '32');
+  });
+
+  it('applies a custom size to the brand mark', () => {
+    const { container } = render(<LogoLoader size={48} />);
+    expect(container.querySelector('svg')).toHaveAttribute('width', '48');
   });
 
   it('has no a11y violations', async () => {

@@ -4,6 +4,13 @@
 
 gh_retry_is_transient_error() {
   local err="$1"
+  # An installation whose quota is already exhausted cannot recover inside a
+  # short retry loop. Retrying only monopolizes the repo-wide queue writer
+  # until GitHub's hourly reset, so fail fast and let the next event retry with
+  # a fresh quota window.
+  if grep -qiE "API rate limit already exceeded for installation ID" <<<"$err"; then
+    return 1
+  fi
   grep -qiE "HTTP (429|502|503|504)|rate limit|timed out|timeout|couldn't respond|stream error|stream ID [0-9]+; CANCEL|unexpected end of JSON input|unexpected EOF|connection reset" <<<"$err"
 }
 

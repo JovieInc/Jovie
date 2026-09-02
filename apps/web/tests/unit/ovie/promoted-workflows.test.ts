@@ -1,7 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import {
   DEST_LINEAR,
-  OVIE_QUEUED_ACK,
+  OVIE_LINEAR_QUEUED_ACK,
   readOvieLinearRoutes,
   readOvieReceiptLog,
   resetOvieIngestLog,
@@ -140,7 +140,7 @@ describe('Summer workflow promotion (JOV-5217)', () => {
       text: 'Jovie signup returns 500 on /start',
       lane: 'engineering' as const,
       destination: DEST_LINEAR,
-      ack: OVIE_QUEUED_ACK,
+      ack: OVIE_LINEAR_QUEUED_ACK,
       destinationHandle: null,
       workerSpawned: false as const,
     };

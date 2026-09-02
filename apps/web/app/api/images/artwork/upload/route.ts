@@ -2,6 +2,10 @@ import { eq } from 'drizzle-orm';
 import { NextRequest, NextResponse } from 'next/server';
 import { getCachedAuth } from '@/lib/auth/cached';
 import { withDbSessionTx } from '@/lib/auth/session';
+import {
+  getBlobCommandOptions,
+  isBlobStorageConfigured,
+} from '@/lib/blob-config';
 import { getUserByClerkId } from '@/lib/db/queries/shared';
 import { discogReleases } from '@/lib/db/schema/content';
 import { creatorProfiles } from '@/lib/db/schema/profiles';
@@ -29,8 +33,7 @@ export const runtime = 'nodejs';
 async function uploadArtworkSizes(
   processed: Record<string, Buffer>,
   releaseId: string,
-  put: Awaited<ReturnType<typeof getVercelBlobUploader>>,
-  token: string | undefined
+  put: Awaited<ReturnType<typeof getVercelBlobUploader>>
 ): Promise<Record<string, string>> {
   // Upload all sized variants concurrently — each is an independent PUT to
   // Vercel Blob. Promise.all preserves first-failure-aborts semantics.
@@ -38,7 +41,7 @@ async function uploadArtworkSizes(
     Object.entries(processed).map(async ([sizeKey, buffer]) => {
       const blobPath = `artwork/releases/${releaseId}/${sizeKey}.avif`;
 
-      if (!put || !token) {
+      if (!put || !isBlobStorageConfigured()) {
         if (env.NODE_ENV === 'production') {
           throw new TypeError('Blob storage not configured');
         }
@@ -51,7 +54,7 @@ async function uploadArtworkSizes(
       const blob = await withTimeout(
         put(blobPath, buffer, {
           access: 'public',
-          token,
+          ...getBlobCommandOptions(),
           contentType: AVIF_MIME_TYPE,
           cacheControlMaxAge: 60 * 60 * 24 * 365,
           addRandomSuffix: false,
@@ -113,8 +116,8 @@ export async function POST(request: NextRequest) {
     );
   }
 
-  if (env.NODE_ENV === 'production' && !env.BLOB_READ_WRITE_TOKEN) {
-    logger.error('BLOB_READ_WRITE_TOKEN is not configured');
+  if (env.NODE_ENV === 'production' && !isBlobStorageConfigured()) {
+    logger.error('Vercel Blob storage is not configured');
     return errorResponse(
       'Image upload is temporarily unavailable. Please try again later.',
       UPLOAD_ERROR_CODES.MISSING_BLOB_TOKEN,
@@ -238,8 +241,7 @@ export async function POST(request: NextRequest) {
       );
 
       const put = await getVercelBlobUploader();
-      const token = env.BLOB_READ_WRITE_TOKEN;
-      const sizes = await uploadArtworkSizes(processed, releaseId, put, token);
+      const sizes = await uploadArtworkSizes(processed, releaseId, put);
 
       // Primary artwork URL is the 1000px version (good balance of quality/size)
       const artworkUrl = sizes['1000'] ?? sizes.original;

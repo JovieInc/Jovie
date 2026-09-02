@@ -1,4 +1,5 @@
 import type { Meta, StoryObj } from '@storybook/nextjs-vite';
+import { expect, fn, userEvent, within } from 'storybook/test';
 import { CollapsibleSectionHeading } from './CollapsibleSectionHeading';
 
 const meta = {
@@ -14,7 +15,7 @@ const meta = {
   ],
   args: {
     isOpen: true,
-    onToggle: () => undefined,
+    onToggle: fn(),
     children: 'Audience details',
     'aria-controls': 'audience-details',
   },
@@ -23,7 +24,16 @@ const meta = {
 export default meta;
 type Story = StoryObj<typeof meta>;
 
-export const Open: Story = {};
+export const Open: Story = {
+  play: async ({ canvasElement, args }) => {
+    const heading = within(canvasElement).getByRole('button', {
+      name: 'Audience details',
+    });
+    await expect(heading).toHaveAttribute('aria-expanded', 'true');
+    await userEvent.click(heading);
+    await expect(args.onToggle).toHaveBeenCalled();
+  },
+};
 
 export const Collapsed: Story = {
   args: {

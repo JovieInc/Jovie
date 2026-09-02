@@ -1,12 +1,20 @@
 import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
 
+import { validateControllerHopChanges } from './controller-hop-contract.mjs';
 import {
   readInvariantRegistry,
   validateInvariantRegistry,
 } from './registry.mjs';
 
 const canonical = readInvariantRegistry();
+const workflowPath = '.github/workflows/new-controller.yml';
+const controllerWorkflow =
+  'name: New Controller\non:\n  workflow_run:\njobs:\n  mutate:\n    permissions:\n      pull-requests: write\n    steps:\n      - run: gh pr ready "$PR_NUMBER"\n';
+const exceptionWorkflow = `# controller-hop-exception: jovie-controller-hop/v1\n# accountable-writer: Gem\n# necessary-trust-boundary: Hosted GitHub App token owns native PR mutation while runner code stays read-only.\n# removal-trigger: Remove when writer runner can request native PR intent directly.\n${controllerWorkflow}`;
+const passiveWorkflow =
+  'name: Existing Workflow\non:\n  pull_request:\njobs:\n  check:\n    steps:\n      - run: echo ok\n';
+const modifiedWorkflow = `${passiveWorkflow}\n  mutate:\n    permissions:\n      pull-requests: write\n    steps:\n      - run: gh pr ready "$PR_NUMBER"\n`;
 
 function clone() {
   return structuredClone(canonical);
@@ -144,6 +152,34 @@ describe('canonical invariant registry', () => {
         verifyBindings: false,
       }).errors.join('\n'),
       /contradictory design\.agent-contract\.invariants/
+    );
+  });
+
+  it('accepts a documented trust-boundary/capability-gap exception', () => {
+    assert.deepEqual(
+      validateControllerHopChanges({
+        addedPaths: [workflowPath],
+        readFile: () => exceptionWorkflow,
+      }),
+      []
+    );
+  });
+
+  it('rejects unjustified workflow/controller hops', () => {
+    assert.match(
+      validateControllerHopChanges({
+        addedPaths: [workflowPath],
+        readFile: () => controllerWorkflow,
+      }).join('\n'),
+      /jovie-controller-hop\/v1/
+    );
+    assert.match(
+      validateControllerHopChanges({
+        changedPaths: [workflowPath],
+        readBaseFile: () => passiveWorkflow,
+        readFile: () => modifiedWorkflow,
+      }).join('\n'),
+      /new workflow\/controller hop/
     );
   });
 });

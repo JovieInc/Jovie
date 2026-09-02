@@ -1,26 +1,17 @@
 name: Auto-Ready Agent Drafts
 
-# Promotes only trusted bot-created drafts, or exact current heads produced
-# by the trusted FX writer, once required checks are green and the PR is
-# mergeable. Branch prefixes never authorize. Native merge-queue autoenroll
-# is the only enrollment owner; this workflow hands off by marking ready with
-# a short-lived Jovie App token so the ready_for_review/CI cascade is real.
+# Manual recovery for interrupted writer-owned promotion drift. Branch prefixes,
+# bot authors, and FX provenance never authorize promotion; an exact-head
+# jovie-writer-pr-proof/v1 receipt does. The owning writer's successful path is
+# scripts/writer-owned-pr-promote.sh, not this workflow.
 #
-# Fires on CI completion (immediate), selected PR events, and manual dispatch.
+# Manual dispatch is recovery-only for rare crash-window drift and must not
+# manufacture missing author proof.
 # Enable this workflow only after the provenance selector and App-token
 # mutation path land. Opt out per-PR with taste/security/hold labels or
 # explicit controlled-proof/canary markers.
 
 on:
-  # Trigger hygiene (#13349): no `synchronize` — every push starts CI, whose
-  # completion fires the workflow_run trigger below. A draft's checks can only
-  # turn green via a CI completion, so per-push spawns of this fleet-wide scan
-  # were pure duplication.
-  pull_request:
-    types: [ready_for_review, reopened]
-  workflow_run:
-    workflows: ['CI']
-    types: [completed]
   workflow_dispatch:
 
 concurrency:
@@ -32,18 +23,11 @@ permissions:
 
 jobs:
   auto-ready:
-    if: >-
-      github.event_name != 'workflow_run' ||
-      (
-        github.event.workflow_run.event == 'pull_request' &&
-        github.event.workflow_run.conclusion != 'cancelled'
-      )
     # Fleet controller: use the hosted image contract so `gh` is always
     # available. Some self-hosted fast runners intentionally lack it.
     runs-on: ubuntu-latest
     permissions:
       actions: read
-      checks: read
       contents: read
       issues: write
       pull-requests: write
@@ -52,8 +36,7 @@ jobs:
         id: app-token
         uses: actions/create-github-app-token@bcd2ba49218906704ab6c1aa796996da409d3eb1 # v3.2.0
         with:
-          # Mutations must fire real PR events (ready_for_review) so CI and
-          # native Auto-Enroll wake; GITHUB_TOKEN mutations would not cascade.
+          # Use the installation identity for the paired PR mutations.
           # Installation permissions stay unbounded here so commit and
           # Rolling CI Dispatch run provenance can be read.
           app-id: ${{ vars.JOVIE_BOT_APP_ID }}
@@ -70,7 +53,7 @@ jobs:
       - name: Verify GitHub CLI
         run: gh --version
 
-      - name: Auto-ready trusted bot and FX-repaired drafts
+      - name: Recover proven writer-owned promotion drift
         env:
           GH_TOKEN: ${{ steps.app-token.outputs.token }}
           REPO: ${{ github.repository }}

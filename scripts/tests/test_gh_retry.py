@@ -56,6 +56,7 @@ def _drain_command(
         f'PATH="{tmp_path}:$PATH" '
         f'DRAIN_EXPECT_GH="{expected}" '
         f'DRAIN_MUTATION_AUTHORIZATION={authorization} '
+        'GH_MUTATION_TOKEN=test-fixture-writer-token '
         f'MERGE_QUEUE_BACKEND={backend} '
     )
     if extra_env:
@@ -144,7 +145,7 @@ def _write_native_receipt_fakes(
             set -euo pipefail
             case "${{2:-}}" in
               preflight) exit 0 ;;
-              list-state) echo '{{"16068":{{"headRefOid":"{head}","queued":false,"isInMergeQueue":false,"mergeQueueEntry":null}}}}' ;;
+              list-state) echo '{{"16068":{{"headRefOid":"{head}","isDraft":false,"mergeable":"MERGEABLE","mergeStateStatus":"CLEAN","baseRefName":"main","labels":{{"nodes":[]}},"queued":false,"isInMergeQueue":false,"mergeQueueEntry":null}}}}' ;;
               explain-selector)
                 cat >/dev/null
                 printf '%s\\n' '{json.dumps(selector)}'
@@ -260,9 +261,11 @@ def _write_null_creator_receipt_drain(
     avatar_url: str = _TRUSTED_BOT_AVATAR,
     queued: bool = False,
     queue_entry_state: str | None = None,
+    queue_position: int = 1,
     labels: list[str] | None = None,
     front_churn: str = "forbid",
     allow_enroll: bool = False,
+    merge_group_runs: list[dict[str, object]] | None = None,
 ) -> dict[str, Path]:
     logs = {
         "api": tmp_path / "api-calls",
@@ -297,16 +300,19 @@ def _write_null_creator_receipt_drain(
     label_json = json.dumps(label_names)
     view_labels = json.dumps([{"name": name} for name in label_names])
     queued_json = "true" if queued else "false"
+    merge_group_runs_json = json.dumps(
+        merge_group_runs or [], separators=(",", ":")
+    )
     if queued:
         entry_state = queue_entry_state or "AWAITING_CHECKS"
         list_state = (
-            f'{{"{pr}":{{"headRefOid":"{head}","queued":true,'
+            f'{{"{pr}":{{"headRefOid":"{head}","isDraft":false,"mergeable":"MERGEABLE","mergeStateStatus":"CLEAN","baseRefName":"main","labels":{{"nodes":[]}},"queued":true,'
             f'"isInMergeQueue":true,'
-            f'"mergeQueueEntry":{{"state":"{entry_state}","position":1}}}}}}'
+            f'"mergeQueueEntry":{{"state":"{entry_state}","position":{queue_position}}}}}}}'
         )
     else:
         list_state = (
-            f'{{"{pr}":{{"headRefOid":"{head}","queued":false,'
+            f'{{"{pr}":{{"headRefOid":"{head}","isDraft":false,"mergeable":"MERGEABLE","mergeStateStatus":"CLEAN","baseRefName":"main","labels":{{"nodes":[]}},"queued":false,'
             f'"isInMergeQueue":false,"mergeQueueEntry":null}}}}'
         )
     if allow_enroll:
@@ -320,7 +326,12 @@ def _write_null_creator_receipt_drain(
             f'enroll) printf \'%s\\n\' "${{3:-}}" >>\'{logs["enroll"]}\'; '
             'echo "null-creator fixture must not enroll" >&2; exit 91 ;;'
         )
-    if front_churn == "allow":
+    if front_churn == "active":
+        front_churn_case = (
+            f'front-churn) printf \'front-churn\\n\' >>\'{logs["front_churn"]}\'; '
+            'echo \'{"action":"allow","reason":"newer attempt still active","evidence":{"activeRunId":88}}\' ;;'
+        )
+    elif front_churn == "allow":
         front_churn_case = (
             f'front-churn) printf \'front-churn\\n\' >>\'{logs["front_churn"]}\'; '
             "echo '{\"action\":\"allow\",\"reason\":\"no classified failure\"}' ;;"
@@ -385,7 +396,7 @@ def _write_null_creator_receipt_drain(
             if [[ "$1" == "api" ]]; then
               printf '%s\\n' "$2" >>'{logs["api"]}'
               if [[ "$2" == *"/git/ref/heads/main"* ]]; then echo '{"9" * 40}'; exit 0; fi
-              if [[ "$2" == *"/actions/workflows/ci.yml/runs"* ]]; then echo '[]'; exit 0; fi
+              if [[ "$2" == *"/actions/workflows/ci.yml/runs"* ]]; then echo '{merge_group_runs_json}'; exit 0; fi
               if [[ "$2" == *"/commits/{head}/status"* ]]; then cat '{status_file}'; exit 0; fi
               if [[ "$2" == "users/jovie-bot%5Bbot%5D" ]]; then cat '{identity_file}'; exit 0; fi
               if [[ "$2" == "repos/JovieInc/Jovie/actions/runs/77" ]]; then cat '{run_file}'; exit 0; fi
@@ -409,6 +420,89 @@ def _write_null_creator_receipt_drain(
 
 
 class TestNullCreatorQueueReceiptProvenance:
+    def test_product_failure_tombstone_never_dequeues_queue_follower(
+        self, tmp_path: Path
+    ) -> None:
+        head = "8" * 40
+        logs = _write_null_creator_receipt_drain(
+            tmp_path,
+            pr=17013,
+            head=head,
+            title="Follower with stale failure receipt",
+            status=_null_creator_status(
+                head=head,
+                context="jovie-queue-product-failure/v1",
+                state="success",
+                description="blocked:merge-group-product-failure",
+            ),
+            run=_trusted_autoenroll_run(head=head),
+            queued=True,
+            queue_position=2,
+        )
+
+        result = _run_bash(
+            _drain_command(
+                tmp_path,
+                backend="native",
+                extra_env=(
+                    "GITHUB_RUN_ID=77 GITHUB_SERVER_URL=https://github.com "
+                    "GITHUB_API_URL=https://api.github.com"
+                ),
+            )
+        )
+
+        assert result.returncode == 0, f"stdout={result.stdout}\nstderr={result.stderr}"
+        assert logs["front_churn"].read_text(encoding="utf-8") == ""
+        assert logs["dequeue"].read_text(encoding="utf-8") == ""
+
+    def test_newer_active_group_protects_head_before_failure_tombstone(
+        self, tmp_path: Path
+    ) -> None:
+        head = "8" * 40
+        base = "9" * 40
+        logs = _write_null_creator_receipt_drain(
+            tmp_path,
+            pr=17013,
+            head=head,
+            title="Active exact-main carrier",
+            status=_null_creator_status(
+                head=head,
+                context="jovie-queue-product-failure/v1",
+                state="success",
+                description="blocked:merge-group-product-failure",
+            ),
+            run=_trusted_autoenroll_run(head=head),
+            queued=True,
+            front_churn="active",
+            merge_group_runs=[
+                {
+                    "id": 88,
+                    "headBranch": f"gh-readonly-queue/main/pr-17013-{base}",
+                    "status": "in_progress",
+                    "conclusion": None,
+                    "headSha": "7" * 40,
+                    "createdAt": "2026-09-02T11:13:03Z",
+                    "updatedAt": "2026-09-02T11:15:46Z",
+                }
+            ],
+        )
+
+        result = _run_bash(
+            _drain_command(
+                tmp_path,
+                backend="native",
+                extra_env=(
+                    "GITHUB_RUN_ID=77 GITHUB_SERVER_URL=https://github.com "
+                    "GITHUB_API_URL=https://api.github.com"
+                ),
+            )
+        )
+
+        assert result.returncode == 0, f"stdout={result.stdout}\nstderr={result.stderr}"
+        assert logs["front_churn"].read_text(encoding="utf-8") == "front-churn\n"
+        assert logs["dequeue"].read_text(encoding="utf-8") == ""
+        assert "durable classified/repeated" not in result.stdout
+
     def test_trusted_product_failure_creator_null_skips_scan_post_dequeue_and_enroll(
         self, tmp_path: Path
     ) -> None:
@@ -753,7 +847,7 @@ class TestExactHeadQueueReceipt:
                 set -euo pipefail
                 case "${{2:-}}" in
                   preflight) exit 0 ;;
-                  list-state) echo '{{"16068":{{"headRefOid":"{head}","queued":false,"isInMergeQueue":false,"mergeQueueEntry":null}}}}' ;;
+                  list-state) echo '{{"16068":{{"headRefOid":"{head}","isDraft":false,"mergeable":"MERGEABLE","mergeStateStatus":"CLEAN","baseRefName":"main","labels":{{"nodes":[]}},"queued":false,"isInMergeQueue":false,"mergeQueueEntry":null}}}}' ;;
                   explain-selector) cat >/dev/null; echo '{{"observed":true,"queued":false,"eligible":true,"reason":"eligible"}}' ;;
                   prove-receipt) echo '{{"ok":false,"state":{{"queued":false}},"explanation":{{"reason":"not-queued"}}}}' ;;
                   enroll) echo "durable product-failure receipt must block enroll" >&2; exit 91 ;;
@@ -839,7 +933,7 @@ class TestExactHeadQueueReceipt:
                 set -euo pipefail
                 case "${{2:-}}" in
                   preflight) exit 0 ;;
-                  list-state) echo '{{"16070":{{"headRefOid":"{new_head}","queued":false,"isInMergeQueue":false,"mergeQueueEntry":null}}}}' ;;
+                  list-state) echo '{{"16070":{{"headRefOid":"{new_head}","isDraft":false,"mergeable":"MERGEABLE","mergeStateStatus":"CLEAN","baseRefName":"main","labels":{{"nodes":[]}},"queued":false,"isInMergeQueue":false,"mergeQueueEntry":null}}}}' ;;
                   max-queue-depth) echo 16 ;;
                   front-churn) echo '{{"action":"allow","reason":"new head has no failed attempt","evidence":null}}' ;;
                   unmergeable-eject) echo '{{"action":"keep","reason":"not-queued"}}' ;;
@@ -922,7 +1016,7 @@ class TestExactHeadQueueReceipt:
                 set -euo pipefail
                 case "${{2:-}}" in
                   preflight) exit 0 ;;
-                  list-state) echo '{{"16069":{{"headRefOid":"{head}","queued":false,"isInMergeQueue":false,"mergeQueueEntry":null}}}}' ;;
+                  list-state) echo '{{"16069":{{"headRefOid":"{head}","isDraft":false,"mergeable":"MERGEABLE","mergeStateStatus":"CLEAN","baseRefName":"main","labels":{{"nodes":[]}},"queued":false,"isInMergeQueue":false,"mergeQueueEntry":null}}}}' ;;
                   explain-selector) cat >/dev/null; echo '{{"observed":true,"queued":false,"eligible":true,"reason":"eligible"}}' ;;
                   prove-receipt) echo '{{"ok":false,"state":{{"queued":false}},"explanation":{{"reason":"not-queued"}}}}' ;;
                   enroll) echo "classified product failure must not enroll" >&2; exit 91 ;;
@@ -1021,7 +1115,7 @@ class TestExactHeadQueueReceipt:
                 set -euo pipefail
                 case "${{2:-}}" in
                   preflight) exit 0 ;;
-                  list-state) echo '{{"16071":{{"headRefOid":"{head}","queued":true,"isInMergeQueue":true,"mergeQueueEntry":{{"state":"AWAITING_CHECKS","position":1}}}}}}' ;;
+                  list-state) echo '{{"16071":{{"headRefOid":"{head}","isDraft":false,"mergeable":"MERGEABLE","mergeStateStatus":"CLEAN","baseRefName":"main","labels":{{"nodes":[]}},"queued":true,"isInMergeQueue":true,"mergeQueueEntry":{{"state":"AWAITING_CHECKS","position":1}}}}}}' ;;
                   dequeue) printf 'dequeue\n' >>'{mutation_order}'; echo '{{"state":{{"queued":false}}}}' ;;
                   max-queue-depth) echo 16 ;;
                   front-churn) echo '{{"action":"block","reason":"unchanged head failed product checks","evidence":{{"failureClass":"deterministic-product-check"}}}}' ;;
@@ -1398,6 +1492,48 @@ class TestGhRetryHelper:
         result = _run_bash(script)
         assert result.returncode == 0, f"stdout={result.stdout}\nstderr={result.stderr}"
 
+    def test_does_not_retry_exhausted_installation_quota(
+        self, tmp_path: Path
+    ) -> None:
+        counter = tmp_path / "calls"
+        counter.write_text("0", encoding="utf-8")
+        fake_gh = tmp_path / "gh"
+        fake_gh.write_text(
+            textwrap.dedent(
+                """\
+                #!/usr/bin/env bash
+                set -euo pipefail
+                count_file="${GH_RETRY_TEST_COUNTER:?}"
+                count=$(<"$count_file")
+                echo "$((count + 1))" >"$count_file"
+                echo "GraphQL: API rate limit already exceeded for installation ID 112037986." >&2
+                exit 1
+                """
+            ),
+            encoding="utf-8",
+        )
+        fake_gh.chmod(fake_gh.stat().st_mode | stat.S_IXUSR | stat.S_IXGRP | stat.S_IXOTH)
+        stderr_file = tmp_path / "stderr.txt"
+
+        script = textwrap.dedent(
+            f"""\
+            set -euo pipefail
+            source "{_GH_RETRY}"
+            export PATH="{tmp_path}:$PATH"
+            export GH_RETRY_ATTEMPTS=8
+            export GH_RETRY_BASE_DELAY=0
+            export GH_RETRY_TEST_COUNTER="{counter}"
+            if gh_retry api graphql 2>"{stderr_file}"; then
+              exit 2
+            fi
+            grep -q "rate limit already exceeded for installation ID" "{stderr_file}"
+            test "$(wc -l <"{stderr_file}" | tr -d ' ')" = "1"
+            """
+        )
+        result = _run_bash(script)
+        assert result.returncode == 0, f"stdout={result.stdout}\nstderr={result.stderr}"
+        assert counter.read_text(encoding="utf-8").strip() == "1"
+
 
 class TestDrainPrQueueWiring:
     def test_exact_admission_rereads_transient_unknown_mergeability(
@@ -1414,7 +1550,7 @@ class TestDrainPrQueueWiring:
                 set -euo pipefail
                 case "${{2:-}}" in
                   preflight) exit 0 ;;
-                  list-state) echo '{{"101":{{"headRefOid":"{head}","queued":false}}}}' ;;
+                  list-state) echo '{{"101":{{"headRefOid":"{head}","isDraft":false,"mergeable":"MERGEABLE","mergeStateStatus":"CLEAN","baseRefName":"main","labels":{{"nodes":[]}},"queued":false}}}}' ;;
                   enroll) echo '{{"state":{{"state":"OPEN","isDraft":false,"headRefOid":"{head}","mergeQueueEntry":{{"id":"MQE_1","state":"AWAITING_CHECKS","position":1}}}}}}' ;;
                   dequeue) echo '{{"state":{{"queued":false}}}}' ;;
                   max-queue-depth) echo 16 ;;
@@ -1525,7 +1661,7 @@ class TestDrainPrQueueWiring:
                 command_name="${{2:-}}"
                 case "$command_name" in
                   preflight) exit 0 ;;
-                  list-state) echo '{{"101":{{"headRefOid":"{head}","queued":false}}}}' ;;
+                  list-state) echo '{{"101":{{"headRefOid":"{head}","isDraft":false,"mergeable":"MERGEABLE","mergeStateStatus":"CLEAN","baseRefName":"main","labels":{{"nodes":[]}},"queued":false}}}}' ;;
                   enroll)
                     if [[ "${{FAKE_ENROLL_MODE:?}}" == "failure" ]]; then
                       exit 1
@@ -1635,7 +1771,7 @@ class TestDrainPrQueueWiring:
                 case "${{2:-}}" in
                   preflight) exit 0 ;;
                   list-state)
-                    echo '{{"1001":{{"headRefOid":"{heads["1001"]}","queued":false}},"1002":{{"headRefOid":"{heads["1002"]}","queued":false}},"1003":{{"headRefOid":"{heads["1003"]}","queued":false}}}}'
+                    echo '{{"1001":{{"headRefOid":"{heads["1001"]}","isDraft":false,"mergeable":"MERGEABLE","mergeStateStatus":"CLEAN","baseRefName":"main","labels":{{"nodes":[]}},"queued":false}},"1002":{{"headRefOid":"{heads["1002"]}","isDraft":false,"mergeable":"MERGEABLE","mergeStateStatus":"CLEAN","baseRefName":"main","labels":{{"nodes":[]}},"queued":false}},"1003":{{"headRefOid":"{heads["1003"]}","isDraft":false,"mergeable":"MERGEABLE","mergeStateStatus":"CLEAN","baseRefName":"main","labels":{{"nodes":[]}},"queued":false}}}}'
                     ;;
                   enroll)
                     echo "${{3:?}}" >>"{enrolled}"
@@ -1720,28 +1856,73 @@ JSON
         assert heads["1003"] not in result.stdout
         assert enrolled.read_text(encoding="utf-8").splitlines() == ["1001", "1002"]
 
-    def test_surviving_mutex_run_recovers_one_missed_head_with_target_under_total_cap(
+    def test_enqueued_continuation_recovers_next_eligible_head_without_duplicate_mutations(
         self, tmp_path: Path
     ) -> None:
-        """One surviving pass recovers lost clean work without exceeding two admissions."""
-        heads = {"1001": "d" * 40, "1002": "e" * 40, "1003": "f" * 40}
+        """Each native enqueued event advances one bounded missed-admission cohort."""
+        heads = {
+            "1001": "d" * 40,
+            "1002": "e" * 40,
+            "1003": "f" * 40,
+            "1004": "a" * 40,
+            "1005": "b" * 40,
+        }
+        real_node = shutil.which("node")
+        assert real_node is not None
         enrolled = tmp_path / "enrolled"
         enrolled.write_text("", encoding="utf-8")
+        conflict_label_calls = tmp_path / "conflict-label-calls"
+        conflict_label_calls.write_text("", encoding="utf-8")
         fake_node = tmp_path / "node"
         fake_node.write_text(
             textwrap.dedent(
                 f"""\\
                 #!/usr/bin/env bash
                 set -euo pipefail
+                queued_json() {{
+                  if grep -qx -- "$1" "{enrolled}"; then
+                    printf true
+                  else
+                    printf false
+                  fi
+                }}
+                queue_entry_json() {{
+                  if grep -qx -- "$1" "{enrolled}"; then
+                    printf '{{"id":"MQE_%s","state":"AWAITING_CHECKS","position":1}}' "$1"
+                  else
+                    printf null
+                  fi
+                }}
+                queue_state() {{
+                  printf '{{"1001":{{"headRefOid":"{heads["1001"]}","isDraft":false,"mergeable":"MERGEABLE","mergeStateStatus":"CLEAN","baseRefName":"main","labels":{{"nodes":[]}},"queued":%s,"isInMergeQueue":%s,"mergeQueueEntry":%s}},"1002":{{"headRefOid":"{heads["1002"]}","isDraft":false,"mergeable":"MERGEABLE","mergeStateStatus":"CLEAN","baseRefName":"main","labels":{{"nodes":[]}},"queued":%s,"isInMergeQueue":%s,"mergeQueueEntry":%s}},"1003":{{"headRefOid":"{heads["1003"]}","isDraft":false,"mergeable":"MERGEABLE","mergeStateStatus":"CLEAN","baseRefName":"main","labels":{{"nodes":[{{"name":"needs-conflict-resolution"}}]}},"queued":%s,"isInMergeQueue":%s,"mergeQueueEntry":%s}},"1004":{{"headRefOid":"{heads["1004"]}","isDraft":false,"mergeable":"MERGEABLE","mergeStateStatus":"CLEAN","baseRefName":"main","labels":{{"nodes":[]}},"queued":%s,"isInMergeQueue":%s,"mergeQueueEntry":%s}},"1005":{{"headRefOid":"{heads["1005"]}","isDraft":false,"mergeable":"MERGEABLE","mergeStateStatus":"CLEAN","baseRefName":"main","labels":{{"nodes":[]}},"queued":%s,"isInMergeQueue":%s,"mergeQueueEntry":%s}}}}\\n' \
+                    "$(queued_json 1001)" "$(queued_json 1001)" "$(queue_entry_json 1001)" \
+                    "$(queued_json 1002)" "$(queued_json 1002)" "$(queue_entry_json 1002)" \
+                    "$(queued_json 1003)" "$(queued_json 1003)" "$(queue_entry_json 1003)" \
+                    "$(queued_json 1004)" "$(queued_json 1004)" "$(queue_entry_json 1004)" \
+                    "$(queued_json 1005)" "$(queued_json 1005)" "$(queue_entry_json 1005)"
+                }}
                 case "${{2:-}}" in
                   preflight) exit 0 ;;
-                  list-state)
-                    echo '{{"1001":{{"headRefOid":"{heads["1001"]}","queued":false}},"1002":{{"headRefOid":"{heads["1002"]}","queued":false}},"1003":{{"headRefOid":"{heads["1003"]}","queued":false}}}}'
+                  list-state) queue_state ;;
+                  explain-selector)
+                    cat >/dev/null
+                    number="${{3:?}}"
+                    if grep -qx -- "$number" "{enrolled}"; then
+                      echo '{{"observed":true,"queued":true,"eligible":false,"reason":"already-queued"}}'
+                    else
+                      echo '{{"observed":true,"queued":false,"eligible":true,"reason":"eligible"}}'
+                    fi
                     ;;
+                  prove-receipt) echo '{{"ok":false,"state":{{"queued":false}},"explanation":{{"reason":"not-queued"}}}}' ;;
                   enroll)
-                    echo "${{3:?}}" >>"{enrolled}"
+                    number="${{3:?}}"
                     head_var="${{4:?}}"
-                    echo "{{\\"state\\":{{\\"state\\":\\"OPEN\\",\\"isDraft\\":false,\\"headRefOid\\":\\"$head_var\\",\\"mergeQueueEntry\\":{{\\"id\\":\\"MQE_${{3}}\\",\\"state\\":\\"AWAITING_CHECKS\\",\\"position\\":1}}}}}}"
+                    if grep -qx -- "$number" "{enrolled}"; then
+                      echo "duplicate native enrollment for #$number" >&2
+                      exit 91
+                    fi
+                    echo "$number" >>"{enrolled}"
+                    echo "{{\\"state\\":{{\\"state\\":\\"OPEN\\",\\"isDraft\\":false,\\"headRefOid\\":\\"$head_var\\",\\"mergeQueueEntry\\":{{\\"id\\":\\"MQE_$number\\",\\"state\\":\\"AWAITING_CHECKS\\",\\"position\\":1}}}}}}"
                     ;;
                   dequeue) echo '{{"state":{{"queued":false}}}}' ;;
                   max-queue-depth) echo 16 ;;
@@ -1750,7 +1931,7 @@ JSON
                   changelog-collision) echo '{{"action":"allow","reason":"candidate-omits-changelog"}}' ;;
                   changelog-inventory) echo '{{"schema":"jovie-pre-land-changelog/v1","ok":true,"reason":"explicit","prs":[],"count":0}}' ;;
                   changelog-drain) echo '{{"action":"keep","reason":"omits-changelog","reenqueue":false}}' ;;
-                  --classify-queue) echo '[]' ;;
+                  --classify-queue) exec "{real_node}" "$@" ;;
                   *) echo "unexpected node args: $*" >&2; exit 2 ;;
                 esac
                 """
@@ -1766,23 +1947,33 @@ JSON
                 set -euo pipefail
                 if [[ "$1 $2" == "pr list" ]]; then
                   cat <<'JSON'
-                [{{"n":1001,"t":"Exact event target","draft":false,"m":"MERGEABLE","ms":"CLEAN","head":"codex/event","headOid":"{heads["1001"]}","base":"main","body":"","L":[],"fail":[]}},{{"n":1002,"t":"Missed exact event","draft":false,"m":"MERGEABLE","ms":"CLEAN","head":"codex/missed","headOid":"{heads["1002"]}","base":"main","body":"","L":[],"fail":[]}},{{"n":1003,"t":"Deferred by total cap","draft":false,"m":"MERGEABLE","ms":"CLEAN","head":"codex/deferred","headOid":"{heads["1003"]}","base":"main","body":"","L":[],"fail":[]}}]
+                [{{"n":1001,"t":"Exact event target","draft":false,"m":"MERGEABLE","ms":"CLEAN","head":"codex/event","headOid":"{heads["1001"]}","base":"main","body":"","L":["merge-queue"],"fail":[]}},{{"n":1002,"t":"Missed exact event","draft":false,"m":"MERGEABLE","ms":"CLEAN","head":"codex/missed","headOid":"{heads["1002"]}","base":"main","body":"","L":["merge-queue"],"fail":[]}},{{"n":1003,"t":"Already-labelled conflict","draft":false,"m":"CONFLICTING","ms":"DIRTY","head":"codex/conflict","headOid":"{heads["1003"]}","base":"main","body":"","L":["merge-queue","needs-conflict-resolution"],"fail":[]}},{{"n":1004,"t":"Terminal red","draft":false,"m":"MERGEABLE","ms":"CLEAN","head":"codex/red","headOid":"{heads["1004"]}","base":"main","body":"","L":["merge-queue"],"fail":["PR Ready"]}},{{"n":1005,"t":"Deferred by total cap","draft":false,"m":"MERGEABLE","ms":"CLEAN","head":"codex/deferred","headOid":"{heads["1005"]}","base":"main","body":"","L":["merge-queue"],"fail":[]}}]
 JSON
                   exit 0
                 fi
                 if [[ "$1 $2" == "pr checks" ]]; then
-                  echo '[{{"name":"PR Ready","bucket":"pass","state":"SUCCESS"}},{{"name":"Migration Guard","bucket":"pass","state":"SUCCESS"}},{{"name":"Fork PR Gate","bucket":"pass","state":"SUCCESS"}},{{"name":"PR Size Guard","bucket":"pass","state":"SUCCESS"}}]'
+                  case "$3" in
+                    1004) echo '[{{"name":"PR Ready","bucket":"fail","state":"FAILURE"}},{{"name":"Migration Guard","bucket":"pass","state":"SUCCESS"}},{{"name":"Fork PR Gate","bucket":"pass","state":"SUCCESS"}},{{"name":"PR Size Guard","bucket":"pass","state":"SUCCESS"}}]' ;;
+                    *) echo '[{{"name":"PR Ready","bucket":"pass","state":"SUCCESS"}},{{"name":"Migration Guard","bucket":"pass","state":"SUCCESS"}},{{"name":"Fork PR Gate","bucket":"pass","state":"SUCCESS"}},{{"name":"PR Size Guard","bucket":"pass","state":"SUCCESS"}}]' ;;
+                  esac
                   exit 0
                 fi
                 if [[ "$1 $2" == "pr view" ]]; then
+                  mergeable=MERGEABLE
                   case "$3" in
-                    1001) head="{heads["1001"]}" ;;
-                    1002) head="{heads["1002"]}" ;;
-                    1003) head="{heads["1003"]}" ;;
+                    1001) head="{heads["1001"]}"; labels='[{{"name":"merge-queue"}}]' ;;
+                    1002) head="{heads["1002"]}"; labels='[{{"name":"merge-queue"}}]' ;;
+                    1003) head="{heads["1003"]}"; labels='[{{"name":"merge-queue"}},{{"name":"needs-conflict-resolution"}}]'; mergeable=CONFLICTING ;;
+                    1004) head="{heads["1004"]}"; labels='[{{"name":"merge-queue"}}]' ;;
+                    1005) head="{heads["1005"]}"; labels='[{{"name":"merge-queue"}}]' ;;
                     *) echo "unexpected PR view: $*" >&2; exit 2 ;;
                   esac
-                  echo "{{\\"state\\":\\"OPEN\\",\\"isDraft\\":false,\\"mergeable\\":\\"MERGEABLE\\",\\"labels\\":[],\\"headRefOid\\":\\"$head\\",\\"baseRefName\\":\\"main\\",\\"body\\":\\"\\"}}"
+                  echo "{{\\"state\\":\\"OPEN\\",\\"isDraft\\":false,\\"mergeable\\":\\"$mergeable\\",\\"labels\\":$labels,\\"headRefOid\\":\\"$head\\",\\"baseRefName\\":\\"main\\",\\"body\\":\\"\\"}}"
                   exit 0
+                fi
+                if [[ "$1 $2" == "pr edit" ]]; then
+                  printf '%s\\n' "$*" >>"{conflict_label_calls}"
+                  exit 97
                 fi
                 if [[ "$1" == "api" ]]; then
                   if [[ "$2" == *"/commits/"*"/status"* ]]; then
@@ -1803,7 +1994,7 @@ JSON
         )
         fake_gh.chmod(fake_gh.stat().st_mode | stat.S_IXUSR)
 
-        result = _run_bash(
+        first = _run_bash(
             _drain_command(
                 tmp_path,
                 backend="native",
@@ -1816,13 +2007,67 @@ JSON
             )
         )
 
-        assert result.returncode == 0, f"stdout={result.stdout}\\nstderr={result.stderr}"
-        assert "bounded exact-head native admission" in result.stdout
-        assert "exact missed admission at " + heads["1002"] in result.stdout
-        assert "reached total exact admission cap (2)" in result.stdout
-        assert "exact missed admission at " + heads["1001"] not in result.stdout
-        assert "exact missed admission at " + heads["1003"] not in result.stdout
+        assert first.returncode == 0, f"stdout={first.stdout}\\nstderr={first.stderr}"
+        assert "bounded exact-head native admission" in first.stdout
+        assert "exact missed admission at " + heads["1002"] in first.stdout
+        assert "reached total exact admission cap (2)" in first.stdout
+        assert "exact missed admission at " + heads["1001"] not in first.stdout
+        assert "exact missed admission at " + heads["1003"] not in first.stdout
+        assert "exact missed admission at " + heads["1004"] not in first.stdout
+        assert "exact missed admission at " + heads["1005"] not in first.stdout
+        assert "#1004" in first.stdout
+        assert "PR Ready" in first.stdout
         assert enrolled.read_text(encoding="utf-8").splitlines() == ["1001", "1002"]
+        assert conflict_label_calls.read_text(encoding="utf-8") == ""
+
+        second = _run_bash(
+            _drain_command(
+                tmp_path,
+                backend="native",
+                extra_env=(
+                    f"DRAIN_ADMISSION_PR=1002 DRAIN_ADMISSION_HEAD={heads['1002']} "
+                    "DRAIN_RECONCILE_MISSED_ADMISSION=1 "
+                    "DRAIN_QUEUE_REENTRY_MAX_PER_RUN=2 "
+                    "GITHUB_RUN_ID=79 GITHUB_SERVER_URL=https://github.com"
+                ),
+            )
+        )
+
+        assert second.returncode == 0, (
+            f"stdout={second.stdout}\\nstderr={second.stderr}"
+        )
+        assert "exact missed admission at " + heads["1005"] in second.stdout
+        assert "exact missed admission at " + heads["1003"] not in second.stdout
+        assert "exact missed admission at " + heads["1004"] not in second.stdout
+        assert enrolled.read_text(encoding="utf-8").splitlines() == [
+            "1001",
+            "1002",
+            "1005",
+        ]
+        assert enrolled.read_text(encoding="utf-8").splitlines().count("1002") == 1
+        assert conflict_label_calls.read_text(encoding="utf-8") == ""
+
+        third = _run_bash(
+            _drain_command(
+                tmp_path,
+                backend="native",
+                extra_env=(
+                    f"DRAIN_ADMISSION_PR=1005 DRAIN_ADMISSION_HEAD={heads['1005']} "
+                    "DRAIN_RECONCILE_MISSED_ADMISSION=1 "
+                    "DRAIN_QUEUE_REENTRY_MAX_PER_RUN=2 "
+                    "GITHUB_RUN_ID=80 GITHUB_SERVER_URL=https://github.com"
+                ),
+            )
+        )
+
+        assert third.returncode == 0, f"stdout={third.stdout}\\nstderr={third.stderr}"
+        assert "exact missed admission at " not in third.stdout
+        assert enrolled.read_text(encoding="utf-8").splitlines() == [
+            "1001",
+            "1002",
+            "1005",
+        ]
+        assert conflict_label_calls.read_text(encoding="utf-8") == ""
 
     def test_missed_admission_recovery_refuses_a_head_that_moved(
         self, tmp_path: Path
@@ -1839,7 +2084,7 @@ JSON
                 set -euo pipefail
                 case "${{2:-}}" in
                   preflight) exit 0 ;;
-                  list-state) echo '{{"1001":{{"headRefOid":"{snapshot_head}","queued":false}}}}' ;;
+                  list-state) echo '{{"1001":{{"headRefOid":"{snapshot_head}","isDraft":false,"mergeable":"MERGEABLE","mergeStateStatus":"CLEAN","baseRefName":"main","labels":{{"nodes":[]}},"queued":false}}}}' ;;
                   enroll) touch "{enrolled}"; exit 99 ;;
                   max-queue-depth) echo 16 ;;
                   unmergeable-eject) echo '{{"action":"keep","reason":"not-queued"}}' ;;
@@ -2603,6 +2848,110 @@ JSON
         assert "would +merge-queue on #16263" not in result.stdout
         assert "{no-auto,merge-queue}" in result.stdout
 
+    def test_positive_mergeable_reread_clears_stale_conflict_label_without_dequeue(
+        self, tmp_path: Path
+    ) -> None:
+        head = "e4ddf77efb91c80665f10dece11836130c1a286a"
+        fake_gh = tmp_path / "gh"
+        fake_gh.write_text(
+            textwrap.dedent(
+                f"""\
+                #!/usr/bin/env bash
+                set -euo pipefail
+                if [[ "$1 $2" == "pr list" ]]; then
+                  echo '[{{"n":16898,"t":"Active exact merge group","draft":false,"m":"MERGEABLE","ms":"CLEAN","head":"tim/jov-5800-fix","headOid":"{head}","base":"main","body":"","L":["merge-queue","needs-conflict-resolution"],"fail":[]}}]'
+                  exit 0
+                fi
+                if [[ "$1 $2" == "pr checks" ]]; then
+                  echo '[{{"name":"PR Ready","bucket":"pass","state":"SUCCESS"}},{{"name":"Migration Guard","bucket":"pass","state":"SUCCESS"}},{{"name":"Fork PR Gate","bucket":"pass","state":"SUCCESS"}},{{"name":"PR Size Guard","bucket":"pass","state":"SUCCESS"}}]'
+                  exit 0
+                fi
+                if [[ "$1 $2" == "pr view" ]]; then
+                  echo '{{"headRefOid":"{head}","mergeable":"MERGEABLE","labels":[{{"name":"merge-queue"}},{{"name":"needs-conflict-resolution"}}]}}'
+                  exit 0
+                fi
+                if [[ "$1" == "api" ]]; then exit 1; fi
+                echo "unexpected gh args: $*" >&2
+                exit 2
+                """
+            ),
+            encoding="utf-8",
+        )
+        fake_gh.chmod(
+            fake_gh.stat().st_mode | stat.S_IXUSR | stat.S_IXGRP | stat.S_IXOTH
+        )
+
+        result = _run_bash(_drain_command(tmp_path, extra_env="DRY_RUN=1"))
+
+        assert result.returncode == 0, f"stdout={result.stdout}\nstderr={result.stderr}"
+        assert "[dry-run] would -needs-conflict-resolution on #16898" in result.stdout
+        assert "[dry-run] would -merge-queue on #16898" not in result.stdout
+        assert "needs-conflict-resolution" not in result.stdout.split(
+            "=== SURFACE", maxsplit=1
+        )[-1]
+
+    @pytest.mark.parametrize("remove_succeeds", [True, False])
+    def test_live_stale_conflict_label_reconciliation_preserves_exact_outcome(
+        self, tmp_path: Path, remove_succeeds: bool
+    ) -> None:
+        head = "e4ddf77efb91c80665f10dece11836130c1a286a"
+        calls = tmp_path / "gh-calls.log"
+        fake_gh = tmp_path / "gh"
+        remove_result = "exit 0" if remove_succeeds else 'echo "permission denied" >&2; exit 1'
+        fake_gh.write_text(
+            textwrap.dedent(
+                f"""\
+                #!/usr/bin/env bash
+                set -euo pipefail
+                echo "$*" >> "${{FAKE_GH_LOG:?}}"
+                if [[ "$1 $2" == "pr list" ]]; then
+                  echo '[{{"n":16898,"t":"Active exact merge group","draft":false,"m":"MERGEABLE","ms":"CLEAN","head":"tim/jov-5800-fix","headOid":"{head}","base":"main","body":"","L":["merge-queue","needs-conflict-resolution"],"fail":[]}}]'
+                  exit 0
+                fi
+                if [[ "$1 $2" == "pr checks" ]]; then
+                  echo '[{{"name":"PR Ready","bucket":"pass","state":"SUCCESS"}},{{"name":"Migration Guard","bucket":"pass","state":"SUCCESS"}},{{"name":"Fork PR Gate","bucket":"pass","state":"SUCCESS"}},{{"name":"PR Size Guard","bucket":"pass","state":"SUCCESS"}}]'
+                  exit 0
+                fi
+                if [[ "$1 $2" == "pr view" ]]; then
+                  echo '{{"headRefOid":"{head}","mergeable":"MERGEABLE","labels":[{{"name":"merge-queue"}},{{"name":"needs-conflict-resolution"}}]}}'
+                  exit 0
+                fi
+                if [[ "$1 $2" == "pr edit" && " $* " == *" --remove-label needs-conflict-resolution "* ]]; then
+                  {remove_result}
+                fi
+                echo "unexpected gh args: $*" >&2
+                exit 2
+                """
+            ),
+            encoding="utf-8",
+        )
+        fake_gh.chmod(
+            fake_gh.stat().st_mode | stat.S_IXUSR | stat.S_IXGRP | stat.S_IXOTH
+        )
+
+        result = _run_bash(
+            _drain_command(
+                tmp_path,
+                extra_env=f"FAKE_GH_LOG={calls} GH_RETRY_ATTEMPTS=1",
+            )
+        )
+
+        assert result.returncode == 0, f"stdout={result.stdout}\nstderr={result.stderr}"
+        log = calls.read_text(encoding="utf-8")
+        assert (
+            "pr edit 16898 -R JovieInc/Jovie --remove-label needs-conflict-resolution"
+            in log
+        )
+        assert "--remove-label merge-queue" not in log
+        assert "--add-label merge-queue" not in log
+        if remove_succeeds:
+            assert "-needs-conflict-resolution on #16898" in result.stdout
+            assert "remains active on #16898" not in result.stdout
+        else:
+            assert "failed to remove needs-conflict-resolution on #16898" in result.stdout
+            assert "needs-conflict-resolution remains active on #16898" in result.stdout
+            assert "preserving current queue state until retry" in result.stdout
+
     def test_draft_only_enrolls_clean_unrelated_pr(self, tmp_path: Path) -> None:
         head = "c" * 40
         receipt = {
@@ -3320,7 +3669,7 @@ JSON
                   exit 0
                 fi
                 if [[ "$1 $2" == "pr checks" ]]; then
-                  [[ "$3" == "101" || "$3" == "104" ]]
+                  [[ "$3" == "101" || "$3" == "104" || "$3" == "456" || "$3" == "789" ]]
                   echo '[{{"name":"PR Ready","bucket":"pass","state":"SUCCESS"}},{{"name":"Migration Guard","bucket":"pass","state":"SUCCESS"}},{{"name":"Fork PR Gate","bucket":"pass","state":"SUCCESS"}},{{"name":"PR Size Guard","bucket":"pass","state":"SUCCESS"}}]'
                   exit 0
                 fi
@@ -3349,18 +3698,16 @@ JSON
 
         assert result.returncode == 0, f"stdout={result.stdout}\nstderr={result.stderr}"
         assert "=== DEQUEUE (hard gates" in result.stdout
-        assert "[dry-run] would -merge-queue on #789" in result.stdout
         assert "[dry-run] would -merge-queue on #102" in result.stdout
         assert "[dry-run] would -merge-queue on #103" in result.stdout
         assert "[dry-run] would +merge-queue on #101" in result.stdout
-        assert "[dry-run] would +merge-queue on #456" not in result.stdout
-        assert "[dry-run] would +merge-queue on #789" not in result.stdout
+        assert "[dry-run] would -merge-queue on #789" not in result.stdout
         assert "[dry-run] would +merge-queue on #102" not in result.stdout
         assert "[dry-run] would +merge-queue on #103" not in result.stdout
         assert "[dry-run] would +merge-queue on #104" not in result.stdout
-        assert "=== SURFACE (human decision; not touched) ===" in result.stdout
-        assert "#456" in result.stdout
-        assert "#789" in result.stdout
+        assert "=== SURFACE (drafts and queue-deferred; not closed) ===" in result.stdout
+        assert "#102" in result.stdout
+        assert "#103" in result.stdout
 
     def test_maintenance_only_run_cannot_admit_a_clean_pr(self, tmp_path: Path) -> None:
         fake_gh = tmp_path / "gh"
@@ -3646,7 +3993,10 @@ class TestReleaseQueueDeferred:
         assert "Queue-Deferred Release]" not in fleet_gate_refresh
         assert "workflows: ['Fleet Gate Refresh']" in workflow
         assert "workflows: ['CI', 'Production Controller', 'Fleet Gate Refresh']" not in workflow
-        assert "pull_request:" in fleet_gate_refresh
+        assert "pull_request_target:" in fleet_gate_refresh
+        assert "\n  pull_request:\n" not in fleet_gate_refresh
+        assert "converted_to_draft" in fleet_gate_refresh
+        assert "github.event_name != 'pull_request_target'" in fleet_gate_refresh
         assert "branches: [main]" in fleet_gate_refresh
         assert "github.event.workflow_run.conclusion != 'cancelled'" in fleet_gate_refresh
         assert "github.event.pull_request.merged != true" in fleet_gate_refresh

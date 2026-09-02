@@ -3,7 +3,7 @@ import { APP_ROUTES } from '@/constants/routes';
 export const HOMEPAGE_REQUEST_ACCESS_STARTER_PROMPT =
   'Hey, I want to get access to Jovie.';
 
-/** Founder-locked public waitlist destination for the prelaunch front door. */
+/** Public waitlist URL. Homepage Get started must not use this — JOV-5085 locks `/start`. */
 export const PUBLIC_WAITLIST_URL = 'https://jov.ie/waitlist';
 
 /** Stable variant identity for the splash-B waitlist-first handoff. */
@@ -46,7 +46,7 @@ export function getHomepageFrontDoorCtaContract(
     return {
       primary: {
         label: 'Get started',
-        href: PUBLIC_WAITLIST_URL,
+        href: buildHomepageStartHref(),
       },
       secondary: null,
       fallbackSupport:

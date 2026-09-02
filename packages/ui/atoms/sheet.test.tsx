@@ -300,5 +300,33 @@ describe('Sheet', () => {
       const content = screen.getByTestId('sheet-content');
       expect(content.className).toContain('transition');
     });
+
+    it('uses canonical cinematic motion for side and bottom sheets', () => {
+      const { rerender } = render(<TestSheet open={true} side='right' />);
+      const rightContent = screen.getByTestId('sheet-content');
+
+      expect(rightContent).toHaveClass(
+        'duration-cinematic',
+        'ease-cinematic',
+        'motion-reduce:transition-none',
+        'data-[state=open]:slide-in-from-right'
+      );
+      expect(rightContent.className).not.toContain('duration-300');
+      expect(rightContent.className).not.toContain('duration-500');
+      expect(rightContent.className).not.toContain('ease-in-out');
+
+      rerender(<TestSheet open={true} side='bottom' />);
+      const bottomContent = screen.getByTestId('sheet-content');
+
+      expect(bottomContent).toHaveClass(
+        'duration-cinematic',
+        'ease-cinematic',
+        'motion-reduce:transition-none',
+        'data-[state=open]:slide-in-from-bottom'
+      );
+      expect(bottomContent.className).not.toContain('duration-300');
+      expect(bottomContent.className).not.toContain('duration-500');
+      expect(bottomContent.className).not.toContain('ease-in-out');
+    });
   });
 });

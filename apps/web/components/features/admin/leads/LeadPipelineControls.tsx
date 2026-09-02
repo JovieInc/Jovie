@@ -39,7 +39,7 @@ function DiagnosticPanel({
   );
 
   return (
-    <ContentSurfaceCard className='mt-4 border-info/20 bg-[color-mix(in_oklab,var(--color-info)_8%,var(--linear-app-content-surface))] p-4'>
+    <ContentSurfaceCard className='mt-4 border-info/20 bg-[color-mix(in_oklab,var(--color-info)_8%,var(--app-shell-content-surface))] p-4'>
       <h3 className='mb-2 text-sm font-semibold text-primary-token'>
         Discovery Diagnostics
       </h3>
@@ -236,7 +236,7 @@ export function LeadPipelineControls({
   const controlsBody = (
     <div className='divide-y divide-subtle'>
       {!hideMainSwitch && (
-        <div className='flex items-start justify-between gap-4 px-(--linear-app-content-padding-x) py-3.5'>
+        <div className='flex items-start justify-between gap-4 px-(--app-shell-content-padding-x) py-3.5'>
           <div>
             <p className='text-sm text-primary-token'>Pipeline enabled</p>
             <p className='text-xs text-secondary-token'>
@@ -254,7 +254,7 @@ export function LeadPipelineControls({
         </div>
       )}
 
-      <div className='flex items-start justify-between gap-4 px-(--linear-app-content-padding-x) py-3.5'>
+      <div className='flex items-start justify-between gap-4 px-(--app-shell-content-padding-x) py-3.5'>
         <div>
           <p className='text-sm text-primary-token'>Discovery enabled</p>
           <p className='text-xs text-secondary-token'>
@@ -271,7 +271,7 @@ export function LeadPipelineControls({
         />
       </div>
 
-      <div className='flex items-start justify-between gap-4 px-(--linear-app-content-padding-x) py-3.5'>
+      <div className='flex items-start justify-between gap-4 px-(--app-shell-content-padding-x) py-3.5'>
         <div>
           <p className='text-sm text-primary-token'>Auto-ingest on approve</p>
           <p className='text-xs text-secondary-token'>
@@ -288,7 +288,7 @@ export function LeadPipelineControls({
         />
       </div>
 
-      <div className='flex items-start justify-between gap-4 px-(--linear-app-content-padding-x) py-3.5'>
+      <div className='flex items-start justify-between gap-4 px-(--app-shell-content-padding-x) py-3.5'>
         <div>
           <p className='text-sm text-primary-token'>Guardrails enabled</p>
           <p className='text-xs text-secondary-token'>
@@ -305,7 +305,7 @@ export function LeadPipelineControls({
         />
       </div>
 
-      <div className='grid gap-3 px-(--linear-app-content-padding-x) py-3.5 sm:grid-cols-2 xl:grid-cols-3'>
+      <div className='grid gap-3 px-(--app-shell-content-padding-x) py-3.5 sm:grid-cols-2 xl:grid-cols-3'>
         <label htmlFor='auto-ingest-min-score' className='block'>
           <span className='text-sm text-primary-token'>
             Min fit score for auto-ingest
@@ -434,7 +434,7 @@ export function LeadPipelineControls({
         </label>
       </div>
 
-      <div className='flex items-center justify-between gap-4 px-(--linear-app-content-padding-x) py-3.5'>
+      <div className='flex items-center justify-between gap-4 px-(--app-shell-content-padding-x) py-3.5'>
         <div>
           <p className='text-sm text-primary-token'>Ramp mode</p>
           <p className='text-xs text-secondary-token'>
@@ -462,7 +462,7 @@ export function LeadPipelineControls({
         </Button>
       </div>
 
-      <div className='flex flex-wrap gap-2 px-(--linear-app-content-padding-x) py-3.5'>
+      <div className='flex flex-wrap gap-2 px-(--app-shell-content-padding-x) py-3.5'>
         <Button
           onClick={() => void save()}
           disabled={saveSettingsMutation.isPending}
@@ -528,7 +528,7 @@ export function LeadPipelineControls({
                 {settings.enabled ? 'Active' : 'Paused'}
               </span>
             }
-            className='min-h-0 px-(--linear-app-header-padding-x) py-3'
+            className='min-h-0 px-(--app-shell-header-padding-x) py-3'
             actionsClassName='shrink-0'
           />
         )}

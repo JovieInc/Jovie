@@ -1,5 +1,6 @@
 import type { Meta, StoryObj } from '@storybook/nextjs-vite';
 import { ArrowRight, Link2 } from 'lucide-react';
+import { expect, fn, userEvent, within } from 'storybook/test';
 import { DrawerActionRow } from './DrawerActionRow';
 
 const meta = {
@@ -13,7 +14,7 @@ const meta = {
   ],
   args: {
     label: 'Open public profile',
-    onClick: () => undefined,
+    onClick: fn(),
     icon: <Link2 aria-hidden='true' className='size-3.5' />,
     trailing: <ArrowRight aria-hidden='true' className='size-3.5' />,
   },
@@ -22,7 +23,15 @@ const meta = {
 export default meta;
 type Story = StoryObj<typeof meta>;
 
-export const Default: Story = {};
+export const Default: Story = {
+  play: async ({ canvasElement, args }) => {
+    const action = within(canvasElement).getByRole('button', {
+      name: 'Open public profile',
+    });
+    await userEvent.click(action);
+    await expect(args.onClick).toHaveBeenCalled();
+  },
+};
 
 export const WithoutTrailingAction: Story = {
   args: {

@@ -82,7 +82,6 @@ ${buildSiteLlmsGuidance()}
 
 - Website: ${BASE_URL}
 - Support: ${BASE_URL}/support
-- Instagram: @meetjovie
 `;
 
   return new Response(content, {

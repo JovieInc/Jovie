@@ -1,8 +1,19 @@
-import { screen } from '@testing-library/react';
-import React from 'react';
+import { readFileSync } from 'node:fs';
+import { resolve } from 'node:path';
+import { fireEvent, screen } from '@testing-library/react';
+import {
+  type ComponentProps,
+  cloneElement,
+  createElement,
+  isValidElement,
+  type ReactElement,
+  type ReactNode,
+} from 'react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-
+import type { ChatError } from '@/components/jovie/types';
 import { fastRender } from '@/tests/utils/fast-render';
+
+const appRoot = resolve(__dirname, '../../..');
 
 // --- Mocks ---
 
@@ -24,32 +35,121 @@ vi.mock('@tanstack/react-virtual', () => ({
   }),
 }));
 
+vi.mock('motion/react', () => ({
+  motion: {
+    div: ({
+      children,
+      initial: _initial,
+      animate: _animate,
+      layoutId: _layoutId,
+      transition: _transition,
+      ...props
+    }: ComponentProps<'div'> & {
+      initial?: unknown;
+      animate?: unknown;
+      layoutId?: unknown;
+      transition?: unknown;
+    }) => <div {...props}>{children}</div>,
+  },
+  useReducedMotion: () => true,
+}));
+
+vi.mock('@jovie/ui', () => ({
+  Button: ({
+    children,
+    size,
+    variant,
+    ...props
+  }: ComponentProps<'button'> & { size?: string; variant?: string }) => (
+    <button data-size={size} data-variant={variant} {...props}>
+      {children}
+    </button>
+  ),
+  Card: ({
+    children,
+    asChild,
+    className,
+    unstyled: _unstyled,
+    ...props
+  }: ComponentProps<'div'> & { asChild?: boolean; unstyled?: boolean }) => {
+    if (asChild && isValidElement(children)) {
+      const child = children as ReactElement<{ className?: string }>;
+      return cloneElement(child, {
+        ...props,
+        className: [className, child.props.className].filter(Boolean).join(' '),
+      });
+    }
+
+    return (
+      <div className={className} {...props}>
+        {children}
+      </div>
+    );
+  },
+  SimpleTooltip: ({ children }: { readonly children: ReactNode }) => (
+    <>{children}</>
+  ),
+  Popover: ({ children }: { readonly children: ReactNode }) => <>{children}</>,
+  PopoverContent: ({
+    children,
+    testId = 'popover-content',
+  }: {
+    readonly children: ReactNode;
+    readonly testId?: string;
+  }) => <div data-testid={testId}>{children}</div>,
+  PopoverTrigger: ({ children }: { readonly children: ReactNode }) => (
+    <>{children}</>
+  ),
+}));
+
+vi.mock('next/image', () => ({
+  default: ({
+    src,
+    alt,
+    fill: _fill,
+    unoptimized: _unoptimized,
+    ...rest
+  }: ComponentProps<'img'> & { fill?: boolean; unoptimized?: boolean }) => (
+    <img src={src as string} alt={alt ?? ''} {...rest} />
+  ),
+}));
+
+vi.mock('@/components/jovie/components/ChatMarkdown', () => ({
+  ChatMarkdown: ({ content }: { readonly content: string }) => (
+    <div>{content}</div>
+  ),
+}));
+
 /** Captured messages from the useJovieChat mock. */
 let mockMessages: Array<{
   id: string;
   role: string;
   parts: Array<Record<string, unknown>>;
 }> = [];
+let mockChatError: ChatError | null = null;
+let mockIsLoading = false;
+let mockIsSubmitting = false;
+const mockHandleRetry = vi.fn();
 
 vi.mock('@/components/jovie/hooks', () => ({
   useJovieChat: () => ({
     messages: mockMessages,
-    chatError: null,
-    isLoading: false,
-    isSubmitting: false,
+    chatError: mockChatError,
+    isLoading: mockIsLoading,
+    isSubmitting: mockIsSubmitting,
     hasMessages: mockMessages.length > 0,
     submitMessage: vi.fn(),
-    handleRetry: vi.fn(),
+    handleRetry: mockHandleRetry,
   }),
 }));
 
 vi.mock('@/components/atoms/BrandLogo', () => ({
-  BrandLogo: () => React.createElement('span', { 'data-testid': 'brand-logo' }),
+  BrandLogo: () => createElement('span', { 'data-testid': 'brand-logo' }),
 }));
 
 vi.mock('@/features/dashboard/organisms/ProfileEditPreviewCard', () => ({
   ProfileEditPreviewCard: (props: { preview: { field: string } }) =>
-    React.createElement('div', {
+    createElement('div', {
       'data-testid': 'profile-edit-preview-card',
       'data-field': props.preview.field,
     }),
@@ -57,12 +157,12 @@ vi.mock('@/features/dashboard/organisms/ProfileEditPreviewCard', () => ({
 
 vi.mock('@/components/jovie/components/ChatAvatarUploadCard', () => ({
   ChatAvatarUploadCard: () =>
-    React.createElement('div', { 'data-testid': 'avatar-upload-card' }),
+    createElement('div', { 'data-testid': 'avatar-upload-card' }),
 }));
 
 vi.mock('@/components/jovie/components/ChatAnalyticsCard', () => ({
   ChatAnalyticsCard: (props: { result: { title: string } }) =>
-    React.createElement('div', {
+    createElement('div', {
       'data-testid': 'chat-analytics-card',
       'data-title': props.result.title,
     }),
@@ -70,7 +170,7 @@ vi.mock('@/components/jovie/components/ChatAnalyticsCard', () => ({
 
 vi.mock('@/components/jovie/components/ChatLinkConfirmationCard', () => ({
   ChatLinkConfirmationCard: (props: { normalizedUrl: string }) =>
-    React.createElement('div', {
+    createElement('div', {
       'data-testid': 'link-confirmation-card',
       'data-url': props.normalizedUrl,
     }),
@@ -90,8 +190,33 @@ function renderInlineChat(expanded = true) {
 describe('InlineChatArea tool invocation rendering', () => {
   beforeEach(() => {
     mockMessages = [];
+    mockChatError = null;
+    mockIsLoading = false;
+    mockIsSubmitting = false;
+    mockHandleRetry.mockClear();
     // jsdom does not implement scrollIntoView
     Element.prototype.scrollIntoView = vi.fn();
+  });
+
+  it('keeps inline transcript bubbles on the canonical ChatMessage owner', () => {
+    const inlineChatAreaSource = readFileSync(
+      resolve(
+        appRoot,
+        'components/features/dashboard/organisms/InlineChatArea.tsx'
+      ),
+      'utf8'
+    );
+    const chatMessageSource = readFileSync(
+      resolve(appRoot, 'components/jovie/components/ChatMessage.tsx'),
+      'utf8'
+    );
+
+    expect(inlineChatAreaSource).toContain('ChatMessage');
+    expect(inlineChatAreaSource).not.toContain('const InlineChatMessage');
+    expect(inlineChatAreaSource).not.toContain('max-w-[85%]');
+    expect(inlineChatAreaSource).not.toContain('rounded-xl px-3 py-2');
+    expect(chatMessageSource).toContain('toolVariant');
+    expect(chatMessageSource).toContain('showAssistantActions');
   });
 
   it('renders ProfileEditPreviewCard for proposeProfileEdit result', () => {
@@ -304,13 +429,82 @@ describe('InlineChatArea tool invocation rendering', () => {
 
     renderInlineChat();
 
-    const textNode = screen.getByText('Keep this quiet and neutral');
-    const bubble = textNode.parentElement;
+    const bubble = screen.getByTestId('chat-user-bubble');
 
-    expect(bubble?.className).toContain('bg-surface-0');
-    expect(bubble?.className).toContain('text-primary-token');
-    expect(bubble?.className).not.toContain('bg-accent');
-    expect(bubble?.className).not.toContain('text-accent-foreground');
+    expect(bubble).toHaveClass('system-b-chat-user-bubble');
+    expect(bubble).toHaveAttribute('data-bubble-shape', 'pill');
+    expect(bubble).toHaveTextContent('Keep this quiet and neutral');
+    expect(bubble.closest('[data-message-id="msg-1"]')).toHaveAttribute(
+      'data-role',
+      'user'
+    );
+  });
+
+  it('renders assistant replies through ChatMessage without full-chat action metadata', () => {
+    mockMessages = [
+      {
+        id: 'msg-assistant',
+        role: 'assistant',
+        parts: [{ type: 'text', text: 'Inline answer' }],
+      },
+    ];
+
+    renderInlineChat();
+
+    expect(screen.getByTestId('chat-message-reply')).toHaveClass(
+      'system-b-chat-message-reply'
+    );
+    expect(
+      screen.getByTestId('chat-message-reply').closest('[data-message-id]')
+    ).toHaveAttribute('data-message-id', 'msg-assistant');
+    expect(screen.queryByRole('button', { name: 'Copy message' })).toBeNull();
+  });
+
+  it('renders inline loading as the canonical compact typing bubble', () => {
+    mockMessages = [
+      {
+        id: 'msg-user',
+        role: 'user',
+        parts: [{ type: 'text', text: 'Generate an answer' }],
+      },
+    ];
+    mockIsLoading = true;
+
+    renderInlineChat();
+
+    const loading = screen.getByTestId('chat-loading-indicator');
+    expect(loading).toHaveClass('system-b-chat-loading-indicator');
+    expect(screen.getByTestId('chat-typing-bubble')).toHaveClass(
+      'system-b-chat-typing-bubble'
+    );
+    expect(loading.closest('[data-message-id]')).toHaveAttribute(
+      'data-message-id',
+      'inline-chat-loading'
+    );
+  });
+
+  it('renders inline errors through the canonical chat retry display', () => {
+    mockMessages = [
+      {
+        id: 'msg-user',
+        role: 'user',
+        parts: [{ type: 'text', text: 'Retry this' }],
+      },
+    ];
+    mockChatError = {
+      type: 'network',
+      message: 'The request disconnected.',
+      failedMessage: 'Retry this',
+    };
+
+    renderInlineChat();
+
+    const alert = screen.getByRole('alert');
+    expect(alert).toHaveTextContent('Message paused');
+    expect(alert).toHaveTextContent('The request disconnected.');
+
+    fireEvent.click(screen.getByRole('button', { name: 'Retry Message' }));
+    expect(mockHandleRetry).toHaveBeenCalledTimes(1);
   });
 
   it('renders a compact status row for unknown tools', () => {

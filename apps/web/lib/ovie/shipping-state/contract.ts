@@ -10,8 +10,10 @@ export const SHIPPING_STATE_SCHEMA = 'ovie.shipping-state.v1' as const;
 export const SHIPPING_STATE_PRODUCER_ID = 'ubuntu-operational-truth' as const;
 export const SHIPPING_STATE_PRODUCER_VERSION = '1' as const;
 export const M1_SOURCE_TO_PROJECTION_BUDGET_MS = 10_000;
+export const SHIPPING_SOURCE_READ_TIMEOUT_MS = 7_500;
 export const SHIPPING_STATE_FRESHNESS_MS = 10_000;
 export const SHIPPING_STATE_CLOCK_SKEW_MS = 60_000;
+export const MAX_ACCEPTED_SOURCE_SEQUENCE_GAP = 10_000;
 
 export const SHIPPING_SOURCE_IDS = [
   'symphony-runtime',
@@ -25,6 +27,23 @@ export const SHIPPING_SOURCE_IDS = [
 ] as const;
 
 export type ShippingSourceId = (typeof SHIPPING_SOURCE_IDS)[number];
+
+/**
+ * Producer-event validity is distinct from successful observation freshness.
+ * Current GitHub/runtime reads are identity-bound and therefore have no
+ * elapsed-time expiry here. Heartbeat and persisted fleet producers retain
+ * their own documented semantic windows.
+ */
+export const SHIPPING_SOURCE_SEMANTIC_FRESHNESS_MS = {
+  'symphony-runtime': 10_000,
+  'symphony-task': null,
+  'lease-guard-capacity': 10 * 60_000,
+  'github-native-merge-queue': null,
+  'exact-sha-ci': null,
+  'production-controller': null,
+  'live-build-info': null,
+  'fleet-receipt': 10 * 60_000,
+} as const satisfies Record<ShippingSourceId, number | null>;
 
 export const SHIPPING_SOURCE_SCHEMAS = {
   'symphony-runtime': 'symphony-runtime-receipt/v1',
@@ -64,6 +83,71 @@ export const OBSERVATION_STATES = [
 ] as const;
 
 export type ObservationState = (typeof OBSERVATION_STATES)[number];
+
+export const OPERATIONAL_TASK_WORKFLOW_STATES = [
+  'queued',
+  'running',
+  'retrying',
+  'blocked',
+  'in-review',
+  'merge-queued',
+  'merged',
+  'production-verified',
+] as const;
+
+export type OperationalTaskWorkflowState =
+  (typeof OPERATIONAL_TASK_WORKFLOW_STATES)[number];
+
+export const OPERATIONAL_TASK_SYNC_STATES = [
+  'fresh',
+  'stale',
+  'syncing',
+  'failed',
+] as const;
+
+export type OperationalTaskSyncState =
+  (typeof OPERATIONAL_TASK_SYNC_STATES)[number];
+
+export type OperationalTaskPriority =
+  | 'urgent'
+  | 'high'
+  | 'medium'
+  | 'low'
+  | 'none';
+
+export type OperationalTask = {
+  /** Stable cross-presentation identity. Linear remains the canonical owner. */
+  readonly id: `linear:${string}`;
+  readonly linearIdentifier: string;
+  readonly linearUrl: string | null;
+  readonly title: string;
+  readonly workflowState: OperationalTaskWorkflowState;
+  readonly priority: OperationalTaskPriority;
+  readonly attempt: number | null;
+  readonly retryAt: string | null;
+  readonly sourceRevision: string | null;
+  readonly updatedAt: string | null;
+};
+
+export type OperationalTaskDelta = {
+  readonly taskId: OperationalTask['id'];
+  readonly kind: 'added' | 'updated' | 'removed';
+  readonly fromState: OperationalTaskWorkflowState | null;
+  readonly toState: OperationalTaskWorkflowState | null;
+  readonly sequence: number;
+};
+
+export type OperationalTaskFeed = {
+  readonly canonicalSource: 'linear';
+  readonly cacheMode: 'local-reconciled';
+  readonly syncState: OperationalTaskSyncState;
+  readonly sourceId: 'symphony-runtime' | 'symphony-task';
+  readonly observedAt: string | null;
+  readonly lastSyncedAt: string | null;
+  readonly freshnessDeadline: string | null;
+  readonly tasks: readonly OperationalTask[];
+  readonly deltas: readonly OperationalTaskDelta[];
+};
 
 export const SHIP_MEANING_KEYS = [
   'merged',
@@ -163,6 +247,7 @@ export type IdentityFields = {
 export type ShippingEntity = IdentityFields & {
   readonly state: ObservationState;
   readonly truncated: boolean;
+  readonly operationalTask?: OperationalTask;
 };
 
 export type SourceObservation = IdentityFields & {
@@ -177,6 +262,7 @@ export type SourceObservation = IdentityFields & {
     | 'replay'
     | 'out-of-order'
     | 'gap'
+    | 'gap-rejected'
     | 'backfill'
     | 'schema-mismatch'
     | 'reconnect';
@@ -193,7 +279,12 @@ export type SourceObservation = IdentityFields & {
     readonly retrying: CountMeasurement;
     readonly blocked: CountMeasurement;
     readonly queued: CountMeasurement;
+    readonly openPullRequests: CountMeasurement;
     readonly capacityAvailable: CountMeasurement;
+  };
+  readonly durations: {
+    readonly queueWaitMs: DurationMeasurement;
+    readonly runDurationMs: DurationMeasurement;
   };
 };
 
@@ -218,6 +309,8 @@ export type ShippingStateProjection = IdentityFields & {
   readonly retrying: CountMeasurement;
   readonly terminalFailures: CountMeasurement;
   readonly capacityAvailable: CountMeasurement;
+  /** Shared cache-backed task projection consumed by Ovie and terminal adapters. */
+  readonly operationalTasks: OperationalTaskFeed;
 };
 
 export type ShippingClock = {
@@ -251,6 +344,7 @@ export const NOT_MEASURED_DURATION: DurationMeasurement = {
 };
 
 export function measuredCount(value: number): CountMeasurement {
+  if (!Number.isSafeInteger(value) || value < 0) return NOT_MEASURED_COUNT;
   if (value === 0) return { state: 'measured-zero', value: 0 };
   return { state: 'measured-nonzero', value };
 }
@@ -274,6 +368,14 @@ export function emptyCounts(): SourceObservation['counts'] {
     retrying: NOT_MEASURED_COUNT,
     blocked: NOT_MEASURED_COUNT,
     queued: NOT_MEASURED_COUNT,
+    openPullRequests: NOT_MEASURED_COUNT,
     capacityAvailable: NOT_MEASURED_COUNT,
+  };
+}
+
+export function emptyDurations(): SourceObservation['durations'] {
+  return {
+    queueWaitMs: NOT_MEASURED_DURATION,
+    runDurationMs: NOT_MEASURED_DURATION,
   };
 }

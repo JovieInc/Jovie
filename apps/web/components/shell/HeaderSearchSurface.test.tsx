@@ -211,9 +211,26 @@ describe('HeaderSearchSurface', () => {
       '/midnight-artist',
       '/midnight-artist/midnight-drive',
     ]);
+    expect(options[0]).toHaveClass(
+      'system-b-table-row-shell',
+      'system-b-table-row-selected'
+    );
+    expect(options[0]).not.toHaveClass('rounded-lg');
+    expect(
+      options[0]?.querySelector('[data-header-search-result-icon]')
+    ).toHaveClass('size-7');
+    expect(
+      options[0]?.querySelector('[data-header-search-result-icon]')
+    ).not.toHaveClass('bg-surface-1');
     expect(options[0]).toHaveAttribute('aria-selected', 'true');
-    expect(options[2]).toHaveClass('min-h-8', 'py-1');
-    expect(options[2]?.firstElementChild).toHaveClass('h-6', 'w-6');
+    expect(options[2]).toHaveClass('system-b-table-row-shell', 'min-h-10');
+    const filterSuggestion = screen.getByRole('option', {
+      name: 'Midnight Artist Filter by artist',
+    });
+    expect(filterSuggestion).toHaveClass(
+      'system-b-table-row-shell',
+      'min-h-10'
+    );
 
     fireEvent.keyDown(input, { key: 'ArrowDown' });
     expect(options[1]).toHaveAttribute('aria-selected', 'true');
@@ -226,11 +243,7 @@ describe('HeaderSearchSurface', () => {
     expect(selectedLink).toHaveAttribute('href', '/midnight-artist');
     activateSelectedLink.mockRestore();
 
-    fireEvent.click(
-      screen.getByRole('option', {
-        name: 'Midnight Artist Filter by artist',
-      })
-    );
+    fireEvent.click(filterSuggestion);
     expect(onPillsChange).toHaveBeenCalledWith([
       expect.objectContaining({
         field: 'artist',
@@ -482,7 +495,8 @@ describe('HeaderSearchSurface', () => {
     expect(screen.getByRole('status')).toHaveTextContent('Searching…');
     await act(() => vi.advanceTimersByTimeAsync(250));
     await act(async () => Promise.resolve());
-    expect(screen.getByRole('status')).toHaveTextContent('Search unavailable');
-    expect(screen.getByRole('status')).toHaveClass('min-h-10');
+    const status = screen.getByRole('status');
+    expect(status).toHaveTextContent('Search unavailable');
+    expect(status).toHaveClass('system-b-table-row-shell', 'min-h-10');
   });
 });

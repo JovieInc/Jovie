@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { BrandLogo } from '@/components/atoms/BrandLogo';
+import { AUTH_SHELL_KIND } from '@/lib/auth/auth-shell-layout-contract';
 import {
   isElectronRuntime,
   openDesktopAuthUrl,
@@ -78,6 +79,7 @@ export function DesktopAuthRouteHandoff() {
     <main
       className='relative isolate grid min-h-dvh place-items-center bg-background px-6 text-white dark:text-white [color-scheme:dark]'
       data-desktop-auth-state={openState}
+      data-auth-shell-kind={AUTH_SHELL_KIND.desktopReturnHandoff}
       data-testid='desktop-auth-route-handoff'
     >
       <section className='relative z-10 flex w-full max-w-90 flex-col items-center px-6 py-16 text-center'>

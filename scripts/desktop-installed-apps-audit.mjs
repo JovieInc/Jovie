@@ -6,8 +6,14 @@
  * See apps/desktop/SIGNING.md for the canonical build matrix.
  */
 
-import { execFileSync } from 'node:child_process';
-import { existsSync, mkdirSync, readdirSync, writeFileSync } from 'node:fs';
+import { execFileSync, spawnSync } from 'node:child_process';
+import {
+  existsSync,
+  mkdirSync,
+  readdirSync,
+  readFileSync,
+  writeFileSync,
+} from 'node:fs';
 import path from 'node:path';
 
 const APPLICATIONS_DIR = '/Applications';
@@ -15,6 +21,15 @@ export const DESKTOP_UPDATE_STALE_AFTER_MS = 24 * 60 * 60 * 1000;
 export const STAGING_DESKTOP_RELEASE_TAG = 'desktop-staging';
 const GITHUB_API = 'https://api.github.com';
 const GITHUB_REPO = 'JovieInc/Jovie';
+const BUILD_IDENTITY_RESOURCE_NAME = 'build-identity.json';
+const FULL_SHA = /^[0-9a-f]{40}$/;
+const SEMVER = /^\d+\.\d+\.\d+$/;
+const BUILD_IDENTITY_KEYS = new Set([
+  'channel',
+  'version',
+  'sourceRevision',
+  'builtAt',
+]);
 
 /** @type {Readonly<Record<string, { readonly role: string; readonly canonical: boolean }>>} */
 export const KNOWN_DESKTOP_BUNDLE_IDS = {
@@ -34,6 +49,66 @@ export const KNOWN_DESKTOP_BUNDLE_IDS = {
 
 /** @type {Readonly<Set<string>>} */
 export const LEGACY_DESKTOP_BUNDLE_IDS = new Set(['ie.jov.Jovie']);
+
+function isIsoTimestamp(value) {
+  if (typeof value !== 'string' || value.length === 0) return false;
+  const parsed = Date.parse(value);
+  return Number.isFinite(parsed) && new Date(parsed).toISOString() === value;
+}
+
+function isDesktopBuildIdentityRecord(value) {
+  if (value === null || typeof value !== 'object' || Array.isArray(value)) {
+    return false;
+  }
+  const keys = Object.keys(value);
+  return (
+    keys.length === BUILD_IDENTITY_KEYS.size &&
+    keys.every(key => BUILD_IDENTITY_KEYS.has(key)) &&
+    ['production', 'staging', 'local'].includes(value.channel) &&
+    typeof value.version === 'string' &&
+    SEMVER.test(value.version) &&
+    (value.sourceRevision === null ||
+      (typeof value.sourceRevision === 'string' &&
+        FULL_SHA.test(value.sourceRevision))) &&
+    (value.builtAt === null || isIsoTimestamp(value.builtAt))
+  );
+}
+
+export function readDesktopBuildIdentity(appPath) {
+  const identityPath = path.join(
+    appPath,
+    'Contents',
+    'Resources',
+    BUILD_IDENTITY_RESOURCE_NAME
+  );
+  try {
+    const parsed = JSON.parse(readFileSync(identityPath, 'utf8'));
+    if (!isDesktopBuildIdentityRecord(parsed)) {
+      return { buildIdentity: null, buildIdentityError: 'invalid' };
+    }
+    return {
+      buildIdentity: {
+        channel: parsed.channel,
+        version: parsed.version,
+        sourceRevision: parsed.sourceRevision,
+        builtAt: parsed.builtAt,
+      },
+      buildIdentityError: null,
+    };
+  } catch {
+    return { buildIdentity: null, buildIdentityError: 'unavailable' };
+  }
+}
+
+function buildIdentityHasReleaseProvenance(identity) {
+  return (
+    (identity.channel === 'production' || identity.channel === 'staging') &&
+    SEMVER.test(identity.version) &&
+    typeof identity.sourceRevision === 'string' &&
+    FULL_SHA.test(identity.sourceRevision) &&
+    isIsoTimestamp(identity.builtAt)
+  );
+}
 
 /**
  * @param {string} applicationsDir
@@ -60,21 +135,51 @@ export function listJovieApplicationBundles(applicationsDir) {
 
 /**
  * @param {string} appPath
+ * @param {{
+ *   readonly runCodesign?: typeof spawnSync;
+ *   readonly readVersion?: (appPath: string) => string | null;
+ * }} dependencies
  * @returns {{ readonly identifier: string | null; readonly version: string | null }}
  */
-export function readCodesignMetadata(appPath) {
+export function readCodesignMetadata(
+  appPath,
+  { runCodesign = spawnSync, readVersion = readApplicationBundleVersion } = {}
+) {
   try {
-    const output = execFileSync('codesign', ['-dv', appPath], {
+    const result = runCodesign('codesign', ['-dv', appPath], {
       encoding: 'utf8',
-      stdio: ['ignore', 'pipe', 'pipe'],
     });
+    if (result.status !== 0 || result.error) {
+      return { identifier: null, version: null };
+    }
+
+    // `codesign -d` writes display metadata to stderr even when it succeeds.
+    const output = `${result.stdout ?? ''}\n${result.stderr ?? ''}`;
     const identifier = output.match(/Identifier=(.+)/)?.[1]?.trim() ?? null;
-    const version =
-      output.match(/Info\.plist version=(.+)/)?.[1]?.trim() ?? null;
-    return { identifier, version };
+    return { identifier, version: readVersion(appPath) };
   } catch {
     return { identifier: null, version: null };
   }
+}
+
+/**
+ * @param {string} appPath
+ * @returns {string | null}
+ */
+export function readApplicationBundleVersion(appPath) {
+  const infoPlistPath = path.join(appPath, 'Contents', 'Info.plist');
+  for (const key of ['CFBundleShortVersionString', 'CFBundleVersion']) {
+    try {
+      return execFileSync(
+        'plutil',
+        ['-extract', key, 'raw', '-o', '-', infoPlistPath],
+        { encoding: 'utf8' }
+      ).trim();
+    } catch {
+      // Try the fallback version key.
+    }
+  }
+  return null;
 }
 
 /**
@@ -89,11 +194,7 @@ export function listRunningJovieProcesses() {
       .split('\n')
       .map(line => line.trim())
       .filter(Boolean)
-      .filter(
-        line =>
-          /\/Jovie/i.test(line) &&
-          !/grep|desktop-installed-apps-audit/.test(line)
-      )
+      .filter(line => commandRunsJovieDesktopShell(line))
       .map(line => {
         const match = line.match(/^(\d+)\s+(.+)$/);
         return {
@@ -104,6 +205,20 @@ export function listRunningJovieProcesses() {
   } catch {
     return [];
   }
+}
+
+/**
+ * Match the primary executable of a Jovie app bundle, excluding Electron
+ * helpers and unrelated processes whose working path happens to contain Jovie.
+ *
+ * @param {string} command
+ * @returns {boolean}
+ */
+export function commandRunsJovieDesktopShell(command) {
+  return (
+    !command.includes('/Contents/Frameworks/') &&
+    /\/(Jovie[^/]*)\.app\/Contents\/MacOS\/\1(?:\s|$)/i.test(command)
+  );
 }
 
 /**
@@ -235,6 +350,8 @@ export async function fetchShippedDesktopVersions(fetchImpl = fetch) {
  *     readonly path: string;
  *     readonly identifier: string | null;
  *     readonly version: string | null;
+ *     readonly buildIdentity?: object | null;
+ *     readonly buildIdentityError?: string | null;
  *   }>;
  *   readonly processes: ReadonlyArray<{ readonly pid: string; readonly command: string }>;
  * }} input
@@ -274,6 +391,43 @@ export function evaluateDesktopInstalledAppsAudit(input) {
     if (!KNOWN_DESKTOP_BUNDLE_IDS[bundle.identifier]) {
       findings.push(
         `${bundle.name} has unknown bundle id ${bundle.identifier}; verify before keeping it installed.`
+      );
+      continue;
+    }
+
+    if (!bundle.buildIdentity) {
+      findings.push(
+        `${bundle.name}: packaged build identity is ${bundle.buildIdentityError ?? 'unavailable'}; provenance is not verified.`
+      );
+      continue;
+    }
+
+    const identity = bundle.buildIdentity;
+    if (bundle.version !== identity.version) {
+      findings.push(
+        `${bundle.name}: bundle version ${bundle.version ?? 'unknown'} does not match build identity ${identity.version}.`
+      );
+    }
+
+    const expectedChannel =
+      KNOWN_DESKTOP_BUNDLE_IDS[bundle.identifier].role === 'local-dev'
+        ? 'local'
+        : KNOWN_DESKTOP_BUNDLE_IDS[bundle.identifier].role;
+    if (expectedChannel !== identity.channel) {
+      findings.push(
+        `${bundle.name}: bundle role ${expectedChannel} does not match build identity channel ${identity.channel}.`
+      );
+    }
+
+    if (identity.channel === 'local') {
+      if (identity.builtAt !== null) {
+        findings.push(
+          `${bundle.name}: local build identity should not include a build timestamp.`
+        );
+      }
+    } else if (!buildIdentityHasReleaseProvenance(identity)) {
+      findings.push(
+        `${bundle.name}: build identity is incomplete; provenance is not verified.`
       );
     }
   }
@@ -317,6 +471,9 @@ function formatReport({ bundles, processes, findings, ok }) {
       lines.push(
         `- ${bundle.name}: id=${bundle.identifier ?? 'unknown'} version=${bundle.version ?? 'unknown'} role=${role} (${canonical})`
       );
+      lines.push(
+        `  buildIdentity=${bundle.buildIdentity ? JSON.stringify(bundle.buildIdentity) : (bundle.buildIdentityError ?? 'unavailable')}`
+      );
     }
   }
 
@@ -347,11 +504,13 @@ export function runDesktopInstalledAppsAudit({
   applicationsDir = APPLICATIONS_DIR,
   listBundles = listJovieApplicationBundles,
   readMetadata = readCodesignMetadata,
+  readBuildIdentity = readDesktopBuildIdentity,
   listProcesses = listRunningJovieProcesses,
 } = {}) {
   const bundles = listBundles(applicationsDir).map(bundle => ({
     ...bundle,
     ...readMetadata(bundle.path),
+    ...readBuildIdentity(bundle.path),
   }));
   const processes = listProcesses();
   const { findings, ok } = evaluateDesktopInstalledAppsAudit({

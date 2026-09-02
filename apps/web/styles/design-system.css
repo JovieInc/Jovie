@@ -49,14 +49,13 @@
   --page-pad: clamp(16px, 4vw, 32px);
   --cover-height: clamp(220px, 34svh, 400px);
   --content-max: 720px;
-  /* Extra --space-8 keeps the last Music/catalog row above the floating tab
+  /* Extra --space-6 keeps the last Music/catalog row above the floating tab
      bar. Home/Events/Alerts share this inset so the shell stays aligned. */
   --profile-bottom-nav-height: calc(
-    var(--space-12) +
-    var(--space-2-5) +
+    var(--space-8) +
     max(10px, env(safe-area-inset-bottom)) +
     var(--space-2) +
-    var(--space-8)
+    var(--space-6)
   );
 
   /* DS_FOUNDATION_V1: canonical semantic aliases (do not redefine downstream) */
@@ -88,20 +87,46 @@
   --ds-marketing-eyebrow-tracking: 0;
   --ds-marketing-eyebrow-color: var(--color-text-tertiary-token);
 
-  /* Shell V1 semantic aliases — app chrome should prefer these names when
-     touching shared shell geometry. They intentionally resolve to the current
-     Linear-derived values so this pass changes the token contract, not visuals. */
-  --app-shell-sidebar-width: var(--linear-app-sidebar-width);
-  --app-shell-header-height: var(--linear-app-header-height);
-  --app-shell-header-height-compact: var(--linear-app-header-height-compact);
+  /* Shell V1 canonical app-shell tokens — app chrome should prefer these
+     names when touching shared shell geometry. Values are centralized here
+     (migrated from linear-tokens.css, JOV-5466). Dark-mode overrides below. */
+  --app-shell-sidebar-width: 224px;
+  --app-shell-header-height: 40px;
+  --app-shell-header-height-compact: 36px;
+  --app-shell-header-padding-x: 12px;
   --app-shell-footer-row-height: calc(var(--space-6) + var(--space-1-5));
-  --app-shell-gap: var(--linear-app-shell-gap);
-  --app-shell-radius: var(--linear-app-shell-radius);
-  --app-shell-border: var(--linear-app-shell-border);
-  --app-shell-frame-seam: var(--linear-app-frame-seam);
-  --app-shell-content-surface: var(--linear-app-content-surface);
-  --app-shell-audio-bar-max-height: var(--linear-app-audio-bar-max-height);
-  --app-shell-audio-compact-height: var(--linear-app-audio-compact-height);
+  --app-shell-gap: 8px;
+  --app-shell-radius: 12px;
+  --app-shell-radius-item: 8px;
+  --app-shell-radius-menu: 8px;
+  --app-shell-border: rgba(0, 0, 0, 0.05);
+  --app-shell-sidebar-seam: rgba(0, 0, 0, 0.05);
+  --app-shell-frame-seam: rgba(0, 0, 0, 0.045);
+  --app-shell-shadow:
+    0 0 0 1px rgba(0, 0, 0, 0.03), 0 14px 30px rgba(0, 0, 0, 0.045);
+  --app-shell-sidebar-shadow:
+    0 0 0 1px rgba(0, 0, 0, 0.022), 0 14px 28px rgba(0, 0, 0, 0.035);
+  --app-shell-card-shadow: none;
+  --app-shell-drawer-shadow:
+    0 0 0 1px rgba(0, 0, 0, 0.03), 0 14px 32px rgba(0, 0, 0, 0.05);
+  --app-shell-content-padding-x: 12px;
+  --app-shell-content-padding-y: 8px;
+  --app-shell-content-surface: var(--linear-bg-surface-0);
+  --app-shell-control-height-sm: 28px;
+  --app-shell-control-padding-x: 11px;
+  --app-shell-control-radius: 9999px;
+  --app-shell-toolbar-gap: 4px;
+  --app-shell-audio-bar-max-height: 120px;
+  --app-shell-audio-compact-height: 64px;
+  --app-shell-sidebar-background: rgb(247 248 248);
+  --app-shell-sidebar-background-rgb: 247 248 248;
+  --app-shell-sidebar-foreground-rgb: 18 18 20;
+  --app-shell-sidebar-border-rgb: 0 0 0 / 0.06;
+  --app-shell-sidebar-accent-rgb: 242 243 245;
+  --app-shell-sidebar-accent-active-rgb: 236 238 241;
+  --app-shell-sidebar-item-foreground-rgb: 88 90 96;
+  --app-shell-sidebar-item-icon-rgb: 122 125 132;
+  --app-shell-sidebar-muted-rgb: 112 116 124;
 
   /* System B semantic aliases for public app surfaces. Keep page-level recipes
      on these names instead of route-local Tailwind literals. */
@@ -158,7 +183,7 @@
   --system-b-chat-activity-icon-size: 0.875rem;
   --system-b-chat-activity-timeline-color: color-mix(
     in oklab,
-    var(--linear-app-shell-border) 70%,
+    var(--app-shell-border) 70%,
     transparent
   );
   --system-b-chat-composer-max-width: 45rem;
@@ -217,6 +242,78 @@
   --page-pad: clamp(16px, 4vw, 32px);
   --cover-height: clamp(220px, 34svh, 400px);
   --content-max: 720px;
+  --color-text-primary-token: #f7f8f8;
+  --color-text-secondary-token: #d0d6e0;
+  --color-text-tertiary-token: #8a8f98;
+  --color-text-quaternary-token: #62666d;
+  --profile-stage-bg: #050608;
+  --profile-stage-overlay:
+    radial-gradient(
+      circle at 50% 12%,
+      rgba(255, 255, 255, 0.09),
+      transparent 20%
+    ),
+    linear-gradient(
+      180deg,
+      rgba(18, 20, 26, 0.18) 0%,
+      rgba(9, 10, 14, 0.68) 54%,
+      rgba(5, 6, 8, 0.92) 100%
+    );
+  --profile-stage-glow-a: rgba(255, 255, 255, 0.1);
+  --profile-stage-glow-b: rgba(38, 42, 54, 0.42);
+  --profile-content-bg: linear-gradient(
+    180deg,
+    rgba(14, 16, 20, 0.96),
+    rgba(10, 12, 16, 0.94)
+  );
+  --profile-panel-border: rgba(255, 255, 255, 0.09);
+  --profile-panel-shadow:
+    0 28px 72px rgba(0, 0, 0, 0.34), 0 12px 28px rgba(0, 0, 0, 0.18);
+  --profile-panel-gradient: linear-gradient(
+    180deg,
+    rgba(255, 255, 255, 0.06),
+    rgba(255, 255, 255, 0.02) 20%,
+    transparent 100%
+  );
+  --profile-drawer-bg: rgb(14, 16, 20);
+  --profile-drawer-highlight: linear-gradient(
+    180deg,
+    rgba(255, 255, 255, 0.08),
+    rgba(255, 255, 255, 0.02) 36%,
+    transparent 100%
+  );
+  --profile-pearl-bg: rgba(255, 255, 255, 0.12);
+  --profile-pearl-bg-hover: rgba(255, 255, 255, 0.16);
+  --profile-pearl-bg-active: rgba(255, 255, 255, 0.22);
+  --profile-pearl-border: rgba(255, 255, 255, 0.16);
+  --profile-pearl-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.12), 0 12px 28px rgba(0, 0, 0, 0.24);
+  --profile-pearl-primary-bg: rgba(255, 255, 255, 0.96);
+  --profile-pearl-primary-fg: rgba(8, 9, 10, 0.96);
+  --profile-accent-primary: rgba(255, 255, 255, 0.96);
+  --profile-accent-on-primary: rgba(8, 9, 10, 0.96);
+  --profile-accent-soft: rgba(255, 255, 255, 0.12);
+  --profile-accent-soft-strong: rgba(255, 255, 255, 0.18);
+  --profile-tab-active-bg: var(--profile-pearl-primary-bg);
+  --profile-tab-active-fg: var(--profile-pearl-primary-fg);
+  --profile-status-pill-bg: rgba(255, 255, 255, 0.12);
+  --profile-status-pill-border: rgba(255, 255, 255, 0.18);
+  --profile-status-pill-fg: rgba(255, 255, 255, 0.98);
+  --profile-rail-dot-active: rgba(255, 255, 255, 0.92);
+  --profile-rail-dot-inactive: rgba(255, 255, 255, 0.18);
+  --profile-composer-border: rgba(255, 255, 255, 0.1);
+  --profile-dock-bg: rgba(30, 32, 40, 0.52);
+  --profile-dock-border: rgba(255, 255, 255, 0.18);
+  --profile-dock-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.14), 0 14px 34px rgba(0, 0, 0, 0.3);
+  --profile-dock-active-bg: rgba(255, 255, 255, 0.16);
+  --profile-dock-active-border: rgba(255, 255, 255, 0.14);
+  --profile-dock-active-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.16);
+  --profile-dock-active-fg: rgba(255, 255, 255, 0.98);
+  --profile-dock-inactive-fg: rgba(255, 255, 255, 0.58);
+  --profile-dock-solid-bg: rgb(24, 26, 32);
+  --profile-dock-solid-border: rgba(255, 255, 255, 0.28);
+  color-scheme: dark;
 }
 
 .public-profile-layout-frame {
@@ -831,7 +928,7 @@ html[data-profile-initial-mode]
   --color-bg-surface-0: #f5f5f5;
   /* Page bg */
   /* prettier-ignore */
-  --color-bg-surface-1: var(--linear-app-content-surface);
+  --color-bg-surface-1: var(--app-shell-content-surface);
   /* App shell canvas in light mode */
   /* prettier-ignore */
   --color-bg-surface-2: #f2f3f5;
@@ -1130,6 +1227,29 @@ html[data-profile-initial-mode]
   --noir-ion-border-interactive: rgba(17, 175, 255, 0.48);
   --noir-ion-focus-ring: rgba(17, 175, 255, 0.72);
 
+  /* App-shell token dark-mode overrides (migrated from linear-tokens.css,
+     JOV-5466). Only tokens that differ from light mode are listed here. */
+  --app-shell-content-surface: #0a0d16;
+  --app-shell-card-shadow: none;
+  --app-shell-border: rgba(168, 176, 195, 0.12);
+  --app-shell-sidebar-seam: rgba(168, 176, 195, 0.1);
+  --app-shell-frame-seam: rgba(168, 176, 195, 0.1);
+  --app-shell-shadow:
+    0 0 0 1px rgba(168, 176, 195, 0.06), 0 14px 36px rgba(0, 0, 0, 0.22);
+  --app-shell-sidebar-shadow:
+    0 0 0 1px rgba(168, 176, 195, 0.05), 0 12px 28px rgba(0, 0, 0, 0.18);
+  --app-shell-drawer-shadow:
+    0 0 0 1px rgba(168, 176, 195, 0.1), 0 18px 42px rgba(0, 0, 0, 0.32);
+  --app-shell-sidebar-background: rgb(6 8 13);
+  --app-shell-sidebar-background-rgb: 6 8 13;
+  --app-shell-sidebar-foreground-rgb: 245 247 251;
+  --app-shell-sidebar-border-rgb: 168 176 195 / 0.1;
+  --app-shell-sidebar-accent-rgb: 168 176 195 / 0.06;
+  --app-shell-sidebar-accent-active-rgb: 17 175 255 / 0.1;
+  --app-shell-sidebar-item-foreground-rgb: 215 220 232;
+  --app-shell-sidebar-item-icon-rgb: 125 135 157;
+  --app-shell-sidebar-muted-rgb: 125 135 157;
+
   /* Dark mode surfaces — Noir Ion stepped near-black ladder */
   --color-bg-base: var(--noir-ion-canvas);
   /* app canvas */
@@ -1379,7 +1499,8 @@ html[data-profile-initial-mode]
 }
 
 :where(.profile-liquid-glass-nav) {
-  height: calc(var(--space-12) + var(--space-2-5));
+  height: var(--space-8);
+  overflow: visible;
   pointer-events: auto;
   border-color: var(--profile-dock-border);
   border-radius: var(--radius-full);
@@ -1388,51 +1509,46 @@ html[data-profile-initial-mode]
 }
 
 :where(.profile-liquid-glass-nav__grid) {
-  height: calc(var(--space-10) + var(--space-2-5));
-  margin-block: 0;
+  height: var(--space-11);
+  margin-block: calc(var(--space-1-5) * -1);
 }
 
 :where(.profile-liquid-glass-nav__item) {
   flex-direction: column;
   gap: var(--space-0-5);
-  border: var(--space-px) solid transparent;
   border-radius: var(--radius-full);
   color: var(--profile-dock-inactive-fg);
+}
+
+:where(.profile-liquid-glass-nav__item)::before {
+  position: absolute;
+  inset-inline: 0;
+  top: 50%;
+  height: var(--space-8);
+  transform: translateY(-50%);
+  border: var(--space-px) solid transparent;
+  border-radius: var(--radius-full);
+  content: "";
   transition:
-    color var(--duration-subtle) var(--ease-subtle),
     background-color var(--duration-subtle) var(--ease-subtle),
     border-color var(--duration-subtle) var(--ease-subtle),
     box-shadow var(--duration-subtle) var(--ease-subtle);
 }
 
 :where(.profile-liquid-glass-nav__item[aria-current="page"]) {
+  color: var(--profile-dock-active-fg);
+}
+
+:where(.profile-liquid-glass-nav__item[aria-current="page"])::before {
   border-color: var(--profile-dock-active-border);
   background: var(--profile-dock-active-bg);
-  color: var(--profile-dock-active-fg);
   box-shadow: var(--profile-dock-active-shadow);
 }
 
 :where(.profile-liquid-glass-nav__icon) {
+  position: relative;
+  z-index: 1;
   color: inherit;
-}
-
-/* Deliberately overrides the retained sr-only utility: visible labels make the
-   four navigation destinations immediate while their accessible names remain
-   unchanged. */
-:where(.profile-liquid-glass-nav__label) {
-  position: static;
-  width: auto;
-  height: auto;
-  padding: 0;
-  margin: 0;
-  overflow: visible;
-  clip: auto;
-  clip-path: none;
-  border: 0;
-  color: inherit;
-  font-size: var(--text-2xs);
-  line-height: 1;
-  white-space: nowrap;
 }
 
 @media (hover: hover) {
@@ -1494,10 +1610,13 @@ html[data-profile-initial-mode]
   }
 
   :where(.profile-liquid-glass-nav__item[aria-current="page"]) {
-    border-color: Highlight;
-    background: Highlight;
     color: HighlightText;
     box-shadow: none;
+  }
+
+  :where(.profile-liquid-glass-nav__item[aria-current="page"])::before {
+    border-color: Highlight;
+    background: Highlight;
   }
 }
 
@@ -1506,7 +1625,8 @@ html[data-profile-initial-mode]
     .profile-liquid-glass-nav,
     .profile-liquid-glass-nav__item,
     .profile-liquid-glass-nav__icon
-  ) {
+  ),
+  :where(.profile-liquid-glass-nav__item)::before {
     transition: none;
   }
 }
@@ -2016,6 +2136,12 @@ html[data-profile-initial-mode]
   /* 80px */
   --space-24: 6rem;
   /* 96px */
+  --space-28: 7rem;
+  /* 112px */
+  --space-32: 8rem;
+  /* 128px */
+  --space-40: 10rem;
+  /* 160px */
 }
 
 /* ============================================
@@ -2197,6 +2323,102 @@ html[data-profile-initial-mode]
   );
 
   color-scheme: dark;
+}
+
+.system-b-marketing.dark {
+  --color-bg-base: #030407;
+  --color-bg-surface-0: #06080d;
+  --color-bg-surface-1: #0f1420;
+  --color-bg-surface-2: #151b2a;
+  --color-bg-surface-3: #1b2436;
+  --color-bg-page: #030407;
+  --color-bg-hover: rgba(168, 176, 195, 0.06);
+  --color-bg-elevated: #0a0d16;
+  --color-bg-input: #0f1420;
+  --color-bg-active: #151b2a;
+  --color-base: var(--color-bg-base);
+  --color-surface-0: var(--color-bg-surface-0);
+  --color-surface-1: var(--color-bg-surface-1);
+  --color-surface-2: var(--color-bg-surface-2);
+  --color-surface-3: var(--color-bg-surface-3);
+  --color-surface-page: var(--color-bg-page);
+  --color-surface-hover: var(--color-bg-hover);
+  --color-surface-elevated: var(--color-bg-elevated);
+  --color-surface-input: var(--color-bg-input);
+  --color-surface-active: var(--color-bg-active);
+  --color-text-primary-token: #f5f7fb;
+  --color-text-secondary-token: #d7dce8;
+  --color-text-tertiary-token: #a8b0c3;
+  --color-text-quaternary-token: #7d879d;
+  --color-primary-token: var(--color-text-primary-token);
+  --color-secondary-token: var(--color-text-secondary-token);
+  --color-tertiary-token: var(--color-text-tertiary-token);
+  --color-quaternary-token: var(--color-text-quaternary-token);
+  --color-accent-gray: #8d8d93;
+  --color-accent-gray-subtle: rgb(127 127 133 / 0.18);
+  --color-accent-blue: #11afff;
+  --color-accent-blue-subtle: rgba(17, 175, 255, 0.12);
+  --color-accent-purple: #a982ff;
+  --color-accent-purple-subtle: rgba(169, 130, 255, 0.12);
+  --color-accent-pink: #ff48d2;
+  --color-accent-pink-subtle: rgba(255, 72, 210, 0.12);
+  --color-accent-red: #ff677d;
+  --color-accent-red-subtle: rgba(255, 103, 125, 0.12);
+  --color-accent-orange: #ffc857;
+  --color-accent-orange-subtle: rgba(255, 200, 87, 0.12);
+  --color-accent-green: #39e58c;
+  --color-accent-green-subtle: rgba(57, 229, 140, 0.12);
+  --color-accent-teal: #24f6d2;
+  --color-accent-teal-subtle: rgba(36, 246, 210, 0.1);
+  --color-accent: #11afff;
+  --color-accent-hover: #3bc0ff;
+  --color-accent-active: #0088ff;
+  --color-accent-subtle: rgba(17, 175, 255, 0.12);
+  --color-border-subtle: rgba(168, 176, 195, 0.1);
+  --color-border-default: rgba(168, 176, 195, 0.16);
+  --color-border-strong: rgba(199, 237, 255, 0.26);
+  --color-subtle: var(--color-border-subtle);
+  --color-default: var(--color-border-default);
+  --color-strong: var(--color-border-strong);
+  --system-b-text-primary: var(--color-text-primary-token);
+  --system-b-bg-page: var(--color-bg-base);
+  --system-b-bg-surface-0: var(--color-bg-surface-0);
+  --system-b-bg-surface-1: var(--color-bg-surface-1);
+  --system-b-bg-surface-2: var(--color-bg-surface-2);
+  --system-b-app-shell-border: var(--color-border-default);
+  --system-b-app-frame-seam: var(--color-border-subtle);
+  --system-b-app-content-surface: var(--color-bg-elevated);
+  --system-b-entity-chip-release-accent: var(--color-accent);
+  --system-b-entity-chip-artist-accent: var(--color-accent-purple);
+  --system-b-entity-chip-track-accent: var(--color-accent-blue);
+  --system-b-entity-chip-event-accent: var(--color-accent-orange);
+  background-color: var(--color-bg-base);
+  color: var(--color-text-primary-token);
+  color-scheme: dark;
+}
+
+.system-b-marketing.dark :where(.bg-base) {
+  background-color: var(--color-bg-base);
+}
+
+.system-b-marketing.dark :where(.bg-surface-page) {
+  background-color: var(--color-bg-page);
+}
+
+.system-b-marketing.dark :where(.bg-surface-0) {
+  background-color: var(--color-bg-surface-0);
+}
+
+.system-b-marketing.dark :where(.bg-surface-1) {
+  background-color: var(--color-bg-surface-1);
+}
+
+.system-b-marketing.dark :where(.bg-surface-2) {
+  background-color: var(--color-bg-surface-2);
+}
+
+.system-b-marketing.dark :where(.bg-surface-3) {
+  background-color: var(--color-bg-surface-3);
 }
 
 html:not(.dark) .profile-intent-page :where(a, button, span),

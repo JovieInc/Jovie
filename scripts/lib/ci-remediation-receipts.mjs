@@ -140,7 +140,7 @@ export function buildSonarQualityDebtReceipt(input) {
     ownership: {
       owner: 'Symphony',
       verifier: 'Gem',
-      lane: 'linear-intake-controller',
+      lane: 'openai-symphony',
     },
     authorization: {
       humanApprovalRequired: false,
@@ -152,7 +152,7 @@ export function buildSonarQualityDebtReceipt(input) {
       availableSlots,
       candidateRank,
       state: available ? 'available' : 'deferred',
-      admissionAuthority: 'jovie-intake-controller',
+      admissionAuthority: 'openai/symphony',
     },
     remediation: {
       mode: 'bounded_exact_head_source_repair',

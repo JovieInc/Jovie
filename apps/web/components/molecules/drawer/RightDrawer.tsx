@@ -240,7 +240,7 @@ export function RightDrawer({
           'overflow-hidden',
           'outline-none focus:outline-none focus-visible:ring-0',
           'border-l border-(--app-shell-frame-seam) bg-(--app-shell-content-surface)',
-          'shadow-(--linear-app-drawer-shadow)',
+          'shadow-(--app-shell-drawer-shadow)',
           'pb-[env(safe-area-inset-bottom)]',
           'transition-transform duration-cinematic ease-cinematic motion-reduce:transition-none',
           isOpen && isActiveMobileDrawer
@@ -267,7 +267,7 @@ export function RightDrawer({
         // Desktop inspector is an in-flow sibling of route content, but it
         // remains its own raised surface. This gives the shell one stable
         // elevation ladder: base/sidebar → main plane → inspector → overlays.
-        'z-10 shrink-0 h-full min-h-0 flex flex-col rounded-(--app-shell-radius) border border-(--app-shell-frame-seam) bg-surface-1 shadow-(--linear-app-drawer-shadow)',
+        'z-10 shrink-0 h-full min-h-0 flex flex-col rounded-(--app-shell-radius) border border-(--app-shell-frame-seam) bg-surface-1 shadow-(--app-shell-drawer-shadow)',
         'outline-none focus:outline-none focus-visible:ring-0',
         'overflow-hidden',
         'transition-[width,opacity] duration-cinematic ease-cinematic motion-reduce:transition-none',

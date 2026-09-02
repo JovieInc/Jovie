@@ -104,7 +104,7 @@ export function DmQueuePanel() {
         className='min-h-0 px-app-header py-3'
         actionsClassName='shrink-0'
       />
-      <div className='px-(--linear-app-content-padding-x) py-(--linear-app-content-padding-y)'>
+      <div className='px-(--app-shell-content-padding-x) py-(--app-shell-content-padding-y)'>
         <DmQueueBody loading={loading} leads={leads} fetchQueue={fetchQueue} />
       </div>
     </ContentSurfaceCard>

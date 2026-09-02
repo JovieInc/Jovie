@@ -292,6 +292,43 @@ describe('POST /api/webhooks/sentry', () => {
     expect(mockServerFetch).not.toHaveBeenCalled();
   });
 
+  it('skips autofix for Vercel IPC socket refusal (JOV-5605)', async () => {
+    mockAcquireRecentDispatch.mockResolvedValue({
+      acquired: true,
+      reason: 'acquired',
+    });
+
+    const { POST } = await import('@/app/api/webhooks/sentry/route');
+    const payload = {
+      data: {
+        issue: {
+          id: '5605',
+          title: 'Error: connect ECONNREFUSED /opt/vercel/ipc.sock',
+          culprit: 'after',
+        },
+      },
+    };
+    const body = JSON.stringify(payload);
+    const request = new Request('https://example.com/api/webhooks/sentry', {
+      method: 'POST',
+      headers: {
+        'sentry-hook-signature': sign(body),
+      },
+      body,
+    });
+
+    const response = await POST(request as never);
+    const data = await response.json();
+
+    expect(response.status).toBe(200);
+    expect(data).toEqual({
+      received: true,
+      skipped: true,
+      reason: 'vercel-ipc-sock',
+    });
+    expect(mockServerFetch).not.toHaveBeenCalled();
+  });
+
   it('skips autofix for quota-exhausted UpstashError titles', async () => {
     mockAcquireRecentDispatch.mockResolvedValue({
       acquired: true,

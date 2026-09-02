@@ -12,6 +12,7 @@ import json
 import os
 import pathlib
 import tempfile
+import time
 import unittest
 from unittest import mock
 
@@ -273,9 +274,9 @@ class CapacityStateTests(unittest.TestCase):
         account.mkdir()
         (account / "auth.json").write_text("{}\n")
 
-    def write_state(self, cooldowns: dict) -> None:
+    def write_state(self, cooldowns: dict, readiness: dict | None = None) -> None:
         (self.accounts / "state.json").write_text(
-            json.dumps({"active": None, "cooldowns": cooldowns, "last_error": {}})
+            json.dumps({"active": None, "cooldowns": cooldowns, "readiness": readiness or {}, "last_error": {}})
         )
 
     def test_available_capacity(self):
@@ -306,6 +307,36 @@ class CapacityStateTests(unittest.TestCase):
         capacity = MODULE.capacity_state()
         self.assertEqual(capacity["state"], "unknown")
         self.assertEqual(capacity["reason"], "account_state_unreadable")
+
+    def test_fresh_authenticated_readiness_recovers_only_that_cooldown(self):
+        self.add_account("account-a")
+        self.add_account("account-b")
+        now = int(time.time())
+        self.write_state(
+            {"account-a": now + 3600, "account-b": now + 3600},
+            {
+                "account-a": {
+                    "checkedAt": now,
+                    "expiresAt": now + 600,
+                    "source": "authenticated_completion_probe/v1",
+                }
+            },
+        )
+        capacity = MODULE.capacity_state()
+        self.assertEqual(capacity["available"], 1)
+        self.assertEqual(capacity["cooldown"], 1)
+        self.assertEqual(capacity["freshReadiness"], 1)
+
+    def test_untrusted_readiness_cannot_clear_cooldown(self):
+        self.add_account("account-a")
+        now = int(time.time())
+        self.write_state(
+            {"account-a": now + 3600},
+            {"account-a": {"checkedAt": now, "expiresAt": now + 600, "source": "untrusted"}},
+        )
+        capacity = MODULE.capacity_state()
+        self.assertEqual(capacity["available"], 0)
+        self.assertEqual(capacity["cooldown"], 1)
 
 
 class ReportTests(unittest.TestCase):

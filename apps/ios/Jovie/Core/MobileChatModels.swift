@@ -142,7 +142,7 @@ enum MobileChatAllComponentsFixture {
   """
 
   static let merchProductOptionsJSON =
-    #"{"success":true,"generationId":"gen-1","options":[{"id":"opt-1","option_number":1,"design_name":"Neon Pulse Tee","product_type":"Tee","concept":"Bold neon typography.","mockup_urls":["https://cdn.test/neon.jpg"],"price_recommendation":{"sale_price":"$45.00"}}]}"#
+    #"{"success":true,"generationId":"gen-1","options":[{"id":"opt-1","option_number":1,"design_name":"Neon Pulse Tee","product_type":"Tee","concept":"Bold neon typography.","mockup_urls":["https://cdn.test/neon.jpg"],"price_recommendation":{"sale_price":"$45.00"}},{"id":"opt-2","option_number":2,"design_name":"Signal Bloom Hoodie","product_type":"Hoodie","concept":"Oversized signal-flower mark.","mockup_urls":[],"price_recommendation":{"sale_price":"$72.00"}},{"id":"opt-3","option_number":3,"design_name":"Tour Grid Cap","product_type":"Cap","concept":"Tour-date grid embroidery.","mockup_urls":[],"price_recommendation":{"sale_price":"$34.00"}}]}"#
 
   static var merchProductOptions: String {
     """
@@ -298,6 +298,22 @@ struct MobileChatTurnRequest: Encodable, Sendable {
     try container.encode(source, forKey: .source)
     try container.encodeIfPresent(chatMode, forKey: .chatMode)
   }
+}
+
+struct EyesFreeCaptureAPIRequest: Encodable, Sendable {
+  let destination: String
+  let transcript: String
+  let clientTurnId: String
+  let clientMessageId: String
+}
+
+struct EyesFreeCaptureAPIResponse: Decodable, Equatable, Sendable {
+  let destination: String
+  let status: String
+  let conversationId: String?
+  let turnId: String?
+  let readback: String
+  let errorCode: String?
 }
 
 enum MobileChatStreamEvent: Equatable, Sendable {

@@ -66,6 +66,12 @@ describe('golden-path lock evaluators', () => {
     ).toMatchObject({
       ok: false,
     });
+    expect(
+      evaluateHomepageHtml('<a href="https://jov.ie/waitlist">Get started</a>')
+    ).toMatchObject({
+      ok: false,
+      reason: 'homepage CTA must be "Get started" → /start',
+    });
     expect(evaluateHomepageHtml('')).toMatchObject({ ok: false });
   });
 

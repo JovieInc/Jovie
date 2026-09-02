@@ -31,7 +31,7 @@ module.exports = {
         normal: 'var(--font-weight-normal)', // 400
         book: 'var(--font-weight-book)', // 450 — Linear's UI default
         caption: 'var(--linear-caption-weight)', // 510 — compact app controls
-        medium: 'var(--font-weight-medium)', // 500
+        medium: 'var(--font-weight-medium)', // 510
         semibold: 'var(--font-weight-semibold)', // 590 — Linear-specific (extracted 2026-03-16)
         bold: 'var(--font-weight-bold)', // 680 — Linear-specific (extracted 2026-03-16)
         heavy: 'var(--font-weight-heavy)', // 680 — matches bold today; reserve for future step
@@ -51,18 +51,12 @@ module.exports = {
         mid: ['var(--text-mid)', { lineHeight: '1.4' }], // 15px — between sm and base
       },
 
-      // Linear spacing tokens
+      // Linear spacing tokens removed JOV-5464; consumers use canonical --space-*.
       spacing: {
-        'linear-1': 'var(--linear-space-1)',
-        'linear-2': 'var(--linear-space-2)',
-        'linear-3': 'var(--linear-space-3)',
-        'linear-4': 'var(--linear-space-4)',
-        'linear-6': 'var(--linear-space-6)',
-        'linear-8': 'var(--linear-space-8)',
-        'app-control-sm': 'var(--linear-app-control-height-sm)',
+        'app-control-sm': 'var(--app-shell-control-height-sm)',
         'button-md': 'var(--linear-button-height-md)',
-        'app-control-x': 'var(--linear-app-control-padding-x)',
-        'app-header': 'var(--linear-app-header-padding-x)',
+        'app-control-x': 'var(--app-shell-control-padding-x)',
+        'app-header': 'var(--app-shell-header-padding-x)',
         'profile-notification-icon': 'var(--profile-notification-icon-size)',
       },
 
@@ -94,9 +88,8 @@ module.exports = {
         pill: 'var(--radius-pill)', // 48px — pill buttons
       },
 
-      // Linear max-width for containers
+      // Linear max-width for containers; canonical public width is --ds-public-content-max.
       maxWidth: {
-        'linear-container': 'var(--linear-container-max)',
         'linear-content': 'var(--linear-content-max)',
         'linear-hero': 'var(--linear-hero-section-max)',
         'linear-pricing': 'var(--linear-pricing-grid-max)',
@@ -200,9 +193,9 @@ module.exports = {
       // Background colors for semantic states
       backgroundColor: {
         'app-control':
-          'color-mix(in oklab, var(--linear-app-content-surface) 97%, var(--linear-bg-surface-0))',
+          'color-mix(in oklab, var(--app-shell-content-surface) 97%, var(--linear-bg-surface-0))',
         'toolbar-pill':
-          'color-mix(in oklab, var(--linear-app-content-surface) 98%, var(--linear-bg-surface-0))',
+          'color-mix(in oklab, var(--app-shell-content-surface) 98%, var(--linear-bg-surface-0))',
         'success-subtle': 'var(--color-success-subtle)',
         'error-subtle': 'var(--color-error-subtle)',
         'warning-subtle': 'var(--color-warning-subtle)',

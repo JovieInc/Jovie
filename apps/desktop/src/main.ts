@@ -1,5 +1,6 @@
 import { spawnSync } from 'node:child_process';
 import { createHash, randomBytes } from 'node:crypto';
+import { spawn } from 'node:child_process';
 import * as fs from 'node:fs';
 import * as path from 'node:path';
 import {
@@ -81,13 +82,18 @@ import {
   packagedDesktopAppId,
   packagedUsesCompetingStagingShell,
 } from './ovie-door';
+import {
+  decideOperatorLaunch,
+  parseOperatorLaunchRequest,
+  terminalLaunchSpec,
+} from './operator-launch';
 import { evaluateRemoteDebuggingGuard } from './remote-debugging-guard';
 import {
   classifyDesktopLoadFailure,
+  createLocalHostedLoadRetryController,
   decideAbortedMainFrameRecovery,
   decideDidFinishLoadRecovery,
   decideHostedLoadRetry,
-  decideLocalMainFrameLoadFailure,
   decideRecoveryUnlatch,
   decideRendererBootWatchdogAfterLoad,
   decideRendererLoadStart,
@@ -95,7 +101,6 @@ import {
   decideRendererWatchdogExpiry,
   describeDesktopLoadFailure,
   hostedUrlCandidates,
-  LOCAL_HOSTED_LOAD_RETRY_DELAY_MS,
   parseDidStartNavigation,
   RECOVERY_UNLATCH_POLL_MS,
   rendererWatchdogMs,
@@ -208,6 +213,7 @@ const TRAY_SET_STATE_CHANNEL = 'tray-set-state';
 const TRAY_ACTION_CHANNEL = 'tray-action';
 /** Renderer → main: first successful React paint of the hosted app (JOV-3595). */
 const APP_BOOTED_CHANNEL = 'app-booted';
+const LAUNCH_OPERATOR_CONTROL_CHANNEL = 'launch-operator-control';
 type UpdateChannel =
   | typeof UPDATE_AVAILABLE_CHANNEL
   | typeof UPDATE_DOWNLOADED_CHANNEL;
@@ -1477,11 +1483,16 @@ function attachRendererRecovery(
   let lastHostedUrl = APP_ENTRY_URL;
   let bootWatchdogTimer: ReturnType<typeof setTimeout> | null = null;
   let loadWatchdogTimer: ReturnType<typeof setTimeout> | null = null;
-  let localHostedLoadRetryCount = 0;
-  let localHostedLoadRetryTimer: ReturnType<typeof setTimeout> | null = null;
   let recoveryUnlatchTimer: ReturnType<typeof setTimeout> | null = null;
   const armWatchdogs = shouldArmRendererWatchdogsForAppEnv(APP_ENV);
   const webContentsId = win.webContents.id;
+  const localHostedLoadRecovery = createLocalHostedLoadRetryController({
+    retry: retryUrl => {
+      if (win.isDestroyed()) return;
+      void win.loadURL(retryUrl);
+    },
+    isWindowDestroyed: () => win.isDestroyed(),
+  });
 
   const clearBootWatchdog = (): void => {
     if (bootWatchdogTimer !== null) {
@@ -1497,17 +1508,9 @@ function attachRendererRecovery(
     }
   };
 
-  const clearLocalHostedLoadRetry = (): void => {
-    if (localHostedLoadRetryTimer !== null) {
-      clearTimeout(localHostedLoadRetryTimer);
-      localHostedLoadRetryTimer = null;
-    }
-  };
-
   const clearAllWatchdogs = (): void => {
     clearBootWatchdog();
     clearLoadWatchdog();
-    clearLocalHostedLoadRetry();
   };
 
   const stopRecoveryUnlatch = (): void => {
@@ -1680,7 +1683,7 @@ function attachRendererRecovery(
     rendererBooted = true;
     rendererEverBooted = true;
     rendererCrashReloadCount = 0;
-    localHostedLoadRetryCount = 0;
+    localHostedLoadRecovery.reset();
     hostedLoadRetryCount = 0;
     clearAllWatchdogs();
     stopRecoveryUnlatch();
@@ -1691,6 +1694,7 @@ function attachRendererRecovery(
     beginRecoveryUnlatch,
     dispose: () => {
       clearAllWatchdogs();
+      localHostedLoadRecovery.dispose();
       stopRecoveryUnlatch();
       rendererBootControllers.delete(webContentsId);
     },
@@ -1711,23 +1715,38 @@ function attachRendererRecovery(
         isInPlace: navigation.isInPlace,
       }) === 'arm-load-watchdog'
     ) {
+      localHostedLoadRecovery.onHostedNavigationStarted();
       lastHostedUrl = navigation.url;
       armLoadWatchdog(navigation.url);
     }
   });
 
+  // did-finish-load is unqualified and can arrive late for the splash or
+  // Chromium error document. did-navigate carries the committed URL, so only
+  // a positively identified hosted app document may complete local recovery.
+  win.webContents.on('did-navigate', (_event, url) => {
+    localHostedLoadRecovery.onMainFrameDocumentCommitted({
+      isHostedAppDocument:
+        decideRendererLoadStart({
+          url,
+          appOrigin: APP_ORIGIN,
+          isMainFrame: true,
+          isInPlace: false,
+        }) === 'arm-load-watchdog',
+    });
+  });
+
   win.webContents.on('did-finish-load', () => {
     // Chromium still emits did-finish-load for chrome-error://chromewebdata/
-    // after did-fail-load. That is not a hosted app load — resetting the
-    // local retry budget and calling clearAllWatchdogs() here cancels the
-    // pending retry and leaves Jovie Local black (JOV-5474).
+    // after did-fail-load. That is not a hosted app load, so it must not arm
+    // the boot watchdog. Local retry completion is owned by the URL-bearing
+    // did-navigate handler above (JOV-5474).
     if (
       decideDidFinishLoadRecovery({ url: win.webContents.getURL() }) ===
       'ignore'
     ) {
       return;
     }
-    localHostedLoadRetryCount = 0;
     armBootWatchdog();
   });
 
@@ -1773,25 +1792,23 @@ function attachRendererRecovery(
           typeof validatedURL === 'string' && validatedURL.startsWith('http')
             ? resolveNavigationUrl(validatedURL)
             : APP_ENTRY_URL;
-        const localAction = decideLocalMainFrameLoadFailure({
+        const localResult = localHostedLoadRecovery.onMainFrameLoadFailure({
           errorCode,
-          retryCount: localHostedLoadRetryCount,
+          retryUrl,
         });
-        if (localAction === 'retry') {
-          localHostedLoadRetryCount += 1;
+        if (localResult.action === 'retry') {
           console.warn('[Jovie Desktop] Local hosted load not ready, retrying', {
             errorCode,
-            attempt: localHostedLoadRetryCount,
+            attempt: localResult.attempt,
             validatedURL:
               typeof validatedURL === 'string'
                 ? validatedURL.split('?')[0]
                 : validatedURL,
           });
-          localHostedLoadRetryTimer = setTimeout(() => {
-            localHostedLoadRetryTimer = null;
-            if (win.isDestroyed()) return;
-            void win.loadURL(retryUrl);
-          }, LOCAL_HOSTED_LOAD_RETRY_DELAY_MS);
+          // Chromium commits chrome-error://chromewebdata/ after a refused
+          // loopback load. Keep the app-owned shell painted while the bounded
+          // retry obligation remains active.
+          void win.loadURL(buildDesktopBootSplashUrl());
           return;
         }
       }
@@ -1811,6 +1828,7 @@ function attachRendererRecovery(
 
   win.webContents.on('render-process-gone', (_event, details) => {
     clearAllWatchdogs();
+    localHostedLoadRecovery.reset();
     const action = decideRendererRecovery({
       reason: details.reason,
       reloadCount: rendererCrashReloadCount,
@@ -2123,6 +2141,9 @@ function configureDesktopAutoUpdater(): void {
     return;
   }
 
+  if (APP_ENV === 'staging') {
+    autoUpdater.allowPrerelease = true;
+  }
   autoUpdater.allowDowngrade = false;
   autoUpdater.autoDownload = true;
   autoUpdater.autoInstallOnAppQuit = true;
@@ -2753,5 +2774,37 @@ ipcMain.handle(
     }
     menuBarTray.setState(payload as TrayStatePayload);
     return { ok: true };
+  }
+);
+
+ipcMain.handle(
+  LAUNCH_OPERATOR_CONTROL_CHANNEL,
+  async (event: IpcMainInvokeEvent, payload: unknown, ...rest: unknown[]) => {
+    if (!isTrustedIpcSender(event) || rest.length !== 0) {
+      return { ok: false, reason: 'invalid-request' };
+    }
+    const request = parseOperatorLaunchRequest(payload);
+    if (!request) return { ok: false, reason: 'invalid-payload' };
+    const decision = decideOperatorLaunch(request);
+    if (!decision.ok) return { ok: false, reason: decision.reason };
+    if (decision.action === 'open-external') {
+      try {
+        await shell.openExternal(decision.url);
+        return { ok: true };
+      } catch {
+        return { ok: false, reason: 'open-external-failed' };
+      }
+    }
+    const spec = terminalLaunchSpec(process.platform, decision.command);
+    if (!spec) return { ok: false, reason: 'unsupported-platform' };
+    try {
+      spawn(spec.command, [...spec.args], {
+        detached: true,
+        stdio: 'ignore',
+      }).unref();
+      return { ok: true };
+    } catch {
+      return { ok: false, reason: 'open-terminal-failed' };
+    }
   }
 );

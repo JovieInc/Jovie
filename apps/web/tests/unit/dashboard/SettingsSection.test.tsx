@@ -40,8 +40,8 @@ describe('SettingsSection', () => {
     );
     expect(heading.closest('section')).not.toHaveAttribute('aria-describedby');
     expect(screen.getByText('Content').parentElement).toHaveClass(
-      'px-(--linear-app-content-padding-x)',
-      'py-(--linear-app-content-padding-y)'
+      'px-(--app-shell-content-padding-x)',
+      'py-(--app-shell-content-padding-y)'
     );
   });
 

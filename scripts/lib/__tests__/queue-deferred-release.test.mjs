@@ -29,9 +29,9 @@ const fleetGateRefreshWorkflow = readFileSync(
 );
 
 const STACK_TRIGGER_TYPES =
-  'types: [opened, edited, synchronize, closed, labeled, unlabeled, ready_for_review, reopened]';
+  'types: [opened, edited, synchronize, converted_to_draft, closed, labeled, unlabeled, reopened]';
 const STACK_EVENT_GUARD =
-  /if: >-\s+steps\.refresh\.outcome == 'success' &&\s+\(\s*\(github\.event_name == 'push' && github\.ref == 'refs\/heads\/main'\)\s+\|\|\s+\(github\.event_name == 'workflow_dispatch' && github\.ref == 'refs\/heads\/main'\)\s+\|\|\s+\(github\.event_name == 'workflow_run' &&\s+github\.event\.workflow_run\.head_branch == 'main'\)\s*\)/;
+  /pull_request_target:[\s\S]*if: steps\.refresh\.outcome == 'success'[\s\S]*steps\.refresh\.outputs\.receipt_path/;
 
 function assertTrustedStackHealthContract(value) {
   expect(value).toContain(STACK_TRIGGER_TYPES);
@@ -45,7 +45,11 @@ function assertTrustedStackHealthContract(value) {
   expect(value).toContain(
     'node "$GITHUB_WORKSPACE/scripts/backlog-orchestrator/delivery-state-machine.mjs"'
   );
-  expect(value).toContain('--closure-health-file=');
+  expect(value).toContain(
+    '--closure-health-file="${{ steps.refresh.outputs.receipt_path }}"'
+  );
+  expect(value).not.toContain('state/gem-priority-gate/latest.json');
+  expect(value).toContain("steps.stack-actions.outcome == 'success'");
 }
 
 describe('queue-deferred release closed loop (JOV-5054)', () => {
@@ -114,7 +118,7 @@ describe('queue-deferred release closed loop (JOV-5054)', () => {
     expect(upstream).not.toContain('Queue-Deferred Release');
     expect(downstream).not.toContain('CI');
     expect(downstream).not.toContain('Production Controller');
-    expect(fleetGateRefreshWorkflow).toContain('pull_request:');
+    expect(fleetGateRefreshWorkflow).toContain('pull_request_target:');
     assertTrustedStackHealthContract(fleetGateRefreshWorkflow);
     expect(fleetGateRefreshWorkflow).toContain('push:\n    branches: [main]');
     expect(fleetGateRefreshWorkflow).toContain(
@@ -138,15 +142,15 @@ describe('queue-deferred release closed loop (JOV-5054)', () => {
     const regressions = [
       fleetGateRefreshWorkflow.replace(
         STACK_TRIGGER_TYPES,
-        'types: [closed, labeled, unlabeled, ready_for_review, reopened]'
+        'types: [closed, labeled, unlabeled, reopened]'
       ),
       fleetGateRefreshWorkflow.replace(
         'ref: main',
         'ref: ${{ github.event.pull_request.head.sha }}'
       ),
       fleetGateRefreshWorkflow.replace(
-        "github.event.workflow_run.head_branch == 'main'",
-        "github.event.workflow_run.head_branch != 'main'"
+        '${{ steps.refresh.outputs.receipt_path }}',
+        'state/gem-priority-gate/latest.json'
       ),
     ];
     for (const workflowValue of regressions) {

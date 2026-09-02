@@ -76,8 +76,31 @@ UI.
 
 ### `AI_GATEWAY_API_KEY`
 
-Server-side API key for Vercel AI Gateway chat completions. Required in
-production and preview for onboarding/chat flows.
+Server-side API key for Vercel AI Gateway chat completions. On Vercel
+(production and preview) this is **not required**: `@ai-sdk/gateway`
+authenticates via OIDC (`VERCEL_OIDC_TOKEN` is auto-injected at runtime).
+Local development and CI keep using the static key via Doppler.
+
+## Vercel Blob
+
+### `BLOB_READ_WRITE_TOKEN`
+
+Static read-write token for Vercel Blob. On Vercel (production and preview)
+this is **not required**: server-side Blob calls authenticate via OIDC
+(`VERCEL_OIDC_TOKEN` is auto-injected at runtime). Local development and CI
+keep using the static token via Doppler.
+
+### `BLOB_STORE_ID`
+
+Vercel Blob store ID. Required on Vercel for OIDC-authenticated Blob access
+(the SDK resolves the store from it when no static token is present). Set as a
+project env var on the Vercel project.
+
+### `BLOB_WEBHOOK_PUBLIC_KEY`
+
+Public key used by `handleUploadPresigned` (client-upload token routes) to
+verify Blob upload-completed webhook signatures. Required on any environment
+serving the presigned upload routes; provisioned as a project env var.
 
 ### `HELICONE_GATEWAY_BASE_URL`
 
@@ -248,6 +271,13 @@ store-scoped requests.
 ### `PRINTFUL_WEBHOOK_SECRET`
 
 Secret used to verify `x-pf-webhook-signature` on `/api/webhooks/printful`.
+
+### `FIRST_SALE_TEXT_LIVE`
+
+Artist first-sale SMS live switch. Unset or `false` is dry-run: the first paid
+merch order is still claimed, but Twilio is not called. Set to `true` only
+after artist phone coverage is ready. Actual provider POSTs still require
+`OUTBOUND_SMS_ENABLED`.
 
 ## Spotify Integration
 

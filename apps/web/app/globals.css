@@ -66,7 +66,7 @@ html[data-desktop-runtime="electron"] {
   --electron-traffic-light-safe-width: 72px;
   --electron-traffic-light-x: 20px;
   --electron-traffic-light-y: 17px;
-  --electron-sidebar-width: var(--linear-app-sidebar-width);
+  --electron-sidebar-width: var(--app-shell-sidebar-width);
   --electron-sidebar-collapsed-width: 52px;
 }
 
@@ -89,9 +89,9 @@ html[data-desktop-runtime="electron"] [data-electron-titlebar="true"] {
   z-index: 60;
   display: grid;
   grid-template-columns: var(--electron-sidebar-width) minmax(0, 1fr);
-  column-gap: var(--linear-app-shell-gap);
+  column-gap: var(--app-shell-gap);
   align-items: center;
-  padding-right: var(--linear-app-shell-gap);
+  padding-right: var(--app-shell-gap);
   flex-shrink: 0;
   height: var(--electron-titlebar-height);
   user-select: none;
@@ -119,12 +119,12 @@ html[data-desktop-runtime="electron"]
 }
 
 /* Titlebar rail alignment for the canonical app shell — the app-shell-body has
-   p-[--linear-app-shell-gap] on all sides, so the sidebar column starts at
+   p-[--app-shell-gap] on all sides, so the sidebar column starts at
    gap offset from the left edge. Mirror that offset in the titlebar so the
    sidebar-cell left edge aligns with the sidebar rail. */
 html[data-desktop-runtime="electron"] [data-app-shell-frame="true"]
   [data-electron-titlebar="true"] {
-  padding-left: var(--linear-app-shell-gap);
+  padding-left: var(--app-shell-gap);
   grid-template-columns: var(--electron-sidebar-width) minmax(0, 1fr);
 }
 
@@ -1508,7 +1508,7 @@ body {
     align-items: center;
     justify-content: center;
     height: var(--linear-button-height-sm);
-    padding: 0 var(--linear-space-4);
+    padding: 0 var(--space-4);
     font-size: var(--linear-caption-size);
     font-weight: 450;
     line-height: var(--linear-caption-leading);
@@ -1581,15 +1581,15 @@ body {
   }
   /* Smaller section spacing for tighter groupings */
   .section-spacing-linear-sm {
-    padding-top: var(--linear-space-12);
-    padding-bottom: var(--linear-space-12);
+    padding-top: var(--space-12);
+    padding-bottom: var(--space-12);
     @media (min-width: 768px) {
-      padding-top: var(--linear-space-16);
-      padding-bottom: var(--linear-space-16);
+      padding-top: var(--space-16);
+      padding-bottom: var(--space-16);
     }
     @media (min-width: 1024px) {
-      padding-top: var(--linear-space-20);
-      padding-bottom: var(--linear-space-20);
+      padding-top: var(--space-20);
+      padding-bottom: var(--space-20);
     }
   }
   .section-gap-linear {
@@ -1788,7 +1788,7 @@ body {
   /* Bento grid for feature showcase */
   .bento-grid {
     display: grid;
-    gap: var(--linear-gap-cards);
+    gap: var(--space-6);
     grid-template-columns: 1fr;
     @media (min-width: 768px) {
       grid-template-columns: 1fr 1fr;

@@ -1,15 +1,21 @@
 #!/usr/bin/env node
 /**
- * Auto-ready authorization is provenance, not a branch prefix.
+ * Auto-ready authorization is author-owned proof, not a branch prefix.
  *
- * A draft may be promoted only when the PR author is an allowlisted bot or
- * the exact current head is an FX child of the signed `FX-Source-Head`
- * trailer with trusted App/run provenance. Branch names never authorize.
+ * A draft may be promoted only when the PR body carries a complete
+ * `jovie-writer-pr-proof/v1` receipt for the exact current head and PR
+ * author. Bot/FX provenance remains useful diagnostic context, but branch
+ * names and trusted automation authors never manufacture missing proof.
  */
 
 import { readFileSync } from 'node:fs';
 import { pathToFileURL } from 'node:url';
-import { HUMAN_POLICY_HOLD_LABELS } from './queue-deferral-receipt.mjs';
+import {
+  CONTROLLED_PROOF_LABELS,
+  extractLatestWriterProofReceipt,
+  validateWriterProofReceipt,
+  WRITER_PROMOTION_HOLD_LABELS,
+} from './writer-owned-pr-promotion.mjs';
 
 export const TRUSTED_BOT_AUTHORS = Object.freeze(['jovie-bot[bot]']);
 export const FX_WRITER_NAME = 'jovie-fx[bot]';
@@ -22,29 +28,7 @@ export const TRUSTED_FX_WORKFLOW_NAME = 'Rolling CI Dispatch';
 
 const SHA_RE = /^[0-9a-f]{40}$/;
 const TRAILER_RE = /^FX-Source-Head:\s*([0-9a-f]{40})\s*$/im;
-const NO_AUTO_HOLD_LABELS = Object.freeze([
-  'no-auto',
-  'no-auto-merge',
-  'no-automerge',
-]);
-const EXTRA_HOLD_LABELS = Object.freeze([
-  'queue-deferred',
-  'security',
-  'needs:security',
-  'human-review-required',
-]);
-export const CONTROLLED_PROOF_LABELS = Object.freeze([
-  'canary',
-  'controlled-proof',
-  'deliberate-red',
-  'proof',
-]);
-export const AUTO_READY_HOLD_LABELS = Object.freeze([
-  ...HUMAN_POLICY_HOLD_LABELS,
-  ...NO_AUTO_HOLD_LABELS,
-  ...EXTRA_HOLD_LABELS,
-  ...CONTROLLED_PROOF_LABELS,
-]);
+export const AUTO_READY_HOLD_LABELS = WRITER_PROMOTION_HOLD_LABELS;
 const CONTROLLED_PROOF_TITLE_RE =
   /[\[(](?:canary|controlled-proof|deliberate-red)[\])]/i;
 const CONTROLLED_PROOF_BRANCH_RE =
@@ -200,10 +184,19 @@ export function classifyAutoReadyPromotion(input = {}) {
   if (hasAutoReadyHold(input.labels)) {
     return { eligible: false, reason: 'held' };
   }
-  if (isTrustedBotAuthor(input.authorLogin)) {
-    return { eligible: true, reason: 'trusted-bot-author' };
+  const proof = validateWriterProofReceipt(
+    input.writerProofReceipt ??
+      extractLatestWriterProofReceipt(input.body ?? input.prBody ?? ''),
+    {
+      expectedHeadSha: input.headSha,
+      writerLogin: input.writerLogin ?? input.authorLogin,
+      prNumber: input.prNumber,
+    }
+  );
+  if (!proof.ok) {
+    return { eligible: false, reason: `writer-proof-${proof.reason}` };
   }
-  return classifyFxChildCommit(input);
+  return { eligible: true, reason: 'writer-proof-complete' };
 }
 
 function readStdin() {

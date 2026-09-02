@@ -59,7 +59,8 @@ win:
 linux:
   target: AppImage
   icon: assets/icon-staging.png
-# Rolling `desktop-staging` tag; publisher requires production v${version} first.
+# Rolling `desktop-staging` tag; publisher requires an already-green CI SHA.
 publish:
   provider: generic
   url: https://github.com/JovieInc/Jovie/releases/download/desktop-staging
+  channel: staging

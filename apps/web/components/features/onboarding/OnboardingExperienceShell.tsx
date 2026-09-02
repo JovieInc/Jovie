@@ -88,7 +88,7 @@ export function OnboardingExperienceShell({
           <aside className='shrink-0 max-lg:w-full lg:w-55 xl:w-60 2xl:w-65'>
             <div className='sticky top-8'>
               {sidebarTitle ? (
-                <div className='border-b border-[color-mix(in_oklab,var(--linear-app-frame-seam)_68%,transparent)] pb-4'>
+                <div className='border-b border-[color-mix(in_oklab,var(--app-shell-frame-seam)_68%,transparent)] pb-4'>
                   <p className='text-sm font-semibold tracking-tighter text-primary-token'>
                     {sidebarTitle}
                   </p>

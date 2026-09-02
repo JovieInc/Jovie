@@ -140,13 +140,15 @@ describe('Popover', () => {
 
       const trigger = screen.getByRole('button', { name: /open popover/i });
 
-      // Trigger should expose basic ARIA metadata
+      // Trigger should expose basic ARIA metadata without referencing
+      // unmounted content while the popover is closed.
       expect(trigger).toHaveAttribute('aria-haspopup', 'dialog');
-      expect(trigger).toHaveAttribute('aria-controls');
+      expect(trigger).not.toHaveAttribute('aria-controls');
 
       fireEvent.click(trigger);
 
       // After opening, content should be rendered and associated via a role
+      expect(trigger).toHaveAttribute('aria-controls');
       const contentNode = screen.getByText('Test popover content');
       const contentWithRole = contentNode.closest('[role]');
       expect(contentWithRole).toBeInTheDocument();
