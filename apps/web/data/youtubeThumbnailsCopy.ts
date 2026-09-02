@@ -1,37 +1,69 @@
+/**
+ * /youtube-thumbnails copy — JOV-5862 lock.
+ *
+ * Paste channel first. Three free before/after per channel, server-counted.
+ * Connect only to apply. No standalone SKU: thumbnails ride the existing
+ * Jovie plan. No generated or altered faces, ever.
+ */
 export const YOUTUBE_THUMBNAILS_COPY = {
   seo: {
-    title: 'YouTube Thumbnail Optimization',
+    title: 'YouTube Thumbnails',
     description:
-      'Approve thumbnail styles once, review candidates in one Inbox, and let Jovie optimize your channel through native YouTube experiments.',
+      'Paste your channel. See three of your thumbnails redone, free. Connect YouTube only when you want to apply one.',
   },
   hero: {
     eyebrow: 'YouTube Thumbnails',
-    title: 'Stop managing thumbnails.',
-    body: 'Jovie brings every thumbnail decision to one Inbox, learns the visual rules you approve, and improves your channel without changing anyone’s face.',
-    primaryCta: 'Start with 10 free',
-    secondaryCta: 'See the approval loop',
-    subcopy:
-      '10 candidates each month with a “Thumbnails Powered by Jovie” link in your video description. No generated creator or collaborator faces.',
+    title: 'Paste your channel. See three thumbnails, redone.',
+    body: 'Jovie takes three of your recent videos and puts the thumbnail you have next to the one it would ship. No account and no Google sign-in until you want to apply one.',
+  },
+  form: {
+    label: 'Your channel',
+    placeholder: '@handle or youtube.com/@handle',
+    submit: 'Show me 3',
+    helper: 'Three free per channel. Jovie never generates or alters faces.',
+  },
+  states: {
+    loading: 'Finding your latest videos…',
+    previewOnly: 'Redos open soon. These are the three we would start with.',
+    ready: 'Your three, redone.',
+    remaining: (count: number) =>
+      count === 1 ? '1 free redo left.' : `${count} free redos left.`,
+    invalidChannel:
+      'We could not find that channel. Paste the @handle or the channel link.',
+    noVideos: 'That channel has no public videos yet.',
+    limitReached: 'You have seen your three. Connect to keep going.',
+    cooldown: 'One at a time. Give it a minute.',
+    blocked: 'That network is blocked. Try again from a normal connection.',
+    unavailable: 'YouTube lookups are paused right now. Try again shortly.',
+    error: 'Something broke on our side. Try again in a minute.',
+  },
+  results: {
+    beforeLabel: 'Now',
+    afterLabel: 'Jovie',
+    pendingLabel: 'Redo coming soon',
+    applyCta: 'Connect to apply',
+    applyNote:
+      'Applying to YouTube needs Connect. Full-size download needs an account.',
   },
   workflow: {
-    eyebrow: 'One quiet loop',
-    title: 'Approve the look. Keep making videos.',
-    body: 'Every new style starts with you. As your decisions become consistent, Jovie asks less and proposes a fully automatic mode only when confidence is high.',
+    eyebrow: 'Three steps',
+    title: 'Paste. Look. Apply.',
+    body: 'You see the difference before you sign in to anything. Connect is the last step, not the first.',
     steps: [
       {
-        title: 'Connect your channel',
+        title: 'Paste your channel',
         description:
-          'Jovie inventories the catalog, protects current winners, and finds the videos with the largest packaging opportunity.',
+          'An @handle or a channel link. Jovie pulls three recent public videos. No login.',
       },
       {
-        title: 'Swipe through one Inbox',
+        title: 'See three before-and-afters',
         description:
-          'Approve or reject candidates in a focused session. Add rejection feedback once at the end, without a daily designer thread.',
+          'Your current thumbnail next to the one Jovie would ship. Same people, same moment, clearer packaging.',
       },
       {
-        title: 'Measure what matters',
+        title: 'Connect only to apply',
         description:
-          'Native YouTube experiments compare approved designs. Qualified watch time and revenue signals matter more than clicks alone.',
+          'Like one? Connect YouTube and Jovie sets it. Nothing touches your channel until you say so.',
       },
     ],
   },
@@ -47,7 +79,7 @@ export const YOUTUBE_THUMBNAILS_COPY = {
       {
         title: 'Every style earns approval',
         description:
-          'Approved design invariants can scale across the channel. New visual directions return to the Inbox first.',
+          'Approved design invariants can scale across the channel. New visual directions return to you first.',
       },
       {
         title: 'Automation is explicit',
@@ -57,36 +89,14 @@ export const YOUTUBE_THUMBNAILS_COPY = {
       {
         title: 'YouTube stays in control',
         description:
-          'The alpha uses YouTube Studio’s native experiment flow with supervised playback before unattended operation.',
+          'Applying uses YouTube’s own thumbnail update with your permission. Nothing runs unattended until you allow it.',
       },
     ],
   },
-  plans: {
-    eyebrow: 'Founding access',
-    title: 'Start free. Pay when the loop is worth scaling.',
-    free: {
-      name: 'Free',
-      price: '$0',
-      cadence: 'forever',
-      description: 'For proving the workflow on your channel.',
-      features: [
-        '10 thumbnail candidates each month',
-        'Creator approval on every new style',
-        '“Thumbnails Powered by Jovie” description link',
-      ],
-      cta: 'Start with 10 free',
-    },
-    founder: {
-      name: 'Founder',
-      price: '$29',
-      cadence: 'per month',
-      description: 'For creators ready to optimize the full catalog.',
-      features: [
-        'Unlimited thumbnail candidate generation',
-        'Up to 10 live experiment starts each month',
-        'No powered-by link required',
-      ],
-      cta: 'Get founder access',
-    },
+  included: {
+    eyebrow: 'Included',
+    title: 'No separate plan.',
+    body: 'Thumbnails come with your Jovie plan. Free shows you three per channel. Applying needs YouTube Connect.',
+    cta: 'Get started',
   },
 } as const;
