@@ -11,6 +11,7 @@ owner="timwhite"
 owner_uid="$(id -u "$owner")"
 timestamp="$(date -u +%Y%m%dT%H%M%SZ)"
 receipt_root="/srv/git/receipts/workspace-mounts"
+package_cache_receipt_root="$receipt_root/package-cache"
 backup_root="/srv/git/rollback/gem-symphony-storage/$timestamp"
 helper_source="$source_root/jovie-symphony-workspace"
 wrapper_source="$source_root/jovie-symphony-workspace-create"
@@ -74,6 +75,7 @@ if grep -Eq 'mounted=false|invalid_manifest=' <<<"$workspace_status_before"; the
 fi
 
 install -d -o root -g root -m 0755 "$receipt_root" "$backup_root"
+install -d -o "$owner" -g "$owner" -m 0755 "$package_cache_receipt_root"
 
 backup_if_present() {
   local source="$1" name="$2"
@@ -156,6 +158,8 @@ receipt="$receipt_root/${timestamp}-gem-symphony-storage-installed.txt"
   printf 'node=%s\n' "$("${tool_env[@]}" node --version)"
   printf 'pnpm=%s\n' "$("${tool_env[@]}" pnpm --version)"
   printf 'cache_mount_source=%s\n' "$cache_source_device"
+  printf 'package_cache_receipt_root=%s\n' "$package_cache_receipt_root"
+  printf 'package_cache_receipt_owner=%s\n' "$(stat -c '%U:%G' "$package_cache_receipt_root")"
   printf 'symphony_pid_before=%s\n' "$service_pid_before"
   printf 'symphony_pid_after=%s\n' "$service_pid_after"
   printf 'symphony_start_tick_before=%s\n' "$service_start_before"

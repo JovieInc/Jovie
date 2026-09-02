@@ -23,6 +23,22 @@ class JovieSymphonyWorkspaceTests(unittest.TestCase):
         self.assertIn('COREPACK_ENABLE_NETWORK=0', source)
         self.assertIn('"$("${tool_env[@]}" pnpm --version)"', source)
 
+    def test_installer_provisions_package_cache_receipts_for_hook_owner(self) -> None:
+        installer = INSTALLER.read_text()
+        wrapper = WRAPPER.read_text()
+        self.assertIn(
+            'cache_receipts="/srv/git/receipts/workspace-mounts/package-cache"',
+            wrapper,
+        )
+        self.assertIn(
+            'package_cache_receipt_root="$receipt_root/package-cache"', installer
+        )
+        self.assertIn(
+            'install -d -o "$owner" -g "$owner" -m 0755 '
+            '"$package_cache_receipt_root"',
+            installer,
+        )
+
     def test_declared_roots_and_known_bucket_mapping(self) -> None:
         source = HELPER.read_text()
         prefix = source.split("\nrequire_root\ninit_state\n", 1)[0]
@@ -59,7 +75,9 @@ class JovieSymphonyWorkspaceTests(unittest.TestCase):
         helper = root / "helper"
         clone = root / "clone"
         cache = root / "cache"
+        receipts = root / "receipts"
         wrapper = root / "wrapper"
+        receipts.mkdir()
 
         (bin_dir / "node").write_text("#!/usr/bin/env bash\nprintf 'v22.23.2\\n'\n")
         (bin_dir / "pnpm").write_text("#!/usr/bin/env bash\nprintf '9.15.4\\n'\n")
@@ -78,6 +96,7 @@ class JovieSymphonyWorkspaceTests(unittest.TestCase):
         cache.write_text(
             "#!/usr/bin/env bash\n"
             "printf 'cache:%s:%s\\n' \"$SYMPHONY_TRUSTED_HOOK_PHASE\" \"$SYMPHONY_ISSUE_IDENTIFIER\" >> \"$EVENT_LOG\"\n"
+            "printf 'receipt\\n' > \"$SYMPHONY_NVME_RECEIPT_DIR/$SYMPHONY_ISSUE_IDENTIFIER.json\"\n"
             f"exit {cache_exit}\n"
         )
         wrapper_source = WRAPPER.read_text()
@@ -85,6 +104,9 @@ class JovieSymphonyWorkspaceTests(unittest.TestCase):
         wrapper_source = wrapper_source.replace('/home/timwhite/.local/bin/jovie-workspace-clone', str(clone))
         wrapper_source = wrapper_source.replace('/home/timwhite/.local/bin/symphony-nvme-package-cache', str(cache))
         wrapper_source = wrapper_source.replace('/home/timwhite/.nvm/versions/node/v22.23.2/bin', str(bin_dir))
+        wrapper_source = wrapper_source.replace(
+            '/srv/git/receipts/workspace-mounts/package-cache', str(receipts)
+        )
         wrapper.write_text(wrapper_source)
         for path in (bin_dir / "node", bin_dir / "pnpm", bin_dir / "realpath", bin_dir / "sudo", helper, clone, cache, wrapper):
             path.chmod(0o755)
@@ -105,6 +127,10 @@ class JovieSymphonyWorkspaceTests(unittest.TestCase):
         self.assertEqual(
             log.read_text().splitlines(),
             ["prepare", "clone", "cache:after_create:JOV-9900000", "activate"],
+        )
+        self.assertEqual(
+            (pathlib.Path(temp.name) / "receipts/JOV-9900000.json").read_text(),
+            "receipt\n",
         )
 
     def test_cache_failure_aborts_without_activation(self) -> None:
