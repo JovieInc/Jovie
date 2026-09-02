@@ -2,9 +2,9 @@ name: desktop-release
 run-name: Desktop release ${{ github.event.workflow_run.head_sha || github.sha }}
 
 # controller-hop-exception: jovie-controller-hop/v1
-# accountable-writer: DesktopRelease
-# necessary-trust-boundary: GitHub Actions reads exact CI and current-main state through the scoped repository token before this workflow mutates a release.
-# removal-trigger: Remove the shell GitHub API hop when a native Actions release primitive can bind publication to exact successful CI and current main.
+# accountable-writer: Gem
+# necessary-trust-boundary: Signed desktop publication must independently cross-prove the exact Production Controller evidence before release.
+# removal-trigger: Remove this observer hop when Production Controller can request the same signed desktop publication directly.
 
 # Triggers:
 # - Auto after Production Controller verifies exact current main. A checked-in
