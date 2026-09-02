@@ -79,5 +79,9 @@ describe('HomeTrustSection', () => {
     );
 
     expect(container.querySelectorAll('[data-logo-asset]')).toHaveLength(4);
+    expect(screen.getByTestId('artist-profile-logo-bar')).toHaveAttribute(
+      'data-presentation',
+      'artist-profile'
+    );
   });
 });

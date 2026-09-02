@@ -100,6 +100,23 @@ describe('MarketingHero — shell mode', () => {
       screen.getByRole('heading', { name: 'Shell heading' })
     ).toBeInTheDocument();
   });
+
+  it('owns route-specific hero markup without adding presentation classes', () => {
+    render(
+      <MarketingHero
+        variant='unstyled'
+        headingId='owned-heading'
+        testId='owned-hero'
+        className='route-owned-presentation'
+      >
+        <h1 id='owned-heading'>Owned heading</h1>
+      </MarketingHero>
+    );
+
+    const hero = screen.getByTestId('owned-hero');
+    expect(hero).toHaveClass('route-owned-presentation');
+    expect(hero).not.toHaveClass('relative', 'w-full', 'pt-20');
+  });
 });
 
 describe('MarketingHero — content mode', () => {
