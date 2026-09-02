@@ -5,6 +5,7 @@ export default defineConfig({
     coverage: {
       include: [
         'agent/instructions/summer-shadow.ts',
+        'agent/lib/summer-photon-offline-proof.ts',
         'agent/lib/summer-shadow-ingress.ts',
         'agent/lib/vercel-blob-shadow-store.ts',
       ],
