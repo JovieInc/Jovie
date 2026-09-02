@@ -430,9 +430,9 @@ jobs:
 
       - name: Slack notification on all success
         if: >-
-          needs.knip.result != 'failure' &&
-          needs.unit-tests.result != 'failure' &&
-          needs.e2e-tests.result != 'failure' &&
+          needs.knip.result == 'success' &&
+          needs.unit-tests.result == 'success' &&
+          needs.e2e-tests.result == 'success' &&
           env.SLACK_WEBHOOK_URL != ''
         uses: 8398a7/action-slack@77eaa4f1c608a7d68b38af4e3f739dcd8cba273e # v3.19.0
         with:

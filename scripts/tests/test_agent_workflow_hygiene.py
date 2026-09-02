@@ -1199,17 +1199,43 @@ def test_nightly_unit_suite_fetches_storybook_provenance_history() -> None:
 def test_nightly_notifications_skip_when_slack_credentials_are_absent() -> None:
     """Missing Slack credentials must not make the notification job fail."""
     job = _job_block("nightly-tests.yml", "notify")
+    knip_failure = _step_block(
+        "nightly-tests.yml", "Slack notification on Knip failure"
+    )
+    unit_failure = _step_block(
+        "nightly-tests.yml", "Slack notification on unit test failure"
+    )
+    e2e_failure = _step_block(
+        "nightly-tests.yml", "Slack notification on E2E failure"
+    )
+    all_success = _step_block(
+        "nightly-tests.yml", "Slack notification on all success"
+    )
 
     assert "SLACK_BOT_TOKEN: ${{ secrets.SLACK_BOT_TOKEN }}" in job
     assert "SLACK_CI_CHANNEL_ID: ${{ vars.SLACK_CI_CHANNEL_ID }}" in job
     assert "SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}" in job
-    assert "env.SLACK_BOT_TOKEN != ''" in job
-    assert "env.SLACK_CI_CHANNEL_ID != ''" in job
-    assert job.count("env.SLACK_WEBHOOK_URL != ''") == 2
-    assert "channel-id:" not in job
-    assert job.count("method: chat.postMessage") == 2
-    assert job.count("token: ${{ env.SLACK_BOT_TOKEN }}") == 2
-    assert job.count('"channel": "${{ env.SLACK_CI_CHANNEL_ID }}"') == 2
+    for step, result in (
+        (knip_failure, "needs.knip.result == 'failure'"),
+        (unit_failure, "needs.unit-tests.result == 'failure'"),
+    ):
+        assert result in step
+        assert "env.SLACK_BOT_TOKEN != ''" in step
+        assert "env.SLACK_CI_CHANNEL_ID != ''" in step
+        assert "channel-id:" not in step
+        assert "method: chat.postMessage" in step
+        assert "token: ${{ env.SLACK_BOT_TOKEN }}" in step
+        assert '"channel": "${{ env.SLACK_CI_CHANNEL_ID }}"' in step
+
+    assert "needs.e2e-tests.result == 'failure'" in e2e_failure
+    assert "env.SLACK_WEBHOOK_URL != ''" in e2e_failure
+    for result in (
+        "needs.knip.result == 'success'",
+        "needs.unit-tests.result == 'success'",
+        "needs.e2e-tests.result == 'success'",
+    ):
+        assert result in all_success
+    assert "env.SLACK_WEBHOOK_URL != ''" in all_success
 
 
 def test_pitch_static_assets_do_not_keep_large_unreferenced_files() -> None:
