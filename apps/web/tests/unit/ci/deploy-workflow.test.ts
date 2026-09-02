@@ -2165,7 +2165,7 @@ describe('iOS stage contract', () => {
     const mainReady = getJobBlock(workflow, 'main-release-ready');
 
     expect(iosWorkflow).toMatch(
-      /^on:\n(?:  #.*\n)*  workflow_call:\n  workflow_dispatch:/m
+      /^on:\n(?:  #.*\n)*  workflow_call:\n(?:    .*\n)*  workflow_dispatch:/m
     );
     expect(iosWorkflow).not.toMatch(/^  pull_request:/m);
     expect(iosWorkflow).not.toMatch(/^  push:/m);
