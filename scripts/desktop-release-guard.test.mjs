@@ -789,6 +789,7 @@ test('staging release versions advance beyond installed and current-feed version
     installedVersion: '26.8.1',
     version: '26.8.2-staging.17823456790.1',
   };
+  assert.doesNotThrow(() => assertStagingVersionTransition(valid));
   assert.doesNotThrow(() =>
     assertStagingVersionTransition({
       ...valid,
