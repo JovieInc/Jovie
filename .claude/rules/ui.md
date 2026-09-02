@@ -231,6 +231,11 @@ accent colors between sections, ornament title text, or place decorative icons
 on colored squares. CTAs remain neutral high-contrast pills. Color never
 carries status alone.
 
+For Jovie-owned intentionally art-directed/generated brand imagery, use
+Scene Palette v1 from `apps/web/data/marketing/imageColorPolicy.ts`. The
+softened scene references are for set design, light, material, wardrobe, and
+prompt contracts only; they do not replace the shipped Noir Ion UI anchors.
+
 ### Do not fuck with art (founder-locked 2026-08-13)
 
 Hard product and marketing rules from `DESIGN.md`. Not aesthetic taste.
