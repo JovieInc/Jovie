@@ -653,6 +653,9 @@ warm_cache() {
     if [ -f "$workspace/pnpm-workspace.yaml" ]; then
       install -m 0644 "$workspace/pnpm-workspace.yaml" "$tmp_dir/pnpm-workspace.yaml"
     fi
+    if [ -d "$workspace/patches" ]; then
+      cp -a -- "$workspace/patches" "$tmp_dir/patches"
+    fi
     (
       cd "$tmp_dir"
       COREPACK_ENABLE_NETWORK=0 pnpm fetch --frozen-lockfile --ignore-scripts --store-dir "$store_dir"
