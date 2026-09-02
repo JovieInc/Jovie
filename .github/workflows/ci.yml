@@ -2037,6 +2037,14 @@ jobs:
         with:
           persist-credentials: false
       - uses: ./.github/actions/setup-node-pnpm
+      - name: Bind staging package identity to the exact CI attempt
+        shell: bash
+        run: |
+          set -euo pipefail
+          version="$(node apps/desktop/scripts/sync-version.mjs \
+            --staging-version "$GITHUB_RUN_ID" "$GITHUB_RUN_ATTEMPT")"
+          echo "DESKTOP_VERSION=$version" >> "$GITHUB_ENV"
+          echo "JOVIE_DESKTOP_SOURCE_REVISION=$GITHUB_SHA" >> "$GITHUB_ENV"
       - name: Test and package exact Mac head
         run: |
           set -euo pipefail
@@ -2048,7 +2056,7 @@ jobs:
       - name: Verify exact Mac artifact set
         run: |
           set -euo pipefail
-          version="$(tr -d '[:space:]' < VERSION)"
+          version="$DESKTOP_VERSION"
           for artifact in \
             "apps/desktop/dist/Jovie-Staging-${version}-universal.dmg" \
             "apps/desktop/dist/Jovie-Staging-${version}-universal.dmg.blockmap" \

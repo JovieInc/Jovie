@@ -524,6 +524,19 @@ describe('merge_group workflow contract', () => {
     expect(macos).toContain(
       'swift build --package-path apps/macos/MenuMonitor -c release'
     );
+    expect(macos).toContain(
+      '--staging-version "$GITHUB_RUN_ID" "$GITHUB_RUN_ATTEMPT"'
+    );
+    expect(macos).toContain(
+      'echo "DESKTOP_VERSION=$version" >> "$GITHUB_ENV"'
+    );
+    expect(macos).toContain(
+      'echo "JOVIE_DESKTOP_SOURCE_REVISION=$GITHUB_SHA" >> "$GITHUB_ENV"'
+    );
+    expect(macos).toContain('version="$DESKTOP_VERSION"');
+    expect(
+      macos.indexOf('Bind staging package identity to the exact CI attempt')
+    ).toBeLessThan(macos.indexOf('Test and package exact Mac head'));
     expect(macos).toContain('pnpm --filter @jovie/desktop run package:staging');
     expect(unitTests).toContain(
       "github.event_name == 'merge_group' && matrix.shard == '4/10'"
