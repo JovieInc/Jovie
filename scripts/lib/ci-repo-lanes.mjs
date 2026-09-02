@@ -55,6 +55,10 @@ const LANE_PREFIXES = Object.freeze([
     lanes: [CI_LANES.SYMPHONY_CONTROL],
   },
   {
+    prefix: 'scripts/verification/',
+    lanes: [CI_LANES.SYMPHONY_CONTROL],
+  },
+  {
     prefix: 'scripts/lib/ci-',
     lanes: [CI_LANES.SYMPHONY_CONTROL],
   },
