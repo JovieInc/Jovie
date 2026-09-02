@@ -9,6 +9,8 @@ import { once } from 'node:events';
 import { mkdir, open, readdir, readFile, rename } from 'node:fs/promises';
 import { dirname, join } from 'node:path';
 
+import { OFFICIAL_ROUTING_RECEIPT_SCHEMA } from './symphony-routing.mjs';
+
 export const NO_UNATTENDED_RED_SCHEMA = 'jovie-no-unattended-red/v1';
 export const SUMMER_QUEUE_SCHEMA = 'jovie-summer-red-queue/v2';
 export const EVIDENCE_TASK_SCHEMA = 'jovie-symphony-evidence-task/v1';
@@ -17,6 +19,22 @@ export const AUTHORITY_BUDGET = 1;
 export const BACKOFF_BASE_MS = 60_000;
 export const BACKOFF_MAX_MS = 60 * 60 * 1000;
 export const SUMMER_QUEUE_LOCK_TIMEOUT_MS = 30_000;
+export const ESCALATION_HANDOFF_SCHEMA = 'jovie-escalation-handoff/v1';
+export const DELEGATION_RECEIPT_SCHEMA = 'jovie-delegated-diagnosis/v1';
+export const FOUNDER_CONTACT_SCHEMA = 'jovie-founder-contact/v1';
+export const NON_PROGRESS_BUDGET = 2;
+export const DELEGATION_BUDGET = 1;
+export const MAX_DELEGATION_DEPTH = 1;
+export const FOUNDER_CONTACT_PRIMARY_CHANNEL = 'ovie-push';
+export const ESCALATION_STATES = Object.freeze([
+  'running',
+  'retrying',
+  'escalation-pending',
+  'delegated-diagnosis',
+  'repair-verifying',
+  'resolved',
+  'hard-blocked',
+]);
 
 const SUMMER_QUEUE_LOCK_HELPER = `import fcntl, sys
 with open(sys.argv[1], 'a+', encoding='utf-8') as handle:
@@ -93,6 +111,7 @@ const QUEUE_KEYS = [
   'owner',
   'outcome',
   'reason',
+  'state',
   'nextProofAt',
   'dispatchState',
   'headSha',
@@ -117,6 +136,63 @@ function createApi() {
   const leaseKeyFor = classified => digest({ issueKey: classified.issueKey, writer: classified.writer, headSha: classified.headSha });
   const backoffMs = attempt => Math.min(BACKOFF_MAX_MS, BACKOFF_BASE_MS * 2 ** (Math.max(1, Number.isInteger(attempt) ? attempt : 1) - 1));
   const nextProofAt = (observedAt, attempt) => new Date(Date.parse(observedAt) + backoffMs(attempt)).toISOString();
+  function transitionRecord(record, changes, discriminator = null) {
+    const rootLoopKey = record.rootLoopKey || record.loopKey;
+    const next = { ...record, ...changes, rootLoopKey, supersedesLoopKey: record.loopKey, generation: Number(record.generation || 0) + 1 };
+    const loopKey = digest({ rootLoopKey, state: next.state, outcome: next.outcome, attempt: next.attempt, reason: next.reason, discriminator });
+    return { ...next, loopKey };
+  }
+  function redactText(value) {
+    const normalized = text(value);
+    if (!normalized) return null;
+    let redacted = normalized
+      .replace(/\b(?:github_pat_|gh[opusr]_|lin_api_|sk-)[a-z0-9_.-]+\b/gi, '[REDACTED]')
+      .replace(/\bBearer\s+[a-z0-9._~-]+\b/gi, 'Bearer [REDACTED]')
+      .replace(/\b(token|secret|password|authorization|api[_-]?key)\s*[:=]\s*[^\s,;]+/gi, '$1=[REDACTED]')
+      .replace(/\/(?:Users|home)\/[^/\s]+/g, '~');
+    try {
+      const url = new URL(redacted);
+      if (url.protocol === 'https:' || url.protocol === 'http:') {
+        url.username = '';
+        url.password = '';
+        url.search = '';
+        url.hash = '';
+        redacted = url.toString();
+      }
+    } catch {
+      redacted = redacted.replace(/([?&](?:token|key|secret|signature)=)[^&#\s]+/gi, '$1[REDACTED]');
+    }
+    return redacted.slice(0, 512);
+  }
+  const redactList = values => [...new Set((Array.isArray(values) ? values : []).map(redactText).filter(Boolean))].slice(0, 10);
+  const progressFingerprint = result => {
+    const transition = redactText(result?.proofTransition);
+    const proof = result?.proof;
+    if (transition) return digest({ transition });
+    if (proof?.verified !== true) return null;
+    const ref = redactText(proof.ref);
+    const revision = sha(proof.revision);
+    const phase = redactText(proof.phase);
+    return ref || revision || phase ? digest({ ref, revision, phase }) : null;
+  };
+  function buildEscalationHandoff(record, input = {}, { now = new Date().toISOString() } = {}) {
+    const object = redactText(input.object) || record.issue || (record.pr ? `pr:${record.pr}` : record.issueKey);
+    const environment = redactText(input.environment) || 'unknown';
+    const revision = sha(input.revision ?? record.headSha);
+    const phase = redactText(input.phase) || record.state || record.dispatchState || 'escalation-pending';
+    const failure = redactText(input.failure) || redactText(record.reason) || record.stallClass;
+    const attempts = Number.isInteger(input.attempts) ? input.attempts : Number(record.attempt || 0);
+    const evidenceRefs = redactList(input.evidenceRefs || record.evidence?.refs);
+    const requiredScopes = redactList(input.requiredScopes);
+    const exactQuestion = redactText(input.exactQuestion) || `What bounded authority or evidence is required to resolve ${object}?`;
+    const escalationKey = digest({ loopKey: record.rootLoopKey || record.loopKey, object, environment, revision, phase, failure });
+    return { schema: ESCALATION_HANDOFF_SCHEMA, escalationKey, object, environment, revision, phase, failure, attempts, evidenceRefs, requiredScopes, exactQuestion, redaction: 'applied', createdAt: iso(now) };
+  }
+  function prepareEscalation(record, reason, now = new Date().toISOString(), input = {}) {
+    const exactReason = text(reason) || `escalation-pending:${record.stallClass}`;
+    const handoff = buildEscalationHandoff(record, { ...input, failure: exactReason, phase: 'escalation-pending' }, { now });
+    return transitionRecord(record, { state: 'escalation-pending', mode: 'authority-blocker', outcome: 'open', terminal: false, dispatchState: 'escalation-pending', action: 'prepare-bounded-escalation', reason: exactReason, observedAt: iso(now), escalation: { key: handoff.escalationKey, status: 'pending', reason: exactReason, owner: record.owner, timeoutAt: nextProofAt(iso(now), Math.max(1, record.attempt || 0)), handoff } }, handoff.escalationKey);
+  }
   function isProvenUnhealthy(signal) {
     if (signal.proven === false) return false;
     if (signal.proven === true) return true;
@@ -180,7 +256,8 @@ function createApi() {
       return { ...existing, duplicate: true, observedAt: iso(now) };
     }
     const observedAt = iso(now);
-    const record = { schema: NO_UNATTENDED_RED_SCHEMA, loopKey: loopKeyFor(classified), leaseKey: leaseKeyFor(classified), stallClass: classified.stallClass, mode: classified.mode, owner: classified.owner, writer: classified.writer, action: classified.action, issue: classified.issue, issueKey: classified.issueKey, pr: classified.pr, headSha: classified.headSha, workflow: classified.workflow || null, deliveryKey: classified.deliveryKey, proven: classified.proven === true, mechanical: classified.mechanical === true, attempt, attemptBudget: ATTEMPT_BUDGET, authorityBudget: AUTHORITY_BUDGET, backoffMs: backoffMs(Math.max(1, attempt)), nextProofAt: nextProofAt(observedAt, Math.max(1, attempt)), outcome: 'open', dispatchState: 'classified', terminal: false, externalMutations: 0, observedAt, reason: `${classified.stallClass}:${classified.action}`, evidence: classified.evidence };
+    const loopKey = loopKeyFor(classified);
+    const record = { schema: NO_UNATTENDED_RED_SCHEMA, loopKey, rootLoopKey: loopKey, generation: 0, leaseKey: leaseKeyFor(classified), stallClass: classified.stallClass, state: 'running', mode: classified.mode, owner: classified.owner, writer: classified.writer, action: classified.action, issue: classified.issue, issueKey: classified.issueKey, pr: classified.pr, headSha: classified.headSha, workflow: classified.workflow || null, deliveryKey: classified.deliveryKey, proven: classified.proven === true, mechanical: classified.mechanical === true, attempt, attemptBudget: ATTEMPT_BUDGET, authorityBudget: AUTHORITY_BUDGET, nonProgressBudget: NON_PROGRESS_BUDGET, nonProgressCount: 0, delegationBudget: DELEGATION_BUDGET, delegationDepth: 0, maxDelegationDepth: MAX_DELEGATION_DEPTH, backoffMs: backoffMs(Math.max(1, attempt)), nextProofAt: nextProofAt(observedAt, Math.max(1, attempt)), outcome: 'open', dispatchState: 'classified', terminal: false, externalMutations: 0, observedAt, reason: `${classified.stallClass}:${classified.action}`, evidence: classified.evidence };
     assertNoUnattendedRed([record]);
     return record;
   }
@@ -191,13 +268,13 @@ function createApi() {
     for (const record of records) {
       if (record.outcome !== 'open' || record.terminal || record.mode === 'authority-blocker') { deferred.push(record); continue; }
       const over = dispatched.length >= measured;
-      (over ? deferred : dispatched).push({ ...record, dispatchState: over ? 'capacity-queued' : 'dispatched', observedAt: iso(now) });
+      (over ? deferred : dispatched).push({ ...record, state: over ? 'retrying' : 'running', dispatchState: over ? 'capacity-queued' : 'dispatched', observedAt: iso(now) });
     }
     return { dispatched, deferred, capacity: measured, mergeQueueIndependent: true };
   }
   function markNotProven(record, reason, now) {
     const classified = classifyStall({ ...record, stallClass: 'not-proven', proven: false, failure: 'not-proven' }, { now });
-    return { ...record, stallClass: 'not-proven', mode: 'collect-evidence', owner: classified.owner, writer: classified.writer, action: classified.action, proven: false, dispatchState: 'classified', outcome: 'open', terminal: false, reason, observedAt: iso(now), nextProofAt: nextProofAt(iso(now), Math.max(1, record.attempt || 0)) };
+    return transitionRecord(record, { stallClass: 'not-proven', state: 'repair-verifying', mode: 'collect-evidence', owner: classified.owner, writer: classified.writer, action: classified.action, proven: false, dispatchState: 'classified', outcome: 'open', terminal: false, reason, observedAt: iso(now), nextProofAt: nextProofAt(iso(now), Math.max(1, record.attempt || 0)) }, sha(record.headSha));
   }
   function requalifyExactHead(record, liveHead, { now = new Date().toISOString() } = {}) {
     const live = sha(liveHead);
@@ -205,18 +282,113 @@ function createApi() {
     if (sha(record.headSha) === live) return record;
     return markNotProven({ ...record, headSha: live, leaseKey: leaseKeyFor({ ...record, headSha: live }) }, 'exact-head-changed-requalify', now);
   }
-  function escalate(record, reason, now = new Date().toISOString()) {
+  function escalate(record, reason, now = new Date().toISOString(), input = {}) {
     const exactReason = text(reason) || `escalated:${record.stallClass}`;
-    return { ...record, mode: 'authority-blocker', outcome: 'escalated', terminal: true, dispatchState: 'escalated', owner: 'human', writer: 'human', action: 'visible-actionable-escalation', reason: exactReason, authorityBudget: 0, observedAt: iso(now), escalation: { reason: exactReason, stallClass: record.stallClass, issue: record.issue, pr: record.pr, headSha: record.headSha, attempts: record.attempt } };
+    const handoff = buildEscalationHandoff(record, { ...input, failure: exactReason, phase: 'hard-blocked' }, { now });
+    return transitionRecord(record, { state: 'hard-blocked', mode: 'authority-blocker', outcome: 'escalated', terminal: true, dispatchState: 'escalated', action: 'visible-founder-review', reason: exactReason, authorityBudget: 0, observedAt: iso(now), escalation: { key: handoff.escalationKey, status: 'hard-blocked', reason: exactReason, stallClass: record.stallClass, issue: record.issue, pr: record.pr, headSha: record.headSha, attempts: record.attempt, owner: record.owner, writer: record.writer, leaseKey: record.leaseKey, handoff } }, handoff.escalationKey);
   }
   function advanceAttempt(record, result, { now = new Date().toISOString() } = {}) {
-    if (record.outcome === 'healthy' || record.outcome === 'escalated') return record;
-    if (result?.healthy === true) return { ...record, outcome: 'healthy', terminal: true, dispatchState: 'complete', reason: result.reason || 'proven-healthy', observedAt: iso(now) };
+    if (record.state === 'resolved' || record.state === 'hard-blocked' || record.outcome === 'healthy' || record.outcome === 'escalated') return record;
+    const fingerprint = progressFingerprint(result);
+    if (result?.healthy === true && result.exitCode === 0 && fingerprint) {
+      return transitionRecord(record, { state: 'resolved', outcome: 'healthy', terminal: true, dispatchState: 'complete', reason: result.reason || 'proven-healthy', lastProgressFingerprint: fingerprint, observedAt: iso(now) }, fingerprint);
+    }
     if (result?.requalifyHead) return requalifyExactHead(record, result.requalifyHead, { now });
     const attempt = (record.attempt || 0) + 1;
-    if (attempt >= record.attemptBudget) return escalate(record, `retry-budget-exhausted:${record.stallClass}`, now);
     if (result?.authorityExhausted === true) return escalate(record, `authority-budget-exhausted:${record.stallClass}`, now);
-    return { ...record, attempt, backoffMs: backoffMs(attempt), nextProofAt: nextProofAt(iso(now), attempt), dispatchState: 'backoff', outcome: 'open', reason: result?.reason || record.reason, observedAt: iso(now) };
+    const sameClass = !result?.failureClass || result.failureClass === record.stallClass;
+    const progressed = Boolean(fingerprint && fingerprint !== record.lastProgressFingerprint);
+    const nonProgressCount = progressed || !sameClass ? 0 : Number(record.nonProgressCount || 0) + 1;
+    const reason = result?.healthy === true ? 'success-unproven' : result?.timedOut === true ? `repair-timeout:${record.stallClass}` : result?.reason || record.reason;
+    const attempted = { ...record, attempt, nonProgressCount, lastProgressFingerprint: fingerprint || record.lastProgressFingerprint || null, reason };
+    if (attempt >= record.attemptBudget) return prepareEscalation(attempted, `retry-budget-exhausted:${record.stallClass}`, now, result?.handoff);
+    if (nonProgressCount >= record.nonProgressBudget) return prepareEscalation(attempted, `nonprogress-budget-exhausted:${record.stallClass}`, now, result?.handoff);
+    const state = result?.phase === 'repair-verifying' ? 'repair-verifying' : 'retrying';
+    return transitionRecord(attempted, { state, backoffMs: backoffMs(attempt), nextProofAt: nextProofAt(iso(now), attempt), dispatchState: state === 'repair-verifying' ? 'verifying' : 'backoff', outcome: 'open', terminal: false, observedAt: iso(now) }, fingerprint || `attempt:${attempt}`);
+  }
+  function planDelegatedDiagnosis(record, input = {}, { now = new Date().toISOString() } = {}) {
+    const target = text(input.target);
+    const ancestry = redactList(input.ancestry);
+    const route = input.route;
+    const officialRoute = route?.schema === OFFICIAL_ROUTING_RECEIPT_SCHEMA && route.phase === 'prepared' && route.terminalOutcome == null && text(route.modelId) && text(route.modelTier);
+    const registryRoute = route?.schema_version === 1 && route.deterministic_first === true && route.workflow === 'remediation' && text(route.selected?.id) && text(route.selected?.provider) && text(route.selected?.model) && Array.isArray(route.candidates) && route.candidates.some(candidate => candidate?.id === route.selected.id && candidate?.status === 'ready');
+    const eligibleRoute = input.routeVerified === true && (officialRoute || registryRoute);
+    const normalizedRoute = officialRoute
+      ? { schema: route.schema, attemptId: route.attemptId, modelId: route.modelId, modelTier: route.modelTier, provider: 'codex', reasoningEffort: route.reasoningEffort, escalation: route.escalation }
+      : registryRoute
+        ? { schema: 'gem-model-router-selection/v1', attemptId: null, modelId: route.selected.id, modelTier: null, provider: route.selected.provider, channel: route.selected.channel, capability: route.capability, escalation: { status: 'alternate-provider' } }
+        : null;
+    const reasons = [];
+    if (record.state !== 'escalation-pending') reasons.push('escalation-pending-required');
+    if (input.deterministicExhausted !== true) reasons.push('deterministic-remediation-not-exhausted');
+    if (!['gem', 'symphony'].includes(target)) reasons.push('delegate-not-allowed');
+    if (target === record.owner || target === record.writer || ancestry.includes(target)) reasons.push('self-or-loop-delegation-denied');
+    if (Number(record.delegationBudget || 0) <= 0) reasons.push('delegation-budget-exhausted');
+    if (Number(record.delegationDepth || 0) >= Number(record.maxDelegationDepth || MAX_DELEGATION_DEPTH)) reasons.push('delegation-depth-exhausted');
+    if (!eligibleRoute) reasons.push('verified-canonical-model-route-required');
+    const delegationKey = digest({ escalationKey: record.escalation?.key || record.loopKey, target, attemptId: normalizedRoute?.attemptId || normalizedRoute?.modelId || null });
+    if (record.delegation?.delegationKey === delegationKey && record.delegation.status === 'delegated') return { status: 'duplicate', reason: 'idempotent-delegation', record };
+    if (reasons.length > 0) {
+      const receipt = { schema: DELEGATION_RECEIPT_SCHEMA, delegationKey, status: 'denied', reasons, target, reconcileOwner: record.owner, writer: record.writer, leaseKey: record.leaseKey, createdAt: iso(now), externalMutations: 0 };
+      return { status: 'denied', reason: reasons[0], record: transitionRecord(record, { delegation: receipt, observedAt: iso(now) }, delegationKey) };
+    }
+    const receipt = { schema: DELEGATION_RECEIPT_SCHEMA, delegationKey, status: 'delegated', target, reconcileOwner: record.owner, writer: record.writer, leaseKey: record.leaseKey, depth: Number(record.delegationDepth || 0) + 1, maxDepth: Number(record.maxDelegationDepth || MAX_DELEGATION_DEPTH), timeoutAt: nextProofAt(iso(now), 1), route: normalizedRoute, ancestry: [...ancestry, record.owner].filter(Boolean), createdAt: iso(now), externalMutations: 0 };
+    return { status: 'delegated', reason: 'bounded-delegated-diagnosis', record: transitionRecord(record, { state: 'delegated-diagnosis', mode: 'typed-remediation', action: 'bounded-delegated-diagnosis', dispatchState: 'delegated', delegationBudget: Number(record.delegationBudget || 0) - 1, delegationDepth: receipt.depth, delegation: receipt, observedAt: iso(now) }, delegationKey) };
+  }
+  function planFounderContact(record, input = {}, { existing = record.escalation?.founderContact || null, now = new Date().toISOString() } = {}) {
+    const severity = text(input.severity);
+    const handoff = record.escalation?.handoff || buildEscalationHandoff(record, input.handoff, { now });
+    const contactKey = digest({ escalationKey: handoff.escalationKey, channel: FOUNDER_CONTACT_PRIMARY_CHANNEL });
+    if (existing?.schema === FOUNDER_CONTACT_SCHEMA && existing.contactKey === contactKey && existing.status !== 'blocked') return { status: 'duplicate', reason: 'idempotent-founder-contact', contact: existing, record };
+    const reasons = [];
+    const reviewOpenedAt = Date.parse(input.founderReviewOpenedAt);
+    const ackWindowMs = Number(input.ackWindowMs || 15 * 60 * 1000);
+    const cooldownMs = Number(input.cooldownMs || 60 * 60 * 1000);
+    if (record.state !== 'hard-blocked') reasons.push('hard-blocked-state-required');
+    if (!['production', 'security', 'data-loss', 'revenue-critical'].includes(severity)) reasons.push('critical-severity-not-proven');
+    if (input.recoveryExhausted !== true) reasons.push('recovery-not-exhausted');
+    if (input.safeRollbackAvailable !== false || input.featureFlagAvailable !== false) reasons.push('safe-containment-available-or-unproven');
+    if (!Number.isFinite(reviewOpenedAt) || !Number.isFinite(ackWindowMs) || ackWindowMs <= 0 || ackWindowMs > 24 * 60 * 60 * 1000 || Date.parse(iso(now)) < reviewOpenedAt + ackWindowMs || input.acknowledged === true) reasons.push('founder-review-ack-window-not-exhausted');
+    if (input.destination !== 'ovie' || input.destinationConsented !== true) reasons.push('ovie-destination-or-consent-unavailable');
+    if (input.provider !== FOUNDER_CONTACT_PRIMARY_CHANNEL || input.providerAllowed !== true) reasons.push('ovie-push-provider-denied');
+    if (!Number.isFinite(cooldownMs) || cooldownMs <= 0 || cooldownMs > 24 * 60 * 60 * 1000) reasons.push('founder-contact-cooldown-invalid');
+    if (existing?.status !== 'blocked' && existing?.cooldownUntil && Date.parse(existing.cooldownUntil) > Date.parse(iso(now))) reasons.push('founder-contact-cooldown-active');
+    const status = reasons.length > 0 ? 'blocked' : 'planned';
+    const contact = { schema: FOUNDER_CONTACT_SCHEMA, contactKey, status, reason: reasons[0] || 'critical-founder-contact-planned', reasons, channel: FOUNDER_CONTACT_PRIMARY_CHANNEL, destinationRef: input.destination === 'ovie' ? 'ovie-founder-surface' : null, severity, writer: record.writer, leaseKey: record.leaseKey, dispatchAuthorized: false, allowedActions: ['ack', 'snooze', 'resolve'], fallbacks: { text: { status: 'inactive', activation: 'explicit-required' }, call: { status: 'inactive', activation: 'explicit-required' } }, payload: { object: handoff.object, environment: handoff.environment, revision: handoff.revision, failure: handoff.failure, evidenceRefs: handoff.evidenceRefs, exactQuestion: handoff.exactQuestion }, receipts: [{ status, observedAt: iso(now), evidence: status === 'blocked' ? reasons[0] : 'policy-gates-satisfied' }], cooldownUntil: status === 'planned' ? new Date(Date.parse(iso(now)) + cooldownMs).toISOString() : null, externalMutations: 0 };
+    const updated = transitionRecord(record, { escalation: { ...record.escalation, founderContact: contact }, observedAt: iso(now) }, contactKey);
+    return { status, reason: contact.reason, contact, record: updated };
+  }
+  function transitionFounderContact(contact, event = {}, { now = new Date().toISOString() } = {}) {
+    if (contact?.schema !== FOUNDER_CONTACT_SCHEMA) return { status: 'denied', reason: 'founder-contact-receipt-required', contact };
+    const type = text(event.type);
+    if (contact.status === 'acknowledged') return { status: 'duplicate', reason: 'founder-contact-already-acknowledged', contact };
+    const deny = reason => ({ status: 'denied', reason, contact: { ...contact, receipts: [...contact.receipts, { status: 'blocked', observedAt: iso(now), evidence: reason }] } });
+    if (type === 'dispatched') {
+      const receipt = redactText(event.receipt);
+      if (contact.status !== 'planned' || event.observed !== true || !receipt) return deny('dispatch-observation-proof-required');
+      const next = { ...contact, status: 'dispatched', dispatchReceipt: receipt, receipts: [...contact.receipts, { status: 'dispatched', observedAt: iso(now), evidence: receipt }] };
+      return { status: 'dispatched', contact: next };
+    }
+    if (type === 'delivered') {
+      const receipt = redactText(event.receipt);
+      if (contact.status !== 'dispatched' || event.observed !== true || !receipt) return deny('delivery-observation-proof-required');
+      const next = { ...contact, status: 'delivered', deliveryReceipt: receipt, receipts: [...contact.receipts, { status: 'delivered', observedAt: iso(now), evidence: receipt }] };
+      return { status: 'delivered', contact: next };
+    }
+    if (['ack', 'snooze', 'resolve'].includes(type)) {
+      if (!['planned', 'dispatched', 'delivered'].includes(contact.status)) return deny('acknowledgeable-contact-required');
+      const receipt = redactText(event.receipt);
+      if (event.observed !== true || !receipt) return deny('founder-ack-observation-proof-required');
+      const acknowledgement = { action: type, observedAt: iso(now), receipt, snoozeUntil: type === 'snooze' ? redactText(event.snoozeUntil) : null };
+      const next = { ...contact, status: 'acknowledged', acknowledgement, receipts: [...contact.receipts, { status: 'acknowledged', observedAt: iso(now), evidence: receipt }] };
+      return { status: 'acknowledged', contact: next };
+    }
+    if (type === 'call-escalation') {
+      if (event.explicitActivation !== true || contact.fallbacks?.call?.status !== 'active') return deny('call-fallback-not-activated');
+      const next = { ...contact, status: 'call-escalation', receipts: [...contact.receipts, { status: 'call-escalation', observedAt: iso(now), evidence: 'explicit-activation-receipt' }] };
+      return { status: 'call-escalation', contact: next };
+    }
+    return deny('founder-contact-transition-denied');
   }
   function sourceAlignment(path) {
     const normalized = text(path)?.replaceAll('\\', '/');
@@ -238,6 +410,11 @@ function createApi() {
     return (observedSignals || []).map(signal => classifyStall(signal, { now })).filter(classified => !persisted.has(classified.issueKey) && (identifiedKey(classified) || !persistedAnonymous.has(anonymousIdentity(classified)))).map(classified => openLoopRecord(classified, { now }));
   }
   function preferQueueRecord(left, right) {
+    if (left.rootLoopKey && left.rootLoopKey === right.rootLoopKey) {
+      const leftGeneration = Number(left.generation || 0);
+      const rightGeneration = Number(right.generation || 0);
+      if (rightGeneration !== leftGeneration) return rightGeneration > leftGeneration ? right : left;
+    }
     const rank = record => (record.outcome === 'escalated' ? 2 : record.outcome === 'open' ? 1 : 0);
     if (rank(right) !== rank(left)) return rank(right) > rank(left) ? right : left;
     return `${right.observedAt || ''}`.localeCompare(`${left.observedAt || ''}`) >= 0 ? right : left;
@@ -269,16 +446,15 @@ function createApi() {
         );
         continue;
       }
-      if (record.outcome === 'healthy') continue;
       const key = identifiedKey(record) || anonymousIdentity(record);
       collapsed.set(key, collapsed.has(key) ? preferQueueRecord(collapsed.get(key), record) : record);
     }
     for (const [key, record] of draftStacks) {
       if (record.outcome !== 'healthy') collapsed.set(key, record);
     }
-    const items = [...collapsed.values()].sort((left, right) => `${left.issueKey}:${left.observedAt}`.localeCompare(`${right.issueKey}:${right.observedAt}`)).map(record => ({ ...Object.fromEntries(QUEUE_KEYS.map(key => [key, record[key]])), issue: record.issue, stallClass: record.stallClass, outcome: record.outcome, escalation: record.escalation || null }));
+    const items = [...collapsed.values()].filter(record => record.outcome !== 'healthy').sort((left, right) => `${left.issueKey}:${left.observedAt}`.localeCompare(`${right.issueKey}:${right.observedAt}`)).map(record => ({ ...Object.fromEntries(QUEUE_KEYS.map(key => [key, record[key]])), issue: record.issue, stallClass: record.stallClass, outcome: record.outcome, escalation: record.escalation || null }));
     const terminalTombstones = [
-      ...source.filter(record => record.stallClass !== 'draft-stack-policy' && record.outcome === 'healthy'),
+      ...[...collapsed.values()].filter(record => record.outcome === 'healthy'),
       ...[...draftStacks.values()].filter(record => record.outcome === 'healthy'),
     ].map(record => ({ ...Object.fromEntries(QUEUE_KEYS.map(key => [key, record[key]])), issue: record.issue, pr: record.pr, outcome: record.outcome, terminal: record.terminal, observedAt: record.observedAt, reason: record.reason }));
     return { schema: SUMMER_QUEUE_SCHEMA, authority: 'Summer', observedAt: iso(now), items, terminalTombstones, counts: { open: items.filter(item => item.outcome === 'open').length, healthy: 0, escalated: items.filter(item => item.outcome === 'escalated').length, terminalHidden: terminalTombstones.length } };
@@ -462,7 +638,7 @@ function createApi() {
     return queueLockHeld ? persist() : withSummerQueueLock(stateDir, persist);
   }
   const classifyAndOpenFromDelivery = (input, options = {}) => openLoopRecord(classifyStall(input, options), options);
-  return { inferStallClass, classifyStall, loopKeyFor, leaseKeyFor, backoffMs, openLoopRecord, dispatchOpenRecords, requalifyExactHead, escalate, advanceAttempt, sourceAlignment, splitSizeGuardChange, reconcileMissedEvents, projectSummerQueue, assertNoUnattendedRed, evidenceTaskForRecord, loadLoopRecords, readSummerQueue, persistLoopOutcome, persistDraftStackResolutions, withSummerQueueLock, classifyAndOpenFromDelivery };
+  return { inferStallClass, classifyStall, loopKeyFor, leaseKeyFor, backoffMs, openLoopRecord, dispatchOpenRecords, requalifyExactHead, buildEscalationHandoff, prepareEscalation, escalate, advanceAttempt, planDelegatedDiagnosis, planFounderContact, transitionFounderContact, sourceAlignment, splitSizeGuardChange, reconcileMissedEvents, projectSummerQueue, assertNoUnattendedRed, evidenceTaskForRecord, loadLoopRecords, readSummerQueue, persistLoopOutcome, persistDraftStackResolutions, withSummerQueueLock, classifyAndOpenFromDelivery };
 }
 
 const api = createApi();
@@ -474,8 +650,13 @@ export const backoffMs = api.backoffMs;
 export const openLoopRecord = api.openLoopRecord;
 export const dispatchOpenRecords = api.dispatchOpenRecords;
 export const requalifyExactHead = api.requalifyExactHead;
+export const buildEscalationHandoff = api.buildEscalationHandoff;
+export const prepareEscalation = api.prepareEscalation;
 export const escalate = api.escalate;
 export const advanceAttempt = api.advanceAttempt;
+export const planDelegatedDiagnosis = api.planDelegatedDiagnosis;
+export const planFounderContact = api.planFounderContact;
+export const transitionFounderContact = api.transitionFounderContact;
 export const sourceAlignment = api.sourceAlignment;
 export const splitSizeGuardChange = api.splitSizeGuardChange;
 export const reconcileMissedEvents = api.reconcileMissedEvents;
