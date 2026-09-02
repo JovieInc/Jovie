@@ -145,7 +145,7 @@ def _write_native_receipt_fakes(
             set -euo pipefail
             case "${{2:-}}" in
               preflight) exit 0 ;;
-              list-state) echo '{{"16068":{{"headRefOid":"{head}","queued":false,"isInMergeQueue":false,"mergeQueueEntry":null}}}}' ;;
+              list-state) echo '{{"16068":{{"headRefOid":"{head}","isDraft":false,"mergeable":"MERGEABLE","mergeStateStatus":"CLEAN","baseRefName":"main","labels":{{"nodes":[]}},"queued":false,"isInMergeQueue":false,"mergeQueueEntry":null}}}}' ;;
               explain-selector)
                 cat >/dev/null
                 printf '%s\\n' '{json.dumps(selector)}'
@@ -301,13 +301,13 @@ def _write_null_creator_receipt_drain(
     if queued:
         entry_state = queue_entry_state or "AWAITING_CHECKS"
         list_state = (
-            f'{{"{pr}":{{"headRefOid":"{head}","queued":true,'
+            f'{{"{pr}":{{"headRefOid":"{head}","isDraft":false,"mergeable":"MERGEABLE","mergeStateStatus":"CLEAN","baseRefName":"main","labels":{{"nodes":[]}},"queued":true,'
             f'"isInMergeQueue":true,'
             f'"mergeQueueEntry":{{"state":"{entry_state}","position":1}}}}}}'
         )
     else:
         list_state = (
-            f'{{"{pr}":{{"headRefOid":"{head}","queued":false,'
+            f'{{"{pr}":{{"headRefOid":"{head}","isDraft":false,"mergeable":"MERGEABLE","mergeStateStatus":"CLEAN","baseRefName":"main","labels":{{"nodes":[]}},"queued":false,'
             f'"isInMergeQueue":false,"mergeQueueEntry":null}}}}'
         )
     if allow_enroll:
@@ -754,7 +754,7 @@ class TestExactHeadQueueReceipt:
                 set -euo pipefail
                 case "${{2:-}}" in
                   preflight) exit 0 ;;
-                  list-state) echo '{{"16068":{{"headRefOid":"{head}","queued":false,"isInMergeQueue":false,"mergeQueueEntry":null}}}}' ;;
+                  list-state) echo '{{"16068":{{"headRefOid":"{head}","isDraft":false,"mergeable":"MERGEABLE","mergeStateStatus":"CLEAN","baseRefName":"main","labels":{{"nodes":[]}},"queued":false,"isInMergeQueue":false,"mergeQueueEntry":null}}}}' ;;
                   explain-selector) cat >/dev/null; echo '{{"observed":true,"queued":false,"eligible":true,"reason":"eligible"}}' ;;
                   prove-receipt) echo '{{"ok":false,"state":{{"queued":false}},"explanation":{{"reason":"not-queued"}}}}' ;;
                   enroll) echo "durable product-failure receipt must block enroll" >&2; exit 91 ;;
@@ -840,7 +840,7 @@ class TestExactHeadQueueReceipt:
                 set -euo pipefail
                 case "${{2:-}}" in
                   preflight) exit 0 ;;
-                  list-state) echo '{{"16070":{{"headRefOid":"{new_head}","queued":false,"isInMergeQueue":false,"mergeQueueEntry":null}}}}' ;;
+                  list-state) echo '{{"16070":{{"headRefOid":"{new_head}","isDraft":false,"mergeable":"MERGEABLE","mergeStateStatus":"CLEAN","baseRefName":"main","labels":{{"nodes":[]}},"queued":false,"isInMergeQueue":false,"mergeQueueEntry":null}}}}' ;;
                   max-queue-depth) echo 16 ;;
                   front-churn) echo '{{"action":"allow","reason":"new head has no failed attempt","evidence":null}}' ;;
                   unmergeable-eject) echo '{{"action":"keep","reason":"not-queued"}}' ;;
@@ -923,7 +923,7 @@ class TestExactHeadQueueReceipt:
                 set -euo pipefail
                 case "${{2:-}}" in
                   preflight) exit 0 ;;
-                  list-state) echo '{{"16069":{{"headRefOid":"{head}","queued":false,"isInMergeQueue":false,"mergeQueueEntry":null}}}}' ;;
+                  list-state) echo '{{"16069":{{"headRefOid":"{head}","isDraft":false,"mergeable":"MERGEABLE","mergeStateStatus":"CLEAN","baseRefName":"main","labels":{{"nodes":[]}},"queued":false,"isInMergeQueue":false,"mergeQueueEntry":null}}}}' ;;
                   explain-selector) cat >/dev/null; echo '{{"observed":true,"queued":false,"eligible":true,"reason":"eligible"}}' ;;
                   prove-receipt) echo '{{"ok":false,"state":{{"queued":false}},"explanation":{{"reason":"not-queued"}}}}' ;;
                   enroll) echo "classified product failure must not enroll" >&2; exit 91 ;;
@@ -1022,7 +1022,7 @@ class TestExactHeadQueueReceipt:
                 set -euo pipefail
                 case "${{2:-}}" in
                   preflight) exit 0 ;;
-                  list-state) echo '{{"16071":{{"headRefOid":"{head}","queued":true,"isInMergeQueue":true,"mergeQueueEntry":{{"state":"AWAITING_CHECKS","position":1}}}}}}' ;;
+                  list-state) echo '{{"16071":{{"headRefOid":"{head}","isDraft":false,"mergeable":"MERGEABLE","mergeStateStatus":"CLEAN","baseRefName":"main","labels":{{"nodes":[]}},"queued":true,"isInMergeQueue":true,"mergeQueueEntry":{{"state":"AWAITING_CHECKS","position":1}}}}}}' ;;
                   dequeue) printf 'dequeue\n' >>'{mutation_order}'; echo '{{"state":{{"queued":false}}}}' ;;
                   max-queue-depth) echo 16 ;;
                   front-churn) echo '{{"action":"block","reason":"unchanged head failed product checks","evidence":{{"failureClass":"deterministic-product-check"}}}}' ;;
@@ -1457,7 +1457,7 @@ class TestDrainPrQueueWiring:
                 set -euo pipefail
                 case "${{2:-}}" in
                   preflight) exit 0 ;;
-                  list-state) echo '{{"101":{{"headRefOid":"{head}","queued":false}}}}' ;;
+                  list-state) echo '{{"101":{{"headRefOid":"{head}","isDraft":false,"mergeable":"MERGEABLE","mergeStateStatus":"CLEAN","baseRefName":"main","labels":{{"nodes":[]}},"queued":false}}}}' ;;
                   enroll) echo '{{"state":{{"state":"OPEN","isDraft":false,"headRefOid":"{head}","mergeQueueEntry":{{"id":"MQE_1","state":"AWAITING_CHECKS","position":1}}}}}}' ;;
                   dequeue) echo '{{"state":{{"queued":false}}}}' ;;
                   max-queue-depth) echo 16 ;;
@@ -1568,7 +1568,7 @@ class TestDrainPrQueueWiring:
                 command_name="${{2:-}}"
                 case "$command_name" in
                   preflight) exit 0 ;;
-                  list-state) echo '{{"101":{{"headRefOid":"{head}","queued":false}}}}' ;;
+                  list-state) echo '{{"101":{{"headRefOid":"{head}","isDraft":false,"mergeable":"MERGEABLE","mergeStateStatus":"CLEAN","baseRefName":"main","labels":{{"nodes":[]}},"queued":false}}}}' ;;
                   enroll)
                     if [[ "${{FAKE_ENROLL_MODE:?}}" == "failure" ]]; then
                       exit 1
@@ -1678,7 +1678,7 @@ class TestDrainPrQueueWiring:
                 case "${{2:-}}" in
                   preflight) exit 0 ;;
                   list-state)
-                    echo '{{"1001":{{"headRefOid":"{heads["1001"]}","queued":false}},"1002":{{"headRefOid":"{heads["1002"]}","queued":false}},"1003":{{"headRefOid":"{heads["1003"]}","queued":false}}}}'
+                    echo '{{"1001":{{"headRefOid":"{heads["1001"]}","isDraft":false,"mergeable":"MERGEABLE","mergeStateStatus":"CLEAN","baseRefName":"main","labels":{{"nodes":[]}},"queued":false}},"1002":{{"headRefOid":"{heads["1002"]}","isDraft":false,"mergeable":"MERGEABLE","mergeStateStatus":"CLEAN","baseRefName":"main","labels":{{"nodes":[]}},"queued":false}},"1003":{{"headRefOid":"{heads["1003"]}","isDraft":false,"mergeable":"MERGEABLE","mergeStateStatus":"CLEAN","baseRefName":"main","labels":{{"nodes":[]}},"queued":false}}}}'
                     ;;
                   enroll)
                     echo "${{3:?}}" >>"{enrolled}"
@@ -1801,7 +1801,7 @@ JSON
                   fi
                 }}
                 queue_state() {{
-                  printf '{{"1001":{{"headRefOid":"{heads["1001"]}","queued":%s,"isInMergeQueue":%s,"mergeQueueEntry":%s}},"1002":{{"headRefOid":"{heads["1002"]}","queued":%s,"isInMergeQueue":%s,"mergeQueueEntry":%s}},"1003":{{"headRefOid":"{heads["1003"]}","queued":%s,"isInMergeQueue":%s,"mergeQueueEntry":%s}},"1004":{{"headRefOid":"{heads["1004"]}","queued":%s,"isInMergeQueue":%s,"mergeQueueEntry":%s}},"1005":{{"headRefOid":"{heads["1005"]}","queued":%s,"isInMergeQueue":%s,"mergeQueueEntry":%s}}}}\\n' \
+                  printf '{{"1001":{{"headRefOid":"{heads["1001"]}","isDraft":false,"mergeable":"MERGEABLE","mergeStateStatus":"CLEAN","baseRefName":"main","labels":{{"nodes":[]}},"queued":%s,"isInMergeQueue":%s,"mergeQueueEntry":%s}},"1002":{{"headRefOid":"{heads["1002"]}","isDraft":false,"mergeable":"MERGEABLE","mergeStateStatus":"CLEAN","baseRefName":"main","labels":{{"nodes":[]}},"queued":%s,"isInMergeQueue":%s,"mergeQueueEntry":%s}},"1003":{{"headRefOid":"{heads["1003"]}","isDraft":false,"mergeable":"MERGEABLE","mergeStateStatus":"CLEAN","baseRefName":"main","labels":{{"nodes":[{{"name":"needs-conflict-resolution"}}]}},"queued":%s,"isInMergeQueue":%s,"mergeQueueEntry":%s}},"1004":{{"headRefOid":"{heads["1004"]}","isDraft":false,"mergeable":"MERGEABLE","mergeStateStatus":"CLEAN","baseRefName":"main","labels":{{"nodes":[]}},"queued":%s,"isInMergeQueue":%s,"mergeQueueEntry":%s}},"1005":{{"headRefOid":"{heads["1005"]}","isDraft":false,"mergeable":"MERGEABLE","mergeStateStatus":"CLEAN","baseRefName":"main","labels":{{"nodes":[]}},"queued":%s,"isInMergeQueue":%s,"mergeQueueEntry":%s}}}}\\n' \
                     "$(queued_json 1001)" "$(queued_json 1001)" "$(queue_entry_json 1001)" \
                     "$(queued_json 1002)" "$(queued_json 1002)" "$(queue_entry_json 1002)" \
                     "$(queued_json 1003)" "$(queued_json 1003)" "$(queue_entry_json 1003)" \
@@ -1990,7 +1990,7 @@ JSON
                 set -euo pipefail
                 case "${{2:-}}" in
                   preflight) exit 0 ;;
-                  list-state) echo '{{"1001":{{"headRefOid":"{snapshot_head}","queued":false}}}}' ;;
+                  list-state) echo '{{"1001":{{"headRefOid":"{snapshot_head}","isDraft":false,"mergeable":"MERGEABLE","mergeStateStatus":"CLEAN","baseRefName":"main","labels":{{"nodes":[]}},"queued":false}}}}' ;;
                   enroll) touch "{enrolled}"; exit 99 ;;
                   max-queue-depth) echo 16 ;;
                   unmergeable-eject) echo '{{"action":"keep","reason":"not-queued"}}' ;;

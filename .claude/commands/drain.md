@@ -89,7 +89,8 @@ Each agent's prompt must be self-contained and instruct it to:
    `pnpm biome check apps/web`, and the specific failing test files.
 4. Fix root causes (not the test, unless the test is wrong).
 5. `git push --force-with-lease` to the PR's head branch. **Never push to `main`.**
-6. Add the `merge-queue` label (`gh pr edit <n> --add-label merge-queue`). **Never `gh pr merge`.**
+6. Do not add `merge-queue`. Native auto-enroll revalidates the exact head after
+   the push. **Never `gh pr merge`.** Graphite and Cursor apps are uninstalled.
 7. Report `DONE` / `BLOCKED_SEMANTIC` / `BLOCKED_OTHER` with the reason.
 
 Re-dispatch any `BLOCKED_SEMANTIC` returns to an Opus agent. After agents return,
@@ -97,10 +98,10 @@ re-run Phase 0 to enroll anything now green.
 
 ## Phase 3 — Surface, don't act
 
-For the **SURFACE** bucket (`needs-human`, `hold`, `gated`) and any
-duplicate/superseded PRs, **report to the human with a recommendation** — do
-not close or merge. The drain strips `merge-queue` from hard-gated PRs before
-surfacing them. Detect dupes:
+`needs-human` is a dead label: if work needs a human it ships flag-off or is
+never created. `hold` / `gated` are not enrollment blockers and must not
+dequeue a PR. Surface duplicate/superseded PRs with a recommendation — do not
+close or merge. Detect dupes:
 
 ```bash
 gh pr list --state open --json number,title --limit 100 \

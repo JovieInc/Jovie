@@ -41,7 +41,8 @@ const NATIVE_QUEUE_ENTRY_STATES = new Set([
   'LOCKED',
 ]);
 
-const PULL_REQUEST_STATE_FIELDS = `id number state isDraft headRefOid labels(first:100){nodes{name}} isInMergeQueue mergeQueueEntry { id state position } autoMergeRequest { enabledAt }`;
+const INVENTORY_PAGE_SIZE = 30;
+const PULL_REQUEST_STATE_FIELDS = `id number state isDraft title body mergeable mergeStateStatus headRefName headRefOid baseRefName labels(first:100){nodes{name}} isInMergeQueue mergeQueueEntry { id state position } autoMergeRequest { enabledAt }`;
 const REQUIRED_NATIVE_STATE_FIELDS =
   `id number state isDraft headRefOid labels isInMergeQueue mergeQueueEntry autoMergeRequest`.split(
     ' '
@@ -71,7 +72,7 @@ const CLEAN_ADMITTING_PROMOTION_MODES = new Set([
   'draft-only',
 ]);
 const PULL_REQUEST_STATE_QUERY = `query MergeQueuePullRequestState($owner:String!,$name:String!,$number:Int!){repository(owner:$owner,name:$name){pullRequest(number:$number){${PULL_REQUEST_STATE_FIELDS}}}}`;
-const OPEN_PULL_REQUEST_STATES_QUERY = `query MergeQueueOpenPullRequestStates($owner:String!,$name:String!,$endCursor:String){repository(owner:$owner,name:$name){pullRequests(first:100,after:$endCursor,states:OPEN){nodes{${PULL_REQUEST_STATE_FIELDS}} pageInfo{hasNextPage endCursor}}}}`;
+const OPEN_PULL_REQUEST_STATES_QUERY = `query MergeQueueOpenPullRequestStates($owner:String!,$name:String!,$endCursor:String){repository(owner:$owner,name:$name){pullRequests(first:${INVENTORY_PAGE_SIZE},after:$endCursor,states:OPEN){nodes{${PULL_REQUEST_STATE_FIELDS}} pageInfo{hasNextPage endCursor}}}}`;
 const BRANCH_PROTECTION_QUERY = `query MergeQueueBranchProtection($owner:String!,$name:String!,$refName:String!){repository(owner:$owner,name:$name){ref(qualifiedName:$refName){name branchProtectionRule{id}}}}`;
 const LIVE_QUEUE_CONFIGURATION_QUERY = `query MergeQueueLiveConfiguration($owner:String!,$name:String!,$branch:String!){repository(owner:$owner,name:$name){mergeQueue(branch:$branch){configuration{checkResponseTimeout maximumEntriesToBuild maximumEntriesToMerge mergeMethod minimumEntriesToMerge minimumEntriesToMergeWaitTime}}}}`;
 const NATIVE_MUTATION_ACTOR_QUERY =
@@ -397,6 +398,16 @@ export function validateNativePreflightEvidence({
   };
 }
 
+/**
+ * @param {{
+ *   backend?: string,
+ *   repository?: string,
+ *   rulesetId?: string,
+ *   baseBranch?: string,
+ *   allowUnavailableBypassActors?: boolean,
+ *   runner?: (args: any) => Promise<{ code: number, stdout: string, stderr: string }>,
+ * }} [input]
+ */
 export async function preflightMergeQueue({
   backend,
   repository = DEFAULT_REPOSITORY,
@@ -578,6 +589,14 @@ async function readNativePullRequestState({ runner, repository, number }) {
   return normalizeNativePullRequest(pr);
 }
 
+/**
+ * @param {{
+ *   backend?: string,
+ *   repository?: string,
+ *   number?: string | number,
+ *   runner?: (args: any) => Promise<{ code: number, stdout: string, stderr: string }>,
+ * }} [input]
+ */
 export async function readPullRequestQueueState({
   backend,
   repository = DEFAULT_REPOSITORY,
@@ -604,12 +623,33 @@ function indexPullRequestStates(states, prs, normalize, missingMessage) {
   return states;
 }
 
+/**
+ * @param {{
+ *   backend?: string,
+ *   repository?: string,
+ *   runner?: (args: any) => Promise<{ code: number, stdout: string, stderr: string }>,
+ *   exactPullRequestNumber?: string | number,
+ * }} [input]
+ */
 export async function listPullRequestQueueStates({
   backend,
   repository = DEFAULT_REPOSITORY,
   runner = createGhRunner(),
+  exactPullRequestNumber,
 } = {}) {
   requireNativeBackend(backend);
+  if (
+    exactPullRequestNumber != null &&
+    String(exactPullRequestNumber).length > 0
+  ) {
+    const state = await readPullRequestQueueState({
+      backend,
+      repository,
+      number: exactPullRequestNumber,
+      runner,
+    });
+    return { [String(state.number)]: state };
+  }
   const states = {};
   const { owner, name } = parseRepositorySlug(repository);
   const pages = await runGhJson(
@@ -998,6 +1038,22 @@ async function pollEnrollmentPostcondition({
   return { attempts, state };
 }
 
+/**
+ * @param {{
+ *   backend?: string,
+ *   repository?: string,
+ *   rulesetId?: string,
+ *   baseBranch?: string,
+ *   allowUnavailableBypassActors?: boolean,
+ *   number?: string | number,
+ *   expectedHeadOid?: string,
+ *   runner?: (args: any) => Promise<{ code: number, stdout: string, stderr: string }>,
+ *   mutationRunner?: (args: any) => Promise<{ code: number, stdout: string, stderr: string }>,
+ *   postconditionAttempts?: number,
+ *   postconditionDelayMs?: number,
+ *   wait?: (milliseconds: number) => Promise<void>,
+ * }} [input]
+ */
 export async function enrollPullRequest({
   backend,
   repository = DEFAULT_REPOSITORY,
@@ -1096,6 +1152,15 @@ async function runGraphqlMutation(runner, query, variables, description) {
   );
 }
 
+/**
+ * @param {{
+ *   backend?: string,
+ *   repository?: string,
+ *   number?: string | number,
+ *   runner?: (args: any) => Promise<{ code: number, stdout: string, stderr: string }>,
+ *   mutationRunner?: (args: any) => Promise<{ code: number, stdout: string, stderr: string }>,
+ * }} [input]
+ */
 export async function dequeuePullRequest({
   backend,
   repository = DEFAULT_REPOSITORY,
@@ -1217,7 +1282,11 @@ export async function runCli(
   const preflightOptions = { ...options, allowUnavailableBypassActors };
   const commands = {
     preflight: () => preflightMergeQueue(preflightOptions),
-    'list-state': () => listPullRequestQueueStates(options),
+    'list-state': () =>
+      listPullRequestQueueStates({
+        ...options,
+        exactPullRequestNumber: args[0],
+      }),
     'explain-selector': () =>
       explainExactHeadAdmissionSelector({
         snapshot: readStdinJson(),
@@ -1248,7 +1317,7 @@ export async function runCli(
   };
   const usage = {
     preflight: [0, 'preflight takes no arguments'],
-    'list-state': [0, 'list-state takes no arguments'],
+    'list-state': [null, 'list-state takes no arguments or one PR number'],
     'explain-selector': [
       4,
       'explain-selector requires <number> <headSha> <promotionMode> <enrollSlots>',
@@ -1264,7 +1333,11 @@ export async function runCli(
     );
   }
   const [argumentCount, usageMessage] = usage[command];
-  if (args.length !== argumentCount) {
+  if (command === 'list-state') {
+    if (args.length > 1) {
+      throw backendError('usage', usageMessage);
+    }
+  } else if (args.length !== argumentCount) {
     throw backendError('usage', usageMessage);
   }
   if (

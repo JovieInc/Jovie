@@ -29,6 +29,9 @@
 #     immediately before exact-head enrollment (defaults 6 / 2)
 #   DRAIN_ADMISSION_PR / DRAIN_ADMISSION_HEAD  optional exact new-admission
 #     scope; when both are empty this run is maintenance-only
+#   GH_INVENTORY_RETRY_ATTEMPTS / GH_INVENTORY_RETRY_MAX_DELAY  cap the
+#     oversized fleet-read class (default 3 / 15). Do not reuse mutation
+#     GH_RETRY_ATTEMPTS=8 on SNAP / list-state.
 #   DRAIN_RECONCILE_MISSED_ADMISSION  permit bounded exact-green recovery
 #     pass for admission events replaced while pending in the workflow mutex
 #   DRAIN_QUEUE_REENTRY_MAX_PER_RUN  total event + recovery admission cap (1-2)
@@ -81,6 +84,65 @@ gh_mutate_retry() {
     export GH_TOKEN="$mutation_token"
     gh_retry "$@"
   )
+}
+
+# Inventory-class GitHub reads (SNAP / list-state). Cap this class so a
+# 502/504/timeout on an oversized fleet query cannot retry eight times and
+# starve the enrollment mutation.
+gh_inventory_retry() {
+  GH_RETRY_ATTEMPTS="${GH_INVENTORY_RETRY_ATTEMPTS:-3}" \
+  GH_RETRY_MAX_DELAY="${GH_INVENTORY_RETRY_MAX_DELAY:-15}" \
+    gh_retry "$@"
+}
+
+native_state_to_snap() {
+  jq -c '
+    [ to_entries[] | .key as $k | .value | {
+      n: (.number // (try ($k | tonumber) catch empty) // null),
+      t: ((.title // "")[0:48]),
+      draft: (.isDraft == true),
+      m: .mergeable,
+      ms: (.mergeStateStatus // "UNKNOWN"),
+      head: .headRefName,
+      headOid: ((.headRefOid // "") | ascii_downcase),
+      base: (.baseRefName // "main"),
+      body: (.body // ""),
+      L: [((.labels.nodes // [])[] | .name)],
+      fail: [],
+      q: (.queued == true),
+      qs: (.mergeQueueEntry.state // null),
+      oid: .headRefOid
+    } | select(.n | type == "number") ]
+  '
+}
+
+inventory_native_queue_state() {
+  local attempts="${GH_INVENTORY_RETRY_ATTEMPTS:-3}"
+  local base_delay="${GH_RETRY_BASE_DELAY:-2}"
+  local max_delay="${GH_INVENTORY_RETRY_MAX_DELAY:-15}"
+  local attempt=1
+  local out_file err_file err delay
+  out_file="$(mktemp)"
+  err_file="$(mktemp)"
+  # shellcheck disable=SC2064
+  trap "rm -f '$out_file' '$err_file'" RETURN
+  while [[ "$attempt" -le "$attempts" ]]; do
+    if node scripts/merge-queue-backend.mjs list-state "$@" >"$out_file" 2>"$err_file"; then
+      cat "$out_file"
+      return 0
+    fi
+    err="$(<"$err_file")"
+    if [[ "$attempt" -eq "$attempts" ]] || ! gh_retry_is_transient_error "$err"; then
+      echo "$err" >&2
+      return 1
+    fi
+    delay=$((base_delay * (2 ** (attempt - 1))))
+    [[ "$delay" -gt "$max_delay" ]] && delay="$max_delay"
+    echo "  [gh-retry] list-state attempt $attempt/$attempts failed (transient); retrying in ${delay}s…" >&2
+    sleep "$delay"
+    attempt=$((attempt + 1))
+  done
+  return 1
 }
 
 REPO="${REPO:-JovieInc/Jovie}"
@@ -1346,43 +1408,28 @@ check_failures_for_pr() {  # check_failures_for_pr <num>
 
 reconcile_deferred_auto_merge_after_main_push
 
-SNAP="$(gh_retry pr list -R "$REPO" --state open --limit 200 \
-  --json number,title,body,isDraft,mergeable,mergeStateStatus,labels,headRefName,headRefOid,baseRefName --jq '
-  [ .[] | {
-    n: .number,
-    t: (.title[0:48]),
-    draft: .isDraft,
-    m: .mergeable,
-    ms: (.mergeStateStatus // "UNKNOWN"),
-    head: .headRefName,
-    headOid: ((.headRefOid // "") | ascii_downcase),
-    base: .baseRefName,
-    body: (.body // ""),
-    L: [.labels[].name],
-    fail: []
-  } ]')"
-
-echo "=== RETARGET (base must be main) ==="
-retargeted=0
-while IFS= read -r pr; do
-  n="$(jq -r '.n' <<<"$pr")"
-  base="$(jq -r '.base' <<<"$pr")"
-  t="$(jq -r '.t' <<<"$pr")"
-  echo "  #$n  $t  $base → main"
-  if [[ "$DRY_RUN" == "1" ]]; then
-    echo "    [dry-run] would gh pr edit $n --base main"
+# Exact-head admission reads one PR. Maintenance pages native queue state
+# (first:30) instead of two `gh pr list --limit 200` fleet dumps before enroll.
+if [[ "$MERGE_QUEUE_BACKEND" == "native" ]]; then
+  if [[ "$DRY_RUN" != "1" ]]; then
+    node scripts/merge-queue-backend.mjs preflight >/dev/null
+  fi
+  if [[ -n "$DRAIN_ADMISSION_PR" ]]; then
+    echo "=== SNAP (exact-head #$DRAIN_ADMISSION_PR) ==="
+    if ! NATIVE_QUEUE_STATE="$(inventory_native_queue_state "$DRAIN_ADMISSION_PR")"; then
+      echo "::error::Exact-target native queue read failed for #$DRAIN_ADMISSION_PR" >&2
+      exit 1
+    fi
   else
-    if ! gh_retry pr edit "$n" -R "$REPO" --base main >/dev/null; then
-      echo "::error::Failed to retarget #$n from $base to main" >&2
+    echo "=== SNAP (paged inventory) ==="
+    if ! NATIVE_QUEUE_STATE="$(inventory_native_queue_state)"; then
+      echo "::error::Paged native queue inventory failed" >&2
       exit 1
     fi
   fi
-  retargeted=$((retargeted + 1))
-done < <(jq -c '.[] | select(.base != "main")' <<<"$SNAP")
-if [[ "$retargeted" -eq 0 ]]; then
-  echo "  (none)"
-elif [[ "$DRY_RUN" != "1" ]]; then
-  SNAP="$(gh_retry pr list -R "$REPO" --state open --limit 200 \
+  SNAP="$(native_state_to_snap <<<"$NATIVE_QUEUE_STATE")"
+else
+  SNAP="$(gh_inventory_retry pr list -R "$REPO" --state open --limit 200 \
     --json number,title,body,isDraft,mergeable,mergeStateStatus,labels,headRefName,headRefOid,baseRefName --jq '
     [ .[] | {
       n: .number,
@@ -1397,34 +1444,70 @@ elif [[ "$DRY_RUN" != "1" ]]; then
       L: [.labels[].name],
       fail: []
     } ]')"
-fi
-
-# Resolve authoritative queue membership once for the snapshot. In native
-# mode labels are only intent/audit evidence and must never be treated as queue
-# state. Fail closed if GitHub omits any open PR from the GraphQL snapshot.
-if [[ "$MERGE_QUEUE_BACKEND" == "native" ]]; then
-  if [[ "$DRY_RUN" != "1" ]]; then
-    node scripts/merge-queue-backend.mjs preflight >/dev/null
-  fi
-  NATIVE_QUEUE_STATE="$(node scripts/merge-queue-backend.mjs list-state)"
-  if ! jq -e --argjson states "$NATIVE_QUEUE_STATE" '
-    all(.[]; ($states[(.n | tostring)] | type) == "object")
-  ' <<<"$SNAP" >/dev/null; then
-    echo "::error::Native queue state omitted an open PR; refusing partial drain" >&2
-    exit 1
-  fi
-  SNAP="$(jq -c --argjson states "$NATIVE_QUEUE_STATE" '
-    map(. + {
-      q: ($states[(.n | tostring)].queued == true),
-      qs: ($states[(.n | tostring)].mergeQueueEntry.state // null),
-      oid: $states[(.n | tostring)].headRefOid
-    })
-  ' <<<"$SNAP")"
-else
   SNAP="$(jq -c '
     map(. + {q: (((.L // []) | index("merge-queue")) != null)})
   ' <<<"$SNAP")"
+fi
 
+echo "=== RETARGET (base must be main) ==="
+retargeted=0
+while IFS= read -r pr; do
+  n="$(jq -r '.n' <<<"$pr")"
+  base="$(jq -r '.base' <<<"$pr")"
+  t="$(jq -r '.t' <<<"$pr")"
+  if [[ ! "$n" =~ ^[1-9][0-9]*$ || -z "$base" || "$base" == "null" ]]; then
+    continue
+  fi
+  echo "  #$n  $t  $base → main"
+  if [[ "$DRY_RUN" == "1" ]]; then
+    echo "    [dry-run] would gh pr edit $n --base main"
+  else
+    if ! gh_retry pr edit "$n" -R "$REPO" --base main >/dev/null; then
+      echo "::error::Failed to retarget #$n from $base to main" >&2
+      exit 1
+    fi
+  fi
+  retargeted=$((retargeted + 1))
+done < <(jq -c '
+  .[]
+  | select((.n | type == "number") and (.base | type == "string") and .base != "main")
+' <<<"$SNAP")
+if [[ "$retargeted" -eq 0 ]]; then
+  echo "  (none)"
+elif [[ "$DRY_RUN" != "1" ]]; then
+  if [[ "$MERGE_QUEUE_BACKEND" == "native" ]]; then
+    if [[ -n "$DRAIN_ADMISSION_PR" ]]; then
+      if ! NATIVE_QUEUE_STATE="$(inventory_native_queue_state "$DRAIN_ADMISSION_PR")"; then
+        echo "::error::Exact-target native queue reread failed after retarget for #$DRAIN_ADMISSION_PR" >&2
+        exit 1
+      fi
+    else
+      if ! NATIVE_QUEUE_STATE="$(inventory_native_queue_state)"; then
+        echo "::error::Paged native queue inventory failed after retarget" >&2
+        exit 1
+      fi
+    fi
+    SNAP="$(native_state_to_snap <<<"$NATIVE_QUEUE_STATE")"
+  else
+    SNAP="$(gh_inventory_retry pr list -R "$REPO" --state open --limit 200 \
+      --json number,title,body,isDraft,mergeable,mergeStateStatus,labels,headRefName,headRefOid,baseRefName --jq '
+      [ .[] | {
+        n: .number,
+        t: (.title[0:48]),
+        draft: .isDraft,
+        m: .mergeable,
+        ms: (.mergeStateStatus // "UNKNOWN"),
+        head: .headRefName,
+        headOid: ((.headRefOid // "") | ascii_downcase),
+        base: .baseRefName,
+        body: (.body // ""),
+        L: [.labels[].name],
+        fail: []
+      } ]')"
+    SNAP="$(jq -c '
+      map(. + {q: (((.L // []) | index("merge-queue")) != null)})
+    ' <<<"$SNAP")"
+  fi
 fi
 
 # Merge-group churn evidence (JOV-5030). Each native group build runs on

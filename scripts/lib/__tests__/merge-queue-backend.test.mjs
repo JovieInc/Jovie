@@ -616,9 +616,7 @@ describe('queue workflow mutation safety', () => {
     expect(drain).toContain(
       'UNMERGEABLE_EJECT_CONTEXT="jovie-native-unmergeable/v1"'
     );
-    expect(drain).toContain(
-      'qs: ($states[(.n | tostring)].mergeQueueEntry.state // null)'
-    );
+    expect(drain).toContain('qs: (.mergeQueueEntry.state // null)');
     expect(drain).toContain('unmergeable-eject');
     expect(drain).toContain('changelog-collision');
     expect(drain).toContain('changelog-inventory');
@@ -954,9 +952,12 @@ describe('queue workflow mutation safety', () => {
     expect(enroll).toContain('failure: $failure');
     expect(enroll).toContain('pr_number: ($pr_number | tonumber)');
     expect(enroll).toContain('head_sha: $head_sha');
-    expect(enroll).toContain('not failing the product PR check');
+    expect(enroll).toContain('GH_INVENTORY_RETRY_ATTEMPTS: 3');
+    expect(enroll).toContain('GH_INVENTORY_RETRY_MAX_DELAY: 15');
+    expect(enroll).toContain('dropped-controller-event fails closed');
+    expect(enroll).not.toContain('not failing the product PR check');
     expect(enroll.indexOf('gh api --method POST')).toBeLessThan(
-      enroll.indexOf('not failing the product PR check')
+      enroll.indexOf('dropped-controller-event fails closed')
     );
     expect(enroll).toContain('exit "$drain_rc"');
     expect(rebasePreflight).toContain(
@@ -969,9 +970,40 @@ describe('queue workflow mutation safety', () => {
       'MERGE_QUEUE_NATIVE_AUTHORIZATION: merge-queue-autoenroll'
     );
     expect(
-      drain.indexOf('node scripts/merge-queue-backend.mjs preflight')
+      drain.indexOf('node scripts/merge-queue-backend.mjs preflight >/dev/null')
     ).toBeLessThan(
-      drain.indexOf('node scripts/merge-queue-backend.mjs list-state')
+      drain.indexOf('inventory_native_queue_state "$DRAIN_ADMISSION_PR"')
+    );
+    expect(drain).toContain('SNAP (exact-head #$DRAIN_ADMISSION_PR)');
+    expect(drain).toContain(
+      'inventory_native_queue_state "$DRAIN_ADMISSION_PR"'
+    );
+    expect(drain).toContain('native_state_to_snap');
+    expect(drain).toContain('GH_INVENTORY_RETRY_ATTEMPTS:-3');
+    expect(drain).toContain('=== RETARGET (base must be main) ===');
+    expect(drain).toContain(
+      '(.n | type == "number") and (.base | type == "string") and .base != "main"'
+    );
+    expect(drain).not.toContain(
+      'SNAP="$(gh_retry pr list -R "$REPO" --state open --limit 200'
+    );
+    expect(readRepoFile('.claude/commands/drain.md')).toContain(
+      'Graphite and Cursor are gone'
+    );
+    expect(readRepoFile('.claude/commands/drain.md')).not.toContain(
+      '--add-label merge-queue'
+    );
+    expect(readRepoFile('.claude/commands/clean.md')).not.toContain(
+      '--add-label merge-queue'
+    );
+    expect(readRepoFile('.claude/commands/sonar-fix.md')).not.toContain(
+      '--add-label merge-queue'
+    );
+    expect(readRepoFile('scripts/merge-queue-backend.mjs')).toContain(
+      'const INVENTORY_PAGE_SIZE = 30'
+    );
+    expect(readRepoFile('scripts/merge-queue-backend.mjs')).toContain(
+      'pullRequests(first:${INVENTORY_PAGE_SIZE},after:$endCursor,states:OPEN)'
     );
     expect(rebaseMutation).toContain("DRAIN_REMEDIATE_MAX_PER_RUN: '24'");
     expect(remediator).toContain("DRAIN_REMEDIATE_MAX_PER_RUN ?? '24'");
@@ -2273,5 +2305,29 @@ describe('authoritative native state listing', () => {
     ).resolves.toMatchObject({
       99: { backend: 'native', queued: true, id: PR_ID },
     });
+  });
+
+  it('reads exact-target queue state for one PR instead of the whole fleet', async () => {
+    const queued = prState({
+      number: 16909,
+      isInMergeQueue: true,
+      mergeQueueEntry: QUEUE_ENTRY,
+    });
+    const runner = createNativeRunner({ states: [queued] });
+    await expect(
+      listPullRequestQueueStates({
+        ...nativeOptions(runner),
+        exactPullRequestNumber: 16909,
+      })
+    ).resolves.toMatchObject({
+      16909: { backend: 'native', queued: true, number: 16909 },
+    });
+    const queries = runner.mock.calls.map(call => queryText(call[0]));
+    expect(
+      queries.some(query => query.includes('MergeQueuePullRequestState'))
+    ).toBe(true);
+    expect(
+      queries.some(query => query.includes('MergeQueueOpenPullRequestStates'))
+    ).toBe(false);
   });
 });
