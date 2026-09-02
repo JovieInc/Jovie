@@ -261,6 +261,7 @@ def _write_null_creator_receipt_drain(
     avatar_url: str = _TRUSTED_BOT_AVATAR,
     queued: bool = False,
     queue_entry_state: str | None = None,
+    queue_position: int = 1,
     labels: list[str] | None = None,
     front_churn: str = "forbid",
     allow_enroll: bool = False,
@@ -307,7 +308,7 @@ def _write_null_creator_receipt_drain(
         list_state = (
             f'{{"{pr}":{{"headRefOid":"{head}","isDraft":false,"mergeable":"MERGEABLE","mergeStateStatus":"CLEAN","baseRefName":"main","labels":{{"nodes":[]}},"queued":true,'
             f'"isInMergeQueue":true,'
-            f'"mergeQueueEntry":{{"state":"{entry_state}","position":1}}}}}}'
+            f'"mergeQueueEntry":{{"state":"{entry_state}","position":{queue_position}}}}}}}'
         )
     else:
         list_state = (
@@ -419,6 +420,41 @@ def _write_null_creator_receipt_drain(
 
 
 class TestNullCreatorQueueReceiptProvenance:
+    def test_product_failure_tombstone_never_dequeues_queue_follower(
+        self, tmp_path: Path
+    ) -> None:
+        head = "8" * 40
+        logs = _write_null_creator_receipt_drain(
+            tmp_path,
+            pr=17013,
+            head=head,
+            title="Follower with stale failure receipt",
+            status=_null_creator_status(
+                head=head,
+                context="jovie-queue-product-failure/v1",
+                state="success",
+                description="blocked:merge-group-product-failure",
+            ),
+            run=_trusted_autoenroll_run(head=head),
+            queued=True,
+            queue_position=2,
+        )
+
+        result = _run_bash(
+            _drain_command(
+                tmp_path,
+                backend="native",
+                extra_env=(
+                    "GITHUB_RUN_ID=77 GITHUB_SERVER_URL=https://github.com "
+                    "GITHUB_API_URL=https://api.github.com"
+                ),
+            )
+        )
+
+        assert result.returncode == 0, f"stdout={result.stdout}\nstderr={result.stderr}"
+        assert logs["front_churn"].read_text(encoding="utf-8") == ""
+        assert logs["dequeue"].read_text(encoding="utf-8") == ""
+
     def test_newer_active_group_protects_head_before_failure_tombstone(
         self, tmp_path: Path
     ) -> None:

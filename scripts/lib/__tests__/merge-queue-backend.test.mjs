@@ -617,6 +617,8 @@ describe('queue workflow mutation safety', () => {
       'UNMERGEABLE_EJECT_CONTEXT="jovie-native-unmergeable/v1"'
     );
     expect(drain).toContain('qs: (.mergeQueueEntry.state // null)');
+    expect(drain).toContain('qp: (.mergeQueueEntry.position // null)');
+    expect(drain).toContain('select(.qp == 1)');
     expect(drain).toContain('unmergeable-eject');
     expect(drain).toContain('changelog-collision');
     expect(drain).toContain('changelog-inventory');

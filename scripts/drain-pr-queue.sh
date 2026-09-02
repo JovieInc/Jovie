@@ -111,6 +111,7 @@ native_state_to_snap() {
       fail: [],
       q: (.queued == true),
       qs: (.mergeQueueEntry.state // null),
+      qp: (.mergeQueueEntry.position // null),
       oid: .headRefOid
     } | select(.n | type == "number") ]
   '
@@ -1956,6 +1957,7 @@ if waiting_lane_allows_clean_enroll || [[ "$DRAIN_PROMOTION_MODE" == "blocked" &
     fi
   done < <(echo "$SNAP" | jq -c '.[]
     | select(.q == true)
+    | select(.qp == 1)
     | select(.base == "main")
     | select(.draft | not)
     | select(([.L[]] | any(.=="queue-deferred" or '"$NO_AUTO_HOLD_JQ"')) | not)')
