@@ -824,6 +824,375 @@ class FallbackTests(unittest.TestCase):
             self.assertEqual(module.reconcile(), module.EXIT_SAFE_FAIL_CLOSED)
         self.assertEqual(controls, [])
 
+    def test_targeted_drain_launches_only_the_exact_eligible_issue(self):
+        module = self.load_controller_module()
+        captured: dict[str, object] = {}
+        selection = {"selected": {"id": "kimi-k3", "pool": "kimi"}}
+        def launch(identifiers, active, executable, bundle_revision, selected, limit):
+            captured.update(
+                identifiers=identifiers,
+                active=active,
+                executable=executable,
+                bundle_revision=bundle_revision,
+                selection=selected,
+                limit=limit,
+            )
+            return {"fallback-ship-JOV-2.service"}, 1
+        with (
+            mock.patch.object(module, "_grok_ship_one_executable", return_value="/bin/true"),
+            mock.patch.object(module, "_fleet_gate_allows_isolated", return_value=(True, "green")),
+            mock.patch.object(
+                module,
+                "_admitted_or_remount_identifiers",
+                return_value=["JOV-1", "JOV-2", "JOV-3"],
+            ),
+            mock.patch.object(
+                module, "_model_router_selection", return_value=(selection, "ready")
+            ),
+            mock.patch.object(module, "_bundle_revision", return_value="a" * 64),
+            mock.patch.object(module, "_grok_limit", return_value=7),
+            mock.patch.object(module, "_launch_fallback_workers", side_effect=launch),
+        ):
+            result = module._drain_included_pools([], "JOV-2")
+        self.assertEqual(captured["identifiers"], ["JOV-2"])
+        self.assertEqual(captured["limit"], 1)
+        self.assertEqual(
+            result, "drain_started=1 pool=kimi model=kimi-k3"
+        )
+
+    def test_targeted_drain_refuses_absent_issue_before_provider_probe(self):
+        module = self.load_controller_module()
+        selection = mock.Mock(return_value=({"selected": {}}, "ready"))
+        with (
+            mock.patch.object(module, "_grok_ship_one_executable", return_value="/bin/true"),
+            mock.patch.object(module, "_fleet_gate_allows_isolated", return_value=(True, "green")),
+            mock.patch.object(
+                module, "_admitted_or_remount_identifiers", return_value=["JOV-1"]
+            ),
+            mock.patch.object(module, "_model_router_selection", selection),
+        ):
+            result = module._drain_included_pools([], "JOV-2")
+        self.assertEqual(result, "drain_skipped=target_not_eligible:JOV-2")
+        selection.assert_not_called()
+
+    def test_targeted_drain_refuses_when_another_worker_owns_capacity(self):
+        module = self.load_controller_module()
+        selection = {"selected": {"id": "kimi-k3", "pool": "kimi"}}
+        with (
+            mock.patch.object(module, "_grok_ship_one_executable", return_value="/bin/true"),
+            mock.patch.object(module, "_fleet_gate_allows_isolated", return_value=(True, "green")),
+            mock.patch.object(
+                module, "_admitted_or_remount_identifiers", return_value=["JOV-2"]
+            ),
+            mock.patch.object(
+                module, "_model_router_selection", return_value=(selection, "ready")
+            ),
+            mock.patch.object(module, "_bundle_revision", return_value="a" * 64),
+            mock.patch.object(
+                module,
+                "_launch_fallback_workers",
+                return_value=(set(), 1),
+            ),
+        ):
+            result = module._drain_included_pools(
+                ["fallback-ship-JOV-1-aaaaaaaaaaaa.service"], "JOV-2"
+            )
+        self.assertEqual(result, "drain_skipped=target_not_started:JOV-2")
+
+    def test_ready_targeted_reconcile_fails_when_exact_issue_does_not_start(self):
+        module = self.load_controller_module()
+        stderr = io.StringIO()
+        with (
+            mock.patch.object(module, "gc_fallback_locks"),
+            mock.patch.object(module, "codex_canary_ready", return_value=(True, "ready")),
+            mock.patch.object(module, "_active_grok_units", return_value=[]),
+            mock.patch.object(module, "_start_jov_primary", return_value=True),
+            mock.patch.object(module, "_services_active", return_value=True),
+            mock.patch.object(
+                module,
+                "_drain_included_pools",
+                return_value="drain_skipped=target_not_started:JOV-2",
+            ),
+            contextlib.redirect_stderr(stderr),
+        ):
+            result = module.reconcile("JOV-2")
+        self.assertEqual(result, module.EXIT_SAFE_FAIL_CLOSED)
+        self.assertIn("target=JOV-2", stderr.getvalue())
+
+    def test_ready_targeted_reconcile_refuses_any_preexisting_fallback_worker(self):
+        module = self.load_controller_module()
+        start_primary = mock.Mock(return_value=True)
+        drain = mock.Mock(return_value="drain_started=1 pool=kimi model=kimi-k3")
+        stderr = io.StringIO()
+        with (
+            mock.patch.object(module, "gc_fallback_locks"),
+            mock.patch.object(module, "codex_canary_ready", return_value=(True, "ready")),
+            mock.patch.object(
+                module,
+                "_active_grok_units",
+                return_value=["fallback-ship-JOV-1-aaaaaaaaaaaa.service"],
+            ),
+            mock.patch.object(module, "_start_jov_primary", start_primary),
+            mock.patch.object(module, "_drain_included_pools", drain),
+            contextlib.redirect_stderr(stderr),
+        ):
+            result = module.reconcile("JOV-2")
+        self.assertEqual(result, module.EXIT_SAFE_FAIL_CLOSED)
+        self.assertIn("target_not_started=JOV-2 grok_ship_active", stderr.getvalue())
+        start_primary.assert_not_called()
+        drain.assert_not_called()
+
+    def test_ready_targeted_reconcile_succeeds_only_on_exact_start(self):
+        module = self.load_controller_module()
+        target_unit = "fallback-ship-JOV-2-aaaaaaaaaaaa.service"
+        stderr = io.StringIO()
+        def drain(_active, _target, launched):
+            launched.add(target_unit)
+            return "drain_started=1 pool=kimi model=kimi-k3"
+        with (
+            mock.patch.object(module, "gc_fallback_locks"),
+            mock.patch.object(module, "codex_canary_ready", return_value=(True, "ready")),
+            mock.patch.object(module, "_active_grok_units", return_value=[]),
+            mock.patch.object(module, "_start_jov_primary", return_value=True),
+            mock.patch.object(module, "_services_active", return_value=True),
+            mock.patch.object(
+                module,
+                "_drain_included_pools",
+                side_effect=drain,
+            ),
+            mock.patch.object(
+                module, "_grok_units_after_survival_window", return_value=[target_unit]
+            ),
+            contextlib.redirect_stderr(stderr),
+        ):
+            result = module.reconcile("JOV-2")
+        self.assertEqual(result, 0)
+        self.assertIn("drain_started=1 pool=kimi model=kimi-k3", stderr.getvalue())
+
+    def test_ready_targeted_reconcile_cleans_up_transient_exact_start(self):
+        module = self.load_controller_module()
+        target_unit = "fallback-ship-JOV-2-aaaaaaaaaaaa.service"
+        controls: list[list[str]] = []
+        stderr = io.StringIO()
+        def drain(_active, _target, launched):
+            launched.add(target_unit)
+            return "drain_started=1 pool=kimi model=kimi-k3"
+        with (
+            mock.patch.object(module, "gc_fallback_locks"),
+            mock.patch.object(module, "codex_canary_ready", return_value=(True, "ready")),
+            mock.patch.object(module, "_active_grok_units", return_value=[]),
+            mock.patch.object(module, "_start_jov_primary", return_value=True),
+            mock.patch.object(module, "_services_active", return_value=True),
+            mock.patch.object(module, "_drain_included_pools", side_effect=drain),
+            mock.patch.object(module, "_grok_units_after_survival_window", return_value=[]),
+            mock.patch.object(
+                module,
+                "_control",
+                side_effect=lambda command: controls.append(command) or True,
+            ),
+            contextlib.redirect_stderr(stderr),
+        ):
+            result = module.reconcile("JOV-2")
+        self.assertEqual(result, module.EXIT_SAFE_FAIL_CLOSED)
+        self.assertIn("target_not_survived=JOV-2", stderr.getvalue())
+        self.assertIn(
+            ["systemctl", "--user", "stop", target_unit],
+            controls,
+        )
+
+    def test_untargeted_drain_preserves_existing_capacity_and_issue_set(self):
+        module = self.load_controller_module()
+        captured: dict[str, object] = {}
+        selection = {"selected": {"id": "grok-4.6", "pool": "grok-build"}}
+        def launch(identifiers, active, executable, bundle_revision, selected, limit):
+            captured.update(identifiers=identifiers, limit=limit)
+            return {"fallback-ship-JOV-1.service"}, 1
+        with (
+            mock.patch.object(module, "_grok_ship_one_executable", return_value="/bin/true"),
+            mock.patch.object(module, "_fleet_gate_allows_isolated", return_value=(True, "green")),
+            mock.patch.object(
+                module,
+                "_admitted_or_remount_identifiers",
+                return_value=["JOV-1", "JOV-2"],
+            ),
+            mock.patch.object(
+                module, "_model_router_selection", return_value=(selection, "ready")
+            ),
+            mock.patch.object(module, "_bundle_revision", return_value="a" * 64),
+            mock.patch.object(module, "_grok_limit", return_value=4),
+            mock.patch.object(module, "_launch_fallback_workers", side_effect=launch),
+        ):
+            module._drain_included_pools([])
+        self.assertEqual(captured["identifiers"], ["JOV-1", "JOV-2"])
+        self.assertEqual(captured["limit"], 4)
+
+    def test_exhausted_target_refuses_absent_issue_without_touching_runtime(self):
+        module = self.load_controller_module()
+        active = mock.Mock(return_value=[])
+        selection = mock.Mock(return_value=({"selected": {}}, "ready"))
+        stderr = io.StringIO()
+        with (
+            mock.patch.object(module, "_grok_ship_one_executable", return_value="/bin/true"),
+            mock.patch.object(
+                module, "_admitted_or_remount_identifiers", return_value=["JOV-1"]
+            ),
+            mock.patch.object(module, "_active_grok_units", active),
+            mock.patch.object(module, "_model_router_selection", selection),
+            contextlib.redirect_stderr(stderr),
+        ):
+            result = module._continue_exhausted_reconcile(
+                "all_accounts_cooldown", "JOV-2"
+            )
+        self.assertEqual(result, module.EXIT_SAFE_FAIL_CLOSED)
+        self.assertIn(
+            "target_not_eligible=JOV-2 symphony_unchanged", stderr.getvalue()
+        )
+        active.assert_not_called()
+        selection.assert_not_called()
+
+    def test_exhausted_target_refuses_when_unrelated_worker_owns_capacity(self):
+        module = self.load_controller_module()
+        final_active = mock.Mock()
+        stderr = io.StringIO()
+        selection = {"selected": {"id": "kimi-k3", "pool": "kimi"}}
+        with (
+            mock.patch.object(module, "_grok_ship_one_executable", return_value="/bin/true"),
+            mock.patch.object(
+                module, "_admitted_or_remount_identifiers", return_value=["JOV-2"]
+            ),
+            mock.patch.object(
+                module,
+                "_active_grok_units",
+                side_effect=[
+                    ["fallback-ship-JOV-1-aaaaaaaaaaaa.service"],
+                    final_active,
+                ],
+            ) as active,
+            mock.patch.object(module, "_fleet_gate_allows_isolated", return_value=(True, "green")),
+            mock.patch.object(
+                module, "_model_router_selection", return_value=(selection, "ready")
+            ),
+            mock.patch.object(module, "_bundle_revision", return_value="a" * 64),
+            mock.patch.object(
+                module, "_launch_fallback_workers", return_value=(set(), 1)
+            ),
+            contextlib.redirect_stderr(stderr),
+        ):
+            result = module._continue_exhausted_reconcile(
+                "all_accounts_cooldown", "JOV-2"
+            )
+        self.assertEqual(result, module.EXIT_SAFE_FAIL_CLOSED)
+        self.assertIn(
+            "target_not_started=JOV-2 symphony_unchanged", stderr.getvalue()
+        )
+        self.assertEqual(active.call_count, 1)
+
+    def test_exhausted_target_succeeds_only_when_exact_unit_survives(self):
+        module = self.load_controller_module()
+        target_unit = "fallback-ship-JOV-2-aaaaaaaaaaaa.service"
+        stderr = io.StringIO()
+        selection = {"selected": {"id": "kimi-k3", "pool": "kimi"}}
+        with (
+            mock.patch.object(module, "_grok_ship_one_executable", return_value="/bin/true"),
+            mock.patch.object(
+                module, "_admitted_or_remount_identifiers", return_value=["JOV-2"]
+            ),
+            mock.patch.object(module, "_active_grok_units", side_effect=[[], [target_unit]]),
+            mock.patch.object(module, "_fleet_gate_allows_isolated", return_value=(True, "green")),
+            mock.patch.object(module, "_model_router_selection", return_value=(selection, "ready")),
+            mock.patch.object(module, "_bundle_revision", return_value="a" * 64),
+            mock.patch.object(module, "_launch_fallback_workers", return_value=({target_unit}, 1)),
+            mock.patch.object(module, "_grok_units_after_survival_window", return_value=[target_unit]),
+            mock.patch.object(module, "_jov_active", return_value=True),
+            contextlib.redirect_stderr(stderr),
+        ):
+            result = module._continue_exhausted_reconcile("all_accounts_cooldown", "JOV-2")
+        self.assertEqual(result, 0)
+        self.assertIn("grok_started=1 grok_survived=1", stderr.getvalue())
+
+    def test_exhausted_target_fails_if_survivor_set_is_not_exact(self):
+        module = self.load_controller_module()
+        target_unit = "fallback-ship-JOV-2-aaaaaaaaaaaa.service"
+        unrelated_unit = "fallback-ship-JOV-1-bbbbbbbbbbbb.service"
+        controls: list[list[str]] = []
+        stderr = io.StringIO()
+        selection = {"selected": {"id": "kimi-k3", "pool": "kimi"}}
+        with (
+            mock.patch.object(module, "_grok_ship_one_executable", return_value="/bin/true"),
+            mock.patch.object(
+                module, "_admitted_or_remount_identifiers", return_value=["JOV-2"]
+            ),
+            mock.patch.object(
+                module,
+                "_active_grok_units",
+                side_effect=[[], [unrelated_unit], [unrelated_unit]],
+            ),
+            mock.patch.object(module, "_fleet_gate_allows_isolated", return_value=(True, "green")),
+            mock.patch.object(module, "_model_router_selection", return_value=(selection, "ready")),
+            mock.patch.object(module, "_bundle_revision", return_value="a" * 64),
+            mock.patch.object(module, "_launch_fallback_workers", return_value=({target_unit}, 1)),
+            mock.patch.object(
+                module,
+                "_grok_units_after_survival_window",
+                return_value=[target_unit, unrelated_unit],
+            ),
+            mock.patch.object(
+                module,
+                "_control",
+                side_effect=lambda command: controls.append(command) or True,
+            ),
+            mock.patch.object(module, "_jov_active", return_value=True),
+            contextlib.redirect_stderr(stderr),
+        ):
+            result = module._continue_exhausted_reconcile("all_accounts_cooldown", "JOV-2")
+        self.assertEqual(result, module.EXIT_SAFE_FAIL_CLOSED)
+        self.assertIn(
+            "target_not_survived=JOV-2 symphony_active", stderr.getvalue()
+        )
+        self.assertIn(["systemctl", "--user", "stop", target_unit], controls)
+
+    def test_exhausted_target_not_survived_reports_restore_failure(self):
+        module = self.load_controller_module()
+        target_unit = "fallback-ship-JOV-2-aaaaaaaaaaaa.service"
+        unrelated_unit = "fallback-ship-JOV-1-bbbbbbbbbbbb.service"
+        stderr = io.StringIO()
+        selection = {"selected": {"id": "kimi-k3", "pool": "kimi"}}
+        with (
+            mock.patch.object(module, "_grok_ship_one_executable", return_value="/bin/true"),
+            mock.patch.object(
+                module, "_admitted_or_remount_identifiers", return_value=["JOV-2"]
+            ),
+            mock.patch.object(
+                module, "_active_grok_units", side_effect=[[], [unrelated_unit]]
+            ),
+            mock.patch.object(module, "_fleet_gate_allows_isolated", return_value=(True, "green")),
+            mock.patch.object(
+                module, "_model_router_selection", return_value=(selection, "ready")
+            ),
+            mock.patch.object(module, "_bundle_revision", return_value="a" * 64),
+            mock.patch.object(
+                module, "_launch_fallback_workers", return_value=({target_unit}, 1)
+            ),
+            mock.patch.object(
+                module,
+                "_grok_units_after_survival_window",
+                return_value=[unrelated_unit],
+            ),
+            mock.patch.object(module, "_cleanup_launched_units", return_value=True),
+            mock.patch.object(module, "_jov_active", return_value=False),
+            mock.patch.object(module, "_start_jov_primary", return_value=False),
+            contextlib.redirect_stderr(stderr),
+        ):
+            result = module._continue_exhausted_reconcile(
+                "all_accounts_cooldown", "JOV-2"
+            )
+
+        self.assertEqual(result, module.EXIT_DEGRADED)
+        self.assertIn(
+            "target_not_survived=JOV-2 symphony_api_restore_failed",
+            stderr.getvalue(),
+        )
+
     def test_non_finite_grok_durations_fall_back_to_safe_defaults(self):
         module = self.load_controller_module()
         cases = (

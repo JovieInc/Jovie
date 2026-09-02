@@ -853,6 +853,52 @@ describe('automation-verify affected scope', () => {
     ).toBe('full');
   });
 
+  it('maps model-router-only changes to the Gem rehabilitation contracts', () => {
+    const plan = buildAffectedTestPlan([
+      'scripts/hermes/model-router.py',
+      'scripts/hermes/config/model-registry.json',
+      'scripts/hermes/tests/test-model-router.py',
+    ]);
+    expect(plan.mode).toBe('selected');
+    expect(plan.pythonUnittestTests).toContain(
+      'scripts/hermes/tests/test-model-router.py'
+    );
+    expect(plan.scriptVitestTests).toContain(
+      'scripts/lib/__tests__/automation-verify.test.mjs'
+    );
+  });
+
+  it('maps the additive Symphony router boundary to its two regression suites', () => {
+    const plan = buildAffectedTestPlan([
+      'scripts/hermes/config/model-registry.json',
+      'scripts/hermes/model-router.py',
+      'scripts/hermes/symphony-codex-exhausted.py',
+      'scripts/hermes/tests/symphony-additive-router.test.py',
+      'scripts/hermes/tests/symphony-codex-auth-fallback.test.py',
+      'scripts/hermes/tests/test-model-router.py',
+      'scripts/run-affected-tests.mjs',
+      'scripts/lib/__tests__/automation-verify.test.mjs',
+    ]);
+    expect(plan).toMatchObject({
+      mode: 'selected',
+      pythonUnittestTests: [
+        'scripts/hermes/tests/symphony-additive-router.test.py',
+        'scripts/hermes/tests/test-model-router.py',
+      ],
+      scriptVitestTests: [
+        'scripts/lib/__tests__/automation-verify.test.mjs',
+      ],
+    });
+  });
+
+  it('does not narrow arbitrary edits to the legacy Symphony controller suite', () => {
+    expect(
+      buildAffectedTestPlan([
+        'scripts/hermes/tests/symphony-codex-auth-fallback.test.py',
+      ]).mode
+    ).toBe('full');
+  });
+
   it('routes a closure-health source-only repair to its Python regression suite', () => {
     expect(
       buildAffectedTestPlan(['scripts/hermes/closure_health.py'])
