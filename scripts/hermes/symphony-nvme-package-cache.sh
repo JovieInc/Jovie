@@ -639,7 +639,15 @@ warm_cache() {
     cleanup_warm_tmp() { rm -rf -- "$tmp_dir"; }
     trap cleanup_warm_tmp EXIT
     install -d -m 0755 "$store_dir"
-    COREPACK_ENABLE_NETWORK=0 pnpm fetch --frozen-lockfile --store-dir "$store_dir"
+    install -m 0644 "$workspace/pnpm-lock.yaml" "$tmp_dir/pnpm-lock.yaml"
+    if [ -f "$workspace/pnpm-workspace.yaml" ]; then
+      install -m 0644 "$workspace/pnpm-workspace.yaml" "$tmp_dir/pnpm-workspace.yaml"
+    fi
+    (
+      cd "$tmp_dir"
+      COREPACK_ENABLE_NETWORK=0 pnpm fetch --frozen-lockfile --ignore-scripts --store-dir "$store_dir"
+    )
+    [ ! -e "$workspace/node_modules" ] || fail "cache-warm-mutated-source-workspace" "$workspace/node_modules"
     tar -cf "$tmp_archive" -C "$store_dir" .
     archive_sha="$(sha256_file "$tmp_archive")"
     printf '%s  %s\n' "$archive_sha" "$(basename "$archive_path")" >"$tmp_checksum"

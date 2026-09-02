@@ -224,6 +224,7 @@ class SymphonyNvmePackageCacheTests(unittest.TestCase):
         )
         self.assertEqual(warm.returncode, 0, warm.stderr)
         self.assertIn("SYMPHONY_NVME_PACKAGE_CACHE_WARM", warm.stdout)
+        self.assertFalse((fx.workspace / "node_modules").exists())
         archives = list(fx.cache_root.glob("*.tar"))
         self.assertEqual(len(archives), 1)
         manifest = json.loads(pathlib.Path(f"{archives[0]}.json").read_text())
