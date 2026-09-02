@@ -473,6 +473,9 @@ jobs:
       shared_contract_impact: ${{ steps.detect.outputs.shared_contract_impact || 'none' }}
       has_code_changes: ${{ steps.detect.outputs.has_code_changes || 'false' }}
       is_noop_merge_group: ${{ steps.detect.outputs.is_noop_merge_group || 'false' }}
+      # The resolver may replace the event base with the live-main merge-base
+      # for coalesced heads. Downstream exact-diff gates must use this same SHA.
+      path_diff_base_sha: ${{ steps.detect.outputs.path_diff_base_sha || '' }}
       run_jovie_product: ${{ steps.detect.outputs.run_jovie_product || 'false' }}
       # Missing selector output fails closed. Only exact source-PR evidence may
       # bypass the multi-gigabyte dependency bootstrap in ci-fast typecheck.
@@ -633,6 +636,7 @@ jobs:
             git cat-file -e "${PATH_DIFF_BASE_SHA}^{commit}"
             git cat-file -e "${PATH_DIFF_HEAD_SHA}^{commit}"
             git merge-base --is-ancestor "$PATH_DIFF_BASE_SHA" "$PATH_DIFF_HEAD_SHA"
+            echo "path_diff_base_sha=$PATH_DIFF_BASE_SHA" >> "$GITHUB_OUTPUT"
             CLASSIFICATION_BASE_REF="$PATH_DIFF_BASE_SHA"
             CLASSIFICATION_HEAD_REF="$PATH_DIFF_HEAD_SHA"
           elif [[ "${{ github.event_name }}" == "pull_request" ]]; then
@@ -1866,7 +1870,9 @@ jobs:
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
-          fetch-depth: 2
+          # The effective coalesced-head diff base may be older than the direct
+          # queue parent; the changed-component gate must have its full ancestry.
+          fetch-depth: 0
           persist-credentials: false
       - uses: ./.github/actions/setup-node-pnpm
       - name: Setup Playwright (Chromium)
@@ -1954,6 +1960,7 @@ jobs:
               exit 1
             }
             if curl -sf http://localhost:6006/iframe.html >/dev/null 2>&1; then
+              node "$GITHUB_WORKSPACE/scripts/component-merge-group-storybook-cert.mjs"
               node "$GITHUB_WORKSPACE/.github/scripts/guard-playwright-artifacts.mjs" --run -- \
                 pnpm exec playwright test \
                   tests/e2e/storybook-elevation.spec.ts \
@@ -1969,6 +1976,7 @@ jobs:
           exit 1
         env:
           STORYBOOK_BASE_URL: http://localhost:6006
+          MERGE_GROUP_DIFF_BASE_SHA: ${{ needs.ci-path-changes.outputs.path_diff_base_sha }}
           CI: true
           PLAYWRIGHT_ARTIFACT_ALLOW_IMAGES: 'true'
       - name: Upload combined layout failure evidence

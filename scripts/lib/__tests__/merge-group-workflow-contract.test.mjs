@@ -1,5 +1,6 @@
 import { spawnSync } from 'node:child_process';
 import {
+  chmodSync,
   mkdirSync,
   mkdtempSync,
   readdirSync,
@@ -8,8 +9,9 @@ import {
   writeFileSync,
 } from 'node:fs';
 import { tmpdir } from 'node:os';
-import { join, resolve } from 'node:path';
+import { delimiter, join, resolve } from 'node:path';
 import { afterEach, describe, expect, it } from 'vitest';
+import { runMergeGroupStorybookCertification } from '../../component-merge-group-storybook-cert.mjs';
 import {
   createGitRunner,
   formatMetaEnv,
@@ -942,6 +944,187 @@ ${selectedGateScript}`,
     );
   });
 
+  it('fails closed unless every changed component renders in live Storybook on the exact merge-group diff', () => {
+    const buildLayout = getJobBlock(CI_WORKFLOW, 'ci-build-layout');
+    const certification = buildLayout.indexOf(
+      'node "$GITHUB_WORKSPACE/scripts/component-merge-group-storybook-cert.mjs"'
+    );
+    const geometry = buildLayout.indexOf(
+      'pnpm exec playwright test',
+      certification
+    );
+
+    expect(buildLayout).toContain(
+      'MERGE_GROUP_DIFF_BASE_SHA: ${{ needs.ci-path-changes.outputs.path_diff_base_sha }}'
+    );
+    expect(buildLayout).toContain('fetch-depth: 0');
+    expect(buildLayout).not.toContain('fetch-depth: 2');
+    const pathChanges = getJobBlock(CI_WORKFLOW, 'ci-path-changes');
+    expect(pathChanges).toContain(
+      'path_diff_base_sha: ${{ steps.detect.outputs.path_diff_base_sha'
+    );
+    expect(pathChanges).toContain(
+      'echo "path_diff_base_sha=$PATH_DIFF_BASE_SHA" >> "$GITHUB_OUTPUT"'
+    );
+    expect(buildLayout).not.toContain(
+      'component-merge-group-storybook-cert.mjs" || true'
+    );
+    expect(certification).toBeGreaterThanOrEqual(0);
+    expect(certification).toBeLessThan(geometry);
+  });
+
+  it('executes only the exact changed-component rendered phase for merge groups', () => {
+    const calls = [];
+    const spawn = (command, args) => {
+      calls.push({ command, args });
+      return { status: 0 };
+    };
+    const result = runMergeGroupStorybookCertification({
+      eventName: 'merge_group',
+      baseSha: 'a'.repeat(40),
+      repoRoot: REPO_ROOT,
+      storybookUrl: 'http://localhost:6006',
+      spawn,
+    });
+
+    expect(result.skipped).toBe(false);
+    expect(calls).toEqual([
+      {
+        command: 'git',
+        args: ['cat-file', '-e', `${'a'.repeat(40)}^{commit}`],
+      },
+      {
+        command: 'git',
+        args: ['merge-base', '--is-ancestor', 'a'.repeat(40), 'HEAD'],
+      },
+      {
+        command: 'pnpm',
+        args: [
+          'component-ship-gate',
+          `--diff-base=${'a'.repeat(40)}`,
+          '--skip-quality',
+          '--skip-ratchet',
+          '--skip-rendered-cert',
+          '--skip-live-storybook',
+          '--require-rendered',
+          '--storybook-url=http://localhost:6006',
+        ],
+      },
+    ]);
+  });
+
+  it('skips non-merge events and fails closed on malformed, missing, or red merge-group evidence', () => {
+    const nonMergeCalls = [];
+    expect(
+      runMergeGroupStorybookCertification({
+        eventName: 'push',
+        spawn: (...args) => {
+          nonMergeCalls.push(args);
+          return { status: 0 };
+        },
+      })
+    ).toMatchObject({ skipped: true });
+    expect(nonMergeCalls).toEqual([]);
+    expect(() =>
+      runMergeGroupStorybookCertification({
+        eventName: 'merge_group',
+        baseSha: 'missing',
+      })
+    ).toThrow(/exact base SHA/);
+    expect(() =>
+      runMergeGroupStorybookCertification({
+        eventName: 'merge_group',
+        baseSha: 'b'.repeat(40),
+        spawn: () => ({ status: 1 }),
+      })
+    ).toThrow(/base is unavailable/);
+
+    let call = 0;
+    expect(() =>
+      runMergeGroupStorybookCertification({
+        eventName: 'merge_group',
+        baseSha: 'c'.repeat(40),
+        spawn: () => ({ status: call++ < 2 ? 0 : 1 }),
+      })
+    ).toThrow(/certification failed/);
+  });
+
+  it('propagates CLI failures and skips pnpm outside merge groups', () => {
+    const root = mkdtempSync(join(tmpdir(), 'jovie-storybook-cli-'));
+    const bin = join(root, 'bin');
+    const marker = join(root, 'pnpm-called');
+    mkdirSync(bin);
+    const gitStub = join(bin, 'git');
+    const pnpmStub = join(bin, 'pnpm');
+    writeFileSync(gitStub, '#!/bin/sh\nexit 0\n');
+    writeFileSync(pnpmStub, `#!/bin/sh\ntouch "${marker}"\nexit 23\n`);
+    chmodSync(gitStub, 0o755);
+    chmodSync(pnpmStub, 0o755);
+    const env = {
+      ...process.env,
+      PATH: `${bin}${delimiter}${process.env.PATH || ''}`,
+      GITHUB_WORKSPACE: REPO_ROOT,
+      MERGE_GROUP_DIFF_BASE_SHA: 'd'.repeat(40),
+    };
+
+    try {
+      const malformed = spawnSync(
+        process.execPath,
+        [
+          resolve(
+            REPO_ROOT,
+            'scripts/component-merge-group-storybook-cert.mjs'
+          ),
+        ],
+        {
+          encoding: 'utf8',
+          env: {
+            ...env,
+            GITHUB_EVENT_NAME: 'merge_group',
+            MERGE_GROUP_DIFF_BASE_SHA: 'malformed',
+          },
+        }
+      );
+      expect(malformed.status).not.toBe(0);
+
+      const redGate = spawnSync(
+        process.execPath,
+        [
+          resolve(
+            REPO_ROOT,
+            'scripts/component-merge-group-storybook-cert.mjs'
+          ),
+        ],
+        {
+          encoding: 'utf8',
+          env: { ...env, GITHUB_EVENT_NAME: 'merge_group' },
+        }
+      );
+      expect(redGate.status).not.toBe(0);
+      expect(readFileSync(marker, 'utf8')).toBe('');
+
+      rmSync(marker, { force: true });
+      const nonMerge = spawnSync(
+        process.execPath,
+        [
+          resolve(
+            REPO_ROOT,
+            'scripts/component-merge-group-storybook-cert.mjs'
+          ),
+        ],
+        {
+          encoding: 'utf8',
+          env: { ...env, GITHUB_EVENT_NAME: 'push' },
+        }
+      );
+      expect(nonMerge.status).toBe(0);
+      expect(nonMerge.stdout).toContain('skipped outside merge_group');
+      expect(() => readFileSync(marker)).toThrow();
+    } finally {
+      rmSync(root, { recursive: true, force: true });
+    }
+  });
+
   it('coalesces a short release wave before exact authorization and mutation', () => {
     const coalesce = getJobBlock(
       PRODUCTION_CONTROLLER_WORKFLOW,
@@ -1599,12 +1782,27 @@ describe('resolveMergeGroupPathDiff coalesced heads (JOV-4905)', () => {
   it('recomputes against live main when the event-base range is empty', () => {
     const { origin, seed, rootSha } = createFixture();
     git(seed, ['switch', '-q', '-c', 'feature']);
-    const headSha = writeAndCommit(
+    writeAndCommit(
       seed,
       'apps/web/product.ts',
       'export const ready = true;\n',
       'add product'
     );
+    writeAndCommit(
+      seed,
+      'apps/web/product.ts',
+      'export const ready = "still";\n',
+      'coalesce product once'
+    );
+    const headSha = writeAndCommit(
+      seed,
+      'apps/web/product.ts',
+      'export const ready = "exact";\n',
+      'coalesce product twice'
+    );
+    expect(
+      Number(git(seed, ['rev-list', '--count', `${rootSha}..${headSha}`]))
+    ).toBeGreaterThan(2);
     git(seed, ['push', '-q', 'origin', `${rootSha}:refs/heads/main`]);
     git(seed, ['push', '-q', 'origin', `${headSha}:refs/heads/feature`]);
 
@@ -1638,6 +1836,22 @@ describe('resolveMergeGroupPathDiff coalesced heads (JOV-4905)', () => {
     });
     expect(formatMetaEnv(result)).toContain(`PATH_DIFF_BASE_SHA=${rootSha}`);
     expect(formatMetaEnv(result)).toContain(`PATH_DIFF_HEAD_SHA=${headSha}`);
+
+    const calls = [];
+    runMergeGroupStorybookCertification({
+      eventName: 'merge_group',
+      baseSha: result.baseSha,
+      repoRoot: work,
+      spawn: (command, args, options) => {
+        calls.push({ command, args });
+        return command === 'pnpm'
+          ? { status: 0 }
+          : spawnSync(command, args, options);
+      },
+    });
+    const gateCall = calls.find(call => call.command === 'pnpm');
+    expect(gateCall?.args).toContain(`--diff-base=${rootSha}`);
+    expect(gateCall?.args).not.toContain(`--diff-base=${headSha}`);
   });
 
   it('treats a valid empty live-main range as a typed no-op', () => {
