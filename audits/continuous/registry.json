@@ -1,0 +1,1208 @@
+{
+  "schemaVersion": 1,
+  "registryId": "jovie-continuous-audit-registry",
+  "owner": "Summer",
+  "implementationOwner": "Symphony",
+  "status": "pilot",
+  "policy": {
+    "objective": "Progressively audit every meaningful code path and operational surface with bounded deterministic evidence first and qualified model review only where it adds signal.",
+    "coverageIntervalDays": 90,
+    "noRawModelClaims": true,
+    "deduplicationKey": "familyId:partitionId:ruleId:primaryLocation:claimDigest",
+    "requiredResolutionStates": [
+      "fixed",
+      "disproven",
+      "deferred-with-expiry",
+      "blocked"
+    ],
+    "proofTiers": ["source", "ci", "queue", "deploy", "runtime"],
+    "proofTierStatuses": [
+      "verified",
+      "observed",
+      "availability-only",
+      "not-collected",
+      "not-applicable"
+    ],
+    "providerSubstitution": "forbidden",
+    "externalScheduleStatus": "proposal-only",
+    "customerDataAllowed": false,
+    "secretMaterialAllowed": false
+  },
+  "providerCatalog": [
+    {
+      "id": "deterministic",
+      "qualificationState": "qualified",
+      "models": ["none"],
+      "capabilities": ["static-analysis", "tests", "metrics", "receipts"],
+      "readBoundary": "repo-and-public-metadata",
+      "egress": "none-except-declared-public-metadata-probes",
+      "costClass": "no-model-spend"
+    },
+    {
+      "id": "codex",
+      "qualificationState": "conditional",
+      "modelRegistry": "scripts/hermes/config/model-registry.json",
+      "requiredCapabilities": ["review", "architecture", "root-cause"],
+      "readBoundary": "sanitized-selected-scope",
+      "egress": "provider-only-after-run-qualification",
+      "costClass": "subscription-included",
+      "perRunQualificationRequired": true
+    },
+    {
+      "id": "cursor",
+      "qualificationState": "conditional",
+      "modelRegistry": "scripts/hermes/config/model-registry.json",
+      "requiredCapabilities": ["review", "architecture"],
+      "readBoundary": "sanitized-selected-scope",
+      "egress": "provider-only-after-run-qualification",
+      "costClass": "subscription-included",
+      "perRunQualificationRequired": true
+    },
+    {
+      "id": "grok",
+      "qualificationState": "conditional",
+      "modelRegistry": "scripts/hermes/config/model-registry.json",
+      "requiredCapabilities": ["review", "architecture", "root-cause"],
+      "readBoundary": "sanitized-selected-scope",
+      "egress": "provider-only-after-run-qualification",
+      "costClass": "subscription-included",
+      "perRunQualificationRequired": true
+    },
+    {
+      "id": "kimi",
+      "qualificationState": "conditional",
+      "modelRegistry": "scripts/hermes/config/model-registry.json",
+      "requiredCapabilities": ["review", "code"],
+      "readBoundary": "sanitized-selected-scope",
+      "egress": "provider-only-after-run-qualification",
+      "costClass": "subscription-included",
+      "perRunQualificationRequired": true
+    },
+    {
+      "id": "hyperagent",
+      "qualificationState": "unqualified",
+      "models": [],
+      "requiredCapabilities": ["review", "architecture", "root-cause"],
+      "readBoundary": "sanitized-selected-scope",
+      "egress": "blocked-until-qualified",
+      "costClass": "unknown-until-qualified",
+      "perRunQualificationRequired": true,
+      "failClosed": true,
+      "substitutionPolicy": "forbidden",
+      "qualificationBaseline": null,
+      "qualificationReceiptsRequired": [
+        "authentication-success",
+        "exact-provider-and-model-identity",
+        "read-boundary-acknowledgement",
+        "no-secret-or-customer-data-egress",
+        "explicit-cost-cap",
+        "deterministic-fixture-eval-at-or-above-0.9",
+        "structured-output-schema-pass"
+      ]
+    }
+  ],
+  "providerQualificationSchema": {
+    "requiredFields": [
+      "provider",
+      "model",
+      "modelRegistryEntryId",
+      "modelCapabilities",
+      "modelQuality",
+      "costTier",
+      "authenticatedAt",
+      "modelIdentityVerified",
+      "readBoundaryAcknowledged",
+      "secretScanPassed",
+      "customerDataExcluded",
+      "costCapCents",
+      "fixtureEvalPassRate",
+      "structuredOutputPassed",
+      "receiptLocator"
+    ],
+    "minimumFixtureEvalPassRate": 0.9,
+    "maximumReceiptAgeHours": 24
+  },
+  "findingSchema": {
+    "id": "continuous-audit-finding/v1",
+    "requiredFields": [
+      "fingerprint",
+      "familyId",
+      "partitionId",
+      "ruleId",
+      "title",
+      "claim",
+      "severity",
+      "riskScore",
+      "primaryLocation",
+      "evidence",
+      "source",
+      "acceptance",
+      "resolution"
+    ],
+    "severityLevels": {
+      "critical": { "minimumRiskScore": 90, "responseHours": 1 },
+      "high": { "minimumRiskScore": 70, "responseHours": 24 },
+      "medium": { "minimumRiskScore": 40, "responseHours": 168 },
+      "low": { "minimumRiskScore": 1, "responseHours": 720 }
+    },
+    "acceptanceStates": ["candidate", "validated", "disproven"],
+    "evidenceRequired": {
+      "minimumDirectItems": 1,
+      "modelClaimMayBeSoleEvidence": false,
+      "requiredItemFields": [
+        "tier",
+        "kind",
+        "direct",
+        "locator",
+        "observedAt",
+        "summary"
+      ]
+    }
+  },
+  "selectionPolicy": {
+    "baseWeight": 1,
+    "changedPathMultiplier": 4,
+    "highRiskMultiplier": 3,
+    "recentIncidentMultiplier": 3,
+    "overdueMultiplier": 2,
+    "crossModelSampleRate": 0.2,
+    "crossModelMinimumForCritical": 1,
+    "sameProviderFamilyCountsAsIndependent": false
+  },
+  "auditFamilies": [
+    {
+      "id": "security",
+      "name": "Security",
+      "scope": {
+        "partitions": [
+          "trust-boundaries",
+          "workflows-and-actions",
+          "dependencies"
+        ],
+        "partitionStrategy": "changed trust boundary plus rotating security slice"
+      },
+      "providerEligibility": {
+        "deterministicFirst": true,
+        "allowedProviders": [
+          "deterministic",
+          "codex",
+          "grok",
+          "cursor",
+          "hyperagent"
+        ],
+        "requiredModelCapabilities": ["review", "root-cause"],
+        "minimumQuality": 82,
+        "crossCheck": "different-provider-required-for-critical"
+      },
+      "readBoundary": {
+        "allow": [
+          "tracked source",
+          "sanitized lockfile metadata",
+          "public advisory metadata"
+        ],
+        "deny": [
+          "secret values",
+          "customer rows",
+          "cookies",
+          "tokens",
+          "private runtime payloads"
+        ]
+      },
+      "costBudget": {
+        "deterministicMinutes": 20,
+        "modelRuns": 2,
+        "maxInputTokensPerRun": 40000,
+        "maxOutputTokensPerRun": 6000,
+        "maxSpendCents": 0
+      },
+      "deterministicProbes": [
+        "bash scripts/security/verify-gitleaks-coverage.sh",
+        "pnpm run skill-governance:check",
+        "python3 .github/scripts/test-security-suppression-audit.py"
+      ],
+      "evidenceSchema": {
+        "schemaRef": "continuous-audit-finding/v1",
+        "requiredKinds": ["test-output", "source-location", "advisory"],
+        "requiredProofTiers": ["source", "ci", "queue", "deploy", "runtime"]
+      },
+      "riskRubric": {
+        "baseDimensions": [
+          "exploitability",
+          "blast-radius",
+          "data-sensitivity",
+          "reversibility"
+        ],
+        "criticalOverrides": [
+          "credential exposure",
+          "cross-tenant access",
+          "remote code execution",
+          "payment bypass"
+        ]
+      },
+      "recurrence": {
+        "events": [
+          "security-sensitive-change",
+          "new-advisory",
+          "suppression-change"
+        ],
+        "cadenceProposal": "daily-delta-weekly-rotation",
+        "coverageWindowDays": 30,
+        "scheduleStatus": "proposal-only"
+      },
+      "acceptanceState": {
+        "state": "draft",
+        "owner": "Security",
+        "acceptedAt": null
+      }
+    },
+    {
+      "id": "correctness-regression",
+      "name": "Correctness and regression",
+      "scope": {
+        "partitions": ["web-product", "native-clients", "shared-packages"],
+        "partitionStrategy": "changed paths plus risk-register rotation"
+      },
+      "providerEligibility": {
+        "deterministicFirst": true,
+        "allowedProviders": [
+          "deterministic",
+          "codex",
+          "grok",
+          "kimi",
+          "hyperagent"
+        ],
+        "requiredModelCapabilities": ["review", "tests"],
+        "minimumQuality": 74,
+        "crossCheck": "different-provider-for-high-risk-sample"
+      },
+      "readBoundary": {
+        "allow": [
+          "tracked source",
+          "test fixtures",
+          "sanitized failure telemetry"
+        ],
+        "deny": ["production customer data", "secret values", "live mutation"]
+      },
+      "costBudget": {
+        "deterministicMinutes": 45,
+        "modelRuns": 2,
+        "maxInputTokensPerRun": 50000,
+        "maxOutputTokensPerRun": 8000,
+        "maxSpendCents": 0
+      },
+      "deterministicProbes": [
+        "pnpm run test:fast",
+        "pnpm run test:bug-to-test",
+        "pnpm --filter @jovie/web run test:nightly-agent:select"
+      ],
+      "evidenceSchema": {
+        "schemaRef": "continuous-audit-finding/v1",
+        "requiredKinds": ["test-output", "reproduction", "source-location"],
+        "requiredProofTiers": ["source", "ci", "queue", "deploy", "runtime"]
+      },
+      "riskRubric": {
+        "baseDimensions": [
+          "user-impact",
+          "blast-radius",
+          "state-corruption",
+          "reversibility"
+        ],
+        "criticalOverrides": [
+          "money path broken",
+          "data loss",
+          "all-user outage"
+        ]
+      },
+      "recurrence": {
+        "events": ["product-code-change", "incident", "test-regression"],
+        "cadenceProposal": "per-change-delta-nightly-rotation",
+        "coverageWindowDays": 30,
+        "scheduleStatus": "proposal-only"
+      },
+      "acceptanceState": {
+        "state": "draft",
+        "owner": "Engineering",
+        "acceptedAt": null
+      }
+    },
+    {
+      "id": "ci-merge-throughput",
+      "name": "CI and merge throughput",
+      "scope": {
+        "partitions": ["workflows-and-actions", "delivery-control"],
+        "partitionStrategy": "exact-main receipts plus bounded queue and duration windows"
+      },
+      "providerEligibility": {
+        "deterministicFirst": true,
+        "allowedProviders": [
+          "deterministic",
+          "codex",
+          "grok",
+          "cursor",
+          "hyperagent"
+        ],
+        "requiredModelCapabilities": ["architecture", "root-cause"],
+        "minimumQuality": 82,
+        "crossCheck": "second-provider-on-root-cause-only"
+      },
+      "readBoundary": {
+        "allow": [
+          "workflow source",
+          "public GitHub metadata",
+          "sanitized run logs",
+          "queue receipts"
+        ],
+        "deny": [
+          "secret values",
+          "write tokens",
+          "queue mutation",
+          "workflow dispatch"
+        ]
+      },
+      "costBudget": {
+        "deterministicMinutes": 10,
+        "modelRuns": 2,
+        "maxInputTokensPerRun": 30000,
+        "maxOutputTokensPerRun": 5000,
+        "maxSpendCents": 0
+      },
+      "deterministicProbes": [
+        "node scripts/ci-duration-ratchet.mjs",
+        "MERGE_QUEUE_BACKEND=native node scripts/merge-queue-backend.mjs list-state",
+        "node scripts/verify-workflow-references.mjs"
+      ],
+      "evidenceSchema": {
+        "schemaRef": "continuous-audit-finding/v1",
+        "requiredKinds": [
+          "source-sha",
+          "workflow-run",
+          "queue-snapshot",
+          "duration-window"
+        ],
+        "requiredProofTiers": ["source", "ci", "queue", "deploy", "runtime"]
+      },
+      "riskRubric": {
+        "baseDimensions": [
+          "queue-depth",
+          "time-to-merge",
+          "false-green-risk",
+          "writer-collision"
+        ],
+        "criticalOverrides": [
+          "unauthorized queue mutation",
+          "system-wide admission deadlock"
+        ]
+      },
+      "recurrence": {
+        "events": [
+          "ci-policy-change",
+          "queue-depth-threshold",
+          "controller-failure"
+        ],
+        "cadenceProposal": "hourly-metrics-daily-audit",
+        "coverageWindowDays": 7,
+        "scheduleStatus": "proposal-only"
+      },
+      "acceptanceState": {
+        "state": "pilot",
+        "owner": "Symphony",
+        "acceptedAt": null
+      }
+    },
+    {
+      "id": "runtime-production-health",
+      "name": "Runtime and production health",
+      "scope": {
+        "partitions": [
+          "production-runtime",
+          "delivery-control",
+          "native-runtime"
+        ],
+        "partitionStrategy": "immutable deployment receipt plus rotating public and authenticated paths"
+      },
+      "providerEligibility": {
+        "deterministicFirst": true,
+        "allowedProviders": ["deterministic", "codex", "grok", "hyperagent"],
+        "requiredModelCapabilities": ["root-cause"],
+        "minimumQuality": 82,
+        "crossCheck": "second-provider-after-deterministic-incident-classification"
+      },
+      "readBoundary": {
+        "allow": [
+          "public probes",
+          "sanitized Sentry classes",
+          "deployment receipts",
+          "packaged-build receipts"
+        ],
+        "deny": [
+          "customer payloads",
+          "raw logs with identifiers",
+          "production mutation",
+          "credentials"
+        ]
+      },
+      "costBudget": {
+        "deterministicMinutes": 15,
+        "modelRuns": 1,
+        "maxInputTokensPerRun": 25000,
+        "maxOutputTokensPerRun": 5000,
+        "maxSpendCents": 0
+      },
+      "deterministicProbes": [
+        "bash scripts/ci-health-check.sh",
+        "node scripts/lib/policy-gate-liveness.mjs",
+        "public health and immutable deployment probes from docs/ci/production-deployment-probes.md"
+      ],
+      "evidenceSchema": {
+        "schemaRef": "continuous-audit-finding/v1",
+        "requiredKinds": [
+          "deployment-receipt",
+          "http-probe",
+          "runtime-identity"
+        ],
+        "requiredProofTiers": ["source", "ci", "queue", "deploy", "runtime"]
+      },
+      "riskRubric": {
+        "baseDimensions": [
+          "availability",
+          "exact-build-parity",
+          "customer-impact",
+          "recovery-time"
+        ],
+        "criticalOverrides": [
+          "production outage",
+          "wrong-build serving",
+          "cross-environment auth"
+        ]
+      },
+      "recurrence": {
+        "events": ["production-controller-terminal", "deploy", "runtime-alert"],
+        "cadenceProposal": "event-driven-plus-daily-canary",
+        "coverageWindowDays": 7,
+        "scheduleStatus": "proposal-only"
+      },
+      "acceptanceState": {
+        "state": "draft",
+        "owner": "Operations",
+        "acceptedAt": null
+      }
+    },
+    {
+      "id": "dependency-upgrade",
+      "name": "Dependency and upgrade",
+      "scope": {
+        "partitions": ["dependencies", "runtime-toolchains"],
+        "partitionStrategy": "lockfile delta plus ecosystem rotation"
+      },
+      "providerEligibility": {
+        "deterministicFirst": true,
+        "allowedProviders": ["deterministic", "codex", "kimi", "hyperagent"],
+        "requiredModelCapabilities": ["review", "code"],
+        "minimumQuality": 74,
+        "crossCheck": "second-provider-for-major-upgrades"
+      },
+      "readBoundary": {
+        "allow": [
+          "manifests",
+          "lockfiles",
+          "public advisories",
+          "release notes"
+        ],
+        "deny": [
+          "registry credentials",
+          "private package contents",
+          "install scripts from untrusted upgrades"
+        ]
+      },
+      "costBudget": {
+        "deterministicMinutes": 20,
+        "modelRuns": 1,
+        "maxInputTokensPerRun": 20000,
+        "maxOutputTokensPerRun": 4000,
+        "maxSpendCents": 0
+      },
+      "deterministicProbes": [
+        "node scripts/dependabot-update-policy.mjs",
+        "pnpm audit --audit-level high",
+        "OSV-Scanner offline or package-metadata-only mode when separately adopted"
+      ],
+      "evidenceSchema": {
+        "schemaRef": "continuous-audit-finding/v1",
+        "requiredKinds": [
+          "lockfile-location",
+          "advisory",
+          "compatibility-test"
+        ],
+        "requiredProofTiers": ["source", "ci", "queue", "deploy", "runtime"]
+      },
+      "riskRubric": {
+        "baseDimensions": [
+          "known-vulnerability",
+          "major-version-distance",
+          "runtime-criticality",
+          "migration-risk"
+        ],
+        "criticalOverrides": [
+          "actively exploited dependency",
+          "unpatched auth runtime"
+        ]
+      },
+      "recurrence": {
+        "events": ["lockfile-change", "advisory", "runtime-eol"],
+        "cadenceProposal": "per-change-weekly-full",
+        "coverageWindowDays": 14,
+        "scheduleStatus": "proposal-only"
+      },
+      "acceptanceState": {
+        "state": "draft",
+        "owner": "Engineering",
+        "acceptedAt": null
+      }
+    },
+    {
+      "id": "architecture-ownership-drift",
+      "name": "Architecture and ownership drift",
+      "scope": {
+        "partitions": [
+          "shared-packages",
+          "delivery-control",
+          "canon-and-ownership"
+        ],
+        "partitionStrategy": "boundary changes plus rotating ownership domains"
+      },
+      "providerEligibility": {
+        "deterministicFirst": true,
+        "allowedProviders": [
+          "deterministic",
+          "codex",
+          "grok",
+          "cursor",
+          "hyperagent"
+        ],
+        "requiredModelCapabilities": ["architecture", "review"],
+        "minimumQuality": 82,
+        "crossCheck": "different-provider-required-for-boundary-change"
+      },
+      "readBoundary": {
+        "allow": [
+          "tracked architecture docs",
+          "imports",
+          "CODEOWNERS",
+          "ownership receipts"
+        ],
+        "deny": [
+          "private personnel data",
+          "credentials",
+          "unbounded full-repo model upload"
+        ]
+      },
+      "costBudget": {
+        "deterministicMinutes": 15,
+        "modelRuns": 2,
+        "maxInputTokensPerRun": 45000,
+        "maxOutputTokensPerRun": 7000,
+        "maxSpendCents": 0
+      },
+      "deterministicProbes": [
+        "pnpm run boundaries:check",
+        "node scripts/invariant-stewardship/audit.mjs",
+        "ownership inventory probes under scripts/backlog-orchestrator"
+      ],
+      "evidenceSchema": {
+        "schemaRef": "continuous-audit-finding/v1",
+        "requiredKinds": [
+          "dependency-edge",
+          "authority-reference",
+          "ownership-receipt"
+        ],
+        "requiredProofTiers": ["source", "ci", "queue", "deploy", "runtime"]
+      },
+      "riskRubric": {
+        "baseDimensions": [
+          "boundary-violation",
+          "owner-ambiguity",
+          "duplicated-writer",
+          "recovery-cost"
+        ],
+        "criticalOverrides": [
+          "multiple production writers",
+          "authority inversion"
+        ]
+      },
+      "recurrence": {
+        "events": [
+          "package-boundary-change",
+          "owner-change",
+          "new-automation-writer"
+        ],
+        "cadenceProposal": "per-change-monthly-rotation",
+        "coverageWindowDays": 30,
+        "scheduleStatus": "proposal-only"
+      },
+      "acceptanceState": {
+        "state": "draft",
+        "owner": "Engineering",
+        "acceptedAt": null
+      }
+    },
+    {
+      "id": "data-migration-safety",
+      "name": "Data and migration safety",
+      "scope": {
+        "partitions": ["database-and-migrations", "data-lifecycle"],
+        "partitionStrategy": "every migration plus rotating retention and RLS surfaces"
+      },
+      "providerEligibility": {
+        "deterministicFirst": true,
+        "allowedProviders": ["deterministic", "codex", "grok", "hyperagent"],
+        "requiredModelCapabilities": ["review", "root-cause"],
+        "minimumQuality": 82,
+        "crossCheck": "different-provider-required-for-irreversible-change"
+      },
+      "readBoundary": {
+        "allow": [
+          "schema",
+          "migration SQL",
+          "synthetic fixtures",
+          "migration receipts"
+        ],
+        "deny": [
+          "production rows",
+          "database credentials",
+          "customer exports",
+          "unapproved migration execution"
+        ]
+      },
+      "costBudget": {
+        "deterministicMinutes": 30,
+        "modelRuns": 2,
+        "maxInputTokensPerRun": 35000,
+        "maxOutputTokensPerRun": 6000,
+        "maxSpendCents": 0
+      },
+      "deterministicProbes": [
+        "migration policy lane from CI",
+        "pnpm --filter @jovie/web run drizzle:check",
+        "RLS and retention contract tests"
+      ],
+      "evidenceSchema": {
+        "schemaRef": "continuous-audit-finding/v1",
+        "requiredKinds": [
+          "migration-diff",
+          "schema-test",
+          "rollback-or-forward-fix-plan"
+        ],
+        "requiredProofTiers": ["source", "ci", "queue", "deploy", "runtime"]
+      },
+      "riskRubric": {
+        "baseDimensions": [
+          "data-loss",
+          "lock-risk",
+          "cross-tenant-risk",
+          "reversibility"
+        ],
+        "criticalOverrides": [
+          "destructive migration without guard",
+          "RLS removal",
+          "irreversible customer data loss"
+        ]
+      },
+      "recurrence": {
+        "events": [
+          "migration-change",
+          "schema-change",
+          "retention-policy-change"
+        ],
+        "cadenceProposal": "per-change-weekly-rotation",
+        "coverageWindowDays": 14,
+        "scheduleStatus": "proposal-only"
+      },
+      "acceptanceState": {
+        "state": "draft",
+        "owner": "Data",
+        "acceptedAt": null
+      }
+    },
+    {
+      "id": "privacy-access-boundaries",
+      "name": "Privacy and access boundaries",
+      "scope": {
+        "partitions": ["trust-boundaries", "data-lifecycle", "integrations"],
+        "partitionStrategy": "every access-boundary change plus rotating data-flow slice"
+      },
+      "providerEligibility": {
+        "deterministicFirst": true,
+        "allowedProviders": ["deterministic", "codex", "grok", "hyperagent"],
+        "requiredModelCapabilities": ["review", "architecture"],
+        "minimumQuality": 82,
+        "crossCheck": "different-provider-required-for-high-or-critical"
+      },
+      "readBoundary": {
+        "allow": [
+          "policy source",
+          "synthetic fixtures",
+          "data-flow docs",
+          "permission metadata"
+        ],
+        "deny": [
+          "PII",
+          "customer content",
+          "tokens",
+          "raw analytics rows",
+          "private communications"
+        ]
+      },
+      "costBudget": {
+        "deterministicMinutes": 25,
+        "modelRuns": 2,
+        "maxInputTokensPerRun": 30000,
+        "maxOutputTokensPerRun": 6000,
+        "maxSpendCents": 0
+      },
+      "deterministicProbes": [
+        "RLS contract tests",
+        "OAuth scope contract tests",
+        "privacy retention and IP purge tests"
+      ],
+      "evidenceSchema": {
+        "schemaRef": "continuous-audit-finding/v1",
+        "requiredKinds": [
+          "access-control-test",
+          "data-flow-location",
+          "retention-proof"
+        ],
+        "requiredProofTiers": ["source", "ci", "queue", "deploy", "runtime"]
+      },
+      "riskRubric": {
+        "baseDimensions": [
+          "sensitivity",
+          "tenant-crossing",
+          "consent",
+          "retention"
+        ],
+        "criticalOverrides": [
+          "cross-tenant disclosure",
+          "secret transfer",
+          "unconsented external model transfer"
+        ]
+      },
+      "recurrence": {
+        "events": [
+          "scope-change",
+          "connector-change",
+          "retention-change",
+          "model-egress-change"
+        ],
+        "cadenceProposal": "per-change-monthly-rotation",
+        "coverageWindowDays": 30,
+        "scheduleStatus": "proposal-only"
+      },
+      "acceptanceState": {
+        "state": "draft",
+        "owner": "Security",
+        "acceptedAt": null
+      }
+    },
+    {
+      "id": "performance-cost",
+      "name": "Performance and cost",
+      "scope": {
+        "partitions": [
+          "web-product",
+          "production-runtime",
+          "runtime-toolchains"
+        ],
+        "partitionStrategy": "changed route or provider plus rotating budget slice"
+      },
+      "providerEligibility": {
+        "deterministicFirst": true,
+        "allowedProviders": ["deterministic", "codex", "kimi", "hyperagent"],
+        "requiredModelCapabilities": ["architecture", "code"],
+        "minimumQuality": 74,
+        "crossCheck": "second-provider-only-for-causal-disagreement"
+      },
+      "readBoundary": {
+        "allow": [
+          "benchmark outputs",
+          "bundle metadata",
+          "sanitized usage aggregates",
+          "source"
+        ],
+        "deny": [
+          "customer-level usage",
+          "billing credentials",
+          "unapproved paid benchmark"
+        ]
+      },
+      "costBudget": {
+        "deterministicMinutes": 30,
+        "modelRuns": 1,
+        "maxInputTokensPerRun": 25000,
+        "maxOutputTokensPerRun": 5000,
+        "maxSpendCents": 0
+      },
+      "deterministicProbes": [
+        "pnpm --filter @jovie/web run test:budgets",
+        "node scripts/ci-duration-ratchet.mjs",
+        "cost anomaly receipts described in docs/COST_MONITORING.md"
+      ],
+      "evidenceSchema": {
+        "schemaRef": "continuous-audit-finding/v1",
+        "requiredKinds": [
+          "same-method-baseline",
+          "same-method-result",
+          "cost-or-latency-metric"
+        ],
+        "requiredProofTiers": ["source", "ci", "queue", "deploy", "runtime"]
+      },
+      "riskRubric": {
+        "baseDimensions": [
+          "user-latency",
+          "spend-rate",
+          "capacity",
+          "regression-size"
+        ],
+        "criticalOverrides": [
+          "runaway spend",
+          "system-wide resource exhaustion"
+        ]
+      },
+      "recurrence": {
+        "events": [
+          "provider-change",
+          "performance-sensitive-change",
+          "cost-anomaly"
+        ],
+        "cadenceProposal": "per-change-weekly-rotation",
+        "coverageWindowDays": 14,
+        "scheduleStatus": "proposal-only"
+      },
+      "acceptanceState": {
+        "state": "draft",
+        "owner": "Engineering",
+        "acceptedAt": null
+      }
+    },
+    {
+      "id": "ux-accessibility-visual-drift",
+      "name": "UX, accessibility, and visual drift",
+      "scope": {
+        "partitions": ["web-ui", "native-ui", "design-system"],
+        "partitionStrategy": "changed surfaces plus canonical-route rotation"
+      },
+      "providerEligibility": {
+        "deterministicFirst": true,
+        "allowedProviders": [
+          "deterministic",
+          "codex",
+          "grok",
+          "cursor",
+          "hyperagent"
+        ],
+        "requiredModelCapabilities": ["review"],
+        "minimumQuality": 74,
+        "crossCheck": "multi-provider-jury-only-after-objective-probes"
+      },
+      "readBoundary": {
+        "allow": [
+          "source",
+          "synthetic screenshots",
+          "public routes",
+          "canonical design assets"
+        ],
+        "deny": [
+          "customer screenshots",
+          "private profiles",
+          "auth tokens",
+          "unredacted browser storage"
+        ]
+      },
+      "costBudget": {
+        "deterministicMinutes": 30,
+        "modelRuns": 3,
+        "maxInputTokensPerRun": 20000,
+        "maxOutputTokensPerRun": 4000,
+        "maxSpendCents": 0
+      },
+      "deterministicProbes": [
+        "pnpm --filter @jovie/web run a11y:axe",
+        "node scripts/design-governance-audit.mjs",
+        "visual regression and no-layout-shift lanes"
+      ],
+      "evidenceSchema": {
+        "schemaRef": "continuous-audit-finding/v1",
+        "requiredKinds": [
+          "screenshot",
+          "axe-result",
+          "layout-metric",
+          "canonical-reference"
+        ],
+        "requiredProofTiers": ["source", "ci", "queue", "deploy", "runtime"]
+      },
+      "riskRubric": {
+        "baseDimensions": [
+          "task-blocking",
+          "accessibility-impact",
+          "surface-reach",
+          "visual-severity"
+        ],
+        "criticalOverrides": [
+          "core task inaccessible",
+          "payment action unusable"
+        ]
+      },
+      "recurrence": {
+        "events": ["ui-change", "design-token-change", "visual-regression"],
+        "cadenceProposal": "per-change-weekly-route-rotation",
+        "coverageWindowDays": 21,
+        "scheduleStatus": "proposal-only"
+      },
+      "acceptanceState": {
+        "state": "draft",
+        "owner": "Design",
+        "acceptedAt": null
+      }
+    },
+    {
+      "id": "test-eval-quality",
+      "name": "Test and eval quality",
+      "scope": {
+        "partitions": ["tests-and-evals", "risk-register"],
+        "partitionStrategy": "changed tests plus mutation and stale-risk rotation"
+      },
+      "providerEligibility": {
+        "deterministicFirst": true,
+        "allowedProviders": [
+          "deterministic",
+          "codex",
+          "grok",
+          "kimi",
+          "hyperagent"
+        ],
+        "requiredModelCapabilities": ["tests", "review"],
+        "minimumQuality": 74,
+        "crossCheck": "different-provider-for-generated-test-sample"
+      },
+      "readBoundary": {
+        "allow": [
+          "tests",
+          "synthetic fixtures",
+          "coverage",
+          "mutation output",
+          "sanitized eval cases"
+        ],
+        "deny": [
+          "production transcripts",
+          "customer prompts",
+          "live keys",
+          "shared provider state"
+        ]
+      },
+      "costBudget": {
+        "deterministicMinutes": 50,
+        "modelRuns": 2,
+        "maxInputTokensPerRun": 35000,
+        "maxOutputTokensPerRun": 7000,
+        "maxSpendCents": 0
+      },
+      "deterministicProbes": [
+        "pnpm run test:coverage:diff",
+        "pnpm --filter @jovie/web run test:mutation:hotspots",
+        "pnpm run evals",
+        "pnpm run test:quarantine-ledger"
+      ],
+      "evidenceSchema": {
+        "schemaRef": "continuous-audit-finding/v1",
+        "requiredKinds": [
+          "coverage",
+          "mutation",
+          "deliberate-red",
+          "eval-result"
+        ],
+        "requiredProofTiers": ["source", "ci", "queue", "deploy", "runtime"]
+      },
+      "riskRubric": {
+        "baseDimensions": [
+          "critical-path-gap",
+          "assertion-strength",
+          "flake-cost",
+          "eval-drift"
+        ],
+        "criticalOverrides": [
+          "false-green critical path",
+          "secret-bearing live eval on schedule"
+        ]
+      },
+      "recurrence": {
+        "events": ["test-change", "incident", "coverage-drop", "eval-change"],
+        "cadenceProposal": "per-change-nightly-risk-rotation",
+        "coverageWindowDays": 14,
+        "scheduleStatus": "proposal-only"
+      },
+      "acceptanceState": {
+        "state": "draft",
+        "owner": "Quality",
+        "acceptedAt": null
+      }
+    },
+    {
+      "id": "documentation-skill-context-freshness",
+      "name": "Documentation, skill, and context freshness",
+      "scope": {
+        "partitions": ["canon-and-ownership", "docs-and-skills"],
+        "partitionStrategy": "changed contract plus registry-guided rotation"
+      },
+      "providerEligibility": {
+        "deterministicFirst": true,
+        "allowedProviders": ["deterministic", "codex", "kimi", "hyperagent"],
+        "requiredModelCapabilities": ["review"],
+        "minimumQuality": 74,
+        "crossCheck": "second-provider-for-policy-contradiction"
+      },
+      "readBoundary": {
+        "allow": [
+          "tracked docs",
+          "skills",
+          "generated indexes",
+          "sanitized context artifacts"
+        ],
+        "deny": [
+          "private conversation history",
+          "credentials",
+          "customer data",
+          "unbounded memory export"
+        ]
+      },
+      "costBudget": {
+        "deterministicMinutes": 15,
+        "modelRuns": 1,
+        "maxInputTokensPerRun": 30000,
+        "maxOutputTokensPerRun": 5000,
+        "maxSpendCents": 0
+      },
+      "deterministicProbes": [
+        "node scripts/doc-freshness-lint.mjs",
+        "node scripts/skill-catalog.mjs",
+        "pnpm run skill-governance:check"
+      ],
+      "evidenceSchema": {
+        "schemaRef": "continuous-audit-finding/v1",
+        "requiredKinds": [
+          "stale-marker",
+          "broken-link",
+          "policy-conflict",
+          "generated-index-drift"
+        ],
+        "requiredProofTiers": ["source", "ci", "queue", "deploy", "runtime"]
+      },
+      "riskRubric": {
+        "baseDimensions": [
+          "instruction-authority",
+          "staleness",
+          "execution-impact",
+          "scope"
+        ],
+        "criticalOverrides": [
+          "unsafe stale credential instruction",
+          "conflicting production mutation authority"
+        ]
+      },
+      "recurrence": {
+        "events": ["canon-change", "skill-change", "registry-change"],
+        "cadenceProposal": "per-change-weekly-gardening",
+        "coverageWindowDays": 30,
+        "scheduleStatus": "proposal-only"
+      },
+      "acceptanceState": {
+        "state": "draft",
+        "owner": "Operations",
+        "acceptedAt": null
+      }
+    },
+    {
+      "id": "operational-automation-liveness",
+      "name": "Operational automation and liveness",
+      "scope": {
+        "partitions": [
+          "delivery-control",
+          "scheduled-automation",
+          "operator-runtime"
+        ],
+        "partitionStrategy": "terminal receipts plus rotating automation owner and heartbeat"
+      },
+      "providerEligibility": {
+        "deterministicFirst": true,
+        "allowedProviders": [
+          "deterministic",
+          "codex",
+          "grok",
+          "cursor",
+          "hyperagent"
+        ],
+        "requiredModelCapabilities": ["architecture", "root-cause"],
+        "minimumQuality": 82,
+        "crossCheck": "different-provider-for-owner-or-liveness-disagreement"
+      },
+      "readBoundary": {
+        "allow": [
+          "workflow source",
+          "heartbeats",
+          "sanitized receipts",
+          "public run metadata"
+        ],
+        "deny": [
+          "control mutation",
+          "credential changes",
+          "raw secrets",
+          "customer payloads"
+        ]
+      },
+      "costBudget": {
+        "deterministicMinutes": 15,
+        "modelRuns": 2,
+        "maxInputTokensPerRun": 30000,
+        "maxOutputTokensPerRun": 6000,
+        "maxSpendCents": 0
+      },
+      "deterministicProbes": [
+        "node scripts/lib/policy-gate-liveness.mjs",
+        "node scripts/automation-verify.sh",
+        "delivery-control receipt reconciliation"
+      ],
+      "evidenceSchema": {
+        "schemaRef": "continuous-audit-finding/v1",
+        "requiredKinds": [
+          "heartbeat",
+          "terminal-receipt",
+          "owner-binding",
+          "recurrence-proof"
+        ],
+        "requiredProofTiers": ["source", "ci", "queue", "deploy", "runtime"]
+      },
+      "riskRubric": {
+        "baseDimensions": [
+          "false-green-risk",
+          "stale-heartbeat",
+          "ownerless-work",
+          "mutation-authority"
+        ],
+        "criticalOverrides": [
+          "unbounded mutator",
+          "multiple production writers",
+          "silent terminal failure"
+        ]
+      },
+      "recurrence": {
+        "events": ["automation-terminal", "heartbeat-stale", "owner-change"],
+        "cadenceProposal": "event-driven-hourly-reconciliation",
+        "coverageWindowDays": 7,
+        "scheduleStatus": "proposal-only"
+      },
+      "acceptanceState": {
+        "state": "draft",
+        "owner": "Operations",
+        "acceptedAt": null
+      }
+    }
+  ]
+}
