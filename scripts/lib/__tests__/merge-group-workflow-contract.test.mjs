@@ -1308,6 +1308,7 @@ ${selectedGateScript}`,
       'ci.yml',
       'fork-pr-gate.yml',
       'pr-size-guard.yml',
+      'pr-targets-main.yml',
     ]);
     expect(getJobBlock(FORK_GATE_WORKFLOW, 'merge-group-gate')).not.toContain(
       'secrets.'
@@ -1454,6 +1455,23 @@ ${selectedGateScript}`,
     expect(FORK_GATE_WORKFLOW.match(/-f context="Fork PR Gate"/g)).toHaveLength(
       3
     );
+  });
+});
+
+describe('PR targets main (no stacked bases)', () => {
+  const workflow = readFileSync(
+    resolve(REPO_ROOT, '.github/workflows/pr-targets-main.yml'),
+    'utf8'
+  );
+
+  it('fails closed on any pull_request base other than main and passes merge_group', () => {
+    expect(workflow).toContain('name: PR targets main');
+    expect(workflow).toMatch(/^on:\n  pull_request:\n    types:/m);
+    expect(workflow).not.toMatch(/branches:\s*\[main/);
+    expect(workflow).toContain('merge_group:');
+    expect(workflow).toContain('"$base" != "main"');
+    expect(workflow).toContain('PRs must target main');
+    expect(workflow).toContain('Retarget the pull request base to main');
   });
 });
 

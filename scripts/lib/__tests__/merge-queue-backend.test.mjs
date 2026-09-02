@@ -649,7 +649,7 @@ describe('queue workflow mutation safety', () => {
       'NO_AUTO_HOLD_JQ=\'. == "no-auto" or . == "no-auto-merge" or . == "no-automerge"\''
     );
     expect(drain).toContain(
-      '(.state.labels.nodes // []) | map(.name) | any(. == "needs-human" or . == "hold" or . == "gated" or . == "queue-deferred" or . == "needs-conflict-resolution" or . == "fast" or \'"$NO_AUTO_HOLD_JQ"\') | not'
+      '(.state.labels.nodes // []) | map(.name) | any(. == "queue-deferred" or . == "needs-conflict-resolution" or . == "fast" or \'"$NO_AUTO_HOLD_JQ"\') | not'
     );
     expect(drain).toContain(
       'queue-noop: missing receipt: exact admission #$DRAIN_ADMISSION_PR at $DRAIN_ADMISSION_HEAD'
@@ -2069,7 +2069,7 @@ describe('exact-head queue receipt proof', () => {
     const queuedAndHeld = prState({
       isInMergeQueue: true,
       mergeQueueEntry: QUEUE_ENTRY,
-      labels: { nodes: [{ name: 'needs-human' }] },
+      labels: { nodes: [{ name: 'queue-deferred' }] },
     });
     expect(hasAuthoritativeExactHeadQueueReceipt(queuedAndHeld, HEAD)).toBe(
       true
@@ -2077,7 +2077,7 @@ describe('exact-head queue receipt proof', () => {
     expect(canAcceptExactHeadQueueReceipt(queuedAndHeld, HEAD)).toBe(false);
     expect(explainExactHeadQueueReceipt(queuedAndHeld, HEAD)).toEqual({
       ok: false,
-      reason: 'held-by=needs-human',
+      reason: 'held-by=queue-deferred',
     });
 
     const runner = createNativeRunner({ states: [queuedAndHeld] });
@@ -2088,7 +2088,7 @@ describe('exact-head queue receipt proof', () => {
     ).resolves.toMatchObject({
       ok: false,
       attempts: 1,
-      explanation: { ok: false, reason: 'held-by=needs-human' },
+      explanation: { ok: false, reason: 'held-by=queue-deferred' },
     });
     expect(invokedEnrollment(runner)).toBe(false);
   });

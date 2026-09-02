@@ -126,6 +126,8 @@ class MainReleaseReadySelectionTests(unittest.TestCase):
                 return {"state": "success"}
             if endpoint.startswith(f"commits/{MAIN_SHA}/check-runs?"):
                 return {"check_runs": []}
+            if endpoint.startswith("actions/runs?"):
+                return {"workflow_runs": []}
             raise AssertionError(f"unexpected GitHub endpoint: {endpoint}")
 
         with mock.patch.object(MODULE, "gh_json", side_effect=github_response):
@@ -134,6 +136,49 @@ class MainReleaseReadySelectionTests(unittest.TestCase):
         self.assertEqual(observed["status"], "unknown")
         self.assertEqual(observed["sha"], MAIN_SHA)
         self.assertIn("Main Release Ready check is missing", observed["error"])
+
+    def test_observe_main_uses_ci_job_when_check_runs_are_flooded(self):
+        def github_response(_repo: str, endpoint: str):
+            if endpoint == "branches/main":
+                return {"commit": {"sha": MAIN_SHA}}
+            if endpoint == f"commits/{MAIN_SHA}/status":
+                return {"state": "success"}
+            if endpoint.startswith(f"commits/{MAIN_SHA}/check-runs?"):
+                return {"check_runs": [{"name": "enroll", "conclusion": "failure"}]}
+            if endpoint.startswith("actions/runs?"):
+                self.assertIn(f"head_sha={MAIN_SHA}", endpoint)
+                self.assertIn("event=push", endpoint)
+                return {
+                    "workflow_runs": [
+                        {
+                            "id": 33549740322,
+                            "path": ".github/workflows/ci.yml",
+                            "head_sha": MAIN_SHA,
+                            "event": "push",
+                        }
+                    ]
+                }
+            if endpoint.startswith("actions/runs/33549740322/jobs"):
+                return {
+                    "jobs": [
+                        {
+                            "name": "Main Release Ready",
+                            "status": "completed",
+                            "conclusion": "success",
+                            "started_at": "2026-09-01T19:30:00Z",
+                            "completed_at": "2026-09-01T19:30:04Z",
+                        }
+                    ]
+                }
+            raise AssertionError(f"unexpected GitHub endpoint: {endpoint}")
+
+        with mock.patch.object(MODULE, "gh_json", side_effect=github_response):
+            observed = MODULE.observe_main("JovieInc/Jovie")
+
+        self.assertEqual(observed["status"], "green")
+        self.assertEqual(observed["sha"], MAIN_SHA)
+        self.assertEqual(observed["sourceGate"]["conclusion"], "success")
+        self.assertEqual(observed["sourceGate"]["status"], "completed")
 
     def test_observe_main_uses_sentinel_when_branch_lookup_fails(self):
         with mock.patch.object(MODULE, "gh_json", side_effect=OSError("offline")):
@@ -1286,18 +1331,36 @@ class DeploymentBindingTests(unittest.TestCase):
         one_landed = self.evaluate(signals)
         self.assertTrue(one_landed["workAdmission"]["newIssueLeaseAllowed"])
 
-    def test_malformed_queue_blocks_promotion_and_new_issue_leases(self):
+    def test_malformed_queue_does_not_freeze_a_bound_green_factory(self):
         signals = dict(GREEN_SIGNALS)
         signals["queue"] = {"status": "known"}
 
         receipt = self.evaluate(signals)
 
-        self.assertEqual(receipt["state"], "AMBER")
-        self.assertFalse(receipt["promotionAdmission"]["allowed"])
-        self.assertFalse(receipt["workAdmission"]["newIssueLeaseAllowed"])
-        self.assertIn(
+        self.assertEqual(receipt["state"], "GREEN")
+        self.assertEqual(receipt["promotionMode"], "normal")
+        self.assertTrue(receipt["promotionAdmission"]["allowed"])
+        self.assertNotIn(
             "queue-unknown",
             {reason["code"] for reason in receipt["reasons"]},
+        )
+
+    def test_malformed_queue_keeps_unbound_production_in_hold_intake(self):
+        signals = dict(GREEN_SIGNALS)
+        signals["production"] = {"status": "green", "deployedSha": "b" * 40}
+        signals["queue"] = {"status": "known"}
+
+        receipt = self.evaluate(signals)
+
+        self.assertEqual(receipt["state"], "AMBER")
+        self.assertEqual(receipt["promotionMode"], "hold-intake")
+        self.assertNotIn(
+            "queue-unknown",
+            {reason["code"] for reason in receipt["reasons"]},
+        )
+        self.assertEqual(
+            {reason["code"] for reason in receipt["reasons"]},
+            {"production-deployment-unbound"},
         )
 
     def test_controller_failure_blocks_deployment(self):
@@ -1317,14 +1380,18 @@ class DeploymentBindingTests(unittest.TestCase):
         self.assertFalse(receipt["isolatedPromotionAdmission"]["deploymentsAllowed"])
         self.assertFalse(receipt["deploymentAdmission"]["allowed"])
 
-    def test_unbound_production_plus_queue_unknown_stays_blocked(self):
+    def test_unbound_production_plus_queue_gap_stays_hold_intake(self):
         signals = dict(GREEN_SIGNALS)
         signals["production"] = {"status": "green", "deployedSha": "b" * 7}
         signals["queue"] = {"status": "known"}
         receipt = self.evaluate(signals)
         self.assertEqual(receipt["state"], "AMBER")
-        self.assertEqual(receipt["promotionMode"], "blocked")
-        self.assertFalse(receipt["alreadyAdmittedCohort"]["preserve"])
+        self.assertEqual(receipt["promotionMode"], "hold-intake")
+        self.assertTrue(receipt["alreadyAdmittedCohort"]["preserve"])
+        self.assertNotIn(
+            "queue-unknown",
+            {reason["code"] for reason in receipt["reasons"]},
+        )
 
 
 class IndependentReviewTests(unittest.TestCase):

@@ -3471,7 +3471,7 @@ JSON
                   exit 0
                 fi
                 if [[ "$1 $2" == "pr checks" ]]; then
-                  [[ "$3" == "101" || "$3" == "104" ]]
+                  [[ "$3" == "101" || "$3" == "104" || "$3" == "456" || "$3" == "789" ]]
                   echo '[{{"name":"PR Ready","bucket":"pass","state":"SUCCESS"}},{{"name":"Migration Guard","bucket":"pass","state":"SUCCESS"}},{{"name":"Fork PR Gate","bucket":"pass","state":"SUCCESS"}},{{"name":"PR Size Guard","bucket":"pass","state":"SUCCESS"}}]'
                   exit 0
                 fi
@@ -3500,18 +3500,16 @@ JSON
 
         assert result.returncode == 0, f"stdout={result.stdout}\nstderr={result.stderr}"
         assert "=== DEQUEUE (hard gates" in result.stdout
-        assert "[dry-run] would -merge-queue on #789" in result.stdout
         assert "[dry-run] would -merge-queue on #102" in result.stdout
         assert "[dry-run] would -merge-queue on #103" in result.stdout
         assert "[dry-run] would +merge-queue on #101" in result.stdout
-        assert "[dry-run] would +merge-queue on #456" not in result.stdout
-        assert "[dry-run] would +merge-queue on #789" not in result.stdout
+        assert "[dry-run] would -merge-queue on #789" not in result.stdout
         assert "[dry-run] would +merge-queue on #102" not in result.stdout
         assert "[dry-run] would +merge-queue on #103" not in result.stdout
         assert "[dry-run] would +merge-queue on #104" not in result.stdout
-        assert "=== SURFACE (human decision; not touched) ===" in result.stdout
-        assert "#456" in result.stdout
-        assert "#789" in result.stdout
+        assert "=== SURFACE (drafts and queue-deferred; not closed) ===" in result.stdout
+        assert "#102" in result.stdout
+        assert "#103" in result.stdout
 
     def test_maintenance_only_run_cannot_admit_a_clean_pr(self, tmp_path: Path) -> None:
         fake_gh = tmp_path / "gh"

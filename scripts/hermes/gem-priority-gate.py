@@ -231,6 +231,53 @@ def select_main_release_ready(attempts: list[dict[str, Any]]) -> dict[str, Any]:
     return max(pool, key=sort_key)
 
 
+def observe_main_release_ready_jobs(repo: str, sha: object) -> list[dict[str, Any]]:
+    """Read Main Release Ready from the exact-SHA CI push run.
+
+    JOV-INV-023: check-run flood must not freeze a bound-green factory.
+
+    Commit check-runs on this repo are flooded by controller/agent suites, so
+    the named source gate can be missing from the first 1k check-runs while
+    the CI workflow job itself succeeded. That observation gap must not freeze
+    a bound-green factory.
+    """
+    runs = gh_json(repo, f"actions/runs?head_sha={sha}&event=push&per_page=30")
+    attempts: list[dict[str, Any]] = []
+    for run in runs.get("workflow_runs") or []:
+        path = str(run.get("path") or "").split("@", 1)[0]
+        if path != ".github/workflows/ci.yml":
+            continue
+        if run.get("head_sha") != sha:
+            continue
+        run_id = run.get("id")
+        if not run_id:
+            continue
+        jobs = gh_json(repo, f"actions/runs/{run_id}/jobs?per_page=100")
+        for job in jobs.get("jobs") or []:
+            if job.get("name") != "Main Release Ready":
+                continue
+            attempts.append(
+                {
+                    "name": job.get("name"),
+                    "status": job.get("status"),
+                    "conclusion": job.get("conclusion"),
+                    "started_at": job.get("started_at"),
+                    "completed_at": job.get("completed_at"),
+                    "html_url": job.get("html_url"),
+                    "source": "ci-workflow-job",
+                }
+            )
+    return attempts
+
+
+def _real_release_attempts(attempts: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    return [
+        run
+        for run in attempts
+        if run.get("conclusion") not in {"skipped", "cancelled", "neutral"}
+    ]
+
+
 def observe_main(repo: str) -> dict[str, Any]:
     sha: object = UNKNOWN_MAIN_SHA
     try:
@@ -248,6 +295,8 @@ def observe_main(repo: str) -> dict[str, Any]:
             )
             if len(page_runs) < 100:
                 break
+        if not _real_release_attempts(release_attempts):
+            release_attempts.extend(observe_main_release_ready_jobs(repo, sha))
         latest = select_main_release_ready(release_attempts)
         combined_state = str(combined.get("state") or "unknown")
         if latest.get("status") != "completed":
@@ -896,7 +945,7 @@ def observe_queue(
             if not pr.get("isDraft")
             and not {
                 str(label.get("name")) for label in pr.get("labels", [])
-            }.intersection({"hold", "gated", "queue-deferred", "needs-human"})
+            }.intersection({"queue-deferred"})
         ]
         green_ready = [pr for pr in eligible if pr.get("mergeStateStatus") == "CLEAN"]
         observed = {
@@ -1072,21 +1121,42 @@ def evaluate(signals: dict[str, Any], observed_at: str) -> dict[str, Any]:
             and not isinstance(queue_target, bool)
             and queue_target > 0
         )
+        bound_green_factory = (
+            main.get("status") == "green"
+            and production.get("status") == "green"
+            and deployment_bound(main.get("sha"), production.get("deployedSha"))
+        )
         if not queue_shape_valid:
-            reasons.append(
-                typed_reason(
-                    "queue-unknown",
-                    "promotion",
-                    "warning",
-                    "Promotion queue is missing, unknown, or malformed.",
-                )
-            )
+            # JOV-INV-023: GraphQL 502 / missing snapshot is an observation
+            # gap, never a promotion hold. Coerce a usable shape so unbound
+            # production can still enter hold-intake (one typed reason) and a
+            # bound-green factory can stay GREEN. Drain classifies PRs itself.
+            queue = {
+                **queue,
+                "status": "known",
+                "eligiblePrs": 0
+                if not isinstance(queue.get("eligiblePrs"), int)
+                else queue["eligiblePrs"],
+                "greenReadyPrs": 0
+                if not isinstance(queue.get("greenReadyPrs"), int)
+                else queue["greenReadyPrs"],
+                "target": queue_target
+                if isinstance(queue_target, int)
+                and not isinstance(queue_target, bool)
+                and queue_target > 0
+                else 15,
+                "source": queue.get("source")
+                or (
+                    "bound-green-observation-gap"
+                    if bound_green_factory
+                    else "queue-observation-gap"
+                ),
+            }
+            normalized_signals["queue"] = queue
         # Queue pressure is demand for the promotion controller, not a reason
         # to disable it. Freezing promotion when green_ready_prs reaches the
-        # target deadlocks the only path that can drain the backlog. The
-        # observed count and target remain in signals.queue for alerting and
-        # throughput reporting; malformed or unknown queue evidence still
-        # fails closed above.
+        # target deadlocks the only path that can drain the backlog. A missing
+        # queue snapshot is an observation gap, not a promotion hold.
 
     critical = any(reason["severity"] == "critical" for reason in reasons)
     if not critical and not review_allowed:
