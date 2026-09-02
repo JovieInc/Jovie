@@ -687,11 +687,18 @@ export async function checkAiChatRateLimitForPlan(
 
     // 2. Check daily plan-specific quota using the plan-aware limiter
     const dailyResult = await aiChatDailyPlanAwareLimiter.limit(userId, plan);
-    return allowIfRateLimitBackendDegraded(dailyResult, {
+    const dailyAllowed = allowIfRateLimitBackendDegraded(dailyResult, {
       limiter: 'ai-chat-daily',
       userId,
       plan,
     });
+    return {
+      ...dailyAllowed,
+      unavailable:
+        burstAllowed.unavailable === true || dailyAllowed.unavailable === true,
+      degraded:
+        burstAllowed.degraded === true || dailyAllowed.degraded === true,
+    };
   } catch {
     // Unexpected limiter failure (should be rare — RateLimiter already
     // catches Redis errors). Fail open so chat stays available.
