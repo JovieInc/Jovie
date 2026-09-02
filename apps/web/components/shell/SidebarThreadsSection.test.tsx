@@ -297,7 +297,11 @@ describe('SidebarThreadsSection', () => {
       name: 'New Chat',
     });
 
-    expect(newThreadButton).toHaveClass('h-6', 'hover:bg-sidebar-accent/70');
+    expect(newThreadButton).toHaveClass(
+      'h-6',
+      'bg-sidebar-accent/70',
+      'hover:bg-sidebar-accent-active'
+    );
     expect(newThreadButton).not.toHaveClass('h-auto', 'hover:bg-transparent');
     fireEvent.click(newThreadButton);
     expect(onNewThread).toHaveBeenCalledTimes(1);
