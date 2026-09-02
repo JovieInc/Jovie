@@ -9,9 +9,9 @@
  * section ids ∈ section registry; anchor parity docs⇔registry.
  *
  * Per codebase-baseline §1: the live homepage lives at (home)/page.tsx NOT
- * app/(marketing)/ — manifest must include (home). Also app/waitlist/page.tsx
- * lives outside (marketing) entirely — manifest must include it for the
- * waitlist recipe (currently stub tier).
+ * app/(marketing)/ — manifest must include (home). Also app/waitlist/* lives
+ * outside (marketing) entirely — manifest must include those public waitlist
+ * surfaces or sanction an exemption.
  */
 
 import type { ProposedSectionId } from './designGaps';
@@ -113,7 +113,7 @@ export interface RouteManifestEntry {
    */
   readonly healthCheck?: {
     readonly path: string;
-    readonly expected: 'page' | 'redirect';
+    readonly expected: 'page' | 'redirect' | 'not-found';
     readonly allowedFinalPaths?: readonly string[];
     readonly allowsAuthShell?: boolean;
     readonly requiresSharedChrome?: boolean;
@@ -135,9 +135,10 @@ export interface RouteManifestEntry {
 }
 
 /**
- * The route manifest. Per JOV-4508 — 25 page.tsx under (marketing)/ after
- * retiring the legacy launch pricing visual fork, plus (home)/page.tsx and
- * app/waitlist/page.tsx = 28 entries.
+ * The route manifest. Per JOV-5650 — every recursive page.tsx under
+ * (marketing), (home), and waitlist is represented exactly once. Dynamic
+ * engineering article routes are explicit exemptions rather than being hidden
+ * behind their index-route entries.
  *
  * Exemptions are sanctioned (carry linearId + approvedBy + prUrl) per DX2.
  * The baseline exemption count for the ratchet = current sanctioned count.
@@ -474,6 +475,30 @@ export const MARKETING_ROUTE_MANIFEST: readonly RouteManifestEntry[] = [
     },
   },
   {
+    glob: '(marketing)/api-versioning/page.tsx',
+    renderedSections: [],
+    bindingEvidence: {
+      status: 'exempt',
+      source: 'JOV-5650 route manifest sweep',
+      notes:
+        'Public API lifecycle policy uses marketing primitives but is prose documentation rather than a recipe-composable page.',
+    },
+    exempt: {
+      reason:
+        'public API policy documentation page - prose lifecycle reference; not recipe-composable',
+      linearId: 'JOV-5650',
+      approvedBy: 'tw',
+      prUrl: 'https://github.com/JovieInc/Jovie/pull/16742',
+    },
+    status: 'active',
+    specVersion: '1.0.0',
+    url: '/api-versioning',
+    healthCheck: {
+      path: '/api-versioning',
+      expected: 'page',
+    },
+  },
+  {
     glob: '(marketing)/cli/page.tsx',
     recipeId: 'seo',
     renderedSections: [
@@ -616,6 +641,29 @@ export const MARKETING_ROUTE_MANIFEST: readonly RouteManifestEntry[] = [
 
   // ── Exemptions (sanctioned per DX2 — linearId + approvedBy + prUrl required) ──
   {
+    glob: 'waitlist/invite/page.tsx',
+    renderedSections: [],
+    bindingEvidence: {
+      status: 'exempt',
+      source: 'sanctioned route manifest exemption',
+    },
+    exempt: {
+      reason:
+        'secure invite redemption flow — auth/token outcome page, not marketing page chrome or section-composable content',
+      linearId: 'JOV-5650',
+      approvedBy: 'tw',
+      prUrl: 'https://github.com/JovieInc/Jovie/pull/16742',
+    },
+    status: 'active',
+    specVersion: '1.0.0',
+    url: '/waitlist/invite',
+    healthCheck: {
+      path: '/waitlist/invite',
+      expected: 'page',
+      requiresSharedChrome: false,
+    },
+  },
+  {
     glob: '(marketing)/ai/page.tsx',
     renderedSections: [],
     bindingEvidence: {
@@ -627,7 +675,7 @@ export const MARKETING_ROUTE_MANIFEST: readonly RouteManifestEntry[] = [
         'noindex public brief — hand-rolled <main> layout, no marketing shell; not recipe-composable',
       linearId: 'JOV-4063',
       approvedBy: 'tw',
-      prUrl: 'https://github.com/JovieInc/Jovie/pull/TBD',
+      prUrl: 'https://github.com/JovieInc/Jovie/pull/13460',
     },
     status: 'active',
     specVersion: '1.0.0',
@@ -646,7 +694,7 @@ export const MARKETING_ROUTE_MANIFEST: readonly RouteManifestEntry[] = [
         'dynamic content page — article body via BlogPostPage organism; not section-composed',
       linearId: 'JOV-4063',
       approvedBy: 'tw',
-      prUrl: 'https://github.com/JovieInc/Jovie/pull/TBD',
+      prUrl: 'https://github.com/JovieInc/Jovie/pull/13460',
     },
     status: 'active',
     specVersion: '1.0.0',
@@ -668,7 +716,7 @@ export const MARKETING_ROUTE_MANIFEST: readonly RouteManifestEntry[] = [
         'dynamic content page — author card + post list; not section-composed',
       linearId: 'JOV-4063',
       approvedBy: 'tw',
-      prUrl: 'https://github.com/JovieInc/Jovie/pull/TBD',
+      prUrl: 'https://github.com/JovieInc/Jovie/pull/13460',
     },
     status: 'active',
     specVersion: '1.0.0',
@@ -690,11 +738,35 @@ export const MARKETING_ROUTE_MANIFEST: readonly RouteManifestEntry[] = [
         'generated content page — rendered from repo CHANGELOG.md via lib/changelog-parser.ts; not recipe-composable',
       linearId: 'JOV-4063',
       approvedBy: 'tw',
-      prUrl: 'https://github.com/JovieInc/Jovie/pull/TBD',
+      prUrl: 'https://github.com/JovieInc/Jovie/pull/13460',
     },
     status: 'active',
     specVersion: '1.0.0',
     url: '/changelog',
+  },
+  {
+    glob: '(marketing)/changelog/[version]/page.tsx',
+    renderedSections: [],
+    bindingEvidence: {
+      status: 'exempt',
+      source: 'JOV-5650 route manifest sweep',
+      notes:
+        'Generated release detail page is backed by CHANGELOG.md content and ChangelogTimeline, not a recipe-composable marketing page.',
+    },
+    exempt: {
+      reason:
+        'generated changelog detail page - release body comes from CHANGELOG.md; not recipe-composable',
+      linearId: 'JOV-5650',
+      approvedBy: 'tw',
+      prUrl: 'https://github.com/JovieInc/Jovie/pull/16742',
+    },
+    status: 'active',
+    specVersion: '1.0.0',
+    url: '/changelog/*',
+    healthCheck: {
+      path: '/changelog/26.8.1',
+      expected: 'page',
+    },
   },
   {
     glob: '(marketing)/demo/video/page.tsx',
@@ -708,7 +780,7 @@ export const MARKETING_ROUTE_MANIFEST: readonly RouteManifestEntry[] = [
         'noindex demo surface — renders features/demo/DemoVideoPage; not section-composed',
       linearId: 'JOV-4063',
       approvedBy: 'tw',
-      prUrl: 'https://github.com/JovieInc/Jovie/pull/TBD',
+      prUrl: 'https://github.com/JovieInc/Jovie/pull/13460',
     },
     status: 'active',
     specVersion: '1.0.0',
@@ -726,7 +798,7 @@ export const MARKETING_ROUTE_MANIFEST: readonly RouteManifestEntry[] = [
       reason: 'noindex duplicate of /demo/video — identical body; legacy route',
       linearId: 'JOV-4063',
       approvedBy: 'tw',
-      prUrl: 'https://github.com/JovieInc/Jovie/pull/TBD',
+      prUrl: 'https://github.com/JovieInc/Jovie/pull/13460',
     },
     status: 'active',
     specVersion: '1.0.0',
@@ -745,7 +817,7 @@ export const MARKETING_ROUTE_MANIFEST: readonly RouteManifestEntry[] = [
         'noindex investor brief — hand-rolled layout; not recipe-composable',
       linearId: 'JOV-4063',
       approvedBy: 'tw',
-      prUrl: 'https://github.com/JovieInc/Jovie/pull/TBD',
+      prUrl: 'https://github.com/JovieInc/Jovie/pull/13460',
     },
     status: 'active',
     specVersion: '1.0.0',
@@ -764,7 +836,7 @@ export const MARKETING_ROUTE_MANIFEST: readonly RouteManifestEntry[] = [
         'internal render surface — screenshot-capture index for marketing renders',
       linearId: 'JOV-4063',
       approvedBy: 'tw',
-      prUrl: 'https://github.com/JovieInc/Jovie/pull/TBD',
+      prUrl: 'https://github.com/JovieInc/Jovie/pull/13460',
     },
     status: 'active',
     specVersion: '1.0.0',
@@ -782,7 +854,7 @@ export const MARKETING_ROUTE_MANIFEST: readonly RouteManifestEntry[] = [
         'internal render surface — profile showcase states; dynamicParams = false',
       linearId: 'JOV-4063',
       approvedBy: 'tw',
-      prUrl: 'https://github.com/JovieInc/Jovie/pull/TBD',
+      prUrl: 'https://github.com/JovieInc/Jovie/pull/13460',
     },
     status: 'active',
     specVersion: '1.0.0',
@@ -791,6 +863,31 @@ export const MARKETING_ROUTE_MANIFEST: readonly RouteManifestEntry[] = [
       path: '/renders/catalog',
       expected: 'page',
     },
+  },
+  {
+    glob: '(marketing)/renders/profile-admission/page.tsx',
+    renderedSections: [],
+    bindingEvidence: {
+      status: 'exempt',
+      source: 'JOV-5650 route manifest sweep',
+      notes:
+        'E2E-only fixture is guarded by the profile-admission runtime flag and exists to render synthetic profile admission states.',
+    },
+    exempt: {
+      reason:
+        'internal E2E profile-admission fixture - synthetic render target; not recipe-composable',
+      linearId: 'JOV-5650',
+      approvedBy: 'tw',
+      prUrl: 'https://github.com/JovieInc/Jovie/pull/16742',
+    },
+    status: 'active',
+    specVersion: '1.0.0',
+    url: '/renders/profile-admission',
+    healthCheck: {
+      path: '/renders/profile-admission',
+      expected: 'page',
+    },
+    noindex: true,
   },
   {
     glob: '(marketing)/renders/surfaces/[surface]/page.tsx',
@@ -804,7 +901,7 @@ export const MARKETING_ROUTE_MANIFEST: readonly RouteManifestEntry[] = [
         'internal render surface — MarketingRenderSurface capture targets',
       linearId: 'JOV-4063',
       approvedBy: 'tw',
-      prUrl: 'https://github.com/JovieInc/Jovie/pull/TBD',
+      prUrl: 'https://github.com/JovieInc/Jovie/pull/13460',
     },
     status: 'active',
     specVersion: '1.0.0',
@@ -825,11 +922,35 @@ export const MARKETING_ROUTE_MANIFEST: readonly RouteManifestEntry[] = [
       reason: 'proof-led engineering index - not recipe-composable',
       linearId: 'JOV-5475',
       approvedBy: 'tw',
-      prUrl: 'https://github.com/JovieInc/Jovie/pull/TBD',
+      prUrl: 'https://github.com/JovieInc/Jovie/pull/16779',
     },
     status: 'active',
     specVersion: '1.0.0',
     url: '/engineering',
+  },
+  {
+    glob: '(marketing)/engineering/[slug]/page.tsx',
+    renderedSections: [],
+    bindingEvidence: {
+      status: 'exempt',
+      source: 'JOV-5475 engineering publication route',
+      notes:
+        'Dynamic public articles are eligible only after publication evidence passes; no published slug exists to use as synthetic health proof.',
+    },
+    exempt: {
+      reason:
+        'evidence-gated engineering article body - dynamic publication content is not recipe-composable',
+      linearId: 'JOV-5475',
+      approvedBy: 'tw',
+      prUrl: 'https://github.com/JovieInc/Jovie/pull/16779',
+    },
+    status: 'active',
+    specVersion: '1.0.0',
+    url: '/engineering/*',
+    healthCheck: {
+      path: '/engineering/verified-changelog',
+      expected: 'not-found',
+    },
   },
   {
     glob: '(marketing)/engineering/preview/page.tsx',
@@ -842,11 +963,36 @@ export const MARKETING_ROUTE_MANIFEST: readonly RouteManifestEntry[] = [
       reason: 'noindex founder preview gallery - drafts stay unpublished',
       linearId: 'JOV-5475',
       approvedBy: 'tw',
-      prUrl: 'https://github.com/JovieInc/Jovie/pull/TBD',
+      prUrl: 'https://github.com/JovieInc/Jovie/pull/16779',
     },
     status: 'active',
     specVersion: '1.0.0',
     url: '/engineering/preview',
+    noindex: true,
+  },
+  {
+    glob: '(marketing)/engineering/preview/[slug]/page.tsx',
+    renderedSections: [],
+    bindingEvidence: {
+      status: 'exempt',
+      source: 'JOV-5475 engineering preview route',
+      notes:
+        'Founder-only noindex preview renders unpublished article evidence and is not a public recipe-composable page.',
+    },
+    exempt: {
+      reason:
+        'noindex founder preview article - unpublished evidence review surface',
+      linearId: 'JOV-5475',
+      approvedBy: 'tw',
+      prUrl: 'https://github.com/JovieInc/Jovie/pull/16779',
+    },
+    status: 'active',
+    specVersion: '1.0.0',
+    url: '/engineering/preview/*',
+    healthCheck: {
+      path: '/engineering/preview/verified-changelog',
+      expected: 'page',
+    },
     noindex: true,
   },
 ] as const;
@@ -875,7 +1021,7 @@ export function isRecipeRoute(glob: string): boolean {
 export interface MarketingRouteHealthTarget {
   readonly glob: string;
   readonly path: string;
-  readonly expected: 'page' | 'redirect';
+  readonly expected: 'page' | 'redirect' | 'not-found';
   readonly allowedFinalPaths: readonly string[];
   readonly allowsAuthShell: boolean;
   readonly requiresSharedChrome: boolean;
