@@ -527,9 +527,7 @@ describe('merge_group workflow contract', () => {
     expect(macos).toContain(
       '--staging-version "$GITHUB_RUN_ID" "$GITHUB_RUN_ATTEMPT"'
     );
-    expect(macos).toContain(
-      'echo "DESKTOP_VERSION=$version" >> "$GITHUB_ENV"'
-    );
+    expect(macos).toContain('echo "DESKTOP_VERSION=$version" >> "$GITHUB_ENV"');
     expect(macos).toContain(
       'echo "JOVIE_DESKTOP_SOURCE_REVISION=$GITHUB_SHA" >> "$GITHUB_ENV"'
     );

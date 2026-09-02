@@ -731,17 +731,23 @@ test('staging release versions advance beyond installed and current-feed version
       currentFeedVersion: '26.8.2-staging.17823456789.1',
     })
   );
-  for (const [input, message] of [
-    [
-      {
+  for (const { input, message } of [
+    {
+      input: {
         ...valid,
         currentFeedVersion: '26.8.2-staging.17823456790.1',
         version: '26.8.2-staging.17823456789.1',
       },
-      /not newer than current feed/,
-    ],
-    [{ ...valid, version: '26.8.1-staging.17823456791.1' }, /next-patch/],
-    [{ ...valid, version: '26.8.1+staging.17823456791.1' }, /valid prerelease/],
+      message: /not newer than current feed/,
+    },
+    {
+      input: { ...valid, version: '26.8.1-staging.17823456791.1' },
+      message: /next-patch/,
+    },
+    {
+      input: { ...valid, version: '26.8.1+staging.17823456791.1' },
+      message: /valid prerelease/,
+    },
   ]) {
     assert.throws(() => assertStagingVersionTransition(input), message);
   }
