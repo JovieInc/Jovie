@@ -51,19 +51,16 @@ jobs:
           DEPENDABOT_UPDATE_TYPE: ${{ steps.meta.outputs.update-type }}
         run: node scripts/dependabot-update-policy.mjs
 
-      - name: Request native merge-queue enrollment (patch + minor)
+      - name: Leave native autoenroll as the queue writer (patch + minor)
         if: steps.policy.outputs.decision == 'queue'
         env:
-          GH_TOKEN: ${{ github.token }}
           PR_URL: ${{ github.event.pull_request.html_url }}
           DEPENDENCY_NAMES: ${{ steps.meta.outputs.dependency-names }}
           UPDATE_TYPE: ${{ steps.meta.outputs.update-type }}
         run: |
           echo "Dependency: $DEPENDENCY_NAMES"
           echo "Update type: $UPDATE_TYPE"
-          # The label is durable intent; Merge Queue Auto-Enroll owns the
-          # exact-head GitHub native queue mutation.
-          gh pr edit --add-label "merge-queue" "$PR_URL"
+          echo "Opened $PR_URL. Native autoenroll owns queue mutation; the merge-queue label is retired."
 
       - name: Recreate confirmed-conflict safe update
         if: steps.policy.outputs.decision == 'recreate'
@@ -73,13 +70,13 @@ jobs:
         run: |
           gh pr comment "$PR_URL" --body "@dependabot recreate"
 
-      - name: Re-enroll recreated exact head
+      - name: Release recreated exact head to native autoenroll
         if: steps.policy.outputs.decision == 'queue-recovered'
         env:
           GH_TOKEN: ${{ github.token }}
           PR_URL: ${{ github.event.pull_request.html_url }}
         run: |
-          gh pr edit --remove-label "needs-conflict-resolution" --add-label "merge-queue" "$PR_URL"
+          gh pr edit --remove-label "needs-conflict-resolution" "$PR_URL"
 
       - name: Reopen safe update closed without a durable hold
         if: steps.policy.outputs.decision == 'reopen-recreate'
@@ -90,15 +87,10 @@ jobs:
           gh pr reopen "$PR_URL"
           gh pr comment "$PR_URL" --body "@dependabot recreate"
 
-      - name: Hold visible major for migration and release review
+      - name: Note visible major for migration and release review
         if: steps.policy.outputs.decision == 'hold-major'
         env:
           GH_TOKEN: ${{ github.token }}
           PR_URL: ${{ github.event.pull_request.html_url }}
-          HAS_QUEUE_LABEL: ${{ steps.policy.outputs.has_queue_label }}
         run: |
-          if [[ "$HAS_QUEUE_LABEL" == "true" ]]; then
-            gh pr edit --remove-label "merge-queue" "$PR_URL"
-          fi
-          gh pr edit --add-label "needs-human" "$PR_URL"
-          gh pr comment "$PR_URL" --body "Major dependency update detected. Native queue admission is held until migration notes, targeted compatibility tests, and release/runtime proof are attached."
+          gh pr comment "$PR_URL" --body "Major dependency update detected. Migration notes, targeted compatibility tests, and release/runtime proof are requested; native admission remains controlled by exact-head CI and the merge queue."

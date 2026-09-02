@@ -19,8 +19,7 @@ for num in "${TRAIN_PRS[@]}"; do
       echo "  (update-branch skipped — may be in merge queue)"
   fi
   if [[ "$state" == "CLEAN" ]]; then
-    # The label records intent; the native auto-enroll controller owns admission.
-    gh pr edit "$num" --add-label "merge-queue" || echo "WARN: failed to request native queue enrollment for #$num" >&2
+    echo "  CLEAN — native auto-enroll owns admission (merge-queue label is retired)"
   fi
 done
 

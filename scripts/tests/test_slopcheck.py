@@ -190,7 +190,7 @@ class TestCodeBlockStripping:
             "Run the command to drain PRs.\n\n"
             "```bash\n"
             "gh pr list --state open --limit 100 --json number --jq '.[]'\n"
-            "gh pr edit 123 --add-label merge-queue --remove-label needs-human\n"
+            "gh pr edit 123 --add-label llm-review --remove-label needs-human\n"
             "pnpm --filter @jovie/web run typecheck --pretty false\n"
             "git push --force-with-lease origin HEAD\n"
             "```\n\n"
@@ -205,7 +205,7 @@ class TestCodeBlockStripping:
 
     def test_double_hyphens_in_inline_code_not_counted(self):
         text = (
-            "Pass `--force-with-lease` and `--add-label merge-queue` "
+            "Pass `--force-with-lease` and `--add-label llm-review` "
             "to avoid accidental overwrites. "
             "Use `--filter @jovie/web` to scope the command.\n"
         )

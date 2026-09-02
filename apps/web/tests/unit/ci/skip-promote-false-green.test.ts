@@ -293,7 +293,7 @@ describe('skip-promote false-green detector (JOV-5458)', () => {
     );
   });
 
-  it('screenshot bot does not add merge-queue during an in-flight Production Controller', () => {
+  it('screenshot bot does not add merge-queue', () => {
     const workflow = readFileSync(screenshotsWorkflowPath, 'utf8');
     const generate = getJobBlock(workflow, 'generate');
     const publish = getStepBlock(generate, 'Create or update screenshot PR');
@@ -307,8 +307,6 @@ describe('skip-promote false-green detector (JOV-5458)', () => {
     expect(publish).toContain(
       'Holding merge-queue enrollment; Production Controller is in-flight.'
     );
-    expect(publish.indexOf('hold_screenshot_merge_queue')).toBeLessThan(
-      publish.indexOf('gh pr edit --add-label "merge-queue"')
-    );
+    expect(publish).not.toContain('gh pr edit --add-label "merge-queue"');
   });
 });
