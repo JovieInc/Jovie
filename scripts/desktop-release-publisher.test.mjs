@@ -435,61 +435,65 @@ test('partial staging uploads resume matching binaries and failed starters', asy
 });
 
 test('published roll failures remain safe and rerunnable', async t => {
-  /** @type {Array<[string, Record<string, unknown>, RegExp, string]>} */
   const scenarios = [
-    ['tag update', { failTagUpdateAt: 1 }, /injected tag update/, 'old'],
-    [
-      'metadata update',
-      { failMetadataUpdateAt: 1, tagSha: SUPER_SHA },
-      /injected release metadata/,
-      'mirror',
-    ],
-    [
-      'metadata and tag rollback',
-      { failMetadataUpdateAt: 1, failTagUpdateAt: 2 },
-      /metadata update and tag rollback both failed/,
-      'split',
-    ],
-    [
-      'feed upload',
-      { failFeedUploadsRemaining: 1 },
-      /feed upload failure/,
-      'old',
-    ],
-    [
-      'feed and metadata rollback',
-      { failFeedUploadsRemaining: 1, failMetadataUpdateAt: 2 },
-      /feed restored but metadata rollback failed/,
-      'newer',
-    ],
-    [
-      'feed and tag rollback',
-      { failFeedUploadsRemaining: 1, failTagUpdateAt: 2 },
-      /feed restored but tag rollback failed/,
-      'split-newer',
-    ],
-    [
-      'feed and rollback upload',
-      { failFeedUploadsRemaining: 2 },
-      /feed upload and rollback both failed/,
-      'starter',
-    ],
-    [
-      'old feed delete',
-      { failDeleteName: 'staging-mac.yml' },
-      /staging-mac\.yml delete failure/,
-      'new',
-    ],
-    [
-      'stale binary prune',
-      {
+    {
+      label: 'tag update',
+      failures: { failTagUpdateAt: 1 },
+      error: /injected tag update/,
+      terminal: 'old',
+    },
+    {
+      label: 'metadata update',
+      failures: { failMetadataUpdateAt: 1, tagSha: SUPER_SHA },
+      error: /injected release metadata/,
+      terminal: 'mirror',
+    },
+    {
+      label: 'metadata and tag rollback',
+      failures: { failMetadataUpdateAt: 1, failTagUpdateAt: 2 },
+      error: /metadata update and tag rollback both failed/,
+      terminal: 'split',
+    },
+    {
+      label: 'feed upload',
+      failures: { failFeedUploadsRemaining: 1 },
+      error: /feed upload failure/,
+      terminal: 'old',
+    },
+    {
+      label: 'feed and metadata rollback',
+      failures: { failFeedUploadsRemaining: 1, failMetadataUpdateAt: 2 },
+      error: /feed restored but metadata rollback failed/,
+      terminal: 'newer',
+    },
+    {
+      label: 'feed and tag rollback',
+      failures: { failFeedUploadsRemaining: 1, failTagUpdateAt: 2 },
+      error: /feed restored but tag rollback failed/,
+      terminal: 'split-newer',
+    },
+    {
+      label: 'feed and rollback upload',
+      failures: { failFeedUploadsRemaining: 2 },
+      error: /feed upload and rollback both failed/,
+      terminal: 'starter',
+    },
+    {
+      label: 'old feed delete',
+      failures: { failDeleteName: 'staging-mac.yml' },
+      error: /staging-mac\.yml delete failure/,
+      terminal: 'new',
+    },
+    {
+      label: 'stale binary prune',
+      failures: {
         failDeleteName: `Jovie-Staging-${STALE_VERSION}-universal.dmg`,
       },
-      /stale binary prune|delete failure/,
-      'published',
-    ],
+      error: /stale binary prune|delete failure/,
+      terminal: 'published',
+    },
   ];
-  for (const [label, failures, error, terminal] of scenarios) {
+  for (const { label, failures, error, terminal } of scenarios) {
     await t.test(label, async t => {
       const { client, input, local } = await rollFixture(t);
       if (label === 'stale binary prune') {

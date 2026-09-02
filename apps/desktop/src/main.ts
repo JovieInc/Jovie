@@ -2131,6 +2131,9 @@ function scheduleDesktopAutoUpdate(): void {
     return;
   }
 
+  if (APP_ENV === 'staging') {
+    autoUpdater.allowPrerelease = true;
+  }
   autoUpdater.allowDowngrade = false;
   autoUpdater.checkForUpdatesAndNotify().catch(() => {
     // Network unavailable or no update server configured yet — non-fatal

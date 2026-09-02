@@ -5,6 +5,7 @@ import { dirname, join } from 'node:path';
 import test from 'node:test';
 import { fileURLToPath } from 'node:url';
 import { promisify } from 'node:util';
+import { deriveStagingReleaseVersion } from './sync-version.mjs';
 
 const desktopRoot = dirname(dirname(fileURLToPath(import.meta.url)));
 const execFileAsync = promisify(execFile);
@@ -383,6 +384,11 @@ test('desktop production bundle declares the jovie auth protocol', async () => {
   assert.match(stagingConfig, /CFBundleURLTypes:/);
   assert.match(stagingConfig, /CFBundleURLName: Jovie Staging Auth/);
   assert.match(stagingConfig, /CFBundleURLSchemes:\s*\n\s*- jovie-staging/);
+  assert.match(stagingConfig, /publish:\s*\n\s*provider: generic/);
+  assert.match(
+    stagingConfig,
+    /url: https:\/\/github\.com\/JovieInc\/Jovie\/releases\/download\/desktop-staging/
+  );
   assert.match(localConfig, /CFBundleURLTypes:/);
   assert.match(localConfig, /CFBundleURLName: Jovie Local Auth/);
   assert.match(localConfig, /CFBundleURLSchemes:\s*\n\s*- jovie-local/);
@@ -529,6 +535,7 @@ test('desktop bridge exposes bounded dictation support', async () => {
   assert.match(mainSource, /if \(APP_ENV === 'local'/);
   assert.match(mainSource, /autoUpdater\.allowDowngrade = false/);
   assert.match(mainSource, /if \(!desktopUpdatesSupported\(\)\)/);
+  assert.match(mainSource, /autoUpdater\.allowPrerelease = true/);
   assert.match(mainSource, /sanitizeWindowState/);
   assert.match(mainSource, /bindPendingDesktopAuthCompletion/);
   assert.match(mainSource, /DESKTOP_AUTH_FLOW_PARAM/);
@@ -643,14 +650,35 @@ test('desktop dev defaults to the local app shell and packaged builds keep produ
       new Date(productionIdentity.builtAt).toISOString()
     );
 
+    const stagingVersion = deriveStagingReleaseVersion(
+      (await readFile(join(desktopRoot, '../../VERSION'), 'utf8')).trim(),
+      '1',
+      '1'
+    );
     const { stdout: stagingStdout } = await execFileAsync(
       process.execPath,
-      [join(desktopRoot, 'scripts/write-env.mjs')],
-      { cwd: desktopRoot, env: { ...baseEnv, ELECTRON_ENV: 'staging' } }
+      [join(desktopRoot, 'scripts/write-env.mjs'), '--require-provenance'],
+      {
+        cwd: desktopRoot,
+        env: {
+          ...baseEnv,
+          ELECTRON_ENV: 'staging',
+          DESKTOP_VERSION: stagingVersion,
+          JOVIE_DESKTOP_BUILT_AT: '2026-08-31T18:45:00.000Z',
+          JOVIE_DESKTOP_SOURCE_REVISION: 'b'.repeat(40),
+        },
+      }
     );
     const stagingEnv = await readFile(envGeneratedPath, 'utf8');
+    const stagingIdentity = JSON.parse(
+      await readFile(identityJsonPath, 'utf8')
+    );
     assert.match(stagingStdout, /APP_ENV='staging'/);
     assert.match(stagingEnv, /APP_URL = 'https:\/\/staging\.jov\.ie'/);
+    assert.deepEqual(
+      [stagingIdentity.channel, stagingIdentity.version],
+      ['staging', stagingVersion]
+    );
 
     await assert.rejects(
       () =>
