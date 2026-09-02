@@ -606,6 +606,7 @@ describe('queue workflow mutation safety', () => {
     expect(drain.match(/gh_retry pr list/gu)).toHaveLength(2);
     expect(drain).toContain('load_open_pr_snapshot initial-snapshot');
     expect(drain).toContain('load_open_pr_snapshot post-retarget-refresh');
+    expect(drain).toContain('--batch-size 25 --concurrency 3');
     expect(drain).toContain('stage=native-preflight source=graphql');
     expect(drain).toContain(
       'stage=native-queue-state source=paginated-graphql'

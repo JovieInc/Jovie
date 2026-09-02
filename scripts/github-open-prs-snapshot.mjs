@@ -10,7 +10,12 @@ import {
 const execFileAsync = promisify(execFile);
 
 export function parseArgs(argv) {
-  const options = { repo: 'JovieInc/Jovie', limit: 200, batchSize: 25 };
+  const options = {
+    repo: 'JovieInc/Jovie',
+    limit: 200,
+    batchSize: 25,
+    maxConcurrency: 2,
+  };
   for (let index = 0; index < argv.length; index += 1) {
     switch (argv[index]) {
       case '--repo':
@@ -21,6 +26,9 @@ export function parseArgs(argv) {
         break;
       case '--batch-size':
         options.batchSize = Number.parseInt(argv[++index], 10);
+        break;
+      case '--concurrency':
+        options.maxConcurrency = Number.parseInt(argv[++index], 10);
         break;
       default:
         throw new Error(`Unknown argument: ${argv[index]}`);
@@ -42,6 +50,13 @@ export function parseArgs(argv) {
     options.batchSize > 50
   ) {
     throw new Error('--batch-size must be between 1 and 50');
+  }
+  if (
+    !Number.isSafeInteger(options.maxConcurrency) ||
+    options.maxConcurrency < 1 ||
+    options.maxConcurrency > 4
+  ) {
+    throw new Error('--concurrency must be between 1 and 4');
   }
   return options;
 }
@@ -109,6 +124,7 @@ export async function runOpenPrSnapshot(
     repo: options.repo,
     prs: summaries,
     batchSize: options.batchSize,
+    maxConcurrency: options.maxConcurrency,
     request: ({ query }) =>
       githubRequest(
         [
