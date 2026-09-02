@@ -6,7 +6,7 @@ helper="/usr/local/sbin/jovie-symphony-workspace"
 clone_tool="/home/timwhite/.local/bin/jovie-workspace-clone"
 cache_hook="/home/timwhite/.local/bin/symphony-nvme-package-cache"
 node_bin="/home/timwhite/.nvm/versions/node/v22.23.2/bin"
-cache_receipts="/srv/git/receipts/workspace-mounts"
+cache_receipts="/srv/git/receipts/workspace-mounts/package-cache"
 
 [[ -n "$logical" ]] || { echo "workspace path required" >&2; exit 64; }
 logical="$(realpath -m "$logical")"
