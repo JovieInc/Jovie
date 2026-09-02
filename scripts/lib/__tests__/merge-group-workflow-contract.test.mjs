@@ -1308,6 +1308,7 @@ ${selectedGateScript}`,
       'ci.yml',
       'fork-pr-gate.yml',
       'pr-size-guard.yml',
+      'pr-targets-main.yml',
     ]);
     expect(getJobBlock(FORK_GATE_WORKFLOW, 'merge-group-gate')).not.toContain(
       'secrets.'

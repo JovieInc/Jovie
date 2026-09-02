@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+/// <reference lib="dom" />
 import { mkdirSync } from 'node:fs';
 import { createRequire } from 'node:module';
 import { basename, dirname, join, resolve } from 'node:path';
