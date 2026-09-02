@@ -233,7 +233,11 @@ describe('append-only audit evidence', () => {
             join(directory, 'missing-parent', 'evidence.jsonl'),
             evidence()
           ),
-        error => error.code === 'ENOENT'
+        error =>
+          typeof error === 'object' &&
+          error !== null &&
+          'code' in error &&
+          error.code === 'ENOENT'
       );
     } finally {
       rmSync(directory, { recursive: true, force: true });
