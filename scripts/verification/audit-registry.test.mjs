@@ -30,14 +30,19 @@ function evidence(overrides = {}) {
       mergeBaseSha: SHA,
       patchDigest: DIGEST,
       requiredContextDigest: DIGEST,
+      artifactDigests: [],
     },
     auditDefinitionDigest: auditDefinitionDigest(SYMPHONY_CHANGE_SAFETY_AUDIT),
     toolDigest: DIGEST,
+    modelDigest: null,
     configDigest: DIGEST,
     inputBundleDigest: DIGEST,
     redactionManifestDigest: DIGEST,
     outcome: 'unknown',
+    producer: { kind: 'deterministic' },
     authority: { repositoryWrite: false },
+    findings: [],
+    supersedes: null,
     startedAt: '2026-09-02T00:00:00.000Z',
     completedAt: '2026-09-02T00:00:01.000Z',
     ...overrides,
@@ -120,6 +125,19 @@ describe('shadow audit registry', () => {
       'requiredContext must be a non-empty string list',
     ]);
     assert.throws(() => auditDefinitionDigest(invalid), /auditId is required/);
+    for (const exclude of ['generated', [false]]) {
+      const badScope = {
+        ...structuredClone(SYMPHONY_CHANGE_SAFETY_AUDIT),
+        scope: { include: ['scripts/**'], exclude },
+      };
+      assert.deepEqual(validateAuditDefinition(badScope), [
+        'scope.exclude must be a string list when present',
+      ]);
+      assert.throws(
+        () => resolveOwedAudits(['scripts/example.mjs'], [badScope]),
+        /scope\.exclude/
+      );
+    }
   });
 
   it('accepts explicit non-pass evidence and rejects missing binding', () => {
@@ -147,14 +165,19 @@ describe('shadow audit registry', () => {
         mergeBaseSha: '',
         patchDigest: '',
         requiredContextDigest: '',
+        artifactDigests: ['wrong'],
       },
       auditDefinitionDigest: '',
       toolDigest: '',
+      modelDigest: 'wrong',
       configDigest: '',
       inputBundleDigest: '',
       redactionManifestDigest: '',
       outcome: 'passed',
+      producer: { kind: 'model' },
       authority: null,
+      findings: null,
+      supersedes: '',
       startedAt: '',
       completedAt: '',
     });
@@ -168,17 +191,28 @@ describe('shadow audit registry', () => {
       'subject.mergeBaseSha must be exact',
       'subject.patchDigest must be sha256',
       'subject.requiredContextDigest must be sha256',
+      'subject.artifactDigests must be a sha256 list',
       'auditDefinitionDigest must be sha256',
       'toolDigest must be sha256',
       'configDigest must be sha256',
       'inputBundleDigest must be sha256',
       'redactionManifestDigest must be sha256',
       'authority is required',
+      'model producer qualification digest must be sha256',
+      'modelDigest must be null or sha256',
+      'findings must be a list',
+      'supersedes must be null or an evidence id',
       'timestamps are required',
     ]);
     assert.deepEqual(
       validateAuditEvidenceShape(evidence({ subject: { repository: '' } })),
       ['subject.repository is required']
+    );
+    assert.deepEqual(
+      validateAuditEvidenceShape(
+        evidence({ producer: { kind: 'unqualified' } })
+      ),
+      ['producer kind must be deterministic or model']
     );
   });
 

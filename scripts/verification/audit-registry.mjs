@@ -45,6 +45,13 @@ function stringList(value) {
   );
 }
 
+function optionalStringList(value) {
+  return (
+    value === undefined ||
+    (Array.isArray(value) && value.every(isNonEmptyString))
+  );
+}
+
 function matchesPattern(path, pattern) {
   const escaped = pattern.replace(/[.+?^${}()|[\]\\]/g, '\\$&');
   const expression = escaped
@@ -62,6 +69,12 @@ export function validateAuditDefinition(definition) {
   if (!isNonEmptyString(definition.auditId)) errors.push('auditId is required');
   if (!isRecord(definition.scope) || !stringList(definition.scope.include)) {
     errors.push('scope.include must be a non-empty string list');
+  }
+  if (
+    isRecord(definition.scope) &&
+    !optionalStringList(definition.scope.exclude)
+  ) {
+    errors.push('scope.exclude must be a string list when present');
   }
   if (!isNonEmptyString(definition.owner)) errors.push('owner is required');
   if (!['low', 'medium', 'high', 'maximal'].includes(definition.riskClass)) {
@@ -98,6 +111,10 @@ export function resolveOwedAudits(
   changedPaths,
   definitions = SHADOW_AUDIT_REGISTRY
 ) {
+  for (const definition of definitions) {
+    const errors = validateAuditDefinition(definition);
+    if (errors.length > 0) throw new Error(errors.join('\n'));
+  }
   const resolvedPaths = [];
   const unmappedPaths = [];
   const owedAuditIds = new Set();
@@ -155,6 +172,12 @@ export function validateAuditEvidenceShape(evidence) {
       if (!isSha256(subject[field]))
         errors.push(`subject.${field} must be sha256`);
     }
+    if (
+      !Array.isArray(subject.artifactDigests) ||
+      !subject.artifactDigests.every(isSha256)
+    ) {
+      errors.push('subject.artifactDigests must be a sha256 list');
+    }
   }
   for (const field of [
     'auditDefinitionDigest',
@@ -166,6 +189,32 @@ export function validateAuditEvidenceShape(evidence) {
     if (!isSha256(evidence[field])) errors.push(`${field} must be sha256`);
   }
   if (!isRecord(evidence.authority)) errors.push('authority is required');
+  if (
+    !isRecord(evidence.producer) ||
+    !['deterministic', 'model'].includes(evidence.producer.kind)
+  ) {
+    errors.push('producer kind must be deterministic or model');
+  } else if (
+    evidence.producer.kind === 'model' &&
+    !isSha256(evidence.producer.providerQualificationDigest)
+  ) {
+    errors.push('model producer qualification digest must be sha256');
+  }
+  if (
+    evidence.modelDigest !== null &&
+    evidence.modelDigest !== undefined &&
+    !isSha256(evidence.modelDigest)
+  ) {
+    errors.push('modelDigest must be null or sha256');
+  }
+  if (!Array.isArray(evidence.findings)) errors.push('findings must be a list');
+  if (
+    evidence.supersedes !== null &&
+    evidence.supersedes !== undefined &&
+    !isNonEmptyString(evidence.supersedes)
+  ) {
+    errors.push('supersedes must be null or an evidence id');
+  }
   if (
     !isNonEmptyString(evidence.startedAt) ||
     !isNonEmptyString(evidence.completedAt)
