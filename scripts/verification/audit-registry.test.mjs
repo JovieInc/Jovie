@@ -242,6 +242,12 @@ describe('shadow audit registry', () => {
     );
     assert.deepEqual(
       validateAuditEvidenceShape(
+        evidence({ startedAt: '+010000-01-01T00:00:00.000Z' })
+      ),
+      ['timestamps must be canonical RFC3339 UTC']
+    );
+    assert.deepEqual(
+      validateAuditEvidenceShape(
         evidence({
           startedAt: '2026-09-02T00:00:02.000Z',
           completedAt: '2026-09-02T00:00:01.000Z',
