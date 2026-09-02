@@ -4,7 +4,11 @@ import Image from 'next/image';
 import Link from 'next/link';
 import { DemoPublicProfileSurface } from '@/components/features/demo/DemoPublicProfileSurface';
 import { HomeTrustSection } from '@/components/features/home/HomeTrustSection';
-import { MarketingContainer, MarketingPageShell } from '@/components/marketing';
+import {
+  MarketingContainer,
+  MarketingHero,
+  MarketingPageShell,
+} from '@/components/marketing';
 import { ArtistProfileModeSwitcher } from '@/components/marketing/artist-profile';
 import { ArtistProfilePhoneFrame } from '@/components/marketing/artist-profile/ArtistProfilePhoneFrame';
 import { ArtistProfileSectionHeader } from '@/components/marketing/artist-profile/ArtistProfileSectionHeader';
@@ -74,10 +78,11 @@ function HomepageV2Hero() {
   );
 
   return (
-    <section
-      data-testid='homepage-v2-shell'
+    <MarketingHero
+      variant='unstyled'
+      testId='homepage-v2-shell'
       className='relative overflow-hidden pb-16 pt-23 sm:pb-20 md:pt-25 lg:pb-24'
-      aria-labelledby='homepage-v2-hero-heading'
+      headingId='homepage-v2-hero-heading'
     >
       <div
         aria-hidden='true'
@@ -181,7 +186,7 @@ function HomepageV2Hero() {
           </div>
         </div>
       </MarketingContainer>
-    </section>
+    </MarketingHero>
   );
 }
 
