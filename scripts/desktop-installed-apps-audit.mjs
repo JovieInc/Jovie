@@ -6,7 +6,7 @@
  * See apps/desktop/SIGNING.md for the canonical build matrix.
  */
 
-import { execFileSync } from 'node:child_process';
+import { execFileSync, spawnSync } from 'node:child_process';
 import { existsSync, readdirSync, readFileSync } from 'node:fs';
 import path from 'node:path';
 
@@ -125,21 +125,51 @@ export function listJovieApplicationBundles(applicationsDir) {
 
 /**
  * @param {string} appPath
+ * @param {{
+ *   readonly runCodesign?: typeof spawnSync;
+ *   readonly readVersion?: (appPath: string) => string | null;
+ * }} dependencies
  * @returns {{ readonly identifier: string | null; readonly version: string | null }}
  */
-export function readCodesignMetadata(appPath) {
+export function readCodesignMetadata(
+  appPath,
+  { runCodesign = spawnSync, readVersion = readApplicationBundleVersion } = {}
+) {
   try {
-    const output = execFileSync('codesign', ['-dv', appPath], {
+    const result = runCodesign('codesign', ['-dv', appPath], {
       encoding: 'utf8',
-      stdio: ['ignore', 'pipe', 'pipe'],
     });
+    if (result.status !== 0 || result.error) {
+      return { identifier: null, version: null };
+    }
+
+    // `codesign -d` writes display metadata to stderr even when it succeeds.
+    const output = `${result.stdout ?? ''}\n${result.stderr ?? ''}`;
     const identifier = output.match(/Identifier=(.+)/)?.[1]?.trim() ?? null;
-    const version =
-      output.match(/Info\.plist version=(.+)/)?.[1]?.trim() ?? null;
-    return { identifier, version };
+    return { identifier, version: readVersion(appPath) };
   } catch {
     return { identifier: null, version: null };
   }
+}
+
+/**
+ * @param {string} appPath
+ * @returns {string | null}
+ */
+export function readApplicationBundleVersion(appPath) {
+  const infoPlistPath = path.join(appPath, 'Contents', 'Info.plist');
+  for (const key of ['CFBundleShortVersionString', 'CFBundleVersion']) {
+    try {
+      return execFileSync(
+        'plutil',
+        ['-extract', key, 'raw', '-o', '-', infoPlistPath],
+        { encoding: 'utf8' }
+      ).trim();
+    } catch {
+      // Try the fallback version key.
+    }
+  }
+  return null;
 }
 
 /**
@@ -154,11 +184,7 @@ export function listRunningJovieProcesses() {
       .split('\n')
       .map(line => line.trim())
       .filter(Boolean)
-      .filter(
-        line =>
-          /\/Jovie/i.test(line) &&
-          !/grep|desktop-installed-apps-audit/.test(line)
-      )
+      .filter(line => commandRunsJovieDesktopShell(line))
       .map(line => {
         const match = line.match(/^(\d+)\s+(.+)$/);
         return {
@@ -169,6 +195,20 @@ export function listRunningJovieProcesses() {
   } catch {
     return [];
   }
+}
+
+/**
+ * Match the primary executable of a Jovie app bundle, excluding Electron
+ * helpers and unrelated processes whose working path happens to contain Jovie.
+ *
+ * @param {string} command
+ * @returns {boolean}
+ */
+export function commandRunsJovieDesktopShell(command) {
+  return (
+    !command.includes('/Contents/Frameworks/') &&
+    /\/(Jovie[^/]*)\.app\/Contents\/MacOS\/\1(?:\s|$)/i.test(command)
+  );
 }
 
 /**

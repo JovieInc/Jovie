@@ -5,8 +5,10 @@ import path from 'node:path';
 import test from 'node:test';
 import {
   commandExposesRemoteDebugging,
+  commandRunsJovieDesktopShell,
   evaluateDesktopInstalledAppsAudit,
   KNOWN_DESKTOP_BUNDLE_IDS,
+  readCodesignMetadata,
   readDesktopBuildIdentity,
 } from './desktop-installed-apps-audit.mjs';
 
@@ -21,6 +23,62 @@ function buildIdentity(overrides = {}) {
     ...overrides,
   };
 }
+
+test('commandRunsJovieDesktopShell counts app shells but excludes helpers and repo processes', () => {
+  assert.equal(
+    commandRunsJovieDesktopShell(
+      '/Applications/Jovie Staging.app/Contents/MacOS/Jovie Staging'
+    ),
+    true
+  );
+  assert.equal(
+    commandRunsJovieDesktopShell(
+      '/Applications/Jovie.app/Contents/Frameworks/Jovie Helper.app/Contents/MacOS/Jovie Helper --type=gpu-process'
+    ),
+    false
+  );
+  assert.equal(
+    commandRunsJovieDesktopShell(
+      '/opt/homebrew/bin/node /Users/timwhite/Jovie/apps/web/server.js'
+    ),
+    false
+  );
+});
+
+test('readCodesignMetadata reads successful codesign output from stderr', () => {
+  const result = readCodesignMetadata('/Applications/Jovie.app', {
+    runCodesign: () => ({
+      error: undefined,
+      status: 0,
+      stderr:
+        'Executable=/Applications/Jovie.app/Contents/MacOS/Jovie\nIdentifier=app.jov.ie\n',
+      stdout: '',
+    }),
+    readVersion: () => '26.8.1',
+  });
+
+  assert.deepEqual(result, {
+    identifier: 'app.jov.ie',
+    version: '26.8.1',
+  });
+});
+
+test('readCodesignMetadata fails closed when codesign fails', () => {
+  const result = readCodesignMetadata('/Applications/Jovie.app', {
+    runCodesign: () => ({
+      error: undefined,
+      status: 1,
+      stderr: 'invalid signature',
+      stdout: '',
+    }),
+    readVersion: () => '26.8.1',
+  });
+
+  assert.deepEqual(result, {
+    identifier: null,
+    version: null,
+  });
+});
 
 test('evaluateDesktopInstalledAppsAudit passes for canonical production only', () => {
   const result = evaluateDesktopInstalledAppsAudit({
