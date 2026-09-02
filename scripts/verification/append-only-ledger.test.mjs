@@ -143,6 +143,14 @@ describe('append-only audit evidence', () => {
       () => readEvidenceLedger(serializeEvidenceLedger([invalidEvidence])),
       /audit evidence schema/
     );
+    const wrongContentId = reseal({
+      ...first,
+      evidence: { ...first.evidence, evidenceId: 'evidence-wrong' },
+    });
+    assert.throws(
+      () => readEvidenceLedger(serializeEvidenceLedger([wrongContentId])),
+      /evidence-content-address-mismatch/
+    );
     assert.throws(() => readEvidenceLedger('{not-json}\n'), SyntaxError);
     const duplicate = reseal({
       schema: AUDIT_LEDGER_ENTRY_SCHEMA,
@@ -218,6 +226,14 @@ describe('append-only audit evidence', () => {
       assert.equal(
         readFileSync(`${ledgerPath}.lock`, 'utf8'),
         'other-writer\n'
+      );
+      assert.throws(
+        () =>
+          appendEvidenceFile(
+            join(directory, 'missing-parent', 'evidence.jsonl'),
+            evidence()
+          ),
+        error => error.code === 'ENOENT'
       );
     } finally {
       rmSync(directory, { recursive: true, force: true });

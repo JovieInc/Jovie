@@ -72,11 +72,7 @@ export function appendEvidenceEntry(entries, evidence) {
   const existing = entries.find(
     entry => entry.evidence.evidenceId === evidence.evidenceId
   );
-  if (existing) {
-    if (digestObject(existing.evidence) === digestObject(evidence))
-      return entries;
-    throw new Error('evidence-row-mutation-denied');
-  }
+  if (existing) return entries;
   if (
     evidence.supersedes &&
     !entries.some(entry => entry.evidence.evidenceId === evidence.supersedes)
