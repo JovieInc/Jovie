@@ -107,6 +107,7 @@ class Fixture:
             "if [ \"${1:-}\" = --version ]; then printf '9.15.4\\n'; exit 0; fi\n"
             "printf '%s\\n' \"$*\" >> \"$PNPM_LOG\"\n"
             "if [ \"${1:-}\" = fetch ]; then\n"
+            "  if [ \"${PNPM_FETCH_EXIT:-0}\" -ne 0 ]; then exit \"$PNPM_FETCH_EXIT\"; fi\n"
             "  store=\n"
             "  while [ $# -gt 0 ]; do\n"
             "    if [ \"$1\" = --store-dir ]; then store=\"$2\"; break; fi\n"
@@ -233,6 +234,23 @@ class SymphonyNvmePackageCacheTests(unittest.TestCase):
         restore = fx.run("after-create", extra_env={"PNPM_LOG": str(fx.pnpm_log)})
         self.assertEqual(restore.returncode, 0, restore.stderr)
         self.assertTrue((fx.workspace / "node_modules/.modules.yaml").is_file())
+
+    def test_failed_warm_removes_only_its_partial_cache_directory(self) -> None:
+        fx = self.fixture()
+        sibling = fx.cache_root / ".warm-unrelated"
+        sibling.mkdir()
+        result = fx.run(
+            "warm",
+            extra_env={
+                "PNPM_FETCH_EXIT": "42",
+                "PNPM_LOG": str(fx.pnpm_log),
+                "SYMPHONY_TRUSTED_HOOK_PHASE": "cache_warm",
+            },
+        )
+        self.assertEqual(result.returncode, 42, result.stderr)
+        self.assertEqual(list(fx.cache_root.glob(".warm-*")), [sibling])
+        self.assertTrue(sibling.is_dir())
+        self.assertFalse(list(fx.cache_root.glob("*.tar")))
 
     def test_before_remove_deletes_mutable_state_and_preserves_archive(self) -> None:
         fx = self.fixture()

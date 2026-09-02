@@ -26,6 +26,16 @@ private_store="${SYMPHONY_NVME_PRIVATE_STORE:-$mutable_root/pnpm-store}"
 receipt_dir="${SYMPHONY_NVME_RECEIPT_DIR:-$HOME/.local/state/symphony-nvme-package-cache}"
 restore_receipt="$mutable_root/restore-receipt.json"
 trusted_hook_phase="${SYMPHONY_TRUSTED_HOOK_PHASE:-}"
+warm_tmp_dir=""
+
+cleanup_warm_tmp() {
+  [ -n "${warm_tmp_dir:-}" ] || return 0
+  case "$warm_tmp_dir" in
+    "$cache_root"/.warm-*) rm -rf -- "$warm_tmp_dir" ;;
+    *) fail "unsafe-warm-temp-path" "$warm_tmp_dir" ;;
+  esac
+  warm_tmp_dir=""
+}
 
 fail() {
   local reason="$1"
@@ -632,11 +642,11 @@ warm_cache() {
     fail "partial-cache-entry" "$archive_path"
   else
     tmp_dir="$(mktemp -d "$cache_root/.warm-${cache_key}.XXXXXX")"
+    warm_tmp_dir="$tmp_dir"
     store_dir="$tmp_dir/store"
     tmp_archive="$tmp_dir/$(basename "$archive_path")"
     tmp_manifest="$tmp_dir/$(basename "$manifest_path")"
     tmp_checksum="$tmp_dir/$(basename "$checksum_path")"
-    cleanup_warm_tmp() { rm -rf -- "$tmp_dir"; }
     trap cleanup_warm_tmp EXIT
     install -d -m 0755 "$store_dir"
     install -m 0644 "$workspace/pnpm-lock.yaml" "$tmp_dir/pnpm-lock.yaml"
