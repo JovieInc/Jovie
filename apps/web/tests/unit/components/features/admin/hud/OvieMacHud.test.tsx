@@ -11,6 +11,10 @@ vi.mock('@/components/features/admin/hud/OvieLauncherRail', () => ({
   OvieLauncherRail: () => <div data-testid='ovie-launcher-rail' />,
 }));
 
+vi.mock('@/components/features/admin/hud/OperationalTasksPanel', () => ({
+  OperationalTasksPanel: () => <div data-testid='operational-tasks-panel' />,
+}));
+
 vi.mock('@/components/features/admin/design-lab', () => ({
   DesignProposalReviewPanel: () => (
     <div data-testid='ovie-taste-inbox'>Taste Inbox</div>
