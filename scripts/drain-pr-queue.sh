@@ -111,6 +111,7 @@ native_state_to_snap() {
       fail: [],
       q: (.queued == true),
       qs: (.mergeQueueEntry.state // null),
+      qp: (.mergeQueueEntry.position // null),
       oid: .headRefOid
     } | select(.n | type == "number") ]
   '
@@ -1534,10 +1535,38 @@ fi
 # reproduced by #16441 on 2026-08-27).
 front_churn_disposition() {
   local n="$1" head_oid="$2" committed run_id jobs_json runs_json
-  local receipt_head receipt_rc decision action failure_class
+  local receipt_head receipt_rc decision action failure_class active_run_id
   if [[ "$MERGE_QUEUE_BACKEND" != "native" ]]; then
     echo "unknown"
     return 0
+  fi
+  if [[ ! "$MAIN_HEAD_SHA" =~ ^[0-9a-f]{40}$ ]]; then
+    echo "unknown"
+    return 0
+  fi
+  committed="$(gh_retry api "repos/${REPO}/commits/${head_oid}" --jq '.commit.committer.date // empty' 2>/dev/null || true)"
+  runs_json="$MERGE_GROUP_RUNS_JSON"
+  # A controller pass can race a newer native group that is still running.
+  # Consult that already-fetched read-only evidence before honoring a durable
+  # failure tombstone; otherwise an older failure can eject the newer group
+  # before it publishes its terminal result (#17013, 2026-09-02).
+  if jq -e --arg prefix "gh-readonly-queue/main/pr-${n}-" --arg committed "$committed" '
+    any(.[];
+      ((.headBranch // "") | startswith($prefix))
+      and (.status == "queued" or .status == "in_progress"
+        or .status == "waiting" or .status == "pending"
+        or .status == "requested")
+      and (($committed == "") or ((.createdAt // "") >= $committed)))
+  ' <<<"$runs_json" >/dev/null; then
+    decision="$(MERGE_GROUP_RUNS_JSON="$runs_json" \
+      node scripts/ci-merge-queue-check.mjs front-churn \
+      --pr="$n" --base="$MAIN_HEAD_SHA" --head-committed-at="$committed" 2>/dev/null || true)"
+    action="$(jq -r '.action // "unknown"' <<<"$decision" 2>/dev/null || echo unknown)"
+    active_run_id="$(jq -r '.evidence.activeRunId // empty' <<<"$decision" 2>/dev/null || true)"
+    if [[ "$action" == "allow" && "$active_run_id" =~ ^[1-9][0-9]*$ ]]; then
+      echo "allow"
+      return 0
+    fi
   fi
   set +e
   receipt_head="$(product_failure_receipt_head "$head_oid")"
@@ -1551,12 +1580,6 @@ front_churn_disposition() {
     echo "block-product"
     return 0
   fi
-  if [[ ! "$MAIN_HEAD_SHA" =~ ^[0-9a-f]{40}$ ]]; then
-    echo "unknown"
-    return 0
-  fi
-  committed="$(gh_retry api "repos/${REPO}/commits/${head_oid}" --jq '.commit.committer.date // empty' 2>/dev/null || true)"
-  runs_json="$MERGE_GROUP_RUNS_JSON"
   while IFS= read -r run_id; do
     [[ "$run_id" =~ ^[1-9][0-9]*$ ]] || continue
     if jq -e --argjson run_id "$run_id" '
@@ -1934,6 +1957,7 @@ if waiting_lane_allows_clean_enroll || [[ "$DRAIN_PROMOTION_MODE" == "blocked" &
     fi
   done < <(echo "$SNAP" | jq -c '.[]
     | select(.q == true)
+    | select(.qp == 1)
     | select(.base == "main")
     | select(.draft | not)
     | select(([.L[]] | any(.=="queue-deferred" or '"$NO_AUTO_HOLD_JQ"')) | not)')
