@@ -1,6 +1,6 @@
 'use client';
 
-import { Button } from '@jovie/ui';
+import { Button, Card } from '@jovie/ui';
 import type { LucideIcon } from 'lucide-react';
 import { ArrowRight, BookOpen, Mail, Rocket } from 'lucide-react';
 import { useEffect } from 'react';
@@ -63,38 +63,36 @@ export function SupportChannels() {
           {CHANNELS.map(channel => {
             const Icon = channel.icon;
             return (
-              <article
-                key={channel.title}
-                className='rounded-2xl border border-subtle bg-surface-1 p-6'
-              >
-                <Icon className='h-5 w-5 text-accent' aria-hidden='true' />
-                <h3 className='mt-4 font-medium text-primary-token'>
-                  {channel.title}
-                </h3>
-                <p className='mt-2 text-sm leading-relaxed text-secondary-token'>
-                  {channel.description}
-                </p>
-                <Button
-                  asChild
-                  variant='ghost'
-                  size='sm'
-                  className='mt-3 px-0 before:h-11 before:min-w-11'
-                  onClick={() =>
-                    track(channel.event, { source: 'support_page' })
-                  }
-                >
-                  <a
-                    href={channel.href}
-                    className='public-action-inline'
-                    {...(channel.external
-                      ? { target: '_blank', rel: 'noopener noreferrer' }
-                      : {})}
+              <Card asChild key={channel.title} className='p-6'>
+                <article>
+                  <Icon className='h-5 w-5 text-accent' aria-hidden='true' />
+                  <h3 className='mt-4 font-medium text-primary-token'>
+                    {channel.title}
+                  </h3>
+                  <p className='mt-2 text-sm leading-relaxed text-secondary-token'>
+                    {channel.description}
+                  </p>
+                  <Button
+                    asChild
+                    variant='ghost'
+                    size='marketing'
+                    className='mt-3 gap-1.5'
+                    onClick={() =>
+                      track(channel.event, { source: 'support_page' })
+                    }
                   >
-                    <span>{channel.cta}</span>
-                    <ArrowRight className='h-3.5 w-3.5' aria-hidden='true' />
-                  </a>
-                </Button>
-              </article>
+                    <a
+                      href={channel.href}
+                      {...(channel.external
+                        ? { target: '_blank', rel: 'noopener noreferrer' }
+                        : {})}
+                    >
+                      <span>{channel.cta}</span>
+                      <ArrowRight className='h-3.5 w-3.5' aria-hidden='true' />
+                    </a>
+                  </Button>
+                </article>
+              </Card>
             );
           })}
         </div>
@@ -116,7 +114,8 @@ export function SupportCta() {
         <Button
           asChild
           variant='secondary'
-          className='mt-6 before:h-11 before:min-w-11'
+          size='marketing'
+          className='mt-6'
           aria-label={`Send email to support team at ${SUPPORT_EMAIL}`}
           onClick={() =>
             track('Support Email Clicked', {
@@ -125,12 +124,7 @@ export function SupportCta() {
             })
           }
         >
-          <a
-            href={`mailto:${SUPPORT_EMAIL}`}
-            className='public-action-secondary'
-          >
-            Contact Support
-          </a>
+          <a href={`mailto:${SUPPORT_EMAIL}`}>Contact Support</a>
         </Button>
       </section>
     </MarketingContainer>
