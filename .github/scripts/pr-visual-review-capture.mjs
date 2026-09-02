@@ -2,7 +2,10 @@
 import { mkdir, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import { chromium } from 'playwright';
-import { validateCaptureManifest } from './pr-visual-review.mjs';
+import {
+  buildCaptureArtifactPaths,
+  validateCaptureManifest,
+} from './pr-visual-review.mjs';
 
 const baseUrl = process.env.BASE_URL ?? 'http://127.0.0.1:3100';
 const routes = JSON.parse(process.env.PR_VISUAL_ROUTES ?? '[]');
@@ -48,9 +51,11 @@ try {
         }
       });
       const url = new URL(route, baseUrl).toString();
-      const safeRoute =
-        route.replace(/[^a-z0-9]+/gi, '-').replace(/^-|-$/g, '') || 'home';
-      const path = join(outDir, `${safeRoute}-${viewportName}.png`);
+      const { artifactPath, outputPath } = buildCaptureArtifactPaths({
+        outDir,
+        route,
+        viewportName,
+      });
       try {
         if (route.startsWith('/app/')) {
           const authEntryUrl = new URL(
@@ -121,11 +126,11 @@ try {
             `Captured route emitted runtime failures: ${JSON.stringify(runtimeFailures)}`
           );
         }
-        await page.screenshot({ path, fullPage: true });
+        await page.screenshot({ path: outputPath, fullPage: true });
         manifest.push({
           route,
           viewport: viewportName,
-          path,
+          path: artifactPath,
           status: 'captured',
         });
       } catch (error) {
