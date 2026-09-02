@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+// @ts-nocheck Playwright page-context DOM globals are not in the Node scripts tsconfig.
 import { mkdirSync } from 'node:fs';
 import { createRequire } from 'node:module';
 import { basename, dirname, join, resolve } from 'node:path';
