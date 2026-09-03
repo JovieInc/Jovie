@@ -59,7 +59,9 @@ describe('PublicPageErrorFallback', () => {
 
     expect(screen.getAllByRole('button')).toHaveLength(1);
     expect(screen.queryByText(/Error ID:/)).not.toBeInTheDocument();
-    expect(document.querySelector('details')).not.toHaveAttribute('open');
+    // No digest -> no disclosure at all (SystemBErrorFallback renders
+    // <details> only when a digest exists).
+    expect(document.querySelector('details')).not.toBeInTheDocument();
   });
 
   it('logs the error and forwards it to Sentry capture when mounted', () => {
