@@ -130,6 +130,10 @@ function resolveLocalBetterAuthUrl(): URL | undefined {
     : undefined;
 }
 
+function isNonVercelRuntime(): boolean {
+  return env.VERCEL_ENV !== 'preview' && env.VERCEL_ENV !== 'production';
+}
+
 /**
  * Local dev / E2E servers can run on a non-default port (e.g. PORT=3200 for
  * parallel QA runs) while Doppler's BETTER_AUTH_URL stays pinned to 3100.
@@ -138,7 +142,7 @@ function resolveLocalBetterAuthUrl(): URL | undefined {
  * never applied to Vercel preview/production deployments.
  */
 function resolveServingPortHosts(): string[] {
-  if (env.VERCEL_ENV === 'preview' || env.VERCEL_ENV === 'production') {
+  if (!isNonVercelRuntime()) {
     return [];
   }
   const port = process.env.PORT?.trim();
@@ -149,6 +153,19 @@ function resolveServingPortHosts(): string[] {
   // advertises localhost. They are both loopback, but Better Auth validates
   // the request host exactly; allow both forms for this process port only.
   return [`localhost:${port}`, `127.0.0.1:${port}`];
+}
+
+/**
+ * Worktree / Playwright / QA servers drift off PORT and BETTER_AUTH_URL
+ * (JOV-5843 localhost:3193 vs PORT=3194). Better Auth matches allowedHosts
+ * with the same globber as trustedOrigins, so `localhost:*` covers any
+ * loopback port without widening production or preview.
+ */
+function resolveLoopbackHostPatterns(): string[] {
+  if (!isNonVercelRuntime()) {
+    return [];
+  }
+  return ['localhost:*', '127.0.0.1:*', '[::1]:*'];
 }
 
 function resolveBaseUrl(): NonNullable<BetterAuthOptions['baseURL']> {
@@ -164,6 +181,7 @@ function resolveBaseUrl(): NonNullable<BetterAuthOptions['baseURL']> {
           'localhost:3100',
           localBetterAuthUrl?.host,
           ...resolveServingPortHosts(),
+          ...resolveLoopbackHostPatterns(),
           env.VERCEL_URL,
           env.VERCEL_BRANCH_URL,
         ].filter((host): host is string => Boolean(host))
