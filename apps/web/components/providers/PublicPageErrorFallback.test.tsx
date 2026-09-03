@@ -53,7 +53,9 @@ describe('PublicPageErrorFallback', () => {
   });
 
   it('omits the diagnostic disclosure when the error carries no digest', () => {
-    render(<PublicPageErrorFallback error={new Error('boom')} context='Profile' />);
+    render(
+      <PublicPageErrorFallback error={new Error('boom')} context='Profile' />
+    );
 
     expect(screen.getAllByRole('button')).toHaveLength(1);
     expect(screen.queryByText(/Error ID:/)).not.toBeInTheDocument();
