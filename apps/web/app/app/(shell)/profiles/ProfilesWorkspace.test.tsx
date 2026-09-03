@@ -310,8 +310,8 @@ describe('ProfilesWorkspace', { timeout: 15_000 }, () => {
   beforeEach(() => {
     vi.clearAllMocks();
     navigationMock.searchParams = new URLSearchParams();
-    vi.spyOn(globalThis, 'fetch').mockResolvedValue(
-      jsonResponse(suggestionsResponse([]))
+    vi.spyOn(globalThis, 'fetch').mockImplementation(
+      () => new Promise(() => {}) // never resolves for tests that don't opt in
     );
   });
 
@@ -473,7 +473,7 @@ describe('ProfilesWorkspace', { timeout: 15_000 }, () => {
     );
     expect(
       screen.getAllByTestId('suggested-connection-row')[0]?.className
-    ).toContain('sm:grid-cols-[minmax(0,1fr)_auto]');
+    ).toContain('justify-between');
     expect(screen.getByText('TikTok')).toBeInTheDocument();
     expect(screen.getByText('YouTube')).toBeInTheDocument();
     expect(screen.queryByText('Fan Wiki')).not.toBeInTheDocument();
