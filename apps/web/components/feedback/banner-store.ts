@@ -14,6 +14,7 @@
  * import { banner } from '@/components/feedback';
  *
  * banner.info('Scheduled maintenance tonight at 10pm PT');
+ * banner.warning('Import is taking longer than expected');
  * banner.error('Payments are degraded', {
  *   description: 'Checkout may fail intermittently. We are on it.',
  * });
@@ -22,7 +23,7 @@
  * ```
  */
 
-export type BannerVariant = 'success' | 'error' | 'info';
+export type BannerVariant = 'success' | 'warning' | 'error' | 'info';
 
 export interface BannerAction {
   label: string;
@@ -105,6 +106,8 @@ export const banner = {
   dismiss,
   success: (title: string, options?: BannerShortcutOptions): string =>
     show({ ...options, title, variant: 'success' }),
+  warning: (title: string, options?: BannerShortcutOptions): string =>
+    show({ ...options, title, variant: 'warning' }),
   error: (title: string, options?: BannerShortcutOptions): string =>
     show({ ...options, title, variant: 'error' }),
   info: (title: string, options?: BannerShortcutOptions): string =>

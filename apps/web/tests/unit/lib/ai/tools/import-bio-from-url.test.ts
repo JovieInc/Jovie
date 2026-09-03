@@ -75,7 +75,7 @@ describe('importBioFromUrl', () => {
 
     expect(result.ok).toBe(true);
     expect(result.candidateBio).toBe(
-      '<untrusted-source url="https://timwhite.co/">Brooklyn DJ blending house and disco.</untrusted-source>'
+      '<untrusted-source url="https://timwhite.co/" encoding="entities-v1">Brooklyn DJ blending house and disco.</untrusted-source>'
     );
     expect(result.sourceUrl).toBe('https://timwhite.co/');
     expect(result.sourceTitle).toBe('Tim White');

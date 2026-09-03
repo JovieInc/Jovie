@@ -3,6 +3,7 @@ import { resolve } from 'node:path';
 import { render, screen } from '@testing-library/react';
 import type { ReactNode } from 'react';
 import { describe, expect, it, vi } from 'vitest';
+import { ArtistProfileLandingPage } from '@/components/marketing/artist-profile/ArtistProfileLandingPage';
 import { ARTIST_PROFILE_COPY } from '@/data/artistProfileCopy';
 import {
   ARTIST_PROFILE_SECTION_ORDER,
@@ -238,10 +239,6 @@ function expectArtistProfileSectionOrder(flags: ArtistProfileSectionFlags) {
 async function renderArtistProfileLandingPage(
   flags: ArtistProfileSectionFlags
 ) {
-  const { ArtistProfileLandingPage } = await import(
-    '@/components/marketing/artist-profile'
-  );
-
   render(<ArtistProfileLandingPage copy={ARTIST_PROFILE_COPY} flags={flags} />);
 }
 

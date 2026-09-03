@@ -73,7 +73,13 @@ def live_state() -> dict:
         "symphony": {
             "updated": observed,
             "error": None,
-            "counts": {"implementing": 2, "retrying": 3, "queued": 4, "blocked": 1},
+            "counts": {
+                "implementing": 2,
+                "stalled": 0,
+                "retrying": 3,
+                "queued": 4,
+                "blocked": 1,
+            },
             "reason_buckets": {
                 "capacity": 2,
                 "timeout": 1,
@@ -87,8 +93,24 @@ def live_state() -> dict:
             "workers": {"runner_jobs": 2, "runner_listeners": 8},
             "next_retry": stamp(-90),
             "jobs": [
-                {"id": "JOV-5400", "started": stamp(600), "title": "Repair controller receipt"},
-                {"id": "JOV-5401", "started": stamp(300), "title": "Verify native merge queue"},
+                {
+                    "id": "JOV-5400",
+                    "started": stamp(600),
+                    "event_age_seconds": 12,
+                    "freshness": "RUNNING",
+                    "owner": "Symphony/JOV",
+                    "gate": "none; worker event stream current",
+                    "title": "Repair controller receipt",
+                },
+                {
+                    "id": "JOV-5401",
+                    "started": stamp(300),
+                    "event_age_seconds": 8,
+                    "freshness": "RUNNING",
+                    "owner": "Symphony/JOV",
+                    "gate": "none; worker event stream current",
+                    "title": "Verify native merge queue",
+                },
             ],
             "blockers": [
                 {
@@ -338,6 +360,9 @@ class RenderTests(unittest.TestCase):
 
         for text in ("QUEUED", "RUNNING", "PASSED", "FAILED", "Symphony work", "PR fleet"):
             self.assertIn(text, lifecycle)
+        self.assertIn("2/4 active", lifecycle)
+        self.assertIn("1 slots open", lifecycle)
+        self.assertIn("official workflow", lifecycle)
         for text in ("POS", "REF", "STATE", "PR #16490", "JOV-5400"):
             self.assertIn(text, issues)
         self.assertNotIn("SECONDARY CAPACITY / OWNERS / DETAIL", output)
@@ -784,6 +809,39 @@ class RenderTests(unittest.TestCase):
         self.assertIn("Native queue", work)
         self.assertIn("UNKNOWN", work)
         self.assertNotIn("READY 15", throughput)
+
+    def test_stalled_worker_row_names_state_age_owner_and_gate(self) -> None:
+        state = live_state()
+        state["symphony"]["counts"]["stalled"] = 1
+        state["symphony"]["jobs"][0].update(
+            {
+                "event_age_seconds": 91 * 60,
+                "freshness": "STALLED",
+                "owner": "Symphony/JOV",
+                "gate": "inspect worker; terminalize or retry with named owner",
+            }
+        )
+
+        work = "\n".join(hud._work_rows(state, 210))
+        attention = "\n".join(hud._attention_rows(state, 210))
+        issue_queue = "\n".join(
+            hud._issue_queue_rows(state, 210, expanded=True)
+        )
+        worker_line = next(line for line in work.splitlines() if "JOV-5400" in line)
+        queue_line = next(
+            line for line in issue_queue.splitlines() if "JOV-5400" in line
+        )
+
+        self.assertIn("Stalled active", work)
+        self.assertIn("STALLED", worker_line)
+        self.assertIn("last event 1h 31m ago", worker_line)
+        self.assertIn("owner Symphony/JOV", worker_line)
+        self.assertIn("gate inspect worker", worker_line)
+        self.assertIn("STALLED", queue_line)
+        self.assertIn("last event 1h 31m ago", queue_line)
+        self.assertIn("owner Symphony/JOV", queue_line)
+        self.assertIn("gate inspect worker", queue_line)
+        self.assertIn("active worker(s) quiet over 90m", attention)
 
     def test_degraded_runtime_never_presents_last_good_capacity_as_current(self) -> None:
         state = live_state()
@@ -1374,6 +1432,39 @@ class RefreshTests(unittest.TestCase):
         self.assertIn("JOV:TimeoutError", result["error"])
         self.assertIn("LYB:TimeoutError", result["error"])
 
+    def test_fetch_symphony_marks_quiet_active_worker_stalled_with_owner_and_gate(self) -> None:
+        moment = dt.datetime(2026, 9, 1, 18, 30, tzinfo=dt.timezone.utc)
+
+        def http_text(url: str) -> str:
+            if url.endswith(":4041/"):
+                return (
+                    '<a href="/api/v1/JOV-5999">worker</a>'
+                    '<a href="https://linear.app/jovie/issue/JOV-5999/repair-queue">issue</a>'
+                )
+            return ""
+
+        worker = {
+            "status": "running",
+            "running": {
+                "started_at": hud.iso(moment - dt.timedelta(hours=2)),
+                "last_event_at": hud.iso(moment - dt.timedelta(minutes=91)),
+                "last_message": "command execution still in progress",
+            },
+        }
+        with mock.patch.object(hud, "now", return_value=moment), mock.patch.object(
+            hud, "http_text", side_effect=http_text
+        ), mock.patch.object(hud, "http_json", return_value=worker), mock.patch.object(
+            hud, "process_count", return_value=0
+        ), mock.patch.object(hud, "configured_slots", return_value=40):
+            result = hud.fetch_symphony()
+
+        self.assertEqual(result["counts"]["implementing"], 1)
+        self.assertEqual(result["counts"]["stalled"], 1)
+        self.assertEqual(result["slots"], {"total": 40, "available": 39, "basis": "configured max plus live capacity signal"})
+        self.assertEqual(result["jobs"][0]["freshness"], "STALLED")
+        self.assertEqual(result["jobs"][0]["owner"], "Symphony/JOV")
+        self.assertIn("inspect", result["jobs"][0]["gate"])
+
     def test_once_cli_routes_keyboard_view_and_canvas_arguments(self) -> None:
         state = live_state()
         stdout = io.StringIO()
@@ -1393,6 +1484,19 @@ class RefreshTests(unittest.TestCase):
 
 
 class SourceContractTests(unittest.TestCase):
+    def test_configured_slots_prefers_official_workflow_then_legacy_fallback(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            official = root / "official-WORKFLOW.md"
+            legacy = root / "legacy-WORKFLOW.md"
+            official.write_text("max_concurrent_agents: 40\n", encoding="utf-8")
+            legacy.write_text("max_concurrent_agents: 1\n", encoding="utf-8")
+
+            self.assertEqual(hud.configured_slots((official, legacy)), 40)
+
+            official.unlink()
+            self.assertEqual(hud.configured_slots((official, legacy)), 1)
+
     def test_production_unbound_pauses_only_release_promotion(self) -> None:
         receipt = live_state()["fleet"]
         receipt.update(

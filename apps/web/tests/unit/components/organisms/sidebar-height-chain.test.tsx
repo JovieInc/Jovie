@@ -41,4 +41,14 @@ describe('sidebar full-height flex chain (JOV-3960)', () => {
     expect(unifiedSource).toContain('SidebarFooter');
     expect(unifiedSource).toMatch(/SidebarFooter className='mt-auto/);
   });
+
+  it('uses SheetContent ownership for the mobile sidebar close affordance', () => {
+    const sidebarSource = readFileSync(
+      path.join(webRoot, 'components/organisms/sidebar/sidebar.tsx'),
+      'utf8'
+    );
+
+    expect(sidebarSource).toContain('hideClose');
+    expect(sidebarSource).not.toContain('[&>button]:hidden');
+  });
 });

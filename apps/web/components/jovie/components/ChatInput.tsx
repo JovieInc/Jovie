@@ -306,6 +306,12 @@ export const ChatInput = forwardRef<HTMLTextAreaElement, ChatInputProps>(
       latestValueRef.current = value;
     }, [value]);
 
+    const scheduleTextareaRefocus = useCallback(() => {
+      globalThis.setTimeout(() => {
+        internalTextareaRef.current?.focus();
+      }, 0);
+    }, []);
+
     useEffect(() => {
       const textarea = internalTextareaRef.current;
       if (!textarea) return;
@@ -369,7 +375,10 @@ export const ChatInput = forwardRef<HTMLTextAreaElement, ChatInputProps>(
     const handlePickerClose = useCallback(() => {
       onPickerOpenChange?.(false);
       picker.close();
-    }, [onPickerOpenChange, picker]);
+      // Closing the slash picker can reflow the hero row and blur the textarea.
+      // Queue focus after the picker state commit so typing can continue.
+      scheduleTextareaRefocus();
+    }, [onPickerOpenChange, picker, scheduleTextareaRefocus]);
 
     // Slash trigger detection: open root picker when `/` follows a word
     // boundary; switch to entity picker when a skill commit demands it; or
@@ -536,12 +545,6 @@ export const ChatInput = forwardRef<HTMLTextAreaElement, ChatInputProps>(
         onChange(dictationBaselineRef.current + sessionTranscript);
       },
     });
-
-    const scheduleTextareaRefocus = useCallback(() => {
-      globalThis.setTimeout(() => {
-        internalTextareaRef.current?.focus();
-      }, 0);
-    }, []);
 
     const captureDictationBaseline = useCallback(() => {
       dictationBaselineRef.current = value;
@@ -716,23 +719,6 @@ export const ChatInput = forwardRef<HTMLTextAreaElement, ChatInputProps>(
         : 'relative flex justify-center';
     // Container the slash key listener cares about when the picker is closed.
     // (The active-listener inside SlashCommandMenu only mounts while open.)
-
-    // Refocus textarea when the picker closes so typing can continue.
-    // We track "picker was open last render" to scope the focus restore: the
-    // AttachDropdown (Radix) also restores focus on close, and racing with it
-    // can leave focus on the dropdown trigger. Deferring to a 0ms timeout
-    // lets Radix run first, then we put focus back where it belongs.
-    const wasPickerOpenRef = useRef(isPickerOpen);
-    useEffect(() => {
-      const wasOpen = wasPickerOpenRef.current;
-      wasPickerOpenRef.current = isPickerOpen;
-      if (!isPickerOpen && wasOpen && isFocused) {
-        const handle = setTimeout(() => {
-          internalTextareaRef.current?.focus();
-        }, 0);
-        return () => clearTimeout(handle);
-      }
-    }, [isPickerOpen, isFocused]);
 
     useLayoutEffect(() => {
       onPickerOpenChange?.(picker.state.status !== 'closed');

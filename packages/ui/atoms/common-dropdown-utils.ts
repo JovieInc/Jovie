@@ -81,6 +81,35 @@ function radioItemMatches(
     .includes(normalizedQuery);
 }
 
+function normalizeMenuSeparators(
+  items: readonly CommonDropdownItem[]
+): CommonDropdownItem[] {
+  const normalized: CommonDropdownItem[] = [];
+
+  for (const item of items) {
+    if (isSeparator(item)) {
+      if (normalized.length === 0 || isSeparator(normalized.at(-1)!)) {
+        continue;
+      }
+
+      normalized.push(item);
+      continue;
+    }
+
+    normalized.push(
+      isSubmenu(item)
+        ? { ...item, items: normalizeMenuSeparators(item.items) }
+        : item
+    );
+  }
+
+  while (normalized.length > 0 && isSeparator(normalized.at(-1)!)) {
+    normalized.pop();
+  }
+
+  return normalized;
+}
+
 function normalizeVisibleItems(
   items: readonly CommonDropdownItem[]
 ): CommonDropdownItem[] {
@@ -128,7 +157,7 @@ export function filterItems(
 ): CommonDropdownItem[] {
   const trimmedQuery = query.trim();
   if (!trimmedQuery) {
-    return [...items];
+    return normalizeMenuSeparators(items);
   }
 
   const filtered = items.flatMap((item): CommonDropdownItem[] => {

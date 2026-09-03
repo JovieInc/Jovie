@@ -71,6 +71,11 @@ function stopPublisher(
       'publisher-stopped',
       'Publishing stopped; expired last-known marker retained'
     ),
+    operationalTasks: {
+      ...state.lastKnown.operationalTasks,
+      syncState: 'stale' as const,
+      deltas: [],
+    },
   };
   state.lastKnown = stopped;
   return stopped;

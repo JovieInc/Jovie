@@ -1,7 +1,9 @@
 import {
+  destinationForOvieLane,
   ingestOvieDump,
   type OvieLane,
   type OvieReceipt,
+  queuedAckForDestination,
 } from '@/lib/ovie/ingest';
 import type { OvieHandoff } from './types';
 
@@ -67,9 +69,18 @@ export function classifyHandoff(handoff: OvieHandoff): {
 } {
   const receipts = ingestOvieDump([handoffDumpText(handoff)]);
   const first = receipts[0];
+  const lane = handoff.priority ?? first.lane;
+  const destination = destinationForOvieLane(lane);
   return {
-    receipts,
-    lane: handoff.priority ?? first.lane,
-    destination: first.destination,
+    receipts: [
+      {
+        ...first,
+        lane,
+        destination,
+        ack: queuedAckForDestination(destination),
+      },
+    ],
+    lane,
+    destination,
   };
 }

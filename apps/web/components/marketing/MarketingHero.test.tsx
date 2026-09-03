@@ -67,4 +67,22 @@ describe('MarketingHero source-backed default story', () => {
         'Active variant-to-route mapping remains owner-stacked and is not proven by this story.',
     });
   });
+
+  it('honors the shared root test id in landing mode', () => {
+    render(
+      <MarketingHero
+        eyebrow='Eyebrow'
+        headingId='landing-heading'
+        title='Landing title'
+        body='Landing body'
+        media={<div>Media</div>}
+        testId='route-hero'
+      />
+    );
+
+    expect(screen.getByTestId('route-hero')).toHaveAttribute(
+      'aria-labelledby',
+      'landing-heading'
+    );
+  });
 });

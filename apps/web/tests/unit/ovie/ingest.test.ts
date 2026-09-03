@@ -3,7 +3,9 @@ import { prepareOvieChatTurn } from '@/lib/ovie/chat-entry';
 import {
   ackOvieDumpBeforeModel,
   DEST_KANBAN,
+  DEST_LINEAR,
   DEST_PERSONAL,
+  OVIE_LINEAR_QUEUED_ACK,
   OVIE_QUEUED_ACK,
   readOvieLinearRoutes,
   readOvieReceiptLog,
@@ -45,11 +47,15 @@ describe('Ovie dump ingest (JOV-5215)', () => {
       'personal',
       'taste',
     ]);
-    expect(receipts[2]?.destination).toBe(DEST_KANBAN);
+    expect(receipts[2]?.destination).toBe(DEST_LINEAR);
     expect(receipts[3]?.destination).toBe(DEST_PERSONAL);
     expect(receipts[3]?.destination).not.toBe(DEST_KANBAN);
     for (const receipt of receipts) {
-      expect(receipt.ack).toBe(OVIE_QUEUED_ACK);
+      expect(receipt.ack).toBe(
+        receipt.destination === DEST_LINEAR
+          ? OVIE_LINEAR_QUEUED_ACK
+          : OVIE_QUEUED_ACK
+      );
       expect(receipt.destinationHandle).toBeNull();
       expect(receipt.workerSpawned).toBe(false);
     }
@@ -81,7 +87,8 @@ describe('Ovie dump ingest (JOV-5215)', () => {
     expect(spawned).toEqual([]);
     expect(receipts).toHaveLength(1);
     expect(receipts[0]?.lane).toBe('engineering');
-    expect(receipts[0]?.destination).toBe(DEST_KANBAN);
+    expect(receipts[0]?.destination).toBe(DEST_LINEAR);
+    expect(receipts[0]?.ack).toBe(OVIE_LINEAR_QUEUED_ACK);
     expect(readOvieReceiptLog()).toEqual(receipts);
     expect(readOvieLinearRoutes()).toEqual([]);
   });
@@ -107,6 +114,6 @@ describe('Ovie dump ingest (JOV-5215)', () => {
     );
     expect(classified).toHaveLength(1);
     expect(classified[0]?.lane).toBe('engineering');
-    expect(classified[0]?.destination).toBe(DEST_KANBAN);
+    expect(classified[0]?.destination).toBe(DEST_LINEAR);
   });
 });

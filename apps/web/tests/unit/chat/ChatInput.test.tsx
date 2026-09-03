@@ -199,7 +199,7 @@ describe('ChatInput', () => {
       )
     );
 
-    expect(getByRole('button', { name: /Attach Files/i })).toBeEnabled();
+    expect(getByRole('button', { name: /Attachment options/i })).toBeEnabled();
   });
 
   it('does not lock the send control behind a spinner while generating', () => {
@@ -224,7 +224,7 @@ describe('ChatInput', () => {
     expect(textarea).toHaveFocus();
 
     // Click the plus button to open the attachment dropdown
-    await user.click(getByRole('button', { name: /Attach Files/i }));
+    await user.click(getByRole('button', { name: /Attachment options/i }));
 
     // Dropdown menu receives focus when opened (standard Radix behavior)
     expect(getByRole('menu')).toBeInTheDocument();
@@ -243,7 +243,7 @@ describe('ChatInput', () => {
       withProviders(<ChatInput {...baseProps} onFileAttach={vi.fn()} />)
     );
 
-    const attachButton = getByRole('button', { name: /Attach Files/i });
+    const attachButton = getByRole('button', { name: /Attachment options/i });
     const sendButton = getByRole('button', { name: /send message/i });
 
     expect(attachButton.className).toContain('h-9');
@@ -346,7 +346,7 @@ describe('ChatInput', () => {
     });
 
     for (const buttonName of [
-      /Attach Files/i,
+      /Attachment options/i,
       /dictation unavailable/i,
       /send message/i,
     ]) {
@@ -369,7 +369,7 @@ describe('ChatInput', () => {
     );
 
     const attachButton = screen.getByRole('button', {
-      name: /Attach Files/i,
+      name: /Attachment options/i,
     });
     const inlineField = screen.getByTestId('chat-input-inline-field');
 

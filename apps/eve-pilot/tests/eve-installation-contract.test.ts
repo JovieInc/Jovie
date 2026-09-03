@@ -9,9 +9,11 @@ describe('Eve installation contract', () => {
     const packageJson = JSON.parse(
       readFileSync(resolve(pilotRoot, 'package.json'), 'utf8')
     ) as {
+      packageManager?: string;
       dependencies?: { eve?: string };
     };
 
+    expect(packageJson.packageManager).toBe('pnpm@9.15.4');
     expect(packageJson.dependencies?.eve).toBe('0.39.0');
     expect(
       existsSync(resolve(pilotRoot, 'node_modules/eve/docs/README.md'))

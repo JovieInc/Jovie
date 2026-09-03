@@ -49,6 +49,15 @@ describe('eve identity instruction packs', () => {
   it('lets Eve ingest/ack and read gbrain at the Ovie door entry', () => {
     const turn = bindEvePilotIdentity('ovie');
     expect(turn.instructions.includes('ingest and ack')).toBe(true);
+    expect(turn.instructions).toMatch(
+      /Engineering enters\s+Summer Linear intake/
+    );
+    expect(turn.instructions).toContain(
+      'stored and queued for Summer Linear intake'
+    );
+    expect(turn.instructions).not.toContain(
+      "including engineering, enter Summer's Kanban"
+    );
     expect(turn.instructions.toLowerCase()).not.toMatch(/you are ovie/);
     expect(() => turn.require('ingest-ack')).not.toThrow();
     expect(() => turn.require('gbrain-read')).not.toThrow();

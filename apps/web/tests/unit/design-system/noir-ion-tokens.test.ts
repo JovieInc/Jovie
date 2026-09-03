@@ -2,6 +2,7 @@ import { readFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
+import { JOVIE_IMAGE_COLOR_POLICY } from '@/data/marketing';
 
 /**
  * Jovie Noir Ion dark-mode contract (JOV-4635 / #15244).
@@ -73,6 +74,26 @@ describe('Noir Ion — approved dark anchors', () => {
     expect(linearDark).toContain(
       '--linear-row-selected: rgba(17, 175, 255, 0.1);'
     );
+  });
+
+  it('keeps generated-scene references separate from shipped UI anchors', () => {
+    const sceneByRole = new Map(
+      JOVIE_IMAGE_COLOR_POLICY.scenePalette.map(entry => [entry.role, entry])
+    );
+
+    expect(sceneByRole.get('ion')?.uiAnchor.hex).toBe('#11AFFF');
+    expect(sceneByRole.get('ultra')?.uiAnchor.hex).toBe('#A982FF');
+    expect(sceneByRole.get('pulse')?.uiAnchor.hex).toBe('#FF48D2');
+    expect(sceneByRole.get('ion')?.sceneReference.hex).toBe('#3FAFF3');
+    expect(sceneByRole.get('ultra')?.sceneReference.hex).toBe('#A789F0');
+    expect(sceneByRole.get('pulse')?.sceneReference.hex).toBe('#EB6AC6');
+
+    expect(designSystem.toLowerCase()).not.toContain('#3faff3');
+    expect(designSystem.toLowerCase()).not.toContain('#a789f0');
+    expect(designSystem.toLowerCase()).not.toContain('#eb6ac6');
+    expect(linearTokens.toLowerCase()).not.toContain('#3faff3');
+    expect(linearTokens.toLowerCase()).not.toContain('#a789f0');
+    expect(linearTokens.toLowerCase()).not.toContain('#eb6ac6');
   });
 
   it('keeps accent semantics for Ultra, Pulse, Aqua, Mint, Orange, Red', () => {

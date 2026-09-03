@@ -52,7 +52,7 @@ export interface HeaderNavCta {
 export interface HeaderNavLinkItem {
   readonly href: string;
   readonly label: string;
-  readonly treatment?: 'wordmark';
+  readonly treatment?: 'wordmark' | 'leading';
 }
 
 export interface HeaderFlyoutMenu {
@@ -466,10 +466,14 @@ export function HeaderNav({
   const hasMobileNavLinks =
     !hideNav && !hideDesktopNav && !!mobileLinks?.length;
   const leadingMarketingLinks = isMarketingGlass
-    ? navLinks?.filter(link => link.treatment === 'wordmark')
+    ? navLinks?.filter(
+        link => link.treatment === 'wordmark' || link.treatment === 'leading'
+      )
     : undefined;
   const trailingNavLinks = isMarketingGlass
-    ? navLinks?.filter(link => link.treatment !== 'wordmark')
+    ? navLinks?.filter(
+        link => link.treatment !== 'wordmark' && link.treatment !== 'leading'
+      )
     : navLinks;
   const renderNavLinks = (
     links: ReadonlyArray<HeaderNavLinkItem> | undefined

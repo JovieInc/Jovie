@@ -9,12 +9,15 @@
 
 import { put as uploadBlob } from '@vercel/blob';
 import {
+  getBlobCommandOptions,
+  isBlobStorageConfigured,
+} from '@/lib/blob-config';
+import {
   BLOCKED_HOSTNAMES,
   INTERNAL_DOMAIN_SUFFIXES,
   isPrivateIpAddress,
   METADATA_HOSTNAMES,
 } from '@/lib/constants/url-safety';
-import { env } from '@/lib/env-server';
 import { captureWarning } from '@/lib/error-tracking';
 import {
   AVATAR_MAX_FILE_SIZE_BYTES,
@@ -71,9 +74,8 @@ export async function copyAvatarToBlob(
   sourceUrl: string,
   handle: string
 ): Promise<string | null> {
-  const token = env.BLOB_READ_WRITE_TOKEN;
-  if (!token) {
-    logger.warn('Skipping avatar copy: BLOB_READ_WRITE_TOKEN is not set');
+  if (!isBlobStorageConfigured()) {
+    logger.warn('Skipping avatar copy: Vercel Blob storage is not configured');
     return null;
   }
 
@@ -150,7 +152,7 @@ export async function copyAvatarToBlob(
 
     const blob = await uploadBlob(path, optimized, {
       access: 'public',
-      token,
+      ...getBlobCommandOptions(),
       contentType: 'image/avif',
       cacheControlMaxAge: 60 * 60 * 24 * 365,
       addRandomSuffix: false,
