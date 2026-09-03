@@ -1,9 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 vi.mock('server-only', () => ({}));
-vi.mock('@/lib/error-tracking', () => ({
-  captureError: vi.fn(),
-}));
+vi.mock('@/lib/error-tracking', () => ({ captureError: vi.fn() }));
 vi.mock('@/lib/utils/logger', () => ({
   logger: { error: vi.fn(), warn: vi.fn() },
 }));
@@ -15,8 +13,6 @@ import {
 
 const READY = {
   schema: 'symphony-codex-account-control/v1',
-  service: 'symphony-elixir.service',
-  observedAt: '2026-08-31T00:00:00Z',
   availability: 'ready',
   binding: {
     boundLabel: 'personal',
@@ -41,10 +37,9 @@ describe('symphony-codex-accounts.server', () => {
   });
 
   it('inspects through the injected runner and keeps unrecognized bindings unselectable', async () => {
-    const runner = vi.fn().mockResolvedValue({
-      status: 0,
-      stdout: JSON.stringify(READY),
-    });
+    const runner = vi
+      .fn()
+      .mockResolvedValue({ status: 0, stdout: JSON.stringify(READY) });
     const snapshot = await inspectSymphonyCodexAccounts(runner);
     expect(runner).toHaveBeenCalledWith(['inspect'], 8_000);
     expect(snapshot.accounts.map(row => row.label)).toEqual([
@@ -52,8 +47,10 @@ describe('symphony-codex-accounts.server', () => {
       'jovie',
       'timwhite-co',
     ]);
-    expect(snapshot.binding.recognized).toBe(false);
-    expect(snapshot.binding.selectable).toBe(false);
+    expect(snapshot.binding).toMatchObject({
+      recognized: false,
+      selectable: false,
+    });
   });
 
   it('fails closed when the runner is unavailable and never restarts the service', async () => {
@@ -77,9 +74,6 @@ describe('symphony-codex-accounts.server', () => {
           account: 'meetjovie',
           phase: 'authorization-pending',
           userCode: 'ABCD-1234',
-          verificationUri: 'https://auth.openai.com/codex/device',
-          createdAt: '2026-08-31T00:00:00Z',
-          expiresAt: '2026-08-31T00:10:00Z',
           receipt: null,
         },
       }),
@@ -89,7 +83,9 @@ describe('symphony-codex-accounts.server', () => {
       ['reconnect', '--account', 'meetjovie'],
       12_000
     );
-    expect(snapshot.session?.phase).toBe('authorization-pending');
-    expect(snapshot.session?.account).toBe('meetjovie');
+    expect(snapshot.session).toMatchObject({
+      phase: 'authorization-pending',
+      account: 'meetjovie',
+    });
   });
 });

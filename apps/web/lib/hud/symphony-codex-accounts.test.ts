@@ -10,6 +10,19 @@ import {
   stripCodexAccountSecrets,
 } from './symphony-codex-accounts';
 
+const now = 1_000_000;
+const classify = (
+  authPresent: boolean,
+  cooldownUntil: number | null,
+  readinessExpiresAt: number | null
+) =>
+  classifyCodexAccountState({
+    authPresent,
+    cooldownUntil,
+    readinessExpiresAt,
+    now,
+  });
+
 describe('symphony-codex-accounts', () => {
   it('lists only founder-approved labels and keeps unrecognized bindings unselectable', () => {
     expect([...APPROVED_CODEX_ACCOUNT_LABELS]).toEqual([
@@ -23,51 +36,22 @@ describe('symphony-codex-accounts', () => {
       canSwitch: false,
       canRestart: false,
     });
-    expect(classifyCodexBinding('meetjovie').recognized).toBe(true);
-    expect(classifyCodexBinding('meetjovie').selectable).toBe(false);
+    expect(classifyCodexBinding('meetjovie')).toMatchObject({
+      recognized: true,
+      selectable: false,
+    });
   });
 
   it('keeps verified, stale, unknown, and usage-exhausted states distinct', () => {
-    const now = 1_000_000;
-    expect(
-      classifyCodexAccountState({
-        authPresent: true,
-        cooldownUntil: now + 10,
-        readinessExpiresAt: now + 10,
-        now,
-      })
-    ).toBe('usage-exhausted');
-    expect(
-      classifyCodexAccountState({
-        authPresent: true,
-        cooldownUntil: null,
-        readinessExpiresAt: now - 1,
-        now,
-      })
-    ).toBe('stale');
-    expect(
-      classifyCodexAccountState({
-        authPresent: false,
-        cooldownUntil: null,
-        readinessExpiresAt: null,
-        now,
-      })
-    ).toBe('unknown');
-    expect(
-      classifyCodexAccountState({
-        authPresent: true,
-        cooldownUntil: now - 1,
-        readinessExpiresAt: now + 10,
-        now,
-      })
-    ).toBe('verified');
+    expect(classify(true, now + 10, now + 10)).toBe('usage-exhausted');
+    expect(classify(true, null, now - 1)).toBe('stale');
+    expect(classify(false, null, null)).toBe('unknown');
+    expect(classify(true, now - 1, now + 10)).toBe('verified');
   });
 
   it('parses inspect snapshots without leaking secrets and fills missing approved rows', () => {
     const parsed = parseCodexAccountControlSnapshot({
       schema: 'symphony-codex-account-control/v1',
-      service: 'symphony-elixir.service',
-      observedAt: '2026-08-31T00:00:00Z',
       availability: 'ready',
       binding: {
         boundLabel: 'personal',
@@ -78,25 +62,14 @@ describe('symphony-codex-accounts', () => {
         serviceActive: true,
       },
       accounts: [
-        {
-          label: 'meetjovie',
-          state: 'usage-exhausted',
-          reconnectEligible: true,
-        },
-        { label: 'personal', state: 'verified', reconnectEligible: true },
+        { label: 'meetjovie', state: 'usage-exhausted' },
+        { label: 'personal', state: 'verified' },
       ],
       session: {
         id: 'abc',
         account: 'meetjovie',
         phase: 'succeeded',
-        userCode: 'ABCD-1234',
-        verificationUri: 'https://auth.openai.com/codex/device',
-        createdAt: '2026-08-31T00:00:00Z',
-        expiresAt: '2026-08-31T00:10:00Z',
-        receipt: {
-          account: 'meetjovie',
-          completedAt: '2026-08-31T00:01:00Z',
-        },
+        receipt: { account: 'meetjovie', completedAt: '2026-08-31T00:01:00Z' },
       },
     });
     expect(parsed?.accounts.map(row => row.label)).toEqual([
@@ -104,9 +77,11 @@ describe('symphony-codex-accounts', () => {
       'jovie',
       'timwhite-co',
     ]);
-    expect(parsed?.binding.recognized).toBe(false);
-    expect(parsed?.binding.selectable).toBe(false);
-    expect(parsed?.binding.canSwitch).toBe(false);
+    expect(parsed?.binding).toMatchObject({
+      recognized: false,
+      selectable: false,
+      canSwitch: false,
+    });
     expect(parsed?.session?.receipt?.result).toBe('selected-account-verified');
     expect(
       stripCodexAccountSecrets(

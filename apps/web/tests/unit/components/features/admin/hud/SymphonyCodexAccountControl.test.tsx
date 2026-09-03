@@ -5,8 +5,6 @@ import { SymphonyCodexAccountControl } from '@/components/features/admin/hud/Sym
 
 const SNAPSHOT = {
   schema: 'symphony-codex-account-control/v1',
-  service: 'symphony-elixir.service',
-  observedAt: '2026-08-31T00:00:00Z',
   availability: 'ready',
   binding: {
     boundLabel: 'personal',
@@ -43,8 +41,6 @@ describe('SymphonyCodexAccountControl', () => {
             phase: 'authorization-pending',
             userCode: 'ABCD-1234',
             verificationUri: 'https://auth.openai.com/codex/device',
-            createdAt: '2026-08-31T00:00:00Z',
-            expiresAt: '2026-08-31T00:10:00Z',
             receipt: null,
           },
         }),
@@ -70,24 +66,17 @@ describe('SymphonyCodexAccountControl', () => {
     const status = screen.getByTestId('ovie-codex-account-status');
     expect(status).toHaveTextContent('unrecognized');
     expect(status).toHaveTextContent('Switch and restart stay unavailable');
-
     const reconnect = screen.getByTestId(
       'ovie-codex-account-reconnect-meetjovie'
     );
     await user.click(reconnect);
-    expect(screen.getByTestId('ovie-codex-account-status')).toHaveAttribute(
-      'data-phase',
-      'confirmation'
-    );
+    expect(status).toHaveAttribute('data-phase', 'confirmation');
     expect(
       screen.getByTestId('ovie-codex-account-row-meetjovie')
     ).toHaveAttribute('data-selected', 'true');
     await user.click(screen.getByTestId('ovie-codex-account-confirm'));
     await waitFor(() => {
-      expect(screen.getByTestId('ovie-codex-account-status')).toHaveAttribute(
-        'data-phase',
-        'authorization-pending'
-      );
+      expect(status).toHaveAttribute('data-phase', 'authorization-pending');
     });
     expect(fetchMock).toHaveBeenLastCalledWith(
       '/api/admin/hud/symphony-codex-accounts',
@@ -96,9 +85,7 @@ describe('SymphonyCodexAccountControl', () => {
         body: JSON.stringify({ account: 'meetjovie', confirm: true }),
       })
     );
-    expect(screen.getByTestId('ovie-codex-account-status')).toHaveTextContent(
-      'ABCD-1234'
-    );
+    expect(status).toHaveTextContent('ABCD-1234');
     await waitFor(() => {
       expect(reconnect).toHaveFocus();
     });

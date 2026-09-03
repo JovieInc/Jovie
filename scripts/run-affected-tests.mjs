@@ -1480,11 +1480,7 @@ export function buildAffectedTestPlan(
   ]);
   const pythonUnittestTests = unique([
     ...(isExactEventDrivenShipper ? EVENT_DRIVEN_SHIPPER_PYTHON_TESTS : []),
-    ...(files.some(
-      file =>
-        file === 'scripts/hermes/symphony-codex-account-control.py' ||
-        file === 'scripts/hermes/tests/symphony-codex-account-control.test.py'
-    )
+    ...(files.some(file => file.includes('symphony-codex-account-control'))
       ? ['scripts/hermes/tests/symphony-codex-account-control.test.py']
       : []),
   ]);

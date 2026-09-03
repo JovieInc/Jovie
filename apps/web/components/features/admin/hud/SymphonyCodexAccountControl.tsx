@@ -12,7 +12,6 @@ import {
   CODEX_ACCOUNT_STATE_LABELS,
   CODEX_RECONNECT_PHASE_LABELS,
   type CodexAccountControlSnapshot,
-  type CodexAccountState,
   type CodexReconnectPhase,
   emptyCodexAccountControlSnapshot,
   parseCodexAccountControlSnapshot,
@@ -20,33 +19,24 @@ import {
 } from '@/lib/hud/symphony-codex-accounts';
 
 const FETCH_URL = '/api/admin/hud/symphony-codex-accounts';
-const FETCH_TIMEOUT_MS = 12_000;
-const POLL_MS = 2_000;
-
-const STATE_TONE: Record<
-  CodexAccountState,
-  'good' | 'warning' | 'bad' | 'neutral'
-> = {
+const STATE_TONE = {
   verified: 'good',
   stale: 'warning',
   unknown: 'neutral',
   'usage-exhausted': 'bad',
-};
+} as const;
 
 function phaseMessage(
   snapshot: CodexAccountControlSnapshot,
   phase: CodexReconnectPhase,
   confirming: ApprovedCodexAccountLabel | null
 ): string {
+  const session = snapshot.session;
   if (phase === 'confirmation' && confirming) {
     return `Reconnect ${confirming} with a one-time device login. Binding stays read-only.`;
   }
-  const session = snapshot.session;
   if (phase === 'authorization-pending' && session) {
-    const code = session.userCode ?? 'Waiting for device code';
-    const uri =
-      session.verificationUri ?? 'https://auth.openai.com/codex/device';
-    return `Authorize ${session.account}: ${code}. Visit ${uri}.`;
+    return `Authorize ${session.account}: ${session.userCode ?? 'Waiting for device code'}. Visit ${session.verificationUri ?? 'https://auth.openai.com/codex/device'}.`;
   }
   if (phase === 'succeeded' && session?.receipt) {
     return `Reconnected ${session.receipt.account}. Selected-account completion receipt stored.`;
@@ -59,13 +49,22 @@ function phaseMessage(
   if (phase === 'expired') {
     return 'Authorization expired. Select an approved account to reconnect again.';
   }
-  if (snapshot.binding.recognized) {
-    return `Binding review: ${snapshot.binding.boundLabel}. Switch and restart stay unavailable.`;
-  }
   if (snapshot.binding.boundLabel) {
-    return `Binding review: ${snapshot.binding.boundLabel} is unrecognized and not selectable. Switch and restart stay unavailable.`;
+    return snapshot.binding.recognized
+      ? `Binding review: ${snapshot.binding.boundLabel}. Switch and restart stay unavailable.`
+      : `Binding review: ${snapshot.binding.boundLabel} is unrecognized and not selectable. Switch and restart stay unavailable.`;
   }
   return 'Binding review is read-only. Switch and restart stay unavailable.';
+}
+
+async function fetchSnapshot(init?: RequestInit) {
+  const response = await fetch(FETCH_URL, {
+    cache: 'no-store',
+    signal: AbortSignal.timeout(12_000),
+    ...init,
+  });
+  if (!response.ok) return null;
+  return parseCodexAccountControlSnapshot(await response.json());
 }
 
 export function SymphonyCodexAccountControl() {
@@ -90,32 +89,12 @@ export function SymphonyCodexAccountControl() {
       if (mode === 'initial') setIsLoading(true);
       setFetchFailed(false);
       try {
-        const response = await fetch(FETCH_URL, {
-          cache: 'no-store',
-          signal: AbortSignal.timeout(FETCH_TIMEOUT_MS),
-        });
-        if (!response.ok) {
-          setFetchFailed(true);
-          setSnapshot(
-            current =>
-              current ??
-              emptyCodexAccountControlSnapshot(
-                'unavailable',
-                'Gem Codex account control is unavailable.'
-              )
-          );
-          return;
-        }
-        const parsed = parseCodexAccountControlSnapshot(await response.json());
+        const parsed = await fetchSnapshot();
         if (!parsed) {
           setFetchFailed(true);
           setSnapshot(
             current =>
-              current ??
-              emptyCodexAccountControlSnapshot(
-                'unavailable',
-                'Gem Codex account control returned an unreadable snapshot.'
-              )
+              current ?? emptyCodexAccountControlSnapshot('unavailable')
           );
           return;
         }
@@ -123,12 +102,7 @@ export function SymphonyCodexAccountControl() {
       } catch {
         setFetchFailed(true);
         setSnapshot(
-          current =>
-            current ??
-            emptyCodexAccountControlSnapshot(
-              'unavailable',
-              'Gem Codex account control is unavailable.'
-            )
+          current => current ?? emptyCodexAccountControlSnapshot('unavailable')
         );
       } finally {
         setIsLoading(false);
@@ -144,51 +118,35 @@ export function SymphonyCodexAccountControl() {
   const phase = snapshot
     ? reconnectPhaseFromSnapshot(snapshot, confirming)
     : 'idle';
-  const shouldPoll = phase === 'authorization-pending';
 
   useEffect(() => {
-    if (!shouldPoll) return;
+    if (phase !== 'authorization-pending') return;
     const timer = globalThis.setInterval(() => {
       void loadSnapshot('refresh');
-    }, POLL_MS);
+    }, 2_000);
     return () => globalThis.clearInterval(timer);
-  }, [shouldPoll, loadSnapshot]);
+  }, [phase, loadSnapshot]);
 
   useEffect(() => {
     const label = focusLabel.current;
-    if (!label) return;
-    actionRefs.current[label]?.focus();
+    if (label) actionRefs.current[label]?.focus();
   }, [phase, pending, snapshot]);
-
-  const startConfirm = (label: ApprovedCodexAccountLabel) => {
-    setSelected(label);
-    setConfirming(label);
-    focusLabel.current = label;
-  };
-
-  const cancelConfirm = () => {
-    focusLabel.current = confirming;
-    setConfirming(null);
-  };
 
   const confirmReconnect = async () => {
     if (!confirming || pending) return;
     const account = confirming;
     setPending(true);
     try {
-      const response = await fetch(FETCH_URL, {
+      const parsed = await fetchSnapshot({
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        cache: 'no-store',
-        signal: AbortSignal.timeout(FETCH_TIMEOUT_MS),
         body: JSON.stringify({ account, confirm: true }),
       });
-      if (!response.ok) {
+      if (!parsed) {
         setFetchFailed(true);
         return;
       }
-      const parsed = parseCodexAccountControlSnapshot(await response.json());
-      if (parsed) setSnapshot(parsed);
+      setSnapshot(parsed);
       setConfirming(null);
       focusLabel.current = account;
     } catch {
@@ -209,7 +167,14 @@ export function SymphonyCodexAccountControl() {
             ? 'fresh'
             : 'empty';
   const view = snapshot ?? emptyCodexAccountControlSnapshot('unavailable');
-  const statusCopy = phaseMessage(view, phase, confirming);
+  const phaseTone =
+    phase === 'succeeded'
+      ? 'good'
+      : phase === 'failed' || phase === 'expired'
+        ? 'bad'
+        : phase === 'authorization-pending' || phase === 'confirmation'
+          ? 'warning'
+          : 'neutral';
 
   return (
     <ContentSurfaceCard
@@ -223,15 +188,7 @@ export function SymphonyCodexAccountControl() {
         </p>
         <HudStatusPill
           label={CODEX_RECONNECT_PHASE_LABELS[phase]}
-          tone={
-            phase === 'succeeded'
-              ? 'good'
-              : phase === 'failed' || phase === 'expired'
-                ? 'bad'
-                : phase === 'authorization-pending' || phase === 'confirmation'
-                  ? 'warning'
-                  : 'neutral'
-          }
+          tone={phaseTone}
         />
       </div>
       {observation === 'loading' ? (
@@ -240,12 +197,7 @@ export function SymphonyCodexAccountControl() {
           aria-hidden
           data-testid='ovie-codex-account-loading'
         >
-          {[1, 2, 3].map(slot => (
-            <div
-              key={slot}
-              className='h-10 animate-pulse rounded-lg border border-subtle bg-surface-0 motion-reduce:animate-none'
-            />
-          ))}
+          <div className='h-36 animate-pulse rounded-lg border border-subtle bg-surface-0 motion-reduce:animate-none' />
         </div>
       ) : null}
       {snapshot ? (
@@ -254,50 +206,48 @@ export function SymphonyCodexAccountControl() {
             className='grid min-h-36 gap-1'
             data-testid='ovie-codex-account-table'
           >
-            {view.accounts.map(row => {
-              const selectedRow = selected === row.label;
-              const reconnectEnabled =
-                snapshot.availability === 'ready' &&
-                row.reconnectEligible &&
-                !pending;
-              return (
-                <li key={row.label}>
-                  <div
-                    className={`flex min-h-10 items-center justify-between gap-3 rounded-lg px-2 py-1 ${
-                      selectedRow ? 'bg-surface-2' : 'bg-transparent'
-                    }`}
-                    data-testid={`ovie-codex-account-row-${row.label}`}
-                    data-selected={selectedRow ? 'true' : 'false'}
-                  >
-                    <button
-                      type='button'
-                      className='min-w-0 flex-1 truncate text-left text-app font-medium text-primary-token focus-ring-themed'
-                      onClick={() => setSelected(row.label)}
-                    >
-                      {row.label}
-                    </button>
-                    <HudStatusPill
-                      label={CODEX_ACCOUNT_STATE_LABELS[row.state]}
-                      tone={STATE_TONE[row.state]}
-                    />
-                    <Button
-                      type='button'
-                      variant='secondary'
-                      size='sm'
-                      disabled={!reconnectEnabled}
-                      aria-label={`Reconnect ${row.label}`}
-                      data-testid={`ovie-codex-account-reconnect-${row.label}`}
-                      ref={node => {
-                        actionRefs.current[row.label] = node;
-                      }}
-                      onClick={() => startConfirm(row.label)}
-                    >
-                      Reconnect
-                    </Button>
-                  </div>
-                </li>
-              );
-            })}
+            {view.accounts.map(row => (
+              <li
+                key={row.label}
+                className={`flex min-h-10 items-center justify-between gap-3 rounded-lg px-2 py-1 ${selected === row.label ? 'bg-surface-2' : 'bg-transparent'}`}
+                data-testid={`ovie-codex-account-row-${row.label}`}
+                data-selected={selected === row.label ? 'true' : 'false'}
+              >
+                <button
+                  type='button'
+                  className='min-w-0 flex-1 truncate text-left text-app font-medium text-primary-token focus-ring-themed'
+                  onClick={() => setSelected(row.label)}
+                >
+                  {row.label}
+                </button>
+                <HudStatusPill
+                  label={CODEX_ACCOUNT_STATE_LABELS[row.state]}
+                  tone={STATE_TONE[row.state]}
+                />
+                <Button
+                  type='button'
+                  variant='secondary'
+                  size='sm'
+                  disabled={
+                    snapshot.availability !== 'ready' ||
+                    !row.reconnectEligible ||
+                    pending
+                  }
+                  aria-label={`Reconnect ${row.label}`}
+                  data-testid={`ovie-codex-account-reconnect-${row.label}`}
+                  ref={node => {
+                    actionRefs.current[row.label] = node;
+                  }}
+                  onClick={() => {
+                    setSelected(row.label);
+                    setConfirming(row.label);
+                    focusLabel.current = row.label;
+                  }}
+                >
+                  Reconnect
+                </Button>
+              </li>
+            ))}
           </ol>
           <div
             className='min-h-16 rounded-lg border border-subtle bg-surface-0 px-3 py-2'
@@ -305,7 +255,7 @@ export function SymphonyCodexAccountControl() {
             data-phase={phase}
           >
             <p className='text-app leading-5 text-secondary-token'>
-              {statusCopy}
+              {phaseMessage(view, phase, confirming)}
             </p>
             {phase === 'confirmation' && confirming ? (
               <div className='mt-2 flex flex-wrap gap-2'>
@@ -324,7 +274,10 @@ export function SymphonyCodexAccountControl() {
                   size='sm'
                   disabled={pending}
                   data-testid='ovie-codex-account-cancel'
-                  onClick={cancelConfirm}
+                  onClick={() => {
+                    focusLabel.current = confirming;
+                    setConfirming(null);
+                  }}
                 >
                   Cancel
                 </Button>
