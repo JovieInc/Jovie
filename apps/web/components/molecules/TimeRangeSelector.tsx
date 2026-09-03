@@ -7,8 +7,6 @@ import {
   DropdownMenuTrigger,
 } from '@jovie/ui';
 import { Check, ChevronDown, Lock } from 'lucide-react';
-import type { KeyboardEvent } from 'react';
-import { useRef } from 'react';
 import { AppSegmentControl } from '@/components/atoms/AppSegmentControl';
 import {
   type AnalyticsRange,
@@ -66,8 +64,6 @@ export function TimeRangeSelector<T extends AnalyticsRange>({
   className,
   triggerClassName,
 }: TimeRangeSelectorProps<T>) {
-  const tabRefs = useRef<Array<HTMLButtonElement | null>>([]);
-
   const isLocked = (range: T): boolean =>
     lockedRanges?.includes(range) ?? false;
   const isDisabled = (range: T): boolean =>
@@ -134,93 +130,30 @@ export function TimeRangeSelector<T extends AnalyticsRange>({
   }
 
   if (variant === 'tabs') {
-    const focusTabByIndex = (targetIndex: number) => {
-      if (!ranges.length) return;
-      const normalizedIndex = (targetIndex + ranges.length) % ranges.length;
-      const targetRange = ranges[normalizedIndex];
-      if (targetRange === undefined || isDisabled(targetRange)) return;
-      onValueChange(targetRange);
-      tabRefs.current[normalizedIndex]?.focus();
-    };
-
-    const handleKeyDown = (
-      event: KeyboardEvent<HTMLButtonElement>,
-      currentIndex: number
-    ) => {
-      switch (event.key) {
-        case 'ArrowRight':
-        case 'ArrowDown':
-          event.preventDefault();
-          focusTabByIndex(currentIndex + 1);
-          break;
-        case 'ArrowLeft':
-        case 'ArrowUp':
-          event.preventDefault();
-          focusTabByIndex(currentIndex - 1);
-          break;
-        case 'Home':
-          event.preventDefault();
-          focusTabByIndex(0);
-          break;
-        case 'End':
-          event.preventDefault();
-          focusTabByIndex(ranges.length - 1);
-          break;
-        default:
-          break;
-      }
-    };
-
     return (
-      <div
-        role='tablist'
-        aria-label={ariaLabel ?? 'Select Analytics Range'}
-        className={cn(
-          'inline-flex items-center rounded-full border border-subtle bg-surface-1 p-0.5',
-          className
-        )}
-      >
-        {ranges.map((range, index) => {
-          const active = range === value;
+      <AppSegmentControl
+        value={value}
+        onValueChange={onValueChange}
+        options={ranges.map(range => {
           const disabled = isDisabled(range);
-          const tabId = `${tabsBaseId}-tab-${range}`;
 
-          let stateClass: string;
-          if (disabled) {
-            stateClass = 'cursor-not-allowed text-tertiary-token/40';
-          } else if (active) {
-            stateClass = 'border-default bg-surface-0 text-primary-token';
-          } else {
-            stateClass =
-              'text-tertiary-token hover:border-subtle hover:bg-surface-0 hover:text-secondary-token';
-          }
-
-          return (
-            <button
-              key={range}
-              id={tabId}
-              role='tab'
-              aria-selected={active}
-              aria-controls={panelId}
-              aria-disabled={disabled || undefined}
-              type='button'
-              tabIndex={active ? 0 : -1}
-              disabled={disabled}
-              ref={node => {
-                tabRefs.current[index] = node;
-              }}
-              onClick={() => !disabled && onValueChange(range)}
-              onKeyDown={event => handleKeyDown(event, index)}
-              title={
-                disabled ? 'Upgrade to Pro for extended analytics' : undefined
-              }
-              className={`relative h-7 rounded-full border border-transparent px-2.5 text-xs font-caption tracking-tight shadow-none transition-[background-color,color,border-color,box-shadow] duration-subtle focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/30 focus-visible:ring-offset-1 focus-visible:ring-offset-(--app-shell-content-surface) ${stateClass}`}
-            >
-              {getTimeRangeLabel(range, 'short')}
-            </button>
-          );
+          return {
+            value: range,
+            label: getTimeRangeLabel(range, 'short'),
+            disabled,
+            id: tabsBaseId ? `${tabsBaseId}-tab-${range}` : undefined,
+            ariaControls: panelId,
+            title: disabled
+              ? 'Upgrade to Pro for extended analytics'
+              : undefined,
+          };
         })}
-      </div>
+        size='sm'
+        className={className}
+        triggerClassName={triggerClassName}
+        aria-label={ariaLabel ?? 'Select Analytics Range'}
+        renderHiddenPanels={panelId ? false : undefined}
+      />
     );
   }
 

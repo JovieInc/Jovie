@@ -21,6 +21,7 @@ private struct AppContentView: View {
   @State private var showWhatsNew = false
 #if DEBUG
   @State private var didSendLiveChatProbe = false
+  @State private var didInitializeAdminUITestWorkspace = false
 #endif
   @AppStorage("jovie.whatsNew.lastPresentedVersion") private var lastPresentedWhatsNewVersion: String?
 
@@ -293,6 +294,17 @@ private struct AppContentView: View {
       await reloadActionLoops(for: appState.activeUserID)
     }
     .task(id: "\(appState.activeUserID ?? "")-\(workspaceMode.rawValue)-\(showsWorkspaceSwitch)") {
+      #if DEBUG
+        if ProcessInfo.processInfo.arguments.contains("-ui-testing-admin"),
+           !didInitializeAdminUITestWorkspace
+        {
+          // UI tests may be interrupted after selecting Ovie. Reset once per
+          // launch so the next admin flow never inherits that persisted state.
+          MobileWorkspaceStore.save(.jovie, isAdmin: true)
+          didInitializeAdminUITestWorkspace = true
+        }
+      #endif
+
       let resolved = MobileWorkspaceStore.load(isAdmin: showsWorkspaceSwitch)
       if workspaceMode != resolved {
         workspaceMode = resolved
@@ -379,7 +391,14 @@ private struct AppContentView: View {
   }
 
   private var showsWorkspaceSwitch: Bool {
-    appState.loadedDashboardResponse?.showsAdminWorkspaceSwitch == true
+    if appState.loadedDashboardResponse?.showsAdminWorkspaceSwitch == true {
+      return true
+    }
+    #if DEBUG
+      return ProcessInfo.processInfo.arguments.contains("-ui-testing-admin")
+    #else
+      return false
+    #endif
   }
 
   private func selectWorkspace(_ mode: MobileWorkspaceMode) {

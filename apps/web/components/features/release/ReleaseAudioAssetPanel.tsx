@@ -1,6 +1,6 @@
 'use client';
 
-import { upload } from '@vercel/blob/client';
+import { uploadPresigned } from '@vercel/blob/client';
 import { FileAudio2, Loader2, Upload } from 'lucide-react';
 import {
   type ChangeEvent,
@@ -150,7 +150,7 @@ export function ReleaseAudioAssetPanel({
       setUploadRejection(null);
 
       try {
-        const blob = await upload(
+        const blob = await uploadPresigned(
           buildAudioBlobPath('library', userId ?? 'unknown', file.name),
           file,
           {

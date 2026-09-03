@@ -10,6 +10,7 @@ export const DESKTOP_BUILD_IDENTITY_JSON_SCRIPT_ID =
 
 const FULL_SHA = /^[0-9a-f]{40}$/;
 const SEMVER = /^\d+\.\d+\.\d+$/;
+const STAGING_SEMVER = /^\d+\.\d+\.\d+-staging\.[1-9]\d*\.[1-9]\d*$/;
 const KEYS = ['channel', 'version', 'sourceRevision', 'builtAt'] as const;
 const CHANNELS = new Set(['production', 'staging', 'local']);
 
@@ -34,8 +35,14 @@ function isChannel(value: unknown): value is DesktopReleaseChannel {
 function isSha(value: unknown): value is string {
   return typeof value === 'string' && FULL_SHA.test(value);
 }
-function isSemver(value: unknown): value is string {
-  return typeof value === 'string' && SEMVER.test(value);
+function isVersionForChannel(
+  channel: DesktopReleaseChannel,
+  value: unknown
+): value is string {
+  return (
+    typeof value === 'string' &&
+    (channel === 'staging' ? STAGING_SEMVER : SEMVER).test(value)
+  );
 }
 function isIso(value: unknown): value is string {
   if (typeof value !== 'string' || value.length === 0) return false;
@@ -54,7 +61,11 @@ export function parseDesktopBuildIdentityRecord(
   if (keys.length !== KEYS.length || KEYS.some(key => !keys.includes(key))) {
     return null;
   }
-  if (!isChannel(record.channel) || !isSemver(record.version)) return null;
+  if (
+    !isChannel(record.channel) ||
+    !isVersionForChannel(record.channel, record.version)
+  )
+    return null;
   if (record.sourceRevision !== null && !isSha(record.sourceRevision)) {
     return null;
   }
@@ -79,7 +90,7 @@ function bakedIdentityMeetsPackagedProvenance(
 ): boolean {
   return (
     (record.channel === 'production' || record.channel === 'staging') &&
-    isSemver(record.version) &&
+    isVersionForChannel(record.channel, record.version) &&
     isSha(record.sourceRevision) &&
     isIso(record.builtAt)
   );
@@ -96,7 +107,9 @@ export function resolveDesktopBuildIdentity(input: {
   if (!baked) {
     return {
       channel: input.runtimeChannel,
-      version: isSemver(input.runtimeVersion) ? input.runtimeVersion : '0.0.0',
+      version: isVersionForChannel(input.runtimeChannel, input.runtimeVersion)
+        ? input.runtimeVersion
+        : '0.0.0',
       sourceRevision: null,
       builtAt: null,
       provenance: 'unverified',

@@ -33,11 +33,26 @@ interface StoryReceipt {
 
 let gitCommandCount = 0;
 
-function runGit(args: string[], input?: string): string {
+interface GitEnvironment {
+  readonly GIT_NO_LAZY_FETCH?: string;
+}
+
+type GitRunner = (
+  args: string[],
+  input?: string,
+  environment?: GitEnvironment
+) => string;
+
+function runGit(
+  args: string[],
+  input?: string,
+  environment?: GitEnvironment
+): string {
   gitCommandCount += 1;
   return execFileSync('git', args, {
     cwd: repoRoot,
     encoding: 'utf8',
+    env: { ...process.env, ...environment },
     input,
     maxBuffer: 10 * 1024 * 1024,
     stdio: ['pipe', 'pipe', 'pipe'],
@@ -82,10 +97,42 @@ function batchObjects(expressions: string[]): Map<string, string | null> {
   );
 }
 
+function replayableStoryPaths(
+  receipts: StoryReceipt[],
+  objects: ReadonlyMap<string, string | null>,
+  git: GitRunner = runGit
+): Set<string> {
+  const receiptsBySourceSha = new Map<string, Set<string>>();
+  for (const { sourceSha, storyPath } of receipts) {
+    if (!objects.get(`${sourceSha}^{commit}`)) continue;
+    const storyPaths = receiptsBySourceSha.get(sourceSha) ?? new Set<string>();
+    storyPaths.add(storyPath);
+    receiptsBySourceSha.set(sourceSha, storyPaths);
+  }
+
+  const replayable = new Set<string>();
+  for (const [sourceSha, storyPaths] of receiptsBySourceSha) {
+    const commitObjectName = objects.get(`${sourceSha}^{commit}`);
+    if (!commitObjectName) continue;
+    const paths = Array.from(storyPaths);
+    const output = git(
+      ['ls-tree', '-r', '-z', '--name-only', commitObjectName, '--', ...paths],
+      undefined,
+      { GIT_NO_LAZY_FETCH: '1' }
+    );
+    for (const storyPath of output.split('\0')) {
+      if (storyPath) replayable.add(`${sourceSha}:${storyPath}`);
+    }
+  }
+
+  return replayable;
+}
+
 function receiptIssues(
   receipts: StoryReceipt[],
   objects: ReadonlyMap<string, string | null>,
   ancestorObjectNames: ReadonlySet<string>,
+  replayablePaths: ReadonlySet<string>,
   shallow: boolean
 ): string[] {
   const issues: string[] = [];
@@ -101,7 +148,7 @@ function receiptIssues(
       issues.push(`${storyPath}: non-ancestral sourceSha ${sourceSha}`);
       continue;
     }
-    if (!objects.get(`${sourceSha}:${storyPath}`)) {
+    if (!replayablePaths.has(`${sourceSha}:${storyPath}`)) {
       issues.push(`${storyPath}: sourceSha cannot replay its story path`);
     }
   }
@@ -141,16 +188,16 @@ describe('story receipt SHA ancestry', () => {
       [`${missingSha}^{commit}`, null],
       [`${nonAncestralSha}^{commit}`, nonAncestralObjectName],
       [`${missingPathSha}^{commit}`, missingPathObjectName],
-      [`${missingPathSha}:moved.stories.tsx`, null],
       [`${validSha}^{commit}`, validObjectName],
-      [`${validSha}:valid.stories.tsx`, 'd'.repeat(40)],
     ]);
+    const replayablePaths = new Set([`${validSha}:valid.stories.tsx`]);
 
     expect(
       receiptIssues(
         receipts,
         objects,
         new Set([missingPathObjectName, validObjectName]),
+        replayablePaths,
         false
       )
     ).toEqual([
@@ -163,12 +210,44 @@ describe('story receipt SHA ancestry', () => {
         receipts,
         objects,
         new Set([missingPathObjectName, validObjectName]),
+        replayablePaths,
         true
       )
     ).toEqual([
       `branch.stories.tsx: non-ancestral sourceSha ${nonAncestralSha}`,
       'moved.stories.tsx: sourceSha cannot replay its story path',
     ]);
+  });
+
+  it('checks replay paths from trees without fetching historical blobs', () => {
+    const sourceSha = '1'.repeat(40);
+    const commitObjectName = '2'.repeat(40);
+    const receipts = [
+      { sourceSha, storyPath: 'present.stories.tsx' },
+      { sourceSha, storyPath: 'missing.stories.tsx' },
+    ];
+    const objects = new Map<string, string | null>([
+      [`${sourceSha}^{commit}`, commitObjectName],
+    ]);
+    const git: GitRunner = (args, input, environment) => {
+      expect(args).toEqual([
+        'ls-tree',
+        '-r',
+        '-z',
+        '--name-only',
+        commitObjectName,
+        '--',
+        'present.stories.tsx',
+        'missing.stories.tsx',
+      ]);
+      expect(input).toBeUndefined();
+      expect(environment).toEqual({ GIT_NO_LAZY_FETCH: '1' });
+      return 'present.stories.tsx\0';
+    };
+
+    expect(replayableStoryPaths(receipts, objects, git)).toEqual(
+      new Set([`${sourceSha}:present.stories.tsx`])
+    );
   });
 
   it('keeps every literal receipt ancestral and able to replay its story path', () => {
@@ -182,22 +261,21 @@ describe('story receipt SHA ancestry', () => {
     );
     const objects = batchObjects([
       ...receiptShas.map(sourceSha => `${sourceSha}^{commit}`),
-      ...receipts.map(
-        ({ sourceSha, storyPath }) => `${sourceSha}:${storyPath}`
-      ),
     ]);
     const ancestorObjectNames = new Set(
       runGit(['rev-list', 'HEAD']).trim().split('\n')
     );
+    const replayablePaths = replayableStoryPaths(receipts, objects);
     const issues = receiptIssues(
       receipts,
       objects,
       ancestorObjectNames,
+      replayablePaths,
       shallow
     );
 
     expect(issues, issues.join('\n')).toEqual([]);
     expect(receipts.length).toBeGreaterThan(0);
-    expect(gitCommandCount - commandsBefore).toBe(3);
+    expect(gitCommandCount - commandsBefore).toBe(3 + receiptShas.length);
   });
 });

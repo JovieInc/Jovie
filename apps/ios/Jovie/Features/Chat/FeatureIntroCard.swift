@@ -58,14 +58,7 @@ struct FeatureIntroCard: View {
     }
     .padding(JovieSpacing.large)
     .frame(maxWidth: .infinity, alignment: .leading)
-    .background(
-      RoundedRectangle(cornerRadius: JovieRadius.xLarge, style: .continuous)
-        .fill(JovieColor.surface1)
-    )
-    .overlay {
-      RoundedRectangle(cornerRadius: JovieRadius.xLarge, style: .continuous)
-        .stroke(JovieColor.borderSubtle, lineWidth: 1)
-    }
+    .jovieSurface(radius: JovieRadius.xLarge)
     .accessibilityElement(children: .contain)
     .accessibilityLabel(accessibilityLabel)
   }

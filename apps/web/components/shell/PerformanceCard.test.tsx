@@ -8,14 +8,14 @@ describe('PerformanceCard', () => {
   it('renders the title and metric label', () => {
     render(
       <PerformanceCard
-        title='Smart link'
+        title='Smart Link'
         metricLabel='clicks'
         pointsByRange={{ '7d': [10, 12, 14, 16, 18, 20, 22] }}
         trend='up'
         delta={12}
       />
     );
-    const title = screen.getByText('Smart link');
+    const title = screen.getByText('Smart Link');
     expect(title).toBeInTheDocument();
     expect(title.className).toContain('tracking-normal');
     expect(title.className).not.toMatch(/\buppercase\b/);
@@ -25,7 +25,7 @@ describe('PerformanceCard', () => {
   it('hides the range selector when only one range is supplied', () => {
     render(
       <PerformanceCard
-        title='Smart link'
+        title='Smart Link'
         metricLabel='clicks'
         pointsByRange={{ '7d': [10, 12, 14] }}
         trend='up'
@@ -38,7 +38,7 @@ describe('PerformanceCard', () => {
   it('renders a tab for every supplied range', () => {
     render(
       <PerformanceCard
-        title='Smart link'
+        title='Smart Link'
         metricLabel='clicks'
         pointsByRange={{
           '7d': [1, 2],
@@ -55,7 +55,7 @@ describe('PerformanceCard', () => {
   it('switches the active range when a tab is clicked', () => {
     render(
       <PerformanceCard
-        title='Smart link'
+        title='Smart Link'
         metricLabel='clicks'
         pointsByRange={{ '7d': [1, 2], '30d': [3, 4] }}
         trend='flat'
@@ -75,7 +75,7 @@ describe('PerformanceCard', () => {
   it('shows the down arrow when trend is down', () => {
     const { container } = render(
       <PerformanceCard
-        title='Smart link'
+        title='Smart Link'
         metricLabel='clicks'
         pointsByRange={{ '7d': [10, 8, 6] }}
         trend='down'
@@ -89,7 +89,7 @@ describe('PerformanceCard', () => {
   it('falls back to the first surfaced range when initialRange is missing', () => {
     render(
       <PerformanceCard
-        title='Smart link'
+        title='Smart Link'
         metricLabel='clicks'
         pointsByRange={{ '30d': [1, 2, 3], '90d': [4, 5, 6, 7] }}
         trend='up'

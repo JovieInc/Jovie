@@ -1,6 +1,5 @@
 'use client';
 
-import { Avatar, AvatarFallback, AvatarImage } from '@jovie/ui';
 import { type ColumnDef, createColumnHelper } from '@tanstack/react-table';
 import {
   AlertTriangle,
@@ -12,6 +11,7 @@ import {
   User,
 } from 'lucide-react';
 import { useMemo } from 'react';
+import { Avatar } from '@/components/molecules/Avatar';
 import {
   createMultiFieldFilterFn,
   PAGE_TOOLBAR_END_GROUP_CLASS,
@@ -192,14 +192,13 @@ function createColumns(): ColumnDef<AdminReleaseRow, unknown>[] {
         const release = row.original;
         return (
           <div className='flex items-center gap-2'>
-            <Avatar className='size-6'>
-              {release.artistAvatarUrl ? (
-                <AvatarImage src={release.artistAvatarUrl} alt='' />
-              ) : null}
-              <AvatarFallback className='text-3xs'>
-                <User className='size-3' />
-              </AvatarFallback>
-            </Avatar>
+            <Avatar
+              src={release.artistAvatarUrl}
+              alt={release.artistDisplayName ?? release.artistUsername}
+              name={release.artistDisplayName ?? release.artistUsername}
+              size='md'
+              className='shrink-0'
+            />
             <div className='min-w-0'>
               <p className='truncate text-xs font-medium text-primary-token'>
                 @{release.artistUsername}

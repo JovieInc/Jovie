@@ -10,7 +10,7 @@ vi.mock('@/lib/queries/useJovieWorkFeedQuery', () => ({
   useJovieWorkFeedQuery: useJovieWorkFeedQueryMock,
 }));
 
-import { JovieWorkFeed } from '@/components/features/dashboard/organisms/jovie-work-feed';
+import { JovieWorkFeed } from '@/components/features/dashboard/organisms/jovie-work-feed/JovieWorkFeed';
 
 describe('JovieWorkFeed', () => {
   beforeEach(() => {
@@ -48,6 +48,62 @@ describe('JovieWorkFeed', () => {
     expect(
       screen.getByText('Jovie ran release-to-revenue for Midnight Drive.')
     ).toBeInTheDocument();
+  });
+
+  it('uses the shared activity timeline row contract without shifting outcome slots', () => {
+    useJovieWorkFeedQueryMock.mockReturnValue({
+      data: [
+        {
+          id: 'workflow:1',
+          source: 'workflow_run',
+          phase: 'completed',
+          title: 'Release autopilot',
+          description: 'Jovie ran release-to-revenue for Midnight Drive.',
+          icon: 'workflow',
+          timestamp: '2026-06-23T00:00:00.000Z',
+          statusLabel: 'Done',
+          outcomeSlot: 'release_outcome',
+          outcome: {
+            state: 'measuring',
+            metrics: {
+              gmvDeltaCents: 1800,
+              clickDelta: 12,
+              dspClickDelta: 7,
+              newFansDelta: 3,
+            },
+          },
+        },
+      ],
+      isLoading: false,
+      isFetching: false,
+      error: null,
+      refetch: refetchMock,
+    });
+
+    render(<JovieWorkFeed profileId='profile-123' />);
+
+    const rowShell = screen.getByTestId('activity-timeline-row-shell');
+    expect(rowShell).toHaveClass('gap-3', 'px-1.5', 'py-1');
+    expect(rowShell).not.toHaveClass('gap-2.5', 'py-1.5');
+    expect(screen.getByTestId('activity-timeline-leading')).toHaveClass(
+      'h-6',
+      'w-6',
+      'rounded-full'
+    );
+
+    const timestamp = screen.getByTestId('activity-timeline-timestamp');
+    expect(timestamp).toHaveAttribute('dateTime', '2026-06-23T00:00:00.000Z');
+    expect(timestamp.parentElement).toHaveClass(
+      'mt-0.5',
+      'flex',
+      'flex-wrap',
+      'gap-x-1.5',
+      'gap-y-0'
+    );
+
+    expect(screen.getByTestId('jovie-work-outcome-slot')).toHaveClass(
+      'min-h-10'
+    );
   });
 
   it('shows the empty state when no autonomous work exists', () => {

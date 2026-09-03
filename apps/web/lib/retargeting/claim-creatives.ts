@@ -1,8 +1,11 @@
 import crypto from 'node:crypto';
 import { eq } from 'drizzle-orm';
+import {
+  getBlobCommandOptions,
+  isBlobStorageConfigured,
+} from '@/lib/blob-config';
 import { db } from '@/lib/db';
 import { creatorProfiles } from '@/lib/db/schema/profiles';
-import { env } from '@/lib/env-server';
 import { logger } from '@/lib/utils/logger';
 
 /**
@@ -136,10 +139,9 @@ export async function ensureClaimRetargetingCreatives(params: {
     }
 
     const { put } = await import('@vercel/blob');
-    const token = env.BLOB_READ_WRITE_TOKEN;
-    if (!token) {
+    if (!isBlobStorageConfigured()) {
       logger.warn(
-        '[Retargeting] Skipping creative upload: BLOB_READ_WRITE_TOKEN missing'
+        '[Retargeting] Skipping creative upload: Vercel Blob storage is not configured'
       );
       return;
     }
@@ -163,7 +165,7 @@ export async function ensureClaimRetargetingCreatives(params: {
       const path = `retargeting/claim-profile/${username}/${layout.key}-${layout.width}x${layout.height}-${claimHash}.svg`;
 
       const blob = await put(path, Buffer.from(svg, 'utf8'), {
-        token,
+        ...getBlobCommandOptions(),
         access: 'public',
         contentType: 'image/svg+xml',
         addRandomSuffix: false,

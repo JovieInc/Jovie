@@ -1,3 +1,6 @@
+import { readdirSync, readFileSync } from 'node:fs';
+import { dirname, relative, resolve } from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 const { mockSonnerToast } = vi.hoisted(() => ({
@@ -22,6 +25,63 @@ import {
   TOAST_DURATIONS,
   toast,
 } from '@/components/feedback/toast';
+
+const webRoot = resolve(dirname(fileURLToPath(import.meta.url)), '../../../..');
+
+const DIRECT_SONNER_IMPORT_PATTERN = /\bfrom\s+['"]sonner['"]/;
+const ALLOWED_SONNER_IMPORT_OWNERS = new Set([
+  'components/feedback/FeedbackProvider.tsx',
+  'components/feedback/toast.ts',
+]);
+
+function shouldScanSourceFile(filePath: string): boolean {
+  if (!(filePath.endsWith('.ts') || filePath.endsWith('.tsx'))) return false;
+  if (filePath.endsWith('.d.ts')) return false;
+  if (/\.(test|spec|stories)\.[cm]?[tj]sx?$/.test(filePath)) return false;
+  return true;
+}
+
+function findDirectSonnerImportsInSource(
+  relativePath: string,
+  source: string
+): string[] {
+  if (ALLOWED_SONNER_IMPORT_OWNERS.has(relativePath)) return [];
+  if (!DIRECT_SONNER_IMPORT_PATTERN.test(source)) return [];
+  return [relativePath];
+}
+
+function findDirectSonnerImports(directory: string): string[] {
+  const matches: string[] = [];
+
+  for (const entry of readdirSync(directory, { withFileTypes: true })) {
+    if (
+      entry.name === '.next' ||
+      entry.name === 'node_modules' ||
+      entry.name === 'scripts' ||
+      entry.name === 'tests'
+    ) {
+      continue;
+    }
+
+    const entryPath = resolve(directory, entry.name);
+    if (entry.isDirectory()) {
+      matches.push(...findDirectSonnerImports(entryPath));
+      continue;
+    }
+
+    if (!shouldScanSourceFile(entryPath)) continue;
+
+    const relativePath = relative(webRoot, entryPath);
+    matches.push(
+      ...findDirectSonnerImportsInSource(
+        relativePath,
+        readFileSync(entryPath, 'utf8')
+      )
+    );
+  }
+
+  return matches.sort();
+}
 
 describe('canonical toast wrapper', () => {
   beforeEach(() => {
@@ -62,6 +122,21 @@ describe('canonical toast wrapper', () => {
   });
 });
 
+describe('canonical toast ownership', () => {
+  it('detects a direct renderer import outside the feedback owner', () => {
+    expect(
+      findDirectSonnerImportsInSource(
+        'components/features/example/BadToast.tsx',
+        "import { toast } from 'sonner';\n\ntoast.success('Saved');\n"
+      )
+    ).toEqual(['components/features/example/BadToast.tsx']);
+  });
+
+  it('keeps production toast calls behind the feedback API', () => {
+    expect(findDirectSonnerImports(webRoot)).toEqual([]);
+  });
+});
+
 describe('canonical banner store', () => {
   beforeEach(() => {
     banner.dismiss();
@@ -80,13 +155,14 @@ describe('canonical banner store', () => {
     });
   });
 
-  it('supports success, error, and info shortcuts', () => {
+  it('supports success, warning, error, and info shortcuts', () => {
     banner.success('Import complete');
+    banner.warning('Import delayed');
     banner.error('Payments degraded');
     banner.info('New feature available');
 
     const variants = banner.getBanners().map(item => item.variant);
-    expect(variants).toEqual(['success', 'error', 'info']);
+    expect(variants).toEqual(['success', 'warning', 'error', 'info']);
   });
 
   it('persists until dismissed and dismisses by id', () => {

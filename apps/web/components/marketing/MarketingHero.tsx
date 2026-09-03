@@ -27,6 +27,7 @@ interface MarketingHeroBaseProps {
   readonly className?: string;
   /** Id applied to the hero heading and referenced by `aria-labelledby`. */
   readonly headingId?: string;
+  readonly testId?: string;
 }
 
 /**
@@ -71,7 +72,6 @@ export interface MarketingHeroContentProps extends MarketingHeroBaseProps {
   readonly media?: ReactNode;
   /** Copy alignment when no `media` column is present. */
   readonly align?: 'center' | 'left';
-  readonly testId?: string;
   /**
    * Link renderer override (e.g. an analytics-tracked link component).
    * Defaults to `next/link`.
@@ -123,10 +123,14 @@ function MarketingHeroShell({
   variant,
   className,
   children,
+  headingId,
+  testId,
 }: MarketingHeroShellProps) {
   return (
     <section
       data-pen-contract={MARKETING_PEN_CONTRACT_IDS.section.hero}
+      data-testid={testId}
+      aria-labelledby={headingId}
       className={cn(
         'relative w-full',
         'pt-20 pb-16 sm:pt-24 sm:pb-24 lg:pt-28 lg:pb-32',
@@ -240,6 +244,7 @@ function MarketingHeroLanding({
   body,
   media,
   headingId,
+  testId,
   titleTestId = 'hero-heading',
   sectionTestId = 'marketing-hero-section',
   primaryCtaLabel = 'Get started',
@@ -259,7 +264,7 @@ function MarketingHeroLanding({
     <section
       data-pen-contract={MARKETING_PEN_CONTRACT_IDS.section.hero}
       className='relative overflow-hidden pb-12 pt-[5.75rem] md:pb-16 md:pt-[6.25rem] lg:pb-20'
-      data-testid={sectionTestId}
+      data-testid={testId ?? sectionTestId}
       aria-labelledby={headingId}
     >
       <div

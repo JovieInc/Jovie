@@ -49,6 +49,11 @@ Design work is justified when evidence shows one of these is limiting throughput
 - Polish is required when lack of polish blocks trust or activation.
 - Layout stability is part of correctness.
 - Taste matters, but customer behavior is stronger evidence.
+- For Jovie-owned intentionally art-directed or generated brand imagery, the
+  camera must find the palette: controllable high-salience color is designed
+  into the scene as a Jovie scene hue or neutral before capture/generation,
+  while human biology, creator identity, safety, trademark, documentary, and
+  other protected colors remain truthful.
 
 ---
 
@@ -75,4 +80,5 @@ Do not spend design effort on:
 
 | Date | Change | Source |
 |---|---|---|
+| 2026-08-21 | Canonized scene-first color harmony for Jovie-owned generated brand imagery. | Tim White approval |
 | 2026-07-17 | Created as domain canon under `/canon`. | Tim White |
