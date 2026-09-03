@@ -1,8 +1,13 @@
 import { readFileSync } from 'node:fs';
+import path from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
 
 const optionSource = readFileSync(
-  new URL('./ComboboxOptionItem.tsx', import.meta.url),
+  path.join(
+    path.dirname(fileURLToPath(import.meta.url)),
+    'ComboboxOptionItem.tsx'
+  ),
   'utf8'
 );
 
