@@ -39,16 +39,6 @@ const HomepageV2FinalCta = dynamic(
     })),
   { ssr: true }
 );
-// Night editorial still behind the hero copy. Two art-directed crops of the
-// same photograph: landscape for desktop, a tighter portrait crop for phones.
-const HERO_BACKDROP = {
-  desktopSrc: '/images/hero/night-desk.webp',
-  desktopWidth: 1536,
-  desktopHeight: 1024,
-  mobileSrc: '/images/hero/night-desk-mobile.webp',
-  mobileWidth: 737,
-  mobileHeight: 1024,
-} as const;
 const ARTIST_PROFILE_PREVIEWS = [
   {
     id: 'tour',
@@ -206,7 +196,6 @@ function HomepageHero() {
         headline={HERO_COPY.headline}
         support={HERO_COPY.subhead}
         search={HERO_COPY.search}
-        backdrop={HERO_BACKDROP}
       />
       <div className='homepage-trust-section system-b-mounted-home-trust-strip-shell'>
         <HomeTrustSection presentation='inline-strip' />

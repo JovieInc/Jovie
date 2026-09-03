@@ -2,6 +2,7 @@ import './home.css';
 import '../../components/marketing/MarketingSnapRail.css';
 import { HomeScrollWatcher } from '@/components/homepage/HomeScrollWatcher';
 import { PublicPageShell } from '@/components/site/PublicPageShell';
+import { MARKETING_NAV_LINKS } from '@/data/marketingNavigation';
 
 export const revalidate = false;
 
@@ -11,7 +12,7 @@ export default function HomeLayout({
   children: React.ReactNode;
 }>) {
   // The homepage composes the shared PublicPageShell as an intentional
-  // variant: homepage header chrome (wordmark only, no center nav), minimal
+  // variant: homepage header chrome (icon, left-aligned nav), minimal
   // footer, and no fixed-header main offset.
   // Dual min-h-svh is intentional (Lovable-style hero shell): the outer
   // container is at least viewport height, AND main holds the hero at full
@@ -23,11 +24,12 @@ export default function HomeLayout({
       footerClassName='system-b-mounted-home-footer'
       footerVariant='minimal'
       headerVariant='homepage'
-      logoSize='sm'
-      logoVariant='word'
+      logoSize='lg'
+      logoVariant='icon'
       mainClassName='min-h-svh'
       mainOffset={false}
-      showHomepageCenterNav={false}
+      navLinks={MARKETING_NAV_LINKS}
+      showHomepageCenterNav
     >
       <HomeScrollWatcher />
       {children}

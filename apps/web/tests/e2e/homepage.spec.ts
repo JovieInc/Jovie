@@ -71,7 +71,7 @@ test.describe('Homepage', () => {
     ).toBeVisible();
     await expect(
       hero.getByText(
-        'Find what the internet knows. Turn it into relationships.'
+        'Find what the internet knows about you, bring it together, and turn attention into lasting relationships.'
       )
     ).toBeVisible();
     await expect(hero.getByPlaceholder('Search your name')).toBeVisible();
@@ -103,10 +103,10 @@ test.describe('Homepage', () => {
       'homepage-embedded'
     );
     await expect(header.locator('a[href="/"]').first()).toBeVisible();
-    await expect(header.getByRole('link', { name: 'Product' })).toHaveCount(0);
-    await expect(header.getByRole('button', { name: 'For' })).toHaveCount(0);
-    await expect(header.getByRole('button', { name: 'Tools' })).toHaveCount(0);
-    await expect(header.getByRole('link', { name: 'Pricing' })).toHaveCount(0);
+    await expect(header.getByRole('link', { name: 'Product' })).toBeVisible();
+    await expect(header.getByRole('link', { name: 'For' })).toBeVisible();
+    await expect(header.getByRole('link', { name: 'Tools' })).toBeVisible();
+    await expect(header.getByRole('link', { name: 'Pricing' })).toBeVisible();
     await expect(header.getByRole('link', { name: 'Contact' })).toHaveCount(0);
     await expect(header.getByRole('link', { name: 'Log in' })).toHaveAttribute(
       'href',
@@ -143,37 +143,15 @@ test.describe('Homepage', () => {
     await expect(toolsFlyout).toHaveCount(0);
   });
 
-  test('hero backdrop is one decorative full-bleed photo that loads first', async ({
-    page,
-  }) => {
+  test('hero backdrop is one decorative optical stage', async ({ page }) => {
     const backdrop = page.getByTestId('homepage-editorial-hero-backdrop');
 
     await expect(backdrop).toHaveAttribute('aria-hidden', 'true');
-    await expect(backdrop.locator('img')).toHaveCount(1);
-    await expect(backdrop.locator('img')).toHaveAttribute('alt', '');
-    await expect(backdrop.locator('img')).toHaveAttribute(
-      'fetchpriority',
-      'high'
+    await expect(backdrop.locator('.homepage-editorial-hero__stage')).toHaveCount(
+      1
     );
-    await page.waitForFunction(() => {
-      const image = document.querySelector<HTMLImageElement>(
-        '[data-testid="homepage-editorial-hero-backdrop"] img'
-      );
-      if (!image) return false;
-      const rect = image.getBoundingClientRect();
-      return (
-        image.complete &&
-        image.naturalWidth > 0 &&
-        rect.width >= window.innerWidth - 1 &&
-        rect.height >= window.innerHeight - 1
-      );
-    });
-    await expect(backdrop.locator('img')).toHaveJSProperty(
-      'currentSrc',
-      /night-desk/
-    );
+    await expect(backdrop.locator('img')).toHaveCount(0);
 
-    // Type sits on top of the photo, inside the viewport.
     const heading = page.getByRole('heading', {
       name: 'Control how the world sees you.',
     });
@@ -611,7 +589,7 @@ test.describe('Homepage', () => {
     });
     await expect(page.getByTestId('header-nav')).toBeVisible();
 
-    // One sentence never wraps onto three lines, even on a phone.
+    // The approved compact composition resolves the headline in three lines.
     await page.evaluate(() => document.fonts.ready);
     const headingLines = await heading.evaluate(element => {
       const style = getComputedStyle(element);
@@ -621,7 +599,7 @@ test.describe('Homepage', () => {
           0.05
       );
     });
-    expect(headingLines).toBeLessThanOrEqual(2);
+    expect(headingLines).toBeLessThanOrEqual(3);
 
     const search = page.getByTestId('homepage-editorial-hero-search');
     const searchBounds = await search.boundingBox();
@@ -643,9 +621,7 @@ test.describe('Homepage', () => {
     });
 
     const header = page.getByTestId('header-nav');
-    await expect(page.getByRole('button', { name: 'Open menu' })).toHaveCount(
-      0
-    );
+    await expect(page.getByRole('button', { name: 'Open menu' })).toBeVisible();
     await expect(
       header.getByRole('link', { name: 'Get started', exact: true })
     ).toHaveCount(0);

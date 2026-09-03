@@ -54,7 +54,7 @@ describe('HomepageIntent', () => {
     ).toBeTruthy();
     expect(
       screen.getByText(
-        'Find what the internet knows. Turn it into relationships.'
+        'Find what the internet knows about you, bring it together, and turn attention into lasting relationships.'
       )
     ).toBeTruthy();
     expect(getInput()).toBeTruthy();

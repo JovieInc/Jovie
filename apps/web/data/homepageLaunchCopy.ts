@@ -28,7 +28,8 @@ export const HOMEPAGE_LAUNCH_COPY = {
   },
   hero: {
     headline: 'Control how the world sees you.',
-    subhead: 'Find what the internet knows. Turn it into relationships.',
+    subhead:
+      'Find what the internet knows about you, bring it together, and turn attention into lasting relationships.',
     // The hero's only conversion control is the existing name search.
     search: {
       placeholder: 'Search your name',

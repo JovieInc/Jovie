@@ -1,15 +1,6 @@
 import type { Meta, StoryObj } from '@storybook/nextjs-vite';
 import { HomepageEditorialHero } from './HomepageEditorialHero';
 
-const BACKDROP = {
-  desktopSrc: '/images/hero/night-desk.webp',
-  desktopWidth: 1536,
-  desktopHeight: 1024,
-  mobileSrc: '/images/hero/night-desk-mobile.webp',
-  mobileWidth: 737,
-  mobileHeight: 1024,
-} as const;
-
 const meta = {
   title: 'Marketing/HomepageEditorialHero',
   component: HomepageEditorialHero,
@@ -18,7 +9,7 @@ const meta = {
     docs: {
       description: {
         component:
-          'Full-viewport editorial hero for the homepage front door: one art-directed photo backdrop, one headline, one support line, and the name search as the only conversion control.',
+          'Full-viewport editorial hero for the homepage front door: one optical field, one headline, one support line, and the name search as the only conversion control.',
       },
     },
   },
@@ -32,8 +23,8 @@ export const Default: Story = {
   args: {
     headingId: 'homepage-editorial-hero-heading',
     headline: 'Control how the world sees you.',
-    support: 'Find what the internet knows. Turn it into relationships.',
+    support:
+      'Find what the internet knows about you, bring it together, and turn attention into lasting relationships.',
     search: { placeholder: 'Search your name', action: 'Find me' },
-    backdrop: BACKDROP,
   },
 };
