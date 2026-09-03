@@ -133,6 +133,12 @@ struct ChatRepositoryTests {
         .assistantDelta(clientTurnId: "PLACEHOLDER", text: "A"),
         .assistantDelta(clientTurnId: "PLACEHOLDER", text: " streamed"),
         .assistantDelta(clientTurnId: "PLACEHOLDER", text: " answer"),
+        .assistantCompleted(
+          clientTurnId: "PLACEHOLDER",
+          conversationId: "conv_stream",
+          turnId: "turn_1",
+          text: "A streamed answer"
+        ),
       ]),
       listConversationsResult: .success([]),
       fetchConversationResult: .failure(MobileChatClientError.requestFailed(statusCode: 404))
@@ -148,7 +154,10 @@ struct ChatRepositoryTests {
     await repository.send(text: "Stream this")
 
     let assistantItem = repository.timeline.first { $0.role == .assistant }
-    #expect(assistantItem?.status == .streaming)
+    // Durable Summer streams must end with a terminal event: a stream that
+    // finishes mid-flight marks the turn failed
+    // (see ovieDurableSummerStatesCoverRedPathsAndResume).
+    #expect(assistantItem?.status == .completed)
     #expect(assistantItem?.content == "A streamed answer")
   }
 
