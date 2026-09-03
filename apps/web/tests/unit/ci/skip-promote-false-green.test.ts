@@ -13,6 +13,10 @@ import {
   classifyInFlightProductionControllerHold,
   IN_FLIGHT_CONTROLLER_STATUSES,
 } from '../../../../../.github/scripts/hold-screenshot-mq-during-controller.mjs';
+import {
+  planProductionLaneRange,
+  WEB_BIND_REASONS,
+} from '../../../../../scripts/lib/production-lane-range.mjs';
 
 const testDir = dirname(fileURLToPath(import.meta.url));
 const repoRoot = resolve(testDir, '..', '..', '..', '..', '..');
@@ -309,6 +313,48 @@ describe('skip-promote false-green detector (JOV-5458)', () => {
     );
     expect(publish.indexOf('hold_screenshot_merge_queue')).toBeLessThan(
       publish.indexOf('gh pr edit --add-label "merge-queue"')
+    );
+  });
+
+  it('forces Web/Promote for SELECTED_LANES=ios while live SHA ≠ origin/main', () => {
+    const liveSha = LIVE_SHA;
+    const mainSha = MAIN_SHA;
+    const plan = planProductionLaneRange({
+      deployedSha: liveSha,
+      currentSha: mainSha,
+      cumulativeChangedPaths: ['apps/ios/Jovie/AppState.swift'],
+      commitsNewestFirst: [
+        {
+          sha: mainSha,
+          firstParent: liveSha,
+          changedPaths: ['apps/ios/Jovie/AppState.swift'],
+        },
+      ],
+    });
+    const releaseCaller = getJobBlock(
+      readFileSync(productionControllerPath, 'utf8'),
+      'production-release'
+    );
+    const authorize = getStepBlock(
+      getJobBlock(
+        readFileSync(productionControllerPath, 'utf8'),
+        'authorize-production'
+      ),
+      'Cross-prove exact successful push CI'
+    );
+
+    expect(plan.selectedLanes).toEqual(['ios']);
+    expect(plan.runWeb).toBe(true);
+    expect(plan.webBindReason).toBe(WEB_BIND_REASONS.liveUnbound);
+    expect(plan.webEvidenceSha).toBeNull();
+    expect(releaseCaller).toContain(
+      "needs.authorize-production.outputs.run_web == 'true'"
+    );
+    expect(releaseCaller).not.toContain('selected_lanes');
+    expect(authorize).toContain('[ "$web_bind_reason" = "live_unbound" ]');
+    expect(authorize).toContain('forcing Web/Promote');
+    expect(authorize).toContain(
+      'node .github/scripts/assert-live-production-bind.mjs --main-sha "$EXPECTED_SHA"'
     );
   });
 });
