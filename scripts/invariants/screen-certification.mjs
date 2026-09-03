@@ -2,8 +2,15 @@
 /** Screen certification gate (JOV-INV-018). Usage: pnpm screen-certification-gate */
 
 import { spawnSync } from 'node:child_process';
-import { existsSync, readFileSync } from 'node:fs';
-import { dirname, resolve } from 'node:path';
+import { createHash } from 'node:crypto';
+import {
+  existsSync,
+  readdirSync,
+  readFileSync,
+  statSync,
+  writeFileSync,
+} from 'node:fs';
+import { dirname, join, relative, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
@@ -229,8 +236,83 @@ function makeDeliberateRedProof(screen, headSha) {
   };
 }
 
-/** @param {any} proof @param {{ screen: object, headSha: string }} context */
-export function evaluateScreenProof(proof, { screen, headSha }) {
+/**
+ * Deterministic sha256 over rendered artifact bytes: a single file hashes its
+ * bytes; a directory hashes its sorted relative paths plus file bytes so the
+ * whole bundle is bound to the proof.
+ *
+ * @param {string} artifactPath absolute path to a file or directory
+ * @returns {string | null} `sha256:<64 hex>`, or null when unreadable/empty
+ */
+export function hashArtifactBytes(artifactPath) {
+  const stat = statSync(artifactPath, { throwIfNoEntry: false });
+  if (!stat) return null;
+  const hash = createHash('sha256');
+  if (stat.isFile()) {
+    hash.update(readFileSync(artifactPath));
+    return `sha256:${hash.digest('hex')}`;
+  }
+  if (!stat.isDirectory()) return null;
+  const files = [];
+  const walk = dir => {
+    for (const entry of readdirSync(dir, { withFileTypes: true })) {
+      const abs = join(dir, entry.name);
+      if (entry.isDirectory()) walk(abs);
+      else if (entry.isFile()) files.push(abs);
+    }
+  };
+  walk(artifactPath);
+  if (files.length === 0) return null;
+  files.sort();
+  for (const file of files) {
+    hash.update(relative(artifactPath, file).replace(/\\/g, '/'));
+    hash.update('\0');
+    hash.update(readFileSync(file));
+    hash.update('\0');
+  }
+  return `sha256:${hash.digest('hex')}`;
+}
+
+/**
+ * Trusted artifact verification for a screen-browser-proof/v1: the proof must
+ * name the exact bundle the external render runner produced, and the gate
+ * recomputes the sha256 over those real bytes. Caller-authored JSON without
+ * verifiable bytes can never certify (JOV-INV-018).
+ *
+ * @param {any} proof
+ * @param {{ artifactRoot?: string }} [options]
+ * @returns {string | null} a finding, or null when the bytes verify
+ */
+export function verifyProofArtifact(proof, { artifactRoot = REPO_ROOT } = {}) {
+  const artifactPath =
+    typeof proof?.artifactPath === 'string' ? proof.artifactPath : '';
+  if (!artifactPath) {
+    return 'proof artifactPath is required; caller-authored proof cannot certify';
+  }
+  const root = resolve(artifactRoot);
+  const resolved = resolve(root, artifactPath);
+  if (resolved !== root && !resolved.startsWith(`${root}/`)) {
+    return `proof artifactPath escapes the artifact root: ${artifactPath}`;
+  }
+  const digest = hashArtifactBytes(resolved);
+  if (digest === null) {
+    return `proof artifact bytes are unreadable: ${artifactPath}`;
+  }
+  const claimed =
+    typeof proof?.artifactDigest === 'string'
+      ? proof.artifactDigest.toLowerCase()
+      : '';
+  if (/^sha256:[0-9a-f]{64}$/.test(claimed) && digest !== claimed) {
+    return 'proof artifactDigest does not match the rendered artifact bytes';
+  }
+  return null;
+}
+
+/** @param {any} proof @param {{ screen: object, headSha: string, verifyArtifact?: (proof: any) => string | null }} context */
+export function evaluateScreenProof(
+  proof,
+  { screen, headSha, verifyArtifact }
+) {
   const findings = [];
   if (!isObject(proof) || proof.schema !== SCREEN_BROWSER_PROOF_SCHEMA) {
     return ['proof schema must be screen-browser-proof/v1'];
@@ -331,9 +413,12 @@ export function evaluateScreenProof(proof, { screen, headSha }) {
   ) {
     findings.push('visible actions are required');
   }
-  findings.push(
-    'trusted external artifact verification is not installed; supplied proof cannot certify'
-  );
+  // The verifier is the fail-closed default: only real rendered artifact
+  // bytes whose recomputed digest matches the proof can certify.
+  const artifactFinding = verifyArtifact
+    ? verifyArtifact(proof)
+    : 'trusted external artifact verification is not installed; supplied proof cannot certify';
+  if (artifactFinding) findings.push(artifactFinding);
   return findings;
 }
 
@@ -664,6 +749,7 @@ export function evaluateChangedScreens({
   headSha,
   proofs = [],
   requireExternalEvidence = false,
+  verifyArtifact = undefined,
 }) {
   const issues = [];
   const changedScreens = [];
@@ -711,13 +797,22 @@ export function evaluateChangedScreens({
       });
       continue;
     }
-    const findings = evaluateScreenProof(proof, { screen, headSha });
+    const findings = evaluateScreenProof(proof, {
+      screen,
+      headSha,
+      verifyArtifact,
+    });
     if (findings.length > 0)
       issues.push(`${screen.id}: ${findings.join('; ')}`);
     changedScreens.push({
       id: screen.id,
       verdict: findings.length === 0 ? 'pass' : 'block',
       findings,
+      // Renderer provenance + immutable artifact identity ride the receipt
+      // for every certified screen.
+      ...(findings.length === 0
+        ? { artifactDigest: proof.artifactDigest, rendererRunUrl: proof.runUrl }
+        : {}),
     });
   }
   for (const screenId of supplied.keys()) {
@@ -769,17 +864,31 @@ export function runScreenCertification(options = {}) {
     headSha,
     proofs: options.proofs,
     requireExternalEvidence: options.registrationOnly !== true,
+    verifyArtifact:
+      options.verifyArtifact ??
+      (proof =>
+        verifyProofArtifact(proof, {
+          artifactRoot: options.artifactRoot ?? repoRoot,
+        })),
   });
   issues.push(...changed.issues);
   const ok = issues.length === 0;
-  const certified = false;
+  // Certification is real now: in the full gate, ok means every changed
+  // screen carried an exact-head proof whose rendered artifact bytes
+  // reverified. Registration-only audits and no-change runs never certify.
+  const certified =
+    ok &&
+    options.registrationOnly !== true &&
+    changed.changedScreens.length > 0;
   const status = !ok
     ? 'blocked'
-    : changed.changedScreens.length > 0
-      ? options.registrationOnly === true
-        ? 'source-registered'
-        : 'evidence-required'
-      : 'not-applicable';
+    : certified
+      ? 'certified'
+      : changed.changedScreens.length > 0
+        ? options.registrationOnly === true
+          ? 'source-registered'
+          : 'evidence-required'
+        : 'not-applicable';
   return {
     ok,
     schema: SCREEN_CERT_SCHEMA,
@@ -818,6 +927,12 @@ if (isMain) {
   const proofFile = process.argv
     .find(arg => arg.startsWith('--proof-file='))
     ?.slice('--proof-file='.length);
+  const artifactRoot = process.argv
+    .find(arg => arg.startsWith('--artifact-root='))
+    ?.slice('--artifact-root='.length);
+  const receiptOut = process.argv
+    .find(arg => arg.startsWith('--receipt-out='))
+    ?.slice('--receipt-out='.length);
   const registrationOnly = process.argv.includes('--registration-only');
   const activeGate = registrationOnly
     ? SCREEN_REGISTRATION_GATE
@@ -834,7 +949,16 @@ if (isMain) {
     diffBase,
     proofs,
     registrationOnly,
+    artifactRoot,
   });
+  if (receiptOut) {
+    // The receipt is the immutable machine record: exact head/base, per-screen
+    // verdicts with artifact digest + renderer provenance, and the certified bit.
+    writeFileSync(
+      resolve(receiptOut),
+      `${JSON.stringify(result.receipt, null, 2)}\n`
+    );
+  }
   if (result.ok) {
     process.stdout.write(
       `[${activeGate}] PASS head=${result.receipt.headSha} changed=${result.receipt.changedScreens.length} status=${result.receipt.status} certified=${result.receipt.certified}\n`
