@@ -1,6 +1,6 @@
 {
-  "id": "ea8274b5-411a-4997-90de-7a5a580f724b",
-  "prevId": "8c230357-5f45-4b3b-9f75-cfcdba418063",
+  "id": "682b924a-6ede-4e22-9685-14486ea3d8c1",
+  "prevId": "ea8274b5-411a-4997-90de-7a5a580f724b",
   "version": "7",
   "dialect": "postgresql",
   "tables": {
@@ -34143,6 +34143,824 @@
       "uniqueConstraints": {},
       "policies": {},
       "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "public.investor_stakeholder_records": {
+      "name": "investor_stakeholder_records",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "uuid",
+          "primaryKey": true,
+          "notNull": true,
+          "default": "gen_random_uuid()"
+        },
+        "reference_label": {
+          "name": "reference_label",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "role": {
+          "name": "role",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "contribution_knowledge": {
+          "name": "contribution_knowledge",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "'unknown'"
+        },
+        "contribution_amount_cents": {
+          "name": "contribution_amount_cents",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "contribution_currency": {
+          "name": "contribution_currency",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "contribution_source_record_id": {
+          "name": "contribution_source_record_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "contribution_as_of": {
+          "name": "contribution_as_of",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "created_by_user_id": {
+          "name": "created_by_user_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        },
+        "updated_at": {
+          "name": "updated_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {
+        "investor_stakeholder_records_role_idx": {
+          "name": "investor_stakeholder_records_role_idx",
+          "columns": [
+            {
+              "expression": "role",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "investor_stakeholder_records_source_idx": {
+          "name": "investor_stakeholder_records_source_idx",
+          "columns": [
+            {
+              "expression": "contribution_source_record_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {
+        "investor_stakeholder_records_contribution_source_record_id_memory_source_records_id_fk": {
+          "name": "investor_stakeholder_records_contribution_source_record_id_memory_source_records_id_fk",
+          "tableFrom": "investor_stakeholder_records",
+          "tableTo": "memory_source_records",
+          "columnsFrom": [
+            "contribution_source_record_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "restrict",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {
+        "investor_stakeholder_records_role_valid": {
+          "name": "investor_stakeholder_records_role_valid",
+          "value": "\"investor_stakeholder_records\".\"role\" in ('investor', 'advisor', 'contributor', 'founder_self')"
+        },
+        "investor_stakeholder_records_knowledge_valid": {
+          "name": "investor_stakeholder_records_knowledge_valid",
+          "value": "\"investor_stakeholder_records\".\"contribution_knowledge\" in ('known', 'estimated', 'unknown')"
+        },
+        "investor_stakeholder_records_contribution_valid": {
+          "name": "investor_stakeholder_records_contribution_valid",
+          "value": "(\"investor_stakeholder_records\".\"contribution_knowledge\" = 'unknown' and \"investor_stakeholder_records\".\"contribution_amount_cents\" is null and \"investor_stakeholder_records\".\"contribution_currency\" is null and \"investor_stakeholder_records\".\"contribution_source_record_id\" is null and \"investor_stakeholder_records\".\"contribution_as_of\" is null) or (\"investor_stakeholder_records\".\"contribution_knowledge\" in ('known', 'estimated') and \"investor_stakeholder_records\".\"contribution_amount_cents\" >= 0 and \"investor_stakeholder_records\".\"contribution_currency\" ~ '^[A-Z]{3}$' and \"investor_stakeholder_records\".\"contribution_source_record_id\" is not null and \"investor_stakeholder_records\".\"contribution_as_of\" is not null)"
+        }
+      },
+      "isRLSEnabled": false
+    },
+    "public.investor_update_candidate_decisions": {
+      "name": "investor_update_candidate_decisions",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "uuid",
+          "primaryKey": true,
+          "notNull": true,
+          "default": "gen_random_uuid()"
+        },
+        "candidate_id": {
+          "name": "candidate_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "decision": {
+          "name": "decision",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "edited_claim": {
+          "name": "edited_claim",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "decided_by_user_id": {
+          "name": "decided_by_user_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "decided_at": {
+          "name": "decided_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {
+        "investor_update_candidate_decisions_candidate_time_idx": {
+          "name": "investor_update_candidate_decisions_candidate_time_idx",
+          "columns": [
+            {
+              "expression": "candidate_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "decided_at",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {
+        "investor_update_candidate_decisions_candidate_id_investor_update_candidates_id_fk": {
+          "name": "investor_update_candidate_decisions_candidate_id_investor_update_candidates_id_fk",
+          "tableFrom": "investor_update_candidate_decisions",
+          "tableTo": "investor_update_candidates",
+          "columnsFrom": [
+            "candidate_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "restrict",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {
+        "investor_update_candidate_decisions_valid": {
+          "name": "investor_update_candidate_decisions_valid",
+          "value": "\"investor_update_candidate_decisions\".\"decision\" in ('share', 'exclude', 'edit')"
+        },
+        "investor_update_candidate_decisions_edit_copy_valid": {
+          "name": "investor_update_candidate_decisions_edit_copy_valid",
+          "value": "(\"investor_update_candidate_decisions\".\"decision\" = 'edit' and nullif(trim(\"investor_update_candidate_decisions\".\"edited_claim\"), '') is not null) or (\"investor_update_candidate_decisions\".\"decision\" <> 'edit' and \"investor_update_candidate_decisions\".\"edited_claim\" is null)"
+        }
+      },
+      "isRLSEnabled": false
+    },
+    "public.investor_update_candidates": {
+      "name": "investor_update_candidates",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "uuid",
+          "primaryKey": true,
+          "notNull": true,
+          "default": "gen_random_uuid()"
+        },
+        "draft_id": {
+          "name": "draft_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "kind": {
+          "name": "kind",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "category": {
+          "name": "category",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "metric_label": {
+          "name": "metric_label",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "metric_value": {
+          "name": "metric_value",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "metric_unit": {
+          "name": "metric_unit",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "window_start": {
+          "name": "window_start",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "window_end": {
+          "name": "window_end",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "source_record_id": {
+          "name": "source_record_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "source_label": {
+          "name": "source_label",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "source_url": {
+          "name": "source_url",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "source_observed_at": {
+          "name": "source_observed_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "confidence": {
+          "name": "confidence",
+          "type": "real",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "caveats": {
+          "name": "caveats",
+          "type": "jsonb",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "'[]'::jsonb"
+        },
+        "proposed_claim": {
+          "name": "proposed_claim",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "relevance_score": {
+          "name": "relevance_score",
+          "type": "real",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {
+        "investor_update_candidates_draft_rank_idx": {
+          "name": "investor_update_candidates_draft_rank_idx",
+          "columns": [
+            {
+              "expression": "draft_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "relevance_score",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "created_at",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "investor_update_candidates_source_idx": {
+          "name": "investor_update_candidates_source_idx",
+          "columns": [
+            {
+              "expression": "source_record_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {
+        "investor_update_candidates_draft_id_investor_update_drafts_id_fk": {
+          "name": "investor_update_candidates_draft_id_investor_update_drafts_id_fk",
+          "tableFrom": "investor_update_candidates",
+          "tableTo": "investor_update_drafts",
+          "columnsFrom": [
+            "draft_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "restrict",
+          "onUpdate": "no action"
+        },
+        "investor_update_candidates_source_record_id_memory_source_records_id_fk": {
+          "name": "investor_update_candidates_source_record_id_memory_source_records_id_fk",
+          "tableFrom": "investor_update_candidates",
+          "tableTo": "memory_source_records",
+          "columnsFrom": [
+            "source_record_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "restrict",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {
+        "investor_update_candidates_kind_valid": {
+          "name": "investor_update_candidates_kind_valid",
+          "value": "\"investor_update_candidates\".\"kind\" in ('win', 'ask')"
+        },
+        "investor_update_candidates_confidence_range": {
+          "name": "investor_update_candidates_confidence_range",
+          "value": "\"investor_update_candidates\".\"confidence\" between 0 and 1"
+        },
+        "investor_update_candidates_relevance_range": {
+          "name": "investor_update_candidates_relevance_range",
+          "value": "\"investor_update_candidates\".\"relevance_score\" between 0 and 1"
+        },
+        "investor_update_candidates_metric_window_valid": {
+          "name": "investor_update_candidates_metric_window_valid",
+          "value": "\"investor_update_candidates\".\"window_end\" >= \"investor_update_candidates\".\"window_start\""
+        }
+      },
+      "isRLSEnabled": false
+    },
+    "public.investor_update_delivery_events": {
+      "name": "investor_update_delivery_events",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "uuid",
+          "primaryKey": true,
+          "notNull": true,
+          "default": "gen_random_uuid()"
+        },
+        "approval_id": {
+          "name": "approval_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "event_type": {
+          "name": "event_type",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "recipient_count": {
+          "name": "recipient_count",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "external_reference": {
+          "name": "external_reference",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "occurred_at": {
+          "name": "occurred_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "recorded_by_user_id": {
+          "name": "recorded_by_user_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {
+        "investor_update_delivery_events_approval_idx": {
+          "name": "investor_update_delivery_events_approval_idx",
+          "columns": [
+            {
+              "expression": "approval_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "occurred_at",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "investor_update_delivery_events_external_unique": {
+          "name": "investor_update_delivery_events_external_unique",
+          "columns": [
+            {
+              "expression": "approval_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "event_type",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "external_reference",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": true,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {
+        "investor_update_delivery_events_approval_id_investor_update_final_approvals_id_fk": {
+          "name": "investor_update_delivery_events_approval_id_investor_update_final_approvals_id_fk",
+          "tableFrom": "investor_update_delivery_events",
+          "tableTo": "investor_update_final_approvals",
+          "columnsFrom": [
+            "approval_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "restrict",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {
+        "investor_update_delivery_events_type_valid": {
+          "name": "investor_update_delivery_events_type_valid",
+          "value": "\"investor_update_delivery_events\".\"event_type\" in ('provider_accepted', 'delivered', 'bounced', 'failed')"
+        },
+        "investor_update_delivery_events_recipient_count_valid": {
+          "name": "investor_update_delivery_events_recipient_count_valid",
+          "value": "\"investor_update_delivery_events\".\"recipient_count\" >= 0"
+        }
+      },
+      "isRLSEnabled": false
+    },
+    "public.investor_update_drafts": {
+      "name": "investor_update_drafts",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "uuid",
+          "primaryKey": true,
+          "notNull": true,
+          "default": "gen_random_uuid()"
+        },
+        "period_start": {
+          "name": "period_start",
+          "type": "date",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "subject": {
+          "name": "subject",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "revision": {
+          "name": "revision",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "default": 0
+        },
+        "created_by_user_id": {
+          "name": "created_by_user_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        },
+        "updated_at": {
+          "name": "updated_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {
+        "investor_update_drafts_period_unique": {
+          "name": "investor_update_drafts_period_unique",
+          "columns": [
+            {
+              "expression": "period_start",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": true,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {},
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {
+        "investor_update_drafts_period_month_start": {
+          "name": "investor_update_drafts_period_month_start",
+          "value": "\"investor_update_drafts\".\"period_start\" = date_trunc('month', \"investor_update_drafts\".\"period_start\")::date"
+        }
+      },
+      "isRLSEnabled": false
+    },
+    "public.investor_update_final_approvals": {
+      "name": "investor_update_final_approvals",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "uuid",
+          "primaryKey": true,
+          "notNull": true,
+          "default": "gen_random_uuid()"
+        },
+        "draft_id": {
+          "name": "draft_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "rendered_copy": {
+          "name": "rendered_copy",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "copy_hash": {
+          "name": "copy_hash",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "snapshot_fingerprint": {
+          "name": "snapshot_fingerprint",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "draft_revision": {
+          "name": "draft_revision",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "decision_record_ids": {
+          "name": "decision_record_ids",
+          "type": "jsonb",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "recipient_segments": {
+          "name": "recipient_segments",
+          "type": "jsonb",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "recipient_count": {
+          "name": "recipient_count",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "tracking_settings": {
+          "name": "tracking_settings",
+          "type": "jsonb",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "'{\"opens\":false,\"clicks\":false,\"privacyDisclosureVersion\":null,\"consentBasis\":null}'::jsonb"
+        },
+        "approved_by_user_id": {
+          "name": "approved_by_user_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "approved_at": {
+          "name": "approved_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        },
+        "expires_at": {
+          "name": "expires_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true
+        }
+      },
+      "indexes": {
+        "investor_update_final_approvals_draft_time_idx": {
+          "name": "investor_update_final_approvals_draft_time_idx",
+          "columns": [
+            {
+              "expression": "draft_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "approved_at",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {
+        "investor_update_final_approvals_draft_id_investor_update_drafts_id_fk": {
+          "name": "investor_update_final_approvals_draft_id_investor_update_drafts_id_fk",
+          "tableFrom": "investor_update_final_approvals",
+          "tableTo": "investor_update_drafts",
+          "columnsFrom": [
+            "draft_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "restrict",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {
+        "investor_update_final_approvals_recipient_count_valid": {
+          "name": "investor_update_final_approvals_recipient_count_valid",
+          "value": "\"investor_update_final_approvals\".\"recipient_count\" > 0"
+        },
+        "investor_update_final_approvals_window_valid": {
+          "name": "investor_update_final_approvals_window_valid",
+          "value": "\"investor_update_final_approvals\".\"expires_at\" > \"investor_update_final_approvals\".\"approved_at\""
+        },
+        "investor_update_final_approvals_tracking_disabled": {
+          "name": "investor_update_final_approvals_tracking_disabled",
+          "value": "coalesce((\"investor_update_final_approvals\".\"tracking_settings\" ->> 'opens')::boolean, false) = false and coalesce((\"investor_update_final_approvals\".\"tracking_settings\" ->> 'clicks')::boolean, false) = false"
+        }
+      },
       "isRLSEnabled": false
     }
   },
