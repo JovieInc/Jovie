@@ -1,6 +1,6 @@
 'use client';
 
-import { upload } from '@vercel/blob/client';
+import { uploadPresigned } from '@vercel/blob/client';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { useAuthSafe } from '@/hooks/useJovieAuth';
 import { buildAudioBlobPath } from '@/lib/audio/blob-path';
@@ -109,6 +109,8 @@ interface UseChatFileAttachmentsOptions {
     readonly prompt: string;
   }) => void;
   readonly disabled?: boolean;
+  /** Clears drag-over when the thread or route identity changes. */
+  readonly resetKey?: string | null;
 }
 
 export interface UseChatFileAttachmentsReturn {
@@ -322,7 +324,7 @@ async function uploadImageAttachment(
     }
 
     previewUrl = URL.createObjectURL(processedFile);
-    const blob = await upload(processedFile.name, processedFile, {
+    const blob = await uploadPresigned(processedFile.name, processedFile, {
       access: 'public',
       handleUploadUrl: '/api/chat/files/upload-token',
     });
@@ -362,7 +364,7 @@ async function uploadAudioAttachment(
       throw new Error('Unsupported audio file type');
     }
 
-    const blob = await upload(
+    const blob = await uploadPresigned(
       buildAudioBlobPath('chat', userId, file.name),
       file,
       {
@@ -427,7 +429,7 @@ async function uploadGenericAttachment(
 ): Promise<void> {
   updateFile(id, { status: 'uploading', progress: 0 });
   try {
-    const blob = await upload(file.name, file, {
+    const blob = await uploadPresigned(file.name, file, {
       access: 'public',
       handleUploadUrl: '/api/chat/files/upload-token',
     });
@@ -564,6 +566,7 @@ export function useChatFileAttachments({
   onError,
   onAudioUploaded,
   disabled = false,
+  resetKey = null,
 }: UseChatFileAttachmentsOptions): UseChatFileAttachmentsReturn {
   const { userId } = useAuthSafe();
   const [pendingFiles, setPendingFiles] = useState<PendingFile[]>([]);
@@ -757,6 +760,10 @@ export function useChatFileAttachments({
     [pendingFiles]
   );
 
+  useEffect(() => {
+    setIsDragOver(false);
+  }, [resetKey]);
+
   const aggregate = useCallback(() => {
     const total = pendingFiles.length;
     const done = pendingFiles.filter(f => f.status === 'ready').length;
@@ -806,6 +813,7 @@ export function useChatFileAttachments({
   useEffect(() => {
     const el = dropZoneRef.current;
     if (!el) return;
+    const clearDragOver = () => setIsDragOver(false);
     const onDragEnter = (e: DragEvent) => {
       e.preventDefault();
       e.stopPropagation();
@@ -821,6 +829,9 @@ export function useChatFileAttachments({
     const onDragOver = (e: DragEvent) => {
       e.preventDefault();
       e.stopPropagation();
+      if (e.dataTransfer) {
+        e.dataTransfer.dropEffect = 'copy';
+      }
     };
     const onDrop = (e: DragEvent) => {
       e.preventDefault();
@@ -830,15 +841,25 @@ export function useChatFileAttachments({
       const { files } = e.dataTransfer ?? {};
       if (files?.length) addFilesRef.current(files);
     };
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') {
+        setIsDragOver(false);
+      }
+    };
     el.addEventListener('dragenter', onDragEnter);
     el.addEventListener('dragleave', onDragLeave);
     el.addEventListener('dragover', onDragOver);
     el.addEventListener('drop', onDrop);
+    window.addEventListener('keydown', onKeyDown);
+    window.addEventListener('dragend', clearDragOver);
     return () => {
+      setIsDragOver(false);
       el.removeEventListener('dragenter', onDragEnter);
       el.removeEventListener('dragleave', onDragLeave);
       el.removeEventListener('dragover', onDragOver);
       el.removeEventListener('drop', onDrop);
+      window.removeEventListener('keydown', onKeyDown);
+      window.removeEventListener('dragend', clearDragOver);
     };
   }, [disabled]);
 

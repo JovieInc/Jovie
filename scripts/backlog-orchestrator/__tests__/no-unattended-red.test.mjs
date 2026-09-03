@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import { spawn } from 'node:child_process';
 import { once } from 'node:events';
-import { mkdtemp, readFile, rm } from 'node:fs/promises';
+import { mkdtemp, readdir, readFile, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { describe, it } from 'node:test';
@@ -10,27 +10,56 @@ import {
   ATTEMPT_BUDGET,
   advanceAttempt,
   assertNoUnattendedRed,
+  buildEscalationHandoff,
   classifyAndOpenFromDelivery,
   classifyStall,
+  DELEGATION_BUDGET,
+  DELEGATION_RECEIPT_SCHEMA,
   dispatchOpenRecords,
+  ESCALATION_HANDOFF_SCHEMA,
+  ESCALATION_STATES,
   escalate,
+  FOUNDER_CONTACT_PRIMARY_CHANNEL,
+  FOUNDER_CONTACT_SCHEMA,
   inferStallClass,
   loopKeyFor,
   NO_UNATTENDED_RED_SCHEMA,
+  NON_PROGRESS_BUDGET,
   openLoopRecord,
   persistDraftStackResolutions,
   persistLoopOutcome,
+  planDelegatedDiagnosis,
+  planFounderContact,
+  prepareEscalation,
   projectSummerQueue,
   reconcileMissedEvents,
   requalifyExactHead,
   STALL_CLASSES,
   SUMMER_QUEUE_SCHEMA,
   splitSizeGuardChange,
+  transitionFounderContact,
   withSummerQueueLock,
 } from '../no-unattended-red.mjs';
+import { OFFICIAL_ROUTING_RECEIPT_SCHEMA } from '../symphony-routing.mjs';
 
 const HEAD = 'a'.repeat(40);
 const NOW = '2026-08-28T22:00:00.000Z';
+const MID = '2026-08-28T22:30:00.000Z';
+const LATER = '2026-08-28T23:00:00.000Z';
+const ROUTE = Object.freeze({
+  schema: OFFICIAL_ROUTING_RECEIPT_SCHEMA,
+  phase: 'prepared',
+  attemptId: 'attempt-1',
+  modelId: 'codex-terra',
+  modelTier: 'standard',
+  reasoningEffort: 'high',
+  terminalOutcome: null,
+  escalation: {
+    status: 'escalated',
+    fromTier: 'economical',
+    toTier: 'standard',
+  },
+});
 const signal = (stallClass, extra = {}) => ({
   stallClass,
   issue: `JOV-${stallClass}`,
@@ -42,6 +71,20 @@ const open = (stallClass, extra = {}) =>
   openLoopRecord(classifyStall(signal(stallClass, extra), { now: NOW }), {
     now: NOW,
   });
+const founderInput = (extra = {}) => ({
+  severity: 'production',
+  recoveryExhausted: true,
+  safeRollbackAvailable: false,
+  featureFlagAvailable: false,
+  founderReviewOpenedAt: NOW,
+  ackWindowMs: 60_000,
+  acknowledged: false,
+  destination: 'ovie',
+  destinationConsented: true,
+  provider: FOUNDER_CONTACT_PRIMARY_CHANNEL,
+  providerAllowed: true,
+  ...extra,
+});
 
 // biome-ignore format: compact deliberate-red coverage for the PR size guard
 describe('no unattended red loop', () => {
@@ -56,6 +99,8 @@ describe('no unattended red loop', () => {
       'missing-owner-lease': 'typed-remediation',
       'dropped-controller-event': 'typed-remediation',
       'draft-stack-policy': 'typed-remediation',
+      'fleet-observation-gap': 'typed-remediation',
+      'base-not-main': 'typed-remediation',
       'not-proven': 'collect-evidence',
     };
     for (const stallClass of STALL_CLASSES) {
@@ -80,6 +125,25 @@ describe('no unattended red loop', () => {
     assert.equal(
       inferStallClass({ workflowName: 'CI', conclusion: 'failure' }),
       'missing-failing-checks'
+    );
+    assert.equal(
+      inferStallClass({
+        workflowName: 'PR targets main',
+        conclusion: 'failure',
+      }),
+      'base-not-main'
+    );
+    assert.equal(
+      inferStallClass({ baseRefName: 'feat/stacked' }),
+      'base-not-main'
+    );
+    assert.equal(
+      inferStallClass({ failure: 'main-unknown' }),
+      'fleet-observation-gap'
+    );
+    assert.equal(
+      inferStallClass({ observationGap: true }),
+      'fleet-observation-gap'
     );
     const empty = dispatchOpenRecords([open('queue-eviction')], {
       capacity: 1,
@@ -123,17 +187,435 @@ describe('no unattended red loop', () => {
     assert.equal(limited.deferred.length, 2);
   });
 
-  it('bounds retry with exponential backoff then escalates', () => {
+  it('detects repeated no-progress before the retry budget is exhausted', () => {
     let record = open('provider-unavailable');
     record = advanceAttempt(record, { reason: 'still-unavailable' }, { now: NOW });
     assert.equal(record.attempt, 1);
     assert.equal(record.backoffMs, 60_000);
+    assert.equal(record.state, 'retrying');
     record = advanceAttempt(record, { reason: 'still-unavailable' }, { now: NOW });
-    assert.equal(record.backoffMs, 120_000);
-    const terminal = advanceAttempt(record, { reason: 'still-unavailable' }, { now: NOW });
-    assert.equal(terminal.outcome, 'escalated');
-    assert.match(terminal.reason, /retry-budget-exhausted:provider-unavailable/);
-    assert.ok(terminal.attempt + 1 >= ATTEMPT_BUDGET);
+    assert.equal(record.nonProgressCount, NON_PROGRESS_BUDGET);
+    assert.equal(record.state, 'escalation-pending');
+    assert.equal(record.outcome, 'open');
+    assert.equal(record.terminal, false);
+    assert.match(record.reason, /nonprogress-budget-exhausted:provider-unavailable/);
+    assert.equal(record.escalation.handoff.schema, ESCALATION_HANDOFF_SCHEMA);
+    assert.equal(ATTEMPT_BUDGET, 3);
+  });
+
+  it('persists state transitions as idempotent append-only generations', async () => {
+    const directory = await mkdtemp(join(tmpdir(), 'jovie-red-generations-'));
+    try {
+      const initial = open('dropped-controller-event', { issue: 'JOV-5169', pr: 16904 });
+      const retrying = advanceAttempt(initial, { reason: 'same-controller-failure' }, { now: MID });
+      const pending = advanceAttempt(retrying, { reason: 'same-controller-failure' }, { now: LATER });
+      assert.notEqual(initial.loopKey, retrying.loopKey);
+      assert.notEqual(retrying.loopKey, pending.loopKey);
+      assert.equal(retrying.rootLoopKey, initial.loopKey);
+      assert.equal(pending.rootLoopKey, initial.loopKey);
+      assert.equal(retrying.supersedesLoopKey, initial.loopKey);
+      assert.equal(pending.supersedesLoopKey, retrying.loopKey);
+      for (const record of [initial, retrying, pending]) {
+        assert.equal((await persistLoopOutcome(record, { stateDir: directory })).status, 'created');
+      }
+      assert.equal(
+        (await persistLoopOutcome(pending, { stateDir: directory })).status,
+        'duplicate'
+      );
+      assert.equal((await readdir(join(directory, 'red-loop'))).length, 3);
+      const queue = JSON.parse(await readFile(join(directory, 'summer-queue.json'), 'utf8'));
+      assert.equal(queue.items.length, 1);
+      assert.equal(queue.items[0].state, 'escalation-pending');
+      assert.equal(queue.items[0].issue, 'JOV-5169');
+      const resolved = advanceAttempt(
+        pending,
+        {
+          healthy: true,
+          exitCode: 0,
+          proof: { verified: true, ref: 'ci:repair-verified' },
+        },
+        { now: '2026-08-28T23:30:00.000Z' }
+      );
+      const completed = await persistLoopOutcome(resolved, { stateDir: directory });
+      assert.equal(completed.queue.items.length, 0);
+      assert.equal(completed.queue.terminalTombstones.length, 1);
+      assert.equal(completed.queue.terminalTombstones[0].state, 'resolved');
+    } finally {
+      await rm(directory, { recursive: true, force: true });
+    }
+  });
+
+  it('never infers success from a swallowed exit code without proof', () => {
+    const first = advanceAttempt(
+      open('dropped-controller-event'),
+      { healthy: true, exitCode: 0 },
+      { now: NOW }
+    );
+    assert.equal(first.outcome, 'open');
+    assert.equal(first.state, 'retrying');
+    assert.equal(first.reason, 'success-unproven');
+    const second = advanceAttempt(
+      first,
+      { healthy: true, exitCode: 1, proof: { verified: true, ref: 'run:failed' } },
+      { now: LATER }
+    );
+    assert.notEqual(second.outcome, 'healthy');
+    const emptyProof = advanceAttempt(
+      open('dropped-controller-event', { issue: 'JOV-EMPTY-PROOF' }),
+      { healthy: true, exitCode: 0, proof: { verified: true } },
+      { now: LATER }
+    );
+    assert.equal(emptyProof.outcome, 'open');
+    assert.equal(emptyProof.reason, 'success-unproven');
+  });
+
+  it('redacts and deduplicates the bounded escalation handoff', () => {
+    const record = open('dropped-controller-event');
+    const input = {
+      object: 'JOV-5169 token=ghs_supersecret',
+      environment: 'production',
+      revision: HEAD,
+      phase: 'controller-observation',
+      failure: 'HTTP 502 authorization=Bearer-secret',
+      evidenceRefs: [
+        'https://github.com/JovieInc/Jovie/actions/runs/1?token=github_pat_secret',
+        '/Users/founder/private/controller.log',
+      ],
+      requiredScopes: ['pull_requests:read', 'api_key=lin_api_secret'],
+      exactQuestion: 'Can the bounded REST snapshot replace secret=sk-private?',
+    };
+    const first = buildEscalationHandoff(record, input, { now: NOW });
+    const duplicate = buildEscalationHandoff(record, input, { now: LATER });
+    assert.equal(first.schema, ESCALATION_HANDOFF_SCHEMA);
+    assert.equal(first.escalationKey, duplicate.escalationKey);
+    assert.deepEqual(Object.keys(first).sort(), [
+      'attempts',
+      'createdAt',
+      'environment',
+      'escalationKey',
+      'evidenceRefs',
+      'exactQuestion',
+      'failure',
+      'object',
+      'phase',
+      'redaction',
+      'requiredScopes',
+      'revision',
+      'schema',
+    ]);
+    const serialized = JSON.stringify(first);
+    assert.doesNotMatch(serialized, /supersecret|github_pat_secret|lin_api_secret|sk-private|\/Users\/founder/);
+    assert.match(serialized, /REDACTED|~\/private/);
+  });
+
+  it('delegates only through the canonical bounded model route and preserves one writer', () => {
+    const pending = prepareEscalation(
+      open('dropped-controller-event'),
+      'nonprogress-budget-exhausted:dropped-controller-event',
+      NOW
+    );
+    const allowed = planDelegatedDiagnosis(
+      pending,
+      { target: 'symphony', deterministicExhausted: true, route: ROUTE, routeVerified: true },
+      { now: NOW }
+    );
+    assert.equal(allowed.status, 'delegated');
+    assert.equal(allowed.record.state, 'delegated-diagnosis');
+    assert.equal(allowed.record.writer, pending.writer);
+    assert.equal(allowed.record.owner, pending.owner);
+    assert.equal(allowed.record.delegation.schema, DELEGATION_RECEIPT_SCHEMA);
+    assert.equal(allowed.record.delegation.reconcileOwner, 'gem');
+    assert.equal(allowed.record.delegationBudget, DELEGATION_BUDGET - 1);
+    const alternate = planDelegatedDiagnosis(
+      pending,
+      {
+        target: 'symphony',
+        deterministicExhausted: true,
+        routeVerified: true,
+        route: {
+          schema_version: 1,
+          deterministic_first: true,
+          workflow: 'remediation',
+          capability: 'code',
+          selected: {
+            id: 'grok-code-fast-1',
+            provider: 'grok',
+            model: 'grok-code-fast-1',
+            channel: 'subscription',
+          },
+          candidates: [{ id: 'grok-code-fast-1', status: 'ready' }],
+        },
+      },
+      { now: NOW }
+    );
+    assert.equal(alternate.status, 'delegated');
+    assert.equal(alternate.record.delegation.route.provider, 'grok');
+    assert.equal(alternate.record.delegation.route.escalation.status, 'alternate-provider');
+    assert.equal(
+      planDelegatedDiagnosis(
+        allowed.record,
+        { target: 'symphony', deterministicExhausted: true, route: ROUTE, routeVerified: true },
+        { now: LATER }
+      ).status,
+      'duplicate'
+    );
+
+    const self = planDelegatedDiagnosis(
+      pending,
+      { target: 'gem', deterministicExhausted: true, route: ROUTE, routeVerified: true },
+      { now: NOW }
+    );
+    assert.equal(self.status, 'denied');
+    assert.ok(self.record.delegation.reasons.includes('self-or-loop-delegation-denied'));
+    const unqualified = planDelegatedDiagnosis(
+      pending,
+      { target: 'symphony', deterministicExhausted: false, route: { modelId: 'other' } },
+      { now: NOW }
+    );
+    assert.equal(unqualified.status, 'denied');
+    assert.ok(unqualified.record.delegation.reasons.includes('deterministic-remediation-not-exhausted'));
+    assert.ok(unqualified.record.delegation.reasons.includes('verified-canonical-model-route-required'));
+    const recovery = planDelegatedDiagnosis(
+      pending,
+      { target: 'symphony', deterministicExhausted: false, route: ROUTE, routeVerified: true },
+      { now: NOW }
+    );
+    assert.equal(recovery.status, 'denied');
+    assert.equal(planDelegatedDiagnosis(recovery.record, { target: 'symphony', deterministicExhausted: true, route: ROUTE, routeVerified: true }, { now: LATER }).status, 'delegated');
+    const noBudget = planDelegatedDiagnosis(
+      { ...pending, delegationBudget: 0 },
+      { target: 'symphony', deterministicExhausted: true, route: ROUTE, routeVerified: true },
+      { now: NOW }
+    );
+    assert.equal(noBudget.reason, 'delegation-budget-exhausted');
+    const malformedRegistry = planDelegatedDiagnosis(
+      pending,
+      {
+        target: 'symphony',
+        deterministicExhausted: true,
+        routeVerified: true,
+        route: {
+          schema_version: 1,
+          deterministic_first: true,
+          workflow: 'remediation',
+          selected: { id: 'grok-code-fast-1', provider: 'grok', model: 'grok-code-fast-1' },
+          candidates: 'ready',
+        },
+      },
+      { now: NOW }
+    );
+    assert.equal(malformedRegistry.status, 'denied');
+    assert.equal(malformedRegistry.reason, 'verified-canonical-model-route-required');
+  });
+
+  it('moves delegated helper output through verification, resolution, and timeout escalation', () => {
+    const pending = prepareEscalation(open('dropped-controller-event'), 'needs-helper', NOW);
+    const delegated = planDelegatedDiagnosis(
+      pending,
+      { target: 'symphony', deterministicExhausted: true, route: ROUTE, routeVerified: true },
+      { now: NOW }
+    ).record;
+    const verifying = advanceAttempt(
+      delegated,
+      {
+        phase: 'repair-verifying',
+        proof: { verified: true, ref: 'workspace:repair-diff', phase: 'helper-repair' },
+        reason: 'helper-repair-produced',
+      },
+      { now: NOW }
+    );
+    assert.equal(verifying.state, 'repair-verifying');
+    assert.equal(verifying.nonProgressCount, 0);
+    const resolved = advanceAttempt(
+      verifying,
+      {
+        healthy: true,
+        exitCode: 0,
+        proof: { verified: true, ref: 'ci:focused-tests', phase: 'verification' },
+        reason: 'repair-verified',
+      },
+      { now: LATER }
+    );
+    assert.equal(resolved.state, 'resolved');
+    assert.equal(resolved.outcome, 'healthy');
+    assert.equal(resolved.terminal, true);
+
+    const timeout = advanceAttempt(delegated, { timedOut: true }, { now: NOW });
+    assert.equal(timeout.state, 'retrying');
+    assert.match(timeout.reason, /repair-timeout/);
+    const exhausted = advanceAttempt(timeout, { timedOut: true }, { now: LATER });
+    assert.equal(exhausted.state, 'escalation-pending');
+    assert.match(exhausted.reason, /nonprogress-budget-exhausted/);
+  });
+
+  it('plans Ovie-first founder contact only after every conservative gate passes', () => {
+    const blocked = escalate(
+      open('production-deployment-unbound'),
+      'recovery-exhausted:production-deployment-unbound',
+      NOW,
+      {
+        environment: 'production',
+        evidenceRefs: ['https://github.com/JovieInc/Jovie/actions/runs/2?token=ghs_hidden'],
+        exactQuestion: 'Approve rollback boundary; api_key=sk-hidden',
+      }
+    );
+    const planned = planFounderContact(blocked, founderInput(), { now: LATER });
+    assert.equal(planned.status, 'planned');
+    assert.equal(planned.contact.schema, FOUNDER_CONTACT_SCHEMA);
+    assert.equal(planned.contact.channel, FOUNDER_CONTACT_PRIMARY_CHANNEL);
+    assert.equal(planned.contact.dispatchAuthorized, false);
+    assert.equal(planned.contact.fallbacks.text.status, 'inactive');
+    assert.equal(planned.contact.fallbacks.call.status, 'inactive');
+    assert.deepEqual(planned.contact.allowedActions, ['ack', 'snooze', 'resolve']);
+    assert.equal(planned.record.escalation.founderContact.contactKey, planned.contact.contactKey);
+    assert.doesNotMatch(JSON.stringify(planned.contact), /ghs_hidden|sk-hidden/);
+    const duplicate = planFounderContact(blocked, founderInput(), {
+      existing: planned.contact,
+      now: LATER,
+    });
+    assert.equal(duplicate.status, 'duplicate');
+    const cooldown = planFounderContact(
+      escalate(
+        open('production-deployment-unbound', { issue: 'JOV-OTHER', pr: 9999 }),
+        'different-critical-block',
+        NOW
+      ),
+      founderInput(),
+      { existing: planned.contact, now: LATER }
+    );
+    assert.equal(cooldown.status, 'blocked');
+    assert.ok(cooldown.contact.reasons.includes('founder-contact-cooldown-active'));
+
+    const lowSeverity = planFounderContact(
+      blocked,
+      founderInput({ severity: 'routine' }),
+      { now: LATER }
+    );
+    assert.equal(lowSeverity.status, 'blocked');
+    assert.ok(lowSeverity.contact.reasons.includes('critical-severity-not-proven'));
+    const noDestination = planFounderContact(
+      blocked,
+      founderInput({ destination: null, destinationConsented: false }),
+      { now: LATER }
+    );
+    assert.equal(noDestination.status, 'blocked');
+    assert.ok(noDestination.contact.reasons.includes('ovie-destination-or-consent-unavailable'));
+    const providerDenied = planFounderContact(
+      blocked,
+      founderInput({ providerAllowed: false }),
+      { now: LATER }
+    );
+    assert.equal(providerDenied.status, 'blocked');
+    assert.ok(providerDenied.contact.reasons.includes('ovie-push-provider-denied'));
+    const recovered = planFounderContact(blocked, founderInput(), {
+      existing: providerDenied.contact,
+      now: LATER,
+    });
+    assert.equal(recovered.status, 'planned');
+    assert.equal(
+      planFounderContact(blocked, founderInput({ ackWindowMs: -1 }), { now: LATER }).status,
+      'blocked'
+    );
+  });
+
+  it('records planned, dispatched, delivered, and acknowledged Ovie receipts without sending', () => {
+    const blocked = escalate(open('provider-unavailable'), 'critical-runtime-blocked', NOW);
+    const planned = planFounderContact(
+      blocked,
+      founderInput({ severity: 'security' }),
+      { now: LATER }
+    ).contact;
+    const dispatched = transitionFounderContact(
+      planned,
+      {
+        type: 'dispatched',
+        observed: true,
+        receipt: 'ovie-push:dispatch:1 token=ghs_hidden',
+      },
+      { now: LATER }
+    );
+    assert.equal(dispatched.status, 'dispatched');
+    assert.doesNotMatch(dispatched.contact.dispatchReceipt, /ghs_hidden/);
+    const delivered = transitionFounderContact(
+      dispatched.contact,
+      { type: 'delivered', observed: true, receipt: 'ovie-push:delivery:1' },
+      { now: LATER }
+    );
+    assert.equal(delivered.status, 'delivered');
+    const acknowledged = transitionFounderContact(
+      delivered.contact,
+      { type: 'ack', observed: true, receipt: 'ovie-push:ack:1' },
+      { now: LATER }
+    );
+    assert.equal(acknowledged.status, 'acknowledged');
+    assert.equal(acknowledged.contact.acknowledgement.action, 'ack');
+    assert.equal(
+      transitionFounderContact(acknowledged.contact, { type: 'ack' }, { now: LATER }).status,
+      'duplicate'
+    );
+    assert.deepEqual(
+      acknowledged.contact.receipts.map(receipt => receipt.status),
+      ['planned', 'dispatched', 'delivered', 'acknowledged']
+    );
+    assert.equal(
+      transitionFounderContact(
+        dispatched.contact,
+        { type: 'delivered', receipt: 'unobserved-delivery' },
+        { now: LATER }
+      ).reason,
+      'delivery-observation-proof-required'
+    );
+    assert.equal(
+      transitionFounderContact(delivered.contact, { type: 'ack' }, { now: LATER }).reason,
+      'founder-ack-observation-proof-required'
+    );
+    assert.equal(
+      transitionFounderContact(planned, { type: 'call-escalation', explicitActivation: true }, { now: LATER }).reason,
+      'call-fallback-not-activated'
+    );
+    assert.equal(
+      transitionFounderContact(
+        planned,
+        { type: 'dispatched', receipt: 'unobserved-dispatch' },
+        { now: LATER }
+      ).reason,
+      'dispatch-observation-proof-required'
+    );
+    const callReady = {
+      ...planned,
+      fallbacks: { ...planned.fallbacks, call: { status: 'active', activation: 'explicit' } },
+    };
+    assert.equal(
+      transitionFounderContact(
+        callReady,
+        { type: 'call-escalation', explicitActivation: true },
+        { now: LATER }
+      ).status,
+      'call-escalation'
+    );
+    assert.equal(
+      transitionFounderContact(planned, { type: 'unknown' }, { now: LATER }).reason,
+      'founder-contact-transition-denied'
+    );
+    assert.equal(
+      transitionFounderContact({}, { type: 'ack' }, { now: LATER }).reason,
+      'founder-contact-receipt-required'
+    );
+    for (const action of ['snooze', 'resolve']) {
+      const result = transitionFounderContact(
+        planned,
+        {
+          type: action,
+          observed: true,
+          receipt: `ovie-push:${action}:1`,
+          snoozeUntil: action === 'snooze' ? '2026-08-29T00:00:00.000Z' : null,
+        },
+        { now: LATER }
+      );
+      assert.equal(result.status, 'acknowledged');
+      assert.equal(result.contact.acknowledgement.action, action);
+    }
+    assert.ok(ESCALATION_STATES.includes('hard-blocked'));
   });
 
   it('deliberate red: not-proven never becomes a repair claim', () => {
@@ -182,8 +664,11 @@ describe('no unattended red loop', () => {
       NOW
     );
     assert.equal(escalated.outcome, 'escalated');
+    assert.equal(escalated.state, 'hard-blocked');
     assert.equal(escalated.reason, 'authority-budget-exhausted:dropped-controller-event');
-    assert.equal(escalated.owner, 'human');
+    assert.equal(escalated.owner, 'gem');
+    assert.equal(escalated.writer, 'gem');
+    assert.equal(escalated.escalation.leaseKey, escalated.leaseKey);
   });
 
   it('persists a canonical Summer queue and rejects silent unattended red', async () => {
@@ -205,7 +690,12 @@ describe('no unattended red loop', () => {
     const active = open('queue-eviction', { issue: 'JOV-5400', pr: 16599 });
     const merged = advanceAttempt(
       open('missing-failing-checks', { issue: 'JOV-5335', pr: 16423 }),
-      { healthy: true, reason: 'linked-pr-merged-and-linear-done' },
+      {
+        healthy: true,
+        exitCode: 0,
+        proof: { verified: true, ref: 'github:pr:16423:merged' },
+        reason: 'linked-pr-merged-and-linear-done',
+      },
       { now: NOW }
     );
     const escalated = escalate(

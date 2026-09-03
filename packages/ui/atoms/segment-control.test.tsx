@@ -494,6 +494,57 @@ describe('SegmentControl', () => {
       ).toBeInTheDocument();
     });
 
+    it('keeps the generated tab-panel relationship for standalone controls', () => {
+      render(
+        <SegmentControl
+          value='links'
+          onValueChange={vi.fn()}
+          options={defaultOptions}
+        />
+      );
+
+      const activeTab = screen.getByRole('tab', { name: 'Links' });
+      const panelId = activeTab.getAttribute('aria-controls');
+      expect(panelId).toBeTruthy();
+      expect(document.getElementById(panelId!)).toHaveAttribute(
+        'role',
+        'tabpanel'
+      );
+    });
+
+    it('wires external tabpanel ids without rendering internal hidden panels', () => {
+      render(
+        <SegmentControl
+          value='7d'
+          onValueChange={vi.fn()}
+          options={[
+            {
+              value: '7d',
+              label: '7D',
+              id: 'analytics-tab-7d',
+              ariaControls: 'analytics-panel',
+            },
+            {
+              value: '30d',
+              label: '30D',
+              id: 'analytics-tab-30d',
+              ariaControls: 'analytics-panel',
+            },
+          ]}
+          aria-label='Select Analytics Range'
+          renderHiddenPanels={false}
+        />
+      );
+
+      const activeTab = screen.getByRole('tab', { name: '7D' });
+      expect(activeTab).toHaveAttribute('id', 'analytics-tab-7d');
+      expect(activeTab).toHaveAttribute('aria-controls', 'analytics-panel');
+      expect(activeTab).toHaveAttribute('aria-selected', 'true');
+      expect(
+        screen.queryByRole('tabpanel', { hidden: true })
+      ).not.toBeInTheDocument();
+    });
+
     it('tabs have proper aria attributes', () => {
       render(
         <SegmentControl
@@ -504,6 +555,24 @@ describe('SegmentControl', () => {
       );
       const tab = screen.getByRole('tab', { name: 'Links' });
       expect(tab).toHaveAttribute('aria-selected', 'true');
+    });
+
+    it('disabled tabs expose native and ARIA disabled state', () => {
+      render(
+        <SegmentControl
+          value='links'
+          onValueChange={vi.fn()}
+          options={[
+            { value: 'links', label: 'Links' },
+            { value: 'music', label: 'Music', disabled: true },
+          ]}
+        />
+      );
+
+      const disabledTab = screen.getByRole('tab', { name: 'Music' });
+      expect(disabledTab).toBeDisabled();
+      expect(disabledTab).toHaveAttribute('aria-disabled', 'true');
+      expect(disabledTab).toHaveAttribute('data-disabled', '');
     });
 
     it('inactive tabs have aria-selected false', () => {

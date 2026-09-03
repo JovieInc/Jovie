@@ -161,6 +161,15 @@ const nextConfig = {
       });
     }
 
+    // Vercel preview deployments back staging.jov.ie. Keep every preview
+    // response non-indexable even when route metadata is production-shaped.
+    if (isVercelPreview) {
+      securityHeaders.push({
+        key: 'X-Robots-Tag',
+        value: 'noindex, nofollow, noarchive, nosnippet',
+      });
+    }
+
     securityHeaders.push({
       key: 'Permissions-Policy',
       value: 'camera=(), microphone=(), geolocation=(self)',
@@ -663,6 +672,7 @@ function exposeBaseStaticConfigForTooling(config) {
 
   return Object.assign(config, {
     experimental: nextConfig.experimental,
+    headers: nextConfig.headers,
     images: nextConfig.images,
     redirects: nextConfig.redirects,
     rewrites: nextConfig.rewrites,

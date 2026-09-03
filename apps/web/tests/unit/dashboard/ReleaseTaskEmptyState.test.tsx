@@ -23,8 +23,9 @@ describe('ReleaseTaskEmptyState', () => {
       'rounded-lg',
       'border',
       'border-(--app-shell-border)',
-      'bg-surface-1'
+      'bg-surface-0'
     );
+    expect(card).not.toHaveClass('bg-surface-1');
     expect(container.querySelector('svg')).toHaveAttribute(
       'aria-hidden',
       'true'

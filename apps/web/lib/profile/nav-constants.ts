@@ -11,12 +11,12 @@
 
 /**
  * Fixed height of the bottom tab bar material, in rem.
- * Equates to 58px at the default 16px base font size.
+ * Equates to 56px at the default 16px base font size.
  *
  * Used in content padding via `--profile-bottom-nav-height`.
  * and in any layout calculation that needs the tab bar footprint.
  */
-export const TAB_BAR_HEIGHT_REM = '3.625rem' as const;
+export const TAB_BAR_HEIGHT_REM = '3.5rem' as const;
 
 /**
  * Canonical Tailwind padding class for content rendered below the tab bar.
@@ -38,3 +38,10 @@ export const CONTENT_SAFE_AREA_BOTTOM_PADDING =
  * Applied as: `pb-[max(env(safe-area-inset-bottom),10px)]`
  */
 export const TAB_BAR_INTERNAL_SAFE_AREA_MIN_PX = 10 as const;
+
+/**
+ * Canonical padding class for the bottom tab bar's internal safe-area inset.
+ * Keep this literal so Tailwind can statically discover the arbitrary class.
+ */
+export const TAB_BAR_INTERNAL_SAFE_AREA_PADDING =
+  'pb-[max(env(safe-area-inset-bottom),10px)]' as const;

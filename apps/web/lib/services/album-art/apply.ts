@@ -5,6 +5,10 @@ import { del } from '@vercel/blob';
 import { eq } from 'drizzle-orm';
 import { revalidateTag } from 'next/cache';
 import { processArtworkBufferToSizes } from '@/app/api/images/artwork/upload/process';
+import {
+  getBlobCommandOptions,
+  isBlobStorageConfigured,
+} from '@/lib/blob-config';
 import { createSmartLinkContentTag } from '@/lib/cache/tags';
 import { db } from '@/lib/db';
 import { users } from '@/lib/db/schema/auth';
@@ -63,12 +67,11 @@ async function uploadProcessedReleaseArtwork(params: {
     '@/app/api/images/upload/lib'
   );
   const put = await getVercelBlobUploader();
-  const token = env.BLOB_READ_WRITE_TOKEN;
   const sizes: Record<string, string> = {};
 
   for (const [sizeKey, buffer] of Object.entries(processed)) {
     const blobPath = `artwork/releases/${params.releaseId}/${sizeKey}.avif`;
-    if (!put || !token) {
+    if (!put || !isBlobStorageConfigured()) {
       if (env.NODE_ENV === 'production') {
         throw new TypeError('Blob storage not configured');
       }
@@ -79,7 +82,7 @@ async function uploadProcessedReleaseArtwork(params: {
     const blob = await withTimeout(
       put(blobPath, buffer, {
         access: 'public',
-        token,
+        ...getBlobCommandOptions(),
         contentType: AVIF_MIME_TYPE,
         cacheControlMaxAge: 60 * 60 * 24 * 365,
         addRandomSuffix: false,
@@ -101,9 +104,8 @@ async function deleteProcessedReleaseArtwork(
 ): Promise<void> {
   const urls = Object.values(sizes).filter(Boolean);
   if (urls.length === 0) return;
-  const token = env.BLOB_READ_WRITE_TOKEN;
-  if (!token) return;
-  await del(urls, { token });
+  if (!isBlobStorageConfigured()) return;
+  await del(urls, getBlobCommandOptions());
 }
 
 async function prepareGeneratedArtwork(params: {

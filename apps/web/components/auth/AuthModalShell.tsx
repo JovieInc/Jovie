@@ -3,6 +3,7 @@
 import { ArrowLeft } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { useCallback, useEffect, useRef } from 'react';
+import { useModalFocusBoundary } from '@/lib/a11y/modal-focus-boundary';
 import { AUTH_SHELL_KIND } from '@/lib/auth/auth-shell-layout-contract';
 
 interface AuthModalShellProps {
@@ -32,39 +33,20 @@ export function AuthModalShell({
     backButtonLabel.trim().length > 0 ? backButtonLabel : 'Go back';
   const router = useRouter();
   const dialogRef = useRef<HTMLDialogElement>(null);
+  const dismiss = useCallback(() => {
+    router.back();
+  }, [router]);
+
+  useModalFocusBoundary(dialogRef, true, {
+    lockScroll: true,
+    onDismiss: dismiss,
+  });
 
   useEffect(() => {
     const dialog = dialogRef.current;
     if (!dialog) return;
     if (!dialog.open) dialog.showModal();
   }, []);
-
-  useEffect(() => {
-    const body = globalThis.document?.body;
-    const root = globalThis.document?.documentElement;
-    if (!body || !root) return;
-
-    const previousBodyOverflow = body.style.overflow;
-    const previousBodyOverscroll = body.style.overscrollBehavior;
-    const previousRootOverflow = root.style.overflow;
-    const previousRootOverscroll = root.style.overscrollBehavior;
-
-    body.style.overflow = 'hidden';
-    body.style.overscrollBehavior = 'contain';
-    root.style.overflow = 'hidden';
-    root.style.overscrollBehavior = 'contain';
-
-    return () => {
-      body.style.overflow = previousBodyOverflow;
-      body.style.overscrollBehavior = previousBodyOverscroll;
-      root.style.overflow = previousRootOverflow;
-      root.style.overscrollBehavior = previousRootOverscroll;
-    };
-  }, []);
-
-  const dismiss = useCallback(() => {
-    router.back();
-  }, [router]);
 
   useEffect(() => {
     const dialog = dialogRef.current;
@@ -89,6 +71,7 @@ export function AuthModalShell({
     <dialog
       ref={dialogRef}
       aria-label={ariaLabel}
+      aria-modal='true'
       data-auth-modal-shell
       data-auth-shell-kind={AUTH_SHELL_KIND.interceptedModal}
       onMouseDown={onBackdropMouseDown}

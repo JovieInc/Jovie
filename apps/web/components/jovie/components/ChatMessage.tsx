@@ -1,5 +1,7 @@
 'use client';
 
+// @coverage-via apps/web/tests/unit/chat/InlineChatArea.tool-rendering.test.tsx
+
 import { Button, SimpleTooltip } from '@jovie/ui';
 import { Check, Copy } from 'lucide-react';
 import { motion, useReducedMotion } from 'motion/react';
@@ -20,7 +22,7 @@ import { TokenizedText } from './TokenizedText';
 interface ChatMessageProps {
   readonly id: string;
   readonly role: 'user' | 'assistant' | 'system';
-  readonly parts: MessagePart[];
+  readonly parts: readonly MessagePart[];
   /** Whether this message is actively being streamed from the AI. */
   readonly isStreaming?: boolean;
   /** Whether this is a synthetic pending placeholder (compact live typing bubble). */
@@ -43,6 +45,10 @@ interface ChatMessageProps {
    * other anonymous embeds where votes cannot be attributed to a user.
    */
   readonly enableFeedback?: boolean;
+  /** Preserve canonical text bubbles while letting compact embeds keep inline tool geometry. */
+  readonly toolVariant?: 'chat' | 'inline';
+  /** Inline embeds can hide assistant actions without forking message bubbles. */
+  readonly showAssistantActions?: boolean;
   /**
    * Render generic app tool cards/status rows. Callers with surface-specific
    * tool cards can opt out and render their own tool UI beside the message.
@@ -67,7 +73,9 @@ function areChatMessagePropsEqual(
     previous.toolStepCapExhausted === next.toolStepCapExhausted &&
     previous.turnId === next.turnId &&
     previous.conversationId === next.conversationId &&
-    previous.enableFeedback === next.enableFeedback
+    previous.enableFeedback === next.enableFeedback &&
+    previous.toolVariant === next.toolVariant &&
+    previous.showAssistantActions === next.showAssistantActions
   );
 }
 
@@ -84,6 +92,8 @@ export const ChatMessage = memo(function ChatMessage({
   turnId,
   conversationId,
   enableFeedback = false,
+  toolVariant = 'chat',
+  showAssistantActions = true,
 }: ChatMessageProps) {
   const isUser = role === 'user';
   const { copy, isSuccess: fallbackCopySuccess } = useClipboard();
@@ -258,7 +268,7 @@ export const ChatMessage = memo(function ChatMessage({
                 <ToolPartsRenderer
                   parts={parts}
                   profileId={profileId}
-                  variant='chat'
+                  variant={toolVariant}
                   hasMessageText={Boolean(messageText)}
                   feedback={
                     enableFeedback && !isStreaming
@@ -276,7 +286,7 @@ export const ChatMessage = memo(function ChatMessage({
               height and prevent a layout shift when streaming ends (JOV-11948).
               The button is hidden via aria-hidden + pointer-events while
               streaming; CSS opacity:0 already hides it visually on non-hover. */}
-          {!showThinkingIndicator && messageText ? (
+          {showAssistantActions && !showThinkingIndicator && messageText ? (
             <div
               className='system-b-chat-copy-row'
               aria-hidden={isStreaming ? true : undefined}

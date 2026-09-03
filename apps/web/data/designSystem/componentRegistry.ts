@@ -10,6 +10,7 @@ import {
 
 export const DESIGN_SYSTEM_COMPONENT_IDS = [
   'atom.button',
+  'atom.input',
   'atom.icon-button',
   'atom.link',
   'atom.brand-logo',
@@ -79,6 +80,36 @@ export const DESIGN_SYSTEM_COMPONENT_REGISTRY = [
       destructive: ['false', 'true'],
       variant: BUTTON_VARIANT_NAMES,
       size: BUTTON_SIZE_NAMES,
+    },
+  },
+  {
+    id: 'atom.input',
+    layer: 'atom',
+    source: 'packages/ui/atoms/input.tsx',
+    exportName: 'Input',
+    storySource: 'packages/ui/atoms/input.stories.tsx',
+    storybookTitle: 'UI/Atoms/Input',
+    storyExport: 'ConformanceMatrix',
+    testSources: ['packages/ui/atoms/input.test.tsx'],
+    dependsOn: [],
+    compatibilityConsumers: [],
+    penRootId: null,
+    referenceEligible: false,
+    penIdentityReason:
+      'No committed canonical Pen save/readback export maps an Input root; source binding remains authoritative until Pen promotion.',
+    variantAxes: {
+      inputSize: ['sm', 'md', 'lg'],
+      state: [
+        'default',
+        'focus-visible',
+        'disabled',
+        'error',
+        'success',
+        'loading',
+        'pending',
+        'long-placeholder',
+      ],
+      type: ['text', 'password', 'search', 'number'],
     },
   },
   {

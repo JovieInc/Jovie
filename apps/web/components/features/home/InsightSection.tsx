@@ -18,7 +18,7 @@ export function InsightSection() {
               lineHeight: 'var(--linear-h2-leading)',
               letterSpacing: 'var(--linear-h2-tracking)',
               color: 'var(--linear-text-primary)',
-              marginBottom: 'var(--linear-space-8)',
+              marginBottom: 'var(--space-8)',
             }}
           >
             {/* ui-casing-allow: marketing display headline */}

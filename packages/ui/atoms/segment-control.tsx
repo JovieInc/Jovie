@@ -79,8 +79,14 @@ interface IndicatorLayout {
 export interface SegmentControlOption<T extends string = string> {
   readonly value: T;
   readonly label: React.ReactNode;
+  /** Stable DOM id when an external tabpanel labels itself from this tab. */
+  readonly id?: string;
+  /** External tabpanel id controlled by this tab. */
+  readonly ariaControls?: string;
   /** Accessible name override for icon-only or richly formatted labels. */
   readonly ariaLabel?: string;
+  /** Native tooltip text for disabled or compact labels. */
+  readonly title?: string;
   readonly disabled?: boolean;
 }
 
@@ -126,6 +132,11 @@ export interface SegmentControlProps<T extends string = string>
    * Additional class name for the active indicator in linear pill mode
    */
   readonly indicatorClassName?: string;
+  /**
+   * Render hidden Radix tab panels for standalone segmented controls.
+   * Set false when triggers control an external tabpanel via ariaControls.
+   */
+  readonly renderHiddenPanels?: boolean;
 }
 
 /**
@@ -165,6 +176,7 @@ export function SegmentControl<T extends string = string>({
   listClassName,
   triggerClassName,
   indicatorClassName,
+  renderHiddenPanels = true,
 }: SegmentControlProps<T>) {
   const resolvedVariant = variant ?? 'default';
   const listRef = React.useRef<HTMLDivElement | null>(null);
@@ -287,7 +299,13 @@ export function SegmentControl<T extends string = string>({
             key={option.value}
             value={option.value}
             disabled={option.disabled}
-            aria-label={option.ariaLabel}
+            {...(option.id ? { id: option.id } : {})}
+            {...(option.ariaControls
+              ? { 'aria-controls': option.ariaControls }
+              : {})}
+            {...(option.disabled ? { 'aria-disabled': true } : {})}
+            {...(option.ariaLabel ? { 'aria-label': option.ariaLabel } : {})}
+            {...(option.title ? { title: option.title } : {})}
             ref={node => {
               triggerRefs.current[option.value] = node;
             }}
@@ -304,15 +322,17 @@ export function SegmentControl<T extends string = string>({
           </Tabs.Trigger>
         ))}
       </Tabs.List>
-      {options.map(option => (
-        <Tabs.Content
-          key={`${option.value}-panel`}
-          value={option.value}
-          forceMount
-          className='hidden'
-          aria-hidden='true'
-        />
-      ))}
+      {renderHiddenPanels
+        ? options.map(option => (
+            <Tabs.Content
+              key={`${option.value}-panel`}
+              value={option.value}
+              forceMount
+              className='hidden'
+              aria-hidden='true'
+            />
+          ))
+        : null}
     </Tabs.Root>
   );
 }

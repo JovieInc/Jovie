@@ -2165,7 +2165,7 @@ describe('iOS stage contract', () => {
     const mainReady = getJobBlock(workflow, 'main-release-ready');
 
     expect(iosWorkflow).toMatch(
-      /^on:\n(?:  #.*\n)*  workflow_call:\n  workflow_dispatch:/m
+      /^on:\n(?:  #.*\n)*  workflow_call:\n(?:    .*\n)*  workflow_dispatch:/m
     );
     expect(iosWorkflow).not.toMatch(/^  pull_request:/m);
     expect(iosWorkflow).not.toMatch(/^  push:/m);
@@ -2433,6 +2433,220 @@ describe('canary health gate workflow', () => {
     expect(aliasJob.indexOf('- name: Alias verified deployment')).toBeLessThan(
       aliasJob.indexOf('- name: Verify aliased staging OAuth redirect URIs')
     );
+  });
+
+  it('reasserts a private exact preview and emits the only green staging receipt', () => {
+    const release = readFileSync(productionReleaseWorkflowPath, 'utf8');
+    const receiptJob = getJobBlock(release, 'staging-deployment-receipt');
+    const reassert = getStepBlock(
+      receiptJob,
+      'Reassert the exact preview after production settles'
+    );
+    const prove = getStepBlock(
+      receiptJob,
+      'Prove exact staging identity, privacy, and representative routes'
+    );
+    const writeReceipt = getStepBlock(
+      receiptJob,
+      'Write typed staging deployment receipt'
+    );
+    const releaseResult = getJobBlock(release, 'release-result');
+
+    expect(receiptJob).toContain(
+      'needs: [deploy-staging, alias-staging, promote-production, rollback-production]'
+    );
+    expect(receiptJob).toContain("needs.alias-staging.result == 'success'");
+    expect(receiptJob).toContain(
+      "needs.alias-staging.outputs.is_current == 'true'"
+    );
+    expect(reassert).toContain(
+      'vercel alias set "$deployment_url" staging.jov.ie'
+    );
+    expect(reassert).toContain(
+      'gh api "repos/$GITHUB_REPOSITORY/commits/main" --jq \'.sha\''
+    );
+    expect(reassert).toContain(
+      '[[ "$current_main" != "$EXPECTED_COMMIT_SHA" ]]'
+    );
+    expect(reassert).toContain('needs.deploy-staging.outputs.deploy_url_b64');
+    expect(prove).toContain('EXPECTED_DEPLOYMENT_ID:');
+    expect(prove).toContain('EXPECTED_COMMIT_SHA:');
+    expect(prove).toContain('--arg url "$deployment_url"');
+    expect(prove).toContain('.id == $id and');
+    expect(prove).toContain('.url == $url');
+    expect(prove).not.toContain('(.readyState | ascii_upcase) == "READY"');
+    expect(prove).toContain('for attempt in $(seq 1 15)');
+    expect(prove).toContain('(.id | type == "string")');
+    expect(prove).toContain('(.readyState | type == "string")');
+    expect(prove).toContain('(.target | type == "string")');
+    expect(prove).toContain('[ "$alias_id" = "$EXPECTED_DEPLOYMENT_ID" ]');
+    expect(prove).toContain('[ "$alias_state" = "READY" ]');
+    expect(prove).toContain('[ "$alias_target" = "preview" ]');
+    expect(prove).toContain('[ "$attempt" -eq 15 ]');
+    expect(prove).toContain('sleep 4');
+    expect(prove).toContain('https://staging.jov.ie/api/health/build-info');
+    expect(prove).toContain('.commitSha == $sha and .environment == "preview"');
+    expect(prove).toContain('https://staging.jov.ie/robots.txt');
+    expect(prove).toContain('staging-homepage-headers.txt');
+    expect(prove).toContain("grep -Eiq '^x-robots-tag:.*noindex'");
+    expect(prove).toContain("$'User-Agent: *\\nDisallow: /'");
+    expect(prove).toContain('[[ "$robots" == *\'Sitemap:\'* ]]');
+    expect(writeReceipt).toContain("'jovie-staging-deployment/v1'");
+    expect(writeReceipt).toContain(
+      'gh api "repos/$GITHUB_REPOSITORY/commits/main" --jq \'.sha\''
+    );
+    expect(writeReceipt).toContain(
+      '[[ "$current_main" != "$EXPECTED_COMMIT_SHA" ]]'
+    );
+    expect(writeReceipt).toContain('currentMainSha: $currentMainSha');
+    expect(writeReceipt).toContain(
+      'ROLLBACK_RESULT: ${{ needs.rollback-production.result }}'
+    );
+    expect(writeReceipt).toContain('rollbackResult: $rollbackResult');
+    expect(writeReceipt).toContain('state: "deployed"');
+    expect(writeReceipt).toContain('terminal: true');
+    expect(writeReceipt).toContain(
+      'privacy: "robots-block-all-and-http-noindex"'
+    );
+    expect(receiptJob).toContain(
+      'name: staging-deployment-${{ inputs.expected_sha }}'
+    );
+    expect(receiptJob).not.toContain('vercel promote');
+    expect(receiptJob).not.toContain('vercel rollback');
+    expect(releaseResult).toContain('staging-deployment-receipt,');
+    expect(releaseResult).toContain(
+      'staging-deployment-receipt:${{ needs.staging-deployment-receipt.result }}'
+    );
+    expect(release.indexOf('  promote-production:')).toBeLessThan(
+      release.indexOf('  staging-deployment-receipt:')
+    );
+  });
+
+  it('waits through a malformed alias inspect before writing an exact staging receipt', () => {
+    const release = readFileSync(productionReleaseWorkflowPath, 'utf8');
+    const prove = getStepBlock(
+      getJobBlock(release, 'staging-deployment-receipt'),
+      'Prove exact staging identity, privacy, and representative routes'
+    );
+    const root = mkdtempSync(resolve(tmpdir(), 'jovie-staging-receipt-'));
+
+    try {
+      const fakeBin = resolve(root, 'bin');
+      const runnerTemp = resolve(root, 'runner-temp');
+      const vercelBin = resolve(root, 'node_modules/.bin');
+      const counter = resolve(root, 'alias-inspect-count');
+      mkdirSync(fakeBin, { recursive: true });
+      mkdirSync(runnerTemp);
+      mkdirSync(vercelBin, { recursive: true });
+      writeFileSync(
+        resolve(fakeBin, 'node'),
+        `#!/usr/bin/env bash
+set -euo pipefail
+jq -n \
+  --arg id "$EXPECTED_DEPLOYMENT_ID" \
+  --arg url "$VERCEL_CANDIDATE_DEPLOYMENT_URL" \
+  '{id: $id, url: $url}'
+`,
+        { mode: 0o700 }
+      );
+      writeFileSync(
+        resolve(vercelBin, 'vercel'),
+        `#!/usr/bin/env bash
+set -euo pipefail
+attempt=0
+if [ -f "$RECEIPT_ALIAS_COUNTER" ]; then
+  attempt="$(cat "$RECEIPT_ALIAS_COUNTER")"
+fi
+attempt=$((attempt + 1))
+printf '%s' "$attempt" > "$RECEIPT_ALIAS_COUNTER"
+if [ "$attempt" -eq 1 ]; then
+  printf '%s\\n' '{"id":42,"readyState":null,"target":{"unexpected":true}}'
+else
+  jq -n --arg id "$EXPECTED_DEPLOYMENT_ID" \
+    '{id: $id, readyState: "READY", target: "preview"}'
+fi
+`,
+        { mode: 0o700 }
+      );
+      writeFileSync(
+        resolve(fakeBin, 'curl'),
+        `#!/usr/bin/env bash
+set -euo pipefail
+header_path=""
+url=""
+while [ "$#" -gt 0 ]; do
+  case "$1" in
+    --dump-header)
+      header_path="$2"
+      shift 2
+      ;;
+    http*)
+      url="$1"
+      shift
+      ;;
+    *)
+      shift
+      ;;
+  esac
+done
+case "$url" in
+  */api/health/build-info)
+    jq -n --arg sha "$EXPECTED_COMMIT_SHA" \
+      '{commitSha: $sha, environment: "preview"}'
+    ;;
+  */robots.txt)
+    printf 'User-Agent: *\\nDisallow: /\\n'
+    ;;
+  */)
+    printf 'HTTP/2 200\\nx-robots-tag: noindex\\n\\n' > "$header_path"
+    ;;
+  *)
+    exit 44
+    ;;
+esac
+`,
+        { mode: 0o700 }
+      );
+      writeFileSync(
+        resolve(fakeBin, 'sleep'),
+        '#!/usr/bin/env bash\nexit 0\n',
+        { mode: 0o700 }
+      );
+
+      const expectedSha = '0123456789abcdef0123456789abcdef01234567';
+      const expectedDeploymentId = 'dpl_exact_receipt';
+      const result = spawnSync(
+        'bash',
+        ['-c', `set -euo pipefail\n${getStepRunScript(prove)}`],
+        {
+          cwd: root,
+          env: {
+            ...process.env,
+            DEPLOYMENT_URL_B64: Buffer.from(
+              'https://jovie-exact-jovie.vercel.app'
+            ).toString('base64'),
+            EXPECTED_COMMIT_SHA: expectedSha,
+            EXPECTED_DEPLOYMENT_ID: expectedDeploymentId,
+            PATH: `${fakeBin}:${process.env.PATH}`,
+            RECEIPT_ALIAS_COUNTER: counter,
+            RUNNER_TEMP: runnerTemp,
+            VERCEL_AUTOMATION_BYPASS_SECRET: 'test-bypass',
+            VERCEL_ORG_ID: 'team_test',
+            VERCEL_PROJECT_ID: 'project_test',
+            VERCEL_TOKEN: 'test-token',
+          },
+          encoding: 'utf8',
+        }
+      );
+
+      expect(result.status, `${result.stdout}\n${result.stderr}`).toBe(0);
+      expect(readFileSync(counter, 'utf8')).toBe('2');
+      expect(result.stdout).toContain(
+        `staging.jov.ie owns exact READY preview ${expectedDeploymentId}.`
+      );
+    } finally {
+      rmSync(root, { force: true, recursive: true });
+    }
   });
 
   it('retries a safe OAuth test failure with clean artifacts and shared guard state', () => {
@@ -3141,7 +3355,7 @@ describe('CI E2E smoke workflow', () => {
 
     expect(smokeManifest).toContain("'golden-path.spec.ts'");
     expect(smokeStep).toContain('export E2E_USE_TEST_AUTH_BYPASS=1');
-    expect(smokeStep).not.toContain('export E2E_TEST_MODE=1');
+    expect(smokeStep).toContain('export E2E_TEST_MODE=1');
     expect(smokeStep).not.toContain('export PUBLIC_NOAUTH_SMOKE=1');
     expect(goldenPathStep).toContain('export E2E_TEST_MODE=1');
     expect(goldenPathStep).toContain('export E2E_FAST_ONBOARDING=1');
@@ -3368,6 +3582,7 @@ describe('CI E2E smoke workflow', () => {
     }
 
     for (const { step } of [standaloneSteps[0], standaloneSteps[2]]) {
+      expect(step).toContain('export E2E_TEST_MODE=1');
       expect(step).toContain(
         'export UPSTASH_REDIS_REST_URL="${{ secrets.UPSTASH_REDIS_REST_URL }}"'
       );
@@ -4418,10 +4633,10 @@ describe('production promotion exact-artifact contract', () => {
         'ref: ${{ needs.authorize-production.outputs.expected_sha }}'
       );
     }
-    expect(reusable.match(/actions\/checkout/g)).toHaveLength(8);
+    expect(reusable.match(/actions\/checkout/g)).toHaveLength(9);
     expect(
       reusable.match(/ref: \$\{\{ inputs\.expected_sha \}\}/g)
-    ).toHaveLength(8);
+    ).toHaveLength(9);
   });
 
   it('keeps rollback centralized behind confirmed structured gate failures', () => {

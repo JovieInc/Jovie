@@ -20,15 +20,27 @@ polling:
 workspace:
   root: ~/symphony-elixir-workspaces
 hooks:
+  timeout_ms: 900000
   after_create: |
     export PATH="$HOME/.local/bin:$HOME/.hermes/bin:$HOME/.npm-global/bin:$PATH"
     git clone --depth 1 https://github.com/JovieInc/Jovie.git .
     git fetch --depth 1 origin main
     git checkout -B main origin/main
-    git clone --depth 1 --filter=blob:none --sparse https://github.com/openai/symphony.git /tmp/openai-symphony
-    git -C /tmp/openai-symphony sparse-checkout set .codex/skills
+    skills_tmp="$(mktemp -d "${TMPDIR:-/tmp}/openai-symphony-skills.XXXXXX")"
+    trap 'rm -rf "$skills_tmp"' EXIT
+    git clone --depth 1 --filter=blob:none --sparse https://github.com/openai/symphony.git "$skills_tmp"
+    git -C "$skills_tmp" sparse-checkout set .codex/skills
     mkdir -p .codex/skills
-    cp -R /tmp/openai-symphony/.codex/skills/commit /tmp/openai-symphony/.codex/skills/push /tmp/openai-symphony/.codex/skills/pull /tmp/openai-symphony/.codex/skills/land /tmp/openai-symphony/.codex/skills/linear .codex/skills/
+    cp -R "$skills_tmp/.codex/skills/commit" "$skills_tmp/.codex/skills/push" "$skills_tmp/.codex/skills/pull" "$skills_tmp/.codex/skills/land" "$skills_tmp/.codex/skills/linear" .codex/skills/
+    SYMPHONY_TRUSTED_HOOK_PHASE=after_create bash ./scripts/hermes/symphony-nvme-package-cache.sh after-create
+  before_remove: |
+    export PATH="$HOME/.local/bin:$HOME/.hermes/bin:$HOME/.npm-global/bin:$PATH"
+    if [ -f ./scripts/hermes/symphony-nvme-package-cache.sh ]; then
+      SYMPHONY_TRUSTED_HOOK_PHASE=before_remove bash ./scripts/hermes/symphony-nvme-package-cache.sh before-remove
+    else
+      rm -rf ./node_modules ./.symphony/package-cache/pnpm-store
+      find ./apps ./packages ./workers -mindepth 2 -maxdepth 2 -type d -name node_modules -exec rm -rf {} + 2>/dev/null || true
+    fi
 agent:
   max_concurrent_agents: 3
   max_turns: 20
@@ -53,7 +65,7 @@ URL: {{ issue.url }}
 
 {{ issue.description }}
 
-Before work: `gbrain search` / `gbrain query`. After: `gbrain put` learnings. No secrets in git. Use official `.codex/skills` only (`commit`, `push`, `pull`, `land`, `linear`) — do not invent a second skill tree. after_create is HTTPS clone only; never SSH. No mix/elixir hooks on this Jovie workspace.
+Before work: `gbrain search` / `gbrain query`. After: `gbrain put` learnings. No secrets in git. Use official `.codex/skills` only (`commit`, `push`, `pull`, `land`, `linear`) — do not invent a second skill tree. after_create is HTTPS clone only; never SSH. The trusted after_create hook alone may perform the one bounded `pnpm install --offline --frozen-lockfile --ignore-scripts` restore from immutable Gem NVMe into private mutable SATA workspace state before agent start; coding agents must not run package install/fetch commands or create package stores. No mix/elixir hooks on this Jovie workspace.
 
 The app-server command is the repository routing launcher. It verifies the durable `symphony-routing/v1` receipt and launches the selected model instead of a fixed default.
 
