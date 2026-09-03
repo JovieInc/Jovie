@@ -2816,3 +2816,12 @@ body {
     transform: scaleY(0.42);
   }
 }
+
+/* DictationWaveform sets its per-bar animation inline (deterministic
+   duration/phase per bar), so reduced-motion needs !important to win. The
+   strip still reads as "listening" via its opacity state. */
+@media (prefers-reduced-motion: reduce) {
+  .dictation-waveform-bar {
+    animation: none !important;
+  }
+}
