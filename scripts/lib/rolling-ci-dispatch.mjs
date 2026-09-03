@@ -1,16 +1,16 @@
 import { createHash } from 'node:crypto';
 
-export const ROLLING_CI_POLICY_VERSION =
-  'jovie-hosted-ci-remediation/2026-08-29';
-export const ROLLING_CI_EVENT_SCHEMA = 'jovie-rolling-ci-failure/v2';
-export const ROLLING_CI_STATE_SCHEMA = 'jovie-rolling-ci-state/v2';
+export const ROLLING_CI_EVENT_SCHEMA = 'jovie-rolling-ci-failure/v1';
+export const ROLLING_CI_STATE_SCHEMA = 'jovie-rolling-ci-state/v1';
 export const ROLLING_CI_STATE_MARKER = 'jovie-rolling-ci-state';
 export const MAX_REPAIR_DELIVERIES = 1;
-export const TRUSTED_REPOSITORY = 'JovieInc/Jovie';
 export const TRUSTED_CI_WORKFLOW = 'CI';
 export const TRUSTED_CI_WORKFLOW_PATH = '.github/workflows/ci.yml';
 export const TRUSTED_FAILURE_EVENTS = Object.freeze(['workflow_run']);
-export const TRUSTED_PRODUCER_EVENTS = Object.freeze(['pull_request']);
+export const TRUSTED_PRODUCER_EVENTS = Object.freeze([
+  'pull_request',
+  'merge_group',
+]);
 
 const SHA_RE = /^[0-9a-f]{40}$/i;
 const QUEUE_FRONT_RE =
@@ -33,7 +33,14 @@ export function resolveDispatchPullRequest(input = {}) {
   if (Number.isInteger(parsedNumber) && parsedNumber > 0) {
     return { prNumber: parsedNumber, source: 'event' };
   }
-  return null;
+  if (input.producerEvent !== 'merge_group') return null;
+  const front = parseMergeQueueFrontBranch(input.headBranch);
+  if (!front) return null;
+  return {
+    prNumber: front.prNumber,
+    source: 'merge_queue_front_ref',
+    baseSha: front.baseSha,
+  };
 }
 
 /**
@@ -46,7 +53,12 @@ export function bindDispatchLiveHead(input = {}) {
   const expected = String(input.expectedHead ?? '').toLowerCase();
   const live = String(input.liveHead ?? '').toLowerCase();
   if (!SHA_RE.test(expected)) return null;
-  if (input.producerEvent !== 'pull_request') return null;
+  if (input.producerEvent === 'merge_group') {
+    return {
+      liveHead: expected,
+      reason: 'merge_group_synthetic_head',
+    };
+  }
   if (live === expected) {
     return { liveHead: live, reason: 'exact_source_head' };
   }
@@ -117,7 +129,6 @@ function assertSha(value, name) {
 
 function stableFailureSignal(check, failedSteps) {
   return JSON.stringify({
-    policyVersion: ROLLING_CI_POLICY_VERSION,
     check: String(check).trim(),
     failedSteps: [...new Set(failedSteps.map(String))].sort(),
   });
@@ -178,8 +189,9 @@ export function normalizeFailureEvents({
   source,
   checkSuiteId,
 }) {
-  if (repository !== TRUSTED_REPOSITORY)
-    throw new Error(`repository must be ${TRUSTED_REPOSITORY}`);
+  if (!/^[^/\s]+\/[^/\s]+$/.test(String(repository ?? ''))) {
+    throw new Error('repository must be owner/name');
+  }
   assertPositiveInteger(prNumber, 'prNumber');
   assertSha(headSha, 'headSha');
   if (!/^\d+$/.test(String(workflowRunId ?? ''))) {
@@ -201,7 +213,6 @@ export function normalizeFailureEvents({
       const fingerprint = failureFingerprint({ check, failedSteps });
       return {
         schema: ROLLING_CI_EVENT_SCHEMA,
-        policyVersion: ROLLING_CI_POLICY_VERSION,
         repository,
         pr: prNumber,
         head: headSha.toLowerCase(),
@@ -222,7 +233,6 @@ export function emptyRollingCiState(headSha) {
   assertSha(headSha, 'headSha');
   return {
     schema: ROLLING_CI_STATE_SCHEMA,
-    policyVersion: ROLLING_CI_POLICY_VERSION,
     head: headSha.toLowerCase(),
     deliveries: [],
     failures: {},
@@ -329,8 +339,7 @@ export function planFailureDispatch({
   state.claim = {
     status: 'active',
     writer,
-    policyVersion: ROLLING_CI_POLICY_VERSION,
-    key: `${event.repository}:pr-${event.pr}:${event.head}:${event.fingerprint}:${ROLLING_CI_POLICY_VERSION}`,
+    key: `${event.repository}:pr-${event.pr}:${event.head}:${event.check}:${event.fingerprint}`,
     repository: event.repository,
     pr: event.pr,
     head: event.head,
@@ -383,7 +392,6 @@ export function renderDispatchComment({ event, plan }) {
 - Failure fingerprint: \`${event.fingerprint}\`
 - Remediation writer: @${owner} (${role})
 - Repair delivery: ${count}/${MAX_REPAIR_DELIVERIES}
-- Policy: \`${ROLLING_CI_POLICY_VERSION}\`
 
 The one-writer lease is pinned to this exact head. A new commit or green rerun supersedes this repair; revalidate the fingerprint before changing code.
 
