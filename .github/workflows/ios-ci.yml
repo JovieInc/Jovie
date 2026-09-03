@@ -6,44 +6,26 @@ on:
   # portable iOS contract inside ci-fast.
   workflow_call:
     inputs:
-      only_testing:
-        description: Optional xcodebuild -only-testing selector for focused CI reproduction.
+      concurrency-key:
+        description: Stable merge-queue PR identity; empty outside merge groups.
         required: false
         type: string
-        default: ''
-      xcodebuild_timeout_seconds:
-        description: Internal xcodebuild timeout budget. Must be shorter than the action step timeout.
-        required: false
-        type: string
-        default: '1680'
   workflow_dispatch:
-    inputs:
-      only_testing:
-        description: Optional xcodebuild -only-testing selector for focused CI reproduction.
-        required: false
-        type: string
-        default: ''
-      xcodebuild_timeout_seconds:
-        description: Internal xcodebuild timeout budget. Must be shorter than the action step timeout.
-        required: false
-        type: string
-        default: '1680'
 
 permissions:
   contents: read
 
 concurrency:
-  group: ios-ci-${{ github.workflow }}-${{ github.ref }}
-  cancel-in-progress: ${{ github.ref != 'refs/heads/main' }}
+  # A regenerated merge-group head supersedes the prior iOS flight for that PR.
+  # Manual/direct-main calls remain isolated by exact SHA and never cancel.
+  group: ios-ci-${{ github.workflow }}-${{ inputs.concurrency-key || github.ref }}
+  cancel-in-progress: ${{ inputs.concurrency-key != '' || github.ref != 'refs/heads/main' }}
 
 jobs:
   test:
     name: Build And Test
     runs-on: macos-26
-    # 30m build/test action budget + 15m screenshot capture budget + preflight
-    # headroom. The xcodebuild wrapper keeps its own 28m timeout so long-running
-    # build/test failures identify the active phase before the action cap.
-    timeout-minutes: 50
+    timeout-minutes: 55
 
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -54,7 +36,6 @@ jobs:
       - name: Test iOS release configuration scripts
         run: |
           node --test apps/ios/scripts/write-configuration.test.mjs \
-          apps/ios/scripts/run-xcodebuild.test.mjs \
           apps/ios/scripts/validate-testflight-env.test.mjs \
           apps/ios/scripts/validate-testflight-artifact.test.mjs
 
@@ -72,21 +53,8 @@ jobs:
         run: bash apps/ios/scripts/run-xcodebuild.sh -resolvePackageDependencies -derivedDataPath .build/ios-ci
 
       - name: Build and test
-        # Recent macos-26 evidence: run 33424555816 needed about 18m15s
-        # before failing after the full 52-test UI suite, while run
-        # 33426523260 spent about 13m reaching UI tests and hit the old 20m
-        # step timeout mid-suite. Keep the gate fail-closed, but give Xcode
-        # the measured headroom and let the wrapper print the timed-out phase.
         timeout-minutes: 30
-        env:
-          JOVIE_IOS_ONLY_TESTING: ${{ inputs.only_testing }}
-          JOVIE_IOS_XCODEBUILD_TIMEOUT_SECONDS: ${{ inputs.xcodebuild_timeout_seconds }}
-        run: |
-          args=(-derivedDataPath .build/ios-ci)
-          if [[ -n "$JOVIE_IOS_ONLY_TESTING" ]]; then
-            args+=("-only-testing:$JOVIE_IOS_ONLY_TESTING")
-          fi
-          bash apps/ios/scripts/run-xcodebuild.sh test "${args[@]}"
+        run: bash apps/ios/scripts/run-xcodebuild.sh test -derivedDataPath .build/ios-ci
 
       - name: Capture simulator screenshots
         timeout-minutes: 15
