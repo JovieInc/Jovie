@@ -19,11 +19,6 @@ import {
   TooltipTrigger,
 } from '@jovie/ui';
 import {
-  type ColumnDef,
-  createColumnHelper,
-  type RowSelectionState,
-} from '@tanstack/react-table';
-import {
   ArrowUpDown,
   Check,
   ChevronDown,
@@ -135,6 +130,8 @@ import {
   releaseStatusDotClasses,
 } from '@/lib/library/release-status';
 import { useSyncReleasesFromSpotifyMutation } from '@/lib/queries';
+import type { ColumnDef, RowSelectionState } from '@/lib/tanstack-v8-compat';
+import { createColumnHelper } from '@/lib/tanstack-v8-compat';
 import { cn } from '@/lib/utils';
 import { capitalizeFirst } from '@/lib/utils/string-utils';
 import {
