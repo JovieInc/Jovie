@@ -118,7 +118,13 @@ describe('HomepageCertifiedSections', () => {
       HOMEPAGE_CERTIFIED_FIGURES.routes.relationships?.length ?? -1
     );
 
-    for (const id of ['smarter', 'built']) {
+    const smarter = screen.getByTestId('homepage-section-smarter');
+    expect(smarter).toHaveAttribute('data-voice', 'quiet');
+    expect(within(smarter).getAllByRole('term')).toHaveLength(
+      HOMEPAGE_CERTIFIED_FIGURES.ledgers.smarter?.length ?? -1
+    );
+
+    for (const id of ['built']) {
       expect(screen.getByTestId(`homepage-section-${id}`)).toHaveAttribute(
         'data-voice',
         'display'
