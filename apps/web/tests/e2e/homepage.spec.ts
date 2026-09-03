@@ -321,8 +321,9 @@ test.describe('Homepage', () => {
     );
     const exportQuality = await page
       .locator(exportSelector)
-      .evaluateAll(images =>
-        images.map(img => {
+      .evaluateAll(elements =>
+        elements.map(element => {
+          const img = element as HTMLImageElement;
           const rect = img.getBoundingClientRect();
           return {
             alt: img.alt,
