@@ -1,7 +1,6 @@
 'use client';
 
 import { Badge, Button } from '@jovie/ui';
-import type { CellContext, HeaderContext, Table } from '@tanstack/react-table';
 import type { RefObject } from 'react';
 import { CopyableMonospaceCell } from '@/components/atoms/CopyableMonospaceCell';
 import { EmptyCell } from '@/components/atoms/EmptyCell';
@@ -30,6 +29,11 @@ import {
 } from '@/lib/discography/formatting';
 import { getReleaseTypeStyle } from '@/lib/discography/release-type-styles';
 import type { ProviderKey, ReleaseViewModel } from '@/lib/discography/types';
+import type {
+  CellContext,
+  HeaderContext,
+  Table,
+} from '@/lib/tanstack-v8-compat';
 import { formatDuration } from '@/lib/utils/formatDuration';
 
 // ============================================================================
