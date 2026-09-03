@@ -44,7 +44,7 @@ export function HomepageEditorialHero({
   const shared = {
     alt: '',
     priority: true,
-    quality: 82,
+    quality: 85,
     sizes: '100vw',
   } as const;
   const { props: desktop } = getImageProps({
