@@ -9,10 +9,10 @@
  */
 
 import { and, eq } from 'drizzle-orm';
+import { CONNECTOR_PROVIDERS } from '@/lib/connectors/registry';
 import { db } from '@/lib/db';
 import { connectorAccounts } from '@/lib/db/schema/connectors';
 import { captureError } from '@/lib/error-tracking';
-import { CONNECTOR_PROVIDERS } from '@/lib/connectors/registry';
 
 /**
  * Fail-soft probe: resolves `false` on error (captured via `captureError`)
