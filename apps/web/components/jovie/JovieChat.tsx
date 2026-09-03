@@ -788,7 +788,7 @@ export function JovieChat({
                       />
                     ) : showEmptyActionCards ? (
                       <div
-                        className='mx-auto flex min-h-full w-full max-w-[46rem] flex-col items-center justify-center gap-5 py-2 sm:py-3'
+                        className='mx-auto flex min-h-full w-full max-w-[46rem] flex-col items-center justify-start gap-5 py-2 sm:py-3'
                         data-testid='chat-empty-state-action-card-slot'
                       >
                         {showEmptyWelcome ? (
@@ -796,24 +796,24 @@ export function JovieChat({
                             onSelectSample={handleSuggestedPrompt}
                           />
                         ) : null}
-                        <ChatStarterActionsRail
-                          cards={visibleActionCards}
-                          onAct={handleActOnActionCard}
-                          onDismiss={handleDismissActionCard}
-                        />
+                        <div className='flex w-full min-h-0 flex-1 flex-col items-center justify-center'>
+                          <ChatStarterActionsRail
+                            cards={visibleActionCards}
+                            onAct={handleActOnActionCard}
+                            onDismiss={handleDismissActionCard}
+                          />
+                        </div>
                       </div>
                     ) : showEmptyPromptRail ? (
                       <div
-                        className='mx-auto flex min-h-full w-full max-w-[46rem] flex-col items-center pb-3'
+                        className='mx-auto flex min-h-full w-full max-w-[46rem] flex-col items-center justify-start pb-3'
                         data-testid='chat-empty-state-soft-suggestions-slot'
                       >
-                        <div className='flex min-h-0 flex-1 flex-col items-center justify-center py-2 text-center'>
-                          {showEmptyWelcome ? (
-                            <ChatEmptyStateWelcome
-                              onSelectSample={handleSuggestedPrompt}
-                            />
-                          ) : null}
-                        </div>
+                        {showEmptyWelcome ? (
+                          <ChatEmptyStateWelcome
+                            onSelectSample={handleSuggestedPrompt}
+                          />
+                        ) : null}
                         <SuggestedPrompts
                           onSelect={handleSuggestedPrompt}
                           isFirstSession={isFirstSession}

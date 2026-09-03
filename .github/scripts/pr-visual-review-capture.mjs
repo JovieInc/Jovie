@@ -26,20 +26,24 @@ if (!Array.isArray(routes) || routes.length === 0)
 async function waitForAuthenticatedShell(page, route) {
   if (!route.startsWith('/app/')) return;
 
-  // Streaming can leave the AppShellSkeleton header in the DOM beside the
-  // loaded shell header. Wait on the first visible match so Playwright
-  // strict mode does not fail closed on the duplicate.
-  const visibleHeader = page
-    .getByTestId('dashboard-header')
+  // Streaming can leave a second dashboard-header in the DOM. `.or().first()`
+  // waits on the first DOM node, which may stay hidden; wait until any match
+  // is visible instead so Playwright strict mode cannot fail closed.
+  const visibleShellChrome = page
+    .locator(
+      '[data-testid="dashboard-header"], [data-testid="dashboard-error"]'
+    )
     .filter({ visible: true });
-  const visibleDashboardError = page
-    .getByTestId('dashboard-error')
-    .filter({ visible: true });
-  await visibleHeader.or(visibleDashboardError).first().waitFor({
+  await visibleShellChrome.first().waitFor({
     state: 'visible',
     timeout: AUTHENTICATED_SHELL_WAIT_MS,
   });
-  if ((await visibleDashboardError.count()) > 0) {
+  if (
+    (await page
+      .getByTestId('dashboard-error')
+      .filter({ visible: true })
+      .count()) > 0
+  ) {
     throw new Error(
       'Captured app route rendered dashboard error UI instead of authenticated shell'
     );
@@ -51,16 +55,23 @@ async function waitForAuthenticatedShell(page, route) {
     .or(page.getByRole('link', { name: 'Inbox' }))
     .or(page.getByRole('link', { name: 'Library' }));
 
-  await shellMarker.first().waitFor({
+  await shellMarker.filter({ visible: true }).first().waitFor({
     state: 'visible',
     timeout: AUTHENTICATED_SHELL_WAIT_MS,
   });
 
   if (route === '/app/chat' || route.startsWith('/app/chat/')) {
-    await page.getByRole('heading', { name: 'Just ask' }).waitFor({
-      state: 'visible',
-      timeout: NEW_CHAT_EMPTY_WAIT_MS,
-    });
+    // Loading still-frame uses the same test id with aria-hidden. Capture the
+    // loaded Just ask heading, which must stay visible with starter-action cards.
+    await page
+      .getByRole('heading', { name: 'Just ask' })
+      .and(page.getByTestId('chat-empty-state-greeting'))
+      .filter({ visible: true })
+      .first()
+      .waitFor({
+        state: 'visible',
+        timeout: NEW_CHAT_EMPTY_WAIT_MS,
+      });
   }
 }
 

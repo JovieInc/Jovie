@@ -367,10 +367,18 @@ describe('JovieChat empty state', () => {
     expect(
       screen.getByTestId('chat-empty-state-centered-composer')
     ).toBeTruthy();
+    expect(screen.getByRole('heading', { name: 'Just ask' })).toBeTruthy();
+    expect(screen.getByTestId('chat-empty-state-greeting')).not.toHaveAttribute(
+      'aria-hidden',
+      'true'
+    );
+    expect(screen.getByTestId('chat-empty-state-welcome').className).toContain(
+      'shrink-0'
+    );
     expect(screen.getByTestId('chat-empty-state-action-card-slot')).toHaveClass(
       'flex-col',
       'items-center',
-      'justify-center'
+      'justify-start'
     );
     // Docked layout: cards scroll above, composer at bottom of usable area.
     const region = screen.getByTestId('chat-empty-state-composer-region');

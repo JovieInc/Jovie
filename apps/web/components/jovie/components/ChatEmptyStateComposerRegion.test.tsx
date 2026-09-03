@@ -200,6 +200,8 @@ describe('ChatEmptyStateComposerRegion', () => {
     const welcome = screen.getByTestId('chat-empty-state-welcome');
     expect(welcome.className).toContain('items-center');
     expect(welcome.className).toContain('min-h-40');
+    expect(welcome.className).toContain('shrink-0');
+    expect(screen.getByRole('heading', { name: 'Just ask' })).toBeTruthy();
     expect(screen.queryByTestId('chat-empty-state-logo')).toBeNull();
     expect(screen.getByTestId('chat-empty-state-greeting').textContent).toBe(
       'Just ask'

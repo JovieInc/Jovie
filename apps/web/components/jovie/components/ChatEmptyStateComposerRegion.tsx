@@ -13,7 +13,7 @@ import {
 import { CHAT_CONTENT_SHELL_CLASSNAME } from '../chat-layout';
 
 const WELCOME_STACK_CLASSNAME =
-  'flex min-h-40 w-full flex-col items-center justify-center gap-5 text-center';
+  'flex min-h-40 w-full shrink-0 flex-col items-center justify-center gap-5 text-center';
 
 export function ChatEmptyStateSamplePreview({
   sample,
@@ -65,7 +65,7 @@ export function ChatEmptyStateWelcome({
       data-testid='chat-empty-state-welcome'
     >
       <h2
-        className='relative z-10 text-2xl font-semibold text-primary-token'
+        className='relative z-10 shrink-0 text-2xl font-semibold text-primary-token'
         data-testid='chat-empty-state-greeting'
       >
         {CHAT_EMPTY_HEADING}

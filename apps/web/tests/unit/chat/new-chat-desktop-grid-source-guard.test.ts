@@ -45,9 +45,14 @@ describe('desktop New Chat grid anchors', () => {
     expect(emptyRegion).toContain("ownsTopSpacing ? 'pt-0 pb-4 sm:pb-5'");
     expect(emptyRegion).toContain("from '@jovie/ui'");
     expect(emptyRegion).toContain('<Button');
+    expect(emptyRegion).toContain('shrink-0');
     expect(emptyRegion).not.toMatch(/<button(?=[\s/>])/);
+    expect(chat).toContain(
+      'mx-auto flex min-h-full w-full max-w-[46rem] flex-col items-center justify-start gap-5 py-2 sm:py-3'
+    );
     expect(loading).toContain('DESKTOP_CONTENT_GRID_ANCHOR');
     expect(loading).toContain('CHAT_EMPTY_VIEWPORT_CLASSNAME');
     expect(loading).toContain("data-top-spacing-owner='none'");
+    expect(loading).toContain('shrink-0');
   });
 });

@@ -378,10 +378,11 @@ describe('bounded PR visual review contract', () => {
       'utf8'
     );
     expect(capture).toContain('waitForAuthenticatedShell');
-    expect(capture).toContain("getByTestId('dashboard-header')");
-    expect(capture).toContain("getByTestId('dashboard-error')");
+    expect(capture).toContain('[data-testid="dashboard-header"]');
+    expect(capture).toContain('[data-testid="dashboard-error"]');
     expect(capture).toContain('filter({ visible: true })');
     expect(capture).toContain('.first().waitFor');
+    expect(capture).not.toContain('.or(visibleDashboardError)');
     expect(capture).toContain(
       'Captured app route rendered dashboard error UI instead of authenticated shell'
     );
@@ -389,6 +390,7 @@ describe('bounded PR visual review contract', () => {
       "getByRole('heading', { name: 'New Chat', level: 1 })"
     );
     expect(capture).toContain("getByRole('heading', { name: 'Just ask' })");
+    expect(capture).toContain("getByTestId('chat-empty-state-greeting')");
     expect(capture).toContain("'domcontentloaded'");
   });
 });

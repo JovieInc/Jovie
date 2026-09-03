@@ -42,11 +42,11 @@ export default function ChatLoading() {
             data-top-spacing-owner='none'
           >
             <div
-              className='flex min-h-40 w-full flex-col items-center justify-center gap-5 text-center'
+              className='flex min-h-40 w-full shrink-0 flex-col items-center justify-center gap-5 text-center'
               data-testid='chat-empty-state-welcome'
             >
               <h2
-                className='relative z-10 text-2xl font-semibold text-primary-token'
+                className='relative z-10 shrink-0 text-2xl font-semibold text-primary-token'
                 aria-hidden='true'
                 data-testid='chat-empty-state-greeting'
               >
