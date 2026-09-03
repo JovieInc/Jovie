@@ -9,7 +9,6 @@ import {
   DropdownMenuTrigger,
   UserAvatar,
 } from '@jovie/ui';
-import { type ColumnDef, createColumnHelper } from '@tanstack/react-table';
 import {
   ArrowLeft,
   ChevronDown,
@@ -107,6 +106,8 @@ import {
   buildTaskPitchChatPrompt,
   isPitchRelatedText,
 } from '@/lib/services/pitch/targets';
+import type { ColumnDef } from '@/lib/tanstack-v8-compat';
+import { createColumnHelper } from '@/lib/tanstack-v8-compat';
 import {
   compareTasksByBoardOrder,
   getVisibleTaskBoardStatuses,
