@@ -1,3 +1,5 @@
+'use client';
+
 /**
  * v8→v9 TanStack Table compatibility shim (PR #16994 remediation).
  *
@@ -27,6 +29,7 @@ import type {
   RowData,
   TableFeatures,
 } from '@tanstack/react-table';
+import type { ColumnHelper as CoreColumnHelper } from '@tanstack/react-table';
 import { flexRender } from '@tanstack/react-table';
 import type {
   LegacyFeatures,
@@ -163,14 +166,17 @@ export type Column<
 
 export type FilterFn<TData> = CoreFilterFn<LegacyFeatures, Bridged<TData>>;
 
-export type ColumnHelper<TData> = {
-  accessor: <
-    TValue,
-    TAccessor extends import('@tanstack/react-table').DeepKeys<Bridged<TData>>,
-  >(
-    accessor: TAccessor | ((row: Bridged<TData>) => TValue),
-    column: Partial<ColumnDef<TData, TValue>> & { header?: unknown }
-  ) => ColumnDef<TData, TValue>;
+/**
+ * v8-shaped single-generic ColumnHelper over v9's natively-inferring legacy
+ * helper. v9's `accessor` infers `TValue` from the accessor key/function
+ * (`DeepValue`), restoring v8's `info.getValue()` value typing that the
+ * previous hand-rolled helper type erased (cell renderers received `unknown`).
+ */
+export type ColumnHelper<TData> = Omit<
+  CoreColumnHelper<LegacyFeatures, Bridged<TData>>,
+  'display'
+> & {
+  /** Overridden so `display` returns the repo's v8-shaped ColumnDef. */
   display: (
     column: ColumnDef<TData, unknown> & { id: string }
   ) => ColumnDef<TData, unknown>;
