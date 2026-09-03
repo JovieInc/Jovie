@@ -17,6 +17,14 @@ export {
   NOT_MEASURED_DURATION,
   OBSERVATION_STATES,
   type ObservationState,
+  OPERATIONAL_TASK_SYNC_STATES,
+  OPERATIONAL_TASK_WORKFLOW_STATES,
+  type OperationalTask,
+  type OperationalTaskDelta,
+  type OperationalTaskFeed,
+  type OperationalTaskPriority,
+  type OperationalTaskSyncState,
+  type OperationalTaskWorkflowState,
   type SanitizedError,
   SHIP_MEANING_KEYS,
   SHIPPING_SOURCE_IDS,
@@ -57,6 +65,7 @@ export {
   systemClock,
 } from './envelope';
 export {
+  ageShippingStateProjection,
   combineSourceStates,
   projectMeanings,
   projectShippingState,

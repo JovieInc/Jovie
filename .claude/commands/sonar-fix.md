@@ -112,8 +112,8 @@ For each COMMENTS_TO_ADDRESS PR, follow this cycle:
 For every open sonar-fix PR (including ones just fixed):
 
 ```bash
-# Request GitHub native merge-queue enrollment
-gh pr edit <NUMBER> --add-label merge-queue
+# Native GitHub merge queue enrollment. Do not add the retired merge-queue
+# label. Graphite and Cursor apps are uninstalled; autoenroll owns queue mutation.
 
 # Update branch with latest base
 gh api repos/{owner}/{repo}/pulls/<NUMBER>/update-branch --method PUT
@@ -252,8 +252,8 @@ Fixes {N} SonarCloud issues ({severity} priority):
 EOF
 )"
 
-# Request GitHub native merge-queue enrollment
-gh pr edit --add-label merge-queue
+# Native GitHub merge queue enrollment. Do not add the retired merge-queue
+# label. Graphite and Cursor apps are uninstalled; autoenroll owns queue mutation.
 ```
 
 **Do NOT wait for CI.** Immediately return to develop and start the next batch.

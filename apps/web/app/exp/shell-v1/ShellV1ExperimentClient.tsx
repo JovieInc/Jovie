@@ -5431,7 +5431,7 @@ function DrawerOverviewTab({ release }: { release: Release }) {
         />
       </div>
       <PerformanceCard
-        title='Smart link'
+        title='Smart Link'
         metricLabel='clicks'
         pointsByRange={pointsByRange}
         trend={trend}

@@ -1353,6 +1353,10 @@ async function dispatchPlan(
         route: attemptRoute,
         gbrain,
         repoRoot: prepared.repoRoot,
+        promotionHelperPath: join(
+          config.repoRoot,
+          'scripts/writer-owned-pr-promote.sh'
+        ),
       });
 
       agentResult = await runAgent(

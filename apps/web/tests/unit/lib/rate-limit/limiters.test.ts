@@ -773,6 +773,7 @@ describe('limiters.ts', () => {
       const result = await checkAiChatRateLimitForPlan('user-1', 'pro');
 
       expect(result.success).toBe(true);
+      expect(result.degraded).toBe(true);
       // burst (degraded → allow) + daily
       expect(mockLimit).toHaveBeenCalledTimes(2);
     });
@@ -788,6 +789,7 @@ describe('limiters.ts', () => {
       const result = await checkAiChatRateLimitForPlan('user-1', 'free');
 
       expect(result.success).toBe(true);
+      expect(result.unavailable).toBe(true);
     });
 
     it('fails open when the limiter throws unexpectedly', async () => {

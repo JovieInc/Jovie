@@ -9,6 +9,7 @@ import {
   type MarketingHeaderNavLink,
   type MarketingHeaderVariant,
 } from './MarketingHeader';
+import { MarketingPageContractMarkers } from './MarketingPageContractMarkers';
 import { PUBLIC_SHELL_MAIN_OFFSET_CLASS } from './public-shell.constants';
 
 export interface PublicPageShellProps {
@@ -68,6 +69,7 @@ export function PublicPageShell({
           mainClassName
         )}
       >
+        <MarketingPageContractMarkers />
         {children}
       </main>
       <MarketingFooter className={footerClassName} variant={footerVariant} />

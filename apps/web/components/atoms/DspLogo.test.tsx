@@ -30,4 +30,21 @@ describe('DspLogo', () => {
 
     expect(source).not.toMatch(/#[0-9A-Fa-f]{3,8}\b/);
   });
+
+  it('scales the icon and label from the height prop', () => {
+    render(<DspLogo height={32} provider='apple_music' />);
+
+    const logo = screen.getByText('Apple Music').closest('.system-b-dsp-logo');
+
+    expect(logo).toHaveStyle({
+      '--system-b-dsp-logo-brand-color': 'var(--color-brand-apple)',
+      '--system-b-dsp-logo-icon-size': '32px',
+      '--system-b-dsp-logo-label-size': '24px',
+    });
+  });
+
+  it('renders nothing for an unmapped provider', () => {
+    const { container } = render(<DspLogo provider='amazon' />);
+    expect(container).toBeEmptyDOMElement();
+  });
 });

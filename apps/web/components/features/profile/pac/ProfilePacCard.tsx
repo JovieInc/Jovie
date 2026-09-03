@@ -45,6 +45,7 @@ import {
   getCaptureDismissalStatus,
   handleCaptureDismissalResponse,
 } from '@/lib/profile/capture-dismissal-client';
+import { PROFILE_CARD_FOOTER_ANCHOR_CLASSNAME } from '@/lib/profile/composition';
 import type { TourDateViewModel } from '@/lib/tour-dates/types';
 import type { PacState as PacEventState } from '@/lib/tracking/pac-events-shared';
 import { cn } from '@/lib/utils';
@@ -927,7 +928,8 @@ export function ProfilePacCard({
 
         <div
           className={cn(
-            'flex min-w-0 flex-none flex-col gap-1.5',
+            'flex min-w-0 flex-col gap-1.5',
+            PROFILE_CARD_FOOTER_ANCHOR_CLASSNAME,
             isProfileLandscape && 'items-start'
           )}
         >

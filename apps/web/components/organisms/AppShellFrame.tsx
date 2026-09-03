@@ -17,7 +17,7 @@ interface AppShellFrameProps {
   readonly mobileBottomNav?: ReactNode;
   readonly contentClassName?: string;
   readonly containerClassName?: string;
-  /** When true (desktop), sidebar dims and right rail fully collapses off-canvas. */
+  /** Local composer-focus signal. Must not dim shell chrome or collapse the reserved rail. */
   readonly composerFocusActive?: boolean;
   /**
    * Chat routes render the ambient blue wash at the shell level so it spans

@@ -2,6 +2,8 @@ import type { ReactNode } from 'react';
 import { cn } from '@/lib/utils';
 import {
   INFOBOX_CONTENT_GEOMETRY_CLASS,
+  INFOBOX_INLINE_GEOMETRY_CLASS,
+  INFOBOX_INLINE_SEMANTIC_SURFACE,
   INFOBOX_SEMANTIC_FOREGROUND,
   INFOBOX_SEMANTIC_SURFACE,
   INFOBOX_SHARED_GEOMETRY_CLASS,
@@ -11,23 +13,37 @@ import {
 interface InfoBoxProps {
   readonly title?: string;
   readonly variant?: 'info' | 'warning' | 'success' | 'error';
+  readonly presentation?: 'box' | 'inline';
   readonly children: ReactNode;
   readonly className?: string;
+  readonly testId?: string;
 }
 
 export function InfoBox({
   title,
   variant = 'info',
+  presentation = 'box',
   children,
   className,
+  testId,
 }: InfoBoxProps) {
+  const isInline = presentation === 'inline';
+  const geometryClassName = isInline
+    ? INFOBOX_INLINE_GEOMETRY_CLASS
+    : INFOBOX_SHARED_GEOMETRY_CLASS;
+  const semanticSurfaceClassName = isInline
+    ? INFOBOX_INLINE_SEMANTIC_SURFACE[variant]
+    : INFOBOX_SEMANTIC_SURFACE[variant];
+  const isError = variant === 'error';
+
   return (
     <div
-      className={cn(
-        INFOBOX_SHARED_GEOMETRY_CLASS,
-        INFOBOX_SEMANTIC_SURFACE[variant],
-        className
-      )}
+      role={isError ? 'alert' : undefined}
+      aria-live={isError ? 'assertive' : 'polite'}
+      data-presentation={presentation}
+      data-testid={testId}
+      data-variant={variant}
+      className={cn(geometryClassName, className, semanticSurfaceClassName)}
     >
       {title && (
         <h3

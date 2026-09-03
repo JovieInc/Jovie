@@ -19,7 +19,12 @@ def test_policy_runs_from_checked_out_trusted_commit() -> None:
     workflow = WORKFLOW.read_text()
 
     checkout = workflow.index("uses: actions/checkout@")
+    provenance = workflow.index(
+        "node scripts/lib/pr-size-guard-label-provenance.mjs"
+    )
     policy = workflow.index("node scripts/lib/pr-size-guard-policy.mjs")
     check_writer = workflow.index("node scripts/pr-size-guard-label-override.mjs")
 
-    assert checkout < policy < check_writer
+    assert checkout < provenance < policy < check_writer
+    assert "ACTOR: ${{ github.event.sender.login }}" in workflow
+    assert "steps.provenance.outputs.allowed == 'true'" in workflow

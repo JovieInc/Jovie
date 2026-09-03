@@ -1,0 +1,458 @@
+{
+  "schema": "jovie.design-system-authority/v1",
+  "statusValues": [
+    "canonical-enforced",
+    "canonical-unenforced",
+    "partially-migrated",
+    "duplicated",
+    "missing",
+    "obsolete-superseded"
+  ],
+  "dependencyOrder": [
+    "foundation.tokens",
+    "primitive.components",
+    "interaction.families",
+    "composition.shared-owners",
+    "archetype.product-screens",
+    "recipe.marketing-pages",
+    "surface.product-routes",
+    "surface.marketing-routes",
+    "certification.changed-surfaces",
+    "legacy.historical-inventories"
+  ],
+  "entries": [
+    {
+      "id": "foundation.tokens",
+      "layer": "foundation",
+      "status": "partially-migrated",
+      "classificationReason": "JOV-3573 landed a machine-readable token source, but live web still carries compatibility token namespaces and active shrink-only retirement lanes.",
+      "dependsOn": [],
+      "owns": [
+        "color",
+        "typography",
+        "spacing",
+        "sizing",
+        "radius",
+        "border",
+        "elevation",
+        "motion",
+        "breakpoints",
+        "focus",
+        "semantic-state"
+      ],
+      "canonicalSources": [
+        "apps/web/design/tokens.json",
+        "apps/web/styles/design-system.css",
+        "apps/web/styles/linear-tokens.css",
+        "apps/web/styles/theme.css",
+        "docs/reference/design-tokens.md",
+        "packages/ui/theme/motion-policy.ts",
+        "packages/ui/theme/tokens.ts"
+      ],
+      "executableChecks": [
+        "apps/web/tests/unit/design-system/design-tokens-source.test.ts",
+        "apps/web/tests/unit/design-system/linear-namespace-ratchet.test.ts",
+        "apps/web/tests/unit/design-system/reduced-motion-tokens.test.ts",
+        "packages/ui/theme/motion-policy.test.ts",
+        "scripts/design-system-source-ratchet.mjs",
+        "scripts/generate-design-tokens-export.test.mjs"
+      ],
+      "currentOwners": [
+        {
+          "issue": "JOV-3573",
+          "state": "Done",
+          "role": "machine-readable token source"
+        },
+        {
+          "issue": "JOV-5674",
+          "state": "In Progress",
+          "pr": "#16730",
+          "role": "linear spacing/gap/container namespace retirement"
+        },
+        {
+          "issue": "JOV-5698",
+          "state": "In Progress",
+          "pr": "#16792",
+          "role": "shared arbitrary visual token retirement"
+        },
+        {
+          "issue": "JOV-5301",
+          "state": "Done",
+          "role": "cheap source ratchet admission"
+        }
+      ]
+    },
+    {
+      "id": "primitive.components",
+      "layer": "primitive",
+      "status": "partially-migrated",
+      "classificationReason": "The core public atom registry is source-bound, while the full required primitive catalog still has active convergence work and compatibility consumers.",
+      "dependsOn": ["foundation.tokens"],
+      "owns": [
+        "text",
+        "link",
+        "button",
+        "icon-button",
+        "input",
+        "textarea",
+        "select",
+        "checkbox",
+        "radio",
+        "switch",
+        "avatar",
+        "badge",
+        "divider",
+        "image",
+        "skeleton",
+        "progress"
+      ],
+      "canonicalSources": [
+        "apps/web/data/designSystem/componentRegistry.ts",
+        "apps/web/data/designSystem/penRefs.ts",
+        "packages/ui/atoms/button.tsx",
+        "packages/ui/atoms/icon-button.tsx",
+        "packages/ui/atoms/link.tsx"
+      ],
+      "executableChecks": [
+        "apps/web/tests/unit/marketing/component-registry.test.ts",
+        "packages/ui/atoms/button.test.tsx",
+        "packages/ui/atoms/icon-button.test.tsx",
+        "packages/ui/atoms/link.test.tsx",
+        "scripts/design-conformance-check.mjs",
+        "scripts/design-conformance-check.test.mjs"
+      ],
+      "currentOwners": [
+        {
+          "issue": "JOV-5673",
+          "state": "In Progress",
+          "pr": "#16696",
+          "role": "brand atom executable stories"
+        },
+        {
+          "issue": "JOV-5698",
+          "state": "In Progress",
+          "pr": "#16792",
+          "role": "shared primitive arbitrary-value cleanup"
+        }
+      ]
+    },
+    {
+      "id": "interaction.families",
+      "layer": "interaction",
+      "status": "canonical-enforced",
+      "classificationReason": "JOV-5429 landed closed-world interaction ownership and projects it through the cross-surface UI ownership registry.",
+      "dependsOn": ["primitive.components"],
+      "owns": [
+        "menu",
+        "tooltip",
+        "popover",
+        "sheet",
+        "drawer",
+        "dialog",
+        "toast",
+        "banner",
+        "tabs",
+        "picker",
+        "search",
+        "form"
+      ],
+      "canonicalSources": [
+        "apps/web/data/designSystem/interactionRegistry.ts",
+        "apps/web/data/designSystem/interactionRegistryValidation.ts",
+        "apps/web/data/designSystem/uiOwnershipRegistry.ts"
+      ],
+      "executableChecks": [
+        "apps/web/tests/unit/design-system/ui-ownership-registry.test.ts"
+      ],
+      "currentOwners": [
+        {
+          "issue": "JOV-5429",
+          "state": "Done",
+          "role": "closed-world shared interaction owners"
+        }
+      ]
+    },
+    {
+      "id": "composition.shared-owners",
+      "layer": "composition",
+      "status": "partially-migrated",
+      "classificationReason": "The UI ownership registry binds shared owners, states, adapters, and duplicate aliases, but several composition families remain backlog leaves under JOV-3570.",
+      "dependsOn": ["interaction.families"],
+      "owns": [
+        "section",
+        "settings-row",
+        "list-row",
+        "table-controls",
+        "profile-header",
+        "stat-card",
+        "empty-state",
+        "error-state",
+        "loading-state",
+        "cta-section"
+      ],
+      "canonicalSources": [
+        "apps/web/data/designSystem/uiOwnershipRegistry.ts",
+        "apps/web/data/designSystem/uiOwnershipRegistryValidation.ts",
+        "docs/design-system/component-inventory.md",
+        "docs/design-system/deprecation-map.md",
+        "docs/design-system/state-matrix.md"
+      ],
+      "executableChecks": [
+        "apps/web/tests/unit/design-system/ui-ownership-registry.test.ts",
+        "apps/web/tests/unit/design-system/component-family-ratchet.test.ts",
+        "apps/web/tests/unit/design-system/raw-button-ratchet.test.ts"
+      ],
+      "currentOwners": [
+        {
+          "issue": "JOV-3570",
+          "state": "In Progress",
+          "role": "umbrella composition authority"
+        },
+        {
+          "issue": "JOV-5550",
+          "state": "Done",
+          "pr": "#16849",
+          "role": "action bar family"
+        },
+        {
+          "issue": "JOV-5723",
+          "state": "In Progress",
+          "pr": "#16540",
+          "role": "loading-state semantics"
+        }
+      ]
+    },
+    {
+      "id": "archetype.product-screens",
+      "layer": "archetype",
+      "status": "canonical-enforced",
+      "classificationReason": "JOV-5424 landed the eight selectable app-screen archetypes and fail-closed registry validation.",
+      "dependsOn": ["composition.shared-owners"],
+      "owns": [
+        "dashboard",
+        "detail",
+        "editor",
+        "settings",
+        "feed-list",
+        "onboarding",
+        "profile",
+        "opportunity-decision"
+      ],
+      "canonicalSources": [
+        "apps/web/data/appScreens/archetypes.ts",
+        "apps/web/data/appScreens/registry.ts",
+        "apps/web/data/appScreens/validation.ts"
+      ],
+      "executableChecks": [
+        "apps/web/tests/unit/design-system/app-screen-archetypes.test.ts",
+        "apps/web/tests/unit/design-system/app-screen-registry.test.ts"
+      ],
+      "currentOwners": [
+        {
+          "issue": "JOV-5424",
+          "state": "Done",
+          "role": "selectable product archetype registry"
+        },
+        {
+          "issue": "JOV-5707",
+          "state": "In Progress",
+          "pr": "#16773",
+          "role": "semantic canvas source guard"
+        },
+        {
+          "issue": "JOV-5706",
+          "state": "In Review",
+          "pr": "#16774",
+          "role": "semantic canvas CI enforcement"
+        }
+      ]
+    },
+    {
+      "id": "recipe.marketing-pages",
+      "layer": "recipe",
+      "status": "canonical-enforced",
+      "classificationReason": "Marketing recipes, sections, route manifest, and registry gates are typed and executable; JOV-5745 owns public shell convergence around them.",
+      "dependsOn": ["composition.shared-owners"],
+      "owns": [
+        "homepage",
+        "feature",
+        "artist-profile",
+        "pricing",
+        "comparison",
+        "editorial-seo",
+        "final-cta"
+      ],
+      "canonicalSources": [
+        "apps/web/data/marketing/componentRegistry.ts",
+        "apps/web/data/marketing/recipes.ts",
+        "apps/web/data/marketing/routeManifest.ts",
+        "apps/web/data/marketing/sections.ts"
+      ],
+      "executableChecks": [
+        "apps/web/tests/unit/marketing/component-registry.test.ts",
+        "apps/web/tests/unit/marketing/recipe-manifest.test.ts"
+      ],
+      "currentOwners": [
+        {
+          "issue": "JOV-5745",
+          "state": "In Progress",
+          "role": "canonical public content shell consumer"
+        }
+      ]
+    },
+    {
+      "id": "surface.product-routes",
+      "layer": "surface",
+      "status": "partially-migrated",
+      "classificationReason": "Authenticated route screens are closed-world in the app-screen registry, but the flagship JOV-3561 acquisition funnel has not shipped end-to-end through canonical owners.",
+      "dependsOn": ["archetype.product-screens"],
+      "owns": [
+        "dashboard-route",
+        "detail-route",
+        "editor-route",
+        "settings-route",
+        "feed-route",
+        "onboarding-route",
+        "profile-route",
+        "opportunity-route"
+      ],
+      "canonicalSources": [
+        "apps/web/data/appScreens/assembly.ts",
+        "apps/web/data/appScreens/registry.ts",
+        "apps/web/lib/canonical-surfaces.ts"
+      ],
+      "executableChecks": [
+        "apps/web/tests/unit/design-system/app-screen-registry.test.ts",
+        "apps/web/tests/unit/routes/shell-nav-coverage.test.ts"
+      ],
+      "currentOwners": [
+        {
+          "issue": "JOV-3561",
+          "state": "Todo",
+          "role": "flagship acquisition funnel vertical proof"
+        },
+        {
+          "issue": "JOV-5706",
+          "state": "In Review",
+          "pr": "#16774",
+          "role": "app-screen canvas CI enforcement"
+        }
+      ]
+    },
+    {
+      "id": "surface.marketing-routes",
+      "layer": "surface",
+      "status": "duplicated",
+      "classificationReason": "Marketing route recipes are registered, while navigation, footer, and long-form public content still have active public-shell consolidation work in JOV-5745.",
+      "dependsOn": ["recipe.marketing-pages"],
+      "owns": [
+        "homepage-route",
+        "feature-route",
+        "artist-profile-route",
+        "pricing-route",
+        "comparison-route",
+        "editorial-route",
+        "final-cta-route"
+      ],
+      "canonicalSources": [
+        "apps/web/components/marketing/MarketingContentShell.tsx",
+        "apps/web/components/marketing/MarketingContainer.tsx",
+        "apps/web/components/site/MarketingFooter.tsx",
+        "apps/web/components/site/MarketingHeader.tsx",
+        "apps/web/components/site/PublicPageShell.tsx",
+        "apps/web/data/marketing/routeManifest.ts"
+      ],
+      "executableChecks": [
+        "apps/web/tests/unit/marketing/recipe-manifest.test.ts",
+        "apps/web/tests/unit/marketing/route-health-contract.test.ts",
+        "apps/web/tests/unit/marketing/static-revalidate-policy.test.ts"
+      ],
+      "currentOwners": [
+        {
+          "issue": "JOV-5745",
+          "state": "In Progress",
+          "role": "public navigation, footer, and long-form content shell"
+        }
+      ]
+    },
+    {
+      "id": "certification.changed-surfaces",
+      "layer": "certification",
+      "status": "partially-migrated",
+      "classificationReason": "Source and visual evidence gates exist, but the single certification admission kernel and exact changed-surface proof are still active work.",
+      "dependsOn": ["surface.product-routes", "surface.marketing-routes"],
+      "owns": [
+        "changed-surface-discovery",
+        "viewport-evidence",
+        "theme-evidence",
+        "state-evidence",
+        "keyboard-evidence",
+        "accessibility-evidence",
+        "layout-stability-evidence",
+        "interaction-evidence"
+      ],
+      "canonicalSources": [
+        ".github/scripts/pr-visual-review.mjs",
+        ".github/scripts/pr-visual-review-capture.mjs",
+        ".github/workflows/pr-visual-review.yml",
+        ".github/workflows/visual-a11y.yml",
+        ".github/workflows/visual-regression.yml",
+        "scripts/lib/__tests__/pr-visual-review.test.mjs"
+      ],
+      "executableChecks": [
+        "apps/web/tests/unit/ci/pr-visual-review-workflow.test.ts",
+        "scripts/lib/__tests__/pr-visual-review.test.mjs"
+      ],
+      "currentOwners": [
+        {
+          "issue": "JOV-5753",
+          "state": "In Progress",
+          "pr": "#16863",
+          "role": "single certification admission kernel"
+        },
+        {
+          "issue": "JOV-5459",
+          "state": "Done",
+          "pr": "#16749",
+          "role": "visual ENOENT fail-closed behavior"
+        },
+        {
+          "issue": "JOV-5672",
+          "state": "In Review",
+          "pr": "#16685",
+          "role": "inert coverage receipt rejection"
+        }
+      ]
+    },
+    {
+      "id": "legacy.historical-inventories",
+      "layer": "legacy",
+      "status": "obsolete-superseded",
+      "classificationReason": "Historical inventory docs remain for provenance only and must not override the executable registries above.",
+      "dependsOn": [
+        "foundation.tokens",
+        "composition.shared-owners",
+        "recipe.marketing-pages"
+      ],
+      "owns": ["provenance-only"],
+      "canonicalSources": [
+        "docs/design-system/component-inventory.md",
+        "docs/design-system/public-surface-consolidation.md",
+        "docs/design-system/token-inventory.md"
+      ],
+      "executableChecks": ["scripts/design-authority-guard.mjs"],
+      "currentOwners": [
+        {
+          "issue": "JOV-3570",
+          "state": "In Progress",
+          "role": "umbrella provenance reconciliation"
+        },
+        {
+          "issue": "JOV-5230",
+          "state": "Canceled",
+          "role": "superseded governance policy holdout"
+        }
+      ]
+    }
+  ]
+}

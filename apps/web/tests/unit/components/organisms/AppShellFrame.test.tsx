@@ -95,7 +95,7 @@ describe('AppShellFrame', () => {
     );
   });
 
-  it('marks composer focus on the shell frame for chrome retreat styles', () => {
+  it('marks composer focus on the shell frame without changing rail geometry', () => {
     render(
       <AppShellFrame
         sidebar={<aside>Sidebar</aside>}

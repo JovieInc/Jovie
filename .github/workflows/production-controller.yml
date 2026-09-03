@@ -247,6 +247,10 @@ jobs:
           marker_reason="$(jq -r '.reason' <<<"$marker_state_json")"
           case "$marker_state" in
             verified)
+              marker_deployment_id="$(jq -r '.deploymentId // ""' <<<"$marker_state_json")"
+              if [ "$marker_deployment_id" = "not-applicable" ]; then
+                node .github/scripts/assert-live-production-bind.mjs --main-sha "$EXPECTED_SHA"
+              fi
               echo "already_verified=true" >> "$GITHUB_OUTPUT"
               echo "::notice::Exact production generation $EXPECTED_SHA is already verified by its payload-bound historical attempt."
               exit 0
@@ -756,7 +760,6 @@ jobs:
         always() &&
         github.event.workflow_run.event == 'push' &&
         needs.authorize-production.result == 'success' &&
-        needs.authorize-production.outputs.authorized == 'true' &&
         needs.authorize-production.outputs.already_verified != 'true'
       }}
     # The workflow-level production lease is still held here. Every probe
@@ -778,6 +781,8 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
           EXPECTED_SHA: ${{ needs.authorize-production.outputs.expected_sha }}
+          PRODUCTION_BUILD_INFO_URL: https://jov.ie/api/health/build-info
+          RUN_WEB: ${{ needs.authorize-production.outputs.run_web }}
         run: |
           set -euo pipefail
           {
@@ -790,6 +795,9 @@ jobs:
           }
           if [ "$current_sha" != "$EXPECTED_SHA" ]; then
             echo "::warning::Post-deploy verification for $EXPECTED_SHA was superseded by $current_sha; exact production bind will be proven before marker preservation."
+            if [ "$RUN_WEB" != true ]; then
+              node .github/scripts/assert-live-production-bind.mjs --main-sha "$current_sha"
+            fi
             echo "is_current=false" >> "$GITHUB_OUTPUT"
             echo "superseded_before_marker=true" >> "$GITHUB_OUTPUT"
             exit 0
@@ -934,8 +942,13 @@ jobs:
               exit 1
             fi
           fi
+          if [ "${{ needs.authorize-production.outputs.authorized }}" != "true" ]; then
+            echo "::error::Exact source CI authorization is required before finalizing production verification."
+            exit 1
+          fi
 
           if [ "$RUN_WEB" != true ]; then
+            node .github/scripts/assert-live-production-bind.mjs --main-sha "$boundary_sha"
             for result in \
               "${{ needs.production-release.result }}" \
               "${{ needs.ci-public-profile-smoke.result }}" \

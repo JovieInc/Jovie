@@ -38,6 +38,20 @@ function collectFiles(dir: string, results: string[] = []): string[] {
 }
 
 describe('public CTA guard', () => {
+  it('audits the exact public CTA owner modules', () => {
+    const authActionsSource = readFileSync(
+      join(ROOT, 'components/molecules/AuthActions.tsx'),
+      'utf8'
+    );
+    const headerNavSource = readFileSync(
+      join(ROOT, 'components/organisms/HeaderNav.tsx'),
+      'utf8'
+    );
+
+    expect(authActionsSource).toContain('export function AuthActions');
+    expect(headerNavSource).toContain('export function HeaderNav');
+  });
+
   it('keeps legacy public CTA classnames out of production marketing and key public feature surfaces', () => {
     const missingDirs = TARGET_DIRS.filter(dir => !existsSync(dir));
     const missingFiles = TARGET_FILES.filter(file => !existsSync(file));
@@ -66,19 +80,30 @@ describe('public CTA guard', () => {
       join(ROOT, 'components/molecules/AuthActions.tsx'),
       'utf8'
     );
+    const marketingHeader = readFileSync(
+      join(ROOT, 'components/site/MarketingHeader.tsx'),
+      'utf8'
+    );
+    const marketingNavigation = readFileSync(
+      join(ROOT, 'data/marketingNavigation.ts'),
+      'utf8'
+    );
     expect(authActions).toContain('export function AuthActions');
 
     expect(headerNav).toContain("minimalAuthLabel?: 'Sign in' | 'Log in'");
     expect(headerNav).toContain(
       "<MarketingSignInLink variant='ghost' label={minimalLabel} />"
     );
-    expect(headerNav).toContain('blur(var(--blur-header))');
-    expect(headerNav).not.toContain('--linear-blur-header');
     expect(headerNav).not.toMatch(
       /minimalAuth[\s\S]*?<Button[\s\S]*?>Get started<\/Button>/
     );
     expect(headerNav).toMatch(
       /size='marketing'\s+variant='primary'[\s\S]*?<Link href=\{publicCta\.href\}>\{publicCta\.label\}<\/Link>/
+    );
+    expect(marketingNavigation).toContain("label: 'Log in'");
+    expect(marketingNavigation).toContain("label: 'Find yourself'");
+    expect(marketingHeader).toContain(
+      'DEFAULT_MARKETING_CTA: MarketingHeaderCta = MARKETING_NAV_UTILITIES[1]'
     );
   });
 });

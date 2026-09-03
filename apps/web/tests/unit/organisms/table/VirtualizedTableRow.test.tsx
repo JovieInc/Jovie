@@ -9,21 +9,27 @@ const createRow = (
   id: string,
   name: string,
   isSelected = false,
-  actionVisibility?: 'always' | 'contextual'
+  actionVisibility?: 'always' | 'contextual',
+  meta?: { align?: 'left' | 'center' | 'right'; className?: string }
 ): Row<TestRow> =>
   ({
     id,
     original: { id, name },
     getVisibleCells: () =>
-      actionVisibility
+      actionVisibility || meta
         ? [
             {
               id: `${id}-actions`,
               column: {
                 getSize: () => 150,
                 columnDef: {
-                  meta: { actionVisibility },
-                  cell: () => <button type='button'>More</button>,
+                  meta: { actionVisibility, ...meta },
+                  cell: () =>
+                    actionVisibility ? (
+                      <button type='button'>More</button>
+                    ) : (
+                      name
+                    ),
                 },
               },
               getContext: () => ({}),
@@ -210,5 +216,39 @@ describe('VirtualizedTableRow', () => {
       .closest('td');
     expect(row).toHaveClass('system-b-table-row-height');
     expect(actionCell).toHaveClass('system-b-table-contextual-action-cell');
+  });
+
+  it('applies column meta alignment to rendered cells', () => {
+    render(
+      <table>
+        <tbody>
+          <VirtualizedTableRow
+            {...baseProps}
+            row={createRow('1', 'One', false, undefined, { align: 'right' })}
+          />
+        </tbody>
+      </table>
+    );
+
+    expect(screen.getByRole('cell')).toHaveClass('text-right');
+  });
+
+  it('lets column meta classes override the canonical cell tone', () => {
+    render(
+      <table>
+        <tbody>
+          <VirtualizedTableRow
+            {...baseProps}
+            row={createRow('1', 'One', false, undefined, {
+              className: 'text-secondary-token',
+            })}
+          />
+        </tbody>
+      </table>
+    );
+
+    const cell = screen.getByRole('cell');
+    expect(cell).toHaveClass('text-secondary-token');
+    expect(cell).not.toHaveClass('text-primary-token');
   });
 });

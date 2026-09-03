@@ -4,7 +4,10 @@
  * Handles uploading images to Vercel Blob storage.
  */
 
-import { env } from '@/lib/env';
+import {
+  getBlobCommandOptions,
+  isBlobStorageConfigured,
+} from '@/lib/blob-config';
 import { logger } from '@/lib/utils/logger';
 import { BLOB_RETRY_DELAY_MS, MAX_BLOB_UPLOAD_RETRIES } from './constants';
 import type { BlobPut } from './types';
@@ -36,14 +39,12 @@ export async function uploadBufferToBlob(
   buffer: Buffer,
   contentType: string
 ): Promise<string> {
-  const token = env.BLOB_READ_WRITE_TOKEN;
-
-  if (!put || !token) {
+  if (!put || !isBlobStorageConfigured()) {
     if (process.env.NODE_ENV === 'production') {
       throw new TypeError('Blob storage not configured');
     }
     logger.warn(
-      '[DEV] BLOB_READ_WRITE_TOKEN missing, returning mock URL for:',
+      '[DEV] Blob storage not configured, returning mock URL for:',
       path
     );
     return `https://blob.vercel-storage.com/${path}`;
@@ -55,7 +56,7 @@ export async function uploadBufferToBlob(
     try {
       const blob = await put(path, buffer, {
         access: 'public',
-        token,
+        ...getBlobCommandOptions(),
         contentType,
         cacheControlMaxAge: 60 * 60 * 24 * 365,
         addRandomSuffix: false,

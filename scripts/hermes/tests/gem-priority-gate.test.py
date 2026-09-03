@@ -118,6 +118,66 @@ class MainReleaseReadySelectionTests(unittest.TestCase):
         )
         self.assertEqual(latest["started_at"], "2026-08-17T19:41:00Z")
 
+    def test_observe_main_treats_all_skipped_release_gate_as_unknown_not_red(self):
+        """A merge_group/cancelled attempt leaves only skipped source-gate
+        check-runs. That is no verdict: promotion freezes on unknown, but the
+        fleet must not flip to main-not-green / draft-only on it."""
+
+        def github_response(_repo: str, endpoint: str):
+            if endpoint == "branches/main":
+                return {"commit": {"sha": MAIN_SHA}}
+            if endpoint == f"commits/{MAIN_SHA}/status":
+                return {"state": "pending"}
+            if endpoint.startswith(f"commits/{MAIN_SHA}/check-runs?"):
+                return {
+                    "check_runs": [
+                        {
+                            "name": "Main Release Ready",
+                            "status": "completed",
+                            "conclusion": "skipped",
+                            "started_at": "2026-09-02T18:34:00Z",
+                            "completed_at": "2026-09-02T18:34:01Z",
+                        }
+                    ]
+                }
+            if endpoint.startswith("actions/runs?"):
+                return {"workflow_runs": []}
+            raise AssertionError(f"unexpected GitHub endpoint: {endpoint}")
+
+        with mock.patch.object(MODULE, "gh_json", side_effect=github_response):
+            observed = MODULE.observe_main("JovieInc/Jovie")
+
+        self.assertEqual(observed["status"], "unknown")
+        self.assertEqual(observed["sha"], MAIN_SHA)
+        self.assertEqual(observed["sourceGate"]["conclusion"], "skipped")
+        self.assertIn("no real attempt", observed["error"])
+
+    def test_observe_main_failure_is_still_red(self):
+        def github_response(_repo: str, endpoint: str):
+            if endpoint == "branches/main":
+                return {"commit": {"sha": MAIN_SHA}}
+            if endpoint == f"commits/{MAIN_SHA}/status":
+                return {"state": "failure"}
+            if endpoint.startswith(f"commits/{MAIN_SHA}/check-runs?"):
+                return {
+                    "check_runs": [
+                        {
+                            "name": "Main Release Ready",
+                            "status": "completed",
+                            "conclusion": "failure",
+                            "started_at": "2026-09-02T18:34:00Z",
+                            "completed_at": "2026-09-02T18:34:01Z",
+                        }
+                    ]
+                }
+            raise AssertionError(f"unexpected GitHub endpoint: {endpoint}")
+
+        with mock.patch.object(MODULE, "gh_json", side_effect=github_response):
+            observed = MODULE.observe_main("JovieInc/Jovie")
+
+        self.assertEqual(observed["status"], "red")
+        self.assertNotIn("error", observed)
+
     def test_observe_main_preserves_exact_sha_when_release_gate_is_missing(self):
         def github_response(_repo: str, endpoint: str):
             if endpoint == "branches/main":
@@ -126,6 +186,8 @@ class MainReleaseReadySelectionTests(unittest.TestCase):
                 return {"state": "success"}
             if endpoint.startswith(f"commits/{MAIN_SHA}/check-runs?"):
                 return {"check_runs": []}
+            if endpoint.startswith("actions/runs?"):
+                return {"workflow_runs": []}
             raise AssertionError(f"unexpected GitHub endpoint: {endpoint}")
 
         with mock.patch.object(MODULE, "gh_json", side_effect=github_response):
@@ -134,6 +196,49 @@ class MainReleaseReadySelectionTests(unittest.TestCase):
         self.assertEqual(observed["status"], "unknown")
         self.assertEqual(observed["sha"], MAIN_SHA)
         self.assertIn("Main Release Ready check is missing", observed["error"])
+
+    def test_observe_main_uses_ci_job_when_check_runs_are_flooded(self):
+        def github_response(_repo: str, endpoint: str):
+            if endpoint == "branches/main":
+                return {"commit": {"sha": MAIN_SHA}}
+            if endpoint == f"commits/{MAIN_SHA}/status":
+                return {"state": "success"}
+            if endpoint.startswith(f"commits/{MAIN_SHA}/check-runs?"):
+                return {"check_runs": [{"name": "enroll", "conclusion": "failure"}]}
+            if endpoint.startswith("actions/runs?"):
+                self.assertIn(f"head_sha={MAIN_SHA}", endpoint)
+                self.assertIn("event=push", endpoint)
+                return {
+                    "workflow_runs": [
+                        {
+                            "id": 33549740322,
+                            "path": ".github/workflows/ci.yml",
+                            "head_sha": MAIN_SHA,
+                            "event": "push",
+                        }
+                    ]
+                }
+            if endpoint.startswith("actions/runs/33549740322/jobs"):
+                return {
+                    "jobs": [
+                        {
+                            "name": "Main Release Ready",
+                            "status": "completed",
+                            "conclusion": "success",
+                            "started_at": "2026-09-01T19:30:00Z",
+                            "completed_at": "2026-09-01T19:30:04Z",
+                        }
+                    ]
+                }
+            raise AssertionError(f"unexpected GitHub endpoint: {endpoint}")
+
+        with mock.patch.object(MODULE, "gh_json", side_effect=github_response):
+            observed = MODULE.observe_main("JovieInc/Jovie")
+
+        self.assertEqual(observed["status"], "green")
+        self.assertEqual(observed["sha"], MAIN_SHA)
+        self.assertEqual(observed["sourceGate"]["conclusion"], "success")
+        self.assertEqual(observed["sourceGate"]["status"], "completed")
 
     def test_observe_main_uses_sentinel_when_branch_lookup_fails(self):
         with mock.patch.object(MODULE, "gh_json", side_effect=OSError("offline")):
@@ -599,7 +704,7 @@ class ConcurrencyObservationTests(unittest.TestCase):
         receipt = MODULE.evaluate(signals, MODULE.isoformat(now))
         self.assertEqual(receipt["signals"]["main"]["sha"], MAIN_SHA)
         self.assertFalse(receipt["workAdmission"]["newIssueLeaseAllowed"])
-        self.assertEqual(receipt["remediationAdmission"]["maxConcurrent"], 0)
+        self.assertEqual(receipt["remediationAdmission"]["maxConcurrent"], 1)
 
 
 class PersistedRefreshTests(unittest.TestCase):
@@ -795,7 +900,7 @@ class DeploymentBindingTests(unittest.TestCase):
             "expected-head-pr-update", receipt["remediationAdmission"]["activities"]
         )
 
-    def test_stale_capacity_preserves_runtime_floor_but_blocks_new_and_remote_mutation(self):
+    def test_stale_capacity_preserves_one_local_repair_but_blocks_new_and_remote_mutation(self):
         signals = dict(GREEN_SIGNALS)
         signals["concurrencyEvidence"] = {
             **GREEN_SIGNALS["concurrencyEvidence"],
@@ -811,7 +916,7 @@ class DeploymentBindingTests(unittest.TestCase):
         self.assertTrue(receipt["remediationAdmission"]["allowed"])
         self.assertTrue(receipt["remediationAdmission"]["localAllowed"])
         self.assertFalse(receipt["remediationAdmission"]["pushAllowed"])
-        self.assertEqual(receipt["remediationAdmission"]["maxConcurrent"], 0)
+        self.assertEqual(receipt["remediationAdmission"]["maxConcurrent"], 1)
         self.assertNotIn(
             "expected-head-pr-update", receipt["remediationAdmission"]["activities"]
         )
@@ -823,7 +928,7 @@ class DeploymentBindingTests(unittest.TestCase):
         )
         self.assertNotIn("draft-pr", receipt["workAdmission"]["activities"])
 
-    def test_missing_or_malformed_capacity_normalizes_to_zero_remote_capacity(self):
+    def test_missing_or_malformed_capacity_normalizes_to_local_only_receipt(self):
         for evidence in (None, {"schema": "malformed"}):
             with self.subTest(evidence=evidence):
                 signals = dict(GREEN_SIGNALS)
@@ -835,7 +940,7 @@ class DeploymentBindingTests(unittest.TestCase):
                 self.assertFalse(receipt["workAdmission"]["newIssueLeaseAllowed"])
                 self.assertFalse(receipt["workAdmission"]["newImplementationAllowed"])
                 self.assertFalse(receipt["remediationAdmission"]["pushAllowed"])
-                self.assertEqual(receipt["remediationAdmission"]["maxConcurrent"], 0)
+                self.assertEqual(receipt["remediationAdmission"]["maxConcurrent"], 1)
                 self.assertEqual(receipt["concurrency"]["gem"]["maxConcurrent"], 0)
                 self.assertEqual(receipt["concurrency"]["gem"]["runtimeFloor"], 1)
 
@@ -876,7 +981,7 @@ class DeploymentBindingTests(unittest.TestCase):
                 self.assertFalse(receipt["workAdmission"]["newIssueLeaseAllowed"])
                 self.assertFalse(receipt["workAdmission"]["newImplementationAllowed"])
                 self.assertFalse(receipt["remediationAdmission"]["pushAllowed"])
-                self.assertEqual(receipt["remediationAdmission"]["maxConcurrent"], 0)
+                self.assertEqual(receipt["remediationAdmission"]["maxConcurrent"], 1)
                 self.assertEqual(receipt["concurrency"]["gem"]["runtimeFloor"], 1)
 
     def test_missing_closure_health_fails_new_intake_closed_without_stopping_promotion(self):
@@ -897,6 +1002,16 @@ class DeploymentBindingTests(unittest.TestCase):
             receipt["signals"]["closureHealth"]["schema"],
             "jovie-closure-health/v1",
         )
+        self.assertEqual(
+            receipt["signals"]["closureHealth"]["stackHealth"],
+            {
+                "maxDepth": MODULE.STACK_MAX_DEPTH,
+                "roots": [],
+                "violations": [],
+                "repairActions": [],
+            },
+        )
+        self.assertEqual(receipt["signals"]["closureHealth"]["repairActions"], [])
 
     def test_severe_gate_failure_keeps_diagnosis_live_but_blocks_remote_push(self):
         receipt = MODULE.failed_evaluation_receipt(ValueError("integrity unknown"))
@@ -907,11 +1022,21 @@ class DeploymentBindingTests(unittest.TestCase):
         self.assertTrue(receipt["remediationAdmission"]["allowed"])
         self.assertTrue(receipt["remediationAdmission"]["localAllowed"])
         self.assertFalse(receipt["remediationAdmission"]["pushAllowed"])
-        self.assertEqual(receipt["remediationAdmission"]["maxConcurrent"], 0)
+        self.assertEqual(receipt["remediationAdmission"]["maxConcurrent"], 1)
         self.assertEqual(receipt["concurrency"]["gem"]["maxConcurrent"], 0)
         self.assertEqual(receipt["concurrency"]["gem"]["runtimeFloor"], 1)
         self.assertFalse(receipt["concurrency"]["gem"]["evidenceAccepted"])
         self.assertIn("diagnose-pr", receipt["remediationAdmission"]["activities"])
+        self.assertEqual(
+            receipt["signals"]["closureHealth"]["stackHealth"],
+            {
+                "maxDepth": MODULE.STACK_MAX_DEPTH,
+                "roots": [],
+                "violations": [],
+                "repairActions": [],
+            },
+        )
+        self.assertEqual(receipt["signals"]["closureHealth"]["repairActions"], [])
         sys.path.insert(0, str(GATE.parent))
         from gem_gate_contract import validate_gate_result
 
@@ -1316,18 +1441,36 @@ class DeploymentBindingTests(unittest.TestCase):
         one_landed = self.evaluate(signals)
         self.assertTrue(one_landed["workAdmission"]["newIssueLeaseAllowed"])
 
-    def test_malformed_queue_blocks_promotion_and_new_issue_leases(self):
+    def test_malformed_queue_does_not_freeze_a_bound_green_factory(self):
         signals = dict(GREEN_SIGNALS)
         signals["queue"] = {"status": "known"}
 
         receipt = self.evaluate(signals)
 
-        self.assertEqual(receipt["state"], "AMBER")
-        self.assertFalse(receipt["promotionAdmission"]["allowed"])
-        self.assertFalse(receipt["workAdmission"]["newIssueLeaseAllowed"])
-        self.assertIn(
+        self.assertEqual(receipt["state"], "GREEN")
+        self.assertEqual(receipt["promotionMode"], "normal")
+        self.assertTrue(receipt["promotionAdmission"]["allowed"])
+        self.assertNotIn(
             "queue-unknown",
             {reason["code"] for reason in receipt["reasons"]},
+        )
+
+    def test_malformed_queue_keeps_unbound_production_in_hold_intake(self):
+        signals = dict(GREEN_SIGNALS)
+        signals["production"] = {"status": "green", "deployedSha": "b" * 40}
+        signals["queue"] = {"status": "known"}
+
+        receipt = self.evaluate(signals)
+
+        self.assertEqual(receipt["state"], "AMBER")
+        self.assertEqual(receipt["promotionMode"], "hold-intake")
+        self.assertNotIn(
+            "queue-unknown",
+            {reason["code"] for reason in receipt["reasons"]},
+        )
+        self.assertEqual(
+            {reason["code"] for reason in receipt["reasons"]},
+            {"production-deployment-unbound"},
         )
 
     def test_controller_failure_blocks_deployment(self):
@@ -1347,14 +1490,18 @@ class DeploymentBindingTests(unittest.TestCase):
         self.assertFalse(receipt["isolatedPromotionAdmission"]["deploymentsAllowed"])
         self.assertFalse(receipt["deploymentAdmission"]["allowed"])
 
-    def test_unbound_production_plus_queue_unknown_stays_blocked(self):
+    def test_unbound_production_plus_queue_gap_stays_hold_intake(self):
         signals = dict(GREEN_SIGNALS)
         signals["production"] = {"status": "green", "deployedSha": "b" * 7}
         signals["queue"] = {"status": "known"}
         receipt = self.evaluate(signals)
         self.assertEqual(receipt["state"], "AMBER")
-        self.assertEqual(receipt["promotionMode"], "blocked")
-        self.assertFalse(receipt["alreadyAdmittedCohort"]["preserve"])
+        self.assertEqual(receipt["promotionMode"], "hold-intake")
+        self.assertTrue(receipt["alreadyAdmittedCohort"]["preserve"])
+        self.assertNotIn(
+            "queue-unknown",
+            {reason["code"] for reason in receipt["reasons"]},
+        )
 
 
 class IndependentReviewTests(unittest.TestCase):
@@ -1698,7 +1845,7 @@ class WorkflowContractTests(unittest.TestCase):
         content = (self.WORKFLOWS / "fleet-gate-refresh.yml").read_text(encoding="utf-8")
         self.assertNotIn("schedule:", content)
         self.assertNotIn("cron:", content)
-        self.assertIn("pull_request:", content)
+        self.assertIn("pull_request_target:", content)
         self.assertIn("workflow_run:", content)
         self.assertIn(
             "workflows: [CI, Production Controller]",
@@ -1796,6 +1943,11 @@ class AutoEnrollStubReceiptTests(unittest.TestCase):
         self.assertTrue(jq_accepts_autoenroll_receipt(receipt))
         self.assertEqual(receipt["signals"]["main"]["sha"], MODULE.UNKNOWN_MAIN_SHA)
         self.assertEqual(receipt["signals"]["integrity"]["status"], "invalid")
+        self.assertEqual(
+            receipt["signals"]["closureHealth"]["stackHealth"]["repairActions"],
+            [],
+        )
+        self.assertEqual(receipt["signals"]["closureHealth"]["repairActions"], [])
 
     def test_malformed_main_sha_is_rejected_without_a_jq_runtime_error(self):
         jq = shutil.which("jq")

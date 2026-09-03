@@ -1,8 +1,11 @@
+import { spawnSync } from 'node:child_process';
 import { readFileSync } from 'node:fs';
 import { mkdtemp, rm, symlink, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
+import { evaluateVisualEvidence } from '../../../.github/scripts/pr-visual-evidence-gate.mjs';
 import {
   buildReviewPrompt,
   classifyFinding,
@@ -333,9 +336,7 @@ describe('bounded PR visual review contract', () => {
     expect(workflow).not.toContain('gh issue list');
     expect(workflow).not.toContain('github-ai-orchestrator.yml');
     expect(workflow).toContain('review_status');
-    expect(workflow).toContain(
-      'Capture changed UI (desktop + mobile) (advisory)'
-    );
+    expect(workflow).toContain('Capture changed UI (desktop + mobile)');
     expect(workflow).toContain('GROK_VISUAL_REVIEW_API_KEY');
     expect(workflow).toContain('CODEX_VISUAL_REVIEW_API_KEY');
     expect(workflow).toContain('Call Grok 4.5 with Codex fallback');
@@ -369,6 +370,136 @@ describe('bounded PR visual review contract', () => {
     expect(capture).toContain('Captured route emitted runtime failures');
     expect(capture).toContain('validateCaptureManifest');
     expect(capture).toContain('capture-validation.json');
+  });
+});
+
+// JOV-5459 (Tim lock 2026-08-30): Visual ENOENT is FAIL, not advisory.
+describe('fail-closed visual evidence gate (JOV-5459)', () => {
+  it('treats a missing capture manifest (ENOENT) as failure, not advisory skip', async () => {
+    const dir = await mkdtemp(join(tmpdir(), 'visual-gate-'));
+    try {
+      await writeFile(
+        join(dir, 'routing.json'),
+        JSON.stringify({ shouldReview: true })
+      );
+      const result = evaluateVisualEvidence({
+        artifactDir: dir,
+        stages: { build: 'success', server: 'success', capture: 'success' },
+      });
+      expect(result.ok).toBe(false);
+      expect(result.status).toBe('unavailable');
+      expect(result.missingEvidence).toContain('manifest.json');
+    } finally {
+      await rm(dir, { recursive: true, force: true });
+    }
+  });
+
+  it('treats a missing routing record as failure instead of assuming skipped', async () => {
+    const dir = await mkdtemp(join(tmpdir(), 'visual-gate-'));
+    try {
+      const result = evaluateVisualEvidence({
+        artifactDir: dir,
+        stages: { build: 'skipped', server: 'skipped', capture: 'skipped' },
+      });
+      expect(result.ok).toBe(false);
+      expect(result.missingEvidence).toContain('routing.json');
+    } finally {
+      await rm(dir, { recursive: true, force: true });
+    }
+  });
+
+  it('fails on any failed capture stage and passes complete or skipped evidence', async () => {
+    const dir = await mkdtemp(join(tmpdir(), 'visual-gate-'));
+    try {
+      await writeFile(
+        join(dir, 'routing.json'),
+        JSON.stringify({ shouldReview: true })
+      );
+      await writeFile(join(dir, 'manifest.json'), JSON.stringify([]));
+
+      const failed = evaluateVisualEvidence({
+        artifactDir: dir,
+        stages: { build: 'success', server: 'failure', capture: 'skipped' },
+      });
+      expect(failed.ok).toBe(false);
+      expect(failed.failedStages).toEqual(['server']);
+
+      const complete = evaluateVisualEvidence({
+        artifactDir: dir,
+        stages: { build: 'success', server: 'success', capture: 'success' },
+      });
+      expect(complete.ok).toBe(true);
+      expect(complete.status).toBe('completed');
+
+      await writeFile(
+        join(dir, 'routing.json'),
+        JSON.stringify({ shouldReview: false })
+      );
+      const skipped = evaluateVisualEvidence({
+        artifactDir: dir,
+        stages: { build: 'skipped', server: 'skipped', capture: 'skipped' },
+      });
+      expect(skipped.ok).toBe(true);
+      expect(skipped.status).toBe('skipped');
+    } finally {
+      await rm(dir, { recursive: true, force: true });
+    }
+  });
+
+  it('exits non-zero from the CLI on missing evidence and records the outcome file', async () => {
+    const dir = await mkdtemp(join(tmpdir(), 'visual-gate-cli-'));
+    try {
+      const artifactDir = join(dir, 'pr-visual-artifacts');
+      const gateScript = fileURLToPath(
+        new URL(
+          '../../../.github/scripts/pr-visual-evidence-gate.mjs',
+          import.meta.url
+        )
+      );
+      const run = env =>
+        spawnSync(process.execPath, [gateScript], {
+          cwd: dir,
+          env: { ...process.env, PR_VISUAL_OUT: artifactDir, ...env },
+        });
+
+      const missing = run({ CAPTURE_OUTCOME: 'skipped' });
+      expect(missing.status).toBe(1);
+
+      const outcome = JSON.parse(
+        readFileSync(join(artifactDir, 'advisory-outcome.json'), 'utf8')
+      );
+      expect(outcome.status).toBe('unavailable');
+      expect(outcome.advisory).toBe(false);
+      expect(outcome.missingEvidence).toContain('routing.json');
+
+      await writeFile(
+        join(artifactDir, 'routing.json'),
+        JSON.stringify({ shouldReview: false })
+      );
+      const failedStage = run({ BUILD_OUTCOME: 'failure' });
+      expect(failedStage.status).toBe(1);
+
+      const skipped = run({});
+      expect(skipped.status).toBe(0);
+    } finally {
+      await rm(dir, { recursive: true, force: true });
+    }
+  });
+
+  it('keeps the workflow wired to the gate script as the enforcement point', () => {
+    const workflow = readFileSync(
+      '.github/workflows/pr-visual-review.yml',
+      'utf8'
+    );
+    const captureJob = workflow.slice(
+      workflow.indexOf('  capture:'),
+      workflow.indexOf('\n  review:')
+    );
+    expect(captureJob).toContain(
+      'run: node .github/scripts/pr-visual-evidence-gate.mjs'
+    );
+    expect(captureJob).not.toMatch(/^    continue-on-error: true/m);
+    expect(captureJob).not.toContain('does not block merging');
   });
 });
 const sonarCheck = (overrides = {}) => ({

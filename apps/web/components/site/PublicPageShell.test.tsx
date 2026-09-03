@@ -1,6 +1,8 @@
 import { render, screen } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
+import { MARKETING_PAGE_CONTRACTS } from '@/data/marketing/pageContracts';
 import { MARKETING_PEN_CONTRACT_IDS } from '@/data/marketing/penContracts';
+import { MarketingPageContractMarkers } from './MarketingPageContractMarkers';
 import { PublicPageShell } from './PublicPageShell';
 
 vi.mock('next/navigation', async importOriginal => {
@@ -27,6 +29,38 @@ describe('PublicPageShell', () => {
     expect(main).toBeInTheDocument();
     expect(main).toHaveTextContent('route content');
     expect(main?.className).toContain('pt-(--public-shell-header-offset)');
+
+    const homepageContract = MARKETING_PAGE_CONTRACTS['(home)/page.tsx'];
+    const marker = main?.querySelector('[data-page-job]');
+    expect(marker).toHaveAttribute('hidden');
+    expect(marker).toHaveAttribute('data-page-job', homepageContract.job);
+    expect(marker).toHaveAttribute('data-proof', homepageContract.proof);
+    expect(marker).toHaveAttribute(
+      'data-success-event',
+      homepageContract.successEvent
+    );
+    expect(marker?.querySelector('[data-primary-cta]')).toHaveAttribute(
+      'href',
+      homepageContract.primaryCta.href
+    );
+  });
+
+  it('renders standalone contract markers for the active route', () => {
+    const { container } = render(<MarketingPageContractMarkers />);
+    const homepageContract = MARKETING_PAGE_CONTRACTS['(home)/page.tsx'];
+
+    const marker = container.querySelector('[data-page-job]');
+    expect(marker).toHaveAttribute('hidden');
+    expect(marker).toHaveAttribute('data-page-job', homepageContract.job);
+    expect(marker).toHaveAttribute('data-proof', homepageContract.proof);
+    expect(marker).toHaveAttribute(
+      'data-success-event',
+      homepageContract.successEvent
+    );
+    expect(marker?.querySelector('[data-primary-cta]')).toHaveAttribute(
+      'href',
+      homepageContract.primaryCta.href
+    );
   });
 
   it('omits the fixed-header offset when mainOffset is false', () => {
