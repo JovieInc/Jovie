@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import {
   evaluateOvieConversationAcceptance,
   OVIE_CONVERSATION_ACCEPTANCE_CHECKS,
+  OVIE_SUMMER_DOOR_OPTIMIZATION_EXCEPTION,
 } from '@/lib/ovie/acceptance';
 import { CURRENT_SUMMER_SESSION_ID } from '@/lib/ovie/summer-session';
 
@@ -34,6 +35,19 @@ describe('Ovie conversation acceptance contract (JOV-5212)', () => {
       failed: [],
     });
     expect(OVIE_CONVERSATION_ACCEPTANCE_CHECKS).toHaveLength(10);
+  });
+
+  it('declares a justified non-product optimization exception', () => {
+    expect(OVIE_SUMMER_DOOR_OPTIMIZATION_EXCEPTION).toMatchObject({
+      kind: 'non-product',
+      invariant: 'JOV-INV-012',
+      variantIdentity: 'mac-ovie-door:summer-current:operator-v1',
+      eligibleContextDimensions: [],
+      rollbackOrControl: expect.stringMatching(/unavailable/i),
+    });
+    expect(OVIE_SUMMER_DOOR_OPTIMIZATION_EXCEPTION.justification).toMatch(
+      /operator-only/i
+    );
   });
 
   it('fails closed on fork, fallback, leakage, or missing Eve binding', () => {
