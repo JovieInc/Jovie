@@ -2,7 +2,12 @@
 import Image from 'next/image';
 import type { ReactNode } from 'react';
 import { ArtistProfilePhoneFrame } from '@/components/marketing/artist-profile/ArtistProfilePhoneFrame';
-import { HOMEPAGE_LAUNCH_COPY } from '@/data/homepageLaunchCopy';
+import {
+  HOMEPAGE_CERTIFIED_FIGURES,
+  HOMEPAGE_LAUNCH_COPY,
+  type HomepageCertifiedLedgerRow,
+  type HomepageCertifiedStats,
+} from '@/data/homepageLaunchCopy';
 import type { MarketingExportImage } from '@/lib/screenshots/registry';
 
 export type HomepageCertifiedSectionId =
@@ -18,6 +23,15 @@ export interface HomepageCertifiedPreviews {
 export interface HomepageCertifiedSectionsProps {
   readonly previews: HomepageCertifiedPreviews;
 }
+
+/**
+ * Sections cooked to the quiet voice: 28/32 Satoshi at 620, 15/24 support,
+ * twelve-column optical grid, type-only figures on hairlines. Grows one
+ * section at a time as each approved still lands; the rest keep the display
+ * treatment.
+ */
+const QUIET_SECTION_IDS: ReadonlySet<HomepageCertifiedSectionId> =
+  new Set<HomepageCertifiedSectionId>(['found']);
 
 const PHONE_SIZES = '(min-width: 1024px) 15rem, (min-width: 768px) 24vw, 62vw';
 
@@ -35,6 +49,49 @@ function ProfilePhone({ image }: { readonly image: MarketingExportImage }) {
         width={image.width}
       />
     </ArtistProfilePhoneFrame>
+  );
+}
+
+function Ledger({
+  rows,
+}: {
+  readonly rows: readonly HomepageCertifiedLedgerRow[];
+}) {
+  return (
+    <dl className='homepage-certified-ledger'>
+      {rows.map(row => (
+        <div className='homepage-certified-ledger__row' key={row.label}>
+          <dt className='homepage-certified-ledger__label'>{row.label}</dt>
+          <dd className='homepage-certified-ledger__line'>{row.line}</dd>
+        </div>
+      ))}
+    </dl>
+  );
+}
+
+function Stats({ stats }: { readonly stats: HomepageCertifiedStats }) {
+  return (
+    <div className='homepage-certified-stats'>
+      {stats.items.map(item => (
+        <div className='homepage-certified-stats__item' key={item.label}>
+          <p className='homepage-certified-stats__value'>{item.value}</p>
+          <p className='homepage-certified-stats__label'>{item.label}</p>
+        </div>
+      ))}
+      <p className='homepage-certified-stats__caption'>{stats.caption}</p>
+    </div>
+  );
+}
+
+function Routes({ routes }: { readonly routes: readonly string[] }) {
+  return (
+    <ul className='homepage-certified-routes'>
+      {routes.map(route => (
+        <li className='homepage-certified-routes__item' key={route}>
+          {route}
+        </li>
+      ))}
+    </ul>
   );
 }
 
@@ -64,12 +121,34 @@ function sectionMedia(
   return null;
 }
 
+/** Type-only figure for a quiet section: a ledger or the stats row. */
+function sectionFigure(id: HomepageCertifiedSectionId): ReactNode {
+  const ledger = HOMEPAGE_CERTIFIED_FIGURES.ledgers[id];
+  if (ledger) {
+    return (
+      <div className='homepage-certified-section__figure'>
+        <Ledger rows={ledger} />
+      </div>
+    );
+  }
+  const stats = HOMEPAGE_CERTIFIED_FIGURES.stats[id];
+  if (stats) {
+    return (
+      <div className='homepage-certified-section__figure homepage-certified-section__figure--stats'>
+        <Stats stats={stats} />
+      </div>
+    );
+  }
+  return null;
+}
+
 /**
  * Sections 2-8 of the certified homepage. Copy is locked in
  * HOMEPAGE_LAUNCH_COPY.certified; this component only owns rhythm: one quiet
  * proof statement, then six top-ruled editorial sections on the shared
  * content column, alternating sides, with real product exports where they
- * exist and nothing where they do not.
+ * exist, type-only figures where a section has been cooked to the quiet
+ * voice, and nothing where neither applies.
  */
 export function HomepageCertifiedSections({
   previews,
@@ -88,6 +167,13 @@ export function HomepageCertifiedSections({
       {sections.map((section, index) => {
         const headingId = `homepage-section-${section.id}-heading`;
         const media = sectionMedia(section.id, previews);
+        const quiet = QUIET_SECTION_IDS.has(section.id);
+        const figure = quiet ? sectionFigure(section.id) : null;
+        const routes = quiet
+          ? HOMEPAGE_CERTIFIED_FIGURES.routes[section.id]
+          : undefined;
+        const washed =
+          quiet && Boolean(HOMEPAGE_CERTIFIED_FIGURES.stats[section.id]);
 
         return (
           <section
@@ -97,6 +183,8 @@ export function HomepageCertifiedSections({
             data-testid={`homepage-section-${section.id}`}
             data-align={index % 2 === 0 ? 'start' : 'end'}
             data-media={media ? 'true' : 'false'}
+            data-voice={quiet ? 'quiet' : 'display'}
+            data-wash={washed ? 'true' : 'false'}
             aria-labelledby={headingId}
           >
             <div className='homepage-certified-section__inner'>
@@ -111,10 +199,12 @@ export function HomepageCertifiedSections({
                 <p className='homepage-certified-section__body'>
                   {section.body}
                 </p>
+                {routes ? <Routes routes={routes} /> : null}
               </div>
               {media ? (
                 <div className='homepage-certified-section__media'>{media}</div>
               ) : null}
+              {figure}
             </div>
           </section>
         );
