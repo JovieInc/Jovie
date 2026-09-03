@@ -6,10 +6,12 @@ import { pathToFileURL } from 'node:url';
 /**
  * JOV-5459: Visual ENOENT is FAIL, not advisory.
  * Missing routing/manifest or a failed capture stage fails the job.
+ * A `cancelled` stage is also a failure: fail-closed means only `success`
+ * (or a legitimately `skipped` lane) may pass — never an interrupted stage.
  */
 export function evaluateVisualEvidence({ artifactDir, stages }) {
   const failedStages = Object.entries(stages)
-    .filter(([, outcome]) => outcome === 'failure')
+    .filter(([, outcome]) => outcome === 'failure' || outcome === 'cancelled')
     .map(([stage]) => stage);
 
   const missingEvidence = [];

@@ -106,6 +106,17 @@ STACK_DEADLINE_MARKER = re.compile(
     r"<!--\s*stack-deadline\s*:\s*([^\s<]+)\s*-->", re.IGNORECASE
 )
 STACK_HEAD_SHA = re.compile(r"^[0-9a-f]{40}$", re.IGNORECASE)
+REPOSITORY_NAME = re.compile(r"^[^/\s]+/[^/\s]+$")
+# JOV-INV-020 native-stack evidence for the duplicate-lane detector (JOV-INV-011):
+# same-issue active writers that verifiably stack are one lane, not duplicates.
+STACK_CONTRACT_HEADING = re.compile(r"\bstack\s+contract\b", re.IGNORECASE)
+STACK_LAYER_DECLARATION = re.compile(r"\blayer\s+\d+\s+of\b", re.IGNORECASE)
+STACK_PARENT_DECLARATION = re.compile(
+    r"\b(?:immediate\s+parent|parent\s+pr|parent|extends|stacked\s+on|based\s+on"
+    r"|builds\s+on|depends\s+on|supersedes)\b\s*:?\s*#(\d{1,9})\b",
+    re.IGNORECASE,
+)
+STACK_NUMBERED_TITLE = re.compile(r"(?<![\d/.])(\d{1,2})\s*/\s*(\d{1,2})(?![\d/])")
 
 
 def isoformat(value: datetime) -> str:
@@ -291,6 +302,7 @@ def _stack_path(numbers: list[int], prs_by_number: dict[int, dict[str, Any]]) ->
 
 
 def _stack_action(
+    repository: str,
     root: dict[str, Any],
     members: list[int],
     longest_path: list[int],
@@ -316,6 +328,7 @@ def _stack_action(
     ]
     root_head_sha = head_by_number[root_number]
     fingerprint = {
+        "repository": repository,
         "rootPr": root_number,
         "prNumbers": members,
         "memberHeads": member_heads,
@@ -330,6 +343,7 @@ def _stack_action(
     ).hexdigest()
     return {
         "schema": "jovie-stack-health-action/v1",
+        "repository": repository,
         "taskKey": task_key,
         "deliveryKey": f"closure-stack:{task_key}",
         "action": STACK_REPAIR_ACTION,
@@ -350,6 +364,7 @@ def _stack_action(
 
 
 def _draft_stack_health(
+    repository: str,
     prs: list[dict[str, Any]],
     prs_by_number: dict[int, dict[str, Any]],
     now: datetime,
@@ -491,6 +506,7 @@ def _draft_stack_health(
         if sorted_violations:
             action = (
                 _stack_action(
+                    repository,
                     root,
                     members,
                     longest_path,
@@ -941,9 +957,95 @@ def _required_checks_green(evidence: dict[str, Any]) -> bool:
     )
 
 
+def _native_stack_declaration(pr: dict[str, Any]) -> bool:
+    """JOV-INV-020: the PR itself declares membership in a native stack."""
+    body = pr.get("body") if isinstance(pr.get("body"), str) else ""
+    title = pr.get("title") if isinstance(pr.get("title"), str) else ""
+    if STACK_CONTRACT_HEADING.search(body):
+        return True
+    if STACK_INTEGRATOR_MARKER.search(body) or STACK_DEADLINE_MARKER.search(body):
+        return True
+    if STACK_LAYER_DECLARATION.search(body):
+        return True
+    match = STACK_NUMBERED_TITLE.search(title)
+    if match:
+        part, whole = int(match.group(1)), int(match.group(2))
+        return whole >= 2 and 1 <= part <= whole
+    return False
+
+
+def _native_stack_components(
+    numbers: list[int],
+    prs_by_number: dict[int, dict[str, Any]],
+    complete: dict[int, frozenset[str]],
+) -> dict[int, int]:
+    """Union same-issue PRs linked by positive JOV-INV-020 stack evidence.
+
+    Returns number -> component root. A singleton component means the PR has no
+    stack evidence and stays subject to duplicate-lane flagging (fail closed).
+    Evidence: an immediate-parent declaration naming a lane member, a branch
+    chain (base is a member's head), shared stack membership declarations, or
+    cumulative nesting (one changed-file set strictly contains the other).
+    """
+    parent: dict[int, int] = {number: number for number in numbers}
+
+    def find(number: int) -> int:
+        while parent[number] != number:
+            parent[number] = parent[parent[number]]
+            number = parent[number]
+        return number
+
+    def union(left: int, right: int) -> None:
+        parent[find(left)] = find(right)
+
+    members = {number: prs_by_number.get(number) for number in numbers}
+    heads: dict[str, int] = {}
+    for number in numbers:
+        pr = members[number]
+        head = pr.get("headRefName") if isinstance(pr, dict) else None
+        if isinstance(head, str) and head:
+            heads.setdefault(head, number)
+    for number in numbers:
+        pr = members[number]
+        if not isinstance(pr, dict):
+            continue
+        base = pr.get("baseRefName")
+        if (
+            isinstance(base, str)
+            and base != STACK_ROOT_BASE
+            and base in heads
+            and heads[base] != number
+        ):
+            union(number, heads[base])
+        body = pr.get("body") if isinstance(pr.get("body"), str) else ""
+        for declared in STACK_PARENT_DECLARATION.findall(body):
+            declared_number = int(declared)
+            if declared_number in members and declared_number != number:
+                union(number, declared_number)
+    declared = [
+        number
+        for number in numbers
+        if isinstance(members[number], dict)
+        and _native_stack_declaration(members[number])
+    ]
+    if len(declared) >= 2:
+        for number in declared[1:]:
+            union(declared[0], number)
+    for index, left in enumerate(numbers):
+        for right in numbers[index + 1 :]:
+            left_files = complete.get(left)
+            right_files = complete.get(right)
+            if left_files is None or right_files is None:
+                continue
+            if left_files < right_files or right_files < left_files:
+                union(left, right)
+    return {number: find(number) for number in numbers}
+
+
 def _duplicate_active_lanes(
     dispositions: list[dict[str, Any]],
     evidence_by_number: dict[int, dict[str, Any]],
+    prs_by_number: dict[int, dict[str, Any]],
 ) -> tuple[list[dict[str, Any]], list[dict[str, Any]]]:
     """Held/draft PRs are not writers. Split work is allowed only when disjoint."""
     active_by_issue: dict[str, list[int]] = {}
@@ -1001,10 +1103,21 @@ def _duplicate_active_lanes(
                     )
                     seen_unclassified.add(number)
             continue
+        components = _native_stack_components(numbers, prs_by_number, complete)
+        component_sizes: dict[int, int] = {}
+        for root in components.values():
+            component_sizes[root] = component_sizes.get(root, 0) + 1
         overlap: set[str] = set()
         overlapping_numbers: set[int] = set()
         for index, left in enumerate(numbers):
             for right in numbers[index + 1 :]:
+                if (
+                    components[left] == components[right]
+                    and component_sizes[components[left]] > 1
+                ):
+                    # One declared JOV-INV-020 native stack is a single lane;
+                    # overlapping cumulative layers are not duplicates.
+                    continue
                 pair_overlap = complete[left] & complete[right]
                 if pair_overlap:
                     overlap |= pair_overlap
@@ -1020,7 +1133,9 @@ def _duplicate_active_lanes(
     return duplicates, extra_unclassified
 
 
-def classify_open_prs(prs: list[dict[str, Any]], now: datetime) -> dict[str, Any]:
+def classify_open_prs(
+    prs: list[dict[str, Any]], now: datetime, repository: str = "JovieInc/Jovie"
+) -> dict[str, Any]:
     """Map every usable open PR to close/repair/promote/queued/held."""
     refs_by_number: dict[int, list[str]] = {}
     unclassified: list[dict[str, Any]] = []
@@ -1128,7 +1243,7 @@ def classify_open_prs(prs: list[dict[str, Any]], now: datetime) -> dict[str, Any
     ]
     evidence_by_number = {item["number"]: item for item in changed_file_evidence}
     duplicates, extra_unclassified = _duplicate_active_lanes(
-        dispositions, evidence_by_number
+        dispositions, evidence_by_number, prs_by_number
     )
     drop = {item["number"] for item in extra_unclassified}
     if drop:
@@ -1138,7 +1253,7 @@ def classify_open_prs(prs: list[dict[str, Any]], now: datetime) -> dict[str, Any
     counts = {state: 0 for state in ("close", "repair", "promote", "queued", "held")}
     for disposition in dispositions:
         counts[disposition["state"]] += 1
-    stack_health = _draft_stack_health(usable, prs_by_number, now)
+    stack_health = _draft_stack_health(repository, usable, prs_by_number, now)
     return {
         "dispositions": dispositions,
         "counts": counts,
@@ -1165,6 +1280,14 @@ def _episode_since(
     return parsed if parsed is not None and parsed <= now else now
 
 
+def _previous_for_repository(
+    previous: dict[str, Any] | None, repository: str | None
+) -> dict[str, Any] | None:
+    if not isinstance(previous, dict) or not isinstance(repository, str):
+        return None
+    return previous if previous.get("repository") == repository else None
+
+
 def _active_episode(
     previous: dict[str, Any] | None,
     key: str,
@@ -1183,6 +1306,9 @@ def evaluate_closure_health(
     now: datetime,
 ) -> dict[str, Any]:
     """Apply Summer's bounded stop-line without touching promotion authority."""
+    repository = snapshot.get("repository")
+    repository_valid = isinstance(repository, str) and REPOSITORY_NAME.fullmatch(repository)
+    scoped_previous = _previous_for_repository(previous, repository)
     classifications = snapshot.get("classifications")
     if not isinstance(classifications, dict):
         classifications = {}
@@ -1196,7 +1322,7 @@ def evaluate_closure_health(
         isinstance(value, int) and not isinstance(value, bool) and value >= 0
         for value in (open_prs, eligible_prs, green_ready_prs, native_queue_count)
     )
-    observer_unknown = not shape_valid or controller_status not in {
+    observer_unknown = not repository_valid or not shape_valid or controller_status not in {
         "green",
         "failed",
         "recovering",
@@ -1246,7 +1372,7 @@ def evaluate_closure_health(
     episodes: dict[str, Any] = {}
     durations: dict[str, timedelta] = {}
     for key, is_active in active.items():
-        episode, duration = _active_episode(previous, key, is_active, now)
+        episode, duration = _active_episode(scoped_previous, key, is_active, now)
         if episode is not None:
             episodes[key] = episode
         durations[key] = duration
@@ -1306,6 +1432,7 @@ def evaluate_closure_health(
     status = "red" if reasons else "grace" if grace_active else "healthy"
     return {
         "schema": SCHEMA,
+        "repository": repository if repository_valid else None,
         "status": status,
         "authority": AUTHORITY,
         "observedAt": isoformat(now),
@@ -1455,7 +1582,7 @@ def observe_closure_health(
     try:
         observed = _run_graphql_snapshot(repo)
         prs = observed["prs"]
-        classifications = classify_open_prs(prs, now)
+        classifications = classify_open_prs(prs, now, repo)
         labels_by_pr = {int(pr["number"]): _labels(pr) for pr in prs}
         eligible = [
             pr
@@ -1471,6 +1598,7 @@ def observe_closure_health(
             key=lambda value: value or now,
         )
         snapshot = {
+            "repository": repo,
             "controller": _observe_queue_controller(repo),
             "openPrs": len(prs),
             "eligiblePrs": len(eligible),
@@ -1484,6 +1612,7 @@ def observe_closure_health(
     except (OSError, subprocess.SubprocessError, ValueError, json.JSONDecodeError) as error:
         return {
             "schema": SCHEMA,
+            "repository": repo,
             "status": "red",
             "authority": AUTHORITY,
             "observedAt": isoformat(now),

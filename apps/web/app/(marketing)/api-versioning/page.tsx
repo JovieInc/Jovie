@@ -46,7 +46,7 @@ export default function ApiVersioningPage() {
         <p className='text-sm font-medium text-tertiary-token'>
           Public API policy
         </p>
-        <h1 className='mt-6 max-w-3xl text-4xl font-semibold tracking-tight text-balance text-primary-token sm:text-5xl lg:text-6xl'>
+        <h1 className='system-b-marketing-route-title mt-6 max-w-3xl text-primary-token'>
           API Versioning And Deprecation Policy
         </h1>
         <p className='mt-6 max-w-2xl text-lg leading-relaxed text-secondary-token'>

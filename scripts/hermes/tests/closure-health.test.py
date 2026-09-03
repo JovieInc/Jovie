@@ -84,6 +84,7 @@ def pr(
 
 def snapshot(**overrides: object) -> dict[str, object]:
     value: dict[str, object] = {
+        "repository": "JovieInc/Jovie",
         "controller": {
             "status": "green",
             "runId": 42,
@@ -195,7 +196,9 @@ class ClosureClassificationTests(unittest.TestCase):
         self.assertEqual(result["repairActions"][0]["rootPr"], 101)
         action = result["repairActions"][0]
         self.assertEqual(action["memberHeads"][-1]["headSha"], layers[-1]["headRefOid"])
+        self.assertEqual(action["repository"], "JovieInc/Jovie")
         self.assertEqual(health["status"], "red")
+        self.assertEqual(health["repository"], "JovieInc/Jovie")
         self.assertIn("draft-stack-policy-violation", health["reasons"])
         self.assertFalse(health["newIssueIntakeAllowed"])
         self.assertTrue(health["promotionContinues"])
@@ -244,6 +247,10 @@ class ClosureClassificationTests(unittest.TestCase):
         self.assertIn("orphaned-stack-base", by_root[123])
         self.assertEqual(
             [action["rootPr"] for action in result["repairActions"]], [121, 123]
+        )
+        self.assertEqual(
+            {action["repository"] for action in result["repairActions"]},
+            {"JovieInc/Jovie"},
         )
 
     def test_cyclic_draft_stack_emits_one_persistable_canonical_action(self):
@@ -422,6 +429,175 @@ class ClosureClassificationTests(unittest.TestCase):
                 }
             ],
         )
+
+    def test_declared_native_stack_is_not_a_duplicate_lane(self):
+        contract = (
+            "## Native stack contract (JOV-INV-020)\n"
+            "- Linear lane: JOV-5158\n"
+            "- Root: #16894 at 2a08234388c342c9c503bd622370f07bcf0b7201\n"
+        )
+        result = MODULE.classify_open_prs(
+            [
+                pr(
+                    30,
+                    title="feat: register thumbnail candidates",
+                    body=(
+                        contract
+                        + "- Immediate parent: #16894 at 2a08234388c342c9c503bd622370f07bcf0b7201"
+                    ),
+                    head_ref="codex/jov-5158-youtube-pilot-stack",
+                    merge_state="DIRTY",
+                    files=("scripts/shared.py", "scripts/a.py"),
+                ),
+                pr(
+                    31,
+                    title="feat: reconcile review decisions",
+                    body="Extends #30 with approve/reject.\n" + contract,
+                    head_ref="codex/jov-5158-youtube-decision-gate",
+                    queued=True,
+                    files=("scripts/shared.py", "scripts/b.py"),
+                ),
+                pr(
+                    32,
+                    title="feat: preview service (JOV-5862, 2/4)",
+                    body="Layer 2 of the JOV-5862 stack.",
+                    head_ref="eve/jov-5862-02-preview-service",
+                    files=("scripts/shared.py", "scripts/c.py"),
+                ),
+                pr(
+                    33,
+                    title="feat: preview route (JOV-5862, 3/4)",
+                    body="Layer 3 of the JOV-5862 stack.",
+                    head_ref="eve/jov-5862-03-preview-route",
+                    merge_state="DIRTY",
+                    files=("scripts/shared.py", "scripts/d.py"),
+                ),
+            ],
+            NOW,
+        )
+
+        self.assertEqual(result["duplicateIssueLanes"], [])
+        self.assertEqual(result["unclassified"], [])
+        health = MODULE.evaluate_closure_health(
+            snapshot(classifications=result),
+            previous=None,
+            now=NOW,
+        )
+        self.assertEqual(health["status"], "healthy")
+        self.assertNotIn("duplicate-issue-lanes-unresolved", health["reasons"])
+
+    def test_branch_chained_and_cumulative_nested_lanes_are_stack_evidence(self):
+        result = MODULE.classify_open_prs(
+            [
+                pr(
+                    34,
+                    title="feat: ship JOV-783",
+                    files=("scripts/a.py",),
+                    head_ref="stack/jov-783-root",
+                ),
+                pr(
+                    35,
+                    title="feat: ship JOV-783",
+                    files=("scripts/a.py", "scripts/b.py"),
+                    base_ref="stack/jov-783-root",
+                    head_ref="stack/jov-783-mid",
+                ),
+                pr(
+                    36,
+                    title="feat: ship JOV-783",
+                    merge_state="DIRTY",
+                    files=("scripts/a.py", "scripts/b.py", "scripts/c.py"),
+                ),
+            ],
+            NOW,
+        )
+
+        self.assertEqual(result["duplicateIssueLanes"], [])
+        health = MODULE.evaluate_closure_health(
+            snapshot(classifications=result),
+            previous=None,
+            now=NOW,
+        )
+        self.assertEqual(health["status"], "healthy")
+        self.assertNotIn("duplicate-issue-lanes-unresolved", health["reasons"])
+
+    def test_parallel_competing_lanes_with_identical_files_still_flag(self):
+        result = MODULE.classify_open_prs(
+            [
+                pr(
+                    37,
+                    title="feat: ship JOV-784",
+                    files=("scripts/shared.py", "scripts/a.py"),
+                ),
+                pr(
+                    38,
+                    title="feat: ship JOV-784",
+                    merge_state="DIRTY",
+                    files=("scripts/shared.py", "scripts/a.py"),
+                ),
+            ],
+            NOW,
+        )
+
+        self.assertEqual(
+            result["duplicateIssueLanes"],
+            [
+                {
+                    "issue": "JOV-784",
+                    "prs": [37, 38],
+                    "overlap": ["scripts/a.py", "scripts/shared.py"],
+                }
+            ],
+        )
+        health = MODULE.evaluate_closure_health(
+            snapshot(classifications=result),
+            previous=None,
+            now=NOW,
+        )
+        self.assertEqual(health["status"], "red")
+        self.assertIn("duplicate-issue-lanes-unresolved", health["reasons"])
+
+    def test_partial_stack_signals_fail_closed(self):
+        result = MODULE.classify_open_prs(
+            [
+                pr(
+                    39,
+                    title="feat: ship JOV-785",
+                    files=("scripts/shared.py", "scripts/a.py"),
+                ),
+                pr(
+                    40,
+                    title="feat: ship JOV-785",
+                    body="Extends #39.\n## Native stack contract (JOV-INV-020)",
+                    files=("scripts/shared.py", "scripts/b.py"),
+                ),
+                pr(
+                    41,
+                    title="feat: ship JOV-785",
+                    merge_state="DIRTY",
+                    files=("scripts/shared.py", "scripts/c.py"),
+                ),
+            ],
+            NOW,
+        )
+
+        self.assertEqual(
+            result["duplicateIssueLanes"],
+            [
+                {
+                    "issue": "JOV-785",
+                    "prs": [39, 40, 41],
+                    "overlap": ["scripts/shared.py"],
+                }
+            ],
+        )
+        health = MODULE.evaluate_closure_health(
+            snapshot(classifications=result),
+            previous=None,
+            now=NOW,
+        )
+        self.assertEqual(health["status"], "red")
+        self.assertIn("duplicate-issue-lanes-unresolved", health["reasons"])
 
     def test_renamed_file_evidence_fails_closed_as_unclassified(self):
         result = MODULE.classify_open_prs(
@@ -831,6 +1007,32 @@ class ClosureHealthEvaluationTests(unittest.TestCase):
         self.assertEqual(result["status"], "red")
         self.assertIn("unclassified-open-pr-over-15m", result["reasons"])
 
+    def test_previous_closure_history_is_scoped_to_repository(self):
+        previous = MODULE.evaluate_closure_health(
+            snapshot(
+                repository="JovieInc/Jovie",
+                nativeQueueCount=0,
+            ),
+            previous=None,
+            now=NOW,
+        )
+        current_now = NOW + timedelta(minutes=20)
+        current = MODULE.evaluate_closure_health(
+            snapshot(
+                repository="JovieInc/LogYourBody",
+                nativeQueueCount=0,
+            ),
+            previous=previous,
+            now=current_now,
+        )
+
+        self.assertEqual(previous["status"], "grace")
+        self.assertEqual(current["status"], "grace")
+        self.assertEqual(
+            current["episodes"]["emptyNativeQueue"]["since"],
+            MODULE.isoformat(current_now),
+        )
+
     def test_malformed_observation_and_expired_hold_fail_closed(self):
         result = MODULE.evaluate_closure_health(
             {
@@ -976,6 +1178,7 @@ class ClosureObservationTests(unittest.TestCase):
             )
 
         self.assertEqual(result["status"], "healthy")
+        self.assertEqual(result["repository"], "JovieInc/Jovie")
         self.assertEqual(result["openPrs"], 2)
         self.assertEqual(result["eligiblePrs"], 1)
         self.assertEqual(result["nativeQueueCount"], 1)
@@ -987,6 +1190,7 @@ class ClosureObservationTests(unittest.TestCase):
                 "JovieInc/Jovie", previous=None, now=NOW
             )
         self.assertEqual(failed["status"], "red")
+        self.assertEqual(failed["repository"], "JovieInc/Jovie")
         self.assertFalse(failed["newIssueIntakeAllowed"])
         self.assertEqual(failed["reasons"], ["closure-observation-unknown"])
         self.assertEqual(
@@ -1000,6 +1204,36 @@ class ClosureObservationTests(unittest.TestCase):
         )
         self.assertEqual(failed["repairActions"], [])
         self.assertIn("bad snapshot", failed["error"])
+
+    def test_live_observer_passes_repository_to_stack_repair_actions(self):
+        prs = [
+            stack_pr(201, "main", body=STACK_BODY),
+            stack_pr(202, "stack/test-201"),
+            stack_pr(203, "stack/test-202"),
+            stack_pr(204, "stack/test-203"),
+            stack_pr(205, "stack/test-204"),
+        ]
+        with mock.patch.object(
+            MODULE,
+            "_run_graphql_snapshot",
+            return_value={
+                "prs": prs,
+                "latestMergeAt": (NOW - timedelta(minutes=30)).isoformat(),
+            },
+        ), mock.patch.object(
+            MODULE,
+            "_observe_queue_controller",
+            return_value={"status": "green", "runId": 42},
+        ):
+            result = MODULE.observe_closure_health(
+                "JovieInc/LogYourBody", previous=None, now=NOW
+            )
+
+        self.assertEqual(result["status"], "red")
+        self.assertEqual(result["repository"], "JovieInc/LogYourBody")
+        self.assertEqual(
+            result["repairActions"][0]["repository"], "JovieInc/LogYourBody"
+        )
 
 
 if __name__ == "__main__":

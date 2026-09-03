@@ -30,7 +30,10 @@ export function YoutubeThumbnailPasteForm({
 
   useEffect(() => {
     const context = {
+      experimentId: YOUTUBE_THUMBNAILS_OPTIMIZATION.experimentId,
       variantIdentity: YOUTUBE_THUMBNAILS_OPTIMIZATION.variantIdentity,
+      parentVariantIdentity:
+        YOUTUBE_THUMBNAILS_OPTIMIZATION.parentVariantIdentity,
       platform: 'web',
       contentVariant: 'paste-channel',
     };
@@ -127,7 +130,9 @@ export function YoutubeThumbnailPasteForm({
       {items ? (
         <section className='mt-10' data-testid='youtube-thumbnails-results'>
           <p className='text-sm font-medium text-primary-token'>
-            {copy.states.previewOnly}
+            {items.some(item => item.afterUrl)
+              ? copy.states.redosReady
+              : copy.states.previewOnly}
           </p>
           <ul className='mt-6 grid gap-6 md:grid-cols-3'>
             {items.map(item => (
@@ -162,8 +167,11 @@ export function YoutubeThumbnailPasteForm({
               data-testid='youtube-thumbnails-apply-cta'
               onClick={() =>
                 track(YOUTUBE_THUMBNAILS_EVENTS.APPLY_CLICKED, {
+                  experimentId: YOUTUBE_THUMBNAILS_OPTIMIZATION.experimentId,
                   variantIdentity:
                     YOUTUBE_THUMBNAILS_OPTIMIZATION.variantIdentity,
+                  parentVariantIdentity:
+                    YOUTUBE_THUMBNAILS_OPTIMIZATION.parentVariantIdentity,
                 })
               }
             >

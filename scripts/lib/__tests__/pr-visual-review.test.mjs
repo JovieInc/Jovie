@@ -117,6 +117,12 @@ describe('bounded PR visual review contract', () => {
     });
   });
 
+  it('does not treat App Router (shell) catalog pages as chat chrome', () => {
+    expect(
+      routeChangedFiles(['apps/web/app/app/(shell)/library/page.tsx']).routes
+    ).toEqual(['/']);
+  });
+
   it('routes the authenticated session boundary through chat instead of masking it with a public capture', () => {
     expect(
       routeChangedFiles([
@@ -548,6 +554,27 @@ describe('fail-closed visual evidence gate (JOV-5459)', () => {
       });
       expect(skipped.ok).toBe(true);
       expect(skipped.status).toBe('skipped');
+    } finally {
+      await rm(dir, { recursive: true, force: true });
+    }
+  });
+
+  it('treats a cancelled capture stage as failure, not success (fail-closed)', async () => {
+    const dir = await mkdtemp(join(tmpdir(), 'visual-gate-'));
+    try {
+      await writeFile(
+        join(dir, 'routing.json'),
+        JSON.stringify({ shouldReview: true })
+      );
+      await writeFile(join(dir, 'manifest.json'), JSON.stringify([]));
+
+      const cancelled = evaluateVisualEvidence({
+        artifactDir: dir,
+        stages: { build: 'success', server: 'success', capture: 'cancelled' },
+      });
+      expect(cancelled.ok).toBe(false);
+      expect(cancelled.status).toBe('unavailable');
+      expect(cancelled.failedStages).toEqual(['capture']);
     } finally {
       await rm(dir, { recursive: true, force: true });
     }

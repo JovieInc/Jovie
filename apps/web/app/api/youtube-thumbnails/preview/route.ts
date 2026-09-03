@@ -6,6 +6,7 @@ import {
 } from '@/data/youtubeThumbnailsCopy';
 import { trackEvent } from '@/lib/analytics/runtime-aware';
 import { captureError } from '@/lib/error-tracking';
+import { isCodeFlagEnabled } from '@/lib/flags/code-flags';
 import { NO_STORE_HEADERS, RETRY_AFTER_SERVICE } from '@/lib/http/headers';
 import { getClientIP } from '@/lib/rate-limit';
 import { extractAsnFromRequest } from '@/lib/utils/bot-detection';
@@ -18,9 +19,17 @@ import {
 } from '@/lib/youtube/resolve-channel';
 import {
   assertChannelSpread,
+  assertGenerationCooldown,
   assertRequestAdmitted,
+  buildThumbnailVisitorKey,
+  consumeGenerationAllowance,
   PreviewAbuseError,
+  parseThumbnailDeviceId,
 } from '@/lib/youtube-thumbnails/abuse';
+import {
+  generateThumbnailRedo,
+  getCachedThumbnailRedo,
+} from '@/lib/youtube-thumbnails/generate';
 
 export const runtime = 'nodejs';
 
@@ -38,6 +47,75 @@ function errorResponse(
     { ok: false, code, error },
     { status, headers: { ...NO_STORE_HEADERS, ...extraHeaders } }
   );
+}
+
+interface PreviewItem {
+  readonly videoId: string;
+  readonly title: string;
+  readonly beforeUrl: string;
+  afterUrl: string | null;
+}
+
+/**
+ * Fill `afterUrl`s for the preview items, cache-first. A cached redo costs
+ * nothing; an uncached one must clear the per-request cooldown and then both
+ * server-counted caps (visitor, channel — first cap wins) before any model
+ * call. A denied cap or a failed generation degrades that item to
+ * before-only; it never fails the whole preview.
+ */
+async function fillThumbnailRedos(
+  items: PreviewItem[],
+  context: { readonly visitorKey: string; readonly channelId: string }
+): Promise<{ generated: number; remaining: number | null }> {
+  const pending: number[] = [];
+  for (const [index, item] of items.entries()) {
+    const cached = await getCachedThumbnailRedo(item.videoId);
+    if (cached) {
+      item.afterUrl = cached;
+    } else {
+      pending.push(index);
+    }
+  }
+
+  let generated = 0;
+  let remaining: number | null = null;
+  if (pending.length === 0) return { generated, remaining };
+
+  try {
+    await assertGenerationCooldown({ visitorKey: context.visitorKey });
+  } catch (error) {
+    if (error instanceof PreviewAbuseError && error.code === 'cooldown') {
+      return { generated, remaining };
+    }
+    throw error;
+  }
+
+  for (const index of pending) {
+    try {
+      const allowance = await consumeGenerationAllowance({
+        visitorKey: context.visitorKey,
+        channelId: context.channelId,
+      });
+      remaining = allowance.remaining;
+    } catch (error) {
+      if (
+        error instanceof PreviewAbuseError &&
+        (error.code === 'visitor_cap' || error.code === 'channel_cap')
+      ) {
+        break;
+      }
+      throw error;
+    }
+    const redo = await generateThumbnailRedo({
+      videoId: items[index].videoId,
+      beforeUrl: items[index].beforeUrl,
+    });
+    if (redo.ok) {
+      items[index].afterUrl = redo.afterUrl;
+      generated += 1;
+    }
+  }
+  return { generated, remaining };
 }
 
 export async function POST(request: Request) {
@@ -80,25 +158,52 @@ export async function POST(request: Request) {
       );
     }
 
+    const items: PreviewItem[] = videos.map(video => ({
+      videoId: video.videoId,
+      title: video.title,
+      beforeUrl: video.thumbnailUrl,
+      afterUrl: null,
+    }));
+
+    let mode: 'preview_only' | 'before_after' = 'preview_only';
+    let remaining: number | null = null;
+    let generated = 0;
+    if (isCodeFlagEnabled('YOUTUBE_THUMBNAILS_PASTE_GENERATE')) {
+      mode = 'before_after';
+      const visitorKey = buildThumbnailVisitorKey(
+        ip,
+        parseThumbnailDeviceId(request.headers.get('x-jovie-device'))
+      );
+      const outcome = await fillThumbnailRedos(items, {
+        visitorKey,
+        channelId: channel.channelId,
+      });
+      generated = outcome.generated;
+      remaining = outcome.remaining;
+    }
+
     const result = {
       channel: {
         id: channel.channelId,
         title: channel.title,
         handle: channel.handle,
       },
-      mode: 'preview_only' as const,
-      remaining: null,
-      items: videos.map(video => ({
-        videoId: video.videoId,
-        title: video.title,
-        beforeUrl: video.thumbnailUrl,
-        afterUrl: null,
-      })),
+      mode,
+      remaining,
+      items,
     };
     void trackEvent(YOUTUBE_THUMBNAILS_EVENTS.PREVIEWED, {
+      experimentId: YOUTUBE_THUMBNAILS_OPTIMIZATION.experimentId,
       variantIdentity: YOUTUBE_THUMBNAILS_OPTIMIZATION.variantIdentity,
+      parentVariantIdentity:
+        YOUTUBE_THUMBNAILS_OPTIMIZATION.parentVariantIdentity,
+      channelId: result.channel.id,
+      platform: 'web',
+      contentVariant: 'paste-channel',
       mode: result.mode,
       itemCount: result.items.length,
+      generatedCount: generated,
+      cachedCount: result.items.filter(item => item.afterUrl !== null).length,
     });
     return NextResponse.json(
       { ok: true, ...result },

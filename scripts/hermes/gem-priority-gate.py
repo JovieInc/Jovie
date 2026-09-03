@@ -15,6 +15,7 @@ import argparse
 import fcntl
 import json
 import os
+import re
 import subprocess
 import sys
 import time
@@ -47,7 +48,7 @@ INDEPENDENT_REVIEW_AUTHORITY = "Gem"
 INDEPENDENT_REVIEWER = "Gem"
 INDEPENDENT_REVIEW_SCOPE = "exact-main-head"
 QUEUE_SNAPSHOT_SCHEMA = "jovie-queue-snapshot/v2"
-LANE_CAPACITY_SCHEMA = "jovie-lane-capacity/v1"
+LANE_CAPACITY_SCHEMA = "jovie-lane-capacity/v2"
 QUEUE_SNAPSHOT_TTL = timedelta(minutes=10)
 CONTROLLER_SNAPSHOT_SCHEMA = "jovie-controller-snapshot/v1"
 CONTROLLER_SNAPSHOT_TTL = timedelta(minutes=10)
@@ -66,9 +67,12 @@ SEVERE_REASONS = {
     "severe-integrity-incident",
 }
 DEFAULT_GEM_CONCURRENCY = 4
+# Keep in sync with symphony-codex-exhausted.DEFAULT_GROK_MAX / MAX_GROK_MAX.
+# Unbound repair is a deploy hold, not a Grok serial pin (JOV-5913).
+DEFAULT_GROK_MAX = 4
+MAX_GROK_MAX = 10
 LOCAL_REMEDIATION_CONCURRENCY_FLOOR = 1
 CONTROL_PLANE_PREFIXES = (
-    ".github/workflows/",
     "canon/",
     "scripts/backlog-orchestrator/",
     "scripts/hermes/",
@@ -621,6 +625,29 @@ def observe_concurrency(path: Path, now: datetime) -> dict[str, Any]:
     return {**receipt, "accepted": eligible}
 
 
+def grok_kimi_unbound_repair_concurrency(evidence: dict[str, Any]) -> int:
+    """Autoscale unbound-repair slots from live Grok+Kimi OAuth seats.
+
+    Production-unbound is a deploy hold (`deploymentsAllowed: false`), not a
+    serial Grok pin. Codex exhaustion / stale Gem capacity evidence is not a
+    reason to cap Grok/Kimi (JOV-5913).
+    """
+    seats = 0
+    providers = evidence.get("providers")
+    if isinstance(providers, dict):
+        for name in ("grok", "kimi"):
+            provider = providers.get(name)
+            if not isinstance(provider, dict):
+                continue
+            ready = provider.get("ready")
+            if isinstance(ready, int) and not isinstance(ready, bool) and ready > 0:
+                seats += ready
+    baseline = DEFAULT_GROK_MAX
+    if seats <= 0:
+        return baseline
+    return max(1, min(MAX_GROK_MAX, max(baseline, seats)))
+
+
 def validate_independent_review(
     receipt: object, expected_head_sha: object, now: datetime
 ) -> dict[str, Any]:
@@ -846,6 +873,12 @@ def collision_domains_for_paths(repo: str, files: list[dict[str, Any]]) -> list[
         segments = [segment for segment in path.split("/") if segment]
         surface = "/".join(segments[:2]) if len(segments) > 1 else path
         domains.add(f"artifact:{repo}:{surface}")
+        lane = lane_for_artifact(path)
+        if lane is not None:
+            domains.add(f"lane:{repo}:{lane}")
+        resource = resource_for_artifact(path)
+        if resource is not None:
+            domains.add(f"resource:{repo}:{resource}")
         if any(path.startswith(prefix) for prefix in CONTROL_PLANE_PREFIXES):
             domains.add(f"risk:{repo}:control-plane")
         lowered = path.lower()
@@ -854,26 +887,84 @@ def collision_domains_for_paths(repo: str, files: list[dict[str, Any]]) -> list[
     return sorted(domains)
 
 
+def lane_for_artifact(path: str) -> str | None:
+    normalized = path.strip().rstrip("/")
+    workflow = normalized.rsplit("/", 1)[-1].lower()
+    if (
+        normalized.startswith("apps/ios/")
+        or re.search(r"^ios[-_.]", workflow)
+        or re.search(r"\b(?:xcode|fastlane|testflight|app-store)\b", workflow)
+    ):
+        return "ios"
+    if (
+        normalized.startswith("apps/web/")
+        or normalized.startswith("apps/docs/")
+        or re.search(r"^web[-_.]", workflow)
+        or re.search(r"^next[-_.]", workflow)
+    ):
+        return "web"
+    if (
+        normalized.startswith("scripts/backlog-orchestrator/")
+        or normalized.startswith("scripts/hermes/")
+        or normalized.startswith("scripts/lib/ci-")
+        or normalized.startswith("scripts/lib/merge-queue")
+        or normalized.startswith("scripts/lib/merge-group")
+        or re.search(r"^fleet[-_.]", workflow)
+        or re.search(r"^merge-queue[-_.]", workflow)
+        or re.search(r"^delivery-control[-_.]", workflow)
+    ):
+        return "symphony-control-plane"
+    if (
+        normalized.startswith("docs/")
+        or normalized.startswith("canon/")
+        or normalized.endswith((".md", ".mdx", ".txt"))
+    ):
+        return "docs"
+    return None
+
+
+def resource_for_artifact(path: str) -> str | None:
+    normalized = path.strip().rstrip("/")
+    if not normalized.startswith(".github/workflows/"):
+        return None
+    name = normalized.rsplit("/", 1)[-1]
+    name = re.sub(r"\.ya?ml$", "", name, flags=re.IGNORECASE)
+    return f"github-actions:{name}" if name else None
+
+
 def build_lane_capacity_receipt(
     repo: str,
     green_ready: list[dict[str, Any]],
     observed_at: datetime,
-    global_budget: int,
+    repository_budget: int,
     default_lane_budget: int,
 ) -> dict[str, Any]:
     lane_counts: dict[str, int] = {}
     for pr in green_ready:
         for domain in collision_domains_for_paths(repo, pr.get("files") or []):
             lane_counts[domain] = lane_counts.get(domain, 0) + 1
+    shared_resources: dict[str, dict[str, Any]] = {}
+    resource_prefix = f"resource:{repo}:"
+    for domain, count in sorted(lane_counts.items()):
+        if not domain.startswith(resource_prefix):
+            continue
+        resource = domain[len(resource_prefix) :]
+        shared_resources[resource] = {
+            "resource": resource,
+            "ready": count,
+            "budget": default_lane_budget,
+            "consumers": [domain],
+        }
     return {
         "schema": LANE_CAPACITY_SCHEMA,
         "observedAt": isoformat(observed_at),
-        "global": {"ready": len(green_ready), "budget": global_budget},
+        "repositories": {repo: {"ready": len(green_ready), "budget": repository_budget}},
         "defaultLaneBudget": default_lane_budget,
         "lanes": {
             domain: {"ready": count, "budget": default_lane_budget}
             for domain, count in sorted(lane_counts.items())
         },
+        "sharedResources": shared_resources,
     }
 
 
@@ -881,27 +972,58 @@ def valid_lane_capacity_receipt(value: object, now: datetime) -> bool:
     if not isinstance(value, dict) or value.get("schema") != LANE_CAPACITY_SCHEMA:
         return False
     observed_at = parse_time(value.get("observedAt"))
-    global_capacity = value.get("global")
+    repositories = value.get("repositories")
+    shared_resources = value.get("sharedResources")
     return bool(
         observed_at is not None
         and observed_at <= now + timedelta(minutes=1)
         and now - observed_at <= QUEUE_SNAPSHOT_TTL
-        and isinstance(global_capacity, dict)
-        and isinstance(global_capacity.get("ready"), int)
-        and not isinstance(global_capacity.get("ready"), bool)
-        and global_capacity.get("ready") >= 0
-        and isinstance(global_capacity.get("budget"), int)
-        and not isinstance(global_capacity.get("budget"), bool)
-        and global_capacity.get("budget") > 0
+        and "global" not in value
+        and isinstance(repositories, dict)
+        and all(
+            isinstance(item, dict)
+            and isinstance(item.get("ready"), int)
+            and not isinstance(item.get("ready"), bool)
+            and item.get("ready") >= 0
+            and isinstance(item.get("budget"), int)
+            and not isinstance(item.get("budget"), bool)
+            and item.get("budget") > 0
+            for item in repositories.values()
+        )
         and isinstance(value.get("defaultLaneBudget"), int)
         and not isinstance(value.get("defaultLaneBudget"), bool)
         and value.get("defaultLaneBudget") > 0
         and isinstance(value.get("lanes"), dict)
+        and all(
+            isinstance(item, dict)
+            and isinstance(item.get("ready"), int)
+            and not isinstance(item.get("ready"), bool)
+            and item.get("ready") >= 0
+            and isinstance(item.get("budget"), int)
+            and not isinstance(item.get("budget"), bool)
+            and item.get("budget") > 0
+            for item in value.get("lanes").values()
+        )
+        and isinstance(shared_resources, dict)
+        and all(
+            isinstance(item, dict)
+            and item.get("resource") == key
+            and isinstance(item.get("ready"), int)
+            and not isinstance(item.get("ready"), bool)
+            and item.get("ready") >= 0
+            and isinstance(item.get("budget"), int)
+            and not isinstance(item.get("budget"), bool)
+            and item.get("budget") > 0
+            and isinstance(item.get("consumers"), list)
+            and len(item.get("consumers")) > 0
+            and all(isinstance(consumer, str) and consumer for consumer in item.get("consumers"))
+            for key, item in shared_resources.items()
+        )
     )
 
 
 def load_last_known_queue(
-    path: Path, now: datetime, target: int
+    path: Path, now: datetime, target: int, repo: str
 ) -> dict[str, Any] | None:
     """Reuse a fresh typed queue snapshot after a transient GitHub blip."""
     if not path.exists():
@@ -911,6 +1033,8 @@ def load_last_known_queue(
     except (OSError, ValueError, json.JSONDecodeError):
         return None
     if data.get("schema") != QUEUE_SNAPSHOT_SCHEMA or data.get("status") != "known":
+        return None
+    if data.get("repository") != repo:
         return None
     observed_at = parse_time(data.get("observedAt"))
     if observed_at is None or now - observed_at > QUEUE_SNAPSHOT_TTL:
@@ -926,12 +1050,13 @@ def load_last_known_queue(
         or isinstance(green_ready, bool)
         or green_ready < 0
         or not valid_lane_capacity_receipt(lane_capacity, now)
-        or lane_capacity.get("global", {}).get("ready") != green_ready
-        or lane_capacity.get("global", {}).get("budget") != target
+        or lane_capacity.get("repositories", {}).get(repo, {}).get("ready") != green_ready
+        or lane_capacity.get("repositories", {}).get(repo, {}).get("budget") != target
     ):
         return None
     return {
         "status": "known",
+        "repository": repo,
         "eligiblePrs": eligible,
         "greenReadyPrs": green_ready,
         "target": target,
@@ -971,6 +1096,7 @@ def observe_queue(
         green_ready = [pr for pr in eligible if pr.get("mergeStateStatus") == "CLEAN"]
         observed = {
             "status": "known",
+            "repository": repo,
             "eligiblePrs": len(eligible),
             "greenReadyPrs": len(green_ready),
             "target": target,
@@ -997,7 +1123,7 @@ def observe_queue(
         if snapshot_path is not None and (
             isinstance(error, OSError) or transient_gh_observation_error(error)
         ):
-            cached = load_last_known_queue(snapshot_path, observed_at, target)
+            cached = load_last_known_queue(snapshot_path, observed_at, target, repo)
             if cached is not None:
                 return {
                     **cached,
@@ -1005,6 +1131,7 @@ def observe_queue(
                 }
         return {
             "status": "unknown",
+            "repository": repo,
             "eligiblePrs": None,
             "target": target,
             "error": f"queue-observation-failed: {error}",
@@ -1221,6 +1348,9 @@ def evaluate(signals: dict[str, Any], observed_at: str) -> dict[str, Any]:
         if gem_concurrency > 0
         else LOCAL_REMEDIATION_CONCURRENCY_FLOOR
     )
+    unbound_repair_concurrency = grok_kimi_unbound_repair_concurrency(
+        concurrency_evidence
+    )
     green_ready_prs = queue.get("greenReadyPrs", queue.get("eligiblePrs"))
     queue_target = queue.get("target")
     queue_shape_valid = (
@@ -1237,15 +1367,23 @@ def evaluate(signals: dict[str, Any], observed_at: str) -> dict[str, Any]:
     lane_capacity_valid = valid_lane_capacity_receipt(
         queue.get("laneCapacity"), evaluated_now
     )
-    lane_global = queue.get("laneCapacity", {}).get("global", {})
+    queue_repository = queue.get("repository")
+    repository_capacity = (
+        queue.get("laneCapacity", {})
+        .get("repositories", {})
+        .get(queue_repository if isinstance(queue_repository, str) else "")
+    )
     lane_capacity_consistent = bool(
         lane_capacity_valid
-        and lane_global.get("ready") == green_ready_prs
-        and lane_global.get("budget") == queue_target
+        and isinstance(queue_repository, str)
+        and "/" in queue_repository
+        and isinstance(repository_capacity, dict)
+        and repository_capacity.get("ready") == green_ready_prs
+        and repository_capacity.get("budget") == queue_target
     )
-    lane_global_available = bool(
+    repository_capacity_available = bool(
         lane_capacity_consistent
-        and lane_global.get("ready") < lane_global.get("budget")
+        and repository_capacity.get("ready") < repository_capacity.get("budget")
     )
     isolated_promotion_allowed = (
         state == "AMBER"
@@ -1298,7 +1436,7 @@ def evaluate(signals: dict[str, Any], observed_at: str) -> dict[str, Any]:
         new_implementation_allowed = (
             capacity_fresh
             and queue_shape_valid
-            and lane_global_available
+            and repository_capacity_available
         )
         work_activities = ["tests", "review"]
         if new_implementation_allowed:
@@ -1396,7 +1534,7 @@ def evaluate(signals: dict[str, Any], observed_at: str) -> dict[str, Any]:
             if unbound_repair_allowed
             else None,
             "scope": "event-scoped-exact-pr-head-with-bound-repair-attestation",
-            "maxConcurrent": 1,
+            "maxConcurrent": unbound_repair_concurrency,
             "deploymentsAllowed": False,
             "authority": "canonical-merge-queue-controller",
         },
