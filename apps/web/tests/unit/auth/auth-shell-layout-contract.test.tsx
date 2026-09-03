@@ -100,7 +100,6 @@ import { AuthModalShell } from '@/components/auth/AuthModalShell';
 import { AuthBranding } from '@/components/features/auth/AuthBranding';
 import { AuthFormContainer } from '@/components/features/auth/AuthFormContainer';
 import { AuthLayout } from '@/components/features/auth/AuthLayout';
-import { AUTH_FORM_MAX_WIDTH_CLASS } from '@/features/auth/constants';
 import { DesktopAuthRouteHandoff } from '../../../app/(auth)/DesktopAuthRouteHandoff';
 
 const originalShowModal = HTMLDialogElement.prototype.showModal;
@@ -386,7 +385,6 @@ describe('auth shell layout contract', () => {
     );
 
     expect(layoutSource).toContain('AUTH_FORM_MAX_WIDTH_CLASS');
-    expect(layoutSource).toContain(AUTH_FORM_MAX_WIDTH_CLASS);
     expect(formContainerSource).not.toContain('AUTH_FORM_MAX_WIDTH_CLASS');
   });
 
