@@ -7,7 +7,7 @@ const meta = {
   parameters: { layout: 'fullscreen' },
   decorators: [
     Story => (
-      <div className='flex min-h-[48rem] min-w-0 bg-surface-page'>
+      <div className='flex min-h-192 min-w-0 bg-surface-page'>
         <Story />
       </div>
     ),
@@ -78,7 +78,7 @@ export const AuthorizationRequired: Story = {
 export const Narrow: Story = {
   decorators: [
     Story => (
-      <div className='mx-auto flex min-h-[48rem] w-90 max-w-full bg-surface-page'>
+      <div className='mx-auto flex min-h-192 w-90 max-w-full bg-surface-page'>
         <Story />
       </div>
     ),
