@@ -31,7 +31,7 @@ describe('authenticated app screen registry', () => {
     expect(APP_SCREEN_REGISTRY.map(entry => entry.source).sort()).toEqual(
       listPageSources(shellRoot)
     );
-    expect(APP_SCREEN_REGISTRY).toHaveLength(94);
+    expect(APP_SCREEN_REGISTRY).toHaveLength(95);
   });
 
   it('has a valid registered recipe and component composition', () => {
@@ -45,7 +45,7 @@ describe('authenticated app screen registry', () => {
     const references = APP_SCREEN_REGISTRY.filter(
       entry => entry.designReference
     );
-    expect(references).toHaveLength(45);
+    expect(references).toHaveLength(46);
     for (const screen of references) {
       expect(screen.archetypeId, screen.route).not.toBeNull();
     }
@@ -105,7 +105,7 @@ describe('authenticated app screen registry', () => {
     // Source-of-truth pin: the Pen lane must derive this count from the
     // export receipt, never hardcode it. /app/ov/ops and /app/admin redirect
     // to /hud.
-    expect(references).toHaveLength(45);
+    expect(references).toHaveLength(46);
     const storyIds = references.map(entry => {
       expect(entry.story, entry.route).not.toBeNull();
       return entry.story?.id as string;
@@ -175,7 +175,7 @@ describe('authenticated app screen registry', () => {
     expect(receipt.schema).toBe(APP_SCREEN_PEN_EXPORT_SCHEMA);
     expect(receipt.counts).toEqual({
       screens: APP_SCREEN_REGISTRY.length,
-      designReferences: 45,
+      designReferences: 46,
       components: APP_SCREEN_COMPONENT_REGISTRY.length,
       recipes: APP_SCREEN_RECIPE_REGISTRY.length,
       archetypes: 8,
