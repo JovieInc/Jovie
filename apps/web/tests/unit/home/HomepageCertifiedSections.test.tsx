@@ -2,7 +2,10 @@ import { render, screen, within } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
 import { HomepageCertifiedSections } from '@/components/homepage/HomepageCertifiedSections';
 import { HomepageClose } from '@/components/homepage/HomepageClose';
-import { HOMEPAGE_LAUNCH_COPY } from '@/data/homepageLaunchCopy';
+import {
+  HOMEPAGE_CERTIFIED_FIGURES,
+  HOMEPAGE_LAUNCH_COPY,
+} from '@/data/homepageLaunchCopy';
 
 vi.mock('next/navigation', () => ({
   useRouter: () => ({ push: vi.fn() }),
@@ -85,6 +88,38 @@ describe('HomepageCertifiedSections', () => {
     expect(screen.queryAllByRole('link')).toHaveLength(0);
     expect(screen.queryAllByRole('button')).toHaveLength(0);
   });
+
+  // QUIET SECTIONS START
+  it('cooks the quiet sections to type-only figures with one heading each', () => {
+    render(<HomepageCertifiedSections previews={PREVIEWS} />);
+
+    expect(screen.getByTestId('homepage-section-connected')).toHaveAttribute(
+      'data-voice',
+      'display'
+    );
+
+    const found = screen.getByTestId('homepage-section-found');
+    expect(found).toHaveAttribute('data-voice', 'quiet');
+    expect(found).toHaveAttribute('data-wash', 'false');
+    expect(within(found).getAllByRole('term')).toHaveLength(
+      HOMEPAGE_CERTIFIED_FIGURES.ledgers.found?.length ?? -1
+    );
+
+    for (const id of ['know', 'relationships', 'smarter', 'built']) {
+      expect(screen.getByTestId(`homepage-section-${id}`)).toHaveAttribute(
+        'data-voice',
+        'display'
+      );
+    }
+
+    // Figures never add headings, links, buttons, or images.
+    expect(screen.getAllByRole('heading', { level: 2 })).toHaveLength(
+      HOMEPAGE_LAUNCH_COPY.certified.sections.length
+    );
+    expect(screen.queryAllByRole('link')).toHaveLength(0);
+    expect(screen.queryAllByRole('button')).toHaveLength(0);
+  });
+  // QUIET SECTIONS END
 
   it('closes with the locked lines and the name search as the only control', () => {
     render(<HomepageClose />);
