@@ -167,6 +167,9 @@ describe('Better Auth base URL', () => {
         'staging.jov.ie',
         'localhost:3100',
         '127.0.0.1:3260',
+        'localhost:*',
+        '127.0.0.1:*',
+        '[::1]:*',
       ],
       protocol: 'http',
     });
@@ -203,6 +206,9 @@ describe('Better Auth base URL', () => {
           'localhost:3100',
           'localhost:3257',
           '127.0.0.1:3257',
+          'localhost:*',
+          '127.0.0.1:*',
+          '[::1]:*',
         ],
         protocol: 'http',
       });
@@ -219,6 +225,77 @@ describe('Better Auth base URL', () => {
       if (originalPort === undefined) delete process.env.PORT;
       else process.env.PORT = originalPort;
     }
+  });
+
+  it('allows a drifted loopback port that is not process PORT (JOV-5843)', async () => {
+    const originalPort = process.env.PORT;
+    mocks.env.VERCEL_ENV = undefined;
+    mocks.env.NODE_ENV = 'development';
+    mocks.env.VERCEL_URL = undefined;
+    mocks.env.VERCEL_BRANCH_URL = undefined;
+    mocks.env.BETTER_AUTH_URL = 'http://localhost:3100';
+    process.env.PORT = '3194';
+    mocks.betterAuth.mockClear();
+    vi.resetModules();
+
+    try {
+      await import('@/lib/auth/better-auth');
+
+      expect(getOptions().baseURL).toEqual(
+        expect.objectContaining({
+          allowedHosts: expect.arrayContaining([
+            'localhost:3100',
+            'localhost:3194',
+            '127.0.0.1:3194',
+            'localhost:*',
+            '127.0.0.1:*',
+          ]),
+        })
+      );
+
+      expect(
+        resolveBaseURL(
+          getOptions().baseURL,
+          '/api/auth',
+          new Request('http://localhost:3193/api/auth/ok'),
+          false
+        )
+      ).toBe('http://localhost:3193/api/auth');
+    } finally {
+      if (originalPort === undefined) delete process.env.PORT;
+      else process.env.PORT = originalPort;
+    }
+  });
+
+  it('does not add loopback host wildcards on Vercel production', async () => {
+    mocks.env.VERCEL_ENV = 'production';
+    mocks.env.VERCEL_URL = 'jovie-kt7t5zw6u-jovie.vercel.app';
+    mocks.env.VERCEL_BRANCH_URL = undefined;
+    mocks.env.BETTER_AUTH_URL = 'https://jov.ie';
+    mocks.betterAuth.mockClear();
+    vi.resetModules();
+
+    await import('@/lib/auth/better-auth');
+
+    const allowedHosts = getOptions().baseURL;
+    expect(allowedHosts).toEqual({
+      allowedHosts: [
+        'jov.ie',
+        'www.jov.ie',
+        'staging.jov.ie',
+        'localhost:3100',
+        'jovie-kt7t5zw6u-jovie.vercel.app',
+      ],
+      protocol: 'https',
+    });
+    expect(() =>
+      resolveBaseURL(
+        allowedHosts,
+        '/api/auth',
+        new Request('http://localhost:3193/api/auth/ok'),
+        false
+      )
+    ).toThrow(/not in the allowed hosts list/i);
   });
 });
 

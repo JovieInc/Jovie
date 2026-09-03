@@ -696,7 +696,6 @@ jobs:
               | select(.isDraft == false)
               | select(.number != '"$PR_NUMBER"')
               | select(
-                  (.labels | any(.name == "merge-queue")) or
                   (.mergeStateStatus == "CLEAN") or
                   (.mergeStateStatus == "UNSTABLE")
                 )
@@ -812,8 +811,9 @@ jobs:
         run: |
           PR_NUMBER="${{ needs.guard.outputs.pr_number }}"
 
-          # Tracking only. The labeled event wakes merge-queue-autoenroll,
-          # which revalidates live gates/head and owns the native transport.
+          # Tracking only. This label event wakes merge-queue-autoenroll,
+          # which revalidates live gates/head and owns the native transport;
+          # the retired merge-queue label is neither intent nor membership.
           gh api repos/${{ github.repository }}/issues/$PR_NUMBER/labels \
             --method POST \
             --field "labels[]=auto-approved"

@@ -385,6 +385,30 @@ describe('delivery state machine', () => {
     }
   });
 
+  it('accepts a schema-valid fleet receipt whose stack fields were omitted', async () => {
+    const result = await persistClosureHealthActions(
+      {
+        schema: 'jovie-fleet-gate/v1',
+        signals: {
+          closureHealth: {
+            schema: 'jovie-closure-health/v1',
+            status: 'healthy',
+            authority: 'Summer',
+            observedAt: '2026-09-03T05:00:00.000Z',
+            newIssueIntakeAllowed: true,
+            promotionContinues: true,
+            remediationContinues: true,
+            reasons: [],
+          },
+        },
+      },
+      { dryRun: true }
+    );
+    assert.equal(result.actionCount, 0);
+    assert.equal(result.evidenceCount, 0);
+    assert.equal(result.status, 'none');
+  });
+
   it('accepts a fail-closed fleet gate receipt with no stack repair work', async () => {
     const directory = await mkdtemp(
       join(tmpdir(), 'jovie-empty-stack-actions-')

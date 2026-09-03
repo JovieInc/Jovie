@@ -347,9 +347,8 @@ describe('merge_group workflow contract', () => {
     }
 
     const remaining = getJobBlock(CI_WORKFLOW, 'ci-fast-remaining');
-    expect(remaining).toContain(
-      'CI_FAST_SKIP_STRUCTURAL: ${{ steps.structural.outputs.skip }}'
-    );
+    expect(remaining).toContain("CI_FAST_SKIP_STRUCTURAL: 'true'");
+    expect(remaining).toContain("CI_FAST_ONLY_STRUCTURAL: 'true'");
     expect(remaining).toContain('github.event_name }}" != "pull_request"');
     expect(remaining).toContain('echo "skip=false"');
     expect(remaining).toContain('apps/web/\\.storybook/');

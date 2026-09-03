@@ -92,20 +92,33 @@ final class ChatRepository {
   }
 
   func openConversation(_ conversationID: String) async {
+    let isSwitchingThread = activeConversationID != conversationID
     activeConversationID = conversationID
+
+    // Paint cached history before the network round trip so a thread switch
+    // is instant; the fetch below reconciles when it lands (JOV-5874). A cache
+    // miss clears the previous thread's rows rather than leaving them under
+    // the new conversation id. Re-opening the already-active thread keeps the
+    // live timeline (it may hold an in-flight turn the cache has not seen).
+    if isSwitchingThread, !(await hydrateConversationFromCache(conversationID)) {
+      timeline = []
+    }
 
     do {
       let detail = try await client.fetchConversation(id: conversationID, limit: 100)
+      await persistCache(messages: detail.messages, conversationID: conversationID)
+      // The user may have moved on while this fetch was in flight; never paint
+      // a stale thread over the one they are looking at now.
+      guard activeConversationID == conversationID else { return }
       timeline = detail.messages.map(timelineItem(from:))
       isOffline = false
       lastErrorMessage = nil
-      await persistCache(messages: detail.messages, conversationID: conversationID)
       donateConversationActivity(
         conversationID: conversationID,
         title: detail.conversation.title
       )
     } catch {
-      await hydrateConversationFromCache(conversationID)
+      guard activeConversationID == conversationID else { return }
       applyFailure(error)
       donateConversationActivity(
         conversationID: conversationID,
@@ -176,6 +189,13 @@ final class ChatRepository {
     isSending = true
     defer { isSending = false }
 
+    // The client publishes one event per NDJSON line, so raw chunk cadence
+    // would otherwise drive one timeline mutation (and one assistant-row
+    // re-parse) per token. Coalesce deltas to a bounded rate (JOV-5874).
+    let coalescer = MobileChatStreamCoalescer { [weak self] batch in
+      self?.apply(events: batch, clientTurnId: clientTurnId)
+    }
+
     do {
       try Task.checkCancellation()
       // Apply each NDJSON event as it arrives so tokens paint before the
@@ -190,9 +210,10 @@ final class ChatRepository {
           source: "typed",
           chatMode: workspace.chatMode
         )
-      ) { [weak self] event in
-        await self?.apply(events: [event], clientTurnId: clientTurnId)
+      ) { event in
+        await coalescer.ingest(event)
       }
+      coalescer.flush()
 
       if Task.isCancelled {
         markAssistantCanceled(clientTurnId: clientTurnId)
@@ -213,6 +234,7 @@ final class ChatRepository {
       markAssistantCanceled(clientTurnId: clientTurnId)
       await persistCache()
     } catch {
+      coalescer.flush()
       applySendFailure(error, clientTurnId: clientTurnId)
       await persistCache()
     }
@@ -489,14 +511,18 @@ final class ChatRepository {
     }
   }
 
-  private func hydrateConversationFromCache(_ conversationID: String) async {
+  /// Paints the cached transcript for `conversationID`. Returns `false` on a
+  /// cache miss so callers can decide what to show while the network loads.
+  @discardableResult
+  private func hydrateConversationFromCache(_ conversationID: String) async -> Bool {
     guard
       let snapshot = await cache.load(for: userID, workspace: workspace),
       let cachedMessages = snapshot.messagesByConversationID[conversationID]
     else {
-      return
+      return false
     }
     timeline = cachedMessages.map(timelineItem(from:))
+    return true
   }
 
   private func persistCache(
@@ -574,5 +600,61 @@ final class ChatRepository {
       createdAt: ISO8601DateFormatter().string(from: Date()),
       requiresWebHandoff: item.requiresWebHandoff
     )
+  }
+}
+
+/// Batches raw NDJSON stream events into bounded-rate timeline mutations.
+///
+/// `MobileChatClient` publishes one event per newline, so without this every
+/// server chunk would mutate `ChatRepository.timeline` and re-parse the
+/// assistant row on the main actor. Deltas accumulate for `window` and flush
+/// together; any lifecycle event (reserved / completed / handoff / error)
+/// flushes immediately so state transitions are never delayed. Mirrors the
+/// web composer's `experimental_throttle` pacing (JOV-5874).
+@MainActor
+final class MobileChatStreamCoalescer {
+  /// ~30 paints/s — smooth on device, well under the parse budget per flush.
+  static let defaultWindow: Duration = .milliseconds(33)
+
+  private let window: Duration
+  private let sink: ([MobileChatStreamEvent]) -> Void
+  private var pending: [MobileChatStreamEvent] = []
+  private var flushTask: Task<Void, Never>?
+  /// Number of batches delivered to `sink`. Exposed for tests.
+  private(set) var flushCount = 0
+
+  init(
+    window: Duration = MobileChatStreamCoalescer.defaultWindow,
+    sink: @escaping ([MobileChatStreamEvent]) -> Void
+  ) {
+    self.window = window
+    self.sink = sink
+  }
+
+  func ingest(_ event: MobileChatStreamEvent) {
+    pending.append(event)
+    guard case .assistantDelta = event else {
+      flush()
+      return
+    }
+    guard flushTask == nil else { return }
+    let window = self.window
+    flushTask = Task { [weak self] in
+      try? await Task.sleep(for: window)
+      guard !Task.isCancelled else { return }
+      self?.flush()
+    }
+  }
+
+  /// Delivers everything buffered so far. Safe to call repeatedly; a no-op
+  /// when nothing is pending.
+  func flush() {
+    flushTask?.cancel()
+    flushTask = nil
+    guard !pending.isEmpty else { return }
+    let batch = pending
+    pending.removeAll(keepingCapacity: true)
+    flushCount += 1
+    sink(batch)
   }
 }

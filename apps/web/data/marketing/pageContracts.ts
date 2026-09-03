@@ -107,8 +107,8 @@ export const MARKETING_PAGE_CONTRACTS = {
     routeGlob: '(marketing)/youtube-thumbnails/page.tsx',
     url: APP_ROUTES.YOUTUBE_THUMBNAILS,
     job: 'show creators how to package YouTube videos',
-    proof: 'thumbnail workflow, variants, and pricing section',
-    successEvent: 'visitor starts the thumbnail workflow',
+    proof: 'paste-channel before/after preview, workflow, and safeguards',
+    successEvent: 'visitor pastes a channel and sees three thumbnails',
     primaryCta: START_CTA,
   },
   '(marketing)/launch/page.tsx': {

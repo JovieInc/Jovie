@@ -134,7 +134,11 @@ const MERGE_QUEUE_CONTROLLER_INPUTS = [
   'scripts/lib/__tests__/merge-queue-guard.test.mjs',
   'scripts/lib/__tests__/pre-land-changelog.test.mjs',
   'scripts/lib/__tests__/pr-check-failures.test.mjs',
+  'scripts/lib/ownerless-recovery-policy.mjs',
+  'scripts/lib/pr-check-failures.mjs',
+  'scripts/lib/upsert-pr-comment.sh',
   'scripts/merge-queue-backend.mjs',
+  'scripts/ownerless-recovery-sweeper.mjs',
   'scripts/tests/test_gh_retry.py',
 ];
 const MERGE_QUEUE_CONTROLLER_SCRIPT_TESTS = [
@@ -143,6 +147,7 @@ const MERGE_QUEUE_CONTROLLER_SCRIPT_TESTS = [
   'scripts/lib/__tests__/merge-group-workflow-contract.test.mjs',
   'scripts/lib/__tests__/merge-queue-backend.test.mjs',
   'scripts/lib/__tests__/merge-queue-guard.test.mjs',
+  'scripts/lib/__tests__/ownerless-recovery-policy.test.mjs',
   'scripts/lib/__tests__/pre-land-changelog.test.mjs',
   'scripts/lib/__tests__/pr-check-failures.test.mjs',
 ];
@@ -633,6 +638,7 @@ describe('automation-verify affected scope', () => {
         'scripts/lib/__tests__/ci-branching-guard.test.mjs',
         'scripts/lib/__tests__/merge-queue-guard.test.mjs',
         'scripts/lib/__tests__/pre-land-changelog.test.mjs',
+        'scripts/lib/__tests__/ownerless-recovery-policy.test.mjs',
         'scripts/lib/__tests__/ci-metrics-compute.test.mjs',
         'scripts/lib/__tests__/auto-ready-agent-drafts.test.mjs',
         'scripts/lib/__tests__/eval-main-health-action.test.mjs',
@@ -1110,9 +1116,10 @@ describe('automation-verify affected scope', () => {
       'apps/web/tests/unit/profile/profile-card-layout.test.tsx',
       'apps/web/tests/unit/profile/profile-compact-surface-hero-layout.test.ts',
       'apps/web/tests/unit/design-system/arbitrary-values-ratchet.test.ts',
+      'apps/web/tests/unit/design-system/app-screen-canvas-manifest.test.ts',
       'apps/web/eslint-rules/canonical-ui-label-casing.test.ts',
     ]);
-    expect(plan.selectedTests).toHaveLength(5);
+    expect(plan.selectedTests).toHaveLength(6);
   });
 
   it('maps the seed confirmation boundary diff to focused behavior tests', () => {
@@ -1390,6 +1397,7 @@ describe('automation-verify affected scope', () => {
       'apps/web/tests/unit/events/insert.test.ts',
       'apps/web/tests/unit/testing/seed-test-data-import-boundary.test.ts',
       'apps/web/tests/unit/design-system/arbitrary-values-ratchet.test.ts',
+      'apps/web/tests/unit/design-system/app-screen-canvas-manifest.test.ts',
       ...PREREQUISITE_TRAIN_TESTS,
     ]);
     expect(plan.selectedTests).toEqual([
@@ -1398,6 +1406,7 @@ describe('automation-verify affected scope', () => {
       'apps/web/tests/unit/events/insert.test.ts',
       'apps/web/tests/unit/testing/seed-test-data-import-boundary.test.ts',
       'apps/web/tests/unit/design-system/arbitrary-values-ratchet.test.ts',
+      'apps/web/tests/unit/design-system/app-screen-canvas-manifest.test.ts',
     ]);
     expect(plan.selectedTests).not.toContain(
       'apps/web/tests/e2e/claim-prebuilt.smoke.spec.ts'
@@ -1620,6 +1629,28 @@ describe('automation-verify affected scope', () => {
     );
   });
 
+  it('deliberately selects the canvas guard for a source-only shell component change', () => {
+    const plan = buildAffectedTestPlan([
+      'apps/web/components/features/opportunity-inbox/OpportunityInboxPageClient.tsx',
+    ]);
+
+    expect(plan.mode).toBe('selected');
+    expect(plan.mandatoryTests).toEqual(
+      expect.arrayContaining([
+        'apps/web/tests/unit/design-system/app-screen-canvas-manifest.test.ts',
+      ])
+    );
+  });
+
+  it('selects the canvas guard for app-screen registry contract changes', () => {
+    const plan = buildAffectedTestPlan(['apps/web/data/appScreens/canvas.ts']);
+
+    expect(plan.mode).toBe('selected');
+    expect(plan.selectedTests).toEqual([
+      'apps/web/tests/unit/design-system/app-screen-canvas-manifest.test.ts',
+    ]);
+  });
+
   it('keeps the authenticated accessibility repair on focused unit coverage', () => {
     const plan = buildAffectedTestPlan([
       ...AUTHENTICATED_A11Y_REPAIR_CORE,
@@ -1635,6 +1666,7 @@ describe('automation-verify affected scope', () => {
       'apps/web/tests/unit/onboarding/OnboardingChat.turnstile.test.tsx',
       'apps/web/tests/unit/sidebar-row-alignment.test.tsx',
       'apps/web/tests/unit/design-system/arbitrary-values-ratchet.test.ts',
+      'apps/web/tests/unit/design-system/app-screen-canvas-manifest.test.ts',
     ]);
     expect(plan.scriptVitestTests).toEqual([
       'scripts/lib/__tests__/automation-verify.test.mjs',

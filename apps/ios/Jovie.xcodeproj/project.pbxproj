@@ -21,6 +21,7 @@
 		A0J0V3632A0000000000000C /* CalendarSurfaceView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A0J0V3632A0000000000000B /* CalendarSurfaceView.swift */; };
 		A0J0V3632A0000000000000E /* InboxSurfaceView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A0J0V3632A0000000000000D /* InboxSurfaceView.swift */; };
 		A0J0V3632A00000000000010 /* AppShellTabBarTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A0J0V3632A0000000000000F /* AppShellTabBarTests.swift */; };
+		A0J0V58710000000000000002 /* PublicProfileBrowserMediaPolicyTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A0J0V58710000000000000001 /* PublicProfileBrowserMediaPolicyTests.swift */; };
 		045FC6E446AFF7FFD3ED0FE2 /* AppState.swift in Sources */ = {isa = PBXBuildFile; fileRef = 71445144CE0970267C0508C6 /* AppState.swift */; };
 		19328D236A7AE57920138038 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 47976CA8BC5B309FDB2B6215 /* Assets.xcassets */; };
 		296968C7C074659FBA3D85E9 /* Inter-Variable.ttf in Resources */ = {isa = PBXBuildFile; fileRef = A108B03BA602F4C24B54E590 /* Inter-Variable.ttf */; };
@@ -158,6 +159,7 @@
 		A0J0V3632A0000000000000B /* CalendarSurfaceView.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = CalendarSurfaceView.swift; sourceTree = "<group>"; };
 		A0J0V3632A0000000000000D /* InboxSurfaceView.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = InboxSurfaceView.swift; sourceTree = "<group>"; };
 		A0J0V3632A0000000000000F /* AppShellTabBarTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = AppShellTabBarTests.swift; sourceTree = "<group>"; };
+		A0J0V58710000000000000001 /* PublicProfileBrowserMediaPolicyTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = PublicProfileBrowserMediaPolicyTests.swift; sourceTree = "<group>"; };
 		000F426E1AB94DD5401C3341 /* QRCodeRenderer.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = QRCodeRenderer.swift; sourceTree = "<group>"; };
 		00BCF42EFB99B5DAB4E0F400 /* JovieApp.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = JovieApp.swift; sourceTree = "<group>"; };
 		0A40F1B3BFCC6AD8FF8EAF93 /* JovieAppIntents.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = JovieAppIntents.swift; sourceTree = "<group>"; };
@@ -408,6 +410,7 @@
 				A0J0V36330000000000000003 /* AppShellDrawerThreadsFilterTests.swift */,
 				A0GH12170000000000000003 /* AppShellChatFirstTests.swift */,
 				A0J0V3632A0000000000000F /* AppShellTabBarTests.swift */,
+				A0J0V58710000000000000001 /* PublicProfileBrowserMediaPolicyTests.swift */,
 				A0J0V36380000000000000008 /* AudienceHighlightsRepositoryTests.swift */,
 				A0J0V3638000000000000000A /* MobileAudienceHighlightsResponseTests.swift */,
 				A0GH12706000000000000005 /* MobileActionLoopResponseTests.swift */,
@@ -800,6 +803,7 @@
 				A0J0V36330000000000000004 /* AppShellDrawerThreadsFilterTests.swift in Sources */,
 				A0GH12170000000000000004 /* AppShellChatFirstTests.swift in Sources */,
 				A0J0V3632A00000000000010 /* AppShellTabBarTests.swift in Sources */,
+				A0J0V58710000000000000002 /* PublicProfileBrowserMediaPolicyTests.swift in Sources */,
 				A0J0V36380000000000000009 /* AudienceHighlightsRepositoryTests.swift in Sources */,
 				A0J0V3638000000000000000B /* MobileAudienceHighlightsResponseTests.swift in Sources */,
 				A0GH12706000000000000006 /* MobileActionLoopResponseTests.swift in Sources */,

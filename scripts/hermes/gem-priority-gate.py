@@ -32,6 +32,8 @@ if HERMES_DIR not in sys.path:
 from closure_health import (  # noqa: E402 - sibling executable module
     AUTHORITY as CLOSURE_HEALTH_AUTHORITY,
     STACK_MAX_DEPTH,
+    bounded_stack_health,
+    empty_stack_health,
 )
 from closure_health import SCHEMA as CLOSURE_HEALTH_SCHEMA  # noqa: E402
 from closure_health import observe_closure_health  # noqa: E402
@@ -149,15 +151,6 @@ def previous_closure_health(state_dir: Path) -> dict[str, Any] | None:
     return candidate
 
 
-def empty_stack_health() -> dict[str, Any]:
-    return {
-        "maxDepth": STACK_MAX_DEPTH,
-        "roots": [],
-        "violations": [],
-        "repairActions": [],
-    }
-
-
 def validate_closure_health(candidate: object) -> dict[str, Any]:
     """Fail new intake closed without converting closure debt into a queue hold."""
     valid = (
@@ -176,7 +169,16 @@ def validate_closure_health(candidate: object) -> dict[str, Any]:
         )
     )
     if valid:
-        return dict(candidate)
+        result = dict(candidate)
+        stack_health = bounded_stack_health(result.get("stackHealth"))
+        repair_actions = result.get("repairActions")
+        result["stackHealth"] = stack_health
+        result["repairActions"] = (
+            repair_actions
+            if isinstance(repair_actions, list)
+            else stack_health["repairActions"]
+        )
+        return result
     return {
         "schema": CLOSURE_HEALTH_SCHEMA,
         "status": "red",

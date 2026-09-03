@@ -1309,46 +1309,41 @@ enroll_if_still_eligible() {  # enroll_if_still_eligible <num> [authorized-pr au
     return 0
   fi
   # native-queue-transport:enrollment:end
-  if ! gh_mutate_retry pr edit "$n" -R "$REPO" --add-label merge-queue >/dev/null; then
-    echo "    !! failed to add merge-queue on #$n" >&2
-    return 1
-  fi
-  if ! current="$(gh_retry pr view "$n" -R "$REPO" \
-    --json state,isDraft,mergeable,labels 2>/dev/null)"; then
-    echo "    !! could not verify #$n after enrollment" >&2
-    if ! dequeue_strict "$n"; then
-      echo "    !! CRITICAL: could not prove failed enrollment was compensated for #$n" >&2
+  # Isolated adapter only: startup requires the explicit test-fixture mutation
+  # authorization, and the production native transport above never enters it.
+  if [[ "$MERGE_QUEUE_BACKEND" == "test-label-fixture" ]]; then
+    if ! gh_mutate_retry pr edit "$n" -R "$REPO" --add-label merge-queue >/dev/null; then
+      echo "    !! failed to add merge-queue on #$n" >&2
+      return 1
     fi
+    if ! current="$(gh_retry pr view "$n" -R "$REPO" \
+      --json state,isDraft,mergeable,labels 2>/dev/null)"; then
+      echo "    !! could not verify #$n after fixture enrollment" >&2
+      return 1
+    fi
+    if jq -e '
+      .state == "OPEN"
+      and (.isDraft | not)
+      and .mergeable == "MERGEABLE"
+      and ([.labels[].name] | index("merge-queue"))
+    ' <<<"$current" >/dev/null; then
+      echo "    +merge-queue on #$n"
+      return 0
+    fi
+    echo "    !! fixture enrollment verification failed for #$n" >&2
     return 1
   fi
-  if jq -e '
-    .state == "OPEN"
-    and (.isDraft | not)
-    and .mergeable == "MERGEABLE"
-    and ([.labels[].name] | index("merge-queue"))
-    and ([.labels[].name] | any(
-      . == "queue-deferred" or . == "needs-conflict-resolution"
-      or . == "fast"
-      or '"$NO_AUTO_HOLD_JQ"'
-    ) | not)
-  ' <<<"$current" >/dev/null; then
-    echo "    +merge-queue on #$n"
-    return 0
-  fi
-  echo "    !! enrollment verification failed for #$n" >&2
-  if ! dequeue_strict "$n"; then
-    echo "    !! CRITICAL: could not prove failed enrollment was compensated for #$n" >&2
-  fi
+  echo "::error::Refusing non-native enrollment; the merge-queue label is retired" >&2
   return 1
 }
 
 dequeue_strict() {  # dequeue_strict <num>
   local n="$1" current
   if [[ "$DRY_RUN" == "1" ]]; then
-    if [[ "$MERGE_QUEUE_BACKEND" == "native" ]]; then
-      echo "    [dry-run] would dequeue #$n from native"
-    else
+    if [[ "$MERGE_QUEUE_BACKEND" == "test-label-fixture" ]]; then
       echo "    [dry-run] would -merge-queue on #$n"
+    else
+      echo "    [dry-run] would dequeue #$n from native"
     fi
     return 0
   fi
@@ -1362,20 +1357,25 @@ dequeue_strict() {  # dequeue_strict <num>
     return 0
   fi
   # native-queue-transport:dequeue:end
-  if ! gh_mutate_retry pr edit "$n" -R "$REPO" --remove-label merge-queue >/dev/null; then
-    echo "    !! failed to remove merge-queue hold violation from #$n" >&2
+  # Keep legacy-label simulation available only to the isolated fixture backend.
+  if [[ "$MERGE_QUEUE_BACKEND" == "test-label-fixture" ]]; then
+    if ! gh_mutate_retry pr edit "$n" -R "$REPO" --remove-label merge-queue >/dev/null; then
+      echo "    !! failed to remove merge-queue fixture label from #$n" >&2
+      return 1
+    fi
+    if ! current="$(gh_retry pr view "$n" -R "$REPO" --json labels 2>/dev/null)"; then
+      echo "    !! could not verify fixture label removal for #$n" >&2
+      return 1
+    fi
+    if jq -e '([.labels[].name] | index("merge-queue")) == null' \
+      <<<"$current" >/dev/null; then
+      echo "    -merge-queue on #$n"
+      return 0
+    fi
+    echo "    !! fixture label remains on #$n after removal" >&2
     return 1
   fi
-  if ! current="$(gh_retry pr view "$n" -R "$REPO" --json labels 2>/dev/null)"; then
-    echo "    !! could not verify merge-queue removal for held PR #$n" >&2
-    return 1
-  fi
-  if jq -e '([.labels[].name] | index("merge-queue")) == null' \
-    <<<"$current" >/dev/null; then
-    echo "    -merge-queue on #$n"
-    return 0
-  fi
-  echo "    !! held PR #$n still has merge-queue after removal" >&2
+  echo "::error::Refusing non-native dequeue; the merge-queue label is retired" >&2
   return 1
 }
 
@@ -1923,8 +1923,8 @@ fi
 # Do NOT dequeue on mergeStateStatus alone. A MERGEABLE PR flickers to BLOCKED
 # whenever a required check has a zombie `cancelled`/`queued` run left behind by
 # `concurrency: cancel-in-progress` (the ruleset evaluates required checks by
-# name and a non-success duplicate pins it BLOCKED). Stripping merge-queue on
-# that transient state un-enrolled green PRs every 20 min and starved the queue
+# name and a non-success duplicate pins it BLOCKED). Dequeueing on that
+# transient state un-enrolled green PRs every 20 min and starved the queue
 # for 6h on 2026-06-22. The raw `mergeable` field has the same flicker:
 # GitHub recomputes it asynchronously every time main advances, reporting
 # UNKNOWN for the recompute window — on 2026-07-09 that churned three clean
@@ -1957,13 +1957,9 @@ echo "$SNAP" | jq -c --arg promotion_mode "$DRAIN_PROMOTION_MODE" --arg freeze "
       ] | join("; ")
     ' <<<"$pr")
     echo "  #$n  $t  ✗ $reason"
-    if [[ "$MERGE_QUEUE_BACKEND" == "native" ]]; then
-      if ! dequeue_strict "$n"; then
-        echo "::error::Failed to prove PR #$n is outside native merge queue" >&2
-        exit 1
-      fi
-    else
-      unlabel "$n" merge-queue
+    if ! dequeue_strict "$n"; then
+      echo "::error::Failed to prove PR #$n is outside the configured queue backend" >&2
+      exit 1
     fi
   done
 

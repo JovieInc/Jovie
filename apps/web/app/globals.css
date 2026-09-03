@@ -882,6 +882,18 @@ body {
     font-variation-settings: "opsz" var(--linear-font-optical-sizing);
     text-wrap: balance;
   }
+  /* Every public marketing H1 may paint at most two lines. The complete text
+     remains in the DOM and accessibility tree; this is a visual constraint,
+     not an alternate or shortened accessible label. The shell fallback stays
+     at zero specificity so an explicitly composed heading can override it. */
+  .marketing-h1-max-two-lines,
+  :where(.home-viewport, .system-b-marketing) :where(h1:not(.sr-only)) {
+    display: -webkit-box;
+    max-block-size: calc(2 * 1lh);
+    overflow: hidden;
+    -webkit-box-orient: vertical;
+    -webkit-line-clamp: 2;
+  }
   @media (min-width: 768px) {
     .marketing-h1-linear {
       font-size: var(--linear-h1-size-md);

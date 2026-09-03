@@ -113,7 +113,6 @@ queue_pressure_allows_release() {  # queue_pressure_allows_release <candidate-pr
         | select(.number != $candidate)
         | select(.isDraft == false)
         | select(
-            (.labels | any(.name == "merge-queue")) or
             (.mergeStateStatus == "CLEAN") or
             (.mergeStateStatus == "UNSTABLE")
           )

@@ -1,6 +1,16 @@
 # Library → Assets IA decision
 
-Status: launch slice recommendation for JOV-4801
+> Historical recommendation only. The 2026-08-28 Tim lock supersedes the
+> rename: the visible product remains **Library**, lifecycle stages are primary,
+> and asset/media kinds remain composable filters. Do not ship `Assets` as the
+> page name from this document.
+
+> Superseded for lifecycle and cross-source organization by
+> [`docs/product/library-content-graph-and-artist-rules.md`](../product/library-content-graph-and-artist-rules.md)
+> (JOV-5362). This document remains the source for the filter-not-move rule,
+> canonical `/library` route, release context, and mixed-media discoverability.
+
+Status: superseded historical recommendation for JOV-4801
 
 ## Decision
 
