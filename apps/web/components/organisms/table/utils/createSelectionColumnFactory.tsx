@@ -26,13 +26,13 @@
  * });
  */
 
+import type { JSX, RefObject } from 'react';
 import type {
   CellContext,
   HeaderContext,
   Row,
   Table,
-} from '@tanstack/react-table';
-import type { JSX, RefObject } from 'react';
+} from '@/lib/tanstack-v8-compat';
 import { TableCheckboxCell } from '../atoms/TableCheckboxCell';
 
 /**
