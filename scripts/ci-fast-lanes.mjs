@@ -31,6 +31,7 @@ import {
   affectsJovieTypecheck,
   classifyCiRepoLanes,
 } from './lib/ci-repo-lanes.mjs';
+import { selectDesignConformanceChecks } from './design-conformance-paths.mjs';
 
 const REPO_ROOT = process.cwd();
 const selectedProductLanes = () =>
@@ -504,26 +505,30 @@ function runDesignExceptionRegistry() {
   return shell(LANE_COMMANDS['design-exception-registry']);
 }
 
-function runDesignConformance() {
+export function runDesignConformance({ changedFiles, execute } = {}) {
   const event = process.env.GITHUB_EVENT_NAME || '';
-  if (event !== 'workflow_dispatch' && !repoLanes().runJovieProduct) {
+  if (event === 'workflow_dispatch') {
+    return (execute ?? shell)(LANE_COMMANDS['design-conformance']);
+  }
+
+  const files =
+    changedFiles === undefined ? listAllChangedFiles() : changedFiles;
+  if (files === null) {
+    return {
+      code: 1,
+      output: 'Design conformance failed: changed files unavailable\n',
+    };
+  }
+
+  if (!selectDesignConformanceChecks(files).applicable) {
     return {
       code: 0,
-      output: 'Design conformance skipped (no Jovie product files changed)\n',
+      output: 'Design conformance skipped (no design-domain files changed)\n',
       skipped: true,
     };
   }
-  const selected = selectedProductLanes();
-  if (!selected.has('operations') && !selected.has('web')) {
-    return {
-      code: 0,
-      output: 'No design product lane selected\n',
-      skipped: true,
-    };
-  }
-  // Always validate the normalized manifest. The selector inside the command
-  // reports affected design domains but never invokes Gem/Symphony/Ubuntu ops.
-  return shell(LANE_COMMANDS['design-conformance']);
+
+  return (execute ?? shell)(LANE_COMMANDS['design-conformance']);
 }
 
 function runIosFast() {
