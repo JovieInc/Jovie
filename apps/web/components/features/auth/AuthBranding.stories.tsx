@@ -1,20 +1,20 @@
 import type { Meta, StoryObj } from '@storybook/nextjs-vite';
-import { AuthBrandPanel } from './AuthBrandPanel';
+import { AuthBranding } from './AuthBranding';
 
 const meta = {
-  title: 'Features/Auth/AuthBrandPanel',
-  component: AuthBrandPanel,
+  title: 'Auth/AuthBranding',
+  component: AuthBranding,
   parameters: {
-    layout: 'centered',
+    layout: 'fullscreen',
   },
-} satisfies Meta<typeof AuthBrandPanel>;
+} satisfies Meta<typeof AuthBranding>;
 
 export default meta;
 type Story = StoryObj<typeof meta>;
 
 export const Default: Story = {
   args: {
-    headline: 'Built For Artists.',
+    title: 'Built For Artists.',
     description:
       'Manage releases, links, and audience signals from one focused workspace.',
   },
@@ -22,7 +22,7 @@ export const Default: Story = {
 
 export const TextHidden: Story = {
   args: {
-    headline: 'Built For Artists.',
+    title: 'Built For Artists.',
     description:
       'Manage releases, links, and audience signals from one focused workspace.',
     showText: false,
