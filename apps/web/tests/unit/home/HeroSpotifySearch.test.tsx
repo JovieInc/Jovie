@@ -118,6 +118,24 @@ describe('HeroSpotifySearch', () => {
       const container = screen.getByRole('combobox').closest('div');
       expect(container?.querySelector('svg')).toBeInTheDocument();
     });
+
+    it('focuses the editorial input when its empty submit is clicked', async () => {
+      render(
+        <HeroSpotifySearch
+          appearance='editorial'
+          placeholder='Search your name'
+          submitLabel='Find me'
+        />
+      );
+      const user = userEvent.setup();
+      const input = getInput();
+      input.blur();
+
+      await user.click(screen.getByRole('button', { name: 'Find me' }));
+
+      expect(input).toHaveFocus();
+      expect(mockPush).not.toHaveBeenCalled();
+    });
   });
 
   describe('search interaction', () => {

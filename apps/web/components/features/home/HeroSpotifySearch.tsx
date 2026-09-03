@@ -156,7 +156,10 @@ export function HeroSpotifySearch({
   const handleClaimArtist = useCallback(() => {
     if (isNavigating) return;
     const query = searchQuery.trim();
-    if (!query) return;
+    if (!query) {
+      inputRef.current?.focus();
+      return;
+    }
 
     if (isSpotifyUrl(query)) {
       handleNavigateToStart(query);
