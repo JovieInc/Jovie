@@ -188,8 +188,8 @@ export function InvestorUpdateReview({
   }
 
   return (
-    <div className='grid gap-4 xl:grid-cols-[minmax(0,1.25fr)_minmax(22rem,0.75fr)]'>
-      <section aria-labelledby='candidate-heading' className='min-w-0'>
+    <div className='grid gap-4 xl:grid-cols-5'>
+      <section aria-labelledby='candidate-heading' className='min-w-0 xl:col-span-3'>
         <div className='mb-3 flex items-end justify-between gap-3'>
           <div>
             <h2
@@ -237,7 +237,7 @@ export function InvestorUpdateReview({
                       {Math.round(candidate.relevanceScore * 100)} relevance
                     </span>
                   </div>
-                  <div className='mt-3 grid gap-3 sm:grid-cols-[minmax(0,1fr)_auto]'>
+                  <div className='mt-3 flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between'>
                     <div className='min-w-0'>
                       <p className='text-sm font-semibold text-primary-token'>
                         {candidate.metricLabel}: {candidate.metricValue}{' '}
