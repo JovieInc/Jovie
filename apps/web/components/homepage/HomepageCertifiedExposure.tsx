@@ -1,4 +1,3 @@
-// @coverage-via apps/web/tests/unit/home/HomepageEditorialHero.test.tsx
 'use client';
 
 import { useEffect } from 'react';

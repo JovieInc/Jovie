@@ -41,6 +41,11 @@ function isSpotifyUrl(value: string): boolean {
   );
 }
 
+interface HeroSpotifySearchSubmitAnalytics {
+  readonly eventName: string;
+  readonly properties?: Record<string, unknown>;
+}
+
 export interface HeroSpotifySearchProps {
   /**
    * `default` keeps the Spotify-badged field. `editorial` renders the same
@@ -52,10 +57,7 @@ export interface HeroSpotifySearchProps {
   readonly placeholder?: string;
   readonly submitLabel?: string;
   readonly submitTestId?: string;
-  readonly submitAnalytics?: {
-    readonly eventName: string;
-    readonly properties?: Record<string, unknown>;
-  };
+  readonly submitAnalytics?: HeroSpotifySearchSubmitAnalytics;
 }
 
 const DEFAULT_INPUT_ID = 'hero-spotify-search';

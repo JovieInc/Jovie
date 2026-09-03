@@ -17,6 +17,7 @@ import {
 import { publicEnv } from '@/lib/env-public';
 import { FEATURE_FLAGS } from '@/lib/flags/marketing-static';
 import { getMarketingExportImage } from '@/lib/screenshots/registry';
+import { HomepageQueryProvider } from './homepage-query-provider';
 
 const HERO_BACKDROP = {
   desktopSrc: '/images/hero/night-desk.webp',
@@ -209,8 +210,10 @@ export default async function HomePage() {
 
   return (
     <HomePageShell>
-      <HomepageHero />
-      <HomepageStoryStack />
+      <HomepageQueryProvider>
+        <HomepageHero />
+        <HomepageStoryStack />
+      </HomepageQueryProvider>
     </HomePageShell>
   );
 }
