@@ -220,6 +220,7 @@ describe('library data', () => {
     expect(buildLibraryMerchAssets(cards, 'Tim White')).toEqual([
       expect.objectContaining({
         id: 'merch-merch-1',
+        source: { provider: 'merch', canonicalId: 'merch-1' },
         title: 'Never Say A Word Hoodie',
         artist: 'Tim White',
         artworkUrl: 'https://cdn.example.com/hoodie.png',
@@ -468,6 +469,10 @@ describe('library version stacking (JOV-3089)', () => {
     expect(libraryAssetMatchesView(document!, 'releases')).toBe(false);
     expect(video?.itemKind).toBe('video');
     expect(video?.catalogType).toBe('media');
+    expect(video?.source).toEqual({
+      provider: 'youtube',
+      canonicalId: 'yt-1',
+    });
     expect(video?.linkedReleaseId).toBe('rel-1');
     expect(libraryAssetMatchesView(video!, 'media')).toBe(true);
     expect(libraryAssetMatchesView(video!, 'videos')).toBe(true);
