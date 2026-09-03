@@ -57,7 +57,7 @@ export function UsageMeter({
         <div className='min-w-0'>
           <p className='text-xs font-caption text-primary-token'>{label}</p>
           {description ? (
-            <p className='mt-0.5 text-2xs leading-[15px] text-secondary-token'>
+            <p className='mt-0.5 text-2xs text-secondary-token'>
               {description}
             </p>
           ) : null}
@@ -78,7 +78,7 @@ export function UsageMeter({
         <div
           data-testid='usage-meter-fill'
           className={cn(
-            'h-full rounded-full transition-[width] duration-subtle ease-out motion-reduce:transition-none',
+            'h-full rounded-full transition-all duration-subtle ease-out motion-reduce:transition-none',
             getFillToneClass(model.state)
           )}
           style={{ width: `${model.remainingPercent}%` }}
@@ -101,7 +101,7 @@ export function UsageMeter({
         {progressValueText}
       </progress>
 
-      <div className='flex items-start justify-between gap-3 text-2xs leading-[15px] text-secondary-token'>
+      <div className='flex items-start justify-between gap-3 text-2xs text-secondary-token'>
         <p
           className={cn(
             model.state === 'warning' && 'text-warning',

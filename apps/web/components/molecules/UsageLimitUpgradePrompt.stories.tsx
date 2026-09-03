@@ -10,7 +10,7 @@ const meta: Meta<typeof UsageLimitUpgradePrompt> = {
   },
   decorators: [
     Story => (
-      <div className='w-[32rem]'>
+      <div style={{ width: '32rem' }}>
         <Story />
       </div>
     ),
