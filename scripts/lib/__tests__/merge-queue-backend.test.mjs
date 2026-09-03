@@ -798,14 +798,14 @@ describe('queue workflow mutation safety', () => {
       "needs.fleet-policy.outputs.mode == 'hold-intake'"
     );
     expect(enroll).toContain("needs.fleet-policy.outputs.mode == 'draft-only'");
-    expect(enroll).toContain("DRAIN_QUEUE_REENTRY_MAX_PER_RUN: '2'");
+    expect(enroll).toContain("DRAIN_QUEUE_REENTRY_MAX_PER_RUN: '0'");
     expect(drain).toContain('QUEUE_REENTRY_CONTEXT="jovie-queue-reentry/v1"');
     expect(drain).toContain('bounded exact-head native admission');
-    expect(drain).toContain('DRAIN_QUEUE_REENTRY_MAX_PER_RUN > 2');
+    expect(drain).toContain('DRAIN_QUEUE_REENTRY_MAX_PER_RUN" =~ ^[0-9]+$');
     expect(drain).toContain('queue_reentry_receipt_is_recoverable "$head_oid"');
     expect(drain).toContain('check_failures_for_pr "$n"');
     expect(drain).toContain(
-      '[[ "$ENROLLED_THIS_RUN" -ge "$DRAIN_QUEUE_REENTRY_MAX_PER_RUN" ]]'
+      '(( DRAIN_QUEUE_REENTRY_MAX_PER_RUN > 0 ))'
     );
     expect(drain).toContain('select((.n | tostring) != $admission_pr)');
     expect(drain).toContain('enroll_if_still_eligible "$n" "$n" "$head_oid"');

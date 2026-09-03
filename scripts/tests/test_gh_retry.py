@@ -2139,7 +2139,7 @@ JSON
         assert "event admission scope no longer matches #1001" in result.stdout
         assert not enrolled.exists(), "recovery mutated the newer PR head"
 
-    def test_missed_admission_recovery_rejects_an_unbounded_cap_before_gh(
+    def test_missed_admission_recovery_rejects_a_non_integer_cap_before_gh(
         self, tmp_path: Path
     ) -> None:
         called = tmp_path / "called"
@@ -2156,14 +2156,14 @@ JSON
                 backend="native",
                 extra_env=(
                     "DRAIN_RECONCILE_MISSED_ADMISSION=1 "
-                    "DRAIN_QUEUE_REENTRY_MAX_PER_RUN=3"
+                    "DRAIN_QUEUE_REENTRY_MAX_PER_RUN=abc"
                 ),
             )
         )
 
         assert result.returncode == 2
-        assert "must be an integer from 1 through 2" in result.stderr
-        assert not called.exists(), "drain invoked gh before bounded-cap preflight"
+        assert "must be a non-negative integer" in result.stderr
+        assert not called.exists(), "drain invoked gh before cap preflight"
 
     def test_constrained_mode_refuses_missing_receipt_before_calling_gh(
         self, tmp_path: Path
