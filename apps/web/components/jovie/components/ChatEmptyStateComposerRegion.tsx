@@ -2,6 +2,8 @@
 
 import { type ReactNode, useState } from 'react';
 
+import { Button } from '@jovie/ui';
+
 import { cn } from '@/lib/utils';
 import {
   CHAT_EMPTY_HEADING,
@@ -70,17 +72,16 @@ export function ChatEmptyStateWelcome({
         {CHAT_EMPTY_HEADING}
       </h2>
       {onSelectSample ? (
-        <button
-          type='button'
+        <Button
           aria-label={`Ask “${sample.prompt}”`}
-          className='w-full max-w-md rounded-2xl p-1 text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/55'
+          className='h-auto w-full max-w-md justify-start rounded-2xl p-1 text-left before:hidden focus-visible:ring-ring/55 focus-visible:ring-offset-0'
           data-testid='chat-empty-state-sample-button'
           onClick={() => onSelectSample(sample.prompt)}
         >
-          <div aria-hidden='true'>
+          <div aria-hidden='true' className='w-full'>
             <ChatEmptyStateSamplePreview sample={sample} />
           </div>
-        </button>
+        </Button>
       ) : (
         <ChatEmptyStateSamplePreview sample={sample} />
       )}
