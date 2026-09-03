@@ -1,5 +1,6 @@
 import 'server-only';
 
+import { GatewayAuthenticationError } from '@ai-sdk/gateway';
 import { gateway, generateText } from '@/lib/ai/sdk';
 import { env } from '@/lib/env-server';
 
@@ -19,14 +20,14 @@ import { env } from '@/lib/env-server';
 export const RETOUCH_MODEL_ID = 'google/gemini-2.5-flash-image';
 
 /**
- * Thrown when AI_GATEWAY_API_KEY is not configured. This is an *expected
- * operational state* (gateway key not provisioned in an env), not an
- * application error. Callers should treat it as provider-unavailable and
+ * Thrown when AI Gateway auth is not configured or rejected. This is an
+ * *expected operational state* (gateway auth not provisioned in an env), not
+ * an application error. Callers should treat it as provider-unavailable and
  * skip Sentry capture.
  */
 export class RetouchGatewayUnconfiguredError extends Error {
   readonly code = 'RETOUCH_GATEWAY_UNCONFIGURED' as const;
-  constructor(message = 'AI_GATEWAY_API_KEY is not configured') {
+  constructor(message = 'AI Gateway authentication is not configured') {
     super(message);
     this.name = 'RetouchGatewayUnconfiguredError';
   }
@@ -49,7 +50,9 @@ export class RetouchNoImageReturnedError extends Error {
 }
 
 export function isRetouchConfigured(): boolean {
-  return Boolean(env.AI_GATEWAY_API_KEY?.trim());
+  // The AI Gateway SDK resolves Vercel OIDC through @vercel/oidc at request
+  // time; do not probe VERCEL_OIDC_TOKEN directly here.
+  return Boolean(env.AI_GATEWAY_API_KEY?.trim()) || process.env.VERCEL === '1';
 }
 
 export interface RetouchModelResult {
@@ -73,18 +76,7 @@ export async function runRetouchModel(params: {
     throw new RetouchGatewayUnconfiguredError();
   }
 
-  const result = await generateText({
-    model: gateway(RETOUCH_MODEL_ID),
-    messages: [
-      {
-        role: 'user',
-        content: [
-          { type: 'text', text: params.prompt },
-          { type: 'image', image: new URL(params.sourceImageUrl) },
-        ],
-      },
-    ],
-  });
+  const result = await runRetouchGatewayRequest(params);
 
   const imageFile = result.files.find(file =>
     file.mediaType?.startsWith('image/')
@@ -100,6 +92,31 @@ export async function runRetouchModel(params: {
     model: RETOUCH_MODEL_ID,
     tokenUsage: toPlainTokenUsage(result.usage),
   };
+}
+
+async function runRetouchGatewayRequest(params: {
+  readonly sourceImageUrl: string;
+  readonly prompt: string;
+}) {
+  try {
+    return await generateText({
+      model: gateway(RETOUCH_MODEL_ID),
+      messages: [
+        {
+          role: 'user',
+          content: [
+            { type: 'text', text: params.prompt },
+            { type: 'image', image: new URL(params.sourceImageUrl) },
+          ],
+        },
+      ],
+    });
+  } catch (error) {
+    if (GatewayAuthenticationError.isInstance(error)) {
+      throw new RetouchGatewayUnconfiguredError();
+    }
+    throw error;
+  }
 }
 
 function toPlainTokenUsage(usage: unknown): Record<string, unknown> {

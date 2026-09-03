@@ -274,7 +274,7 @@ function TaskBoardColumn({
           type='button'
           onClick={onCreateTask}
           aria-label={`Create ${visual.label} task`}
-          className='inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-md text-tertiary-token transition-[background-color,color] hover:bg-[color-mix(in_oklab,var(--linear-row-hover)_64%,transparent)] hover:text-primary-token focus-visible:outline-none focus-visible:bg-[color-mix(in_oklab,var(--linear-row-hover)_70%,transparent)] focus-visible:text-primary-token'
+          className='relative inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-md text-tertiary-token transition-[background-color,color] before:absolute before:left-1/2 before:top-1/2 before:h-11 before:w-11 before:-translate-x-1/2 before:-translate-y-1/2 before:content-[""] hover:bg-[color-mix(in_oklab,var(--linear-row-hover)_64%,transparent)] hover:text-primary-token focus-visible:outline-none focus-visible:bg-[color-mix(in_oklab,var(--linear-row-hover)_70%,transparent)] focus-visible:text-primary-token sm:before:h-8 sm:before:w-8'
         >
           <Plus className='h-3.5 w-3.5' />
         </button>

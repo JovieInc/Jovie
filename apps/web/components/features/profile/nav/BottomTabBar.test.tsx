@@ -15,7 +15,9 @@
  */
 
 import { fireEvent, render, screen } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 import { describe, expect, it, vi } from 'vitest';
+import { TAB_BAR_INTERNAL_SAFE_AREA_PADDING } from '@/lib/profile/nav-constants';
 import type { BottomTabBarProps } from './BottomTabBar';
 import { BottomTabBar } from './BottomTabBar';
 
@@ -177,6 +179,23 @@ describe('BottomTabBar — interaction handlers', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Alerts' }));
     expect(onTabSelect).toHaveBeenCalledWith('subscribe');
   });
+
+  it('keeps tab selection keyboard-operable inside the safe-area wrapper', async () => {
+    const user = userEvent.setup();
+    const onTabSelect = vi.fn();
+    const { container } = render(
+      <BottomTabBar {...makeProps({ onTabSelect })} />
+    );
+    const wrapper = container.querySelector('[data-testid="profile-tab-bar"]');
+    const music = screen.getByRole('button', { name: 'Music' });
+
+    expect(wrapper?.className).toContain(TAB_BAR_INTERNAL_SAFE_AREA_PADDING);
+
+    music.focus();
+    await user.keyboard('{Enter}');
+
+    expect(onTabSelect).toHaveBeenCalledWith('listen');
+  });
 });
 
 // ---------------------------------------------------------------------------
@@ -235,11 +254,9 @@ describe('BottomTabBar — grid layout', () => {
 // ---------------------------------------------------------------------------
 
 describe('BottomTabBar — safe area classes', () => {
-  it('applies pb-[max(env(safe-area-inset-bottom),10px)] inside the bar wrapper', () => {
+  it('applies the canonical internal safe-area padding inside the bar wrapper', () => {
     const { container } = render(<BottomTabBar {...makeProps()} />);
     const wrapper = container.querySelector('[data-testid="profile-tab-bar"]');
-    expect(wrapper?.className).toContain(
-      'pb-[max(env(safe-area-inset-bottom),10px)]'
-    );
+    expect(wrapper?.className).toContain(TAB_BAR_INTERNAL_SAFE_AREA_PADDING);
   });
 });

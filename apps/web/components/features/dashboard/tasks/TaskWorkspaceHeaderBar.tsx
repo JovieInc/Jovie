@@ -18,6 +18,26 @@ import {
 } from '@/components/organisms/table/molecules/DisplayMenuDropdown';
 import { cn } from '@/lib/utils';
 
+const TASK_DESKTOP_CONTROL_HIT_TARGET_CLASSNAME =
+  'sm:before:h-8 sm:before:min-w-0';
+
+const TASK_FILTER_TAB_CLASSNAME = cn(
+  'relative h-8 gap-1.5 px-2 text-xs',
+  'before:absolute before:left-1/2 before:top-1/2 before:h-11 before:min-w-11 before:w-full before:-translate-x-1/2 before:-translate-y-1/2 before:content-[""]',
+  TASK_DESKTOP_CONTROL_HIT_TARGET_CLASSNAME
+);
+
+const TASK_TOOLBAR_TEXT_BUTTON_CLASSNAME = cn(
+  'h-8 px-2.5',
+  TASK_DESKTOP_CONTROL_HIT_TARGET_CLASSNAME
+);
+
+const TASK_TOOLBAR_ICON_BUTTON_CLASSNAME = cn(
+  'h-8 w-8 px-0',
+  TASK_DESKTOP_CONTROL_HIT_TARGET_CLASSNAME,
+  'sm:before:w-8'
+);
+
 export type TaskSubviewId = 'all' | 'mine' | 'jovie';
 
 export interface TaskSubviewOption {
@@ -110,7 +130,7 @@ export function TaskWorkspaceHeaderBar({
           size='sm'
           form={createFormId}
           disabled={createPending || !draftTitle.trim()}
-          className='h-7 px-2.5'
+          className={TASK_TOOLBAR_TEXT_BUTTON_CLASSNAME}
         >
           Create
         </Button>
@@ -119,7 +139,7 @@ export function TaskWorkspaceHeaderBar({
           variant='secondary'
           size='sm'
           onClick={onCancelCreate}
-          className='h-7 px-2.5'
+          className={TASK_TOOLBAR_TEXT_BUTTON_CLASSNAME}
         >
           Cancel
         </Button>
@@ -132,13 +152,17 @@ export function TaskWorkspaceHeaderBar({
           iconOnly
           align='end'
           shortcutHint='S'
+          buttonClassName={TASK_TOOLBAR_ICON_BUTTON_CLASSNAME}
         />
         <PageToolbarActionButton
           ariaLabel='Create task'
           label='New Task'
           onClick={onCreateTask}
           icon={<Plus className='h-3.5 w-3.5' />}
-          className='hidden px-2.5 lg:inline-flex'
+          className={cn(
+            TASK_TOOLBAR_TEXT_BUTTON_CLASSNAME,
+            'hidden lg:inline-flex'
+          )}
         />
         <DisplayMenuDropdown
           viewMode={viewMode}
@@ -158,6 +182,7 @@ export function TaskWorkspaceHeaderBar({
               tooltipLabel='Display'
               iconOnly
               icon={<Settings2 className='h-3.5 w-3.5' />}
+              className={TASK_TOOLBAR_ICON_BUTTON_CLASSNAME}
             />
           }
         />
@@ -171,6 +196,7 @@ export function TaskWorkspaceHeaderBar({
               disabled={!canSelectPrevious}
               iconOnly
               icon={<ArrowUp className='h-3.5 w-3.5' />}
+              className={TASK_TOOLBAR_ICON_BUTTON_CLASSNAME}
             />
             <PageToolbarActionButton
               ariaLabel='Next Task'
@@ -180,6 +206,7 @@ export function TaskWorkspaceHeaderBar({
               disabled={!canSelectNext}
               iconOnly
               icon={<ArrowDown className='h-3.5 w-3.5' />}
+              className={TASK_TOOLBAR_ICON_BUTTON_CLASSNAME}
             />
           </div>
         ) : null}
@@ -232,7 +259,7 @@ export function TaskSubviewTabs({
       overflowMode='collapse'
       variant='segment'
       className={className}
-      triggerClassName='gap-1.5 px-2 text-xs'
+      triggerClassName={TASK_FILTER_TAB_CLASSNAME}
       options={subviews.map(subview => ({
         value: subview.id,
         label: (

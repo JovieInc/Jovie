@@ -1,5 +1,11 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { fireEvent, render, screen, waitFor } from '@testing-library/react';
+import {
+  fireEvent,
+  render,
+  screen,
+  waitFor,
+  within,
+} from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { ShellReleasesView } from '@/components/features/dashboard/organisms/release-provider-matrix/shell-releases/ShellReleasesView';
 import { HeaderSearchSurfaceFromContext } from '@/components/shell/HeaderSearchSurfaceFromContext';
@@ -13,20 +19,25 @@ import {
 } from '@/contexts/RightPanelContext';
 import type { ReleaseViewModel } from '@/lib/discography/types';
 
-const { mockUseDspMatchesQuery, mockUsePlanGate } = vi.hoisted(() => ({
-  mockUseDspMatchesQuery: vi.fn(() => ({ data: [], isLoading: false })),
-  mockUsePlanGate: vi.fn(() => ({
-    isLoading: false,
-    isError: false,
-    smartLinksLimit: null as number | null,
-    isPro: true,
-    canCreateManualReleases: true,
-    canGenerateAlbumArt: false,
-    canGenerateReleasePlans: true,
-    canEditSmartLinks: true,
-    canAccessFutureReleases: true,
-  })),
-}));
+const { mockUseDspMatchesQuery, mockUsePlanGate, navigationState } = vi.hoisted(
+  () => ({
+    mockUseDspMatchesQuery: vi.fn(() => ({ data: [], isLoading: false })),
+    mockUsePlanGate: vi.fn(() => ({
+      isLoading: false,
+      isError: false,
+      smartLinksLimit: null as number | null,
+      isPro: true,
+      canCreateManualReleases: true,
+      canGenerateAlbumArt: false,
+      canGenerateReleasePlans: true,
+      canEditSmartLinks: true,
+      canAccessFutureReleases: true,
+    })),
+    navigationState: {
+      searchParams: new URLSearchParams(),
+    },
+  })
+);
 
 vi.mock('next/navigation', () => ({
   useRouter: () => ({
@@ -37,7 +48,7 @@ vi.mock('next/navigation', () => ({
     forward: vi.fn(),
     prefetch: vi.fn(),
   }),
-  useSearchParams: () => new URLSearchParams(),
+  useSearchParams: () => navigationState.searchParams,
   usePathname: () => '/app/dashboard/releases',
 }));
 
@@ -130,7 +141,15 @@ vi.mock(
   '@/features/dashboard/organisms/release-provider-matrix/SpotifyConnectDialog',
   () => ({
     SpotifyConnectDialog: ({ open }: { open: boolean }) =>
-      open ? <div data-testid='spotify-connect-dialog' /> : null,
+      open ? (
+        <div data-testid='spotify-connect-dialog'>
+          <h2>Connect Spotify</h2>
+          <label htmlFor='spotify-search'>
+            Search Spotify artists or paste a link
+          </label>
+          <input id='spotify-search' />
+        </div>
+      ) : null,
   })
 );
 
@@ -365,6 +384,7 @@ function renderShell(
 }
 
 beforeEach(() => {
+  navigationState.searchParams = new URLSearchParams();
   mockUseDspMatchesQuery.mockReturnValue({ data: [], isLoading: false });
   mockUsePlanGate.mockReturnValue({
     isLoading: false,
@@ -458,6 +478,22 @@ describe('ShellReleasesView', () => {
     renderShell([]);
     expect(
       screen.getByText(/Connect Spotify to get started/)
+    ).toBeInTheDocument();
+  });
+
+  it('opens Spotify connection from the catalog connection route', () => {
+    navigationState.searchParams = new URLSearchParams('connect=spotify');
+
+    renderShell([]);
+
+    const dialog = screen.getByTestId('spotify-connect-dialog');
+    expect(
+      within(dialog).getByRole('heading', { name: 'Connect Spotify' })
+    ).toBeInTheDocument();
+    expect(
+      within(dialog).getByRole('textbox', {
+        name: 'Search Spotify artists or paste a link',
+      })
     ).toBeInTheDocument();
   });
 

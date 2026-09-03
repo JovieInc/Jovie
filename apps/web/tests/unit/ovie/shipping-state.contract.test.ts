@@ -200,6 +200,113 @@ describe('ovie.shipping-state.v1 contract', () => {
       expect(read.status).toBe('ok');
     }
   });
+
+  it('projects Linear-canonical Symphony work with stable shared task identity', async () => {
+    const projection = await publish(
+      baseline({
+        'symphony-runtime': ok('symphony-runtime', {
+          running: [],
+          retrying: [
+            {
+              issue_identifier: 'jov-5544',
+              issue_url:
+                'https://linear.app/jovie/issue/JOV-5544/ui-consolidation-library-cards',
+              attempt: 19,
+              due_at: '2026-08-22T00:05:00.000Z',
+            },
+          ],
+          blocked: [],
+        }),
+      })
+    );
+
+    expect(projection.operationalTasks).toMatchObject({
+      canonicalSource: 'linear',
+      cacheMode: 'local-reconciled',
+      syncState: 'fresh',
+      sourceId: 'symphony-runtime',
+      tasks: [
+        {
+          id: 'linear:JOV-5544',
+          linearIdentifier: 'JOV-5544',
+          title: 'Ui Consolidation Library Cards',
+          workflowState: 'retrying',
+          attempt: 19,
+          retryAt: '2026-08-22T00:05:00.000Z',
+        },
+      ],
+    });
+    expect(projection.sources['symphony-runtime'].entities[0]).toMatchObject({
+      entityId: 'linear:JOV-5544',
+      sourceId: 'symphony-runtime',
+    });
+  });
+
+  it('emits task state deltas and retains last-known work when sync fails', async () => {
+    const first = await publish(
+      baseline({
+        'symphony-runtime': ok(
+          'symphony-runtime',
+          {
+            running: [
+              {
+                issue_identifier: 'JOV-5544',
+                title: 'Consolidate library cards',
+              },
+            ],
+            retrying: [],
+            blocked: [],
+          },
+          { sequence: 1, eventId: 'symphony-runtime:task:1' }
+        ),
+      })
+    );
+    expect(first.operationalTasks.tasks[0]?.workflowState).toBe('running');
+
+    const second = await publish(
+      baseline({
+        'symphony-runtime': ok(
+          'symphony-runtime',
+          {
+            running: [],
+            retrying: [
+              {
+                issue_identifier: 'JOV-5544',
+                title: 'Consolidate library cards',
+              },
+            ],
+            blocked: [],
+          },
+          {
+            sequence: 2,
+            eventId: 'symphony-runtime:task:2',
+            sourceRevision: SHA_B,
+          }
+        ),
+      })
+    );
+    expect(second.operationalTasks.deltas).toEqual([
+      {
+        taskId: 'linear:JOV-5544',
+        kind: 'updated',
+        fromState: 'running',
+        toState: 'retrying',
+        sequence: 2,
+      },
+    ]);
+
+    const stale = await publish(
+      baseline({
+        'symphony-runtime': failed('symphony-runtime', 'unavailable', {
+          sequence: null,
+          eventId: null,
+        }),
+      })
+    );
+    expect(stale.operationalTasks.syncState).toBe('stale');
+    expect(stale.operationalTasks.tasks).toEqual(second.operationalTasks.tasks);
+    expect(stale.operationalTasks.deltas).toEqual([]);
+  });
 });
 
 describe('zero, states, ordering, meanings, cadence', () => {

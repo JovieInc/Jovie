@@ -5,6 +5,7 @@ import { readFileSync } from 'node:fs';
 import { createRequire } from 'node:module';
 import test from 'node:test';
 import {
+  assertStagingVersionTransition,
   expectedDesktopAssetNames,
   validateReleaseAssets,
 } from './desktop-release-assets.mjs';
@@ -58,11 +59,15 @@ function hash(buffer, algorithm, encoding) {
   return createHash(algorithm).update(buffer).digest(encoding);
 }
 
-function desktopReleaseFixture() {
-  const version = '26.7.1';
+function desktopReleaseFixture(environment = 'production') {
+  const version =
+    environment === 'staging' ? '26.7.2-staging.17823456789.1' : '26.7.1';
   const releaseSha = 'a'.repeat(40);
-  const dmgName = `Jovie-${version}-universal.dmg`;
-  const zipName = `Jovie-${version}-universal.zip`;
+  const prefix = environment === 'staging' ? 'Jovie-Staging' : 'Jovie';
+  const channelFile =
+    environment === 'staging' ? 'staging-mac.yml' : 'latest-mac.yml';
+  const dmgName = `${prefix}-${version}-universal.dmg`;
+  const zipName = `${prefix}-${version}-universal.zip`;
   const buffers = new Map([
     [dmgName, Buffer.from('signed dmg bytes')],
     [`${dmgName}.blockmap`, Buffer.from('dmg blockmap')],
@@ -83,26 +88,28 @@ function desktopReleaseFixture() {
     'releaseDate: 2026-07-29T00:00:00.000Z',
     '',
   ].join('\n');
-  buffers.set('latest-mac.yml', Buffer.from(updater));
+  buffers.set(channelFile, Buffer.from(updater));
 
   const release = {
     id: 123,
-    tag_name: `v${version}`,
+    tag_name: environment === 'staging' ? 'desktop-staging' : `v${version}`,
     target_commitish: releaseSha,
     name: version,
     draft: true,
-    prerelease: false,
+    prerelease: environment === 'staging',
     published_at: null,
-    assets: expectedDesktopAssetNames(version).map((name, index) => ({
-      id: index + 1,
-      name,
-      state: 'uploaded',
-      size: buffers.get(name).length,
-      digest: `sha256:${hash(buffers.get(name), 'sha256', 'hex')}`,
-      url: `https://api.github.com/assets/${index + 1}`,
-    })),
+    assets: expectedDesktopAssetNames(version, environment).map(
+      (name, index) => ({
+        id: index + 1,
+        name,
+        state: 'uploaded',
+        size: buffers.get(name).length,
+        digest: `sha256:${hash(buffers.get(name), 'sha256', 'hex')}`,
+        url: `https://api.github.com/assets/${index + 1}`,
+      })
+    ),
   };
-  return { buffers, release, releaseSha, version };
+  return { buffers, environment, release, releaseSha, version };
 }
 
 const releaseStampManifests = discoverVersionedManifests();
@@ -569,19 +576,36 @@ test('automatic desktop publishing selects VERSION changes only', () => {
   assert.equal(paths?.includes('VERSION'), true);
 });
 
-test('desktop staging is a bounded artifact and production is separately proven', () => {
+test('desktop staging publishes an exact signed prerelease and production stays separately proven', () => {
+  const authorize = step(
+    job(desktopWorkflow, 'authorize-release'),
+    'Cross-prove exact production evidence'
+  );
   const build = job(desktopWorkflow, 'build');
   const publish = step(build, 'Publish production desktop release');
+  const stagingPublish = step(build, 'Publish staging desktop prerelease');
+  const stagingVerify = step(build, 'Verify staging desktop artifact set');
   const stagingUpload = step(build, 'Upload staging desktop package');
   const marker = job(desktopWorkflow, 'record-production-publish');
 
+  assertPatterns(authorize, [
+    /actions\/workflows\/ci\.yml/,
+    /\.name == "CI"/,
+    /\.path == "\.github\/workflows\/ci\.yml"/,
+    /\.head_sha == \$sha/,
+    /\.conclusion == "success"/,
+  ]);
   assertPatterns(build, [
     /needs: \[authorize-release\]/,
     /ref: \$\{\{ needs\.authorize-release\.outputs\.release_sha \}\}/,
     /package:staging/,
     /package:production/,
+    /sync-version\.mjs[\s\S]*--staging-version/,
+    /Validate rolling staging prerelease/,
+    /Require staging signing and notarization credentials/,
     /desktop-release-assets\.mjs upload-and-publish/,
     /dist\/latest-mac\.yml/,
+    /dist\/staging-mac\.yml/,
   ]);
   assertPatterns(publish, [
     /repos\/\$\{\{ github\.repository \}\}\/commits\/main/,
@@ -591,11 +615,27 @@ test('desktop staging is a bounded artifact and production is separately proven'
   assertPatterns(stagingUpload, [
     /if: env\.ENVIRONMENT == 'staging'/,
     /desktop-staging-/,
+    /staging-mac\.yml/,
     /retention-days: 7/,
   ]);
-  // publish is null in electron-builder.staging.yml, so staging produces no
-  // auto-update metadata (staging-mac.yml) and must not try to upload it.
-  assert.doesNotMatch(stagingUpload, /staging-mac\.yml/);
+  assertPatterns(stagingPublish, [
+    /commits\/main/,
+    /desktop-release-assets\.mjs upload-and-publish/,
+    /--environment staging/,
+    /--version "\$\{\{ steps\.staging-version\.outputs\.version \}\}"/,
+  ]);
+  assertPatterns(stagingVerify, [
+    /codesign --verify --deep --strict/,
+    /spctl --assess --type execute/,
+    /xcrun stapler validate/,
+    /build-identity\.json/,
+    /record\.sourceRevision === sha/,
+    /--print-build-identity/,
+    /app-update\.yml/,
+    /provider:\[\[:space:\]\]\*generic/,
+    /releases\/download\/desktop-staging/,
+    /channel:\[\[:space:\]\]\*staging/,
+  ]);
   assert.doesNotMatch(stagingUpload, /desktop-production-published|GH_TOKEN/);
   assert.ok(
     publish.indexOf('commits/main') <
@@ -604,6 +644,10 @@ test('desktop staging is a bounded artifact and production is separately proven'
   assert.ok(
     build.indexOf('Prepare private production draft') <
       build.indexOf('Package production desktop app')
+  );
+  assert.ok(
+    build.indexOf('Validate rolling staging prerelease') <
+      build.indexOf('Package staging desktop app')
   );
   assert.doesNotMatch(build, /Upload production desktop publish marker/);
   assertPatterns(marker, [
@@ -653,4 +697,58 @@ test('desktop release proof rejects zero-asset and mismatched-digest releases', 
     () => validateReleaseAssets({ ...wrongTarget, draft: true }),
     /authorized commit/
   );
+});
+
+test('staging release proof binds prerelease assets and channel metadata', () => {
+  const valid = desktopReleaseFixture('staging');
+  assert.doesNotThrow(() => validateReleaseAssets({ ...valid, draft: true }));
+
+  const stableEnvelope = desktopReleaseFixture('staging');
+  stableEnvelope.release.prerelease = false;
+  assert.throws(
+    () => validateReleaseAssets({ ...stableEnvelope, draft: true }),
+    /prerelease state/
+  );
+
+  const wrongChannel = desktopReleaseFixture('staging');
+  const manifest = wrongChannel.buffers.get('staging-mac.yml');
+  wrongChannel.buffers.delete('staging-mac.yml');
+  wrongChannel.buffers.set('latest-mac.yml', manifest);
+  assert.throws(
+    () => validateReleaseAssets({ ...wrongChannel, draft: true }),
+    /Artifact bytes are missing for staging-mac\.yml/
+  );
+});
+
+test('staging release versions advance beyond installed and current-feed versions', () => {
+  const valid = {
+    installedVersion: '26.8.1',
+    version: '26.8.2-staging.17823456790.1',
+  };
+  assert.doesNotThrow(() =>
+    assertStagingVersionTransition({
+      ...valid,
+      currentFeedVersion: '26.8.2-staging.17823456789.1',
+    })
+  );
+  for (const { input, message } of [
+    {
+      input: {
+        ...valid,
+        currentFeedVersion: '26.8.2-staging.17823456790.1',
+        version: '26.8.2-staging.17823456789.1',
+      },
+      message: /not newer than current feed/,
+    },
+    {
+      input: { ...valid, version: '26.8.1-staging.17823456791.1' },
+      message: /next-patch/,
+    },
+    {
+      input: { ...valid, version: '26.8.1+staging.17823456791.1' },
+      message: /valid prerelease/,
+    },
+  ]) {
+    assert.throws(() => assertStagingVersionTransition(input), message);
+  }
 });

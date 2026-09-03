@@ -13,11 +13,26 @@ describe('FilterCheckboxItem', () => {
       />
     );
 
-    const row = screen.getByRole('button', { name: /Todo/ });
+    const row = screen.getByRole('menuitemcheckbox', { name: /Todo/ });
 
     expect(row).toHaveAttribute('data-selected', 'true');
+    expect(row).toHaveAttribute('aria-checked', 'true');
     expect(row.querySelector('[data-menu-trailing]')).toHaveTextContent('2');
     expect(row.querySelector('svg')).toBeTruthy();
+  });
+
+  it('exposes checkbox menu semantics for assistive technology', () => {
+    render(
+      <FilterCheckboxItem
+        label='Needs Review'
+        checked={false}
+        onCheckedChange={vi.fn()}
+      />
+    );
+
+    const row = screen.getByRole('menuitemcheckbox', { name: 'Needs Review' });
+
+    expect(row).toHaveAttribute('aria-checked', 'false');
   });
 
   it('supports keyboard selection with Enter', () => {
@@ -31,7 +46,7 @@ describe('FilterCheckboxItem', () => {
       />
     );
 
-    fireEvent.keyDown(screen.getByRole('button', { name: 'Todo' }), {
+    fireEvent.keyDown(screen.getByRole('menuitemcheckbox', { name: 'Todo' }), {
       key: 'Enter',
     });
 

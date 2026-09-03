@@ -1,4 +1,4 @@
-import { and, asc, sql as drizzleSql, eq } from 'drizzle-orm';
+import { and, asc, sql as drizzleSql, eq, inArray } from 'drizzle-orm';
 import { db } from '@/lib/db';
 import {
   type ChatMessage,
@@ -555,6 +555,151 @@ export async function persistTerminalAssistantMessage(input: {
     );
     return ephemeralAssistantMessage(input);
   }
+}
+
+export type TerminalChatTurnInput = {
+  readonly turnId: string;
+  readonly status: TerminalChatTurnStatus;
+  readonly errorCode: string;
+  readonly errorMessage: string;
+};
+
+/**
+ * Finalize a failed/canceled turn without inserting an assistant message.
+ * Mobile clients consume these states as typed errors, never as assistant
+ * completions, and retryable Ovie turns can later be reclaimed atomically.
+ */
+export async function markChatTurnTerminal(
+  input: TerminalChatTurnInput
+): Promise<boolean> {
+  const now = new Date();
+  try {
+    const [terminal] = await db
+      .update(chatTurns)
+      .set({
+        status: input.status,
+        errorCode: input.errorCode,
+        errorMessage: input.errorMessage,
+        completedAt: now,
+        updatedAt: now,
+      })
+      .where(
+        and(
+          eq(chatTurns.id, input.turnId),
+          inArray(chatTurns.status, ['reserved', 'running', 'streaming'])
+        )
+      )
+      .returning({ id: chatTurns.id });
+    return Boolean(terminal);
+  } catch (error) {
+    logger.error(
+      'Chat terminal status persist failed',
+      {
+        turnId: input.turnId,
+        status: input.status,
+        errorCode: input.errorCode,
+        error: error instanceof Error ? error.message : String(error),
+      },
+      'chat/turns'
+    );
+    return false;
+  }
+}
+
+/**
+ * Reclaim one exact retryable terminal turn. The status/error-code compare is
+ * the concurrency gate: only one reconnect can move it back to reserved.
+ */
+export async function resumeTerminalChatTurn(
+  input: TerminalChatTurnInput
+): Promise<'resumed' | 'conflict' | 'error'> {
+  const now = new Date();
+  try {
+    const [resumed] = await db
+      .update(chatTurns)
+      .set({
+        status: 'reserved',
+        errorCode: null,
+        errorMessage: null,
+        startedAt: null,
+        completedAt: null,
+        updatedAt: now,
+      })
+      .where(
+        and(
+          eq(chatTurns.id, input.turnId),
+          eq(chatTurns.status, input.status),
+          eq(chatTurns.errorCode, input.errorCode)
+        )
+      )
+      .returning({ id: chatTurns.id });
+    return resumed ? 'resumed' : 'conflict';
+  } catch (error) {
+    logger.error(
+      'Chat terminal turn resume failed',
+      {
+        turnId: input.turnId,
+        status: input.status,
+        errorCode: input.errorCode,
+        error: error instanceof Error ? error.message : String(error),
+      },
+      'chat/turns'
+    );
+    return 'error';
+  }
+}
+
+export async function resumeStaleChatTurn(input: {
+  readonly turnId: string;
+  readonly status: Extract<
+    ChatTurn['status'],
+    'reserved' | 'running' | 'streaming'
+  >;
+  readonly updatedAt: Date;
+}): Promise<'resumed' | 'conflict' | 'error'> {
+  const now = new Date();
+  try {
+    const [resumed] = await db
+      .update(chatTurns)
+      .set({
+        status: 'reserved',
+        errorCode: null,
+        errorMessage: null,
+        startedAt: null,
+        completedAt: null,
+        updatedAt: now,
+      })
+      .where(
+        and(
+          eq(chatTurns.id, input.turnId),
+          eq(chatTurns.status, input.status),
+          eq(chatTurns.updatedAt, input.updatedAt)
+        )
+      )
+      .returning({ id: chatTurns.id });
+    return resumed ? 'resumed' : 'conflict';
+  } catch (error) {
+    logger.error(
+      'Stale chat turn resume failed',
+      {
+        turnId: input.turnId,
+        status: input.status,
+        error: error instanceof Error ? error.message : String(error),
+      },
+      'chat/turns'
+    );
+    return 'error';
+  }
+}
+
+export async function persistTerminalAssistantMessageWithReceipt(
+  input: Parameters<typeof persistTerminalAssistantMessage>[0]
+): Promise<{ readonly message: ChatMessage; readonly persisted: boolean }> {
+  const message = await persistTerminalAssistantMessage(input);
+  return {
+    message,
+    persisted: message.id !== `ephemeral-${input.turnId}`,
+  };
 }
 
 export function isInFlightChatTurn(turn: ChatTurn): boolean {
