@@ -291,14 +291,14 @@ export function ArtistRulesSheet({
                       <span className='truncate text-xs font-medium text-primary-token'>
                         {rule.category} · {rule.ruleKey}
                       </span>
-                      <span className='shrink-0 text-[11px] text-tertiary-token'>
+                      <span className='shrink-0 text-2xs text-tertiary-token'>
                         {ruleStatusLabel(rule)}
                       </span>
                     </div>
                     <p className='text-sm leading-5 text-secondary-token'>
                       {rule.instruction}
                     </p>
-                    <p className='text-[11px] text-tertiary-token'>
+                    <p className='text-2xs text-tertiary-token'>
                       {rule.allowOverride
                         ? 'Overrides require evidence'
                         : 'Cannot be overridden'}
