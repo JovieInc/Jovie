@@ -221,29 +221,23 @@ vi.mock('@/lib/rate-limit/config', () => ({
       prefix: 'dsp:apple-music:search',
     },
     aiChat: { name: 'AI Chat', limit: 30, window: '1 h', prefix: 'ai:chat' },
-    aiChatWeeklyFree: {
-      name: 'AI Chat Weekly (Free)',
-      limit: 15,
-      window: '7 d',
-      prefix: 'ai:chat:weekly:free',
+    aiChatDailyFree: {
+      name: 'AI Chat Daily (Free)',
+      limit: 10,
+      window: '1 d',
+      prefix: 'ai:chat:daily:free',
     },
-    aiChatWeeklyTrial: {
-      name: 'AI Chat Weekly (Trial)',
-      limit: 50,
-      window: '7 d',
-      prefix: 'ai:chat:weekly:trial',
+    aiChatDailyPro: {
+      name: 'AI Chat Daily (Pro)',
+      limit: 100,
+      window: '1 d',
+      prefix: 'ai:chat:daily:pro',
     },
-    aiChatWeeklyPro: {
-      name: 'AI Chat Weekly (Pro)',
-      limit: 70,
-      window: '7 d',
-      prefix: 'ai:chat:weekly:pro',
-    },
-    aiChatWeeklyMax: {
-      name: 'AI Chat Weekly (Max)',
-      limit: 250,
-      window: '7 d',
-      prefix: 'ai:chat:weekly:max',
+    aiChatDailyMax: {
+      name: 'AI Chat Daily (Max)',
+      limit: 200,
+      window: '1 d',
+      prefix: 'ai:chat:daily:max',
     },
     bandsintownSync: {
       name: 'Bandsintown Sync',
@@ -669,7 +663,7 @@ describe('limiters.ts', () => {
   // =========================================================================
 
   describe('checkAiChatRateLimitForPlan', () => {
-    it('returns success when both burst and weekly limits pass (free plan)', async () => {
+    it('returns success when both burst and daily limits pass (free plan)', async () => {
       mockLimit.mockResolvedValue(makeAllowedResult());
 
       const { checkAiChatRateLimitForPlan } = await import(
@@ -678,7 +672,7 @@ describe('limiters.ts', () => {
       const result = await checkAiChatRateLimitForPlan('user-1', null);
 
       expect(result.success).toBe(true);
-      // burst + weekly = 2 calls
+      // burst + daily = 2 calls
       expect(mockLimit).toHaveBeenCalledTimes(2);
     });
 
@@ -694,19 +688,6 @@ describe('limiters.ts', () => {
       expect(mockLimit).toHaveBeenCalledTimes(2);
     });
 
-    it('uses the trial weekly quota instead of the pro weekly quota', async () => {
-      const { aiChatWeeklyPlanAwareLimiter } = await import(
-        '@/lib/rate-limit/limiters'
-      );
-
-      expect(aiChatWeeklyPlanAwareLimiter.getConfigForPlan('trial')).toEqual({
-        name: 'AI Chat Weekly (Trial)',
-        limit: 50,
-        window: '7 d',
-        prefix: 'ai:chat:weekly:trial',
-      });
-    });
-
     it('returns success for max plan', async () => {
       mockLimit.mockResolvedValue(makeAllowedResult());
 
@@ -719,7 +700,7 @@ describe('limiters.ts', () => {
       expect(mockLimit).toHaveBeenCalledTimes(2);
     });
 
-    it('returns burst failure before checking weekly limit', async () => {
+    it('returns burst failure before checking daily limit', async () => {
       mockLimit.mockResolvedValue(makeDeniedResult());
 
       const { checkAiChatRateLimitForPlan } = await import(
@@ -735,10 +716,10 @@ describe('limiters.ts', () => {
       expect(mockLimit).toHaveBeenCalledTimes(1);
     });
 
-    it('returns weekly quota failure with upgrade message for free plan', async () => {
+    it('returns daily quota failure with upgrade message for free plan', async () => {
       mockLimit
         .mockResolvedValueOnce(makeAllowedResult()) // burst passes
-        .mockResolvedValueOnce(makeDeniedResult()); // weekly fails
+        .mockResolvedValueOnce(makeDeniedResult()); // daily fails
 
       const { checkAiChatRateLimitForPlan } = await import(
         '@/lib/rate-limit/limiters'
@@ -749,7 +730,7 @@ describe('limiters.ts', () => {
       expect(result.reason).toContain('Upgrade to Pro');
     });
 
-    it('returns weekly quota failure without upgrade message for pro plan', async () => {
+    it('returns daily quota failure without upgrade message for pro plan', async () => {
       mockLimit
         .mockResolvedValueOnce(makeAllowedResult())
         .mockResolvedValueOnce(makeDeniedResult());
@@ -761,11 +742,11 @@ describe('limiters.ts', () => {
 
       expect(result.success).toBe(false);
       expect(result.reason).toBe(
-        'You have reached your weekly AI message limit. Your quota resets when the current seven-day window ends.'
+        'You have reached your daily AI message limit. Your quota resets tomorrow.'
       );
     });
 
-    it('returns weekly quota failure without upgrade message for max plan', async () => {
+    it('returns daily quota failure without upgrade message for max plan', async () => {
       mockLimit
         .mockResolvedValueOnce(makeAllowedResult())
         .mockResolvedValueOnce(makeDeniedResult());
@@ -777,7 +758,7 @@ describe('limiters.ts', () => {
 
       expect(result.success).toBe(false);
       expect(result.reason).toBe(
-        'You have reached your weekly AI message limit. Your quota resets when the current seven-day window ends.'
+        'You have reached your daily AI message limit. Your quota resets tomorrow.'
       );
     });
 
@@ -792,11 +773,12 @@ describe('limiters.ts', () => {
       const result = await checkAiChatRateLimitForPlan('user-1', 'pro');
 
       expect(result.success).toBe(true);
-      // burst (degraded -> allow) + weekly
+      expect(result.degraded).toBe(true);
+      // burst (degraded → allow) + daily
       expect(mockLimit).toHaveBeenCalledTimes(2);
     });
 
-    it('fails open when the weekly limit is denied by an unavailable backend', async () => {
+    it('fails open when the daily limit is denied by an unavailable backend', async () => {
       mockLimit
         .mockResolvedValueOnce(makeAllowedResult())
         .mockResolvedValueOnce(makeDeniedResult({ unavailable: true }));
@@ -807,6 +789,7 @@ describe('limiters.ts', () => {
       const result = await checkAiChatRateLimitForPlan('user-1', 'free');
 
       expect(result.success).toBe(true);
+      expect(result.unavailable).toBe(true);
     });
 
     it('fails open when the limiter throws unexpectedly', async () => {
