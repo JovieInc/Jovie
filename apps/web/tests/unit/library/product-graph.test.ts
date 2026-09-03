@@ -84,9 +84,22 @@ describe('library product graph stores', () => {
   it('keeps a complete product optimization contract on existing surfaces', () => {
     expect(LIBRARY_PRODUCT_GRAPH_OPTIMIZATION_CONTRACT).toMatchObject({
       variantIdentity: 'library.product-graph.catalog.v1',
-      primaryMetric: expect.stringContaining('release-to-revenue'),
+      exposure: expect.stringContaining('Library catalog'),
+      outcome: expect.stringContaining('release-to-revenue GMV'),
       attribution: expect.stringContaining('audience-event'),
+      contextDimensions: expect.arrayContaining([
+        'platform',
+        'content-variant',
+        'consented-audience-segment',
+      ]),
+      hypothesis: expect.stringContaining('one-card catalog'),
+      primaryMetric: expect.stringContaining('release-to-revenue'),
+      guardrails: expect.arrayContaining(['complaint rate']),
+      privacy: expect.stringContaining('server-side'),
+      optimizerOwner: expect.stringContaining('JOV-5726'),
+      cadence: expect.stringContaining('daily'),
       decisionWriteback: expect.stringContaining('model-experiment'),
+      rollback: expect.stringContaining('paused'),
     });
   });
 });

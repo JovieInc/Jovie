@@ -540,4 +540,56 @@ describe('library version stacking (JOV-3089)', () => {
     expect(enrichedVideo?.relatedMerchTitles).toEqual(['Tour Tee']);
     expect(enrichedRelease?.postReleaseDownloadCount).toBe(1);
   });
+
+  it('attaches product-graph state after version stacking so canonical rows keep it', () => {
+    const assets = buildLibraryReleaseAssets([
+      buildRelease({
+        id: 'sparse',
+        title: 'All This Noise EP',
+        totalTracks: 0,
+        releaseDate: '2026-01-01T00:00:00.000Z',
+      }),
+      buildRelease({
+        id: 'full',
+        title: 'All This Noise (Remixed)',
+        totalTracks: 6,
+        releaseDate: '2026-02-01T00:00:00.000Z',
+      }),
+    ]);
+    const stacked = attachLibraryProductGraph(
+      stackLibraryReleaseVersions(assets),
+      {
+        merchProducts: [{ id: 'merch-1', title: 'Tour Tee' }],
+        relationships: [
+          {
+            id: 'rel-graph-1',
+            kind: 'features_merch',
+            subjectType: 'release',
+            subjectId: 'full',
+            objectType: 'merch_product',
+            objectId: 'merch-1',
+            status: 'active',
+            createdAt: '2026-09-01T00:00:00.000Z',
+          },
+        ],
+        postReleaseBundle: {
+          downloads: [
+            {
+              id: 'dl-1',
+              releaseId: 'full',
+              title: 'WAV',
+              fileName: 'noise.wav',
+            },
+          ],
+          findings: [],
+          rightsholders: [],
+        },
+      }
+    );
+
+    expect(stacked.map(asset => asset.id)).toEqual(['full']);
+    expect(stacked[0]?.relatedMerchTitles).toEqual(['Tour Tee']);
+    expect(stacked[0]?.relationshipCount).toBe(1);
+    expect(stacked[0]?.postReleaseDownloadCount).toBe(1);
+  });
 });
