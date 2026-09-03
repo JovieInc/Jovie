@@ -59,7 +59,7 @@ describe('PublicPageErrorFallback', () => {
 
     expect(screen.getAllByRole('button')).toHaveLength(1);
     expect(screen.queryByText(/Error ID:/)).not.toBeInTheDocument();
-    expect(document.querySelector('details')).not.toHaveAttribute('open');
+    expect(document.querySelector('details')).toBeNull();
   });
 
   it('logs the error and forwards it to Sentry capture when mounted', () => {
