@@ -425,8 +425,15 @@ jobs:
               --mode "$lane_range_mode" \
               --json-out "$lane_range_json"
             selected_lanes="$(jq -r 'if (.selectedLanes | length) == 0 then "none" else (.selectedLanes | join(",")) end' "$lane_range_json")"
+            # Planner sets runWeb true when the range selects Web OR live SHA ≠
+            # current main (JOV-5821). Skip-promote stays fail-closed while
+            # unbound (JOV-5458 / JOV-5807).
             run_web="$(jq -r '.runWeb' "$lane_range_json")"
+            web_bind_reason="$(jq -r '.webBindReason // "none"' "$lane_range_json")"
             web_evidence_sha="$(jq -r '.webEvidenceSha // "none"' "$lane_range_json")"
+            if [ "$web_bind_reason" = "live_unbound" ]; then
+              echo "::notice::Live production $deployed_sha is unbound from current main $EXPECTED_SHA with sealed lanes $selected_lanes; forcing Web/Promote so skip-promote cannot occupy the bind."
+            fi
 
             final_main_sha="$(gh api "repos/$REPOSITORY/commits/main" --jq '.sha // empty')"
             [[ "$final_main_sha" =~ ^[0-9a-f]{40}$ ]] || {
@@ -449,7 +456,7 @@ jobs:
               echo "lane_receipt_artifact_id=$receipt_artifact_id"
               echo "authorized=true"
             } >> "$GITHUB_OUTPUT"
-            echo "Authorized production from exact CI run $source_run_id attempt $source_run_attempt over deployed range $deployed_sha..$EXPECTED_SHA."
+            echo "Authorized production from exact CI run $source_run_id attempt $source_run_attempt over deployed range $deployed_sha..$EXPECTED_SHA (Web=$run_web bind=$web_bind_reason)."
             exit 0
 
       - name: Preserve cumulative production lane evidence

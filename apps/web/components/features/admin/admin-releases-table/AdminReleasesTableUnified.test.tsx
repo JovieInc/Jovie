@@ -8,31 +8,6 @@ const { mockUseAdminReleasesInfiniteQuery } = vi.hoisted(() => ({
   mockUseAdminReleasesInfiniteQuery: vi.fn(),
 }));
 
-vi.mock('@/components/molecules/Avatar', () => ({
-  Avatar: ({
-    alt,
-    className,
-    name,
-    size,
-    src,
-  }: {
-    readonly alt?: string;
-    readonly className?: string;
-    readonly name?: string | null;
-    readonly size?: string;
-    readonly src?: string | null;
-  }) => (
-    <span
-      data-testid='admin-release-artist-avatar'
-      data-avatar-alt={alt ?? ''}
-      data-avatar-class={className ?? ''}
-      data-avatar-name={name ?? ''}
-      data-avatar-size={size ?? ''}
-      data-avatar-src={src ?? ''}
-    />
-  ),
-}));
-
 vi.mock('@/components/organisms/table', () => ({
   createMultiFieldFilterFn: () => () => true,
   PAGE_TOOLBAR_END_GROUP_CLASS: '',
@@ -146,8 +121,8 @@ describe('AdminReleasesTableUnified artist identity rows', () => {
     });
   });
 
-  it('uses the app Avatar contract for artist fallback identity', () => {
-    render(
+  it('renders artist identity with the canonical ui Avatar composite and fallback glyph', () => {
+    const { container } = render(
       <AdminReleasesTableUnified
         releases={[release]}
         pageSize={20}
@@ -157,13 +132,51 @@ describe('AdminReleasesTableUnified artist identity rows', () => {
       />
     );
 
-    const avatar = screen.getByTestId('admin-release-artist-avatar');
+    // The row composes the @jovie/ui Avatar atoms (person shape, md size by
+    // contract) — wrapper sizing classes (size-/h-/w-) are banned by the
+    // Avatar contract ratchet, so the caller passes the size prop instead.
+    const avatarRoot = container.querySelector("span[data-shape='person']");
+    expect(avatarRoot).not.toBeNull();
+    expect(avatarRoot).toHaveAttribute('data-size', 'md');
+    expect(avatarRoot).toHaveAttribute('data-shape', 'person');
+    expect(avatarRoot).toHaveStyle({ width: '24px', height: '24px' });
+    expect(avatarRoot?.className).not.toMatch(/\b(?:size|h|w)-/);
 
-    expect(avatar).toHaveAttribute('data-avatar-size', 'md');
-    expect(avatar).toHaveAttribute('data-avatar-name', 'Alpha Artist');
-    expect(avatar).toHaveAttribute('data-avatar-src', '');
-    expect(avatar.className).not.toMatch(/\b(?:size|h|w)-/);
+    // No artwork URL -> no <img>; fallback renders the identity glyph.
+    expect(container.querySelector('img')).toBeNull();
+    expect(avatarRoot?.querySelector('svg')).not.toBeNull();
+
     expect(screen.getByText('@alpha')).toBeInTheDocument();
     expect(screen.getByText('Alpha Artist')).toBeInTheDocument();
+  });
+
+  it('renders the artist avatar image when an artwork URL exists', () => {
+    const withAvatar: AdminReleaseRow = {
+      ...release,
+      artistAvatarUrl: 'https://cdn.jov.ie/alpha.jpg',
+    };
+    // The table renders from the query payload, so seed the mock with the
+    // avatar-bearing row before rendering.
+    mockUseAdminReleasesInfiniteQuery.mockReturnValue({
+      data: { pages: [{ rows: [withAvatar], total: 1 }] },
+      fetchNextPage: vi.fn(),
+      hasNextPage: false,
+      isFetchingNextPage: false,
+    });
+
+    const { container } = render(
+      <AdminReleasesTableUnified
+        releases={[withAvatar]}
+        pageSize={20}
+        total={1}
+        search=''
+        sort='release_date_desc'
+      />
+    );
+
+    const image = container.querySelector('img');
+    expect(image).not.toBeNull();
+    expect(image).toHaveAttribute('src', 'https://cdn.jov.ie/alpha.jpg');
+    expect(image).toHaveAttribute('alt', '');
   });
 });

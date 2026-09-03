@@ -75,9 +75,7 @@ doppler run --project jovie-web --config dev -- pnpm --filter @jovie/web run tes
 
 Standard release QA:
 
-```bash
-/qa
-```
+`/qa`
 
 For local browse QA, start the app with:
 
@@ -102,3 +100,7 @@ pnpm run dev:web:browse
 - QA evidence is stored in `.context/launch-readiness/<date>/`.
 - Last 3 synthetic golden-path runs are green.
 - No open Sev-1 or Sev-2 launch regressions remain.
+
+## CI remediation log
+
+- 2026-09-03: Merge-group run 33752429756 rejected the combined head on a Unit Tests (8/10) shard crash — exit 1 with no failing assertion and no junit report. Shard 8 does not intersect this PR's changed files or their transitive imports, and the queue-parent tree passed the identical suites minutes earlier. Head refreshed to re-queue fresh validation; no code change.

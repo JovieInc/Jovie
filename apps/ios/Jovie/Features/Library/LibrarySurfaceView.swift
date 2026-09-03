@@ -46,7 +46,16 @@ struct LibrarySurfaceView: View {
         listBody
       }
     }
-    .accessibilityIdentifier("library-surface")
+    // `.contain` keeps this container out of the child identifier space so
+    // home switcher / search keep `library-home-*` and `library-search`.
+    // Without it the container identifier overwrites those children and
+    // XCUITest cannot find the Catalog switcher (ci:2fa8414a).
+    .accessibilityElement(
+      children: LibraryControlMetrics.requiresPassthroughAccessibilityContainer
+        ? .contain
+        : .ignore
+    )
+    .accessibilityIdentifier(LibraryControlMetrics.accessibilityIdentifier)
     .scrollDismissesKeyboard(.interactively)
     .task {
       await reloadLocalVideos()
@@ -77,17 +86,7 @@ struct LibrarySurfaceView: View {
           home = segment
           openCollection = nil
         } label: {
-          Text(segment.title)
-            .font(JovieFont.body(size: 13, weight: .semibold))
-            .foregroundStyle(
-              home == segment ? JovieColor.backgroundBase : JovieColor.textSecondary
-            )
-            .padding(.horizontal, JovieSpacing.medium)
-            .padding(.vertical, 8)
-            .background(
-              home == segment ? Color.white : JovieColor.surface1,
-              in: Capsule()
-            )
+          LibraryPillLabel(title: segment.title, isSelected: home == segment)
         }
         .buttonStyle(.plain)
         .accessibilityAddTraits(home == segment ? [.isSelected] : [])
@@ -104,11 +103,20 @@ struct LibrarySurfaceView: View {
       .font(JovieFont.body(size: 15))
       .foregroundStyle(JovieColor.textPrimary)
       .padding(.horizontal, JovieSpacing.medium)
-      .frame(height: 36)
-      .background(JovieColor.surface1, in: Capsule())
-      .overlay {
-        Capsule().stroke(JovieColor.borderSubtle, lineWidth: 1)
+      .frame(height: LibraryControlMetrics.minimumTouchTarget)
+      .background {
+        // 36-pt visual capsule centered in the 44-pt hit container: the
+        // accessibility element itself must measure >= 44 pt or XCUITest
+        // reports the inner text-field frame and the hit-frame test fails
+        // (ci:a4699f7d).
+        Capsule()
+          .fill(JovieColor.surface1)
+          .frame(height: LibraryControlMetrics.searchVisualHeight)
+          .overlay {
+            Capsule().stroke(JovieColor.borderSubtle, lineWidth: 1)
+          }
       }
+      .contentShape(Rectangle())
       .padding(.horizontal, JovieSpacing.large)
       .padding(.bottom, JovieSpacing.small)
       .accessibilityIdentifier("library-search")
@@ -121,17 +129,7 @@ struct LibrarySurfaceView: View {
           Button {
             filter = chip
           } label: {
-            Text(chip.title)
-              .font(JovieFont.body(size: 13, weight: .semibold))
-              .foregroundStyle(
-                filter == chip ? JovieColor.backgroundBase : JovieColor.textSecondary
-              )
-              .padding(.horizontal, JovieSpacing.medium)
-              .padding(.vertical, 8)
-              .background(
-                filter == chip ? Color.white : JovieColor.surface1,
-                in: Capsule()
-              )
+            LibraryPillLabel(title: chip.title, isSelected: filter == chip)
           }
           .buttonStyle(.plain)
           .accessibilityAddTraits(filter == chip ? [.isSelected] : [])
@@ -152,7 +150,10 @@ struct LibrarySurfaceView: View {
         Image(systemName: "chevron.left")
           .font(.system(size: 16, weight: .semibold))
           .foregroundStyle(JovieColor.textPrimary)
-          .frame(width: 44, height: 44)
+          .frame(
+            width: LibraryControlMetrics.minimumTouchTarget,
+            height: LibraryControlMetrics.minimumTouchTarget
+          )
       }
       .buttonStyle(.plain)
       .accessibilityLabel("Back to collections")
@@ -268,6 +269,33 @@ struct LibrarySurfaceView: View {
       store.recent()
     }.value
     localVideoAssets = LibraryVlogVideos.assets(from: sessions, store: store)
+  }
+}
+
+enum LibraryControlMetrics {
+  static let minimumTouchTarget: CGFloat = JovieIconButtonStyle.targetSize
+  static let searchVisualHeight: CGFloat = 36
+  static let accessibilityIdentifier = "library-surface"
+  /// `LibrarySurfaceView` must be a passthrough accessibility container
+  /// (`.accessibilityElement(children: .contain)`): without it the container
+  /// identifier propagates to children and hides `library-home-catalog` /
+  /// `library-search` from XCUITest (merge-queue failure ci:2fa8414a).
+  static let requiresPassthroughAccessibilityContainer = true
+}
+
+private struct LibraryPillLabel: View {
+  let title: String
+  let isSelected: Bool
+
+  var body: some View {
+    Text(title)
+      .font(JovieFont.body(size: 13, weight: .semibold))
+      .foregroundStyle(isSelected ? JovieColor.backgroundBase : JovieColor.textSecondary)
+      .padding(.horizontal, JovieSpacing.medium)
+      .padding(.vertical, JovieSpacing.small)
+      .background(isSelected ? Color.white : JovieColor.surface1, in: Capsule())
+      .frame(minHeight: LibraryControlMetrics.minimumTouchTarget)
+      .contentShape(Rectangle())
   }
 }
 

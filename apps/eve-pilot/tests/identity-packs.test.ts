@@ -21,8 +21,8 @@ function armFactoryWrite(turn: EvePilotBoundTurn): EvePilotBoundTurn {
 }
 
 describe('eve identity instruction packs', () => {
-  it('keeps the shared Jovie and Ovie agent model unchanged', () => {
-    expect(eveAgent).toEqual({ model: 'openai/gpt-5.4-mini' });
+  it('pins the Summer Photon speaker model on Eve Gateway OIDC', () => {
+    expect(eveAgent).toEqual({ model: 'zai/glm-5.3-flash' });
   });
 
   it('denies Jovie privileged gbrain write and Symphony heal at the Eve entry', () => {
@@ -119,7 +119,7 @@ describe('eve identity instruction packs', () => {
     expect(eveIdentityForChannel('jovie-core-chat').pack.id).toBe('jovie');
     expect(eveIdentityForChannel('unknown-source').pack.id).toBe('jovie');
     expect(eveIdentityForChannel('ovie-summer-shadow').pack.id).toBe('summer');
-    expect(eveIdentityForChannel('photon').pack.id).toBe('ovie');
+    expect(eveIdentityForChannel('photon').pack.id).toBe('summer');
     if (previous === undefined) {
       delete process.env.EVE_IDENTITY;
     } else {

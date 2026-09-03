@@ -122,8 +122,10 @@ Labels are part of the CI control plane, not just project organization. Apply in
   deterministic combined-head evidence for only the selected product lanes.
 - `testing`, `deep-ci`, `launch-candidate`, and `deploy-preview` are metadata only. They have no CI fan-out semantics.
 
-- Add `needs-human` when the PR should be held for human review or automation must stop. This is for physical actions only a human can perform (sign agreement, rotate key, flip dashboard toggle).
-- If a PR has `needs-human`, do **NOT** enable or preserve auto-merge. Treat the label as a hard stop for unattended automation until a human clears it.
+- Do not use `needs-human` as a PR enrollment hold. If completion requires a
+  physical action only a human can perform (sign an agreement, rotate a key,
+  flip a dashboard toggle), ship the code path disabled or keep the external
+  action unsubmitted and track that authority gate separately.
 - **Do NOT use `needs-human` for taste/design issues** — taste is advisory and routes to LLM review, not a human queue.
 
 - Use `automerge` only for clearly safe PRs that fit the auto-merge guardrails below.
@@ -170,12 +172,9 @@ When in doubt, skip auto-merge and request review.
 3. **When ready to ship:** run `/qa` → `/review` → `/ship` (skip `/qa` or `/review` if already run manually).
 4. `/ship` handles tests, review, commit, push, and PR creation/update. It must **not** edit `CHANGELOG.md` or bump the version fan-out (`VERSION`, `version.json`, package versions) — see "Version Stamping (main-only)" and "Changelog" below.
 5. `/land-and-deploy` handles: merge, CI wait, deploy verification.
-6. Apply `merge-queue` after the PR is ready. The live
-   `MERGE_QUEUE_BACKEND=native` controller treats the label as intent/audit
-   evidence, revalidates the exact head, and enrolls through GitHub's queue:
-   ```bash
-   gh pr edit --add-label merge-queue
-   ```
+6. Leave queue mutation to the live native controller after the PR is ready.
+   Do not add, read, or retain the retired `merge-queue` label; authoritative
+   membership is `isInMergeQueue` plus a positioned `mergeQueueEntry`.
 
 ## Conventional Commits Required
 

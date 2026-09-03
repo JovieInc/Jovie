@@ -309,12 +309,12 @@ jobs:
 
           if [ -n "$EXISTING_PR" ]; then
             echo "Updated existing PR #$EXISTING_PR via force-push"
-            gh pr edit --add-label "merge-queue" "$EXISTING_PR" || { echo "::error::Failed to add merge-queue label to $EXISTING_PR"; exit 1; }
+            echo "Native autoenroll owns queue mutation; the merge-queue label is retired."
           else
             PR_URL=$(gh pr create \
               --title "chore: refresh visual regression baselines" \
               --body "Auto-generated scheduled/manual baseline refresh triggered by ${GITHUB_SHA::8}. Generated on ubuntu-latest + Chromium (pinned via pnpm).")
-            gh pr edit --add-label "merge-queue" "$PR_URL" || { echo "::error::Failed to add merge-queue label to $PR_URL"; exit 1; }
+            echo "Opened $PR_URL. Native autoenroll owns queue mutation; the merge-queue label is retired."
           fi
 
       - name: Cleanup Neon branch
