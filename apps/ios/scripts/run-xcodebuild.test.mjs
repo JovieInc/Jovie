@@ -23,6 +23,11 @@ test('xcodebuild wrapper prints phase timing and bounded timeout diagnostics', (
   assert.match(runXcodebuildSource, /iOS phase timed out after/);
   assert.match(runXcodebuildSource, /Invalid timeout for/);
   assert.match(runXcodebuildSource, /\$\{1:-\}" == "--"/);
+  // set -e would otherwise abort before the xcresult dump (ci:2fa8414a).
+  assert.match(
+    runXcodebuildSource,
+    /set \+e\nrun_phase_with_optional_timeout "xcodebuild \$ACTION"[\s\S]*?XCODEBUILD_STATUS=\$\?\nset -e/
+  );
 });
 
 test('iOS CI exposes focused reproduction while preserving measured build-test headroom', () => {

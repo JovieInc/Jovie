@@ -81,8 +81,10 @@ run_phase_with_optional_timeout() {
       return 2
     fi
 
+    set +e
     run_phase "$phase_name" run_with_timeout "$timeout_seconds" "$@"
     local status=$?
+    set -e
     if [[ "$status" -eq 124 ]]; then
       echo "iOS phase timed out after ${timeout_seconds}s: $phase_name" >&2
     fi
@@ -379,6 +381,7 @@ if [[ "$ACTION" == "test" ]]; then
   RESULT_BUNDLE_ARGS=(-resultBundlePath "$RESULT_BUNDLE_PATH")
 fi
 
+set +e
 run_phase_with_optional_timeout "xcodebuild $ACTION" "${JOVIE_IOS_XCODEBUILD_TIMEOUT_SECONDS:-}" \
   xcodebuild "$ACTION" \
   -project "$PROJECT_PATH" \
@@ -388,6 +391,7 @@ run_phase_with_optional_timeout "xcodebuild $ACTION" "${JOVIE_IOS_XCODEBUILD_TIM
   "$@" \
   CODE_SIGNING_ALLOWED="$CODE_SIGNING_ALLOWED_VALUE"
 XCODEBUILD_STATUS=$?
+set -e
 
 if [[ -n "$RESULT_BUNDLE_PATH" && "$XCODEBUILD_STATUS" -ne 0 && -d "$RESULT_BUNDLE_PATH" ]]; then
   echo "::group::xcresult summary (xcodebuild exit $XCODEBUILD_STATUS)"
