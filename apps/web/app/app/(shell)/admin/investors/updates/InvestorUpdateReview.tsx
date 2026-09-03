@@ -189,7 +189,10 @@ export function InvestorUpdateReview({
 
   return (
     <div className='grid gap-4 xl:grid-cols-5'>
-      <section aria-labelledby='candidate-heading' className='min-w-0 xl:col-span-3'>
+      <section
+        aria-labelledby='candidate-heading'
+        className='min-w-0 xl:col-span-3'
+      >
         <div className='mb-3 flex items-end justify-between gap-3'>
           <div>
             <h2
