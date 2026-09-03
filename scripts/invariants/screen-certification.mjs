@@ -22,7 +22,8 @@ export const EXCLUDED_OWNERS = Object.freeze([
   'ios-shell',
 ]);
 export const RETAINED_SWEEP_WORKFLOWS = Object.freeze([
-  { path: '.github/workflows/screenshots.yml', cron: '0 9 * * *' },
+  // JOV-5852: screenshots.yml is path-complete on push to main + manual
+  // dispatch (its daily cron was retired); live external drift keeps a sweep.
   { path: '.github/workflows/visual-a11y.yml', cron: '37 7 * * *' },
 ]);
 
