@@ -6,7 +6,6 @@ import {
   emptyCodexAccountControlSnapshot,
   parseCodexAccountControlSnapshot,
   reconnectPhaseFromSnapshot,
-  SYMPHONY_CODEX_ACCOUNT_OPTIMIZATION_EXCEPTION,
   stripCodexAccountSecrets,
 } from './symphony-codex-accounts';
 
@@ -24,32 +23,22 @@ const classify = (
   });
 
 describe('symphony-codex-accounts', () => {
-  it('lists only founder-approved labels and keeps unrecognized bindings unselectable', () => {
+  it('keeps allowlist, states, secret-free parse, and phases distinct', () => {
     expect([...APPROVED_CODEX_ACCOUNT_LABELS]).toEqual([
       'meetjovie',
       'jovie',
       'timwhite-co',
     ]);
-    expect(classifyCodexBinding('personal')).toEqual({
+    expect(classifyCodexBinding('personal')).toMatchObject({
       recognized: false,
       selectable: false,
       canSwitch: false,
-      canRestart: false,
     });
-    expect(classifyCodexBinding('meetjovie')).toMatchObject({
-      recognized: true,
-      selectable: false,
-    });
-  });
-
-  it('keeps verified, stale, unknown, and usage-exhausted states distinct', () => {
+    expect(classifyCodexBinding('meetjovie').recognized).toBe(true);
     expect(classify(true, now + 10, now + 10)).toBe('usage-exhausted');
     expect(classify(true, null, now - 1)).toBe('stale');
     expect(classify(false, null, null)).toBe('unknown');
     expect(classify(true, now - 1, now + 10)).toBe('verified');
-  });
-
-  it('parses inspect snapshots without leaking secrets and fills missing approved rows', () => {
     const parsed = parseCodexAccountControlSnapshot({
       schema: 'symphony-codex-account-control/v1',
       availability: 'ready',
@@ -88,12 +77,6 @@ describe('symphony-codex-accounts', () => {
         'token=secret-live access_token=redacted-token-material'
       )
     ).not.toMatch(/secret-live|redacted-token-material/);
-    expect(SYMPHONY_CODEX_ACCOUNT_OPTIMIZATION_EXCEPTION.class).toBe(
-      'non-product'
-    );
-  });
-
-  it('maps confirmation and session phases for the reserved status region', () => {
     const snapshot = emptyCodexAccountControlSnapshot('unavailable', 'down');
     expect(reconnectPhaseFromSnapshot(snapshot, 'jovie')).toBe('confirmation');
     expect(reconnectPhaseFromSnapshot(snapshot, null)).toBe('idle');

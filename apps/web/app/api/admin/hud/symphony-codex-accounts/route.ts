@@ -11,11 +11,15 @@ import { logger } from '@/lib/utils/logger';
 
 export const runtime = 'nodejs';
 
-const NO_STORE_HEADERS = { 'Cache-Control': 'no-store' } as const;
+const HEADERS = { 'Cache-Control': 'no-store' } as const;
 const reconnectSchema = z.object({
   account: z.enum(APPROVED_CODEX_ACCOUNT_LABELS),
   confirm: z.literal(true),
 });
+
+function json(body: unknown, status: number) {
+  return NextResponse.json(body, { status, headers: HEADERS });
+}
 
 async function fail(
   method: 'GET' | 'POST',
@@ -30,20 +34,14 @@ async function fail(
     route: '/api/admin/hud/symphony-codex-accounts',
     method,
   });
-  return NextResponse.json(
-    { error: message },
-    { status: 500, headers: NO_STORE_HEADERS }
-  );
+  return json({ error: message }, 500);
 }
 
 export async function GET(): Promise<Response> {
   const denied = await requireAdminHudApiAccess();
   if (denied) return denied;
   try {
-    return NextResponse.json(await inspectSymphonyCodexAccounts(), {
-      status: 200,
-      headers: NO_STORE_HEADERS,
-    });
+    return json(await inspectSymphonyCodexAccounts(), 200);
   } catch (error) {
     return fail('GET', error, 'Failed to inspect Codex accounts');
   }
@@ -57,22 +55,11 @@ export async function POST(request: Request): Promise<Response> {
     try {
       body = await request.json();
     } catch {
-      return NextResponse.json(
-        { error: 'Invalid JSON payload' },
-        { status: 400, headers: NO_STORE_HEADERS }
-      );
+      return json({ error: 'Invalid JSON payload' }, 400);
     }
     const parsed = reconnectSchema.safeParse(body);
-    if (!parsed.success) {
-      return NextResponse.json(
-        { error: 'Invalid payload' },
-        { status: 400, headers: NO_STORE_HEADERS }
-      );
-    }
-    return NextResponse.json(
-      await reconnectSymphonyCodexAccount(parsed.data.account),
-      { status: 200, headers: NO_STORE_HEADERS }
-    );
+    if (!parsed.success) return json({ error: 'Invalid payload' }, 400);
+    return json(await reconnectSymphonyCodexAccount(parsed.data.account), 200);
   } catch (error) {
     return fail('POST', error, 'Failed to reconnect Codex account');
   }

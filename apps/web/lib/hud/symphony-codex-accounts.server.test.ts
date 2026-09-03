@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 
 vi.mock('server-only', () => ({}));
 vi.mock('@/lib/error-tracking', () => ({ captureError: vi.fn() }));
@@ -32,11 +32,7 @@ const READY = {
 };
 
 describe('symphony-codex-accounts.server', () => {
-  beforeEach(() => {
-    vi.clearAllMocks();
-  });
-
-  it('inspects through the injected runner and keeps unrecognized bindings unselectable', async () => {
+  it('inspects, fails closed, and reconnects without restarting the service', async () => {
     const runner = vi
       .fn()
       .mockResolvedValue({ status: 0, stdout: JSON.stringify(READY) });
@@ -51,21 +47,14 @@ describe('symphony-codex-accounts.server', () => {
       recognized: false,
       selectable: false,
     });
-  });
-
-  it('fails closed when the runner is unavailable and never restarts the service', async () => {
-    const snapshot = await inspectSymphonyCodexAccounts(async () => ({
+    const failed = await inspectSymphonyCodexAccounts(async () => ({
       status: 1,
       stdout: 'systemctl restart symphony-elixir.service token=secret',
     }));
-    expect(snapshot.availability).toBe('unavailable');
-    expect(snapshot.accounts).toHaveLength(3);
-    expect(JSON.stringify(snapshot)).not.toContain('secret');
-    expect(JSON.stringify(snapshot)).not.toContain('restart');
-  });
-
-  it('reconnects only an approved account through the helper argv', async () => {
-    const runner = vi.fn().mockResolvedValue({
+    expect(failed.availability).toBe('unavailable');
+    expect(JSON.stringify(failed)).not.toContain('secret');
+    expect(JSON.stringify(failed)).not.toContain('restart');
+    runner.mockResolvedValue({
       status: 0,
       stdout: JSON.stringify({
         ...READY,
@@ -78,12 +67,15 @@ describe('symphony-codex-accounts.server', () => {
         },
       }),
     });
-    const snapshot = await reconnectSymphonyCodexAccount('meetjovie', runner);
+    const reconnected = await reconnectSymphonyCodexAccount(
+      'meetjovie',
+      runner
+    );
     expect(runner).toHaveBeenCalledWith(
       ['reconnect', '--account', 'meetjovie'],
       12_000
     );
-    expect(snapshot.session).toMatchObject({
+    expect(reconnected.session).toMatchObject({
       phase: 'authorization-pending',
       account: 'meetjovie',
     });

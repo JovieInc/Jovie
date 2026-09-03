@@ -26,10 +26,6 @@ const SNAPSHOT = {
   accounts: [{ label: 'meetjovie', state: 'usage-exhausted' }],
 };
 
-async function loadRoute() {
-  return import('@/app/api/admin/hud/symphony-codex-accounts/route');
-}
-
 function post(body: unknown) {
   return new Request('http://localhost/api/admin/hud/symphony-codex-accounts', {
     method: 'POST',
@@ -43,37 +39,30 @@ describe('/api/admin/hud/symphony-codex-accounts', () => {
     hoisted.requireAdminHudApiAccess.mockResolvedValue(null);
   });
 
-  it('returns 401 when the HUD API gate denies inspect', async () => {
+  it('gates inspect and only reconnects a confirmed approved account', async () => {
+    const route = await import(
+      '@/app/api/admin/hud/symphony-codex-accounts/route'
+    );
     hoisted.requireAdminHudApiAccess.mockResolvedValue(
       new Response(JSON.stringify({ error: 'Unauthorized' }), { status: 401 })
     );
-    const { GET } = await loadRoute();
-    expect((await GET()).status).toBe(401);
+    expect((await route.GET()).status).toBe(401);
     expect(hoisted.inspectSymphonyCodexAccounts).not.toHaveBeenCalled();
-  });
-
-  it('inspects for admins', async () => {
+    hoisted.requireAdminHudApiAccess.mockResolvedValue(null);
     hoisted.inspectSymphonyCodexAccounts.mockResolvedValue(SNAPSHOT);
-    const { GET } = await loadRoute();
-    const response = await GET();
-    expect(response.status).toBe(200);
-    await expect(response.json()).resolves.toMatchObject(SNAPSHOT);
-  });
-
-  it('rejects reconnect without an explicit confirm of an approved account', async () => {
-    const { POST } = await loadRoute();
-    expect((await POST(post({ account: 'meetjovie' }))).status).toBe(400);
+    const inspect = await route.GET();
+    expect(inspect.status).toBe(200);
+    await expect(inspect.json()).resolves.toMatchObject(SNAPSHOT);
+    expect((await route.POST(post({ account: 'meetjovie' }))).status).toBe(400);
     expect(
-      (await POST(post({ account: 'personal', confirm: true }))).status
+      (await route.POST(post({ account: 'personal', confirm: true }))).status
     ).toBe(400);
     expect(hoisted.reconnectSymphonyCodexAccount).not.toHaveBeenCalled();
-  });
-
-  it('reconnects an approved account after confirm', async () => {
     hoisted.reconnectSymphonyCodexAccount.mockResolvedValue(SNAPSHOT);
-    const { POST } = await loadRoute();
-    const response = await POST(post({ account: 'meetjovie', confirm: true }));
-    expect(response.status).toBe(200);
+    const reconnect = await route.POST(
+      post({ account: 'meetjovie', confirm: true })
+    );
+    expect(reconnect.status).toBe(200);
     expect(hoisted.reconnectSymphonyCodexAccount).toHaveBeenCalledWith(
       'meetjovie'
     );

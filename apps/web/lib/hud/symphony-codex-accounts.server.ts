@@ -20,6 +20,8 @@ import { logger } from '@/lib/utils/logger';
 const INSPECT_TIMEOUT_MS = 8_000;
 const RECONNECT_TIMEOUT_MS = 12_000;
 const UNAVAILABLE = 'Gem Codex account control is unavailable.';
+const SSH_ARGS =
+  '-o BatchMode=yes -o ConnectTimeout=2 -o StrictHostKeyChecking=yes';
 
 function helperPath(): string {
   const configured = process.env.JOVIE_CODEX_ACCOUNT_CONTROL_HELPER;
@@ -46,6 +48,10 @@ function spawnWithTimeout(
       stdio: ['pipe', 'pipe', 'pipe'],
     });
     let stdout = '';
+    const done = (status: number) => {
+      clearTimeout(timer);
+      resolve({ stdout, status });
+    };
     const timer = setTimeout(() => {
       child.kill('SIGKILL');
       resolve({ stdout, status: 124 });
@@ -54,14 +60,8 @@ function spawnWithTimeout(
       stdout += String(chunk);
     });
     child.stderr?.on('data', () => {});
-    child.once('error', () => {
-      clearTimeout(timer);
-      resolve({ stdout, status: 127 });
-    });
-    child.once('exit', code => {
-      clearTimeout(timer);
-      resolve({ stdout, status: code ?? 1 });
-    });
+    child.once('error', () => done(127));
+    child.once('exit', code => done(code ?? 1));
     child.stdin?.end(stdin ?? '');
   });
 }
@@ -74,20 +74,18 @@ export function createDefaultCodexAccountControlRunner(): CodexAccountControlRun
     if (!isSafeSshHost(SYMPHONY_SSH_TEMPLATE_HOST)) {
       return { stdout: '', status: 2 };
     }
-    let helperSource = '';
     try {
-      helperSource = readFileSync(helperPath(), 'utf8');
+      return spawnWithTimeout(
+        'ssh',
+        `${SSH_ARGS} ${SYMPHONY_SSH_TEMPLATE_HOST} python3 -`
+          .split(' ')
+          .concat([...args]),
+        timeoutMs,
+        readFileSync(helperPath(), 'utf8')
+      );
     } catch {
       return { stdout: '', status: 2 };
     }
-    return spawnWithTimeout(
-      'ssh',
-      `-o BatchMode=yes -o ConnectTimeout=2 -o StrictHostKeyChecking=yes ${SYMPHONY_SSH_TEMPLATE_HOST} python3 -`
-        .split(' ')
-        .concat([...args]),
-      timeoutMs,
-      helperSource
-    );
   };
 }
 

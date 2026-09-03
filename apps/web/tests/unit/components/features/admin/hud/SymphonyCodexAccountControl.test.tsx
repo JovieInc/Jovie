@@ -24,30 +24,37 @@ const SNAPSHOT = {
 };
 
 describe('SymphonyCodexAccountControl', () => {
-  it('lists approved accounts, keeps unrecognized binding unselectable, and reconnects inline', async () => {
+  it('reserves loading geometry then reconnects an approved account inline', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn().mockReturnValue(new Promise(() => undefined))
+    );
+    const first = render(<SymphonyCodexAccountControl />);
+    expect(
+      screen.getByTestId('ovie-codex-account-loading')
+    ).toBeInTheDocument();
+    expect(screen.getByTestId('ovie-codex-account-control')).toHaveClass(
+      'min-h-56'
+    );
+    first.unmount();
+    const pending = {
+      id: 'sess',
+      account: 'meetjovie',
+      phase: 'authorization-pending',
+      userCode: 'ABCD-1234',
+      verificationUri: 'https://auth.openai.com/codex/device',
+      receipt: null,
+    };
     const fetchMock = vi
       .fn()
+      .mockResolvedValueOnce({ ok: true, json: async () => SNAPSHOT })
       .mockResolvedValueOnce({
         ok: true,
-        json: async () => SNAPSHOT,
-      })
-      .mockResolvedValueOnce({
-        ok: true,
-        json: async () => ({
-          ...SNAPSHOT,
-          session: {
-            id: 'sess',
-            account: 'meetjovie',
-            phase: 'authorization-pending',
-            userCode: 'ABCD-1234',
-            verificationUri: 'https://auth.openai.com/codex/device',
-            receipt: null,
-          },
-        }),
+        json: async () => ({ ...SNAPSHOT, session: pending }),
       });
     vi.stubGlobal('fetch', fetchMock);
-    const user = userEvent.setup();
     render(<SymphonyCodexAccountControl />);
+    const user = userEvent.setup();
     await waitFor(() => {
       expect(
         screen.getByTestId('ovie-codex-account-table')
@@ -95,19 +102,5 @@ describe('SymphonyCodexAccountControl', () => {
         { name: /Reconnect/ }
       )
     ).toHaveLength(3);
-  });
-
-  it('reserves the loading table geometry before the snapshot arrives', () => {
-    vi.stubGlobal(
-      'fetch',
-      vi.fn().mockReturnValue(new Promise(() => undefined))
-    );
-    render(<SymphonyCodexAccountControl />);
-    expect(
-      screen.getByTestId('ovie-codex-account-loading')
-    ).toBeInTheDocument();
-    expect(screen.getByTestId('ovie-codex-account-control')).toHaveClass(
-      'min-h-56'
-    );
   });
 });

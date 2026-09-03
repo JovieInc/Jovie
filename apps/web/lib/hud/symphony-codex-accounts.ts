@@ -43,12 +43,6 @@ export const CODEX_RECONNECT_PHASE_LABELS = {
   failed: 'Reconnect Failed',
   expired: 'Authorization Expired',
 } as const satisfies Record<CodexReconnectPhase, string>;
-export const SYMPHONY_CODEX_ACCOUNT_OPTIMIZATION_EXCEPTION = Object.freeze({
-  kind: 'exception',
-  class: 'non-product',
-  justification:
-    'Operator control-plane Ovie Mac HUD for Gem Symphony Codex accounts; no artist-facing page, link, asset, campaign, recommendation, or content variant.',
-});
 
 const SECRETISH =
   /(?:api[_-]?key|token|secret|password|bearer|authorization|access_token|refresh_token)=([^&\s]+)|eyJ[A-Za-z0-9_-]{20,}|sk-[A-Za-z0-9]+/gi;
@@ -90,10 +84,9 @@ export function classifyCodexAccountState(input: {
     return 'usage-exhausted';
   }
   if (!input.authPresent) return 'unknown';
-  return input.readinessExpiresAt == null ||
-    input.readinessExpiresAt < input.now
-    ? 'stale'
-    : 'verified';
+  const expired =
+    input.readinessExpiresAt == null || input.readinessExpiresAt < input.now;
+  return expired ? 'stale' : 'verified';
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {
@@ -191,13 +184,10 @@ function parseSession(value: unknown): CodexReconnectSession | null {
   const receiptRaw = isRecord(value.receipt) ? value.receipt : null;
   const receiptAccount = receiptRaw ? text(receiptRaw.account) : null;
   const completedAt = receiptRaw ? text(receiptRaw.completedAt) : null;
-  if (
-    !id ||
-    !account ||
-    !isApprovedCodexAccountLabel(account) ||
-    !phase ||
-    !SESSION_PHASES.includes(phase as (typeof SESSION_PHASES)[number])
-  ) {
+  const validPhase = SESSION_PHASES.includes(
+    phase as (typeof SESSION_PHASES)[number]
+  );
+  if (!id || !account || !isApprovedCodexAccountLabel(account) || !validPhase) {
     return null;
   }
   return {
@@ -272,11 +262,9 @@ export function parseCodexAccountControlSnapshot(
     availability,
     binding: lockedBinding(
       boundLabel,
-      bindingRaw?.serviceActive === true
-        ? true
-        : bindingRaw?.serviceActive === false
-          ? false
-          : null
+      typeof bindingRaw?.serviceActive === 'boolean'
+        ? bindingRaw.serviceActive
+        : null
     ),
     accounts: APPROVED_CODEX_ACCOUNT_LABELS.map(
       label =>

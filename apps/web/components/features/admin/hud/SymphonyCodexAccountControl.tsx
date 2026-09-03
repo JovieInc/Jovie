@@ -32,11 +32,12 @@ function phaseMessage(
   confirming: ApprovedCodexAccountLabel | null
 ): string {
   const session = snapshot.session;
+  const bound = snapshot.binding.boundLabel;
   if (phase === 'confirmation' && confirming) {
     return `Reconnect ${confirming} with a one-time device login. Binding stays read-only.`;
   }
   if (phase === 'authorization-pending' && session) {
-    return `Authorize ${session.account}: ${session.userCode ?? 'Waiting for device code'}. Visit ${session.verificationUri ?? 'https://auth.openai.com/codex/device'}.`;
+    return `Authorize ${session.account}: ${session.userCode ?? 'Waiting for device code'}.`;
   }
   if (phase === 'succeeded' && session?.receipt) {
     return `Reconnected ${session.receipt.account}. Selected-account completion receipt stored.`;
@@ -49,12 +50,12 @@ function phaseMessage(
   if (phase === 'expired') {
     return 'Authorization expired. Select an approved account to reconnect again.';
   }
-  if (snapshot.binding.boundLabel) {
-    return snapshot.binding.recognized
-      ? `Binding review: ${snapshot.binding.boundLabel}. Switch and restart stay unavailable.`
-      : `Binding review: ${snapshot.binding.boundLabel} is unrecognized and not selectable. Switch and restart stay unavailable.`;
+  if (!bound) {
+    return 'Binding review is read-only. Switch and restart stay unavailable.';
   }
-  return 'Binding review is read-only. Switch and restart stay unavailable.';
+  return snapshot.binding.recognized
+    ? `Binding review: ${bound}. Switch and restart stay unavailable.`
+    : `Binding review: ${bound} is unrecognized and not selectable. Switch and restart stay unavailable.`;
 }
 
 async function fetchSnapshot(init?: RequestInit) {
@@ -68,8 +69,8 @@ async function fetchSnapshot(init?: RequestInit) {
 }
 
 export function SymphonyCodexAccountControl() {
-  const [snapshot, setSnapshot] = useState<CodexAccountControlSnapshot | null>(
-    null
+  const [snapshot, setSnapshot] = useState(() =>
+    emptyCodexAccountControlSnapshot('unavailable')
   );
   const [isLoading, setIsLoading] = useState(true);
   const [fetchFailed, setFetchFailed] = useState(false);
@@ -84,46 +85,29 @@ export function SymphonyCodexAccountControl() {
   >({});
   const focusLabel = useRef<ApprovedCodexAccountLabel | null>(null);
 
-  const loadSnapshot = useCallback(
-    async (mode: 'initial' | 'refresh' = 'refresh') => {
-      if (mode === 'initial') setIsLoading(true);
-      setFetchFailed(false);
-      try {
-        const parsed = await fetchSnapshot();
-        if (!parsed) {
-          setFetchFailed(true);
-          setSnapshot(
-            current =>
-              current ?? emptyCodexAccountControlSnapshot('unavailable')
-          );
-          return;
-        }
-        setSnapshot(parsed);
-      } catch {
-        setFetchFailed(true);
-        setSnapshot(
-          current => current ?? emptyCodexAccountControlSnapshot('unavailable')
-        );
-      } finally {
-        setIsLoading(false);
-      }
-    },
-    []
-  );
+  const loadSnapshot = useCallback(async (initial = false) => {
+    if (initial) setIsLoading(true);
+    setFetchFailed(false);
+    try {
+      const parsed = await fetchSnapshot();
+      if (parsed) setSnapshot(parsed);
+      else setFetchFailed(true);
+    } catch {
+      setFetchFailed(true);
+    } finally {
+      setIsLoading(false);
+    }
+  }, []);
 
   useEffect(() => {
-    void loadSnapshot('initial');
+    void loadSnapshot(true);
   }, [loadSnapshot]);
 
-  const phase = snapshot
-    ? reconnectPhaseFromSnapshot(snapshot, confirming)
-    : 'idle';
+  const phase = reconnectPhaseFromSnapshot(snapshot, confirming);
 
   useEffect(() => {
     if (phase !== 'authorization-pending') return;
-    const timer = globalThis.setInterval(() => {
-      void loadSnapshot('refresh');
-    }, 2_000);
+    const timer = globalThis.setInterval(() => void loadSnapshot(), 2_000);
     return () => globalThis.clearInterval(timer);
   }, [phase, loadSnapshot]);
 
@@ -156,17 +140,11 @@ export function SymphonyCodexAccountControl() {
     }
   };
 
-  const observation =
-    isLoading && !snapshot
-      ? 'loading'
-      : fetchFailed
-        ? 'unavailable'
-        : snapshot?.availability === 'stale'
-          ? 'stale'
-          : snapshot
-            ? 'fresh'
-            : 'empty';
-  const view = snapshot ?? emptyCodexAccountControlSnapshot('unavailable');
+  const observation = fetchFailed
+    ? 'unavailable'
+    : snapshot.availability === 'stale'
+      ? 'stale'
+      : null;
   const phaseTone =
     phase === 'succeeded'
       ? 'good'
@@ -175,12 +153,18 @@ export function SymphonyCodexAccountControl() {
         : phase === 'authorization-pending' || phase === 'confirmation'
           ? 'warning'
           : 'neutral';
+  const choose = (label: ApprovedCodexAccountLabel) => {
+    setSelected(label);
+    setConfirming(label);
+    focusLabel.current = label;
+  };
 
   return (
     <ContentSurfaceCard
       surface='details'
       className='min-h-56 space-y-3 p-3'
       data-testid='ovie-codex-account-control'
+      data-loading={isLoading ? 'true' : 'false'}
     >
       <div className='flex min-h-6 items-center justify-between gap-2'>
         <p className='text-xs font-caption text-tertiary-token'>
@@ -191,102 +175,88 @@ export function SymphonyCodexAccountControl() {
           tone={phaseTone}
         />
       </div>
-      {observation === 'loading' ? (
-        <div
-          className='grid min-h-36 gap-2'
-          aria-hidden
-          data-testid='ovie-codex-account-loading'
-        >
-          <div className='h-36 animate-pulse rounded-lg border border-subtle bg-surface-0 motion-reduce:animate-none' />
-        </div>
-      ) : null}
-      {snapshot ? (
-        <div className='space-y-3'>
-          <ol
-            className='grid min-h-36 gap-1'
-            data-testid='ovie-codex-account-table'
+      <ol
+        className='grid min-h-36 gap-1'
+        data-testid={
+          isLoading ? 'ovie-codex-account-loading' : 'ovie-codex-account-table'
+        }
+      >
+        {snapshot.accounts.map(row => (
+          <li
+            key={row.label}
+            className={`flex min-h-10 items-center justify-between gap-3 rounded-lg px-2 py-1 ${selected === row.label ? 'bg-surface-2' : 'bg-transparent'}`}
+            data-testid={`ovie-codex-account-row-${row.label}`}
+            data-selected={selected === row.label ? 'true' : 'false'}
           >
-            {view.accounts.map(row => (
-              <li
-                key={row.label}
-                className={`flex min-h-10 items-center justify-between gap-3 rounded-lg px-2 py-1 ${selected === row.label ? 'bg-surface-2' : 'bg-transparent'}`}
-                data-testid={`ovie-codex-account-row-${row.label}`}
-                data-selected={selected === row.label ? 'true' : 'false'}
-              >
-                <button
-                  type='button'
-                  className='min-w-0 flex-1 truncate text-left text-app font-medium text-primary-token focus-ring-themed'
-                  onClick={() => setSelected(row.label)}
-                >
-                  {row.label}
-                </button>
-                <HudStatusPill
-                  label={CODEX_ACCOUNT_STATE_LABELS[row.state]}
-                  tone={STATE_TONE[row.state]}
-                />
-                <Button
-                  type='button'
-                  variant='secondary'
-                  size='sm'
-                  disabled={
-                    snapshot.availability !== 'ready' ||
-                    !row.reconnectEligible ||
-                    pending
-                  }
-                  aria-label={`Reconnect ${row.label}`}
-                  data-testid={`ovie-codex-account-reconnect-${row.label}`}
-                  ref={node => {
-                    actionRefs.current[row.label] = node;
-                  }}
-                  onClick={() => {
-                    setSelected(row.label);
-                    setConfirming(row.label);
-                    focusLabel.current = row.label;
-                  }}
-                >
-                  Reconnect
-                </Button>
-              </li>
-            ))}
-          </ol>
-          <div
-            className='min-h-16 rounded-lg border border-subtle bg-surface-0 px-3 py-2'
-            data-testid='ovie-codex-account-status'
-            data-phase={phase}
-          >
-            <p className='text-app leading-5 text-secondary-token'>
-              {phaseMessage(view, phase, confirming)}
-            </p>
-            {phase === 'confirmation' && confirming ? (
-              <div className='mt-2 flex flex-wrap gap-2'>
-                <Button
-                  type='button'
-                  size='sm'
-                  disabled={pending}
-                  data-testid='ovie-codex-account-confirm'
-                  onClick={() => void confirmReconnect()}
-                >
-                  Confirm Reconnect
-                </Button>
-                <Button
-                  type='button'
-                  variant='secondary'
-                  size='sm'
-                  disabled={pending}
-                  data-testid='ovie-codex-account-cancel'
-                  onClick={() => {
-                    focusLabel.current = confirming;
-                    setConfirming(null);
-                  }}
-                >
-                  Cancel
-                </Button>
-              </div>
-            ) : null}
+            <button
+              type='button'
+              className='min-w-0 flex-1 truncate text-left text-app font-medium text-primary-token focus-ring-themed'
+              onClick={() => setSelected(row.label)}
+            >
+              {row.label}
+            </button>
+            <HudStatusPill
+              label={CODEX_ACCOUNT_STATE_LABELS[row.state]}
+              tone={STATE_TONE[row.state]}
+            />
+            <Button
+              type='button'
+              variant='secondary'
+              size='sm'
+              disabled={
+                snapshot.availability !== 'ready' ||
+                !row.reconnectEligible ||
+                pending ||
+                isLoading
+              }
+              aria-label={`Reconnect ${row.label}`}
+              data-testid={`ovie-codex-account-reconnect-${row.label}`}
+              ref={node => {
+                actionRefs.current[row.label] = node;
+              }}
+              onClick={() => choose(row.label)}
+            >
+              Reconnect
+            </Button>
+          </li>
+        ))}
+      </ol>
+      <div
+        className='min-h-16 rounded-lg border border-subtle bg-surface-0 px-3 py-2'
+        data-testid='ovie-codex-account-status'
+        data-phase={phase}
+      >
+        <p className='text-app leading-5 text-secondary-token'>
+          {phaseMessage(snapshot, phase, confirming)}
+        </p>
+        {phase === 'confirmation' && confirming ? (
+          <div className='mt-2 flex flex-wrap gap-2'>
+            <Button
+              type='button'
+              size='sm'
+              disabled={pending}
+              data-testid='ovie-codex-account-confirm'
+              onClick={() => void confirmReconnect()}
+            >
+              Confirm Reconnect
+            </Button>
+            <Button
+              type='button'
+              variant='secondary'
+              size='sm'
+              disabled={pending}
+              data-testid='ovie-codex-account-cancel'
+              onClick={() => {
+                focusLabel.current = confirming;
+                setConfirming(null);
+              }}
+            >
+              Cancel
+            </Button>
           </div>
-        </div>
-      ) : null}
-      {observation === 'unavailable' || observation === 'stale' ? (
+        ) : null}
+      </div>
+      {observation ? (
         <HudObservationStatus
           state={observation}
           message={
@@ -294,7 +264,7 @@ export function SymphonyCodexAccountControl() {
               ? 'Codex account state is stale.'
               : 'Codex account control could not reach Gem.'
           }
-          onRetry={() => void loadSnapshot('refresh')}
+          onRetry={() => void loadSnapshot()}
           testId='ovie-codex-account-observation'
         />
       ) : null}
