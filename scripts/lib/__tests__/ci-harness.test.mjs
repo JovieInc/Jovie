@@ -211,7 +211,7 @@ describe('ci-harness manifest', () => {
     const prReady = extractWorkflowJobBlock(workflow, 'ci-pr-ready');
 
     expect(prReady).toContain(
-      'needs: [ci-path-changes, ci-risk-classifier, ci-fast, ci-secret-scan, ci-golden-path-lock, ci-investor-update-ledger]'
+      'needs: [ci-path-changes, ci-risk-classifier, ci-fast, ci-secret-scan, ci-golden-path-lock]'
     );
     expect(prReady).toContain('Evaluate deterministic source PR checks');
     expect(prReady).toContain('All deterministic source PR checks passed.');
