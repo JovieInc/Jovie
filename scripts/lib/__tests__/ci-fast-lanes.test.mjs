@@ -23,7 +23,9 @@ describe('runDesignConformance', () => {
 
     expect(result.code).toBe(0);
     expect(result.skipped).toBe(true);
-    expect(result.output).toContain('No design-domain files changed');
+    expect(result.output).toContain(
+      'Design conformance skipped (no design-domain files changed)'
+    );
     expect(execute).not.toHaveBeenCalled();
   });
 
@@ -41,9 +43,7 @@ describe('runDesignConformance', () => {
 
     expect(result.code).toBe(0);
     expect(execute).toHaveBeenCalledOnce();
-    expect(execute).toHaveBeenCalledWith(
-      LANE_COMMANDS['design-conformance']
-    );
+    expect(execute).toHaveBeenCalledWith(LANE_COMMANDS['design-conformance']);
     expect(result.skipped).toBeUndefined();
   });
 
