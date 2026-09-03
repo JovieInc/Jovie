@@ -33,6 +33,16 @@ LOCAL_INTERVAL = max(10, int(os.environ.get("HUD_LOCAL_INTERVAL", "15")))
 REMOTE_INTERVAL = max(60, int(os.environ.get("HUD_REMOTE_INTERVAL", "120")))
 FLEET_RECEIPT_STALE_SECONDS = 10 * 60
 FLEET_RECEIPT_FUTURE_SKEW_SECONDS = 5
+ACTIVE_WORK_STALLED_SECONDS = 90 * 60
+SYMPHONY_WORKFLOW_PATHS = (
+    Path(
+        os.environ.get(
+            "HUD_SYMPHONY_WORKFLOW",
+            "~/.config/symphony/WORKFLOW.md",
+        )
+    ).expanduser(),
+    Path("/home/timwhite/symphony-runtime/elixir/WORKFLOW.jovie-ui-pilot.md"),
+)
 STALE_AFTER = {
     "symphony": LOCAL_INTERVAL * 3,
     "fleet": FLEET_RECEIPT_STALE_SECONDS,
@@ -67,10 +77,6 @@ SUMMER_QUEUE_PATH = Path(
         "/home/timwhite/gem-workspace/state/jovie-delivery-controller/summer-queue.json",
     )
 ).expanduser()
-DEFAULT_WORKFLOW = Path(
-    os.environ.get("SYMPHONY_WORKFLOW_PATH", str(Path.home() / ".config/symphony/WORKFLOW.md"))
-).expanduser()
-REPO_WORKFLOW = Path(__file__).resolve().parent / "symphony" / "WORKFLOW.md"
 WORKFLOWS = {
     "CI",
     "Production Controller",
@@ -671,18 +677,33 @@ def error_kind(text: Any) -> str:
     return "other"
 
 
-def configured_slots(path: Path | None = None) -> int | None:
-    for candidate in (path, DEFAULT_WORKFLOW, REPO_WORKFLOW):
-        if candidate is None or not candidate.is_file():
-            continue
+def configured_slots(paths: tuple[Path, ...] | None = None) -> int | None:
+    for path in paths or SYMPHONY_WORKFLOW_PATHS:
         try:
-            text = candidate.read_text(encoding="utf-8")
+            content = path.read_text(encoding="utf-8")
         except OSError:
             continue
-        match = re.search(r"^\s*max_concurrent_agents:\s*([1-9][0-9]*)\s*$", text, re.MULTILINE)
+        match = re.search(
+            r"^\s*max_concurrent_agents:\s*([1-9][0-9]*)\s*$",
+            content,
+            re.MULTILINE,
+        )
         if match:
             return int(match.group(1))
     return None
+
+
+def worker_freshness(event_at: str | None) -> tuple[str, int | None]:
+    stamp = parse_time(event_at)
+    if stamp is None or stamp.tzinfo is None or stamp.utcoffset() is None:
+        return ("UNKNOWN", None)
+    age_seconds = int((now() - stamp).total_seconds())
+    if age_seconds < -FLEET_RECEIPT_FUTURE_SKEW_SECONDS:
+        return ("UNKNOWN", None)
+    age_seconds = max(0, age_seconds)
+    if age_seconds > ACTIVE_WORK_STALLED_SECONDS:
+        return ("STALLED", age_seconds)
+    return ("RUNNING", age_seconds)
 
 
 def duration_text(seconds: float | int | None) -> str:
@@ -750,7 +771,7 @@ def _ansi(text: str, *codes: str) -> str:
 STATUS_TOKEN_STYLES = (
     (("ERROR", "FAILING", "FAILED", "BLOCKED", "DEFAULT DEAD"), ("1", "31")),
     (("OWNER INPUT", "HUMAN ACTION", "DECISION"), ("1", "35")),
-    (("UNAVAILABLE", "UNKNOWN", "NOT PROVEN", "STALE", "DEGRADED", "PENDING", "ATTENTION", "RETRY", "BACKPRESSURE", "PAUSED", "BELOW BAR"), ("1", "33")),
+    (("UNAVAILABLE", "UNKNOWN", "NOT PROVEN", "STALE", "STALLED", "DEGRADED", "PENDING", "ATTENTION", "RETRY", "BACKPRESSURE", "PAUSED", "BELOW BAR"), ("1", "33")),
     (("ACTIVE", "RUNNING", "CLEAR", "EXACT", "HEALTHY", "DEFAULT ALIVE", "READY"), ("1", "32")),
 )
 STATUS_TOKEN_CODES = {
@@ -1043,7 +1064,13 @@ def fetch_symphony() -> dict[str, Any]:
     blockers: list[dict[str, Any]] = []
     runtime_errors: list[str] = []
     runtime_payload_seen = False
-    counts = {"implementing": 0, "retrying": 0, "queued": 0, "blocked": 0}
+    counts = {
+        "implementing": 0,
+        "stalled": 0,
+        "retrying": 0,
+        "queued": 0,
+        "blocked": 0,
+    }
     reasons = {
         "capacity": 0,
         "timeout": 0,
@@ -1076,14 +1103,35 @@ def fetch_symphony() -> dict[str, Any]:
                 retry = item.get("retry") or {}
                 if status == "running":
                     counts["implementing"] += 1
+                    event_at = running.get("last_event_at")
+                    freshness, event_age_seconds = worker_freshness(event_at)
+                    if freshness == "STALLED":
+                        counts["stalled"] += 1
+                    gate = (
+                        "inspect worker; terminalize or retry with named owner"
+                        if freshness == "STALLED"
+                        else "restore last-event timestamp source"
+                        if freshness == "UNKNOWN"
+                        else "none; worker event stream current"
+                    )
                     jobs.append(
                         {
                             "id": compact(identifier, 18),
                             "title": compact(titles.get(identifier) or "title unavailable", 64),
                             "lane": label,
                             "status": status,
-                            "activity": compact(running.get("last_activity") or "active", 50),
+                            "activity": compact(
+                                running.get("last_message")
+                                or running.get("last_event")
+                                or "active",
+                                50,
+                            ),
                             "started": running.get("started_at") or running.get("start_time") or running.get("claimed_at"),
+                            "event_at": event_at,
+                            "event_age_seconds": event_age_seconds,
+                            "freshness": freshness,
+                            "owner": f"Symphony/{label}",
+                            "gate": gate,
                         }
                     )
                 elif status in {"retrying", "blocked"}:
@@ -1982,6 +2030,14 @@ def _attention_items(
             items.append((evidence, source, recovery))
 
     if _section_is_current(state, "symphony"):
+        if int(counts.get("stalled") or 0) > 0:
+            items.append(
+                (
+                    "STALLED",
+                    f"{counts.get('stalled')} active worker(s) quiet over 90m",
+                    "Symphony owner · inspect worker or terminalize issue",
+                )
+            )
         if int(counts.get("blocked") or 0) > 0:
             items.append(("OWNER INPUT", f"{counts.get('blocked')} blocked", "named operator decision/action required · Symphony"))
         if int(counts.get("retrying") or 0) > 0:
@@ -2057,6 +2113,13 @@ def _work_rows(state: dict[str, Any], width: int) -> list[str]:
 
     rows = [
         work_row("Implementing", counts.get("implementing"), "RUNNING", "IDLE", "Symphony live runtime"),
+        work_row(
+            "Stalled active",
+            counts.get("stalled", 0),
+            "STALLED",
+            "CLEAR",
+            "running with no event for >90m · Symphony owner",
+        ),
         work_row("First-run queue", counts.get("queued"), "PENDING", "CLEAR", "retries excluded · Symphony"),
         work_row("Retry wait", counts.get("retrying"), "PENDING", "CLEAR", f"automatic · next {until_text(local.get('next_retry'))}"),
     ]
@@ -2077,7 +2140,24 @@ def _work_rows(state: dict[str, Any], width: int) -> list[str]:
         rows.append(_metric("Native queue", native_queue, native_status, native_detail, width))
     for job in (local.get("jobs") or [])[:7]:
         if local_evidence == "HEALTHY":
-            rows.append(_metric(job.get("id", "job"), elapsed_text(job.get("started")), "RUNNING", job.get("title", "title unavailable"), width))
+            freshness = str(job.get("freshness") or "UNKNOWN")
+            event_age = (
+                duration_text(job.get("event_age_seconds"))
+                if job.get("event_age_seconds") is not None
+                else "unknown"
+            )
+            rows.append(
+                _metric(
+                    job.get("id", "job"),
+                    elapsed_text(job.get("started")),
+                    freshness,
+                    (
+                        f"{job.get('title', 'title unavailable')} · last event {event_age} ago · "
+                        f"owner {job.get('owner', 'UNKNOWN')} · gate {job.get('gate', 'UNKNOWN')}"
+                    ),
+                    width,
+                )
+            )
         else:
             value = "UNAVAILABLE" if local_evidence == "UNAVAILABLE" else elapsed_text(job.get("started"))
             rows.append(_metric(job.get("id", "job"), value, local_evidence, f"{local_detail} · last-known {job.get('title', 'title unavailable')}", width))
@@ -2790,6 +2870,7 @@ def _lifecycle_matrix_rows(state: dict[str, Any], width: int) -> list[str]:
     local = state.get("symphony") or {}
     delivery = state.get("delivery") or {}
     counts = local.get("counts") or {}
+    slots = local.get("slots") or {}
     pr_fleet = _pr_fleet_receipt(delivery)
     pr_counts = pr_fleet.get("counts") or {}
     local_evidence, local_detail = section_evidence(state, "symphony")
@@ -2813,12 +2894,25 @@ def _lifecycle_matrix_rows(state: dict[str, Any], width: int) -> list[str]:
     queued_pending: Any = None
     if queued_count is not None or retrying_count is not None:
         queued_pending = (queued_count or 0) + (retrying_count or 0)
-    local_detail_text = (
-        local_detail if local_evidence != "HEALTHY" else "local runtime counts"
-    )
+    slot_total = count_int(slots.get("total"))
+    slot_available = count_int(slots.get("available"))
+    local_detail_text = local_detail
+    if local_evidence == "HEALTHY":
+        local_detail_text = (
+            f"{counts.get('implementing', '?')}/{slot_total} active · "
+            f"{slot_available} slots open · official workflow"
+            if slot_total is not None and slot_available is not None
+            else "capacity unavailable · inspect official workflow"
+        )
     if local_evidence == "HEALTHY" and retrying_count:
         local_detail_text = (
-            f"queued {queued_count or 0} + retry {retrying_count} wait · local runtime counts"
+            f"{local_detail_text} · queued {queued_count or 0} + retry {retrying_count} wait"
+        )
+    stalled_count = count_int(counts.get("stalled"))
+    if local_evidence == "HEALTHY" and stalled_count:
+        local_detail_text = (
+            f"{local_detail_text} · {stalled_count} active quiet >90m · "
+            "inspect worker or terminalize issue"
         )
 
     def local_value(value: Any) -> str:
@@ -2948,6 +3042,26 @@ def _issue_queue_rows(
     def local_state(status: str) -> str:
         return status if local_evidence == "HEALTHY" else local_evidence
 
+    def job_state(job: dict[str, Any]) -> str:
+        if local_evidence != "HEALTHY":
+            return local_evidence
+        freshness = str(job.get("freshness") or "UNKNOWN")
+        return freshness if freshness in {"RUNNING", "STALLED"} else "UNKNOWN"
+
+    def job_detail(job: dict[str, Any]) -> str:
+        title = job.get("title", "title unavailable")
+        if local_evidence != "HEALTHY":
+            return f"{local_detail} · last-known {title}"
+        event_age = (
+            duration_text(job.get("event_age_seconds"))
+            if job.get("event_age_seconds") is not None
+            else "unknown"
+        )
+        return (
+            f"{title} · last event {event_age} ago · "
+            f"owner {job.get('owner', 'UNKNOWN')} · gate {job.get('gate', 'UNKNOWN')}"
+        )
+
     def blocker_state(blocker: dict[str, Any]) -> str:
         if local_evidence != "HEALTHY":
             return local_evidence
@@ -2981,11 +3095,9 @@ def _issue_queue_rows(
             _stable_issue_row(
                 "-",
                 job.get("id", "job"),
-                local_state("RUNNING"),
+                job_state(job),
                 "UNK" if local_evidence == "UNAVAILABLE" else elapsed_text(job.get("started")),
-                job.get("title", "title unavailable")
-                if local_evidence == "HEALTHY"
-                else f"{local_detail} · last-known {job.get('title', 'title unavailable')}",
+                job_detail(job),
                 width,
             )
         )
