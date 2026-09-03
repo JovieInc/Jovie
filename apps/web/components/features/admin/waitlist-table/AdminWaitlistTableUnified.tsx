@@ -1,6 +1,5 @@
 'use client';
 
-import { type ColumnDef, createColumnHelper } from '@tanstack/react-table';
 import { ClipboardList } from 'lucide-react';
 import { useCallback, useMemo, useRef } from 'react';
 import { toast } from '@/components/feedback';
@@ -12,6 +11,8 @@ import { AdminDataTable } from '@/features/admin/table/AdminDataTable';
 import { copyToClipboard } from '@/hooks/useClipboard';
 import type { WaitlistEntryRow } from '@/lib/admin/types';
 import { TABLE_MIN_WIDTHS, TABLE_ROW_HEIGHTS } from '@/lib/constants/layout';
+import type { ColumnDef } from '@/lib/tanstack-v8-compat';
+import { createColumnHelper } from '@/lib/tanstack-v8-compat';
 import type { WaitlistTableProps } from './types';
 import { useApproveEntry } from './useApproveEntry';
 import {
