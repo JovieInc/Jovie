@@ -52,6 +52,10 @@
   <string>Jovie uses the camera so you can record teleprompter videos. Recordings stay on your device until you choose to share them.</string>
   <key>NSSpeechRecognitionUsageDescription</key>
   <string>Jovie transcribes your voice on-device when available (Apple Speech may use a network path only if on-device is unavailable) and sends it when you tap Send. Jovie does not store the recording.</string>
+  <key>UIBackgroundModes</key>
+  <array>
+    <string>audio</string>
+  </array>
   <key>UIAppFonts</key>
   <array>
     <string>Inter-Variable.ttf</string>
