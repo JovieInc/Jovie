@@ -1,1 +1,105 @@
-aW1wb3J0IHsgcmVhZEZpbGVTeW5jIH0gZnJvbSAnbm9kZTpmcyc7CmltcG9ydCB7IGpvaW4gfSBmcm9tICdub2RlOnBhdGgnOwppbXBvcnQgeyBkZXNjcmliZSwgZXhwZWN0LCBpdCB9IGZyb20gJ3ZpdGVzdCc7Cgpjb25zdCBXRUJfUk9PVCA9IGpvaW4oaW1wb3J0Lm1ldGEuZGlybmFtZSwgJy4uJywgJy4uJywgJy4uJyk7CmNvbnN0IFJFUE9fUk9PVCA9IGpvaW4oV0VCX1JPT1QsICcuLicsICcuLicpOwoKZnVuY3Rpb24gcmVhZFdlYihyZWxhdGl2ZVBhdGg6IHN0cmluZyk6IHN0cmluZyB7CiAgcmV0dXJuIHJlYWRGaWxlU3luYyhqb2luKFdFQl9ST09ULCByZWxhdGl2ZVBhdGgpLCAndXRmOCcpOwp9CgpkZXNjcmliZSgnc2hhcmVkIHByZXNzLW1vdGlvbiBjb250cmFjdCcsICgpID0+IHsKICBpdCgna2VlcHMgdGhlIGNhbm9uaWNhbCBwcmVzcyBzY2FsZSBzdWJ0bGUgYW5kIHJlZHVjZWQtbW90aW9uIHNhZmUnLCAoKSA9PiB7CiAgICBjb25zdCBkZXNpZ25TeXN0ZW0gPSByZWFkV2ViKCdzdHlsZXMvZGVzaWduLXN5c3RlbS5jc3MnKTsKICAgIGNvbnN0IGJ1dHRvbiA9IHJlYWRGaWxlU3luYygKICAgICAgam9pbihSRVBPX1JPT1QsICdwYWNrYWdlcy91aS9hdG9tcy9idXR0b24udHN4JyksCiAgICAgICd1dGY4JwogICAgKTsKCiAgICBleHBlY3QoZGVzaWduU3lzdGVtKS50b01hdGNoKC8tLXNjYWxlLXByZXNzOlxzKjBcLjk4Oy8pOwogICAgZXhwZWN0KGJ1dHRvbikudG9Db250YWluKCdhY3RpdmU6c2NhbGUtcHJlc3MnKTsKICAgIGV4cGVjdChidXR0b24pLnRvQ29udGFpbignbW90aW9uLXJlZHVjZTphY3RpdmU6c2NhbGUtMTAwJyk7CiAgICBleHBlY3QoYnV0dG9uKS5ub3QudG9NYXRjaCgvYWN0aXZlOnNjYWxlLVxbLyk7CiAgICBleHBlY3QoYnV0dG9uKS50b0NvbnRhaW4oJ3ByZXNzRmVlZGJhY2sgPSBmYWxzZScpOwogIH0pOwoKICBpdCgnZG9lcyBub3Qgc2NhbGUgZXZlcnkgaW50ZXJhY3RpdmUgZWxlbWVudCBnbG9iYWxseScsICgpID0+IHsKICAgIGNvbnN0IGdsb2JhbHMgPSByZWFkV2ViKCdhcHAvZ2xvYmFscy5jc3MnKTsKCiAgICBleHBlY3QoZ2xvYmFscykubm90LnRvQ29udGFpbigndHJhbnNmb3JtOiBzY2FsZSgwLjk2KScpOwogICAgZXhwZWN0KGdsb2JhbHMpLm5vdC50b0NvbnRhaW4oJ2FjdGl2ZTpzY2FsZS1bMC45Nl0nKTsKICAgIGV4cGVjdChnbG9iYWxzKS5ub3QudG9Db250YWluKAogICAgICAnYnV0dG9uOm5vdCg6ZGlzYWJsZWQpOm5vdChbZGF0YS1zdGF0aWM9InRydWUiXSknCiAgICApOwogICAgZXhwZWN0KGdsb2JhbHMpLm5vdC50b0NvbnRhaW4oCiAgICAgICdbcm9sZT0iYnV0dG9uIl06bm90KFthcmlhLWRpc2FibGVkPSJ0cnVlIl0pOm5vdChbZGF0YS1zdGF0aWM9InRydWUiXSknCiAgICApOwogICAgZXhwZWN0KGdsb2JhbHMpLnRvQ29udGFpbigKICAgICAgJ2FjdGl2ZTpzY2FsZS1wcmVzcyBtb3Rpb24tcmVkdWNlOmFjdGl2ZTpzY2FsZS0xMDAnCiAgICApOwogICAgLy8gVGhlIHByZXNzIHNjYWxlIGlzIGEgbmFtZWQgVGFpbHdpbmQgdjQgdXRpbGl0eSwgbm90IGFuIGFyYml0cmFyeSB2YWx1ZS4KICAgIGV4cGVjdChnbG9iYWxzKS50b01hdGNoKAogICAgICAvQHV0aWxpdHkgc2NhbGUtcHJlc3MgXHtccypcblxzKnNjYWxlOiB2YXJcKC0tc2NhbGUtcHJlc3NcKTtccypcblxzKlx9LwogICAgKTsKICB9KTsKCiAgaXQoJ2tlZXBzIGltbWVkaWF0ZS1zdGF0ZSBhbmQgY2Fyb3VzZWwgY29udHJvbHMgc3RhdGljIHdoaWxlIHJlbWFpbmluZyBwcmVzcyBmZWVkYmFjayBzdGF5cyBhdCAwLjk4JywgKCkgPT4gewogICAgY29uc3QgYm90dG9tVGFicyA9IHJlYWRXZWIoCiAgICAgICdjb21wb25lbnRzL2ZlYXR1cmVzL3Byb2ZpbGUvbmF2L0JvdHRvbVRhYkJhci50c3gnCiAgICApOwogICAgY29uc3QgZW50aXR5Q2FyZCA9IHJlYWRXZWIoCiAgICAgICdjb21wb25lbnRzL29yZ2FuaXNtcy9lbnRpdHktY2FyZC9FbnRpdHlDYXJkLnRzeCcKICAgICk7CiAgICBjb25zdCBzbWFydExpbmtBdWRpb1ByZXZpZXcgPSByZWFkV2ViKAogICAgICAnY29tcG9uZW50cy9mZWF0dXJlcy9yZWxlYXNlL1NtYXJ0TGlua0F1ZGlvUHJldmlldy50c3gnCiAgICApOwogICAgY29uc3QgaG9tZXBhZ2VQb3N0ZXJIZXJvID0gcmVhZFdlYigKICAgICAgJ2NvbXBvbmVudHMvbWFya2V0aW5nL01hcmtldGluZ1Bvc3Rlckhlcm8udHN4JwogICAgKTsKICAgIGNvbnN0IGNhcHR1cmVTaGFyZWQgPSByZWFkV2ViKAogICAgICAnY29tcG9uZW50cy9tYXJrZXRpbmcvYXJ0aXN0LXByb2ZpbGUvY2FwdHVyZVNoYXJlZC50c3gnCiAgICApOwogICAgY29uc3Qgam92aWVPdmVybGF5ID0gcmVhZFdlYignY29tcG9uZW50cy9zaGVsbC9Kb3ZpZU92ZXJsYXkudHN4Jyk7CgogICAgZXhwZWN0KGJvdHRvbVRhYnMpLm5vdC50b0NvbnRhaW4oJ2FjdGl2ZTpzY2FsZScpOwogICAgZXhwZWN0KGJvdHRvbVRhYnMpLm5vdC50b0NvbnRhaW4oJ3RyYW5zaXRpb24tW2NvbG9yLHRyYW5zZm9ybV0nKTsKICAgIGV4cGVjdChlbnRpdHlDYXJkKS5ub3QudG9Db250YWluKCdncm91cC1hY3RpdmU6c2NhbGUnKTsKICAgIGV4cGVjdChlbnRpdHlDYXJkKS5ub3QudG9Db250YWluKCd0cmFuc2l0aW9uLVtiYWNrZ3JvdW5kLWNvbG9yLHRyYW5zZm9ybV0nKTsKICAgIGV4cGVjdChzbWFydExpbmtBdWRpb1ByZXZpZXcpLm5vdC50b0NvbnRhaW4oJ2FjdGl2ZTpzY2FsZScpOwogICAgZXhwZWN0KGhvbWVwYWdlUG9zdGVySGVybykubm90LnRvQ29udGFpbignYWN0aXZlOnNjYWxlJyk7CiAgICBleHBlY3QoY2FwdHVyZVNoYXJlZCkubm90LnRvQ29udGFpbignc2NhbGUtWzAuOTZdJyk7CiAgICBleHBlY3QoY2FwdHVyZVNoYXJlZCkubm90LnRvQ29udGFpbigKICAgICAgJ3RyYW5zaXRpb24tW2JhY2tncm91bmQtY29sb3IsY29sb3IsdHJhbnNmb3JtXScKICAgICk7CiAgICBleHBlY3Qoam92aWVPdmVybGF5KS5ub3QudG9Db250YWluKCdzY2FsZSgwLjk2KScpOwogICAgZXhwZWN0KGpvdmllT3ZlcmxheSkudG9Db250YWluKCd1c2VSZWR1Y2VkTW90aW9uJyk7CiAgICBleHBlY3Qoam92aWVPdmVybGF5KS50b01hdGNoKAogICAgICAvcHJlZmVyc1JlZHVjZWRNb3Rpb25ccypcP1xzKid0cmFuc2xhdGVZXCgwXCknLwogICAgKTsKICB9KTsKCiAgaXQuZWFjaChbCiAgICAnY29tcG9uZW50cy9mZWF0dXJlcy9kYXNoYm9hcmQvb3JnYW5pc21zL0Rhc2hib2FyZEhlYWRlci50c3gnLAogICAgJ2NvbXBvbmVudHMvZmVhdHVyZXMvZGFzaGJvYXJkL2Rhc2hib2FyZC1uYXYvTmF2TWVudUl0ZW0udHN4JywKICAgICdjb21wb25lbnRzL29yZ2FuaXNtcy91c2VyLWJ1dHRvbi9Vc2VyQnV0dG9uLnRzeCcsCiAgICAnY29tcG9uZW50cy9qb3ZpZS9jb21wb25lbnRzL1NsYXNoQ29tbWFuZE1lbnUudHN4JywKICAgICdjb21wb25lbnRzL2pvdmllL2NvbXBvbmVudHMvQ2hhdENvbXBvc2VyVG9vbGJhci50c3gnLAogICAgJ2NvbXBvbmVudHMvam92aWUvY29tcG9uZW50cy9DaGF0TWVzc2FnZS50c3gnLAogICAgJ2NvbXBvbmVudHMvZmVhdHVyZXMvcHJpY2luZy9QcmljaW5nQ1RBLnRzeCcsCiAgXSkoJyVzIGRvZXMgbm90IGZvcmsgaGFyZGNvZGVkIHByZXNzIG9yIGhvdmVyIHNjYWxpbmcnLCByZWxhdGl2ZVBhdGggPT4gewogICAgY29uc3Qgc291cmNlID0gcmVhZFdlYihyZWxhdGl2ZVBhdGgpOwoKICAgIGV4cGVjdChzb3VyY2UpLm5vdC50b01hdGNoKC9hY3RpdmU6c2NhbGUtXFsoPyF2YXJcKC0tc2NhbGUtcHJlc3NcKSkvKTsKICAgIGV4cGVjdChzb3VyY2UpLm5vdC50b01hdGNoKC93aGlsZVRhcD1ce1x7XHMqc2NhbGU6Lyk7CiAgICBleHBlY3Qoc291cmNlKS5ub3QudG9NYXRjaCgvd2hpbGVIb3Zlcj1ce1x7XHMqc2NhbGU6Lyk7CiAgfSk7CgogIGl0KCdyb3V0ZXMgdGhlIHJlcHJlc2VudGF0aXZlIHN0YW5kYWxvbmUgQ1RBIHRocm91Z2ggdGhlIHNoYXJlZCBCdXR0b24gcHJpbWl0aXZlJywgKCkgPT4gewogICAgY29uc3QgcHJpY2luZ0N0YSA9IHJlYWRXZWIoJ2NvbXBvbmVudHMvZmVhdHVyZXMvcHJpY2luZy9QcmljaW5nQ1RBLnRzeCcpOwoKICAgIGV4cGVjdChwcmljaW5nQ3RhKS50b0NvbnRhaW4oImltcG9ydCB7IEJ1dHRvbiB9IGZyb20gJ0Bqb3ZpZS91aSciKTsKICAgIGV4cGVjdChwcmljaW5nQ3RhKS50b0NvbnRhaW4oJzxCdXR0b24nKTsKICAgIGV4cGVjdChwcmljaW5nQ3RhKS5ub3QudG9Db250YWluKCc8bW90aW9uLmJ1dHRvbicpOwogIH0pOwp9KTsK
+import { readFileSync } from 'node:fs';
+import { join } from 'node:path';
+import { describe, expect, it } from 'vitest';
+
+const WEB_ROOT = join(import.meta.dirname, '..', '..', '..');
+const REPO_ROOT = join(WEB_ROOT, '..', '..');
+
+function readWeb(relativePath: string): string {
+  return readFileSync(join(WEB_ROOT, relativePath), 'utf8');
+}
+
+describe('shared press-motion contract', () => {
+  it('keeps the canonical press scale subtle and reduced-motion safe', () => {
+    const designSystem = readWeb('styles/design-system.css');
+    const button = readFileSync(
+      join(REPO_ROOT, 'packages/ui/atoms/button.tsx'),
+      'utf8'
+    );
+
+    expect(designSystem).toMatch(/--scale-press:\s*0\.98;/);
+    expect(button).toContain('active:scale-press');
+    expect(button).toContain('motion-reduce:active:scale-100');
+    expect(button).not.toMatch(/active:scale-\[/);
+    expect(button).toContain('pressFeedback = false');
+  });
+
+  it('does not scale every interactive element globally', () => {
+    const globals = readWeb('app/globals.css');
+
+    expect(globals).not.toContain('transform: scale(0.96)');
+    expect(globals).not.toContain('active:scale-[0.96]');
+    expect(globals).not.toContain(
+      'button:not(:disabled):not([data-static="true"])'
+    );
+    expect(globals).not.toContain(
+      '[role="button"]:not([aria-disabled="true"]):not([data-static="true"])'
+    );
+    expect(globals).toContain(
+      'active:scale-press motion-reduce:active:scale-100'
+    );
+    // The press scale is a named Tailwind v4 utility, not an arbitrary value.
+    expect(globals).toMatch(
+      /@utility scale-press \{\s*\n\s*scale: var\(--scale-press\);\s*\n\s*\}/
+    );
+  });
+
+  it('keeps immediate-state and carousel controls static while remaining press feedback stays at 0.98', () => {
+    const bottomTabs = readWeb(
+      'components/features/profile/nav/BottomTabBar.tsx'
+    );
+    const entityCard = readWeb(
+      'components/organisms/entity-card/EntityCard.tsx'
+    );
+    const smartLinkAudioPreview = readWeb(
+      'components/features/release/SmartLinkAudioPreview.tsx'
+    );
+    const homepagePosterHero = readWeb(
+      'components/marketing/MarketingPosterHero.tsx'
+    );
+    const captureShared = readWeb(
+      'components/marketing/artist-profile/captureShared.tsx'
+    );
+    const jovieOverlay = readWeb('components/shell/JovieOverlay.tsx');
+
+    expect(bottomTabs).not.toContain('active:scale');
+    expect(bottomTabs).not.toContain('transition-[color,transform]');
+    expect(entityCard).not.toContain('group-active:scale');
+    expect(entityCard).not.toContain('transition-[background-color,transform]');
+    expect(smartLinkAudioPreview).not.toContain('active:scale');
+    expect(homepagePosterHero).not.toContain('active:scale');
+    expect(captureShared).not.toContain('scale-[0.96]');
+    expect(captureShared).not.toContain(
+      'transition-[background-color,color,transform]'
+    );
+    expect(jovieOverlay).not.toContain('scale(0.96)');
+    expect(jovieOverlay).toContain('useReducedMotion');
+    expect(jovieOverlay).toMatch(
+      /prefersReducedMotion\s*\?\s*'translateY\(0\)'/
+    );
+  });
+
+  it.each([
+    'components/features/dashboard/organisms/DashboardHeader.tsx',
+    'components/features/dashboard/dashboard-nav/NavMenuItem.tsx',
+    'components/organisms/user-button/UserButton.tsx',
+    'components/jovie/components/SlashCommandMenu.tsx',
+    'components/jovie/components/ChatComposerToolbar.tsx',
+    'components/jovie/components/ChatMessage.tsx',
+    'components/features/pricing/PricingCTA.tsx',
+  ])('%s does not fork hardcoded press or hover scaling', relativePath => {
+    const source = readWeb(relativePath);
+
+    expect(source).not.toMatch(/active:scale-\[(?!var\(--scale-press\))/);
+    expect(source).not.toMatch(/whileTap=\{\{\s*scale:/);
+    expect(source).not.toMatch(/whileHover=\{\{\s*scale:/);
+  });
+
+  it('routes the representative standalone CTA through the shared Button primitive', () => {
+    const pricingCta = readWeb('components/features/pricing/PricingCTA.tsx');
+
+    expect(pricingCta).toContain("import { Button } from '@jovie/ui'");
+    expect(pricingCta).toContain('<Button');
+    expect(pricingCta).not.toContain('<motion.button');
+  });
+});
