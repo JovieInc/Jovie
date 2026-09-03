@@ -94,7 +94,8 @@ export const Recording: Story = {
   args: {
     ...Idle.args,
     sessionActive: true,
-    transcript: 'Approve this one — the new thumbnail reads better at feed size.',
+    transcript:
+      'Approve this one — the new thumbnail reads better at feed size.',
     typedText: 'Also pull the old cover art.',
     keepAudio: true,
   },

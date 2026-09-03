@@ -16,11 +16,6 @@ export const Empty: Story = {
     connectedDSPs: [],
     initialLinks: [],
   },
-  render: args => (
-    <div className='flex h-128 bg-(--app-shell-content-surface)'>
-      <OpportunityInboxPageClient {...args} />
-    </div>
-  ),
 };
 
 export const WithCards: Story = {
@@ -45,9 +40,4 @@ export const WithCards: Story = {
     connectedDSPs: [],
     initialLinks: [],
   },
-  render: args => (
-    <div className='flex h-128 bg-(--app-shell-content-surface)'>
-      <OpportunityInboxPageClient {...args} />
-    </div>
-  ),
 };

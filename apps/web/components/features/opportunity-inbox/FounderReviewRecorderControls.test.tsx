@@ -123,10 +123,7 @@ describe('FounderReviewRecorderControls', () => {
     const { onTypedTextChange, onKeepAudioChange, onAllowContentUseChange } =
       renderControls();
 
-    await user.type(
-      screen.getByLabelText('Typed fallback or refinement'),
-      'x'
-    );
+    await user.type(screen.getByLabelText('Typed fallback or refinement'), 'x');
     expect(onTypedTextChange).toHaveBeenCalledWith('x');
 
     await user.click(
