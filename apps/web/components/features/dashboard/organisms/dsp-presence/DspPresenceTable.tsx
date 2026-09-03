@@ -1,6 +1,5 @@
 'use client';
 
-import { type ColumnDef, createColumnHelper } from '@tanstack/react-table';
 import { ExternalLink } from 'lucide-react';
 import Image from 'next/image';
 import { memo, useCallback } from 'react';
@@ -11,6 +10,8 @@ import {
   PROVIDER_LABELS,
 } from '@/features/dashboard/atoms/DspProviderIcon';
 import { MatchStatusBadge } from '@/features/dashboard/atoms/MatchStatusBadge';
+import type { ColumnDef } from '@/lib/tanstack-v8-compat';
+import { createColumnHelper } from '@/lib/tanstack-v8-compat';
 import { isExternalDspImage } from '@/lib/utils/dsp-images';
 
 // ============================================================================
