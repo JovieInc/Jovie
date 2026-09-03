@@ -910,7 +910,7 @@ function SuggestedConnectionRow({
   return (
     <li
       data-testid='suggested-connection-row'
-      className='grid min-h-16 min-w-0 gap-2 px-3 py-2.5 sm:grid-cols-[minmax(0,1fr)_auto] sm:items-center'
+      className='flex min-h-16 min-w-0 items-center justify-between gap-2 px-3 py-2.5'
     >
       <div className='flex min-w-0 items-center gap-2.5'>
         <span className='flex h-8 w-8 shrink-0 items-center justify-center rounded-md border border-subtle bg-surface-0 text-secondary-token'>
