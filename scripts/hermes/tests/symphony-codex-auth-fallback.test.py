@@ -3607,6 +3607,67 @@ class FallbackLockGcTests(unittest.TestCase):
         self.assertNotIn(16854, [entry["number"] for entry in index.values()])
         self.assertEqual(index["JOV-5694"]["number"], 17090)
 
+    def test_linear_graphql_backs_off_on_ratelimit(self):
+        """A RATELIMITED response stamps a backoff; while fresh, no HTTP call
+        is even attempted (the per-timer reconcile must not stampede the
+        shared 2500 req/hr budget)."""
+        import urllib.error
+
+        backoff = self.root / "linear-backoff.json"
+        calls: list = []
+
+        def fake_urlopen(req, timeout=0):
+            calls.append(req)
+            raise urllib.error.HTTPError(
+                req.full_url,
+                400,
+                "Bad Request",
+                None,
+                io.BytesIO(b'{"errors":[{"extensions":{"code":"RATELIMITED"}}]}'),
+            )
+
+        with (
+            mock.patch.dict(
+                os.environ,
+                {"SYMPHONY_LINEAR_BACKOFF": str(backoff), "LINEAR_API_KEY": "test-key"},
+            ),
+            mock.patch.object(self.module.urllib.request, "urlopen", side_effect=fake_urlopen),
+        ):
+            self.assertIsNone(self.module._linear_graphql({"query": "x"}))
+            self.assertTrue(backoff.exists())
+            # Backoff fresh: the second call must not touch the network.
+            self.assertIsNone(self.module._linear_graphql({"query": "x"}))
+        self.assertEqual(len(calls), 1)
+
+    def test_linear_graphql_success_clears_stale_backoff(self):
+        backoff = self.root / "linear-backoff.json"
+        backoff.write_text(
+            json.dumps({"epoch": time.time() - self.module.LINEAR_BACKOFF_SECONDS - 5})
+        )
+
+        class _Resp:
+            def __enter__(self):
+                return self
+
+            def __exit__(self, *args):
+                return False
+
+            def read(self):
+                return b'{"data": {"viewer": {"id": "x"}}}'
+
+        with (
+            mock.patch.dict(
+                os.environ,
+                {"SYMPHONY_LINEAR_BACKOFF": str(backoff), "LINEAR_API_KEY": "test-key"},
+            ),
+            mock.patch.object(
+                self.module.urllib.request, "urlopen", side_effect=lambda req, timeout=0: _Resp()
+            ),
+        ):
+            body = self.module._linear_graphql({"query": "x"})
+        self.assertEqual(body["data"]["viewer"]["id"], "x")
+        self.assertFalse(backoff.exists())
+
     def test_pickup_check_refuses_in_review_and_admits_todo(self):
         stderr = io.StringIO()
         with (
