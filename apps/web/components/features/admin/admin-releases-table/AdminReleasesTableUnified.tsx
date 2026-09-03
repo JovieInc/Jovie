@@ -3,7 +3,6 @@
 // @coverage-via apps/web/tests/unit/app/admin-releases-table-normalization.test.ts
 
 import { Avatar, AvatarFallback, AvatarImage } from '@jovie/ui';
-import { type ColumnDef, createColumnHelper } from '@tanstack/react-table';
 import {
   AlertTriangle,
   ExternalLink,
@@ -29,6 +28,8 @@ import {
   type AdminReleasesSort,
   useAdminReleasesInfiniteQuery,
 } from '@/lib/queries';
+import type { ColumnDef } from '@/lib/tanstack-v8-compat';
+import { createColumnHelper } from '@/lib/tanstack-v8-compat';
 import { cn } from '@/lib/utils';
 
 interface AdminReleasesTableProps {
