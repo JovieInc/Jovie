@@ -14,6 +14,7 @@ import { useOptionalChatEntityPanel } from '@/app/app/(shell)/chat/ChatEntityPan
 import { ChatThreadNavigationRail } from '@/components/features/chat/navigation-rail';
 import { track } from '@/lib/analytics';
 import { AUDIO_FILE_ACCEPT } from '@/lib/audio/constants';
+import { CHAT_TRANSCRIPT_WINDOW } from '@/lib/chat/transcript-window';
 import type { OpportunityInboxCardViewModel } from '@/lib/connectors/opportunity-inbox-types';
 import { useAppFlag } from '@/lib/flags/client';
 import { usePendingOpportunityCardsQuery, usePlanGate } from '@/lib/queries';
@@ -54,8 +55,8 @@ import type {
   JovieChatProps,
 } from './types';
 
-/** Window long threads early so short-but-growing chats stay at 60fps. */
-const VIRTUALIZATION_THRESHOLD = 8;
+const VIRTUALIZATION_THRESHOLD =
+  CHAT_TRANSCRIPT_WINDOW.virtualizeAfterMessageCount;
 const CHAT_PICKER_THREAD_CLEARANCE = 'min(620px, calc(100vh - 8rem))';
 
 function findLastAssistantIndex(
@@ -388,7 +389,7 @@ export function JovieChat({
     count: messages.length,
     getScrollElement: () => scrollContainerRef.current,
     estimateSize: () => 80,
-    overscan: 5,
+    overscan: CHAT_TRANSCRIPT_WINDOW.overscanRowCount,
     measureElement: el => el.getBoundingClientRect().height,
   });
   const shouldVirtualizeMessages = messages.length > VIRTUALIZATION_THRESHOLD;

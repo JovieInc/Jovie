@@ -22,9 +22,13 @@ final class ChatRepository {
   private(set) var activeConversationID: String?
   private(set) var isLoadingConversations = false
   private(set) var isSending = false
+  private(set) var isLoadingOlder = false
+  private(set) var hasMoreOlder = false
   private(set) var isOffline = false
   private(set) var sessionExpired = false
   private(set) var lastErrorMessage: String?
+  private var olderCursor: String?
+  private var sendGeneration = 0
 
   private let client: MobileChatClientProtocol
   private let cache: ChatCache
@@ -81,19 +85,32 @@ final class ChatRepository {
 
   func openConversation(_ conversationID: String) async {
     activeConversationID = conversationID
+    await paintCachedWindow(conversationID)
 
     do {
-      let detail = try await client.fetchConversation(id: conversationID, limit: 100)
-      timeline = detail.messages.map(timelineItem(from:))
+      let detail = try await client.fetchConversation(
+        id: conversationID,
+        limit: ChatTranscriptWindow.initialMessageLimit,
+        before: nil
+      )
+      guard activeConversationID == conversationID else { return }
+      let hasInFlightTurn = timeline.contains {
+        $0.status == .sending || $0.status == .streaming
+      }
+      if !hasInFlightTurn {
+        applyFetchedWindow(detail.messages, hasMore: detail.hasMore)
+        await persistCache(messages: detail.messages, conversationID: conversationID)
+      }
       isOffline = false
       lastErrorMessage = nil
-      await persistCache(messages: detail.messages, conversationID: conversationID)
       donateConversationActivity(
         conversationID: conversationID,
         title: detail.conversation.title
       )
     } catch {
-      await hydrateConversationFromCache(conversationID)
+      if timeline.isEmpty {
+        await hydrateConversationFromCache(conversationID)
+      }
       applyFailure(error)
       donateConversationActivity(
         conversationID: conversationID,
@@ -102,9 +119,39 @@ final class ChatRepository {
     }
   }
 
+  func loadOlderMessages() async {
+    guard
+      hasMoreOlder,
+      !isLoadingOlder,
+      let conversationID = activeConversationID,
+      let olderCursor,
+      !olderCursor.isEmpty
+    else { return }
+
+    isLoadingOlder = true
+    defer { isLoadingOlder = false }
+
+    do {
+      let detail = try await client.fetchConversation(
+        id: conversationID,
+        limit: ChatTranscriptWindow.initialMessageLimit,
+        before: olderCursor
+      )
+      guard activeConversationID == conversationID else { return }
+      prependFetchedWindow(detail.messages, hasMore: detail.hasMore)
+      isOffline = false
+      lastErrorMessage = nil
+      await persistCache()
+    } catch {
+      applyFailure(error)
+    }
+  }
+
   func startNewConversation() {
     activeConversationID = nil
     timeline = []
+    hasMoreOlder = false
+    olderCursor = nil
     lastErrorMessage = nil
   }
 
@@ -121,13 +168,22 @@ final class ChatRepository {
     isFixtureSeeded = true
     self.activeConversationID = activeConversationID
     self.timeline = timeline
+    hasMoreOlder = false
+    olderCursor = nil
     isOffline = false
     lastErrorMessage = nil
   }
 
   func send(text: String) async {
     let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
-    guard !trimmed.isEmpty, !isSending else { return }
+    guard !trimmed.isEmpty else { return }
+
+    let wasSending = isSending
+    sendGeneration += 1
+    let generation = sendGeneration
+    if wasSending {
+      interruptInFlightAssistantRows()
+    }
 
     let clientTurnId = UUID().uuidString
     let clientMessageId = UUID().uuidString
@@ -156,7 +212,11 @@ final class ChatRepository {
     )
 
     isSending = true
-    defer { isSending = false }
+    defer {
+      if generation == sendGeneration {
+        isSending = false
+      }
+    }
 
     do {
       // Apply each NDJSON event as it arrives so tokens paint before the
@@ -172,15 +232,21 @@ final class ChatRepository {
           chatMode: workspace.chatMode
         )
       ) { [weak self] event in
-        await self?.apply(events: [event], clientTurnId: clientTurnId)
+        await self?.applyIfCurrent(
+          generation: generation,
+          events: [event],
+          clientTurnId: clientTurnId
+        )
       }
 
+      guard generation == sendGeneration else { return }
       isOffline = false
       if assistantStatus(clientTurnId: clientTurnId) != .failed {
         lastErrorMessage = nil
       }
       await persistCache()
     } catch {
+      guard generation == sendGeneration else { return }
       applySendFailure(error, clientTurnId: clientTurnId)
       await persistCache()
     }
@@ -308,6 +374,15 @@ final class ChatRepository {
     }
   }
 
+  private func applyIfCurrent(
+    generation: Int,
+    events: [MobileChatStreamEvent],
+    clientTurnId: String
+  ) {
+    guard generation == sendGeneration else { return }
+    apply(events: events, clientTurnId: clientTurnId)
+  }
+
   private func apply(events: [MobileChatStreamEvent], clientTurnId: String) {
     var pendingDeltas: [String: String] = [:]
 
@@ -396,21 +471,68 @@ final class ChatRepository {
   private func hydrateFromCache() async {
     guard let snapshot = await cache.load(for: userID, workspace: workspace) else { return }
     conversations = snapshot.conversations
-    if let activeConversationID,
-       let cachedMessages = snapshot.messagesByConversationID[activeConversationID]
-    {
-      timeline = cachedMessages.map(timelineItem(from:))
+    if let activeConversationID {
+      await paintCachedWindow(activeConversationID, snapshot: snapshot)
     }
   }
 
   private func hydrateConversationFromCache(_ conversationID: String) async {
-    guard
-      let snapshot = await cache.load(for: userID, workspace: workspace),
-      let cachedMessages = snapshot.messagesByConversationID[conversationID]
-    else {
+    await paintCachedWindow(conversationID)
+  }
+
+  private func paintCachedWindow(
+    _ conversationID: String,
+    snapshot: CachedChatSnapshot? = nil
+  ) async {
+    let loaded = snapshot ?? (await cache.load(for: userID, workspace: workspace))
+    guard let cachedMessages = loaded?.messagesByConversationID[conversationID] else {
       return
     }
-    timeline = cachedMessages.map(timelineItem(from:))
+    applyFetchedWindow(
+      ChatTranscriptWindow.visibleTail(cachedMessages),
+      hasMore: ChatTranscriptWindow.hasOlderHistory(
+        cachedCount: cachedMessages.count,
+        fetchedHasMore: false
+      )
+    )
+  }
+
+  private func applyFetchedWindow(
+    _ messages: [MobileConversationMessage],
+    hasMore: Bool
+  ) {
+    timeline = messages.map(timelineItem(from:))
+    olderCursor = messages.first?.createdAt
+    hasMoreOlder = hasMore
+  }
+
+  private func prependFetchedWindow(
+    _ messages: [MobileConversationMessage],
+    hasMore: Bool
+  ) {
+    let existingIDs = Set(timeline.map(\.id))
+    let incoming = messages.filter { !existingIDs.contains($0.id) }
+    timeline.insert(contentsOf: incoming.map(timelineItem(from:)), at: 0)
+    olderCursor = (incoming.first ?? messages.first)?.createdAt ?? olderCursor
+    hasMoreOlder = hasMore
+  }
+
+  private func interruptInFlightAssistantRows() {
+    timeline.removeAll {
+      $0.role == .assistant
+        && ($0.status == .sending || $0.status == .streaming)
+        && $0.content.isEmpty
+    }
+    for index in timeline.indices {
+      let item = timeline[index]
+      guard
+        item.role == .assistant,
+        item.status == .sending || item.status == .streaming
+      else { continue }
+      var updated = item
+      updated.status = .completed
+      timeline[index] = updated
+    }
   }
 
   private func persistCache(
