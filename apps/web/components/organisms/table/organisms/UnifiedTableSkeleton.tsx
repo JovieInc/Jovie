@@ -1,6 +1,6 @@
 'use client';
 
-import type { ColumnDef } from '@tanstack/react-table';
+import type { ColumnDef } from '@/lib/tanstack-v8-compat';
 import { UnifiedTable } from './UnifiedTable';
 
 export interface UnifiedTableSkeletonProps<TData> {

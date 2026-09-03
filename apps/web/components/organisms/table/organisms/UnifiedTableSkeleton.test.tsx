@@ -1,6 +1,6 @@
-import type { ColumnDef } from '@tanstack/react-table';
 import { render, screen } from '@testing-library/react';
 import { describe, expect, it } from 'vitest';
+import type { ColumnDef } from '@/lib/tanstack-v8-compat';
 import { UnifiedTableSkeleton } from './UnifiedTableSkeleton';
 
 type Row = { id: string; title: string; count: number };

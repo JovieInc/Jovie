@@ -1,7 +1,6 @@
 'use client';
 
 import { Button, IconButton, Switch } from '@jovie/ui';
-import { type ColumnDef, createColumnHelper } from '@tanstack/react-table';
 import { RotateCcw } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { useCallback, useMemo, useState } from 'react';
@@ -11,6 +10,8 @@ import { AdminDataTable } from '@/features/admin/table/AdminDataTable';
 import { AdminTableShell } from '@/features/admin/table/AdminTableShell';
 import { copyToClipboard } from '@/hooks/useClipboard';
 import type { FlagEnvTier } from '@/lib/flags/env-tier';
+import type { ColumnDef } from '@/lib/tanstack-v8-compat';
+import { createColumnHelper } from '@/lib/tanstack-v8-compat';
 import {
   FlagChangeConfirmDialog,
   type FlagChangeConfirmRequest,

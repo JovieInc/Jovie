@@ -1,4 +1,3 @@
-import type { CellContext } from '@tanstack/react-table';
 import { Copy, ExternalLink } from 'lucide-react';
 import { InlineIconButton } from '@/components/atoms/InlineIconButton';
 import { toast } from '@/components/feedback';
@@ -6,6 +5,7 @@ import { AvatarCell, SocialLinksCell } from '@/components/organisms/table';
 import { getProfileUrl } from '@/constants/domains';
 import { copyToClipboard } from '@/hooks/useClipboard';
 import type { AdminCreatorProfileRow } from '@/lib/admin/types';
+import type { CellContext } from '@/lib/tanstack-v8-compat';
 
 /**
  * Renders the avatar cell with profile information

@@ -13,7 +13,6 @@ import {
   Button,
   Textarea,
 } from '@jovie/ui';
-import { type ColumnDef, createColumnHelper } from '@tanstack/react-table';
 import { Copy, Users } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
@@ -52,6 +51,8 @@ import {
 import type { AdminUserRow } from '@/lib/admin/types';
 import { SIDEBAR_WIDTH } from '@/lib/constants/layout';
 import { QueryErrorBoundary, useAdminUsersInfiniteQuery } from '@/lib/queries';
+import type { ColumnDef } from '@/lib/tanstack-v8-compat';
+import { createColumnHelper } from '@/lib/tanstack-v8-compat';
 import { AdminUserDetailDrawer } from './AdminUserDetailDrawer';
 import {
   type BuildAdminUserActionsCallbacks,

@@ -13,10 +13,8 @@ import {
   AlertDialogTitle,
   Button,
 } from '@jovie/ui';
-import { type ColumnDef, createColumnHelper } from '@tanstack/react-table';
 import type { ComponentPropsWithoutRef, ReactNode } from 'react';
 import { useCallback, useState } from 'react';
-
 import { Icon } from '@/components/atoms/Icon';
 import { ContentMetricCard } from '@/components/molecules/ContentMetricCard';
 import { ContentSectionHeader } from '@/components/molecules/ContentSectionHeader';
@@ -37,6 +35,8 @@ import {
   useCampaignStatsQuery,
   useSendCampaignInvitesMutation,
 } from '@/lib/queries';
+import type { ColumnDef } from '@/lib/tanstack-v8-compat';
+import { createColumnHelper } from '@/lib/tanstack-v8-compat';
 import { cn } from '@/lib/utils';
 
 /** Threshold for showing confirmation modal */

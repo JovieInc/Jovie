@@ -3,11 +3,11 @@
 // @coverage-via apps/web/app/app/(shell)/dashboard/releases/[releaseId]/downloads/PromoDownloadsTable.test.tsx
 
 import { IconButton, Switch } from '@jovie/ui';
-import { type ColumnDef } from '@tanstack/react-table';
 import { Music, Trash2 } from 'lucide-react';
 import { useMemo } from 'react';
 import { ContentSurfaceCard } from '@/components/molecules/ContentSurfaceCard';
 import { TableEmptyState, UnifiedTable } from '@/components/organisms/table';
+import type { ColumnDef } from '@/lib/tanstack-v8-compat';
 import { cn } from '@/lib/utils';
 
 export interface PromoDownloadFile {

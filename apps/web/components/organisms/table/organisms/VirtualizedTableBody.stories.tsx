@@ -1,5 +1,5 @@
 import type { Meta, StoryObj } from '@storybook/nextjs-vite';
-import type { Row } from '@tanstack/react-table';
+import type { Row } from '@/lib/tanstack-v8-compat';
 import { VirtualizedTableBody } from './VirtualizedTableBody';
 
 type RowData = { id: string; title: string };

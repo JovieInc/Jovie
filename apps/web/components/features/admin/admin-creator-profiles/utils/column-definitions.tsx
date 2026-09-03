@@ -5,8 +5,6 @@
  * Uses refs for selection state to prevent column recreation on every selection change.
  */
 
-import type { ColumnDef, HeaderContext, Row } from '@tanstack/react-table';
-import { createColumnHelper } from '@tanstack/react-table';
 import type { RefObject } from 'react';
 import { TableActionMenu } from '@/components/atoms/table-action-menu/TableActionMenu';
 import type { ContextMenuItemType } from '@/components/organisms/table';
@@ -15,6 +13,8 @@ import {
   TableCheckboxCell,
 } from '@/components/organisms/table';
 import type { AdminCreatorProfileRow } from '@/lib/admin/types';
+import type { ColumnDef, HeaderContext, Row } from '@/lib/tanstack-v8-compat';
+import { createColumnHelper } from '@/lib/tanstack-v8-compat';
 import {
   renderAvatarCell,
   renderCreatedDateCell,

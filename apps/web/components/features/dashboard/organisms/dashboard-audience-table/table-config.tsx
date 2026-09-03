@@ -1,11 +1,8 @@
 'use client';
 
-import {
-  type ColumnDef,
-  createColumnHelper,
-  type VisibilityState,
-} from '@tanstack/react-table';
 import { TABLE_MIN_WIDTHS } from '@/lib/constants/layout';
+import type { ColumnDef, VisibilityState } from '@/lib/tanstack-v8-compat';
+import { createColumnHelper } from '@/lib/tanstack-v8-compat';
 import type { AudienceMember } from '@/types';
 import {
   AudienceActionCell,

@@ -2,7 +2,6 @@
 
 import { Button, type CommonDropdownItem, SimpleTooltip } from '@jovie/ui';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { type ColumnDef, createColumnHelper } from '@tanstack/react-table';
 import {
   ArrowDownRight,
   ArrowUpRight,
@@ -73,6 +72,8 @@ import {
   sortProfileWorkspaceRows,
 } from '@/lib/profile-surfaces/workspace';
 import { fetchWithTimeout, queryKeys, STANDARD_CACHE } from '@/lib/queries';
+import type { ColumnDef } from '@/lib/tanstack-v8-compat';
+import { createColumnHelper } from '@/lib/tanstack-v8-compat';
 import { cn } from '@/lib/utils';
 import {
   AddConnectionRail,

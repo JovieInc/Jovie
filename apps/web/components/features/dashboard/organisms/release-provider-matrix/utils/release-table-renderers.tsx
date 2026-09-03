@@ -1,6 +1,5 @@
 'use client';
 
-import type { CellContext } from '@tanstack/react-table';
 import { ArtworkThumb } from '@/components/shell/ArtworkThumb';
 import { DropDateChip } from '@/components/shell/DropDateChip';
 import { DspAvatarStack } from '@/components/shell/DspAvatarStack';
@@ -23,6 +22,7 @@ import {
 import { getReleaseTypeStyle } from '@/lib/discography/release-type-styles';
 import type { ReleaseViewModel } from '@/lib/discography/types';
 import { dropDateMeta } from '@/lib/format-drop-date';
+import type { CellContext } from '@/lib/tanstack-v8-compat';
 
 export function createReleaseCellRenderer(
   artistName: string | null | undefined,

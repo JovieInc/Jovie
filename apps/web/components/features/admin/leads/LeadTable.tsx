@@ -2,7 +2,6 @@
 
 import { Badge, Button } from '@jovie/ui';
 import { useQueryClient } from '@tanstack/react-query';
-import { type ColumnDef, createColumnHelper } from '@tanstack/react-table';
 import { AlertTriangle, Check, ExternalLink, Loader2, X } from 'lucide-react';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { toast } from '@/components/feedback';
@@ -25,6 +24,8 @@ import {
   useLeadsInfiniteQuery,
   useUpdateLeadStatusMutation,
 } from '@/lib/queries';
+import type { ColumnDef } from '@/lib/tanstack-v8-compat';
+import { createColumnHelper } from '@/lib/tanstack-v8-compat';
 
 const STATUS_OPTIONS = [
   { value: '', label: 'All' },

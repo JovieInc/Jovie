@@ -1,6 +1,6 @@
-import type { ColumnDef } from '@tanstack/react-table';
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+import type { ColumnDef } from '@/lib/tanstack-v8-compat';
 import { TABLE_EMPTY_STATE_MIN_HEIGHT_PX } from '../atoms/TableEmptyState';
 import { UnifiedTable } from './UnifiedTable';
 

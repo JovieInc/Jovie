@@ -1,9 +1,9 @@
-import type { Row } from '@tanstack/react-table';
 import type { VirtualItem } from '@tanstack/react-virtual';
 import { render, screen } from '@testing-library/react';
 import type { ReactNode } from 'react';
 import { describe, expect, it, vi } from 'vitest';
 import { VirtualizedTableBody } from '@/components/organisms/table/organisms/VirtualizedTableBody';
+import type { Row } from '@/lib/tanstack-v8-compat';
 
 const tableContextMenuSpy = vi.fn();
 

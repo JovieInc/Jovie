@@ -1,6 +1,6 @@
-import type { Header } from '@tanstack/react-table';
 import { fireEvent, render, screen } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
+import type { Header } from '@/lib/tanstack-v8-compat';
 import { TableHeaderCell } from './TableHeaderCell';
 
 type Row = { title: string };

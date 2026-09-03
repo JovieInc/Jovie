@@ -1,4 +1,4 @@
-import type { FilterFn } from '@tanstack/react-table';
+import type { FilterFn } from '@/lib/tanstack-v8-compat';
 
 /**
  * Creates a TanStack Table FilterFn that searches across arbitrary fields

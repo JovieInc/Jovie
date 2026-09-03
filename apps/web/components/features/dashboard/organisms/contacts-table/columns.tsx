@@ -1,8 +1,6 @@
 'use client';
 
 import { Badge } from '@jovie/ui';
-import type { ColumnDef } from '@tanstack/react-table';
-import { createColumnHelper } from '@tanstack/react-table';
 import { Mail, Phone } from 'lucide-react';
 import {
   TableActionMenu,
@@ -15,6 +13,8 @@ import {
   getContactRoleLabel,
   summarizeTerritories,
 } from '@/lib/contacts/constants';
+import type { ColumnDef } from '@/lib/tanstack-v8-compat';
+import { createColumnHelper } from '@/lib/tanstack-v8-compat';
 import { buildContactActions } from './contact-actions';
 
 const contactColumnHelper = createColumnHelper<EditableContact>();

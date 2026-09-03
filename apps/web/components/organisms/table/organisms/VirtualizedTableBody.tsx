@@ -2,9 +2,9 @@
 
 // @coverage-via apps/web/tests/unit/organisms/table/VirtualizedTableBody.test.tsx
 
-import type { Row } from '@tanstack/react-table';
 import type { VirtualItem, Virtualizer } from '@tanstack/react-virtual';
 import React from 'react';
+import type { Row } from '@/lib/tanstack-v8-compat';
 import {
   type ContextMenuItemType,
   TableContextMenu,

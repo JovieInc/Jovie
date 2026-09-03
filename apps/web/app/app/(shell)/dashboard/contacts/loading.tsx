@@ -1,9 +1,10 @@
 'use client';
 
-import { type ColumnDef, createColumnHelper } from '@tanstack/react-table';
 import { LoadingSkeleton } from '@/components/molecules/LoadingSkeleton';
 import { UnifiedTableSkeleton } from '@/components/organisms/table';
 import { SKELETON_ROW_COUNT } from '@/lib/constants/layout';
+import type { ColumnDef } from '@/lib/tanstack-v8-compat';
+import { createColumnHelper } from '@/lib/tanstack-v8-compat';
 
 type ContactsLoadingRow = {
   readonly role: string;

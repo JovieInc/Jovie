@@ -1,6 +1,5 @@
 'use client';
 
-import type { CellContext } from '@tanstack/react-table';
 import {
   ArrowLeftRight,
   Flame,
@@ -13,6 +12,7 @@ import {
   TrendingUp,
 } from 'lucide-react';
 import { SocialIcon } from '@/components/atoms/SocialIcon';
+import type { CellContext } from '@/lib/tanstack-v8-compat';
 import type {
   AudienceIntentLevel,
   AudienceMember,

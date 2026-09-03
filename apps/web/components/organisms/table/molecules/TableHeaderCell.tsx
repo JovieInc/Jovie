@@ -1,8 +1,8 @@
 'use client';
 
-import type { Header } from '@tanstack/react-table';
-import { flexRender } from '@tanstack/react-table';
 import { Icon } from '@/components/atoms/Icon';
+import type { Header } from '@/lib/tanstack-v8-compat';
+import { flexRender } from '@/lib/tanstack-v8-compat';
 import { cn } from '@/lib/utils';
 import '../table.types';
 import { iconColors, tableAlignment } from '../table.styles';

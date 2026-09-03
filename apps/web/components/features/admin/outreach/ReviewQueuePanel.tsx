@@ -3,11 +3,6 @@
 // @coverage-via apps/web/tests/unit/app/outreach-admin-table-normalization.test.ts
 
 import { Badge, Spinner as LoadingSpinner } from '@jovie/ui';
-import {
-  type CellContext,
-  type ColumnDef,
-  createColumnHelper,
-} from '@tanstack/react-table';
 import { ExternalLink } from 'lucide-react';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { toast } from '@/components/feedback';
@@ -17,6 +12,8 @@ import { DrawerButton } from '@/components/molecules/drawer';
 import { TableEmptyState } from '@/components/organisms/table';
 import { AdminDataTable } from '@/features/admin/table/AdminDataTable';
 import { AdminTablePagination } from '@/features/admin/table/AdminTablePagination';
+import type { CellContext, ColumnDef } from '@/lib/tanstack-v8-compat';
+import { createColumnHelper } from '@/lib/tanstack-v8-compat';
 
 interface ReviewLead {
   id: string;
