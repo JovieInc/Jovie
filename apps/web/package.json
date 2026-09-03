@@ -320,7 +320,7 @@
     "@storybook/addon-a11y": "10.4.6",
     "@storybook/addon-docs": "10.5.7",
     "@storybook/addon-vitest": "10.5.4",
-    "@storybook/nextjs-vite": "10.4.6",
+    "@storybook/nextjs-vite": "10.5.10",
     "@stryker-mutator/core": "10.0.0",
     "@stryker-mutator/vitest-runner": "9.6.1",
     "@tailwindcss/postcss": "^4.2.2",
