@@ -1,6 +1,5 @@
 'use client';
 
-import { type ColumnDef, createColumnHelper } from '@tanstack/react-table';
 import {
   Check,
   Copy,
@@ -23,6 +22,8 @@ import { BASE_URL } from '@/constants/domains';
 import { useClipboard } from '@/hooks/useClipboard';
 import { useNotifications } from '@/lib/hooks/useNotifications';
 import { type TipperRow, useEarningsQuery } from '@/lib/queries';
+import type { ColumnDef } from '@/lib/tanstack-v8-compat';
+import { createColumnHelper } from '@/lib/tanstack-v8-compat';
 import { downloadBlob, downloadString } from '@/lib/utils/download';
 import { formatAmount } from '@/lib/utils/format-number';
 import {
