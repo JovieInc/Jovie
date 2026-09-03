@@ -9,7 +9,7 @@ const meta = {
     docs: {
       description: {
         component:
-          'Full-viewport editorial hero for the homepage front door: one optical field, one headline, one support line, and the name search as the only conversion control.',
+          'Full-viewport editorial hero for the homepage front door: one quiet optical stage, one headline, one support line, and the name search as the only conversion control.',
       },
     },
   },
