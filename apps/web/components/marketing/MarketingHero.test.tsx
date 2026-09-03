@@ -85,50 +85,52 @@ describe('MarketingHero source-backed default story', () => {
       'landing-heading'
     );
   });
-});
 
-describe('MarketingHero — shell mode', () => {
-  it('keeps canonical hero spacing on styled shell variants', () => {
-    render(
-      <MarketingHero
-        variant='left'
-        headingId='styled-heading'
-        testId='styled-hero'
-      >
-        <h1 id='styled-heading'>Styled heading</h1>
-      </MarketingHero>
-    );
-
-    const hero = screen.getByTestId('styled-hero');
-    expect(hero).toHaveAttribute(
-      'data-pen-contract',
-      MARKETING_PEN_CONTRACT_IDS.section.hero
-    );
-    expect(hero).toHaveClass('relative', 'w-full', 'pt-20');
-  });
-
-  it('delegates route-owned presentation to the unstyled shell root', () => {
+  it('routes route-owned presentation through the unstyled shell without hero chrome', () => {
     render(
       <MarketingHero
         variant='unstyled'
-        headingId='owned-heading'
-        testId='owned-hero'
-        className='route-owned-presentation'
+        className='homepage-poster-hero'
+        headingId='unstyled-heading'
+        testId='unstyled-hero'
       >
-        <h1 id='owned-heading'>Owned heading</h1>
+        <h1 id='unstyled-heading'>Route-owned hero</h1>
       </MarketingHero>
     );
 
-    const hero = screen.getByTestId('owned-hero');
-    expect(hero).toHaveAttribute(
+    const shell = screen.getByTestId('unstyled-hero');
+    expect(shell).toHaveAttribute(
       'data-pen-contract',
       MARKETING_PEN_CONTRACT_IDS.section.hero
     );
-    expect(hero).toHaveAttribute('aria-labelledby', 'owned-heading');
-    expect(hero).toHaveClass('route-owned-presentation');
-    expect(hero).not.toHaveClass('relative', 'w-full', 'pt-20');
-    expect(
-      screen.getByRole('heading', { name: 'Owned heading' })
-    ).toBeInTheDocument();
+    expect(shell).toHaveAttribute('aria-labelledby', 'unstyled-heading');
+    // Route-owned presentation: canonical Pen root + caller class only —
+    // no default hero spacing, elevation, or layout chrome.
+    expect(shell).toHaveClass('homepage-poster-hero');
+    expect(shell.className).not.toContain('relative w-full');
+    expect(shell.className).not.toContain('pt-20');
+    expect(shell.className).not.toContain('pb-16');
+    expect(shell.className).not.toContain('max-w-300');
+  });
+
+  it('keeps canonical hero chrome on styled shell variants', () => {
+    render(
+      <MarketingHero
+        variant='centered'
+        headingId='centered-heading'
+        testId='centered-hero'
+      >
+        <h1 id='centered-heading'>Centered hero</h1>
+      </MarketingHero>
+    );
+
+    const shell = screen.getByTestId('centered-hero');
+    expect(shell).toHaveAttribute(
+      'data-pen-contract',
+      MARKETING_PEN_CONTRACT_IDS.section.hero
+    );
+    expect(shell).toHaveClass('relative', 'w-full');
+    expect(shell).toHaveClass('pt-20', 'pb-16');
+    expect(shell).toHaveClass('items-center', 'text-center');
   });
 });
