@@ -24,11 +24,13 @@ export const RetryAction: Story = {
     title: 'Something went wrong',
     description: 'Try again in a moment.',
     digest: 'dashboard-timeout',
-    action: {
-      type: 'button',
-      label: 'Try again',
-      onClick: () => undefined,
-    },
+    actions: [
+      {
+        type: 'button',
+        label: 'Try again',
+        onClick: () => undefined,
+      },
+    ],
     role: 'alert',
   },
 };
@@ -36,11 +38,13 @@ export const RetryAction: Story = {
 export const RecoveryLink: Story = {
   args: {
     description: 'This page moved. Head back home.',
-    action: {
-      type: 'link',
-      label: 'Go home',
-      href: '/',
-    },
+    actions: [
+      {
+        type: 'link',
+        label: 'Go home',
+        href: '/',
+      },
+    ],
     ariaLive: 'polite',
   },
 };
