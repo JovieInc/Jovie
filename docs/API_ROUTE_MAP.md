@@ -358,7 +358,7 @@
 | Route | Methods | Auth | Description |
 |-------|---------|------|-------------|
 | `/api/library/post-release` | GET | `auth` | Load attested downloads, presence findings, observed rightsholders, provider connection state, and running Library experiments for an owned profile |
-| `/api/library/post-release` | PATCH | `auth` | Apply a local presence action (draft repair, collision disposition, or direct update) without sending outbound requests |
+| `/api/library/post-release` | PATCH | `auth` | Apply a local presence action (draft repair, collision disposition, or direct update) without sending outbound requests. Missing findings return 404; invalid or terminal transitions return 409 |
 
 ### Merch
 

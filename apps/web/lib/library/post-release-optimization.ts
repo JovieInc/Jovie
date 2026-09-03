@@ -1,13 +1,10 @@
-/** JOV-INV-012 contract. Uses existing telemetry; no parallel analytics stack. */
 export const LIBRARY_POST_RELEASE_OPTIMIZATION = {
   kind: 'product',
   variantIdentityPrefix: 'library-content-card',
   exposure:
-    'audience-event impression or click on the selected Library content card or public destination; YouTube packaging experiments record exposure through locked measurement windows',
-  outcome:
-    'artist-business-outcome via release-to-revenue attributed GMV or paid conversion for the same content/release context',
-  attribution:
-    'release-to-revenue plus analytics session; YouTube and Library decisions persist on optimization_experiments.decisionEvidence',
+    'audience-event impression/click or locked YouTube measurement window',
+  outcome: 'attributed GMV or paid conversion for the same content context',
+  attribution: 'release-to-revenue plus analytics session and decisionEvidence',
   eligibleContextDimensions: [
     'platform',
     'medium-or-channel',
@@ -18,18 +15,18 @@ export const LIBRARY_POST_RELEASE_OPTIMIZATION = {
     'consented-audience-segment',
   ] as const,
   hypothesis:
-    'A track-first Library card with evidence-backed presence, destinations, and packaging variants increases paid conversion and durable fan value without selling licenses or inventing metrics',
+    'Evidence-backed Library presence and packaging lift paid conversion',
   primaryMetric:
     'artist-business-outcome: paid conversion or attributed GMV per eligible exposure',
   guardrails: 'complaint, trust, brand',
   privacyAndConsent:
-    'first-party consented behavior only; no sensitive demographic inference or cross-platform identity stitching',
+    'first-party consented behavior only; no sensitive demographic inference',
   optimizerOwner: 'Library product / Symphony',
   cadence: 'weekly decision with writeback after a locked measurement window',
   decisionWriteback:
-    'model-experiment promotion receipt plus optimization_experiments.winnerVariantKey and explicit promoteThumbnailWinner',
+    'optimization_experiments.decisionEvidence; never auto-promote gated classes',
   rollbackOrControl:
-    'revert to the control variant; do not auto-promote identity, legal, privacy, external publication, or material spend',
+    'revert to control; no auto-promote of identity, legal, privacy, or spend',
   surfaces: {
     analytics: 'apps/web/lib/analytics/metrics.ts',
     modelExperiment: 'apps/web/lib/db/schema/model-experiments.ts',

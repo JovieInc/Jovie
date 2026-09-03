@@ -5,13 +5,13 @@ import { getExactProfileAccess } from '@/lib/auth/profile-access';
 import { db } from '@/lib/db';
 import { captureError } from '@/lib/error-tracking';
 import { NO_STORE_HEADERS } from '@/lib/http/headers';
+import { presenceActionFailureStatus } from '@/lib/library/post-release';
 import { LIBRARY_POST_RELEASE_OPTIMIZATION } from '@/lib/library/post-release-optimization';
 import {
   applyPresenceFindingAction,
   listLibraryPostReleaseBundle,
 } from '@/lib/library/post-release-store';
 
-export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
 
 const profileQuerySchema = z.object({ creatorProfileId: z.string().uuid() });
@@ -65,13 +65,25 @@ export async function PATCH(request: Request) {
   const auth = await requireProfileAccess(parsed.data.creatorProfileId);
   if ('error' in auth) return auth.error;
   try {
-    const finding = await applyPresenceFindingAction({
+    const result = await applyPresenceFindingAction({
       ...parsed.data,
       actorUserId: auth.userId,
     });
-    return finding
-      ? json({ finding, optimization: LIBRARY_POST_RELEASE_OPTIMIZATION })
-      : json({ error: 'Finding cannot take that action' }, 409);
+    if (!result.ok) {
+      const missing = result.reason === 'not_found';
+      return json(
+        {
+          error: missing
+            ? 'Finding not found'
+            : 'Finding cannot take that action',
+        },
+        presenceActionFailureStatus(result.reason)
+      );
+    }
+    return json({
+      finding: result.finding,
+      optimization: LIBRARY_POST_RELEASE_OPTIMIZATION,
+    });
   } catch (error) {
     await captureError('Library post-release action failed', error, {
       route: '/api/library/post-release',

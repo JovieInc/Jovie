@@ -12,6 +12,7 @@ import {
 import { promoDownloads } from '@/lib/db/schema/promo-downloads';
 import { captureError } from '@/lib/error-tracking';
 import {
+  type PresenceActionFailureReason,
   type PresenceFindingAction,
   transitionPresenceFinding,
 } from './post-release';
@@ -112,21 +113,21 @@ export async function listLibraryPostReleaseBundle(
       shareBps: item.shareBps,
     })),
     stats: [
-      {
-        platform: 'youtube',
-        connected: youtubeConnected,
-        measurements: [],
-      },
+      { platform: 'youtube', connected: youtubeConnected, measurements: [] },
     ],
   };
 }
+
+export type ApplyPresenceFindingResult =
+  | { readonly ok: true; readonly finding: LibraryPresenceFindingView }
+  | { readonly ok: false; readonly reason: PresenceActionFailureReason };
 
 export async function applyPresenceFindingAction(input: {
   readonly creatorProfileId: string;
   readonly findingId: string;
   readonly actorUserId: string;
   readonly action: PresenceFindingAction;
-}): Promise<LibraryPresenceFindingView | null> {
+}): Promise<ApplyPresenceFindingResult> {
   const [finding] = await db
     .select()
     .from(libraryPresenceFindings)
@@ -137,9 +138,9 @@ export async function applyPresenceFindingAction(input: {
       )
     )
     .limit(1);
-  if (!finding) return null;
+  if (!finding) return { ok: false, reason: 'not_found' };
   const transition = transitionPresenceFinding(finding, input.action);
-  if (!transition.ok) return null;
+  if (!transition.ok) return { ok: false, reason: transition.reason };
   const now = new Date();
   const [updated] = await db
     .update(libraryPresenceFindings)
@@ -158,7 +159,7 @@ export async function applyPresenceFindingAction(input: {
       )
     )
     .returning();
-  if (!updated) return null;
+  if (!updated) return { ok: false, reason: 'not_found' };
   try {
     await writePresenceDecision({
       creatorProfileId: input.creatorProfileId,
@@ -177,7 +178,7 @@ export async function applyPresenceFindingAction(input: {
       }
     );
   }
-  return toFindingView(updated);
+  return { ok: true, finding: toFindingView(updated) };
 }
 
 async function writePresenceDecision(input: {
@@ -187,22 +188,23 @@ async function writePresenceDecision(input: {
   readonly status: LibraryPresenceFinding['status'];
   readonly now: Date;
 }): Promise<void> {
+  const experiments = optimizationExperiments;
   const [experiment] = await db
     .select({
-      id: optimizationExperiments.id,
-      variants: optimizationExperiments.variants,
-      decisionEvidence: optimizationExperiments.decisionEvidence,
+      id: experiments.id,
+      variants: experiments.variants,
+      decisionEvidence: experiments.decisionEvidence,
     })
-    .from(optimizationExperiments)
+    .from(experiments)
     .where(
       and(
-        eq(optimizationExperiments.creatorProfileId, input.creatorProfileId),
+        eq(experiments.creatorProfileId, input.creatorProfileId),
         eq(
-          optimizationExperiments.subjectType,
+          experiments.subjectType,
           toLibraryEntityType(input.finding.subjectType)
         ),
-        eq(optimizationExperiments.subjectId, input.finding.subjectId),
-        eq(optimizationExperiments.status, 'running')
+        eq(experiments.subjectId, input.finding.subjectId),
+        eq(experiments.status, 'running')
       )
     )
     .limit(1);
@@ -214,7 +216,7 @@ async function writePresenceDecision(input: {
     ? experiment.decisionEvidence
     : {};
   await db
-    .update(optimizationExperiments)
+    .update(experiments)
     .set({
       decisionEvidence: {
         ...existing,
@@ -232,5 +234,5 @@ async function writePresenceDecision(input: {
       },
       updatedAt: input.now,
     })
-    .where(eq(optimizationExperiments.id, experiment.id));
+    .where(eq(experiments.id, experiment.id));
 }
