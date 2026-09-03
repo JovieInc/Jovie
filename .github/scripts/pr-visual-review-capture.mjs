@@ -11,8 +11,44 @@ const viewports = {
   desktop: { width: 1440, height: 900 },
   mobile: { width: 390, height: 844 },
 };
+const AUTHENTICATED_SHELL_WAIT_MS = 30_000;
+const NEW_CHAT_EMPTY_WAIT_MS = 15_000;
 if (!Array.isArray(routes) || routes.length === 0)
   throw new Error('No routes supplied');
+
+/**
+ * Next production streaming can paint the app-shell Suspense fallback
+ * (unlabeled skeleton + aria-hidden Just ask) before DashboardShellContent
+ * resolves. Capture must wait for the live authenticated chrome, not the
+ * first HTML chunk. JOV-5387 New Chat evidence also requires the loaded
+ * empty-state heading, which is not aria-hidden.
+ */
+async function waitForAuthenticatedShell(page, route) {
+  if (!route.startsWith('/app/')) return;
+
+  await page.getByTestId('dashboard-header').waitFor({
+    state: 'visible',
+    timeout: AUTHENTICATED_SHELL_WAIT_MS,
+  });
+
+  const shellMarker = page
+    .getByRole('heading', { name: 'New Chat', level: 1 })
+    .or(page.getByRole('link', { name: 'New Chat' }))
+    .or(page.getByRole('link', { name: 'Inbox' }))
+    .or(page.getByRole('link', { name: 'Library' }));
+
+  await shellMarker.first().waitFor({
+    state: 'visible',
+    timeout: AUTHENTICATED_SHELL_WAIT_MS,
+  });
+
+  if (route === '/app/chat' || route.startsWith('/app/chat/')) {
+    await page.getByRole('heading', { name: 'Just ask' }).waitFor({
+      state: 'visible',
+      timeout: NEW_CHAT_EMPTY_WAIT_MS,
+    });
+  }
+}
 
 await mkdir(outDir, { recursive: true });
 const browser = await chromium.launch({ headless: true });
@@ -85,7 +121,9 @@ try {
           }
         }
         const response = await page.goto(url, {
-          waitUntil: 'networkidle',
+          waitUntil: route.startsWith('/app/')
+            ? 'domcontentloaded'
+            : 'networkidle',
           timeout: 45_000,
         });
         if (!response || !response.ok())
@@ -101,6 +139,7 @@ try {
               `Test-auth handoff ended at ${page.url()}, expected ${expected.toString()}.`
             );
         }
+        await waitForAuthenticatedShell(page, route);
         const pageText = (await page.locator('body').innerText()).trim();
         if (!pageText || /\b404\b|content not found/i.test(pageText))
           throw new Error('Captured route did not render a meaningful surface');
@@ -129,9 +168,15 @@ try {
           status: 'captured',
         });
       } catch (error) {
+        try {
+          await page.screenshot({ path, fullPage: true });
+        } catch {
+          // Best-effort failure evidence; the capture status stays failed.
+        }
         manifest.push({
           route,
           viewport: viewportName,
+          path,
           status: 'failed',
           error: String(error.message ?? error),
         });

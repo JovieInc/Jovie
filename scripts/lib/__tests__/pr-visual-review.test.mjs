@@ -371,6 +371,20 @@ describe('bounded PR visual review contract', () => {
     expect(capture).toContain('validateCaptureManifest');
     expect(capture).toContain('capture-validation.json');
   });
+
+  it('waits for the loaded authenticated New Chat shell instead of the streaming fallback', () => {
+    const capture = readFileSync(
+      '.github/scripts/pr-visual-review-capture.mjs',
+      'utf8'
+    );
+    expect(capture).toContain('waitForAuthenticatedShell');
+    expect(capture).toContain("getByTestId('dashboard-header')");
+    expect(capture).toContain(
+      "getByRole('heading', { name: 'New Chat', level: 1 })"
+    );
+    expect(capture).toContain("getByRole('heading', { name: 'Just ask' })");
+    expect(capture).toContain("'domcontentloaded'");
+  });
 });
 
 // JOV-5459 (Tim lock 2026-08-30): Visual ENOENT is FAIL, not advisory.
