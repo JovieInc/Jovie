@@ -78,7 +78,7 @@ export function HomepageEditorialHero({
             sizes={mobile.sizes}
           />
           {/* eslint-disable-next-line @next/next/no-img-element -- art-directed <picture>; sources come from getImageProps */}
-          <img {...desktop} alt='' decoding='async' />
+          <img {...desktop} alt='' decoding='async' fetchPriority='high' />
         </picture>
       </div>
       <div className='homepage-editorial-hero__scrim' aria-hidden='true' />

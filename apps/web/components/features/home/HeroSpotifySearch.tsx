@@ -53,6 +53,8 @@ export interface HeroSpotifySearchProps {
   readonly submitTestId?: string;
 }
 
+const DEFAULT_INPUT_ID = 'hero-spotify-search';
+const DEFAULT_RESULTS_ID = 'hero-spotify-results';
 const DEFAULT_PLACEHOLDER = 'Search your artist name or paste a Spotify link';
 const DEFAULT_SUBMIT_LABEL = 'Claim Artist';
 
@@ -64,13 +66,14 @@ const DEFAULT_SUBMIT_LABEL = 'Claim Artist';
  */
 export function HeroSpotifySearch({
   appearance = 'default',
-  inputId = 'hero-spotify-search',
+  inputId = DEFAULT_INPUT_ID,
   placeholder = DEFAULT_PLACEHOLDER,
   submitLabel = DEFAULT_SUBMIT_LABEL,
   submitTestId,
 }: HeroSpotifySearchProps = {}) {
   const isEditorial = appearance === 'editorial';
-  const resultsId = `${inputId}-results`;
+  const resultsId =
+    inputId === DEFAULT_INPUT_ID ? DEFAULT_RESULTS_ID : `${inputId}-results`;
   const router = useRouter();
   const [searchQuery, setSearchQuery] = useState('');
   const [showResults, setShowResults] = useState(false);
