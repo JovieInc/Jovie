@@ -1100,8 +1100,7 @@ export function buildPipelineScoreboard(
     : mergeEvidence;
   const merges = mergeEvidence.complete ? (input.mergedPrs?.length ?? 0) : null;
   // JOV-5030: MQ attempts come from GitHub's authoritative merge_group
-  // workflow runs, not from the merge-queue label (which is stripped seconds
-  // after enqueue and structurally under-reports to zero).
+  // workflow runs, never from the retired merge-queue label.
   const mqRunEvidence = input.mergeGroupRunEvidence ?? null;
   const mergeGroupEvidence: MergedPrEvidenceStatus = mqRunEvidence
     ? {

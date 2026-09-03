@@ -192,6 +192,17 @@ class EvaluateFleetGateWrapperTests(unittest.TestCase):
         self.assertEqual(outputs["promotion_allowed"], "false")
         self.assertEqual(outputs["gate_rc"], "0")
 
+    def test_expected_sha_binds_fleet_consumer_to_exact_main(self):
+        code, outputs, receipt = run_wrapper(signals(), expected_sha=SHA)
+        self.assertEqual(code, 0)
+        self.assertEqual(receipt["signals"]["main"]["sha"], SHA)
+        self.assertEqual(outputs["mode"], "normal")
+
+        code, outputs, receipt = run_wrapper(signals(), expected_sha="b" * 40)
+        self.assertEqual(code, 2)
+        self.assertEqual(receipt["signals"]["main"]["sha"], SHA)
+        self.assertNotEqual(outputs.get("mode"), "normal")
+
     def test_deployment_consumer_uses_deployment_admission_not_promotion(self):
         action = (ROOT / ".github/actions/evaluate-fleet-gate/action.yml").read_text()
         self.assertIn("FLEET_GATE_CONSUMER", action)
@@ -283,6 +294,12 @@ class EvaluateFleetGateWrapperTests(unittest.TestCase):
             "DRAIN_FLEET_GATE_B64: ${{ needs.fleet-policy.outputs.receipt_b64 }}",
             autoenroll,
         )
+        for needle in (
+            "main_sha: ${{ steps.main-head.outputs.sha }}",
+            "expected-sha: ${{ steps.main-head.outputs.sha }}",
+            "ref: ${{ needs.fleet-policy.outputs.main_sha }}",
+        ):
+            self.assertIn(needle, autoenroll)
         for workflow in (autoenroll, deferred_release):
             self.assertIn(
                 "receipt_b64: ${{ steps.policy.outputs.receipt_b64 }}", workflow

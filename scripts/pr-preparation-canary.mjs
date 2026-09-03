@@ -119,7 +119,9 @@ export function validatePlan(plan, { nowMs = Date.now() } = {}) {
     ) {
       errors.push(`${at}.headRefName is invalid`);
     } else if (entry.headRefName.startsWith('gtmq_')) {
-      errors.push(`${at}.headRefName cannot be a Graphite merge-queue ref`);
+      errors.push(
+        `${at}.headRefName cannot be a retired gtmq_ merge-queue ref`
+      );
     }
     if (!isSha(entry.headOid))
       errors.push(`${at}.headOid must be a lowercase 40-character SHA`);

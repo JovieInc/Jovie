@@ -59,4 +59,10 @@ describe('JOV-5465 duration/ease/shadow/blur retire', () => {
     expect(source).not.toMatch(/--linear-(?:space|gap|container)-/);
     expect(source).not.toContain('--linear-shadow-card');
   });
+
+  it('keeps PricingSection heading guarded by canonical-ui-label-casing (JOV-5747)', () => {
+    const source = readSource('components/features/home/PricingSection.tsx');
+    expect(source).toContain('Simple Pricing.');
+    expect(source).not.toContain('ui-casing-allow');
+  });
 });

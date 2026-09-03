@@ -692,8 +692,7 @@ describe('merge queue telemetry parser', () => {
   it('records queued duration, evictions, requeues, staleness, and speculative reruns', () => {
     const metrics = parseMergeQueueTimeline([
       {
-        event: 'labeled',
-        label: { name: 'merge-queue' },
+        event: 'added_to_merge_queue',
         created_at: '2026-06-20T01:00:00Z',
       },
       {
@@ -707,19 +706,17 @@ describe('merge queue telemetry parser', () => {
         created_at: '2026-06-20T01:30:00Z',
       },
       {
-        event: 'unlabeled',
-        label: { name: 'merge-queue' },
-        actor: { login: 'graphite-app[bot]' },
+        event: 'removed_from_merge_queue',
+        actor: { login: 'jovie-bot[bot]' },
         created_at: '2026-06-20T01:31:00Z',
       },
       {
-        event: 'labeled',
-        label: { name: 'merge-queue' },
+        event: 'added_to_merge_queue',
         created_at: '2026-06-20T02:00:00Z',
       },
       {
         event: 'commented',
-        body: 'CI failed after Graphite speculative rerun',
+        body: 'CI failed after native speculative rerun',
         created_at: '2026-06-20T02:10:00Z',
       },
       {
@@ -743,8 +740,7 @@ describe('merge queue telemetry parser', () => {
         created_at: '2026-06-20T01:00:00Z',
       },
       {
-        event: 'labeled',
-        label: { name: 'merge-queue' },
+        event: 'added_to_merge_queue',
         created_at: '2026-06-20T01:05:00Z',
       },
       {
@@ -1746,14 +1742,7 @@ describe('remediation mutations', () => {
       123,
       'needs-conflict-resolution'
     );
-    expect(labelPrImpl).toHaveBeenCalledWith(
-      'JovieInc/Jovie',
-      123,
-      'merge-queue'
-    );
-    expect(removeLabelPrImpl.mock.invocationCallOrder[0]).toBeLessThan(
-      labelPrImpl.mock.invocationCallOrder[0]
-    );
+    expect(labelPrImpl).not.toHaveBeenCalled();
     expect(commentPrImpl).toHaveBeenCalledOnce();
   });
 });

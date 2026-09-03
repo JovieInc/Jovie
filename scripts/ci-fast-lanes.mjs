@@ -1,16 +1,18 @@
 #!/usr/bin/env node
 /**
- * Run the cheap CI cluster as labeled lanes with continue-on-failure semantics.
+ * Run the cheap CI cluster as labeled lanes.
  *
  * Used by the dedicated `ci-fast-typecheck` and `ci-fast-remaining` jobs in
  * `.github/workflows/ci.yml` (JOV-4477). Each hosted job checks out and installs
  * once, invokes one value from LANE_GROUPS, and publishes an isolated lane
  * artifact; the aggregate `ci-fast` job also requires the dedicated profile
- * browser admission job. Never aborts mid-group — always reports every
- * selected lane, writes
- * $GITHUB_STEP_SUMMARY, emits lane records for the harness, and exits non-zero
- * only after all selected lanes finish if any failed. Local callers may omit
- * the selector to retain the historical all-lanes behavior.
+ * browser admission job.
+ *
+ * Fail-fast: the first failed lane skips later lanes in the same group so
+ * biome/typecheck red does not pay for structural Playwright. Skipped-later
+ * lanes still emit a receipt. Set CI_FAST_FAIL_FAST=false to restore the
+ * historical run-every-lane report. Local callers may omit the selector to
+ * retain the all-lanes default.
  *
  * Usage:
  *   node scripts/ci-fast-lanes.mjs [with CI_FAST_LANE_GROUP=<group>]
@@ -21,6 +23,8 @@
  *   CI_FAST_LANES_OUT  — optional path for JSON lane results
  *   TURBO_SCM_BASE     — for typecheck --affected
  *   CI_FAST_SKIP_STRUCTURAL — "true" to skip the remaining group's structural lane
+ *   CI_FAST_ONLY_STRUCTURAL — "true" to run only the structural lane
+ *   CI_FAST_FAIL_FAST — "false" to run every selected lane even after a failure
  */
 
 import { spawnSync } from 'node:child_process';
@@ -744,19 +748,44 @@ function writeLaneResults(results, laneGroup, setupError) {
   return outPath;
 }
 
+function failFastEnabled() {
+  return process.env.CI_FAST_FAIL_FAST !== 'false';
+}
+
 function main() {
   const laneGroup = process.env.CI_FAST_LANE_GROUP;
   /** @type {LaneResult[]} */
   const results = [];
   /** @type {string | undefined} */
   let setupError;
+  const failFast = failFastEnabled();
 
   try {
-    const selectedLanes = selectLanes(laneGroup);
+    let selectedLanes = selectLanes(laneGroup);
+    if (process.env.CI_FAST_ONLY_STRUCTURAL === 'true') {
+      selectedLanes = selectedLanes.filter(lane => lane.id === 'structural');
+    }
 
+    let failedFast = false;
     for (const lane of selectedLanes) {
       console.log(`\n======== lane: ${lane.id} ========`);
       const laneStartedAt = Date.now();
+
+      if (failedFast) {
+        const logExcerpt = 'skipped: earlier lane failed (fail-fast)';
+        console.log(`[ci-fast] ${lane.id}: skipped`);
+        console.log(logExcerpt);
+        results.push({
+          id: lane.id,
+          name: lane.name,
+          nextLocalCommand: lane.nextLocalCommand,
+          status: 'skipped',
+          logExcerpt,
+          durationMs: Math.max(0, Date.now() - laneStartedAt),
+        });
+        continue;
+      }
+
       let outcome;
       try {
         outcome = lane.run();
@@ -776,6 +805,7 @@ function main() {
 
       if (status === 'failure') {
         annotateFailure(lane, logExcerpt);
+        if (failFast) failedFast = true;
       }
 
       console.log(`[ci-fast] ${lane.id}: ${status}`);

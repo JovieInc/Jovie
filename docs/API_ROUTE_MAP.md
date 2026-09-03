@@ -256,6 +256,7 @@
 | `/api/youtube-library/links` | GET | `auth` | Approval queue: pending_review video↔release ISRC links for the user's profiles |
 | `/api/youtube-library/links/[id]/approve` | POST | `auth` | Approve a pending ISRC release link (owner only) |
 | `/api/youtube-library/links/[id]/reject` | POST | `auth` | Reject a pending ISRC release link with a reason (owner only) |
+| `/api/youtube-library/videos/[videoId]/optimization` | GET | `auth` | Evidence-backed YouTube thumbnail, metric, and experiment snapshot |
 
 ### Email
 
@@ -350,6 +351,7 @@
 | `/api/library/documents/[id]/claims` | POST | `auth` | Attach a sourced evidence claim to the current private revision |
 | `/api/library/documents/[id]/review` | POST | `auth` | Freeze factual evidence for the exact current script revision |
 | `/api/library/documents/[id]/approve` | POST | `auth` (owner) | Approve and hand off the exact reviewed script revision for capture |
+| `/api/library/relationships` | POST, DELETE | `auth` | Confirm or remove merch-in-video library relationships |
 
 ### Merch
 

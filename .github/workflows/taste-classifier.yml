@@ -7,7 +7,8 @@ name: Taste Classifier
 #
 # Outputs:
 #   - Posts classification as a PR comment
-#   - Applies the appropriate label: llm-review or merge-queue. Full-autonomy
+#   - Applies llm-review when taste needs a stronger model. Auto-ship applies
+#     no transport label; native autoenroll owns queue mutation. Full-autonomy
 #     policy (2026-07-06): taste-flagged PRs ship autonomously after strong LLM
 #     review; humans steer via issues + post-ship production walkthroughs, not
 #     pre-merge gates. The classification comment remains the steering signal.
@@ -157,7 +158,6 @@ jobs:
             const labelMap = {
               'taste-required': 'llm-review',
               'llm-reviewable': 'llm-review',
-              'auto-ship': 'merge-queue',
             };
             const label = labelMap[result];
             if (label) {
