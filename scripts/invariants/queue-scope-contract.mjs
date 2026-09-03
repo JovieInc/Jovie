@@ -2,7 +2,7 @@ import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
-export const QUEUE_SCOPE_INVARIANT = 'JOV-INV-024';
+export const QUEUE_SCOPE_INVARIANT = 'JOV-INV-025';
 
 const DEFAULT_REPO_ROOT = fileURLToPath(new URL('../../', import.meta.url));
 
@@ -186,4 +186,4 @@ if (process.argv[1] === fileURLToPath(import.meta.url)) {
   console.log(`${QUEUE_SCOPE_INVARIANT} queue scope contract OK`);
 }
 
-// Production consumer binding: JOV-INV-024.
+// Production consumer binding: JOV-INV-025.
