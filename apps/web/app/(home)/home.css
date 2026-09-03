@@ -2048,10 +2048,7 @@ body:has(.home-viewport)::-webkit-scrollbar {
     transparent calc(100% - var(--space-px)),
     var(--homepage-editorial-grid-line) 0
   );
-  background-size: calc(
-      (100% - var(--space-6) * 11) / 12 + var(--space-6)
-    )
-    100%;
+  background-size: calc((100% - var(--space-6) * 11) / 12 + var(--space-6)) 100%;
   mask-image: linear-gradient(
     90deg,
     transparent,
