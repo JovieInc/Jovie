@@ -315,6 +315,7 @@ const nativeBindingsByEntry: Partial<
       semanticRole: 'plain-content-press-feedback',
       consumerPaths: [
         'apps/ios/Jovie/Features/AppShell/AppShellLeftDrawer.swift',
+        'apps/ios/Jovie/Features/Settings/SettingsView.swift',
       ],
       testEvidence: nativeButtonStyleTests,
     },
