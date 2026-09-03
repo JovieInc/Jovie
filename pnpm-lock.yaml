@@ -669,7 +669,7 @@ importers:
         specifier: ^7.2.0
         version: 7.2.0(@typescript-eslint/parser@8.67.0(eslint@10.9.1(jiti@2.6.1))(typescript@6.0.3))(eslint@10.9.1(jiti@2.6.1))
       fast-check:
-        specifier: ^4.8.0
+        specifier: 4.8.0
         version: 4.8.0
       glob:
         specifier: ^13.0.6
