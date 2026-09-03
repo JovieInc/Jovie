@@ -1,0 +1,5 @@
+{
+  "$comment": "Shrink-only floor for rounded-[…] values not derived from calc(var(--radius-*) ± var(--space-*)) across apps/web/{app,components} + packages/ui (JOV-5865). Lower when a PR converges a radius onto the System B scale; never raise.",
+  "count": 48,
+  "files": 22
+}
