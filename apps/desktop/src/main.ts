@@ -672,16 +672,22 @@ function findLegacyAuthReturnRouteInArgv(argv: readonly string[]): string | null
   return null;
 }
 
+// Chromium's Web Speech recognition backend needs Google API keys that
+// Electron cannot ship, so `webkitSpeechRecognition` exists in the renderer
+// but every start() fails with a 'network' error (electron/electron#46143,
+// #7749). Advertising it as a fallback made the composer mic look live and
+// fail on every press. Report it unavailable so the renderer points at OS
+// dictation instead — macOS dictation types into any focused field here.
 function getDesktopDictationStatus(): DesktopDictationStatus {
   return {
     ok: true,
     nativeAvailable: false,
-    webSpeechFallbackAllowed: true,
-    mode: 'web-speech',
+    webSpeechFallbackAllowed: false,
+    mode: 'unavailable',
     reason:
       process.platform === 'darwin'
-        ? 'native-macos-dictation-is-system-owned-web-speech-fallback-enabled'
-        : 'native-dictation-unavailable-web-speech-fallback-enabled',
+        ? 'web-speech-unsupported-in-electron-use-macos-system-dictation'
+        : 'web-speech-unsupported-in-electron-use-system-dictation',
   };
 }
 
