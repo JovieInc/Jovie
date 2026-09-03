@@ -1,13 +1,17 @@
 import type { ReactNode } from 'react';
 import { NormalizedTrustLogo } from '@/components/media/NormalizedTrustLogo';
-import { TRUST_LOGO_ASSETS } from '@/components/media/trustLogoAssets';
+import {
+  TRUST_LOGO_ASSETS,
+  type TrustLogoAssetId,
+} from '@/components/media/trustLogoAssets';
 import { MARKETING_PEN_CONTRACT_IDS } from '@/data/marketing/penContracts';
 import { cn } from '@/lib/utils';
 
 interface HomeTrustSectionProps {
   readonly variant?: 'default' | 'compact';
   readonly className?: string;
-  readonly presentation?: 'card' | 'inline-strip';
+  readonly presentation?: 'card' | 'inline-strip' | 'artist-profile';
+  readonly logoIds?: readonly TrustLogoAssetId[];
   /** Label rendered above the logos. Artist-profile and release-notification
    * surfaces use the default ("Trusted by artists and teams releasing on");
    * the homepage hero historically used a shorter variant. */
@@ -50,6 +54,7 @@ export function HomeTrustSection({
   presentation = 'card',
   label = 'Trusted by artists and teams releasing on',
   ariaLabel,
+  logoIds,
 }: Readonly<HomeTrustSectionProps>) {
   const isInlineStrip = presentation === 'inline-strip';
   const accessibleLabel =
@@ -57,6 +62,32 @@ export function HomeTrustSection({
   const logoTone = isInlineStrip ? '' : 'text-white/55';
   const innerBoxClass = getInnerBoxClass(isInlineStrip, variant);
   const labelMarginClass = getLabelMarginClass(isInlineStrip, variant);
+  const assets = logoIds
+    ? TRUST_LOGO_ASSETS.filter(asset => logoIds.includes(asset.id))
+    : TRUST_LOGO_ASSETS;
+
+  if (presentation === 'artist-profile') {
+    return (
+      <section
+        data-pen-contract={MARKETING_PEN_CONTRACT_IDS.section.logoCloud}
+        data-testid='artist-profile-logo-bar'
+        data-presentation={presentation}
+        className={cn(
+          'flex w-full flex-wrap items-center justify-center gap-x-11 gap-y-6 text-primary-token/72',
+          className
+        )}
+        aria-label={accessibleLabel}
+      >
+        {assets.map(asset => (
+          <NormalizedTrustLogo
+            key={asset.id}
+            id={asset.id}
+            className='max-w-43'
+          />
+        ))}
+      </section>
+    );
+  }
 
   return (
     <section
@@ -99,7 +130,7 @@ export function HomeTrustSection({
               'gap-x-5 gap-y-5 sm:gap-x-8'
           )}
         >
-          {TRUST_LOGO_ASSETS.map(asset => {
+          {assets.map(asset => {
             const slotName =
               asset.id === 'black-hole-recordings' ? 'black-hole' : asset.id;
             return (

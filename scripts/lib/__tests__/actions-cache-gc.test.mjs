@@ -73,6 +73,9 @@ describe('Actions cache GC', () => {
     expect(plan.evict.map(item => item.id).sort()).toEqual([1, 3]);
     expect(plan.keep.map(item => item.id).sort()).toEqual([2, 4]);
     expect(isProtectedCacheKey('Linux-playwright-chromium-v1')).toBe(true);
+    expect(isProtectedCacheKey('macOS-swiftpm-xcode-abc')).toBe(true);
+    expect(isProtectedCacheKey('Linux-pip-pytest-abc')).toBe(true);
+    expect(isProtectedCacheKey('macOS-electron-downloads-abc')).toBe(true);
     expect(turboFamily('Linux-turbo-aaa')).toBe('Linux-turbo');
   });
 
@@ -136,6 +139,39 @@ describe('Actions cache GC', () => {
     });
     expect(plan.evict).toEqual([]);
     expect(plan.keep.map(item => item.id)).toEqual([9]);
+  });
+
+  it('trims recent live caches by LRU until the byte budget is restored', () => {
+    const fiveGiB = 5 * 1024 * 1024 * 1024;
+    const plan = planCacheGc({
+      nowMs: now,
+      openRefs: new Set(['refs/heads/main']),
+      usage: {
+        active_caches_count: 2,
+        active_caches_size_in_bytes: fiveGiB * 2,
+      },
+      caches: [
+        cache({
+          id: 10,
+          ref: 'refs/heads/main',
+          key: 'macOS-swiftpm-old',
+          size_in_bytes: fiveGiB,
+          last_accessed_at: '2026-08-21T11:00:00Z',
+        }),
+        cache({
+          id: 11,
+          ref: 'refs/heads/main',
+          key: 'macOS-swiftpm-new',
+          size_in_bytes: fiveGiB,
+          last_accessed_at: '2026-08-22T11:00:00Z',
+        }),
+      ],
+    });
+
+    expect(plan.evict.map(item => item.id)).toEqual([10]);
+    expect(plan.evict[0]?.reason).toBe('budget_lru');
+    expect(plan.keep.map(item => item.id)).toEqual([11]);
+    expect(plan.keepBytes).toBe(fiveGiB);
   });
 
   it('parses paginated gh --slurp pages instead of crashing on 459 caches', async () => {
