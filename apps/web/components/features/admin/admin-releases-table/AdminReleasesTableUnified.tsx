@@ -191,7 +191,7 @@ function createColumns(): ColumnDef<AdminReleaseRow, unknown>[] {
         const release = row.original;
         return (
           <div className='flex items-center gap-2'>
-            <Avatar className='size-6'>
+            <Avatar size='md'>
               {release.artistAvatarUrl ? (
                 <AvatarImage src={release.artistAvatarUrl} alt='' />
               ) : null}
