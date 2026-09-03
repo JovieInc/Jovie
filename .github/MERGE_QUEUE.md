@@ -5,24 +5,21 @@ is `MERGE_QUEUE_BACKEND=native`, and ruleset `Main Branch Protection`
 (`10512119`) owns queue admission and combined-head validation. Native GitHub is
 also the supported stack-construction path: dependent PRs may temporarily target
 their immediate parent, then are retargeted and rebased onto `main` after that
-parent lands. Graphite is not required and there is no second landing transport.
+parent lands. There is no second landing transport.
 
 ## How a PR lands
 
 1. Open a root PR against `main`. A dependent child may instead target its
    immediate parent while both are open, but it must remain draft and must not
-   receive `merge-queue` while that parent base is live.
+   be enrolled while that parent base is live. Do not add `merge-queue`.
 2. After the parent lands, retarget the child to `main`, rebase it from the
    recorded parent tip, and prove its exact remote head lease and semantic
-   ancestry. The owning agent's final action pairs marking ready with enabling
-   native auto-merge. Pending checks are valid; GitHub will not merge until the
-   existing source flight is green. If auto-merge cannot be enabled, automation
-   restores draft state rather than leaving a ready PR without merge intent.
+   ancestry. Mark the child ready. Native autoenroll owns queue mutation;
+   do not `gh pr merge` / `--auto` / `--admin`, and do not add `merge-queue`.
 3. `merge-queue-autoenroll.yml` revalidates the PR's current state, hard-gate
    labels, the first source CI flight, and exact head SHA. It enrolls through
    `scripts/merge-queue-backend.mjs` and proves authoritative queue state after
-   mutation. `ready_for_review` never launches a second source CI flight, and
-   Graphite/Cursor are not queue transports.
+   mutation. `ready_for_review` never launches a second source CI flight.
 4. GitHub creates a synthetic `merge_group` head against current `main` and
    waits for the same required contexts on that exact combined SHA.
 5. GitHub squash-merges the green queue entry. `linear-sync-on-merge.yml`

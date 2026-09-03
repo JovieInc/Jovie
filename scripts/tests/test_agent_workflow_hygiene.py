@@ -1290,7 +1290,7 @@ def test_product_screenshot_budget_covers_capture_and_publication() -> None:
     assert "production-controller.yml/runs?status=in_progress&per_page=100" in publication
     assert "production-controller.yml/runs?status=queued&per_page=100" in publication
     assert "hold-screenshot-mq-during-controller.mjs" in publication
-    assert publication.count('gh pr edit --add-label "merge-queue"') == 2
+    assert publication.count('gh pr edit --add-label "merge-queue"') == 0
     assert publication.count("if hold_screenshot_merge_queue; then") == 2
 
 
@@ -1435,7 +1435,26 @@ def test_api_only_pr_controllers_never_consume_fixed_ci_capacity() -> None:
         encoding="utf-8"
     )
     assert "Graphite" not in dependabot
-    assert "native merge-queue enrollment" in dependabot
+    assert "Native autoenroll owns queue mutation" in dependabot
+
+
+def test_retired_merge_queue_label_has_no_active_producers() -> None:
+    """Native queue membership must never be synthesized from a legacy label."""
+    sources = [
+        REPO_ROOT / ".claude/rules/release.md",
+        REPO_ROOT / ".claude/rules/swarm.md",
+        REPO_ROOT / ".github/rulesets/branch-protection.yml",
+        WORKFLOWS / "agent-pipeline.yml",
+        REPO_ROOT / "scripts/release-queue-deferred.sh",
+        REPO_ROOT / "scripts/hermes/lib/codex-issue-shipper.ts",
+    ]
+    forbidden = re.compile(
+        r"--(?:add|remove)-label\s+[\"']?merge-queue|"
+        r"\.name\s*==\s*[\"']merge-queue[\"']|"
+        r"labels[^\n]*[\"'`]merge-queue[\"'`]"
+    )
+    for source in sources:
+        assert forbidden.search(source.read_text(encoding="utf-8")) is None, source
 
 
 def test_background_controllers_never_consume_fixed_ci_capacity() -> None:
