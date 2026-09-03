@@ -95,21 +95,18 @@ test.describe('Homepage', () => {
       'homepage-embedded'
     );
     await expect(header.locator('a[href="/"]').first()).toBeVisible();
-    await expect(header.getByRole('button', { name: 'Features' })).toHaveCount(
-      0
-    );
-    await expect(header.getByRole('button', { name: 'Resources' })).toHaveCount(
-      0
-    );
+    await expect(header.getByRole('link', { name: 'Product' })).toHaveCount(0);
+    await expect(header.getByRole('button', { name: 'For' })).toHaveCount(0);
+    await expect(header.getByRole('button', { name: 'Tools' })).toHaveCount(0);
     await expect(header.getByRole('link', { name: 'Pricing' })).toHaveCount(0);
     await expect(header.getByRole('link', { name: 'Contact' })).toHaveCount(0);
     await expect(header.getByRole('link', { name: 'Log in' })).toHaveAttribute(
       'href',
       '/signin'
     );
-    await expect(header.getByRole('link', { name: 'Get started' })).toHaveCount(
-      0
-    );
+    await expect(
+      header.getByRole('link', { name: 'Find yourself' })
+    ).toHaveCount(0);
 
     await page.evaluate(() =>
       window.scrollTo({ top: 320, behavior: 'instant' })
@@ -131,12 +128,11 @@ test.describe('Homepage', () => {
 
   test('header flyouts are not mounted by default', async ({ page }) => {
     const header = page.getByTestId('header-nav');
-    const featuresFlyout = page.locator('#marketing-header-flyout-features');
+    const toolsFlyout = page.locator('#marketing-header-flyout-tools');
 
-    await expect(header.getByRole('button', { name: 'Features' })).toHaveCount(
-      0
-    );
-    await expect(featuresFlyout).toHaveCount(0);
+    await expect(header.getByRole('button', { name: 'For' })).toHaveCount(0);
+    await expect(header.getByRole('button', { name: 'Tools' })).toHaveCount(0);
+    await expect(toolsFlyout).toHaveCount(0);
   });
 
   test('hero exposes one centered artist dashboard at source quality', async ({
@@ -652,6 +648,9 @@ test.describe('Homepage', () => {
     );
     await expect(
       header.getByRole('link', { name: 'Get started', exact: true })
+    ).toHaveCount(0);
+    await expect(
+      header.getByRole('link', { name: 'Find yourself', exact: true })
     ).toHaveCount(0);
     await expect(
       header.getByRole('link', { name: 'Log in', exact: true })

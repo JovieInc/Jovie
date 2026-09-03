@@ -14,12 +14,13 @@
  */
 
 import { and, sql as drizzleSql, eq, inArray } from 'drizzle-orm';
-import { after, type NextRequest, NextResponse } from 'next/server';
+import { type NextRequest, NextResponse } from 'next/server';
 import { db } from '@/lib/db';
 import { recordClickEvent } from '@/lib/db/queries/analytics';
 import { socialLinks } from '@/lib/db/schema/links';
 import { creatorProfiles } from '@/lib/db/schema/profiles';
 import { captureError } from '@/lib/error-tracking';
+import { scheduleAfter } from '@/lib/next/schedule-after';
 import { publicClickLimiter } from '@/lib/rate-limit';
 import { resolveSocialShortcutPlatforms } from '@/lib/social/shortcut-platforms';
 import { detectBot, recordAnonymousBotMetric } from '@/lib/utils/bot-detection';
@@ -169,7 +170,7 @@ export async function GET(
       ? null
       : await publicClickLimiter.limit(clientIP);
     if (rateLimitResult?.success) {
-      after(() =>
+      scheduleAfter(() =>
         recordShortcutAnalytics({
           creatorProfileId: profile.id,
           socialLinkId: link.id,

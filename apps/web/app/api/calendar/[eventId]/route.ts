@@ -1,5 +1,5 @@
 import { and, eq } from 'drizzle-orm';
-import { after, NextResponse } from 'next/server';
+import { NextResponse } from 'next/server';
 import { db } from '@/lib/db';
 import { creatorProfiles } from '@/lib/db/schema/profiles';
 import { tourDates } from '@/lib/db/schema/tour';
@@ -9,6 +9,7 @@ import {
   formatIcsTimestamp,
   sanitizeIcsUrl,
 } from '@/lib/ics/format';
+import { scheduleAfter } from '@/lib/next/schedule-after';
 
 const UUID_REGEX =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
@@ -141,7 +142,7 @@ export async function GET(
       },
     });
   } catch (error) {
-    after(() =>
+    scheduleAfter(() =>
       captureError('Calendar ICS generation failed', error, {
         route: '/api/calendar/[eventId]',
         eventId,

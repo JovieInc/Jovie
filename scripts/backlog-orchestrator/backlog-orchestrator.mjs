@@ -751,11 +751,18 @@ async function evaluateGateCandidate(
       client: linear,
     });
   } else {
-    researchResult = {
-      status: 'already-approved',
-      fingerprint:
-        researchGate.researchGateReceipt(current).payload.fingerprint,
-    };
+    const researchReceipt = researchGate.researchGateReceipt(current);
+    if (!researchReceipt) {
+      researchResult = {
+        status: 'rejected',
+        reason: 'research-evidence-required',
+      };
+    } else {
+      researchResult = {
+        status: 'already-approved',
+        fingerprint: researchReceipt.payload.fingerprint,
+      };
+    }
   }
   if (researchResult.status === 'rejected') {
     return {

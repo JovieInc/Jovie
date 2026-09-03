@@ -1,7 +1,7 @@
-import { after } from 'next/server';
 import type { StructuredReleaseCollaborator } from '@/lib/discography/artist-queries';
 import { reconcileCreditedArtistProfiles } from '@/lib/discography/collaborator-profile-reconciliation';
 import { captureWarning } from '@/lib/error-tracking';
+import { scheduleAfter } from '@/lib/next/schedule-after';
 
 interface SchedulePublicCollaboratorReconciliationInput {
   readonly creatorProfileId: string;
@@ -43,32 +43,33 @@ export function schedulePublicCollaboratorProfileReconciliation({
   }
 
   try {
-    after(() =>
-      reconcileCreditedArtistProfiles(creatorProfileId, ownerSpotifyId)
-        .then(result => {
-          if (result.created > 0 || result.reused > 0) return;
+    return scheduleAfter(
+      () =>
+        reconcileCreditedArtistProfiles(creatorProfileId, ownerSpotifyId)
+          .then(result => {
+            if (result.created > 0 || result.reused > 0) return;
 
-          if (result.conflicted > 0 || result.metadataUnavailable > 0) {
-            return captureWarning(
-              'Public collaborator profile reconciliation completed without a link',
-              undefined,
-              {
-                ...RECONCILIATION_CONTEXT,
-                creatorProfileId,
-                ...result,
-              }
-            );
-          }
-        })
-        .catch(error =>
-          captureWarning(
-            'Public collaborator profile reconciliation failed',
-            error,
-            { ...RECONCILIATION_CONTEXT, creatorProfileId }
-          )
-        )
+            if (result.conflicted > 0 || result.metadataUnavailable > 0) {
+              return captureWarning(
+                'Public collaborator profile reconciliation completed without a link',
+                undefined,
+                {
+                  ...RECONCILIATION_CONTEXT,
+                  creatorProfileId,
+                  ...result,
+                }
+              );
+            }
+          })
+          .catch(error =>
+            captureWarning(
+              'Public collaborator profile reconciliation failed',
+              error,
+              { ...RECONCILIATION_CONTEXT, creatorProfileId }
+            )
+          ),
+      { fallback: 'skip' }
     );
-    return true;
   } catch {
     // Static generation and non-request callers do not have an `after()`
     // lifecycle. The importer/backfill still owns those paths; never fail a

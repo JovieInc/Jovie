@@ -1,4 +1,5 @@
 import { cn } from '@/lib/utils';
+import { presets } from '../table.styles';
 
 export interface TableHeaderRowProps {
   readonly children: React.ReactNode;
@@ -13,7 +14,7 @@ export function TableHeaderRow({
 }: TableHeaderRowProps) {
   return (
     <tr
-      className={cn('h-12', className)}
+      className={cn(presets.tableHeaderRow, className)}
       style={stickyOffset > 0 ? { top: `${stickyOffset}px` } : undefined}
     >
       {children}

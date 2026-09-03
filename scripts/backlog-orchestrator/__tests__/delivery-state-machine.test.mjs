@@ -35,6 +35,8 @@ describe('delivery state machine', () => {
       ['missing-owner-lease', 'reconcile-exact-head-lease'],
       ['dropped-controller-event', 'restore-event-trigger-and-reconcile'],
       ['draft-stack-policy', 'split-or-retarget-draft-stack'],
+      ['fleet-observation-gap', 'restore-fleet-observation'],
+      ['base-not-main', 'retarget-pr-base-to-main'],
     ]) {
       const receipt = buildDeliveryReceipt({ delivery_key: failure, failure });
       assert.equal(receipt.schema, DELIVERY_RECEIPT_SCHEMA);
@@ -139,6 +141,52 @@ describe('delivery state machine', () => {
     assert.equal(receipt.next.owner, 'gem');
   });
 
+  it('classifies a suppressed product PR queue failure dispatch as exact-head queue repair', () => {
+    const receipt = buildDeliveryReceipt({
+      action: 'delivery-control-failure',
+      client_payload: {
+        source: 'merge-queue-autoenroll',
+        event: 'suppressed-product-pr-check-failure',
+        failure: 'queue-noop',
+        delivery_key: `merge-queue-autoenroll:99:1:16376:${HEAD}:3`,
+        pr_number: 16376,
+        head_sha: HEAD,
+        evidence: {
+          workflow: 'Merge Queue Auto-Enroll',
+          exit_code: '3',
+        },
+      },
+    });
+
+    assert.equal(receipt.event.failure, 'queue-noop');
+    assert.equal(receipt.event.pr, 16376);
+    assert.equal(receipt.event.headSha, HEAD);
+    assert.equal(receipt.next.action, 'reconcile-exact-head-queue-admission');
+  });
+
+  it('classifies a suppressed non-queue product PR drain failure as a dropped controller event', () => {
+    const receipt = buildDeliveryReceipt({
+      action: 'delivery-control-failure',
+      client_payload: {
+        source: 'merge-queue-autoenroll',
+        event: 'suppressed-product-pr-check-failure',
+        failure: 'dropped-controller-event',
+        delivery_key: `merge-queue-autoenroll:99:1:16376:${HEAD}:1`,
+        pr_number: 16376,
+        head_sha: HEAD,
+        evidence: {
+          workflow: 'Merge Queue Auto-Enroll',
+          exit_code: '1',
+        },
+      },
+    });
+
+    assert.equal(receipt.event.failure, 'dropped-controller-event');
+    assert.equal(receipt.event.pr, 16376);
+    assert.equal(receipt.event.headSha, HEAD);
+    assert.equal(receipt.next.action, 'restore-event-trigger-and-reconcile');
+  });
+
   it('routes stale Gem service/config evidence to reload plus post-reload attestation', () => {
     const receipt = attestGemService({
       sourceSha: HEAD,
@@ -177,7 +225,7 @@ describe('delivery state machine', () => {
       const action = {
         schema: 'jovie-stack-health-action/v1',
         taskKey: 'b'.repeat(64),
-        deliveryKey: 'closure-stack:test-root',
+        deliveryKey: `closure-stack:${'b'.repeat(64)}`,
         action: 'split-or-retarget-draft-stack',
         owner: 'symphony',
         writer: 'symphony',
@@ -185,10 +233,14 @@ describe('delivery state machine', () => {
         rootPr: 16510,
         rootHeadSha: HEAD,
         prNumbers: [16510, 16511],
-        maxDepth: 5,
+        memberHeads: [
+          { pr: 16510, headSha: HEAD },
+          { pr: 16511, headSha: HEAD },
+        ],
+        maxDepth: 2,
         promotionPath: [
-          { pr: 16510, base: 'main', head: 'stack/root' },
-          { pr: 16511, base: 'stack/root', head: 'stack/child' },
+          { pr: 16510, base: 'main', head: 'stack/root', headSha: HEAD },
+          { pr: 16511, base: 'stack/root', head: 'stack/child', headSha: HEAD },
         ],
         integrator: null,
         deadline: null,
@@ -197,17 +249,83 @@ describe('delivery state machine', () => {
       };
       const source = {
         schema: 'jovie-closure-health/v1',
+        authority: 'Summer',
         observedAt: '2026-08-28T22:00:00.000Z',
+        reasons: [],
+        stackHealth: { violations: [] },
         repairActions: [action],
       };
-      const first = await persistClosureHealthActions(source, {
-        stateDir: directory,
+      const variant = (key, rootPr) => ({
+        ...action,
+        taskKey: key.repeat(64),
+        deliveryKey: `closure-stack:${key.repeat(64)}`,
+        rootPr,
+        rootHeadSha: key.repeat(40),
+        prNumbers: [rootPr],
+        memberHeads: [{ pr: rootPr, headSha: key.repeat(40) }],
+        maxDepth: 1,
+        promotionPath: [
+          { pr: rootPr, base: 'main', head: key, headSha: key.repeat(40) },
+        ],
       });
-      const duplicate = await persistClosureHealthActions(source, {
-        stateDir: directory,
-      });
+      const persist = (
+        repairActions,
+        observedAt = source.observedAt,
+        violationRoots = repairActions.map(item => item.rootPr),
+        reasons = violationRoots.length ? ['draft-stack-policy-violation'] : []
+      ) =>
+        persistClosureHealthActions(
+          {
+            ...source,
+            observedAt,
+            reasons,
+            stackHealth: {
+              violations: violationRoots.map(rootPr => ({ rootPr })),
+            },
+            repairActions,
+          },
+          { stateDir: directory }
+        );
+      const readQueue = async () =>
+        JSON.parse(
+          await readFile(join(directory, 'summer-queue.json'), 'utf8')
+        );
+      const otherRoot = variant('c', 16512);
+      const advancedRoot = variant('d', 16510);
+      const first = await persist([action]);
+      const stillViolatingWithoutExactEvidence = await persist(
+        [],
+        '2026-08-28T22:30:00.000Z',
+        [16510, 16513]
+      );
+      assert.equal(stillViolatingWithoutExactEvidence.evidenceCount, 2);
+      const firstSeenEvidence =
+        stillViolatingWithoutExactEvidence.evidence.find(
+          item => item.rootPr === 16513
+        );
+      assert.equal(firstSeenEvidence.task.action, 'collect-missing-evidence');
+      assert.equal(firstSeenEvidence.loop.mode, 'collect-evidence');
+      const unknownObservation = await persist(
+        [],
+        '2026-08-28T22:45:00.000Z',
+        [],
+        ['closure-observation-unknown']
+      );
+      assert.equal(unknownObservation.resolution.status, 'unobserved');
+      await persist([action, otherRoot], '2026-08-28T23:00:00.000Z');
+      await persist([advancedRoot, otherRoot], '2026-08-29T00:00:00.000Z');
+      const duplicate = await persist(
+        [advancedRoot, otherRoot],
+        '2026-08-29T00:00:00.000Z'
+      );
       assert.equal(first.status, 'created');
       assert.equal(duplicate.status, 'duplicate');
+      const queue = await readQueue();
+      assert.equal(queue.items.length, 2);
+      assert.equal(
+        queue.items.find(item => item.pr === 16510).headSha,
+        'd'.repeat(40)
+      );
       assert.equal(
         first.actions[0].task.action,
         'split-or-retarget-draft-stack'
@@ -216,7 +334,45 @@ describe('delivery state machine', () => {
         await readFile(first.actions[0].taskPath, 'utf8')
       );
       assert.deepEqual(task.evidence.prNumbers, [16510, 16511]);
+      assert.deepEqual(task.evidence.memberHeads, action.memberHeads);
       assert.equal(task.evidence.rootHeadSha, HEAD);
+      assert.equal(task.evidence.promotionPath[0].headSha, HEAD);
+      const resolved = await persist([], '2026-08-29T01:00:00.000Z');
+      assert.equal(resolved.status, 'resolved');
+      assert.deepEqual(
+        resolved.resolution.resolved.map(item => item.rootPr).sort(),
+        [16510, 16512]
+      );
+      const resolvedQueue = await readQueue();
+      assert.equal(resolvedQueue.items.length, 0);
+      assert.equal(resolvedQueue.terminalTombstones.length, 2);
+      assert.equal(
+        resolvedQueue.terminalTombstones[0].reason,
+        'draft-stack-policy-current-action-absent'
+      );
+      // Resolution is append-only: task/receipt history remains readable.
+      assert.equal(
+        JSON.parse(await readFile(first.actions[0].taskPath, 'utf8')).taskKey,
+        task.taskKey
+      );
+      await persist([action], '2026-08-29T02:00:00.000Z');
+      await persist([advancedRoot], '2026-08-29T03:00:00.000Z');
+      const returned = await persist([action], '2026-08-29T04:00:00.000Z');
+      assert.equal(returned.resolution.queue.items[0].headSha, HEAD);
+      assert.ok(returned.actions[0].loop.supersedesLoopKey);
+      await Promise.all([
+        persist([action, otherRoot], '2026-08-29T05:00:00.000Z'),
+        persist([], '2026-08-29T06:00:00.000Z'),
+      ]);
+      assert.equal((await readQueue()).items.length, 0);
+      await persist([action], '2026-08-29T07:00:00.000Z');
+      const olderEmpty = await persist([], '2026-08-29T06:30:00.000Z');
+      assert.equal(olderEmpty.status, 'stale');
+      const refreshed = await persist([action], '2026-08-29T08:00:00.000Z');
+      assert.equal(
+        (await readQueue()).items[0].observedAt,
+        refreshed.observedAt
+      );
       await assert.rejects(
         persistClosureHealthActions(
           { ...source, repairActions: [{ ...action, rootHeadSha: null }] },
@@ -227,6 +383,95 @@ describe('delivery state machine', () => {
     } finally {
       await rm(directory, { recursive: true, force: true });
     }
+  });
+
+  it('accepts a fail-closed fleet gate receipt with no stack repair work', async () => {
+    const directory = await mkdtemp(
+      join(tmpdir(), 'jovie-empty-stack-actions-')
+    );
+    try {
+      const result = await persistClosureHealthActions(
+        {
+          schema: 'jovie-fleet-gate/v1',
+          signals: {
+            closureHealth: {
+              schema: 'jovie-closure-health/v1',
+              status: 'red',
+              authority: 'Summer',
+              observedAt: '2026-09-01T01:23:29.000Z',
+              newIssueIntakeAllowed: false,
+              promotionContinues: true,
+              remediationContinues: true,
+              blockedActivities: [
+                'new-issue-lease',
+                'new-implementation',
+                'fallback-pr-generation',
+              ],
+              reasons: ['gate-evaluation-failed'],
+              stackHealth: {
+                maxDepth: 4,
+                roots: [],
+                violations: [],
+                repairActions: [],
+              },
+              repairActions: [],
+            },
+          },
+        },
+        { stateDir: directory }
+      );
+
+      assert.equal(result.actionCount, 0);
+      assert.equal(result.evidenceCount, 0);
+      assert.equal(result.status, 'none');
+    } finally {
+      await rm(directory, { recursive: true, force: true });
+    }
+  });
+
+  it('keeps legacy closure health without repair actions bounded and unobserved', async () => {
+    const fallback = await persistClosureHealthActions(
+      {
+        schema: 'jovie-fleet-gate/v1',
+        signals: {
+          closureHealth: {
+            schema: 'jovie-closure-health/v1',
+            authority: 'Summer',
+            status: 'red',
+            observedAt: '2026-09-01T02:20:00.000Z',
+            newIssueIntakeAllowed: false,
+            promotionContinues: true,
+            remediationContinues: true,
+            reasons: ['gate-evaluation-failed'],
+          },
+        },
+      },
+      { dryRun: true }
+    );
+    assert.equal(fallback.actionCount, 0);
+    assert.equal(fallback.evidenceCount, 0);
+    assert.equal(fallback.resolution.status, 'unobserved');
+
+    const activeViolation = await persistClosureHealthActions(
+      {
+        schema: 'jovie-closure-health/v1',
+        authority: 'Summer',
+        status: 'red',
+        observedAt: '2026-09-01T02:25:00.000Z',
+        newIssueIntakeAllowed: false,
+        promotionContinues: true,
+        remediationContinues: true,
+        reasons: ['draft-stack-policy-violation'],
+        stackHealth: {
+          violations: [{ rootPr: 16514 }],
+        },
+      },
+      { dryRun: true }
+    );
+    assert.equal(activeViolation.actionCount, 0);
+    assert.equal(activeViolation.evidenceCount, 1);
+    assert.equal(activeViolation.evidence[0].rootPr, 16514);
+    assert.equal(activeViolation.evidence[0].loop.mode, 'collect-evidence');
   });
 
   it('writes handed-off repair work as one exact-head Gem-to-FX task', async () => {

@@ -1,5 +1,6 @@
 import type { Meta, StoryObj } from '@storybook/nextjs-vite';
 import { X } from 'lucide-react';
+import { expect, userEvent, within } from 'storybook/test';
 import { DrawerButton } from './DrawerButton';
 import { DrawerHeader } from './DrawerHeader';
 
@@ -31,6 +32,13 @@ export const WithActions: Story = {
         <X aria-hidden='true' />
       </DrawerButton>
     ),
+  },
+  play: async ({ canvasElement }) => {
+    const close = within(canvasElement).getByRole('button', {
+      name: 'Close details',
+    });
+    await userEvent.click(close);
+    await expect(close).toHaveFocus();
   },
 };
 

@@ -1,10 +1,11 @@
 #!/usr/bin/env bash
 # Auto-Ready Agent Drafts
 #
-# Promotes only trusted bot-created drafts, or exact current heads produced
-# by the trusted FX writer. Branch-name prefixes are discovery noise, never
-# authorization. The only valid promotion pairs `ready` and native auto-merge
-# intent in one bounded action. Existing source checks may still be pending;
+# Recovers only author-proofed writer promotion drift. Branch-name prefixes,
+# trusted bot authors, and FX provenance are discovery noise, never promotion
+# authorization. The only valid recovery pairs `ready` and native auto-merge
+# intent in one bounded action after a `jovie-writer-pr-proof/v1` receipt is
+# present for the exact head. Existing source checks may still be pending;
 # GitHub keeps the merge blocked until they pass.
 #
 # Opt out per-PR with taste/security/hold labels, controlled-proof/canary
@@ -112,11 +113,11 @@ read_state() {  # read_state <num>
   local name="${REPO#*/}"
   [[ -n "$owner" && -n "$name" && "$owner" != "$name" ]]
   gh_retry api graphql \
-    -f query='query($owner:String!,$name:String!,$number:Int!){repository(owner:$owner,name:$name){pullRequest(number:$number){isDraft headRefOid headRefName state autoMergeRequest{enabledAt} isInMergeQueue mergeQueueEntry{id} labels(first:100){nodes{name}}}}}' \
+    -f query='query($owner:String!,$name:String!,$number:Int!){repository(owner:$owner,name:$name){pullRequest(number:$number){isDraft headRefOid headRefName body state autoMergeRequest{enabledAt} isInMergeQueue mergeQueueEntry{id} labels(first:100){nodes{name}}}}}' \
     -f owner="$owner" \
     -f name="$name" \
     -F number="$n" \
-    --jq '.data.repository.pullRequest | {draft: .isDraft, head: ((.headRefOid // "") | ascii_downcase), branch: .headRefName, labels: [.labels.nodes[].name], state: .state, autoMerge: (.autoMergeRequest != null), queued: (.isInMergeQueue == true or .mergeQueueEntry != null)}'
+    --jq '.data.repository.pullRequest | {draft: .isDraft, head: ((.headRefOid // "") | ascii_downcase), branch: .headRefName, body: (.body // ""), labels: [.labels.nodes[].name], state: .state, autoMerge: (.autoMergeRequest != null), queued: (.isInMergeQueue == true or .mergeQueueEntry != null)}'
 }
 
 state_needs_pairing() {  # state_needs_pairing <json> <expected-head> <expected-branch>
@@ -190,33 +191,37 @@ classify_promotion() {  # classify_promotion <json>
   node "$PROVENANCE_LIB" classify <<<"$1"
 }
 
-build_promotion_input() {  # build_promotion_input <author> <title> <branch> <labels-json> <head> [commit-json] [fx-run-json]
-  local author="$1" title="$2" branch="$3" labels_json="$4" head="$5"
-  local commit_json="${6:-null}"
-  local fx_run_json="${7:-null}"
+build_promotion_input() {  # build_promotion_input <pr> <author> <title> <branch> <labels-json> <head> <body> [commit-json] [fx-run-json]
+  local pr_number="$1" author="$2" title="$3" branch="$4" labels_json="$5" head="$6" body="$7"
+  local commit_json="${8:-null}"
+  local fx_run_json="${9:-null}"
   jq -nc \
+    --argjson prNumber "$pr_number" \
     --arg author "$author" \
     --arg title "$title" \
     --arg branch "$branch" \
     --argjson labels "$labels_json" \
     --arg head "$head" \
+    --arg body "$body" \
     --argjson commit "$commit_json" \
     --argjson fxRun "$fx_run_json" \
     '{
+      prNumber: $prNumber,
       authorLogin: $author,
       title: $title,
       branch: $branch,
       labels: $labels,
       headSha: $head,
+      body: $body,
       commit: $commit,
       fxRun: $fxRun
     }'
 }
 
-resolve_promotion() {  # resolve_promotion <author> <title> <branch> <labels-json> <head>
-  local author="$1" title="$2" branch="$3" labels_json="$4" head="$5"
+resolve_promotion() {  # resolve_promotion <pr> <author> <title> <branch> <labels-json> <head> <body>
+  local pr_number="$1" author="$2" title="$3" branch="$4" labels_json="$5" head="$6" body="$7"
   local input verdict reason commit_json fx_run_json trailer
-  input="$(build_promotion_input "$author" "$title" "$branch" "$labels_json" "$head")"
+  input="$(build_promotion_input "$pr_number" "$author" "$title" "$branch" "$labels_json" "$head" "$body")"
   verdict="$(classify_promotion "$input")"
   reason="$(jq -r '.reason' <<<"$verdict")"
   if [[ "$(jq -r '.eligible' <<<"$verdict")" == "true" || "$reason" != "commit-provenance-required" ]]; then
@@ -233,29 +238,30 @@ resolve_promotion() {  # resolve_promotion <author> <title> <branch> <labels-jso
     fx_run_json="$(fetch_fx_run "$trailer" 2>/dev/null || echo null)"
     [[ -z "$fx_run_json" ]] && fx_run_json="null"
   fi
-  input="$(build_promotion_input "$author" "$title" "$branch" "$labels_json" "$head" "$commit_json" "$fx_run_json")"
+  input="$(build_promotion_input "$pr_number" "$author" "$title" "$branch" "$labels_json" "$head" "$body" "$commit_json" "$fx_run_json")"
   classify_promotion "$input"
 }
 
 echo "=== AUTO-READY: scanning trusted-bot and FX-repaired PRs ==="
 
 SNAP="$(gh_retry pr list -R "$REPO" --state open --limit 200 \
-  --json number,title,isDraft,labels,headRefName,headRefOid,author --jq '
+  --json number,title,isDraft,labels,headRefName,headRefOid,author,body --jq '
   [ .[] | {
     n: .number,
     t: .title,
     draft: .isDraft,
     head: .headRefName,
     oid: ((.headRefOid // "") | ascii_downcase),
+    body: (.body // ""),
     author: (.author.login // ""),
     L: [.labels[].name]
   } ]')"
 
-# Pair ready + auto-merge for provenance-authorized drafts, and reconcile a
-# trusted ready PR if an earlier process died between the two mutations. Branch
-# prefixes never authorize; the Node classifier owns bot-author and FX-child
-# admission. Pending checks are expected and remain GitHub merge gates.
-echo "=== PAIR: trusted provenance → ready + native auto-merge ==="
+# Pair ready + auto-merge only for writer-proofed exact heads, and reconcile a
+# proofed ready PR if an owning writer died between the two mutations. Branch
+# prefixes, bot authors, and FX children never authorize missing proof. Pending
+# checks are expected and remain GitHub merge gates.
+echo "=== PAIR: writer proof → ready + native auto-merge ==="
 echo "$SNAP" | jq -c --arg hold_re "$HOLD_LABEL_RE" '.[]
   | select([.L[] | select(test($hold_re))] | length == 0)' \
   | while read -r pr; do
@@ -265,9 +271,10 @@ echo "$SNAP" | jq -c --arg hold_re "$HOLD_LABEL_RE" '.[]
     expected_branch=$(jq -r '.head' <<<"$pr")
     author_login=$(jq -r '.author' <<<"$pr")
     labels_json=$(jq -c '.L' <<<"$pr")
+    pr_body=$(jq -r '.body // ""' <<<"$pr")
     echo "  #$n  ${t:0:48}"
 
-    snapshot_verdict="$(resolve_promotion "$author_login" "$t" "$expected_branch" "$labels_json" "$expected_head")"
+    snapshot_verdict="$(resolve_promotion "$n" "$author_login" "$t" "$expected_branch" "$labels_json" "$expected_head" "$pr_body")"
     if [[ "$(jq -r '.eligible' <<<"$snapshot_verdict")" != "true" ]]; then
       echo "    ~ provenance $(jq -r '.reason' <<<"$snapshot_verdict"); leaving PR unchanged"
       continue
@@ -284,7 +291,8 @@ echo "$SNAP" | jq -c --arg hold_re "$HOLD_LABEL_RE" '.[]
       continue
     fi
     live_labels="$(jq -c '.labels' <<<"$before")"
-    live_verdict="$(resolve_promotion "$author_login" "$t" "$expected_branch" "$live_labels" "$expected_head")"
+    live_body="$(jq -r '.body // ""' <<<"$before")"
+    live_verdict="$(resolve_promotion "$n" "$author_login" "$t" "$expected_branch" "$live_labels" "$expected_head" "$live_body")"
     if [[ "$(jq -r '.eligible' <<<"$live_verdict")" != "true" ]]; then
       echo "    ~ live provenance $(jq -r '.reason' <<<"$live_verdict"); leaving PR unchanged"
       continue
@@ -301,7 +309,8 @@ echo "$SNAP" | jq -c --arg hold_re "$HOLD_LABEL_RE" '.[]
       continue
     fi
     mutation_labels="$(jq -c '.labels' <<<"$before_mutation")"
-    mutation_verdict="$(resolve_promotion "$author_login" "$t" "$expected_branch" "$mutation_labels" "$expected_head")"
+    mutation_body="$(jq -r '.body // ""' <<<"$before_mutation")"
+    mutation_verdict="$(resolve_promotion "$n" "$author_login" "$t" "$expected_branch" "$mutation_labels" "$expected_head" "$mutation_body")"
     if [[ "$(jq -r '.eligible' <<<"$mutation_verdict")" != "true" ]]; then
       echo "    ~ provenance changed before mutation ($(jq -r '.reason' <<<"$mutation_verdict")); leaving PR unchanged"
       continue
@@ -315,7 +324,7 @@ echo "$SNAP" | jq -c --arg hold_re "$HOLD_LABEL_RE" '.[]
       recover_ready_without_auto_merge "$n" "$expected_head" || pair_status=$?
     fi
     if [[ "$pair_status" -ne 0 ]]; then
-      upsert_status_comment "$n" "⚠️ Auto-ready: the paired ready + native auto-merge action failed. If ready succeeded but auto-merge did not, the controller attempted to restore draft state. The next source/CI recovery event may retry immediately. _(last attempt: $(date -u +%Y-%m-%dT%H:%M:%SZ))_"
+      upsert_status_comment "$n" "⚠️ Auto-ready: the paired ready + native auto-merge action failed. If ready succeeded but auto-merge did not, the controller attempted to restore draft state. A manual recovery run may retry after the writer proof/head is still current. _(last attempt: $(date -u +%Y-%m-%dT%H:%M:%SZ))_"
       if [[ "$pair_status" -eq 2 ]]; then
         echo "    !! stopping: #$n could not be returned to a closed-loop state"
         exit 2

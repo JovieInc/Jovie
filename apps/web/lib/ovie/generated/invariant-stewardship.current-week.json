@@ -797,9 +797,9 @@
       "semanticValue": "linear-ships-kanban-ops",
       "scope": ["shipping", "ovie-intake"],
       "owner": "summer",
-      "classification": "missing-consumer",
+      "classification": "approved",
       "authorityStatus": "founder-approved",
-      "implementationAuthority": "none",
+      "implementationAuthority": "JOV-5735",
       "provenance": [
         "gbrain:jovie/coordination/linear-ships-kanban-ops-20260822",
         "user:2026-08-22"
@@ -808,12 +808,12 @@
         {
           "name": "Ovie classifier",
           "path": "apps/web/lib/ovie/ingest.ts",
-          "status": "pending"
+          "status": "active"
         },
         {
           "name": "Mac Kanban lander",
           "path": "scripts/ovie-intake-to-kanban.py",
-          "status": "pending"
+          "status": "active"
         }
       ],
       "tests": [
@@ -821,13 +821,13 @@
           "name": "engineering routes to Linear",
           "path": "apps/web/tests/unit/ovie/persist.test.ts",
           "kind": "deliberate-red",
-          "status": "pending"
+          "status": "active"
         },
         {
           "name": "lander rejects engineering",
           "path": "scripts/tests/test_ovie_intake_to_kanban.py",
           "kind": "deliberate-red",
-          "status": "pending"
+          "status": "active"
         }
       ],
       "relations": {
@@ -836,7 +836,7 @@
         "supersedes": ["company-work-all-kanban"],
         "scopeSeparated": []
       },
-      "lifecycle": "approved-unimplemented",
+      "lifecycle": "active",
       "source": {
         "kind": "gbrain",
         "ref": "gbrain:jovie/coordination/linear-ships-kanban-ops-20260822",
@@ -1248,13 +1248,6 @@
       "candidateIds": ["P08-company-identity"],
       "owner": "summer",
       "action": "Refresh current first-party legal and product identity evidence before adoption."
-    },
-    {
-      "id": "missing-consumer:OPS-linear-ships",
-      "kind": "missing-consumer",
-      "candidateIds": ["OPS-linear-ships"],
-      "owner": "summer",
-      "action": "Bind Linear-ships / Kanban-ops to the current Ovie classifier and Mac lander without inventing a second shipping control plane."
     }
   ],
   "founderQueue": [],

@@ -1,4 +1,5 @@
 import type { Meta, StoryObj } from '@storybook/nextjs-vite';
+import { expect, userEvent, within } from 'storybook/test';
 import { DrawerFormField } from './DrawerFormField';
 
 const meta = {
@@ -25,7 +26,14 @@ const meta = {
 export default meta;
 type Story = StoryObj<typeof meta>;
 
-export const WithHelperText: Story = {};
+export const WithHelperText: Story = {
+  play: async ({ canvasElement }) => {
+    const field = within(canvasElement).getByLabelText('Profile URL');
+    await expect(field).toHaveAttribute('id', 'profile-url');
+    await userEvent.click(field);
+    await expect(field).toHaveFocus();
+  },
+};
 
 export const WithoutHelperText: Story = {
   args: {

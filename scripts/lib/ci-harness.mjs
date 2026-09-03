@@ -363,15 +363,10 @@ export function classifyCiRisk(files, manifest, options = {}) {
     requiresPreview,
     blocksUnattendedAutoMerge,
     matchedRules: matches,
-    recommendedLabels: [
-      // Deep evidence is manual/scheduled/event-driven. Risk classification
-      // must never fan out source-PR work through a label.
-      ...(blocksUnattendedAutoMerge ? ['needs-human'] : []),
-    ],
+    recommendedLabels: [],
     nextLocalCommands: buildRiskLocalCommands({
       requiresSmoke,
       requiresPreview,
-      blocksUnattendedAutoMerge,
     }),
     errors,
   };
@@ -384,9 +379,6 @@ function buildRiskLocalCommands(classification) {
   }
   if (classification.requiresPreview) {
     commands.push('pnpm run build:web');
-  }
-  if (classification.blocksUnattendedAutoMerge) {
-    commands.push('gh pr edit <pr> --add-label needs-human');
   }
   return commands;
 }

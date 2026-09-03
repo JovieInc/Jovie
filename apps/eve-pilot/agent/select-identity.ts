@@ -2,7 +2,7 @@ import { existsSync, readFileSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
-export type EvePilotIdentityId = 'jovie' | 'ovie';
+export type EvePilotIdentityId = 'jovie' | 'ovie' | 'summer';
 
 export type EvePilotCapability =
   | 'privileged-gbrain-write'
@@ -12,7 +12,7 @@ export type EvePilotCapability =
 
 export type EvePilotPack = {
   readonly id: EvePilotIdentityId;
-  readonly role: 'artist' | 'founder';
+  readonly role: 'artist' | 'founder' | 'company-operator';
   readonly canPrivilegedWriteGbrain: boolean;
   readonly canHealSymphony: boolean;
   readonly canIngestAck: boolean;
@@ -49,6 +49,21 @@ const OVIE_PACK: EvePilotPack = {
   canReadGbrain: true,
 };
 
+/**
+ * First Vercel cutover phase: Summer can observe and reason about company
+ * operations, but cannot yet mutate Linear, GitHub, GBrain, or Symphony.
+ * The future receipt/outbox writer must be introduced as a separately tested
+ * capability before any of those permissions are granted.
+ */
+const SUMMER_SHADOW_PACK: EvePilotPack = {
+  id: 'summer',
+  role: 'company-operator',
+  canPrivilegedWriteGbrain: false,
+  canHealSymphony: false,
+  canIngestAck: false,
+  canReadGbrain: false,
+};
+
 function allowed(pack: EvePilotPack, capability: EvePilotCapability): boolean {
   switch (capability) {
     case 'privileged-gbrain-write':
@@ -67,7 +82,12 @@ function allowed(pack: EvePilotPack, capability: EvePilotCapability): boolean {
  * so a runtime that still writes gbrain or heals Symphony fails closed.
  */
 export function bindEvePilotIdentity(id: EvePilotIdentityId) {
-  const pack = id === 'ovie' ? OVIE_PACK : JOVIE_PACK;
+  const pack =
+    id === 'ovie'
+      ? OVIE_PACK
+      : id === 'summer'
+        ? SUMMER_SHADOW_PACK
+        : JOVIE_PACK;
   const instructionPath = resolve(root, 'identities', id, 'instructions.md');
   const instructions = existsSync(instructionPath)
     ? readFileSync(instructionPath, 'utf8')
@@ -101,21 +121,27 @@ export type EvePilotChannelSource =
   | 'telegram'
   | 'imessage'
   | 'photon'
+  | 'ovie-summer-shadow'
   | 'jovie-core-chat'
   | string;
 
 /**
- * Telegram and iMessage are always the Ovie founder pack. Other sources
- * follow EVE_IDENTITY (default Jovie) so the artist runtime cannot inherit
- * founder mail.
+ * Telegram remains the Ovie founder pack. Photon/iMessage is Summer's live
+ * talk channel. The ovie-summer-shadow source stays Summer for the OIDC
+ * observation path. Other sources keep the Jovie runtime default.
  */
 export function eveIdentityIdForChannel(
   source?: EvePilotChannelSource
 ): EvePilotIdentityId {
-  if (source === 'telegram' || source === 'imessage' || source === 'photon') {
+  if (source === 'telegram') {
     return 'ovie';
   }
-  return process.env.EVE_IDENTITY === 'ovie' ? 'ovie' : 'jovie';
+  if (source === 'imessage' || source === 'photon') {
+    return 'summer';
+  }
+  if (source === 'ovie-summer-shadow') return 'summer';
+  if (process.env.EVE_IDENTITY === 'ovie') return 'ovie';
+  return 'jovie';
 }
 
 export function eveIdentityForChannel(source?: EvePilotChannelSource) {

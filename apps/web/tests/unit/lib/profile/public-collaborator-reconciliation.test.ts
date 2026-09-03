@@ -130,6 +130,21 @@ describe('public collaborator profile reconciliation scheduling', () => {
     expect(hoisted.captureWarning).not.toHaveBeenCalled();
   });
 
+  it('silently skips when after() hits the Vercel IPC socket (JOV-5605)', () => {
+    hoisted.after.mockImplementation(() => {
+      throw new Error('connect ECONNREFUSED /opt/vercel/ipc.sock');
+    });
+
+    expect(
+      schedulePublicCollaboratorProfileReconciliation({
+        creatorProfileId: 'owner-profile',
+        ownerSpotifyId: 'spotify-owner',
+        collaborators: [unavailableCollaborator],
+      })
+    ).toBe(false);
+    expect(hoisted.reconcileCreditedArtistProfiles).not.toHaveBeenCalled();
+  });
+
   it('does not retry credits that have no exact provider identity', () => {
     expect(
       schedulePublicCollaboratorProfileReconciliation({

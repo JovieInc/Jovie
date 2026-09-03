@@ -5,6 +5,7 @@ import { dirname, join } from 'node:path';
 import test from 'node:test';
 import { fileURLToPath } from 'node:url';
 import { promisify } from 'node:util';
+import { deriveStagingReleaseVersion } from './sync-version.mjs';
 
 const desktopRoot = dirname(dirname(fileURLToPath(import.meta.url)));
 const execFileAsync = promisify(execFile);
@@ -197,13 +198,40 @@ test('desktop window fails into a branded Jovie recovery surface', async () => {
   assert.doesNotMatch(mainSource, /'did-start-loading'/);
   // JOV-5339: Jovie Local must not trip packaged recovery on compile/HMR.
   assert.match(mainSource, /shouldArmRendererWatchdogsForAppEnv\(APP_ENV\)/);
-  assert.match(mainSource, /decideLocalMainFrameLoadFailure/);
   assert.match(mainSource, /decideDidFinishLoadRecovery/);
   assert.match(recoverySource, /isChromiumErrorDocument/);
   assert.match(recoverySource, /chrome-error:/);
   assert.match(
     mainSource,
     /webContents\.on\(\s*'did-finish-load'[\s\S]{0,500}?decideDidFinishLoadRecovery/
+  );
+  assert.match(mainSource, /createLocalHostedLoadRetryController/);
+  assert.match(mainSource, /onMainFrameLoadFailure/);
+  assert.match(mainSource, /onHostedNavigationStarted/);
+  assert.match(
+    mainSource,
+    /win\.webContents\.on\('did-start-navigation'[\s\S]*?localHostedLoadRecovery\.onHostedNavigationStarted\(\)/
+  );
+  assert.match(mainSource, /onMainFrameDocumentCommitted/);
+  assert.match(mainSource, /isHostedAppDocument/);
+  assert.match(mainSource, /win\.webContents\.on\('did-navigate'/);
+  assert.doesNotMatch(
+    mainSource,
+    /win\.webContents\.on\('did-finish-load'[\s\S]{0,500}?onMainFrameDocumentCommitted/
+  );
+  assert.match(
+    mainSource,
+    /localResult\.action === 'retry'[\s\S]*?win\.loadURL\(buildDesktopBootSplashUrl\(\)\)/
+  );
+  const localDidFailLoadBlock = mainSource.match(
+    /if \(APP_ENV === 'local'\) \{\s*const retryUrl =[\s\S]*?\n      \}\n\n      console\.error/
+  );
+  assert.ok(localDidFailLoadBlock);
+  assert.equal(
+    localDidFailLoadBlock[0].match(
+      /win\.loadURL\(buildDesktopBootSplashUrl\(\)\)/g
+    )?.length,
+    1
   );
   assert.match(mainSource, /host-resolver-rules/);
   assert.match(mainSource, /MAP localhost 127\.0\.0\.1/);
@@ -356,6 +384,11 @@ test('desktop production bundle declares the jovie auth protocol', async () => {
   assert.match(stagingConfig, /CFBundleURLTypes:/);
   assert.match(stagingConfig, /CFBundleURLName: Jovie Staging Auth/);
   assert.match(stagingConfig, /CFBundleURLSchemes:\s*\n\s*- jovie-staging/);
+  assert.match(stagingConfig, /publish:\s*\n\s*provider: generic/);
+  assert.match(
+    stagingConfig,
+    /url: https:\/\/github\.com\/JovieInc\/Jovie\/releases\/download\/desktop-staging/
+  );
   assert.match(localConfig, /CFBundleURLTypes:/);
   assert.match(localConfig, /CFBundleURLName: Jovie Local Auth/);
   assert.match(localConfig, /CFBundleURLSchemes:\s*\n\s*- jovie-local/);
@@ -463,6 +496,26 @@ test('preload marks the hosted app as Electron after the document root is ready'
   assert.match(preloadSource, /markElectronRuntime\(\)/);
   assert.match(preloadSource, /DOMContentLoaded/);
   assert.match(preloadSource, /dataset\.desktopRuntime = 'electron'/);
+  assert.match(
+    preloadSource,
+    /import \{ BAKED_DESKTOP_BUILD_IDENTITY \} from '\.\/build-identity\.generated';/
+  );
+  assert.match(
+    preloadSource,
+    /dataset\.desktopChannel = BAKED_DESKTOP_BUILD_IDENTITY\.channel/
+  );
+  assert.match(
+    preloadSource,
+    /dataset\.desktopVersion = BAKED_DESKTOP_BUILD_IDENTITY\.version/
+  );
+  assert.match(
+    preloadSource,
+    /dataset\.desktopSourceRevision =\s*BAKED_DESKTOP_BUILD_IDENTITY\.sourceRevision/
+  );
+  assert.match(
+    preloadSource,
+    /dataset\.desktopBuiltAt = BAKED_DESKTOP_BUILD_IDENTITY\.builtAt/
+  );
   assert.match(preloadSource, /startDesktopAuthHandoff/);
   assert.match(preloadSource, /openDesktopAuthUrl/);
   assert.match(preloadSource, /closeDesktopAuthWindow/);
@@ -497,11 +550,23 @@ test('desktop bridge exposes bounded dictation support', async () => {
   assert.match(mainSource, /shouldGrantTrustedAudioPermissionCheck/);
   assert.match(mainSource, /backgroundThrottling: false/);
   assert.match(mainSource, /installDesktopCspWatchdog/);
+  const autoUpdateSource = await readFile(
+    join(desktopRoot, 'src/desktop-auto-update.ts'),
+    'utf8'
+  );
   assert.match(mainSource, /from '\.\/desktop-auto-update'/);
+  assert.match(mainSource, /hasNightlyUpdateFlag/);
+  assert.match(mainSource, /installNightlyUpdateLaunchAgent/);
   assert.match(mainSource, /shouldScheduleDesktopAutoUpdate\(/);
   assert.match(mainSource, /if \(APP_ENV === 'local'/);
   assert.match(mainSource, /autoUpdater\.allowDowngrade = false/);
+  assert.match(mainSource, /autoUpdater\.autoInstallOnAppQuit = true/);
   assert.match(mainSource, /if \(!desktopUpdatesSupported\(\)\)/);
+  assert.match(autoUpdateSource, /export const NIGHTLY_UPDATE_FLAG/);
+  assert.match(autoUpdateSource, /\/usr\/bin\/open/);
+  assert.match(autoUpdateSource, /app\.jov\.ie\.nightly-update/);
+  assert.match(autoUpdateSource, /appEnv === 'local'/);
+  assert.match(mainSource, /autoUpdater\.allowPrerelease = true/);
   assert.match(mainSource, /sanitizeWindowState/);
   assert.match(mainSource, /bindPendingDesktopAuthCompletion/);
   assert.match(mainSource, /DESKTOP_AUTH_FLOW_PARAM/);
@@ -616,14 +681,35 @@ test('desktop dev defaults to the local app shell and packaged builds keep produ
       new Date(productionIdentity.builtAt).toISOString()
     );
 
+    const stagingVersion = deriveStagingReleaseVersion(
+      (await readFile(join(desktopRoot, '../../VERSION'), 'utf8')).trim(),
+      '1',
+      '1'
+    );
     const { stdout: stagingStdout } = await execFileAsync(
       process.execPath,
-      [join(desktopRoot, 'scripts/write-env.mjs')],
-      { cwd: desktopRoot, env: { ...baseEnv, ELECTRON_ENV: 'staging' } }
+      [join(desktopRoot, 'scripts/write-env.mjs'), '--require-provenance'],
+      {
+        cwd: desktopRoot,
+        env: {
+          ...baseEnv,
+          ELECTRON_ENV: 'staging',
+          DESKTOP_VERSION: stagingVersion,
+          JOVIE_DESKTOP_BUILT_AT: '2026-08-31T18:45:00.000Z',
+          JOVIE_DESKTOP_SOURCE_REVISION: 'b'.repeat(40),
+        },
+      }
     );
     const stagingEnv = await readFile(envGeneratedPath, 'utf8');
+    const stagingIdentity = JSON.parse(
+      await readFile(identityJsonPath, 'utf8')
+    );
     assert.match(stagingStdout, /APP_ENV='staging'/);
     assert.match(stagingEnv, /APP_URL = 'https:\/\/staging\.jov\.ie'/);
+    assert.deepEqual(
+      [stagingIdentity.channel, stagingIdentity.version],
+      ['staging', stagingVersion]
+    );
 
     await assert.rejects(
       () =>

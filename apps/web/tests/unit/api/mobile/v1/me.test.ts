@@ -59,6 +59,44 @@ function makeRequest(options?: { readonly supportsWaitlistPending?: boolean }) {
   });
 }
 
+const JOVIE_WORKSPACE = {
+  id: 'customer',
+  label: 'Jovie',
+  href: '/app',
+  brandVariant: 'jovie',
+  role: 'primary',
+  access: 'authenticated',
+  shellOwner: 'jovie',
+  chatOwner: 'jovie-chat',
+  chatMode: null,
+  selectedAgent: 'jovie',
+  dataScope: 'customer',
+  navigationDivergenceReason: null,
+} as const;
+
+const OVIE_WORKSPACE = {
+  id: 'ov',
+  label: 'OV',
+  href: '/app/ov',
+  brandVariant: 'ov',
+  role: 'secondary',
+  access: 'admin',
+  shellOwner: 'jovie',
+  chatOwner: 'jovie-chat',
+  chatMode: 'ov',
+  selectedAgent: 'summer',
+  dataScope: 'operator',
+  navigationDivergenceReason: 'operator-capabilities',
+} as const;
+
+const JOVIE_ONLY_APP_SHELL = {
+  launchWorkspaceId: 'customer',
+  primaryWorkspaceId: 'customer',
+  shellOwner: 'jovie',
+  chatOwner: 'jovie-chat',
+  workspaces: [JOVIE_WORKSPACE],
+} as const;
+
 describe('GET /api/mobile/v1/me', () => {
   beforeEach(() => {
     vi.clearAllMocks();
@@ -158,6 +196,7 @@ describe('GET /api/mobile/v1/me', () => {
       appleWalletProfilePassAvailable: true,
       chatEnabled: true,
       isAdmin: false,
+      appShell: JOVIE_ONLY_APP_SHELL,
     });
     expect(hoisted.isProfileCompleteMock).toHaveBeenCalledWith({
       username: 'djshadow',
@@ -218,6 +257,10 @@ describe('GET /api/mobile/v1/me', () => {
 
     expect(response.status).toBe(200);
     expect(data.isAdmin).toBe(true);
+    expect(data.appShell).toEqual({
+      ...JOVIE_ONLY_APP_SHELL,
+      workspaces: [JOVIE_WORKSPACE, OVIE_WORKSPACE],
+    });
     expect(hoisted.checkAdminRoleMock).toHaveBeenCalledWith('user_123');
   });
 
@@ -242,6 +285,7 @@ describe('GET /api/mobile/v1/me', () => {
       appleWalletProfilePassAvailable: false,
       chatEnabled: false,
       isAdmin: false,
+      appShell: JOVIE_ONLY_APP_SHELL,
     });
   });
 
@@ -269,6 +313,7 @@ describe('GET /api/mobile/v1/me', () => {
       appleWalletProfilePassAvailable: false,
       chatEnabled: false,
       isAdmin: false,
+      appShell: JOVIE_ONLY_APP_SHELL,
     });
   });
 
@@ -296,6 +341,7 @@ describe('GET /api/mobile/v1/me', () => {
       appleWalletProfilePassAvailable: false,
       chatEnabled: false,
       isAdmin: false,
+      appShell: JOVIE_ONLY_APP_SHELL,
     });
   });
 
@@ -332,6 +378,7 @@ describe('GET /api/mobile/v1/me', () => {
       appleWalletProfilePassAvailable: false,
       chatEnabled: false,
       isAdmin: false,
+      appShell: JOVIE_ONLY_APP_SHELL,
     });
   });
 

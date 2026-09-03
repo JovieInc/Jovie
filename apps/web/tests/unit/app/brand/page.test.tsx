@@ -32,6 +32,7 @@ describe('app/brand/page', () => {
       'lockups',
       'usage',
       'color',
+      'imagery',
       'type',
       'icons',
       'downloads',
@@ -40,6 +41,24 @@ describe('app/brand/page', () => {
       container.querySelectorAll('section[id]')
     ).map(s => s.id);
     expect(sectionIds).toEqual(expectedIds);
+  });
+
+  it('renders scene-first generated imagery guidance', () => {
+    render(<BrandPage />);
+    expect(
+      screen.getByRole('heading', {
+        level: 2,
+        name: /The camera finds the palette\./,
+      })
+    ).toBeInTheDocument();
+    expect(
+      screen.getByText(
+        /Jovie-owned generated imagery follows Scene Palette v1\./
+      )
+    ).toBeInTheDocument();
+    expect(
+      screen.getByText(/They are never recolored into brand harmony\./)
+    ).toBeInTheDocument();
   });
 
   it('renders the brand@jov.ie contact line', () => {

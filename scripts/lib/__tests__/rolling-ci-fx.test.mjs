@@ -649,25 +649,23 @@ describe('rolling CI FX webhook remediation', () => {
     expect(planned.dispatch.state.claim.writer).toBe(FX_ADAPTER_NAME);
     expect(planned.dispatch.state.claim.status).toBe('terminal');
     const terminalFingerprint = planned.launch.receipt.fingerprint;
-    const unrelatedFingerprint = Object.keys(
-      planned.dispatch.state.failures
-    ).find(fingerprint => fingerprint !== terminalFingerprint);
+    const unrelatedEvent = planned.dispatch.events.find(
+      event => event.fingerprint !== terminalFingerprint
+    );
+    const unrelatedFingerprint = unrelatedEvent?.fingerprint;
     expect(
       planned.dispatch.state.failures[terminalFingerprint].terminalReceipt
         .terminal
     ).toBe(true);
     expect(unrelatedFingerprint).toBeDefined();
     expect(
-      planned.dispatch.state.failures[unrelatedFingerprint].terminalReceipt
+      planned.dispatch.state.failures[unrelatedFingerprint]
     ).toBeUndefined();
     expect(planned.dispatch.body).toContain('## FX execution terminal');
     expect(planned.dispatch.body).toContain('jovie-fx-execution-receipt');
 
     const terminalEvent = planned.dispatch.events.find(
       event => event.fingerprint === terminalFingerprint
-    );
-    const unrelatedEvent = planned.dispatch.events.find(
-      event => event.fingerprint === unrelatedFingerprint
     );
     expect(
       planFailureDispatch({

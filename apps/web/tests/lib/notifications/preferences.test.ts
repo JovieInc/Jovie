@@ -3,26 +3,45 @@
  * Tests for notification preferences management
  */
 
-import { describe, expect, it, vi } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
+
+const dbMocks = vi.hoisted(() => {
+  const selectLimit = vi.fn(() => Promise.resolve([]));
+  const selectWhere = vi.fn(() => ({ limit: selectLimit }));
+  const selectLeftJoin = vi.fn(() => ({
+    limit: selectLimit,
+    where: selectWhere,
+  }));
+  const selectFrom = vi.fn(() => ({ leftJoin: selectLeftJoin }));
+  const updateWhere = vi.fn(() => Promise.resolve());
+  const updateSet = vi.fn(() => ({ where: updateWhere }));
+
+  return {
+    select: vi.fn(() => ({ from: selectFrom })),
+    selectFrom,
+    selectLeftJoin,
+    selectLimit,
+    selectWhere,
+    update: vi.fn(() => ({ set: updateSet })),
+    updateSet,
+    updateWhere,
+  };
+});
+
+const drizzleMocks = vi.hoisted(() => ({
+  eq: vi.fn((column, value) => ({ column, value })),
+  sql: vi.fn((strings: TemplateStringsArray, ...values: unknown[]) => ({
+    kind: 'sql',
+    strings: Array.from(strings),
+    values,
+  })),
+}));
 
 // Mock database
 vi.mock('@/lib/db', () => ({
   db: {
-    select: vi.fn(() => ({
-      from: vi.fn(() => ({
-        leftJoin: vi.fn(() => ({
-          where: vi.fn(() => ({
-            limit: vi.fn(() => Promise.resolve([])),
-          })),
-          limit: vi.fn(() => Promise.resolve([])),
-        })),
-      })),
-    })),
-    update: vi.fn(() => ({
-      set: vi.fn(() => ({
-        where: vi.fn(() => Promise.resolve()),
-      })),
-    })),
+    select: dbMocks.select,
+    update: dbMocks.update,
   },
 }));
 
@@ -33,11 +52,16 @@ vi.mock('@/lib/auth/session', () => ({
 
 // Mock drizzle-orm
 vi.mock('drizzle-orm', () => ({
-  eq: vi.fn((a, b) => ({ column: a, value: b })),
+  eq: drizzleMocks.eq,
+  sql: drizzleMocks.sql,
 }));
 
 // Mock schema
-vi.mock('@/lib/db/schema', () => ({
+vi.mock('@/lib/db/schema/auth', () => ({
+  users: { id: 'id', email: 'email', clerkId: 'clerkId' },
+}));
+
+vi.mock('@/lib/db/schema/profiles', () => ({
   creatorProfiles: {
     id: 'id',
     settings: 'settings',
@@ -45,13 +69,38 @@ vi.mock('@/lib/db/schema', () => ({
     marketingOptOut: 'marketingOptOut',
     updatedAt: 'updatedAt',
   },
-  users: { id: 'id', email: 'email', clerkId: 'clerkId' },
 }));
 
-import { mergePreferences } from '@/lib/notifications/preferences';
+import { db } from '@/lib/db';
+import {
+  markNotificationDismissed,
+  mergePreferences,
+  updateNotificationPreferences,
+} from '@/lib/notifications/preferences';
 import type { NotificationPreferences } from '@/types/notifications';
 
 describe('Notification Preferences', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    dbMocks.select.mockImplementation(() => ({ from: dbMocks.selectFrom }));
+    dbMocks.selectFrom.mockImplementation(() => ({
+      leftJoin: dbMocks.selectLeftJoin,
+    }));
+    dbMocks.selectLeftJoin.mockImplementation(() => ({
+      limit: dbMocks.selectLimit,
+      where: dbMocks.selectWhere,
+    }));
+    dbMocks.selectWhere.mockImplementation(() => ({
+      limit: dbMocks.selectLimit,
+    }));
+    dbMocks.selectLimit.mockResolvedValue([]);
+    dbMocks.update.mockImplementation(() => ({ set: dbMocks.updateSet }));
+    dbMocks.updateSet.mockImplementation(() => ({
+      where: dbMocks.updateWhere,
+    }));
+    dbMocks.updateWhere.mockResolvedValue(undefined);
+  });
+
   describe('mergePreferences', () => {
     const basePreferences: NotificationPreferences = {
       channels: { email: true, sms: true, push: false, in_app: true },
@@ -223,6 +272,92 @@ describe('Notification Preferences', () => {
       };
 
       expect(defaults.channels.in_app).toBe(true);
+    });
+  });
+
+  describe('persistence', () => {
+    const storedRow = {
+      creatorProfileId: 'profile-123',
+      email: 'artist@example.com',
+      marketingOptOut: false,
+      settings: {
+        firstSaleText: {
+          claimedAt: '2026-08-31T16:00:00.000Z',
+          merchOrderId: 'order-123',
+          status: 'claimed',
+        },
+        notifications: {
+          channels: { email: true, sms: true, push: false, in_app: true },
+          dismissedIds: ['old-notification'],
+          preferredChannel: 'sms',
+        },
+      },
+    };
+
+    function getPersistedSettingsSql() {
+      const setArgs = dbMocks.updateSet.mock.calls.at(-1)?.[0];
+      expect(setArgs?.updatedAt).toBeInstanceOf(Date);
+      expect(setArgs?.settings).toEqual(
+        expect.objectContaining({ kind: 'sql' })
+      );
+      return setArgs.settings as {
+        readonly strings: readonly string[];
+        readonly values: readonly unknown[];
+      };
+    }
+
+    it('marks dismissals with a JSONB patch that preserves sibling settings', async () => {
+      dbMocks.selectLimit.mockResolvedValueOnce([storedRow]);
+
+      await markNotificationDismissed('new-notification', {
+        creatorProfileId: 'profile-123',
+      });
+
+      expect(db.update).toHaveBeenCalledTimes(1);
+      const settingsSql = getPersistedSettingsSql();
+      const sqlText = settingsSql.strings.join(' ');
+      expect(sqlText).toContain('COALESCE');
+      expect(sqlText).toContain('{marketing_emails}');
+      expect(sqlText).toContain('{notifications}');
+
+      const notificationsJson = settingsSql.values.find(
+        value => typeof value === 'string' && value.includes('dismissedIds')
+      );
+      expect(JSON.parse(notificationsJson as string)).toEqual({
+        channels: { email: true, sms: true, push: false, in_app: true },
+        dismissedIds: ['old-notification', 'new-notification'],
+        lastDismissedAt: expect.any(String),
+        preferredChannel: 'sms',
+      });
+    });
+
+    it('updates preferences with a JSONB patch that preserves sibling settings', async () => {
+      dbMocks.selectLimit.mockResolvedValueOnce([storedRow]);
+
+      await updateNotificationPreferences(
+        { creatorProfileId: 'profile-123' },
+        {
+          channels: { email: false, sms: true, push: true, in_app: true },
+          marketingEmails: false,
+        }
+      );
+
+      expect(db.update).toHaveBeenCalledTimes(1);
+      const settingsSql = getPersistedSettingsSql();
+      const sqlText = settingsSql.strings.join(' ');
+      expect(sqlText).toContain('COALESCE');
+      expect(sqlText).toContain('{marketing_emails}');
+      expect(sqlText).toContain('{notifications}');
+      expect(settingsSql.values).toContain('false');
+
+      const notificationsJson = settingsSql.values.find(
+        value => typeof value === 'string' && value.includes('dismissedIds')
+      );
+      expect(JSON.parse(notificationsJson as string)).toEqual({
+        channels: { email: false, sms: true, push: true, in_app: true },
+        dismissedIds: ['old-notification'],
+        preferredChannel: 'sms',
+      });
     });
   });
 });

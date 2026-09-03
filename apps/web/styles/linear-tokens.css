@@ -194,9 +194,8 @@
   /* ============================================
      LAYOUT — mode-independent
      ============================================ */
-  /* Aliased to canonical DS token (DS_FOUNDATION_V1) — both resolve to 1298px */
-  --linear-container-max: var(--ds-public-content-max);
-  --linear-container-padding: 24px;
+  /* Container max + padding tokens removed JOV-5464
+     (migrated to ds-public-content-max / space-6 respectively) */
   --linear-content-max: 1200px;
   --linear-hero-section-max: 1024px;
   --linear-prose-max: 624px;
@@ -272,24 +271,9 @@
   /* ============================================
      SPACING — mode-independent
      ============================================ */
-  --linear-space-1: 4px;
-  --linear-space-2: 8px;
-  --linear-space-3: 12px;
-  --linear-space-4: 16px;
-  --linear-space-5: 20px;
-  --linear-space-6: 24px;
-  --linear-space-8: 32px;
-  --linear-space-10: 40px;
-  --linear-space-12: 48px;
-  --linear-space-16: 64px;
-  --linear-space-20: 80px;
-  --linear-space-24: 96px;
-  --linear-space-28: 112px;
-  --linear-space-32: 128px;
-  --linear-space-40: 160px;
-  --linear-gap-nav: 4px;
-  --linear-gap-buttons: 8px;
-  --linear-gap-cards: 24px;
+  /* Legacy linear space-* (1-40) and gap-{nav,buttons,cards} removed
+     JOV-5464. Consumers now use canonical space-* scale in design-system.css:
+     gap-nav -> space-1, gap-buttons -> space-2, gap-cards -> space-6. */
   --linear-section-pt-sm: 56px;
   --linear-section-pb-sm: 56px;
   --linear-section-pt-md: 80px;
@@ -404,10 +388,6 @@
    ============================================ */
 
 :root {
-  /* Semantic text */
-  --linear-color-text: var(--linear-text-primary);
-  --linear-color-text-muted: var(--linear-text-secondary);
-  --linear-color-text-subtle: var(--linear-text-tertiary);
   /* Semantic backgrounds */
   --linear-color-bg: var(--linear-bg-page);
   --linear-color-bg-elevated: var(--linear-bg-surface-0);

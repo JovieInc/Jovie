@@ -1,6 +1,7 @@
-import { expect, test } from 'vitest';
+import { afterEach, expect, test, vi } from 'vitest';
 import {
   classifyDesktopLoadFailure,
+  createLocalHostedLoadRetryController,
   decideAbortedMainFrameRecovery,
   decideDidFinishLoadRecovery,
   decideHostedLoadRetry,
@@ -30,6 +31,188 @@ import {
 } from '../src/renderer-recovery.ts';
 
 const MAX = 2;
+
+afterEach(() => {
+  vi.useRealTimers();
+});
+
+test('a Chromium error document cannot cancel the bounded local retry obligation', () => {
+  vi.useFakeTimers();
+  const retriedUrls: string[] = [];
+  const controller = createLocalHostedLoadRetryController({
+    retry: url => retriedUrls.push(url),
+    isWindowDestroyed: () => false,
+  });
+  const retryUrl = 'http://localhost:3100/app/chat?runtime=electron';
+
+  for (
+    let attempt = 1;
+    attempt <= LOCAL_HOSTED_LOAD_RETRY_LIMIT;
+    attempt += 1
+  ) {
+    expect(
+      controller.onMainFrameLoadFailure({ errorCode: -102, retryUrl })
+    ).toEqual({ action: 'retry', attempt });
+
+    // Chromium finishes chrome-error://chromewebdata/ after did-fail-load.
+    // That internal document must not reset the count or cancel this timer.
+    controller.onMainFrameDocumentCommitted({ isHostedAppDocument: false });
+    vi.advanceTimersByTime(LOCAL_HOSTED_LOAD_RETRY_DELAY_MS);
+    expect(retriedUrls).toHaveLength(attempt);
+  }
+
+  expect(
+    controller.onMainFrameLoadFailure({ errorCode: -102, retryUrl })
+  ).toEqual({
+    action: 'failure-page',
+    attempt: LOCAL_HOSTED_LOAD_RETRY_LIMIT,
+  });
+  controller.onMainFrameDocumentCommitted({ isHostedAppDocument: false });
+  vi.runOnlyPendingTimers();
+  expect(retriedUrls).toHaveLength(LOCAL_HOSTED_LOAD_RETRY_LIMIT);
+});
+
+test('a stale splash finish after retry start cannot reset the retry budget', () => {
+  vi.useFakeTimers();
+  const retriedUrls: string[] = [];
+  const controller = createLocalHostedLoadRetryController({
+    retry: url => retriedUrls.push(url),
+    isWindowDestroyed: () => false,
+  });
+  const retryUrl = 'http://localhost:3100/app/chat?runtime=electron';
+
+  expect(
+    controller.onMainFrameLoadFailure({ errorCode: -102, retryUrl })
+  ).toEqual({ action: 'retry', attempt: 1 });
+  controller.onMainFrameDocumentCommitted({ isHostedAppDocument: false });
+  vi.advanceTimersByTime(LOCAL_HOSTED_LOAD_RETRY_DELAY_MS);
+  expect(retriedUrls).toEqual([retryUrl]);
+
+  // The splash/error document can complete after the hosted retry starts.
+  // Only a positively identified app-origin document may complete recovery.
+  expect(
+    controller.onMainFrameDocumentCommitted({ isHostedAppDocument: false })
+  ).toBe('preserve-retry');
+  expect(
+    controller.onMainFrameLoadFailure({ errorCode: -102, retryUrl })
+  ).toEqual({ action: 'retry', attempt: 2 });
+});
+
+test('a successful hosted retry completes and resets the local recovery obligation', () => {
+  vi.useFakeTimers();
+  const controller = createLocalHostedLoadRetryController({
+    retry: () => undefined,
+    isWindowDestroyed: () => false,
+  });
+  const retryUrl = 'http://localhost:3100/app/chat?runtime=electron';
+
+  expect(
+    controller.onMainFrameLoadFailure({ errorCode: -102, retryUrl })
+  ).toEqual({ action: 'retry', attempt: 1 });
+  expect(
+    controller.onMainFrameDocumentCommitted({ isHostedAppDocument: false })
+  ).toBe('preserve-retry');
+  vi.advanceTimersByTime(LOCAL_HOSTED_LOAD_RETRY_DELAY_MS);
+  expect(
+    controller.onMainFrameDocumentCommitted({ isHostedAppDocument: true })
+  ).toBe('complete-retry');
+
+  expect(
+    controller.onMainFrameLoadFailure({ errorCode: -102, retryUrl })
+  ).toEqual({ action: 'retry', attempt: 1 });
+});
+
+test('a manual hosted reload completes recovery and cancels the stale retry timer', () => {
+  vi.useFakeTimers();
+  const retriedUrls: string[] = [];
+  const controller = createLocalHostedLoadRetryController({
+    retry: url => retriedUrls.push(url),
+    isWindowDestroyed: () => false,
+  });
+  const retryUrl = 'http://localhost:3100/app/chat?runtime=electron';
+
+  expect(
+    controller.onMainFrameDocumentCommitted({ isHostedAppDocument: true })
+  ).toBe('ignore');
+  expect(
+    controller.onMainFrameLoadFailure({ errorCode: -102, retryUrl })
+  ).toEqual({ action: 'retry', attempt: 1 });
+  expect(
+    controller.onMainFrameDocumentCommitted({ isHostedAppDocument: false })
+  ).toBe('preserve-retry');
+
+  expect(
+    controller.onMainFrameDocumentCommitted({ isHostedAppDocument: true })
+  ).toBe('complete-retry');
+  vi.advanceTimersByTime(LOCAL_HOSTED_LOAD_RETRY_DELAY_MS);
+
+  expect(retriedUrls).toEqual([]);
+});
+
+test('a hosted navigation start cancels a stale retry without resetting the budget', () => {
+  vi.useFakeTimers();
+  const retriedUrls: string[] = [];
+  const controller = createLocalHostedLoadRetryController({
+    retry: url => retriedUrls.push(url),
+    isWindowDestroyed: () => false,
+  });
+  const retryUrl = 'http://localhost:3100/app/chat?runtime=electron';
+
+  expect(
+    controller.onMainFrameLoadFailure({ errorCode: -102, retryUrl })
+  ).toEqual({ action: 'retry', attempt: 1 });
+
+  controller.onHostedNavigationStarted();
+  vi.advanceTimersByTime(LOCAL_HOSTED_LOAD_RETRY_DELAY_MS);
+  expect(retriedUrls).toEqual([]);
+
+  expect(
+    controller.onMainFrameDocumentCommitted({ isHostedAppDocument: false })
+  ).toBe('preserve-retry');
+  expect(
+    controller.onMainFrameLoadFailure({ errorCode: -102, retryUrl })
+  ).toEqual({ action: 'retry', attempt: 2 });
+});
+
+test('a failed manual reload replaces rather than overlaps the pending retry', () => {
+  vi.useFakeTimers();
+  const retriedUrls: string[] = [];
+  const controller = createLocalHostedLoadRetryController({
+    retry: url => retriedUrls.push(url),
+    isWindowDestroyed: () => false,
+  });
+  const retryUrl = 'http://localhost:3100/app/chat?runtime=electron';
+
+  expect(
+    controller.onMainFrameLoadFailure({ errorCode: -102, retryUrl })
+  ).toEqual({ action: 'retry', attempt: 1 });
+  controller.onMainFrameDocumentCommitted({ isHostedAppDocument: false });
+  expect(
+    controller.onMainFrameLoadFailure({ errorCode: -102, retryUrl })
+  ).toEqual({ action: 'retry', attempt: 2 });
+  controller.onMainFrameDocumentCommitted({ isHostedAppDocument: false });
+  vi.advanceTimersByTime(LOCAL_HOSTED_LOAD_RETRY_DELAY_MS);
+
+  expect(retriedUrls).toEqual([retryUrl]);
+});
+
+test('a destroyed local window never executes its pending hosted retry', () => {
+  vi.useFakeTimers();
+  const retriedUrls: string[] = [];
+  const controller = createLocalHostedLoadRetryController({
+    retry: url => retriedUrls.push(url),
+    isWindowDestroyed: () => true,
+  });
+
+  controller.onMainFrameLoadFailure({
+    errorCode: -102,
+    retryUrl: 'http://localhost:3100/app/chat?runtime=electron',
+  });
+  controller.onMainFrameDocumentCommitted({ isHostedAppDocument: false });
+  vi.advanceTimersByTime(LOCAL_HOSTED_LOAD_RETRY_DELAY_MS);
+
+  expect(retriedUrls).toEqual([]);
+});
 
 test('clean-exit is normal teardown, never recovered', () => {
   expect(

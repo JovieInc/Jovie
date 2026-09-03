@@ -172,6 +172,29 @@ if [ $ADDED_COUNT -gt 1 ]; then
             if echo "$LABELS" | grep -q "$BULK_LABEL_MARKER"; then
                 HAS_BULK_LABEL=true
             fi
+
+            if [ "$HAS_BULK_LABEL" = false ] &&
+                [ -n "${GITHUB_REPOSITORY:-}" ] &&
+                command -v gh > /dev/null 2>&1 &&
+                [ -n "${GH_TOKEN:-${GITHUB_TOKEN:-}}" ]; then
+                PR_NUMBER=$(jq -r '
+                    if (.pull_request.number // null) != null then
+                        (.pull_request.number | tostring)
+                    else
+                        try (
+                            (.merge_group.head_ref // .merge_group.head_branch // .ref // env.GITHUB_REF_NAME // "")
+                            | capture("pr-(?<number>[0-9]+)-").number
+                        ) catch empty
+                    end
+                ' "$GITHUB_EVENT_PATH" 2>/dev/null || echo "")
+
+                if [ -n "$PR_NUMBER" ]; then
+                    LABELS=$(gh api "repos/$GITHUB_REPOSITORY/issues/$PR_NUMBER/labels" --jq '.[].name' 2>/dev/null || echo "")
+                    if echo "$LABELS" | grep -q "$BULK_LABEL_MARKER"; then
+                        HAS_BULK_LABEL=true
+                    fi
+                fi
+            fi
         fi
     fi
     

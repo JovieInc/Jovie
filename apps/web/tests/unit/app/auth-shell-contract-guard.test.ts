@@ -47,4 +47,25 @@ describe('auth shell contract guard', () => {
 
     expect(offenders).toEqual([]);
   });
+
+  it('keeps the sign-in full route on the desktop split shell', () => {
+    const signin = readFileSync(
+      join(process.cwd(), 'app', '(auth)', 'signin', 'SignInPageClient.tsx'),
+      'utf8'
+    );
+    const loading = readFileSync(
+      join(process.cwd(), 'app', '(auth)', 'signin', 'loading.tsx'),
+      'utf8'
+    );
+    const modal = readFileSync(
+      join(process.cwd(), 'app', '@auth', '(.)signin', 'SigninModalClient.tsx'),
+      'utf8'
+    );
+
+    expect(signin).toContain("layoutVariant='split'");
+    expect(signin).not.toContain("chrome='splash-b'");
+    expect(loading).toContain("layoutVariant='split'");
+    expect(modal).toContain('<AuthModalShell');
+    expect(modal).not.toContain('<AuthLayout');
+  });
 });

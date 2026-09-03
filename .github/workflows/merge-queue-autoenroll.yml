@@ -10,14 +10,14 @@ name: Merge Queue Auto-Enroll
 # alternate transport.
 #
 # Triggers:
-#   pull_request      — PR label changes and reopen (maintenance only)
+#   pull_request      — PR label/reopen maintenance plus native-enqueue continuation
 #   workflow_run      — CI completion (green PRs are now enrollable)
 #   push (main)       — main moved → queued PRs may conflict or get stale
 #   workflow_dispatch — maintenance-only unless exact PR + head are supplied
 #
 # Two jobs run (not at the same time — concurrency group serializes):
-#   enroll    — classify open PRs, enroll the event-scoped exact head plus at
-#               most one bounded missed-admission recovery head,
+#   enroll    — classify open PRs, enroll the event-scoped exact head plus a
+#               bounded missed-admission cohort under one total cap,
 #               dequeue broken ones,
 #               flag conflicts for the fix agent (no pytest/Python setup;
 #               drain regression tests run in CI Structural Contract instead)
@@ -32,7 +32,10 @@ on:
   pull_request:
     # Ready transitions do not restart CI. The owning agent pairs ready with
     # native auto-merge intent; the first source CI flight remains authoritative.
-    types: [reopened, labeled, unlabeled]
+    # A successful native enqueue emits `enqueued`, which advances the next
+    # bounded recovery cohort after the event target proves idempotently
+    # already queued.
+    types: [reopened, labeled, unlabeled, enqueued]
   workflow_run:
     workflows: ['CI', 'Production Controller']
     types: [completed]
@@ -72,14 +75,6 @@ jobs:
       mode: ${{ steps.policy.outputs.promotion_mode }}
       receipt_b64: ${{ steps.policy.outputs.receipt_b64 }}
     steps:
-      - name: Generate read-only Jovie Bot token
-        id: app-token
-        uses: actions/create-github-app-token@bcd2ba49218906704ab6c1aa796996da409d3eb1 # v3.2.0
-        with:
-          app-id: ${{ vars.JOVIE_BOT_APP_ID }}
-          private-key: ${{ secrets.JOVIE_BOT_PRIVATE_KEY }}
-          permission-contents: read
-          permission-pull-requests: read
       - name: Checkout canonical main policy
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -89,7 +84,7 @@ jobs:
         id: policy
         uses: ./.github/actions/evaluate-fleet-gate
         with:
-          github-token: ${{ steps.app-token.outputs.token }}
+          github-token: ${{ github.token }}
           dry-run: 'false'
 
   enroll:
@@ -126,7 +121,7 @@ jobs:
       - name: Resolve exact admission scope
         id: admission
         env:
-          GH_TOKEN: ${{ steps.app-token.outputs.token }}
+          GH_TOKEN: ${{ github.token }}
           REPO: ${{ github.repository }}
           EVENT_NAME: ${{ github.event_name }}
           MANUAL_PR: ${{ inputs.pr_number || '' }}
@@ -268,10 +263,13 @@ jobs:
           } >>"$GITHUB_OUTPUT"
       - name: Enroll clean PRs
         env:
-          GH_TOKEN: ${{ steps.app-token.outputs.token }}
+          GH_TOKEN: ${{ github.token }}
+          GH_MUTATION_TOKEN: ${{ steps.app-token.outputs.token }}
           REPO: ${{ github.repository }}
           GH_RETRY_ATTEMPTS: 8
           GH_RETRY_MAX_DELAY: 60
+          GH_INVENTORY_RETRY_ATTEMPTS: 3
+          GH_INVENTORY_RETRY_MAX_DELAY: 15
           MERGE_QUEUE_BACKEND: ${{ vars.MERGE_QUEUE_BACKEND }}
           DRAIN_MUTATION_AUTHORIZATION: merge-queue-autoenroll
           MERGE_QUEUE_NATIVE_AUTHORIZATION: merge-queue-autoenroll
@@ -310,12 +308,89 @@ jobs:
           # pressure deferral from an explicit repair/human hold. Main-push
           # maintenance must preserve it until an owner explicitly releases it.
           DRAIN_RECONCILE_QUEUE_DEFERRED: '0'
+          EVENT_NAME: ${{ github.event_name }}
+          WORKFLOW_RUN_EVENT: ${{ github.event.workflow_run.event || '' }}
         run: |
           if [[ "$MERGE_QUEUE_BACKEND" != "native" ]]; then
             echo "::error::Merge Queue Auto-Enroll requires MERGE_QUEUE_BACKEND=native" >&2
             exit 2
           fi
+          set +e
           bash scripts/drain-pr-queue.sh
+          drain_rc=$?
+          set -e
+
+          if [[ "$drain_rc" -eq 0 ]]; then
+            exit 0
+          fi
+
+          # `enroll` is attached to the product PR head for pull_request events
+          # and for CI-completion workflow_run events produced by pull_request.
+          # Controller dispositions such as queue-noop must not paint that
+          # product PR UNSTABLE; main-push/manual maintenance still fails closed.
+          product_pr_check=0
+          if [[ "$EVENT_NAME" == "pull_request" ]]; then
+            product_pr_check=1
+          elif [[ "$EVENT_NAME" == "workflow_run" && "$WORKFLOW_RUN_EVENT" == "pull_request" ]]; then
+            product_pr_check=1
+          fi
+
+          if [[ "$product_pr_check" -eq 1 ]]; then
+            pr_number="${DRAIN_ADMISSION_PR:-}"
+            head_sha="${DRAIN_ADMISSION_HEAD:-}"
+            if [[ ! "$pr_number" =~ ^[1-9][0-9]*$ || ! "$head_sha" =~ ^[0-9a-f]{40}$ ]]; then
+              echo "::error::Cannot emit delivery-control-failure without exact PR/head for suppressed product PR check" >&2
+              exit "$drain_rc"
+            fi
+            failure='dropped-controller-event'
+            if [[ "$drain_rc" -eq 3 ]]; then
+              failure='queue-noop'
+            fi
+            run_url="${GITHUB_SERVER_URL:-https://github.com}/$REPO/actions/runs/$GITHUB_RUN_ID"
+            payload="$(jq -cn \
+              --arg source 'merge-queue-autoenroll' \
+              --arg event 'suppressed-product-pr-check-failure' \
+              --arg failure "$failure" \
+              --arg delivery_key "merge-queue-autoenroll:${GITHUB_RUN_ID:-unknown}:${GITHUB_RUN_ATTEMPT:-unknown}:$pr_number:$head_sha:$drain_rc" \
+              --arg pr_number "$pr_number" \
+              --arg head_sha "$head_sha" \
+              --arg exit_code "$drain_rc" \
+              --arg github_event "$EVENT_NAME" \
+              --arg workflow_run_event "$WORKFLOW_RUN_EVENT" \
+              --arg run_id "${GITHUB_RUN_ID:-}" \
+              --arg run_attempt "${GITHUB_RUN_ATTEMPT:-}" \
+              --arg run_url "$run_url" \
+              '{
+                event_type: "delivery-control-failure",
+                client_payload: {
+                  source: $source,
+                  event: $event,
+                  failure: $failure,
+                  delivery_key: $delivery_key,
+                  pr_number: ($pr_number | tonumber),
+                  head_sha: $head_sha,
+                  evidence: {
+                    workflow: "Merge Queue Auto-Enroll",
+                    exit_code: $exit_code,
+                    github_event: $github_event,
+                    workflow_run_event: $workflow_run_event,
+                    run_id: $run_id,
+                    run_attempt: $run_attempt,
+                    run_url: $run_url
+                  }
+                }
+              }')"
+            gh api --method POST "repos/$REPO/dispatches" --input - <<<"$payload" >/dev/null
+            echo "delivery-control-failure dispatched for $failure #$pr_number at $head_sha (exit $drain_rc)"
+            if [[ "$drain_rc" -eq 3 ]]; then
+              echo "queue-noop is a controller disposition, not a product-quality failure"
+              exit 0
+            fi
+            echo "::error::dropped-controller-event fails closed (exit $drain_rc)" >&2
+            exit "$drain_rc"
+          fi
+
+          exit "$drain_rc"
 
   rebase:
     needs: enroll
@@ -342,7 +417,7 @@ jobs:
           node-version-file: '.nvmrc'
       - name: Preflight native queue cutover
         env:
-          GH_TOKEN: ${{ steps.app-token.outputs.token }}
+          GH_TOKEN: ${{ github.token }}
           REPO: ${{ github.repository }}
           MERGE_QUEUE_BACKEND: ${{ vars.MERGE_QUEUE_BACKEND }}
           MERGE_QUEUE_NATIVE_AUTHORIZATION: merge-queue-autoenroll

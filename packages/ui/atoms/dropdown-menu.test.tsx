@@ -214,6 +214,7 @@ describe('DropdownMenu', () => {
       );
       const item = screen.getByRole('menuitemcheckbox');
       expect(item).toHaveAttribute('data-state', 'checked');
+      expect(item.className).toContain('data-[state=checked]:bg-surface-1');
     });
   });
 
@@ -262,6 +263,7 @@ describe('DropdownMenu', () => {
       const option2 = screen.getByRole('menuitemradio', { name: 'Option 2' });
       expect(option1).toHaveAttribute('data-state', 'checked');
       expect(option2).toHaveAttribute('data-state', 'unchecked');
+      expect(option1.className).toContain('data-[state=checked]:bg-surface-1');
     });
   });
 

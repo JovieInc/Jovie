@@ -89,8 +89,15 @@ class JovieOwnershipTests(unittest.TestCase):
         self.assertFalse(MODULE.repo_drain_enabled("other/repo", False))
         self.assertTrue(MODULE.repo_drain_enabled("other/repo", True))
 
-    def test_stale_capacity_exits_cleanly_before_auth_inventory_or_mutation(self):
+    def test_stale_capacity_receipt_keeps_remote_drain_at_zero(self):
         receipt = stale_capacity_receipt()
+        first = self._open_pr(
+            1, mergeable_state="behind", created_at="2026-08-28T20:00:00Z"
+        )
+        second = self._open_pr(
+            2, mergeable_state="behind", created_at="2026-08-28T20:01:00Z"
+        )
+
         with tempfile.TemporaryDirectory() as tmp:
             state = pathlib.Path(tmp)
             stdout = io.StringIO()
@@ -100,20 +107,24 @@ class JovieOwnershipTests(unittest.TestCase):
                 mock.patch.object(MODULE, "POLICY_ENABLED", True),
                 mock.patch.object(MODULE, "evaluate_remediation_gate", return_value=receipt),
                 mock.patch.object(MODULE, "capacity", return_value=8),
-                mock.patch.object(MODULE, "auth_status") as auth,
-                mock.patch.object(MODULE, "inventory") as inventory,
+                mock.patch.object(MODULE, "auth_status", return_value=(True, "github_auth_ok")),
+                mock.patch.object(MODULE, "inventory", return_value=([first, second], [first, second])),
+                mock.patch.object(MODULE, "update_one") as update_one,
                 mock.patch.object(MODULE, "run") as remote,
-                mock.patch.object(MODULE.sys, "argv", [str(SOURCE)]),
+                mock.patch.object(MODULE.sys, "argv", [str(SOURCE), "--dry-run"]),
                 redirect_stdout(stdout),
             ):
                 exit_code = MODULE.main()
+
         document = json.loads(stdout.getvalue())
         self.assertEqual(exit_code, 0, document)
         self.assertEqual(document["capacity"], 0)
         self.assertEqual(document["selected"], [])
-        self.assertEqual(document["intake"], "blocked_missing_capacity_evidence")
-        auth.assert_not_called()
-        inventory.assert_not_called()
+        self.assertEqual(document["processed"], [])
+        self.assertEqual(document["remediation_admission"], "local_only")
+        self.assertFalse(receipt["workAdmission"]["newIssueLeaseAllowed"])
+        self.assertFalse(receipt["remediationAdmission"]["pushAllowed"])
+        update_one.assert_not_called()
         remote.assert_not_called()
 
     def test_stale_capacity_contract_rejects_remote_or_multiple_mutation(self):
@@ -123,7 +134,8 @@ class JovieOwnershipTests(unittest.TestCase):
         self.assertEqual(validated["concurrency"]["gem"]["runtimeFloor"], 1)
         for field, value, expected in (
             ("pushAllowed", True, "remote remediation must require"),
-            ("maxConcurrent", 2, "stale capacity must keep remediation maxConcurrent at zero"),
+            ("maxConcurrent", 0, "stale capacity must bound local remediation to one"),
+            ("maxConcurrent", 2, "stale capacity must bound local remediation to one"),
         ):
             with self.subTest(field=field):
                 broken = json.loads(json.dumps(receipt))
@@ -133,73 +145,75 @@ class JovieOwnershipTests(unittest.TestCase):
                 with self.assertRaisesRegex(RuntimeError, expected):
                     MODULE.validate_gate_result(0, json.dumps(broken), "remediation")
 
-    def test_failed_gate_receipt_is_valid_zero_capacity_remediation(self):
+    def test_failed_gate_receipt_is_valid_local_only_capacity_remediation(self):
         receipt = GATE_MODULE.failed_evaluation_receipt(ValueError("capacity unavailable"))
         validated = MODULE.validate_gate_result(0, json.dumps(receipt), "remediation")
         self.assertEqual(validated["state"], "RED")
-        self.assertEqual(validated["remediationAdmission"]["maxConcurrent"], 0)
+        self.assertEqual(validated["remediationAdmission"]["maxConcurrent"], 1)
+        self.assertEqual(MODULE.effective_capacity(8, validated), 0)
 
     def test_typed_remediation_capacity_caps_host_parallelism(self):
-        gate = {"remediationAdmission": {"maxConcurrent": 1}}
+        gate = {"remediationAdmission": {"pushAllowed": True, "maxConcurrent": 1}}
         self.assertEqual(MODULE.effective_capacity(4, gate), 1)
         self.assertEqual(MODULE.effective_capacity(1, gate), 1)
-        self.assertEqual(
-            MODULE.effective_capacity(
-                4, {"remediationAdmission": {"maxConcurrent": 0}}
-            ),
-            0,
-        )
-        for maximum in (None, -1, True, 1.5):
+        for maximum in (None, 0, -1, True, 1.5):
             with self.subTest(maximum=maximum), self.assertRaises(ValueError):
                 MODULE.effective_capacity(
-                    4, {"remediationAdmission": {"maxConcurrent": maximum}}
+                    4,
+                    {
+                        "remediationAdmission": {
+                            "pushAllowed": True,
+                            "maxConcurrent": maximum,
+                        }
+                    },
                 )
 
-    def test_zero_remote_capacity_is_clean_idle_without_github_mutation(self):
+    def test_local_only_capacity_does_not_authenticate_remote_drain(self):
         receipt = stale_capacity_receipt()
-        self.assertEqual(receipt["remediationAdmission"]["maxConcurrent"], 0)
-        self.assertEqual(receipt["concurrency"]["gem"]["maxConcurrent"], 0)
-        self.assertEqual(receipt["concurrency"]["gem"]["runtimeFloor"], 1)
-        self.assertFalse(receipt["remediationAdmission"]["pushAllowed"])
+        first = self._open_pr(
+            1, mergeable_state="behind", created_at="2026-08-28T20:00:00Z"
+        )
+        second = self._open_pr(
+            2, mergeable_state="behind", created_at="2026-08-28T20:01:00Z"
+        )
 
         with tempfile.TemporaryDirectory() as tmp:
             state = pathlib.Path(tmp)
             stdout = io.StringIO()
+            gate_process = MODULE.subprocess.CompletedProcess(
+                ["python3", str(GATE_SOURCE)],
+                0,
+                stdout=json.dumps(receipt),
+                stderr="",
+            )
             with (
                 mock.patch.object(MODULE, "STATE", state),
                 mock.patch.object(MODULE, "ARTIFACT", state / "latest.json"),
                 mock.patch.object(MODULE, "POLICY_ENABLED", True),
-                mock.patch.object(
-                    MODULE,
-                    "run_process",
-                    return_value=MODULE.subprocess.CompletedProcess(
-                        ["python3", str(GATE_SOURCE)],
-                        0,
-                        stdout=json.dumps(receipt),
-                        stderr="",
-                    ),
-                ),
-                mock.patch.object(MODULE, "auth_status") as auth_status,
-                mock.patch.object(MODULE, "inventory") as inventory,
-                mock.patch.object(MODULE, "update_one") as update_one,
+                mock.patch.object(MODULE, "run_process", return_value=gate_process),
+                mock.patch.object(MODULE, "auth_status", return_value=(True, "github_auth_ok")),
+                mock.patch.object(MODULE, "inventory", return_value=([first, second], [first, second])),
+                mock.patch.object(MODULE, "capacity", return_value=8),
                 mock.patch.object(MODULE, "run") as remote_run,
                 mock.patch.object(MODULE.sys, "argv", [str(SOURCE)]),
                 redirect_stdout(stdout),
             ):
+                MODULE.WORK_GATE_CACHE.update(
+                    checked_at=0.0, blocker="fleet_gate_not_checked"
+                )
                 exit_code = MODULE.main()
 
         document = json.loads(stdout.getvalue())
         self.assertEqual(exit_code, 0, document)
-        self.assertEqual(document["status"], "ok")
         self.assertEqual(document["capacity"], 0)
         self.assertEqual(document["selected"], [])
         self.assertEqual(document["processed"], [])
-        self.assertEqual(document["intake"], "blocked_missing_capacity_evidence")
         self.assertEqual(document["remediation_admission"], "local_only")
-        auth_status.assert_not_called()
-        inventory.assert_not_called()
-        update_one.assert_not_called()
         remote_run.assert_not_called()
+
+    def test_push_blocked_remediation_capacity_is_zero(self):
+        gate = {"remediationAdmission": {"pushAllowed": False, "maxConcurrent": 1}}
+        self.assertEqual(MODULE.effective_capacity(8, gate), 0)
 
     def test_stale_capacity_receipt_rejects_remote_mutation(self):
         receipt = stale_capacity_receipt()
@@ -212,13 +226,13 @@ class JovieOwnershipTests(unittest.TestCase):
         ):
             MODULE.validate_gate_result(0, json.dumps(receipt), "remediation")
 
-    def test_stale_capacity_rejects_contradictory_remote_floor(self):
+    def test_stale_capacity_receipt_rejects_more_than_one_local_repair(self):
         receipt = stale_capacity_receipt()
-        receipt["remediationAdmission"]["maxConcurrent"] = 1
+        receipt["remediationAdmission"]["maxConcurrent"] = 2
 
         with self.assertRaisesRegex(
             RuntimeError,
-            "stale capacity must keep remediation maxConcurrent at zero",
+            "stale capacity must bound local remediation to one",
         ):
             MODULE.validate_gate_result(0, json.dumps(receipt), "remediation")
 

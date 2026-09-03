@@ -31,7 +31,7 @@ module.exports = {
         normal: 'var(--font-weight-normal)', // 400
         book: 'var(--font-weight-book)', // 450 — Linear's UI default
         caption: 'var(--linear-caption-weight)', // 510 — compact app controls
-        medium: 'var(--font-weight-medium)', // 500
+        medium: 'var(--font-weight-medium)', // 510
         semibold: 'var(--font-weight-semibold)', // 590 — Linear-specific (extracted 2026-03-16)
         bold: 'var(--font-weight-bold)', // 680 — Linear-specific (extracted 2026-03-16)
         heavy: 'var(--font-weight-heavy)', // 680 — matches bold today; reserve for future step
@@ -51,14 +51,8 @@ module.exports = {
         mid: ['var(--text-mid)', { lineHeight: '1.4' }], // 15px — between sm and base
       },
 
-      // Linear spacing tokens
+      // Linear spacing tokens removed JOV-5464; consumers use canonical --space-*.
       spacing: {
-        'linear-1': 'var(--linear-space-1)',
-        'linear-2': 'var(--linear-space-2)',
-        'linear-3': 'var(--linear-space-3)',
-        'linear-4': 'var(--linear-space-4)',
-        'linear-6': 'var(--linear-space-6)',
-        'linear-8': 'var(--linear-space-8)',
         'app-control-sm': 'var(--app-shell-control-height-sm)',
         'button-md': 'var(--linear-button-height-md)',
         'app-control-x': 'var(--app-shell-control-padding-x)',
@@ -94,9 +88,8 @@ module.exports = {
         pill: 'var(--radius-pill)', // 48px — pill buttons
       },
 
-      // Linear max-width for containers
+      // Linear max-width for containers; canonical public width is --ds-public-content-max.
       maxWidth: {
-        'linear-container': 'var(--linear-container-max)',
         'linear-content': 'var(--linear-content-max)',
         'linear-hero': 'var(--linear-hero-section-max)',
         'linear-pricing': 'var(--linear-pricing-grid-max)',

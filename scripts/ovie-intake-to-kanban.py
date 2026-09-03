@@ -1,8 +1,9 @@
 #!/usr/bin/env python3
 """Land persisted Ovie receipts onto the Summer-owned Kanban.
 
-Never creates Linear issues. Never discards receipts. Receipt-only mode
-keeps cards and last status while disabling downstream routing.
+Never creates Linear issues. Engineering receipts are left for Summer's Linear
+intake and never copied into the operations Kanban. Receipt-only mode keeps
+operations cards and last status while disabling downstream routing.
 """
 
 from __future__ import annotations
@@ -14,9 +15,23 @@ from pathlib import Path
 from typing import Any
 
 
-COMPANY_LANES = frozenset({"flash", "heavy", "engineering"})
+COMPANY_LANES = frozenset({"flash", "heavy"})
+SHIPPING_LANES = frozenset({"engineering"})
 PERSONAL_LANES = frozenset({"personal"})
 TASTE_LANES = frozenset({"taste"})
+
+
+def task_matches_ovie_item(task: dict[str, Any], work_id: str, key: str) -> bool:
+    if task.get("created_by") != "ovie":
+        return False
+    return task.get("id") == work_id or task.get("idempotency_key") == key
+
+
+def remove_legacy_shipping_task(tasks: list[dict[str, Any]], work_id: str, key: str) -> bool:
+    kept = [task for task in tasks if not task_matches_ovie_item(task, work_id, key)]
+    removed = len(kept) != len(tasks)
+    tasks[:] = kept
+    return removed
 
 
 def load_board(path: Path) -> dict[str, Any]:
@@ -52,12 +67,16 @@ def upsert_company_task(
         raise ValueError("pending item missing durable id")
     key = str(item.get("idempotency_key") or item.get("idempotencyKey") or f"ovie-{work_id}")
     lane = str(item.get("lane") or "")
+    tasks: list[dict[str, Any]] = board["tasks"]
     if lane in PERSONAL_LANES or lane in TASTE_LANES:
         return "skipped-non-company"
+    if lane in SHIPPING_LANES:
+        if remove_legacy_shipping_task(tasks, work_id, key):
+            return "removed-shipping-linear"
+        return "skipped-shipping-linear"
     if lane not in COMPANY_LANES:
         return "skipped-non-company"
 
-    tasks: list[dict[str, Any]] = board["tasks"]
     existing = next(
         (task for task in tasks if task.get("id") == work_id or task.get("idempotency_key") == key),
         None,
