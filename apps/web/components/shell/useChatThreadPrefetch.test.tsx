@@ -4,16 +4,19 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type { SidebarThread } from './SidebarThreadsSection';
 import { useChatThreadPrefetch } from './useChatThreadPrefetch';
 
-const routerPrefetch = vi.fn();
-const prefetchChatConversation = vi.fn(() => Promise.resolve());
+const { routerPrefetch, prefetchChatConversation } = vi.hoisted(() => ({
+  routerPrefetch: vi.fn(),
+  prefetchChatConversation: vi.fn((_client: unknown, _conversationId: string) =>
+    Promise.resolve()
+  ),
+}));
 
 vi.mock('next/navigation', () => ({
   useRouter: () => ({ prefetch: routerPrefetch }),
 }));
 
 vi.mock('@/lib/queries/useChatConversationQuery', () => ({
-  prefetchChatConversation: (...args: unknown[]) =>
-    prefetchChatConversation(...(args as [])),
+  prefetchChatConversation,
 }));
 
 const thread: SidebarThread = {
