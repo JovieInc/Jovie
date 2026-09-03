@@ -2,7 +2,8 @@
 """Source-owned checks for the official OpenAI Symphony runtime.
 
 This module deliberately stays outside the upstream Symphony binary. Jovie owns
-the deployed service unit, workflow shape, request-budget math, and rate-limit
+the deployed service unit, workflow shape, request-budget math, closure
+stop-line admission, permanent-error dead-letter receipts, and rate-limit
 classification artifacts; OpenAI owns the binary itself. The selected Codex
 account remains host-owned configuration and is never pinned by this source.
 """
@@ -54,6 +55,38 @@ DEFAULT_MAX_GATE_SLEEP_SECONDS = 3_900
 DEFAULT_RATE_LIMIT_GATE = (
     pathlib.Path.home() / ".local/state/symphony-elixir/linear-rate-limit.json"
 )
+# Closure stop-line: Summer's jovie-closure-health/v1 signal embedded in the
+# Gem fleet gate receipt is the admission stop-line for new Symphony work.
+# "healthy" is the green admission state; grace/red, a missing receipt, a stale
+# receipt, or any schema/authority/consistency violation all fail closed.
+FLEET_GATE_SCHEMA = "jovie-fleet-gate/v1"
+CLOSURE_HEALTH_SCHEMA = "jovie-closure-health/v1"
+CLOSURE_HEALTH_AUTHORITY = "Summer"
+CLOSURE_HEALTHY_STATUS = "healthy"
+CLOSURE_HEALTH_STATUSES = frozenset({"healthy", "grace", "red"})
+CLOSURE_HOLD_SCHEMA = "symphony-closure-hold/v1"
+CLOSURE_HOLD_EXIT_CODE = 76
+DEFAULT_FLEET_GATE_RECEIPT = (
+    pathlib.Path.home() / "gem-workspace/state/gem-priority-gate/latest.json"
+)
+DEFAULT_CLOSURE_HOLD_RECEIPT = (
+    pathlib.Path.home() / ".local/state/symphony-elixir/closure-hold.json"
+)
+DEFAULT_DEAD_LETTER_DIR = (
+    pathlib.Path.home() / ".local/state/symphony-elixir/dead-letters"
+)
+# Mirrors gem-priority-gate.RECEIPT_STALE_AFTER; the receipt is regenerated
+# every minute on Gem, so a receipt older than this is a writer outage.
+FLEET_GATE_RECEIPT_MAX_AGE_SECONDS = 600
+FLEET_GATE_RECEIPT_FUTURE_SKEW_SECONDS = 60
+CLOSURE_HOLD_RECHECK_SECONDS = 30
+ISSUE_DEAD_LETTER_SCHEMA = "symphony-issue-dead-letter/v1"
+LINEAR_PERMANENT_ERROR_MAX_ATTEMPTS = 3
+LINEAR_API_STATUS_PATTERN = re.compile(
+    r"linear_api_status[=:\s]+(\d{3})\b", re.IGNORECASE
+)
+LOG_ATTEMPT_PATTERN = re.compile(r"\battempt[=:\s]+(\d+)\b", re.IGNORECASE)
+ISSUE_IDENTIFIER_PATTERN = re.compile(r"\b([A-Z][A-Z0-9]*-\d+)\b")
 ACTIVE_STATES = ("Todo", "In Progress", "Rework", "Merging")
 TERMINAL_STATES = ("Done", "Canceled", "Cancelled", "Duplicate", "Closed")
 EXCLUDED_LABELS = ("no-symphony", "needs-human")
@@ -110,6 +143,14 @@ class BudgetInputs:
     tool_requests_per_hour: int = TOOL_REQUESTS_PER_HOUR
     reset_canary_requests_per_hour: int = RESET_CANARY_REQUESTS_PER_HOUR
     hourly_budget: int = LINEAR_HOURLY_REQUEST_BUDGET
+
+
+@dataclass(frozen=True)
+class ClosureStopLine:
+    receipt_path: pathlib.Path = DEFAULT_FLEET_GATE_RECEIPT
+    hold_receipt_path: pathlib.Path = DEFAULT_CLOSURE_HOLD_RECEIPT
+    dead_letter_dir: pathlib.Path = DEFAULT_DEAD_LETTER_DIR
+    max_receipt_age_seconds: int = FLEET_GATE_RECEIPT_MAX_AGE_SECONDS
 
 
 def _iso(value: dt.datetime) -> str:
@@ -520,6 +561,8 @@ def validate_source(
             errors.append("unit_missing_rate_limit_runtime_wrapper")
         if "--max-gate-sleep-seconds" not in unit:
             errors.append("unit_missing_rate_limit_sleep_bound")
+        if "--closure-gate-file" not in unit:
+            errors.append("unit_missing_closure_stop_line_gate")
         if "ExecStartPre=%h/.local/bin/symphony-official-runtime reset-gate" in unit:
             errors.append("unit_uses_tight_restart_rate_limit_gate")
         if (
@@ -788,10 +831,399 @@ def _pause_child_for_gate(
                 pass
 
 
+def _write_json_receipt(path: pathlib.Path, payload: dict[str, Any]) -> None:
+    """Atomic durable receipt write (same fsync+replace shape as the rate gate)."""
+    path.parent.mkdir(parents=True, exist_ok=True)
+    descriptor, tmp_name = tempfile.mkstemp(prefix=f".{path.name}.", dir=path.parent)
+    try:
+        with os.fdopen(descriptor, "w", encoding="utf-8") as handle:
+            json.dump(payload, handle, indent=2, sort_keys=True)
+            handle.write("\n")
+            handle.flush()
+            os.fsync(handle.fileno())
+        os.replace(tmp_name, path)
+    finally:
+        if os.path.exists(tmp_name):
+            os.unlink(tmp_name)
+
+
+def read_closure_stop_line(
+    path: pathlib.Path,
+    now: dt.datetime | None = None,
+    *,
+    max_age_seconds: int = FLEET_GATE_RECEIPT_MAX_AGE_SECONDS,
+) -> dict[str, Any]:
+    """Fail-closed admission verdict from the freshest Gem fleet gate receipt.
+
+    New issue admission is allowed only while Summer's closure health signal is
+    healthy (the green admission state). A missing, unreadable, stale,
+    future-dated, or internally inconsistent receipt holds new admission.
+    """
+    observed_at = now or _now()
+
+    def hold(reason: str, **extra: Any) -> dict[str, Any]:
+        return {"hold": True, "reason": reason, "path": str(path), **extra}
+
+    if not path.exists():
+        return hold("fleet-gate-receipt-missing")
+    try:
+        payload = json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError) as exc:
+        return hold(f"fleet-gate-receipt-invalid:{type(exc).__name__}")
+    if not isinstance(payload, dict) or payload.get("schema") != FLEET_GATE_SCHEMA:
+        return hold("fleet-gate-receipt-schema-mismatch")
+    receipt_observed_raw = payload.get("observedAt")
+    try:
+        receipt_observed = (
+            dt.datetime.fromisoformat(str(receipt_observed_raw).replace("Z", "+00:00"))
+            if receipt_observed_raw
+            else None
+        )
+    except ValueError:
+        receipt_observed = None
+    if receipt_observed is None:
+        return hold("fleet-gate-receipt-observed-at-missing")
+    age_seconds = math.ceil((observed_at - receipt_observed).total_seconds())
+    details: dict[str, Any] = {
+        "receiptObservedAt": _iso(receipt_observed),
+        "receiptAgeSeconds": age_seconds,
+        "maxReceiptAgeSeconds": max_age_seconds,
+    }
+    if age_seconds < -FLEET_GATE_RECEIPT_FUTURE_SKEW_SECONDS:
+        return hold("fleet-gate-receipt-future", **details)
+    if age_seconds > max_age_seconds:
+        return hold("fleet-gate-receipt-stale", **details)
+    signals = payload.get("signals")
+    closure = signals.get("closureHealth") if isinstance(signals, dict) else None
+    if not isinstance(closure, dict):
+        return hold("closure-health-missing", **details)
+    status = closure.get("status")
+    intake = closure.get("newIssueIntakeAllowed")
+    tampered = (
+        closure.get("schema") != CLOSURE_HEALTH_SCHEMA
+        or closure.get("authority") != CLOSURE_HEALTH_AUTHORITY
+        or status not in CLOSURE_HEALTH_STATUSES
+        or not isinstance(intake, bool)
+        or intake is not (status == CLOSURE_HEALTHY_STATUS)
+        or closure.get("promotionContinues") is not True
+        or closure.get("remediationContinues") is not True
+    )
+    details["closureStatus"] = status if isinstance(status, str) else None
+    if tampered:
+        return hold("closure-health-receipt-tampered", **details)
+    admission = payload.get("closureAdmission")
+    if (
+        not isinstance(admission, dict)
+        or admission.get("newIssueIntakeAllowed") is not intake
+        or admission.get("status") != status
+    ):
+        return hold("closure-admission-disagrees", **details)
+    details["newIssueIntakeAllowed"] = intake
+    if status != CLOSURE_HEALTHY_STATUS or intake is not True:
+        return hold("closure-health-not-green", **details)
+    return {
+        "hold": False,
+        "reason": "closure-health-green",
+        "path": str(path),
+        **details,
+    }
+
+
+def write_closure_hold_receipt(
+    path: pathlib.Path,
+    verdict: dict[str, Any],
+    *,
+    status: str,
+    sleep_seconds_used: int,
+    max_sleep_seconds: int | None,
+    now: dt.datetime | None = None,
+) -> dict[str, Any]:
+    """Durable symphony-closure-hold/v1 receipt for one hold decision."""
+    payload = {
+        "schema": CLOSURE_HOLD_SCHEMA,
+        "status": status,
+        "reason": verdict.get("reason"),
+        "closureStatus": verdict.get("closureStatus"),
+        "newIssueIntakeAllowed": verdict.get("newIssueIntakeAllowed"),
+        "receiptPath": verdict.get("path"),
+        "receiptObservedAt": verdict.get("receiptObservedAt"),
+        "receiptAgeSeconds": verdict.get("receiptAgeSeconds"),
+        "holdSleepSecondsUsed": sleep_seconds_used,
+        "maxGateSleepSeconds": max_sleep_seconds,
+        "observedAt": _iso(now or _now()),
+    }
+    _write_json_receipt(path, payload)
+    return payload
+
+
+def _closure_hold_receipt_status(path: pathlib.Path) -> str | None:
+    try:
+        payload = json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError):
+        return None
+    if not isinstance(payload, dict) or payload.get("schema") != CLOSURE_HOLD_SCHEMA:
+        return None
+    status = payload.get("status")
+    return status if isinstance(status, str) else None
+
+
+def _sleep_closure_hold(verdict: dict[str, Any], seconds: int) -> int:
+    if seconds <= 0:
+        return 0
+    print(
+        json.dumps(
+            {
+                "kind": "closure_hold_wait",
+                "reason": verdict.get("reason"),
+                "closureStatus": verdict.get("closureStatus"),
+                "sleepSeconds": seconds,
+            },
+            sort_keys=True,
+        ),
+        flush=True,
+    )
+    time.sleep(seconds)
+    return seconds
+
+
+def _closure_hold_wait(
+    stop_line: ClosureStopLine,
+    verdict: dict[str, Any],
+    *,
+    max_sleep_seconds: int | None,
+    sleep_used: int,
+) -> tuple[int, dict[str, Any]]:
+    """Hold new admission in bounded chunks, re-reading the fleet receipt.
+
+    The fleet gate is regenerated every minute on Gem, so the hold re-reads the
+    receipt after every bounded chunk and releases as soon as closure health
+    returns to healthy. Every hold decision rewrites the durable hold receipt.
+    """
+    while verdict["hold"]:
+        write_closure_hold_receipt(
+            stop_line.hold_receipt_path,
+            verdict,
+            status="holding",
+            sleep_seconds_used=sleep_used,
+            max_sleep_seconds=max_sleep_seconds,
+        )
+        remaining = (
+            None if max_sleep_seconds is None else max_sleep_seconds - sleep_used
+        )
+        chunk = CLOSURE_HOLD_RECHECK_SECONDS
+        if remaining is not None:
+            chunk = min(chunk, remaining)
+        if chunk <= 0:
+            break
+        sleep_used += _sleep_closure_hold(verdict, chunk)
+        verdict = read_closure_stop_line(
+            stop_line.receipt_path, max_age_seconds=stop_line.max_receipt_age_seconds
+        )
+    return sleep_used, verdict
+
+
+def _print_closure_hold_exhausted(max_sleep_seconds: int | None) -> None:
+    print(
+        json.dumps(
+            {
+                "kind": "closure_hold_wait_exhausted",
+                "maxGateSleepSeconds": max_sleep_seconds,
+            },
+            sort_keys=True,
+        ),
+        flush=True,
+    )
+
+
+def _pause_child_for_closure_hold(
+    process: subprocess.Popen[str],
+    stop_line: ClosureStopLine,
+    verdict: dict[str, Any],
+    max_gate_sleep_seconds: int | None,
+) -> int:
+    """Pause only the scheduler while closure health holds new admission.
+
+    Same contract as the rate-limit pause: agent processes already launched by
+    the scheduler keep running to completion. The budget bounds one continuous
+    hold episode; on exhaustion the scheduler resumes so finished agents are
+    collected before the next bounded episode starts on a still-red receipt.
+    """
+    if process.poll() is not None or not verdict.get("hold"):
+        return 0
+    if not isinstance(process.pid, int) or process.pid <= 0:
+        return 0
+    os.kill(process.pid, signal.SIGSTOP)
+    try:
+        slept, latest = _closure_hold_wait(
+            stop_line, verdict, max_sleep_seconds=max_gate_sleep_seconds, sleep_used=0
+        )
+        if latest["hold"]:
+            write_closure_hold_receipt(
+                stop_line.hold_receipt_path,
+                latest,
+                status="exhausted",
+                sleep_seconds_used=slept,
+                max_sleep_seconds=max_gate_sleep_seconds,
+            )
+            _print_closure_hold_exhausted(max_gate_sleep_seconds)
+        else:
+            write_closure_hold_receipt(
+                stop_line.hold_receipt_path,
+                latest,
+                status="released",
+                sleep_seconds_used=slept,
+                max_sleep_seconds=max_gate_sleep_seconds,
+            )
+            print(
+                json.dumps(
+                    {
+                        "kind": "closure_hold_release",
+                        "receiptObservedAt": latest.get("receiptObservedAt"),
+                    },
+                    sort_keys=True,
+                ),
+                flush=True,
+            )
+        return slept
+    finally:
+        if process.poll() is None:
+            try:
+                os.kill(process.pid, signal.SIGCONT)
+            except ProcessLookupError:
+                pass
+
+
+def classify_linear_issue_error_log_line(
+    line: str, now: dt.datetime | None = None
+) -> dict[str, Any] | None:
+    """Classify permanent Linear per-issue client errors from scheduler logs.
+
+    Only a ``linear_api_status`` 4xx (never 429, never a RATELIMITED body, which
+    the rate-limit gate owns) attributed to exactly one issue identifier may
+    dead-letter. Ambiguous or unattributable lines fail closed to no action.
+    """
+    status_match = LINEAR_API_STATUS_PATTERN.search(line)
+    if status_match is None:
+        return None
+    status = int(status_match.group(1))
+    if status < 400 or status >= 500 or status == 429:
+        return None
+    if "RATELIMITED" in line.upper():
+        return None
+    issues = {match.upper() for match in ISSUE_IDENTIFIER_PATTERN.findall(line)}
+    if len(issues) != 1:
+        return None
+    attempt_match = LOG_ATTEMPT_PATTERN.search(line)
+    return {
+        "kind": "linear_permanent_client_error",
+        "issue": sorted(issues)[0],
+        "status": status,
+        "attempt": int(attempt_match.group(1)) if attempt_match else None,
+        "recordedAt": _iso(now or _now()),
+    }
+
+
+def write_issue_dead_letter(
+    path: pathlib.Path,
+    issue_error: dict[str, Any],
+    *,
+    attempts: int,
+    first_observed_at: str,
+    now: dt.datetime | None = None,
+) -> dict[str, Any]:
+    """Durable symphony-issue-dead-letter/v1 terminal receipt for one issue."""
+    payload = {
+        "schema": ISSUE_DEAD_LETTER_SCHEMA,
+        "status": "dead-lettered",
+        "issue": issue_error["issue"],
+        "errorClass": issue_error["kind"],
+        "linearApiStatus": issue_error["status"],
+        "attempts": attempts,
+        "maxAttempts": LINEAR_PERMANENT_ERROR_MAX_ATTEMPTS,
+        "firstObservedAt": first_observed_at,
+        "observedAt": _iso(now or _now()),
+        "excludedFromDispatch": True,
+        "nextAction": "apply the no-symphony Linear label (already dispatch-excluded by the workflow) before any further machine pickup",
+        "source": "symphony-official-runtime",
+    }
+    _write_json_receipt(path, payload)
+    return payload
+
+
+def record_linear_issue_error(
+    dead_letter_dir: pathlib.Path,
+    issue_error: dict[str, Any],
+    tracked: dict[str, dict[str, Any]],
+    noted: set[str],
+    now: dt.datetime | None = None,
+) -> dict[str, Any] | None:
+    """Count permanent per-issue errors; dead-letter at the bounded ceiling.
+
+    The receipt is written once and then suppresses further accounting for the
+    issue (exclude-from-dispatch): the durable receipt, not the log stream, is
+    the terminal record downstream tooling and humans act on. The wrapper has
+    no Linear mutation path, so applying the no-symphony label stays with the
+    downstream consumer of the receipt.
+    """
+    issue = issue_error["issue"]
+    receipt_path = dead_letter_dir / f"{issue}.json"
+    if issue in noted or receipt_path.exists():
+        if issue not in noted:
+            noted.add(issue)
+            print(
+                json.dumps(
+                    {"kind": "issue_dead_letter_suppressed", "issue": issue},
+                    sort_keys=True,
+                ),
+                flush=True,
+            )
+        return None
+    entry = tracked.setdefault(
+        issue,
+        {
+            "count": 0,
+            "maxAttempt": 0,
+            "status": issue_error["status"],
+            "firstObservedAt": issue_error["recordedAt"],
+        },
+    )
+    entry["count"] += 1
+    entry["status"] = issue_error["status"]
+    attempt = issue_error.get("attempt")
+    if isinstance(attempt, int):
+        entry["maxAttempt"] = max(entry["maxAttempt"], attempt)
+    attempts = max(entry["count"], entry["maxAttempt"])
+    if attempts < LINEAR_PERMANENT_ERROR_MAX_ATTEMPTS:
+        return None
+    receipt = write_issue_dead_letter(
+        receipt_path,
+        issue_error,
+        attempts=attempts,
+        first_observed_at=entry["firstObservedAt"],
+        now=now,
+    )
+    noted.add(issue)
+    print(
+        json.dumps(
+            {
+                "kind": "issue_dead_letter",
+                "issue": issue,
+                "status": issue_error["status"],
+                "attempts": attempts,
+                "receipt": str(receipt_path),
+            },
+            sort_keys=True,
+        ),
+        flush=True,
+    )
+    return receipt
+
+
 def run_official_binary_once(
     command: list[str],
     *,
     gate_file: pathlib.Path,
+    closure: ClosureStopLine,
     max_gate_sleep_seconds: int | None,
 ) -> int:
     process = subprocess.Popen(
@@ -803,6 +1235,9 @@ def run_official_binary_once(
         bufsize=1,
     )
     rate_limited = False
+    issue_errors: dict[str, dict[str, Any]] = {}
+    dead_letter_noted: set[str] = set()
+    last_closure_check = 0.0
     assert process.stdout is not None
     for line in process.stdout:
         print(line, end="", flush=True)
@@ -814,6 +1249,25 @@ def run_official_binary_once(
             rate_limited = True
             gate = read_rate_limit_gate(gate_file)
             _pause_child_for_gate(process, gate, max_gate_sleep_seconds)
+        else:
+            issue_error = classify_linear_issue_error_log_line(line)
+            if issue_error is not None:
+                record_linear_issue_error(
+                    closure.dead_letter_dir,
+                    issue_error,
+                    issue_errors,
+                    dead_letter_noted,
+                )
+        monotonic_now = time.monotonic()
+        if monotonic_now - last_closure_check >= CLOSURE_HOLD_RECHECK_SECONDS:
+            last_closure_check = monotonic_now
+            verdict = read_closure_stop_line(
+                closure.receipt_path, max_age_seconds=closure.max_receipt_age_seconds
+            )
+            if verdict["hold"]:
+                _pause_child_for_closure_hold(
+                    process, closure, verdict, max_gate_sleep_seconds
+                )
     returncode = process.wait()
     return RATE_LIMIT_EXIT_CODE if rate_limited else returncode
 
@@ -822,12 +1276,67 @@ def run_official_binary(
     command: list[str],
     *,
     gate_file: pathlib.Path,
+    closure: ClosureStopLine,
     max_gate_sleep_seconds: int | None = DEFAULT_MAX_GATE_SLEEP_SECONDS,
 ) -> int:
     if not command:
         raise ValueError("missing official Symphony command after --")
     gate_sleep_used = 0
+    closure_sleep_used = 0
     while True:
+        verdict = read_closure_stop_line(
+            closure.receipt_path, max_age_seconds=closure.max_receipt_age_seconds
+        )
+        if verdict["hold"]:
+            # The closure stop-line holds NEW admission only. Already-running
+            # work belongs to a live scheduler process (or none has started
+            # yet), so holding here never interrupts an active agent.
+            closure_sleep_used, verdict = _closure_hold_wait(
+                closure,
+                verdict,
+                max_sleep_seconds=max_gate_sleep_seconds,
+                sleep_used=closure_sleep_used,
+            )
+            if verdict["hold"]:
+                write_closure_hold_receipt(
+                    closure.hold_receipt_path,
+                    verdict,
+                    status="exhausted",
+                    sleep_seconds_used=closure_sleep_used,
+                    max_sleep_seconds=max_gate_sleep_seconds,
+                )
+                _print_closure_hold_exhausted(max_gate_sleep_seconds)
+                return CLOSURE_HOLD_EXIT_CODE
+            write_closure_hold_receipt(
+                closure.hold_receipt_path,
+                verdict,
+                status="released",
+                sleep_seconds_used=closure_sleep_used,
+                max_sleep_seconds=max_gate_sleep_seconds,
+            )
+            print(
+                json.dumps(
+                    {
+                        "kind": "closure_hold_release",
+                        "receiptObservedAt": verdict.get("receiptObservedAt"),
+                    },
+                    sort_keys=True,
+                ),
+                flush=True,
+            )
+        elif _closure_hold_receipt_status(closure.hold_receipt_path) in {
+            "holding",
+            "exhausted",
+        }:
+            # A previous bounded episode ended mid-hold; record that admission
+            # resumed instead of leaving a stale hold receipt behind.
+            write_closure_hold_receipt(
+                closure.hold_receipt_path,
+                verdict,
+                status="released",
+                sleep_seconds_used=closure_sleep_used,
+                max_sleep_seconds=max_gate_sleep_seconds,
+            )
         gate = read_rate_limit_gate(gate_file)
         if gate["active"]:
             remaining_sleep = (
@@ -849,6 +1358,7 @@ def run_official_binary(
         returncode = run_official_binary_once(
             command,
             gate_file=gate_file,
+            closure=closure,
             max_gate_sleep_seconds=max_gate_sleep_seconds,
         )
         if returncode != RATE_LIMIT_EXIT_CODE:
@@ -988,6 +1498,26 @@ def main(argv: list[str] | None = None) -> int:
         type=int,
         default=DEFAULT_MAX_GATE_SLEEP_SECONDS,
     )
+    run_parser.add_argument(
+        "--closure-gate-file",
+        type=pathlib.Path,
+        default=DEFAULT_FLEET_GATE_RECEIPT,
+    )
+    run_parser.add_argument(
+        "--closure-gate-max-age-seconds",
+        type=int,
+        default=FLEET_GATE_RECEIPT_MAX_AGE_SECONDS,
+    )
+    run_parser.add_argument(
+        "--closure-hold-receipt",
+        type=pathlib.Path,
+        default=DEFAULT_CLOSURE_HOLD_RECEIPT,
+    )
+    run_parser.add_argument(
+        "--dead-letter-dir",
+        type=pathlib.Path,
+        default=DEFAULT_DEAD_LETTER_DIR,
+    )
     run_parser.add_argument("binary_command", nargs=argparse.REMAINDER)
 
     args = parser.parse_args(argv)
@@ -1063,6 +1593,12 @@ def main(argv: list[str] | None = None) -> int:
         return run_official_binary(
             command,
             gate_file=args.gate_file,
+            closure=ClosureStopLine(
+                receipt_path=args.closure_gate_file,
+                hold_receipt_path=args.closure_hold_receipt,
+                dead_letter_dir=args.dead_letter_dir,
+                max_receipt_age_seconds=args.closure_gate_max_age_seconds,
+            ),
             max_gate_sleep_seconds=args.max_gate_sleep_seconds,
         )
 

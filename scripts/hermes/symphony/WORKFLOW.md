@@ -64,7 +64,7 @@ Ticket: `{{ issue.identifier }}` — {{ issue.title }}
 Status: {{ issue.state }}
 URL: {{ issue.url }}
 
-Intake is the Jovie Linear team. States: `Todo` = queued (move to `In Progress` before work); `In Progress` = continue; `Rework` = address review feedback on the existing PR; `Merging` = land the attached PR through the native merge queue. Issues labeled `no-symphony` or `needs-human` are never dispatched.
+Intake is the Jovie Linear team. States: `Todo` = queued (move to `In Progress` before work); `In Progress` = continue; `Rework` = address review feedback on the existing PR; `Merging` = land the attached PR through the native merge queue. Issues labeled `no-symphony` or `needs-human` are never dispatched. Admission stop-line: the source-owned runtime wrapper holds new dispatch while Summer's closure-health signal in the Gem fleet gate receipt is not healthy (missing or stale receipts hold too), and an issue that hits the bounded ceiling of permanent Linear 4xx errors is dead-lettered to a durable `symphony-issue-dead-letter/v1` receipt and must receive the `no-symphony` label before any further machine pickup.
 
 {% if attempt %}Continuation attempt #{{ attempt }}. Resume; do not redo finished validation.{% endif %}
 
