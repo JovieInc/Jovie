@@ -323,7 +323,16 @@ export const HOMEPAGE_CERTIFIED_FIGURES: HomepageCertifiedFigures = {
       caption: 'Example numbers, layout only.',
     },
   },
-  routes: {},
+  routes: {
+    relationships: [
+      'Follow',
+      'Subscribe',
+      'Listen',
+      'Buy',
+      'Book',
+      'Reach out',
+    ],
+  },
 };
 // HOMEPAGE_CERTIFIED_FIGURES END
 
