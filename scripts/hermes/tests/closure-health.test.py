@@ -84,7 +84,6 @@ def pr(
 
 def snapshot(**overrides: object) -> dict[str, object]:
     value: dict[str, object] = {
-        "repository": "JovieInc/Jovie",
         "controller": {
             "status": "green",
             "runId": 42,
@@ -120,13 +119,14 @@ def stack_pr(
     *,
     body: str = "",
     merge_state: str = "CLEAN",
+    draft: bool = True,
 ) -> dict[str, object]:
     return pr(
         number,
         title=f"wip: stack layer {number}",
         body=body,
         merge_state=merge_state,
-        draft=True,
+        draft=draft,
         base_ref=base_ref,
         head_ref=f"stack/test-{number}",
     )
@@ -150,6 +150,19 @@ def stack_health(layers: list[dict[str, object]]) -> tuple[dict[str, object], di
 
 
 class ClosureClassificationTests(unittest.TestCase):
+    def test_ready_ancestors_are_resolved_but_only_draft_groups_are_enforced(self):
+        root = stack_pr(91, "main", draft=False)
+        child = stack_pr(92, "stack/test-91", draft=False)
+        ready = MODULE.classify_open_prs([root, child], NOW)
+        self.assertEqual((ready["stackHealth"]["roots"], ready["repairActions"]), ([], []))
+        child["isDraft"] = True
+        mixed = MODULE.classify_open_prs([root, child], NOW)
+        self.assertEqual(mixed["stackHealth"]["roots"][0]["prNumbers"], [91, 92])
+        self.assertIn(
+            "missing-stack-integrator",
+            mixed["stackHealth"]["violations"][0]["codes"],
+        )
+
     def test_four_layer_stack_with_owner_deadline_and_clean_path_is_green(self):
         layers = [
             stack_pr(101, "main", body=STACK_BODY),
@@ -180,13 +193,24 @@ class ClosureClassificationTests(unittest.TestCase):
         self.assertEqual(len(result["repairActions"]), 1)
         self.assertEqual(result["repairActions"][0]["action"], MODULE.STACK_REPAIR_ACTION)
         self.assertEqual(result["repairActions"][0]["rootPr"], 101)
-        self.assertEqual(result["repairActions"][0]["repository"], "JovieInc/Jovie")
+        action = result["repairActions"][0]
+        self.assertEqual(action["memberHeads"][-1]["headSha"], layers[-1]["headRefOid"])
         self.assertEqual(health["status"], "red")
-        self.assertEqual(health["repository"], "JovieInc/Jovie")
         self.assertIn("draft-stack-policy-violation", health["reasons"])
         self.assertFalse(health["newIssueIntakeAllowed"])
         self.assertTrue(health["promotionContinues"])
         self.assertTrue(health["remediationContinues"])
+        layers[-1]["headRefOid"] = "f" * 40
+        head_key = MODULE.classify_open_prs(layers, NOW)["repairActions"][0]["taskKey"]
+        layers[0]["body"] = STACK_BODY.replace("summer-test", "fx-test")
+        metadata_key = MODULE.classify_open_prs(layers, NOW)["repairActions"][0]["taskKey"]
+        layers[0]["body"] += "\n<!-- linear-issue-id:JOV-5362 -->"
+        issue_key = MODULE.classify_open_prs(layers, NOW)["repairActions"][0]["taskKey"]
+        self.assertNotEqual(action["taskKey"], head_key)
+        self.assertNotEqual(head_key, metadata_key)
+        self.assertNotEqual(metadata_key, issue_key)
+        layers[-1]["headRefOid"] = None
+        self.assertEqual(MODULE.classify_open_prs(layers, NOW)["repairActions"], [])
 
     def test_stack_requires_metadata_and_clean_ancestors(self):
         layers = [
@@ -221,10 +245,23 @@ class ClosureClassificationTests(unittest.TestCase):
         self.assertEqual(
             [action["rootPr"] for action in result["repairActions"]], [121, 123]
         )
-        self.assertEqual(
-            {action["repository"] for action in result["repairActions"]},
-            {"JovieInc/Jovie"},
+
+    def test_cyclic_draft_stack_emits_one_persistable_canonical_action(self):
+        result = MODULE.classify_open_prs(
+            [
+                stack_pr(131, "stack/test-132", body=STACK_BODY),
+                stack_pr(132, "stack/test-131"),
+            ],
+            NOW,
         )
+        action = result["repairActions"][0]
+        path = [entry["pr"] for entry in action["promotionPath"]]
+        codes = result["stackHealth"]["violations"][0]["codes"]
+        self.assertIn("cyclic-promotion-path", codes)
+        self.assertEqual((action["rootPr"], action["prNumbers"]), (131, [131, 132]))
+        self.assertEqual((path, action["maxDepth"]), ([131, 132], 2))
+        self.assertEqual(len(path), len(set(path)))
+        self.assertEqual([entry["pr"] for entry in action["memberHeads"]], path)
 
     def test_every_open_pr_receives_a_deterministic_lifecycle_disposition(self):
         result = MODULE.classify_open_prs(
@@ -768,32 +805,6 @@ class ClosureHealthEvaluationTests(unittest.TestCase):
         self.assertEqual(result["status"], "red")
         self.assertIn("unclassified-open-pr-over-15m", result["reasons"])
 
-    def test_previous_closure_history_is_scoped_to_repository(self):
-        previous = MODULE.evaluate_closure_health(
-            snapshot(
-                repository="JovieInc/Jovie",
-                nativeQueueCount=0,
-            ),
-            previous=None,
-            now=NOW,
-        )
-        current_now = NOW + timedelta(minutes=20)
-        current = MODULE.evaluate_closure_health(
-            snapshot(
-                repository="JovieInc/LogYourBody",
-                nativeQueueCount=0,
-            ),
-            previous=previous,
-            now=current_now,
-        )
-
-        self.assertEqual(previous["status"], "grace")
-        self.assertEqual(current["status"], "grace")
-        self.assertEqual(
-            current["episodes"]["emptyNativeQueue"]["since"],
-            MODULE.isoformat(current_now),
-        )
-
     def test_malformed_observation_and_expired_hold_fail_closed(self):
         result = MODULE.evaluate_closure_health(
             {
@@ -939,7 +950,6 @@ class ClosureObservationTests(unittest.TestCase):
             )
 
         self.assertEqual(result["status"], "healthy")
-        self.assertEqual(result["repository"], "JovieInc/Jovie")
         self.assertEqual(result["openPrs"], 2)
         self.assertEqual(result["eligiblePrs"], 1)
         self.assertEqual(result["nativeQueueCount"], 1)
@@ -951,40 +961,19 @@ class ClosureObservationTests(unittest.TestCase):
                 "JovieInc/Jovie", previous=None, now=NOW
             )
         self.assertEqual(failed["status"], "red")
-        self.assertEqual(failed["repository"], "JovieInc/Jovie")
         self.assertFalse(failed["newIssueIntakeAllowed"])
         self.assertEqual(failed["reasons"], ["closure-observation-unknown"])
-        self.assertIn("bad snapshot", failed["error"])
-
-    def test_live_observer_passes_repository_to_stack_repair_actions(self):
-        prs = [
-            stack_pr(201, "main", body=STACK_BODY),
-            stack_pr(202, "stack/test-201"),
-            stack_pr(203, "stack/test-202"),
-            stack_pr(204, "stack/test-203"),
-            stack_pr(205, "stack/test-204"),
-        ]
-        with mock.patch.object(
-            MODULE,
-            "_run_graphql_snapshot",
-            return_value={
-                "prs": prs,
-                "latestMergeAt": (NOW - timedelta(minutes=30)).isoformat(),
-            },
-        ), mock.patch.object(
-            MODULE,
-            "_observe_queue_controller",
-            return_value={"status": "green", "runId": 42},
-        ):
-            result = MODULE.observe_closure_health(
-                "JovieInc/LogYourBody", previous=None, now=NOW
-            )
-
-        self.assertEqual(result["status"], "red")
-        self.assertEqual(result["repository"], "JovieInc/LogYourBody")
         self.assertEqual(
-            result["repairActions"][0]["repository"], "JovieInc/LogYourBody"
+            failed["stackHealth"],
+            {
+                "maxDepth": MODULE.STACK_MAX_DEPTH,
+                "roots": [],
+                "violations": [],
+                "repairActions": [],
+            },
         )
+        self.assertEqual(failed["repairActions"], [])
+        self.assertIn("bad snapshot", failed["error"])
 
 
 if __name__ == "__main__":
