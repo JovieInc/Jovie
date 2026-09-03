@@ -118,7 +118,11 @@ describe('FormField', () => {
 
     const error = screen.getByRole('alert');
     expect(error).toHaveTextContent('This field is required');
-    expect(error.parentElement).toHaveAttribute('aria-live', 'polite');
-    expect(error.parentElement).toHaveAttribute('aria-atomic', 'true');
+    // The reserved feedback wrapper stays semantics-free: the error's
+    // role="alert" announces itself (mirrors packages/ui field.test.tsx).
+    expect(error.parentElement).toHaveAttribute('data-slot', 'field-feedback');
+    expect(error.parentElement).not.toHaveAttribute('aria-live');
+    expect(error.parentElement).not.toHaveAttribute('aria-atomic');
+    expect(error).not.toHaveAttribute('aria-live');
   });
 });
