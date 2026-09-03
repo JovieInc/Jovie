@@ -80,6 +80,14 @@ describe('public CTA guard', () => {
       join(ROOT, 'components/molecules/AuthActions.tsx'),
       'utf8'
     );
+    const marketingHeader = readFileSync(
+      join(ROOT, 'components/site/MarketingHeader.tsx'),
+      'utf8'
+    );
+    const marketingNavigation = readFileSync(
+      join(ROOT, 'data/marketingNavigation.ts'),
+      'utf8'
+    );
     expect(authActions).toContain('export function AuthActions');
 
     expect(headerNav).toContain("minimalAuthLabel?: 'Sign in' | 'Log in'");
@@ -88,6 +96,14 @@ describe('public CTA guard', () => {
     );
     expect(headerNav).not.toMatch(
       /minimalAuth[\s\S]*?<Button[\s\S]*?>Get started<\/Button>/
+    );
+    expect(headerNav).toMatch(
+      /size='marketing'\s+variant='primary'[\s\S]*?<Link href=\{publicCta\.href\}>\{publicCta\.label\}<\/Link>/
+    );
+    expect(marketingNavigation).toContain("label: 'Log in'");
+    expect(marketingNavigation).toContain("label: 'Find yourself'");
+    expect(marketingHeader).toContain(
+      'DEFAULT_MARKETING_CTA: MarketingHeaderCta = MARKETING_NAV_UTILITIES[1]'
     );
   });
 });

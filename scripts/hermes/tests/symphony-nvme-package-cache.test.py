@@ -6,6 +6,7 @@ import hashlib
 import json
 import os
 import pathlib
+import platform
 import subprocess
 import tarfile
 import tempfile
@@ -16,21 +17,23 @@ ROOT = pathlib.Path(__file__).resolve().parents[3]
 SCRIPT = ROOT / "scripts/hermes/symphony-nvme-package-cache.sh"
 NODE_VERSION = "22.23.2"
 PNPM_VERSION = "9.15.4"
-SCHEMA = "symphony-nvme-package-cache/v1"
+SCHEMA = "symphony-nvme-package-cache/v2"
 
 
 def sha256(path: pathlib.Path) -> str:
     return hashlib.sha256(path.read_bytes()).hexdigest()
 
 
-def cache_key(source: str, lock_sha: str) -> str:
+def cache_key(lock_sha: str, workspace_sha: str) -> str:
     payload = {
         "schema": SCHEMA,
         "repo": "JovieInc/Jovie",
-        "sourceSha": source,
         "nodeVersion": NODE_VERSION,
         "pnpmVersion": PNPM_VERSION,
         "lockfileSha256": lock_sha,
+        "workspaceFileSha256": workspace_sha,
+        "platform": platform.system().lower(),
+        "arch": platform.machine(),
     }
     raw = json.dumps(payload, sort_keys=True, separators=(",", ":")).encode()
     return hashlib.sha256(raw).hexdigest()
@@ -103,6 +106,18 @@ class Fixture:
             "#!/usr/bin/env bash\n"
             "if [ \"${1:-}\" = --version ]; then printf '9.15.4\\n'; exit 0; fi\n"
             "printf '%s\\n' \"$*\" >> \"$PNPM_LOG\"\n"
+            "if [ \"${1:-}\" = fetch ]; then\n"
+            "  if [ \"${PNPM_FETCH_EXIT:-0}\" -ne 0 ]; then exit \"$PNPM_FETCH_EXIT\"; fi\n"
+            "  if [ \"${PNPM_REQUIRE_PATCH:-0}\" = 1 ] && [ ! -f patches/test.patch ]; then exit 44; fi\n"
+            "  store=\n"
+            "  while [ $# -gt 0 ]; do\n"
+            "    if [ \"$1\" = --store-dir ]; then store=\"$2\"; break; fi\n"
+            "    shift\n"
+            "  done\n"
+            "  mkdir -p \"$store/v3/files/ab\"\n"
+            "  printf 'cached package bytes\\n' > \"$store/v3/files/ab/pkg\"\n"
+            "  exit 0\n"
+            "fi\n"
             "if [ \"${npm_config_ignore_scripts:-}\" != true ]; then echo scripts-enabled >&2; exit 42; fi\n"
             "if [ \"${npm_config_offline:-}\" != true ]; then echo offline-disabled >&2; exit 43; fi\n"
             "mkdir -p node_modules apps/web/node_modules/next\n"
@@ -139,7 +154,8 @@ class Fixture:
     def build_archive(self, tamper: bool = False, manifest_overrides: dict[str, str] | None = None) -> pathlib.Path:
         source = subprocess.check_output(["git", "rev-parse", "HEAD"], cwd=self.workspace, text=True).strip()
         lock_sha = sha256(self.workspace / "pnpm-lock.yaml")
-        key = cache_key(source, lock_sha)
+        workspace_sha = sha256(self.workspace / "pnpm-workspace.yaml")
+        key = cache_key(lock_sha, workspace_sha)
         archive = self.cache_root / f"node-{NODE_VERSION}-pnpm-{PNPM_VERSION}-lock-{lock_sha[:16]}-cache-{key[:16]}.tar"
         store = self.root / "store"
         (store / "v3/files/ab").mkdir(parents=True)
@@ -151,10 +167,13 @@ class Fixture:
         manifest = {
             "schema": SCHEMA,
             "repo": "JovieInc/Jovie",
-            "sourceSha": source,
+            "warmedFromSourceSha": source,
             "nodeVersion": NODE_VERSION,
             "pnpmVersion": PNPM_VERSION,
             "lockfileSha256": lock_sha,
+            "workspaceFileSha256": workspace_sha,
+            "platform": platform.system().lower(),
+            "arch": platform.machine(),
             "cacheKey": key,
             "archivePath": str(archive),
             "archiveSha256": archive_hash,
@@ -195,6 +214,63 @@ class SymphonyNvmePackageCacheTests(unittest.TestCase):
         self.assertEqual(receipt["restore"]["networkProof"]["afInetEvents"], 0)
         self.assertFalse(receipt["commandPolicy"]["agentInstallOrFetchAllowed"])
         self.assertTrue(list(fx.receipts.glob("*-restore.json")))
+
+    def test_warm_builds_dependency_keyed_archive_then_restore_hits_it(self) -> None:
+        fx = self.fixture()
+        warm = fx.run(
+            "warm",
+            extra_env={
+                "PNPM_LOG": str(fx.pnpm_log),
+                "SYMPHONY_TRUSTED_HOOK_PHASE": "cache_warm",
+            },
+        )
+        self.assertEqual(warm.returncode, 0, warm.stderr)
+        self.assertIn("SYMPHONY_NVME_PACKAGE_CACHE_WARM", warm.stdout)
+        self.assertFalse((fx.workspace / "node_modules").exists())
+        archives = list(fx.cache_root.glob("*.tar"))
+        self.assertEqual(len(archives), 1)
+        manifest = json.loads(pathlib.Path(f"{archives[0]}.json").read_text())
+        self.assertEqual(manifest["schema"], SCHEMA)
+        self.assertNotIn("sourceSha", manifest)
+        restore = fx.run("after-create", extra_env={"PNPM_LOG": str(fx.pnpm_log)})
+        self.assertEqual(restore.returncode, 0, restore.stderr)
+        self.assertTrue((fx.workspace / "node_modules/.modules.yaml").is_file())
+
+    def test_failed_warm_removes_only_its_partial_cache_directory(self) -> None:
+        fx = self.fixture()
+        sibling = fx.cache_root / ".warm-unrelated"
+        sibling.mkdir()
+        result = fx.run(
+            "warm",
+            extra_env={
+                "PNPM_FETCH_EXIT": "42",
+                "PNPM_LOG": str(fx.pnpm_log),
+                "SYMPHONY_TRUSTED_HOOK_PHASE": "cache_warm",
+            },
+        )
+        self.assertEqual(result.returncode, 42, result.stderr)
+        self.assertEqual(list(fx.cache_root.glob(".warm-*")), [sibling])
+        self.assertTrue(sibling.is_dir())
+        self.assertFalse(list(fx.cache_root.glob("*.tar")))
+
+    def test_warm_stages_checked_in_patch_inputs_without_mutating_source(self) -> None:
+        fx = self.fixture()
+        (fx.workspace / "patches").mkdir()
+        (fx.workspace / "patches/test.patch").write_text("checked-in patch input\n")
+        result = fx.run(
+            "warm",
+            extra_env={
+                "PNPM_LOG": str(fx.pnpm_log),
+                "PNPM_REQUIRE_PATCH": "1",
+                "SYMPHONY_TRUSTED_HOOK_PHASE": "cache_warm",
+            },
+        )
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertFalse((fx.workspace / "node_modules").exists())
+        self.assertEqual(
+            (fx.workspace / "patches/test.patch").read_text(),
+            "checked-in patch input\n",
+        )
 
     def test_before_remove_deletes_mutable_state_and_preserves_archive(self) -> None:
         fx = self.fixture()

@@ -57,6 +57,7 @@ jobs:
       NEXT_PUBLIC_CLERK_PROXY_DISABLED: '1'
       E2E_USE_TEST_AUTH_BYPASS: '1'
       E2E_CLERK_USER_ID: user_test
+      PUBLIC_NOAUTH_SMOKE: '1'
 
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -91,10 +92,36 @@ jobs:
           cat "$RUNNER_TEMP/product-screenshots-server.log"
           exit 1
 
+      - name: Capture exact marketing routes
+        timeout-minutes: 30
+        run: |
+          pnpm exec playwright test \
+            tests/product-screenshots/marketing-routes.spec.ts \
+            --config=playwright.config.screenshots.ts \
+            --project=screenshots \
+            --workers=4
+        env:
+          BASE_URL: http://localhost:3000
+
+      - name: Upload exact marketing route captures
+        if: >-
+          always() &&
+          hashFiles('apps/web/test-results/**/marketing-route.png', 'apps/web/test-results/**/receipt.json') != ''
+        uses: ./.github/actions/upload-safe-playwright-artifact
+        with:
+          name: marketing-route-screenshots-${{ github.sha }}
+          path: |
+            apps/web/test-results/**/marketing-route.png
+            apps/web/test-results/**/receipt.json
+          if-no-files-found: error
+          retention-days: 14
+          allow-images: true
+
       - name: Capture screenshot catalog
         timeout-minutes: 30
         run: |
           pnpm exec playwright test \
+            tests/product-screenshots/catalog.spec.ts \
             --config=playwright.config.screenshots.ts \
             --project=screenshots
         env:

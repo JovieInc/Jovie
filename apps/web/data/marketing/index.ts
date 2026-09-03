@@ -209,6 +209,17 @@ export {
   JOVIE_IMAGE_COLOR_POLICY_VERSION,
   resolveJovieSceneColorRole,
 } from './imageColorPolicy';
+export type {
+  MarketingPageContract,
+  MarketingPageContractRouteGlob,
+} from './pageContracts';
+export {
+  getMarketingPageContractForPathname,
+  getMarketingPageContractForRouteGlob,
+  MARKETING_PAGE_CONTRACT_ROUTE_GLOBS,
+  MARKETING_PAGE_CONTRACTS,
+  normalizeMarketingPathname,
+} from './pageContracts';
 export type { MarketingPenContractId } from './penContracts';
 export {
   MARKETING_CONTAINER_PEN_CONTRACT_BY_WIDTH,
@@ -231,6 +242,11 @@ export {
   MARKETING_RECIPES,
 } from './recipes';
 export type {
+  MarketingExactPublicRouteTarget,
+  MarketingRouteCaptureState,
+  MarketingRouteCaptureViewport,
+  MarketingRouteDisposition,
+  MarketingRouteDispositionLedgerEntry,
   MarketingRouteHealthTarget,
   RouteManifestEntry,
   RouteRecipeParityReport,
@@ -243,6 +259,8 @@ export {
   getRouteRecipeParity,
   isExempt,
   isRecipeRoute,
+  MARKETING_EXACT_PUBLIC_ROUTE_TARGETS,
+  MARKETING_ROUTE_DISPOSITION_LEDGER,
   MARKETING_ROUTE_HEALTH_TARGETS,
   MARKETING_ROUTE_MANIFEST,
 } from './routeManifest';

@@ -24,7 +24,8 @@ const hoisted = vi.hoisted(() => {
   return {
     requireAuthMock: vi.fn(),
     getSessionContextMock: vi.fn(),
-    handleUploadMock: vi.fn(),
+    handleUploadPresignedMock: vi.fn(),
+    issueSignedTokenMock: vi.fn(),
     resolvePrimaryRecordingForReleaseMock: vi.fn(),
     selectMock,
     selectLimitMock,
@@ -37,7 +38,11 @@ const hoisted = vi.hoisted(() => {
 });
 
 vi.mock('@vercel/blob/client', () => ({
-  handleUpload: hoisted.handleUploadMock,
+  handleUploadPresigned: hoisted.handleUploadPresignedMock,
+}));
+
+vi.mock('@vercel/blob', () => ({
+  issueSignedToken: hoisted.issueSignedTokenMock,
 }));
 
 vi.mock('next/cache', () => ({
@@ -125,27 +130,41 @@ describe('library audio upload API', () => {
     });
   });
 
-  it('generates a Blob client upload token for authenticated creators', async () => {
-    hoisted.handleUploadMock.mockResolvedValue({
-      type: 'blob.generate-client-token',
+  it('generates a Blob presigned upload URL for authenticated creators', async () => {
+    hoisted.handleUploadPresignedMock.mockResolvedValue({
+      type: 'blob.generate-presigned-url',
+    });
+    hoisted.issueSignedTokenMock.mockResolvedValue({
+      delegationToken: 'delegation',
+      clientSigningToken: 'signing',
+      validUntil: Date.now() + 60_000,
     });
 
     const { POST } = await import('@/app/api/library/audio/upload-token/route');
     const response = await POST(
       new Request('http://localhost/api/library/audio/upload-token', {
         method: 'POST',
-        body: JSON.stringify({ type: 'blob.generate-client-token' }),
+        body: JSON.stringify({ type: 'blob.generate-presigned-url' }),
       }) as never
     );
 
     expect(response.status).toBe(200);
-    expect(hoisted.handleUploadMock).toHaveBeenCalledTimes(1);
-    const options = hoisted.handleUploadMock.mock.calls[0][0];
-    const token = await options.onBeforeGenerateToken(
-      'jovie/audio/library/clerk_user_123/take-me-over.mp3'
+    expect(hoisted.handleUploadPresignedMock).toHaveBeenCalledTimes(1);
+    const options = hoisted.handleUploadPresignedMock.mock.calls[0][0];
+    const { urlOptions } = await options.getSignedToken(
+      'jovie/audio/library/clerk_user_123/take-me-over.mp3',
+      null,
+      false
     );
-    expect(token.maximumSizeInBytes).toBe(150 * 1024 * 1024);
-    expect(token.allowedContentTypes).toContain('audio/mpeg');
+    expect(urlOptions.maximumSizeInBytes).toBe(150 * 1024 * 1024);
+    expect(urlOptions.allowedContentTypes).toContain('audio/mpeg');
+    expect(hoisted.issueSignedTokenMock).toHaveBeenCalledWith(
+      expect.objectContaining({
+        pathname: 'jovie/audio/library/clerk_user_123/take-me-over.mp3',
+        operations: ['put'],
+        maximumSizeInBytes: 150 * 1024 * 1024,
+      })
+    );
   });
 
   it('attaches uploaded audio to the first recording for an owned release', async () => {
