@@ -10,6 +10,8 @@ import {
 } from '@/lib/library/asset-share.server';
 import type { LibraryProfileVisibility } from '@/lib/library/profile-visibility';
 import { getLibraryProfileStateMapForProfile } from '@/lib/library/profile-visibility.server';
+import { listActiveLibraryRelationships } from '@/lib/library/track-drawer.server';
+import type { LibraryRelationshipView } from '@/lib/library/track-drawer-types';
 import { getLibraryMerchCardsForProfile } from '@/lib/merch/service';
 import { queryKeys } from '@/lib/queries';
 import { HydrateClient } from '@/lib/queries/HydrateClient';
@@ -63,6 +65,7 @@ export default async function LibraryPage({
   let creatorDocumentsNextCursor: string | null = null;
   let creatorDocumentsLoadFailed = false;
   let youtubeVideos: PublicVideoListItem[] = [];
+  let relationships: LibraryRelationshipView[] = [];
   if (profileId && selectedProfile) {
     {
       try {
@@ -108,6 +111,7 @@ export default async function LibraryPage({
           profileStates,
           assetShares,
           videos,
+          relationshipRows,
         ] = await Promise.all([
           queryClient.fetchQuery({
             queryKey: queryKeys.releases.matrix(profileId),
@@ -119,6 +123,7 @@ export default async function LibraryPage({
           getLibraryProfileStateMapForProfile(profileId),
           assetSharesPromise,
           listVideosForProfile({ creatorProfileId: profileId }),
+          listActiveLibraryRelationships(profileId),
         ]);
         merchCards = merch;
         archivedMerchCards = archivedMerch;
@@ -137,6 +142,7 @@ export default async function LibraryPage({
         );
         assetShareByAssetId = Object.fromEntries(assetShares);
         youtubeVideos = videos;
+        relationships = relationshipRows;
       } catch (error) {
         void captureError(
           'Release matrix prefetch failed on library page',
@@ -163,6 +169,7 @@ export default async function LibraryPage({
         creatorDocumentsNextCursor={creatorDocumentsNextCursor}
         creatorDocumentsLoadFailed={creatorDocumentsLoadFailed}
         youtubeVideos={youtubeVideos}
+        relationships={relationships}
       />
     </HydrateClient>
   );
