@@ -15,7 +15,7 @@ export const REQUIRED_MERGE_STATUSES = [
 
 /** Canonical native merge-queue operating policy (controller + repo guardrails). */
 export const MERGE_QUEUE_POLICY = Object.freeze({
-  enqueueLabel: MERGE_QUEUE_LABEL,
+  enqueueLabel: null,
   // 12→16 on 2026-07-09 per JOV-3833 decision trigger (ready→merged p95 718m
   // vs 15m target after one week live; queue-depth deferral was a binding
   // constraint during merge waves). Re-evaluate if runner-pool saturation
@@ -677,7 +677,7 @@ const KEYWORD_HOT_KEYS = [
     key: 'hot:ci-workflows',
     reason: 'CI/workflow control plane',
     pattern:
-      /\b(ci|workflow|github actions|merge queue|graphite|agent pipeline|actionlint)\b/i,
+      /\b(ci|workflow|github actions|merge queue|agent pipeline|actionlint)\b/i,
   },
   {
     key: 'hot:package-manifest',
@@ -1836,12 +1836,12 @@ export function parseMergeQueueTimeline(events, options = {}) {
   let mergedAt = null;
 
   for (const event of events ?? []) {
-    if (event.event === 'labeled' && event.label?.name === MERGE_QUEUE_LABEL) {
+    if (event.event === 'added_to_merge_queue' || event.event === 'enqueued') {
       queuedAt.push(event.created_at);
     }
     if (
-      event.event === 'unlabeled' &&
-      event.label?.name === MERGE_QUEUE_LABEL
+      event.event === 'removed_from_merge_queue' ||
+      event.event === 'dequeued'
     ) {
       dequeued.push({
         at: event.created_at,
@@ -1958,6 +1958,13 @@ export const RETRYABLE_PRODUCT_FAILURE_STEPS = new Set([
 ]);
 export const MERGE_GROUP_CHURN_FAILURE_THRESHOLD = 2;
 export const MERGE_GROUP_CHURN_COOLDOWN_MS = 5 * 60 * 1000;
+export const ACTIVE_MERGE_GROUP_STATUSES = new Set([
+  'queued',
+  'in_progress',
+  'waiting',
+  'pending',
+  'requested',
+]);
 
 export function parseMergeQueueFrontBranch(branch) {
   const match =
@@ -2015,6 +2022,39 @@ export function frontItemChurnDecision({
     .map(({ run }) => run)
     .sort((a, b) => String(b.createdAt).localeCompare(String(a.createdAt)));
 
+  const headMs = Date.parse(headCommittedAt);
+  const failuresForCurrentHead = Number.isFinite(headMs)
+    ? allFailedFrontedRuns.filter(run => Date.parse(run.createdAt) >= headMs)
+    : allFailedFrontedRuns;
+  const latestActiveForCurrentHead = mergeGroupRuns
+    .map(run => ({ run, front: parseMergeQueueFrontBranch(run?.headBranch) }))
+    .filter(
+      ({ run, front }) =>
+        front?.prNumber === prNumber &&
+        ACTIVE_MERGE_GROUP_STATUSES.has(run.status) &&
+        (!Number.isFinite(headMs) || Date.parse(run.createdAt) >= headMs)
+    )
+    .map(({ run }) => run)
+    .sort((a, b) => String(b.createdAt).localeCompare(String(a.createdAt)))[0];
+  if (
+    latestActiveForCurrentHead &&
+    (failuresForCurrentHead.length === 0 ||
+      String(latestActiveForCurrentHead.createdAt).localeCompare(
+        String(failuresForCurrentHead[0].createdAt)
+      ) > 0)
+  ) {
+    return {
+      action: 'allow',
+      reason:
+        'a newer merge-group attempt for the unchanged head is still active; incomplete evidence cannot eject it',
+      evidence: {
+        activeRunId: latestActiveForCurrentHead.id ?? null,
+        activeStartedAt: latestActiveForCurrentHead.createdAt ?? null,
+        activeStatus: latestActiveForCurrentHead.status ?? null,
+      },
+    };
+  }
+
   if (allFailedFrontedRuns.length === 0) {
     return {
       action: 'allow',
@@ -2023,10 +2063,6 @@ export function frontItemChurnDecision({
     };
   }
 
-  const headMs = Date.parse(headCommittedAt);
-  const failuresForCurrentHead = Number.isFinite(headMs)
-    ? allFailedFrontedRuns.filter(run => Date.parse(run.createdAt) >= headMs)
-    : allFailedFrontedRuns;
   if (failuresForCurrentHead.length === 0) {
     const lastFailed = allFailedFrontedRuns[0];
     return {

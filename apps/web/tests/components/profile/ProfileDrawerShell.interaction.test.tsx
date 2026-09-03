@@ -152,7 +152,15 @@ function renderOpenShell(
   onOpenChange = vi.fn()
 ) {
   return render(
-    <MenuShell presentation={presentation} onOpenChange={onOpenChange} />
+    <ProfileDrawerShell
+      open
+      onOpenChange={onOpenChange}
+      title='Menu'
+      presentation={presentation}
+      dataTestId='profile-menu-drawer'
+    >
+      <button type='button'>Share Profile</button>
+    </ProfileDrawerShell>
   );
 }
 

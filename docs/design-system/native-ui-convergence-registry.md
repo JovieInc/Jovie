@@ -130,7 +130,7 @@ Profile is historical ledger drift, not a reason to change the current code.
 | --- | --- | --- | --- |
 | `ios.chat-composer` | `ChatComposerBar` | Plus/workflow trigger, 52-point text-entry lane, 52-point send target, slash palette, workflow sheet; slash rows use background-only pressed feedback | `apps/ios/Jovie/Features/Chat/ChatComposerBar.swift:L3-L113,L130-L363`; `ComposerWorkflowSheet.swift:L3-L141` |
 | `ios.entity-sheet` | `EntityContextSheet` | Cover/title/kind, visibility row, deterministic stat grid, Edit In Chat, Copy Link, medium/large detents; stats are explicitly placeholder and visibility has no backend save | `apps/ios/Jovie/Features/AppShell/EntityContextSheet.swift:L4-L55,L57-L221` |
-| `ios.talk-overlay` | `TalkOverlayView` | Starting, recording, reviewing; fixed transcript/draft region; reserved error region; Cancel and Use Draft; draft is editable and never auto-sent | `apps/ios/Jovie/Features/AppShell/TalkOverlayView.swift:L3-L24,L26-L133,L135-L291`; shell handoff at `AppShellView.swift:L255-L269` |
+| `ios.talk-overlay` | `TalkOverlayView` | Starting, recording, submitting, unavailable, and recovery review; fixed transcript/draft region; reserved error region; Cancel and Send; normal mic and App Shortcut paths submit on the second activation; editable draft is failure recovery only | `apps/ios/Jovie/Features/AppShell/TalkOverlayView.swift`; shell policy at `AppShellView.swift`; executable budget at `AppShellIntentNavigation.swift` |
 | `ios.workflow-sheet` | `ComposerWorkflowSheet` | Six workflow actions, two-column grid, sheet presentation, 92-point tile target, 36-point icon frame | `apps/ios/Jovie/Features/Chat/ComposerWorkflowSheet.swift:L3-L141` |
 
 ## iOS atom, molecule, and organism ownership
@@ -138,7 +138,7 @@ Profile is historical ledger drift, not a reason to change the current code.
 | Classification | Canonical owner | Consumers | Ownership rule |
 | --- | --- | --- | --- |
 | Atom | `JovieColor`, `JovieFont`, `JovieSpacing`, `JovieRadius`, `JovieMotion` | All native iOS product surfaces | Extend this token owner only after prior-art review; do not create feature-local colors, fonts, or spacing registries. `JovieTheme.swift:L4-L122`. |
-| Atom | `JoviePillButtonStyle` | Dashboard, auth, onboarding, audience, calendar, inbox, entity, Talk | Canonical full-width pill action in `JovieTheme.swift`. |
+| Atom | `JoviePillButtonStyle` | Dashboard, auth, onboarding, audience, calendar, inbox, library, entity, Talk | Canonical full-width pill action in `JovieTheme.swift`. |
 | Atom | `JovieIconButtonStyle` | Shell gear, settings close, chat scroll-to-bottom | Canonical 44-point circular icon target in `JovieTheme.swift`. |
 | Atom | `JovieLogoMark` and QR plate modifier | Splash, auth, QR surfaces | Logo and QR plate are shared source owners; `JovieTheme.swift:L124-L180,L244-L256`. |
 | Atom | `EntityAccent` | Inline chat entity chips | Only for entity-kind parity; do not reuse as generic iOS accents; `JovieTheme.swift:L26-L53`. |

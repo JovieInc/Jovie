@@ -143,6 +143,13 @@ headings) stays Inter. This deviation is approved as of 2026-04-28 — the
 hero needed a wider, heavier display character to match the Frame.io-inspired
 poster composition; Inter at 80px reads narrow and tech-y in this context.
 
+**Marketing H1 visual-line contract:** public marketing and homepage H1s paint
+at most two visual lines. The complete authored text stays in the DOM and
+accessibility tree; this is a visual constraint, not a shortened accessible
+name. Do not lock superseded Quiet-hero copy (`Own your story…`) or competing
+Get started / Drop Music CTAs onto `/` — name search `Find me` is the certified
+primary conversion (#17055 / JOV-5864).
+
 ### Font Weights
 
 | Name | Value | Usage |
@@ -472,6 +479,52 @@ Specimen: Storybook `Design System/Noir Ion Specimen`.
 | Login button bg | `rgba(255,255,255,0.1)` | Subtle glass |
 | Header bg | `transparent` | Blur backdrop |
 
+### Generated Brand Imagery - Scene Palette v1
+
+Founder-approved 2026-08-21: **the camera must find the palette**. For
+Jovie-owned, intentionally art-directed or generated brand imagery, every
+high-salience controllable color must be chosen as a physically plausible
+Jovie scene hue or low-chroma neutral before capture/generation. Human biology
+and identity-bearing objects keep truthful real-world color.
+
+This does **not** change production UI hue anchors. The UI keeps the current
+Noir Ion anchors; generated scene work uses softer scene references so color
+can exist as light, material, wardrobe, set dressing, and atmosphere.
+
+| Role | Current UI anchor | Scene reference | Hue corridor |
+|------|-------------------|-----------------|--------------|
+| Ion | `oklch(71.95% 0.1626 240.25)` / `#11AFFF` | `oklch(72% 0.14 240)` / `#3FAFF3` | 220-258 |
+| Ultra | `oklch(69.82% 0.1792 295.80)` / `#A982FF` | `oklch(70% 0.15 296)` / `#A789F0` | 276-314 |
+| Pulse | `oklch(70.73% 0.2552 339.69)` / `#FF48D2` | `oklch(71% 0.19 340)` / `#EB6AC6` | 322-358 |
+
+Operational source: `apps/web/data/marketing/imageColorPolicy.ts`
+(`jovie-image-color-policy/v1`). That policy owns Scene Palette v1, the
+neutral rule, protected classes, reflection/source consistency, subject
+separation, skin/material protection, failure actions, and the post-merge
+30-image validation tier.
+
+Rules:
+- Controllable wardrobe, props, furniture, paint, locations, signage,
+  practical lights, vehicles, and set dressing use a scene hue or low-chroma
+  neutral before generation/capture.
+- Natural, biological, semantic, safety, cultural, trademark, creator-owned,
+  and identity-bearing colors stay truthful.
+- A conflicting protected object is reframed, replaced, removed, reduced in
+  salience, or rejected. It is never falsified with recoloring.
+- Emitted light, spill, haze, glass, chrome, puddles, and reflections must
+  agree with one physically plausible source.
+- Subject/background separation is evaluated through OKLCH lightness, chroma,
+  hue, wardrobe, edge light, focus, and composition. No material is banned by
+  default.
+- Skin keeps believable hue, texture, pores, and local specular response.
+  Prevent oily or clipped highlights through lighting, exposure, material,
+  makeup, and restrained local correction.
+- Grading is restrained finishing. It cannot fake set design or rewrite
+  material response.
+- Saturated green, yellow-green, orange, and red are not decorative
+  controllable scene colors. Protected real-world occurrences remain truthful
+  and visually subordinate, or the composition changes.
+
 ### Semantic feature colors (never decorative)
 
 These colors identify named product states or data categories. They are never
@@ -692,6 +745,14 @@ These are surface-side aliases of `--ds-motion-*` tokens (DS_FOUNDATION_V1).
 
 ### Interaction feedback
 
+- Frequent actions normally finish end-to-end within two deliberate
+  activations, and in one when their input is already complete. A capture may
+  use one activation to start and one to finish and submit. A third step is an
+  exception, never an unexamined default: name review, safety, ambiguity,
+  irreversible impact, or recovery, make that reason visible or documented,
+  and encode it in the surface's executable interaction contract or focused
+  behavior test. Editing after voice capture is a recovery path; successful
+  capture submits on its finishing activation.
 - Press feedback uses the shared `--scale-press` token. The canonical value is
   `0.98`: enough tactile response to register without visible shrink or jump.
 - Press compression is opt-in. Use it only when an action has no immediate
@@ -1124,3 +1185,4 @@ mark intentional marketing sentence-case headlines with
 | 2026-04-11 | Ban gold colors | Gold signals prestige-seeking. Not appropriate for Jovie's DJ audience. |
 | 2026-06-18 | **Unify on one design system, two languages.** Retire System A; conform whole app to System B tokens. | Founder-directed (supersedes the 2026-04-22 "defer 3 months" note). Target = one token foundation, one palette, one core typeface (Inter), expressed as a compact product language + an editorial marketing language. Aligns with gbrain "design system review" canon ("not two design systems — one system, two languages"). Editorial layouts are preserved; surfaces are reskinned onto System B tokens, each with a `*-system-b-style-guard` test + a global shrink-only ratchet. |
 | 2026-06-18 | Retire DM Sans; Inter is the sole body/UI face; Satoshi kept for display only | One core typeface for the unified system. Satoshi remains the single approved display exception (hero / large editorial headings), generalizing the 2026-04-28 homepage-hero exception. DM Sans `next/font` load removed from `app/layout.tsx`; `--font-body` and `--marketing-font-body` repoint to Inter. |
+| 2026-09-03 | Public marketing H1s paint at most two visual lines | Layout contract only. Complete authored text remains accessible. Does not land superseded Quiet-hero copy or competing homepage CTAs. |

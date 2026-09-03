@@ -124,12 +124,19 @@ describe('mounted homepage pricing System B source contract', () => {
     expect(css).toContain('@media (max-width: 767px)');
   });
 
-  it('locks the homepage final CTA to the marketing ActionButton size', () => {
+  it('delegates the final CTA to the canonical terminal CTA owner', () => {
     const source = extractFinalCtaComponentSource(
       readFileSync(path.join(webRoot, pricingComponentPath), 'utf8')
     );
 
-    expect(source).toContain("size='marketing'");
-    expect(source).not.toMatch(/\bsize='(?:sm|md|lg|xl)'/);
+    expect(source).toContain('<MarketingTerminalCta');
+    expect(source).toContain("variant='homepage-v2'");
+    expect(source).toContain(
+      'penContractId={MARKETING_PEN_CONTRACT_IDS.shell.footerCta}'
+    );
+    expect(source).toContain('testId={sectionTestId}');
+    expect(source).toContain('headingTestId={headingTestId}');
+    expect(source).toContain('actionTestId={actionTestId}');
+    expect(source).not.toContain('<section');
   });
 });

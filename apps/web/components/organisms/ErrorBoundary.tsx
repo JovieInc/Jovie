@@ -2,9 +2,9 @@
 
 import { Button } from '@jovie/ui';
 import { AlertTriangle } from 'lucide-react';
-import { useRouter } from 'next/navigation';
 import { useEffect } from 'react';
 import { ErrorDetails } from '@/features/feedback/ErrorDetails';
+import { RECOVERY_COPY } from '@/features/feedback/recovery-contract';
 import { captureErrorInSentry } from '@/lib/errors/capture';
 
 interface ErrorBoundaryProps {
@@ -38,7 +38,6 @@ export default function ErrorBoundary({
   context,
   message = "We couldn't load this page. Give it another try, or head home.",
 }: ErrorBoundaryProps) {
-  const router = useRouter();
   const isSkewError = isDeploymentSkewError(error);
 
   useEffect(() => {
@@ -75,7 +74,7 @@ export default function ErrorBoundary({
           <p className='text-app text-tertiary-token'>{displayMessage}</p>
         </div>
 
-        <div className='flex justify-center gap-3'>
+        <div className='flex justify-center' data-recovery-actions=''>
           {isSkewError ? (
             <Button
               variant='primary'
@@ -86,16 +85,9 @@ export default function ErrorBoundary({
             </Button>
           ) : (
             <Button variant='primary' size='sm' onClick={reset}>
-              Try Again
+              {RECOVERY_COPY.retryLabel}
             </Button>
           )}
-          <Button
-            variant='secondary'
-            size='sm'
-            onClick={() => router.push('/')}
-          >
-            Go Home
-          </Button>
         </div>
 
         {!isSkewError && (

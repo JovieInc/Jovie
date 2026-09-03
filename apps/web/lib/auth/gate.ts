@@ -78,6 +78,32 @@ function canUseE2ETestAuthFallback(): boolean {
   );
 }
 
+/**
+ * Secretless visual capture and local E2E have no reachable waitlist store;
+ * fail soft like the user-row lookup or the app shell renders "Dashboard
+ * failed to load" (JOV-5387 PR visual review).
+ */
+async function readWaitlistGateEnabledForAuthGate(): Promise<boolean> {
+  try {
+    return await isWaitlistGateEnabled();
+  } catch (error) {
+    if (!canUseE2ETestAuthFallback()) {
+      throw error;
+    }
+
+    Sentry.addBreadcrumb({
+      category: 'auth-gate',
+      level: 'warning',
+      message:
+        'Using E2E test auth fallback after waitlist gate lookup failure',
+      data: {
+        error: error instanceof Error ? error.message : String(error),
+      },
+    });
+    return false;
+  }
+}
+
 function createE2ETestAuthGateResult(
   clerkUserId: string,
   email: string | null
@@ -696,7 +722,7 @@ async function resolveUserStateInternal(
   const identityPromise = knownAuthIdentity
     ? Promise.resolve(knownAuthIdentity)
     : resolveAuthIdentity(knownClerkUserId);
-  const waitlistGatePromise = isWaitlistGateEnabled();
+  const waitlistGatePromise = readWaitlistGateEnabledForAuthGate();
   const { clerkUserId, email } = await identityPromise;
 
   if (!clerkUserId) {

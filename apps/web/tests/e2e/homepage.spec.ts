@@ -58,31 +58,39 @@ test.describe('Homepage', () => {
     await gotoHomepage(page);
   });
 
-  test('renders the System B poster hero and CTA', async ({ page }) => {
+  test('renders the editorial hero with the name search as the only control', async ({
+    page,
+  }) => {
     const hero = page.getByTestId('homepage-hero-shell');
 
     await expect(hero).toBeVisible();
     await expect(hero.getByText('operating system')).toHaveCount(0);
     await expect(
       hero.getByRole('heading', {
-        name: 'Jovie helps you move your music forward.',
+        name: 'Control how the world sees you.',
       })
     ).toBeVisible();
     await expect(
       hero.getByText(
-        'It uses your catalog, audience, and artist presence to surface the one action most likely to pay off.'
+        'Find what the internet knows. Turn it into relationships.'
       )
     ).toBeVisible();
+    await expect(hero.getByPlaceholder('Search your name')).toBeVisible();
     await expect(
-      hero.getByRole('link', { name: 'Get started', exact: true })
-    ).toHaveAttribute('href', PUBLIC_WAITLIST_URL);
-    await expect(
-      hero.getByRole('link', {
-        name: 'See a live profile',
-        exact: true,
-      })
-    ).toHaveAttribute('href', '/artist-profiles');
+      hero.getByRole('button', { name: 'Find me', exact: true })
+    ).toBeEnabled();
+    await expect(hero.getByRole('link')).toHaveCount(0);
+    await expect(hero.getByRole('button')).toHaveCount(1);
+    await expect(hero.getByText('Get started')).toHaveCount(0);
     await expect(hero.getByPlaceholder('Ask Jovie...')).toHaveCount(0);
+
+    // The hero owns the first viewport.
+    const heroBox = await hero.boundingBox();
+    const viewport = page.viewportSize();
+    expect(heroBox?.y ?? 1).toBeLessThanOrEqual(0);
+    expect(heroBox?.height ?? 0).toBeGreaterThanOrEqual(
+      (viewport?.height ?? 0) - 1
+    );
   });
 
   test('header uses compact homepage presentation and text-only login', async ({
@@ -96,21 +104,18 @@ test.describe('Homepage', () => {
       'homepage-embedded'
     );
     await expect(header.locator('a[href="/"]').first()).toBeVisible();
-    await expect(header.getByRole('button', { name: 'Features' })).toHaveCount(
-      0
-    );
-    await expect(header.getByRole('button', { name: 'Resources' })).toHaveCount(
-      0
-    );
+    await expect(header.getByRole('link', { name: 'Product' })).toHaveCount(0);
+    await expect(header.getByRole('button', { name: 'For' })).toHaveCount(0);
+    await expect(header.getByRole('button', { name: 'Tools' })).toHaveCount(0);
     await expect(header.getByRole('link', { name: 'Pricing' })).toHaveCount(0);
     await expect(header.getByRole('link', { name: 'Contact' })).toHaveCount(0);
     await expect(header.getByRole('link', { name: 'Log in' })).toHaveAttribute(
       'href',
       '/signin'
     );
-    await expect(header.getByRole('link', { name: 'Get started' })).toHaveCount(
-      0
-    );
+    await expect(
+      header.getByRole('link', { name: 'Find yourself' })
+    ).toHaveCount(0);
 
     await page.evaluate(() =>
       window.scrollTo({ top: 320, behavior: 'instant' })
@@ -132,123 +137,59 @@ test.describe('Homepage', () => {
 
   test('header flyouts are not mounted by default', async ({ page }) => {
     const header = page.getByTestId('header-nav');
-    const featuresFlyout = page.locator('#marketing-header-flyout-features');
+    const toolsFlyout = page.locator('#marketing-header-flyout-tools');
 
-    await expect(header.getByRole('button', { name: 'Features' })).toHaveCount(
-      0
-    );
-    await expect(featuresFlyout).toHaveCount(0);
+    await expect(header.getByRole('button', { name: 'For' })).toHaveCount(0);
+    await expect(header.getByRole('button', { name: 'Tools' })).toHaveCount(0);
+    await expect(toolsFlyout).toHaveCount(0);
   });
 
-  test('hero exposes one centered artist dashboard at source quality', async ({
+  test('hero backdrop is one decorative full-bleed photo that loads first', async ({
     page,
   }) => {
-    const commandCenter = page.getByTestId('homepage-hero-command-center');
+    const backdrop = page.getByTestId('homepage-editorial-hero-backdrop');
 
-    await expect(commandCenter).toBeVisible();
-    await expect(
-      commandCenter.getByAltText('Jovie authenticated releases workspace')
-    ).toBeVisible();
-    await expect(commandCenter.locator('img')).toHaveCount(1);
-    await expect(commandCenter.getByRole('button')).toHaveCount(0);
+    await expect(backdrop).toHaveAttribute('aria-hidden', 'true');
+    await expect(backdrop.locator('img')).toHaveCount(1);
+    await expect(backdrop.locator('img')).toHaveAttribute('alt', '');
+    await expect(backdrop.locator('img')).toHaveAttribute(
+      'fetchpriority',
+      'high'
+    );
     await page.waitForFunction(() => {
-      const commandCenterEl = document.querySelector(
-        '[data-testid="homepage-hero-command-center"]'
+      const image = document.querySelector<HTMLImageElement>(
+        '[data-testid="homepage-editorial-hero-backdrop"] img'
       );
-      const image = commandCenterEl?.querySelector<HTMLImageElement>('img');
       if (!image) return false;
       const rect = image.getBoundingClientRect();
-      const imageCenter = rect.left + rect.width / 2;
       return (
         image.complete &&
         image.naturalWidth > 0 &&
-        Math.abs(imageCenter - window.innerWidth / 2) < 12
+        rect.width >= window.innerWidth - 1 &&
+        rect.height >= window.innerHeight - 1
       );
     });
-
-    const visibleImageQuality = await commandCenter
-      .locator('img')
-      .evaluateAll(images =>
-        images
-          .map(img => {
-            const rect = img.getBoundingClientRect();
-            const sourceWidth =
-              Number(
-                new URL(img.currentSrc, window.location.href).searchParams.get(
-                  'w'
-                )
-              ) || img.naturalWidth;
-            return {
-              alt: img.alt,
-              clientWidth: rect.width,
-              naturalWidth: img.naturalWidth,
-              sourceWidth,
-              visible:
-                rect.width > 0 && rect.right > 0 && rect.left < innerWidth,
-              requiredWidth: Math.ceil(rect.width * devicePixelRatio),
-            };
-          })
-          .filter(image => image.visible)
-      );
-
-    expect(visibleImageQuality).toHaveLength(1);
-    for (const image of visibleImageQuality) {
-      expect(
-        image.sourceWidth,
-        `${image.alt} should be loaded at device pixel ratio quality`
-      ).toBeGreaterThanOrEqual(image.requiredWidth);
-    }
-    await expect(commandCenter.locator('img')).toHaveAttribute(
-      'src',
-      /releases-dashboard-sidebar/
+    await expect(backdrop.locator('img')).toHaveJSProperty(
+      'currentSrc',
+      /night-desk/
     );
-  });
 
-  test.skip('electric seam keeps hero geometry stable and respects reduced motion', async ({
-    page,
-  }) => {
-    const seamSlot = page.getByTestId('homepage-poster-hero-seam');
-    const mediaSlot = page.getByTestId('homepage-poster-hero-media');
-    const initialSeam = await seamSlot.boundingBox();
-    const initialMedia = await mediaSlot.boundingBox();
-
-    await page.getByTestId('homepage-electric-seam').evaluate(async element => {
-      await Promise.all(
-        element
-          .getAnimations({ subtree: true })
-          .map(animation => animation.finished.catch(() => undefined))
-      );
+    // Type sits on top of the photo, inside the viewport.
+    const heading = page.getByRole('heading', {
+      name: 'Control how the world sees you.',
     });
-
-    const settledSeam = await seamSlot.boundingBox();
-    const settledMedia = await mediaSlot.boundingBox();
-    expect(initialSeam).not.toBeNull();
-    expect(initialMedia).not.toBeNull();
-    expect(
-      Math.abs((settledSeam?.height ?? 0) - (initialSeam?.height ?? 0))
-    ).toBeLessThanOrEqual(1);
-    expect(
-      Math.abs((settledMedia?.y ?? 0) - (initialMedia?.y ?? 0))
-    ).toBeLessThanOrEqual(1);
-    expect(
-      Math.abs((settledMedia?.height ?? 0) - (initialMedia?.height ?? 0))
-    ).toBeLessThanOrEqual(1);
-
-    await page.emulateMedia({ reducedMotion: 'reduce' });
-    await gotoHomepage(page);
-
-    const reducedMotionSeam = page.getByTestId('homepage-electric-seam');
-    await expect(reducedMotionSeam.locator('[data-seam-glow]')).toHaveCount(1);
-    await expect(
-      reducedMotionSeam.locator('path[stroke-dasharray]')
-    ).toHaveCount(0);
-    await expect(page.getByTestId('homepage-poster-hero-media')).toBeVisible();
+    const headingBox = await heading.boundingBox();
+    const viewport = page.viewportSize();
+    expect(headingBox?.y ?? -1).toBeGreaterThan(0);
+    expect((headingBox?.y ?? 0) + (headingBox?.height ?? 0)).toBeLessThan(
+      viewport?.height ?? 0
+    );
   });
 
   test('hero reveal is geometry-safe, interactive, and static under reduced motion', async ({
     page,
   }) => {
-    const copy = page.locator('.homepage-poster-hero__copy');
+    const copy = page.locator('.homepage-editorial-hero__copy');
     const before = await copy.boundingBox();
     expect(
       await copy.evaluate(element => {
@@ -272,190 +213,10 @@ test.describe('Homepage', () => {
     ).toEqual(['none', '1']);
   });
 
-  test.skip('renders the System B narrative in order through the footer CTA', async ({
-    page,
-  }) => {
-    await expect(page.getByTestId('homepage-trust')).toHaveAttribute(
-      'data-presentation',
-      'inline-strip'
-    );
-    await expect(page.getByTestId('homepage-story-stack')).toHaveAttribute(
-      'data-proof-transition',
-      'true'
-    );
-    const opportunity = page.getByTestId('homepage-opportunity-section');
-    const workspace = page.getByTestId('homepage-workspace-section');
-    const meetJovie = page.getByTestId('homepage-meet-jovie');
-    const artistProfiles = page.getByTestId('homepage-artist-profiles');
-    const closedLoop = page.getByTestId('homepage-closed-loop');
-
-    await expect(opportunity).toBeVisible();
-    await expect(workspace).toBeVisible();
-    await expect(meetJovie).toBeVisible();
-    await expect(artistProfiles).toBeVisible();
-    await expect(closedLoop).toBeVisible();
-    const proofParallaxAnimation = await page.evaluate(() => {
-      const supportsScrollTimeline = CSS.supports('animation-timeline: view()');
-      const logoGrid = document.querySelector('.homepage-trust-logo-grid');
-      return supportsScrollTimeline && logoGrid
-        ? getComputedStyle(logoGrid).animationName
-        : 'unsupported';
-    });
-    if (proofParallaxAnimation !== 'unsupported') {
-      expect(proofParallaxAnimation).toBe('homepage-proof-logos-parallax');
-    }
-    await expect(
-      page.getByRole('heading', {
-        name: 'Release day is not the finish line.',
-      })
-    ).toBeVisible();
-    await expect(page.getByTestId('homepage-ai-composer-demo')).toBeVisible();
-    const sectionOrder = await page.evaluate(() => {
-      const testIds = [
-        'homepage-meet-jovie',
-        'homepage-opportunity-section',
-        'homepage-workspace-section',
-        'homepage-closed-loop',
-        'homepage-faq',
-        'homepage-v2-final-cta',
-      ];
-      return testIds.map(testId => {
-        const element = document.querySelector(`[data-testid="${testId}"]`);
-        return element?.getBoundingClientRect().top ?? -1;
-      });
-    });
-    expect(sectionOrder.every(top => top >= 0)).toBe(true);
-    expect(sectionOrder).toEqual([...sectionOrder].sort((a, b) => a - b));
-    await expect(
-      page.getByRole('heading', {
-        name: 'All your music. Working while you sleep.',
-      })
-    ).toBeVisible();
-    await expect(
-      page.getByTestId('homepage-workspace-screenshot').locator('img')
-    ).toBeVisible();
-    for (const outcome of [
-      'Your catalog, in one place',
-      'Opportunities surfaced',
-      'Launch the next one',
-    ]) {
-      await expect(
-        workspace.getByRole('heading', { name: outcome })
-      ).toBeVisible();
-    }
-    await expect(page.getByTestId('homepage-product-statement')).toHaveCount(0);
-    await expect(page.getByTestId('homepage-go-live-section')).toHaveCount(0);
-    await expect(page.getByTestId('homepage-product-depth-band')).toHaveCount(
-      0
-    );
-    await expect(page.getByTestId('homepage-workflow-strip')).toHaveCount(0);
-    await expect(page.getByTestId('friday-rhythm-section')).toHaveCount(0);
-    await expect(page.getByTestId('homepage-profile-proof-band')).toHaveCount(
-      0
-    );
-    await expect(
-      meetJovie.getByRole('heading', {
-        name: 'Jovie is the AI workspace for artists. Built around your artist presence.',
-      })
-    ).toBeVisible();
-    for (const preview of ['Tour', 'Subscribe', 'Pay', 'Presave']) {
-      await expect(artistProfiles.getByText(preview)).toBeVisible();
-    }
-    await artistProfiles.scrollIntoViewIfNeeded();
-    await page.waitForFunction(() => {
-      const section = document.querySelector(
-        '[data-testid="homepage-artist-profiles"]'
-      );
-      if (!section) return false;
-      return Array.from(
-        section.querySelectorAll<HTMLImageElement>('img')
-      ).every(img => img.complete && img.naturalWidth > 0);
-    });
-    const profileImageQuality = await artistProfiles
-      .locator('img')
-      .evaluateAll(images =>
-        images.map(img => {
-          const rect = img.getBoundingClientRect();
-          return {
-            alt: img.alt,
-            clientWidth: rect.width,
-            naturalWidth: img.naturalWidth,
-            requiredWidth: Math.ceil(rect.width * devicePixelRatio),
-          };
-        })
-      );
-
-    expect(profileImageQuality).toHaveLength(4);
-    for (const image of profileImageQuality) {
-      expect(
-        image.naturalWidth,
-        `${image.alt} should be loaded at device pixel ratio quality`
-      ).toBeGreaterThanOrEqual(image.requiredWidth);
-    }
-    await expect(page.getByText('2.9x')).toHaveCount(0);
-    await expect(
-      closedLoop.getByRole('heading', {
-        name: 'Every release makes the next move clearer.',
-      })
-    ).toBeVisible();
-    await expect(
-      closedLoop.getByTestId('homepage-closed-loop-step')
-    ).toHaveCount(5);
-    // Spec wall section removed — JOV-2073
-    await expect(page.getByTestId('homepage-v2-pricing')).toHaveCount(0);
-    await expect(page.getByTestId('homepage-faq')).toBeVisible();
-    const finalCta = page.getByTestId('homepage-v2-final-cta');
-    await finalCta.scrollIntoViewIfNeeded();
-    await expect(finalCta).toBeVisible();
-    await expect(page.getByTestId('homepage-v2-final-cta-heading')).toHaveText(
-      'Keep your music moving.'
-    );
-    await expect(page.getByTestId('homepage-v2-final-cta-primary')).toHaveText(
-      'Get started'
-    );
-    await expect(
-      page.getByTestId('homepage-v2-final-cta-primary')
-    ).toHaveAttribute('href', PUBLIC_WAITLIST_URL);
-    const footer = page.getByTestId('marketing-footer');
-    await expect(footer).toBeVisible();
-    await expect(footer.getByRole('link', { name: 'Privacy' })).toHaveAttribute(
-      'href',
-      '/legal/privacy'
-    );
-    await expect(footer.getByRole('link', { name: 'Terms' })).toHaveAttribute(
-      'href',
-      '/legal/terms'
-    );
-    await expect(footer.getByRole('link', { name: 'Pricing' })).toHaveCount(0);
-    await expect(footer.getByRole('link', { name: 'Investors' })).toHaveCount(
-      0
-    );
-  });
-
-  test('locks the final homepage story, product evidence, heading lines, and CLS', async ({
+  test('locks the nine certified sections, their order, heading lines, and CLS', async ({
     page,
     browserName,
   }) => {
-    const proofState = () =>
-      page.evaluate(() => {
-        const logos = document.querySelector('.homepage-trust-logo-grid');
-        const panel = document.querySelector(
-          '[data-testid="homepage-meet-jovie"]'
-        );
-        if (!(logos instanceof HTMLElement) || !(panel instanceof HTMLElement))
-          return null;
-        const logoStyle = getComputedStyle(logos);
-        return {
-          opacity: Number.parseFloat(logoStyle.opacity),
-          logoTransform: logoStyle.transform,
-          panelTransform: getComputedStyle(panel).transform,
-        };
-      });
-    const identityTransforms = ['none', 'matrix(1, 0, 0, 1, 0, 0)'];
-    const atRest = await proofState();
-    expect(atRest?.opacity).toBe(1);
-    expect(identityTransforms).toContain(atRest?.logoTransform);
-
     if (browserName === 'chromium') {
       await page.evaluate(() => {
         const target = window as Window & { __homepageCls?: number };
@@ -472,12 +233,17 @@ test.describe('Homepage', () => {
         }).observe({ type: 'layout-shift', buffered: true });
       });
     }
+
     const sectionIds = [
-      'homepage-meet-jovie',
-      'homepage-artist-profiles',
-      'homepage-closed-loop',
-      'homepage-faq',
-      'homepage-v2-final-cta',
+      'homepage-hero-shell',
+      'homepage-proof',
+      'homepage-section-connected',
+      'homepage-section-found',
+      'homepage-section-know',
+      'homepage-section-relationships',
+      'homepage-section-smarter',
+      'homepage-section-built',
+      'homepage-close',
     ];
     const sectionTops = await page.evaluate(
       ids =>
@@ -485,84 +251,116 @@ test.describe('Homepage', () => {
           id =>
             document
               .querySelector(`[data-testid="${id}"]`)
-              ?.getBoundingClientRect().top ?? -1
+              ?.getBoundingClientRect().top ?? Number.NaN
         ),
       sectionIds
     );
+    expect(sectionTops.some(top => Number.isNaN(top))).toBe(false);
     expect(sectionTops).toEqual([...sectionTops].sort((a, b) => a - b));
 
-    const profiles = page.getByTestId('homepage-artist-profiles');
-    await profiles.scrollIntoViewIfNeeded();
-    await expect(
-      profiles.locator('.homepage-artist-profile-preview__device')
-    ).toHaveCount(4);
-    await expect(profiles.locator('img')).toHaveCount(4);
-    const profileRailGeometry = await profiles.evaluate(section => {
-      const rail = section.querySelector('.homepage-artist-profiles__row');
-      const cards = [
-        ...section.querySelectorAll<HTMLElement>(
-          '.homepage-artist-profiles__card'
-        ),
-      ];
-      if (!(rail instanceof HTMLElement) || cards.length !== 4) return null;
+    // Section 2 is a statement, never a logo strip.
+    const proof = page.getByTestId('homepage-proof');
+    await expect(proof).toHaveText("Proof is earned. We don't borrow it.");
+    await expect(proof.locator('img, svg')).toHaveCount(0);
+    await expect(page.getByTestId('homepage-trust')).toHaveCount(0);
 
-      const railRect = rail.getBoundingClientRect();
-      const cardRects = cards.map(card => card.getBoundingClientRect());
-      return {
-        fullyVisible: cardRects.filter(
-          rect =>
-            rect.left >= railRect.left - 1 && rect.right <= railRect.right + 1
-        ).length,
-        fourthStartsPastRail: cardRects[3].left >= railRect.right,
-      };
-    });
-    expect(profileRailGeometry).toEqual({
-      fullyVisible: 3,
-      fourthStartsPastRail: true,
-    });
-    const previous = profiles.getByRole('button', {
-      name: 'Previous Artist Profile Preview',
-    });
-    const next = profiles.getByRole('button', {
-      name: 'Next Artist Profile Preview',
-    });
-    await expect(previous).toBeDisabled();
-    await expect(next).toBeEnabled();
-    await next.click();
-    await expect.poll(() => previous.isEnabled()).toBe(true);
-    await expect.poll(() => next.isDisabled()).toBe(true);
-    await previous.click();
-    await expect.poll(() => previous.isDisabled()).toBe(true);
-    await expect.poll(() => next.isEnabled()).toBe(true);
-    await page.emulateMedia({ reducedMotion: 'reduce' });
-    await next.click();
-    await expect.poll(() => previous.isEnabled()).toBe(true);
-    await expect.poll(() => next.isDisabled()).toBe(true);
-    await previous.click();
-    await expect.poll(() => previous.isDisabled()).toBe(true);
-    await expect.poll(() => next.isEnabled()).toBe(true);
-    await page.emulateMedia({ reducedMotion: 'no-preference' });
-    await expect
-      .poll(async () => {
-        const state = await proofState();
-        return Boolean(
-          state &&
-            state.opacity < 1 &&
-            !identityTransforms.includes(state.logoTransform) &&
-            !identityTransforms.includes(state.panelTransform)
-        );
-      })
-      .toBe(true);
-    const duringTransition = await proofState();
-    expect(duringTransition?.opacity ?? 1).toBeLessThan(1);
-    expect(duringTransition?.opacity ?? 0).toBeGreaterThanOrEqual(0.18);
-    expect(identityTransforms).not.toContain(duringTransition?.logoTransform);
-    expect(identityTransforms).not.toContain(duringTransition?.panelTransform);
+    // Locked section copy, verbatim.
+    for (const [id, headline, body] of [
+      [
+        'connected',
+        'Everything about you, connected.',
+        'Your work, links, story, and presence—organized into one living profile.',
+      ],
+      [
+        'found',
+        'Be found. Be understood.',
+        'Share the right version of you, legible wherever people want to know how you can help.',
+      ],
+      [
+        'know',
+        'Know who cares.',
+        'See who is paying attention, what brought them to you, and what they may want next.',
+      ],
+      [
+        'relationships',
+        'Turn attention into relationships.',
+        'Give every person a tailored next step—follow, subscribe, listen, buy, book, or reach out—without forcing everyone through the same funnel.',
+      ],
+      [
+        'smarter',
+        'A presence that gets smarter.',
+        'Every interaction improves what you know, what you show, and what you do next.',
+      ],
+      [
+        'built',
+        'Built around who you are.',
+        'Jovie adapts to your work without reducing you to a category.',
+      ],
+    ] as const) {
+      const section = page.getByTestId(`homepage-section-${id}`);
+      await expect(
+        section.getByRole('heading', { level: 2, name: headline })
+      ).toBeVisible();
+      await expect(section.getByText(body)).toBeVisible();
+    }
+
+    // Real product exports load at device quality where they appear.
+    const connected = page.getByTestId('homepage-section-connected');
+    await connected.scrollIntoViewIfNeeded();
+    await expect(connected.locator('img')).toHaveCount(1);
+    const relationships = page.getByTestId('homepage-section-relationships');
+    await relationships.scrollIntoViewIfNeeded();
+    await expect(relationships.locator('img')).toHaveCount(3);
+    const exportSelector =
+      '[data-testid="homepage-section-connected"] img, [data-testid="homepage-section-relationships"] img';
+    await page.waitForFunction(
+      selector =>
+        Array.from(document.querySelectorAll<HTMLImageElement>(selector)).every(
+          img => img.complete && img.naturalWidth > 0
+        ),
+      exportSelector
+    );
+    const exportQuality = await page
+      .locator(exportSelector)
+      .evaluateAll(elements =>
+        elements.map(element => {
+          const img = element as HTMLImageElement;
+          const rect = img.getBoundingClientRect();
+          return {
+            alt: img.alt,
+            naturalWidth: img.naturalWidth,
+            requiredWidth: Math.ceil(rect.width * devicePixelRatio),
+          };
+        })
+      );
+    expect(exportQuality).toHaveLength(4);
+    for (const image of exportQuality) {
+      expect(
+        image.naturalWidth,
+        `${image.alt} should be loaded at device pixel ratio quality`
+      ).toBeGreaterThanOrEqual(image.requiredWidth);
+    }
+
+    // Section 9 repeats the name search; CTA is Find me, never Search.
+    const close = page.getByTestId('homepage-close');
+    await close.scrollIntoViewIfNeeded();
     await expect(
-      page.getByTestId('homepage-closed-loop').getByRole('heading', {
-        name: 'All your music working while you sleep',
-      })
+      close.getByRole('heading', { level: 2, name: 'See what the world sees.' })
     ).toBeVisible();
+    await expect(close.getByText('Start with your name.')).toBeVisible();
+    await expect(close.getByPlaceholder('Search your name')).toBeVisible();
+    await expect(
+      close.getByRole('button', { name: 'Find me', exact: true })
+    ).toBeEnabled();
+    await expect(
+      page.getByRole('button', { name: 'Find me', exact: true })
+    ).toHaveCount(2);
+    await expect(page.getByRole('button', { name: /^Search$/ })).toHaveCount(0);
+    await expect(page.getByText('Get started')).toHaveCount(0);
+    await expect(page.getByText('Drop more music')).toHaveCount(0);
+    await expect(page.getByTestId('homepage-faq')).toHaveCount(0);
+    await expect(page.getByTestId('homepage-v2-final-cta')).toHaveCount(0);
+
     if (browserName === 'chromium') {
       expect(
         await page.evaluate(
@@ -579,41 +377,24 @@ test.describe('Homepage', () => {
       await page.evaluate(() => document.fonts.ready);
       const headingLines = await page
         .locator(
-          '.homepage-poster-hero__headline, [data-homepage-section-heading]'
+          '.homepage-editorial-hero__headline, [data-homepage-section-heading]'
         )
         .evaluateAll(headings =>
           headings.map(heading => {
             const style = getComputedStyle(heading);
-            return {
-              isMeetJovie: heading.classList.contains(
-                'homepage-meet-jovie__heading'
-              ),
-              lines: Math.ceil(
-                heading.getBoundingClientRect().height /
-                  Number.parseFloat(style.lineHeight) -
-                  0.05
-              ),
-            };
+            return Math.ceil(
+              heading.getBoundingClientRect().height /
+                Number.parseFloat(style.lineHeight) -
+                0.05
+            );
           })
         );
-      expect(
-        Math.max(
-          ...headingLines
-            .filter(heading => !heading.isMeetJovie)
-            .map(heading => heading.lines)
-        )
-      ).toBeLessThanOrEqual(2);
-      expect(
-        headingLines.find(heading => heading.isMeetJovie)?.lines
-      ).toBeLessThanOrEqual(width >= 768 ? 2 : 4);
+      expect(headingLines).toHaveLength(8);
+      expect(Math.max(...headingLines)).toBeLessThanOrEqual(2);
     }
-    await page.emulateMedia({ reducedMotion: 'reduce' });
-    await gotoHomepage(page);
-    await profiles.scrollIntoViewIfNeeded();
-    const reduced = await proofState();
-    expect(reduced?.opacity).toBe(1);
-    expect(reduced?.logoTransform).toBe('none');
-    expect(reduced?.panelTransform).toBe('none');
+
+    const footer = page.getByTestId('marketing-footer');
+    await expect(footer).toBeVisible();
   });
 
   test('mobile keeps hero and product proof inside the viewport with direct auth CTAs', async ({
@@ -622,23 +403,37 @@ test.describe('Homepage', () => {
     await page.setViewportSize({ width: 390, height: 844 });
     await gotoHomepage(page);
 
-    await expect(
-      page.getByRole('heading', {
-        name: 'Jovie helps you move your music forward.',
-      })
-    ).toBeVisible({
+    const heading = page.getByRole('heading', {
+      name: 'Control how the world sees you.',
+    });
+    await expect(heading).toBeVisible({
       timeout: SMOKE_TIMEOUTS.VISIBILITY,
     });
     await expect(page.getByTestId('header-nav')).toBeVisible();
 
-    const heroProductRail = page.getByTestId('homepage-hero-command-center');
-    const heroShotBounds = await heroProductRail.boundingBox();
+    // One sentence never wraps onto three lines, even on a phone.
+    await page.evaluate(() => document.fonts.ready);
+    const headingLines = await heading.evaluate(element => {
+      const style = getComputedStyle(element);
+      return Math.ceil(
+        element.getBoundingClientRect().height /
+          Number.parseFloat(style.lineHeight) -
+          0.05
+      );
+    });
+    expect(headingLines).toBeLessThanOrEqual(2);
+
+    const search = page.getByTestId('homepage-editorial-hero-search');
+    const searchBounds = await search.boundingBox();
     const viewportWidth = page.viewportSize()?.width ?? 0;
 
-    expect(heroShotBounds?.x ?? -1).toBeGreaterThanOrEqual(0);
+    expect(searchBounds?.x ?? -1).toBeGreaterThanOrEqual(0);
     expect(
-      (heroShotBounds?.x ?? 0) + (heroShotBounds?.width ?? 0)
+      (searchBounds?.x ?? 0) + (searchBounds?.width ?? 0)
     ).toBeLessThanOrEqual(viewportWidth + 1);
+    await expect(
+      page.getByRole('button', { name: 'Find me', exact: true })
+    ).toBeVisible();
 
     await page.evaluate(() => {
       const closeDevTools = document.querySelector<HTMLButtonElement>(
@@ -653,6 +448,9 @@ test.describe('Homepage', () => {
     );
     await expect(
       header.getByRole('link', { name: 'Get started', exact: true })
+    ).toHaveCount(0);
+    await expect(
+      header.getByRole('link', { name: 'Find yourself', exact: true })
     ).toHaveCount(0);
     await expect(
       header.getByRole('link', { name: 'Log in', exact: true })
@@ -723,10 +521,12 @@ test.describe('Homepage', () => {
     const ctaLinks = page.locator('[data-cta-sign-up="true"]');
     const count = await ctaLinks.count();
 
-    expect(
-      count,
-      'Homepage must have at least one data-cta-sign-up CTA'
-    ).toBeGreaterThan(0);
+    // The certified homepage converts through the name search (two Find me
+    // buttons); anchor sign-up CTAs are optional, but any that exist must
+    // still route through /start.
+    await expect(
+      page.getByRole('button', { name: 'Find me', exact: true })
+    ).toHaveCount(2);
 
     for (let i = 0; i < count; i += 1) {
       const cta = ctaLinks.nth(i);
@@ -743,27 +543,5 @@ test.describe('Homepage', () => {
         ).toBe(true);
       }
     }
-  });
-
-  /**
-   * JOV-2066: Trust logo bar contains SVG or img elements (not text-only logos)
-   */
-  test('trust logo bar contains visual logo elements (SVG or img)', async ({
-    page,
-  }) => {
-    await gotoHomepage(page);
-
-    const trustSection = page.getByTestId('homepage-trust');
-    await expect(trustSection).toBeVisible({
-      timeout: SMOKE_TIMEOUTS.VISIBILITY,
-    });
-
-    const svgCount = await trustSection.locator('svg').count();
-    const imgCount = await trustSection.locator('img').count();
-
-    expect(
-      svgCount + imgCount,
-      'Trust logo bar must contain SVG or img logo elements'
-    ).toBeGreaterThan(0);
   });
 });

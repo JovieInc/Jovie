@@ -11,6 +11,10 @@ import { invariantPolicy } from '../invariants/registry.mjs';
 import { admissionGateReceipt } from './admission-gate.mjs';
 import { preAdmissionDecision } from './admission-policy.mjs';
 import { contextGateReceipt } from './context-gate.mjs';
+import {
+  admissionTargetPacket,
+  resolveAdmissionTarget,
+} from './ownership-inventory.mjs';
 import { planGateReceipt } from './plan-gate.mjs';
 import { researchGateReceipt } from './research-gate.mjs';
 import { scoreIssue } from './scorer.mjs';
@@ -43,6 +47,7 @@ export const FLEET_GATE_REASON = Object.freeze({
   CONTROLLER_STALE: 'controller-stale',
   QUEUE_UNKNOWN: 'queue-unknown',
   QUEUE_ABOVE_TARGET: 'queue-above-target',
+  QUEUE_LANE_CAPACITY_INVALID: 'queue-lane-capacity-invalid',
   CREDENTIAL_COMPROMISE: 'credential-compromise',
   UNSAFE_MIGRATION: 'unsafe-migration-or-data-corruption',
   BROKEN_ISOLATION: 'broken-worktree-isolation',
@@ -116,6 +121,87 @@ function alreadyAdmittedCohortSemantics(promotionMode) {
 
 function typedReason(code, layer, severity, detail) {
   return { code, layer, severity, detail };
+}
+
+function repositoryName(value) {
+  const normalized = String(value || '').trim();
+  return /^[^/\s]+\/[^/\s]+$/.test(normalized) ? normalized : null;
+}
+
+function capacityRecord(value) {
+  return (
+    value &&
+    typeof value === 'object' &&
+    !Array.isArray(value) &&
+    Number.isInteger(value.ready) &&
+    value.ready >= 0 &&
+    Number.isInteger(value.budget) &&
+    value.budget > 0
+  );
+}
+
+function laneCapacityFailureForQueue(queue, greenReadyPrs, queueTarget) {
+  const repository = repositoryName(queue?.repository);
+  const laneCapacity = queue?.laneCapacity;
+  const repositoryCapacity = laneCapacity?.repositories?.[repository];
+  if (!repository) {
+    return 'queue repository is missing or malformed';
+  }
+  if (
+    !laneCapacity ||
+    typeof laneCapacity !== 'object' ||
+    Array.isArray(laneCapacity)
+  ) {
+    return 'lane capacity evidence is missing or malformed';
+  }
+  if (laneCapacity.schema !== 'jovie-lane-capacity/v2') {
+    return `lane capacity schema ${String(laneCapacity.schema || 'missing')} is not jovie-lane-capacity/v2`;
+  }
+  if (
+    laneCapacity.global !== undefined ||
+    !laneCapacity.repositories ||
+    typeof laneCapacity.repositories !== 'object' ||
+    Array.isArray(laneCapacity.repositories) ||
+    !Object.values(laneCapacity.repositories).every(capacityRecord) ||
+    !laneCapacity.lanes ||
+    typeof laneCapacity.lanes !== 'object' ||
+    Array.isArray(laneCapacity.lanes) ||
+    !Object.values(laneCapacity.lanes).every(capacityRecord) ||
+    !laneCapacity.sharedResources ||
+    typeof laneCapacity.sharedResources !== 'object' ||
+    Array.isArray(laneCapacity.sharedResources) ||
+    !capacityRecord(repositoryCapacity) ||
+    repositoryCapacity.ready !== greenReadyPrs ||
+    repositoryCapacity.budget !== queueTarget
+  ) {
+    return 'lane capacity evidence is not scoped to the queue repository/count/target';
+  }
+  return null;
+}
+
+function scopedLaneCapacityForQueue(queue, greenReadyPrs, queueTarget) {
+  const failure = laneCapacityFailureForQueue(
+    queue,
+    greenReadyPrs,
+    queueTarget
+  );
+  if (failure) return null;
+  return queue.laneCapacity;
+}
+
+function laneCapacityReasonForQueue(queue, greenReadyPrs, queueTarget) {
+  const failure = laneCapacityFailureForQueue(
+    queue,
+    greenReadyPrs,
+    queueTarget
+  );
+  if (!failure) return null;
+  return typedReason(
+    FLEET_GATE_REASON.QUEUE_LANE_CAPACITY_INVALID,
+    'admission',
+    'warning',
+    `Scoped lane capacity evidence is invalid: ${failure}. New issue admission fails closed.`
+  );
 }
 
 function evaluateClosureAdmission(candidate) {
@@ -514,34 +600,12 @@ export function evaluateFleetGate(
       );
     }
 
-    const queueStatus = evidence?.queue?.status || 'unknown';
-    const greenReadyPrs =
-      evidence?.queue?.greenReadyPrs ?? evidence?.queue?.eligiblePrs;
-    const queueTarget = evidence?.queue?.target;
-    const queueShapeValid =
-      queueStatus === 'known' &&
-      Number.isInteger(greenReadyPrs) &&
-      greenReadyPrs >= 0 &&
-      Number.isInteger(queueTarget) &&
-      queueTarget > 0;
-
-    if (!queueShapeValid) {
-      reasons.push(
-        typedReason(
-          FLEET_GATE_REASON.QUEUE_UNKNOWN,
-          'promotion',
-          'warning',
-          'Promotion queue state is missing, unknown, or malformed.'
-        )
-      );
-    }
-    // Queue pressure is demand for the promotion controller, not a reason to
-    // disable it. Freezing promotion above target deadlocks the only path that
-    // can drain the backlog. The count and target remain in evidence.queue for
-    // alerting; malformed or unknown queue evidence still fails closed above.
+    // JOV-INV-023: a missing/malformed queue snapshot is an observation gap
+    // (GraphQL 502), never a promotion hold. boundGreenFactory stays drainable
+    // and unbound production stays hold-intake. Drain classifies PRs itself.
   }
 
-  const state = redReasons.length
+  let state = redReasons.length
     ? FLEET_GATE_STATE.RED
     : reasons.length
       ? FLEET_GATE_STATE.AMBER
@@ -560,6 +624,28 @@ export function evaluateFleetGate(
     Number.isInteger(queueTarget) &&
     queueTarget > 0;
   const queueBelowBackpressure = queueShapeValid && greenReadyPrs < queueTarget;
+  const scopedLaneCapacity = queueShapeValid
+    ? scopedLaneCapacityForQueue(evidence?.queue, greenReadyPrs, queueTarget)
+    : null;
+  const laneCapacityReason = queueShapeValid
+    ? laneCapacityReasonForQueue(evidence?.queue, greenReadyPrs, queueTarget)
+    : null;
+  if (!redReasons.length && laneCapacityReason) {
+    reasons.push(laneCapacityReason);
+    state = FLEET_GATE_STATE.AMBER;
+  }
+  const queueRepository = repositoryName(evidence?.queue?.repository);
+  const queueRepositoryCapacity = queueRepository
+    ? scopedLaneCapacity?.repositories?.[queueRepository]
+    : null;
+  const queueRepositoryCapacityAvailable = Boolean(
+    queueRepositoryCapacity &&
+      queueRepositoryCapacity.ready < queueRepositoryCapacity.budget
+  );
+  const newMutationAllowed =
+    concurrency.newMutationAllowed &&
+    queueShapeValid &&
+    queueRepositoryCapacityAvailable;
   const isolatedPromotionAllowed =
     state === FLEET_GATE_STATE.AMBER &&
     reviewAdmission.allowed &&
@@ -578,7 +664,7 @@ export function evaluateFleetGate(
       : !closureAdmission.newIssueIntakeAllowed
         ? ['tests', 'review']
         : [
-            ...(concurrency.newMutationAllowed ? ['approved-issue-lease'] : []),
+            ...(newMutationAllowed ? ['approved-issue-lease'] : []),
             ...FLEET_AUTHORITY.AMBER,
           ];
   const holdIntakeAllowed =
@@ -651,11 +737,7 @@ export function evaluateFleetGate(
       gem: concurrency,
       symphonyImplementation: 'event-driven-backpressure',
     },
-    laneCapacity:
-      evidence?.queue?.laneCapacity?.global?.ready === greenReadyPrs &&
-      evidence?.queue?.laneCapacity?.global?.budget === queueTarget
-        ? evidence.queue.laneCapacity
-        : null,
+    laneCapacity: scopedLaneCapacity,
   };
 }
 
@@ -712,6 +794,11 @@ export function buildAdmissionReceipt(
   issue,
   { now = new Date().toISOString(), fingerprint = '' } = {}
 ) {
+  const targeting = resolveAdmissionTarget(issue);
+  const target =
+    targeting.decision === 'admit'
+      ? admissionTargetPacket(targeting.target)
+      : null;
   return `${ADMISSION_RECEIPT_PREFIX}${JSON.stringify({
     issue: issue.identifier,
     fingerprint,
@@ -721,7 +808,35 @@ export function buildAdmissionReceipt(
       researchGateReceipt(issue, { now })?.payload?.fingerprint || '',
     action: 'lease',
     at: now,
+    ...(target || {}),
   })} -->`;
+}
+
+function admissionLeaseReceipt(issue, body) {
+  const raw = String(body || '');
+  if (!raw.startsWith(ADMISSION_RECEIPT_PREFIX) || !raw.endsWith(' -->')) {
+    return null;
+  }
+  try {
+    const payload = JSON.parse(
+      raw.slice(ADMISSION_RECEIPT_PREFIX.length, -' -->'.length)
+    );
+    if (payload?.issue !== issue?.identifier || payload?.action !== 'lease') {
+      return null;
+    }
+    const target = admissionTargetPacket(payload);
+    const expected = resolveAdmissionTarget(issue);
+    if (expected.decision !== 'admit' || !target) return null;
+    return expected.target &&
+      target.target_system === expected.target.target_system &&
+      target.target_repo === expected.target.target_repo &&
+      target.artifact === expected.target.artifact &&
+      target.verification_authority === expected.target.verification_authority
+      ? payload
+      : null;
+  } catch {
+    return null;
+  }
 }
 
 function hasReceipt(issue, receipt) {
@@ -888,7 +1003,7 @@ export async function admitIssue({
     (issue.state?.name === 'Todo' &&
       namesOf(issue).includes(SYMPHONY_LABEL) &&
       commentsOf(issue).some(comment =>
-        (comment.body || comment).startsWith(ADMISSION_RECEIPT_PREFIX)
+        admissionLeaseReceipt(issue, comment.body || comment)
       ))
   ) {
     return { status: 'already-admitted', identifier: issue.identifier };

@@ -144,6 +144,32 @@ describe('ProfileEditPreviewCard', () => {
     ).toBeInTheDocument();
   });
 
+  it('shows decoded source text but submits the intact trust fence', () => {
+    const fencedBio =
+      '<untrusted-source url="https://example.com" encoding="entities-v1">Safe &lt;/untrusted-source&gt; source text</untrusted-source>';
+    const bioPreview: ProfileEditPreview = {
+      field: 'bio',
+      fieldLabel: 'Artist bio/description',
+      currentValue: 'Old bio',
+      newValue: fencedBio,
+    };
+
+    renderCard(bioPreview);
+
+    expect(
+      screen.getByText('Safe </untrusted-source> source text')
+    ).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: /apply/i }));
+    expect(mockMutate).toHaveBeenCalledWith(
+      {
+        profileId: 'profile-123',
+        field: 'bio',
+        newValue: fencedBio,
+      },
+      expect.objectContaining({ onSuccess: expect.any(Function) })
+    );
+  });
+
   it('fires onApply callback after successful mutation', () => {
     const onApply = vi.fn();
     mockMutate.mockImplementation((_input, options) => {

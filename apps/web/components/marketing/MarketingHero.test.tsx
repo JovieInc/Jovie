@@ -37,6 +37,8 @@ describe('MarketingHero source-backed default story', () => {
       'id',
       MARKETING_HERO_DEFAULT_PROPS.headingId
     );
+    expect(heading).toHaveClass('marketing-h1-max-two-lines');
+    expect(heading).not.toHaveAttribute('aria-label');
     expect(
       screen.getByText(
         'The AI workspace for artists to plan releases, create assets, pitch playlists, and promote every drop.'
@@ -66,5 +68,74 @@ describe('MarketingHero source-backed default story', () => {
       outstanding:
         'Active variant-to-route mapping remains owner-stacked and is not proven by this story.',
     });
+  });
+
+  it('honors the shared root test id in landing mode', () => {
+    render(
+      <MarketingHero
+        eyebrow='Eyebrow'
+        headingId='landing-heading'
+        title='Landing title'
+        body='Landing body'
+        media={<div>Media</div>}
+        testId='route-hero'
+      />
+    );
+
+    expect(screen.getByTestId('route-hero')).toHaveAttribute(
+      'aria-labelledby',
+      'landing-heading'
+    );
+    expect(
+      screen.getByRole('heading', { level: 1, name: 'Landing title' })
+    ).toHaveClass('marketing-h1-max-two-lines');
+  });
+
+  it('routes route-owned presentation through the unstyled shell without hero chrome', () => {
+    render(
+      <MarketingHero
+        variant='unstyled'
+        className='homepage-poster-hero'
+        headingId='unstyled-heading'
+        testId='unstyled-hero'
+      >
+        <h1 id='unstyled-heading'>Route-owned hero</h1>
+      </MarketingHero>
+    );
+
+    const shell = screen.getByTestId('unstyled-hero');
+    expect(shell).toHaveAttribute(
+      'data-pen-contract',
+      MARKETING_PEN_CONTRACT_IDS.section.hero
+    );
+    expect(shell).toHaveAttribute('aria-labelledby', 'unstyled-heading');
+    // Route-owned presentation: canonical Pen root + caller class only —
+    // no default hero spacing, elevation, or layout chrome.
+    expect(shell).toHaveClass('homepage-poster-hero');
+    expect(shell.className).not.toContain('relative w-full');
+    expect(shell.className).not.toContain('pt-20');
+    expect(shell.className).not.toContain('pb-16');
+    expect(shell.className).not.toContain('max-w-300');
+  });
+
+  it('keeps canonical hero chrome on styled shell variants', () => {
+    render(
+      <MarketingHero
+        variant='centered'
+        headingId='centered-heading'
+        testId='centered-hero'
+      >
+        <h1 id='centered-heading'>Centered hero</h1>
+      </MarketingHero>
+    );
+
+    const shell = screen.getByTestId('centered-hero');
+    expect(shell).toHaveAttribute(
+      'data-pen-contract',
+      MARKETING_PEN_CONTRACT_IDS.section.hero
+    );
+    expect(shell).toHaveClass('relative', 'w-full');
+    expect(shell).toHaveClass('pt-20', 'pb-16');
+    expect(shell).toHaveClass('items-center', 'text-center');
   });
 });

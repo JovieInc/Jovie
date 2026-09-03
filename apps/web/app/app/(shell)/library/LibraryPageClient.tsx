@@ -12,6 +12,7 @@ import {
   parseLibraryStageParam,
 } from '@/lib/library/lifecycle-stage';
 import type { LibraryProfileVisibility } from '@/lib/library/profile-visibility';
+import type { LibraryRelationshipView } from '@/lib/library/track-drawer-types';
 import type { LibraryMerchCard } from '@/lib/merch/types';
 import type { PublicVideoListItem } from '@/lib/youtube-library/queries';
 import { ReleaseCatalogPageClient } from '../dashboard/releases/ReleaseCatalogPageClient';
@@ -31,6 +32,7 @@ export function LibraryPageClient({
   creatorDocumentsNextCursor = null,
   creatorDocumentsLoadFailed = false,
   youtubeVideos = [],
+  relationships = [],
 }: {
   readonly creatorProfileId: string;
   readonly merchCards: readonly LibraryMerchCard[];
@@ -47,6 +49,7 @@ export function LibraryPageClient({
   readonly creatorDocumentsNextCursor?: string | null;
   readonly creatorDocumentsLoadFailed?: boolean;
   readonly youtubeVideos?: readonly PublicVideoListItem[];
+  readonly relationships?: readonly LibraryRelationshipView[];
 }) {
   const pathname = usePathname();
   const router = useRouter();
@@ -167,6 +170,7 @@ export function LibraryPageClient({
             assetShareByAssetId={assetShareByAssetId}
             creatorDocuments={creatorDocuments}
             youtubeVideos={youtubeVideos}
+            relationships={relationships}
           />
         </div>
       )}

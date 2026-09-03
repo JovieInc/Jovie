@@ -1,6 +1,6 @@
 'use client';
 
-import { upload } from '@vercel/blob/client';
+import { uploadPresigned } from '@vercel/blob/client';
 import { captureVideoFileName } from '@/lib/capture/account-video';
 import type { ScreenRecording } from '@/lib/capture/record-screen';
 import type {
@@ -62,7 +62,7 @@ export async function uploadWorkflowCapture(
   if (!details.uploadPathPrefix) {
     throw new Error('Workflow capture upload path missing');
   }
-  const blob = await upload(
+  const blob = await uploadPresigned(
     `${details.uploadPathPrefix}${captureVideoFileName('workflow_capture', new Date())}`,
     recording.file,
     {

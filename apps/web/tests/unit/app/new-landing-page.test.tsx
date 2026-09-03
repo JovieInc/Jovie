@@ -64,17 +64,18 @@ describe('NewLandingPage', () => {
   it('renders the staged homepage v2 content with YC-tightened nav', () => {
     render(<MarketingHeader />);
 
-    expect(screen.getByRole('button', { name: /Features/ })).toBeVisible();
-    expect(screen.getByRole('button', { name: /Resources/ })).toBeVisible();
+    expect(screen.getByRole('link', { name: 'Product' })).toHaveAttribute(
+      'href',
+      '/artist-profiles'
+    );
+    expect(screen.getByRole('button', { name: /For/ })).toBeVisible();
+    expect(screen.getByRole('button', { name: /Tools/ })).toBeVisible();
     expect(screen.getByRole('link', { name: 'Pricing' })).toHaveAttribute(
       'href',
       '/pricing'
     );
-    expect(screen.getByRole('link', { name: 'Contact' })).toHaveAttribute(
-      'href',
-      '/support'
-    );
-    expect(screen.getByRole('link', { name: 'Get started' })).toHaveAttribute(
+    expect(screen.queryByRole('link', { name: 'Contact' })).toBeNull();
+    expect(screen.getByRole('link', { name: 'Find yourself' })).toHaveAttribute(
       'href',
       'https://jov.ie/waitlist'
     );

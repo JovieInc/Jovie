@@ -1,6 +1,6 @@
 'use client';
 
-import { upload } from '@vercel/blob/client';
+import { uploadPresigned } from '@vercel/blob/client';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { useAuthSafe } from '@/hooks/useJovieAuth';
 import { buildAudioBlobPath } from '@/lib/audio/blob-path';
@@ -324,7 +324,7 @@ async function uploadImageAttachment(
     }
 
     previewUrl = URL.createObjectURL(processedFile);
-    const blob = await upload(processedFile.name, processedFile, {
+    const blob = await uploadPresigned(processedFile.name, processedFile, {
       access: 'public',
       handleUploadUrl: '/api/chat/files/upload-token',
     });
@@ -364,7 +364,7 @@ async function uploadAudioAttachment(
       throw new Error('Unsupported audio file type');
     }
 
-    const blob = await upload(
+    const blob = await uploadPresigned(
       buildAudioBlobPath('chat', userId, file.name),
       file,
       {
@@ -429,7 +429,7 @@ async function uploadGenericAttachment(
 ): Promise<void> {
   updateFile(id, { status: 'uploading', progress: 0 });
   try {
-    const blob = await upload(file.name, file, {
+    const blob = await uploadPresigned(file.name, file, {
       access: 'public',
       handleUploadUrl: '/api/chat/files/upload-token',
     });

@@ -1,13 +1,18 @@
+import { spawnSync } from 'node:child_process';
 import { readFileSync } from 'node:fs';
 import { mkdtemp, rm, symlink, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
+import { evaluateVisualEvidence } from '../../../.github/scripts/pr-visual-evidence-gate.mjs';
 import {
+  blockingCaptureRuntimeFailures,
   buildReviewPrompt,
   classifyFinding,
   classifyReviewOutcome,
   inspectReviewBackendConfiguration,
+  isBlockingCaptureRuntimeFailure,
   normalizeBackendReview,
   readTrustedCapture,
   reviewWithConfiguredBackends,
@@ -82,6 +87,31 @@ describe('bounded PR visual review contract', () => {
     ).toEqual({
       shouldReview: true,
       routes: ['/app/chat'],
+      reason: 'ui-change',
+      review_status: 'advisory',
+    });
+    expect(
+      routeChangedFiles(['apps/web/components/jovie/JovieChat.tsx']).routes
+    ).toEqual(['/app/chat']);
+    expect(
+      routeChangedFiles(['apps/web/app/app/(shell)/chat/page.tsx']).routes
+    ).toEqual(['/app/chat']);
+  });
+
+  it('does not send API, server, or onboarding chat files to /app/chat', () => {
+    expect(
+      routeChangedFiles([
+        'apps/web/app/api/chat/route.ts',
+        'apps/web/app/api/chat/onboarding-handler.ts',
+        'apps/web/lib/chat/run.ts',
+        'apps/web/lib/mobile/chat/turn-handler.ts',
+        'apps/web/lib/ai/gateway-errors.ts',
+        'apps/web/components/features/onboarding/onboardingChatHelpers.ts',
+        'apps/web/components/jovie/utils.ts',
+      ])
+    ).toEqual({
+      shouldReview: true,
+      routes: ['/'],
       reason: 'ui-change',
       review_status: 'advisory',
     });
@@ -333,9 +363,7 @@ describe('bounded PR visual review contract', () => {
     expect(workflow).not.toContain('gh issue list');
     expect(workflow).not.toContain('github-ai-orchestrator.yml');
     expect(workflow).toContain('review_status');
-    expect(workflow).toContain(
-      'Capture changed UI (desktop + mobile) (advisory)'
-    );
+    expect(workflow).toContain('Capture changed UI (desktop + mobile)');
     expect(workflow).toContain('GROK_VISUAL_REVIEW_API_KEY');
     expect(workflow).toContain('CODEX_VISUAL_REVIEW_API_KEY');
     expect(workflow).toContain('Call Grok 4.5 with Codex fallback');
@@ -367,8 +395,218 @@ describe('bounded PR visual review contract', () => {
     expect(capture).toContain("type: 'page-error'");
     expect(capture).toContain('response.status() >= 500');
     expect(capture).toContain('Captured route emitted runtime failures');
+    expect(capture).toContain('blockingCaptureRuntimeFailures');
     expect(capture).toContain('validateCaptureManifest');
     expect(capture).toContain('capture-validation.json');
+  });
+
+  it('keeps secretless authenticated API and same-document 5xxs from failing New Chat capture', () => {
+    const context = {
+      route: '/app/chat',
+      baseUrl: 'http://127.0.0.1:3100',
+    };
+    const noise = [
+      {
+        type: 'http-5xx',
+        status: 503,
+        url: 'http://127.0.0.1:3100/api/analytics/navigation',
+      },
+      {
+        type: 'console-error',
+        message:
+          'Failed to load resource: the server responded with a status of 503 (Service Unavailable)',
+      },
+      {
+        type: 'http-5xx',
+        status: 500,
+        url: 'http://127.0.0.1:3100/app/chat',
+      },
+    ];
+    expect(blockingCaptureRuntimeFailures(noise, context)).toEqual([]);
+    expect(
+      isBlockingCaptureRuntimeFailure(
+        { type: 'page-error', message: 'boom' },
+        context
+      )
+    ).toBe(true);
+    expect(
+      isBlockingCaptureRuntimeFailure(
+        {
+          type: 'http-5xx',
+          status: 500,
+          url: 'http://127.0.0.1:3100/signin',
+        },
+        context
+      )
+    ).toBe(true);
+    expect(
+      isBlockingCaptureRuntimeFailure(
+        {
+          type: 'http-5xx',
+          status: 500,
+          url: 'http://127.0.0.1:3100/api/billing/status',
+        },
+        { route: '/', baseUrl: context.baseUrl }
+      )
+    ).toBe(true);
+    expect(
+      isBlockingCaptureRuntimeFailure(
+        { type: 'console-error', message: 'Uncaught TypeError: exploded' },
+        context
+      )
+    ).toBe(true);
+  });
+
+  it('waits for the loaded authenticated New Chat shell instead of the streaming fallback', () => {
+    const capture = readFileSync(
+      '.github/scripts/pr-visual-review-capture.mjs',
+      'utf8'
+    );
+    expect(capture).toContain('waitForAuthenticatedShell');
+    expect(capture).toContain('[data-testid="dashboard-header"]');
+    expect(capture).toContain('[data-testid="dashboard-error"]');
+    expect(capture).toContain('filter({ visible: true })');
+    expect(capture).toContain('.first().waitFor');
+    expect(capture).not.toContain('.or(visibleDashboardError)');
+    expect(capture).toContain(
+      'Captured app route rendered dashboard error UI instead of authenticated shell'
+    );
+    expect(capture).toContain(
+      "getByRole('heading', { name: 'New Chat', level: 1 })"
+    );
+    expect(capture).toContain("getByRole('heading', { name: 'Just ask' })");
+    expect(capture).toContain("getByTestId('chat-empty-state-greeting')");
+    expect(capture).toContain("'domcontentloaded'");
+  });
+});
+
+// JOV-5459 (Tim lock 2026-08-30): Visual ENOENT is FAIL, not advisory.
+describe('fail-closed visual evidence gate (JOV-5459)', () => {
+  it('treats a missing capture manifest (ENOENT) as failure, not advisory skip', async () => {
+    const dir = await mkdtemp(join(tmpdir(), 'visual-gate-'));
+    try {
+      await writeFile(
+        join(dir, 'routing.json'),
+        JSON.stringify({ shouldReview: true })
+      );
+      const result = evaluateVisualEvidence({
+        artifactDir: dir,
+        stages: { build: 'success', server: 'success', capture: 'success' },
+      });
+      expect(result.ok).toBe(false);
+      expect(result.status).toBe('unavailable');
+      expect(result.missingEvidence).toContain('manifest.json');
+    } finally {
+      await rm(dir, { recursive: true, force: true });
+    }
+  });
+
+  it('treats a missing routing record as failure instead of assuming skipped', async () => {
+    const dir = await mkdtemp(join(tmpdir(), 'visual-gate-'));
+    try {
+      const result = evaluateVisualEvidence({
+        artifactDir: dir,
+        stages: { build: 'skipped', server: 'skipped', capture: 'skipped' },
+      });
+      expect(result.ok).toBe(false);
+      expect(result.missingEvidence).toContain('routing.json');
+    } finally {
+      await rm(dir, { recursive: true, force: true });
+    }
+  });
+
+  it('fails on any failed capture stage and passes complete or skipped evidence', async () => {
+    const dir = await mkdtemp(join(tmpdir(), 'visual-gate-'));
+    try {
+      await writeFile(
+        join(dir, 'routing.json'),
+        JSON.stringify({ shouldReview: true })
+      );
+      await writeFile(join(dir, 'manifest.json'), JSON.stringify([]));
+
+      const failed = evaluateVisualEvidence({
+        artifactDir: dir,
+        stages: { build: 'success', server: 'failure', capture: 'skipped' },
+      });
+      expect(failed.ok).toBe(false);
+      expect(failed.failedStages).toEqual(['server']);
+
+      const complete = evaluateVisualEvidence({
+        artifactDir: dir,
+        stages: { build: 'success', server: 'success', capture: 'success' },
+      });
+      expect(complete.ok).toBe(true);
+      expect(complete.status).toBe('completed');
+
+      await writeFile(
+        join(dir, 'routing.json'),
+        JSON.stringify({ shouldReview: false })
+      );
+      const skipped = evaluateVisualEvidence({
+        artifactDir: dir,
+        stages: { build: 'skipped', server: 'skipped', capture: 'skipped' },
+      });
+      expect(skipped.ok).toBe(true);
+      expect(skipped.status).toBe('skipped');
+    } finally {
+      await rm(dir, { recursive: true, force: true });
+    }
+  });
+
+  it('exits non-zero from the CLI on missing evidence and records the outcome file', async () => {
+    const dir = await mkdtemp(join(tmpdir(), 'visual-gate-cli-'));
+    try {
+      const artifactDir = join(dir, 'pr-visual-artifacts');
+      const gateScript = fileURLToPath(
+        new URL(
+          '../../../.github/scripts/pr-visual-evidence-gate.mjs',
+          import.meta.url
+        )
+      );
+      const run = env =>
+        spawnSync(process.execPath, [gateScript], {
+          cwd: dir,
+          env: { ...process.env, PR_VISUAL_OUT: artifactDir, ...env },
+        });
+
+      const missing = run({ CAPTURE_OUTCOME: 'skipped' });
+      expect(missing.status).toBe(1);
+
+      const outcome = JSON.parse(
+        readFileSync(join(artifactDir, 'advisory-outcome.json'), 'utf8')
+      );
+      expect(outcome.status).toBe('unavailable');
+      expect(outcome.advisory).toBe(false);
+      expect(outcome.missingEvidence).toContain('routing.json');
+
+      await writeFile(
+        join(artifactDir, 'routing.json'),
+        JSON.stringify({ shouldReview: false })
+      );
+      const failedStage = run({ BUILD_OUTCOME: 'failure' });
+      expect(failedStage.status).toBe(1);
+
+      const skipped = run({});
+      expect(skipped.status).toBe(0);
+    } finally {
+      await rm(dir, { recursive: true, force: true });
+    }
+  });
+
+  it('keeps the workflow wired to the gate script as the enforcement point', () => {
+    const workflow = readFileSync(
+      '.github/workflows/pr-visual-review.yml',
+      'utf8'
+    );
+    const captureJob = workflow.slice(
+      workflow.indexOf('  capture:'),
+      workflow.indexOf('\n  review:')
+    );
+    expect(captureJob).toContain(
+      'run: node .github/scripts/pr-visual-evidence-gate.mjs'
+    );
+    expect(captureJob).not.toMatch(/^    continue-on-error: true/m);
+    expect(captureJob).not.toContain('does not block merging');
   });
 });
 const sonarCheck = (overrides = {}) => ({

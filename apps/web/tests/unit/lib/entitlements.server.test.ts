@@ -67,7 +67,7 @@ describe('getCurrentUserEntitlements', () => {
       analyticsRetentionDays: 30,
       contactsLimit: 100,
       smartLinksLimit: null,
-      aiDailyMessageLimit: 10,
+      aiWeeklyMessageLimit: 15,
       canAccessPreSave: false,
       canAccessTipping: false,
       canAccessUrlEncryption: false,
@@ -223,7 +223,7 @@ describe('getCurrentUserEntitlements', () => {
       analyticsRetentionDays: 30,
       contactsLimit: 100,
       smartLinksLimit: null,
-      aiDailyMessageLimit: 10,
+      aiWeeklyMessageLimit: 15,
       canAccessPreSave: false,
       canAccessTipping: false,
       canAccessUrlEncryption: false,
@@ -309,7 +309,7 @@ describe('getCurrentUserEntitlements', () => {
       analyticsRetentionDays: 180,
       contactsLimit: null,
       smartLinksLimit: null,
-      aiDailyMessageLimit: 100,
+      aiWeeklyMessageLimit: 70,
       aiPitchGenPerRelease: 5,
       canAccessAiRetouching: true,
       aiRetouchDailyLimit: 10,
@@ -447,7 +447,7 @@ describe('getCurrentUserEntitlements', () => {
       analyticsRetentionDays: null,
       contactsLimit: null,
       smartLinksLimit: null,
-      aiDailyMessageLimit: 500,
+      aiWeeklyMessageLimit: 250,
       aiPitchGenPerRelease: null,
       canAccessAiRetouching: true,
       aiRetouchDailyLimit: 50,
@@ -491,7 +491,7 @@ describe('getCurrentUserEntitlements', () => {
     expect(entitlements.trialDaysRemaining).toBe(expectedDays);
     expect(entitlements.isPro).toBe(true); // via isProPlan('trial')
     expect(entitlements.canAccessTasksWorkspace).toBe(true); // trial gets pro booleans
-    expect(entitlements.aiDailyMessageLimit).toBe(25); // trial-specific limit (not pro's 100)
+    expect(entitlements.aiWeeklyMessageLimit).toBe(50); // trial-specific limit (not pro's 100)
     expect(entitlements.contactsLimit).toBe(250); // trial-specific
   });
 

@@ -122,7 +122,9 @@ function AuthFormColumn({
         tabIndex={-1}
         className='w-full scroll-mt-4'
       >
-        <div className='mx-auto w-full max-w-105'>{children}</div>
+        <div className={cn('mx-auto w-full', AUTH_FORM_MAX_WIDTH_CLASS)}>
+          {children}
+        </div>
       </main>
 
       {showFooterPrompt && !isKeyboardVisible ? (

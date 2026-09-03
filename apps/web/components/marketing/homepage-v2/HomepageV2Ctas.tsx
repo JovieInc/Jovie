@@ -1,10 +1,10 @@
 // @coverage-via apps/web/tests/unit/home/mounted-home-pricing-system-b-style-guard.test.ts
-import { Button } from '@jovie/ui';
-import Link from 'next/link';
 import { MarketingPricingPlans } from '@/components/features/pricing/MarketingPricingPlans';
 import { MarketingContainer } from '@/components/marketing/MarketingContainer';
+import { MarketingTerminalCta } from '@/components/site/MarketingTerminalCta';
 import { HOMEPAGE_FRONT_DOOR_CTA } from '@/data/homepageLaunchCopy';
 import { HOMEPAGE_V2_COPY } from '@/data/homepageV2Copy';
+import { MARKETING_PEN_CONTRACT_IDS } from '@/data/marketing/penContracts';
 import { cn } from '@/lib/utils';
 
 export function HomepageStoryHeader({
@@ -102,46 +102,26 @@ export function HomepageV2FinalCta({
   analyticsSource,
 }: Readonly<HomepageV2FinalCtaProps> = {}) {
   return (
-    <section
-      data-testid={sectionTestId}
-      className='homepage-story-final-cta system-b-mounted-home-footer-cta relative isolate overflow-hidden'
-    >
-      <div
-        aria-hidden='true'
-        className='system-b-mounted-home-footer-cta-abyss'
-      >
-        <div className='system-b-mounted-home-footer-cta-abyss-plane' />
-      </div>
-      <MarketingContainer
-        width='page'
-        className='system-b-mounted-home-footer-cta-container'
-      >
-        <div className='homepage-final-cta-copy system-b-mounted-home-footer-cta-copy mx-auto'>
-          <h2
-            data-homepage-section-heading
-            data-testid={headingTestId}
-            className='homepage-final-cta-heading system-b-mounted-home-footer-cta-heading text-balance'
-          >
-            {headline}
-          </h2>
-          <Button
-            variant='primary'
-            size='marketing'
-            asChild
-            className='homepage-final-cta-action system-b-mounted-home-footer-cta-action'
-          >
-            <Link
-              href={ctaHref}
-              data-testid={actionTestId}
-              data-cta-sign-up='true'
-              data-analytics-event={analyticsEventName}
-              data-analytics-source={analyticsSource}
-            >
-              {ctaLabel}
-            </Link>
-          </Button>
+    <MarketingTerminalCta
+      variant='homepage-v2'
+      penContractId={MARKETING_PEN_CONTRACT_IDS.shell.footerCta}
+      testId={sectionTestId}
+      headingTestId={headingTestId}
+      actionTestId={actionTestId}
+      title={headline}
+      ctaLabel={ctaLabel}
+      ctaHref={ctaHref}
+      ctaSignUp
+      ctaAnalyticsEvent={analyticsEventName}
+      ctaAnalyticsSource={analyticsSource}
+      decoration={
+        <div
+          aria-hidden='true'
+          className='system-b-mounted-home-footer-cta-abyss'
+        >
+          <div className='system-b-mounted-home-footer-cta-abyss-plane' />
         </div>
-      </MarketingContainer>
-    </section>
+      }
+    />
   );
 }

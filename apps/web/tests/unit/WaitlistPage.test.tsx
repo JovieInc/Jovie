@@ -101,7 +101,8 @@ describe('WaitlistPage', () => {
 
     const result = await WaitlistPage();
 
-    expect(result.type).toBe(WaitlistPublicLanding);
+    expect(result.type.name).toBe('WaitlistRouteWithContract');
+    expect(result.props.children.type).toBe(WaitlistPublicLanding);
     expect(mockRedirect).not.toHaveBeenCalled();
     expect(mockNotFound).not.toHaveBeenCalled();
     expect(mockResolveRequestAuthIdentity).toHaveBeenCalledTimes(1);
@@ -122,7 +123,8 @@ describe('WaitlistPage', () => {
 
     const result = await WaitlistPage();
 
-    expect(result.type).toBe(WaitlistPublicLanding);
+    expect(result.type.name).toBe('WaitlistRouteWithContract');
+    expect(result.props.children.type).toBe(WaitlistPublicLanding);
     expect(mockResolveRequestAuthIdentity).not.toHaveBeenCalled();
     expect(mockResolveUserState).not.toHaveBeenCalled();
     expect(mockRedirect).not.toHaveBeenCalled();
@@ -157,7 +159,8 @@ describe('WaitlistPage', () => {
     });
     expect(mockRedirect).not.toHaveBeenCalled();
     expect(mockNotFound).not.toHaveBeenCalled();
-    expect(result.type).toBe(WaitlistSuccessView);
+    expect(result.type.name).toBe('WaitlistRouteWithContract');
+    expect(result.props.children.type).toBe(WaitlistSuccessView);
   });
 
   test.each([

@@ -12,6 +12,7 @@ import {
   fetchArtistLlms,
   fetchOpenApi,
   fetchSiteLlms,
+  JovieInputError,
   JovieRequestError,
   normalizeBaseUrl,
 } from './client.js';
@@ -90,7 +91,7 @@ Options:
   --json                 Emit compact JSON; text resources use {"content":"..."}
   --full                 Fetch /llms-full.txt (only with docs llms)
   -h, --help             Show this help
-  -v, --version          Show the pre-release CLI version
+  -v, --version          Show the installed CLI version
 
 Examples:
   jovie artist get <artist-username> --json
@@ -115,6 +116,10 @@ function errorPayload(error: unknown): Record<string, unknown> {
       ...(error.status === undefined ? {} : { status: error.status }),
       ...(error.responseBody ? { responseBody: error.responseBody } : {}),
     };
+  }
+
+  if (error instanceof JovieInputError) {
+    return { code: error.code, message: error.message };
   }
 
   if (error instanceof UsageError) {
@@ -222,7 +227,7 @@ async function execute(
     return fetchSiteLlms(values.full === true, options);
   }
 
-  throw new UsageError(`Unknown command: ${positionals.join(' ') || '(none)'}`);
+  throw new UsageError(`Unknown command: ${positionals.join(' ')}`);
 }
 
 export async function runCli(
@@ -237,7 +242,10 @@ export async function runCli(
   try {
     parsed = parseCliArgs(argv);
   } catch (error) {
-    const payload = errorPayload(error);
+    const usageError = new UsageError(
+      error instanceof Error ? error.message : String(error)
+    );
+    const payload = errorPayload(usageError);
     if (requestedJson) {
       writeLine(stdout, JSON.stringify({ error: payload }));
     } else {
@@ -277,7 +285,9 @@ export async function runCli(
     } else {
       writeLine(stderr, payload.message as string);
     }
-    return error instanceof UsageError ? 2 : 1;
+    return error instanceof UsageError || error instanceof JovieInputError
+      ? 2
+      : 1;
   }
 }
 

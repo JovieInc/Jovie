@@ -229,6 +229,19 @@ must never name a provider or model. Narrative planning happens before copy and
 must give every section a unique question, responsibility, belief change, and
 evidence object. A failed stage may repair at most three times.
 
+Jovie-owned generated brand imagery must embed Scene Palette v1 from
+`apps/web/data/marketing/imageColorPolicy.ts`
+(`jovie-image-color-policy/v1`). The invariant is: the camera must find the
+palette. Controllable wardrobe, props, furniture, paint, locations, signage,
+practical lights, vehicles, and set dressing must be chosen as an Ion, Ultra,
+Pulse, or low-chroma neutral scene color before capture/generation. Protected
+real-world, biological, cultural, safety, trademark, creator-owned, and
+identity-bearing colors stay truthful. Conflicts are art-directed, reframed,
+replaced, removed, reduced in salience, or rejected, never fixed with post-hoc
+recoloring or a fake grade. Product screenshots, customer evidence,
+documentary material, album art, merch artwork, and artist retouching remain
+truthful source material rather than palette-controlled set pieces.
+
 Only one candidate may reach Taste. It needs one digest-bound passing receipt
 for every gate in `MARKETING_TASTE_GATE_IDS`, including independent visual
 review, product truth, design-system fidelity, responsive accessibility, and

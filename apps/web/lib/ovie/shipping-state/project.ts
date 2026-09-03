@@ -9,6 +9,9 @@ import {
   NOT_MEASURED_COUNT,
   NOT_MEASURED_DURATION,
   type ObservationState,
+  type OperationalTask,
+  type OperationalTaskDelta,
+  type OperationalTaskFeed,
   SHIPPING_SOURCE_IDS,
   SHIPPING_STATE_PRODUCER_ID,
   SHIPPING_STATE_PRODUCER_VERSION,
@@ -185,6 +188,118 @@ function revisionFingerprint(
   ).join('|');
 }
 
+function operationalTaskSource(
+  sources: Readonly<Record<ShippingSourceId, SourceObservation>>,
+  lastKnown?: ShippingStateProjection | null
+) {
+  if (SUCCESS_STATES.has(sources['symphony-runtime'].state)) {
+    return 'symphony-runtime' as const;
+  }
+  if (lastKnown?.operationalTasks.sourceId) {
+    return lastKnown.operationalTasks.sourceId;
+  }
+  const taskReceipt = sources['symphony-task'];
+  if (
+    SUCCESS_STATES.has(taskReceipt.state) &&
+    taskReceipt.entities.some(entity => entity.operationalTask)
+  ) {
+    return 'symphony-task' as const;
+  }
+  return 'symphony-runtime' as const;
+}
+
+function taskDeltas(
+  previous: readonly OperationalTask[],
+  current: readonly OperationalTask[],
+  sequence: number
+): OperationalTaskDelta[] {
+  const before = new Map(previous.map(task => [task.id, task]));
+  const after = new Map(current.map(task => [task.id, task]));
+  const deltas: OperationalTaskDelta[] = [];
+  for (const task of current) {
+    const prior = before.get(task.id);
+    if (!prior) {
+      deltas.push({
+        taskId: task.id,
+        kind: 'added',
+        fromState: null,
+        toState: task.workflowState,
+        sequence,
+      });
+    } else if (
+      prior.workflowState !== task.workflowState ||
+      prior.title !== task.title ||
+      prior.priority !== task.priority ||
+      prior.attempt !== task.attempt ||
+      prior.retryAt !== task.retryAt ||
+      prior.sourceRevision !== task.sourceRevision
+    ) {
+      deltas.push({
+        taskId: task.id,
+        kind: 'updated',
+        fromState: prior.workflowState,
+        toState: task.workflowState,
+        sequence,
+      });
+    }
+  }
+  for (const task of previous) {
+    if (!after.has(task.id)) {
+      deltas.push({
+        taskId: task.id,
+        kind: 'removed',
+        fromState: task.workflowState,
+        toState: null,
+        sequence,
+      });
+    }
+  }
+  return deltas;
+}
+
+function projectOperationalTasks(input: {
+  readonly sources: Readonly<Record<ShippingSourceId, SourceObservation>>;
+  readonly sequence: number;
+  readonly publishing: boolean;
+  readonly lastKnown?: ShippingStateProjection | null;
+}): OperationalTaskFeed {
+  const sourceId = operationalTaskSource(input.sources, input.lastKnown);
+  const source = input.sources[sourceId];
+  const currentTasks = source.entities.flatMap(entity =>
+    entity.operationalTask ? [entity.operationalTask] : []
+  );
+  const last = input.lastKnown?.operationalTasks;
+  const currentUsable = SUCCESS_STATES.has(source.state);
+  const tasks = currentUsable ? currentTasks : (last?.tasks ?? []);
+  const syncState: OperationalTaskFeed['syncState'] = !input.publishing
+    ? last
+      ? 'stale'
+      : 'failed'
+    : source.state === 'fresh'
+      ? 'fresh'
+      : currentUsable || last
+        ? 'stale'
+        : source.state === 'unknown'
+          ? 'syncing'
+          : 'failed';
+  return {
+    canonicalSource: 'linear',
+    cacheMode: 'local-reconciled',
+    syncState,
+    sourceId,
+    observedAt: source.observationTimestamp,
+    lastSyncedAt: currentUsable
+      ? (source.lastSuccess?.at ?? source.observationTimestamp)
+      : (last?.lastSyncedAt ?? null),
+    freshnessDeadline: source.freshnessDeadline,
+    tasks,
+    deltas:
+      currentUsable && last
+        ? taskDeltas(last.tasks, currentTasks, input.sequence)
+        : [],
+  };
+}
+
 export function projectShippingState(input: {
   readonly sequence: number;
   readonly observationTimestamp: string;
@@ -254,6 +369,7 @@ export function projectShippingState(input: {
     retrying: pickCount(input.sources, 'retrying'),
     terminalFailures: pickCount(input.sources, 'blocked'),
     capacityAvailable: pickCount(input.sources, 'capacityAvailable'),
+    operationalTasks: projectOperationalTasks(input),
   };
 }
 
@@ -288,6 +404,13 @@ export function ageShippingStateProjection(
           aggregateState
         )
       : projection.state,
+    operationalTasks: {
+      ...projection.operationalTasks,
+      syncState:
+        sources[projection.operationalTasks.sourceId].state === 'fresh'
+          ? projection.operationalTasks.syncState
+          : 'stale',
+    },
   };
 }
 
@@ -303,6 +426,11 @@ export function retainLastKnownOnFailure(
     state: 'stale',
     publishing,
     lastError: lastError ?? lastKnown.lastError,
+    operationalTasks: {
+      ...lastKnown.operationalTasks,
+      syncState: 'stale',
+      deltas: [],
+    },
   };
 }
 
@@ -428,5 +556,16 @@ export function unknownProjection(input: {
     retrying: NOT_MEASURED_COUNT,
     terminalFailures: NOT_MEASURED_COUNT,
     capacityAvailable: NOT_MEASURED_COUNT,
+    operationalTasks: {
+      canonicalSource: 'linear',
+      cacheMode: 'local-reconciled',
+      syncState: input.publishing ? 'syncing' : 'failed',
+      sourceId: 'symphony-runtime',
+      observedAt: null,
+      lastSyncedAt: null,
+      freshnessDeadline: null,
+      tasks: [],
+      deltas: [],
+    },
   };
 }

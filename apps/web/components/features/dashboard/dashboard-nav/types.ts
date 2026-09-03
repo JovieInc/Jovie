@@ -29,6 +29,6 @@ export interface NavItem {
 
 export interface DashboardNavProps {
   readonly collapsed?: boolean;
-  /** Shell-owned surface placed after the secondary New Chat action. */
+  /** Shell-owned surface placed after the New Chat primary action. */
   readonly children?: ReactNode;
 }

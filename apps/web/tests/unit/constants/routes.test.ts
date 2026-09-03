@@ -3,8 +3,10 @@ import {
   APP_ROUTES,
   buildLyricsRoute,
   buildReleaseTasksRoute,
+  buildSpotifyCatalogConnectionRoute,
   isDemoRoutePath,
   resolveLyricsReturnRoute,
+  shouldOpenSpotifyCatalogConnection,
 } from '@/constants/routes';
 
 describe('APP_ROUTES settings', () => {
@@ -58,6 +60,23 @@ describe('buildReleaseTasksRoute', () => {
     expect(buildReleaseTasksRoute('release 1/alt')).toBe(
       '/app/releases/release%201%2Falt/tasks'
     );
+  });
+});
+
+describe('Spotify catalog connection route', () => {
+  it('builds the releases route that opens Spotify catalog connection', () => {
+    expect(buildSpotifyCatalogConnectionRoute()).toBe(
+      '/app/dashboard/releases?connect=spotify'
+    );
+  });
+
+  it('matches only the Spotify catalog connection request', () => {
+    expect(
+      shouldOpenSpotifyCatalogConnection(new URLSearchParams('connect=spotify'))
+    ).toBe(true);
+    expect(
+      shouldOpenSpotifyCatalogConnection(new URLSearchParams('connect=apple'))
+    ).toBe(false);
   });
 });
 

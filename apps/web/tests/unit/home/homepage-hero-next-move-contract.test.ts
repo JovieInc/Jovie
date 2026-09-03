@@ -5,96 +5,76 @@ import { HOMEPAGE_LAUNCH_COPY } from '@/data/homepageLaunchCopy';
 
 const webRoot = path.resolve(__dirname, '../../..');
 
-describe('homepage hero next-move contract (JOV-4475)', () => {
-  it('uses the exact approved headline and supporting line', () => {
+function readHeroCss(): string {
+  const css = readFileSync(path.join(webRoot, 'app/(home)/home.css'), 'utf8');
+  const start = css.indexOf('HOMEPAGE EDITORIAL HERO START');
+  const end = css.indexOf('HOMEPAGE EDITORIAL HERO END', start);
+  return css.slice(start, end);
+}
+
+describe('homepage hero contract (JOV-5864)', () => {
+  it('uses the exact locked headline and one-line support', () => {
     expect(HOMEPAGE_LAUNCH_COPY.hero.headline).toBe(
-      'Jovie helps you move your music forward.'
+      'Control how the world sees you.'
     );
     expect(HOMEPAGE_LAUNCH_COPY.hero.subhead).toBe(
-      'It uses your catalog, audience, and artist presence to surface the one action most likely to pay off.'
+      'Find what the internet knows. Turn it into relationships.'
     );
   });
 
-  it('keeps Get started as the sole primary conversion path', () => {
-    expect(HOMEPAGE_LAUNCH_COPY.hero.primaryCta.label).toBe('Get started');
-    expect(HOMEPAGE_LAUNCH_COPY.hero.primaryCta.href).toBe(
-      'https://jov.ie/waitlist'
-    );
-    expect(HOMEPAGE_LAUNCH_COPY.fallbackCta.href).toBe(
-      'https://jov.ie/waitlist'
-    );
-    expect(HOMEPAGE_LAUNCH_COPY.hero.secondaryCta.label).toBe(
-      'See a live profile'
-    );
-    expect(HOMEPAGE_LAUNCH_COPY.hero.secondaryCta.href).toBe(
-      '/artist-profiles'
-    );
-  });
+  it('keeps the existing name search as the sole primary conversion', () => {
+    expect(HOMEPAGE_LAUNCH_COPY.hero.search).toEqual({
+      placeholder: 'Search your name',
+      action: 'Find me',
+    });
 
-  it('demotes the live-profile path to a quiet ghost control in the poster hero', () => {
-    const heroSource = readFileSync(
-      path.join(webRoot, 'components/marketing/MarketingPosterHero.tsx'),
-      'utf8'
-    );
-    const css = readFileSync(path.join(webRoot, 'app/(home)/home.css'), 'utf8');
-
-    expect(heroSource).toContain("data-testid='homepage-primary-cta'");
-    expect(heroSource).toContain("data-testid='homepage-secondary-cta'");
-    expect(heroSource).toContain("variant='primary'");
-    expect(heroSource).toContain("variant='ghost'");
-    expect(heroSource.match(/size='marketing'/gu)).toHaveLength(2);
-    expect(heroSource).not.toMatch(
-      /secondaryCta[\s\S]*?variant=['"]tertiary['"]/
-    );
-    expect(heroSource).not.toContain('active:scale');
-    expect(css).toMatch(
-      /\.homepage-poster-hero__action-button\s*\{[\s\S]*?border-radius: var\(--radius-pill\);[\s\S]*?var\(--font-satoshi\)[\s\S]*?font-size: 14px;[\s\S]*?font-weight: 510;[\s\S]*?\}/
-    );
-  });
-
-  it('uses a 100ms opacity-only ready reveal with reduced-motion parity', () => {
-    const css = readFileSync(path.join(webRoot, 'app/(home)/home.css'), 'utf8');
-    const heroCssStart = css.indexOf('HOMEPAGE POSTER HERO SYSTEM B START');
-    const heroCssEnd = css.indexOf(
-      'HOMEPAGE POSTER HERO SYSTEM B END',
-      heroCssStart
-    );
-    const heroCss = css.slice(heroCssStart, heroCssEnd);
-
-    expect(heroCss).toContain('--homepage-hero-reveal-delay: 100ms;');
-    expect(heroCss).toContain('@keyframes homepage-hero-content-reveal');
-    expect(heroCss).toContain('opacity: 0;');
-    expect(heroCss).toContain('opacity: 1;');
-    expect(heroCss).not.toMatch(
-      /@keyframes homepage-hero-content-reveal[\s\S]*?(?:transform|translate|scale|height|margin)/
-    );
-    expect(heroCss).toContain('@media (prefers-reduced-motion: reduce)');
-    expect(heroCss).toContain('animation: none;');
-  });
-
-  it('keeps product proof on a truthful screenshot path, not Deep End mock copy', () => {
     const pageSource = readFileSync(
       path.join(webRoot, 'app/(home)/page.tsx'),
       'utf8'
     );
-    const commandCenterSource = readFileSync(
-      path.join(webRoot, 'components/homepage/HomepageHeroCommandCenter.tsx'),
-      'utf8'
+    const heroSource = pageSource.slice(
+      pageSource.indexOf('function HomepageHero()'),
+      pageSource.indexOf('function HomepageUnlockedSections()')
     );
 
-    expect(pageSource).toContain(
-      "getMarketingExportImage('dashboard-releases-sidebar-desktop')"
+    expect(heroSource).toContain('search={HERO_COPY.search}');
+    expect(heroSource).toContain('backdrop={HERO_BACKDROP}');
+    expect(heroSource).not.toContain('primaryCta');
+    expect(heroSource).not.toContain('secondaryCta');
+    expect(heroSource).not.toMatch(/Get started|Drop more music|waitlist/i);
+    expect(pageSource).toContain('/images/hero/night-desk.webp');
+    expect(pageSource).toContain('/images/hero/night-desk-mobile.webp');
+  });
+
+  it('keeps the one-line H1 contract and the two-line phone fallback', () => {
+    const css = readHeroCss();
+
+    expect(css).toMatch(
+      /\.homepage-editorial-hero__headline\s*\{[\s\S]*?white-space: nowrap;[\s\S]*?\}/
     );
-    expect(pageSource).toContain('<HomepageHeroCommandCenter');
-    expect(commandCenterSource).toContain('homepage-product-pane__image');
-    expect(commandCenterSource).toContain(
-      'Jovie authenticated releases workspace with a selected release and detail rail'
+    expect(css).toMatch(
+      /@media \(max-width: 767px\)[\s\S]*?\.homepage-editorial-hero__headline\s*\{[\s\S]*?white-space: normal;[\s\S]*?\}/
     );
-    expect(commandCenterSource).toMatch(/authenticated releases/i);
-    expect(commandCenterSource).not.toMatch(/The Deep End|Deep End/);
-    expect(pageSource).not.toMatch(
-      /function HomepageHero\(\)[\s\S]*?The Deep End/
+    expect(css).toMatch(
+      /\.homepage-editorial-hero__support\s*\{[\s\S]*?white-space: nowrap;[\s\S]*?\}/
     );
+  });
+
+  it('keeps the Find me pill on the 32/510 marketing button contract', () => {
+    const css = readHeroCss();
+
+    expect(css).toMatch(
+      /\.homepage-name-search__submit\s*\{[\s\S]*?var\(--font-satoshi\)[\s\S]*?font-size: 14px;[\s\S]*?font-weight: 510;[\s\S]*?\}/
+    );
+  });
+
+  it('uses a 100ms opacity-only ready reveal with reduced-motion parity', () => {
+    const css = readHeroCss();
+
+    expect(css).toContain('--homepage-hero-reveal-delay: 100ms;');
+    expect(css).toContain('animation: homepage-hero-content-reveal');
+    expect(css).toContain('@media (prefers-reduced-motion: reduce)');
+    expect(css).toContain('animation: none;');
   });
 
   it('mounts registry Artist Profile previews directly in phone frames', () => {
@@ -108,14 +88,20 @@ describe('homepage hero next-move contract (JOV-4475)', () => {
     expect(profilesSource).not.toContain('homepage-artist-outcome__copy');
   });
 
-  it('keeps homepage nav as Log in text only, with no second Get started', () => {
+  it('keeps homepage nav as wordmark plus Log in text only, with no Get started', () => {
     const headerSource = readFileSync(
       path.join(webRoot, 'components/site/MarketingHeader.tsx'),
+      'utf8'
+    );
+    const layoutSource = readFileSync(
+      path.join(webRoot, 'app/(home)/layout.tsx'),
       'utf8'
     );
 
     expect(headerSource).toContain('minimalAuth={isMinimal || isHomepage}');
     expect(headerSource).toContain("isHomepage ? 'Log in' : 'Sign in'");
+    expect(layoutSource).toContain("logoVariant='word'");
+    expect(layoutSource).toContain('showHomepageCenterNav={false}');
 
     const css = readFileSync(path.join(webRoot, 'app/(home)/home.css'), 'utf8');
     expect(css).not.toMatch(

@@ -3,6 +3,7 @@ import { createHash } from 'node:crypto';
 import { access, mkdir, readFile, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 import process from 'node:process';
+import { pathToFileURL } from 'node:url';
 import {
   assertVisualQaCoverageManifest,
   VISUAL_QA_COVERAGE_MANIFEST,
@@ -61,8 +62,15 @@ export interface VisualQaCoverageReceiptEntry {
   readonly source: {
     readonly kind: VisualQaCoverageSource['kind'];
     readonly route?: string;
+    readonly expectedPath?: string;
+    readonly expectedRuntimeSelector?: string;
+    readonly fixturePath?: string;
     readonly harness?: string;
+    readonly routeDisposition?: string;
+    readonly sourcePath?: string;
+    readonly sourceSha?: string;
     readonly specPath?: string;
+    readonly stateMatrix?: readonly string[];
     readonly baselinePath?: string;
     readonly surfaceId?: string;
   };
@@ -78,6 +86,7 @@ export interface VisualQaCoverageReceiptEntry {
     readonly reason: string;
   }[];
   readonly diffThreshold: VisualQaCoverageEntry['diffThreshold'];
+  readonly qualityChecks: NonNullable<VisualQaCoverageEntry['qualityChecks']>;
   readonly captures: readonly CaptureEvidence[];
 }
 
@@ -172,6 +181,17 @@ function describeSource(source: VisualQaCoverageSource) {
       return {
         kind: source.kind,
         route: source.route,
+        ...(source.expectedPath ? { expectedPath: source.expectedPath } : {}),
+        ...(source.expectedRuntimeSelector
+          ? { expectedRuntimeSelector: source.expectedRuntimeSelector }
+          : {}),
+        ...(source.fixturePath ? { fixturePath: source.fixturePath } : {}),
+        ...(source.routeDisposition
+          ? { routeDisposition: source.routeDisposition }
+          : {}),
+        ...(source.sourcePath ? { sourcePath: source.sourcePath } : {}),
+        ...(source.sourceSha ? { sourceSha: source.sourceSha } : {}),
+        ...(source.stateMatrix ? { stateMatrix: source.stateMatrix } : {}),
         ...(source.specPath ? { specPath: source.specPath } : {}),
         ...(source.baselinePath ? { baselinePath: source.baselinePath } : {}),
       };
@@ -346,6 +366,7 @@ async function buildEntryReceipt(
     source: describeSource(entry.source),
     dynamicMasks: entry.dynamicMasks,
     diffThreshold: entry.diffThreshold,
+    qualityChecks: entry.qualityChecks ?? [],
   } as const;
 
   if (entry.availability === 'unavailable') {
@@ -592,7 +613,12 @@ async function main(): Promise<void> {
   if (receipt.overallStatus !== 'verified') process.exitCode = 1;
 }
 
-void main().catch(error => {
-  console.error(error);
-  process.exitCode = 1;
-});
+if (
+  process.argv[1] &&
+  import.meta.url === pathToFileURL(process.argv[1]).href
+) {
+  void main().catch(error => {
+    console.error(error);
+    process.exitCode = 1;
+  });
+}

@@ -71,7 +71,11 @@ describe('WaitlistSuccessView', () => {
       'if (access?.entryId && isWaitlistPendingStatus(access.status))'
     );
     expect(routeSource).toContain(
-      'return <WaitlistSuccessView email={authResult.context.email} />;'
+      "import { MarketingPageContractMarkers } from '@/components/site/MarketingPageContractMarkers';"
+    );
+    expect(routeSource).toContain('<WaitlistRouteWithContract>');
+    expect(routeSource).toContain(
+      '<WaitlistSuccessView email={authResult.context.email} />'
     );
     expect(routeSource).toContain('getWaitlistRouteRedirect');
     expect(routeSource).toContain('notFound()');

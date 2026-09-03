@@ -47,7 +47,7 @@ const artistContext: ArtistContext = {
 
 const paidPlanLimits = {
   booleans: { aiCanUseTools: true },
-  limits: { aiDailyMessageLimit: 500 },
+  limits: { aiWeeklyMessageLimit: 500 },
 } as unknown as Parameters<typeof executeChatTurn>[0]['planLimits'];
 
 function userMessage(text: string): UIMessage {

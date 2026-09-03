@@ -22,14 +22,17 @@ export interface HomepageHeroCarouselSlide {
 
 export const HOMEPAGE_LAUNCH_COPY = {
   seo: {
-    title: 'Jovie | Your AI artist manager',
-    description:
-      'Jovie is the AI artist workspace that surfaces opportunities in your catalog — presaves, captures, pitches — and helps you ship the next one.',
+    title: 'Jovie | Control how the world sees you',
+    description: 'Find what the internet knows. Turn it into relationships.',
   },
   hero: {
-    headline: 'Jovie helps you move your music forward.',
-    subhead:
-      'It uses your catalog, audience, and artist presence to surface the one action most likely to pay off.',
+    headline: 'Control how the world sees you.',
+    subhead: 'Find what the internet knows. Turn it into relationships.',
+    // The hero's only conversion control is the existing name search.
+    search: {
+      placeholder: 'Search your name',
+      action: 'Find me',
+    },
     primaryCta: {
       ...HOMEPAGE_FRONT_DOOR_CTA.primary,
       label: 'Get started',
@@ -44,6 +47,48 @@ export const HOMEPAGE_LAUNCH_COPY = {
     label: FRONT_DOOR_CTA_LABEL,
     href: HOMEPAGE_FRONT_DOOR_CTA.primary.href,
     support: FALLBACK_CTA_SUPPORT,
+  },
+  // Certified nine-section homepage: sections 2-9. Section 1 is `hero`.
+  certified: {
+    proof: {
+      statement: "Proof is earned. We don't borrow it.",
+    },
+    sections: [
+      {
+        id: 'connected',
+        headline: 'Everything about you, connected.',
+        body: 'Your work, links, story, and presence—organized into one living profile.',
+      },
+      {
+        id: 'found',
+        headline: 'Be found. Be understood.',
+        body: 'Share the right version of you, legible wherever people want to know how you can help.',
+      },
+      {
+        id: 'know',
+        headline: 'Know who cares.',
+        body: 'See who is paying attention, what brought them to you, and what they may want next.',
+      },
+      {
+        id: 'relationships',
+        headline: 'Turn attention into relationships.',
+        body: 'Give every person a tailored next step—follow, subscribe, listen, buy, book, or reach out—without forcing everyone through the same funnel.',
+      },
+      {
+        id: 'smarter',
+        headline: 'A presence that gets smarter.',
+        body: 'Every interaction improves what you know, what you show, and what you do next.',
+      },
+      {
+        id: 'built',
+        headline: 'Built around who you are.',
+        body: 'Jovie adapts to your work without reducing you to a category.',
+      },
+    ],
+    close: {
+      headline: 'See what the world sees.',
+      support: 'Start with your name.',
+    },
   },
   workspace: {
     kicker: 'What Jovie finds.',
