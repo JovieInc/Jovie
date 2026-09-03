@@ -1,5 +1,4 @@
 import { Badge } from '@jovie/ui';
-import type { CellContext, HeaderContext, Table } from '@tanstack/react-table';
 import { Copy, ExternalLink } from 'lucide-react';
 import type { RefObject } from 'react';
 import { EmptyCell } from '@/components/atoms/EmptyCell';
@@ -16,6 +15,11 @@ import {
 import { getProfileUrl } from '@/constants/domains';
 import { copyToClipboard } from '@/hooks/useClipboard';
 import type { AdminUserRow } from '@/lib/admin/types';
+import type {
+  CellContext,
+  HeaderContext,
+  Table,
+} from '@/lib/tanstack-v8-compat';
 
 /**
  * Renders the name cell with name and email (truncated with tooltip).
