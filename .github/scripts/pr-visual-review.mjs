@@ -35,6 +35,18 @@ const AUTHENTICATED_CHAT_CAPTURE_ROUTE = '/app/chat';
 const AUTHENTICATED_SHELL_CAPTURE_FILE =
   /^(?:apps\/web\/(?:proxy|middleware)\.[cm]?[jt]s|apps\/web\/lib\/auth\/(?:gate|session|auth-session-cookies)\.[cm]?[jt]sx?|apps\/web\/app\/app(?:\/\(shell\))?\/layout\.[cm]?[jt]sx?)$/i;
 
+/**
+ * Authenticated `/app/chat` capture is for visual chat/shell surfaces.
+ * API handlers, server turn execution, and onboarding helpers share the
+ * "chat" path token but are not the workspace chrome the fixture proves.
+ */
+function isAuthenticatedChatUiChange(file) {
+  if (!/chat|shell/i.test(file)) return false;
+  if (/onboarding/i.test(file)) return false;
+  if (/^apps\/web\/(app\/api\/|lib\/)/.test(file)) return false;
+  return true;
+}
+
 /** @typedef {{ apiKey?: string, baseUrl?: string, model?: string }} ReviewBackend */
 
 export function buildCaptureArtifactPaths({ outDir, route, viewportName }) {
@@ -89,7 +101,7 @@ export function routeChangedFiles(files) {
       routes.add(PUBLIC_HOME_CAPTURE_ROUTE);
     else if (/dynamic|profile|username|artist/i.test(file))
       routes.add(PUBLIC_PROFILE_CAPTURE_ROUTE);
-    else if (/chat|shell/i.test(file))
+    else if (isAuthenticatedChatUiChange(file))
       routes.add(AUTHENTICATED_CHAT_CAPTURE_ROUTE);
     else routes.add(PUBLIC_HOME_CAPTURE_ROUTE);
   }
