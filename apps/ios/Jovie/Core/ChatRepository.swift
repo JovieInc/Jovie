@@ -154,7 +154,7 @@ final class ChatRepository {
     let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
     guard !trimmed.isEmpty, !isSending else { return }
     let task = Task { [weak self] in
-      await self?.performSend(text: trimmed)
+      _ = await self?.performSend(text: trimmed)
     }
     sendTask = task
     await task.value
