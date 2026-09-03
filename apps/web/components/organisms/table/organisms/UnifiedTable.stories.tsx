@@ -1,5 +1,5 @@
 import type { Meta, StoryObj } from '@storybook/nextjs-vite';
-import type { ColumnDef } from '@tanstack/react-table';
+import type { ColumnDef } from '@/lib/tanstack-v8-compat';
 import { UnifiedTable } from './UnifiedTable';
 
 type RowData = { id: string; title: string; artist: string };
