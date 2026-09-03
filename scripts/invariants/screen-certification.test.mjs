@@ -80,6 +80,10 @@ describe('JOV-INV-018 screen-certification/v2', () => {
     assert.equal(kindOf('apps/web/app/(home)/page.tsx'), 'registered');
     assert.equal(kindOf('apps/web/app/error.tsx'), 'registered');
     assert.equal(kindOf('apps/web/app/global-error.tsx'), 'registered');
+    assert.equal(
+      kindOf('apps/web/app/app/(shell)/library/page.tsx'),
+      'registered'
+    );
   });
 
   it('registers every protected revenue screen source', () => {

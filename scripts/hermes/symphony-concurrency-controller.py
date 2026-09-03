@@ -71,6 +71,16 @@ def write_json_atomic(path: pathlib.Path, value: dict[str, Any], mode: int = 0o6
     os.replace(temporary, path)
 
 
+def resource_scope(args: argparse.Namespace) -> dict[str, str]:
+    return {
+        "kind": "gem-host-provider-accounts-workflow",
+        "host": os.uname().nodename,
+        "workflow": str(args.workflow),
+        "runtimeUrl": str(args.runtime_url),
+        "leaseGuard": str(args.lease_guard),
+    }
+
+
 def parse_pressure(text: str, kind: str) -> float | None:
     for line in text.splitlines():
         fields = line.split()
@@ -211,14 +221,17 @@ def write_workflow_atomic(path: pathlib.Path, text: str) -> None:
     os.replace(temporary, path)
 
 
-def load_state(path: pathlib.Path, current_target: int) -> dict[str, Any]:
+def load_state(
+    path: pathlib.Path, current_target: int, scope: dict[str, str]
+) -> dict[str, Any]:
     try:
         value = read_json(path)
     except (OSError, ValueError, json.JSONDecodeError):
         value = {}
-    if value.get("schema") != STATE_SCHEMA:
+    if value.get("schema") != STATE_SCHEMA or value.get("resourceScope") != scope:
         return {
             "schema": STATE_SCHEMA,
+            "resourceScope": scope,
             "target": current_target,
             "lowStreak": 0,
             "lastChangeEpoch": 0.0,
@@ -234,6 +247,7 @@ def load_state(path: pathlib.Path, current_target: int) -> dict[str, Any]:
         last_change = 0.0
     return {
         "schema": STATE_SCHEMA,
+        "resourceScope": scope,
         "target": target,
         "lowStreak": low_streak,
         "lastChangeEpoch": float(last_change),
@@ -308,7 +322,8 @@ def choose_target(
 def run(args: argparse.Namespace) -> dict[str, Any]:
     now_epoch = time.time()
     workflow_text, current = read_current_target(args.workflow)
-    state = load_state(args.state, current)
+    scope = resource_scope(args)
+    state = load_state(args.state, current, scope)
     proc_root = args.proc_root
     sample = {
         "cpuCount": read_cpu_count(),
@@ -334,6 +349,7 @@ def run(args: argparse.Namespace) -> dict[str, Any]:
         write_workflow_atomic(args.workflow, render_target(workflow_text, target))
     next_state = {
         "schema": STATE_SCHEMA,
+        "resourceScope": scope,
         "target": target,
         "lowStreak": low_streak,
         "lastChangeEpoch": now_epoch if changed else state.get("lastChangeEpoch", 0.0),
@@ -342,6 +358,7 @@ def run(args: argparse.Namespace) -> dict[str, Any]:
         write_json_atomic(args.state, next_state)
     receipt = {
         "schema": SCHEMA,
+        "resourceScope": scope,
         "observedAt": utc_now(),
         "mode": "dry-run" if args.dry_run else "applied",
         "current": current,
@@ -372,7 +389,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument(
         "--workflow",
         type=pathlib.Path,
-        default=home / "symphony-runtime/elixir/WORKFLOW.jovie-ui-pilot.md",
+        default=home / ".config/symphony/WORKFLOW.md",
     )
     parser.add_argument(
         "--state",

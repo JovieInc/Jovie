@@ -117,6 +117,12 @@ describe('bounded PR visual review contract', () => {
     });
   });
 
+  it('does not treat App Router (shell) catalog pages as chat chrome', () => {
+    expect(
+      routeChangedFiles(['apps/web/app/app/(shell)/library/page.tsx']).routes
+    ).toEqual(['/']);
+  });
+
   it('routes the authenticated session boundary through chat instead of masking it with a public capture', () => {
     expect(
       routeChangedFiles([

@@ -19,6 +19,13 @@ Repair the deterministic path.
 
 ## Acceptance criteria
 - Focused coverage passes.`;
+const TARGETED_DESCRIPTION = `${DESCRIPTION}
+
+## Target
+- target_system: jovie-product
+- target_repo: JovieInc/Jovie
+- artifact: scripts/backlog-orchestrator/admission-gate.mjs
+- verification_authority: JovieInc/Jovie CI`;
 
 function issue(identifier, overrides = {}) {
   return {
@@ -144,6 +151,24 @@ describe('exhaustive Symphony admission dispositions', () => {
       'deferred',
       'nested-evidence-incomplete'
     );
+  });
+
+  it('does not treat a mismatched repository admission receipt as ownership evidence', () => {
+    const result = expect(
+      issue('JOV-25', {
+        description: TARGETED_DESCRIPTION,
+        comments: {
+          nodes: [
+            {
+              body: '<!-- symphony-admission:v1 {"target_system":"jovie-product","target_repo":"JovieInc/LogYourBody","artifact":"scripts/backlog-orchestrator/admission-gate.mjs","verification_authority":"JovieInc/LogYourBody CI"} -->',
+            },
+          ],
+        },
+      }),
+      'eligible',
+      'deterministic-safe'
+    );
+    assert.equal(result.evidence.admissionReceipt, false);
   });
 
   it('gives protected, sensitive, active, parent, incomplete, and stale work typed outcomes', () => {

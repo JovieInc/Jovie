@@ -111,6 +111,7 @@ BLOCKED_ADMISSION_LABELS = frozenset(
         "hold",
         "manual-incident",
         "blocked",
+        "no-symphony",
     )
 )
 SUPPORTED_TEAMS = frozenset(("JOV", "LYB"))

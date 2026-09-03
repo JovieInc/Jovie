@@ -31,8 +31,8 @@ from typing import Any
 
 OFFICIAL_SERVICE_NAME = "symphony-elixir.service"
 OFFICIAL_PORT = 4041
-OFFICIAL_PROJECT_ID = "440ea404-041f-461e-ae45-dd6a2e98e4a1"
-OFFICIAL_PROJECT_SLUG = "symphony-ui-pilot-96d6b9c5b2d5"
+OFFICIAL_TEAM_KEY = "JOV"
+TEAM_KEY_PATTERN = re.compile(r"^[A-Z][A-Z0-9]*$")
 OFFICIAL_WORKSPACE_ROOT = "~/symphony-elixir-workspaces"
 OFFICIAL_WORKFLOW_TARGET = "%h/.config/symphony/WORKFLOW.md"
 OFFICIAL_LOGS_ROOT = "%h/symphony-elixir-logs"
@@ -42,7 +42,7 @@ LINEAR_HOURLY_REQUEST_BUDGET = 2_500
 LINEAR_PAGE_SIZE = 50
 LINEAR_COUNT_PAGE_SIZE = 100
 LINEAR_COUNT_MAX_PAGES = 100
-MEASURED_ACTIVE_ISSUES = 110
+MEASURED_ACTIVE_ISSUES = 185  # JOV team Todo/In Progress/Rework/Merging, 2026-09-03
 PER_AGENT_REQUESTS_PER_HOUR = 30
 RETRY_REFRESH_REQUESTS_PER_HOUR = 100
 TOOL_REQUESTS_PER_HOUR = 300
@@ -54,8 +54,9 @@ DEFAULT_MAX_GATE_SLEEP_SECONDS = 3_900
 DEFAULT_RATE_LIMIT_GATE = (
     pathlib.Path.home() / ".local/state/symphony-elixir/linear-rate-limit.json"
 )
-ACTIVE_STATES = ("Todo", "In Progress")
+ACTIVE_STATES = ("Todo", "In Progress", "Rework", "Merging")
 TERMINAL_STATES = ("Done", "Canceled", "Cancelled", "Duplicate", "Closed")
+EXCLUDED_LABELS = ("no-symphony", "needs-human")
 LINEAR_API_URL = "https://api.linear.app/graphql"
 OBSOLETE_TOKENS = (
     "symphony-burrito.service",
@@ -68,16 +69,14 @@ OBSOLETE_TOKENS = (
     "WORKFLOW.jovie-ui-pilot.md",
 )
 LINEAR_ELIGIBLE_COUNT_QUERY = """
-query SymphonyLinearEligibleCount($projectId: String!, $first: Int!, $after: String) {
-  project(id: $projectId) {
-    issues(first: $first, after: $after) {
-      nodes {
-        state { name }
-      }
-      pageInfo {
-        hasNextPage
-        endCursor
-      }
+query SymphonyLinearEligibleCount($teamKey: String!, $stateNames: [String!]!, $first: Int!, $after: String) {
+  issues(filter: {team: {key: {eq: $teamKey}}, state: {name: {in: $stateNames}}}, first: $first, after: $after) {
+    nodes {
+      id
+    }
+    pageInfo {
+      hasNextPage
+      endCursor
     }
   }
 }
@@ -86,8 +85,11 @@ query SymphonyLinearEligibleCount($projectId: String!, $first: Int!, $after: Str
 
 @dataclass(frozen=True)
 class WorkflowContract:
-    project_slug: str
+    team_key: str
     api_key: str
+    project_slug: str | None
+    required_labels: tuple[str, ...]
+    excluded_labels: tuple[str, ...]
     active_states: tuple[str, ...]
     terminal_states: tuple[str, ...]
     poll_interval_ms: int
@@ -236,18 +238,25 @@ def parse_workflow(path: pathlib.Path) -> WorkflowContract:
     workspace = _section(lines, "workspace")
     agent = _section(lines, "agent")
     server = _section(lines, "server")
-    project_match = re.search(r'^\s+project_slug:\s*"?([^"\n]+)"?\s*$', front, re.M)
+    team_match = re.search(r'^\s+team_key:\s*"?([^"\n]+?)"?\s*$', front, re.M)
+    project_match = re.search(r'^\s+project_slug:\s*"?([^"\n]+?)"?\s*$', front, re.M)
     api_key_match = re.search(r"^\s+api_key:\s*(.+?)\s*$", front, re.M)
-    if not project_match:
-        raise ValueError("missing tracker.provider.project_slug")
+    if not team_match:
+        raise ValueError("missing tracker.provider.team_key")
+    team_key = team_match.group(1).strip()
+    if not TEAM_KEY_PATTERN.fullmatch(team_key):
+        raise ValueError(f"malformed tracker.provider.team_key:{team_key}")
     if not api_key_match:
         raise ValueError("missing tracker.provider.api_key")
     after_create = ""
     if "after_create:" in front:
         after_create = front.split("after_create:", 1)[1].split("\nagent:", 1)[0]
     return WorkflowContract(
-        project_slug=project_match.group(1).strip(),
+        team_key=team_key,
         api_key=api_key_match.group(1).strip(),
+        project_slug=project_match.group(1).strip() if project_match else None,
+        required_labels=_list_items(tracker, "required_labels"),
+        excluded_labels=_list_items(tracker, "excluded_labels"),
         active_states=_list_items(tracker, "active_states"),
         terminal_states=_list_items(tracker, "terminal_states"),
         poll_interval_ms=_int_scalar(polling, "interval_ms"),
@@ -304,7 +313,7 @@ def compute_budget(inputs: BudgetInputs) -> dict[str, int | bool]:
 def fetch_linear_eligible_issue_count(
     *,
     api_key: str,
-    project_id: str = OFFICIAL_PROJECT_ID,
+    team_key: str = OFFICIAL_TEAM_KEY,
     active_states: tuple[str, ...] = ACTIVE_STATES,
     api_url: str = LINEAR_API_URL,
     page_size: int = LINEAR_COUNT_PAGE_SIZE,
@@ -313,8 +322,9 @@ def fetch_linear_eligible_issue_count(
         return 0
     if page_size <= 0:
         raise ValueError("page_size must be positive")
+    if not TEAM_KEY_PATTERN.fullmatch(team_key):
+        raise ValueError(f"team_key must match {TEAM_KEY_PATTERN.pattern}")
 
-    active = set(active_states)
     count = 0
     after: str | None = None
     pages = 0
@@ -323,7 +333,8 @@ def fetch_linear_eligible_issue_count(
             {
                 "query": LINEAR_ELIGIBLE_COUNT_QUERY,
                 "variables": {
-                    "projectId": project_id,
+                    "teamKey": team_key,
+                    "stateNames": list(active_states),
                     "first": page_size,
                     "after": after,
                 },
@@ -381,17 +392,12 @@ def fetch_linear_eligible_issue_count(
         errors = decoded.get("errors") if isinstance(decoded, dict) else None
         if errors:
             raise RuntimeError("linear_eligible_count_graphql_errors")
-        project = decoded.get("data", {}).get("project") if isinstance(decoded, dict) else None
-        issues = project.get("issues") if isinstance(project, dict) else None
+        issues = decoded.get("data", {}).get("issues") if isinstance(decoded, dict) else None
         nodes = issues.get("nodes") if isinstance(issues, dict) else None
         page_info = issues.get("pageInfo") if isinstance(issues, dict) else None
         if not isinstance(nodes, list) or not isinstance(page_info, dict):
-            raise RuntimeError("linear_eligible_count_missing_project_issues")
-        for node in nodes:
-            state = node.get("state") if isinstance(node, dict) else None
-            state_name = state.get("name") if isinstance(state, dict) else None
-            if state_name in active:
-                count += 1
+            raise RuntimeError("linear_eligible_count_missing_team_issues")
+        count += len(nodes)
         if page_info.get("hasNextPage") is not True:
             return count
         after_value = page_info.get("endCursor")
@@ -406,7 +412,7 @@ def fetch_linear_eligible_issue_count(
 def resolve_linear_eligible_issue_count(
     *,
     linear_env_file: pathlib.Path | None,
-    project_id: str = OFFICIAL_PROJECT_ID,
+    team_key: str = OFFICIAL_TEAM_KEY,
     active_states: tuple[str, ...] = ACTIVE_STATES,
     api_url: str = LINEAR_API_URL,
 ) -> int:
@@ -415,7 +421,7 @@ def resolve_linear_eligible_issue_count(
         return _non_negative_int(override.strip(), name="SYMPHONY_LINEAR_ACTIVE_ISSUES")
     return fetch_linear_eligible_issue_count(
         api_key=_linear_api_key(linear_env_file),
-        project_id=project_id,
+        team_key=team_key,
         active_states=active_states,
         api_url=api_url,
     )
@@ -443,10 +449,19 @@ def validate_source(
         errors.append(f"workflow_invalid:{exc}")
 
     if workflow is not None:
-        if workflow.project_slug != OFFICIAL_PROJECT_SLUG:
-            errors.append(f"workflow_project_slug:{workflow.project_slug}")
+        if workflow.team_key != OFFICIAL_TEAM_KEY:
+            errors.append(f"workflow_team_key:{workflow.team_key}")
+        if workflow.project_slug is not None:
+            errors.append(f"workflow_project_slug_present:{workflow.project_slug}")
         if workflow.api_key != "$LINEAR_API_KEY":
             errors.append("workflow_api_key_not_env_bound")
+        if workflow.required_labels:
+            errors.append(
+                f"workflow_required_labels_present:{','.join(workflow.required_labels)}"
+            )
+        for label in EXCLUDED_LABELS:
+            if label not in workflow.excluded_labels:
+                errors.append(f"workflow_excluded_label_missing:{label}")
         if workflow.active_states != ACTIVE_STATES:
             errors.append(f"workflow_active_states:{','.join(workflow.active_states)}")
         for state in TERMINAL_STATES:
@@ -949,7 +964,7 @@ def main(argv: list[str] | None = None) -> int:
         type=pathlib.Path,
         default=pathlib.Path.home() / ".config/symphony/linear.env",
     )
-    count_parser.add_argument("--project-id", default=OFFICIAL_PROJECT_ID)
+    count_parser.add_argument("--team-key", default=OFFICIAL_TEAM_KEY)
     count_parser.add_argument("--api-url", default=LINEAR_API_URL)
     count_parser.add_argument("--active-state", action="append")
 
@@ -1014,7 +1029,7 @@ def main(argv: list[str] | None = None) -> int:
         active_states = tuple(args.active_state or ACTIVE_STATES)
         count = resolve_linear_eligible_issue_count(
             linear_env_file=args.linear_env_file,
-            project_id=args.project_id,
+            team_key=args.team_key,
             active_states=active_states,
             api_url=args.api_url,
         )

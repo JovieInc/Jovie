@@ -3,6 +3,7 @@
 import { Button, ConfirmDialog } from '@jovie/ui';
 import { usePathname, useRouter, useSearchParams } from 'next/navigation';
 import { type KeyboardEvent, useRef, useState } from 'react';
+import type { ArtistRuleView } from '@/lib/artist-rules/types';
 import type { CreatorDocumentListItem } from '@/lib/creator-documents/types';
 import type { ReleaseViewModel } from '@/lib/discography/types';
 import type { LibraryAssetShareViewModel } from '@/lib/library/asset-share';
@@ -11,7 +12,9 @@ import {
   LIBRARY_STAGE_LABELS,
   parseLibraryStageParam,
 } from '@/lib/library/lifecycle-stage';
+import type { LibraryPostReleaseBundle } from '@/lib/library/post-release-types';
 import type { LibraryProfileVisibility } from '@/lib/library/profile-visibility';
+import type { LibraryRelationshipView } from '@/lib/library/track-drawer-types';
 import type { LibraryMerchCard } from '@/lib/merch/types';
 import type { PublicVideoListItem } from '@/lib/youtube-library/queries';
 import { ReleaseCatalogPageClient } from '../dashboard/releases/ReleaseCatalogPageClient';
@@ -31,6 +34,10 @@ export function LibraryPageClient({
   creatorDocumentsNextCursor = null,
   creatorDocumentsLoadFailed = false,
   youtubeVideos = [],
+  youtubeConnected = false,
+  initialArtistRules = [],
+  relationships = [],
+  postReleaseBundle,
 }: {
   readonly creatorProfileId: string;
   readonly merchCards: readonly LibraryMerchCard[];
@@ -47,6 +54,10 @@ export function LibraryPageClient({
   readonly creatorDocumentsNextCursor?: string | null;
   readonly creatorDocumentsLoadFailed?: boolean;
   readonly youtubeVideos?: readonly PublicVideoListItem[];
+  readonly youtubeConnected?: boolean;
+  readonly initialArtistRules?: readonly ArtistRuleView[];
+  readonly relationships?: readonly LibraryRelationshipView[];
+  readonly postReleaseBundle?: LibraryPostReleaseBundle;
 }) {
   const pathname = usePathname();
   const router = useRouter();
@@ -111,6 +122,8 @@ export function LibraryPageClient({
         aria-label='Library Stages'
         data-testid='library-stage-tabs'
         className='flex h-10 shrink-0 items-center gap-1 border-b border-subtle px-3'
+        data-youtube-connected={youtubeConnected ? 'true' : 'false'}
+        data-artist-rule-count={String(initialArtistRules.length)}
       >
         {STAGE_TABS.map(tab => (
           <Button
@@ -167,6 +180,12 @@ export function LibraryPageClient({
             assetShareByAssetId={assetShareByAssetId}
             creatorDocuments={creatorDocuments}
             youtubeVideos={youtubeVideos}
+            merchProducts={merchCards.map(card => ({
+              id: card.id,
+              title: card.title,
+            }))}
+            relationships={relationships}
+            postReleaseBundle={postReleaseBundle}
           />
         </div>
       )}
