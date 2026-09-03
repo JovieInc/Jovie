@@ -1,4 +1,5 @@
 import { render, screen } from '@testing-library/react';
+import type { ReactNode } from 'react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { ChatUsageAlert } from './ChatUsageAlert';
 
@@ -6,6 +7,12 @@ const mockUseChatUsageQuery = vi.fn();
 
 vi.mock('@/lib/queries', () => ({
   useChatUsageQuery: () => mockUseChatUsageQuery(),
+}));
+
+vi.mock('@/components/molecules/UpgradeButton', () => ({
+  UpgradeButton: ({ children }: { readonly children: ReactNode }) => (
+    <button type='button'>{children}</button>
+  ),
 }));
 
 vi.mock('@/lib/env-client', () => ({
