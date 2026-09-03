@@ -54,6 +54,7 @@
 
 import type * as Sentry from '@sentry/nextjs';
 import {
+  isNonActionableLoopbackBetterAuthHostEvent,
   isNonActionableSpotifyReleaseCreditBoundEvent,
   isNonActionableUpstashErrorBagEvent,
   isNonActionableVercelIpcEvent,
@@ -479,6 +480,10 @@ export function scrubPii(
   }
 
   if (isNonActionableVercelIpcEvent(event)) {
+    return null;
+  }
+
+  if (isNonActionableLoopbackBetterAuthHostEvent(event)) {
     return null;
   }
 
