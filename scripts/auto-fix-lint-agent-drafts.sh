@@ -2,11 +2,12 @@
 # Auto-Fix Lint on Agent Drafts
 #
 # Finds agent-owned draft PRs with a failing Lint/Biome check, checks out the
-# PR head, runs `pnpm biome check --write .` on changed files, and pushes the
-# mechanical fixes back. If typecheck fails (semantic error), it skips and
-# comments instead.
+# same-repo PR head, runs `pnpm biome check --write .` on changed files, and
+# pushes the mechanical fixes back. If typecheck fails (semantic error), it
+# skips and comments instead.
 #
-# Only fires on agent branches. Human PRs are left alone.
+# Same-repo agent branches only. Fork heads are never cloned or installed.
+# Human PRs are left alone.
 #
 # Env:
 #   DRY_RUN=1   classify and print only; fix nothing
@@ -16,6 +17,7 @@ set -euo pipefail
 source "$(dirname "${BASH_SOURCE[0]}")/lib/gh-retry.sh"
 
 REPO="${REPO:-JovieInc/Jovie}"
+REPO_OWNER="${REPO%%/*}"
 DRY_RUN="${DRY_RUN:-0}"
 AGENT_RE='^(tim/|codex/|agent/|claude/|linear/|dependabot/)'
 
@@ -102,8 +104,9 @@ ENRICHED="[]"
 while IFS= read -r pr; do
   n="$(jq -r '.n' <<<"$pr")"
   fail="[]"
-  if jq -e '
+  if jq -e --arg repo_owner "$REPO_OWNER" '
     .draft
+    and .headOwner == $repo_owner
     and ((.head | test("^(tim/|codex/|agent/|claude/|linear/|dependabot/)")))
     and (([.L[]] | any(. == "needs-human" or . == "hold" or . == "gated" or . == "fast")) | not)
   ' <<<"$pr" >/dev/null; then
@@ -114,9 +117,10 @@ done < <(jq -c '.[]' <<<"$SNAP")
 SNAP="$ENRICHED"
 
 # Filter to PRs with a failing lint check
-LINT_PR="$(echo "$SNAP" | jq -c '[.[] |
+LINT_PR="$(echo "$SNAP" | jq -c --arg repo_owner "$REPO_OWNER" '[.[] |
   select(
     .draft
+    and .headOwner == $repo_owner
     and ((.head | test("^(tim/|codex/|agent/|claude/|linear/|dependabot/)")))
     and (([.L[]] | any(. == "needs-human" or . == "hold" or . == "gated" or . == "fast")) | not)
     and ([.fail[]] | any(test("(?i)lint|biome")))
@@ -151,16 +155,17 @@ while IFS= read -r pr; do
     continue
   fi
 
-  # Clone the PR head into a temp dir
+  if [[ "$headOwner" != "$REPO_OWNER" ]]; then
+    echo "    skip: head $headOwner/$headRepo is not same-repo $REPO"
+    continue
+  fi
+
+  # Clone the same-repo PR head into a temp dir. Fork heads are never
+  # installed or executed — they can plant lifecycle scripts that steal
+  # the workflow's contents:write token.
   clone_dir="$WORKDIR/pr-$n"
   mkdir -p "$clone_dir"
-
-  # Determine clone URL — same repo or fork
-  if [[ -n "$headOwner" && "$headOwner" != "$(echo "$REPO" | cut -d/ -f1)" ]]; then
-    clone_url="https://github.com/$headOwner/$headRepo.git"
-  else
-    clone_url="https://github.com/$REPO.git"
-  fi
+  clone_url="https://github.com/$REPO.git"
 
   if ! git clone --depth 50 --branch "$head" "$clone_url" "$clone_dir" 2>/dev/null; then
     echo "    !! failed to clone $clone_url branch $head"
@@ -176,7 +181,10 @@ while IFS= read -r pr; do
     corepack prepare pnpm@9.15.4 --activate >/dev/null 2>&1
   fi
 
-  if ! pnpm install --frozen-lockfile >/dev/null 2>&1; then
+  # Ignore lifecycle scripts and drop write tokens from the install env so
+  # PR-controlled package.json cannot RCE or exfiltrate GH_TOKEN.
+  if ! env -u GH_TOKEN -u GITHUB_TOKEN -u NODE_AUTH_TOKEN \
+    pnpm install --frozen-lockfile --ignore-scripts >/dev/null 2>&1; then
     echo "    !! pnpm install failed"
     comment "$n" "🤖 Auto-fix failed: dependency install error. Manual fix needed."
     continue
@@ -195,8 +203,11 @@ while IFS= read -r pr; do
     git -c user.name="jovie-bot" -c user.email="bot@jovie.com" \
       commit -m "chore(ci): auto-fix biome lint failures"
 
-    # Push back to the PR branch
-    if git push origin "$head" 2>/dev/null; then
+    # Push back to the same-repo PR branch. Authenticate only for this
+    # git invocation so the token never sits in the clone's git config.
+    push_auth="AUTHORIZATION: basic $(printf 'x-access-token:%s' "$GH_TOKEN" | openssl base64 -A)"
+    if git -c "http.https://github.com/.extraheader=${push_auth}" \
+      push origin "$head" 2>/dev/null; then
       echo "    ✓ pushed biome fixes to $head"
       comment "$n" "🤖 Auto-fixed biome lint violations. If typecheck still fails, manual fix needed."
     else

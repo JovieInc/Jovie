@@ -1845,6 +1845,39 @@ describe('merge-group front-item churn guard (JOV-5030)', () => {
     expect(decision.action).toBe('allow');
   });
 
+  it('blocks when drain evidence only annotates the latest repeated unit-test failure', () => {
+    // Live #16238: drain attached failedSteps to the latest merge_group run
+    // only. Each ejection retried on a new main SHA, so the unclassified
+    // sibling attempt kept re-entering the queue.
+    const decision = frontItemChurnDecision({
+      prNumber: 16238,
+      currentBaseSha: NEW_BASE,
+      headCommittedAt: '2026-08-20T00:00:00.000Z',
+      observedAt: '2026-08-20T03:30:00.000Z',
+      mergeGroupRuns: [
+        groupRun(
+          16238,
+          BASE,
+          'failure',
+          '2026-08-20T02:41:31.000Z',
+          'completed'
+        ),
+        groupRun(
+          16238,
+          NEW_BASE,
+          'failure',
+          '2026-08-20T03:21:50.000Z',
+          'completed',
+          ['Run unit tests']
+        ),
+      ],
+    });
+    expect(decision.action).toBe('block');
+    expect(decision.reason).toContain('unchanged head');
+    expect(decision.evidence.failureClass).toBe('repeated-product-check');
+    expect(decision.evidence.failedAttempts).toBe(2);
+  });
+
   it('suppresses an unchanged iOS source head after repeated build failures', () => {
     // Live #16441 failed the iOS `Build and test` step four times without a
     // source commit. Each queue rebuild changed the synthetic group base, so
@@ -1967,6 +2000,88 @@ describe('merge-group front-item churn guard (JOV-5030)', () => {
     });
     expect(decision.action).toBe('allow');
     expect(decision.reason).toContain('succeeded');
+  });
+
+  it('keeps a newer in-progress attempt queued instead of replaying stale failures', () => {
+    // Live #17013: a standalone exact-main group started at 11:13:03, the
+    // controller ejected it at 11:15:46 based on older failures, and the same
+    // group completed successfully at 11:21:14. Incomplete newer evidence must
+    // win until GitHub publishes a terminal conclusion.
+    const active = groupRun(
+      17013,
+      BASE,
+      null,
+      '2026-09-02T11:13:03.000Z',
+      'in_progress'
+    );
+    const decision = frontItemChurnDecision({
+      prNumber: 17013,
+      currentBaseSha: BASE,
+      headCommittedAt: '2026-09-02T10:00:00.000Z',
+      observedAt: '2026-09-02T11:15:46.000Z',
+      mergeGroupRuns: [
+        groupRun(
+          17013,
+          NEW_BASE,
+          'failure',
+          '2026-09-02T11:01:00.000Z',
+          'completed',
+          ['Run unit tests']
+        ),
+        active,
+      ],
+    });
+
+    expect(decision.action).toBe('allow');
+    expect(decision.reason).toContain('still active');
+    expect(decision.evidence).toEqual({
+      activeRunId: active.id,
+      activeStartedAt: '2026-09-02T11:13:03.000Z',
+      activeStatus: 'in_progress',
+    });
+  });
+
+  it('does not let an older active attempt hide a newer terminal failure', () => {
+    const decision = frontItemChurnDecision({
+      prNumber: 17013,
+      currentBaseSha: BASE,
+      headCommittedAt: '2026-09-02T10:00:00.000Z',
+      observedAt: '2026-09-02T11:15:46.000Z',
+      mergeGroupRuns: [
+        groupRun(17013, BASE, null, '2026-09-02T11:01:00.000Z', 'in_progress'),
+        groupRun(
+          17013,
+          NEW_BASE,
+          'failure',
+          '2026-09-02T11:13:03.000Z',
+          'completed',
+          ['Run deterministic brand safety scan']
+        ),
+      ],
+    });
+
+    expect(decision.action).toBe('block');
+    expect(decision.evidence.failureClass).toBe('deterministic-product-check');
+  });
+
+  it('protects an active current-head attempt when older failures rolled out of history', () => {
+    const active = groupRun(
+      17013,
+      BASE,
+      null,
+      '2026-09-02T11:13:03.000Z',
+      'in_progress'
+    );
+    const decision = frontItemChurnDecision({
+      prNumber: 17013,
+      currentBaseSha: BASE,
+      headCommittedAt: '2026-09-02T10:00:00.000Z',
+      observedAt: '2026-09-02T11:15:46.000Z',
+      mergeGroupRuns: [active],
+    });
+
+    expect(decision.action).toBe('allow');
+    expect(decision.evidence.activeRunId).toBe(active.id);
   });
 
   it('keeps the failing source head suppressed after elapsed time', () => {
@@ -2224,13 +2339,20 @@ describe('native merge-queue cohort (JOV-5047)', () => {
 
   it('converts GraphQL checkResponseTimeout seconds onto REST minutes (JOV-5315)', () => {
     expect(mapGraphqlCheckResponseTimeoutToMinutes(3600)).toBe(60);
-    expect(mapGraphqlCheckResponseTimeoutToMinutes(60)).toBe(60);
+    expect(mapGraphqlCheckResponseTimeoutToMinutes(60)).toBe(1);
+    expect(mapGraphqlCheckResponseTimeoutToMinutes(120)).toBe(2);
+    expect(mapGraphqlCheckResponseTimeoutToMinutes(360)).toBe(6);
     expect(mapGraphqlCheckResponseTimeoutToMinutes(1800)).toBe(30);
     expect(
       normalizeNativeQueuePolicyParameters({ checkResponseTimeout: 3600 })
     ).toMatchObject({ check_response_timeout_minutes: 60 });
     expect(
-      normalizeNativeQueuePolicyParameters({ checkResponseTimeout: 60 })
+      normalizeNativeQueuePolicyParameters({ checkResponseTimeout: 120 })
+    ).toMatchObject({ check_response_timeout_minutes: 2 });
+    expect(
+      normalizeNativeQueuePolicyParameters({
+        check_response_timeout_minutes: 60,
+      })
     ).toMatchObject({ check_response_timeout_minutes: 60 });
     expect(
       mergeNativeQueuePolicyObservations(

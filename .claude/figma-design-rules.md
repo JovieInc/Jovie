@@ -109,11 +109,17 @@ design-system.css (:root vars) → globals.css (@theme blocks) → Tailwind util
 ### Accent Color
 
 ```css
---color-accent:        lch(47.918% 59.303 288.421)  /* #5e6ad2 — Linear purple-blue */
---color-accent-hover:  lch(55% 59.303 288.421)      /* Dark mode */
---color-accent-active: lch(42% 59.303 288.421)
---color-accent-subtle: lch(20% 30 288.421)           /* Dark mode bg */
+--color-accent:        var(--noir-ion-ion)        /* dark UI anchor #11AFFF */
+--color-accent-purple: #A982FF                    /* Ultra */
+--color-accent-pink:   #FF48D2                    /* Pulse */
+--color-info:          var(--color-accent-teal)   /* Aqua system signal */
 ```
+
+Current production UI anchors are Noir Ion, not the retired Carbon/Linear
+purple-blue values. Figma translation must read `DESIGN.md` and the live CSS
+emitters before introducing colors. Jovie-owned generated brand imagery uses
+Scene Palette v1 from `apps/web/data/marketing/imageColorPolicy.ts`; do not
+apply the softened scene references to shipped UI tokens.
 
 ### Borders
 

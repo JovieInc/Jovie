@@ -1,7 +1,9 @@
 name: PR Visual Review
 
-# Bounded, advisory UI evidence lane. Capture runs on PR code without secrets;
+# Bounded UI evidence lane. Capture runs on PR code without secrets;
 # the review step uses only the trusted base script and a configured backend.
+# JOV-5459: missing capture evidence (ENOENT) fails the capture job. LLM review
+# comments stay advisory.
 on:
   pull_request_target:
     types: [opened, reopened, synchronize]
@@ -31,11 +33,9 @@ env:
 
 jobs:
   capture:
-    # Failures remain visible in Actions and its uploaded evidence, but the
-    # check itself cannot become a native merge-queue gate. Deterministic CI
-    # remains fail-closed and is the merge gate.
-    name: Capture changed UI (desktop + mobile) (advisory)
-    continue-on-error: true
+    # Capture evidence is fail-closed (JOV-5459). LLM screenshot review below
+    # stays advisory and is not a merge-queue gate.
+    name: Capture changed UI (desktop + mobile)
     runs-on: ubuntu-latest
     timeout-minutes: 35
     permissions:
@@ -135,44 +135,13 @@ jobs:
         if: always()
         run: kill "$(cat "$RUNNER_TEMP/pr-visual-server.pid" 2>/dev/null)" 2>/dev/null || true
 
-      - name: Record advisory capture outcome
+      - name: Enforce visual evidence (fail-closed)
         if: always()
         env:
           BUILD_OUTCOME: ${{ steps.build.outcome }}
           SERVER_OUTCOME: ${{ steps.server.outcome }}
           CAPTURE_OUTCOME: ${{ steps.routed_capture.outcome }}
-        run: |
-          mkdir -p "$PR_VISUAL_OUT"
-          node --input-type=module - <<'NODE'
-          import { writeFile } from 'node:fs/promises';
-
-          const stages = {
-            build: process.env.BUILD_OUTCOME || 'skipped',
-            server: process.env.SERVER_OUTCOME || 'skipped',
-            capture: process.env.CAPTURE_OUTCOME || 'skipped',
-          };
-          const failedStages = Object.entries(stages)
-            .filter(([, outcome]) => outcome === 'failure')
-            .map(([stage]) => stage);
-          await writeFile(
-            `${process.env.PR_VISUAL_OUT}/advisory-outcome.json`,
-            JSON.stringify(
-              {
-                status: failedStages.length ? 'unavailable' : 'completed',
-                advisory: true,
-                stages,
-                failedStages,
-              },
-              null,
-              2
-            )
-          );
-          if (failedStages.length) {
-            console.log(
-              `::warning::Visual capture evidence is unavailable at: ${failedStages.join(', ')}. This advisory lane does not block merging.`
-            );
-          }
-          NODE
+        run: node .github/scripts/pr-visual-evidence-gate.mjs
 
       - name: Upload visual evidence
         id: upload
@@ -185,13 +154,14 @@ jobs:
           if-no-files-found: error
           retention-days: 14
 
-      - name: Report artifact upload advisory outcome
+      - name: Fail on missing evidence upload
         if: always()
         env:
           UPLOAD_OUTCOME: ${{ steps.upload.outcome }}
         run: |
           if [ "$UPLOAD_OUTCOME" = failure ]; then
-            echo "::warning::Visual evidence upload failed. The capture outcome above remains advisory and does not block merging."
+            echo "::error::Visual evidence upload failed. Visual ENOENT is FAIL, not advisory (JOV-5459)."
+            exit 1
           fi
 
   review:

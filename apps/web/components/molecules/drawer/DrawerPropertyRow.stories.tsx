@@ -1,4 +1,5 @@
 import type { Meta, StoryObj } from '@storybook/nextjs-vite';
+import { expect, fn, userEvent, within } from 'storybook/test';
 import { DrawerPropertyRow } from './DrawerPropertyRow';
 
 const meta = {
@@ -24,9 +25,16 @@ export const ReadOnly: Story = {};
 export const Interactive: Story = {
   args: {
     interactive: true,
-    onClick: () => undefined,
+    onClick: fn(),
     label: 'Open release',
     value: 'Summer EP',
+  },
+  play: async ({ canvasElement, args }) => {
+    const property = within(canvasElement).getByRole('button', {
+      name: 'Open release Summer EP',
+    });
+    await userEvent.click(property);
+    await expect(args.onClick).toHaveBeenCalled();
   },
 };
 

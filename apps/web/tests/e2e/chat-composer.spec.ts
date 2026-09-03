@@ -501,13 +501,7 @@ test.describe('Chat composer — Variant F surface morph', () => {
     await expectSurfaceMode(page, 'root');
 
     await page.keyboard.press('Escape');
-
-    const isFocused = await page.evaluate(
-      selector =>
-        document.activeElement === document.querySelector(selector as string),
-      COMPOSER_TEXTAREA
-    );
-    expect(isFocused).toBe(true);
+    await expect(textarea).toBeFocused({ timeout: 5_000 });
   });
 
   test('F: compact viewport stacks rail above input', async ({ page }) => {

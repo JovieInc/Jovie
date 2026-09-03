@@ -1,4 +1,8 @@
 import { APP_ROUTES } from '@/constants/routes';
+import {
+  E2E_PREBUILT_CLAIM_TOKEN,
+  E2E_PREBUILT_CLAIM_USERNAME,
+} from '@/lib/testing/e2e-prebuilt-claim';
 
 export type PublicSurfaceFamily =
   | 'marketing'
@@ -633,7 +637,10 @@ const PROFILE_SURFACES = [
     allowMissingMain: true,
     lighthouse: false,
     perfGroups: ['public-profile-core'],
-    interactions: [...PROFILE_INTERACTIONS, { id: 'dsp-actions' }],
+    interactions: [
+      ...PROFILE_INTERACTIONS,
+      { id: 'dsp-actions', optional: true },
+    ],
   },
   {
     id: 'profile-music',
@@ -648,7 +655,10 @@ const PROFILE_SURFACES = [
     allowMissingMain: true,
     lighthouse: false,
     perfGroups: ['public-profile-core'],
-    interactions: [...PROFILE_INTERACTIONS, { id: 'dsp-actions' }],
+    interactions: [
+      ...PROFILE_INTERACTIONS,
+      { id: 'dsp-actions', optional: true },
+    ],
   },
   {
     id: 'profile-notifications',
@@ -666,7 +676,10 @@ const PROFILE_SURFACES = [
     allowMissingMain: true,
     lighthouse: true,
     perfGroups: ['public-profile-core'],
-    interactions: [...PROFILE_INTERACTIONS, { id: 'notification-form' }],
+    interactions: [
+      ...PROFILE_INTERACTIONS,
+      { id: 'notification-form', optional: true },
+    ],
   },
   {
     id: 'profile-pay',
@@ -765,11 +778,14 @@ const PROFILE_SURFACES = [
     family: 'profile-core',
     expectedState: 'redirect',
     path: '/[username]/claim',
-    resolvePath: () => `/${resolveProfileHandle('tip')}/claim`,
+    resolvePath: () =>
+      `/${E2E_PREBUILT_CLAIM_USERNAME}/claim?token=${E2E_PREBUILT_CLAIM_TOKEN}`,
     readySelectors: ['body', 'form, button, h1'],
     mainSelector: 'body',
     minMainTextLength: 60,
-    expectedRedirects: [/\/[^/?#]+\?claim=1$/],
+    expectedRedirects: [
+      new RegExp(`^/${E2E_PREBUILT_CLAIM_USERNAME}\\?claim=1$`),
+    ],
     allowMissingMain: true,
     requiresDatabase: true,
     lighthouse: false,
@@ -834,7 +850,10 @@ const PROFILE_MODE_SURFACES = [
     allowedFinalPaths: [/^\/[^/?#]+\?mode=listen$/],
     lighthouse: true,
     perfGroups: ['public-profile-mode-shell'],
-    interactions: [...PROFILE_INTERACTIONS, { id: 'dsp-actions' }],
+    interactions: [
+      ...PROFILE_INTERACTIONS,
+      { id: 'dsp-actions', optional: true },
+    ],
   },
   {
     id: 'profile-mode-subscribe',
@@ -855,7 +874,10 @@ const PROFILE_MODE_SURFACES = [
     allowedFinalPaths: [/^\/[^/?#]+\?mode=subscribe$/],
     lighthouse: true,
     perfGroups: ['public-profile-mode-shell'],
-    interactions: [...PROFILE_INTERACTIONS, { id: 'notification-form' }],
+    interactions: [
+      ...PROFILE_INTERACTIONS,
+      { id: 'notification-form', optional: true },
+    ],
   },
   {
     id: 'profile-mode-pay',

@@ -1,4 +1,7 @@
-import { APP_ROUTES } from '@/constants/routes';
+import {
+  APP_ROUTES,
+  buildSpotifyCatalogConnectionRoute,
+} from '@/constants/routes';
 import { WORKFLOW_CAPTURE_REQUEST_KIND } from '@/lib/connectors/suggested-action-kinds';
 import {
   WorkflowCaptureExecutionResultSchema,
@@ -159,8 +162,8 @@ export const DEFAULT_OPPORTUNITY_INBOX_EMPTY_ACTION_CARDS: readonly OpportunityI
       id: 'connect-spotify',
       title: 'Connect Spotify',
       body: 'Link your catalog so Jovie can spot releases, audience spikes, and pitch windows.',
-      actionLabel: 'Connect catalog',
-      href: `${APP_ROUTES.SETTINGS_ARTIST_PROFILE}?tab=music`,
+      actionLabel: 'Connect Spotify',
+      href: buildSpotifyCatalogConnectionRoute(),
     },
     {
       id: 'add-tour-dates',

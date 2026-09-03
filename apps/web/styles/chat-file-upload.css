@@ -2,19 +2,27 @@
 
 :where(.system-b-chat-drop-zone-overlay) {
   position: absolute;
-  inset: var(--space-3);
-  z-index: 6;
+  top: 0;
+  right: 0;
+  bottom: var(--system-b-chat-composer-thread-scroll-padding);
+  left: 0;
+  z-index: 4;
   display: flex;
-  align-items: center;
+  align-items: flex-start;
   justify-content: center;
-  border: 1px dashed
-    color-mix(in oklab, var(--color-border-focus) 74%, transparent);
-  border-radius: var(--radius-xl);
-  background: color-mix(
-    in oklab,
-    var(--system-b-app-content-surface) 10%,
-    transparent
-  );
+  pointer-events: none;
+  overflow: hidden;
+  contain: paint;
+  padding-top: var(--space-5);
+  border-radius: inherit;
+  background: color-mix(in oklab, var(--color-border-focus) 8%, transparent);
+}
+
+:where(.system-b-chat-drop-zone-border) {
+  position: absolute;
+  inset: var(--space-3);
+  border: 1px dashed var(--color-border-focus);
+  border-radius: inherit;
   pointer-events: none;
 }
 
@@ -100,22 +108,6 @@
   );
 }
 
-:where(.system-b-chat-upload-manifest-bar) {
-  height: 3px;
-  background: color-mix(
-    in oklab,
-    var(--color-text-primary-token) 7%,
-    transparent
-  );
-  overflow: hidden;
-}
-
-:where(.system-b-chat-upload-manifest-bar-fill) {
-  height: 100%;
-  background: var(--color-border-focus);
-  transition: width 0.5s ease;
-}
-
 :where(.system-b-chat-upload-manifest-list) {
   padding: var(--space-2);
   max-height: 280px;
@@ -162,21 +154,6 @@
   align-items: center;
   justify-content: center;
   background: color-mix(in oklab, oklch(72% 0.19 149) 18%, transparent);
-}
-
-:where(.system-b-chat-upload-manifest-mini-bar) {
-  width: 46px;
-  height: 4px;
-  border-radius: 9999px;
-  background: color-mix(in oklab, white 8%, transparent);
-  overflow: hidden;
-  flex-shrink: 0;
-}
-
-:where(.system-b-chat-upload-manifest-mini-bar-fill) {
-  height: 100%;
-  background: var(--color-border-focus);
-  transition: width 0.5s ease;
 }
 
 /* ── Chat File Chips (ready state) ───────────────────────────────────── */

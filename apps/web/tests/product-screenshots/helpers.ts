@@ -148,7 +148,7 @@ export async function waitForImages(
       if (!container) return false;
       const images = container.querySelectorAll('img');
       return (
-        images.length > 0 &&
+        images.length === 0 ||
         Array.from(images).every(
           img =>
             (img as HTMLImageElement).complete &&

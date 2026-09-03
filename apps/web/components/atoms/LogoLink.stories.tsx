@@ -7,12 +7,17 @@ const meta = {
   parameters: {
     layout: 'centered',
   },
+  args: {
+    href: '/',
+    logoSize: 'sm',
+    variant: 'word',
+  },
 } satisfies Meta<typeof LogoLink>;
 
 export default meta;
 type Story = StoryObj<typeof meta>;
 
-export const Home: Story = {};
+export const Default: Story = {};
 
 export const CustomDestination: Story = {
   args: {
@@ -23,10 +28,29 @@ export const CustomDestination: Story = {
   },
 };
 
-export const IconLink: Story = {
+export const Icon: Story = {
   args: {
-    href: '/app',
     variant: 'icon',
+    logoSize: 'md',
+  },
+};
+
+export const Full: Story = {
+  args: {
+    variant: 'full',
+    logoSize: 'md',
+  },
+};
+
+export const Large: Story = {
+  args: {
     logoSize: 'lg',
+    variant: 'word',
+  },
+};
+
+export const CustomHref: Story = {
+  args: {
+    href: '/custom',
   },
 };

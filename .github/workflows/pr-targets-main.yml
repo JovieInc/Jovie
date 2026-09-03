@@ -1,0 +1,43 @@
+name: PR targets main
+
+# JOV-INV-023: stacked/feature bases are a factory failure.
+# Fail-closed: every Jovie PR targets main. Stacked/feature bases are a
+# repeat factory failure (Graphite is dead; integration/loop-* is dormant).
+# This job is a required context on main and also runs on every other PR
+# base so agents cannot "succeed" by targeting a side branch.
+#
+# merge_group only exists for the main queue, so it passes.
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened, edited]
+  merge_group:
+    types: [checks_requested]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: pr-targets-main-${{ github.event.pull_request.number || github.event.merge_group.head_sha }}
+  cancel-in-progress: false
+
+jobs:
+  pr-targets-main:
+    name: PR targets main
+    runs-on: ubuntu-latest
+    timeout-minutes: 2
+    steps:
+      - name: Refuse any base other than main
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [[ "${{ github.event_name }}" == "merge_group" ]]; then
+            echo "merge_group only exists for main"
+            exit 0
+          fi
+          base="${{ github.event.pull_request.base.ref }}"
+          if [[ "$base" != "main" ]]; then
+            echo "::error::PRs must target main. Base '$base' is forbidden. Retarget the pull request base to main, fetch origin/main, and rebase."
+            exit 1
+          fi
+          echo "PR targets main"

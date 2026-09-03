@@ -68,11 +68,12 @@ describe('useAvatarMutation', () => {
     );
     const file = new File(['avatar'], 'avatar.png', { type: 'image/png' });
 
-    await expect(
-      act(async () => {
-        await result.current.mutateAsync(file);
-      })
-    ).rejects.toThrow('Missing profile id');
+    await act(async () => {
+      await expect(result.current.mutateAsync(file)).rejects.toThrow(
+        'Missing profile id'
+      );
+    });
+    await waitFor(() => expect(result.current.isError).toBe(true));
 
     expect(mockUploadAvatar).not.toHaveBeenCalled();
     expect(mockUpdateProfile).not.toHaveBeenCalled();
@@ -91,6 +92,7 @@ describe('useAvatarMutation', () => {
     await act(async () => {
       await result.current.mutateAsync(file);
     });
+    await waitFor(() => expect(result.current.isSuccess).toBe(true));
 
     expect(mockUploadAvatar).toHaveBeenCalledExactlyOnceWith(file);
     expect(mockUpdateProfile).toHaveBeenCalledExactlyOnceWith({
@@ -134,6 +136,7 @@ describe('useAvatarMutation', () => {
       resolveUpload?.('https://blob.example/new.avif');
       await mutationPromise;
     });
+    await waitFor(() => expect(result.current.isSuccess).toBe(true));
 
     expect(queryClient.getQueryData(['user', 'profile'])).toEqual(otherProfile);
   });
@@ -204,6 +207,7 @@ describe('profile-scoped mutations', () => {
       });
       await mutationPromise;
     });
+    await waitFor(() => expect(result.current.isSuccess).toBe(true));
 
     expect(queryClient.getQueryData(['user', 'profile'])).toEqual(profileB);
     expect(onSuccess).not.toHaveBeenCalled();
@@ -258,6 +262,7 @@ describe('profile-scoped mutations', () => {
       });
       await mutationPromise;
     });
+    await waitFor(() => expect(result.current.isSuccess).toBe(true));
 
     expect(queryClient.getQueryData(['user', 'profile'])).toEqual(profileB);
   });

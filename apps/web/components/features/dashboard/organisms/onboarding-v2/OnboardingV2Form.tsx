@@ -17,6 +17,7 @@ import { connectOnboardingSpotifyArtist } from '@/app/onboarding/actions/connect
 import { enrichProfileFromDsp } from '@/app/onboarding/actions/enrich-profile';
 import { OnboardingExperienceShell } from '@/components/features/onboarding/OnboardingExperienceShell';
 import { ContentSurfaceCard } from '@/components/molecules/ContentSurfaceCard';
+import { InfoBox } from '@/components/molecules/InfoBox';
 import { getProfileUrl } from '@/constants/domains';
 import { APP_ROUTES } from '@/constants/routes';
 import { OnboardingHandleStep } from '@/features/dashboard/organisms/onboarding';
@@ -592,18 +593,6 @@ function FlatPanel({
 }>) {
   return (
     <div className={cn('system-b-onboarding-flat-panel', className)}>
-      {children}
-    </div>
-  );
-}
-
-function InlineNotice({
-  children,
-}: Readonly<{
-  children: React.ReactNode;
-}>) {
-  return (
-    <div className='system-b-onboarding-inline-notice text-sm leading-6 text-secondary-token'>
       {children}
     </div>
   );
@@ -1728,7 +1717,9 @@ export function OnboardingV2Form({
         return (
           <StepFrame title='Are you on Spotify?'>
             {discoveryError ? (
-              <InlineNotice>{discoveryError}</InlineNotice>
+              <InfoBox presentation='inline' variant='error'>
+                {discoveryError}
+              </InfoBox>
             ) : null}
 
             <div className='relative'>
@@ -1869,7 +1860,9 @@ export function OnboardingV2Form({
             }
           >
             {discoveryError ? (
-              <InlineNotice>{discoveryError}</InlineNotice>
+              <InfoBox presentation='inline' variant='error'>
+                {discoveryError}
+              </InfoBox>
             ) : null}
 
             {discoverySnapshot?.dspItems.length ? (
@@ -1952,7 +1945,9 @@ export function OnboardingV2Form({
             }
           >
             {discoveryError ? (
-              <InlineNotice>{discoveryError}</InlineNotice>
+              <InfoBox presentation='inline' variant='error'>
+                {discoveryError}
+              </InfoBox>
             ) : null}
 
             {(discoverySnapshot?.socialItems.length ?? 0) > 0 ? (

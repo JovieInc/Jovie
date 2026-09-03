@@ -187,6 +187,7 @@ describe('sitemap', () => {
         'https://jov.ie/llms-full.txt',
         'https://jov.ie/blog/hello-world',
         'https://jov.ie/changelog/26.8.0',
+        'https://jov.ie/engineering',
         'https://jov.ie/legal/privacy',
         'https://jov.ie/legal/terms',
         'https://jov.ie/tim',
@@ -209,6 +210,9 @@ describe('sitemap', () => {
       'https://jov.ie/hud',
       'https://jov.ie/investor-portal',
       'https://jov.ie/api/v1',
+      'https://jov.ie/engineering/preview',
+      'https://jov.ie/engineering/preview/verified-changelog',
+      'https://jov.ie/engineering/verified-changelog',
     ]) {
       expect(entries.map(entry => entry.url)).not.toContain(blockedUrl);
     }

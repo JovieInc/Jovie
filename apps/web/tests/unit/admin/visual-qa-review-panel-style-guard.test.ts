@@ -15,4 +15,9 @@ describe('VisualQaReviewPanel typography contract', () => {
     expect(panelSource).not.toContain('font-[560]');
     expect(panelSource.match(/font-semibold/g)).toHaveLength(3);
   });
+
+  it('routes transient feedback through the canonical feedback API', () => {
+    expect(panelSource).not.toContain("from 'sonner'");
+    expect(panelSource).toContain("from '@/components/feedback'");
+  });
 });

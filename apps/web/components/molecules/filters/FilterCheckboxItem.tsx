@@ -74,9 +74,11 @@ export function FilterCheckboxItem({
   return (
     <button
       type='button'
+      aria-checked={checked}
       data-filter-item
       data-menu-row
       data-selected={checked ? 'true' : undefined}
+      role='menuitemcheckbox'
       onClick={e => {
         e.preventDefault();
         e.stopPropagation();

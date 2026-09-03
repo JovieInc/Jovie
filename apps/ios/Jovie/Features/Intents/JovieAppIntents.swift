@@ -4,7 +4,7 @@ import AppIntents
 // NOT require the legacy `com.apple.developer.siri` SiriKit entitlement — they
 // are discovered by the App Intents metadata processor at build time.
 // Action Button can run an App Shortcut; iOS does not give third-party apps a
-// press-and-release capture gesture, so listening is start → Stop/submit.
+// press-and-release capture gesture, so listening is start → Send.
 
 struct OpenChatIntent: AppIntent {
   static let title: LocalizedStringResource = "Open Jovie Chat"
@@ -58,7 +58,7 @@ enum EyesFreeCaptureIntentSupport {
 struct StartVoiceCaptureIntent: AppIntent {
   static let title: LocalizedStringResource = "Talk to Jovie"
   static let description = IntentDescription(
-    "Starts Jovie capture. Tap Stop when you are done. iOS does not provide a press-and-release capture gesture."
+    "Starts Jovie capture. Tap Send when you are done. iOS does not provide a press-and-release capture gesture."
   )
   static let openAppWhenRun = true
 
@@ -74,7 +74,7 @@ struct StartVoiceCaptureIntent: AppIntent {
 struct CaptureForSummerIntent: AppIntent {
   static let title: LocalizedStringResource = "Talk to Summer"
   static let description = IntentDescription(
-    "Founder-only Summer capture. Ordinary users are rejected by the server. Tap Stop when you are done."
+    "Founder-only Summer capture. Ordinary users are rejected by the server. Tap Send when you are done."
   )
   static let openAppWhenRun = true
 

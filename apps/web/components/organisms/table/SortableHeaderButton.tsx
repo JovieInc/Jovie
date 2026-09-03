@@ -38,8 +38,8 @@ export function SortableHeaderButton({
         className
       )}
     >
-      <span className='inline-flex items-center gap-2'>
-        {label}
+      <span className='inline-flex min-w-0 items-center gap-2'>
+        <span className='min-w-0 truncate'>{label}</span>
         <span
           className={cn(
             'text-3xs transition-opacity',

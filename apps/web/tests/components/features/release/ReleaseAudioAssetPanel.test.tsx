@@ -6,7 +6,7 @@ const blobUploadMock = vi.fn();
 const decodeWaveformPeaksMock = vi.fn();
 
 vi.mock('@vercel/blob/client', () => ({
-  upload: (...args: unknown[]) => blobUploadMock(...args),
+  uploadPresigned: (...args: unknown[]) => blobUploadMock(...args),
 }));
 
 vi.mock('@/lib/audio/decode-waveform-peaks', () => ({

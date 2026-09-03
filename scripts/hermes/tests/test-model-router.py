@@ -6,6 +6,10 @@ ROUTER = ROOT / "scripts/hermes/model-router.py"
 CONFIG = ROOT / "scripts/hermes/config/model-registry.json"
 
 class RegistryTests(unittest.TestCase):
+    def setUp(self):
+        self.state_directory = tempfile.TemporaryDirectory()
+        self.addCleanup(self.state_directory.cleanup)
+
     def run_router(self, *args, env=None):
         e = os.environ.copy()
         e.update({
@@ -15,6 +19,9 @@ class RegistryTests(unittest.TestCase):
             "GEM_CLAUDE_EXECUTABLE": "/missing",
             "GEM_DEEPSEEK_EXECUTABLE": "/missing",
             "GEM_PR_DRAIN_CODEX": "/missing",
+            "GEM_MODEL_ROUTER_STATE": str(
+                pathlib.Path(self.state_directory.name) / "router-state.json"
+            ),
         })
         e.update(env or {})
         return subprocess.run(["python3", str(ROUTER), *args], text=True, capture_output=True, env=e, check=True)
@@ -45,6 +52,15 @@ class RegistryTests(unittest.TestCase):
             cfg["route_chains"]["new_pr"].index("qwen-coder-local"),
             cfg["route_chains"]["new_pr"].index("cursor-luna"),
         )
+        for model in cfg["models"]:
+            if model["provider"] != "kimi":
+                continue
+            self.assertNotIn("--auto", model["agent_argv"])
+            self.assertEqual(model["probe_mode"], "json-model-key")
+            self.assertEqual(
+                model["probe_argv"],
+                ["{executable}", "provider", "list", "--json"],
+            )
 
     def test_remediation_rejects_executor_without_isolated_cwd(self):
         with tempfile.TemporaryDirectory() as td:
@@ -107,6 +123,34 @@ class RegistryTests(unittest.TestCase):
         doc = json.loads(self.run_router("probe").stdout)
         self.assertIn("qwen-coder-local", doc)
 
+    def test_probe_command_checks_each_provider_model_once(self):
+        with tempfile.TemporaryDirectory() as td:
+            root = pathlib.Path(td)
+            counter = root / "count"
+            kimi = self._ready(
+                root,
+                "kimi",
+                f"printf x >> {counter}\n"
+                "printf '%s\\n' "
+                "'{\"providers\":{\"managed:kimi-code\":{}},\"models\":{\"kimi-code/k3\":{}}}'\n",
+            )
+            registry = json.loads(CONFIG.read_text())
+            registry["models"] = [
+                model for model in registry["models"] if model["id"] == "kimi-k3"
+            ]
+            registry["route_chains"] = {
+                "new_pr": ["kimi-k3"],
+                "remediation": ["kimi-k3"],
+            }
+            registry_path = root / "registry.json"
+            registry_path.write_text(json.dumps(registry))
+            result = self.run_router(
+                "probe", "--config", str(registry_path),
+                env={"GEM_KIMI_EXECUTABLE": str(kimi)},
+            )
+            self.assertTrue(json.loads(result.stdout)["kimi-k3"]["ready"])
+            self.assertEqual(counter.read_text(), "x")
+
     def test_ready_local_qwen_has_a_tool_capable_executor_contract(self):
         with tempfile.TemporaryDirectory() as td:
             root = pathlib.Path(td)
@@ -137,6 +181,17 @@ class RegistryTests(unittest.TestCase):
         path.chmod(0o755)
         return path
 
+    def _grok_ready(self, root):
+        return self._ready(root, "grok", "echo grok-4.6\n")
+
+    def _kimi_ready(self, root):
+        return self._ready(
+            root,
+            "kimi",
+            "printf '%s\\n' "
+            "'{\"providers\":{\"managed:kimi-code\":{}},\"models\":{\"kimi-code/k3\":{},\"kimi-code/kimi-for-coding\":{}}}'\n",
+        )
+
     def test_cursor_grok_beats_local_when_cursor_cli_is_ready(self):
         with tempfile.TemporaryDirectory() as td:
             root = pathlib.Path(td)
@@ -163,8 +218,8 @@ class RegistryTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as td:
             root = pathlib.Path(td)
             cursor = self._ready(root, "cursor-agent", "echo cursor-agent 0.0.0\n")
-            grok = self._ready(root, "grok", "echo grok-4.6\n")
-            kimi = self._ready(root, "kimi", "echo 0.34.0\n")
+            grok = self._grok_ready(root)
+            kimi = self._kimi_ready(root)
             state = {
                 "pools": {
                     "cursor-models": {"exhausted_until": time.time() + 3600, "uses": 9},
@@ -197,7 +252,7 @@ class RegistryTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as td:
             root = pathlib.Path(td)
             cursor = self._ready(root, "cursor-agent", "echo cursor-agent 0.0.0\n")
-            grok = self._ready(root, "grok", "echo grok-4.6\n")
+            grok = self._grok_ready(root)
             state_path = root / "state.json"
             state_path.write_text(json.dumps({
                 "pools": {
@@ -229,7 +284,7 @@ class RegistryTests(unittest.TestCase):
         """
         with tempfile.TemporaryDirectory() as td:
             root = pathlib.Path(td)
-            grok = self._ready(root, "grok", "echo grok-4.6\n")
+            grok = self._grok_ready(root)
             result = self.run_router(
                 "choose", "--workflow", "new_pr", "--capability", "code",
                 env={
@@ -250,6 +305,73 @@ class RegistryTests(unittest.TestCase):
             self.assertIn("--always-approve", selected["executor"]["argv"])
             self.assertNotIn("agent", selected["executor"]["argv"])
 
+    def test_grok_model_list_that_reports_signed_out_is_not_ready(self):
+        cases = (
+            ("signed-out", "echo 'You are not authenticated.'\necho 'Available models: grok-4.6'\n", "auth_or_runtime_failed"),
+            ("nonzero", "echo 'Available models: grok-4.6'\nexit 7\n", "probe_failed"),
+        )
+        for name, script, expected in cases:
+          with self.subTest(name=name), tempfile.TemporaryDirectory() as td:
+            root = pathlib.Path(td); grok = self._ready(root, "grok", script)
+            result = self.run_router(
+                "choose", "--workflow", "new_pr", "--capability", "code",
+                env={
+                    "GEM_MODEL_ROUTER_STATE": str(root / "state.json"),
+                    "GEM_GROK_EXECUTABLE": str(grok),
+                    "GEM_KIMI_EXECUTABLE": "/missing",
+                    "GEM_PR_DRAIN_QWEN": "/missing",
+                    "GEM_PR_DRAIN_CODEX": "/missing",
+                },
+            )
+            document = json.loads(result.stdout)
+            grok_candidate = next(
+                item for item in document["candidates"] if item["id"] == "grok-4.6"
+            )
+            self.assertEqual(grok_candidate["reason"], expected)
+            self.assertIsNone(document["selected"])
+
+    def test_kimi_oauth_model_probe_selects_valid_prompt_executor(self):
+        with tempfile.TemporaryDirectory() as td:
+            root = pathlib.Path(td)
+            kimi = self._kimi_ready(root)
+            result = self.run_router(
+                "choose", "--workflow", "new_pr", "--capability", "mechanical",
+                env={
+                    "GEM_MODEL_ROUTER_STATE": str(root / "state.json"),
+                    "GEM_KIMI_EXECUTABLE": str(kimi),
+                    "GEM_PR_DRAIN_QWEN": "/missing",
+                    "GEM_PR_DRAIN_CODEX": "/missing",
+                },
+            )
+            selected = json.loads(result.stdout)["selected"]
+            self.assertEqual(selected["id"], "kimi-k3")
+            self.assertEqual(selected["provider"], "kimi")
+            self.assertNotIn("--auto", selected["executor"]["argv"])
+            self.assertEqual(
+                selected["executor"]["argv"],
+                ["-m", "{model}", "-p", "{prompt}"],
+            )
+
+    def test_kimi_version_only_output_does_not_prove_subscription_model(self):
+        with tempfile.TemporaryDirectory() as td:
+            root = pathlib.Path(td)
+            kimi = self._ready(root, "kimi", "echo 0.28.1\n")
+            result = self.run_router(
+                "choose", "--workflow", "new_pr", "--capability", "code",
+                env={
+                    "GEM_MODEL_ROUTER_STATE": str(root / "state.json"),
+                    "GEM_KIMI_EXECUTABLE": str(kimi),
+                    "GEM_PR_DRAIN_QWEN": "/missing",
+                    "GEM_PR_DRAIN_CODEX": "/missing",
+                },
+            )
+            document = json.loads(result.stdout)
+            kimi_candidate = next(
+                item for item in document["candidates"] if item["id"] == "kimi-k3"
+            )
+            self.assertEqual(kimi_candidate["reason"], "probe_invalid_json")
+            self.assertIsNone(document["selected"])
+
     def test_openrouter_max_tokens_402_marks_the_pool_exhausted(self):
         with tempfile.TemporaryDirectory() as td:
             root = pathlib.Path(td)
@@ -258,7 +380,7 @@ class RegistryTests(unittest.TestCase):
                 "grok",
                 "echo 'HTTP 402: You requested up to 65536 tokens, but can only afford 687' >&2\nexit 1\n",
             )
-            kimi = self._ready(root, "kimi", "echo 0.34.0\n")
+            kimi = self._kimi_ready(root)
             state_path = root / "state.json"
             first = self.run_router(
                 "choose", "--workflow", "new_pr", "--capability", "code",
@@ -281,7 +403,7 @@ class RegistryTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as td:
             root = pathlib.Path(td)
             grok = self._ready(root, "grok", "echo 'weekly usage limit reached' >&2\nexit 1\n")
-            kimi = self._ready(root, "kimi", "echo 0.34.0\n")
+            kimi = self._kimi_ready(root)
             state_path = root / "state.json"
             first = self.run_router(
                 "choose", "--workflow", "new_pr", "--capability", "code",
@@ -303,7 +425,7 @@ class RegistryTests(unittest.TestCase):
     def test_included_grok_beats_ready_gateway(self):
         with tempfile.TemporaryDirectory() as td:
             root = pathlib.Path(td)
-            grok = self._ready(root, "grok", "echo grok-4.6\n")
+            grok = self._grok_ready(root)
             deepseek = self._ready(root, "hermes", "echo ok\n")
             result = self.run_router(
                 "choose", "--workflow", "new_pr", "--capability", "code",
