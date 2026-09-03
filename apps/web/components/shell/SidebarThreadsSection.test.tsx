@@ -368,6 +368,27 @@ describe('SidebarThreadsSection', () => {
     ).toBe(false);
   });
 
+  it('warms a thread on hover and keyboard focus so the click paints instantly (JOV-5874)', () => {
+    const onThreadPrefetch = vi.fn();
+    render(
+      <SidebarThreadsSection
+        threads={threads}
+        activeThreadId={null}
+        onThreadPrefetch={onThreadPrefetch}
+        collapsed={false}
+      />
+    );
+
+    const row = screen.getByRole('link', { name: /Pitch tasks/ });
+    fireEvent.pointerEnter(row);
+    fireEvent.focus(row);
+
+    expect(onThreadPrefetch).toHaveBeenCalledTimes(2);
+    expect(onThreadPrefetch).toHaveBeenCalledWith(
+      expect.objectContaining({ id: 'thread-newer' })
+    );
+  });
+
   it('persists valid read timestamps and degrades safely for invalid storage', () => {
     const readState = { 'thread-one': '2026-05-12T00:00:00.000Z' };
     writeThreadReadState(readState);
