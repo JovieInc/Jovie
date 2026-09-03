@@ -1,7 +1,7 @@
-import type { Row } from '@tanstack/react-table';
 import { fireEvent, render, screen } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
 import { VirtualizedTableRow } from '@/components/organisms/table/organisms/VirtualizedTableRow';
+import type { Row } from '@/lib/tanstack-v8-compat';
 
 type TestRow = { id: string; name: string };
 
