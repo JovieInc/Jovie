@@ -312,6 +312,14 @@ export const HOMEPAGE_CERTIFIED_FIGURES: HomepageCertifiedFigures = {
         line: 'Dates, rates, and requirements without the back-and-forth.',
       },
     ],
+    smarter: [
+      { label: 'Know', line: 'A booker read your page twice this week.' },
+      {
+        label: 'Show',
+        line: 'Booking moves up for people arriving from that thread.',
+      },
+      { label: 'Do next', line: 'Follow up while the interest is fresh.' },
+    ],
   },
   stats: {
     know: {
