@@ -3,19 +3,6 @@
 // @coverage-via apps/web/components/organisms/table/organisms/UnifiedTable.keyboard.test.tsx
 
 import { Spinner as LoadingSpinner } from '@jovie/ui';
-import {
-  type ColumnDef,
-  type ColumnPinningState,
-  type FilterFn,
-  getCoreRowModel,
-  getFilteredRowModel,
-  getSortedRowModel,
-  type OnChangeFn,
-  type RowSelectionState,
-  type SortingState,
-  useReactTable,
-  type VisibilityState,
-} from '@tanstack/react-table';
 import React, {
   useCallback,
   useEffect,
@@ -24,6 +11,21 @@ import React, {
   useState,
 } from 'react';
 import { TABLE_MIN_WIDTHS } from '@/lib/constants/layout';
+import type {
+  ColumnDef,
+  ColumnPinningState,
+  FilterFn,
+  OnChangeFn,
+  RowSelectionState,
+  SortingState,
+  VisibilityState,
+} from '@/lib/tanstack-v8-compat';
+import {
+  getCoreRowModel,
+  getFilteredRowModel,
+  getSortedRowModel,
+  useReactTable,
+} from '@/lib/tanstack-v8-compat';
 import { TABLE_EMPTY_STATE_MIN_HEIGHT_PX } from '../atoms/TableEmptyState';
 import { GroupedTableBody } from '../molecules/GroupedTableBody';
 import { LoadingTableBody } from '../molecules/LoadingTableBody';
@@ -434,10 +436,10 @@ export function UnifiedTable<TData>({
     !hasExpandedRows;
 
   // Initialize TanStack Table
-  const coreRowModel = getCoreRowModel();
-  const sortedRowModel = getSortedRowModel();
+  const coreRowModel = getCoreRowModel<TData>();
+  const sortedRowModel = getSortedRowModel<TData>();
   const filteredRowModel = useMemo(
-    () => (enableFiltering ? getFilteredRowModel() : undefined),
+    () => (enableFiltering ? getFilteredRowModel<TData>() : undefined),
     [enableFiltering]
   );
 
