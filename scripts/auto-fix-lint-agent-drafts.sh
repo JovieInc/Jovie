@@ -10,7 +10,8 @@
 # Human PRs are left alone.
 #
 # Env:
-#   DRY_RUN=1   classify and print only; fix nothing
+#   DRY_RUN=1         classify and print only; fix nothing
+#   TARGET_PR_NUMBER  inspect only this PR; empty retains manual sweep behavior
 set -euo pipefail
 
 # shellcheck source=./scripts/lib/gh-retry.sh
@@ -19,7 +20,13 @@ source "$(dirname "${BASH_SOURCE[0]}")/lib/gh-retry.sh"
 REPO="${REPO:-JovieInc/Jovie}"
 REPO_OWNER="${REPO%%/*}"
 DRY_RUN="${DRY_RUN:-0}"
+TARGET_PR_NUMBER="${TARGET_PR_NUMBER:-}"
 AGENT_RE='^(tim/|codex/|agent/|claude/|linear/|dependabot/)'
+
+if [[ -n "$TARGET_PR_NUMBER" && ! "$TARGET_PR_NUMBER" =~ ^[1-9][0-9]*$ ]]; then
+  echo "TARGET_PR_NUMBER must be a positive integer" >&2
+  exit 2
+fi
 
 check_failures_for_pr() {  # check_failures_for_pr <num>
   local n="$1"
@@ -84,9 +91,8 @@ comment() {  # comment <num> <body>
 
 echo "=== AUTO-FIX LINT: scanning for agent drafts with failing lint ==="
 
-SNAP="$(gh_retry pr list -R "$REPO" --state open --limit 200 \
-  --json number,title,isDraft,mergeable,mergeStateStatus,labels,headRefName,headRepositoryOwner,headRepository --jq '
-  [ .[] | {
+PR_JSON_FILTER='[
+  .[] | {
     n: .number,
     t: (.title[0:48]),
     draft: .isDraft,
@@ -97,7 +103,18 @@ SNAP="$(gh_retry pr list -R "$REPO" --state open --limit 200 \
     headRepo: (.headRepository.name // ""),
     L: [.labels[].name],
     fail: []
-  } ]')"
+  } ]'
+
+if [[ -n "$TARGET_PR_NUMBER" ]]; then
+  echo "  Trigger target: #$TARGET_PR_NUMBER"
+  SNAP="$(gh_retry pr view "$TARGET_PR_NUMBER" -R "$REPO" \
+    --json number,title,isDraft,mergeable,mergeStateStatus,labels,headRefName,headRepositoryOwner,headRepository \
+    --jq "[.] | $PR_JSON_FILTER")"
+else
+  SNAP="$(gh_retry pr list -R "$REPO" --state open --limit 200 \
+    --json number,title,isDraft,mergeable,mergeStateStatus,labels,headRefName,headRepositoryOwner,headRepository \
+    --jq "$PR_JSON_FILTER")"
+fi
 
 # Enrich with check failures for agent-owned drafts
 ENRICHED="[]"

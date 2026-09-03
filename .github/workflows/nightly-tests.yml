@@ -44,12 +44,30 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  unchanged:
+    name: Skip if no new SHA
+    runs-on: ubuntu-latest
+    timeout-minutes: 2
+    outputs:
+      skip: ${{ steps.gate.outputs.skip }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+          sparse-checkout: .github/actions/skip-if-unchanged
+      - id: gate
+        uses: ./.github/actions/skip-if-unchanged
+        with:
+          workflow: nightly-tests.yml
+
   knip:
     name: Knip Dead Code Audit
+    needs: unchanged
     if: >-
+      needs.unchanged.outputs.skip != 'true' && (
       github.event_name == 'schedule' ||
       github.event.inputs.suite == 'all' ||
-      github.event.inputs.suite == 'unit'
+      github.event.inputs.suite == 'unit')
     runs-on: ubuntu-latest
     timeout-minutes: 15
     steps:
@@ -67,10 +85,12 @@ jobs:
   # ==========================================================================
   unit-tests:
     name: Full Unit Test Suite
+    needs: unchanged
     if: >-
+      needs.unchanged.outputs.skip != 'true' && (
       github.event_name == 'schedule' ||
       github.event.inputs.suite == 'all' ||
-      github.event.inputs.suite == 'unit'
+      github.event.inputs.suite == 'unit')
     runs-on: ubuntu-latest
     # The unsharded suite was still making steady progress when the 30m cap
     # cancelled it every night (Jul 15-20, JOV-4326). 60m fits the current

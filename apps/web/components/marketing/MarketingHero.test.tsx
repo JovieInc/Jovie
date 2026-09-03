@@ -37,6 +37,8 @@ describe('MarketingHero source-backed default story', () => {
       'id',
       MARKETING_HERO_DEFAULT_PROPS.headingId
     );
+    expect(heading).toHaveClass('marketing-h1-max-two-lines');
+    expect(heading).not.toHaveAttribute('aria-label');
     expect(
       screen.getByText(
         'The AI workspace for artists to plan releases, create assets, pitch playlists, and promote every drop.'
@@ -84,6 +86,9 @@ describe('MarketingHero source-backed default story', () => {
       'aria-labelledby',
       'landing-heading'
     );
+    expect(
+      screen.getByRole('heading', { level: 1, name: 'Landing title' })
+    ).toHaveClass('marketing-h1-max-two-lines');
   });
 
   it('routes route-owned presentation through the unstyled shell without hero chrome', () => {
