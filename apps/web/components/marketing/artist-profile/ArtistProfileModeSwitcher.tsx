@@ -65,7 +65,13 @@ export function ArtistProfileModeSwitcher({
         {showIntroHeading ? (
           <>
             {/* ui-casing-allow: marketing display headline */}
-            <h2 className={cn(SHELL_H2_CLASS, 'ap-mode-switcher__headline')}>
+            <h2
+              className={cn(
+                SHELL_H2_CLASS,
+                'ap-mode-switcher__headline',
+                'line-clamp-2'
+              )}
+            >
               {headlineLines.map((line, index) => (
                 <span key={line} className='block'>
                   {line}

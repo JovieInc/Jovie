@@ -1,4 +1,4 @@
-import { render, screen } from '@testing-library/react';
+import { render, screen, within } from '@testing-library/react';
 import React from 'react';
 import { describe, expect, it, vi } from 'vitest';
 import type { PublicContact } from '@/types/contacts';
@@ -185,7 +185,12 @@ describe('ProfileDesktopSurface', () => {
     expect(listenCta).toHaveClass('h-8');
     expect(listenCta.className).toContain('before:h-11');
     expect(listenCta.className).toContain('before:min-w-11');
-    expect(screen.getByText('Tim White')).toBeInTheDocument();
+    expect(
+      within(screen.getByTestId('profile-header')).getByText('Tim White')
+    ).toHaveClass('line-clamp-2');
+    expect(
+      screen.getByText('Producer, songwriter, and after-hours romantic.')
+    ).toHaveClass('line-clamp-2');
     expect(screen.getByTestId('mock-desktop-drawer')).toHaveAttribute(
       'data-presentation',
       'modal'

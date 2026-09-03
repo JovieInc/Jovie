@@ -200,7 +200,7 @@ export function InvestorUpdateReview({
           <div>
             <h2
               id='candidate-heading'
-              className='text-sm font-semibold text-primary-token'
+              className='text-sm font-semibold text-primary-token line-clamp-2'
             >
               Candidate Wins And Asks
             </h2>
@@ -346,7 +346,7 @@ export function InvestorUpdateReview({
             <div className='min-w-0'>
               <h2
                 id='draft-heading'
-                className='text-sm font-semibold text-primary-token'
+                className='text-sm font-semibold text-primary-token line-clamp-2'
               >
                 Monthly Draft
               </h2>

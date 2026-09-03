@@ -336,6 +336,265 @@ describe('JOV-INV-018 screen-certification/v2', () => {
     ]);
   });
 
+  it('registers the marketing AI landing page for changed-surface certification', () => {
+    const source = 'apps/web/app/(marketing)/ai/page.tsx';
+    const screen = SCREEN_REGISTRY.find(
+      entry => entry.id === 'web.marketing-ai'
+    );
+
+    assert.deepEqual(screen, {
+      id: 'web.marketing-ai',
+      platform: 'web',
+      owner: 'marketing-ai',
+      sources: [source],
+      viewports: ['desktop', 'mobile'],
+    });
+
+    const result = evaluateChangedScreens({
+      changedFiles: [{ path: source, status: 'A' }],
+      headSha: HEAD,
+    });
+    assert.deepEqual(result.issues, []);
+    assert.deepEqual(result.changedScreens, [
+      { id: 'web.marketing-ai', verdict: 'evidence-required', findings: [] },
+    ]);
+  });
+
+  it('registers the alternatives marketing surfaces for changed-surface certification', () => {
+    const source = 'apps/web/app/(marketing)/alternatives/';
+    const screen = SCREEN_REGISTRY.find(
+      entry => entry.id === 'web.marketing-alternatives'
+    );
+
+    assert.deepEqual(screen, {
+      id: 'web.marketing-alternatives',
+      platform: 'web',
+      owner: 'marketing-alternatives',
+      sources: [source],
+      viewports: ['desktop', 'mobile'],
+    });
+
+    const result = evaluateChangedScreens({
+      changedFiles: [
+        {
+          path: 'apps/web/app/(marketing)/alternatives/[slug]/page.tsx',
+          status: 'M',
+        },
+      ],
+      headSha: HEAD,
+    });
+    assert.deepEqual(result.issues, []);
+    assert.deepEqual(result.changedScreens, [
+      {
+        id: 'web.marketing-alternatives',
+        verdict: 'evidence-required',
+        findings: [],
+      },
+    ]);
+  });
+
+  it('registers the marketing download page for changed-surface certification', () => {
+    const source = 'apps/web/app/(marketing)/download/page.tsx';
+    const screen = SCREEN_REGISTRY.find(
+      entry => entry.id === 'web.marketing-download'
+    );
+
+    assert.deepEqual(screen, {
+      id: 'web.marketing-download',
+      platform: 'web',
+      owner: 'marketing-download',
+      sources: [source],
+      viewports: ['desktop', 'mobile'],
+    });
+
+    const result = evaluateChangedScreens({
+      changedFiles: [{ path: source, status: 'M' }],
+      headSha: HEAD,
+    });
+    assert.deepEqual(result.issues, []);
+    assert.deepEqual(result.changedScreens, [
+      {
+        id: 'web.marketing-download',
+        verdict: 'evidence-required',
+        findings: [],
+      },
+    ]);
+  });
+
+  it('registers the marketing investors page for changed-surface certification', () => {
+    const source = 'apps/web/app/(marketing)/investors/page.tsx';
+    const screen = SCREEN_REGISTRY.find(
+      entry => entry.id === 'web.marketing-investors'
+    );
+
+    assert.deepEqual(screen, {
+      id: 'web.marketing-investors',
+      platform: 'web',
+      owner: 'marketing-investors',
+      sources: [source],
+      viewports: ['desktop', 'mobile'],
+    });
+
+    const result = evaluateChangedScreens({
+      changedFiles: [{ path: source, status: 'M' }],
+      headSha: HEAD,
+    });
+    assert.deepEqual(result.issues, []);
+    assert.deepEqual(result.changedScreens, [
+      {
+        id: 'web.marketing-investors',
+        verdict: 'evidence-required',
+        findings: [],
+      },
+    ]);
+  });
+
+  it('registers the marketing launch page for changed-surface certification', () => {
+    const source = 'apps/web/app/(marketing)/launch/page.tsx';
+    const screen = SCREEN_REGISTRY.find(
+      entry => entry.id === 'web.marketing-launch'
+    );
+
+    assert.deepEqual(screen, {
+      id: 'web.marketing-launch',
+      platform: 'web',
+      owner: 'marketing-launch',
+      sources: [source],
+      viewports: ['desktop', 'mobile'],
+    });
+
+    const result = evaluateChangedScreens({
+      changedFiles: [{ path: source, status: 'M' }],
+      headSha: HEAD,
+    });
+    assert.deepEqual(result.issues, []);
+    assert.deepEqual(result.changedScreens, [
+      {
+        id: 'web.marketing-launch',
+        verdict: 'evidence-required',
+        findings: [],
+      },
+    ]);
+  });
+
+  it('registers the marketing not-found page for changed-surface certification', () => {
+    const source = 'apps/web/app/(marketing)/not-found.tsx';
+    const screen = SCREEN_REGISTRY.find(
+      entry => entry.id === 'web.marketing-not-found'
+    );
+
+    assert.deepEqual(screen, {
+      id: 'web.marketing-not-found',
+      platform: 'web',
+      owner: 'marketing-not-found',
+      sources: [source],
+      viewports: ['desktop', 'mobile'],
+    });
+
+    const result = evaluateChangedScreens({
+      changedFiles: [{ path: source, status: 'M' }],
+      headSha: HEAD,
+    });
+    assert.deepEqual(result.issues, []);
+    assert.deepEqual(result.changedScreens, [
+      {
+        id: 'web.marketing-not-found',
+        verdict: 'evidence-required',
+        findings: [],
+      },
+    ]);
+  });
+
+  it('registers the renders marketing surfaces for changed-surface certification', () => {
+    const source = 'apps/web/app/(marketing)/renders/';
+    const screen = SCREEN_REGISTRY.find(
+      entry => entry.id === 'web.marketing-renders'
+    );
+
+    assert.deepEqual(screen, {
+      id: 'web.marketing-renders',
+      platform: 'web',
+      owner: 'marketing-renders',
+      sources: [source],
+      viewports: ['desktop', 'mobile'],
+    });
+
+    const result = evaluateChangedScreens({
+      changedFiles: [
+        { path: 'apps/web/app/(marketing)/renders/page.tsx', status: 'M' },
+        {
+          path: 'apps/web/app/(marketing)/renders/[state]/page.tsx',
+          status: 'M',
+        },
+      ],
+      headSha: HEAD,
+    });
+    assert.deepEqual(result.issues, []);
+    assert.deepEqual(result.changedScreens, [
+      {
+        id: 'web.marketing-renders',
+        verdict: 'evidence-required',
+        findings: [],
+      },
+    ]);
+  });
+
+  it('registers the app shell root not-found page for changed-surface certification', () => {
+    const source = 'apps/web/app/app/not-found.tsx';
+    const screen = SCREEN_REGISTRY.find(
+      entry => entry.id === 'web.app-not-found'
+    );
+
+    assert.deepEqual(screen, {
+      id: 'web.app-not-found',
+      platform: 'web',
+      owner: 'app-shell-not-found',
+      sources: [source],
+      viewports: ['desktop', 'mobile'],
+    });
+
+    const result = evaluateChangedScreens({
+      changedFiles: [{ path: source, status: 'M' }],
+      headSha: HEAD,
+    });
+    assert.deepEqual(result.issues, []);
+    assert.deepEqual(result.changedScreens, [
+      {
+        id: 'web.app-not-found',
+        verdict: 'evidence-required',
+        findings: [],
+      },
+    ]);
+  });
+
+  it('registers the experimental library surface for changed-surface certification', () => {
+    const source = 'apps/web/app/exp/library-v1/page.tsx';
+    const screen = SCREEN_REGISTRY.find(
+      entry => entry.id === 'web.exp-library-v1'
+    );
+
+    assert.deepEqual(screen, {
+      id: 'web.exp-library-v1',
+      platform: 'web',
+      owner: 'exp-library-v1',
+      sources: [source],
+      viewports: ['desktop', 'mobile'],
+    });
+
+    const result = evaluateChangedScreens({
+      changedFiles: [{ path: source, status: 'M' }],
+      headSha: HEAD,
+    });
+    assert.deepEqual(result.issues, []);
+    assert.deepEqual(result.changedScreens, [
+      {
+        id: 'web.exp-library-v1',
+        verdict: 'evidence-required',
+        findings: [],
+      },
+    ]);
+  });
+
   it('retains scheduled whole-system sweeps', () => {
     assert.deepEqual(validateRetainedSweeps(), []);
     for (const workflow of RETAINED_SWEEP_WORKFLOWS) {
