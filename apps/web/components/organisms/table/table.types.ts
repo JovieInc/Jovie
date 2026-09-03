@@ -1,4 +1,8 @@
-import type { RowData } from '@tanstack/react-table';
+import type {
+  CellData,
+  RowData,
+  TableFeatures,
+} from '@tanstack/react-table';
 import '@tanstack/react-table';
 
 /**
@@ -8,9 +12,17 @@ import '@tanstack/react-table';
  * feature that defines the column. These flags let a dense workspace table
  * express semantic headers and stable contextual affordances without copying
  * row-state CSS into each consumer.
+ *
+ * TanStack Table v9 made `ColumnMeta` three-generic
+ * (`<TFeatures, TData, TValue>`); all declarations must match that shape
+ * exactly for declaration merging to succeed.
  */
 declare module '@tanstack/react-table' {
-  interface ColumnMeta<TData extends RowData, TValue> {
+  interface ColumnMeta<
+    TFeatures extends TableFeatures,
+    TData extends RowData,
+    TValue extends CellData = CellData,
+  > {
     /** Additional tokenized cell/header classes owned by the consumer. */
     readonly className?: string;
     /** Horizontal alignment for dense numeric/action columns. */
