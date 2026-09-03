@@ -502,6 +502,13 @@ const ADVANCED_TOOL_SCHEMAS = {
       stepId: z.string().optional(),
     }),
   },
+  surfaceLibraryOpportunities: {
+    description:
+      'Onboarding presence-build Library opportunities artifact. System-emitted tool event, not a model-invoked chat tool.',
+    inputSchema: z.object({
+      stepId: z.string().optional(),
+    }),
+  },
   assembleArtistProfile: {
     description:
       'Onboarding presence-build profile assembly artifact. System-emitted tool event, not a model-invoked chat tool.',
@@ -573,6 +580,7 @@ const ALWAYS_PAID_TOOL_NAMES = [
   'formatLyrics',
   'proposeVideoRecording',
   'researchArtistPresence',
+  'surfaceLibraryOpportunities',
   'assembleArtistProfile',
   'generateSmartLink',
   'draftWelcomePost',
@@ -806,6 +814,7 @@ const TOOL_RESULT_REQUIRED_KEYS: Record<string, readonly string[]> = {
   unpauseMerchCard: ['success', 'action', 'merchCardId'],
   writeWorldClassBio: ['success', 'action', 'bio', 'summary'],
   researchArtistPresence: ['action', 'stepId', 'title', 'summary'],
+  surfaceLibraryOpportunities: ['action', 'stepId', 'title', 'summary'],
   assembleArtistProfile: ['action', 'stepId', 'title', 'summary'],
   generateSmartLink: ['action', 'stepId', 'title', 'summary'],
   draftWelcomePost: ['action', 'stepId', 'title', 'summary'],
@@ -4377,6 +4386,7 @@ function defaultToolResult(toolName: string, input: unknown): unknown {
         summary: 'Pitch ready.',
       };
     case 'researchArtistPresence':
+    case 'surfaceLibraryOpportunities':
     case 'assembleArtistProfile':
     case 'generateSmartLink':
     case 'draftWelcomePost':
@@ -5016,6 +5026,7 @@ function sampleToolInput(toolName: string): Record<string, unknown> {
           'Hey everyone, Neon Reef is out now. Thank you so much for listening.',
       };
     case 'researchArtistPresence':
+    case 'surfaceLibraryOpportunities':
     case 'assembleArtistProfile':
     case 'generateSmartLink':
     case 'draftWelcomePost':
