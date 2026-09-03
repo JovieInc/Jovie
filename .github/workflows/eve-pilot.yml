@@ -165,18 +165,27 @@ jobs:
             --scope jovie \
             --token "$VERCEL_TOKEN" \
             --format=json)"
+          # Audit record: the inspected identity (no env values or secrets in
+          # this projection) is durable evidence of what was promoted.
+          jq '{id, url, readyState, target, createdAt, meta}' <<<"$inspect_json"
           jq -e \
             --arg id "$PRODUCTION_DEPLOYMENT_ID" \
             --arg sha "$EXPECTED_COMMIT_SHA" '
               type == "object" and
               .id == $id and
               (.readyState | ascii_upcase) == "READY" and
-              .meta.githubCommitSha == $sha and
-              (.url | endswith(".vercel.app"))
+              (.url | endswith(".vercel.app")) and
+              # CLI deploys may lack commit metadata entirely; when present it
+              # must bind to the exact expected commit, never silently pass a
+              # foreign one.
+              ((.meta.githubCommitSha // "") == "" or .meta.githubCommitSha == $sha)
             ' >/dev/null <<<"$inspect_json" || {
-            echo 'Deployment is not the exact READY commit-bound deployment; refusing to mutate production aliases.' >&2
+            echo 'Deployment is not the exact READY deployment for this promotion; refusing to mutate production aliases.' >&2
             exit 1
           }
+          if [ "$(jq -r '.meta.githubCommitSha // ""' <<<"$inspect_json")" != "$EXPECTED_COMMIT_SHA" ]; then
+            echo "::warning::Deployment carries no githubCommitSha meta; promoted on the exact dpl_ id and READY state alone (expected $EXPECTED_COMMIT_SHA)."
+          fi
           deployment_url="https://$(jq -r '.url' <<<"$inspect_json")"
           for production_alias in \
             jovie-eve-shadow.vercel.app \
