@@ -80,6 +80,7 @@ web.release-landing|web|release-landing|apps/web/app/r/[slug]/page.tsx,apps/web/
 web.dashboard-releases|web|dashboard-releases|apps/web/app/app/(shell)/dashboard/releases/page.tsx|desktop,mobile
 web.library|web|library|apps/web/app/app/(shell)/library/page.tsx|desktop,mobile
 web.settings-artist-profile|web|settings-artist-profile|apps/web/app/app/(shell)/settings/artist-profile/page.tsx|desktop,mobile
+web.youtube-channel-pilot|web|screen.youtube.channel-pilot|apps/web/app/app/(shell)/youtube/page.tsx|desktop,mobile
 web.start|web|organism.onboarding-chat|apps/web/app/(dynamic)/start/page.tsx|desktop,mobile
 web.app-root|web|screen.root|apps/web/app/app/(shell)/page.tsx|desktop,mobile
 web.jovie-work|web|screen.jovie.work|apps/web/app/app/(shell)/jovie-work/page.tsx|desktop,mobile
