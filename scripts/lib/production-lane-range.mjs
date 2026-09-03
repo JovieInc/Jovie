@@ -111,6 +111,7 @@ export function planProductionLaneRange({
   const selectedWeb = cumulative.selectedLanes.includes('web');
   let runWeb = selectedWeb;
   let webEvidenceSha = null;
+  /** @type {'none' | 'selected_lane' | 'live_unbound'} */
   let webBindReason = WEB_BIND_REASONS.none;
   if (selectedWeb) {
     const evidenceCommit = commitsNewestFirst.find(commit =>
