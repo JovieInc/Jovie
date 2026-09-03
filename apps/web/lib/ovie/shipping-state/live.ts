@@ -23,7 +23,7 @@ export const NAMED_AUTHORITY_PATHS = {
 } as const;
 
 export const NAMED_AUTHORITY_URLS = {
-  'symphony-runtime': 'http://127.0.0.1:4043/api/v1/state',
+  'symphony-runtime': 'http://127.0.0.1:4041/api/v1/state',
   'live-build-info': 'https://jov.ie/api/health/build-info',
 } as const;
 

@@ -14,8 +14,12 @@ const NO_STORE_HEADERS = { 'Cache-Control': 'no-store' } as const;
 const ovieSummerShadowInputSchema = z
   .object({
     eventId: z.string().regex(/^[A-Za-z0-9][A-Za-z0-9_-]{7,127}$/u),
+    conversationId: z.string().regex(/^[A-Za-z0-9][A-Za-z0-9_-]{7,127}$/u),
+    turn: z.number().int().min(1).max(5),
+    dailySlot: z.number().int().min(1).max(25),
     message: z.string().trim().min(1).max(4000),
     evidence: z.array(z.string().url().max(2048)).max(16).default([]),
+    requestedCapability: z.literal('core_chat').optional(),
   })
   .strict();
 
@@ -91,9 +95,15 @@ export async function POST(request: Request): Promise<NextResponse> {
         body: JSON.stringify({
           schema: 'jovie.ovie-summer-shadow.event/v1',
           eventId: parsed.data.eventId,
+          conversationId: parsed.data.conversationId,
+          turn: parsed.data.turn,
+          dailySlot: parsed.data.dailySlot,
           occurredAt: new Date().toISOString(),
           message: parsed.data.message,
           evidence: parsed.data.evidence,
+          ...(parsed.data.requestedCapability
+            ? { requestedCapability: parsed.data.requestedCapability }
+            : {}),
         }),
         signal: AbortSignal.timeout(15_000),
       }
@@ -112,6 +122,9 @@ export async function POST(request: Request): Promise<NextResponse> {
   if (upstream.status === 409) {
     return json({ ok: false, code: 'replay_rejected', eve: upstreamBody }, 409);
   }
+  if (upstream.status === 429) {
+    return json({ ok: false, code: 'budget_rejected', eve: upstreamBody }, 429);
+  }
   if (!upstream.ok) {
     logger.error('[ovie-summer-shadow] Eve rejected the signed origin', {
       status: upstream.status,
@@ -120,4 +133,68 @@ export async function POST(request: Request): Promise<NextResponse> {
   }
 
   return json({ ok: true, eve: upstreamBody }, 202);
+}
+
+/** Read-only Ovie proxy for durable Eve stream catch-up and reconnect proof. */
+export async function GET(request: Request): Promise<Response> {
+  const authError = verifyCronRequest(request, {
+    route: '/api/internal/ovie/summer-shadow',
+    requireTrustedOrigin: true,
+  });
+  if (authError) return authError;
+
+  if (process.env.VERCEL_ENV !== 'production') {
+    return json({ ok: false, code: 'production_origin_required' }, 503);
+  }
+
+  const requestUrl = new URL(request.url);
+  const sessionId = requestUrl.searchParams.get('sessionId');
+  const conversationId = requestUrl.searchParams.get('conversationId');
+  const startIndexValue = requestUrl.searchParams.get('startIndex') ?? '0';
+  const startIndex = Number(startIndexValue);
+  if (
+    !sessionId ||
+    !/^ses_[A-Za-z0-9_-]+$/u.test(sessionId) ||
+    !conversationId ||
+    !/^[A-Za-z0-9][A-Za-z0-9_-]{7,127}$/u.test(conversationId) ||
+    !Number.isSafeInteger(startIndex) ||
+    startIndex < 0
+  ) {
+    return json({ ok: false, code: 'invalid_stream_request' }, 400);
+  }
+
+  let oidcToken: string;
+  try {
+    oidcToken = await getVercelOidcToken();
+  } catch {
+    return json({ ok: false, code: 'signed_origin_unavailable' }, 503);
+  }
+
+  let upstream: Response;
+  try {
+    const upstreamUrl = new URL(
+      `/ovie/v1/summer-shadow/sessions/${encodeURIComponent(sessionId)}/stream`,
+      EVE_SHADOW_ORIGIN
+    );
+    upstreamUrl.searchParams.set('conversationId', conversationId);
+    upstreamUrl.searchParams.set('startIndex', String(startIndex));
+    upstream = await fetch(upstreamUrl, {
+      headers: { authorization: `Bearer ${oidcToken}` },
+      signal: AbortSignal.timeout(20_000),
+    });
+  } catch {
+    return json({ ok: false, code: 'eve_shadow_unavailable' }, 503);
+  }
+
+  if (!upstream.ok || !upstream.body) {
+    return json({ ok: false, code: 'eve_stream_rejected' }, 502);
+  }
+
+  return new Response(upstream.body, {
+    status: 200,
+    headers: {
+      'cache-control': 'no-store',
+      'content-type': 'application/x-ndjson',
+    },
+  });
 }

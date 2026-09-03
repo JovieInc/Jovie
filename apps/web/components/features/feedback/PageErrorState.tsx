@@ -32,7 +32,6 @@ interface PageErrorStateProps {
  *   error={error}
  *   actionLabel="Reload dashboard"
  *   onRetry={resetErrorBoundary}
- *   secondaryAction={{ label: 'Go home', onClick: () => router.push('/') }}
  *   extraContext={{ Context: 'Dashboard' }}
  * />
  */
@@ -62,7 +61,7 @@ export function PageErrorState({
           <p className='text-app text-tertiary-token'>{message}</p>
         </div>
 
-        <div className='flex justify-center'>
+        <div className='flex justify-center' data-recovery-actions=''>
           <Button
             variant='primary'
             size='sm'

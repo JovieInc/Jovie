@@ -1,9 +1,11 @@
 import type { SessionAuthContext } from 'eve/context';
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import {
   createSummerShadowIngressHandler,
   isSummerShadowEnabled,
+  renderSummerShadowObservation,
   type ShadowRecord,
+  type SummerShadowEvent,
 } from '../agent/lib/summer-shadow-ingress';
 
 const NOW = new Date('2026-08-31T20:00:00.000Z');
@@ -26,6 +28,9 @@ function event(overrides: Readonly<Record<string, unknown>> = {}) {
   return {
     schema: 'jovie.ovie-summer-shadow.event/v1',
     eventId: 'evt_shadow_0001',
+    conversationId: 'conv_shadow_0001',
+    turn: 1,
+    dailySlot: 1,
     occurredAt: NOW.toISOString(),
     message: 'Observe the exact-main production release queue.',
     evidence: ['https://github.com/JovieInc/jovie/actions'],
@@ -45,6 +50,7 @@ function dependencies(
   overrides: {
     authenticate?: () => Promise<SessionAuthContext | Response>;
     dispatch?: () => Promise<{ sessionId: string }>;
+    enabled?: () => boolean;
     persistImmutable?: (
       pathname: string,
       record: ShadowRecord
@@ -55,29 +61,44 @@ function dependencies(
     authenticate: overrides.authenticate ?? vi.fn(async () => signedAuth),
     dispatch:
       overrides.dispatch ?? vi.fn(async () => ({ sessionId: 'ses_shadow_1' })),
+    enabled: overrides.enabled ?? (() => true),
     persistImmutable:
       overrides.persistImmutable ?? vi.fn(async () => 'created' as const),
     now: () => NOW,
     deployment: () => ({
       commitSha: 'abc123',
       deploymentId: 'dpl_shadow_1',
+      environment: 'preview',
       url: 'https://jovie-eve-shadow.vercel.app',
     }),
   };
 }
 
 describe('Summer shadow ingress', () => {
-  beforeEach(() => {
-    vi.stubEnv('SUMMER_SHADOW_ENABLED', 'true');
-    vi.stubEnv('VERCEL_ENV', 'preview');
-  });
-
-  afterEach(() => vi.unstubAllEnvs());
-
-  it('enables only an explicit Preview deployment', () => {
-    expect(isSummerShadowEnabled(process.env)).toBe(true);
-    vi.stubEnv('VERCEL_ENV', 'production');
-    expect(isSummerShadowEnabled(process.env)).toBe(false);
+  it('enables explicit Preview and Production deployments and fails closed elsewhere', () => {
+    expect(
+      isSummerShadowEnabled({
+        SUMMER_SHADOW_ENABLED: 'true',
+        VERCEL_ENV: 'preview',
+      })
+    ).toBe(true);
+    expect(
+      isSummerShadowEnabled({
+        SUMMER_SHADOW_ENABLED: 'true',
+        VERCEL_ENV: 'production',
+      })
+    ).toBe(true);
+    expect(
+      isSummerShadowEnabled({
+        SUMMER_SHADOW_ENABLED: 'true',
+        VERCEL_ENV: 'development',
+      })
+    ).toBe(false);
+    expect(isSummerShadowEnabled({ SUMMER_SHADOW_ENABLED: 'true' })).toBe(
+      false
+    );
+    expect(isSummerShadowEnabled({ VERCEL_ENV: 'preview' })).toBe(false);
+    expect(isSummerShadowEnabled({ VERCEL_ENV: 'production' })).toBe(false);
   });
 
   it('authenticates before parsing and rejects unsigned input without side effects', async () => {
@@ -129,6 +150,8 @@ describe('Summer shadow ingress', () => {
     expect(response.status).toBe(202);
     expect(operations).toEqual([
       'persist:receipts',
+      'persist:budgets',
+      'persist:budgets',
       'dispatch',
       'persist:terminal',
     ]);
@@ -144,21 +167,35 @@ describe('Summer shadow ingress', () => {
       deployment: {
         commitSha: 'abc123',
         deploymentId: 'dpl_shadow_1',
+        environment: 'preview',
         url: 'https://jovie-eve-shadow.vercel.app',
       },
     });
     expect(records[0]?.record).toMatchObject({
-      verdict: 'accepted_for_eve_dispatch',
+      verdict: 'accepted_for_budget_reservation',
       source: {
         surface: 'ovie',
         source: 'ovie-summer-shadow',
         verifiedBy: 'vercel-oidc',
         subject: 'owner:jovie:project:jovie:environment:production',
       },
-      outbox: { status: 'ready', destination: 'eve-session' },
+      outbox: {
+        status: 'pending_budget_reservation',
+        destination: 'eve-session',
+      },
+      budget: {
+        maxTurnsPerSession: 5,
+        maxTurnsPerUtcDay: 25,
+      },
       authority: { dispatchAuthority: 'none', allowedMutations: [] },
     });
-    expect(records[1]?.record).toMatchObject({
+    expect(records[1]?.pathname).toMatch(
+      /^summer-shadow\/budgets\/session\/[a-f0-9]{64}\/turn-1\.json$/u
+    );
+    expect(records[2]?.pathname).toBe(
+      'summer-shadow/budgets/daily/2026-08-31/slot-1.json'
+    );
+    expect(records[3]?.record).toMatchObject({
       verdict: 'eve_session_accepted',
       identity: 'summer',
       source: 'ovie-summer-shadow',
@@ -169,6 +206,7 @@ describe('Summer shadow ingress', () => {
       expect.objectContaining({
         auth: signedAuth,
         eventKey: expect.stringMatching(/^[a-f0-9]{64}$/u),
+        conversationKey: expect.stringMatching(/^[a-f0-9]{64}$/u),
         message: expect.stringContaining('Do not call tools'),
       })
     );
@@ -215,6 +253,28 @@ describe('Summer shadow ingress', () => {
     expect(dispatch).not.toHaveBeenCalled();
   });
 
+  it('fails closed behind the kill switch after auth and before parsing', async () => {
+    const persistImmutable = vi.fn();
+    const dispatch = vi.fn();
+    const handler = createSummerShadowIngressHandler(
+      dependencies({ enabled: () => false, persistImmutable, dispatch })
+    );
+
+    const response = await handler(
+      new Request('https://eve.example.com/ovie/v1/summer-shadow/events', {
+        method: 'POST',
+        body: '{not-json',
+      })
+    );
+
+    expect(response.status).toBe(503);
+    await expect(response.json()).resolves.toMatchObject({
+      code: 'shadow_disabled',
+    });
+    expect(persistImmutable).not.toHaveBeenCalled();
+    expect(dispatch).not.toHaveBeenCalled();
+  });
+
   it.each([
     [
       'expired',
@@ -227,6 +287,8 @@ describe('Summer shadow ingress', () => {
       'event_outside_freshness_window',
     ],
     ['malformed', { unexpected: true }, 'invalid_event'],
+    ['session budget overflow', { turn: 6 }, 'invalid_event'],
+    ['daily budget overflow', { dailySlot: 26 }, 'invalid_event'],
   ])('rejects %s events before persistence', async (_name, change, code) => {
     const persistImmutable = vi.fn();
     const dispatch = vi.fn();
@@ -287,6 +349,8 @@ describe('Summer shadow ingress', () => {
     const persistImmutable = vi
       .fn()
       .mockResolvedValueOnce('created')
+      .mockResolvedValueOnce('created')
+      .mockResolvedValueOnce('created')
       .mockRejectedValueOnce(new Error('terminal unavailable'));
     const handler = createSummerShadowIngressHandler(
       dependencies({ persistImmutable })
@@ -319,12 +383,14 @@ describe('Summer shadow ingress', () => {
       code: 'eve_dispatch_failed',
       receiptPath: expect.stringMatching(/^summer-shadow\/receipts\//u),
     });
-    expect(persistImmutable).toHaveBeenCalledTimes(1);
+    expect(persistImmutable).toHaveBeenCalledTimes(3);
   });
 
   it('fails closed when the immutable terminal path already exists', async () => {
     const persistImmutable = vi
       .fn()
+      .mockResolvedValueOnce('created')
+      .mockResolvedValueOnce('created')
       .mockResolvedValueOnce('created')
       .mockResolvedValueOnce('exists');
     const handler = createSummerShadowIngressHandler(
@@ -340,20 +406,99 @@ describe('Summer shadow ingress', () => {
     });
   });
 
+  it('rejects a duplicate per-session turn reservation before dispatch', async () => {
+    const dispatch = vi.fn();
+    const persistImmutable = vi
+      .fn()
+      .mockResolvedValueOnce('created')
+      .mockResolvedValueOnce('exists');
+    const handler = createSummerShadowIngressHandler(
+      dependencies({ persistImmutable, dispatch })
+    );
+
+    const response = await handler(request());
+
+    expect(response.status).toBe(429);
+    await expect(response.json()).resolves.toMatchObject({
+      code: 'session_budget_rejected',
+    });
+    expect(dispatch).not.toHaveBeenCalled();
+  });
+
+  it('rejects a duplicate daily slot reservation before dispatch', async () => {
+    const dispatch = vi.fn();
+    const persistImmutable = vi
+      .fn()
+      .mockResolvedValueOnce('created')
+      .mockResolvedValueOnce('created')
+      .mockResolvedValueOnce('exists');
+    const handler = createSummerShadowIngressHandler(
+      dependencies({ persistImmutable, dispatch })
+    );
+
+    const response = await handler(request());
+
+    expect(response.status).toBe(429);
+    await expect(response.json()).resolves.toMatchObject({
+      code: 'daily_budget_rejected',
+    });
+    expect(dispatch).not.toHaveBeenCalled();
+  });
+
+  it('uses one stable continuation key for five bounded turns', async () => {
+    const dispatch = vi.fn(async () => ({ sessionId: 'ses_shadow_1' }));
+    const handler = createSummerShadowIngressHandler(
+      dependencies({ dispatch })
+    );
+
+    for (let turn = 1; turn <= 5; turn += 1) {
+      const response = await handler(
+        request(
+          event({
+            eventId: `evt_shadow_turn_${turn}`,
+            turn,
+            dailySlot: turn,
+          })
+        )
+      );
+      expect(response.status).toBe(202);
+    }
+
+    const continuationKeys = dispatch.mock.calls.map(
+      ([input]) => input.conversationKey
+    );
+    expect(new Set(continuationKeys).size).toBe(1);
+  });
+
+  it('renders only the allowlisted read-only tool request', () => {
+    const rendered = renderSummerShadowObservation(
+      event({ requestedCapability: 'core_chat' }) as SummerShadowEvent
+    );
+
+    expect(rendered).toContain(
+      'Call exactly jovie_capability_manifest once with capability core_chat'
+    );
+    expect(rendered).toContain('Do not call any other tool');
+    expect(rendered).toContain('Never dispatch work or mutate');
+  });
+
   it('uses runtime deployment metadata and the no-evidence rendering path', async () => {
     const previous = {
       commitSha: process.env.VERCEL_GIT_COMMIT_SHA,
       deploymentId: process.env.VERCEL_DEPLOYMENT_ID,
+      environment: process.env.VERCEL_ENV,
       url: process.env.VERCEL_URL,
     };
     process.env.VERCEL_GIT_COMMIT_SHA = 'runtime-sha';
     process.env.VERCEL_DEPLOYMENT_ID = 'dpl_runtime';
+    process.env.VERCEL_ENV = 'preview';
     process.env.VERCEL_URL = 'runtime-eve.vercel.app';
 
     try {
       const handler = createSummerShadowIngressHandler({
         authenticate: vi.fn(async () => signedAuth),
         dispatch: vi.fn(async () => ({ sessionId: 'ses_runtime' })),
+        enabled: () => true,
         persistImmutable: vi.fn(async () => 'created' as const),
       });
 
@@ -361,6 +506,9 @@ describe('Summer shadow ingress', () => {
         request({
           schema: 'jovie.ovie-summer-shadow.event/v1',
           eventId: 'evt_shadow_runtime',
+          conversationId: 'conv_shadow_runtime',
+          turn: 1,
+          dailySlot: 1,
           occurredAt: new Date().toISOString(),
           message: 'Runtime deployment proof.',
         })
@@ -371,6 +519,7 @@ describe('Summer shadow ingress', () => {
         deployment: {
           commitSha: 'runtime-sha',
           deploymentId: 'dpl_runtime',
+          environment: 'preview',
           url: 'https://runtime-eve.vercel.app',
         },
       });
@@ -381,6 +530,8 @@ describe('Summer shadow ingress', () => {
       if (previous.deploymentId === undefined)
         delete process.env.VERCEL_DEPLOYMENT_ID;
       else process.env.VERCEL_DEPLOYMENT_ID = previous.deploymentId;
+      if (previous.environment === undefined) delete process.env.VERCEL_ENV;
+      else process.env.VERCEL_ENV = previous.environment;
       if (previous.url === undefined) delete process.env.VERCEL_URL;
       else process.env.VERCEL_URL = previous.url;
     }

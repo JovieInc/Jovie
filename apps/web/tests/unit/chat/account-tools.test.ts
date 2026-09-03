@@ -31,14 +31,10 @@ function makeAccountContext(
     billingVerification: 'verified',
     planMismatch: null,
     usage: {
-      dailyLimit: 100,
+      weeklyLimit: 70,
       used: 4,
-      remaining: 96,
+      remaining: 66,
       resetAt: '2026-05-24T07:00:00.000Z',
-      monthlyLimit: 3100,
-      monthlyUsed: 4,
-      monthlyRemaining: 3096,
-      monthlyResetAt: '2026-06-01T00:00:00.000Z',
     },
     entitlements: {
       aiCanUseTools: true,
@@ -114,9 +110,9 @@ describe('account chat tools', () => {
       success: true,
       displayPlan: 'Pro',
       usage: {
-        dailyLimit: 100,
+        weeklyLimit: 70,
         used: 4,
-        remaining: 96,
+        remaining: 66,
       },
     });
   });

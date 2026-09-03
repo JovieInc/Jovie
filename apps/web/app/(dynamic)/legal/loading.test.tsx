@@ -96,9 +96,8 @@ describe('LegalLoading', () => {
 
     expect(container.querySelector('.lg\\:hidden')).toHaveClass(
       'border-y',
-      'border-neutral-200',
-      'py-5',
-      'dark:border-white/10'
+      'border-subtle',
+      'py-5'
     );
     expect(
       container.querySelector(

@@ -56,8 +56,8 @@ in the merge queue, while network/deploy/exhaustive depth runs later.
 
 Rules:
 - **Heavy scans never gate a source PR or a merge-queue batch.** Running CodeQL
-  ×5 + the full security suite per-PR saturated the runner pool and made Graphite
-  retry-storm itself into a 6-hour stall. CodeQL / Trivy / Scorecard scan the
+  ×5 + the full security suite per-PR saturated the runner pool and made the
+  native queue retry-storm itself into a 6-hour stall. CodeQL / Trivy / Scorecard scan the
   *merged* code on `main` + nightly. **Slop Gate** is the same class: a weekly
   post-merge copy-smell report on `main`. Taste/copy judgment is post-ship
   (`taste-classifier` + production walkthroughs). Do not add slopcheck to
@@ -109,8 +109,9 @@ before you open the PR (source: `.github/ci-harness/manifest.json` `riskRules`):
   freshly green. The event target, native re-entry, and missed-event recovery
   share a hard cap of two admissions per run, the App-backed controller remains
   the sole writer, and every mutation rechecks the live head, labels, base,
-  queue depth, and native postcondition. Enrollment uses GitHub's native queue;
-  `merge-queue` remains intent/audit evidence only. You don't merge by hand.
+  queue depth, and native postcondition. Enrollment uses GitHub's native queue
+  only. The `merge-queue` label is retired and must not be added, read, or
+  retained. You don't merge by hand.
   Each proven native enrollment emits a `pull_request: enqueued` continuation.
   Its already-queued exact-head target is an idempotent no-op while the surviving
   pass advances the next bounded cohort; when no eligible remainder exists, no
@@ -256,16 +257,16 @@ timed-out, or API-uncertain evidence succeeds with `ubuntu-latest`; the hosted
 
 ## What broke on 2026-06-22
 
-The queue stalled for 6 hours and looked like "Graphite is paused." It wasn't.
-Three compounding bugs on a finite runner pool:
+The queue stalled for 6 hours. It was not a paused merge product. Three
+compounding bugs on a finite runner pool:
 
 1. **Stacked-codemod pileup** — a token sweep shipped as 63 base-on-base PRs; the
    queue landed them bottom-up at full CI each → never drained. Collapsed in #11689.
 2. **Drain churn** — `drain-pr-queue.sh` counted zombie `cancelled`/`queued` checks
-   as failures and stripped `merge-queue` from green PRs every 20 min, so no PR
-   stayed enrolled long enough to land. Fixed in #11727/#11730.
+   as failures and dequeued green PRs every 20 min, so no PR stayed enrolled long
+   enough to land. Fixed in #11727/#11730.
 3. **CI-tiering runaway** — CodeQL ×5 + the security suite ran on every PR **and**
-   every Graphite batch; batches couldn't get runner slots, timed out, and Graphite
+   every combined-head batch; batches couldn't get runner slots, timed out, and
    retried every few minutes — each retry spawning another full run that saturated
    the runners further. Fixed in #11735 by moving scans off the PR path.
 

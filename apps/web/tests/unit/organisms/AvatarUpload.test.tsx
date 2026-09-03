@@ -1,6 +1,6 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
-import type { ReactElement } from 'react';
+import type { ComponentProps } from 'react';
 import {
   afterEach,
   beforeEach,
@@ -22,10 +22,12 @@ function createTestQueryClient() {
   });
 }
 
-function renderWithQueryClient(ui: ReactElement) {
+function renderWithQueryClient(props: ComponentProps<typeof AvatarUpload>) {
   const queryClient = createTestQueryClient();
   return render(
-    <QueryClientProvider client={queryClient}>{ui}</QueryClientProvider>
+    <QueryClientProvider client={queryClient}>
+      <AvatarUpload {...props} />
+    </QueryClientProvider>
   );
 }
 
@@ -103,12 +105,10 @@ describe('AvatarUpload - Error Handling', () => {
   });
 
   it('should show error toast for invalid file type', async () => {
-    renderWithQueryClient(
-      <AvatarUpload
-        artistName='Test Artist'
-        currentAvatarUrl='/test-avatar.jpg'
-      />
-    );
+    renderWithQueryClient({
+      artistName: 'Test Artist',
+      currentAvatarUrl: '/test-avatar.jpg',
+    });
 
     const fileInput = screen.getByLabelText('Choose Profile Photo File');
 
@@ -124,12 +124,10 @@ describe('AvatarUpload - Error Handling', () => {
   });
 
   it('should show error toast for file too large', async () => {
-    renderWithQueryClient(
-      <AvatarUpload
-        artistName='Test Artist'
-        currentAvatarUrl='/test-avatar.jpg'
-      />
-    );
+    renderWithQueryClient({
+      artistName: 'Test Artist',
+      currentAvatarUrl: '/test-avatar.jpg',
+    });
 
     const fileInput = screen.getByLabelText('Choose Profile Photo File');
 
@@ -155,13 +153,11 @@ describe('AvatarUpload - Error Handling', () => {
 
     const onUploadSuccess = vi.fn();
 
-    renderWithQueryClient(
-      <AvatarUpload
-        artistName='Test Artist'
-        currentAvatarUrl='/test-avatar.jpg'
-        onUploadSuccess={onUploadSuccess}
-      />
-    );
+    renderWithQueryClient({
+      artistName: 'Test Artist',
+      currentAvatarUrl: '/test-avatar.jpg',
+      onUploadSuccess,
+    });
 
     const fileInput = screen.getByLabelText('Choose Profile Photo File');
     const validFile = new File(['test'], 'test.jpg', { type: 'image/jpeg' });
@@ -183,12 +179,10 @@ describe('AvatarUpload - Error Handling', () => {
       json: () => Promise.resolve({ error: 'Upload failed' }),
     });
 
-    renderWithQueryClient(
-      <AvatarUpload
-        artistName='Test Artist'
-        currentAvatarUrl='/test-avatar.jpg'
-      />
-    );
+    renderWithQueryClient({
+      artistName: 'Test Artist',
+      currentAvatarUrl: '/test-avatar.jpg',
+    });
 
     const fileInput = screen.getByLabelText('Choose Profile Photo File');
     const validFile = new File(['test'], 'test.jpg', { type: 'image/jpeg' });
@@ -201,12 +195,10 @@ describe('AvatarUpload - Error Handling', () => {
   });
 
   it('should display upload instructions', () => {
-    const { container } = renderWithQueryClient(
-      <AvatarUpload
-        artistName='Test Artist'
-        currentAvatarUrl='/test-avatar.jpg'
-      />
-    );
+    const { container } = renderWithQueryClient({
+      artistName: 'Test Artist',
+      currentAvatarUrl: '/test-avatar.jpg',
+    });
 
     expect(container.querySelector('[data-slot="app-avatar"]')).toHaveAttribute(
       'data-size',

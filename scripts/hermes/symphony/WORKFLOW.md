@@ -2,13 +2,16 @@
 tracker:
   kind: linear
   provider:
-    project_slug: "symphony-ui-pilot-96d6b9c5b2d5"
+    team_key: "JOV"
     api_key: $LINEAR_API_KEY
-  required_labels:
-    - symphony
+  excluded_labels:
+    - no-symphony
+    - needs-human
   active_states:
     - Todo
     - In Progress
+    - Rework
+    - Merging
   terminal_states:
     - Done
     - Canceled
@@ -42,7 +45,7 @@ hooks:
       find ./apps ./packages ./workers -mindepth 2 -maxdepth 2 -type d -name node_modules -exec rm -rf {} + 2>/dev/null || true
     fi
 agent:
-  max_concurrent_agents: 3
+  max_concurrent_agents: 8
   max_turns: 20
 codex:
   command: ./scripts/hermes/symphony-codex-router app-server
@@ -52,7 +55,7 @@ codex:
     type: workspaceWrite
     networkAccess: true
 server:
-  port: 4043
+  port: 4041
 ---
 
 You are an unattended Symphony coding agent on Jovie (`JovieInc/Jovie`). PATH includes `~/.hermes/bin` and `~/.npm-global/bin`. Codex MCP allowlist is GBrain + Hyperagent only.
@@ -60,6 +63,8 @@ You are an unattended Symphony coding agent on Jovie (`JovieInc/Jovie`). PATH in
 Ticket: `{{ issue.identifier }}` — {{ issue.title }}
 Status: {{ issue.state }}
 URL: {{ issue.url }}
+
+Intake is the Jovie Linear team. States: `Todo` = queued (move to `In Progress` before work); `In Progress` = continue; `Rework` = address review feedback on the existing PR; `Merging` = land the attached PR through the native merge queue. Issues labeled `no-symphony` or `needs-human` are never dispatched.
 
 {% if attempt %}Continuation attempt #{{ attempt }}. Resume; do not redo finished validation.{% endif %}
 

@@ -80,3 +80,19 @@ export const AllVariants: Story = {
     </div>
   ),
 };
+
+export const InlineNotices: Story = {
+  render: () => (
+    <div className='w-96 space-y-4'>
+      <InfoBox presentation='inline' variant='success'>
+        Artist import complete.
+      </InfoBox>
+      <InfoBox presentation='inline' variant='warning'>
+        Artist import is taking longer than expected.
+      </InfoBox>
+      <InfoBox presentation='inline' variant='error'>
+        Artist import failed. Try again.
+      </InfoBox>
+    </div>
+  ),
+};

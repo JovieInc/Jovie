@@ -20,8 +20,8 @@ on:
         description: 'Operator ceiling above the adaptive 2 -> 10 -> 40 cohorts.'
         required: false
         default: '40'
-  schedule:
-    - cron: '7,37 * * * *'
+  push:
+    branches: [main]
   workflow_run:
     workflows: ['CI']
     types: [completed]

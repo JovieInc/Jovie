@@ -365,6 +365,47 @@ describe('@critical gate.ts (Better Auth)', () => {
     expect(mockGetSession).not.toHaveBeenCalled();
   });
 
+  it('keeps the synthetic visual-capture session when waitlist gate lookup throws', async () => {
+    vi.stubEnv('E2E_USE_TEST_AUTH_BYPASS', '1');
+    vi.stubEnv('NEXT_PUBLIC_E2E_MODE', '1');
+    vi.stubEnv('VERCEL_ENV', 'development');
+    mockGetCachedDevTestAuthSession.mockResolvedValue({
+      dbUserId: 'ba_creator_ready',
+      clerkUserId: 'ba_creator_ready',
+      email: 'browse-ready+clerk_test@jov.ie',
+      persona: 'creator-ready',
+    });
+    mockIsWaitlistGateEnabled.mockRejectedValue(
+      new Error('database unavailable in visual capture')
+    );
+    mockDbSelect.mockReturnValue(
+      chainLimitRejecting(new Error('database unavailable in visual capture'))
+    );
+
+    const result = await resolveUserState({
+      knownClerkUserId: 'ba_creator_ready',
+    });
+
+    expect(result).toMatchObject({
+      state: CanonicalUserState.ACTIVE,
+      clerkUserId: 'ba_creator_ready',
+      dbUserId: '00000000-0000-4000-8000-000000000101',
+    });
+  });
+
+  it('still fails closed when waitlist gate lookup throws outside E2E fallback', async () => {
+    mockGetSession.mockResolvedValue({
+      user: { id: 'ba_live', email: 'live@example.com' },
+      session: { id: 'sess_live' },
+    });
+    mockIsWaitlistGateEnabled.mockRejectedValue(
+      new Error('database unavailable')
+    );
+    mockDbSelect.mockReturnValue(chainLimit([activeDbUser()]));
+
+    await expect(resolveUserState()).rejects.toThrow('database unavailable');
+  });
+
   it('creates a DB user when waitlist gate is disabled and no waitlist entry exists', async () => {
     mockGetSession.mockResolvedValue({
       user: { id: 'ba_new_user', email: 'new@example.com' },

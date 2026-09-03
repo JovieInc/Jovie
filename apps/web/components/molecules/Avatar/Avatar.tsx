@@ -104,7 +104,14 @@ const AvatarComponent = forwardRef<HTMLDivElement, AvatarProps>(function Avatar(
 
   if (shouldShowFallback) {
     return (
-      <div ref={ref} className={cn('relative', className)} style={style}>
+      <div
+        ref={ref}
+        data-slot='app-avatar-frame'
+        data-size={size}
+        data-shape={shape}
+        className={cn('relative inline-flex shrink-0', className)}
+        style={{ ...style, width, height: width }}
+      >
         <BaseAvatar
           size={size}
           shape={shape}
@@ -130,7 +137,14 @@ const AvatarComponent = forwardRef<HTMLDivElement, AvatarProps>(function Avatar(
   }
 
   return (
-    <div ref={ref} className={cn('relative', className)} style={style}>
+    <div
+      ref={ref}
+      data-slot='app-avatar-frame'
+      data-size={size}
+      data-shape={shape}
+      className={cn('relative inline-flex shrink-0', className)}
+      style={{ ...style, width, height: width }}
+    >
       <BaseAvatar
         size={size}
         shape={shape}

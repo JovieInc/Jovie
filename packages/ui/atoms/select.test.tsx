@@ -118,6 +118,14 @@ describe('Select', () => {
       render(<TestSelect defaultValue='banana' />);
       expect(screen.getByText('Banana')).toBeInTheDocument();
     });
+
+    it('applies checked state styling to the selected option', () => {
+      render(<TestSelect open={true} value='apple' />);
+
+      const option = screen.getByRole('option', { name: 'Apple' });
+      expect(option).toHaveAttribute('data-state', 'checked');
+      expect(option.className).toContain('data-[state=checked]:bg-surface-1');
+    });
   });
 
   describe('Controlled Mode', () => {

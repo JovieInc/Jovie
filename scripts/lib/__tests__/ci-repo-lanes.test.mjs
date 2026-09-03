@@ -42,6 +42,42 @@ describe('JOV-5288 CI repo lanes', () => {
     expect(classifyChangedFile('scripts/lib/ci-repo-lanes.mjs')).toEqual([
       CI_LANES.SYMPHONY_CONTROL,
     ]);
+    const verificationPlan = classifyCiRepoLanes([
+      'scripts/verification/contracts.mjs',
+    ]);
+    expect(verificationPlan.runJovieProduct).toBe(false);
+    expect(verificationPlan.runSymphonyControl).toBe(true);
+    expect(verificationPlan.lanes).toEqual([CI_LANES.SYMPHONY_CONTROL]);
+  });
+
+  it('runs scripts typecheck for component certification harness scripts', () => {
+    const plan = classifyCiRepoLanes([
+      'scripts/component-rendered-evaluator.mjs',
+      'scripts/lib/__tests__/component-ship-gate.test.mjs',
+    ]);
+    expect(plan.runJovieProduct).toBe(true);
+    expect(plan.runSymphonyControl).toBe(true);
+    expect(plan.runJovieTypecheck).toBe(false);
+    expect(plan.runSummerOps).toBe(false);
+    expect(plan.lanes).toEqual([
+      CI_LANES.JOVIE_PRODUCT,
+      CI_LANES.SYMPHONY_CONTROL,
+    ]);
+  });
+
+  it('runs scripts typecheck for component certification harness scripts', () => {
+    const plan = classifyCiRepoLanes([
+      'scripts/component-rendered-evaluator.mjs',
+      'scripts/lib/__tests__/component-ship-gate.test.mjs',
+    ]);
+    expect(plan.runJovieProduct).toBe(true);
+    expect(plan.runSymphonyControl).toBe(true);
+    expect(plan.runJovieTypecheck).toBe(false);
+    expect(plan.runSummerOps).toBe(false);
+    expect(plan.lanes).toEqual([
+      CI_LANES.JOVIE_PRODUCT,
+      CI_LANES.SYMPHONY_CONTROL,
+    ]);
   });
 
   it('selects the product typecheck only for exact TypeScript graph inputs', () => {

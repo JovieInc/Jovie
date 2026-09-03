@@ -210,9 +210,8 @@ gh pr create --draft --base main --title "fix(design-system): <title>" --body "<
 # Invoke /ship
 # /ship detects the draft PR, promotes it, runs typecheck + lint + tests
 
-# 8. Request GitHub native merge-queue enrollment
-PR_NUM=$(gh pr view --json number --jq '.number')
-gh pr edit $PR_NUM --add-label merge-queue
+# 8. Leave GitHub native merge-queue enrollment to the controller.
+# Do not add the retired merge-queue label; verify native membership instead.
 
 # 9. Release claim
 mcp__ruflo__claims_release({ id: "<chunk-slug>", swarmId: "<swarm-id>" })

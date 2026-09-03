@@ -26,9 +26,9 @@ enum VoiceCaptureError: LocalizedError, Equatable {
   }
 }
 
-/// Shared transcript → editable action/task draft contract for iOS voice memo
-/// capture. Mirrors the web voice-input path: transcript lands in the chat
-/// composer as an editable draft; the user sends when ready.
+/// Shared transcript normalization and recovery-draft contract for iOS voice.
+/// Normal capture submits directly; this keeps recoverable text editable when
+/// a direct completion cannot finish safely.
 enum EyesFreeReadback {
   @MainActor
   static func speak(_ text: String) {
@@ -93,24 +93,24 @@ enum EyesFreeCaptureGate: Equatable {
 }
 
 enum VoiceMemoActionDraft: Equatable {
-  /// Shell handoff outcome for a finished voice memo (never auto-sends).
+  /// Shell handoff outcome for a recovered voice memo (never auto-sends).
   struct ShellHandoff: Equatable {
     let chatDraft: String
-    /// Always nil for voice memo capture — send remains a composer action.
+    /// Recovery requires a new explicit send from the composer.
     let autoSendMessage: String?
   }
 
-  /// Normalize spoken text into a composer-ready action draft.
+  /// Normalize spoken text for direct submission or recovery.
   static func make(fromTranscript transcript: String) -> String {
     transcript.trimmingCharacters(in: .whitespacesAndNewlines)
   }
 
-  /// Whether a draft is ready to insert into the action surface.
+  /// Whether normalized text is ready to submit or preserve.
   static func isReady(_ draft: String) -> Bool {
     !draft.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
   }
 
-  /// Talk overlay → AppShell contract: insert transcript as editable draft only.
+  /// Failed Talk completion → AppShell recovery contract.
   static func shellHandoff(fromTranscript transcript: String) -> ShellHandoff {
     ShellHandoff(
       chatDraft: make(fromTranscript: transcript),

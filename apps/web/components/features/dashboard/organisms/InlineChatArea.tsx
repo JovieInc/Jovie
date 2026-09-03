@@ -10,32 +10,21 @@
  * and race-condition-safe message saving.
  */
 
-import { Button } from '@jovie/ui';
 import { useVirtualizer } from '@tanstack/react-virtual';
-import {
-  AlertCircle,
-  ChevronDown,
-  ChevronUp,
-  Loader2,
-  RefreshCw,
-  User,
-  WifiOff,
-} from 'lucide-react';
+import { ChevronDown, ChevronUp } from 'lucide-react';
 import {
   forwardRef,
-  memo,
   useCallback,
   useEffect,
   useImperativeHandle,
   useRef,
 } from 'react';
 import { BrandLogo } from '@/components/atoms/BrandLogo';
+import { ChatMessage } from '@/components/jovie/components/ChatMessage';
+import { ErrorDisplay } from '@/components/jovie/components/ErrorDisplay';
 import { useJovieChat } from '@/components/jovie/hooks';
-import { ToolPartsRenderer } from '@/components/jovie/tool-ui';
-import { type ArtistContext, type MessagePart } from '@/components/jovie/types';
-import { getMessageText } from '@/components/jovie/utils';
+import type { ArtistContext } from '@/components/jovie/types';
 import { ContentSurfaceCard } from '@/components/molecules/ContentSurfaceCard';
-import { cn } from '@/lib/utils';
 
 interface InlineChatAreaProps {
   /** @deprecated Use profileId instead. Client-provided artist context for backward compatibility. */
@@ -55,59 +44,15 @@ export interface InlineChatAreaRef {
   isLoading: boolean;
 }
 
-/** Memoized per-message renderer to avoid reprocessing tool invocations on every render. */
-const InlineChatMessage = memo(function InlineChatMessage({
-  message,
-  profileId,
-}: {
-  message: { id: string; role: string; parts: MessagePart[] };
-  profileId: string;
-}) {
-  const textContent = getMessageText(message.parts);
+function getChatMessageRole(role: string): 'user' | 'assistant' | 'system' {
+  if (role === 'user' || role === 'assistant') {
+    return role;
+  }
 
-  return (
-    <div className='space-y-3'>
-      {textContent && (
-        <div
-          className={cn(
-            'flex gap-3',
-            message.role === 'user' ? 'justify-end' : 'justify-start'
-          )}
-        >
-          {message.role === 'assistant' && (
-            <div className='flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-surface-2'>
-              <BrandLogo size={14} tone='auto' />
-            </div>
-          )}
-          <div
-            className={cn(
-              'max-w-[85%] rounded-xl px-3 py-2',
-              'border border-subtle bg-surface-0 text-primary-token'
-            )}
-          >
-            <div className='whitespace-pre-wrap text-app leading-relaxed'>
-              {textContent}
-            </div>
-          </div>
-          {message.role === 'user' && (
-            <div className='flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-surface-2'>
-              <User className='h-3.5 w-3.5 text-secondary-token' />
-            </div>
-          )}
-        </div>
-      )}
+  return 'system';
+}
 
-      <div className='ml-10'>
-        <ToolPartsRenderer
-          parts={message.parts}
-          profileId={profileId}
-          variant='inline'
-          hasMessageText={Boolean(textContent)}
-        />
-      </div>
-    </div>
-  );
-});
+const ASSISTANT_MESSAGE_ROLE = getChatMessageRole('assistant');
 
 export const InlineChatArea = forwardRef<
   InlineChatAreaRef,
@@ -247,9 +192,14 @@ export const InlineChatArea = forwardRef<
                       }}
                     >
                       <div className='pb-4'>
-                        <InlineChatMessage
-                          message={message}
+                        <ChatMessage
+                          id={message.id}
+                          role={getChatMessageRole(message.role)}
+                          parts={message.parts}
                           profileId={profileId}
+                          skipEntrance
+                          toolVariant='inline'
+                          showAssistantActions={false}
                         />
                       </div>
                     </div>
@@ -260,53 +210,46 @@ export const InlineChatArea = forwardRef<
               <div>
                 {messages.map(message => (
                   <div key={message.id} className='pb-4'>
-                    <InlineChatMessage
-                      message={message}
+                    <ChatMessage
+                      id={message.id}
+                      role={getChatMessageRole(message.role)}
+                      parts={message.parts}
                       profileId={profileId}
+                      skipEntrance
+                      toolVariant='inline'
+                      showAssistantActions={false}
                     />
                   </div>
                 ))}
               </div>
             )}
 
-            {/* Loading indicator — rendered outside virtualizer */}
+            {/* Loading indicator - rendered outside virtualizer */}
             {isLoading && messages.at(-1)?.role === 'user' && (
-              <div className='flex gap-3 pb-4'>
-                <div className='flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-surface-2'>
-                  <BrandLogo size={14} tone='auto' />
-                </div>
-                <div className='rounded-lg border border-subtle bg-surface-0 px-3 py-2'>
-                  <Loader2 className='h-4 w-4 animate-spin text-secondary-token' />
-                </div>
+              <div className='pb-4'>
+                <ChatMessage
+                  id='inline-chat-loading'
+                  role={ASSISTANT_MESSAGE_ROLE}
+                  parts={[]}
+                  isThinking
+                  profileId={profileId}
+                  renderTools={false}
+                  skipEntrance
+                  toolVariant='inline'
+                  showAssistantActions={false}
+                />
               </div>
             )}
 
             {/* Error display */}
             {chatError && (
-              <div className='flex items-start gap-3 rounded-lg border border-error/20 bg-error-subtle p-3'>
-                {chatError.type === 'network' ? (
-                  <WifiOff className='mt-0.5 h-4 w-4 shrink-0 text-error' />
-                ) : (
-                  <AlertCircle className='mt-0.5 h-4 w-4 shrink-0 text-error' />
-                )}
-                <div className='flex-1'>
-                  <p className='text-app text-primary-token'>
-                    {chatError.message}
-                  </p>
-                  {chatError.failedMessage && !chatError.retryAfter && (
-                    <Button
-                      type='button'
-                      variant='secondary'
-                      size='sm'
-                      onClick={handleRetry}
-                      disabled={isLoading || isSubmitting}
-                      className='mt-2 h-7 gap-1.5 rounded-lg text-2xs font-caption tracking-tight'
-                    >
-                      <RefreshCw className='h-3 w-3' />
-                      Try Again
-                    </Button>
-                  )}
-                </div>
+              <div className='pb-4'>
+                <ErrorDisplay
+                  chatError={chatError}
+                  onRetry={handleRetry}
+                  isLoading={isLoading}
+                  isSubmitting={isSubmitting}
+                />
               </div>
             )}
           </div>

@@ -50,9 +50,9 @@
 #    requirement in this repository-wide ruleset.
 #
 # 6. GitHub native merge queue
-#    Existing producers keep applying merge-queue as an intent label; the
-#    central controller converts that intent into exact-head native enrollment.
-#    GitHub validates the synthetic merge_group head before squash-merging.
+#    The central controller owns exact-head native enrollment. The retired
+#    merge-queue label is neither intent nor transport. GitHub validates the
+#    synthetic merge_group head before squash-merging.
 #
 # 7. Fork PR Gate (required status check)
 #    Since required_approving_review_count is 0, fork PRs from external
@@ -164,5 +164,5 @@ rules:
   # by a future source apply. Enable only by an explicit reviewed live cutover.
 
 # ── Bypass Actors ──────────────────────────────────────────────────────
-# Native merge-queue cutover requires no Graphite or human bypass actor.
+# Native merge-queue cutover requires no vendor or human bypass actor.
 bypass_actors: []

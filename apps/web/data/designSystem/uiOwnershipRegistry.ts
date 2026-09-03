@@ -30,7 +30,7 @@ export type UIOwnershipPlatform = (typeof UI_OWNERSHIP_PLATFORMS)[number];
 export const UI_OWNERSHIP_BREAKPOINTS = ['compact', 'medium', 'wide'] as const;
 export type UIOwnershipBreakpoint = (typeof UI_OWNERSHIP_BREAKPOINTS)[number];
 export const UI_OWNERSHIP_STATES = words(
-  'default hover focus-visible pressed visited selected disabled loading pending empty partial success error offline recovery collapsed expanded'
+  'default hover focus-visible pressed visited selected disabled loading pending empty partial success warning error offline recovery collapsed expanded'
 );
 export type UIOwnershipState = (typeof UI_OWNERSHIP_STATES)[number];
 export type UIOwnershipLayer = 'atom' | 'interaction' | 'molecule' | 'organism';
@@ -303,8 +303,8 @@ const nativeBindingsByEntry: Partial<
         'apps/ios/Jovie/Features/Dashboard/PublicProfileBrowserView.swift',
         'apps/ios/Jovie/Features/Dashboard/VenueModeView.swift',
         'apps/ios/Jovie/Features/Inbox/InboxSurfaceView.swift',
+        'apps/ios/Jovie/Features/Library/LibrarySurfaceView.swift',
         'apps/ios/Jovie/Features/NeedsOnboarding/NeedsOnboardingView.swift',
-        'apps/ios/Jovie/Features/Settings/SettingsView.swift',
         'apps/ios/Jovie/Features/Teleprompter/TeleprompterProposal.swift',
       ],
       testEvidence: nativeButtonStyleTests,
@@ -315,8 +315,6 @@ const nativeBindingsByEntry: Partial<
       semanticRole: 'plain-content-press-feedback',
       consumerPaths: [
         'apps/ios/Jovie/Features/AppShell/AppShellLeftDrawer.swift',
-        'apps/ios/Jovie/Features/AppShell/AppShellTabBar.swift',
-        'apps/ios/Jovie/Features/Settings/SettingsView.swift',
       ],
       testEvidence: nativeButtonStyleTests,
     },
@@ -330,7 +328,6 @@ const nativeBindingsByEntry: Partial<
         'apps/ios/Jovie/Features/AppShell/AppShellView.swift',
         'apps/ios/Jovie/Features/Chat/MobileChatView.swift',
         'apps/ios/Jovie/Features/Dashboard/PublicProfileBrowserView.swift',
-        'apps/ios/Jovie/Features/Settings/SettingsView.swift',
         'apps/ios/Jovie/Features/Teleprompter/TeleprompterOverlayView.swift',
       ],
       testEvidence: nativeButtonStyleTests,

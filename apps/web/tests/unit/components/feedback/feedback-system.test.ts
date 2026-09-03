@@ -155,13 +155,14 @@ describe('canonical banner store', () => {
     });
   });
 
-  it('supports success, error, and info shortcuts', () => {
+  it('supports success, warning, error, and info shortcuts', () => {
     banner.success('Import complete');
+    banner.warning('Import delayed');
     banner.error('Payments degraded');
     banner.info('New feature available');
 
     const variants = banner.getBanners().map(item => item.variant);
-    expect(variants).toEqual(['success', 'error', 'info']);
+    expect(variants).toEqual(['success', 'warning', 'error', 'info']);
   });
 
   it('persists until dismissed and dismisses by id', () => {

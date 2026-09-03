@@ -10,6 +10,7 @@ import {
   uuid,
 } from 'drizzle-orm/pg-core';
 import { createInsertSchema, createSelectSchema } from 'drizzle-zod';
+import { users } from './auth';
 import { discogReleases } from './content';
 import { creatorProfiles } from './profiles';
 
@@ -34,6 +35,14 @@ export const promoDownloads = pgTable(
     fileMimeType: text('file_mime_type').notNull(),
     artworkUrl: text('artwork_url'),
     isActive: boolean('is_active').notNull().default(true),
+    rightsControlAttested: boolean('rights_control_attested')
+      .notNull()
+      .default(false),
+    rightsControlAttestedBy: uuid('rights_control_attested_by').references(
+      () => users.id,
+      { onDelete: 'set null' }
+    ),
+    rightsControlAttestedAt: timestamp('rights_control_attested_at'),
     position: integer('position').notNull().default(0),
     metadata: jsonb('metadata').$type<Record<string, unknown>>().default({}),
     createdAt: timestamp('created_at').defaultNow().notNull(),

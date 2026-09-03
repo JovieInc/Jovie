@@ -42,6 +42,24 @@ describe('MarketingHero — landing mode', () => {
     expect(screen.queryByTestId('homepage-shell')).not.toBeInTheDocument();
   });
 
+  it('honors the shared test id override in landing mode', () => {
+    render(
+      <MarketingHero
+        eyebrow='Eyebrow'
+        headingId='shared-hero-heading'
+        title='Hero title'
+        body='Hero body'
+        media={<div>Media</div>}
+        testId='route-hero'
+      />
+    );
+
+    expect(screen.getByTestId('route-hero')).toHaveAttribute(
+      'aria-labelledby',
+      'shared-hero-heading'
+    );
+  });
+
   it('passes an override CTA analytics event to the CTA button', () => {
     render(
       <MarketingHero
@@ -65,14 +83,39 @@ describe('MarketingHero — landing mode', () => {
 describe('MarketingHero — shell mode', () => {
   it('renders children inside a variant-constrained section', () => {
     render(
-      <MarketingHero variant='left'>
-        <h1>Shell heading</h1>
+      <MarketingHero
+        variant='left'
+        headingId='shell-heading'
+        testId='shell-hero'
+      >
+        <h1 id='shell-heading'>Shell heading</h1>
       </MarketingHero>
     );
 
+    expect(screen.getByTestId('shell-hero')).toHaveAttribute(
+      'aria-labelledby',
+      'shell-heading'
+    );
     expect(
       screen.getByRole('heading', { name: 'Shell heading' })
     ).toBeInTheDocument();
+  });
+
+  it('owns route-specific hero markup without adding presentation classes', () => {
+    render(
+      <MarketingHero
+        variant='unstyled'
+        headingId='owned-heading'
+        testId='owned-hero'
+        className='route-owned-presentation'
+      >
+        <h1 id='owned-heading'>Owned heading</h1>
+      </MarketingHero>
+    );
+
+    const hero = screen.getByTestId('owned-hero');
+    expect(hero).toHaveClass('route-owned-presentation');
+    expect(hero).not.toHaveClass('relative', 'w-full', 'pt-20');
   });
 });
 

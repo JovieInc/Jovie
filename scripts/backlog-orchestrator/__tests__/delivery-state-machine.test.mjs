@@ -15,6 +15,8 @@ import {
 } from '../delivery-state-machine.mjs';
 
 const HEAD = 'a'.repeat(40);
+const REPO = 'JovieInc/Jovie';
+const LYB_REPO = 'JovieInc/LogYourBody';
 
 describe('delivery state machine', () => {
   it('turns every machine-owned failure into one bounded repair route', () => {
@@ -35,6 +37,8 @@ describe('delivery state machine', () => {
       ['missing-owner-lease', 'reconcile-exact-head-lease'],
       ['dropped-controller-event', 'restore-event-trigger-and-reconcile'],
       ['draft-stack-policy', 'split-or-retarget-draft-stack'],
+      ['fleet-observation-gap', 'restore-fleet-observation'],
+      ['base-not-main', 'retarget-pr-base-to-main'],
     ]) {
       const receipt = buildDeliveryReceipt({ delivery_key: failure, failure });
       assert.equal(receipt.schema, DELIVERY_RECEIPT_SCHEMA);
@@ -139,6 +143,26 @@ describe('delivery state machine', () => {
     assert.equal(receipt.next.owner, 'gem');
   });
 
+  it('includes repository identity in delivery receipt keys', () => {
+    const jovie = buildDeliveryReceipt({
+      repository: REPO,
+      delivery_key: 'queue-eviction-42',
+      failure: 'queue-noop',
+      pr_number: 42,
+      head_sha: HEAD,
+    });
+    const logYourBody = buildDeliveryReceipt({
+      repository: LYB_REPO,
+      delivery_key: 'queue-eviction-42',
+      failure: 'queue-noop',
+      pr_number: 42,
+      head_sha: HEAD,
+    });
+    assert.equal(jovie.event.repository, REPO);
+    assert.equal(logYourBody.event.repository, LYB_REPO);
+    assert.notEqual(jovie.receiptKey, logYourBody.receiptKey);
+  });
+
   it('classifies a suppressed product PR queue failure dispatch as exact-head queue repair', () => {
     const receipt = buildDeliveryReceipt({
       action: 'delivery-control-failure',
@@ -222,6 +246,7 @@ describe('delivery state machine', () => {
     try {
       const action = {
         schema: 'jovie-stack-health-action/v1',
+        repository: REPO,
         taskKey: 'b'.repeat(64),
         deliveryKey: `closure-stack:${'b'.repeat(64)}`,
         action: 'split-or-retarget-draft-stack',
@@ -333,6 +358,8 @@ describe('delivery state machine', () => {
       );
       assert.deepEqual(task.evidence.prNumbers, [16510, 16511]);
       assert.deepEqual(task.evidence.memberHeads, action.memberHeads);
+      assert.equal(task.repository, REPO);
+      assert.equal(task.evidence.repository, REPO);
       assert.equal(task.evidence.rootHeadSha, HEAD);
       assert.equal(task.evidence.promotionPath[0].headSha, HEAD);
       const resolved = await persist([], '2026-08-29T01:00:00.000Z');
@@ -381,6 +408,30 @@ describe('delivery state machine', () => {
     } finally {
       await rm(directory, { recursive: true, force: true });
     }
+  });
+
+  it('accepts a schema-valid fleet receipt whose stack fields were omitted', async () => {
+    const result = await persistClosureHealthActions(
+      {
+        schema: 'jovie-fleet-gate/v1',
+        signals: {
+          closureHealth: {
+            schema: 'jovie-closure-health/v1',
+            status: 'healthy',
+            authority: 'Summer',
+            observedAt: '2026-09-03T05:00:00.000Z',
+            newIssueIntakeAllowed: true,
+            promotionContinues: true,
+            remediationContinues: true,
+            reasons: [],
+          },
+        },
+      },
+      { dryRun: true }
+    );
+    assert.equal(result.actionCount, 0);
+    assert.equal(result.evidenceCount, 0);
+    assert.equal(result.status, 'none');
   });
 
   it('accepts a fail-closed fleet gate receipt with no stack repair work', async () => {

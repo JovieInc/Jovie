@@ -1710,7 +1710,7 @@ async function seedReleasesForProfile(
           fileMimeType: 'audio/mpeg',
           fileSizeBytes: 4_600_000,
           artworkUrl: DEFAULT_TEST_RELEASE_ARTWORK_URL,
-          isActive: true,
+          isActive: false,
           position: 0,
           metadata: { fixture: true },
         })
