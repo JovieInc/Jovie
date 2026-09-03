@@ -1,4 +1,5 @@
 import type { Meta, StoryObj } from '@storybook/nextjs-vite';
+import { Button } from '@jovie/ui';
 import { House, SquarePen } from 'lucide-react';
 import {
   getSidebarNavIconClassName,
@@ -38,15 +39,18 @@ export const ActiveCollapsed: Story = {
 
 export const EnabledPrimaryCreate: Story = {
   render: () => (
-    <button
-      type='button'
-      className={getSidebarNavRowClassName({ tone: 'primary' })}
+    <Button
+      variant='ghost'
+      size='md'
+      className='h-auto w-auto min-w-0 rounded-full px-0 py-0 before:hidden'
     >
-      <SquarePen
-        className={getSidebarNavIconClassName({ tone: 'primary' })}
-        strokeWidth={2}
-      />
-      <span>New Chat</span>
-    </button>
+      <div className={getSidebarNavRowClassName({ tone: 'primary' })}>
+        <SquarePen
+          className={getSidebarNavIconClassName({ tone: 'primary' })}
+          strokeWidth={2}
+        />
+        <span>New Chat</span>
+      </div>
+    </Button>
   ),
 };
