@@ -625,6 +625,10 @@ export async function persistClosureHealthActions(
   }
   const actions = Array.isArray(rawActions) ? rawActions : [];
   const boundedActions = actions.map(boundedStackHealthAction);
+  const closureRepository =
+    repositoryName(candidate.repository) ||
+    boundedActions.map(action => action.repository).find(Boolean) ||
+    DEFAULT_DELIVERY_REPOSITORY;
   const observedAtInput = nonEmpty(candidate.observedAt) || now;
   if (!Number.isFinite(Date.parse(observedAtInput))) {
     throw new Error('closure health observedAt is invalid');
@@ -688,6 +692,7 @@ export async function persistClosureHealthActions(
       if (roots.has(rootPr)) continue;
       const record = classifyAndOpenFromDelivery(
         {
+          repository: closureRepository,
           delivery_key: `closure-stack-evidence:${rootPr}`,
           failure: 'not-proven',
           proven: false,
