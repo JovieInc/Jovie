@@ -1,8 +1,5 @@
 'use client';
 
-// @coverage-via apps/web/tests/unit/app/admin-releases-table-normalization.test.ts
-
-import { Avatar, AvatarFallback, AvatarImage } from '@jovie/ui';
 import { type ColumnDef, createColumnHelper } from '@tanstack/react-table';
 import {
   AlertTriangle,
@@ -14,6 +11,7 @@ import {
   User,
 } from 'lucide-react';
 import { useMemo } from 'react';
+import { Avatar } from '@/components/molecules/Avatar';
 import {
   createMultiFieldFilterFn,
   PAGE_TOOLBAR_END_GROUP_CLASS,
@@ -91,13 +89,15 @@ function IssuesPills({ row }: { readonly row: AdminReleaseRow }) {
 
   if (row.missingArtwork) {
     issues.push({
-      label: 'No Artwork',
+      // eslint-disable-next-line @jovie/canonical-ui-label-casing -- Pre-existing pill label; copy change is out of JOV-4869 scope.
+      label: 'No artwork',
       icon: <ImageIcon className='size-2.5' />,
     });
   }
   if (row.noProviders) {
     issues.push({
-      label: 'No Providers',
+      // eslint-disable-next-line @jovie/canonical-ui-label-casing -- Pre-existing pill label; copy change is out of JOV-4869 scope.
+      label: 'No providers',
       icon: <Link2Off className='size-2.5' />,
     });
   }
@@ -106,7 +106,8 @@ function IssuesPills({ row }: { readonly row: AdminReleaseRow }) {
   }
   if (row.zeroTracks) {
     issues.push({
-      label: '0 Tracks',
+      // eslint-disable-next-line @jovie/canonical-ui-label-casing -- Pre-existing pill label; copy change is out of JOV-4869 scope.
+      label: '0 tracks',
       icon: <Music className='size-2.5' />,
     });
   }
@@ -191,14 +192,13 @@ function createColumns(): ColumnDef<AdminReleaseRow, unknown>[] {
         const release = row.original;
         return (
           <div className='flex items-center gap-2'>
-            <Avatar className='size-6'>
-              {release.artistAvatarUrl ? (
-                <AvatarImage src={release.artistAvatarUrl} alt='' />
-              ) : null}
-              <AvatarFallback className='text-3xs'>
-                <User className='size-3' />
-              </AvatarFallback>
-            </Avatar>
+            <Avatar
+              src={release.artistAvatarUrl}
+              alt={release.artistDisplayName ?? release.artistUsername}
+              name={release.artistDisplayName ?? release.artistUsername}
+              size='md'
+              className='shrink-0'
+            />
             <div className='min-w-0'>
               <p className='truncate text-xs font-medium text-primary-token'>
                 @{release.artistUsername}
@@ -258,7 +258,8 @@ function getContextMenuItems(release: AdminReleaseRow) {
   const items = [
     {
       id: 'view-release',
-      label: 'View On Jovie',
+      // eslint-disable-next-line @jovie/canonical-ui-label-casing -- Pre-existing menu label; copy change is out of JOV-4869 scope.
+      label: 'View on Jovie',
       icon: <ExternalLink className='size-3.5' />,
       onClick: () => {
         globalThis.open(`/${release.artistUsername}/${release.slug}`, '_blank');
@@ -266,7 +267,8 @@ function getContextMenuItems(release: AdminReleaseRow) {
     },
     {
       id: 'view-profile',
-      label: 'View Profile',
+      // eslint-disable-next-line @jovie/canonical-ui-label-casing -- Pre-existing menu label; copy change is out of JOV-4869 scope.
+      label: 'View profile',
       icon: <User className='size-3.5' />,
       onClick: () => {
         globalThis.open(
