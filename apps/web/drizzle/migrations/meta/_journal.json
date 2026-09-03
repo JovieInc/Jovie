@@ -677,8 +677,15 @@
     {
       "idx": 96,
       "version": "7",
-      "when": 1788024658505,
-      "tag": "0096_hesitant_demogoblin",
+      "when": 1787927993353,
+      "tag": "0096_petite_doomsday",
+      "breakpoints": true
+    },
+    {
+      "idx": 97,
+      "version": "7",
+      "when": 1787928766493,
+      "tag": "0097_regular_mister_sinister",
       "breakpoints": true
     }
   ]
