@@ -1,5 +1,6 @@
 'use client';
 
+// @coverage-via apps/web/tests/unit/components/features/admin/hud/OvieShippingStateCard.test.tsx
 import { useQuery } from '@tanstack/react-query';
 import { Ship } from 'lucide-react';
 import { useEffect, useRef } from 'react';
