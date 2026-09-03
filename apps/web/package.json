@@ -340,7 +340,7 @@
     "autoprefixer": "^10.4.27",
     "axe-core": "^4.12.1",
     "babel-plugin-react-compiler": "19.1.0-rc.3",
-    "danger": "^13.0.10",
+    "danger": "^14.0.5",
     "drizzle-kit": "^0.31.10",
     "drizzle-zod": "^0.8.3",
     "eslint": "^10.2.1",
