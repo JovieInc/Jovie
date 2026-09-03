@@ -9,6 +9,7 @@ import {
   messagePartsIncludeFailedTool,
   shouldSuppressChatPauseForToolFailure,
 } from '@/components/jovie/utils';
+import { GATEWAY_BUDGET_EXCEEDED_USER_MESSAGE } from '@/lib/ai/gateway-errors';
 
 describe('extractErrorMetadata', () => {
   it('infers AUTH_REQUIRED from a 401 Unauthorized JSON body', () => {
@@ -131,6 +132,20 @@ describe('getPreferredErrorMessage', () => {
 
     expect(getPreferredErrorMessage(error, 'server', {})).toBe(
       'Service is temporarily unavailable.'
+    );
+  });
+
+  it('does not leak a gateway budget wall to the chat user', () => {
+    const error = Object.assign(
+      new Error(
+        'API key budget exceeded. Current spend: $1.05, limit: $1.00. Please contact your administrator to increase the budget.'
+      ),
+      { name: 'GatewayInternalServerError' }
+    );
+
+    expect(getErrorType(error)).toBe('server');
+    expect(getPreferredErrorMessage(error, 'server', {})).toBe(
+      GATEWAY_BUDGET_EXCEEDED_USER_MESSAGE
     );
   });
 });
