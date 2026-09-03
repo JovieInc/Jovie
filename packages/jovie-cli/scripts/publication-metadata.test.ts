@@ -64,7 +64,7 @@ describe('public CLI publication metadata', () => {
     expect(readme).toContain('jovie --version');
     expect(readme).toContain('artist get <username>');
     expect(readme).toContain('https://jov.ie/cli');
-    expect(readme).toContain('not published from this branch');
+    expect(readme).toContain('A repository build is not proof that npm has the package');
   });
 
   it('leaves CI-injected singleton test flags to the caller', () => {
