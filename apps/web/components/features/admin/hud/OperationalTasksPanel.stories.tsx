@@ -1,6 +1,6 @@
 import type { Meta, StoryObj } from '@storybook/nextjs-vite';
-import { OperationalTasksPanelView } from './OperationalTasksPanel';
 import type { ShippingCockpitProjection } from '@/lib/ovie/shipping-state/client';
+import { OperationalTasksPanelView } from './OperationalTasksPanel';
 
 type OperationalTaskFeed = ShippingCockpitProjection['operationalTasks'];
 
