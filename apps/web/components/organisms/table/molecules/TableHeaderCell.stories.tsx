@@ -1,5 +1,5 @@
 import type { Meta, StoryObj } from '@storybook/nextjs-vite';
-import type { Header } from '@tanstack/react-table';
+import type { Header } from '@/lib/tanstack-v8-compat';
 import { TableHeaderCell } from './TableHeaderCell';
 
 type Row = { title: string };
