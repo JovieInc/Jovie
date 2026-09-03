@@ -8,7 +8,8 @@
  * - Reuses patterns from lib/connectors/workflows/execute-approved-action.ts (CAS, logging, captureError)
  * - No social/write scopes ever enabled in v0.
  *
- * Triggered from: demo script, future Trigger.dev job (trigger/ dir), or cron on photo tags.
+ * Triggered inline from the demo script or a bounded cron caller.
+ * No durable workflow runner is currently commissioned for this loop.
  * Writes to memory.ts tables via AgentHarness + MemoryStore.
  */
 
@@ -75,7 +76,7 @@ export async function runStudioSessionMemoryLoop(
       flag: flagName,
     };
 
-    // In future: enqueue a workflowRuns row of kind 'studio_session_memory_v0' for durable follow-up (Trigger.dev or cron)
+    // A future durable follow-up requires a newly commissioned runner and receipt contract.
     // For v0 the harness already wrote memory source records, observations, and opportunity.
 
     return result;
