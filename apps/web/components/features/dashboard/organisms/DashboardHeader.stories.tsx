@@ -1,4 +1,5 @@
 import type { Meta, StoryObj } from '@storybook/nextjs-vite';
+import { Button } from '@jovie/ui';
 import { DashboardHeader } from './DashboardHeader';
 
 const meta = {
@@ -32,9 +33,13 @@ export const TransparentChat: Story = {
     breadcrumbs: [{ label: 'New Chat', href: '/app/chat' }],
     transparent: true,
     searchSurface: (
-      <button type='button' className='text-xs text-secondary-token'>
+      <Button
+        variant='ghost'
+        size='md'
+        className='h-auto rounded-full px-0 py-0 text-xs text-secondary-token before:hidden'
+      >
         Search chats
-      </button>
+      </Button>
     ),
   },
 };
