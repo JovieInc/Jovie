@@ -4,6 +4,10 @@ import {
   YOUTUBE_THUMBNAILS_EVENTS,
   YOUTUBE_THUMBNAILS_OPTIMIZATION,
 } from '@/data/youtubeThumbnailsCopy';
+import {
+  LAUNCH_ACQUISITION_VARIANT_ID,
+  YOUTUBE_GROWTH_EXPERIMENT_ID,
+} from '@/lib/acquisition';
 import { trackEvent } from '@/lib/analytics/runtime-aware';
 import { captureError } from '@/lib/error-tracking';
 import { isCodeFlagEnabled } from '@/lib/flags/code-flags';
@@ -194,6 +198,8 @@ export async function POST(request: Request) {
     };
     void trackEvent(YOUTUBE_THUMBNAILS_EVENTS.PREVIEWED, {
       variantIdentity: YOUTUBE_THUMBNAILS_OPTIMIZATION.variantIdentity,
+      launchAcquisitionVariant: LAUNCH_ACQUISITION_VARIANT_ID,
+      experimentId: YOUTUBE_GROWTH_EXPERIMENT_ID,
       mode: result.mode,
       itemCount: result.items.length,
       generatedCount: generated,

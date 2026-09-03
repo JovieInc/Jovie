@@ -84,6 +84,7 @@
 | `ingestion/` | Social platform profile ingestion: scheduler, processor, avatar handling | `processor`, `scheduler`, `statusManager` |
 | `ingestion/jobs/` | Platform-specific ingestion processors (Linktree, Instagram, TikTok, YouTube, etc.) | `executeIngestionJob`, `processLinktreeJob` |
 | `ingestion/strategies/` | Platform-specific HTML extraction with URL validation | `detectIngestionPlatform`, `extractLinktree` |
+| `acquisition/` | Shared launch-acquisition loop for premade-profile and YouTube-growth experiments | `machineCertifyPremadeProfile`, `LAUNCH_ACQUISITION_OPTIMIZATION_CONTRACT` |
 | `intent-detection/` | AI intent classifier and pattern matching for chat command routing | `classifyIntent`, `routeIntent`, `INTENT_PATTERNS` |
 
 ## Infrastructure
