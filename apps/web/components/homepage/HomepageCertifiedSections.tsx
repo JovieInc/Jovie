@@ -31,7 +31,7 @@ export interface HomepageCertifiedSectionsProps {
  * treatment.
  */
 const QUIET_SECTION_IDS: ReadonlySet<HomepageCertifiedSectionId> =
-  new Set<HomepageCertifiedSectionId>(['found', 'know']);
+  new Set<HomepageCertifiedSectionId>(['found', 'know', 'relationships']);
 
 const PHONE_SIZES = '(min-width: 1024px) 15rem, (min-width: 768px) 24vw, 62vw';
 
@@ -184,6 +184,7 @@ export function HomepageCertifiedSections({
             data-align={index % 2 === 0 ? 'start' : 'end'}
             data-media={media ? 'true' : 'false'}
             data-voice={quiet ? 'quiet' : 'display'}
+            data-figure={figure ? 'true' : 'false'}
             data-wash={washed ? 'true' : 'false'}
             aria-labelledby={headingId}
           >
