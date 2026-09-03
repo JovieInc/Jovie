@@ -35,13 +35,8 @@ describe('globals.css ui-feel quick wins (JOV-3368)', () => {
 
   it('keeps press compression explicit and token-driven', () => {
     expect(source).toContain('.interactive-press');
-    // Press feedback must be transform-scale driven by the --scale-press token.
-    // Both canonical spellings satisfy the contract: the semantic Tailwind v4
-    // utility `active:scale-press` (post-#16792 canonical form, pinned by
-    // press-motion-contract.test.ts) and the arbitrary-value form
-    // `active:scale-[var(--scale-press)]`. (JOV-3368)
     expect(source).toMatch(
-      /\.interactive-press\s*\{[\s\S]*transition-transform[\s\S]*active:(?:scale-\[var\(--scale-press\)\]|scale-press)/
+      /\.interactive-press\s*\{[\s\S]*transition-transform[\s\S]*active:scale-\[var\(--scale-press\)\]/
     );
     expect(source).not.toContain(
       'button:not(:disabled):not([data-static="true"])'
@@ -54,7 +49,7 @@ describe('globals.css ui-feel quick wins (JOV-3368)', () => {
 
   it('migrates btn-press from opacity to scale press feedback', () => {
     expect(source).toMatch(
-      /\.btn-press\s*\{[\s\S]*transition-transform[\s\S]*active:(?:scale-\[var\(--scale-press\)\]|scale-press)/
+      /\.btn-press\s*\{[\s\S]*transition-transform[\s\S]*active:scale-\[var\(--scale-press\)\]/
     );
     expect(source).not.toMatch(/\.btn-press\s*\{[^}]*active:opacity-80/);
   });
