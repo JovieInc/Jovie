@@ -86,3 +86,49 @@ describe('MarketingHero source-backed default story', () => {
     );
   });
 });
+
+describe('MarketingHero — shell mode', () => {
+  it('keeps canonical hero spacing on styled shell variants', () => {
+    render(
+      <MarketingHero
+        variant='left'
+        headingId='styled-heading'
+        testId='styled-hero'
+      >
+        <h1 id='styled-heading'>Styled heading</h1>
+      </MarketingHero>
+    );
+
+    const hero = screen.getByTestId('styled-hero');
+    expect(hero).toHaveAttribute(
+      'data-pen-contract',
+      MARKETING_PEN_CONTRACT_IDS.section.hero
+    );
+    expect(hero).toHaveClass('relative', 'w-full', 'pt-20');
+  });
+
+  it('delegates route-owned presentation to the unstyled shell root', () => {
+    render(
+      <MarketingHero
+        variant='unstyled'
+        headingId='owned-heading'
+        testId='owned-hero'
+        className='route-owned-presentation'
+      >
+        <h1 id='owned-heading'>Owned heading</h1>
+      </MarketingHero>
+    );
+
+    const hero = screen.getByTestId('owned-hero');
+    expect(hero).toHaveAttribute(
+      'data-pen-contract',
+      MARKETING_PEN_CONTRACT_IDS.section.hero
+    );
+    expect(hero).toHaveAttribute('aria-labelledby', 'owned-heading');
+    expect(hero).toHaveClass('route-owned-presentation');
+    expect(hero).not.toHaveClass('relative', 'w-full', 'pt-20');
+    expect(
+      screen.getByRole('heading', { name: 'Owned heading' })
+    ).toBeInTheDocument();
+  });
+});
