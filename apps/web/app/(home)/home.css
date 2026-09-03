@@ -2626,6 +2626,7 @@ body:has(.home-viewport)::-webkit-scrollbar {
   .homepage-certified-section[data-voice="quiet"][data-align="end"]
     .homepage-certified-section__copy {
     grid-column: 8 / span 5;
+    margin-left: 0;
   }
 
   .homepage-certified-section[data-voice="quiet"]
