@@ -107,12 +107,14 @@ describe('public CTA guard', () => {
     );
   });
 
-  it('keys marketing nav links by href+label so duplicate labels stay distinct', () => {
+  it('keys marketing nav links by href and label together', () => {
     const headerNav = readFileSync(
       join(ROOT, 'components/organisms/HeaderNav.tsx'),
       'utf8'
     );
 
+    // Duplicate hrefs (e.g. two labels routing to the same page) must not
+    // collide on the React key.
     expect(headerNav).toContain('key={`${link.href}:${link.label}`}');
   });
 });
