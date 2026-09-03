@@ -1,5 +1,8 @@
 import { beforeEach, describe, expect, it } from 'vitest';
-import { EveAuthorityError } from '@/lib/ovie/eve-authority';
+import {
+  assertEveCannotChoosePriority,
+  EveAuthorityError,
+} from '@/lib/ovie/eve-authority';
 import {
   DEST_KANBAN,
   DEST_LINEAR,
@@ -7,18 +10,26 @@ import {
   OVIE_BLOCKED_ACK,
   OVIE_LINEAR_QUEUED_ACK,
   OVIE_QUEUED_ACK,
+  OVIE_UNAVAILABLE_ACK,
   resetOvieIngestLog,
 } from '@/lib/ovie/ingest';
 import { MemoryOperatingStore } from '@/lib/ovie/mcp/store';
-import type { OvieInitiative, OvieRoutingState } from '@/lib/ovie/mcp/types';
+import type {
+  OvieBlocker,
+  OvieEvidence,
+  OvieInitiative,
+  OvieRoutingState,
+} from '@/lib/ovie/mcp/types';
 import {
   applyOvieDump,
   listPendingInitiatives,
+  markInitiativeLanded,
   ovieIdempotencyKey,
 } from '@/lib/ovie/persist';
 import {
   inspectSummerCard,
   listSummerKanban,
+  toSummerKanbanCard,
   transitionSummerCard,
 } from '@/lib/ovie/summer-kanban';
 
@@ -101,6 +112,60 @@ function legacyEngineeringInitiative(
     createdAt: now,
     updatedAt: now,
     evidence: [receiptEvidence],
+  };
+}
+
+function kanbanInitiative(
+  id: string,
+  options?: {
+    readonly routingState?: OvieRoutingState;
+    readonly routingReason?: string;
+    readonly blocker?: OvieBlocker;
+    readonly destinationHandle?: string | null;
+    readonly evidence?: readonly OvieEvidence[];
+    readonly updatedAt?: string;
+    readonly status?: OvieInitiative['status'];
+  }
+): OvieInitiative {
+  const now = new Date().toISOString();
+  const routingState = options?.routingState ?? 'queued';
+  const destinationHandle = options?.destinationHandle ?? null;
+  return {
+    id,
+    kind: 'initiative',
+    status: options?.status ?? statusForRoutingState(routingState),
+    confidence: 'medium',
+    handoff: {
+      title: 'Post the launch tweet',
+      intent: 'post this tweet',
+      priority: 'flash',
+    },
+    lane: 'flash',
+    destination: DEST_KANBAN,
+    receipts: [
+      {
+        text: 'post this tweet',
+        lane: 'flash',
+        destination: DEST_KANBAN,
+        ack: OVIE_QUEUED_ACK,
+        destinationHandle,
+        workerSpawned: false,
+        workId: id,
+        idempotencyKey: `ovie-${id}`,
+        routingState,
+      },
+    ],
+    workerSpawned: false,
+    destinationHandle,
+    idempotencyKey: `ovie-${id}`,
+    routingState,
+    routingReason: options?.routingReason,
+    blocker: options?.blocker,
+    createdAt: options?.updatedAt ?? now,
+    updatedAt: options?.updatedAt ?? now,
+    evidence: options?.evidence ?? [
+      { kind: 'receipt', summary: OVIE_QUEUED_ACK, ref: DEST_KANBAN },
+    ],
   };
 }
 
@@ -328,5 +393,250 @@ describe('Summer Kanban (JOV-5215)', () => {
     expect(stillStored?.destination).toBe(DEST_KANBAN);
     expect(stillStored?.destinationHandle).toBe('task_kanban_1');
     expect(stillStored?.receipts[0]?.destinationHandle).toBe('task_kanban_1');
+  });
+});
+
+describe('Summer Kanban card truth (JOV-5761)', () => {
+  const NOW = Date.parse('2026-09-01T12:00:00.000Z');
+  const fixedNow = { now: () => NOW };
+
+  beforeEach(() => {
+    resetOvieIngestLog();
+  });
+
+  it('marks a stale source timestamp as stale, never fresh', async () => {
+    const store = new MemoryOperatingStore();
+    await store.putInitiative(
+      kanbanInitiative('ini_stale', {
+        updatedAt: '2026-08-30T11:59:59.000Z',
+      })
+    );
+    await store.putInitiative(
+      kanbanInitiative('ini_fresh', {
+        updatedAt: '2026-09-01T11:30:00.000Z',
+      })
+    );
+
+    const board = await listSummerKanban(store, fixedNow);
+    const stale = board.find(card => card.workId === 'ini_stale');
+    const fresh = board.find(card => card.workId === 'ini_fresh');
+    expect(stale?.sourceUpdatedAt).toBe('2026-08-30T11:59:59.000Z');
+    expect(stale?.freshness).toBe('stale');
+    expect(stale?.freshness).not.toBe('fresh');
+    expect(fresh?.sourceUpdatedAt).toBe('2026-09-01T11:30:00.000Z');
+    expect(fresh?.freshness).toBe('fresh');
+
+    const future = toSummerKanbanCard(
+      kanbanInitiative('ini_future', {
+        updatedAt: '2026-09-01T12:05:00.000Z',
+      }),
+      fixedNow
+    );
+    expect(future?.freshness).toBe('unknown');
+    expect(future?.sourceUpdatedAt).toBe('2026-09-01T12:05:00.000Z');
+  });
+
+  it('does not prove done or landed without an exact terminal receipt', async () => {
+    const store = new MemoryOperatingStore();
+    await store.putInitiative(kanbanInitiative('ini_done_unproven'));
+
+    const done = await transitionSummerCard(store, {
+      workId: 'ini_done_unproven',
+      routingState: 'done',
+      actor: 'summer',
+    });
+    expect(done.routingState).toBe('done');
+    const doneCard = await inspectSummerCard(store, 'ini_done_unproven');
+    expect(doneCard?.terminal).toEqual({
+      state: 'not-proven',
+      receiptRef: null,
+      observedAt: null,
+    });
+
+    await store.putInitiative(
+      kanbanInitiative('ini_landed_unproven', { routingState: 'landed' })
+    );
+    const landedCard = await inspectSummerCard(store, 'ini_landed_unproven');
+    expect(landedCard?.routingState).toBe('landed');
+    expect(landedCard?.terminal.state).toBe('not-proven');
+
+    await store.putInitiative(kanbanInitiative('ini_landed_proven'));
+    const landed = await markInitiativeLanded(store, {
+      id: 'ini_landed_proven',
+      task_id: 'task_kanban_42',
+    });
+    const observedAt = landed?.updatedAt;
+    const provenCard = await inspectSummerCard(store, 'ini_landed_proven');
+    expect(provenCard?.terminal).toEqual({
+      state: 'proven',
+      receiptRef: 'task_kanban_42',
+      observedAt,
+    });
+    expect(provenCard?.terminal.state).toBe('proven');
+  });
+
+  it('exposes blocked work with missing owner, next action, or deadline', async () => {
+    const store = new MemoryOperatingStore();
+    await store.putInitiative(kanbanInitiative('ini_blocked'));
+
+    await transitionSummerCard(store, {
+      workId: 'ini_blocked',
+      routingState: 'blocked',
+      actor: 'summer',
+      reason: 'waiting on X credentials',
+    });
+    const bare = await inspectSummerCard(store, 'ini_blocked');
+    expect(bare?.blocker).toEqual({
+      state: 'blocked',
+      summary: 'waiting on X credentials',
+      owner: null,
+      nextAction: null,
+      nextProofDeadline: null,
+      complete: false,
+    });
+
+    await transitionSummerCard(store, {
+      workId: 'ini_blocked',
+      routingState: 'blocked',
+      actor: 'summer',
+      blocker: {
+        summary: 'waiting on X credentials',
+        owner: 'summer',
+        nextAction: 'rotate the X app token',
+      },
+    });
+    const partial = await inspectSummerCard(store, 'ini_blocked');
+    expect(partial?.blocker.state).toBe('blocked');
+    if (partial?.blocker.state !== 'blocked') {
+      throw new Error('expected blocked card');
+    }
+    expect(partial.blocker.owner).toBe('summer');
+    expect(partial.blocker.nextAction).toBe('rotate the X app token');
+    expect(partial.blocker.nextProofDeadline).toBeNull();
+    expect(partial.blocker.complete).toBe(false);
+
+    await transitionSummerCard(store, {
+      workId: 'ini_blocked',
+      routingState: 'blocked',
+      actor: 'summer',
+      blocker: {
+        summary: 'waiting on X credentials',
+        owner: 'summer',
+        nextAction: 'rotate the X app token',
+        nextProofDeadline: '2026-09-02T12:00:00.000Z',
+      },
+    });
+    const full = await inspectSummerCard(store, 'ini_blocked');
+    expect(full?.blocker).toEqual({
+      state: 'blocked',
+      summary: 'waiting on X credentials',
+      owner: 'summer',
+      nextAction: 'rotate the X app token',
+      nextProofDeadline: '2026-09-02T12:00:00.000Z',
+      complete: true,
+    });
+
+    const persisted = await store.getInitiative('ini_blocked');
+    expect(persisted?.blocker?.nextProofDeadline).toBe(
+      '2026-09-02T12:00:00.000Z'
+    );
+
+    await transitionSummerCard(store, {
+      workId: 'ini_blocked',
+      routingState: 'in_progress',
+      actor: 'summer',
+    });
+    const resumed = await inspectSummerCard(store, 'ini_blocked');
+    expect(resumed?.blocker).toEqual({ state: 'not-blocked' });
+    expect((await store.getInitiative('ini_blocked'))?.blocker).toBeUndefined();
+  });
+
+  it('keeps a missing source timestamp explicit instead of blank or now', () => {
+    const card = toSummerKanbanCard(
+      kanbanInitiative('ini_no_timestamp', { updatedAt: '' }),
+      fixedNow
+    );
+    expect(card).not.toBeNull();
+    expect(card?.sourceUpdatedAt).toBeNull();
+    expect(card?.freshness).toBe('unknown');
+    expect(card?.freshness).not.toBe('fresh');
+    expect(card?.sourceUpdatedAt).not.toBe('2026-09-01T12:00:00.000Z');
+
+    const garbage = toSummerKanbanCard(
+      kanbanInitiative('ini_bad_timestamp', { updatedAt: 'not-a-date' }),
+      fixedNow
+    );
+    expect(garbage?.sourceUpdatedAt).toBeNull();
+    expect(garbage?.freshness).toBe('unknown');
+  });
+
+  it('never masks provider failure as ordinary queued work', async () => {
+    const store = new MemoryOperatingStore();
+    const [receipt] = await applyOvieDump(['post this tweet'], {
+      store,
+      routeCompany: async () => {
+        throw new Error('kanban-outage');
+      },
+    });
+    expect(receipt?.ack).toBe(OVIE_UNAVAILABLE_ACK);
+
+    const board = await listSummerKanban(store);
+    expect(board).toHaveLength(1);
+    const card = board[0];
+    expect(card?.routingState).toBe('unavailable');
+    expect(card?.routingState).not.toBe('queued');
+    expect(card?.availability).toBe('unavailable');
+    expect(card?.status).toBe('failed');
+    expect(card?.reason).toBe('kanban-outage');
+  });
+
+  it('denies Eve priority choice and card transitions without mutation', async () => {
+    const store = new MemoryOperatingStore();
+    await store.putInitiative(kanbanInitiative('ini_eve_denied'));
+    const before = await store.getInitiative('ini_eve_denied');
+
+    expect(() => assertEveCannotChoosePriority()).toThrow(EveAuthorityError);
+    for (const routingState of ['accepted', 'blocked', 'done'] as const) {
+      await expect(
+        transitionSummerCard(store, {
+          workId: 'ini_eve_denied',
+          routingState,
+          actor: 'eve',
+          blocker: {
+            owner: 'eve',
+            nextAction: 'self-assigned',
+            nextProofDeadline: '2026-09-02T00:00:00.000Z',
+          },
+        })
+      ).rejects.toBeInstanceOf(EveAuthorityError);
+    }
+    expect(await store.getInitiative('ini_eve_denied')).toEqual(before);
+  });
+
+  it('keeps personal and taste intake off the company board', async () => {
+    const store = new MemoryOperatingStore();
+    const receipts = await applyOvieDump(
+      [
+        'post this tweet',
+        'remind me to text Liv about Catalina',
+        'does this hero look too salesy',
+      ],
+      { store }
+    );
+    const board = await listSummerKanban(store);
+    expect(board).toHaveLength(1);
+    expect(board[0]?.lane).toBe('flash');
+
+    const personal = receipts.find(receipt => receipt.lane === 'personal');
+    const taste = receipts.find(receipt => receipt.lane === 'taste');
+    expect(personal).toBeTruthy();
+    expect(taste).toBeTruthy();
+    expect(board.some(card => card.workId === personal?.workId)).toBe(false);
+    expect(board.some(card => card.workId === taste?.workId)).toBe(false);
+    expect(board.some(card => card.lane === 'personal')).toBe(false);
+    expect(board.some(card => card.lane === 'taste')).toBe(false);
+    expect(
+      board.every(card => card.lane === 'flash' || card.lane === 'heavy')
+    ).toBe(true);
   });
 });
