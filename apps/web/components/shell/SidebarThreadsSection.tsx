@@ -416,7 +416,10 @@ export function SidebarThreadsSection({
           >
             <Icon
               name='MessageSquarePlus'
-              className={getSidebarNavIconClassName({ tight })}
+              className={getSidebarNavIconClassName({
+                tight,
+                tone: 'primary',
+              })}
               aria-hidden='true'
               strokeWidth={2.25}
             />
