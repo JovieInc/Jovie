@@ -274,6 +274,50 @@ export const HOMEPAGE_LAUNCH_COPY = {
   ],
 } as const;
 
+// HOMEPAGE_CERTIFIED_FIGURES START
+export interface HomepageCertifiedLedgerRow {
+  readonly label: string;
+  readonly line: string;
+}
+
+export interface HomepageCertifiedStats {
+  readonly items: readonly { readonly value: string; readonly label: string }[];
+  /** Numbers above are illustrative; the caption says so on the page. */
+  readonly caption: string;
+}
+
+export interface HomepageCertifiedFigures {
+  readonly ledgers: Readonly<
+    Record<string, readonly HomepageCertifiedLedgerRow[]>
+  >;
+  readonly stats: Readonly<Record<string, HomepageCertifiedStats>>;
+  readonly routes: Readonly<Record<string, readonly string[]>>;
+}
+
+// Type-only figures for the quiet certified sections (4-8), keyed by section
+// id. Sections 1-3 and 9 have no entry here. Locked with the section copy.
+export const HOMEPAGE_CERTIFIED_FIGURES: HomepageCertifiedFigures = {
+  ledgers: {
+    found: [
+      {
+        label: 'In search',
+        line: 'Your name, what you do, and where you are, kept current.',
+      },
+      {
+        label: 'To an assistant',
+        line: 'How to reach you and what you are open to, answered the way you would answer.',
+      },
+      {
+        label: 'In a booking thread',
+        line: 'Dates, rates, and requirements without the back-and-forth.',
+      },
+    ],
+  },
+  stats: {},
+  routes: {},
+};
+// HOMEPAGE_CERTIFIED_FIGURES END
+
 export const HOMEPAGE_HERO_CAROUSEL_SLIDES: readonly HomepageHeroCarouselSlide[] =
   [
     {
