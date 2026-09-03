@@ -127,10 +127,14 @@ export function PersistentAudioBar() {
     toggleTrack({
       id: playbackState.activeTrackId,
       title: playbackState.trackTitle,
+      ...(playbackState.sourceKind
+        ? { sourceKind: playbackState.sourceKind }
+        : {}),
     }).catch(() => {});
   }, [
     playbackState.activeTrackId,
     playbackState.playbackStatus,
+    playbackState.sourceKind,
     playbackState.trackTitle,
     toggleTrack,
   ]);
