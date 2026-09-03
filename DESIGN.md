@@ -143,6 +143,13 @@ headings) stays Inter. This deviation is approved as of 2026-04-28 — the
 hero needed a wider, heavier display character to match the Frame.io-inspired
 poster composition; Inter at 80px reads narrow and tech-y in this context.
 
+**Marketing H1 visual-line contract:** public marketing and homepage H1s paint
+at most two visual lines. The complete authored text stays in the DOM and
+accessibility tree; this is a visual constraint, not a shortened accessible
+name. Do not lock superseded Quiet-hero copy (`Own your story…`) or competing
+Get started / Drop Music CTAs onto `/` — name search `Find me` is the certified
+primary conversion (#17055 / JOV-5864).
+
 ### Font Weights
 
 | Name | Value | Usage |
@@ -1178,3 +1185,4 @@ mark intentional marketing sentence-case headlines with
 | 2026-04-11 | Ban gold colors | Gold signals prestige-seeking. Not appropriate for Jovie's DJ audience. |
 | 2026-06-18 | **Unify on one design system, two languages.** Retire System A; conform whole app to System B tokens. | Founder-directed (supersedes the 2026-04-22 "defer 3 months" note). Target = one token foundation, one palette, one core typeface (Inter), expressed as a compact product language + an editorial marketing language. Aligns with gbrain "design system review" canon ("not two design systems — one system, two languages"). Editorial layouts are preserved; surfaces are reskinned onto System B tokens, each with a `*-system-b-style-guard` test + a global shrink-only ratchet. |
 | 2026-06-18 | Retire DM Sans; Inter is the sole body/UI face; Satoshi kept for display only | One core typeface for the unified system. Satoshi remains the single approved display exception (hero / large editorial headings), generalizing the 2026-04-28 homepage-hero exception. DM Sans `next/font` load removed from `app/layout.tsx`; `--font-body` and `--marketing-font-body` repoint to Inter. |
+| 2026-09-03 | Public marketing H1s paint at most two visual lines | Layout contract only. Complete authored text remains accessible. Does not land superseded Quiet-hero copy or competing homepage CTAs. |

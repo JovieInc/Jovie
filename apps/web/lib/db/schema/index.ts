@@ -653,6 +653,25 @@ export {
   selectLibraryRelationshipSchema,
   selectOptimizationExperimentSchema,
 } from './library-content-graph';
+// Post-release presence, collision repair, and rightsholder evidence
+export {
+  insertLibraryPresenceFindingSchema,
+  insertLibraryRightsholderEvidenceSchema,
+  type LibraryPresenceFinding,
+  type LibraryRightsholderEvidence,
+  libraryCollisionDispositionEnum,
+  libraryPresenceActionModeEnum,
+  libraryPresenceFindingKindEnum,
+  libraryPresenceFindingStatusEnum,
+  libraryPresenceFindings,
+  libraryPresenceIssueTypeEnum,
+  libraryRightsholderEvidence,
+  rightsholderDomainEnum,
+  rightsholderEvidenceClassEnum,
+  rightsholderEvidenceSourceEnum,
+  selectLibraryPresenceFindingSchema,
+  selectLibraryRightsholderEvidenceSchema,
+} from './library-presence';
 // Library Share Drops (press kit / label review portals)
 export {
   insertLibraryShareDropItemSchema,

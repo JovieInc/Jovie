@@ -312,7 +312,7 @@
   "devDependencies": {
     "@axe-core/playwright": "^4.11.2",
     "@biomejs/biome": "^2.5.1",
-    "@chromatic-com/storybook": "^5.2.1",
+    "@chromatic-com/storybook": "^5.3.0",
     "@lhci/cli": "^0.15.1",
     "@next/bundle-analyzer": "^16.2.10",
     "@playwright/test": "1.62.0",

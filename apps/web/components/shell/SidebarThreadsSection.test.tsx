@@ -82,7 +82,7 @@ describe('SidebarThreadsSection', () => {
 
     expect(
       screen.getByRole('button', { name: 'New Chat' }).querySelector('svg')
-    ).toHaveClass('h-3', 'w-3', 'text-sidebar-muted/70');
+    ).toHaveClass('h-3', 'w-3', 'text-accent-teal!');
   });
 
   it('uses the full middle track at rest and layers chat actions over a visible cross-engine faded edge', () => {

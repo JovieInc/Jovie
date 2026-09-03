@@ -22,7 +22,8 @@ export const EXCLUDED_OWNERS = Object.freeze([
   'ios-shell',
 ]);
 export const RETAINED_SWEEP_WORKFLOWS = Object.freeze([
-  { path: '.github/workflows/screenshots.yml', cron: '0 9 * * *' },
+  // JOV-5852: screenshots.yml is path-complete on push to main + manual
+  // dispatch (its daily cron was retired); live external drift keeps a sweep.
   { path: '.github/workflows/visual-a11y.yml', cron: '37 7 * * *' },
 ]);
 
@@ -77,6 +78,7 @@ web.engineering-publication|web|engineering-publication|apps/web/app/(marketing)
 web.public-profile|web|public-profile|apps/web/app/[username]/page.tsx|desktop,mobile
 web.release-landing|web|release-landing|apps/web/app/r/[slug]/page.tsx,apps/web/app/r/[slug]/ReleaseLandingPage.tsx|desktop,mobile
 web.dashboard-releases|web|dashboard-releases|apps/web/app/app/(shell)/dashboard/releases/page.tsx|desktop,mobile
+web.library|web|library|apps/web/app/app/(shell)/library/page.tsx|desktop,mobile
 web.settings-artist-profile|web|settings-artist-profile|apps/web/app/app/(shell)/settings/artist-profile/page.tsx|desktop,mobile
 web.start|web|organism.onboarding-chat|apps/web/app/(dynamic)/start/page.tsx|desktop,mobile
 web.app-root|web|screen.root|apps/web/app/app/(shell)/page.tsx|desktop,mobile

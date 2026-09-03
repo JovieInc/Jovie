@@ -205,7 +205,10 @@ function MarketingHeroContent({
       <MarketingContainer width='page'>
         <div className='marketing-hero-inner'>
           <div className='marketing-hero-copy'>
-            <h1 id={headingId} className='marketing-hero-headline'>
+            <h1
+              id={headingId}
+              className='marketing-hero-headline marketing-h1-max-two-lines'
+            >
               {headline}
             </h1>
             <p className='marketing-hero-subtitle'>{subtitle}</p>
@@ -295,7 +298,7 @@ function MarketingHeroLanding({
                 id={headingId}
                 data-testid={titleTestId}
                 className={cn(
-                  'marketing-h1-linear mt-5 text-primary-token',
+                  'marketing-h1-linear marketing-h1-max-two-lines mt-5 text-primary-token',
                   titleClassName
                 )}
               >
