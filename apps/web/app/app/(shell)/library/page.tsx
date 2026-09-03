@@ -1,13 +1,9 @@
-import { and, eq } from 'drizzle-orm';
 import { APP_ROUTES } from '@/constants/routes';
 import { listArtistRulesForProfile } from '@/lib/artist-rules/store';
 import type { ArtistRuleView } from '@/lib/artist-rules/types';
-import { CONNECTOR_PROVIDERS } from '@/lib/connectors/registry';
 import { requireCreatorDocumentAccess } from '@/lib/creator-documents/access';
 import type { CreatorDocumentListItem } from '@/lib/creator-documents/types';
-import { db } from '@/lib/db';
 import { listCreatorDocuments } from '@/lib/db/creator-documents/store';
-import { connectorAccounts } from '@/lib/db/schema/connectors';
 import { captureError } from '@/lib/error-tracking';
 import type { LibraryAssetShareViewModel } from '@/lib/library/asset-share';
 import {
@@ -32,6 +28,7 @@ import {
   loadReleaseMatrixForProfile,
 } from '@/lib/releases/release-matrix-loader';
 import {
+  hasConnectedYouTubeAccount,
   listVideosForLibraryProjection,
   type PublicVideoListItem,
 } from '@/lib/youtube-library';
@@ -163,25 +160,11 @@ export default async function LibraryPage({
             });
             return [];
           }),
-          db
-            .select({ id: connectorAccounts.id })
-            .from(connectorAccounts)
-            .where(
-              and(
-                eq(connectorAccounts.userId, routeContext.userId),
-                eq(connectorAccounts.creatorProfileId, profileId),
-                eq(connectorAccounts.provider, CONNECTOR_PROVIDERS.youtube),
-                eq(connectorAccounts.status, 'connected')
-              )
-            )
-            .limit(1)
-            .then(rows => rows[0] ?? null)
-            .catch(error => {
-              void captureError('YouTube Library projection failed', error, {
-                route: APP_ROUTES.LIBRARY,
-              });
-              return null;
-            }),
+          hasConnectedYouTubeAccount({
+            userId: routeContext.userId,
+            creatorProfileId: profileId,
+            route: APP_ROUTES.LIBRARY,
+          }),
         ]);
         merchCards = merch;
         archivedMerchCards = archivedMerch;

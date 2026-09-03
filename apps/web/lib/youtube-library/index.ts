@@ -8,6 +8,7 @@ export {
   classifyYouTubeVideo,
   type YouTubeVideoContentType,
 } from './classify';
+export { hasConnectedYouTubeAccount } from './connection';
 export {
   COLLABORATOR_AUTO_APPROVE_CONFIDENCE,
   planYouTubeImportArtifacts,
