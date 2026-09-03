@@ -26,10 +26,17 @@ if (!Array.isArray(routes) || routes.length === 0)
 async function waitForAuthenticatedShell(page, route) {
   if (!route.startsWith('/app/')) return;
 
-  await page.getByTestId('dashboard-header').waitFor({
+  const header = page.getByTestId('dashboard-header');
+  const dashboardError = page.getByTestId('dashboard-error');
+  await header.or(dashboardError).waitFor({
     state: 'visible',
     timeout: AUTHENTICATED_SHELL_WAIT_MS,
   });
+  if (await dashboardError.isVisible()) {
+    throw new Error(
+      'Captured app route rendered dashboard error UI instead of authenticated shell'
+    );
+  }
 
   const shellMarker = page
     .getByRole('heading', { name: 'New Chat', level: 1 })

@@ -379,6 +379,10 @@ describe('bounded PR visual review contract', () => {
     );
     expect(capture).toContain('waitForAuthenticatedShell');
     expect(capture).toContain("getByTestId('dashboard-header')");
+    expect(capture).toContain("getByTestId('dashboard-error')");
+    expect(capture).toContain(
+      'Captured app route rendered dashboard error UI instead of authenticated shell'
+    );
     expect(capture).toContain(
       "getByRole('heading', { name: 'New Chat', level: 1 })"
     );
