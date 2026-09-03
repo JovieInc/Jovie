@@ -1,22 +1,29 @@
 /**
- * Summer-owned company Kanban (JOV-5215).
+ * Summer-owned company Kanban (JOV-5215, card truth JOV-5761).
  *
  * Operations items (flash/heavy) share durable work IDs with Eve receipts.
  * Engineering ships through Linear; personal and taste remain isolated.
  *
  * JOV-5761 projection fields: per-source freshness reuses the
  * ovie.shipping-state.v1 observation vocabulary, the accountable next
- * action / next proof derive from the routing state, and terminal cards
- * carry their existing evidence reference. Everything is derived at read
- * time — nothing here is stored — and missing source data is unknown,
- * never fresh, zero, or healthy.
+ * action / next proof derive from the routing state, blocker facts are
+ * exposed only when actually persisted, and terminal `done`/`landed` cards
+ * are proven only when an exact receipt/evidence reference exists.
+ * Everything is derived at read time — nothing here is stored — and
+ * missing or stale source data is explicit `unknown` / `not-proven`,
+ * never fresh, healthy, zero, blank, or a new timestamp.
  */
 
 import { denyEveAction } from '@/lib/ovie/eve-authority';
 import { DEST_KANBAN, type OvieLane } from '@/lib/ovie/ingest';
 import { normalizeLegacyEngineeringInitiativeForStore } from '@/lib/ovie/legacy-routing';
 import type { OperatingStore } from '@/lib/ovie/mcp/store';
-import type { OvieInitiative, OvieRoutingState } from '@/lib/ovie/mcp/types';
+import type {
+  InitiativeStatus,
+  OvieBlocker,
+  OvieInitiative,
+  OvieRoutingState,
+} from '@/lib/ovie/mcp/types';
 import {
   freshnessDeadline,
   type ObservationState,
@@ -34,6 +41,9 @@ export type SummerKanbanLane = Extract<OvieLane, 'flash' | 'heavy'>;
  * in SHIPPING_SOURCE_SEMANTIC_FRESHNESS_MS (fleet-receipt, lease-guard).
  */
 export const SUMMER_KANBAN_FRESHNESS_MS = 10 * 60_000;
+
+/** Future-dated source writes beyond this skew are not provably fresh. */
+export const SUMMER_KANBAN_CLOCK_SKEW_MS = 60_000;
 
 export const SUMMER_KANBAN_FRESHNESS_SOURCES = ['initiative-record'] as const;
 
@@ -54,13 +64,31 @@ export type SummerKanbanSourceFreshness = {
   readonly freshnessDeadline: string | null;
 };
 
+export type SummerKanbanAvailability = 'available' | 'unavailable';
+
+export type SummerKanbanBlockerTruth =
+  | { readonly state: 'not-blocked' }
+  | {
+      readonly state: 'blocked';
+      readonly summary: string | null;
+      readonly owner: string | null;
+      readonly nextAction: string | null;
+      readonly nextProofDeadline: string | null;
+      /** True only when owner, next action, and next-proof deadline are all persisted. */
+      readonly complete: boolean;
+    };
+
 export type SummerKanbanTerminalEvidence = {
+  /** `done`/`landed` without an exact receipt/evidence ref is not proven. */
+  readonly state: 'proven' | 'not-proven';
   /** Existing receipt/evidence reference; null when none was recorded. */
   readonly ref: string | null;
   /** The same reference when it is already a URL (for example Linear). */
   readonly url: string | null;
   /** Existing evidence summary line for the reference. */
   readonly summary: string | null;
+  /** Observation time of the terminal evidence; null when unrecorded. */
+  readonly observedAt: string | null;
 };
 
 export type SummerKanbanCard = {
@@ -71,8 +99,13 @@ export type SummerKanbanCard = {
   readonly routingState: OvieRoutingState;
   readonly reason?: string;
   readonly owner: typeof SUMMER_KANBAN_OWNER;
+  readonly status: InitiativeStatus;
   /** Read-only per-source freshness in the ovie.shipping-state.v1 vocabulary. */
   readonly freshness: readonly SummerKanbanSourceFreshness[];
+  /** Provider/runtime failure must never render as ordinary queued work. */
+  readonly availability: SummerKanbanAvailability;
+  /** Persisted blocker facts; missing fields stay null, never invented. */
+  readonly blocker: SummerKanbanBlockerTruth;
   /** Accountable next action for Summer; null once the card is terminal. */
   readonly nextAction: string | null;
   /** Proof that closes the loop on the next action; null once terminal. */
@@ -102,7 +135,20 @@ function initiativeRecordFreshness(
   now: string
 ): SummerKanbanSourceFreshness {
   const observedAt = parseTimestamp(initiative.updatedAt);
-  if (!observedAt || !parseTimestamp(now)) return UNKNOWN_INITIATIVE_FRESHNESS;
+  const nowParsed = parseTimestamp(now);
+  if (!observedAt || !nowParsed) return UNKNOWN_INITIATIVE_FRESHNESS;
+  if (
+    Date.parse(observedAt) - Date.parse(nowParsed) >
+    SUMMER_KANBAN_CLOCK_SKEW_MS
+  ) {
+    // Future-dated beyond skew tolerance: not provably fresh, never rewritten.
+    return {
+      source: 'initiative-record',
+      state: 'unknown',
+      observedAt,
+      freshnessDeadline: null,
+    };
+  }
   const deadline = freshnessDeadline(observedAt, SUMMER_KANBAN_FRESHNESS_MS);
   return {
     source: 'initiative-record',
@@ -145,6 +191,34 @@ const NEXT_STEP_BY_ROUTING_STATE: Readonly<
   done: { action: null, proof: null },
 };
 
+function blockerTruth(initiative: OvieInitiative): SummerKanbanBlockerTruth {
+  if ((initiative.routingState ?? 'queued') !== 'blocked') {
+    return { state: 'not-blocked' };
+  }
+  const blocker = initiative.blocker;
+  const summary =
+    blocker?.summary?.trim() || initiative.routingReason?.trim() || null;
+  const owner = blocker?.owner?.trim() || null;
+  const nextAction = blocker?.nextAction?.trim() || null;
+  const nextProofDeadline = blocker?.nextProofDeadline?.trim() || null;
+  return {
+    state: 'blocked',
+    summary,
+    owner,
+    nextAction,
+    nextProofDeadline,
+    complete: Boolean(owner && nextAction && nextProofDeadline),
+  };
+}
+
+function availabilityOf(initiative: OvieInitiative): SummerKanbanAvailability {
+  // Provider/runtime failure must never render as ordinary queued work.
+  return initiative.routingState === 'unavailable' ||
+    initiative.status === 'failed'
+    ? 'unavailable'
+    : 'available';
+}
+
 function terminalEvidenceOf(
   initiative: OvieInitiative,
   routingState: OvieRoutingState
@@ -164,15 +238,17 @@ function terminalEvidenceOf(
       .find(entry => entry.kind === 'landed' && entry.ref?.trim())
       ?.ref?.trim() ||
     null;
-  const summary = ref
-    ? (evidence.find(
+  const matching = ref
+    ? evidence.find(
         entry => entry.landed_ref?.trim() === ref || entry.ref?.trim() === ref
-      )?.summary ?? null)
-    : null;
+      )
+    : undefined;
   return {
+    state: ref ? 'proven' : 'not-proven',
     ref,
     url: ref && /^https:\/\/\S+$/.test(ref) ? ref : null,
-    summary,
+    summary: matching?.summary ?? null,
+    observedAt: matching?.observedAt?.trim() || null,
   };
 }
 
@@ -192,7 +268,10 @@ export function toSummerKanbanCard(
     routingState,
     reason: initiative.routingReason,
     owner: SUMMER_KANBAN_OWNER,
+    status: initiative.status,
     freshness: [initiativeRecordFreshness(initiative, now)],
+    availability: availabilityOf(initiative),
+    blocker: blockerTruth(initiative),
     nextAction: nextStep.action,
     nextProof: nextStep.proof,
     terminalEvidence: terminalEvidenceOf(initiative, routingState),
@@ -239,6 +318,8 @@ export async function transitionSummerCard(
     readonly routingState: OvieRoutingState;
     readonly actor: 'summer' | 'eve';
     readonly reason?: string;
+    /** Persisted blocker facts; meaningful only with routingState 'blocked'. */
+    readonly blocker?: OvieBlocker;
   }
 ): Promise<OvieInitiative> {
   if (input.actor !== 'summer') {
@@ -258,6 +339,10 @@ export async function transitionSummerCard(
     updatedAt: now,
     routingState: input.routingState,
     routingReason: input.reason ?? current.routingReason,
+    blocker:
+      input.routingState === 'blocked'
+        ? (input.blocker ?? current.blocker)
+        : undefined,
     status:
       input.routingState === 'blocked'
         ? 'blocked'
