@@ -9,7 +9,7 @@ const meta = {
   },
   decorators: [
     Story => (
-      <div className='w-[min(28rem,calc(100vw-2rem))] text-primary-token'>
+      <div className='w-full max-w-md text-primary-token'>
         <Story />
       </div>
     ),
