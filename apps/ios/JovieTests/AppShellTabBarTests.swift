@@ -348,6 +348,11 @@ struct AppShellDrawerProfilePolicyTests {
         publicProfileURL: nil
       ) == false
     )
+    #expect(
+      AppShellDrawerProfilePolicy.accountHeaderOpensEmbeddedPublicProfile(
+        publicProfileURL: "https://jov.ie/app"
+      ) == false
+    )
   }
 }
 
