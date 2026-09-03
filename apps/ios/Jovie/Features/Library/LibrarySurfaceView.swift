@@ -94,12 +94,19 @@ struct LibrarySurfaceView: View {
       .font(JovieFont.body(size: 15))
       .foregroundStyle(JovieColor.textPrimary)
       .padding(.horizontal, JovieSpacing.medium)
-      .frame(height: LibraryControlMetrics.searchVisualHeight)
-      .background(JovieColor.surface1, in: Capsule())
-      .overlay {
-        Capsule().stroke(JovieColor.borderSubtle, lineWidth: 1)
+      .frame(height: LibraryControlMetrics.minimumTouchTarget)
+      .background {
+        // 36-pt visual capsule centered in the 44-pt hit container: the
+        // accessibility element itself must measure >= 44 pt or XCUITest
+        // reports the inner text-field frame and the hit-frame test fails
+        // (ci:a4699f7d).
+        Capsule()
+          .fill(JovieColor.surface1)
+          .frame(height: LibraryControlMetrics.searchVisualHeight)
+          .overlay {
+            Capsule().stroke(JovieColor.borderSubtle, lineWidth: 1)
+          }
       }
-      .frame(minHeight: LibraryControlMetrics.minimumTouchTarget)
       .contentShape(Rectangle())
       .padding(.horizontal, JovieSpacing.large)
       .padding(.bottom, JovieSpacing.small)
