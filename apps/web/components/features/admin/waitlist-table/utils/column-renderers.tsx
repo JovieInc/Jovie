@@ -1,7 +1,6 @@
 'use client';
 
 import { Badge } from '@jovie/ui';
-import type { CellContext, HeaderContext, Table } from '@tanstack/react-table';
 import { ShoppingBag, Ticket, TrendingUp } from 'lucide-react';
 import type { RefObject } from 'react';
 import { EmptyCell } from '@/components/atoms/EmptyCell';
@@ -15,6 +14,11 @@ import {
 } from '@/components/organisms/table';
 import { PlatformPill } from '@/features/dashboard/atoms/PlatformPill';
 import type { WaitlistEntryRow } from '@/lib/admin/types';
+import type {
+  CellContext,
+  HeaderContext,
+  Table,
+} from '@/lib/tanstack-v8-compat';
 import {
   PLATFORM_LABELS,
   PRIMARY_GOAL_LABELS,
