@@ -211,6 +211,10 @@ describe('ci-fast bounded parallel workflow', () => {
             CI_FAST_LANE_GROUP: 'remaining',
             CI_FAST_LANES_OUT: outPath,
             CI_FAST_SKIP_STRUCTURAL: 'true',
+            // Structural steps set CI_FAST_ONLY_STRUCTURAL=true in the runner
+            // env; spawned ci-fast-lanes.mjs children inherit it and would
+            // filter the lane list down to structural only. Pin it off here.
+            CI_FAST_ONLY_STRUCTURAL: 'false',
             CI_PRODUCT_LANES: 'none',
             GITHUB_EVENT_NAME: 'pull_request',
             GITHUB_BASE_REF: 'main',
