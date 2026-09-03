@@ -17,7 +17,7 @@ vi.mock('@/lib/utils/logger', () => ({
   logger: { error: vi.fn() },
 }));
 
-import { POST } from './route';
+import { GET, POST } from './route';
 
 function request(body: unknown, authorization = 'Bearer test-cron-secret') {
   return new Request('https://jov.ie/api/internal/ovie/summer-shadow', {
@@ -33,6 +33,9 @@ function request(body: unknown, authorization = 'Bearer test-cron-secret') {
 
 const validEvent = {
   eventId: 'evt_ovie_origin_0001',
+  conversationId: 'conv_ovie_origin_0001',
+  turn: 1,
+  dailySlot: 1,
   message: 'Observe the production source binding only.',
   evidence: [],
 };
@@ -112,6 +115,9 @@ describe('POST /api/internal/ovie/summer-shadow', () => {
     expect(JSON.parse(String(init?.body))).toMatchObject({
       schema: 'jovie.ovie-summer-shadow.event/v1',
       eventId: validEvent.eventId,
+      conversationId: validEvent.conversationId,
+      turn: 1,
+      dailySlot: 1,
       message: validEvent.message,
       evidence: [],
     });
@@ -132,6 +138,27 @@ describe('POST /api/internal/ovie/summer-shadow', () => {
       ok: false,
       code: 'replay_rejected',
       eve: { code: 'replay_rejected' },
+    });
+  });
+
+  it('propagates an exhausted hard budget without dispatch authority', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async () =>
+        Response.json(
+          { ok: false, code: 'session_budget_rejected' },
+          { status: 429 }
+        )
+      )
+    );
+
+    const response = await POST(request(validEvent));
+
+    expect(response.status).toBe(429);
+    await expect(response.json()).resolves.toMatchObject({
+      ok: false,
+      code: 'budget_rejected',
+      eve: { code: 'session_budget_rejected' },
     });
   });
 
@@ -169,6 +196,62 @@ describe('POST /api/internal/ovie/summer-shadow', () => {
 
     expect(response.status).toBe(status);
     await expect(response.json()).resolves.toMatchObject({ code });
+    expect(mocks.getVercelOidcToken).not.toHaveBeenCalled();
+  });
+
+  it('proxies a signed, read-only durable stream from an exact cursor', async () => {
+    const fetch = vi.fn<typeof globalThis.fetch>(
+      async () =>
+        new Response(
+          `${JSON.stringify({ type: 'session.waiting', meta: { id: 'evt_1' } })}\n`,
+          {
+            headers: { 'content-type': 'application/x-ndjson' },
+          }
+        )
+    );
+    vi.stubGlobal('fetch', fetch);
+
+    const response = await GET(
+      new Request(
+        'https://jov.ie/api/internal/ovie/summer-shadow?sessionId=ses_shadow_1&conversationId=conv_shadow_1&startIndex=7',
+        {
+          headers: {
+            authorization: 'Bearer test-cron-secret',
+            'x-forwarded-host': 'jov.ie',
+          },
+        }
+      )
+    );
+
+    expect(response.status).toBe(200);
+    expect(response.headers.get('content-type')).toBe('application/x-ndjson');
+    await expect(response.text()).resolves.toContain('session.waiting');
+    expect(fetch).toHaveBeenCalledTimes(1);
+    const streamCall = fetch.mock.calls[0];
+    expect(streamCall).toBeDefined();
+    const [streamUrl, streamInit] = streamCall as Parameters<
+      typeof globalThis.fetch
+    >;
+    expect(String(streamUrl)).toBe(
+      'https://jovie-eve-shadow-staging.vercel.app/ovie/v1/summer-shadow/sessions/ses_shadow_1/stream?conversationId=conv_shadow_1&startIndex=7'
+    );
+    expect(streamInit).toMatchObject({
+      headers: { authorization: 'Bearer test-vercel-oidc-token' },
+    });
+  });
+
+  it('rejects malformed stream requests before obtaining an OIDC token', async () => {
+    const response = await GET(
+      new Request(
+        'https://jov.ie/api/internal/ovie/summer-shadow?sessionId=not-a-session&startIndex=-1',
+        { headers: { authorization: 'Bearer test-cron-secret' } }
+      )
+    );
+
+    expect(response.status).toBe(400);
+    await expect(response.json()).resolves.toMatchObject({
+      code: 'invalid_stream_request',
+    });
     expect(mocks.getVercelOidcToken).not.toHaveBeenCalled();
   });
 });

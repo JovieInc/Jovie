@@ -27,6 +27,7 @@ import { spawnSync } from 'node:child_process';
 import { appendFileSync, writeFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { selectDesignConformanceChecks } from './design-conformance-paths.mjs';
 import {
   affectsJovieTypecheck,
   classifyCiRepoLanes,
@@ -108,7 +109,7 @@ const LANES = [
     id: 'structural',
     name: 'Structural Contract',
     nextLocalCommand:
-      'pnpm invariants:check && pnpm ci:harness:check && pnpm ci:control:test && pnpm ci:merge-queue:check && pnpm next:proxy-guard && pnpm tailwind:check && pnpm --filter=@jovie/web run lint:no-native-dialogs && pnpm --filter=@jovie/web run lint:seo && pnpm --filter=@jovie/web run lint:contrast-ratchet && pnpm design:shared-ui-visual-arbitrary:check && pnpm component-ship-gate && pnpm screen-certification-gate && pnpm doc:freshness:check && pnpm test:reliability-detectors',
+      'pnpm invariants:check && pnpm ci:harness:check && pnpm ci:control:test && pnpm ci:merge-queue:check && pnpm next:proxy-guard && pnpm tailwind:check && pnpm --filter=@jovie/web run lint:no-native-dialogs && pnpm --filter=@jovie/web run lint:seo && pnpm --filter=@jovie/web run lint:contrast-ratchet && pnpm design:shared-ui-visual-arbitrary:check && pnpm component-ship-gate && pnpm screen-registration-gate && pnpm doc:freshness:check && pnpm test:reliability-detectors',
     run: runStructural,
   },
 ];
@@ -379,31 +380,9 @@ function runTypecheck() {
 }
 
 function runScriptsTypecheck() {
-  // JOV-4327: scripts/ tree typecheck vs shrink-only baseline. Exclusive
-  // Jovie product PRs skip this Symphony/control-plane suite (JOV-5288).
-  const event = process.env.GITHUB_EVENT_NAME || '';
-  if (event !== 'workflow_dispatch' && !repoLanes().runSymphonyControl) {
-    return {
-      code: 0,
-      output:
-        'Scripts typecheck skipped (no Symphony/control-plane files changed)\n',
-      skipped: true,
-    };
-  }
-  const files = changedFiles([
-    'scripts/**/*.ts',
-    'scripts/**/*.mts',
-    'scripts/**/*.mjs',
-    'scripts/**/*.cts',
-    'scripts/tsconfig*.json',
-  ]);
-  if (files && files.length === 0) {
-    return {
-      code: 0,
-      output: 'No scripts typecheck paths changed\n',
-      skipped: true,
-    };
-  }
+  // JOV-4327: run the shrink-only scripts ratchet on every hydrated remaining
+  // job. The TypeScript project imports files outside scripts/, and baseline or
+  // resolver changes can alter its diagnostics without touching a path filter.
   return shell('pnpm run typecheck:scripts');
 }
 
@@ -504,26 +483,43 @@ function runDesignExceptionRegistry() {
   return shell(LANE_COMMANDS['design-exception-registry']);
 }
 
-function runDesignConformance() {
+/**
+ * @typedef {object} DesignConformanceOpts
+ * @property {string[] | null} [changedFileList]
+ * @property {(command: string) => {code: number, output: string, skipped?: boolean}} [execute]
+ */
+
+/**
+ * @param {DesignConformanceOpts} [opts]
+ */
+export function runDesignConformance(opts) {
+  const options = opts ?? {};
+  const execute = options.execute;
   const event = process.env.GITHUB_EVENT_NAME || '';
-  if (event !== 'workflow_dispatch' && !repoLanes().runJovieProduct) {
+  if (event === 'workflow_dispatch') {
+    return (execute ?? shell)(LANE_COMMANDS['design-conformance']);
+  }
+
+  const files =
+    'changedFileList' in options
+      ? options.changedFileList
+      : listAllChangedFiles();
+  if (files === null) {
+    return {
+      code: 1,
+      output: 'Design conformance failed: changed files unavailable\n',
+    };
+  }
+
+  if (!selectDesignConformanceChecks(files).applicable) {
     return {
       code: 0,
-      output: 'Design conformance skipped (no Jovie product files changed)\n',
+      output: 'Design conformance skipped (no design-domain files changed)\n',
       skipped: true,
     };
   }
-  const selected = selectedProductLanes();
-  if (!selected.has('operations') && !selected.has('web')) {
-    return {
-      code: 0,
-      output: 'No design product lane selected\n',
-      skipped: true,
-    };
-  }
-  // Always validate the normalized manifest. The selector inside the command
-  // reports affected design domains but never invokes Gem/Symphony/Ubuntu ops.
-  return shell(LANE_COMMANDS['design-conformance']);
+
+  return (execute ?? shell)(LANE_COMMANDS['design-conformance']);
 }
 
 function runIosFast() {
@@ -610,6 +606,7 @@ function runStructural() {
   const selected = selectedProductLanes();
   const operationsParts = [
     'pnpm invariants:check',
+    "node --experimental-test-coverage --test --test-coverage-include='scripts/verification/*.mjs' --test-coverage-exclude='scripts/verification/*.test.mjs' --test-coverage-lines=100 --test-coverage-functions=100 --test-coverage-branches=98 scripts/verification/*.test.mjs",
     'pnpm ci:harness:check',
     'pnpm ci:incident-contract:validate',
     'node --test scripts/ci-release-trigger-contract.test.mjs',
@@ -646,7 +643,7 @@ function runStructural() {
     // JOV-5454: live Storybook certification evaluator + lifecycle.
     'pnpm exec vitest --root scripts --config vitest.config.mts run lib/__tests__/component-live-storybook-certification.test.mjs',
     'pnpm component-ship-gate',
-    'pnpm screen-certification-gate',
+    'pnpm screen-registration-gate',
     // CI workflow changes live at the repo root, so Turbo --affected can select
     // only the root package and return success after running zero web tests.
     // Target Vitest directly so the deploy contract always executes and fails

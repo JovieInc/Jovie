@@ -5,14 +5,21 @@ on:
   # combined head or an unproven direct-main fallback. Source PRs receive the
   # portable iOS contract inside ci-fast.
   workflow_call:
+    inputs:
+      concurrency-key:
+        description: Stable merge-queue PR identity; empty outside merge groups.
+        required: false
+        type: string
   workflow_dispatch:
 
 permissions:
   contents: read
 
 concurrency:
-  group: ios-ci-${{ github.workflow }}-${{ github.ref }}
-  cancel-in-progress: ${{ github.ref != 'refs/heads/main' }}
+  # A regenerated merge-group head supersedes the prior iOS flight for that PR.
+  # Manual/direct-main calls remain isolated by exact SHA and never cancel.
+  group: ios-ci-${{ github.workflow }}-${{ inputs.concurrency-key || github.ref }}
+  cancel-in-progress: ${{ inputs.concurrency-key != '' || github.ref != 'refs/heads/main' }}
 
 jobs:
   test:

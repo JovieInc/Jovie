@@ -42,7 +42,7 @@ hooks:
       find ./apps ./packages ./workers -mindepth 2 -maxdepth 2 -type d -name node_modules -exec rm -rf {} + 2>/dev/null || true
     fi
 agent:
-  max_concurrent_agents: 3
+  max_concurrent_agents: 8
   max_turns: 20
 codex:
   command: ./scripts/hermes/symphony-codex-router app-server
@@ -52,7 +52,7 @@ codex:
     type: workspaceWrite
     networkAccess: true
 server:
-  port: 4043
+  port: 4041
 ---
 
 You are an unattended Symphony coding agent on Jovie (`JovieInc/Jovie`). PATH includes `~/.hermes/bin` and `~/.npm-global/bin`. Codex MCP allowlist is GBrain + Hyperagent only.

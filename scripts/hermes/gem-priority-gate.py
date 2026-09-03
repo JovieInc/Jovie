@@ -209,6 +209,9 @@ def gh_json(repo: str, endpoint: str) -> dict[str, Any]:
     return value
 
 
+NO_VERDICT_CONCLUSIONS = frozenset({"skipped", "cancelled", "neutral"})
+
+
 def select_main_release_ready(attempts: list[dict[str, Any]]) -> dict[str, Any]:
     """Pick the latest real Main Release Ready attempt.
 
@@ -299,22 +302,38 @@ def observe_main(repo: str) -> dict[str, Any]:
             release_attempts.extend(observe_main_release_ready_jobs(repo, sha))
         latest = select_main_release_ready(release_attempts)
         combined_state = str(combined.get("state") or "unknown")
+        conclusion = latest.get("conclusion")
         if latest.get("status") != "completed":
             status = "unknown"
+        elif conclusion == "success":
+            status = "green"
+        elif conclusion in NO_VERDICT_CONCLUSIONS:
+            # A skipped/cancelled/neutral source gate is the absence of a
+            # verdict (merge_group or source-inactive job, cancelled attempt),
+            # not a red main. Freezing promotion on unknown is correct; flipping
+            # the fleet to main-not-green/draft-only on it is a false red.
+            status = "unknown"
         else:
-            status = "green" if latest.get("conclusion") == "success" else "red"
-        return {
+            status = "red"
+        observed = {
             "status": status,
             "sha": sha,
             "combinedStatus": combined_state,
             "sourceGate": {
                 "name": "Main Release Ready",
                 "status": latest.get("status"),
-                "conclusion": latest.get("conclusion"),
+                "conclusion": conclusion,
                 "startedAt": latest.get("started_at"),
                 "completedAt": latest.get("completed_at"),
             },
         }
+        if status == "unknown" and conclusion in NO_VERDICT_CONCLUSIONS:
+            observed["error"] = (
+                f"Main Release Ready has no real attempt for {sha} "
+                f"(latest conclusion: {conclusion})"
+            )
+        return observed
+
     except (OSError, subprocess.SubprocessError, ValueError, json.JSONDecodeError) as error:
         observed_sha = sha if valid_commit_sha(sha, exact=True) else UNKNOWN_MAIN_SHA
         return {

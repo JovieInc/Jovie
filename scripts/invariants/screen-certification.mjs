@@ -9,8 +9,11 @@ import { fileURLToPath } from 'node:url';
 const __dirname = dirname(fileURLToPath(import.meta.url));
 export const REPO_ROOT = resolve(__dirname, '../..');
 export const SCREEN_CERT_INVARIANT_ID = 'JOV-INV-018';
-export const SCREEN_CERT_SCHEMA = 'screen-certification/v1';
+export const SCREEN_CERT_SCHEMA = 'screen-certification/v2';
+export const SCREEN_BROWSER_PROOF_SCHEMA = 'screen-browser-proof/v1';
 export const SCREEN_CERT_GATE = 'screen-certification-gate';
+export const SCREEN_REGISTRATION_GATE = 'screen-registration-gate';
+export const CLS_INTERACTION_BUDGET = 0.05;
 export const SCREEN_PLATFORMS = Object.freeze(['web', 'macos-electron', 'ios']);
 export const EXCLUDED_OWNERS = Object.freeze([
   'ovie',
@@ -73,8 +76,8 @@ web.cli-landing|web|cli-landing|apps/web/app/(marketing)/cli/page.tsx|desktop,mo
 web.engineering-publication|web|engineering-publication|apps/web/app/(marketing)/engineering/|desktop,mobile
 web.public-profile|web|public-profile|apps/web/app/[username]/page.tsx|desktop,mobile
 web.release-landing|web|release-landing|apps/web/app/r/[slug]/page.tsx,apps/web/app/r/[slug]/ReleaseLandingPage.tsx|desktop,mobile
-web.dashboard-releases|web|dashboard-releases|apps/web/app/app/(shell)/dashboard/releases/page.tsx|desktop
-web.settings-artist-profile|web|settings-artist-profile|apps/web/app/app/(shell)/settings/artist-profile/page.tsx|desktop
+web.dashboard-releases|web|dashboard-releases|apps/web/app/app/(shell)/dashboard/releases/page.tsx|desktop,mobile
+web.settings-artist-profile|web|settings-artist-profile|apps/web/app/app/(shell)/settings/artist-profile/page.tsx|desktop,mobile
 web.start|web|organism.onboarding-chat|apps/web/app/(dynamic)/start/page.tsx|desktop,mobile
 web.app-root|web|screen.root|apps/web/app/app/(shell)/page.tsx|desktop,mobile
 web.jovie-work|web|screen.jovie.work|apps/web/app/app/(shell)/jovie-work/page.tsx|desktop,mobile
@@ -103,13 +106,6 @@ function normalizeRepoPath(value) {
     .replace(/\\/g, '/');
 }
 
-function isProtectedRevenueScreenSource(path) {
-  return Object.hasOwn(
-    PROTECTED_REVENUE_SCREEN_SOURCES,
-    normalizeRepoPath(path)
-  );
-}
-
 function matchesSource(file, source) {
   const path = normalizeRepoPath(file);
   const target = normalizeRepoPath(source);
@@ -133,21 +129,28 @@ export function isScreenLikePath(path) {
   }
   if (
     normalized.startsWith('apps/web/app/') &&
-    (normalized.endsWith('/page.tsx') ||
+    (/(?:^|\/)(?:page|layout|loading|error|global-error|default|not-found|template)\.tsx$/.test(
+      normalized
+    ) ||
       normalized.endsWith('ReleaseLandingPage.tsx'))
+  ) {
+    return true;
+  }
+  if (
+    normalized.startsWith('apps/desktop/src/renderer/') &&
+    /(?:View|Screen|App)\.tsx$/.test(normalized)
   ) {
     return true;
   }
   if (!normalized.startsWith('apps/ios/Jovie/Features/')) return false;
   if (
     !normalized.endsWith('View.swift') &&
-    !normalized.endsWith('AuthScreen.swift')
+    !normalized.endsWith('Screen.swift') &&
+    !normalized.endsWith('Sheet.swift')
   ) {
     return false;
   }
-  return !/(?:Card|Overlay|Placeholder|Options|ToolCard)View\.swift$/.test(
-    normalized
-  );
+  return !/(?:Card|Placeholder|Options|ToolCard)View\.swift$/.test(normalized);
 }
 
 /** @param {string} path @param {readonly object[]} [registry] */
@@ -183,14 +186,26 @@ function normalizeChanged(files) {
     .filter(Boolean);
 }
 
-/** @param {object} screen @param {string} headSha */
-export function makeScreenProof(screen, headSha) {
+/** Deliberate-red fixture only. Never used to certify a changed surface. */
+function makeDeliberateRedProof(screen, headSha) {
   return {
-    schema: SCREEN_CERT_SCHEMA,
+    schema: SCREEN_BROWSER_PROOF_SCHEMA,
+    producer: 'external-render-runner',
     screenId: screen.id,
     headSha,
-    tier: 'changed-surface-proof',
-    viewports: screen.viewports.map(id => ({ id, decision: 'pass' })),
+    tier: 'rendered-evidence',
+    runUrl: 'https://github.com/JovieInc/Jovie/actions/runs/1',
+    artifactDigest: `sha256:${'a'.repeat(64)}`,
+    capturedAt: '2026-09-02T00:00:00.000Z',
+    viewports: screen.viewports.map(id => ({
+      id,
+      decision: 'pass',
+      rendered: true,
+      axe: { violations: 0 },
+      overflow: { maxHorizontalPx: 0 },
+      interaction: { passed: true },
+      cls: { value: 0 },
+    })),
     activeFlow: { disclosure: false },
     historyProof: { separate: true, path: 'docs/VISUAL_TESTING_POLICY.md' },
     visibleActions: ['Certify', 'Block'],
@@ -200,8 +215,11 @@ export function makeScreenProof(screen, headSha) {
 /** @param {any} proof @param {{ screen: object, headSha: string }} context */
 export function evaluateScreenProof(proof, { screen, headSha }) {
   const findings = [];
-  if (!isObject(proof) || proof.schema !== SCREEN_CERT_SCHEMA) {
-    return ['proof schema must be screen-certification/v1'];
+  if (!isObject(proof) || proof.schema !== SCREEN_BROWSER_PROOF_SCHEMA) {
+    return ['proof schema must be screen-browser-proof/v1'];
+  }
+  if (proof.producer !== 'external-render-runner') {
+    findings.push('proof producer must be external-render-runner');
   }
   if (proof.screenId !== screen.id) {
     findings.push(
@@ -215,8 +233,29 @@ export function evaluateScreenProof(proof, { screen, headSha }) {
   }
   if (proof.tier === 'scheduled-sweep') {
     findings.push('scheduled-sweep cannot satisfy changed-surface proof');
-  } else if (proof.tier !== 'changed-surface-proof') {
-    findings.push('proof tier must be changed-surface-proof');
+  } else if (proof.tier !== 'rendered-evidence') {
+    findings.push('proof tier must be rendered-evidence');
+  }
+  if (
+    typeof proof.runUrl !== 'string' ||
+    !/^https:\/\/[^\s]+$/i.test(proof.runUrl)
+  ) {
+    findings.push('proof runUrl must be an https URL');
+  }
+  if (
+    typeof proof.artifactDigest !== 'string' ||
+    !/^sha256:[0-9a-f]{64}$/i.test(proof.artifactDigest)
+  ) {
+    findings.push('proof artifactDigest must be sha256:<64 hex>');
+  }
+  if (
+    typeof proof.capturedAt !== 'string' ||
+    !/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d{3})?Z$/.test(
+      proof.capturedAt
+    ) ||
+    !Number.isFinite(Date.parse(proof.capturedAt))
+  ) {
+    findings.push('proof capturedAt must be an ISO timestamp');
   }
   const viewports = Array.isArray(proof.viewports) ? proof.viewports : [];
   const seen = new Map();
@@ -234,6 +273,25 @@ export function evaluateScreenProof(proof, { screen, headSha }) {
       viewport.decision.trim() === ''
     ) {
       findings.push(`viewport ${id} is missing a decision`);
+    } else if (viewport.decision !== 'pass') {
+      findings.push(`viewport ${id} decision must be pass`);
+    }
+    if (viewport.rendered !== true) {
+      findings.push(`viewport ${id} was not rendered`);
+    }
+    if (viewport.axe?.violations !== 0) {
+      findings.push(`viewport ${id} axe violations must be zero`);
+    }
+    const overflow = viewport.overflow?.maxHorizontalPx;
+    if (typeof overflow !== 'number' || overflow < 0 || overflow > 1) {
+      findings.push(`viewport ${id} horizontal overflow exceeds 1px`);
+    }
+    if (viewport.interaction?.passed !== true) {
+      findings.push(`viewport ${id} interaction check did not pass`);
+    }
+    const cls = viewport.cls?.value;
+    if (typeof cls !== 'number' || cls < 0 || cls > CLS_INTERACTION_BUDGET) {
+      findings.push(`viewport ${id} CLS exceeds ${CLS_INTERACTION_BUDGET}`);
     }
   }
   for (const id of screen.viewports) {
@@ -256,6 +314,9 @@ export function evaluateScreenProof(proof, { screen, headSha }) {
   ) {
     findings.push('visible actions are required');
   }
+  findings.push(
+    'trusted external artifact verification is not installed; supplied proof cannot certify'
+  );
   return findings;
 }
 
@@ -343,6 +404,13 @@ export function validateScreenRegistry(
     }
     if (!Array.isArray(entry.viewports) || entry.viewports.length === 0) {
       issues.push(`${entry.id}: viewports must be non-empty`);
+    }
+    if (!entry.excluded && entry.platform === 'web') {
+      for (const viewport of ['desktop', 'mobile']) {
+        if (!entry.viewports?.includes(viewport)) {
+          issues.push(`${entry.id}: web screens must include ${viewport}`);
+        }
+      }
     }
     if (entry.excluded) {
       if (!EXCLUDED_OWNERS.includes(entry.owner)) {
@@ -434,7 +502,7 @@ export function validateRetainedSweeps({
 }
 
 function resolveHeadSha(explicit, repoRoot = REPO_ROOT) {
-  if (typeof explicit === 'string' && /^[0-9a-f]{7,40}$/i.test(explicit)) {
+  if (typeof explicit === 'string' && /^[0-9a-f]{40}$/i.test(explicit)) {
     return explicit.toLowerCase();
   }
   const result = spawnSync('git', ['rev-parse', 'HEAD'], {
@@ -464,11 +532,30 @@ function resolveDiffBase(explicit, repoRoot = REPO_ROOT) {
   return probe.status === 0 ? 'origin/main' : null;
 }
 
+function resolveCommitSha(ref, repoRoot = REPO_ROOT) {
+  if (!ref) return null;
+  const result = spawnSync(
+    'git',
+    ['rev-parse', '--verify', `${ref}^{commit}`],
+    {
+      cwd: repoRoot,
+      encoding: 'utf8',
+    }
+  );
+  const sha = result.stdout?.trim() ?? '';
+  if (result.status !== 0 || !/^[0-9a-f]{40}$/i.test(sha)) {
+    throw new Error(
+      `screen certification diff base is not an exact commit: ${ref}`
+    );
+  }
+  return sha.toLowerCase();
+}
+
 function changedFilesFromGit(diffBase, repoRoot = REPO_ROOT) {
   if (!diffBase) return [];
   const result = spawnSync(
     'git',
-    ['diff', '--diff-filter=ACMR', '--name-status', `${diffBase}...HEAD`],
+    ['diff', '--diff-filter=ACDMR', '--name-status', `${diffBase}...HEAD`],
     { cwd: repoRoot, encoding: 'utf8' }
   );
   if (result.status !== 0) {
@@ -480,12 +567,19 @@ function changedFilesFromGit(diffBase, repoRoot = REPO_ROOT) {
     .split('\n')
     .map(line => line.trim())
     .filter(Boolean)
-    .map(line => {
+    .flatMap(line => {
       const parts = line.split('\t');
       if (parts.length === 1)
         return { path: normalizeRepoPath(parts[0]), status: 'M' };
+      const status = parts[0].trim().charAt(0).toUpperCase();
+      if (status === 'R' && parts.length >= 3) {
+        return [
+          { status, path: normalizeRepoPath(parts[1]) },
+          { status, path: normalizeRepoPath(parts[2]) },
+        ];
+      }
       return {
-        status: parts[0].trim().charAt(0).toUpperCase(),
+        status,
         path: normalizeRepoPath(parts[parts.length - 1]),
       };
     });
@@ -506,7 +600,7 @@ function evaluateDeliberateRed({ registry, headSha, fixtures }) {
           registry: fixtureRegistry,
           headSha,
           proofs: [],
-          mintFromSamples: false,
+          requireExternalEvidence: true,
         }).issues
       );
     } else if (
@@ -514,7 +608,7 @@ function evaluateDeliberateRed({ registry, headSha, fixtures }) {
       fixture.kind === 'scheduled-sweep'
     ) {
       const screen = registry.find(entry => entry.id === fixture.screenId);
-      const proof = makeScreenProof(
+      const proof = makeDeliberateRedProof(
         screen,
         fixture.kind === 'stale-head' ? '0'.repeat(40) : headSha
       );
@@ -522,7 +616,7 @@ function evaluateDeliberateRed({ registry, headSha, fixtures }) {
       findings.push(...evaluateScreenProof(proof, { screen, headSha }));
     } else if (fixture.kind === 'decision-review') {
       const screen = registry.find(entry => !entry.excluded);
-      const base = makeScreenProof(screen, headSha);
+      const base = makeDeliberateRedProof(screen, headSha);
       const proof = {
         ...base,
         ...fixture.proof,
@@ -552,7 +646,7 @@ export function evaluateChangedScreens({
   registry = SCREEN_REGISTRY,
   headSha,
   proofs = [],
-  mintFromSamples = true,
+  requireExternalEvidence = false,
 }) {
   const issues = [];
   const changedScreens = [];
@@ -560,6 +654,9 @@ export function evaluateChangedScreens({
   const supplied = new Map();
   for (const proof of proofs || []) {
     if (isObject(proof) && typeof proof.screenId === 'string') {
+      if (supplied.has(proof.screenId)) {
+        issues.push(`duplicate proof for ${proof.screenId}`);
+      }
       supplied.set(proof.screenId, proof);
     }
   }
@@ -576,28 +673,24 @@ export function evaluateChangedScreens({
     }
     if (classified.kind === 'out-of-scope') continue;
     if (classified.kind === 'unregistered') {
-      const protectedModification =
-        file.status === 'M' && isProtectedRevenueScreenSource(file.path);
-      if (file.status === 'A' || file.status === 'C' || protectedModification) {
-        issues.push(
-          `missing registration for changed in-scope screen ${file.path}`
-        );
-      }
+      issues.push(
+        `missing registration for changed in-scope screen ${file.path}`
+      );
       continue;
     }
     const screen = classified.entry;
     if (seen.has(screen.id)) continue;
     seen.add(screen.id);
-    const proof =
-      supplied.get(screen.id) ||
-      (mintFromSamples ? makeScreenProof(screen, headSha) : null);
+    const proof = supplied.get(screen.id) || null;
     if (!proof) {
-      const detail = `missing exact-head proof for ${screen.id}`;
-      issues.push(detail);
+      const detail = requireExternalEvidence
+        ? `missing exact-head proof for ${screen.id}`
+        : null;
+      if (detail) issues.push(detail);
       changedScreens.push({
         id: screen.id,
-        verdict: 'block',
-        findings: [detail],
+        verdict: requireExternalEvidence ? 'block' : 'evidence-required',
+        findings: detail ? [detail] : [],
       });
       continue;
     }
@@ -609,6 +702,11 @@ export function evaluateChangedScreens({
       verdict: findings.length === 0 ? 'pass' : 'block',
       findings,
     });
+  }
+  for (const screenId of supplied.keys()) {
+    if (!seen.has(screenId)) {
+      issues.push(`proof supplied for unchanged or unknown screen ${screenId}`);
+    }
   }
   return { issues, changedScreens, excludedChanges };
 }
@@ -638,30 +736,49 @@ export function runScreenCertification(options = {}) {
     fixtures: fixtures ?? [],
   });
   issues.push(...red.issues);
+  const diffBase =
+    options.diffBase ?? resolveDiffBase(options.diffBase, repoRoot);
+  const baseSha = options.changedFiles
+    ? null
+    : resolveCommitSha(diffBase, repoRoot);
+  if (!options.changedFiles && (!baseSha || baseSha === headSha)) {
+    issues.push('screen diff base must resolve and differ from exact HEAD');
+  }
   const changedFiles =
-    options.changedFiles ??
-    changedFilesFromGit(
-      options.diffBase ?? resolveDiffBase(options.diffBase, repoRoot),
-      repoRoot
-    );
+    options.changedFiles ?? changedFilesFromGit(diffBase, repoRoot);
   const changed = evaluateChangedScreens({
     changedFiles,
     registry,
     headSha,
     proofs: options.proofs,
-    mintFromSamples: options.mintFromSamples !== false,
+    requireExternalEvidence: options.registrationOnly !== true,
   });
   issues.push(...changed.issues);
   const ok = issues.length === 0;
+  const certified = false;
+  const status = !ok
+    ? 'blocked'
+    : changed.changedScreens.length > 0
+      ? options.registrationOnly === true
+        ? 'source-registered'
+        : 'evidence-required'
+      : 'not-applicable';
   return {
     ok,
     schema: SCREEN_CERT_SCHEMA,
     receipt: {
       schema: SCREEN_CERT_SCHEMA,
-      gate: SCREEN_CERT_GATE,
+      gate:
+        options.registrationOnly === true
+          ? SCREEN_REGISTRATION_GATE
+          : SCREEN_CERT_GATE,
       invariant: SCREEN_CERT_INVARIANT_ID,
       headSha,
+      baseSha,
       ok,
+      certified,
+      registrationOnly: options.registrationOnly === true,
+      status,
       issues,
       changedScreens: changed.changedScreens,
       excludedChanges: changed.excludedChanges,
@@ -681,17 +798,36 @@ if (isMain) {
   const diffBase = process.argv
     .find(arg => arg.startsWith('--diff-base='))
     ?.slice(12);
-  const result = runScreenCertification({ diffBase });
+  const proofFile = process.argv
+    .find(arg => arg.startsWith('--proof-file='))
+    ?.slice('--proof-file='.length);
+  const registrationOnly = process.argv.includes('--registration-only');
+  const activeGate = registrationOnly
+    ? SCREEN_REGISTRATION_GATE
+    : SCREEN_CERT_GATE;
+  let proofs = [];
+  if (proofFile) {
+    const parsed = JSON.parse(readFileSync(resolve(proofFile), 'utf8'));
+    proofs = Array.isArray(parsed) ? parsed : parsed.proofs;
+    if (!Array.isArray(proofs)) {
+      throw new Error('screen proof file must contain an array or { proofs }');
+    }
+  }
+  const result = runScreenCertification({
+    diffBase,
+    proofs,
+    registrationOnly,
+  });
   if (result.ok) {
     process.stdout.write(
-      `[${SCREEN_CERT_GATE}] PASS head=${result.receipt.headSha} changed=${result.receipt.changedScreens.length}\n`
+      `[${activeGate}] PASS head=${result.receipt.headSha} changed=${result.receipt.changedScreens.length} status=${result.receipt.status} certified=${result.receipt.certified}\n`
     );
   } else {
     for (const issue of result.receipt.issues) {
-      process.stderr.write(`[${SCREEN_CERT_GATE}] ${issue}\n`);
+      process.stderr.write(`[${activeGate}] ${issue}\n`);
     }
     process.stderr.write(
-      `[${SCREEN_CERT_GATE}] FAIL — ${SCREEN_CERT_INVARIANT_ID} screen-certification/v1\n`
+      `[${activeGate}] FAIL — ${SCREEN_CERT_INVARIANT_ID} ${SCREEN_CERT_SCHEMA}\n`
     );
   }
   process.exit(result.ok ? 0 : 1);

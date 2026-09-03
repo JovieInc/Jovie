@@ -1564,6 +1564,15 @@ class SourceContractTests(unittest.TestCase):
                     {status for status, _detail in lanes.values()}, {"NOT PROVEN"}
                 )
 
+    def test_configured_slots_reads_canonical_official_workflow(self) -> None:
+        source = SOURCE.read_text(encoding="utf-8")
+        self.assertIn(".config/symphony/WORKFLOW.md", source)
+        self.assertNotIn("symphony-runtime/elixir/WORKFLOW.jovie-ui-pilot.md", source)
+        with tempfile.TemporaryDirectory() as tmp:
+            workflow = Path(tmp) / "WORKFLOW.md"
+            workflow.write_text("agent:\n  max_concurrent_agents: 8\n", encoding="utf-8")
+            self.assertEqual(hud.configured_slots(workflow), 8)
+
     def test_mixed_blocked_reasons_never_describe_promotion_as_safe_pause(self) -> None:
         receipt = live_state()["fleet"]
         receipt.update(

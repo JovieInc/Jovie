@@ -1186,6 +1186,80 @@ def test_deep_lanes_are_staggered_and_bounded() -> None:
     assert "'0 9 * * 2'" in harness
 
 
+def test_nightly_unit_suite_fetches_storybook_provenance_history() -> None:
+    """Storybook provenance receipts need more than the depth-1 HEAD commit."""
+    job = _job_block("nightly-tests.yml", "unit-tests")
+
+    assert "name: Full Unit Test Suite" in job
+    assert "fetch-depth: 0" in job
+    assert "fetch-depth: 1" not in job
+    assert "pnpm --filter=@jovie/web run test" in job
+
+
+def test_nightly_notifications_skip_when_slack_credentials_are_absent() -> None:
+    """Missing Slack credentials must not make the notification job fail."""
+    job = _job_block("nightly-tests.yml", "notify")
+    knip_failure = _step_block(
+        "nightly-tests.yml", "Slack notification on Knip failure"
+    )
+    unit_failure = _step_block(
+        "nightly-tests.yml", "Slack notification on unit test failure"
+    )
+    e2e_failure = _step_block(
+        "nightly-tests.yml", "Slack notification on E2E failure"
+    )
+    all_success = _step_block(
+        "nightly-tests.yml", "Slack notification on all success"
+    )
+
+    assert "SLACK_BOT_TOKEN: ${{ secrets.SLACK_BOT_TOKEN }}" in job
+    assert "SLACK_CI_CHANNEL_ID: ${{ vars.SLACK_CI_CHANNEL_ID }}" in job
+    assert "SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}" in job
+    for step, result in (
+        (knip_failure, "needs.knip.result == 'failure'"),
+        (unit_failure, "needs.unit-tests.result == 'failure'"),
+    ):
+        assert result in step
+        assert "env.SLACK_BOT_TOKEN != ''" in step
+        assert "env.SLACK_CI_CHANNEL_ID != ''" in step
+        assert "channel-id:" not in step
+        assert "method: chat.postMessage" in step
+        assert "token: ${{ env.SLACK_BOT_TOKEN }}" in step
+        assert '"channel": "${{ env.SLACK_CI_CHANNEL_ID }}"' in step
+
+    assert "needs.e2e-tests.result == 'failure'" in e2e_failure
+    assert "env.SLACK_WEBHOOK_URL != ''" in e2e_failure
+    for result in (
+        "needs.knip.result == 'success'",
+        "needs.unit-tests.result == 'success'",
+        "needs.e2e-tests.result == 'success'",
+    ):
+        assert result in all_success
+    assert "env.SLACK_WEBHOOK_URL != ''" in all_success
+
+
+def test_pitch_static_assets_do_not_keep_large_unreferenced_files() -> None:
+    """Large public pitch assets must be referenced by the checked-in deck."""
+    pitch_dir = REPO_ROOT / "apps" / "web" / "public" / "pitch"
+    assets_dir = pitch_dir / "assets"
+    deck_sources = "\n".join(
+        path.read_text(encoding="utf-8")
+        for path in pitch_dir.iterdir()
+        if path.is_file() and path.suffix in {".css", ".html", ".js"}
+    )
+    referenced_assets = set(re.findall(r"assets/([^\"')\s>]+)", deck_sources))
+
+    large_unreferenced = sorted(
+        path.name
+        for path in assets_dir.iterdir()
+        if path.is_file()
+        and path.stat().st_size > 250_000
+        and path.name not in referenced_assets
+    )
+
+    assert large_unreferenced == []
+
+
 def test_product_screenshot_budget_covers_capture_and_publication() -> None:
     """The screenshot publisher must outlive capture plus the normal push gate."""
     job = _job_block("screenshots.yml", "generate")

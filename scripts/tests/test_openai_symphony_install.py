@@ -13,15 +13,23 @@ ROOT = Path(__file__).resolve().parents[2]
 
 
 class OpenAISymphonyInstallTests(unittest.TestCase):
-    def test_official_workflow_and_burrito_installer(self) -> None:
-        workflow = (ROOT / "WORKFLOW.md").read_text()
-        self.assertIn('project_slug: "ba6736cbfbb9"', workflow)
+    def test_official_workflow_and_elixir_installer(self) -> None:
+        self.assertFalse((ROOT / "WORKFLOW.md").exists())
+        workflow = (ROOT / "scripts/hermes/symphony/WORKFLOW.md").read_text()
+        self.assertIn('project_slug: "symphony-ui-pilot-96d6b9c5b2d5"', workflow)
         self.assertIn("api_key: $LINEAR_API_KEY", workflow)
         self.assertIn(
-            "git clone --depth 1 git@github.com:JovieInc/Jovie.git .", workflow
+            "git clone --depth 1 https://github.com/JovieInc/Jovie.git .", workflow
         )
-        self.assertRegex(workflow, re.compile(r"^\s+command: codex .*app-server$", re.M))
-        self.assertNotIn("symphony-codex-router", workflow)
+        self.assertRegex(
+            workflow,
+            re.compile(r"^\s+command: \./scripts/hermes/symphony-codex-router app-server$", re.M),
+        )
+        self.assertIn("symphony-codex-router", workflow)
+        self.assertIn("interval_ms: 30000", workflow)
+        self.assertIn("max_concurrent_agents: 8", workflow)
+        self.assertIn("port: 4041", workflow)
+        self.assertNotIn("- Rework", workflow)
 
         installer = (ROOT / "scripts/install-openai-symphony.sh").read_text()
         self.assertIn('SYMPHONY_VERSION="v0.0.2"', installer)
@@ -29,6 +37,10 @@ class OpenAISymphonyInstallTests(unittest.TestCase):
         self.assertIn("macos_arm64", installer)
         self.assertIn("shasum -a 256 -c", installer)
         self.assertIn('"$SYMPHONY_INSTALL_DIR/symphony"', installer)
+        updater = (ROOT / "scripts/hermes/update-symphony-burrito.sh").read_text()
+        self.assertIn('SYMPHONY_VERSION="${SYMPHONY_VERSION:-v0.0.2}"', updater)
+        self.assertIn("symphony-elixir.service", updater)
+        self.assertIn('SUM_NAME="${BIN_NAME}.sha256"', updater)
 
     def test_homemade_issue_pickup_is_disabled(self) -> None:
         self.assertFalse(

@@ -67,7 +67,7 @@ function buildNavLinks(
   }
 
   if (!showAuthenticatedAction && includePublicLogin) {
-    baseLinks.push({ href: APP_ROUTES.SIGNIN, label: 'Log In' });
+    baseLinks.push({ href: APP_ROUTES.SIGNIN, label: 'Log in' });
   }
 
   return baseLinks;

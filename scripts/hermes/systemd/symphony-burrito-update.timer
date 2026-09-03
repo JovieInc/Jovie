@@ -1,9 +1,0 @@
-[Unit]
-Description=Hourly official burrito auto-update on gem
-
-[Timer]
-OnCalendar=hourly
-Persistent=true
-
-[Install]
-WantedBy=timers.target
