@@ -14,6 +14,7 @@
  *   8. Design-agent invariants project from canon/invariants.jsonl only.
  *   9. Shared-UI visual arbitrary values are shrink-only (JOV-5437).
  *  10. Shadcn/Typeset outcome inventory is fail-closed (JOV-5438).
+ *  11. Design-system authority map declares ordered owners and evidence.
  *
  * Invariant consumer: JOV-INV-019.
  *
@@ -35,6 +36,10 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { runOutcomeCertification } from './component-shadcn-outcome-inventory.mjs';
 import { findDesignManifestProjectionViolations } from './design-authority-guard.mjs';
+import {
+  AUTHORITY_MAP_PATH,
+  loadAndValidateDesignSystemAuthorityMap,
+} from './design-system-authority-map.mjs';
 import { buildLlmsDesignManifest } from './generate-llms-design-manifest.mjs';
 import {
   findDesignInvariantProjectionViolations,
@@ -107,10 +112,16 @@ function readJson(repoRoot, relativePath) {
 }
 
 /**
+ * @typedef {{ includeAuthorityMap?: boolean }} AuditOptions
+ *
  * @param {string} [repoRoot]
+ * @param {AuditOptions} [options]
  * @returns {{ results: CheckResult[], failed: CheckResult[], warned: CheckResult[] }}
  */
-export function runDesignGovernanceAudit(repoRoot = DEFAULT_REPO_ROOT) {
+export function runDesignGovernanceAudit(
+  repoRoot = DEFAULT_REPO_ROOT,
+  options = {}
+) {
   /** @type {CheckResult[]} */
   const results = [];
   const report = (id, status, detail) => {
@@ -375,6 +386,36 @@ export function runDesignGovernanceAudit(repoRoot = DEFAULT_REPO_ROOT) {
       'FAIL',
       `${CI_FAST_LANES_PATH} unreadable: ${error instanceof Error ? error.message : error}`
     );
+  }
+
+  if (options.includeAuthorityMap !== false) {
+    try {
+      const issues = loadAndValidateDesignSystemAuthorityMap(repoRoot);
+      if (issues.length > 0) {
+        const detail = issues
+          .map(issue => `${issue.code}:${issue.detail}`)
+          .join('; ');
+        report(
+          'design-system-authority-map',
+          'FAIL',
+          `${AUTHORITY_MAP_PATH} invalid: ${detail}`
+        );
+      } else {
+        report(
+          'design-system-authority-map',
+          'PASS',
+          `${AUTHORITY_MAP_PATH} validates dependency order, canonical owners, ` +
+            'regular-file evidence paths, immutable status floors, and ' +
+            'executable checks'
+        );
+      }
+    } catch (error) {
+      report(
+        'design-system-authority-map',
+        'FAIL',
+        `${AUTHORITY_MAP_PATH} unreadable: ${error instanceof Error ? error.message : error}`
+      );
+    }
   }
 
   try {

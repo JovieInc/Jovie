@@ -1,6 +1,10 @@
 import { NextResponse } from 'next/server';
 import { getAppUrl, getProfileUrl } from '@/constants/domains';
 import { isAdmin as checkAdminRole } from '@/lib/admin/roles';
+import {
+  type AppShellContract,
+  getAppShellContract,
+} from '@/lib/app-shell/workspaces';
 import { isProfileComplete } from '@/lib/auth/profile-completeness';
 import { getSessionContext, SESSION_ERRORS } from '@/lib/auth/session';
 import { captureError } from '@/lib/error-tracking';
@@ -23,6 +27,7 @@ export interface MobileMeResponse {
   appleWalletProfilePassAvailable: boolean;
   chatEnabled: boolean;
   isAdmin: boolean;
+  appShell: AppShellContract;
 }
 
 function buildWaitlistPendingResponse(isAdmin: boolean): NextResponse {
@@ -37,6 +42,7 @@ function buildWaitlistPendingResponse(isAdmin: boolean): NextResponse {
     appleWalletProfilePassAvailable: false,
     chatEnabled: false,
     isAdmin,
+    appShell: getAppShellContract({ isAdmin }),
   };
 
   return NextResponse.json(payload, {
@@ -63,6 +69,7 @@ function buildNeedsOnboardingResponse(
     appleWalletProfilePassAvailable: false,
     chatEnabled: false,
     isAdmin,
+    appShell: getAppShellContract({ isAdmin }),
   };
 
   return NextResponse.json(payload, {
@@ -166,6 +173,7 @@ export async function GET(request: Request) {
       appleWalletProfilePassAvailable,
       chatEnabled,
       isAdmin: isAdminUser,
+      appShell: getAppShellContract({ isAdmin: isAdminUser }),
     };
 
     return NextResponse.json(payload, {

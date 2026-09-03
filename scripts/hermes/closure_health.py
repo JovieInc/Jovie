@@ -1465,6 +1465,16 @@ def observe_closure_health(
             "reasons": ["closure-observation-unknown"],
             "episodes": {},
             "error": f"closure-observation-failed: {error}",
+            # The observation is non-authoritative, so an empty action set
+            # must not resolve prior work. It still has to satisfy the bounded
+            # JOV-INV-020 ingress contract used by Fleet Gate Refresh.
+            "stackHealth": {
+                "maxDepth": STACK_MAX_DEPTH,
+                "roots": [],
+                "violations": [],
+                "repairActions": [],
+            },
+            "repairActions": [],
             "classifications": {
                 "dispositions": [],
                 "counts": {},

@@ -18,6 +18,7 @@ import {
 } from '@/lib/db/schema/content';
 import { joviePlaylists } from '@/lib/db/schema/playlists';
 import { creatorProfiles } from '@/lib/db/schema/profiles';
+import { getPublishedEngineeringStories } from '@/lib/engineering-publication';
 import { env } from '@/lib/env-server';
 import { isPublicProfileIndexable } from '@/lib/profile/public-profile-indexing-policy';
 import { publicReleaseEligibilitySqlPredicate } from '@/lib/profile/public-release-eligibility';
@@ -158,11 +159,13 @@ const getSitemapCatalog = unstable_cache(
 );
 
 export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
-  const [catalog, blogPosts, changelogReleases] = await Promise.all([
-    getSitemapCatalog(),
-    getBlogPosts(),
-    getChangelogReleases(),
-  ]);
+  const [catalog, blogPosts, changelogReleases, engineeringStories] =
+    await Promise.all([
+      getSitemapCatalog(),
+      getBlogPosts(),
+      getChangelogReleases(),
+      getPublishedEngineeringStories(),
+    ]);
 
   const now = new Date();
 
@@ -254,6 +257,24 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
       changeFrequency: 'weekly',
       priority: 0.5,
     },
+    {
+      url: `${BASE_URL}${APP_ROUTES.ENGINEERING}`,
+      lastModified: now,
+      changeFrequency: 'weekly',
+      priority: 0.5,
+    },
+    ...engineeringStories.flatMap(story =>
+      story.source
+        ? [
+            {
+              url: `${BASE_URL}${APP_ROUTES.ENGINEERING}/${story.slug}`,
+              lastModified: new Date(`${story.source.date}T00:00:00Z`),
+              changeFrequency: 'monthly' as const,
+              priority: 0.4,
+            },
+          ]
+        : []
+    ),
     {
       url: `${BASE_URL}/legal/privacy`,
       lastModified: now,

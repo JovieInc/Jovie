@@ -20,7 +20,7 @@ describe('public profile Liquid Glass navigation', () => {
   it('renders one floating navigation material with no nested glass', () => {
     expect(NAV).toContain('profile-floating-tab-bar');
     expect(NAV).toContain(
-      'profile-liquid-glass-nav h-12 rounded-full border p-1 shadow-(--profile-dock-shadow) backdrop-blur-xl backdrop-saturate-150'
+      'profile-liquid-glass-nav h-8 rounded-full border px-1 shadow-(--profile-dock-shadow) backdrop-blur-xl backdrop-saturate-150'
     );
     expect(SURFACE).toContain('CONTENT_SAFE_AREA_BOTTOM_PADDING');
     expect(CSS).toMatch(
@@ -31,18 +31,25 @@ describe('public profile Liquid Glass navigation', () => {
     );
   });
 
-  it('keeps explicit 44px-plus targets, visible labels, and one active page', () => {
-    expect(NAV).toContain('profile-liquid-glass-nav__grid -my-0.5 grid h-11');
+  it('keeps a 32px visual rail, explicit 44px targets, icon-only labels, and one active page', () => {
+    expect(NAV).toContain('profile-liquid-glass-nav__grid -my-1.5 grid h-11');
     expect(NAV).toContain(
       'profile-liquid-glass-nav__item relative flex h-full'
     );
     expect(NAV).toContain("aria-current={isActive ? 'page' : undefined}");
     expect(NAV).toContain('profile-liquid-glass-nav__label sr-only');
+    expect(NAV).toContain('profile-liquid-glass-nav__icon h-4 w-4');
     expect(CSS).toMatch(
-      /\.profile-liquid-glass-nav__grid\)[\s\S]{0,120}height:\s*calc\(var\(--space-10\) \+ var\(--space-2-5\)\)/
+      /\.profile-liquid-glass-nav\)[\s\S]{0,120}height:\s*var\(--space-8\)/
     );
     expect(CSS).toMatch(
-      /\.profile-liquid-glass-nav__label\)[\s\S]{0,320}position:\s*static[\s\S]{0,220}font-size:\s*var\(--text-2xs\)/
+      /\.profile-liquid-glass-nav__grid\)[\s\S]{0,140}height:\s*var\(--space-11\)[\s\S]{0,80}margin-block:\s*calc\(var\(--space-1-5\) \* -1\)/
+    );
+    expect(CSS).toMatch(
+      /:where\(\.profile-liquid-glass-nav__item\)::before[\s\S]{0,240}height:\s*var\(--space-8\)/
+    );
+    expect(CSS).not.toMatch(
+      /\.profile-liquid-glass-nav__label\)[\s\S]{0,520}(?:position:\s*static|width:\s*auto|height:\s*auto|overflow:\s*visible|clip:\s*auto|clip-path:\s*none)/
     );
   });
 

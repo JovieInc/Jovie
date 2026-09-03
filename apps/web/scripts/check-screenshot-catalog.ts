@@ -1,6 +1,6 @@
 #!/usr/bin/env tsx
 
-import { readdir, readFile, stat } from 'node:fs/promises';
+import { lstat, readdir, readFile, realpath, stat } from 'node:fs/promises';
 import { dirname, extname, join, resolve } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { SCREENSHOT_SCENARIOS } from '@/lib/screenshots/registry';
@@ -172,16 +172,19 @@ async function inspectDirectory(
   budget: DirectoryBudget,
   maxImageBytes: number,
   label: string,
-  violations: string[]
+  violations: string[],
+  allowFileSymlinks = false
 ) {
   const directoryEntries = await readdir(directory, { withFileTypes: true });
   const actualFiles = directoryEntries
-    .filter(entry => entry.isFile())
+    .filter(
+      entry => entry.isFile() || (allowFileSymlinks && entry.isSymbolicLink())
+    )
     .map(entry => entry.name)
     .sort();
 
   for (const entry of directoryEntries) {
-    if (!entry.isFile()) {
+    if (!entry.isFile() && !(allowFileSymlinks && entry.isSymbolicLink())) {
       violations.push(`${label} contains non-file entry: ${entry.name}`);
     }
   }
@@ -262,7 +265,8 @@ export async function checkScreenshotCatalog({
     budgets.publicExports,
     budgets.maxImageBytes,
     'public/product-screenshots',
-    violations
+    violations,
+    true
   );
 
   for (const entry of entries) {
@@ -273,6 +277,28 @@ export async function checkScreenshotCatalog({
     const publicImage = await readFile(
       join(paths.publicExportDirectory, entry.publicExportPath)
     ).catch(() => null);
+    const publicPath = join(
+      paths.publicExportDirectory,
+      entry.publicExportPath
+    );
+    const publicStats = await lstat(publicPath).catch(() => null);
+    if (publicStats?.isSymbolicLink()) {
+      const [resolvedPublicPath, resolvedCatalogPath] = await Promise.all([
+        realpath(publicPath).catch(() => null),
+        realpath(join(paths.catalogDirectory, entry.imagePath)).catch(
+          () => null
+        ),
+      ]);
+      if (
+        resolvedPublicPath === null ||
+        resolvedCatalogPath === null ||
+        resolvedPublicPath !== resolvedCatalogPath
+      ) {
+        violations.push(
+          `${entry.id}: public export symlink must target its canonical catalog image`
+        );
+      }
+    }
     if (catalogImage && publicImage && !catalogImage.equals(publicImage)) {
       violations.push(
         `${entry.id}: public export does not match its canonical catalog image`

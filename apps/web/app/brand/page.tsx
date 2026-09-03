@@ -4,6 +4,7 @@ import type { ReactNode } from 'react';
 import { APP_NAME, BASE_URL } from '@/constants/app';
 import { APP_ROUTES } from '@/constants/routes';
 import { Mark, PALETTE, Wordmark } from '@/lib/brand';
+import { PUBLIC_IMAGERY_RULES } from '@/lib/brand/public-system';
 import { safeJsonLdStringify } from '@/lib/utils/json-ld';
 
 export const revalidate = false;
@@ -153,6 +154,7 @@ export default function BrandPage() {
       <LockupsSection />
       <UsageSection />
       <ColorSection />
+      <ImagerySection />
       <TypeSection />
       <IconPackSection />
       <DownloadsSection />
@@ -397,7 +399,8 @@ function UsageSection() {
           No gradients on the mark. No effects. No borrowed energy.
         </p>
         <p className={prose}>
-          Artists bring the color. Jovie brings the structure.
+          Artists bring truthful identity. Jovie-owned scenes bring controlled
+          harmony.
         </p>
         <Guideline title='Use'>
           Cream on ink. Ink on cream. Cream on midnight. Black and white.
@@ -451,6 +454,27 @@ function ColorSection() {
   );
 }
 
+function ImagerySection() {
+  return (
+    <section id='imagery' className={sectionShell}>
+      <div>
+        {/* ui-casing-allow: marketing display headline */}
+        <h2 className={sectionHeading}>The camera finds the palette.</h2>
+      </div>
+      <div className='system-b-brand-copy-stack'>
+        <p className={proseStrong}>
+          Jovie-owned generated imagery follows Scene Palette v1.
+        </p>
+        <p className={prose}>
+          Set color is chosen before capture or generation. Reality, identity,
+          and artist-owned material stay truthful.
+        </p>
+        <ColorList title='Imagery rules' items={PUBLIC_IMAGERY_RULES} />
+      </div>
+    </section>
+  );
+}
+
 function TypeSection() {
   return (
     <section id='type' className={sectionShell}>
@@ -468,8 +492,8 @@ function TypeSection() {
           type carries the work.
         </p>
         <p className={proseStrong}>
-          Satoshi for display. DM Sans for body. Inter for product UI. Three
-          voices. One system.
+          Satoshi for display. Inter for body and product UI. Two languages. One
+          system.
         </p>
         <div className='system-b-brand-type-stack'>
           {TYPE_SAMPLES.map(sample => (

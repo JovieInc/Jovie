@@ -1,6 +1,14 @@
 'use client';
 
+// @coverage-via apps/web/tests/unit/dashboard/AudienceMemberActivityFeed.test.tsx
 import { Icon } from '@/components/atoms/Icon';
+import {
+  ACTIVITY_TIMELINE_LIST_CLASSNAME,
+  ActivityTimelineIcon,
+  ActivityTimelineMeta,
+  ActivityTimelineRow,
+  ActivityTimelineTimestamp,
+} from '@/components/molecules/ActivityFeed';
 import { DrawerInlineNote } from '@/components/molecules/drawer';
 import { renderAudienceEventSentence } from '@/lib/audience/activity-grammar';
 import { formatTimeAgo } from '@/lib/utils/audience';
@@ -32,21 +40,14 @@ export function AudienceMemberActivityFeed({
     .slice(0, 10);
 
   return (
-    <div className='relative'>
-      <div
-        className='absolute top-2.5 bottom-2.5 left-3 w-px bg-subtle'
-        aria-hidden='true'
-      />
-
-      <ul className='space-y-px'>
-        {sorted.map((action, index) => (
-          <ActivityItem
-            key={`${member.id}-activity-${action.label}-${action.timestamp ?? index}`}
-            action={action}
-          />
-        ))}
-      </ul>
-    </div>
+    <ul className={ACTIVITY_TIMELINE_LIST_CLASSNAME}>
+      {sorted.map((action, index) => (
+        <ActivityItem
+          key={`${member.id}-activity-${action.label}-${action.timestamp ?? index}`}
+          action={action}
+        />
+      ))}
+    </ul>
   );
 }
 
@@ -58,19 +59,24 @@ function ActivityItem({
   const rendered = renderAudienceEventSentence(action);
   const label = rendered.kind === 'sentence' ? rendered.text : action.label;
   const icon = rendered.kind === 'sentence' ? rendered.icon : 'Sparkles';
+  const hasMeta =
+    Boolean(action.sourceLabel) ||
+    action.confidence === 'verified' ||
+    Boolean(action.timestamp);
 
   return (
-    <li className='relative flex items-start gap-2.5 py-1.5'>
-      <span
-        className='relative z-10 inline-flex h-5 w-5 shrink-0 items-center justify-center rounded-full border border-subtle bg-surface-1 text-tertiary-token'
-        aria-hidden='true'
-      >
-        <Icon name={icon} className='h-3 w-3' />
-      </span>
-
-      <div className='min-w-0 flex-1 pt-px'>
-        <p className='truncate text-xs leading-4 text-primary-token'>{label}</p>
-        <div className='mt-0.5 flex items-center gap-1.5 text-3xs text-tertiary-token'>
+    <ActivityTimelineRow
+      as='li'
+      contentClassName='pt-px'
+      leading={
+        <ActivityTimelineIcon className='border border-subtle bg-surface-1 text-tertiary-token'>
+          <Icon name={icon} className='h-3 w-3' />
+        </ActivityTimelineIcon>
+      }
+    >
+      <p className='truncate text-xs leading-4 text-primary-token'>{label}</p>
+      {hasMeta ? (
+        <ActivityTimelineMeta className='text-3xs'>
           {action.sourceLabel ? (
             <span className='max-w-35 truncate rounded bg-surface-0 px-1 text-secondary-token'>
               {action.sourceLabel}
@@ -82,10 +88,12 @@ function ActivityItem({
             </span>
           ) : null}
           {action.timestamp ? (
-            <span>{formatTimeAgo(action.timestamp)}</span>
+            <ActivityTimelineTimestamp dateTime={action.timestamp}>
+              {formatTimeAgo(action.timestamp)}
+            </ActivityTimelineTimestamp>
           ) : null}
-        </div>
-      </div>
-    </li>
+        </ActivityTimelineMeta>
+      ) : null}
+    </ActivityTimelineRow>
   );
 }

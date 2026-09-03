@@ -2,8 +2,10 @@ import { describe, expect, it } from 'vitest';
 import {
   APP_SHELL_WORKSPACES,
   type AppShellWorkspace,
+  getAppShellContract,
   getCurrentAppShellWorkspace,
   getNextAppShellWorkspace,
+  getPermittedAppShellWorkspaces,
 } from './workspaces';
 
 describe('app shell workspaces', () => {
@@ -30,7 +32,7 @@ describe('app shell workspaces', () => {
         href: '/app/support',
         brandVariant: 'jovie',
       },
-    ] as const satisfies readonly AppShellWorkspace[];
+    ] as const;
 
     expect(getNextAppShellWorkspace(workspaces, 'ov')?.id).toBe('support');
     expect(getNextAppShellWorkspace(workspaces, 'support')?.id).toBe(
@@ -51,5 +53,58 @@ describe('app shell workspaces', () => {
         'missing'
       )?.id
     ).toBe('customer');
+  });
+
+  it('keeps launch and ordinary navigation Jovie-first', () => {
+    const contract = getAppShellContract({ isAdmin: false });
+
+    expect(contract.launchWorkspaceId).toBe('customer');
+    expect(contract.primaryWorkspaceId).toBe('customer');
+    expect(contract.workspaces.map(workspace => workspace.id)).toEqual([
+      'customer',
+    ]);
+    expect(contract.workspaces[0]).toMatchObject({
+      label: 'Jovie',
+      role: 'primary',
+      access: 'authenticated',
+      selectedAgent: 'jovie',
+      dataScope: 'customer',
+    });
+  });
+
+  it('fails deliberate-red role leakage by hiding Ovie from ordinary users', () => {
+    const ordinaryIds = getPermittedAppShellWorkspaces({ isAdmin: false }).map(
+      workspace => workspace.id
+    );
+    const adminIds = getPermittedAppShellWorkspaces({ isAdmin: true }).map(
+      workspace => workspace.id
+    );
+
+    expect(ordinaryIds).not.toContain('ov');
+    expect(adminIds).toEqual(['customer', 'ov']);
+  });
+
+  it('keeps Ovie secondary and limits divergence to typed operator capabilities', () => {
+    const contract = getAppShellContract({ isAdmin: true });
+    const ov = contract.workspaces.find(workspace => workspace.id === 'ov');
+
+    expect(ov).toMatchObject({
+      role: 'secondary',
+      access: 'admin',
+      selectedAgent: 'summer',
+      dataScope: 'operator',
+      navigationDivergenceReason: 'operator-capabilities',
+    });
+  });
+
+  it('detects duplicate shell and chat owners across Jovie and Ovie', () => {
+    const contract = getAppShellContract({ isAdmin: true });
+
+    expect(
+      new Set(contract.workspaces.map(workspace => workspace.shellOwner))
+    ).toEqual(new Set([contract.shellOwner]));
+    expect(
+      new Set(contract.workspaces.map(workspace => workspace.chatOwner))
+    ).toEqual(new Set([contract.chatOwner]));
   });
 });

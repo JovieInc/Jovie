@@ -132,15 +132,17 @@ describe('SharedCommandPalette (cmd+k surface)', () => {
       <PaletteList
         sections={[]}
         selectedIndex={0}
-        setSelectedIndex={() => undefined}
-        commitIndex={() => undefined}
+        setSelectedIndex={vi.fn()}
+        commitIndex={vi.fn()}
         emptyHint='No matches'
       />
     );
+
     expect(screen.getByText('No matches')).toBeInTheDocument();
     expect(fuzzyMatch('SharedCommandPalette', 'palette')).toBe(true);
     expect(fuzzyMatch('SharedCommandPalette', 'missing')).toBe(false);
   });
+
   it('exposes both skills and navs from the registry on the cmdk surface', () => {
     const cmds = commandsForSurface('cmdk');
     const skills = cmds.filter(c => c.kind === 'skill');
@@ -499,6 +501,60 @@ describe('SharedCommandPalette (cmd+k surface)', () => {
     fireEvent.mouseDown(threadRow!);
     expect(onAdditionalSelect).toHaveBeenCalledWith('thread:abc');
     // The additional path delegates to the caller; no router.push.
+    expect(pushMock).not.toHaveBeenCalled();
+  });
+
+  it('searches injected command descriptions and keeps the matched row keyboard-committable', () => {
+    pushMock.mockClear();
+    const onAdditionalSelect = vi.fn();
+    render(
+      <CmdKPalette
+        profileId='profile-1'
+        open
+        onOpenChange={vi.fn()}
+        additionalSectionsAfter={[
+          {
+            id: 'workspace-actions',
+            label: 'Workspace',
+            items: [
+              {
+                kind: 'nav',
+                nav: {
+                  kind: 'nav',
+                  id: 'switch-workspace',
+                  label: 'Switch workspace',
+                  description: 'Change the active workspace.',
+                  iconName: 'Columns2',
+                  surfaces: ['cmdk'],
+                  href: '/app/ov',
+                },
+              },
+            ],
+          },
+        ]}
+        onAdditionalSelect={onAdditionalSelect}
+      />
+    );
+
+    const input = screen.getByRole('combobox', {
+      name: 'Command Palette Search',
+    });
+    fireEvent.change(input, { target: { value: 'zzzz-not-found' } });
+
+    expect(screen.getByText('No matches.')).toBeVisible();
+    expect(input).not.toHaveAttribute('aria-activedescendant');
+
+    fireEvent.change(input, { target: { value: 'active workspace' } });
+
+    const action = screen.getByRole('option', {
+      name: 'Switch workspace Change the active workspace. ⌘1',
+    });
+    expect(action).toHaveAttribute('aria-selected', 'true');
+    expect(input).toHaveAttribute('aria-activedescendant', action.id);
+
+    fireEvent.keyDown(input, { key: 'Enter' });
+
+    expect(onAdditionalSelect).toHaveBeenCalledWith('switch-workspace');
     expect(pushMock).not.toHaveBeenCalled();
   });
 

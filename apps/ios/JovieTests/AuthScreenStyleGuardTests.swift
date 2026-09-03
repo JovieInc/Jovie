@@ -62,6 +62,32 @@ struct AuthScreenStyleGuardTests {
     #expect(!buttonSource.contains(".tint(JovieColor.accentBlue)"))
   }
 
+  @Test func continueInBrowserButtonPaddingStaysInsideHitTarget() throws {
+    let sourceURL = URL(fileURLWithPath: #filePath)
+      .deletingLastPathComponent()
+      .deletingLastPathComponent()
+      .appendingPathComponent("Jovie/Features/Auth/AuthScreen.swift")
+    let source = try String(contentsOf: sourceURL, encoding: .utf8)
+
+    let buttonStart = try #require(source.range(of: "private struct ContinueInBrowserButton: View"))
+    let buttonEnd = try #require(source.range(of: "private struct AuthErrorText: View"))
+    let buttonSource = source[buttonStart.lowerBound..<buttonEnd.lowerBound]
+
+    #expect(buttonSource.contains("private static let minimumHitTargetHeight: CGFloat = 44"))
+    #expect(buttonSource.contains("private static var minimumHitTargetPadding: CGFloat"))
+    let hasHitTargetPaddingInsideLabel = buttonSource.range(
+      of: #"\.padding\(\.vertical,\s*Self\.minimumHitTargetPadding\)\s*\.contentShape\(Rectangle\(\)\)"#,
+      options: .regularExpression
+    ) != nil
+    #expect(hasHitTargetPaddingInsideLabel)
+
+    let hasLegacyOuterPadding = buttonSource.range(
+      of: #"\.contentShape\(Rectangle\(\)\)\s*\}\s*\.padding\(\.vertical,\s*6\)"#,
+      options: .regularExpression
+    ) != nil
+    #expect(!hasLegacyOuterPadding)
+  }
+
   /// System B token guard: JovieTheme must carry the canonical Noir Ion
   /// values from DESIGN.md / apps/web/styles/design-system.css and none of the
   /// pre-Noir-Ion carbon or pre-System-B drifted hexes.
@@ -107,6 +133,8 @@ struct AuthScreenStyleGuardTests {
     #expect(!source.contains("textPrimary = Color(hex: 0xFFFFFF)"))
     #expect(!source.contains("0xE3E4E6"))
     #expect(!source.contains("0x969799"))
+    #expect(!source.contains("borderSubtle = Color.white.opacity(0.05)"))
+    #expect(!source.contains("borderDefault = Color.white.opacity(0.08)"))
     #expect(!source.contains("Color.white.opacity(0.05)"))
     #expect(!source.contains("Color.white.opacity(0.08)"))
     #expect(!source.contains("borderStrong = Color.white.opacity(0.10)"))

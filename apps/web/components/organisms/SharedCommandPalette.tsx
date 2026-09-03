@@ -150,8 +150,15 @@ export function filterAdditionalSections(
     .map(section => ({
       ...section,
       items: section.items.filter(item => {
-        if (item.kind === 'skill') return fuzzyMatch(item.skill.label, lower);
-        if (item.kind === 'nav') return fuzzyMatch(item.nav.label, lower);
+        if (item.kind === 'skill') {
+          return fuzzyMatch(
+            `${item.skill.label} ${item.skill.description}`,
+            lower
+          );
+        }
+        if (item.kind === 'nav') {
+          return fuzzyMatch(`${item.nav.label} ${item.nav.description}`, lower);
+        }
         if (item.kind === 'prompt')
           return fuzzyMatch(
             `${item.prompt.label} ${item.prompt.description}`,

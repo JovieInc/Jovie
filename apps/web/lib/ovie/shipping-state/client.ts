@@ -1,6 +1,8 @@
 import { z } from 'zod';
 import {
   OBSERVATION_STATES,
+  OPERATIONAL_TASK_SYNC_STATES,
+  OPERATIONAL_TASK_WORKFLOW_STATES,
   SHIPPING_SOURCE_IDS,
   SHIPPING_STATE_SCHEMA,
 } from './contract';
@@ -30,6 +32,44 @@ const NOT_MEASURED_DURATIONS = {
 } as const;
 const observationStateSchema = z.enum(OBSERVATION_STATES);
 const sourceIdSchema = z.enum(SHIPPING_SOURCE_IDS);
+const operationalTaskWorkflowStateSchema = z.enum(
+  OPERATIONAL_TASK_WORKFLOW_STATES
+);
+const operationalTaskSyncStateSchema = z.enum(OPERATIONAL_TASK_SYNC_STATES);
+const operationalTaskIdSchema = z.string().regex(/^linear:[A-Z]+-\d+$/);
+
+const operationalTaskSchema = z.object({
+  id: operationalTaskIdSchema,
+  linearIdentifier: z.string().regex(/^[A-Z]+-\d+$/),
+  linearUrl: z.string().url().startsWith('https://linear.app/').nullable(),
+  title: z.string().min(1).max(180),
+  workflowState: operationalTaskWorkflowStateSchema,
+  priority: z.enum(['urgent', 'high', 'medium', 'low', 'none']),
+  attempt: z.number().int().nonnegative().nullable(),
+  retryAt: z.string().nullable(),
+  sourceRevision: z.string().max(128).nullable(),
+  updatedAt: z.string().nullable(),
+});
+
+const operationalTaskFeedSchema = z.object({
+  canonicalSource: z.literal('linear'),
+  cacheMode: z.literal('local-reconciled'),
+  syncState: operationalTaskSyncStateSchema,
+  sourceId: z.enum(['symphony-runtime', 'symphony-task']),
+  observedAt: z.string().nullable(),
+  lastSyncedAt: z.string().nullable(),
+  freshnessDeadline: z.string().nullable(),
+  tasks: z.array(operationalTaskSchema),
+  deltas: z.array(
+    z.object({
+      taskId: operationalTaskIdSchema,
+      kind: z.enum(['added', 'updated', 'removed']),
+      fromState: operationalTaskWorkflowStateSchema.nullable(),
+      toState: operationalTaskWorkflowStateSchema.nullable(),
+      sequence: z.number().int().nonnegative(),
+    })
+  ),
+});
 
 const sourceObservationSchema = z.object({
   sourceId: sourceIdSchema,
@@ -97,6 +137,7 @@ export const shippingCockpitProjectionSchema = z.object({
   retrying: countMeasurementSchema,
   terminalFailures: countMeasurementSchema,
   capacityAvailable: countMeasurementSchema,
+  operationalTasks: operationalTaskFeedSchema,
   sources: z.object(sourceMapShape),
 });
 

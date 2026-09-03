@@ -16,7 +16,7 @@
  * removing/deprecating = major bump + lifecycle field + canon precedence update.
  *
  * Inherited invariants (NOT restated here — see AGENT_GUIDE.md §Inherited):
- *   - dark-only theme (charter delta #9; DESIGN.md System A)
+ *   - dark-first editorial language on System B tokens
  *   - fully static: revalidate = false (.claude/rules/ui.md)
  *   - copy-in-data files (apps/web/data/*Copy.ts pattern)
  *   - one body face, one container width ('page' | 'prose'), spacing-only transitions
@@ -124,6 +124,7 @@ export type {
 export {
   auditMarketingNarrativePlan,
   auditMarketingTasteAdmission,
+  MARKETING_ASSET_GENERATION_COLOR_CONTRACT,
   MARKETING_CREATIVE_ROLES,
   MARKETING_GENERATION_SPEC_VERSION,
   MARKETING_GENERATION_STAGES,
@@ -131,6 +132,7 @@ export {
   MARKETING_ROLE_REQUIREMENTS,
   MARKETING_STAGE_ATTEMPT_LIMITS,
   MARKETING_TASTE_GATE_IDS,
+  MARKETING_VISUAL_REVIEW_COLOR_CONTRACT,
   selectMarketingModelCandidate,
 } from './generation';
 export type {
@@ -177,6 +179,47 @@ export {
   STAGED_HOMEPAGE_SOURCE_FILES,
   START_GOLDEN_PATH_ROUTE,
 } from './homepageRedesign';
+export type {
+  JovieForbiddenControllableHue,
+  JovieHueCorridor,
+  JovieImageColorControl,
+  JovieImageColorDecision,
+  JovieImageColorFailureAction,
+  JovieImageColorFinding,
+  JovieImageColorPolicy,
+  JovieImageColorRequestedAction,
+  JovieImageColorSalience,
+  JovieImageProtectedColorClass,
+  JovieImageSceneColorRole,
+  JovieImageSkinMaterialEvaluation,
+  JovieImageSubjectSeparationEvaluation,
+  JovieOklchColorReference,
+  JovieOklchColorSample,
+  JovieScenePaletteReference,
+  JovieSubjectSeparationRequirement,
+  JovieUiColorAnchor,
+} from './imageColorPolicy';
+export {
+  auditJovieImageColorDecision,
+  formatJovieImageColorPolicyForPrompt,
+  isForbiddenControllableSceneColor,
+  isHueInCorridor,
+  JOVIE_IMAGE_COLOR_POLICY,
+  JOVIE_IMAGE_COLOR_POLICY_SCHEMA,
+  JOVIE_IMAGE_COLOR_POLICY_VERSION,
+  resolveJovieSceneColorRole,
+} from './imageColorPolicy';
+export type {
+  MarketingPageContract,
+  MarketingPageContractRouteGlob,
+} from './pageContracts';
+export {
+  getMarketingPageContractForPathname,
+  getMarketingPageContractForRouteGlob,
+  MARKETING_PAGE_CONTRACT_ROUTE_GLOBS,
+  MARKETING_PAGE_CONTRACTS,
+  normalizeMarketingPathname,
+} from './pageContracts';
 export type { MarketingPenContractId } from './penContracts';
 export {
   MARKETING_CONTAINER_PEN_CONTRACT_BY_WIDTH,
@@ -199,6 +242,11 @@ export {
   MARKETING_RECIPES,
 } from './recipes';
 export type {
+  MarketingExactPublicRouteTarget,
+  MarketingRouteCaptureState,
+  MarketingRouteCaptureViewport,
+  MarketingRouteDisposition,
+  MarketingRouteDispositionLedgerEntry,
   MarketingRouteHealthTarget,
   RouteManifestEntry,
   RouteRecipeParityReport,
@@ -211,6 +259,8 @@ export {
   getRouteRecipeParity,
   isExempt,
   isRecipeRoute,
+  MARKETING_EXACT_PUBLIC_ROUTE_TARGETS,
+  MARKETING_ROUTE_DISPOSITION_LEDGER,
   MARKETING_ROUTE_HEALTH_TARGETS,
   MARKETING_ROUTE_MANIFEST,
 } from './routeManifest';

@@ -87,4 +87,37 @@ describe('Logo', () => {
     expect(logo).toHaveAttribute('xmlns', 'http://www.w3.org/2000/svg');
     expect(logo).toHaveAttribute('xmlns:xlink', 'http://www.w3.org/1999/xlink');
   });
+
+  it('names the wordmark for assistive tech', () => {
+    render(<Logo />);
+    expect(screen.getByLabelText('Jovie logo')).toBeInTheDocument();
+  });
+
+  it('renders the icon variant as the brand mark', () => {
+    render(<Logo variant='icon' />);
+    expect(screen.getByLabelText('Jovie')).toBeInTheDocument();
+    expect(screen.queryByLabelText('Jovie logo')).not.toBeInTheDocument();
+  });
+
+  it('renders both mark and wordmark for the full variant', () => {
+    render(<Logo variant='full' />);
+    expect(screen.getByLabelText('Jovie')).toBeInTheDocument();
+    expect(screen.getByLabelText('Jovie logo')).toBeInTheDocument();
+  });
+
+  it('uses explicit dark and light alt wordmarks instead of inherited text color', () => {
+    render(<Logo variant='wordAlt' />);
+    const images = screen.getAllByAltText('Jovie logo');
+    expect(images).toHaveLength(2);
+    expect(images[0]).toHaveAttribute(
+      'src',
+      '/brand/Jovie-Logo-Wordmark-Alt-Black.svg'
+    );
+    expect(images[0]).toHaveClass('dark:hidden');
+    expect(images[1]).toHaveAttribute(
+      'src',
+      '/brand/Jovie-Logo-Wordmark-Alt-White.svg'
+    );
+    expect(images[1]).toHaveClass('hidden', 'dark:block');
+  });
 });

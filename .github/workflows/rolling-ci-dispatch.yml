@@ -34,6 +34,7 @@ jobs:
       source_head: ${{ steps.plan.outputs.source_head }}
       head_ref: ${{ steps.plan.outputs.head_ref }}
       fingerprint: ${{ steps.plan.outputs.fingerprint }}
+      hosted_plan_b64: ${{ steps.hosted-plan.outputs.plan_b64 }}
     steps:
       - name: Checkout trusted dispatch policy
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -44,7 +45,13 @@ jobs:
             scripts/lib/rolling-ci-dispatch.mjs
             scripts/lib/rolling-ci-handoff.mjs
             scripts/lib/rolling-ci-fx.mjs
+            scripts/lib/rolling-ci-hosted-writer.mjs
             scripts/lib/upsert-pr-comment.sh
+            .github/actions/evaluate-fleet-gate/action.yml
+            scripts/hermes/evaluate-fleet-gate.sh
+            scripts/hermes/fleet_admission_receipt.py
+            scripts/hermes/gem-priority-gate.py
+            scripts/hermes/closure_health.py
           sparse-checkout-cone-mode: false
 
       - name: Setup Node.js
@@ -200,6 +207,29 @@ jobs:
           set -euo pipefail
           bash scripts/lib/upsert-pr-comment.sh "$PR_NUMBER" "rolling-ci-dispatch" "$COMMENT_BODY"
 
+      - name: Build hosted writer plan
+        id: hosted-plan
+        if: steps.plan.outputs.launch_action == 'launch_local' && github.event.workflow_run.event == 'pull_request'
+        env:
+          HEAD_REF: ${{ steps.plan.outputs.head_ref }}
+          ROLLING_CI_PLAN: ${{ runner.temp }}/rolling-ci-plan.json
+        run: |
+          set -euo pipefail
+          TRUSTED_POLICY_OID=$(git rev-parse HEAD)
+          export TRUSTED_POLICY_OID
+          node --input-type=module <<'EOF' > "$RUNNER_TEMP/hosted-plan.json"
+          import { readFileSync } from 'node:fs';
+          import { buildHostedRepairPlan } from './scripts/lib/rolling-ci-hosted-writer.mjs';
+          const input = JSON.parse(readFileSync(process.env.ROLLING_CI_PLAN, 'utf8'));
+          const plan = buildHostedRepairPlan({
+            dispatch: input.dispatch,
+            headRefName: process.env.HEAD_REF,
+            trustedPolicyOid: process.env.TRUSTED_POLICY_OID,
+          });
+          process.stdout.write(JSON.stringify(plan));
+          EOF
+          echo "plan_b64=$(base64 -w0 < "$RUNNER_TEMP/hosted-plan.json" 2>/dev/null || base64 < "$RUNNER_TEMP/hosted-plan.json" | tr -d '\n')" >> "$GITHUB_OUTPUT"
+
       - name: Checkout exact source PR head
         if: steps.plan.outputs.launch_action == 'launch_local'
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -337,20 +367,62 @@ jobs:
           CI: 'true'
         run: pnpm ci:control:test
 
+      - name: Evaluate hosted writer gate
+        id: hosted-gate
+        if: steps.guard.outputs.changed == 'true' && github.event.workflow_run.event == 'pull_request'
+        uses: ./.github/actions/evaluate-fleet-gate
+        with:
+          dry-run: 'true'
+          github-token: ${{ github.token }}
+
       - name: Create immutable FX repair artifact
         id: artifact
         if: steps.guard.outputs.changed == 'true'
         working-directory: source
         env:
+          ARTIFACT_DIR: ${{ runner.temp }}/fx-remediation
           PR_NUMBER: ${{ steps.plan.outputs.pr_number }}
           SOURCE_HEAD: ${{ steps.plan.outputs.source_head }}
           FINGERPRINT: ${{ steps.plan.outputs.fingerprint }}
         run: |
           set -euo pipefail
-          artifact_dir="$RUNNER_TEMP/fx-remediation"
+          artifact_dir="$ARTIFACT_DIR"
           mkdir -p "$artifact_dir"
           git diff --cached --binary --full-index > "$artifact_dir/repair.patch"
           patch_sha=$(sha256sum "$artifact_dir/repair.patch" | cut -d' ' -f1)
+          node --input-type=module <<'EOF' > "$artifact_dir/changes.json"
+          import { execFileSync } from 'node:child_process';
+          import { createHash } from 'node:crypto';
+          import { copyFileSync, mkdirSync, readFileSync } from 'node:fs';
+          import { dirname, join } from 'node:path';
+          const root = process.env.ARTIFACT_DIR;
+          const paths = execFileSync('git', [
+            'diff',
+            '--cached',
+            '--name-only',
+            '--diff-filter=M',
+            '-z',
+          ])
+            .toString('utf8')
+            .split('\0')
+            .filter(Boolean)
+            .sort((left, right) => left.localeCompare(right));
+          if (paths.length === 0) throw new Error('hosted writer requires modified files');
+          const changes = paths.map(path => {
+            const bytes = readFileSync(path);
+            const target = join(root, 'files', path);
+            mkdirSync(dirname(target), { recursive: true });
+            copyFileSync(path, target);
+            return {
+              path,
+              status: 'M',
+              symlink: false,
+              bytes: bytes.length,
+              sha256: createHash('sha256').update(bytes).digest('hex'),
+            };
+          });
+          process.stdout.write(`${JSON.stringify(changes, null, 2)}\n`);
+          EOF
           jq -n \
             --argjson pr "$PR_NUMBER" \
             --arg sourceHead "$SOURCE_HEAD" \
@@ -358,6 +430,24 @@ jobs:
             --arg patchSha256 "$patch_sha" \
             '{schema:"jovie-fx-repair-artifact/v1",pr:$pr,sourceHead:$sourceHead,fingerprint:$fingerprint,patchSha256:$patchSha256}' \
             > "$artifact_dir/receipt.json"
+          chmod -R go-rwx "$artifact_dir"
+
+      - name: Accept hosted writer artifact without credentials
+        if: steps.artifact.outcome == 'success' && github.event.workflow_run.event == 'pull_request'
+        env:
+          HOSTED_GATE_B64: ${{ steps.hosted-gate.outputs.receipt_b64 }}
+          HOSTED_PLAN_B64: ${{ steps.hosted-plan.outputs.plan_b64 }}
+          FX_VERSION: v0.0.7
+          FX_SHA256: c5787ea041d3b5521ec675f1ada78f30cf1b11021ffcac48b4969cf5beb65c45
+        run: |
+          set -euo pipefail
+          executor=$(jq -nc --arg sha "$FX_SHA256" --arg version "$FX_VERSION" \
+            '{kind:"cursor-cli", installerSha256:$sha, version:$version}' | base64 -w0)
+          HOSTED_EXECUTOR_B64="$executor" \
+            node scripts/lib/rolling-ci-hosted-writer.mjs hosted-acceptance \
+              --artifact "$RUNNER_TEMP/fx-remediation" \
+              --repository source \
+              --writer-root "$RUNNER_TEMP/fx-remediation/writer"
 
       - name: Upload immutable FX repair artifact
         id: upload
@@ -469,8 +559,56 @@ jobs:
           permission-contents: write
           permission-pull-requests: read
 
-      - name: Push guarded FX repair
+      - name: Checkout trusted writer policy
+        if: needs.dispatch.outputs.hosted_plan_b64 != ''
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
+          path: trusted
+          sparse-checkout: |
+            scripts/lib/rolling-ci-hosted-writer.mjs
+            scripts/hermes/evaluate-fleet-gate.sh
+            scripts/hermes/fleet_admission_receipt.py
+            scripts/hermes/gem-priority-gate.py
+            scripts/hermes/closure_health.py
+          sparse-checkout-cone-mode: false
+
+      - name: Evaluate fresh writer gate
+        id: fresh-gate
+        if: needs.dispatch.outputs.hosted_plan_b64 != ''
+        working-directory: trusted
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GEM_PRIORITY_GATE_REPO: ${{ github.repository }}
+          FLEET_GATE_DRY_RUN: '1'
+        run: bash scripts/hermes/evaluate-fleet-gate.sh
+
+      - name: Commit hosted repair through trusted writer
         id: push
+        if: needs.dispatch.outputs.hosted_plan_b64 != ''
+        working-directory: trusted
+        env:
+          GH_TOKEN: ${{ steps.app-token.outputs.token }}
+          STATUS_TOKEN: ${{ github.token }}
+          HOSTED_GATE_B64: ${{ steps.fresh-gate.outputs.receipt_b64 }}
+          HOSTED_PLAN_B64: ${{ needs.dispatch.outputs.hosted_plan_b64 }}
+        run: |
+          set -euo pipefail
+          artifact_dir="$RUNNER_TEMP/fx-remediation"
+          find "$artifact_dir" -type d -exec chmod 700 {} +
+          find "$artifact_dir" -type f -exec chmod 600 {} +
+          node scripts/lib/rolling-ci-hosted-writer.mjs hosted-commit \
+            --artifact "$artifact_dir" \
+            --writer-root "$artifact_dir/writer" \
+            --output "$RUNNER_TEMP/hosted-terminal.json"
+          outcome=$(jq -r '.outcome' "$RUNNER_TEMP/hosted-terminal.json")
+          echo "::notice::FX outcome=$outcome"
+          echo "FX outcome: \`$outcome\`" >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Push guarded FX repair
+        id: push-fallback
+        if: needs.dispatch.outputs.hosted_plan_b64 == ''
         env:
           GH_TOKEN: ${{ steps.app-token.outputs.token }}
           REPOSITORY: ${{ github.repository }}

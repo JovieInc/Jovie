@@ -190,7 +190,9 @@ export function getEnvironmentInfo() {
     hasStripe: !!(
       env.STRIPE_SECRET_KEY && publicEnv.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY
     ),
-    hasVercelBlob: !!env.BLOB_READ_WRITE_TOKEN,
+    hasVercelBlob: !!(
+      env.BLOB_READ_WRITE_TOKEN?.trim() || env.BLOB_STORE_ID?.trim()
+    ),
   };
 }
 

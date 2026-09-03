@@ -1,4 +1,5 @@
 import type { Meta, StoryObj } from '@storybook/nextjs-vite';
+import { expect, within } from 'storybook/test';
 import { DrawerInspectorGrid } from './DrawerInspectorGrid';
 import { DrawerPropertyRow } from './DrawerPropertyRow';
 
@@ -25,7 +26,15 @@ const meta = {
 export default meta;
 type Story = StoryObj<typeof meta>;
 
-export const Default: Story = {};
+export const Default: Story = {
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+    await expect(canvas.getByTestId('inspector-grid')).toHaveTextContent(
+      'Ready'
+    );
+    await expect(canvas.queryByRole('button')).not.toBeInTheDocument();
+  },
+};
 
 export const WiderLabels: Story = {
   args: {

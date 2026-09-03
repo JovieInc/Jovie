@@ -35,6 +35,8 @@ describe('delivery state machine', () => {
       ['missing-owner-lease', 'reconcile-exact-head-lease'],
       ['dropped-controller-event', 'restore-event-trigger-and-reconcile'],
       ['draft-stack-policy', 'split-or-retarget-draft-stack'],
+      ['fleet-observation-gap', 'restore-fleet-observation'],
+      ['base-not-main', 'retarget-pr-base-to-main'],
     ]) {
       const receipt = buildDeliveryReceipt({ delivery_key: failure, failure });
       assert.equal(receipt.schema, DELIVERY_RECEIPT_SCHEMA);
@@ -381,6 +383,95 @@ describe('delivery state machine', () => {
     } finally {
       await rm(directory, { recursive: true, force: true });
     }
+  });
+
+  it('accepts a fail-closed fleet gate receipt with no stack repair work', async () => {
+    const directory = await mkdtemp(
+      join(tmpdir(), 'jovie-empty-stack-actions-')
+    );
+    try {
+      const result = await persistClosureHealthActions(
+        {
+          schema: 'jovie-fleet-gate/v1',
+          signals: {
+            closureHealth: {
+              schema: 'jovie-closure-health/v1',
+              status: 'red',
+              authority: 'Summer',
+              observedAt: '2026-09-01T01:23:29.000Z',
+              newIssueIntakeAllowed: false,
+              promotionContinues: true,
+              remediationContinues: true,
+              blockedActivities: [
+                'new-issue-lease',
+                'new-implementation',
+                'fallback-pr-generation',
+              ],
+              reasons: ['gate-evaluation-failed'],
+              stackHealth: {
+                maxDepth: 4,
+                roots: [],
+                violations: [],
+                repairActions: [],
+              },
+              repairActions: [],
+            },
+          },
+        },
+        { stateDir: directory }
+      );
+
+      assert.equal(result.actionCount, 0);
+      assert.equal(result.evidenceCount, 0);
+      assert.equal(result.status, 'none');
+    } finally {
+      await rm(directory, { recursive: true, force: true });
+    }
+  });
+
+  it('keeps legacy closure health without repair actions bounded and unobserved', async () => {
+    const fallback = await persistClosureHealthActions(
+      {
+        schema: 'jovie-fleet-gate/v1',
+        signals: {
+          closureHealth: {
+            schema: 'jovie-closure-health/v1',
+            authority: 'Summer',
+            status: 'red',
+            observedAt: '2026-09-01T02:20:00.000Z',
+            newIssueIntakeAllowed: false,
+            promotionContinues: true,
+            remediationContinues: true,
+            reasons: ['gate-evaluation-failed'],
+          },
+        },
+      },
+      { dryRun: true }
+    );
+    assert.equal(fallback.actionCount, 0);
+    assert.equal(fallback.evidenceCount, 0);
+    assert.equal(fallback.resolution.status, 'unobserved');
+
+    const activeViolation = await persistClosureHealthActions(
+      {
+        schema: 'jovie-closure-health/v1',
+        authority: 'Summer',
+        status: 'red',
+        observedAt: '2026-09-01T02:25:00.000Z',
+        newIssueIntakeAllowed: false,
+        promotionContinues: true,
+        remediationContinues: true,
+        reasons: ['draft-stack-policy-violation'],
+        stackHealth: {
+          violations: [{ rootPr: 16514 }],
+        },
+      },
+      { dryRun: true }
+    );
+    assert.equal(activeViolation.actionCount, 0);
+    assert.equal(activeViolation.evidenceCount, 1);
+    assert.equal(activeViolation.evidence[0].rootPr, 16514);
+    assert.equal(activeViolation.evidence[0].loop.mode, 'collect-evidence');
   });
 
   it('writes handed-off repair work as one exact-head Gem-to-FX task', async () => {

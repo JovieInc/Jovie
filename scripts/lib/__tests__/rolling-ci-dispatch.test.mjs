@@ -6,6 +6,7 @@ import {
   bindDispatchLiveHead,
   emptyRollingCiState,
   failureFingerprint,
+  MAX_REPAIR_DELIVERIES,
   normalizeFailureEvents,
   parseMergeQueueFrontBranch,
   parseRollingCiState,
@@ -391,16 +392,12 @@ describe('rolling CI failure dispatch', () => {
 
   it('deliberate red: bounds repeated repair deliveries', () => {
     let state = emptyRollingCiState(head);
-    for (let attempt = 1; attempt <= 3; attempt += 1) {
-      const next = plan(
-        event({ workflowRunId: 9000 + attempt, workflowRunAttempt: attempt }),
-        { priorState: state }
-      );
-      expect(next.mutate).toBe(true);
-      state = next.state;
-    }
+    expect(MAX_REPAIR_DELIVERIES).toBe(1);
+    const first = plan(event(), { priorState: state });
+    expect(first.mutate).toBe(true);
+    state = first.state;
     expect(
-      plan(event({ workflowRunId: 9010, workflowRunAttempt: 4 }), {
+      plan(event({ workflowRunId: 9010, workflowRunAttempt: 2 }), {
         priorState: state,
       })
     ).toMatchObject({
@@ -408,6 +405,102 @@ describe('rolling CI failure dispatch', () => {
       mutate: false,
       incident: { type: 'non_progressing_policy_cycle' },
     });
+  });
+
+  it('preserves an actionable failure when a later fingerprint is exhausted', () => {
+    const exhausted = runDispatch(
+      dispatchInput({
+        failedJobs: [{ name: 'z-exhausted', steps: ['Retry'] }],
+        checks: [
+          {
+            name: 'z-exhausted',
+            conclusion: 'failure',
+            headSha: head,
+            checkSuiteId: 44,
+          },
+        ],
+      })
+    );
+    const actionableFingerprint = failureFingerprint({
+      check: 'a-actionable',
+      failedSteps: ['Typecheck'],
+    });
+    const next = runDispatch(
+      dispatchInput({
+        workflowRunId: 9010,
+        workflowRunAttempt: 2,
+        failedJobs: [
+          { name: 'a-actionable', steps: ['Typecheck'] },
+          { name: 'z-exhausted', steps: ['Retry'] },
+        ],
+        checks: [
+          {
+            name: 'a-actionable',
+            conclusion: 'failure',
+            headSha: head,
+            checkSuiteId: 44,
+          },
+          {
+            name: 'z-exhausted',
+            conclusion: 'failure',
+            headSha: head,
+            checkSuiteId: 44,
+          },
+        ],
+        priorCommentBody: exhausted.body,
+      })
+    );
+
+    expect(next).toMatchObject({
+      action: 'dispatch_implementer',
+      mutate: true,
+      state: { claim: { fingerprint: actionableFingerprint } },
+    });
+    expect(next.body).toContain(
+      `- Failure fingerprint: \`${actionableFingerprint}\``
+    );
+  });
+
+  it('admits one failure per lease without consuming siblings', () => {
+    const firstFingerprint = failureFingerprint({
+      check: 'a-first',
+      failedSteps: ['Typecheck'],
+    });
+    const secondFingerprint = failureFingerprint({
+      check: 'b-second',
+      failedSteps: ['Unit tests'],
+    });
+    const next = runDispatch(
+      dispatchInput({
+        failedJobs: [
+          { name: 'a-first', steps: ['Typecheck'] },
+          { name: 'b-second', steps: ['Unit tests'] },
+        ],
+        checks: [
+          {
+            name: 'a-first',
+            conclusion: 'failure',
+            headSha: head,
+            checkSuiteId: 44,
+          },
+          {
+            name: 'b-second',
+            conclusion: 'failure',
+            headSha: head,
+            checkSuiteId: 44,
+          },
+        ],
+      })
+    );
+
+    expect(next).toMatchObject({
+      action: 'dispatch_implementer',
+      mutate: true,
+      state: { claim: { fingerprint: firstFingerprint } },
+    });
+    expect(next.state.failures[firstFingerprint]?.deliveryCount).toBe(1);
+    expect(next.state.failures[secondFingerprint]).toBeUndefined();
+    expect(next.state.deliveries).toHaveLength(1);
   });
 
   it('successful current-head rerun supersedes active repairs', () => {

@@ -52,9 +52,11 @@ describe('JOV-5465 duration/ease/shadow/blur retire', () => {
     expect(source).not.toContain('--linear-shadow-button');
   });
 
-  it('keeps ConsentBanner on the canonical card shadow', () => {
+  it('keeps ConsentBanner on canonical spacing and card shadow tokens', () => {
     const source = readSource('components/features/tracking/ConsentBanner.tsx');
+    expect(source).toContain("gap: 'var(--space-2)'");
     expect(source).toContain('var(--shadow-card)');
+    expect(source).not.toMatch(/--linear-(?:space|gap|container)-/);
     expect(source).not.toContain('--linear-shadow-card');
   });
 });
