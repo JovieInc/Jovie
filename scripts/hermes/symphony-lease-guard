@@ -39,8 +39,8 @@ from datetime import datetime, timezone
 SCHEMA = "symphony-lease-guard/v1"
 REPORT_SCHEMA = "symphony-lease-guard-report/v1"
 DEFAULT_STATE_DIR = "~/.local/state/symphony-lease-guard"
-DEFAULT_WORKFLOW = "~/symphony-runtime/elixir/WORKFLOW.jovie-ui-pilot.md"
-FALLBACK_ACTIVE_STATES = ("Todo", "In Progress")
+DEFAULT_WORKFLOW = "~/.config/symphony/WORKFLOW.md"
+FALLBACK_ACTIVE_STATES = ("Todo", "In Progress", "Rework", "Merging")
 LINEAR_API = "https://api.linear.app/graphql"
 LINEAR_ENV_PATH = "~/.config/symphony/linear.env"
 CONTROL_TIMEOUT_SECONDS = 10.0

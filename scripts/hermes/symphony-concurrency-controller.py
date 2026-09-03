@@ -372,7 +372,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument(
         "--workflow",
         type=pathlib.Path,
-        default=home / "symphony-runtime/elixir/WORKFLOW.jovie-ui-pilot.md",
+        default=home / ".config/symphony/WORKFLOW.md",
     )
     parser.add_argument(
         "--state",

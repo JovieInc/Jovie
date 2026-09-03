@@ -16,8 +16,13 @@ class OpenAISymphonyInstallTests(unittest.TestCase):
     def test_official_workflow_and_elixir_installer(self) -> None:
         self.assertFalse((ROOT / "WORKFLOW.md").exists())
         workflow = (ROOT / "scripts/hermes/symphony/WORKFLOW.md").read_text()
-        self.assertIn('project_slug: "symphony-ui-pilot-96d6b9c5b2d5"', workflow)
+        self.assertIn('team_key: "JOV"', workflow)
         self.assertIn("api_key: $LINEAR_API_KEY", workflow)
+        self.assertNotIn("project_slug", workflow)
+        self.assertNotIn("required_labels:", workflow)
+        self.assertIn("excluded_labels:", workflow)
+        self.assertIn("    - no-symphony", workflow)
+        self.assertIn("    - needs-human", workflow)
         self.assertIn(
             "git clone --depth 1 https://github.com/JovieInc/Jovie.git .", workflow
         )
@@ -29,16 +34,18 @@ class OpenAISymphonyInstallTests(unittest.TestCase):
         self.assertIn("interval_ms: 30000", workflow)
         self.assertIn("max_concurrent_agents: 8", workflow)
         self.assertIn("port: 4041", workflow)
-        self.assertNotIn("- Rework", workflow)
+        self.assertIn("- Rework", workflow)
+        self.assertIn("- Merging", workflow)
 
         installer = (ROOT / "scripts/install-openai-symphony.sh").read_text()
-        self.assertIn('SYMPHONY_VERSION="v0.0.2"', installer)
-        self.assertIn("github.com/openai/symphony/releases/download", installer)
+        self.assertIn('SYMPHONY_VERSION="v0.0.2-jovie.2"', installer)
+        self.assertIn("github.com/JovieInc/symphony/releases/download", installer)
         self.assertIn("macos_arm64", installer)
         self.assertIn("shasum -a 256 -c", installer)
         self.assertIn('"$SYMPHONY_INSTALL_DIR/symphony"', installer)
         updater = (ROOT / "scripts/hermes/update-symphony-burrito.sh").read_text()
-        self.assertIn('SYMPHONY_VERSION="${SYMPHONY_VERSION:-v0.0.2}"', updater)
+        self.assertIn('SYMPHONY_VERSION="${SYMPHONY_VERSION:-v0.0.2-jovie.2}"', updater)
+        self.assertIn("github.com/JovieInc/symphony/releases/download", updater)
         self.assertIn("symphony-elixir.service", updater)
         self.assertIn('SUM_NAME="${BIN_NAME}.sha256"', updater)
 
