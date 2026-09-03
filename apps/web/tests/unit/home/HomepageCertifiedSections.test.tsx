@@ -124,12 +124,11 @@ describe('HomepageCertifiedSections', () => {
       HOMEPAGE_CERTIFIED_FIGURES.ledgers.smarter?.length ?? -1
     );
 
-    for (const id of ['built']) {
-      expect(screen.getByTestId(`homepage-section-${id}`)).toHaveAttribute(
-        'data-voice',
-        'display'
-      );
-    }
+    const built = screen.getByTestId('homepage-section-built');
+    expect(built).toHaveAttribute('data-voice', 'quiet');
+    expect(
+      built.querySelector('.homepage-certified-section__figure')
+    ).toBeNull();
 
     // Figures never add headings, links, buttons, or images.
     expect(screen.getAllByRole('heading', { level: 2 })).toHaveLength(
