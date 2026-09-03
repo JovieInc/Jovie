@@ -26,8 +26,16 @@ export function SidebarBottomNowPlayingBridge() {
     toggleTrack({
       id: playbackState.activeTrackId,
       title: playbackState.trackTitle,
+      ...(playbackState.sourceKind
+        ? { sourceKind: playbackState.sourceKind }
+        : {}),
     }).catch(() => {});
-  }, [playbackState.activeTrackId, playbackState.trackTitle, toggleTrack]);
+  }, [
+    playbackState.activeTrackId,
+    playbackState.sourceKind,
+    playbackState.trackTitle,
+    toggleTrack,
+  ]);
 
   const hasActiveTrack = Boolean(
     playbackState.activeTrackId && playbackState.trackTitle
