@@ -348,7 +348,7 @@ export interface UserEntitlements {
   analyticsRetentionDays: number | null; // null = unlimited (Max tier)
   contactsLimit: number | null; // null = unlimited
   smartLinksLimit: number | null; // null = unlimited, 25 for free tier
-  aiDailyMessageLimit: number;
+  aiWeeklyMessageLimit: number;
   aiPitchGenPerRelease: number | null;
   aiRetouchDailyLimit: number | null;
   /** Max files per chat upload batch. Null = unlimited. */

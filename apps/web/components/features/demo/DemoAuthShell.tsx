@@ -78,11 +78,11 @@ function createDemoQueryClient(
   });
   client.setQueryData<ChatUsageData>(queryKeys.chat.usage(), {
     plan: 'max',
-    dailyLimit: 1000,
+    weeklyLimit: 250,
     used: 128,
-    remaining: 872,
+    remaining: 122,
     isExhausted: false,
-    warningThreshold: 5,
+    warningThreshold: 50,
     isNearLimit: false,
   });
   seedQueryClient?.(client, dashboardData);

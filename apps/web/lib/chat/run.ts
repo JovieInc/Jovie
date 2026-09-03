@@ -315,7 +315,7 @@ export async function executeChatTurn(
       buildPinnedOpportunityBlock(pinnedOpportunity);
     systemPrompt = buildSystemPrompt(artistContext, releases, {
       aiCanUseTools: planLimits.booleans.aiCanUseTools,
-      aiDailyMessageLimit: planLimits.limits.aiDailyMessageLimit,
+      aiWeeklyMessageLimit: planLimits.limits.aiWeeklyMessageLimit,
       insightsEnabled,
       knowledgeContext: selectKnowledgeContextForTurn(uiMessages) || undefined,
       accountContext,

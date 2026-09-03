@@ -2688,8 +2688,8 @@ function assertPromptContextFreePlanLimitations(output) {
   if (!payload.hasPlanLimitationsSection) {
     return fail('free prompt did not include plan limitations');
   }
-  if (!/Free plan with 10 messages per day/i.test(systemPrompt)) {
-    return fail('free prompt did not include the free daily limit');
+  if (!/Free plan with 15 messages per week/i.test(systemPrompt)) {
+    return fail('free prompt did not include the free weekly limit');
   }
   for (const toolName of [
     'proposeAvatarUpload',
