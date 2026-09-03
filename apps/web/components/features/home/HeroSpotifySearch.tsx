@@ -398,7 +398,9 @@ export function HeroSpotifySearch({
             aria-expanded={shouldShowDropdown}
             aria-controls={resultsId}
             aria-activedescendant={
-              activeIndex >= 0 ? `hero-result-${activeIndex}` : undefined
+              activeIndex >= 0
+                ? `${resultsId}-result-${activeIndex}`
+                : undefined
             }
           />
           {showClaimButton ? (
@@ -445,7 +447,7 @@ export function HeroSpotifySearch({
               {results.map((artist, index) => (
                 <option
                   key={artist.id}
-                  id={`hero-result-${index}`}
+                  id={`${resultsId}-result-${index}`}
                   value={artist.id}
                 >
                   {artist.name}
@@ -454,7 +456,10 @@ export function HeroSpotifySearch({
                     : ''}
                 </option>
               ))}
-              <option id={`hero-result-${pasteUrlIndex}`} value='__paste__'>
+              <option
+                id={`${resultsId}-result-${pasteUrlIndex}`}
+                value='__paste__'
+              >
                 Paste a Spotify URL instead
               </option>
             </select>
