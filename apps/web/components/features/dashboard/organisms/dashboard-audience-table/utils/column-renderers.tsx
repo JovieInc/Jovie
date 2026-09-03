@@ -1,6 +1,5 @@
 'use client';
 
-import type { CellContext } from '@tanstack/react-table';
 import { Bell, Eye } from 'lucide-react';
 import { TableActionMenu } from '@/components/atoms/table-action-menu';
 import {
@@ -23,6 +22,7 @@ import {
   AudienceVisitsCell,
   convertContextMenuItems,
 } from '@/components/organisms/table';
+import type { CellContext } from '@/lib/tanstack-v8-compat';
 import { cn } from '@/lib/utils';
 import { formatTimeAgo } from '@/lib/utils/audience';
 import type { AudienceMember, AudienceMemberType } from '@/types';
