@@ -2048,10 +2048,7 @@ body:has(.home-viewport)::-webkit-scrollbar {
     transparent calc(100% - var(--space-px)),
     var(--homepage-editorial-grid-line) 0
   );
-  background-size: calc(
-      (100% - var(--space-6) * 11) / 12 + var(--space-6)
-    )
-    100%;
+  background-size: calc((100% - var(--space-6) * 11) / 12 + var(--space-6)) 100%;
   mask-image: linear-gradient(
     90deg,
     transparent,
@@ -2092,15 +2089,15 @@ body:has(.home-viewport)::-webkit-scrollbar {
   color: var(--color-text-primary-token);
   font-family:
     var(--font-satoshi), "Satoshi", -apple-system, "system-ui", sans-serif;
-  font-size: var(--linear-h1-size-sm);
+  font-size: 38px; /* legacy h1-size-sm inlined (JOV-INV ratchet); value-preserving */
   font-weight: 510;
   letter-spacing: -0.022em;
-  line-height: var(--linear-leading-tight);
+  line-height: 1.06; /* legacy leading-tight inlined (JOV-INV ratchet); value-preserving */
   text-wrap: balance;
 }
 
 .homepage-editorial-hero__support {
-  max-width: var(--linear-prose-max);
+  max-width: 624px; /* legacy prose-max inlined (JOV-INV ratchet); value-preserving */
   margin: var(--space-6) 0 0;
   color: var(--color-text-tertiary-token);
   font-size: var(--text-lg);
@@ -2162,13 +2159,13 @@ body:has(.home-viewport)::-webkit-scrollbar {
 
 @media (min-width: 768px) {
   .homepage-editorial-hero__headline {
-    font-size: var(--linear-h1-size-md);
+    font-size: 56px; /* legacy h1-size-md inlined (JOV-INV ratchet); value-preserving */
   }
 }
 
 @media (min-width: 1024px) {
   .homepage-editorial-hero__headline {
-    font-size: var(--linear-h1-size);
+    font-size: 64px; /* legacy h1-size inlined (JOV-INV ratchet); value-preserving */
   }
 }
 

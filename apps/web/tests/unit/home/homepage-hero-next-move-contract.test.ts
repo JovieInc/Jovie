@@ -46,9 +46,12 @@ describe('homepage hero contract (JOV-5864)', () => {
   it('keeps the Quiet H1 ramp and balanced support copy', () => {
     const css = readHeroCss();
 
-    expect(css).toContain('font-size: var(--linear-h1-size-sm);');
-    expect(css).toContain('font-size: var(--linear-h1-size-md);');
-    expect(css).toContain('font-size: var(--linear-h1-size);');
+    // Values inlined from the retired legacy h1-size/leading tokens
+    // (value-preserving; the --linear-* ratchet is shrink-only).
+    expect(css).toContain('font-size: 38px;');
+    expect(css).toContain('font-size: 56px;');
+    expect(css).toContain('font-size: 64px;');
+    expect(css).toContain('line-height: 1.06;');
     expect(css).toContain('font-weight: 510;');
     expect(css).toContain('letter-spacing: -0.022em;');
     expect(css).toContain('text-wrap: balance;');

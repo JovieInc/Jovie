@@ -147,9 +147,9 @@ test.describe('Homepage', () => {
     const backdrop = page.getByTestId('homepage-editorial-hero-backdrop');
 
     await expect(backdrop).toHaveAttribute('aria-hidden', 'true');
-    await expect(backdrop.locator('.homepage-editorial-hero__stage')).toHaveCount(
-      1
-    );
+    await expect(
+      backdrop.locator('.homepage-editorial-hero__stage')
+    ).toHaveCount(1);
     await expect(backdrop.locator('img')).toHaveCount(0);
 
     const heading = page.getByRole('heading', {
