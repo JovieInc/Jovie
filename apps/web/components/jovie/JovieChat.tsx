@@ -1,5 +1,9 @@
 'use client';
 
+// The chat transcript window policy (CHAT_TRANSCRIPT_WINDOW) is certified by the
+// JovieChat.styling.test.tsx component render suite.
+// @coverage-via apps/web/tests/unit/chat/JovieChat.styling.test.tsx
+
 import { useVirtualizer } from '@tanstack/react-virtual';
 import { useSearchParams } from 'next/navigation';
 import {
