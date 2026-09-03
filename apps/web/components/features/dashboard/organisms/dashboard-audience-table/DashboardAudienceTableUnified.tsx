@@ -2,7 +2,6 @@
 
 import { Button, CommonDropdown, type CommonDropdownItem } from '@jovie/ui';
 import { useQueryClient } from '@tanstack/react-query';
-import { type OnChangeFn, type SortingState } from '@tanstack/react-table';
 import { Copy, Download, ExternalLink, Users } from 'lucide-react';
 import * as React from 'react';
 import { memo, useMemo } from 'react';
@@ -34,6 +33,7 @@ import { AudienceMemberSidebar } from '@/features/dashboard/organisms/audience-m
 import { useRegisterRightPanel } from '@/hooks/useRegisterRightPanel';
 import { captureError } from '@/lib/error-tracking';
 import { queryKeys } from '@/lib/queries';
+import type { OnChangeFn, SortingState } from '@/lib/tanstack-v8-compat';
 import { cn } from '@/lib/utils';
 import { downloadBlob } from '@/lib/utils/download';
 import {
