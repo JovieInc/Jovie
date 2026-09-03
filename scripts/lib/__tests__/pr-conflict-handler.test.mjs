@@ -1,10 +1,128 @@
+import { spawnSync } from 'node:child_process';
+import {
+  mkdirSync,
+  mkdtempSync,
+  readFileSync,
+  rmSync,
+  writeFileSync,
+} from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join, resolve } from 'node:path';
 import { describe, expect, it } from 'vitest';
 import {
+  bindOpenPrsToLiveBaseRefs,
+  buildConflictCohortLiveHeadQuery,
+  buildConflictFxCohortMarker,
+  buildConflictFxPrompt,
+  buildConflictFxStatusDescription,
+  buildLiveBaseRefQuery,
   buildPlan,
+  buildSteeringExceptionReceipt,
+  CONFLICT_CLOSED_LOOP_INVARIANT_ID,
+  CONFLICT_FX_CLAIM_TTL_MS,
+  CONFLICT_FX_COHORT_SCHEMA,
+  CONFLICT_FX_MAX_ATTEMPTS,
+  CONFLICT_FX_MODEL,
+  CONFLICT_FX_RECEIPT_SCHEMA,
+  CONFLICT_FX_STATUS_CONTEXT,
+  CONFLICT_STEERING_EXCEPTION_SCHEMA,
   classifyPr,
+  computeAdaptiveConcurrency,
+  computeConflictCohortReadBudget,
+  indexLatestConflictCohortCiRuns,
   orderPrsDependencyAware,
+  parseConflictFxCohortComments,
+  parseConflictFxReceipt,
+  reconcileConflictCohortLiveHeads,
+  requireSuccessfulMutationResults,
   summarizeChecks,
 } from '../pr-conflict-handler.mjs';
+
+const HEAD = 'a'.repeat(40);
+const BASE = 'b'.repeat(40);
+const OTHER_BASE_WITH_SAME_PREFIX = `${BASE.slice(0, 12)}${'c'.repeat(28)}`;
+const TRUSTED_APP_LOGIN = 'jovie-bot[bot]';
+const NOW = Date.parse('2026-08-30T18:00:00Z');
+const LIVE_BASE = 'd'.repeat(40);
+const WORKFLOW = readFileSync(
+  resolve(
+    import.meta.dirname,
+    '..',
+    '..',
+    '..',
+    '.github/workflows/pr-conflict-handler.yml'
+  ),
+  'utf8'
+);
+
+function workflowStep(name) {
+  const marker = `      - name: ${name}\n`;
+  const start = WORKFLOW.indexOf(marker);
+  expect(start).toBeGreaterThan(-1);
+  const remainder = WORKFLOW.slice(start + marker.length);
+  return `${marker}${remainder.split('\n      - name:', 1)[0]}`;
+}
+
+function workflowRunBodies() {
+  const bodies = [];
+  const lines = WORKFLOW.split('\n');
+  for (let index = 0; index < lines.length; index += 1) {
+    if (!/^ {8}run: \|$/u.test(lines[index])) continue;
+    const body = [];
+    for (index += 1; index < lines.length; index += 1) {
+      if (lines[index] !== '' && !lines[index].startsWith('          ')) {
+        index -= 1;
+        break;
+      }
+      body.push(lines[index]);
+    }
+    bodies.push(body.join('\n'));
+  }
+  return bodies;
+}
+
+function workflowRunScript(name) {
+  const step = workflowStep(name);
+  const marker = '        run: |\n';
+  const start = step.indexOf(marker);
+  expect(start).toBeGreaterThan(-1);
+  return step
+    .slice(start + marker.length)
+    .split('\n')
+    .map(line => (line.startsWith('          ') ? line.slice(10) : line))
+    .join('\n')
+    .trimEnd();
+}
+
+function runGit(cwd, args) {
+  const result = spawnSync('git', args, { cwd, encoding: 'utf8' });
+  expect(result.status, result.stderr).toBe(0);
+  return result.stdout.trim();
+}
+
+function workflowRejectsConflictPaths(paths) {
+  const prepare = workflowStep(
+    'Prepare exact conflict manifest without credentials'
+  );
+  const match = /elif jq -e '([\s\S]*?)'\s+<<<"\$conflict_files"/u.exec(
+    prepare
+  );
+  expect(match).not.toBeNull();
+  const result = spawnSync('jq', ['-e', match[1]], {
+    input: JSON.stringify(paths),
+    encoding: 'utf8',
+  });
+  expect([0, 1]).toContain(result.status);
+  return result.status === 0;
+}
+
+function rawPathBytesAreValidUtf8(input) {
+  const result = spawnSync('iconv', ['-f', 'UTF-8', '-t', 'UTF-8'], {
+    input,
+  });
+  expect([0, 1]).toContain(result.status);
+  return result.status === 0;
+}
 
 function pr(overrides) {
   return {
@@ -12,7 +130,9 @@ function pr(overrides) {
     title: 'Example PR',
     createdAt: '2026-06-01T00:00:00Z',
     baseRefName: 'main',
+    baseRefOid: BASE,
     headRefName: 'tim/example',
+    headRefOid: HEAD,
     headRepositoryOwner: { login: 'JovieInc' },
     isCrossRepository: false,
     isDraft: false,
@@ -26,6 +146,154 @@ function pr(overrides) {
     ...overrides,
   };
 }
+
+/**
+ * @param {{
+ *   baseOid?: string,
+ *   baseRefName?: string,
+ *   cap?: number,
+ *   attempt?: number,
+ *   maxAttempts?: number,
+ *   outcome?: string,
+ *   cohortId?: string,
+ *   createdAt?: string,
+ *   creator?: {login: string, type: string},
+ *   typename?: string,
+ *   targetUrl?: string,
+ * }} [options]
+ */
+function conflictStatus({
+  baseOid = BASE,
+  baseRefName = 'main',
+  cap = 2,
+  attempt = 1,
+  maxAttempts = CONFLICT_FX_MAX_ATTEMPTS,
+  outcome = 'pending',
+  cohortId = 'cohort-2-a',
+  createdAt = '2026-08-30T17:55:00Z',
+  creator = { login: TRUSTED_APP_LOGIN, type: 'Bot' },
+  typename = 'StatusContext',
+  targetUrl,
+} = {}) {
+  return {
+    __typename: typename,
+    context: CONFLICT_FX_STATUS_CONTEXT,
+    state:
+      outcome === 'pending'
+        ? 'PENDING'
+        : outcome === 'success'
+          ? 'SUCCESS'
+          : 'FAILURE',
+    description: buildConflictFxStatusDescription({
+      cohortId,
+      cap,
+      attempt,
+      maxAttempts,
+      outcome,
+      baseOid,
+    }),
+    targetUrl:
+      targetUrl ??
+      `https://github.com/JovieInc/Jovie/actions/runs/123456789?base_ref=${encodeURIComponent(baseRefName)}`,
+    createdAt,
+    creator,
+  };
+}
+
+function cohort(overrides = {}) {
+  return {
+    id: 'cohort-10-a',
+    cap: 10,
+    attempted: 10,
+    successes: 10,
+    failures: 0,
+    pending: 0,
+    staleHeadSkips: 0,
+    staleHeadSkipRate: 0,
+    p95CiLatencyMs: 300_000,
+    baselineP95CiLatencyMs: 300_000,
+    runnerCapacity: 120,
+    activeCi: 0,
+    queuedCi: 0,
+    backlog: 80,
+    clean: true,
+    createdAt: '2026-08-30T17:00:00Z',
+    runUrl: 'https://github.com/JovieInc/Jovie/actions/runs/123456789',
+    ...overrides,
+  };
+}
+
+describe('live base-ref binding', () => {
+  it('deduplicates base refs and replaces stale PR snapshot OIDs with live tips', () => {
+    const prs = [
+      pr({ number: 41, baseRefOid: BASE }),
+      pr({
+        number: 42,
+        baseRefName: 'release/next',
+        baseRefOid: OTHER_BASE_WITH_SAME_PREFIX,
+      }),
+      pr({ number: 43, baseRefOid: OTHER_BASE_WITH_SAME_PREFIX }),
+    ];
+    const query = buildLiveBaseRefQuery(prs);
+
+    expect(query.match(/refs\/heads\/main/gu)).toHaveLength(1);
+    expect(query.match(/refs\/heads\/release\/next/gu)).toHaveLength(1);
+    const bound = bindOpenPrsToLiveBaseRefs({
+      prs,
+      response: {
+        data: {
+          repository: {
+            b0: { target: { oid: LIVE_BASE } },
+            b1: { target: { oid: HEAD } },
+          },
+        },
+      },
+    });
+
+    expect(bound[0]).toMatchObject({
+      baseRefOid: LIVE_BASE,
+      reportedBaseRefOid: BASE,
+      baseRefOidSource: 'live_repository_ref',
+    });
+    expect(bound[1].baseRefOid).toBe(HEAD);
+    expect(bound[2].baseRefOid).toBe(LIVE_BASE);
+
+    const [conflicted] = bindOpenPrsToLiveBaseRefs({
+      prs: [
+        pr({
+          number: 44,
+          mergeable: 'CONFLICTING',
+          mergeStateStatus: 'DIRTY',
+          baseRefOid: BASE,
+        }),
+      ],
+      response: {
+        data: { repository: { b0: { target: { oid: LIVE_BASE } } } },
+      },
+    });
+    const plan = buildPlan([conflicted], {
+      runnerCapacity: 120,
+      maxConcurrent: 40,
+      cohortId: 'live-base',
+    });
+    expect(plan.fxMatrix[0].baseRefOid).toBe(LIVE_BASE);
+    expect(plan.fxMatrix[0].baseRefOid).not.toBe(BASE);
+    expect(conflicted.reportedBaseRefOid).toBe(BASE);
+  });
+
+  it('fails closed when any live base ref is missing or malformed', () => {
+    const prs = [pr({ number: 41, baseRefOid: BASE })];
+    expect(() =>
+      bindOpenPrsToLiveBaseRefs({
+        prs,
+        response: { data: { repository: { b0: null } } },
+      })
+    ).toThrow('live base ref refs/heads/main is unavailable');
+    expect(() =>
+      buildLiveBaseRefQuery([pr({ baseRefName: 'bad\nref' })])
+    ).toThrow('has an invalid base ref');
+  });
+});
 
 const greenRequired = [
   {
@@ -97,6 +365,26 @@ describe('PR freshness classification', () => {
 
     expect(result.state).toBe('BLOCKED');
     expect(result.reason).toContain('PR Ready:FAILURE');
+  });
+
+  it('does not falsely claim first-fail FX ownership for a generic BLOCKED state', () => {
+    const plan = buildPlan(
+      [
+        pr({
+          mergeStateStatus: 'BLOCKED',
+          statusCheckRollup: [],
+        }),
+      ],
+      { requiredChecks: [] }
+    );
+
+    expect(plan.items[0]).toMatchObject({
+      action: 'skip_non_conflict_blocker',
+      triggersCi: false,
+      label: undefined,
+    });
+    expect(plan.items[0].actionReason).toContain('not a merge conflict');
+    expect(plan.items[0].actionReason).not.toContain('owns this exact head');
   });
 
   it('classifies mergeable stale branches as BEHIND for update-branch', () => {
@@ -187,7 +475,7 @@ describe('dependency-aware ordering and Neon capacity', () => {
     ).toEqual([9, 10, 11]);
   });
 
-  it('caps CI-heavy re-triggers by subtracting in-flight CI from max concurrency', () => {
+  it('does not double-count unrelated in-flight CI against remediation capacity', () => {
     const plan = buildPlan(
       [
         pr({
@@ -210,12 +498,46 @@ describe('dependency-aware ordering and Neon capacity', () => {
     );
 
     expect(plan.capacity.currentCiInFlight).toBe(1);
+    expect(plan.capacity.availableCiSlots).toBe(2);
     expect(plan.items.find(item => item.number === 2).action).toBe(
       'request_github_rebase'
     );
     expect(plan.items.find(item => item.number === 3).action).toBe(
-      'wait_capacity'
+      'request_github_rebase'
     );
+  });
+
+  it('shares one adaptive capacity budget across clean rebases and conflict FX', () => {
+    const plan = buildPlan(
+      [
+        pr({
+          number: 1,
+          mergeStateStatus: 'BEHIND',
+          statusCheckRollup: greenRequired,
+        }),
+        pr({
+          number: 2,
+          mergeable: 'CONFLICTING',
+          mergeStateStatus: 'DIRTY',
+          statusCheckRollup: greenRequired,
+        }),
+        pr({
+          number: 3,
+          mergeable: 'CONFLICTING',
+          mergeStateStatus: 'DIRTY',
+          statusCheckRollup: greenRequired,
+        }),
+      ],
+      { maxConcurrent: 40, runnerCapacity: 120 }
+    );
+
+    expect(plan.capacity.availableCiSlots).toBe(2);
+    expect(plan.capacity.plannedCiTriggers).toBe(2);
+    expect(plan.items.map(item => item.action)).toEqual([
+      'request_github_rebase',
+      'escalate_conflict_fx',
+      'wait_capacity',
+    ]);
   });
 
   it('skips update-branch for forks even when they are behind', () => {
@@ -234,18 +556,1206 @@ describe('dependency-aware ordering and Neon capacity', () => {
 });
 
 describe('conflict mutation policy', () => {
-  it('labels true conflicts without merging or force-pushing the PR branch', () => {
-    const plan = buildPlan([
-      pr({
-        mergeable: 'CONFLICTING',
-        mergeStateStatus: 'DIRTY',
-        statusCheckRollup: greenRequired,
-      }),
-    ]);
-
+  it('never mutates a PR already owned by the native merge queue', () => {
+    const plan = buildPlan(
+      [
+        pr({
+          isInMergeQueue: true,
+          mergeable: 'CONFLICTING',
+          mergeStateStatus: 'DIRTY',
+        }),
+      ],
+      { now: NOW, runnerCapacity: 120, maxConcurrent: 40 }
+    );
     expect(plan.items[0]).toMatchObject({
-      action: 'label_needs_manual_rebase',
+      action: 'skip_native_merge_queue',
       triggersCi: false,
     });
+    expect(plan.fxMatrix).toEqual([]);
+  });
+
+  it('routes same-repository conflicts to bounded smarter-model FX', () => {
+    const plan = buildPlan(
+      [
+        pr({
+          mergeable: 'CONFLICTING',
+          mergeStateStatus: 'DIRTY',
+          statusCheckRollup: greenRequired,
+        }),
+      ],
+      {
+        maxConcurrent: 40,
+        runnerCapacity: 120,
+        activeCi: 0,
+        queuedCi: 0,
+        cohortId: 'cohort-2-a',
+      }
+    );
+
+    expect(plan.items[0]).toMatchObject({
+      action: 'escalate_conflict_fx',
+      triggersCi: true,
+      attempt: 1,
+      maxAttempts: 2,
+      model: 'openai/gpt-5.6-sol',
+      label: undefined,
+    });
+    expect(plan.fxMatrix).toEqual([
+      expect.objectContaining({
+        prNumber: 1,
+        headRefOid: HEAD,
+        baseRefOid: BASE,
+        attempt: 1,
+        maxAttempts: CONFLICT_FX_MAX_ATTEMPTS,
+        model: CONFLICT_FX_MODEL,
+      }),
+    ]);
+    expect(plan.summary).not.toHaveProperty('manualRebaseCandidates');
+
+    const prompt = buildConflictFxPrompt({
+      repository: 'JovieInc/Jovie',
+      prNumber: 1,
+      headOid: HEAD,
+      baseOid: BASE,
+      conflictFiles: ['scripts/conflicted.mjs'],
+      attempt: 1,
+    });
+    expect(prompt).toContain(`Exact source head: ${HEAD}`);
+    expect(prompt).toContain(`Exact base head: ${BASE}`);
+    expect(prompt).toContain('Bounded attempt: 1/2');
+    expect(prompt).toContain('separate follow-up PR');
+    expect(prompt).toContain('or add a hold label');
+    expect(prompt).not.toMatch(/needs-manual-rebase|needs-human/iu);
+  });
+
+  it('does not reuse a receipt after retargeting to a same-SHA base ref', () => {
+    const plan = buildPlan(
+      [
+        pr({
+          baseRefName: 'release/same-tree',
+          baseRefOid: BASE,
+          mergeable: 'CONFLICTING',
+          mergeStateStatus: 'DIRTY',
+          statusCheckRollup: [
+            ...greenRequired,
+            conflictStatus({
+              baseOid: BASE,
+              baseRefName: 'main',
+              attempt: 1,
+              outcome: 'failed',
+            }),
+          ],
+        }),
+      ],
+      { now: NOW, runnerCapacity: 120, maxConcurrent: 40 }
+    );
+    expect(plan.items[0]).toMatchObject({
+      action: 'escalate_conflict_fx',
+      attempt: 1,
+    });
+  });
+
+  it('deliberate red: exhausted or expired attempts emit a typed non-blocking steering exception', () => {
+    const expiredSecondClaim = conflictStatus({
+      attempt: CONFLICT_FX_MAX_ATTEMPTS,
+      outcome: 'pending',
+      createdAt: new Date(NOW - CONFLICT_FX_CLAIM_TTL_MS - 1).toISOString(),
+    });
+    const plan = buildPlan(
+      [
+        pr({
+          mergeable: 'CONFLICTING',
+          mergeStateStatus: 'DIRTY',
+          statusCheckRollup: [...greenRequired, expiredSecondClaim],
+        }),
+      ],
+      { now: NOW, runnerCapacity: 120, maxConcurrent: 40 }
+    );
+
+    expect(plan.items[0]).toMatchObject({
+      action: 'emit_steering_exception',
+      triggersCi: false,
+      attempt: CONFLICT_FX_MAX_ATTEMPTS,
+      label: undefined,
+    });
+    expect(plan.fxMatrix).toEqual([]);
+
+    const receipt = buildSteeringExceptionReceipt({
+      prNumber: 1,
+      headOid: HEAD,
+      baseOid: BASE,
+      attempts: CONFLICT_FX_MAX_ATTEMPTS,
+      conflictFiles: ['scripts/conflicted.mjs'],
+      competingChanges: [
+        {
+          file: 'scripts/conflicted.mjs',
+          head: 'retain the shipping default',
+          base: 'adopt the new product direction',
+        },
+      ],
+      recommendedAction:
+        'ship the objective fix now and put the product-direction choice in a separate follow-up PR',
+    });
+    expect(receipt).toEqual(
+      expect.objectContaining({
+        schema: CONFLICT_STEERING_EXCEPTION_SCHEMA,
+        leaseTerminal: true,
+        closedLoopTerminal: true,
+        pr: 1,
+        headOid: HEAD,
+        baseOid: BASE,
+        attempts: 2,
+        blocksShippingPr: false,
+        mergeBlockingLabels: [],
+        steeringTiming: 'before_pr_or_separate_follow_up_pr',
+      })
+    );
+    expect(receipt.conflictFiles).toEqual(['scripts/conflicted.mjs']);
+    expect(receipt.competingChanges).toHaveLength(1);
+    expect(receipt.nextAction).toContain('new exact head/base pair');
+  });
+
+  it('keeps taste and steering outside the shipping PR merge path', () => {
+    const receipt = buildSteeringExceptionReceipt({
+      prNumber: 1,
+      headOid: HEAD,
+      baseOid: BASE,
+      conflictFiles: ['apps/web/app/page.tsx'],
+      competingChanges: [
+        {
+          file: 'apps/web/app/page.tsx',
+          head: 'existing approved treatment',
+          base: 'new subjective treatment',
+        },
+      ],
+    });
+    const serialized = JSON.stringify(receipt);
+
+    expect(receipt.blocksShippingPr).toBe(false);
+    expect(receipt.mergeBlockingLabels).toEqual([]);
+    expect(receipt.steeringTiming).toBe('before_pr_or_separate_follow_up_pr');
+    expect(receipt.recommendedAction).toContain('separate follow-up PR');
+    for (const forbidden of [
+      'needs-human',
+      'needs:taste',
+      'needs-human-taste',
+      'needs-manual-rebase',
+      'hold',
+      'gated',
+    ]) {
+      expect(serialized).not.toContain(`"${forbidden}"`);
+    }
+  });
+});
+
+describe('trusted exact-head conflict receipts', () => {
+  it('round-trips a full exact base SHA without prefix matching', () => {
+    const description = buildConflictFxStatusDescription({
+      cohortId: 'cohort-1234567890123456789012345',
+      cap: 40,
+      attempt: 1,
+      outcome: 'pending',
+      baseOid: BASE,
+    });
+    expect(description).toContain(`base=${BASE}`);
+
+    const receipt = parseConflictFxReceipt({
+      ...conflictStatus(),
+      description,
+    });
+    expect(receipt).toMatchObject({
+      cohortId: 'cohort-1234567890123456789012345',
+      cap: 40,
+      attempt: 1,
+      maxAttempts: CONFLICT_FX_MAX_ATTEMPTS,
+      outcome: 'pending',
+      baseOid: BASE,
+    });
+
+    const plan = buildPlan(
+      [
+        pr({
+          baseRefOid: OTHER_BASE_WITH_SAME_PREFIX,
+          mergeable: 'CONFLICTING',
+          mergeStateStatus: 'DIRTY',
+          statusCheckRollup: [
+            ...greenRequired,
+            conflictStatus({ baseOid: BASE, attempt: 1, outcome: 'failed' }),
+          ],
+        }),
+      ],
+      { now: NOW, runnerCapacity: 120, maxConcurrent: 40 }
+    );
+    expect(plan.items[0]).toMatchObject({
+      action: 'escalate_conflict_fx',
+      attempt: 1,
+    });
+  });
+
+  it('deliberate red: rejects truncated, malformed, or untrusted conflict receipts', () => {
+    expect(parseConflictFxReceipt(conflictStatus())).not.toBeNull();
+    expect(
+      parseConflictFxReceipt(
+        conflictStatus({
+          creator: { login: 'untrusted-contributor', type: 'User' },
+        })
+      )
+    ).toBeNull();
+    expect(
+      parseConflictFxReceipt(
+        conflictStatus({
+          targetUrl: 'https://example.invalid/forged-conflict-receipt',
+        })
+      )
+    ).toBeNull();
+    expect(
+      parseConflictFxReceipt(conflictStatus({ typename: 'CheckRun' }))
+    ).toBeNull();
+
+    const trusted = conflictStatus();
+    for (const description of [
+      `${CONFLICT_FX_RECEIPT_SCHEMA} cohort=c cap=2 attempt=3/2 outcome=pending base=${BASE}`,
+      `${CONFLICT_FX_RECEIPT_SCHEMA} cohort=c cap=-1 attempt=1/2 outcome=pending base=${BASE}`,
+      `${CONFLICT_FX_RECEIPT_SCHEMA} cohort=c cap=2 attempt=1/99 outcome=pending base=${BASE}`,
+      `${CONFLICT_FX_RECEIPT_SCHEMA} cohort=c cap=2 attempt=1/2 outcome=forged base=${BASE}`,
+      `${CONFLICT_FX_RECEIPT_SCHEMA} cohort=c cap=2 attempt=1/2 outcome=success base=${BASE}`,
+      `${CONFLICT_FX_RECEIPT_SCHEMA} cohort=c cap=2 attempt=1/2 outcome=pending base=${BASE.slice(0, 12)}`,
+    ]) {
+      expect(parseConflictFxReceipt({ ...trusted, description })).toBeNull();
+    }
+  });
+
+  it('accepts durable cohorts only from the trusted controller and validates their metrics', () => {
+    const marker = buildConflictFxCohortMarker(
+      cohort({ id: 'cohort-10-trusted' })
+    );
+    const trusted = {
+      body: marker,
+      user: { login: TRUSTED_APP_LOGIN, type: 'Bot' },
+      author_association: 'MEMBER',
+      created_at: '2026-08-30T17:00:00Z',
+      html_url: 'https://github.com/JovieInc/Jovie/issues/comments/123456789',
+    };
+    expect(parseConflictFxCohortComments([trusted])).toEqual([
+      expect.objectContaining({
+        id: 'cohort-10-trusted',
+        cap: 10,
+        attempted: 10,
+        successes: 10,
+        failures: 0,
+        pending: 0,
+        staleHeadSkips: 0,
+        staleHeadSkipRate: 0,
+        p95CiLatencyMs: 300_000,
+        baselineP95CiLatencyMs: 300_000,
+        runnerCapacity: 120,
+        activeCi: 0,
+        queuedCi: 0,
+        backlog: 80,
+        runUrl: 'https://github.com/JovieInc/Jovie/actions/runs/123456789',
+        clean: true,
+      }),
+    ]);
+    expect(
+      parseConflictFxCohortComments([
+        {
+          ...trusted,
+          user: { login: 'untrusted-contributor', type: 'User' },
+        },
+      ])
+    ).toEqual([]);
+
+    const impossible = buildConflictFxCohortMarker(
+      cohort({
+        id: 'cohort-impossible',
+        attempted: 2,
+        successes: 3,
+        failures: 1,
+      })
+    );
+    expect(
+      parseConflictFxCohortComments([{ ...trusted, body: impossible }])
+    ).toEqual([]);
+  });
+});
+
+describe('mutation result gate', () => {
+  it('fails closed when any planned rebase mutation is not proven successful', () => {
+    expect(() =>
+      requireSuccessfulMutationResults([
+        { pr: 41, ok: true, action: 'request_github_rebase' },
+        {
+          pr: 42,
+          ok: false,
+          action: 'request_github_rebase',
+          category: 'auth',
+        },
+      ])
+    ).toThrow('conflict-controller mutations failed closed (1/2): #42:auth');
+  });
+
+  it('accepts an empty or entirely successful mutation receipt', () => {
+    expect(requireSuccessfulMutationResults([])).toEqual([]);
+    expect(
+      requireSuccessfulMutationResults([
+        { pr: 43, ok: true, action: 'request_github_rebase' },
+      ])
+    ).toHaveLength(1);
+  });
+});
+
+describe('conflict cohort repository-read budget', () => {
+  const candidates = Array.from({ length: 40 }, (_, index) => ({
+    pr: 17000 + index,
+    sourceHead: `${index.toString(16).padStart(2, '0')}${'a'.repeat(38)}`,
+    resolvedHead: `${index.toString(16).padStart(2, '0')}${'b'.repeat(38)}`,
+  }));
+
+  it('keeps the maximum 40-PR cohort below the repository token budget', () => {
+    const budget = computeConflictCohortReadBudget({ cohortSize: 40 });
+
+    expect(budget).toMatchObject({
+      pollIterations: 40,
+      fixedReadCeiling: 220,
+      worstCaseReads: 460,
+      repositoryReadLimit: 1000,
+      withinRepositoryReadLimit: true,
+    });
+    const oldPerCandidatePolling =
+      budget.fixedReadCeiling + budget.pollIterations * candidates.length;
+    expect(oldPerCandidatePolling).toBeGreaterThan(1000);
+    expect(() => computeConflictCohortReadBudget({ cohortSize: 41 })).toThrow(
+      /exceeds cap 40/u
+    );
+  });
+
+  it('batches exact live heads and marks changed or missing PRs terminal', () => {
+    const query = buildConflictCohortLiveHeadQuery(candidates);
+    expect(query.match(/pullRequest\(number:/gu)).toHaveLength(40);
+    expect(query).not.toContain(candidates[0].resolvedHead);
+
+    const repository = Object.fromEntries(
+      candidates.map((candidate, index) => [
+        `p${index}`,
+        {
+          number: candidate.pr,
+          state: 'OPEN',
+          headRefOid:
+            index === 3 ? `${'f'.repeat(40)}` : candidate.resolvedHead,
+        },
+      ])
+    );
+    delete repository.p4;
+    const live = reconcileConflictCohortLiveHeads({
+      candidates,
+      response: { data: { repository } },
+    });
+
+    expect(live[0]).toMatchObject({ healthy: true, reason: 'exact_head' });
+    expect(live[3]).toMatchObject({ healthy: false, reason: 'stale_head' });
+    expect(live[4]).toMatchObject({
+      healthy: false,
+      reason: 'live_pr_missing_or_closed',
+    });
+  });
+
+  it('indexes the newest exact-head CI run across five shared pages', () => {
+    const pages = Array.from({ length: 5 }, (_, page) => ({
+      workflow_runs: Array.from({ length: 100 }, (_, index) => ({
+        id: page * 100 + index,
+        event: 'pull_request',
+        head_sha: `${'f'.repeat(38)}${page}${index % 10}`,
+        created_at: `2026-08-30T${String(10 + page).padStart(2, '0')}:00:${String(index % 60).padStart(2, '0')}Z`,
+      })),
+    }));
+    pages[0].workflow_runs[0] = {
+      id: 1,
+      event: 'pull_request',
+      head_sha: candidates[0].resolvedHead,
+      created_at: '2026-08-30T10:00:00Z',
+    };
+    pages[4].workflow_runs[99] = {
+      id: 2,
+      event: 'pull_request_target',
+      head_sha: candidates[0].resolvedHead,
+      created_at: '2026-08-30T14:00:00Z',
+    };
+
+    const indexed = indexLatestConflictCohortCiRuns({ candidates, pages });
+    expect(indexed[candidates[0].resolvedHead]?.id).toBe(2);
+    expect(indexed[candidates[1].resolvedHead]).toBeUndefined();
+    expect(Object.keys(indexed)).toEqual([candidates[0].resolvedHead]);
+  });
+});
+
+describe('adaptive conflict capacity', () => {
+  const capacityInput = {
+    runnerCapacity: 120,
+    activeCi: 0,
+    queuedCi: 0,
+    backlog: 80,
+  };
+
+  it('ramps adaptive conflict cohorts only after durable clean receipts', () => {
+    expect(computeAdaptiveConcurrency(capacityInput)).toMatchObject({
+      tier: 2,
+      cap: 2,
+    });
+
+    const cleanCanary = cohort({
+      id: 'cohort-2-clean',
+      cap: 2,
+      attempted: 2,
+      successes: 2,
+      createdAt: '2026-08-30T15:00:00Z',
+    });
+    expect(
+      computeAdaptiveConcurrency({
+        ...capacityInput,
+        recentCohorts: [cleanCanary],
+      })
+    ).toMatchObject({ tier: 10, cap: 10 });
+    expect(
+      computeAdaptiveConcurrency({
+        ...capacityInput,
+        recentCohorts: [{ ...cleanCanary, durable: false }],
+      })
+    ).toMatchObject({ tier: 2, cap: 2 });
+
+    const partialTenA = cohort({
+      id: 'cohort-10-partial-a',
+      attempted: 2,
+      successes: 2,
+      createdAt: '2026-08-30T16:00:00Z',
+    });
+    const partialTenB = cohort({
+      id: 'cohort-10-partial-b',
+      attempted: 2,
+      successes: 2,
+      createdAt: '2026-08-30T15:30:00Z',
+    });
+    expect(
+      computeAdaptiveConcurrency({
+        ...capacityInput,
+        recentCohorts: [partialTenA, partialTenB, cleanCanary],
+      })
+    ).toMatchObject({ tier: 10, cap: 10 });
+
+    const cleanTenA = cohort({
+      id: 'cohort-10-clean-a',
+      createdAt: '2026-08-30T17:00:00Z',
+    });
+    const cleanTenB = cohort({
+      id: 'cohort-10-clean-b',
+      createdAt: '2026-08-30T16:30:00Z',
+    });
+    expect(
+      computeAdaptiveConcurrency({
+        ...capacityInput,
+        recentCohorts: [cleanTenA, cleanTenB, cleanCanary],
+      })
+    ).toMatchObject({ tier: 40, cap: 40 });
+
+    expect(
+      computeAdaptiveConcurrency({
+        ...capacityInput,
+        runnerCapacity: 12,
+        activeCi: 7,
+        queuedCi: 1,
+        recentCohorts: [cleanTenA, cleanTenB],
+      })
+    ).toMatchObject({ tier: 10, availableRunners: 4, cap: 4 });
+  });
+
+  it('releases expired pending claims instead of deadlocking the canary budget', () => {
+    const pending = cohort({
+      id: 'cohort-pending',
+      cap: 2,
+      attempted: 0,
+      successes: 0,
+      failures: 0,
+      pending: 2,
+      clean: false,
+      durable: false,
+      createdAt: new Date(NOW - 60_000).toISOString(),
+    });
+    expect(
+      computeAdaptiveConcurrency({
+        ...capacityInput,
+        recentCohorts: [pending],
+        now: NOW,
+      })
+    ).toMatchObject({ tier: 2, cap: 0, pendingRemediations: 2 });
+    expect(
+      computeAdaptiveConcurrency({
+        ...capacityInput,
+        recentCohorts: [
+          {
+            ...pending,
+            createdAt: new Date(
+              NOW - CONFLICT_FX_CLAIM_TTL_MS - 1
+            ).toISOString(),
+          },
+        ],
+        now: NOW,
+      })
+    ).toMatchObject({ tier: 2, cap: 2, pendingRemediations: 0 });
+  });
+
+  it('deliberate red: degraded CI or remediation failure backs concurrency down', () => {
+    const cleanTenA = cohort({
+      id: 'cohort-10-clean-a',
+      createdAt: '2026-08-30T17:00:00Z',
+    });
+    const cleanTenB = cohort({
+      id: 'cohort-10-clean-b',
+      createdAt: '2026-08-30T16:30:00Z',
+    });
+    const healthy = [cleanTenA, cleanTenB];
+    expect(
+      computeAdaptiveConcurrency({
+        ...capacityInput,
+        recentCohorts: healthy,
+      }).tier
+    ).toBe(40);
+
+    expect(
+      computeAdaptiveConcurrency({
+        ...capacityInput,
+        recentCohorts: [
+          cohort({
+            id: 'cohort-failed',
+            successes: 9,
+            failures: 1,
+            clean: false,
+            createdAt: '2026-08-30T17:30:00Z',
+          }),
+          ...healthy,
+        ],
+      }).tier
+    ).toBe(2);
+    expect(
+      computeAdaptiveConcurrency({
+        ...capacityInput,
+        recentCohorts: [
+          cohort({
+            id: 'cohort-relative-latency-regressed',
+            p95CiLatencyMs: 600_000,
+            baselineP95CiLatencyMs: 300_000,
+            clean: true,
+            createdAt: '2026-08-30T17:30:00Z',
+          }),
+          ...healthy,
+        ],
+      }).tier
+    ).toBe(2);
+    expect(
+      computeAdaptiveConcurrency({
+        ...capacityInput,
+        recentCohorts: [
+          cohort({
+            id: 'cohort-absolute-latency-regressed',
+            p95CiLatencyMs: 780_000,
+            baselineP95CiLatencyMs: 600_000,
+            clean: true,
+            createdAt: '2026-08-30T17:30:00Z',
+          }),
+          ...healthy,
+        ],
+      }).tier
+    ).toBe(2);
+    expect(
+      computeAdaptiveConcurrency({
+        ...capacityInput,
+        recentCohorts: [
+          cohort({
+            id: 'cohort-stale-skips',
+            staleHeadSkips: 1,
+            staleHeadSkipRate: 0.1,
+            clean: true,
+            createdAt: '2026-08-30T17:30:00Z',
+          }),
+          ...healthy,
+        ],
+      }).tier
+    ).toBe(2);
+    expect(
+      computeAdaptiveConcurrency({
+        ...capacityInput,
+        activeCi: 62,
+        queuedCi: 10,
+        recentCohorts: healthy,
+      }).tier
+    ).toBe(10);
+  });
+});
+
+describe('conflict workflow contract', () => {
+  it('allows ordinary literal conflict paths while rejecting protected or unsafe paths', () => {
+    expect(
+      workflowRejectsConflictPaths([
+        'packages/ui/atoms/button.tsx',
+        'scripts/desktop-release-guard.mjs',
+      ])
+    ).toBe(false);
+    expect(workflowRejectsConflictPaths(['.github/workflows/ci.yml'])).toBe(
+      true
+    );
+    expect(workflowRejectsConflictPaths(['.github/workflows'])).toBe(true);
+    expect(
+      workflowRejectsConflictPaths(['scripts/pr-conflict-handler.mjs'])
+    ).toBe(true);
+    expect(workflowRejectsConflictPaths(['packages/ui/../secrets'])).toBe(true);
+    expect(
+      workflowRejectsConflictPaths(['packages/ui/atoms/\u0000button.tsx'])
+    ).toBe(true);
+    expect(
+      workflowRejectsConflictPaths(['packages/ui/atoms/\u007fbutton.tsx'])
+    ).toBe(true);
+  });
+
+  it('fails closed on raw invalid-UTF-8 conflict paths before lossy JSON or Node decoding', () => {
+    const prepare = workflowStep(
+      'Prepare exact conflict manifest without credentials'
+    );
+    const delivery = workflowStep('Validate, reread, and deliver once');
+    const safePaths = Buffer.from(
+      'packages/ui/atoms/button.tsx\0scripts/desktop-release-guard.mjs\0',
+      'utf8'
+    );
+    const replacementAlias = Buffer.concat([
+      Buffer.from([0xff]),
+      Buffer.from('bad\0�bad\0', 'utf8'),
+    ]);
+
+    expect(rawPathBytesAreValidUtf8(safePaths)).toBe(true);
+    expect(rawPathBytesAreValidUtf8(replacementAlias)).toBe(false);
+    expect(prepare).toContain('iconv -f UTF-8 -t UTF-8 "$raw_conflict_paths"');
+    expect(prepare.indexOf('iconv -f UTF-8 -t UTF-8')).toBeLessThan(
+      prepare.indexOf("jq -Rs 'split")
+    );
+    expect(delivery).toContain(
+      'iconv -f UTF-8 -t UTF-8 "$live_conflict_paths"'
+    );
+    const manifestValidator = delivery.indexOf(
+      'iconv -f UTF-8 -t UTF-8 "$raw_file"'
+    );
+    expect(manifestValidator).toBeGreaterThan(-1);
+    expect(manifestValidator).toBeLessThan(
+      delivery.indexOf('node --input-type=module')
+    );
+  });
+
+  const linuxIt = process.platform === 'linux' ? it : it.skip;
+  linuxIt(
+    'routes a real invalid-byte Git conflict to protected_conflict before FX',
+    () => {
+      const root = mkdtempSync(join(tmpdir(), 'jovie-conflict-utf8-'));
+      const repository = join(root, 'repository');
+      const runnerTemp = join(root, 'runner');
+      mkdirSync(repository);
+      mkdirSync(join(runnerTemp, 'fx-home'), { recursive: true });
+      const invalidPath = Buffer.concat([
+        Buffer.from(`${repository}/`),
+        Buffer.from([0xff]),
+        Buffer.from('conflict.txt'),
+      ]);
+
+      try {
+        runGit(repository, ['init', '-b', 'main']);
+        runGit(repository, ['config', 'user.name', 'Conflict Test']);
+        runGit(repository, ['config', 'user.email', 'conflict@example.test']);
+        writeFileSync(invalidPath, 'root\n');
+        runGit(repository, ['add', '--all']);
+        runGit(repository, ['commit', '-m', 'root']);
+        const rootHead = runGit(repository, ['rev-parse', 'HEAD']);
+
+        runGit(repository, ['switch', '-c', 'source']);
+        writeFileSync(invalidPath, 'source\n');
+        runGit(repository, ['commit', '-am', 'source']);
+        const sourceHead = runGit(repository, ['rev-parse', 'HEAD']);
+
+        runGit(repository, ['switch', '-c', 'base', rootHead]);
+        writeFileSync(invalidPath, 'base\n');
+        runGit(repository, ['commit', '-am', 'base']);
+        const baseHead = runGit(repository, ['rev-parse', 'HEAD']);
+        runGit(repository, ['switch', 'source']);
+
+        const githubOutput = join(root, 'github-output');
+        const result = spawnSync(
+          'bash',
+          [
+            '-c',
+            workflowRunScript(
+              'Prepare exact conflict manifest without credentials'
+            ),
+          ],
+          {
+            cwd: repository,
+            encoding: 'utf8',
+            env: {
+              ...process.env,
+              ATTEMPT: '1',
+              BASE_HEAD: baseHead,
+              BASE_REF: 'main',
+              COHORT_ID: 'invalid-byte-test',
+              FX_AUTO_UPGRADE: '0',
+              FX_MODEL: 'openai/gpt-5.6-sol',
+              FX_PERMISSION_MODE: 'ask',
+              GITHUB_OUTPUT: githubOutput,
+              HEAD_REF: 'source',
+              HOME: join(runnerTemp, 'fx-home'),
+              MAX_ATTEMPTS: '3',
+              PR_NUMBER: '1',
+              REPOSITORY: 'JovieInc/Jovie',
+              RUNNER_TEMP: runnerTemp,
+              SOURCE_HEAD: sourceHead,
+            },
+          }
+        );
+
+        expect(result.status, result.stderr).toBe(0);
+        const receipt = JSON.parse(
+          readFileSync(
+            join(runnerTemp, 'conflict-fx-artifact', 'receipt.json'),
+            'utf8'
+          )
+        );
+        expect(receipt).toMatchObject({
+          conflictFiles: [],
+          outcome: 'protected_conflict',
+        });
+        expect(receipt.detail).toContain('invalid UTF-8');
+        expect(readFileSync(githubOutput, 'utf8')).toContain(
+          'model_required=false'
+        );
+      } finally {
+        rmSync(root, { recursive: true, force: true });
+      }
+    }
+  );
+
+  it('routes a real valid UTF-8 Git conflict to the credential-isolated FX step', () => {
+    const root = mkdtempSync(join(tmpdir(), 'jovie-conflict-valid-utf8-'));
+    const repository = join(root, 'repository');
+    const runnerTemp = join(root, 'runner');
+    const fxHome = join(runnerTemp, 'fx-home');
+    const mockBin = join(root, 'bin');
+    const conflictPath = join(repository, 'safe.txt');
+    mkdirSync(repository);
+    mkdirSync(join(fxHome, '.fx'), { recursive: true });
+    mkdirSync(mockBin);
+
+    try {
+      runGit(repository, ['init', '-b', 'main']);
+      runGit(repository, ['config', 'user.name', 'Conflict Test']);
+      runGit(repository, ['config', 'user.email', 'conflict@example.test']);
+      writeFileSync(conflictPath, 'root\n');
+      runGit(repository, ['add', '--all']);
+      runGit(repository, ['commit', '-m', 'root']);
+      const rootHead = runGit(repository, ['rev-parse', 'HEAD']);
+
+      runGit(repository, ['switch', '-c', 'source']);
+      writeFileSync(conflictPath, 'source\n');
+      runGit(repository, ['commit', '-am', 'source']);
+      const sourceHead = runGit(repository, ['rev-parse', 'HEAD']);
+
+      runGit(repository, ['switch', '-c', 'base', rootHead]);
+      writeFileSync(conflictPath, 'base\n');
+      runGit(repository, ['commit', '-am', 'base']);
+      const baseHead = runGit(repository, ['rev-parse', 'HEAD']);
+      runGit(repository, ['switch', 'source']);
+
+      writeFileSync(
+        join(mockBin, 'fx'),
+        `#!/usr/bin/env bash
+set -euo pipefail
+test "$1" = permissions
+test "$2" = --json
+printf '%s\n' '{"mode":"ask","rules":[{"permission":"*","pattern":"*","action":"deny"},{"permission":"read","pattern":"*","action":"deny"},{"permission":"edit","pattern":"*","action":"deny"},{"permission":"read","pattern":"safe.txt","action":"allow"},{"permission":"edit","pattern":"safe.txt","action":"allow"}]}'
+`,
+        { mode: 0o755 }
+      );
+      const githubOutput = join(root, 'github-output');
+      const result = spawnSync(
+        'bash',
+        [
+          '-c',
+          workflowRunScript(
+            'Prepare exact conflict manifest without credentials'
+          ),
+        ],
+        {
+          cwd: repository,
+          encoding: 'utf8',
+          env: {
+            ...process.env,
+            ATTEMPT: '1',
+            BASE_HEAD: baseHead,
+            BASE_REF: 'main',
+            COHORT_ID: 'valid-utf8-test',
+            FX_AUTO_UPGRADE: '0',
+            FX_MODEL: 'openai/gpt-5.6-sol',
+            FX_PERMISSION_MODE: 'ask',
+            GITHUB_OUTPUT: githubOutput,
+            HEAD_REF: 'source',
+            HOME: fxHome,
+            MAX_ATTEMPTS: '3',
+            PATH: `${mockBin}:${process.env.PATH ?? ''}`,
+            PR_NUMBER: '1',
+            REPOSITORY: 'JovieInc/Jovie',
+            RUNNER_TEMP: runnerTemp,
+            SOURCE_HEAD: sourceHead,
+          },
+        }
+      );
+
+      expect(result.status, result.stderr).toBe(0);
+      const artifactDir = join(runnerTemp, 'conflict-fx-artifact');
+      const receipt = JSON.parse(
+        readFileSync(join(artifactDir, 'receipt.json'), 'utf8')
+      );
+      expect(receipt).toMatchObject({
+        conflictFiles: ['safe.txt'],
+        outcome: 'model_required',
+      });
+      expect(readFileSync(githubOutput, 'utf8')).toContain(
+        'model_required=true'
+      );
+      expect(readFileSync(join(artifactDir, 'prompt.txt'), 'utf8')).toContain(
+        'Conflicting files: safe.txt'
+      );
+    } finally {
+      rmSync(root, { recursive: true, force: true });
+    }
+  });
+
+  it('executes the exact trusted-writer UTF-8 guard before accepting live conflict paths', () => {
+    const delivery = workflowStep('Validate, reread, and deliver once');
+    const match =
+      /(if ! iconv -f UTF-8 -t UTF-8 "\$live_conflict_paths"[\s\S]*?^\s+fi)/mu.exec(
+        delivery
+      );
+    expect(match).not.toBeNull();
+    const root = mkdtempSync(join(tmpdir(), 'jovie-writer-utf8-'));
+    const rawPaths = join(root, 'live-conflict-paths.z');
+
+    try {
+      writeFileSync(rawPaths, Buffer.from([0xff, 0x00]));
+      const rejected = spawnSync(
+        'bash',
+        [
+          '-c',
+          `set -euo pipefail\nlive_conflict_paths="$1"\n${match?.[1]}\necho accepted`,
+          'writer-guard',
+          rawPaths,
+        ],
+        { encoding: 'utf8' }
+      );
+      expect(rejected.status).toBe(1);
+      expect(rejected.stdout).toContain(
+        'Live conflict path set contains invalid UTF-8 bytes.'
+      );
+
+      writeFileSync(rawPaths, Buffer.from('safe.txt\0', 'utf8'));
+      const accepted = spawnSync(
+        'bash',
+        [
+          '-c',
+          `set -euo pipefail\nlive_conflict_paths="$1"\n${match?.[1]}\necho accepted`,
+          'writer-guard',
+          rawPaths,
+        ],
+        { encoding: 'utf8' }
+      );
+      expect(accepted.status, accepted.stderr).toBe(0);
+      expect(accepted.stdout).toContain('accepted');
+    } finally {
+      rmSync(root, { recursive: true, force: true });
+    }
+  });
+
+  it('executes the exact index-manifest validator and propagates invalid bytes as failure', () => {
+    const delivery = workflowStep('Validate, reread, and deliver once');
+    const functionStart = delivery.indexOf(
+      '          build_index_manifest() {'
+    );
+    const functionEnd = delivery.indexOf(
+      '\n\n          git ls-files --stage -z',
+      functionStart
+    );
+    expect(functionStart).toBeGreaterThan(-1);
+    expect(functionEnd).toBeGreaterThan(functionStart);
+    const manifestFunction = delivery
+      .slice(functionStart, functionEnd)
+      .replace(/^ {10}/gmu, '');
+    const root = mkdtempSync(join(tmpdir(), 'jovie-index-utf8-'));
+    const rawManifest = join(root, 'index.raw');
+    const outputManifest = join(root, 'index.json');
+    const script = `set -euo pipefail\nconflict_files='[]'\n${manifestFunction}\nbuild_index_manifest "$1" "$2" false`;
+
+    try {
+      writeFileSync(rawManifest, Buffer.from([0xff, 0x00]));
+      const rejected = spawnSync(
+        'bash',
+        ['-c', script, 'manifest-guard', rawManifest, outputManifest],
+        { encoding: 'utf8' }
+      );
+      expect(rejected.status).toBe(1);
+      expect(rejected.stdout).toContain(
+        'Git index manifest contains invalid UTF-8 path bytes.'
+      );
+
+      writeFileSync(
+        rawManifest,
+        Buffer.from(`100644 ${'a'.repeat(40)} 0\tREADME.md\0`, 'utf8')
+      );
+      const accepted = spawnSync(
+        'bash',
+        ['-c', script, 'manifest-guard', rawManifest, outputManifest],
+        { encoding: 'utf8' }
+      );
+      expect(accepted.status, accepted.stderr).toBe(0);
+      expect(JSON.parse(readFileSync(outputManifest, 'utf8'))).toEqual([
+        {
+          mode: '100644',
+          oid: 'a'.repeat(40),
+          path: Buffer.from('README.md', 'utf8').toString('base64url'),
+          stage: '0',
+        },
+      ]);
+    } finally {
+      rmSync(root, { recursive: true, force: true });
+    }
+  });
+
+  it('computes the FX matrix from live runner and CI pressure instead of a fixed fleet number', () => {
+    expect(WORKFLOW).toContain(CONFLICT_CLOSED_LOOP_INVARIANT_ID);
+    expect(WORKFLOW).toMatch(
+      /(?:actions\/runs\?[^\n]*status=in_progress|gh run list[^\n]*--status[= ]in_progress)/u
+    );
+    expect(WORKFLOW).toMatch(
+      /(?:actions\/runs\?[^\n]*status=queued|gh run list[^\n]*--status[= ]queued)/u
+    );
+    expect(WORKFLOW).toContain('--runner-capacity');
+    expect(WORKFLOW).toContain('--active-ci');
+    expect(WORKFLOW).toContain('--queued-ci');
+    expect(WORKFLOW).toContain('--plan-file');
+    expect(WORKFLOW).toMatch(/fromJSON\([^\n]*fx_matrix/iu);
+    const dynamicCaps =
+      WORKFLOW.match(
+        /max-parallel:\s*\$\{\{\s*fromJSON\(needs\.plan\.outputs\.adaptive_cap\)\s*\}\}/gu
+      ) ?? [];
+    expect(dynamicCaps.length).toBeGreaterThanOrEqual(2);
+  });
+
+  it('persists trusted adaptive cohort evidence after the repair matrix settles', () => {
+    const cohortStep = workflowStep(
+      'Reconcile exact outcomes and persist trusted cohort receipt'
+    );
+    expect(WORKFLOW).toMatch(
+      new RegExp(
+        `(?:buildConflictFxCohortMarker|${CONFLICT_FX_COHORT_SCHEMA.replaceAll('/', '\\/')})`,
+        'u'
+      )
+    );
+    for (const field of [
+      'staleHeadSkips',
+      'staleHeadSkipRate',
+      'p95CiLatencyMs',
+      'baselineP95CiLatencyMs',
+      'runnerCapacity',
+      'activeCi',
+      'queuedCi',
+      'backlog',
+      'runUrl',
+    ]) {
+      expect(WORKFLOW).toContain(field);
+    }
+    expect(WORKFLOW).toMatch(
+      /gh\s+api\s+-X\s+POST[^\n]*(?:issues\/[^\s"']+\/comments|issues\/\$[A-Z_]+\/comments)/iu
+    );
+    expect(WORKFLOW).toContain('buildConflictCohortLiveHeadQuery');
+    expect(WORKFLOW).toContain('indexLatestConflictCohortCiRuns');
+    expect(WORKFLOW).toContain('page <= max_ci_run_pages');
+    expect(WORKFLOW).not.toContain(
+      'actions/workflows/ci.yml/runs?head_sha=$resolved_head'
+    );
+    expect(cohortStep).toContain('--paginate --slurp');
+    expect(cohortStep).not.toContain('| head -1 || true');
+    expect(WORKFLOW).toContain('ci-latencies.txt');
+    expect(WORKFLOW).toContain('latest_check("PR Ready")');
+    expect(WORKFLOW).toContain('latest_check("Migration Guard")');
+    expect(WORKFLOW).toContain('latest_status("Fork PR Gate")');
+    expect(WORKFLOW).not.toContain(
+      'actions/workflows/ci.yml/runs?status=completed&per_page=50'
+    );
+  });
+
+  it('binds the stronger FX model and immutable artifact before granting writer authority', () => {
+    expect(WORKFLOW).toMatch(/FX_MODEL:\s*['"]?openai\/gpt-5\.6-sol['"]?/u);
+    expect(WORKFLOW).toContain('AI_GATEWAY_API_KEY');
+    expect(WORKFLOW).toContain('fx ask');
+    expect(WORKFLOW).toContain('jovie-conflict-fx-artifact/v1');
+    expect(WORKFLOW).toMatch(/(?:\.|[,{])pr[=:]/u);
+    expect(WORKFLOW).toMatch(/(?:\.|[,{])(?:sourceHead|head)[=:]/u);
+    expect(WORKFLOW).toMatch(/(?:\.|[,{])(?:baseHead|base)[=:]/u);
+    expect(WORKFLOW).toMatch(/(?:\.|[,{])attempt[=:]/u);
+    expect(WORKFLOW).toMatch(
+      /(?:\.|[,{])(?:expectedModel|observedModel|model)[=:]/u
+    );
+
+    const fxJob = WORKFLOW.slice(
+      WORKFLOW.indexOf('\n  conflict_fx:'),
+      WORKFLOW.indexOf('\n  deliver:')
+    );
+    expect(fxJob).toContain('AI_GATEWAY_API_KEY');
+    expect(fxJob).toContain('FX_MODEL: openai/gpt-5.6-sol');
+    expect(fxJob).not.toContain('actions/create-github-app-token@');
+    expect(fxJob).not.toContain('JOVIE_BOT_PRIVATE_KEY');
+    expect(fxJob).not.toContain('GH_TOKEN:');
+
+    const modelStep = workflowStep(
+      'Run pinned stronger-model FX with no executable tools'
+    );
+    expect(modelStep).toContain(
+      'AI_GATEWAY_API_KEY: ${{ secrets.AI_GATEWAY_API_KEY }}'
+    );
+    expect(WORKFLOW.replace(modelStep, '')).not.toContain('AI_GATEWAY_API_KEY');
+    expect(modelStep).toContain('HOME: ${{ runner.temp }}/fx-home');
+    expect(modelStep).toContain('.session_permission_grants == 0');
+    expect(modelStep).toContain('.mcp.connection_check == "not_checked"');
+    expect(modelStep).toContain('exec fx ask --json --no-save');
+    expect(modelStep).not.toMatch(/\b(?:git|gh|pnpm|npm|yarn)\s/u);
+    expect(modelStep).not.toMatch(/--(?:auto|yolo)\b/u);
+    expect(modelStep).not.toContain('JOVIE_BOT_PRIVATE_KEY');
+    expect(modelStep).not.toContain('GH_TOKEN');
+    for (const runBody of workflowRunBodies()) {
+      expect(runBody).not.toMatch(/\$\{\{\s*(?:matrix\.|github\.event)/u);
+    }
+
+    const fxIndex = WORKFLOW.indexOf('fx ask');
+    const immutableValidationIndex = WORKFLOW.lastIndexOf(
+      'sha256sum --check --strict'
+    );
+    const appTokens = [
+      ...WORKFLOW.matchAll(/actions\/create-github-app-token@/gu),
+    ];
+    const writerAppTokenIndex = appTokens.at(-1)?.index ?? -1;
+    const writerTokenStepStart = WORKFLOW.lastIndexOf(
+      '- name: Generate short-lived Jovie App writer token'
+    );
+    const writerTokenStepEnd = WORKFLOW.indexOf(
+      '\n      - name:',
+      writerTokenStepStart + 1
+    );
+    const writerTokenStep = WORKFLOW.slice(
+      writerTokenStepStart,
+      writerTokenStepEnd
+    );
+    expect(fxIndex).toBeGreaterThan(-1);
+    expect(immutableValidationIndex).toBeGreaterThan(fxIndex);
+    expect(appTokens.length).toBeGreaterThanOrEqual(2);
+    expect(writerAppTokenIndex).toBeGreaterThan(immutableValidationIndex);
+    expect(writerTokenStep).toMatch(
+      /if:\s*[^\n]*steps\.prevalidate\.outputs\.(?:trusted|validated|deliverable)[^\n]*==\s*['"]true['"]/u
+    );
+    expect(WORKFLOW).toContain('app-id: ${{ vars.JOVIE_BOT_APP_ID }}');
+    expect(WORKFLOW).toContain(
+      'private-key: ${{ secrets.JOVIE_BOT_PRIVATE_KEY }}'
+    );
+    expect(WORKFLOW).toContain(
+      'GH_TOKEN: ${{ steps.app-token.outputs.token }}'
+    );
+    expect(WORKFLOW).toContain('expected-merge-manifest.json');
+    expect(WORKFLOW).toContain('candidate-merge-manifest.json');
+    expect(WORKFLOW).toContain('live_conflict_files');
+    expect(WORKFLOW).toMatch(
+      /cmp\s+--silent\s+"\$expected_manifest"\s+"\$candidate_manifest"/u
+    );
+    expect(WORKFLOW).toContain(
+      'conflict candidate introduced an unsafe entry type'
+    );
+  });
+
+  it('sets non-secret local committer identity before both merge reproductions', () => {
+    const prepare = workflowStep(
+      'Prepare exact conflict manifest without credentials'
+    );
+    const delivery = workflowStep('Validate, reread, and deliver once');
+    for (const step of [prepare, delivery]) {
+      const identityIndex = step.indexOf('git config user.name');
+      const mergeIndex = step.indexOf('git merge --no-commit --no-ff');
+      expect(identityIndex).toBeGreaterThan(-1);
+      expect(identityIndex).toBeLessThan(mergeIndex);
+      expect(step).not.toContain('git config --global');
+    }
+    expect(prepare).not.toContain('JOVIE_BOT_PRIVATE_KEY');
+    expect(prepare).not.toContain('GH_TOKEN');
+  });
+
+  it('deliberate red: workflow refuses stale-head or force-push conflict delivery', () => {
+    expect(WORKFLOW).not.toContain('expected_base:0:12');
+    expect(WORKFLOW).not.toContain('BASE_HEAD:0:12');
+    const pushMatch =
+      /git[\s\S]{0,240}?\bpush\s+"https:\/\/github\.com\/\$REPOSITORY\.git"\s+"(?:HEAD|\$[A-Z_]*(?:HEAD|COMMIT)):refs\/heads\/\$HEAD_REF"/iu.exec(
+        WORKFLOW
+      );
+    expect(pushMatch).not.toBeNull();
+    const pushIndex = pushMatch?.index ?? -1;
+    const liveReadIndex = WORKFLOW.lastIndexOf('pulls/$PR_NUMBER', pushIndex);
+    expect(liveReadIndex).toBeGreaterThan(-1);
+    const prePush = WORKFLOW.slice(liveReadIndex, pushIndex);
+    expect(prePush).toContain('.head.sha');
+    expect(prePush).not.toContain('.base.sha');
+    expect(prePush).toContain('ref(qualifiedName:$qualifiedName)');
+    expect(prePush).toContain('.data.repository.ref.target.oid');
+    expect(prePush).toMatch(/\.state|isDraft|\.draft/u);
+    expect(prePush).toMatch(/same_repo|full_name/u);
+    expect(WORKFLOW).toMatch(/rev-parse HEAD|HEAD\^\{commit\}/u);
+
+    expect(WORKFLOW).not.toMatch(
+      /git[\s\S]{0,160}?\bpush\b[^\n]*(?:--force(?:-with-lease)?|\s-f(?:\s|$))/u
+    );
+    expect(WORKFLOW).not.toContain('force-with-lease');
+    expect(WORKFLOW).not.toMatch(/\bgh\s+pr\s+merge\b/u);
+    expect(WORKFLOW).not.toContain('.base.sha');
+    const claim = workflowStep('Build plan and claim exact heads');
+    const exception = workflowStep(
+      'Upsert exact typed exception and terminal status'
+    );
+    const delivery = workflowStep('Validate, reread, and deliver once');
+    for (const step of [claim, exception, delivery]) {
+      expect(step).toContain('ref(qualifiedName:$qualifiedName)');
+      expect(step).toContain('GH_TOKEN="$GH_QUEUE_TOKEN" gh api graphql');
+      expect(step).not.toContain('.base.sha');
+    }
+    expect(
+      delivery.match(/ref\(qualifiedName:\$qualifiedName\)/gu)
+    ).toHaveLength(2);
+    expect(WORKFLOW).not.toContain(
+      'GH_TOKEN="$GH_MUTATION_TOKEN" gh api graphql'
+    );
+  });
+
+  it('preserves native auto-merge without a ready-for-review or dequeue side flight', () => {
+    expect(WORKFLOW).not.toMatch(/types:\s*\[[^\]]*ready_for_review[^\]]*\]/u);
+    expect(WORKFLOW).not.toMatch(/\bgh\s+pr\s+ready\b/u);
+    expect(WORKFLOW).not.toContain('dequeuePullRequest');
+    expect(WORKFLOW).not.toContain('disablePullRequestAutoMerge');
+    expect(WORKFLOW).not.toMatch(/merge-queue-backend\.mjs\s+dequeue/u);
+    expect(WORKFLOW).not.toContain('withgraphite/graphite-ci-action');
+    expect(WORKFLOW).not.toContain('steps.graphite');
+
+    const autoMergeReads = WORKFLOW.match(/autoMergeRequest/gu) ?? [];
+    expect(autoMergeReads.length).toBeGreaterThanOrEqual(2);
+    expect(WORKFLOW).toContain('isInMergeQueue');
+    expect(WORKFLOW).toContain('mergeQueueEntry');
+    expect(
+      WORKFLOW.match(/GH_QUEUE_TOKEN: \$\{\{ github\.token \}\}/gu)
+    ).toHaveLength(4);
+    expect(
+      WORKFLOW.match(/GH_TOKEN="\$GH_QUEUE_TOKEN" gh api graphql/gu)
+    ).toHaveLength(6);
   });
 });

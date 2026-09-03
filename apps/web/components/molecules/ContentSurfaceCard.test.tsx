@@ -16,6 +16,7 @@ describe('ContentSurfaceCard', () => {
     const card = screen.getByTestId('card');
     expect(card.className).toContain('rounded-xl');
     expect(card.className).toContain('border-(--app-shell-border)');
+    expect(card.className).toContain('bg-surface-1');
     expect(card.className).toContain('shadow-none');
     expect(card.className).not.toContain('shadow-card');
     expect(card).not.toHaveAttribute('data-variant');
@@ -110,6 +111,9 @@ describe('ContentSurfaceCard', () => {
     const inner = screen.getByTestId('inner-card');
     expect(inner.parentElement).toBe(outer);
     expect(outer.className).toContain('rounded-xl');
+    expect(outer.className).toContain('bg-surface-1');
     expect(inner.className).toContain('rounded-lg');
+    expect(inner.className).toContain('bg-surface-0');
+    expect(inner.className).not.toContain('bg-surface-1');
   });
 });

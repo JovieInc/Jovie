@@ -17,6 +17,7 @@ const hoisted = vi.hoisted(() => ({
   dbInsertMock: vi.fn(),
   dbUpdateMock: vi.fn(),
   dbSelectRowsMock: vi.fn(),
+  dbOnConflictDoUpdateMock: vi.fn(),
 }));
 
 vi.mock('server-only', () => ({}));
@@ -109,6 +110,8 @@ function installDefaultDbMocks() {
     values: () => ({
       returning: vi.fn().mockResolvedValue([{ id: 'conv_anonymous' }]),
       onConflictDoNothing: vi.fn().mockResolvedValue(undefined),
+      onConflictDoUpdate:
+        hoisted.dbOnConflictDoUpdateMock.mockResolvedValue(undefined),
     }),
   }));
   hoisted.dbUpdateMock.mockImplementation(() => ({
@@ -343,6 +346,20 @@ describe('tryHandleAnonymousOnboardingChat', () => {
     expect(result?.status).toBe(200);
     expect(result?.headers.get('x-fallback-reason')).toBe('injected');
     expect(hoisted.executeChatTurnMock).not.toHaveBeenCalled();
+    expect(hoisted.dbOnConflictDoUpdateMock).toHaveBeenCalledWith(
+      expect.objectContaining({
+        target: expect.any(Array),
+        targetWhere: expect.anything(),
+        set: expect.objectContaining({
+          assistantSource: 'script',
+          content: expect.any(String),
+          scriptLineKey: expect.stringMatching(/^greet:v\d+$/),
+        }),
+      })
+    );
+    const conflictUpdate =
+      hoisted.dbOnConflictDoUpdateMock.mock.calls.at(-1)?.[0];
+    expect(conflictUpdate?.set).toHaveProperty('toolCalls');
   });
 
   it('ignores the injection header when the env flag is not set', async () => {

@@ -217,6 +217,10 @@ vi.mock('@/lib/ai/tools/import-bio-from-url', () => ({
   createImportBioFromUrlTool: vi.fn(),
 }));
 
+vi.mock('@/lib/ai/tools/inspect-press-source', () => ({
+  createInspectPressSourceTool: vi.fn(),
+}));
+
 vi.mock('@/lib/ai/tools/profile-edit', () => ({
   createProfileEditTool: vi.fn(),
 }));

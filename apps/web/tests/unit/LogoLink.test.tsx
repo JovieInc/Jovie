@@ -6,8 +6,9 @@ describe('LogoLink', () => {
   it('renders with default props', () => {
     render(<LogoLink />);
 
-    const link = screen.getByRole('link');
+    const link = screen.getByRole('link', { name: 'Jovie' });
     expect(link).toHaveAttribute('href', '/');
+    expect(link).toHaveAttribute('aria-label', 'Jovie');
   });
 
   it('renders with custom href', () => {

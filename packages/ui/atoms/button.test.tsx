@@ -45,6 +45,7 @@ describe('Button', () => {
       );
 
       expect(source).toContain('[font-weight:var(--font-weight-medium)]');
+      expect(source).not.toMatch(/\bfont-medium\b/);
       expect(source).not.toMatch(/\bfont-(?:semibold|bold|book|normal)\b/);
       expect(source).not.toMatch(/font-\[(?:400|450|590|600|650)\]/);
 
@@ -60,6 +61,7 @@ describe('Button', () => {
         expect(button.className).toContain(
           '[font-weight:var(--font-weight-medium)]'
         );
+        expect(button.className).not.toMatch(/\bfont-medium\b/);
         expect(button.className).not.toMatch(/\bfont-(?:semibold|bold)\b/);
       }
     });
@@ -149,6 +151,7 @@ describe('Button', () => {
     expect(btn).toHaveAttribute('data-variant', 'primary');
     expect(btn).toHaveAttribute('data-size', 'md');
     expect(btn.className).toContain('h-9');
+    expect(btn.className).toContain('text-app');
     expect(btn.className).toContain('bg-btn-primary');
   });
 

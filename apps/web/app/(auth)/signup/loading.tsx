@@ -8,7 +8,8 @@ export default function SignUpLoading() {
     <AuthPageSkeleton
       formTitle='Create your account'
       showFormTitle={false}
-      layoutVariant='split'
+      layoutVariant='stack'
+      chrome='splash-b'
     />
   );
 }

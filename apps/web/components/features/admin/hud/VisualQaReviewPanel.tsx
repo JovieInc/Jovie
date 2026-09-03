@@ -1,9 +1,10 @@
+// @coverage-via apps/web/tests/unit/admin/visual-qa-review-panel-style-guard.test.ts
 'use client';
 
 import { Loader2 } from 'lucide-react';
 import Image from 'next/image';
 import { useCallback, useEffect, useState } from 'react';
-import { toast } from 'sonner';
+import { toast } from '@/components/feedback';
 import { ContentSurfaceCard } from '@/components/molecules/ContentSurfaceCard';
 import { DrawerButton } from '@/components/molecules/drawer';
 import type {

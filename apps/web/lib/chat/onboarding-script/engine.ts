@@ -605,44 +605,50 @@ export async function decideFallbackTurn(
     };
   }
 
+  const confirmedNow = handleConfirmedEventFromLatest(latest);
+  if (
+    confirmedNow &&
+    !findLatestToolOutput(
+      uiMessages,
+      WIDGET_COMPLETION_ACTIONS.HANDLE_CONFIRMED
+    )
+  ) {
+    const handle =
+      confirmedNow.handle ||
+      (typeof existingHandleCheck.handle === 'string'
+        ? String(existingHandleCheck.handle)
+        : handleFromArtistName(state.spotifyArtistName ?? ''));
+    const line = pick('ask_audience');
+    return {
+      line,
+      text: renderLine(line, {}),
+      toolEvents: [
+        {
+          toolName: 'checkHandle',
+          input: { handle },
+          output: {
+            action: WIDGET_COMPLETION_ACTIONS.HANDLE_CONFIRMED,
+            handle,
+            summary: `Handle @${handle} confirmed.`,
+          },
+        },
+        {
+          toolName: 'proposeSocialLink',
+          input: { url: '' },
+          output: {
+            action: 'propose_social_link',
+            url: null,
+            summary: 'Attach a public social account.',
+          },
+        },
+      ],
+      guardedStep: 'social',
+    };
+  }
+
   // Handle shown but not confirmed via widget event — stay on handle.
   // Free-text "ok" / "k" does not advance.
   if (!hasHandleConfirmed(uiMessages)) {
-    const confirmedNow = handleConfirmedEventFromLatest(latest);
-    if (confirmedNow) {
-      const handle =
-        confirmedNow.handle ||
-        (typeof existingHandleCheck.handle === 'string'
-          ? String(existingHandleCheck.handle)
-          : handleFromArtistName(state.spotifyArtistName ?? ''));
-      // Emit handle_confirmed completion + advance to social.
-      const line = pick('ask_audience');
-      return {
-        line,
-        text: renderLine(line, {}),
-        toolEvents: [
-          {
-            toolName: 'checkHandle',
-            input: { handle },
-            output: {
-              action: WIDGET_COMPLETION_ACTIONS.HANDLE_CONFIRMED,
-              handle,
-              summary: `Handle @${handle} confirmed.`,
-            },
-          },
-          {
-            toolName: 'proposeSocialLink',
-            input: { url: '' },
-            output: {
-              action: 'propose_social_link',
-              url: null,
-              summary: 'Attach a public social account.',
-            },
-          },
-        ],
-        guardedStep: 'social',
-      };
-    }
     // Re-surface handle step; do not decide access.
     const handle =
       typeof existingHandleCheck.handle === 'string'
@@ -657,31 +663,34 @@ export async function decideFallbackTurn(
     };
   }
 
+  const attachedNow = socialAttachedEventFromLatest(latest);
+  if (
+    attachedNow &&
+    !findLatestToolOutput(uiMessages, WIDGET_COMPLETION_ACTIONS.SOCIAL_ATTACHED)
+  ) {
+    const url = attachedNow.url;
+    const line = pick('ask_audience');
+    return {
+      line,
+      text: renderLine(line, {}),
+      toolEvents: [
+        {
+          toolName: 'proposeSocialLink',
+          input: { url },
+          output: {
+            action: WIDGET_COMPLETION_ACTIONS.SOCIAL_ATTACHED,
+            url: url || null,
+            summary: url ? `Attached ${url}.` : 'Social account attached.',
+          },
+        },
+      ],
+      guardedStep: 'contact',
+    };
+  }
+
   // Social step: require Attach Account event (or meaningful free-text skip).
   // hasSocialAttached is false until one of those happens.
   if (!hasSocialAttached(uiMessages)) {
-    const attachedNow = socialAttachedEventFromLatest(latest);
-    if (attachedNow) {
-      const url = attachedNow.url;
-      const line = pick('ask_audience');
-      return {
-        line,
-        text: renderLine(line, {}),
-        toolEvents: [
-          {
-            toolName: 'proposeSocialLink',
-            input: { url },
-            output: {
-              action: WIDGET_COMPLETION_ACTIONS.SOCIAL_ATTACHED,
-              url: url || null,
-              summary: url ? `Attached ${url}.` : 'Social account attached.',
-            },
-          },
-        ],
-        guardedStep: 'contact',
-      };
-    }
-
     if (!findLatestToolOutput(uiMessages, 'propose_social_link')) {
       const line = pick('ask_audience');
       return {

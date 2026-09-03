@@ -1,9 +1,11 @@
 import 'server-only';
 
 import { NextResponse } from 'next/server';
+import { isAdmin as checkAdminRole } from '@/lib/admin/roles';
 import { getCurrentUserEntitlements } from '@/lib/entitlements/server';
 import { env } from '@/lib/env-server';
 import { captureError } from '@/lib/error-tracking';
+import { serverFetch } from '@/lib/http/server-fetch';
 import { medianNumber } from '@/lib/hud/number-series';
 import type { HudObservationState } from '@/lib/hud/observation';
 import { observationFromShippingVelocityBuckets } from '@/lib/hud/shipping-velocity-observation';
@@ -11,16 +13,29 @@ import { getRedis } from '@/lib/redis';
 import { logger } from '@/lib/utils/logger';
 
 export const runtime = 'nodejs';
+export const maxDuration = 60;
 
 const NO_STORE_HEADERS = { 'Cache-Control': 'no-store' } as const;
+const VELOCITY_CACHE_MAX_AGE_MS = 2 * 60 * 1000;
+const VELOCITY_CACHE_STALE_MAX_AGE_MS = 10 * 60 * 1000;
+const velocityInFlight = new Map<string, Promise<ShippingVelocityResponse>>();
 
-const RANGE_DAYS: Record<string, number> = {
+type ValidRange = '7d' | '30d' | '1y';
+
+const RANGE_DAYS: Record<ValidRange, number> = {
   '7d': 7,
   '30d': 30,
   '1y': 365,
 };
 
-type ValidRange = '7d' | '30d' | '1y';
+const RANGE_FETCH_BUDGETS: Record<
+  ValidRange,
+  { readonly maxPages: number; readonly timeoutMs: number }
+> = {
+  '7d': { maxPages: 30, timeoutMs: 20_000 },
+  '30d': { maxPages: 75, timeoutMs: 30_000 },
+  '1y': { maxPages: 180, timeoutMs: 55_000 },
+};
 
 export interface DailyBucket {
   date: string; // "2026-05-08"
@@ -33,7 +48,7 @@ export interface DailyBucket {
 
 export type ShippingVelocityObservation = Extract<
   HudObservationState,
-  'fresh' | 'empty' | 'not_configured'
+  'fresh' | 'stale' | 'empty' | 'not_configured'
 >;
 
 export interface ShippingVelocityResponse {
@@ -48,6 +63,7 @@ interface GitHubPrNode {
   state: string;
   merged: boolean;
   createdAt: string;
+  updatedAt: string;
   mergedAt: string | null;
   closedAt: string | null;
 }
@@ -66,6 +82,20 @@ interface GraphQLResponse {
   };
   errors?: Array<{ message: string }>;
 }
+
+const SHIPPING_VELOCITY_QUERY = `query ShippingVelocity($owner: String!, $name: String!, $cursor: String) {
+  repository(owner: $owner, name: $name) {
+    pullRequests(
+      states: [MERGED, CLOSED, OPEN]
+      first: 100
+      orderBy: { field: UPDATED_AT, direction: DESC }
+      after: $cursor
+    ) {
+      nodes { state merged createdAt updatedAt mergedAt closedAt }
+      pageInfo { hasNextPage endCursor }
+    }
+  }
+}`;
 
 function toDateString(isoString: string): string {
   return isoString.slice(0, 10);
@@ -91,40 +121,28 @@ function buildEmptyBuckets(days: number): Map<string, DailyBucket> {
   return buckets;
 }
 
-function buildPrQuery(
-  owner: string,
-  repo: string,
-  cursor: string | null
-): string {
-  const afterClause = cursor ? `, after: "${cursor}"` : '';
-  return `query {
-    repository(owner: "${owner}", name: "${repo}") {
-      pullRequests(
-        states: [MERGED, CLOSED, OPEN]
-        first: 100
-        orderBy: { field: CREATED_AT, direction: DESC }
-        ${afterClause}
-      ) {
-        nodes { state merged createdAt mergedAt closedAt }
-        pageInfo { hasNextPage endCursor }
-      }
-    }
-  }`;
-}
-
 async function fetchGraphQLPage(
   token: string,
-  query: string
+  owner: string,
+  repo: string,
+  cursor: string | null,
+  signal: AbortSignal
 ): Promise<GraphQLResponse> {
-  const response = await fetch('https://api.github.com/graphql', {
+  const response = await serverFetch('https://api.github.com/graphql', {
     method: 'POST',
     headers: {
       Authorization: `Bearer ${token}`,
       'Content-Type': 'application/json',
       'User-Agent': 'Jovie-HUD/1.0',
     },
-    body: JSON.stringify({ query }),
-    signal: AbortSignal.timeout(15000),
+    body: JSON.stringify({
+      query: SHIPPING_VELOCITY_QUERY,
+      variables: { owner, name: repo, cursor },
+    }),
+    timeoutMs: 15_000,
+    context: 'GitHub shipping velocity GraphQL',
+    retry: { maxRetries: 1, baseDelayMs: 250 },
+    signal,
   });
 
   if (!response.ok) {
@@ -141,32 +159,86 @@ async function fetchGraphQLPage(
   return payload;
 }
 
-async function fetchPullRequestsFromGitHub(
+function isGitHubPrNode(value: unknown): value is GitHubPrNode {
+  if (typeof value !== 'object' || value === null) return false;
+  const node = value as Record<string, unknown>;
+  const isTimestamp = (timestamp: unknown): timestamp is string =>
+    typeof timestamp === 'string' && Number.isFinite(Date.parse(timestamp));
+  const state = node.state;
+  const mergedAtValid = node.mergedAt === null || isTimestamp(node.mergedAt);
+  const closedAtValid = node.closedAt === null || isTimestamp(node.closedAt);
+  return (
+    (state === 'OPEN' || state === 'CLOSED' || state === 'MERGED') &&
+    typeof node.merged === 'boolean' &&
+    isTimestamp(node.createdAt) &&
+    isTimestamp(node.updatedAt) &&
+    mergedAtValid &&
+    closedAtValid &&
+    (!node.merged || isTimestamp(node.mergedAt)) &&
+    (node.merged || state !== 'CLOSED' || isTimestamp(node.closedAt))
+  );
+}
+
+async function fetchBucketsFromGitHub(
   token: string,
   owner: string,
   repo: string,
-  sinceIso: string
-): Promise<GitHubPrNode[]> {
-  const nodes: GitHubPrNode[] = [];
+  sinceIso: string,
+  days: number,
+  budget: { readonly maxPages: number; readonly timeoutMs: number }
+): Promise<DailyBucket[]> {
+  const buckets = buildEmptyBuckets(days);
+  const mergeHoursByDate = new Map<string, number[]>();
+  const signal = AbortSignal.timeout(budget.timeoutMs);
+  const maxNodes = budget.maxPages * 100;
   let cursor: string | null = null;
+  let pageCount = 0;
+  let nodeCount = 0;
 
   for (;;) {
-    const query = buildPrQuery(owner, repo, cursor);
-    const payload = await fetchGraphQLPage(token, query);
+    pageCount += 1;
+    if (pageCount > budget.maxPages) {
+      throw new Error('GitHub GraphQL page budget exceeded');
+    }
+    const payload = await fetchGraphQLPage(token, owner, repo, cursor, signal);
 
     const prs = payload.data?.repository?.pullRequests;
-    if (!prs) break;
+    if (
+      !prs ||
+      !Array.isArray(prs.nodes) ||
+      !prs.nodes.every(isGitHubPrNode) ||
+      !prs.pageInfo ||
+      typeof prs.pageInfo.hasNextPage !== 'boolean' ||
+      (typeof prs.pageInfo.endCursor !== 'string' &&
+        prs.pageInfo.endCursor !== null)
+    ) {
+      throw new Error('GitHub GraphQL pull-request shape unavailable');
+    }
 
     for (const node of prs.nodes) {
-      if (node.createdAt < sinceIso) return nodes;
-      nodes.push(node);
+      if (node.updatedAt < sinceIso) {
+        finalizeMergeP50(buckets, mergeHoursByDate);
+        return Array.from(buckets.values());
+      }
+      nodeCount += 1;
+      if (nodeCount > maxNodes) {
+        throw new Error('GitHub GraphQL node budget exceeded');
+      }
+      incrementBucket(buckets, toDateString(node.createdAt), 'opened');
+      countMergedPr(node, buckets, mergeHoursByDate);
+      countClosedPr(node, buckets);
     }
 
     if (!prs.pageInfo.hasNextPage) break;
-    cursor = prs.pageInfo.endCursor;
+    const nextCursor = prs.pageInfo.endCursor;
+    if (!nextCursor || nextCursor === cursor) {
+      throw new Error('GitHub GraphQL pagination cursor did not advance');
+    }
+    cursor = nextCursor;
   }
 
-  return nodes;
+  finalizeMergeP50(buckets, mergeHoursByDate);
+  return Array.from(buckets.values());
 }
 
 function incrementBucket(
@@ -231,20 +303,6 @@ function finalizeMergeP50(
   }
 }
 
-function computeBuckets(nodes: GitHubPrNode[], days: number): DailyBucket[] {
-  const buckets = buildEmptyBuckets(days);
-  const mergeHoursByDate = new Map<string, number[]>();
-
-  for (const node of nodes) {
-    incrementBucket(buckets, toDateString(node.createdAt), 'opened');
-    countMergedPr(node, buckets, mergeHoursByDate);
-    countClosedPr(node, buckets);
-  }
-
-  finalizeMergeP50(buckets, mergeHoursByDate);
-  return Array.from(buckets.values());
-}
-
 function parseRange(request: Request): ValidRange {
   const { searchParams } = new URL(request.url);
   const rawRange = searchParams.get('range') ?? '7d';
@@ -254,13 +312,17 @@ function parseRange(request: Request): ValidRange {
 
 async function authorizeAdmin(): Promise<Response | null> {
   const entitlements = await getCurrentUserEntitlements();
-  if (!entitlements.isAuthenticated) {
+  if (!entitlements.isAuthenticated || !entitlements.userId) {
     return NextResponse.json(
       { error: 'Unauthorized' },
       { status: 401, headers: NO_STORE_HEADERS }
     );
   }
-  if (!entitlements.isAdmin) {
+  // This GET is a read-only HUD observation. Match authorizeHud(): stale MFA
+  // may hide mutations, but it must not make an admin's observation API 403.
+  const hasAdminRole =
+    entitlements.isAdmin || (await checkAdminRole(entitlements.userId));
+  if (!hasAdminRole) {
     return NextResponse.json(
       { error: 'Forbidden' },
       { status: 403, headers: NO_STORE_HEADERS }
@@ -282,6 +344,15 @@ function normalizeVelocityResponse(
         'GitHub is not configured for shipping velocity.',
     };
   }
+  if (result.observation === 'stale') {
+    return {
+      ...result,
+      observation: 'stale',
+      errorMessage:
+        result.errorMessage ??
+        'Refresh unavailable; showing last verified shipping velocity.',
+    };
+  }
   return {
     ...result,
     observation: observationFromShippingVelocityBuckets(result.data),
@@ -292,11 +363,23 @@ function normalizeVelocityResponse(
 async function readCachedVelocity(
   redis: ReturnType<typeof getRedis>,
   cacheKey: string
-): Promise<ShippingVelocityResponse | null> {
+): Promise<{
+  readonly ageMs: number;
+  readonly response: ShippingVelocityResponse;
+} | null> {
   if (!redis) return null;
   try {
     const cached = await redis.get<ShippingVelocityResponse>(cacheKey);
-    return cached ? normalizeVelocityResponse(cached) : null;
+    if (!cached) return null;
+    const ageMs = Date.now() - Date.parse(cached.cachedAt);
+    if (
+      !Number.isFinite(ageMs) ||
+      ageMs < 0 ||
+      ageMs > VELOCITY_CACHE_STALE_MAX_AGE_MS
+    ) {
+      return null;
+    }
+    return { ageMs, response: normalizeVelocityResponse(cached) };
   } catch (redisError) {
     logger.error('[hud/shipping-velocity] Redis get failed', redisError);
     return null;
@@ -310,7 +393,9 @@ async function cacheVelocity(
 ): Promise<void> {
   if (!redis) return;
   try {
-    await redis.set(cacheKey, result, { ex: 20 * 60 });
+    await redis.set(cacheKey, result, {
+      ex: Math.ceil(VELOCITY_CACHE_STALE_MAX_AGE_MS / 1000),
+    });
   } catch (redisError) {
     logger.error('[hud/shipping-velocity] Redis set failed', redisError);
   }
@@ -326,6 +411,35 @@ function notConfiguredVelocityResponse(
     observation: 'not_configured',
     errorMessage: 'GitHub is not configured for shipping velocity.',
   };
+}
+
+async function computeVelocity(
+  token: string,
+  owner: string,
+  repo: string,
+  range: ValidRange,
+  days: number,
+  redis: ReturnType<typeof getRedis>,
+  cacheKey: string
+): Promise<ShippingVelocityResponse> {
+  const sinceDate = new Date();
+  sinceDate.setUTCDate(sinceDate.getUTCDate() - days);
+  const buckets = await fetchBucketsFromGitHub(
+    token,
+    owner,
+    repo,
+    sinceDate.toISOString(),
+    days,
+    RANGE_FETCH_BUDGETS[range]
+  );
+  const result: ShippingVelocityResponse = {
+    data: buckets,
+    range,
+    cachedAt: new Date().toISOString(),
+    observation: observationFromShippingVelocityBuckets(buckets),
+  };
+  await cacheVelocity(redis, cacheKey, result);
+  return result;
 }
 
 export async function GET(request: Request): Promise<Response> {
@@ -348,36 +462,66 @@ export async function GET(request: Request): Promise<Response> {
     }
 
     const redis = getRedis();
-    const cacheKey = `hud:shipping-velocity:v2:${range}`;
+    const deploymentEnv = env.VERCEL_ENV ?? env.NODE_ENV ?? 'development';
+    const cacheKey = `hud:shipping-velocity:v5:${deploymentEnv}:${range}`;
     const cached = await readCachedVelocity(redis, cacheKey);
-    if (cached && cached.observation !== 'not_configured') {
-      return NextResponse.json(cached, {
+    if (
+      cached &&
+      cached.ageMs <= VELOCITY_CACHE_MAX_AGE_MS &&
+      cached.response.observation !== 'not_configured'
+    ) {
+      return NextResponse.json(cached.response, {
         status: 200,
         headers: NO_STORE_HEADERS,
       });
     }
 
-    // Compute "since" date
-    const sinceDate = new Date();
-    sinceDate.setUTCDate(sinceDate.getUTCDate() - days);
-    const sinceIso = sinceDate.toISOString();
-
-    const nodes = await fetchPullRequestsFromGitHub(
-      token,
-      owner,
-      repo,
-      sinceIso
-    );
-    const buckets = computeBuckets(nodes, days);
-
-    const result: ShippingVelocityResponse = {
-      data: buckets,
-      range,
-      cachedAt: new Date().toISOString(),
-      observation: observationFromShippingVelocityBuckets(buckets),
-    };
-
-    await cacheVelocity(redis, cacheKey, result);
+    let computation = velocityInFlight.get(cacheKey);
+    if (!computation) {
+      computation = computeVelocity(
+        token,
+        owner,
+        repo,
+        range,
+        days,
+        redis,
+        cacheKey
+      );
+      velocityInFlight.set(cacheKey, computation);
+      const clearComputation = () => {
+        if (velocityInFlight.get(cacheKey) === computation) {
+          velocityInFlight.delete(cacheKey);
+        }
+      };
+      void computation.then(clearComputation, clearComputation);
+    }
+    let result: ShippingVelocityResponse;
+    try {
+      result = await computation;
+    } catch (error) {
+      if (cached?.response.observation !== undefined) {
+        const stale = normalizeVelocityResponse({
+          ...cached.response,
+          observation: 'stale',
+          errorMessage:
+            'Refresh unavailable; showing last verified shipping velocity.',
+        });
+        logger.error(
+          '[hud/shipping-velocity] Refresh failed; serving stale cache',
+          error
+        );
+        await captureError('HUD shipping velocity refresh failed', error, {
+          route: '/api/admin/hud/shipping-velocity',
+          method: 'GET',
+          fallback: 'stale-cache',
+        });
+        return NextResponse.json(stale, {
+          status: 200,
+          headers: NO_STORE_HEADERS,
+        });
+      }
+      throw error;
+    }
 
     return NextResponse.json(result, {
       status: 200,

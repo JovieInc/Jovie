@@ -67,9 +67,9 @@ export const WORDMARK_TRACK = {
  * are for the brand-kit documentation surface only; production UI should keep
  * using --color-bg-base / surface-0 / surface-1 tokens.
  *
- * Feature hues: a carbon-style palette of eight equal accents — no hierarchy,
- * no "brand purple." Use on text, eyebrows, data highlights, never on filled
- * brand surfaces or buttons.
+ * Feature hues: public documentation for the current Noir Ion semantic anchors.
+ * No "brand purple." Use on text, data highlights, and named states, never on
+ * filled brand surfaces or buttons.
  */
 export const PALETTE = {
   surface: [
@@ -80,13 +80,13 @@ export const PALETTE = {
     { name: 'Cream', hex: '#F5F4F0', token: '--cream' },
   ],
   feature: [
-    { name: 'Blue', hex: '#4D7DFF' },
-    { name: 'Purple', hex: '#9B4DFF' },
-    { name: 'Pink', hex: '#EA4A9C' },
-    { name: 'Red', hex: '#FF4D5F' },
-    { name: 'Orange', hex: '#FFAB2E' },
-    { name: 'Green', hex: '#43B85C' },
-    { name: 'Teal', hex: '#22B8A7' },
+    { name: 'Ion', hex: '#11AFFF' },
+    { name: 'Ultra', hex: '#A982FF' },
+    { name: 'Pulse', hex: '#FF48D2' },
+    { name: 'Aqua', hex: '#24F6D2' },
+    { name: 'Mint', hex: '#39E58C' },
+    { name: 'Orange', hex: '#FFC857' },
+    { name: 'Red', hex: '#FF677D' },
     { name: 'Gray', hex: '#8D8D93' },
   ],
 } as const;
@@ -121,14 +121,14 @@ export const TYPOGRAPHY = {
     className: 'font-display font-bold tracking-[-0.02em] leading-[1.1]',
   },
   bodyLg: {
-    label: 'Body LG · DM Sans 400',
+    label: 'Body LG · Inter 400',
     spec: '22 / 1.4',
     fontVar: '--font-body',
     sample: 'Streams, drops, tips, bookings, and fan capture in a single page.',
     className: 'font-body font-normal leading-[1.4] text-secondary-token',
   },
   body: {
-    label: 'Body · DM Sans 400',
+    label: 'Body · Inter 400',
     spec: '15 / 1.55',
     fontVar: '--font-body',
     sample: 'Turn attention into action.',

@@ -13,6 +13,8 @@ const hoisted = vi.hoisted(() => ({
   mockGetPlanFromPriceId: vi.fn(),
   mockCaptureCriticalError: vi.fn(),
   mockLogFallback: vi.fn(),
+  mockAttributeLeadPaidConversionByAppUserId: vi.fn(),
+  mockExpireReferralOnChurn: vi.fn(),
 }));
 
 export const mockGetUserIdFromStripeCustomer =
@@ -22,6 +24,9 @@ export const mockUpdateUserBillingStatus = hoisted.mockUpdateUserBillingStatus;
 export const mockGetPlanFromPriceId = hoisted.mockGetPlanFromPriceId;
 export const mockCaptureCriticalError = hoisted.mockCaptureCriticalError;
 export const mockLogFallback = hoisted.mockLogFallback;
+export const mockAttributeLeadPaidConversionByAppUserId =
+  hoisted.mockAttributeLeadPaidConversionByAppUserId;
+export const mockExpireReferralOnChurn = hoisted.mockExpireReferralOnChurn;
 
 // Setup mocks
 vi.mock('@/lib/stripe/webhooks/utils', () => ({
@@ -47,6 +52,15 @@ vi.mock('@/lib/stripe/config', () => ({
 vi.mock('@/lib/error-tracking', () => ({
   captureCriticalError: mockCaptureCriticalError,
   logFallback: mockLogFallback,
+}));
+
+vi.mock('@/lib/leads/funnel-events', () => ({
+  attributeLeadPaidConversionByAppUserId:
+    mockAttributeLeadPaidConversionByAppUserId,
+}));
+
+vi.mock('@/lib/referrals/service', () => ({
+  expireReferralOnChurn: mockExpireReferralOnChurn,
 }));
 
 // Mock heavy dependencies to prevent slow module resolution timeouts
@@ -126,6 +140,11 @@ export function createSubscriptionContext(
  */
 export function setupDefaultMocks() {
   mockGetPlanFromPriceId.mockReturnValue('standard');
-  mockUpdateUserBillingStatus.mockResolvedValue({ success: true });
+  mockUpdateUserBillingStatus.mockResolvedValue({
+    success: true,
+    appUserId: 'app_user_test',
+  });
   mockInvalidateBillingCache.mockResolvedValue(undefined);
+  mockAttributeLeadPaidConversionByAppUserId.mockResolvedValue(undefined);
+  mockExpireReferralOnChurn.mockResolvedValue(undefined);
 }

@@ -1,6 +1,7 @@
 import { readFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import postcss from 'postcss';
 import { describe, expect, it } from 'vitest';
 import {
   checkOutputs,
@@ -23,6 +24,62 @@ import {
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const WEB_ROOT = join(__dirname, '..', '..', '..');
+
+const TEXT_TOKEN_PAIRS = [
+  ['--linear-text-primary', '--color-text-primary-token'],
+  ['--linear-text-secondary', '--color-text-secondary-token'],
+  ['--linear-text-tertiary', '--color-text-tertiary-token'],
+  ['--linear-text-quaternary', '--color-text-quaternary-token'],
+] as const;
+
+function customPropertiesForSelector(
+  css: string,
+  selector: ':root' | ':root.dark'
+): Map<string, string> {
+  const properties = new Map<string, string>();
+  const root = postcss.parse(css);
+
+  for (const node of root.nodes) {
+    if (node.type !== 'rule' || !node.selectors.includes(selector)) continue;
+    for (const child of node.nodes) {
+      if (child.type === 'decl' && child.prop.startsWith('--')) {
+        properties.set(child.prop, child.value.trim());
+      }
+    }
+  }
+
+  return properties;
+}
+
+function resolveCustomProperty(
+  property: string,
+  properties: Map<string, string>,
+  seen = new Set<string>()
+): string {
+  const value = properties.get(property);
+  if (!value) throw new Error(`Missing custom property: ${property}`);
+  if (seen.has(property))
+    throw new Error(`Circular custom property: ${property}`);
+
+  const alias = value.match(/^var\((--[a-z0-9-]+)\)$/);
+  if (!alias) return value.replace(/\s+/g, ' ');
+
+  const nextSeen = new Set(seen);
+  nextSeen.add(property);
+  return resolveCustomProperty(alias[1], properties, nextSeen);
+}
+
+function textTokenMismatches(
+  linearProperties: Map<string, string>,
+  canonicalProperties: Map<string, string>
+): string[] {
+  return TEXT_TOKEN_PAIRS.flatMap(([linear, canonical]) =>
+    resolveCustomProperty(linear, linearProperties) ===
+    resolveCustomProperty(canonical, canonicalProperties)
+      ? []
+      : [`${linear} -> ${canonical}`]
+  );
+}
 
 describe('design tokens — single machine-readable source', () => {
   it('generated outputs are in sync with design/tokens.json', () => {
@@ -49,6 +106,94 @@ describe('design tokens — single machine-readable source', () => {
         `--gray${step}:`
       );
     }
+  });
+
+  it('owns radius CSS and leaves Tailwind no legacy linear radius namespace', () => {
+    const tokens = loadSource() as {
+      radius: Record<string, string>;
+    };
+    const generated = readFileSync(
+      join(WEB_ROOT, 'styles', 'generated', 'design-tokens.css'),
+      'utf8'
+    );
+    const designSystem = readFileSync(
+      join(WEB_ROOT, 'styles', 'design-system.css'),
+      'utf8'
+    );
+    const linearTokens = readFileSync(
+      join(WEB_ROOT, 'styles', 'linear-tokens.css'),
+      'utf8'
+    );
+    const tailwindConfig = readFileSync(
+      join(WEB_ROOT, 'tailwind.config.js'),
+      'utf8'
+    );
+
+    for (const [name, value] of Object.entries(tokens.radius)) {
+      if (name.startsWith('$')) continue;
+      expect(generated).toContain(`--radius-${name}: ${value};`);
+    }
+
+    expect(designSystem).not.toMatch(/^\s*--radius-[a-z0-9-]+:/m);
+    expect(linearTokens).not.toMatch(/--linear-radius-[a-z0-9-]+/);
+    expect(tailwindConfig).not.toMatch(/'linear-(?:sm|md|lg)'/);
+
+    const tailwindRadiusTokens = [
+      ...tailwindConfig.matchAll(/var\(--radius-([a-z0-9-]+)\)/g),
+    ].map(match => match[1]);
+    expect(tailwindRadiusTokens.length).toBeGreaterThan(0);
+    for (const name of tailwindRadiusTokens) {
+      expect(tokens.radius).toHaveProperty(name);
+    }
+  });
+
+  it('keeps zero-consumer linear text semantic aliases retired', () => {
+    const linearTokens = readFileSync(
+      join(WEB_ROOT, 'styles', 'linear-tokens.css'),
+      'utf8'
+    );
+
+    expect(linearTokens).not.toMatch(
+      /--linear-color-text(?:-muted|-subtle)?\s*:/
+    );
+  });
+
+  it('deliberate-red: keeps light-mode linear text declarations unequal until redesign', () => {
+    const linearTokens = readFileSync(
+      join(WEB_ROOT, 'styles', 'linear-tokens.css'),
+      'utf8'
+    );
+    const designSystem = readFileSync(
+      join(WEB_ROOT, 'styles', 'design-system.css'),
+      'utf8'
+    );
+
+    expect(
+      textTokenMismatches(
+        customPropertiesForSelector(linearTokens, ':root'),
+        customPropertiesForSelector(designSystem, ':root')
+      )
+    ).toEqual(
+      TEXT_TOKEN_PAIRS.map(([linear, canonical]) => `${linear} -> ${canonical}`)
+    );
+  });
+
+  it('keeps dark-mode linear and canonical text declarations identical after alias resolution', () => {
+    const linearTokens = readFileSync(
+      join(WEB_ROOT, 'styles', 'linear-tokens.css'),
+      'utf8'
+    );
+    const designSystem = readFileSync(
+      join(WEB_ROOT, 'styles', 'design-system.css'),
+      'utf8'
+    );
+
+    expect(
+      textTokenMismatches(
+        customPropertiesForSelector(linearTokens, ':root.dark'),
+        customPropertiesForSelector(designSystem, ':root.dark')
+      )
+    ).toEqual([]);
   });
 
   it('accent values in tokens.json match the live design-system.css emitter', () => {

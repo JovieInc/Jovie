@@ -1,4 +1,5 @@
 export type {
+  DesignSystemCompatibilityConsumer,
   DesignSystemComponentId,
   DesignSystemComponentRegistryEntry,
   DesignSystemLayer,
@@ -11,8 +12,11 @@ export {
   designSystemCanonicalPenRoot,
   designSystemVariantKey,
   getDesignSystemComponent,
+  validateDesignSystemCompatibilityConsumerSource,
   validateDesignSystemComponentRegistry,
 } from './componentRegistry';
+export * from './interactionRegistry';
+export * from './interactionRegistryValidation';
 export type {
   ButtonPenPropagationFixture,
   ButtonPenRefInput,
@@ -25,5 +29,7 @@ export {
   BUTTON_PEN_PROPAGATION_FIXTURES,
   normalizeButtonPenRef,
 } from './penRefs';
+export * from './systemAuthorityMap';
+export * from './systemAuthorityMapValidation';
 export * from './uiOwnershipRegistry';
 export * from './uiOwnershipRegistryValidation';

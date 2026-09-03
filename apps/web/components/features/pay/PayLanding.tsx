@@ -24,12 +24,22 @@ function TipsHero() {
   return (
     <section className='relative overflow-hidden'>
       <div className='hero-glow pointer-events-none absolute inset-0' />
-      <MarketingHero variant='centered' className='items-start text-left'>
+      <MarketingHero
+        variant='centered'
+        className='items-start text-left'
+        headingId='pay-hero-heading'
+        testId='pay-hero'
+      >
         <p className='marketing-kicker'>Pay</p>
         {/* ui-casing-allow: marketing display headline */}
-        <h1 className='marketing-h1-linear mt-6 max-w-[10ch] text-primary-token'>
+        {/* eslint-disable @jovie/canonical-ui-label-casing -- Preserve approved sentence-case marketing copy while adding binding evidence. */}
+        <h1
+          id='pay-hero-heading'
+          className='marketing-h1-linear mt-6 max-w-[10ch] text-primary-token'
+        >
           Turn every payment into a fan.
         </h1>
+        {/* eslint-enable @jovie/canonical-ui-label-casing */}
 
         <p className='marketing-lead-linear mt-6 max-w-[33rem] text-secondary-token'>
           Scan. Pay. Stream. One QR code turns a stranger into a superfan and

@@ -3,6 +3,7 @@ import 'server-only';
 import { and, desc, eq, gte, or } from 'drizzle-orm';
 import {
   type JovieWorkItem,
+  type JovieWorkOutcome,
   mapAgentRunToJovieWorkItem,
   mapFanNotificationToJovieWorkItem,
   mapMerchFulfillmentJobToJovieWorkItem,
@@ -12,11 +13,13 @@ import {
   mapWorkflowRunToJovieWorkItem,
   mergeJovieWorkItems,
 } from '@/lib/activity/jovie-work-feed';
+import { resolveReleaseOutcomeMeasurementState } from '@/lib/connectors/workflows/outcome-attribution';
 import { db } from '@/lib/db';
 import { retouchJobs } from '@/lib/db/schema/agents';
 import {
   agentRuns,
   suggestedActions,
+  workflowRunOutcomes,
   workflowRuns,
 } from '@/lib/db/schema/connectors';
 import { discogReleases } from '@/lib/db/schema/content';
@@ -36,6 +39,35 @@ export interface LoadJovieWorkFeedInput {
   readonly creatorProfileId: string;
   readonly limit: number;
   readonly range: ActivityRange;
+}
+
+function toJovieWorkOutcome(input: {
+  readonly windowStart: Date | null;
+  readonly windowEnd: Date | null;
+  readonly gmvDeltaCents: number | null;
+  readonly clickDelta: number | null;
+  readonly dspClickDelta: number | null;
+  readonly newFansDelta: number | null;
+}): JovieWorkOutcome | null {
+  if (!input.windowStart || !input.windowEnd) {
+    return null;
+  }
+
+  const metrics = {
+    gmvDeltaCents: Number(input.gmvDeltaCents ?? 0),
+    clickDelta: Number(input.clickDelta ?? 0),
+    dspClickDelta: Number(input.dspClickDelta ?? 0),
+    newFansDelta: Number(input.newFansDelta ?? 0),
+  };
+
+  return {
+    state: resolveReleaseOutcomeMeasurementState({
+      windowStart: input.windowStart,
+      windowEnd: input.windowEnd,
+      ...metrics,
+    }),
+    metrics,
+  };
 }
 
 export async function loadJovieWorkFeed(
@@ -62,12 +94,25 @@ export async function loadJovieWorkFeed(
         stepOutputs: workflowRuns.stepOutputs,
         createdAt: workflowRuns.createdAt,
         updatedAt: workflowRuns.updatedAt,
+        outcomeWindowStart: workflowRunOutcomes.windowStart,
+        outcomeWindowEnd: workflowRunOutcomes.windowEnd,
+        outcomeGmvDeltaCents: workflowRunOutcomes.gmvDeltaCents,
+        outcomeClickDelta: workflowRunOutcomes.clickDelta,
+        outcomeDspClickDelta: workflowRunOutcomes.dspClickDelta,
+        outcomeNewFansDelta: workflowRunOutcomes.newFansDelta,
       })
       .from(workflowRuns)
+      .leftJoin(
+        workflowRunOutcomes,
+        eq(workflowRunOutcomes.workflowRunId, workflowRuns.id)
+      )
       .where(
         and(
           eq(workflowRuns.userId, input.userId),
-          gte(workflowRuns.updatedAt, since)
+          or(
+            gte(workflowRuns.updatedAt, since),
+            gte(workflowRunOutcomes.windowEnd, since)
+          )
         )
       )
       .orderBy(desc(workflowRuns.updatedAt))
@@ -206,7 +251,25 @@ export async function loadJovieWorkFeed(
   ]);
 
   const items: JovieWorkItem[] = [
-    ...workflowRows.map(mapWorkflowRunToJovieWorkItem),
+    ...workflowRows.map(row =>
+      mapWorkflowRunToJovieWorkItem({
+        id: row.id,
+        kind: row.kind,
+        status: row.status,
+        currentStep: row.currentStep,
+        stepOutputs: row.stepOutputs,
+        createdAt: row.createdAt,
+        updatedAt: row.updatedAt,
+        outcome: toJovieWorkOutcome({
+          windowStart: row.outcomeWindowStart,
+          windowEnd: row.outcomeWindowEnd,
+          gmvDeltaCents: row.outcomeGmvDeltaCents,
+          clickDelta: row.outcomeClickDelta,
+          dspClickDelta: row.outcomeDspClickDelta,
+          newFansDelta: row.outcomeNewFansDelta,
+        }),
+      })
+    ),
     ...agentRows.map(mapAgentRunToJovieWorkItem),
     ...suggestedActionRows.map(mapSuggestedActionToJovieWorkItem),
     ...retouchRows.map(mapRetouchJobToJovieWorkItem),

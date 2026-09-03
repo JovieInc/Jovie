@@ -1,9 +1,20 @@
 import { execFileSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
-import storybookConfig from '../../../.storybook/main';
+import storybookConfig, {
+  storybookAddonsForEnvironment,
+} from '../../../.storybook/main';
 
 describe('Storybook next-themes resolution', () => {
+  it('keeps automatic a11y enabled outside the dedicated live-cert build', () => {
+    expect(storybookAddonsForEnvironment(false)).toContain(
+      '@storybook/addon-a11y'
+    );
+    expect(storybookAddonsForEnvironment(true)).not.toContain(
+      '@storybook/addon-a11y'
+    );
+  });
+
   it('resolves the bare package import to the script-free mock', async () => {
     const viteFinal = storybookConfig.viteFinal;
     expect(viteFinal).toBeTypeOf('function');

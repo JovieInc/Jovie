@@ -9,6 +9,12 @@ function readWebSource(path: string): string {
 describe('support route header contract', () => {
   it('keeps support in the canonical landing header taxonomy', () => {
     const headerSource = readWebSource('components/site/MarketingHeader.tsx');
+    expect(
+      readFileSync(
+        resolve(process.cwd(), 'components/site/MarketingHeader.tsx'),
+        'utf8'
+      )
+    ).toContain('export function MarketingHeader');
     const registrySource = readWebSource('lib/sections/variants/header.tsx');
     const landingStart = registrySource.indexOf(
       "id: 'marketing-header-landing'"
@@ -26,9 +32,11 @@ describe('support route header contract', () => {
       'penContractId={MARKETING_PEN_CONTRACT_IDS.shell.header}'
     );
     expect(headerSource).toContain(
-      'getHomepageFrontDoorCtaContract(FEATURE_FLAGS.WAITLIST_ENABLED).primary'
+      'DEFAULT_MARKETING_CTA: MarketingHeaderCta = MARKETING_NAV_UTILITIES[1]'
     );
     expect(headerSource).toContain("treatment: 'wordmark'");
+    expect(headerSource).toContain('MARKETING_GLASS_FLYOUTS');
+    expect(headerSource).toContain('showContactLink={false}');
     expect(registrySource).not.toContain('marketing-header-content');
     expect(landingStart).toBeGreaterThanOrEqual(0);
     expect(minimalStart).toBeGreaterThan(landingStart);

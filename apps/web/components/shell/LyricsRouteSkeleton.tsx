@@ -13,9 +13,9 @@ export function LyricsRouteSkeleton() {
       aria-label='Loading lyrics'
       aria-busy='true'
       aria-live='polite'
-      className='flex h-full min-h-0 flex-col bg-(--linear-app-content-surface)'
+      className='flex h-full min-h-0 flex-col bg-(--app-shell-content-surface)'
     >
-      <header className='flex h-16 shrink-0 items-center justify-between gap-4 border-b border-(--linear-app-shell-border) px-6'>
+      <header className='flex h-16 shrink-0 items-center justify-between gap-4 border-b border-(--app-shell-border) px-6'>
         <div className='min-w-0 space-y-2'>
           <div className='skeleton h-5 w-44 rounded-md' />
           <div className='skeleton h-3.5 w-28 rounded' />
@@ -37,7 +37,7 @@ export function LyricsRouteSkeleton() {
         </div>
       </div>
 
-      <footer className='flex h-14 shrink-0 items-center gap-4 border-t border-(--linear-app-shell-border) px-6'>
+      <footer className='flex h-14 shrink-0 items-center gap-4 border-t border-(--app-shell-border) px-6'>
         <div className='skeleton h-3 w-10 rounded' />
         <div className='skeleton h-1.5 flex-1 rounded-full' />
         <div className='skeleton h-3 w-10 rounded' />

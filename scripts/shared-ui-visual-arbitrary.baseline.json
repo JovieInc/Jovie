@@ -1,0 +1,18 @@
+{
+  "schema": "jovie.shared-ui-visual-arbitrary/v1",
+  "scope": ["packages/ui"],
+  "totalFindings": 14,
+  "findings": [
+    {"file":"packages/ui/atoms/button.tsx","value":"shadow-[inset_0_1px_0_rgba(255,255,255,0.04),0_1px_1px_rgba(0,0,0,0.08)]","count":1},
+    {"file":"packages/ui/atoms/icon-button.tsx","value":"focus-visible:shadow-[0_10px_24px_rgba(10,12,18,0.12)]","count":1},
+    {"file":"packages/ui/atoms/icon-button.tsx","value":"hover:shadow-[0_10px_24px_rgba(10,12,18,0.1)]","count":1},
+    {"file":"packages/ui/atoms/progress.tsx","value":"animate-[progress-indeterminate_1.5s_ease-in-out_infinite]","count":1},
+    {"file":"packages/ui/atoms/sheet.tsx","value":"max-h-[calc(100dvh-1rem)]","count":2},
+    {"file":"packages/ui/atoms/sheet.tsx","value":"w-[min(26rem,calc(100vw-1rem))]","count":2},
+    {"file":"packages/ui/atoms/tooltip.tsx","value":"z-[150]","count":2},
+    {"file":"packages/ui/lib/overlay-styles.ts","value":"max-h-[calc(100dvh-2rem)]","count":1},
+    {"file":"packages/ui/lib/overlay-styles.ts","value":"tracking-[-0.015em]","count":1},
+    {"file":"packages/ui/lib/overlay-styles.ts","value":"w-[calc(100vw-2rem)]","count":1},
+    {"file":"packages/ui/lib/overlay-styles.ts","value":"z-[65]","count":1}
+  ]
+}

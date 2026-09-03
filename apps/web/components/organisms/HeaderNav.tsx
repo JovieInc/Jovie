@@ -52,7 +52,7 @@ export interface HeaderNavCta {
 export interface HeaderNavLinkItem {
   readonly href: string;
   readonly label: string;
-  readonly treatment?: 'wordmark';
+  readonly treatment?: 'wordmark' | 'leading';
 }
 
 export interface HeaderFlyoutMenu {
@@ -110,7 +110,7 @@ function PublicAuthActions({
       </Button>
       <Button
         asChild
-        size='md'
+        size='marketing'
         variant='primary'
         className='focus-ring-themed shrink-0 whitespace-nowrap'
       >
@@ -466,10 +466,14 @@ export function HeaderNav({
   const hasMobileNavLinks =
     !hideNav && !hideDesktopNav && !!mobileLinks?.length;
   const leadingMarketingLinks = isMarketingGlass
-    ? navLinks?.filter(link => link.treatment === 'wordmark')
+    ? navLinks?.filter(
+        link => link.treatment === 'wordmark' || link.treatment === 'leading'
+      )
     : undefined;
   const trailingNavLinks = isMarketingGlass
-    ? navLinks?.filter(link => link.treatment !== 'wordmark')
+    ? navLinks?.filter(
+        link => link.treatment !== 'wordmark' && link.treatment !== 'leading'
+      )
     : navLinks;
   const renderNavLinks = (
     links: ReadonlyArray<HeaderNavLinkItem> | undefined
@@ -554,11 +558,11 @@ export function HeaderNav({
         backdropFilter:
           presentation === 'homepage-embedded' || isMarketingGlass
             ? 'none'
-            : `blur(var(--linear-blur-header))`,
+            : `blur(var(--blur-header))`,
         WebkitBackdropFilter:
           presentation === 'homepage-embedded' || isMarketingGlass
             ? 'none'
-            : `blur(var(--linear-blur-header))`,
+            : `blur(var(--blur-header))`,
         minWidth: 0,
         minHeight: 0,
         /* iOS safe area: push header content below the notch/Dynamic Island */

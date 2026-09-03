@@ -6,11 +6,17 @@
  *   1. Dangling skill symlinks in .claude/skills + stale ownedSkills pins.
  *   2. .claude/skills/gstack is a symlink to the vendored fork.
  *   3. design.tokens.json freshness vs design-system.css (export --check).
- *   4. DESIGN.md Noir Ion sidebar rgb agrees with linear-tokens.css.
+ *   4. DESIGN.md Noir Ion sidebar rgb agrees with design-system.css.
  *   5. Enforcement commands exist in package.json. Absence from
  *      ci-fast-lanes.mjs is WARN-only (weekly + local; not a merge gate).
  *   6. code-style.md custom-rule count matches eslint.config.js.
  *   7. DESIGN_COMPLETE.md carries a superseded banner.
+ *   8. Design-agent invariants project from canon/invariants.jsonl only.
+ *   9. Shared-UI visual arbitrary values are shrink-only (JOV-5437).
+ *  10. Shadcn/Typeset outcome inventory is fail-closed (JOV-5438).
+ *  11. Design-system authority map declares ordered owners and evidence.
+ *
+ * Invariant consumer: JOV-INV-019.
  *
  * Exit 0 when nothing FAILs (WARN is allowed); exit 1 on any FAIL.
  *
@@ -28,6 +34,21 @@ import {
 } from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { runOutcomeCertification } from './component-shadcn-outcome-inventory.mjs';
+import { findDesignManifestProjectionViolations } from './design-authority-guard.mjs';
+import {
+  AUTHORITY_MAP_PATH,
+  loadAndValidateDesignSystemAuthorityMap,
+} from './design-system-authority-map.mjs';
+import { buildLlmsDesignManifest } from './generate-llms-design-manifest.mjs';
+import {
+  findDesignInvariantProjectionViolations,
+  readDesignAgentContract,
+} from './invariants/design-agent-contract.mjs';
+import {
+  evaluateSharedUiVisualArbitraryAudit,
+  CHECK_COMMAND as SHARED_UI_VISUAL_ARBITRARY_CHECK,
+} from './shared-ui-visual-arbitrary-audit.mjs';
 
 const THIS_DIR = path.dirname(fileURLToPath(import.meta.url));
 const DEFAULT_REPO_ROOT = path.join(THIS_DIR, '..');
@@ -39,18 +60,24 @@ const SKILLS_LOCK_PATH = 'skills-lock.json';
 const DESIGN_TOKENS_PATH = 'design.tokens.json';
 const DESIGN_TOKENS_GENERATOR = 'scripts/generate-design-tokens-export.mjs';
 const DESIGN_MD_PATH = 'DESIGN.md';
-const LINEAR_TOKENS_PATH = 'apps/web/styles/linear-tokens.css';
+const DESIGN_SYSTEM_PATH = 'apps/web/styles/design-system.css';
 const CI_FAST_LANES_PATH = 'scripts/ci-fast-lanes.mjs';
 const ROOT_PACKAGE_PATH = 'package.json';
 const WEB_PACKAGE_PATH = 'apps/web/package.json';
 const ESLINT_CONFIG_PATH = 'apps/web/eslint.config.js';
 const CODE_STYLE_RULES_PATH = '.claude/rules/code-style.md';
 const DESIGN_COMPLETE_PATH = 'DESIGN_COMPLETE.md';
+const LLM_DESIGN_MANIFEST_PATH = 'docs/llms-design-manifest.txt';
+const DESIGN_PROJECTION_PROBE = {
+  id: 'design-projection-binding-probe',
+  statement: 'Executable projection binding probe.',
+};
 
 const ROOT_REQUIRED_SCRIPTS = [
   'design:authority:check',
   'design:tokens:export:check',
   'design:governance:audit',
+  'design:shared-ui-visual-arbitrary:check',
 ];
 const WEB_REQUIRED_SCRIPTS = ['lint:touch-target', 'lint:eslint'];
 const CI_FAST_REQUIRED_COMMANDS = [
@@ -85,10 +112,16 @@ function readJson(repoRoot, relativePath) {
 }
 
 /**
+ * @typedef {{ includeAuthorityMap?: boolean }} AuditOptions
+ *
  * @param {string} [repoRoot]
+ * @param {AuditOptions} [options]
  * @returns {{ results: CheckResult[], failed: CheckResult[], warned: CheckResult[] }}
  */
-export function runDesignGovernanceAudit(repoRoot = DEFAULT_REPO_ROOT) {
+export function runDesignGovernanceAudit(
+  repoRoot = DEFAULT_REPO_ROOT,
+  options = {}
+) {
   /** @type {CheckResult[]} */
   const results = [];
   const report = (id, status, detail) => {
@@ -224,7 +257,7 @@ export function runDesignGovernanceAudit(repoRoot = DEFAULT_REPO_ROOT) {
 
   try {
     const designMd = readRepoFile(DESIGN_MD_PATH);
-    const linearTokens = readRepoFile(LINEAR_TOKENS_PATH);
+    const designSystem = readRepoFile(DESIGN_SYSTEM_PATH);
     const noirRow = designMd.match(/^\| *Shell *\|.*$/m)?.[0] ?? null;
     const noirTriplet = parseTriplet(
       noirRow?.match(/sidebar rgb `([^`]+)`/i)?.[1]
@@ -237,15 +270,15 @@ export function runDesignGovernanceAudit(repoRoot = DEFAULT_REPO_ROOT) {
       : [];
     const sidebarTriplet = parseTriplet(sidebarCells[sidebarCells.length - 1]);
     const cssTriplets = [
-      ...linearTokens.matchAll(
-        /--linear-app-sidebar-background-rgb:\s*([^;]+);/g
+      ...designSystem.matchAll(
+        /--app-shell-sidebar-background-rgb:\s*([^;]+);/g
       ),
     ].map(match => parseTriplet(match[1]));
     const cssTriplet = cssTriplets[cssTriplets.length - 1] ?? null;
     const sources = {
       'DESIGN.md Noir Ion table': noirTriplet,
       'DESIGN.md Sidebar table (dark)': sidebarTriplet,
-      'linear-tokens.css :root.dark': cssTriplet,
+      'design-system.css :root.dark': cssTriplet,
     };
     const missing = Object.entries(sources)
       .filter(([, value]) => value === null)
@@ -271,7 +304,7 @@ export function runDesignGovernanceAudit(repoRoot = DEFAULT_REPO_ROOT) {
         report(
           'design-md-consistency',
           'PASS',
-          `dark sidebar rgb triplet consistent across DESIGN.md and linear-tokens.css (${cssTriplet})`
+          `dark sidebar rgb triplet consistent across DESIGN.md and design-system.css (${cssTriplet})`
         );
       }
     }
@@ -355,6 +388,36 @@ export function runDesignGovernanceAudit(repoRoot = DEFAULT_REPO_ROOT) {
     );
   }
 
+  if (options.includeAuthorityMap !== false) {
+    try {
+      const issues = loadAndValidateDesignSystemAuthorityMap(repoRoot);
+      if (issues.length > 0) {
+        const detail = issues
+          .map(issue => `${issue.code}:${issue.detail}`)
+          .join('; ');
+        report(
+          'design-system-authority-map',
+          'FAIL',
+          `${AUTHORITY_MAP_PATH} invalid: ${detail}`
+        );
+      } else {
+        report(
+          'design-system-authority-map',
+          'PASS',
+          `${AUTHORITY_MAP_PATH} validates dependency order, canonical owners, ` +
+            'regular-file evidence paths, immutable status floors, and ' +
+            'executable checks'
+        );
+      }
+    } catch (error) {
+      report(
+        'design-system-authority-map',
+        'FAIL',
+        `${AUTHORITY_MAP_PATH} unreadable: ${error instanceof Error ? error.message : error}`
+      );
+    }
+  }
+
   try {
     const config = readRepoFile(ESLINT_CONFIG_PATH);
     const rulesDoc = readRepoFile(CODE_STYLE_RULES_PATH);
@@ -409,6 +472,104 @@ export function runDesignGovernanceAudit(repoRoot = DEFAULT_REPO_ROOT) {
       'design-complete-banner',
       'FAIL',
       `${DESIGN_COMPLETE_PATH} unreadable: ${error instanceof Error ? error.message : error}`
+    );
+  }
+
+  try {
+    const contract = readDesignAgentContract(repoRoot);
+    const manifestViolations = findDesignInvariantProjectionViolations(
+      readRepoFile(LLM_DESIGN_MANIFEST_PATH),
+      contract
+    );
+    const probeContract = {
+      ...contract,
+      invariants: [...contract.invariants, DESIGN_PROJECTION_PROBE],
+    };
+    const generatedProbe = buildLlmsDesignManifest({
+      repoRoot,
+      designAgentContract: probeContract,
+    });
+    const generatorBindingViolations = findDesignInvariantProjectionViolations(
+      generatedProbe,
+      probeContract
+    );
+    const guardDetectsProbe = findDesignManifestProjectionViolations(
+      repoRoot,
+      probeContract
+    ).some(detail => detail.includes('projection differs from JOV-INV-019'));
+    const bindingViolations = [
+      ...generatorBindingViolations.map(
+        detail => `generator ignored contract probe: ${detail}`
+      ),
+      ...(guardDetectsProbe
+        ? []
+        : ['authority guard did not reject a changed contract projection']),
+    ];
+    const violations = [...manifestViolations, ...bindingViolations];
+    if (violations.length > 0) {
+      report(
+        'design-invariant-projection',
+        'FAIL',
+        `design invariants must project only from canon/invariants.jsonl: ${violations.join('; ')}`
+      );
+    } else {
+      report(
+        'design-invariant-projection',
+        'PASS',
+        `${contract.invariants.length} design invariants project from JOV-INV-019 through executable generator and guard bindings`
+      );
+    }
+  } catch (error) {
+    report(
+      'design-invariant-projection',
+      'FAIL',
+      `canonical projection unreadable: ${error instanceof Error ? error.message : error}`
+    );
+  }
+
+  try {
+    const lanes = readRepoFile(CI_FAST_LANES_PATH);
+    const wired = lanes.includes(SHARED_UI_VISUAL_ARBITRARY_CHECK);
+    report(
+      'shared-ui-visual-arbitrary-wiring',
+      wired ? 'PASS' : 'FAIL',
+      wired
+        ? `${CI_FAST_LANES_PATH} runs ${SHARED_UI_VISUAL_ARBITRARY_CHECK}`
+        : `${CI_FAST_LANES_PATH} must run ${SHARED_UI_VISUAL_ARBITRARY_CHECK} in hosted structural CI`
+    );
+    const audit = evaluateSharedUiVisualArbitraryAudit({
+      repoRoot,
+      eventName: 'local',
+    });
+    report(
+      'shared-ui-visual-arbitrary',
+      audit.ok ? 'PASS' : 'FAIL',
+      audit.ok
+        ? `${audit.totalFindings} visual findings across ${audit.scannedFiles.length} production files match the shrink-only baseline`
+        : audit.issues.join('; ')
+    );
+  } catch (error) {
+    report(
+      'shared-ui-visual-arbitrary',
+      'FAIL',
+      `shared-UI visual arbitrary audit unreadable: ${error instanceof Error ? error.message : error}`
+    );
+  }
+
+  try {
+    const outcome = runOutcomeCertification({ repoRoot });
+    report(
+      'shadcn-outcome-inventory',
+      outcome.ok ? 'PASS' : 'FAIL',
+      outcome.ok
+        ? `${(outcome.receipt.enrolled ?? []).length} enrolled primitives; MIT public-outcome boundary; catalog=${outcome.receipt.catalogCount}`
+        : outcome.receipt.issues.join('; ')
+    );
+  } catch (error) {
+    report(
+      'shadcn-outcome-inventory',
+      'FAIL',
+      `Shadcn outcome inventory unreadable: ${error instanceof Error ? error.message : error}`
     );
   }
 

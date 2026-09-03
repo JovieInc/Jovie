@@ -3,15 +3,23 @@ import userEvent from '@testing-library/user-event';
 import { describe, expect, it, vi } from 'vitest';
 
 vi.mock('@jovie/ui', () => ({
-  Button: ({
+  IconButton: ({
     children,
-    pressFeedback: _pressFeedback,
-    static: _static,
+    variant,
+    size,
     ...props
   }: React.ComponentProps<'button'> & {
-    readonly pressFeedback?: boolean;
-    readonly static?: boolean;
-  }) => <button {...props}>{children}</button>,
+    readonly variant?: string;
+    readonly size?: string;
+  }) => (
+    <button
+      data-icon-button-variant={variant}
+      data-icon-button-size={size}
+      {...props}
+    >
+      {children}
+    </button>
+  ),
   TooltipShortcut: ({ children }: { readonly children: React.ReactNode }) =>
     children,
 }));
@@ -38,8 +46,11 @@ describe('RailToggleButton', () => {
 
     const button = screen.getByTestId('left-toggle');
     expect(button).toHaveAttribute('data-rail-toggle', 'left');
+    expect(button).toHaveAttribute('data-icon-button-variant', 'secondary');
+    expect(button).toHaveAttribute('data-icon-button-size', 'sm');
     expect(button).toHaveAttribute('aria-expanded', 'true');
-    expect(button).toHaveClass('h-7', 'w-7', 'rounded-full');
+    expect(button).toHaveAttribute('aria-pressed', 'true');
+    expect(button.className).toContain('aria-pressed:bg-interactive-active');
     expect(button.className).not.toContain('active:scale');
     expect(screen.getByTestId('left-icon')).toHaveAttribute(
       'aria-hidden',
@@ -65,7 +76,9 @@ describe('RailToggleButton', () => {
     const button = screen.getByTestId('right-toggle');
     expect(button).toHaveAttribute('data-rail-toggle', 'right');
     expect(button).toHaveAttribute('aria-expanded', 'false');
+    expect(button).toHaveAttribute('aria-pressed', 'false');
     expect(button).toHaveAttribute('aria-label', 'Show profile');
-    expect(button).toHaveClass('h-7', 'w-7', 'rounded-full');
+    expect(button).toHaveAttribute('data-icon-button-variant', 'secondary');
+    expect(button).toHaveAttribute('data-icon-button-size', 'sm');
   });
 });

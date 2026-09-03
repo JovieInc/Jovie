@@ -1,5 +1,11 @@
 import type { ReactNode } from 'react';
 import { cn } from '@/lib/utils';
+import {
+  ONBOARDING_STAGE_FLAT_CLASS,
+  ONBOARDING_STAGE_FRAME_GEOMETRY_CLASS,
+  ONBOARDING_STAGE_FRAMED_SURFACE_CLASS,
+  ONBOARDING_STAGE_V1_SURFACE_CLASS,
+} from './onboarding-experience-shell-stage-contract';
 
 export interface OnboardingExperienceShellProps {
   readonly children: ReactNode;
@@ -36,9 +42,11 @@ const STAGE_HEIGHT_CLASSNAME = {
 } as const;
 
 const STAGE_VARIANT_CLASSNAME = {
-  flat: 'px-0 py-2 sm:px-0 sm:py-3',
-  framed:
-    'rounded-3xl border border-(--linear-app-frame-seam) bg-[linear-gradient(180deg,rgba(255,255,255,0.03),rgba(255,255,255,0.01))] px-5 py-6 shadow-[0_24px_60px_rgba(0,0,0,0.18)] sm:px-8 sm:py-8',
+  flat: ONBOARDING_STAGE_FLAT_CLASS,
+  framed: [
+    ONBOARDING_STAGE_FRAME_GEOMETRY_CLASS,
+    ONBOARDING_STAGE_FRAMED_SURFACE_CLASS,
+  ],
 } as const;
 
 export function OnboardingExperienceShell({
@@ -80,7 +88,7 @@ export function OnboardingExperienceShell({
           <aside className='shrink-0 max-lg:w-full lg:w-55 xl:w-60 2xl:w-65'>
             <div className='sticky top-8'>
               {sidebarTitle ? (
-                <div className='border-b border-[color-mix(in_oklab,var(--linear-app-frame-seam)_68%,transparent)] pb-4'>
+                <div className='border-b border-[color-mix(in_oklab,var(--app-shell-frame-seam)_68%,transparent)] pb-4'>
                   <p className='text-sm font-semibold tracking-tighter text-primary-token'>
                     {sidebarTitle}
                   </p>
@@ -97,8 +105,10 @@ export function OnboardingExperienceShell({
               'flex min-w-0 flex-1 flex-col pt-[12vh]',
               STAGE_HEIGHT_CLASSNAME[stableStageHeight],
               STAGE_VARIANT_CLASSNAME[stageVariant],
-              visualVariant === 'v1' &&
-                'rounded-3xl border border-white/[0.07] bg-(--color-bg-surface-0)/72 px-5 py-6 shadow-[0_28px_100px_rgba(0,0,0,0.34)] sm:px-8',
+              visualVariant === 'v1' && [
+                ONBOARDING_STAGE_FRAME_GEOMETRY_CLASS,
+                ONBOARDING_STAGE_V1_SURFACE_CLASS,
+              ],
               stageClassName
             )}
             data-testid={`onboarding-stage-${stageVariant}`}

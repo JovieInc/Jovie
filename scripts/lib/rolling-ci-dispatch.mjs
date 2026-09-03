@@ -3,7 +3,7 @@ import { createHash } from 'node:crypto';
 export const ROLLING_CI_EVENT_SCHEMA = 'jovie-rolling-ci-failure/v1';
 export const ROLLING_CI_STATE_SCHEMA = 'jovie-rolling-ci-state/v1';
 export const ROLLING_CI_STATE_MARKER = 'jovie-rolling-ci-state';
-export const MAX_REPAIR_DELIVERIES = 3;
+export const MAX_REPAIR_DELIVERIES = 1;
 export const TRUSTED_CI_WORKFLOW = 'CI';
 export const TRUSTED_CI_WORKFLOW_PATH = '.github/workflows/ci.yml';
 export const TRUSTED_FAILURE_EVENTS = Object.freeze(['workflow_run']);
@@ -297,6 +297,22 @@ export function planFailureDispatch({
     check: event.check,
     deliveryCount: 0,
   };
+  if (priorFailure.terminalReceipt?.terminal === true) {
+    return {
+      action: 'terminal_configuration_incident',
+      mutate: false,
+      state,
+      incident: {
+        type: 'terminal_remediation_receipt',
+        head: event.head,
+        fingerprint: event.fingerprint,
+        owner: 'CI Platform',
+        remedy:
+          priorFailure.terminalReceipt.result ??
+          'inspect the terminal remediation receipt',
+      },
+    };
+  }
   if (priorFailure.deliveryCount >= maxDeliveries) {
     return {
       action: 'terminal_configuration_incident',
@@ -424,8 +440,9 @@ export function runDispatch(input) {
   }
 
   const events = normalizeFailureEvents(input);
-  let mutated = false;
   let finalPlan = null;
+  let actionablePlan = null;
+  let actionableEvent = null;
   for (const event of events) {
     finalPlan = planFailureDispatch({
       event,
@@ -434,23 +451,23 @@ export function runDispatch(input) {
       priorState: state,
     });
     if (finalPlan.mutate) {
-      mutated = true;
       state = finalPlan.state;
+      actionablePlan = finalPlan;
+      actionableEvent = event;
+      break;
     }
   }
-  const actionableEvent = events.find(event =>
-    state?.deliveries?.includes(event.delivery)
-  );
+  const selectedPlan = actionablePlan ?? finalPlan;
   return {
     events,
-    action: finalPlan?.action ?? 'no_failure',
-    mutate: mutated,
+    action: selectedPlan?.action ?? 'no_failure',
+    mutate: Boolean(actionablePlan),
     state,
     body:
-      mutated && actionableEvent && state
+      actionablePlan && actionableEvent && state
         ? renderDispatchComment({
             event: actionableEvent,
-            plan: { ...finalPlan, state },
+            plan: { ...actionablePlan, state },
           })
         : '',
   };

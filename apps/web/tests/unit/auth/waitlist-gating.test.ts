@@ -694,7 +694,6 @@ describe('proxy.ts path categorization', () => {
       '/app/admin',
       '/app/billing',
       '/app/account',
-      '/waitlist',
     ];
 
     it('documents all protected paths', () => {
@@ -702,7 +701,7 @@ describe('proxy.ts path categorization', () => {
       // update this test
       expect(protectedPaths).toContain('/app/profile');
       expect(protectedPaths).toContain('/app/settings');
-      expect(protectedPaths).toContain('/waitlist');
+      expect(protectedPaths).not.toContain('/waitlist');
       expect(protectedPaths).not.toContain('/onboarding');
     });
   });

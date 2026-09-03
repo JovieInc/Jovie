@@ -1,3 +1,5 @@
+import { readFileSync } from 'node:fs';
+import { resolve } from 'node:path';
 import { fireEvent, render, screen } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
 import { DrawerTabStrip } from './DrawerTabStrip';
@@ -62,5 +64,15 @@ describe('DrawerTabStrip', () => {
     expect(
       screen.getByRole('tablist', { name: 'Drawer sections' })
     ).toBeInTheDocument();
+  });
+});
+
+describe('JOV-5466 token retire', () => {
+  it('does not keep retired --linear-app-* tokens', () => {
+    const source = readFileSync(
+      resolve(__dirname, './DrawerTabStrip.tsx'),
+      'utf8'
+    );
+    expect(source).not.toMatch(/--linear-app-/);
   });
 });

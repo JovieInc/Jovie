@@ -105,6 +105,11 @@ export function FeatureIntroCard({
       className='p-4'
       data-testid='feature-intro-card'
       data-mode={presentation.kind}
+      data-source-id={
+        presentation.kind === 'highlight'
+          ? presentation.highlight.id
+          : presentation.id
+      }
     >
       <div className='flex items-start gap-3'>
         {presentation.kind === 'highlight' ? (

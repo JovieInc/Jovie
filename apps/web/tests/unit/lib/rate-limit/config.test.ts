@@ -105,6 +105,7 @@ describe('Rate Limit Config', () => {
           'trackingClicks',
           'trackingVisits',
           'publicProfile',
+          'publicArtistApi',
           'publicProfileCaptureDismissal',
           'publicProfilePacEvent',
           'health',
@@ -185,6 +186,19 @@ describe('Rate Limit Config', () => {
         expect(pac.algorithm).toBe('fixed-window');
         expect(capture.prefix).not.toBe(pac.prefix);
         expect(capture.limit + pac.limit).toBe(RATE_LIMITERS.general.limit);
+      });
+
+      it('isolates the public artist API from profile-view telemetry', () => {
+        const profile = RATE_LIMITERS.publicProfile;
+        const artistApi = RATE_LIMITERS.publicArtistApi;
+
+        expect(artistApi.limit).toBe(100);
+        expect(artistApi.window).toBe('1 m');
+        expect(artistApi.prefix).toBe('public:artist-api');
+        expect(artistApi.trafficClass).toBe('anonymous');
+        expect(artistApi.algorithm).toBe('fixed-window');
+        expect(artistApi.analytics).toBe(false);
+        expect(artistApi.prefix).not.toBe(profile.prefix);
       });
     });
 

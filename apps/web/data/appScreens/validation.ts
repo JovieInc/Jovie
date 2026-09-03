@@ -1,8 +1,22 @@
 import {
+  APP_SCREEN_ARCHETYPE_IDS,
+  APP_SCREEN_ARCHETYPE_REGISTRY,
+  APP_SCREEN_SLOT_IDS,
+  APP_SCREEN_STATE_IDS,
+  type AppScreenArchetypeId,
+  type AppScreenArchetypeRegistryEntry,
+} from './archetypes';
+import {
+  APP_SCREEN_CANVAS_EXCEPTIONS,
+  APP_SCREEN_NESTED_SURFACE_ROLES,
+  type AppScreenCanvasContract,
+} from './canvas';
+import {
   APP_SCREEN_COMPONENT_REGISTRY,
   APP_SCREEN_LEGACY_BODY_SOURCES,
   APP_SCREEN_RECIPE_REGISTRY,
   APP_SCREEN_REGISTRY,
+  APP_SCREEN_SOURCES,
   type AppScreenComponentRegistryEntry,
   type AppScreenRecipeRegistryEntry,
   type AppScreenRegistryEntry,
@@ -33,7 +47,26 @@ export type AppScreenValidationCode =
   | 'story-recipe-mismatch'
   | 'story-component-mismatch'
   | 'unresolved-concept'
-  | 'unexpected-redirect-receipt';
+  | 'unexpected-redirect-receipt'
+  | 'duplicate-archetype'
+  | 'missing-archetype'
+  | 'unexpected-archetype'
+  | 'invalid-archetype-recipe'
+  | 'illegal-recipe-component'
+  | 'missing-slot'
+  | 'missing-state'
+  | 'stale-representative-story'
+  | 'unmapped-design-reference'
+  | 'canvas-exception-unknown-source'
+  | 'screen-canvas-owner-without-sources'
+  | 'shell-canvas-owner-with-nested-sources'
+  | 'canvas-nested-source-not-tsx'
+  | 'canvas-owner-invalid'
+  | 'canvas-nested-role-invalid'
+  | 'canvas-nested-role-duplicate'
+  | 'canvas-nested-component-invalid'
+  | 'canvas-nested-function-invalid'
+  | 'canvas-nested-allowance-duplicate';
 
 export interface AppScreenValidationIssue {
   readonly code: AppScreenValidationCode;
@@ -44,6 +77,8 @@ export interface AppScreenValidationInput {
   readonly components?: readonly AppScreenComponentRegistryEntry[];
   readonly recipes?: readonly AppScreenRecipeRegistryEntry[];
   readonly screens?: readonly AppScreenRegistryEntry[];
+  readonly archetypes?: readonly AppScreenArchetypeRegistryEntry[];
+  readonly canvasExceptions?: Readonly<Record<string, AppScreenCanvasContract>>;
 }
 
 const duplicates = (values: readonly string[]): readonly string[] => {
@@ -60,6 +95,10 @@ const duplicates = (values: readonly string[]): readonly string[] => {
 const BROWSER_SAFE_STORY_ID =
   /^[a-z0-9]+(?:-[a-z0-9]+)*--[a-z0-9]+(?:-[a-z0-9]+)*$/;
 
+const SLOT_ID_SET: ReadonlySet<string> = new Set(APP_SCREEN_SLOT_IDS);
+const STATE_ID_SET: ReadonlySet<string> = new Set(APP_SCREEN_STATE_IDS);
+const REQUIRED_ARCHETYPE_IDS: readonly string[] = APP_SCREEN_ARCHETYPE_IDS;
+
 const LEGACY_BODY_SOURCE_SET: ReadonlySet<string> = new Set(
   APP_SCREEN_LEGACY_BODY_SOURCES
 );
@@ -75,6 +114,8 @@ export function validateAppScreenSystem({
   components = APP_SCREEN_COMPONENT_REGISTRY,
   recipes = APP_SCREEN_RECIPE_REGISTRY,
   screens = APP_SCREEN_REGISTRY,
+  archetypes = APP_SCREEN_ARCHETYPE_REGISTRY,
+  canvasExceptions = APP_SCREEN_CANVAS_EXCEPTIONS,
 }: AppScreenValidationInput = {}): readonly AppScreenValidationIssue[] {
   const issues: AppScreenValidationIssue[] = [];
   const add = (code: AppScreenValidationCode, message: string) =>
@@ -259,6 +300,265 @@ export function validateAppScreenSystem({
     }
   }
 
+  for (const id of duplicates(archetypes.map(entry => entry.id))) {
+    add('duplicate-archetype', `archetype ${id} is registered more than once`);
+  }
+  const registeredArchetypeIds = new Set(archetypes.map(entry => entry.id));
+  for (const id of REQUIRED_ARCHETYPE_IDS) {
+    if (!registeredArchetypeIds.has(id)) {
+      add('missing-archetype', `required product archetype ${id} is missing`);
+    }
+  }
+  for (const id of registeredArchetypeIds) {
+    if (!REQUIRED_ARCHETYPE_IDS.includes(id)) {
+      add(
+        'unexpected-archetype',
+        `archetype ${id} is not one of the eight product archetypes`
+      );
+    }
+  }
+
+  const screensById = new Map(screens.map(screen => [screen.id, screen]));
+  const representedArchetypes = new Set<string>();
+  const representativeStories = new Set<string>();
+  for (const archetype of archetypes) {
+    const recipe = recipesById.get(archetype.recipeId);
+    if (!recipe || !archetype.allowedRecipeIds.includes(archetype.recipeId)) {
+      add(
+        'invalid-archetype-recipe',
+        `archetype ${archetype.id} canonical recipe ${archetype.recipeId} is invalid`
+      );
+    }
+    for (const recipeId of archetype.allowedRecipeIds) {
+      if (!recipesById.has(recipeId)) {
+        add(
+          'invalid-archetype-recipe',
+          `archetype ${archetype.id} allows unregistered ${recipeId}`
+        );
+      }
+    }
+    const recipeComponents = new Set(recipe?.componentIds ?? []);
+    for (const componentId of archetype.componentIds) {
+      if (
+        !componentsById.has(componentId) ||
+        !recipeComponents.has(componentId)
+      ) {
+        add(
+          'illegal-recipe-component',
+          `archetype ${archetype.id} pairs ${archetype.recipeId} with ${componentId}`
+        );
+      }
+    }
+    if (
+      archetype.requiredSlots.length === 0 ||
+      duplicates(archetype.requiredSlots).length > 0 ||
+      archetype.requiredSlots.some(slot => !SLOT_ID_SET.has(slot))
+    ) {
+      add(
+        'missing-slot',
+        `archetype ${archetype.id} has invalid required slots`
+      );
+    }
+    if (
+      archetype.requiredStates.length === 0 ||
+      duplicates(archetype.requiredStates).length > 0 ||
+      archetype.requiredStates.some(state => !STATE_ID_SET.has(state))
+    ) {
+      add(
+        'missing-state',
+        `archetype ${archetype.id} has invalid required states`
+      );
+    }
+    const storyId = archetype.representativeStoryId;
+    if (
+      !BROWSER_SAFE_STORY_ID.test(storyId) ||
+      representativeStories.has(storyId)
+    ) {
+      add(
+        'stale-representative-story',
+        `archetype ${archetype.id} representative story ${storyId} is stale`
+      );
+    }
+    representativeStories.add(storyId);
+    const screen = archetype.representativeScreenId
+      ? screensById.get(archetype.representativeScreenId)
+      : null;
+    const story = screen?.story;
+    const representativeOk = archetype.representativeScreenId
+      ? Boolean(
+          screen?.designReference &&
+            screen.archetypeId === archetype.id &&
+            story?.id === storyId &&
+            story.recipeId === archetype.recipeId &&
+            sameComponentIds(story.componentIds, archetype.componentIds)
+        )
+      : Boolean(storyId);
+    if (!representativeOk) {
+      add(
+        'stale-representative-story',
+        `archetype ${archetype.id} representative ${archetype.representativeScreenId ?? storyId} is stale`
+      );
+    } else {
+      representedArchetypes.add(archetype.id);
+    }
+  }
+
+  for (const screen of screens) {
+    const projection =
+      screen.kind === 'alias' ||
+      screen.kind === 'legacy' ||
+      !screen.designReference;
+    if (projection) {
+      if (screen.archetypeId) {
+        add(
+          'unexpected-archetype',
+          `${screen.kind} screen ${screen.id} cannot mint archetype authority`
+        );
+      }
+      continue;
+    }
+    if (!screen.archetypeId) {
+      add(
+        'unmapped-design-reference',
+        `design reference ${screen.id} has no product archetype`
+      );
+      continue;
+    }
+    const archetype = archetypes.find(entry => entry.id === screen.archetypeId);
+    if (!archetype) {
+      add(
+        'missing-archetype',
+        `screen ${screen.id} uses unregistered ${screen.archetypeId}`
+      );
+    } else if (!archetype.allowedRecipeIds.includes(screen.recipeId)) {
+      add(
+        'invalid-archetype-recipe',
+        `screen ${screen.id} uses ${screen.recipeId} which ${archetype.id} does not allow`
+      );
+    }
+  }
+  for (const id of REQUIRED_ARCHETYPE_IDS) {
+    if (registeredArchetypeIds.has(id) && !representedArchetypes.has(id)) {
+      add(
+        'stale-representative-story',
+        `archetype ${id} has no representative design-reference screen or story`
+      );
+    }
+  }
+
+  const knownSources: ReadonlySet<string> = new Set(APP_SCREEN_SOURCES);
+  const allowedNestedRoles: ReadonlySet<string> = new Set(
+    APP_SCREEN_NESTED_SURFACE_ROLES
+  );
+  const allowedCanvasComponents: ReadonlySet<string> = new Set([
+    'PageShell',
+    'AppShellContentPanel',
+  ]);
+  for (const [source, contract] of Object.entries(canvasExceptions)) {
+    const runtimeContract = contract as unknown as {
+      readonly canvasOwner?: unknown;
+      readonly nestedSurfaceRoles?: unknown;
+      readonly nestedCanvasAllowances?: unknown;
+    };
+    const canvasOwner = runtimeContract.canvasOwner;
+    const nestedSurfaceRoles = Array.isArray(runtimeContract.nestedSurfaceRoles)
+      ? runtimeContract.nestedSurfaceRoles
+      : [];
+    const nestedCanvasAllowances = Array.isArray(
+      runtimeContract.nestedCanvasAllowances
+    )
+      ? runtimeContract.nestedCanvasAllowances
+      : [];
+    if (!knownSources.has(source)) {
+      add(
+        'canvas-exception-unknown-source',
+        `canvas exception ${source} is not a registered app screen source`
+      );
+    }
+    if (canvasOwner !== 'shell' && canvasOwner !== 'screen') {
+      add(
+        'canvas-owner-invalid',
+        `canvas exception ${source} has invalid owner ${String(canvasOwner)}`
+      );
+    }
+    if (canvasOwner === 'screen' && nestedCanvasAllowances.length === 0) {
+      add(
+        'screen-canvas-owner-without-sources',
+        `canvas exception ${source} owns a nested canvas without declaring precise implementation allowances`
+      );
+    }
+    if (canvasOwner === 'shell' && nestedCanvasAllowances.length > 0) {
+      add(
+        'shell-canvas-owner-with-nested-sources',
+        `canvas exception ${source} is shell-owned but declares nested canvas allowances`
+      );
+    }
+    const seenRoles = new Set<string>();
+    for (const role of nestedSurfaceRoles) {
+      if (typeof role !== 'string' || !allowedNestedRoles.has(role)) {
+        add(
+          'canvas-nested-role-invalid',
+          `canvas exception ${source} has invalid nested surface role ${String(role)}`
+        );
+        continue;
+      }
+      if (seenRoles.has(role)) {
+        add(
+          'canvas-nested-role-duplicate',
+          `canvas exception ${source} repeats nested surface role ${role}`
+        );
+      }
+      seenRoles.add(role);
+    }
+    const allowanceKeys = new Set<string>();
+    for (const rawAllowance of nestedCanvasAllowances) {
+      const allowance = (rawAllowance ?? {}) as {
+        readonly source?: unknown;
+        readonly component?: unknown;
+        readonly enclosingFunction?: unknown;
+      };
+      if (
+        typeof allowance.source !== 'string' ||
+        !/^apps\/web\/.+\.tsx$/.test(allowance.source)
+      ) {
+        add(
+          'canvas-nested-source-not-tsx',
+          `canvas exception ${source} nested source ${String(allowance.source)} is not a plausible apps/web .tsx path`
+        );
+      }
+      if (
+        typeof allowance.component !== 'string' ||
+        !allowedCanvasComponents.has(allowance.component)
+      ) {
+        add(
+          'canvas-nested-component-invalid',
+          `canvas exception ${source} nested component ${String(allowance.component)} is not a canvas primitive`
+        );
+      }
+      if (
+        typeof allowance.enclosingFunction !== 'string' ||
+        !/^[A-Za-z_$][\w$]*$/.test(allowance.enclosingFunction)
+      ) {
+        add(
+          'canvas-nested-function-invalid',
+          `canvas exception ${source} nested function ${allowance.enclosingFunction} is not a stable identifier`
+        );
+      }
+      const allowanceKey = [
+        String(allowance.source),
+        String(allowance.component),
+        String(allowance.enclosingFunction),
+      ].join(':');
+      if (allowanceKeys.has(allowanceKey)) {
+        add(
+          'canvas-nested-allowance-duplicate',
+          `canvas exception ${source} duplicates allowance ${allowanceKey}`
+        );
+      }
+      allowanceKeys.add(allowanceKey);
+    }
+  }
+
   return issues;
 }
 
@@ -272,4 +572,44 @@ export function assertAppScreenSystem(): void {
       ].join('\n')
     );
   }
+}
+
+export const APP_SCREEN_ARCHETYPE_RECEIPT_SCHEMA =
+  'app-screen-archetype-receipt/v1';
+
+export interface AppScreenArchetypeReceipt {
+  readonly schema: typeof APP_SCREEN_ARCHETYPE_RECEIPT_SCHEMA;
+  readonly headSha: string;
+  readonly ok: boolean;
+  readonly issues: readonly string[];
+  readonly archetypes: readonly AppScreenArchetypeId[];
+  readonly representatives: readonly {
+    readonly archetypeId: AppScreenArchetypeId;
+    readonly screenId: `screen.${string}` | null;
+    readonly storyId: string;
+  }[];
+}
+
+export function buildAppScreenArchetypeReceipt(input: {
+  readonly headSha: string;
+}): AppScreenArchetypeReceipt {
+  const headSha = input.headSha.toLowerCase();
+  if (!/^[0-9a-f]{40}$/.test(headSha)) {
+    throw new Error(
+      'Cannot build app-screen archetype receipt without an exact HEAD SHA'
+    );
+  }
+  const issues = validateAppScreenSystem();
+  return {
+    schema: APP_SCREEN_ARCHETYPE_RECEIPT_SCHEMA,
+    headSha,
+    ok: issues.length === 0,
+    issues: issues.map(issue => `[${issue.code}] ${issue.message}`),
+    archetypes: APP_SCREEN_ARCHETYPE_IDS,
+    representatives: APP_SCREEN_ARCHETYPE_REGISTRY.map(entry => ({
+      archetypeId: entry.id,
+      screenId: entry.representativeScreenId,
+      storyId: entry.representativeStoryId,
+    })),
+  };
 }

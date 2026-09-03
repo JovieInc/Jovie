@@ -66,7 +66,7 @@ const NativeSelect = React.forwardRef<HTMLSelectElement, NativeSelectProps>(
         aria-describedby={describedBy}
         aria-invalid={error ? true : ariaInvalid}
         className={cn(
-          'block h-9 w-full rounded-md border border-(--linear-border-subtle) bg-(--linear-bg-surface-1) px-3 text-[13px] font-normal text-(--linear-text-primary)',
+          'block h-9 w-full rounded-md border border-(--linear-border-subtle) bg-(--linear-bg-surface-1) px-3 text-app font-normal text-(--linear-text-primary)',
           'hover:border-(--linear-border-default)',
           'focus-visible:border-(--linear-border-focus) focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-(--linear-border-focus)/24',
           'disabled:cursor-not-allowed disabled:opacity-50',

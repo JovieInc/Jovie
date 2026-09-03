@@ -183,9 +183,11 @@ const ROLLING_CI_FX_CACHE_GC_PRIMARY_INPUTS = new Set([
   'scripts/lib/actions-cache-gc.mjs',
   'scripts/lib/rolling-ci-dispatch.mjs',
   'scripts/lib/rolling-ci-fx.mjs',
+  'scripts/lib/rolling-ci-hosted-writer.mjs',
   'scripts/lib/__tests__/actions-cache-gc.test.mjs',
   'scripts/lib/__tests__/rolling-ci-dispatch.test.mjs',
   'scripts/lib/__tests__/rolling-ci-fx.test.mjs',
+  'scripts/lib/__tests__/rolling-ci-hosted-writer.test.mjs',
 ]);
 const ROLLING_CI_FX_CACHE_GC_LANE = new Set([
   ...ROLLING_CI_FX_CACHE_GC_PRIMARY_INPUTS,
@@ -198,6 +200,7 @@ const ROLLING_CI_FX_CACHE_GC_SCRIPT_TESTS = [
   'scripts/lib/__tests__/automation-verify.test.mjs',
   'scripts/lib/__tests__/rolling-ci-dispatch.test.mjs',
   'scripts/lib/__tests__/rolling-ci-fx.test.mjs',
+  'scripts/lib/__tests__/rolling-ci-hosted-writer.test.mjs',
   'scripts/lib/__tests__/rolling-ci-handoff.test.mjs',
 ];
 const ROLLING_CI_FX_CACHE_GC_NODE_TESTS = ['scripts/typecheck-scripts.mjs'];
@@ -249,8 +252,14 @@ const CI_CONTROL_SCRIPT_TESTS = [
   'scripts/lib/__tests__/eval-main-health-action.test.mjs',
   'scripts/lib/__tests__/pr-check-failures.test.mjs',
   'scripts/lib/__tests__/pr-conflict-handler.test.mjs',
+  'scripts/lib/__tests__/github-open-prs-rest.test.mjs',
+  'scripts/lib/__tests__/github-merge-queue.test.mjs',
   'scripts/lib/__tests__/ci-fast-workflow-contract.test.mjs',
+  'scripts/lib/__tests__/codeql-workflow-contract.test.mjs',
+  'scripts/lib/__tests__/design-exception-registry.test.mjs',
+  'scripts/lib/__tests__/design-system-source-ratchet.test.mjs',
   'scripts/lib/__tests__/ci-repo-lanes.test.mjs',
+  'scripts/lib/__tests__/merge-group-admission.test.mjs',
   'scripts/lib/__tests__/merge-group-workflow-contract.test.mjs',
   'scripts/lib/__tests__/lockfile-specifier-preflight.test.mjs',
   'scripts/lib/__tests__/sentry-autofix-workflow-contract.test.mjs',
@@ -268,11 +277,14 @@ const CI_CONTROL_SCRIPT_TESTS = [
   'scripts/lib/__tests__/linear-issue-intake.test.mjs',
   'scripts/lib/__tests__/agent-qc-wires.test.mjs',
   'scripts/lib/__tests__/needs-human-autoclose.test.mjs',
+  'scripts/lib/__tests__/production-lane-range.test.mjs',
 ];
 const PRODUCT_LANE_FOUNDATION_PRIMARY_INPUTS = new Set([
   'scripts/lib/product-lane-classifier.mjs',
   'scripts/lib/product-lane-finalize.mjs',
+  'scripts/lib/production-lane-range.mjs',
   'scripts/lib/__tests__/product-lane-classifier.test.mjs',
+  'scripts/lib/__tests__/production-lane-range.test.mjs',
 ]);
 const PRODUCT_LANE_FOUNDATION_LANE = new Set([
   ...PRODUCT_LANE_FOUNDATION_PRIMARY_INPUTS,
@@ -288,11 +300,36 @@ const PRODUCT_LANE_FOUNDATION_LANE = new Set([
   'scripts/lib/merge-queue-guard.mjs',
   'scripts/lib/resolve-merge-group-path-diff.mjs',
 ]);
+const MERGE_GROUP_ADMISSION_PRIMARY_INPUTS = new Set([
+  'scripts/lib/merge-group-admission.mjs',
+  'scripts/lib/__tests__/merge-group-admission.test.mjs',
+]);
+const MERGE_GROUP_ADMISSION_LANE = new Set([
+  ...MERGE_GROUP_ADMISSION_PRIMARY_INPUTS,
+  ...AFFECTED_TEST_SELECTOR_MANIFEST,
+  '.github/workflows/ci.yml',
+  '.github/workflows/ios-ci.yml',
+  'apps/web/tests/unit/ci/deploy-workflow.test.ts',
+  'scripts/lib/__tests__/merge-group-workflow-contract.test.mjs',
+]);
+const MERGE_GROUP_ADMISSION_WEB_TESTS = [
+  'apps/web/tests/unit/ci/deploy-workflow.test.ts',
+];
+const MERGE_GROUP_ADMISSION_SCRIPT_TESTS = [
+  'scripts/lib/__tests__/automation-verify.test.mjs',
+  'scripts/lib/__tests__/merge-group-admission.test.mjs',
+  'scripts/lib/__tests__/merge-group-workflow-contract.test.mjs',
+];
 const MERGE_QUEUE_CONTROLLER_INPUTS = new Set([
+  '.github/actions/evaluate-fleet-gate/action.yml',
   '.github/workflows/merge-queue-autoenroll.yml',
   'docs/PR_FLOW.md',
   'scripts/ci-merge-queue-check.mjs',
   'scripts/drain-pr-queue.sh',
+  'scripts/hermes/evaluate-fleet-gate.sh',
+  'scripts/hermes/fleet_admission_receipt.py',
+  'scripts/hermes/tests/test_evaluate_fleet_gate.py',
+  'scripts/hermes/tests/test_fleet_admission_receipt.py',
   'scripts/lib/merge-queue-guard.mjs',
   'scripts/lib/pre-land-changelog.mjs',
   'scripts/lib/resolve-merge-group-path-diff.mjs',
@@ -314,7 +351,11 @@ const MERGE_QUEUE_CONTROLLER_SCRIPT_TESTS = [
   'scripts/lib/__tests__/pre-land-changelog.test.mjs',
   'scripts/lib/__tests__/pr-check-failures.test.mjs',
 ];
-const MERGE_QUEUE_CONTROLLER_PYTHON_TESTS = ['scripts/tests/test_gh_retry.py'];
+const MERGE_QUEUE_CONTROLLER_PYTHON_TESTS = [
+  'scripts/hermes/tests/test_evaluate_fleet_gate.py',
+  'scripts/hermes/tests/test_fleet_admission_receipt.py',
+  'scripts/tests/test_gh_retry.py',
+];
 const EVENT_DRIVEN_SHIPPER_SCRIPT_TESTS = [
   ...CI_CONTROL_SCRIPT_TESTS,
   'scripts/lib/__tests__/hermes-launchd.test.mjs',
@@ -350,7 +391,11 @@ const SYMPHONY_THROUGHPUT_CONTROL_MANIFEST = new Set([
   'scripts/backlog-orchestrator/deterministic-gates.mjs',
   'scripts/backlog-orchestrator/gate-next-hold.mjs',
   'scripts/hermes/codex-rotate',
+  'scripts/hermes/codex-account-probe.sh',
+  'scripts/hermes/symphony-lease-guard',
+  'scripts/hermes/tests/codex-account-probe.test.py',
   'scripts/hermes/tests/codex-rotate.test.py',
+  'scripts/hermes/tests/symphony-lease-guard.test.py',
   'scripts/lib/__tests__/automation-verify.test.mjs',
   'scripts/lib/__tests__/pre-push-gate.test.mjs',
   'scripts/run-affected-tests.mjs',
@@ -365,7 +410,32 @@ const SYMPHONY_THROUGHPUT_SCRIPT_TESTS = [
   'scripts/lib/__tests__/pre-push-gate.test.mjs',
 ];
 const SYMPHONY_THROUGHPUT_PYTHON_TESTS = [
+  'scripts/hermes/tests/codex-account-probe.test.py',
   'scripts/hermes/tests/codex-rotate.test.py',
+  'scripts/hermes/tests/symphony-lease-guard.test.py',
+];
+const BACKLOG_REMEDIATION_PRIMARY_INPUTS = new Set([
+  'scripts/backlog-orchestrator/backlog-remediation.mjs',
+  'scripts/backlog-orchestrator/__tests__/backlog-remediation.test.mjs',
+]);
+const BACKLOG_REMEDIATION_LANE = new Set([
+  ...BACKLOG_REMEDIATION_PRIMARY_INPUTS,
+  'scripts/backlog-orchestrator/admission-disposition.mjs',
+  'scripts/backlog-orchestrator/admission-policy.mjs',
+  'scripts/backlog-orchestrator/backlog-orchestrator.mjs',
+  'scripts/backlog-orchestrator/backlog-reduction.mjs',
+  'scripts/backlog-orchestrator/config.json',
+  'scripts/backlog-orchestrator/linear-client.mjs',
+  'scripts/backlog-orchestrator/ownership-inventory.mjs',
+  '.github/workflows/fleet-gate-refresh.yml',
+  'scripts/lib/__tests__/automation-verify.test.mjs',
+  'scripts/run-affected-tests.mjs',
+]);
+const BACKLOG_REMEDIATION_NODE_TESTS = [
+  'scripts/backlog-orchestrator/__tests__/backlog-remediation.test.mjs',
+];
+const BACKLOG_REMEDIATION_SCRIPT_TESTS = [
+  'scripts/lib/__tests__/automation-verify.test.mjs',
 ];
 const FLEET_PROMOTION_GATE_INPUTS = new Set([
   'scripts/hermes/gem-priority-gate.py',
@@ -373,20 +443,31 @@ const FLEET_PROMOTION_GATE_INPUTS = new Set([
 ]);
 const FLEET_PROMOTION_GATE_LANE = new Set([
   ...FLEET_PROMOTION_GATE_INPUTS,
+  '.github/actions/evaluate-fleet-gate/action.yml',
   'apps/web/tests/unit/api/health/deploy.critical.test.ts',
+  'scripts/hermes/evaluate-fleet-gate.sh',
+  'scripts/hermes/fleet_admission_receipt.py',
+  'scripts/hermes/tests/test_evaluate_fleet_gate.py',
+  'scripts/hermes/tests/test_fleet_admission_receipt.py',
   'scripts/lib/__tests__/automation-verify.test.mjs',
   'scripts/run-affected-tests.mjs',
 ]);
 const FLEET_PROMOTION_GATE_PYTHON_TESTS = [
   'scripts/hermes/tests/gem-priority-gate.test.py',
 ];
+const FLEET_PROMOTION_GATE_PYTEST_TESTS = [
+  'scripts/hermes/tests/test_evaluate_fleet_gate.py',
+  'scripts/hermes/tests/test_fleet_admission_receipt.py',
+];
 const GEM_PR_REHABILITATION_LANE = new Set([
   '.github/requirements/pytest.in',
   '.github/requirements/pytest.txt',
   '.github/workflows/gem-delivery-controller-activation.yml',
   '.github/workflows/ci.yml',
+  'docs/PR_FLOW.md',
   'scripts/hermes/config/gem-repo-registry.json',
   'scripts/hermes/config/model-registry.json',
+  'scripts/hermes/closure_health.py',
   'scripts/hermes/gem-pr-drain.py',
   'scripts/hermes/gem-ops-hud.py',
   'scripts/hermes/gem-priority-gate.py',
@@ -397,6 +478,7 @@ const GEM_PR_REHABILITATION_LANE = new Set([
   'scripts/hermes/install-gem-fleet-controller.sh',
   'scripts/hermes/install-gem-pr-rehabilitation.sh',
   'scripts/hermes/model-router.py',
+  'scripts/hermes/symphony-reconciler.py',
   'scripts/hermes/systemd/gem-pr-drain.service',
   'scripts/hermes/systemd/gem-pr-drain.timer',
   'scripts/hermes/tests/gem-pr-drain.test.py',
@@ -404,6 +486,8 @@ const GEM_PR_REHABILITATION_LANE = new Set([
   'scripts/hermes/tests/gem-pr-rehabilitation-contract.test.py',
   'scripts/hermes/tests/gem-priority-gate.test.py',
   'scripts/hermes/tests/gem-rehabilitation-policy.test.py',
+  'scripts/hermes/tests/closure-health.test.py',
+  'scripts/hermes/tests/symphony-reconciler.test.py',
   'scripts/backlog-orchestrator/__tests__/backlog-orchestrator.test.mjs',
   'scripts/hermes/tests/test-model-router.py',
   'scripts/ci-fast-lanes.mjs',
@@ -412,28 +496,73 @@ const GEM_PR_REHABILITATION_LANE = new Set([
   'scripts/run-affected-tests.mjs',
 ]);
 const GEM_PR_REHABILITATION_PYTHON_TESTS = [
+  'scripts/hermes/tests/closure-health.test.py',
   'scripts/hermes/tests/gem-priority-gate.test.py',
   'scripts/hermes/tests/gem-pr-drain.test.py',
   'scripts/hermes/tests/gem-ops-hud.test.py',
   'scripts/hermes/tests/gem-pr-rehabilitation-contract.test.py',
   'scripts/hermes/tests/gem-rehabilitation-policy.test.py',
+  'scripts/hermes/tests/symphony-reconciler.test.py',
+  'scripts/hermes/tests/test-model-router.py',
+];
+const GEM_CHECKIN_HUD_PRIMARY_INPUTS = new Set([
+  'scripts/hermes/symphony/WORKFLOW.md',
+  'scripts/hermes/gem-checkin-hud.py',
+  'scripts/hermes/gem-checkin-tty1.sh',
+  'scripts/hermes/systemd/symphony-burrito.service',
+  'scripts/hermes/systemd/symphony-burrito-update.service',
+  'scripts/hermes/systemd/symphony-burrito-update.timer',
+  'scripts/hermes/update-symphony-burrito.sh',
+  'scripts/hermes/tests/gem-checkin-hud.test.py',
+  'scripts/hermes/tests/symphony-burrito-workflow.test.py',
+]);
+const GEM_CHECKIN_HUD_LANE = new Set([
+  ...GEM_CHECKIN_HUD_PRIMARY_INPUTS,
+  ...AFFECTED_TEST_SELECTOR_MANIFEST,
+  '.github/workflows/reusable-ci-lint.yml',
+]);
+const GEM_CHECKIN_HUD_PYTHON_TESTS = [
+  'scripts/hermes/tests/gem-checkin-hud.test.py',
+  'scripts/hermes/tests/symphony-burrito-workflow.test.py',
+];
+const SYMPHONY_ADDITIVE_ROUTER_PRIMARY_INPUTS = new Set([
+  'scripts/hermes/symphony-codex-exhausted.py',
+  'scripts/hermes/tests/symphony-additive-router.test.py',
+]);
+const SYMPHONY_ADDITIVE_ROUTER_LANE = new Set([
+  ...SYMPHONY_ADDITIVE_ROUTER_PRIMARY_INPUTS,
+  'scripts/hermes/config/model-registry.json',
+  'scripts/hermes/model-router.py',
+  'scripts/hermes/tests/symphony-codex-auth-fallback.test.py',
+  'scripts/hermes/tests/test-model-router.py',
+  ...AFFECTED_TEST_SELECTOR_MANIFEST,
+]);
+const SYMPHONY_ADDITIVE_ROUTER_PYTHON_TESTS = [
+  'scripts/hermes/tests/symphony-additive-router.test.py',
   'scripts/hermes/tests/test-model-router.py',
 ];
 const GEM_PR_REHABILITATION_PRIMARY_INPUTS = new Set([
   'scripts/hermes/config/gem-repo-registry.json',
+  'scripts/hermes/config/model-registry.json',
+  'scripts/hermes/closure_health.py',
   'scripts/hermes/gem-pr-drain.py',
   'scripts/hermes/gem-ops-hud.py',
   'scripts/hermes/gem-repo-drain-cycle.py',
   'scripts/hermes/gem_repo_registry.py',
   'scripts/hermes/gem_rehabilitation_policy.py',
+  'scripts/hermes/symphony-reconciler.py',
   'scripts/hermes/install-gem-fleet-controller.sh',
   'scripts/hermes/install-gem-pr-rehabilitation.sh',
+  'scripts/hermes/model-router.py',
   'scripts/hermes/systemd/gem-pr-drain.service',
   'scripts/hermes/systemd/gem-pr-drain.timer',
   'scripts/hermes/tests/gem-pr-drain.test.py',
   'scripts/hermes/tests/gem-ops-hud.test.py',
   'scripts/hermes/tests/gem-pr-rehabilitation-contract.test.py',
   'scripts/hermes/tests/gem-rehabilitation-policy.test.py',
+  'scripts/hermes/tests/test-model-router.py',
+  'scripts/hermes/tests/closure-health.test.py',
+  'scripts/hermes/tests/symphony-reconciler.test.py',
 ]);
 const NO_UNATTENDED_RED_PRIMARY_INPUTS = new Set([
   'scripts/backlog-orchestrator/no-unattended-red.mjs',
@@ -444,13 +573,19 @@ const NO_UNATTENDED_RED_PRIMARY_INPUTS = new Set([
 const NO_UNATTENDED_RED_LANE = new Set([
   ...NO_UNATTENDED_RED_PRIMARY_INPUTS,
   ...AFFECTED_TEST_SELECTOR_MANIFEST,
+  '.github/workflows/fleet-gate-refresh.yml',
   '.github/workflows/delivery-control-receipts.yml',
   'canon/invariants.jsonl',
+  'scripts/hermes/closure_health.py',
   'scripts/hermes/gem-ops-hud.py',
+  'scripts/hermes/tests/closure-health.test.py',
+  'scripts/hermes/tests/gem-priority-gate.test.py',
   'scripts/hermes/tests/gem-ops-hud.test.py',
   'scripts/lib/ownerless-recovery-policy.mjs',
   'scripts/lib/__tests__/ownerless-recovery-policy.test.mjs',
+  'scripts/lib/__tests__/queue-deferred-release.test.mjs',
   'scripts/invariants/registry.test.mjs',
+  'scripts/tests/test_agent_workflow_hygiene.py',
 ]);
 const NO_UNATTENDED_RED_NODE_TESTS = [
   'scripts/backlog-orchestrator/__tests__/delivery-state-machine.test.mjs',
@@ -458,11 +593,17 @@ const NO_UNATTENDED_RED_NODE_TESTS = [
   'scripts/invariants/registry.test.mjs',
 ];
 const NO_UNATTENDED_RED_PYTHON_TESTS = [
+  'scripts/hermes/tests/closure-health.test.py',
+  'scripts/hermes/tests/gem-priority-gate.test.py',
   'scripts/hermes/tests/gem-ops-hud.test.py',
+];
+const NO_UNATTENDED_RED_PYTEST_TESTS = [
+  'scripts/tests/test_agent_workflow_hygiene.py',
 ];
 const NO_UNATTENDED_RED_SCRIPT_TESTS = [
   'scripts/lib/__tests__/automation-verify.test.mjs',
   'scripts/lib/__tests__/ownerless-recovery-policy.test.mjs',
+  'scripts/lib/__tests__/queue-deferred-release.test.mjs',
 ];
 const AUTHENTICATED_A11Y_REPAIR_CORE = new Set([
   'apps/web/app/exp/shell-v1/page.tsx',
@@ -734,6 +875,22 @@ export function buildAffectedTestPlan(
   if (files.some(file => GLOBAL_TEST_INPUTS.has(file))) {
     return { mode: 'full', relatedFiles: [], mandatoryTests: [] };
   }
+  const isBoundedBacklogRemediationChange =
+    files.some(file => BACKLOG_REMEDIATION_PRIMARY_INPUTS.has(file)) &&
+    files.every(file => BACKLOG_REMEDIATION_LANE.has(file));
+  if (isBoundedBacklogRemediationChange) {
+    return {
+      mode: 'selected',
+      relatedFiles: [],
+      mandatoryTests: [],
+      selectedTests: [],
+      rootVitestTests: [],
+      pythonTests: [],
+      pythonUnittestTests: [],
+      scriptVitestTests: BACKLOG_REMEDIATION_SCRIPT_TESTS,
+      nodeTests: BACKLOG_REMEDIATION_NODE_TESTS,
+    };
+  }
   const isBoundedProductLaneFoundation =
     files.some(file => PRODUCT_LANE_FOUNDATION_PRIMARY_INPUTS.has(file)) &&
     files.every(file => PRODUCT_LANE_FOUNDATION_LANE.has(file));
@@ -818,6 +975,47 @@ export function buildAffectedTestPlan(
       nodeTests: SAFE_PR_REMEDIATION_NODE_TESTS,
     };
   }
+  const isBoundedGemCheckinHudChange =
+    files.some(file => GEM_CHECKIN_HUD_PRIMARY_INPUTS.has(file)) &&
+    files.every(file => GEM_CHECKIN_HUD_LANE.has(file));
+  if (isBoundedGemCheckinHudChange) {
+    return {
+      mode: 'selected',
+      relatedFiles: [],
+      mandatoryTests: [],
+      selectedTests: [],
+      rootVitestTests: [],
+      pythonTests: [],
+      pythonUnittestTests: GEM_CHECKIN_HUD_PYTHON_TESTS,
+      scriptVitestTests: ['scripts/lib/__tests__/automation-verify.test.mjs'],
+      nodeTests: [],
+    };
+  }
+  const hasLegacySymphonyTestChange = files.includes(
+    'scripts/hermes/tests/symphony-codex-auth-fallback.test.py'
+  );
+  const hasAdditiveSymphonyTestAnchor = files.includes(
+    'scripts/hermes/tests/symphony-additive-router.test.py'
+  );
+  if (hasLegacySymphonyTestChange && !hasAdditiveSymphonyTestAnchor) {
+    return { mode: 'full', relatedFiles: [], mandatoryTests: [] };
+  }
+  const isBoundedSymphonyAdditiveRouterChange =
+    files.some(file => SYMPHONY_ADDITIVE_ROUTER_PRIMARY_INPUTS.has(file)) &&
+    files.every(file => SYMPHONY_ADDITIVE_ROUTER_LANE.has(file));
+  if (isBoundedSymphonyAdditiveRouterChange) {
+    return {
+      mode: 'selected',
+      relatedFiles: [],
+      mandatoryTests: [],
+      selectedTests: [],
+      rootVitestTests: [],
+      pythonTests: [],
+      pythonUnittestTests: SYMPHONY_ADDITIVE_ROUTER_PYTHON_TESTS,
+      scriptVitestTests: AFFECTED_TEST_SELECTOR_TESTS,
+      nodeTests: [],
+    };
+  }
   const isBoundedGemPrRehabilitationChange =
     files.some(file => GEM_PR_REHABILITATION_PRIMARY_INPUTS.has(file)) &&
     files.every(file => GEM_PR_REHABILITATION_LANE.has(file));
@@ -847,7 +1045,7 @@ export function buildAffectedTestPlan(
       mandatoryTests: [],
       selectedTests: [],
       rootVitestTests: [],
-      pythonTests: [],
+      pythonTests: NO_UNATTENDED_RED_PYTEST_TESTS,
       pythonUnittestTests: NO_UNATTENDED_RED_PYTHON_TESTS,
       scriptVitestTests: NO_UNATTENDED_RED_SCRIPT_TESTS,
       nodeTests: NO_UNATTENDED_RED_NODE_TESTS,
@@ -877,6 +1075,28 @@ export function buildAffectedTestPlan(
       scriptVitestTests: CI_UI_DRIFT_GUARDRAIL_SCRIPT_TESTS,
       nodeTests: CI_UI_DRIFT_GUARDRAIL_NODE_TESTS,
     };
+  }
+  const hasMergeGroupAdmissionPrimaryInput = files.some(file =>
+    MERGE_GROUP_ADMISSION_PRIMARY_INPUTS.has(file)
+  );
+  const isBoundedMergeGroupAdmissionChange =
+    hasMergeGroupAdmissionPrimaryInput &&
+    files.every(file => MERGE_GROUP_ADMISSION_LANE.has(file));
+  if (isBoundedMergeGroupAdmissionChange) {
+    return {
+      mode: 'selected',
+      relatedFiles: [],
+      mandatoryTests: [],
+      selectedTests: MERGE_GROUP_ADMISSION_WEB_TESTS,
+      rootVitestTests: [],
+      pythonTests: [],
+      pythonUnittestTests: [],
+      scriptVitestTests: MERGE_GROUP_ADMISSION_SCRIPT_TESTS,
+      nodeTests: [],
+    };
+  }
+  if (hasMergeGroupAdmissionPrimaryInput) {
+    return { mode: 'full', relatedFiles: [], mandatoryTests: [] };
   }
   const deliveryLivenessInputCount = files.filter(file =>
     DELIVERY_LIVENESS_LANE.has(file)
@@ -956,7 +1176,7 @@ export function buildAffectedTestPlan(
       mandatoryTests: [],
       selectedTests: ['apps/web/tests/unit/api/health/deploy.critical.test.ts'],
       rootVitestTests: [],
-      pythonTests: [],
+      pythonTests: FLEET_PROMOTION_GATE_PYTEST_TESTS,
       pythonUnittestTests: FLEET_PROMOTION_GATE_PYTHON_TESTS,
       scriptVitestTests: ['scripts/lib/__tests__/automation-verify.test.mjs'],
       nodeTests: [],
@@ -1412,7 +1632,8 @@ export function buildAffectedTestPlan(
   const hasIncompleteEventDrivenShipper =
     hasManifestInputBeyondDirectTests(EVENT_DRIVEN_SHIPPER_PRIMARY_MANIFEST) &&
     !isExactEventDrivenShipper &&
-    !isBoundedFleetPromotionGateChange;
+    !isBoundedFleetPromotionGateChange &&
+    !isBoundedBacklogRemediationChange;
   const hasIncompletePrSizeGuard =
     hasManifestInputBeyondDirectTests(PR_SIZE_GUARD_MANIFEST) &&
     !isExactPrSizeGuard &&
@@ -1520,6 +1741,9 @@ export function buildAffectedTestPlan(
     !isExactRunnerPrerequisiteRepair &&
     !isExactLayoutGuardContract &&
     !isExactPrSizeGuardWithSelector;
+  const hasUnboundedBacklogRemediationChange =
+    files.some(file => BACKLOG_REMEDIATION_PRIMARY_INPUTS.has(file)) &&
+    !isBoundedBacklogRemediationChange;
   const hasUncoveredSource =
     !isExactEventDrivenShipper &&
     (relatedFiles.some(file => !isCoveredSource(file)) ||
@@ -1528,6 +1752,7 @@ export function buildAffectedTestPlan(
         !isExactScannerLoadRepairPrimary &&
         !isExactScannerLoadRepairWithSelector) ||
       hasUnboundedFleetPromotionGateChange ||
+      hasUnboundedBacklogRemediationChange ||
       hasUnknownCiCancellationHealerPeer ||
       hasStandaloneCiFastLanesChange ||
       hasIncompletePrerequisiteTrain ||
@@ -1867,7 +2092,10 @@ if (process.argv[1] === fileURLToPath(import.meta.url)) {
     ),
     DEFAULT_PROGRESS_INTERVAL_MS
   );
-  const plan = buildAffectedTestPlan(changedFiles(base));
+  const explicitFiles = argValue(args, '--changed-files-json', '');
+  const plan = buildAffectedTestPlan(
+    explicitFiles ? JSON.parse(explicitFiles) : changedFiles(base)
+  );
   if (args.includes('--dry-run')) {
     console.log(JSON.stringify(plan, null, 2));
     process.exit(0);

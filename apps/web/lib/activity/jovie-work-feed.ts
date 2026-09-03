@@ -34,6 +34,31 @@ export const JOVIE_WORK_ICONS = [
 
 export type JovieWorkIcon = (typeof JOVIE_WORK_ICONS)[number];
 
+export const JOVIE_WORK_OUTCOME_STATES = [
+  'measuring',
+  'measured_zero',
+  'measured_positive',
+  'unavailable',
+] as const;
+
+export type JovieWorkOutcomeState = (typeof JOVIE_WORK_OUTCOME_STATES)[number];
+
+export const JOVIE_WORK_OUTCOME_SLOT = 'release_outcome' as const;
+
+export type JovieWorkOutcomeSlot = typeof JOVIE_WORK_OUTCOME_SLOT;
+
+export interface JovieWorkOutcomeMetrics {
+  readonly gmvDeltaCents: number;
+  readonly clickDelta: number;
+  readonly dspClickDelta: number;
+  readonly newFansDelta: number;
+}
+
+export interface JovieWorkOutcome {
+  readonly state: JovieWorkOutcomeState;
+  readonly metrics: JovieWorkOutcomeMetrics | null;
+}
+
 export interface JovieWorkItem {
   id: string;
   source: JovieWorkSource;
@@ -44,6 +69,8 @@ export interface JovieWorkItem {
   timestamp: string;
   statusLabel: string;
   href?: string;
+  outcomeSlot?: JovieWorkOutcomeSlot;
+  outcome?: JovieWorkOutcome;
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {
@@ -225,6 +252,7 @@ export function mapWorkflowRunToJovieWorkItem(input: {
   stepOutputs: unknown;
   createdAt: Date | string;
   updatedAt: Date | string;
+  outcome?: JovieWorkOutcome | null;
 }): JovieWorkItem {
   const phase = mapWorkflowRunStatusToPhase(input.status);
   const releaseTitle = readReleaseTitleFromWorkflowOutputs(input.stepOutputs);
@@ -247,6 +275,15 @@ export function mapWorkflowRunToJovieWorkItem(input: {
     typeof input.updatedAt === 'string'
       ? input.updatedAt
       : input.updatedAt.toISOString();
+  const outcome =
+    input.kind === RELEASE_TO_REVENUE_WORKFLOW_KIND &&
+    input.status === 'completed'
+      ? (input.outcome ?? { state: 'unavailable', metrics: null })
+      : undefined;
+  const outcomeSlot =
+    input.kind === RELEASE_TO_REVENUE_WORKFLOW_KIND
+      ? JOVIE_WORK_OUTCOME_SLOT
+      : undefined;
 
   return {
     id: `workflow:${input.id}`,
@@ -258,6 +295,8 @@ export function mapWorkflowRunToJovieWorkItem(input: {
     timestamp,
     statusLabel: phaseToStatusLabel(phase),
     href: APP_ROUTES.RELEASES,
+    ...(outcomeSlot ? { outcomeSlot } : {}),
+    ...(outcome ? { outcome } : {}),
   };
 }
 
@@ -478,6 +517,8 @@ export function coerceJovieWorkItem(value: unknown): JovieWorkItem | null {
   const icon = value.icon;
   const timestamp = value.timestamp;
   const statusLabel = value.statusLabel;
+  const outcomeSlot = value.outcomeSlot;
+  const outcome = coerceJovieWorkOutcome(value.outcome);
 
   if (
     typeof id !== 'string' ||
@@ -487,7 +528,10 @@ export function coerceJovieWorkItem(value: unknown): JovieWorkItem | null {
     typeof statusLabel !== 'string' ||
     !JOVIE_WORK_SOURCES.includes(source as JovieWorkSource) ||
     !JOVIE_WORK_PHASES.includes(phase as JovieWorkPhase) ||
-    !JOVIE_WORK_ICONS.includes(icon as JovieWorkIcon)
+    !JOVIE_WORK_ICONS.includes(icon as JovieWorkIcon) ||
+    (outcomeSlot !== undefined && outcomeSlot !== JOVIE_WORK_OUTCOME_SLOT) ||
+    (outcome && outcomeSlot !== JOVIE_WORK_OUTCOME_SLOT) ||
+    (value.outcome !== undefined && !outcome)
   ) {
     return null;
   }
@@ -504,6 +548,60 @@ export function coerceJovieWorkItem(value: unknown): JovieWorkItem | null {
     timestamp,
     statusLabel,
     href,
+    ...(outcomeSlot === JOVIE_WORK_OUTCOME_SLOT ? { outcomeSlot } : {}),
+    ...(outcome ? { outcome } : {}),
+  };
+}
+
+function coerceJovieWorkOutcome(value: unknown): JovieWorkOutcome | null {
+  if (!isRecord(value)) {
+    return null;
+  }
+
+  const state = value.state;
+  if (!JOVIE_WORK_OUTCOME_STATES.includes(state as JovieWorkOutcomeState)) {
+    return null;
+  }
+
+  if (state === 'unavailable') {
+    return value.metrics === null
+      ? { state: 'unavailable', metrics: null }
+      : null;
+  }
+
+  if (!isRecord(value.metrics)) {
+    return null;
+  }
+
+  const metrics = {
+    gmvDeltaCents: value.metrics.gmvDeltaCents,
+    clickDelta: value.metrics.clickDelta,
+    dspClickDelta: value.metrics.dspClickDelta,
+    newFansDelta: value.metrics.newFansDelta,
+  };
+  if (
+    Object.values(metrics).some(
+      metric =>
+        typeof metric !== 'number' || !Number.isFinite(metric) || metric < 0
+    )
+  ) {
+    return null;
+  }
+
+  const typedMetrics = metrics as JovieWorkOutcomeMetrics;
+  const hasPositiveMetric = Object.values(typedMetrics).some(
+    metric => metric > 0
+  );
+  if (
+    (state === 'measured_positive' && !hasPositiveMetric) ||
+    (state === 'measured_zero' && hasPositiveMetric)
+  ) {
+    return null;
+  }
+
+  return {
+    state: state as Exclude<JovieWorkOutcomeState, 'unavailable'>,
+    metrics: typedMetrics,
   };
 }
 

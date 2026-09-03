@@ -3,6 +3,10 @@
 import { Pause, Play, SkipBack, SkipForward } from 'lucide-react';
 import Image from 'next/image';
 import React from 'react';
+import {
+  ARTWORK_FIT_CLASSNAME,
+  ArtworkFrame,
+} from '@/components/atoms/ArtworkFrame';
 import { formatTime } from '@/lib/format-time';
 import { cn } from '@/lib/utils';
 import type { NowPlayingTrack } from './SidebarNowPlaying';
@@ -67,7 +71,7 @@ export const TabletPlayerCard = React.memo(function TabletPlayerCard({
         className
       )}
     >
-      <div className='rounded-2xl backdrop-blur-2xl bg-(--linear-app-content-surface)/70 border border-(--linear-app-frame-seam) shadow-[0_10px_40px_rgba(0,0,0,0.18)] relative overflow-hidden'>
+      <div className='rounded-2xl backdrop-blur-2xl bg-(--app-shell-content-surface)/70 border border-(--app-shell-frame-seam) shadow-[0_10px_40px_rgba(0,0,0,0.18)] relative overflow-hidden'>
         <span
           aria-hidden='true'
           className='absolute top-0 left-0 right-0 h-px bg-tertiary-token/30'
@@ -80,18 +84,18 @@ export const TabletPlayerCard = React.memo(function TabletPlayerCard({
 
         <div className='grid grid-cols-[minmax(160px,1fr)_auto_minmax(200px,2fr)] items-center gap-4 px-3 py-2.5'>
           <div className='flex items-center gap-3 min-w-0'>
-            <div className='relative h-10 w-10 rounded-lg overflow-hidden shrink-0 bg-surface-2'>
+            <ArtworkFrame size={40} className='h-10 w-10 shrink-0 bg-surface-2'>
               {artworkUrl && (
                 <Image
                   src={artworkUrl}
                   alt=''
                   fill
                   sizes='40px'
-                  className='object-cover'
+                  className={ARTWORK_FIT_CLASSNAME}
                   unoptimized
                 />
               )}
-            </div>
+            </ArtworkFrame>
             <div className='min-w-0'>
               <div className='truncate text-app font-caption text-primary-token leading-tight'>
                 {trackTitle}

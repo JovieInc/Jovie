@@ -9,7 +9,7 @@ permissions: {}
 
 concurrency:
   group: rolling-ci-dispatch-${{ github.event.workflow_run.pull_requests[0].number || github.event.workflow_run.head_sha }}
-  cancel-in-progress: true
+  cancel-in-progress: false
 
 jobs:
   dispatch:
@@ -22,12 +22,19 @@ jobs:
       (github.event.workflow_run.conclusion == 'failure' ||
       github.event.workflow_run.conclusion == 'success')
     runs-on: ubuntu-latest
-    timeout-minutes: 5
+    timeout-minutes: 30
     permissions:
       actions: read
       checks: read
       contents: read
       pull-requests: write
+    outputs:
+      artifact_id: ${{ steps.upload.outputs.artifact-id }}
+      pr_number: ${{ steps.plan.outputs.pr_number }}
+      source_head: ${{ steps.plan.outputs.source_head }}
+      head_ref: ${{ steps.plan.outputs.head_ref }}
+      fingerprint: ${{ steps.plan.outputs.fingerprint }}
+      hosted_plan_b64: ${{ steps.hosted-plan.outputs.plan_b64 }}
     steps:
       - name: Checkout trusted dispatch policy
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -38,7 +45,13 @@ jobs:
             scripts/lib/rolling-ci-dispatch.mjs
             scripts/lib/rolling-ci-handoff.mjs
             scripts/lib/rolling-ci-fx.mjs
+            scripts/lib/rolling-ci-hosted-writer.mjs
             scripts/lib/upsert-pr-comment.sh
+            .github/actions/evaluate-fleet-gate/action.yml
+            scripts/hermes/evaluate-fleet-gate.sh
+            scripts/hermes/fleet_admission_receipt.py
+            scripts/hermes/gem-priority-gate.py
+            scripts/hermes/closure_health.py
           sparse-checkout-cone-mode: false
 
       - name: Setup Node.js
@@ -50,7 +63,7 @@ jobs:
         id: plan
         env:
           GH_TOKEN: ${{ github.token }}
-          CURSOR_API_KEY: ${{ secrets.CURSOR_API_KEY }}
+          AI_GATEWAY_API_KEY: ${{ secrets.AI_GATEWAY_API_KEY }}
           REPOSITORY: ${{ github.repository }}
           EVENT_NAME: ${{ github.event_name }}
           WORKFLOW_NAME: ${{ github.event.workflow_run.name }}
@@ -66,10 +79,17 @@ jobs:
           HEAD_BRANCH: ${{ github.event.workflow_run.head_branch }}
         run: |
           set -euo pipefail
-          echo "should_record=false" >> "$GITHUB_OUTPUT"
-          echo "launch_action=skip" >> "$GITHUB_OUTPUT"
-          echo "fx_outcome=needs_human" >> "$GITHUB_OUTPUT"
-          echo "pr_number=" >> "$GITHUB_OUTPUT"
+          {
+            echo "should_record=false"
+            echo "launch_action=skip"
+            echo "fx_outcome=needs_human"
+            echo "pr_number="
+            echo "source_head="
+            echo "head_ref="
+            echo "workflow_run_id="
+            echo "workflow_run_attempt="
+            echo "fingerprint="
+          } >> "$GITHUB_OUTPUT"
           RESOLVED_PR=$(node --input-type=module <<'EOF'
           import { resolveDispatchPullRequest } from './scripts/lib/rolling-ci-dispatch.mjs';
           const resolved = resolveDispatchPullRequest({
@@ -121,8 +141,14 @@ jobs:
             echo "fx_outcome=skipped_stale" >> "$GITHUB_OUTPUT"
             exit 0
           fi
-          echo "pr_number=$RESOLVED_PR" >> "$GITHUB_OUTPUT"
-          FAILED_JOBS=$(gh api "repos/$REPOSITORY/actions/runs/$WORKFLOW_RUN_ID/jobs" \
+          {
+            echo "pr_number=$RESOLVED_PR"
+            echo "source_head=$LIVE_HEAD"
+            echo "head_ref=$LIVE_REF"
+            echo "workflow_run_id=$WORKFLOW_RUN_ID"
+            echo "workflow_run_attempt=$WORKFLOW_RUN_ATTEMPT"
+          } >> "$GITHUB_OUTPUT"
+          FAILED_JOBS=$(gh api "repos/$REPOSITORY/actions/runs/$WORKFLOW_RUN_ID/attempts/$WORKFLOW_RUN_ATTEMPT/jobs?per_page=100" \
             --jq '[.jobs[] | select(.conclusion == "failure" or .conclusion == "timed_out" or .conclusion == "startup_failure") | {name: .name, conclusion: .conclusion, steps: [.steps[]? | select(.conclusion == "failure" or .conclusion == "timed_out") | .name]}]')
           CHECKS=$(gh api --paginate "repos/$REPOSITORY/commits/$EXPECTED_HEAD/check-runs" \
             --jq '.check_runs[] | {name: .name, conclusion: .conclusion, headSha: .head_sha, checkSuiteId: .check_suite.id}' \
@@ -153,16 +179,18 @@ jobs:
             --arg workflowPath "$WORKFLOW_PATH" \
             --arg producerEvent "$PRODUCER_EVENT" \
             --arg trustedPolicyRef "$TRUSTED_REF" \
-            --arg cursorApiKey "${CURSOR_API_KEY:-}" \
-            '{repository:$repository,prNumber:$prNumber,headSha:$headSha,liveHead:$liveHead,sourceHead:$sourceHead,headRef:$headRef,workflowRunId:$workflowRunId,workflowRunAttempt:$workflowRunAttempt,failedJobs:$failedJobs,writer:$writer,priorCommentBody:$priorCommentBody,handoffCommentBody:$handoffCommentBody,conclusion:$conclusion,checkSuiteId:$checkSuiteId,checks:$checks,cursorApiKey:$cursorApiKey,source:{eventName:$eventName,workflow:$workflow,workflowPath:$workflowPath,producerEvent:$producerEvent,trustedPolicyRef:$trustedPolicyRef}}' \
+            --argjson fxAuthConfigured "$([[ -n "${AI_GATEWAY_API_KEY:-}" ]] && echo true || echo false)" \
+            --argjson runnerLocalAvailable true \
+            '{repository:$repository,prNumber:$prNumber,headSha:$headSha,liveHead:$liveHead,sourceHead:$sourceHead,headRef:$headRef,workflowRunId:$workflowRunId,workflowRunAttempt:$workflowRunAttempt,failedJobs:$failedJobs,writer:$writer,priorCommentBody:$priorCommentBody,handoffCommentBody:$handoffCommentBody,conclusion:$conclusion,checkSuiteId:$checkSuiteId,checks:$checks,fxAuthConfigured:$fxAuthConfigured,runnerLocalAvailable:$runnerLocalAvailable,remoteMutationAllowed:false,source:{eventName:$eventName,workflow:$workflow,workflowPath:$workflowPath,producerEvent:$producerEvent,trustedPolicyRef:$trustedPolicyRef}}' \
             | node scripts/lib/rolling-ci-fx.mjs > "$RUNNER_TEMP/rolling-ci-plan.json"
 
           cat "$RUNNER_TEMP/rolling-ci-plan.json"
-          echo "should_record=$(jq -r '.dispatch.mutate' "$RUNNER_TEMP/rolling-ci-plan.json")" >> "$GITHUB_OUTPUT"
-          echo "launch_action=$(jq -r '.launch.action' "$RUNNER_TEMP/rolling-ci-plan.json")" >> "$GITHUB_OUTPUT"
-          echo "fx_outcome=$(jq -r '.outcome // "needs_human"' "$RUNNER_TEMP/rolling-ci-plan.json")" >> "$GITHUB_OUTPUT"
-          echo "launch_request=$(jq -c '.launch.request // {}' "$RUNNER_TEMP/rolling-ci-plan.json")" >> "$GITHUB_OUTPUT"
           {
+            echo "should_record=$(jq -r '.dispatch.mutate' "$RUNNER_TEMP/rolling-ci-plan.json")"
+            echo "launch_action=$(jq -r '.launch.action' "$RUNNER_TEMP/rolling-ci-plan.json")"
+            echo "fx_outcome=$(jq -r '.outcome // "needs_human"' "$RUNNER_TEMP/rolling-ci-plan.json")"
+            echo "launch_request=$(jq -c '.launch.request // {}' "$RUNNER_TEMP/rolling-ci-plan.json")"
+            echo "fingerprint=$(jq -r '.launch.request.fingerprint // ""' "$RUNNER_TEMP/rolling-ci-plan.json")"
             echo "comment_body<<ROLLING_CI_COMMENT"
             jq -r '.dispatch.body' "$RUNNER_TEMP/rolling-ci-plan.json"
             echo "ROLLING_CI_COMMENT"
@@ -179,45 +207,425 @@ jobs:
           set -euo pipefail
           bash scripts/lib/upsert-pr-comment.sh "$PR_NUMBER" "rolling-ci-dispatch" "$COMMENT_BODY"
 
-      - name: Launch FX remediator
-        id: launch
-        if: steps.plan.outputs.launch_action == 'launch'
+      - name: Build hosted writer plan
+        id: hosted-plan
+        if: steps.plan.outputs.launch_action == 'launch_local' && github.event.workflow_run.event == 'pull_request'
         env:
-          CURSOR_API_KEY: ${{ secrets.CURSOR_API_KEY }}
+          HEAD_REF: ${{ steps.plan.outputs.head_ref }}
+          ROLLING_CI_PLAN: ${{ runner.temp }}/rolling-ci-plan.json
         run: |
           set -euo pipefail
-          if [[ -z "${CURSOR_API_KEY:-}" ]]; then
-            echo "::error::CURSOR_API_KEY is missing. FX cannot remediate this CI failure."
+          TRUSTED_POLICY_OID=$(git rev-parse HEAD)
+          export TRUSTED_POLICY_OID
+          node --input-type=module <<'EOF' > "$RUNNER_TEMP/hosted-plan.json"
+          import { readFileSync } from 'node:fs';
+          import { buildHostedRepairPlan } from './scripts/lib/rolling-ci-hosted-writer.mjs';
+          const input = JSON.parse(readFileSync(process.env.ROLLING_CI_PLAN, 'utf8'));
+          const plan = buildHostedRepairPlan({
+            dispatch: input.dispatch,
+            headRefName: process.env.HEAD_REF,
+            trustedPolicyOid: process.env.TRUSTED_POLICY_OID,
+          });
+          process.stdout.write(JSON.stringify(plan));
+          EOF
+          echo "plan_b64=$(base64 -w0 < "$RUNNER_TEMP/hosted-plan.json" 2>/dev/null || base64 < "$RUNNER_TEMP/hosted-plan.json" | tr -d '\n')" >> "$GITHUB_OUTPUT"
+
+      - name: Checkout exact source PR head
+        if: steps.plan.outputs.launch_action == 'launch_local'
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ steps.plan.outputs.source_head }}
+          fetch-depth: 0
+          persist-credentials: false
+          path: source
+
+      - name: Require full exact-source checkout
+        if: steps.plan.outputs.launch_action == 'launch_local'
+        working-directory: source
+        env:
+          SOURCE_HEAD: ${{ steps.plan.outputs.source_head }}
+        run: |
+          set -euo pipefail
+          test -f package.json
+          test -f pnpm-lock.yaml
+          test "$(git rev-parse HEAD)" = "$SOURCE_HEAD"
+
+      - name: Capture exact failed-run evidence
+        if: steps.plan.outputs.launch_action == 'launch_local'
+        working-directory: source
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPOSITORY: ${{ github.repository }}
+          WORKFLOW_RUN_ID: ${{ steps.plan.outputs.workflow_run_id }}
+          WORKFLOW_RUN_ATTEMPT: ${{ steps.plan.outputs.workflow_run_attempt }}
+        run: |
+          set -euo pipefail
+          mkdir -p .fx-ci
+          gh run view "$WORKFLOW_RUN_ID" --repo "$REPOSITORY" \
+            --attempt "$WORKFLOW_RUN_ATTEMPT" --log-failed \
+            > .fx-ci/failure.log
+
+      - name: Setup pnpm for repair verification
+        if: steps.plan.outputs.launch_action == 'launch_local'
+        uses: pnpm/action-setup@0977fd99725f1db4007ccb2928dbb4e90d06cc86 # v6.0.10
+        with:
+          version: 9.15.4
+
+      - name: Restore source dependencies without model credentials
+        if: steps.plan.outputs.launch_action == 'launch_local'
+        working-directory: source
+        env:
+          CI: 'true'
+        run: pnpm install --frozen-lockfile
+
+      - name: Require a clean dependency baseline
+        if: steps.plan.outputs.launch_action == 'launch_local'
+        working-directory: source
+        run: |
+          set -euo pipefail
+          if [[ -n "$(git status --porcelain --untracked-files=all)" ]]; then
+            echo "::error::Dependency setup changed the exact source head; refusing to attribute those changes to FX."
+            git status --short
             exit 1
           fi
-          node --input-type=module <<'EOF'
-          import { readFileSync } from 'node:fs';
-          import { launchCursorAgent } from './scripts/lib/rolling-ci-fx.mjs';
-          const planned = JSON.parse(
-            readFileSync(`${process.env.RUNNER_TEMP}/rolling-ci-plan.json`, 'utf8')
-          );
-          if (!planned?.launch?.request?.prompt?.text) {
-            throw new Error('FX launch request is missing');
-          }
-          const launched = await launchCursorAgent({
-            request: planned.launch.request,
-            cursorApiKey: process.env.CURSOR_API_KEY,
+
+      - name: Install pinned FX
+        if: steps.plan.outputs.launch_action == 'launch_local'
+        env:
+          FX_VERSION: v0.0.7
+          FX_SHA256: c5787ea041d3b5521ec675f1ada78f30cf1b11021ffcac48b4969cf5beb65c45
+        run: |
+          set -euo pipefail
+          archive="$RUNNER_TEMP/fx-linux-x86_64.tar.gz"
+          install_dir="$RUNNER_TEMP/fx-bin"
+          curl --fail --show-error --location --retry 3 \
+            "https://releases.fx.sh/$FX_VERSION/fx-linux-x86_64.tar.gz" \
+            --output "$archive"
+          echo "$FX_SHA256  $archive" | sha256sum --check --strict
+          mkdir -p "$install_dir"
+          tar -xzf "$archive" -C "$install_dir" fx
+          chmod 0755 "$install_dir/fx"
+          echo "$install_dir" >> "$GITHUB_PATH"
+          "$install_dir/fx" --version
+
+      - name: Run FX on the exact source head
+        id: launch
+        if: steps.plan.outputs.launch_action == 'launch_local'
+        working-directory: source
+        env:
+          AI_GATEWAY_API_KEY: ${{ secrets.AI_GATEWAY_API_KEY }}
+        run: |
+          set -euo pipefail
+          prompt=$(jq -r '.launch.request.prompt.text' "$RUNNER_TEMP/rolling-ci-plan.json")
+          if [[ -z "$prompt" || "$prompt" == "null" ]]; then
+            echo "::error::Runner-local FX launch request is missing."
+            exit 1
+          fi
+          for attempt in 1 2; do
+            if fx ask --auto --json --no-save --timeout 600 -- "$prompt" \
+              > "$RUNNER_TEMP/fx-result-$attempt.json"; then
+              exit 0
+            fi
+            if [[ "$attempt" == 1 ]]; then
+              echo "::warning::FX attempt 1 failed; retrying once on the same isolated head."
+            fi
+          done
+          echo "::error::FX failed after two bounded attempts."
+          exit 1
+
+      - name: Guard FX diff
+        id: guard
+        if: steps.launch.outcome == 'success'
+        working-directory: source
+        run: |
+          set -euo pipefail
+          rm -rf .fx-ci
+          git add --all
+          git diff --cached --check
+          if git diff --cached --quiet; then
+            echo "changed=false" >> "$GITHUB_OUTPUT"
+            echo "::warning::FX completed without a repair diff."
+            exit 0
+          fi
+          protected=$(git diff --cached --name-only --diff-filter=ACDMRTUXB \
+            | grep -E '^(\.github/workflows/|scripts/lib/rolling-ci-(dispatch|fx|handoff)\.mjs$|scripts/lib/__tests__/rolling-ci-(dispatch|fx)\.test\.mjs$|scripts/lib/upsert-pr-comment\.sh$)' || true)
+          if [[ -n "$protected" ]]; then
+            echo "::error::FX modified protected remediation-control paths:"
+            echo "$protected"
+            exit 1
+          fi
+          if git diff --cached --summary | grep -E 'create mode (120000|160000)' >/dev/null; then
+            echo "::error::FX may not add symlinks or submodules."
+            exit 1
+          fi
+          echo "changed=true" >> "$GITHUB_OUTPUT"
+
+      - name: Independently verify the guarded FX repair
+        if: steps.guard.outputs.changed == 'true'
+        working-directory: source
+        env:
+          CI: 'true'
+        run: pnpm ci:control:test
+
+      - name: Evaluate hosted writer gate
+        id: hosted-gate
+        if: steps.guard.outputs.changed == 'true' && github.event.workflow_run.event == 'pull_request'
+        uses: ./.github/actions/evaluate-fleet-gate
+        with:
+          dry-run: 'true'
+          github-token: ${{ github.token }}
+
+      - name: Create immutable FX repair artifact
+        id: artifact
+        if: steps.guard.outputs.changed == 'true'
+        working-directory: source
+        env:
+          ARTIFACT_DIR: ${{ runner.temp }}/fx-remediation
+          PR_NUMBER: ${{ steps.plan.outputs.pr_number }}
+          SOURCE_HEAD: ${{ steps.plan.outputs.source_head }}
+          FINGERPRINT: ${{ steps.plan.outputs.fingerprint }}
+        run: |
+          set -euo pipefail
+          artifact_dir="$ARTIFACT_DIR"
+          mkdir -p "$artifact_dir"
+          git diff --cached --binary --full-index > "$artifact_dir/repair.patch"
+          patch_sha=$(sha256sum "$artifact_dir/repair.patch" | cut -d' ' -f1)
+          node --input-type=module <<'EOF' > "$artifact_dir/changes.json"
+          import { execFileSync } from 'node:child_process';
+          import { createHash } from 'node:crypto';
+          import { copyFileSync, mkdirSync, readFileSync } from 'node:fs';
+          import { dirname, join } from 'node:path';
+          const root = process.env.ARTIFACT_DIR;
+          const paths = execFileSync('git', [
+            'diff',
+            '--cached',
+            '--name-only',
+            '--diff-filter=M',
+            '-z',
+          ])
+            .toString('utf8')
+            .split('\0')
+            .filter(Boolean)
+            .sort((left, right) => left.localeCompare(right));
+          if (paths.length === 0) throw new Error('hosted writer requires modified files');
+          const changes = paths.map(path => {
+            const bytes = readFileSync(path);
+            const target = join(root, 'files', path);
+            mkdirSync(dirname(target), { recursive: true });
+            copyFileSync(path, target);
+            return {
+              path,
+              status: 'M',
+              symlink: false,
+              bytes: bytes.length,
+              sha256: createHash('sha256').update(bytes).digest('hex'),
+            };
           });
-          console.log(JSON.stringify({ id: launched?.id ?? null, ok: true }));
+          process.stdout.write(`${JSON.stringify(changes, null, 2)}\n`);
           EOF
+          jq -n \
+            --argjson pr "$PR_NUMBER" \
+            --arg sourceHead "$SOURCE_HEAD" \
+            --arg fingerprint "$FINGERPRINT" \
+            --arg patchSha256 "$patch_sha" \
+            '{schema:"jovie-fx-repair-artifact/v1",pr:$pr,sourceHead:$sourceHead,fingerprint:$fingerprint,patchSha256:$patchSha256}' \
+            > "$artifact_dir/receipt.json"
+          chmod -R go-rwx "$artifact_dir"
+
+      - name: Accept hosted writer artifact without credentials
+        if: steps.artifact.outcome == 'success' && github.event.workflow_run.event == 'pull_request'
+        env:
+          HOSTED_GATE_B64: ${{ steps.hosted-gate.outputs.receipt_b64 }}
+          HOSTED_PLAN_B64: ${{ steps.hosted-plan.outputs.plan_b64 }}
+          FX_VERSION: v0.0.7
+          FX_SHA256: c5787ea041d3b5521ec675f1ada78f30cf1b11021ffcac48b4969cf5beb65c45
+        run: |
+          set -euo pipefail
+          executor=$(jq -nc --arg sha "$FX_SHA256" --arg version "$FX_VERSION" \
+            '{kind:"cursor-cli", installerSha256:$sha, version:$version}' | base64 -w0)
+          HOSTED_EXECUTOR_B64="$executor" \
+            node scripts/lib/rolling-ci-hosted-writer.mjs hosted-acceptance \
+              --artifact "$RUNNER_TEMP/fx-remediation" \
+              --repository source \
+              --writer-root "$RUNNER_TEMP/fx-remediation/writer"
+
+      - name: Upload immutable FX repair artifact
+        id: upload
+        if: steps.artifact.outcome == 'success'
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: fx-remediation-${{ steps.plan.outputs.pr_number }}-${{ steps.plan.outputs.source_head }}
+          path: ${{ runner.temp }}/fx-remediation
+          if-no-files-found: error
+          retention-days: 1
 
       - name: Record FX outcome
         if: always() && steps.plan.outcome != 'skipped'
         env:
           PLAN_OUTCOME: ${{ steps.plan.outputs.fx_outcome }}
           LAUNCH_RESULT: ${{ steps.launch.outcome }}
+          GUARD_RESULT: ${{ steps.guard.outcome }}
+          CHANGED: ${{ steps.guard.outputs.changed }}
+          UPLOAD_RESULT: ${{ steps.upload.outcome }}
         run: |
           set -euo pipefail
           outcome="${PLAN_OUTCOME:-needs_human}"
-          if [[ "${LAUNCH_RESULT:-}" == 'success' ]]; then
-            outcome='launched'
+          if [[ "${UPLOAD_RESULT:-}" == 'success' ]]; then
+            outcome='prepared'
+          elif [[ "${LAUNCH_RESULT:-}" == 'success' && "${GUARD_RESULT:-}" == 'success' && "${CHANGED:-}" == 'false' ]]; then
+            outcome='needs_human'
+          elif [[ "${LAUNCH_RESULT:-}" == 'success' ]]; then
+            outcome='failed_after_launch'
           elif [[ "${LAUNCH_RESULT:-}" == 'failure' && "$outcome" == 'launched' ]]; then
             outcome='needs_human'
           fi
           echo "::notice::FX outcome=${outcome}"
           echo "FX outcome: \`${outcome}\`" >> "$GITHUB_STEP_SUMMARY"
+
+  writer:
+    name: Deliver guarded FX repair
+    needs: dispatch
+    if: needs.dispatch.outputs.artifact_id != ''
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    permissions:
+      actions: read
+      contents: read
+      pull-requests: read
+    steps:
+      - name: Checkout exact source PR head without credentials
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ needs.dispatch.outputs.source_head }}
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Download immutable FX repair artifact
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          artifact-ids: ${{ needs.dispatch.outputs.artifact_id }}
+          path: ${{ runner.temp }}/fx-remediation
+
+      - name: Revalidate and apply immutable FX patch
+        env:
+          PR_NUMBER: ${{ needs.dispatch.outputs.pr_number }}
+          SOURCE_HEAD: ${{ needs.dispatch.outputs.source_head }}
+          FINGERPRINT: ${{ needs.dispatch.outputs.fingerprint }}
+        run: |
+          set -euo pipefail
+          artifact_dir="$RUNNER_TEMP/fx-remediation"
+          patch="$artifact_dir/repair.patch"
+          receipt="$artifact_dir/receipt.json"
+          jq -e \
+            --argjson pr "$PR_NUMBER" \
+            --arg sourceHead "$SOURCE_HEAD" \
+            --arg fingerprint "$FINGERPRINT" \
+            '.schema == "jovie-fx-repair-artifact/v1" and .pr == $pr and .sourceHead == $sourceHead and .fingerprint == $fingerprint' \
+            "$receipt" >/dev/null
+          patch_sha=$(jq -r '.patchSha256' "$receipt")
+          echo "$patch_sha  $patch" | sha256sum --check --strict
+          git apply --index --check "$patch"
+          git apply --index "$patch"
+          git diff --cached --check
+          protected=$(git diff --cached --name-only --diff-filter=ACDMRTUXB \
+            | grep -E '^(\.github/workflows/|scripts/lib/rolling-ci-(dispatch|fx|handoff)\.mjs$|scripts/lib/__tests__/rolling-ci-(dispatch|fx)\.test\.mjs$|scripts/lib/upsert-pr-comment\.sh$)' || true)
+          if [[ -n "$protected" ]]; then
+            echo "::error::Immutable FX artifact contains protected remediation-control paths:"
+            echo "$protected"
+            exit 1
+          fi
+          if git diff --cached --summary | grep -E 'create mode (120000|160000)' >/dev/null; then
+            echo "::error::Immutable FX artifact may not add symlinks or submodules."
+            exit 1
+          fi
+
+      - name: Commit validated FX repair
+        env:
+          SOURCE_HEAD: ${{ needs.dispatch.outputs.source_head }}
+          FINGERPRINT: ${{ needs.dispatch.outputs.fingerprint }}
+        run: |
+          set -euo pipefail
+          git config user.name "jovie-fx[bot]"
+          git config user.email "jovie-fx[bot]@users.noreply.github.com"
+          git commit -m "fix(ci): remediate ${FINGERPRINT:-exact-head failure}" \
+            -m "FX-Source-Head: $SOURCE_HEAD"
+
+      - name: Generate short-lived Jovie App writer token
+        id: app-token
+        uses: actions/create-github-app-token@bcd2ba49218906704ab6c1aa796996da409d3eb1 # v3.2.0
+        with:
+          app-id: ${{ vars.JOVIE_BOT_APP_ID }}
+          private-key: ${{ secrets.JOVIE_BOT_PRIVATE_KEY }}
+          permission-contents: write
+          permission-pull-requests: read
+
+      - name: Checkout trusted writer policy
+        if: needs.dispatch.outputs.hosted_plan_b64 != ''
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
+          path: trusted
+          sparse-checkout: |
+            scripts/lib/rolling-ci-hosted-writer.mjs
+            scripts/hermes/evaluate-fleet-gate.sh
+            scripts/hermes/fleet_admission_receipt.py
+            scripts/hermes/gem-priority-gate.py
+            scripts/hermes/closure_health.py
+          sparse-checkout-cone-mode: false
+
+      - name: Evaluate fresh writer gate
+        id: fresh-gate
+        if: needs.dispatch.outputs.hosted_plan_b64 != ''
+        working-directory: trusted
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GEM_PRIORITY_GATE_REPO: ${{ github.repository }}
+          FLEET_GATE_DRY_RUN: '1'
+        run: bash scripts/hermes/evaluate-fleet-gate.sh
+
+      - name: Commit hosted repair through trusted writer
+        id: push
+        if: needs.dispatch.outputs.hosted_plan_b64 != ''
+        working-directory: trusted
+        env:
+          GH_TOKEN: ${{ steps.app-token.outputs.token }}
+          STATUS_TOKEN: ${{ github.token }}
+          HOSTED_GATE_B64: ${{ steps.fresh-gate.outputs.receipt_b64 }}
+          HOSTED_PLAN_B64: ${{ needs.dispatch.outputs.hosted_plan_b64 }}
+        run: |
+          set -euo pipefail
+          artifact_dir="$RUNNER_TEMP/fx-remediation"
+          find "$artifact_dir" -type d -exec chmod 700 {} +
+          find "$artifact_dir" -type f -exec chmod 600 {} +
+          node scripts/lib/rolling-ci-hosted-writer.mjs hosted-commit \
+            --artifact "$artifact_dir" \
+            --writer-root "$artifact_dir/writer" \
+            --output "$RUNNER_TEMP/hosted-terminal.json"
+          outcome=$(jq -r '.outcome' "$RUNNER_TEMP/hosted-terminal.json")
+          echo "::notice::FX outcome=$outcome"
+          echo "FX outcome: \`$outcome\`" >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Push guarded FX repair
+        id: push-fallback
+        if: needs.dispatch.outputs.hosted_plan_b64 == ''
+        env:
+          GH_TOKEN: ${{ steps.app-token.outputs.token }}
+          REPOSITORY: ${{ github.repository }}
+          PR_NUMBER: ${{ needs.dispatch.outputs.pr_number }}
+          SOURCE_HEAD: ${{ needs.dispatch.outputs.source_head }}
+          HEAD_REF: ${{ needs.dispatch.outputs.head_ref }}
+        run: |
+          set -euo pipefail
+          LIVE_PR=$(gh api "repos/$REPOSITORY/pulls/$PR_NUMBER" \
+            --jq '{head: .head.sha, ref: .head.ref, state: .state, same_repo: (.head.repo.full_name == .base.repo.full_name), fork: (.head.repo.fork // false)}')
+          REMOTE_HEAD=$(jq -r '.head' <<<"$LIVE_PR")
+          if [[ "$REMOTE_HEAD" != "$SOURCE_HEAD" || "$(jq -r '.ref' <<<"$LIVE_PR")" != "$HEAD_REF" || "$(jq -r '.state' <<<"$LIVE_PR")" != "open" || "$(jq -r '.same_repo' <<<"$LIVE_PR")" != "true" || "$(jq -r '.fork' <<<"$LIVE_PR")" == "true" ]]; then
+            echo "::error::PR head changed or is no longer an eligible same-repository branch; refusing stale FX push."
+            exit 1
+          fi
+          auth=$(printf 'x-access-token:%s' "$GH_TOKEN" | base64 -w 0)
+          git -c http.https://github.com/.extraheader="AUTHORIZATION: basic $auth" \
+            push "https://github.com/$REPOSITORY.git" "HEAD:refs/heads/$HEAD_REF"
+          echo "::notice::FX outcome=repaired"
+          echo "FX outcome: \`repaired\`" >> "$GITHUB_STEP_SUMMARY"

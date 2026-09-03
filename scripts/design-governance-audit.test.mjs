@@ -2,8 +2,14 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 import { runDesignGovernanceAudit } from './design-governance-audit.mjs';
 
+const CONFORMANCE_AUDIT_OPTIONS = Object.freeze({
+  includeAuthorityMap: false,
+});
+const runConformanceAudit = () =>
+  runDesignGovernanceAudit(undefined, CONFORMANCE_AUDIT_OPTIONS);
+
 test('repo design governance audit has no FAIL checks', () => {
-  const { failed, results } = runDesignGovernanceAudit();
+  const { failed, results } = runConformanceAudit();
   assert.ok(results.length > 0, 'audit must report at least one check');
   assert.deepEqual(
     failed,
@@ -13,7 +19,7 @@ test('repo design governance audit has no FAIL checks', () => {
 });
 
 test('audit requires the standing enforcement commands', () => {
-  const { results } = runDesignGovernanceAudit();
+  const { results } = runConformanceAudit();
   const wiring = results.find(item => item.id === 'enforcement-wiring');
   assert.equal(wiring?.status, 'WARN');
   assert.match(wiring.detail, /design:governance:audit/);
@@ -21,4 +27,33 @@ test('audit requires the standing enforcement commands', () => {
   assert.match(wiring.detail, /not a ci-fast merge gate/);
   const scripts = results.find(item => item.id === 'package-scripts');
   assert.equal(scripts?.status, 'PASS');
+});
+
+test('keeps local-only authority map out of conformance audit tests', () => {
+  const { results } = runConformanceAudit();
+  const authority = results.find(
+    item => item.id === 'design-system-authority-map'
+  );
+  assert.equal(authority, undefined);
+});
+
+test('binds design projections to the canonical invariant registry', () => {
+  const { results } = runConformanceAudit();
+  const projection = results.find(
+    item => item.id === 'design-invariant-projection'
+  );
+  assert.equal(projection?.status, 'PASS');
+  assert.match(projection.detail, /JOV-INV-019/);
+  assert.match(projection.detail, /executable generator and guard bindings/);
+  const audit = results.find(item => item.id === 'shared-ui-visual-arbitrary');
+  assert.equal(audit?.status, 'PASS');
+  assert.match(audit.detail, /visual findings/);
+  const outcome = results.find(item => item.id === 'shadcn-outcome-inventory');
+  assert.equal(outcome?.status, 'PASS');
+  assert.match(outcome.detail, /MIT public-outcome boundary/);
+  const wiring = results.find(
+    item => item.id === 'shared-ui-visual-arbitrary-wiring'
+  );
+  assert.equal(wiring?.status, 'PASS');
+  assert.match(wiring.detail, /design:shared-ui-visual-arbitrary:check/);
 });

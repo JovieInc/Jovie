@@ -161,7 +161,7 @@ function SignalCard({
   }
 
   return (
-    <div className='pointer-events-none absolute left-75 top-22 z-20 w-103 rounded-xl border border-(--linear-app-shell-border) bg-(--linear-app-content-surface)/95 p-3 shadow-[0_18px_55px_rgba(0,0,0,0.35)] backdrop-blur'>
+    <div className='pointer-events-none absolute left-75 top-22 z-20 w-103 rounded-xl border border-(--app-shell-border) bg-(--app-shell-content-surface)/95 p-3 shadow-[0_18px_55px_rgba(0,0,0,0.35)] backdrop-blur'>
       <div className='mb-2 flex items-center gap-3'>
         <ArtworkThumb
           src='/img/releases/the-deep-end.jpg'
@@ -205,8 +205,8 @@ function ApprovalStatus({
   }
 
   return (
-    <div className='pointer-events-none absolute left-75 bottom-9 z-20 flex items-center gap-2 rounded-full border border-(--linear-app-shell-border) bg-(--linear-app-content-surface)/95 px-3 py-2 text-xs text-secondary-token shadow-[0_12px_35px_rgba(0,0,0,0.32)]'>
-      <span className='relative grid size-5 place-items-center rounded-full bg-primary-token text-(--linear-app-content-surface)'>
+    <div className='pointer-events-none absolute left-75 bottom-9 z-20 flex items-center gap-2 rounded-full border border-(--app-shell-border) bg-(--app-shell-content-surface)/95 px-3 py-2 text-xs text-secondary-token shadow-[0_12px_35px_rgba(0,0,0,0.32)]'>
+      <span className='relative grid size-5 place-items-center rounded-full bg-primary-token text-(--app-shell-content-surface)'>
         <Check className='size-3' />
         {activeScene === 'approval-execution' ? (
           <AgentPulse className='rounded-full' />
@@ -254,7 +254,7 @@ function RecordingChatPanel({
     (elapsedSeconds >= 76 && elapsedSeconds < 77);
 
   return (
-    <div className='absolute bottom-4 right-4 top-12 z-30 w-108 overflow-hidden rounded-xl border border-(--linear-app-shell-border) bg-(--linear-app-content-surface)/98 shadow-[0_24px_80px_rgba(0,0,0,0.42)] backdrop-blur'>
+    <div className='absolute bottom-4 right-4 top-12 z-30 w-108 overflow-hidden rounded-xl border border-(--app-shell-border) bg-(--app-shell-content-surface)/98 shadow-[0_24px_80px_rgba(0,0,0,0.42)] backdrop-blur'>
       <ThreadView
         thread={{
           id: 'the-deep-end-weekend-drop',
@@ -298,7 +298,7 @@ function RecordingChatPanel({
           </ThreadTurn>
         ) : null}
         {elapsedSeconds >= 46 && elapsedSeconds < 76 ? (
-          <div className='rounded-lg border border-(--linear-app-shell-border) bg-surface-1 p-3 text-app'>
+          <div className='rounded-lg border border-(--app-shell-border) bg-surface-1 p-3 text-app'>
             <div className='mb-3 text-secondary-token'>
               Approve this and I will create the campaign, update your Jovie
               Link, draft the fan notification, schedule the drop, and monitor
@@ -337,7 +337,7 @@ export function FounderDemoRecordingSurface() {
   return (
     <DemoClientProviders>
       <main
-        className='relative h-screen w-full max-w-full overflow-hidden bg-(--linear-app-content-surface)'
+        className='relative h-screen w-full max-w-full overflow-hidden bg-(--app-shell-content-surface)'
         data-testid='founder-demo-recording-surface'
       >
         <div

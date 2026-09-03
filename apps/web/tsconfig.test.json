@@ -1,15 +1,28 @@
 {
   "extends": "./tsconfig.json",
   "compilerOptions": {
-    "tsBuildInfoFile": ".cache/tsbuildinfo-tests"
+    "tsBuildInfoFile": ".cache/tsbuildinfo-tests",
+    "skipLibCheck": true
   },
   "include": [
     "tests/**/*.ts",
     "tests/**/*.tsx",
     "scripts/**/*.ts",
-    "playwright.config*.ts",
     "drizzle.config.ts",
     "dangerfile.ts"
   ],
-  "exclude": ["node_modules"]
+  "exclude": [
+    "node_modules",
+    "tests/e2e/**",
+    "tests/eval/**",
+    "tests/audit/**",
+    "tests/performance/**",
+    "tests/integration/**",
+    "tests/product-screenshots/**",
+    "tests/visual-qa/**",
+    "tests/**/*.nightly.test.ts",
+    ".artifact-comparison-*/**",
+    ".next/**",
+    ".stryker-tmp/**"
+  ]
 }

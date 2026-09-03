@@ -96,6 +96,10 @@
 | Route | Methods | Auth | Description |
 |-------|---------|------|-------------|
 | `/api/artist/theme` | GET, PUT | `auth` | Get/update artist theme |
+| `/api/v1` | GET | `public` | Stable, non-enumerating capability index for the anonymous read-only artist API; lifecycle Link only |
+| `/api/v1/[username]` | GET | `public` | Public read-only artist profile with releases, events, merch, durable 100/min/IP artist-profile limit, RateLimit headers, and typed 429/503 paths |
+| `/api/v1/openapi.json` | GET | `public` | Canonical OpenAPI 3.1 contract for the public artist API |
+| `/openapi.json` | GET | `public` | Conventional discovery surface; identical contract to `/api/v1/openapi.json` |
 
 ### Audience
 
@@ -153,6 +157,7 @@
 | `/api/chat/conversations/[id]` | GET, DELETE | `auth` | Get/delete conversation |
 | `/api/chat/conversations/[id]/messages` | GET | `auth` | Get conversation messages |
 | `/api/chat/usage` | GET | `auth` | Get chat usage stats |
+| `/api/mobile/v1/eyes-free-capture` | POST | mobile session | Closed-destination eyes-free capture. `jovie` runs the existing creative chat turn; `summer` is founder-only via the OV admin gate. Idempotent on `clientTurnId`. |
 
 ### Clerk
 

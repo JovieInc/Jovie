@@ -246,7 +246,7 @@ describe('baked runner prerequisite contract', () => {
       readonly devDependencies: Readonly<Record<string, string>>;
     };
     expect(requirements.nodeMajor).toBe(22);
-    expect(requirements.nodeMinimum).toBe('22.23.1');
+    expect(requirements.nodeMinimum).toBe('22.23.2');
     expect(requirements.nodeMinimum).toBe(
       readFileSync(resolve(repoRoot, '.nvmrc'), 'utf8').trim()
     );
@@ -266,7 +266,7 @@ describe('baked runner prerequisite contract', () => {
       'sha256:f546db5932b903c81cf269a712dad679fdf139dc08b7676c08f391a11258de5e'
     );
     expect(runnerDockerfile).toContain(
-      '9749e988f437343b7fa832c69ded82a312e41a03116d766797ac14f6f9eee578'
+      'd60acfe00a2932254bb0ad20e01b0d74397a0875595de719654b214f4b03f307'
     );
     expect(runnerDockerfile).toContain('sha256sum --check --strict');
     expect(runnerDockerfile).not.toMatch(/curl[\s\S]*?\|\s*tar/);
@@ -276,7 +276,7 @@ describe('baked runner prerequisite contract', () => {
     expect(runnerDockerfile).toContain('COREPACK_HOME=/opt/corepack');
     expect(runnerDockerfile).toContain('su -s /bin/bash runner -c');
     expect(runnerDockerfile).toContain(
-      '/opt/hostedtoolcache/node/22.23.1/x64/bin/pnpm --version'
+      '/opt/hostedtoolcache/node/22.23.2/x64/bin/pnpm --version'
     );
     expect(
       runnerDockerfile.indexOf('FROM runner-base\n\n# Corepack')

@@ -133,7 +133,7 @@ async function InvestorPipelineTable() {
   if (links.length === 0) {
     return (
       <ContentSurfaceCard className='overflow-hidden p-0'>
-        <div className='px-(--linear-app-header-padding-x) py-6 text-app text-secondary-token'>
+        <div className='px-(--app-shell-header-padding-x) py-6 text-app text-secondary-token'>
           No investor links yet.
         </div>
       </ContentSurfaceCard>

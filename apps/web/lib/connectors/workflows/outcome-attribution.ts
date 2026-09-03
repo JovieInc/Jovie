@@ -11,11 +11,17 @@ import { and, sql as drizzleSql, eq, gte, lte, or } from 'drizzle-orm';
 import { db } from '@/lib/db';
 import { audienceMembers, clickEvents } from '@/lib/db/schema/analytics';
 import { workflowRunOutcomes, workflowRuns } from '@/lib/db/schema/connectors';
-import { ensureJovieActiveCohort } from '@/lib/metrics/artist-revenue-cohorts';
+import {
+  BASELINE_WINDOW_DAYS,
+  ensureJovieActiveCohort,
+} from '@/lib/metrics/artist-revenue-cohorts';
 import { buildReleaseGmvRowForRun } from '@/lib/release-to-revenue/gmv-attribution';
 import type { ReleaseToRevenueRunStepOutputs } from '@/lib/release-to-revenue/types';
 import { RELEASE_TO_REVENUE_WORKFLOW_KIND } from '@/lib/release-to-revenue/types';
 import { logger } from '@/lib/utils/logger';
+
+const MS_PER_DAY = 24 * 60 * 60 * 1000;
+export const RELEASE_OUTCOME_MEASUREMENT_WINDOW_DAYS = BASELINE_WINDOW_DAYS;
 
 export interface WorkflowRunAttributionWindow {
   readonly start: Date;
@@ -46,6 +52,36 @@ export interface AutomationAttributedRevenue {
   readonly windowEnd: Date;
 }
 
+export type ReleaseOutcomeMeasurementState =
+  | 'measuring'
+  | 'measured_zero'
+  | 'measured_positive';
+
+/** Classify a stored snapshot without treating an unreconciled early row as mature. */
+export function resolveReleaseOutcomeMeasurementState(input: {
+  readonly windowStart: Date;
+  readonly windowEnd: Date;
+  readonly gmvDeltaCents: number;
+  readonly clickDelta: number;
+  readonly dspClickDelta: number;
+  readonly newFansDelta: number;
+}): ReleaseOutcomeMeasurementState {
+  const maturityAt = new Date(
+    input.windowStart.getTime() +
+      RELEASE_OUTCOME_MEASUREMENT_WINDOW_DAYS * MS_PER_DAY
+  );
+  if (input.windowEnd < maturityAt) {
+    return 'measuring';
+  }
+
+  const hasPositiveResult =
+    input.gmvDeltaCents > 0 ||
+    input.clickDelta > 0 ||
+    input.dspClickDelta > 0 ||
+    input.newFansDelta > 0;
+  return hasPositiveResult ? 'measured_positive' : 'measured_zero';
+}
+
 function parseApprovalId(stepOutputs: Record<string, unknown>): string | null {
   return typeof stepOutputs.approvalId === 'string'
     ? stepOutputs.approvalId
@@ -53,9 +89,11 @@ function parseApprovalId(stepOutputs: Record<string, unknown>): string | null {
 }
 
 function resolveAttributionWindow(input: {
+  readonly kind: string;
   readonly createdAt: Date;
   readonly stepOutputs: Record<string, unknown>;
   readonly completedAt: Date;
+  readonly asOf: Date;
 }): WorkflowRunAttributionWindow {
   const triggeredAtRaw = input.stepOutputs.triggeredAt;
   const triggeredAt =
@@ -65,7 +103,20 @@ function resolveAttributionWindow(input: {
       ? triggeredAt
       : input.createdAt;
 
-  return { start, end: input.completedAt };
+  if (input.kind !== RELEASE_TO_REVENUE_WORKFLOW_KIND) {
+    return { start, end: input.completedAt };
+  }
+
+  const maturityAt = new Date(
+    start.getTime() + RELEASE_OUTCOME_MEASUREMENT_WINDOW_DAYS * MS_PER_DAY
+  );
+  const boundedAsOf = new Date(
+    Math.max(
+      start.getTime(),
+      Math.min(input.asOf.getTime(), maturityAt.getTime())
+    )
+  );
+  return { start, end: boundedAsOf };
 }
 
 async function countReleaseClicks(input: {
@@ -117,17 +168,21 @@ async function countCapturedFansInWindow(input: {
 }
 
 export async function computeWorkflowRunOutcomeDeltas(input: {
+  readonly workflowRunId: string;
   readonly kind: string;
   readonly userId: string;
   readonly createdAt: Date;
   readonly stepOutputs: Record<string, unknown>;
   readonly completedAt?: Date;
+  readonly asOf?: Date;
 }): Promise<WorkflowRunOutcomeDeltas> {
   const completedAt = input.completedAt ?? new Date();
   const window = resolveAttributionWindow({
+    kind: input.kind,
     createdAt: input.createdAt,
     stepOutputs: input.stepOutputs,
     completedAt,
+    asOf: input.asOf ?? new Date(),
   });
   const suggestedActionId = parseApprovalId(input.stepOutputs);
 
@@ -153,8 +208,9 @@ export async function computeWorkflowRunOutcomeDeltas(input: {
   let gmvDeltaCents = 0;
   if (releaseStepOutputs.release?.title) {
     const gmvRow = await buildReleaseGmvRowForRun({
-      workflowRunId: 'pending',
+      workflowRunId: input.workflowRunId,
       stepOutputs: releaseStepOutputs,
+      window,
     });
     gmvDeltaCents = gmvRow.gmvCents;
   }
@@ -193,8 +249,29 @@ export async function computeWorkflowRunOutcomeDeltas(input: {
   };
 }
 
+function resolveReleaseActivationAt(
+  stepOutputs: ReleaseToRevenueRunStepOutputs,
+  fallback: Date
+): Date | null {
+  const dispatched = stepOutputs.distributionDrafts?.items.filter(
+    draft => draft.status === 'dispatched'
+  );
+  if (!dispatched || dispatched.length === 0) {
+    return null;
+  }
+
+  const activationTimes = dispatched
+    .map(draft => (draft.dispatchedAt ? new Date(draft.dispatchedAt) : null))
+    .filter(
+      (date): date is Date => date !== null && !Number.isNaN(date.getTime())
+    )
+    .sort((a, b) => a.getTime() - b.getTime());
+  return activationTimes[0] ?? fallback;
+}
+
 export async function recordWorkflowRunOutcome(
-  workflowRunId: string
+  workflowRunId: string,
+  options: { readonly asOf?: Date } = {}
 ): Promise<AutomationAttributedRevenue | null> {
   const [run] = await db
     .select()
@@ -211,39 +288,69 @@ export async function recordWorkflowRunOutcome(
     return null;
   }
 
+  const isReleaseOutcome = run.kind === RELEASE_TO_REVENUE_WORKFLOW_KIND;
+  const releaseActivationAt = isReleaseOutcome
+    ? resolveReleaseActivationAt(
+        run.stepOutputs as unknown as ReleaseToRevenueRunStepOutputs,
+        run.updatedAt
+      )
+    : null;
+  if (isReleaseOutcome && !releaseActivationAt) {
+    return null;
+  }
+
   const [existing] = await db
     .select({ id: workflowRunOutcomes.id })
     .from(workflowRunOutcomes)
     .where(eq(workflowRunOutcomes.workflowRunId, workflowRunId))
     .limit(1);
 
-  if (existing) {
+  if (existing && !isReleaseOutcome) {
     return getAutomationAttributedRevenueForRun(workflowRunId);
   }
 
   const deltas = await computeWorkflowRunOutcomeDeltas({
+    workflowRunId,
     kind: run.kind,
     userId: run.userId,
     createdAt: run.createdAt,
     stepOutputs: run.stepOutputs as Record<string, unknown>,
     completedAt: run.updatedAt,
+    asOf: options.asOf,
   });
 
-  const [inserted] = await db
-    .insert(workflowRunOutcomes)
-    .values({
-      workflowRunId,
-      userId: run.userId,
-      releaseId: deltas.releaseId,
-      suggestedActionId: deltas.suggestedActionId,
-      gmvDeltaCents: deltas.gmvDeltaCents,
-      clickDelta: deltas.clickDelta,
-      dspClickDelta: deltas.dspClickDelta,
-      newFansDelta: deltas.newFansDelta,
-      windowStart: deltas.window.start,
-      windowEnd: deltas.window.end,
-    })
-    .returning();
+  const values = {
+    workflowRunId,
+    userId: run.userId,
+    releaseId: deltas.releaseId,
+    suggestedActionId: deltas.suggestedActionId,
+    gmvDeltaCents: deltas.gmvDeltaCents,
+    clickDelta: deltas.clickDelta,
+    dspClickDelta: deltas.dspClickDelta,
+    newFansDelta: deltas.newFansDelta,
+    windowStart: deltas.window.start,
+    windowEnd: deltas.window.end,
+  };
+
+  const [recorded] = isReleaseOutcome
+    ? await db
+        .insert(workflowRunOutcomes)
+        .values(values)
+        .onConflictDoUpdate({
+          target: workflowRunOutcomes.workflowRunId,
+          set: {
+            releaseId: values.releaseId,
+            suggestedActionId: values.suggestedActionId,
+            gmvDeltaCents: values.gmvDeltaCents,
+            clickDelta: values.clickDelta,
+            dspClickDelta: values.dspClickDelta,
+            newFansDelta: values.newFansDelta,
+            windowStart: values.windowStart,
+            windowEnd: values.windowEnd,
+          },
+        })
+        .returning()
+    : await db.insert(workflowRunOutcomes).values(values).returning();
 
   logger.info('[workflow-run-outcome] recorded automation attribution', {
     workflowRunId,
@@ -257,12 +364,14 @@ export async function recordWorkflowRunOutcome(
   // First recorded automation outcome tags the artist jovie_active and
   // snapshots their pre-Jovie baseline (IRPAA cohort foundation, gh-12141).
   // Best-effort: never blocks the automation path.
-  await ensureJovieActiveCohort({
-    userId: run.userId,
-    activatedAt: run.updatedAt,
-  });
+  if (!existing) {
+    await ensureJovieActiveCohort({
+      userId: run.userId,
+      activatedAt: releaseActivationAt ?? run.updatedAt,
+    });
+  }
 
-  return inserted ? toAutomationAttributedRevenue(inserted) : null;
+  return recorded ? toAutomationAttributedRevenue(recorded) : null;
 }
 
 function toAutomationAttributedRevenue(

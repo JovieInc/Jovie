@@ -13,23 +13,24 @@ parent lands. Graphite is not required and there is no second landing transport.
    immediate parent while both are open, but it must remain draft and must not
    receive `merge-queue` while that parent base is live.
 2. After the parent lands, retarget the child to `main`, rebase it from the
-   recorded parent tip, prove its exact remote head lease and semantic ancestry,
-   then mark it ready and apply `merge-queue`. Automation normally does this;
-   humans can use `gh pr edit <pr> --add-label merge-queue` only after that proof.
-3. Before labeling, the operator must verify the child targets `main` and that
-   its exact head is the rebased SHA. `merge-queue-autoenroll.yml` then
-   revalidates the PR's current state, hard-gate labels, terminal checks, and
-   exact head SHA. It enrolls through `scripts/merge-queue-backend.mjs` and
-   proves authoritative queue state after mutation. The label remains intent/
-   audit evidence, never queue truth.
+   recorded parent tip, and prove its exact remote head lease and semantic
+   ancestry. The owning agent's final action pairs marking ready with enabling
+   native auto-merge. Pending checks are valid; GitHub will not merge until the
+   existing source flight is green. If auto-merge cannot be enabled, automation
+   restores draft state rather than leaving a ready PR without merge intent.
+3. `merge-queue-autoenroll.yml` revalidates the PR's current state, hard-gate
+   labels, the first source CI flight, and exact head SHA. It enrolls through
+   `scripts/merge-queue-backend.mjs` and proves authoritative queue state after
+   mutation. `ready_for_review` never launches a second source CI flight, and
+   Graphite/Cursor are not queue transports.
 4. GitHub creates a synthetic `merge_group` head against current `main` and
    waits for the same required contexts on that exact combined SHA.
 5. GitHub squash-merges the green queue entry. `linear-sync-on-merge.yml`
    transitions its Linear issue to `Done`.
 
-Do not manually merge queue-eligible PRs or use a second transport. The normal
-operator action is the intent label; the controller owns exact-head enrollment,
-dequeue compensation, and postcondition checks.
+Do not manually merge queue-eligible PRs or use a second transport. Native
+auto-merge records merge-when-ready intent; the controller owns exact-head
+enrollment and postcondition checks.
 
 ## Required contexts and CI stages
 

@@ -16,8 +16,8 @@
 import type Stripe from 'stripe';
 
 import { captureCriticalError, logFallback } from '@/lib/error-tracking';
-import { attributeLeadPaidConversionByClerkUserId } from '@/lib/leads/funnel-events';
-import { activateReferral, getInternalUserId } from '@/lib/referrals/service';
+import { attributeLeadPaidConversionByAppUserId } from '@/lib/leads/funnel-events';
+import { activateReferral } from '@/lib/referrals/service';
 import { stripe } from '@/lib/stripe/client';
 import { logger } from '@/lib/utils/logger';
 
@@ -32,12 +32,9 @@ import { getUserIdFromStripeCustomer, invalidateBillingCache } from '../utils';
 /**
  * Best-effort referral activation — logs but does not throw on failure.
  */
-async function tryActivateReferral(clerkUserId: string): Promise<void> {
+async function tryActivateReferral(appUserId: string): Promise<void> {
   try {
-    const internalId = await getInternalUserId(clerkUserId);
-    if (internalId) {
-      await activateReferral(internalId);
-    }
+    await activateReferral(appUserId);
   } catch (error) {
     logger.warn('Failed to activate referral on checkout', {
       error: error instanceof Error ? error.message : 'Unknown error',
@@ -135,16 +132,18 @@ export class CheckoutSessionHandler extends BaseSubscriptionHandler {
       eventType: 'subscription_created',
     });
 
-    // Activate referral if this user was referred (best-effort).
-    // Awaited to preserve ordering before cache invalidation; failures are logged, not thrown.
-    await tryActivateReferral(userId);
-
-    // Invalidate client cache
-    await invalidateBillingCache(userId);
-
     if (result.success && result.isActive) {
+      if (!result.appUserId) {
+        throw new Error('Billing update omitted canonical app user ID');
+      }
+
+      // Secondary revenue attribution always uses the canonical app UUID.
+      await tryActivateReferral(result.appUserId);
       try {
-        await attributeLeadPaidConversionByClerkUserId(userId, subscription.id);
+        await attributeLeadPaidConversionByAppUserId(
+          result.appUserId,
+          subscription.id
+        );
       } catch (error) {
         logger.warn('Failed to attribute lead paid conversion on checkout', {
           userId,
@@ -153,6 +152,9 @@ export class CheckoutSessionHandler extends BaseSubscriptionHandler {
         });
       }
     }
+
+    // Invalidate the same canonical identity used by billing-status reads.
+    await invalidateBillingCache(result.appUserId ?? userId);
 
     return result;
   }

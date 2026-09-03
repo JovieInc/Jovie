@@ -10,6 +10,17 @@ struct EntityContextItem: Identifiable, Equatable, Hashable, Sendable {
 
   var id: String { "\(kind.rawValue):\(entityID)" }
 
+  static func fromLibraryAsset(_ asset: LibraryAsset) -> EntityContextItem {
+    let kind: MobileChatEntityKind
+    switch asset.type {
+    case .release:
+      kind = .release
+    case .merch, .smartLink, .photo, .press, .video:
+      kind = .track
+    }
+    return EntityContextItem(kind: kind, entityID: asset.id, label: asset.name)
+  }
+
   var title: String { label }
 
   var kindTitle: String {
@@ -266,7 +277,10 @@ struct AppShellRightRail: View {
 
         Button("Talk", action: onTalk)
           .buttonStyle(JoviePillButtonStyle(filled: true))
-          .accessibilityIdentifier("shell-rail-talk")
+          .accessibilityRepresentation {
+            Button("Talk", action: onTalk)
+              .accessibilityIdentifier("shell-rail-talk")
+          }
       }
 
       Spacer(minLength: 0)
@@ -274,6 +288,7 @@ struct AppShellRightRail: View {
     .padding(JovieSpacing.large)
     .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
     .background(JovieColor.backgroundBase)
+    .accessibilityElement(children: .contain)
     .accessibilityIdentifier("shell-right-rail")
   }
 }

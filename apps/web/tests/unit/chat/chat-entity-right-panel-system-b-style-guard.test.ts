@@ -7,8 +7,8 @@ const sourcePath = 'app/app/(shell)/chat/ChatEntityRightPanelHost.tsx';
 const designSystemPath = 'styles/system-b-app.css';
 
 const legacyRightPanelPatterns = [
-  /bg-\(--linear-app-content-surface\)/,
-  /--linear-app-shell-border/,
+  /bg-\(--app-shell-content-surface\)/,
+  /--app-shell-border/,
   /bg-cyan-/,
   /text-cyan-/,
   /border-\[color-mix\(in_oklab,var\(--linear-/,

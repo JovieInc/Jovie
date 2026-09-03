@@ -432,16 +432,23 @@ describe('production marker attempt state', () => {
 describe('recovered production marker state', () => {
   const recoveryRunId = 789;
 
-  function recoveryDispatchRun(status: string, conclusion: string | null) {
+  function markerRecoveryRun(
+    status: string,
+    conclusion: string | null,
+    event = 'workflow_dispatch'
+  ) {
     return {
       id: recoveryRunId,
       run_attempt: 1,
       workflow_id: workflowId + 1,
       path: '.github/workflows/production-marker-recovery.yml',
+      // workflow_run jobs execute from the then-current default branch. The
+      // recovered generation is authenticated by the payload-bound source
+      // controller, not this downstream checkout SHA.
       head_sha: 'c'.repeat(40),
       head_branch: 'main',
       head_repository: { full_name: repo },
-      event: 'workflow_dispatch',
+      event,
       status,
       conclusion,
     };
@@ -463,7 +470,7 @@ describe('recovered production marker state', () => {
         recoveredFromControllerRun: String(controllerRun),
         recoveredFromControllerAttempt: '1',
       },
-      attemptRun: recoveryDispatchRun('completed', 'success'),
+      attemptRun: markerRecoveryRun('completed', 'success'),
       attemptJobs: [],
       originalRun: run(1, 'completed', 'failure'),
       originalJobs: [
@@ -491,6 +498,58 @@ describe('recovered production marker state', () => {
     });
   });
 
+  it('verifies event recovery when the default branch advanced after promotion', () => {
+    const marker = recoveredMarker();
+    marker.attemptRun = markerRecoveryRun(
+      'completed',
+      'success',
+      'workflow_run'
+    );
+
+    expect(
+      classifyProductionMarkerEvidence(
+        evidence({ markers: [marker], latestRun: undefined })
+      )
+    ).toMatchObject({
+      state: 'verified',
+      reason: 'exact_recovered_generation_verified',
+      controllerRun: recoveryRunId,
+      controllerAttempt: 1,
+    });
+  });
+
+  it('rejects event recovery bound to a different source generation', () => {
+    const marker = recoveredMarker();
+    marker.attemptRun = markerRecoveryRun(
+      'completed',
+      'success',
+      'workflow_run'
+    );
+    marker.originalRun = {
+      ...run(1, 'completed', 'failure'),
+      head_sha: 'd'.repeat(40),
+    };
+
+    expect(
+      classifyProductionMarkerEvidence(evidence({ markers: [marker] }))
+    ).toMatchObject({
+      state: 'manual',
+      reason: 'contradictory_recovery_source_run',
+    });
+  });
+
+  it('rejects unsupported recovery events', () => {
+    const marker = recoveredMarker();
+    marker.attemptRun = markerRecoveryRun('completed', 'success', 'push');
+
+    expect(
+      classifyProductionMarkerEvidence(evidence({ markers: [marker] }))
+    ).toMatchObject({
+      state: 'manual',
+      reason: 'contradictory_marker_attempt',
+    });
+  });
+
   it('fails closed when the recovered source run was rolled back', () => {
     const marker = recoveredMarker();
     marker.originalJobs = [
@@ -511,12 +570,61 @@ describe('recovered production marker state', () => {
 
   it('fails closed when the recovery run did not complete successfully', () => {
     const marker = recoveredMarker();
-    marker.attemptRun = recoveryDispatchRun('completed', 'failure');
+    marker.attemptRun = markerRecoveryRun('completed', 'failure');
     expect(
       classifyProductionMarkerEvidence(evidence({ markers: [marker] }))
     ).toMatchObject({
       state: 'manual',
       reason: 'contradictory_marker_attempt',
+    });
+  });
+
+  it('preserves exact runtime proof when only the post-write fleet dispatch failed', () => {
+    const marker = recoveredMarker();
+    marker.attemptRun = markerRecoveryRun('completed', 'failure');
+    const successfulSteps = [
+      'Validate bounded recovery request',
+      'Verify canonical ownership and exact runtime probes',
+      'Re-probe production Better Auth OAuth runtime',
+      'Preserve recovered verified-generation marker',
+      'Upload recovered verified-generation marker',
+      'Confirm uploaded recovered marker bytes',
+    ];
+    marker.attemptJobs = [
+      {
+        id: 71,
+        run_id: recoveryRunId,
+        run_attempt: 1,
+        name: 'Recover exact verified-generation marker',
+        head_sha: 'c'.repeat(40),
+        head_branch: 'main',
+        status: 'completed',
+        conclusion: 'failure',
+        steps: [
+          ...successfulSteps.map((name, index) => ({
+            number: index + 1,
+            name,
+            status: 'completed',
+            conclusion: 'success',
+          })),
+          {
+            number: successfulSteps.length + 1,
+            name: 'Dispatch fresh fleet reconciliation',
+            status: 'completed',
+            conclusion: 'failure',
+          },
+        ],
+      },
+    ];
+
+    expect(
+      classifyProductionMarkerEvidence(
+        evidence({ markers: [marker], latestRun: undefined })
+      )
+    ).toMatchObject({
+      state: 'verified',
+      reason: 'exact_recovered_generation_verified',
+      controllerRun: recoveryRunId,
     });
   });
 

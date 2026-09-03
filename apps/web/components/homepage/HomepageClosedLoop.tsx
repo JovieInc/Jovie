@@ -1,3 +1,4 @@
+// @coverage-via apps/web/tests/unit/home/HomepageClosedLoop.test.tsx
 import { MarketingScreenshot } from '@/components/marketing/MarketingScreenshot';
 import { cn } from '@/lib/utils';
 
@@ -78,14 +79,14 @@ export function HomepageClosedLoop({
                 >
                   {index + 1}
                 </span>
-                <span className='homepage-closed-loop-step-copy'>
-                  <span className='homepage-closed-loop-step-title'>
+                <div className='homepage-closed-loop-step-copy'>
+                  <h3 className='homepage-closed-loop-step-title'>
                     {step.title}
-                  </span>
+                  </h3>
                   <span className='homepage-closed-loop-step-description'>
                     {step.description}
                   </span>
-                </span>
+                </div>
               </li>
             ))}
           </ol>

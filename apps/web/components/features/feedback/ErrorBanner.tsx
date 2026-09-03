@@ -7,6 +7,31 @@ import Link from 'next/link';
 import { useState } from 'react';
 import { toast } from '@/components/feedback';
 import { cn } from '@/lib/utils';
+import {
+  ERROR_BANNER_ACTION_LAYOUT_CLASS,
+  ERROR_BANNER_ACTION_SIZE,
+  ERROR_BANNER_ACTIONS_ROW_CLASS,
+  ERROR_BANNER_BODY_CLASS,
+  ERROR_BANNER_COPY_ICON_CLASS,
+  ERROR_BANNER_COPY_SIZE,
+  ERROR_BANNER_DESCRIPTION_CLASS,
+  ERROR_BANNER_DETAILS_META_CLASS,
+  ERROR_BANNER_DETAILS_PANEL_CLASS,
+  ERROR_BANNER_DETAILS_TOGGLE_CLASS,
+  ERROR_BANNER_DETAILS_WRAP_CLASS,
+  ERROR_BANNER_DEV_PANEL_CLASS,
+  ERROR_BANNER_DEV_PRE_CLASS,
+  ERROR_BANNER_DEV_SUMMARY_CLASS,
+  ERROR_BANNER_DISMISS_ICON_CLASS,
+  ERROR_BANNER_DISMISS_LAYOUT_CLASS,
+  ERROR_BANNER_DISMISS_SIZE,
+  ERROR_BANNER_ICON_CLASS,
+  ERROR_BANNER_ICON_WRAP_CLASS,
+  ERROR_BANNER_ROW_CLASS,
+  ERROR_BANNER_SHELL_GEOMETRY_CLASS,
+  ERROR_BANNER_SHELL_SEMANTIC_CLASS,
+  ERROR_BANNER_TITLE_CLASS,
+} from './error-banner-semantic-contract';
 import { RECOVERY_COPY } from './recovery-contract';
 
 export interface ErrorBannerAction {
@@ -63,7 +88,6 @@ export function ErrorBanner({
         toast.error('Failed to copy error details');
       });
   };
-  const actionClass = 'w-full sm:w-auto';
 
   const renderAction = (action: ErrorBannerAction, index: number) => {
     const variant = action.variant ?? (index === 0 ? 'primary' : 'secondary');
@@ -77,7 +101,8 @@ export function ErrorBanner({
             key={`${action.label}-${index}`}
             asChild
             variant={variant}
-            className={actionClass}
+            size={ERROR_BANNER_ACTION_SIZE}
+            className={ERROR_BANNER_ACTION_LAYOUT_CLASS}
           >
             <Link href={action.href}>{action.label}</Link>
           </Button>
@@ -89,7 +114,8 @@ export function ErrorBanner({
           key={`${action.label}-${index}`}
           asChild
           variant={variant}
-          className={actionClass}
+          size={ERROR_BANNER_ACTION_SIZE}
+          className={ERROR_BANNER_ACTION_LAYOUT_CLASS}
         >
           <a href={action.href} onClick={action.onClick}>
             {action.label}
@@ -103,8 +129,9 @@ export function ErrorBanner({
         key={`${action.label}-${index}`}
         type='button'
         variant={variant}
+        size={ERROR_BANNER_ACTION_SIZE}
         onClick={action.onClick}
-        className={actionClass}
+        className={ERROR_BANNER_ACTION_LAYOUT_CLASS}
       >
         {action.label || 'Action'}
       </Button>
@@ -118,37 +145,37 @@ export function ErrorBanner({
       aria-label='Error'
       data-testid={testId ?? 'app-error-banner'}
       className={cn(
-        'rounded-2xl border border-error/30 bg-error-subtle px-5 py-4 text-error-foreground shadow-xl backdrop-blur-sm dark:border-error/40',
+        ERROR_BANNER_SHELL_GEOMETRY_CLASS,
+        ERROR_BANNER_SHELL_SEMANTIC_CLASS,
         className
       )}
     >
-      <div className='flex gap-3'>
-        <span className='mt-1 flex h-8 w-8 items-center justify-center rounded-full border border-red-500/40 bg-red-500/15 text-red-200 shadow-inner dark:border-red-700/60 dark:bg-red-900/40'>
-          <AlertTriangle className='h-5 w-5' aria-hidden='true' />
+      <div className={ERROR_BANNER_ROW_CLASS}>
+        <span className={ERROR_BANNER_ICON_WRAP_CLASS}>
+          <AlertTriangle
+            className={ERROR_BANNER_ICON_CLASS}
+            aria-hidden='true'
+          />
         </span>
 
-        <div className='flex-1 min-w-0 space-y-1.5'>
-          <p className='text-sm font-semibold leading-snug tracking-tight break-words'>
-            {title}
-          </p>
+        <div className={ERROR_BANNER_BODY_CLASS}>
+          <p className={ERROR_BANNER_TITLE_CLASS}>{title}</p>
           {description ? (
-            <p className='text-sm leading-snug text-red-100/90 dark:text-red-100/80'>
-              {description}
-            </p>
+            <p className={ERROR_BANNER_DESCRIPTION_CLASS}>{description}</p>
           ) : null}
 
           {actions.length > 0 ? (
-            <div className='mt-3 flex flex-col gap-2 sm:flex-row sm:flex-wrap'>
+            <div className={ERROR_BANNER_ACTIONS_ROW_CLASS}>
               {actions.map((action, index) => renderAction(action, index))}
             </div>
           ) : null}
 
-          <div className='mt-3'>
+          <div className={ERROR_BANNER_DETAILS_WRAP_CLASS}>
             <Button
               type='button'
               variant='link'
               onClick={() => setShowDetails(!showDetails)}
-              className='h-auto text-xs text-red-100/70 hover:text-red-100 dark:text-red-200/70 dark:hover:text-red-200 underline decoration-dotted'
+              className={ERROR_BANNER_DETAILS_TOGGLE_CLASS}
             >
               {showDetails
                 ? `Hide ${RECOVERY_COPY.detailsLabel}`
@@ -156,34 +183,36 @@ export function ErrorBanner({
             </Button>
 
             {showDetails && (
-              <div className='mt-2 pt-2 border-t border-red-500/20 dark:border-red-900/40 space-y-1.5'>
+              <div className={ERROR_BANNER_DETAILS_PANEL_CLASS}>
                 {error?.digest && (
-                  <p className='text-xs text-red-100/80 dark:text-red-200/70'>
+                  <p className={ERROR_BANNER_DETAILS_META_CLASS}>
                     Error ID: {error.digest}
                   </p>
                 )}
-                <p className='text-xs text-red-100/80 dark:text-red-200/70'>
+                <p className={ERROR_BANNER_DETAILS_META_CLASS}>
                   Time: {timestamp.toLocaleString()}
                 </p>
 
                 <Button
                   type='button'
                   variant='ghost'
-                  size='sm'
+                  size={ERROR_BANNER_COPY_SIZE}
                   onClick={handleCopyErrorDetails}
-                  className='inline-flex h-auto items-center gap-1.5 rounded-md px-2 py-1 text-xs font-medium text-red-100 hover:text-white hover:bg-red-500/20 transition-colors dark:text-red-200 dark:hover:text-red-50'
                   aria-label='Copy Error Details To Clipboard'
                 >
-                  <Copy className='h-3 w-3' aria-hidden='true' />
+                  <Copy
+                    className={ERROR_BANNER_COPY_ICON_CLASS}
+                    aria-hidden='true'
+                  />
                   Copy Error Details
                 </Button>
 
                 {process.env.NODE_ENV === 'development' && error?.message && (
-                  <details className='mt-2 rounded-md bg-red-900/30 dark:bg-red-950/50 p-2'>
-                    <summary className='cursor-pointer text-xs font-medium text-red-100/90 dark:text-red-200/80 hover:text-red-50'>
+                  <details className={ERROR_BANNER_DEV_PANEL_CLASS}>
+                    <summary className={ERROR_BANNER_DEV_SUMMARY_CLASS}>
                       Developer Info (dev only)
                     </summary>
-                    <pre className='mt-2 overflow-auto text-xs text-red-100/80 dark:text-red-200/70 whitespace-pre-wrap break-words'>
+                    <pre className={ERROR_BANNER_DEV_PRE_CLASS}>
                       {error.message}
                       {error.stack && `\n\n${error.stack}`}
                     </pre>
@@ -198,12 +227,12 @@ export function ErrorBanner({
           <Button
             type='button'
             variant='ghost'
-            size='icon'
+            size={ERROR_BANNER_DISMISS_SIZE}
             onClick={onDismiss}
             aria-label='Dismiss Error'
-            className='mt-0.5 h-auto w-auto shrink-0 self-start rounded-full border border-red-500/30 bg-transparent p-1.5 text-red-700 transition-colors hover:bg-red-500/10 hover:text-red-900 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-500/70 focus-visible:ring-offset-1 focus-visible:ring-offset-red-50 dark:border-red-800/50 dark:text-red-300 dark:hover:bg-red-900/40 dark:hover:text-red-100 dark:focus-visible:ring-offset-red-950'
+            className={ERROR_BANNER_DISMISS_LAYOUT_CLASS}
           >
-            <X className='h-4 w-4' aria-hidden='true' />
+            <X className={ERROR_BANNER_DISMISS_ICON_CLASS} aria-hidden='true' />
           </Button>
         ) : null}
       </div>

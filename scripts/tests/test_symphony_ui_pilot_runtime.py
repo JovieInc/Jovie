@@ -8,7 +8,8 @@ Guards the contract that the orphan beam.smp incident violated:
   policy, a clean stop (beam exits 1 on SIGTERM), and a single-listener guard
   for 127.0.0.1:4041;
 - the install script materializes both onto a target home idempotently, keeps
-  timestamped backups, and detects drift in --check mode.
+  timestamped backups, and detects drift in --check mode except the bounded
+  runtime overlay on agent.max_concurrent_agents (1..8).
 
 No network, no systemd, no host state: everything runs against the repo
 checkout and a tmp_path target home. CI's pytest lane has no PyYAML, so the
@@ -41,7 +42,6 @@ INSTALLER = ROOT / "scripts/hermes/install-symphony-ui-pilot.sh"
 FLEET_INSTALLER = ROOT / "scripts/hermes/install-gem-fleet-controller.sh"
 REHAB_INSTALLER = ROOT / "scripts/hermes/install-gem-pr-rehabilitation.sh"
 USER_SYSTEMD_LIB = ROOT / "scripts/hermes/lib/user-systemd-context.sh"
-INTAKE_WORKFLOW = ROOT / ".github/workflows/jovie-intake-controller.yml"
 FLEET_WORKFLOW = ROOT / ".github/workflows/fleet-gate-refresh.yml"
 ACTIVATION_WORKFLOW = ROOT / ".github/workflows/gem-delivery-controller-activation.yml"
 ACTIONLINT_CONFIG = ROOT / ".github/actionlint.yaml"
@@ -140,72 +140,6 @@ def test_workflow_admission_contract() -> None:
     assert _list_items(tracker, "active_states") == ["Todo", "In Progress"]
     for state in ("Done", "Canceled"):
         assert state in _list_items(tracker, "terminal_states")
-
-
-def test_workflow_uses_event_wake_with_slow_poll_backstop() -> None:
-    polling = _section(_front_matter_lines(), "polling")
-    assert int(_scalar(polling, "interval_ms")) >= 300_000
-    intake = INTAKE_WORKFLOW.read_text()
-    assert "Wake the local lease executor for an admitted event" in intake
-    assert "steps.admission.outputs.admitted == 'true'" in intake
-    assert "-X POST http://127.0.0.1:4041/api/v1/refresh" in intake
-    assert 'any(.teams[]; .status == "admitted"' in intake
-
-
-def test_intake_workflow_pins_the_gem_gbrain_adapter_contract() -> None:
-    intake = INTAKE_WORKFLOW.read_text()
-    assert "JOVIE_GBRAIN_BIN: /home/timwhite/.local/bin/gbrain" in intake
-    assert "JOVIE_GBRAIN_DIALECT: adapter" in intake
-
-
-def _fleet_admit_env(workflow: str) -> dict[str, str]:
-    start_marker = "      - name: Admit one issue from the fresh event\n"
-    end_marker = "\n      - name: Record event admission heartbeat"
-    start = workflow.index(start_marker)
-    end = workflow.index(end_marker, start)
-    step = workflow[start:end]
-    env_start = step.index("        env:\n") + len("        env:\n")
-    values: dict[str, str] = {}
-    for line in step[env_start:].splitlines():
-        if not line.startswith("          "):
-            break
-        key, separator, value = line.strip().partition(":")
-        if separator:
-            values[key] = value.strip().strip("\"'")
-    return values
-
-
-def _assert_exact_fleet_gbrain_bindings(workflow: str) -> None:
-    env = _fleet_admit_env(workflow)
-    assert env.get("JOVIE_GBRAIN_BIN") == "/home/timwhite/.local/bin/gbrain"
-    assert env.get("JOVIE_GBRAIN_DIALECT") == "adapter"
-
-
-def test_fleet_workflow_pins_the_gem_gbrain_adapter_contract() -> None:
-    _assert_exact_fleet_gbrain_bindings(FLEET_WORKFLOW.read_text())
-
-
-def test_fleet_workflow_rejects_missing_blank_and_legacy_gbrain_configuration() -> None:
-    workflow = FLEET_WORKFLOW.read_text()
-    cases = [
-        workflow.replace(
-            "          JOVIE_GBRAIN_BIN: /home/timwhite/.local/bin/gbrain\n", ""
-        ),
-        workflow.replace(
-            "          JOVIE_GBRAIN_BIN: /home/timwhite/.local/bin/gbrain\n",
-            "          JOVIE_GBRAIN_BIN: ''\n",
-        ),
-        workflow.replace(
-            "          JOVIE_GBRAIN_DIALECT: adapter\n",
-            "          JOVIE_GBRAIN_DIALECT: legacy\n",
-        ),
-    ]
-    for invalid_workflow in cases:
-        try:
-            _assert_exact_fleet_gbrain_bindings(invalid_workflow)
-        except AssertionError:
-            continue
-        raise AssertionError("invalid GBrain workflow configuration was accepted")
 
 
 def test_activation_requires_exact_production_revision_and_attestation() -> None:
@@ -495,6 +429,21 @@ def _run_installer(target_home: Path, *args: str) -> subprocess.CompletedProcess
     )
 
 
+def _rewrite_installed_concurrency(workflow: Path, value: str) -> None:
+    def replace(match: re.Match[str]) -> str:
+        return f"{match.group(1)}{value}{match.group(3)}"
+
+    updated, count = re.subn(
+        r"^(\s*max_concurrent_agents:\s*)([0-9]+)(\s*)$",
+        replace,
+        workflow.read_text(),
+        count=1,
+        flags=re.MULTILINE,
+    )
+    assert count == 1, "installed workflow must contain one concurrency scalar"
+    workflow.write_text(updated)
+
+
 def test_installer_deploys_workflow_and_unit(tmp_path: Path) -> None:
     result = _run_installer(tmp_path, "--no-daemon-reload")
     assert result.returncode == 0, result.stderr
@@ -741,6 +690,47 @@ def test_installer_backs_up_and_detects_drift(tmp_path: Path) -> None:
     assert backups[0].read_text() == "drifted\n"
     assert workflow.read_text() == WORKFLOW.read_text()
     assert _run_installer(tmp_path, "--check").returncode == 0
+
+
+def test_installer_accepts_only_the_bounded_runtime_concurrency_overlay(tmp_path: Path) -> None:
+    assert _run_installer(tmp_path, "--no-daemon-reload").returncode == 0
+    workflow = tmp_path / "symphony-runtime/elixir/WORKFLOW.jovie-ui-pilot.md"
+    source = WORKFLOW.read_text()
+
+    for target in range(1, 9):
+        _rewrite_installed_concurrency(workflow, str(target))
+        accepted = _run_installer(tmp_path, "--check")
+        assert accepted.returncode == 0, accepted.stdout
+        assert f"OK {workflow}" in accepted.stdout
+        assert f"runtime max_concurrent_agents={target}" in accepted.stdout
+
+    for invalid in ("0", "9", "01", "08", "0001", "0008", "not-a-number"):
+        workflow.write_text(
+            source.replace("  max_concurrent_agents: 4", f"  max_concurrent_agents: {invalid}", 1)
+        )
+        rejected = _run_installer(tmp_path, "--check")
+        assert rejected.returncode == 1, invalid
+        assert f"DRIFT {workflow}" in rejected.stdout
+
+    for malformed in (
+        source.replace("  max_concurrent_agents: 4\n", ""),
+        source.replace("  max_concurrent_agents: 4", "  max_concurrent_workers: 4", 1),
+        source.replace(
+            "  max_concurrent_agents: 4",
+            "  max_concurrent_agents: 4\n  max_concurrent_agents: 4",
+            1,
+        ),
+    ):
+        workflow.write_text(malformed)
+        rejected = _run_installer(tmp_path, "--check")
+        assert rejected.returncode == 1
+        assert f"DRIFT {workflow}" in rejected.stdout
+
+    runtime = source.replace("  max_concurrent_agents: 4", "  max_concurrent_agents: 1", 1)
+    workflow.write_text(runtime.replace("  max_turns: 24", "  max_turns: 25", 1))
+    other_drift = _run_installer(tmp_path, "--check")
+    assert other_drift.returncode == 1
+    assert f"DRIFT {workflow}" in other_drift.stdout
 
 
 def test_installer_restores_only_lease_guard_atomically(tmp_path: Path) -> None:

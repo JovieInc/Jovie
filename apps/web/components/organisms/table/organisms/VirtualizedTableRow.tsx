@@ -4,8 +4,9 @@
 import type { Row } from '@tanstack/react-table';
 import { flexRender } from '@tanstack/react-table';
 import React, { memo, useCallback, useEffect, useRef } from 'react';
+import { cn } from '@/lib/utils';
 import '../table.types';
-import { cn, presets, rowState } from '../table.styles';
+import { presets, rowState, tableAlignment } from '../table.styles';
 
 /**
  * Props that VirtualizedTableRow manages internally.
@@ -192,11 +193,13 @@ function VirtualizedTableRowComponent<TData>({
       {row.getVisibleCells().map(cell => {
         const meta = cell.column.columnDef.meta;
         const metaClassName = meta?.className;
+        const align = meta?.align ?? 'left';
         return (
           <td
             key={cell.id}
             className={cn(
               presets.tableCell,
+              tableAlignment.text[align],
               meta?.actionVisibility === 'contextual' &&
                 'system-b-table-contextual-action-cell',
               metaClassName

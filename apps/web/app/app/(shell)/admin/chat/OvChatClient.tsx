@@ -4,14 +4,13 @@ import { useDashboardData } from '@/app/app/(shell)/dashboard/DashboardDataConte
 import { ChatWorkspaceSurface } from '@/components/jovie/ChatWorkspaceSurface';
 import { JovieChat } from '@/components/jovie/JovieChat';
 import { ContentSurfaceCard } from '@/components/molecules/ContentSurfaceCard';
+import { OVIE_APP_SHELL_WORKSPACE } from '@/lib/app-shell/workspaces';
 
 /**
- * Operator (OV) chat surface (JOV-4810). Deliberately much simpler than the
- * customer ChatPageClient: no preview panels, no onboarding welcome-chat
- * bootstrap, no header actions, and no conversation-route navigation — the
- * URL stays on /app/ov/chat while JovieChat tracks the active conversation
- * internally. Voice dictation and playback interruption ship inside the
- * JovieChat composer (ChatInput), so no extra wiring is needed here.
+ * Operator (OV) chat surface (JOV-4810). Ovie dogfoods the canonical Jovie
+ * shell, workspace surface, and chat component. Its typed differences are the
+ * selected Summer agent, admin authorization, operator data scope, and
+ * capability-derived navigation; it does not own parallel chat presentation.
  */
 export function OvChatClient() {
   const { selectedProfile, creatorProfiles } = useDashboardData();
@@ -42,7 +41,7 @@ export function OvChatClient() {
         displayName={activeProfile.displayName ?? undefined}
         avatarUrl={activeProfile.avatarUrl}
         username={activeProfile.username ?? undefined}
-        chatMode='ov'
+        chatMode={OVIE_APP_SHELL_WORKSPACE.chatMode}
       />
     </ChatWorkspaceSurface>
   );

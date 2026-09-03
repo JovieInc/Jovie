@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import { getOvieOAuthIssuer, ovieIssuerSecret } from '@/lib/ovie/mcp/oauth';
+import { OVIE_OAUTH_DISCOVERY_HEADERS } from '@/lib/ovie/mcp/oauth-contract';
 
 export const dynamic = 'force-dynamic';
 
@@ -8,10 +9,7 @@ export async function GET(request: Request): Promise<NextResponse> {
   return NextResponse.json(
     getOvieOAuthIssuer(ovieIssuerSecret()).metadata(origin),
     {
-      headers: {
-        'access-control-allow-origin': '*',
-        'cache-control': 'no-store',
-      },
+      headers: OVIE_OAUTH_DISCOVERY_HEADERS,
     }
   );
 }

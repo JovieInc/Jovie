@@ -10,7 +10,7 @@ const meta: Meta<typeof Skeleton> = {
     docs: {
       description: {
         component:
-          'Loading shimmer uses .skeleton on JovieColor.surface1 (--color-skeleton-base). See packages/ui/docs/loading-states.md.',
+          'Loading shimmer uses the semantic skeleton base token (--color-skeleton-base). Reduced motion keeps the base fill and removes animation. See packages/ui/docs/loading-states.md.',
       },
     },
   },
@@ -34,7 +34,8 @@ export const LoadingShimmer: Story = {
   parameters: {
     docs: {
       description: {
-        story: 'Canonical loading-shimmer state with animated gradient.',
+        story:
+          'Canonical loading-shimmer state with an animated gradient when motion is allowed; reduced motion keeps the tokenized base fill.',
       },
     },
   },

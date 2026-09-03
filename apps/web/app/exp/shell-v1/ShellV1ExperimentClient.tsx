@@ -2209,9 +2209,9 @@ function ShellV1ExperimentContent() {
             '--linear-bg-surface-0': palette.surface0,
             '--linear-bg-surface-1': palette.surface1,
             '--linear-bg-surface-2': palette.surface2,
-            '--linear-app-content-surface': palette.contentSurface,
-            '--linear-app-shell-border': palette.border,
-            '--linear-app-shell-radius': '12px',
+            '--app-shell-content-surface': palette.contentSurface,
+            '--app-shell-border': palette.border,
+            '--app-shell-radius': '12px',
             opacity: mounted ? 1 : 0,
             transform: mounted ? 'scale(1)' : 'scale(0.985)',
             transition: `opacity var(--ds-motion-cinematic-duration) var(--ds-motion-cinematic-easing), transform var(--ds-motion-cinematic-duration) var(--ds-motion-cinematic-easing), background-color var(--ds-motion-subtle-duration) ease-out`,
@@ -2448,7 +2448,7 @@ function ShellV1ExperimentContent() {
                 : `padding-bottom var(--ds-motion-subtle-duration) ease-out`,
           }}
         >
-          <main className='relative flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden bg-surface-0 lg:rounded-(--linear-app-shell-radius) lg:border lg:border-(--linear-app-shell-border) lg:bg-(--linear-app-content-surface) lg:shadow-(--linear-app-shell-shadow)'>
+          <main className='relative flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden bg-surface-0 lg:rounded-(--app-shell-radius) lg:border lg:border-(--app-shell-border) lg:bg-(--app-shell-content-surface) lg:shadow-(--app-shell-shadow)'>
             {/* Static grain overlay — adds a subtle paper roughness so the
               dark surface doesn't read as flat slab. Pointer-events off,
               no animation; GPU-composited at zero per-frame cost. */}
@@ -2943,7 +2943,7 @@ function FloatingSidebarLayer({
       {/* biome-ignore lint/a11y/noStaticElementInteractions: same as above */}
       {/* biome-ignore lint/a11y/noNoninteractiveElementInteractions: same */}
       <div
-        className='hidden lg:flex fixed top-2 bottom-2 left-2 z-40 w-56 rounded-(--linear-app-shell-radius) border border-(--linear-app-shell-border) bg-(--linear-app-content-surface) shadow-(--linear-app-shell-shadow) overflow-hidden'
+        className='hidden lg:flex fixed top-2 bottom-2 left-2 z-40 w-56 rounded-(--app-shell-radius) border border-(--app-shell-border) bg-(--app-shell-content-surface) shadow-(--app-shell-shadow) overflow-hidden'
         style={{
           transform: visible
             ? 'translateX(0)'
@@ -3454,7 +3454,7 @@ function CanvasSubheader({
   // demo, and lyrics from carrying a 40px empty band under the header.
   if (subviews.length === 0 && !extraToolbar && !onAddView) return null;
   return (
-    <div className='shrink-0 h-10 px-3 flex items-center gap-2 border-b border-(--linear-app-shell-border)/50'>
+    <div className='shrink-0 h-10 px-3 flex items-center gap-2 border-b border-(--app-shell-border)/50'>
       <div className='flex items-center gap-0.5 min-w-0'>
         {subviews.map(t => {
           const active = subview === t.id;
@@ -4593,7 +4593,7 @@ function SettingsView({ section }: { section: SettingsSectionId }) {
           dividers — no per-row card chrome. Danger keeps the same
           neutral shell; only the action buttons carry the rose
           accent so the page doesn't shout. */}
-      <div className='mt-6 rounded-xl border border-(--linear-app-shell-border)/70 bg-(--surface-0)/40 overflow-hidden'>
+      <div className='mt-6 rounded-xl border border-(--app-shell-border)/70 bg-(--surface-0)/40 overflow-hidden'>
         {rows.map((row, i) => (
           <SettingsRow key={row.label} {...row} divider={i > 0} />
         ))}
@@ -4614,7 +4614,7 @@ function settingsRowsFor(id: SettingsSectionId): Array<{
   const editBtn = (
     <button
       type='button'
-      className='inline-flex items-center h-7 px-3 rounded-md text-xs text-secondary-token hover:text-primary-token border border-(--linear-app-shell-border) bg-(--surface-0) hover:bg-surface-1/60 transition-colors duration-subtle ease-out'
+      className='inline-flex items-center h-7 px-3 rounded-md text-xs text-secondary-token hover:text-primary-token border border-(--app-shell-border) bg-(--surface-0) hover:bg-surface-1/60 transition-colors duration-subtle ease-out'
     >
       Edit
     </button>
@@ -4636,7 +4636,7 @@ function settingsRowsFor(id: SettingsSectionId): Array<{
           label: 'Two-factor Authentication', // ui-casing-allow: hyphenated settings label
           description: 'Required for production workspaces',
           control: (
-            <span className='inline-flex items-center gap-1.5 h-6 px-2 rounded text-3xs uppercase tracking-[0.06em] text-tertiary-token bg-(--surface-1)/60 border border-(--linear-app-shell-border)'>
+            <span className='inline-flex items-center gap-1.5 h-6 px-2 rounded text-3xs uppercase tracking-[0.06em] text-tertiary-token bg-(--surface-1)/60 border border-(--app-shell-border)'>
               <span className='h-1.5 w-1.5 rounded-full bg-cyan-300/80' />
               Enabled
             </span>
@@ -4716,7 +4716,7 @@ function settingsRowsFor(id: SettingsSectionId): Array<{
           label: 'Spotify For Artists',
           description: 'Auto-pitch playlists, push Canvas, sync streams', // ui-casing-allow: feature list copy
           control: (
-            <span className='inline-flex items-center gap-1.5 h-6 px-2 rounded text-3xs uppercase tracking-[0.06em] text-tertiary-token bg-(--surface-1)/60 border border-(--linear-app-shell-border)'>
+            <span className='inline-flex items-center gap-1.5 h-6 px-2 rounded text-3xs uppercase tracking-[0.06em] text-tertiary-token bg-(--surface-1)/60 border border-(--app-shell-border)'>
               <span className='h-1.5 w-1.5 rounded-full bg-cyan-300/80' />
               Connected
             </span>
@@ -4728,7 +4728,7 @@ function settingsRowsFor(id: SettingsSectionId): Array<{
           control: (
             <button
               type='button'
-              className='inline-flex items-center h-7 px-3 rounded-md text-xs text-secondary-token hover:text-primary-token border border-(--linear-app-shell-border) bg-(--surface-0) hover:bg-surface-1/60 transition-colors duration-subtle ease-out'
+              className='inline-flex items-center h-7 px-3 rounded-md text-xs text-secondary-token hover:text-primary-token border border-(--app-shell-border) bg-(--surface-0) hover:bg-surface-1/60 transition-colors duration-subtle ease-out'
             >
               Connect
             </button>
@@ -4740,7 +4740,7 @@ function settingsRowsFor(id: SettingsSectionId): Array<{
           control: (
             <button
               type='button'
-              className='inline-flex items-center h-7 px-3 rounded-md text-xs text-secondary-token hover:text-primary-token border border-(--linear-app-shell-border) bg-(--surface-0) hover:bg-surface-1/60 transition-colors duration-subtle ease-out'
+              className='inline-flex items-center h-7 px-3 rounded-md text-xs text-secondary-token hover:text-primary-token border border-(--app-shell-border) bg-(--surface-0) hover:bg-surface-1/60 transition-colors duration-subtle ease-out'
             >
               Connect
             </button>
@@ -4755,7 +4755,7 @@ function settingsRowsFor(id: SettingsSectionId): Array<{
           control: (
             <button
               type='button'
-              className='inline-flex items-center h-7 px-3 rounded-md text-xs text-secondary-token hover:text-rose-200 border border-(--linear-app-shell-border) bg-(--surface-0) hover:border-rose-400/40 hover:bg-rose-500/[0.06] transition-colors duration-subtle ease-out'
+              className='inline-flex items-center h-7 px-3 rounded-md text-xs text-secondary-token hover:text-rose-200 border border-(--app-shell-border) bg-(--surface-0) hover:border-rose-400/40 hover:bg-rose-500/[0.06] transition-colors duration-subtle ease-out'
             >
               Reset workspace
             </button>
@@ -4768,7 +4768,7 @@ function settingsRowsFor(id: SettingsSectionId): Array<{
           control: (
             <button
               type='button'
-              className='inline-flex items-center h-7 px-3 rounded-md text-xs text-secondary-token hover:text-rose-200 border border-(--linear-app-shell-border) bg-(--surface-0) hover:border-rose-400/40 hover:bg-rose-500/[0.06] transition-colors duration-subtle ease-out'
+              className='inline-flex items-center h-7 px-3 rounded-md text-xs text-secondary-token hover:text-rose-200 border border-(--app-shell-border) bg-(--surface-0) hover:border-rose-400/40 hover:bg-rose-500/[0.06] transition-colors duration-subtle ease-out'
             >
               Delete account
             </button>
@@ -5298,7 +5298,7 @@ function ReleaseDrawer({
       {/* Hero card — elevated, no internal hairline separators. Holds
           artwork, title, status, drop-in-N callout, smart link. */}
       <div className='shrink-0 px-2 pt-2'>
-        <div className='rounded-xl bg-(--linear-app-content-surface) shadow-[0_12px_32px_-12px_rgba(0,0,0,0.45),0_2px_6px_rgba(0,0,0,0.22)] overflow-hidden'>
+        <div className='rounded-xl bg-(--app-shell-content-surface) shadow-[0_12px_32px_-12px_rgba(0,0,0,0.45),0_2px_6px_rgba(0,0,0,0.22)] overflow-hidden'>
           <DrawerHero
             release={r}
             onClose={onClose}
@@ -5313,7 +5313,7 @@ function ReleaseDrawer({
           shadow stack as the hero so the two read as siblings of the
           page floor, not of each other. */}
       <div className='flex-1 min-h-0 px-2 pt-2 pb-2 flex flex-col'>
-        <div className='flex-1 min-h-0 rounded-xl bg-(--linear-app-content-surface) shadow-[0_12px_32px_-12px_rgba(0,0,0,0.45),0_2px_6px_rgba(0,0,0,0.22)] flex flex-col overflow-hidden'>
+        <div className='flex-1 min-h-0 rounded-xl bg-(--app-shell-content-surface) shadow-[0_12px_32px_-12px_rgba(0,0,0,0.45),0_2px_6px_rgba(0,0,0,0.22)] flex flex-col overflow-hidden'>
           <DrawerTabStrip
             tabs={tabs.map(t => ({ value: t, label: TAB_LABEL[t] }))}
             active={tab}
@@ -5431,7 +5431,7 @@ function DrawerOverviewTab({ release }: { release: Release }) {
         />
       </div>
       <PerformanceCard
-        title='Smart link'
+        title='Smart Link'
         metricLabel='clicks'
         pointsByRange={pointsByRange}
         trend={trend}
@@ -5686,7 +5686,7 @@ function DrawerDistribution({ release }: { release: Release }) {
       </div>
 
       {/* Search — matches the smart-link pill language. */}
-      <div className='flex items-center gap-1.5 h-7 pl-3 pr-2 rounded-full border border-(--linear-app-shell-border) bg-(--surface-0)/60 text-2xs mb-2 focus-within:border-cyan-300/40'>
+      <div className='flex items-center gap-1.5 h-7 pl-3 pr-2 rounded-full border border-(--app-shell-border) bg-(--surface-0)/60 text-2xs mb-2 focus-within:border-cyan-300/40'>
         <Search className='h-3 w-3 text-quaternary-token shrink-0' />
         <input
           value={filter}
@@ -6017,7 +6017,7 @@ function TracksView({
             toggle ride along on the same line as the column labels. Pinned
             to top:0 with an opaque (not /95) background so rows can't peek
             through above it during scroll. */}
-        <div className='sticky top-0 z-10 bg-(--linear-app-content-surface) px-2 pt-3 pb-1.5 flex items-center gap-3 select-none border-b border-(--linear-app-shell-border)/50'>
+        <div className='sticky top-0 z-10 bg-(--app-shell-content-surface) px-2 pt-3 pb-1.5 flex items-center gap-3 select-none border-b border-(--app-shell-border)/50'>
           <ColumnLabel
             field='index'
             label='#'
@@ -6232,7 +6232,7 @@ function TrackRow({
 
       {/* Key as a badge — quiet pill */}
       <span className='w-15 shrink-0 flex justify-end'>
-        <span className='inline-flex items-center h-5 px-1.5 rounded text-3xs font-caption tabular-nums text-secondary-token border border-(--linear-app-shell-border) bg-surface-1/40'>
+        <span className='inline-flex items-center h-5 px-1.5 rounded text-3xs font-caption tabular-nums text-secondary-token border border-(--app-shell-border) bg-surface-1/40'>
           {keyMode === 'normal' ? track.keyNormal : track.keyCamelot}
         </span>
       </span>
@@ -6419,7 +6419,7 @@ function TasksView({
       aria-label='Tasks'
     >
       {/* List pane */}
-      <div className='w-95 shrink-0 flex flex-col border-r border-(--linear-app-shell-border)/60 min-h-0'>
+      <div className='w-95 shrink-0 flex flex-col border-r border-(--app-shell-border)/60 min-h-0'>
         <div className='shrink-0 px-3 pt-3 pb-2 flex items-center gap-2'>
           <span className='text-xs font-caption text-primary-token tracking-[-0.012em]'>
             All
@@ -6470,18 +6470,18 @@ function TasksView({
                 Pick a task from the list to see what it needs.
               </p>
               <p className='text-2xs text-quaternary-token mt-2'>
-                <kbd className='inline-flex items-center h-4 px-1 rounded text-3xs bg-(--surface-1)/60 border border-(--linear-app-shell-border) tabular-nums mr-1'>
+                <kbd className='inline-flex items-center h-4 px-1 rounded text-3xs bg-(--surface-1)/60 border border-(--app-shell-border) tabular-nums mr-1'>
                   ↵
                 </kbd>
                 to open ·
-                <kbd className='inline-flex items-center h-4 px-1 rounded text-3xs bg-(--surface-1)/60 border border-(--linear-app-shell-border) tabular-nums mx-1'>
+                <kbd className='inline-flex items-center h-4 px-1 rounded text-3xs bg-(--surface-1)/60 border border-(--app-shell-border) tabular-nums mx-1'>
                   j
                 </kbd>
-                <kbd className='inline-flex items-center h-4 px-1 rounded text-3xs bg-(--surface-1)/60 border border-(--linear-app-shell-border) tabular-nums mr-1'>
+                <kbd className='inline-flex items-center h-4 px-1 rounded text-3xs bg-(--surface-1)/60 border border-(--app-shell-border) tabular-nums mr-1'>
                   k
                 </kbd>
                 to navigate ·
-                <kbd className='inline-flex items-center h-4 px-1 rounded text-3xs bg-(--surface-1)/60 border border-(--linear-app-shell-border) tabular-nums ml-1'>
+                <kbd className='inline-flex items-center h-4 px-1 rounded text-3xs bg-(--surface-1)/60 border border-(--app-shell-border) tabular-nums ml-1'>
                   esc
                 </kbd>{' '}
                 to close
@@ -6734,7 +6734,7 @@ function TaskDetail({
         </p>
       )}
 
-      <div className='mt-8 border-t border-(--linear-app-shell-border)/50 pt-4 text-2xs text-quaternary-token'>
+      <div className='mt-8 border-t border-(--app-shell-border)/50 pt-4 text-2xs text-quaternary-token'>
         Updated {relativeDate(task.updatedIso)}
       </div>
     </article>

@@ -137,9 +137,6 @@ jobs:
             exit 1
           fi
 
-      - name: Test secret scan corruption recovery
-        run: ./scripts/security/scan-secrets.test.sh
-
       - name: Run TruffleHog (full history on main/schedule, PR diff on pull_request)
         shell: bash
         run: |
@@ -157,6 +154,21 @@ jobs:
           else
             ./scripts/security/scan-secrets.sh full-trufflehog
           fi
+
+      - name: Test secret scan regressions with installed TruffleHog
+        shell: bash
+        run: |
+          set -euo pipefail
+          trufflehog_bin="$(command -v trufflehog || true)"
+          if [[ -z "$trufflehog_bin" ]]; then
+            version="${TRUFFLEHOG_VERSION:-3.95.5}"
+            trufflehog_bin="${TMPDIR:-/tmp}/trufflehog-${version}/trufflehog"
+          fi
+          if [[ ! -x "$trufflehog_bin" ]]; then
+            echo "::error::Installed TruffleHog binary is unavailable to regression tests"
+            exit 1
+          fi
+          TRUFFLEHOG_BIN="$trufflehog_bin" ./scripts/security/scan-secrets.test.sh
 
   trivy:
     name: Trivy Vulnerability Scanning
@@ -182,7 +194,7 @@ jobs:
           ignore-unfixed: true
 
       - name: Upload Trivy scan results to GitHub Security tab
-        uses: github/codeql-action/upload-sarif@db488ddef3bf6cb639b32c2e9a7c0a7ea8271d28 # v3.28.15
+        uses: github/codeql-action/upload-sarif@cdf488f595d80d6e07e03d4674febd5ab45fa938 # v4.37.9
         with:
           sarif_file: 'trivy-results.sarif'
           category: 'trivy-filesystem'
@@ -211,7 +223,7 @@ jobs:
           publish_results: false
 
       - name: Upload Scorecard results to GitHub Security tab
-        uses: github/codeql-action/upload-sarif@db488ddef3bf6cb639b32c2e9a7c0a7ea8271d28 # v3.28.15
+        uses: github/codeql-action/upload-sarif@cdf488f595d80d6e07e03d4674febd5ab45fa938 # v4.37.9
         with:
           sarif_file: 'scorecard-results.sarif'
           category: 'ossf-scorecard'

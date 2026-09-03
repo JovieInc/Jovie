@@ -77,7 +77,12 @@ export function ProfileSwitcher() {
               src={selectedProfile?.avatarUrl}
               alt={selectedProfile?.displayName ?? ''}
               size='xs'
-              className='size-4.5 shrink-0 rounded-full'
+              name={
+                selectedProfile?.displayName ||
+                selectedProfile?.username ||
+                'Select profile'
+              }
+              className='shrink-0'
             />
             <span className='truncate flex-1 text-left text-app tracking-tight text-sidebar-item-foreground group-data-[collapsible=icon]:hidden [font-weight:var(--font-weight-nav)]'>
               {selectedProfile?.displayName || 'Select profile'}
@@ -102,8 +107,9 @@ export function ProfileSwitcher() {
                 <Avatar
                   src={profile.avatarUrl}
                   alt={profile.displayName ?? ''}
-                  size='xs'
-                  className='size-5 shrink-0 rounded-full'
+                  name={profile.displayName || profile.username}
+                  size='sm'
+                  className='shrink-0'
                 />
                 <div className='min-w-0 flex-1'>
                   <p className='truncate text-sm font-medium'>

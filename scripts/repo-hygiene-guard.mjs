@@ -10,6 +10,7 @@ import {
 } from 'node:fs';
 import { extname, resolve } from 'node:path';
 import { pathToFileURL } from 'node:url';
+import { validateControllerHopChanges } from './invariants/controller-hop-contract.mjs';
 
 const MiB = 1024 * 1024;
 
@@ -604,6 +605,7 @@ function collectSnapshotBudget(root) {
 export function evaluateRepoHygiene({
   addedPaths,
   addedRegularPaths = addedPaths,
+  baseRef = '',
   baseline = REPO_HEALTH_BASELINE,
   changedPaths = addedPaths,
   deletedPaths = [],
@@ -635,6 +637,25 @@ export function evaluateRepoHygiene({
     paths: scope,
   });
   errors.push(...exception.errors);
+  errors.push(
+    ...validateControllerHopChanges({
+      addedPaths: added,
+      changedPaths: changed,
+      readBaseFile: path => {
+        if (!baseRef) return '';
+        try {
+          return execFileSync('git', ['show', `${baseRef}:${path}`], {
+            cwd: root,
+            encoding: 'utf8',
+            stdio: ['ignore', 'pipe', 'ignore'],
+          });
+        } catch {
+          return '';
+        }
+      },
+      readFile: path => readFileSync(resolve(root, path), 'utf8'),
+    })
+  );
 
   for (const path of added) {
     const parts = path.split('/').filter(Boolean);
@@ -881,6 +902,7 @@ export function collectGitPaths(args) {
     ? ['diff', '--cached', '--name-only', '--diff-filter=ACMR', '-z']
     : ['diff', '--name-only', '--diff-filter=ACMR', '-z', `${baseRef}..HEAD`];
   return {
+    baseRef,
     ...pathDelta(base, current),
     changedPaths: gitPaths(diffArgs),
     trackedPaths: [...current.keys()],

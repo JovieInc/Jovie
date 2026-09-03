@@ -218,3 +218,19 @@ jobs:
 
       - name: Run golden eval-set CI gate
         run: pnpm run evals:golden
+
+  hermes-checkin-hud:
+    name: Hermes check-in HUD + burrito
+    if: ${{ inputs.skip == 'false' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 3
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          fetch-depth: 1
+
+      - name: Run check-in HUD and official burrito contracts
+        run: |
+          set -euo pipefail
+          python3 scripts/hermes/tests/gem-checkin-hud.test.py
+          python3 scripts/hermes/tests/symphony-burrito-workflow.test.py

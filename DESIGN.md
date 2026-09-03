@@ -472,6 +472,52 @@ Specimen: Storybook `Design System/Noir Ion Specimen`.
 | Login button bg | `rgba(255,255,255,0.1)` | Subtle glass |
 | Header bg | `transparent` | Blur backdrop |
 
+### Generated Brand Imagery - Scene Palette v1
+
+Founder-approved 2026-08-21: **the camera must find the palette**. For
+Jovie-owned, intentionally art-directed or generated brand imagery, every
+high-salience controllable color must be chosen as a physically plausible
+Jovie scene hue or low-chroma neutral before capture/generation. Human biology
+and identity-bearing objects keep truthful real-world color.
+
+This does **not** change production UI hue anchors. The UI keeps the current
+Noir Ion anchors; generated scene work uses softer scene references so color
+can exist as light, material, wardrobe, set dressing, and atmosphere.
+
+| Role | Current UI anchor | Scene reference | Hue corridor |
+|------|-------------------|-----------------|--------------|
+| Ion | `oklch(71.95% 0.1626 240.25)` / `#11AFFF` | `oklch(72% 0.14 240)` / `#3FAFF3` | 220-258 |
+| Ultra | `oklch(69.82% 0.1792 295.80)` / `#A982FF` | `oklch(70% 0.15 296)` / `#A789F0` | 276-314 |
+| Pulse | `oklch(70.73% 0.2552 339.69)` / `#FF48D2` | `oklch(71% 0.19 340)` / `#EB6AC6` | 322-358 |
+
+Operational source: `apps/web/data/marketing/imageColorPolicy.ts`
+(`jovie-image-color-policy/v1`). That policy owns Scene Palette v1, the
+neutral rule, protected classes, reflection/source consistency, subject
+separation, skin/material protection, failure actions, and the post-merge
+30-image validation tier.
+
+Rules:
+- Controllable wardrobe, props, furniture, paint, locations, signage,
+  practical lights, vehicles, and set dressing use a scene hue or low-chroma
+  neutral before generation/capture.
+- Natural, biological, semantic, safety, cultural, trademark, creator-owned,
+  and identity-bearing colors stay truthful.
+- A conflicting protected object is reframed, replaced, removed, reduced in
+  salience, or rejected. It is never falsified with recoloring.
+- Emitted light, spill, haze, glass, chrome, puddles, and reflections must
+  agree with one physically plausible source.
+- Subject/background separation is evaluated through OKLCH lightness, chroma,
+  hue, wardrobe, edge light, focus, and composition. No material is banned by
+  default.
+- Skin keeps believable hue, texture, pores, and local specular response.
+  Prevent oily or clipped highlights through lighting, exposure, material,
+  makeup, and restrained local correction.
+- Grading is restrained finishing. It cannot fake set design or rewrite
+  material response.
+- Saturated green, yellow-green, orange, and red are not decorative
+  controllable scene colors. Protected real-world occurrences remain truthful
+  and visually subordinate, or the composition changes.
+
 ### Semantic feature colors (never decorative)
 
 These colors identify named product states or data categories. They are never
@@ -692,6 +738,14 @@ These are surface-side aliases of `--ds-motion-*` tokens (DS_FOUNDATION_V1).
 
 ### Interaction feedback
 
+- Frequent actions normally finish end-to-end within two deliberate
+  activations, and in one when their input is already complete. A capture may
+  use one activation to start and one to finish and submit. A third step is an
+  exception, never an unexamined default: name review, safety, ambiguity,
+  irreversible impact, or recovery, make that reason visible or documented,
+  and encode it in the surface's executable interaction contract or focused
+  behavior test. Editing after voice capture is a recovery path; successful
+  capture submits on its finishing activation.
 - Press feedback uses the shared `--scale-press` token. The canonical value is
   `0.98`: enough tactile response to register without visible shrink or jump.
 - Press compression is opt-in. Use it only when an action has no immediate
@@ -1077,7 +1131,9 @@ mark intentional marketing sentence-case headlines with
 | File | Responsibility |
 |------|----------------|
 | `apps/web/design/oklch-palette.json` | **Authored OKLCH palette** — locked light/dark semantics, elevation, and hex projections (JOV-5388) |
-| `apps/web/styles/design-system.css` | **Live token emitter** — CSS custom properties; color hex must match the OKLCH registry |
+| `apps/web/design/tokens.json` | **Machine-readable base-token source** — compiler-owned brand, gray, and radius values plus explicit migration divergences |
+| `apps/web/styles/generated/design-tokens.css` | **Generated base-token emitter** — CSS projection of `design/tokens.json`; never hand-edit |
+| `apps/web/styles/design-system.css` | **Live semantic emitter** — imports generated base tokens and projects unmigrated semantic/color properties; color hex must match the OKLCH registry |
 | `apps/web/styles/linear-tokens.css` | Marketing-specific Linear-extracted tokens |
 | `apps/web/styles/theme.css` | Feature accents & animations only |
 | `apps/web/app/globals.css` | Tailwind registration + shared utilities |

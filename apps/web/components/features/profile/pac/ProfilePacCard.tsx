@@ -1,5 +1,7 @@
 'use client';
 
+// @coverage-via apps/web/components/organisms/entity-card/EntityCard.test.tsx
+
 import {
   Bell,
   HandHeart,
@@ -21,6 +23,11 @@ import {
   useRef,
   useState,
 } from 'react';
+import {
+  ARTWORK_FIT_CLASSNAME,
+  getArtworkFitClassName,
+  getArtworkRadiusClassName,
+} from '@/components/atoms/ArtworkFrame';
 import { ImageWithFallback } from '@/components/atoms/ImageWithFallback';
 import { SeekBar } from '@/components/atoms/SeekBar';
 import type { EntityCarouselLayout } from '@/components/organisms/entity-card';
@@ -38,6 +45,7 @@ import {
   getCaptureDismissalStatus,
   handleCaptureDismissalResponse,
 } from '@/lib/profile/capture-dismissal-client';
+import { PROFILE_CARD_FOOTER_ANCHOR_CLASSNAME } from '@/lib/profile/composition';
 import type { TourDateViewModel } from '@/lib/tour-dates/types';
 import type { PacState as PacEventState } from '@/lib/tracking/pac-events-shared';
 import { cn } from '@/lib/utils';
@@ -819,6 +827,8 @@ export function ProfilePacCard({
       : release
         ? `${release.title} artwork`
         : artist.name;
+  const isReleaseArtwork =
+    state.kind !== 'merch' && Boolean(release?.artworkUrl);
 
   // Exposure ref on the outer card (callback ref).
   const sectionRef = useCallback(
@@ -853,7 +863,10 @@ export function ProfilePacCard({
           'relative aspect-square flex-none overflow-hidden bg-surface-2',
           isProfileLandscape
             ? cn(
-                'self-stretch w-auto rounded-(--profile-action-radius)',
+                'self-stretch w-auto',
+                isReleaseArtwork
+                  ? getArtworkRadiusClassName('default')
+                  : 'rounded-(--profile-action-radius)',
                 usesFullWidthCaptureLayout && 'invisible'
               )
             : 'w-full border-b border-subtle'
@@ -871,7 +884,13 @@ export function ProfilePacCard({
                 ? '(max-width: 767px) 44vw, 180px'
                 : '(max-width: 767px) 70vw, 300px'
             }
-            className='object-cover'
+            className={
+              isReleaseArtwork
+                ? ARTWORK_FIT_CLASSNAME
+                : getArtworkFitClassName(
+                    state.kind === 'merch' ? 'merch' : 'avatar'
+                  )
+            }
             fallbackVariant='release'
             fallbackClassName='bg-transparent'
           />
@@ -909,7 +928,8 @@ export function ProfilePacCard({
 
         <div
           className={cn(
-            'flex min-w-0 flex-none flex-col gap-1.5',
+            'flex min-w-0 flex-col gap-1.5',
+            PROFILE_CARD_FOOTER_ANCHOR_CLASSNAME,
             isProfileLandscape && 'items-start'
           )}
         >

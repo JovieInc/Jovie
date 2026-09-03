@@ -5,6 +5,11 @@
  * their existing ownership while CI can reject unregistered screens and
  * recipes before they become new design references.
  */
+import { type AppScreenArchetypeId, archetypeIdForScreen } from './archetypes';
+import {
+  type AppScreenCanvasContract,
+  appScreenCanvasContract,
+} from './canvas';
 
 export type AppScreenKind = 'canonical' | 'alias' | 'legacy' | 'operator';
 
@@ -70,11 +75,18 @@ export interface AppScreenRegistryEntry {
    */
   readonly conceptId: string;
   readonly recipeId: AppScreenRecipeId;
+  /** Set on design references only. Alias/legacy/non-reference stay null. */
+  readonly archetypeId: AppScreenArchetypeId | null;
   readonly designReference: boolean;
   /** Redirect receipt: literal destination for redirect-only sources. */
   readonly redirectTo: string | null;
   /** Present exactly when `designReference` is true. */
   readonly story: AppScreenStoryContract | null;
+  /**
+   * Canvas-ownership contract (jovie.app-screens.canvas/v1). Not projected
+   * into the Pen export receipt; the receipt shape stays byte-stable.
+   */
+  readonly canvas: AppScreenCanvasContract;
 }
 
 export const APP_SCREEN_COMPONENT_REGISTRY = [
@@ -611,6 +623,7 @@ export const APP_SCREEN_REGISTRY: readonly AppScreenRegistryEntry[] =
       kind,
       conceptId: mapping?.conceptId ?? route,
       recipeId,
+      archetypeId: archetypeIdForScreen({ route, kind, designReference }),
       designReference,
       redirectTo: mapping?.redirectTo ?? null,
       story: designReference
@@ -620,6 +633,7 @@ export const APP_SCREEN_REGISTRY: readonly AppScreenRegistryEntry[] =
             componentIds: recipe.componentIds,
           }
         : null,
+      canvas: appScreenCanvasContract(source),
     };
   });
 

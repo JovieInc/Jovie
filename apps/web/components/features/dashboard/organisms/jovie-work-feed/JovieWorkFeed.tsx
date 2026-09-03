@@ -1,5 +1,6 @@
 'use client';
 
+// @coverage-via apps/web/tests/unit/dashboard/JovieWorkFeed.test.tsx
 import {
   Bell,
   Bot,
@@ -10,19 +11,28 @@ import {
   Sparkles,
   Workflow,
 } from 'lucide-react';
-import Link from 'next/link';
-import { memo } from 'react';
-import { ActivityFeedSkeleton } from '@/components/molecules/ActivityFeed';
+import { memo, type ReactNode } from 'react';
+import {
+  ACTIVITY_TIMELINE_LIST_CLASSNAME,
+  ACTIVITY_TIMELINE_PRIMARY_TEXT_CLASSNAME,
+  ActivityFeedSkeleton,
+  ActivityTimelineIcon,
+  ActivityTimelineMeta,
+  ActivityTimelineRow,
+  ActivityTimelineTimestamp,
+} from '@/components/molecules/ActivityFeed';
 import { EmptyState } from '@/components/molecules/EmptyState';
 import { PageErrorState } from '@/features/feedback/PageErrorState';
 import type {
   JovieWorkIcon,
   JovieWorkItem,
+  JovieWorkOutcome,
   JovieWorkPhase,
 } from '@/lib/activity/jovie-work-feed';
 import { useJovieWorkFeedQuery } from '@/lib/queries/useJovieWorkFeedQuery';
 import { cn } from '@/lib/utils';
 import { formatTimeAgo } from '@/lib/utils/date-formatting';
+import { formatAmount } from '@/lib/utils/format-number';
 import type { JovieWorkFeedProps } from './types';
 
 const JOVIE_WORK_ICONS: Record<JovieWorkIcon, typeof Sparkles> = {
@@ -42,10 +52,14 @@ const PHASE_STYLES: Record<JovieWorkPhase, string> = {
   failed: 'bg-red-500/10 text-red-700 dark:text-red-300',
 };
 
+const OUTCOME_SLOT_CLASS_NAME =
+  'mt-1 grid min-h-10 grid-cols-2 content-start gap-x-3 text-2xs leading-5 text-tertiary-token sm:grid-cols-4';
+const countFormatter = new Intl.NumberFormat('en-US');
+
 function JovieWorkGlyph({ icon }: { readonly icon: JovieWorkIcon }) {
   const Icon = JOVIE_WORK_ICONS[icon] ?? Sparkles;
 
-  return <Icon className='h-4 w-4 text-tertiary-token' aria-hidden='true' />;
+  return <Icon className='h-3 w-3 text-tertiary-token' aria-hidden='true' />;
 }
 
 function JovieWorkEmptyState({
@@ -65,71 +79,128 @@ function JovieWorkEmptyState({
   );
 }
 
+function JovieWorkOutcomeSlot({
+  outcome,
+}: {
+  readonly outcome?: JovieWorkOutcome;
+}) {
+  let content: ReactNode;
+  let displayState: JovieWorkOutcome['state'] | 'reserved' = 'reserved';
+
+  if (!outcome) {
+    content = null;
+  } else if (outcome.state === 'measuring') {
+    displayState = outcome.state;
+    content = (
+      <span className='col-span-full'>
+        Measuring attributed results for 30 days.
+      </span>
+    );
+  } else if (outcome.state === 'measured_zero') {
+    displayState = outcome.state;
+    content = (
+      <span className='col-span-full'>
+        No attributed results in the 30-day window.
+      </span>
+    );
+  } else if (outcome.state === 'unavailable' || !outcome.metrics) {
+    displayState = 'unavailable';
+    content = (
+      <span className='col-span-full'>Attributed results are unavailable.</span>
+    );
+  } else {
+    displayState = outcome.state;
+    const metrics = [
+      {
+        key: 'gmv',
+        value: outcome.metrics.gmvDeltaCents,
+        valueLabel: formatAmount(outcome.metrics.gmvDeltaCents),
+        label: 'GMV',
+      },
+      {
+        key: 'clicks',
+        value: outcome.metrics.clickDelta,
+        valueLabel: countFormatter.format(outcome.metrics.clickDelta),
+        label: 'Clicks',
+      },
+      {
+        key: 'dsp-clicks',
+        value: outcome.metrics.dspClickDelta,
+        valueLabel: countFormatter.format(outcome.metrics.dspClickDelta),
+        label: 'DSP Clicks',
+      },
+      {
+        key: 'new-fans',
+        value: outcome.metrics.newFansDelta,
+        valueLabel: countFormatter.format(outcome.metrics.newFansDelta),
+        label: 'New Fans',
+      },
+    ].filter(metric => metric.value > 0);
+
+    content = metrics.map(metric => (
+      <span key={metric.key} className='inline-flex min-w-0 gap-1'>
+        <span className='tabular-nums text-primary-token'>
+          {metric.valueLabel}
+        </span>
+        <span>{metric.label}</span>
+      </span>
+    ));
+  }
+
+  return (
+    <div
+      aria-hidden={outcome ? undefined : true}
+      className={OUTCOME_SLOT_CLASS_NAME}
+      data-testid='jovie-work-outcome-slot'
+      data-outcome-state={displayState}
+    >
+      {content}
+    </div>
+  );
+}
+
 const JovieWorkItemRow = memo(function JovieWorkItemRow({
   item,
 }: {
   readonly item: JovieWorkItem;
 }) {
-  const content = (
-    <>
-      <span
-        aria-hidden='true'
-        className='relative z-10 flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-surface-0 text-base'
-      >
-        <JovieWorkGlyph icon={item.icon} />
-      </span>
-      <div className='min-w-0 flex-1'>
-        <div className='flex flex-wrap items-center gap-2'>
-          <p className='text-app font-caption tracking-tight text-primary-token'>
-            {item.title}
-          </p>
-          <span
-            className={cn(
-              'inline-flex rounded-full px-2 py-0.5 text-2xs font-caption',
-              PHASE_STYLES[item.phase]
-            )}
-          >
-            {item.statusLabel}
-          </span>
-        </div>
-        <p className='mt-0.5 text-app leading-5 tracking-tight text-secondary-token'>
-          <span className='tabular-nums text-tertiary-token'>
-            {formatTimeAgo(item.timestamp)}
-          </span>
-          <span className='text-tertiary-token'> - </span>
-          <span>{item.description}</span>
-        </p>
-      </div>
-    </>
-  );
-
-  if (item.href) {
-    return (
-      <li className='relative'>
-        <div
-          aria-hidden='true'
-          className='absolute left-3 top-0 bottom-0 w-px bg-subtle'
-        />
-        <Link
-          href={item.href}
-          className='group relative flex items-start gap-2.5 rounded-md px-1.5 py-1.5 transition-[background-color] duration-subtle ease-subtle hover:bg-surface-1 focus-visible:bg-surface-1 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/55 focus-visible:ring-offset-2 focus-visible:ring-offset-base'
-        >
-          {content}
-        </Link>
-      </li>
-    );
-  }
-
   return (
-    <li className='relative'>
-      <div
-        aria-hidden='true'
-        className='absolute left-3 top-0 bottom-0 w-px bg-subtle'
-      />
-      <div className='group relative flex items-start gap-2.5 rounded-md px-1.5 py-1.5'>
-        {content}
+    <ActivityTimelineRow
+      as='li'
+      href={item.href}
+      leading={
+        <ActivityTimelineIcon>
+          <JovieWorkGlyph icon={item.icon} />
+        </ActivityTimelineIcon>
+      }
+    >
+      <div className='flex flex-wrap items-center gap-2'>
+        <p className='text-app font-caption tracking-tight text-primary-token'>
+          {item.title}
+        </p>
+        <span
+          className={cn(
+            'inline-flex rounded-full px-2 py-0.5 text-2xs font-caption',
+            PHASE_STYLES[item.phase]
+          )}
+        >
+          {item.statusLabel}
+        </span>
       </div>
-    </li>
+      <p
+        className={`${ACTIVITY_TIMELINE_PRIMARY_TEXT_CLASSNAME} mt-0.5 text-secondary-token`}
+      >
+        {item.description}
+      </p>
+      <ActivityTimelineMeta>
+        <ActivityTimelineTimestamp dateTime={item.timestamp}>
+          {formatTimeAgo(item.timestamp)}
+        </ActivityTimelineTimestamp>
+      </ActivityTimelineMeta>
+      {item.outcomeSlot ? (
+        <JovieWorkOutcomeSlot outcome={item.outcome} />
+      ) : null}
+    </ActivityTimelineRow>
   );
 });
 
@@ -206,7 +277,7 @@ export function JovieWorkFeed({
                 isRefreshing ? 'opacity-70 transition-opacity' : undefined
               }
             >
-              <ul className='space-y-0.5'>
+              <ul className={ACTIVITY_TIMELINE_LIST_CLASSNAME}>
                 {items.map(item => (
                   <JovieWorkItemRow key={item.id} item={item} />
                 ))}

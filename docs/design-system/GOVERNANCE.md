@@ -14,7 +14,9 @@ or PR Ready merge gate.
   `pnpm design:conformance:gate` only — same as origin/main. Do not expand the
   always-run remaining group with `design:authority:check`,
   `design:tokens:export:check`, `design:governance:audit`, or
-  `lint:touch-target`.
+  `lint:touch-target`. The merge-gated governance audit tests run a
+  conformance-safe view that excludes local-only checks such as the
+  design-system authority map.
 - **Weekly:** `.github/workflows/design-governance.yml` — Monday 08:17 UTC +
   `workflow_dispatch`. Informational / standing-issue only — **not** a required
   merge-gate workflow. Scheduled runs `exit 0` and file a standing issue on
@@ -57,6 +59,27 @@ permanent check:
    configured in `apps/web/eslint.config.js`.
 7. **Stale completion docs** — `DESIGN_COMPLETE.md` must carry a superseded
    banner rather than contradict live tests.
+8. **Design-invariant projection** — `JOV-INV-019` in
+   `canon/invariants.jsonl` is the only executable list of design-agent
+   invariants. The generated LLM manifest, design authority guard, and this
+   audit consume that record. The audit injects a contract-change probe and
+   fails unless both generator output and authority-guard rejection change.
+9. **Shared-UI visual arbitrary values** — every production TypeScript source
+   under `packages/ui` cannot grow one-off visual Tailwind values. Tests,
+   stories, fixtures, generated output, and build/tooling artifacts stay
+   excluded. Exact file/value/count debt may only shrink
+   (`pnpm design:shared-ui-visual-arbitrary:check`).
+10. **Shadcn / Typeset outcome inventory** — enrolled primitives keep a
+    machine-readable comparison rubric against public Shadcn docs and Typeset
+    typography concepts (`pnpm component-ship-gate` + this audit). Missing or
+    unknown benchmark dimensions fail closed. No Shadcn/Typeset implementation
+    is imported.
+11. **Design-system authority map** —
+    `apps/web/data/designSystem/systemAuthorityMap.json` must preserve layer
+    order, owners, one owner per capability, source evidence, immutable status
+    floors, executable checks, and gap reasons. The audit delegates to
+    `scripts/design-system-authority-map.mjs` and remains local/weekly-only,
+    excluded from merge-gated design-conformance audit tests.
 
 Exit code is non-zero on any FAIL; WARN never blocks. Failures print the
 exact offending values so remediation is mechanical.
@@ -71,6 +94,15 @@ and the weekly `.github/workflows/design-governance.yml` dispatch (issue-only).
 When you add a check, add it to `scripts/design-governance-audit.mjs`. Absence
 from `ci-fast-lanes.mjs` is WARN, not FAIL — the audit must not demand a
 merge halt.
+
+Exception (JOV-5301): the remaining-group `design-system-source-ratchet` lane
+is a ~100ms filesystem count of apps/web arbitrary Tailwind values and
+`--linear-*` usage. It fails only on growth so a source-green PR cannot enroll
+and UNMERGEABLE an ALLGREEN group. It does not expand `design-conformance:gate`,
+unit tests, or e2e.
+
+Exception (JOV-5447): `design-exception-registry` compares inventoried
+design-debt registries to the trusted ci-fast base and fails closed on growth.
 
 Do not add a heavy new required workflow for design governance. The weekly
 workflow is the standing safety net for drift that no PR happened to touch.

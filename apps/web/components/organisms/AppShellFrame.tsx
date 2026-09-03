@@ -17,7 +17,7 @@ interface AppShellFrameProps {
   readonly mobileBottomNav?: ReactNode;
   readonly contentClassName?: string;
   readonly containerClassName?: string;
-  /** When true (desktop), sidebar dims and right rail fully collapses off-canvas. */
+  /** Local composer-focus signal. Must not dim shell chrome or collapse the reserved rail. */
   readonly composerFocusActive?: boolean;
   /**
    * Chat routes render the ambient blue wash at the shell level so it spans
@@ -102,7 +102,7 @@ export const AppShellFrame = memo(function AppShellFrame({
                 // Do not use a translucent recessed well here: it makes the
                 // frame, header, and content read as unrelated backgrounds.
                 'relative flex min-h-0 min-w-0 flex-1 overflow-hidden bg-(--app-shell-content-surface)',
-                'lg:rounded-(--app-shell-radius) lg:border lg:border-(--app-shell-border) lg:bg-(--app-shell-content-surface) lg:shadow-(--linear-app-shell-shadow)'
+                'lg:rounded-(--app-shell-radius) lg:border lg:border-(--app-shell-border) lg:bg-(--app-shell-content-surface) lg:shadow-(--app-shell-shadow)'
               )}
             >
               <div

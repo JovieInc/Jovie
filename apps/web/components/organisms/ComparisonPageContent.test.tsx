@@ -70,7 +70,7 @@ describe('ComparisonPageContent', () => {
     const match = storySource.match(/sourceSha: '([0-9a-f]{40})'/);
     expect(match).not.toBeNull();
     const sourceSha = match?.[1] as string;
-    expect(sourceSha).toBe('da7ea056fe9df567fff098cdeb13e9b3785f707e');
+    expect(sourceSha).toBe('8b0353fcbeb0cffef614fa47afbbbd8eeae48997');
 
     try {
       execFileSync('git', ['cat-file', '-e', `${sourceSha}^{commit}`]);

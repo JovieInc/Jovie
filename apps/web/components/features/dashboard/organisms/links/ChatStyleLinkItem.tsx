@@ -186,7 +186,7 @@ export const ChatStyleLinkItem = React.memo(function ChatStyleLinkItem<
       >
         <div
           className={cn(
-            'flex items-center gap-2 rounded-lg border border-(--linear-app-frame-seam) bg-surface-0 px-3 py-3 sm:gap-3 sm:px-4',
+            'flex items-center gap-2 rounded-lg border border-(--app-shell-frame-seam) bg-surface-0 px-3 py-3 sm:gap-3 sm:px-4',
             'transition-[border-color,box-shadow,opacity] duration-subtle',
             !visible && 'opacity-50',
             isLastAdded && 'ring-2 ring-accent ring-offset-2 ring-offset-base'

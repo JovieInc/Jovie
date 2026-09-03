@@ -83,6 +83,12 @@ const APPROVED_STATUSES = new Set([
   'active',
 ]);
 
+export function isWaitlistApprovedUserStatus(
+  userStatus: string | null | undefined
+): boolean {
+  return APPROVED_STATUSES.has(userStatus ?? '');
+}
+
 // ---------------------------------------------------------------------------
 // State Resolver (pure function)
 // ---------------------------------------------------------------------------
@@ -127,7 +133,7 @@ export function resolveCanonicalState(
   // Waitlist gate is enabled and user is not approved
   if (
     input.waitlistGateEnabled &&
-    !APPROVED_STATUSES.has(input.userStatus ?? '')
+    !isWaitlistApprovedUserStatus(input.userStatus)
   ) {
     // User hasn't submitted yet
     return CanonicalUserState.NEEDS_WAITLIST_SUBMISSION;

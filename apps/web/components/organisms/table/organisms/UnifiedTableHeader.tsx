@@ -47,7 +47,7 @@ export function UnifiedTableHeader<TData>({
       {caption && <caption className='sr-only'>{caption}</caption>}
       <thead>
         {headerGroups.map(headerGroup => (
-          <tr key={headerGroup.id}>
+          <tr key={headerGroup.id} className={presets.tableHeaderRow}>
             {headerGroup.headers.map(header => (
               <TableHeaderCell
                 key={header.id}
@@ -55,7 +55,7 @@ export function UnifiedTableHeader<TData>({
                 canSort={header.column.getCanSort()}
                 sortDirection={header.column.getIsSorted()}
                 stickyHeaderClass={presets.stickyHeader}
-                tableHeaderClass={presets.tableHeader}
+                tableHeaderClass={presets.tableHeaderCell}
                 onToggleSort={header.column.getToggleSortingHandler()}
               />
             ))}

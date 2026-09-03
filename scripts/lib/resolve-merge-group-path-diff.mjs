@@ -256,6 +256,8 @@ export function formatMetaEnv(result) {
   return [
     `IS_NOOP=${result.isNoop ? 'true' : 'false'}`,
     `SOURCE=${result.source}`,
+    `PATH_DIFF_BASE_SHA=${result.baseSha ?? ''}`,
+    `PATH_DIFF_HEAD_SHA=${result.headSha}`,
     '',
   ].join('\n');
 }

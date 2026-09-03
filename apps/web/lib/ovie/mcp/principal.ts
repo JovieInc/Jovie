@@ -2,6 +2,7 @@ import { getCurrentUserEntitlements } from '@/lib/entitlements/server';
 import {
   extractBearer,
   getOvieOAuthIssuer,
+  OVIE_OAUTH_SCOPES,
   ovieIssuerSecret,
 } from '@/lib/ovie/mcp/oauth';
 import type { OvieMcpPrincipal } from '@/lib/ovie/mcp/types';
@@ -36,6 +37,6 @@ export async function resolveOviePrincipal(
     isAdmin: entitlements.isAdmin,
     subject: entitlements.userId ?? undefined,
     email: entitlements.email ?? undefined,
-    scopes: entitlements.isAdmin ? ['ovie:read', 'ovie:write'] : [],
+    scopes: entitlements.isAdmin ? [...OVIE_OAUTH_SCOPES] : [],
   };
 }

@@ -8,6 +8,7 @@ import { pathToFileURL } from 'node:url';
 
 const MARKER_FILE = 'production-generation-verified.json';
 const RECOVERY_FILE = 'production-generation-recovery.json';
+const SHA_PATTERN = /^[0-9a-f]{40}$/;
 const CONTROLLER_PATH = '.github/workflows/production-controller.yml';
 const MARKER_RECOVERY_PATH = '.github/workflows/production-marker-recovery.yml';
 const INTERRUPTED_CONCLUSIONS = new Set([
@@ -85,14 +86,22 @@ function validateArtifact(artifact, expectedName) {
 }
 
 function validateMarkerPayload(payload, context, artifact) {
-  return (
+  const identityMatches =
     payload &&
     typeof payload === 'object' &&
     payload.sha === context.sha &&
     typeof payload.deploymentId === 'string' &&
-    /^dpl_[A-Za-z0-9]+$/.test(payload.deploymentId) &&
     sameInteger(payload.controllerRun, artifact.workflowRunId) &&
-    positiveInteger(payload.controllerAttempt) !== null
+    positiveInteger(payload.controllerAttempt) !== null;
+  if (!identityMatches) return false;
+  if (/^dpl_[A-Za-z0-9]+$/.test(payload.deploymentId)) return true;
+  return (
+    payload.deploymentId === 'not-applicable' &&
+    SHA_PATTERN.test(payload.deploymentBaseSha ?? '') &&
+    payload.webEvidenceSha === 'none' &&
+    Array.isArray(payload.selectedLanes) &&
+    !payload.selectedLanes.includes('web') &&
+    payload.authSmoke === 'not-applicable'
   );
 }
 
@@ -114,23 +123,87 @@ function markerNameForAttempt(sha, attempt) {
 }
 
 /**
- * A recovered marker is written by the bounded workflow_dispatch recovery
- * path after it re-proves canonical ownership and every exact runtime probe
- * for a generation whose original controller run never preserved a marker.
- * The uploading recovery run replaces the controller-run binding; the payload
- * must name the exact original controller run attempt it recovers.
+ * A recovered marker is written by the bounded event-driven or manual recovery
+ * path after it re-proves canonical ownership and every exact runtime probe for
+ * a generation whose original controller run never preserved a marker. The
+ * uploading recovery run replaces the controller-run binding; the payload must
+ * name the exact original controller run attempt it recovers.
  */
-function validateMarkerRecoveryRun(run, context, attempt) {
+function validatePostWriteRefreshFailure(jobs, context, attempt) {
+  if (!Array.isArray(jobs) || jobs.length !== 1) return false;
+  const job = jobs[0];
+  if (
+    !job ||
+    typeof job !== 'object' ||
+    !sameInteger(job.run_id, context.controllerRun) ||
+    !sameInteger(job.run_attempt, attempt) ||
+    job.name !== 'Recover exact verified-generation marker' ||
+    job.head_branch !== 'main' ||
+    job.status !== 'completed' ||
+    job.conclusion !== 'failure' ||
+    !Array.isArray(job.steps)
+  ) {
+    return false;
+  }
+  const requiredSuccessfulSteps = [
+    'Validate bounded recovery request',
+    'Verify canonical ownership and exact runtime probes',
+    'Re-probe production Better Auth OAuth runtime',
+    'Preserve recovered verified-generation marker',
+    'Upload recovered verified-generation marker',
+    'Confirm uploaded recovered marker bytes',
+  ];
+  const dispatchName = 'Dispatch fresh fleet reconciliation';
+  const requiredSteps = [...requiredSuccessfulSteps, dispatchName].map(name =>
+    job.steps.filter(step => step?.name === name)
+  );
+  if (requiredSteps.some(matches => matches.length !== 1)) return false;
+  const dispatch = requiredSteps.at(-1)[0];
+  if (
+    dispatch.status !== 'completed' ||
+    dispatch.conclusion !== 'failure' ||
+    !positiveInteger(dispatch.number)
+  ) {
+    return false;
+  }
+  for (const [index, name] of requiredSuccessfulSteps.entries()) {
+    const step = requiredSteps[index][0];
+    if (
+      step.name !== name ||
+      step.status !== 'completed' ||
+      step.conclusion !== 'success' ||
+      !positiveInteger(step.number) ||
+      step.number >= dispatch.number
+    ) {
+      return false;
+    }
+  }
+  return job.steps.every(
+    step =>
+      step?.status === 'completed' &&
+      (step.name === dispatchName
+        ? step.conclusion === 'failure'
+        : step.conclusion === 'success')
+  );
+}
+
+function validateMarkerRecoveryRun(run, context, attempt, jobs) {
   if (!run || typeof run !== 'object') return false;
+  const trustedRecoveryEvent =
+    run.event === 'workflow_dispatch' || run.event === 'workflow_run';
+  const completedWithDurableProof =
+    run.status === 'completed' &&
+    (run.conclusion === 'success' ||
+      (run.conclusion === 'failure' &&
+        validatePostWriteRefreshFailure(jobs, context, attempt)));
   return (
     sameInteger(run.id, context.controllerRun) &&
     sameInteger(run.run_attempt, attempt) &&
     run.path === MARKER_RECOVERY_PATH &&
     run.head_branch === 'main' &&
     run.head_repository?.full_name === context.repo &&
-    run.event === 'workflow_dispatch' &&
-    run.status === 'completed' &&
-    run.conclusion === 'success'
+    trustedRecoveryEvent &&
+    completedWithDurableProof
   );
 }
 
@@ -153,7 +226,14 @@ function classifyRecoveredMarkerEntry(entry, context) {
     return { error: 'malformed_or_contradictory_marker' };
   }
   const markerContext = { ...context, controllerRun };
-  if (!validateMarkerRecoveryRun(entry.attemptRun, markerContext, attempt)) {
+  if (
+    !validateMarkerRecoveryRun(
+      entry.attemptRun,
+      markerContext,
+      attempt,
+      entry.attemptJobs
+    )
+  ) {
     return { error: 'contradictory_marker_attempt' };
   }
   const sourceContext = { ...context, controllerRun: sourceRun };
