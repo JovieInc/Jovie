@@ -2,6 +2,7 @@ import type { Meta, StoryObj } from '@storybook/nextjs-vite';
 import {
   PageToolbar,
   PageToolbarActionButton,
+  PageToolbarBackLink,
   PageToolbarTabButton,
 } from './PageToolbar';
 
@@ -49,5 +50,22 @@ export const WithTopDivider: Story = {
   args: {
     ...Default.args,
     topDivider: true,
+  },
+};
+
+export const WithBackLink: Story = {
+  args: {
+    start: (
+      <>
+        <PageToolbarBackLink
+          href='/app/releases'
+          label='Releases'
+          ariaLabel='Back to releases'
+        />
+        <span className='min-w-0 truncate text-xs text-tertiary-token tabular-nums'>
+          The Deep End release tasks
+        </span>
+      </>
+    ),
   },
 };

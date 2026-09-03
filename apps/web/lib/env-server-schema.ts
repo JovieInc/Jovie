@@ -128,8 +128,12 @@ export const ServerEnvSchema = z.object({
   // Bandsintown configuration
   BANDSINTOWN_APP_ID: z.string().optional(),
 
-  // Vercel Blob
+  // Vercel Blob — production/preview authenticate via OIDC
+  // (VERCEL_OIDC_TOKEN + BLOB_STORE_ID); the static token is the local-dev
+  // fallback only.
   BLOB_READ_WRITE_TOKEN: z.string().optional(),
+  BLOB_STORE_ID: z.string().optional(),
+  BLOB_WEBHOOK_PUBLIC_KEY: z.string().optional(),
 
   // Telegram Bot (for asset ingestion webhook)
   TELEGRAM_BOT_TOKEN: z.string().optional(),
@@ -332,6 +336,8 @@ export const ServerEnvSchema = z.object({
   GOOGLE_OAUTH_CLIENT_SECRET: z.string().optional(),
   /** Base URL for the Google OAuth redirect URI, e.g. https://jov.ie/api/connectors/google */
   GOOGLE_OAUTH_REDIRECT_URI_BASE: z.string().url().optional(),
+  /** Base URL for the YouTube OAuth redirect URI, e.g. https://jov.ie/api/connectors/youtube */
+  YOUTUBE_OAUTH_REDIRECT_URI_BASE: z.string().url().optional(),
   /** Days before/after today to fetch Calendar events (default: 90 past, 365 future) */
   GOOGLE_CALENDAR_DEFAULT_WINDOW_DAYS: z.string().optional(),
   /** Days of Gmail history to scan for booking signals (default: 30) */
@@ -482,6 +488,8 @@ export const ENV_KEYS = [
   'APPLE_WALLET_APNS_PRODUCTION',
   'BANDSINTOWN_APP_ID',
   'BLOB_READ_WRITE_TOKEN',
+  'BLOB_STORE_ID',
+  'BLOB_WEBHOOK_PUBLIC_KEY',
   'TELEGRAM_BOT_TOKEN',
   'TELEGRAM_WEBHOOK_SECRET',
   'STRIPE_SECRET_KEY',
@@ -625,6 +633,7 @@ export const ENV_KEYS = [
   'GOOGLE_OAUTH_CLIENT_ID',
   'GOOGLE_OAUTH_CLIENT_SECRET',
   'GOOGLE_OAUTH_REDIRECT_URI_BASE',
+  'YOUTUBE_OAUTH_REDIRECT_URI_BASE',
   'GOOGLE_CALENDAR_DEFAULT_WINDOW_DAYS',
   'GMAIL_HISTORY_WINDOW_DAYS',
   'AI_CONNECTORS_DAILY_TOKEN_BUDGET',

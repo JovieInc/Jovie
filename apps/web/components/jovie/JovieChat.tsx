@@ -84,6 +84,7 @@ export function JovieChat({
   isProfileComplete = false,
   chatMode,
   actionCards,
+  featureIntroCatalog,
   ambientOwnedByShell = false,
 }: JovieChatProps) {
   const initialQuerySubmitted = useRef(false);
@@ -244,6 +245,7 @@ export function JovieChat({
     fileUploadLimit: chatFileUploadLimit,
     onError: error => setChatError({ type: 'unknown', message: error }),
     onAudioUploaded: handleAudioUploaded,
+    resetKey: activeConversationId ?? conversationId ?? null,
   });
 
   // Manifest collapse state: when uploading and user scrolls/types, show collapsed bar
@@ -686,7 +688,6 @@ export function JovieChat({
   return (
     <EntityResolutionProvider profileId={profileId}>
       <div
-        ref={dropZoneRef}
         className={cn(
           'relative flex h-full flex-col',
           // On chat routes the shell frame paints the canvas fill + ambient
@@ -738,17 +739,17 @@ export function JovieChat({
           data-testid='chat-audio-file-input'
         />
 
-        {/* Drag-and-drop overlay */}
-        <ChatDropZoneOverlay
-          isDragOver={isDragOver}
-          pendingFiles={pendingFiles}
-        />
-
         {/* Persistent scroll viewport (flex-1) + morphing upper content.
             Empty chat docks the composer; the feature-intro card sits above
             it. Thread state owns the message viewport and the persistent
-            bottom dock. */}
-        <div className='relative flex flex-1 flex-col overflow-hidden'>
+            bottom dock. The drop overlay is clipped to this workspace so it
+            cannot cover the header, composer, sidebar, or entity rail. */}
+        <div
+          ref={dropZoneRef}
+          className='relative flex flex-1 flex-col overflow-hidden'
+          data-testid='chat-workspace'
+          data-chat-drag-over={isDragOver ? 'true' : undefined}
+        >
           <div
             ref={scrollContainerRef}
             data-testid='chat-message-scroll'
@@ -810,6 +811,7 @@ export function JovieChat({
                 >
                   {!composerHasIntent ? (
                     <FeatureIntroHost
+                      catalog={featureIntroCatalog}
                       onHighlightCTA={() => {
                         inputRef.current?.focus();
                       }}
@@ -853,6 +855,11 @@ export function JovieChat({
               </>
             )}
           </div>
+
+          <ChatDropZoneOverlay
+            isDragOver={isDragOver}
+            pendingFiles={pendingFiles}
+          />
 
           {/*
             Thread composer dock. Empty chat keeps the same composer surface centered

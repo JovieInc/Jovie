@@ -41,6 +41,18 @@ DEFAULT_FLEET_GATE_RECEIPT = "/home/timwhite/gem-workspace/state/gem-priority-ga
 MODEL_ID = "qwen-coder-local"
 MODEL_TIMEOUT_SECONDS = 12 * 60
 RETRY_MINUTES = 15
+LOCAL_REPAIR_MAX_ATTEMPTS = 1
+CONSUMED_LOCAL_REPAIR_STATUSES = frozenset(
+    {
+        "repair_started",
+        "repair_interrupted",
+        "repair_handoff_ready",
+        "repair_failed",
+        "repair_timed_out",
+        "not_started",
+        "repair_not_started",
+    }
+)
 SYMPHONY_SERVICE = "symphony-ui-pilot.service"
 REQUIRED_RUNTIME_CAPABILITIES = frozenset(
     {
@@ -85,11 +97,11 @@ def _stale_capacity_local_remediation_limit(
         age = None
     safe_stale_lane = (
         receipt.get("schema") == "jovie-fleet-gate/v1"
-        and receipt.get("state") in {"GREEN", "AMBER", "RED"}
+        and receipt.get("state") in {"GREEN", "AMBER"}
         and remediation.get("allowed") is True
         and remediation.get("localAllowed") is True
         and remediation.get("pushAllowed") is False
-        and remediation.get("maxConcurrent") == 0
+        and remediation.get("maxConcurrent") == LOCAL_REPAIR_MAX_ATTEMPTS
         and gem.get("runtimeFloor") == 1
         and evidence.get("accepted") is False
         and gem.get("evidenceAccepted") is False
@@ -886,6 +898,74 @@ def _parse_ahead_behind(value: str | None) -> tuple[int | None, int | None]:
     return int(parts[1]), int(parts[0])
 
 
+def _git_bytes(workspace: pathlib.Path, *args: str) -> bytes | None:
+    try:
+        result = subprocess.run(
+            ["git", *args],
+            cwd=workspace,
+            check=False,
+            capture_output=True,
+            timeout=10,
+        )
+    except (OSError, subprocess.TimeoutExpired):
+        return None
+    return result.stdout if result.returncode == 0 else None
+
+
+def _workspace_dirty_content_digest(
+    workspace: pathlib.Path,
+    status: str | None,
+) -> str | None:
+    if not status:
+        return None
+    digest = hashlib.sha256()
+    digest.update(status.encode())
+    for label, args in (
+        ("unstaged", ("diff", "--no-ext-diff", "--binary", "HEAD", "--")),
+        ("staged", ("diff", "--cached", "--no-ext-diff", "--binary", "HEAD", "--")),
+    ):
+        output = _git_bytes(workspace, *args)
+        if output is None:
+            return None
+        digest.update(label.encode())
+        digest.update(b"\0")
+        digest.update(output)
+        digest.update(b"\0")
+    untracked = _git_bytes(workspace, "ls-files", "--others", "--exclude-standard", "-z")
+    if untracked is None:
+        return None
+    root = workspace.resolve()
+    for raw_path in sorted(value for value in untracked.split(b"\0") if value):
+        relative = pathlib.Path(os.fsdecode(raw_path))
+        try:
+            target = root / relative
+            target.resolve().relative_to(root)
+            stat_result = target.lstat()
+        except (OSError, ValueError):
+            return None
+        digest.update(b"untracked\0")
+        digest.update(raw_path)
+        digest.update(b"\0")
+        digest.update(str(stat_result.st_mode).encode())
+        digest.update(b"\0")
+        if target.is_symlink():
+            try:
+                digest.update(os.fsencode(os.readlink(target)))
+            except (OSError, UnicodeEncodeError):
+                return None
+        elif target.is_file():
+            try:
+                with target.open("rb") as handle:
+                    for chunk in iter(lambda: handle.read(1024 * 1024), b""):
+                        digest.update(chunk)
+            except OSError:
+                return None
+        else:
+            digest.update(b"non-file")
+        digest.update(b"\0")
+    return digest.hexdigest()
+
+
 def _workspace_revision(
     *,
     head: str | None,
@@ -894,9 +974,10 @@ def _workspace_revision(
     status: str | None,
     ahead: int | None,
     behind: int | None,
+    content_digest: str | None = None,
 ) -> dict[str, object]:
     status_value = status or ""
-    return {
+    revision: dict[str, object] = {
         "schema": WORKSPACE_REVISION_SCHEMA,
         "head": head,
         "baseRef": "origin/main",
@@ -907,6 +988,9 @@ def _workspace_revision(
         "dirty": bool(status_value),
         "statusDigest": _sha256_bytes(status_value.encode()),
     }
+    if content_digest:
+        revision["contentDigest"] = content_digest
+    return revision
 
 
 def _upgrade_stale_workspace(path: pathlib.Path) -> dict[str, object]:
@@ -1029,6 +1113,7 @@ def _workspace_state(raw_path: object, identifier: str) -> dict[str, object]:
     conflicts = _git(path, "diff", "--name-only", "--diff-filter=U")
     counts = _git(path, "rev-list", "--left-right", "--count", "origin/main...HEAD") if head and base else None
     ahead, behind = _parse_ahead_behind(counts)
+    content_digest = _workspace_dirty_content_digest(path, status)
     return {
         "workspace": str(path),
         "valid": bool(head and base),
@@ -1050,6 +1135,7 @@ def _workspace_state(raw_path: object, identifier: str) -> dict[str, object]:
             status=status,
             ahead=ahead,
             behind=behind,
+            content_digest=content_digest,
         ),
     }
 
@@ -1068,6 +1154,46 @@ def _generation(
             "base": state.get("base"),
             "conflicts": state.get("conflictedPaths"),
             "workspaceRevision": state.get("workspaceRevision"),
+            "runtimeRevision": runtime.get("runtimeRevision") if runtime else None,
+        },
+        sort_keys=True,
+        separators=(",", ":"),
+    )
+    return hashlib.sha256(raw.encode()).hexdigest()
+
+
+def _local_repair_generation(
+    identifier: str,
+    error: str,
+    state: dict[str, object],
+    runtime: dict[str, object] | None = None,
+) -> str:
+    """Stable identity for one local attempt, excluding mutable base/status."""
+    raw = json.dumps(
+        {
+            "issue": identifier,
+            "error": error,
+            "head": state.get("head"),
+            "runtimeRevision": runtime.get("runtimeRevision") if runtime else None,
+        },
+        sort_keys=True,
+        separators=(",", ":"),
+    )
+    return hashlib.sha256(raw.encode()).hexdigest()
+
+
+def _legacy_base_scoped_local_repair_generation(
+    identifier: str,
+    error: str,
+    state: dict[str, object],
+    runtime: dict[str, object] | None = None,
+) -> str:
+    raw = json.dumps(
+        {
+            "issue": identifier,
+            "error": error,
+            "head": state.get("head"),
+            "base": state.get("base"),
             "runtimeRevision": runtime.get("runtimeRevision") if runtime else None,
         },
         sort_keys=True,
@@ -1294,7 +1420,62 @@ def _reconcile_item(
     state_before = _workspace_state(item.get("workspace_path"), identifier)
     runtime = runtime or runtime_preflight()
     generation = _generation(identifier, error, state_before, runtime)
+    local_repair_generation = _local_repair_generation(
+        identifier,
+        error,
+        state_before,
+        runtime,
+    )
     previous = _read_receipt(identifier)
+    previous_alternate = previous.get("alternateModel") if previous else None
+    previous_scope = previous.get("resourceScope") if previous else None
+    previous_base_state = {
+        **state_before,
+        "base": previous_scope.get("base")
+        if isinstance(previous_scope, dict)
+        else state_before.get("base"),
+    }
+    same_local_repair_generation = bool(
+        previous
+        and (
+            previous.get("localRepairGeneration") == local_repair_generation
+            or previous.get("localRepairGeneration")
+            == _legacy_base_scoped_local_repair_generation(
+                identifier,
+                error,
+                previous_base_state,
+                runtime,
+            )
+            or (
+                previous.get("localRepairGeneration") is None
+                and previous.get("reason") == error
+                and isinstance(previous_scope, dict)
+                and previous_scope.get("head") == state_before.get("head")
+                and previous_scope.get("runtimeRevision")
+                == runtime.get("runtimeRevision")
+            )
+        )
+    )
+    consumed_previous_local_repair = (
+        previous
+        and same_local_repair_generation
+        and isinstance(previous_alternate, dict)
+        and previous_alternate.get("status") in CONSUMED_LOCAL_REPAIR_STATUSES
+    )
+    previous_consumed_status = (
+        previous_alternate.get("status")
+        if consumed_previous_local_repair and isinstance(previous_alternate, dict)
+        else None
+    )
+    returned_previous_local_repair = (
+        consumed_previous_local_repair
+        and previous_consumed_status == "repair_handoff_ready"
+    )
+    previous_workspace_revision = (
+        previous_scope.get("workspaceRevision")
+        if isinstance(previous_scope, dict)
+        else None
+    )
     launcher_failure = classify_launcher_failure(error, item)
     routing_receipt = None
     workspace_value = state_before.get("workspace")
@@ -1323,6 +1504,64 @@ def _reconcile_item(
     launcher_failure = decision["failure"] or launcher_failure
     policy_retryable = bool(decision["retryable"])
     decision_state = str(decision["state"])
+    fresh_routing_ready_after_consumed_repair = (
+        decision_state == "ready"
+        and previous_consumed_status not in {"repair_started"}
+        and previous_workspace_revision is not None
+        and previous_workspace_revision != state_before.get("workspaceRevision")
+    )
+    if (
+        consumed_previous_local_repair
+        and not returned_previous_local_repair
+        and not fresh_routing_ready_after_consumed_repair
+    ):
+        previous_status = previous_consumed_status
+        if previous_status == "repair_started":
+            current_scope = (
+                previous_scope.copy() if isinstance(previous_scope, dict) else {}
+            )
+            previous = {
+                **previous,
+                "updatedAt": _iso(_now()),
+                "authoritativeOwner": "symphony-reconciler",
+                "controllerState": "blocked",
+                "transition": "github_runner_handoff_required",
+                "nextAutomatedAction": "escalate_ci_platform_dependency",
+                "nextRetryAt": None,
+                "alternateModel": {
+                    **previous_alternate,
+                    "status": "repair_interrupted",
+                },
+                "resourceScope": {
+                    **current_scope,
+                    "issue": identifier,
+                    "workspace": state_before.get("workspace"),
+                    "head": state_before.get("head"),
+                    "base": state_before.get("base"),
+                    "workspaceRevision": state_before.get("workspaceRevision"),
+                    "runtimeRevision": runtime.get("runtimeRevision"),
+                    "capabilities": runtime.get("capabilities", []),
+                },
+                "headBaseCurrent": state_before,
+                "terminalEscalation": {
+                    "owner": "symphony-reconciler",
+                    "requestedOwner": "CI Platform",
+                    "route": "rolling-ci-fx",
+                    "state": "handoff_unaccepted",
+                    "reason": "repair_interrupted",
+                    "trigger": "authenticated_ci_workflow_run",
+                },
+            }
+            _write_receipt(identifier, previous)
+        _event(
+            identifier,
+            "completed_local_repair_held",
+            reason=error,
+            alternate=previous_status,
+            next=previous.get("nextAutomatedAction"),
+            retry_at=previous.get("nextRetryAt"),
+        )
+        return False
     retry_scheduled = decision_state == "retrying"
     terminal = decision_state == "blocked"
     deterministic_terminal = terminal and launcher_failure.get("retryable") is False
@@ -1345,8 +1584,10 @@ def _reconcile_item(
         )
         return False
     next_retry = _parse_time(decision.get("due_at")) if retry_scheduled else None
+    previous_retry = _parse_time(previous.get("nextRetryAt")) if previous else None
     repeated = (
         alternate_permitted
+        and not returned_previous_local_repair
         and (retry_scheduled or retry_exhausted)
         and _is_repeated_or_conflict(item, source, state_before)
     )
@@ -1396,12 +1637,34 @@ def _reconcile_item(
     )
     state_after = state_before
     local_repair_attempted = False
+    terminal_escalation: dict[str, object] | None = None
+    receipt_controller_state = decision_state
+    authoritative_owner = (
+        "symphony-reconciler" if alternate_permitted else "symphony-ui-pilot"
+    )
     if deterministic_terminal:
         alternate["status"] = "not_permitted"
+    if returned_previous_local_repair and decision_state != "ready":
+        attempted.append(
+            {
+                "kind": "successful_local_repair_handoff",
+                "result": "returned_to_normal_loop",
+                "status": previous_consumed_status,
+            }
+        )
+        transition = "returned_to_normal_loop"
+        next_action = "normal_model_update_test_ready_native_merge"
+        if next_retry is None:
+            next_retry = previous_retry if previous_retry and previous_retry > _now() else _now()
+        policy_retryable = True
+        receipt_controller_state = "retrying"
+        authoritative_owner = "symphony-ui-pilot"
+        if isinstance(previous_alternate, dict):
+            for key in ("selection", "summary"):
+                if key in previous_alternate:
+                    alternate[key] = previous_alternate[key]
+        alternate["status"] = "repair_handoff_ready"
 
-    already_attempted = bool(previous and previous.get("generation") == generation and previous.get("alternateModel", {}).get("status") in {"repair_handoff_ready", "repair_failed", "repair_timed_out", "repair_not_started"})
-    previous_retry = _parse_time(previous.get("nextRetryAt")) if previous else None
-    escalation_due = not already_attempted or (previous_retry is not None and previous_retry <= _now())
     if repeated:
         attempted.append(
             {
@@ -1410,8 +1673,54 @@ def _reconcile_item(
                 "result": "acquired" if alternate_permitted else "not_acquired",
             }
         )
-        if escalation_due and state_before.get("valid") and alternate_permitted:
+        if state_before.get("valid") and alternate_permitted:
             transition = "alternate_local_repair_started"
+            _write_receipt(
+                identifier,
+                {
+                    "schema": SCHEMA,
+                    "updatedAt": _iso(_now()),
+                    "generation": generation,
+                    "localRepairGeneration": local_repair_generation,
+                    "issue": {
+                        "identifier": identifier,
+                        "id": item.get("issue_id"),
+                        "url": item.get("issue_url"),
+                    },
+                    "reason": error,
+                    "launcherFailure": launcher_failure,
+                    "retryPolicy": {
+                        "retryable": False,
+                        "maxAttempts": decision["maxAttempts"],
+                        "localRepairAttempts": 1,
+                        "localRepairMaxAttempts": LOCAL_REPAIR_MAX_ATTEMPTS,
+                    },
+                    "entryCriteria": "runtime retry/blocked after bounded normal-model attempt",
+                    "authoritativeOwner": "symphony-reconciler",
+                    "resourceScope": {
+                        "issue": identifier,
+                        "workspace": state_before.get("workspace"),
+                        "head": state_before.get("head"),
+                        "base": state_before.get("base"),
+                        "workspaceRevision": state_before.get("workspaceRevision"),
+                        "runtimeRevision": runtime.get("runtimeRevision"),
+                        "capabilities": runtime.get("capabilities", []),
+                    },
+                    "deadline": _iso(
+                        _now() + dt.timedelta(seconds=_model_timeout_seconds())
+                    ),
+                    "runtimeState": source,
+                    "controllerState": "blocked",
+                    "attempt": decision["attempt"],
+                    "transition": transition,
+                    "nextAutomatedAction": "await_local_repair_result",
+                    "nextRetryAt": None,
+                    "alternateModel": {
+                        **alternate,
+                        "status": "repair_started",
+                    },
+                },
+            )
             _event(
                 identifier,
                 transition,
@@ -1434,10 +1743,22 @@ def _reconcile_item(
                 transition = "returned_to_normal_loop"
                 next_action = "normal_model_update_test_ready_native_merge"
                 next_retry = _now() + dt.timedelta(minutes=RETRY_MINUTES)
+                authoritative_owner = "symphony-ui-pilot"
             else:
-                transition = "alternate_local_repair_deferred"
-                next_action = "retry_alternate_local_model"
-                next_retry = _now() + dt.timedelta(minutes=RETRY_MINUTES)
+                transition = "github_runner_handoff_required"
+                next_action = "escalate_ci_platform_dependency"
+                next_retry = None
+                policy_retryable = False
+                receipt_controller_state = "blocked"
+                authoritative_owner = "symphony-reconciler"
+                terminal_escalation = {
+                    "owner": "symphony-reconciler",
+                    "requestedOwner": "CI Platform",
+                    "route": "rolling-ci-fx",
+                    "state": "handoff_unaccepted",
+                    "reason": str(repair.get("result") or "local_repair_failed"),
+                    "trigger": "authenticated_ci_workflow_run",
+                }
         elif not state_before.get("valid"):
             transition = "durable_escalation_blocked"
             next_action = "retry_exact_workspace_observation"
@@ -1455,10 +1776,22 @@ def _reconcile_item(
             transition = "alternate_local_repair_waiting"
             next_action = "retry_alternate_local_model"
 
+    retry_policy: dict[str, object] = {
+        "retryable": policy_retryable,
+        "maxAttempts": decision["maxAttempts"],
+    }
+    if local_repair_attempted or returned_previous_local_repair:
+        retry_policy.update(
+            {
+                "localRepairAttempts": 1,
+                "localRepairMaxAttempts": LOCAL_REPAIR_MAX_ATTEMPTS,
+            }
+        )
     receipt: dict[str, object] = {
         "schema": SCHEMA,
         "updatedAt": _iso(_now()),
         "generation": generation,
+        "localRepairGeneration": local_repair_generation,
         "issue": {
             "identifier": identifier,
             "id": item.get("issue_id"),
@@ -1466,12 +1799,9 @@ def _reconcile_item(
         },
         "reason": error,
         "launcherFailure": launcher_failure,
-        "retryPolicy": {
-            "retryable": policy_retryable,
-            "maxAttempts": decision["maxAttempts"],
-        },
+        "retryPolicy": retry_policy,
         "entryCriteria": "runtime retry/blocked after bounded normal-model attempt",
-        "authoritativeOwner": "symphony-reconciler" if alternate_permitted else "symphony-ui-pilot",
+        "authoritativeOwner": authoritative_owner,
         "resourceScope": {
             "issue": identifier,
             "workspace": state_after.get("workspace"),
@@ -1483,7 +1813,11 @@ def _reconcile_item(
         },
         "deadline": (
             None
-            if deterministic_terminal or decision_state == "ready"
+            if (
+                deterministic_terminal
+                or decision_state == "ready"
+                or terminal_escalation
+            )
             else _iso(_now() + dt.timedelta(seconds=_model_timeout_seconds()))
             if alternate_permitted
             else _iso(next_retry)
@@ -1491,7 +1825,7 @@ def _reconcile_item(
             else None
         ),
         "runtimeState": source,
-        "controllerState": decision_state,
+        "controllerState": receipt_controller_state,
         "attempt": decision["attempt"],
         "headBaseBefore": state_before,
         "headBaseCurrent": state_after,
@@ -1504,6 +1838,8 @@ def _reconcile_item(
         "nextRetryAt": _iso(next_retry) if next_retry else None,
         "alternateModel": alternate,
     }
+    if terminal_escalation:
+        receipt["terminalEscalation"] = terminal_escalation
     _write_receipt(identifier, receipt)
     _event(
         identifier,
@@ -1555,13 +1891,16 @@ def main() -> int:
     if local_lease is None:
         _event(
             "control-plane",
-            "reconciliation_writer_busy",
+            "bounded_local_remediation_busy"
+            if local_limit
+            else "reconciliation_writer_busy",
             reason=local_reason,
             capacity=local_limit,
             observed=len(items),
         )
         return 0
     local_slot_available = bool(local_limit)
+    local_repair_attempts = 0
     try:
         for source, item in items:
             permitted = local_slot_available
@@ -1571,6 +1910,7 @@ def main() -> int:
                 # lease or remote mutation is admitted by that receipt.
                 attempted = _reconcile_item(item, source, permitted, runtime)
                 if attempted:
+                    local_repair_attempts += 1
                     local_slot_available = False
             except (OSError, TypeError, ValueError, subprocess.SubprocessError) as exc:
                 if permitted:
@@ -1584,10 +1924,13 @@ def main() -> int:
         if local_limit:
             _event(
                 "control-plane",
-                "bounded_local_remediation_admitted",
+                "bounded_local_remediation_admitted"
+                if local_repair_attempts
+                else "bounded_local_remediation_idle",
                 reason=local_reason,
                 capacity=local_limit,
                 observed=len(items),
+                attempted=local_repair_attempts,
             )
     finally:
         _release_local_remediation_lease(local_lease)

@@ -5,8 +5,8 @@ name: Fleet Gate Refresh
 # no issue admission or worker-dispatch path.
 
 on:
-  pull_request:
-    types: [opened, edited, synchronize, closed, labeled, unlabeled, reopened]
+  pull_request_target:
+    types: [opened, edited, synchronize, converted_to_draft, closed, labeled, unlabeled, reopened]
   workflow_run:
     # Queue-Deferred Release is downstream of this gate. Listening to it here
     # formed a reciprocal workflow_run loop that could retrigger both
@@ -39,11 +39,11 @@ jobs:
     if: >-
       (github.event_name != 'workflow_run' ||
       github.event.workflow_run.conclusion != 'cancelled') &&
-      (github.event_name != 'pull_request' ||
+      (github.event_name != 'pull_request_target' ||
       github.event.action != 'closed' ||
       github.event.pull_request.merged != true) &&
       (
-        github.event_name != 'pull_request' ||
+        github.event_name != 'pull_request_target' ||
         (github.event.action != 'labeled' && github.event.action != 'unlabeled') ||
         github.event.label.name == 'hold' ||
         github.event.label.name == 'gated' ||
@@ -82,8 +82,25 @@ jobs:
       # Source PR/fork workflow definitions never execute their code here.
       # Consume actions only after the reviewed CLI is present on main.
       - name: Persist stack policy repair actions (JOV-INV-020)
+        id: stack-actions
+        if: steps.refresh.outcome == 'success'
+        env:
+          GEM_WORKSPACE: /home/timwhite/gem-workspace
+        shell: bash
+        run: |
+          set -euo pipefail
+          grep -Fq "arg.startsWith('--closure-health-file=')" \
+            scripts/backlog-orchestrator/delivery-state-machine.mjs || {
+            echo "::error::JOV-INV-020 ingress is missing from trusted main"
+            exit 1
+          }
+          node "$GITHUB_WORKSPACE/scripts/backlog-orchestrator/delivery-state-machine.mjs" \
+            --closure-health-file="${{ steps.refresh.outputs.receipt_path }}"
+
+      - name: Remediate JOV backlog through official Symphony
         if: >-
           steps.refresh.outcome == 'success' &&
+          steps.stack-actions.outcome == 'success' &&
           ((github.event_name == 'push' && github.ref == 'refs/heads/main') ||
           (github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/main') ||
           (github.event_name == 'workflow_run' && github.event.workflow_run.head_branch == 'main'))
@@ -92,8 +109,6 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          node "$GITHUB_WORKSPACE/scripts/backlog-orchestrator/delivery-state-machine.mjs" \
-            --closure-health-file="$GEM_WORKSPACE/state/gem-priority-gate/latest.json"
           linear_env="${HOME}/.config/symphony/linear.env"
           if [[ -z "${LINEAR_API_KEY:-}" && -r "$linear_env" ]]; then
             LINEAR_API_KEY="$(tr -d '\r\n' < "$linear_env")"

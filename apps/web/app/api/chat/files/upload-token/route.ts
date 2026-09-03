@@ -1,17 +1,20 @@
 /**
  * Chat File Upload Token
  *
- * Generates a Vercel Blob client upload token for generic file types
+ * Issues a Vercel Blob presigned upload URL for generic file types
  * (video, documents, archives already expanded, other) so the browser
  * can upload directly to Blob without routing large bodies through Next.js.
+ *
+ * Uses `handleUploadPresigned` + `issueSignedToken` so the route works with
+ * Vercel OIDC federation (no static BLOB_READ_WRITE_TOKEN required).
  */
 
-import { type HandleUploadBody, handleUpload } from '@vercel/blob/client';
-import { NextRequest, NextResponse } from 'next/server';
+import { NextRequest } from 'next/server';
 
 import { requireAuth } from '@/lib/auth/require-auth';
 import { getSessionContext } from '@/lib/auth/session';
-import { NO_STORE_HEADERS } from '@/lib/http/headers';
+import { issueBlobPutUploadToken } from '@/lib/blob-presigned';
+import { handleBlobPresignedUploadTokenRequest } from '@/lib/blob-presigned-route';
 
 /** Max file size for generic chat file uploads (500 MB). */
 const CHAT_FILE_MAX_SIZE = 500 * 1024 * 1024;
@@ -39,44 +42,21 @@ export async function POST(request: NextRequest) {
   const { userId: clerkUserId, error } = await requireAuth();
   if (error) return error;
 
-  try {
-    const body = (await request.json()) as HandleUploadBody;
-
-    const jsonResponse = await handleUpload({
-      body,
-      request,
-      onBeforeGenerateToken: async _pathname => {
-        const { profile } = await getSessionContext({
-          clerkUserId,
-          requireUser: true,
-          requireProfile: false,
-        });
-
-        if (!profile) {
-          throw new Error('Creator profile not found');
-        }
-
-        return {
-          allowedContentTypes: ALLOWED_CONTENT_TYPES,
-          maximumSizeInBytes: CHAT_FILE_MAX_SIZE,
-          tokenPayload: JSON.stringify({
-            creatorProfileId: profile.id,
-            userId: clerkUserId,
-          }),
-        };
-      },
-      onUploadCompleted: async () => {
-        // No server-side confirmation needed for generic file uploads;
-        // the blob URL is used directly in the chat message.
-      },
+  return handleBlobPresignedUploadTokenRequest(request, async pathname => {
+    const { profile } = await getSessionContext({
+      clerkUserId,
+      requireUser: true,
+      requireProfile: false,
     });
 
-    return NextResponse.json(jsonResponse, { headers: NO_STORE_HEADERS });
-  } catch (err) {
-    const message = err instanceof Error ? err.message : 'Upload failed';
-    return NextResponse.json(
-      { error: message },
-      { status: 400, headers: NO_STORE_HEADERS }
-    );
-  }
+    if (!profile) {
+      throw new Error('Creator profile not found');
+    }
+
+    return issueBlobPutUploadToken({
+      pathname,
+      allowedContentTypes: ALLOWED_CONTENT_TYPES,
+      maximumSizeInBytes: CHAT_FILE_MAX_SIZE,
+    });
+  });
 }

@@ -208,32 +208,65 @@ describe('skip-promote false-green detector (JOV-5458)', () => {
 
   it('Production Verified cannot skip-succeed without a live bind proof', () => {
     const workflow = readFileSync(productionControllerPath, 'utf8');
+    const authorize = getStepBlock(
+      getJobBlock(workflow, 'authorize-production'),
+      'Cross-prove exact successful push CI'
+    );
     const verified = getJobBlock(workflow, 'production-verified');
     const current = getStepBlock(
       verified,
       'Resolve current main before final verification'
-    );
-    const verify = getStepBlock(
-      verified,
-      'Require exact deployment and every post-deploy probe'
     );
     const finalize = getStepBlock(
       verified,
       'Finalize exact current release generation'
     );
 
+    expect(authorize).toContain(
+      'marker_deployment_id="$(jq -r \'.deploymentId // ""\' <<<"$marker_state_json")"'
+    );
+    expect(authorize).toContain(
+      'if [ "$marker_deployment_id" = "not-applicable" ]; then'
+    );
+    expect(authorize).toContain(
+      'node .github/scripts/assert-live-production-bind.mjs --main-sha "$EXPECTED_SHA"'
+    );
+    expect(
+      authorize.indexOf(
+        'node .github/scripts/assert-live-production-bind.mjs --main-sha "$EXPECTED_SHA"'
+      )
+    ).toBeLessThan(authorize.indexOf('echo "already_verified=true"'));
     expect(current).toContain('https://jov.ie/api/health/build-info');
+    expect(current).toContain(
+      'RUN_WEB: ${{ needs.authorize-production.outputs.run_web }}'
+    );
     expect(current).toContain(
       'node .github/scripts/assert-live-production-bind.mjs --main-sha "$current_sha"'
     );
-    expect(current).not.toContain('neutral with no notification');
-    expect(verify).toContain(
-      'node .github/scripts/assert-live-production-bind.mjs --main-sha "$boundary_sha"'
+    expect(current).toContain('[ "$RUN_WEB" != true ]');
+    expect(current.indexOf('[ "$RUN_WEB" != true ]')).toBeLessThan(
+      current.indexOf(
+        'node .github/scripts/assert-live-production-bind.mjs --main-sha "$current_sha"'
+      )
     );
+    expect(current).not.toContain('neutral with no notification');
     expect(finalize).toContain(
       'node .github/scripts/assert-live-production-bind.mjs --main-sha "$boundary_sha"'
     );
-    expect(verify).not.toContain('neutral with no notification');
+    expect(finalize).toContain('[ "$RUN_WEB" != true ]');
+    expect(finalize.indexOf('[ "$RUN_WEB" != true ]')).toBeLessThan(
+      finalize.indexOf(
+        'node .github/scripts/assert-live-production-bind.mjs --main-sha "$boundary_sha"'
+      )
+    );
+    expect(
+      finalize.indexOf(
+        'node .github/scripts/assert-live-production-bind.mjs --main-sha "$boundary_sha"'
+      )
+    ).toBeLessThan(
+      finalize.indexOf('> "$RUNNER_TEMP/production-generation-verified.json"')
+    );
+    expect(finalize).not.toContain('neutral with no notification');
   });
 
   it('Production Controller Health stays red until live bind on superseded or skip-success', () => {

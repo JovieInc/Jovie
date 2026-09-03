@@ -6,7 +6,7 @@
  * ladders. Docs under docs/marketing/ own rationale only and link by stable id.
  *
  * Inherited invariants (NOT restated here — see AGENT_GUIDE.md §Inherited):
- *   - dark-only theme (charter delta #9; DESIGN.md System A)
+ *   - dark-first editorial language on System B tokens
  *   - fully static: revalidate = false (.claude/rules/ui.md)
  *   - copy-in-data files (apps/web/data/*Copy.ts pattern)
  *   - one body face, one container width ('page' | 'prose'), spacing-only transitions

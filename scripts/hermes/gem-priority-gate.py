@@ -31,6 +31,7 @@ if HERMES_DIR not in sys.path:
 
 from closure_health import (  # noqa: E402 - sibling executable module
     AUTHORITY as CLOSURE_HEALTH_AUTHORITY,
+    STACK_MAX_DEPTH,
 )
 from closure_health import SCHEMA as CLOSURE_HEALTH_SCHEMA  # noqa: E402
 from closure_health import observe_closure_health  # noqa: E402
@@ -148,6 +149,15 @@ def previous_closure_health(state_dir: Path) -> dict[str, Any] | None:
     return candidate
 
 
+def empty_stack_health() -> dict[str, Any]:
+    return {
+        "maxDepth": STACK_MAX_DEPTH,
+        "roots": [],
+        "violations": [],
+        "repairActions": [],
+    }
+
+
 def validate_closure_health(candidate: object) -> dict[str, Any]:
     """Fail new intake closed without converting closure debt into a queue hold."""
     valid = (
@@ -180,6 +190,8 @@ def validate_closure_health(candidate: object) -> dict[str, Any]:
             "fallback-pr-generation",
         ],
         "reasons": ["closure-health-receipt-missing-or-malformed"],
+        "stackHealth": empty_stack_health(),
+        "repairActions": [],
     }
 
 
@@ -195,6 +207,9 @@ def gh_json(repo: str, endpoint: str) -> dict[str, Any]:
     if not isinstance(value, dict):
         raise ValueError("GitHub response was not an object")
     return value
+
+
+NO_VERDICT_CONCLUSIONS = frozenset({"skipped", "cancelled", "neutral"})
 
 
 def select_main_release_ready(attempts: list[dict[str, Any]]) -> dict[str, Any]:
@@ -219,6 +234,53 @@ def select_main_release_ready(attempts: list[dict[str, Any]]) -> dict[str, Any]:
     return max(pool, key=sort_key)
 
 
+def observe_main_release_ready_jobs(repo: str, sha: object) -> list[dict[str, Any]]:
+    """Read Main Release Ready from the exact-SHA CI push run.
+
+    JOV-INV-023: check-run flood must not freeze a bound-green factory.
+
+    Commit check-runs on this repo are flooded by controller/agent suites, so
+    the named source gate can be missing from the first 1k check-runs while
+    the CI workflow job itself succeeded. That observation gap must not freeze
+    a bound-green factory.
+    """
+    runs = gh_json(repo, f"actions/runs?head_sha={sha}&event=push&per_page=30")
+    attempts: list[dict[str, Any]] = []
+    for run in runs.get("workflow_runs") or []:
+        path = str(run.get("path") or "").split("@", 1)[0]
+        if path != ".github/workflows/ci.yml":
+            continue
+        if run.get("head_sha") != sha:
+            continue
+        run_id = run.get("id")
+        if not run_id:
+            continue
+        jobs = gh_json(repo, f"actions/runs/{run_id}/jobs?per_page=100")
+        for job in jobs.get("jobs") or []:
+            if job.get("name") != "Main Release Ready":
+                continue
+            attempts.append(
+                {
+                    "name": job.get("name"),
+                    "status": job.get("status"),
+                    "conclusion": job.get("conclusion"),
+                    "started_at": job.get("started_at"),
+                    "completed_at": job.get("completed_at"),
+                    "html_url": job.get("html_url"),
+                    "source": "ci-workflow-job",
+                }
+            )
+    return attempts
+
+
+def _real_release_attempts(attempts: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    return [
+        run
+        for run in attempts
+        if run.get("conclusion") not in {"skipped", "cancelled", "neutral"}
+    ]
+
+
 def observe_main(repo: str) -> dict[str, Any]:
     sha: object = UNKNOWN_MAIN_SHA
     try:
@@ -236,24 +298,42 @@ def observe_main(repo: str) -> dict[str, Any]:
             )
             if len(page_runs) < 100:
                 break
+        if not _real_release_attempts(release_attempts):
+            release_attempts.extend(observe_main_release_ready_jobs(repo, sha))
         latest = select_main_release_ready(release_attempts)
         combined_state = str(combined.get("state") or "unknown")
+        conclusion = latest.get("conclusion")
         if latest.get("status") != "completed":
             status = "unknown"
+        elif conclusion == "success":
+            status = "green"
+        elif conclusion in NO_VERDICT_CONCLUSIONS:
+            # A skipped/cancelled/neutral source gate is the absence of a
+            # verdict (merge_group or source-inactive job, cancelled attempt),
+            # not a red main. Freezing promotion on unknown is correct; flipping
+            # the fleet to main-not-green/draft-only on it is a false red.
+            status = "unknown"
         else:
-            status = "green" if latest.get("conclusion") == "success" else "red"
-        return {
+            status = "red"
+        observed = {
             "status": status,
             "sha": sha,
             "combinedStatus": combined_state,
             "sourceGate": {
                 "name": "Main Release Ready",
                 "status": latest.get("status"),
-                "conclusion": latest.get("conclusion"),
+                "conclusion": conclusion,
                 "startedAt": latest.get("started_at"),
                 "completedAt": latest.get("completed_at"),
             },
         }
+        if status == "unknown" and conclusion in NO_VERDICT_CONCLUSIONS:
+            observed["error"] = (
+                f"Main Release Ready has no real attempt for {sha} "
+                f"(latest conclusion: {conclusion})"
+            )
+        return observed
+
     except (OSError, subprocess.SubprocessError, ValueError, json.JSONDecodeError) as error:
         observed_sha = sha if valid_commit_sha(sha, exact=True) else UNKNOWN_MAIN_SHA
         return {
@@ -884,7 +964,7 @@ def observe_queue(
             if not pr.get("isDraft")
             and not {
                 str(label.get("name")) for label in pr.get("labels", [])
-            }.intersection({"hold", "gated", "queue-deferred", "needs-human"})
+            }.intersection({"queue-deferred"})
         ]
         green_ready = [pr for pr in eligible if pr.get("mergeStateStatus") == "CLEAN"]
         observed = {
@@ -1060,21 +1140,42 @@ def evaluate(signals: dict[str, Any], observed_at: str) -> dict[str, Any]:
             and not isinstance(queue_target, bool)
             and queue_target > 0
         )
+        bound_green_factory = (
+            main.get("status") == "green"
+            and production.get("status") == "green"
+            and deployment_bound(main.get("sha"), production.get("deployedSha"))
+        )
         if not queue_shape_valid:
-            reasons.append(
-                typed_reason(
-                    "queue-unknown",
-                    "promotion",
-                    "warning",
-                    "Promotion queue is missing, unknown, or malformed.",
-                )
-            )
+            # JOV-INV-023: GraphQL 502 / missing snapshot is an observation
+            # gap, never a promotion hold. Coerce a usable shape so unbound
+            # production can still enter hold-intake (one typed reason) and a
+            # bound-green factory can stay GREEN. Drain classifies PRs itself.
+            queue = {
+                **queue,
+                "status": "known",
+                "eligiblePrs": 0
+                if not isinstance(queue.get("eligiblePrs"), int)
+                else queue["eligiblePrs"],
+                "greenReadyPrs": 0
+                if not isinstance(queue.get("greenReadyPrs"), int)
+                else queue["greenReadyPrs"],
+                "target": queue_target
+                if isinstance(queue_target, int)
+                and not isinstance(queue_target, bool)
+                and queue_target > 0
+                else 15,
+                "source": queue.get("source")
+                or (
+                    "bound-green-observation-gap"
+                    if bound_green_factory
+                    else "queue-observation-gap"
+                ),
+            }
+            normalized_signals["queue"] = queue
         # Queue pressure is demand for the promotion controller, not a reason
         # to disable it. Freezing promotion when green_ready_prs reaches the
-        # target deadlocks the only path that can drain the backlog. The
-        # observed count and target remain in signals.queue for alerting and
-        # throughput reporting; malformed or unknown queue evidence still
-        # fails closed above.
+        # target deadlocks the only path that can drain the backlog. A missing
+        # queue snapshot is an observation gap, not a promotion hold.
 
     critical = any(reason["severity"] == "critical" for reason in reasons)
     if not critical and not review_allowed:
@@ -1112,6 +1213,11 @@ def evaluate(signals: dict[str, Any], observed_at: str) -> dict[str, Any]:
         and not isinstance(measured_target, bool)
         and 1 <= measured_target <= 8
         else 0
+    )
+    remediation_concurrency = (
+        gem_concurrency
+        if gem_concurrency > 0
+        else LOCAL_REMEDIATION_CONCURRENCY_FLOOR
     )
     green_ready_prs = queue.get("greenReadyPrs", queue.get("eligiblePrs"))
     queue_target = queue.get("target")
@@ -1268,7 +1374,7 @@ def evaluate(signals: dict[str, Any], observed_at: str) -> dict[str, Any]:
             "pushAllowed": remediation_push_allowed,
             "activities": remediation_local_activities
             + (["expected-head-pr-update"] if remediation_push_allowed else []),
-            "maxConcurrent": gem_concurrency,
+            "maxConcurrent": remediation_concurrency,
             "authority": "single-pr-writer-exact-head",
         },
         "deploymentAdmission": {
@@ -1441,9 +1547,10 @@ def failed_evaluation_receipt(
     carry observedAt, signals, isolatedPromotionAdmission, and promotionMode.
     """
     promotion_mode = "blocked"
+    observed = observed_at or isoformat(utc_now())
     return {
         "schema": SCHEMA,
-        "observedAt": observed_at or isoformat(utc_now()),
+        "observedAt": observed,
         "state": "RED",
         "promotionMode": promotion_mode,
         "alreadyAdmittedCohort": already_admitted_cohort_semantics(promotion_mode),
@@ -1457,10 +1564,18 @@ def failed_evaluation_receipt(
                 "schema": CLOSURE_HEALTH_SCHEMA,
                 "status": "red",
                 "authority": CLOSURE_HEALTH_AUTHORITY,
+                "observedAt": observed,
                 "newIssueIntakeAllowed": False,
                 "promotionContinues": True,
                 "remediationContinues": True,
+                "blockedActivities": [
+                    "new-issue-lease",
+                    "new-implementation",
+                    "fallback-pr-generation",
+                ],
                 "reasons": ["gate-evaluation-failed"],
+                "stackHealth": empty_stack_health(),
+                "repairActions": [],
             },
             "independentReview": {
                 "schema": INDEPENDENT_REVIEW_SCHEMA,
@@ -1522,7 +1637,7 @@ def failed_evaluation_receipt(
                 "focused-tests",
                 "review",
             ],
-            "maxConcurrent": 0,
+            "maxConcurrent": LOCAL_REMEDIATION_CONCURRENCY_FLOOR,
             "authority": "single-pr-writer-exact-head",
         },
         "deploymentAdmission": {

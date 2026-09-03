@@ -895,6 +895,58 @@ export const RATE_LIMITERS = {
     algorithm: 'sliding-window',
     trafficClass: 'authenticated',
   } satisfies RateLimitConfig,
+
+  // ---------------------------------------------------------------------------
+  // YouTube thumbnail paste-channel preview (JOV-5862) — anonymous, fail-closed
+  // ---------------------------------------------------------------------------
+
+  /** Per-IP burst on channel lookups: 6 per minute. Hard block beyond. */
+  youtubeThumbnailPreviewBurst: {
+    name: 'YouTube Thumbnail Preview Burst',
+    limit: 6,
+    window: '1 m',
+    prefix: 'yt_thumb_preview_burst',
+    analytics: false,
+    algorithm: 'fixed-window',
+    trafficClass: 'anonymous',
+    requireRedis: true,
+  } satisfies RateLimitConfig,
+
+  /** Cooldown between model generations per visitor: 1 per minute. */
+  youtubeThumbnailPreviewCooldown: {
+    name: 'YouTube Thumbnail Preview Cooldown',
+    limit: 1,
+    window: '1 m',
+    prefix: 'yt_thumb_preview_cooldown',
+    analytics: false,
+    algorithm: 'fixed-window',
+    trafficClass: 'anonymous',
+    requireRedis: true,
+  } satisfies RateLimitConfig,
+
+  /** Free generations per visitor (IP + device): 3 per 30 days. Server-counted. */
+  youtubeThumbnailPreviewVisitor: {
+    name: 'YouTube Thumbnail Preview Visitor',
+    limit: 3,
+    window: '30 d',
+    prefix: 'yt_thumb_preview_visitor',
+    analytics: false,
+    algorithm: 'fixed-window',
+    trafficClass: 'anonymous',
+    requireRedis: true,
+  } satisfies RateLimitConfig,
+
+  /** Free generations per YouTube channel: 3 per 30 days. First cap wins. */
+  youtubeThumbnailPreviewChannel: {
+    name: 'YouTube Thumbnail Preview Channel',
+    limit: 3,
+    window: '30 d',
+    prefix: 'yt_thumb_preview_channel',
+    analytics: false,
+    algorithm: 'fixed-window',
+    trafficClass: 'anonymous',
+    requireRedis: true,
+  } satisfies RateLimitConfig,
 } as const;
 
 export type RateLimiterName = keyof typeof RATE_LIMITERS;

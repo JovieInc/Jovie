@@ -58,6 +58,7 @@ describe('Ovie iMessage allowlist', () => {
     delete process.env.EVE_IDENTITY;
     expect(eveIdentityForChannel('imessage').pack.id).toBe('ovie');
     expect(eveIdentityForChannel('photon').pack.id).toBe('ovie');
+    expect(eveIdentityForChannel('ovie-summer-shadow').pack.id).toBe('summer');
     if (previous === undefined) delete process.env.EVE_IDENTITY;
     else process.env.EVE_IDENTITY = previous;
   });

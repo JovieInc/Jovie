@@ -235,6 +235,28 @@ describe('UserButton billing actions', () => {
     });
   });
 
+  it('renders the compact trigger avatar on the canonical app frame size', () => {
+    mockUseBillingStatusQuery.mockReturnValue({
+      data: { isPro: false, plan: null, hasStripeCustomer: false },
+      isLoading: false,
+      error: null,
+    } as any);
+
+    render(<UserButton />);
+
+    const avatarFrame = screen
+      .getByTestId('user-button-loaded')
+      .querySelector<HTMLElement>('[data-slot="app-avatar-frame"]');
+
+    if (!avatarFrame) {
+      throw new Error('Expected compact UserButton to render app avatar frame');
+    }
+
+    expect(avatarFrame).toHaveAttribute('data-size', 'sm');
+    expect(avatarFrame).toHaveStyle({ width: '20px', height: '20px' });
+    expect(avatarFrame.className).not.toMatch(/\b(?:size|h|w)-/);
+  });
+
   it('offers a direct upgrade checkout when the user is not on Pro', async () => {
     const checkoutUrl = 'https://checkout.stripe.com/session/test';
 

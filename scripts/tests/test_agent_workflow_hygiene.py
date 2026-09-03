@@ -1186,6 +1186,28 @@ def test_deep_lanes_are_staggered_and_bounded() -> None:
     assert "'0 9 * * 2'" in harness
 
 
+def test_pitch_static_assets_do_not_keep_large_unreferenced_files() -> None:
+    """Large public pitch assets must be referenced by the checked-in deck."""
+    pitch_dir = REPO_ROOT / "apps" / "web" / "public" / "pitch"
+    assets_dir = pitch_dir / "assets"
+    deck_sources = "\n".join(
+        path.read_text(encoding="utf-8")
+        for path in pitch_dir.iterdir()
+        if path.is_file() and path.suffix in {".css", ".html", ".js"}
+    )
+    referenced_assets = set(re.findall(r"assets/([^\"')\s>]+)", deck_sources))
+
+    large_unreferenced = sorted(
+        path.name
+        for path in assets_dir.iterdir()
+        if path.is_file()
+        and path.stat().st_size > 250_000
+        and path.name not in referenced_assets
+    )
+
+    assert large_unreferenced == []
+
+
 def test_product_screenshot_budget_covers_capture_and_publication() -> None:
     """The screenshot publisher must outlive capture plus the normal push gate."""
     job = _job_block("screenshots.yml", "generate")
@@ -1212,6 +1234,12 @@ def test_product_screenshot_budget_covers_capture_and_publication() -> None:
         "E2E_CLERK_USER_ID",
     ):
         assert f"-u {capture_only_variable}" in publication
+    assert "hold_screenshot_merge_queue()" in publication
+    assert "production-controller.yml/runs?status=in_progress&per_page=100" in publication
+    assert "production-controller.yml/runs?status=queued&per_page=100" in publication
+    assert "hold-screenshot-mq-during-controller.mjs" in publication
+    assert publication.count('gh pr edit --add-label "merge-queue"') == 2
+    assert publication.count("if hold_screenshot_merge_queue; then") == 2
 
 
 def test_cost_monitoring_docs_match_activation_gated_observer() -> None:
@@ -1393,6 +1421,8 @@ def test_fleet_gate_refresh_skips_cancelled_ci_and_ignored_labels() -> None:
     assert "Persist stack policy repair actions" in block
     assert "--closure-health-file=" in block
     assert "delivery-state-machine.mjs" in block
+    assert "\n  pull_request_target:\n" in workflow and "\n  pull_request:\n" not in workflow and "converted_to_draft" in trigger and "github.event_name != 'pull_request_target'" in block and "steps.refresh.outputs.receipt_path" in block and "state/gem-priority-gate/latest.json" not in block
+    assert "steps.stack-actions.outcome == 'success'" in block
 
 
 def test_heartbeat_is_the_only_scheduled_generic_fixed_runner_consumer() -> None:

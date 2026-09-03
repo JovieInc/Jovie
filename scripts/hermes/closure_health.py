@@ -266,15 +266,30 @@ def _stack_action(
     prs_by_number: dict[int, dict[str, Any]],
     issue: str | None,
     max_depth: int,
-) -> dict[str, Any]:
+) -> dict[str, Any] | None:
     root_number = int(root["number"])
-    promotion_path = _stack_path(longest_path, prs_by_number)
-    root_head_sha = _stack_head_sha(root)
+    head_by_number = {number: _stack_head_sha(prs_by_number[number]) for number in members}
+    if any(head_sha is None for head_sha in head_by_number.values()):
+        return None
+    member_heads = [{"pr": number, "headSha": head_by_number[number]} for number in members]
+    promotion_path = [
+        {
+            "pr": number,
+            "base": prs_by_number[number].get("baseRefName"),
+            "head": prs_by_number[number].get("headRefName"),
+            "headSha": head_by_number[number],
+        }
+        for number in longest_path
+    ]
+    root_head_sha = head_by_number[root_number]
     fingerprint = {
         "rootPr": root_number,
-        "rootHeadSha": root_head_sha,
         "prNumbers": members,
+        "memberHeads": member_heads,
         "promotionPath": promotion_path,
+        "integrator": metadata["integrator"],
+        "deadline": metadata["deadline"],
+        "issue": issue,
         "violations": violations,
     }
     task_key = hashlib.sha256(
@@ -291,6 +306,7 @@ def _stack_action(
         "rootPr": root_number,
         "rootHeadSha": root_head_sha,
         "prNumbers": members,
+        "memberHeads": member_heads,
         "maxDepth": max_depth,
         "promotionPath": promotion_path,
         "integrator": metadata["integrator"],
@@ -346,6 +362,8 @@ def _draft_stack_health(
             return memo[number]
         if number in trail:
             cycle = list(trail[trail.index(number) :])
+            anchor = cycle.index(min(cycle))
+            cycle = cycle[anchor:] + cycle[:anchor]
             key = f"cycle:{min(cycle)}"
             result = (key, cycle, {"cyclic-promotion-path"})
             return result
@@ -361,7 +379,7 @@ def _draft_stack_health(
             memo[number] = result
             return result
         key, path, errors = resolve(parent, trail + (number,))
-        result = (key, path + [number], set(errors))
+        result = (key, path if number in path else path + [number], set(errors))
         memo[number] = result
         return result
     groups: dict[str, dict[str, Any]] = {}
@@ -378,7 +396,9 @@ def _draft_stack_health(
     actions: list[dict[str, Any]] = []
     for group in groups.values():
         members = sorted(group["members"])
-        if not members:
+        if not members or not any(
+            internal[number].get("isDraft") is True for number in members
+        ):
             continue
         root_candidates = [
             number
@@ -436,7 +456,7 @@ def _draft_stack_health(
         }
         roots.append(diagnostic)
         if sorted_violations:
-            actions.append(
+            action = (
                 _stack_action(
                     root,
                     members,
@@ -448,6 +468,8 @@ def _draft_stack_health(
                     max_depth,
                 )
             )
+            if action is not None:
+                actions.append(action)
     return {
         "maxDepth": STACK_MAX_DEPTH,
         "roots": sorted(roots, key=lambda item: item["rootPr"]),
@@ -1443,6 +1465,16 @@ def observe_closure_health(
             "reasons": ["closure-observation-unknown"],
             "episodes": {},
             "error": f"closure-observation-failed: {error}",
+            # The observation is non-authoritative, so an empty action set
+            # must not resolve prior work. It still has to satisfy the bounded
+            # JOV-INV-020 ingress contract used by Fleet Gate Refresh.
+            "stackHealth": {
+                "maxDepth": STACK_MAX_DEPTH,
+                "roots": [],
+                "violations": [],
+                "repairActions": [],
+            },
+            "repairActions": [],
             "classifications": {
                 "dispositions": [],
                 "counts": {},

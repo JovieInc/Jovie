@@ -122,6 +122,10 @@ export {
   verificationRequestLimiter,
   wrapLinkAnonymousLimiter,
   wrapLinkLimiter,
+  youtubeThumbnailPreviewBurstLimiter,
+  youtubeThumbnailPreviewChannelLimiter,
+  youtubeThumbnailPreviewCooldownLimiter,
+  youtubeThumbnailPreviewVisitorLimiter,
 } from './limiters';
 export {
   clearStore,

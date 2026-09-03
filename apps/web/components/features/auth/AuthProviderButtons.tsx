@@ -41,7 +41,7 @@ export function AuthProviderButtonSlot({
       data-auth-provider-pending={pending ? 'true' : undefined}
       onClick={onClick}
       className={cn(
-        'flex h-8 min-h-8 w-full items-center justify-center gap-(--linear-gap-buttons) rounded-full border px-(--linear-space-4) text-sm font-[510] tracking-normal',
+        'flex h-8 min-h-8 w-full items-center justify-center gap-(--space-2) rounded-full border px-(--space-4) text-sm font-[510] tracking-normal',
         'transition-[background-color,border-color,color,box-shadow,opacity] duration-subtle ease-out',
         'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-(--linear-border-focus)/40',
         isDisabled && 'cursor-wait opacity-75',

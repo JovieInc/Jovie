@@ -3,7 +3,8 @@
  *
  * Tim always talks through Ovie. The door drives Jovie for creator/dogfood
  * work. Missing product capability becomes an admit-build, not a second chat.
- * Company work is Eve ingest/ack onto Summer's Kanban — not a persona answer.
+ * Flash/heavy work is Eve ingest/ack onto Summer's Kanban; engineering is
+ * queued for Summer Linear intake. Neither path is a persona answer.
  */
 
 export type OvieTalkKind = 'ingest-ack' | 'drive-jovie' | 'admit-build';
