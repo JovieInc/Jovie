@@ -36,7 +36,7 @@ const meta = {
   parameters: { layout: 'fullscreen' },
   decorators: [
     Story => (
-      <div className='mx-auto min-h-[44rem] w-full max-w-3xl bg-surface-page p-6'>
+      <div className='mx-auto min-h-176 w-full max-w-3xl bg-surface-page p-6'>
         <Story />
       </div>
     ),
@@ -57,7 +57,7 @@ export const Review: Story = {};
 export const Narrow: Story = {
   decorators: [
     Story => (
-      <div className='mx-auto min-h-[44rem] w-90 max-w-full bg-surface-page p-3'>
+      <div className='mx-auto min-h-176 w-90 max-w-full bg-surface-page p-3'>
         <Story />
       </div>
     ),
