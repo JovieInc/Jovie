@@ -36,6 +36,7 @@ const QUIET_SECTION_IDS: ReadonlySet<HomepageCertifiedSectionId> =
     'know',
     'relationships',
     'smarter',
+    'built',
   ]);
 
 const PHONE_SIZES = '(min-width: 1024px) 15rem, (min-width: 768px) 24vw, 62vw';
