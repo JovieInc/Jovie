@@ -229,8 +229,10 @@ const AFFECTED_TEST_SELECTOR_MANIFEST = [
 ];
 const GEM_CHECKIN_HUD_LANE = [
   'scripts/hermes/symphony/WORKFLOW.md',
+  'scripts/hermes/symphony_official_runtime.py',
   'scripts/hermes/gem-checkin-hud.py',
   'scripts/hermes/gem-checkin-tty1.sh',
+  'scripts/hermes/systemd/symphony-elixir.service',
   'scripts/hermes/systemd/symphony-burrito.service',
   'scripts/hermes/systemd/symphony-burrito-update.service',
   'scripts/hermes/systemd/symphony-burrito-update.timer',

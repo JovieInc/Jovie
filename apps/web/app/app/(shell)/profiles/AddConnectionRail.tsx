@@ -252,12 +252,16 @@ function ChoiceRow({
  */
 export function AddConnectionRail({
   data,
+  suggestedCount,
+  suggestionsLoading,
   onClose,
   onCandidatePreview,
   onReviewCandidate,
   onReviewSuggestions,
 }: Readonly<{
   data: ProfilesWorkspaceData;
+  suggestedCount: number;
+  suggestionsLoading: boolean;
   onClose: () => void;
   onCandidatePreview: (candidate: ConnectionIntakeCandidate | null) => void;
   onReviewCandidate: (candidate: ConnectionIntakeCandidate) => void;
@@ -275,9 +279,6 @@ export function AddConnectionRail({
       classifyConnectionInput(profileUrl, existingPlatforms, data.artist.name),
     [data.artist.name, existingPlatforms, profileUrl]
   );
-  const suggestedCount = data.rows.filter(
-    row => row.rowType === 'surface' && row.qualificationStatus === 'suggested'
-  ).length;
   useEffect(() => {
     onCandidatePreview(intake.candidate);
   }, [intake.candidate, onCandidatePreview]);
@@ -319,6 +320,13 @@ export function AddConnectionRail({
 
   const title =
     view === 'profile' ? 'Add Public Profile' : 'Add Profile Or Site';
+  let suggestionDescription = 'No suggested profiles are waiting for review.';
+  if (suggestionsLoading) {
+    suggestionDescription = 'Checking saved suggestions.';
+  } else if (suggestedCount > 0) {
+    const suggestionLabel = suggestedCount === 1 ? 'profile' : 'profiles';
+    suggestionDescription = `${suggestedCount} suggested ${suggestionLabel} to review.`;
+  }
 
   return (
     <EntitySidebarShell
@@ -389,12 +397,8 @@ export function AddConnectionRail({
           />
           <ChoiceRow
             icon={<ReviewIcon />}
-            title='Review suggestions'
-            description={
-              suggestedCount > 0
-                ? `${suggestedCount} suggested ${suggestedCount === 1 ? 'profile' : 'profiles'} to review.`
-                : 'No suggested profiles are waiting for review.'
-            }
+            title='Review Suggestions'
+            description={suggestionDescription}
             onClick={onReviewSuggestions}
           />
         </DrawerSection>

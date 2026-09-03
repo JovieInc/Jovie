@@ -626,7 +626,7 @@ class StaleCapacityLocalRemediationTests(unittest.TestCase):
             receipt["nextAutomatedAction"],
             "normal_model_update_test_ready_native_merge",
         )
-        self.assertEqual(receipt["authoritativeOwner"], "symphony-ui-pilot")
+        self.assertEqual(receipt["authoritativeOwner"], "symphony-elixir")
         self.assertEqual(receipt["controllerState"], "retrying")
         self.assertEqual(receipt["nextRetryAt"], "2030-01-01T00:00:00Z")
         self.assertEqual(receipt["alternateModel"]["status"], "repair_handoff_ready")
