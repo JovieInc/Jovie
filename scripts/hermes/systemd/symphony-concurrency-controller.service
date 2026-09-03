@@ -1,0 +1,11 @@
+[Unit]
+Description=Pressure-driven Symphony concurrency controller
+After=symphony-elixir.service
+
+[Service]
+Type=oneshot
+ExecStart=%h/.local/bin/symphony-concurrency-controller
+Nice=10
+
+# Missing or drifted workflow evidence exits 2 and stays a real unit failure;
+# the controller's own fail-closed decisions exit 0 with a durable receipt.

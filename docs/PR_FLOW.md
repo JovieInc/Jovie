@@ -105,9 +105,11 @@ before you open the PR (source: `.github/ci-harness/manifest.json` `riskRules`):
   `merge-queue-autoenroll` first revalidates the PR associated with the
   triggering PR/CI event at that event's exact published head. Because GitHub's
   shared concurrency group retains only one pending run, every surviving pass
-  may also recover a tiny deterministic cohort whose source-required checks are
+  may also recover a deterministic cohort whose source-required checks are
   freshly green. The event target, native re-entry, and missed-event recovery
-  share a hard cap of two admissions per run, the App-backed controller remains
+  share one admission path bounded only by native queue depth (a positive
+  `DRAIN_QUEUE_REENTRY_MAX_PER_RUN` re-caps admissions per run; default `0` =
+  uncapped), the App-backed controller remains
   the sole writer, and every mutation rechecks the live head, labels, base,
   queue depth, and native postcondition. Enrollment uses GitHub's native queue
   only. The `merge-queue` label is retired and must not be added, read, or

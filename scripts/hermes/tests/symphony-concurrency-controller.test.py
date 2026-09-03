@@ -4,12 +4,17 @@ from __future__ import annotations
 
 import importlib.util
 import pathlib
+import re
 import tempfile
 import unittest
 
 
 ROOT = pathlib.Path(__file__).resolve().parents[3]
 SOURCE = ROOT / "scripts/hermes/symphony-concurrency-controller.py"
+UNIT_DIR = ROOT / "scripts/hermes/systemd"
+SERVICE_UNIT = UNIT_DIR / "symphony-concurrency-controller.service"
+TIMER_UNIT = UNIT_DIR / "symphony-concurrency-controller.timer"
+INSTALLER = ROOT / "scripts/hermes/install-symphony-ui-pilot.sh"
 SPEC = importlib.util.spec_from_file_location("symphony_concurrency_controller", SOURCE)
 if SPEC is None or SPEC.loader is None:
     raise RuntimeError(f"could not load {SOURCE}")
@@ -25,6 +30,22 @@ def low_sample(cpu_count: int = 8) -> dict:
         "ioFullAvg10": 0.0,
         "availableMemoryBytes": 55 * 1024**3,
     }
+
+
+def ini_value(text: str, key: str) -> str | None:
+    for line in text.splitlines():
+        stripped = line.strip()
+        if stripped.startswith(f"{key}="):
+            return stripped.split("=", 1)[1].strip()
+    return None
+
+
+def timespan_seconds(value: str) -> int:
+    units = {"s": 1, "sec": 1, "min": 60, "m": 60, "h": 3600}
+    match = re.fullmatch(r"([0-9]+)\s*([a-z]+)", value.strip())
+    if match is None or match.group(2) not in units:
+        raise AssertionError(f"unsupported systemd timespan: {value!r}")
+    return int(match.group(1)) * units[match.group(2)]
 
 
 def provider(accounts: int = 8, locked: int = 4, available: int = 4) -> dict:
@@ -251,6 +272,70 @@ class WorkflowOverlayIdentityTests(unittest.TestCase):
         drifted = self.overlay("1").replace("max_turns: 24", "max_turns: 99")
         with self.assertRaisesRegex(ValueError, "beyond concurrency overlay"):
             MODULE.verify_concurrency_overlay(self.SOURCE, drifted)
+
+
+class SystemdActivationTests(unittest.TestCase):
+    """The controller is activated by a versioned systemd user service+timer.
+
+    The pair mirrors the symphony-reconciler siblings: a oneshot service that
+    invokes the controller with its fail-closed defaults (missing evidence
+    fails to minimum concurrency inside the process) and a timer whose cadence
+    is bounded by the controller's own hysteresis constants.
+    """
+
+    def test_unit_files_exist(self):
+        self.assertTrue(SERVICE_UNIT.is_file())
+        self.assertTrue(TIMER_UNIT.is_file())
+
+    def test_service_invokes_controller_with_fail_closed_defaults(self):
+        text = SERVICE_UNIT.read_text(encoding="utf-8")
+        self.assertEqual(ini_value(text, "Type"), "oneshot")
+        # Exactly the binary, no flags: every policy input stays at its
+        # fail-closed default (missing telemetry or integrity evidence pins
+        # concurrency to MIN_CONCURRENCY).
+        self.assertEqual(
+            ini_value(text, "ExecStart"),
+            "%h/.local/bin/symphony-concurrency-controller",
+        )
+        self.assertEqual(ini_value(text, "After"), "symphony-elixir.service")
+        # Exit 2 (unreadable or drifted workflow) must stay a real unit
+        # failure; only clean runs are success.
+        self.assertIn(ini_value(text, "SuccessExitStatus"), (None, "0"))
+
+    def test_timer_cadence_matches_controller_hysteresis(self):
+        text = TIMER_UNIT.read_text(encoding="utf-8")
+        cadence = timespan_seconds(
+            ini_value(text, "OnUnitActiveSec") or ""
+        )
+        # Scale-down is documented as immediate: the sampling cadence must be
+        # at least as fine as the change cooldown so a severe sample is acted
+        # on within one cooldown window.
+        self.assertLessEqual(cadence, MODULE.CHANGE_COOLDOWN_SECONDS)
+        # Scale-up hysteresis: LOW_STREAK_REQUIRED consecutive low samples at
+        # this cadence must span at least the change cooldown.
+        self.assertGreaterEqual(
+            cadence * MODULE.LOW_STREAK_REQUIRED,
+            MODULE.CHANGE_COOLDOWN_SECONDS,
+        )
+        self.assertIsNotNone(ini_value(text, "OnBootSec"))
+        self.assertEqual(ini_value(text, "Persistent"), "true")
+        self.assertEqual(ini_value(text, "WantedBy"), "timers.target")
+
+    def test_installer_installs_and_enables_like_sibling_units(self):
+        text = INSTALLER.read_text(encoding="utf-8")
+        self.assertIn(
+            'CONTROLLER_SRC="$REPO_ROOT/scripts/hermes/symphony-concurrency-controller.py"',
+            text,
+        )
+        self.assertIn('install_one "$CONTROLLER_SRC" "$CONTROLLER_DST" 0755', text)
+        self.assertIn('install_one "$CONTROLLER_SERVICE_SRC" "$CONTROLLER_SERVICE_DST"', text)
+        self.assertIn('install_one "$CONTROLLER_TIMER_SRC" "$CONTROLLER_TIMER_DST"', text)
+        self.assertIn('check_one "$CONTROLLER_SERVICE_SRC" "$CONTROLLER_SERVICE_DST"', text)
+        self.assertIn('check_one "$CONTROLLER_TIMER_SRC" "$CONTROLLER_TIMER_DST"', text)
+        self.assertIn(
+            "systemctl --user enable --now symphony-concurrency-controller.timer",
+            text,
+        )
 
 
 if __name__ == "__main__":

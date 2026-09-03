@@ -189,7 +189,7 @@ describe('SimpleTooltip', () => {
         </TestWrapper>
       );
       expect(screen.getByTestId('tooltip-content')).toHaveClass(
-        'rounded-full',
+        'rounded-(--system-b-radius-overlay)',
         'whitespace-nowrap'
       );
 
