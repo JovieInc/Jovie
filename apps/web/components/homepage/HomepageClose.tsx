@@ -39,10 +39,7 @@ export function HomepageClose() {
             submitTestId='homepage-close-cta'
           />
         </div>
-        <div
-          className='homepage-close__mark'
-          data-testid='homepage-close-mark'
-        >
+        <div className='homepage-close__mark' data-testid='homepage-close-mark'>
           <Logo variant='word' size='xs' aria-hidden />
         </div>
       </div>
