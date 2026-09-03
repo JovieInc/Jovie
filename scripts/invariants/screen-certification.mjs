@@ -69,7 +69,7 @@ function parseRegistry(raw) {
 export const SCREEN_REGISTRY = Object.freeze(
   parseRegistry(
     `
-web.homepage|web|marketing-home|apps/web/app/(home)/page.tsx|desktop,mobile
+web.homepage|web|marketing-home|apps/web/app/(home)/page.tsx,apps/web/app/(home)/layout.tsx|desktop,mobile
 web.developers|web|developer-documentation|apps/web/app/(marketing)/developers/page.tsx|desktop,mobile
 web.api-versioning-policy|web|api-versioning-policy|apps/web/app/(marketing)/api-versioning/page.tsx|desktop,mobile
 web.cli-landing|web|cli-landing|apps/web/app/(marketing)/cli/page.tsx|desktop,mobile
