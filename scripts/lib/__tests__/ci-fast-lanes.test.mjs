@@ -17,7 +17,7 @@ describe('runDesignConformance', () => {
     });
 
     const result = runDesignConformance({
-      changedFiles: ['apps/eve-pilot/some-ui-changes.swift'],
+      changedFileList: ['apps/eve-pilot/some-ui-changes.swift'],
       execute,
     });
 
@@ -37,7 +37,7 @@ describe('runDesignConformance', () => {
     });
 
     const result = runDesignConformance({
-      changedFiles: ['apps/ios/Scenes/AppShell/AppShellTabBar.swift'],
+      changedFileList: ['apps/ios/Scenes/AppShell/AppShellTabBar.swift'],
       execute,
     });
 
@@ -55,7 +55,7 @@ describe('runDesignConformance', () => {
     });
 
     const result = runDesignConformance({
-      changedFiles: null,
+      changedFileList: null,
       execute,
     });
 

@@ -27,11 +27,11 @@ import { spawnSync } from 'node:child_process';
 import { appendFileSync, writeFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { selectDesignConformanceChecks } from './design-conformance-paths.mjs';
 import {
   affectsJovieTypecheck,
   classifyCiRepoLanes,
 } from './lib/ci-repo-lanes.mjs';
-import { selectDesignConformanceChecks } from './design-conformance-paths.mjs';
 
 const REPO_ROOT = process.cwd();
 const selectedProductLanes = () =>
@@ -505,14 +505,27 @@ function runDesignExceptionRegistry() {
   return shell(LANE_COMMANDS['design-exception-registry']);
 }
 
-export function runDesignConformance({ changedFiles, execute } = {}) {
+/**
+ * @typedef {object} DesignConformanceOpts
+ * @property {string[] | null} [changedFileList]
+ * @property {(command: string) => {code: number, output: string, skipped?: boolean}} [execute]
+ */
+
+/**
+ * @param {DesignConformanceOpts} [opts]
+ */
+export function runDesignConformance(opts) {
+  const options = opts ?? {};
+  const execute = options.execute;
   const event = process.env.GITHUB_EVENT_NAME || '';
   if (event === 'workflow_dispatch') {
     return (execute ?? shell)(LANE_COMMANDS['design-conformance']);
   }
 
   const files =
-    changedFiles === undefined ? listAllChangedFiles() : changedFiles;
+    'changedFileList' in options
+      ? options.changedFileList
+      : listAllChangedFiles();
   if (files === null) {
     return {
       code: 1,
