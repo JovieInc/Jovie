@@ -166,7 +166,7 @@ export default defineConfig({
     reporters: isCI
       ? [
           ['default', { summary: false }],
-          ['junit', { outputFile: 'test-report.junit.xml' }],
+          ['junit', { outputFile: process.env.VITEST_JUNIT_OUTPUT_FILE || 'test-report.junit.xml' }],
         ]
       : ['default'],
 
