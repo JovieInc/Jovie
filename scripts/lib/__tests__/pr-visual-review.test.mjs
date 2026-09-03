@@ -7,10 +7,12 @@ import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
 import { evaluateVisualEvidence } from '../../../.github/scripts/pr-visual-evidence-gate.mjs';
 import {
+  blockingCaptureRuntimeFailures,
   buildReviewPrompt,
   classifyFinding,
   classifyReviewOutcome,
   inspectReviewBackendConfiguration,
+  isBlockingCaptureRuntimeFailure,
   normalizeBackendReview,
   readTrustedCapture,
   reviewWithConfiguredBackends,
@@ -85,6 +87,31 @@ describe('bounded PR visual review contract', () => {
     ).toEqual({
       shouldReview: true,
       routes: ['/app/chat'],
+      reason: 'ui-change',
+      review_status: 'advisory',
+    });
+    expect(
+      routeChangedFiles(['apps/web/components/jovie/JovieChat.tsx']).routes
+    ).toEqual(['/app/chat']);
+    expect(
+      routeChangedFiles(['apps/web/app/app/(shell)/chat/page.tsx']).routes
+    ).toEqual(['/app/chat']);
+  });
+
+  it('does not send API, server, or onboarding chat files to /app/chat', () => {
+    expect(
+      routeChangedFiles([
+        'apps/web/app/api/chat/route.ts',
+        'apps/web/app/api/chat/onboarding-handler.ts',
+        'apps/web/lib/chat/run.ts',
+        'apps/web/lib/mobile/chat/turn-handler.ts',
+        'apps/web/lib/ai/gateway-errors.ts',
+        'apps/web/components/features/onboarding/onboardingChatHelpers.ts',
+        'apps/web/components/jovie/utils.ts',
+      ])
+    ).toEqual({
+      shouldReview: true,
+      routes: ['/'],
       reason: 'ui-change',
       review_status: 'advisory',
     });
@@ -368,8 +395,88 @@ describe('bounded PR visual review contract', () => {
     expect(capture).toContain("type: 'page-error'");
     expect(capture).toContain('response.status() >= 500');
     expect(capture).toContain('Captured route emitted runtime failures');
+    expect(capture).toContain('blockingCaptureRuntimeFailures');
     expect(capture).toContain('validateCaptureManifest');
     expect(capture).toContain('capture-validation.json');
+  });
+
+  it('keeps secretless authenticated API and same-document 5xxs from failing New Chat capture', () => {
+    const context = {
+      route: '/app/chat',
+      baseUrl: 'http://127.0.0.1:3100',
+    };
+    const noise = [
+      {
+        type: 'http-5xx',
+        status: 503,
+        url: 'http://127.0.0.1:3100/api/analytics/navigation',
+      },
+      {
+        type: 'console-error',
+        message:
+          'Failed to load resource: the server responded with a status of 503 (Service Unavailable)',
+      },
+      {
+        type: 'http-5xx',
+        status: 500,
+        url: 'http://127.0.0.1:3100/app/chat',
+      },
+    ];
+    expect(blockingCaptureRuntimeFailures(noise, context)).toEqual([]);
+    expect(
+      isBlockingCaptureRuntimeFailure(
+        { type: 'page-error', message: 'boom' },
+        context
+      )
+    ).toBe(true);
+    expect(
+      isBlockingCaptureRuntimeFailure(
+        {
+          type: 'http-5xx',
+          status: 500,
+          url: 'http://127.0.0.1:3100/signin',
+        },
+        context
+      )
+    ).toBe(true);
+    expect(
+      isBlockingCaptureRuntimeFailure(
+        {
+          type: 'http-5xx',
+          status: 500,
+          url: 'http://127.0.0.1:3100/api/billing/status',
+        },
+        { route: '/', baseUrl: context.baseUrl }
+      )
+    ).toBe(true);
+    expect(
+      isBlockingCaptureRuntimeFailure(
+        { type: 'console-error', message: 'Uncaught TypeError: exploded' },
+        context
+      )
+    ).toBe(true);
+  });
+
+  it('waits for the loaded authenticated New Chat shell instead of the streaming fallback', () => {
+    const capture = readFileSync(
+      '.github/scripts/pr-visual-review-capture.mjs',
+      'utf8'
+    );
+    expect(capture).toContain('waitForAuthenticatedShell');
+    expect(capture).toContain('[data-testid="dashboard-header"]');
+    expect(capture).toContain('[data-testid="dashboard-error"]');
+    expect(capture).toContain('filter({ visible: true })');
+    expect(capture).toContain('.first().waitFor');
+    expect(capture).not.toContain('.or(visibleDashboardError)');
+    expect(capture).toContain(
+      'Captured app route rendered dashboard error UI instead of authenticated shell'
+    );
+    expect(capture).toContain(
+      "getByRole('heading', { name: 'New Chat', level: 1 })"
+    );
+    expect(capture).toContain("getByRole('heading', { name: 'Just ask' })");
+    expect(capture).toContain("getByTestId('chat-empty-state-greeting')");
+    expect(capture).toContain("'domcontentloaded'");
   });
 });
 

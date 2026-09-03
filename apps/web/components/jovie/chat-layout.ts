@@ -18,3 +18,13 @@ export const CHAT_COMPOSER_THREAD_SCROLL_PADDING_CLASSNAME =
 
 /** Inline max-width token for motion surfaces that cannot use the shell class. */
 export const CHAT_COMPOSER_MAX_WIDTH = '45rem';
+
+/**
+ * Empty New Chat viewport owns content-area top inset. Nested shells must not
+ * add another gap under the shell header.
+ */
+export const CHAT_EMPTY_TOP_SPACING_OWNER = 'chat-empty-viewport';
+
+/** Horizontal inset shared with the desktop header grid. */
+export const CHAT_EMPTY_VIEWPORT_CLASSNAME =
+  'flex flex-col px-(--app-shell-header-padding-x) pt-0 pb-5';

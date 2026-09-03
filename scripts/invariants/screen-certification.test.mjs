@@ -78,6 +78,12 @@ describe('JOV-INV-018 screen-certification/v2', () => {
       'excluded'
     );
     assert.equal(kindOf('apps/web/app/(home)/page.tsx'), 'registered');
+    assert.equal(kindOf('apps/web/app/error.tsx'), 'registered');
+    assert.equal(kindOf('apps/web/app/global-error.tsx'), 'registered');
+    assert.equal(
+      kindOf('apps/web/app/app/(shell)/library/page.tsx'),
+      'registered'
+    );
   });
 
   it('registers every protected revenue screen source', () => {
@@ -362,6 +368,22 @@ describe('JOV-INV-018 screen-certification/v2', () => {
     assert.match(result.issues.join('\n'), /missing registration/);
   });
 
+  it('registers the root and global recovery presenters without requiring proof', () => {
+    const result = evaluateChangedScreens({
+      changedFiles: [
+        { path: 'apps/web/app/error.tsx', status: 'M' },
+        { path: 'apps/web/app/global-error.tsx', status: 'M' },
+      ],
+      headSha: HEAD,
+      proofs: [],
+    });
+    assert.deepEqual(result.issues, []);
+    assert.deepEqual(
+      result.changedScreens.map(screen => screen.id),
+      ['web.root-error-boundary']
+    );
+  });
+
   it('rejects a modified protected source when its registration is missing', () => {
     const source = 'apps/web/app/app/(shell)/jovie-work/page.tsx';
     const registry = SCREEN_REGISTRY.filter(
@@ -394,7 +416,7 @@ describe('JOV-INV-018 screen-certification/v2', () => {
     const paths = [
       'apps/web/app/(dynamic)/start/loading.tsx',
       'apps/web/app/billing/success/error.tsx',
-      'apps/web/app/global-error.tsx',
+      'apps/web/app/not-found.tsx',
       'apps/desktop/src/renderer/App.tsx',
       'apps/ios/Jovie/Features/New/NewScreen.swift',
       'apps/ios/Jovie/Features/Chat/ComposerWorkflowSheet.swift',

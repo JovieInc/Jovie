@@ -78,7 +78,25 @@ describe('ChatLoading (chat home)', () => {
       screen.queryByText('Ask Jovie to plan your next release...')
     ).toBeNull();
     expect(screen.getByTestId('chat-empty-state-greeting').textContent).toBe(
-      "Let's get it"
+      'Just ask'
     );
+    expect(screen.getByTestId('chat-empty-state-sample-user').textContent).toBe(
+      'Plan my next release'
+    );
+    expect(
+      screen
+        .getByTestId('chat-empty-state-sample')
+        .getAttribute('data-sample-prompt')
+    ).toBe('Plan my next release');
+    expect(screen.getByTestId('chat-loading')).toHaveAttribute(
+      'aria-busy',
+      'true'
+    );
+    expect(
+      screen.getByTestId('chat-empty-state-welcome').parentElement
+    ).toHaveAttribute('data-grid-anchor', 'desktop-content');
+    expect(
+      screen.getByTestId('chat-empty-state-welcome').parentElement
+    ).toHaveAttribute('data-top-spacing-owner', 'none');
   });
 });

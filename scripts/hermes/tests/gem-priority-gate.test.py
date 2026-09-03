@@ -939,6 +939,25 @@ class DeploymentBindingTests(unittest.TestCase):
                 self.assertEqual(receipt["remediationAdmission"]["maxConcurrent"], 1)
                 self.assertEqual(receipt["concurrency"]["gem"]["runtimeFloor"], 1)
 
+    def test_schema_valid_closure_health_without_stack_fields_stays_persistable(self):
+        receipt = self.evaluate(GREEN_SIGNALS)
+        closure = receipt["signals"]["closureHealth"]
+
+        self.assertEqual(closure["status"], "healthy")
+        self.assertEqual(closure["stackHealth"], MODULE.empty_stack_health())
+        self.assertEqual(closure["repairActions"], [])
+
+        malformed = dict(GREEN_SIGNALS)
+        malformed["closureHealth"] = {
+            **GREEN_SIGNALS["closureHealth"],
+            "stackHealth": {"maxDepth": 4},
+            "repairActions": {"rootPr": 1},
+        }
+        coerced = self.evaluate(malformed)["signals"]["closureHealth"]
+        self.assertEqual(coerced["status"], "healthy")
+        self.assertEqual(coerced["stackHealth"], MODULE.empty_stack_health())
+        self.assertEqual(coerced["repairActions"], [])
+
     def test_missing_closure_health_fails_new_intake_closed_without_stopping_promotion(self):
         signals = dict(GREEN_SIGNALS)
         signals.pop("closureHealth")

@@ -10,8 +10,13 @@ Element.prototype.scrollIntoView = vi.fn();
 // --- Mocks ---
 
 const mockPush = vi.fn();
+const mockTrack = vi.fn();
 vi.mock('next/navigation', () => ({
   useRouter: () => ({ push: mockPush }),
+}));
+vi.mock('@/lib/analytics', () => ({
+  track: (...args: unknown[]) => mockTrack(...args),
+  page: vi.fn(),
 }));
 
 const mockSearch = vi.fn();
@@ -117,6 +122,58 @@ describe('HeroSpotifySearch', () => {
       // Lucide Search icon renders as an SVG inside the input container
       const container = screen.getByRole('combobox').closest('div');
       expect(container?.querySelector('svg')).toBeInTheDocument();
+    });
+
+    it('records the certified search-submit outcome without the query text', async () => {
+      mockHookReturn.results = ARTISTS;
+      mockHookReturn.state = 'success';
+      render(
+        <HeroSpotifySearch
+          appearance='editorial'
+          placeholder='Search your name'
+          submitLabel='Find me'
+          submitAnalytics={{
+            eventName: 'homepage_certified_search_submitted',
+            properties: {
+              variantIdentity:
+                'homepage-certified:control-how-the-world-sees-you:v1',
+              placement: 'hero',
+            },
+          }}
+        />
+      );
+      const user = userEvent.setup();
+      await user.type(getInput(), 'Taylor');
+      await user.click(screen.getByText('Taylor Swift'));
+
+      expect(mockTrack).toHaveBeenCalledWith(
+        'homepage_certified_search_submitted',
+        expect.objectContaining({
+          variantIdentity:
+            'homepage-certified:control-how-the-world-sees-you:v1',
+          placement: 'hero',
+          hasArtistName: true,
+        })
+      );
+      expect(JSON.stringify(mockTrack.mock.calls)).not.toContain('Taylor');
+    });
+
+    it('focuses the editorial input when its empty submit is clicked', async () => {
+      render(
+        <HeroSpotifySearch
+          appearance='editorial'
+          placeholder='Search your name'
+          submitLabel='Find me'
+        />
+      );
+      const user = userEvent.setup();
+      const input = getInput();
+      input.blur();
+
+      await user.click(screen.getByRole('button', { name: 'Find me' }));
+
+      expect(input).toHaveFocus();
+      expect(mockPush).not.toHaveBeenCalled();
     });
   });
 

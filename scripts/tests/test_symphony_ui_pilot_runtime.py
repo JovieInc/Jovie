@@ -155,6 +155,12 @@ def test_activation_requires_exact_production_revision_and_attestation() -> None
     assert "immutable successful" in activation
     assert "GEM_CONTROLLER_EXPECTED_REVISION" in activation
     assert 'gem-service-attestation/v1' in activation
+    assert "ss -ltnp 'sport = :4041'" in installer
+    assert "LISTENER_PID" in installer
+    assert '"boundToService": True' in installer
+    assert '"wrapperPid": int(os.environ["SERVICE_PID"])' in installer
+    assert ".listener.boundToService == true" in activation
+    assert ".listener.wrapperPid > 0" in activation
 
 
 def test_activation_uses_the_provisioned_gem_host_runner_contract() -> None:
@@ -312,10 +318,12 @@ def test_user_systemd_lib_fail_closes_on_missing_bus_socket(tmp_path: Path) -> N
 def test_activation_exports_user_systemd_before_both_installers() -> None:
     activation = ACTIVATION_WORKFLOW.read_text()
     establish = activation.index("Establish lingering user-systemd session")
+    official = activation.index(
+        "update-symphony-burrito.sh --skip-binary"
+    )
     install = activation.index("bash scripts/hermes/install-gem-fleet-controller.sh")
     rehab = activation.index("bash scripts/hermes/install-gem-pr-rehabilitation.sh")
-    reconciler = activation.index("bash scripts/hermes/install-symphony-ui-pilot.sh")
-    assert establish < install < rehab < reconciler
+    assert establish < official < install < rehab
     assert "GITHUB_ENV" in activation
     assert "XDG_RUNTIME_DIR" in activation
     assert "DBUS_SESSION_BUS_ADDRESS" in activation
@@ -334,22 +342,26 @@ def test_activation_exports_user_systemd_before_both_installers() -> None:
     assert 'has("running") and has("retrying") and has("blocked")' in activation
 
 
-def test_activation_requires_reconciler_runtime_preflight_and_timer() -> None:
+def test_activation_requires_official_runtime_and_retires_custom_automation() -> None:
     activation = ACTIVATION_WORKFLOW.read_text()
-    installer = INSTALLER.read_text()
-    assert "install-symphony-ui-pilot.sh --check" in activation
-    assert "runtime-preflight" in activation
-    assert "is-enabled --quiet symphony-reconciler.timer" in activation
-    assert "is-active --quiet symphony-reconciler.timer" in activation
-    assert "symphony-runtime-receipt/v1" in RECONCILER.read_text()
-    assert "enable --now symphony-reconciler.timer" in installer
-    assert "restart symphony-ui-pilot.service" not in installer
-    assert "start symphony-ui-pilot.service" not in installer
-    assert "stop symphony-ui-pilot.service" not in installer
-    check = activation.index("install-symphony-ui-pilot.sh --check")
-    preflight = activation.index("runtime-preflight")
-    timer = activation.index("is-enabled --quiet symphony-reconciler.timer")
-    assert check < preflight < timer
+    assert "symphony-elixir.service" in activation
+    assert 'DEFAULT_WORKSPACES = "~/symphony-elixir-workspaces"' in RECONCILER.read_text()
+    assert (
+        "update-symphony-burrito.sh --skip-binary"
+        in activation
+    )
+    assert "--no-restart --retire-legacy" not in activation
+    assert 'test "$main_pid" = "$after_pid"' not in activation
+    assert "install-symphony-ui-pilot.sh" not in activation
+    assert "runtime-preflight" not in activation
+    assert "LoadState --value" in activation
+    assert "symphony-ui-pilot.service" in activation
+    assert "symphony-reconciler.timer" in activation
+    assert "symphony-grok-sidecar.timer" in activation
+    assert "ControlGroup --value" in activation
+    assert "listener_pid" in activation
+    assert "/proc/${listener_pid}/cgroup" in activation
+    assert "ss -H -ltn 'sport = :4043'" in activation
 
 
 def test_workflow_server_and_workspace() -> None:
@@ -655,6 +667,7 @@ def test_reconciler_never_stops_main_service_or_takes_alternate_ownership(
         SYMPHONY_STATE_URL=f"http://127.0.0.1:{server.server_port}/api/v1/state",
         SYMPHONY_WORKSPACE_ROOT=str(workspace_root),
         SYMPHONY_RECONCILER_STATE=str(tmp_path / "state"),
+        GEM_FLEET_GATE_RECEIPT=str(tmp_path / "missing-fleet-gate.json"),
         SYMPHONY_SYSTEMCTL=str(fake_systemctl),
     )
     try:
@@ -670,7 +683,7 @@ def test_reconciler_never_stops_main_service_or_takes_alternate_ownership(
     assert receipt["retryPolicy"] == {"maxAttempts": 3, "retryable": False}
     assert receipt["nextRetryAt"] is None
     assert receipt["alternateModel"]["status"] == "not_due"
-    assert receipt["authoritativeOwner"] == "symphony-ui-pilot"
+    assert receipt["authoritativeOwner"] == "symphony-elixir"
     assert "alternate_owner" not in result.stdout
     assert "normal_owner_restored" not in result.stdout
 

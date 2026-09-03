@@ -45,19 +45,11 @@ export default function GlobalError({
           <SystemBErrorFallback
             description='An unexpected error occurred.'
             digest={error.digest}
-            actions={[
-              {
-                type: 'button',
-                label: RECOVERY_COPY.retryLabel,
-                onClick: reset,
-              },
-              {
-                type: 'link',
-                label: 'Go Home',
-                href: '/',
-                variant: 'secondary',
-              },
-            ]}
+            action={{
+              type: 'button',
+              label: RECOVERY_COPY.retryLabel,
+              onClick: reset,
+            }}
           />
         </main>
       </body>

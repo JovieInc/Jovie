@@ -12,6 +12,16 @@ on:
       - 'apps/eve-pilot/**'
       - 'pnpm-workspace.yaml'
       - '.github/workflows/eve-pilot.yml'
+  workflow_dispatch:
+    inputs:
+      production_deployment_id:
+        description: Exact READY deployment ID (dpl_...) in jovie-eve-shadow to promote to the production aliases.
+        required: true
+        type: string
+      expected_sha:
+        description: Exact 40-hex commit the deployment must carry in meta.githubCommitSha.
+        required: true
+        type: string
 
 permissions:
   contents: read
@@ -97,3 +107,118 @@ jobs:
             jovie-eve-shadow-staging.vercel.app \
             --scope jovie \
             --token "$VERCEL_TOKEN"
+
+  promote-shadow-production:
+    name: Promote exact Eve shadow deployment to production aliases
+    if: github.event_name == 'workflow_dispatch'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    concurrency:
+      group: eve-shadow-production-mutation
+      cancel-in-progress: false
+    defaults:
+      run:
+        working-directory: apps/eve-pilot
+    env:
+      VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
+      PRODUCTION_DEPLOYMENT_ID: ${{ inputs.production_deployment_id }}
+      EXPECTED_COMMIT_SHA: ${{ inputs.expected_sha }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: pnpm/action-setup@0977fd99725f1db4007ccb2928dbb4e90d06cc86 # v6.0.10
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: '24'
+          cache: pnpm
+          cache-dependency-path: apps/eve-pilot/pnpm-lock.yaml
+      # The pilot is intentionally excluded from the root workspace and owns its
+      # own lockfile. Ignore the parent workspace so pnpm installs this unit's
+      # dependencies instead of the monorepo root graph.
+      - run: pnpm install --ignore-workspace --frozen-lockfile
+      # Bounded break-glass promotion (JOV-5868): the isolated jovie-eve-shadow
+      # project is not Git-linked, so moving its production aliases to an exact
+      # already-READY deployment is a Vercel alias mutation, not a merge. The
+      # job refuses anything but the exact dpl_ id carrying the exact expected
+      # commit, and never touches Preview protection or any other project.
+      - name: Promote exact deployment to the Eve shadow production aliases
+        run: |
+          set -euo pipefail
+          if [ -z "$VERCEL_TOKEN" ]; then
+            echo 'VERCEL_TOKEN is required for the Eve shadow promotion.' >&2
+            exit 1
+          fi
+          if [[ ! "$PRODUCTION_DEPLOYMENT_ID" =~ ^dpl_[A-Za-z0-9]+$ ]]; then
+            echo 'production_deployment_id must be an exact dpl_ identifier.' >&2
+            exit 1
+          fi
+          if [[ ! "$EXPECTED_COMMIT_SHA" =~ ^[0-9a-f]{40}$ ]]; then
+            echo 'expected_sha must be a full 40-hex commit.' >&2
+            exit 1
+          fi
+          pnpm exec vercel link \
+            --yes \
+            --project jovie-eve-shadow \
+            --scope jovie \
+            --token "$VERCEL_TOKEN"
+          inspect_json="$(pnpm exec vercel inspect \
+            "$PRODUCTION_DEPLOYMENT_ID" \
+            --scope jovie \
+            --token "$VERCEL_TOKEN" \
+            --format=json)"
+          jq -e \
+            --arg id "$PRODUCTION_DEPLOYMENT_ID" \
+            --arg sha "$EXPECTED_COMMIT_SHA" '
+              type == "object" and
+              .id == $id and
+              (.readyState | ascii_upcase) == "READY" and
+              .meta.githubCommitSha == $sha and
+              (.url | endswith(".vercel.app"))
+            ' >/dev/null <<<"$inspect_json" || {
+            echo 'Deployment is not the exact READY commit-bound deployment; refusing to mutate production aliases.' >&2
+            exit 1
+          }
+          deployment_url="https://$(jq -r '.url' <<<"$inspect_json")"
+          for production_alias in \
+            jovie-eve-shadow.vercel.app \
+            jovie-eve-shadow-jovie.vercel.app; do
+            pnpm exec vercel alias set \
+              "$deployment_url" \
+              "$production_alias" \
+              --scope jovie \
+              --token "$VERCEL_TOKEN"
+          done
+          for production_alias in \
+            jovie-eve-shadow.vercel.app \
+            jovie-eve-shadow-jovie.vercel.app; do
+            verified=false
+            for attempt in $(seq 1 12); do
+              alias_json="$(pnpm exec vercel inspect \
+                "$production_alias" \
+                --scope jovie \
+                --token "$VERCEL_TOKEN" \
+                --format=json)" || continue
+              if jq -e --arg id "$PRODUCTION_DEPLOYMENT_ID" \
+                '.id == $id and (.readyState | ascii_upcase) == "READY"' \
+                >/dev/null <<<"$alias_json"; then
+                verified=true
+                break
+              fi
+              sleep 5
+            done
+            if [ "$verified" != true ]; then
+              echo "Alias $production_alias did not converge on $PRODUCTION_DEPLOYMENT_ID." >&2
+              exit 1
+            fi
+            echo "Alias $production_alias serves $PRODUCTION_DEPLOYMENT_ID."
+          done
+          # An unsigned POST must reach the Eve Photon route (400 missing
+          # signature), not Vercel SSO (302). This proves the production alias
+          # serves the app without disabling Preview protection.
+          status="$(curl -s -o /dev/null -w '%{http_code}' \
+            -X POST https://jovie-eve-shadow.vercel.app/eve/v1/photon \
+            -H 'content-type: application/json' --data '{}')"
+          echo "Unsigned Photon POST status: $status"
+          if [ "$status" != "400" ] && [ "$status" != "401" ]; then
+            echo 'Photon route did not answer the unsigned POST contract on the production alias.' >&2
+            exit 1
+          fi

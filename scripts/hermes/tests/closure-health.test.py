@@ -687,6 +687,32 @@ class ClosureHealthEvaluationTests(unittest.TestCase):
         self.assertEqual(result["authority"], "Summer")
         self.assertTrue(result["promotionContinues"])
         self.assertTrue(result["remediationContinues"])
+        self.assertEqual(result["stackHealth"], MODULE.empty_stack_health())
+        self.assertEqual(result["repairActions"], [])
+
+    def test_malformed_stack_health_stays_bounded_for_fleet_refresh_ingress(self):
+        result = MODULE.evaluate_closure_health(
+            snapshot(
+                classifications={
+                    "dispositions": [
+                        {"number": 1, "state": "promote"},
+                    ],
+                    "unclassified": [],
+                    "duplicateIssueLanes": [],
+                    "expiredHolds": [],
+                    "changedFileEvidence": [],
+                    "stackHealth": {"maxDepth": 4},
+                    "repairActions": {"rootPr": 1},
+                }
+            ),
+            previous=None,
+            now=NOW,
+        )
+
+        self.assertEqual(result["status"], "red")
+        self.assertIn("closure-observation-unknown", result["reasons"])
+        self.assertEqual(result["stackHealth"], MODULE.empty_stack_health())
+        self.assertEqual(result["repairActions"], [])
 
     def test_controller_and_empty_queue_episodes_cross_bounded_red_thresholds(self):
         stalled = snapshot(

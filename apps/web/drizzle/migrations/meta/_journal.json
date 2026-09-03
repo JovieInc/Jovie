@@ -687,6 +687,20 @@
       "when": 1787928766493,
       "tag": "0097_regular_mister_sinister",
       "breakpoints": true
+    },
+    {
+      "idx": 98,
+      "version": "7",
+      "when": 1788415545307,
+      "tag": "0098_regular_puff_adder",
+      "breakpoints": true
+    },
+    {
+      "idx": 99,
+      "version": "7",
+      "when": 1788415600000,
+      "tag": "0099_youtube_thumbnail_versions_uuid_policy",
+      "breakpoints": true
     }
   ]
 }
