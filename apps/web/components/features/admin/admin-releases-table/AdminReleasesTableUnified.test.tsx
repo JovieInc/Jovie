@@ -133,13 +133,14 @@ describe('AdminReleasesTableUnified artist identity rows', () => {
     );
 
     // The row composes the @jovie/ui Avatar atoms (person shape, md size by
-    // contract) with the caller-supplied size class — no molecule Avatar.
+    // contract) — wrapper sizing classes (size-/h-/w-) are banned by the
+    // Avatar contract ratchet, so the caller passes the size prop instead.
     const avatarRoot = container.querySelector("span[data-shape='person']");
     expect(avatarRoot).not.toBeNull();
     expect(avatarRoot).toHaveAttribute('data-size', 'md');
     expect(avatarRoot).toHaveAttribute('data-shape', 'person');
     expect(avatarRoot).toHaveStyle({ width: '24px', height: '24px' });
-    expect(avatarRoot?.className).toContain('size-6');
+    expect(avatarRoot?.className).not.toMatch(/\b(?:size|h|w)-/);
 
     // No artwork URL -> no <img>; fallback renders the identity glyph.
     expect(container.querySelector('img')).toBeNull();
