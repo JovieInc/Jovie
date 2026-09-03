@@ -34,7 +34,8 @@
 #     GH_RETRY_ATTEMPTS=8 on SNAP / list-state.
 #   DRAIN_RECONCILE_MISSED_ADMISSION  permit bounded exact-green recovery
 #     pass for admission events replaced while pending in the workflow mutex
-#   DRAIN_QUEUE_REENTRY_MAX_PER_RUN  total event + recovery admission cap (1-2)
+#   DRAIN_QUEUE_REENTRY_MAX_PER_RUN  total event + recovery admission cap;
+#     0 = uncapped (bounded only by native queue depth), positive N re-caps
 #   DRAIN_PROMOTION_MODE  normal, isolated-only, draft-only, hold-intake, or blocked
 #   DRAIN_FLEET_GATE_B64  bounded admission projection; required outside normal
 #   DRAIN_RECOVER_FLEET_HOLDS  exact production-controller recovery event only
@@ -204,12 +205,12 @@ FLEET_HOLD_TTL_SECONDS="${FLEET_HOLD_TTL_SECONDS:-720}"
 # A completed CI merge_group has no source PR head to admit, but it is the
 # authoritative signal that GitHub may just have ejected unmerged cohort
 # members while main advanced. Separately, GitHub may replace an older pending
-# admission run in this workflow's one mutex. A surviving pass may recover a
-# tiny exact-green cohort without requiring a prior receipt; both recovery
-# sources share one cap and the same exact-head enrollment gate.
+# admission run in this workflow's one mutex. A surviving pass may recover the
+# exact-green cohort without requiring a prior receipt; both recovery sources
+# share the same admission bound and the same exact-head enrollment gate.
 DRAIN_RECONCILE_QUEUE_REENTRY="${DRAIN_RECONCILE_QUEUE_REENTRY:-0}"
 DRAIN_RECONCILE_MISSED_ADMISSION="${DRAIN_RECONCILE_MISSED_ADMISSION:-0}"
-DRAIN_QUEUE_REENTRY_MAX_PER_RUN="${DRAIN_QUEUE_REENTRY_MAX_PER_RUN:-2}"
+DRAIN_QUEUE_REENTRY_MAX_PER_RUN="${DRAIN_QUEUE_REENTRY_MAX_PER_RUN:-0}"
 QUEUE_REENTRY_CONTEXT="jovie-queue-reentry/v1"
 UNMERGEABLE_EJECT_CONTEXT="jovie-native-unmergeable/v1"
 PRODUCT_FAILURE_CONTEXT="jovie-queue-product-failure/v1"
@@ -342,9 +343,8 @@ if [[ "$DRAIN_RECONCILE_MISSED_ADMISSION" == "1" ]]; then
       ;;
   esac
 fi
-if [[ ! "$DRAIN_QUEUE_REENTRY_MAX_PER_RUN" =~ ^[1-9][0-9]*$ ]] \
-  || (( DRAIN_QUEUE_REENTRY_MAX_PER_RUN > 2 )); then
-  echo "::error::DRAIN_QUEUE_REENTRY_MAX_PER_RUN must be an integer from 1 through 2" >&2
+if [[ ! "$DRAIN_QUEUE_REENTRY_MAX_PER_RUN" =~ ^[0-9]+$ ]]; then
+  echo "::error::DRAIN_QUEUE_REENTRY_MAX_PER_RUN must be a non-negative integer (0 = uncapped, bounded by native queue depth)" >&2
   exit 2
 fi
 if [[ -z "$DRAIN_ADMISSION_PR" && -z "$DRAIN_ADMISSION_HEAD" ]]; then
@@ -2212,7 +2212,8 @@ if [[ "$DRAIN_RECONCILE_QUEUE_REENTRY" == "1" || "$DRAIN_RECONCILE_MISSED_ADMISS
   echo "=== RECOVER (bounded exact-head native admission) ==="
   while read -r pr; do
     stop_if_budget_exhausted && break
-    if [[ "$ENROLLED_THIS_RUN" -ge "$DRAIN_QUEUE_REENTRY_MAX_PER_RUN" ]]; then
+    if (( DRAIN_QUEUE_REENTRY_MAX_PER_RUN > 0 )) \
+      && [[ "$ENROLLED_THIS_RUN" -ge "$DRAIN_QUEUE_REENTRY_MAX_PER_RUN" ]]; then
       echo "  ~ reached total exact admission cap ($DRAIN_QUEUE_REENTRY_MAX_PER_RUN)"
       break
     fi
