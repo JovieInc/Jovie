@@ -1,6 +1,5 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { render, screen, waitFor } from '@testing-library/react';
-import type { ReactElement } from 'react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { OvieShippingStateCard } from '@/components/features/admin/hud/OvieShippingStateCard';
 import { SHIPPING_STATE_SCHEMA } from '@/lib/ovie/shipping-state-client';
@@ -8,14 +7,10 @@ import { SHIPPING_STATE_SCHEMA } from '@/lib/ovie/shipping-state-client';
 const fetchMock = vi.fn();
 vi.stubGlobal('fetch', fetchMock);
 
-function renderWithQuery(ui: ReactElement) {
-  const client = new QueryClient({
+function createQueryClient() {
+  return new QueryClient({
     defaultOptions: { queries: { retry: false } },
   });
-  return {
-    client,
-    ...render(<QueryClientProvider client={client}>{ui}</QueryClientProvider>),
-  };
 }
 
 function jsonResponse(status: number, body: unknown) {
@@ -85,7 +80,11 @@ describe('OvieShippingStateCard', () => {
 
   it('keeps Delivery geometry and labels across unknown and fresh, including measured zero', async () => {
     fetchMock.mockResolvedValue(jsonResponse(200, projection));
-    renderWithQuery(<OvieShippingStateCard />);
+    render(
+      <QueryClientProvider client={createQueryClient()}>
+        <OvieShippingStateCard />
+      </QueryClientProvider>
+    );
     const panel = () => screen.getByTestId('hud-shipper-status-panel');
 
     expect(panel()).toHaveAttribute('data-truth', 'unknown');
@@ -113,7 +112,11 @@ describe('OvieShippingStateCard', () => {
     fetchMock.mockResolvedValue(
       jsonResponse(401, { error: 'Unauthorized', state: 'unauthorized' })
     );
-    renderWithQuery(<OvieShippingStateCard />);
+    render(
+      <QueryClientProvider client={createQueryClient()}>
+        <OvieShippingStateCard />
+      </QueryClientProvider>
+    );
     await waitFor(() => {
       expect(screen.getByTestId('hud-shipper-status-panel')).toHaveAttribute(
         'data-truth',
@@ -126,7 +129,11 @@ describe('OvieShippingStateCard', () => {
 
   it('does not refetch for the initial pageshow event', async () => {
     fetchMock.mockResolvedValue(jsonResponse(200, projection));
-    renderWithQuery(<OvieShippingStateCard />);
+    render(
+      <QueryClientProvider client={createQueryClient()}>
+        <OvieShippingStateCard />
+      </QueryClientProvider>
+    );
 
     await waitFor(() => {
       expect(screen.getByTestId('hud-shipper-status-panel')).toHaveAttribute(
@@ -165,8 +172,11 @@ describe('OvieShippingStateCard', () => {
           },
         })
       );
-    const { client, rerender } = renderWithQuery(
-      <OvieShippingStateCard kioskToken='token-a' />
+    const client = createQueryClient();
+    const { rerender } = render(
+      <QueryClientProvider client={client}>
+        <OvieShippingStateCard kioskToken='token-a' />
+      </QueryClientProvider>
     );
     const panel = () => screen.getByTestId('hud-shipper-status-panel');
 
@@ -193,8 +203,11 @@ describe('OvieShippingStateCard', () => {
     fetchMock
       .mockImplementationOnce(() => oldToken.promise)
       .mockImplementationOnce(() => newToken.promise);
-    const { client, rerender } = renderWithQuery(
-      <OvieShippingStateCard kioskToken='token-a' />
+    const client = createQueryClient();
+    const { rerender } = render(
+      <QueryClientProvider client={client}>
+        <OvieShippingStateCard kioskToken='token-a' />
+      </QueryClientProvider>
     );
     const panel = () => screen.getByTestId('hud-shipper-status-panel');
 
