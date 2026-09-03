@@ -49,8 +49,22 @@ export interface LibraryRightsholderEvidenceView {
   readonly shareBps: number | null;
 }
 
+export interface LibraryProviderStatView {
+  readonly platform: string;
+  readonly connected: boolean;
+  readonly measurements: readonly [];
+}
+
 export interface LibraryPostReleaseBundle {
   readonly downloads: readonly LibraryDownloadView[];
   readonly findings: readonly LibraryPresenceFindingView[];
   readonly rightsholders: readonly LibraryRightsholderEvidenceView[];
+  readonly stats: readonly LibraryProviderStatView[];
 }
+
+export const EMPTY_LIBRARY_POST_RELEASE_BUNDLE: LibraryPostReleaseBundle = {
+  downloads: [],
+  findings: [],
+  rightsholders: [],
+  stats: [],
+};

@@ -5,6 +5,10 @@ import {
   getErrorType,
   getPreferredErrorMessage,
 } from '@/components/jovie/utils';
+import {
+  GATEWAY_BUDGET_EXCEEDED_ERROR_CODE,
+  GATEWAY_BUDGET_EXCEEDED_USER_MESSAGE,
+} from '@/lib/ai/gateway-errors';
 
 function serializeApiError(
   status: number,
@@ -116,5 +120,15 @@ describe('getOnboardingErrorMessage', () => {
         'unknown'
       )
     ).toBe('Jovie could not send your message. Try again.');
+  });
+
+  it('maps a gateway budget wall to a try-again fallback', () => {
+    expect(
+      getOnboardingErrorMessage(
+        'API key budget exceeded. Current spend: $1.05, limit: $1.00.',
+        GATEWAY_BUDGET_EXCEEDED_ERROR_CODE,
+        'server'
+      )
+    ).toBe(GATEWAY_BUDGET_EXCEEDED_USER_MESSAGE);
   });
 });

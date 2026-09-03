@@ -41,8 +41,9 @@ export interface MarketingHeroShellProps extends MarketingHeroBaseProps {
    * - `centered`: single column, text centered, constrained to page width
    * - `left`: single column, text left-aligned, constrained to page width
    * - `split`: two-column grid on md+, text left / media right
+   * - `unstyled`: route-owned presentation delegated to this canonical root
    */
-  readonly variant: 'split' | 'centered' | 'left';
+  readonly variant: 'split' | 'centered' | 'left' | 'unstyled';
   readonly children: ReactNode;
 }
 
@@ -132,9 +133,10 @@ function MarketingHeroShell({
       data-testid={testId}
       aria-labelledby={headingId}
       className={cn(
-        'relative w-full',
-        'pt-20 pb-16 sm:pt-24 sm:pb-24 lg:pt-28 lg:pb-32',
-        shellVariantClasses[variant],
+        variant !== 'unstyled' && 'relative w-full',
+        variant !== 'unstyled' &&
+          'pt-20 pb-16 sm:pt-24 sm:pb-24 lg:pt-28 lg:pb-32',
+        variant !== 'unstyled' && shellVariantClasses[variant],
         className
       )}
     >
@@ -203,7 +205,10 @@ function MarketingHeroContent({
       <MarketingContainer width='page'>
         <div className='marketing-hero-inner'>
           <div className='marketing-hero-copy'>
-            <h1 id={headingId} className='marketing-hero-headline'>
+            <h1
+              id={headingId}
+              className='marketing-hero-headline marketing-h1-max-two-lines'
+            >
               {headline}
             </h1>
             <p className='marketing-hero-subtitle'>{subtitle}</p>
@@ -293,7 +298,7 @@ function MarketingHeroLanding({
                 id={headingId}
                 data-testid={titleTestId}
                 className={cn(
-                  'marketing-h1-linear mt-5 text-primary-token',
+                  'marketing-h1-linear marketing-h1-max-two-lines mt-5 text-primary-token',
                   titleClassName
                 )}
               >
@@ -358,13 +363,15 @@ function MarketingHeroLanding({
 /**
  * The single marketing hero section primitive.
  *
- * Three modes, discriminated by required props:
+ * Four modes, discriminated by required props:
  * - Shell (`variant` + `children`): layout shell for content-heavy page
  *   heroes — support, about, blog, changelog, compare, alternatives, pay.
  * - Content (`headline` + `subtitle` + `primaryCta`): the canonical
  *   content-driven landing hero with dual CTA and logo-bar proof.
  * - Landing (`eyebrow` + `title` + `body` + `media`): feature-landing
  *   hero (`/voice`) over the Linear hero backdrop.
+ * - Unstyled shell (`variant='unstyled'`): canonical ownership for a
+ *   route-specific, already-approved presentation without changing its pixels.
  */
 export function MarketingHero(props: MarketingHeroProps) {
   if ('variant' in props) {

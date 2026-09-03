@@ -2139,7 +2139,7 @@ JSON
         assert "event admission scope no longer matches #1001" in result.stdout
         assert not enrolled.exists(), "recovery mutated the newer PR head"
 
-    def test_missed_admission_recovery_rejects_an_unbounded_cap_before_gh(
+    def test_missed_admission_recovery_rejects_a_non_integer_cap_before_gh(
         self, tmp_path: Path
     ) -> None:
         called = tmp_path / "called"
@@ -2156,14 +2156,14 @@ JSON
                 backend="native",
                 extra_env=(
                     "DRAIN_RECONCILE_MISSED_ADMISSION=1 "
-                    "DRAIN_QUEUE_REENTRY_MAX_PER_RUN=3"
+                    "DRAIN_QUEUE_REENTRY_MAX_PER_RUN=abc"
                 ),
             )
         )
 
         assert result.returncode == 2
-        assert "must be an integer from 1 through 2" in result.stderr
-        assert not called.exists(), "drain invoked gh before bounded-cap preflight"
+        assert "must be a non-negative integer" in result.stderr
+        assert not called.exists(), "drain invoked gh before cap preflight"
 
     def test_constrained_mode_refuses_missing_receipt_before_calling_gh(
         self, tmp_path: Path
@@ -3868,6 +3868,7 @@ def _receipt_comment_body(
     tmp_path: Path,
     *,
     head: str,
+    repository: str = "JovieInc/Jovie",
     deferred_minutes: int = 120,
     pr: int = 900,
     author: str = "itstimwhite",
@@ -3877,6 +3878,7 @@ def _receipt_comment_body(
     deferred = datetime.now(timezone.utc) - timedelta(minutes=deferred_minutes)
     receipt = {
         "schema": "jovie-queue-deferral/v1",
+        "repository": repository,
         "pr": pr,
         "head": head,
         "reason": reason,
@@ -4320,6 +4322,21 @@ JSON
         assert "deferral-receipt-pr-mismatch (receipt=#901, live=#900)" in result.stdout
         assert "treating as untyped ready hold" in result.stdout
         assert "would remove `queue-deferred` from #900" in result.stdout
+
+    def test_receipt_for_another_repository_stays_held(
+        self, tmp_path: Path
+    ) -> None:
+        head = "c" * 40
+        _receipt_comment_body(tmp_path, head=head, repository="JovieInc/LogYourBody")
+        result = _run_single_candidate_release(tmp_path, head=head)
+
+        assert result.returncode == 0, f"stdout={result.stdout}\nstderr={result.stderr}"
+        assert (
+            "deferral-receipt-repository-mismatch (receipt=JovieInc/LogYourBody, live=JovieInc/Jovie)"
+            in result.stdout
+        )
+        assert "untyped-hold-manual-release-required" in result.stdout
+        assert "would remove" not in result.stdout
 
     def test_head_stale_mechanical_receipt_is_released_against_live_head(
         self, tmp_path: Path

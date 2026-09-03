@@ -1,6 +1,6 @@
 import { execFile } from 'node:child_process';
 import { cp, mkdir, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
-import { type AddressInfo, createServer } from 'node:http';
+import { createServer } from 'node:http';
 import { tmpdir } from 'node:os';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
@@ -81,7 +81,7 @@ async function withLocalPublicApi<T>(
     if (!address || typeof address === 'string') {
       throw new Error('Local CLI fixture server did not bind a TCP port.');
     }
-    const origin = `http://127.0.0.1:${(address as AddressInfo).port}`;
+    const origin = `http://127.0.0.1:${address.port}`;
     return await run(origin);
   } finally {
     await new Promise<void>((resolveClose, reject) => {
@@ -89,6 +89,73 @@ async function withLocalPublicApi<T>(
         if (error) reject(error);
         else resolveClose();
       });
+    });
+  }
+}
+
+async function runInstalledCriticalCommand(
+  installedCli: string,
+  installRoot: string
+): Promise<void> {
+  const requests: Array<{
+    readonly accept: string | undefined;
+    readonly method: string | undefined;
+    readonly url: string | undefined;
+  }> = [];
+  const server = createServer((request, response) => {
+    requests.push({
+      accept: request.headers.accept,
+      method: request.method,
+      url: request.url,
+    });
+    response.writeHead(200, { 'Content-Type': 'application/json' });
+    response.end('{"openapi":"3.1.0","info":{"title":"Jovie Artist API"}}');
+  });
+
+  await new Promise<void>((resolvePromise, reject) => {
+    server.once('error', reject);
+    server.listen(0, '127.0.0.1', resolvePromise);
+  });
+
+  try {
+    const address = server.address();
+    if (!address || typeof address === 'string') {
+      throw new Error('Local package smoke server did not expose a TCP port.');
+    }
+    const { stdout } = await execFileAsync(
+      installedCli,
+      [
+        'api',
+        'openapi',
+        '--base-url',
+        `http://127.0.0.1:${address.port}`,
+        '--json',
+      ],
+      { cwd: installRoot, maxBuffer: 10 * 1024 * 1024 }
+    );
+    const parsed: unknown = JSON.parse(stdout);
+    if (
+      typeof parsed !== 'object' ||
+      parsed === null ||
+      (parsed as { readonly openapi?: unknown }).openapi !== '3.1.0'
+    ) {
+      throw new Error(
+        'Installed CLI critical command returned unexpected JSON.'
+      );
+    }
+    if (
+      requests.length !== 1 ||
+      requests[0]?.method !== 'GET' ||
+      requests[0]?.url !== '/api/v1/openapi.json' ||
+      requests[0]?.accept !== 'application/json'
+    ) {
+      throw new Error(
+        'Installed CLI critical command sent an unexpected request.'
+      );
+    }
+  } finally {
+    await new Promise<void>((resolvePromise, reject) => {
+      server.close(error => (error ? reject(error) : resolvePromise()));
     });
   }
 }
@@ -218,6 +285,7 @@ async function main(): Promise<void> {
       'LICENSE',
       'dist/cli.js',
       'dist/index.js',
+      'dist/index.d.ts',
     ]) {
       if (!files.has(requiredFile)) {
         throw new Error(`npm pack omitted required file: ${requiredFile}`);
@@ -277,6 +345,24 @@ async function main(): Promise<void> {
       );
     }
 
+    const { stdout: installedImport } = await execFileAsync(
+      process.execPath,
+      [
+        '--input-type=module',
+        '--eval',
+        "const api = await import('@jovie/cli'); process.stdout.write(JSON.stringify({ baseUrl: api.DEFAULT_BASE_URL, hasFetchOpenApi: typeof api.fetchOpenApi === 'function' }));",
+      ],
+      { cwd: installRoot, maxBuffer: 10 * 1024 * 1024 }
+    );
+    if (
+      installedImport.trim() !==
+      '{"baseUrl":"https://jov.ie","hasFetchOpenApi":true}'
+    ) {
+      throw new Error(
+        'Installed package did not expose the advertised library API.'
+      );
+    }
+
     const fixtureOrigin = await withLocalPublicApi(async origin => {
       await assertInstalledCommand(
         installedCli,
@@ -311,6 +397,8 @@ async function main(): Promise<void> {
       return origin;
     });
 
+    await runInstalledCriticalCommand(installedCli, installRoot);
+
     process.stdout.write(
       `${JSON.stringify(
         {
@@ -319,6 +407,8 @@ async function main(): Promise<void> {
             version: pack.version,
           },
           files: [...files].sort(),
+          criticalCommandSmoke: 'passed',
+          importSmoke: 'passed',
           installSmoke: 'passed',
           commandSmoke: 'passed',
           fixtureOrigin,

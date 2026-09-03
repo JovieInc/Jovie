@@ -1,20 +1,29 @@
+import { NextResponse } from 'next/server';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-const mocks = vi.hoisted(() => ({
-  getCachedAuth: vi.fn(),
-  getExactProfileAccess: vi.fn(),
-  removeYouTubeVideoMerchTag: vi.fn(),
-  tagYouTubeVideoWithMerch: vi.fn(),
-}));
+const mocks = vi.hoisted(() => {
+  class LibraryRelationshipWriteError extends Error {
+    readonly code: 'not_found' | 'conflict';
+    constructor(code: 'not_found' | 'conflict', message: string) {
+      super(message);
+      this.name = 'LibraryRelationshipWriteError';
+      this.code = code;
+    }
+  }
+  return {
+    requireLibraryProfileAccess: vi.fn(),
+    tagMerchInYouTubeVideo: vi.fn(),
+    untagMerchInYouTubeVideo: vi.fn(),
+    LibraryRelationshipWriteError,
+  };
+});
 
-vi.mock('@/lib/auth/cached', () => ({ getCachedAuth: mocks.getCachedAuth }));
-vi.mock('@/lib/auth/profile-access', () => ({
-  getExactProfileAccess: mocks.getExactProfileAccess,
-}));
-vi.mock('@/lib/db', () => ({ db: {} }));
-vi.mock('@/lib/library/graph-store', () => ({
-  removeYouTubeVideoMerchTag: mocks.removeYouTubeVideoMerchTag,
-  tagYouTubeVideoWithMerch: mocks.tagYouTubeVideoWithMerch,
+vi.mock('@/lib/error-tracking', () => ({ captureError: vi.fn() }));
+vi.mock('@/lib/library/track-drawer.server', () => ({
+  requireLibraryProfileAccess: mocks.requireLibraryProfileAccess,
+  tagMerchInYouTubeVideo: mocks.tagMerchInYouTubeVideo,
+  untagMerchInYouTubeVideo: mocks.untagMerchInYouTubeVideo,
+  LibraryRelationshipWriteError: mocks.LibraryRelationshipWriteError,
 }));
 
 import { DELETE, POST } from './route';
@@ -30,23 +39,28 @@ function request(method: 'POST' | 'DELETE') {
   });
 }
 
+function authError(status: 401 | 403) {
+  return {
+    error: NextResponse.json(
+      { error: status === 401 ? 'Unauthorized' : 'Forbidden' },
+      { status }
+    ),
+  };
+}
+
 describe('library relationships route', () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    mocks.getCachedAuth.mockResolvedValue({ userId: 'app-user-id' });
-    mocks.getExactProfileAccess.mockResolvedValue({
-      ok: true,
-      profileId: creatorProfileId,
-      ownerUserId: 'app-user-id',
+    mocks.requireLibraryProfileAccess.mockResolvedValue({
+      userId: 'app-user-id',
     });
   });
 
   it('rejects unauthenticated relationship writes', async () => {
-    mocks.getCachedAuth.mockResolvedValue({ userId: null });
+    mocks.requireLibraryProfileAccess.mockResolvedValue(authError(401));
     const response = await POST(request('POST'));
     expect(response.status).toBe(401);
-    expect(mocks.getExactProfileAccess).not.toHaveBeenCalled();
-    expect(mocks.tagYouTubeVideoWithMerch).not.toHaveBeenCalled();
+    expect(mocks.tagMerchInYouTubeVideo).not.toHaveBeenCalled();
   });
 
   it('rejects invalid relationship payloads', async () => {
@@ -57,54 +71,60 @@ describe('library relationships route', () => {
       })
     );
     expect(response.status).toBe(400);
-    expect(mocks.getExactProfileAccess).not.toHaveBeenCalled();
-    expect(mocks.tagYouTubeVideoWithMerch).not.toHaveBeenCalled();
+    expect(mocks.requireLibraryProfileAccess).not.toHaveBeenCalled();
+    expect(mocks.tagMerchInYouTubeVideo).not.toHaveBeenCalled();
   });
 
   it('does not write relationships across profiles', async () => {
-    mocks.getExactProfileAccess.mockResolvedValue({
-      ok: false,
-      reason: 'forbidden',
-    });
+    mocks.requireLibraryProfileAccess.mockResolvedValue(authError(403));
     const response = await POST(request('POST'));
     expect(response.status).toBe(403);
-    expect(mocks.tagYouTubeVideoWithMerch).not.toHaveBeenCalled();
+    expect(mocks.tagMerchInYouTubeVideo).not.toHaveBeenCalled();
   });
 
   it('records an artist-confirmed video to merch relationship', async () => {
-    mocks.tagYouTubeVideoWithMerch.mockResolvedValue({
+    mocks.tagMerchInYouTubeVideo.mockResolvedValue({
       id: 'relationship-id',
     });
     const response = await POST(request('POST'));
-    expect(response.status).toBe(201);
-    expect(mocks.tagYouTubeVideoWithMerch).toHaveBeenCalledWith({
+    expect(response.status).toBe(200);
+    expect(mocks.tagMerchInYouTubeVideo).toHaveBeenCalledWith({
       creatorProfileId,
       videoId,
       merchCardId,
-      actorUserId: 'app-user-id',
     });
   });
 
   it('returns not found when the requested relationship target is absent', async () => {
-    mocks.tagYouTubeVideoWithMerch.mockResolvedValue(null);
+    mocks.tagMerchInYouTubeVideo.mockRejectedValue(
+      new mocks.LibraryRelationshipWriteError(
+        'not_found',
+        'Video or merch product not found'
+      )
+    );
     const response = await POST(request('POST'));
     expect(response.status).toBe(404);
   });
 
   it('soft-removes an existing video to merch relationship', async () => {
-    mocks.removeYouTubeVideoMerchTag.mockResolvedValue(true);
+    mocks.untagMerchInYouTubeVideo.mockResolvedValue(undefined);
     const response = await DELETE(request('DELETE'));
     expect(response.status).toBe(200);
-    expect(mocks.removeYouTubeVideoMerchTag).toHaveBeenCalledWith({
+    expect(mocks.untagMerchInYouTubeVideo).toHaveBeenCalledWith({
       creatorProfileId,
       videoId,
       merchCardId,
     });
   });
 
-  it('returns not found when there is no active relationship to remove', async () => {
-    mocks.removeYouTubeVideoMerchTag.mockResolvedValue(false);
+  it('returns conflict when there is no active relationship to remove', async () => {
+    mocks.untagMerchInYouTubeVideo.mockRejectedValue(
+      new mocks.LibraryRelationshipWriteError(
+        'conflict',
+        'Active relationship not found'
+      )
+    );
     const response = await DELETE(request('DELETE'));
-    expect(response.status).toBe(404);
+    expect(response.status).toBe(409);
   });
 });

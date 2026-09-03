@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import type {
   CreatorOffer,
   LibraryRelationship,
-} from '@/lib/db/schema/library-graph';
+} from '@/lib/db/schema/library-content-graph';
 import {
   isExternalCollaboratorCredit,
   relationshipTypesAreValid,

@@ -41,8 +41,8 @@ one stacked PR per component.
 - **Dependent work** (B needs A) → a **native GitHub stacked-PR sequence**:
   push each layer normally and open it against its immediate parent. After the
   parent lands, retarget the child to `main`, rebase it onto the new `origin/main`,
-  and push with `--force-with-lease` before running fresh checks. Graphite is not
-  required and is not a landing transport.
+  and push with `--force-with-lease` before running fresh checks. Do not introduce
+  a second landing transport.
 - **Independent work** in the same area → **sibling PRs** off `main`. They land
   in parallel and don't trigger each other's rebases.
 - **One PR = one logical change.** No drive-by refactors — pull them into their
@@ -68,8 +68,9 @@ gh pr create --draft --base feat/x-01 --head feat/x-02
 ```
 
 Keep every dependent child draft and unenrolled while its immediate-parent base
-is still open. Only mark the child ready and add `merge-queue` after its parent
-has landed, the child targets `main`, and the rebase and fresh checks below pass.
+is still open. Only mark the child ready after its parent has landed, the child
+targets `main`, and the rebase and fresh checks below pass. Native autoenroll
+owns queue mutation; do not add `merge-queue`.
 
 Record every branch, PR number, immediate-parent base, and exact head SHA. When
 the parent merges, keep both the old parent tip and the recorded child remote

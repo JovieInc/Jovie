@@ -214,7 +214,7 @@ describe('scripts-typecheck: lane contract', () => {
     expect(baseline.totalErrors).toBe(sum);
   });
 
-  it('scripts/tsconfig.json enables checkJs over the .mjs + .ts tree', () => {
+  it('scripts/tsconfig.json covers every script extension selected by CI', () => {
     // tsconfig.json is JSONC (header comments); strip // lines before parse.
     const raw = readFileSync(
       resolve(REPO_ROOT, 'scripts/tsconfig.json'),
@@ -229,7 +229,7 @@ describe('scripts-typecheck: lane contract', () => {
     expect(config.compilerOptions.checkJs).toBe(true);
     expect(config.compilerOptions.noEmit).toBe(true);
     expect(config.include).toEqual(
-      expect.arrayContaining(['**/*.mjs', '**/*.ts'])
+      expect.arrayContaining(['**/*.ts', '**/*.mts', '**/*.mjs', '**/*.cts'])
     );
   });
 

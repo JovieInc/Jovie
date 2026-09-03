@@ -3,8 +3,7 @@ import 'server-only';
 import { and, desc, sql as drizzleSql, eq } from 'drizzle-orm';
 import { db } from '@/lib/db';
 import { artists, releaseArtists } from '@/lib/db/schema/content';
-import { libraryRelationships } from '@/lib/db/schema/library-graph';
-import { merchCards } from '@/lib/db/schema/merch';
+import { libraryRelationships } from '@/lib/db/schema/library-content-graph';
 import {
   youtubeVideoReleaseLinks,
   youtubeVideos,
@@ -41,111 +40,6 @@ export async function listLibraryRelationshipsForProfile(
     )
     .orderBy(desc(libraryRelationships.createdAt));
   return rows.map(toView);
-}
-
-export async function tagYouTubeVideoWithMerch(input: {
-  readonly creatorProfileId: string;
-  readonly videoId: string;
-  readonly merchCardId: string;
-  readonly actorUserId: string;
-}): Promise<LibraryRelationshipView | null> {
-  const [video, merch] = await Promise.all([
-    db
-      .select({ id: youtubeVideos.id })
-      .from(youtubeVideos)
-      .where(
-        and(
-          eq(youtubeVideos.id, input.videoId),
-          eq(youtubeVideos.creatorProfileId, input.creatorProfileId)
-        )
-      )
-      .limit(1)
-      .then(rows => rows[0] ?? null),
-    db
-      .select({ id: merchCards.id })
-      .from(merchCards)
-      .where(
-        and(
-          eq(merchCards.id, input.merchCardId),
-          eq(merchCards.creatorProfileId, input.creatorProfileId)
-        )
-      )
-      .limit(1)
-      .then(rows => rows[0] ?? null),
-  ]);
-  if (!video || !merch) return null;
-
-  const now = new Date();
-  const [relationship] = await db
-    .insert(libraryRelationships)
-    .values({
-      creatorProfileId: input.creatorProfileId,
-      kind: 'features_merch',
-      subjectType: 'youtube_video',
-      subjectId: video.id,
-      objectType: 'merch_product',
-      objectId: merch.id,
-      status: 'active',
-      confidence: '1.0000',
-      evidence: {
-        source: 'artist_confirmation',
-        sourceId: input.actorUserId,
-        observedAt: now.toISOString(),
-      },
-      reviewedBy: input.actorUserId,
-      reviewedAt: now,
-      effectiveAt: now,
-      updatedAt: now,
-    })
-    .onConflictDoUpdate({
-      target: [
-        libraryRelationships.creatorProfileId,
-        libraryRelationships.kind,
-        libraryRelationships.subjectType,
-        libraryRelationships.subjectId,
-        libraryRelationships.objectType,
-        libraryRelationships.objectId,
-      ],
-      set: {
-        status: 'active',
-        confidence: '1.0000',
-        evidence: {
-          source: 'artist_confirmation',
-          sourceId: input.actorUserId,
-          observedAt: now.toISOString(),
-        },
-        reviewedBy: input.actorUserId,
-        reviewedAt: now,
-        effectiveAt: now,
-        expiresAt: null,
-        updatedAt: now,
-      },
-    })
-    .returning();
-  return relationship ? toView(relationship) : null;
-}
-
-export async function removeYouTubeVideoMerchTag(input: {
-  readonly creatorProfileId: string;
-  readonly videoId: string;
-  readonly merchCardId: string;
-}): Promise<boolean> {
-  const [updated] = await db
-    .update(libraryRelationships)
-    .set({ status: 'removed', updatedAt: new Date() })
-    .where(
-      and(
-        eq(libraryRelationships.creatorProfileId, input.creatorProfileId),
-        eq(libraryRelationships.kind, 'features_merch'),
-        eq(libraryRelationships.subjectType, 'youtube_video'),
-        eq(libraryRelationships.subjectId, input.videoId),
-        eq(libraryRelationships.objectType, 'merch_product'),
-        eq(libraryRelationships.objectId, input.merchCardId),
-        eq(libraryRelationships.status, 'active')
-      )
-    )
-    .returning({ id: libraryRelationships.id });
-  return Boolean(updated);
 }
 
 /**

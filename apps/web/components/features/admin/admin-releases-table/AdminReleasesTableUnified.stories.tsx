@@ -1,97 +1,107 @@
 import type { Meta, StoryObj } from '@storybook/nextjs-vite';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import type { AdminReleaseRow } from '@/lib/admin/types';
+import { queryKeys } from '@/lib/queries';
 import { AdminReleasesTableUnified } from './AdminReleasesTableUnified';
 
-const queryClient = new QueryClient({
-  defaultOptions: { queries: { retry: false } },
-});
-
-const releases: AdminReleaseRow[] = [
+const releases = [
   {
-    id: 'release-1',
-    title: 'First Light',
-    slug: 'first-light',
-    releaseType: 'single',
-    releaseDate: new Date('2026-08-21T00:00:00.000Z'),
-    artworkUrl: null,
-    totalTracks: 1,
-    isExplicit: false,
-    label: 'Signal Works',
-    upc: '123456789012',
-    sourceType: 'manual',
-    spotifyPopularity: 42,
-    createdAt: new Date('2026-08-22T00:00:00.000Z'),
-    creatorProfileId: 'profile-alpha',
-    artistUsername: 'alpha',
-    artistDisplayName: 'Alpha Artist',
-    artistAvatarUrl: null,
-    artistUserId: 'user-alpha',
-    providerCount: 3,
-    missingArtwork: true,
-    noProviders: false,
-    noUpc: false,
-    zeroTracks: false,
-  },
-  {
-    id: 'release-2',
-    title: 'Night Routes',
-    slug: 'night-routes',
-    releaseType: 'ep',
-    releaseDate: null,
+    id: 'rel-story-1',
+    title: 'Signal Bloom',
+    slug: 'signal-bloom',
+    releaseType: 'album',
+    releaseDate: new Date('2026-08-14T00:00:00.000Z'),
     artworkUrl: null,
     totalTracks: 0,
-    isExplicit: true,
-    label: null,
+    isExplicit: false,
+    label: 'Jovie Labs',
     upc: null,
     sourceType: 'ingested',
-    spotifyPopularity: null,
-    createdAt: new Date('2026-08-24T00:00:00.000Z'),
-    creatorProfileId: 'profile-beta',
-    artistUsername: 'beta',
-    artistDisplayName: 'Beta Artist',
+    spotifyPopularity: 42,
+    createdAt: new Date('2026-08-16T00:00:00.000Z'),
+    creatorProfileId: 'profile-story-1',
+    artistUsername: 'signalbloom',
+    artistDisplayName: 'Signal Bloom',
     artistAvatarUrl: null,
-    artistUserId: null,
+    artistUserId: 'user-story-1',
     providerCount: 0,
     missingArtwork: true,
     noProviders: true,
     noUpc: true,
     zeroTracks: true,
   },
-];
+  {
+    id: 'rel-story-2',
+    title: 'Late Checkout',
+    slug: 'late-checkout',
+    releaseType: 'single',
+    releaseDate: new Date('2026-07-02T00:00:00.000Z'),
+    artworkUrl: null,
+    totalTracks: 1,
+    isExplicit: true,
+    label: 'North Pier',
+    upc: '123456789012',
+    sourceType: 'manual',
+    spotifyPopularity: 67,
+    createdAt: new Date('2026-07-04T00:00:00.000Z'),
+    creatorProfileId: 'profile-story-2',
+    artistUsername: 'latecheckout',
+    artistDisplayName: 'Late Checkout',
+    artistAvatarUrl: null,
+    artistUserId: null,
+    providerCount: 3,
+    missingArtwork: false,
+    noProviders: false,
+    noUpc: false,
+    zeroTracks: false,
+  },
+] satisfies AdminReleaseRow[];
 
-const meta: Meta<typeof AdminReleasesTableUnified> = {
-  title: 'Admin/Releases/AdminReleasesTableUnified',
+function createStoryQueryClient() {
+  const client = new QueryClient({
+    defaultOptions: {
+      queries: { retry: false, staleTime: Infinity },
+      mutations: { retry: false },
+    },
+  });
+  client.setQueryData(
+    queryKeys.adminReleases.list({
+      sort: 'created_desc',
+      search: '',
+      pageSize: 20,
+    }),
+    { pages: [{ rows: releases, total: releases.length }], pageParams: [1] }
+  );
+  return client;
+}
+
+const storyQueryClient = createStoryQueryClient();
+
+const meta = {
+  title: 'Admin/Tables/Releases',
   component: AdminReleasesTableUnified,
+  parameters: {
+    layout: 'fullscreen',
+  },
   decorators: [
     Story => (
-      <QueryClientProvider client={queryClient}>
-        <div className='h-96 p-4'>
+      <QueryClientProvider client={storyQueryClient}>
+        <div className='h-160 bg-base text-primary-token'>
           <Story />
         </div>
       </QueryClientProvider>
     ),
   ],
-  parameters: {
-    layout: 'fullscreen',
-  },
   args: {
     releases,
     pageSize: 20,
     total: releases.length,
     search: '',
-    sort: 'release_date_desc',
+    sort: 'created_desc',
   },
-};
+} satisfies Meta<typeof AdminReleasesTableUnified>;
 
 export default meta;
-type Story = StoryObj<typeof AdminReleasesTableUnified>;
+type Story = StoryObj<typeof meta>;
 
-export const Populated: Story = {};
-
-export const Empty: Story = {
-  args: {
-    releases: [],
-    total: 0,
-  },
-};
+export const Default: Story = {};

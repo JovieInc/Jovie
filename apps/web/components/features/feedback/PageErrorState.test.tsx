@@ -1,6 +1,7 @@
 import { fireEvent, render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { describe, expect, it, vi } from 'vitest';
+import { inspectRecoveryActions } from '@/tests/utils/recovery-actions';
 import { PageErrorState } from './PageErrorState';
 
 describe('PageErrorState', () => {
@@ -55,6 +56,22 @@ describe('PageErrorState', () => {
 
     fireEvent.click(screen.getByRole('button', { name: 'Try again' }));
     expect(onRetry).toHaveBeenCalledOnce();
+  });
+
+  it('satisfies the one-action recovery contract', () => {
+    const { container } = render(
+      <PageErrorState
+        title='Unable to Load Dashboard'
+        message='Try again in a moment.'
+        error={Object.assign(new Error('Request timed out.'), {
+          digest: 'dashboard-timeout',
+        })}
+      />
+    );
+
+    const inspection = inspectRecoveryActions(container);
+    expect(inspection.recoveryActionCount).toBe(1);
+    expect(inspection.issues).toEqual([]);
   });
 
   it('keeps a repeated error message out of the diagnostic disclosure', () => {

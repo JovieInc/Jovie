@@ -65,10 +65,21 @@ export type PresenceFindingTransition =
   | {
       readonly ok: false;
       readonly reason:
+        | 'already_terminal'
         | 'draft_missing'
         | 'not_a_collision'
         | 'wrong_collision_action';
     };
+
+export type PresenceActionFailureReason =
+  | 'not_found'
+  | Extract<PresenceFindingTransition, { readonly ok: false }>['reason'];
+
+export function presenceActionFailureStatus(
+  reason: PresenceActionFailureReason
+): 404 | 409 {
+  return reason === 'not_found' ? 404 : 409;
+}
 
 export function transitionPresenceFinding(
   finding: Pick<
@@ -77,7 +88,13 @@ export function transitionPresenceFinding(
   >,
   action: PresenceFindingAction
 ): PresenceFindingTransition {
+  if (finding.status === 'resolved' || finding.status === 'dismissed') {
+    return { ok: false, reason: 'already_terminal' };
+  }
   if (action === 'prepare_update') {
+    if (finding.kind === 'collision') {
+      return { ok: false, reason: 'wrong_collision_action' };
+    }
     if (
       finding.actionMode === 'draft_request' &&
       !finding.draftRequest?.trim()
@@ -87,7 +104,11 @@ export function transitionPresenceFinding(
     return {
       ok: true,
       status:
-        finding.actionMode === 'draft_request' ? 'drafted' : finding.status,
+        finding.actionMode === 'draft_request'
+          ? 'drafted'
+          : finding.actionMode === 'direct_update'
+            ? 'resolved'
+            : finding.status,
       collisionDisposition: null,
     };
   }

@@ -114,4 +114,25 @@ describe('executePresenceBuildStep', () => {
     );
     expect(JSON.stringify(artifact)).not.toMatch(/streams|revenue|license/i);
   });
+
+  it('counts attested live downloads without inventing stats', async () => {
+    mockSelect
+      .mockReturnValueOnce(chainSelect([]))
+      .mockReturnValueOnce(chainSelect([]))
+      .mockReturnValueOnce(chainSelect([{ id: 'd1' }]));
+
+    const artifact = await executePresenceBuildStep(
+      'surface_library_opportunities',
+      'p1'
+    );
+
+    expect(artifact.facts).toEqual(
+      expect.arrayContaining([
+        { label: 'Downloads', value: '1 attested file live' },
+        { label: 'Stats', value: 'Not connected' },
+      ])
+    );
+    expect(artifact.summary).toContain('nothing was sent');
+    expect(JSON.stringify(artifact)).not.toMatch(/streams|revenue|license/i);
+  });
 });

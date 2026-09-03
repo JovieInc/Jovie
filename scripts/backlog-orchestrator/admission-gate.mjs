@@ -128,20 +128,13 @@ export function admissionGateReceipt(issue, options = {}) {
     )
       return null;
     const storedTarget = admissionTargetPacket(payload);
+    const targeting = resolveAdmissionTarget(issue);
     if (
-      storedTarget ||
-      payload?.target_system ||
-      payload?.target_repo ||
-      payload?.artifact ||
-      payload?.verification_authority
-    ) {
-      const targeting = resolveAdmissionTarget(issue);
-      if (
-        targeting.decision !== 'admit' ||
-        !sameAdmissionTarget(storedTarget, targeting.target)
-      )
-        return null;
-    }
+      targeting.decision !== 'admit' ||
+      !storedTarget ||
+      !sameAdmissionTarget(storedTarget, targeting.target)
+    )
+      return null;
     return { body, payload };
   } catch {
     return null;

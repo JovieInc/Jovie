@@ -180,7 +180,10 @@ describe('promo downloads API', () => {
 
     expect(response.status).toBe(201);
     expect(hoisted.insertValuesMock).toHaveBeenCalledWith(
-      expect.objectContaining({ fileMimeType: 'audio/mpeg' })
+      expect.objectContaining({
+        fileMimeType: 'audio/mpeg',
+        isActive: false,
+      })
     );
   });
 

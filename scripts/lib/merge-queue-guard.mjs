@@ -15,7 +15,7 @@ export const REQUIRED_MERGE_STATUSES = [
 
 /** Canonical native merge-queue operating policy (controller + repo guardrails). */
 export const MERGE_QUEUE_POLICY = Object.freeze({
-  enqueueLabel: MERGE_QUEUE_LABEL,
+  enqueueLabel: null,
   // 12→16 on 2026-07-09 per JOV-3833 decision trigger (ready→merged p95 718m
   // vs 15m target after one week live; queue-depth deferral was a binding
   // constraint during merge waves). Re-evaluate if runner-pool saturation
@@ -677,7 +677,7 @@ const KEYWORD_HOT_KEYS = [
     key: 'hot:ci-workflows',
     reason: 'CI/workflow control plane',
     pattern:
-      /\b(ci|workflow|github actions|merge queue|graphite|agent pipeline|actionlint)\b/i,
+      /\b(ci|workflow|github actions|merge queue|agent pipeline|actionlint)\b/i,
   },
   {
     key: 'hot:package-manifest',
@@ -1836,12 +1836,12 @@ export function parseMergeQueueTimeline(events, options = {}) {
   let mergedAt = null;
 
   for (const event of events ?? []) {
-    if (event.event === 'labeled' && event.label?.name === MERGE_QUEUE_LABEL) {
+    if (event.event === 'added_to_merge_queue' || event.event === 'enqueued') {
       queuedAt.push(event.created_at);
     }
     if (
-      event.event === 'unlabeled' &&
-      event.label?.name === MERGE_QUEUE_LABEL
+      event.event === 'removed_from_merge_queue' ||
+      event.event === 'dequeued'
     ) {
       dequeued.push({
         at: event.created_at,

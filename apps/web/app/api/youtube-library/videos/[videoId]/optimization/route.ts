@@ -1,44 +1,49 @@
 import { NextResponse } from 'next/server';
-import { z } from 'zod';
-import { getCachedAuth } from '@/lib/auth/cached';
-import { getExactProfileAccess } from '@/lib/auth/profile-access';
-import { db } from '@/lib/db';
-import { getYouTubeOptimizationSnapshotForProfile } from '@/lib/youtube-library/queries';
+import { captureError } from '@/lib/error-tracking';
+import { NO_STORE_HEADERS } from '@/lib/http/headers';
+import {
+  loadYouTubeOptimizationSnapshot,
+  requireLibraryProfileAccess,
+} from '@/lib/library/track-drawer.server';
 
 export const runtime = 'nodejs';
-export const dynamic = 'force-dynamic';
-
-const querySchema = z.object({ creatorProfileId: z.string().uuid() });
-const paramsSchema = z.object({ videoId: z.string().uuid() });
 
 export async function GET(
   request: Request,
-  context: { readonly params: Promise<{ readonly videoId: string }> }
+  { params }: { params: Promise<{ videoId: string }> }
 ) {
-  const query = querySchema.safeParse({
-    creatorProfileId: new URL(request.url).searchParams.get('creatorProfileId'),
-  });
-  const params = paramsSchema.safeParse(await context.params);
-  if (!query.success || !params.success) {
-    return NextResponse.json({ error: 'Invalid request' }, { status: 400 });
+  try {
+    const { videoId } = await params;
+    const creatorProfileId = new URL(request.url).searchParams.get(
+      'creatorProfileId'
+    );
+    if (!videoId || !creatorProfileId) {
+      return NextResponse.json(
+        { error: 'Invalid payload' },
+        { status: 400, headers: NO_STORE_HEADERS }
+      );
+    }
+    const auth = await requireLibraryProfileAccess(creatorProfileId);
+    if (auth.error) return auth.error;
+    const snapshot = await loadYouTubeOptimizationSnapshot({
+      creatorProfileId,
+      videoId,
+    });
+    if (!snapshot) {
+      return NextResponse.json(
+        { error: 'Video was not found' },
+        { status: 404, headers: NO_STORE_HEADERS }
+      );
+    }
+    return NextResponse.json({ snapshot }, { headers: NO_STORE_HEADERS });
+  } catch (error) {
+    await captureError('YouTube optimization snapshot failed', error, {
+      route: '/api/youtube-library/videos/[videoId]/optimization',
+      method: 'GET',
+    });
+    return NextResponse.json(
+      { error: 'Internal error' },
+      { status: 500, headers: NO_STORE_HEADERS }
+    );
   }
-  const { userId } = await getCachedAuth();
-  if (!userId) {
-    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-  }
-  const access = await getExactProfileAccess(
-    db,
-    userId,
-    query.data.creatorProfileId
-  );
-  if (!access.ok) {
-    return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
-  }
-  const snapshot = await getYouTubeOptimizationSnapshotForProfile({
-    creatorProfileId: query.data.creatorProfileId,
-    videoId: params.data.videoId,
-  });
-  return snapshot
-    ? NextResponse.json({ snapshot })
-    : NextResponse.json({ error: 'Video not found' }, { status: 404 });
 }

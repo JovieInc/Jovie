@@ -97,6 +97,8 @@ export function DashboardHeader({
   return (
     <header
       data-testid='dashboard-header'
+      data-grid-anchor='desktop-content'
+      data-top-spacing-owner='shell-header'
       className={cn(
         'z-20',
         // Keep ordinary headers on the AppShellFrame plane. Chat explicitly
@@ -112,7 +114,7 @@ export function DashboardHeader({
         className={cn(
           'relative flex w-full items-center gap-2',
           MOBILE_HEADER_PADDING,
-          'sm:h-(--app-shell-header-height-compact) sm:px-3 sm:py-0'
+          'sm:h-(--app-shell-header-height-compact) sm:px-(--app-shell-header-padding-x) sm:py-0'
         )}
       >
         {leading ? (

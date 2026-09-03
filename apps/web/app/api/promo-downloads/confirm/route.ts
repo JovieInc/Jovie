@@ -185,7 +185,9 @@ export async function POST(request: NextRequest) {
     let slug = slugify(title);
     if (!slug) slug = 'download';
 
-    // Insert promo download record (store pathname, NOT public URL)
+    // Insert promo download record (store pathname, NOT public URL).
+    // Active files require an immutable full-control attestation; uploads
+    // stay inactive until that later attestation path records the actor.
     const [record] = await db
       .insert(promoDownloads)
       .values({
@@ -200,6 +202,7 @@ export async function POST(request: NextRequest) {
         rightsControlAttested,
         rightsControlAttestedBy: user.id,
         rightsControlAttestedAt: new Date(),
+        isActive: false,
         position: nextPosition,
       })
       .returning();

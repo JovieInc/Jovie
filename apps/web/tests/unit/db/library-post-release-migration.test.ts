@@ -6,8 +6,36 @@ const postReleaseMigration = join(
   process.cwd(),
   'drizzle/migrations/0098_regular_puff_adder.sql'
 );
+const snapshot = join(
+  process.cwd(),
+  'drizzle/migrations/meta/0098_snapshot.json'
+);
+const schemaModule = join(process.cwd(), 'lib/db/schema/library-presence.ts');
+const promoSchemaModule = join(
+  process.cwd(),
+  'lib/db/schema/promo-downloads.ts'
+);
 
 describe('library post-release private migration', () => {
+  it('defines typed Drizzle schema for presence, rights, and attestation columns', async () => {
+    const schema = await readFile(schemaModule, 'utf8');
+    const promoSchema = await readFile(promoSchemaModule, 'utf8');
+    const snapshotJson = JSON.parse(await readFile(snapshot, 'utf8'));
+    for (const [tableName, exportName] of [
+      ['library_presence_findings', 'libraryPresenceFindings'],
+      ['library_rightsholder_evidence', 'libraryRightsholderEvidence'],
+    ] as const) {
+      expect(schema).toContain(`export const ${exportName} = pgTable(`);
+      expect(schema).toContain(`'${tableName}'`);
+      expect(snapshotJson.tables[`public.${tableName}`]).toBeDefined();
+    }
+    expect(promoSchema).toContain("boolean('rights_control_attested')");
+    expect(
+      snapshotJson.tables['public.promo_downloads'].columns
+        .rights_control_attested
+    ).toMatchObject({ default: false, notNull: true });
+  });
+
   it('forces private access and evidence truthfulness for post-release data', async () => {
     const sql = await readFile(postReleaseMigration, 'utf8');
     for (const table of [

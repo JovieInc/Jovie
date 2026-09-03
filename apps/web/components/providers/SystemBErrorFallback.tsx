@@ -26,7 +26,7 @@ interface SystemBErrorFallbackProps {
   readonly description: string;
   /** Support-path diagnostic. Rendered only behind an opt-in disclosure. */
   readonly digest?: string;
-  readonly actions: readonly SystemBErrorFallbackAction[];
+  readonly action: SystemBErrorFallbackAction;
   readonly role?: 'alert';
   readonly ariaLive?: 'assertive' | 'polite';
   readonly className?: string;
@@ -38,11 +38,44 @@ function rootClassName(className: string | undefined): string {
     .join(' ');
 }
 
+function actionVariant(
+  variant: SystemBErrorFallbackAction['variant']
+): 'primary' | 'secondary' {
+  return variant === 'secondary' ? 'secondary' : 'primary';
+}
+
+function SystemBErrorFallbackActionControl({
+  action,
+}: {
+  readonly action: SystemBErrorFallbackAction;
+}) {
+  const variant = actionVariant(action.variant);
+
+  if (action.type === 'link') {
+    return (
+      <Button
+        asChild
+        variant={variant}
+        size='sm'
+        className='system-b-error-fallback__action-link'
+      >
+        <a href={action.href}>{action.label}</a>
+      </Button>
+    );
+  }
+
+  return (
+    <Button type='button' variant={variant} size='sm' onClick={action.onClick}>
+      {action.label || 'Action'}
+    </Button>
+  );
+}
+
 export function SystemBErrorFallback({
   title = RECOVERY_COPY.title,
   description,
   digest,
-  actions,
+  action,
   role,
   ariaLive,
   className,
@@ -63,42 +96,11 @@ export function SystemBErrorFallback({
         <h1 className='system-b-error-fallback__title'>{title}</h1>
         <p className='system-b-error-fallback__description'>{description}</p>
 
-        <div className='system-b-error-fallback__actions'>
-          {actions.map(action => {
-            if (action.type === 'link') {
-              return (
-                <a
-                  key={`${action.type}-${action.label}`}
-                  href={action.href}
-                  className='system-b-error-fallback__action-link'
-                >
-                  <Button
-                    type='button'
-                    variant={
-                      action.variant === 'secondary' ? 'secondary' : 'primary'
-                    }
-                    size='sm'
-                  >
-                    {action.label}
-                  </Button>
-                </a>
-              );
-            }
-
-            return (
-              <Button
-                key={`${action.type}-${action.label}`}
-                type='button'
-                variant={
-                  action.variant === 'secondary' ? 'secondary' : 'primary'
-                }
-                size='sm'
-                onClick={action.onClick}
-              >
-                {action.label || 'Action'}
-              </Button>
-            );
-          })}
+        <div
+          className='system-b-error-fallback__actions'
+          data-recovery-actions=''
+        >
+          <SystemBErrorFallbackActionControl action={action} />
         </div>
 
         {digest ? (

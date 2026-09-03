@@ -1,4 +1,15 @@
 export type ArtistRuleStrength = 'hard_constraint' | 'preference';
+export type ArtistRuleScope =
+  | 'artist'
+  | 'channel'
+  | 'release'
+  | 'item_kind'
+  | 'item';
+export type StoredArtistRuleStatus =
+  | 'suggested'
+  | 'active'
+  | 'superseded'
+  | 'revoked';
 
 export interface ArtistRuleView {
   readonly id: string;
@@ -6,15 +17,11 @@ export interface ArtistRuleView {
   readonly ruleKey: string;
   readonly instruction: string;
   readonly strength: ArtistRuleStrength;
-  readonly scope: 'artist' | 'channel' | 'release' | 'item_kind' | 'item';
+  readonly scope: ArtistRuleScope;
   readonly scopeValue: string | null;
   readonly allowOverride: boolean;
-  readonly status: 'suggested' | 'active' | 'superseded' | 'revoked';
-  readonly provenanceSource:
-    | 'artist'
-    | 'authorized_team'
-    | 'memory'
-    | 'contract';
+  readonly status: StoredArtistRuleStatus;
+  readonly provenanceSource: string | null;
   readonly confirmedAt: string | null;
   readonly createdAt: string;
 }

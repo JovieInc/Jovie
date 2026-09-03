@@ -75,7 +75,7 @@ function dependencies(
 }
 
 describe('Summer shadow ingress', () => {
-  it('enables only an explicit Preview deployment and fails closed elsewhere', () => {
+  it('enables explicit Preview and Production deployments and fails closed elsewhere', () => {
     expect(
       isSummerShadowEnabled({
         SUMMER_SHADOW_ENABLED: 'true',
@@ -87,8 +87,18 @@ describe('Summer shadow ingress', () => {
         SUMMER_SHADOW_ENABLED: 'true',
         VERCEL_ENV: 'production',
       })
+    ).toBe(true);
+    expect(
+      isSummerShadowEnabled({
+        SUMMER_SHADOW_ENABLED: 'true',
+        VERCEL_ENV: 'development',
+      })
     ).toBe(false);
+    expect(isSummerShadowEnabled({ SUMMER_SHADOW_ENABLED: 'true' })).toBe(
+      false
+    );
     expect(isSummerShadowEnabled({ VERCEL_ENV: 'preview' })).toBe(false);
+    expect(isSummerShadowEnabled({ VERCEL_ENV: 'production' })).toBe(false);
   });
 
   it('authenticates before parsing and rejects unsigned input without side effects', async () => {

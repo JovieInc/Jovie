@@ -38,6 +38,12 @@ export async function executePresenceBuildStep(
   }
 }
 
+/**
+ * Read-only onboarding exposure of Library presence primitives (JOV-5694).
+ * Reuses the Library optimization contract in
+ * `docs/product/library-content-graph-and-artist-rules.md`. Does not send,
+ * invent stats, or create a parallel experiment.
+ */
 async function surfaceLibraryOpportunities(
   profileId: string
 ): Promise<PresenceBuildArtifact> {

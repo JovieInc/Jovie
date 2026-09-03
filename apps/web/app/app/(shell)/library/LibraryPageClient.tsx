@@ -8,14 +8,17 @@ import type { ArtistRuleView } from '@/lib/artist-rules/types';
 import type { CreatorDocumentListItem } from '@/lib/creator-documents/types';
 import type { ReleaseViewModel } from '@/lib/discography/types';
 import type { LibraryAssetShareViewModel } from '@/lib/library/asset-share';
-import type { LibraryRelationshipView } from '@/lib/library/graph-types';
 import {
   LIBRARY_LIFECYCLE_STAGES,
   LIBRARY_STAGE_LABELS,
   parseLibraryStageParam,
 } from '@/lib/library/lifecycle-stage';
-import type { LibraryPostReleaseBundle } from '@/lib/library/post-release-types';
+import {
+  EMPTY_LIBRARY_POST_RELEASE_BUNDLE,
+  type LibraryPostReleaseBundle,
+} from '@/lib/library/post-release-types';
 import type { LibraryProfileVisibility } from '@/lib/library/profile-visibility';
+import type { LibraryRelationshipView } from '@/lib/library/track-drawer-types';
 import type { LibraryMerchCard } from '@/lib/merch/types';
 import type { PublicVideoListItem } from '@/lib/youtube-library/queries';
 import { ReleaseCatalogPageClient } from '../dashboard/releases/ReleaseCatalogPageClient';
@@ -35,11 +38,11 @@ export function LibraryPageClient({
   creatorDocuments = [],
   creatorDocumentsNextCursor = null,
   creatorDocumentsLoadFailed = false,
-  initialArtistRules = [],
   youtubeVideos = [],
   youtubeConnected = false,
-  libraryRelationships = [],
-  postReleaseBundle = { downloads: [], findings: [], rightsholders: [] },
+  initialArtistRules = [],
+  relationships = [],
+  postReleaseBundle = EMPTY_LIBRARY_POST_RELEASE_BUNDLE,
 }: {
   readonly creatorProfileId: string;
   readonly merchCards: readonly LibraryMerchCard[];
@@ -55,10 +58,10 @@ export function LibraryPageClient({
   readonly creatorDocuments?: readonly CreatorDocumentListItem[];
   readonly creatorDocumentsNextCursor?: string | null;
   readonly creatorDocumentsLoadFailed?: boolean;
-  readonly initialArtistRules?: readonly ArtistRuleView[];
   readonly youtubeVideos?: readonly PublicVideoListItem[];
   readonly youtubeConnected?: boolean;
-  readonly libraryRelationships?: readonly LibraryRelationshipView[];
+  readonly initialArtistRules?: readonly ArtistRuleView[];
+  readonly relationships?: readonly LibraryRelationshipView[];
   readonly postReleaseBundle?: LibraryPostReleaseBundle;
 }) {
   const pathname = usePathname();
@@ -157,6 +160,8 @@ export function LibraryPageClient({
           role='tablist'
           aria-label='Library Stages'
           data-testid='library-stage-tabs'
+          data-youtube-connected={youtubeConnected ? 'true' : 'false'}
+          data-artist-rule-count={String(initialArtistRules.length)}
           className='flex min-w-0 flex-1 items-center gap-1 overflow-x-auto'
         >
           {STAGE_TABS.map(tab => (
@@ -235,7 +240,11 @@ export function LibraryPageClient({
             assetShareByAssetId={assetShareByAssetId}
             creatorDocuments={creatorDocuments}
             youtubeVideos={youtubeVideos}
-            libraryRelationships={libraryRelationships}
+            merchProducts={merchCards.map(card => ({
+              id: card.id,
+              title: card.title,
+            }))}
+            relationships={relationships}
             postReleaseBundle={postReleaseBundle}
           />
         </div>

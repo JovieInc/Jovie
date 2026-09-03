@@ -1,77 +1,88 @@
 import { NextResponse } from 'next/server';
 import { z } from 'zod';
-import { getCachedAuth } from '@/lib/auth/cached';
-import { getExactProfileAccess } from '@/lib/auth/profile-access';
-import { db } from '@/lib/db';
+import { captureError } from '@/lib/error-tracking';
+import { NO_STORE_HEADERS } from '@/lib/http/headers';
 import {
-  removeYouTubeVideoMerchTag,
-  tagYouTubeVideoWithMerch,
-} from '@/lib/library/graph-store';
+  LibraryRelationshipWriteError,
+  requireLibraryProfileAccess,
+  tagMerchInYouTubeVideo,
+  untagMerchInYouTubeVideo,
+} from '@/lib/library/track-drawer.server';
 
 export const runtime = 'nodejs';
-export const dynamic = 'force-dynamic';
 
-const bodySchema = z.object({
+const mutationSchema = z.object({
   creatorProfileId: z.string().uuid(),
-  videoId: z.string().uuid(),
+  videoId: z.string().min(1),
   merchCardId: z.string().uuid(),
 });
 
-async function authorize(creatorProfileId: string) {
-  const { userId } = await getCachedAuth();
-  if (!userId) return { ok: false as const, status: 401, userId: null };
-  const access = await getExactProfileAccess(db, userId, creatorProfileId);
-  if (!access.ok) return { ok: false as const, status: 403, userId };
-  return { ok: true as const, status: 200, userId };
+async function readMutation(request: Request) {
+  const parsed = mutationSchema.safeParse(
+    await request.json().catch(() => null)
+  );
+  if (!parsed.success) {
+    return {
+      error: NextResponse.json(
+        { error: 'Invalid payload' },
+        { status: 400, headers: NO_STORE_HEADERS }
+      ),
+    };
+  }
+  const auth = await requireLibraryProfileAccess(parsed.data.creatorProfileId);
+  if (auth.error) return auth;
+  return { data: parsed.data };
 }
 
 export async function POST(request: Request) {
-  const parsed = bodySchema.safeParse(await request.json().catch(() => null));
-  if (!parsed.success) {
+  try {
+    const auth = await readMutation(request);
+    if ('error' in auth) return auth.error;
     return NextResponse.json(
-      { error: 'Invalid relationship' },
-      { status: 400 }
+      { relationship: await tagMerchInYouTubeVideo(auth.data) },
+      { headers: NO_STORE_HEADERS }
     );
-  }
-  const auth = await authorize(parsed.data.creatorProfileId);
-  if (!auth.ok || !auth.userId) {
-    return NextResponse.json(
-      { error: auth.status === 401 ? 'Unauthorized' : 'Forbidden' },
-      { status: auth.status }
-    );
-  }
-  const relationship = await tagYouTubeVideoWithMerch({
-    ...parsed.data,
-    actorUserId: auth.userId,
-  });
-  return relationship
-    ? NextResponse.json({ relationship }, { status: 201 })
-    : NextResponse.json(
-        { error: 'Video or merch product not found' },
-        { status: 404 }
+  } catch (error) {
+    if (error instanceof LibraryRelationshipWriteError) {
+      return NextResponse.json(
+        { error: error.message },
+        {
+          status: error.code === 'not_found' ? 404 : 409,
+          headers: NO_STORE_HEADERS,
+        }
       );
+    }
+    await captureError('Library relationship POST failed', error, {
+      route: '/api/library/relationships',
+      method: 'POST',
+    });
+    return NextResponse.json(
+      { error: 'Internal error' },
+      { status: 500, headers: NO_STORE_HEADERS }
+    );
+  }
 }
 
 export async function DELETE(request: Request) {
-  const parsed = bodySchema.safeParse(await request.json().catch(() => null));
-  if (!parsed.success) {
-    return NextResponse.json(
-      { error: 'Invalid relationship' },
-      { status: 400 }
-    );
-  }
-  const auth = await authorize(parsed.data.creatorProfileId);
-  if (!auth.ok) {
-    return NextResponse.json(
-      { error: auth.status === 401 ? 'Unauthorized' : 'Forbidden' },
-      { status: auth.status }
-    );
-  }
-  const removed = await removeYouTubeVideoMerchTag(parsed.data);
-  return removed
-    ? NextResponse.json({ ok: true })
-    : NextResponse.json(
-        { error: 'Active relationship not found' },
-        { status: 404 }
+  try {
+    const auth = await readMutation(request);
+    if ('error' in auth) return auth.error;
+    await untagMerchInYouTubeVideo(auth.data);
+    return NextResponse.json({ ok: true }, { headers: NO_STORE_HEADERS });
+  } catch (error) {
+    if (error instanceof LibraryRelationshipWriteError) {
+      return NextResponse.json(
+        { error: error.message },
+        { status: 409, headers: NO_STORE_HEADERS }
       );
+    }
+    await captureError('Library relationship DELETE failed', error, {
+      route: '/api/library/relationships',
+      method: 'DELETE',
+    });
+    return NextResponse.json(
+      { error: 'Internal error' },
+      { status: 500, headers: NO_STORE_HEADERS }
+    );
+  }
 }

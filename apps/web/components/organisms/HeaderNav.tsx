@@ -480,7 +480,7 @@ export function HeaderNav({
   ) =>
     links?.map(link => (
       <HeaderNavLink
-        key={link.href}
+        key={`${link.href}:${link.label}`}
         href={link.href}
         label={link.label}
         className={cn(

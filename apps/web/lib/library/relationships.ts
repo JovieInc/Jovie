@@ -1,7 +1,7 @@
 import type {
   CreatorOffer,
   LibraryRelationship,
-} from '@/lib/db/schema/library-graph';
+} from '@/lib/db/schema/library-content-graph';
 
 type RelationshipKind = LibraryRelationship['kind'];
 type EntityType = LibraryRelationship['subjectType'];
