@@ -7,6 +7,7 @@ import {
   MarketingPosterHero,
   type MarketingPosterHeroCta,
 } from '@/components/marketing/MarketingPosterHero';
+import { MARKETING_PEN_CONTRACT_IDS } from '@/data/marketing/penContracts';
 
 vi.mock('@/components/homepage/homepage-analytics', () => ({
   trackHomepageEvent: vi.fn(),
@@ -47,9 +48,11 @@ describe('MarketingPosterHero', () => {
 
     const heading = screen.getByRole('heading', { level: 1 });
     expect(screen.getAllByRole('heading', { level: 1 })).toHaveLength(1);
-    expect(screen.getByTestId('homepage-hero-shell')).toHaveAttribute(
-      'aria-labelledby',
-      heading.id
+    const shell = screen.getByTestId('homepage-hero-shell');
+    expect(shell).toHaveAttribute('aria-labelledby', heading.id);
+    expect(shell).toHaveAttribute(
+      'data-pen-contract',
+      MARKETING_PEN_CONTRACT_IDS.section.hero
     );
     expect(screen.getAllByTestId('homepage-primary-cta')).toHaveLength(1);
     const primaryLink = screen.getByRole('link', { name: 'Enter Jovie' });

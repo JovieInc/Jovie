@@ -5,23 +5,43 @@ ACTION="${1:-test}"
 if [[ $# -gt 0 ]]; then
   shift
 fi
+if [[ "${1:-}" == "--" ]]; then
+  shift
+fi
 CODE_SIGNING_ALLOWED_VALUE="${CODE_SIGNING_ALLOWED:-NO}"
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 IOS_DIR="$(cd "$SCRIPT_DIR/.." && pwd)"
 PROJECT_PATH="$IOS_DIR/Jovie.xcodeproj"
 SCHEME="Jovie"
 
-if [[ "$ACTION" == "-resolvePackageDependencies" ]]; then
-  echo "Resolving Swift package dependencies without a simulator destination..." >&2
-  xcodebuild "$ACTION" \
-    -project "$PROJECT_PATH" \
-    -scheme "$SCHEME" \
-    "$@" \
-    CODE_SIGNING_ALLOWED=NO
-  exit 0
-fi
+ios_now() {
+  date -u +%Y-%m-%dT%H:%M:%SZ
+}
 
-"$SCRIPT_DIR/ensure-configuration.sh"
+run_phase() {
+  local phase_name="$1"
+  shift
+
+  local started_at
+  local start_seconds
+  started_at="$(ios_now)"
+  start_seconds="$(date +%s)"
+
+  echo "::group::iOS phase: $phase_name"
+  echo "iOS phase started_at=$started_at name=\"$phase_name\""
+
+  set +e
+  "$@"
+  local status=$?
+  set -e
+
+  local end_seconds
+  end_seconds="$(date +%s)"
+  echo "iOS phase finished_at=$(ios_now) name=\"$phase_name\" status=$status duration_seconds=$((end_seconds - start_seconds))"
+  echo "::endgroup::"
+
+  return "$status"
+}
 
 run_with_timeout() {
   local timeout_seconds="$1"
@@ -49,6 +69,41 @@ run_with_timeout() {
 
   wait "$command_pid"
 }
+
+run_phase_with_optional_timeout() {
+  local phase_name="$1"
+  local timeout_seconds="$2"
+  shift 2
+
+  if [[ -n "$timeout_seconds" ]]; then
+    if [[ ! "$timeout_seconds" =~ ^[0-9]+$ ]]; then
+      echo "Invalid timeout for $phase_name: $timeout_seconds" >&2
+      return 2
+    fi
+
+    run_phase "$phase_name" run_with_timeout "$timeout_seconds" "$@"
+    local status=$?
+    if [[ "$status" -eq 124 ]]; then
+      echo "iOS phase timed out after ${timeout_seconds}s: $phase_name" >&2
+    fi
+    return "$status"
+  fi
+
+  run_phase "$phase_name" "$@"
+}
+
+if [[ "$ACTION" == "-resolvePackageDependencies" ]]; then
+  echo "Resolving Swift package dependencies without a simulator destination..." >&2
+  run_phase "Resolve Swift package dependencies" \
+    xcodebuild "$ACTION" \
+      -project "$PROJECT_PATH" \
+      -scheme "$SCHEME" \
+      "$@" \
+      CODE_SIGNING_ALLOWED=NO
+  exit 0
+fi
+
+run_phase "Ensure iOS local configuration" "$SCRIPT_DIR/ensure-configuration.sh"
 
 pick_destination_from_simctl() {
   local prefer_ios_prefix="${1:-}"
@@ -303,13 +358,18 @@ DESTINATION_ID="${DESTINATION#*id=}"
 DESTINATION_ID="${DESTINATION_ID%%,*}"
 
 if [[ "$ACTION" == "test" && "${JOVIE_IOS_RESET_SIMULATOR:-1}" != "0" ]]; then
-  xcrun simctl shutdown "$DESTINATION_ID" >/dev/null 2>&1 || true
-  xcrun simctl boot "$DESTINATION_ID" >/dev/null 2>&1 || true
-  xcrun simctl bootstatus "$DESTINATION_ID" -b
-  xcrun simctl terminate "$DESTINATION_ID" ie.jov.Jovie >/dev/null 2>&1 || true
+  run_phase "Reset iOS Simulator" bash -c '
+    set -euo pipefail
+    destination_id="$1"
+    xcrun simctl shutdown "$destination_id" >/dev/null 2>&1 || true
+    xcrun simctl boot "$destination_id" >/dev/null 2>&1 || true
+    xcrun simctl bootstatus "$destination_id" -b
+    xcrun simctl terminate "$destination_id" ie.jov.Jovie >/dev/null 2>&1 || true
+  ' bash "$DESTINATION_ID"
 fi
 
-xcodebuild "$ACTION" \
+run_phase_with_optional_timeout "xcodebuild $ACTION" "${JOVIE_IOS_XCODEBUILD_TIMEOUT_SECONDS:-}" \
+  xcodebuild "$ACTION" \
   -project "$PROJECT_PATH" \
   -scheme "$SCHEME" \
   -destination "$DESTINATION" \

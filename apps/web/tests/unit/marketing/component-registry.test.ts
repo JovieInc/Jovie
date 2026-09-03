@@ -407,6 +407,34 @@ describe('canonical marketing component registry', () => {
     ).toBe(1);
   });
 
+  it('routes explicit hero, credibility, and terminal CTA forks through their canonical owners', () => {
+    const source = (relativePath: string) =>
+      fs.readFileSync(path.join(repoRoot, relativePath), 'utf8');
+
+    expect(
+      source('apps/web/components/marketing/MarketingPosterHero.tsx')
+    ).toContain('<MarketingHero');
+    expect(
+      source('apps/web/components/marketing/homepage-v2/HomepageV2Route.tsx')
+    ).toContain('<MarketingHero');
+    expect(
+      source(
+        'apps/web/components/marketing/artist-profile/ArtistProfileLogoBar.tsx'
+      )
+    ).toContain('<HomeTrustSection');
+    expect(
+      source(
+        'apps/web/components/marketing/artist-profile/ArtistProfileLogoBar.tsx'
+      )
+    ).not.toContain('<NormalizedTrustLogo');
+    expect(
+      source('apps/web/components/marketing/homepage-v2/HomepageV2Ctas.tsx')
+    ).toContain('<MarketingTerminalCta');
+    expect(
+      source('apps/web/components/marketing/homepage-v2/HomepageV2Ctas.tsx')
+    ).toContain('MARKETING_PEN_CONTRACT_IDS.shell.footerCta');
+  });
+
   it('resolves every source-backed Pen root and wires its identity in source', () => {
     const coveredSourceNames = MARKETING_COMPONENT_REGISTRY.flatMap(entry => [
       entry.exportName,
@@ -603,7 +631,9 @@ describe('canonical marketing component registry', () => {
 
     expect(source).toContain("import { Button } from '@jovie/ui'");
     expect(source).toContain('function MarketingTerminalCtaAction');
-    expect(source.match(/<MarketingTerminalCtaAction[\s>]/g)).toHaveLength(2);
+    expect(source.match(/<MarketingTerminalCtaAction[\s>]/g)).toHaveLength(3);
+    expect(source.match(/variant='primary'/g)).toHaveLength(2);
+    expect(source.match(/variant='tertiary'/g)).toHaveLength(1);
     expect(source).toContain("variant='primary'");
     expect(source).toContain("variant='tertiary'");
     expect(source).toContain("size='lg'");
