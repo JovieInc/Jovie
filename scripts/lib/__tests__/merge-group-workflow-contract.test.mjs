@@ -1483,8 +1483,18 @@ ${selectedGateScript}`,
     );
     expect(sizeGuard).toContain("MAX_LINES: ${{ vars.PR_MAX_LINES || '800' }}");
     expect(sizeGuard).not.toContain('members were size-checked as source PRs');
-    expect(getJobBlock(SIZE_GUARD_WORKFLOW, 'size')).toContain(
-      "github.event_name == 'pull_request'"
+    const sourceSizeGuard = getJobBlock(SIZE_GUARD_WORKFLOW, 'size');
+    expect(sourceSizeGuard).toContain("github.event_name == 'pull_request'");
+    expect(sourceSizeGuard).toContain('name: Check out exact PR head');
+    expect(sourceSizeGuard).toContain(
+      'ref: ${{ github.event.pull_request.head.sha }}'
+    );
+    expect(sourceSizeGuard).toContain('persist-credentials: false');
+    expect(sourceSizeGuard).toContain(
+      'git fetch --no-tags --depth=1 origin "${{ github.event.pull_request.base.sha }}"'
+    );
+    expect(sourceSizeGuard).toContain(
+      'repo-hygiene-guard.mjs --diff-base "${{ github.event.pull_request.base.sha }}"'
     );
     expect(MEMBER_POLICY).toContain('fetchComparison');
     expect(MEMBER_POLICY).toContain('fetchPullRequest');
