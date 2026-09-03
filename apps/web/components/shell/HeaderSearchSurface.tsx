@@ -23,6 +23,11 @@ import {
   getPlatformIconMetadata,
   SocialIcon,
 } from '@/components/atoms/SocialIcon';
+import {
+  getShellListRowFrameClassName,
+  ShellListRowButton,
+  ShellListRowFrame,
+} from '@/components/organisms/table/atoms/ShellListRowFrame';
 import { type HeaderSearchAdapter } from '@/contexts/HeaderActionsContext';
 import { cn } from '@/lib/utils';
 import {
@@ -100,6 +105,15 @@ function HeaderSearchResultIcon({
   }
 
   return <Disc3 className='h-3.5 w-3.5' aria-hidden='true' />;
+}
+
+function getHeaderSearchResultRowClassName(isSelected: boolean) {
+  return getShellListRowFrameClassName({
+    interactive: true,
+    isSelected,
+    className:
+      'system-b-table-row-shell flex min-h-10 w-full items-center gap-2 px-2.5 py-1.5 text-left last:border-b-0',
+  });
 }
 
 interface SearchSelectableResult {
@@ -453,30 +467,31 @@ function HeaderGlobalSearch({
               </div>
               {group.items.map((item, itemIndex) => {
                 const index = startIndex + itemIndex;
+                const isSelected = activeIndex === index;
                 return (
                   <Link
                     key={item.id}
                     id={`${listboxId}-option-${index}`}
                     href={item.href}
                     role='option'
-                    aria-selected={activeIndex === index}
+                    aria-selected={isSelected}
+                    data-shell-list-row='true'
+                    data-selected={isSelected ? 'true' : undefined}
                     onMouseEnter={() => selectResultAtIndex(index)}
                     onClick={onClose}
-                    className={cn(
-                      'flex min-h-8 items-center gap-2 rounded-lg px-2 py-1 text-left transition-colors duration-subtle ease-subtle',
-                      activeIndex === index
-                        ? 'bg-surface-1 text-primary-token'
-                        : 'text-secondary-token hover:bg-surface-0 hover:text-primary-token'
-                    )}
+                    className={getHeaderSearchResultRowClassName(isSelected)}
                   >
-                    <span className='inline-flex h-6 w-6 shrink-0 items-center justify-center rounded-md bg-surface-1 text-tertiary-token'>
+                    <span
+                      data-header-search-result-icon='true'
+                      className='flex size-7 shrink-0 items-center justify-center text-tertiary-token'
+                    >
                       <HeaderSearchResultIcon item={item} />
                     </span>
-                    <span className='min-w-0 flex-1'>
-                      <span className='block truncate text-xs font-medium'>
+                    <span className='flex min-w-0 flex-1 items-baseline gap-2 overflow-hidden'>
+                      <span className='truncate text-app font-caption text-primary-token'>
                         {item.label}
                       </span>
-                      <span className='block truncate text-2xs text-tertiary-token'>
+                      <span className='truncate text-2xs text-tertiary-token'>
                         {item.description}
                       </span>
                     </span>
@@ -499,46 +514,43 @@ function HeaderGlobalSearch({
               </div>
               {contextualSuggestions.map((suggestion, suggestionIndex) => {
                 const index = items.length + suggestionIndex;
+                const isSelected = activeIndex === index;
                 return (
-                  <Button
+                  <ShellListRowButton
                     key={`${suggestion.field}:${suggestion.value}`}
                     id={`${listboxId}-option-${index}`}
                     type='button'
-                    variant='ghost'
                     role='option'
-                    aria-selected={activeIndex === index}
+                    aria-selected={isSelected}
+                    isSelected={isSelected}
                     onMouseEnter={() => selectResultAtIndex(index)}
                     onClick={() => commitContextualSuggestion(suggestion)}
-                    className={cn(
-                      'flex min-h-9 w-full items-center gap-2 rounded-lg px-2 py-1.5 text-left transition-colors duration-subtle ease-subtle',
-                      activeIndex === index
-                        ? 'bg-surface-1 text-primary-token'
-                        : 'text-secondary-token hover:bg-surface-0 hover:text-primary-token'
-                    )}
+                    className='system-b-table-row-shell flex min-h-10 w-full items-center gap-2 px-2.5 py-1.5 text-left last:border-b-0'
                   >
-                    <span className='min-w-0 flex-1 truncate text-xs font-medium'>
+                    <span className='min-w-0 flex-1 truncate text-app font-caption text-primary-token'>
                       {suggestion.value}
                     </span>
                     <span className='shrink-0 text-2xs text-tertiary-token'>
                       Filter by {FIELD_LABEL[suggestion.field].toLowerCase()}
                     </span>
-                  </Button>
+                  </ShellListRowButton>
                 );
               })}
             </fieldset>
           ) : null}
           {groups.length === 0 && contextualSuggestions.length === 0 ? (
-            <div
+            <ShellListRowFrame
               role='status'
               aria-live='polite'
-              className='min-h-10 px-2 py-3 text-xs text-tertiary-token'
+              interaction='none'
+              className='system-b-table-row-shell flex min-h-10 items-center px-2.5 py-1.5 text-xs text-tertiary-token'
             >
               {isLoading || remoteSearchPending
                 ? 'Searching…'
                 : remoteSearchFailed
                   ? 'Search unavailable'
                   : 'No matching results'}
-            </div>
+            </ShellListRowFrame>
           ) : null}
         </div>
       ) : null}

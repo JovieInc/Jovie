@@ -14,19 +14,20 @@ landing**. The queue, not this command, keeps `main` green.
 
 - **Never manually run `gh pr merge` / `--auto` / `--admin`.** The authorized
   native controller owns queue mutation and postcondition checks.
-- **Enrollment intent = add `merge-queue`.** The label wakes the native
-  controller; GitHub's authoritative queue state determines membership.
+- **Do not add, read, or retain the `merge-queue` label.** Native queue
+  membership (`isInMergeQueue`) is the only enrollment signal.
 - **`fast` is emergency/hotfix-only.** Ordinary generated PRs on `codex/*`,
   `claude/*`, `agent/*`, or similar branches must not use `fast` unless the PR
-  is explicitly classified as emergency/hotfix/incident; otherwise the guard
-  removes `fast` and gates the PR for human review.
-- **Dequeue hard gates through the controller.** A PR with `needs-human`,
-  `hold`, or `gated` must not occupy native queue slots; remove the intent label
-  only after authoritative dequeue succeeds.
-- **Never retarget to `integration/loop-*`.** That model is dormant; agents go to `main`.
-- **Never close a PR you didn't open.** Surface superseded/stale ones to the human.
-- **Opt-outs:** `needs-human`, `hold`, `gated` → leave the PR for a human after
-  removing `merge-queue` if it was already enrolled.
+  is explicitly classified as emergency/hotfix/incident.
+- **Nothing is gated on a human.** `needs-human`, `hold`, and `gated` are not
+  enrollment blockers. Conflicts are repaired in worktrees. Fleet `blocked`
+  from an observation gap is auto-resolved, not left in limbo.
+- **PRs must target `main`.** Non-main bases are a factory failure; retarget
+  to `main` and rebase. Never retarget to `integration/loop-*`.
+- **Never close a PR you didn't open.** Drafts and `queue-deferred` are
+  reported, not closed.
+- **Graphite and Cursor are gone.** Do not run `gt`, restore Graphite, or treat
+  Cursor as a landing path. Native GitHub merge queue is the only transport.
 
 ## Phase 0 — Classify + enroll the clean bucket
 
@@ -47,10 +48,10 @@ and **NATIVE QUEUE**.
 ## Phase 1 — Kill systemic blockers first
 
 If the same required check fails on **3+ PRs**, it's broken on `main`, not in the
-branches. Fix it once on `main` via a single PR, then add `merge-queue` so
-the native controller can enroll it ahead of downstream work. Add `fast` only
-when the PR is explicitly emergency/hotfix/incident-classified. Do not use an
-alternate merge path or fix the same thing on N branches.
+branches. Fix it once on `main` via a single PR, then let native autoenroll
+pick it up ahead of downstream work. Add `fast` only when the PR is explicitly
+emergency/hotfix/incident-classified. Do not use an alternate merge path or
+fix the same thing on N branches.
 
 ```bash
 # failing-check histogram across open PRs
@@ -88,7 +89,8 @@ Each agent's prompt must be self-contained and instruct it to:
    `pnpm biome check apps/web`, and the specific failing test files.
 4. Fix root causes (not the test, unless the test is wrong).
 5. `git push --force-with-lease` to the PR's head branch. **Never push to `main`.**
-6. Add the `merge-queue` label (`gh pr edit <n> --add-label merge-queue`). **Never `gh pr merge`.**
+6. Do not add `merge-queue`. Native auto-enroll revalidates the exact head after
+   the push. **Never `gh pr merge`.** Graphite and Cursor apps are uninstalled.
 7. Report `DONE` / `BLOCKED_SEMANTIC` / `BLOCKED_OTHER` with the reason.
 
 Re-dispatch any `BLOCKED_SEMANTIC` returns to an Opus agent. After agents return,
@@ -96,10 +98,10 @@ re-run Phase 0 to enroll anything now green.
 
 ## Phase 3 — Surface, don't act
 
-For the **SURFACE** bucket (`needs-human`, `hold`, `gated`) and any
-duplicate/superseded PRs, **report to the human with a recommendation** — do
-not close or merge. The drain strips `merge-queue` from hard-gated PRs before
-surfacing them. Detect dupes:
+`needs-human` is a dead label: if work needs a human it ships flag-off or is
+never created. `hold` / `gated` are not enrollment blockers and must not
+dequeue a PR. Surface duplicate/superseded PRs with a recommendation — do not
+close or merge. Detect dupes:
 
 ```bash
 gh pr list --state open --json number,title --limit 100 \

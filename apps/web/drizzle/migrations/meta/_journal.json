@@ -673,6 +673,20 @@
       "when": 1787267156057,
       "tag": "0095_neat_hannibal_king",
       "breakpoints": true
+    },
+    {
+      "idx": 96,
+      "version": "7",
+      "when": 1787927993353,
+      "tag": "0096_petite_doomsday",
+      "breakpoints": true
+    },
+    {
+      "idx": 97,
+      "version": "7",
+      "when": 1787928766493,
+      "tag": "0097_regular_mister_sinister",
+      "breakpoints": true
     }
   ]
 }

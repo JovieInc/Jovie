@@ -1,586 +1,112 @@
-import { EventEmitter } from 'node:events';
-import { PassThrough } from 'node:stream';
 import { describe, expect, it, vi } from 'vitest';
 import {
   createSummerRuntimeBridge,
   invokeSummerRuntime,
   parseSummerRuntimeCompletion,
+  SUMMER_LOCAL_RUNTIME_ERROR,
+  SUMMER_LOCAL_RUNTIME_STATUS,
 } from '../src/summer-runtime-bridge';
 
-function response(body: unknown, status = 200): Response {
-  return new Response(JSON.stringify(body), {
-    status,
-    headers: { 'content-type': 'application/json' },
-  });
-}
+const claimedTurn = {
+  id: 'turn_retired',
+  conversation_id: 'founder-conversation',
+  user_text: 'Founder prompt',
+  claim_token: 'claim_retired',
+};
 
-function fakeChild(input: {
-  readonly stdout?: string;
-  readonly stderr?: string;
-  readonly exitCode?: number;
-}) {
-  const emitter = new EventEmitter();
-  const stdin = new PassThrough();
-  const stdout = new PassThrough();
-  const stderr = new PassThrough();
-  const child = Object.assign(emitter, {
-    stdin,
-    stdout,
-    stderr,
-    kill: vi.fn(() => true),
-  });
-  queueMicrotask(() => {
-    if (input.stdout) stdout.write(input.stdout);
-    if (input.stderr) stderr.write(input.stderr);
-    stdout.end();
-    stderr.end();
-    emitter.emit('close', input.exitCode ?? 0, null);
-  });
-  return child;
-}
-
-function hangingChild() {
-  const emitter = new EventEmitter();
-  const stdin = new PassThrough();
-  return Object.assign(emitter, {
-    stdin,
-    stdout: new PassThrough(),
-    stderr: new PassThrough(),
-    kill: vi.fn(() => true),
-  });
-}
-
-function queueFetch(
-  turn: Record<string, unknown>,
-  claimStatus = 200,
-  failStatus = 200
-) {
-  const posted: Array<Record<string, unknown>> = [];
-  const fetch = vi.fn(
-    async (_url: string | URL | Request, init?: RequestInit) => {
-      if (!init?.method) return response({ ok: true, turns: [turn] });
-      const body = JSON.parse(String(init.body)) as Record<string, unknown>;
-      posted.push(body);
-      if (body.action === 'claim') {
-        return response(
-          {
-            ok: claimStatus === 200,
-            turn:
-              claimStatus === 200
-                ? { ...turn, claim_token: 'claim_1' }
-                : undefined,
-          },
-          claimStatus
-        );
-      }
-      if (body.action === 'fail') {
-        return response({ ok: failStatus === 200 }, failStatus);
-      }
-      return response({ ok: true });
-    }
-  );
-  return { fetch, posted };
-}
-
-describe('packaged Summer runtime bridge', () => {
-  it('uses fixed Hermes argv, stdin-only founder text, and never a shell', async () => {
-    const childInputs: string[] = [];
-    const spawnProcess = vi.fn(() => {
-      const child = fakeChild({ stdout: 'Summer response\n' });
-      child.stdin.on('data', chunk => childInputs.push(String(chunk)));
-      return child;
-    });
-    const completion = await invokeSummerRuntime({
-      homeDirectory: '/Users/founder',
-      turn: {
-        id: 'turn_1',
-        conversation_id: 'founder-conversation',
-        user_text: 'Ship this; $(touch /tmp/nope)',
-        claim_token: 'claim_1',
-      },
-      spawnProcess,
-    });
-    expect(completion).toEqual({ responseText: 'Summer response' });
-    const [executable, args, options] = spawnProcess.mock.calls[0] ?? [];
-    expect(executable).toBe('/Users/founder/.hermes/bin/hermes');
-    expect(args).toEqual([
-      '-p',
-      'summer',
-      'chat',
-      '-Q',
-      '-c',
-      expect.stringMatching(/^ovie-founder-[a-f0-9]{24}$/),
-      '--create-if-missing',
-      '--query-file',
-      '-',
-      '--source',
-      'tool',
-    ]);
-    expect(args).not.toContain('Ship this; $(touch /tmp/nope)');
-    expect(options).toEqual({ shell: false, stdio: ['pipe', 'pipe', 'pipe'] });
-    expect(childInputs.join('')).toBe('Ship this; $(touch /tmp/nope)');
+describe('retired local Summer runtime bridge', () => {
+  it('fails closed without invoking any local executable', async () => {
+    const spawnProcess = vi.fn();
+    await expect(
+      invokeSummerRuntime({
+        homeDirectory: '/Users/founder',
+        turn: claimedTurn,
+        spawnProcess,
+      })
+    ).rejects.toThrow(SUMMER_LOCAL_RUNTIME_ERROR);
+    expect(SUMMER_LOCAL_RUNTIME_STATUS).toBe('retired-awaiting-eve');
+    expect(spawnProcess).not.toHaveBeenCalled();
   });
 
-  it('reuses authenticated session cookies and persists completion', async () => {
-    const { fetch, posted } = queueFetch({
-      id: 'turn_1',
-      conversation_id: 'conversation_1',
-      user_text: 'Founder prompt',
-    });
-    const bridge = createSummerRuntimeBridge({
-      platform: 'darwin',
-      appOrigin: 'https://jov.ie/app/chat',
-      homeDirectory: '/Users/founder',
-      workerId: 'jovie-mac',
-      fetch,
-      spawnProcess: () => fakeChild({ stdout: 'Actual Summer answer' }),
-    });
-    await expect(bridge.runCycle()).resolves.toMatchObject({
-      state: 'completed',
-      turnId: 'turn_1',
-    });
-    expect(
-      fetch.mock.calls.every(([, init]) => init?.credentials === 'include')
-    ).toBe(true);
-    expect(posted[1]).toMatchObject({
-      action: 'complete',
-      id: 'turn_1',
-      claim_token: 'claim_1',
-      response_text: 'Actual Summer answer',
-    });
-  });
-
-  it('posts a fenced failure when Hermes exits unsuccessfully', async () => {
-    const { fetch, posted } = queueFetch({
-      id: 'turn_failed',
-      conversation_id: 'conversation_1',
-      user_text: 'Founder prompt',
-    });
+  it('does not poll, claim, or complete a server turn on macOS', async () => {
+    const fetch = vi.fn();
+    const onReceipt = vi.fn();
     const bridge = createSummerRuntimeBridge({
       platform: 'darwin',
       appOrigin: 'https://jov.ie',
       homeDirectory: '/Users/founder',
       workerId: 'jovie-mac',
       fetch,
-      spawnProcess: () => fakeChild({ exitCode: 1 }),
+      onReceipt,
     });
-    await expect(bridge.runCycle()).resolves.toMatchObject({
+
+    await expect(bridge.runCycle()).resolves.toEqual({
+      cycle: 1,
       state: 'runtime-error',
-      errorCode: 'summer-runtime-exit-1',
+      errorCode: SUMMER_LOCAL_RUNTIME_ERROR,
     });
-    expect(posted.at(-1)).toMatchObject({
-      action: 'fail',
-      id: 'turn_failed',
-      claim_token: 'claim_1',
-      failure_code: 'summer-runtime-exit-1',
-    });
+    expect(fetch).not.toHaveBeenCalled();
+    expect(onReceipt).toHaveBeenCalledOnce();
   });
 
-  it('strips a safe Summer tool fence and posts it with completion', async () => {
-    const { fetch, posted } = queueFetch({
-      id: 'turn_tool',
-      conversation_id: 'conversation_1',
-      user_text: 'Org state?',
-    });
-    const stdout = [
-      'Current org.',
-      '```summer-tool',
-      JSON.stringify({
-        name: 'get_org_state',
-        ok: true,
-        receiptId: 'tool_ok_1',
-        summary: 'read-only org snapshot',
-      }),
-      '```',
-      '',
-    ].join('\n');
+  it('emits one retired receipt when started and can be stopped safely', async () => {
+    const onReceipt = vi.fn();
     const bridge = createSummerRuntimeBridge({
       platform: 'darwin',
-      appOrigin: 'https://jov.ie',
-      homeDirectory: '/Users/founder',
-      workerId: 'jovie-mac',
-      fetch,
-      spawnProcess: () =>
-        fakeChild({ stdout, stderr: 'private hermes diagnostic' }),
-    });
-    await expect(bridge.runCycle()).resolves.toMatchObject({
-      state: 'completed',
-      turnId: 'turn_tool',
-    });
-    expect(posted.at(-1)).toMatchObject({
-      action: 'complete',
-      response_text: 'Current org.',
-      tool: {
-        name: 'get_org_state',
-        ok: true,
-        receiptId: 'tool_ok_1',
-        summary: 'read-only org snapshot',
-      },
-    });
-    expect(parseSummerRuntimeCompletion(stdout).responseText).toBe(
-      'Current org.'
-    );
-  });
-
-  it('fences an unsafe tool instead of completing', async () => {
-    const { fetch, posted } = queueFetch({
-      id: 'turn_unsafe',
-      conversation_id: 'conversation_1',
-      user_text: 'Upload avatar',
-    });
-    const stdout = [
-      'No.',
-      '```summer-tool',
-      JSON.stringify({
-        name: 'proposeAvatarUpload',
-        ok: true,
-        receiptId: 'tool_bad',
-        summary: 'artist tool',
-      }),
-      '```',
-    ].join('\n');
-    const bridge = createSummerRuntimeBridge({
-      platform: 'darwin',
-      appOrigin: 'https://jov.ie',
-      homeDirectory: '/Users/founder',
-      workerId: 'jovie-mac',
-      fetch,
-      spawnProcess: () => fakeChild({ stdout }),
-    });
-    await expect(bridge.runCycle()).resolves.toMatchObject({
-      state: 'runtime-error',
-      errorCode: 'summer-unsafe-tool',
-    });
-    expect(posted.at(-1)).toMatchObject({
-      action: 'fail',
-      failure_code: 'summer-unsafe-tool',
-    });
-  });
-
-  it('survives an idle heartbeat and completes on the next cycle', async () => {
-    let pendingCalls = 0;
-    const fetch = vi.fn(
-      async (_url: string | URL | Request, init?: RequestInit) => {
-        if (!init?.method) {
-          pendingCalls += 1;
-          return response({
-            ok: true,
-            turns:
-              pendingCalls === 1
-                ? []
-                : [
-                    {
-                      id: 'turn_heartbeat',
-                      conversation_id: 'conversation_1',
-                      user_text: 'Second cycle',
-                    },
-                  ],
-          });
-        }
-        const body = JSON.parse(String(init.body)) as { action: string };
-        return body.action === 'claim'
-          ? response({
-              ok: true,
-              turn: {
-                id: 'turn_heartbeat',
-                conversation_id: 'conversation_1',
-                user_text: 'Second cycle',
-                claim_token: 'claim_heartbeat',
-              },
-            })
-          : response({ ok: true });
-      }
-    );
-    const bridge = createSummerRuntimeBridge({
-      platform: 'darwin',
-      appOrigin: 'https://jov.ie',
-      homeDirectory: '/Users/founder',
-      workerId: 'jovie-mac',
-      fetch,
-      spawnProcess: () => fakeChild({ stdout: 'Heartbeat response' }),
-    });
-    await expect(bridge.runCycle()).resolves.toMatchObject({ state: 'idle' });
-    await expect(bridge.runCycle()).resolves.toMatchObject({
-      state: 'completed',
-      turnId: 'turn_heartbeat',
-    });
-  });
-
-  it('reclaims a server-listed expired turn after a packaged-worker restart', async () => {
-    const { fetch, posted } = queueFetch({
-      id: 'turn_restart',
-      conversation_id: 'conversation_1',
-      user_text: 'Resume after restart.',
-      state: 'claimed',
-    });
-    const restartedBridge = createSummerRuntimeBridge({
-      platform: 'darwin',
-      appOrigin: 'https://jov.ie',
-      homeDirectory: '/Users/founder',
-      workerId: 'jovie-mac-after-restart',
-      fetch,
-      spawnProcess: () => fakeChild({ stdout: 'Recovered answer' }),
-    });
-    await expect(restartedBridge.runCycle()).resolves.toMatchObject({
-      state: 'completed',
-      turnId: 'turn_restart',
-    });
-    expect(posted[0]).toMatchObject({
-      action: 'claim',
-      id: 'turn_restart',
-      worker_id: 'jovie-mac-after-restart',
-    });
-    expect(posted[1]).toMatchObject({
-      action: 'complete',
-      response_text: 'Recovered answer',
-    });
-  });
-
-  it('kills Hermes and rejects when runtime exceeds the bound', async () => {
-    const child = hangingChild();
-    const result = invokeSummerRuntime({
-      homeDirectory: '/Users/founder',
-      turn: {
-        id: 'turn_timeout',
-        conversation_id: 'conversation_1',
-        user_text: 'Bound the runtime',
-        claim_token: 'claim_timeout',
-      },
-      spawnProcess: () => child,
-      timeoutMs: 20,
-    });
-    await expect(result).rejects.toThrow('summer-runtime-timeout');
-    expect(child.kill).toHaveBeenCalledWith('SIGTERM');
-  });
-
-  it('posts a fenced failure when Hermes exceeds the runtime bound', async () => {
-    const { fetch, posted } = queueFetch({
-      id: 'turn_timeout',
-      conversation_id: 'conversation_1',
-      user_text: 'Bound the runtime',
-    });
-    const child = hangingChild();
-    const bridge = createSummerRuntimeBridge({
-      platform: 'darwin',
-      appOrigin: 'https://jov.ie',
-      homeDirectory: '/Users/founder',
-      workerId: 'jovie-mac',
-      fetch,
-      timeoutMs: 20,
-      spawnProcess: () => child,
-    });
-    await expect(bridge.runCycle()).resolves.toMatchObject({
-      state: 'runtime-error',
-      errorCode: 'summer-runtime-timeout',
-    });
-    expect(child.kill).toHaveBeenCalledWith('SIGTERM');
-    expect(posted.at(-1)).toMatchObject({
-      action: 'fail',
-      id: 'turn_timeout',
-      claim_token: 'claim_1',
-      failure_code: 'summer-runtime-timeout',
-    });
-  });
-
-  it('posts a fenced failure when Hermes exceeds the output bound', async () => {
-    const { fetch, posted } = queueFetch({
-      id: 'turn_output',
-      conversation_id: 'conversation_1',
-      user_text: 'Bound the output',
-    });
-    const spawnProcess = () => {
-      const child = hangingChild();
-      queueMicrotask(() => {
-        child.stdout.write('x'.repeat(128 * 1024 + 1));
-      });
-      return child;
-    };
-    const bridge = createSummerRuntimeBridge({
-      platform: 'darwin',
-      appOrigin: 'https://jov.ie',
-      homeDirectory: '/Users/founder',
-      workerId: 'jovie-mac',
-      fetch,
-      spawnProcess,
-    });
-    await expect(bridge.runCycle()).resolves.toMatchObject({
-      state: 'runtime-error',
-      errorCode: 'summer-runtime-output-limit',
-    });
-    expect(posted.at(-1)).toMatchObject({
-      action: 'fail',
-      id: 'turn_output',
-      claim_token: 'claim_1',
-      failure_code: 'summer-runtime-output-limit',
-    });
-  });
-
-  it('does not report a persisted runtime failure when the fail receipt is refused', async () => {
-    const { fetch, posted } = queueFetch(
-      {
-        id: 'turn_fail_http',
-        conversation_id: 'conversation_1',
-        user_text: 'Persist the fence',
-      },
-      200,
-      500
-    );
-    const bridge = createSummerRuntimeBridge({
-      platform: 'darwin',
-      appOrigin: 'https://jov.ie',
-      homeDirectory: '/Users/founder',
-      workerId: 'jovie-mac',
-      fetch,
-      spawnProcess: () => fakeChild({ exitCode: 1 }),
-    });
-    await expect(bridge.runCycle()).resolves.toMatchObject({
-      state: 'http-error',
-      turnId: 'turn_fail_http',
-      errorCode: 'fail-500',
-    });
-    expect(posted.at(-1)).toMatchObject({
-      action: 'fail',
-      failure_code: 'summer-runtime-exit-1',
-    });
-  });
-
-  it('does not report a persisted runtime failure when the fail receipt throws', async () => {
-    const posted: Array<Record<string, unknown>> = [];
-    const fetch = vi.fn(
-      async (_url: string | URL | Request, init?: RequestInit) => {
-        if (!init?.method) {
-          return response({
-            ok: true,
-            turns: [
-              {
-                id: 'turn_fail_throw',
-                conversation_id: 'conversation_1',
-                user_text: 'Persist the fence',
-              },
-            ],
-          });
-        }
-        const body = JSON.parse(String(init.body)) as Record<string, unknown>;
-        posted.push(body);
-        if (body.action === 'claim') {
-          return response({
-            ok: true,
-            turn: {
-              id: 'turn_fail_throw',
-              conversation_id: 'conversation_1',
-              user_text: 'Persist the fence',
-              claim_token: 'claim_1',
-            },
-          });
-        }
-        if (body.action === 'fail') {
-          throw new Error('network down');
-        }
-        return response({ ok: true });
-      }
-    );
-    const bridge = createSummerRuntimeBridge({
-      platform: 'darwin',
-      appOrigin: 'https://jov.ie',
-      homeDirectory: '/Users/founder',
-      workerId: 'jovie-mac',
-      fetch,
-      spawnProcess: () => fakeChild({ exitCode: 1 }),
-    });
-    await expect(bridge.runCycle()).resolves.toMatchObject({
-      state: 'http-error',
-      turnId: 'turn_fail_throw',
-      errorCode: 'fail-persist',
-    });
-    expect(posted.at(-1)).toMatchObject({
-      action: 'fail',
-      failure_code: 'summer-runtime-exit-1',
-    });
-  });
-
-  it('cancels the Hermes child without an unhandled stdin EPIPE', async () => {
-    const child = hangingChild();
-    const stdinErrors: Error[] = [];
-    child.stdin.on('error', error => stdinErrors.push(error));
-    const controller = new AbortController();
-    const result = invokeSummerRuntime({
-      homeDirectory: '/Users/founder',
-      turn: {
-        id: 'turn_cancel',
-        conversation_id: 'conversation_1',
-        user_text: 'Cancel safely',
-        claim_token: 'claim_cancel',
-      },
-      spawnProcess: () => child,
-      signal: controller.signal,
-    });
-    controller.abort();
-    child.stdin.emit('error', new Error('EPIPE'));
-    await expect(result).rejects.toThrow('summer-runtime-canceled');
-    expect(child.kill).toHaveBeenCalledWith('SIGTERM');
-    expect(stdinErrors).toHaveLength(1);
-  });
-
-  it('aborts an in-flight Hermes child when the packaged app stops', async () => {
-    const child = hangingChild();
-    const { fetch } = queueFetch({
-      id: 'turn_stop',
-      conversation_id: 'conversation_1',
-      user_text: 'Background then quit',
-    });
-    const bridge = createSummerRuntimeBridge({
-      platform: 'darwin',
-      appOrigin: 'https://jov.ie',
-      homeDirectory: '/Users/founder',
-      workerId: 'jovie-mac',
-      fetch,
-      spawnProcess: () => child,
-    });
-    const cycle = bridge.runCycle();
-    await vi.waitFor(() => {
-      expect(fetch.mock.calls.length).toBeGreaterThan(1);
-    });
-    bridge.stop();
-    await expect(cycle).resolves.toMatchObject({
-      state: 'runtime-error',
-      errorCode: 'summer-runtime-canceled',
-    });
-    expect(child.kill).toHaveBeenCalledWith('SIGTERM');
-  });
-
-  it('stays idle off Darwin and reports a claim conflict without spawning', async () => {
-    const linux = createSummerRuntimeBridge({
-      platform: 'linux',
       appOrigin: 'https://jov.ie',
       homeDirectory: '/Users/founder',
       workerId: 'jovie-mac',
       fetch: vi.fn(),
-      spawnProcess: () => fakeChild({ stdout: 'nope' }),
+      onReceipt,
     });
-    await expect(linux.runCycle()).resolves.toMatchObject({ state: 'idle' });
 
-    const { fetch, posted } = queueFetch(
-      {
-        id: 'turn_conflict',
-        conversation_id: 'conversation_1',
-        user_text: 'Already claimed',
-      },
-      409
-    );
-    const darwin = createSummerRuntimeBridge({
-      platform: 'darwin',
+    bridge.start();
+    bridge.start();
+    await vi.waitFor(() => expect(onReceipt).toHaveBeenCalledOnce());
+    bridge.stop();
+    bridge.start();
+    await vi.waitFor(() => expect(onReceipt).toHaveBeenCalledTimes(2));
+  });
+
+  it('stays idle off macOS without contacting the server', async () => {
+    const fetch = vi.fn();
+    const bridge = createSummerRuntimeBridge({
+      platform: 'linux',
       appOrigin: 'https://jov.ie',
       homeDirectory: '/Users/founder',
-      workerId: 'jovie-mac',
+      workerId: 'jovie-linux',
       fetch,
-      spawnProcess: () => fakeChild({ stdout: 'nope' }),
     });
-    await expect(darwin.runCycle()).resolves.toMatchObject({
-      state: 'claim-conflict',
-      turnId: 'turn_conflict',
+    await expect(bridge.runCycle()).resolves.toEqual({
+      cycle: 1,
+      state: 'idle',
     });
-    expect(posted).toEqual([
-      expect.objectContaining({ action: 'claim', id: 'turn_conflict' }),
-    ]);
+    expect(fetch).not.toHaveBeenCalled();
+  });
+
+  it('keeps historical completion parsing data-only', () => {
+    const stdout = [
+      'Historical response.',
+      '```summer-tool',
+      JSON.stringify({
+        name: 'search_gbrain',
+        ok: true,
+        receiptId: 'tool_old_1',
+        summary: 'historical read-only receipt',
+      }),
+      '```',
+    ].join('\n');
+    expect(parseSummerRuntimeCompletion(stdout)).toEqual({
+      responseText: 'Historical response.',
+      tool: {
+        name: 'search_gbrain',
+        ok: true,
+        receiptId: 'tool_old_1',
+        summary: 'historical read-only receipt',
+      },
+    });
+    expect(parseSummerRuntimeCompletion('plain text')).toEqual({
+      responseText: 'plain text',
+    });
   });
 });

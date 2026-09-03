@@ -187,6 +187,12 @@ const LIBRARY_CARD_FOCUS_CLASS =
   'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-(--linear-border-focus)/55 focus-visible:ring-offset-2 focus-visible:ring-offset-(--app-shell-content-surface) outline-none';
 const LIBRARY_BUTTON_FOCUS_CLASS =
   'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-(--linear-border-focus)/55 focus-visible:ring-offset-2 focus-visible:ring-offset-(--app-shell-content-surface) outline-none';
+const LIBRARY_DESKTOP_CONTROL_DENSITY_CLASS =
+  'h-8 min-h-8 lg:before:h-8 lg:before:min-w-0';
+const LIBRARY_DESKTOP_ICON_CONTROL_DENSITY_CLASS = cn(
+  LIBRARY_DESKTOP_CONTROL_DENSITY_CLASS,
+  'w-8 min-w-8'
+);
 const LIBRARY_TABLE_SKELETON_CONFIG: Array<{
   readonly width?: string;
   readonly variant?:
@@ -715,7 +721,7 @@ export function LibraryLoadingState() {
               {LIBRARY_VIEW_FILTER_CHIP_KEYS.map(key => (
                 <span
                   key={key}
-                  className='inline-block h-7 w-16 rounded-full skeleton motion-reduce:animate-none'
+                  className='inline-block h-8 w-16 rounded-full skeleton motion-reduce:animate-none'
                   aria-hidden='true'
                 />
               ))}
@@ -764,6 +770,7 @@ function LibraryViewFilterChips({
           }
           active={preset === view.id}
           onClick={() => onPreset(view.id)}
+          className={LIBRARY_DESKTOP_CONTROL_DENSITY_CLASS}
         />
       ))}
     </div>
@@ -1139,6 +1146,7 @@ function LibraryFiltersControl({
       ariaLabel={ariaLabel}
       active={open}
       iconOnly
+      className={LIBRARY_DESKTOP_ICON_CONTROL_DENSITY_CLASS}
     />
   );
 
@@ -1212,6 +1220,7 @@ function SortDropdown({
               }
               ariaLabel={`Sort by ${SORT_LABELS[sort]}`}
               iconOnly
+              className={LIBRARY_DESKTOP_ICON_CONTROL_DENSITY_CLASS}
             />
           </DropdownMenuTrigger>
         </TooltipTrigger>
@@ -1255,6 +1264,7 @@ function ViewToggle({
         onClick={() => onView('grid')}
         iconOnly
         tooltipLabel='Grid View'
+        className={LIBRARY_DESKTOP_ICON_CONTROL_DENSITY_CLASS}
       />
       <PageToolbarActionButton
         label='List View'
@@ -1263,6 +1273,7 @@ function ViewToggle({
         onClick={() => onView('list')}
         iconOnly
         tooltipLabel='List View'
+        className={LIBRARY_DESKTOP_ICON_CONTROL_DENSITY_CLASS}
       />
       <PageToolbarActionButton
         label='Table View'
@@ -1271,6 +1282,7 @@ function ViewToggle({
         onClick={() => onView('table')}
         iconOnly
         tooltipLabel='Table View'
+        className={LIBRARY_DESKTOP_ICON_CONTROL_DENSITY_CLASS}
       />
     </div>
   );
@@ -1297,6 +1309,7 @@ function GridDensityToggle({
           onClick={() => onDensity(option.value)}
           tooltipLabel={option.tooltip}
           ariaLabel={`${option.tooltip} card size`}
+          className={LIBRARY_DESKTOP_ICON_CONTROL_DENSITY_CLASS}
         />
       ))}
     </fieldset>
@@ -1445,34 +1458,6 @@ const AssetCard = memo(function AssetCard({
             )}
           >
             <LibraryMediaThumbnail asset={asset} size='card' />
-            {/*
-              Two status axes, always reserved in a fixed stack so card layout
-              never shifts between draft/approved states (#10384 / JOV-3333).
-            */}
-            <div className='absolute left-2 top-2 flex max-w-[calc(100%-3.5rem)] flex-col items-start gap-1'>
-              <span
-                role='status'
-                className={cn(
-                  'system-b-library-card-status inline-flex max-w-full truncate rounded-full border px-1.5 py-0.5 leading-4',
-                  releaseStatusClasses(asset.status)
-                )}
-                data-testid={`library-release-status-${asset.id}`}
-                aria-label={`Release Status: ${formatLibraryStatus(asset)}`}
-              >
-                {formatLibraryStatus(asset)}
-              </span>
-              <span
-                role='status'
-                className={cn(
-                  'system-b-library-card-status inline-flex max-w-full truncate rounded-full border px-1.5 py-0.5 leading-4',
-                  libraryApprovalStatusClasses(asset.approvalStatus)
-                )}
-                data-testid={`library-approval-status-${asset.id}`}
-                aria-label={`Approval Status: ${formatLibraryApprovalStatus(asset.approvalStatus)}`}
-              >
-                {formatLibraryApprovalStatus(asset.approvalStatus)}
-              </span>
-            </div>
           </div>
           <div className='min-w-0 p-3'>
             <div className='flex min-w-0 items-start justify-between gap-2'>
@@ -1498,6 +1483,38 @@ const AssetCard = memo(function AssetCard({
                   {formatCompactCount(asset.providerCount)}
                 </span>
               )}
+            </div>
+            {/*
+              Two status axes, always reserved in a fixed stack so card layout
+              never shifts between draft/approved states (#10384 / JOV-3333).
+              Keep them off the media frame; only playback belongs on artwork.
+            */}
+            <div
+              className='mt-2 flex min-h-11 max-w-full flex-col items-start gap-1'
+              data-testid={`library-card-status-stack-${asset.id}`}
+            >
+              <span
+                role='status'
+                className={cn(
+                  'system-b-library-card-status inline-flex max-w-full truncate rounded-full border px-1.5 py-0.5 leading-4',
+                  releaseStatusClasses(asset.status)
+                )}
+                data-testid={`library-release-status-${asset.id}`}
+                aria-label={`Release Status: ${formatLibraryStatus(asset)}`}
+              >
+                {formatLibraryStatus(asset)}
+              </span>
+              <span
+                role='status'
+                className={cn(
+                  'system-b-library-card-status inline-flex max-w-full truncate rounded-full border px-1.5 py-0.5 leading-4',
+                  libraryApprovalStatusClasses(asset.approvalStatus)
+                )}
+                data-testid={`library-approval-status-${asset.id}`}
+                aria-label={`Approval Status: ${formatLibraryApprovalStatus(asset.approvalStatus)}`}
+              >
+                {formatLibraryApprovalStatus(asset.approvalStatus)}
+              </span>
             </div>
             <div className='system-b-library-card-summary mt-2 flex min-w-0 items-center gap-1.5'>
               {getLibraryItemKind(asset) === 'merch' ? (

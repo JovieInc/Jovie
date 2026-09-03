@@ -1,3 +1,4 @@
+import { spawnSync } from 'node:child_process';
 import { createHash, randomBytes } from 'node:crypto';
 import { spawn } from 'node:child_process';
 import * as fs from 'node:fs';
@@ -31,6 +32,14 @@ import {
 } from './desktop-auth-security';
 import {
   buildDesktopUpdateMenuItem,
+  desktopBundlePathFromExecutable,
+  hasNightlyUpdateFlag,
+  NIGHTLY_UPDATE_HOUR,
+  NIGHTLY_UPDATE_TIMEOUT_MS,
+  nightlyUpdateLaunchAgentLabel,
+  nightlyUpdateMinute,
+  renderNightlyUpdateLaunchAgentPlist,
+  shouldInstallDownloadedUpdateNow,
   shouldScheduleDesktopAutoUpdate,
 } from './desktop-auto-update';
 import { installDesktopCspWatchdog } from './desktop-csp-watchdog';
@@ -329,6 +338,9 @@ function applyLocalChromiumLoopbackResolver(): void {
 
 applyLocalChromiumLoopbackResolver();
 
+const nightlyUpdateLaunch =
+  hasNightlyUpdateFlag(process.argv) ||
+  app.commandLine.hasSwitch('jovie-nightly-update');
 const gotSingleInstanceLock = app.requestSingleInstanceLock();
 
 if (!gotSingleInstanceLock && !printBuildIdentityOnStart) {
@@ -2121,27 +2133,96 @@ function checkForUpdatesFromMenu(): void {
     return;
   }
 
-  autoUpdater.checkForUpdatesAndNotify().catch(() => {
-    // Network unavailable or no update server configured yet — non-fatal
-  });
+  runDesktopUpdateCheck('notify');
 }
 
-function scheduleDesktopAutoUpdate(): void {
+function configureDesktopAutoUpdater(): void {
   if (!desktopUpdatesSupported()) {
     return;
   }
 
+  if (APP_ENV === 'staging') {
+    autoUpdater.allowPrerelease = true;
+  }
   autoUpdater.allowDowngrade = false;
-  autoUpdater.checkForUpdatesAndNotify().catch(() => {
-    // Network unavailable or no update server configured yet — non-fatal
+  autoUpdater.autoDownload = true;
+  autoUpdater.autoInstallOnAppQuit = true;
+}
+
+function runDesktopUpdateCheck(mode: 'silent' | 'notify'): void {
+  if (!desktopUpdatesSupported()) {
+    return;
+  }
+
+  const pending =
+    mode === 'notify'
+      ? autoUpdater.checkForUpdatesAndNotify()
+      : autoUpdater.checkForUpdates();
+  pending.catch(() => {
+    if (nightlyUpdateLaunch) {
+      app.quit();
+    }
   });
+}
+
+function scheduleDesktopAutoUpdate(): void {
+  configureDesktopAutoUpdater();
+  runDesktopUpdateCheck('silent');
 
   const UPDATE_INTERVAL_MS = 30 * 60 * 1000;
-  setInterval(() => {
-    autoUpdater.checkForUpdatesAndNotify().catch(() => {
-      // Same: non-fatal update check failure
-    });
+  const interval = setInterval(() => {
+    runDesktopUpdateCheck('silent');
   }, UPDATE_INTERVAL_MS);
+  interval.unref?.();
+}
+
+function installNightlyUpdateLaunchAgent(): void {
+  if (
+    nightlyUpdateLaunch ||
+    !app.isPackaged ||
+    process.platform !== 'darwin' ||
+    !desktopUpdatesSupported()
+  ) {
+    return;
+  }
+
+  const label = nightlyUpdateLaunchAgentLabel(APP_ENV);
+  const minute = nightlyUpdateMinute(APP_ENV);
+  if (!label || minute === null) {
+    return;
+  }
+
+  const bundlePath = desktopBundlePathFromExecutable(process.execPath);
+  const plistPath = path.join(
+    app.getPath('home'),
+    'Library',
+    'LaunchAgents',
+    `${label}.plist`
+  );
+  fs.mkdirSync(path.dirname(plistPath), { recursive: true });
+  fs.writeFileSync(
+    plistPath,
+    renderNightlyUpdateLaunchAgentPlist({
+      label,
+      bundlePath,
+      hour: NIGHTLY_UPDATE_HOUR,
+      minute,
+    }),
+    'utf8'
+  );
+
+  const uid = process.getuid?.();
+  if (typeof uid !== 'number') {
+    return;
+  }
+
+  const domain = `gui/${uid}`;
+  spawnSync('launchctl', ['bootout', `${domain}/${label}`], {
+    stdio: 'ignore',
+  });
+  spawnSync('launchctl', ['bootstrap', domain, plistPath], {
+    stdio: 'ignore',
+  });
 }
 
 function scheduleHudBuildAutoReload(): void {
@@ -2310,6 +2391,30 @@ autoUpdater.on('update-downloaded', () => {
   updateReadyToInstall = true;
   refreshApplicationMenu();
   sendToAppWindows(UPDATE_DOWNLOADED_CHANNEL);
+
+  const hasVisibleWindow = BrowserWindow.getAllWindows().some(
+    win => !win.isDestroyed() && win.isVisible() && !win.isMinimized()
+  );
+  if (
+    shouldInstallDownloadedUpdateNow({
+      nightlyLaunch: nightlyUpdateLaunch,
+      hasVisibleWindow,
+    })
+  ) {
+    autoUpdater.quitAndInstall(true, false);
+  }
+});
+
+autoUpdater.on('update-not-available', () => {
+  if (nightlyUpdateLaunch) {
+    app.quit();
+  }
+});
+
+autoUpdater.on('error', () => {
+  if (nightlyUpdateLaunch) {
+    app.quit();
+  }
 });
 
 // Allow renderer to trigger quit-and-install without exposing node access.
@@ -2518,6 +2623,11 @@ if (gotSingleInstanceLock) {
       return;
     }
 
+    if (hasNightlyUpdateFlag(argv)) {
+      runDesktopUpdateCheck('silent');
+      return;
+    }
+
     const win =
       mainWindow && !mainWindow.isDestroyed() ? mainWindow : createWindow();
     showWindow(win);
@@ -2576,6 +2686,21 @@ app.whenReady().then(() => {
   registerAuthReturnProtocol();
   refreshApplicationMenu();
 
+  if (nightlyUpdateLaunch) {
+    if (process.platform === 'darwin' && app.dock) {
+      app.dock.hide();
+    }
+    configureDesktopAutoUpdater();
+    runDesktopUpdateCheck('silent');
+    const nightlyTimeout = setTimeout(() => {
+      app.quit();
+    }, NIGHTLY_UPDATE_TIMEOUT_MS);
+    nightlyTimeout.unref?.();
+    return;
+  }
+
+  installNightlyUpdateLaunchAgent();
+
   // macOS menu bar extra (NSStatusItem via Electron Tray)
   if (process.platform === 'darwin') {
     menuBarTray = new MenuBarTray(handleTrayAction);
@@ -2586,7 +2711,7 @@ app.whenReady().then(() => {
       ? buildAuthCompletionUrl(pendingAuthCompletion)
       : pendingLegacyAuthReturnRoute
         ? new URL(pendingLegacyAuthReturnRoute, APP_URL).toString()
-      : APP_ENTRY_URL
+        : APP_ENTRY_URL
   );
   const directProfileUrl = process.argv.find((arg: string) =>
     canonicalPublicProfileUrl(arg)

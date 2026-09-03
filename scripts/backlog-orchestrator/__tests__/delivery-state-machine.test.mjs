@@ -35,6 +35,8 @@ describe('delivery state machine', () => {
       ['missing-owner-lease', 'reconcile-exact-head-lease'],
       ['dropped-controller-event', 'restore-event-trigger-and-reconcile'],
       ['draft-stack-policy', 'split-or-retarget-draft-stack'],
+      ['fleet-observation-gap', 'restore-fleet-observation'],
+      ['base-not-main', 'retarget-pr-base-to-main'],
     ]) {
       const receipt = buildDeliveryReceipt({ delivery_key: failure, failure });
       assert.equal(receipt.schema, DELIVERY_RECEIPT_SCHEMA);
