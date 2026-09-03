@@ -106,7 +106,7 @@ export function FounderReviewStack({
           <h2 className='mt-2 truncate text-xl font-semibold tracking-tight text-primary-token sm:text-2xl'>
             {card.title}
           </h2>
-          <p className='mt-2 line-clamp-3 min-h-[4.5rem] text-sm leading-6 text-secondary-token'>
+          <p className='mt-2 line-clamp-3 min-h-18 text-sm leading-6 text-secondary-token'>
             {card.why}
           </p>
           <FounderReviewRecorder
