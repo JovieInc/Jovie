@@ -3,6 +3,7 @@ export { ChatAvatarUploadCard } from './ChatAvatarUploadCard';
 export { ChatDropZoneOverlay } from './ChatDropZoneOverlay';
 export {
   ChatEmptyStateComposerRegion,
+  ChatEmptyStateSamplePreview,
   ChatEmptyStateWelcome,
 } from './ChatEmptyStateComposerRegion';
 export { ChatEmptyStateOpportunityCards } from './ChatEmptyStateOpportunityCards';
