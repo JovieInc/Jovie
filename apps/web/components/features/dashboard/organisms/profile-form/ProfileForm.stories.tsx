@@ -1,17 +1,17 @@
 import type { Meta, StoryObj } from '@storybook/nextjs-vite';
 import type { Artist } from '@/types/db';
-import { ListenNowForm } from './ListenNowForm';
+import { ProfileForm } from './ProfileForm';
 
 const storyArtist = {
-  id: 'story-legacy-listen-now',
+  id: 'story-artist',
   owner_user_id: 'story-user',
   handle: 'story-artist',
   spotify_id: '',
   name: 'Mina Vale',
   tagline: 'Independent producer and vocalist',
   image_url: '',
-  spotify_url: 'https://open.spotify.com/artist/story',
-  apple_music_url: 'https://music.apple.com/artist/story',
+  spotify_url: '',
+  apple_music_url: '',
   youtube_url: '',
   settings: {},
   published: true,
@@ -22,8 +22,8 @@ const storyArtist = {
 } satisfies Artist;
 
 const meta = {
-  title: 'Dashboard/Organisms/LegacyListenNowForm',
-  component: ListenNowForm,
+  title: 'Dashboard/Organisms/ProfileForm',
+  component: ProfileForm,
   parameters: {
     layout: 'centered',
   },
@@ -38,7 +38,7 @@ const meta = {
     artist: storyArtist,
     onUpdate: () => undefined,
   },
-} satisfies Meta<typeof ListenNowForm>;
+} satisfies Meta<typeof ProfileForm>;
 
 export default meta;
 type Story = StoryObj<typeof meta>;

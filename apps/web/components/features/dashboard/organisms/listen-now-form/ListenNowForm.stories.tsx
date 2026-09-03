@@ -3,7 +3,7 @@ import type { Artist } from '@/types/db';
 import { ListenNowForm } from './ListenNowForm';
 
 const storyArtist = {
-  id: 'story-legacy-listen-now',
+  id: 'story-listen-now',
   owner_user_id: 'story-user',
   handle: 'story-artist',
   spotify_id: '',
@@ -11,8 +11,8 @@ const storyArtist = {
   tagline: 'Independent producer and vocalist',
   image_url: '',
   spotify_url: 'https://open.spotify.com/artist/story',
-  apple_music_url: 'https://music.apple.com/artist/story',
-  youtube_url: '',
+  apple_music_url: '',
+  youtube_url: 'https://youtube.com/@minavale',
   settings: {},
   published: true,
   is_verified: true,
@@ -22,14 +22,14 @@ const storyArtist = {
 } satisfies Artist;
 
 const meta = {
-  title: 'Dashboard/Organisms/LegacyListenNowForm',
+  title: 'Dashboard/Organisms/ListenNowForm',
   component: ListenNowForm,
   parameters: {
     layout: 'centered',
   },
   decorators: [
     Story => (
-      <div className='w-full max-w-96'>
+      <div className='w-full max-w-2xl'>
         <Story />
       </div>
     ),
