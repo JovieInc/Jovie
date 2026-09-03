@@ -81,7 +81,7 @@ export function FounderReviewStack({
         data-testid={`founder-review-card-${card.id}`}
         aria-busy={pendingActionId === card.id}
       >
-        <div className='relative flex aspect-[16/8] min-h-52 items-center justify-center overflow-hidden border-b border-subtle bg-surface-1'>
+        <div className='relative flex aspect-2/1 min-h-52 items-center justify-center overflow-hidden border-b border-subtle bg-surface-1'>
           {card.visual ? (
             <Image
               src={card.visual.url}
