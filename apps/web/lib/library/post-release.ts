@@ -90,7 +90,11 @@ export function transitionPresenceFinding(
     return {
       ok: true,
       status:
-        finding.actionMode === 'draft_request' ? 'drafted' : finding.status,
+        finding.actionMode === 'draft_request'
+          ? 'drafted'
+          : finding.actionMode === 'direct_update'
+            ? 'resolved'
+            : finding.status,
       collisionDisposition: null,
     };
   }

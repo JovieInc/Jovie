@@ -1,15 +1,21 @@
-import { NextResponse } from 'next/server';
+import { type NextRequest, NextResponse } from 'next/server';
 import { z } from 'zod';
 import { getCachedAuth } from '@/lib/auth/cached';
 import { getExactProfileAccess } from '@/lib/auth/profile-access';
 import { db } from '@/lib/db';
-import { applyPresenceFindingAction } from '@/lib/library/post-release-store';
+import { captureError } from '@/lib/error-tracking';
+import { NO_STORE_HEADERS } from '@/lib/http/headers';
+import { LIBRARY_POST_RELEASE_OPTIMIZATION } from '@/lib/library/post-release-optimization';
+import {
+  applyPresenceFindingAction,
+  listLibraryPostReleaseBundle,
+} from '@/lib/library/post-release-store';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
 
-const bodySchema = z.object({
-  creatorProfileId: z.string().uuid(),
+const profileQuerySchema = z.object({ creatorProfileId: z.string().uuid() });
+const bodySchema = profileQuerySchema.extend({
   findingId: z.string().uuid(),
   action: z.enum([
     'prepare_update',
@@ -20,31 +26,57 @@ const bodySchema = z.object({
   ]),
 });
 
+function json(body: object, status = 200) {
+  return NextResponse.json(body, { status, headers: NO_STORE_HEADERS });
+}
+
+async function requireProfileAccess(creatorProfileId: string) {
+  const { userId } = await getCachedAuth();
+  if (!userId) return { error: json({ error: 'Unauthorized' }, 401) };
+  const access = await getExactProfileAccess(db, userId, creatorProfileId);
+  if (!access.ok) return { error: json({ error: 'Forbidden' }, 403) };
+  return { userId };
+}
+
+export async function GET(request: NextRequest) {
+  const parsed = profileQuerySchema.safeParse({
+    creatorProfileId: request.nextUrl.searchParams.get('creatorProfileId'),
+  });
+  if (!parsed.success) return json({ error: 'Invalid payload' }, 400);
+  const auth = await requireProfileAccess(parsed.data.creatorProfileId);
+  if ('error' in auth) return auth.error;
+  try {
+    const bundle = await listLibraryPostReleaseBundle(
+      parsed.data.creatorProfileId
+    );
+    return json({ ...bundle, optimization: LIBRARY_POST_RELEASE_OPTIMIZATION });
+  } catch (error) {
+    await captureError('Library post-release lookup failed', error, {
+      route: '/api/library/post-release',
+      method: 'GET',
+    });
+    return json({ error: 'Failed to load post-release presence' }, 500);
+  }
+}
+
 export async function PATCH(request: Request) {
   const parsed = bodySchema.safeParse(await request.json().catch(() => null));
-  if (!parsed.success) {
-    return NextResponse.json({ error: 'Invalid action' }, { status: 400 });
+  if (!parsed.success) return json({ error: 'Invalid action' }, 400);
+  const auth = await requireProfileAccess(parsed.data.creatorProfileId);
+  if ('error' in auth) return auth.error;
+  try {
+    const finding = await applyPresenceFindingAction({
+      ...parsed.data,
+      actorUserId: auth.userId,
+    });
+    return finding
+      ? json({ finding, optimization: LIBRARY_POST_RELEASE_OPTIMIZATION })
+      : json({ error: 'Finding cannot take that action' }, 409);
+  } catch (error) {
+    await captureError('Library post-release action failed', error, {
+      route: '/api/library/post-release',
+      method: 'PATCH',
+    });
+    return json({ error: 'Failed to apply presence action' }, 500);
   }
-  const { userId } = await getCachedAuth();
-  if (!userId) {
-    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-  }
-  const access = await getExactProfileAccess(
-    db,
-    userId,
-    parsed.data.creatorProfileId
-  );
-  if (!access.ok) {
-    return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
-  }
-  const finding = await applyPresenceFindingAction({
-    ...parsed.data,
-    actorUserId: userId,
-  });
-  return finding
-    ? NextResponse.json({ finding })
-    : NextResponse.json(
-        { error: 'Finding cannot take that action' },
-        { status: 409 }
-      );
 }
