@@ -51,7 +51,7 @@ import {
 import type { AdminUserRow } from '@/lib/admin/types';
 import { SIDEBAR_WIDTH } from '@/lib/constants/layout';
 import { QueryErrorBoundary, useAdminUsersInfiniteQuery } from '@/lib/queries';
-import type { ColumnDef } from '@/lib/tanstack-v8-compat';
+import type { ColumnDef, RowSelectionState } from '@/lib/tanstack-v8-compat';
 import { createColumnHelper } from '@/lib/tanstack-v8-compat';
 import { AdminUserDetailDrawer } from './AdminUserDetailDrawer';
 import {
@@ -227,8 +227,10 @@ export function AdminUsersTableUnified(props: Readonly<AdminUsersTableProps>) {
   } = useRowSelection(rowIds);
 
   // TanStack Table row selection state
-  const rowSelection = useMemo(() => {
-    return Object.fromEntries(Array.from(selectedIds).map(id => [id, true]));
+  const rowSelection = useMemo<RowSelectionState>(() => {
+    return Object.fromEntries(
+      Array.from(selectedIds).map(id => [id, true as const])
+    );
   }, [selectedIds]);
 
   // Refs for selection state to avoid column recreation on every selection change
