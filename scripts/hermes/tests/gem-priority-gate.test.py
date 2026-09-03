@@ -689,6 +689,11 @@ class ConcurrencyObservationTests(unittest.TestCase):
                     "observe_lease",
                     return_value={"status": "unknown", "reason": "missing"},
                 ),
+                mock.patch.object(
+                    MODULE,
+                    "observe_fallback_seats",
+                    return_value=MODULE._unavailable_fallback_seats("test-fixture"),
+                ),
             ):
                 signals = MODULE.observe_signals(args, now)
 
@@ -705,6 +710,216 @@ class ConcurrencyObservationTests(unittest.TestCase):
         self.assertEqual(receipt["signals"]["main"]["sha"], MAIN_SHA)
         self.assertFalse(receipt["workAdmission"]["newIssueLeaseAllowed"])
         self.assertEqual(receipt["remediationAdmission"]["maxConcurrent"], 1)
+
+
+def fallback_seat_signal(grok: bool, kimi: bool) -> dict[str, object]:
+    return {
+        "schema": "gem-fallback-seats/v1",
+        "observedAt": MODULE.isoformat(MODULE.utc_now()),
+        "providers": {
+            "grok": {
+                "available": grok,
+                "reason": "ready" if grok else "probe-failed",
+            },
+            "kimi": {
+                "available": kimi,
+                "reason": "ready" if kimi else "probe-failed",
+            },
+        },
+        "availableSeats": int(grok) + int(kimi),
+    }
+
+
+class FallbackSeatTests(unittest.TestCase):
+    """JOV-5913: unbound-repair concurrency follows live Grok/Kimi OAuth seats."""
+
+    def evaluate_unbound(self, **overrides: object) -> dict[str, object]:
+        signals = dict(GREEN_SIGNALS)
+        signals["production"] = {"status": "green", "deployedSha": "b" * 7}
+        signals.update(overrides)
+        return MODULE.evaluate(signals, MODULE.isoformat(MODULE.utc_now()))
+
+    def test_unbound_repair_scales_to_eight_with_both_oauth_seats(self):
+        receipt = self.evaluate_unbound(
+            fallbackSeats=fallback_seat_signal(True, True)
+        )
+        admission = receipt["productionUnboundRepairAdmission"]
+        self.assertEqual(receipt["promotionMode"], "hold-intake")
+        self.assertTrue(admission["allowed"])
+        self.assertEqual(admission["maxConcurrent"], 8)
+        self.assertFalse(admission["deploymentsAllowed"])
+        self.assertEqual(receipt["signals"]["fallbackSeats"]["availableSeats"], 2)
+
+    def test_unbound_repair_scales_to_four_with_one_oauth_seat(self):
+        for grok, kimi in ((True, False), (False, True)):
+            with self.subTest(grok=grok, kimi=kimi):
+                receipt = self.evaluate_unbound(
+                    fallbackSeats=fallback_seat_signal(grok, kimi)
+                )
+                self.assertEqual(
+                    receipt["productionUnboundRepairAdmission"]["maxConcurrent"], 4
+                )
+
+    def test_missing_or_malformed_seat_evidence_fails_closed_to_floor(self):
+        malformed = [
+            {"schema": "other"},
+            {"schema": "gem-fallback-seats/v1", "providers": {}},
+            {
+                "schema": "gem-fallback-seats/v1",
+                "providers": {
+                    "grok": {"available": "yes"},
+                    "kimi": {"available": True},
+                },
+            },
+        ]
+        receipt = self.evaluate_unbound()
+        self.assertEqual(
+            receipt["productionUnboundRepairAdmission"]["maxConcurrent"], 1
+        )
+        for evidence in malformed:
+            with self.subTest(evidence=evidence):
+                receipt = self.evaluate_unbound(fallbackSeats=evidence)
+                self.assertEqual(
+                    receipt["productionUnboundRepairAdmission"]["maxConcurrent"], 1
+                )
+
+    def test_zero_live_seats_stays_at_floor(self):
+        receipt = self.evaluate_unbound(
+            fallbackSeats=fallback_seat_signal(False, False)
+        )
+        self.assertEqual(
+            receipt["productionUnboundRepairAdmission"]["maxConcurrent"], 1
+        )
+
+    def test_codex_capacity_evidence_never_caps_fallback_repair(self):
+        stale_capacity = {
+            "schema": "gem-concurrency-evidence/v1",
+            "accepted": False,
+            "reason": "capacity-evidence-missing-malformed-or-stale",
+        }
+        receipt = self.evaluate_unbound(
+            concurrencyEvidence=stale_capacity,
+            fallbackSeats=fallback_seat_signal(True, True),
+        )
+        self.assertFalse(receipt["concurrency"]["gem"]["evidenceAccepted"])
+        self.assertEqual(
+            receipt["productionUnboundRepairAdmission"]["maxConcurrent"], 8
+        )
+
+    def test_unbound_repair_concurrency_bounds(self):
+        cases = [(-1, 1), (0, 1), (1, 4), (2, 8), (99, 8), (None, 1), ("4", 1), (True, 1)]
+        for available, expected in cases:
+            with self.subTest(available=available):
+                self.assertEqual(
+                    MODULE.unbound_repair_concurrency({"availableSeats": available}),
+                    expected,
+                )
+
+    def test_observe_fallback_seats_missing_registry_is_unavailable(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            receipt = MODULE.observe_fallback_seats(
+                MODULE.utc_now(),
+                registry_path=pathlib.Path(tmp) / "missing.json",
+            )
+        self.assertEqual(receipt["schema"], MODULE.FALLBACK_SEAT_SCHEMA)
+        self.assertEqual(receipt["availableSeats"], 0)
+        self.assertEqual(receipt["reason"], "model-registry-missing")
+
+    def test_observe_fallback_seats_probes_registry_providers(self):
+        registry = {
+            "models": [
+                {
+                    "provider": "grok",
+                    "model": "grok-4.6",
+                    "executable_default": "grok",
+                    "probe_argv": ["{executable}", "models"],
+                    "probe_forbidden_patterns": ["not authenticated"],
+                },
+                {
+                    "provider": "kimi",
+                    "model": "kimi-code/k3",
+                    "executable_env": "GEM_KIMI_EXECUTABLE",
+                    "executable_default": "kimi",
+                    "probe_argv": ["{executable}", "provider", "list", "--json"],
+                    "probe_mode": "json-model-key",
+                },
+            ]
+        }
+        with tempfile.TemporaryDirectory() as tmp:
+            path = pathlib.Path(tmp) / "model-registry.json"
+            path.write_text(json.dumps(registry), encoding="utf-8")
+
+            def fake_run(argv, **_kwargs):
+                if "provider" in argv:
+                    return subprocess.CompletedProcess(
+                        argv,
+                        0,
+                        stdout=json.dumps({"models": {"kimi-code/k3": {}}}).encode(),
+                        stderr=b"",
+                    )
+                return subprocess.CompletedProcess(argv, 0, stdout=b"grok-4.6\n", stderr=b"")
+
+            with (
+                mock.patch.object(
+                    MODULE, "_resolve_seat_executable", return_value="/bin/true"
+                ),
+                mock.patch.object(MODULE.subprocess, "run", side_effect=fake_run),
+            ):
+                receipt = MODULE.observe_fallback_seats(
+                    MODULE.utc_now(), registry_path=path
+                )
+        self.assertEqual(receipt["availableSeats"], 2)
+        self.assertTrue(receipt["providers"]["grok"]["available"])
+        self.assertTrue(receipt["providers"]["kimi"]["available"])
+
+    def test_observe_fallback_seats_marks_auth_and_quota_failures_unavailable(self):
+        registry = {
+            "models": [
+                {
+                    "provider": "grok",
+                    "model": "grok-4.6",
+                    "executable_default": "grok",
+                    "probe_argv": ["{executable}", "models"],
+                    "probe_forbidden_patterns": ["not authenticated"],
+                },
+                {
+                    "provider": "kimi",
+                    "model": "kimi-code/k3",
+                    "executable_default": "kimi",
+                    "probe_argv": ["{executable}", "provider", "list", "--json"],
+                    "probe_mode": "json-model-key",
+                },
+            ]
+        }
+        with tempfile.TemporaryDirectory() as tmp:
+            path = pathlib.Path(tmp) / "model-registry.json"
+            path.write_text(json.dumps(registry), encoding="utf-8")
+
+            def fake_run(argv, **_kwargs):
+                if "provider" in argv:
+                    return subprocess.CompletedProcess(
+                        argv, 0, stdout=b"error: 429 too many requests", stderr=b""
+                    )
+                return subprocess.CompletedProcess(
+                    argv, 0, stdout=b"not authenticated", stderr=b""
+                )
+
+            with (
+                mock.patch.object(
+                    MODULE, "_resolve_seat_executable", return_value="/bin/true"
+                ),
+                mock.patch.object(MODULE.subprocess, "run", side_effect=fake_run),
+            ):
+                receipt = MODULE.observe_fallback_seats(
+                    MODULE.utc_now(), registry_path=path
+                )
+        self.assertEqual(receipt["availableSeats"], 0)
+        self.assertEqual(
+            receipt["providers"]["grok"]["reason"], "auth-or-runtime-failed"
+        )
+        self.assertEqual(
+            receipt["providers"]["kimi"]["reason"], "pool-quota-exhausted"
+        )
 
 
 class PersistedRefreshTests(unittest.TestCase):
@@ -1353,7 +1568,7 @@ class DeploymentBindingTests(unittest.TestCase):
                 "mainSha": MAIN_SHA,
                 "deployedSha": "b" * 7,
                 "scope": "event-scoped-exact-pr-head-with-bound-repair-attestation",
-                "maxConcurrent": 4,
+                "maxConcurrent": 1,
                 "deploymentsAllowed": False,
                 "authority": "canonical-merge-queue-controller",
             },
@@ -1364,6 +1579,8 @@ class DeploymentBindingTests(unittest.TestCase):
         )
 
     def test_unbound_repair_autoscales_from_live_oauth_seats_not_codex(self):
+        # JOV-5913: concurrencyEvidence / Codex readiness must not drive unbound
+        # repair slots; only the typed fallbackSeats signal does.
         signals = dict(GREEN_SIGNALS)
         signals["production"] = {"status": "green", "deployedSha": "b" * 7}
         signals["concurrencyEvidence"] = {
@@ -1377,25 +1594,19 @@ class DeploymentBindingTests(unittest.TestCase):
                 "kimi": {"enrolled": 1, "ready": 1, "reason": "oauth-enrolled"},
             },
         }
-
+        # Without fallbackSeats evidence, fail closed to the floor even if
+        # concurrencyEvidence reports ready Grok/Kimi providers.
         receipt = self.evaluate(signals)
-
         self.assertEqual(receipt["promotionMode"], "hold-intake")
-        self.assertEqual(receipt["productionUnboundRepairAdmission"]["maxConcurrent"], 4)
+        self.assertEqual(receipt["productionUnboundRepairAdmission"]["maxConcurrent"], 1)
         self.assertFalse(receipt["productionUnboundRepairAdmission"]["deploymentsAllowed"])
         self.assertEqual(receipt["isolatedPromotionAdmission"]["maxConcurrent"], 1)
-        self.assertEqual(receipt["remediationAdmission"]["maxConcurrent"], 1)
 
-        signals["concurrencyEvidence"] = {
-            **GREEN_SIGNALS["concurrencyEvidence"],
-            "target": 2,
-            "source": "live-oauth-cli-seats",
-            "providers": {
-                "codex": {"ready": 0, "reason": "usageLimitExceeded-excluded"},
-                "grok": {"enrolled": 6, "ready": 6, "reason": "oauth-enrolled"},
-                "kimi": {"enrolled": 2, "ready": 2, "reason": "oauth-enrolled"},
-            },
-        }
+        signals["fallbackSeats"] = fallback_seat_signal(True, False)
+        one_seat = self.evaluate(signals)
+        self.assertEqual(one_seat["productionUnboundRepairAdmission"]["maxConcurrent"], 4)
+
+        signals["fallbackSeats"] = fallback_seat_signal(True, True)
         scaled = self.evaluate(signals)
         self.assertEqual(scaled["productionUnboundRepairAdmission"]["maxConcurrent"], 8)
         self.assertFalse(scaled["productionUnboundRepairAdmission"]["deploymentsAllowed"])
