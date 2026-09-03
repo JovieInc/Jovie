@@ -21,6 +21,7 @@ import {
   writeThreadReadState,
 } from '@/components/shell/SidebarThreadsSection';
 import { useChatThreadContextMenu } from '@/components/shell/useChatThreadContextMenu';
+import { useChatThreadPrefetch } from '@/components/shell/useChatThreadPrefetch';
 import { APP_ROUTES, isDemoRoutePath } from '@/constants/routes';
 import { useIsElectronRuntime } from '@/lib/desktop/electron-bridge';
 import { NAV_SHORTCUTS } from '@/lib/keyboard-shortcuts';
@@ -101,6 +102,7 @@ export function DashboardNav({ children: searchSurface }: DashboardNavProps) {
   const pathname = usePathname();
   const router = useRouter();
   const queryClient = useQueryClient();
+  const onThreadPrefetch = useChatThreadPrefetch();
   const isElectron = useIsElectronRuntime();
   // Persisted navigation state is a client-only enhancement. Reading it during
   // the first render would make a returning browser render different badges
@@ -510,6 +512,7 @@ export function DashboardNav({ children: searchSurface }: DashboardNavProps) {
                 normalizeTrailingSlash(pathname) === APP_ROUTES.CHATS
               }
               onThreadContextMenu={onThreadContextMenu}
+              onThreadPrefetch={onThreadPrefetch}
               state={
                 conversationsError
                   ? 'error'
