@@ -162,11 +162,21 @@ export default defineConfig({
     },
 
     // Reduce reporter overhead - basic was removed in vitest 4, use default with summary:false
-    // JUnit reporter in CI for Codecov Test Analytics ingestion
+    // JUnit reporter in CI for Codecov Test Analytics ingestion.
+    // The per-reporter outputFile OVERRIDES the CLI --outputFile flag in Vitest 4,
+    // so sharded CI runs (`--outputFile=test-report.5-10.junit.xml`) all wrote the
+    // same default name that the workflow upload glob never matched (JOV: #17071).
+    // Read the shard path from the environment instead; the workflow exports it.
     reporters: isCI
       ? [
           ['default', { summary: false }],
-          ['junit', { outputFile: 'test-report.junit.xml' }],
+          [
+            'junit',
+            {
+              outputFile:
+                process.env.VITEST_JUNIT_OUTPUT_FILE ?? 'test-report.junit.xml',
+            },
+          ],
         ]
       : ['default'],
 
