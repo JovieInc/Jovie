@@ -379,6 +379,21 @@ struct LibraryFeedTests {
     #expect(LibraryHome.ideas.accessibilityIdentifier == "library-home-ideas")
   }
 
+  @Test func controlHitFramesStayCanonicalWithoutEnlargingSearchVisual() {
+    #expect(LibraryControlMetrics.minimumTouchTarget == JovieIconButtonStyle.targetSize)
+    #expect(LibraryControlMetrics.minimumTouchTarget == 44)
+    #expect(LibraryControlMetrics.searchVisualHeight == 36)
+    #expect(LibraryControlMetrics.searchVisualHeight < LibraryControlMetrics.minimumTouchTarget)
+  }
+
+  @Test func surfaceIdentifierDoesNotClobberChildIdentifiers() {
+    // The surface container must stay a passthrough container or its
+    // identifier overwrites `library-home-*` / `library-search` and XCUITest
+    // can no longer find the Catalog switcher (ci:2fa8414a).
+    #expect(LibraryControlMetrics.accessibilityIdentifier == "library-surface")
+    #expect(LibraryControlMetrics.requiresPassthroughAccessibilityContainer)
+  }
+
   @Test func searchMatchesCatalogNameAndIgnoresTakes() {
     let hits = LibraryFeed.matching(LibraryFeed.previewAssets, query: "midnight")
     #expect(hits.map(\.id) == ["lib-release-midnight"])

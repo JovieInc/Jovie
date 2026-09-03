@@ -329,6 +329,7 @@ const nativeBindingsByEntry: Partial<
         'apps/ios/Jovie/Features/AppShell/AppShellView.swift',
         'apps/ios/Jovie/Features/Chat/MobileChatView.swift',
         'apps/ios/Jovie/Features/Dashboard/PublicProfileBrowserView.swift',
+        'apps/ios/Jovie/Features/Library/LibrarySurfaceView.swift',
         'apps/ios/Jovie/Features/Teleprompter/TeleprompterOverlayView.swift',
       ],
       testEvidence: nativeButtonStyleTests,

@@ -2,6 +2,9 @@
 
 from __future__ import annotations
 
+import contextlib
+import datetime as dt
+import io
 import os
 import pathlib
 import re
@@ -34,6 +37,55 @@ def _load_helper():
     sys.modules[spec.name] = module
     spec.loader.exec_module(module)
     return module
+
+
+def _fleet_gate_payload(status="healthy", intake=True, observed_at=None):
+    observed = observed_at or (
+        dt.datetime.now(dt.timezone.utc)
+        .replace(microsecond=0)
+        .isoformat()
+        .replace("+00:00", "Z")
+    )
+    return {
+        "schema": "jovie-fleet-gate/v1",
+        "observedAt": observed,
+        "state": "GREEN" if status == "healthy" else "AMBER",
+        "signals": {
+            "closureHealth": {
+                "schema": "jovie-closure-health/v1",
+                "status": status,
+                "authority": "Summer",
+                "newIssueIntakeAllowed": intake,
+                "promotionContinues": True,
+                "remediationContinues": True,
+                "reasons": [] if intake else ["duplicate-issue-lanes-unresolved"],
+            }
+        },
+        "closureAdmission": {
+            "allowed": intake,
+            "newIssueIntakeAllowed": intake,
+            "newImplementationAllowed": intake,
+            "fallbackPrGenerationAllowed": intake,
+            "authority": "Summer",
+            "status": status,
+            "promotionContinues": True,
+            "remediationContinues": True,
+        },
+    }
+
+
+def _closure_run_args(tmp):
+    """Green fleet-gate fixture plus hermetic stop-line paths for run tests."""
+    closure_gate = pathlib.Path(tmp) / "fleet-gate.json"
+    closure_gate.write_text(json.dumps(_fleet_gate_payload()), encoding="utf-8")
+    return [
+        "--closure-gate-file",
+        str(closure_gate),
+        "--closure-hold-receipt",
+        str(pathlib.Path(tmp) / "closure-hold.json"),
+        "--dead-letter-dir",
+        str(pathlib.Path(tmp) / "dead-letters"),
+    ]
 
 
 class OfficialSymphonyContractTests(unittest.TestCase):
@@ -242,6 +294,7 @@ class OfficialSymphonyContractTests(unittest.TestCase):
                     "run",
                     "--gate-file",
                     str(gate),
+                    *_closure_run_args(tmp),
                     "--max-gate-sleep-seconds",
                     "0",
                     "--",
@@ -483,6 +536,7 @@ class OfficialSymphonyContractTests(unittest.TestCase):
                     "run",
                     "--gate-file",
                     str(gate),
+                    *_closure_run_args(tmp),
                     "--max-gate-sleep-seconds",
                     "0",
                     "--",
@@ -535,6 +589,552 @@ class OfficialSymphonyContractTests(unittest.TestCase):
         self.assertEqual(slept, 20)
         self.assertEqual(sleeps, [20])
         self.assertEqual(kills, [(process.pid, helper.signal.SIGSTOP), (process.pid, helper.signal.SIGCONT)])
+
+    def test_unit_binds_closure_stop_line_gate(self):
+        helper = _load_helper()
+        flag = "--closure-gate-file %h/gem-workspace/state/gem-priority-gate/latest.json"
+        self.assertIn(flag, UNIT)
+        with tempfile.TemporaryDirectory() as tmp:
+            variant = pathlib.Path(tmp) / "symphony-elixir.service"
+            variant.write_text(UNIT.replace(f"{flag} ", ""), encoding="utf-8")
+            result = helper.validate_source(
+                repo_root=ROOT,
+                workflow_path=WORKFLOW_PATH,
+                unit_path=variant,
+                service_name="symphony-elixir.service",
+                active_issues=helper.MEASURED_ACTIVE_ISSUES,
+            )
+            self.assertFalse(result["ok"])
+            self.assertIn("unit_missing_closure_stop_line_gate", result["errors"])
+
+    def test_closure_stop_line_red_receipt_holds_new_admission(self):
+        helper = _load_helper()
+        with tempfile.TemporaryDirectory() as tmp:
+            closure_gate = pathlib.Path(tmp) / "fleet-gate.json"
+            closure_gate.write_text(
+                json.dumps(_fleet_gate_payload(status="red", intake=False)),
+                encoding="utf-8",
+            )
+            hold = pathlib.Path(tmp) / "closure-hold.json"
+            verdict = helper.read_closure_stop_line(closure_gate)
+            self.assertTrue(verdict["hold"])
+            self.assertEqual(verdict["reason"], "closure-health-not-green")
+            self.assertEqual(verdict["closureStatus"], "red")
+            result = subprocess.run(
+                [
+                    "python3",
+                    str(HELPER_PATH),
+                    "run",
+                    "--gate-file",
+                    str(pathlib.Path(tmp) / "linear-rate-limit.json"),
+                    "--closure-gate-file",
+                    str(closure_gate),
+                    "--closure-hold-receipt",
+                    str(hold),
+                    "--dead-letter-dir",
+                    str(pathlib.Path(tmp) / "dead-letters"),
+                    "--max-gate-sleep-seconds",
+                    "0",
+                    "--",
+                    "python3",
+                    "-c",
+                    "print('must-not-run')",
+                ],
+                cwd=ROOT,
+                capture_output=True,
+                text=True,
+            )
+            self.assertEqual(result.returncode, helper.CLOSURE_HOLD_EXIT_CODE)
+            self.assertNotIn("must-not-run", result.stdout)
+            receipt = json.loads(hold.read_text(encoding="utf-8"))
+            self.assertEqual(receipt["schema"], helper.CLOSURE_HOLD_SCHEMA)
+            self.assertEqual(receipt["status"], "exhausted")
+            self.assertEqual(receipt["reason"], "closure-health-not-green")
+            self.assertEqual(receipt["closureStatus"], "red")
+            self.assertEqual(receipt["receiptPath"], str(closure_gate))
+            self.assertFalse(receipt["newIssueIntakeAllowed"])
+
+    def test_closure_stop_line_green_receipt_admits(self):
+        helper = _load_helper()
+        with tempfile.TemporaryDirectory() as tmp:
+            result = subprocess.run(
+                [
+                    "python3",
+                    str(HELPER_PATH),
+                    "run",
+                    "--gate-file",
+                    str(pathlib.Path(tmp) / "linear-rate-limit.json"),
+                    *_closure_run_args(tmp),
+                    "--max-gate-sleep-seconds",
+                    "0",
+                    "--",
+                    "python3",
+                    "-c",
+                    "print('closure-green-child-ran')",
+                ],
+                cwd=ROOT,
+                capture_output=True,
+                text=True,
+            )
+            self.assertEqual(result.returncode, 0, result.stderr + result.stdout)
+            self.assertIn("closure-green-child-ran", result.stdout)
+            closure_gate = pathlib.Path(tmp) / "fleet-gate.json"
+            verdict = helper.read_closure_stop_line(closure_gate)
+            self.assertFalse(verdict["hold"])
+            self.assertEqual(verdict["reason"], "closure-health-green")
+
+    def test_closure_stop_line_missing_stale_future_or_tampered_fails_closed(self):
+        helper = _load_helper()
+        now = dt.datetime(2026, 9, 3, 12, 0, 0, tzinfo=dt.timezone.utc)
+        with tempfile.TemporaryDirectory() as tmp:
+            missing = pathlib.Path(tmp) / "absent.json"
+            verdict = helper.read_closure_stop_line(missing, now=now)
+            self.assertTrue(verdict["hold"])
+            self.assertEqual(verdict["reason"], "fleet-gate-receipt-missing")
+
+            gate = pathlib.Path(tmp) / "fleet-gate.json"
+            gate.write_text("not json", encoding="utf-8")
+            verdict = helper.read_closure_stop_line(gate, now=now)
+            self.assertTrue(verdict["hold"])
+            self.assertEqual(
+                verdict["reason"], "fleet-gate-receipt-invalid:JSONDecodeError"
+            )
+
+            gate.write_text("[]", encoding="utf-8")
+            verdict = helper.read_closure_stop_line(gate, now=now)
+            self.assertEqual(verdict["reason"], "fleet-gate-receipt-schema-mismatch")
+
+            # Stale: observed 11 minutes before now with the 600s window.
+            gate.write_text(
+                json.dumps(_fleet_gate_payload(observed_at="2026-09-03T11:49:00Z")),
+                encoding="utf-8",
+            )
+            verdict = helper.read_closure_stop_line(gate, now=now)
+            self.assertTrue(verdict["hold"])
+            self.assertEqual(verdict["reason"], "fleet-gate-receipt-stale")
+            self.assertEqual(verdict["receiptAgeSeconds"], 660)
+
+            # Fresh within the window admits.
+            gate.write_text(
+                json.dumps(_fleet_gate_payload(observed_at="2026-09-03T11:51:00Z")),
+                encoding="utf-8",
+            )
+            verdict = helper.read_closure_stop_line(gate, now=now)
+            self.assertFalse(verdict["hold"])
+
+            # Future-dated beyond the skew bound fails closed.
+            gate.write_text(
+                json.dumps(_fleet_gate_payload(observed_at="2026-09-03T12:05:00Z")),
+                encoding="utf-8",
+            )
+            verdict = helper.read_closure_stop_line(gate, now=now)
+            self.assertTrue(verdict["hold"])
+            self.assertEqual(verdict["reason"], "fleet-gate-receipt-future")
+
+            fresh = "2026-09-03T11:59:00Z"
+
+            def write_tampered(mutate):
+                payload = _fleet_gate_payload(observed_at=fresh)
+                mutate(payload)
+                gate.write_text(json.dumps(payload), encoding="utf-8")
+                return helper.read_closure_stop_line(gate, now=now)
+
+            verdict = write_tampered(
+                lambda payload: payload["signals"]["closureHealth"].update(
+                    authority="Gem"
+                )
+            )
+            self.assertEqual(verdict["reason"], "closure-health-receipt-tampered")
+            verdict = write_tampered(
+                lambda payload: payload["signals"]["closureHealth"].update(
+                    newIssueIntakeAllowed=False
+                )
+            )
+            self.assertEqual(verdict["reason"], "closure-health-receipt-tampered")
+            verdict = write_tampered(
+                lambda payload: payload["signals"]["closureHealth"].update(
+                    status="red", newIssueIntakeAllowed=True
+                )
+            )
+            self.assertEqual(verdict["reason"], "closure-health-receipt-tampered")
+            verdict = write_tampered(
+                lambda payload: payload["signals"]["closureHealth"].update(
+                    promotionContinues=False
+                )
+            )
+            self.assertEqual(verdict["reason"], "closure-health-receipt-tampered")
+            verdict = write_tampered(
+                lambda payload: payload["closureAdmission"].update(status="red")
+            )
+            self.assertEqual(verdict["reason"], "closure-admission-disagrees")
+            verdict = write_tampered(lambda payload: payload.pop("signals"))
+            self.assertEqual(verdict["reason"], "closure-health-missing")
+
+            # Grace is internally consistent but is not the green admission state.
+            gate.write_text(
+                json.dumps(
+                    _fleet_gate_payload(
+                        status="grace", intake=False, observed_at=fresh
+                    )
+                ),
+                encoding="utf-8",
+            )
+            verdict = helper.read_closure_stop_line(gate, now=now)
+            self.assertTrue(verdict["hold"])
+            self.assertEqual(verdict["reason"], "closure-health-not-green")
+            self.assertEqual(verdict["closureStatus"], "grace")
+
+    def test_closure_hold_releases_when_receipt_turns_green(self):
+        helper = _load_helper()
+        with tempfile.TemporaryDirectory() as tmp:
+            closure_gate = pathlib.Path(tmp) / "fleet-gate.json"
+            hold = pathlib.Path(tmp) / "closure-hold.json"
+            closure_gate.write_text(
+                json.dumps(_fleet_gate_payload(status="red", intake=False)),
+                encoding="utf-8",
+            )
+            closure = helper.ClosureStopLine(
+                receipt_path=closure_gate,
+                hold_receipt_path=hold,
+                dead_letter_dir=pathlib.Path(tmp) / "dead-letters",
+            )
+            sleeps = []
+
+            def fake_sleep(seconds):
+                sleeps.append(seconds)
+                closure_gate.write_text(
+                    json.dumps(_fleet_gate_payload()), encoding="utf-8"
+                )
+
+            out = io.StringIO()
+            with mock.patch.object(helper.time, "sleep", side_effect=fake_sleep):
+                with contextlib.redirect_stdout(out):
+                    returncode = helper.run_official_binary(
+                        ["python3", "-c", "print('closure-released-child-ran')"],
+                        gate_file=pathlib.Path(tmp) / "linear-rate-limit.json",
+                        closure=closure,
+                        max_gate_sleep_seconds=300,
+                    )
+            self.assertEqual(returncode, 0)
+            self.assertIn("closure-released-child-ran", out.getvalue())
+            self.assertIn("closure_hold_wait", out.getvalue())
+            self.assertIn("closure_hold_release", out.getvalue())
+            self.assertEqual(sleeps, [helper.CLOSURE_HOLD_RECHECK_SECONDS])
+            receipt = json.loads(hold.read_text(encoding="utf-8"))
+            self.assertEqual(receipt["schema"], helper.CLOSURE_HOLD_SCHEMA)
+            self.assertEqual(receipt["status"], "released")
+            self.assertEqual(
+                receipt["holdSleepSecondsUsed"], helper.CLOSURE_HOLD_RECHECK_SECONDS
+            )
+            self.assertEqual(receipt["reason"], "closure-health-green")
+
+    def test_closure_hold_pauses_live_scheduler_without_terminating_child(self):
+        helper = _load_helper()
+        process = subprocess.Popen(
+            ["python3", "-c", "import time; time.sleep(30)"],
+            cwd=ROOT,
+            text=True,
+        )
+        kills = []
+        try:
+            with tempfile.TemporaryDirectory() as tmp:
+                closure_gate = pathlib.Path(tmp) / "fleet-gate.json"
+                hold = pathlib.Path(tmp) / "closure-hold.json"
+                closure_gate.write_text(
+                    json.dumps(_fleet_gate_payload(status="red", intake=False)),
+                    encoding="utf-8",
+                )
+                closure = helper.ClosureStopLine(
+                    receipt_path=closure_gate,
+                    hold_receipt_path=hold,
+                    dead_letter_dir=pathlib.Path(tmp) / "dead-letters",
+                )
+                verdict = helper.read_closure_stop_line(closure_gate)
+                self.assertTrue(verdict["hold"])
+
+                def fake_sleep(_seconds):
+                    closure_gate.write_text(
+                        json.dumps(_fleet_gate_payload()), encoding="utf-8"
+                    )
+
+                out = io.StringIO()
+                with mock.patch.object(
+                    helper.os,
+                    "kill",
+                    side_effect=lambda pid, sig: kills.append((pid, sig)),
+                ):
+                    with mock.patch.object(
+                        helper.time, "sleep", side_effect=fake_sleep
+                    ):
+                        with contextlib.redirect_stdout(out):
+                            slept = helper._pause_child_for_closure_hold(
+                                process, closure, verdict, 300
+                            )
+                self.assertEqual(slept, helper.CLOSURE_HOLD_RECHECK_SECONDS)
+                self.assertEqual(
+                    kills,
+                    [
+                        (process.pid, helper.signal.SIGSTOP),
+                        (process.pid, helper.signal.SIGCONT),
+                    ],
+                )
+                self.assertEqual(json.loads(hold.read_text())["status"], "released")
+                self.assertIn("closure_hold_wait", out.getvalue())
+                self.assertIn("closure_hold_release", out.getvalue())
+        finally:
+            process.terminate()
+            process.wait(timeout=5)
+
+    def test_closure_hold_exhaustion_resumes_scheduler_for_collection(self):
+        helper = _load_helper()
+        process = subprocess.Popen(
+            ["python3", "-c", "import time; time.sleep(30)"],
+            cwd=ROOT,
+            text=True,
+        )
+        kills = []
+        try:
+            with tempfile.TemporaryDirectory() as tmp:
+                closure_gate = pathlib.Path(tmp) / "fleet-gate.json"
+                hold = pathlib.Path(tmp) / "closure-hold.json"
+                closure_gate.write_text(
+                    json.dumps(_fleet_gate_payload(status="red", intake=False)),
+                    encoding="utf-8",
+                )
+                closure = helper.ClosureStopLine(
+                    receipt_path=closure_gate,
+                    hold_receipt_path=hold,
+                    dead_letter_dir=pathlib.Path(tmp) / "dead-letters",
+                )
+                verdict = helper.read_closure_stop_line(closure_gate)
+                self.assertTrue(verdict["hold"])
+                out = io.StringIO()
+                with mock.patch.object(
+                    helper.os,
+                    "kill",
+                    side_effect=lambda pid, sig: kills.append((pid, sig)),
+                ):
+                    with mock.patch.object(helper.time, "sleep", lambda _seconds: None):
+                        with contextlib.redirect_stdout(out):
+                            slept = helper._pause_child_for_closure_hold(
+                                process,
+                                closure,
+                                verdict,
+                                helper.CLOSURE_HOLD_RECHECK_SECONDS,
+                            )
+                self.assertEqual(slept, helper.CLOSURE_HOLD_RECHECK_SECONDS)
+                self.assertEqual(
+                    kills,
+                    [
+                        (process.pid, helper.signal.SIGSTOP),
+                        (process.pid, helper.signal.SIGCONT),
+                    ],
+                )
+                receipt = json.loads(hold.read_text())
+                self.assertEqual(receipt["status"], "exhausted")
+                self.assertEqual(receipt["reason"], "closure-health-not-green")
+                self.assertIn("closure_hold_wait_exhausted", out.getvalue())
+        finally:
+            process.terminate()
+            process.wait(timeout=5)
+
+    def test_linear_permanent_error_dead_letters_after_bounded_ceiling(self):
+        helper = _load_helper()
+        lines = "".join(
+            f"linear_api_status=400 issue_identifier=JOV-4195 attempt={attempt}\n"
+            for attempt in (1, 2, 3, 4)
+        )
+        script = f"import sys\nsys.stdout.write({lines!r})\nsys.stdout.flush()\n"
+        with tempfile.TemporaryDirectory() as tmp:
+            dead = pathlib.Path(tmp) / "dead-letters"
+            command = [
+                "python3",
+                str(HELPER_PATH),
+                "run",
+                "--gate-file",
+                str(pathlib.Path(tmp) / "linear-rate-limit.json"),
+                *_closure_run_args(tmp),
+                "--max-gate-sleep-seconds",
+                "0",
+                "--",
+                "python3",
+                "-c",
+                script,
+            ]
+            result = subprocess.run(
+                command, cwd=ROOT, capture_output=True, text=True
+            )
+            self.assertEqual(result.returncode, 0, result.stderr + result.stdout)
+            self.assertIn("issue_dead_letter", result.stdout)
+            receipt_path = dead / "JOV-4195.json"
+            self.assertTrue(receipt_path.is_file())
+            receipt = json.loads(receipt_path.read_text(encoding="utf-8"))
+            self.assertEqual(receipt["schema"], helper.ISSUE_DEAD_LETTER_SCHEMA)
+            self.assertEqual(receipt["status"], "dead-lettered")
+            self.assertEqual(receipt["issue"], "JOV-4195")
+            self.assertEqual(receipt["errorClass"], "linear_permanent_client_error")
+            self.assertEqual(receipt["linearApiStatus"], 400)
+            self.assertEqual(
+                receipt["attempts"], helper.LINEAR_PERMANENT_ERROR_MAX_ATTEMPTS
+            )
+            self.assertEqual(
+                receipt["maxAttempts"], helper.LINEAR_PERMANENT_ERROR_MAX_ATTEMPTS
+            )
+            self.assertTrue(receipt["excludedFromDispatch"])
+            self.assertTrue(receipt["firstObservedAt"])
+            before = receipt_path.read_text(encoding="utf-8")
+
+            # Exclude-from-dispatch: a later storm for the same issue is
+            # suppressed against the durable receipt, not re-receipted.
+            again = subprocess.run(
+                command, cwd=ROOT, capture_output=True, text=True
+            )
+            self.assertEqual(again.returncode, 0, again.stderr + again.stdout)
+            self.assertIn("issue_dead_letter_suppressed", again.stdout)
+            self.assertEqual(receipt_path.read_text(encoding="utf-8"), before)
+
+    def test_linear_permanent_error_classifier_boundaries(self):
+        helper = _load_helper()
+        now = dt.datetime(2026, 9, 3, 12, 0, 0, tzinfo=dt.timezone.utc)
+        out = io.StringIO()
+        with contextlib.redirect_stdout(out):
+            with tempfile.TemporaryDirectory() as tmp:
+                tracked: dict = {}
+                noted: set = set()
+                for attempt in (1, 2):
+                    error = helper.classify_linear_issue_error_log_line(
+                        f"linear_api_status=400 issue_identifier=JOV-4195 attempt={attempt}",
+                        now=now,
+                    )
+                    self.assertIsNotNone(error)
+                    self.assertEqual(error["kind"], "linear_permanent_client_error")
+                    self.assertEqual(error["issue"], "JOV-4195")
+                    self.assertEqual(error["status"], 400)
+                    self.assertEqual(error["attempt"], attempt)
+                    self.assertIsNone(
+                        helper.record_linear_issue_error(
+                            pathlib.Path(tmp), error, tracked, noted, now=now
+                        )
+                    )
+                self.assertFalse((pathlib.Path(tmp) / "JOV-4195.json").exists())
+
+            # A logged attempt at/over the ceiling dead-letters immediately.
+            with tempfile.TemporaryDirectory() as tmp:
+                error = helper.classify_linear_issue_error_log_line(
+                    "linear_api_status=400 issue_identifier=JOV-4195 attempt=49",
+                    now=now,
+                )
+                receipt = helper.record_linear_issue_error(
+                    pathlib.Path(tmp), error, {}, set(), now=now
+                )
+                self.assertIsNotNone(receipt)
+                self.assertEqual(receipt["attempts"], 49)
+
+        # 429 stays with the rate-limit path and never dead-letters.
+        self.assertIsNone(
+            helper.classify_linear_issue_error_log_line(
+                "linear_api_status=429 issue_identifier=JOV-4195 attempt=53", now=now
+            )
+        )
+        # A RATELIMITED 400 body is owned by the rate-limit gate.
+        line = (
+            "linear_api_status=400 issue_identifier=JOV-4195 attempt=49 "
+            '{"errors":[{"extensions":{"code":"RATELIMITED"}}]}'
+        )
+        self.assertIsNone(helper.classify_linear_issue_error_log_line(line, now=now))
+        self.assertIsNotNone(helper.classify_linear_log_line(line, now=now))
+        # The space-separated live loopback shape classifies too.
+        error = helper.classify_linear_issue_error_log_line(
+            "linear_api_status 400 JOV-4195", now=now
+        )
+        self.assertIsNotNone(error)
+        self.assertEqual(error["issue"], "JOV-4195")
+        self.assertIsNone(error["attempt"])
+        # Ambiguous or missing attribution fails closed to no action.
+        self.assertIsNone(
+            helper.classify_linear_issue_error_log_line(
+                "linear_api_status=400 JOV-1 JOV-2", now=now
+            )
+        )
+        self.assertIsNone(
+            helper.classify_linear_issue_error_log_line("linear_api_status=400", now=now)
+        )
+        # 5xx is transient, never permanent.
+        self.assertIsNone(
+            helper.classify_linear_issue_error_log_line(
+                "linear_api_status=502 issue_identifier=JOV-4195", now=now
+            )
+        )
+        # Ordinary Linear traffic is not an error signal.
+        self.assertIsNone(
+            helper.classify_linear_issue_error_log_line(
+                "linear_api_status=200 issue_identifier=JOV-4195", now=now
+            )
+        )
+
+    def test_linear_429_storm_never_dead_letters(self):
+        helper = _load_helper()
+        lines = "".join(
+            f"linear_api_status=429 issue_identifier=JOV-4195 attempt={attempt}\n"
+            for attempt in range(49, 54)
+        )
+        script = f"import sys\nsys.stdout.write({lines!r})\nsys.stdout.flush()\n"
+        with tempfile.TemporaryDirectory() as tmp:
+            dead = pathlib.Path(tmp) / "dead-letters"
+            result = subprocess.run(
+                [
+                    "python3",
+                    str(HELPER_PATH),
+                    "run",
+                    "--gate-file",
+                    str(pathlib.Path(tmp) / "linear-rate-limit.json"),
+                    *_closure_run_args(tmp),
+                    "--max-gate-sleep-seconds",
+                    "0",
+                    "--",
+                    "python3",
+                    "-c",
+                    script,
+                ],
+                cwd=ROOT,
+                capture_output=True,
+                text=True,
+            )
+            self.assertEqual(result.returncode, 0, result.stderr + result.stdout)
+            self.assertFalse((dead / "JOV-4195.json").exists())
+            self.assertNotIn("issue_dead_letter", result.stdout)
+
+    def test_linear_ambiguous_error_storm_never_dead_letters(self):
+        helper = _load_helper()
+        lines = "".join(
+            f"linear_api_status=400 issue_identifier=JOV-4195 related=JOV-4200 attempt={attempt}\n"
+            for attempt in (1, 2, 3, 4, 5)
+        )
+        script = f"import sys\nsys.stdout.write({lines!r})\nsys.stdout.flush()\n"
+        with tempfile.TemporaryDirectory() as tmp:
+            dead = pathlib.Path(tmp) / "dead-letters"
+            result = subprocess.run(
+                [
+                    "python3",
+                    str(HELPER_PATH),
+                    "run",
+                    "--gate-file",
+                    str(pathlib.Path(tmp) / "linear-rate-limit.json"),
+                    *_closure_run_args(tmp),
+                    "--max-gate-sleep-seconds",
+                    "0",
+                    "--",
+                    "python3",
+                    "-c",
+                    script,
+                ],
+                cwd=ROOT,
+                capture_output=True,
+                text=True,
+            )
+            self.assertEqual(result.returncode, 0, result.stderr + result.stdout)
+            self.assertFalse(dead.exists())
+            self.assertNotIn("issue_dead_letter", result.stdout)
 
     def test_linear_eligible_count_override_is_dependency_free_and_validated(self):
         result = subprocess.run(

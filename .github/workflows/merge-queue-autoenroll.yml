@@ -341,14 +341,24 @@ jobs:
           DRAIN_RECOVER_FLEET_HOLDS: ${{ needs.fleet-policy.outputs.mode == 'normal' && steps.admission.outputs.recover_holds == '1' && '1' || '0' }}
           # Composite CI heads cannot map to source PRs. The drain consumes
           # only bot-authored exact-head native-admission receipts, with fresh
-          # checks and the shared total cap below; it is never a global sweep.
+          # checks and the shared admission bound below; it is never a global sweep.
           DRAIN_RECONCILE_QUEUE_REENTRY: ${{ needs.fleet-policy.outputs.mode == 'normal' && steps.admission.outputs.reconcile_queue_reentry == '1' && '1' || '0' }}
           # GitHub's single pending slot can replace an exact CI admission event
           # even with cancel-in-progress=false. Reconcile only in the same fleet
-          # modes that already permit clean exact-head admission, sharing the
-          # total cap below with the event-scoped candidate and native re-entry.
+          # modes that already permit clean exact-head admission. Admissions are
+          # uncapped (0): native queue depth is the sole bound; a positive
+          # integer re-caps event + recovery admissions per run.
           DRAIN_RECONCILE_MISSED_ADMISSION: ${{ steps.admission.outputs.deferred_release != '1' && (needs.fleet-policy.outputs.mode == 'normal' || needs.fleet-policy.outputs.mode == 'hold-intake' || needs.fleet-policy.outputs.mode == 'draft-only') && '1' || '0' }}
-          DRAIN_QUEUE_REENTRY_MAX_PER_RUN: '2'
+          DRAIN_QUEUE_REENTRY_MAX_PER_RUN: '0'
+          # A non-draft main PR whose required source checks never registered a
+          # check-run on its exact head can never turn green and never enroll
+          # (observed 2026-09-03 across multiple open PRs for 24h+). The drain
+          # re-fires source CI with a bounded close+reopen: at most two per run,
+          # heads at least two hours old, and never twice on the same exact head
+          # (bot-comment marker). Not an admission path, so no fleet-mode gate.
+          DRAIN_RECOVER_MISSING_CI: '1'
+          DRAIN_MISSING_CI_MAX_PER_RUN: '2'
+          DRAIN_MISSING_CI_MIN_AGE_MINUTES: '120'
           # `queue-deferred` has no typed provenance separating a temporary
           # pressure deferral from an explicit repair/human hold. Main-push
           # maintenance must preserve it until an owner explicitly releases it.

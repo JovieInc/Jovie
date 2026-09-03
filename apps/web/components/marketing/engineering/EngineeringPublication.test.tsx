@@ -55,7 +55,10 @@ describe('EngineeringPublication', () => {
     expect(screen.getByTestId('engineering-article')).toBeVisible();
     expect(screen.getByText('Evidence')).toBeVisible();
     expect(screen.getByText('https://jov.ie/changelog')).toBeVisible();
-    expect(container.querySelector('h1')).toHaveClass('sm:text-5xl');
+    expect(container.querySelector('h1')).toHaveClass(
+      'system-b-marketing-route-title'
+    );
+    expect(container.querySelector('h1')).not.toHaveClass('sm:text-5xl');
     expect(container.querySelector('.pb-20')).toHaveClass('sm:pb-28');
   });
 });

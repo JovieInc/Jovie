@@ -81,8 +81,10 @@ run_phase_with_optional_timeout() {
       return 2
     fi
 
+    set +e
     run_phase "$phase_name" run_with_timeout "$timeout_seconds" "$@"
     local status=$?
+    set -e
     if [[ "$status" -eq 124 ]]; then
       echo "iOS phase timed out after ${timeout_seconds}s: $phase_name" >&2
     fi
@@ -368,10 +370,41 @@ if [[ "$ACTION" == "test" && "${JOVIE_IOS_RESET_SIMULATOR:-1}" != "0" ]]; then
   ' bash "$DESTINATION_ID"
 fi
 
+# Preserve an xcresult for the test action and, on failure, surface the
+# failing test names as GitHub annotations (check-run annotations stay
+# readable without admin-gated job-log access - JOV-5371 CI remediation).
+RESULT_BUNDLE_ARGS=()
+RESULT_BUNDLE_PATH=""
+if [[ "$ACTION" == "test" ]]; then
+  RESULT_BUNDLE_PATH="${JOVIE_IOS_RESULT_BUNDLE_PATH:-.build/ios-ci/ios-test-results.xcresult}"
+  rm -rf "$RESULT_BUNDLE_PATH"
+  RESULT_BUNDLE_ARGS=(-resultBundlePath "$RESULT_BUNDLE_PATH")
+fi
+
+set +e
 run_phase_with_optional_timeout "xcodebuild $ACTION" "${JOVIE_IOS_XCODEBUILD_TIMEOUT_SECONDS:-}" \
   xcodebuild "$ACTION" \
   -project "$PROJECT_PATH" \
   -scheme "$SCHEME" \
   -destination "$DESTINATION" \
+  ${RESULT_BUNDLE_ARGS[@]+"${RESULT_BUNDLE_ARGS[@]}"} \
   "$@" \
   CODE_SIGNING_ALLOWED="$CODE_SIGNING_ALLOWED_VALUE"
+XCODEBUILD_STATUS=$?
+set -e
+
+if [[ -n "$RESULT_BUNDLE_PATH" && "$XCODEBUILD_STATUS" -ne 0 && -d "$RESULT_BUNDLE_PATH" ]]; then
+  echo "::group::xcresult summary (xcodebuild exit $XCODEBUILD_STATUS)"
+  xcrun xcresulttool get test-results summary --path "$RESULT_BUNDLE_PATH" 2>/dev/null | head -c 8000 || true
+  echo
+  echo "::endgroup::"
+  echo "::group::xcresult failing tests"
+  xcrun xcresulttool get test-results tests --path "$RESULT_BUNDLE_PATH" 2>/dev/null | head -c 16000 || true
+  echo
+  echo "::endgroup::"
+  echo "::error::iOS test action failed (xcodebuild exit $XCODEBUILD_STATUS); see xcresult groups above and result bundle $RESULT_BUNDLE_PATH"
+fi
+
+if [[ "$XCODEBUILD_STATUS" -ne 0 ]]; then
+  exit "$XCODEBUILD_STATUS"
+fi

@@ -40,6 +40,9 @@ STALE_REMOUNT_SECONDS = 90 * 60  # product remounts (JOV-5235) still grok at 54 
 # Held live implement/remount locks are never TTL-expired.
 FALLBACK_LEASE_TTL_SECONDS = STALE_REMOUNT_SECONDS
 FALLBACK_LEASE_DIR = "~/.local/state/symphony-fallback/leases"
+# When Linear rate-limits the shared workspace key, every Linear call pauses
+# for this long instead of stampeding the exhausted budget (JOV drain 2026-09-03).
+LINEAR_BACKOFF_SECONDS = 15 * 60
 FALLBACK_GC_SCHEMA = "symphony-fallback-lease-gc/v1"
 FALLBACK_PICKUP_SCHEMA = "symphony-fallback-pickup/v1"
 FALLBACK_LOCK_NAME = re.compile(r"^((?:JOV|LYB)-\d+)\.lock$")
@@ -179,7 +182,14 @@ ADMITTED_STATES = frozenset(("todo", "in progress", "in review"))
 # keep flowing on the grok fallback after #16212 emptied the receipt list.
 # Todo still requires a current admission-gate/v1 receipt.
 CONTINUE_WITHOUT_RECEIPT_STATES = frozenset(("in progress", "in review"))
-AUTONOMOUS_HEAD_RE = re.compile(r"^(?:symphony|grok|fallback)/((?:JOV|LYB)-\d+)-fix$")
+# symphony/grok/fallback heads are the autonomous lane's own; codex/fable/fugu
+# heads are GPT-worker-authored. Failed or DIRTY GPT work is adopted by the
+# grok/kimi fallback lane (Tim 2026-09-03: "allow the failed gpt ones to move
+# to grok or kimi"). Codex-lane identifiers are lowercase in branch names.
+AUTONOMOUS_HEAD_RE = re.compile(
+    r"^(?:(?:symphony|grok|fallback)/((?:JOV|LYB)-\d+)-fix"
+    r"|(?:codex|fable|fugu)/((?:jov|lyb)-\d+)(?:-.+)?)$"
+)
 FALLBACK_UNIT_RE = re.compile(
     r"^(?:fallback-ship|grok-ship)-((?:JOV|LYB)-\d+)(?:-[0-9a-f]{12})?\.service$"
 )
@@ -749,7 +759,48 @@ def _linear_issues_list_request(after: str | None = None) -> dict:
     return {"query": LINEAR_QUERY, "variables": variables}
 
 
+def _linear_backoff_path() -> pathlib.Path:
+    return pathlib.Path(
+        os.path.expanduser(
+            os.environ.get(
+                "SYMPHONY_LINEAR_BACKOFF",
+                "~/.local/state/symphony-fallback/linear-backoff.json",
+            )
+        )
+    )
+
+
+def _linear_backoff_active() -> bool:
+    try:
+        data = json.loads(_linear_backoff_path().read_text(encoding="utf-8"))
+        stamped = float(data.get("epoch", 0))
+    except (OSError, ValueError, TypeError):
+        return False
+    return (time.time() - stamped) < LINEAR_BACKOFF_SECONDS
+
+
+def _linear_note_ratelimited() -> None:
+    path = _linear_backoff_path()
+    try:
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text(json.dumps({"epoch": time.time()}), encoding="utf-8")
+    except OSError:
+        pass
+
+
+def _linear_clear_backoff() -> None:
+    try:
+        _linear_backoff_path().unlink(missing_ok=True)
+    except OSError:
+        pass
+
+
 def _linear_graphql(payload: dict) -> dict | None:
+    # A ratelimited shared Linear budget must not be stampeded by the timer
+    # loop: while a backoff stamp is fresh, skip the network entirely (every
+    # caller already fails closed on None).
+    if _linear_backoff_active():
+        return None
     key = os.environ.get("LINEAR_API_KEY") or _linear_api_key_from_file()
     if not key:
         return None
@@ -761,8 +812,20 @@ def _linear_graphql(payload: dict) -> dict | None:
     try:
         with urllib.request.urlopen(request, timeout=CONTROL_TIMEOUT_SECONDS) as response:
             body = json.load(response)
+    except urllib.error.HTTPError as exc:
+        # Linear signals rate limiting as HTTP 400/429 with a RATELIMITED code
+        # in the error body (observed live 2026-09-03: 2500 req/hr exhausted on
+        # Gem, every worker died on admission re-verify).
+        try:
+            detail = exc.read().decode("utf-8", "replace")
+        except (OSError, ValueError):
+            detail = ""
+        if exc.code == 429 or "RATELIMITED" in detail:
+            _linear_note_ratelimited()
+        return None
     except (OSError, ValueError, TypeError, urllib.error.URLError):
         return None
+    _linear_clear_backoff()
     return body if isinstance(body, dict) else None
 
 
@@ -863,7 +926,7 @@ def _fetch_single_issue(identifier: str) -> dict | None:
 
 
 def _issue_meta(
-    issue: dict, identifier: str, *, require_receipt: bool = True
+    issue: dict, identifier: str, *, require_receipt: bool = True, remount: bool = False
 ) -> tuple[bool, str, dict | None]:
     """Validate one issue against the shared admission predicate and, when
     admitted, produce the meta record grok-ship-one needs to run.
@@ -915,7 +978,13 @@ def _issue_meta(
         return False, "identifier_mismatch", None
     state_name = str(state.get("name") or "").strip().lower()
     if state_name not in ADMITTED_STATES:
-        return False, "state_not_admitted", None
+        # Remount continues an existing open autonomous PR on GitHub. Linear
+        # reading done/closed while that PR is still open and unmerged is a
+        # state-sync error (e.g. linear-sync marked the issue Done on a partial
+        # sibling merge), not proof the work finished. Canceled/duplicate stay
+        # refused: those are deliberate kills.
+        if not (remount and state_name in {"done", "closed"}):
+            return False, "state_not_admitted", None
     state_nodes = team.get("states")
     states: dict[str, str] = {}
     if isinstance(state_nodes, dict) and isinstance(state_nodes.get("nodes"), list):
@@ -958,6 +1027,7 @@ def check_admission(identifier: str, *, remount: bool = False) -> int:
         issue,
         identifier,
         require_receipt=not remount and not _continue_without_receipt(issue),
+        remount=remount,
     )
     if not ok:
         print(f"not admitted:{reason}", file=sys.stderr)
@@ -1035,7 +1105,9 @@ def _autonomous_open_pr_index(identifiers: list[str] | None = None) -> dict[str,
             match = AUTONOMOUS_HEAD_RE.fullmatch(head)
             if match is None:
                 continue
-            ident = match.group(1)
+            # Group 2 covers the lowercase codex-lane identifier; normalize to
+            # the canonical JOV-/LYB- form used everywhere downstream.
+            ident = (match.group(1) or match.group(2)).upper()
             if wanted is not None and ident not in wanted:
                 continue
             if ident not in index:
@@ -1257,6 +1329,12 @@ def expire_fallback_lock_decision(
         return "expire", "open_pr_inflight"
     state = (state_name or "").strip().lower()
     if state in DONE_LOCK_STATES:
+        # A live remount of a done/closed issue keeps its lease: the open
+        # DIRTY/CI-red PR proves the work never landed, and expiring the lock
+        # mid-remount would admit a second writer. Canceled/duplicate locks
+        # still expire — those are deliberate kills.
+        if held and pr_verdict == "remount" and state in {"done", "closed"}:
+            return "keep", "live_remount"
         return "expire", {
             "done": "issue_done",
             "closed": "issue_done",
@@ -1466,13 +1544,19 @@ def pickup_refuse_reason(
         return "open_pr_inflight"
     state = (_issue_state_name(issue) or "").strip().lower()
     if state in DONE_LOCK_STATES:
-        return {
-            "done": "issue_done",
-            "closed": "issue_done",
-            "canceled": "issue_canceled",
-            "cancelled": "issue_canceled",
-            "duplicate": "issue_duplicate",
-        }[state]
+        # An open DIRTY/CI-red autonomous PR proves the work never landed:
+        # remounting it continues existing GitHub work and is exempt from the
+        # done/closed refusal (Linear state-sync error, e.g. marked Done on a
+        # partial sibling merge). Canceled/duplicate stay refused — those are
+        # deliberate kills.
+        if not (pr_verdict == "remount" and state in {"done", "closed"}):
+            return {
+                "done": "issue_done",
+                "closed": "issue_done",
+                "canceled": "issue_canceled",
+                "cancelled": "issue_canceled",
+                "duplicate": "issue_duplicate",
+            }[state]
     if held is True:
         return "fallback_lease_held"
     if held is None:
@@ -1607,6 +1691,7 @@ def _launch_fallback_workers(
             issue,
             identifier,
             require_receipt=(verdict != "remount" and not _continue_without_receipt(issue)),
+            remount=(verdict == "remount"),
         )
         if not ok:
             reason = meta_reason if meta_reason in TYPED_PICKUP_REFUSE_REASONS else "not_admitted"

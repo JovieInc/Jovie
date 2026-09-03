@@ -34,11 +34,17 @@
 #     GH_RETRY_ATTEMPTS=8 on SNAP / list-state.
 #   DRAIN_RECONCILE_MISSED_ADMISSION  permit bounded exact-green recovery
 #     pass for admission events replaced while pending in the workflow mutex
-#   DRAIN_QUEUE_REENTRY_MAX_PER_RUN  total event + recovery admission cap (1-2)
+#   DRAIN_QUEUE_REENTRY_MAX_PER_RUN  total event + recovery admission cap;
+#     0 = uncapped (bounded only by native queue depth), positive N re-caps
 #   DRAIN_PROMOTION_MODE  normal, isolated-only, draft-only, hold-intake, or blocked
 #   DRAIN_FLEET_GATE_B64  bounded admission projection; required outside normal
 #   DRAIN_RECOVER_FLEET_HOLDS  exact production-controller recovery event only
 #   FLEET_HOLD_TTL_SECONDS  pending jovie-fleet-queue-hold/v1 deadline (default 720)
+#   DRAIN_RECOVER_MISSING_CI  bounded close+reopen recovery for non-draft PRs
+#     whose required source checks never registered on the exact head (default 0)
+#   DRAIN_MISSING_CI_MAX_PER_RUN  close+reopen cap per run (1-2, default 2)
+#   DRAIN_MISSING_CI_MIN_AGE_MINUTES  minimum head commit age before a
+#     close+reopen is attempted (default 120)
 #   MERGE_QUEUE_BACKEND  native (default); test-label-fixture is test-only
 set -euo pipefail
 
@@ -204,12 +210,22 @@ FLEET_HOLD_TTL_SECONDS="${FLEET_HOLD_TTL_SECONDS:-720}"
 # A completed CI merge_group has no source PR head to admit, but it is the
 # authoritative signal that GitHub may just have ejected unmerged cohort
 # members while main advanced. Separately, GitHub may replace an older pending
-# admission run in this workflow's one mutex. A surviving pass may recover a
-# tiny exact-green cohort without requiring a prior receipt; both recovery
-# sources share one cap and the same exact-head enrollment gate.
+# admission run in this workflow's one mutex. A surviving pass may recover the
+# exact-green cohort without requiring a prior receipt; both recovery sources
+# share the same admission bound and the same exact-head enrollment gate.
 DRAIN_RECONCILE_QUEUE_REENTRY="${DRAIN_RECONCILE_QUEUE_REENTRY:-0}"
 DRAIN_RECONCILE_MISSED_ADMISSION="${DRAIN_RECONCILE_MISSED_ADMISSION:-0}"
-DRAIN_QUEUE_REENTRY_MAX_PER_RUN="${DRAIN_QUEUE_REENTRY_MAX_PER_RUN:-2}"
+DRAIN_QUEUE_REENTRY_MAX_PER_RUN="${DRAIN_QUEUE_REENTRY_MAX_PER_RUN:-0}"
+# Missing-CI class (2026-09-03): a non-draft main PR can sit for days with zero
+# check-runs for the required source contexts on its exact head, so it never
+# becomes green and never enrolls. Close+reopen re-fires the pull_request source
+# CI triggers. Bounded per run and idempotent per exact head through a
+# bot-comment marker, so a broken CI workflow cannot be re-triggered forever.
+DRAIN_RECOVER_MISSING_CI="${DRAIN_RECOVER_MISSING_CI:-0}"
+DRAIN_MISSING_CI_MAX_PER_RUN="${DRAIN_MISSING_CI_MAX_PER_RUN:-2}"
+DRAIN_MISSING_CI_MIN_AGE_MINUTES="${DRAIN_MISSING_CI_MIN_AGE_MINUTES:-120}"
+MISSING_CI_RECOVERY_MARKER='<!-- bot-comment:missing-ci-recovery -->'
+MISSING_CI_RECOVERY_ACTOR='jovie-bot[bot]'
 QUEUE_REENTRY_CONTEXT="jovie-queue-reentry/v1"
 UNMERGEABLE_EJECT_CONTEXT="jovie-native-unmergeable/v1"
 PRODUCT_FAILURE_CONTEXT="jovie-queue-product-failure/v1"
@@ -342,9 +358,22 @@ if [[ "$DRAIN_RECONCILE_MISSED_ADMISSION" == "1" ]]; then
       ;;
   esac
 fi
-if [[ ! "$DRAIN_QUEUE_REENTRY_MAX_PER_RUN" =~ ^[1-9][0-9]*$ ]] \
-  || (( DRAIN_QUEUE_REENTRY_MAX_PER_RUN > 2 )); then
-  echo "::error::DRAIN_QUEUE_REENTRY_MAX_PER_RUN must be an integer from 1 through 2" >&2
+if [[ ! "$DRAIN_QUEUE_REENTRY_MAX_PER_RUN" =~ ^[0-9]+$ ]]; then
+  echo "::error::DRAIN_QUEUE_REENTRY_MAX_PER_RUN must be a non-negative integer (0 = uncapped, bounded by native queue depth)" >&2
+  exit 2
+fi
+if [[ "$DRAIN_RECOVER_MISSING_CI" != "0" && "$DRAIN_RECOVER_MISSING_CI" != "1" ]]; then
+  echo "::error::DRAIN_RECOVER_MISSING_CI must be 0 or 1" >&2
+  exit 2
+fi
+if [[ ! "$DRAIN_MISSING_CI_MAX_PER_RUN" =~ ^[1-9][0-9]*$ ]] \
+  || (( DRAIN_MISSING_CI_MAX_PER_RUN > 2 )); then
+  echo "::error::DRAIN_MISSING_CI_MAX_PER_RUN must be an integer from 1 through 2" >&2
+  exit 2
+fi
+if [[ ! "$DRAIN_MISSING_CI_MIN_AGE_MINUTES" =~ ^[1-9][0-9]*$ ]] \
+  || (( DRAIN_MISSING_CI_MIN_AGE_MINUTES > 1440 )); then
+  echo "::error::DRAIN_MISSING_CI_MIN_AGE_MINUTES must be an integer from 1 through 1440" >&2
   exit 2
 fi
 if [[ -z "$DRAIN_ADMISSION_PR" && -z "$DRAIN_ADMISSION_HEAD" ]]; then
@@ -376,6 +405,22 @@ deferred_release_receipt_for_pr() {  # <pr>
   ' <<<"$raw" 2>/dev/null || true)"
   [[ -n "$body" ]] || return 0
   node "$QUEUE_DEFERRED_RELEASE_LIB" extract <<<"$body" 2>/dev/null || true
+}
+
+# Returns 0 when a prior bot-authored close+reopen attempt already exists for
+# this exact head, or when the comment evidence is unreadable (fail closed:
+# never risk re-triggering a head twice on a transport error).
+missing_ci_recovery_attempted() {  # <pr> <head>
+  local n="$1" head="$2" raw
+  if ! raw="$(gh_retry api "repos/${REPO}/issues/${n}/comments" --paginate --slurp 2>/dev/null)"; then
+    return 0
+  fi
+  jq -e --arg marker "$MISSING_CI_RECOVERY_MARKER" --arg actor "$MISSING_CI_RECOVERY_ACTOR" --arg head "$head" '
+    [ .[][]?
+      | select(.user.login == $actor)
+      | select((.body | type == "string") and (.body | contains($marker)) and (.body | contains($head)))
+    ] | length > 0
+  ' <<<"$raw" >/dev/null 2>&1
 }
 
 # The production-unbound exception is a typed exact PR/head/current-main
@@ -2212,7 +2257,8 @@ if [[ "$DRAIN_RECONCILE_QUEUE_REENTRY" == "1" || "$DRAIN_RECONCILE_MISSED_ADMISS
   echo "=== RECOVER (bounded exact-head native admission) ==="
   while read -r pr; do
     stop_if_budget_exhausted && break
-    if [[ "$ENROLLED_THIS_RUN" -ge "$DRAIN_QUEUE_REENTRY_MAX_PER_RUN" ]]; then
+    if (( DRAIN_QUEUE_REENTRY_MAX_PER_RUN > 0 )) \
+      && [[ "$ENROLLED_THIS_RUN" -ge "$DRAIN_QUEUE_REENTRY_MAX_PER_RUN" ]]; then
       echo "  ~ reached total exact admission cap ($DRAIN_QUEUE_REENTRY_MAX_PER_RUN)"
       break
     fi
@@ -2314,6 +2360,83 @@ if [[ "$DRAIN_RECOVER_FLEET_HOLDS" == "1" ]]; then
     | select(.base == "main")
     | select(.fail | length == 0)
     | select([.L[]] | any(. == "queue-deferred" or . == "needs-conflict-resolution" or . == "fast" or '"$NO_AUTO_HOLD_JQ"') | not)')
+fi
+
+# --- MISSING CI: required source checks never registered on the exact head ---
+# The snapshot classifier reports one `<context> (missing)` blocker per absent
+# required context. A non-draft main PR whose fresh blockers are ALL of that
+# shape has no check-runs at all for the required contexts (distinct from any
+# terminal red, pending, or unavailable status) and can never turn green on its
+# own; close+reopen re-fires the pull_request source CI triggers. Bounded per
+# run, age-gated so an in-flight first CI flight is never interrupted, and
+# idempotent per exact head via a bot-comment marker so a durably broken
+# workflow is not re-triggered forever. The event-scoped admission target is
+# excluded: its own exact-head path owns the outcome.
+if [[ "$DRAIN_RECOVER_MISSING_CI" == "1" ]]; then
+  echo "=== RECOVER (missing source CI → bounded close+reopen) ==="
+  MISSING_CI_RECOVERED=0
+  while read -r pr; do
+    stop_if_budget_exhausted && break
+    if [[ "$MISSING_CI_RECOVERED" -ge "$DRAIN_MISSING_CI_MAX_PER_RUN" ]]; then
+      echo "  ~ reached missing-CI recovery cap ($DRAIN_MISSING_CI_MAX_PER_RUN)"
+      break
+    fi
+    n="$(jq -r '.n' <<<"$pr")"
+    t="$(jq -r '.t' <<<"$pr")"
+    head_oid="$(jq -r '.headOid // ""' <<<"$pr" | tr '[:upper:]' '[:lower:]')"
+    # The snapshot's check result can be stale. Re-read the exact current head
+    # and require every blocker to still be a missing required context.
+    fresh_failures="$(check_failures_for_pr "$n")"
+    if ! jq -e '
+      type == "array" and length > 0 and all(.[]; endswith(" (missing)"))
+    ' <<<"$fresh_failures" >/dev/null 2>&1; then
+      echo "  #$n  $t  ⏸ current exact-head blockers are not missing-only"
+      continue
+    fi
+    committed="$(gh_retry api "repos/${REPO}/commits/${head_oid}" --jq '.commit.committer.date // empty' 2>/dev/null || true)"
+    committed_epoch="$(jq -rn --arg d "$committed" 'try ($d | fromdateiso8601) catch empty' 2>/dev/null || true)"
+    min_age_seconds=$((DRAIN_MISSING_CI_MIN_AGE_MINUTES * 60))
+    if [[ ! "$committed_epoch" =~ ^[0-9]+$ ]] \
+      || (( $(date -u +%s) - committed_epoch < min_age_seconds )); then
+      echo "  #$n  $t  ⏸ head younger than ${DRAIN_MISSING_CI_MIN_AGE_MINUTES}m (or age unreadable)"
+      continue
+    fi
+    if missing_ci_recovery_attempted "$n" "$head_oid"; then
+      echo "  #$n  $t  ⏸ close+reopen already attempted at $head_oid"
+      continue
+    fi
+    if [[ "$DRY_RUN" == "1" ]]; then
+      echo "  #$n  $t  [dry-run] would comment + close/reopen to re-trigger source CI at $head_oid"
+      MISSING_CI_RECOVERED=$((MISSING_CI_RECOVERED + 1))
+      continue
+    fi
+    if ! gh_mutate_retry pr comment "$n" -R "$REPO" --body "$MISSING_CI_RECOVERY_MARKER
+Required source checks never registered a run for head $head_oid, so this PR could never become enrollable. Closing and reopening to re-fire the pull_request CI triggers. This recovery is attempted at most once per exact head." >/dev/null; then
+      echo "::error::Failed to record missing-CI recovery intent on #$n" >&2
+      exit 1
+    fi
+    if ! gh_mutate_retry pr close "$n" -R "$REPO" >/dev/null; then
+      echo "::error::Failed to close #$n for missing-CI recovery" >&2
+      exit 1
+    fi
+    if ! gh_mutate_retry pr reopen "$n" -R "$REPO" >/dev/null; then
+      echo "::error::Closed #$n for missing-CI recovery but failed to reopen it" >&2
+      exit 1
+    fi
+    echo "  #$n  $t  ↻ closed+reopened to re-trigger source CI at $head_oid"
+    MISSING_CI_RECOVERED=$((MISSING_CI_RECOVERED + 1))
+  done < <(echo "$SNAP" | jq -c --arg admission_pr "$DRAIN_ADMISSION_PR" '[ .[]
+    | select((.n | tostring) != $admission_pr)
+    | select(.q | not)
+    | select(.draft | not)
+    | select(.m == "MERGEABLE")
+    | select(.base == "main")
+    | select((.fail | length) > 0)
+    | select(.fail | all(.[]; endswith(" (missing)")))
+    | select([.L[]] | any(. == "queue-deferred" or . == "needs-conflict-resolution" or . == "fast" or '"$NO_AUTO_HOLD_JQ"') | not)
+    | select((.headOid // "") | test("^[0-9a-f]{40}$"))
+    | {n, t, headOid}
+  ] | sort_by(.n)[]')
 fi
 
 # --- CONFLICT: needs rebase (agent branches only) → label + hand to fix agent ---

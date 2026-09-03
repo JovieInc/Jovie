@@ -3483,6 +3483,191 @@ class FallbackLockGcTests(unittest.TestCase):
         typed, red = self.module._typed_pickup_reason("not_a_real_reason")
         self.assertEqual((typed, red), ("unknown", True))
 
+    def test_pickup_allows_done_issue_remount_but_not_new_work(self):
+        """Linear Done + open DIRTY autonomous PR = state-sync error; remount
+        continues the GitHub-side work. Done without a remount target and
+        deliberate kills (canceled/duplicate) stay refused."""
+        refuse = self.module.pickup_refuse_reason
+        self.assertIsNone(
+            refuse(
+                "JOV-5874",
+                issue={"state": {"name": "Done"}},
+                pr_verdict="remount",
+                held=False,
+            )
+        )
+        self.assertEqual(
+            refuse(
+                "JOV-5874",
+                issue={"state": {"name": "Done"}},
+                pr_verdict="none",
+                held=False,
+            ),
+            "issue_done",
+        )
+        self.assertEqual(
+            refuse(
+                "JOV-5874",
+                issue={"state": {"name": "Canceled"}},
+                pr_verdict="remount",
+                held=False,
+            ),
+            "issue_canceled",
+        )
+
+    def test_expire_decision_keeps_live_done_remount_lock(self):
+        expire = self.module.expire_fallback_lock_decision
+        self.assertEqual(
+            expire(held=True, state_name="Done", pr_verdict="remount", age_seconds=10),
+            ("keep", "live_remount"),
+        )
+        self.assertEqual(
+            expire(held=False, state_name="Done", pr_verdict="remount", age_seconds=10),
+            ("expire", "issue_done"),
+        )
+        self.assertEqual(
+            expire(held=True, state_name="Canceled", pr_verdict="remount", age_seconds=10),
+            ("expire", "issue_canceled"),
+        )
+
+    def test_issue_meta_admits_done_state_for_remount_only(self):
+        issue = {
+            "id": "uuid-JOV-5874",
+            "identifier": "JOV-5874",
+            "title": "Recertify Grok Bot smoothness",
+            "description": "",
+            "url": "https://linear.example/JOV-5874",
+            "updatedAt": "2026-09-03T00:00:00Z",
+            "state": {"id": "JOV-done", "name": "Done"},
+            "team": {
+                "key": "JOV",
+                "states": {
+                    "nodes": [
+                        {"id": "JOV-progress", "name": "In Progress"},
+                        {"id": "JOV-review", "name": "In Review"},
+                    ]
+                },
+            },
+            "labels": {"nodes": []},
+            "comments": {"nodes": []},
+        }
+        ok, reason, meta = self.module._issue_meta(
+            issue, "JOV-5874", require_receipt=False, remount=True
+        )
+        self.assertTrue(ok, reason)
+        self.assertEqual(meta["original_state_name"], "Done")
+        ok, reason, _ = self.module._issue_meta(
+            issue, "JOV-5874", require_receipt=False, remount=False
+        )
+        self.assertFalse(ok)
+        self.assertEqual(reason, "state_not_admitted")
+        canceled = dict(issue, state={"id": "JOV-canceled", "name": "Canceled"})
+        ok, reason, _ = self.module._issue_meta(
+            canceled, "JOV-5874", require_receipt=False, remount=True
+        )
+        self.assertFalse(ok)
+        self.assertEqual(reason, "state_not_admitted")
+
+    def test_index_adopts_codex_lane_heads(self):
+        """Failed GPT-lane heads (codex/fable/fugu) join the remount index."""
+        payload = [
+            {
+                "number": 17017,
+                "headRefName": "codex/jov-5853-summer-stack-03-runtime",
+                "mergeStateStatus": "DIRTY",
+                "mergeable": "CONFLICTING",
+            },
+            {
+                "number": 17059,
+                "headRefName": "fable/jov-5865-optical-grid-ratchets",
+                "mergeStateStatus": "DIRTY",
+                "mergeable": "CONFLICTING",
+            },
+            {
+                "number": 16854,
+                "headRefName": "codex/quiet-hero-two-line-h1",
+                "mergeStateStatus": "DIRTY",
+                "mergeable": "CONFLICTING",
+            },
+            {
+                "number": 17090,
+                "headRefName": "fallback/JOV-5694-fix",
+                "mergeStateStatus": "CLEAN",
+                "mergeable": "MERGEABLE",
+            },
+        ]
+        with (
+            mock.patch.dict(os.environ, {"SYMPHONY_OPEN_PR_INDEX": ""}),
+            mock.patch.object(self.module, "_gh_json", return_value=payload),
+        ):
+            index = self.module._autonomous_open_pr_index(None)
+        self.assertEqual(index["JOV-5853"]["number"], 17017)
+        self.assertEqual(index["JOV-5865"]["head"], "fable/jov-5865-optical-grid-ratchets")
+        # No JOV-/LYB- identifier segment in the branch name: not adoptable.
+        self.assertNotIn(16854, [entry["number"] for entry in index.values()])
+        self.assertEqual(index["JOV-5694"]["number"], 17090)
+
+    def test_linear_graphql_backs_off_on_ratelimit(self):
+        """A RATELIMITED response stamps a backoff; while fresh, no HTTP call
+        is even attempted (the per-timer reconcile must not stampede the
+        shared 2500 req/hr budget)."""
+        import urllib.error
+
+        backoff = self.root / "linear-backoff.json"
+        calls: list = []
+
+        def fake_urlopen(req, timeout=0):
+            calls.append(req)
+            raise urllib.error.HTTPError(
+                req.full_url,
+                400,
+                "Bad Request",
+                None,
+                io.BytesIO(b'{"errors":[{"extensions":{"code":"RATELIMITED"}}]}'),
+            )
+
+        with (
+            mock.patch.dict(
+                os.environ,
+                {"SYMPHONY_LINEAR_BACKOFF": str(backoff), "LINEAR_API_KEY": "test-key"},
+            ),
+            mock.patch.object(self.module.urllib.request, "urlopen", side_effect=fake_urlopen),
+        ):
+            self.assertIsNone(self.module._linear_graphql({"query": "x"}))
+            self.assertTrue(backoff.exists())
+            # Backoff fresh: the second call must not touch the network.
+            self.assertIsNone(self.module._linear_graphql({"query": "x"}))
+        self.assertEqual(len(calls), 1)
+
+    def test_linear_graphql_success_clears_stale_backoff(self):
+        backoff = self.root / "linear-backoff.json"
+        backoff.write_text(
+            json.dumps({"epoch": time.time() - self.module.LINEAR_BACKOFF_SECONDS - 5})
+        )
+
+        class _Resp:
+            def __enter__(self):
+                return self
+
+            def __exit__(self, *args):
+                return False
+
+            def read(self):
+                return b'{"data": {"viewer": {"id": "x"}}}'
+
+        with (
+            mock.patch.dict(
+                os.environ,
+                {"SYMPHONY_LINEAR_BACKOFF": str(backoff), "LINEAR_API_KEY": "test-key"},
+            ),
+            mock.patch.object(
+                self.module.urllib.request, "urlopen", side_effect=lambda req, timeout=0: _Resp()
+            ),
+        ):
+            body = self.module._linear_graphql({"query": "x"})
+        self.assertEqual(body["data"]["viewer"]["id"], "x")
+        self.assertFalse(backoff.exists())
+
     def test_pickup_check_refuses_in_review_and_admits_todo(self):
         stderr = io.StringIO()
         with (
