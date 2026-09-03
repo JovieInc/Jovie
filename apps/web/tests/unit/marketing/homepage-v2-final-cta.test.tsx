@@ -15,7 +15,7 @@ describe('HomepageV2FinalCta', () => {
     ).toHaveTextContent('Get started');
     expect(screen.getByTestId('homepage-v2-final-cta-primary')).toHaveAttribute(
       'data-size',
-      'marketing'
+      'md'
     );
     expect(screen.getByTestId('homepage-v2-final-cta-primary')).toHaveAttribute(
       'href',
