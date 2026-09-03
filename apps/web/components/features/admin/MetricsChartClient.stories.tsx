@@ -26,7 +26,7 @@ const meta = {
   },
   decorators: [
     Story => (
-      <div className='w-[min(52rem,calc(100vw-2rem))] rounded-xl border border-subtle bg-surface-1 p-4'>
+      <div className='w-full max-w-4xl rounded-xl border border-subtle bg-surface-1 p-4'>
         <Story />
       </div>
     ),
