@@ -264,9 +264,7 @@ describe('OpportunityCardStack', () => {
       screen.getByTestId('opportunity-inbox-youtube-thumbnail-yt-card-1')
     ).toBeInTheDocument();
 
-    await user.click(
-      screen.getByRole('button', { name: 'Approve Candidate' })
-    );
+    await user.click(screen.getByRole('button', { name: 'Approve Candidate' }));
     await user.click(screen.getByRole('button', { name: 'Reject' }));
 
     expect(onAccept).toHaveBeenCalledWith('yt-card-1');
