@@ -97,7 +97,7 @@ describe('FounderReviewRecorderControls', () => {
     const user = userEvent.setup();
     const { onStart } = renderControls();
 
-    expect(screen.getByText('Mic off')).toBeVisible();
+    expect(screen.getByText(/Mic off/)).toBeVisible();
     const startButton = screen.getByRole('button', { name: 'Start Session' });
     await user.click(startButton);
     expect(onStart).toHaveBeenCalledOnce();
@@ -110,7 +110,7 @@ describe('FounderReviewRecorderControls', () => {
       transcript: 'Approve this one before the weekend drop.',
     });
 
-    expect(screen.getByText('Recording this card')).toBeVisible();
+    expect(screen.getByText(/Recording this card/)).toBeVisible();
     expect(
       screen.getByText(/Approve this one before the weekend drop/)
     ).toBeVisible();
