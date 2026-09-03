@@ -40,6 +40,9 @@ STALE_REMOUNT_SECONDS = 90 * 60  # product remounts (JOV-5235) still grok at 54 
 # Held live implement/remount locks are never TTL-expired.
 FALLBACK_LEASE_TTL_SECONDS = STALE_REMOUNT_SECONDS
 FALLBACK_LEASE_DIR = "~/.local/state/symphony-fallback/leases"
+# When Linear rate-limits the shared workspace key, every Linear call pauses
+# for this long instead of stampeding the exhausted budget (JOV drain 2026-09-03).
+LINEAR_BACKOFF_SECONDS = 15 * 60
 FALLBACK_GC_SCHEMA = "symphony-fallback-lease-gc/v1"
 FALLBACK_PICKUP_SCHEMA = "symphony-fallback-pickup/v1"
 FALLBACK_LOCK_NAME = re.compile(r"^((?:JOV|LYB)-\d+)\.lock$")
@@ -756,7 +759,48 @@ def _linear_issues_list_request(after: str | None = None) -> dict:
     return {"query": LINEAR_QUERY, "variables": variables}
 
 
+def _linear_backoff_path() -> pathlib.Path:
+    return pathlib.Path(
+        os.path.expanduser(
+            os.environ.get(
+                "SYMPHONY_LINEAR_BACKOFF",
+                "~/.local/state/symphony-fallback/linear-backoff.json",
+            )
+        )
+    )
+
+
+def _linear_backoff_active() -> bool:
+    try:
+        data = json.loads(_linear_backoff_path().read_text(encoding="utf-8"))
+        stamped = float(data.get("epoch", 0))
+    except (OSError, ValueError, TypeError):
+        return False
+    return (time.time() - stamped) < LINEAR_BACKOFF_SECONDS
+
+
+def _linear_note_ratelimited() -> None:
+    path = _linear_backoff_path()
+    try:
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text(json.dumps({"epoch": time.time()}), encoding="utf-8")
+    except OSError:
+        pass
+
+
+def _linear_clear_backoff() -> None:
+    try:
+        _linear_backoff_path().unlink(missing_ok=True)
+    except OSError:
+        pass
+
+
 def _linear_graphql(payload: dict) -> dict | None:
+    # A ratelimited shared Linear budget must not be stampeded by the timer
+    # loop: while a backoff stamp is fresh, skip the network entirely (every
+    # caller already fails closed on None).
+    if _linear_backoff_active():
+        return None
     key = os.environ.get("LINEAR_API_KEY") or _linear_api_key_from_file()
     if not key:
         return None
@@ -768,8 +812,20 @@ def _linear_graphql(payload: dict) -> dict | None:
     try:
         with urllib.request.urlopen(request, timeout=CONTROL_TIMEOUT_SECONDS) as response:
             body = json.load(response)
+    except urllib.error.HTTPError as exc:
+        # Linear signals rate limiting as HTTP 400/429 with a RATELIMITED code
+        # in the error body (observed live 2026-09-03: 2500 req/hr exhausted on
+        # Gem, every worker died on admission re-verify).
+        try:
+            detail = exc.read().decode("utf-8", "replace")
+        except (OSError, ValueError):
+            detail = ""
+        if exc.code == 429 or "RATELIMITED" in detail:
+            _linear_note_ratelimited()
+        return None
     except (OSError, ValueError, TypeError, urllib.error.URLError):
         return None
+    _linear_clear_backoff()
     return body if isinstance(body, dict) else None
 
 
