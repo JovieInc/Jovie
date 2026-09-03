@@ -206,14 +206,14 @@ try {
         const message = String(error.message ?? error);
         console.error(`Capture failed ${route} ${viewportName}: ${message}`);
         try {
-          await page.screenshot({ path, fullPage: true });
+          await page.screenshot({ path: outputPath, fullPage: true });
         } catch {
           // Best-effort failure evidence; the capture status stays failed.
         }
         manifest.push({
           route,
           viewport: viewportName,
-          path,
+          path: artifactPath,
           status: 'failed',
           error: message,
         });
