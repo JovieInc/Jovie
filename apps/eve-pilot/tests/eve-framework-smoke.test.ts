@@ -136,97 +136,86 @@ describe('Eve framework smoke', () => {
         status: 'ready',
         diagnostics: { errors: 0, warnings: 0 },
         skills: ['jovie-action-boundary'],
-        tools: ['jovie_capability_manifest'],
         subagents: [],
         schedules: [],
-        channels: [
-          {
-            name: 'eve',
-            kind: 'http',
-            method: 'GET',
-            urlPath: '/eve/v1/info',
-          },
-          {
-            name: 'eve',
-            kind: 'http',
-            method: 'POST',
-            urlPath: '/eve/v1/session',
-          },
-          {
-            name: 'eve',
-            kind: 'http',
-            method: 'POST',
-            urlPath: '/eve/v1/session/:sessionId',
-          },
-          {
-            name: 'eve',
-            kind: 'http',
-            method: 'POST',
-            urlPath: '/eve/v1/session/:sessionId/cancel',
-          },
-          {
-            name: 'eve',
-            kind: 'http',
-            method: 'POST',
-            urlPath: '/eve/v1/session/:sessionId/compact',
-          },
-          {
-            name: 'eve',
-            kind: 'http',
-            method: 'POST',
-            urlPath: '/eve/v1/session/:sessionId/clear',
-          },
-          {
-            name: 'eve',
-            kind: 'http',
-            method: 'POST',
-            urlPath: '/eve/v1/session/:sessionId/reset',
-          },
-          {
-            name: 'eve',
-            kind: 'http',
-            method: 'GET',
-            urlPath: '/eve/v1/session/:sessionId/stream',
-          },
-          {
-            name: 'eve',
-            kind: 'http',
-            method: 'GET',
-            urlPath:
-              '/eve/v1/session/:parentSessionId/subagents/:callId/:childSessionId/stream',
-          },
-          {
-            name: 'photon',
-            kind: 'chat-sdk',
-            method: 'GET',
-            urlPath: '/eve/v1/photon',
-          },
-          {
-            name: 'photon',
-            kind: 'chat-sdk',
-            method: 'POST',
-            urlPath: '/eve/v1/photon',
-          },
-          {
-            name: 'summer-shadow',
-            kind: 'defineChannel',
-            method: 'POST',
-            urlPath: '/ovie/v1/summer-shadow/events',
-          },
-          {
-            name: 'summer-shadow',
-            kind: 'defineChannel',
-            method: 'GET',
-            urlPath: '/ovie/v1/summer-shadow/sessions/:sessionId/stream',
-          },
-          {
-            name: 'telegram',
-            kind: 'telegram',
-            method: 'POST',
-            urlPath: '/eve/v1/telegram',
-          },
-        ],
       });
+      // Eve 0.47 registers a growing set of built-in tools (bash, read_file,
+      // web_search, agent, ...). Pin only the pilot-owned capability surface —
+      // the Jovie capability manifest tool must be discovered alongside the
+      // framework's built-ins, never replaced by them.
+      expect(info.tools).toContain('jovie_capability_manifest');
+
+      // Eve 0.47 ships additional built-in HTTP channels (the `home` landing
+      // surface, `/eve/v1/health`, connection callbacks, activity/task-input
+      // webhooks). Pin the pilot-owned channels plus the core session
+      // protocol; the framework's volatile extras are not part of this
+      // contract.
+      const hasChannel = (
+        name: string,
+        kind: string,
+        method: string,
+        urlPath: string
+      ) =>
+        info.channels.some(
+          c =>
+            c.name === name &&
+            c.kind === kind &&
+            c.method === method &&
+            c.urlPath === urlPath
+        );
+      expect(hasChannel('eve', 'http', 'GET', '/eve/v1/info')).toBe(true);
+      expect(hasChannel('eve', 'http', 'POST', '/eve/v1/session')).toBe(true);
+      expect(
+        hasChannel('eve', 'http', 'POST', '/eve/v1/session/:sessionId')
+      ).toBe(true);
+      expect(
+        hasChannel('eve', 'http', 'POST', '/eve/v1/session/:sessionId/cancel')
+      ).toBe(true);
+      expect(
+        hasChannel('eve', 'http', 'POST', '/eve/v1/session/:sessionId/compact')
+      ).toBe(true);
+      expect(
+        hasChannel('eve', 'http', 'POST', '/eve/v1/session/:sessionId/clear')
+      ).toBe(true);
+      expect(
+        hasChannel('eve', 'http', 'POST', '/eve/v1/session/:sessionId/reset')
+      ).toBe(true);
+      expect(
+        hasChannel('eve', 'http', 'GET', '/eve/v1/session/:sessionId/stream')
+      ).toBe(true);
+      expect(
+        hasChannel(
+          'eve',
+          'http',
+          'GET',
+          '/eve/v1/session/:parentSessionId/subagents/:callId/:childSessionId/stream'
+        )
+      ).toBe(true);
+      expect(hasChannel('photon', 'chat-sdk', 'GET', '/eve/v1/photon')).toBe(
+        true
+      );
+      expect(hasChannel('photon', 'chat-sdk', 'POST', '/eve/v1/photon')).toBe(
+        true
+      );
+      expect(
+        hasChannel(
+          'summer-shadow',
+          'defineChannel',
+          'POST',
+          '/ovie/v1/summer-shadow/events'
+        )
+      ).toBe(true);
+      expect(
+        hasChannel(
+          'summer-shadow',
+          'defineChannel',
+          'GET',
+          '/ovie/v1/summer-shadow/sessions/:sessionId/stream'
+        )
+      ).toBe(true);
+      expect(
+        hasChannel('telegram', 'telegram', 'POST', '/eve/v1/telegram')
+      ).toBe(true);
       // Eve 0.39 discovery is offline. The hook would write this file if
       // fetch ran; a missing sentinel means no network attempt.
       expect(existsSync(networkSentinel)).toBe(false);
