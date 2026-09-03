@@ -155,11 +155,15 @@ def capacity():
 
 
 def effective_capacity(host_capacity, gate):
-    maximum = gate.get("remediationAdmission", {}).get("maxConcurrent")
-    if isinstance(maximum, bool) or not isinstance(maximum, int) or maximum < 0:
-        raise ValueError("typed remediation maxConcurrent is missing or invalid")
-    if maximum == 0:
+    admission = gate.get("remediationAdmission", {})
+    push_allowed = admission.get("pushAllowed")
+    if push_allowed is False:
         return 0
+    if push_allowed is not True:
+        raise ValueError("typed remediation pushAllowed is missing or invalid")
+    maximum = admission.get("maxConcurrent")
+    if isinstance(maximum, bool) or not isinstance(maximum, int) or maximum < 1:
+        raise ValueError("typed remediation maxConcurrent is missing or invalid")
     return min(host_capacity, maximum)
 
 

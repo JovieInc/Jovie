@@ -31,5 +31,8 @@ describe('OnboardingV2Form System B source contract', () => {
     expect(source).toContain('system-b-onboarding-step-icon');
     expect(source).toContain('system-b-onboarding-flat-panel');
     expect(source).toContain('system-b-onboarding-context-textarea');
+    expect(source).toContain('InfoBox');
+    expect(source).not.toContain('function InlineNotice');
+    expect(source).not.toContain('system-b-onboarding-inline-notice');
   });
 });

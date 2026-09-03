@@ -47,6 +47,34 @@ export const albumArtGenerationBurstLimiter = createRateLimiter(
   { requireRedis: RATE_LIMITERS.albumArtGenerationBurst.requireRedis }
 );
 
+// ============================================================================
+// YouTube thumbnail paste-channel preview (JOV-5862) — anonymous, fail-closed
+// ============================================================================
+
+/** Per-IP burst on channel lookups. */
+export const youtubeThumbnailPreviewBurstLimiter = createRateLimiter(
+  RATE_LIMITERS.youtubeThumbnailPreviewBurst,
+  { requireRedis: true }
+);
+
+/** Cooldown between model generations per visitor. */
+export const youtubeThumbnailPreviewCooldownLimiter = createRateLimiter(
+  RATE_LIMITERS.youtubeThumbnailPreviewCooldown,
+  { requireRedis: true }
+);
+
+/** 3 free generations per visitor (IP + device). */
+export const youtubeThumbnailPreviewVisitorLimiter = createRateLimiter(
+  RATE_LIMITERS.youtubeThumbnailPreviewVisitor,
+  { requireRedis: true }
+);
+
+/** 3 free generations per YouTube channel. */
+export const youtubeThumbnailPreviewChannelLimiter = createRateLimiter(
+  RATE_LIMITERS.youtubeThumbnailPreviewChannel,
+  { requireRedis: true }
+);
+
 /**
  * General API rate limiter
  * Limit: 100 requests per minute per IP
@@ -687,11 +715,18 @@ export async function checkAiChatRateLimitForPlan(
 
     // 2. Check daily plan-specific quota using the plan-aware limiter
     const dailyResult = await aiChatDailyPlanAwareLimiter.limit(userId, plan);
-    return allowIfRateLimitBackendDegraded(dailyResult, {
+    const dailyAllowed = allowIfRateLimitBackendDegraded(dailyResult, {
       limiter: 'ai-chat-daily',
       userId,
       plan,
     });
+    return {
+      ...dailyAllowed,
+      unavailable:
+        burstAllowed.unavailable === true || dailyAllowed.unavailable === true,
+      degraded:
+        burstAllowed.degraded === true || dailyAllowed.degraded === true,
+    };
   } catch {
     // Unexpected limiter failure (should be rare — RateLimiter already
     // catches Redis errors). Fail open so chat stays available.
@@ -1159,5 +1194,9 @@ export function getAllLimiters(): Record<string, RateLimiter> {
     wrapLink: wrapLinkLimiter,
     wrapLinkAnonymous: wrapLinkAnonymousLimiter,
     verificationRequest: verificationRequestLimiter,
+    youtubeThumbnailPreviewBurst: youtubeThumbnailPreviewBurstLimiter,
+    youtubeThumbnailPreviewCooldown: youtubeThumbnailPreviewCooldownLimiter,
+    youtubeThumbnailPreviewVisitor: youtubeThumbnailPreviewVisitorLimiter,
+    youtubeThumbnailPreviewChannel: youtubeThumbnailPreviewChannelLimiter,
   };
 }

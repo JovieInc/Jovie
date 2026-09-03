@@ -7,7 +7,7 @@ behind the door. Symphony orchestrates code on Gem Ubuntu.
 Canonical program: [`docs/OVIE_PROGRAM.md`](../../docs/OVIE_PROGRAM.md)
 (JOV-5214).
 
-`Tim -> Ovie -> Eve intake/ack -> durable Kanban -> Summer -> Symphony -> identified coding worker on Gem Ubuntu`
+`Tim -> Ovie -> Eve/Summer -> durable receipt/outbox -> Linear projection -> Symphony -> identified coding worker on Gem Ubuntu`
 
 ## Split
 
@@ -16,7 +16,8 @@ Tim always talks through Ovie.
 - Creator work and dogfood → this door drives Jovie on the same product path.
 - Jovie cannot do it → Eve admits a build (engineering). No second chat.
 - Feeling the product → Tim opens the Jovie app. That is taste, not talk.
-- Conversational authority is Summer. Eve does not answer as Summer or as Ovie.
+- Conversational authority is Summer. Ovie is Tim's interface to Summer, not
+  a second persona.
 - Jovie-on-iMessage is later.
 
 ## Channels
@@ -27,6 +28,54 @@ Tim always talks through Ovie.
 | Telegram | Ovie door | Dedicated bot. Do not reuse Hermes |
 | iMessage (Photon) | Ovie door | Portable Photon creds. No Vercel Connect |
 | Jovie product chat | Jovie | Artist identity only |
+
+## Summer Vercel migration
+
+Summer begins as an explicit `ovie-summer-shadow` identity in this Eve app.
+It can observe and report engineering throughput from Ovie, but it has no
+write capability during this phase. Photon, Telegram, and iMessage remain
+bound to Ovie. The dedicated non-production
+`jovie-eve-shadow-staging.vercel.app` deployment accepts only Jovie production
+OIDC at `POST /ovie/v1/summer-shadow/events`. It writes a
+private immutable Vercel Blob receipt/outbox before Eve dispatch and a second
+terminal receipt before returning `202`. `SUMMER_SHADOW_ENABLED=true` in a
+Vercel Preview deployment is the explicit kill-switch opt-in; every other
+environment and value fails closed. Immutable reservations cap each
+logical conversation at five turns and all shadow traffic at 25 turns per UTC
+day. Duplicate event IDs, occupied budget slots, unsigned calls, stale events,
+and persistence uncertainty fail closed. The binding conveys
+`dispatchAuthority: none`; it does not expose Linear, Symphony, GitHub, GBrain,
+deployment, or permission mutations. Before Summer may orchestrate mutations,
+the separately gated rate-limit replay path must also pass. Linear remains the
+coordination projection, not delivery truth. Hermes remains available as
+rollback until that proof is complete.
+
+`agent/lib/summer-photon-offline-proof.ts` is a test-only, zero-outbound safety
+proof. It is not registered as an Eve channel and cannot reach Photon or an
+iMessage recipient. Live routing remains unchanged until both existing Photon
+projects and their distinct assigned lines are verified.
+
+The accepted event contract is strict:
+
+```json
+{
+  "schema": "jovie.ovie-summer-shadow.event/v1",
+  "eventId": "evt_unique_identifier",
+  "conversationId": "conv_stable_identifier",
+  "turn": 1,
+  "dailySlot": 1,
+  "occurredAt": "2026-08-31T20:00:00.000Z",
+  "message": "Read-only observation",
+  "evidence": []
+}
+```
+
+For an Ovie-originated production probe, invoke the narrow Jovie server bridge
+with its existing cron authentication. That production Function obtains its
+short-lived Vercel OIDC token from the request context and signs the Eve call.
+The script never prints either credential:
+
+    # The bounded dogfood probe ships in the dependent safety PR.
 
 Telegram and iMessage fail closed without an allowlist. Groups and unknown
 senders are dropped.

@@ -1,8 +1,21 @@
 import { render, screen } from '@testing-library/react';
-import { describe, expect, it } from 'vitest';
+import type { ComponentProps } from 'react';
+import { describe, expect, it, vi } from 'vitest';
 import { buildLibraryReleaseAssets } from '@/app/app/(shell)/library/library-data';
-import { LibraryCatalogWaveformCell } from '@/components/features/library/library-catalog-columns';
+import {
+  LibraryCatalogArtworkCell,
+  LibraryCatalogWaveformCell,
+} from '@/components/features/library/library-catalog-columns';
 import type { ReleaseViewModel } from '@/lib/discography/types';
+
+vi.mock('next/image', () => ({
+  default: (
+    props: ComponentProps<'img'> & { readonly unoptimized?: boolean }
+  ) => {
+    const { unoptimized: _unoptimized, ...imgProps } = props;
+    return <img alt='' {...imgProps} />;
+  },
+}));
 
 function buildRelease(
   previewVerification: ReleaseViewModel['previewVerification']
@@ -26,6 +39,21 @@ function buildRelease(
 }
 
 describe('LibraryCatalogWaveformCell', () => {
+  it('keeps table artwork in the single caller-owned row frame', () => {
+    const [asset] = buildLibraryReleaseAssets([buildRelease('verified')]);
+
+    render(<LibraryCatalogArtworkCell asset={asset!} />);
+
+    const thumbnail = screen.getByTestId('library-media-thumbnail-release-1');
+    expect(thumbnail).toHaveAttribute('data-artwork-frame', 'thumbnail');
+    expect(thumbnail).toHaveClass('h-9', 'w-9');
+    expect(thumbnail.querySelector('img')).toHaveClass(
+      'h-full',
+      'w-full',
+      'object-contain'
+    );
+  });
+
   it('renders the waveform only for a verified preview', () => {
     const [asset] = buildLibraryReleaseAssets([buildRelease('verified')]);
 

@@ -7,6 +7,11 @@
  * a page recipe or generation request.
  */
 
+import {
+  formatJovieImageColorPolicyForPrompt,
+  JOVIE_IMAGE_COLOR_POLICY,
+} from './imageColorPolicy';
+
 export const MARKETING_GENERATION_SPEC_VERSION = '1.0.0';
 
 export const MARKETING_GENERATION_STAGES = [
@@ -80,6 +85,22 @@ export const MARKETING_ROLE_REQUIREMENTS: Readonly<
   ],
   'final-polisher': ['editorial-compression', 'truth-review', 'vision-review'],
 };
+
+export const MARKETING_ASSET_GENERATION_COLOR_CONTRACT = {
+  stage: 'asset-generation',
+  policySchema: JOVIE_IMAGE_COLOR_POLICY.schema,
+  policyVersion: JOVIE_IMAGE_COLOR_POLICY.version,
+  promptBlock: formatJovieImageColorPolicyForPrompt(),
+  gateIds: ['asset-consent', 'visual-review'] as const,
+} as const;
+
+export const MARKETING_VISUAL_REVIEW_COLOR_CONTRACT = {
+  stage: 'adversarial-review',
+  policySchema: JOVIE_IMAGE_COLOR_POLICY.schema,
+  policyVersion: JOVIE_IMAGE_COLOR_POLICY.version,
+  promptBlock: formatJovieImageColorPolicyForPrompt(),
+  reviewsStage: 'asset-generation',
+} as const;
 
 export interface MarketingModelCandidate {
   readonly id: string;

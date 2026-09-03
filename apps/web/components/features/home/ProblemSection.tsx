@@ -38,15 +38,12 @@ export function ProblemSection() {
             <span className='text-tertiary-token'>Clear value. No fluff.</span>
           </h2>
 
-          <div
-            className='flex flex-col'
-            style={{ gap: 'var(--linear-space-10)' }}
-          >
+          <div className='flex flex-col' style={{ gap: 'var(--space-10)' }}>
             {benefits.map(benefit => (
               <div
                 key={benefit.title}
                 className='flex items-start'
-                style={{ gap: 'var(--linear-space-4)' }}
+                style={{ gap: 'var(--space-4)' }}
               >
                 <div className='flex items-center justify-center w-6 h-6 shrink-0'>
                   <CheckCircle2 className='w-5 h-5 text-success' />
@@ -57,7 +54,7 @@ export function ProblemSection() {
                     style={{
                       fontSize: 'var(--linear-h4-size)',
                       fontWeight: 'var(--linear-font-weight-medium)',
-                      marginBottom: 'var(--linear-space-1)',
+                      marginBottom: 'var(--space-1)',
                     }}
                   >
                     {benefit.title}

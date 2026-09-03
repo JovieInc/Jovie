@@ -37,10 +37,9 @@ SheetOverlay.displayName = SheetPrimitive.Overlay.displayName;
 const sheetVariants = cva(
   [
     sheetSurfaceStyles,
-    'transition ease-in-out',
+    'transition-transform duration-cinematic ease-cinematic',
     'data-[state=open]:animate-in data-[state=closed]:animate-out',
-    'data-[state=closed]:duration-300 data-[state=open]:duration-500',
-    'motion-reduce:animate-none motion-reduce:transition-opacity',
+    'motion-reduce:animate-none motion-reduce:transition-none',
   ].join(' '),
   {
     variants: {

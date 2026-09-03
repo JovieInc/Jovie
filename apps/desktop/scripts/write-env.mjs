@@ -8,12 +8,18 @@ import { execFileSync } from 'node:child_process';
 import { readFileSync, writeFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
+import { resolveDesktopVersion } from './sync-version.mjs';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const DESKTOP_ROOT = join(__dirname, '..');
 const REPO_ROOT = join(DESKTOP_ROOT, '..', '..');
 const FULL_SOURCE_REVISION = /^[0-9a-f]{40}$/;
 const SEMVER = /^\d+\.\d+\.\d+$/;
+const STAGING_SEMVER = /^\d+\.\d+\.\d+-staging\.[1-9]\d*\.[1-9]\d*$/;
+
+function isVersionForChannel(channel, version) {
+  return (channel === 'staging' ? STAGING_SEMVER : SEMVER).test(version);
+}
 
 export function resolveAppEnv(raw) {
   return raw === 'staging' || raw === 'local' ? raw : 'production';
@@ -123,7 +129,11 @@ export function bakeDesktopEnvAndIdentity({
 } = {}) {
   const appEnv = resolveAppEnv(env.ELECTRON_ENV);
   const appUrl = resolveAppUrl(appEnv, env.ELECTRON_APP_URL);
-  const version = readVersion();
+  const version = resolveDesktopVersion({
+    desktopVersion: env.DESKTOP_VERSION,
+    electronEnv: appEnv,
+    repoVersion: readVersion(),
+  });
   const sourceRevision = resolveSourceRevision(env);
   const builtAt = resolveBuiltAt(appEnv, env);
   const identity = {
@@ -135,7 +145,7 @@ export function bakeDesktopEnvAndIdentity({
 
   const complete =
     (identity.channel === 'production' || identity.channel === 'staging') &&
-    SEMVER.test(identity.version) &&
+    isVersionForChannel(identity.channel, identity.version) &&
     typeof identity.sourceRevision === 'string' &&
     FULL_SOURCE_REVISION.test(identity.sourceRevision) &&
     typeof identity.builtAt === 'string' &&

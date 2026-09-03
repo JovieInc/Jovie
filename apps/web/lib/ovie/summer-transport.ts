@@ -278,7 +278,12 @@ export async function* runOvieSummerTurn(input: {
     }
     yield {
       type: 'state',
-      state: replay.state === 'failed_tool' ? 'failed_tool' : 'completed',
+      state:
+        replay.state === 'failed_tool'
+          ? 'failed_tool'
+          : replay.state === 'completed'
+            ? 'completed'
+            : 'failure',
     };
     return;
   }
@@ -286,8 +291,12 @@ export async function* runOvieSummerTurn(input: {
   yield { type: 'state', state: 'streaming' };
   let assistantText = '';
   let toolReceipt: SummerToolReceipt | null = null;
-  let terminal: 'completed' | 'canceled' | 'failed_tool' | 'failure' =
-    'completed';
+  let terminal:
+    | 'completed'
+    | 'canceled'
+    | 'failed_tool'
+    | 'failure'
+    | 'unavailable' = 'completed';
 
   try {
     for await (const event of input.speaker.speak({
@@ -331,7 +340,7 @@ export async function* runOvieSummerTurn(input: {
         if (!event.ok) terminal = 'failed_tool';
         continue;
       }
-      terminal = 'failure';
+      terminal = event.state === 'failure' ? 'failure' : 'unavailable';
       yield { type: 'state', state: event.state };
       break;
     }
@@ -352,7 +361,7 @@ export async function* runOvieSummerTurn(input: {
   // Canceled streams are not durable session turns. The Eve/Mac queue keeps
   // the work; reconnect with the same clientTurnId waits for completion
   // instead of replaying an empty canceled row.
-  if (terminal !== 'canceled') {
+  if (terminal !== 'canceled' && terminal !== 'unavailable') {
     await appendSummerTurn(input.store, {
       clientTurnId: input.clientTurnId ?? null,
       userText: input.userText,
@@ -368,7 +377,7 @@ export async function* runOvieSummerTurn(input: {
 
   yield {
     type: 'state',
-    state: terminal === 'failure' ? 'failure' : terminal,
+    state: terminal,
   };
 }
 

@@ -34,6 +34,8 @@ export type TableEmptyStateProps = TableEmptyStateActionProps & {
   readonly description?: string;
   /** Optional icon to display */
   readonly icon?: React.ReactNode;
+  /** Empty-state semantic variant from the canonical molecule */
+  readonly variant?: NonNullable<EmptyStateProps['variant']>;
   /** Optional structured secondary action (rendered as a link-style Button) */
   readonly secondaryAction?: NonNullable<EmptyStateProps['secondaryAction']>;
   /** Additional CSS classes */
@@ -51,6 +53,7 @@ export function TableEmptyState({
   heading,
   description,
   icon,
+  variant,
   action,
   actionSlot,
   secondaryAction,
@@ -63,6 +66,7 @@ export function TableEmptyState({
   return (
     <DrawerSurfaceCard
       variant='card'
+      testId={testId}
       className={cn(
         'flex min-h-55 flex-1 flex-col items-center justify-center rounded-lg bg-surface-0 px-4 py-6 text-center',
         className
@@ -72,8 +76,8 @@ export function TableEmptyState({
         icon={icon}
         heading={heading}
         description={description}
+        variant={variant}
         secondaryAction={secondaryAction}
-        testId={testId}
         className='py-4'
         {...actionProps}
       />

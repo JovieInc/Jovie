@@ -16,6 +16,7 @@ UPDATE_UNIT_DST="${TARGET_HOME}/.config/systemd/user/symphony-burrito-update.ser
 WORKFLOW_SRC="${SYMPHONY_WORKFLOW_SRC:-${REPO_ROOT}/scripts/hermes/symphony/WORKFLOW.md}"
 WORKFLOW_DST="${TARGET_HOME}/.config/symphony/WORKFLOW.md"
 LOG_DIR="${TARGET_HOME}/symphony-burrito-logs"
+RUNTIME_STATE_URL="${SYMPHONY_BURRITO_STATE_URL:-http://127.0.0.1:4043/api/v1/state}"
 RESTART=1
 DRY_RUN=0
 SKIP_BINARY=0
@@ -88,16 +89,72 @@ maybe_copy_workflow() {
 import pathlib, sys
 t = pathlib.Path(sys.argv[1]).read_text()
 h = t.split("after_create:", 1)[-1].split("agent:", 1)[0]
-raise SystemExit(0 if ('project_slug: "symphony-ui-pilot-96d6b9c5b2d5"' in t and "git clone --depth 1 https://github.com/JovieInc/Jovie.git ." in t and "symphony-elixir-workspaces" in t and "git@" not in h and "max_concurrent_agents: 3" in t and "gh CLI" in t and "create_branch" in t and "76869538009648d5b282a4bb21c3d157" in t and "jovie-ba6736cbfbb9" not in t) else 1)
+raise SystemExit(0 if ('project_slug: "symphony-ui-pilot-96d6b9c5b2d5"' in t and "git clone --depth 1 https://github.com/JovieInc/Jovie.git ." in t and "symphony-elixir-workspaces" in t and "git@" not in h and "max_concurrent_agents: 3" in t and "symphony-codex-router app-server" in t and "gh CLI" in t and "create_branch" in t and "76869538009648d5b282a4bb21c3d157" in t and "jovie-ba6736cbfbb9" not in t and "timeout_ms: 900000" in t and "before_remove:" in t and "symphony-nvme-package-cache.sh after-create" in t and "pnpm install --offline --frozen-lockfile --ignore-scripts" in t) else 1)
 PY
   then install -m 0644 "$WORKFLOW_SRC" "$WORKFLOW_DST" && echo "INSTALLED $WORKFLOW_DST"
   else echo "CONFIG_COPY_RED repo WORKFLOW does not match live slug+HTTPS+git/gh; leaving $WORKFLOW_DST untouched"
   fi
 }
 
+assert_restart_safe() {
+  if ! command -v systemctl >/dev/null 2>&1; then
+    return
+  fi
+  if ! systemctl --user is-active --quiet symphony-burrito.service; then
+    return
+  fi
+  local payload
+  if ! payload="$(curl --fail --silent --show-error --max-time 5 "$RUNTIME_STATE_URL")"; then
+    echo "RESTART_REFUSED_STATE_UNREADABLE $RUNTIME_STATE_URL" >&2
+    exit 75
+  fi
+  local status=0
+  local active
+  active="$(printf '%s' "$payload" | python3 -c '
+import json, sys
+payload = json.load(sys.stdin)
+running = payload.get("running")
+if not isinstance(running, list):
+    raise SystemExit(2)
+if running:
+    for item in running[:5]:
+        print(item.get("issue_identifier") or item.get("identifier") or item.get("id") or "unknown")
+    raise SystemExit(1)
+' 2>&1)" || status=$?
+  if [ "$status" -eq 1 ]; then
+    [ -z "$active" ] || printf '%s\n' "$active" >&2
+    echo "RESTART_REFUSED_ACTIVE_LEASES symphony-burrito.service" >&2
+    exit 75
+  fi
+  if [ "$status" -ne 0 ]; then
+    echo "RESTART_REFUSED_STATE_MALFORMED $RUNTIME_STATE_URL" >&2
+    exit 75
+  fi
+}
+
+restart_service() {
+  if ! command -v systemctl >/dev/null 2>&1; then
+    echo "RESTART_REFUSED_SYSTEMCTL_MISSING" >&2
+    exit 75
+  fi
+  assert_restart_safe
+  if [ -z "${XDG_RUNTIME_DIR:-}" ]; then
+    XDG_RUNTIME_DIR="/run/user/$(id -u)"
+    export XDG_RUNTIME_DIR
+  fi
+  systemctl --user daemon-reload
+  systemctl --user enable symphony-burrito.service symphony-burrito-update.timer
+  systemctl --user restart symphony-burrito.service
+  systemctl --user start symphony-burrito-update.timer
+  echo "RESTARTED symphony-burrito.service"
+}
+
 if [ "$SKIP_BINARY" -eq 1 ]; then
   echo "SKIP_BINARY"
   maybe_copy_workflow
+  if [ "$RESTART" -eq 1 ]; then
+    restart_service
+  fi
   echo "DONE"
   exit 0
 fi
@@ -142,15 +199,7 @@ echo "INSTALLED $UNIT_DST"
 maybe_copy_workflow
 
 if [ "$RESTART" -eq 1 ]; then
-  if [ -z "${XDG_RUNTIME_DIR:-}" ]; then
-    XDG_RUNTIME_DIR="/run/user/$(id -u)"
-    export XDG_RUNTIME_DIR
-  fi
-  systemctl --user daemon-reload
-  systemctl --user enable symphony-burrito.service symphony-burrito-update.timer
-  systemctl --user restart symphony-burrito.service
-  systemctl --user start symphony-burrito-update.timer
-  echo "RESTARTED symphony-burrito.service"
+  restart_service
 fi
 
 echo "DONE"

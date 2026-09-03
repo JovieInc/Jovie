@@ -1,5 +1,6 @@
 'use client';
 
+// @coverage-via apps/web/tests/unit/dashboard/DashboardActivityFeed.test.tsx
 import {
   Camera,
   DollarSign,
@@ -10,9 +11,16 @@ import {
   Music2,
   Zap,
 } from 'lucide-react';
-import Link from 'next/link';
 import { memo } from 'react';
-import { ActivityFeedSkeleton } from '@/components/molecules/ActivityFeed';
+import {
+  ACTIVITY_TIMELINE_LIST_CLASSNAME,
+  ACTIVITY_TIMELINE_PRIMARY_TEXT_CLASSNAME,
+  ActivityFeedSkeleton,
+  ActivityTimelineIcon,
+  ActivityTimelineMeta,
+  ActivityTimelineRow,
+  ActivityTimelineTimestamp,
+} from '@/components/molecules/ActivityFeed';
 import { normalizeDashboardActivityIcon } from '@/lib/activity/dashboard-feed';
 import { useActivityFeedQuery } from '@/lib/queries';
 import { formatTimeAgo } from '@/lib/utils/date-formatting';
@@ -32,7 +40,7 @@ function ActivityGlyph({ icon }: { readonly icon: Activity['icon'] }) {
   const normalizedIcon = normalizeDashboardActivityIcon(icon);
   const Icon = ACTIVITY_ICONS[normalizedIcon] ?? Link2;
 
-  return <Icon className='h-4 w-4 text-tertiary-token' aria-hidden='true' />;
+  return <Icon className='h-3 w-3 text-tertiary-token' aria-hidden='true' />;
 }
 
 function ActivityEmptyState({
@@ -60,7 +68,7 @@ function ActivityList({
 }) {
   return (
     <div className={isRefreshing ? 'opacity-70 transition-opacity' : undefined}>
-      <ul className='space-y-0.5'>
+      <ul className={ACTIVITY_TIMELINE_LIST_CLASSNAME}>
         {activities.map(activity => (
           <ActivityItem key={activity.id} activity={activity} />
         ))}
@@ -74,53 +82,27 @@ const ActivityItem = memo(function ActivityItem({
 }: {
   readonly activity: Activity;
 }) {
-  const content = (
-    <>
-      <span
-        aria-hidden='true'
-        className='relative z-10 flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-surface-0 text-base'
-      >
-        <ActivityGlyph icon={activity.icon} />
-      </span>
-      <div className='min-w-0 flex-1'>
-        <p className='text-app leading-5 tracking-tight text-secondary-token'>
-          <span className='tabular-nums text-tertiary-token'>
-            {formatTimeAgo(activity.timestamp)}
-          </span>
-          <span className='text-tertiary-token'> - </span>
-          <span className='text-primary-token'>{activity.description}</span>
-        </p>
-      </div>
-    </>
-  );
-
-  if (activity.href) {
-    return (
-      <li className='relative'>
-        <div
-          aria-hidden='true'
-          className='absolute left-3 top-0 bottom-0 w-px bg-subtle'
-        />
-        <Link
-          href={activity.href}
-          className='group relative flex items-start gap-2.5 rounded-md px-1.5 py-1.5 transition-[background-color] duration-subtle ease-subtle hover:bg-surface-1 focus-visible:bg-surface-1 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/55 focus-visible:ring-offset-2 focus-visible:ring-offset-base'
-        >
-          {content}
-        </Link>
-      </li>
-    );
-  }
-
   return (
-    <li className='relative'>
-      <div
-        aria-hidden='true'
-        className='absolute left-3 top-0 bottom-0 w-px bg-subtle'
-      />
-      <div className='group relative flex items-start gap-2.5 rounded-md px-1.5 py-1.5'>
-        {content}
-      </div>
-    </li>
+    <ActivityTimelineRow
+      as='li'
+      href={activity.href}
+      leading={
+        <ActivityTimelineIcon>
+          <ActivityGlyph icon={activity.icon} />
+        </ActivityTimelineIcon>
+      }
+    >
+      <p
+        className={`${ACTIVITY_TIMELINE_PRIMARY_TEXT_CLASSNAME} text-primary-token`}
+      >
+        {activity.description}
+      </p>
+      <ActivityTimelineMeta>
+        <ActivityTimelineTimestamp dateTime={activity.timestamp}>
+          {formatTimeAgo(activity.timestamp)}
+        </ActivityTimelineTimestamp>
+      </ActivityTimelineMeta>
+    </ActivityTimelineRow>
   );
 });
 

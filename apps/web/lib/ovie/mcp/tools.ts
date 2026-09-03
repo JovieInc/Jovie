@@ -1,5 +1,6 @@
 import { authorizeSummerControl } from '@/lib/ovie/control';
 import { bindEveIdentityForTurn } from '@/lib/ovie/identity';
+import { normalizeLegacyEngineeringInitiativeForStore } from '@/lib/ovie/legacy-routing';
 import { initiativeAckView } from '@/lib/ovie/persist';
 import { getPage, searchPages } from '@/lib/wiki/gbrain-client';
 import { CreateWorkflowCaptureRequestSchema } from '@/lib/workflow-capture/contract';
@@ -388,11 +389,16 @@ async function getInitiative(
   const record = await store.getInitiative(id);
   if (!record)
     return { ok: false as const, message: `unknown initiative ${id}` };
+  const normalized = await normalizeLegacyEngineeringInitiativeForStore(
+    store,
+    record,
+    { persistence: 'best-effort' }
+  );
   return {
     ok: true as const,
     result: {
-      ...initiativeAckView(record),
-      certified: record.status === 'certified',
+      ...initiativeAckView(normalized),
+      certified: normalized.status === 'certified',
       merged_is_not_complete: true,
     },
   };

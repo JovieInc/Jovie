@@ -6,6 +6,9 @@ import Image from 'next/image';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { Avatar } from '@/components/molecules/Avatar';
 
+const avatarHasWrapperSizingClass = (source: string) =>
+  /<Avatar\b[^>]*\bclassName=['"][^'"]*\b(?:size|h|w)-/.test(source);
+
 // Mock Next.js Image component with proper event handling
 vi.mock('next/image', () => ({
   default: vi
@@ -265,6 +268,28 @@ describe('Avatar Component', () => {
       expect(wrapper).toHaveClass('custom-avatar-class');
     });
 
+    it('keeps the app frame on the canonical size when a caller passes sizing classes', () => {
+      const { container } = render(
+        <Avatar
+          src={null}
+          alt='User avatar'
+          name='Tim White'
+          size='xs'
+          className='size-10 h-10 w-10'
+        />
+      );
+
+      const frame = container.querySelector('[data-slot="app-avatar-frame"]');
+      expect(frame).toHaveAttribute('data-size', 'xs');
+      expect(frame).toHaveAttribute('data-shape', 'person');
+      expect(frame).toHaveClass('size-10', 'h-10', 'w-10');
+      expect(frame).toHaveStyle({ width: '16px', height: '16px' });
+
+      const avatar = container.querySelector('[data-slot="app-avatar"]');
+      expect(avatar).toHaveStyle({ width: '16px', height: '16px' });
+      expect(screen.getByText('TW')).toBeInTheDocument();
+    });
+
     it('accepts custom style props', () => {
       const customStyle = { border: '2px solid red', opacity: '0.5' };
 
@@ -337,6 +362,32 @@ describe('Avatar Component', () => {
       for (const size of AVATAR_SIZE_NAMES) {
         expect(typeof AVATAR_SIZE_MAP[size].px).toBe('number');
       }
+    });
+
+    it('keeps observed identity-row callers off wrapper sizing classes', () => {
+      const observedIdentitySources = [
+        'components/organisms/user-button/UserButton.tsx',
+        'components/organisms/ProfileSwitcher.tsx',
+        'components/features/admin/admin-releases-table/AdminReleasesTableUnified.tsx',
+      ] as const;
+
+      for (const sourcePath of observedIdentitySources) {
+        const source = readFileSync(path.resolve(process.cwd(), sourcePath), {
+          encoding: 'utf8',
+        });
+        expect(avatarHasWrapperSizingClass(source)).toBe(false);
+      }
+    });
+
+    it('binds wrapper sizing detection to the Avatar opening tag', () => {
+      expect(
+        avatarHasWrapperSizingClass(
+          "<Avatar className='shrink-0' />\n<div className='min-w-0' />"
+        )
+      ).toBe(false);
+      expect(
+        avatarHasWrapperSizingClass("<Avatar className='shrink-0 h-8' />")
+      ).toBe(true);
     });
 
     it('hides loading shimmer after image loads', () => {

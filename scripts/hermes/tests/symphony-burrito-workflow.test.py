@@ -21,18 +21,32 @@ TOKEN_RE = re.compile(r"lin_(?:api_|oauth_)?[A-Za-z0-9]{12,}|api_key:\s*(?!\$LIN
 class OfficialBurritoContractTests(unittest.TestCase):
     def test_live_queue_and_no_root_workflow(self):
         """Burrito runtime is ~/.config/symphony/WORKFLOW.md; product clone is not a Symphony config."""
-        self.assertFalse((ROOT / "WORKFLOW.md").exists())
+        root_workflow = (ROOT / "WORKFLOW.md").read_text(encoding="utf-8")
+        self.assertNotIn(f'project_slug: "{LIVE_SLUG}"', root_workflow)
+        self.assertIn("root: ~/code/symphony-workspaces", root_workflow)
         self.assertTrue(WORKFLOW_PATH.is_file())
         self.assertIn("%h/.config/symphony/WORKFLOW.md", UNIT)
         self.assertIn(f'project_slug: "{LIVE_SLUG}"', WORKFLOW)
         self.assertNotIn("jovie-ba6736cbfbb9", WORKFLOW)
         self.assertIn("root: ~/symphony-elixir-workspaces", WORKFLOW)
+        self.assertIn("timeout_ms: 900000", WORKFLOW)
         self.assertIn("max_concurrent_agents: 3", WORKFLOW)
         self.assertIn("api_key: $LINEAR_API_KEY", WORKFLOW)
-        self.assertIn("codex app-server", WORKFLOW)
+        self.assertIn("required_labels:", WORKFLOW)
+        self.assertIn("    - symphony", WORKFLOW)
+        self.assertRegex(
+            WORKFLOW,
+            re.compile(r"^\s+command: \./scripts/hermes/symphony-codex-router app-server$", re.M),
+        )
+        self.assertNotIn("codex app-server", WORKFLOW)
+        self.assertIn("symphony-routing/v1", WORKFLOW)
         hook = WORKFLOW.split("after_create:", 1)[1].split("agent:", 1)[0]
         self.assertIn("git clone --depth 1 https://github.com/JovieInc/Jovie.git .", hook)
         self.assertTrue("git@" not in hook and "mix " not in hook)
+        self.assertIn("symphony-nvme-package-cache.sh after-create", hook)
+        self.assertIn("pnpm install --offline --frozen-lockfile --ignore-scripts", WORKFLOW)
+        self.assertIn("before_remove:", WORKFLOW)
+        self.assertIn("symphony-nvme-package-cache.sh before-remove", WORKFLOW)
         self.assertIn("git + gh CLI only", WORKFLOW)
         self.assertIn("76869538009648d5b282a4bb21c3d157", WORKFLOW)
         self.assertIn("enabled=false", WORKFLOW)
@@ -50,6 +64,9 @@ class OfficialBurritoContractTests(unittest.TestCase):
         self.assertIn("sha256", UPDATER)
         self.assertIn("scripts/hermes/symphony/WORKFLOW.md", UPDATER)
         self.assertIn("CONFIG_COPY_RED", UPDATER)
+        self.assertIn("RESTART_REFUSED_ACTIVE_LEASES", UPDATER)
+        self.assertIn("http://127.0.0.1:4043/api/v1/state", UPDATER)
+        self.assertIn("symphony-codex-router app-server", UPDATER)
         self.assertLess(UPDATER.index(LIVE_SLUG), UPDATER.index('install -m 0644 "$WORKFLOW_SRC" "$WORKFLOW_DST"'))
         tty1 = (ROOT / "scripts/hermes/gem-checkin-tty1.sh").read_text()
         self.assertIn("List HUD owns tty1", tty1)
@@ -72,6 +89,38 @@ class OfficialBurritoContractTests(unittest.TestCase):
             good = subprocess.run(["bash", str(updater), "--skip-binary", "--no-restart"], cwd=ROOT, env=env, capture_output=True, text=True)
             self.assertEqual(good.returncode, 0, good.stderr)
             self.assertIn(LIVE_SLUG, existing.read_text())
+
+    def test_restart_refuses_active_leases(self):
+        updater = ROOT / "scripts/hermes/update-symphony-burrito.sh"
+        with tempfile.TemporaryDirectory() as tmp:
+            fake_bin = pathlib.Path(tmp) / "bin"
+            fake_bin.mkdir()
+            (fake_bin / "systemctl").write_text(
+                "#!/usr/bin/env bash\n"
+                "if [ \"$1\" = --user ] && [ \"$2\" = is-active ]; then exit 0; fi\n"
+                "echo unexpected systemctl \"$@\" >&2\n"
+                "exit 9\n"
+            )
+            (fake_bin / "curl").write_text(
+                "#!/usr/bin/env bash\n"
+                "printf '%s\\n' '{\"running\":[{\"issue_identifier\":\"JOV-1\"}],\"retrying\":[],\"blocked\":[]}'\n"
+            )
+            os.chmod(fake_bin / "systemctl", 0o755)
+            os.chmod(fake_bin / "curl", 0o755)
+            env = {
+                **os.environ,
+                "PATH": f"{fake_bin}:{os.environ['PATH']}",
+                "SYMPHONY_BURRITO_HOME": str(pathlib.Path(tmp) / "home"),
+            }
+            result = subprocess.run(
+                ["bash", str(updater), "--skip-binary"],
+                cwd=ROOT,
+                env=env,
+                capture_output=True,
+                text=True,
+            )
+            self.assertEqual(result.returncode, 75)
+            self.assertIn("RESTART_REFUSED_ACTIVE_LEASES", result.stderr)
 
 
 if __name__ == "__main__":

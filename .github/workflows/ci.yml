@@ -473,6 +473,9 @@ jobs:
       shared_contract_impact: ${{ steps.detect.outputs.shared_contract_impact || 'none' }}
       has_code_changes: ${{ steps.detect.outputs.has_code_changes || 'false' }}
       is_noop_merge_group: ${{ steps.detect.outputs.is_noop_merge_group || 'false' }}
+      # The resolver may replace the event base with the live-main merge-base
+      # for coalesced heads. Downstream exact-diff gates must use this same SHA.
+      path_diff_base_sha: ${{ steps.detect.outputs.path_diff_base_sha || '' }}
       run_jovie_product: ${{ steps.detect.outputs.run_jovie_product || 'false' }}
       # Missing selector output fails closed. Only exact source-PR evidence may
       # bypass the multi-gigabyte dependency bootstrap in ci-fast typecheck.
@@ -633,6 +636,7 @@ jobs:
             git cat-file -e "${PATH_DIFF_BASE_SHA}^{commit}"
             git cat-file -e "${PATH_DIFF_HEAD_SHA}^{commit}"
             git merge-base --is-ancestor "$PATH_DIFF_BASE_SHA" "$PATH_DIFF_HEAD_SHA"
+            echo "path_diff_base_sha=$PATH_DIFF_BASE_SHA" >> "$GITHUB_OUTPUT"
             CLASSIFICATION_BASE_REF="$PATH_DIFF_BASE_SHA"
             CLASSIFICATION_HEAD_REF="$PATH_DIFF_HEAD_SHA"
           elif [[ "${{ github.event_name }}" == "pull_request" ]]; then
@@ -890,9 +894,17 @@ jobs:
     if: ${{ needs.ci-path-changes.result == 'success' && github.event_name == 'merge_group' }}
     runs-on: ubuntu-latest
     timeout-minutes: 2
+    outputs:
+      admitted: ${{ steps.admission.outputs.admitted || 'false' }}
+      obsolete: ${{ steps.admission.outputs.obsolete || 'false' }}
+      pr_number: ${{ steps.admission.outputs.pr_number || '' }}
+      synthetic_head_sha: ${{ steps.admission.outputs.synthetic_head_sha || '' }}
+      current_queue_state: ${{ steps.admission.outputs.current_queue_state || '' }}
+      replacement_combined_head: ${{ steps.admission.outputs.replacement_combined_head || '' }}
     permissions:
       checks: read
       contents: read
+      pull-requests: read
     steps:
       - name: Check out trusted admission policy
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -905,10 +917,39 @@ jobs:
           persist-credentials: false
           sparse-checkout: scripts/lib/merge-group-admission.mjs
           sparse-checkout-cone-mode: false
-      - name: Require live queue ref and external admission checks
+      - name: Require live queue membership and external admission checks
+        id: admission
         env:
           GH_TOKEN: ${{ github.token }}
-        run: node scripts/lib/merge-group-admission.mjs
+        run: |
+          set -euo pipefail
+          policy='scripts/lib/merge-group-admission.mjs'
+          policy_contract="$(node "$policy" --print-contract-version)"
+          if [[ "$policy_contract" == 'jovie-merge-group-live-admission/v1' ]]; then
+            node "$policy"
+            admitted_value="$(sed -n 's/^admitted=//p' "$GITHUB_OUTPUT")"
+            if [[ "$admitted_value" != 'true' && "$admitted_value" != 'false' ]]; then
+              echo '::error::Live queue admission policy emitted an invalid admitted value'
+              exit 1
+            fi
+            exit 0
+          fi
+
+          # One-release bootstrap: the trusted main helper predates typed live
+          # queue outputs but has already proved the exact queue ref and both
+          # external admission checks. This path disappears automatically as
+          # soon as this helper version lands on main.
+          if [[ ! "${GITHUB_REF:-}" =~ ^refs/heads/gh-readonly-queue/main/pr-([1-9][0-9]*)-[0-9a-f]{40}$ ]]; then
+            echo '::error::Legacy admission bootstrap could not bind the queue PR'
+            exit 1
+          fi
+          {
+            echo 'admitted=true'
+            echo 'obsolete=false'
+            echo "pr_number=${BASH_REMATCH[1]}"
+            echo "synthetic_head_sha=$GITHUB_SHA"
+            echo 'current_queue_state=LEGACY_EXACT_REF_BOOTSTRAP'
+          } >> "$GITHUB_OUTPUT"
 
   ci-risk-classifier:
     # Dependency-free so fork PRs classify without waiting on a trusted job or
@@ -1206,7 +1247,10 @@ jobs:
       needs.ci-path-changes.result == 'success' &&
       (
         github.event_name != 'merge_group' ||
-        needs.ci-merge-group-admission.result == 'success'
+        (
+          needs.ci-merge-group-admission.result == 'success' &&
+          needs.ci-merge-group-admission.outputs.admitted == 'true'
+        )
       )
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -1240,6 +1284,7 @@ jobs:
         id: lanes
         env:
           CI_FAST_LANE_GROUP: typecheck
+          CI_FAST_RUN_JOVIE_TYPECHECK: ${{ needs.ci-path-changes.outputs.run_jovie_typecheck }}
           TURBO_SCM_BASE: ${{ github.event_name == 'merge_group' && github.event.merge_group.base_sha || (github.event_name == 'push' && github.event.before || ((github.base_ref && format('origin/{0}', github.base_ref)) || '')) }}
           CI_FAST_LANES_OUT: ${{ runner.temp }}/ci-fast-lanes.json
         run: node scripts/ci-fast-lanes.mjs
@@ -1268,7 +1313,10 @@ jobs:
       needs.ci-path-changes.result == 'success' &&
       (
         github.event_name != 'merge_group' ||
-        needs.ci-merge-group-admission.result == 'success'
+        (
+          needs.ci-merge-group-admission.result == 'success' &&
+          needs.ci-merge-group-admission.outputs.admitted == 'true'
+        )
       )
     env:
       # Match prior Structural Contract job so actionlint/shellcheck is hermetic.
@@ -1307,7 +1355,7 @@ jobs:
           # origin/<base>; a --depth=1 fetch leaves the base tip shallow and fails
           # desktop-release-guard / version-fanout-guard on PRs.
           git fetch origin "${{ github.base_ref }}" --no-tags
-          STRUCTURAL_CONTROL_PATTERN='^(\.github/|\.claude/rules/(ci-branching|release|testing|gstack)\.md|AGENTS\.md|CODEX\.md|canon/invariants\.jsonl|scripts/invariants/|scripts/automation-verify\.sh$|scripts/run-affected-tests\.mjs$|scripts/backlog-orchestrator/(admission-gate|context-gate|deterministic-gates|gbrain-client|gate-next-hold|ownership-inventory)|scripts/backlog-orchestrator/__tests__/(backlog-orchestrator|pre-lease-gates|gate-next-hold|ownership-inventory)\.test\.mjs$|scripts/doc-freshness-lint|scripts/(drain-pr-queue\.sh|drain-pr-remediate\.mjs|merge-queue-backend\.mjs|ownerless-recovery-sweeper\.mjs)|scripts/lib/(ci-|merge-queue|ownerless-recovery-policy|pr-check-failures|pre-land-changelog|resolve-merge-group-path-diff|upsert-pr-comment|product-lane-(classifier|finalize)|production-lane-range)|scripts/lib/__tests__/(automation-verify|ci-fast-workflow-contract|merge-group-workflow-contract|merge-queue-backend|merge-queue-guard|ownerless-recovery-policy|pre-land-changelog|pr-check-failures|product-lane-classifier|production-lane-range)\.test\.mjs|scripts/ci-|scripts/hermes/(closure_health\.py$|config/(gem-repo-registry|model-registry)\.json$|evaluate-fleet-gate\.sh$|fleet_admission_receipt\.py$|gem-|gem_|install-gem-(fleet-controller|pr-rehabilitation)\.sh$|model-router\.py$|symphony-reconciler\.py$|systemd/gem-pr-drain\.(service|timer)$)|scripts/hermes/tests/(closure-health\.test\.py$|gem-(pr-drain|ops-hud|pr-rehabilitation-contract|priority-gate|rehabilitation-policy)\.test\.py$|symphony-reconciler\.test\.py$|test(-model-router|_evaluate_fleet_gate|_fleet_admission_receipt)\.py$)|scripts/brand-scrub\.py|scripts/tests/test_(agent_workflow_hygiene|brand_scrub|gh_retry|runner_routing|symphony_ui_pilot_runtime|symphony_reconciler_runtime|vercel_prebuilt_deploy)\.py)'
+          STRUCTURAL_CONTROL_PATTERN='^(\.github/|\.claude/rules/(ci-branching|release|testing|gstack)\.md|AGENTS\.md|CODEX\.md|canon/invariants\.jsonl|scripts/invariants/|scripts/verification/|scripts/automation-verify\.sh$|scripts/run-affected-tests\.mjs$|scripts/backlog-orchestrator/(admission-gate|context-gate|deterministic-gates|gbrain-client|gate-next-hold|ownership-inventory|symphony-(routing|official-runtime))|scripts/backlog-orchestrator/__tests__/(backlog-orchestrator|pre-lease-gates|gate-next-hold|ownership-inventory|symphony-(routing|official-runtime))\.test\.mjs$|scripts/doc-freshness-lint|scripts/(drain-pr-queue\.sh|drain-pr-remediate\.mjs|merge-queue-backend\.mjs|ownerless-recovery-sweeper\.mjs)|scripts/lib/(ci-|merge-queue|ownerless-recovery-policy|pr-check-failures|pre-land-changelog|resolve-merge-group-path-diff|upsert-pr-comment|product-lane-(classifier|finalize)|production-lane-range)|scripts/lib/__tests__/(automation-verify|ci-fast-workflow-contract|gbrain-runtime-assets|merge-group-workflow-contract|merge-queue-backend|merge-queue-guard|ownerless-recovery-policy|pre-land-changelog|pr-check-failures|product-lane-classifier|production-lane-range)\.test\.mjs|scripts/ci-|scripts/hermes/(closure_health\.py$|config/(gem-repo-registry|model-registry)\.json$|evaluate-fleet-gate\.sh$|fleet_admission_receipt\.py$|gbrain-runtime/|gem-|gem_|install-gem-(fleet-controller|pr-rehabilitation)\.sh$|model-router\.py$|symphony-reconciler\.py$|systemd/gem-pr-drain\.(service|timer)$)|scripts/hermes/tests/(closure-health\.test\.py$|gem-(pr-drain|ops-hud|pr-rehabilitation-contract|priority-gate|rehabilitation-policy)\.test\.py$|symphony-reconciler\.test\.py$|test(-model-router|_evaluate_fleet_gate|_fleet_admission_receipt)\.py$)|scripts/brand-scrub\.py|scripts/tests/test_(agent_workflow_hygiene|brand_scrub|gh_retry|runner_routing|symphony_ui_pilot_runtime|symphony_reconciler_runtime|vercel_prebuilt_deploy)\.py)'
           # Component receipts are executable test evidence; Storybook/Chromatic
           # config and the shared-UI token audit feed structural component proof.
           STRUCTURAL_UI_PATTERN='^(apps/web/app/.*\.(tsx|css)$|apps/web/components/|apps/web/\.storybook/|apps/web/package\.json$|apps/web/scripts/(check-reliability-detectors|lint-contrast-|lint-no-native-dialogs|next-proxy-guard|seo-ratchet-|tailwind-guard)|apps/web/tests/|apps/web/styles/|packages/ui/|chromatic\.config\.json$|package\.json$|DESIGN\.md$|design\.tokens\.json$|scripts/(component-|design-|ds-offscale|screen-certification|shared-ui-visual-arbitrary|story-coverage|storybook-story-quality|ui-story-coverage)|scripts/lib/__tests__/(component-|design-|screen-certification|story-coverage|storybook-story-quality|ui-story-coverage))'
@@ -1363,7 +1411,10 @@ jobs:
       needs.ci-path-changes.result == 'success' &&
       (
         github.event_name != 'merge_group' ||
-        needs.ci-merge-group-admission.result == 'success'
+        (
+          needs.ci-merge-group-admission.result == 'success' &&
+          needs.ci-merge-group-admission.outputs.admitted == 'true'
+        )
       )
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -1459,7 +1510,10 @@ jobs:
       needs.ci-path-changes.result == 'success' &&
       (
         github.event_name != 'merge_group' ||
-        needs.ci-merge-group-admission.result == 'success'
+        (
+          needs.ci-merge-group-admission.result == 'success' &&
+          needs.ci-merge-group-admission.outputs.admitted == 'true'
+        )
       )
     runs-on: ubuntu-latest
     timeout-minutes: 3
@@ -1489,7 +1543,10 @@ jobs:
       needs.ci-path-changes.result == 'success' &&
       (
         github.event_name != 'merge_group' ||
-        needs.ci-merge-group-admission.result == 'success'
+        (
+          needs.ci-merge-group-admission.result == 'success' &&
+          needs.ci-merge-group-admission.outputs.admitted == 'true'
+        )
       ) &&
       (
         github.event_name == 'workflow_dispatch' ||
@@ -1529,7 +1586,10 @@ jobs:
       needs.ci-path-changes.result == 'success' &&
       (
         github.event_name != 'merge_group' ||
-        needs.ci-merge-group-admission.result == 'success'
+        (
+          needs.ci-merge-group-admission.result == 'success' &&
+          needs.ci-merge-group-admission.outputs.admitted == 'true'
+        )
       ) &&
       (
         github.event_name == 'workflow_dispatch' ||
@@ -1707,6 +1767,10 @@ jobs:
     if: ${{ needs.ci-path-changes.result == 'success' && (github.event_name == 'merge_group' || github.event_name == 'push' || (github.event_name == 'pull_request' && !contains(github.event.pull_request.labels.*.name, 'skip-migration-guard'))) }}
     runs-on: ubuntu-latest
     timeout-minutes: 3
+    permissions:
+      contents: read
+      issues: read
+      pull-requests: read
     outputs:
       run_full_ci: ${{ steps.check_changes.outputs.run_full_ci }}
     steps:
@@ -1737,7 +1801,9 @@ jobs:
           ./scripts/check-migrations.sh
           ./scripts/validate-migrations.sh
         env:
+          GH_TOKEN: ${{ github.token }}
           GITHUB_EVENT_PATH: ${{ github.event_path }}
+          GITHUB_REPOSITORY: ${{ github.repository }}
 
   ci-drizzle-check:
     name: Drizzle Check
@@ -1836,7 +1902,10 @@ jobs:
       needs.ci-path-changes.result == 'success' &&
       (
         github.event_name != 'merge_group' ||
-        needs.ci-merge-group-admission.result == 'success'
+        (
+          needs.ci-merge-group-admission.result == 'success' &&
+          needs.ci-merge-group-admission.outputs.admitted == 'true'
+        )
       ) &&
       (
         github.event_name == 'workflow_dispatch' ||
@@ -1856,7 +1925,9 @@ jobs:
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
-          fetch-depth: 2
+          # The effective coalesced-head diff base may be older than the direct
+          # queue parent; the changed-component gate must have its full ancestry.
+          fetch-depth: 0
           persist-credentials: false
       - uses: ./.github/actions/setup-node-pnpm
       - name: Setup Playwright (Chromium)
@@ -1944,9 +2015,11 @@ jobs:
               exit 1
             }
             if curl -sf http://localhost:6006/iframe.html >/dev/null 2>&1; then
+              node "$GITHUB_WORKSPACE/scripts/component-merge-group-storybook-cert.mjs"
               node "$GITHUB_WORKSPACE/.github/scripts/guard-playwright-artifacts.mjs" --run -- \
                 pnpm exec playwright test \
                   tests/e2e/storybook-elevation.spec.ts \
+                  tests/e2e/storybook-input.spec.ts \
                   tests/e2e/storybook-marketing-faq.spec.ts \
                   tests/e2e/storybook-skeleton.spec.ts \
                   --config=playwright.config.storybook.ts --project=chromium --reporter=line
@@ -1958,7 +2031,9 @@ jobs:
           exit 1
         env:
           STORYBOOK_BASE_URL: http://localhost:6006
+          MERGE_GROUP_DIFF_BASE_SHA: ${{ needs.ci-path-changes.outputs.path_diff_base_sha }}
           CI: true
+          PLAYWRIGHT_ARTIFACT_ALLOW_IMAGES: 'true'
       - name: Upload combined layout failure evidence
         if: ${{ failure() && hashFiles('apps/web/test-results/**') != '' }}
         continue-on-error: true
@@ -1967,6 +2042,14 @@ jobs:
           name: combined-layout-report-${{ github.run_id }}-${{ github.run_attempt }}
           path: apps/web/test-results/
           retention-days: 3
+      - name: Upload input Storybook evidence
+        if: ${{ success() && hashFiles('apps/web/test-results/storybook-input-evidence/**') != '' }}
+        uses: ./.github/actions/upload-safe-playwright-artifact
+        with:
+          name: storybook-input-evidence-${{ github.run_id }}-${{ github.run_attempt }}
+          path: apps/web/test-results/storybook-input-evidence/
+          allow-images: 'true'
+          retention-days: 7
 
   # Full Xcode work belongs on the synthetic combined head, never the source
   # PR. The same reusable lane is the fail-closed fallback for direct/admin
@@ -1979,7 +2062,10 @@ jobs:
       needs.ci-path-changes.result == 'success' &&
       (
         github.event_name != 'merge_group' ||
-        needs.ci-merge-group-admission.result == 'success'
+        (
+          needs.ci-merge-group-admission.result == 'success' &&
+          needs.ci-merge-group-admission.outputs.admitted == 'true'
+        )
       ) &&
       needs.ci-path-changes.outputs.run_ios == 'true' &&
       (
@@ -1988,6 +2074,8 @@ jobs:
         (github.event_name == 'push' && github.ref == 'refs/heads/main')
       )
     uses: ./.github/workflows/ios-ci.yml
+    with:
+      concurrency-key: ${{ github.event_name == 'merge_group' && needs.ci-merge-group-admission.outputs.pr_number != '' && format('pr-{0}', needs.ci-merge-group-admission.outputs.pr_number) || '' }}
 
   # Mac product evidence stays on the synthetic combined head or direct-main
   # fallback. It covers both the MenuMonitor Swift package and the packaged
@@ -2000,7 +2088,10 @@ jobs:
       needs.ci-path-changes.result == 'success' &&
       (
         github.event_name != 'merge_group' ||
-        needs.ci-merge-group-admission.result == 'success'
+        (
+          needs.ci-merge-group-admission.result == 'success' &&
+          needs.ci-merge-group-admission.outputs.admitted == 'true'
+        )
       ) &&
       needs.ci-path-changes.outputs.run_macos == 'true' &&
       (
@@ -2008,6 +2099,11 @@ jobs:
         github.event_name == 'merge_group' ||
         (github.event_name == 'push' && github.ref == 'refs/heads/main')
       )
+    concurrency:
+      # A regenerated merge-group head supersedes the prior Mac flight for the
+      # same PR. Direct-main and manual runs keep exact, non-canceling groups.
+      group: ${{ github.event_name == 'merge_group' && needs.ci-merge-group-admission.outputs.pr_number != '' && format('ci-macos-pr-{0}', needs.ci-merge-group-admission.outputs.pr_number) || format('ci-macos-{0}-{1}', github.run_id, github.run_attempt) }}
+      cancel-in-progress: ${{ github.event_name == 'merge_group' && needs.ci-merge-group-admission.outputs.pr_number != '' }}
     runs-on: macos-26
     timeout-minutes: 45
     steps:
@@ -2015,6 +2111,14 @@ jobs:
         with:
           persist-credentials: false
       - uses: ./.github/actions/setup-node-pnpm
+      - name: Bind staging package identity to the exact CI attempt
+        id: desktop-staging-identity
+        shell: bash
+        run: |
+          set -euo pipefail
+          version="$(node apps/desktop/scripts/sync-version.mjs \
+            --staging-version "$GITHUB_RUN_ID" "$GITHUB_RUN_ATTEMPT")"
+          echo "version=$version" >> "$GITHUB_OUTPUT"
       - name: Test and package exact Mac head
         run: |
           set -euo pipefail
@@ -2022,11 +2126,14 @@ jobs:
           swift build --package-path apps/macos/MenuMonitor -c release
           pnpm --filter @jovie/desktop run typecheck
           pnpm --filter @jovie/desktop run test
-          pnpm --filter @jovie/desktop run package:staging
+          ELECTRON_ENV=staging \
+            DESKTOP_VERSION="${{ steps.desktop-staging-identity.outputs.version }}" \
+            JOVIE_DESKTOP_SOURCE_REVISION="$GITHUB_SHA" \
+            pnpm --filter @jovie/desktop run package:staging
       - name: Verify exact Mac artifact set
         run: |
           set -euo pipefail
-          version="$(tr -d '[:space:]' < VERSION)"
+          version="${{ steps.desktop-staging-identity.outputs.version }}"
           for artifact in \
             "apps/desktop/dist/Jovie-Staging-${version}-universal.dmg" \
             "apps/desktop/dist/Jovie-Staging-${version}-universal.dmg.blockmap" \
@@ -2059,7 +2166,10 @@ jobs:
       needs.ci-path-changes.outputs.run_cross_product == 'true' &&
       (
         github.event_name != 'merge_group' ||
-        needs.ci-merge-group-admission.result == 'success'
+        (
+          needs.ci-merge-group-admission.result == 'success' &&
+          needs.ci-merge-group-admission.outputs.admitted == 'true'
+        )
       ) &&
       (
         github.event_name == 'workflow_dispatch' ||
@@ -3494,7 +3604,10 @@ jobs:
       needs.ci-path-changes.result == 'success' &&
       (
         github.event_name != 'merge_group' ||
-        needs.ci-merge-group-admission.result == 'success'
+        (
+          needs.ci-merge-group-admission.result == 'success' &&
+          needs.ci-merge-group-admission.outputs.admitted == 'true'
+        )
       ) &&
       (
         (
@@ -4109,6 +4222,7 @@ jobs:
           export TURNSTILE_SECRET_KEY="1x0000000000000000000000000000000AA"
           export CLERK_SECRET_KEY="${{ secrets.CLERK_SECRET_KEY }}"
           export NEXT_PUBLIC_E2E_MODE=1
+          export E2E_TEST_MODE=1
           export NEXT_DISABLE_TOOLBAR=1
           export CHAT_LLM_FAILURE_INJECTION=1
           export E2E_CLERK_USER_ID="${{ secrets.E2E_CLERK_USER_ID }}"
@@ -5027,6 +5141,12 @@ jobs:
           set -euo pipefail
           PATH_RESULT="${{ needs.ci-path-changes.result }}"
           ADMISSION_RESULT="${{ needs.ci-merge-group-admission.result }}"
+          ADMISSION_ADMITTED="${{ needs.ci-merge-group-admission.outputs.admitted }}"
+          ADMISSION_OBSOLETE="${{ needs.ci-merge-group-admission.outputs.obsolete }}"
+          ADMISSION_PR="${{ needs.ci-merge-group-admission.outputs.pr_number }}"
+          ADMISSION_SYNTHETIC_HEAD="${{ needs.ci-merge-group-admission.outputs.synthetic_head_sha }}"
+          ADMISSION_QUEUE_STATE="${{ needs.ci-merge-group-admission.outputs.current_queue_state }}"
+          ADMISSION_REPLACEMENT_HEAD="${{ needs.ci-merge-group-admission.outputs.replacement_combined_head }}"
           RISK_RESULT="${{ needs.ci-risk-classifier.result }}"
           FAST_RESULT="${{ needs.ci-fast.result }}"
           UNIT_RESULT="${{ needs.ci-unit-tests.result }}"
@@ -5065,6 +5185,10 @@ jobs:
             echo "| Selected product lanes | $SELECTED_LANES |"
             echo "| Shared-contract impact | $SHARED_IMPACT |"
             echo "| Merge Group Admission | $ADMISSION_RESULT |"
+            echo "| Live queue admitted | ${ADMISSION_ADMITTED:-false} |"
+            echo "| Admission PR | ${ADMISSION_PR:-unknown} |"
+            echo "| Admission queue state | ${ADMISSION_QUEUE_STATE:-unknown} |"
+            echo "| Replacement combined head | ${ADMISSION_REPLACEMENT_HEAD:-none} |"
             echo "| CI Risk Classifier | $RISK_RESULT |"
             echo "| ci-fast | $FAST_RESULT |"
             echo "| Unit Tests | $UNIT_RESULT |"
@@ -5082,6 +5206,15 @@ jobs:
             echo
             echo "Preview/A11y evidence is explicit opt-in or post-merge; merge groups do not provision Neon."
           } >> "$GITHUB_STEP_SUMMARY"
+
+          if [[ "$ADMISSION_RESULT" == "success" && "$ADMISSION_ADMITTED" != "true" ]]; then
+            if [[ "$ADMISSION_ADMITTED" == "false" && "$ADMISSION_OBSOLETE" == "true" ]]; then
+              echo "::notice::Obsolete merge-group neutralized before selected product lanes: pr=${ADMISSION_PR:-unknown} synthetic=${ADMISSION_SYNTHETIC_HEAD:-unknown} state=${ADMISSION_QUEUE_STATE:-unknown} replacement=${ADMISSION_REPLACEMENT_HEAD:-none}"
+              exit 0
+            fi
+            echo "::error::Merge-group admission succeeded without a valid admitted/obsolete disposition"
+            exit 1
+          fi
 
           for gate in \
             "Path Changes:$PATH_RESULT" \
@@ -5338,7 +5471,7 @@ jobs:
               requiresPreview: $requiresPreview,
               blocksUnattendedAutoMerge: $blocksUnattended,
               matchedRules: ($rules | split(",") | map(select(length > 0) | {id: ., title: ., level: $riskLevel, files: []})),
-              recommendedLabels: (if $blocksUnattended then ["needs-human"] else [] end)
+              recommendedLabels: []
             }' > "$RISK_JSON"
 
           node scripts/ci-harness.mjs emit-artifact \
@@ -5672,6 +5805,7 @@ jobs:
           export UPSTASH_REDIS_REST_URL="${{ secrets.UPSTASH_REDIS_REST_URL }}"
           export UPSTASH_REDIS_REST_TOKEN="${{ secrets.UPSTASH_REDIS_REST_TOKEN }}"
           export NEXT_PUBLIC_E2E_MODE=1
+          export E2E_TEST_MODE=1
           export NEXT_DISABLE_TOOLBAR=1
           export NEXT_PUBLIC_CLERK_MOCK=1
           export NEXT_PUBLIC_CLERK_PROXY_DISABLED=1

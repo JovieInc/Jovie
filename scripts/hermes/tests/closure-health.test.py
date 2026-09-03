@@ -119,13 +119,14 @@ def stack_pr(
     *,
     body: str = "",
     merge_state: str = "CLEAN",
+    draft: bool = True,
 ) -> dict[str, object]:
     return pr(
         number,
         title=f"wip: stack layer {number}",
         body=body,
         merge_state=merge_state,
-        draft=True,
+        draft=draft,
         base_ref=base_ref,
         head_ref=f"stack/test-{number}",
     )
@@ -149,6 +150,19 @@ def stack_health(layers: list[dict[str, object]]) -> tuple[dict[str, object], di
 
 
 class ClosureClassificationTests(unittest.TestCase):
+    def test_ready_ancestors_are_resolved_but_only_draft_groups_are_enforced(self):
+        root = stack_pr(91, "main", draft=False)
+        child = stack_pr(92, "stack/test-91", draft=False)
+        ready = MODULE.classify_open_prs([root, child], NOW)
+        self.assertEqual((ready["stackHealth"]["roots"], ready["repairActions"]), ([], []))
+        child["isDraft"] = True
+        mixed = MODULE.classify_open_prs([root, child], NOW)
+        self.assertEqual(mixed["stackHealth"]["roots"][0]["prNumbers"], [91, 92])
+        self.assertIn(
+            "missing-stack-integrator",
+            mixed["stackHealth"]["violations"][0]["codes"],
+        )
+
     def test_four_layer_stack_with_owner_deadline_and_clean_path_is_green(self):
         layers = [
             stack_pr(101, "main", body=STACK_BODY),
@@ -179,11 +193,24 @@ class ClosureClassificationTests(unittest.TestCase):
         self.assertEqual(len(result["repairActions"]), 1)
         self.assertEqual(result["repairActions"][0]["action"], MODULE.STACK_REPAIR_ACTION)
         self.assertEqual(result["repairActions"][0]["rootPr"], 101)
+        action = result["repairActions"][0]
+        self.assertEqual(action["memberHeads"][-1]["headSha"], layers[-1]["headRefOid"])
         self.assertEqual(health["status"], "red")
         self.assertIn("draft-stack-policy-violation", health["reasons"])
         self.assertFalse(health["newIssueIntakeAllowed"])
         self.assertTrue(health["promotionContinues"])
         self.assertTrue(health["remediationContinues"])
+        layers[-1]["headRefOid"] = "f" * 40
+        head_key = MODULE.classify_open_prs(layers, NOW)["repairActions"][0]["taskKey"]
+        layers[0]["body"] = STACK_BODY.replace("summer-test", "fx-test")
+        metadata_key = MODULE.classify_open_prs(layers, NOW)["repairActions"][0]["taskKey"]
+        layers[0]["body"] += "\n<!-- linear-issue-id:JOV-5362 -->"
+        issue_key = MODULE.classify_open_prs(layers, NOW)["repairActions"][0]["taskKey"]
+        self.assertNotEqual(action["taskKey"], head_key)
+        self.assertNotEqual(head_key, metadata_key)
+        self.assertNotEqual(metadata_key, issue_key)
+        layers[-1]["headRefOid"] = None
+        self.assertEqual(MODULE.classify_open_prs(layers, NOW)["repairActions"], [])
 
     def test_stack_requires_metadata_and_clean_ancestors(self):
         layers = [
@@ -218,6 +245,23 @@ class ClosureClassificationTests(unittest.TestCase):
         self.assertEqual(
             [action["rootPr"] for action in result["repairActions"]], [121, 123]
         )
+
+    def test_cyclic_draft_stack_emits_one_persistable_canonical_action(self):
+        result = MODULE.classify_open_prs(
+            [
+                stack_pr(131, "stack/test-132", body=STACK_BODY),
+                stack_pr(132, "stack/test-131"),
+            ],
+            NOW,
+        )
+        action = result["repairActions"][0]
+        path = [entry["pr"] for entry in action["promotionPath"]]
+        codes = result["stackHealth"]["violations"][0]["codes"]
+        self.assertIn("cyclic-promotion-path", codes)
+        self.assertEqual((action["rootPr"], action["prNumbers"]), (131, [131, 132]))
+        self.assertEqual((path, action["maxDepth"]), ([131, 132], 2))
+        self.assertEqual(len(path), len(set(path)))
+        self.assertEqual([entry["pr"] for entry in action["memberHeads"]], path)
 
     def test_every_open_pr_receives_a_deterministic_lifecycle_disposition(self):
         result = MODULE.classify_open_prs(
@@ -919,6 +963,16 @@ class ClosureObservationTests(unittest.TestCase):
         self.assertEqual(failed["status"], "red")
         self.assertFalse(failed["newIssueIntakeAllowed"])
         self.assertEqual(failed["reasons"], ["closure-observation-unknown"])
+        self.assertEqual(
+            failed["stackHealth"],
+            {
+                "maxDepth": MODULE.STACK_MAX_DEPTH,
+                "roots": [],
+                "violations": [],
+                "repairActions": [],
+            },
+        )
+        self.assertEqual(failed["repairActions"], [])
         self.assertIn("bad snapshot", failed["error"])
 
 

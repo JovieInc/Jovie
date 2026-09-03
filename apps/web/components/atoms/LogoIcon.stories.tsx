@@ -7,29 +7,42 @@ const meta = {
   parameters: {
     layout: 'centered',
   },
+  args: {
+    size: 48,
+    variant: 'color',
+  },
 } satisfies Meta<typeof LogoIcon>;
 
 export default meta;
 type Story = StoryObj<typeof meta>;
 
-export const Color: Story = {
+export const Default: Story = {};
+
+export const Muted: Story = {
   args: {
-    size: 48,
-    variant: 'color',
+    variant: 'muted',
   },
 };
 
 export const White: Story = {
   args: {
-    size: 40,
     variant: 'white',
-    className: 'rounded-lg bg-surface-inverse p-2',
   },
+  parameters: {
+    backgrounds: { default: 'dark' },
+    themes: { themeOverride: 'dark' },
+  },
+  decorators: [
+    StoryComponent => (
+      <div className='rounded-lg bg-surface-0 p-6'>
+        <StoryComponent />
+      </div>
+    ),
+  ],
 };
 
-export const Muted: Story = {
+export const Sized: Story = {
   args: {
-    size: 32,
-    variant: 'muted',
+    size: 72,
   },
 };

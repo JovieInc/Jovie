@@ -1,6 +1,10 @@
 import 'server-only';
 
 import { list, put } from '@vercel/blob';
+import {
+  getBlobCommandOptions,
+  isBlobStorageConfigured,
+} from '@/lib/blob-config';
 import { env } from '@/lib/env-server';
 import { logger } from '@/lib/utils/logger';
 import type { AlbumArtCandidate, AlbumArtManifest } from './types';
@@ -27,19 +31,22 @@ async function uploadPublicBuffer(params: {
   readonly buffer: Buffer;
   readonly contentType: string;
 }): Promise<string> {
-  if (!env.BLOB_READ_WRITE_TOKEN) {
+  if (!isBlobStorageConfigured()) {
     if (env.NODE_ENV === 'production') {
       throw new TypeError('Blob storage not configured');
     }
-    logger.warn('[album-art] Blob token missing; returning development URL', {
-      path: params.path,
-    });
+    logger.warn(
+      '[album-art] Blob storage not configured; returning development URL',
+      {
+        path: params.path,
+      }
+    );
     return fallbackBlobUrl(params.path);
   }
 
   const blob = await put(params.path, params.buffer, {
     access: 'public',
-    token: env.BLOB_READ_WRITE_TOKEN,
+    ...getBlobCommandOptions(),
     contentType: params.contentType,
     cacheControlMaxAge: 60 * 60 * 24 * 365,
     addRandomSuffix: false,
@@ -95,11 +102,11 @@ export async function fetchAlbumArtManifest(params: {
   readonly generationId: string;
 }): Promise<AlbumArtManifest> {
   const pathname = `artwork/generated/${params.profileId}/${params.generationId}/manifest.json`;
-  const url = env.BLOB_READ_WRITE_TOKEN
+  const url = isBlobStorageConfigured()
     ? ((
         await list({
           prefix: pathname,
-          token: env.BLOB_READ_WRITE_TOKEN,
+          ...getBlobCommandOptions(),
           limit: 1,
         })
       ).blobs[0]?.url ?? fallbackBlobUrl(pathname))

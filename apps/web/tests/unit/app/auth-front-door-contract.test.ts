@@ -12,6 +12,7 @@ describe('auth front-door contract', () => {
       href: APP_ROUTES.START,
     });
     expect(contract.primary.href).not.toMatch(/waitlist/i);
+    expect(contract.primary.href).not.toContain('starter_prompt');
     expect(contract.secondary).toBeNull();
     expect(contract.fallbackSupport).toBe(
       'Limited prelaunch access. We will email when you are in.'

@@ -1,7 +1,6 @@
 'use client';
 
-import { Button } from '@jovie/ui';
-
+import { Button, ProgressBar } from '@jovie/ui';
 import {
   AlertCircle,
   Check,
@@ -17,14 +16,17 @@ import { APP_ROUTES } from '@/constants/routes';
 import type { PendingFile } from '../hooks/useChatFileAttachments';
 import { fileKindIcon } from './file-kind-icons';
 
-const _ACCENT = '#7170ff';
+function clampUploadProgress(progress: number): number {
+  if (!Number.isFinite(progress)) return 0;
+  return Math.min(100, Math.max(0, progress));
+}
 
-function _formatBytes(bytes: number): string {
-  if (bytes < 1024) return `${bytes} B`;
-  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(0)} KB`;
-  if (bytes < 1024 * 1024 * 1024)
-    return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
-  return `${(bytes / (1024 * 1024 * 1024)).toFixed(2)} GB`;
+function formatUploadProgress(progress: number): string {
+  return `${Math.round(clampUploadProgress(progress))}%`;
+}
+
+function aggregateProgressLabel(done: number, total: number): string {
+  return `Upload progress: ${done} of ${total} files complete`;
 }
 
 function statusColor(status: PendingFile['status']): string {
@@ -56,7 +58,7 @@ function statusText(f: PendingFile): string {
     case 'duplicate':
       return 'Duplicate — skipped';
     case 'uploading':
-      return `${f.progress}% · uploading`;
+      return `${formatUploadProgress(f.progress)} · uploading`;
     case 'processing':
       return 'Processing';
     case 'queued':
@@ -121,12 +123,13 @@ function FileRowTrailingIcon({ file }: { readonly file: PendingFile }) {
     case 'uploading':
     case 'processing':
       return (
-        <div className='system-b-chat-upload-manifest-mini-bar'>
-          <div
-            className='system-b-chat-upload-manifest-mini-bar-fill'
-            style={{ width: `${file.progress}%` }}
-          />
-        </div>
+        <ProgressBar
+          value={clampUploadProgress(file.progress)}
+          aria-label={`Upload progress for ${file.name}`}
+          className='w-12 shrink-0 space-y-0'
+          trackClassName='h-1 rounded-full bg-surface-2'
+          fillClassName='bg-accent'
+        />
       );
     default:
       return null;
@@ -169,6 +172,9 @@ export function ChatUploadManifest({
   const visibleFiles = files.filter(f => f.status !== 'duplicate');
   const duplicateCount = files.filter(f => f.status === 'duplicate').length;
   const hasDuplicates = duplicateCount > 0;
+  const progressLabel = aggregateProgressLabel(aggregate.done, aggregate.total);
+  const aggregateProgress = clampUploadProgress(aggregate.overallPct);
+  const aggregateProgressText = formatUploadProgress(aggregate.overallPct);
 
   if (files.length === 0) return null;
 
@@ -193,16 +199,17 @@ export function ChatUploadManifest({
             </p>
           </div>
           <span className='text-xs font-medium tabular-nums text-primary-token'>
-            {aggregate.overallPct}%
+            {aggregateProgressText}
           </span>
           <ChevronDown className='h-3.5 w-3.5 text-tertiary-token' />
         </Button>
-        <div className='system-b-chat-upload-manifest-bar'>
-          <div
-            className='system-b-chat-upload-manifest-bar-fill'
-            style={{ width: `${aggregate.overallPct}%` }}
-          />
-        </div>
+        <ProgressBar
+          value={aggregateProgress}
+          aria-label={progressLabel}
+          className='space-y-0'
+          trackClassName='h-1 rounded-none bg-surface-2'
+          fillClassName='rounded-none bg-accent'
+        />
         <div className='flex gap-1.5 px-3 py-2.5'>
           {files.map(f => (
             <span key={f.id} className='system-b-chat-upload-manifest-thumb'>
@@ -242,7 +249,7 @@ export function ChatUploadManifest({
           </p>
         </div>
         <span className='text-xs font-semibold tabular-nums text-primary-token'>
-          {aggregate.overallPct}%
+          {aggregateProgressText}
         </span>
         {onCollapse ? (
           <Button
@@ -259,12 +266,13 @@ export function ChatUploadManifest({
       </div>
 
       {/* Overall progress bar */}
-      <div className='system-b-chat-upload-manifest-bar'>
-        <div
-          className='system-b-chat-upload-manifest-bar-fill'
-          style={{ width: `${aggregate.overallPct}%` }}
-        />
-      </div>
+      <ProgressBar
+        value={aggregateProgress}
+        aria-label={progressLabel}
+        className='space-y-0'
+        trackClassName='h-1 rounded-none bg-surface-2'
+        fillClassName='rounded-none bg-accent'
+      />
 
       {/* File list */}
       <div className='system-b-chat-upload-manifest-list'>
