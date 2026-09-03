@@ -81,12 +81,22 @@ function legacyEvidenceResult({
   );
 }
 
+/**
+ * @typedef {object} RenderedEvaluationTestResult
+ * @property {boolean} ok
+ * @property {number} status
+ * @property {{ ok: boolean, results?: unknown[] } | null} report
+ * @property {string} output
+ */
+
+/** @type {RenderedEvaluationTestResult} */
 const renderedPass = {
   ok: true,
   status: 0,
   report: { ok: true, results: [] },
   output: '{"ok":true}',
 };
+/** @type {RenderedEvaluationTestResult} */
 const renderedFailure = {
   ok: false,
   status: 1,
@@ -592,13 +602,16 @@ describe('diff gate', () => {
   });
 });
 
+/**
+ * @param {Parameters<typeof resolveRenderedEvaluationSection>[0]} [options]
+ * @param {RenderedEvaluationTestResult} [response]
+ */
 // biome-ignore format: compact fixture keeps this source-PR under the hard size cap
-/** @param {object} [options] @param {typeof renderedPass} [response] */
 function renderedSection(options = {}, response = renderedPass) { const calls = []; const result = resolveRenderedEvaluationSection({ changedComponents: [BADGE_COMPONENT_REL], storybookUrl: STORYBOOK_URL, evaluateRendered: args => { calls.push(args); return response; }, ...options }); return { calls, result }; }
 
 describe('live rendered evaluation section', () => {
   // biome-ignore format: compact matrix keeps this source-PR under the hard size cap
-  it.each([['empty', {}, true, { applicable: false, skipped: true }, undefined], ['advisory without Storybook', { storybookUrl: null }, true, { skipped: true }, undefined], ['required without Storybook', { requireRendered: true, storybookUrl: null }, false, { ok: false, skipped: true }, undefined], ['advisory failure', {}, true, { ok: false, status: 1 }, renderedFailure], ['required failure', { requireRendered: true }, false, { ok: false, status: 1 }, renderedFailure]])('handles %s', (_name, options, ok, section, response) => {
+  it.each([['empty', {}, true, { applicable: false, skipped: true }, renderedPass], ['advisory without Storybook', { storybookUrl: null }, true, { skipped: true }, renderedPass], ['required without Storybook', { requireRendered: true, storybookUrl: null }, false, { ok: false, skipped: true }, renderedPass], ['advisory failure', {}, true, { ok: false, status: 1 }, renderedFailure], ['required failure', { requireRendered: true }, false, { ok: false, status: 1 }, renderedFailure]])('handles %s', (_name, options, ok, section, response) => {
     const result =
       _name === 'empty'
         ? resolveRenderedEvaluationSection()

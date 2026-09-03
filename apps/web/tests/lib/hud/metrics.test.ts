@@ -79,6 +79,7 @@ vi.mock('@/lib/hud/ai-ops', () => ({
 }));
 
 afterEach(() => {
+  vi.useRealTimers();
   vi.restoreAllMocks();
 });
 
@@ -234,6 +235,38 @@ describe('getHudMetrics', () => {
     expect(metrics.sources.sentry.state).toBe('ok');
     expect(metrics.sources.github.state).toBe('not_configured');
     expect(metrics.sources.stripe.fetchedAtIso).toBe(metrics.generatedAtIso);
+  });
+
+  it('stamps the aggregate payload after producer observations resolve', async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date('2026-08-22T18:00:00.000Z'));
+    mockGetHudDeployments.mockResolvedValueOnce({
+      availability: 'not_configured',
+      current: null,
+      recent: [],
+    });
+    vi.mocked(getAdminStripeOverviewMetrics).mockImplementationOnce(
+      async () => {
+        vi.setSystemTime(new Date('2026-08-22T18:00:01.000Z'));
+        return {
+          mrrUsd: 1000,
+          activeSubscribers: 25,
+          mrrGrowth30dUsd: 50,
+          isConfigured: true,
+          isAvailable: true,
+          observedAtIso: '2026-08-22T18:00:01.000Z',
+        };
+      }
+    );
+
+    const metrics = await getHudMetrics('admin');
+
+    expect(metrics.sources.stripe.fetchedAtIso).toBe(
+      '2026-08-22T18:00:01.000Z'
+    );
+    expect(Date.parse(metrics.generatedAtIso)).toBeGreaterThanOrEqual(
+      Date.parse(metrics.sources.stripe.fetchedAtIso)
+    );
   });
 
   it('returns degraded metrics when an upstream fetch times out', async () => {

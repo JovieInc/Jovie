@@ -57,22 +57,45 @@ async function assertPageHealth(
 ) {
   const finalPath = pathname(page.url());
   expect(
-    target.expected === 'page'
-      ? finalPath
-      : target.allowedFinalPaths.map(pathname),
+    target.expected === 'redirect'
+      ? target.allowedFinalPaths.map(pathname)
+      : finalPath,
     `${target.glob} did not settle on the declared path`
   ).toEqual(
-    target.expected === 'page'
-      ? pathname(target.path)
-      : expect.arrayContaining([finalPath])
+    target.expected === 'redirect'
+      ? expect.arrayContaining([finalPath])
+      : pathname(target.path)
   );
-  expect(failedResponses, `${target.glob} has same-origin 4xx/5xx`).toEqual([]);
+  const unexpectedFailedResponses =
+    target.expected === 'not-found'
+      ? failedResponses.filter(entry => {
+          const [status, ...urlParts] = entry.split(' ');
+          return (
+            status !== '404' ||
+            pathname(urlParts.join(' ')) !== pathname(target.path)
+          );
+        })
+      : failedResponses;
+  expect(
+    unexpectedFailedResponses,
+    `${target.glob} has unexpected same-origin 4xx/5xx`
+  ).toEqual([]);
   expect(failedRequests, `${target.glob} has failed requests`).toEqual([]);
   expect(consoleErrors, `${target.glob} emitted console errors`).toEqual([]);
   expect(pageErrors, `${target.glob} threw runtime exceptions`).toEqual([]);
   if (target.expected === 'redirect') return;
 
   await assertNoDevChrome(page);
+  if (target.expected === 'not-found') {
+    const body = (await page.locator('body').innerText())
+      .replace(/\s+/g, ' ')
+      .trim();
+    expect(body, `${target.glob} did not render its not-found state`).toMatch(
+      /not found|could not be found/i
+    );
+    return;
+  }
+
   await expect(page.locator('main').first()).toBeVisible();
   const body = (await page.locator('body').innerText())
     .replace(/\s+/g, ' ')
@@ -131,10 +154,15 @@ async function checkTarget(page: Page, target: MarketingRouteHealthTarget) {
     waitUntil: 'domcontentloaded',
     timeout: NAVIGATION_TIMEOUT,
   });
-  expect(
-    response?.status() ?? 0,
-    `${target.glob} has no document response`
-  ).toBeLessThan(400);
+  const responseStatus = response?.status() ?? 0;
+  if (target.expected === 'not-found') {
+    expect(responseStatus, `${target.glob} must remain unpublished`).toBe(404);
+  } else {
+    expect(
+      responseStatus,
+      `${target.glob} has no document response`
+    ).toBeLessThan(400);
+  }
   await page.waitForTimeout(750);
   await assertPageHealth(
     page,

@@ -41,6 +41,14 @@ describe('pay landing System B source contract', () => {
   it('keeps the final claim section to the handle form action path', () => {
     render(<PayLanding />);
 
+    expect(screen.getByTestId('pay-hero')).toHaveAttribute(
+      'aria-labelledby',
+      'pay-hero-heading'
+    );
+    expect(
+      screen.getByRole('heading', { name: /turn every payment into a fan/i })
+    ).toHaveAttribute('id', 'pay-hero-heading');
+
     const finalHeading = screen.getByRole('heading', {
       name: /start turning payments into fans/i,
     });

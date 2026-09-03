@@ -29,7 +29,7 @@ const managedWebServerPort = managedWebServerUrl.port;
 export default defineConfig({
   captureGitInfo: { commit: false, diff: false },
   testDir: './tests/product-screenshots',
-  testMatch: '**/catalog.spec.ts',
+  testMatch: ['**/catalog.spec.ts', '**/marketing-routes.spec.ts'],
   fullyParallel: false, // Run sequentially for deterministic screenshots
   forbidOnly: true,
   retries: 1, // One retry in case of flaky image loads

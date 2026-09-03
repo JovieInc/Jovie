@@ -7,14 +7,14 @@
  */
 
 export const HUD_NEED_SECTION_IDS = [
-  'action-required',
   'cash-mrr',
-  'bottleneck',
+  'action-required',
   'shipper',
   'factory-health',
 ] as const;
 
 export const HUD_NOISE_SECTION_IDS = [
+  'bottleneck',
   'morning-walk',
   'design-jury',
   'velocity',
@@ -46,7 +46,7 @@ export const HUD_SECTION_TEST_IDS = {
 
 export const HUD_SECTION_LABELS = {
   'action-required': 'Needs Tim',
-  'cash-mrr': 'Survival',
+  'cash-mrr': 'Company Now',
   bottleneck: 'Bottleneck',
   shipper: 'Delivery',
   'factory-health': 'Operating chain',

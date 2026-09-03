@@ -18,6 +18,10 @@ describe('SupportPageContent', () => {
     expect(
       screen.getByRole('heading', { level: 1, name: "We're Here To Help." })
     ).toBeVisible();
+    expect(screen.getByTestId('support-hero')).toHaveAttribute(
+      'aria-labelledby',
+      'support-hero-heading'
+    );
     const sectionHeadings = Array.from(container.querySelectorAll('section'))
       .map(section => section.querySelector('h1, h2')?.textContent?.trim())
       .filter((heading): heading is string => heading !== undefined);

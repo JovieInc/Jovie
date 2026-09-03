@@ -1263,11 +1263,17 @@ jobs:
             VERCEL_DEPLOYMENT_POLL_INTERVAL_MS=3000 \
               node apps/web/scripts/vercel-protected-origin.cjs resolve-deployment
           )"
-          jq -e --arg id "$EXPECTED_DEPLOYMENT_ID" '
+          # resolve-deployment returns only after the exact candidate is READY;
+          # its bounded output intentionally contains identity, not raw Vercel
+          # lifecycle fields. Re-prove that returned identity here.
+          jq -e \
+            --arg id "$EXPECTED_DEPLOYMENT_ID" \
+            --arg url "$deployment_url" '
+            type == "object" and
             .id == $id and
-            (.readyState | ascii_upcase) == "READY"
+            .url == $url
           ' >/dev/null <<<"$exact_json" || {
-            echo "::error::Exact staging deployment is not READY."
+            echo "::error::Exact READY staging deployment identity did not converge."
             exit 1
           }
 

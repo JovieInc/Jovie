@@ -2002,6 +2002,88 @@ describe('merge-group front-item churn guard (JOV-5030)', () => {
     expect(decision.reason).toContain('succeeded');
   });
 
+  it('keeps a newer in-progress attempt queued instead of replaying stale failures', () => {
+    // Live #17013: a standalone exact-main group started at 11:13:03, the
+    // controller ejected it at 11:15:46 based on older failures, and the same
+    // group completed successfully at 11:21:14. Incomplete newer evidence must
+    // win until GitHub publishes a terminal conclusion.
+    const active = groupRun(
+      17013,
+      BASE,
+      null,
+      '2026-09-02T11:13:03.000Z',
+      'in_progress'
+    );
+    const decision = frontItemChurnDecision({
+      prNumber: 17013,
+      currentBaseSha: BASE,
+      headCommittedAt: '2026-09-02T10:00:00.000Z',
+      observedAt: '2026-09-02T11:15:46.000Z',
+      mergeGroupRuns: [
+        groupRun(
+          17013,
+          NEW_BASE,
+          'failure',
+          '2026-09-02T11:01:00.000Z',
+          'completed',
+          ['Run unit tests']
+        ),
+        active,
+      ],
+    });
+
+    expect(decision.action).toBe('allow');
+    expect(decision.reason).toContain('still active');
+    expect(decision.evidence).toEqual({
+      activeRunId: active.id,
+      activeStartedAt: '2026-09-02T11:13:03.000Z',
+      activeStatus: 'in_progress',
+    });
+  });
+
+  it('does not let an older active attempt hide a newer terminal failure', () => {
+    const decision = frontItemChurnDecision({
+      prNumber: 17013,
+      currentBaseSha: BASE,
+      headCommittedAt: '2026-09-02T10:00:00.000Z',
+      observedAt: '2026-09-02T11:15:46.000Z',
+      mergeGroupRuns: [
+        groupRun(17013, BASE, null, '2026-09-02T11:01:00.000Z', 'in_progress'),
+        groupRun(
+          17013,
+          NEW_BASE,
+          'failure',
+          '2026-09-02T11:13:03.000Z',
+          'completed',
+          ['Run deterministic brand safety scan']
+        ),
+      ],
+    });
+
+    expect(decision.action).toBe('block');
+    expect(decision.evidence.failureClass).toBe('deterministic-product-check');
+  });
+
+  it('protects an active current-head attempt when older failures rolled out of history', () => {
+    const active = groupRun(
+      17013,
+      BASE,
+      null,
+      '2026-09-02T11:13:03.000Z',
+      'in_progress'
+    );
+    const decision = frontItemChurnDecision({
+      prNumber: 17013,
+      currentBaseSha: BASE,
+      headCommittedAt: '2026-09-02T10:00:00.000Z',
+      observedAt: '2026-09-02T11:15:46.000Z',
+      mergeGroupRuns: [active],
+    });
+
+    expect(decision.action).toBe('allow');
+    expect(decision.evidence.activeRunId).toBe(active.id);
+  });
+
   it('keeps the failing source head suppressed after elapsed time', () => {
     const decision = frontItemChurnDecision({
       prNumber: 15849,
