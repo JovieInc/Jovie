@@ -1,19 +1,15 @@
+import { NextResponse } from 'next/server';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 const mocks = vi.hoisted(() => ({
-  getCachedAuth: vi.fn(),
-  getExactProfileAccess: vi.fn(),
-  getYouTubeOptimizationSnapshotForProfile: vi.fn(),
+  requireLibraryProfileAccess: vi.fn(),
+  loadYouTubeOptimizationSnapshot: vi.fn(),
 }));
 
-vi.mock('@/lib/auth/cached', () => ({ getCachedAuth: mocks.getCachedAuth }));
-vi.mock('@/lib/auth/profile-access', () => ({
-  getExactProfileAccess: mocks.getExactProfileAccess,
-}));
-vi.mock('@/lib/db', () => ({ db: {} }));
-vi.mock('@/lib/youtube-library/queries', () => ({
-  getYouTubeOptimizationSnapshotForProfile:
-    mocks.getYouTubeOptimizationSnapshotForProfile,
+vi.mock('@/lib/error-tracking', () => ({ captureError: vi.fn() }));
+vi.mock('@/lib/library/track-drawer.server', () => ({
+  requireLibraryProfileAccess: mocks.requireLibraryProfileAccess,
+  loadYouTubeOptimizationSnapshot: mocks.loadYouTubeOptimizationSnapshot,
 }));
 
 import { GET } from './route';
@@ -30,30 +26,24 @@ function request() {
 describe('YouTube optimization snapshot route', () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    mocks.getCachedAuth.mockResolvedValue({ userId: 'app-user-id' });
-    mocks.getExactProfileAccess.mockResolvedValue({
-      ok: true,
-      profileId,
-      ownerUserId: 'app-user-id',
+    mocks.requireLibraryProfileAccess.mockResolvedValue({
+      userId: 'app-user-id',
     });
   });
 
   it('rejects cross-profile reads', async () => {
-    mocks.getExactProfileAccess.mockResolvedValue({
-      ok: false,
-      reason: 'forbidden',
+    mocks.requireLibraryProfileAccess.mockResolvedValue({
+      error: NextResponse.json({ error: 'Forbidden' }, { status: 403 }),
     });
     const response = await GET(request(), {
       params: Promise.resolve({ videoId }),
     });
     expect(response.status).toBe(403);
-    expect(
-      mocks.getYouTubeOptimizationSnapshotForProfile
-    ).not.toHaveBeenCalled();
+    expect(mocks.loadYouTubeOptimizationSnapshot).not.toHaveBeenCalled();
   });
 
   it('returns the scoped thumbnail, metric, and experiment history', async () => {
-    mocks.getYouTubeOptimizationSnapshotForProfile.mockResolvedValue({
+    mocks.loadYouTubeOptimizationSnapshot.mockResolvedValue({
       thumbnails: [],
       metrics: [],
       experiments: [],
@@ -62,8 +52,9 @@ describe('YouTube optimization snapshot route', () => {
       params: Promise.resolve({ videoId }),
     });
     expect(response.status).toBe(200);
-    expect(mocks.getYouTubeOptimizationSnapshotForProfile).toHaveBeenCalledWith(
-      { creatorProfileId: profileId, videoId }
-    );
+    expect(mocks.loadYouTubeOptimizationSnapshot).toHaveBeenCalledWith({
+      creatorProfileId: profileId,
+      videoId,
+    });
   });
 });
