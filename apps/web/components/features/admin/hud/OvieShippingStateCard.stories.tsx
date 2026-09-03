@@ -19,9 +19,7 @@ function createStoryQueryClient() {
 function StoryShell({ children }: { children: ReactElement }) {
   return (
     <QueryClientProvider client={createStoryQueryClient()}>
-      <div className='w-80 bg-base p-4 text-primary-token'>
-        {children}
-      </div>
+      <div className='w-80 bg-base p-4 text-primary-token'>{children}</div>
     </QueryClientProvider>
   );
 }
