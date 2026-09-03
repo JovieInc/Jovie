@@ -541,7 +541,9 @@ export function UnifiedTable<TData>({
   // Memoized row renderer for grouped table mode
   const renderGroupedRow = useCallback(
     (item: TData, index: number) => {
-      const row = groupedRowMap.get(getRowId ? getRowId(item) : item);
+      const row = groupedRowMap.get(
+        getRowId ? getRowId(item) : (item as unknown as string)
+      );
       if (!row) return null;
 
       const rowData = row.original as TData;
