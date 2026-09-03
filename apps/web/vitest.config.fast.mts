@@ -25,6 +25,14 @@ dotenv.config({ path: path.resolve(realRoot, '.env.test') });
 const isCI = process.env.CI === 'true';
 const isChangedRun = process.argv.includes('--changed');
 const isCoverageRun = process.argv.includes('--coverage');
+// CI unit lanes pass --shard=N/M; derive the slug so the junit report
+// lands on the exact filename the CI artifact/Codecov steps glob for
+// (test-report.{shard}.junit.xml). Vitest 4 ignores the CLI --outputFile
+// flag for inline reporters that pin their own outputFile (#17105).
+const shardArg = process.argv.find(arg => arg.startsWith('--shard='));
+const shardSlug = shardArg
+  ? (shardArg.split('=')[1] ?? '').replace(/\//g, '-') || null
+  : null;
 
 // Changed-suite runs can fan out many short-lived workers on parity branches,
 // which increases startup churn and causes timeout cascades under aggregate load.
@@ -166,7 +174,16 @@ export default defineConfig({
     reporters: isCI
       ? [
           ['default', { summary: false }],
-          ['junit', { outputFile: process.env.VITEST_JUNIT_OUTPUT_FILE || 'test-report.junit.xml' }],
+          [
+            'junit',
+            {
+              outputFile:
+                process.env.VITEST_JUNIT_OUTPUT_FILE ||
+                (shardSlug
+                  ? `test-report.${shardSlug}.junit.xml`
+                  : 'test-report.junit.xml'),
+            },
+          ],
         ]
       : ['default'],
 
