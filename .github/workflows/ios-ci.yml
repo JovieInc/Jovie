@@ -7,7 +7,7 @@ on:
   workflow_call:
     inputs:
       concurrency-key:
-        description: Stable key used to coalesce superseded merge-group heads.
+        description: Stable merge-queue PR identity; empty outside merge groups.
         required: false
         type: string
   workflow_dispatch:
@@ -16,6 +16,8 @@ permissions:
   contents: read
 
 concurrency:
+  # A regenerated merge-group head supersedes the prior iOS flight for that PR.
+  # Manual/direct-main calls remain isolated by exact SHA and never cancel.
   group: ios-ci-${{ github.workflow }}-${{ inputs.concurrency-key || github.ref }}
   cancel-in-progress: ${{ inputs.concurrency-key != '' || github.ref != 'refs/heads/main' }}
 

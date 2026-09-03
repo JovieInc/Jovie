@@ -2471,6 +2471,10 @@ describe('canary health gate workflow', () => {
     expect(reassert).toContain('needs.deploy-staging.outputs.deploy_url_b64');
     expect(prove).toContain('EXPECTED_DEPLOYMENT_ID:');
     expect(prove).toContain('EXPECTED_COMMIT_SHA:');
+    expect(prove).toContain('--arg url "$deployment_url"');
+    expect(prove).toContain('.id == $id and');
+    expect(prove).toContain('.url == $url');
+    expect(prove).not.toContain('(.readyState | ascii_upcase) == "READY"');
     expect(prove).toContain('for attempt in $(seq 1 15)');
     expect(prove).toContain('(.id | type == "string")');
     expect(prove).toContain('(.readyState | type == "string")');
@@ -2538,7 +2542,10 @@ describe('canary health gate workflow', () => {
         resolve(fakeBin, 'node'),
         `#!/usr/bin/env bash
 set -euo pipefail
-jq -n --arg id "$EXPECTED_DEPLOYMENT_ID" '{id: $id, readyState: "READY"}'
+jq -n \
+  --arg id "$EXPECTED_DEPLOYMENT_ID" \
+  --arg url "$VERCEL_CANDIDATE_DEPLOYMENT_URL" \
+  '{id: $id, url: $url}'
 `,
         { mode: 0o700 }
       );
@@ -3348,7 +3355,7 @@ describe('CI E2E smoke workflow', () => {
 
     expect(smokeManifest).toContain("'golden-path.spec.ts'");
     expect(smokeStep).toContain('export E2E_USE_TEST_AUTH_BYPASS=1');
-    expect(smokeStep).not.toContain('export E2E_TEST_MODE=1');
+    expect(smokeStep).toContain('export E2E_TEST_MODE=1');
     expect(smokeStep).not.toContain('export PUBLIC_NOAUTH_SMOKE=1');
     expect(goldenPathStep).toContain('export E2E_TEST_MODE=1');
     expect(goldenPathStep).toContain('export E2E_FAST_ONBOARDING=1');
@@ -3575,6 +3582,7 @@ describe('CI E2E smoke workflow', () => {
     }
 
     for (const { step } of [standaloneSteps[0], standaloneSteps[2]]) {
+      expect(step).toContain('export E2E_TEST_MODE=1');
       expect(step).toContain(
         'export UPSTASH_REDIS_REST_URL="${{ secrets.UPSTASH_REDIS_REST_URL }}"'
       );
