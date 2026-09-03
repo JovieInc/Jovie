@@ -112,7 +112,13 @@ describe('HomepageCertifiedSections', () => {
       HOMEPAGE_CERTIFIED_FIGURES.stats.know?.caption ?? 'missing'
     );
 
-    for (const id of ['relationships', 'smarter', 'built']) {
+    const relationships = screen.getByTestId('homepage-section-relationships');
+    expect(relationships).toHaveAttribute('data-voice', 'quiet');
+    expect(within(relationships).getAllByRole('listitem')).toHaveLength(
+      HOMEPAGE_CERTIFIED_FIGURES.routes.relationships?.length ?? -1
+    );
+
+    for (const id of ['smarter', 'built']) {
       expect(screen.getByTestId(`homepage-section-${id}`)).toHaveAttribute(
         'data-voice',
         'display'
