@@ -11,6 +11,12 @@ vi.mock('@/components/features/admin/hud/OvieLauncherRail', () => ({
   OvieLauncherRail: () => <div data-testid='ovie-launcher-rail' />,
 }));
 
+vi.mock('@/components/features/admin/hud/SymphonyCodexAccountControl', () => ({
+  SymphonyCodexAccountControl: () => (
+    <div data-testid='ovie-codex-account-control'>Codex Accounts</div>
+  ),
+}));
+
 vi.mock('@/components/features/admin/design-lab', () => ({
   DesignProposalReviewPanel: () => (
     <div data-testid='ovie-taste-inbox'>Taste Inbox</div>
@@ -104,6 +110,9 @@ describe('OvieMacHud', () => {
       within(panel).getByRole('link', { name: /#16886/i })
     ).toHaveAttribute('href', 'https://github.com/JovieInc/Jovie/pull/16886');
     expect(screen.getByTestId('ovie-launcher-rail')).toBeInTheDocument();
+    expect(screen.getByTestId('ovie-codex-account-control')).toHaveTextContent(
+      'Codex Accounts'
+    );
     expect(screen.getByTestId('ovie-taste-inbox')).toHaveTextContent(
       'Taste Inbox'
     );
