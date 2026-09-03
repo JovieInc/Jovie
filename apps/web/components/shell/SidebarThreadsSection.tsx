@@ -58,6 +58,9 @@ export interface SidebarThreadsSectionProps {
     e: React.MouseEvent,
     thread: SidebarThread
   ) => void;
+  // Hover/focus intent on a row — callers warm the route + conversation cache
+  // so the click paints instantly (JOV-5874).
+  readonly onThreadPrefetch?: (thread: SidebarThread) => void;
   readonly state?: SidebarThreadListState;
   readonly onRetry?: () => void;
   readonly onNewThread?: () => void;
@@ -188,6 +191,7 @@ const SidebarThreadRow = React.memo(function SidebarThreadRow({
   tight,
   onSelect,
   onThreadContextMenu,
+  onThreadPrefetch,
 }: {
   readonly thread: SidebarThread;
   readonly active: boolean;
@@ -198,7 +202,11 @@ const SidebarThreadRow = React.memo(function SidebarThreadRow({
     e: React.MouseEvent,
     thread: SidebarThread
   ) => void;
+  readonly onThreadPrefetch?: (thread: SidebarThread) => void;
 }) {
+  const handlePrefetch = onThreadPrefetch
+    ? () => onThreadPrefetch(thread)
+    : undefined;
   const rowClasses = cn(
     getSidebarNavRowClassName({
       active,
@@ -250,6 +258,8 @@ const SidebarThreadRow = React.memo(function SidebarThreadRow({
             aria-current={active ? 'page' : undefined}
             className={rowClasses}
             onContextMenu={e => onThreadContextMenu?.(e, thread)}
+            onPointerEnter={handlePrefetch}
+            onFocus={handlePrefetch}
           >
             {rowContent}
           </Link>
@@ -313,6 +323,7 @@ export function SidebarThreadsSection({
   allThreadsActive = false,
   onSelect,
   onThreadContextMenu,
+  onThreadPrefetch,
   state = 'idle',
   onRetry,
   onNewThread,
@@ -426,6 +437,7 @@ export function SidebarThreadsSection({
               tight={tight}
               onSelect={onSelect}
               onThreadContextMenu={onThreadContextMenu}
+              onThreadPrefetch={onThreadPrefetch}
             />
           );
         })}
