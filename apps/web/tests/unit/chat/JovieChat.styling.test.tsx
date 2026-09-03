@@ -1,3 +1,5 @@
+import { readFileSync } from 'node:fs';
+import { resolve } from 'node:path';
 import {
   afterAll,
   afterEach,
@@ -254,7 +256,7 @@ describe('JovieChat styling regressions', () => {
     // Asserted node:fs read of the exact component source (coverage-via
     // receipt evidence for the component-ship-gate structural contract).
     const jovieChatSource = readFileSync(
-      resolve(appRoot, 'components/jovie/JovieChat.tsx'),
+      resolve(process.cwd(), 'components/jovie/JovieChat.tsx'),
       'utf8'
     );
 
