@@ -75,7 +75,7 @@ Optimization exception: non-product control-plane factory.
 
 export function projectPerformancePack({
   repoRoot = DEFAULT_ROOT,
-  files,
+  files = {},
   generatedAt = '2026-09-03T00:00:00.000Z',
 } = {}) {
   const budgets = packRows(
@@ -111,7 +111,7 @@ export function projectPerformancePack({
   return pack;
 }
 
-export function loadCheckedInPack(repoRoot = DEFAULT_ROOT, files) {
+export function loadCheckedInPack(repoRoot = DEFAULT_ROOT, files = {}) {
   return parseJson(
     readText(repoRoot, PERFORMANCE_PACK_PATH, files),
     PERFORMANCE_PACK_PATH
@@ -162,7 +162,7 @@ export function validatePerformancePack(pack, projected) {
 export function validateFactoryContract(
   registry,
   repoRoot = DEFAULT_ROOT,
-  files
+  files = {}
 ) {
   const invariant = registry.invariants.find(
     item => item.id === PERFORMANCE_FACTORY_INVARIANT_ID
@@ -334,7 +334,7 @@ export function planLinearIssues({ pack, measurements, existingIssues = [] }) {
 
 export function validatePerformanceFactory(
   repoRoot = DEFAULT_ROOT,
-  { files, registry = readInvariantRegistry(repoRoot) } = {}
+  { files = {}, registry = readInvariantRegistry(repoRoot) } = {}
 ) {
   const projected = projectPerformancePack({ repoRoot, files });
   return [
@@ -345,7 +345,7 @@ export function validatePerformanceFactory(
 
 export function runFactory({
   repoRoot = DEFAULT_ROOT,
-  files,
+  files = {},
   measurements = [],
   existingIssues = [],
   writePack = false,
