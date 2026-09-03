@@ -90,7 +90,7 @@ struct PublicProfileURLPolicy: Equatable {
   init?(webBaseURL: URL) {
     guard webBaseURL.scheme?.lowercased() == "https",
           let host = webBaseURL.host?.lowercased(),
-          allowedHosts.contains(host),
+          Self.allowedHosts.contains(host),
           let profileRoot = Self.validatedProfileRoot(for: webBaseURL)
     else {
       return nil
