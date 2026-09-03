@@ -4,6 +4,7 @@ import { join } from 'node:path';
 import { chromium } from 'playwright';
 import {
   blockingCaptureRuntimeFailures,
+  buildCaptureArtifactPaths,
   validateCaptureManifest,
 } from './pr-visual-review.mjs';
 
@@ -112,9 +113,11 @@ try {
         }
       });
       const url = new URL(route, baseUrl).toString();
-      const safeRoute =
-        route.replace(/[^a-z0-9]+/gi, '-').replace(/^-|-$/g, '') || 'home';
-      const path = join(outDir, `${safeRoute}-${viewportName}.png`);
+      const { artifactPath, outputPath } = buildCaptureArtifactPaths({
+        outDir,
+        route,
+        viewportName,
+      });
       try {
         if (route.startsWith('/app/')) {
           const authEntryUrl = new URL(
@@ -192,11 +195,11 @@ try {
             `Captured route emitted runtime failures: ${JSON.stringify(blockingFailures)}`
           );
         }
-        await page.screenshot({ path, fullPage: true });
+        await page.screenshot({ path: outputPath, fullPage: true });
         manifest.push({
           route,
           viewport: viewportName,
-          path,
+          path: artifactPath,
           status: 'captured',
         });
       } catch (error) {
