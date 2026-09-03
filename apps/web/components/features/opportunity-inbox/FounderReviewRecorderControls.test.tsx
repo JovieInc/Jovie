@@ -78,47 +78,62 @@ function renderControls(
     <FounderReviewRecorderControls
       target={TARGET}
       sessionActive={false}
-      transcript=''
-      typedText=''
+      receipt={RECEIPT}
+      typedText=""
       keepAudio={false}
       allowContentUse={false}
+      audioState={null}
       saving={false}
-      error={null}
-      latestReceipt={null}
-      {...handlers}
       {...overrides}
+      {...handlers}
     />
   );
   return handlers;
 }
 
 describe('FounderReviewRecorderControls', () => {
-  it('starts a session from idle and reports the off-state', async () => {
-    const { onStart } = renderControls();
+  it('keeps approve/reject hidden while no session is active', () => {
+    renderControls();
 
-    expect(screen.getByText('Mic off')).toBeVisible();
-    const startButton = screen.getByRole('button', { name: 'Start Session' });
-    await userEvent.click(startButton);
-    expect(onStart).toHaveBeenCalledOnce();
+    expect(screen.queryByRole('button', { name: 'Approve' })).toBeNull();
+    expect(screen.queryByRole('button', { name: 'Reject' })).toBeNull();
   });
 
-  it('stops an active session and surfaces the live transcript', async () => {
-    const { onStop } = renderControls({
-      sessionActive: true,
-      transcript: 'Approve this one before the weekend drop.',
-    });
+  it('requires typed fallback text before approve is enabled', async () => {
+    const user = userEvent.setup();
+    const { onApprove } = renderControls({ sessionActive: true });
 
-    expect(screen.getByText('Recording this card')).toBeVisible();
-    expect(
-      screen.getByText(/Approve this one before the weekend drop/)
-    ).toBeVisible();
-    await userEvent.click(
-      screen.getByRole('button', { name: 'Stop And Save' })
+    const approve = screen.getByRole('button', { name: 'Approve' });
+    expect(approve).toBeDisabled();
+
+    await user.type(
+      screen.getByLabelText('Typed fallback or refinement'),
+      'Looks right'
     );
-    expect(onStop).toHaveBeenCalledOnce();
+
+    expect(approve).toBeEnabled();
+    await user.click(approve);
+    expect(onApprove).toHaveBeenCalledTimes(1);
   });
 
-  it('routes typed text and consent toggles through the parent handlers', async () => {
+  it('requires typed fallback text before reject is enabled', async () => {
+    const user = userEvent.setup();
+    const { onReject } = renderControls({ sessionActive: true });
+
+    const reject = screen.getByRole('button', { name: 'Reject' });
+    expect(reject).toBeDisabled();
+
+    await user.type(
+      screen.getByLabelText('Typed fallback or refinement'),
+      'Wrong target'
+    );
+
+    expect(reject).toBeEnabled();
+    await user.click(reject);
+    expect(onReject).toHaveBeenCalledTimes(1);
+  });
+
+  it('routes typed input through onTypedTextChange', async () => {
     const user = userEvent.setup();
     const { onTypedTextChange, onKeepAudioChange, onAllowContentUseChange } =
       renderControls();
@@ -127,73 +142,37 @@ describe('FounderReviewRecorderControls', () => {
     expect(onTypedTextChange).toHaveBeenCalledWith('x');
 
     await user.click(
-      screen.getByRole('checkbox', {
-        name: 'Keep private audio after saving',
-      })
+      screen.getByRole('checkbox', { name: 'Keep the recording' })
     );
     expect(onKeepAudioChange).toHaveBeenCalledWith(true);
 
     await user.click(
-      screen.getByRole('checkbox', {
-        name: 'Allow this material in future content',
-      })
+      screen.getByRole('checkbox', { name: 'Allow content use' })
     );
     expect(onAllowContentUseChange).toHaveBeenCalledWith(true);
   });
 
-  it('disables decisions while saving', () => {
-    renderControls({ saving: true });
-
-    expect(
-      screen.getByRole('button', { name: 'Saving Decision…' })
-    ).toBeDisabled();
-    expect(screen.getByRole('button', { name: 'Reject' })).toBeDisabled();
-  });
-
-  it('fires approve and reject when idle', async () => {
+  it('keeps the delete-audio action available when media exists', async () => {
     const user = userEvent.setup();
-    const { onApprove, onReject } = renderControls();
-
-    await user.click(screen.getByRole('button', { name: 'Approve' }));
-    expect(onApprove).toHaveBeenCalledOnce();
-
-    await user.click(screen.getByRole('button', { name: 'Reject' }));
-    expect(onReject).toHaveBeenCalledOnce();
-  });
-
-  it('surfaces errors via alert role', () => {
-    renderControls({
-      error: 'Microphone permission was denied. Typed notes still work.',
-    });
-    expect(screen.getByRole('alert')).toHaveTextContent(
-      'Microphone permission was denied'
-    );
-  });
-
-  it('shows the saved-receipt status without delete affordance for transcript-only reviews', () => {
-    renderControls({ latestReceipt: RECEIPT });
-
-    expect(
-      screen.getByText(/Saved · Refresh a weak YouTube thumbnail/)
-    ).toBeVisible();
-    expect(screen.queryByRole('button', { name: /Delete Audio/ })).toBeNull();
-  });
-
-  it('swaps the decision row for Save Brain Dump on founder-note targets', () => {
-    renderControls({
-      target: {
-        type: 'founder-note',
-        id: 'note-1',
-        title: 'Brain Dump',
-        sourceKind: 'founder.brain_dump',
-        category: 'suggestion',
+    const { onDeleteAudio } = renderControls({
+      sessionActive: true,
+      audioState: {
+        status: 'ready' as const,
+        url: 'blob:founder-review-audio',
+        byteSize: 2048,
       },
     });
 
-    expect(
-      screen.getByRole('button', { name: 'Save Brain Dump' })
-    ).toBeDisabled();
-    expect(screen.queryByRole('button', { name: 'Approve' })).toBeNull();
-    expect(screen.queryByRole('button', { name: 'Reject' })).toBeNull();
+    const del = screen.getByRole('button', { name: /delete audio/i });
+    expect(del).toBeEnabled();
+    await user.click(del);
+    expect(onDeleteAudio).toHaveBeenCalledTimes(1);
+  });
+
+  it('disables decision actions while a save is in flight', () => {
+    renderControls({ sessionActive: true, saving: true });
+
+    expect(screen.getByRole('button', { name: 'Approve' })).toBeDisabled();
+    expect(screen.getByRole('button', { name: 'Reject' })).toBeDisabled();
   });
 });
