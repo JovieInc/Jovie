@@ -1,4 +1,4 @@
-function parseOutput(output) {
+<mcp-tool-result vendor="github">function parseOutput(output) {
   if (output && typeof output === 'object') return output;
 
   try {
@@ -2618,7 +2618,9 @@ function assertPromptContextAccountSummary(output) {
     return fail('prompt did not include verified billing state');
   }
   if (
-    !/- \*\*AI Usage Today:\*\* 7 used, 93 remaining of 100/i.test(systemPrompt)
+    !/- \*\*AI Usage This Week:\*\* 7 used, 63 remaining of 70/i.test(
+      systemPrompt
+    )
   ) {
     return fail('prompt did not include deterministic usage summary');
   }
@@ -2664,7 +2666,7 @@ function assertPromptContextMissingAccountOmitted(output) {
     return fail('missing-account prompt included account access section');
   }
   if (
-    /Account Email|Billing Portal|Billing Verification|AI Usage Today/i.test(
+    /Account Email|Billing Portal|Billing Verification|AI Usage This Week/i.test(
       systemPrompt
     )
   ) {
@@ -5276,3 +5278,4 @@ module.exports = {
   assertToolResultShapeMatrix,
   assertEvalCaseInventoryCovered,
 };
+</mcp-tool-result>
