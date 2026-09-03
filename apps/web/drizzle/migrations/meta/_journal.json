@@ -687,6 +687,13 @@
       "when": 1787928766493,
       "tag": "0097_regular_mister_sinister",
       "breakpoints": true
+    },
+    {
+      "idx": 98,
+      "version": "7",
+      "when": 1788024658505,
+      "tag": "0096_hesitant_demogoblin",
+      "breakpoints": true
     }
   ]
 }
