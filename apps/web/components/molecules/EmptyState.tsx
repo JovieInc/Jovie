@@ -257,6 +257,8 @@ export function EmptyState({
     <output
       aria-labelledby={headingId}
       aria-describedby={description ? descriptionId : undefined}
+      data-content-state={variant === 'error' ? 'error' : 'empty'}
+      data-empty-state-presentation={presentation}
       data-testid={testId}
       className={cn(
         'flex flex-1 flex-col items-center justify-center px-3 py-10 text-center',
@@ -306,7 +308,7 @@ export function EmptyState({
       )}
 
       {hasActions && (
-        <div className='flex flex-col items-center gap-2 sm:flex-row sm:gap-3'>
+        <div className='flex max-w-full flex-col items-center gap-2 sm:flex-row sm:gap-3'>
           {actionSlot}
           {renderPrimaryAction()}
           {renderSecondaryAction()}

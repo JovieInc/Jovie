@@ -223,17 +223,31 @@ def probe(m, timeout=20, st=None, now=None):
     try:
         result = subprocess.run(argv, capture_output=True, text=True, timeout=timeout)
         out = (result.stdout or "") + "\n" + (result.stderr or "")
+        forbidden = [
+            str(value).lower()
+            for value in (m.get("probe_forbidden_patterns") or [])
+            if isinstance(value, str) and value
+        ]
+        if any(pattern in out.lower() for pattern in forbidden):
+            return False, "auth_or_runtime_failed"
         if _quota_signal(out):
             if st is not None:
                 mark_pool_exhausted(st, m.get("pool"), m.get("pool_cooldown_seconds") or m.get("cooldown_seconds") or 1800, now)
             return False, "pool_exhausted"
         if m.get("probe_mode") == "exit-zero":
             return (result.returncode == 0, "ready" if result.returncode == 0 else "probe_failed")
+        if m.get("probe_mode") == "json-model-key":
+            try:
+                payload = json.loads(result.stdout)
+                models = payload.get("models")
+            except (AttributeError, TypeError, ValueError, json.JSONDecodeError):
+                return False, "probe_invalid_json"
+            ready = result.returncode == 0 and isinstance(models, dict) and m["model"] in models
+            return ready, "ready" if ready else "model_unlisted"
+        if result.returncode != 0: return False, "probe_failed"
         if m["provider"] == "ollama" and m["model"] not in result.stdout: return False, "model_missing"
         if m["provider"] == "grok" and m["model"] not in result.stdout: return False, "model_unlisted"
         if m["provider"] == "codex" and "GEM_MODEL_READY" not in result.stdout: return False, "auth_or_runtime_failed"
-        if result.returncode != 0 and m["provider"] in {"cursor", "kimi"}:
-            return False, "probe_failed"
         return True, "ready"
     except Exception as e: return False, type(e).__name__
 
@@ -399,7 +413,11 @@ def main():
     v = sub.add_parser("validate"); v.add_argument("--config")
     args = ap.parse_args(); cfg, config_path = load(getattr(args, "config", None))
     if args.cmd == "probe":
-        print(json.dumps({m["id"]: {"ready": probe(m)[0], "reason": probe(m)[1]} for m in cfg["models"]}, indent=2)); return 0
+        results = {}
+        for model in cfg["models"]:
+            ready, reason = probe(model)
+            results[model["id"]] = {"ready": ready, "reason": reason}
+        print(json.dumps(results, indent=2)); return 0
     if args.cmd == "validate":
         print(json.dumps({"ok": True, "config": str(config_path), "models": len(cfg["models"])}, indent=2)); return 0
     print(json.dumps(choose(args.workflow, args.capability, args.allow_codex_exception, args.config, args.exclude_pool), indent=2)); return 0

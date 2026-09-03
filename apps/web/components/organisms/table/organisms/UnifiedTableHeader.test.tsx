@@ -29,6 +29,7 @@ function Harness({
     columnHelper.accessor('count', {
       header: 'Count',
       enableSorting: true,
+      meta: { align: 'right' },
     }),
     columnHelper.display({
       id: 'actions',
@@ -71,6 +72,11 @@ describe('UnifiedTableHeader', () => {
   it('renders a screen reader caption when provided', () => {
     render(<Harness />);
     expect(screen.getByText('Test table')).toBeInTheDocument();
+  });
+
+  it('uses the canonical table header row density', () => {
+    render(<Harness />);
+    expect(screen.getByRole('row')).toHaveClass('h-8');
   });
 
   it('renders sortable columns as buttons', () => {
@@ -131,6 +137,15 @@ describe('UnifiedTableHeader', () => {
       .getByRole('button', { name: /Count/ })
       .closest('th');
     expect(countHeader).toHaveAttribute('aria-sort', 'none');
+  });
+
+  it('applies column meta alignment to sortable header chrome', () => {
+    render(<Harness />);
+
+    const countButton = screen.getByRole('button', { name: /Count/ });
+    const countHeader = countButton.closest('th');
+    expect(countHeader).toHaveClass('text-right');
+    expect(countButton).toHaveClass('justify-end');
   });
 
   it('omits aria-sort on non-sortable columns', () => {

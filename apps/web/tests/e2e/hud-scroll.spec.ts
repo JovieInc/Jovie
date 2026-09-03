@@ -1,5 +1,6 @@
 import { expect, test } from '@playwright/test';
 import { APP_ROUTES } from '@/constants/routes';
+import type { HudMetrics } from '@/types/hud';
 import {
   assertBottomReachable,
   assertScrollable,
@@ -118,6 +119,92 @@ test.describe('HUD kiosk scroll regression', () => {
     await assertBottomReachable(page, 'hud-bottom-marker', {
       viewportHeight: 600,
     });
+  });
+});
+
+test.describe('Ovie CEO metric stability', () => {
+  test.use({ storageState: { cookies: [], origins: [] } });
+
+  test('keeps mobile row geometry fixed across fresh and degraded polls', async ({
+    page,
+  }) => {
+    // Intentional conditional skip: this geometry check needs the dev auth bypass
+    // to create an admin HUD session in local and CI environments. NOSONAR S1607
+    test.skip(
+      process.env.E2E_USE_TEST_AUTH_BYPASS !== '1',
+      'dev-auth bypass not enabled — set E2E_USE_TEST_AUTH_BYPASS=1'
+    ); // NOSONAR
+
+    await page.setViewportSize({ width: 390, height: 844 });
+    await page.addInitScript(() => {
+      const nativeSetInterval = globalThis.setInterval.bind(globalThis);
+      globalThis.setInterval = ((handler, timeout, ...args) =>
+        nativeSetInterval(
+          handler,
+          timeout === 30_000 ? 500 : timeout,
+          ...args
+        )) as typeof globalThis.setInterval;
+    });
+
+    let pollCount = 0;
+    await page.route('**/api/hud/metrics**', async route => {
+      const response = await route.fetch();
+      const metrics = (await response.json()) as HudMetrics;
+      const observedAtIso = new Date().toISOString();
+      pollCount += 1;
+      const degraded = pollCount > 1;
+      const nextMetrics: HudMetrics = {
+        ...metrics,
+        generatedAtIso: observedAtIso,
+        overview: {
+          ...metrics.overview,
+          mrrUsd: 5200,
+          activeSubscribers: 42,
+          balanceUsd: 100_000,
+          burnRateUsd: degraded ? 0 : 30_000,
+          runwayMonths: degraded ? null : 4,
+          defaultStatus: degraded ? 'unknown' : 'alive',
+          defaultStatusDetail: degraded
+            ? 'Mercury transaction window timed out.'
+            : 'Runway covers the profitability horizon with verified cash, recurring revenue, and a complete 30-day outflow window.',
+          financialDataAvailable: !degraded,
+        },
+        sources: {
+          ...metrics.sources,
+          stripe: {
+            ...metrics.sources.stripe,
+            state: 'ok',
+            fetchedAtIso: observedAtIso,
+          },
+          mercury: {
+            ...metrics.sources.mercury,
+            state: degraded ? 'degraded' : 'ok',
+            fetchedAtIso: observedAtIso,
+          },
+        },
+      };
+      await route.fulfill({ response, json: nextMetrics });
+    });
+
+    await page.goto(
+      `/api/dev/test-auth/enter?persona=admin&redirect=${encodeURIComponent(APP_ROUTES.HUD)}`
+    );
+    await page.waitForURL(/\/hud(?:\?|$)/, { timeout: 30_000 });
+
+    const company = page.getByTestId('ovie-core-metric-company-survival');
+    const nextMetric = page.getByTestId('ovie-core-metric-primary-outcome');
+    await expect(company).toHaveAttribute('data-state', 'fresh');
+    const freshCompanyBox = await company.boundingBox();
+    const freshNextBox = await nextMetric.boundingBox();
+    expect(freshCompanyBox).not.toBeNull();
+    expect(freshNextBox).not.toBeNull();
+
+    await expect(company).toHaveAttribute('data-state', 'degraded');
+    const degradedCompanyBox = await company.boundingBox();
+    const degradedNextBox = await nextMetric.boundingBox();
+
+    expect(degradedCompanyBox).toEqual(freshCompanyBox);
+    expect(degradedNextBox).toEqual(freshNextBox);
   });
 });
 

@@ -1,6 +1,10 @@
 import 'server-only';
 
 import { put } from '@vercel/blob';
+import {
+  getBlobCommandOptions,
+  isBlobStorageConfigured,
+} from '@/lib/blob-config';
 import { env } from '@/lib/env-server';
 import { logger } from '@/lib/utils/logger';
 
@@ -37,19 +41,22 @@ export async function uploadRetouchResult(params: {
 }): Promise<RetouchResultUpload> {
   const path = `retouch/${params.userId}/${params.jobId}/result.${extensionForMediaType(params.mediaType)}`;
 
-  if (!env.BLOB_READ_WRITE_TOKEN) {
+  if (!isBlobStorageConfigured()) {
     if (env.NODE_ENV === 'production') {
       throw new TypeError('Blob storage not configured');
     }
-    logger.warn('[retouch] Blob token missing; returning development URL', {
-      path,
-    });
+    logger.warn(
+      '[retouch] Blob storage not configured; returning development URL',
+      {
+        path,
+      }
+    );
     return { assetId: path, url: fallbackBlobUrl(path) };
   }
 
   const blob = await put(path, params.image, {
     access: 'public',
-    token: env.BLOB_READ_WRITE_TOKEN,
+    ...getBlobCommandOptions(),
     contentType: params.mediaType,
     cacheControlMaxAge: 60 * 60 * 24 * 365,
     addRandomSuffix: false,

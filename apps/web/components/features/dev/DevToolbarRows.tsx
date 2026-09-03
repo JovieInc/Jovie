@@ -1,7 +1,7 @@
+// @coverage-via apps/web/tests/unit/dev/DevToolbar.test.tsx
 'use client';
 
-import { Button } from '@jovie/ui';
-import * as Switch from '@radix-ui/react-switch';
+import { Button, Switch } from '@jovie/ui';
 import {
   type QueryClient,
   useQueryClient as useQueryClientBase,
@@ -157,15 +157,11 @@ export function FlagRow({
         flashing ? 'bg-accent/10' : ''
       }`}
     >
-      <Switch.Root
+      <Switch
         checked={checked}
         onCheckedChange={onCheckedChange}
-        className={`relative w-7 h-4 rounded-full transition-colors outline-none cursor-pointer shrink-0 ${
-          checked ? 'bg-accent' : 'bg-surface-3'
-        }`}
-      >
-        <Switch.Thumb className='block w-3 h-3 bg-white rounded-full transition-transform translate-x-0.5 data-[state=checked]:translate-x-3.5 shadow-sm dark:bg-white' />
-      </Switch.Root>
+        aria-label={`Override ${label}`}
+      />
       <span
         className={`flex-1 truncate ${isOverridden ? 'text-(--color-text-primary)' : 'text-(--color-text-tertiary)'}`}
       >

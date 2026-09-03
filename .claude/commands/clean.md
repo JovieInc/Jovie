@@ -125,8 +125,8 @@ gh pr create \
 EOF
 )"
 
-# Request GitHub native merge-queue enrollment
-gh pr edit --add-label merge-queue
+# Native GitHub merge queue enrollment. Do not add the retired merge-queue
+# label. Graphite and Cursor apps are uninstalled; autoenroll owns queue mutation.
 
 # Return to develop for next batch
 git checkout develop

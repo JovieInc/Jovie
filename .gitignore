@@ -31,6 +31,7 @@ scripts/backlog-orchestrator/shadow-report-latest.txt
 /coverage
 apps/web/coverage/
 packages/ui/coverage/
+apps/eve-pilot/coverage/
 
 # playwright
 /playwright-report/
@@ -213,6 +214,7 @@ apps/desktop/src/*
 !apps/desktop/src/ovie-door.ts
 !apps/desktop/src/operator-launch.ts
 !apps/desktop/src/summer-runtime-bridge.ts
+!apps/desktop/src/desktop-auto-update.ts
 !apps/desktop/src/build-identity.ts
 !apps/desktop/scripts/desktop-tray-contract.test.mjs
 !apps/desktop/scripts/
