@@ -1,10 +1,17 @@
 'use client';
 
+import type { AudioPlaybackSourceKind } from '@jovie/audio-contracts';
 import { useCallback, useEffect, useState } from 'react';
 
 export interface AudioTrackSource {
   readonly id: string;
   readonly title: string;
+  /**
+   * Typed provenance of the source. Identity is the (id, sourceKind) pair so
+   * equal ids from different surfaces (catalog track vs. chat upload preview)
+   * can never overwrite one another. Defaults to `catalog`.
+   */
+  readonly sourceKind?: AudioPlaybackSourceKind;
   /** Required when loading a new track; omit when resuming the same track. */
   readonly audioUrl?: string;
   /** ISRC code for the track — used to fetch a fresh preview URL if the stored one expires. */
@@ -20,8 +27,9 @@ export interface ToggleTrackOptions {
   readonly queue?: readonly AudioTrackSource[];
 }
 
-interface PlaybackState {
+export interface PlaybackState {
   readonly activeTrackId: string | null;
+  readonly sourceKind: AudioPlaybackSourceKind | null;
   readonly isPlaying: boolean;
   readonly playbackStatus: 'idle' | 'loading' | 'playing' | 'paused' | 'error';
   readonly lastErrorReason:
@@ -58,15 +66,39 @@ let _mediaSessionBound = false;
 /** ~4 Hz progress notify for cross-surface scrub without rAF thrash. */
 const PROGRESS_NOTIFY_MS = 250;
 
+function createAudioElement(): HTMLAudioElement {
+  const audio = new Audio();
+  audio.preload = 'metadata';
+  bindAudioEvents(audio);
+  return audio;
+}
+
 /** Lazily create the Audio element — safe to call during SSR (returns null server-side). */
 function getAudio(): HTMLAudioElement | null {
   if (typeof Audio === 'undefined') return null;
   if (!_audio) {
-    _audio = new Audio();
-    _audio.preload = 'metadata';
-    bindAudioEvents(_audio);
+    _audio = createAudioElement();
   }
   return _audio;
+}
+
+/**
+ * Give a new source exclusive ownership of browser media events.
+ *
+ * Clearing the prior element alone is insufficient: late events (`play`,
+ * `error`, `timeupdate`) from an already-loaded source can otherwise mutate
+ * the canonical singleton state after another source has taken authority.
+ */
+function replaceAudioElement(): HTMLAudioElement | null {
+  if (typeof Audio === 'undefined') return null;
+  const previousAudio = _audio;
+  const nextAudio = createAudioElement();
+  _audio = nextAudio;
+  if (previousAudio) {
+    previousAudio.pause();
+    previousAudio.src = '';
+  }
+  return nextAudio;
 }
 
 function isPlayableTrack(track: AudioTrackSource): boolean {
@@ -111,6 +143,7 @@ function getQueueTrackAt(index: number): AudioTrackSource | null {
 
 let state: PlaybackState = {
   activeTrackId: null,
+  sourceKind: null,
   isPlaying: false,
   playbackStatus: 'idle',
   lastErrorReason: null,
@@ -266,6 +299,7 @@ function handlePlaybackFailure(
   clearPlaybackQueue();
   setState({
     activeTrackId: null,
+    sourceKind: null,
     isPlaying: false,
     playbackStatus: 'error',
     lastErrorReason: reason,
@@ -282,7 +316,14 @@ function handlePlaybackFailure(
 }
 
 async function loadAndPlayTrack(track: AudioTrackSource): Promise<void> {
-  const audio = getAudio();
+  const sourceKind = track.sourceKind ?? 'catalog';
+  // Switching identity (id or provenance) hands a fresh element to the new
+  // source so the prior element's late events cannot leak into state.
+  const audio =
+    state.activeTrackId &&
+    (state.activeTrackId !== track.id || state.sourceKind !== sourceKind)
+      ? replaceAudioElement()
+      : getAudio();
   if (!audio) return;
 
   if (!track.audioUrl) {
@@ -297,6 +338,7 @@ async function loadAndPlayTrack(track: AudioTrackSource): Promise<void> {
   audio.src = track.audioUrl;
   setState({
     activeTrackId: track.id,
+    sourceKind,
     isPlaying: false,
     playbackStatus: 'loading',
     lastErrorReason: null,
@@ -338,7 +380,19 @@ function bindAudioEvents(el: HTMLAudioElement): void {
   // swallowed by the throttle when initialized to 0, dropping the first
   // progress update (surfaced as a shard-order-dependent unit test flake).
   let lastNotifiedAt = -Infinity;
-  el.addEventListener('timeupdate', () => {
+  // Only the element that currently holds authority may mutate state. A
+  // replaced element keeps emitting (pause/emptied/error) after hand-off.
+  const bindCurrentAudioEvent = (
+    event: keyof HTMLMediaElementEventMap,
+    handler: () => void
+  ) => {
+    el.addEventListener(event, () => {
+      if (_audio !== el) return;
+      handler();
+    });
+  };
+
+  bindCurrentAudioEvent('timeupdate', () => {
     // ~4 Hz keeps cross-surface scrub bars smooth without rAF thrash.
     const now =
       typeof performance !== 'undefined' ? performance.now() : Date.now();
@@ -350,20 +404,20 @@ function bindAudioEvents(el: HTMLAudioElement): void {
     });
   });
 
-  el.addEventListener('play', () =>
+  bindCurrentAudioEvent('play', () =>
     setState({
       isPlaying: true,
       playbackStatus: 'playing',
       lastErrorReason: null,
     })
   );
-  el.addEventListener('pause', () =>
+  bindCurrentAudioEvent('pause', () =>
     setState({
       isPlaying: false,
       playbackStatus: state.activeTrackId ? 'paused' : 'idle',
     })
   );
-  el.addEventListener('ended', () => {
+  bindCurrentAudioEvent('ended', () => {
     const nextIndex = _queueIndex + 1;
     const nextTrack = getQueueTrackAt(nextIndex);
     if (nextTrack) {
@@ -378,19 +432,19 @@ function bindAudioEvents(el: HTMLAudioElement): void {
       ...getQueueSnapshot(),
     });
   });
-  el.addEventListener('loadedmetadata', () => {
+  bindCurrentAudioEvent('loadedmetadata', () => {
     setState({
       duration: Number.isFinite(el.duration) ? el.duration : 0,
     });
   });
-  el.addEventListener('seeked', () => {
+  bindCurrentAudioEvent('seeked', () => {
     lastNotifiedAt = -Infinity; // invalidate throttle so next timeupdate fires
     setState({
       currentTime: el.currentTime,
       duration: Number.isFinite(el.duration) ? el.duration : 0,
     });
   });
-  el.addEventListener('error', () => {
+  bindCurrentAudioEvent('error', () => {
     // Guard: only handle errors when a track is actively loaded.
     // The audio element can fire stale error events (e.g., after tab
     // backgrounding/resuming) even when src is already cleared.
@@ -499,8 +553,9 @@ export function useTrackAudioPlayer() {
         _wasPlayingBeforeInterruption = false;
       }
 
-      // Same track — toggle pause/resume
-      if (state.activeTrackId === track.id) {
+      // Same source identity (id + provenance) — toggle pause/resume
+      const sourceKind = track.sourceKind ?? 'catalog';
+      if (state.activeTrackId === track.id && state.sourceKind === sourceKind) {
         if (audio.paused) {
           try {
             await audio.play();
@@ -552,6 +607,7 @@ export function useTrackAudioPlayer() {
     clearPlaybackQueue();
     setState({
       activeTrackId: null,
+      sourceKind: null,
       isPlaying: false,
       playbackStatus: 'idle',
       lastErrorReason: null,
