@@ -13,6 +13,10 @@ describe('HomepageV2FinalCta', () => {
     expect(
       screen.getByTestId('homepage-v2-final-cta-primary')
     ).toHaveTextContent('Get started');
+    expect(screen.getByTestId('homepage-v2-final-cta-primary')).toHaveAttribute(
+      'href',
+      '/start'
+    );
     expect(
       screen.queryByTestId('homepage-v2-final-cta-secondary')
     ).not.toBeInTheDocument();

@@ -70,7 +70,7 @@ const VALID_BRANCH_PROTECTION_REF = Object.freeze({
   minimumEntriesToMergeWaitTime: number,
 }} */
 const VALID_LIVE_QUEUE_CONFIGURATION = Object.freeze({
-  checkResponseTimeout: 60,
+  checkResponseTimeout: 3600,
   maximumEntriesToBuild: 3,
   maximumEntriesToMerge: 10,
   mergeMethod: 'SQUASH',
@@ -270,11 +270,12 @@ function workflowRunScript(workflow, name) {
 }
 
 function executeAdmissionScope({
-  path,
-  conclusion,
-  name,
+  path = null,
+  conclusion = null,
+  name = null,
   workflowEvent = 'pull_request',
   pullRequests = [],
+  pullRequestEvent = null,
 }) {
   const workflow = readRepoFile('.github/workflows/merge-queue-autoenroll.yml');
   const script = workflowRunScript(workflow, 'Resolve exact admission scope');
@@ -291,15 +292,17 @@ function executeAdmissionScope({
   chmodSync(ghPath, 0o755);
   writeFileSync(
     eventPath,
-    JSON.stringify({
-      workflow_run: {
-        path,
-        conclusion,
-        name,
-        event: workflowEvent,
-        head_sha: HEAD,
-      },
-    })
+    JSON.stringify(
+      pullRequestEvent ?? {
+        workflow_run: {
+          path,
+          conclusion,
+          name,
+          event: workflowEvent,
+          head_sha: HEAD,
+        },
+      }
+    )
   );
   writeFileSync(outputPath, '');
   try {
@@ -310,7 +313,7 @@ function executeAdmissionScope({
         encoding: 'utf8',
         env: {
           ...process.env,
-          EVENT_NAME: 'workflow_run',
+          EVENT_NAME: pullRequestEvent ? 'pull_request' : 'workflow_run',
           GITHUB_EVENT_PATH: eventPath,
           GITHUB_OUTPUT: outputPath,
           MANUAL_PR: '',
@@ -420,6 +423,24 @@ describe('merge queue backend resolution', () => {
       })
     ).rejects.toMatchObject({ code: 'native_mutation_unauthorized' });
     expect(runner).not.toHaveBeenCalled();
+  });
+
+  it('refuses a live drain without a dedicated GitHub App mutation token', () => {
+    const result = spawnSync('bash', ['scripts/drain-pr-queue.sh'], {
+      cwd: REPO_ROOT,
+      encoding: 'utf8',
+      env: {
+        ...process.env,
+        DRAIN_MUTATION_AUTHORIZATION: 'merge-queue-autoenroll',
+        GH_MUTATION_TOKEN: '',
+        GH_TOKEN: 'read-token-fixture',
+      },
+    });
+
+    expect(result.status).toBe(2);
+    expect(result.stderr).toContain(
+      'Refusing live drain without GH_MUTATION_TOKEN'
+    );
   });
 });
 
@@ -534,12 +555,21 @@ describe('queue workflow mutation safety', () => {
     );
     const scope = workflowStep(workflow, 'Resolve exact admission scope');
     const enroll = workflowStep(workflow, 'Enroll clean PRs');
+    const fleetPolicy = workflowStep(workflow, 'Evaluate fresh fleet policy');
     const drain = readRepoFile('scripts/drain-pr-queue.sh');
 
-    expect(workflow).toContain('types: [reopened, labeled, unlabeled]');
+    expect(workflow).toContain(
+      'types: [reopened, labeled, unlabeled, enqueued]'
+    );
     expect(workflow).not.toContain('ready_for_review, reopened');
 
+    expect(fleetPolicy).toContain('github-token: ${{ github.token }}');
     expect(scope).toContain('case "$EVENT_NAME" in');
+    expect(scope).toContain('GH_TOKEN: ${{ github.token }}');
+    expect(enroll).toContain('GH_TOKEN: ${{ github.token }}');
+    expect(enroll).toContain(
+      'GH_MUTATION_TOKEN: ${{ steps.app-token.outputs.token }}'
+    );
     expect(scope).toContain('pull_request)');
     expect(scope).toContain('workflow_run)');
     expect(scope).toContain('workflow_dispatch)');
@@ -586,9 +616,9 @@ describe('queue workflow mutation safety', () => {
     expect(drain).toContain(
       'UNMERGEABLE_EJECT_CONTEXT="jovie-native-unmergeable/v1"'
     );
-    expect(drain).toContain(
-      'qs: ($states[(.n | tostring)].mergeQueueEntry.state // null)'
-    );
+    expect(drain).toContain('qs: (.mergeQueueEntry.state // null)');
+    expect(drain).toContain('qp: (.mergeQueueEntry.position // null)');
+    expect(drain).toContain('select(.qp == 1)');
     expect(drain).toContain('unmergeable-eject');
     expect(drain).toContain('changelog-collision');
     expect(drain).toContain('changelog-inventory');
@@ -599,7 +629,7 @@ describe('queue workflow mutation safety', () => {
       'DEQUEUE (pre-land CHANGELOG.md → drain without CI bypass)'
     );
     expect(drain).toContain(
-      'classified skip; enroll is not a product-quality failure'
+      'queue-noop: classified-skip: exact admission #$DRAIN_ADMISSION_PR at $DRAIN_ADMISSION_HEAD'
     );
     expect(drain).toContain(
       '.state.mergeQueueEntry.position | type == "number" and floor == . and . > 0'
@@ -619,7 +649,7 @@ describe('queue workflow mutation safety', () => {
       'NO_AUTO_HOLD_JQ=\'. == "no-auto" or . == "no-auto-merge" or . == "no-automerge"\''
     );
     expect(drain).toContain(
-      '(.state.labels.nodes // []) | map(.name) | any(. == "needs-human" or . == "hold" or . == "gated" or . == "queue-deferred" or . == "needs-conflict-resolution" or . == "fast" or \'"$NO_AUTO_HOLD_JQ"\') | not'
+      '(.state.labels.nodes // []) | map(.name) | any(. == "queue-deferred" or . == "needs-conflict-resolution" or . == "fast" or \'"$NO_AUTO_HOLD_JQ"\') | not'
     );
     expect(drain).toContain(
       'queue-noop: missing receipt: exact admission #$DRAIN_ADMISSION_PR at $DRAIN_ADMISSION_HEAD'
@@ -683,6 +713,28 @@ describe('queue workflow mutation safety', () => {
         pr_number: '',
         head_sha: '',
         reconcile_queue_reentry: '0',
+      })
+    );
+  });
+
+  it('treats a native enqueued event as an exact-head continuation candidate', () => {
+    const outputs = executeAdmissionScope({
+      pullRequestEvent: {
+        action: 'enqueued',
+        pull_request: {
+          number: 16762,
+          base: { ref: 'main' },
+          head: { sha: HEAD },
+        },
+      },
+    });
+
+    expect(outputs).toEqual(
+      expect.objectContaining({
+        disposition: 'candidate',
+        reason: 'pull-request-exact-head',
+        pr_number: '16762',
+        head_sha: HEAD,
       })
     );
   });
@@ -857,11 +909,59 @@ describe('queue workflow mutation safety', () => {
       expect(job).not.toContain('secrets.GITHUB_TOKEN');
     }
     for (const step of [enroll, rebasePreflight, rebaseMutation]) {
-      expect(step).toContain('GH_TOKEN: ${{ steps.app-token.outputs.token }}');
       expect(step).not.toContain('secrets.GITHUB_TOKEN');
     }
+    expect(enroll).toContain('GH_TOKEN: ${{ github.token }}');
+    expect(enroll).toContain(
+      'GH_MUTATION_TOKEN: ${{ steps.app-token.outputs.token }}'
+    );
+    expect(rebasePreflight).toContain('GH_TOKEN: ${{ github.token }}');
+    expect(rebaseMutation).toContain(
+      'GH_TOKEN: ${{ steps.app-token.outputs.token }}'
+    );
     expect(enroll).toContain('if [[ "$MERGE_QUEUE_BACKEND" != "native" ]]');
     expect(enroll).toContain('bash scripts/drain-pr-queue.sh');
+    expect(enroll).toContain('EVENT_NAME: ${{ github.event_name }}');
+    expect(enroll).toContain(
+      "WORKFLOW_RUN_EVENT: ${{ github.event.workflow_run.event || '' }}"
+    );
+    expect(enroll).toContain('set +e');
+    expect(enroll).toContain('drain_rc=$?');
+    expect(enroll).toContain('product_pr_check=0');
+    expect(enroll).toContain('[[ "$EVENT_NAME" == "pull_request" ]]');
+    expect(enroll).toContain(
+      '[[ "$EVENT_NAME" == "workflow_run" && "$WORKFLOW_RUN_EVENT" == "pull_request" ]]'
+    );
+    expect(enroll).toContain(
+      'queue-noop is a controller disposition, not a product-quality failure'
+    );
+    expect(enroll).toContain("failure='dropped-controller-event'");
+    expect(enroll).toContain("failure='queue-noop'");
+    expect(enroll).toContain('[[ "$drain_rc" -eq 3 ]]');
+    expect(enroll).toContain('--arg failure "$failure"');
+    expect(enroll).toContain(
+      'delivery-control-failure dispatched for $failure'
+    );
+    expect(enroll).not.toContain("--arg failure 'queue-noop'");
+    expect(enroll).toContain(
+      'Cannot emit delivery-control-failure without exact PR/head'
+    );
+    expect(enroll).toContain(
+      'gh api --method POST "repos/$REPO/dispatches" --input -'
+    );
+    expect(enroll).toContain('event_type: "delivery-control-failure"');
+    expect(enroll).toContain('source: $source');
+    expect(enroll).toContain('failure: $failure');
+    expect(enroll).toContain('pr_number: ($pr_number | tonumber)');
+    expect(enroll).toContain('head_sha: $head_sha');
+    expect(enroll).toContain('GH_INVENTORY_RETRY_ATTEMPTS: 3');
+    expect(enroll).toContain('GH_INVENTORY_RETRY_MAX_DELAY: 15');
+    expect(enroll).toContain('dropped-controller-event fails closed');
+    expect(enroll).not.toContain('not failing the product PR check');
+    expect(enroll.indexOf('gh api --method POST')).toBeLessThan(
+      enroll.indexOf('dropped-controller-event fails closed')
+    );
+    expect(enroll).toContain('exit "$drain_rc"');
     expect(rebasePreflight).toContain(
       'if [[ "$MERGE_QUEUE_BACKEND" != "native" ]]'
     );
@@ -871,13 +971,41 @@ describe('queue workflow mutation safety', () => {
     expect(rebasePreflight).toContain(
       'MERGE_QUEUE_NATIVE_AUTHORIZATION: merge-queue-autoenroll'
     );
-    expect(rebasePreflight).toContain(
-      'GH_TOKEN: ${{ steps.app-token.outputs.token }}'
-    );
     expect(
-      drain.indexOf('node scripts/merge-queue-backend.mjs preflight')
+      drain.indexOf('node scripts/merge-queue-backend.mjs preflight >/dev/null')
     ).toBeLessThan(
-      drain.indexOf('node scripts/merge-queue-backend.mjs list-state')
+      drain.indexOf('inventory_native_queue_state "$DRAIN_ADMISSION_PR"')
+    );
+    expect(drain).toContain('SNAP (exact-head #$DRAIN_ADMISSION_PR)');
+    expect(drain).toContain(
+      'inventory_native_queue_state "$DRAIN_ADMISSION_PR"'
+    );
+    expect(drain).toContain('native_state_to_snap');
+    expect(drain).toContain('GH_INVENTORY_RETRY_ATTEMPTS:-3');
+    expect(drain).toContain('=== RETARGET (base must be main) ===');
+    expect(drain).toContain(
+      '(.n | type == "number") and (.base | type == "string") and .base != "main"'
+    );
+    expect(drain).not.toContain(
+      'SNAP="$(gh_retry pr list -R "$REPO" --state open --limit 200'
+    );
+    expect(readRepoFile('.claude/commands/drain.md')).toContain(
+      'Graphite and Cursor are gone'
+    );
+    expect(readRepoFile('.claude/commands/drain.md')).not.toContain(
+      '--add-label merge-queue'
+    );
+    expect(readRepoFile('.claude/commands/clean.md')).not.toContain(
+      '--add-label merge-queue'
+    );
+    expect(readRepoFile('.claude/commands/sonar-fix.md')).not.toContain(
+      '--add-label merge-queue'
+    );
+    expect(readRepoFile('scripts/merge-queue-backend.mjs')).toContain(
+      'const INVENTORY_PAGE_SIZE = 30'
+    );
+    expect(readRepoFile('scripts/merge-queue-backend.mjs')).toContain(
+      'pullRequests(first:${INVENTORY_PAGE_SIZE},after:$endCursor,states:OPEN)'
     );
     expect(rebaseMutation).toContain("DRAIN_REMEDIATE_MAX_PER_RUN: '24'");
     expect(remediator).toContain("DRAIN_REMEDIATE_MAX_PER_RUN ?? '24'");
@@ -1347,6 +1475,80 @@ describe('native live preflight', () => {
 });
 
 describe('native mutation actor boundary', () => {
+  it('reserves the App runner for actor proof and GraphQL mutations', async () => {
+    const readRunner = createNativeRunner({
+      states: [
+        prState(),
+        prState({
+          isInMergeQueue: true,
+          mergeQueueEntry: QUEUE_ENTRY,
+        }),
+      ],
+    });
+    const mutationRunner = createNativeRunner();
+
+    await expect(
+      enrollPullRequest(
+        nativeOptions(readRunner, {
+          expectedHeadOid: HEAD,
+          mutationRunner,
+        })
+      )
+    ).resolves.toMatchObject({ changed: true });
+
+    expect(invokedMutationActorCheck(readRunner)).toBe(false);
+    expect(invokedNativeMutation(readRunner)).toBe(false);
+    expect(invokedMutationActorCheck(mutationRunner)).toBe(true);
+    expect(invokedEnrollment(mutationRunner)).toBe(true);
+    expect(
+      mutationRunner.mock.calls.every(([args]) => {
+        const query = queryText(args);
+        return (
+          query.includes('MergeQueueNativeMutationActor') ||
+          query.includes('enablePullRequestAutoMerge')
+        );
+      })
+    ).toBe(true);
+  });
+
+  it('keeps dequeue reads on the workflow runner and mutations on the App runner', async () => {
+    const queued = prState({
+      isInMergeQueue: true,
+      mergeQueueEntry: QUEUE_ENTRY,
+      autoMergeRequest: AUTO_MERGE,
+    });
+    const autoMergeOnly = prState({
+      autoMergeRequest: AUTO_MERGE,
+    });
+    const readRunner = createNativeRunner({
+      states: [queued, autoMergeOnly, prState()],
+    });
+    const mutationRunner = createNativeRunner();
+
+    await expect(
+      dequeuePullRequest(
+        nativeOptions(readRunner, {
+          mutationRunner,
+        })
+      )
+    ).resolves.toMatchObject({ changed: true });
+
+    expect(invokedMutationActorCheck(readRunner)).toBe(false);
+    expect(invokedNativeMutation(readRunner)).toBe(false);
+    expect(invokedMutationActorCheck(mutationRunner)).toBe(true);
+    expect(invokedNativeMutation(mutationRunner)).toBe(true);
+    expect(
+      mutationRunner.mock.calls.every(([args]) => {
+        const query = queryText(args);
+        return (
+          query.includes('MergeQueueNativeMutationActor') ||
+          query.includes('dequeuePullRequest') ||
+          query.includes('disablePullRequestAutoMerge')
+        );
+      })
+    ).toBe(true);
+  });
+
   it('rejects an authorized CLI intent when GitHub identifies the Tim user', async () => {
     const runner = createNativeRunner({
       viewerPayload: { data: { viewer: { login: 'itstimwhite' } } },
@@ -1901,7 +2103,7 @@ describe('exact-head queue receipt proof', () => {
     const queuedAndHeld = prState({
       isInMergeQueue: true,
       mergeQueueEntry: QUEUE_ENTRY,
-      labels: { nodes: [{ name: 'needs-human' }] },
+      labels: { nodes: [{ name: 'queue-deferred' }] },
     });
     expect(hasAuthoritativeExactHeadQueueReceipt(queuedAndHeld, HEAD)).toBe(
       true
@@ -1909,7 +2111,7 @@ describe('exact-head queue receipt proof', () => {
     expect(canAcceptExactHeadQueueReceipt(queuedAndHeld, HEAD)).toBe(false);
     expect(explainExactHeadQueueReceipt(queuedAndHeld, HEAD)).toEqual({
       ok: false,
-      reason: 'held-by=needs-human',
+      reason: 'held-by=queue-deferred',
     });
 
     const runner = createNativeRunner({ states: [queuedAndHeld] });
@@ -1920,7 +2122,7 @@ describe('exact-head queue receipt proof', () => {
     ).resolves.toMatchObject({
       ok: false,
       attempts: 1,
-      explanation: { ok: false, reason: 'held-by=needs-human' },
+      explanation: { ok: false, reason: 'held-by=queue-deferred' },
     });
     expect(invokedEnrollment(runner)).toBe(false);
   });
@@ -2105,5 +2307,29 @@ describe('authoritative native state listing', () => {
     ).resolves.toMatchObject({
       99: { backend: 'native', queued: true, id: PR_ID },
     });
+  });
+
+  it('reads exact-target queue state for one PR instead of the whole fleet', async () => {
+    const queued = prState({
+      number: 16909,
+      isInMergeQueue: true,
+      mergeQueueEntry: QUEUE_ENTRY,
+    });
+    const runner = createNativeRunner({ states: [queued] });
+    await expect(
+      listPullRequestQueueStates({
+        ...nativeOptions(runner),
+        exactPullRequestNumber: 16909,
+      })
+    ).resolves.toMatchObject({
+      16909: { backend: 'native', queued: true, number: 16909 },
+    });
+    const queries = runner.mock.calls.map(call => queryText(call[0]));
+    expect(
+      queries.some(query => query.includes('MergeQueuePullRequestState'))
+    ).toBe(true);
+    expect(
+      queries.some(query => query.includes('MergeQueueOpenPullRequestStates'))
+    ).toBe(false);
   });
 });

@@ -498,7 +498,7 @@ function SectionPreview({ variant }: Readonly<{ variant: SectionVariant }>) {
     */
     <div
       className={cn(
-        'max-h-[360px] transform-gpu overflow-hidden rounded-lg border border-white/10 bg-(--linear-app-content-surface)',
+        'max-h-[360px] transform-gpu overflow-hidden rounded-lg border border-white/10 bg-(--app-shell-content-surface)',
         // Fixed-position headers contribute no height, so reserve room for
         // the floating glass pill (~54px) to keep the preview card visible.
         variant.category === 'header' && 'min-h-20'

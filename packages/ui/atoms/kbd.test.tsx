@@ -70,15 +70,15 @@ describe('Kbd', () => {
       expect(kbd.className).toContain('inline-flex');
       expect(kbd.className).toContain('items-center');
       expect(kbd.className).toContain('justify-center');
-      expect(kbd.className).toContain('rounded-(--linear-app-radius-item)');
+      expect(kbd.className).toContain('rounded-(--app-shell-radius-item)');
       expect(kbd.className).toContain('min-h-5');
       expect(kbd.className).toContain('min-w-5');
       expect(kbd.className).toContain('px-1.5');
       expect(kbd.className).toContain('py-px');
       expect(kbd.className).toContain('leading-none');
       expect(kbd.className).toContain('font-mono');
-      expect(kbd.className).toContain('text-[11px]');
-      expect(kbd.className).toContain('font-[510]');
+      expect(kbd.className).toContain('text-2xs');
+      expect(kbd.className).toContain('font-medium');
       expect(kbd.className).toContain('shadow-sm');
     });
 
@@ -90,7 +90,7 @@ describe('Kbd', () => {
       );
       const kbd = screen.getByTestId('kbd');
       expect(kbd.className).toContain('custom-class');
-      expect(kbd.className).toContain('rounded-(--linear-app-radius-item)');
+      expect(kbd.className).toContain('rounded-(--app-shell-radius-item)');
     });
   });
 

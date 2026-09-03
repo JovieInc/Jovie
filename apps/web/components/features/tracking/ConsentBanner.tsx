@@ -1,3 +1,4 @@
+// @coverage-via apps/web/tests/unit/design-system/linear-token-retire-jov-5465.test.ts
 'use client';
 
 import { X } from 'lucide-react';
@@ -94,7 +95,7 @@ export function ConsentBanner({ className }: ConsentBannerProps) {
         backgroundColor:
           'color-mix(in oklch, var(--linear-bg-surface-0) 95%, transparent)',
         borderTop: '1px solid var(--linear-border-subtle)',
-        boxShadow: 'var(--linear-shadow-card)',
+        boxShadow: 'var(--shadow-card)',
       }}
       aria-label='Cookie Consent'
     >
@@ -125,7 +126,7 @@ export function ConsentBanner({ className }: ConsentBannerProps) {
 
         <div
           className='flex items-center shrink-0'
-          style={{ gap: 'var(--linear-space-2)' }}
+          style={{ gap: 'var(--space-2)' }}
         >
           <button
             type='button'

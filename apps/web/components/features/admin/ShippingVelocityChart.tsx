@@ -3,7 +3,7 @@
 import { Button } from '@jovie/ui';
 
 import dynamic from 'next/dynamic';
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useId, useRef, useState } from 'react';
 import type {
   DailyBucket,
   ShippingVelocityResponse,
@@ -29,16 +29,24 @@ const RANGE_OPTIONS: Array<{ value: Range; label: string }> = [
 ];
 
 const SERIES_COLORS = {
-  merged: 'var(--color-accent)',
-  opened: 'var(--color-success)',
-  closed: 'var(--color-error)',
+  merged: 'var(--color-accent-blue)',
+  opened: 'var(--color-accent-purple)',
+  closed: 'var(--color-accent-gray)',
 } as const;
 
 const CHART_DOT_STROKE = 'var(--color-bg-surface-1)';
 const CHART_CURSOR_STROKE = 'var(--color-border-subtle)';
+const REFRESH_INTERVAL_MS = 2 * 60 * 1000;
+const AGE_TICK_INTERVAL_MS = 30 * 1000;
 
-function formatCachedAgo(cachedAt: string): string {
-  const diff = Date.now() - new Date(cachedAt).getTime();
+function cachedAtTimestamp(cachedAt: string | undefined): number | null {
+  if (!cachedAt) return null;
+  const timestamp = new Date(cachedAt).getTime();
+  return Number.isFinite(timestamp) ? timestamp : null;
+}
+
+function formatCachedAgo(cachedTimestamp: number, nowMs: number): string {
+  const diff = Math.max(0, nowMs - cachedTimestamp);
   const minutes = Math.floor(diff / 60000);
   if (minutes < 1) return 'just now';
   if (minutes === 1) return '1 min ago';
@@ -185,6 +193,7 @@ const LazyVelocityChart = dynamic(
               data={formatted}
               margin={{ top: 8, right: 8, left: 8, bottom: 0 }}
               onClick={onChartClick}
+              accessibilityLayer={false}
             >
               <defs>
                 <linearGradient id='mergedGradient' x1='0' y1='0' x2='0' y2='1'>
@@ -213,7 +222,7 @@ const LazyVelocityChart = dynamic(
                 cursor={{ stroke: CHART_CURSOR_STROKE, strokeWidth: 1 }}
               />
 
-              {/* Merged PRs — hero series (purple) */}
+              {/* Merged PRs — hero series */}
               <Area
                 type='monotone'
                 dataKey='merged'
@@ -233,12 +242,13 @@ const LazyVelocityChart = dynamic(
                 style={{ cursor: 'pointer' }}
               />
 
-              {/* Opened PRs — ghost green */}
+              {/* Opened PRs — dashed comparison series */}
               <Area
                 type='monotone'
                 dataKey='opened'
                 stroke={SERIES_COLORS.opened}
                 strokeWidth={1.5}
+                strokeDasharray='5 3'
                 fill='none'
                 dot={false}
                 activeDot={{
@@ -248,7 +258,7 @@ const LazyVelocityChart = dynamic(
                   strokeWidth: 2,
                   onClick: () => onLineClick('opened'),
                 }}
-                opacity={openedOpacity * 0.35}
+                opacity={openedOpacity * 0.55}
                 onClick={() => onLineClick('opened')}
                 style={{ cursor: 'pointer' }}
               />
@@ -260,6 +270,7 @@ const LazyVelocityChart = dynamic(
                   dataKey='closed'
                   stroke={SERIES_COLORS.closed}
                   strokeWidth={1.5}
+                  strokeDasharray='2 3'
                   fill='none'
                   dot={false}
                   activeDot={{
@@ -292,10 +303,14 @@ export function ShippingVelocityChart({
   initialRange = '7d',
   cachedAt: initialCachedAt,
 }: Readonly<ShippingVelocityChartProps>) {
-  const [range, setRange] = useState<Range>(initialRange);
+  const [requestedRange, setRequestedRange] = useState<Range>(initialRange);
+  const [displayedRange, setDisplayedRange] = useState<Range | null>(
+    initialData ? initialRange : null
+  );
   const [data, setData] = useState<DailyBucket[]>(initialData ?? []);
   const [cachedAt, setCachedAt] = useState<string | undefined>(initialCachedAt);
   const [isLoading, setIsLoading] = useState(!initialData);
+  const [isRefreshing, setIsRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [observation, setObservation] = useState<HudObservationState>(
     initialData
@@ -304,46 +319,164 @@ export function ShippingVelocityChart({
   );
   const [spotlight, setSpotlight] = useState<string | null>(null);
   const [showClosed, setShowClosed] = useState(false);
+  const [nowMs, setNowMs] = useState(() => Date.now());
+  const titleId = useId();
+  const summaryId = useId();
   const hasObservedRef = useRef(Boolean(initialData));
+  const shouldSkipInitialFetchRef = useRef(Boolean(initialData));
+  const requestSequenceRef = useRef(0);
+  const activeRequestRef = useRef<{
+    readonly controller: AbortController;
+    readonly requestId: number;
+  } | null>(null);
+  const initialCachedTimestamp = cachedAtTimestamp(initialCachedAt);
+  const lastRequestStartedAtRef = useRef<number | null>(
+    initialData
+      ? Math.min(Date.now(), initialCachedTimestamp ?? Date.now())
+      : null
+  );
 
-  const fetchData = useCallback(async (r: Range) => {
+  const fetchData = useCallback(async (rangeToFetch: Range) => {
+    const requestId = requestSequenceRef.current + 1;
+    requestSequenceRef.current = requestId;
+    activeRequestRef.current?.controller.abort();
+    const controller = new AbortController();
+    activeRequestRef.current = { controller, requestId };
+    lastRequestStartedAtRef.current = Date.now();
+
     if (!hasObservedRef.current) {
       setIsLoading(true);
+    } else {
+      setIsRefreshing(true);
     }
     setError(null);
+
+    const isActiveRequest = () =>
+      activeRequestRef.current?.requestId === requestId &&
+      !controller.signal.aborted;
+
     try {
       const response = await fetch(
-        `/api/admin/hud/shipping-velocity?range=${r}`
+        `/api/admin/hud/shipping-velocity?range=${rangeToFetch}`,
+        { signal: controller.signal }
       );
       if (!response.ok) {
         throw new Error(`Failed to fetch (${response.status})`);
       }
       const result = (await response.json()) as ShippingVelocityResponse;
+      if (!isActiveRequest()) return;
+      if (result.range !== rangeToFetch) {
+        throw new Error(
+          `Received ${result.range} data while loading ${rangeToFetch}`
+        );
+      }
       setData(result.data);
       setCachedAt(result.cachedAt);
+      setDisplayedRange(result.range);
+      setError(result.errorMessage ?? null);
       setObservation(
         result.observation ??
           observationFromShippingVelocityBuckets(result.data)
       );
       hasObservedRef.current = true;
     } catch (err) {
+      if (!isActiveRequest()) return;
       setError(
         err instanceof Error ? err.message : 'Could not load shipping data'
       );
       setObservation('unavailable');
     } finally {
-      setIsLoading(false);
+      if (activeRequestRef.current?.requestId === requestId) {
+        activeRequestRef.current = null;
+        setIsLoading(false);
+        setIsRefreshing(false);
+      }
     }
   }, []);
 
   // Fetch when range changes (but not on initial mount if initialData is provided)
   useEffect(() => {
-    if (initialData && range === initialRange) return;
-    fetchData(range).catch(() => {});
-  }, [range, fetchData, initialData, initialRange]);
+    if (shouldSkipInitialFetchRef.current) {
+      shouldSkipInitialFetchRef.current = false;
+      return;
+    }
+    fetchData(requestedRange).catch(() => {});
+  }, [requestedRange, fetchData]);
+
+  useEffect(() => {
+    let refreshTimer: ReturnType<typeof setTimeout> | null = null;
+    let ageTimer: ReturnType<typeof setInterval> | null = null;
+    let disposed = false;
+
+    const clearTimers = () => {
+      if (refreshTimer) clearTimeout(refreshTimer);
+      if (ageTimer) clearInterval(ageTimer);
+      refreshTimer = null;
+      ageTimer = null;
+    };
+
+    const scheduleRefresh = () => {
+      if (disposed || document.visibilityState !== 'visible') return;
+      const now = Date.now();
+      const lastStartedAt = lastRequestStartedAtRef.current;
+      const elapsed =
+        lastStartedAt === null ? REFRESH_INTERVAL_MS : now - lastStartedAt;
+      const delay = Math.max(0, REFRESH_INTERVAL_MS - elapsed);
+
+      refreshTimer = setTimeout(() => {
+        if (disposed || document.visibilityState !== 'visible') return;
+        fetchData(requestedRange).catch(() => {});
+        scheduleRefresh();
+      }, delay);
+    };
+
+    const activate = () => {
+      clearTimers();
+      if (disposed) return;
+      if (document.visibilityState !== 'visible') {
+        activeRequestRef.current?.controller.abort();
+        return;
+      }
+
+      const now = Date.now();
+      setNowMs(now);
+      ageTimer = setInterval(() => setNowMs(Date.now()), AGE_TICK_INTERVAL_MS);
+
+      const lastStartedAt = lastRequestStartedAtRef.current;
+      const activeRequest = activeRequestRef.current;
+      const needsInitialObservation =
+        !hasObservedRef.current &&
+        (activeRequest === null || activeRequest.controller.signal.aborted);
+      if (
+        needsInitialObservation ||
+        (lastStartedAt !== null && now - lastStartedAt >= REFRESH_INTERVAL_MS)
+      ) {
+        fetchData(requestedRange).catch(() => {});
+      }
+      scheduleRefresh();
+    };
+
+    document.addEventListener('visibilitychange', activate);
+    activate();
+
+    return () => {
+      disposed = true;
+      clearTimers();
+      document.removeEventListener('visibilitychange', activate);
+    };
+  }, [fetchData, requestedRange]);
+
+  useEffect(
+    () => () => {
+      requestSequenceRef.current += 1;
+      activeRequestRef.current?.controller.abort();
+      activeRequestRef.current = null;
+    },
+    []
+  );
 
   function handleRangeChange(newRange: Range) {
-    setRange(newRange);
+    setRequestedRange(newRange);
     setSpotlight(null);
   }
 
@@ -356,22 +489,44 @@ export function ShippingVelocityChart({
   }
 
   const handleRetry = () => {
-    fetchData(range).catch(() => {});
+    fetchData(requestedRange).catch(() => {});
   };
+  const cachedTimestamp = cachedAtTimestamp(cachedAt);
+  const isStale =
+    cachedTimestamp !== null && nowMs - cachedTimestamp >= REFRESH_INTERVAL_MS;
+  const freshnessLabel =
+    cachedTimestamp === null ? null : formatCachedAgo(cachedTimestamp, nowMs);
+  const retainedRangeMessage = displayedRange
+    ? requestedRange === displayedRange
+      ? `Showing last known ${displayedRange.toUpperCase()} velocity. ${error ?? 'Refresh failed.'}`
+      : `Showing last known ${displayedRange.toUpperCase()} velocity. ${requestedRange.toUpperCase()} refresh failed. ${error ?? ''}`.trim()
+    : (error ?? 'Shipping velocity is unavailable.');
   const showChart =
     observation !== 'not_configured' &&
     observation !== 'loading' &&
     !(observation === 'unavailable' && data.length === 0) &&
     observation !== 'empty';
+  const totals = data.reduce(
+    (sum, bucket) => ({
+      merged: sum.merged + bucket.merged,
+      opened: sum.opened + bucket.opened,
+      closed: sum.closed + bucket.closed,
+    }),
+    { merged: 0, opened: 0, closed: 0 }
+  );
+  const accessibleSummary = `${displayedRange?.toUpperCase() ?? requestedRange.toUpperCase()} shipping velocity: ${totals.merged} merged, ${totals.opened} opened, and ${totals.closed} closed without merge.`;
 
   return (
     <div className='p-4'>
       {/* Header row */}
       <div className='mb-3 flex items-center justify-between gap-3'>
         <div className='flex items-center gap-3'>
-          <p className='text-2xs font-semibold tracking-normal text-secondary-token'>
+          <h3
+            id={titleId}
+            className='text-2xs font-semibold tracking-normal text-secondary-token'
+          >
             Shipping Velocity
-          </p>
+          </h3>
           {/* Legend */}
           <div className='flex items-center gap-2.5'>
             <Button
@@ -380,6 +535,7 @@ export function ShippingVelocityChart({
               onClick={() => handleLineClick('merged')}
               className='h-auto flex items-center gap-1 opacity-80 transition-opacity hover:opacity-100 hover:bg-transparent'
               aria-label='Toggle Merged Series Spotlight'
+              aria-pressed={spotlight === 'merged'}
             >
               <span
                 className='block h-1 w-3 rounded-full'
@@ -393,6 +549,7 @@ export function ShippingVelocityChart({
               onClick={() => handleLineClick('opened')}
               className='h-auto flex items-center gap-1 opacity-80 transition-opacity hover:opacity-100 hover:bg-transparent'
               aria-label='Toggle Opened Series Spotlight'
+              aria-pressed={spotlight === 'opened'}
             >
               <span
                 className='block h-1 w-3 rounded-full'
@@ -407,6 +564,7 @@ export function ShippingVelocityChart({
               className='h-auto flex items-center gap-1 transition-opacity hover:opacity-100 hover:bg-transparent'
               style={{ opacity: showClosed ? 0.8 : 0.4 }}
               aria-label='Toggle Closed Series Visibility'
+              aria-pressed={showClosed}
             >
               <span
                 className='block h-1 w-3 rounded-full'
@@ -427,11 +585,11 @@ export function ShippingVelocityChart({
               size='sm'
               onClick={() => handleRangeChange(opt.value)}
               className={
-                range === opt.value
+                requestedRange === opt.value
                   ? 'h-auto rounded-md bg-surface-2 px-2.5 py-1 text-2xs font-semibold text-primary-token'
                   : 'h-auto rounded-md px-2.5 py-1 text-2xs font-medium text-tertiary-token transition-colors hover:text-secondary-token'
               }
-              aria-pressed={range === opt.value}
+              aria-pressed={requestedRange === opt.value}
             >
               {opt.label}
             </Button>
@@ -455,7 +613,7 @@ export function ShippingVelocityChart({
           <HudObservationStatus
             state='empty'
             message='No PRs in this period. Zero is shown only after a successful observation.'
-            freshnessLabel={cachedAt ? formatCachedAgo(cachedAt) : null}
+            freshnessLabel={freshnessLabel}
             testId='hud-shipping-velocity-observation'
           />
         </div>
@@ -464,40 +622,60 @@ export function ShippingVelocityChart({
           <HudObservationStatus
             state='unavailable'
             message={error ?? 'Shipping velocity is unavailable.'}
-            freshnessLabel={cachedAt ? formatCachedAgo(cachedAt) : null}
+            freshnessLabel={freshnessLabel}
             onRetry={handleRetry}
             testId='hud-shipping-velocity-observation'
           />
         </div>
       ) : showChart ? (
         <>
-          {observation === 'unavailable' ? (
-            <HudObservationStatus
-              state='unavailable'
-              message={`Showing last known velocity. ${error ?? 'Refresh failed.'}`}
-              freshnessLabel={cachedAt ? formatCachedAgo(cachedAt) : null}
-              onRetry={handleRetry}
-              testId='hud-shipping-velocity-observation'
+          <div className='min-h-14' data-testid='shipping-velocity-status-slot'>
+            {observation === 'unavailable' || observation === 'stale' ? (
+              <HudObservationStatus
+                state={observation}
+                message={
+                  observation === 'stale'
+                    ? (error ??
+                      'Refresh unavailable; showing last verified shipping velocity.')
+                    : retainedRangeMessage
+                }
+                freshnessLabel={freshnessLabel}
+                onRetry={handleRetry}
+                testId='hud-shipping-velocity-observation'
+              />
+            ) : null}
+          </div>
+          <figure
+            role='img'
+            aria-labelledby={titleId}
+            aria-describedby={summaryId}
+            data-testid='shipping-velocity-figure'
+          >
+            <LazyVelocityChart
+              data={data}
+              spotlight={spotlight}
+              onLineClick={handleLineClick}
+              onChartClick={handleChartClick}
+              showClosed={showClosed}
             />
-          ) : null}
-          <LazyVelocityChart
-            data={data}
-            spotlight={spotlight}
-            onLineClick={handleLineClick}
-            onChartClick={handleChartClick}
-            showClosed={showClosed}
-          />
+            <figcaption id={summaryId} className='sr-only'>
+              {accessibleSummary}
+            </figcaption>
+          </figure>
         </>
       ) : (
         <ChartSkeleton />
       )}
 
       {/* Footer */}
-      {cachedAt && !isLoading && !error ? (
-        <p className='mt-2 text-right text-3xs text-tertiary-token'>
-          Updated {formatCachedAgo(cachedAt)}
-        </p>
-      ) : null}
+      <div
+        className='mt-2 min-h-4 truncate text-right text-3xs text-tertiary-token'
+        data-testid='shipping-velocity-freshness'
+      >
+        {displayedRange && freshnessLabel && !isLoading
+          ? `${isRefreshing ? 'Refreshing' : 'Showing'} ${displayedRange.toUpperCase()} · Updated ${freshnessLabel}${isStale ? ' · Stale' : ''}`
+          : null}
+      </div>
     </div>
   );
 }

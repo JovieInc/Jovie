@@ -1,3 +1,4 @@
+// @coverage-via apps/web/tests/unit/design-system/linear-token-retire-jov-5465.test.ts
 'use client';
 
 import { useEffect, useRef, useState } from 'react';
@@ -118,7 +119,7 @@ export function DashboardLinksDemo() {
                     left: link.active ? 14 : 2,
                     backgroundColor: '#fff',
                     transition: 'left 0.2s',
-                    boxShadow: 'var(--linear-shadow-button)',
+                    boxShadow: 'var(--shadow-button)',
                   }}
                 />
               </div>

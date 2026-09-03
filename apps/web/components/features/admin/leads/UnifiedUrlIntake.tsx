@@ -44,9 +44,9 @@ export function UnifiedUrlIntake({ onSubmitted }: UnifiedUrlIntakeProps) {
       <ContentSectionHeader
         title='Unified URL intake'
         subtitle='Paste Linktree, Spotify, Instagram, Apple Music, or site URLs for one shared queue.'
-        className='min-h-0 px-(--linear-app-header-padding-x) py-3'
+        className='min-h-0 px-(--app-shell-header-padding-x) py-3'
       />
-      <div className='space-y-3 px-(--linear-app-content-padding-x) py-(--linear-app-content-padding-y)'>
+      <div className='space-y-3 px-(--app-shell-content-padding-x) py-(--app-shell-content-padding-y)'>
         <Textarea
           rows={5}
           value={input}

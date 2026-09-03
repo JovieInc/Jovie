@@ -75,7 +75,10 @@ export function ProfileEditPreviewCard({
       {
         profileId,
         field: preview.field,
-        newValue: resolvedNewValue,
+        newValue:
+          preview.field === 'bio' && typeof preview.newValue === 'string'
+            ? preview.newValue
+            : resolvedNewValue,
       },
       {
         onSuccess: () => {

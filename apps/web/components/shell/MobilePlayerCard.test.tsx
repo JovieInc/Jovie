@@ -32,11 +32,14 @@ describe('MobilePlayerCard', () => {
     );
     expect(screen.getByText('Lost in the Light')).toBeInTheDocument();
     expect(screen.getByText('Bahamas')).toBeInTheDocument();
-    expect(container.innerHTML).toContain('border-(--linear-app-frame-seam)');
+    expect(container.innerHTML).toContain('border-(--app-shell-frame-seam)');
     expect(container.innerHTML).toContain(
-      'bg-(--linear-app-content-surface)/70'
+      'bg-(--app-shell-content-surface)/70'
     );
     expect(container.innerHTML).not.toContain('border-white/10');
+    expect(
+      container.querySelector('[data-artwork-frame="thumbnail"]')
+    ).toBeInTheDocument();
   });
 
   it('shows the play label when not playing and pause when playing', () => {

@@ -1,8 +1,5 @@
 import { APP_ROUTES } from '@/constants/routes';
-import {
-  buildHomepageStartHref,
-  HOMEPAGE_REQUEST_ACCESS_STARTER_PROMPT,
-} from '@/data/homepageFrontDoorCta';
+import { PUBLIC_WAITLIST_URL } from '@/data/homepageFrontDoorCta';
 
 /**
  * Single shared CTA intent registry for public marketing surfaces.
@@ -29,7 +26,7 @@ export const MARKETING_CTA_INTENTS = {
   claimProfile: {
     id: 'claim-profile',
     label: 'Claim your profile',
-    href: buildHomepageStartHref(HOMEPAGE_REQUEST_ACCESS_STARTER_PROMPT),
+    href: PUBLIC_WAITLIST_URL,
     eventName: 'landing_cta_claim_profile',
     support: 'Free to start. No credit card.',
   },
@@ -51,11 +48,12 @@ export function buildClaimProfileStartHref(handle?: string): string {
     return MARKETING_CTA_INTENTS.claimProfile.href;
   }
 
-  const params = new URLSearchParams({
+  const destination = new URL(PUBLIC_WAITLIST_URL);
+  destination.search = new URLSearchParams({
     starter_prompt: `I want to claim jov.ie/${trimmed}.`,
     handle: trimmed,
-  });
-  return `${APP_ROUTES.START}?${params.toString()}`;
+  }).toString();
+  return destination.toString();
 }
 
 export function getClaimProfileIntent(): ClaimProfileCtaIntent {

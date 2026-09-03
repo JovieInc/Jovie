@@ -5,6 +5,10 @@
  * single-event blip from Upstash Redis REST pipeline latency during cold starts.
  * It is not an application defect and should not trigger autofix or performance alerts.
  *
+ * `Error: connect ECONNREFUSED /opt/vercel/ipc.sock` (JOV-5605) is Next.js
+ * `after()` / Vercel `waitUntil` talking to a missing helper socket. Not an
+ * application defect.
+ *
  * Opaque `{"error":{"name":"UpstashError"}}` titles are the JSON-stringified
  * form of an UpstashError whose `message` is non-enumerable (JOV-5182,
  * JOV-5183, JOV-5185, JOV-5186, JOV-5187, JOV-5209, JOV-5218, JOV-5220,
@@ -62,6 +66,15 @@ const SPOTIFY_RELEASE_CREDIT_BOUND_PATTERN =
 
 export const SPOTIFY_RELEASE_CREDIT_BOUND_IGNORE_ERRORS: ReadonlyArray<RegExp> =
   [SPOTIFY_RELEASE_CREDIT_BOUND_PATTERN];
+
+/**
+ * Next.js `after()` / Vercel `waitUntil` talking to a missing helper socket
+ * (JOV-5605). Not an application defect; the runtime cannot keep the
+ * function alive. Drop at capture and webhook so it does not file Linear.
+ */
+export const VERCEL_IPC_SOCK_IGNORE_ERRORS: ReadonlyArray<RegExp> = [
+  /connect ECONNREFUSED .*\/opt\/vercel\/ipc\.sock/,
+];
 
 function isSpotifyReleaseCreditBoundBag(value: unknown): boolean {
   if (!value || typeof value !== 'object') return false;
@@ -129,6 +142,16 @@ const UPSTASH_ERROR_JSON_BAG_TITLE = `Error: ${UPSTASH_ERROR_JSON_BAG}`;
 
 function normalize(value: string | null | undefined): string {
   return (value ?? '').trim().toLowerCase();
+}
+
+const VERCEL_IPC_SOCK_TITLE = 'connect econnrefused /opt/vercel/ipc.sock';
+
+function isVercelIpcSockText(value: string | null | undefined): boolean {
+  if (!value) return false;
+  if (VERCEL_IPC_SOCK_IGNORE_ERRORS.some(pattern => pattern.test(value))) {
+    return true;
+  }
+  return normalize(value).includes(VERCEL_IPC_SOCK_TITLE);
 }
 
 function isUpstashErrorJsonBagText(value: string | null | undefined): boolean {
@@ -327,4 +350,24 @@ export function isNonActionableUpstashIssue(
   issue: SentryIssueSummary
 ): boolean {
   return isUpstashQuotaNoise(issue.title);
+}
+
+/**
+ * True when a Sentry/Linear title is the JOV-5605 Vercel IPC socket refusal.
+ */
+export function isNonActionableVercelIpcIssue(
+  issue: SentryIssueSummary
+): boolean {
+  return isVercelIpcSockText(issue.title) || isVercelIpcSockText(issue.culprit);
+}
+
+/**
+ * True when a Sentry event is the JOV-5605 Vercel IPC socket refusal.
+ */
+export function isNonActionableVercelIpcEvent(
+  event: SentryExceptionLike
+): boolean {
+  return collectSentryEventCaptureValues(event).some(
+    value => typeof value === 'string' && isVercelIpcSockText(value)
+  );
 }

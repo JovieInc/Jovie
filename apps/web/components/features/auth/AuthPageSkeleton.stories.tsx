@@ -15,6 +15,9 @@ type Story = StoryObj<typeof AuthPageSkeleton>;
 export const SignIn: Story = {
   args: {
     formTitle: 'Sign in to Jovie',
+    showFormTitle: false,
+    layoutVariant: 'stack',
+    chrome: 'splash-b',
     footerPrompt: "Don't have access?",
     footerLinkText: 'Join the waitlist',
     footerLinkHref: '/waitlist',
@@ -24,6 +27,9 @@ export const SignIn: Story = {
 export const SignUp: Story = {
   args: {
     formTitle: 'Create your account',
+    showFormTitle: false,
+    layoutVariant: 'stack',
+    chrome: 'splash-b',
     footerPrompt: 'Already have an account?',
     footerLinkText: 'Sign in',
     footerLinkHref: '/signin',

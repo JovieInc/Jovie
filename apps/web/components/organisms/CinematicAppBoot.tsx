@@ -206,7 +206,7 @@ export function CinematicAppBoot({
           right: 12,
           bottom: 12,
           left: 12,
-          background: 'var(--linear-app-content-surface, #0F1011)',
+          background: 'var(--app-shell-content-surface, #0F1011)',
           border: '1px solid rgba(255, 255, 255, 0.045)',
           borderRadius: 14,
           boxShadow:
@@ -336,7 +336,7 @@ function CinematicSidebarStub() {
       style={{
         position: 'absolute',
         inset: 0,
-        background: 'var(--linear-app-sidebar-background, #0c0d0f)',
+        background: 'var(--app-shell-sidebar-background, #0c0d0f)',
         borderRight:
           '1px solid var(--linear-border-subtle, rgba(255,255,255,0.055))',
         display: 'flex',

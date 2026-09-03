@@ -193,6 +193,9 @@ describe('proxy composition (critical)', () => {
         'text/markdown; charset=utf-8'
       );
       expect(res.headers.get('vary')).toBe('Accept');
+      expect(res.headers.get('link')).toBe(
+        '</>; rel="alternate"; type="text/html"'
+      );
       await expect(res.text()).resolves.toContain('# ');
       expect(mocks.buildContentSecurityPolicy).not.toHaveBeenCalled();
     });

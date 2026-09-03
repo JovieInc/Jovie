@@ -21,10 +21,13 @@ Before implementation, write the following in the feature plan, issue, or PR
 description for every user-facing behavior change:
 
 1. **Primary task and direct action:** what the user is trying to finish, the
-   visible control that starts it, and the observable outcome. A frequent,
-   reversible action should complete from the current context in one direct
-   activation. An extra step needs a named reason, such as destructive impact,
-   missing information, or a platform-required permission.
+   visible control that starts it, and the observable outcome. A frequent action
+   normally completes end-to-end within two deliberate activations, and in one
+   when the input is already complete. Starting and finishing a capture may use
+   the two-activation budget. Three or more requires one named exception:
+   review, safety, ambiguity, irreversible impact, or recovery. The exception
+   reason must be visible or documented and covered by an executable interaction
+   contract or focused behavior test when the surface has a test substrate.
 2. **Context contract:** what focus, selection, text/caret, scroll position,
    and open context remain stable, and the explicit user action that may change
    each one.
@@ -199,19 +202,19 @@ export function MyComponent({ title, children, onAction }: MyComponentProps) {
 
 ### Surface Elevation Rules (Card/Background Consistency)
 
-The main content area (`<main>`) uses `bg-(--linear-app-content-surface)`, a dedicated shell canvas tone. In dark mode it must stay distinct from both recessed wells (`bg-surface-0`) and shared cards (`bg-surface-1`).
+The main content area (`<main>`) uses `bg-(--app-shell-content-surface)`, the shell-owned canvas tone. In dark mode it must stay distinct from both recessed wells (`bg-surface-0`) and shared cards (`bg-surface-1`).
 
 **Allowed patterns:**
 - Card on app-shell canvas parent → `bg-surface-1` for shared cards and panels
 - Recessed/"well" element inside the shell or a card → `bg-surface-0` (e.g., skeleton containers, empty states, input wells)
-- Sticky shell chrome (toolbars, table headers, shell frame) → `bg-(--linear-app-content-surface)`
+- Sticky shell chrome (toolbars, table headers, shell frame) → `bg-(--app-shell-content-surface)`
 - Card with elevation → `Card` component as-is (has `bg-surface-1 border border-subtle shadow-card`)
 - Nested card inside card → `bg-surface-0` for the inner element
-- Table/workspace routes → wrap the primary content in `DashboardWorkspacePanel` plus a bordered `LINEAR_SURFACE.contentContainer`; do not render route content directly on the shell canvas
+- Table/workspace routes → consume the shell-owned canvas by default. A nested bordered `LINEAR_SURFACE.contentContainer` canvas is allowed only when the screen declares `canvasOwner: 'screen'` in the app-screen canvas manifest (`apps/web/data/appScreens/canvas.ts`); undeclared nested canvases are rejected by the canvas-ownership guardrail
 
 **Banned patterns (will cause invisible cards):**
-- `bg-(--linear-app-content-surface)` on card-like elements inside the shell unless the element is shell chrome (toolbar/header/frame)
-- Table/task routes that place their main list or empty state directly on the shell canvas instead of inside a framed content container
+- `bg-(--app-shell-content-surface)` on card-like elements inside the shell unless the element is shell chrome (toolbar/header/frame)
+- Undeclared canvas-sized surfaces nested inside the shell canvas (for example, a second `LINEAR_SURFACE.contentContainer` without an app-screen canvas-manifest exception)
 - `bg-surface-1` on elements inside a `surface-1` parent WITHOUT border+shadow — same color on same color
 - `bg-surface-1/XX` (semi-transparent) — low opacity surface-1 on surface-1 parent is nearly invisible
 - `Card className='border-0 shadow-none'` — strips all elevation from a surface-1 card, making it invisible on surface-1 parent
@@ -227,6 +230,11 @@ selection, active navigation, links, or a named data category. Do not rotate
 accent colors between sections, ornament title text, or place decorative icons
 on colored squares. CTAs remain neutral high-contrast pills. Color never
 carries status alone.
+
+For Jovie-owned intentionally art-directed/generated brand imagery, use
+Scene Palette v1 from `apps/web/data/marketing/imageColorPolicy.ts`. The
+softened scene references are for set design, light, material, wardrobe, and
+prompt contracts only; they do not replace the shipped Noir Ion UI anchors.
 
 ### Do not fuck with art (founder-locked 2026-08-13)
 

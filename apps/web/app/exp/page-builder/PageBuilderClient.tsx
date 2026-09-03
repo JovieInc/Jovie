@@ -184,7 +184,7 @@ export function PageBuilderClient() {
       marketing sections their token/font context. `overflow-x-clip` (not
       `-hidden`) avoids creating a scroll container that would break sticky.
     */
-    <div className='page-builder-root system-b-marketing dark relative min-h-screen w-full overflow-x-clip bg-(--linear-app-content-surface)'>
+    <div className='page-builder-root system-b-marketing dark relative min-h-screen w-full overflow-x-clip bg-(--app-shell-content-surface)'>
       <Toolbar
         headerMode={headerMode}
         footerMode={footerMode}

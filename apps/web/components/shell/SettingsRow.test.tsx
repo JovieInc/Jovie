@@ -1,3 +1,5 @@
+import { readFileSync } from 'node:fs';
+import { resolve } from 'node:path';
 import { render, screen } from '@testing-library/react';
 import { describe, expect, it } from 'vitest';
 import { SettingsRow } from './SettingsRow';
@@ -48,5 +50,15 @@ describe('SettingsRow', () => {
     expect((container.firstElementChild as HTMLElement).className).toContain(
       'border-t'
     );
+  });
+});
+
+describe('JOV-5466 token retire', () => {
+  it('does not keep retired --linear-app-* tokens', () => {
+    const source = readFileSync(
+      resolve(__dirname, './SettingsRow.tsx'),
+      'utf8'
+    );
+    expect(source).not.toMatch(/--linear-app-/);
   });
 });

@@ -5,24 +5,44 @@ import { fileURLToPath } from 'url';
 
 const require = createRequire(import.meta.url);
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
+// Literal paths so the live-cert build stays bounded and statically analyzable.
+const LIVE_CERT_STORIES = [
+  '../../../packages/ui/atoms/badge.stories.tsx',
+  '../../../packages/ui/atoms/button.stories.tsx',
+  '../../../packages/ui/atoms/Card.stories.tsx',
+] as const;
 
-const config: StorybookConfig = {
-  stories: [
-    // Local story matrices (e.g. the surface-elevation visual-regression
-    // matrix, JOV-2156) that are not tied to a single component directory.
-    './stories/**/*.stories.@(js|jsx|ts|tsx|mdx)',
-    '../components/**/*.stories.@(js|jsx|ts|tsx|mdx)',
-    // packages/ui atoms — highest-reuse surface; must enter Chromatic/Storybook
-    // (Phase 2 visual-testing coverage; see docs/VISUAL_TESTING_POLICY.md).
-    '../../../packages/ui/**/*.stories.@(js|jsx|ts|tsx|mdx)',
-  ],
-  addons: [
+const FULL_CATALOG_STORIES = [
+  // Local story matrices (e.g. the surface-elevation visual-regression
+  // matrix, JOV-2156) that are not tied to a single component directory.
+  './stories/**/*.stories.@(js|jsx|ts|tsx|mdx)',
+  '../components/**/*.stories.@(js|jsx|ts|tsx|mdx)',
+  // packages/ui atoms — highest-reuse surface; must enter Chromatic/Storybook
+  // (Phase 2 visual-testing coverage; see docs/VISUAL_TESTING_POLICY.md).
+  '../../../packages/ui/**/*.stories.@(js|jsx|ts|tsx|mdx)',
+] as const;
+
+export function storybookAddonsForEnvironment(
+  isLiveStorybookCert = process.env.JOVIE_LIVE_STORYBOOK_CERT === '1'
+) {
+  return [
     '@storybook/addon-docs',
-    '@storybook/addon-a11y',
+    // The live cert runs its own pinned, fail-closed axe pass in the preview
+    // iframe. Keep Storybook's automatic scan for normal and scheduled builds,
+    // but omit it from this dedicated build so the two axe runs cannot race.
+    ...(isLiveStorybookCert ? [] : ['@storybook/addon-a11y']),
     '@storybook/addon-vitest',
     '@chromatic-com/storybook',
     '@storybook/addon-mcp',
-  ],
+  ];
+}
+
+const config: StorybookConfig = {
+  stories:
+    process.env.JOVIE_LIVE_STORYBOOK_CERT === '1'
+      ? [...LIVE_CERT_STORIES]
+      : [...FULL_CATALOG_STORIES],
+  addons: storybookAddonsForEnvironment(),
   framework: {
     name: '@storybook/nextjs-vite',
     options: {
@@ -32,19 +52,22 @@ const config: StorybookConfig = {
     },
   },
   docs: {},
-  typescript: {
-    check: true,
-    reactDocgen: 'react-docgen-typescript',
-    reactDocgenTypescriptOptions: {
-      shouldExtractLiteralValuesFromEnum: true,
-      propFilter: prop =>
-        prop.parent ? !/node_modules/.test(prop.parent.fileName) : true,
-      compilerOptions: {
-        allowSyntheticDefaultImports: true,
-        esModuleInterop: true,
-      },
-    },
-  },
+  typescript:
+    process.env.JOVIE_LIVE_STORYBOOK_CERT === '1'
+      ? { check: false, reactDocgen: false }
+      : {
+          check: true,
+          reactDocgen: 'react-docgen-typescript',
+          reactDocgenTypescriptOptions: {
+            shouldExtractLiteralValuesFromEnum: true,
+            propFilter: prop =>
+              prop.parent ? !/node_modules/.test(prop.parent.fileName) : true,
+            compilerOptions: {
+              allowSyntheticDefaultImports: true,
+              esModuleInterop: true,
+            },
+          },
+        },
   core: {
     disableTelemetry: true,
   },
@@ -357,7 +380,17 @@ const config: StorybookConfig = {
         }
 
         let bare: string | null = null;
-        if (normalized.includes('next/dist/compiled/react-dom')) {
+        // `next/dist/compiled/react-dom/client` contains `.../react-dom`, so
+        // the client path must win. Mapping it to bare `react-dom` drops
+        // createRoot and Storybook's react-18 shim throws in production.
+        if (
+          normalized.includes('next/dist/compiled/react-dom/client') ||
+          normalized.includes(
+            'next/dist/compiled/react-dom/cjs/react-dom-client'
+          )
+        ) {
+          bare = 'react-dom/client';
+        } else if (normalized.includes('next/dist/compiled/react-dom')) {
           bare = 'react-dom';
         } else if (
           normalized.includes('next/dist/compiled/react/jsx-dev-runtime')
@@ -378,6 +411,37 @@ const config: StorybookConfig = {
         if (!bare) return null;
 
         return this.resolve(bare, importer, { skipSelf: true });
+      },
+    };
+
+    // Production Rollup leaves React 19's CJS `react-dom/client` as
+    // `{ default: module.exports }`. Storybook's shim does
+    // `import * as ReactDOM from 'react-dom/client'` then `ReactDOM.createRoot`,
+    // which is undefined unless we re-export named bindings. Dev optimizeDeps
+    // already interops; this plugin is the production equivalent.
+    const reactDomClientPath = require.resolve('react-dom/client');
+    const reactDomClientInteropPlugin = {
+      name: 'jovie-storybook-react-dom-client-interop',
+      enforce: 'pre' as const,
+      resolveId(source: string) {
+        if (source === 'react-dom/client' || source === 'react-dom/client.js') {
+          return '\0jovie-react-dom-client';
+        }
+        return null;
+      },
+      load(id: string) {
+        if (id !== '\0jovie-react-dom-client') return null;
+        return `
+import * as ns from ${JSON.stringify(reactDomClientPath)};
+const client = ns.createRoot
+  ? ns
+  : ns.default?.createRoot
+    ? ns.default
+    : ns.default ?? ns;
+export const createRoot = client.createRoot.bind(client);
+export const hydrateRoot = client.hydrateRoot.bind(client);
+export default client;
+`;
       },
     };
 
@@ -403,6 +467,7 @@ const config: StorybookConfig = {
       });
     };
     config.plugins = [
+      reactDomClientInteropPlugin,
       rewriteNextReactPlugin,
       ...stripWorkflowPlugins(config.plugins),
     ] as typeof config.plugins;

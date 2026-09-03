@@ -1,6 +1,49 @@
+import { readFileSync } from 'node:fs';
+import { resolve } from 'node:path';
 import { render, screen } from '@testing-library/react';
 import { describe, expect, it } from 'vitest';
 import { StatusBadge } from '@/components/atoms/StatusBadge';
+
+const statusBadgeSourcePath = resolve(
+  __dirname,
+  '../../components/atoms/StatusBadge.tsx'
+);
+
+const STATUS_BADGE_GEOMETRY_DRIFT_FIXTURE_SOURCE = `
+const localStatusBadgeClassName = 'gap-2 px-4 py-2 text-sm';
+`;
+
+const STATUS_BADGE_GEOMETRY_DRIFT_TEST_ID =
+  'status-badge-geometry-drift-fixture';
+
+const STATUS_BADGE_ALLOWED_GEOMETRY_CLASSES = new Set(['shrink-0', 'min-w-0']);
+const STATUS_BADGE_LOCAL_GEOMETRY_PATTERN =
+  /\b(?:gap|p|px|py|pt|pb|pl|pr|h|min-h|max-h|w|min-w|space-[xy]|text)-(?:[a-z0-9.[\]/-]+)\b/;
+
+function quotedClassStrings(source: string): readonly string[] {
+  return [...source.matchAll(/'([^']+)'/g)].map(match => match[1]);
+}
+
+function auditStatusBadgeLocalGeometry(source: string): readonly string[] {
+  return quotedClassStrings(source).filter(
+    className =>
+      !STATUS_BADGE_ALLOWED_GEOMETRY_CLASSES.has(className) &&
+      STATUS_BADGE_LOCAL_GEOMETRY_PATTERN.test(className)
+  );
+}
+
+function StatusBadgeGeometryDriftFixture() {
+  return (
+    <span
+      data-deliberate-red=''
+      data-testid={STATUS_BADGE_GEOMETRY_DRIFT_TEST_ID}
+      className='gap-2 px-4 py-2 text-sm'
+      style={{ outline: '2px solid #ff0000' }}
+    >
+      Status
+    </span>
+  );
+}
 
 function getBadgeElement(text: string): HTMLElement {
   const label = screen.getByText(text);
@@ -87,27 +130,36 @@ describe('StatusBadge', () => {
       render(<StatusBadge>Medium</StatusBadge>);
       const badge = getBadgeElement('Medium');
 
-      expect(badge).toHaveClass('px-4');
-      expect(badge).toHaveClass('py-2');
-      expect(badge).toHaveClass('text-sm');
+      expect(badge).toHaveClass('px-2');
+      expect(badge).toHaveClass('py-0.5');
+      expect(badge).toHaveClass('text-xs');
+      expect(badge).toHaveClass('leading-5');
+      expect(badge).not.toHaveClass('px-4');
+      expect(badge).not.toHaveClass('py-2');
+      expect(badge).not.toHaveClass('text-sm');
     });
 
     it('renders small size', () => {
       render(<StatusBadge size='sm'>Small</StatusBadge>);
       const badge = getBadgeElement('Small');
 
-      expect(badge).toHaveClass('px-3');
-      expect(badge).toHaveClass('py-1');
-      expect(badge).toHaveClass('text-xs');
+      expect(badge).toHaveClass('px-1.5');
+      expect(badge).toHaveClass('py-0');
+      expect(badge).toHaveClass('text-3xs');
+      expect(badge).toHaveClass('leading-5');
+      expect(badge).not.toHaveClass('px-3');
     });
 
     it('renders large size', () => {
       render(<StatusBadge size='lg'>Large</StatusBadge>);
       const badge = getBadgeElement('Large');
 
-      expect(badge).toHaveClass('px-5');
-      expect(badge).toHaveClass('py-2.5');
-      expect(badge).toHaveClass('text-base');
+      expect(badge).toHaveClass('px-2.5');
+      expect(badge).toHaveClass('py-0.5');
+      expect(badge).toHaveClass('text-xs');
+      expect(badge).toHaveClass('leading-5');
+      expect(badge).not.toHaveClass('px-5');
+      expect(badge).not.toHaveClass('text-base');
     });
   });
 
@@ -182,8 +234,8 @@ describe('StatusBadge', () => {
 
       expect(badge).toHaveClass('inline-flex');
       expect(badge).toHaveClass('items-center');
-      expect(badge).toHaveClass('gap-2');
-      expect(badge).toHaveClass('rounded-full');
+      expect(badge).toHaveClass('gap-1');
+      expect(badge).toHaveClass('rounded-(--system-b-radius-pill)');
       expect(badge).toHaveClass('border');
       expect(badge).toHaveClass('font-medium');
     });
@@ -245,8 +297,8 @@ describe('StatusBadge', () => {
       expect(badge).toHaveClass('bg-surface-1');
       expect(badge).toHaveClass('border-success/20');
       expect(badge).toHaveClass('text-success');
-      expect(badge).toHaveClass('px-5');
-      expect(badge).toHaveClass('text-base');
+      expect(badge).toHaveClass('px-2.5');
+      expect(badge).toHaveClass('text-xs');
       expect(badge).toHaveClass('extra-class');
       expect(screen.getByText('✓')).toBeInTheDocument();
       expect(screen.getByText('Success')).toBeInTheDocument();
@@ -265,5 +317,36 @@ describe('StatusBadge', () => {
 
       expect(badge).toBeInTheDocument();
     });
+  });
+});
+
+describe('StatusBadge canonical geometry ownership', () => {
+  it('delegates size geometry to the canonical Badge atom', () => {
+    const source = readFileSync(statusBadgeSourcePath, 'utf8');
+
+    expect(source).not.toContain('STATUS_BADGE_SIZE_CLASSES');
+    expect(auditStatusBadgeLocalGeometry(source)).toEqual([]);
+
+    render(<StatusBadge size='lg'>Source-Backed</StatusBadge>);
+    const badge = getBadgeElement('Source-Backed');
+
+    expect(badge).toHaveClass('px-2.5', 'py-0.5', 'text-xs', 'leading-5');
+    expect(badge).not.toHaveClass('px-5', 'py-2.5', 'text-base');
+  });
+
+  it('rejects the deliberate local geometry drift fixture', () => {
+    expect(
+      auditStatusBadgeLocalGeometry(STATUS_BADGE_GEOMETRY_DRIFT_FIXTURE_SOURCE)
+    ).toEqual(['gap-2 px-4 py-2 text-sm']);
+
+    render(<StatusBadgeGeometryDriftFixture />);
+    const fixture = screen.getByTestId(STATUS_BADGE_GEOMETRY_DRIFT_TEST_ID);
+
+    expect(fixture).toHaveAttribute('data-deliberate-red', '');
+    expect(fixture.getAttribute('style') ?? '').toContain('#ff0000');
+    expect(fixture).toHaveClass('gap-2', 'px-4', 'py-2', 'text-sm');
+    expect(readFileSync(statusBadgeSourcePath, 'utf8')).not.toContain(
+      STATUS_BADGE_GEOMETRY_DRIFT_TEST_ID
+    );
   });
 });

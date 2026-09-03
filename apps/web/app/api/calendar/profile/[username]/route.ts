@@ -1,5 +1,5 @@
 import { eq } from 'drizzle-orm';
-import { after, type NextRequest, NextResponse } from 'next/server';
+import { type NextRequest, NextResponse } from 'next/server';
 import { db } from '@/lib/db';
 import { creatorProfiles } from '@/lib/db/schema/profiles';
 import { captureError } from '@/lib/error-tracking';
@@ -8,6 +8,7 @@ import {
   formatIcsTimestamp,
   sanitizeIcsUrl,
 } from '@/lib/ics/format';
+import { scheduleAfter } from '@/lib/next/schedule-after';
 import { getPublicProfileDiscoveryExclusionResponse } from '@/lib/profile/public-profile-discovery-response';
 import { apiLimiter, createRateLimitHeaders } from '@/lib/rate-limit';
 import { getConfirmedTourEventsForProfile } from '@/lib/tour-dates/queries';
@@ -175,7 +176,7 @@ export async function GET(
       },
     });
   } catch (error) {
-    after(() =>
+    scheduleAfter(() =>
       captureError('Per-artist ICS generation failed', error, {
         route: '/api/calendar/profile/[username]',
         username,

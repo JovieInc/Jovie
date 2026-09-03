@@ -6,7 +6,7 @@
  */
 
 import { headers } from 'next/headers';
-import { after, NextRequest, NextResponse } from 'next/server';
+import { NextRequest, NextResponse } from 'next/server';
 
 import {
   hashIP,
@@ -15,6 +15,7 @@ import {
   verifyTrackingToken,
 } from '@/lib/email/tracking';
 import { captureError } from '@/lib/error-tracking';
+import { scheduleAfter } from '@/lib/next/schedule-after';
 import { extractClientIP } from '@/lib/utils/ip-extraction';
 import { logger } from '@/lib/utils/logger';
 
@@ -78,7 +79,7 @@ export async function GET(request: NextRequest) {
         city,
       },
     };
-    after(async () => {
+    scheduleAfter(async () => {
       const result = await recordEngagement(engagementData);
       if (!result.success) {
         logger.error('[Email Open Track] Failed to record engagement', {

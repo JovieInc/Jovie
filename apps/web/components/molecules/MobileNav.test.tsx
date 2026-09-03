@@ -1,3 +1,5 @@
+import { readFileSync } from 'node:fs';
+import { resolve } from 'node:path';
 import { fireEvent, render, screen } from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { MobileNav } from './MobileNav';
@@ -45,5 +47,29 @@ describe('MobileNav', () => {
       '/start'
     );
     expect(document.body).toHaveStyle({ overflow: 'hidden' });
+  });
+
+  it('uses the canonical public login label when adding the mobile utility link', () => {
+    render(
+      <MobileNav
+        navLinks={[{ href: '/pricing', label: 'Pricing' }]}
+        publicCtaHref='/start'
+        publicCtaLabel='Find yourself'
+      />
+    );
+
+    fireEvent.click(screen.getByRole('button', { name: 'Open menu' }));
+
+    expect(screen.getByRole('link', { name: 'Log in' })).toHaveAttribute(
+      'href',
+      '/signin'
+    );
+    expect(screen.queryByRole('link', { name: 'Log In' })).toBeNull();
+  });
+
+  it('uses the canonical button shadow token', () => {
+    const source = readFileSync(resolve(__dirname, './MobileNav.tsx'), 'utf8');
+    expect(source).toContain('var(--shadow-button)');
+    expect(source).not.toContain('--linear-shadow-button');
   });
 });

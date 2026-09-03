@@ -1,5 +1,5 @@
 import { and, sql as drizzleSql, eq, isNull } from 'drizzle-orm';
-import { after, NextResponse } from 'next/server';
+import { NextResponse } from 'next/server';
 import { gateway, generateText } from '@/lib/ai/sdk';
 import { buildAiTelemetry } from '@/lib/ai/telemetry';
 import { getSessionContext } from '@/lib/auth/session';
@@ -14,6 +14,7 @@ import { db } from '@/lib/db';
 import { chatConversations, chatMessages } from '@/lib/db/schema/chat';
 import { captureError } from '@/lib/error-tracking';
 import { NO_CACHE_HEADERS } from '@/lib/http/headers';
+import { scheduleAfter } from '@/lib/next/schedule-after';
 import { logger } from '@/lib/utils/logger';
 import { getSessionErrorResponse } from '../../../session-error-response';
 
@@ -201,7 +202,7 @@ export async function POST(req: Request, { params }: RouteParams) {
     const titlePending = hasUserMessage && !conversation.title;
 
     if (titlePending) {
-      after(async () => {
+      scheduleAfter(async () => {
         try {
           await maybeGenerateTitle(conversationId, messagesToInsert, {
             userId: clerkUserId,

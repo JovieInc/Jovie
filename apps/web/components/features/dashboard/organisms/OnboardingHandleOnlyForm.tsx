@@ -41,7 +41,7 @@ function HandleSidebar() {
                 className={
                   step.id === 'handle'
                     ? 'h-4 w-4 shrink-0 rounded-full border border-primary-token bg-primary-token'
-                    : 'h-4 w-4 shrink-0 rounded-full border border-(--linear-app-frame-seam) bg-transparent'
+                    : 'h-4 w-4 shrink-0 rounded-full border border-(--app-shell-frame-seam) bg-transparent'
                 }
               />
               <span

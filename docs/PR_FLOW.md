@@ -111,6 +111,10 @@ before you open the PR (source: `.github/ci-harness/manifest.json` `riskRules`):
   the sole writer, and every mutation rechecks the live head, labels, base,
   queue depth, and native postcondition. Enrollment uses GitHub's native queue;
   `merge-queue` remains intent/audit evidence only. You don't merge by hand.
+  Each proven native enrollment emits a `pull_request: enqueued` continuation.
+  Its already-queued exact-head target is an idempotent no-op while the surviving
+  pass advances the next bounded cohort; when no eligible remainder exists, no
+  new enrollment event is created and the chain converges.
 - **The queue tolerates transient state.** A PR is only dequeued on a real merge
   conflict, `needs-conflict-resolution`, or a **terminal** failing check
   (`FAILURE`/`ERROR`/`TIMED_OUT`/`ACTION_REQUIRED`). A `pending`/`queued`/`cancelled`
@@ -129,6 +133,8 @@ queued after mutation. Hard-gated, conflicting, or terminal-red entries are
 dequeued through the native API and then have their audit label removed.
 Pending, queued, and cancelled check runs are not terminal failures, preventing
 dequeue/re-enroll loops during ordinary CI cancellation or main movement.
+An agent conflict that already carries `needs-conflict-resolution` is reported
+without repeating the same label mutation on every drain pass.
 When a merge-group run proves a classified product failure, Gem writes the
 bot-authored `jovie-queue-product-failure/v1` status before dequeue or admission
 refusal. That success status preserves source-head cleanliness while acting as
@@ -179,6 +185,16 @@ episode also pauses new intake until the writer and queue prove progress. This
 stop-line never disables native promotion, exact-head PR remediation, tests, or
 review; those are the mechanisms that recover closure health. The executable
 authority is `JOV-INV-011` in `canon/invariants.jsonl`.
+
+Draft stacks are a bounded exception with a four-layer maximum. A root must name
+an integrator, expose a promotion path through open exact-base parents, retain a
+clean ancestor chain, and carry an unexpired deadline no more than seven days
+after root creation. Any depth-five stack or missing/expired contract is red
+immediately: new intake stops while promotion and remediation remain live. The
+observer emits one idempotent `split-or-retarget-draft-stack` action per
+violating root through the existing delivery repair-task and No Unattended Red
+path. That receipt is consumed evidence only; it never mutates a pull request
+automatically. The executable stack contract is `JOV-INV-020`.
 
 ### Update Branch control-plane safety
 

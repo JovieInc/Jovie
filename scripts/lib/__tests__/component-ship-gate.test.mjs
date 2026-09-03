@@ -5,6 +5,8 @@ import { afterEach, describe, expect, it } from 'vitest';
 import {
   auditCoverageViaReceipts,
   checkChangedComponents,
+  resolveRenderedEvaluationSection,
+  runComponentShipGate,
 } from '../../component-ship-gate.mjs';
 import {
   checkStoryMatchesComponent,
@@ -39,6 +41,8 @@ function fixtureRepo(tree) {
   return root;
 }
 
+const BADGE_COMPONENT_REL = 'packages/ui/atoms/badge.tsx';
+const STORYBOOK_URL = 'http://127.0.0.1:6006';
 const LEGACY_COMPONENT_REL =
   'apps/web/components/marketing/legacy/LegacyPanel.tsx';
 const LEGACY_TEST_REL = 'apps/web/tests/unit/marketing/LegacyPanel.test.tsx';
@@ -48,7 +52,9 @@ const LEGACY_COMPONENT_SOURCE =
   'export interface LegacyPanelProps { readonly title: string }\n' +
   'export function LegacyPanel({ title }: LegacyPanelProps) { return <h2>{title}</h2> }';
 const LEGACY_TEST_SOURCE =
-  "import { LegacyPanel } from '@/components/marketing/legacy/LegacyPanel';\nvoid LegacyPanel;";
+  "import { render } from '@testing-library/react';\n" +
+  "import { LegacyPanel } from '@/components/marketing/legacy/LegacyPanel';\n" +
+  "render(<LegacyPanel title='Legacy' />);";
 const LEGACY_STORY_SOURCE =
   "import { LegacyPanel } from '@/components/marketing/legacy/LegacyPanel';\n" +
   "export const Legacy = { render: () => <LegacyPanel title='Legacy' /> };";
@@ -74,6 +80,29 @@ function legacyEvidenceResult({
     }
   );
 }
+
+/**
+ * @typedef {object} RenderedEvaluationTestResult
+ * @property {boolean} ok
+ * @property {number} status
+ * @property {{ ok: boolean, results?: unknown[] } | null} report
+ * @property {string} output
+ */
+
+/** @type {RenderedEvaluationTestResult} */
+const renderedPass = {
+  ok: true,
+  status: 0,
+  report: { ok: true, results: [] },
+  output: '{"ok":true}',
+};
+/** @type {RenderedEvaluationTestResult} */
+const renderedFailure = {
+  ok: false,
+  status: 1,
+  report: { ok: false, results: [] },
+  output: 'missing rendered contract',
+};
 
 describe('component-ship-policy scope', () => {
   it('includes shippable surfaces and excludes tests/stories/utils', () => {
@@ -216,6 +245,68 @@ describe('story match checks', () => {
 });
 
 describe('diff gate', () => {
+  it('honors an explicit null diffBase instead of re-resolving origin/main', () => {
+    // Regression for JOV-5454 contract failure: in CI origin/main is always
+    // present, so re-resolving an explicit opt-out turned into a diff scan
+    // against main and reported false missing-test/story issues for unrelated
+    // changed components. With an explicit null base and quality/ratchet
+    // skipped, the report must be green and skip the diff section.
+    const report = runComponentShipGate({
+      diffBase: null,
+      skipQuality: true,
+      skipRatchet: true,
+      skipRenderedCert: true,
+      skipLiveStorybook: true,
+    });
+    expect(report.ok).toBe(true);
+    expect(report.sections.diff.applicable).toBe(false);
+  });
+
+  it('still auto-resolves a base when diffBase is omitted', () => {
+    // When diffBase is not provided at all, the gate falls back to
+    // COMPONENT_SHIP_DIFF_BASE / origin/main. Pin an empty-diff ref so this
+    // 5s control stays isolated from large mechanical PRs (JOV-5466).
+    const previous = process.env.COMPONENT_SHIP_DIFF_BASE;
+    process.env.COMPONENT_SHIP_DIFF_BASE = 'HEAD';
+    try {
+      const report = runComponentShipGate({
+        skipQuality: true,
+        skipRatchet: true,
+        skipRenderedCert: true,
+        skipLiveStorybook: true,
+      });
+      expect(report.diffBase).toBe('HEAD');
+      expect(report.sections.diff.note).toBeUndefined();
+    } finally {
+      if (previous === undefined) {
+        delete process.env.COMPONENT_SHIP_DIFF_BASE;
+      } else {
+        process.env.COMPONENT_SHIP_DIFF_BASE = previous;
+      }
+    }
+  });
+
+  it('treats a resolved base with no in-scope changes as scanned but not applicable', () => {
+    // Regression for ci:f4bd9bc60a2c6c3c188d: screenshots/manifest-only PRs
+    // resolve a diff base yet contain no ship-scope component changes, so
+    // `applicable` is false even though the scan ran. `applicable` must never
+    // be conflated with "a base resolved" — only the skip note marks an
+    // explicit opt-out. Use HEAD...HEAD (empty) so the 5s control does not
+    // scan this PR against origin/main (JOV-5466).
+    const report = runComponentShipGate({
+      diffBase: 'HEAD',
+      skipQuality: true,
+      skipRatchet: true,
+      skipRenderedCert: true,
+      skipLiveStorybook: true,
+    });
+    expect(report.diffBase).toBe('HEAD');
+    expect(report.sections.diff.note).toBeUndefined();
+    expect(report.sections.diff.ok).toBe(true);
+    expect(report.sections.diff.applicable).toBe(false);
+    expect(report.sections.diff.changedComponents).toEqual([]);
+  });
+
   it('fails closed without test and story', () => {
     const root = fixtureRepo({
       'apps/web/components/atoms/NewThing.tsx':
@@ -263,7 +354,9 @@ describe('diff gate', () => {
         'export interface ProfileSignalProps { readonly label: string }\n' +
         'export function ProfileSignal({ label }: ProfileSignalProps) { return <span>{label}</span> }\n',
       [testRel]:
-        "import { ProfileSignal } from './ProfileSignal';\nvoid ProfileSignal;\n",
+        "import { render } from '@testing-library/react';\n" +
+        "import { ProfileSignal } from './ProfileSignal';\n" +
+        "render(<ProfileSignal label='Signal' />);\n",
       [storyRel]:
         "import { ProfileSignal } from './ProfileSignal';\n" +
         'export default { component: ProfileSignal };\n' +
@@ -278,6 +371,14 @@ describe('diff gate', () => {
       applicable: true,
       ok: true,
       changedComponents: [sourceRel],
+      componentStories: [
+        {
+          component: sourceRel,
+          story: storyRel,
+          storyName: null,
+          storyNames: [],
+        },
+      ],
     });
   });
 
@@ -300,7 +401,16 @@ describe('diff gate', () => {
   });
 
   it('accepts central evidence only for a changed legacy component', () => {
-    expect(legacyEvidenceResult().ok).toBe(true);
+    const accepted = legacyEvidenceResult();
+    expect(accepted.ok).toBe(true);
+    expect(accepted.componentStories).toEqual([
+      {
+        component: LEGACY_COMPONENT_REL,
+        story: LEGACY_STORY_REL,
+        storyName: 'Legacy',
+        storyNames: ['Legacy'],
+      },
+    ]);
 
     const unchangedTest = legacyEvidenceResult({ changedTest: false });
     expect(unchangedTest.ok).toBe(false);
@@ -434,6 +544,37 @@ describe('diff gate', () => {
     expect(result.ok).toBe(true);
   });
 
+  it('preserves every catalog story export that contributes coverage', () => {
+    const result = legacyEvidenceResult({
+      componentSource: [
+        'export interface LegacyPanelProps {',
+        '  readonly title: string;',
+        '  readonly subtitle: string;',
+        '}',
+        'export function LegacyPanel({ title, subtitle }: LegacyPanelProps) { return <section>{title}{subtitle}</section> }',
+      ].join('\n'),
+      storySource: [
+        "import { LegacyPanel } from '@/components/marketing/legacy/LegacyPanel';",
+        'export const TitleCoverage = {',
+        "  render: () => <LegacyPanel title='Title' />,",
+        '};',
+        'export const SubtitleCoverage = {',
+        "  render: () => <LegacyPanel subtitle='Subtitle' />,",
+        '};',
+      ].join('\n'),
+    });
+
+    expect(result.ok).toBe(true);
+    expect(result.componentStories).toEqual([
+      {
+        component: LEGACY_COMPONENT_REL,
+        story: LEGACY_STORY_REL,
+        storyName: 'TitleCoverage',
+        storyNames: ['TitleCoverage', 'SubtitleCoverage'],
+      },
+    ]);
+  });
+
   it('does not let one export exempt another export', () => {
     const result = legacyEvidenceResult({
       componentSource: [
@@ -458,6 +599,47 @@ describe('diff gate', () => {
     expect(result.issues.some(issue => issue.rule === 'missing-story')).toBe(
       true
     );
+  });
+});
+
+/**
+ * @param {Parameters<typeof resolveRenderedEvaluationSection>[0]} [options]
+ * @param {RenderedEvaluationTestResult} [response]
+ */
+// biome-ignore format: compact fixture keeps this source-PR under the hard size cap
+function renderedSection(options = {}, response = renderedPass) { const calls = []; const result = resolveRenderedEvaluationSection({ changedComponents: [BADGE_COMPONENT_REL], storybookUrl: STORYBOOK_URL, evaluateRendered: args => { calls.push(args); return response; }, ...options }); return { calls, result }; }
+
+describe('live rendered evaluation section', () => {
+  // biome-ignore format: compact matrix keeps this source-PR under the hard size cap
+  it.each([['empty', {}, true, { applicable: false, skipped: true }, renderedPass], ['advisory without Storybook', { storybookUrl: null }, true, { skipped: true }, renderedPass], ['required without Storybook', { requireRendered: true, storybookUrl: null }, false, { ok: false, skipped: true }, renderedPass], ['advisory failure', {}, true, { ok: false, status: 1 }, renderedFailure], ['required failure', { requireRendered: true }, false, { ok: false, status: 1 }, renderedFailure]])('handles %s', (_name, options, ok, section, response) => {
+    const result =
+      _name === 'empty'
+        ? resolveRenderedEvaluationSection()
+        : renderedSection(options, response).result;
+    expect(result).toMatchObject({ ok, section });
+  });
+
+  it('runs rendered evaluation for adjacent component evidence', () => {
+    const { calls, result } = renderedSection({
+      captureDir: '/tmp/component-evidence',
+    });
+    // biome-ignore format: compact assertion keeps this source-PR under the hard size cap
+    expect(calls).toEqual([{ storybookUrl: STORYBOOK_URL, captureDir: '/tmp/component-evidence', components: [BADGE_COMPONENT_REL], storyPaths: [], expectedFamilies: ['badge'] }]);
+    expect(result.section).toMatchObject({
+      ok: true,
+      required: false,
+      status: 0,
+    });
+  });
+
+  it('forwards deduped canonical catalog exports to rendered evaluation', () => {
+    const { calls } = renderedSection({
+      changedComponents: [LEGACY_COMPONENT_REL],
+      // biome-ignore format: compact fixture keeps this source-PR under the hard size cap
+      componentStories: [{ component: LEGACY_COMPONENT_REL, story: LEGACY_STORY_REL, storyName: 'Legacy' }, { component: LEGACY_COMPONENT_REL, story: LEGACY_STORY_REL, storyName: 'TitleCoverage', storyNames: ['TitleCoverage', 'SubtitleCoverage'] }],
+    });
+    // biome-ignore format: compact assertion keeps this source-PR under the hard size cap
+    expect(calls[0]).toMatchObject({ components: [], storyPaths: [`${LEGACY_STORY_REL}#Legacy`, `${LEGACY_STORY_REL}#TitleCoverage`, `${LEGACY_STORY_REL}#SubtitleCoverage`], expectedFamilies: ['LegacyPanel'] });
   });
 });
 
@@ -489,6 +671,17 @@ function coverageViaResult({
 }
 
 describe('coverage-via executable evidence', () => {
+  const viaImport = "import { ViaPanel } from '@/components/atoms/ViaPanel';";
+  const renderImport = "import { render } from '@testing-library/react';";
+
+  function expectInvalidCoverageVia(testSource) {
+    const result = coverageViaResult({ testSource });
+    expect(result.ok).toBe(false);
+    expect(
+      result.issues.some(issue => issue.rule === 'coverage-via-invalid')
+    ).toBe(true);
+  }
+
   it('rejects a deliberate-red commented basename as coverage-via evidence', () => {
     const result = coverageViaResult({
       testSource: [
@@ -503,14 +696,68 @@ describe('coverage-via executable evidence', () => {
     ).toBe(true);
   });
 
-  it('accepts an exact module import plus runtime use', () => {
+  it('accepts an exact module import plus render', () => {
     const result = coverageViaResult({
       testSource: [
+        "import { render } from '@testing-library/react';",
         "import { ViaPanel } from '@/components/atoms/ViaPanel';",
-        'void ViaPanel;',
+        'render(<ViaPanel />);',
       ].join('\n'),
     });
     expect(result.ok).toBe(true);
+  });
+
+  it.each([
+    ['a direct call', [viaImport, 'ViaPanel();'].join('\n')],
+    ['a direct construct', [viaImport, 'new ViaPanel();'].join('\n')],
+    [
+      'argument zero of an imported test renderer',
+      [renderImport, viaImport, 'render(ViaPanel);'].join('\n'),
+    ],
+    [
+      'argument zero of createRoot().render',
+      [
+        "import { createRoot } from 'react-dom/client';",
+        viaImport,
+        'createRoot(globalThis.document.createElement("div")).render(ViaPanel);',
+      ].join('\n'),
+    ],
+    [
+      'a wrapped createRoot().render consumer',
+      [
+        "import { createRoot } from 'react-dom/client';",
+        viaImport,
+        '(createRoot(globalThis.document.createElement("div")).render)(ViaPanel);',
+      ].join('\n'),
+    ],
+    [
+      'a namespaced React element factory followed by a renderer',
+      [
+        "import * as React from 'react';",
+        renderImport,
+        viaImport,
+        'render(React.createElement(ViaPanel));',
+      ].join('\n'),
+    ],
+    [
+      'a registered test helper',
+      [
+        renderImport,
+        viaImport,
+        'function renderReceipt() { render(<ViaPanel />); }',
+        "it('renders', renderReceipt);",
+      ].join('\n'),
+    ],
+    [
+      'a test.each callback',
+      [
+        renderImport,
+        viaImport,
+        "test.each([1])('renders %s', () => render(<ViaPanel />));",
+      ].join('\n'),
+    ],
+  ])('accepts %s as executable @coverage-via evidence', (_case, testSource) => {
+    expect(coverageViaResult({ testSource }).ok).toBe(true);
   });
 
   it('accepts an asserted exact source read through node:fs', () => {
@@ -525,14 +772,137 @@ describe('coverage-via executable evidence', () => {
     expect(result.ok).toBe(true);
   });
 
-  it('accepts a dynamic exact-module import plus runtime use', () => {
+  it('accepts an exact source read through a statically bound path', () => {
     const result = coverageViaResult({
       testSource: [
-        "const { ViaPanel } = await import('@/components/atoms/ViaPanel');",
-        'void ViaPanel;',
+        "import { readFileSync } from 'node:fs';",
+        "import { resolve } from 'node:path';",
+        "const sourcePath = 'components/atoms/ViaPanel.tsx';",
+        "const source = readFileSync(resolve(process.cwd(), sourcePath), 'utf8');",
+        "expect(source).toContain('ViaPanel');",
       ].join('\n'),
     });
     expect(result.ok).toBe(true);
+  });
+
+  it('accepts a dynamic exact-module import plus render', () => {
+    const result = coverageViaResult({
+      testSource: [
+        "import { render } from '@testing-library/react';",
+        "const { ViaPanel } = await import('@/components/atoms/ViaPanel');",
+        'render(<ViaPanel />);',
+      ].join('\n'),
+    });
+    expect(result.ok).toBe(true);
+  });
+
+  it.each([
+    ['import-only evidence', viaImport],
+    ['void evidence', [viaImport, 'void ViaPanel;'].join('\n')],
+    [
+      'assignment evidence',
+      [viaImport, 'const Comp = ViaPanel;', 'expect(Comp).toBeTruthy();'].join(
+        '\n'
+      ),
+    ],
+    [
+      'metadata evidence',
+      [viaImport, 'expect(ViaPanel).toBeDefined();'].join('\n'),
+    ],
+    ['unrendered JSX', [viaImport, 'const node = <ViaPanel />;'].join('\n')],
+    [
+      'a never-called render helper',
+      [
+        renderImport,
+        viaImport,
+        'function renderReceipt() { render(<ViaPanel />); }',
+      ].join('\n'),
+    ],
+    [
+      'a fake renderer',
+      [
+        viaImport,
+        'function render(Component) { return Component; }',
+        'render(ViaPanel);',
+      ].join('\n'),
+    ],
+    [
+      'a component passed as a non-path consumer argument',
+      [renderImport, viaImport, "render('not the component', ViaPanel);"].join(
+        '\n'
+      ),
+    ],
+    [
+      'wrong-argument source evidence',
+      [
+        "import { readFileSync } from 'node:fs';",
+        "import { resolve } from 'node:path';",
+        "const source = readFileSync('utf8', resolve(process.cwd(), 'components/atoms/ViaPanel.tsx'));",
+        "expect(source).toContain('ViaPanel');",
+      ].join('\n'),
+    ],
+  ])('rejects %s as inert @coverage-via evidence', (_case, testSource) => {
+    expectInvalidCoverageVia(testSource);
+  });
+
+  it.each([
+    [
+      'it.skip',
+      [
+        renderImport,
+        viaImport,
+        "it.skip('renders', () => render(<ViaPanel />));",
+      ],
+    ],
+    [
+      'test.skip',
+      [
+        renderImport,
+        viaImport,
+        "test.skip('renders', () => render(<ViaPanel />));",
+      ],
+    ],
+    [
+      'describe.skip',
+      [
+        renderImport,
+        viaImport,
+        "describe.skip('coverage', () => render(<ViaPanel />));",
+      ],
+    ],
+    [
+      'test.skip.each',
+      [
+        renderImport,
+        viaImport,
+        "test.skip.each([1])('renders %s', () => render(<ViaPanel />));",
+      ],
+    ],
+    [
+      'test.todo',
+      [
+        renderImport,
+        viaImport,
+        "test.todo('renders', () => render(<ViaPanel />));",
+      ],
+    ],
+  ])('rejects a render inside %s as inert @coverage-via evidence', (_case, testSource) => {
+    expectInvalidCoverageVia(testSource.join('\n'));
+  });
+
+  it('rejects a helper call from an unrelated shadowed scope', () => {
+    expectInvalidCoverageVia(
+      [
+        renderImport,
+        viaImport,
+        'function renderReceipt() { render(<ViaPanel />); }',
+        'function unrelated() {',
+        '  function renderReceipt() { return null; }',
+        '  renderReceipt();',
+        '}',
+        'unrelated();',
+      ].join('\n')
+    );
   });
 
   it('accepts an asserted join-of-literals node:fs read', () => {

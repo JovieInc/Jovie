@@ -128,7 +128,7 @@ function EditableBio({
       onKeyDown={handleKeyDown}
       maxLength={512}
       rows={4}
-      className='w-full resize-none rounded-lg border border-(--linear-app-frame-seam) bg-surface-0 px-3 py-2.5 text-xs leading-relaxed text-secondary-token placeholder:text-tertiary-token outline-none focus:border-interactive'
+      className='w-full resize-none rounded-lg border border-(--app-shell-frame-seam) bg-surface-0 px-3 py-2.5 text-xs leading-relaxed text-secondary-token placeholder:text-tertiary-token outline-none focus:border-interactive'
       placeholder='Write your bio...'
     />
   );
@@ -330,7 +330,7 @@ function PressPhotosSection({
 
       {/* First-import banner */}
       {draftPhotos.length > 0 && !bannerDismissed && (
-        <div className='relative rounded-lg border border-(--linear-app-frame-seam) bg-surface-1 px-3 py-2'>
+        <div className='relative rounded-lg border border-(--app-shell-frame-seam) bg-surface-1 px-3 py-2'>
           <Button
             variant='ghost'
             size='icon'
@@ -370,7 +370,7 @@ function PressPhotosSection({
             {draftPhotos.map(photo => (
               <div
                 key={photo.id}
-                className='group relative aspect-[4/5] overflow-hidden rounded-xl border border-dashed border-(--linear-app-frame-seam) bg-surface-0'
+                className='group relative aspect-[4/5] overflow-hidden rounded-xl border border-dashed border-(--app-shell-frame-seam) bg-surface-0'
               >
                 <Image
                   src={photo.smallUrl ?? photo.mediumUrl ?? photo.blobUrl ?? ''}
@@ -444,7 +444,7 @@ function PressPhotosSection({
             {otherStatusPhotos.map(photo => (
               <div
                 key={photo.id}
-                className='group relative aspect-[4/5] overflow-hidden rounded-xl border border-(--linear-app-frame-seam) bg-surface-0'
+                className='group relative aspect-[4/5] overflow-hidden rounded-xl border border-(--app-shell-frame-seam) bg-surface-0'
               >
                 <Image
                   src={photo.smallUrl ?? photo.mediumUrl ?? photo.blobUrl ?? ''}
@@ -490,7 +490,7 @@ function PressPhotosSection({
             {publishedPhotos.map(photo => (
               <div
                 key={photo.id}
-                className='group relative aspect-[4/5] overflow-hidden rounded-xl border border-(--linear-app-frame-seam) bg-surface-0'
+                className='group relative aspect-[4/5] overflow-hidden rounded-xl border border-(--app-shell-frame-seam) bg-surface-0'
               >
                 <Image
                   src={photo.smallUrl ?? photo.mediumUrl ?? photo.blobUrl ?? ''}
@@ -524,7 +524,7 @@ function PressPhotosSection({
             onClick={() => fileInputRef.current?.click()}
             disabled={!canUpload || isUploading}
             className={cn(
-              'relative flex aspect-[4/5] flex-col items-center justify-center gap-2 rounded-xl border border-dashed border-(--linear-app-frame-seam) bg-surface-0 px-3 text-center transition-colors',
+              'relative flex aspect-[4/5] flex-col items-center justify-center gap-2 rounded-xl border border-dashed border-(--app-shell-frame-seam) bg-surface-0 px-3 text-center transition-colors',
               canUpload
                 ? 'hover:border-default hover:bg-surface-1'
                 : 'cursor-not-allowed opacity-60'
@@ -546,7 +546,7 @@ function PressPhotosSection({
               </>
             ) : (
               <>
-                <div className='inline-flex h-9 w-9 items-center justify-center rounded-full border border-(--linear-app-frame-seam) bg-surface-1 text-secondary-token'>
+                <div className='inline-flex h-9 w-9 items-center justify-center rounded-full border border-(--app-shell-frame-seam) bg-surface-1 text-secondary-token'>
                   <ImagePlus className='h-4 w-4' />
                 </div>
                 <div className='space-y-0.5'>

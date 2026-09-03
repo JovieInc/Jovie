@@ -5,6 +5,7 @@ import { TABLE_EMPTY_STATE_MIN_HEIGHT_PX } from '../atoms/TableEmptyState';
 import { UnifiedTable } from './UnifiedTable';
 
 type TestRow = { id: string; name: string };
+type AlignedTestRow = TestRow & { count: number };
 
 const data: TestRow[] = [
   { id: 'one', name: 'One' },
@@ -16,6 +17,20 @@ const columns: ColumnDef<TestRow, unknown>[] = [
   {
     accessorKey: 'name',
     header: 'Name',
+  },
+];
+
+const alignedData: AlignedTestRow[] = [{ id: 'one', name: 'One', count: 42 }];
+
+const alignedColumns: ColumnDef<AlignedTestRow, unknown>[] = [
+  {
+    accessorKey: 'name',
+    header: 'Name',
+  },
+  {
+    accessorKey: 'count',
+    header: 'Count',
+    meta: { align: 'right' },
   },
 ];
 
@@ -169,5 +184,20 @@ describe('UnifiedTable keyboard interaction', () => {
     const spinner = screen.getByRole('status', { name: 'Loading More' });
     expect(spinner).toHaveAttribute('data-size', 'sm');
     expect(spinner).toHaveAttribute('data-tone', 'muted');
+  });
+
+  it('applies column meta alignment to rendered body cells', () => {
+    const { container } = render(
+      <UnifiedTable
+        data={alignedData}
+        columns={alignedColumns}
+        hideHeader
+        enableVirtualization={false}
+        getRowId={row => row.id}
+      />
+    );
+
+    const firstRowCells = container.querySelectorAll('tbody tr:first-child td');
+    expect(firstRowCells[1]).toHaveClass('text-right');
   });
 });

@@ -192,7 +192,7 @@ describe('Dialog', () => {
       expect(closeButton.className).toBe(closeButtonClassName);
       expect(closeButton.className).toContain('rounded-full');
       expect(closeButton.className).not.toContain(
-        'rounded-(--linear-app-radius-item)'
+        'rounded-(--app-shell-radius-item)'
       );
     });
 

@@ -1,13 +1,18 @@
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { render, screen } from '@testing-library/react';
+import { renderToStaticMarkup } from 'react-dom/server';
 import { describe, expect, it } from 'vitest';
+import { MarketingPricingPlans } from '@/components/features/pricing/MarketingPricingPlans';
 import { getVisibleMarketingPricingPlans } from '@/data/marketingPricingPlans';
 import { PricingRecipeBody } from './PricingRecipeBody';
 import { PRICING_RECIPE_STORY_REQUEST_ACCESS_COPY } from './PricingRecipeBody.stories';
 
 const paidPlans = getVisibleMarketingPricingPlans().filter(
   plan => plan.id !== 'free'
+);
+const proPlan = getVisibleMarketingPricingPlans().find(
+  plan => plan.id === 'pro'
 );
 const paidPlanName = paidPlans.length === 1 ? paidPlans[0]?.name : null;
 const expectedRequestAccessCopy = paidPlanName
@@ -58,6 +63,36 @@ describe('PricingRecipeBody', () => {
   it('keeps the story closing copy derived from exact production plan data', () => {
     expect(PRICING_RECIPE_STORY_REQUEST_ACCESS_COPY).toBe(
       expectedRequestAccessCopy
+    );
+  });
+
+  it('serializes the Pro plan, price, and signup intent before hydration', () => {
+    const markup = renderToStaticMarkup(
+      <PricingRecipeBody
+        requestAccessCopy={expectedRequestAccessCopy}
+        plans={
+          <MarketingPricingPlans mode='expanded' variant='tier-cards-neutral' />
+        }
+        comparisonChart={<div>Production comparison</div>}
+      />
+    );
+    const document = new DOMParser().parseFromString(
+      `<body>${markup}</body>`,
+      'text/html'
+    );
+    const proCard = document.querySelector(
+      '[data-testid="marketing-pricing-plan-pro"]'
+    );
+
+    expect(proPlan).toBeDefined();
+    expect(proCard).not.toBeNull();
+    expect(proCard?.textContent).toContain('Pro');
+    expect(proPlan?.price).toBeDefined();
+    expect(proCard?.textContent).toContain(proPlan?.price ?? '');
+    expect(proCard?.textContent).toContain('/mo');
+    expect(proCard?.textContent).toContain('Start Free Trial');
+    expect(proCard?.querySelector('a')?.getAttribute('href')).toBe(
+      '/signup?plan=pro'
     );
   });
 

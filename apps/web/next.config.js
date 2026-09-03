@@ -161,6 +161,15 @@ const nextConfig = {
       });
     }
 
+    // Vercel preview deployments back staging.jov.ie. Keep every preview
+    // response non-indexable even when route metadata is production-shaped.
+    if (isVercelPreview) {
+      securityHeaders.push({
+        key: 'X-Robots-Tag',
+        value: 'noindex, nofollow, noarchive, nosnippet',
+      });
+    }
+
     securityHeaders.push({
       key: 'Permissions-Policy',
       value: 'camera=(), microphone=(), geolocation=(self)',
@@ -212,16 +221,21 @@ const nextConfig = {
         source: '/api/health/:path*',
         headers: healthNoStoreHeaders,
       },
-      // Marketing pages (pre-rendered at build) - long-lived cache
+      // Homepage is content-negotiated (HTML vs Markdown). Do not mark it
+      // immutable: a year-long HTML object cannot safely mix with Accept.
       {
         source: '/',
         headers: [
           ...securityHeaders,
-          cacheHeaders.immutable,
+          cacheHeaders.revalidate,
           {
             key: 'Vary',
             value:
               'Accept, rsc, next-router-state-tree, next-router-prefetch, next-router-segment-prefetch',
+          },
+          {
+            key: 'Link',
+            value: '</>; rel="alternate"; type="text/markdown"',
           },
         ],
       },
@@ -255,14 +269,20 @@ const nextConfig = {
       },
       // Homepage content-negotiation: later rules win. Keep Accept on Vary
       // together with Next's RSC tokens so a prerendered HTML object cannot
-      // be reused for Accept: text/markdown at the CDN.
+      // be reused for Accept: text/markdown at the CDN. Link survives even
+      // when Next overwrites Vary with RSC-only tokens on the HTML shell.
       {
         source: '/',
         headers: [
+          cacheHeaders.revalidate,
           {
             key: 'Vary',
             value:
               'Accept, rsc, next-router-state-tree, next-router-prefetch, next-router-segment-prefetch',
+          },
+          {
+            key: 'Link',
+            value: '</>; rel="alternate"; type="text/markdown"',
           },
         ],
       },
@@ -652,6 +672,7 @@ function exposeBaseStaticConfigForTooling(config) {
 
   return Object.assign(config, {
     experimental: nextConfig.experimental,
+    headers: nextConfig.headers,
     images: nextConfig.images,
     redirects: nextConfig.redirects,
     rewrites: nextConfig.rewrites,

@@ -156,7 +156,10 @@ The `auto-pr-on-push.yml` workflow closes the handoff gap for agent branches
 (`codex/*`, `claude/*`, `codegen-bot/*`, `linear/*`) by creating a draft PR
 after a push. It enforces the same 5 open-agent-PR capacity cap before creating
 new draft PRs; downstream verification and agent pipeline jobs decide when a
-draft is ready and whether auto-merge is eligible.
+draft is ready and whether auto-merge is eligible. For provenance-authorized
+agent PRs, Auto-Ready immediately pairs the ready transition with native
+auto-merge intent while the first source CI flight is still pending. An
+unchanged `ready_for_review` event never launches another CI flight.
 
 <!-- ci-harness:start -->
 ## CI Agent Harness
@@ -179,7 +182,7 @@ Generated from `.github/ci-harness/manifest.json`. Do not hand-edit this block; 
 
 | Tier | Purpose | Merge-gate jobs |
 | --- | --- | --- |
-| Source Fast Gate | Cheap deterministic checks required on each source PR and repeated on the synthetic combined head. | `Path Changes` (both), `ci-fast` (both), `Secret Scan (gitleaks + trufflehog)` (both), `Golden Path Lock` (both), `Migration Guard` (both), `Unit Tests` (merge-group) |
+| Source Fast Gate | Cheap deterministic checks required on each source PR and repeated on the synthetic combined head. | `Path Changes` (both), `ci-fast` (both), `Secret Scan (gitleaks + trufflehog)` (both), `Golden Path Lock` (both), `Visual Snapshot Compare` (merge-group), `Migration Guard` (both), `Unit Tests` (merge-group) |
 | Structural Contract | Mechanical architecture, workflow, docs, and repo-rule checks. | `CI Risk Classifier` (both) |
 | Explicit Deep Evidence | Manual, scheduled, or event-driven deep evidence that never starts from or delays ordinary PR Ready. | none |
 | Preview Evidence | Hosted manual/event visual, a11y, performance, and preview evidence outside the source-PR event. | none |
@@ -199,6 +202,7 @@ Source `PR Ready` may require only `source-pr`/`both` jobs below. Merge-group `P
 | `CI Risk Classifier` | both | structural-contract | `pnpm ci:harness:check` |
 | `Secret Scan (gitleaks + trufflehog)` | both | fast-gate | `./scripts/security/scan-secrets.sh ci-pr origin/main` |
 | `Golden Path Lock` | both | fast-gate | `node scripts/golden-path-lock.mjs merge-gate` |
+| `Visual Snapshot Compare` | merge-group | fast-gate | `node scripts/visual-snapshot-compare.mjs compare` |
 | `Migration Guard` | both | fast-gate | `cd apps/web && ./scripts/check-migrations.sh && ./scripts/validate-migrations.sh` |
 | `Unit Tests` | merge-group | fast-gate | `pnpm --filter=@jovie/web run test:fast` |
 | `Build + Layout (combined)` | merge-group | combined-integration | `pnpm run build:web && pnpm --filter @jovie/web exec playwright test tests/e2e/hud-scroll.spec.ts --config=playwright.config.noauth.ts --project=chromium` |

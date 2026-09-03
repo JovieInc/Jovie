@@ -1,3 +1,5 @@
+import { readFileSync } from 'node:fs';
+import { resolve } from 'node:path';
 import { fireEvent, render, screen } from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { CookieActions } from '@/components/molecules/CookieActions';
@@ -8,6 +10,11 @@ import {
 } from '@/lib/cookies/banner-visibility';
 
 const mockPathname = vi.hoisted(() => vi.fn(() => '/'));
+const appRoot = resolve(__dirname, '../..');
+
+function readAppSource(relativePath: string): string {
+  return readFileSync(resolve(appRoot, relativePath), 'utf8');
+}
 
 vi.mock('next/navigation', () => ({
   usePathname: mockPathname,
@@ -96,6 +103,14 @@ describe('CookieActions', () => {
     expect(rejectAll).toHaveStyle({ borderRadius: 'var(--radius-sm)' });
     expect(customize).toHaveStyle({ borderRadius: 'var(--radius-sm)' });
   });
+
+  it('keeps standard action spacing on canonical design tokens', () => {
+    const source = readAppSource('components/molecules/CookieActions.tsx');
+    expect(source).toContain(
+      "const containerGap = compact ? '4px' : 'var(--space-2)'"
+    );
+    expect(source).not.toMatch(/--linear-(?:space|gap|container)-/);
+  });
 });
 
 describe('CookieBannerSection', () => {
@@ -174,7 +189,7 @@ describe('CookieBannerSection', () => {
     // Inner card surface matching upgrade compact + floating
     const card = banner.firstChild as HTMLElement;
     expect(card.className).toContain('rounded-2xl');
-    expect(card.className).toContain('border-(--linear-app-frame-seam)');
+    expect(card.className).toContain('border-(--app-shell-frame-seam)');
     expect(card.className).toContain('bg-surface-1');
     expect(card.className).toContain('shadow-card');
     // Compact actions always visible (no mobile Manage toggle)

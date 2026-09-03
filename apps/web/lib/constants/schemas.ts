@@ -42,14 +42,6 @@ export const SCHEMA_FRAGMENTS = {
       height: 512,
     },
   },
-  searchAction: {
-    '@type': 'SearchAction' as const,
-    target: {
-      '@type': 'EntryPoint' as const,
-      urlTemplate: `${BASE_URL}/search?q={search_term_string}`,
-    },
-    'query-input': 'required name=search_term_string',
-  },
   contactPoint: {
     '@type': 'ContactPoint' as const,
     contactType: 'customer support',
@@ -71,7 +63,9 @@ export function buildWebsiteSchema(overrides: {
     description: overrides.description,
     url: BASE_URL,
     inLanguage: 'en-US',
-    potentialAction: SCHEMA_FRAGMENTS.searchAction,
+    // Do not advertise a SearchAction until the public route accepts and
+    // serves search queries. A structured-data action is a real capability
+    // claim, not a placeholder for a future search page.
     publisher: { '@id': SCHEMA_IDS.organization },
   });
 }
@@ -97,7 +91,8 @@ export function buildSoftwareSchema(description: string) {
 export function buildOrganizationSchema(overrides: {
   legalName: string;
   description: string;
-  sameAs: string[];
+  /** Only include founder-confirmed public identity URLs. */
+  sameAs?: string[];
 }) {
   return jsonLd({
     '@context': 'https://schema.org',
@@ -109,7 +104,7 @@ export function buildOrganizationSchema(overrides: {
     logo: SCHEMA_FRAGMENTS.logo,
     image: `${BASE_URL}/og/default.png`,
     description: overrides.description,
-    sameAs: overrides.sameAs,
+    ...(overrides.sameAs?.length ? { sameAs: overrides.sameAs } : {}),
     contactPoint: SCHEMA_FRAGMENTS.contactPoint,
     foundingDate: '2024',
     additionalType: 'https://schema.org/SoftwareApplication',

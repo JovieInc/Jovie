@@ -194,7 +194,7 @@ async function queryFeaturedCreators(): Promise<FeaturedCreator[]> {
           id: a.id,
           handle: a.username,
           name: a.displayName || a.username,
-          src: transformImageUrl(a.avatarUrl || '/android-chrome-192x192.png', {
+          src: transformImageUrl(a.avatarUrl || '/avatars/default-user.png', {
             width: 256,
             height: 256,
             quality: 70,
@@ -324,7 +324,7 @@ async function queryCreatorByHandle(
       handle: creatorRow.username,
       name: creatorRow.displayName || creatorRow.username,
       src: transformImageUrl(
-        creatorRow.avatarUrl || '/android-chrome-192x192.png',
+        creatorRow.avatarUrl || '/avatars/default-user.png',
         {
           width: 256,
           height: 256,

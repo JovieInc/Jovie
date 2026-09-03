@@ -6,6 +6,10 @@
  * recipes before they become new design references.
  */
 import { type AppScreenArchetypeId, archetypeIdForScreen } from './archetypes';
+import {
+  type AppScreenCanvasContract,
+  appScreenCanvasContract,
+} from './canvas';
 
 export type AppScreenKind = 'canonical' | 'alias' | 'legacy' | 'operator';
 
@@ -78,6 +82,11 @@ export interface AppScreenRegistryEntry {
   readonly redirectTo: string | null;
   /** Present exactly when `designReference` is true. */
   readonly story: AppScreenStoryContract | null;
+  /**
+   * Canvas-ownership contract (jovie.app-screens.canvas/v1). Not projected
+   * into the Pen export receipt; the receipt shape stays byte-stable.
+   */
+  readonly canvas: AppScreenCanvasContract;
 }
 
 export const APP_SCREEN_COMPONENT_REGISTRY = [
@@ -625,6 +634,7 @@ export const APP_SCREEN_REGISTRY: readonly AppScreenRegistryEntry[] =
             componentIds: recipe.componentIds,
           }
         : null,
+      canvas: appScreenCanvasContract(source),
     };
   });
 

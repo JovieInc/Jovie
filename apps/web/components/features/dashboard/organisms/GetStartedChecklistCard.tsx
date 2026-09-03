@@ -223,7 +223,7 @@ export function GetStartedChecklistCard({
               className={`flex h-4.5 w-4.5 flex-shrink-0 items-center justify-center rounded-full border transition-colors ${
                 isDone
                   ? 'border-(--linear-accent) bg-(--linear-accent)'
-                  : 'border-subtle bg-(--linear-app-content-surface) hover:border-secondary-token'
+                  : 'border-subtle bg-(--app-shell-content-surface) hover:border-secondary-token'
               }`}
               aria-label={
                 isDone ? `Unmark ${item.label}` : `Mark ${item.label} as done`

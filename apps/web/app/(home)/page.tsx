@@ -8,6 +8,7 @@ import {
 import { HomepageClosedLoop } from '@/components/homepage/HomepageClosedLoop';
 import { HomepageHeroCommandCenter } from '@/components/homepage/HomepageHeroCommandCenter';
 import { HomepageMeetJovie } from '@/components/homepage/HomepageMeetJovie';
+import { HomepageNoScriptContent } from '@/components/homepage/HomepageNoScriptContent';
 import { HomepageTrackedLink } from '@/components/homepage/HomepageTrackedLink';
 import { HERO_COPY } from '@/components/homepage/intent';
 import {
@@ -15,7 +16,7 @@ import {
   MarketingElectricSeam,
   MarketingPosterHero,
 } from '@/components/marketing';
-import { APP_NAME, BASE_URL } from '@/constants/app';
+import { APP_NAME, BASE_URL, LEGAL_ENTITY_NAME } from '@/constants/app';
 import { HOMEPAGE_LAUNCH_COPY } from '@/data/homepageLaunchCopy';
 import {
   buildFaqSchema,
@@ -119,6 +120,9 @@ export async function generateMetadata(): Promise<Metadata> {
       languages: {
         'en-US': '/',
       },
+      types: {
+        'text/markdown': '/',
+      },
     },
     openGraph: {
       type: 'website',
@@ -188,10 +192,9 @@ const SOFTWARE_SCHEMA = buildSoftwareSchema(
 );
 
 const ORGANIZATION_SCHEMA = buildOrganizationSchema({
-  legalName: 'Jovie Technology Inc.',
+  legalName: LEGAL_ENTITY_NAME,
   description:
     'Jovie is an AI workspace for artists managing releases, assets, audience signal, and promotion.',
-  sameAs: ['https://instagram.com/meetjovie'],
 });
 
 const FAQ_SCHEMA = buildFaqSchema([...HOMEPAGE_LAUNCH_COPY.faq]);
@@ -285,6 +288,7 @@ function HomePageShell({ children }: { readonly children: React.ReactNode }) {
       <script type='application/ld+json'>{ORGANIZATION_SCHEMA}</script>
       <script type='application/ld+json'>{FAQ_SCHEMA}</script>
       {children}
+      <HomepageNoScriptContent />
     </>
   );
 }

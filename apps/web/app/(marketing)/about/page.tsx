@@ -3,7 +3,7 @@ import {
   ABOUT_FAQ_ITEMS,
   AboutPageContent,
 } from '@/components/organisms/AboutPageContent';
-import { APP_NAME, BASE_URL } from '@/constants/app';
+import { APP_NAME, BASE_URL, LEGAL_ENTITY_NAME } from '@/constants/app';
 import {
   buildBreadcrumbSchema,
   buildFaqSchema,
@@ -42,10 +42,9 @@ export const metadata: Metadata = {
 };
 
 const ORGANIZATION_SCHEMA = buildOrganizationSchema({
-  legalName: 'Jovie Technology Inc.',
+  legalName: LEGAL_ENTITY_NAME,
   description:
     'Jovie is the release platform for independent musicians, combining smart links, artist profiles, audience insights, paid release notifications, and AI support.',
-  sameAs: ['https://instagram.com/meetjovie'],
 });
 
 const FAQ_SCHEMA = buildFaqSchema([...ABOUT_FAQ_ITEMS]);

@@ -24,7 +24,31 @@ function statusContext(status) {
     __typename: 'StatusContext',
     context: status.context,
     state: upper(status.state),
+    description: status.description ?? '',
+    targetUrl: status.target_url ?? '',
+    creator: status.creator
+      ? { login: status.creator.login ?? '', type: status.creator.type ?? '' }
+      : null,
     startedAt: status.created_at,
+    createdAt: status.created_at,
+  };
+}
+
+function graphqlStatusContext(status) {
+  return {
+    __typename: 'StatusContext',
+    context: status.context,
+    state: upper(status.state),
+    description: status.description ?? '',
+    targetUrl: status.targetUrl ?? '',
+    creator: status.creator
+      ? {
+          login: status.creator.login ?? '',
+          type: status.creator.__typename ?? '',
+        }
+      : null,
+    startedAt: status.createdAt,
+    createdAt: status.createdAt,
   };
 }
 
@@ -37,6 +61,15 @@ export function normalizeRestPullRequest(detail, statusCheckRollup) {
     createdAt: detail.created_at,
     updatedAt: detail.updated_at,
     isDraft: detail.draft === true,
+    autoMergeRequest: detail.auto_merge
+      ? {
+          enabledAt: detail.auto_merge.enabled_at ?? null,
+          enabledBy: detail.auto_merge.enabled_by
+            ? { login: detail.auto_merge.enabled_by.login ?? '' }
+            : null,
+          mergeMethod: upper(detail.auto_merge.merge_method ?? ''),
+        }
+      : null,
     mergeable: mergeableValue(detail.mergeable),
     mergeStateStatus: upper(detail.mergeable_state || 'UNKNOWN'),
     baseRefName: detail.base?.ref ?? '',
@@ -94,6 +127,61 @@ async function fetchCompleteCollection({
       throw new Error(`REST ${label} for PR #${prNumber} were incomplete`);
     }
   }
+}
+
+export async function hydrateOpenPrStatusContexts({
+  repo,
+  prs,
+  request,
+  includeStatuses = _pr => true,
+  batchSize = 40,
+}) {
+  if (!Number.isSafeInteger(batchSize) || batchSize < 1 || batchSize > 50) {
+    throw new Error('status hydration batchSize must be between 1 and 50');
+  }
+  const [owner, name] = repo.split('/');
+  if (!owner || !name) throw new Error('repo must be OWNER/NAME');
+  const hydrated = prs.map(pr => ({ ...pr, statusCheckRollup: [] }));
+  const selected = hydrated
+    .map((pr, index) => ({ pr, index }))
+    .filter(({ pr }) => includeStatuses(pr));
+
+  for (let offset = 0; offset < selected.length; offset += batchSize) {
+    const batch = selected.slice(offset, offset + batchSize).map((item, i) => {
+      if (!/^[0-9a-f]{40}$/u.test(item.pr.headRefOid ?? '')) {
+        throw new Error(`PR #${item.pr.number} is missing exact headRefOid`);
+      }
+      return { ...item, alias: `c${i}` };
+    });
+    const selections = batch
+      .map(
+        ({ alias, pr }) =>
+          `${alias}:object(oid:"${pr.headRefOid}"){... on Commit{oid status{contexts{context state description targetUrl createdAt creator{login __typename}}}}}`
+      )
+      .join(' ');
+    const query = `query($owner:String!,$name:String!){repository(owner:$owner,name:$name){${selections}}}`;
+    const response = await request({ owner, name, query });
+    const repository = response?.data?.repository;
+    if (!repository || typeof repository !== 'object') {
+      throw new Error('GraphQL commit-status batch omitted repository data');
+    }
+    for (const { alias, index, pr } of batch) {
+      const commit = repository[alias];
+      if (!commit || commit.oid !== pr.headRefOid) {
+        throw new Error(
+          `GraphQL statuses for PR #${pr.number} omitted the exact head`
+        );
+      }
+      const contexts = commit.status?.contexts ?? [];
+      if (!Array.isArray(contexts)) {
+        throw new Error(
+          `GraphQL statuses for PR #${pr.number} were incomplete`
+        );
+      }
+      hydrated[index].statusCheckRollup = contexts.map(graphqlStatusContext);
+    }
+  }
+  return hydrated;
 }
 
 export async function fetchOpenPrsRest({ repo, limit = 200, request }) {

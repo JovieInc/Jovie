@@ -1,3 +1,5 @@
+import { readFileSync } from 'node:fs';
+import { resolve } from 'node:path';
 import { render } from '@testing-library/react';
 import { describe, expect, it } from 'vitest';
 import { LyricsTimeline } from './LyricsTimeline';
@@ -51,5 +53,15 @@ describe('LyricsTimeline', () => {
       />
     );
     expect(getAllByText('0:00').length).toBe(2);
+  });
+});
+
+describe('JOV-5466 token retire', () => {
+  it('does not keep retired --linear-app-* tokens', () => {
+    const source = readFileSync(
+      resolve(__dirname, './LyricsTimeline.tsx'),
+      'utf8'
+    );
+    expect(source).not.toMatch(/--linear-app-/);
   });
 });

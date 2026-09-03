@@ -1,4 +1,5 @@
-import { fireEvent, render, screen } from '@testing-library/react';
+import { fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { useState } from 'react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 const mockBack = vi.fn();
@@ -11,6 +12,25 @@ vi.mock('next/navigation', () => ({
 
 import { AuthModalShell } from '@/components/auth/AuthModalShell';
 
+function AuthModalBoundaryHarness() {
+  const [open, setOpen] = useState(false);
+
+  return (
+    <div>
+      <button type='button' onClick={() => setOpen(true)}>
+        Open auth modal
+      </button>
+      {open ? (
+        <AuthModalShell>
+          <button type='button' onClick={() => setOpen(false)}>
+            Finish auth
+          </button>
+        </AuthModalShell>
+      ) : null}
+    </div>
+  );
+}
+
 describe('AuthModalShell', () => {
   // Snapshot native dialog prototype methods at module load so we can restore
   // them between tests — otherwise the vi.fn() replacements would leak into
@@ -21,7 +41,11 @@ describe('AuthModalShell', () => {
   beforeEach(() => {
     mockBack.mockReset();
     // jsdom doesn't implement the native dialog API used by showModal().
-    HTMLDialogElement.prototype.showModal = vi.fn();
+    HTMLDialogElement.prototype.showModal = vi.fn(function showModalMock(
+      this: HTMLDialogElement
+    ) {
+      this.querySelector<HTMLElement>('button')?.focus();
+    });
     HTMLDialogElement.prototype.close = vi.fn();
   });
 
@@ -52,6 +76,10 @@ describe('AuthModalShell', () => {
     expect(
       container.querySelector('.auth-showcase-panel')
     ).not.toBeInTheDocument();
+    expect(container.querySelector('[data-auth-modal-shell]')).toHaveAttribute(
+      'data-auth-shell-kind',
+      'intercepted-modal'
+    );
   });
 
   it('dismisses through router.back when the backdrop is clicked', () => {
@@ -113,6 +141,40 @@ describe('AuthModalShell', () => {
     expect(document.body.style.overflow).toBe('');
     expect(document.body.style.overscrollBehavior).toBe('');
     expect(document.documentElement.style.overflow).toBe('');
+    expect(document.documentElement.style.overscrollBehavior).toBe('');
+  });
+
+  it('isolates background focus with the shared modal boundary and restores focus on close', async () => {
+    const { container } = render(<AuthModalBoundaryHarness />);
+    const trigger = screen.getByRole('button', { name: 'Open auth modal' });
+    trigger.focus();
+
+    fireEvent.click(trigger);
+
+    const dialog = container.querySelector('[data-auth-modal-shell]');
+    expect(dialog).toHaveAttribute('aria-modal', 'true');
+    expect(document.body.style.overflow).toBe('hidden');
+    expect(document.documentElement.style.overscrollBehavior).toBe('contain');
+
+    const backButton = screen.getByLabelText('Go back');
+    await waitFor(() => expect(backButton).toHaveFocus());
+    expect(trigger).toHaveAttribute('inert');
+    expect(trigger).toHaveAttribute('aria-hidden', 'true');
+
+    trigger.focus();
+    await waitFor(() => expect(backButton).toHaveFocus());
+
+    fireEvent.click(screen.getByText('Finish auth'));
+
+    await waitFor(() =>
+      expect(
+        container.querySelector('[data-auth-modal-shell]')
+      ).not.toBeInTheDocument()
+    );
+    expect(trigger).not.toHaveAttribute('inert');
+    expect(trigger).not.toHaveAttribute('aria-hidden');
+    await waitFor(() => expect(trigger).toHaveFocus());
+    expect(document.body.style.overflow).toBe('');
     expect(document.documentElement.style.overscrollBehavior).toBe('');
   });
 

@@ -8,8 +8,10 @@ import {
   TRUSTED_CI_WORKFLOW_PATH,
 } from '../rolling-ci-dispatch.mjs';
 import {
+  buildFxPrompt,
   classifyRunnerFailure,
   FX_EXECUTION_RECEIPT_SCHEMA,
+  FX_GITHUB_RUNNER_EXECUTOR,
   findOwnedAgents,
   launchCursorAgent,
   listCursorAgents,
@@ -246,6 +248,168 @@ describe('rolling CI FX webhook remediation', () => {
       'https://github.com/JovieInc/Jovie/pull/17'
     );
     expect(planned.launch.request.prompt.text).toContain(head);
+  });
+
+  it('launches a runner-local FX repair without Cursor or remote mutation', () => {
+    const planned = planFxWebhookRemediation({
+      dispatch: dispatch({ writer: FX_ADAPTER_NAME }),
+      receipt: null,
+      liveHead: head,
+      implementer: 'tim',
+      fxAdapter,
+      fxAuthConfigured: true,
+      runnerLocalAvailable: true,
+      cursorApiKey: '',
+      remoteMutationAllowed: false,
+      repository: 'JovieInc/Jovie',
+      prNumber: 16730,
+      headSha: head,
+      sourceHead: head,
+      headRef: 'fallback/JOV-5464-fix',
+    });
+
+    expect(planned).toMatchObject({
+      launch: {
+        action: 'launch_local',
+        executor: FX_GITHUB_RUNNER_EXECUTOR,
+        request: {
+          repository: 'JovieInc/Jovie',
+          prNumber: 16730,
+          headSha: head,
+          sourceHead: head,
+        },
+      },
+      outcome: 'launched',
+    });
+    expect(planned.launch.request).not.toHaveProperty('repos');
+    expect(planned.launch.request.prompt.text).toContain('.fx-ci/failure.log');
+    expect(planned.launch.request.prompt.text).toContain(
+      'do not commit, push, open a pull request, merge, or access credentials'
+    );
+  });
+
+  it('preserves one-writer safety while an implementer lease is active', () => {
+    const planned = planFxWebhookRemediation({
+      dispatch: dispatch(),
+      receipt: activeReceipt,
+      liveHead: head,
+      implementer: 'tim',
+      fxAdapter,
+      fxAuthConfigured: true,
+      runnerLocalAvailable: true,
+      cursorApiKey: '',
+      remoteMutationAllowed: false,
+      now: '2026-08-22T01:00:00Z',
+      repository: 'JovieInc/Jovie',
+      prNumber: 17,
+      headSha: head,
+      sourceHead: head,
+      headRef: 'fix/ci',
+    });
+
+    expect(planned.route).toMatchObject({ route: 'implementer' });
+    expect(planned.launch).toMatchObject({
+      action: 'skip',
+      reason: 'implementer_lease_live',
+    });
+    expect(planned.outcome).toBe('implementer_owned');
+  });
+
+  it('keeps runner-local instructions out of the legacy remote prompt', () => {
+    const remote = buildFxPrompt({
+      repository: 'JovieInc/Jovie',
+      prNumber: 17,
+      headSha: head,
+      fingerprint: 'ci:remote',
+    });
+    const local = buildFxPrompt({
+      repository: 'JovieInc/Jovie',
+      prNumber: 17,
+      headSha: head,
+      fingerprint: 'ci:local',
+      runnerLocal: true,
+    });
+
+    expect(remote).not.toContain('.fx-ci/failure.log');
+    expect(remote).not.toContain('ephemeral GitHub Actions runner');
+    expect(local).toContain('.fx-ci/failure.log');
+    expect(local).toContain('ephemeral GitHub Actions runner');
+  });
+
+  it('routes runner failures to runner-local FX instead of terminalizing them', () => {
+    const checkoutJobs = [
+      { name: 'ci-fast', steps: ['Checkout exact PR head'] },
+    ];
+    const planned = planFxWebhookRemediation({
+      dispatch: dispatch({ failedJobs: checkoutJobs }),
+      receipt: activeReceipt,
+      liveHead: head,
+      implementer: 'tim',
+      fxAdapter,
+      fxAuthConfigured: true,
+      runnerLocalAvailable: true,
+      now: '2026-08-22T01:00:00Z',
+      failedJobs: checkoutJobs,
+      repository: 'JovieInc/Jovie',
+      prNumber: 17,
+      headSha: head,
+      sourceHead: head,
+      headRef: 'fix/ci',
+    });
+
+    expect(planned.runnerClass).toBe('checkout');
+    expect(planned.launch).toMatchObject({
+      action: 'launch_local',
+      executor: FX_GITHUB_RUNNER_EXECUTOR,
+    });
+    expect(planned.outcome).toBe('launched');
+    expect(planned.dispatch.state.claim.status).not.toBe('terminal');
+  });
+
+  it('CLI selects runner-local FX when AI Gateway auth is configured', () => {
+    const input = {
+      repository: 'JovieInc/Jovie',
+      prNumber: 16730,
+      headSha: head,
+      liveHead: head,
+      sourceHead: head,
+      headRef: 'fallback/JOV-5464-fix',
+      workflowRunId: 9001,
+      workflowRunAttempt: 1,
+      failedJobs: [{ name: 'ci-fast', steps: ['Typecheck'] }],
+      source: trustedSource,
+      checkSuiteId: 44,
+      checks: [
+        {
+          name: 'ci-fast',
+          conclusion: 'failure',
+          headSha: head,
+          checkSuiteId: 44,
+        },
+      ],
+      writer: 'tim',
+      priorCommentBody: '',
+      conclusion: 'failure',
+      fxAuthConfigured: true,
+      runnerLocalAvailable: true,
+      cursorApiKey: '',
+      remoteMutationAllowed: false,
+      listCursorAgents: false,
+    };
+    const launched = spawnSync(process.execPath, [CLI], {
+      input: JSON.stringify(input),
+      encoding: 'utf8',
+    });
+
+    expect(launched.status, launched.stderr).toBe(0);
+    expect(JSON.parse(launched.stdout)).toMatchObject({
+      route: { route: 'fx' },
+      launch: {
+        action: 'launch_local',
+        executor: FX_GITHUB_RUNNER_EXECUTOR,
+      },
+      outcome: 'launched',
+    });
   });
 
   it('deduplicates when a Cursor agent already owns the fingerprint', () => {
@@ -485,25 +649,23 @@ describe('rolling CI FX webhook remediation', () => {
     expect(planned.dispatch.state.claim.writer).toBe(FX_ADAPTER_NAME);
     expect(planned.dispatch.state.claim.status).toBe('terminal');
     const terminalFingerprint = planned.launch.receipt.fingerprint;
-    const unrelatedFingerprint = Object.keys(
-      planned.dispatch.state.failures
-    ).find(fingerprint => fingerprint !== terminalFingerprint);
+    const unrelatedEvent = planned.dispatch.events.find(
+      event => event.fingerprint !== terminalFingerprint
+    );
+    const unrelatedFingerprint = unrelatedEvent?.fingerprint;
     expect(
       planned.dispatch.state.failures[terminalFingerprint].terminalReceipt
         .terminal
     ).toBe(true);
     expect(unrelatedFingerprint).toBeDefined();
     expect(
-      planned.dispatch.state.failures[unrelatedFingerprint].terminalReceipt
+      planned.dispatch.state.failures[unrelatedFingerprint]
     ).toBeUndefined();
     expect(planned.dispatch.body).toContain('## FX execution terminal');
     expect(planned.dispatch.body).toContain('jovie-fx-execution-receipt');
 
     const terminalEvent = planned.dispatch.events.find(
       event => event.fingerprint === terminalFingerprint
-    );
-    const unrelatedEvent = planned.dispatch.events.find(
-      event => event.fingerprint === unrelatedFingerprint
     );
     expect(
       planFailureDispatch({

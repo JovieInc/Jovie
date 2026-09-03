@@ -98,15 +98,15 @@
   --linear-accent-orange: #ff9800;
   --linear-accent-green: #2f9e44;
   --linear-accent-teal: #0f9b8e;
-  --linear-success: var(--linear-accent-green);
+  --linear-success: #2f9e44;
   --linear-success-subtle: rgb(47 158 68 / 0.14);
-  --linear-warning: var(--linear-accent-orange);
+  --linear-warning: #ff9800;
   --linear-warning-subtle: rgb(255 152 0 / 0.15);
-  --linear-error: var(--linear-accent-red);
+  --linear-error: #f3122d;
   --linear-error-subtle: rgb(243 18 45 / 0.14);
-  --linear-info: var(--linear-accent-blue);
+  --linear-info: #2563ff;
   --linear-info-subtle: rgb(37 99 255 / 0.14);
-  --linear-accent: var(--linear-accent-purple);
+  --linear-accent: #8b1eff;
   /* ============================================
      HERO-SPECIFIC TOKENS
      Used by RedesignedHero for theme-aware gradients
@@ -123,15 +123,8 @@
   /* ============================================
      SHADOWS — LIGHT MODE
      ============================================ */
-  --linear-shadow-button:
-    rgba(0, 0, 0, 0) 0px 8px 2px 0px, rgba(0, 0, 0, 0.01) 0px 5px 2px 0px, rgba(
-      0,
-      0,
-      0,
-      0.04
-    ) 0px 3px 2px 0px, rgba(0, 0, 0, 0.07) 0px 1px 1px 0px, rgba(0, 0, 0, 0.08) 0px 0px 1px 0px;
-  --linear-shadow-card: 0px 4px 24px rgba(0, 0, 0, 0.08);
-  --linear-shadow-card-elevated: 0px 7px 32px rgba(0, 0, 0, 0.12);
+  /* Shadow tokens retired (JOV-5465) — use --shadow-button, --shadow-card,
+     --shadow-card-elevated from design-system.css. */
   /* ============================================
      TYPOGRAPHY (mode-independent)
      ============================================ */
@@ -201,9 +194,8 @@
   /* ============================================
      LAYOUT — mode-independent
      ============================================ */
-  /* Aliased to canonical DS token (DS_FOUNDATION_V1) — both resolve to 1298px */
-  --linear-container-max: var(--ds-public-content-max);
-  --linear-container-padding: 24px;
+  /* Container max + padding tokens removed JOV-5464
+     (migrated to ds-public-content-max / space-6 respectively) */
   --linear-content-max: 1200px;
   --linear-hero-section-max: 1024px;
   --linear-prose-max: 624px;
@@ -217,50 +209,13 @@
   --linear-button-height-md: 40px;
   --linear-pill-track-padding: 3px;
   --linear-pill-height-md: 36px;
-  --linear-pill-surface-shadow: var(--linear-shadow-button);
+  --linear-pill-surface-shadow: var(--shadow-button);
   --linear-pill-indicator-shadow: var(
     --shadow-button-inset,
-    var(--linear-shadow-button)
+    var(--shadow-button)
   );
-  /* App UI tokens (distinct from marketing page tokens) */
-  --linear-app-radius-item: 8px;
-  --linear-app-radius-menu: 8px;
-  --linear-app-shell-gap: 8px;
-  --linear-app-shell-radius: 12px;
-  --linear-app-shell-border: rgba(0, 0, 0, 0.05);
-  --linear-app-shell-sidebar-seam: rgba(0, 0, 0, 0.05);
-  --linear-app-frame-seam: rgba(0, 0, 0, 0.045);
-  --linear-app-shell-shadow:
-    0 0 0 1px rgba(0, 0, 0, 0.03), 0 14px 30px rgba(0, 0, 0, 0.045);
-  --linear-app-sidebar-shadow:
-    0 0 0 1px rgba(0, 0, 0, 0.022), 0 14px 28px rgba(0, 0, 0, 0.035);
-  --linear-app-header-height: 40px;
-  /* Desktop breadcrumb/header bar uses a slightly tighter height than content headers. */
-  --linear-app-header-height-compact: 36px;
-  --linear-app-header-padding-x: 12px;
-  --linear-app-content-padding-x: 12px;
-  --linear-app-content-padding-y: 8px;
-  --linear-app-control-height-sm: 28px;
-  --linear-app-control-padding-x: 11px;
-  --linear-app-control-radius: 9999px;
-  --linear-app-toolbar-gap: 4px;
-  --linear-app-content-surface: var(--linear-bg-surface-0);
-  --linear-app-card-shadow: none;
-  --linear-app-drawer-shadow:
-    0 0 0 1px rgba(0, 0, 0, 0.03), 0 14px 32px rgba(0, 0, 0, 0.05);
   --linear-row-hover: oklch(96.2% 0.003 282);
   --linear-row-selected: oklch(94.8% 0.006 282);
-  --linear-app-sidebar-width: 224px;
-  --linear-app-audio-bar-max-height: 120px;
-  --linear-app-audio-compact-height: 64px;
-  --linear-app-sidebar-background-rgb: 247 248 248;
-  --linear-app-sidebar-foreground-rgb: 18 18 20;
-  --linear-app-sidebar-border-rgb: 0 0 0 / 0.06;
-  --linear-app-sidebar-accent-rgb: 242 243 245;
-  --linear-app-sidebar-accent-active-rgb: 236 238 241;
-  --linear-app-sidebar-item-foreground-rgb: 88 90 96;
-  --linear-app-sidebar-item-icon-rgb: 122 125 132;
-  --linear-app-sidebar-muted-rgb: 112 116 124;
   /* ============================================
      COMPONENT-SCOPED TOKENS — marketing page effects
      ============================================ */
@@ -297,7 +252,7 @@
     transparent 65%
   );
   /* Pricing accent */
-  --linear-pricing-accent: var(--linear-accent);
+  --linear-pricing-accent: #8b1eff;
   --linear-pricing-accent-border: rgba(94, 106, 210, 0.4);
   --linear-pricing-accent-shadow: rgba(94, 106, 210, 0.15);
   /* Audience CRM section */
@@ -316,24 +271,9 @@
   /* ============================================
      SPACING — mode-independent
      ============================================ */
-  --linear-space-1: 4px;
-  --linear-space-2: 8px;
-  --linear-space-3: 12px;
-  --linear-space-4: 16px;
-  --linear-space-5: 20px;
-  --linear-space-6: 24px;
-  --linear-space-8: 32px;
-  --linear-space-10: 40px;
-  --linear-space-12: 48px;
-  --linear-space-16: 64px;
-  --linear-space-20: 80px;
-  --linear-space-24: 96px;
-  --linear-space-28: 112px;
-  --linear-space-32: 128px;
-  --linear-space-40: 160px;
-  --linear-gap-nav: 4px;
-  --linear-gap-buttons: 8px;
-  --linear-gap-cards: 24px;
+  /* Legacy linear space-* (1-40) and gap-{nav,buttons,cards} removed
+     JOV-5464. Consumers now use canonical space-* scale in design-system.css:
+     gap-nav -> space-1, gap-buttons -> space-2, gap-cards -> space-6. */
   --linear-section-pt-sm: 56px;
   --linear-section-pb-sm: 56px;
   --linear-section-pt-md: 80px;
@@ -351,11 +291,8 @@
   /* ============================================
      EFFECTS — mode-independent
      ============================================ */
-  --linear-blur-header: 20px;
-  --linear-ease: cubic-bezier(0.25, 0.46, 0.45, 0.94);
-  --linear-duration-fast: 100ms;
-  --linear-duration-normal: 160ms;
-  --linear-duration-slow: 300ms;
+  /* Blur/ease/duration tokens retired (JOV-5465) — use --blur-header,
+     --ease-interactive, --duration-* from design-system.css. */
   /* ============================================
      RESPONSIVE TYPOGRAPHY — mode-independent
      ============================================ */
@@ -437,33 +374,12 @@
   --linear-separator-from: rgba(168, 176, 195, 0.1);
   --linear-separator-via: rgba(168, 176, 195, 0.04);
   /* Shadows — restrained depth on near-black */
-  --linear-shadow-card: 0px 4px 24px rgba(0, 0, 0, 0.4);
-  --linear-shadow-card-elevated:
-    0 0 0 1px rgba(168, 176, 195, 0.12), 0px 8px 40px rgba(0, 0, 0, 0.55);
-  --linear-app-content-surface: #0a0d16;
-  /* panel — primary framed main-pane surface */
-  --linear-app-card-shadow: none;
-  --linear-app-shell-border: rgba(168, 176, 195, 0.12);
-  --linear-app-shell-sidebar-seam: rgba(168, 176, 195, 0.1);
-  --linear-app-frame-seam: rgba(168, 176, 195, 0.1);
-  --linear-app-shell-shadow:
-    0 0 0 1px rgba(168, 176, 195, 0.06), 0 14px 36px rgba(0, 0, 0, 0.22);
-  --linear-app-sidebar-shadow:
-    0 0 0 1px rgba(168, 176, 195, 0.05), 0 12px 28px rgba(0, 0, 0, 0.18);
-  --linear-app-drawer-shadow:
-    0 0 0 1px rgba(168, 176, 195, 0.1), 0 18px 42px rgba(0, 0, 0, 0.32);
+  /* Dark-mode card shadows retired (JOV-5465) — use --shadow-card,
+     --shadow-card-elevated from design-system.css. */
+  /* App-shell dark overrides retired (JOV-5466) — canonical
+     --app-shell-* values live in design-system.css :root.dark. */
   --linear-row-hover: rgba(168, 176, 195, 0.06);
   --linear-row-selected: rgba(17, 175, 255, 0.1);
-  /* Ion selection */
-  --linear-app-sidebar-background-rgb: 6 8 13;
-  /* shell #06080D */
-  --linear-app-sidebar-foreground-rgb: 245 247 251;
-  --linear-app-sidebar-border-rgb: 168 176 195 / 0.1;
-  --linear-app-sidebar-accent-rgb: 168 176 195 / 0.06;
-  --linear-app-sidebar-accent-active-rgb: 17 175 255 / 0.1;
-  --linear-app-sidebar-item-foreground-rgb: 215 220 232;
-  --linear-app-sidebar-item-icon-rgb: 125 135 157;
-  --linear-app-sidebar-muted-rgb: 125 135 157;
 }
 
 /* ============================================
@@ -472,26 +388,12 @@
    ============================================ */
 
 :root {
-  /* Semantic text */
-  --linear-color-text: var(--linear-text-primary);
-  --linear-color-text-muted: var(--linear-text-secondary);
-  --linear-color-text-subtle: var(--linear-text-tertiary);
   /* Semantic backgrounds */
   --linear-color-bg: var(--linear-bg-page);
   --linear-color-bg-elevated: var(--linear-bg-surface-0);
   --linear-color-bg-card: var(--linear-bg-surface-2);
-  /* Semantic borders */
-  --linear-color-border: var(--linear-border-default);
-  --linear-color-divider: var(--linear-border-subtle);
 }
 
-/* Reduced motion — zero the raw linear duration scale so every consumer
-   inherits 0ms (mirrors the --duration-* zeroing in design-system.css).
-   Guarded by tests/unit/design-system/reduced-motion-tokens.test.ts. */
-@media (prefers-reduced-motion: reduce) {
-  :root {
-    --linear-duration-fast: 0ms;
-    --linear-duration-normal: 0ms;
-    --linear-duration-slow: 0ms;
-  }
-}
+/* Reduced motion — linear duration zeroing retired (JOV-5465); the
+   canonical --duration-* scale in design-system.css is already zeroed under
+   prefers-reduced-motion. */

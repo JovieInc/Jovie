@@ -1,7 +1,7 @@
 'use client';
 
-import { Bell } from 'lucide-react';
 import { useEffect, useState } from 'react';
+import { Banner } from '@/components/feedback/Banner';
 
 /**
  * Shows a success banner when the user arrives via the email confirmation link.
@@ -25,17 +25,14 @@ export function SubscriptionConfirmedBanner() {
 
   return (
     <div className='shrink-0 pb-3'>
-      <output
-        aria-live='polite'
-        className='block w-full px-4 py-3 mb-4 rounded-xl bg-green-50 dark:bg-green-950/40 border border-green-200 dark:border-green-800 text-green-800 dark:text-green-200 text-sm text-center animate-in fade-in slide-in-from-top-2 duration-slower'
-      >
-        <span className='inline-flex items-center gap-2'>
-          <Bell className='w-4 h-4' aria-hidden='true' />
-          <span className='font-medium'>
-            Notifications on! You&apos;ll receive updates from this artist.
-          </span>
-        </span>
-      </output>
+      <Banner
+        variant='success'
+        title='Notifications on!'
+        description="You'll receive updates from this artist."
+        onDismiss={() => setVisible(false)}
+        className='mb-4'
+        testId='subscription-confirmed-banner'
+      />
     </div>
   );
 }

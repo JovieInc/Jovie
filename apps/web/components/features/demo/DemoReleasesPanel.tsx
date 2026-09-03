@@ -108,7 +108,7 @@ export function DemoReleasesPanel({
         return (
           <div key={group.status}>
             {/* Group header */}
-            <div className='sticky top-0 z-10 flex h-8 items-center gap-1 border-b border-(--linear-app-frame-seam) bg-surface-0 px-4'>
+            <div className='sticky top-0 z-10 flex h-8 items-center gap-1 border-b border-(--app-shell-frame-seam) bg-surface-0 px-4'>
               <button
                 type='button'
                 onClick={() => toggleGroup(group.status)}
@@ -166,7 +166,7 @@ export function DemoReleasesPanel({
                       }
                     }}
                     className={cn(
-                      'flex h-8 cursor-pointer items-center gap-3 border-b border-(--linear-app-frame-seam) px-4 text-app',
+                      'flex h-8 cursor-pointer items-center gap-3 border-b border-(--app-shell-frame-seam) px-4 text-app',
                       isSelected &&
                         'bg-[color-mix(in_oklab,var(--linear-row-selected)_20%,transparent)] shadow-[inset_2px_0_0_var(--color-accent)]',
                       isFocused && !isSelected && 'bg-surface-2',

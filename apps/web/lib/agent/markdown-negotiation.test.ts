@@ -7,6 +7,7 @@ import {
   negotiateAgentMarkdown,
   shouldPassThroughMarkdownNegotiation,
 } from '@/lib/agent/markdown-negotiation';
+import { HOMEPAGE_HTML_ALTERNATE_LINK } from '@/lib/http/accept-header';
 
 function request(
   pathname: string,
@@ -56,6 +57,7 @@ describe('negotiateAgentMarkdown', () => {
       'text/markdown; charset=utf-8'
     );
     expect(res?.headers.get('vary')).toBe('Accept');
+    expect(res?.headers.get('link')).toBe(HOMEPAGE_HTML_ALTERNATE_LINK);
 
     const body = await res?.text();
     expect(body).toContain(`# ${HOMEPAGE_LAUNCH_COPY.hero.headline}`);
@@ -103,6 +105,21 @@ describe('negotiateAgentMarkdown', () => {
     expect(await res?.text()).toBe('');
   });
 
+  it('omits the markdown 404 body on HEAD', async () => {
+    const res = negotiateAgentMarkdown(
+      request('/some-path-that-definitely-does-not-exist', {
+        accept: 'text/markdown',
+        method: 'HEAD',
+      })
+    );
+    expect(res?.status).toBe(404);
+    expect(res?.headers.get('content-type')).toBe(
+      'text/markdown; charset=utf-8'
+    );
+    expect(res?.headers.get('vary')).toBe('Accept');
+    expect(await res?.text()).toBe('');
+  });
+
   it('does not intercept HTML or RSC homepage requests', () => {
     expect(negotiateAgentMarkdown(request('/'))).toBeNull();
     expect(
@@ -114,6 +131,14 @@ describe('negotiateAgentMarkdown', () => {
       )
     ).toBeNull();
     expect(negotiateAgentMarkdown(request('/', { accept: '*/*' }))).toBeNull();
+    expect(
+      negotiateAgentMarkdown(request('/', { accept: 'text/*' }))
+    ).toBeNull();
+    expect(
+      negotiateAgentMarkdown(
+        request('/', { accept: 'text/markdown;q=0.5, text/html;q=0.5' })
+      )
+    ).toBeNull();
     expect(
       negotiateAgentMarkdown(
         request('/', { accept: 'text/markdown', rsc: true })
@@ -129,6 +154,17 @@ describe('negotiateAgentMarkdown', () => {
     expect(res?.headers.get('content-type')).toBe(
       'text/markdown; charset=utf-8'
     );
+  });
+
+  it('serves markdown when explicit markdown outranks a wildcard', async () => {
+    const res = negotiateAgentMarkdown(
+      request('/', { accept: 'text/markdown, */*;q=0.8' })
+    );
+    expect(res?.status).toBe(200);
+    expect(res?.headers.get('content-type')).toBe(
+      'text/markdown; charset=utf-8'
+    );
+    expect(res?.headers.get('vary')).toBe('Accept');
   });
 
   it('returns 406 when the client rejects HTML and markdown', () => {
@@ -167,5 +203,38 @@ describe('homepage CDN Vary contract', () => {
     expect(homepageBlock).toContain("key: 'Vary'");
     expect(homepageBlock).toContain('Accept');
     expect(homepageBlock).toContain('rsc');
+    expect(homepageBlock).toContain("key: 'Link'");
+    expect(homepageBlock).toContain('text/markdown');
+    expect(homepageBlock).toContain('cacheHeaders.revalidate');
+    expect(homepageBlock).not.toContain('immutable');
+  });
+
+  it('does not mark the negotiated homepage immutable in any `/` header rule', () => {
+    const candidates = [
+      resolve(process.cwd(), 'next.config.js'),
+      resolve(process.cwd(), 'apps/web/next.config.js'),
+    ];
+    const source = readFileSync(
+      candidates.find(path => existsSync(path)) ?? candidates[0],
+      'utf8'
+    );
+    let searchFrom = 0;
+    let homepageRules = 0;
+    while (true) {
+      const start = source.indexOf("source: '/',", searchFrom);
+      if (start === -1) break;
+      const nextSource = source.indexOf('source:', start + 'source:'.length);
+      const block = source.slice(
+        start,
+        nextSource === -1 ? undefined : nextSource
+      );
+      searchFrom = start + 1;
+      if (!block.includes("key: 'Vary'")) continue;
+      homepageRules += 1;
+      expect(block).not.toContain('immutable');
+      expect(block).toContain('Accept');
+      expect(block).toContain('cacheHeaders.revalidate');
+    }
+    expect(homepageRules).toBeGreaterThanOrEqual(2);
   });
 });

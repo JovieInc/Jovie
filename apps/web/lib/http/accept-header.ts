@@ -116,6 +116,14 @@ export const NEXT_RSC_VARY =
 /** Homepage / CDN Vary: Accept plus the RSC tokens Next already emits. */
 export const HOMEPAGE_ACCEPT_VARY = `Accept, ${NEXT_RSC_VARY}`;
 
+/** RFC 8288 alternate for the HTML homepage. Survives Next overwriting Vary. */
+export const HOMEPAGE_MARKDOWN_ALTERNATE_LINK =
+  '</>; rel="alternate"; type="text/markdown"';
+
+/** RFC 8288 alternate for the Markdown homepage representation. */
+export const HOMEPAGE_HTML_ALTERNATE_LINK =
+  '</>; rel="alternate"; type="text/html"';
+
 function varyTokens(header: string | null): string[] {
   if (!header) return [];
   const tokens: string[] = [];

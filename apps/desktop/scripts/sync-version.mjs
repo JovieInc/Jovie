@@ -11,7 +11,7 @@
 
 import { readFileSync, writeFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
-import { fileURLToPath } from 'node:url';
+import { fileURLToPath, pathToFileURL } from 'node:url';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const REPO_ROOT = join(__dirname, '..', '..', '..');
@@ -39,31 +39,102 @@ function readRequiredFile(filePath, description) {
   }
 }
 
-const version = readRequiredFile(VERSION_FILE, 'VERSION file').trim();
-if (!/^\d+\.\d+\.\d+$/.test(version)) {
-  console.error(
-    `[sync-version] VERSION file is not a valid semver string: "${version}"`
+export function resolveDesktopVersion({
+  desktopVersion,
+  electronEnv,
+  repoVersion,
+}) {
+  const match = /^(\d+)\.(\d+)\.(\d+)$/.exec(repoVersion);
+  if (!match) {
+    throw new Error(
+      `[sync-version] VERSION file is not a valid semver string: "${repoVersion}"`
+    );
+  }
+  if (!desktopVersion && electronEnv !== 'staging') {
+    return repoVersion;
+  }
+  if (!desktopVersion) {
+    throw new Error(
+      '[sync-version] DESKTOP_VERSION is required for staging builds.'
+    );
+  }
+  if (electronEnv !== 'staging') {
+    throw new Error(
+      '[sync-version] DESKTOP_VERSION override is allowed only for staging builds.'
+    );
+  }
+  const [, major, minor, patch] = match;
+  const expectedCore = `${major}.${minor}.${Number(patch) + 1}`;
+  const escapedCore = expectedCore.replaceAll('.', '\\.');
+  const stagingPattern = new RegExp(
+    `^${escapedCore}-staging\\.[1-9][0-9]*\\.[1-9][0-9]*$`
   );
-  process.exit(1);
+  if (!stagingPattern.test(desktopVersion)) {
+    throw new Error(
+      `[sync-version] DESKTOP_VERSION must be a ${expectedCore}-staging.<run>.<attempt> prerelease.`
+    );
+  }
+  return desktopVersion;
 }
 
-const packageJson = readRequiredFile(PACKAGE_JSON, 'desktop package.json');
-let pkg;
-try {
-  pkg = JSON.parse(packageJson);
-} catch (error) {
-  fail(
-    `[sync-version] Could not parse desktop package.json at ${PACKAGE_JSON}.`,
-    error
-  );
+export function deriveStagingReleaseVersion(baseVersion, runId, runAttempt) {
+  if (!/^[1-9][0-9]*$/.test(runId) || !/^[1-9][0-9]*$/.test(runAttempt)) {
+    throw new Error(
+      '[sync-version] GitHub run coordinates must be positive integers.'
+    );
+  }
+  const match = /^(\d+)\.(\d+)\.(\d+)$/.exec(baseVersion);
+  if (!match) {
+    throw new Error('[sync-version] Base desktop version is not valid semver.');
+  }
+  const nextPatch = Number(match[3]) + 1;
+  if (!Number.isSafeInteger(nextPatch)) {
+    throw new Error('[sync-version] Desktop patch version overflowed.');
+  }
+  return `${match[1]}.${match[2]}.${nextPatch}-staging.${runId}.${runAttempt}`;
 }
 
-if (pkg.version === version) {
-  console.log(`[sync-version] package.json already at ${version}`);
-  process.exit(0);
+function main() {
+  const repoVersion = readRequiredFile(VERSION_FILE, 'VERSION file').trim();
+  if (process.argv[2] === '--staging-version') {
+    console.log(
+      deriveStagingReleaseVersion(repoVersion, process.argv[3], process.argv[4])
+    );
+    return;
+  }
+  let version;
+  try {
+    version = resolveDesktopVersion({
+      desktopVersion: process.env.DESKTOP_VERSION,
+      electronEnv: process.env.ELECTRON_ENV,
+      repoVersion,
+    });
+  } catch (error) {
+    fail('[sync-version] Could not resolve the desktop build version.', error);
+  }
+
+  const packageJson = readRequiredFile(PACKAGE_JSON, 'desktop package.json');
+  let pkg;
+  try {
+    pkg = JSON.parse(packageJson);
+  } catch (error) {
+    fail(
+      `[sync-version] Could not parse desktop package.json at ${PACKAGE_JSON}.`,
+      error
+    );
+  }
+
+  if (pkg.version === version) {
+    console.log(`[sync-version] package.json already at ${version}`);
+    return;
+  }
+
+  const previous = pkg.version;
+  pkg.version = version;
+  writeFileSync(PACKAGE_JSON, `${JSON.stringify(pkg, null, 2)}\n`, 'utf8');
+  console.log(`[sync-version] ${previous} → ${version}`);
 }
 
-const previous = pkg.version;
-pkg.version = version;
-writeFileSync(PACKAGE_JSON, `${JSON.stringify(pkg, null, 2)}\n`, 'utf8');
-console.log(`[sync-version] ${previous} → ${version}`);
+if (import.meta.url === pathToFileURL(process.argv[1]).href) {
+  main();
+}

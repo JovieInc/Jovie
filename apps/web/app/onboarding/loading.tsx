@@ -21,7 +21,7 @@ function SidebarLoadingState() {
                 className={
                   step === 'Handle'
                     ? 'h-4 w-4 shrink-0 rounded-full border border-primary-token bg-primary-token'
-                    : 'h-4 w-4 shrink-0 rounded-full border border-(--linear-app-frame-seam) bg-transparent'
+                    : 'h-4 w-4 shrink-0 rounded-full border border-(--app-shell-frame-seam) bg-transparent'
                 }
               />
               <span
@@ -62,10 +62,10 @@ export default function OnboardingLoading() {
             </p>
           </div>
 
-          <div className='w-full rounded-xl border border-(--linear-app-frame-seam) bg-[color-mix(in_oklab,var(--linear-app-content-surface)_96%,var(--linear-bg-surface-0))] p-4 sm:p-5'>
-            <div className='flex w-full items-center gap-3 rounded-full border border-(--linear-app-frame-seam) bg-[color-mix(in_oklab,var(--linear-app-content-surface)_94%,var(--linear-bg-surface-0))] px-4 py-3'>
+          <div className='w-full rounded-xl border border-(--app-shell-frame-seam) bg-[color-mix(in_oklab,var(--app-shell-content-surface)_96%,var(--linear-bg-surface-0))] p-4 sm:p-5'>
+            <div className='flex w-full items-center gap-3 rounded-full border border-(--app-shell-frame-seam) bg-[color-mix(in_oklab,var(--app-shell-content-surface)_94%,var(--linear-bg-surface-0))] px-4 py-3'>
               <span className='text-app text-tertiary-token'>@</span>
-              <div className='h-2 flex-1 rounded-full bg-[color-mix(in_oklab,var(--linear-app-frame-seam)_76%,transparent)]' />
+              <div className='h-2 flex-1 rounded-full bg-[color-mix(in_oklab,var(--app-shell-frame-seam)_76%,transparent)]' />
             </div>
             <div className='mt-4 h-11 rounded-full bg-primary-token/14' />
           </div>

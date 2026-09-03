@@ -136,4 +136,12 @@ export const BUTTON_PEN_PROPAGATION_FIXTURES = [
     variant: 'primary',
     size: 'lg',
   },
+  {
+    route: '/artist-profiles',
+    source: 'apps/web/components/site/MarketingTerminalCta.tsx',
+    labelSource: 'apps/web/components/site/MarketingFinalCTA.tsx',
+    label: 'Request Access',
+    variant: 'primary',
+    size: 'lg',
+  },
 ] as const satisfies readonly ButtonPenPropagationFixture[];

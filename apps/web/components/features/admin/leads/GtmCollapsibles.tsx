@@ -78,7 +78,7 @@ function AccordionSection({
         variant='ghost'
         onClick={onToggle}
         aria-expanded={isOpen}
-        className='flex h-auto w-full items-center justify-start gap-2 rounded-none px-(--linear-app-content-padding-x) py-3 text-left hover:bg-transparent'
+        className='flex h-auto w-full items-center justify-start gap-2 rounded-none px-(--app-shell-content-padding-x) py-3 text-left hover:bg-transparent'
       >
         <ChevronRight
           className={cn(
@@ -170,7 +170,7 @@ export function GtmCollapsibles({ initialOpen }: GtmCollapsiblesProps) {
         onToggle={() => toggle(0)}
       >
         {everOpened.has(0) && (
-          <div className='space-y-4 px-(--linear-app-content-padding-x) py-(--linear-app-content-padding-y)'>
+          <div className='space-y-4 px-(--app-shell-content-padding-x) py-(--app-shell-content-padding-y)'>
             <GrowthIntakeComposer
               initialMode={initialOpen === 'ingest' ? 'queue' : 'single'}
             />
@@ -185,7 +185,7 @@ export function GtmCollapsibles({ initialOpen }: GtmCollapsiblesProps) {
         onToggle={() => toggle(1)}
       >
         {everOpened.has(1) && (
-          <div className='space-y-4 px-(--linear-app-content-padding-x) py-(--linear-app-content-padding-y)'>
+          <div className='space-y-4 px-(--app-shell-content-padding-x) py-(--app-shell-content-padding-y)'>
             <LeadPipelineControls hideMainSwitch embedded />
             <CampaignSettingsPanel />
           </div>
@@ -198,7 +198,7 @@ export function GtmCollapsibles({ initialOpen }: GtmCollapsiblesProps) {
         onToggle={() => toggle(2)}
       >
         {everOpened.has(2) && (
-          <div className='space-y-4 px-(--linear-app-content-padding-x) py-(--linear-app-content-padding-y)'>
+          <div className='space-y-4 px-(--app-shell-content-padding-x) py-(--app-shell-content-padding-y)'>
             <OutreachOverviewPanel embedded />
             <InviteCampaignManager embedded />
           </div>

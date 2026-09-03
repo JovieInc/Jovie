@@ -38,6 +38,7 @@ vi.mock('@/lib/flags/contracts', () => ({
 
 import { DevToolbar } from '@/components/features/dev/DevToolbar';
 import { isDevToolbarSuppressedPath } from '@/components/features/dev/DevToolbarGate';
+import { FlagRow } from '@/components/features/dev/DevToolbarRows';
 
 const TOOLBAR_HIDDEN_KEY = '__dev_toolbar_hidden';
 const TOOLBAR_OPEN_KEY = '__dev_toolbar_open';
@@ -90,6 +91,28 @@ describe('DevToolbar', () => {
       expect(isDevToolbarSuppressedPath('/onboarding')).toBe(true);
       expect(isDevToolbarSuppressedPath('/onboarding/checkout')).toBe(true);
       expect(isDevToolbarSuppressedPath('/app/dashboard/releases')).toBe(false);
+    });
+  });
+
+  describe('flag rows', () => {
+    it('names override switches and emits checked changes through the canonical control', () => {
+      const onCheckedChange = vi.fn();
+
+      render(
+        <FlagRow
+          label='claim handle'
+          isOverridden={false}
+          checked={false}
+          onCheckedChange={onCheckedChange}
+          onClear={vi.fn()}
+        />
+      );
+
+      fireEvent.click(
+        screen.getByRole('switch', { name: 'Override claim handle' })
+      );
+
+      expect(onCheckedChange).toHaveBeenCalledWith(true);
     });
   });
 
@@ -569,11 +592,10 @@ describe('DevToolbar', () => {
 
       expect(screen.getByTestId('dev-toolbar-flag-drawer')).toBeInTheDocument();
 
-      const flagLabel = screen.getByText('claim handle');
-      const row = flagLabel.closest('[class*="rounded-sm"]');
-      const flagSwitch = row?.querySelector('[role="switch"]');
-      expect(flagSwitch).toBeTruthy();
-      fireEvent.click(flagSwitch as Element);
+      const flagSwitch = screen.getByRole('switch', {
+        name: 'Override claim handle',
+      });
+      fireEvent.click(flagSwitch);
 
       // Drawer collapses after selection; badge count remains on the bar.
       expect(

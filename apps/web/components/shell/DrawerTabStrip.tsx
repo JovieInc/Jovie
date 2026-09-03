@@ -50,7 +50,7 @@ export function DrawerTabStrip<T extends string>({
       <div
         role='tablist'
         aria-label={ariaLabel}
-        className='flex items-center gap-0.5 p-0.5 rounded-full bg-(--surface-0)/70 border border-(--linear-app-shell-border)/70'
+        className='flex items-center gap-0.5 p-0.5 rounded-full bg-(--surface-0)/70 border border-(--app-shell-border)/70'
       >
         {tabs.map(t => {
           const on = active === t.value;

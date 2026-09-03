@@ -160,16 +160,10 @@ export const CHANGELOG_COLLISION_PATH = 'CHANGELOG.md';
 const ENUM_POLICY_FIELDS = new Set(['merge_method', 'grouping_strategy']);
 
 /**
- * REST `check_response_timeout_minutes` max is 360. Live GraphQL
- * `checkResponseTimeout` returns seconds (3600 for a 60-minute ruleset).
- * Docs claim minutes; Auto-Enroll fail-closed on that mismatch (JOV-5315).
- */
-export const REST_CHECK_RESPONSE_TIMEOUT_MAX_MINUTES = 360;
-
-/**
  * Map GraphQL `checkResponseTimeout` onto REST minutes. Values inside the
- * REST minute range stay as minutes so docs-shaped fixtures keep working.
- * Values above that range that are whole minutes-in-seconds convert.
+ * REST minute range are still seconds when they come from GraphQL, so whole
+ * minute second values convert. Non-minute values stay unchanged so drift is
+ * still visible instead of rounded away.
  *
  * @param {unknown} value
  * @returns {unknown}
@@ -178,7 +172,7 @@ export function mapGraphqlCheckResponseTimeoutToMinutes(value) {
   if (typeof value !== 'number' || !Number.isFinite(value) || value < 0) {
     return value;
   }
-  if (value > REST_CHECK_RESPONSE_TIMEOUT_MAX_MINUTES && value % 60 === 0) {
+  if (Number.isInteger(value) && value >= 60 && value % 60 === 0) {
     return value / 60;
   }
   return value;
@@ -503,6 +497,8 @@ export const FORBIDDEN_PINNED_JOB_CONTEXTS = Object.freeze([
   'Secret Scan (gitleaks + trufflehog)',
   'CI / Golden Path Lock',
   'Golden Path Lock',
+  'CI / Visual Snapshot Compare',
+  'Visual Snapshot Compare',
   'CI / Layout Guard',
   'Layout Guard',
   'CI / Build + Layout (combined)',
@@ -1962,6 +1958,13 @@ export const RETRYABLE_PRODUCT_FAILURE_STEPS = new Set([
 ]);
 export const MERGE_GROUP_CHURN_FAILURE_THRESHOLD = 2;
 export const MERGE_GROUP_CHURN_COOLDOWN_MS = 5 * 60 * 1000;
+export const ACTIVE_MERGE_GROUP_STATUSES = new Set([
+  'queued',
+  'in_progress',
+  'waiting',
+  'pending',
+  'requested',
+]);
 
 export function parseMergeQueueFrontBranch(branch) {
   const match =
@@ -2019,6 +2022,39 @@ export function frontItemChurnDecision({
     .map(({ run }) => run)
     .sort((a, b) => String(b.createdAt).localeCompare(String(a.createdAt)));
 
+  const headMs = Date.parse(headCommittedAt);
+  const failuresForCurrentHead = Number.isFinite(headMs)
+    ? allFailedFrontedRuns.filter(run => Date.parse(run.createdAt) >= headMs)
+    : allFailedFrontedRuns;
+  const latestActiveForCurrentHead = mergeGroupRuns
+    .map(run => ({ run, front: parseMergeQueueFrontBranch(run?.headBranch) }))
+    .filter(
+      ({ run, front }) =>
+        front?.prNumber === prNumber &&
+        ACTIVE_MERGE_GROUP_STATUSES.has(run.status) &&
+        (!Number.isFinite(headMs) || Date.parse(run.createdAt) >= headMs)
+    )
+    .map(({ run }) => run)
+    .sort((a, b) => String(b.createdAt).localeCompare(String(a.createdAt)))[0];
+  if (
+    latestActiveForCurrentHead &&
+    (failuresForCurrentHead.length === 0 ||
+      String(latestActiveForCurrentHead.createdAt).localeCompare(
+        String(failuresForCurrentHead[0].createdAt)
+      ) > 0)
+  ) {
+    return {
+      action: 'allow',
+      reason:
+        'a newer merge-group attempt for the unchanged head is still active; incomplete evidence cannot eject it',
+      evidence: {
+        activeRunId: latestActiveForCurrentHead.id ?? null,
+        activeStartedAt: latestActiveForCurrentHead.createdAt ?? null,
+        activeStatus: latestActiveForCurrentHead.status ?? null,
+      },
+    };
+  }
+
   if (allFailedFrontedRuns.length === 0) {
     return {
       action: 'allow',
@@ -2027,10 +2063,6 @@ export function frontItemChurnDecision({
     };
   }
 
-  const headMs = Date.parse(headCommittedAt);
-  const failuresForCurrentHead = Number.isFinite(headMs)
-    ? allFailedFrontedRuns.filter(run => Date.parse(run.createdAt) >= headMs)
-    : allFailedFrontedRuns;
   if (failuresForCurrentHead.length === 0) {
     const lastFailed = allFailedFrontedRuns[0];
     return {

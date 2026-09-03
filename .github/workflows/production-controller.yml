@@ -247,6 +247,10 @@ jobs:
           marker_reason="$(jq -r '.reason' <<<"$marker_state_json")"
           case "$marker_state" in
             verified)
+              marker_deployment_id="$(jq -r '.deploymentId // ""' <<<"$marker_state_json")"
+              if [ "$marker_deployment_id" = "not-applicable" ]; then
+                node .github/scripts/assert-live-production-bind.mjs --main-sha "$EXPECTED_SHA"
+              fi
               echo "already_verified=true" >> "$GITHUB_OUTPUT"
               echo "::notice::Exact production generation $EXPECTED_SHA is already verified by its payload-bound historical attempt."
               exit 0
@@ -756,12 +760,11 @@ jobs:
         always() &&
         github.event.workflow_run.event == 'push' &&
         needs.authorize-production.result == 'success' &&
-        needs.authorize-production.outputs.authorized == 'true' &&
         needs.authorize-production.outputs.already_verified != 'true'
       }}
     # The workflow-level production lease is still held here. Every probe
     # targets the immutable deployment URL, and no newer generation can mutate
-    # canonical production until this final current-main proof completes.
+    # canonical production until this final marker decision completes.
     runs-on: ubuntu-latest
     timeout-minutes: 10
     permissions:
@@ -769,38 +772,52 @@ jobs:
     outputs:
       verified: ${{ steps.finalize.outputs.verified || 'false' }}
     steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+          fetch-depth: 1
       - name: Resolve current main before final verification
         id: current
         env:
           GH_TOKEN: ${{ github.token }}
           EXPECTED_SHA: ${{ needs.authorize-production.outputs.expected_sha }}
+          PRODUCTION_BUILD_INFO_URL: https://jov.ie/api/health/build-info
+          RUN_WEB: ${{ needs.authorize-production.outputs.run_web }}
         run: |
           set -euo pipefail
+          {
+            echo "superseded_before_marker=false"
+          } >> "$GITHUB_OUTPUT"
           current_sha="$(gh api "repos/${{ github.repository }}/commits/main" --jq '.sha // empty')"
           [[ "$current_sha" =~ ^[0-9a-f]{40}$ ]] || {
             echo "::error::Could not resolve an exact current main SHA."
             exit 1
           }
           if [ "$current_sha" != "$EXPECTED_SHA" ]; then
-            echo "::notice::Post-deploy verification for $EXPECTED_SHA was superseded by $current_sha; neutral with no notification."
+            echo "::warning::Post-deploy verification for $EXPECTED_SHA was superseded by $current_sha; exact production bind will be proven before marker preservation."
+            if [ "$RUN_WEB" != true ]; then
+              node .github/scripts/assert-live-production-bind.mjs --main-sha "$current_sha"
+            fi
             echo "is_current=false" >> "$GITHUB_OUTPUT"
+            echo "superseded_before_marker=true" >> "$GITHUB_OUTPUT"
+            exit 0
           else
             echo "is_current=true" >> "$GITHUB_OUTPUT"
           fi
 
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-        if: steps.current.outputs.is_current == 'true' && needs.authorize-production.outputs.run_web == 'true'
+        if: ${{ (steps.current.outputs.is_current == 'true' || steps.current.outputs.superseded_before_marker == 'true') && needs.authorize-production.outputs.run_web == 'true' }}
         with:
           ref: ${{ needs.authorize-production.outputs.expected_sha }}
           fetch-depth: 1
           persist-credentials: false
 
       - uses: ./.github/actions/setup-node-pnpm
-        if: steps.current.outputs.is_current == 'true' && needs.authorize-production.outputs.run_web == 'true'
+        if: ${{ (steps.current.outputs.is_current == 'true' || steps.current.outputs.superseded_before_marker == 'true') && needs.authorize-production.outputs.run_web == 'true' }}
 
       - name: Require exact deployment and every post-deploy probe
         id: verify
-        if: steps.current.outputs.is_current == 'true' && needs.authorize-production.outputs.run_web == 'true'
+        if: ${{ (steps.current.outputs.is_current == 'true' || steps.current.outputs.superseded_before_marker == 'true') && needs.authorize-production.outputs.run_web == 'true' }}
         shell: bash
         env:
           GH_TOKEN: ${{ github.token }}
@@ -818,6 +835,7 @@ jobs:
             echo "canonical_verified=false"
             echo "canonical_deployment_id="
             echo "canonical_sha="
+            echo "superseded_after_public_bind=false"
           } >> "$GITHUB_OUTPUT"
           if [ "${{ needs.authorize-production.result }}" != "success" ] ||
             [ "${{ needs.authorize-production.outputs.authorized }}" != "true" ]; then
@@ -871,8 +889,8 @@ jobs:
             exit 1
           fi
           if [ "$boundary_sha" != "$EXPECTED_COMMIT_SHA" ]; then
-            echo "Main advanced to $boundary_sha before canonical verification; neutral with no notification."
-            exit 0
+            echo "::notice::Main advanced to $boundary_sha before canonical verification; exact production bind for $EXPECTED_COMMIT_SHA will be preserved and not used as proof for the newer main SHA."
+            echo "superseded_after_public_bind=true" >> "$GITHUB_OUTPUT"
           fi
 
           bash .github/scripts/verify-production-alias.sh
@@ -885,7 +903,7 @@ jobs:
 
       - name: Finalize exact current release generation
         id: finalize
-        if: ${{ always() && steps.current.outputs.is_current == 'true' }}
+        if: ${{ always() && (steps.current.outputs.is_current == 'true' || steps.verify.outputs.canonical_verified == 'true') }}
         env:
           GH_TOKEN: ${{ github.token }}
           EXPECTED_SHA: ${{ needs.authorize-production.outputs.expected_sha }}
@@ -899,22 +917,38 @@ jobs:
         run: |
           set -euo pipefail
           echo "verified=false" >> "$GITHUB_OUTPUT"
+          superseded_after_public_bind=false
 
-          # API uncertainty fails before finalization; a newer main SHA exits
-          # neutral. Marker write-through happens in this same step so a
-          # successful verification cannot complete without local marker bytes
-          # (upload is the only remaining durable step). JOV-4442.
+          # API uncertainty fails before finalization. If main advanced after
+          # successful promotion, preserve a marker only from the exact public
+          # bind proof gathered while this controller still holds the production
+          # FIFO. Marker write-through happens in this same step so successful
+          # verification cannot complete without local marker bytes. JOV-4442.
           boundary_sha="$(gh api "repos/${{ github.repository }}/commits/main" --jq '.sha // empty')"
           if [[ ! "$boundary_sha" =~ ^[0-9a-f]{40}$ ]]; then
             echo "::error::Could not resolve exact main at the finalization boundary."
             exit 1
           fi
           if [ "$boundary_sha" != "$EXPECTED_SHA" ]; then
-            echo "Main advanced to $boundary_sha before finalization; neutral."
-            exit 0
+            if [ "$RUN_WEB" = true ] &&
+              [ "${{ steps.verify.outcome }}" = "success" ] &&
+              [ "${{ steps.verify.outputs.canonical_verified }}" = "true" ] &&
+              [ "${{ steps.verify.outputs.canonical_deployment_id }}" = "$DEPLOYMENT_ID" ] &&
+              [ "${{ steps.verify.outputs.canonical_sha }}" = "$EXPECTED_SHA" ]; then
+              superseded_after_public_bind=true
+              echo "::notice::Main advanced to $boundary_sha before finalization; preserving the exact verified marker for superseded production generation $EXPECTED_SHA."
+            else
+              echo "::error::Main advanced to $boundary_sha before finalization without exact public bind proof for $EXPECTED_SHA."
+              exit 1
+            fi
+          fi
+          if [ "${{ needs.authorize-production.outputs.authorized }}" != "true" ]; then
+            echo "::error::Exact source CI authorization is required before finalizing production verification."
+            exit 1
           fi
 
           if [ "$RUN_WEB" != true ]; then
+            node .github/scripts/assert-live-production-bind.mjs --main-sha "$boundary_sha"
             for result in \
               "${{ needs.production-release.result }}" \
               "${{ needs.ci-public-profile-smoke.result }}" \
@@ -929,7 +963,8 @@ jobs:
               --arg web_evidence_sha "$WEB_EVIDENCE_SHA" \
               --arg controller_run "${{ github.run_id }}" \
               --arg controller_attempt "${{ github.run_attempt }}" \
-              '{sha: $sha, deploymentId: "not-applicable", deploymentBaseSha: $deployed_sha, webEvidenceSha: $web_evidence_sha, selectedLanes: (if $lanes == "none" then [] else ($lanes | split(",")) end), controllerRun: $controller_run, controllerAttempt: $controller_attempt, authSmoke: "not-applicable"}' \
+              --arg terminal_reason "skipped_no_web" \
+              '{sha: $sha, deploymentId: "not-applicable", deploymentBaseSha: $deployed_sha, webEvidenceSha: $web_evidence_sha, selectedLanes: (if $lanes == "none" then [] else ($lanes | split(",")) end), controllerRun: $controller_run, controllerAttempt: $controller_attempt, authSmoke: "not-applicable", terminalReason: $terminal_reason}' \
               > "$RUNNER_TEMP/production-generation-verified.json"
             echo "verified=true" >> "$GITHUB_OUTPUT"
             echo "Web release skipped by the sealed product-lane receipt."
@@ -946,6 +981,10 @@ jobs:
               echo "::error::Cannot write verified marker without an exact deployment ID."
               exit 1
             }
+            terminal_reason=promoted
+            if [ "$superseded_after_public_bind" = true ]; then
+              terminal_reason=skipped_superseded
+            fi
             # Write-through: marker payload is produced only on verified success
             # in the same step that sets verified=true (no separate skippable write).
             jq -n \
@@ -957,7 +996,8 @@ jobs:
               --arg deployed_sha "$DEPLOYED_SHA" \
               --arg web_evidence_sha "$WEB_EVIDENCE_SHA" \
               --arg lanes "$SELECTED_LANES" \
-              '{sha: $sha, deploymentId: $deployment_id, deploymentBaseSha: $deployed_sha, webEvidenceSha: $web_evidence_sha, selectedLanes: (if $lanes == "none" then [] else ($lanes | split(",")) end), controllerRun: $controller_run, controllerAttempt: $controller_attempt, authSmoke: $auth_smoke}' \
+              --arg terminal_reason "$terminal_reason" \
+              '{sha: $sha, deploymentId: $deployment_id, deploymentBaseSha: $deployed_sha, webEvidenceSha: $web_evidence_sha, selectedLanes: (if $lanes == "none" then [] else ($lanes | split(",")) end), controllerRun: $controller_run, controllerAttempt: $controller_attempt, authSmoke: $auth_smoke, terminalReason: $terminal_reason}' \
               > "$RUNNER_TEMP/production-generation-verified.json"
             test -s "$RUNNER_TEMP/production-generation-verified.json" || {
               echo "::error::Verified marker write-through produced an empty file."
@@ -979,7 +1019,7 @@ jobs:
           retention-days: 30
 
       - name: Notify exact verified production generation
-        if: ${{ steps.finalize.outputs.verified == 'true' && needs.authorize-production.outputs.run_web == 'true' }}
+        if: ${{ steps.finalize.outputs.verified == 'true' && needs.authorize-production.outputs.run_web == 'true' && steps.current.outputs.is_current == 'true' }}
         env:
           SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
         shell: bash

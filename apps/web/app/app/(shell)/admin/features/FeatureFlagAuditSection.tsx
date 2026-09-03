@@ -134,7 +134,7 @@ export function FeatureFlagAuditSection({
       aria-label='Recent Flag Changes'
     >
       <div className='flex flex-wrap items-center justify-between gap-2'>
-        <h2 className='text-sm font-semibold text-primary-token'>
+        <h2 className='line-clamp-2 text-sm font-semibold text-primary-token'>
           Recent Changes
         </h2>
         <div className='flex items-center gap-2'>

@@ -7,7 +7,7 @@ import * as React from 'react';
 import { cn } from '../lib/utils';
 
 const labelVariants = cva(
-  'inline-flex cursor-pointer items-center text-[13px] font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-[var(--state-disabled-opacity)] data-[disabled=true]:cursor-not-allowed data-[disabled=true]:text-(--color-text-disabled-token) data-[disabled=true]:opacity-[var(--state-disabled-opacity)]',
+  'inline-flex cursor-pointer items-center text-app font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-[var(--state-disabled-opacity)] data-[disabled=true]:cursor-not-allowed data-[disabled=true]:text-(--color-text-disabled-token) data-[disabled=true]:opacity-[var(--state-disabled-opacity)]',
   {
     variants: {
       variant: {

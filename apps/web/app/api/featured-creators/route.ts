@@ -43,7 +43,7 @@ async function getFeaturedCreators() {
       id: a.id,
       handle: a.username,
       name: a.displayName || a.username,
-      src: a.avatarUrl || '/android-chrome-192x192.png',
+      src: a.avatarUrl || '/avatars/default-user.png',
     }));
   } finally {
     if (timerId !== undefined) clearTimeout(timerId);

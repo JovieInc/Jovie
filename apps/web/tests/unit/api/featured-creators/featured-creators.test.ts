@@ -13,6 +13,19 @@ vi.mock('@/lib/db/schema', () => ({
   socialLinks: {},
 }));
 
+vi.mock('@/lib/db/schema/profiles', () => ({
+  creatorProfiles: {
+    avatarUrl: 'avatarUrl',
+    creatorType: 'creatorType',
+    displayName: 'displayName',
+    id: 'id',
+    isFeatured: 'isFeatured',
+    isPublic: 'isPublic',
+    marketingOptOut: 'marketingOptOut',
+    username: 'username',
+  },
+}));
+
 describe('GET /api/featured-creators', () => {
   beforeEach(() => {
     vi.clearAllMocks();
@@ -39,6 +52,13 @@ describe('GET /api/featured-creators', () => {
                 avatarUrl: 'https://example.com/avatar2.jpg',
                 creatorType: 'artist',
               },
+              {
+                id: 'profile_3',
+                username: 'creator3',
+                displayName: 'Creator Three',
+                avatarUrl: null,
+                creatorType: 'artist',
+              },
             ]),
           }),
         }),
@@ -51,12 +71,18 @@ describe('GET /api/featured-creators', () => {
 
     expect(response.status).toBe(200);
     expect(Array.isArray(data)).toBe(true);
-    expect(data).toHaveLength(2);
+    expect(data).toHaveLength(3);
     expect(data[0]).toEqual({
       id: 'profile_1',
       handle: 'creator1',
       name: 'Creator One',
       src: 'https://example.com/avatar1.jpg',
+    });
+    expect(data[2]).toEqual({
+      id: 'profile_3',
+      handle: 'creator3',
+      name: 'Creator Three',
+      src: '/avatars/default-user.png',
     });
   });
 

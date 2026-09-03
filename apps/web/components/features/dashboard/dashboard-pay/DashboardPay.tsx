@@ -474,7 +474,7 @@ export function DashboardPay() {
             <>
               <ContentSurfaceCard className='overflow-hidden p-0'>
                 <div className='grid grid-cols-1 gap-0 sm:grid-cols-[minmax(0,1fr)_320px]'>
-                  <div className='grid grid-cols-2 gap-0 [&>*]:border-b [&>*]:border-[color-mix(in_oklab,var(--linear-app-shell-border)_72%,transparent)] sm:grid-cols-3 sm:[&>*]:border-b-0 sm:[&>*]:border-r sm:[&>*:last-child]:border-r-0'>
+                  <div className='grid grid-cols-2 gap-0 [&>*]:border-b [&>*]:border-[color-mix(in_oklab,var(--app-shell-border)_72%,transparent)] sm:grid-cols-3 sm:[&>*]:border-b-0 sm:[&>*]:border-r sm:[&>*:last-child]:border-r-0'>
                     <StatCard
                       label='QR Scans'
                       value={qrTipClicks}
@@ -503,7 +503,7 @@ export function DashboardPay() {
                       bordered={false}
                     />
                   </div>
-                  <div className='border-t border-[color-mix(in_oklab,var(--linear-app-shell-border)_72%,transparent)] px-4 py-4 sm:border-l sm:border-t-0 sm:px-5'>
+                  <div className='border-t border-[color-mix(in_oklab,var(--app-shell-border)_72%,transparent)] px-4 py-4 sm:border-l sm:border-t-0 sm:px-5'>
                     <TipLinkSection
                       tipUrl={tipUrls.tipUrl}
                       tipRelativePathLink={tipUrls.tipRelativePathLink}

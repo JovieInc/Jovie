@@ -3,17 +3,21 @@
  * Hard component ship gate (JOV-4421).
  *
  * Fail closed when a shippable UI component is added/changed without:
- *   1. Matching unit/interaction test (colocated or verified @coverage-via)
+ *   1. Matching unit/interaction test (colocated or verified @coverage-via;
+ *      JOV-5451 rejects inert executable receipts)
  *   2. Matching Storybook story that imports the real component
  *   3. Static match checks (required props / state matrix hints)
  *   4. Story quality hygiene (no pure-black voids / fake CTAs)
  *   5. Multi-root story-coverage ratchet (lock_up + no uncovered growth)
  *   6. Fail-closed source-blind rendered certification (JOV-5400)
  *      including the Shadcn/Typeset outcome inventory (JOV-5438)
+ *   7. Live rendered component evaluation from computed Storybook DOM
+ *   8. Fail-closed live Storybook certification for enrolled canonical
+ *      Badge/Button/Card stories (JOV-5454)
  *
  * Usage:
  *   pnpm component-ship-gate
- *   node scripts/component-ship-gate.mjs [--diff-base=origin/main] [--skip-quality] [--skip-ratchet] [--skip-rendered-cert]
+ *   node scripts/component-ship-gate.mjs [--diff-base=origin/main] [--skip-quality] [--skip-ratchet] [--skip-rendered-cert] [--skip-live-storybook] [--require-rendered --storybook-url=http://127.0.0.1:6006]
  *
  * Env:
  *   COMPONENT_SHIP_DIFF_BASE / STORY_COVERAGE_DIFF_BASE / TURBO_SCM_BASE / GITHUB_BASE_REF
@@ -24,6 +28,7 @@ import { existsSync } from 'node:fs';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import ts from 'typescript';
+import { runLiveStorybookCertification } from './component-live-storybook-certification.mjs';
 import { runRenderedCertification } from './component-rendered-certification.mjs';
 import {
   COVERAGE_ROOTS,
@@ -59,6 +64,10 @@ function parseArgs(argv) {
     skipQuality: false,
     skipRatchet: false,
     skipRenderedCert: false,
+    skipLiveStorybook: false,
+    requireRendered: false,
+    storybookUrl: null,
+    captureDir: null,
     json: false,
     auditCoverageVia: false,
   };
@@ -68,7 +77,13 @@ function parseArgs(argv) {
     else if (arg === '--skip-quality') flags.skipQuality = true;
     else if (arg === '--skip-ratchet') flags.skipRatchet = true;
     else if (arg === '--skip-rendered-cert') flags.skipRenderedCert = true;
-    else if (arg === '--audit-coverage-via') flags.auditCoverageVia = true;
+    else if (arg === '--skip-live-storybook') flags.skipLiveStorybook = true;
+    else if (arg === '--require-rendered') flags.requireRendered = true;
+    else if (arg.startsWith('--storybook-url=')) {
+      flags.storybookUrl = arg.slice('--storybook-url='.length);
+    } else if (arg.startsWith('--capture-dir=')) {
+      flags.captureDir = arg.slice('--capture-dir='.length);
+    } else if (arg === '--audit-coverage-via') flags.auditCoverageVia = true;
     else if (arg === '--json') flags.json = true;
     else if (arg === '--help' || arg === '-h') flags.help = true;
   }
@@ -258,6 +273,109 @@ function shadowedBindingNames(sourceFile, importedNames) {
   return shadowed;
 }
 
+function isLexicalScopeNode(node, sourceFile) {
+  return (
+    node === sourceFile ||
+    ts.isFunctionLike(node) ||
+    ts.isBlock(node) ||
+    ts.isModuleBlock(node) ||
+    ts.isCaseBlock(node) ||
+    ts.isCatchClause(node) ||
+    ts.isForStatement(node) ||
+    ts.isForInStatement(node) ||
+    ts.isForOfStatement(node)
+  );
+}
+
+function nearestLexicalScope(node, sourceFile) {
+  for (let current = node; current; current = current.parent) {
+    if (isLexicalScopeNode(current, sourceFile)) return current;
+  }
+  return sourceFile;
+}
+
+function nearestFunctionScope(node, sourceFile) {
+  for (let current = node; current; current = current.parent) {
+    if (current === sourceFile || ts.isFunctionLike(current)) {
+      return current;
+    }
+  }
+  return sourceFile;
+}
+
+function addScopedBinding(bindings, scope, name) {
+  if (!scope || !name) return;
+  let names = bindings.get(scope);
+  if (!names) {
+    names = new Set();
+    bindings.set(scope, names);
+  }
+  for (const bindingName of collectBindingNames(name)) {
+    names.add(bindingName);
+  }
+}
+
+function scopedBindings(sourceFile) {
+  const bindings = new Map();
+  walkAst(sourceFile, node => {
+    if (ts.isVariableDeclaration(node)) {
+      // A destructured dynamic import is an actual component import, not a
+      // local declaration that shadows the binding collected from the exact
+      // module import analysis.
+      if (isDynamicImportExpression(node.initializer)) return;
+      const scope =
+        (node.parent.flags & ts.NodeFlags.BlockScoped) === 0
+          ? nearestFunctionScope(node.parent, sourceFile)
+          : nearestLexicalScope(node.parent, sourceFile);
+      addScopedBinding(bindings, scope, node.name);
+      return;
+    }
+    if (ts.isParameter(node)) {
+      addScopedBinding(
+        bindings,
+        nearestFunctionScope(node, sourceFile),
+        node.name
+      );
+      return;
+    }
+    if (
+      (ts.isFunctionDeclaration(node) || ts.isClassDeclaration(node)) &&
+      node.name
+    ) {
+      addScopedBinding(
+        bindings,
+        nearestLexicalScope(node.parent, sourceFile),
+        node.name
+      );
+      return;
+    }
+    if (
+      (ts.isFunctionExpression(node) || ts.isClassExpression(node)) &&
+      node.name
+    ) {
+      addScopedBinding(bindings, node, node.name);
+    }
+  });
+  return bindings;
+}
+
+function isBindingShadowedAt(node, name, sourceFile, bindings) {
+  for (let current = node.parent; current; current = current.parent) {
+    if (!isLexicalScopeNode(current, sourceFile)) continue;
+    if (bindings.get(current)?.has(name)) return true;
+    if (current === sourceFile) break;
+  }
+  return false;
+}
+
+function variableDeclarationScope(declaration, sourceFile) {
+  const declarationList = declaration.parent;
+  const scopeNode = declarationList?.parent ?? declaration;
+  return (declarationList.flags & ts.NodeFlags.BlockScoped) === 0
+    ? nearestFunctionScope(scopeNode, sourceFile)
+    : nearestLexicalScope(scopeNode, sourceFile);
+}
+
 function exactRuntimeImports({
   sourceFile,
   importerRel,
@@ -435,21 +553,587 @@ function isExactModuleMocked({ sourceFile, importerRel, sourceRel }) {
   return mocked;
 }
 
-function isTypeOrImportUse(node) {
-  for (let current = node.parent; current; current = current.parent) {
-    if (ts.isImportDeclaration(current) || ts.isTypeNode(current)) return true;
-    if (ts.isBindingElement(current) && isDynamicImportBinding(current)) {
-      return true;
+const RUNTIME_COMPONENT_RENDERER_MODULES = new Map([
+  ['@testing-library/react', new Set(['render'])],
+  ['@testing-library/react/pure', new Set(['render'])],
+  ['enzyme', new Set(['mount', 'shallow'])],
+  ['react-dom', new Set(['render', 'hydrate'])],
+  [
+    'react-dom/server',
+    new Set([
+      'renderToString',
+      'renderToStaticMarkup',
+      'renderToPipeableStream',
+      'renderToReadableStream',
+    ]),
+  ],
+  ['react-test-renderer', new Set(['create'])],
+]);
+
+const RUNTIME_COMPONENT_ELEMENT_FACTORY_MODULES = new Map([
+  ['react', new Set(['createElement'])],
+  ['react/jsx-dev-runtime', new Set(['jsxDEV'])],
+  ['react/jsx-runtime', new Set(['jsx', 'jsxs'])],
+]);
+
+const RUNTIME_COMPONENT_ROOT_FACTORY_MODULES = new Map([
+  ['react-dom/client', new Set(['createRoot', 'hydrateRoot'])],
+]);
+
+function runtimeComponentConsumerBindings(sourceFile, consumerModules) {
+  const direct = new Map();
+  const namespaces = new Map();
+
+  for (const statement of sourceFile.statements) {
+    if (
+      !ts.isImportDeclaration(statement) ||
+      !statement.importClause ||
+      statement.importClause.isTypeOnly ||
+      !ts.isStringLiteral(statement.moduleSpecifier)
+    ) {
+      continue;
     }
-    if (ts.isStatement(current)) return false;
+    const moduleName = statement.moduleSpecifier.text;
+    const consumers = consumerModules.get(moduleName);
+    if (!consumers) continue;
+
+    if (statement.importClause.name) {
+      namespaces.set(statement.importClause.name.text, consumers);
+    }
+
+    const bindings = statement.importClause.namedBindings;
+    if (bindings && ts.isNamespaceImport(bindings)) {
+      namespaces.set(bindings.name.text, consumers);
+      continue;
+    }
+    if (!bindings || !ts.isNamedImports(bindings)) continue;
+    for (const element of bindings.elements) {
+      if (element.isTypeOnly) continue;
+      const importedName = (element.propertyName ?? element.name).text;
+      if (consumers.has(importedName)) {
+        direct.set(element.name.text, importedName);
+      }
+    }
+  }
+
+  return { direct, namespaces };
+}
+
+function isRuntimeComponentRootConsumer(
+  expression,
+  rootBindings,
+  sourceFile,
+  scopedBindingNames
+) {
+  const value = unwrapRuntimeValue(expression);
+  if (
+    !ts.isPropertyAccessExpression(value) ||
+    value.name.text !== 'render' ||
+    !ts.isCallExpression(unwrapRuntimeValue(value.expression))
+  ) {
+    return false;
+  }
+  const rootCall = unwrapRuntimeValue(value.expression);
+  return isRuntimeComponentConsumer(
+    rootCall.expression,
+    rootBindings,
+    sourceFile,
+    scopedBindingNames
+  );
+}
+
+function isRuntimeComponentRenderer(
+  expression,
+  rendererBindings,
+  rootBindings,
+  sourceFile,
+  scopedBindingNames
+) {
+  return (
+    isRuntimeComponentConsumer(
+      expression,
+      rendererBindings,
+      sourceFile,
+      scopedBindingNames
+    ) ||
+    isRuntimeComponentRootConsumer(
+      expression,
+      rootBindings,
+      sourceFile,
+      scopedBindingNames
+    )
+  );
+}
+
+function isRuntimeComponentConsumer(
+  expression,
+  bindings,
+  sourceFile,
+  scopedBindingNames
+) {
+  const value = unwrapRuntimeValue(expression);
+  if (ts.isIdentifier(value)) {
+    return (
+      bindings.direct.has(value.text) &&
+      !isBindingShadowedAt(value, value.text, sourceFile, scopedBindingNames)
+    );
+  }
+  return (
+    ts.isPropertyAccessExpression(value) &&
+    ts.isIdentifier(value.expression) &&
+    bindings.namespaces.has(value.expression.text) &&
+    !isBindingShadowedAt(
+      value.expression,
+      value.expression.text,
+      sourceFile,
+      scopedBindingNames
+    ) &&
+    bindings.namespaces.get(value.expression.text).has(value.name.text)
+  );
+}
+
+function isFunctionNode(node) {
+  return (
+    ts.isArrowFunction(node) ||
+    ts.isFunctionDeclaration(node) ||
+    ts.isFunctionExpression(node) ||
+    ts.isMethodDeclaration(node)
+  );
+}
+
+const EXECUTED_TEST_CALLBACKS = new Set([
+  'afterAll',
+  'afterEach',
+  'beforeAll',
+  'beforeEach',
+  'describe',
+  'it',
+  'test',
+]);
+
+const EXECUTED_TEST_CALLBACK_MODIFIERS = new Set([
+  'concurrent',
+  'each',
+  'fails',
+  'only',
+  'sequential',
+]);
+
+const SKIPPED_TEST_CALLBACK_MODIFIERS = new Set(['skip', 'todo']);
+
+function isExecutedTestCallbackExpression(expression) {
+  const value = unwrapRuntimeValue(expression);
+  if (ts.isIdentifier(value)) {
+    return EXECUTED_TEST_CALLBACKS.has(value.text);
+  }
+  if (ts.isCallExpression(value)) {
+    return isExecutedTestCallbackExpression(value.expression);
+  }
+  if (ts.isPropertyAccessExpression(value)) {
+    if (SKIPPED_TEST_CALLBACK_MODIFIERS.has(value.name.text)) return false;
+    return (
+      EXECUTED_TEST_CALLBACK_MODIFIERS.has(value.name.text) &&
+      isExecutedTestCallbackExpression(value.expression)
+    );
   }
   return false;
 }
 
+function registeredTestCallbackCall(node) {
+  const parent = node.parent;
+  if (
+    ts.isCallExpression(parent) &&
+    parent.arguments.includes(node) &&
+    isExecutedTestCallbackExpression(parent.expression)
+  ) {
+    return parent;
+  }
+  return null;
+}
+
+function registeredTestCallbackReference(node) {
+  return ts.isIdentifier(node) && registeredTestCallbackCall(node);
+}
+
+function immediatelyInvokedFunctionCall(node) {
+  let expression = node;
+  while (ts.isParenthesizedExpression(expression.parent)) {
+    expression = expression.parent;
+  }
+  if (
+    ts.isCallExpression(expression.parent) &&
+    expression.parent.expression === expression
+  ) {
+    return expression.parent;
+  }
+  return null;
+}
+
+function functionBindingName(node) {
+  if (ts.isFunctionDeclaration(node)) {
+    return node.name?.text ?? null;
+  }
+  if (
+    (ts.isArrowFunction(node) || ts.isFunctionExpression(node)) &&
+    ts.isVariableDeclaration(node.parent) &&
+    node.parent.initializer === node &&
+    ts.isIdentifier(node.parent.name)
+  ) {
+    return node.parent.name.text;
+  }
+  return null;
+}
+
+function functionBindingScope(node, sourceFile) {
+  if (ts.isFunctionDeclaration(node)) {
+    return nearestLexicalScope(node.parent, sourceFile);
+  }
+  if (
+    (ts.isArrowFunction(node) || ts.isFunctionExpression(node)) &&
+    ts.isVariableDeclaration(node.parent) &&
+    node.parent.initializer === node
+  ) {
+    return variableDeclarationScope(node.parent, sourceFile);
+  }
+  return null;
+}
+
+function isReferenceToFunctionBinding(
+  node,
+  bindingName,
+  bindingScope,
+  sourceFile,
+  scopedBindingNames
+) {
+  if (!bindingScope) return false;
+  for (let current = node.parent; current; current = current.parent) {
+    if (!isLexicalScopeNode(current, sourceFile)) continue;
+    if (scopedBindingNames.get(current)?.has(bindingName)) {
+      return current === bindingScope;
+    }
+    if (current === sourceFile) break;
+  }
+  return false;
+}
+
+function isFunctionExecuted(
+  node,
+  sourceFile,
+  seenFunctions = new Set(),
+  scopedBindingNames = scopedBindings(sourceFile)
+) {
+  const registeredCall = registeredTestCallbackCall(node);
+  if (registeredCall) {
+    return isExecutedRuntimePath(
+      registeredCall,
+      sourceFile,
+      seenFunctions,
+      scopedBindingNames
+    );
+  }
+  const immediateCall = immediatelyInvokedFunctionCall(node);
+  if (immediateCall) {
+    return isExecutedRuntimePath(
+      immediateCall,
+      sourceFile,
+      seenFunctions,
+      scopedBindingNames
+    );
+  }
+
+  const bindingName = functionBindingName(node);
+  if (!bindingName || seenFunctions.has(node.pos)) return false;
+  const bindingScope = functionBindingScope(node, sourceFile);
+  if (!bindingScope) return false;
+  const nextSeen = new Set(seenFunctions).add(node.pos);
+  let called = false;
+  walkAst(sourceFile, candidate => {
+    if (
+      called ||
+      !ts.isIdentifier(candidate) ||
+      candidate.text !== bindingName
+    ) {
+      return;
+    }
+    if (
+      !isReferenceToFunctionBinding(
+        candidate,
+        bindingName,
+        bindingScope,
+        sourceFile,
+        scopedBindingNames
+      )
+    ) {
+      return;
+    }
+    if (
+      ts.isCallExpression(candidate.parent) &&
+      candidate.parent.expression === candidate
+    ) {
+      called = isExecutedRuntimePath(
+        candidate.parent,
+        sourceFile,
+        nextSeen,
+        scopedBindingNames
+      );
+      return;
+    }
+    const callbackCall = registeredTestCallbackReference(candidate);
+    if (callbackCall) {
+      called = isExecutedRuntimePath(
+        callbackCall,
+        sourceFile,
+        nextSeen,
+        scopedBindingNames
+      );
+    }
+  });
+  return called;
+}
+
+function isExecutedRuntimePath(
+  node,
+  sourceFile,
+  seenFunctions = new Set(),
+  scopedBindingNames = scopedBindings(sourceFile)
+) {
+  for (let current = node.parent; current; current = current.parent) {
+    if (isFunctionNode(current)) {
+      return isFunctionExecuted(
+        current,
+        sourceFile,
+        seenFunctions,
+        scopedBindingNames
+      );
+    }
+  }
+  return true;
+}
+
+function unwrapRuntimeValue(node) {
+  let current = node;
+  while (
+    current &&
+    (ts.isParenthesizedExpression(current) ||
+      ts.isAsExpression(current) ||
+      ts.isSatisfiesExpression(current) ||
+      ts.isTypeAssertionExpression(current))
+  ) {
+    current = current.expression;
+  }
+  return current;
+}
+
+function outerRuntimeValue(node) {
+  let current = node;
+  while (
+    current.parent &&
+    ((ts.isParenthesizedExpression(current.parent) &&
+      current.parent.expression === current) ||
+      (ts.isAsExpression(current.parent) &&
+        current.parent.expression === current) ||
+      (ts.isSatisfiesExpression(current.parent) &&
+        current.parent.expression === current) ||
+      (ts.isTypeAssertionExpression(current.parent) &&
+        current.parent.expression === current))
+  ) {
+    current = current.parent;
+  }
+  return current;
+}
+
+function renderedConsumerCall(
+  node,
+  rendererBindings,
+  rootBindings,
+  sourceFile,
+  scopedBindingNames
+) {
+  const value = outerRuntimeValue(node);
+  const parent = value.parent;
+  return ts.isCallExpression(parent) &&
+    parent.arguments[0] === value &&
+    isRuntimeComponentRenderer(
+      parent.expression,
+      rendererBindings,
+      rootBindings,
+      sourceFile,
+      scopedBindingNames
+    )
+    ? parent
+    : null;
+}
+
+function renderedJsxRoot(node) {
+  const parent = node.parent;
+  let current = null;
+  if (ts.isJsxSelfClosingElement(parent) && parent.tagName === node) {
+    current = parent;
+  } else if (
+    (ts.isJsxOpeningElement(parent) || ts.isJsxClosingElement(parent)) &&
+    parent.tagName === node &&
+    ts.isJsxElement(parent.parent)
+  ) {
+    current = parent.parent;
+  }
+  if (!current) return null;
+
+  while (current.parent) {
+    const next = current.parent;
+    if (ts.isJsxElement(next) || ts.isJsxFragment(next)) {
+      current = next;
+      continue;
+    }
+    if (
+      ts.isJsxExpression(next) ||
+      ts.isJsxAttribute(next) ||
+      ts.isJsxAttributes(next) ||
+      ts.isJsxSpreadAttribute(next)
+    ) {
+      current = next;
+      continue;
+    }
+    if (ts.isFunctionLike(next)) break;
+
+    // A nested JSX value can be wrapped in a conditional, call, or other
+    // expression before reaching its containing JSX element. Do not cross a
+    // function boundary (a callback returning JSX is not rendered by the
+    // outer tree), and do not promote a standalone JSX assignment.
+    let hasJsxContext = false;
+    for (let probe = next.parent; probe; probe = probe.parent) {
+      if (ts.isFunctionLike(probe)) break;
+      if (
+        ts.isJsxExpression(probe) ||
+        ts.isJsxAttribute(probe) ||
+        ts.isJsxAttributes(probe) ||
+        ts.isJsxSpreadAttribute(probe) ||
+        ts.isJsxElement(probe) ||
+        ts.isJsxFragment(probe)
+      ) {
+        hasJsxContext = true;
+        break;
+      }
+    }
+    if (!hasJsxContext) break;
+    current = next;
+  }
+  return current;
+}
+
+/**
+ * A bare identifier reference or inert React element is not executable
+ * component evidence. Accept only a direct component call/constructor, or a
+ * JSX/createElement value that reaches an imported renderer on an executed
+ * top-level/test/helper path.
+ */
+function isMeaningfulRuntimeComponentUse(
+  node,
+  { elementFactoryBindings, rendererBindings, rootBindings },
+  sourceFile,
+  scopedBindingNames
+) {
+  const parent = node.parent;
+  const jsxRoot = renderedJsxRoot(node);
+  if (jsxRoot) {
+    const renderCall = renderedConsumerCall(
+      jsxRoot,
+      rendererBindings,
+      rootBindings,
+      sourceFile,
+      scopedBindingNames
+    );
+    return Boolean(
+      renderCall &&
+        isExecutedRuntimePath(
+          renderCall,
+          sourceFile,
+          new Set(),
+          scopedBindingNames
+        )
+    );
+  }
+
+  if (
+    (ts.isCallExpression(parent) || ts.isNewExpression(parent)) &&
+    parent.expression === node
+  ) {
+    return isExecutedRuntimePath(
+      parent,
+      sourceFile,
+      new Set(),
+      scopedBindingNames
+    );
+  }
+
+  const rendererCall =
+    ts.isCallExpression(parent) &&
+    parent.arguments[0] === node &&
+    isRuntimeComponentRenderer(
+      parent.expression,
+      rendererBindings,
+      rootBindings,
+      sourceFile,
+      scopedBindingNames
+    )
+      ? parent
+      : null;
+  if (rendererCall) {
+    return isExecutedRuntimePath(
+      rendererCall,
+      sourceFile,
+      new Set(),
+      scopedBindingNames
+    );
+  }
+
+  const elementFactoryCall =
+    ts.isCallExpression(parent) &&
+    parent.arguments[0] === node &&
+    isRuntimeComponentConsumer(
+      parent.expression,
+      elementFactoryBindings,
+      sourceFile,
+      scopedBindingNames
+    )
+      ? parent
+      : null;
+  if (!elementFactoryCall) return false;
+  const renderCall = renderedConsumerCall(
+    elementFactoryCall,
+    rendererBindings,
+    rootBindings,
+    sourceFile,
+    scopedBindingNames
+  );
+  return Boolean(
+    renderCall &&
+      isExecutedRuntimePath(
+        renderCall,
+        sourceFile,
+        new Set(),
+        scopedBindingNames
+      )
+  );
+}
+
 function hasRuntimeImportedUse(sourceFile, importedNames) {
   const allNames = importedNames.map(item => item.localName);
-  const shadowedNames = shadowedBindingNames(sourceFile, allNames);
-  const names = new Set(allNames.filter(name => !shadowedNames.has(name)));
+  const names = new Set(allNames);
+  const scopedBindingNames = scopedBindings(sourceFile);
+  const consumerBindings = {
+    elementFactoryBindings: runtimeComponentConsumerBindings(
+      sourceFile,
+      RUNTIME_COMPONENT_ELEMENT_FACTORY_MODULES
+    ),
+    rendererBindings: runtimeComponentConsumerBindings(
+      sourceFile,
+      RUNTIME_COMPONENT_RENDERER_MODULES
+    ),
+    rootBindings: runtimeComponentConsumerBindings(
+      sourceFile,
+      RUNTIME_COMPONENT_ROOT_FACTORY_MODULES
+    ),
+  };
   if (names.size === 0) return false;
   let used = false;
   walkAst(sourceFile, node => {
@@ -457,7 +1141,13 @@ function hasRuntimeImportedUse(sourceFile, importedNames) {
       !used &&
       ts.isIdentifier(node) &&
       names.has(node.text) &&
-      !isTypeOrImportUse(node)
+      !isBindingShadowedAt(node, node.text, sourceFile, scopedBindingNames) &&
+      isMeaningfulRuntimeComponentUse(
+        node,
+        consumerBindings,
+        sourceFile,
+        scopedBindingNames
+      )
     ) {
       used = true;
     }
@@ -596,30 +1286,59 @@ function hasExplicitSourceRead(sourceFile, sourceRel) {
     sourceRel.replace(/^apps\/web\//, ''),
   ]);
   const wrappers = localReadWrappers(sourceFile, readBindings);
-  const pathBindings = new Set();
+  const identifierInits = new Map();
   walkAst(sourceFile, node => {
-    if (!ts.isVariableDeclaration(node) || !ts.isIdentifier(node.name)) return;
-    const value = unwrapStringLiteral(node.initializer);
-    if (value && exactPaths.has(value)) pathBindings.add(node.name.text);
+    if (
+      !ts.isVariableDeclaration(node) ||
+      !ts.isIdentifier(node.name) ||
+      !node.initializer
+    ) {
+      return;
+    }
+    identifierInits.set(node.name.text, node.initializer);
   });
 
-  const nodeReadsExactPath = node => {
-    const literal = unwrapStringLiteral(node);
-    if (literal && exactPaths.has(literal)) return true;
+  const isJoinOrResolveCall = node => {
+    if (!ts.isCallExpression(node)) return false;
+    const callee = node.expression;
+    const name = ts.isIdentifier(callee)
+      ? callee.text
+      : ts.isPropertyAccessExpression(callee)
+        ? callee.name.text
+        : null;
+    return name === 'join' || name === 'resolve';
+  };
+
+  const nodeReadsExactPath = (node, seen = new Set()) => {
+    if (!node) return false;
+    const resolved = staticStringValue(node, identifierInits);
+    if (resolved && exactPaths.has(resolved)) return true;
     const joined = joinedLiteralPath(node);
     if (joined && exactPaths.has(joined)) return true;
-    return ts.isIdentifier(node) && pathBindings.has(node.text);
+    if (isJoinOrResolveCall(node)) {
+      return node.arguments.some(argument =>
+        nodeReadsExactPath(argument, seen)
+      );
+    }
+    if (ts.isIdentifier(node) && identifierInits.has(node.text)) {
+      if (seen.has(node.text)) return false;
+      return nodeReadsExactPath(
+        identifierInits.get(node.text),
+        new Set([...seen, node.text])
+      );
+    }
+    return false;
   };
 
   const callReadsExactPath = call => {
     if (nodeReadsExactPath(call)) return true;
     let matches = false;
-    for (const argument of call.arguments) {
-      walkAst(argument, node => {
-        if (matches) return;
-        if (nodeReadsExactPath(node)) matches = true;
-      });
-    }
+    const pathArgument = call.arguments[0];
+    if (!pathArgument) return false;
+    walkAst(pathArgument, node => {
+      if (matches) return;
+      if (nodeReadsExactPath(node)) matches = true;
+    });
     return matches;
   };
 
@@ -676,8 +1395,10 @@ export function hasRealLegacyTestEvidence({
   testRel,
   sourceRel,
   componentSource,
+  sourceFile: providedSourceFile = null,
 }) {
-  const sourceFile = parseTypeScriptSource(testSource, testRel);
+  const sourceFile =
+    providedSourceFile ?? parseTypeScriptSource(testSource, testRel);
   const exportNames = extractExportedComponentNames(componentSource);
   const imports = exactRuntimeImports({
     sourceFile,
@@ -700,6 +1421,7 @@ export function inspectCoverageViaReceipt({
   componentBase,
   componentSource,
   repoRoot = REPO_ROOT,
+  testSourceCache = null,
 }) {
   return verifyCoverageVia({
     viaRel,
@@ -707,12 +1429,36 @@ export function inspectCoverageViaReceipt({
     componentBase,
     repoRoot,
     componentSource,
-    hasExecutableEvidence: hasRealLegacyTestEvidence,
+    hasExecutableEvidence: ({
+      testSource,
+      testRel,
+      sourceRel: evidenceSourceRel,
+      componentSource: evidenceComponentSource,
+    }) => {
+      let sourceFile;
+      if (testSourceCache) {
+        const cached = testSourceCache.get(testRel);
+        if (cached?.text === testSource) {
+          sourceFile = cached.sourceFile;
+        } else {
+          sourceFile = parseTypeScriptSource(testSource, testRel);
+          testSourceCache.set(testRel, { text: testSource, sourceFile });
+        }
+      }
+      return hasRealLegacyTestEvidence({
+        testSource,
+        testRel,
+        sourceRel: evidenceSourceRel,
+        componentSource: evidenceComponentSource,
+        sourceFile,
+      });
+    },
   });
 }
 
 export function auditCoverageViaReceipts({ repoRoot = REPO_ROOT } = {}) {
   const seen = new Set();
+  const testSourceCache = new Map();
   const receipts = [];
   const invalid = [];
 
@@ -730,6 +1476,7 @@ export function auditCoverageViaReceipts({ repoRoot = REPO_ROOT } = {}) {
         componentBase: component.component,
         componentSource,
         repoRoot,
+        testSourceCache,
       });
       const receipt = {
         path: component.sourceRel,
@@ -802,6 +1549,7 @@ function findCanonicalMarketingStory({ sourceRel, componentSource, repoRoot }) {
       importedNames.map(item => [item.localName, item.exportName])
     );
     const openingTags = [];
+    const matchedStoryNames = new Set();
     const componentAllowlist = new Set();
 
     for (const statement of sourceFile.statements) {
@@ -836,6 +1584,11 @@ function findCanonicalMarketingStory({ sourceRel, componentSource, repoRoot }) {
       });
       if (statementTags.length === 0) continue;
       openingTags.push(...statementTags);
+      for (const declaration of statement.declarationList.declarations) {
+        if (ts.isIdentifier(declaration.name)) {
+          matchedStoryNames.add(declaration.name.text);
+        }
+      }
 
       if (exportNames.length !== 1) continue;
       walkAst(statement, node => {
@@ -880,7 +1633,15 @@ function findCanonicalMarketingStory({ sourceRel, componentSource, repoRoot }) {
       componentRel: sourceRel,
       storyRel,
     });
-    if (match.ok) return { storyRel, storySource: scopedStorySource };
+    if (match.ok) {
+      const storyNames = [...matchedStoryNames];
+      return {
+        storyRel,
+        storySource: scopedStorySource,
+        storyName: storyNames[0] ?? null,
+        storyNames,
+      };
+    }
   }
 
   return null;
@@ -904,6 +1665,7 @@ export function checkChangedComponents(
 ) {
   const issues = [];
   const componentSources = changed.filter(isUnderShipScope);
+  const componentStories = [];
 
   for (const sourceRel of componentSources) {
     const {
@@ -1023,12 +1785,28 @@ export function checkChangedComponents(
         detail: finding.detail,
       });
     }
+    if (match.ok) {
+      const selectedStoryNames = adjacentStoryRel
+        ? [null]
+        : centralStory?.storyNames?.length
+          ? centralStory.storyNames
+          : [centralStory?.storyName ?? null];
+      componentStories.push({
+        component: sourceRel,
+        story: storyRel,
+        storyName: selectedStoryNames[0] ?? null,
+        storyNames: selectedStoryNames.filter(
+          storyName => typeof storyName === 'string' && storyName
+        ),
+      });
+    }
   }
 
   return {
     ok: issues.length === 0,
     applicable: componentSources.length > 0,
     changedComponents: componentSources,
+    componentStories,
     issues,
   };
 }
@@ -1053,13 +1831,156 @@ function runRatchet() {
   return { ok: comparison.ok, comparison, measurement };
 }
 
+function runRenderedEvaluation({
+  storybookUrl,
+  captureDir,
+  components,
+  storyPaths = [],
+  expectedFamilies = [],
+}) {
+  const script = join(__dirname, 'component-rendered-evaluator.mjs');
+  const args = [script, `--storybook-url=${storybookUrl}`];
+  if (captureDir) args.push(`--capture-dir=${captureDir}`);
+  for (const component of components) args.push(`--component=${component}`);
+  for (const storyPath of storyPaths) args.push(`--story-path=${storyPath}`);
+  for (const family of expectedFamilies)
+    args.push(`--expected-family=${family}`);
+  const result = spawnSync(process.execPath, args, {
+    cwd: REPO_ROOT,
+    encoding: 'utf8',
+    maxBuffer: 10 * 1024 * 1024,
+  });
+  const output = `${result.stdout ?? ''}${result.stderr ?? ''}`.trim();
+  let report = null;
+  try {
+    report = JSON.parse(result.stdout?.trim() ?? '');
+  } catch {
+    report = null;
+  }
+  return {
+    ok: result.status === 0 && report?.ok === true,
+    status: result.status ?? 1,
+    report,
+    output: output.slice(0, 6000),
+  };
+}
+
+export function resolveRenderedEvaluationSection({
+  changedComponents = [],
+  componentStories = [],
+  storybookUrl = null,
+  captureDir = null,
+  requireRendered = false,
+  evaluateRendered = runRenderedEvaluation,
+} = {}) {
+  if (changedComponents.length === 0) {
+    return {
+      ok: true,
+      section: {
+        ok: true,
+        applicable: false,
+        skipped: true,
+        note: 'no changed in-scope components',
+      },
+    };
+  }
+
+  if (!storybookUrl) {
+    const ok = !requireRendered;
+    return {
+      ok,
+      section: {
+        ok,
+        applicable: true,
+        skipped: true,
+        note: requireRendered
+          ? 'rendered evaluation required but --storybook-url was not provided'
+          : 'rendered evaluation not requested (advisory rollout)',
+      },
+    };
+  }
+
+  const componentFamilyName = component =>
+    String(component)
+      .split('/')
+      .pop()
+      .replace(/\.(?:tsx?|jsx?)$/i, '');
+  const expectedFamilies = [
+    ...new Set(changedComponents.map(componentFamilyName).filter(Boolean)),
+  ];
+  const rendered = evaluateRendered({
+    storybookUrl,
+    captureDir,
+    components: changedComponents.filter(
+      component =>
+        !componentStories.some(
+          entry =>
+            entry?.component === component &&
+            typeof entry.story === 'string' &&
+            entry.story
+        )
+    ),
+    storyPaths: [
+      ...new Set(
+        componentStories
+          .flatMap(entry => {
+            if (!entry?.story) return [];
+            const storyNames = Array.isArray(entry.storyNames)
+              ? entry.storyNames.filter(
+                  storyName => typeof storyName === 'string' && storyName
+                )
+              : [];
+            if (storyNames.length > 0)
+              return storyNames.map(storyName => `${entry.story}#${storyName}`);
+            return [
+              entry?.storyName
+                ? `${entry.story}#${entry.storyName}`
+                : entry.story,
+            ];
+          })
+          .filter(storyPath => typeof storyPath === 'string' && storyPath)
+      ),
+    ],
+    expectedFamilies,
+  });
+  const sectionOk = rendered.ok;
+  return {
+    ok: requireRendered ? sectionOk : true,
+    section: {
+      ok: sectionOk,
+      applicable: true,
+      required: requireRendered,
+      status: rendered.status,
+      report: rendered.report,
+      output: rendered.output,
+    },
+  };
+}
+
 export function runComponentShipGate(options = {}) {
   const flags = {
-    diffBase: options.diffBase ?? resolveDiffBase(null),
+    // Honor an explicit null/empty diffBase as "no diff base" instead of
+    // re-resolving origin/main behind the caller's back. In CI origin/main is
+    // always present, so re-resolving turned an explicit opt-out into a diff
+    // scan against main (JOV-5454 live-cert contract). `??` would also treat
+    // explicit null as missing and fall through to TURBO_SCM_BASE, which
+    // times out the 5s control tests on large mechanical PRs (JOV-5466).
+    // Only auto-resolve when diffBase is omitted entirely; preserve explicit
+    // null so report.diffBase stays null and the skip note is recorded.
+    diffBase: Object.hasOwn(options, 'diffBase')
+      ? options.diffBase
+      : resolveDiffBase(null),
     skipQuality: options.skipQuality ?? false,
     skipRatchet: options.skipRatchet ?? false,
     skipRenderedCert: options.skipRenderedCert ?? false,
+    skipLiveStorybook: options.skipLiveStorybook ?? false,
     headSha: options.headSha ?? null,
+    requireRendered: options.requireRendered ?? false,
+    storybookUrl: options.storybookUrl ?? null,
+    captureDir: options.captureDir ?? null,
+    comparativeQualificationControls: options.comparativeQualificationControls,
+    liveObservations: options.liveObservations,
+    liveNodeVersion: options.liveNodeVersion,
   };
 
   const report = {
@@ -1086,6 +2007,7 @@ export function runComponentShipGate(options = {}) {
       ok: true,
       applicable: false,
       changedComponents: [],
+      componentStories: [],
       issues: [],
       note: 'no diff base; skipped changed-component checks',
     };
@@ -1133,6 +2055,8 @@ export function runComponentShipGate(options = {}) {
     try {
       const rendered = runRenderedCertification({
         headSha: flags.headSha ?? undefined,
+        comparativeQualificationControls:
+          flags.comparativeQualificationControls,
       });
       report.sections.renderedCertification = {
         ok: rendered.ok,
@@ -1149,6 +2073,51 @@ export function runComponentShipGate(options = {}) {
     }
   } else {
     report.sections.renderedCertification = { ok: true, skipped: true };
+  }
+
+  // 5) Live source-blind browser evaluation. The declarative certification
+  // above remains the canonical invariant/fixture layer; this measures its
+  // runtime effects from computed DOM and accessibility output.
+  const changedComponents = report.sections.diff?.changedComponents ?? [];
+  const componentStories = report.sections.diff?.componentStories ?? [];
+  const renderedEvaluation = resolveRenderedEvaluationSection({
+    changedComponents,
+    componentStories,
+    storybookUrl: flags.storybookUrl,
+    captureDir: flags.captureDir,
+    requireRendered: flags.requireRendered,
+  });
+  report.sections.rendered = renderedEvaluation.section;
+  if (!renderedEvaluation.ok) report.ok = false;
+
+  // 6) Live Storybook certification (JOV-5454)
+  if (!flags.skipLiveStorybook) {
+    try {
+      const live = runLiveStorybookCertification({
+        headSha: flags.headSha ?? undefined,
+        observations: flags.liveObservations,
+        nodeVersion: flags.liveNodeVersion,
+      });
+      report.sections.liveStorybookCertification = {
+        ok: live.ok,
+        schema: live.schema,
+        receipt: live.receipt,
+      };
+      const outcome =
+        report.sections.renderedCertification?.receipt?.shadcnOutcome;
+      if (outcome && live.receipt?.liveVisualCertification) {
+        outcome.liveVisualCertification = live.receipt.liveVisualCertification;
+      }
+      if (!live.ok) report.ok = false;
+    } catch (error) {
+      report.sections.liveStorybookCertification = {
+        ok: false,
+        message: error instanceof Error ? error.message : String(error),
+      };
+      report.ok = false;
+    }
+  } else {
+    report.sections.liveStorybookCertification = { ok: true, skipped: true };
   }
 
   return report;
@@ -1218,13 +2187,27 @@ function printReport(report) {
     const outcome = rendered.receipt?.shadcnOutcome;
     if (outcome) {
       console.log(
-        `[component-ship-gate] shadcn-outcome: ${outcome.ok ? 'ok' : 'FAIL'} enrolled=${(outcome.enrolled ?? []).length}`
+        `[component-ship-gate] shadcn-outcome rubric: ${outcome.ok ? 'qualified' : 'FAIL'} enrolled=${(outcome.enrolled ?? []).length} live-visual=${outcome.liveVisualCertification?.status ?? 'unknown'}`
       );
       for (const item of outcome.fixtures ?? []) {
         console.log(`  outcome-fixture ${item.id}: ${item.verdict}`);
       }
       for (const item of outcome.enrolledBatch ?? []) {
         console.log(`  outcome-batch ${item.id}: ${item.verdict}`);
+      }
+      const comparative = outcome.comparativeQualityBar;
+      if (comparative) {
+        console.log(
+          `  quality-bar inventory: ${comparative.inventory.rubricEnrolled}/${comparative.inventory.total} rubric-enrolled, ${comparative.inventory.pendingComparison} pending comparison`
+        );
+        for (const item of comparative.fixtures ?? []) {
+          console.log(`  quality-bar fixture ${item.id}: ${item.verdict}`);
+        }
+        for (const item of comparative.qualificationControls ?? []) {
+          console.log(
+            `  quality-bar qualification control ${item.baselineId}: ${item.verdict}`
+          );
+        }
       }
     }
   } else {
@@ -1235,11 +2218,41 @@ function printReport(report) {
     }
   }
 
+  const renderedEvaluation = report.sections.rendered;
+  if (renderedEvaluation?.skipped) {
+    const method = renderedEvaluation.ok ? 'advisory' : 'FAIL';
+    console[renderedEvaluation.ok ? 'log' : 'error'](
+      `[component-ship-gate] rendered: ${method} - ${renderedEvaluation.note}`
+    );
+  } else if (renderedEvaluation?.ok) {
+    console.log('[component-ship-gate] rendered: ok');
+  } else {
+    console.error('[component-ship-gate] rendered: FAIL');
+    if (renderedEvaluation?.output) console.error(renderedEvaluation.output);
+  }
+
+  const live = report.sections.liveStorybookCertification;
+  if (live?.skipped) {
+    console.log('[component-ship-gate] live-storybook-cert: skipped');
+  } else if (live?.ok) {
+    const head = live.receipt?.headSha ?? 'unknown';
+    console.log(`[component-ship-gate] live-storybook-cert: ok head=${head}`);
+    for (const item of live.receipt?.observations ?? []) {
+      console.log(`  live ${item.id}: ${item.verdict}`);
+    }
+  } else {
+    console.error('[component-ship-gate] live-storybook-cert: FAIL');
+    if (live?.message) console.error(live.message);
+    for (const issue of live?.receipt?.issues ?? []) {
+      console.error(`- ${issue}`);
+    }
+  }
+
   if (report.ok) {
     console.log('[component-ship-gate] PASS');
   } else {
     console.error(
-      '[component-ship-gate] FAIL — shippable UI components require matching tests + stories + rendered certification (JOV-4421, JOV-5400, JOV-5438)'
+      '[component-ship-gate] FAIL - shippable UI components require matching tests + stories + rendered certification + live rendered evaluation + live Storybook certification (JOV-4421, JOV-5400, JOV-5438, JOV-5454, JOV-5721)'
     );
   }
 }
@@ -1252,6 +2265,10 @@ function main(argv = process.argv.slice(2)) {
   --skip-quality         Skip storybook quality guard
   --skip-ratchet         Skip multi-root story coverage ratchet
   --skip-rendered-cert   Skip source-blind rendered certification
+  --skip-live-storybook  Skip live Storybook certification
+  --require-rendered     Fail closed when changed components lack rendered evidence
+  --storybook-url=URL    Evaluate computed DOM from a running Storybook instance
+  --capture-dir=PATH     Save desktop/compact rendered screenshots
   --audit-coverage-via   Whole-tree executable @coverage-via receipt audit
   --json                 Print machine-readable report`);
     return 0;
@@ -1282,6 +2299,10 @@ function main(argv = process.argv.slice(2)) {
     skipQuality: flags.skipQuality,
     skipRatchet: flags.skipRatchet,
     skipRenderedCert: flags.skipRenderedCert,
+    skipLiveStorybook: flags.skipLiveStorybook,
+    requireRendered: flags.requireRendered,
+    storybookUrl: flags.storybookUrl,
+    captureDir: flags.captureDir,
   });
 
   if (flags.json) {

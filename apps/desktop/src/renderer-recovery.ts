@@ -122,6 +122,78 @@ export function decideLocalMainFrameLoadFailure(input: {
   return 'failure-page';
 }
 
+export type LocalHostedLoadFailureResult =
+  | { readonly action: 'retry'; readonly attempt: number }
+  | { readonly action: 'failure-page'; readonly attempt: number };
+
+export type LocalHostedDocumentAction =
+  | 'ignore'
+  | 'preserve-retry'
+  | 'complete-retry';
+
+export interface LocalHostedLoadRetryController {
+  readonly onMainFrameLoadFailure: (input: {
+    readonly errorCode: number;
+    readonly retryUrl: string;
+  }) => LocalHostedLoadFailureResult;
+  readonly onHostedNavigationStarted: () => void;
+  readonly onMainFrameDocumentCommitted: (input: {
+    readonly isHostedAppDocument: boolean;
+  }) => LocalHostedDocumentAction;
+  readonly reset: () => void;
+  readonly dispose: () => void;
+}
+
+export function createLocalHostedLoadRetryController(input: {
+  readonly retry: (url: string) => void;
+  readonly isWindowDestroyed: () => boolean;
+}): LocalHostedLoadRetryController {
+  let retryCount = 0;
+  let retryTimer: ReturnType<typeof setTimeout> | null = null;
+  let recoveryActive = false;
+
+  const clearPendingRetry = (): void => {
+    if (retryTimer === null) return;
+    clearTimeout(retryTimer);
+    retryTimer = null;
+  };
+
+  const reset = (): void => {
+    retryCount = 0;
+    recoveryActive = false;
+    clearPendingRetry();
+  };
+
+  return {
+    onMainFrameLoadFailure: ({ errorCode, retryUrl }) => {
+      recoveryActive = true;
+      const action = decideLocalMainFrameLoadFailure({ errorCode, retryCount });
+      if (action === 'failure-page') {
+        clearPendingRetry();
+        return { action, attempt: retryCount };
+      }
+
+      retryCount += 1;
+      clearPendingRetry();
+      retryTimer = setTimeout(() => {
+        retryTimer = null;
+        if (input.isWindowDestroyed()) return;
+        input.retry(retryUrl);
+      }, LOCAL_HOSTED_LOAD_RETRY_DELAY_MS);
+      return { action, attempt: retryCount };
+    },
+    onHostedNavigationStarted: clearPendingRetry,
+    onMainFrameDocumentCommitted: ({ isHostedAppDocument }) => {
+      if (!recoveryActive) return 'ignore';
+      if (!isHostedAppDocument) return 'preserve-retry';
+      reset();
+      return 'complete-retry';
+    },
+    reset,
+    dispose: reset,
+  };
+}
+
 export type RendererWatchdogExpiryAction = 'ignore' | 'failure-page';
 
 export type DesktopLoadFailureKind =
@@ -387,6 +459,28 @@ export function decideHostedLoadRetry(input: {
   return 'failure-page';
 }
 
+/**
+ * Chromium commits `chrome-error://chromewebdata/` after a failed hosted
+ * navigation. That finish event is not a hosted app load: it must not reset
+ * the local retry budget or cancel a pending retry timer (JOV-5474).
+ */
+export function isChromiumErrorDocument(url: string): boolean {
+  return url.startsWith('chrome-error:');
+}
+
+export type DidFinishLoadRecoveryAction = 'ignore' | 'hosted-finished';
+
+/**
+ * Only a verified hosted (or app-owned) finish may clear local retry state.
+ * A Chromium error document finishing after `did-fail-load` is not that.
+ */
+export function decideDidFinishLoadRecovery(input: {
+  readonly url: string;
+}): DidFinishLoadRecoveryAction {
+  if (isChromiumErrorDocument(input.url)) return 'ignore';
+  return 'hosted-finished';
+}
+
 export type RendererBootWatchdogAfterLoadAction =
   | 'already-booted'
   | 'arm-boot-watchdog'
@@ -419,8 +513,10 @@ export function decideRendererRecovery(input: {
  * Only arm the boot watchdog for real hosted navigations on the app origin —
  * the app origin is the only one that ever sends the app-booted ping, so
  * arming for any other http(s) URL is a guaranteed false-positive.
- * Skip data: recovery pages, about:blank, and devtools so the failure shell
- * cannot re-trigger itself and auth blanks don't false-alarm.
+ * Skip data: recovery pages, about:blank, Chromium error documents, and
+ * devtools so the failure shell cannot re-trigger itself, a chrome-error
+ * interstitial cannot cancel local retry (JOV-5474), and auth blanks
+ * don't false-alarm.
  */
 export function shouldArmRendererBootWatchdog(
   url: string,
@@ -429,6 +525,7 @@ export function shouldArmRendererBootWatchdog(
   if (!url) return false;
   if (url === 'about:blank') return false;
   if (url.startsWith('data:')) return false;
+  if (isChromiumErrorDocument(url)) return false;
   if (url.startsWith('devtools:')) return false;
 
   try {

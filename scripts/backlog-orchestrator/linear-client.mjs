@@ -787,6 +787,19 @@ export async function addComment(issueId, body) {
   );
 }
 
+export async function updateComment(commentId, body) {
+  return graphql(
+    `
+    mutation($id: String!, $body: String!) {
+      commentUpdate(id: $id, input: { body: $body }) {
+        success
+      }
+    }
+  `,
+    { id: commentId, body }
+  );
+}
+
 /**
  * Transition an issue to a new state.
  */

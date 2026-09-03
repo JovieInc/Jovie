@@ -1,9 +1,10 @@
 #!/usr/bin/env node
-/** Shadcn/Typeset outcome inventory (JOV-5438). Public references only. */
+/** Shadcn/Typeset outcome inventory (JOV-5438 / JOV-5448 / JOV-5452). Public references only. */
 
 import { existsSync, readFileSync } from 'node:fs';
 import { basename, dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { runComparativeQualityBar } from './component-comparative-quality-bar.mjs';
 import {
   listComponentsInRoot,
   REPO_ROOT as POLICY_REPO_ROOT,
@@ -13,6 +14,7 @@ const __dirname = dirname(fileURLToPath(import.meta.url));
 export const REPO_ROOT = POLICY_REPO_ROOT ?? resolve(__dirname, '..');
 export const OUTCOME_INVENTORY_SCHEMA = 'jovie.shadcn-outcome-inventory/v1';
 export const ENROLLMENT_BATCH = 'batch-1';
+export const ENROLLMENT_BATCHES = Object.freeze(['batch-1', 'batch-2']);
 export const PRODUCT_CONTEXTS = Object.freeze([
   'artist-profiles',
   'smart-links',
@@ -31,16 +33,48 @@ export const BENCHMARK_DIMENSIONS = Object.freeze([
   'typography-rhythm',
   'typography-overflow',
 ]);
-export const APPROVED_ENROLLMENT_BATCH_IDS = Object.freeze([
-  'atom.select',
-  'atom.kbd',
-  'atom.button',
-  'atom.switch',
-  'molecule.sidebar-nav-item',
-  'atom.card',
-  'atom.field',
-  'typography.system-b',
-]);
+export const APPROVED_ENROLLMENT_BATCH_IDS_BY_BATCH = Object.freeze({
+  'batch-1': Object.freeze([
+    'atom.select',
+    'atom.kbd',
+    'atom.button',
+    'atom.switch',
+    'molecule.sidebar-nav-item',
+    'atom.card',
+    'atom.field',
+    'typography.system-b',
+  ]),
+  'batch-2': Object.freeze([
+    'atom.input',
+    'atom.textarea',
+    'atom.checkbox',
+    'atom.radio-group',
+    'atom.native-select',
+  ]),
+});
+export const APPROVED_ENROLLMENT_BATCH_IDS = Object.freeze(
+  ENROLLMENT_BATCHES.flatMap(
+    batch => APPROVED_ENROLLMENT_BATCH_IDS_BY_BATCH[batch]
+  )
+);
+const sampleContract = (id, ...applicable) =>
+  Object.freeze({ id, applicable: Object.freeze(applicable) });
+// biome-ignore format: owner -> canonical source-blind sample contract.
+export const APPROVED_OUTCOME_SAMPLE_CONTRACTS = Object.freeze({
+  'atom.select': sampleContract('outcome-batch.atom.select.closed-open', 'select-layout-stability'),
+  'atom.kbd': sampleContract('outcome-batch.atom.kbd.shortcut', 'keyboard-shortcut'),
+  'atom.button': sampleContract('outcome-batch.atom.button.primary', 'button-affordance'),
+  'atom.switch': sampleContract('outcome-batch.atom.switch.on', 'toggle-state'),
+  'molecule.sidebar-nav-item': sampleContract('outcome-batch.molecule.sidebar-nav-item.compact', 'compact-navigation'),
+  'atom.card': sampleContract('outcome-batch.atom.card.default', 'card-bento'),
+  'atom.field': sampleContract('outcome-batch.atom.field.labeled', 'form-control'),
+  'atom.input': sampleContract('outcome-batch.atom.input.labeled', 'form-control'),
+  'atom.textarea': sampleContract('outcome-batch.atom.textarea.labeled', 'form-control'),
+  'atom.checkbox': sampleContract('outcome-batch.atom.checkbox.labeled', 'form-control'),
+  'atom.radio-group': sampleContract('outcome-batch.atom.radio-group.labeled', 'form-control'),
+  'atom.native-select': sampleContract('outcome-batch.atom.native-select.labeled', 'form-control'),
+  'typography.system-b': sampleContract('outcome-batch.typography.system-b.rhythm', 'typography-rhythm', 'typography-overflow'),
+});
 export const CATALOG_ROOTS = Object.freeze([
   Object.freeze({ root: 'packages/ui/atoms', layer: 'atom' }),
   Object.freeze({ root: 'apps/web/components/molecules', layer: 'molecule' }),
@@ -65,6 +99,8 @@ export const OUTCOME_PROVENANCE = Object.freeze({
     }),
     Object.freeze({
       name: 'Typeset',
+      url: 'https://ui.shadcn.com/docs/typeset',
+      license: 'MIT',
       concepts: Object.freeze(['rhythm', 'overflow', 'measure']),
       role: 'typography-outcome-concepts',
       note: 'Named public typography outcome concepts. No Typeset implementation, font, or CSS is imported.',
@@ -84,7 +120,13 @@ const DIMENSION_SET = new Set(BENCHMARK_DIMENSIONS);
 const DISPOSITION_SET = new Set(DISPOSITIONS);
 const CONTEXT_SET = new Set(PRODUCT_CONTEXTS);
 const LAYER_SET = new Set(INVENTORY_LAYERS);
+const BATCH_SET = new Set(ENROLLMENT_BATCHES);
 const APPROVED_SET = new Set(APPROVED_ENROLLMENT_BATCH_IDS);
+const APPROVED_BATCH_BY_ID = new Map(
+  ENROLLMENT_BATCHES.flatMap(batch =>
+    APPROVED_ENROLLMENT_BATCH_IDS_BY_BATCH[batch].map(id => [id, batch])
+  )
+);
 const PUBLIC_PATTERN_HOSTS = new Set(['ui.shadcn.com']);
 const LAYOUT_CONTRACTS = new Set([
   'static',
@@ -132,6 +174,15 @@ function finding(dimension, detail) {
 function csv(value) {
   return value ? value.split(',').filter(Boolean) : [];
 }
+function sameStrings(left, right) {
+  return (
+    Array.isArray(left) &&
+    Array.isArray(right) &&
+    left.every(value => typeof value === 'string') &&
+    right.every(value => typeof value === 'string') &&
+    [...left].sort().join('\n') === [...right].sort().join('\n')
+  );
+}
 function dimensionContract(applicable, reasons = SHARED_REASONS) {
   const applicableSet = new Set(applicable);
   return {
@@ -164,6 +215,7 @@ function parseEntries(raw) {
         story,
         test,
         invariant,
+        enrollmentBatch = ENROLLMENT_BATCH,
       ] = line.split('|');
       const evidence =
         story === 'DESIGN.md'
@@ -175,7 +227,7 @@ function parseEntries(raw) {
         source,
         exportName,
         enrolled: true,
-        enrollmentBatch: ENROLLMENT_BATCH,
+        enrollmentBatch,
         nearestPublicPattern: Object.freeze({
           name: exportName,
           url: `https://ui.shadcn.com/docs/components/${slug}`,
@@ -194,6 +246,7 @@ function parseEntries(raw) {
 export const OUTCOME_INVENTORY = Object.freeze({
   schema: OUTCOME_INVENTORY_SCHEMA,
   enrollmentBatch: ENROLLMENT_BATCH,
+  enrollmentBatches: ENROLLMENT_BATCHES,
   provenance: OUTCOME_PROVENANCE,
   productContexts: PRODUCT_CONTEXTS,
   benchmarkDimensions: BENCHMARK_DIMENSIONS,
@@ -206,7 +259,12 @@ atom.button|atom|packages/ui/atoms/button.tsx|Button|button|diverge|button-affor
 atom.switch|atom|packages/ui/atoms/switch.tsx|Switch|switch|keep|toggle-state||packages/ui/atoms/switch.stories.tsx|packages/ui/atoms/switch.test.tsx|Named switch state changes without shifting surrounding geometry.
 molecule.sidebar-nav-item|molecule|apps/web/components/shell/SidebarNavItem.tsx|SidebarNavItem|sidebar|diverge|compact-navigation|atom.segment-control|apps/web/components/shell/SidebarNavItem.stories.tsx|apps/web/components/shell/SidebarNavItem.test.tsx|Compact shell rows keep an accessible name when collapsed.;;No decorative hover translation.
 atom.card|atom|packages/ui/atoms/card.tsx|Card|card|keep|card-bento||packages/ui/atoms/Card.stories.tsx|packages/ui/atoms/card.test.tsx|Single card surface; nested card-in-card compositions are blocked.
-atom.field|atom|packages/ui/atoms/field.tsx|Field|field|keep|form-control|atom.input,atom.textarea,atom.checkbox,atom.label|packages/ui/atoms/field.stories.tsx|packages/ui/atoms/field.test.tsx|Labeled control; error/description reserve geometry and stay described.
+atom.field|atom|packages/ui/atoms/field.tsx|Field|field|keep|form-control|atom.input,atom.textarea,atom.checkbox,atom.radio-group,atom.native-select,atom.label|packages/ui/atoms/field.stories.tsx|packages/ui/atoms/field.test.tsx|Labeled control; error/description reserve geometry and stay described.
+atom.input|atom|packages/ui/atoms/input.tsx|Input|input|keep|form-control|atom.field,atom.textarea|packages/ui/atoms/input.stories.tsx|packages/ui/atoms/input.test.tsx|Labeled textbox; invalid/pending reserve geometry and stay described.|batch-2
+atom.textarea|atom|packages/ui/atoms/textarea.tsx|Textarea|textarea|keep|form-control|atom.field,atom.input|packages/ui/atoms/textarea.stories.tsx|packages/ui/atoms/textarea.test.tsx|Labeled multiline textbox; long copy wraps and invalid/pending reserve geometry.|batch-2
+atom.checkbox|atom|packages/ui/atoms/checkbox.tsx|Checkbox|checkbox|keep|form-control|atom.field,atom.label|packages/ui/atoms/checkbox.stories.tsx|packages/ui/atoms/checkbox.test.tsx|Named checkbox exposes checked/unchecked/indeterminate without shifting layout.|batch-2
+atom.radio-group|atom|packages/ui/atoms/radio-group.tsx|RadioGroup|radio-group|keep|form-control|atom.field,atom.label|packages/ui/atoms/radio-group.stories.tsx|packages/ui/atoms/radio-group.test.tsx|Radio group keeps one accessible name per option and arrow-key movement.|batch-2
+atom.native-select|atom|packages/ui/atoms/native-select.tsx|NativeSelect|native-select|improve|form-control|atom.select,atom.field|packages/ui/atoms/native-select.stories.tsx|packages/ui/atoms/native-select.test.tsx|Native select stays form-associated; invalid/disabled do not shift siblings.|batch-2
 typography.system-b|system|DESIGN.md|Typography|typography|diverge|typography-rhythm,typography-overflow||DESIGN.md|apps/web/styles/design-system.css|Heading leading stays near 1.3; body leading stays near 1.5.;;Long copy wraps; clip/visible overflow fails closed.
 `.trim()
     )
@@ -286,27 +344,26 @@ function publicUrlOk(value) {
 // biome-ignore format: compact provenance + inventory checks
 function validateProvenance(provenance, issues) {
   if (!isObject(provenance)) { issues.push('provenance is required'); return; }
-  const boundary = typeof provenance.boundary === 'string' ? provenance.boundary : '';
-  if (provenance.license !== 'MIT' || !/does not import/i.test(boundary)) {
-    issues.push('provenance must declare the MIT license boundary and that no third-party implementation is imported');
-  }
-  const references = Array.isArray(provenance.references) ? provenance.references : [];
-  if (references.length === 0) issues.push('provenance requires public outcome references');
-  for (const reference of references) {
-    if (!isObject(reference) || typeof reference.name !== 'string') issues.push('provenance reference requires a name');
-    else if (typeof reference.url === 'string' && !publicUrlOk(reference.url)) {
-      issues.push(`provenance reference ${reference.name} is not a public Shadcn outcome URL`);
-    }
+  if (JSON.stringify(provenance) !== JSON.stringify(OUTCOME_PROVENANCE)) {
+    issues.push('provenance must exactly match the approved MIT public-reference and no-import boundary');
   }
 }
 
 // biome-ignore format: compact inventory validation
 export function evaluateOutcomeInventory(options = {}) {
-  const repoRoot = options.repoRoot ?? REPO_ROOT;
-  const inventory = options.inventory ?? OUTCOME_INVENTORY;
+  const optionsValid = isObject(options);
+  const resolvedOptions = optionsValid ? options : {};
+  const repoRoot = resolvedOptions.repoRoot ?? REPO_ROOT;
+  const inventory = resolvedOptions.inventory ?? OUTCOME_INVENTORY;
   const issues = [];
+  if (!optionsValid) {
+    issues.push('outcome inventory options must be an object; fail closed');
+  }
   if (!isObject(inventory) || inventory.schema !== OUTCOME_INVENTORY_SCHEMA) issues.push(`inventory schema must be ${OUTCOME_INVENTORY_SCHEMA}`);
   if (inventory?.enrollmentBatch !== ENROLLMENT_BATCH) issues.push(`enrollment batch must be ${ENROLLMENT_BATCH}`);
+  if (!Array.isArray(inventory?.enrollmentBatches) || inventory.enrollmentBatches.join('\n') !== ENROLLMENT_BATCHES.join('\n')) {
+    issues.push(`enrollment batches must be ${ENROLLMENT_BATCHES.join(', ')}`);
+  }
   validateProvenance(inventory?.provenance, issues);
   const entries = Array.isArray(inventory?.entries) ? inventory.entries : [];
   if (entries.length === 0) issues.push('inventory entries are missing; fail closed');
@@ -330,7 +387,20 @@ export function evaluateOutcomeInventory(options = {}) {
     if (!Array.isArray(item.outcomeInvariants) || item.outcomeInvariants.length === 0) issues.push(`${item.id}: outcome invariants are required`);
     if (item.enrolled === true) {
       enrolledIds.push(item.id);
-      if (!APPROVED_SET.has(item.id)) issues.push(`${item.id}: unapproved enrollment; batch-1 is closed`);
+      if (!APPROVED_SET.has(item.id)) issues.push(`${item.id}: unapproved enrollment; approved enrollment batches are closed`);
+      if (!BATCH_SET.has(item.enrollmentBatch)) issues.push(`${item.id}: unknown enrollment batch ${item.enrollmentBatch}`);
+      else if (APPROVED_BATCH_BY_ID.get(item.id) !== item.enrollmentBatch) {
+        issues.push(`${item.id}: enrollment batch must be ${APPROVED_BATCH_BY_ID.get(item.id) ?? 'an approved batch'}`);
+      }
+      const sampleContract = APPROVED_OUTCOME_SAMPLE_CONTRACTS[item.id];
+      if (
+        !sampleContract ||
+        !sameStrings(item.applicable, sampleContract.applicable)
+      ) {
+        issues.push(
+          `${item.id}: applicable dimensions contradict the approved outcome sample contract`
+        );
+      }
       collectNamedDimensions(item, issues, item.id);
       for (const relativePath of [item.source, ...evidencePaths(item.evidence)].filter(Boolean)) {
         if (!existsSync(resolve(repoRoot, relativePath))) issues.push(`${item.id}: missing evidence path ${relativePath}`);
@@ -477,6 +547,7 @@ function outcomeSample(id, kind, owner, applicable, nodes) {
     id,
     kind,
     owner,
+    productContexts: PRODUCT_CONTEXTS,
     ...dimensionContract(applicable),
     nodes: Object.freeze(nodes.map(node => Object.freeze(node))),
   });
@@ -492,6 +563,30 @@ export const OUTCOME_RED_FIXTURES = Object.freeze([
   outcomeSample('deliberate-red.typography.rhythm-overflow', 'deliberate-red', 'typography.system-b', ['typography-rhythm', 'typography-overflow'], [
     { copy: 'Never Say A Word — a long artist title that must wrap on a smart link', accessibleName: 'Track title', typography: { role: 'heading', fontSizePx: 18, lineHeightPx: 18, measureCh: 20, overflow: 'clip' } },
   ]),
+]);
+
+export const OUTCOME_RED_CONTRACTS = Object.freeze([
+  Object.freeze({
+    id: 'deliberate-red.select.layout-shift',
+    owner: 'atom.select',
+    fingerprints: Object.freeze([
+      'select-layout-stability\u0000Pro: open select shifted the trigger by 12px',
+      'select-layout-stability\u0000Pro: unknown layout contract unbounded',
+      'select-layout-stability\u0000Pro: open select content must portal or stay a bounded local disclosure',
+      'select-layout-stability\u0000Pro: open select shifted siblings by 48px',
+      'select-layout-stability\u0000Pro: open select shifted the trigger by 12px',
+      'select-layout-stability\u0000Display name: open select shifted siblings by 48px',
+    ]),
+  }),
+  Object.freeze({
+    id: 'deliberate-red.typography.rhythm-overflow',
+    owner: 'typography.system-b',
+    fingerprints: Object.freeze([
+      'typography-rhythm\u0000Never Say A Word — a long artist title that must wrap on a smart link: Typeset rhythm 1.000 is outside 1.25–1.4 for heading',
+      'typography-overflow\u0000Never Say A Word — a long artist title that must wrap on a smart link: Typeset overflow "clip" fails closed; wrap or reserved ellipsis required',
+      'typography-overflow\u0000Never Say A Word — a long artist title that must wrap on a smart link: long copy exceeds measure 20ch without wrapping',
+    ]),
+  }),
 ]);
 
 // biome-ignore format: compact outcome fixtures
@@ -518,6 +613,21 @@ export const OUTCOME_BATCH_SAMPLES = Object.freeze([
   outcomeSample('outcome-batch.atom.field.labeled', 'outcome-batch', 'atom.field', ['form-control'], [
     { copy: 'Display name', accessibleName: 'Display name', description: 'Shown on your public profile', describedBy: 'field-name-description', error: 'Enter a display name', layoutContract: 'reserved-geometry' },
   ]),
+  outcomeSample('outcome-batch.atom.input.labeled', 'outcome-batch', 'atom.input', ['form-control'], [
+    { copy: 'Artist name', accessibleName: 'Artist name', description: 'Shown on your public profile', describedBy: 'input-name-description', error: 'Enter an artist name', pending: true, layoutContract: 'reserved-geometry' },
+  ]),
+  outcomeSample('outcome-batch.atom.textarea.labeled', 'outcome-batch', 'atom.textarea', ['form-control'], [
+    { copy: 'Bio', accessibleName: 'Bio', description: 'Shown on your public profile', describedBy: 'textarea-bio-description', error: 'Enter a bio', layoutContract: 'reserved-geometry' },
+  ]),
+  outcomeSample('outcome-batch.atom.checkbox.labeled', 'outcome-batch', 'atom.checkbox', ['form-control'], [
+    { copy: 'Public profile', accessibleName: 'Public profile', role: 'checkbox', layoutContract: 'static' },
+  ]),
+  outcomeSample('outcome-batch.atom.radio-group.labeled', 'outcome-batch', 'atom.radio-group', ['form-control'], [
+    { copy: 'Visibility', accessibleName: 'Visibility', role: 'radiogroup', layoutContract: 'static' },
+  ]),
+  outcomeSample('outcome-batch.atom.native-select.labeled', 'outcome-batch', 'atom.native-select', ['form-control'], [
+    { copy: 'Release type', accessibleName: 'Release type', description: 'Shown on the smart link', describedBy: 'native-select-type-description', error: 'Choose a release type', layoutContract: 'reserved-geometry' },
+  ]),
   outcomeSample('outcome-batch.typography.system-b.rhythm', 'outcome-batch', 'typography.system-b', ['typography-rhythm', 'typography-overflow'], [
     { copy: 'Never Say A Word', accessibleName: 'Track title', typography: { role: 'heading', fontSizePx: 18, lineHeightPx: 23.4, measureCh: 40, overflow: 'wrap' } },
     { copy: 'Stream the release from any DSP on a smart link.', accessibleName: 'Release description', typography: { role: 'body', fontSizePx: 14, lineHeightPx: 21, measureCh: 65, overflow: 'wrap' } },
@@ -526,41 +636,169 @@ export const OUTCOME_BATCH_SAMPLES = Object.freeze([
 
 function receiptFor(sample, evaluation) {
   return {
-    id: sample.id,
-    kind: sample.kind,
-    owner: sample.owner ?? null,
+    id: sample?.id ?? null,
+    kind: sample?.kind ?? null,
+    owner: sample?.owner ?? null,
     verdict: evaluation.ok ? 'pass' : 'block',
     findings: evaluation.findings,
   };
 }
 
+function findingFingerprints(findings) {
+  return findings.map(item => `${item.dimension}\u0000${item.detail}`);
+}
+
+function validateOutcomeSampleContract(sample, issues) {
+  if (!isObject(sample)) {
+    issues.push('outcome batch sample must be an object; fail closed');
+    return;
+  }
+  const contract = APPROVED_OUTCOME_SAMPLE_CONTRACTS[sample.owner];
+  if (!contract) {
+    issues.push(
+      `${String(sample.owner)}: outcome batch sample has no approved contract`
+    );
+    return;
+  }
+  if (sample.id !== contract.id) {
+    issues.push(
+      `${String(sample.id)}: outcome batch sample id must be ${contract.id}`
+    );
+  }
+  if (sample.kind !== 'outcome-batch') {
+    issues.push(
+      `${sample.id}: outcome batch sample kind must be outcome-batch`
+    );
+  }
+  if (!sameStrings(sample.productContexts, PRODUCT_CONTEXTS)) {
+    issues.push(
+      `${sample.id}: outcome batch sample must name every approved Jovie product context`
+    );
+  }
+  if (!sameStrings(sample.applicable, contract.applicable)) {
+    issues.push(
+      `${sample.id}: applicable dimensions contradict the approved sample contract`
+    );
+  }
+  const expectedNotApplicable = BENCHMARK_DIMENSIONS.filter(
+    dimension => !contract.applicable.includes(dimension)
+  );
+  const actualNotApplicable = Array.isArray(sample.notApplicable)
+    ? sample.notApplicable.map(item => item?.invariant)
+    : [];
+  if (!sameStrings(actualNotApplicable, expectedNotApplicable)) {
+    issues.push(
+      `${sample.id}: not-applicable dimensions contradict the approved sample contract`
+    );
+  }
+}
+
 export function runOutcomeCertification(options = {}) {
-  const inventory = options.inventory ?? OUTCOME_INVENTORY;
-  const redFixtures = options.redFixtures ?? OUTCOME_RED_FIXTURES;
-  const enrolledBatch = options.enrolledBatch ?? OUTCOME_BATCH_SAMPLES;
+  const optionsValid = isObject(options);
+  const resolvedOptions = optionsValid ? options : {};
+  const inventory = resolvedOptions.inventory ?? OUTCOME_INVENTORY;
+  const redFixturesOption = resolvedOptions.redFixtures ?? OUTCOME_RED_FIXTURES;
+  const redFixtures = Array.isArray(redFixturesOption) ? redFixturesOption : [];
+  const enrolledBatchOption =
+    resolvedOptions.enrolledBatch ?? OUTCOME_BATCH_SAMPLES;
+  const enrolledBatch = Array.isArray(enrolledBatchOption)
+    ? enrolledBatchOption
+    : [];
   const inventoryResult = evaluateOutcomeInventory({
-    repoRoot: options.repoRoot,
+    repoRoot: resolvedOptions.repoRoot,
     inventory,
   });
   const issues = [...inventoryResult.issues];
-  if (!Array.isArray(redFixtures) || redFixtures.length === 0) {
+  if (!optionsValid) {
+    issues.push('outcome certification options must be an object; fail closed');
+  }
+  const comparative = runComparativeQualityBar({
+    repoRoot: resolvedOptions.repoRoot ?? REPO_ROOT,
+    approvedOutcomeEntries: inventory?.entries,
+    inventory: resolvedOptions.comparativeInventory,
+    redFixtures: resolvedOptions.comparativeRedFixtures,
+    qualificationControls: resolvedOptions.qualificationControls,
+    trustedBaseEnrollment: resolvedOptions.trustedBaseEnrollment,
+  });
+  if (!comparative.ok) {
+    issues.push(
+      ...comparative.receipt.issues.map(
+        issue => `comparative quality bar: ${issue}`
+      )
+    );
+  }
+  if (!Array.isArray(redFixturesOption)) {
+    issues.push(
+      'outcome deliberate-red fixtures must be an array; fail closed'
+    );
+  } else if (redFixtures.length === 0) {
     issues.push('outcome deliberate-red fixtures are missing; fail closed');
   }
-  if (!Array.isArray(enrolledBatch) || enrolledBatch.length === 0) {
+  if (!Array.isArray(enrolledBatchOption)) {
+    issues.push('outcome enrolled-batch samples must be an array; fail closed');
+  } else if (enrolledBatch.length === 0) {
     issues.push('outcome enrolled-batch samples are missing; fail closed');
   }
-  const fixtureReceipts = (redFixtures ?? []).map(sample => {
-    const receipt = receiptFor(sample, evaluateOutcomeSample(sample));
-    if (receipt.verdict !== 'block')
-      issues.push(`${sample.id}: deliberate-red fixture must block`);
+  const redCounts = new Map();
+  for (const sample of redFixtures) {
+    redCounts.set(sample?.id, (redCounts.get(sample?.id) ?? 0) + 1);
+  }
+  for (const contract of OUTCOME_RED_CONTRACTS) {
+    const count = redCounts.get(contract.id) ?? 0;
+    if (count !== 1) {
+      issues.push(
+        `${contract.id}: deliberate-red contract requires exactly one fixture; found ${count}`
+      );
+    }
+  }
+  const fixtureReceipts = redFixtures.map(sample => {
+    const evaluation = evaluateOutcomeSample(sample);
+    const receipt = receiptFor(sample, evaluation);
+    const contract = OUTCOME_RED_CONTRACTS.find(item => item.id === sample?.id);
+    if (!contract) {
+      issues.push(
+        `${sample?.id ?? 'unknown fixture'}: deliberate-red fixture has no approved contract`
+      );
+    } else if (
+      sample?.kind !== 'deliberate-red' ||
+      sample?.owner !== contract.owner ||
+      !sameStrings(sample?.productContexts, PRODUCT_CONTEXTS) ||
+      receipt.verdict !== 'block' ||
+      findingFingerprints(evaluation.findings).join('\n') !==
+        contract.fingerprints.join('\n')
+    ) {
+      issues.push(
+        `${String(sample?.id)}: deliberate-red fixture must match its approved contract and exact fingerprints`
+      );
+    }
     return receipt;
   });
-  const batchReceipts = (enrolledBatch ?? []).map(sample => {
+  const sampleCounts = new Map();
+  for (const sample of enrolledBatch) {
+    sampleCounts.set(sample?.owner, (sampleCounts.get(sample?.owner) ?? 0) + 1);
+    validateOutcomeSampleContract(sample, issues);
+  }
+  for (const id of inventoryResult.enrolledIds) {
+    const count = sampleCounts.get(id) ?? 0;
+    if (count !== 1) {
+      issues.push(
+        `${id}: enrolled outcome owner requires exactly one batch sample; found ${count}`
+      );
+    }
+  }
+  for (const owner of sampleCounts.keys()) {
+    if (!inventoryResult.enrolledIds.includes(owner)) {
+      issues.push(
+        `${String(owner)}: outcome batch sample has no enrolled owner`
+      );
+    }
+  }
+  const batchReceipts = enrolledBatch.map(sample => {
     const evaluation = evaluateOutcomeSample(sample);
     const receipt = receiptFor(sample, evaluation);
     if (receipt.verdict !== 'pass') {
       issues.push(
-        `${sample.id}: outcome-batch blocked (${evaluation.findings.map(item => item.detail).join('; ')})`
+        `${String(sample?.id)}: outcome-batch blocked (${evaluation.findings.map(item => item.detail).join('; ')})`
       );
     }
     return receipt;
@@ -573,16 +811,35 @@ export function runOutcomeCertification(options = {}) {
       schema: OUTCOME_INVENTORY_SCHEMA,
       gate: 'component-ship-gate',
       section: 'shadcnOutcome',
-      headSha: options.headSha ?? null,
+      headSha: resolvedOptions.headSha ?? null,
       ok,
       issues,
+      claimBoundary: 'rubric-and-evaluator-qualification-only',
+      liveVisualCertification: {
+        status: 'not-started',
+        certified: 0,
+        productContexts: PRODUCT_CONTEXTS,
+        contextEvidence: [],
+        requires: [
+          'rendered observations from each exact Jovie product context',
+          'exact CI receipt',
+          'founder-approved live review diff',
+        ],
+      },
       provenance: {
         license: inventory?.provenance?.license ?? null,
         boundary: inventory?.provenance?.boundary ?? null,
       },
       enrolled: inventoryResult.enrolledIds,
+      enrollmentBatches: ENROLLMENT_BATCHES.map(id => ({
+        id,
+        ownerIds: inventoryResult.enrolledIds.filter(
+          ownerId => APPROVED_BATCH_BY_ID.get(ownerId) === id
+        ),
+      })),
       catalogCount: inventoryResult.catalogCount,
       unenrolledCount: inventoryResult.unenrolledCount,
+      comparativeQualityBar: comparative.receipt,
       fixtures: fixtureReceipts,
       enrolledBatch: batchReceipts,
     },
