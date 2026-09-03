@@ -78,8 +78,9 @@ if (sentryE2eEnabled) {
 export default defineConfig({
   captureGitInfo: { commit: false, diff: false },
   testDir: './tests/e2e',
-  // Exclude nightly tests - they run via playwright.config.nightly.ts on schedule
-  testIgnore: ['**/nightly/**'],
+  // Nightly and Storybook specs have dedicated servers/configs and must never
+  // be discovered against the default Next.js app server.
+  testIgnore: ['**/nightly/**', '**/storybook-*.spec.ts'],
   fullyParallel: !shouldSerializeLocalBypassRuns,
   forbidOnly: isCI,
   // Smoke tests: fewer retries for faster feedback; full suite: more resilience
