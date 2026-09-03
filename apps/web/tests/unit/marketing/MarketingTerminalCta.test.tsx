@@ -1,6 +1,7 @@
 import { BUTTON_PEN_CONTRACT } from '@jovie/ui';
 import { render, screen } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
+import { HomepageV2FinalCta } from '@/components/marketing/homepage-v2/HomepageV2Ctas';
 import { MarketingFinalCTA } from '@/components/site/MarketingFinalCTA';
 import { MarketingFooterCta } from '@/components/site/MarketingFooterCta';
 import { MarketingTerminalCta } from '@/components/site/MarketingTerminalCta';
@@ -151,5 +152,22 @@ describe('Marketing terminal CTA wrappers', () => {
     const action = screen.getByRole('link', { name: 'Download for Mac' });
     expect(action).toHaveAttribute('href', '/api/desktop/download');
     expect(action).toHaveAttribute('data-prefetch', 'false');
+  });
+
+  it('keeps the homepage terminal variant on the canonical family', () => {
+    render(<HomepageV2FinalCta />);
+
+    const section = screen.getByTestId('homepage-v2-final-cta');
+    const action = screen.getByTestId('homepage-v2-final-cta-primary');
+    expect(section).toHaveAttribute(
+      'data-pen-contract',
+      MARKETING_PEN_CONTRACT_IDS.shell.footerCta
+    );
+    expect(screen.getByTestId('homepage-v2-final-cta-heading')).toHaveAttribute(
+      'data-homepage-section-heading',
+      'true'
+    );
+    expect(action).toHaveAttribute('data-size', 'md');
+    expect(action).toHaveAttribute('data-cta-sign-up', 'true');
   });
 });

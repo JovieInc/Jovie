@@ -20,6 +20,12 @@ const footerCtaCssBlock = (source: string) => {
 describe('mounted homepage footer CTA System B source contract', () => {
   it('keeps mounted footer CTA markup on named System B primitives', () => {
     const layoutSource = readSource('app/(home)/layout.tsx');
+    // The mounted footer CTA classes are owned by the canonical
+    // `MarketingTerminalCta` 'homepage-v2' variant; the route CTA composes
+    // that owner instead of carrying the primitives itself.
+    const terminalCtaSource = readSource(
+      'components/site/MarketingTerminalCta.tsx'
+    );
     const finalCtaSource = readSource(
       'components/marketing/homepage-v2/HomepageV2Ctas.tsx'
     );
@@ -29,9 +35,11 @@ describe('mounted homepage footer CTA System B source contract', () => {
     expect(layoutSource).toContain(
       "footerClassName='system-b-mounted-home-footer'"
     );
-    expect(finalCtaSource).toMatch(
+    expect(terminalCtaSource).toMatch(
       /(?=.*system-b-mounted-home-footer-cta(?!-))(?=.*system-b-mounted-home-footer-cta-container)(?=.*system-b-mounted-home-footer-cta-copy)(?=.*system-b-mounted-home-footer-cta-heading)(?=.*system-b-mounted-home-footer-cta-action)/s
     );
+    expect(finalCtaSource).toContain('<MarketingTerminalCta');
+    expect(finalCtaSource).toContain("variant='homepage-v2'");
     expect(finalCtaSource).not.toMatch(
       /HOMEPAGE_FINAL_CTA_ARCS|homepage-final-cta-ray|stopColor=|linearGradient|bg-black|text-white|tracking-\[-|text-\[clamp/
     );
