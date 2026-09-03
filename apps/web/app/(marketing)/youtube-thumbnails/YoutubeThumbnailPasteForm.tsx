@@ -127,7 +127,9 @@ export function YoutubeThumbnailPasteForm({
       {items ? (
         <section className='mt-10' data-testid='youtube-thumbnails-results'>
           <p className='text-sm font-medium text-primary-token'>
-            {copy.states.previewOnly}
+            {items.some(item => item.afterUrl)
+              ? copy.states.redosReady
+              : copy.states.previewOnly}
           </p>
           <ul className='mt-6 grid gap-6 md:grid-cols-3'>
             {items.map(item => (
