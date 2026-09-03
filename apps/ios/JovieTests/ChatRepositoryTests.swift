@@ -661,6 +661,62 @@ struct ChatRepositoryTests {
     #expect(repository.timeline.contains { $0.status == .failed })
   }
 
+  @Test func ovieDurableSummerStatesCoverRedPathsAndResume() async {
+    let url = URL(string: "https://preview.example")!
+    func repo(_ suite: String, _ client: MobileChatClientProtocol) -> ChatRepository {
+      ChatRepository(
+        client: client,
+        cache: ChatCache(defaults: UserDefaults(suiteName: suite)!),
+        userID: "user_ov",
+        webBaseURL: url,
+        workspace: .ovie
+      )
+    }
+    func scripted(_ events: Result<[MobileChatStreamEvent], Error>) -> ScriptedChatClient {
+      ScriptedChatClient(
+        sendTurnResult: events,
+        listConversationsResult: .success([]),
+        fetchConversationResult: .failure(MobileChatClientError.requestFailed(statusCode: 404))
+      )
+    }
+    let prompt = "Need a taste decision"
+    let stale = repo("ie.jov.Jovie.tests.chat-ov-stale", scripted(.success([
+      .turnReserved(conversationId: "conv_ov", turnId: "turn_ov", clientTurnId: "PLACEHOLDER"),
+      .turnState(clientTurnId: "PLACEHOLDER", state: "queued", eveWorkId: "ini_eve_1"),
+      .error(code: "SUMMER_TRANSPORT_FAILED", message: "Summer could not complete this turn."),
+      .assistantCompleted(clientTurnId: "PLACEHOLDER", conversationId: "conv_ov", turnId: "turn_ov", text: "stale success"),
+    ])))
+    await stale.send(text: prompt)
+    #expect(stale.timeline.last?.status == .failed && stale.timeline.last?.eveWorkId == "ini_eve_1")
+
+    let order = repo("ie.jov.Jovie.tests.chat-ov-order", scripted(.success([
+      .error(code: "SUMMER_TRANSPORT_FAILED", message: "terminal failure"),
+      .assistantDelta(clientTurnId: "PLACEHOLDER", text: "late"),
+    ])))
+    await order.send(text: prompt)
+    #expect(order.timeline.last?.content == "terminal failure")
+
+    let dropped = repo("ie.jov.Jovie.tests.chat-ov-drop", scripted(.success([
+      .turnState(clientTurnId: "PLACEHOLDER", state: "running", eveWorkId: "ini_eve_1"),
+    ])))
+    await dropped.send(text: prompt)
+    #expect(dropped.timeline.last?.status == .failed)
+
+    let conflict = repo("ie.jov.Jovie.tests.chat-ov-409", scripted(.failure(MobileChatClientError.requestFailed(statusCode: 409))))
+    await conflict.send(text: prompt)
+    #expect(conflict.timeline.last?.status == .retrying)
+
+    let cache = ChatCache(defaults: UserDefaults(suiteName: "ie.jov.Jovie.tests.chat-ov-resume")!)
+    let first = ChatRepository(client: scripted(.success([
+      .assistantCompleted(clientTurnId: "PLACEHOLDER", conversationId: "conv_ov", turnId: "turn_ov", text: "Summer reply"),
+    ])), cache: cache, userID: "user_ov_resume", webBaseURL: url, workspace: .ovie)
+    await first.send(text: prompt)
+    let relaunched = ChatRepository(client: FailingChatClient(), cache: cache, userID: "user_ov_resume", webBaseURL: url, workspace: .ovie)
+    await relaunched.bootstrap()
+    #expect(relaunched.activeConversationID == "conv_ov")
+    #expect(relaunched.timeline.filter { $0.content == "Summer reply" }.count == 1)
+  }
+
   @Test func sendOnTransportFailureMarksOfflineAndDoesNotExpireSession() async {
     let client = ScriptedChatClient(
       sendTurnResult: .failure(MobileChatClientError.transportFailed(code: -1009)),
@@ -850,6 +906,8 @@ private final class ScriptedChatClient: MobileChatClientProtocol, @unchecked Sen
     switch event {
     case let .turnReserved(conversationId, turnId, _):
       return .turnReserved(conversationId: conversationId, turnId: turnId, clientTurnId: clientTurnId)
+    case let .turnState(_, state, eveWorkId):
+      return .turnState(clientTurnId: clientTurnId, state: state, eveWorkId: eveWorkId)
     case let .assistantDelta(_, text):
       return .assistantDelta(clientTurnId: clientTurnId, text: text)
     case let .assistantCompleted(_, conversationId, turnId, text):
