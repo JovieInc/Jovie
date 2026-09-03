@@ -331,7 +331,7 @@ describe('ci-fast bounded parallel workflow', () => {
       'profile-admission':
         'pnpm --filter @jovie/web exec vitest run --config=vitest.config.mts lib/profile/capture-dismissal-client.test.ts components/features/release/SmartLinkProviderButton.test.tsx tests/unit/api/profile/capture-dismissal.test.ts tests/unit/api/profile/pac-event.test.ts tests/unit/lib/rate-limit/config.test.ts tests/unit/lib/rate-limit/limiters.test.ts tests/unit/profile/ProfileHomeRail.test.tsx tests/unit/cookie-banner-fixes.test.tsx tests/unit/tracking/pac-events.test.ts',
       structural:
-        'pnpm invariants:check && pnpm ci:harness:check && pnpm ci:control:test && pnpm ci:merge-queue:check && pnpm next:proxy-guard && pnpm tailwind:check && pnpm --filter=@jovie/web run lint:no-native-dialogs && pnpm --filter=@jovie/web run lint:seo && pnpm --filter=@jovie/web run lint:contrast-ratchet && pnpm design:shared-ui-visual-arbitrary:check && pnpm component-ship-gate && pnpm screen-certification-gate && pnpm doc:freshness:check && pnpm test:reliability-detectors',
+        'pnpm invariants:check && pnpm ci:harness:check && pnpm ci:control:test && pnpm ci:merge-queue:check && pnpm next:proxy-guard && pnpm tailwind:check && pnpm --filter=@jovie/web run lint:no-native-dialogs && pnpm --filter=@jovie/web run lint:seo && pnpm --filter=@jovie/web run lint:contrast-ratchet && pnpm design:shared-ui-visual-arbitrary:check && pnpm component-ship-gate && pnpm screen-registration-gate && pnpm doc:freshness:check && pnpm test:reliability-detectors',
     });
     expect(CI_FAST_SOURCE).toContain(
       "'pnpm design:shared-ui-visual-arbitrary:check'"
@@ -458,10 +458,17 @@ describe('ci-fast bounded parallel workflow', () => {
     );
 
     expect(remaining).toContain(
-      'scripts/hermes/(closure_health\\.py$|config/(gem-repo-registry|model-registry)\\.json$|evaluate-fleet-gate\\.sh$|fleet_admission_receipt\\.py$|gem-|gem_|install-(gem-(fleet-controller|pr-rehabilitation)|symphony-ui-pilot)\\.sh$|model-router\\.py$|symphony-reconciler\\.py$|systemd/gem-(disk-reclaim|pr-drain)\\.(service|timer)$)'
+      'scripts/hermes/(closure_health\\.py$|config/(gem-repo-registry|model-registry)\\.json$|evaluate-fleet-gate\\.sh$|fleet_admission_receipt\\.py$|gbrain-runtime/|gem-|gem_|install-gem-(fleet-controller|pr-rehabilitation)\\.sh$|model-router\\.py$|symphony-reconciler\\.py$|systemd/gem-pr-drain\\.(service|timer)$)'
     );
+    expect(remaining).toContain('gbrain-runtime-assets|merge-group');
+    expect(CI_FAST_SOURCE).toContain(
+      'GBRAIN_PROXY_COVERAGE=1 pnpm exec vitest --root scripts'
+    );
+    expect(CI_FAST_SOURCE).toContain('--precision=2 --fail-under=78');
+    expect(CI_FAST_SOURCE).toContain('elif [ "${CI:-}" = "true" ]');
+    expect(CI_FAST_SOURCE).not.toContain('elif [[');
     expect(remaining).toContain(
-      'scripts/hermes/tests/(closure-health\\.test\\.py$|gem-(disk-reclaim|pr-drain|ops-hud|pr-rehabilitation-contract|priority-gate|rehabilitation-policy)\\.test\\.py$|symphony-reconciler\\.test\\.py$|test(-model-router|_evaluate_fleet_gate|_fleet_admission_receipt|_gem_disk_reclaim)\\.py$)'
+      'scripts/hermes/tests/(closure-health\\.test\\.py$|gem-(pr-drain|ops-hud|pr-rehabilitation-contract|priority-gate|rehabilitation-policy)\\.test\\.py$|symphony-reconciler\\.test\\.py$|test(-model-router|_evaluate_fleet_gate|_fleet_admission_receipt)\\.py$)'
     );
     expect(CI_FAST_SOURCE).toContain(
       'coverage run --branch scripts/hermes/tests/gem-rehabilitation-policy.test.py'
@@ -473,7 +480,6 @@ describe('ci-fast bounded parallel workflow', () => {
       "node --test --test-name-pattern='keeps the Gem drain on typed fleet admission' scripts/backlog-orchestrator/__tests__/backlog-orchestrator.test.mjs"
     );
     for (const gemContractCommand of [
-      'python3 scripts/hermes/tests/test_gem_disk_reclaim.py',
       'python3 scripts/hermes/tests/gem-pr-drain.test.py',
       'python3 scripts/hermes/tests/gem-pr-rehabilitation-contract.test.py',
       'python3 scripts/hermes/tests/gem-priority-gate.test.py',
@@ -681,6 +687,9 @@ describe('ci-fast bounded parallel workflow', () => {
         'scripts/lib/__tests__/merge-group-workflow-contract.test.mjs'
       )
     ).toBe(true);
+    expect(
+      selectsStructural.test('scripts/verification/admission-shadow.mjs')
+    ).toBe(true);
     for (const mergeQueueControllerPath of [
       'scripts/automation-verify.sh',
       'scripts/run-affected-tests.mjs',
@@ -709,13 +718,9 @@ describe('ci-fast bounded parallel workflow', () => {
       'scripts/hermes/config/model-registry.json',
       'scripts/hermes/evaluate-fleet-gate.sh',
       'scripts/hermes/fleet_admission_receipt.py',
-      'scripts/hermes/gem-disk-reclaim.py',
       'scripts/hermes/install-gem-fleet-controller.sh',
-      'scripts/hermes/install-symphony-ui-pilot.sh',
       'scripts/hermes/model-router.py',
       'scripts/hermes/symphony-reconciler.py',
-      'scripts/hermes/systemd/gem-disk-reclaim.service',
-      'scripts/hermes/systemd/gem-disk-reclaim.timer',
       'scripts/hermes/systemd/gem-pr-drain.service',
       'scripts/hermes/systemd/gem-pr-drain.timer',
       'scripts/hermes/tests/closure-health.test.py',
@@ -725,7 +730,6 @@ describe('ci-fast bounded parallel workflow', () => {
       'scripts/hermes/tests/gem-priority-gate.test.py',
       'scripts/hermes/tests/gem-rehabilitation-policy.test.py',
       'scripts/hermes/tests/symphony-reconciler.test.py',
-      'scripts/hermes/tests/test_gem_disk_reclaim.py',
       'scripts/hermes/tests/test-model-router.py',
       'scripts/hermes/tests/test_evaluate_fleet_gate.py',
       'scripts/hermes/tests/test_fleet_admission_receipt.py',
@@ -734,6 +738,10 @@ describe('ci-fast bounded parallel workflow', () => {
     }
     expect(selectsStructural.test('.github/workflows/ci.yml')).toBe(true);
     expect(selectsStructural.test('.claude/rules/ci-branching.md')).toBe(true);
+    expect(CI_FAST_SOURCE).toContain(
+      "--test-coverage-include='scripts/verification/*.mjs'"
+    );
+    expect(CI_FAST_SOURCE).toContain('--test-coverage-branches=98');
     expect(selectsStructural.test('apps/web/components/atoms/Button.tsx')).toBe(
       true
     );
