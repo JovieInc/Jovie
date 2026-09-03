@@ -1423,6 +1423,23 @@ def evaluate(signals: dict[str, Any], observed_at: str) -> dict[str, Any]:
         promotion_mode = "draft-only"
     elif hold_intake_allowed:
         promotion_mode = "hold-intake"
+    elif (
+        state == "AMBER"
+        and main.get("status") == "green"
+        and production.get("status") == "green"
+        and integrity.get("status") in {"clear", "resolved"}
+        and closure_health.get("status") == "red"
+        and set(closure_health.get("reasons") or [])
+        <= {"native-queue-empty-with-eligible-over-15m"}
+    ):
+        # An empty native queue with eligible PRs waiting is a FEED signal,
+        # not a stop signal: blocking admission here deadlocks the loop
+        # (queue stays empty because admission is blocked; closure stays red
+        # because the queue is empty; controller then fails on queue-noop).
+        # Live 2026-09-03: 10+ mergeable PRs stranded with an empty queue.
+        # New-issue intake stays closed (closure red); only promotion of
+        # already-green work resumes.
+        promotion_mode = "hold-intake"
     else:
         promotion_mode = "blocked"
     if state == "RED":
