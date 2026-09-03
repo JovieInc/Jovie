@@ -1,11 +1,6 @@
 'use client';
 
 import { Badge, type BadgeProps, Button } from '@jovie/ui';
-import {
-  type ColumnDef,
-  createColumnHelper,
-  type SortingState,
-} from '@tanstack/react-table';
 import { memo, useCallback, useMemo, useState } from 'react';
 import { Icon } from '@/components/atoms/Icon';
 import { TableActionMenu } from '@/components/atoms/table-action-menu/TableActionMenu';
@@ -16,6 +11,8 @@ import {
 } from '@/components/organisms/table';
 import { convertContextMenuItems } from '@/components/organisms/table/molecules/TableContextMenu';
 import { TABLE_ROW_HEIGHTS } from '@/lib/constants/layout';
+import type { ColumnDef, SortingState } from '@/lib/tanstack-v8-compat';
+import { createColumnHelper } from '@/lib/tanstack-v8-compat';
 import type { TourDateViewModel } from '@/lib/tour-dates/types';
 import { cn } from '@/lib/utils';
 import { formatShortDate } from '@/lib/utils/date-formatting';
