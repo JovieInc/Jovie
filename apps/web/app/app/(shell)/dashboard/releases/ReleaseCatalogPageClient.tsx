@@ -24,6 +24,7 @@ import {
   isLibraryProfileVisibility,
   type LibraryProfileVisibility,
 } from '@/lib/library/profile-visibility';
+import type { LibraryRelationshipView } from '@/lib/library/track-drawer-types';
 import type { LibraryMerchCard } from '@/lib/merch/types';
 import { useReleasesQuery } from '@/lib/queries/useReleasesQuery';
 import type { PublicVideoListItem } from '@/lib/youtube-library/queries';
@@ -44,6 +45,7 @@ interface ReleaseCatalogPageClientProps {
   >;
   readonly creatorDocuments?: readonly CreatorDocumentListItem[];
   readonly youtubeVideos?: readonly PublicVideoListItem[];
+  readonly relationships?: readonly LibraryRelationshipView[];
 }
 
 function toApprovalStatusMap(
@@ -78,6 +80,7 @@ export function ReleaseCatalogPageClient({
   assetShareByAssetId = {},
   creatorDocuments = [],
   youtubeVideos = [],
+  relationships = [],
 }: ReleaseCatalogPageClientProps) {
   const { selectedProfile } = useDashboardData();
   const profileId = selectedProfile?.id ?? '';
@@ -154,6 +157,7 @@ export function ReleaseCatalogPageClient({
         profileId={profileId}
         artistHandle={artistHandle}
         canSyncSpotify={spotifyConnected}
+        relationships={relationships}
         assets={[
           ...buildLibraryReleaseAssets(
             [...releases, ...archivedReleases],

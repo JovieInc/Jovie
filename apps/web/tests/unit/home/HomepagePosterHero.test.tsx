@@ -48,6 +48,8 @@ describe('MarketingPosterHero', () => {
 
     const heading = screen.getByRole('heading', { level: 1 });
     expect(screen.getAllByRole('heading', { level: 1 })).toHaveLength(1);
+    expect(heading).toHaveClass('marketing-h1-max-two-lines');
+    expect(heading).not.toHaveAttribute('aria-label');
     const shell = screen.getByTestId('homepage-hero-shell');
     expect(shell).toHaveAttribute('aria-labelledby', heading.id);
     expect(shell).toHaveAttribute(

@@ -470,6 +470,83 @@ def test_autofix_uses_corepack_for_pnpm_distribution() -> None:
     assert ".headOwner == $repo_owner" in script
     assert "headOwner/$headRepo.git" not in script
     assert "persist-credentials: false" in workflow
+    assert "TARGET_PR_NUMBER" in script
+    assert 'gh_retry pr view "$TARGET_PR_NUMBER"' in script
+    assert "github.event.workflow_run.conclusion == 'failure'" in workflow
+    assert "github.event.workflow_run.pull_requests[0].number != null" in workflow
+
+
+def test_repair_controllers_use_causal_events_instead_of_polling() -> None:
+    """Repairs run from the state change they reconcile, without duplicate clocks."""
+    autofix = (WORKFLOWS / "auto-fix-lint-agent-drafts.yml").read_text(
+        encoding="utf-8"
+    )
+    receipts = (WORKFLOWS / "delivery-control-receipts.yml").read_text(
+        encoding="utf-8"
+    )
+    conflicts = (WORKFLOWS / "pr-conflict-handler.yml").read_text(
+        encoding="utf-8"
+    )
+
+    assert "schedule:" not in autofix
+    assert "workflows: ['CI']" in autofix
+    assert "schedule:" not in receipts
+    assert "workflow_run:" in receipts
+    assert "--reconcile" not in receipts
+    assert "schedule:" not in conflicts
+    assert "push:" in conflicts and "branches: [main]" in conflicts
+    assert "workflows: ['CI']" in conflicts
+
+
+def test_sha_bound_nightlies_skip_only_repeated_scheduled_heads() -> None:
+    """Expensive clocks fail closed and manual dispatches always execute."""
+    action = (
+        REPO_ROOT / ".github" / "actions" / "skip-if-unchanged" / "action.yml"
+    ).read_text(encoding="utf-8")
+
+    assert 'if [[ "$EVENT" != "schedule" ]]' in action
+    assert 'echo "skip=false"' in action
+    assert "^[0-9a-f]{40}$" in action
+    assert "--branch main --event schedule --status success" in action
+    assert '[[ -n "$last" && "$last" == "$SHA" ]]' in action
+
+    for workflow_name in (
+        "nightly-testing-agent.yml",
+        "nightly-tests.yml",
+        "sonarcloud.yml",
+    ):
+        workflow = (WORKFLOWS / workflow_name).read_text(encoding="utf-8")
+        assert "actions: read" in workflow, workflow_name
+        assert "uses: ./.github/actions/skip-if-unchanged" in workflow, workflow_name
+        assert "needs: unchanged" in workflow, workflow_name
+        assert "needs.unchanged.outputs.skip != 'true'" in workflow, workflow_name
+
+    live_model = (WORKFLOWS / "eval-real-model.yml").read_text(encoding="utf-8")
+    nightly = (WORKFLOWS / "nightly-tests.yml").read_text(encoding="utf-8")
+    assert "uses: ./.github/actions/skip-if-unchanged" not in live_model
+    assert "needs: unchanged" not in _job_block("nightly-tests.yml", "e2e-tests")
+    assert "needs.unchanged.outputs.skip" not in _job_block(
+        "nightly-tests.yml", "e2e-tests"
+    )
+
+
+def test_event_complete_workflows_do_not_retain_fallback_clocks() -> None:
+    """Path-complete main events own screenshots; live external drift keeps its clock."""
+    screenshots = (WORKFLOWS / "screenshots.yml").read_text(encoding="utf-8")
+    screenshot_triggers = screenshots.split("\non:\n", 1)[1].split(
+        "\npermissions:", 1
+    )[0]
+    ruleset = (WORKFLOWS / "merge-queue-ruleset-verify.yml").read_text(
+        encoding="utf-8"
+    )
+    ruleset_triggers = ruleset.split("\non:\n", 1)[1].split(
+        "\npermissions:", 1
+    )[0]
+
+    assert "push:" in screenshot_triggers
+    assert "workflow_dispatch:" in screenshot_triggers
+    assert "schedule:" not in screenshot_triggers
+    assert "schedule:" in ruleset_triggers
 
 
 def test_agent_landing_does_not_treat_risk_classifier_as_human_merge_gate() -> None:
@@ -1182,7 +1259,11 @@ def test_deep_lanes_are_staggered_and_bounded() -> None:
         encoding="utf-8"
     )
     assert "'30 23 * * *'" in nightly
-    assert "'0 9 * * *'" in screenshots
+    screenshot_triggers = screenshots.split("\non:\n", 1)[1].split(
+        "\npermissions:", 1
+    )[0]
+    assert "push:" in screenshot_triggers
+    assert "schedule:" not in screenshot_triggers
     assert "'0 9 * * 2'" in harness
 
 
@@ -1290,7 +1371,7 @@ def test_product_screenshot_budget_covers_capture_and_publication() -> None:
     assert "production-controller.yml/runs?status=in_progress&per_page=100" in publication
     assert "production-controller.yml/runs?status=queued&per_page=100" in publication
     assert "hold-screenshot-mq-during-controller.mjs" in publication
-    assert publication.count('gh pr edit --add-label "merge-queue"') == 2
+    assert publication.count('gh pr edit --add-label "merge-queue"') == 0
     assert publication.count("if hold_screenshot_merge_queue; then") == 2
 
 
@@ -1435,7 +1516,26 @@ def test_api_only_pr_controllers_never_consume_fixed_ci_capacity() -> None:
         encoding="utf-8"
     )
     assert "Graphite" not in dependabot
-    assert "native merge-queue enrollment" in dependabot
+    assert "Native autoenroll owns queue mutation" in dependabot
+
+
+def test_retired_merge_queue_label_has_no_active_producers() -> None:
+    """Native queue membership must never be synthesized from a legacy label."""
+    sources = [
+        REPO_ROOT / ".claude/rules/release.md",
+        REPO_ROOT / ".claude/rules/swarm.md",
+        REPO_ROOT / ".github/rulesets/branch-protection.yml",
+        WORKFLOWS / "agent-pipeline.yml",
+        REPO_ROOT / "scripts/release-queue-deferred.sh",
+        REPO_ROOT / "scripts/hermes/lib/codex-issue-shipper.ts",
+    ]
+    forbidden = re.compile(
+        r"--(?:add|remove)-label\s+[\"']?merge-queue|"
+        r"\.name\s*==\s*[\"']merge-queue[\"']|"
+        r"labels[^\n]*[\"'`]merge-queue[\"'`]"
+    )
+    for source in sources:
+        assert forbidden.search(source.read_text(encoding="utf-8")) is None, source
 
 
 def test_background_controllers_never_consume_fixed_ci_capacity() -> None:

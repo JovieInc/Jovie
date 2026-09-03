@@ -207,7 +207,9 @@ describe('PR preparation eligibility parity', () => {
     const graphiteEntry = entry({ headRefName: 'gtmq_main_16001' });
     expect(
       validatePlan(plan({ entries: [graphiteEntry] }), { nowMs: NOW }).errors
-    ).toContain('entries[0].headRefName cannot be a Graphite merge-queue ref');
+    ).toContain(
+      'entries[0].headRefName cannot be a retired gtmq_ merge-queue ref'
+    );
     expect(
       evaluateEligibility({
         entry: graphiteEntry,

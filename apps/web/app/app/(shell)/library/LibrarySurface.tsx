@@ -134,6 +134,7 @@ import {
   releaseStatusClasses,
   releaseStatusDotClasses,
 } from '@/lib/library/release-status';
+import type { LibraryRelationshipView } from '@/lib/library/track-drawer-types';
 import { useSyncReleasesFromSpotifyMutation } from '@/lib/queries';
 import { cn } from '@/lib/utils';
 import { capitalizeFirst } from '@/lib/utils/string-utils';
@@ -178,9 +179,14 @@ import {
   persistLibrarySavedView,
   readPersistedLibrarySavedView,
 } from './library-saved-views';
+import {
+  YouTubeMerchRelationshipEditor,
+  YouTubeOptimizationPanel,
+} from './YouTubeAssetDrawerPanels';
 
 const LIBRARY_TABLE_ROW_HEIGHT = 56;
 const LIBRARY_TABLE_MIN_WIDTH = '0';
+const EMPTY_RELATIONSHIPS: readonly LibraryRelationshipView[] = [];
 const LIBRARY_CONTENT_INSET_CLASS =
   'px-(--app-shell-header-padding-x) py-(--app-shell-content-padding-y)';
 const LIBRARY_CARD_FOCUS_CLASS =
@@ -2004,6 +2010,8 @@ function AssetDrawer({
   approvalSavingIds,
   artistHandle,
   pressKitCandidates,
+  merchProducts,
+  relationships,
   onApprovalStatusChange,
   onShareChange,
 }: {
@@ -2019,6 +2027,11 @@ function AssetDrawer({
   readonly approvalSavingIds: ReadonlySet<string>;
   readonly artistHandle: string | null;
   readonly pressKitCandidates: readonly LibraryReleaseAsset[];
+  readonly merchProducts: readonly {
+    readonly id: string;
+    readonly title: string;
+  }[];
+  readonly relationships: readonly LibraryRelationshipView[];
   readonly onApprovalStatusChange: (
     asset: LibraryReleaseAsset,
     approvalStatus: LibraryApprovalStatus
@@ -2038,6 +2051,12 @@ function AssetDrawer({
 
   const current = asset ?? stickyAsset;
   const isMerch = current ? getLibraryItemKind(current) === 'merch' : false;
+  const isYouTubeVideo = current?.source?.provider === 'youtube';
+  const defaultOpenSectionId = isMerch
+    ? 'merch'
+    : isYouTubeVideo
+      ? 'relationships'
+      : 'details';
   const closedInteractiveProps = open ? {} : { tabIndex: -1 };
   const closedTabIndex = open ? undefined : -1;
   const currentId = current?.id ?? null;
@@ -2128,9 +2147,7 @@ function AssetDrawer({
           searchPlaceholder='Search actions'
           searchMode='recursive'
         >
-          <DrawerSectionGroup
-            defaultOpenSectionId={isMerch ? 'merch' : 'details'}
-          >
+          <DrawerSectionGroup defaultOpenSectionId={defaultOpenSectionId}>
             <div className='space-y-2.5 overflow-visible px-3'>
               {isMerch ? (
                 <DrawerSection
@@ -2155,11 +2172,41 @@ function AssetDrawer({
                 </DrawerSection>
               ) : (
                 <>
+                  {isYouTubeVideo && current.source ? (
+                    <>
+                      <DrawerSection
+                        sectionId='relationships'
+                        surface='card'
+                        title='Relationships'
+                        defaultOpen
+                      >
+                        <YouTubeMerchRelationshipEditor
+                          profileId={profileId}
+                          videoId={current.source.canonicalId}
+                          merchProducts={merchProducts}
+                          relationships={relationships}
+                          disabled={!open}
+                        />
+                      </DrawerSection>
+                      <DrawerSection
+                        sectionId='optimization'
+                        surface='card'
+                        title='Optimization'
+                        defaultOpen={false}
+                      >
+                        <YouTubeOptimizationPanel
+                          profileId={profileId}
+                          videoId={current.source.canonicalId}
+                          disabled={!open}
+                        />
+                      </DrawerSection>
+                    </>
+                  ) : null}
                   <DrawerSection
                     sectionId='share-link'
                     surface='card'
                     title='Share Link'
-                    defaultOpen
+                    defaultOpen={!isYouTubeVideo}
                   >
                     <LibraryAssetSharePanel
                       asset={current}
@@ -2373,11 +2420,13 @@ export function LibrarySurface({
   profileId = null,
   artistHandle = null,
   canSyncSpotify = false,
+  relationships = EMPTY_RELATIONSHIPS,
 }: {
   readonly assets: readonly LibraryReleaseAsset[];
   readonly profileId?: string | null;
   readonly artistHandle?: string | null;
   readonly canSyncSpotify?: boolean;
+  readonly relationships?: readonly LibraryRelationshipView[];
 }) {
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -2954,6 +3003,13 @@ export function LibrarySurface({
         pressKitCandidates={effectiveAssets.filter(
           item => getLibraryItemKind(item) === 'release'
         )}
+        merchProducts={effectiveAssets.flatMap(asset =>
+          getLibraryItemKind(asset) === 'merch' &&
+          asset.source?.provider === 'merch'
+            ? [{ id: asset.source.canonicalId, title: asset.title }]
+            : []
+        )}
+        relationships={relationships}
         onApprovalStatusChange={handleApprovalStatusChange}
         onShareChange={handleShareChange}
       />
@@ -2971,6 +3027,7 @@ export function LibrarySurface({
       handleTogglePreview,
       playingPreviewId,
       profileId,
+      relationships,
       selectedAsset,
     ]
   );

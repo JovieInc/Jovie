@@ -33,6 +33,39 @@ STACK_DEADLINE_MAX = timedelta(days=7)
 STACK_ROOT_BASE = "main"
 STACK_REPAIR_ACTION = "split-or-retarget-draft-stack"
 UTC = timezone.utc
+
+
+def empty_stack_health() -> dict[str, Any]:
+    """Bounded empty JOV-INV-020 stack contract for fail-closed receipts."""
+    return {
+        "maxDepth": STACK_MAX_DEPTH,
+        "roots": [],
+        "violations": [],
+        "repairActions": [],
+    }
+
+
+def bounded_stack_health(value: object) -> dict[str, Any]:
+    """Keep stack diagnostics persistable even when observation is incomplete."""
+    empty = empty_stack_health()
+    if not isinstance(value, dict):
+        return empty
+    max_depth = value.get("maxDepth")
+    roots = value.get("roots")
+    violations = value.get("violations")
+    repair_actions = value.get("repairActions")
+    return {
+        "maxDepth": (
+            max_depth
+            if isinstance(max_depth, int)
+            and not isinstance(max_depth, bool)
+            and max_depth > 0
+            else STACK_MAX_DEPTH
+        ),
+        "roots": roots if isinstance(roots, list) else [],
+        "violations": violations if isinstance(violations, list) else [],
+        "repairActions": repair_actions if isinstance(repair_actions, list) else [],
+    }
 ISSUE_REFERENCE = re.compile(r"\b(?:JOV|LYB)-\d+\b", re.IGNORECASE)
 EXPLICIT_ISSUE_MARKER = re.compile(
     r"<!--\s*linear-issue-(?:id|identifier)\s*:\s*((?:JOV|LYB)-\d+)\s*-->",
@@ -1187,7 +1220,7 @@ def evaluate_closure_health(
                 for key in ("roots", "violations", "repairActions")
             )
     else:
-        stack_health = {"maxDepth": STACK_MAX_DEPTH, "roots": [], "violations": []}
+        stack_health = empty_stack_health()
     if repair_actions is None:
         repair_actions = []
     observer_unknown = observer_unknown or not isinstance(repair_actions, list)
@@ -1293,8 +1326,8 @@ def evaluate_closure_health(
         "nativeQueueCount": native_queue_count if shape_valid else None,
         "unmergeableNativeQueuePrs": unmergeable_queue_prs,
         "latestMergeAt": snapshot.get("latestMergeAt"),
-        "stackHealth": stack_health,
-        "repairActions": repair_actions,
+        "stackHealth": bounded_stack_health(stack_health),
+        "repairActions": repair_actions if isinstance(repair_actions, list) else [],
         "classifications": classifications,
     }
 
@@ -1468,12 +1501,7 @@ def observe_closure_health(
             # The observation is non-authoritative, so an empty action set
             # must not resolve prior work. It still has to satisfy the bounded
             # JOV-INV-020 ingress contract used by Fleet Gate Refresh.
-            "stackHealth": {
-                "maxDepth": STACK_MAX_DEPTH,
-                "roots": [],
-                "violations": [],
-                "repairActions": [],
-            },
+            "stackHealth": empty_stack_health(),
             "repairActions": [],
             "classifications": {
                 "dispositions": [],

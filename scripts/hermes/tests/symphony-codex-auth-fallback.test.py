@@ -39,17 +39,29 @@ RUNTIME_NAMES = tuple(path.name for path in RUNTIME_ARTIFACTS)
 LAUNCHER_NAMES = (WRAPPER.name, CONTROLLER.name, SIDECAR.name, GROK_SHIP.name, CURSOR_STD.name)
 
 
+def _load_python_module(name: str, path: pathlib.Path):
+    spec = importlib.util.spec_from_file_location(name, path)
+    assert spec and spec.loader
+    module = importlib.util.module_from_spec(spec)
+    sys.modules[spec.name] = module
+    spec.loader.exec_module(module)
+    return module
+
+
 class OfficialServiceOwnershipContract(unittest.TestCase):
     def test_recovery_targets_only_official_elixir_service(self):
-        module = importlib.util.module_from_spec(
-            spec := importlib.util.spec_from_file_location("symphony_codex_exhausted", CONTROLLER)
+        module = _load_python_module("symphony_codex_exhausted", CONTROLLER)
+        official = _load_python_module(
+            "symphony_official_runtime", SOURCE_DIR / "symphony_official_runtime.py"
         )
-        assert spec and spec.loader
-        spec.loader.exec_module(module)
+        self.assertEqual(module.PRIMARY_SERVICE, official.OFFICIAL_SERVICE_NAME)
         self.assertEqual(module.PRIMARY_SERVICE, "symphony-elixir.service")
         self.assertEqual(module.OPTIONAL_SERVICES, ())
         self.assertNotIn("symphony-ui-pilot.service", module.SERVICES)
         self.assertNotIn("symphony-lyb.service", module.SERVICES)
+        for obsolete in official.OBSOLETE_TOKENS:
+            if obsolete.endswith(".service"):
+                self.assertNotIn(obsolete, module.SERVICES)
 
 
 OWNERSHIP_COVERAGE_MARKERS = (

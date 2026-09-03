@@ -60,6 +60,13 @@ export type LibraryViewMode = 'grid' | 'list' | 'table';
 
 export type LibraryMediaOrientation = 'landscape' | 'portrait';
 
+export type LibraryAssetSourceProvider = 'youtube' | 'discography' | 'merch';
+
+export interface LibraryAssetSource {
+  readonly provider: LibraryAssetSourceProvider;
+  readonly canonicalId: string;
+}
+
 export interface LibraryReleaseAsset {
   readonly itemKind?: LibraryItemKind;
   readonly id: string;
@@ -111,6 +118,7 @@ export interface LibraryReleaseAsset {
   readonly mediaOrientation?: LibraryMediaOrientation;
   readonly share?: LibraryAssetShareViewModel | null;
   readonly catalogType?: LibraryCatalogType;
+  readonly source?: LibraryAssetSource;
   readonly linkedReleaseId?: string | null;
   readonly documentStage?: CreatorDocumentListItem['stage'];
   readonly privacyStatus?: string | null;
@@ -304,6 +312,7 @@ export function buildLibraryMerchAssets(
     return {
       itemKind: 'merch',
       id: assetId,
+      source: { provider: 'merch', canonicalId: card.id },
       title: card.title,
       artist: artistName,
       artworkUrl: imageUrl,
@@ -447,6 +456,7 @@ export function buildLibraryYouTubeAssets(
     const asset: LibraryReleaseAsset = {
       itemKind: 'video',
       catalogType,
+      source: { provider: 'youtube', canonicalId: video.videoId },
       linkedReleaseId: video.releaseLink?.releaseId ?? null,
       id: assetId,
       title: video.title,
