@@ -534,6 +534,7 @@ describe('library version stacking (JOV-3089)', () => {
           ],
           findings: [],
           rightsholders: [],
+          stats: [],
         },
       }
     );
@@ -583,6 +584,7 @@ describe('library version stacking (JOV-3089)', () => {
           ],
           findings: [],
           rightsholders: [],
+          stats: [],
         },
       }
     );

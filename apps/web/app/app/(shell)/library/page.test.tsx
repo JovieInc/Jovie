@@ -130,6 +130,7 @@ describe('LibraryPage private document boundary', () => {
       downloads: [],
       findings: [],
       rightsholders: [],
+      stats: [],
     });
     mocks.fetchQuery.mockResolvedValue([]);
     mocks.loadArchivedReleaseMatrixForProfile.mockResolvedValue([]);

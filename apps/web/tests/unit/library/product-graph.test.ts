@@ -13,7 +13,7 @@ vi.mock('@/lib/db', () => ({
   },
 }));
 
-function chain(result: unknown) {
+function thenableQuery(result: unknown) {
   const query = {
     from: vi.fn(),
     where: vi.fn(),
@@ -24,8 +24,18 @@ function chain(result: unknown) {
   query.from.mockReturnValue(query);
   query.where.mockReturnValue(query);
   query.orderBy.mockReturnValue(query);
+  return query;
+}
+
+function chain(result: unknown) {
+  const query = thenableQuery(result);
   mockSelect.mockReturnValue(query);
   return query;
+}
+
+function chainResults(...results: unknown[]) {
+  let index = 0;
+  mockSelect.mockImplementation(() => thenableQuery(results[index++] ?? []));
 }
 
 describe('library product graph stores', () => {
@@ -66,15 +76,20 @@ describe('library product graph stores', () => {
     ]);
   });
 
-  it('lists active post-release downloads for a profile', async () => {
-    chain([
-      {
-        id: 'dl-1',
-        releaseId: 'rel-1',
-        title: 'WAV',
-        fileName: 'neon.wav',
-      },
-    ]);
+  it('lists attested post-release downloads with presence stats', async () => {
+    chainResults(
+      [
+        {
+          id: 'dl-1',
+          releaseId: 'rel-1',
+          title: 'WAV',
+          fileName: 'neon.wav',
+        },
+      ],
+      [],
+      [],
+      [{ provider: 'youtube', status: 'connected' }]
+    );
     const { listLibraryPostReleaseBundle } = await import(
       '@/lib/library/post-release-store'
     );
@@ -89,6 +104,7 @@ describe('library product graph stores', () => {
       ],
       findings: [],
       rightsholders: [],
+      stats: [{ platform: 'youtube', connected: true, measurements: [] }],
     });
   });
 
