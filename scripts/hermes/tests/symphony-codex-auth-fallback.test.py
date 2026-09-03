@@ -1515,6 +1515,7 @@ class FallbackTests(unittest.TestCase):
         self.assertIn("blocked", module.BLOCKED_ADMISSION_LABELS)
         self.assertIn("needs-human", module.BLOCKED_ADMISSION_LABELS)
         self.assertIn("needs:human", module.BLOCKED_ADMISSION_LABELS)
+        self.assertIn("no-symphony", module.BLOCKED_ADMISSION_LABELS)
         for label in ("held", "decision-required", "manual-incident"):
             self.assertIn(label, module.BLOCKED_ADMISSION_LABELS)
         # admission_decision is one predicate shared front-to-back.

@@ -185,7 +185,9 @@ class ActiveStatesTests(unittest.TestCase):
     def test_missing_workflow_falls_back_to_symphony_default(self):
         with mock.patch.dict(os.environ, {"SYMPHONY_WORKFLOW_PATH": "/nonexistent/WORKFLOW.md"}):
             states = MODULE._active_states()
-        self.assertEqual(states, frozenset(("todo", "in progress")))
+        self.assertEqual(
+            states, frozenset(("todo", "in progress", "rework", "merging"))
+        )
 
 
 def write_fake_process(
