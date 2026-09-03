@@ -1,5 +1,7 @@
 'use client';
 
+// @coverage-via apps/web/tests/unit/chat/ChatUsageAlert.test.tsx
+
 import { Button } from '@jovie/ui';
 import Link from 'next/link';
 import { InfoBox } from '@/components/molecules/InfoBox';
