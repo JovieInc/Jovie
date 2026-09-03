@@ -40,6 +40,9 @@ describe('authenticated app screen product archetypes', () => {
     expect(Object.keys(DESIGN_REFERENCE_ARCHETYPE_BY_ROUTE).sort()).toEqual(
       references.map(entry => entry.route).sort()
     );
+    expect(
+      DESIGN_REFERENCE_ARCHETYPE_BY_ROUTE['/app/admin/investors/updates']
+    ).toBe('opportunity-decision');
     for (const archetype of APP_SCREEN_ARCHETYPE_REGISTRY) {
       const assembled = assembleAppScreen({
         archetypeId: archetype.id,
