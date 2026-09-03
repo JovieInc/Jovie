@@ -1,4 +1,5 @@
 import type { Meta, StoryObj } from '@storybook/nextjs-vite';
+import { fn } from 'storybook/test';
 import { SystemBErrorFallback } from './SystemBErrorFallback';
 
 const meta: Meta<typeof SystemBErrorFallback> = {
@@ -17,20 +18,18 @@ const meta: Meta<typeof SystemBErrorFallback> = {
 };
 
 export default meta;
-type Story = StoryObj<typeof meta>;
+type Story = StoryObj<typeof SystemBErrorFallback>;
 
 export const RetryAction: Story = {
   args: {
     title: 'Something went wrong',
     description: 'Try again in a moment.',
     digest: 'dashboard-timeout',
-    actions: [
-      {
-        type: 'button',
-        label: 'Try again',
-        onClick: () => undefined,
-      },
-    ],
+    action: {
+      type: 'button',
+      label: 'Try again',
+      onClick: fn(),
+    },
     role: 'alert',
   },
 };
@@ -38,13 +37,11 @@ export const RetryAction: Story = {
 export const RecoveryLink: Story = {
   args: {
     description: 'This page moved. Head back home.',
-    actions: [
-      {
-        type: 'link',
-        label: 'Go home',
-        href: '/',
-      },
-    ],
+    action: {
+      type: 'link',
+      label: 'Go home',
+      href: '/',
+    },
     ariaLive: 'polite',
   },
 };
