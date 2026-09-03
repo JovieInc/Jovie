@@ -390,7 +390,7 @@ describe('production lane range', () => {
         githubOutputPath,
       ]);
       const expectedWebEvidence =
-        expectedPlan.webBindReason === WEB_BIND_REASONS.liveUnbound
+        String(expectedPlan.webBindReason) === WEB_BIND_REASONS.liveUnbound
           ? {
               sha: currentSha,
               lane: 'web',
