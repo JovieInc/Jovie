@@ -18,17 +18,6 @@ import { publicEnv } from '@/lib/env-public';
 import { FEATURE_FLAGS } from '@/lib/flags/marketing-static';
 import { getMarketingExportImage } from '@/lib/screenshots/registry';
 
-// Night editorial still behind the hero copy. Two art-directed crops of the
-// same photograph: landscape for desktop, a tighter portrait crop for phones.
-const HERO_BACKDROP = {
-  desktopSrc: '/images/hero/night-desk.webp',
-  desktopWidth: 1536,
-  desktopHeight: 1024,
-  mobileSrc: '/images/hero/night-desk-mobile.webp',
-  mobileWidth: 737,
-  mobileHeight: 1024,
-} as const;
-
 // Real public-profile exports (jov.ie/timwhite) for the two sections that
 // show product. Every other section is type only.
 const CERTIFIED_PREVIEWS = {
@@ -171,7 +160,6 @@ function HomepageHero() {
       headline={HERO_COPY.headline}
       support={HERO_COPY.subhead}
       search={HERO_COPY.search}
-      backdrop={HERO_BACKDROP}
     />
   );
 }
