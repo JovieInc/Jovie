@@ -540,14 +540,15 @@ export function JovieChat({
   });
   const showEmptyActionCards = emptyStateAffordance === 'starter-actions';
   const showEmptyPromptRail = emptyStateAffordance === 'suggestion-pills';
-  // Clean start screen (JOV-4878): when the stage is otherwise bare, fill the
-  // scroll region above the docked composer with the centered welcome (ambient
-  // brand logo + invitation). Hidden while the composer has intent so the
-  // composer owns attention; geometry never shifts (composer stays docked).
+  // JOV-5387: Just ask + executable sample is the shared empty-state heading.
+  // Starter-action cards and suggestion pills may sit below it; they must not
+  // replace it. Hidden while the composer has intent so the composer owns
+  // attention; geometry never shifts (composer stays docked).
   const showEmptyWelcome =
     !composerHasIntent &&
     (emptyStateAffordance === 'none' ||
-      emptyStateAffordance === 'suggestion-pills');
+      emptyStateAffordance === 'suggestion-pills' ||
+      emptyStateAffordance === 'starter-actions');
   const shouldReservePickerClearance = showBottomComposer && composerPickerOpen;
   const messageViewportPaddingBottom = shouldReservePickerClearance
     ? CHAT_PICKER_THREAD_CLEARANCE
@@ -787,9 +788,14 @@ export function JovieChat({
                       />
                     ) : showEmptyActionCards ? (
                       <div
-                        className='mx-auto flex min-h-full w-full max-w-[46rem] items-start py-2 sm:items-center sm:py-3'
+                        className='mx-auto flex min-h-full w-full max-w-[46rem] flex-col items-center justify-center gap-5 py-2 sm:py-3'
                         data-testid='chat-empty-state-action-card-slot'
                       >
+                        {showEmptyWelcome ? (
+                          <ChatEmptyStateWelcome
+                            onSelectSample={handleSuggestedPrompt}
+                          />
+                        ) : null}
                         <ChatStarterActionsRail
                           cards={visibleActionCards}
                           onAct={handleActOnActionCard}

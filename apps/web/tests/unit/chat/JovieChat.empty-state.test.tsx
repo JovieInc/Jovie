@@ -351,6 +351,15 @@ describe('JovieChat empty state', () => {
       screen.getByTestId('chat-empty-state-action-card-slot')
     ).toBeTruthy();
     expect(screen.getByTestId('chat-starter-actions-rail')).toBeTruthy();
+    expect(screen.getByTestId('chat-empty-state-greeting').textContent).toBe(
+      'Just ask'
+    );
+    expect(screen.getByTestId('chat-empty-state-sample-user').textContent).toBe(
+      'Plan my next release'
+    );
+    expect(
+      screen.getByRole('button', { name: 'Ask “Plan my next release”' })
+    ).toBeTruthy();
     expect(screen.getByTestId('chat-empty-state-viewport')).toHaveAttribute(
       'data-empty-affordance',
       'starter-actions'
@@ -359,8 +368,9 @@ describe('JovieChat empty state', () => {
       screen.getByTestId('chat-empty-state-centered-composer')
     ).toBeTruthy();
     expect(screen.getByTestId('chat-empty-state-action-card-slot')).toHaveClass(
-      'items-start',
-      'sm:items-center'
+      'flex-col',
+      'items-center',
+      'justify-center'
     );
     // Docked layout: cards scroll above, composer at bottom of usable area.
     const region = screen.getByTestId('chat-empty-state-composer-region');
@@ -385,6 +395,13 @@ describe('JovieChat empty state', () => {
         { name: /Show Starter Action/ }
       )
     ).toHaveLength(3);
+
+    fireEvent.click(
+      screen.getByRole('button', { name: 'Ask “Plan my next release”' })
+    );
+    expect(mockChatState.handleSuggestedPrompt).toHaveBeenCalledWith(
+      'Plan my next release'
+    );
   });
 
   it('does not resurrect dismissed primary actions as chips or recenter the composer', () => {

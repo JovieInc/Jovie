@@ -380,6 +380,8 @@ describe('bounded PR visual review contract', () => {
     expect(capture).toContain('waitForAuthenticatedShell');
     expect(capture).toContain("getByTestId('dashboard-header')");
     expect(capture).toContain("getByTestId('dashboard-error')");
+    expect(capture).toContain('filter({ visible: true })');
+    expect(capture).toContain('.first().waitFor');
     expect(capture).toContain(
       'Captured app route rendered dashboard error UI instead of authenticated shell'
     );

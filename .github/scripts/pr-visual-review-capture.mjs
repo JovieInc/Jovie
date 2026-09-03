@@ -26,13 +26,20 @@ if (!Array.isArray(routes) || routes.length === 0)
 async function waitForAuthenticatedShell(page, route) {
   if (!route.startsWith('/app/')) return;
 
-  const header = page.getByTestId('dashboard-header');
-  const dashboardError = page.getByTestId('dashboard-error');
-  await header.or(dashboardError).waitFor({
+  // Streaming can leave the AppShellSkeleton header in the DOM beside the
+  // loaded shell header. Wait on the first visible match so Playwright
+  // strict mode does not fail closed on the duplicate.
+  const visibleHeader = page
+    .getByTestId('dashboard-header')
+    .filter({ visible: true });
+  const visibleDashboardError = page
+    .getByTestId('dashboard-error')
+    .filter({ visible: true });
+  await visibleHeader.or(visibleDashboardError).first().waitFor({
     state: 'visible',
     timeout: AUTHENTICATED_SHELL_WAIT_MS,
   });
-  if (await dashboardError.isVisible()) {
+  if ((await visibleDashboardError.count()) > 0) {
     throw new Error(
       'Captured app route rendered dashboard error UI instead of authenticated shell'
     );
