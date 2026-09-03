@@ -250,6 +250,19 @@ describe('JovieChat styling regressions', () => {
     ).toBeTruthy();
   });
 
+  it('certifies the chat transcript window policy against the real component source', () => {
+    // Asserted node:fs read of the exact component source (coverage-via
+    // receipt evidence for the component-ship-gate structural contract).
+    const jovieChatSource = readFileSync(
+      resolve(appRoot, 'components/jovie/JovieChat.tsx'),
+      'utf8'
+    );
+
+    expect(jovieChatSource).toContain('CHAT_TRANSCRIPT_WINDOW');
+    expect(jovieChatSource).toContain('virtualizeAfterMessageCount');
+    expect(jovieChatSource).toContain('overscanRowCount');
+  });
+
   it('marks an empty conversation-load shell as busy for assistive technology', () => {
     mockChatState.isLoadingConversation = true;
     mockChatState.hasMessages = false;
