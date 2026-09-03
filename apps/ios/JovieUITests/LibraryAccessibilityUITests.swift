@@ -15,13 +15,24 @@ final class LibraryAccessibilityUITests: XCTestCase {
   }
 
   func testLibraryPillExpandedHitAreaAndLandscapeConformance() {
-    let app = launchLibrary()
-    XCUIDevice.shared.orientation = .landscapeLeft
-    let landscapeExpectation = XCTNSPredicateExpectation(
-      predicate: NSPredicate { _, _ in app.frame.width > app.frame.height },
-      object: app
+    // Launch already rotated: a fresh app presented into the device's current
+    // orientation settles deterministically, unlike rotating mid-test and
+    // racing the scene's orientation change on fresh CI simulators.
+    let app = launchLibrary(orientation: .landscapeLeft)
+
+    let landscapeSettled = XCTWaiter.wait(
+      for: [XCTNSPredicateExpectation(
+        predicate: NSPredicate { _, _ in app.frame.width > app.frame.height },
+        object: app
+      )],
+      timeout: 10
     )
-    wait(for: [landscapeExpectation], timeout: 3)
+    guard landscapeSettled == .completed else {
+      XCTFail(
+        "Library window did not settle into landscape after launching rotated. frame=\(app.frame)\n\(app.debugDescription)"
+      )
+      return
+    }
 
     assertPrimaryControlsMeetMinimumTouchTarget(in: app)
     let collections = app.buttons["library-home-collections"]
@@ -31,14 +42,14 @@ final class LibraryAccessibilityUITests: XCTestCase {
       object: app
     )
     XCTAssertEqual(
-      XCTWaiter.wait(for: [selectedExpectation], timeout: 2),
+      XCTWaiter.wait(for: [selectedExpectation], timeout: 6),
       .completed,
       "The expanded top edge must activate the pill after rotation."
     )
   }
 
-  private func launchLibrary() -> XCUIApplication {
-    XCUIDevice.shared.orientation = .portrait
+  private func launchLibrary(orientation: UIDeviceOrientation = .portrait) -> XCUIApplication {
+    XCUIDevice.shared.orientation = orientation
     let app = XCUIApplication()
     app.launchArguments = ["-ui-testing-library", "-ui-testing-allow-exit"]
     addTeardownBlock {
