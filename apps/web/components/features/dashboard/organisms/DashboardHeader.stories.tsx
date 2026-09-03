@@ -37,7 +37,7 @@ export const TransparentChat: Story = {
         type='button'
         variant='ghost'
         size='sm'
-        className='text-xs text-secondary-token'
+        className='h-auto rounded-full px-0 py-0 text-xs text-secondary-token before:hidden'
       >
         Search chats
       </Button>

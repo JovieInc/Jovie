@@ -75,7 +75,7 @@ export function ChatEmptyStateWelcome({
           type='button'
           variant='ghost'
           aria-label={`Ask “${sample.prompt}”`}
-          className='h-auto min-h-0 w-full max-w-md rounded-2xl p-1 text-left font-normal shadow-none before:hidden hover:bg-transparent hover:text-inherit active:bg-transparent [&>span]:flex [&>span]:w-full [&>span]:flex-col'
+          className='h-auto min-h-0 w-full max-w-md justify-start rounded-2xl p-1 text-left font-normal shadow-none before:hidden hover:bg-transparent hover:text-inherit active:bg-transparent [&>span]:flex [&>span]:w-full [&>span]:flex-col'
           data-testid='chat-empty-state-sample-button'
           onClick={() => onSelectSample(sample.prompt)}
         >

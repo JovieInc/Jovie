@@ -42,13 +42,16 @@ export const EnabledPrimaryCreate: Story = {
     <Button
       type='button'
       variant='ghost'
-      className={getSidebarNavRowClassName({ tone: 'primary' })}
+      size='md'
+      className='h-auto w-auto min-w-0 rounded-full px-0 py-0 before:hidden'
     >
-      <SquarePen
-        className={getSidebarNavIconClassName({ tone: 'primary' })}
-        strokeWidth={2}
-      />
-      <span>New Chat</span>
+      <div className={getSidebarNavRowClassName({ tone: 'primary' })}>
+        <SquarePen
+          className={getSidebarNavIconClassName({ tone: 'primary' })}
+          strokeWidth={2}
+        />
+        <span>New Chat</span>
+      </div>
     </Button>
   ),
 };
