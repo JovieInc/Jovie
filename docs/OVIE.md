@@ -58,6 +58,15 @@ the typed fleet receipt. JOV-5249 consumes freshness UX. Shutdown retains the
 expired last-known marker. No Mac-journal fallback, merged-PR-as-shipped, or
 dispatch/retry/cancel/restart surface.
 
+The Summer Kanban projection (`SummerKanbanCard` in
+`apps/web/lib/ovie/summer-kanban.ts`, JOV-5761) extends the same conventions:
+every card carries per-source freshness in the shipping-state observation
+vocabulary (`fresh` / `stale` / `unknown`, never fresh on missing data), the
+accountable next action and next proof derived from its routing state and
+reason, and the terminal evidence reference once the card lands. All three are
+derived at read time from the existing initiative record — nothing is stored —
+and Eve remains denied from card transitions.
+
 If you are already signed in as admin, Fullscreen fetches `/api/hud/kiosk-session` and writes the token onto the URL so the same tab can be bookmarked or thrown on a display.
 
 ## History

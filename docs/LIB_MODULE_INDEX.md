@@ -67,6 +67,7 @@
 | `utm/` | UTM parameter builder with presets, sorting, and share menu generators | `buildUTMUrl`, `UTM_PRESET_MAP`, `extractUTMParams` |
 | `monitoring/` | Performance monitoring for APIs, DB queries, middleware with request ID | `withApiPerformanceMonitoring`, `withDatabaseMonitoring` |
 | `fit-scoring/` | ICP fit scoring for creator profiles with Spotify enrichment | `calculateFitScore`, `getTopFitProfiles` |
+| `acquisition/` | Shared launch-experiment kernel (JOV-5911): Experiment 2 YouTube closed-loop audit, ICP, Tim-only send | `qualifyRegularlyUploadingChannel`, `nextAcquisitionPath`, `youtubeClosedLoopAttribution` |
 | `sentry/` | Sentry SDK factory: lite (public, ~20KB) vs full (dashboard, ~60KB) | `initSentry`, `getSentryMode`, `upgradeSentryToFull` |
 
 ## Billing
