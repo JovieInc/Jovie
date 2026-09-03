@@ -34,15 +34,12 @@ export type HomepageRedesignViewportId =
 
 export const LIVE_HOMEPAGE_SOURCE_FILES = [
   'apps/web/app/(home)/page.tsx',
-  'apps/web/components/features/home/HomeTrustSection.tsx',
-  'apps/web/components/homepage/HomepageArtistProfiles.tsx',
-  'apps/web/components/homepage/HomepageClosedLoop.tsx',
-  'apps/web/components/homepage/HomepageHeroCommandCenter.tsx',
-  'apps/web/components/homepage/HomepageMeetJovie.tsx',
-  'apps/web/components/homepage/HomepageTrackedLink.tsx',
+  'apps/web/components/homepage/HomepageEditorialHero.tsx',
+  'apps/web/components/homepage/HomepageCertifiedSections.tsx',
+  'apps/web/components/homepage/HomepageClose.tsx',
+  'apps/web/components/features/home/HeroSpotifySearch.tsx',
   'apps/web/components/homepage/intent.ts',
   'apps/web/data/homepageLaunchCopy.ts',
-  'apps/web/components/marketing/homepage-v2/HomepageV2Ctas.tsx',
 ] as const;
 
 export const STAGED_HOMEPAGE_SOURCE_FILES = [
@@ -54,14 +51,12 @@ export const STAGED_HOMEPAGE_SOURCE_FILES = [
 export const HOMEPAGE_PROPOSAL_NARRATIVE_SOURCE =
   'apps/web/components/features/home/CaptureFlowSection.tsx' as const;
 
+// Certified nine-section homepage. Sections 2-8 are copy-driven inside one
+// mount, so the source markers are the hero, the certified body, and the close.
 export const LIVE_HOMEPAGE_SECTION_IDS = [
   'hero',
-  'trust',
-  'meet-jovie',
-  'artist-profiles',
-  'closed-loop',
-  'faq',
-  'final-cta',
+  'certified-sections',
+  'close',
 ] as const;
 
 export type LiveHomepageSectionId = (typeof LIVE_HOMEPAGE_SECTION_IDS)[number];
@@ -70,12 +65,8 @@ export const LIVE_HOMEPAGE_SECTION_MARKERS: Readonly<
   Record<LiveHomepageSectionId, string>
 > = {
   hero: 'function HomepageHero()',
-  trust: 'homepage-trust-section',
-  'meet-jovie': '<HomepageMeetJovie />',
-  'artist-profiles': '<HomepageArtistProfiles',
-  'closed-loop': '<HomepageClosedLoop />',
-  faq: 'function HomepageFaq()',
-  'final-cta': '<HomepageV2FinalCta />',
+  'certified-sections': '<HomepageCertifiedSections',
+  close: '<HomepageClose />',
 };
 
 export interface HomepageLiveBaseline {

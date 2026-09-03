@@ -18,7 +18,7 @@ describe('homepage hero contract (JOV-5864)', () => {
       'Control how the world sees you.'
     );
     expect(HOMEPAGE_LAUNCH_COPY.hero.subhead).toBe(
-      'Find what the internet knows about you, bring it together, and turn attention into lasting relationships.'
+      'Find what the internet knows. Turn it into relationships.'
     );
   });
 
@@ -34,7 +34,7 @@ describe('homepage hero contract (JOV-5864)', () => {
     );
     const heroSource = pageSource.slice(
       pageSource.indexOf('function HomepageHero()'),
-      pageSource.indexOf('function HomepageFaq()')
+      pageSource.indexOf('function HomepageUnlockedSections()')
     );
 
     expect(heroSource).toContain('search={HERO_COPY.search}');
@@ -43,16 +43,18 @@ describe('homepage hero contract (JOV-5864)', () => {
     expect(heroSource).not.toMatch(/Get started|Drop more music|waitlist/i);
   });
 
-  it('keeps the Quiet H1 ramp and balanced support copy', () => {
+  it('keeps the one-line H1 contract and the two-line phone fallback', () => {
     const css = readHeroCss();
 
-    expect(css).toContain('font-size: 38px;');
-    expect(css).toContain('font-size: 56px;');
-    expect(css).toContain('font-size: 64px;');
-    expect(css).toContain('font-weight: 510;');
-    expect(css).toContain('letter-spacing: -0.022em;');
-    expect(css).toContain('text-wrap: balance;');
-    expect(css).toContain('text-wrap: pretty;');
+    expect(css).toMatch(
+      /\.homepage-editorial-hero__headline\s*\{[\s\S]*?white-space: nowrap;[\s\S]*?\}/
+    );
+    expect(css).toMatch(
+      /@media \(max-width: 767px\)[\s\S]*?\.homepage-editorial-hero__headline\s*\{[\s\S]*?white-space: normal;[\s\S]*?\}/
+    );
+    expect(css).toMatch(
+      /\.homepage-editorial-hero__support\s*\{[\s\S]*?white-space: nowrap;[\s\S]*?\}/
+    );
   });
 
   it('keeps the Find me pill on the 32/510 marketing button contract', () => {
@@ -83,7 +85,7 @@ describe('homepage hero contract (JOV-5864)', () => {
     expect(profilesSource).not.toContain('homepage-artist-outcome__copy');
   });
 
-  it('keeps homepage nav as icon, canonical links, and Log in only', () => {
+  it('keeps homepage nav as wordmark plus Log in text only, with no Get started', () => {
     const headerSource = readFileSync(
       path.join(webRoot, 'components/site/MarketingHeader.tsx'),
       'utf8'
@@ -95,10 +97,8 @@ describe('homepage hero contract (JOV-5864)', () => {
 
     expect(headerSource).toContain('minimalAuth={isMinimal || isHomepage}');
     expect(headerSource).toContain("isHomepage ? 'Log in' : 'Sign in'");
-    expect(layoutSource).toContain("logoSize='lg'");
-    expect(layoutSource).toContain("logoVariant='icon'");
-    expect(layoutSource).toContain('navLinks={MARKETING_NAV_LINKS}');
-    expect(layoutSource).toContain('showHomepageCenterNav');
+    expect(layoutSource).toContain("logoVariant='word'");
+    expect(layoutSource).toContain('showHomepageCenterNav={false}');
 
     const css = readFileSync(path.join(webRoot, 'app/(home)/home.css'), 'utf8');
     expect(css).not.toMatch(

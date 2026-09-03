@@ -1,20 +1,15 @@
 import type { Metadata } from 'next';
-import dynamic from 'next/dynamic';
-import { HomeTrustSection } from '@/components/features/home/HomeTrustSection';
 import {
-  type HomepageArtistProfilePreviews,
-  HomepageArtistProfiles,
-} from '@/components/homepage/HomepageArtistProfiles';
-import { HomepageClosedLoop } from '@/components/homepage/HomepageClosedLoop';
+  type HomepageCertifiedPreviews,
+  HomepageCertifiedSections,
+} from '@/components/homepage/HomepageCertifiedSections';
+import { HomepageClose } from '@/components/homepage/HomepageClose';
 import { HomepageEditorialHero } from '@/components/homepage/HomepageEditorialHero';
-import { HomepageMeetJovie } from '@/components/homepage/HomepageMeetJovie';
 import { HomepageNoScriptContent } from '@/components/homepage/HomepageNoScriptContent';
 import { HERO_COPY } from '@/components/homepage/intent';
-import { FaqSection } from '@/components/marketing';
 import { APP_NAME, BASE_URL, LEGAL_ENTITY_NAME } from '@/constants/app';
 import { HOMEPAGE_LAUNCH_COPY } from '@/data/homepageLaunchCopy';
 import {
-  buildFaqSchema,
   buildOrganizationSchema,
   buildSoftwareSchema,
   buildWebsiteSchema,
@@ -23,44 +18,27 @@ import { publicEnv } from '@/lib/env-public';
 import { FEATURE_FLAGS } from '@/lib/flags/marketing-static';
 import { getMarketingExportImage } from '@/lib/screenshots/registry';
 
-// Below-the-fold sections are dynamic-loaded so their `motion/react`
-// hydration cost doesn't compete with above-the-fold work.
-//
-// JOV-1835: cuts homepage TBT from ~1365ms toward the 300ms budget.
-//
-// Sections that are not motion-heavy keep `ssr: true` so their HTML stays in
-// the initial document for SEO. The motion-driven workspace lives behind a
-// client `*Lazy.tsx` shim with reserved placeholder geometry, so its chunk and
-// scroll subscriptions do not compete with hero hydration or shift the page.
-const HomepageV2FinalCta = dynamic(
-  () =>
-    import('@/components/marketing/homepage-v2/HomepageV2Ctas').then(m => ({
-      default: m.HomepageV2FinalCta,
-    })),
-  { ssr: true }
-);
-const ARTIST_PROFILE_PREVIEWS = [
-  {
-    id: 'tour',
-    label: 'Tour',
-    image: getMarketingExportImage('tim-white-profile-tour-mobile'),
-  },
-  {
-    id: 'subscribe',
-    label: 'Subscribe',
-    image: getMarketingExportImage('tim-white-profile-subscribe-mobile'),
-  },
-  {
-    id: 'pay',
-    label: 'Pay',
-    image: getMarketingExportImage('tim-white-profile-pay-mobile'),
-  },
-  {
-    id: 'presave',
-    label: 'Presave',
-    image: getMarketingExportImage('tim-white-profile-presave-mobile'),
-  },
-] as const satisfies HomepageArtistProfilePreviews;
+// Night editorial still behind the hero copy. Two art-directed crops of the
+// same photograph: landscape for desktop, a tighter portrait crop for phones.
+const HERO_BACKDROP = {
+  desktopSrc: '/images/hero/night-desk.webp',
+  desktopWidth: 1536,
+  desktopHeight: 1024,
+  mobileSrc: '/images/hero/night-desk-mobile.webp',
+  mobileWidth: 737,
+  mobileHeight: 1024,
+} as const;
+
+// Real public-profile exports (jov.ie/timwhite) for the two sections that
+// show product. Every other section is type only.
+const CERTIFIED_PREVIEWS = {
+  connected: getMarketingExportImage('tim-white-profile-listen-mobile'),
+  relationships: [
+    getMarketingExportImage('tim-white-profile-subscribe-mobile'),
+    getMarketingExportImage('tim-white-profile-pay-mobile'),
+    getMarketingExportImage('tim-white-profile-tour-mobile'),
+  ],
+} as const satisfies HomepageCertifiedPreviews;
 
 export const revalidate = false;
 
@@ -186,48 +164,20 @@ const ORGANIZATION_SCHEMA = buildOrganizationSchema({
     'Jovie is an AI workspace for artists managing releases, assets, audience signal, and promotion.',
 });
 
-const FAQ_SCHEMA = buildFaqSchema([...HOMEPAGE_LAUNCH_COPY.faq]);
-
 function HomepageHero() {
   return (
-    <>
-      <HomepageEditorialHero
-        headingId='home-hero-heading'
-        headline={HERO_COPY.headline}
-        support={HERO_COPY.subhead}
-        search={HERO_COPY.search}
-      />
-      <div className='homepage-trust-section system-b-mounted-home-trust-strip-shell'>
-        <HomeTrustSection presentation='inline-strip' />
-      </div>
-    </>
-  );
-}
-
-function HomepageFaq() {
-  return (
-    <div id='faq' className='homepage-faq-section' data-testid='homepage-faq'>
-      <FaqSection
-        items={HOMEPAGE_LAUNCH_COPY.faq}
-        heading='Questions'
-        headingClassName='homepage-story-heading'
-        className='homepage-faq-section__inner'
-        analyticsEventName='homepage_faq_opened'
-        analyticsProperties={{ source: 'homepage' }}
-      />
-    </div>
+    <HomepageEditorialHero
+      headingId='home-hero-heading'
+      headline={HERO_COPY.headline}
+      support={HERO_COPY.subhead}
+      search={HERO_COPY.search}
+      backdrop={HERO_BACKDROP}
+    />
   );
 }
 
 function HomepageUnlockedSections() {
-  return (
-    <>
-      <HomepageMeetJovie />
-      <HomepageArtistProfiles previews={ARTIST_PROFILE_PREVIEWS} />
-      <HomepageClosedLoop />
-      <HomepageFaq />
-    </>
-  );
+  return <HomepageCertifiedSections previews={CERTIFIED_PREVIEWS} />;
 }
 
 function HomepageStoryStack() {
@@ -238,7 +188,7 @@ function HomepageStoryStack() {
       data-testid='homepage-story-stack'
     >
       <HomepageUnlockedSections />
-      <HomepageV2FinalCta />
+      <HomepageClose />
     </div>
   );
 }
@@ -249,7 +199,6 @@ function HomePageShell({ children }: { readonly children: React.ReactNode }) {
       <script type='application/ld+json'>{WEBSITE_SCHEMA}</script>
       <script type='application/ld+json'>{SOFTWARE_SCHEMA}</script>
       <script type='application/ld+json'>{ORGANIZATION_SCHEMA}</script>
-      <script type='application/ld+json'>{FAQ_SCHEMA}</script>
       {children}
       <HomepageNoScriptContent />
     </>

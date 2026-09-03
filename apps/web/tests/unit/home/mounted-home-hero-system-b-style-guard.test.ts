@@ -40,7 +40,7 @@ function extractMountedHeroCss(source: string): string {
 
 function extractMountedHeroPageSource(source: string): string {
   const heroStart = source.indexOf('function HomepageHero()');
-  const heroEnd = source.indexOf('function HomepageFaq()');
+  const heroEnd = source.indexOf('function HomepageUnlockedSections()');
 
   expect(heroStart, 'homepage hero source exists').toBeGreaterThanOrEqual(0);
   expect(heroEnd, 'homepage hero source is bounded').toBeGreaterThan(heroStart);
@@ -66,10 +66,10 @@ describe('mounted homepage hero System B source contract', () => {
       ).not.toMatch(pattern);
     }
 
-    // The homepage owns copy and its optical field; the hero primitive owns
-    // the composition; the existing name search is the only control.
+    // The homepage owns copy and backdrop; the hero primitive owns the
+    // composition; the existing name search is the only control.
     expect(pageSource).toContain('<HomepageEditorialHero');
-    expect(pageSource).toContain('homepage-trust-section');
+    expect(pageSource).not.toContain('HomeTrustSection');
     expect(pageSource).not.toMatch(/statsRow|stats=\{/);
     expect(pageSource).not.toContain('secondaryCta');
     expect(heroComponentSource).toContain("appearance='editorial'");
@@ -81,7 +81,7 @@ describe('mounted homepage hero System B source contract', () => {
     for (const className of [
       'homepage-editorial-hero',
       'homepage-editorial-hero__backdrop',
-      'homepage-editorial-hero__stage',
+      'homepage-editorial-hero__scrim',
       'homepage-editorial-hero__copy',
       'homepage-editorial-hero__headline',
       'homepage-editorial-hero__support',
@@ -115,13 +115,15 @@ describe('mounted homepage hero System B source contract', () => {
 
     expect(css).toContain('var(--system-b-bg-page)');
     expect(css).toContain('var(--color-text-primary-token)');
-    expect(css).toContain('var(--color-text-tertiary-token)');
+    expect(css).toContain('var(--color-text-secondary-token)');
     expect(css).toContain('var(--homepage-grid-max)');
     expect(css).toContain('var(--homepage-grid-gutter)');
     expect(css).toContain('var(--space-');
     expect(css).toContain('var(--font-satoshi)');
-    expect(css).toContain('font-weight: 510;');
-    expect(css).toContain('letter-spacing: -0.022em;');
+    expect(css).toContain('font-weight: var(--font-weight-bold);');
+    expect(css).toContain(
+      'letter-spacing: var(--ds-marketing-display-tracking);'
+    );
     expect(css).toContain('border-radius: var(--radius-pill);');
     expect(css).toContain('min-height: 100svh;');
     // Every scrim color is mixed from a token, never a raw value.
