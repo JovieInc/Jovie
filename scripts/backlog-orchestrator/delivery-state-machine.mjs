@@ -20,9 +20,12 @@ import {
 import {
   classifyAndOpenFromDelivery,
   DELIVERY_WORKFLOW_FAILURES,
+  persistDraftStackResolutions,
   persistLoopOutcome,
+  readSummerQueue,
   STALL_AUTOMATED_FAILURES,
   STALL_EVIDENCE_FAILURES,
+  withSummerQueueLock,
 } from './no-unattended-red.mjs';
 
 export const DELIVERY_RECEIPT_SCHEMA = 'jovie-delivery-receipt/v1';
@@ -88,6 +91,12 @@ const STAGES = new Set([
   'external-blocked',
 ]);
 
+const NON_AUTHORITATIVE_CLOSURE_REASONS = new Set([
+  'closure-health-receipt-missing-or-malformed',
+  'closure-observation-unknown',
+  'gate-evaluation-failed',
+]);
+
 function digest(value) {
   return createHash('sha256').update(JSON.stringify(value)).digest('hex');
 }
@@ -127,7 +136,11 @@ function boundedStackHealthAction(action) {
     throw new Error('stack health repair action requires a SHA-256 task key');
   }
   const deliveryKey = nonEmpty(action.deliveryKey);
-  if (!deliveryKey || deliveryKey.length > 160) {
+  if (
+    !deliveryKey ||
+    deliveryKey !== `closure-stack:${taskKey}` ||
+    deliveryKey.length > 160
+  ) {
     throw new Error(
       'stack health repair action requires a bounded delivery key'
     );
@@ -165,6 +178,21 @@ function boundedStackHealthAction(action) {
   ) {
     throw new Error('stack health repair action PR members are invalid');
   }
+  const memberHeads = Array.isArray(action.memberHeads)
+    ? action.memberHeads.map(entry => ({
+        pr: exactPositiveInteger(entry?.pr),
+        headSha: exactSha(entry?.headSha),
+      }))
+    : [];
+  if (
+    memberHeads.length !== prNumbers.length ||
+    memberHeads.some(
+      entry => !entry.pr || !entry.headSha || !prNumbers.includes(entry.pr)
+    ) ||
+    new Set(memberHeads.map(entry => entry.pr)).size !== memberHeads.length ||
+    memberHeads.find(entry => entry.pr === rootPr)?.headSha !== rootHeadSha
+  )
+    throw new Error('stack health repair action member heads are invalid');
   const maxDepth = exactPositiveInteger(action.maxDepth);
   if (!maxDepth || maxDepth > 100) {
     throw new Error('stack health repair action max depth is invalid');
@@ -187,14 +215,28 @@ function boundedStackHealthAction(action) {
     const pr = exactPositiveInteger(entry.pr);
     const base = nonEmpty(entry.base);
     const head = nonEmpty(entry.head);
-    if (!pr || !base || !head || base.length > 255 || head.length > 255) {
+    const headSha = exactSha(entry.headSha);
+    if (
+      !pr ||
+      !base ||
+      !head ||
+      !headSha ||
+      !prNumbers.includes(pr) ||
+      memberHeads.find(item => item.pr === pr)?.headSha !== headSha ||
+      base.length > 255 ||
+      head.length > 255
+    ) {
       throw new Error(
         `stack health repair action promotion path ${index} is invalid`
       );
     }
-    return { pr, base, head };
+    return { pr, base, head, headSha };
   });
-  if (!promotionPath.some(entry => entry.pr === rootPr)) {
+  if (
+    !promotionPath.some(entry => entry.pr === rootPr) ||
+    promotionPath.length !== maxDepth ||
+    new Set(promotionPath.map(entry => entry.pr)).size !== promotionPath.length
+  ) {
     throw new Error('stack health repair action promotion path omits root PR');
   }
   if (
@@ -236,6 +278,7 @@ function boundedStackHealthAction(action) {
     rootPr,
     rootHeadSha,
     prNumbers,
+    memberHeads,
     maxDepth,
     promotionPath,
     integrator,
@@ -511,16 +554,25 @@ async function atomicPersist(destination, value) {
 /** Persist a receipt and, when appropriate, a formal Gem-to-Symphony task. */
 export async function persistDeliveryOutcome(
   receipt,
-  { stateDir = DEFAULT_DELIVERY_STATE_DIR, dryRun = false } = {}
+  {
+    stateDir = DEFAULT_DELIVERY_STATE_DIR,
+    dryRun = false,
+    reactivateDraftStack = false,
+    queueLockHeld = false,
+    draftStackGeneration = null,
+  } = {}
 ) {
   const receiptDestination = receiptPath(stateDir, receipt);
   const task = repairTaskForReceipt(receipt);
   const taskDestination = task
     ? join(stateDir, 'repair-tasks', `${task.taskKey}.json`)
     : null;
-  const loopRecord = classifyAndOpenFromDelivery(receipt.event, {
+  const classifiedLoop = classifyAndOpenFromDelivery(receipt.event, {
     now: receipt.observedAt,
   });
+  const loopRecord = draftStackGeneration
+    ? { ...classifiedLoop, draftStackGeneration }
+    : classifiedLoop;
   if (dryRun) {
     return {
       status: 'dry-run',
@@ -535,7 +587,11 @@ export async function persistDeliveryOutcome(
   const persistedTask = task
     ? await atomicPersist(taskDestination, task)
     : null;
-  const persistedLoop = await persistLoopOutcome(loopRecord, { stateDir });
+  const persistedLoop = await persistLoopOutcome(loopRecord, {
+    stateDir,
+    reactivateDraftStack,
+    queueLockHeld,
+  });
   return {
     status: persistedReceipt.status,
     receipt: persistedReceipt.value,
@@ -560,15 +616,20 @@ export async function persistClosureHealthActions(
   if (!candidate || typeof candidate !== 'object' || Array.isArray(candidate)) {
     throw new Error('closure health action source is missing or malformed');
   }
-  const actions = candidate.repairActions;
-  if (!Array.isArray(actions) || actions.length > 100) {
+  const rawActions = candidate.repairActions;
+  if (
+    rawActions != null &&
+    (!Array.isArray(rawActions) || rawActions.length > 100)
+  ) {
     throw new Error('closure health repair actions are missing or unbounded');
   }
+  const actions = Array.isArray(rawActions) ? rawActions : [];
   const boundedActions = actions.map(boundedStackHealthAction);
-  const observedAt = nonEmpty(candidate.observedAt) || now;
-  if (!Number.isFinite(Date.parse(observedAt))) {
+  const observedAtInput = nonEmpty(candidate.observedAt) || now;
+  if (!Number.isFinite(Date.parse(observedAtInput))) {
     throw new Error('closure health observedAt is invalid');
   }
+  const observedAt = new Date(observedAtInput).toISOString();
   const roots = new Set();
   for (const action of boundedActions) {
     if (roots.has(action.rootPr)) {
@@ -576,31 +637,166 @@ export async function persistClosureHealthActions(
     }
     roots.add(action.rootPr);
   }
-  const results = [];
-  for (const action of boundedActions) {
-    const receipt = buildStackHealthReceipt(action, { now: observedAt });
-    results.push(await persistDeliveryOutcome(receipt, { stateDir, dryRun }));
+  let activeViolationRoots = null;
+  if (candidate.stackHealth != null) {
+    const violations = candidate.stackHealth?.violations;
+    if (!Array.isArray(violations) || violations.length > 100) {
+      throw new Error(
+        'closure health stack violations are malformed or unbounded'
+      );
+    }
+    const reasons = Array.isArray(candidate.reasons) ? candidate.reasons : [];
+    const stackObservationAuthoritative =
+      candidate.schema === 'jovie-closure-health/v1' &&
+      candidate.authority === 'Summer' &&
+      Array.isArray(candidate.reasons) &&
+      !reasons.some(reason => NON_AUTHORITATIVE_CLOSURE_REASONS.has(reason));
+    const violationRoots = violations.map(violation =>
+      exactPositiveInteger(violation?.rootPr)
+    );
+    if (violationRoots.some(root => !root)) {
+      throw new Error('closure health stack violation has an invalid root');
+    }
+    const uniqueViolationRoots = new Set(violationRoots);
+    if (uniqueViolationRoots.size !== violationRoots.length) {
+      throw new Error('closure health stack violation roots are duplicated');
+    }
+    if ([...roots].some(root => !uniqueViolationRoots.has(root))) {
+      throw new Error('stack repair root is missing from current violations');
+    }
+    if (stackObservationAuthoritative) {
+      activeViolationRoots = uniqueViolationRoots;
+    }
   }
-  const statuses = results.map(result => result.status);
-  return {
-    schema: 'jovie-stack-health-action-ingress/v1',
-    observedAt,
-    actionCount: results.length,
-    status:
-      results.length === 0
-        ? 'none'
-        : statuses.every(status => status === 'duplicate')
-          ? 'duplicate'
-          : 'created',
-    actions: results.map(result => ({
-      status: result.status,
-      rootPr: result.receipt.event.pr,
-      task: result.task,
-      taskPath: result.taskPath,
-      receiptPath: result.receiptPath,
-      loop: result.loop,
-    })),
+  const persistSnapshot = async (queueLockHeld, draftStackAuthority = null) => {
+    const results = [];
+    for (const action of boundedActions) {
+      const receipt = buildStackHealthReceipt(action, { now: observedAt });
+      results.push(
+        await persistDeliveryOutcome(receipt, {
+          stateDir,
+          dryRun,
+          queueLockHeld,
+          reactivateDraftStack:
+            activeViolationRoots?.has(action.rootPr) === true,
+          draftStackGeneration: draftStackAuthority?.snapshotKey || null,
+        })
+      );
+    }
+    const evidence = [];
+    for (const rootPr of activeViolationRoots || []) {
+      if (roots.has(rootPr)) continue;
+      const record = classifyAndOpenFromDelivery(
+        {
+          delivery_key: `closure-stack-evidence:${rootPr}`,
+          failure: 'not-proven',
+          proven: false,
+          evidence: {
+            draftStackRoot: rootPr,
+            reason: 'missing-exact-head-evidence',
+          },
+        },
+        { now: observedAt }
+      );
+      Object.assign(record, {
+        stallClass: 'draft-stack-policy',
+        pr: rootPr,
+        reason: 'draft-stack-policy:collect-missing-exact-head-evidence',
+        draftStackGeneration: draftStackAuthority?.snapshotKey || null,
+      });
+      evidence.push(
+        await persistLoopOutcome(record, {
+          stateDir,
+          dryRun,
+          queueLockHeld,
+          reactivateDraftStack: true,
+        })
+      );
+    }
+    const resolution = await persistDraftStackResolutions(
+      activeViolationRoots,
+      {
+        stateDir,
+        dryRun,
+        now: observedAt,
+        queueLockHeld,
+        draftStackAuthority,
+      }
+    );
+    const statuses = [...results, ...evidence].map(result => result.status);
+    return {
+      schema: 'jovie-stack-health-action-ingress/v1',
+      observedAt,
+      actionCount: results.length,
+      evidenceCount: evidence.length,
+      status:
+        statuses.length === 0
+          ? resolution.status === 'resolved'
+            ? 'resolved'
+            : 'none'
+          : statuses.every(status => status === 'duplicate')
+            ? 'duplicate'
+            : 'created',
+      resolution,
+      actions: results.map(result => ({
+        status: result.status,
+        rootPr: result.receipt.event.pr,
+        task: result.task,
+        taskPath: result.taskPath,
+        receiptPath: result.receiptPath,
+        loop: result.loop,
+      })),
+      evidence: evidence.map(result => ({
+        status: result.status,
+        rootPr: result.record.pr,
+        task: result.evidence,
+        taskPath: result.evidencePath,
+        loop: result.record,
+      })),
+    };
   };
+  if (activeViolationRoots == null || dryRun) return persistSnapshot(false);
+  const watermark = {
+    schema: 'jovie-draft-stack-authority/v1',
+    observedAt,
+    snapshotKey: digest({
+      observedAt,
+      reasons: [...candidate.reasons].sort(),
+      roots: [...activeViolationRoots].sort((a, b) => a - b),
+      actions: boundedActions.map(action => action.taskKey).sort(),
+    }),
+  };
+  return withSummerQueueLock(stateDir, async () => {
+    const current = (await readSummerQueue(stateDir))?.draftStackAuthority;
+    if (
+      current &&
+      (current.schema !== watermark.schema ||
+        !Number.isFinite(Date.parse(current.observedAt)) ||
+        !/^[0-9a-f]{64}$/.test(current.snapshotKey))
+    ) {
+      throw new Error('draft stack authority watermark is malformed');
+    }
+    if (current && Date.parse(current.observedAt) > Date.parse(observedAt)) {
+      return {
+        schema: 'jovie-stack-health-action-ingress/v1',
+        observedAt,
+        status: 'stale',
+        actionCount: 0,
+        evidenceCount: 0,
+        actions: [],
+        evidence: [],
+      };
+    }
+    if (
+      current?.observedAt === observedAt &&
+      current.snapshotKey !== watermark.snapshotKey
+    ) {
+      throw new Error(
+        'conflicting authoritative draft stack snapshot timestamp'
+      );
+    }
+    return persistSnapshot(true, watermark);
+  });
 }
 
 /** Attestation is evidence only; mismatch is routed through the same repair contract. */

@@ -600,31 +600,9 @@ export function evaluateFleetGate(
       );
     }
 
-    const queueStatus = evidence?.queue?.status || 'unknown';
-    const greenReadyPrs =
-      evidence?.queue?.greenReadyPrs ?? evidence?.queue?.eligiblePrs;
-    const queueTarget = evidence?.queue?.target;
-    const queueShapeValid =
-      queueStatus === 'known' &&
-      Number.isInteger(greenReadyPrs) &&
-      greenReadyPrs >= 0 &&
-      Number.isInteger(queueTarget) &&
-      queueTarget > 0;
-
-    if (!queueShapeValid) {
-      reasons.push(
-        typedReason(
-          FLEET_GATE_REASON.QUEUE_UNKNOWN,
-          'promotion',
-          'warning',
-          'Promotion queue state is missing, unknown, or malformed.'
-        )
-      );
-    }
-    // Queue pressure is demand for the promotion controller, not a reason to
-    // disable it. Freezing promotion above target deadlocks the only path that
-    // can drain the backlog. The count and target remain in evidence.queue for
-    // alerting; malformed or unknown queue evidence still fails closed above.
+    // JOV-INV-023: a missing/malformed queue snapshot is an observation gap
+    // (GraphQL 502), never a promotion hold. boundGreenFactory stays drainable
+    // and unbound production stays hold-intake. Drain classifies PRs itself.
   }
 
   let state = redReasons.length

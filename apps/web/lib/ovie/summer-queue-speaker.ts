@@ -28,6 +28,7 @@ export function createCurrentSummerQueueSpeaker(
         input.conversationId?.trim() || CURRENT_SUMMER_SESSION_ID;
       const clientTurnId = input.clientTurnId?.trim() || 'turn-none';
       const turnId = ovieSummerTurnId({ conversationId, clientTurnId });
+      let enqueued = false;
       try {
         await enqueueOvieSummerTurn(store, {
           id: turnId,
@@ -35,6 +36,7 @@ export function createCurrentSummerQueueSpeaker(
           userText: input.userText,
           receipts: input.receipts,
         });
+        enqueued = true;
         const terminal = await waitForOvieSummerTurn(store, {
           id: turnId,
           timeoutMs: SUMMER_RESPONSE_TIMEOUT_MS,
@@ -59,7 +61,21 @@ export function createCurrentSummerQueueSpeaker(
           state: terminal?.state === 'failed' ? 'failure' : 'unavailable',
         };
       } catch {
-        yield { type: 'error', state: 'failure' };
+        let durableTurnExists = false;
+        let durabilityWasChecked = false;
+        try {
+          durableTurnExists = Boolean(await store.getSummerTurn(turnId));
+          durabilityWasChecked = true;
+        } catch {
+          // A failed read cannot prove the enqueue failed before persistence.
+        }
+        yield {
+          type: 'error',
+          state:
+            enqueued || durableTurnExists || !durabilityWasChecked
+              ? 'unknown'
+              : 'failure',
+        };
       }
     },
   };

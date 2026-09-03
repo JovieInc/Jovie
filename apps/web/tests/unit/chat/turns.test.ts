@@ -37,7 +37,10 @@ const hoisted = vi.hoisted(() => {
   }));
   const insertMock = vi.fn(() => ({ values: insertValuesMock }));
 
-  const updateWhereMock = vi.fn();
+  const updateReturningMock = vi.fn();
+  const updateWhereMock = vi.fn(() => ({
+    returning: updateReturningMock,
+  }));
   const updateSetMock = vi.fn(() => ({ where: updateWhereMock }));
   const updateMock = vi.fn(() => ({ set: updateSetMock }));
   const deleteWhereMock = vi.fn();
@@ -52,6 +55,8 @@ const hoisted = vi.hoisted(() => {
     insertOnConflictDoNothingMock,
     insertReturningMock,
     updateMock,
+    updateSetMock,
+    updateReturningMock,
     deleteMock,
   };
 });
@@ -118,6 +123,7 @@ vi.mock('drizzle-orm', () => ({
   and: vi.fn(),
   asc: vi.fn(),
   eq: vi.fn(),
+  inArray: vi.fn(),
   sql: vi.fn((strings: TemplateStringsArray, ...values: unknown[]) => ({
     strings,
     values,
@@ -127,6 +133,7 @@ vi.mock('drizzle-orm', () => ({
 describe('chat turn service', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    hoisted.updateReturningMock.mockResolvedValue([{ id: 'turn-1' }]);
   });
 
   it('returns TURN_IN_PROGRESS semantics for duplicate in-flight turns', async () => {
@@ -397,5 +404,174 @@ describe('chat turn service', () => {
       expect.objectContaining({ turnId: 'turn-1' }),
       'chat/turns'
     );
+  });
+
+  it('persists terminal error state without inserting an assistant message', async () => {
+    const { markChatTurnTerminal } = await import('@/lib/chat/turns');
+
+    await expect(
+      markChatTurnTerminal({
+        turnId: 'turn-1',
+        status: 'failed_timeout',
+        errorCode: 'SUMMER_TEMPORARILY_UNAVAILABLE',
+        errorMessage: 'Summer timed out.',
+      })
+    ).resolves.toBe(true);
+
+    expect(hoisted.updateSetMock).toHaveBeenCalledWith(
+      expect.objectContaining({
+        status: 'failed_timeout',
+        errorCode: 'SUMMER_TEMPORARILY_UNAVAILABLE',
+      })
+    );
+    expect(hoisted.insertMock).not.toHaveBeenCalled();
+  });
+
+  it('atomically reclaims one exact terminal turn for retry', async () => {
+    hoisted.updateReturningMock.mockResolvedValueOnce([{ id: 'turn-1' }]);
+    const { resumeTerminalChatTurn } = await import('@/lib/chat/turns');
+
+    await expect(
+      resumeTerminalChatTurn({
+        turnId: 'turn-1',
+        status: 'failed_timeout',
+        errorCode: 'SUMMER_TEMPORARILY_UNAVAILABLE',
+        errorMessage: 'Summer timed out.',
+      })
+    ).resolves.toBe('resumed');
+
+    expect(hoisted.updateSetMock).toHaveBeenCalledWith(
+      expect.objectContaining({
+        status: 'reserved',
+        errorCode: null,
+        completedAt: null,
+      })
+    );
+  });
+
+  it('reports when another reconnect already reclaimed the terminal turn', async () => {
+    hoisted.updateReturningMock.mockResolvedValueOnce([]);
+    const { resumeTerminalChatTurn } = await import('@/lib/chat/turns');
+
+    await expect(
+      resumeTerminalChatTurn({
+        turnId: 'turn-1',
+        status: 'canceled',
+        errorCode: 'SUMMER_TURN_CANCELED',
+        errorMessage: 'Canceled.',
+      })
+    ).resolves.toBe('conflict');
+  });
+
+  it('fails closed when terminal status persistence is unavailable', async () => {
+    hoisted.updateMock.mockImplementationOnce(() => {
+      throw new Error('db unavailable');
+    });
+    const { logger } = await import('@/lib/utils/logger');
+    const { markChatTurnTerminal } = await import('@/lib/chat/turns');
+
+    await expect(
+      markChatTurnTerminal({
+        turnId: 'turn-1',
+        status: 'failed_network',
+        errorCode: 'SUMMER_TRANSPORT_FAILED',
+        errorMessage: 'Bridge offline.',
+      })
+    ).resolves.toBe(false);
+    expect(logger.error).toHaveBeenCalledWith(
+      'Chat terminal status persist failed',
+      expect.objectContaining({ turnId: 'turn-1' }),
+      'chat/turns'
+    );
+  });
+
+  it('reclaims an exact stale in-flight turn', async () => {
+    const { resumeStaleChatTurn } = await import('@/lib/chat/turns');
+    const updatedAt = new Date('2026-09-01T00:00:00.000Z');
+
+    await expect(
+      resumeStaleChatTurn({
+        turnId: 'turn-1',
+        status: 'streaming',
+        updatedAt,
+      })
+    ).resolves.toBe('resumed');
+    expect(hoisted.updateSetMock).toHaveBeenCalledWith(
+      expect.objectContaining({
+        status: 'reserved',
+        updatedAt: expect.any(Date),
+      })
+    );
+  });
+
+  it('reports stale-turn reclaim contention separately from database failure', async () => {
+    const { resumeStaleChatTurn } = await import('@/lib/chat/turns');
+    const updatedAt = new Date('2026-09-01T00:00:00.000Z');
+    hoisted.updateReturningMock.mockResolvedValueOnce([]);
+
+    await expect(
+      resumeStaleChatTurn({
+        turnId: 'turn-1',
+        status: 'streaming',
+        updatedAt,
+      })
+    ).resolves.toBe('conflict');
+
+    hoisted.updateMock.mockImplementationOnce(() => {
+      throw new Error('db unavailable');
+    });
+    await expect(
+      resumeStaleChatTurn({
+        turnId: 'turn-1',
+        status: 'streaming',
+        updatedAt,
+      })
+    ).resolves.toBe('error');
+  });
+
+  it('fails closed when terminal turn reclaim cannot reach the database', async () => {
+    hoisted.updateMock.mockImplementationOnce(() => {
+      throw new Error('db unavailable');
+    });
+    const { logger } = await import('@/lib/utils/logger');
+    const { resumeTerminalChatTurn } = await import('@/lib/chat/turns');
+
+    await expect(
+      resumeTerminalChatTurn({
+        turnId: 'turn-1',
+        status: 'failed_timeout',
+        errorCode: 'SUMMER_TEMPORARILY_UNAVAILABLE',
+        errorMessage: 'Timed out.',
+      })
+    ).resolves.toBe('error');
+    expect(logger.error).toHaveBeenCalledWith(
+      'Chat terminal turn resume failed',
+      expect.objectContaining({ turnId: 'turn-1' }),
+      'chat/turns'
+    );
+  });
+
+  it('marks an ephemeral terminal assistant result as not durable', async () => {
+    hoisted.selectOrderByMock.mockReturnValueOnce({
+      limit: vi.fn().mockRejectedValueOnce(new Error('db unavailable')),
+      then: (onFulfilled: (value: unknown) => unknown, onRejected) =>
+        Promise.reject(new Error('db unavailable')).then(
+          onFulfilled,
+          onRejected
+        ),
+    });
+    const { persistTerminalAssistantMessageWithReceipt } = await import(
+      '@/lib/chat/turns'
+    );
+
+    const result = await persistTerminalAssistantMessageWithReceipt({
+      conversationId: 'conv-1',
+      turnId: 'turn-1',
+      status: 'completed',
+      content: 'Summer reply',
+    });
+
+    expect(result.persisted).toBe(false);
+    expect(result.message.id).toBe('ephemeral-turn-1');
   });
 });

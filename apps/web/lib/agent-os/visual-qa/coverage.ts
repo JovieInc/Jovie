@@ -1,3 +1,8 @@
+import {
+  MARKETING_EXACT_PUBLIC_ROUTE_TARGETS,
+  type MarketingRouteCaptureState,
+  type MarketingRouteDisposition,
+} from '@/data/marketing';
 import type {
   VisualQaDynamicMask,
   VisualQaViewportSize,
@@ -10,6 +15,7 @@ export type VisualQaCoverageArea =
   | 'app'
   | 'admin'
   | 'public'
+  | 'marketing'
   | 'auth'
   | 'onboarding'
   | 'waitlist';
@@ -60,6 +66,12 @@ export interface VisualQaPlaywrightRouteSource {
   readonly expectedPath?: string;
   readonly fullPage?: boolean;
   readonly fixedNow?: string;
+  readonly fixturePath?: string;
+  readonly sourcePath?: string;
+  readonly sourceSha?: 'capture-time-git-sha';
+  readonly stateMatrix?: readonly MarketingRouteCaptureState[];
+  readonly expectedRuntimeSelector?: string;
+  readonly routeDisposition?: MarketingRouteDisposition;
 }
 
 export interface VisualQaPlaywrightSnapshotSource {
@@ -97,6 +109,14 @@ export interface VisualQaCoverageEntry {
   readonly dynamicMasks: readonly VisualQaDynamicMask[];
   readonly lockedRegions: readonly VisualQaLockedRegion[];
   readonly diffThreshold: VisualQaDiffThresholdRegistration;
+  readonly qualityChecks?: readonly (
+    | 'accessibility'
+    | 'console-errors'
+    | 'focus-visible'
+    | 'horizontal-overflow'
+    | 'layout-stability'
+    | 'reduced-motion'
+  )[];
 }
 
 export interface VisualQaCoverageManifest {
@@ -253,6 +273,72 @@ const DEFAULT_WEB_THRESHOLD: VisualQaDiffThresholdRegistration = {
   maxWeightedDriftScore: 0.08,
 };
 
+const MARKETING_ROUTE_QUALITY_CHECKS = [
+  'accessibility',
+  'console-errors',
+  'focus-visible',
+  'horizontal-overflow',
+  'layout-stability',
+  'reduced-motion',
+] as const;
+
+function marketingRouteSlug(route: string): string {
+  if (route === '/') return 'home';
+  return route
+    .split('/')
+    .filter(Boolean)
+    .join('-')
+    .replace(/[^a-z0-9]+/gi, '-');
+}
+
+function marketingRouteLockedRegions(route: string, disposition: string) {
+  if (route === '/waitlist') return [AUTH_SHELL_LOCK];
+  if (
+    disposition === 'active-verified' ||
+    disposition === 'active-unverified'
+  ) {
+    return [MARKETING_HEADER_LOCK];
+  }
+  return [];
+}
+
+/** Desktop and mobile coverage generated from the exact active route source. */
+export const MARKETING_EXACT_ROUTE_VISUAL_QA_ENTRIES: readonly VisualQaCoverageEntry[] =
+  MARKETING_EXACT_PUBLIC_ROUTE_TARGETS.flatMap(target =>
+    target.viewports.map(viewport => ({
+      id: `web-marketing-route-${marketingRouteSlug(target.url)}-${viewport}`,
+      title: `Web — marketing route ${target.url} — ${viewport}`,
+      platform: 'web' as const,
+      area: 'marketing' as const,
+      state: target.stateMatrix.join(', '),
+      fixtureId:
+        viewport === 'desktop'
+          ? WEB_CHROMIUM_1440X900.id
+          : WEB_CHROMIUM_390X844.id,
+      availability: 'available' as const,
+      source: {
+        kind: 'playwright-route' as const,
+        route: target.fixturePath,
+        expectedPath: target.expectedPath,
+        fixturePath: target.fixturePath,
+        waitFor: target.expectedRuntimeSelector,
+        expectedRuntimeSelector: target.expectedRuntimeSelector,
+        sourcePath: target.sourcePath,
+        sourceSha: target.sourceSha,
+        stateMatrix: target.stateMatrix,
+        routeDisposition: target.disposition,
+        fullPage: true,
+      },
+      dynamicMasks: [],
+      lockedRegions: marketingRouteLockedRegions(
+        target.url,
+        target.disposition
+      ),
+      diffThreshold: DEFAULT_WEB_THRESHOLD,
+      qualityChecks: MARKETING_ROUTE_QUALITY_CHECKS,
+    }))
+  );
+
 export const VISUAL_QA_FIXTURES = [
   WEB_CHROMIUM_1280X720,
   WEB_CHROMIUM_1280X800,
@@ -264,7 +350,8 @@ export const VISUAL_QA_FIXTURES = [
   MACOS_ELECTRON_1440,
 ] as const satisfies readonly VisualQaCoverageFixture[];
 
-export const VISUAL_QA_COVERAGE_ENTRIES = [
+export const VISUAL_QA_COVERAGE_ENTRIES: readonly VisualQaCoverageEntry[] = [
+  ...MARKETING_EXACT_ROUTE_VISUAL_QA_ENTRIES,
   {
     id: 'web-public-homepage',
     title: 'Web — public homepage',
@@ -357,27 +444,6 @@ export const VISUAL_QA_COVERAGE_ENTRIES = [
       kind: 'playwright-route',
       route: '/start',
       waitFor: '[data-app-shell-frame="true"]',
-      specPath: 'apps/web/tests/e2e/start-onboarding-chat.spec.ts',
-      baselinePath:
-        'apps/web/tests/e2e/__snapshots__/start-onboarding-chat.spec.ts/start-app-shell-initial.png',
-    },
-    dynamicMasks: [],
-    lockedRegions: [APP_SHELL_LOCK],
-    diffThreshold: DEFAULT_WEB_THRESHOLD,
-  },
-  {
-    id: 'web-waitlist-start-continuity',
-    title: 'Web — waitlist to start continuity',
-    platform: 'web',
-    area: 'waitlist',
-    state: 'legacy route redirect to canonical start',
-    fixtureId: WEB_CHROMIUM_1280X820.id,
-    availability: 'available',
-    source: {
-      kind: 'playwright-route',
-      route: '/waitlist',
-      waitFor: '[data-app-shell-frame="true"]',
-      expectedPath: '/start',
       specPath: 'apps/web/tests/e2e/start-onboarding-chat.spec.ts',
       baselinePath:
         'apps/web/tests/e2e/__snapshots__/start-onboarding-chat.spec.ts/start-app-shell-initial.png',
@@ -506,7 +572,7 @@ export const VISUAL_QA_COVERAGE_ENTRIES = [
     lockedRegions: [],
     diffThreshold: { pixelThreshold: 34, maxWeightedDriftScore: 0.08 },
   },
-] as const satisfies readonly VisualQaCoverageEntry[];
+];
 
 export const VISUAL_QA_COVERAGE_MANIFEST = {
   version: VISUAL_QA_COVERAGE_VERSION,

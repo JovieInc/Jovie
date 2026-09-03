@@ -19,7 +19,13 @@ describe('public surface guardrails', () => {
     const wildcardRule = rules.find(rule => rule.userAgent === '*');
 
     expect(wildcardRule?.disallow).toEqual(
-      expect.arrayContaining(['/app/', '/api/', '/out/', '/investors/'])
+      expect.arrayContaining([
+        '/app/',
+        '/api/',
+        '/out/',
+        '/investors/',
+        '/engineering/preview/',
+      ])
     );
     expect(wildcardRule?.disallow).not.toEqual(
       expect.arrayContaining([
@@ -121,6 +127,8 @@ describe('public surface guardrails', () => {
       import('../../../app/investor-portal/respond/page'),
       import('../../../app/(marketing)/ai/page'),
       import('../../../app/(marketing)/investors/page'),
+      import('../../../app/(marketing)/engineering/preview/page'),
+      import('../../../app/(marketing)/engineering/preview/[slug]/page'),
       import('../../../app/pitch/page'),
     ]);
 

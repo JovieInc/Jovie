@@ -33,6 +33,14 @@ export const TAB_BAR_SEGMENT_TRIGGER_CLASSNAME =
 export const TAB_BAR_SEGMENT_TRIGGER_ACTIVE_CLASSNAME =
   'bg-surface-0 font-semibold text-primary-token';
 
+const TAB_BAR_SEGMENT_OVERFLOW_TRIGGER_CLASSNAME =
+  'h-8 w-8 sm:before:h-8 sm:before:w-8';
+
+const TAB_BAR_OVERFLOW_TRIGGER_CLASSNAME_BY_VARIANT = {
+  drawer: undefined,
+  segment: TAB_BAR_SEGMENT_OVERFLOW_TRIGGER_CLASSNAME,
+} as const;
+
 export interface TabBarProps<T extends string> {
   readonly value: T;
   readonly onValueChange: (value: T) => void;
@@ -68,6 +76,8 @@ export function TabBar<T extends string>({
     variant === 'drawer'
       ? TAB_BAR_DRAWER_TRIGGER_ACTIVE_CLASSNAME
       : TAB_BAR_SEGMENT_TRIGGER_ACTIVE_CLASSNAME;
+  const overflowTriggerClassName =
+    TAB_BAR_OVERFLOW_TRIGGER_CLASSNAME_BY_VARIANT[variant];
 
   const isCollapseMode = overflowMode === 'collapse';
   const isScrollMode = overflowMode === 'scroll';
@@ -204,6 +214,7 @@ export function TabBar<T extends string>({
                       ref={moreButtonRef}
                       hasActiveOverflow={activeInOverflow}
                       variant={variant}
+                      className={overflowTriggerClassName}
                     />
                   </DropdownMenuTrigger>
                 </TooltipTrigger>
@@ -237,7 +248,7 @@ export function TabBar<T extends string>({
               ref={moreButtonRef}
               hasActiveOverflow={false}
               variant={variant}
-              className='invisible absolute'
+              className={cn('invisible absolute', overflowTriggerClassName)}
               aria-hidden='true'
               tabIndex={-1}
             />

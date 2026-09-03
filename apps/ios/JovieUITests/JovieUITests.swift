@@ -16,11 +16,11 @@ final class JovieUITests: XCTestCase {
   }
 
   func testSignedOutLaunchShowsAuthScreen() {
-    let app = launchMockApp(launchArgument: "-ui-testing-signed-out", expectedElementDescription: "\"Continue in Browser\"") {
-      $0.buttons["Continue in Browser"]
+    let app = launchMockApp(launchArgument: "-ui-testing-signed-out", expectedElementDescription: "\"Continue to Jovie\"") {
+      $0.buttons["Continue to Jovie"]
     }
 
-    XCTAssertTrue(app.buttons["Continue in Browser"].exists)
+    XCTAssertTrue(app.buttons["Continue to Jovie"].exists)
     XCTAssertFalse(app.buttons["Continue with Google"].exists)
     XCTAssertFalse(app.buttons["Continue with Apple"].exists)
     XCTAssertFalse(app.staticTexts["Email"].exists)
@@ -75,7 +75,7 @@ final class JovieUITests: XCTestCase {
     measure(metrics: [XCTApplicationLaunchMetric(waitUntilResponsive: true)]) {
       app.launch()
       XCTAssertTrue(
-        app.buttons["Continue in Browser"].waitForExistence(timeout: timeoutSeconds),
+        app.buttons["Continue to Jovie"].waitForExistence(timeout: timeoutSeconds),
         "Signed-out shell did not become responsive within \(timeoutSeconds) seconds.\n\(app.debugDescription)"
       )
       app.terminate()
@@ -135,7 +135,7 @@ final class JovieUITests: XCTestCase {
     )
     app.buttons["Retry"].tap()
     XCTAssertTrue(
-      app.staticTexts["Public Profile"].waitForExistence(timeout: 3),
+      app.staticTexts["Public Profile"].waitForExistence(timeout: 5),
       "Retry did not recover the embedded browser.\n\(app.debugDescription)"
     )
   }
@@ -242,7 +242,7 @@ final class JovieUITests: XCTestCase {
     let switchAccount = app.buttons["waitlist-use-different-account"]
     switchAccount.tap()
     XCTAssertTrue(
-      app.buttons["Continue in Browser"].waitForExistence(timeout: 10),
+      app.buttons["Continue to Jovie"].waitForExistence(timeout: 10),
       "Waitlist account switch did not return to signed-out account selection.\n\(app.debugDescription)"
     )
   }
@@ -310,7 +310,7 @@ final class JovieUITests: XCTestCase {
     app.buttons["profile-completion-submit"].tap()
 
     XCTAssertTrue(
-      app.buttons["Continue in Browser"].waitForExistence(timeout: 3),
+      app.buttons["Continue to Jovie"].waitForExistence(timeout: 3),
       "An expired onboarding session must return to native sign-in.\n\(app.debugDescription)"
     )
     XCTAssertFalse(app.staticTexts["Finish Your Profile"].exists)
@@ -318,7 +318,11 @@ final class JovieUITests: XCTestCase {
   }
 
   func testFullScreenSettingsLogsOutToSignedOut() {
-    let app = launchMockApp(launchArgument: "-ui-testing-settings", expectedElementDescription: "\"Settings\"") {
+    let app = launchMockApp(
+      launchArgument: "-ui-testing-settings",
+      additionalLaunchArguments: ["-ui-testing-delayed-logout"],
+      expectedElementDescription: "\"Settings\""
+    ) {
       $0.staticTexts["Settings"]
     }
 
@@ -336,7 +340,9 @@ final class JovieUITests: XCTestCase {
       )
     }
 
-    app.buttons["Log Out"].tap()
+    let logoutButton = app.buttons["Log Out"]
+    let idleFrame = logoutButton.frame
+    logoutButton.tap()
 
     XCTAssertTrue(
       app.buttons["Confirm Log Out"].waitForExistence(timeout: 3),
@@ -346,7 +352,25 @@ final class JovieUITests: XCTestCase {
     app.buttons["Confirm Log Out"].tap()
 
     XCTAssertTrue(
-      app.buttons["Continue in Browser"].waitForExistence(timeout: 5),
+      app.staticTexts["Logging Out"].waitForExistence(timeout: 2),
+      "Settings did not expose its deterministic pending logout state.\n\(app.debugDescription)"
+    )
+    let pendingLogoutButton = app.buttons["Log Out"]
+    XCTAssertTrue(
+      pendingLogoutButton.waitForExistence(timeout: 1),
+      "Pending logout control did not remain in the accessibility tree.\n\(app.debugDescription)"
+    )
+    XCTAssertFalse(
+      pendingLogoutButton.isEnabled,
+      "Pending logout must reject duplicate submission."
+    )
+    XCTAssertEqual(pendingLogoutButton.frame.minX, idleFrame.minX, accuracy: 1)
+    XCTAssertEqual(pendingLogoutButton.frame.minY, idleFrame.minY, accuracy: 1)
+    XCTAssertEqual(pendingLogoutButton.frame.width, idleFrame.width, accuracy: 1)
+    XCTAssertEqual(pendingLogoutButton.frame.height, idleFrame.height, accuracy: 1)
+
+    XCTAssertTrue(
+      app.buttons["Continue to Jovie"].waitForExistence(timeout: 5),
       "Logout did not return to signed-out state.\n\(app.debugDescription)"
     )
   }
@@ -903,10 +927,9 @@ final class JovieUITests: XCTestCase {
     )
 
     measure(metrics: shellRuntimeMetrics(for: app)) {
-      // Swipe the app, not `mobile-chat`: that identifier is on the chat
-      // ZStack and also matches descendant rows, so XCUI cannot pick one.
-      app.swipeUp()
-      app.swipeDown()
+      let chat = app.scrollViews["mobile-chat"]
+      chat.swipeUp()
+      chat.swipeDown()
       XCTAssertTrue(
         app.textFields["chat-composer-input"].waitForExistence(timeout: timeoutSeconds),
         "Composer disappeared during all-components scroll measurement.\n\(app.debugDescription)"
@@ -914,30 +937,28 @@ final class JovieUITests: XCTestCase {
     }
   }
 
-  // JOV-3635: horizontal page-swipes between tabs are banned. Profile is
-  // drawer-only — open the drawer, pick Profile, then return via Chat tab.
+  // JOV-5201: on chat home, a leading pan opens the sidebar. It must not
+  // page onto Profile. Profile stays a sidebar destination.
   func testSwipeNavigatesBetweenProfileAndChat() {
     let app = launchMockApp(launchArgument: "-ui-testing-chat", expectedElementDescription: "\"chat-composer-input\"") {
       $0.textFields["chat-composer-input"]
     }
 
-    // Full-width swipe must NOT switch tabs (gesture ownership: edges only).
-    app.swipeRight()
+    dragChatHomeLeadingSwipe(app)
+    let profileSurface = app.buttons["shell-drawer-surface-shell-tab-profile"]
     XCTAssertTrue(
-      app.textFields["chat-composer-input"].waitForExistence(timeout: 2),
-      "Horizontal swipe incorrectly left Chat.\n\(app.debugDescription)"
+      waitForHittable(profileSurface, timeout: 3),
+      "Leading swipe did not open the sidebar.\n\(app.debugDescription)"
+    )
+    XCTAssertTrue(
+      app.buttons["shell-drawer-surface-shell-tab-library"].isHittable,
+      "Sidebar Library must be reachable after a leading swipe.\n\(app.debugDescription)"
     )
     XCTAssertFalse(
       app.buttons["Copy URL"].exists,
-      "Horizontal swipe must not open Profile (drawer-only surface).\n\(app.debugDescription)"
+      "Horizontal swipe must not open Profile as a paged tab.\n\(app.debugDescription)"
     )
 
-    app.buttons["Open navigation drawer"].tap()
-    let profileSurface = app.buttons["shell-drawer-surface-shell-tab-profile"]
-    XCTAssertTrue(
-      profileSurface.waitForExistence(timeout: 3),
-      "Drawer Profile surface missing.\n\(app.debugDescription)"
-    )
     profileSurface.tap()
     XCTAssertTrue(
       app.buttons["Copy URL"].waitForExistence(timeout: 3),
@@ -954,6 +975,179 @@ final class JovieUITests: XCTestCase {
     XCTAssertTrue(
       app.textFields["chat-composer-input"].waitForExistence(timeout: 3),
       "Drawer Chat did not return to Chat.\n\(app.debugDescription)"
+    )
+  }
+
+  func testChatHomeTrailingSwipeOpensRightRail() {
+    let app = launchMockApp(launchArgument: "-ui-testing-chat", expectedElementDescription: "\"chat-composer-input\"") {
+      $0.textFields["chat-composer-input"]
+    }
+
+    dragChatHomeTrailingSwipe(app)
+    let rightRail = app.descendants(matching: .any)["shell-right-rail"]
+    XCTAssertTrue(
+      waitForHittable(rightRail, timeout: 3),
+      "Trailing swipe did not open the right rail.\n\(app.debugDescription)"
+    )
+    XCTAssertTrue(
+      app.buttons["shell-rail-talk"].waitForExistence(timeout: 2),
+      "Empty right rail must still offer Talk.\n\(app.debugDescription)"
+    )
+    XCTAssertFalse(
+      shellControlExists(app, identifier: "shell-tab-bar"),
+      "Right-rail swipe must not restore the bottom tab bar.\n\(app.debugDescription)"
+    )
+    attachScreenshot(named: "chat-first-right-rail", app: app)
+
+    let shortCloseStart = app.coordinate(withNormalizedOffset: CGVector(dx: 0.6, dy: 0.42))
+    let shortCloseEnd = app.coordinate(withNormalizedOffset: CGVector(dx: 0.64, dy: 0.42))
+    shortCloseStart.press(
+      forDuration: 0.3,
+      thenDragTo: shortCloseEnd,
+      withVelocity: .slow,
+      thenHoldForDuration: 0.4
+    )
+    XCTAssertTrue(
+      rightRail.isHittable,
+      "A subthreshold close drag dismissed the right rail.\n\(app.debugDescription)"
+    )
+
+    let closeStart = app.coordinate(withNormalizedOffset: CGVector(dx: 0.6, dy: 0.42))
+    let closeEnd = app.coordinate(withNormalizedOffset: CGVector(dx: 0.95, dy: 0.42))
+    closeStart.press(forDuration: 0.05, thenDragTo: closeEnd)
+    XCTAssertTrue(
+      waitForNotHittable(rightRail, timeout: 3),
+      "A valid close drag did not dismiss the right rail.\n\(app.debugDescription)"
+    )
+    XCTAssertTrue(
+      waitForHittable(app.textFields["chat-composer-input"], timeout: 3),
+      "Chat did not regain interaction after right-rail dismissal.\n\(app.debugDescription)"
+    )
+  }
+
+  func testReduceMotionRailDragsStayUsableWithoutPartialProgress() {
+    let app = launchMockApp(
+      launchArgument: "-ui-testing-chat",
+      additionalLaunchArguments: ["-ui-testing-reduce-motion"],
+      expectedElementDescription: "\"chat-composer-input\""
+    ) {
+      $0.textFields["chat-composer-input"]
+    }
+
+    let reduceMotionStatus = app.descendants(matching: .any)["shell-reduce-motion-status"]
+    XCTAssertTrue(
+      reduceMotionStatus.waitForExistence(timeout: 3),
+      "The deterministic Reduce Motion test policy was not active.\n\(app.debugDescription)"
+    )
+    XCTAssertEqual(reduceMotionStatus.value as? String, "Interactive progress hidden")
+
+    let shortStart = app.coordinate(withNormalizedOffset: CGVector(dx: 0.3, dy: 0.42))
+    let shortEnd = app.coordinate(withNormalizedOffset: CGVector(dx: 0.4, dy: 0.42))
+    shortStart.press(forDuration: 0.4, thenDragTo: shortEnd)
+    XCTAssertFalse(app.descendants(matching: .any)["shell-drawer"].isHittable)
+    XCTAssertFalse(app.descendants(matching: .any)["shell-right-rail"].isHittable)
+    XCTAssertEqual(
+      reduceMotionStatus.value as? String,
+      "Interactive progress hidden",
+      "Reduce Motion exposed a partial rail position during the rejected drag."
+    )
+
+    dragChatHomeLeadingSwipe(app)
+    let drawerSettings = app.buttons["shell-drawer-settings"]
+    XCTAssertTrue(
+      waitForHittable(drawerSettings, timeout: 3),
+      "Reduce Motion prevented an accepted leading swipe from opening the drawer.\n\(app.debugDescription)"
+    )
+
+    app.coordinate(withNormalizedOffset: CGVector(dx: 0.96, dy: 0.5)).tap()
+    XCTAssertTrue(waitForNotHittable(drawerSettings, timeout: 3))
+
+    dragChatHomeTrailingSwipe(app)
+    XCTAssertTrue(
+      waitForHittable(app.buttons["shell-rail-talk"], timeout: 3),
+      "Reduce Motion prevented an accepted trailing swipe from opening the right rail.\n\(app.debugDescription)"
+    )
+    XCTAssertEqual(
+      reduceMotionStatus.value as? String,
+      "Interactive progress hidden",
+      "Reduce Motion exposed a partial rail position during an accepted drag."
+    )
+  }
+
+  func testNonChatSurfaceKeepsRailGesturesAtTheEdges() {
+    let app = launchMockApp(
+      launchArgument: "-ui-testing-library",
+      expectedElementDescription: "\"library-surface\""
+    ) {
+      $0.descendants(matching: .any)["library-surface"]
+    }
+
+    let centerLeadingStart = app.coordinate(withNormalizedOffset: CGVector(dx: 0.3, dy: 0.42))
+    let centerLeadingEnd = app.coordinate(withNormalizedOffset: CGVector(dx: 0.9, dy: 0.42))
+    centerLeadingStart.press(forDuration: 0.05, thenDragTo: centerLeadingEnd)
+    XCTAssertFalse(app.descendants(matching: .any)["shell-drawer"].isHittable)
+
+    let leftEdgeStart = app.coordinate(withNormalizedOffset: CGVector(dx: 0.02, dy: 0.42))
+    let leftEdgeEnd = app.coordinate(withNormalizedOffset: CGVector(dx: 0.8, dy: 0.42))
+    leftEdgeStart.press(forDuration: 0.05, thenDragTo: leftEdgeEnd)
+    let profileSurface = app.buttons["shell-drawer-surface-shell-tab-profile"]
+    XCTAssertTrue(
+      waitForHittable(profileSurface, timeout: 3),
+      "A valid Library edge swipe did not open the drawer.\n\(app.debugDescription)"
+    )
+
+    app.coordinate(withNormalizedOffset: CGVector(dx: 0.96, dy: 0.5)).tap()
+    XCTAssertTrue(waitForNotHittable(profileSurface, timeout: 3))
+
+    let centerTrailingStart = app.coordinate(withNormalizedOffset: CGVector(dx: 0.7, dy: 0.42))
+    let centerTrailingEnd = app.coordinate(withNormalizedOffset: CGVector(dx: 0.1, dy: 0.42))
+    centerTrailingStart.press(forDuration: 0.05, thenDragTo: centerTrailingEnd)
+    XCTAssertFalse(app.descendants(matching: .any)["shell-right-rail"].isHittable)
+
+    let rightEdgeStart = app.coordinate(withNormalizedOffset: CGVector(dx: 0.98, dy: 0.42))
+    let rightEdgeEnd = app.coordinate(withNormalizedOffset: CGVector(dx: 0.2, dy: 0.42))
+    rightEdgeStart.press(forDuration: 0.05, thenDragTo: rightEdgeEnd)
+    XCTAssertTrue(
+      waitForHittable(app.descendants(matching: .any)["shell-right-rail"], timeout: 3),
+      "A valid Library trailing-edge swipe did not open the right rail.\n\(app.debugDescription)"
+    )
+  }
+
+  func testAdminSettingsWorkspaceSwitchUpdatesOvieAndRestoresJovie() {
+    let app = launchMockApp(
+      launchArgument: "-ui-testing-chat-all-components",
+      additionalLaunchArguments: ["-ui-testing-admin"],
+      expectedElementDescription: "\"chat-composer-input\""
+    ) {
+      $0.textFields["chat-composer-input"]
+    }
+
+    app.buttons["Open Settings"].tap()
+    XCTAssertTrue(
+      app.descendants(matching: .any)["settings-view"].waitForExistence(timeout: 3)
+    )
+    let workspaceSwitch = app.buttons["settings-workspace-switch"]
+    XCTAssertTrue(waitForLabel(workspaceSwitch, label: "Workspace Jovie", timeout: 3))
+    workspaceSwitch.tap()
+    XCTAssertTrue(waitForLabel(workspaceSwitch, label: "Workspace Ovie", timeout: 3))
+    app.buttons["Close Settings"].tap()
+
+    XCTAssertTrue(
+      waitForPlaceholder(
+        app.textFields["chat-composer-input"],
+        placeholder: "Ask Summer",
+        timeout: 3
+      ),
+      "Ovie workspace did not restore the Summer-owned chat surface.\n\(app.debugDescription)"
+    )
+
+    app.buttons["Open Settings"].tap()
+    XCTAssertTrue(waitForLabel(workspaceSwitch, label: "Workspace Ovie", timeout: 3))
+    workspaceSwitch.tap()
+    XCTAssertTrue(waitForLabel(workspaceSwitch, label: "Workspace Jovie", timeout: 3))
+    app.buttons["Close Settings"].tap()
+    XCTAssertTrue(
+      waitForPlaceholder(app.textFields["chat-composer-input"], placeholder: "", timeout: 3)
     )
   }
 
@@ -1269,6 +1463,54 @@ final class JovieUITests: XCTestCase {
     attachScreenshot(named: "library-populated", app: app)
   }
 
+  func testLibraryAssetTapOpensDedicatedItemScreen() {
+    let app = launchMockApp(
+      launchArgument: "-ui-testing-library",
+      expectedElementDescription: "\"library-surface\""
+    ) {
+      $0.descendants(matching: .any)["library-surface"]
+    }
+
+    let asset = app.descendants(matching: .any)["library-asset-lib-release-midnight"]
+    XCTAssertTrue(
+      waitForHittable(asset, timeout: 3),
+      "Library asset was not hittable.\n\(app.debugDescription)"
+    )
+    asset.tap()
+
+    XCTAssertTrue(
+      app.descendants(matching: .any)["library-item-screen"].waitForExistence(timeout: 3),
+      "Library tap must open the dedicated left/main/right item screen.\n\(app.debugDescription)"
+    )
+    XCTAssertFalse(
+      app.descendants(matching: .any)["entity-context-sheet"].exists,
+      "Library tap must not present the entity sheet.\n\(app.debugDescription)"
+    )
+    XCTAssertFalse(
+      app.descendants(matching: .any)["library-video-player"].exists,
+      "Library tap must not present the video sheet.\n\(app.debugDescription)"
+    )
+    XCTAssertFalse(
+      shellControlExists(app, identifier: "shell-tab-bar"),
+      "Library item screen must not restore bottom tabs.\n\(app.debugDescription)"
+    )
+    XCTAssertTrue(
+      app.buttons["Open navigation drawer"].exists,
+      "Existing left rail must stay reachable on the item screen.\n\(app.debugDescription)"
+    )
+    XCTAssertTrue(
+      app.buttons["library-item-back"].exists,
+      "Item screen must expose back to the library list.\n\(app.debugDescription)"
+    )
+
+    app.buttons["Open navigation drawer"].tap()
+    XCTAssertTrue(
+      app.buttons["shell-drawer-surface-shell-tab-chat"].waitForExistence(timeout: 3),
+      "Item screen must reuse the existing sidebar, not a new nav.\n\(app.debugDescription)"
+    )
+    attachScreenshot(named: "library-item-screen", app: app)
+  }
+
   func testLibraryEmptyLaunchShowsEmptyFilterCopy() {
     let app = launchMockApp(
       launchArgument: "-ui-testing-library-empty",
@@ -1432,10 +1674,118 @@ final class JovieUITests: XCTestCase {
     )
 
     app.buttons["Open navigation drawer"].tap()
-    app.buttons["Settings"].tap()
+    let drawerSettings = app.buttons["shell-drawer-settings"]
     XCTAssertTrue(
-      app.staticTexts["Settings"].waitForExistence(timeout: 3),
+      waitForDrawerSurfaceToBeUncovered(
+        drawerSettings,
+        contentPlaneMarker: app.buttons["Open navigation drawer"],
+        timeout: 6
+      ),
+      "Settings row stayed covered by the opening content plane.\n\(app.debugDescription)"
+    )
+    drawerSettings.tap()
+    XCTAssertTrue(
+      app.descendants(matching: .any)["settings-view"].waitForExistence(timeout: 3),
       "Shell navigation did not open settings from the drawer.\n\(app.debugDescription)"
+    )
+
+    let closeSettings = app.buttons["Close Settings"]
+    XCTAssertTrue(
+      waitForHittable(closeSettings, timeout: 3),
+      "Settings did not expose a usable Done button.\n\(app.debugDescription)"
+    )
+    closeSettings.tap()
+    XCTAssertTrue(
+      app.descendants(matching: .any)["settings-view"].waitForNonExistence(timeout: 3),
+      "Done did not dismiss the full-screen Settings cover.\n\(app.debugDescription)"
+    )
+    XCTAssertTrue(
+      app.buttons["Copy URL"].waitForExistence(timeout: 3),
+      "Dismissing Settings did not restore the prior shell surface.\n\(app.debugDescription)"
+    )
+  }
+
+  // JOV-5201: horizontal motion inside a merch carousel belongs to that
+  // carousel. The shell must not also interpret it as a right-rail gesture.
+  func testMerchCarouselHorizontalScrollDoesNotOpenShellRails() {
+    let app = launchMockApp(
+      launchArgument: "-ui-testing-chat-all-components",
+      expectedElementDescription: "\"chat-composer-input\"",
+      timeout: 10
+    ) {
+      $0.textFields["chat-composer-input"]
+    }
+
+    if app.buttons["whats-new-done"].waitForExistence(timeout: 1) {
+      app.buttons["whats-new-done"].tap()
+    }
+
+    let merchCard = app.descendants(matching: .any).matching(
+      NSPredicate(format: "label CONTAINS %@", "Neon Pulse Tee")
+    ).firstMatch
+    let chat = app.scrollViews["mobile-chat"]
+    let merchScroll = app.scrollViews.matching(identifier: "mobile-chat-merch-scroll").firstMatch
+    for _ in 0..<16 {
+      if merchScroll.exists,
+         merchScroll.isHittable,
+         merchScroll.frame.minY > 140,
+         merchScroll.frame.maxY < 840
+      {
+        break
+      }
+      if chat.exists { chat.swipeUp() } else { app.swipeUp() }
+    }
+    XCTAssertTrue(
+      merchCard.isHittable,
+      "Could not bring the merch carousel on-screen.\n\(app.debugDescription)"
+    )
+
+    let trailingCard = app.descendants(matching: .any).matching(
+      NSPredicate(format: "label CONTAINS %@", "Tour Grid Cap")
+    ).firstMatch
+    XCTAssertFalse(
+      trailingCard.isHittable,
+      "The trailing merch card must begin outside the carousel viewport for this regression check."
+    )
+    XCTAssertTrue(
+      waitForHittable(merchScroll, timeout: 3),
+      "Merch carousel did not expose its horizontal scroll surface.\n\(app.debugDescription)"
+    )
+    merchScroll.swipeLeft()
+
+    XCTAssertTrue(
+      waitForHittable(trailingCard, timeout: 3),
+      "Horizontal drag did not reveal the trailing merch card.\n\(app.debugDescription)"
+    )
+    XCTAssertFalse(
+      app.descendants(matching: .any)["shell-right-rail"].isHittable,
+      "Merch carousel drag incorrectly opened the shell right rail.\n\(app.debugDescription)"
+    )
+    XCTAssertFalse(
+      app.descendants(matching: .any)["shell-drawer"].isHittable,
+      "Merch carousel drag incorrectly opened the shell drawer.\n\(app.debugDescription)"
+    )
+
+    let merchMidY = min(
+      0.9,
+      max(0.1, (merchScroll.frame.midY - app.frame.minY) / app.frame.height)
+    )
+    app.buttons["Open navigation drawer"].tap()
+    let profileSurface = app.buttons["shell-drawer-surface-shell-tab-profile"]
+    XCTAssertTrue(
+      waitForHittable(profileSurface, timeout: 3),
+      "Drawer did not open before the exclusion-frame dismissal check.\n\(app.debugDescription)"
+    )
+    let drawerCloseStart = app.coordinate(
+      withNormalizedOffset: CGVector(dx: 0.96, dy: merchMidY)
+    )
+    let drawerCloseEnd = app.coordinate(
+      withNormalizedOffset: CGVector(dx: 0.1, dy: merchMidY)
+    )
+    drawerCloseStart.press(forDuration: 0.05, thenDragTo: drawerCloseEnd)
+    XCTAssertFalse(
+      profileSurface.isHittable,
+      "A stale merch exclusion frame prevented the open drawer from closing.\n\(app.debugDescription)"
     )
   }
 
@@ -1475,9 +1825,16 @@ final class JovieUITests: XCTestCase {
       "Chat composer input did not become hittable.\n\(app.debugDescription)"
     )
     input.tap()
+    XCTAssertTrue(
+      app.keyboards.firstMatch.waitForExistence(timeout: 3),
+      "Keyboard did not appear before the rail-gesture lock check.\n\(app.debugDescription)"
+    )
 
-    let start = app.coordinate(withNormalizedOffset: CGVector(dx: 0.02, dy: 0.5))
-    let end = app.coordinate(withNormalizedOffset: CGVector(dx: 0.85, dy: 0.5))
+    // The downward component can dismiss the keyboard during this same drag.
+    // Eligibility must stay latched from gesture start so the drawer cannot
+    // open after that state transition.
+    let start = app.coordinate(withNormalizedOffset: CGVector(dx: 0.02, dy: 0.4))
+    let end = app.coordinate(withNormalizedOffset: CGVector(dx: 0.85, dy: 0.65))
     start.press(forDuration: 0.05, thenDragTo: end)
 
     XCTAssertFalse(
@@ -1526,7 +1883,7 @@ final class JovieUITests: XCTestCase {
     app.launch()
 
     XCTAssertTrue(
-      app.buttons["Continue in Browser"].waitForExistence(timeout: 10),
+      app.buttons["Continue to Jovie"].waitForExistence(timeout: 10),
       "Browser auth entry button did not appear.\n\(app.debugDescription)"
     )
   }
@@ -1571,7 +1928,7 @@ final class JovieUITests: XCTestCase {
       return
     }
 
-    if app.buttons["Continue in Browser"].waitForExistence(timeout: 2) {
+    if app.buttons["Continue to Jovie"].waitForExistence(timeout: 2) {
       attachScreenshot(named: "live-chat-signed-out", app: app)
       XCTFail("Live auth stayed signed out.\n\(app.debugDescription)")
       return
@@ -1653,11 +2010,11 @@ final class JovieUITests: XCTestCase {
     app.launch()
 
     XCTAssertTrue(
-      app.buttons["Continue in Browser"].waitForExistence(timeout: 10),
+      app.buttons["Continue to Jovie"].waitForExistence(timeout: 10),
       "Browser auth entry button did not appear.\n\(app.debugDescription)"
     )
 
-    app.buttons["Continue in Browser"].tap()
+    app.buttons["Continue to Jovie"].tap()
     acceptSystemAuthPromptIfNeeded()
 
     let copyURLButton = app.buttons["Copy URL"]
@@ -1742,9 +2099,9 @@ final class JovieUITests: XCTestCase {
   func testAuthCallbackProviderErrorShowsAuthError() throws {
     let app = launchMockApp(
       launchArgument: "-ui-testing-auth-callback",
-      expectedElementDescription: "\"Continue in Browser\""
+      expectedElementDescription: "\"Continue to Jovie\""
     ) {
-      $0.buttons["Continue in Browser"]
+      $0.buttons["Continue to Jovie"]
     }
 
     try openAuthCallbackURL(
@@ -1977,6 +2334,20 @@ final class JovieUITests: XCTestCase {
     }
   }
 
+  /// Mid-canvas pans on chat home (JOV-5201). Start away from the 44pt edges
+  /// so the test proves full-width swipe, not only the leftover edge drag.
+  private func dragChatHomeLeadingSwipe(_ app: XCUIApplication) {
+    let start = app.coordinate(withNormalizedOffset: CGVector(dx: 0.22, dy: 0.42))
+    let end = app.coordinate(withNormalizedOffset: CGVector(dx: 0.88, dy: 0.42))
+    start.press(forDuration: 0.05, thenDragTo: end)
+  }
+
+  private func dragChatHomeTrailingSwipe(_ app: XCUIApplication) {
+    let start = app.coordinate(withNormalizedOffset: CGVector(dx: 0.78, dy: 0.42))
+    let end = app.coordinate(withNormalizedOffset: CGVector(dx: 0.12, dy: 0.42))
+    start.press(forDuration: 0.05, thenDragTo: end)
+  }
+
   private func waitForHittable(_ element: XCUIElement, timeout: TimeInterval) -> Bool {
     let deadline = Date().addingTimeInterval(timeout)
 
@@ -1989,6 +2360,53 @@ final class JovieUITests: XCTestCase {
     }
 
     return element.exists && element.isHittable
+  }
+
+  private func waitForNotHittable(_ element: XCUIElement, timeout: TimeInterval) -> Bool {
+    let deadline = Date().addingTimeInterval(timeout)
+
+    while Date() < deadline {
+      if !element.exists || !element.isHittable {
+        return true
+      }
+      RunLoop.current.run(until: Date().addingTimeInterval(0.05))
+    }
+
+    return !element.exists || !element.isHittable
+  }
+
+  private func waitForLabel(
+    _ element: XCUIElement,
+    label: String,
+    timeout: TimeInterval
+  ) -> Bool {
+    let deadline = Date().addingTimeInterval(timeout)
+
+    while Date() < deadline {
+      if element.exists && element.label == label {
+        return true
+      }
+      RunLoop.current.run(until: Date().addingTimeInterval(0.05))
+    }
+
+    return element.exists && element.label == label
+  }
+
+  private func waitForPlaceholder(
+    _ element: XCUIElement,
+    placeholder: String,
+    timeout: TimeInterval
+  ) -> Bool {
+    let deadline = Date().addingTimeInterval(timeout)
+
+    while Date() < deadline {
+      if element.exists && (element.placeholderValue as? String) == placeholder {
+        return true
+      }
+      RunLoop.current.run(until: Date().addingTimeInterval(0.05))
+    }
+
+    return element.exists && (element.placeholderValue as? String) == placeholder
   }
 
   /// SwiftUI reports recessed drawer controls hittable before the animated

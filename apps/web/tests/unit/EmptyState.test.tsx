@@ -41,6 +41,10 @@ describe('EmptyState (canonical molecule API)', () => {
     const iconWrapper = screen.getByTestId('test-icon').parentElement;
     expect(iconWrapper?.className).toContain('h-9');
     expect(iconWrapper?.className).toContain('text-tertiary-token');
+    expect(screen.getByRole('status')).toHaveAttribute(
+      'data-content-state',
+      'empty'
+    );
   });
 
   it('invokes primary action callback when clicked', () => {
@@ -137,6 +141,10 @@ describe('EmptyState (canonical molecule API)', () => {
     );
 
     const heading = screen.getByRole('heading', { name: /access denied/i });
+    expect(screen.getByRole('status')).toHaveAttribute(
+      'data-content-state',
+      'error'
+    );
     expect(heading.className).toContain('text-secondary-token');
     expect(screen.getByTestId('error-icon').parentElement?.className).toContain(
       'text-error'
@@ -195,5 +203,26 @@ describe('EmptyState (canonical molecule API)', () => {
     expect(description.className).toContain('max-w-md');
     expect(description.className).toContain('text-secondary-token');
     expect(description.className).toContain('mb-0');
+  });
+
+  it('keeps action layout compact-first and inline at the small breakpoint', () => {
+    render(
+      <EmptyState
+        heading='No Matches'
+        action={{ label: 'Create Match', onClick: () => undefined }}
+        secondaryAction={{ label: 'Clear Filters', onClick: () => undefined }}
+      />
+    );
+
+    const actionGroup = screen.getByRole('button', {
+      name: 'Create Match',
+    }).parentElement;
+    expect(actionGroup).toHaveClass(
+      'max-w-full',
+      'flex-col',
+      'gap-2',
+      'sm:flex-row',
+      'sm:gap-3'
+    );
   });
 });

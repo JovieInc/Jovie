@@ -84,6 +84,71 @@ export const OBSERVATION_STATES = [
 
 export type ObservationState = (typeof OBSERVATION_STATES)[number];
 
+export const OPERATIONAL_TASK_WORKFLOW_STATES = [
+  'queued',
+  'running',
+  'retrying',
+  'blocked',
+  'in-review',
+  'merge-queued',
+  'merged',
+  'production-verified',
+] as const;
+
+export type OperationalTaskWorkflowState =
+  (typeof OPERATIONAL_TASK_WORKFLOW_STATES)[number];
+
+export const OPERATIONAL_TASK_SYNC_STATES = [
+  'fresh',
+  'stale',
+  'syncing',
+  'failed',
+] as const;
+
+export type OperationalTaskSyncState =
+  (typeof OPERATIONAL_TASK_SYNC_STATES)[number];
+
+export type OperationalTaskPriority =
+  | 'urgent'
+  | 'high'
+  | 'medium'
+  | 'low'
+  | 'none';
+
+export type OperationalTask = {
+  /** Stable cross-presentation identity. Linear remains the canonical owner. */
+  readonly id: `linear:${string}`;
+  readonly linearIdentifier: string;
+  readonly linearUrl: string | null;
+  readonly title: string;
+  readonly workflowState: OperationalTaskWorkflowState;
+  readonly priority: OperationalTaskPriority;
+  readonly attempt: number | null;
+  readonly retryAt: string | null;
+  readonly sourceRevision: string | null;
+  readonly updatedAt: string | null;
+};
+
+export type OperationalTaskDelta = {
+  readonly taskId: OperationalTask['id'];
+  readonly kind: 'added' | 'updated' | 'removed';
+  readonly fromState: OperationalTaskWorkflowState | null;
+  readonly toState: OperationalTaskWorkflowState | null;
+  readonly sequence: number;
+};
+
+export type OperationalTaskFeed = {
+  readonly canonicalSource: 'linear';
+  readonly cacheMode: 'local-reconciled';
+  readonly syncState: OperationalTaskSyncState;
+  readonly sourceId: 'symphony-runtime' | 'symphony-task';
+  readonly observedAt: string | null;
+  readonly lastSyncedAt: string | null;
+  readonly freshnessDeadline: string | null;
+  readonly tasks: readonly OperationalTask[];
+  readonly deltas: readonly OperationalTaskDelta[];
+};
+
 export const SHIP_MEANING_KEYS = [
   'merged',
   'queued',
@@ -182,6 +247,7 @@ export type IdentityFields = {
 export type ShippingEntity = IdentityFields & {
   readonly state: ObservationState;
   readonly truncated: boolean;
+  readonly operationalTask?: OperationalTask;
 };
 
 export type SourceObservation = IdentityFields & {
@@ -243,6 +309,8 @@ export type ShippingStateProjection = IdentityFields & {
   readonly retrying: CountMeasurement;
   readonly terminalFailures: CountMeasurement;
   readonly capacityAvailable: CountMeasurement;
+  /** Shared cache-backed task projection consumed by Ovie and terminal adapters. */
+  readonly operationalTasks: OperationalTaskFeed;
 };
 
 export type ShippingClock = {

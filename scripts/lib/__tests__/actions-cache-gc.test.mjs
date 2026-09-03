@@ -5,7 +5,10 @@ import {
   buildOpenCacheRefs,
   CACHE_BYTES_SOFT_LIMIT,
   CACHE_COUNT_SOFT_LIMIT,
+  collectCacheGcSnapshot,
+  flattenGhPages,
   isProtectedCacheKey,
+  parseGhJsonOutput,
   planCacheGc,
   turboFamily,
 } from '../actions-cache-gc.mjs';
@@ -133,6 +136,52 @@ describe('Actions cache GC', () => {
     });
     expect(plan.evict).toEqual([]);
     expect(plan.keep.map(item => item.id)).toEqual([9]);
+  });
+
+  it('parses paginated gh --slurp pages instead of crashing on 459 caches', async () => {
+    const pageOne = {
+      total_count: 459,
+      actions_caches: [cache({ id: 1, key: 'Linux-turbo-one' })],
+    };
+    const pageTwo = {
+      total_count: 459,
+      actions_caches: [cache({ id: 2, key: 'Linux-turbo-two' })],
+    };
+    expect(
+      flattenGhPages(
+        parseGhJsonOutput(JSON.stringify([pageOne, pageTwo])),
+        'actions_caches'
+      ).map(item => item.id)
+    ).toEqual([1, 2]);
+    expect(
+      flattenGhPages(
+        parseGhJsonOutput(
+          `${JSON.stringify(pageOne)}\n${JSON.stringify(pageTwo)}`
+        ),
+        'actions_caches'
+      ).map(item => item.id)
+    ).toEqual([1, 2]);
+    const snapshot = await collectCacheGcSnapshot({
+      repository: 'JovieInc/Jovie',
+      execJson: async args => {
+        const joined = args.join(' ');
+        if (joined.includes('/actions/caches')) {
+          expect(args.includes('--paginate')).toBe(true);
+          expect(args.includes('--slurp')).toBe(true);
+          return [pageOne, pageTwo];
+        }
+        if (joined.includes('/actions/cache/usage')) {
+          return { active_caches_count: 459, active_caches_size_in_bytes: 10 };
+        }
+        expect(joined.includes('/pulls?')).toBe(true);
+        expect(args.includes('--paginate')).toBe(true);
+        expect(args.includes('--slurp')).toBe(true);
+        return [[{ number: 17, head: { ref: 'cursor/fx' } }]];
+      },
+    });
+    expect(snapshot.caches.map(item => item.id)).toEqual([1, 2]);
+    expect(snapshot.openRefs.has('refs/heads/cursor/fx')).toBe(true);
+    expect(snapshot.openRefs.has('refs/pull/17/merge')).toBe(true);
   });
 
   it('schedules automatic GC with actions: write and no human smash', () => {

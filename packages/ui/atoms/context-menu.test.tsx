@@ -232,6 +232,7 @@ describe('ContextMenu', () => {
       await waitFor(() => {
         const item = screen.getByRole('menuitemcheckbox');
         expect(item).toHaveAttribute('data-state', 'checked');
+        expect(item.className).toContain('data-[state=checked]:bg-surface-1');
       });
     });
 
@@ -336,6 +337,7 @@ describe('ContextMenu', () => {
         const medium = screen.getByRole('menuitemradio', { name: 'Medium' });
         expect(small).toHaveAttribute('data-state', 'unchecked');
         expect(medium).toHaveAttribute('data-state', 'checked');
+        expect(medium.className).toContain('data-[state=checked]:bg-surface-1');
       });
     });
   });

@@ -1072,7 +1072,7 @@ struct AppStateTests {
         isOpening: false,
         isDisabled: false,
         hasRecoveryMessage: false
-      ) == "Continue in Browser"
+      ) == "Continue to Jovie"
     )
     #expect(canStartMobileAuth(isMock: false, isOpening: false))
     #expect(!canStartMobileAuth(isMock: false, isOpening: true))

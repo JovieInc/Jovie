@@ -2,6 +2,8 @@
 
 // @coverage-via apps/web/tests/unit/components/table/PageToolbar.test.tsx
 import { Button, TooltipShortcut } from '@jovie/ui';
+import { ArrowLeft } from 'lucide-react';
+import Link from 'next/link';
 import type { ComponentProps, ReactNode } from 'react';
 import { cn } from '@/lib/utils';
 import { ACTION_BAR_BUTTON_CLASS, ActionBar } from './ActionBar';
@@ -33,6 +35,14 @@ export const PAGE_TOOLBAR_ACTION_BUTTON_CLASS = cn(
 
 export const PAGE_TOOLBAR_ACTION_ICON_ONLY_BUTTON_CLASS =
   'w-7 justify-center px-0 text-tertiary-token';
+
+export const PAGE_TOOLBAR_BACK_LINK_CLASS = cn(
+  PAGE_TOOLBAR_ACTION_BUTTON_CLASS,
+  'min-w-0 max-w-full gap-1.5 max-sm:w-7 max-sm:px-0'
+);
+
+export const PAGE_TOOLBAR_BACK_LINK_LABEL_CLASS =
+  'min-w-0 truncate max-sm:sr-only';
 
 export const TABLE_TOOLBAR_SHELL_CLASS =
   'flex h-11 min-h-11 min-w-0 items-center gap-2 overflow-x-auto overflow-y-hidden border-b border-(--app-shell-frame-seam) bg-(--app-shell-content-surface) px-3 py-2 scroll-smooth [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden';
@@ -109,6 +119,44 @@ export function PageToolbar({
         </ActionBar>
       ) : null}
     </div>
+  );
+}
+
+interface PageToolbarBackLinkProps {
+  readonly href: string;
+  readonly label: ReactNode;
+  readonly ariaLabel?: string;
+  readonly className?: string;
+}
+
+function getBackLinkAriaLabel(label: ReactNode, ariaLabel?: string): string {
+  if (ariaLabel) return ariaLabel;
+  return typeof label === 'string' ? `Back to ${label}` : 'Go back';
+}
+
+export function PageToolbarBackLink({
+  href,
+  label,
+  ariaLabel,
+  className,
+}: PageToolbarBackLinkProps) {
+  return (
+    <Button
+      asChild
+      variant='ghost'
+      size='sm'
+      aria-label={getBackLinkAriaLabel(label, ariaLabel)}
+      className={cn(PAGE_TOOLBAR_BACK_LINK_CLASS, className)}
+    >
+      <Link href={href}>
+        <ArrowLeft
+          className={PAGE_TOOLBAR_ICON_CLASS}
+          strokeWidth={PAGE_TOOLBAR_ICON_STROKE_WIDTH}
+          aria-hidden='true'
+        />
+        <span className={PAGE_TOOLBAR_BACK_LINK_LABEL_CLASS}>{label}</span>
+      </Link>
+    </Button>
   );
 }
 

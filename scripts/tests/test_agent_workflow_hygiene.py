@@ -1,4 +1,5 @@
 """Regression tests for self-hosted agent workflow hygiene."""
+import json
 import os
 import re
 import subprocess
@@ -77,6 +78,48 @@ HOSTED_POST_MERGE_JOBS = (
     ("linear-sync-on-merge.yml", "sync_done"),
     ("neon-ephemeral-branch-cleanup.yml", "delete-neon-branch"),
 )
+
+def _writer_proof_body(
+    head: str,
+    pr_number: int,
+    writer: str = "itstimwhite",
+    issue: str = "JOV-5751",
+) -> str:
+    gates = (
+        "exact-head",
+        "writer",
+        "required-tests",
+        "review-sweep",
+        "ticket-evidence",
+        "pr-evidence",
+        "writer-promotion-path",
+    )
+    receipt = {
+        "schema": "jovie-writer-pr-proof/v1",
+        "issuedAt": "2026-08-31T00:00:00.000Z",
+        "issueId": issue,
+        "prNumber": pr_number,
+        "headSha": head,
+        "writerLogin": writer,
+        "ownership": "author-owned",
+        "evidence": {
+            "requiredTests": "passed: focused promotion tests",
+            "reviewSweep": "complete: review comments checked",
+            "ticketEvidence": "attached: Linear workpad current",
+            "prEvidence": "attached: PR body current",
+        },
+        "promotion": {
+            "path": "writer-owned-pr-promote",
+            "readyAndNativeIntent": "same-bounded-action",
+            "reconciliationRequired": False,
+        },
+        "gates": [
+            {"id": gate, "passed": True, "reason": "test proof"} for gate in gates
+        ],
+        "proofComplete": True,
+        "blockedBy": [],
+    }
+    return f"<!-- jovie-writer-pr-proof/v1\n{json.dumps(receipt, separators=(',', ':'))}\n-->"
 
 HOSTED_API_ONLY_PR_CONTROLLERS = (
     ("dependabot-auto-merge.yml", "auto-merge"),
@@ -416,9 +459,43 @@ def test_autofix_uses_corepack_for_pnpm_distribution() -> None:
     script = (REPO_ROOT / "scripts" / "auto-fix-lint-agent-drafts.sh").read_text(
         encoding="utf-8"
     )
+    workflow = (WORKFLOWS / "auto-fix-lint-agent-drafts.yml").read_text(
+        encoding="utf-8"
+    )
 
     assert "npm install -g pnpm@" not in script
     assert "corepack prepare pnpm@9.15.4 --activate" in script
+    assert "pnpm install --frozen-lockfile --ignore-scripts" in script
+    assert "env -u GH_TOKEN -u GITHUB_TOKEN -u NODE_AUTH_TOKEN" in script
+    assert ".headOwner == $repo_owner" in script
+    assert "headOwner/$headRepo.git" not in script
+    assert "persist-credentials: false" in workflow
+
+
+def test_agent_landing_does_not_treat_risk_classifier_as_human_merge_gate() -> None:
+    """Autonomous shipping: high-risk paths get stricter CI, not needs-human."""
+    for workflow_name in (
+        "agent-pipeline.yml",
+        "agent-landing-sweep.yml",
+        "agent-tick.yml",
+    ):
+        content = (WORKFLOWS / workflow_name).read_text(encoding="utf-8")
+        assert "blocksUnattendedAutoMerge == true" not in content, workflow_name
+        assert "--add-label needs-human" not in content, workflow_name
+
+
+def test_claude_mention_requires_write_capable_association() -> None:
+    """Public @claude mentions must not mint a write token for strangers."""
+    workflow = (WORKFLOWS / "claude.yml").read_text(encoding="utf-8")
+    job = _job_block("claude.yml", "claude")
+
+    assert "github.event.comment.author_association == 'OWNER'" in job
+    assert "github.event.comment.author_association == 'MEMBER'" in job
+    assert "github.event.comment.author_association == 'COLLABORATOR'" in job
+    assert "github.actor == 'coderabbitai[bot]'" in job
+    assert "allowed_bots: 'coderabbitai[bot]'" in workflow
+    assert "author_association == 'CONTRIBUTOR'" not in job
+    assert "author_association == 'NONE'" not in job
 
 
 def test_trigger_guard_materializes_systemic_detector_import_closure() -> None:
@@ -606,12 +683,18 @@ def test_workflow_run_controllers_ignore_non_pr_and_stale_runs() -> None:
     """Main/merge-group completions must not wake PR fleet controllers."""
     for workflow, job_name in (
         ("merge-queue-autoenroll.yml", "enroll"),
-        ("auto-ready-agent-drafts.yml", "auto-ready"),
         ("pr-conflict-handler.yml", "plan"),
     ):
         block = _job_block(workflow, job_name)
         assert "github.event.workflow_run.event == 'pull_request'" in block, workflow
         assert "github.event.workflow_run.conclusion != 'cancelled'" in block, workflow
+
+    auto_ready = (WORKFLOWS / "auto-ready-agent-drafts.yml").read_text(
+        encoding="utf-8"
+    )
+    assert "workflow_dispatch:" in auto_ready
+    assert "workflow_run:" not in auto_ready
+    assert "pull_request:" not in auto_ready
 
     pipeline = _job_block("agent-pipeline.yml", "guard")
     assert "github.event.workflow_run.event == 'pull_request'" in pipeline
@@ -782,7 +865,7 @@ def test_main_autofix_waits_for_rerun_and_exact_sha_repair_ownership() -> None:
 
 
 def test_auto_ready_compensates_live_hold_race(tmp_path: Path) -> None:
-    """A hold racing in after an FX-provenance promotion restores draft."""
+    """A hold racing in after a writer-proofed promotion restores draft."""
     fake_bin = tmp_path / "bin"
     fake_bin.mkdir()
     state_file = tmp_path / "state"
@@ -790,6 +873,7 @@ def test_auto_ready_compensates_live_hold_race(tmp_path: Path) -> None:
     call_log = tmp_path / "calls.log"
     fx_child_head = "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
     fx_source_head = "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+    proof_body = json.dumps(_writer_proof_body(fx_child_head, 42))
     fake_gh = fake_bin / "gh"
     fake_gh.write_text(
         textwrap.dedent(
@@ -798,15 +882,15 @@ def test_auto_ready_compensates_live_hold_race(tmp_path: Path) -> None:
             set -euo pipefail
             printf '%s\\n' "$*" >> {call_log}
             if [[ "$1 $2" == "pr list" ]]; then
-              printf '%s\\n' '[{{"n":42,"t":"race guard","draft":true,"head":"codex/race","oid":"{fx_child_head}","author":"itstimwhite","L":[]}}]'
+              printf '%s\\n' '[{{"n":42,"t":"race guard","draft":true,"head":"codex/race","oid":"{fx_child_head}","body":{proof_body},"author":"itstimwhite","L":[]}}]'
             elif [[ "$1 $2" == "pr view" ]]; then
               phase="$(cat {state_file})"
               if [[ "$phase" == "promoted" ]]; then
-                printf '%s\\n' '{{"draft":false,"head":"{fx_child_head}","branch":"codex/race","labels":["gated"],"state":"OPEN","autoMerge":true,"queued":false}}'
+                printf '%s\\n' '{{"draft":false,"head":"{fx_child_head}","branch":"codex/race","body":{proof_body},"labels":["gated"],"state":"OPEN","autoMerge":true,"queued":false}}'
               elif [[ "$phase" == "restored" ]]; then
-                printf '%s\\n' '{{"draft":true,"head":"{fx_child_head}","branch":"codex/race","labels":["gated"],"state":"OPEN","autoMerge":false,"queued":false}}'
+                printf '%s\\n' '{{"draft":true,"head":"{fx_child_head}","branch":"codex/race","body":{proof_body},"labels":["gated"],"state":"OPEN","autoMerge":false,"queued":false}}'
               else
-                printf '%s\\n' '{{"draft":true,"head":"{fx_child_head}","branch":"codex/race","labels":[],"state":"OPEN","autoMerge":false,"queued":false}}'
+                printf '%s\\n' '{{"draft":true,"head":"{fx_child_head}","branch":"codex/race","body":{proof_body},"labels":[],"state":"OPEN","autoMerge":false,"queued":false}}'
               fi
             elif [[ "$1 $2" == "pr checks" ]]; then
               printf 'fake gh must never wait for checks before promotion\\n' >&2
@@ -828,11 +912,11 @@ def test_auto_ready_compensates_live_hold_race(tmp_path: Path) -> None:
                 graphql)
                   phase="$(cat {state_file})"
                   if [[ "$phase" == "promoted" ]]; then
-                    printf '%s\\n' '{{"draft":false,"head":"{fx_child_head}","branch":"codex/race","labels":["gated"],"state":"OPEN","autoMerge":true,"queued":false}}'
+                    printf '%s\\n' '{{"draft":false,"head":"{fx_child_head}","branch":"codex/race","body":{proof_body},"labels":["gated"],"state":"OPEN","autoMerge":true,"queued":false}}'
                   elif [[ "$phase" == "restored" ]]; then
-                    printf '%s\\n' '{{"draft":true,"head":"{fx_child_head}","branch":"codex/race","labels":["gated"],"state":"OPEN","autoMerge":false,"queued":false}}'
+                    printf '%s\\n' '{{"draft":true,"head":"{fx_child_head}","branch":"codex/race","body":{proof_body},"labels":["gated"],"state":"OPEN","autoMerge":false,"queued":false}}'
                   else
-                    printf '%s\\n' '{{"draft":true,"head":"{fx_child_head}","branch":"codex/race","labels":[],"state":"OPEN","autoMerge":false,"queued":false}}'
+                    printf '%s\\n' '{{"draft":true,"head":"{fx_child_head}","branch":"codex/race","body":{proof_body},"labels":[],"state":"OPEN","autoMerge":false,"queued":false}}'
                   fi
                   ;;
                 repos/*/commits/*)
@@ -967,6 +1051,7 @@ def test_auto_ready_recovers_interrupted_ready_without_auto_merge(
     state_file.write_text("orphan-ready", encoding="utf-8")
     call_log = tmp_path / "calls.log"
     head = "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee"
+    proof_body = json.dumps(_writer_proof_body(head, 88, "jovie-bot[bot]"))
     fake_gh = fake_bin / "gh"
     fake_gh.write_text(
         textwrap.dedent(
@@ -975,7 +1060,7 @@ def test_auto_ready_recovers_interrupted_ready_without_auto_merge(
             set -euo pipefail
             printf '%s\n' "$*" >> {call_log}
             if [[ "$1 $2" == "pr list" ]]; then
-              printf '%s\n' '[{{"n":88,"t":"interrupted pair","draft":false,"head":"codex/interrupted","oid":"{head}","author":"jovie-bot[bot]","L":[]}}]'
+              printf '%s\n' '[{{"n":88,"t":"interrupted pair","draft":false,"head":"codex/interrupted","oid":"{head}","body":{proof_body},"author":"jovie-bot[bot]","L":[]}}]'
             elif [[ "$1 $2" == "pr ready" ]]; then
               printf 'recovery must not repeat the ready mutation\n' >&2
               exit 2
@@ -988,9 +1073,9 @@ def test_auto_ready_recovers_interrupted_ready_without_auto_merge(
               fi
             elif [[ "$1" == "api" && "$2" == "graphql" ]]; then
               if [[ "$(cat {state_file})" == "auto-enabled" ]]; then
-                printf '%s\n' '{{"draft":false,"head":"{head}","branch":"codex/interrupted","labels":[],"state":"OPEN","autoMerge":true,"queued":false}}'
+                printf '%s\n' '{{"draft":false,"head":"{head}","branch":"codex/interrupted","body":{proof_body},"labels":[],"state":"OPEN","autoMerge":true,"queued":false}}'
               else
-                printf '%s\n' '{{"draft":false,"head":"{head}","branch":"codex/interrupted","labels":[],"state":"OPEN","autoMerge":false,"queued":false}}'
+                printf '%s\n' '{{"draft":false,"head":"{head}","branch":"codex/interrupted","body":{proof_body},"labels":[],"state":"OPEN","autoMerge":false,"queued":false}}'
               fi
             else
               printf 'unexpected fake gh invocation: %s\n' "$*" >&2
@@ -1101,6 +1186,28 @@ def test_deep_lanes_are_staggered_and_bounded() -> None:
     assert "'0 9 * * 2'" in harness
 
 
+def test_pitch_static_assets_do_not_keep_large_unreferenced_files() -> None:
+    """Large public pitch assets must be referenced by the checked-in deck."""
+    pitch_dir = REPO_ROOT / "apps" / "web" / "public" / "pitch"
+    assets_dir = pitch_dir / "assets"
+    deck_sources = "\n".join(
+        path.read_text(encoding="utf-8")
+        for path in pitch_dir.iterdir()
+        if path.is_file() and path.suffix in {".css", ".html", ".js"}
+    )
+    referenced_assets = set(re.findall(r"assets/([^\"')\s>]+)", deck_sources))
+
+    large_unreferenced = sorted(
+        path.name
+        for path in assets_dir.iterdir()
+        if path.is_file()
+        and path.stat().st_size > 250_000
+        and path.name not in referenced_assets
+    )
+
+    assert large_unreferenced == []
+
+
 def test_product_screenshot_budget_covers_capture_and_publication() -> None:
     """The screenshot publisher must outlive capture plus the normal push gate."""
     job = _job_block("screenshots.yml", "generate")
@@ -1127,6 +1234,12 @@ def test_product_screenshot_budget_covers_capture_and_publication() -> None:
         "E2E_CLERK_USER_ID",
     ):
         assert f"-u {capture_only_variable}" in publication
+    assert "hold_screenshot_merge_queue()" in publication
+    assert "production-controller.yml/runs?status=in_progress&per_page=100" in publication
+    assert "production-controller.yml/runs?status=queued&per_page=100" in publication
+    assert "hold-screenshot-mq-during-controller.mjs" in publication
+    assert publication.count('gh pr edit --add-label "merge-queue"') == 2
+    assert publication.count("if hold_screenshot_merge_queue; then") == 2
 
 
 def test_cost_monitoring_docs_match_activation_gated_observer() -> None:
@@ -1308,6 +1421,8 @@ def test_fleet_gate_refresh_skips_cancelled_ci_and_ignored_labels() -> None:
     assert "Persist stack policy repair actions" in block
     assert "--closure-health-file=" in block
     assert "delivery-state-machine.mjs" in block
+    assert "\n  pull_request_target:\n" in workflow and "\n  pull_request:\n" not in workflow and "converted_to_draft" in trigger and "github.event_name != 'pull_request_target'" in block and "steps.refresh.outputs.receipt_path" in block and "state/gem-priority-gate/latest.json" not in block
+    assert "steps.stack-actions.outcome == 'success'" in block
 
 
 def test_heartbeat_is_the_only_scheduled_generic_fixed_runner_consumer() -> None:

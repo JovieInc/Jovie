@@ -29,5 +29,7 @@ export {
   BUTTON_PEN_PROPAGATION_FIXTURES,
   normalizeButtonPenRef,
 } from './penRefs';
+export * from './systemAuthorityMap';
+export * from './systemAuthorityMapValidation';
 export * from './uiOwnershipRegistry';
 export * from './uiOwnershipRegistryValidation';

@@ -1,0 +1,349 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+logical_root="/srv/worktrees/jovie"
+manifest_dir="/var/lib/jovie-symphony-workspaces/manifests"
+marker_dir="/var/lib/jovie-symphony-workspaces/markers"
+lock_file="/run/lock/jovie-symphony-workspaces.lock"
+receipt_dir="/srv/git/receipts/workspace-mounts"
+failed_root="/srv/scratch/symphony-failed-clones/jovie"
+quarantine_root="/srv/scratch/symphony-workspace-quarantine/jovie"
+owner="timwhite"
+group="timwhite"
+roots=(
+  "/srv/worktrees/symphony-shards/jovie"
+  "/srv/models/symphony-worktrees/jovie"
+  "/srv/cache/symphony-worktrees/jovie"
+  "/srv/scratch/symphony-worktrees/jovie"
+)
+
+usage() {
+  echo "usage: $0 route <JOV-N> | prepare|activate|abort|cleanup <logical-path> | restore-all | reconcile-cleanup | status" >&2
+  exit 64
+}
+
+require_root() {
+  [[ "$(id -u)" -eq 0 ]] || { echo "must run as root" >&2; exit 77; }
+}
+
+init_state() {
+  install -d -o root -g root -m 0755 "$manifest_dir" "$marker_dir" "$(dirname "$lock_file")" "$receipt_dir"
+  install -d -o "$owner" -g "$group" -m 0755 "$failed_root" "$quarantine_root"
+  local root
+  for root in "${roots[@]}"; do
+    install -d -o "$owner" -g "$group" -m 0755 "$root"
+  done
+}
+
+issue_from_logical() {
+  local logical="$1" issue
+  [[ "$logical" == "$logical_root/"* ]] || { echo "logical path escapes root: $logical" >&2; return 1; }
+  issue="${logical#"$logical_root/"}"
+  [[ "$issue" != */* && "$issue" =~ ^JOV-[0-9]+$ ]] || { echo "invalid issue path: $logical" >&2; return 1; }
+  [[ "$logical" == "$logical_root/$issue" ]] || return 1
+  printf '%s\n' "$issue"
+}
+
+bucket_for_issue() {
+  local issue="$1" prefix
+  [[ "$issue" =~ ^JOV-[0-9]+$ ]] || { echo "invalid issue: $issue" >&2; return 1; }
+  prefix="$(printf '%s' "$issue" | sha256sum | cut -c1-8)"
+  printf '%s\n' "$((16#$prefix % 4))"
+}
+
+expected_backing() {
+  local issue="$1" bucket
+  bucket="$(bucket_for_issue "$issue")"
+  printf '%s/%s\n' "${roots[$bucket]}" "$issue"
+}
+
+manifest_for_issue() {
+  printf '%s/%s.env\n' "$manifest_dir" "$1"
+}
+
+marker_for_issue() {
+  printf '%s/%s.marker\n' "$marker_dir" "$1"
+}
+
+read_manifest_value() {
+  local manifest="$1" key="$2"
+  awk -F= -v key="$key" '$1 == key {sub(/^[^=]*=/, ""); print; exit}' "$manifest"
+}
+
+validate_manifest() {
+  local manifest="$1" issue logical backing bucket expected
+  [[ -f "$manifest" && ! -L "$manifest" ]] || return 1
+  issue="$(read_manifest_value "$manifest" issue)"
+  logical="$(read_manifest_value "$manifest" logical)"
+  backing="$(read_manifest_value "$manifest" backing)"
+  bucket="$(read_manifest_value "$manifest" bucket)"
+  [[ "$issue" =~ ^JOV-[0-9]+$ ]] || return 1
+  [[ "$logical" == "$logical_root/$issue" ]] || return 1
+  [[ "$bucket" == "$(bucket_for_issue "$issue")" ]] || return 1
+  expected="$(expected_backing "$issue")"
+  [[ "$backing" == "$expected" ]] || return 1
+}
+
+write_manifest() {
+  local issue="$1" state="$2" logical bucket backing manifest tmp
+  logical="$logical_root/$issue"
+  bucket="$(bucket_for_issue "$issue")"
+  backing="$(expected_backing "$issue")"
+  manifest="$(manifest_for_issue "$issue")"
+  tmp="$(mktemp "$manifest_dir/.${issue}.XXXXXX")"
+  {
+    printf 'issue=%s\n' "$issue"
+    printf 'logical=%s\n' "$logical"
+    printf 'backing=%s\n' "$backing"
+    printf 'bucket=%s\n' "$bucket"
+    printf 'state=%s\n' "$state"
+  } >"$tmp"
+  chmod 0644 "$tmp"
+  mv "$tmp" "$manifest"
+}
+
+write_receipt() {
+  local action="$1" issue="$2" detail="${3:-}" timestamp receipt
+  timestamp="$(date -u +%Y%m%dT%H%M%SZ)"
+  receipt="$receipt_dir/${timestamp}-${issue}-${action}.txt"
+  {
+    printf 'timestamp=%s\n' "$timestamp"
+    printf 'action=%s\n' "$action"
+    printf 'issue=%s\n' "$issue"
+    printf 'logical=%s/%s\n' "$logical_root" "$issue"
+    printf 'backing=%s\n' "$(expected_backing "$issue")"
+    printf 'bucket=%s\n' "$(bucket_for_issue "$issue")"
+    printf 'detail=%s\n' "$detail"
+  } >"$receipt"
+  chmod 0644 "$receipt"
+}
+
+same_inode() {
+  [[ "$(stat -Lc '%d:%i' "$1")" == "$(stat -Lc '%d:%i' "$2")" ]]
+}
+
+has_proc_refs() {
+  local logical="$1" backing="$2" link target
+  shopt -s nullglob
+  for link in /proc/[0-9]*/cwd /proc/[0-9]*/root /proc/[0-9]*/fd/*; do
+    target="$(readlink "$link" 2>/dev/null || true)"
+    case "$target" in
+      "$logical"|"$logical"/*|"$logical (deleted)"|"$logical"/*" (deleted)"|\
+      "$backing"|"$backing"/*|"$backing (deleted)"|"$backing"/*" (deleted)")
+        printf '%s -> %s\n' "$link" "$target" >&2
+        return 0
+        ;;
+    esac
+  done
+  return 1
+}
+
+marker_valid() {
+  local issue="$1" backing="$2" marker
+  marker="$(marker_for_issue "$issue")"
+  [[ -f "$marker" && ! -L "$marker" ]] || return 1
+  grep -Fxq "issue=$issue" "$marker" && grep -Fxq "backing=$backing" "$marker"
+}
+
+quarantine_backing() {
+  local issue="$1" backing="$2" reason="$3" destination
+  [[ -e "$backing" ]] || return 0
+  destination="$quarantine_root/${issue}-$(date -u +%Y%m%dT%H%M%SZ)-$reason"
+  mv "$backing" "$destination"
+  chown -R "$owner:$group" "$destination"
+  write_receipt quarantine "$issue" "$destination"
+}
+
+delete_verified_backing() {
+  local issue="$1" backing="$2"
+  [[ "$backing" == "$(expected_backing "$issue")" ]] || { echo "backing mismatch: $backing" >&2; return 1; }
+  if ! marker_valid "$issue" "$backing"; then
+    quarantine_backing "$issue" "$backing" missing-or-invalid-marker
+    return 0
+  fi
+  rm -rf --one-file-system -- "$backing"
+  [[ ! -e "$backing" ]]
+}
+
+prepare_workspace() {
+  local logical="$1" issue backing manifest
+  issue="$(issue_from_logical "$logical")"
+  backing="$(expected_backing "$issue")"
+  manifest="$(manifest_for_issue "$issue")"
+  [[ -d "$logical" && ! -L "$logical" ]] || { echo "logical directory missing or unsafe: $logical" >&2; return 1; }
+  [[ -z "$(find "$logical" -mindepth 1 -maxdepth 1 -print -quit)" ]] || { echo "logical directory is not empty: $logical" >&2; return 1; }
+  [[ ! -e "$manifest" ]] || { echo "manifest already exists: $manifest" >&2; return 1; }
+  [[ ! -e "$backing" ]] || { echo "backing already exists: $backing" >&2; return 1; }
+  install -d -o "$owner" -g "$group" -m 0755 "$backing"
+  write_manifest "$issue" prepared
+  mount --bind "$backing" "$logical"
+  same_inode "$logical" "$backing" || { echo "bind mount verification failed" >&2; return 1; }
+  write_receipt prepared "$issue" bind-verified
+  printf 'issue=%s\nbucket=%s\nbacking=%s\n' "$issue" "$(bucket_for_issue "$issue")" "$backing"
+}
+
+activate_workspace() {
+  local logical="$1" issue backing manifest state marker marker_tmp
+  issue="$(issue_from_logical "$logical")"
+  backing="$(expected_backing "$issue")"
+  manifest="$(manifest_for_issue "$issue")"
+  validate_manifest "$manifest" || { echo "invalid manifest: $manifest" >&2; return 1; }
+  state="$(read_manifest_value "$manifest" state)"
+  [[ "$state" == prepared ]] || { echo "workspace is not prepared: $state" >&2; return 1; }
+  if ! mountpoint -q "$logical" || ! same_inode "$logical" "$backing"; then
+    echo "expected bind mount is absent" >&2
+    return 1
+  fi
+  [[ -d "$logical/.git" ]] || { echo "clone is incomplete: $logical/.git missing" >&2; return 1; }
+  marker="$(marker_for_issue "$issue")"
+  marker_tmp="$(mktemp "$marker_dir/.${issue}.XXXXXX")"
+  {
+    printf 'issue=%s\n' "$issue"
+    printf 'backing=%s\n' "$backing"
+  } >"$marker_tmp"
+  chmod 0444 "$marker_tmp"
+  mv "$marker_tmp" "$marker"
+  write_manifest "$issue" active
+  write_receipt activated "$issue" clone-and-marker-verified
+}
+
+abort_workspace() {
+  local logical="$1" issue backing manifest state destination
+  issue="$(issue_from_logical "$logical")"
+  backing="$(expected_backing "$issue")"
+  manifest="$(manifest_for_issue "$issue")"
+  [[ -f "$manifest" ]] || return 0
+  validate_manifest "$manifest" || { echo "invalid manifest: $manifest" >&2; return 1; }
+  state="$(read_manifest_value "$manifest" state)"
+  [[ "$state" == prepared ]] || { echo "refusing to abort state: $state" >&2; return 1; }
+  if mountpoint -q "$logical"; then
+    umount "$logical" || umount --lazy "$logical"
+  fi
+  destination="$failed_root/${issue}-$(date -u +%Y%m%dT%H%M%SZ)"
+  if [[ -e "$backing" ]]; then
+    mv "$backing" "$destination"
+    chown -R "$owner:$group" "$destination"
+  fi
+  rm -- "$manifest"
+  rmdir "$logical" 2>/dev/null || true
+  write_receipt aborted "$issue" "$destination"
+}
+
+cleanup_workspace() {
+  local logical="$1" issue backing manifest state
+  issue="$(issue_from_logical "$logical")"
+  manifest="$(manifest_for_issue "$issue")"
+  if [[ ! -f "$manifest" ]]; then
+    printf 'unmanaged_workspace=%s\n' "$logical"
+    return 0
+  fi
+  validate_manifest "$manifest" || { echo "invalid manifest: $manifest" >&2; return 1; }
+  backing="$(read_manifest_value "$manifest" backing)"
+  state="$(read_manifest_value "$manifest" state)"
+  [[ "$state" == active || "$state" == cleanup_requested ]] || { echo "refusing cleanup state: $state" >&2; return 1; }
+  write_manifest "$issue" cleanup_requested
+  if mountpoint -q "$logical"; then
+    if ! umount "$logical"; then
+      umount --lazy "$logical"
+      write_receipt detached "$issue" lazy-unmount
+    fi
+  fi
+  mountpoint -q "$logical" && { echo "logical path remains mounted: $logical" >&2; return 1; }
+  if has_proc_refs "$logical" "$backing"; then
+    write_receipt cleanup_deferred "$issue" proc-reference-remains
+    return 0
+  fi
+  delete_verified_backing "$issue" "$backing"
+  rm -f -- "$(marker_for_issue "$issue")"
+  rm -- "$manifest"
+  rmdir "$logical" 2>/dev/null || true
+  write_receipt cleaned "$issue" terminal-cleanup-complete
+}
+
+restore_manifest() {
+  local manifest="$1" issue logical backing state
+  validate_manifest "$manifest" || { echo "invalid manifest preserved: $manifest" >&2; return 1; }
+  issue="$(read_manifest_value "$manifest" issue)"
+  logical="$(read_manifest_value "$manifest" logical)"
+  backing="$(read_manifest_value "$manifest" backing)"
+  state="$(read_manifest_value "$manifest" state)"
+  case "$state" in
+    active)
+      [[ -d "$backing" ]] || { echo "active backing missing: $backing" >&2; return 1; }
+      marker_valid "$issue" "$backing" || { echo "active marker invalid: $backing" >&2; return 1; }
+      install -d -o "$owner" -g "$group" -m 0755 "$logical"
+      if mountpoint -q "$logical"; then
+        same_inode "$logical" "$backing" || { echo "wrong mount at $logical" >&2; return 1; }
+      else
+        [[ -z "$(find "$logical" -mindepth 1 -maxdepth 1 -print -quit)" ]] || { echo "restore target is not empty: $logical" >&2; return 1; }
+        mount --bind "$backing" "$logical"
+        same_inode "$logical" "$backing" || return 1
+        write_receipt restored "$issue" boot-or-reconcile-restore
+      fi
+      ;;
+    cleanup_requested)
+      cleanup_workspace "$logical"
+      ;;
+    prepared)
+      if mountpoint -q "$logical"; then umount "$logical" || umount --lazy "$logical"; fi
+      quarantine_backing "$issue" "$backing" interrupted-prepare
+      rm -- "$manifest"
+      rmdir "$logical" 2>/dev/null || true
+      ;;
+    *)
+      echo "unknown manifest state: $state" >&2
+      return 1
+      ;;
+  esac
+}
+
+restore_all() {
+  local manifest failed=0
+  shopt -s nullglob
+  for manifest in "$manifest_dir"/*.env; do
+    restore_manifest "$manifest" || failed=1
+  done
+  return "$failed"
+}
+
+status_all() {
+  local manifest issue logical backing state mounted
+  shopt -s nullglob
+  for manifest in "$manifest_dir"/*.env; do
+    validate_manifest "$manifest" || { printf 'invalid_manifest=%s\n' "$manifest"; continue; }
+    issue="$(read_manifest_value "$manifest" issue)"
+    logical="$(read_manifest_value "$manifest" logical)"
+    backing="$(read_manifest_value "$manifest" backing)"
+    state="$(read_manifest_value "$manifest" state)"
+    mounted=false
+    mountpoint -q "$logical" && mounted=true
+    printf 'issue=%s state=%s bucket=%s mounted=%s logical=%s backing=%s\n' \
+      "$issue" "$state" "$(bucket_for_issue "$issue")" "$mounted" "$logical" "$backing"
+  done
+}
+
+require_root
+init_state
+exec 9>"$lock_file"
+flock 9
+
+command="${1:-}"
+case "$command" in
+  route)
+    [[ $# -eq 2 ]] || usage
+    printf 'issue=%s\nbucket=%s\nbacking=%s\n' "$2" "$(bucket_for_issue "$2")" "$(expected_backing "$2")"
+    ;;
+  prepare|activate|abort|cleanup)
+    [[ $# -eq 2 ]] || usage
+    "${command}_workspace" "$2"
+    ;;
+  restore-all|reconcile-cleanup)
+    [[ $# -eq 1 ]] || usage
+    restore_all
+    ;;
+  status)
+    [[ $# -eq 1 ]] || usage
+    status_all
+    ;;
+  *) usage ;;
+esac

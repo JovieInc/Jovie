@@ -15,6 +15,8 @@ import hashlib
 import json
 import re
 import subprocess
+import time
+from concurrent.futures import Future, ThreadPoolExecutor, wait
 from datetime import datetime, timedelta, timezone
 from typing import Any
 
@@ -41,6 +43,25 @@ CLOSE_LABELS = {"duplicate"}
 ACTIVE_WRITER_STATES = frozenset({"repair", "promote", "queued"})
 CHANGED_FILES_PAGE = 100
 EVIDENCE_STATUSES = frozenset({"complete", "missing", "malformed", "truncated"})
+GIT_OID = re.compile(r"^[0-9a-f]{40}$")
+# Mirrors the required contexts in .github/rulesets/branch-protection.yml. Live
+# `gh pr checks --required` output must match this complete set before a PR can
+# be classified as promotable; drift fails closed instead of silently dropping
+# a newly required check.
+EXPECTED_REQUIRED_CHECKS = frozenset(
+    {"Fork PR Gate", "Migration Guard", "PR Ready", "PR Size Guard"}
+)
+CHECKABLE_MERGE_STATES = frozenset({"CLEAN", "HAS_HOOKS", "UNSTABLE"})
+ACCEPTED_CHECK_RUN_CONCLUSIONS = frozenset({"NEUTRAL", "SKIPPED", "SUCCESS"})
+SNAPSHOT_ATTEMPTS = 3
+CLOSURE_OBSERVATION_SECONDS = 120
+PROMOTION_COMMAND_TIMEOUT_SECONDS = 12
+PROMOTION_EVIDENCE_PHASE_SECONDS = 30
+PROMOTION_EVIDENCE_WORKERS = 8
+PROMOTION_READBACK_BATCH = 4
+PROMOTION_READBACK_WORKERS = 4
+REQUIRED_CHECK_SUITE_PAGE = 50
+REQUIRED_CHECK_RUN_PAGE = 5
 COMPLETE_CHANGED_FILE_TYPES = frozenset(
     {"ADDED", "CHANGED", "COPIED", "DELETED", "MODIFIED"}
 )
@@ -76,6 +97,40 @@ def _labels(pr: dict[str, Any]) -> set[str]:
         for node in nodes
         if str(node.get("name") if isinstance(node, dict) else node).strip()
     }
+
+
+def _label_evidence(pr: dict[str, Any]) -> dict[str, Any]:
+    """Prove lifecycle labels were read completely before classifying a PR."""
+    value = pr.get("labels")
+    if isinstance(value, dict):
+        nodes = value.get("nodes")
+        total_count = _non_negative_int(value.get("totalCount"))
+    else:
+        return {"status": "missing"}
+    if not isinstance(nodes, list) or total_count is None:
+        return {"status": "malformed"}
+    if not all(
+        isinstance(node, (str, dict))
+        and isinstance(node if isinstance(node, str) else node.get("name"), str)
+        and bool((node if isinstance(node, str) else node.get("name")).strip())
+        for node in nodes
+    ):
+        return {"status": "malformed"}
+    normalized = [
+        (node if isinstance(node, str) else str(node["name"])).strip()
+        for node in nodes
+    ]
+    if len(normalized) != len(set(normalized)):
+        return {"status": "malformed"}
+    if len(nodes) < total_count:
+        return {
+            "status": "truncated",
+            "observedCount": len(nodes),
+            "expectedCount": total_count,
+        }
+    if len(nodes) > total_count:
+        return {"status": "malformed"}
+    return {"status": "complete"}
 
 
 def _author(pr: dict[str, Any]) -> str | None:
@@ -213,16 +268,31 @@ def _stack_action(
     prs_by_number: dict[int, dict[str, Any]],
     issue: str | None,
     max_depth: int,
-) -> dict[str, Any]:
+) -> dict[str, Any] | None:
     root_number = int(root["number"])
-    promotion_path = _stack_path(longest_path, prs_by_number)
-    root_head_sha = _stack_head_sha(root)
+    head_by_number = {number: _stack_head_sha(prs_by_number[number]) for number in members}
+    if any(head_sha is None for head_sha in head_by_number.values()):
+        return None
+    member_heads = [{"pr": number, "headSha": head_by_number[number]} for number in members]
+    promotion_path = [
+        {
+            "pr": number,
+            "base": prs_by_number[number].get("baseRefName"),
+            "head": prs_by_number[number].get("headRefName"),
+            "headSha": head_by_number[number],
+        }
+        for number in longest_path
+    ]
+    root_head_sha = head_by_number[root_number]
     fingerprint = {
         "repository": repository,
         "rootPr": root_number,
-        "rootHeadSha": root_head_sha,
         "prNumbers": members,
+        "memberHeads": member_heads,
         "promotionPath": promotion_path,
+        "integrator": metadata["integrator"],
+        "deadline": metadata["deadline"],
+        "issue": issue,
         "violations": violations,
     }
     task_key = hashlib.sha256(
@@ -240,6 +310,7 @@ def _stack_action(
         "rootPr": root_number,
         "rootHeadSha": root_head_sha,
         "prNumbers": members,
+        "memberHeads": member_heads,
         "maxDepth": max_depth,
         "promotionPath": promotion_path,
         "integrator": metadata["integrator"],
@@ -296,6 +367,8 @@ def _draft_stack_health(
             return memo[number]
         if number in trail:
             cycle = list(trail[trail.index(number) :])
+            anchor = cycle.index(min(cycle))
+            cycle = cycle[anchor:] + cycle[:anchor]
             key = f"cycle:{min(cycle)}"
             result = (key, cycle, {"cyclic-promotion-path"})
             return result
@@ -311,7 +384,7 @@ def _draft_stack_health(
             memo[number] = result
             return result
         key, path, errors = resolve(parent, trail + (number,))
-        result = (key, path + [number], set(errors))
+        result = (key, path if number in path else path + [number], set(errors))
         memo[number] = result
         return result
     groups: dict[str, dict[str, Any]] = {}
@@ -328,7 +401,9 @@ def _draft_stack_health(
     actions: list[dict[str, Any]] = []
     for group in groups.values():
         members = sorted(group["members"])
-        if not members:
+        if not members or not any(
+            internal[number].get("isDraft") is True for number in members
+        ):
             continue
         root_candidates = [
             number
@@ -386,7 +461,7 @@ def _draft_stack_health(
         }
         roots.append(diagnostic)
         if sorted_violations:
-            actions.append(
+            action = (
                 _stack_action(
                     repository,
                     root,
@@ -399,6 +474,8 @@ def _draft_stack_health(
                     max_depth,
                 )
             )
+            if action is not None:
+                actions.append(action)
     return {
         "maxDepth": STACK_MAX_DEPTH,
         "roots": sorted(roots, key=lambda item: item["rootPr"]),
@@ -413,6 +490,428 @@ def _draft_stack_health(
         ],
         "repairActions": sorted(actions, key=lambda item: item["rootPr"]),
     }
+def _valid_oid(value: object) -> bool:
+    return isinstance(value, str) and GIT_OID.fullmatch(value) is not None
+
+
+def _remaining_timeout(deadline: float, cap_seconds: float) -> float:
+    remaining = deadline - time.monotonic()
+    if remaining <= 0:
+        raise TimeoutError("closure observation deadline exceeded")
+    return max(0.1, min(cap_seconds, remaining))
+
+
+def _run_json_command(
+    command: list[str],
+    *,
+    deadline: float,
+    timeout_cap: float = PROMOTION_COMMAND_TIMEOUT_SECONDS,
+    allowed_returncodes: frozenset[int] = frozenset({0}),
+    run_impl: Any = subprocess.run,
+) -> Any:
+    completed = run_impl(
+        command,
+        check=False,
+        capture_output=True,
+        text=True,
+        timeout=_remaining_timeout(deadline, timeout_cap),
+    )
+    if completed.returncode not in allowed_returncodes:
+        stderr = completed.stderr.strip() if isinstance(completed.stderr, str) else ""
+        detail = stderr.splitlines()[-1][:240] if stderr else f"exit {completed.returncode}"
+        raise ValueError(f"GitHub promotion evidence command failed: {detail}")
+    return json.loads(completed.stdout)
+
+
+def _needs_promotion_evidence(pr: dict[str, Any]) -> bool:
+    if _label_evidence(pr).get("status") != "complete":
+        return False
+    labels = _labels(pr)
+    return bool(
+        pr.get("mergeStateStatus") in CHECKABLE_MERGE_STATES
+        and pr.get("baseRefName") == "main"
+        and not pr.get("isDraft")
+        and not pr.get("isCrossRepository")
+        and not pr.get("mergeQueueEntry")
+        and not labels.intersection(HOLD_LABELS | CLOSE_LABELS)
+    )
+
+
+def _observe_live_required_checks(
+    repo: str, deadline: float, *, run_impl: Any = subprocess.run
+) -> frozenset[str]:
+    payload = _run_json_command(
+        ["gh", "api", f"repos/{repo}/rules/branches/main"],
+        deadline=deadline,
+        run_impl=run_impl,
+    )
+    if not isinstance(payload, list):
+        raise ValueError("GitHub evaluated main rules are malformed")
+    matches = [
+        rule
+        for rule in payload
+        if isinstance(rule, dict) and rule.get("type") == "required_status_checks"
+    ]
+    if not matches:
+        raise ValueError("GitHub evaluated main rules omit required checks")
+    contexts: list[Any] = []
+    for rule in matches:
+        parameters = rule.get("parameters")
+        required = (
+            parameters.get("required_status_checks")
+            if isinstance(parameters, dict)
+            else None
+        )
+        if not isinstance(required, list):
+            raise ValueError("GitHub evaluated required checks are malformed")
+        contexts.extend(required)
+    names = [
+        context.get("context") if isinstance(context, dict) else None
+        for context in contexts
+    ]
+    if not names or not all(isinstance(name, str) and name for name in names):
+        raise ValueError("GitHub required-check contexts are malformed")
+    return frozenset(names)
+
+
+def _observe_one_comparison(
+    repo: str,
+    pr: dict[str, Any],
+    current_base_oid: str,
+    deadline: float,
+    *,
+    run_impl: Any = subprocess.run,
+) -> dict[str, Any]:
+    """Prove base freshness for one exact-head, required-check-green candidate."""
+    number = pr.get("number")
+    head_oid = pr.get("headRefOid")
+    if (
+        isinstance(number, bool)
+        or not isinstance(number, int)
+        or number <= 0
+        or not _valid_oid(head_oid)
+        or not _valid_oid(current_base_oid)
+    ):
+        return {"status": "malformed"}
+
+    try:
+        comparison = _run_json_command(
+            [
+                "gh",
+                "api",
+                f"repos/{repo}/compare/{current_base_oid}...{head_oid}",
+            ],
+            deadline=deadline,
+            run_impl=run_impl,
+        )
+    except (OSError, subprocess.SubprocessError, ValueError, json.JSONDecodeError):
+        return {"status": "error", "headOid": head_oid, "baseOid": current_base_oid}
+
+    if not isinstance(comparison, dict):
+        return {"status": "malformed", "headOid": head_oid, "baseOid": current_base_oid}
+
+    behind_by = _non_negative_int(comparison.get("behind_by"))
+    ahead_by = _non_negative_int(comparison.get("ahead_by"))
+    base_commit = comparison.get("base_commit")
+    comparison_base = base_commit.get("sha") if isinstance(base_commit, dict) else None
+    comparison_status = comparison.get("status")
+    if (
+        behind_by is None
+        or ahead_by is None
+        or comparison_base != current_base_oid
+        or not isinstance(comparison_status, str)
+        or not comparison_status
+    ):
+        return {"status": "malformed", "headOid": head_oid, "baseOid": current_base_oid}
+
+    return {
+        "status": "complete",
+        "headOid": head_oid,
+        "baseOid": current_base_oid,
+        "comparisonStatus": comparison_status,
+        "aheadBy": ahead_by,
+        "behindBy": behind_by,
+    }
+
+
+def _complete_connection(value: object, label: str) -> list[dict[str, Any]]:
+    if not isinstance(value, dict):
+        raise ValueError(f"GitHub {label} connection is missing")
+    total = _non_negative_int(value.get("totalCount"))
+    nodes = value.get("nodes")
+    if total is None or not isinstance(nodes, list) or total != len(nodes):
+        raise ValueError(f"GitHub {label} connection is incomplete")
+    if not all(isinstance(node, dict) for node in nodes):
+        raise ValueError(f"GitHub {label} connection is malformed")
+    return nodes
+
+
+def _required_check_fields(required_names: frozenset[str]) -> str:
+    legacy = " ".join(
+        f"legacy_{index}:context(name:{json.dumps(name)})"
+        "{context state createdAt}"
+        for index, name in enumerate(sorted(required_names))
+    )
+    runs = " ".join(
+        f"runs_{index}:checkRuns(first:{REQUIRED_CHECK_RUN_PAGE},filterBy:"
+        f"{{checkName:{json.dumps(name)}}})"
+        "{totalCount nodes{databaseId name status conclusion}}"
+        for index, name in enumerate(sorted(required_names))
+    )
+    suites = (
+        f"requiredSuites:checkSuites(first:{REQUIRED_CHECK_SUITE_PAGE})"
+        f"{{totalCount nodes{{app{{id slug}} {runs}}}}}"
+    )
+    return f"status{{{legacy}}} {suites}"
+
+
+def _normalize_named_required_checks(
+    commit: dict[str, Any], required_names: frozenset[str]
+) -> list[dict[str, Any]]:
+    status = commit.get("status")
+    if status is not None and not isinstance(status, dict):
+        raise ValueError("GitHub exact status evidence is malformed")
+    suites = _complete_connection(
+        commit.get("requiredSuites"), "required-check suites"
+    )
+    checks: list[dict[str, Any]] = []
+    for index, name in enumerate(sorted(required_names)):
+        evidence_by_producer: dict[str, list[tuple[int, dict[str, Any]]]] = {}
+        legacy = status.get(f"legacy_{index}") if isinstance(status, dict) else None
+        if legacy is not None:
+            if (
+                not isinstance(legacy, dict)
+                or legacy.get("context") != name
+                or parse_time(legacy.get("createdAt")) is None
+            ):
+                raise ValueError("GitHub exact legacy status is malformed")
+            evidence_by_producer["legacy-status"] = [
+                (
+                    0,
+                    {"name": name, "kind": "status-context", "state": legacy.get("state")},
+                )
+            ]
+        for suite in suites:
+            runs = _complete_connection(suite.get(f"runs_{index}"), f"{name} check runs")
+            if not runs:
+                continue
+            app = suite.get("app")
+            app_id = app.get("id") if isinstance(app, dict) else None
+            app_slug = app.get("slug") if isinstance(app, dict) else None
+            if (
+                not isinstance(app_id, str)
+                or not app_id
+                or not isinstance(app_slug, str)
+                or not app_slug
+            ):
+                raise ValueError("GitHub exact check suite identity is malformed")
+            for run in runs:
+                database_id = _non_negative_int(run.get("databaseId"))
+                if run.get("name") != name or database_id is None:
+                    raise ValueError("GitHub exact check name is malformed")
+                evidence_by_producer.setdefault(f"check-app:{app_id}", []).append(
+                    (
+                        database_id,
+                        {
+                            "name": name,
+                            "kind": "check-run",
+                            "producer": app_slug,
+                            "status": run.get("status"),
+                            "conclusion": run.get("conclusion"),
+                        },
+                    )
+                )
+        if not evidence_by_producer:
+            continue
+        sources: list[dict[str, Any]] = []
+        for producer, evidence in sorted(evidence_by_producer.items()):
+            newest_id = max(item[0] for item in evidence)
+            latest = [item[1] for item in evidence if item[0] == newest_id]
+            if len(latest) != 1:
+                raise ValueError("GitHub exact required-check evidence is ambiguous")
+            sources.append({"producer": producer, **latest[0]})
+        checks.append({"name": name, "kind": "required-check", "sources": sources})
+    return checks
+
+
+def _readback_promotion_batch(
+    repo: str,
+    candidates: list[dict[str, Any]],
+    required_names: frozenset[str],
+    deadline: float,
+    *,
+    run_impl: Any = subprocess.run,
+) -> dict[str, Any]:
+    owner, name = _repo_parts(repo)
+    pr_fields = " ".join(
+        f"pr_{int(pr['number'])}:pullRequest(number:{int(pr['number'])}){{"
+        "state headRefOid baseRefName isDraft isCrossRepository mergeStateStatus "
+        "updatedAt author{login} labels(first:100){totalCount nodes{name}} "
+        "mergeQueueEntry{position enqueuedAt state}}"
+        for pr in candidates
+    )
+    check_fields = _required_check_fields(required_names)
+    commit_fields = " ".join(
+        f'commit_{int(pr["number"])}:object(oid:"{pr["headRefOid"]}"){{'
+        f"... on Commit{{oid {check_fields}}}}}"
+        for pr in candidates
+    )
+    query = (
+        "query($owner:String!,$name:String!){repository(owner:$owner,name:$name){"
+        'base:ref(qualifiedName:"refs/heads/main"){target{oid}} '
+        f"{pr_fields} {commit_fields}}}}}"
+    )
+    payload = _run_json_command(
+        [
+            "gh",
+            "api",
+            "graphql",
+            "-f",
+            f"query={query}",
+            "-F",
+            f"owner={owner}",
+            "-F",
+            f"name={name}",
+        ],
+        deadline=deadline,
+        run_impl=run_impl,
+    )
+    repository = (
+        payload.get("data", {}).get("repository")
+        if isinstance(payload, dict)
+        else None
+    )
+    if not isinstance(repository, dict):
+        raise ValueError("GitHub promotion readback omitted repository")
+    base = repository.get("base")
+    target = base.get("target") if isinstance(base, dict) else None
+    base_oid = target.get("oid") if isinstance(target, dict) else None
+    if not _valid_oid(base_oid):
+        raise ValueError("GitHub promotion readback omitted main OID")
+    prs: dict[int, dict[str, Any]] = {}
+    for candidate in candidates:
+        number = int(candidate["number"])
+        pr = repository.get(f"pr_{number}")
+        commit = repository.get(f"commit_{number}")
+        if not isinstance(pr, dict) or not isinstance(commit, dict):
+            raise ValueError("GitHub promotion readback omitted pull request")
+        expected_head_oid = candidate.get("headRefOid")
+        if commit.get("oid") != expected_head_oid:
+            raise ValueError("GitHub promotion readback returned the wrong commit")
+        if pr.get("headRefOid") != expected_head_oid:
+            raise ValueError(
+                "GitHub promotion readback returned the wrong pull request head"
+            )
+        try:
+            required_checks = _normalize_named_required_checks(commit, required_names)
+            check_evidence_status = "complete"
+        except ValueError:
+            required_checks = []
+            check_evidence_status = "malformed"
+        prs[number] = {
+            **pr,
+            "headOid": pr.get("headRefOid"),
+            "checkEvidenceStatus": check_evidence_status,
+            "requiredChecks": required_checks,
+        }
+    return {"baseOid": base_oid, "prs": prs}
+
+
+def _readback_promotion_state(
+    repo: str,
+    candidates: list[dict[str, Any]],
+    required_names: frozenset[str],
+    deadline: float,
+    *,
+    run_impl: Any = subprocess.run,
+) -> dict[str, Any]:
+    """Bound GraphQL cost while requiring one main identity across all batches."""
+    if not candidates:
+        raise ValueError("GitHub promotion readback requires candidates")
+    batches = [
+        candidates[offset : offset + PROMOTION_READBACK_BATCH]
+        for offset in range(0, len(candidates), PROMOTION_READBACK_BATCH)
+    ]
+    executor = ThreadPoolExecutor(
+        max_workers=min(PROMOTION_READBACK_WORKERS, len(batches))
+    )
+    futures = [
+        executor.submit(
+            _readback_promotion_batch,
+            repo,
+            batch,
+            required_names,
+            deadline,
+            run_impl=run_impl,
+        )
+        for batch in batches
+    ]
+    completed: set[Future[dict[str, Any]]] = set()
+    pending: set[Future[dict[str, Any]]] = set()
+    try:
+        completed, pending = wait(
+            futures,
+            timeout=_remaining_timeout(deadline, PROMOTION_EVIDENCE_PHASE_SECONDS),
+        )
+        if pending:
+            raise TimeoutError("GitHub promotion readback deadline exceeded")
+        readbacks = [future.result() for future in futures]
+    finally:
+        for future in pending:
+            future.cancel()
+        executor.shutdown(wait=False, cancel_futures=True)
+    base_oid: str | None = None
+    prs: dict[int, dict[str, Any]] = {}
+    for readback in readbacks:
+        observed_base = readback.get("baseOid")
+        if base_oid is None:
+            base_oid = observed_base
+        elif observed_base != base_oid:
+            raise ValueError("GitHub main changed across promotion batches")
+        observed_prs = readback.get("prs")
+        if not isinstance(observed_prs, dict):
+            raise ValueError("GitHub promotion batch omitted pull requests")
+        prs.update(observed_prs)
+    if not _valid_oid(base_oid) or len(prs) != len(candidates):
+        raise ValueError("GitHub promotion batches are incomplete")
+    return {"baseOid": base_oid, "prs": prs}
+
+
+def _required_checks_green(evidence: dict[str, Any]) -> bool:
+    checks = evidence.get("requiredChecks")
+    if not isinstance(checks, list):
+        return False
+    observed_names = [
+        check.get("name") for check in checks if isinstance(check, dict)
+    ]
+    required_names = evidence.get("requiredCheckNames")
+    if (
+        not isinstance(required_names, list)
+        or set(observed_names) != set(required_names)
+        or len(observed_names) != len(set(observed_names))
+    ):
+        return False
+    return all(
+        check.get("kind") == "required-check"
+        and isinstance(check.get("sources"), list)
+        and bool(check["sources"])
+        and all(
+            (
+                source.get("kind") == "check-run"
+                and source.get("status") == "COMPLETED"
+                and source.get("conclusion") in ACCEPTED_CHECK_RUN_CONCLUSIONS
+            )
+            or (
+                source.get("kind") == "status-context"
+                and source.get("state") == "SUCCESS"
+            )
+            for source in check["sources"]
+            if isinstance(source, dict)
+        )
+        and all(isinstance(source, dict) for source in check["sources"])
+        for check in checks
+        if isinstance(check, dict)
+    )
 
 
 def _duplicate_active_lanes(
@@ -838,7 +1337,7 @@ query($owner:String!,$name:String!,$endCursor:String){
       nodes{
         number title body baseRefName headRefName headRefOid isDraft isCrossRepository mergeStateStatus createdAt updatedAt
         author{login}
-        labels(first:50){nodes{name}}
+        labels(first:100){totalCount nodes{name}}
         mergeQueueEntry{position enqueuedAt state}
         changedFiles
         files(first:__FILES_PAGE__){totalCount nodes{path changeType}}
@@ -988,6 +1487,16 @@ def observe_closure_health(
             "reasons": ["closure-observation-unknown"],
             "episodes": {},
             "error": f"closure-observation-failed: {error}",
+            # The observation is non-authoritative, so an empty action set
+            # must not resolve prior work. It still has to satisfy the bounded
+            # JOV-INV-020 ingress contract used by Fleet Gate Refresh.
+            "stackHealth": {
+                "maxDepth": STACK_MAX_DEPTH,
+                "roots": [],
+                "violations": [],
+                "repairActions": [],
+            },
+            "repairActions": [],
             "classifications": {
                 "dispositions": [],
                 "counts": {},

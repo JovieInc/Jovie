@@ -271,6 +271,8 @@ class FleetAdmissionReceiptTests(unittest.TestCase):
         self.assertEqual(blocked["promotionMode"], "blocked")
         self.assertFalse(blocked["promotionAdmission"]["allowed"])
         self.assertFalse(blocked["isolatedPromotionAdmission"]["allowed"])
+        self.assertNotIn("stackHealth", blocked["signals"]["closureHealth"])
+        self.assertNotIn("repairActions", blocked["signals"]["closureHealth"])
 
     def test_cli_projects_stdin_and_fails_closed(self):
         receipt = inject_inventories(evaluate_receipt())

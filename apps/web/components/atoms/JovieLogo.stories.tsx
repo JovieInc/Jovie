@@ -7,14 +7,35 @@ const meta = {
   parameters: {
     layout: 'centered',
   },
+  args: {
+    href: '/',
+    variant: 'light',
+    size: 'md',
+    showText: false,
+  },
 } satisfies Meta<typeof JovieLogo>;
 
 export default meta;
 type Story = StoryObj<typeof meta>;
 
+export const Default: Story = {};
+
 export const Home: Story = {
   args: {
     showText: true,
+  },
+};
+
+export const SmallWithText: Story = {
+  args: {
+    size: 'sm',
+    showText: true,
+  },
+};
+
+export const ArtistProfile: Story = {
+  args: {
+    artistHandle: 'demo-artist',
   },
 };
 

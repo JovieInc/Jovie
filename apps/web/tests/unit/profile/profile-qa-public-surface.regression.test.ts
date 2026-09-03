@@ -27,7 +27,7 @@ describe('public profile QA regressions', () => {
     // Report: .gstack/qa-reports/qa-report-localhost-3100-2026-08-17.md
     const source = readRepoFile('styles/design-system.css');
     expect(source).toMatch(
-      /--profile-bottom-nav-height:\s*calc\(\s*var\(--space-12\)[\s\S]{0,160}?var\(--space-8\)\s*\)/
+      /--profile-bottom-nav-height:\s*calc\(\s*var\(--space-8\)[\s\S]{0,160}?var\(--space-6\)\s*\)/
     );
   });
 

@@ -43,11 +43,37 @@ test('parses the four-field contract and rejects extra or malformed fields', () 
   expect(
     parseDesktopBuildIdentityRecord({ ...baked, builtAt: 'August 30 2026' })
   ).toBeNull();
+  expect(
+    parseDesktopBuildIdentityRecord({
+      ...baked,
+      version: '26.8.2-staging.1.1',
+    })
+  ).toBeNull();
+  expect(
+    parseDesktopBuildIdentityRecord({
+      ...baked,
+      channel: 'staging',
+      version: '26.8.2',
+    })
+  ).toBeNull();
 });
 
 test('matching packaged production identity is verified and copyable', () => {
   const identity = resolve();
   expect(identity.provenance).toBe('verified');
+  const staging = {
+    ...baked,
+    channel: 'staging' as const,
+    version: '26.8.2-staging.1.1',
+  };
+  expect(
+    resolve({
+      baked: staging,
+      runtimeChannel: 'staging',
+      runtimeVersion: staging.version,
+      packagedRecord: staging,
+    }).provenance
+  ).toBe('verified');
   const copy = formatDesktopBuildIdentityDisplay(identity);
   expect(copy).toMatch(
     new RegExp(
@@ -92,20 +118,38 @@ describe('deliberate-red: unknown or mismatched provenance cannot be verified', 
     },
     { name: 'missing extraResource', overrides: { packagedRecord: null } },
     { name: 'runtime version drift', overrides: { runtimeVersion: '26.8.0' } },
+    {
+      name: 'staging package version drift',
+      overrides: {
+        baked: {
+          ...baked,
+          channel: 'staging' as const,
+          version: '26.8.2-staging.1.1',
+        },
+        runtimeChannel: 'staging',
+        runtimeVersion: '26.8.2-staging.1.1',
+        packagedRecord: {
+          ...baked,
+          channel: 'staging' as const,
+          version: '26.8.2-staging.1.2',
+        },
+      },
+    },
     { name: 'unknown baked record', overrides: { baked: { not: 'identity' } } },
     {
       name: 'incomplete packaged staging',
       overrides: {
         baked: {
           channel: 'staging' as const,
-          version: '26.8.1',
+          version: '26.8.2-staging.1.1',
           sourceRevision: SHA,
           builtAt: null,
         },
         runtimeChannel: 'staging',
+        runtimeVersion: '26.8.2-staging.1.1',
         packagedRecord: {
           channel: 'staging' as const,
-          version: '26.8.1',
+          version: '26.8.2-staging.1.1',
           sourceRevision: SHA,
           builtAt: null,
         },

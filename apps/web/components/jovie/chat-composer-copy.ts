@@ -28,8 +28,8 @@ export const CHAT_COMPOSER_SEND_ARIA_LABEL = 'Send message';
 /** Stop-generation control accessible name. */
 export const CHAT_COMPOSER_STOP_ARIA_LABEL = 'Stop generating';
 
-/** Attach control accessible name (Title Case product UI). */
-export const CHAT_COMPOSER_ATTACH_ARIA_LABEL = 'Attach Files';
+/** Attach menu trigger accessible name. */
+export const CHAT_COMPOSER_ATTACH_ARIA_LABEL = 'Attachment options';
 
 /** Plus-menu item for uploading a song from the new-chat composer. */
 export const CHAT_COMPOSER_UPLOAD_SONG_LABEL = 'Upload Song';

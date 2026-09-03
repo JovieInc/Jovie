@@ -237,8 +237,8 @@ def validate_gate_result(returncode: int, stdout: str, consumer: str) -> dict[st
     if isinstance(gem_maximum, bool) or not isinstance(gem_maximum, int) or gem_maximum < 0:
         raise GateContractError("Gem mutation concurrency must be a non-negative integer")
     if not capacity_accepted:
-        if maximum != 0:
-            raise GateContractError("stale capacity must keep remediation maxConcurrent at zero")
+        if maximum != runtime_floor:
+            raise GateContractError("stale capacity must bound local remediation to one")
         if gem_maximum != 0:
             raise GateContractError("stale capacity must block new mutation concurrency")
         if new_issue_lease:
@@ -256,9 +256,7 @@ def validate_gate_result(returncode: int, stdout: str, consumer: str) -> dict[st
             raise GateContractError("accepted capacity must provide positive concurrency")
         if maximum != gem_maximum:
             raise GateContractError("remote remediation concurrency contradicts accepted capacity")
-    if (maximum > 0) is not (gem_maximum > 0):
-        raise GateContractError("remote and local capacity receipts contradict each other")
-    if maximum > gem_maximum:
+    if capacity_accepted and maximum > gem_maximum:
         raise GateContractError("remediation concurrency exceeds accepted capacity")
     if remediation.get("authority") != "single-pr-writer-exact-head":
         raise GateContractError("remediation authority must require one exact-head writer")
