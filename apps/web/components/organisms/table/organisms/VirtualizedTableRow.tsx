@@ -1,9 +1,9 @@
 'use client';
 
-// @coverage-via apps/web/tests/unit/organisms/table/VirtualizedTableRow.test.tsx
-import type { Row } from '@tanstack/react-table';
-import { flexRender } from '@tanstack/react-table';
 import React, { memo, useCallback, useEffect, useRef } from 'react';
+// @coverage-via apps/web/tests/unit/organisms/table/VirtualizedTableRow.test.tsx
+import type { Row } from '@/lib/tanstack-v8-compat';
+import { flexRender } from '@/lib/tanstack-v8-compat';
 import { cn } from '@/lib/utils';
 import '../table.types';
 import { presets, rowState, tableAlignment } from '../table.styles';
