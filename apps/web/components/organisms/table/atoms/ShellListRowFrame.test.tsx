@@ -80,14 +80,17 @@ describe('ShellListRowFrame', () => {
     );
 
     const disclosure = getByTestId('disclosure');
+    // jsdom exposes SVG className as an SVGAnimatedString, so read the
+    // rendered class attribute directly (same pattern as other SVG asserts).
+    const disclosureClassName = disclosure.getAttribute('class') ?? '';
     expect(disclosure).toHaveAttribute(
       'data-shell-list-row-disclosure',
       'true'
     );
     expect(disclosure).toHaveAttribute('data-state', 'open');
-    expect(disclosure.className).toContain('text-tertiary-token');
-    expect(disclosure.className).toContain('rotate-90');
-    expect(disclosure.className).not.toContain('rounded');
-    expect(disclosure.className).not.toContain('bg-');
+    expect(disclosureClassName).toContain('text-tertiary-token');
+    expect(disclosureClassName).toContain('rotate-90');
+    expect(disclosureClassName).not.toContain('rounded');
+    expect(disclosureClassName).not.toContain('bg-');
   });
 });
