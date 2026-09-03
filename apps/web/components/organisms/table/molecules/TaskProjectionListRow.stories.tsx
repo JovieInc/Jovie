@@ -13,10 +13,7 @@ export const Default: Story = {
   args: {
     testId: 'task-projection-row-story',
     leading: (
-      <span
-        className='text-app text-secondary-token'
-        aria-hidden='true'
-      >
+      <span className='text-app text-secondary-token' aria-hidden='true'>
         ◷
       </span>
     ),
@@ -29,9 +26,7 @@ export const Default: Story = {
       </div>
     ),
     actionSlot: (
-      <span className='text-3xs text-secondary-token'>
-        queued → running
-      </span>
+      <span className='text-3xs text-secondary-token'>queued → running</span>
     ),
   },
 };
@@ -41,9 +36,7 @@ export const Selected: Story = {
     ...Default.args,
     isSelected: true,
     actionSlot: (
-      <span className='text-3xs text-secondary-token'>
-        merge-queued → merged
-      </span>
+      <span className='text-3xs text-secondary-token'>merge-queued → merged</span>
     ),
   },
 };
