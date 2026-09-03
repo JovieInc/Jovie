@@ -29,9 +29,7 @@ const PANEL_TABLE_SURFACE_CLASSNAME = 'p-0 bg-(--app-shell-content-surface)';
 
 const PANEL_CONTENT_PADDING_CLASSNAME = {
   none: '',
-  // Resolves the workspace seam token on every side (12px, on the 4px grid).
-  // The former sm: step was 14px — off the optical grid (JOV-5865).
-  compact: 'p-(--app-shell-content-padding-x)',
+  compact: 'px-3 py-3 sm:px-3.5 sm:py-3.5',
   default:
     'px-(--app-shell-content-padding-x) py-(--app-shell-content-padding-y)',
 } as const;

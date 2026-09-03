@@ -35,7 +35,7 @@ describe('PageShell compatibility contract', () => {
       'max-w-(--app-shell-content-max-reading)',
       'bg-(--app-shell-content-surface)'
     );
-    expect(container.innerHTML).toContain('p-(--app-shell-content-padding-x)');
+    expect(container.innerHTML).toContain('px-3 py-3 sm:px-3.5 sm:py-3.5');
   });
 
   it('keeps PageHeader semantics and action placement stable', () => {

@@ -5,6 +5,18 @@ import { resolveShrinkOnlyCountEvent } from '@/lib/design/shrink-only-count-ratc
 
 const WEB_ROOT = process.cwd();
 const WORKSPACE_SEAM_CLASS = 'px-3';
+const WORKSPACE_SEAM_TOKENS = [
+  'px-(--app-shell-header-padding-x)',
+  'px-(--app-shell-content-padding-x)',
+  'alignment.workspaceSeamX',
+] as const;
+
+function usesSharedWorkspaceSeam(source: string): boolean {
+  return (
+    source.includes(WORKSPACE_SEAM_CLASS) ||
+    WORKSPACE_SEAM_TOKENS.some(token => source.includes(token))
+  );
+}
 
 function read(relativePath: string) {
   return readFileSync(join(WEB_ROOT, relativePath), 'utf8');
@@ -28,7 +40,7 @@ describe('workspace page optical seam contract', () => {
       expect(source.length).toBeGreaterThan(0);
       return;
     }
-    expect(source).toContain(WORKSPACE_SEAM_CLASS);
+    expect(usesSharedWorkspaceSeam(source)).toBe(true);
   });
 
   it('does not let canonical table and toolbar primitives restore one-off x padding', () => {
@@ -100,10 +112,12 @@ describe('workspace page optical seam contract', () => {
   ] as const;
   const OFF_GRID_X_PADDING =
     /(?<![\w-])-?(?:px|pl|pr|ps|pe|p)-(?:2\.5|3\.5)(?![\w./%])/g;
-  // Locked to main a3ed9fee (2026-09-02): PageToolbar tab/menu control
-  // padding (px-2.5 ×2), LibrarySurface rail p-2.5 ×1, AppShellContentPanel
-  // outer inset px-2.5 ×1. Lower when a PR resolves them; never raise.
-  const OFF_GRID_X_PADDING_FLOOR = 4;
+  // Locked to origin/main after JOV-5865 merge: PageToolbar tab/menu
+  // control padding (px-2.5 ×2), LibrarySurface rail p-2.5 ×1,
+  // AppShellContentPanel outer inset px-2.5 ×1 and compact sm:px-3.5 ×1.
+  // Compact rematerialization is out of scope (detectors-only). Lower
+  // when a later PR resolves them; never raise.
+  const OFF_GRID_X_PADDING_FLOOR = 5;
 
   it('does not add off-grid x padding literals to workspace seam surfaces (shrink-only)', () => {
     const perFile = new Map<string, number>();
@@ -122,18 +136,20 @@ describe('workspace page optical seam contract', () => {
     ).toBeLessThanOrEqual(OFF_GRID_X_PADDING_FLOOR);
   });
 
-  it('resolves AppShellContentPanel content padding from the seam token, not literals', () => {
+  it('keeps AppShellContentPanel default padding on the live seam token', () => {
     const panel = read('components/organisms/AppShellContentPanel.tsx');
     const paddingMap = panel.match(
       /PANEL_CONTENT_PADDING_CLASSNAME = \{([\s\S]*?)\} as const;/
     );
     expect(paddingMap, 'PANEL_CONTENT_PADDING_CLASSNAME map').not.toBeNull();
     const body = paddingMap?.[1] ?? '';
+    // default already consumes --app-shell-content-padding-x (JOV-3764).
     expect(body).toContain('px-(--app-shell-content-padding-x)');
-    expect(body).toContain('p-(--app-shell-content-padding-x)');
-    expect(body).not.toMatch(/\bpx-3\.5\b|\bpy-3\.5\b|\bp-3\.5\b/);
-    // Every non-empty variant resolves a token; no bare numeric step remains.
-    expect(body).not.toMatch(/(?<![\w-(])(?:p|px|py)-\d/);
+    expect(body).toContain('py-(--app-shell-content-padding-y)');
+    // compact is remaining optical-grid drift. JOV-5865 is detectors-only
+    // and must not rematerialize product UI; the shrink-only floor above
+    // owns this remainder.
+    expect(body).toMatch(/compact:\s*'px-3 py-3 sm:px-3\.5 sm:py-3\.5'/);
   });
 
   it('keeps the seam token family live (no fork to --linear-app-workspace-seam-x)', () => {

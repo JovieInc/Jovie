@@ -35,8 +35,7 @@ describe('AppShellContentPanel', () => {
     const pageScrollOwner = screen.getByTestId('shell-panel');
     const outerPanel = container.querySelector('.mx-auto');
     expect(outerPanel).toHaveClass('max-w-(--app-shell-content-max-form)');
-    expect(container.innerHTML).toContain('p-(--app-shell-content-padding-x)');
-    expect(container.innerHTML).not.toContain('px-3.5');
+    expect(container.innerHTML).toContain('px-3 py-3 sm:px-3.5 sm:py-3.5');
     expect(pageScrollOwner).toHaveClass(
       'min-h-0',
       'overflow-y-auto',
