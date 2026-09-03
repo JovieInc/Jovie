@@ -22,6 +22,7 @@
  * - Handlers are registered in lib/stripe/webhooks/registry.ts
  */
 
+import { createHash } from 'node:crypto';
 import * as Sentry from '@sentry/nextjs';
 import { and, eq, isNull, lt, or } from 'drizzle-orm';
 import { NextRequest, NextResponse } from 'next/server';
@@ -44,6 +45,59 @@ export const runtime = 'nodejs';
 
 const NO_STORE_HEADERS = { 'Cache-Control': 'no-store' } as const;
 const WEBHOOK_PROCESSING_LEASE_MS = 5 * 60 * 1000;
+
+/**
+ * Build attribution context for a signature verification failure.
+ *
+ * Verification failed, so nothing in the payload can be trusted — the event
+ * ID parsed from the raw body is diagnostic-only and must never drive
+ * processing. Endpoint mode and a truncated secret fingerprint let us
+ * attribute secret/deploy skew bursts (JOV-5851, JOV-1617) in Sentry without
+ * logging the secret itself.
+ */
+function buildSignatureFailureContext(
+  body: string,
+  signatureHeader: string,
+  webhookSecret: string
+): Record<string, unknown> {
+  let unverifiedEventId: string | undefined;
+  try {
+    const parsed: unknown = JSON.parse(body);
+    if (
+      parsed !== null &&
+      typeof parsed === 'object' &&
+      typeof (parsed as { id?: unknown }).id === 'string'
+    ) {
+      unverifiedEventId = (parsed as { id: string }).id;
+    }
+  } catch {
+    // Body was not JSON — nothing to attribute.
+  }
+
+  const signatureTimestamp = /(?:^|,)t=(\d+)/.exec(signatureHeader)?.[1];
+  const signatureSchemeCount = (signatureHeader.match(/(?:^|,)v\d+=/g) ?? [])
+    .length;
+
+  const secretKey = env.STRIPE_SECRET_KEY?.trim();
+  const endpointMode = secretKey?.startsWith('sk_live_')
+    ? 'live'
+    : secretKey?.startsWith('sk_test_')
+      ? 'test'
+      : 'unknown';
+
+  return {
+    route: '/api/stripe/webhooks',
+    error_class: 'stripe_signature_verification_failed',
+    unverifiedEventId,
+    endpointMode,
+    signatureTimestamp,
+    signatureSchemeCount,
+    webhookSecretFingerprint: createHash('sha256')
+      .update(webhookSecret)
+      .digest('hex')
+      .slice(0, 12),
+  };
+}
 
 export async function POST(request: NextRequest) {
   const webhookSecret = env.STRIPE_WEBHOOK_SECRET?.trim();
@@ -85,9 +139,11 @@ export async function POST(request: NextRequest) {
     try {
       event = stripe.webhooks.constructEvent(body, signature, webhookSecret);
     } catch (error) {
-      await captureCriticalError('Invalid Stripe webhook signature', error, {
-        route: '/api/stripe/webhooks',
-      });
+      await captureCriticalError(
+        'Invalid Stripe webhook signature',
+        error,
+        buildSignatureFailureContext(body, signature, webhookSecret)
+      );
       return NextResponse.json(
         { error: 'Invalid signature' },
         { status: 400, headers: NO_STORE_HEADERS }
