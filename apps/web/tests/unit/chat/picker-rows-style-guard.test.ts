@@ -39,7 +39,7 @@ function cmdKPaletteRowSource(source: string): string {
 }
 
 describe('picker row style guard', () => {
-  it('keeps Cmd+K result rows on the shared dense table-row primitive', () => {
+  it('keeps Cmd+K result rows on owner-managed shell row affordances', () => {
     const source = readFileSync(SHARED_COMMAND_PALETTE, 'utf8');
     const rowSource = cmdKPaletteRowSource(source);
     const offenders = rawRowSurfaceOffendersFor(rowSource);
@@ -51,7 +51,9 @@ describe('picker row style guard', () => {
     expect(source).toContain(
       "import { ShellListRowFrame } from './table/atoms/ShellListRowFrame';"
     );
-    expect(rowSource).toContain("className='system-b-table-row-shell");
+    expect(rowSource).toContain("chrome='shell'");
+    expect(rowSource).toContain("density='standard'");
+    expect(rowSource).not.toContain("className='system-b-table-row-shell");
     expect(rowSource).toContain("<RowVisual item={item} variant='dense' />");
     expect(rowSource).toContain("<RowBody item={item} variant='dense' />");
     expect(rowSource).not.toContain('system-b-picker-row');

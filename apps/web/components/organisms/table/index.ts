@@ -85,12 +85,16 @@ export { DateCell } from './atoms/DateCell';
 export { GroupHeader } from './atoms/GroupHeader';
 export type {
   ShellListRowButtonProps,
+  ShellListRowChrome,
+  ShellListRowDensity,
+  ShellListRowDisclosureIconProps,
   ShellListRowFrameProps,
   ShellListRowInteraction,
 } from './atoms/ShellListRowFrame';
 export {
   getShellListRowFrameClassName,
   ShellListRowButton,
+  ShellListRowDisclosureIcon,
   ShellListRowFrame,
 } from './atoms/ShellListRowFrame';
 export { SkeletonCell } from './atoms/SkeletonCell';
@@ -253,4 +257,4 @@ export { useTableGrouping } from './utils/useTableGrouping';
 // Styles
 // =============================================================================
 
-export { cn, presets, rowState } from './table.styles';
+export { cn, contextualAction, presets, rowState } from './table.styles';
