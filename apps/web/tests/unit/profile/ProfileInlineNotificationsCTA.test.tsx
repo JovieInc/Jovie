@@ -7,8 +7,8 @@ import {
 } from '@testing-library/react';
 import React from 'react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { ProfileInlineNotificationsCTA } from '@/components/features/profile/artist-notifications-cta/ProfileInlineNotificationsCTA';
 import type { ProfileNotificationsContextValue } from '@/components/organisms/profile-shell/types';
-import { ProfileInlineNotificationsCTA } from '@/features/profile/artist-notifications-cta/ProfileInlineNotificationsCTA';
 import type { Artist } from '@/types/db';
 
 const mockUseProfileNotifications = vi.fn();
@@ -178,6 +178,16 @@ describe('ProfileInlineNotificationsCTA', () => {
 
   afterEach(() => {
     vi.unstubAllGlobals();
+  });
+
+  it('uses the canonical 32px CTA with a 44px target and accessible name', () => {
+    render(<ProfileInlineNotificationsCTA artist={makeArtist()} />);
+
+    const trigger = screen.getByRole('button', { name: 'Get alerts' });
+    expect(trigger).toHaveClass('h-8');
+    expect(trigger.className).toContain('before:h-11');
+    expect(trigger.className).toContain('before:min-w-11');
+    expect(trigger).not.toHaveClass('h-11', 'h-12');
   });
 
   it('opens the shared full-screen flow from the trigger', async () => {

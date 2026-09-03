@@ -1,19 +1,25 @@
 import { describe, expect, it } from 'vitest';
 
 import {
+  isNonActionableLoopbackBetterAuthHostEvent,
+  isNonActionableLoopbackBetterAuthHostIssue,
   isNonActionableSpotifyReleaseCreditBoundEvent,
   isNonActionableSpotifyReleaseCreditBoundIssue,
   isNonActionableUpstashErrorBag,
   isNonActionableUpstashErrorBagEvent,
   isNonActionableUpstashIssue,
+  isNonActionableVercelIpcEvent,
+  isNonActionableVercelIpcIssue,
   isOpaqueUpstashErrorJsonBag,
   isSpotifyReleaseCreditBoundCapture,
   isTransientInfraHttpIssue,
   isTransientInfraHttpTransaction,
   isUpstashQuotaNoise,
   isUpstashQuotaSentryEvent,
+  LOOPBACK_BETTER_AUTH_HOST_IGNORE_ERRORS,
   SPOTIFY_RELEASE_CREDIT_BOUND_IGNORE_ERRORS,
   UPSTASH_ERROR_JSON_BAG,
+  VERCEL_IPC_SOCK_IGNORE_ERRORS,
 } from '@/lib/sentry/non-actionable-issues';
 
 const JOV_5185_TITLE =
@@ -425,6 +431,111 @@ describe('non-actionable Sentry issues', () => {
 
     it('does not match unrelated transactions', () => {
       expect(isTransientInfraHttpTransaction('GET /api/health')).toBe(false);
+    });
+  });
+
+  describe('isNonActionableVercelIpcIssue (JOV-5605)', () => {
+    const title = 'Error: connect ECONNREFUSED /opt/vercel/ipc.sock';
+
+    it('matches the Linear/Sentry title', () => {
+      expect(isNonActionableVercelIpcIssue({ title })).toBe(true);
+      expect(
+        VERCEL_IPC_SOCK_IGNORE_ERRORS.some(pattern => pattern.test(title))
+      ).toBe(true);
+    });
+
+    it('matches a Sentry exception event', () => {
+      expect(
+        isNonActionableVercelIpcEvent({
+          exception: {
+            values: [
+              {
+                type: 'Error',
+                value: 'connect ECONNREFUSED /opt/vercel/ipc.sock',
+              },
+            ],
+          },
+        })
+      ).toBe(true);
+    });
+
+    it('does not match unrelated connection failures', () => {
+      expect(
+        isNonActionableVercelIpcIssue({
+          title: 'Error: connect ECONNREFUSED 127.0.0.1:5432',
+        })
+      ).toBe(false);
+      expect(
+        isNonActionableVercelIpcEvent({
+          exception: { values: [{ value: 'Unauthorized' }] },
+        })
+      ).toBe(false);
+    });
+  });
+
+  describe('isNonActionableLoopbackBetterAuthHostIssue (JOV-5843)', () => {
+    const title =
+      'BetterAuthError: Host "localhost:3193" is not in the allowed hosts list. Allowed hosts: jov.ie, www.jov.ie, staging.jov.ie, localhost:3100, localhost:3194, 127.0.0.1:3194. Add this host to your allowedHosts config or provide a fallback URL.';
+
+    it('matches the Linear/Sentry localhost:3193 title', () => {
+      expect(isNonActionableLoopbackBetterAuthHostIssue({ title })).toBe(true);
+      expect(
+        LOOPBACK_BETTER_AUTH_HOST_IGNORE_ERRORS.some(pattern =>
+          pattern.test(title)
+        )
+      ).toBe(true);
+    });
+
+    it('matches 127.0.0.1 and IPv6 loopback host rejections', () => {
+      expect(
+        isNonActionableLoopbackBetterAuthHostIssue({
+          title:
+            'BetterAuthError: Host "127.0.0.1:32117" is not in the allowed hosts list. Allowed hosts: jov.ie.',
+        })
+      ).toBe(true);
+      expect(
+        isNonActionableLoopbackBetterAuthHostIssue({
+          title:
+            'BetterAuthError: Host "[::1]:43217" is not in the allowed hosts list. Allowed hosts: jov.ie.',
+        })
+      ).toBe(true);
+    });
+
+    it('matches a Sentry exception event without a request URL', () => {
+      expect(
+        isNonActionableLoopbackBetterAuthHostEvent({
+          exception: {
+            values: [
+              {
+                type: 'BetterAuthError',
+                value:
+                  'Host "localhost:3193" is not in the allowed hosts list. Allowed hosts: jov.ie.',
+              },
+            ],
+          },
+        })
+      ).toBe(true);
+    });
+
+    it('does not match remote-host allowlist failures', () => {
+      expect(
+        isNonActionableLoopbackBetterAuthHostIssue({
+          title:
+            'BetterAuthError: Host "jovie-timwhite-jovie.vercel.app" is not in the allowed hosts list. Allowed hosts: jov.ie.',
+        })
+      ).toBe(false);
+      expect(
+        isNonActionableLoopbackBetterAuthHostEvent({
+          exception: {
+            values: [
+              {
+                value:
+                  'Host "attacker.example" is not in the allowed hosts list.',
+              },
+            ],
+          },
+        })
+      ).toBe(false);
     });
   });
 });

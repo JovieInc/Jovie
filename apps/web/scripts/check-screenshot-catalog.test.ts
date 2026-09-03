@@ -1,4 +1,4 @@
-import { mkdir, mkdtemp, rm, writeFile } from 'node:fs/promises';
+import { mkdir, mkdtemp, rm, symlink, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterEach, describe, expect, it } from 'vitest';
@@ -75,6 +75,45 @@ describe('checkScreenshotCatalog', () => {
         publicExportFiles: 1,
       }
     );
+  });
+
+  it('accepts a public export symlink only when it targets the canonical image', async () => {
+    const paths = await createFixture();
+    const publicExport = join(paths.publicExportDirectory, 'homepage.png');
+    await rm(publicExport);
+    await symlink(
+      '../../screenshot-catalog/current/homepage-desktop.png',
+      publicExport
+    );
+
+    await expect(checkScreenshotCatalog({ paths, scenarios })).resolves.toEqual(
+      {
+        catalogBytes: 15,
+        catalogFiles: 1,
+        manifestEntries: 1,
+        publicExportBytes: 15,
+        publicExportFiles: 1,
+      }
+    );
+  });
+
+  it('rejects a public export symlink to any non-canonical file', async () => {
+    const paths = await createFixture();
+    const publicExport = join(paths.publicExportDirectory, 'homepage.png');
+    await writeFile(
+      join(paths.catalogDirectory, 'other.png'),
+      'canonical-image'
+    );
+    await rm(publicExport);
+    await symlink('../../screenshot-catalog/current/other.png', publicExport);
+
+    await expect(
+      checkScreenshotCatalog({ paths, scenarios })
+    ).rejects.toMatchObject<ScreenshotCatalogIntegrityError>({
+      violations: expect.arrayContaining([
+        'homepage-desktop: public export symlink must target its canonical catalog image',
+      ]),
+    });
   });
 
   it('rejects manifest drift, temporary files, and stale public exports', async () => {

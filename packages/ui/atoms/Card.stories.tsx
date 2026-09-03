@@ -41,6 +41,11 @@ export default meta;
 type Story = StoryObj<typeof meta>;
 
 export const Default: Story = {
+  render: args => (
+    <div className='box-border min-w-0 w-[min(24rem,calc(100vw-2rem))]'>
+      <Card {...args} />
+    </div>
+  ),
   args: {
     children: (
       <>
@@ -112,6 +117,11 @@ export const WithFooter: Story = {
 };
 
 export const Hoverable: Story = {
+  render: args => (
+    <div className='box-border min-w-0 w-[min(24rem,calc(100vw-2rem))]'>
+      <Card {...args} />
+    </div>
+  ),
   args: {
     variant: 'hoverable',
     children: (

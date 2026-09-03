@@ -61,6 +61,7 @@ struct AppShellLeftDrawer: View {
   let isLoadingConversations: Bool
   let activeConversationID: String?
   let drawerWidth: CGFloat
+  let reduceMotion: Bool
   let onSelectTab: (AppShellTab) -> Void
   let onStartNewChat: () -> Void
   let onSelectConversation: (String) -> Void
@@ -73,8 +74,6 @@ struct AppShellLeftDrawer: View {
   // Decorative open-stagger only; the drawer is fully interactive regardless
   // of this flag (rows never block on it — see DrawerRowRevealModifier).
   @State private var contentRevealed = false
-  @Environment(\.accessibilityReduceMotion) private var reduceMotion
-
   private var filteredConversations: [MobileConversationSummary] {
     AppShellDrawerThreadsFilter.filtered(
       conversations: recentConversations,
@@ -187,7 +186,7 @@ private struct DrawerRowRevealModifier: ViewModifier {
 
   func body(content: Content) -> some View {
     content
-      .opacity(isRevealed ? 1 : 0)
+      .opacity((reduceMotion || isRevealed) ? 1 : 0)
       .offset(x: (reduceMotion || isRevealed) ? 0 : -8)
       .animation(
         reduceMotion ? nil : JovieMotion.easeOut().delay(delay),

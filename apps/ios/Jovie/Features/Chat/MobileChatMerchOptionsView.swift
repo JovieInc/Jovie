@@ -127,6 +127,15 @@ struct MobileChatMerchOptionsView: View {
           content()
         }
       }
+      .accessibilityIdentifier("mobile-chat-merch-scroll")
+      .background {
+        GeometryReader { proxy in
+          Color.clear.preference(
+            key: AppShellRailSwipeExclusionFramesKey.self,
+            value: [proxy.frame(in: .named("app-shell"))]
+          )
+        }
+      }
     }
   }
 

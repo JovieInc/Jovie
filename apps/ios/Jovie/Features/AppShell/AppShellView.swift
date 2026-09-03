@@ -42,10 +42,6 @@ enum AppShellTab: Equatable, Hashable {
     }
   }
 
-  /// Bottom-bar destinations are unused. Every surface is sidebar or rail.
-  var isPrimaryTab: Bool {
-    false
-  }
 }
 
 // File-level so unit tests can call it without importing SwiftUI.
@@ -59,11 +55,21 @@ func resolveShellInitialTab(_ initialTab: AppShellTab, chatEnabled: Bool) -> App
 }
 
 // GH-12949: the recessed drawer base plane must be fully invisible while closed.
+func appShellDrawerIsPresented(
+  isShowingDrawer: Bool,
+  drawerDragOffset: CGFloat
+) -> Bool {
+  isShowingDrawer || drawerDragOffset != 0
+}
+
 func appShellDrawerBasePlaneOpacity(
   isShowingDrawer: Bool,
   drawerDragOffset: CGFloat
 ) -> Double {
-  (isShowingDrawer || drawerDragOffset != 0) ? 1 : 0
+  appShellDrawerIsPresented(
+    isShowingDrawer: isShowingDrawer,
+    drawerDragOffset: drawerDragOffset
+  ) ? 1 : 0
 }
 
 // File-level so unit tests can assert the shipped keep-mounted policy.
@@ -87,10 +93,6 @@ func appShellRightRailOpacity(isShowing: Bool, dragOffset: CGFloat) -> Double {
 
 func appShellHomeSurface(chatEnabled: Bool) -> AppShellTab {
   AppShellPanePolicy.homeSurface(chatEnabled: chatEnabled)
-}
-
-private enum AppShellRoute: Hashable {
-  case settings
 }
 
 struct AppShellProfile: Equatable {
@@ -117,8 +119,8 @@ struct AppShellProfile: Equatable {
   }
 }
 
-/// 4-layer chat-first shell (JOV-3632):
-/// home content → tab bar → rails (drawer / entity sheet) → overlays (Talk).
+/// Chat-first shell (JOV-5201): home content → swipe rails → overlays.
+/// No bottom tab bar. Leading pan = sidebar, trailing pan = right rail.
 struct AppShellView<
   ProfileContent: View,
   AudienceContent: View,
@@ -141,6 +143,7 @@ struct AppShellView<
   let onSelectConversation: (String) -> Void
   let onStartNewChat: () -> Void
   let onAutoSendMessage: (String) -> Void
+  let onEyesFreeSubmit: (EyesFreeCaptureLaunch, String) -> Void
   let onLogout: @MainActor () async -> Void
   let showsWorkspaceSwitch: Bool
   let workspaceMode: MobileWorkspaceMode
@@ -161,19 +164,26 @@ struct AppShellView<
   ) -> ChatContent
 
   @State private var selectedTab: AppShellTab
-  @State private var navigationPath: [AppShellRoute] = []
+  @State private var isShowingSettings = false
   @State private var isShowingDrawer = false
   @State private var drawerDragOffset: CGFloat = 0
   @State private var isShowingRightRail = false
   @State private var railDragOffset: CGFloat = 0
+  @State private var railSwipeExclusionStore = AppShellRailSwipeExclusionStore()
+  @State private var isRailGestureBlockedForCurrentDrag = false
+  @GestureState private var isRailGestureActive = false
   @State private var isKeyboardVisible = false
   @State private var didOpenLaunchSettings = false
   @State private var chatDraft = ""
   @State private var voiceCaptureTrigger = 0
   @State private var isShowingTalkOverlay = false
+  @State private var talkAutoSubmit = false
+  @State private var talkUnavailableMessage: String?
+  @State private var eyesFreeLaunch: EyesFreeCaptureLaunch?
   @State private var talkVoiceService = VoiceCaptureService()
   @State private var teleprompterProposal: MobileChatVideoProposalPayload?
   @State private var libraryHome: LibraryHome = .catalog
+  @State private var selectedLibraryAsset: LibraryAsset?
   @State private var videoPlaybackAsset: LibraryAsset?
   @State private var publicProfileBrowserItem: PublicProfileBrowserDestination?
   @State private var isShowingProfileQR = false
@@ -181,6 +191,9 @@ struct AppShellView<
   @State private var lastEntityContext: EntityContextItem?
   @State private var intentStore = IntentNavigationStore.shared
   @Environment(\.accessibilityReduceMotion) private var reduceMotion
+#if DEBUG
+  @State private var didExposeInteractiveRailProgressForUITest = false
+#endif
 
   init(
     profile: AppShellProfile,
@@ -198,6 +211,7 @@ struct AppShellView<
     onSelectConversation: @escaping (String) -> Void = { _ in },
     onStartNewChat: @escaping () -> Void = {},
     onAutoSendMessage: @escaping (String) -> Void = { _ in },
+    onEyesFreeSubmit: @escaping (EyesFreeCaptureLaunch, String) -> Void = { _, _ in },
     onLogout: @escaping @MainActor () async -> Void,
     showsWorkspaceSwitch: Bool = false,
     workspaceMode: MobileWorkspaceMode = .jovie,
@@ -238,6 +252,7 @@ struct AppShellView<
     self.onSelectConversation = onSelectConversation
     self.onStartNewChat = onStartNewChat
     self.onAutoSendMessage = onAutoSendMessage
+    self.onEyesFreeSubmit = onEyesFreeSubmit
     self.onLogout = onLogout
     self.showsWorkspaceSwitch = showsWorkspaceSwitch
     self.workspaceMode = workspaceMode
@@ -263,15 +278,18 @@ struct AppShellView<
   }
 
   var body: some View {
-    NavigationStack(path: $navigationPath) {
+    NavigationStack {
       GeometryReader { proxy in
         let openOffset = drawerOpenOffset(safeAreaLeading: proxy.safeAreaInsets.leading)
-        let isDrawerBasePlaneVisible = isShowingDrawer || drawerDragOffset != 0
+        let isDrawerPresented = appShellDrawerIsPresented(
+          isShowingDrawer: isShowingDrawer,
+          drawerDragOffset: drawerDragOffset
+        )
 
-        // Layer stack (bottom → top): drawer rail → home+tab bar → Talk overlay.
+        // Layer stack (bottom → top): drawer rail → home → right rail → overlays.
         ZStack(alignment: .leading) {
           AppShellLeftDrawer(
-            isPresented: isShowingDrawer,
+            isPresented: isDrawerPresented,
             profile: profile,
             chatEnabled: chatEnabled,
             audienceEnabled: audienceEnabled,
@@ -280,6 +298,7 @@ struct AppShellView<
             isLoadingConversations: isLoadingConversations,
             activeConversationID: activeConversationID,
             drawerWidth: drawerWidth,
+            reduceMotion: isReduceMotionEnabled,
             onSelectTab: { tab in
               closeDrawerThenSelect(tab)
             },
@@ -294,7 +313,12 @@ struct AppShellView<
             },
             onOpenSettings: {
               closeDrawer()
-              navigationPath.append(.settings)
+              // Commit the pane dismissal before asking SwiftUI to present
+              // the full-screen cover. Presenting in the same transaction as
+              // the animated drawer close can drop the cover request.
+              DispatchQueue.main.async {
+                isShowingSettings = true
+              }
             },
             onTalk: {
               closeDrawer()
@@ -314,21 +338,13 @@ struct AppShellView<
             )
           )
           .animation(drawerAnimation, value: isShowingDrawer)
-          .animation(reduceMotion ? nil : drawerAnimation, value: drawerDragOffset)
-          .accessibilityHidden(!isDrawerBasePlaneVisible)
+          .accessibilityHidden(!isDrawerPresented)
 
           shellContent
             .frame(maxWidth: .infinity, maxHeight: .infinity)
-            .offset(
-              x: reduceMotion
-                ? 0
-                : contentOffset(openOffset: openOffset, railOpenOffset: railWidth)
-            )
-            .opacity(reduceMotion && isShowingDrawer ? 0 : 1)
-            .animation(drawerAnimation, value: isShowingDrawer)
-            .animation(drawerAnimation, value: isShowingRightRail)
-            .animation(reduceMotion ? nil : drawerAnimation, value: drawerDragOffset)
-            .animation(reduceMotion ? nil : drawerAnimation, value: railDragOffset)
+            .offset(x: contentOffset(openOffset: openOffset, railOpenOffset: railWidth))
+            .animation(isReduceMotionEnabled ? nil : drawerAnimation, value: isShowingDrawer)
+            .animation(isReduceMotionEnabled ? nil : drawerAnimation, value: isShowingRightRail)
 
           AppShellRightRail(
             item: lastEntityContext,
@@ -342,26 +358,51 @@ struct AppShellView<
           )
           .frame(width: railWidth)
           .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .trailing)
-          .offset(x: reduceMotion ? 0 : rightRailOffset(railOpenOffset: railWidth))
-          .opacity(appShellRightRailOpacity(isShowing: isShowingRightRail, dragOffset: railDragOffset))
-          .animation(drawerAnimation, value: isShowingRightRail)
+          .offset(x: rightRailOffset(railOpenOffset: railWidth))
+          .opacity(
+            appShellRightRailOpacity(
+              isShowing: isShowingRightRail,
+              dragOffset: isReduceMotionEnabled ? 0 : railDragOffset
+            )
+          )
+          .animation(isReduceMotionEnabled ? nil : drawerAnimation, value: isShowingRightRail)
           .accessibilityHidden(!isShowingRightRail && railDragOffset == 0)
           .allowsHitTesting(isShowingRightRail)
 
-          if isShowingTalkOverlay, chatEnabled {
+          if isShowingTalkOverlay, chatEnabled || talkUnavailableMessage != nil {
             TalkOverlayView(
               voiceCaptureService: talkVoiceService,
               onCancel: {
                 isShowingTalkOverlay = false
+                talkAutoSubmit = false
+                talkUnavailableMessage = nil
+                eyesFreeLaunch = nil
               },
               onInsertDraft: { transcript in
-                // Voice memo → editable action draft (not auto-send). User
-                // reviews/edits in composer, then sends when ready (#10380).
+                // Recovery-only handoff: a failed direct completion may preserve
+                // the transcript as an editable composer draft (#10380).
                 let handoff = VoiceMemoActionDraft.shellHandoff(fromTranscript: transcript)
                 isShowingTalkOverlay = false
+                talkAutoSubmit = false
                 selectTab(.chat)
                 chatDraft = handoff.chatDraft
-                // handoff.autoSendMessage is always nil — intentional.
+                // Recovery drafts never auto-send.
+              },
+              autoSubmit: talkAutoSubmit,
+              unavailableMessage: talkUnavailableMessage,
+              listeningCue: eyesFreeLaunch?.destination.listeningCue
+                ?? EyesFreeCaptureDestination.jovie.listeningCue,
+              onSubmit: { transcript in
+                let launch = eyesFreeLaunch ?? EyesFreeCaptureLaunch(
+                  destination: .jovie,
+                  spokenText: transcript,
+                  idempotencyKey: UUID().uuidString
+                )
+                isShowingTalkOverlay = false
+                talkAutoSubmit = false
+                talkUnavailableMessage = nil
+                selectTab(.chat)
+                onEyesFreeSubmit(launch, transcript)
               }
             )
             .transition(.opacity)
@@ -378,6 +419,22 @@ struct AppShellView<
             .transition(.opacity)
             .zIndex(11)
           }
+
+#if DEBUG
+          if isReduceMotionUITest {
+            Text("Reduce Motion Active")
+              .font(.system(size: 1))
+              .frame(width: 1, height: 1)
+              .clipped()
+              .accessibilityIdentifier("shell-reduce-motion-status")
+              .accessibilityValue(
+                didExposeInteractiveRailProgressForUITest
+                  ? "Interactive progress exposed"
+                  : "Interactive progress hidden"
+              )
+              .allowsHitTesting(false)
+          }
+#endif
         }
         .simultaneousGesture(
           edgeRailGesture(
@@ -385,7 +442,28 @@ struct AppShellView<
             containerWidth: proxy.size.width
           )
         )
+        .coordinateSpace(name: "app-shell")
+        .onPreferenceChange(AppShellRailSwipeExclusionFramesKey.self) { frames in
+          railSwipeExclusionStore.frames = frames
+        }
+        .onChange(of: isRailGestureActive) { _, isActive in
+          guard !isActive else { return }
+          // GestureState resets on both completion and cancellation. Defer the
+          // cleanup so onEnded can still inspect the latched eligibility bit.
+          DispatchQueue.main.async {
+            guard !isRailGestureActive else { return }
+            isRailGestureBlockedForCurrentDrag = false
+            resetRailDragOffsets()
+          }
+        }
+        .onChange(of: drawerDragOffset) { _, offset in
+          recordInteractiveRailProgressForUITest(offset)
+        }
+        .onChange(of: railDragOffset) { _, offset in
+          recordInteractiveRailProgressForUITest(offset)
+        }
       }
+      .navigationBarHidden(true)
     }
     .background(JovieColor.backgroundBase)
     .sheet(item: $entityContext) { item in
@@ -420,11 +498,27 @@ struct AppShellView<
         )
       }
     }
+    .fullScreenCover(isPresented: $isShowingSettings) {
+      NavigationStack {
+        SettingsView(
+          profile: profile,
+          buildInfo: .current(),
+          accountURL: accountURL,
+          billingURL: billingURL,
+          onClose: { isShowingSettings = false },
+          onLogout: onLogout,
+          showsWorkspaceSwitch: showsWorkspaceSwitch,
+          workspaceMode: workspaceMode,
+          onSelectWorkspace: onSelectWorkspace
+        )
+        .navigationBarBackButtonHidden()
+      }
+    }
     .task(id: opensSettingsOnLaunch) {
       guard opensSettingsOnLaunch, didOpenLaunchSettings == false else { return }
       didOpenLaunchSettings = true
       await Task.yield()
-      navigationPath.append(.settings)
+      isShowingSettings = true
     }
     .task {
       applyPendingIntentNavigation()
@@ -450,8 +544,8 @@ struct AppShellView<
     }
   }
 
-  // Elevated content plane: toolbar + page + tab bar ride together so the
-  // drawer transform reads as one spatial move.
+  // Elevated content plane: toolbar + page ride together so the drawer
+  // transform reads as one spatial move. No bottom tab bar (JOV-5201).
   private var shellContent: some View {
     let isElevated = isShowingDrawer || drawerDragOffset != 0
       || isShowingRightRail || railDragOffset != 0
@@ -467,35 +561,6 @@ struct AppShellView<
       }
       .safeAreaInset(edge: .top, spacing: 0) {
         shellToolbar
-      }
-      .safeAreaInset(edge: .bottom, spacing: 0) {
-        if AppShellPanePolicy.showsBottomTabBar(), chatEnabled {
-          AppShellTabBar(
-            selectedTab: selectedTab,
-            onSelect: { primary in
-              selectTab(primary.shellTab)
-            },
-            onTalk: openTalkOverlay
-          )
-        }
-      }
-      .navigationBarHidden(true)
-      .navigationDestination(for: AppShellRoute.self) { route in
-        switch route {
-        case .settings:
-          SettingsView(
-            profile: profile,
-            buildInfo: .current(),
-            accountURL: accountURL,
-            billingURL: billingURL,
-            onClose: { navigationPath.removeLast() },
-            onLogout: onLogout,
-            showsWorkspaceSwitch: showsWorkspaceSwitch,
-            workspaceMode: workspaceMode,
-            onSelectWorkspace: onSelectWorkspace
-          )
-          .navigationBarBackButtonHidden()
-        }
       }
       .allowsHitTesting(!isElevated && !isShowingTalkOverlay && teleprompterProposal == nil)
       .accessibilityHidden(isElevated || isShowingTalkOverlay || teleprompterProposal != nil)
@@ -538,6 +603,9 @@ struct AppShellView<
       chatDraft: chatDraft,
       autoSendMessage: nil,
       shouldStartVoiceCapture: false,
+      talkAutoSubmit: false,
+      eyesFreeLaunch: nil,
+      unavailableMessage: nil,
       openConversationID: nil,
       pendingRequest: intentStore.consume()
     )
@@ -545,12 +613,22 @@ struct AppShellView<
 
     guard AppShellIntentNavigation.applyPendingRequest(
       chatEnabled: chatEnabled,
+      canUseSummer: showsWorkspaceSwitch,
+      isOffline: isOffline,
       state: &state
     ) else { return }
 
     chatDraft = state.chatDraft
+    talkAutoSubmit = state.talkAutoSubmit
+    eyesFreeLaunch = state.eyesFreeLaunch
+    talkUnavailableMessage = state.unavailableMessage
 
-    if let autoSendMessage = state.autoSendMessage {
+    if let launch = state.eyesFreeLaunch,
+       let autoSendMessage = state.autoSendMessage,
+       state.talkAutoSubmit
+    {
+      onEyesFreeSubmit(launch, autoSendMessage)
+    } else if let autoSendMessage = state.autoSendMessage {
       onAutoSendMessage(autoSendMessage)
     }
 
@@ -559,11 +637,20 @@ struct AppShellView<
     }
 
     if state.shouldStartVoiceCapture {
-      voiceCaptureTrigger += 1
+      // Present the overlay directly. Incrementing `voiceCaptureTrigger` would
+      // call `openTalkOverlay()`, which would replace the Shortcut launch
+      // metadata with an ordinary in-app launch.
+      dismissKeyboardIfNeeded()
+      isShowingTalkOverlay = true
     }
 
-    if state.shouldOpenSettings, navigationPath.last != .settings {
-      navigationPath.append(.settings)
+    if let unavailable = state.unavailableMessage, !state.shouldStartVoiceCapture {
+      talkUnavailableMessage = unavailable
+      isShowingTalkOverlay = true
+    }
+
+    if state.shouldOpenSettings {
+      isShowingSettings = true
     }
 
     if state.selectedTab != previousTab {
@@ -576,6 +663,9 @@ struct AppShellView<
   }
 
   private func selectTab(_ tab: AppShellTab) {
+    if tab != .library {
+      selectedLibraryAsset = nil
+    }
     withAnimation(JovieMotion.easeOut(duration: JovieMotion.slowDuration)) {
       selectedTab = tab
     }
@@ -596,6 +686,10 @@ struct AppShellView<
   private func openTalkOverlay() {
     guard chatEnabled else { return }
     dismissKeyboardIfNeeded()
+    talkAutoSubmit = FrequentActionInteractionBudget.inAppVoiceSubmit
+      .completesOnFinalActivation
+    talkUnavailableMessage = nil
+    eyesFreeLaunch = nil
     isShowingTalkOverlay = true
   }
 
@@ -651,21 +745,20 @@ struct AppShellView<
   }
 
   private func presentEntityFromLibrary(_ asset: LibraryAsset) {
-    // Locally recorded teleprompter videos play back in place; every other
-    // asset maps into the entity sheet for a shared context surface.
-    if asset.type == .video, asset.localVideoURL != nil {
-      videoPlaybackAsset = asset
+    lastEntityContext = EntityContextItem.fromLibraryAsset(asset)
+    entityContext = nil
+    videoPlaybackAsset = nil
+
+    if LibraryItemPresentationPolicy.shouldOpenSheet(for: asset) {
+      entityContext = lastEntityContext
+      if asset.type == .video, asset.localVideoURL != nil {
+        videoPlaybackAsset = asset
+      }
       return
     }
 
-    let kind: MobileChatEntityKind
-    switch asset.type {
-    case .release: kind = .release
-    case .merch, .smartLink, .photo, .press, .video: kind = .track
-    }
-    presentEntity(
-      EntityContextItem(kind: kind, entityID: asset.id, label: asset.name)
-    )
+    selectedLibraryAsset = asset
+    applyOpenPane(.none)
   }
 
   static func resolvedInitialTab(
@@ -684,7 +777,33 @@ struct AppShellView<
   }
 
   private var drawerAnimation: Animation {
-    reduceMotion ? JovieMotion.subtle : JovieMotion.cinematic
+    isReduceMotionEnabled ? JovieMotion.subtle : JovieMotion.cinematic
+  }
+
+  private var isReduceMotionEnabled: Bool {
+    #if DEBUG
+      AppShellGesturePolicy.effectiveReduceMotion(
+        environmentValue: reduceMotion,
+        arguments: ProcessInfo.processInfo.arguments
+      )
+    #else
+      reduceMotion
+    #endif
+  }
+
+  private var isReduceMotionUITest: Bool {
+    #if DEBUG
+      ProcessInfo.processInfo.arguments.contains("-ui-testing-reduce-motion")
+    #else
+      false
+    #endif
+  }
+
+  private func recordInteractiveRailProgressForUITest(_ offset: CGFloat) {
+    #if DEBUG
+      guard isReduceMotionUITest, offset != 0 else { return }
+      didExposeInteractiveRailProgressForUITest = true
+    #endif
   }
 
   private func drawerOpenOffset(safeAreaLeading: CGFloat) -> CGFloat {
@@ -742,6 +861,9 @@ struct AppShellView<
   }
 
   private func closeDrawerThenSelect(_ tab: AppShellTab) {
+    if tab == .library {
+      selectedLibraryAsset = nil
+    }
     closeDrawer()
     DispatchQueue.main.asyncAfter(deadline: .now() + JovieMotion.cinematicDuration) {
       selectTab(tab)
@@ -786,7 +908,7 @@ struct AppShellView<
     case .chat:
       profileContent
     case .library:
-      libraryContent(presentEntityFromLibrary, $libraryHome)
+      libraryPagedContent
     case .calendar:
       calendarContent(openAudienceChat)
     case .inbox:
@@ -798,42 +920,150 @@ struct AppShellView<
     }
   }
 
+  @ViewBuilder
+  private var libraryPagedContent: some View {
+    ZStack {
+      libraryContent(presentEntityFromLibrary, $libraryHome)
+        .opacity(selectedLibraryAsset == nil ? 1 : 0)
+        .allowsHitTesting(selectedLibraryAsset == nil)
+        .accessibilityHidden(selectedLibraryAsset != nil)
+
+      if let asset = selectedLibraryAsset {
+        LibraryItemScreen(
+          asset: asset,
+          onBack: {
+            selectedLibraryAsset = nil
+          },
+          onEditInChat: { prompt in
+            selectedLibraryAsset = nil
+            applyOpenPane(.none)
+            chatDraft = prompt
+            selectTab(.chat)
+          }
+        )
+        .id(asset.id)
+      }
+    }
+  }
+
   private var pageTransition: AnyTransition {
     .opacity
   }
 
-  /// Edge swipes own rails only (JOV-3635). No horizontal tab paging.
+  private func followLeadingRailDrag(translationX: CGFloat, openOffset: CGFloat) {
+    drawerDragOffset = min(translationX, openOffset)
+    railDragOffset = 0
+  }
+
+  private func followTrailingRailDrag(translationX: CGFloat) {
+    drawerDragOffset = 0
+    railDragOffset = max(translationX, -railWidth)
+  }
+
+  private func resetRailDragOffsets() {
+    drawerDragOffset = 0
+    railDragOffset = 0
+  }
+
+  private func settleRailDragOffsets() {
+    withAnimation(isReduceMotionEnabled ? nil : drawerAnimation) {
+      resetRailDragOffsets()
+    }
+  }
+
+  private func isRailSwipeExcluded(at startLocation: CGPoint) -> Bool {
+    guard AppShellGesturePolicy.appliesSubviewExclusion(
+      selectedTab: selectedTab,
+      isShowingDrawer: isShowingDrawer,
+      isShowingRightRail: isShowingRightRail
+    ) else { return false }
+    return railSwipeExclusionStore.frames.contains(where: { $0.contains(startLocation) })
+  }
+
+  /// Chat-home pans open rails (JOV-5201). Other surfaces keep edge drags.
+  /// Horizontal pans never page between tabs.
   private func edgeRailGesture(openOffset: CGFloat, containerWidth: CGFloat) -> some Gesture {
-    DragGesture(minimumDistance: 8, coordinateSpace: .global)
+    DragGesture(minimumDistance: 8, coordinateSpace: .named("app-shell"))
+      .updating($isRailGestureActive) { _, isActive, _ in
+        isActive = true
+      }
       .onChanged { value in
+        guard !isRailGestureBlockedForCurrentDrag else {
+          resetRailDragOffsets()
+          return
+        }
+
         guard AppShellGesturePolicy.allowsEdgeRailDrag(
-          reduceMotion: reduceMotion,
+          reduceMotion: isReduceMotionEnabled,
           isKeyboardVisible: isKeyboardVisible,
           isShowingTalkOverlay: isShowingTalkOverlay,
           hasTeleprompterProposal: teleprompterProposal != nil
-        ) else { return }
+        ) else {
+          isRailGestureBlockedForCurrentDrag = true
+          resetRailDragOffsets()
+          return
+        }
+
+        guard AppShellGesturePolicy.showsInteractiveRailProgress(
+          reduceMotion: isReduceMotionEnabled
+        ) else {
+          resetRailDragOffsets()
+          return
+        }
+
+        guard !isRailSwipeExcluded(at: value.startLocation) else {
+          isRailGestureBlockedForCurrentDrag = true
+          resetRailDragOffsets()
+          return
+        }
 
         if isShowingDrawer {
           drawerDragOffset = min(0, value.translation.width)
+          railDragOffset = 0
         } else if isShowingRightRail {
+          drawerDragOffset = 0
           railDragOffset = max(0, value.translation.width)
-        } else if value.startLocation.x < AppShellGesturePolicy.leftEdgeOpenWidth,
-                  value.translation.width > 0
-        {
-          drawerDragOffset = min(value.translation.width, openOffset)
-        } else if value.startLocation.x > containerWidth - AppShellGesturePolicy.rightEdgeOpenWidth,
-                  value.translation.width < 0
-        {
-          railDragOffset = max(value.translation.width, -railWidth)
+        } else if AppShellGesturePolicy.shouldFollowLeadingDrag(
+          selectedTab: selectedTab,
+          startX: value.startLocation.x,
+          translationX: value.translation.width,
+          translationY: value.translation.height
+        ) {
+          followLeadingRailDrag(translationX: value.translation.width, openOffset: openOffset)
+        } else if AppShellGesturePolicy.shouldFollowTrailingDrag(
+          selectedTab: selectedTab,
+          startX: value.startLocation.x,
+          containerWidth: containerWidth,
+          translationX: value.translation.width,
+          translationY: value.translation.height
+        ) {
+          followTrailingRailDrag(translationX: value.translation.width)
+        } else {
+          resetRailDragOffsets()
         }
       }
       .onEnded { value in
+        defer { isRailGestureBlockedForCurrentDrag = false }
+
+        guard !isRailGestureBlockedForCurrentDrag else {
+          settleRailDragOffsets()
+          return
+        }
+
         guard AppShellGesturePolicy.allowsEdgeRailDrag(
-          reduceMotion: reduceMotion,
+          reduceMotion: isReduceMotionEnabled,
           isKeyboardVisible: isKeyboardVisible,
           isShowingTalkOverlay: isShowingTalkOverlay,
           hasTeleprompterProposal: teleprompterProposal != nil
-        ) else { return }
+        ) else {
+          settleRailDragOffsets()
+          return
+        }
+
+        guard !isRailSwipeExcluded(at: value.startLocation) else {
+          settleRailDragOffsets()
+          return
+        }
 
         let predicted = value.predictedEndTranslation.width
         if isShowingDrawer {
@@ -842,7 +1072,7 @@ struct AppShellView<
           {
             applyOpenPane(AppShellPanePolicy.paneAfterDismiss())
           } else {
-            drawerDragOffset = 0
+            settleRailDragOffsets()
           }
           return
         }
@@ -855,31 +1085,34 @@ struct AppShellView<
           ) {
             applyOpenPane(AppShellPanePolicy.paneAfterDismiss())
           } else {
-            railDragOffset = 0
+            settleRailDragOffsets()
           }
           return
         }
 
-        if AppShellGesturePolicy.isLeftEdgeOpen(
+        if AppShellGesturePolicy.isLeadingSwipeOpen(
+          selectedTab: selectedTab,
           startX: value.startLocation.x,
           translationX: value.translation.width,
-          predictedX: predicted
+          predictedX: predicted,
+          translationY: value.translation.height
         ) {
           applyOpenPane(AppShellPanePolicy.paneAfterLeadingSwipe(current: .none))
           return
         }
 
-        if AppShellGesturePolicy.isRightEdgeOpen(
+        if AppShellGesturePolicy.isTrailingSwipeOpen(
+          selectedTab: selectedTab,
           startX: value.startLocation.x,
           containerWidth: containerWidth,
           translationX: value.translation.width,
-          predictedX: predicted
+          predictedX: predicted,
+          translationY: value.translation.height
         ) {
           applyOpenPane(AppShellPanePolicy.paneAfterTrailingSwipe(current: .none))
           return
         }
-        drawerDragOffset = 0
-        railDragOffset = 0
+        settleRailDragOffsets()
       }
   }
 
@@ -930,7 +1163,7 @@ struct AppShellView<
       }
 
       Button {
-        navigationPath.append(.settings)
+        isShowingSettings = true
       } label: {
         Image(systemName: "gearshape")
       }

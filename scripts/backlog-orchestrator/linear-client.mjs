@@ -21,6 +21,19 @@ export const LINEAR_RETRY_BASE_MS = 100;
 export const LINEAR_MAX_ERROR_BODY_LENGTH = 256;
 export const LINEAR_PAGE_SIZE = 50;
 export const LINEAR_MAX_PAGES = 1000;
+export const LINEAR_FLEET_CLOSURE_ISSUE_STATE_NAMES = Object.freeze([
+  'Triage',
+  'Backlog',
+  'Todo',
+  'In Progress',
+  'In Review',
+  'Done',
+  'Completed',
+  'Canceled',
+  'Cancelled',
+  'Closed',
+  'Duplicate',
+]);
 
 const RETRYABLE_STATUS = new Set([429, 500, 502, 503, 504]);
 const JSON_CONTENT_TYPE = /(^|;)\s*application\/json\s*(;|$)/i;
@@ -460,23 +473,24 @@ export async function fetchTeamTriageIssues(
 /**
  * Fetch an exhaustive active-issue snapshot plus a machine-readable coverage
  * receipt. Callers must not treat a pagination error as an empty team.
+ * @param {string} teamId
+ * @param {{ graphqlImpl?: typeof graphql, maxPages?: number, stateNames?: readonly string[] }} [options]
  */
 export async function fetchTeamActiveIssueSnapshot(
   teamId,
-  { graphqlImpl = graphql, maxPages = LINEAR_MAX_PAGES } = {}
+  { graphqlImpl = graphql, maxPages = LINEAR_MAX_PAGES, stateNames } = {}
 ) {
+  const stateNameFilter = stateNames ? [...stateNames] : null;
   return collectLinearConnectionPages(
     async cursor => {
       const data = await graphqlImpl(
         `
-      query($teamId: String!, $cursor: String) {
+      query($teamId: String!, $cursor: String, $stateNames: [String!] = ["Triage", "Backlog", "Todo", "In Progress", "In Review"]) {
         team(id: $teamId) {
           issues(
             first: 50,
             after: $cursor,
-            filter: {
-              state: { name: { in: ["Triage", "Backlog", "Todo", "In Progress", "In Review"] } }
-            }
+            filter: { state: { name: { in: $stateNames } } }
           ) {
             nodes {
               id
@@ -504,6 +518,10 @@ export async function fetchTeamActiveIssueSnapshot(
                 nodes { type relatedIssue { id identifier title } }
                 pageInfo { hasNextPage endCursor }
               }
+              attachments(first: 50) {
+                nodes { id title subtitle url sourceType metadata }
+                pageInfo { hasNextPage endCursor }
+              }
               state { id name type }
               comments(first: 50) {
                 nodes { id body createdAt }
@@ -515,12 +533,25 @@ export async function fetchTeamActiveIssueSnapshot(
         }
       }
     `,
-        { teamId, cursor }
+        stateNameFilter
+          ? { teamId, cursor, stateNames: stateNameFilter }
+          : { teamId, cursor }
       );
       return data?.team?.issues;
     },
     { maxPages }
   );
+}
+
+/**
+ * @param {string} teamId
+ * @param {{ graphqlImpl?: typeof graphql, maxPages?: number, stateNames?: readonly string[] }} [options]
+ */
+export async function fetchTeamFleetClosureIssueSnapshot(teamId, options = {}) {
+  return fetchTeamActiveIssueSnapshot(teamId, {
+    ...options,
+    stateNames: options.stateNames ?? LINEAR_FLEET_CLOSURE_ISSUE_STATE_NAMES,
+  });
 }
 
 /** Fetch only the issues while retaining exhaustive snapshot semantics. */
@@ -784,6 +815,19 @@ export async function addComment(issueId, body) {
     }
   `,
     { id: issueId, body }
+  );
+}
+
+export async function updateComment(commentId, body) {
+  return graphql(
+    `
+    mutation($id: String!, $body: String!) {
+      commentUpdate(id: $id, input: { body: $body }) {
+        success
+      }
+    }
+  `,
+    { id: commentId, body }
   );
 }
 

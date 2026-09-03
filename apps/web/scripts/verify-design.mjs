@@ -10,8 +10,8 @@ const CARBON_PALETTE = {
   '--linear-bg-surface-0': '#0a0b0e',
   '--linear-bg-surface-1': '#101216',
   '--linear-bg-surface-2': '#161a20',
-  '--linear-app-content-surface': '#0a0c0f',
-  '--linear-app-shell-border': '#171a20',
+  '--app-shell-content-surface': '#0a0c0f',
+  '--app-shell-border': '#171a20',
 };
 
 function rgbStringToHex(value) {

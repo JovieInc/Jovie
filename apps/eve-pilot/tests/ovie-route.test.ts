@@ -53,11 +53,13 @@ describe('Ovie iMessage allowlist', () => {
     expect(admitOvieIMessage(undefined, allowed)).toBe(false);
   });
 
-  it('binds iMessage and Photon to Ovie', () => {
+  it('binds iMessage and Photon to Summer while Telegram stays Ovie', () => {
     const previous = process.env.EVE_IDENTITY;
     delete process.env.EVE_IDENTITY;
-    expect(eveIdentityForChannel('imessage').pack.id).toBe('ovie');
-    expect(eveIdentityForChannel('photon').pack.id).toBe('ovie');
+    expect(eveIdentityForChannel('imessage').pack.id).toBe('summer');
+    expect(eveIdentityForChannel('photon').pack.id).toBe('summer');
+    expect(eveIdentityForChannel('telegram').pack.id).toBe('ovie');
+    expect(eveIdentityForChannel('ovie-summer-shadow').pack.id).toBe('summer');
     if (previous === undefined) delete process.env.EVE_IDENTITY;
     else process.env.EVE_IDENTITY = previous;
   });

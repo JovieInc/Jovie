@@ -242,6 +242,50 @@ export async function listVideosForProfile(
     );
 }
 
+/** Authenticated Library projection: uncapped, one row per video. */
+export async function listVideosForLibraryProjection(input: {
+  readonly creatorProfileId: string;
+}): Promise<PublicVideoListItem[]> {
+  const videos = await db
+    .select()
+    .from(youtubeVideos)
+    .where(eq(youtubeVideos.creatorProfileId, input.creatorProfileId))
+    .orderBy(desc(youtubeVideos.publishedAt));
+  if (videos.length === 0) return [];
+
+  const videoPks = videos.map(video => video.id);
+  const [links, versions] = await Promise.all([
+    db
+      .select()
+      .from(youtubeVideoReleaseLinks)
+      .where(
+        and(
+          inArray(youtubeVideoReleaseLinks.videoId, videoPks),
+          eq(youtubeVideoReleaseLinks.status, 'approved')
+        )
+      ),
+    db
+      .select()
+      .from(youtubeThumbnailVersions)
+      .where(inArray(youtubeThumbnailVersions.videoId, videoPks)),
+  ]);
+
+  const linkByVideo = new Map<string, YoutubeVideoReleaseLink>();
+  for (const link of links) {
+    if (!linkByVideo.has(link.videoId)) {
+      linkByVideo.set(link.videoId, link);
+    }
+  }
+  const thumbnails = pickDisplayThumbnails(versions);
+  return videos.map(video =>
+    toPublicItem(
+      video,
+      linkByVideo.get(video.id) ?? null,
+      thumbnails.get(video.id) ?? null
+    )
+  );
+}
+
 export interface GetVideoMetricsInput {
   readonly creatorProfileId: string;
   /** YouTube video id (as exposed publicly), not the internal row id. */

@@ -9,9 +9,11 @@
 #   FLEET_GATE_DRY_RUN       1 to pass --dry-run (no persisted receipt)
 #   FLEET_GATE_EVALUATE_JSON optional fixture for tests (skips live observe)
 #   FLEET_GATE_CONSUMER      fleet (default) or deployment
-#   EXPECTED_SHA             when set, receipt main.sha must match (deployment)
+#   EXPECTED_SHA             when set, receipt main.sha must match
 #   FLEET_GATE_RECEIPT       output path (default $RUNNER_TEMP/jovie-fleet-gate.json)
 #   GITHUB_OUTPUT            optional Actions output file
+#
+# Job-output `receipt_b64` is a bounded admission projection, not FLEET_GATE_RECEIPT.
 set -euo pipefail
 
 repo_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
@@ -58,6 +60,13 @@ jq -e '
   exit 2
 }
 
+if [[ -n "${EXPECTED_SHA:-}" ]]; then
+  jq -e --arg expected "$EXPECTED_SHA" '.signals.main.sha == $expected' "$receipt" >/dev/null || {
+    echo '::error::Fleet gate main.sha is not the exact expected subject.' >&2
+    exit 2
+  }
+fi
+
 if [[ "$consumer" == "deployment" ]]; then
   jq -e '
     (.deploymentAdmission.allowed | type == "boolean") and
@@ -66,18 +75,28 @@ if [[ "$consumer" == "deployment" ]]; then
     echo '::error::Fleet gate emitted a malformed deployment receipt.' >&2
     exit 2
   }
-  if [[ -n "${EXPECTED_SHA:-}" ]]; then
-    jq -e --arg expected "$EXPECTED_SHA" '.signals.main.sha == $expected' "$receipt" >/dev/null || {
-      echo '::error::Fleet gate main.sha is not the exact expected subject.' >&2
-      exit 2
-    }
-  fi
 fi
 
 if [[ "$gate_rc" -ne 0 && "$gate_rc" -ne 2 ]]; then
   echo "::error::Fleet gate exited unexpectedly: $gate_rc" >&2
   exit 2
 fi
+
+admission="${receipt}.admission.json"
+if ! python3 "$repo_root/scripts/hermes/fleet_admission_receipt.py" <"$receipt" >"$admission"; then
+  echo '::error::Fleet gate admission projection failed.' >&2
+  exit 2
+fi
+jq -e '
+  .schema == "jovie-fleet-gate/v1" and
+  (.signals.closureHealth | has("classifications") | not) and
+  (.signals.closureHealth | has("changedFileEvidence") | not) and
+  (.signals.closureHealth | has("duplicateIssueLanes") | not) and
+  (.workAdmission.allowed | type == "boolean")
+' "$admission" >/dev/null || {
+  echo '::error::Fleet gate emitted a malformed admission projection.' >&2
+  exit 2
+}
 
 work_allowed=false
 new_issue_intake_allowed=false
@@ -114,7 +133,7 @@ else
   work_out=false
 fi
 
-receipt_b64="$(base64 -w0 <"$receipt" 2>/dev/null || base64 <"$receipt" | tr -d '\n')"
+receipt_b64="$(base64 -w0 <"$admission" 2>/dev/null || base64 <"$admission" | tr -d '\n')"
 
 if [[ -n "${GITHUB_OUTPUT:-}" ]]; then
   {

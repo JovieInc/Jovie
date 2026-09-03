@@ -84,6 +84,13 @@ const proConfig: RateLimitConfig = {
   prefix: 'test:pro',
 };
 
+const trialConfig: RateLimitConfig = {
+  name: 'test-trial',
+  limit: 50,
+  window: '1 d',
+  prefix: 'test:trial',
+};
+
 const maxConfig: RateLimitConfig = {
   name: 'test-max',
   limit: 500,
@@ -189,8 +196,8 @@ describe('plan-aware-limiter.ts', () => {
       expect(mockLimit).toHaveBeenCalledWith('user-1');
     });
 
-    it('normalizes trial to pro config (active reverse-trial users get Pro limits)', async () => {
-      mockLimit.mockResolvedValue(makeAllowedResult({ limit: 100 }));
+    it('uses trial config when the caller provides one', async () => {
+      mockLimit.mockResolvedValue(makeAllowedResult({ limit: 50 }));
 
       const { createPlanAwareRateLimiter } = await import(
         '@/lib/rate-limit/plan-aware-limiter'
@@ -199,13 +206,14 @@ describe('plan-aware-limiter.ts', () => {
       const limiter = createPlanAwareRateLimiter({
         configs: {
           free: freeConfig,
+          trial: trialConfig,
           pro: proConfig,
         },
       });
 
       const result = await limiter.limit('user-1', 'trial');
       expect(result.success).toBe(true);
-      expect(limiter.getConfigForPlan('trial')).toEqual(proConfig);
+      expect(limiter.getConfigForPlan('trial')).toEqual(trialConfig);
     });
 
     it('normalizes founding to pro config', async () => {

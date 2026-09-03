@@ -46,7 +46,7 @@ export function LyricsTimeline({
   return (
     <div
       className={cn(
-        'shrink-0 border-t border-(--linear-app-shell-border)/50 bg-(--linear-app-content-surface)/95 backdrop-blur-md px-4 py-3',
+        'shrink-0 border-t border-(--app-shell-border)/50 bg-(--app-shell-content-surface)/95 backdrop-blur-md px-4 py-3',
         className
       )}
     >
@@ -60,7 +60,7 @@ export function LyricsTimeline({
           className='relative flex-1 h-6 rounded-full grid focus:outline-none'
           aria-label='Lyric Timeline'
         >
-          <span className='pointer-events-none absolute inset-x-0 top-1/2 -translate-y-1/2 h-px bg-(--linear-app-shell-border)' />
+          <span className='pointer-events-none absolute inset-x-0 top-1/2 -translate-y-1/2 h-px bg-(--app-shell-border)' />
           <span
             className='pointer-events-none absolute left-0 top-1/2 -translate-y-1/2 h-px bg-cyan-400/80 transition-[width] duration-subtle ease-subtle'
             style={{ width: `${pct}%` }}

@@ -139,6 +139,9 @@ class DeploymentContractTests(unittest.TestCase):
         self.assertIn("install-gem-pr-rehabilitation.sh", workflow)
         self.assertIn("gem-pr-rehabilitation-attestation/v1", workflow)
         self.assertIn(".sourceRevision == $sha", workflow)
+        self.assertIn(".timerEnabled == true", workflow)
+        self.assertIn("systemctl --user is-enabled --quiet gem-pr-drain.timer", workflow)
+        self.assertIn("systemctl --user is-active --quiet gem-pr-drain.timer", workflow)
         self.assertIn("([.artifacts[].matches] | all)", workflow)
 
     def test_verify_only_installer_is_source_clean_and_side_effect_free(self):
@@ -178,6 +181,183 @@ class DeploymentContractTests(unittest.TestCase):
             )
         self.assertEqual(process.returncode, 0, process.stderr)
         self.assertIn("install sources verified", process.stdout)
+
+    def _install_runtime(
+        self,
+        directory: str,
+        *,
+        fail_enable: bool = False,
+        stuck_service: bool = False,
+        prior_enabled: bool = False,
+        prior_active: bool = False,
+    ) -> tuple[subprocess.CompletedProcess[str], pathlib.Path, pathlib.Path, pathlib.Path]:
+        root = pathlib.Path(directory)
+        fixture = root / "repo"
+        home = root / "home"
+        gem = root / "gem"
+        fake_bin = root / "bin"
+        log = root / "systemctl.log"
+        enabled = root / "timer.enabled"
+        active = root / "timer.active"
+        shutil.copytree(HERMES, fixture / "scripts/hermes")
+        (home / ".local/bin").mkdir(parents=True)
+        unit_root = home / ".config/systemd/user"
+        unit_root.mkdir(parents=True)
+        (unit_root / "gem-pr-drain.timer").write_text(
+            "old timer\n", encoding="utf-8"
+        )
+        if prior_enabled:
+            enabled.touch()
+        if prior_active:
+            active.touch()
+        fake_bin.mkdir()
+        git_env = _git_env()
+        subprocess.run(["git", "init", "-q", str(fixture)], check=True, env=git_env)
+        subprocess.run(
+            ["git", "-C", str(fixture), "add", "scripts/hermes"],
+            check=True,
+            env=git_env,
+        )
+        subprocess.run(
+            [
+                "git",
+                "-C",
+                str(fixture),
+                "-c",
+                "user.name=Gem Test",
+                "-c",
+                "user.email=gem-test@example.invalid",
+                "commit",
+                "-qm",
+                "fixture",
+            ],
+            check=True,
+            env=git_env,
+        )
+        systemctl = fake_bin / "systemctl"
+        systemctl.write_text(
+            """#!/bin/sh
+printf '%s\n' "$*" >> "$FAKE_SYSTEMCTL_LOG"
+case "$*" in
+  *"show-environment"*) exit 0 ;;
+  *"is-active --quiet gem-pr-drain.timer"*) test -f "$FAKE_TIMER_ACTIVE"; exit $? ;;
+  *"is-enabled --quiet gem-pr-drain.timer"*) test -f "$FAKE_TIMER_ENABLED"; exit $? ;;
+  *"is-active --quiet gem-pr-drain.service"*)
+    if [ "$FAKE_STUCK_SERVICE" = true ]; then exit 0; else exit 1; fi
+    ;;
+  *"enable --now gem-pr-drain.timer"*)
+    : > "$FAKE_TIMER_ENABLED"
+    : > "$FAKE_TIMER_ACTIVE"
+    if [ "$FAKE_ENABLE_FAILURE" = true ]; then
+      exit 9
+    fi
+    exit 0
+    ;;
+  *"enable gem-pr-drain.timer"*) : > "$FAKE_TIMER_ENABLED"; exit 0 ;;
+  *"disable gem-pr-drain.timer"*) rm -f "$FAKE_TIMER_ENABLED"; exit 0 ;;
+  *"stop gem-pr-drain.timer"*) rm -f "$FAKE_TIMER_ACTIVE"; exit 0 ;;
+  *"start gem-pr-drain.timer"*) : > "$FAKE_TIMER_ACTIVE"; exit 0 ;;
+  *"show gem-pr-drain.service --property=Result --value"*)
+    printf '%s\n' success
+    exit 0
+    ;;
+esac
+exit 0
+""",
+            encoding="utf-8",
+        )
+        systemctl.chmod(0o755)
+        sleep = fake_bin / "sleep"
+        sleep.write_text("#!/bin/sh\nexit 0\n", encoding="utf-8")
+        sleep.chmod(0o755)
+        process = subprocess.run(
+            [
+                "bash",
+                str(fixture / "scripts/hermes/install-gem-pr-rehabilitation.sh"),
+                str(fixture),
+            ],
+            env={
+                "HOME": str(home),
+                "GEM_WORKSPACE": str(gem),
+                "PATH": f"{fake_bin}:/usr/bin:/bin:/usr/sbin:/sbin",
+                "FAKE_SYSTEMCTL_LOG": str(log),
+                "FAKE_TIMER_ENABLED": str(enabled),
+                "FAKE_TIMER_ACTIVE": str(active),
+                "FAKE_ENABLE_FAILURE": "true" if fail_enable else "false",
+                "FAKE_STUCK_SERVICE": "true" if stuck_service else "false",
+            },
+            text=True,
+            capture_output=True,
+            check=False,
+        )
+        return process, log, enabled, active
+
+    def test_installer_enables_and_attests_the_recurring_timer(self):
+        with tempfile.TemporaryDirectory() as directory:
+            process, log, enabled, active = self._install_runtime(directory)
+            self.assertEqual(process.returncode, 0, process.stderr)
+            receipt = json.loads(
+                (
+                    pathlib.Path(directory)
+                    / "gem/state/gem-pr-rehabilitation-attestation.json"
+                ).read_text(encoding="utf-8")
+            )
+            commands = log.read_text(encoding="utf-8").splitlines()
+            enabled_exists = enabled.exists()
+            active_exists = active.exists()
+
+        self.assertTrue(enabled_exists)
+        self.assertTrue(active_exists)
+        self.assertIn("--user enable --now gem-pr-drain.timer", commands)
+        self.assertIn("--user is-enabled --quiet gem-pr-drain.timer", commands)
+        self.assertTrue(receipt["timerEnabled"])
+        self.assertTrue(receipt["timerActive"])
+
+    def test_failed_install_restores_every_prior_timer_state(self):
+        for prior_enabled in (False, True):
+            for prior_active in (False, True):
+                with self.subTest(
+                    prior_enabled=prior_enabled, prior_active=prior_active
+                ), tempfile.TemporaryDirectory() as directory:
+                    process, log, enabled, active = self._install_runtime(
+                        directory,
+                        fail_enable=True,
+                        prior_enabled=prior_enabled,
+                        prior_active=prior_active,
+                    )
+                    commands = log.read_text(encoding="utf-8").splitlines()
+                    enabled_exists = enabled.exists()
+                    active_exists = active.exists()
+
+                self.assertNotEqual(
+                    process.returncode, 0, f"{process.stderr}\n{commands}"
+                )
+                self.assertEqual(enabled_exists, prior_enabled, commands)
+                self.assertEqual(active_exists, prior_active, commands)
+                expected_persistence_command = (
+                    "--user enable gem-pr-drain.timer"
+                    if prior_enabled
+                    else "--user disable gem-pr-drain.timer"
+                )
+                self.assertIn(expected_persistence_command, commands)
+
+    def test_early_stuck_service_failure_restores_prior_active_timer(self):
+        with tempfile.TemporaryDirectory() as directory:
+            process, log, enabled, active = self._install_runtime(
+                directory,
+                stuck_service=True,
+                prior_enabled=False,
+                prior_active=True,
+            )
+            commands = log.read_text(encoding="utf-8").splitlines()
+            enabled_exists = enabled.exists()
+            active_exists = active.exists()
+
+        self.assertEqual(process.returncode, 3, process.stderr)
+        self.assertFalse(enabled_exists, commands)
+        self.assertTrue(active_exists, commands)
+        self.assertIn("--user disable gem-pr-drain.timer", commands)
+        self.assertIn("--user start gem-pr-drain.timer", commands)
 
 
 class FleetControllerInstallerContractTests(unittest.TestCase):
@@ -231,12 +411,13 @@ class FleetControllerInstallerContractTests(unittest.TestCase):
             "consumer": gem / "scripts/gem-pr-drain.py",
             "registry_module": gem / "scripts/gem_repo_registry.py",
             "registry_config": gem / "config/gem-repo-registry.json",
-            "workflow": symphony / "WORKFLOW.jovie-ui-pilot.md",
+            "workflow": symphony / "WORKFLOW.md",
             "attestation": gem / "state/gem-service-attestation.json",
         }
         (gem / "scripts").mkdir(parents=True)
         (gem / "config").mkdir(parents=True)
         symphony.mkdir(parents=True)
+        (home / ".config/symphony").mkdir(parents=True)
         (home / ".config/systemd/user").mkdir(parents=True)
         fake_bin.mkdir()
         paths["gate"].write_text("old gate\n", encoding="utf-8")
@@ -261,17 +442,39 @@ case "$*" in
   *"show-environment"*) exit 0 ;;
   *"is-active --quiet gem-pr-drain.timer"*) exit 1 ;;
   *"is-active --quiet gem-pr-drain.service"*) exit 1 ;;
-  *"restart symphony-ui-pilot.service"*)
-    [ "${FAKE_RESTART_FAILURE:-false}" != true ]
+  *"daemon-reload"*)
+    if { [ -n "${FAKE_WORKFLOW_OVERLAY_VALUE:-}" ] || [ "${FAKE_WORKFLOW_UNRELATED_DRIFT:-false}" = true ]; } &&
+       [ ! -e "$FAKE_WORKFLOW_MUTATION_MARKER" ]; then
+      if [ -n "${FAKE_WORKFLOW_OVERLAY_VALUE:-}" ]; then
+        sed "s/max_concurrent_agents: [0-9][0-9]*$/max_concurrent_agents: ${FAKE_WORKFLOW_OVERLAY_VALUE}/" \
+          "$FAKE_WORKFLOW_OVERLAY_TARGET" > "$FAKE_WORKFLOW_OVERLAY_TARGET.fake"
+        mv "$FAKE_WORKFLOW_OVERLAY_TARGET.fake" "$FAKE_WORKFLOW_OVERLAY_TARGET"
+      fi
+      if [ "${FAKE_WORKFLOW_UNRELATED_DRIFT:-false}" = true ]; then
+        printf '\n# unrelated runtime drift\n' >> "$FAKE_WORKFLOW_OVERLAY_TARGET"
+      fi
+      : > "$FAKE_WORKFLOW_MUTATION_MARKER"
+    fi
+    exit 0
+    ;;
+  *"is-active --quiet symphony-elixir.service"*)
+    [ "${FAKE_RUNTIME_FAILURE:-false}" != true ]
     exit
     ;;
-  *"is-active --quiet symphony-ui-pilot.service"*) exit 0 ;;
+  *"show symphony-elixir.service --property=MainPID"*) printf '3131\n'; exit 0 ;;
+  *"show symphony-elixir.service --property=ControlGroup"*)
+    printf '/user.slice/user-1000.slice/user@1000.service/app.slice/symphony-elixir.service\n'
+    exit 0
+    ;;
 esac
 exit 0
 """,
             encoding="utf-8",
         )
         systemctl.chmod(0o755)
+        sleep = fake_bin / "sleep"
+        sleep.write_text("#!/bin/sh\nexit 0\n", encoding="utf-8")
+        sleep.chmod(0o755)
         curl = fake_bin / "curl"
         curl.write_text(
             "#!/bin/sh\n"
@@ -280,10 +483,28 @@ exit 0
             encoding="utf-8",
         )
         curl.chmod(0o755)
+        ss = fake_bin / "ss"
+        ss.write_text(
+            "#!/bin/sh\n"
+            "[ \"${FAKE_RUNTIME_FAILURE:-false}\" != true ] || exit 1\n"
+            "printf 'LISTEN 0 128 127.0.0.1:4041 0.0.0.0:* users:((\\\"beam.smp\\\",pid=4242,fd=42))\\n'\n",
+            encoding="utf-8",
+        )
+        ss.chmod(0o755)
+        proc_root = root / "proc"
+        for pid in ("3131", "4242"):
+            (proc_root / pid).mkdir(parents=True)
+            (proc_root / pid / "cgroup").write_text(
+                "0::/user.slice/user-1000.slice/user@1000.service/app.slice/symphony-elixir.service\n",
+                encoding="utf-8",
+            )
         env = {
             "HOME": str(home),
             "GEM_WORKSPACE": str(gem),
             "SYMPHONY_RUNTIME": str(symphony),
+            "FAKE_WORKFLOW_MUTATION_MARKER": str(root / "workflow-mutated"),
+            "FAKE_WORKFLOW_OVERLAY_TARGET": str(paths["workflow"]),
+            "GEM_PROC_ROOT": str(proc_root),
             "PATH": f"{fake_bin}:/usr/bin:/bin:/usr/sbin:/sbin",
         }
         return paths, env
@@ -294,12 +515,18 @@ exit 0
         env: dict[str, str],
         *,
         fail_restart: bool = False,
+        workflow_overlay: str = "",
+        unrelated_workflow_drift: bool = False,
     ) -> subprocess.CompletedProcess[str]:
         return subprocess.run(
             ["bash", str(fixture / FLEET_INSTALLER.relative_to(ROOT)), str(fixture)],
             env={
                 **env,
-                "FAKE_RESTART_FAILURE": "true" if fail_restart else "false",
+                "FAKE_RUNTIME_FAILURE": "true" if fail_restart else "false",
+                "FAKE_WORKFLOW_OVERLAY_VALUE": workflow_overlay,
+                "FAKE_WORKFLOW_UNRELATED_DRIFT": (
+                    "true" if unrelated_workflow_drift else "false"
+                ),
             },
             text=True,
             capture_output=True,
@@ -381,8 +608,60 @@ exit 0
             attestation["policy"]["sourceSha256"],
             attestation["policy"]["installedSha256"],
         )
+        self.assertEqual(attestation["workflow"]["matchMode"], "exact")
+        self.assertEqual(attestation["workflow"]["sourceMaxConcurrentAgents"], 8)
+        self.assertEqual(attestation["workflow"]["installedMaxConcurrentAgents"], 8)
+        self.assertEqual(attestation["listener"]["wrapperPid"], 3131)
+        self.assertEqual(attestation["listener"]["pid"], 4242)
 
-    def test_failed_install_removes_a_new_policy_during_atomic_rollback(self):
+    def test_install_attests_controller_owned_bounded_concurrency_overlay(self):
+        with tempfile.TemporaryDirectory() as directory:
+            fixture = self._fixture(directory)
+            paths, env = self._runtime(directory)
+            process = self._install(fixture, env, workflow_overlay="1")
+            installed_workflow = paths["workflow"].read_text(encoding="utf-8")
+            attestation = json.loads(paths["attestation"].read_text(encoding="utf-8"))
+
+        self.assertEqual(process.returncode, 0, process.stderr)
+        self.assertIn("max_concurrent_agents: 1", installed_workflow)
+        self.assertTrue(attestation["workflow"]["matches"])
+        self.assertEqual(
+            attestation["workflow"]["matchMode"], "bounded_concurrency_overlay"
+        )
+        self.assertEqual(attestation["workflow"]["sourceMaxConcurrentAgents"], 8)
+        self.assertEqual(attestation["workflow"]["installedMaxConcurrentAgents"], 1)
+        self.assertNotEqual(
+            attestation["workflow"]["sourceSha256"],
+            attestation["workflow"]["installedSha256"],
+        )
+
+    def test_install_rejects_out_of_bounds_concurrency_overlay(self):
+        with tempfile.TemporaryDirectory() as directory:
+            fixture = self._fixture(directory)
+            paths, env = self._runtime(directory)
+            process = self._install(fixture, env, workflow_overlay="9")
+            restored_workflow = paths["workflow"].read_text(encoding="utf-8")
+            attestation_exists = paths["attestation"].exists()
+
+        self.assertNotEqual(process.returncode, 0)
+        self.assertEqual(restored_workflow, "old workflow\n")
+        self.assertFalse(attestation_exists)
+        self.assertIn("refusing stale Gem service attestation", process.stderr)
+
+    def test_install_rejects_unrelated_workflow_drift(self):
+        with tempfile.TemporaryDirectory() as directory:
+            fixture = self._fixture(directory)
+            paths, env = self._runtime(directory)
+            process = self._install(fixture, env, unrelated_workflow_drift=True)
+            restored_workflow = paths["workflow"].read_text(encoding="utf-8")
+            attestation_exists = paths["attestation"].exists()
+
+        self.assertNotEqual(process.returncode, 0)
+        self.assertEqual(restored_workflow, "old workflow\n")
+        self.assertFalse(attestation_exists)
+        self.assertIn("refusing stale Gem service attestation", process.stderr)
+
+    def test_install_refuses_unhealthy_official_service_before_writes(self):
         with tempfile.TemporaryDirectory() as directory:
             fixture = self._fixture(directory)
             paths, env = self._runtime(directory)
@@ -392,6 +671,7 @@ exit 0
                 for name in ("gate", "closure", "consumer", "workflow", "registry_module", "registry_config")
             }
             policy_exists = paths["policy"].exists()
+            backup_root_exists = (pathlib.Path(directory) / "gem/state/backups").exists()
 
         self.assertNotEqual(process.returncode, 0)
         self.assertEqual(restored["gate"], "old gate\n")
@@ -401,7 +681,8 @@ exit 0
         self.assertIn("FileNotFoundError", restored["registry_module"])
         self.assertEqual(restored["registry_config"], "{}\n")
         self.assertFalse(policy_exists)
-        self.assertIn("fleet controller install rolled back", process.stderr)
+        self.assertFalse(backup_root_exists)
+        self.assertIn("official Symphony service symphony-elixir.service is not active", process.stderr)
 
     def test_fleet_installer_replaces_stale_registry_before_target_smoke(self):
         installer = FLEET_INSTALLER.read_text(encoding="utf-8")

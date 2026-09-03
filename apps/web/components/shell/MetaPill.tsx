@@ -36,7 +36,7 @@ export function MetaPill({
           ? 'text-amber-300/85 hover:border-amber-500/30 hover:bg-amber-500/10'
           : tone === 'cyan'
             ? 'text-cyan-300/85 hover:border-cyan-500/30 hover:bg-cyan-500/10'
-            : 'text-secondary-token hover:border-(--linear-app-shell-border) hover:bg-surface-1/40',
+            : 'text-secondary-token hover:border-(--app-shell-border) hover:bg-surface-1/40',
         className
       )}
     >

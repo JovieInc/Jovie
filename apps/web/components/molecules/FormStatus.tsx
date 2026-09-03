@@ -8,6 +8,30 @@ interface FormStatusProps {
   readonly className?: string;
 }
 
+function getStatusState({
+  loading,
+  error,
+  success,
+}: {
+  readonly loading: boolean;
+  readonly error: string;
+  readonly success: string;
+}) {
+  if (loading) {
+    return 'loading';
+  }
+
+  if (error) {
+    return 'error';
+  }
+
+  if (success) {
+    return 'success';
+  }
+
+  return 'idle';
+}
+
 export function FormStatus({
   loading = false,
   error,
@@ -16,25 +40,35 @@ export function FormStatus({
 }: FormStatusProps) {
   const trimmedError = error?.trim() ?? '';
   const trimmedSuccess = success?.trim() ?? '';
-
-  // Render nothing when there's no loading state and no meaningful messages
-  if (!loading && !trimmedError && !trimmedSuccess) return null;
+  const state = getStatusState({
+    loading,
+    error: trimmedError,
+    success: trimmedSuccess,
+  });
 
   return (
-    <div className={cn('space-y-2', className)}>
+    <div
+      className={cn('min-h-5 space-y-1 text-app', className)}
+      data-slot='form-status'
+      data-state={state}
+      aria-live={trimmedError ? undefined : 'polite'}
+      aria-atomic={trimmedError ? undefined : 'true'}
+    >
       {loading && (
-        <div className='flex items-center space-x-2 text-sm text-tertiary-token'>
+        <div className='flex items-center gap-2 text-app text-tertiary-token'>
           <LoadingSpinner size='sm' tone='muted' />
           <span>Processing...</span>
         </div>
       )}
 
       {trimmedError && (
-        <p className='text-sm text-destructive'>{trimmedError}</p>
+        <p className='font-medium text-error' role='alert'>
+          {trimmedError}
+        </p>
       )}
 
       {trimmedSuccess && (
-        <p className='text-sm text-success'>{trimmedSuccess}</p>
+        <output className='font-medium text-success'>{trimmedSuccess}</output>
       )}
     </div>
   );

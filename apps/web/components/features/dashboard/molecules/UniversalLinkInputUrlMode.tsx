@@ -131,10 +131,10 @@ export function UniversalLinkInputUrlMode({
     <div className='relative w-full'>
       <div
         className={cn(
-          'relative flex w-full items-center gap-2 overflow-hidden bg-(--linear-app-content-surface) px-2 py-1 transition-[border-color,box-shadow]',
+          'relative flex w-full items-center gap-2 overflow-hidden bg-(--app-shell-content-surface) px-2 py-1 transition-[border-color,box-shadow]',
           isDropdownOpen
             ? 'rounded-t-xl border-2 border-b-0 border-accent'
-            : 'rounded-xl border border-(--linear-app-frame-seam) focus-within:border-accent focus-within:ring-2 focus-within:ring-accent/20',
+            : 'rounded-xl border border-(--app-shell-frame-seam) focus-within:border-accent focus-within:ring-2 focus-within:ring-accent/20',
           disabled && 'opacity-50'
         )}
       >
@@ -240,7 +240,7 @@ export function UniversalLinkInputUrlMode({
         )}
         aria-live='polite'
       >
-        <div className='rounded-xl border border-(--linear-app-frame-seam) bg-surface-1 px-3 py-2'>
+        <div className='rounded-xl border border-(--app-shell-frame-seam) bg-surface-1 px-3 py-2'>
           {dictationState === 'listening' ? (
             <div className='flex items-center gap-2'>
               <button
@@ -251,7 +251,7 @@ export function UniversalLinkInputUrlMode({
               >
                 <X className='h-4 w-4' />
               </button>
-              <div className='flex min-w-0 flex-1 items-center justify-between gap-3 rounded-lg border border-(--linear-app-frame-seam) bg-surface-0 px-3 py-2'>
+              <div className='flex min-w-0 flex-1 items-center justify-between gap-3 rounded-lg border border-(--app-shell-frame-seam) bg-surface-0 px-3 py-2'>
                 <div className='flex min-w-0 items-center gap-3'>
                   <VoiceRecordingWaveform levels={waveformLevels} />
                   <span className='truncate text-sm text-secondary-token'>

@@ -20,6 +20,7 @@ import { handleMutationError } from './mutation-utils';
  */
 export interface CheckoutInput {
   priceId: string;
+  source?: 'youtube_thumbnails';
 }
 
 /**
@@ -48,7 +49,7 @@ async function createCheckoutSession(
   return fetchWithTimeout<CheckoutResponse>('/api/stripe/checkout', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ priceId: input.priceId }),
+    body: JSON.stringify({ priceId: input.priceId, source: input.source }),
   });
 }
 

@@ -40,9 +40,9 @@ export function AdminKpiSectionSkeleton() {
         <ContentSectionHeaderSkeleton
           titleWidth='w-20'
           descriptionWidth='w-48'
-          className='min-h-0 px-(--linear-app-header-padding-x) py-3'
+          className='min-h-0 px-(--app-shell-header-padding-x) py-3'
         />
-        <div className='grid gap-3 px-(--linear-app-content-padding-x) py-(--linear-app-content-padding-y) sm:grid-cols-2 xl:grid-cols-3'>
+        <div className='grid gap-3 px-(--app-shell-content-padding-x) py-(--app-shell-content-padding-y) sm:grid-cols-2 xl:grid-cols-3'>
           {CORE_KPI_SKELETON_KEYS.map(metricKey => (
             <ContentMetricCardSkeleton key={metricKey} />
           ))}
@@ -52,9 +52,9 @@ export function AdminKpiSectionSkeleton() {
         <ContentSectionHeaderSkeleton
           titleWidth='w-32'
           descriptionWidth='w-56'
-          className='min-h-0 px-(--linear-app-header-padding-x) py-3'
+          className='min-h-0 px-(--app-shell-header-padding-x) py-3'
         />
-        <div className='grid gap-3 px-(--linear-app-content-padding-x) py-(--linear-app-content-padding-y) sm:grid-cols-2 xl:grid-cols-5'>
+        <div className='grid gap-3 px-(--app-shell-content-padding-x) py-(--app-shell-content-padding-y) sm:grid-cols-2 xl:grid-cols-5'>
           {INSTAGRAM_KPI_SKELETON_KEYS.map(metricKey => (
             <ContentMetricCardSkeleton key={metricKey} />
           ))}
@@ -64,9 +64,9 @@ export function AdminKpiSectionSkeleton() {
         <ContentSectionHeaderSkeleton
           titleWidth='w-20'
           descriptionWidth='w-48'
-          className='min-h-0 px-(--linear-app-header-padding-x) py-3'
+          className='min-h-0 px-(--app-shell-header-padding-x) py-3'
         />
-        <div className='grid gap-3 px-(--linear-app-content-padding-x) py-(--linear-app-content-padding-y) sm:grid-cols-2 xl:grid-cols-4'>
+        <div className='grid gap-3 px-(--app-shell-content-padding-x) py-(--app-shell-content-padding-y) sm:grid-cols-2 xl:grid-cols-4'>
           {YC_KPI_SKELETON_KEYS.map(metricKey => (
             <ContentMetricCardSkeleton key={metricKey} showIcon={false} />
           ))}

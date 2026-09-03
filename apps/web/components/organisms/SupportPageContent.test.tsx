@@ -18,6 +18,10 @@ describe('SupportPageContent', () => {
     expect(
       screen.getByRole('heading', { level: 1, name: "We're Here To Help." })
     ).toBeVisible();
+    expect(screen.getByTestId('support-hero')).toHaveAttribute(
+      'aria-labelledby',
+      'support-hero-heading'
+    );
     const sectionHeadings = Array.from(container.querySelectorAll('section'))
       .map(section => section.querySelector('h1, h2')?.textContent?.trim())
       .filter((heading): heading is string => heading !== undefined);
@@ -109,12 +113,12 @@ describe('SupportPageContent', () => {
       source: 'apps/web/components/organisms/SupportPageContent.tsx',
       sourceExport: 'SupportPageContent',
       storyExport: 'Web040Support',
-      sourceSha: '70cb3b51b852a25213911ffe78cc81c35a73f788',
+      sourceSha: '8b0353fcbeb0cffef614fa47afbbbd8eeae48997',
       proofScope: 'system-b-body-only',
       implementation: 'exact-production-body',
     });
     expect(storySource).toContain(
-      "sourceSha: '70cb3b51b852a25213911ffe78cc81c35a73f788'"
+      "sourceSha: '8b0353fcbeb0cffef614fa47afbbbd8eeae48997'"
     );
     expect(storySource).toContain("proofScope: 'system-b-body-only'");
     expect(storySource).toContain("sourceExport: 'SupportPageContent'");

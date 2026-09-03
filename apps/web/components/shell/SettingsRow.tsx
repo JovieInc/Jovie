@@ -68,7 +68,7 @@ export function SettingsRow({
     <div
       className={cn(
         'flex items-center gap-4 px-4 py-3.5',
-        divider && 'border-t border-(--linear-app-shell-border)/50',
+        divider && 'border-t border-(--app-shell-border)/50',
         className
       )}
     >

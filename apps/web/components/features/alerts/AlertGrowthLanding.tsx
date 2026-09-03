@@ -236,7 +236,7 @@ export function AlertGrowthLanding({
     submitState.kind === 'subscribed';
 
   return (
-    <main className='min-h-dvh bg-(--linear-app-content-surface) text-primary-token'>
+    <main className='min-h-dvh bg-(--app-shell-content-surface) text-primary-token'>
       <div className='mx-auto flex min-h-dvh max-w-108 flex-col px-5 py-6 sm:py-10'>
         <div className='mb-4 flex items-center justify-between gap-3'>
           <Link

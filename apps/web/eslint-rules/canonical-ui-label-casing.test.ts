@@ -63,6 +63,14 @@ ruleTester.run('canonical-ui-label-casing', rule, {
     },
     {
       filename,
+      code: `const issues = [{ label: '0 Tracks' }];`,
+    },
+    {
+      filename,
+      code: `const options = [{ label: 'Low (0-33)' }];`,
+    },
+    {
+      filename,
       code: `toast.success('Member removed');`,
     },
     {
@@ -125,6 +133,11 @@ ruleTester.run('canonical-ui-label-casing', rule, {
     {
       filename,
       code: `const columns = [{ header: 'last action' }];`,
+      errors: [{ messageId: 'useTitleCase' }],
+    },
+    {
+      filename,
+      code: `const issues = [{ label: '0 tracks' }];`,
       errors: [{ messageId: 'useTitleCase' }],
     },
     {

@@ -18,7 +18,14 @@ const contactLoadingColumnHelper = createColumnHelper<ContactsLoadingRow>();
 
 function createLoadingHeader(width: string) {
   function ContactsLoadingHeader() {
-    return <LoadingSkeleton height='h-4' width={width} rounded='md' />;
+    return (
+      <LoadingSkeleton
+        announce={false}
+        height='h-4'
+        width={width}
+        rounded='md'
+      />
+    );
   }
 
   return ContactsLoadingHeader;
@@ -79,24 +86,48 @@ const CONTACTS_MOBILE_ROW_KEYS = Array.from(
 
 export default function ContactsLoading() {
   return (
-    <div className='flex h-full min-h-0 flex-col' aria-busy='true'>
+    <div
+      className='flex h-full min-h-0 flex-col'
+      role='status'
+      aria-busy='true'
+      aria-live='polite'
+      aria-atomic='true'
+      aria-label='Loading Contacts'
+    >
       {/* Mobile: card layout (visible below sm) */}
       <div className='flex-1 min-h-0 overflow-hidden sm:hidden'>
         <div className='divide-y divide-subtle'>
           {CONTACTS_MOBILE_ROW_KEYS.map(key => (
             <div key={key} className='flex items-center gap-3 px-4 py-3'>
               <LoadingSkeleton
+                announce={false}
                 height='h-10'
                 width='w-10'
                 rounded='full'
                 className='shrink-0'
               />
               <div className='flex-1 min-w-0 space-y-1.5'>
-                <LoadingSkeleton height='h-4' width='w-32' rounded='md' />
-                <LoadingSkeleton height='h-3' width='w-24' rounded='sm' />
-                <LoadingSkeleton height='h-3' width='w-40' rounded='sm' />
+                <LoadingSkeleton
+                  announce={false}
+                  height='h-4'
+                  width='w-32'
+                  rounded='md'
+                />
+                <LoadingSkeleton
+                  announce={false}
+                  height='h-3'
+                  width='w-24'
+                  rounded='sm'
+                />
+                <LoadingSkeleton
+                  announce={false}
+                  height='h-3'
+                  width='w-40'
+                  rounded='sm'
+                />
               </div>
               <LoadingSkeleton
+                announce={false}
                 height='h-8'
                 width='w-8'
                 rounded='md'
@@ -121,9 +152,19 @@ export default function ContactsLoading() {
       </div>
 
       {/* Footer matching actual contacts footer */}
-      <div className='shrink-0 flex items-center justify-between border-t border-subtle bg-(--linear-app-content-surface) px-4 py-2'>
-        <LoadingSkeleton height='h-4' width='w-20' rounded='md' />
-        <LoadingSkeleton height='h-8' width='w-28' rounded='lg' />
+      <div className='shrink-0 flex items-center justify-between border-t border-subtle bg-(--app-shell-content-surface) px-4 py-2'>
+        <LoadingSkeleton
+          announce={false}
+          height='h-4'
+          width='w-20'
+          rounded='md'
+        />
+        <LoadingSkeleton
+          announce={false}
+          height='h-8'
+          width='w-28'
+          rounded='lg'
+        />
       </div>
     </div>
   );

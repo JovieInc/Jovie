@@ -186,6 +186,12 @@ function deriveSpotifyImportStatus(result: SpotifyImportResult) {
   return 'failed' as const;
 }
 
+function getE2EFastSpotifyImportOptions() {
+  return isE2EFastOnboardingEnabled()
+    ? { maxReleases: 1, maxTracksPerRelease: 6 }
+    : {};
+}
+
 async function requireProfile(): Promise<{
   id: string;
   spotifyId: string | null;
@@ -988,7 +994,12 @@ export async function syncFromSpotify(): Promise<{
     };
   }
 
-  const result: SpotifyImportResult = await syncReleasesFromSpotify(profile.id);
+  const result: SpotifyImportResult = await syncReleasesFromSpotify(
+    profile.id,
+    {
+      ...getE2EFastSpotifyImportOptions(),
+    }
+  );
 
   // Invalidate cache and revalidate path
   revalidateTag(`releases:${userId}:${profile.id}`, 'max');
@@ -1483,6 +1494,7 @@ export async function connectSpotifyArtist(params: {
   const runSpotifyImport = async (): Promise<SpotifyImportResult> => {
     return syncReleasesFromSpotify(profile.id, {
       includeTracks: params.includeTracks ?? true,
+      ...getE2EFastSpotifyImportOptions(),
     });
   };
 

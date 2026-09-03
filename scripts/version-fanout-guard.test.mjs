@@ -135,6 +135,8 @@ test('rejects every feature branch CHANGELOG edit', () => {
   });
 
   assert.equal(result.passed, false);
+  assert.match(result.violations[0], /CHANGELOG\.md/);
+  assert.match(result.violations[0], /must not add or edit/);
   assert.match(result.violations[0], /pre-land changelog artifacts/);
 });
 

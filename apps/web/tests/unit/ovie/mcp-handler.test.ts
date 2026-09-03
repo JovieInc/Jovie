@@ -1,5 +1,10 @@
 import { describe, expect, it, vi } from 'vitest';
 
+const workflowCaptureMocks = vi.hoisted(() => ({
+  create: vi.fn(),
+  get: vi.fn(),
+}));
+
 vi.mock('@/lib/wiki/gbrain-client', () => ({
   searchPages: vi.fn(async (query: string) => [
     { slug: 'ovie-mcp', title: `hit:${query}`, score: 0.9 },
@@ -11,15 +16,27 @@ vi.mock('@/lib/wiki/gbrain-client', () => ({
   ),
 }));
 
+vi.mock('@/lib/workflow-capture/server', () => ({
+  createWorkflowCaptureRequest: workflowCaptureMocks.create,
+  getWorkflowCaptureReceipt: workflowCaptureMocks.get,
+}));
+
 import {
   bindEveIdentityForTurn,
   eveIdentityForMcpDoor,
 } from '@/lib/ovie/identity';
+import {
+  DEST_KANBAN,
+  DEST_LINEAR,
+  OVIE_LINEAR_QUEUED_ACK,
+  OVIE_QUEUED_ACK,
+} from '@/lib/ovie/ingest';
 import { handleOvieMcpRequest } from '@/lib/ovie/mcp/handler';
 import {
   getOvieOAuthIssuer,
   isAllowedRedirect,
   isOvieOAuthFounder,
+  OVIE_OAUTH_SCOPES,
   ovieFounderLoginLocation,
   pkceS256,
 } from '@/lib/ovie/mcp/oauth';
@@ -30,7 +47,7 @@ import {
   memoryRecordBackend,
   type RecordBackend,
 } from '@/lib/ovie/mcp/store';
-import { OVIE_MCP_TOOLS } from '@/lib/ovie/mcp/types';
+import { OVIE_MCP_TOOLS, type OvieInitiative } from '@/lib/ovie/mcp/types';
 
 const founder = {
   authenticated: true,
@@ -51,6 +68,47 @@ function rpc(method: string, params?: unknown, id: string | number = 'req-1') {
 function toolResult<T>(body: unknown): T {
   return (body as { result: { structuredContent: T } }).result
     .structuredContent;
+}
+
+function legacyEngineeringInitiative(id: string): OvieInitiative {
+  const now = new Date().toISOString();
+  return {
+    id,
+    kind: 'initiative',
+    status: 'proposed',
+    confidence: 'medium',
+    handoff: {
+      title: 'Legacy signup bug',
+      intent: 'Fix a production signup bug',
+      priority: 'engineering',
+    },
+    lane: 'engineering',
+    destination: DEST_KANBAN,
+    receipts: [
+      {
+        text: 'legacy signup bug',
+        lane: 'engineering',
+        destination: DEST_KANBAN,
+        ack: OVIE_QUEUED_ACK,
+        destinationHandle: null,
+        workerSpawned: false,
+        workId: id,
+        idempotencyKey: `ovie-dump:v1:${id}`,
+      },
+    ],
+    workerSpawned: false,
+    destinationHandle: null,
+    idempotencyKey: `ovie-dump:v1:${id}`,
+    createdAt: now,
+    updatedAt: now,
+    evidence: [
+      {
+        kind: 'receipt',
+        summary: OVIE_QUEUED_ACK,
+        ref: DEST_KANBAN,
+      },
+    ],
+  };
 }
 
 describe('Ovie MCP handler', () => {
@@ -131,6 +189,7 @@ describe('Ovie MCP handler', () => {
     expect(created.status).toBe(200);
     const createdBody = toolResult<{
       id: string;
+      confidence: string;
       workerSpawned: boolean;
       destinationHandle: string | null;
       ack: string;
@@ -145,10 +204,15 @@ describe('Ovie MCP handler', () => {
       };
     }>(created.body);
     expect((created.body as { id: string }).id).toBe('c1');
+    expect(createdBody.confidence).toBe('medium');
     expect(createdBody.workerSpawned).toBe(false);
     expect(createdBody.destinationHandle).toBeNull();
-    expect(createdBody.ack).toBe('stored and queued for Summer lander');
-    expect(createdBody.queuedFor).toBe('summer-lander');
+    expect(createdBody.ack).toBe('stored and queued for Summer Linear intake');
+    expect(createdBody.queuedFor).toBe('summer-linear-intake');
+    expect(createdBody.receipts[0]?.destination).toBe('linear');
+    expect(createdBody.evidence[0]?.summary).toBe(
+      'stored and queued for Summer Linear intake'
+    );
     expect(createdBody.id).toMatch(/^ini_[A-Za-z0-9_-]{8,24}$/);
     expect(createdBody.id.includes('.')).toBe(false);
     expect(createdBody.id.length).toBeLessThan(48);
@@ -205,6 +269,44 @@ describe('Ovie MCP handler', () => {
     expect(isolated.body).toMatchObject({
       error: { message: `unknown initiative ${createdBody.id}` },
     });
+  });
+
+  it('normalizes legacy engineering records during direct initiative reads', async () => {
+    const store = new MemoryOperatingStore();
+    await store.putInitiative(legacyEngineeringInitiative('ini_legacy_mcp'));
+
+    const fetched = await handleOvieMcpRequest({
+      store,
+      principal: founder,
+      body: rpc(
+        'tools/call',
+        { name: 'get_initiative', arguments: { id: 'ini_legacy_mcp' } },
+        'g-legacy'
+      ),
+    });
+
+    expect(fetched.status).toBe(200);
+    const fetchedBody = toolResult<{
+      destination: string;
+      status: string;
+      ack: string;
+      queuedFor?: string;
+      receipts: Array<{ destination: string; ack: string }>;
+      evidence: Array<{ ref?: string; summary: string }>;
+    }>(fetched.body);
+    expect(fetchedBody.destination).toBe(DEST_LINEAR);
+    expect(fetchedBody.status).toBe('proposed');
+    expect(fetchedBody.ack).toBe(OVIE_LINEAR_QUEUED_ACK);
+    expect(fetchedBody.queuedFor).toBe('summer-linear-intake');
+    expect(fetchedBody.receipts[0]?.destination).toBe(DEST_LINEAR);
+    expect(fetchedBody.evidence[0]).toMatchObject({
+      ref: DEST_LINEAR,
+      summary: OVIE_LINEAR_QUEUED_ACK,
+    });
+
+    const stored = await store.getInitiative('ini_legacy_mcp');
+    expect(stored?.status).toBe('proposed');
+    expect(stored?.destination).toBe(DEST_LINEAR);
   });
 
   it('returns evidence after Redis quota by reading a second fallback store', async () => {
@@ -329,6 +431,155 @@ describe('Ovie MCP handler', () => {
     expect(initiative.decisionId).toBe(decision.id);
   });
 
+  it('persists initiative confidence and rejects unknown values', async () => {
+    const store = new MemoryOperatingStore();
+    const created = toolResult<{
+      confidence: string;
+      workerSpawned: boolean;
+    }>(
+      (
+        await handleOvieMcpRequest({
+          store,
+          principal: founder,
+          body: rpc('tools/call', {
+            name: 'create_initiative',
+            arguments: {
+              title: 'Certify public artist profiles',
+              intent: 'Launch-ready /tim',
+              confidence: 'high',
+              open_questions: ['What is the discography truth set?'],
+            },
+          }),
+        })
+      ).body
+    );
+    expect(created.confidence).toBe('high');
+    expect(created.workerSpawned).toBe(false);
+
+    const state = toolResult<{
+      active_initiatives: Array<{ confidence: string }>;
+      session_handoff: { open_questions: string[] };
+    }>(
+      (
+        await handleOvieMcpRequest({
+          store,
+          principal: founder,
+          body: rpc('tools/call', {
+            name: 'get_org_state',
+            arguments: { query: 'session handoff' },
+          }),
+        })
+      ).body
+    );
+    expect(state.active_initiatives[0]?.confidence).toBe('high');
+    expect(state.session_handoff.open_questions).toContain(
+      'What is the discography truth set?'
+    );
+
+    const rejected = await handleOvieMcpRequest({
+      store,
+      principal: founder,
+      body: rpc('tools/call', {
+        name: 'create_initiative',
+        arguments: {
+          title: 'Bad confidence',
+          intent: 'Should fail',
+          confidence: 'pretty-sure',
+        },
+      }),
+    });
+    expect(rejected.status).toBe(200);
+    expect(rejected.body).toMatchObject({
+      error: { message: 'confidence must be high, medium, or low' },
+    });
+  });
+
+  it('puts a recording request in the founder Inbox and returns it to the requesting task', async () => {
+    const principal = {
+      ...founder,
+      subject: 'c67f31fc-4b61-43de-b690-b9d8045de8e0',
+    };
+    workflowCaptureMocks.create.mockResolvedValue({
+      schemaVersion: 1,
+      captureId: 'capture-123',
+      requestingTaskId: 'task-youtube-playback',
+      state: 'pending',
+      expiresAt: '2026-09-04T18:00:00.000Z',
+      sha256: null,
+      byteSize: null,
+      durationMs: null,
+      uploadedAt: null,
+      readyAt: null,
+      revokedAt: null,
+    });
+
+    const created = await handleOvieMcpRequest({
+      principal,
+      body: rpc('tools/call', {
+        name: 'request_workflow_capture',
+        arguments: {
+          requesting_task_id: 'task-youtube-playback',
+          request_key: 'studio-native-experiment-v1',
+          title: 'Record a YouTube Studio thumbnail experiment',
+          instructions: 'Open one eligible video and start the native test.',
+          start_url: 'https://studio.youtube.com/',
+        },
+      }),
+    });
+
+    expect(created.status).toBe(200);
+    expect(workflowCaptureMocks.create).toHaveBeenCalledWith({
+      userId: principal.subject,
+      request: expect.objectContaining({
+        requestingTaskId: 'task-youtube-playback',
+        requestedBy: 'jovie_agent',
+      }),
+    });
+    expect(
+      toolResult<{
+        requestingTaskId: string;
+        delivery: string;
+        recordButton: boolean;
+        pollWith: string;
+      }>(created.body)
+    ).toMatchObject({
+      requestingTaskId: 'task-youtube-playback',
+      delivery: 'ovie_inbox',
+      recordButton: true,
+      pollWith: 'get_workflow_capture',
+    });
+
+    workflowCaptureMocks.get.mockResolvedValue({
+      schemaVersion: 1,
+      captureId: 'capture-123',
+      requestingTaskId: 'task-youtube-playback',
+      state: 'ready',
+      expiresAt: '2026-09-04T18:00:00.000Z',
+      sha256: 'a'.repeat(64),
+      byteSize: 1200,
+      durationMs: 6000,
+      uploadedAt: '2026-08-28T18:00:00.000Z',
+      readyAt: '2026-08-28T18:01:00.000Z',
+      revokedAt: null,
+    });
+    const fetched = await handleOvieMcpRequest({
+      principal,
+      body: rpc('tools/call', {
+        name: 'get_workflow_capture',
+        arguments: { capture_id: 'capture-123' },
+      }),
+    });
+    expect(
+      toolResult<{ state: string; mediaPath: string; recordButton: boolean }>(
+        fetched.body
+      )
+    ).toMatchObject({
+      state: 'ready',
+      mediaPath: '/api/workflow-captures/capture-123/media',
+      recordButton: false,
+    });
+  });
+
   it('lets authenticated non-founders read org state', async () => {
     const result = await handleOvieMcpRequest({
       principal: user,
@@ -338,7 +589,42 @@ describe('Ovie MCP handler', () => {
       }),
     });
     expect(result.status).toBe(200);
-    expect(toolResult<{ identity: string }>(result.body).identity).toBe('ovie');
+    const body = toolResult<{
+      identity: string;
+      uncertified_launch_critical: Array<{ id: string }>;
+      session_handoff: { decisions: string[]; initiatives: unknown[] };
+    }>(result.body);
+    expect(body.identity).toBe('ovie');
+    expect(body.uncertified_launch_critical.length).toBeGreaterThan(0);
+    expect(body.session_handoff).toMatchObject({
+      decisions: expect.any(Array),
+      initiatives: expect.any(Array),
+    });
+  });
+
+  it('returns a four-pass certification spec without executing money paths', async () => {
+    const result = await handleOvieMcpRequest({
+      principal: founder,
+      body: rpc('tools/call', {
+        name: 'certify_feature',
+        arguments: { feature: 'auto-sync-from-spotify' },
+      }),
+    });
+    const body = toolResult<{
+      executed_live_mission: boolean;
+      money_path_executed: boolean;
+      spec: string;
+      passes: Array<{ n: number; name: string }>;
+    }>(result.body);
+    expect(body.executed_live_mission).toBe(false);
+    expect(body.money_path_executed).toBe(false);
+    expect(body.spec).toMatch(/canonical artist identity/i);
+    expect(body.passes.map(pass => pass.name)).toEqual([
+      'author',
+      'adversary',
+      'execute',
+      'backfill',
+    ]);
   });
 
   it('projects invariant exceptions to Ovie for the founder without dumping healthy detail', async () => {
@@ -416,6 +702,8 @@ describe('Ovie MCP OAuth', () => {
     const claims = exchanger.verifyAccessToken(token.access_token);
     expect(claims?.isAdmin).toBe(true);
     expect(claims?.email).toBe('tim@meetjovie.com');
+    expect(claims?.scopes).toEqual([...OVIE_OAUTH_SCOPES]);
+    expect(token.scope).toBe(OVIE_OAUTH_SCOPES.join(' '));
     expect(isAllowedRedirect('https://evil.example/cb')).toBe(false);
   });
 

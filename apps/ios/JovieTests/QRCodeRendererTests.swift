@@ -112,6 +112,8 @@ struct PublicProfileURLPolicyTests {
     let url = URL(string: "https://jov.ie/tim")!
     let model = PublicProfileBrowserModel(initialURL: url, policy: policy)
     #expect(model.webView.configuration.websiteDataStore.isPersistent == false)
+    #expect(model.webView.configuration.allowsInlineMediaPlayback)
+    #expect(model.webView.configuration.mediaTypesRequiringUserActionForPlayback.isEmpty)
   }
 }
 

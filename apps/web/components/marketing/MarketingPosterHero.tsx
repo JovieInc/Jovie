@@ -3,6 +3,7 @@ import { Button } from '@jovie/ui/atoms/button';
 import Link from 'next/link';
 import type { ElementType, ReactNode } from 'react';
 import { MarketingCtaPendingLabel } from './MarketingCtaPendingLabel';
+import { MarketingHero } from './MarketingHero';
 
 export interface MarketingPosterHeroCta {
   readonly label: ReactNode;
@@ -51,19 +52,29 @@ export function MarketingPosterHero({
       : {};
 
   return (
-    <section
+    <MarketingHero
+      variant='unstyled'
       className='homepage-poster-hero'
-      aria-labelledby={headingId}
-      data-testid='homepage-hero-shell'
+      headingId={headingId}
+      testId='homepage-hero-shell'
     >
       <div className='homepage-poster-hero__copy'>
-        <h1 id={headingId} className='homepage-poster-hero__headline'>
+        <h1
+          id={headingId}
+          className='homepage-poster-hero__headline marketing-h1-max-two-lines'
+        >
           {headline}
         </h1>
         <p className='homepage-poster-hero__subtitle'>{subtitle}</p>
         {lede ? <p className='homepage-poster-hero__lede'>{lede}</p> : null}
         <div className='homepage-poster-hero__actions'>
-          <Button asChild static size='md' variant='primary'>
+          <Button
+            asChild
+            static
+            size='marketing'
+            variant='primary'
+            className='homepage-poster-hero__action-button text-sm'
+          >
             <LinkComponent
               href={primaryCta.href}
               prefetch={primaryCta.prefetch}
@@ -77,7 +88,13 @@ export function MarketingPosterHero({
             </LinkComponent>
           </Button>
           {secondaryCta ? (
-            <Button asChild static size='md' variant='ghost'>
+            <Button
+              asChild
+              static
+              size='marketing'
+              variant='ghost'
+              className='homepage-poster-hero__action-button text-sm'
+            >
               <LinkComponent
                 href={secondaryCta.href}
                 prefetch={secondaryCta.prefetch}
@@ -102,6 +119,6 @@ export function MarketingPosterHero({
       >
         {media}
       </div>
-    </section>
+    </MarketingHero>
   );
 }

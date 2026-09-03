@@ -18,6 +18,14 @@ export const ActiveOverflow: Story = {
   args: { 'aria-label': 'More actions', hasActiveOverflow: true },
 };
 
+export const MenuOpen: Story = {
+  args: {
+    'aria-label': 'More actions',
+    'data-state': 'open',
+    hasActiveOverflow: true,
+  },
+};
+
 export const Disabled: Story = {
   args: { 'aria-label': 'More actions', disabled: true },
 };

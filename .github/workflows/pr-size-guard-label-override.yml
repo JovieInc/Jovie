@@ -51,8 +51,25 @@ jobs:
           fetch-depth: 1
           persist-credentials: false
 
+      - name: Verify label sender provenance
+        id: provenance
+        if: >-
+          github.event.pull_request.user.login != 'dependabot[bot]' &&
+          github.event.pull_request.head.ref != 'screenshots/auto-update' &&
+          (
+            github.event.label.name == 'big-pr' ||
+            github.event.label.name == 'codemod' ||
+            github.event.label.name == 'integration-train'
+          )
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GITHUB_REPOSITORY: ${{ github.repository }}
+          ACTOR: ${{ github.event.sender.login }}
+        run: node scripts/lib/pr-size-guard-label-provenance.mjs
+
       - name: Recompute and validate bounded integration train
         if: >-
+          steps.provenance.outputs.allowed == 'true' &&
           github.event.pull_request.user.login != 'dependabot[bot]' &&
           github.event.pull_request.head.ref != 'screenshots/auto-update' &&
           github.event.label.name == 'integration-train'
@@ -91,6 +108,7 @@ jobs:
 
       - name: Post passing PR Size Guard check
         if: >-
+          steps.provenance.outputs.allowed == 'true' &&
           github.event.pull_request.user.login != 'dependabot[bot]' &&
           github.event.pull_request.head.ref != 'screenshots/auto-update' &&
           (

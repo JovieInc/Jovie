@@ -3,7 +3,8 @@ import { pathToFileURL } from 'node:url';
 
 export const CACHE_COUNT_SOFT_LIMIT = 400;
 export const CACHE_BYTES_SOFT_LIMIT = 8 * 1024 * 1024 * 1024;
-export const PROTECTED_KEY = /pnpm|node-cache|playwright|setup-node/i;
+export const PROTECTED_KEY =
+  /pnpm|node-cache|playwright|setup-node|swiftpm|pip|electron-downloads/i;
 export const PROTECTED_MAX_AGE_MS = 14 * 24 * 60 * 60 * 1000;
 export const TURBO_KEEP_UNDER_BUDGET = 2;
 export const TURBO_KEEP_OVER_BUDGET = 1;
@@ -46,6 +47,11 @@ function evictRecord(cache, reason) {
     reason,
     size_in_bytes: cache.size_in_bytes ?? 0,
   };
+}
+
+function cacheSizeBytes(cache) {
+  const size = Number(cache?.size_in_bytes ?? 0);
+  return Number.isFinite(size) && size > 0 ? size : 0;
 }
 
 /** @param {Record<string, any>} [input] */
@@ -125,7 +131,7 @@ export function planCacheGc(input = {}) {
     }
   }
 
-  const keep = [];
+  let keep = [];
   for (const cache of afterTurbo) {
     const stale = nowMs - accessedAtMs(cache) > PROTECTED_MAX_AGE_MS;
     if (overBudget && isProtectedCacheKey(cache.key) && stale) {
@@ -135,14 +141,61 @@ export function planCacheGc(input = {}) {
     keep.push(cache);
   }
 
+  let keepBytes = keep.reduce(
+    (total, cache) => total + cacheSizeBytes(cache),
+    0
+  );
+  if (overBudget && keepBytes > CACHE_BYTES_SOFT_LIMIT) {
+    const budgetEvictions = new Set();
+    const leastRecentlyUsed = [...keep].sort(
+      (left, right) =>
+        accessedAtMs(left) - accessedAtMs(right) ||
+        cacheSizeBytes(right) - cacheSizeBytes(left)
+    );
+    for (const cache of leastRecentlyUsed) {
+      if (keepBytes <= CACHE_BYTES_SOFT_LIMIT) break;
+      budgetEvictions.add(cache.id);
+      keepBytes -= cacheSizeBytes(cache);
+      evict.push(evictRecord(cache, 'budget_lru'));
+    }
+    keep = keep.filter(cache => !budgetEvictions.has(cache.id));
+  }
+
   return {
     evict,
     keep,
+    keepBytes,
     overBudget,
     turboKeep,
     protectedRetained: keep.filter(cache => isProtectedCacheKey(cache.key))
       .length,
   };
+}
+
+export function parseGhJsonOutput(stdout) {
+  const trimmed = String(stdout ?? '').trim();
+  if (!trimmed) return null;
+  try {
+    return JSON.parse(trimmed);
+  } catch {
+    const lines = trimmed
+      .split('\n')
+      .map(line => line.trim())
+      .filter(Boolean);
+    return lines.flatMap(line => {
+      const parsed = JSON.parse(line);
+      return Array.isArray(parsed) ? parsed : [parsed];
+    });
+  }
+}
+
+export function flattenGhPages(parsed, key) {
+  const pages = Array.isArray(parsed) ? parsed : parsed == null ? [] : [parsed];
+  return pages.flatMap(page => {
+    if (Array.isArray(page)) return page;
+    if (key && Array.isArray(page?.[key])) return page[key];
+    return page && typeof page === 'object' ? [page] : [];
+  });
 }
 
 /** @param {Record<string, any>} [input] */
@@ -152,28 +205,31 @@ export async function collectCacheGcSnapshot(input = {}) {
   if (typeof execJson !== 'function') {
     throw new Error('execJson is required');
   }
-  const cachesRaw = await execJson([
+  const cachePages = await execJson([
     'api',
     '--paginate',
+    '--slurp',
     `repos/${repository}/actions/caches`,
-    '--jq',
-    '[.actions_caches[]]',
   ]);
   const usage = await execJson([
     'api',
     `repos/${repository}/actions/cache/usage`,
   ]);
-  const pulls = await execJson([
+  const pullPages = await execJson([
     'api',
     '--paginate',
+    '--slurp',
     `repos/${repository}/pulls?state=open&per_page=100`,
-    '--jq',
-    '[.[] | {number, headRef: .head.ref}]',
   ]);
   return {
-    caches: Array.isArray(cachesRaw) ? cachesRaw.flat() : [],
+    caches: flattenGhPages(cachePages, 'actions_caches'),
     usage: usage ?? {},
-    openRefs: buildOpenCacheRefs({ pullRequests: pulls ?? [] }),
+    openRefs: buildOpenCacheRefs({
+      pullRequests: flattenGhPages(pullPages).map(pull => ({
+        number: pull?.number,
+        headRef: pull?.head?.ref ?? pull?.headRef,
+      })),
+    }),
   };
 }
 
@@ -191,7 +247,7 @@ async function main() {
         maxBuffer: 20 * 1024 * 1024,
         env: process.env,
       });
-      return JSON.parse(stdout || 'null');
+      return parseGhJsonOutput(stdout);
     },
   });
   const plan = planCacheGc({
@@ -220,6 +276,7 @@ async function main() {
     cacheCount: snapshot.caches.length,
     evictCount: plan.evict.length,
     keepCount: plan.keep.length,
+    keepBytes: plan.keepBytes,
     overBudget: plan.overBudget,
     turboKeep: plan.turboKeep,
     protectedRetained: plan.protectedRetained,

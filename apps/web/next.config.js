@@ -161,6 +161,15 @@ const nextConfig = {
       });
     }
 
+    // Vercel preview deployments back staging.jov.ie. Keep every preview
+    // response non-indexable even when route metadata is production-shaped.
+    if (isVercelPreview) {
+      securityHeaders.push({
+        key: 'X-Robots-Tag',
+        value: 'noindex, nofollow, noarchive, nosnippet',
+      });
+    }
+
     securityHeaders.push({
       key: 'Permissions-Policy',
       value: 'camera=(), microphone=(), geolocation=(self)',
@@ -212,10 +221,23 @@ const nextConfig = {
         source: '/api/health/:path*',
         headers: healthNoStoreHeaders,
       },
-      // Marketing pages (pre-rendered at build) - long-lived cache
+      // Homepage is content-negotiated (HTML vs Markdown). Do not mark it
+      // immutable: a year-long HTML object cannot safely mix with Accept.
       {
         source: '/',
-        headers: [...securityHeaders, cacheHeaders.immutable],
+        headers: [
+          ...securityHeaders,
+          cacheHeaders.revalidate,
+          {
+            key: 'Vary',
+            value:
+              'Accept, rsc, next-router-state-tree, next-router-prefetch, next-router-segment-prefetch',
+          },
+          {
+            key: 'Link',
+            value: '</>; rel="alternate"; type="text/markdown"',
+          },
+        ],
       },
       {
         source: '/(pricing|support|investors|engagement-engine|blog|changelog)',
@@ -244,6 +266,25 @@ const nextConfig = {
       {
         source: '/(.*)',
         headers: [...securityHeaders, cacheHeaders.revalidate],
+      },
+      // Homepage content-negotiation: later rules win. Keep Accept on Vary
+      // together with Next's RSC tokens so a prerendered HTML object cannot
+      // be reused for Accept: text/markdown at the CDN. Link survives even
+      // when Next overwrites Vary with RSC-only tokens on the HTML shell.
+      {
+        source: '/',
+        headers: [
+          cacheHeaders.revalidate,
+          {
+            key: 'Vary',
+            value:
+              'Accept, rsc, next-router-state-tree, next-router-prefetch, next-router-segment-prefetch',
+          },
+          {
+            key: 'Link',
+            value: '</>; rel="alternate"; type="text/markdown"',
+          },
+        ],
       },
       // Canonical pitch-deck static HTML (apps/web/public/pitch/**) is
       // embedded as a same-origin iframe from the /pitch wrapper page.
@@ -540,7 +581,9 @@ const nextConfig = {
   // See JOV-2322.
   serverExternalPackages: ['@statsig/statsig-node-core'],
   experimental: {
-    cpus: process.env.GITHUB_ACTIONS === 'true' ? 2 : undefined,
+    // GitHub-hosted ubuntu-latest/24.04 runners are 4 vCPU / 16 GB RAM — cap
+    // at 4 (was 2, which halved build parallelism; revert to 2 if OOM recurs).
+    cpus: process.env.GITHUB_ACTIONS === 'true' ? 4 : undefined,
     // Note: PPR (ppr: 'incremental') was deprecated in Next.js 15.3
     // cacheComponents: true requires additional configuration, disabled for now
     // Turbopack filesystem cache for faster dev server startup
@@ -629,6 +672,7 @@ function exposeBaseStaticConfigForTooling(config) {
 
   return Object.assign(config, {
     experimental: nextConfig.experimental,
+    headers: nextConfig.headers,
     images: nextConfig.images,
     redirects: nextConfig.redirects,
     rewrites: nextConfig.rewrites,

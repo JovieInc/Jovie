@@ -1,15 +1,29 @@
 import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
 
+import { validateControllerHopChanges } from './controller-hop-contract.mjs';
 import {
   readInvariantRegistry,
   validateInvariantRegistry,
 } from './registry.mjs';
 
 const canonical = readInvariantRegistry();
+const workflowPath = '.github/workflows/new-controller.yml';
+const controllerWorkflow =
+  'name: New Controller\non:\n  workflow_run:\njobs:\n  mutate:\n    permissions:\n      pull-requests: write\n    steps:\n      - run: gh pr ready "$PR_NUMBER"\n';
+const exceptionWorkflow = `# controller-hop-exception: jovie-controller-hop/v1\n# accountable-writer: Gem\n# necessary-trust-boundary: Hosted GitHub App token owns native PR mutation while runner code stays read-only.\n# removal-trigger: Remove when writer runner can request native PR intent directly.\n${controllerWorkflow}`;
+const passiveWorkflow =
+  'name: Existing Workflow\non:\n  pull_request:\njobs:\n  check:\n    steps:\n      - run: echo ok\n';
+const modifiedWorkflow = `${passiveWorkflow}\n  mutate:\n    permissions:\n      pull-requests: write\n    steps:\n      - run: gh pr ready "$PR_NUMBER"\n`;
 
 function clone() {
   return structuredClone(canonical);
+}
+
+function getInvariant(registry, id) {
+  const invariant = registry.invariants.find(item => item.id === id);
+  assert.ok(invariant, `missing ${id}`);
+  return invariant;
 }
 
 describe('canonical invariant registry', () => {
@@ -39,9 +53,10 @@ describe('canonical invariant registry', () => {
 
   it('rejects a second executable registry declaration', () => {
     const candidate = clone();
-    candidate.invariants[0].policy.value = 'docs/another-registry.jsonl';
+    const registryAuthority = getInvariant(candidate, 'JOV-INV-001');
+    registryAuthority.policy.value = 'docs/another-registry.jsonl';
     candidate.invariants.push({
-      ...structuredClone(candidate.invariants[0]),
+      ...structuredClone(registryAuthority),
       id: 'JOV-INV-999',
       policy: {
         key: 'invariants.registry.path',
@@ -65,8 +80,9 @@ describe('canonical invariant registry', () => {
 
   it('rejects contradictory overlapping active invariants', () => {
     const candidate = clone();
+    const fleetAuthority = getInvariant(candidate, 'JOV-INV-008');
     candidate.invariants.push({
-      ...structuredClone(candidate.invariants[7]),
+      ...structuredClone(fleetAuthority),
       id: 'JOV-INV-998',
       effective: { date: '2026-08-23', version: 2 },
       policy: {
@@ -81,7 +97,7 @@ describe('canonical invariant registry', () => {
 
   it('accepts explicit reciprocal supersession', () => {
     const candidate = clone();
-    const older = candidate.invariants[7];
+    const older = getInvariant(candidate, 'JOV-INV-008');
     older.lifecycle = {
       state: 'superseded',
       supersedes: [],
@@ -109,10 +125,61 @@ describe('canonical invariant registry', () => {
 
   it('rejects an adopted orphan without a bound consumer', () => {
     const candidate = clone();
-    candidate.invariants[3].enforcementConsumers = [];
+    getInvariant(candidate, 'JOV-INV-004').enforcementConsumers = [];
     assert.match(
       validateInvariantRegistry(candidate).errors.join('\n'),
       /adopted invariant has no production consumer/
+    );
+  });
+
+  it('rejects a contradictory design invariant projection', () => {
+    const candidate = clone();
+    const designAuthority = getInvariant(candidate, 'JOV-INV-019');
+    candidate.invariants.push({
+      ...structuredClone(designAuthority),
+      id: 'JOV-INV-997',
+      effective: { date: '2026-08-29', version: 2 },
+      policy: {
+        key: 'design.agent-contract.invariants',
+        value: {
+          ...structuredClone(designAuthority.policy.value),
+          invariants: designAuthority.policy.value.invariants.slice(1),
+        },
+      },
+    });
+    assert.match(
+      validateInvariantRegistry(candidate, {
+        verifyBindings: false,
+      }).errors.join('\n'),
+      /contradictory design\.agent-contract\.invariants/
+    );
+  });
+
+  it('accepts a documented trust-boundary/capability-gap exception', () => {
+    assert.deepEqual(
+      validateControllerHopChanges({
+        addedPaths: [workflowPath],
+        readFile: () => exceptionWorkflow,
+      }),
+      []
+    );
+  });
+
+  it('rejects unjustified workflow/controller hops', () => {
+    assert.match(
+      validateControllerHopChanges({
+        addedPaths: [workflowPath],
+        readFile: () => controllerWorkflow,
+      }).join('\n'),
+      /jovie-controller-hop\/v1/
+    );
+    assert.match(
+      validateControllerHopChanges({
+        changedPaths: [workflowPath],
+        readBaseFile: () => passiveWorkflow,
+        readFile: () => modifiedWorkflow,
+      }).join('\n'),
+      /new workflow\/controller hop/
     );
   });
 });

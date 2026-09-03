@@ -41,15 +41,18 @@ describe('PR visual review workflow', () => {
     expect(workflow).not.toContain('--jq --arg marker');
   });
 
-  it('keeps capture and screenshot review visibly advisory without terminal queue failures', () => {
+  it('fails capture closed on missing visual evidence (JOV-5459)', () => {
     const workflow = readFileSync(workflowPath, 'utf8');
     const capture = jobBlock(workflow, 'capture', 'review');
     const review = jobBlock(workflow, 'review');
 
+    expect(capture).toContain('name: Capture changed UI (desktop + mobile)');
+    expect(capture).not.toMatch(/^    continue-on-error: true/m);
     expect(capture).toContain(
-      'name: Capture changed UI (desktop + mobile) (advisory)'
+      'run: node .github/scripts/pr-visual-evidence-gate.mjs'
     );
-    expect(capture).toContain('continue-on-error: true');
+    expect(capture).toContain('name: Enforce visual evidence (fail-closed)');
+    expect(capture).not.toContain('does not block merging');
     expect(capture).toMatch(
       /id: build\n        if: steps\.route\.outputs\.should_review == 'true'\n        continue-on-error: true/
     );
@@ -59,16 +62,11 @@ describe('PR visual review workflow', () => {
     expect(capture).toMatch(
       /id: routed_capture\n        if: steps\.route\.outputs\.should_review == 'true' && steps\.build\.outcome == 'success' && steps\.server\.outcome == 'success'\n        continue-on-error: true/
     );
-    expect(capture).toContain('name: Record advisory capture outcome');
-    expect(capture).toContain('advisory-outcome.json');
-    expect(capture).toContain(
-      "status: failedStages.length ? 'unavailable' : 'completed'"
-    );
     expect(capture).toContain('name: Upload visual evidence');
     expect(capture).toMatch(
       /id: upload\n        if: always\(\)\n        continue-on-error: true/
     );
-    expect(capture).toContain('name: Report artifact upload advisory outcome');
+    expect(capture).toContain('name: Fail on missing evidence upload');
     expect(capture).toContain('if: always()');
     expect(review).toContain('continue-on-error: true');
   });

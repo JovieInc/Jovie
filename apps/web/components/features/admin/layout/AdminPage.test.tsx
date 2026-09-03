@@ -1,3 +1,5 @@
+import { readFileSync } from 'node:fs';
+import { resolve } from 'node:path';
 import { render, screen, within } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
 import { AdminPage } from './AdminPage';
@@ -53,5 +55,12 @@ describe('AdminPage', () => {
     expect(screen.getByTestId('admin-overview-view')).toHaveTextContent(
       'Overview content'
     );
+  });
+});
+
+describe('JOV-5466 token retire', () => {
+  it('does not keep retired --linear-app-* tokens', () => {
+    const source = readFileSync(resolve(__dirname, './AdminPage.tsx'), 'utf8');
+    expect(source).not.toMatch(/--linear-app-/);
   });
 });

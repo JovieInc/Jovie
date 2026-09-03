@@ -1,5 +1,7 @@
 'use client';
 
+// @coverage-via apps/web/tests/unit/app/outreach-admin-table-normalization.test.ts
+
 import { Button, Input, Switch } from '@jovie/ui';
 import { type ColumnDef, createColumnHelper } from '@tanstack/react-table';
 import { useCallback, useEffect, useState } from 'react';
@@ -238,11 +240,10 @@ export function EmailQueuePanel() {
               checked={campaignsEnabled}
               onCheckedChange={toggleCampaignsEnabled}
               disabled={togglingCampaigns}
-              // eslint-disable-next-line @jovie/canonical-ui-label-casing -- Pre-existing aria label; copy change is out of JOV-4869 scope.
-              aria-label='Toggle campaign emails'
+              aria-label='Toggle Campaign Emails'
             />
           }
-          className='min-h-0 px-(--linear-app-header-padding-x) py-3'
+          className='min-h-0 px-(--app-shell-header-padding-x) py-3'
           actionsClassName='shrink-0'
         />
       </ContentSurfaceCard>
@@ -261,8 +262,7 @@ export function EmailQueuePanel() {
                 onChange={event => setQueueLimit(event.target.value)}
                 disabled={queueing}
                 className='h-8 w-20'
-                // eslint-disable-next-line @jovie/canonical-ui-label-casing -- Pre-existing aria label; copy change is out of JOV-4869 scope.
-                aria-label='Queue outreach count'
+                aria-label='Queue Outreach Count'
               />
               <Button
                 size='sm'
@@ -278,12 +278,12 @@ export function EmailQueuePanel() {
               </span>
             </div>
           }
-          className='min-h-0 px-(--linear-app-header-padding-x) py-3'
+          className='min-h-0 px-(--app-shell-header-padding-x) py-3'
           actionsClassName='shrink-0'
         />
 
         {(queueMessage || queueError) && (
-          <div className='border-b border-subtle px-(--linear-app-content-padding-x) py-3 text-sm'>
+          <div className='border-b border-subtle px-(--app-shell-content-padding-x) py-3 text-sm'>
             <p
               className={cn(
                 'font-medium',
@@ -315,7 +315,7 @@ export function EmailQueuePanel() {
         />
 
         {totalPages > 1 && (
-          <div className='border-t border-subtle px-(--linear-app-content-padding-x) py-2'>
+          <div className='border-t border-subtle px-(--app-shell-content-padding-x) py-2'>
             <AdminTablePagination
               page={page}
               totalPages={totalPages}

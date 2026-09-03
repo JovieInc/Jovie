@@ -13,6 +13,7 @@ import {
   DESIGN_SYSTEM_COMPONENT_REGISTRY,
   designSystemVariantKey,
   normalizeButtonPenRef,
+  validateDesignSystemCompatibilityConsumerSource,
   validateDesignSystemComponentRegistry,
 } from '@/data/designSystem';
 import {
@@ -142,8 +143,6 @@ function validateMoleculeOwnershipReceipt({
  */
 const CENTRAL_MARKETING_CONTRACT_COVERAGE = [
   'FaqSection',
-  'MarketingContainer',
-  'MarketingContentShell',
   'ArtistNotificationsLanding',
   'ArtistProfileCaptureSection',
   'ArtistProfileHowItWorks',
@@ -260,12 +259,18 @@ function hasSourceBackedButtonFixture(
       );
     }
 
+    const jsxOpening = ts.isJsxElement(node)
+      ? node.openingElement
+      : ts.isJsxSelfClosingElement(node)
+        ? node
+        : null;
     if (
-      ts.isJsxElement(node) &&
-      node.openingElement.tagName.getText() === 'Button'
+      jsxOpening &&
+      (jsxOpening.tagName.getText() === 'Button' ||
+        jsxOpening.tagName.getText() === 'MarketingTerminalCtaAction')
     ) {
       const attributes = new Map(
-        node.openingElement.attributes.properties
+        jsxOpening.attributes.properties
           .filter(ts.isJsxAttribute)
           .map(attribute => [
             attribute.name.getText(),
@@ -402,6 +407,34 @@ describe('canonical marketing component registry', () => {
     ).toBe(1);
   });
 
+  it('routes explicit hero, credibility, and terminal CTA forks through their canonical owners', () => {
+    const source = (relativePath: string) =>
+      fs.readFileSync(path.join(repoRoot, relativePath), 'utf8');
+
+    expect(
+      source('apps/web/components/marketing/MarketingPosterHero.tsx')
+    ).toContain('<MarketingHero');
+    expect(
+      source('apps/web/components/marketing/homepage-v2/HomepageV2Route.tsx')
+    ).toContain('<MarketingHero');
+    expect(
+      source(
+        'apps/web/components/marketing/artist-profile/ArtistProfileLogoBar.tsx'
+      )
+    ).toContain('<HomeTrustSection');
+    expect(
+      source(
+        'apps/web/components/marketing/artist-profile/ArtistProfileLogoBar.tsx'
+      )
+    ).not.toContain('<NormalizedTrustLogo');
+    expect(
+      source('apps/web/components/marketing/homepage-v2/HomepageV2Ctas.tsx')
+    ).toContain('<MarketingTerminalCta');
+    expect(
+      source('apps/web/components/marketing/homepage-v2/HomepageV2Ctas.tsx')
+    ).toContain('MARKETING_PEN_CONTRACT_IDS.shell.footerCta');
+  });
+
   it('resolves every source-backed Pen root and wires its identity in source', () => {
     const coveredSourceNames = MARKETING_COMPONENT_REGISTRY.flatMap(entry => [
       entry.exportName,
@@ -450,6 +483,146 @@ describe('canonical marketing component registry', () => {
     }
   });
 
+  it('reads every centrally covered marketing component from its exact source path', () => {
+    const centrallyReadSources = {
+      FaqSection: fs.readFileSync(
+        path.join(repoRoot, 'apps/web/components/marketing/FaqSection.tsx'),
+        'utf8'
+      ),
+      MarketingContainer: fs.readFileSync(
+        path.join(
+          repoRoot,
+          'apps/web/components/marketing/MarketingContainer.tsx'
+        ),
+        'utf8'
+      ),
+      MarketingContentShell: fs.readFileSync(
+        path.join(
+          repoRoot,
+          'apps/web/components/marketing/MarketingContentShell.tsx'
+        ),
+        'utf8'
+      ),
+      ArtistNotificationsLanding: fs.readFileSync(
+        path.join(
+          repoRoot,
+          'apps/web/components/marketing/artist-notifications/ArtistNotificationsLanding.tsx'
+        ),
+        'utf8'
+      ),
+      ArtistProfileAdaptiveSection: fs.readFileSync(
+        path.join(
+          repoRoot,
+          'apps/web/components/marketing/artist-profile/ArtistProfileAdaptiveSection.tsx'
+        ),
+        'utf8'
+      ),
+      ArtistProfileCaptureSection: fs.readFileSync(
+        path.join(
+          repoRoot,
+          'apps/web/components/marketing/artist-profile/ArtistProfileCaptureSection.tsx'
+        ),
+        'utf8'
+      ),
+      ArtistProfileHowItWorks: fs.readFileSync(
+        path.join(
+          repoRoot,
+          'apps/web/components/marketing/artist-profile/ArtistProfileHowItWorks.tsx'
+        ),
+        'utf8'
+      ),
+      ArtistProfileLandingRoute: fs.readFileSync(
+        path.join(
+          repoRoot,
+          'apps/web/components/marketing/artist-profile/ArtistProfileLandingRoute.tsx'
+        ),
+        'utf8'
+      ),
+      ArtistProfileOutcomesCarousel: fs.readFileSync(
+        path.join(
+          repoRoot,
+          'apps/web/components/marketing/artist-profile/ArtistProfileOutcomesCarousel.tsx'
+        ),
+        'utf8'
+      ),
+      ArtistProfileSectionShell: fs.readFileSync(
+        path.join(
+          repoRoot,
+          'apps/web/components/marketing/artist-profile/ArtistProfileSectionShell.tsx'
+        ),
+        'utf8'
+      ),
+      ArtistProfileSocialProof: fs.readFileSync(
+        path.join(
+          repoRoot,
+          'apps/web/components/marketing/artist-profile/ArtistProfileSocialProof.tsx'
+        ),
+        'utf8'
+      ),
+      ArtistProfileSpecWall: fs.readFileSync(
+        path.join(
+          repoRoot,
+          'apps/web/components/marketing/artist-profile/ArtistProfileSpecWall.tsx'
+        ),
+        'utf8'
+      ),
+      HomepageV2Route: fs.readFileSync(
+        path.join(
+          repoRoot,
+          'apps/web/components/marketing/homepage-v2/HomepageV2Route.tsx'
+        ),
+        'utf8'
+      ),
+      MarketingFinalCTA: fs.readFileSync(
+        path.join(repoRoot, 'apps/web/components/site/MarketingFinalCTA.tsx'),
+        'utf8'
+      ),
+    };
+
+    expect(centrallyReadSources).toEqual({
+      FaqSection: expect.stringContaining('export function FaqSection'),
+      MarketingContainer: expect.stringContaining(
+        'export function MarketingContainer'
+      ),
+      MarketingContentShell: expect.stringContaining(
+        'export function MarketingContentShell'
+      ),
+      ArtistNotificationsLanding: expect.stringContaining(
+        'export function ArtistNotificationsLanding'
+      ),
+      ArtistProfileAdaptiveSection: expect.stringContaining(
+        'export function ArtistProfileAdaptiveSection'
+      ),
+      ArtistProfileCaptureSection: expect.stringContaining(
+        'export function ArtistProfileCaptureSection'
+      ),
+      ArtistProfileHowItWorks: expect.stringContaining(
+        'export function ArtistProfileHowItWorks'
+      ),
+      ArtistProfileLandingRoute: expect.stringContaining(
+        'export function ArtistProfileLandingRoute'
+      ),
+      ArtistProfileOutcomesCarousel: expect.stringContaining(
+        'export function ArtistProfileOutcomesCarousel'
+      ),
+      ArtistProfileSectionShell: expect.stringContaining(
+        'export function ArtistProfileSectionShell'
+      ),
+      ArtistProfileSocialProof: expect.stringContaining(
+        'export function ArtistProfileSocialProof'
+      ),
+      ArtistProfileSpecWall: expect.stringContaining(
+        'export function ArtistProfileSpecWall'
+      ),
+      HomepageV2Route: expect.stringContaining(
+        'export function HomepageV2Route'
+      ),
+      MarketingFinalCTA: expect.stringContaining(
+        'export function MarketingFinalCTA'
+      ),
+    });
+  });
+
   it('keeps terminal CTA actions on the canonical Button atom', () => {
     const source = fs.readFileSync(
       path.join(repoRoot, 'apps/web/components/site/MarketingTerminalCta.tsx'),
@@ -457,11 +630,123 @@ describe('canonical marketing component registry', () => {
     );
 
     expect(source).toContain("import { Button } from '@jovie/ui'");
+    expect(source).toContain('function MarketingTerminalCtaAction');
+    expect(source.match(/<MarketingTerminalCtaAction[\s>]/g)).toHaveLength(3);
+    expect(source.match(/variant='primary'/g)).toHaveLength(2);
+    expect(source.match(/variant='tertiary'/g)).toHaveLength(1);
     expect(source).toContain("variant='primary'");
     expect(source).toContain("variant='tertiary'");
-    expect(source.match(/asChild/g)).toHaveLength(2);
+    expect(source).toContain("size='lg'");
+    expect(source).toContain("size='md'");
+    expect(source).toContain('asChild');
     expect(source).not.toContain('public-action-primary');
     expect(source).not.toContain('focus-visible:ring-white/40');
+    expect(source).not.toContain('inline-flex h-10');
+  });
+
+  it('asserts exact source reads for shared marketing coverage-via receipts', () => {
+    expect(
+      fs.readFileSync(
+        path.join(
+          repoRoot,
+          'apps/web/components/marketing/artist-notifications/ArtistNotificationsLanding.tsx'
+        ),
+        'utf8'
+      )
+    ).toContain('export function ArtistNotificationsLanding');
+    expect(
+      fs.readFileSync(
+        path.join(
+          repoRoot,
+          'apps/web/components/marketing/artist-profile/ArtistProfileAdaptiveSection.tsx'
+        ),
+        'utf8'
+      )
+    ).toContain('export function ArtistProfileAdaptiveSection');
+    expect(
+      fs.readFileSync(
+        path.join(
+          repoRoot,
+          'apps/web/components/marketing/artist-profile/ArtistProfileCaptureSection.tsx'
+        ),
+        'utf8'
+      )
+    ).toContain('export function ArtistProfileCaptureSection');
+    expect(
+      fs.readFileSync(
+        path.join(
+          repoRoot,
+          'apps/web/components/marketing/artist-profile/ArtistProfileHowItWorks.tsx'
+        ),
+        'utf8'
+      )
+    ).toContain('export function ArtistProfileHowItWorks');
+    expect(
+      fs.readFileSync(
+        path.join(
+          repoRoot,
+          'apps/web/components/marketing/artist-profile/ArtistProfileLandingRoute.tsx'
+        ),
+        'utf8'
+      )
+    ).toContain('export function ArtistProfileLandingRoute');
+    expect(
+      fs.readFileSync(
+        path.join(
+          repoRoot,
+          'apps/web/components/marketing/artist-profile/ArtistProfileOutcomesCarousel.tsx'
+        ),
+        'utf8'
+      )
+    ).toContain('export function ArtistProfileOutcomesCarousel');
+    expect(
+      fs.readFileSync(
+        path.join(
+          repoRoot,
+          'apps/web/components/marketing/artist-profile/ArtistProfileSectionShell.tsx'
+        ),
+        'utf8'
+      )
+    ).toContain('export function ArtistProfileSectionShell');
+    expect(
+      fs.readFileSync(
+        path.join(
+          repoRoot,
+          'apps/web/components/marketing/artist-profile/ArtistProfileSocialProof.tsx'
+        ),
+        'utf8'
+      )
+    ).toContain('export function ArtistProfileSocialProof');
+    expect(
+      fs.readFileSync(
+        path.join(
+          repoRoot,
+          'apps/web/components/marketing/artist-profile/ArtistProfileSpecWall.tsx'
+        ),
+        'utf8'
+      )
+    ).toContain('export function ArtistProfileSpecWall');
+    expect(
+      fs.readFileSync(
+        path.join(repoRoot, 'apps/web/components/marketing/FaqSection.tsx'),
+        'utf8'
+      )
+    ).toContain('export function FaqSection');
+    expect(
+      fs.readFileSync(
+        path.join(
+          repoRoot,
+          'apps/web/components/marketing/homepage-v2/HomepageV2Route.tsx'
+        ),
+        'utf8'
+      )
+    ).toContain('export function HomepageV2Route');
+    expect(
+      fs.readFileSync(
+        path.join(repoRoot, 'apps/web/components/site/MarketingFinalCTA.tsx'),
+        'utf8'
+      )
+    ).toContain('export function MarketingFinalCTA');
   });
 
   it('keeps contract ids and Pen roots globally unique', () => {
@@ -521,13 +806,13 @@ describe('canonical marketing component registry', () => {
     );
   });
 
-  it('keeps section.cta unresolved until JOV-4954 converges the production shell root', () => {
+  it('keeps section.cta unresolved until JOV-5356 converges the production shell root', () => {
     expect(
       MARKETING_COMPONENT_REGISTRY.find(entry => entry.id === 'section.cta')
     ).toMatchObject({
       sourceBacked: false,
       unresolvedReason:
-        'A production shell root exists, but section.cta convergence is pending JOV-4954.',
+        'A production shell root exists, but section.cta convergence is pending JOV-5356.',
     });
   });
 });
@@ -799,6 +1084,20 @@ describe('canonical shared source atom registry', () => {
           true
         );
       }
+      for (const consumer of entry.compatibilityConsumers) {
+        const consumerSource = fs.readFileSync(
+          path.join(repoRoot, consumer.source),
+          'utf8'
+        );
+        expect(
+          validateDesignSystemCompatibilityConsumerSource(
+            entry,
+            consumer,
+            consumerSource
+          ),
+          `${entry.id}:${consumer.exportName}`
+        ).toEqual([]);
+      }
     }
 
     expect(
@@ -813,10 +1112,61 @@ describe('canonical shared source atom registry', () => {
         size: BUTTON_SIZE_NAMES,
       },
     });
+    expect(
+      DESIGN_SYSTEM_COMPONENT_REGISTRY.find(entry => entry.id === 'atom.input')
+    ).toMatchObject({
+      penRootId: null,
+      referenceEligible: false,
+      variantAxes: {
+        inputSize: ['sm', 'md', 'lg'],
+        state: [
+          'default',
+          'focus-visible',
+          'disabled',
+          'error',
+          'success',
+          'loading',
+          'pending',
+          'long-placeholder',
+        ],
+        type: ['text', 'password', 'search', 'number'],
+      },
+    });
     expect(DESIGN_SYSTEM_COMPONENT_REGISTRY.map(entry => entry.id)).toEqual(
       DESIGN_SYSTEM_COMPONENT_IDS
     );
     expect(validateDesignSystemComponentRegistry()).toEqual([]);
+  });
+
+  it('fails closed when an IconButton compatibility consumer detaches', () => {
+    const iconButton = DESIGN_SYSTEM_COMPONENT_REGISTRY.find(
+      entry => entry.id === 'atom.icon-button'
+    );
+    expect(iconButton).toBeDefined();
+    const overflow = iconButton?.compatibilityConsumers.find(
+      consumer => consumer.exportName === 'OverflowMenuTrigger'
+    );
+    expect(overflow).toBeDefined();
+    if (!iconButton || !overflow) return;
+
+    const detachedSource = `
+      import { Button } from './button';
+      export function OverflowMenuTrigger() {
+        return <Button aria-label='More tabs' />;
+      }
+    `;
+    expect(
+      validateDesignSystemCompatibilityConsumerSource(
+        iconButton,
+        overflow,
+        detachedSource
+      )
+    ).toEqual([
+      {
+        code: 'detached-canonical-consumer',
+        id: 'atom.icon-button:OverflowMenuTrigger',
+      },
+    ]);
   });
 
   it('keeps atom.logo raw until it has a source-mapped Pen origin', () => {
@@ -935,7 +1285,7 @@ describe('canonical shared source atom registry', () => {
     );
   });
 
-  it('keeps two production CTAs on one Button master with label overrides', () => {
+  it('keeps production and terminal CTAs on one Button master with label overrides', () => {
     for (const fixture of BUTTON_PEN_PROPAGATION_FIXTURES) {
       expect(hasSourceBackedButtonFixture(fixture), fixture.route).toBe(true);
     }
@@ -954,10 +1304,11 @@ describe('canonical shared source atom registry', () => {
         ref =>
           ref.overrides.find(override => override.property === 'content')?.value
       )
-    ).toEqual(['Download for Mac', 'Get started']);
-    // Both instances carry only their independent label override; neither
+    ).toEqual(['Download for Mac', 'Get started', 'Request Access']);
+    // Each instance carries only its independent label override; none
     // claims a leading-icon slot the Pen master does not expose.
-    expect(refs[0]?.overrides).toHaveLength(1);
-    expect(refs[1]?.overrides).toHaveLength(1);
+    for (const ref of refs) {
+      expect(ref.overrides).toHaveLength(1);
+    }
   });
 });

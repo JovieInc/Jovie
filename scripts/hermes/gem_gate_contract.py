@@ -198,11 +198,66 @@ def validate_gate_result(returncode: int, stdout: str, consumer: str) -> dict[st
     push_allowed = remediation.get("pushAllowed")
     if not isinstance(push_allowed, bool):
         raise GateContractError("remediation push admission is missing or is not boolean")
-    if push_allowed != (state != "RED"):
-        raise GateContractError("remote remediation must fail closed only on RED")
+    concurrency = receipt.get("concurrency") or {}
+    if not isinstance(concurrency, dict):
+        raise GateContractError("concurrency admission is malformed")
+    gem_concurrency = concurrency.get("gem") or {}
+    if not isinstance(gem_concurrency, dict):
+        raise GateContractError("Gem concurrency admission is malformed")
+    capacity_accepted = gem_concurrency.get("evidenceAccepted")
+    new_mutation_allowed = gem_concurrency.get("newMutationAllowed")
+    if not isinstance(capacity_accepted, bool):
+        raise GateContractError("capacity evidence acceptance is missing or is not boolean")
+    if not isinstance(new_mutation_allowed, bool):
+        raise GateContractError("new mutation admission is missing or is not boolean")
+    if new_mutation_allowed is not capacity_accepted:
+        raise GateContractError("new mutation admission bypasses capacity evidence")
+    capacity_signal = receipt.get("signals", {}).get("concurrencyEvidence") or {}
+    capacity_signal_accepted = (
+        capacity_signal.get("accepted") if isinstance(capacity_signal, dict) else None
+    )
+    if not isinstance(capacity_signal_accepted, bool):
+        raise GateContractError("capacity evidence signal acceptance is not boolean")
+    if capacity_signal_accepted is not capacity_accepted:
+        raise GateContractError("capacity evidence signal and admission disagree")
+    runtime_floor = gem_concurrency.get("runtimeFloor")
+    if isinstance(runtime_floor, bool) or runtime_floor != 1:
+        raise GateContractError("runtimeFloor must admit exactly one local repair")
+    if push_allowed != (state != "RED" and capacity_accepted):
+        raise GateContractError(
+            "remote remediation must require non-RED state and accepted capacity"
+        )
+    remote_update_listed = "expected-head-pr-update" in remediation.get("activities", [])
+    if remote_update_listed is not push_allowed:
+        raise GateContractError("remote remediation activity contradicts push admission")
     maximum = remediation.get("maxConcurrent")
-    if isinstance(maximum, bool) or not isinstance(maximum, int) or maximum < 1:
-        raise GateContractError("remediation concurrency must be a positive integer")
+    if isinstance(maximum, bool) or not isinstance(maximum, int) or maximum < 0:
+        raise GateContractError("remediation concurrency must be a non-negative integer")
+    gem_maximum = gem_concurrency.get("maxConcurrent")
+    if isinstance(gem_maximum, bool) or not isinstance(gem_maximum, int) or gem_maximum < 0:
+        raise GateContractError("Gem mutation concurrency must be a non-negative integer")
+    if not capacity_accepted:
+        if maximum != runtime_floor:
+            raise GateContractError("stale capacity must bound local remediation to one")
+        if gem_maximum != 0:
+            raise GateContractError("stale capacity must block new mutation concurrency")
+        if new_issue_lease:
+            raise GateContractError("stale capacity must block new issue leases")
+        if receipt.get("workAdmission", {}).get("newImplementationAllowed") is not False:
+            raise GateContractError("stale capacity must block new implementation intake")
+        if "approved-issue-lease" in receipt.get("workAdmission", {}).get("activities", []):
+            raise GateContractError("stale capacity must not advertise new issue leases")
+        if "isolated-implementation" in receipt.get("workAdmission", {}).get("activities", []):
+            raise GateContractError("stale capacity must not advertise implementation intake")
+        if "draft-pr" in receipt.get("workAdmission", {}).get("activities", []):
+            raise GateContractError("stale capacity must not advertise draft PR generation")
+    else:
+        if gem_maximum < 1:
+            raise GateContractError("accepted capacity must provide positive concurrency")
+        if maximum != gem_maximum:
+            raise GateContractError("remote remediation concurrency contradicts accepted capacity")
+    if capacity_accepted and maximum > gem_maximum:
+        raise GateContractError("remediation concurrency exceeds accepted capacity")
     if remediation.get("authority") != "single-pr-writer-exact-head":
         raise GateContractError("remediation authority must require one exact-head writer")
     reasons = receipt.get("reasons")

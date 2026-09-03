@@ -1,23 +1,13 @@
 'use client';
 
 import Image from 'next/image';
-import {
-  type MouseEvent as ReactMouseEvent,
-  useCallback,
-  useState,
-} from 'react';
 import { ArtworkFallbackTile } from '@/components/atoms/ArtworkFallbackTile';
-import { ArtworkFrame } from '@/components/atoms/ArtworkFrame';
-import { cn } from '@/lib/utils';
-import { LibraryArtworkHoverZoom } from './LibraryArtworkHoverZoom';
-import { LibraryAudioWaveformThumbnail } from './LibraryAudioWaveformThumbnail';
-import { LibraryVideoScrubThumbnail } from './LibraryVideoScrubThumbnail';
-import type { LibraryReleaseAsset } from './library-data';
 import {
-  getLibraryItemKind,
-  hasVerifiedLibraryAudioPreview,
-} from './library-data';
-import { scrubRatioFromPointer } from './library-thumbnail-utils';
+  ARTWORK_FIT_CLASSNAME,
+  ArtworkFrame,
+} from '@/components/atoms/ArtworkFrame';
+import { cn } from '@/lib/utils';
+import type { LibraryReleaseAsset } from './library-data';
 
 export type LibraryThumbnailSize = 'card' | 'row' | 'drawer';
 
@@ -36,7 +26,7 @@ function LibraryArtworkImage({
 }) {
   const sizeClasses = {
     card: 'h-full w-full',
-    row: 'h-10 w-10',
+    row: 'h-full w-full',
     drawer: 'h-full w-full',
   } satisfies Record<LibraryThumbnailSize, string>;
 
@@ -47,7 +37,7 @@ function LibraryArtworkImage({
         alt=''
         width={size === 'row' ? 48 : 320}
         height={size === 'row' ? 48 : 320}
-        className={cn('object-cover', sizeClasses[size])}
+        className={cn(ARTWORK_FIT_CLASSNAME, sizeClasses[size])}
         loading={size === 'row' ? 'lazy' : 'eager'}
         unoptimized
       />
@@ -70,29 +60,8 @@ export function LibraryMediaThumbnail({
   size = 'card',
   className,
 }: LibraryMediaThumbnailProps) {
-  const [isHovering, setIsHovering] = useState(false);
-  const [scrubRatio, setScrubRatio] = useState(0);
-  const compact = size === 'row';
-  const itemKind = getLibraryItemKind(asset);
-  const showVideoScrub = Boolean(asset.videoUrl);
-  // Compact rows already expose the row's playback affordance. Keep their
-  // artwork quiet; a waveform overlay belongs to larger cards only and only
-  // after the media QA pipeline verifies the preview.
-  const showAudioScrub =
-    !compact && hasVerifiedLibraryAudioPreview(asset) && !showVideoScrub;
-  const hasScrubPreview = showVideoScrub || showAudioScrub;
-  const showArtworkHoverZoom =
-    !hasScrubPreview &&
-    Boolean(asset.artworkUrl) &&
-    (itemKind === 'image' || itemKind === 'merch') &&
-    size !== 'row';
   const artworkFrameSize =
     size === 'row' ? 'thumbnail' : size === 'drawer' ? 'hero' : 'default';
-
-  const updateScrub = useCallback((event: ReactMouseEvent<HTMLElement>) => {
-    const rect = event.currentTarget.getBoundingClientRect();
-    setScrubRatio(scrubRatioFromPointer(event.clientX, rect));
-  }, []);
 
   return (
     <ArtworkFrame
@@ -102,65 +71,9 @@ export function LibraryMediaThumbnail({
         className
       )}
       data-testid={`library-media-thumbnail-${asset.id}`}
-      data-preview-mode={
-        showVideoScrub ? 'video' : showAudioScrub ? 'audio' : 'static'
-      }
+      data-preview-mode='static'
     >
-      {showArtworkHoverZoom && asset.artworkUrl ? (
-        <LibraryArtworkHoverZoom
-          imageUrl={asset.artworkUrl}
-          title={asset.title}
-        >
-          <LibraryArtworkImage asset={asset} size={size} />
-        </LibraryArtworkHoverZoom>
-      ) : (
-        <LibraryArtworkImage asset={asset} size={size} />
-      )}
-      {hasScrubPreview ? (
-        <div
-          role='slider'
-          aria-label={`Scrub preview for ${asset.title}`}
-          aria-valuemin={0}
-          aria-valuemax={100}
-          aria-valuenow={Math.round(scrubRatio * 100)}
-          tabIndex={-1}
-          data-testid={`library-media-scrub-surface-${asset.id}`}
-          className='absolute inset-0 z-[1]'
-          onMouseEnter={event => {
-            setIsHovering(true);
-            updateScrub(event);
-          }}
-          onMouseMove={event => {
-            setIsHovering(true);
-            updateScrub(event);
-          }}
-          onMouseLeave={() => {
-            setIsHovering(false);
-            setScrubRatio(0);
-          }}
-        />
-      ) : null}
-      {showVideoScrub && asset.videoUrl ? (
-        <LibraryVideoScrubThumbnail
-          title={asset.title}
-          videoUrl={asset.videoUrl}
-          posterUrl={asset.artworkUrl}
-          durationMs={asset.totalDurationMs}
-          scrubRatio={scrubRatio}
-          isActive={isHovering}
-          compact={compact}
-        />
-      ) : null}
-      {showAudioScrub ? (
-        <LibraryAudioWaveformThumbnail
-          title={asset.title}
-          waveformSeed={asset.waveformSeed}
-          durationMs={asset.totalDurationMs}
-          scrubRatio={scrubRatio}
-          isActive={isHovering}
-          compact={compact}
-        />
-      ) : null}
+      <LibraryArtworkImage asset={asset} size={size} />
     </ArtworkFrame>
   );
 }

@@ -1,3 +1,5 @@
+import { evaluatePreLandChangelogAdmission } from './pre-land-changelog.mjs';
+
 export const MERGE_QUEUE_LABEL = 'merge-queue';
 export const FAST_TRACK_LABEL = 'fast';
 export const FAST_TRACK_UI_LABEL = 'fast-track-ui';
@@ -13,7 +15,7 @@ export const REQUIRED_MERGE_STATUSES = [
 
 /** Canonical native merge-queue operating policy (controller + repo guardrails). */
 export const MERGE_QUEUE_POLICY = Object.freeze({
-  enqueueLabel: MERGE_QUEUE_LABEL,
+  enqueueLabel: null,
   // 12→16 on 2026-07-09 per JOV-3833 decision trigger (ready→merged p95 718m
   // vs 15m target after one week live; queue-depth deferral was a binding
   // constraint during merge waves). Re-evaluate if runner-pool saturation
@@ -158,16 +160,10 @@ export const CHANGELOG_COLLISION_PATH = 'CHANGELOG.md';
 const ENUM_POLICY_FIELDS = new Set(['merge_method', 'grouping_strategy']);
 
 /**
- * REST `check_response_timeout_minutes` max is 360. Live GraphQL
- * `checkResponseTimeout` returns seconds (3600 for a 60-minute ruleset).
- * Docs claim minutes; Auto-Enroll fail-closed on that mismatch (JOV-5315).
- */
-export const REST_CHECK_RESPONSE_TIMEOUT_MAX_MINUTES = 360;
-
-/**
  * Map GraphQL `checkResponseTimeout` onto REST minutes. Values inside the
- * REST minute range stay as minutes so docs-shaped fixtures keep working.
- * Values above that range that are whole minutes-in-seconds convert.
+ * REST minute range are still seconds when they come from GraphQL, so whole
+ * minute second values convert. Non-minute values stay unchanged so drift is
+ * still visible instead of rounded away.
  *
  * @param {unknown} value
  * @returns {unknown}
@@ -176,7 +172,7 @@ export function mapGraphqlCheckResponseTimeoutToMinutes(value) {
   if (typeof value !== 'number' || !Number.isFinite(value) || value < 0) {
     return value;
   }
-  if (value > REST_CHECK_RESPONSE_TIMEOUT_MAX_MINUTES && value % 60 === 0) {
+  if (Number.isInteger(value) && value >= 60 && value % 60 === 0) {
     return value / 60;
   }
   return value;
@@ -346,30 +342,43 @@ export function unmergeableReenqueueDecision({
  * rejects every candidate that still touches it. Queued members are retained
  * only as diagnostic evidence while the legacy backlog drains.
  *
- * Unknown evidence never skips (same fail-open as front-item churn).
+ * Implementation PRs that touch CHANGELOG.md are skipped at admission
+ * (JOV-5378). Stamp/release heads still serialize against a queued
+ * CHANGELOG member. Unknown evidence never skips.
  *
  * @param {{
  *   candidateFiles?: unknown,
  *   queuedMemberFiles?: unknown,
+ *   branch?: unknown,
  * }} [input]
  */
 export function changelogGroupCollisionDecision({
   candidateFiles,
   queuedMemberFiles,
+  branch,
 } = {}) {
-  if (!Array.isArray(candidateFiles) || !Array.isArray(queuedMemberFiles)) {
+  const admission = evaluatePreLandChangelogAdmission({
+    changedFiles: candidateFiles,
+    branch,
+  });
+  if (admission.action === 'unknown') {
     return { action: 'unknown', reason: 'changelog-evidence-unavailable' };
   }
-  const touchesChangelog = files =>
-    Array.isArray(files) && files.includes(CHANGELOG_COLLISION_PATH);
-  if (!touchesChangelog(candidateFiles)) {
+  if (admission.action === 'reject') {
+    return { action: 'skip', reason: 'pre-land-changelog' };
+  }
+  if (admission.reason === 'omits-changelog') {
     return { action: 'allow', reason: 'candidate-omits-changelog' };
+  }
+  if (!Array.isArray(queuedMemberFiles)) {
+    return { action: 'unknown', reason: 'changelog-evidence-unavailable' };
   }
   const colliding = queuedMemberFiles.filter(
     member =>
       Number.isInteger(member?.prNumber) &&
       member.prNumber > 0 &&
-      touchesChangelog(member.files)
+      Array.isArray(member.files) &&
+      member.files.includes(CHANGELOG_COLLISION_PATH)
   );
   return {
     action: 'skip',
@@ -488,6 +497,8 @@ export const FORBIDDEN_PINNED_JOB_CONTEXTS = Object.freeze([
   'Secret Scan (gitleaks + trufflehog)',
   'CI / Golden Path Lock',
   'Golden Path Lock',
+  'CI / Visual Snapshot Compare',
+  'Visual Snapshot Compare',
   'CI / Layout Guard',
   'Layout Guard',
   'CI / Build + Layout (combined)',
@@ -666,7 +677,7 @@ const KEYWORD_HOT_KEYS = [
     key: 'hot:ci-workflows',
     reason: 'CI/workflow control plane',
     pattern:
-      /\b(ci|workflow|github actions|merge queue|graphite|agent pipeline|actionlint)\b/i,
+      /\b(ci|workflow|github actions|merge queue|agent pipeline|actionlint)\b/i,
   },
   {
     key: 'hot:package-manifest',
@@ -1825,12 +1836,12 @@ export function parseMergeQueueTimeline(events, options = {}) {
   let mergedAt = null;
 
   for (const event of events ?? []) {
-    if (event.event === 'labeled' && event.label?.name === MERGE_QUEUE_LABEL) {
+    if (event.event === 'added_to_merge_queue' || event.event === 'enqueued') {
       queuedAt.push(event.created_at);
     }
     if (
-      event.event === 'unlabeled' &&
-      event.label?.name === MERGE_QUEUE_LABEL
+      event.event === 'removed_from_merge_queue' ||
+      event.event === 'dequeued'
     ) {
       dequeued.push({
         at: event.created_at,
@@ -1947,6 +1958,13 @@ export const RETRYABLE_PRODUCT_FAILURE_STEPS = new Set([
 ]);
 export const MERGE_GROUP_CHURN_FAILURE_THRESHOLD = 2;
 export const MERGE_GROUP_CHURN_COOLDOWN_MS = 5 * 60 * 1000;
+export const ACTIVE_MERGE_GROUP_STATUSES = new Set([
+  'queued',
+  'in_progress',
+  'waiting',
+  'pending',
+  'requested',
+]);
 
 export function parseMergeQueueFrontBranch(branch) {
   const match =
@@ -2004,6 +2022,39 @@ export function frontItemChurnDecision({
     .map(({ run }) => run)
     .sort((a, b) => String(b.createdAt).localeCompare(String(a.createdAt)));
 
+  const headMs = Date.parse(headCommittedAt);
+  const failuresForCurrentHead = Number.isFinite(headMs)
+    ? allFailedFrontedRuns.filter(run => Date.parse(run.createdAt) >= headMs)
+    : allFailedFrontedRuns;
+  const latestActiveForCurrentHead = mergeGroupRuns
+    .map(run => ({ run, front: parseMergeQueueFrontBranch(run?.headBranch) }))
+    .filter(
+      ({ run, front }) =>
+        front?.prNumber === prNumber &&
+        ACTIVE_MERGE_GROUP_STATUSES.has(run.status) &&
+        (!Number.isFinite(headMs) || Date.parse(run.createdAt) >= headMs)
+    )
+    .map(({ run }) => run)
+    .sort((a, b) => String(b.createdAt).localeCompare(String(a.createdAt)))[0];
+  if (
+    latestActiveForCurrentHead &&
+    (failuresForCurrentHead.length === 0 ||
+      String(latestActiveForCurrentHead.createdAt).localeCompare(
+        String(failuresForCurrentHead[0].createdAt)
+      ) > 0)
+  ) {
+    return {
+      action: 'allow',
+      reason:
+        'a newer merge-group attempt for the unchanged head is still active; incomplete evidence cannot eject it',
+      evidence: {
+        activeRunId: latestActiveForCurrentHead.id ?? null,
+        activeStartedAt: latestActiveForCurrentHead.createdAt ?? null,
+        activeStatus: latestActiveForCurrentHead.status ?? null,
+      },
+    };
+  }
+
   if (allFailedFrontedRuns.length === 0) {
     return {
       action: 'allow',
@@ -2012,10 +2063,6 @@ export function frontItemChurnDecision({
     };
   }
 
-  const headMs = Date.parse(headCommittedAt);
-  const failuresForCurrentHead = Number.isFinite(headMs)
-    ? allFailedFrontedRuns.filter(run => Date.parse(run.createdAt) >= headMs)
-    : allFailedFrontedRuns;
   if (failuresForCurrentHead.length === 0) {
     const lastFailed = allFailedFrontedRuns[0];
     return {

@@ -1,4 +1,12 @@
-import { APP_ROUTES } from '@/constants/routes';
+import {
+  APP_ROUTES,
+  buildSpotifyCatalogConnectionRoute,
+} from '@/constants/routes';
+import { WORKFLOW_CAPTURE_REQUEST_KIND } from '@/lib/connectors/suggested-action-kinds';
+import {
+  WorkflowCaptureExecutionResultSchema,
+  WorkflowCaptureRequestPayloadSchema,
+} from '@/lib/workflow-capture/contract';
 import {
   formatBrandDealOpportunityMetadata,
   parseBrandDealOpportunity,
@@ -25,6 +33,7 @@ interface SuggestedActionRow {
   readonly kind: string;
   readonly payload: unknown;
   readonly rationale: string | null;
+  readonly executionResult?: unknown;
   readonly createdAt: Date;
   /** Persisted classification (nullable pre-backfill / pre-migration). */
   readonly signalType?: string | null;
@@ -33,6 +42,7 @@ interface SuggestedActionRow {
 const PRIMARY_ACTION_LABEL_BY_KIND: Readonly<Record<string, string>> = {
   'calendar.create_event': 'Add to calendar',
   'brand_deal.opportunity': 'Approve buyer',
+  [WORKFLOW_CAPTURE_REQUEST_KIND]: 'Record',
 };
 
 function primaryActionLabelFor(
@@ -86,12 +96,21 @@ export function mapSuggestedActionToInboxCard(
     ? parseReportMeasurement(row.payload)
     : null;
   const brandDeal = parseBrandDealOpportunity(row.kind, row.payload);
+  const workflowCapturePayload =
+    row.kind === WORKFLOW_CAPTURE_REQUEST_KIND
+      ? WorkflowCaptureRequestPayloadSchema.safeParse(row.payload)
+      : null;
+  const workflowCaptureResult = WorkflowCaptureExecutionResultSchema.safeParse(
+    row.executionResult
+  );
   const signalType = classifyOpportunitySignalType(row);
   const category: OpportunityInboxCardCategory = report
     ? 'report'
     : brandDeal
       ? 'brand_deal'
-      : classifySuggestedActionCategory(row);
+      : workflowCapturePayload?.success
+        ? 'workflow_capture'
+        : classifySuggestedActionCategory(row);
   return {
     id: row.id,
     signalType,
@@ -100,20 +119,40 @@ export function mapSuggestedActionToInboxCard(
     typeLabel:
       category === 'report'
         ? 'Report'
-        : category === 'brand_deal'
-          ? 'Brand Deal'
-          : OPPORTUNITY_SIGNAL_TYPE_META[signalType].label,
+        : category === 'workflow_capture'
+          ? 'Workflow'
+          : category === 'brand_deal'
+            ? 'Brand Deal'
+            : OPPORTUNITY_SIGNAL_TYPE_META[signalType].label,
     createdAt: row.createdAt.toISOString(),
     title: titleFromPayload(row.payload, category),
     why: brandDeal
       ? formatBrandDealOpportunityMetadata(brandDeal)
       : whyFromRow(row, category),
     primaryActionLabel:
-      report?.nextStep?.label ?? primaryActionLabelFor(row.kind, category),
+      report?.nextStep?.label ??
+      (workflowCaptureResult.success &&
+      workflowCaptureResult.data.state === 'uploaded_needs_review'
+        ? 'Send Recording'
+        : primaryActionLabelFor(row.kind, category)),
     status: 'pending',
     category,
     ...(brandDeal ? { brandDealRankingScore: brandDeal.rankingScore } : {}),
     ...(report ? { report } : {}),
+    ...(workflowCapturePayload?.success
+      ? {
+          workflowCapture: {
+            instructions: workflowCapturePayload.data.instructions,
+            startUrl: workflowCapturePayload.data.startUrl ?? null,
+            expiresAt: workflowCapturePayload.data.expiresAt,
+            state:
+              workflowCaptureResult.success &&
+              workflowCaptureResult.data.state === 'uploaded_needs_review'
+                ? ('uploaded_needs_review' as const)
+                : ('pending' as const),
+          },
+        }
+      : {}),
   };
 }
 
@@ -123,8 +162,8 @@ export const DEFAULT_OPPORTUNITY_INBOX_EMPTY_ACTION_CARDS: readonly OpportunityI
       id: 'connect-spotify',
       title: 'Connect Spotify',
       body: 'Link your catalog so Jovie can spot releases, audience spikes, and pitch windows.',
-      actionLabel: 'Connect catalog',
-      href: `${APP_ROUTES.SETTINGS_ARTIST_PROFILE}?tab=music`,
+      actionLabel: 'Connect Spotify',
+      href: buildSpotifyCatalogConnectionRoute(),
     },
     {
       id: 'add-tour-dates',
@@ -144,6 +183,12 @@ export function buildOpportunityInboxData(
     if (
       signalType === 'brand_deal' &&
       !parseBrandDealOpportunity(row.kind, row.payload)
+    ) {
+      return [];
+    }
+    if (
+      row.kind === WORKFLOW_CAPTURE_REQUEST_KIND &&
+      !WorkflowCaptureRequestPayloadSchema.safeParse(row.payload).success
     ) {
       return [];
     }

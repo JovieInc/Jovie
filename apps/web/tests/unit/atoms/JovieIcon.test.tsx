@@ -33,4 +33,10 @@ describe('JovieIcon', () => {
     const svg = container.querySelector('svg');
     expect(svg).toHaveClass('my-icon');
   });
+
+  it('keeps dark and light contrast explicit instead of inheriting text color', () => {
+    const { container } = render(<JovieIcon />);
+    const svg = container.querySelector('svg');
+    expect(svg).toHaveClass('text-black', 'dark:text-white');
+  });
 });

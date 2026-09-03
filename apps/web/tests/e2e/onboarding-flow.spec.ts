@@ -34,9 +34,8 @@ test.describe('Onboarding Flow', () => {
   });
 
   test('anonymous handle claim redirects to waitlist', async ({ page }) => {
-    // The homepage currently uses RedesignedHero with a "Get started" CTA
-    // that links to /waitlist. The ClaimHandleForm is behind a feature flag
-    // and may not be rendered. Check for either form.
+    // Homepage Get started is locked to /start. The ClaimHandleForm is behind
+    // a feature flag and may not be rendered. Check for either form.
     const handleInput = page.getByLabel(
       /choose your handle|claim your handle/i
     );
@@ -45,14 +44,14 @@ test.describe('Onboarding Flow', () => {
       .catch(() => false);
 
     if (!isFormVisible) {
-      // No claim form on homepage — verify the "Get started" link goes to /waitlist
+      // No claim form on homepage — locked golden path is Get started → /start.
       const getStartedLink = page.getByRole('link', { name: /get started/i });
       const isGetStartedVisible = await getStartedLink
         .isVisible({ timeout: 5000 })
         .catch(() => false);
 
       if (isGetStartedVisible) {
-        await expect(getStartedLink).toHaveAttribute('href', '/signup');
+        await expect(getStartedLink).toHaveAttribute('href', '/start');
       }
 
       console.log(

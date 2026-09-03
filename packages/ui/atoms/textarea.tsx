@@ -8,13 +8,13 @@ import { cn } from '../lib/utils';
 const textareaVariants = cva(
   [
     'flex w-full rounded-lg border border-subtle bg-surface-1 px-3 py-2',
-    'text-[13px] font-[400] tracking-normal text-primary-token',
+    'text-app font-normal tracking-normal text-primary-token',
     'placeholder:text-tertiary-token',
     'hover:border-default',
     'focus-visible:outline-none focus-visible:border-focus focus-visible:ring-2 focus-visible:ring-focus/25',
     'disabled:cursor-not-allowed disabled:opacity-[var(--state-disabled-opacity)]',
     'transition-[background-color,border-color,box-shadow,color,opacity] duration-subtle ease-subtle motion-reduce:transition-none',
-    'min-h-[80px]',
+    'min-h-20',
   ],
   {
     variants: {
@@ -26,9 +26,9 @@ const textareaVariants = cva(
           'border-success hover:border-success focus-visible:border-success focus-visible:ring-success/25',
       },
       textareaSize: {
-        sm: 'px-2 py-1.5 text-xs min-h-[60px]',
-        md: 'px-3 py-2 text-[13px] min-h-[80px]',
-        lg: 'px-3.5 py-3 text-[13px] min-h-[120px]',
+        sm: 'px-2 py-1.5 text-xs min-h-15',
+        md: 'px-3 py-2 text-app min-h-20',
+        lg: 'px-3.5 py-3 text-app min-h-30',
       },
     },
     defaultVariants: {

@@ -1,5 +1,7 @@
 'use client';
 
+// @coverage-via apps/web/tests/components/release-provider-matrix/ReleaseFilterDropdown.test.tsx
+
 import {
   Button,
   DropdownMenu,
@@ -54,11 +56,9 @@ const POPULARITY_OPTIONS: {
   label: string;
   iconName: string;
 }[] = [
-  /* eslint-disable @jovie/canonical-ui-label-casing -- Pre-existing filter labels; numeric ranges make the rule's suggestion identical. Out of JOV-4869 scope. */
   { id: 'low', label: 'Low (0-33)', iconName: 'SignalLow' },
   { id: 'med', label: 'Medium (34-66)', iconName: 'SignalMedium' },
   { id: 'high', label: 'High (67-100)', iconName: 'SignalHigh' },
-  /* eslint-enable @jovie/canonical-ui-label-casing */
 ];
 
 // ============================================================================

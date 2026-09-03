@@ -7,7 +7,7 @@ and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 
 ## [Unreleased]
 
-- [internal] **iOS public-profile browser stays on the published creator page (JOV-5148):** Open Public Profile still uses the full-screen embedded browser, but navigation is now limited to HTTPS `jov.ie` / `staging.jov.ie` and the server-provided username root. App, admin, HUD, auth, and other reserved routes cannot load inside it.
+## [26.8.2] - 2026-08-31
 
 - **Library is one catalog with Ideas, In Progress, and Out:** documents, YouTube videos, releases, and merch share stage, type, and release filters. Ideas is a stage, not a separate destination.
 

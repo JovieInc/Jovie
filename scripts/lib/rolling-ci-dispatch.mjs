@@ -1,16 +1,16 @@
 import { createHash } from 'node:crypto';
 
-export const ROLLING_CI_EVENT_SCHEMA = 'jovie-rolling-ci-failure/v1';
-export const ROLLING_CI_STATE_SCHEMA = 'jovie-rolling-ci-state/v1';
+export const ROLLING_CI_POLICY_VERSION =
+  'jovie-hosted-ci-remediation/2026-08-29';
+export const ROLLING_CI_EVENT_SCHEMA = 'jovie-rolling-ci-failure/v2';
+export const ROLLING_CI_STATE_SCHEMA = 'jovie-rolling-ci-state/v2';
 export const ROLLING_CI_STATE_MARKER = 'jovie-rolling-ci-state';
-export const MAX_REPAIR_DELIVERIES = 3;
+export const MAX_REPAIR_DELIVERIES = 1;
+export const TRUSTED_REPOSITORY = 'JovieInc/Jovie';
 export const TRUSTED_CI_WORKFLOW = 'CI';
 export const TRUSTED_CI_WORKFLOW_PATH = '.github/workflows/ci.yml';
 export const TRUSTED_FAILURE_EVENTS = Object.freeze(['workflow_run']);
-export const TRUSTED_PRODUCER_EVENTS = Object.freeze([
-  'pull_request',
-  'merge_group',
-]);
+export const TRUSTED_PRODUCER_EVENTS = Object.freeze(['pull_request']);
 
 const SHA_RE = /^[0-9a-f]{40}$/i;
 const QUEUE_FRONT_RE =
@@ -33,14 +33,7 @@ export function resolveDispatchPullRequest(input = {}) {
   if (Number.isInteger(parsedNumber) && parsedNumber > 0) {
     return { prNumber: parsedNumber, source: 'event' };
   }
-  if (input.producerEvent !== 'merge_group') return null;
-  const front = parseMergeQueueFrontBranch(input.headBranch);
-  if (!front) return null;
-  return {
-    prNumber: front.prNumber,
-    source: 'merge_queue_front_ref',
-    baseSha: front.baseSha,
-  };
+  return null;
 }
 
 /**
@@ -53,12 +46,7 @@ export function bindDispatchLiveHead(input = {}) {
   const expected = String(input.expectedHead ?? '').toLowerCase();
   const live = String(input.liveHead ?? '').toLowerCase();
   if (!SHA_RE.test(expected)) return null;
-  if (input.producerEvent === 'merge_group') {
-    return {
-      liveHead: expected,
-      reason: 'merge_group_synthetic_head',
-    };
-  }
+  if (input.producerEvent !== 'pull_request') return null;
   if (live === expected) {
     return { liveHead: live, reason: 'exact_source_head' };
   }
@@ -129,6 +117,7 @@ function assertSha(value, name) {
 
 function stableFailureSignal(check, failedSteps) {
   return JSON.stringify({
+    policyVersion: ROLLING_CI_POLICY_VERSION,
     check: String(check).trim(),
     failedSteps: [...new Set(failedSteps.map(String))].sort(),
   });
@@ -189,9 +178,8 @@ export function normalizeFailureEvents({
   source,
   checkSuiteId,
 }) {
-  if (!/^[^/\s]+\/[^/\s]+$/.test(String(repository ?? ''))) {
-    throw new Error('repository must be owner/name');
-  }
+  if (repository !== TRUSTED_REPOSITORY)
+    throw new Error(`repository must be ${TRUSTED_REPOSITORY}`);
   assertPositiveInteger(prNumber, 'prNumber');
   assertSha(headSha, 'headSha');
   if (!/^\d+$/.test(String(workflowRunId ?? ''))) {
@@ -213,6 +201,7 @@ export function normalizeFailureEvents({
       const fingerprint = failureFingerprint({ check, failedSteps });
       return {
         schema: ROLLING_CI_EVENT_SCHEMA,
+        policyVersion: ROLLING_CI_POLICY_VERSION,
         repository,
         pr: prNumber,
         head: headSha.toLowerCase(),
@@ -233,6 +222,7 @@ export function emptyRollingCiState(headSha) {
   assertSha(headSha, 'headSha');
   return {
     schema: ROLLING_CI_STATE_SCHEMA,
+    policyVersion: ROLLING_CI_POLICY_VERSION,
     head: headSha.toLowerCase(),
     deliveries: [],
     failures: {},
@@ -297,6 +287,22 @@ export function planFailureDispatch({
     check: event.check,
     deliveryCount: 0,
   };
+  if (priorFailure.terminalReceipt?.terminal === true) {
+    return {
+      action: 'terminal_configuration_incident',
+      mutate: false,
+      state,
+      incident: {
+        type: 'terminal_remediation_receipt',
+        head: event.head,
+        fingerprint: event.fingerprint,
+        owner: 'CI Platform',
+        remedy:
+          priorFailure.terminalReceipt.result ??
+          'inspect the terminal remediation receipt',
+      },
+    };
+  }
   if (priorFailure.deliveryCount >= maxDeliveries) {
     return {
       action: 'terminal_configuration_incident',
@@ -323,7 +329,8 @@ export function planFailureDispatch({
   state.claim = {
     status: 'active',
     writer,
-    key: `${event.repository}:pr-${event.pr}:${event.head}:${event.check}:${event.fingerprint}`,
+    policyVersion: ROLLING_CI_POLICY_VERSION,
+    key: `${event.repository}:pr-${event.pr}:${event.head}:${event.fingerprint}:${ROLLING_CI_POLICY_VERSION}`,
     repository: event.repository,
     pr: event.pr,
     head: event.head,
@@ -376,6 +383,7 @@ export function renderDispatchComment({ event, plan }) {
 - Failure fingerprint: \`${event.fingerprint}\`
 - Remediation writer: @${owner} (${role})
 - Repair delivery: ${count}/${MAX_REPAIR_DELIVERIES}
+- Policy: \`${ROLLING_CI_POLICY_VERSION}\`
 
 The one-writer lease is pinned to this exact head. A new commit or green rerun supersedes this repair; revalidate the fingerprint before changing code.
 
@@ -424,8 +432,9 @@ export function runDispatch(input) {
   }
 
   const events = normalizeFailureEvents(input);
-  let mutated = false;
   let finalPlan = null;
+  let actionablePlan = null;
+  let actionableEvent = null;
   for (const event of events) {
     finalPlan = planFailureDispatch({
       event,
@@ -434,23 +443,23 @@ export function runDispatch(input) {
       priorState: state,
     });
     if (finalPlan.mutate) {
-      mutated = true;
       state = finalPlan.state;
+      actionablePlan = finalPlan;
+      actionableEvent = event;
+      break;
     }
   }
-  const actionableEvent = events.find(event =>
-    state?.deliveries?.includes(event.delivery)
-  );
+  const selectedPlan = actionablePlan ?? finalPlan;
   return {
     events,
-    action: finalPlan?.action ?? 'no_failure',
-    mutate: mutated,
+    action: selectedPlan?.action ?? 'no_failure',
+    mutate: Boolean(actionablePlan),
     state,
     body:
-      mutated && actionableEvent && state
+      actionablePlan && actionableEvent && state
         ? renderDispatchComment({
             event: actionableEvent,
-            plan: { ...finalPlan, state },
+            plan: { ...actionablePlan, state },
           })
         : '',
   };

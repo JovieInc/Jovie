@@ -1,44 +1,32 @@
 name: PR Conflict Handler
 
-# Classifies PR freshness, requests exact-head GitHub rebases for clean-behind
-# branches, and labels true conflicts for manual resolution.
-# Fires on:
-#   - CI completion (conflict may surface as test failure)
-#   - Schedule weekday safety net
-#   - Manual dispatch
-#
-# NOTE: no `pull_request: synchronize` trigger. This is a FLEET-WIDE scan that
-# lists all open PRs, so per-push spawns are pure duplication: every push
-# already triggers CI, which fires the workflow_run below. Removed in #13359.
+# JOV-INV-021: a hard PR blocker is an owned, bounded repair loop. Clean-behind
+# branches use the shared exact-head GitHub rebase. True same-repository
+# conflicts are resolved in a credential-free FX job and delivered by a
+# separate App-token writer only after an exact head/base reread.
 
 on:
   workflow_dispatch:
     inputs:
       apply:
-        description: 'Apply safe labels and exact-head GitHub rebases. Defaults to dry-run.'
+        description: 'Run the trusted repair lane. False produces a read-only plan.'
         required: false
-        default: 'false'
+        default: 'true'
         type: choice
         options:
-          - 'false'
           - 'true'
+          - 'false'
       max_concurrent:
-        description: 'Maximum CI-heavy PR freshness re-triggers, including in-flight CI.'
+        description: 'Operator ceiling above the adaptive 2 -> 10 -> 40 cohorts.'
         required: false
-        default: '2'
-  schedule:
-    # Read-only audit. Do not auto-push/rebase the fleet on a tight cadence.
-    - cron: '17 15 * * 1-5'
+        default: '40'
+  push:
+    branches: [main]
   workflow_run:
     workflows: ['CI']
     types: [completed]
 
-permissions:
-  contents: write
-  pull-requests: write
-  issues: write
-  checks: read
-  statuses: read
+permissions: {}
 
 defaults:
   run:
@@ -46,21 +34,45 @@ defaults:
 
 jobs:
   plan:
+    name: Classify, claim, and plan exact-head repairs
     if: >-
       github.event_name != 'workflow_run' ||
       (
         github.event.workflow_run.event == 'pull_request' &&
         github.event.workflow_run.conclusion != 'cancelled'
       )
-    name: Classify and plan PR freshness
     runs-on: ubuntu-latest
+    timeout-minutes: 20
+    # Coalesce redundant CI-completion audits without ever cancelling an
+    # explicit operator run. Downstream per-PR leases remain independently
+    # serialized after a plan completes.
     concurrency:
-      # CI-completion audits are read-only and supersedable. Operator dispatches
-      # serialize separately so an incoming CI event cannot cancel manual apply.
       group: pr-conflict-handler-${{ github.repository }}-${{ github.event_name == 'workflow_dispatch' && 'operator' || 'audit' }}
       cancel-in-progress: ${{ github.event_name != 'workflow_dispatch' }}
+    permissions:
+      actions: read
+      checks: read
+      contents: read
+      issues: read
+      pull-requests: read
+      statuses: read
+    outputs:
+      apply: ${{ steps.plan.outputs.apply }}
+      adaptive_cap: ${{ steps.plan.outputs.adaptive_cap }}
+      adaptive_tier: ${{ steps.plan.outputs.adaptive_tier }}
+      baseline_p95_ci_latency_ms: ${{ steps.plan.outputs.baseline_p95_ci_latency_ms }}
+      before_report: ${{ steps.plan.outputs.before_report }}
+      cohort_id: ${{ steps.plan.outputs.cohort_id }}
+      exception_count: ${{ steps.plan.outputs.exception_count }}
+      exception_matrix: ${{ steps.plan.outputs.exception_matrix }}
+      fx_count: ${{ steps.plan.outputs.fx_count }}
+      fx_matrix: ${{ steps.plan.outputs.fx_matrix }}
+      plan_started_at: ${{ steps.plan.outputs.plan_started_at }}
+      runner_capacity: ${{ steps.capacity.outputs.runner_capacity }}
+      active_ci: ${{ steps.capacity.outputs.active_ci }}
+      queued_ci: ${{ steps.capacity.outputs.queued_ci }}
     steps:
-      - name: Checkout
+      - name: Checkout trusted main policy
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           ref: main
@@ -71,27 +83,1545 @@ jobs:
         with:
           node-version-file: '.nvmrc'
 
-      - name: Run handler
+      - name: Verify GitHub CLI
+        run: gh --version
+
+      - name: Generate short-lived Jovie App controller token
+        id: app-token
+        uses: actions/create-github-app-token@bcd2ba49218906704ab6c1aa796996da409d3eb1 # v3.2.0
+        with:
+          app-id: ${{ vars.JOVIE_BOT_APP_ID }}
+          private-key: ${{ secrets.JOVIE_BOT_PRIVATE_KEY }}
+          permission-actions: read
+          permission-checks: read
+          permission-contents: write
+          permission-issues: write
+          permission-pull-requests: write
+          permission-statuses: write
+
+      - name: Measure hosted CI pressure
+        id: capacity
         env:
           GH_TOKEN: ${{ github.token }}
+          REPOSITORY: ${{ github.repository }}
+          # Unknown capacity is not authority to stampede CI. The repository
+          # variable may raise this after measurement; absence fails low.
+          CONFIGURED_RUNNER_CAPACITY: ${{ vars.HOSTED_RUNNER_CAPACITY || '2' }}
         run: |
+          set -euo pipefail
+          capacity="$CONFIGURED_RUNNER_CAPACITY"
+          if [[ ! "$capacity" =~ ^[1-9][0-9]*$ ]]; then
+            echo "::warning::Invalid hosted capacity; failing low to the two-item canary."
+            capacity=2
+          fi
+          active=$(gh api "repos/$REPOSITORY/actions/runs?status=in_progress&per_page=1" --jq '.total_count')
+          queued=$(gh api "repos/$REPOSITORY/actions/runs?status=queued&per_page=1" --jq '.total_count')
+          [[ "$active" =~ ^[0-9]+$ ]] || active="$capacity"
+          [[ "$queued" =~ ^[0-9]+$ ]] || queued="$capacity"
+          # The planning job itself is one of the in-progress runs but consumes
+          # no repair slot after the matrix starts.
+          active=$(( active > 0 ? active - 1 : 0 ))
+          {
+            echo "runner_capacity=$capacity"
+            echo "active_ci=$active"
+            echo "queued_ci=$queued"
+          } >> "$GITHUB_OUTPUT"
+
+      - name: Build plan and claim exact heads
+        id: plan
+        env:
+          # All fleet inventory stays on the workflow-scoped read budget. The
+          # App installation token is reserved for the bounded mutation set.
+          GH_TOKEN: ${{ github.token }}
+          GH_QUEUE_TOKEN: ${{ github.token }}
+          GH_MUTATION_TOKEN: ${{ steps.app-token.outputs.token }}
+          REPOSITORY: ${{ github.repository }}
+          MAX_CONCURRENT: ${{ inputs.max_concurrent || '40' }}
+          RUNNER_CAPACITY: ${{ steps.capacity.outputs.runner_capacity }}
+          ACTIVE_CI: ${{ steps.capacity.outputs.active_ci }}
+          QUEUED_CI: ${{ steps.capacity.outputs.queued_ci }}
+          TRACKING_ISSUE: '16794'
+          EVENT_NAME: ${{ github.event_name }}
+          APPLY_INPUT: ${{ inputs.apply || 'false' }}
+        run: |
+          set -euo pipefail
+          plan_started_at=$(date -u +%Y-%m-%dT%H:%M:%SZ)
+          cohort_id="${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}"
+          run_url="https://github.com/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}"
           MODE="--dry-run"
-          if [[ "${{ github.event_name }}" == "workflow_dispatch" && "${{ inputs.apply }}" == "true" ]]; then
+          apply='false'
+          if [[ "$EVENT_NAME" == "workflow_dispatch" && "$APPLY_INPUT" == "true" ]]; then
             MODE="--apply"
+            apply='true'
+          elif [[ "$EVENT_NAME" != "workflow_dispatch" ]]; then
+            MODE="--apply"
+            apply='true'
           fi
 
           node scripts/pr-conflict-handler.mjs "$MODE" \
-            --repo "${{ github.repository }}" \
-            --max-concurrent "${{ inputs.max_concurrent || '2' }}" \
-            --json | tee pr-conflict-handler-plan.log
+            --repo "$REPOSITORY" \
+            --max-concurrent "$MAX_CONCURRENT" \
+            --runner-capacity "$RUNNER_CAPACITY" \
+            --active-ci "$ACTIVE_CI" \
+            --queued-ci "$QUEUED_CI" \
+            --cohort-id "$cohort_id" \
+            --history-issue "$TRACKING_ISSUE" \
+            --plan-file "$RUNNER_TEMP/pr-conflict-handler-plan.json" \
+            --json | tee "$RUNNER_TEMP/pr-conflict-handler.log"
 
-      - name: Summarize
-        if: always()
-        run: |
+          jq -e '.fxMatrix | type == "array"' "$RUNNER_TEMP/pr-conflict-handler-plan.json" >/dev/null
+          raw_fx=$(jq -c '.fxMatrix // []' "$RUNNER_TEMP/pr-conflict-handler-plan.json")
+          raw_exceptions=$(jq -c '.exceptionMatrix // []' "$RUNNER_TEMP/pr-conflict-handler-plan.json")
+          adaptive_cap=$(jq -r '(.capacity.availableCiSlots // 0) | if . < 1 then 1 else . end' "$RUNNER_TEMP/pr-conflict-handler-plan.json")
+          adaptive_tier=$(jq -r '.capacity.adaptive.tier // 2' "$RUNNER_TEMP/pr-conflict-handler-plan.json")
+          baseline_p95_ci_latency_ms=$(jq -r '[.capacity.recentCohorts[]? | select(.durable != false and .attempted > 0 and .pending == 0) | .p95CiLatencyMs] | .[0] // 0' "$RUNNER_TEMP/pr-conflict-handler-plan.json")
+          before_report=$(jq -c '{total:.summary.total,states:.summary.byState,actions:.summary.byAction}' "$RUNNER_TEMP/pr-conflict-handler-plan.json")
+
+          printf '[]\n' > "$RUNNER_TEMP/claimed-fx.json"
+          if [[ "$apply" == 'true' ]]; then
+            while IFS= read -r item; do
+              [[ -n "$item" ]] || continue
+              pr=$(jq -r '.prNumber' <<<"$item")
+              expected_head=$(jq -r '.headRefOid' <<<"$item")
+              expected_base=$(jq -r '.baseRefOid' <<<"$item")
+              expected_base_ref=$(jq -r '.baseRefName' <<<"$item")
+              expected_ref=$(jq -r '.headRefName' <<<"$item")
+              attempt=$(jq -r '.attempt' <<<"$item")
+              max_attempts=$(jq -r '.maxAttempts' <<<"$item")
+              expected_auto_merge=$(jq -r '.autoMergeEnabled' <<<"$item")
+              expected_draft=$(jq -r '.draftState' <<<"$item")
+              live=$(GH_TOKEN="$GH_MUTATION_TOKEN" gh api "repos/$REPOSITORY/pulls/$pr" \
+                --jq '{state:.state,draft:.draft,head:.head.sha,baseRef:.base.ref,ref:.head.ref,autoMerge:(.auto_merge != null),sameRepo:(.head.repo.full_name == .base.repo.full_name),fork:(.head.repo.fork // false)}')
+              # shellcheck disable=SC2016
+              live_base=$(GH_TOKEN="$GH_QUEUE_TOKEN" gh api graphql \
+                -f query='query($owner:String!,$name:String!,$qualifiedName:String!){repository(owner:$owner,name:$name){ref(qualifiedName:$qualifiedName){target{oid}}}}' \
+                -f owner="${REPOSITORY%%/*}" -f name="${REPOSITORY#*/}" \
+                -f qualifiedName="refs/heads/$expected_base_ref" \
+                --jq '.data.repository.ref.target.oid // ""')
+              live=$(jq --arg base "$live_base" '. + {base:$base}' <<<"$live")
+              if ! jq -e --arg head "$expected_head" --arg base "$expected_base" --arg baseRef "$expected_base_ref" --arg ref "$expected_ref" \
+                --argjson draft "$expected_draft" --argjson autoMerge "$expected_auto_merge" \
+                '.state == "open" and .draft == $draft and .sameRepo == true and .fork == false and .head == $head and .base == $base and .baseRef == $baseRef and .ref == $ref and .autoMerge == $autoMerge' \
+                <<<"$live" >/dev/null; then
+                echo "::notice::PR #$pr changed before claim; waiting for a fresh pass."
+                continue
+              fi
+              draft_state=$(jq -r '.draft' <<<"$live")
+              item=$(jq --argjson draftState "$draft_state" '. + {draftState:$draftState}' <<<"$item")
+              safe_cohort=$(printf '%s' "$cohort_id" | tr -cd 'A-Za-z0-9_.-' | head -c 32)
+              description="jovie-conflict-fx/v1 cohort=${safe_cohort:-unknown} cap=$adaptive_cap try=$attempt/$max_attempts result=pending base=$expected_base"
+              status_url="$run_url?base_ref=$(jq -nr --arg value "$expected_base_ref" '$value | @uri')"
+              GH_TOKEN="$GH_MUTATION_TOKEN" gh api -X POST "repos/$REPOSITORY/statuses/$expected_head" \
+                -f state=pending -f context='Jovie Conflict FX' \
+                -f description="${description:0:140}" -f target_url="$status_url" >/dev/null
+              jq --argjson item "$item" '. + [$item]' "$RUNNER_TEMP/claimed-fx.json" \
+                > "$RUNNER_TEMP/claimed-fx.next.json"
+              mv "$RUNNER_TEMP/claimed-fx.next.json" "$RUNNER_TEMP/claimed-fx.json"
+            done < <(jq -c '.[]' <<<"$raw_fx")
+          fi
+
+          fx_matrix=$(jq -c '.' "$RUNNER_TEMP/claimed-fx.json")
+          [[ "$apply" == 'true' ]] || raw_exceptions='[]'
+          fx_count=$(jq 'length' <<<"$fx_matrix")
+          exception_count=$(jq 'length' <<<"$raw_exceptions")
           {
-            echo '## PR conflict handler plan'
+            echo "apply=$apply"
+            echo "adaptive_cap=$adaptive_cap"
+            echo "adaptive_tier=$adaptive_tier"
+            echo "baseline_p95_ci_latency_ms=$baseline_p95_ci_latency_ms"
+            echo "before_report=$before_report"
+            echo "cohort_id=$cohort_id"
+            echo "exception_count=$exception_count"
+            echo "exception_matrix=$raw_exceptions"
+            echo "fx_count=$fx_count"
+            echo "fx_matrix=$fx_matrix"
+            echo "plan_started_at=$plan_started_at"
+          } >> "$GITHUB_OUTPUT"
+          {
+            echo '## JOV-INV-021 conflict plan'
             echo
-            echo '```text'
-            sed -n '1,160p' pr-conflict-handler-plan.log
-            echo '```'
+            echo "- Apply: \`$apply\`"
+            echo "- Cohort: \`$cohort_id\`"
+            echo "- Adaptive tier: \`$adaptive_tier\`"
+            echo "- Adaptive parallelism: \`$adaptive_cap\`"
+            echo "- Claimed FX repairs: \`$fx_count\`"
+            echo "- Typed exceptions: \`$exception_count\`"
+            echo "- Before: \`$before_report\`"
           } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Upload exact plan receipt
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: pr-conflict-plan-${{ github.run_id }}-${{ github.run_attempt }}
+          path: |
+            ${{ runner.temp }}/pr-conflict-handler-plan.json
+            ${{ runner.temp }}/pr-conflict-handler.log
+          if-no-files-found: error
+          retention-days: 7
+
+  record_exception:
+    name: Record PR #${{ matrix.prNumber }} typed exception
+    needs: plan
+    if: needs.plan.outputs.apply == 'true' && needs.plan.outputs.exception_count != '0'
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    permissions:
+      contents: read
+      issues: read
+      pull-requests: read
+      statuses: read
+    strategy:
+      fail-fast: false
+      max-parallel: 2
+      matrix:
+        include: ${{ fromJSON(needs.plan.outputs.exception_matrix) }}
+    steps:
+      - name: Generate short-lived Jovie App receipt token
+        id: app-token
+        uses: actions/create-github-app-token@bcd2ba49218906704ab6c1aa796996da409d3eb1 # v3.2.0
+        with:
+          app-id: ${{ vars.JOVIE_BOT_APP_ID }}
+          private-key: ${{ secrets.JOVIE_BOT_PRIVATE_KEY }}
+          permission-issues: write
+          permission-pull-requests: read
+          permission-statuses: write
+
+      - name: Upsert exact typed exception and terminal status
+        env:
+          GH_TOKEN: ${{ steps.app-token.outputs.token }}
+          GH_QUEUE_TOKEN: ${{ github.token }}
+          REPOSITORY: ${{ github.repository }}
+          PR_NUMBER: ${{ matrix.prNumber }}
+          SOURCE_HEAD: ${{ matrix.headRefOid }}
+          BASE_HEAD: ${{ matrix.baseRefOid }}
+          BASE_REF: ${{ matrix.baseRefName }}
+          ATTEMPTS: ${{ matrix.attempt || matrix.maxAttempts || 2 }}
+          MAX_ATTEMPTS: ${{ matrix.maxAttempts || 2 }}
+          EXCEPTION_TYPE: ${{ matrix.exceptionType }}
+          COHORT_ID: ${{ needs.plan.outputs.cohort_id }}
+          ADAPTIVE_CAP: ${{ needs.plan.outputs.adaptive_cap }}
+        run: |
+          set -euo pipefail
+          live=$(gh api "repos/$REPOSITORY/pulls/$PR_NUMBER" \
+            --jq '{state:.state,head:.head.sha,baseRef:.base.ref}')
+          # shellcheck disable=SC2016
+          live_base=$(GH_TOKEN="$GH_QUEUE_TOKEN" gh api graphql \
+            -f query='query($owner:String!,$name:String!,$qualifiedName:String!){repository(owner:$owner,name:$name){ref(qualifiedName:$qualifiedName){target{oid}}}}' \
+            -f owner="${REPOSITORY%%/*}" -f name="${REPOSITORY#*/}" \
+            -f qualifiedName="refs/heads/$BASE_REF" \
+            --jq '.data.repository.ref.target.oid // ""')
+          live=$(jq --arg base "$live_base" '. + {base:$base}' <<<"$live")
+          if ! jq -e --arg head "$SOURCE_HEAD" --arg base "$BASE_HEAD" --arg baseRef "$BASE_REF" \
+            '.state == "open" and .head == $head and .base == $base and .baseRef == $baseRef' \
+            <<<"$live" >/dev/null; then
+            echo "::notice::PR #$PR_NUMBER changed before exception receipt; a fresh pass owns it."
+            exit 0
+          fi
+
+          if [[ "$EXCEPTION_TYPE" == 'permission' ]]; then
+            hidden='<!-- bot-comment:conflict-fx-permission -->'
+            body=$(jq -nr --arg head "$SOURCE_HEAD" --arg base "$BASE_HEAD" \
+              '["<!-- jovie-conflict-permission-exception/v1 -->","## Conflict remediation permission boundary","","- Exact head: `"+$head+"`","- Exact base: `"+$base+"`","- Category: `untrusted-or-fork-head`","","No merge-blocking label was added. Next owner: trusted-writer intake. Mirror the objective change onto a same-repository branch, then the bounded conflict lane resumes automatically."] | join("\n")')
+          elif [[ "$EXCEPTION_TYPE" == 'exhausted' ]]; then
+            # Attempt 2 already emitted the exact conflict files and ours/theirs
+            # blob evidence. Preserve that richer idempotent receipt rather than
+            # overwriting it with a planner-only summary.
+            hidden='<!-- bot-comment:conflict-fx-exhaustion -->'
+            existing=$(gh api "repos/$REPOSITORY/issues/$PR_NUMBER/comments?per_page=100" --paginate \
+              --jq ".[] | select(.body | contains(\"$hidden\")) | .id" | head -1 || true)
+            if [[ -n "$existing" ]]; then
+              exit 0
+            fi
+            body=$(jq -nr --arg head "$SOURCE_HEAD" --arg base "$BASE_HEAD" \
+              --arg attempts "$ATTEMPTS/$MAX_ATTEMPTS" \
+              '["<!-- jovie-conflict-steering-exception/v1 -->","## Conflict FX bounded exhaustion","","- Exact head: `"+$head+"`","- Exact base: `"+$base+"`","- Attempts: `"+$attempts+"`","- Closed-loop terminal for this exact pair: `true`","","No taste or passive-human hold was added. A changed source or base SHA starts a fresh bounded lease automatically; route any subjective choice to a separate follow-up PR."] | join("\n")')
+          else
+            echo "::error::Unknown typed exception: $EXCEPTION_TYPE"
+            exit 1
+          fi
+          existing=$(gh api "repos/$REPOSITORY/issues/$PR_NUMBER/comments?per_page=100" --paginate \
+            --jq ".[] | select(.body | contains(\"$hidden\")) | .id" | head -1 || true)
+          if [[ -n "$existing" ]]; then
+            gh api -X PATCH "repos/$REPOSITORY/issues/comments/$existing" -f body="$body" >/dev/null
+          else
+            gh api -X POST "repos/$REPOSITORY/issues/$PR_NUMBER/comments" -f body="$body" >/dev/null
+          fi
+
+  conflict_fx:
+    name: Resolve PR #${{ matrix.prNumber }} at exact head
+    needs: plan
+    if: needs.plan.outputs.apply == 'true' && needs.plan.outputs.fx_count != '0'
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    permissions:
+      contents: read
+    concurrency:
+      group: pr-conflict-fx-${{ github.repository }}-${{ matrix.prNumber }}
+      cancel-in-progress: false
+    strategy:
+      fail-fast: false
+      max-parallel: ${{ fromJSON(needs.plan.outputs.adaptive_cap) }}
+      matrix:
+        include: ${{ fromJSON(needs.plan.outputs.fx_matrix) }}
+    steps:
+      - name: Checkout exact source head without credentials
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ matrix.headRefOid }}
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Require exact source and base objects
+        env:
+          SOURCE_HEAD: ${{ matrix.headRefOid }}
+          BASE_HEAD: ${{ matrix.baseRefOid }}
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "$SOURCE_HEAD"
+          if ! git cat-file -e "$BASE_HEAD^{commit}" 2>/dev/null; then
+            git fetch --no-tags origin "$BASE_HEAD"
+          fi
+          test "$(git rev-parse "$BASE_HEAD^{commit}")" = "$BASE_HEAD"
+
+      - name: Install pinned FX
+        env:
+          FX_AUTO_UPGRADE: '0'
+          FX_VERSION: v0.0.7
+          FX_SHA256: c5787ea041d3b5521ec675f1ada78f30cf1b11021ffcac48b4969cf5beb65c45
+        run: |
+          set -euo pipefail
+          archive="$RUNNER_TEMP/fx-linux-x86_64.tar.gz"
+          install_dir="$RUNNER_TEMP/fx-bin"
+          curl --fail --show-error --location --retry 3 \
+            "https://releases.fx.sh/$FX_VERSION/fx-linux-x86_64.tar.gz" \
+            --output "$archive"
+          echo "$FX_SHA256  $archive" | sha256sum --check --strict
+          mkdir -p "$install_dir"
+          tar -xzf "$archive" -C "$install_dir" fx
+          chmod 0755 "$install_dir/fx"
+          echo "$install_dir" >> "$GITHUB_PATH"
+          "$install_dir/fx" --version
+
+      - name: Enforce trusted out-of-tree FX permissions
+        env:
+          FX_AUTO_UPGRADE: '0'
+          FX_PERMISSION_MODE: ask
+          HOME: ${{ runner.temp }}/fx-home
+        run: |
+          set -euo pipefail
+          umask 077
+          mkdir -p "$HOME/.fx"
+          jq -n '{permission_mode:"ask",auto_upgrade:false,permission:{"*":"deny",edit:"deny"}}' \
+            > "$HOME/.fx/settings.json"
+          fx permissions --json > "$RUNNER_TEMP/fx-permissions.json"
+          jq -e '
+            .mode == "ask" and
+            any(.rules[]; .permission == "*" and .pattern == "*" and .action == "deny") and
+            any(.rules[]; .permission == "edit" and .pattern == "*" and .action == "deny") and
+            all(.rules[]; .action != "allow") and
+            all(.rules[]; .permission != "bash" and .permission != "url" and .permission != "web_fetch")
+          ' "$RUNNER_TEMP/fx-permissions.json" >/dev/null
+
+      - name: Prepare exact conflict manifest without credentials
+        id: prepare
+        env:
+          FX_AUTO_UPGRADE: '0'
+          FX_PERMISSION_MODE: ask
+          FX_MODEL: openai/gpt-5.6-sol
+          REPOSITORY: ${{ github.repository }}
+          PR_NUMBER: ${{ matrix.prNumber }}
+          SOURCE_HEAD: ${{ matrix.headRefOid }}
+          BASE_HEAD: ${{ matrix.baseRefOid }}
+          BASE_REF: ${{ matrix.baseRefName }}
+          HEAD_REF: ${{ matrix.headRefName }}
+          ATTEMPT: ${{ matrix.attempt }}
+          MAX_ATTEMPTS: ${{ matrix.maxAttempts }}
+          COHORT_ID: ${{ needs.plan.outputs.cohort_id }}
+          HOME: ${{ runner.temp }}/fx-home
+        run: |
+          set -euo pipefail
+          artifact_dir="$RUNNER_TEMP/conflict-fx-artifact"
+          mkdir -p "$artifact_dir"
+          outcome='prepare_failed'
+          detail='could not prepare the exact merge conflict'
+          observed_model=''
+          conflict_files='[]'
+          competing_changes='[]'
+          resolved_tree=''
+          patch_sha=''
+          printf '' > "$artifact_dir/repair.patch"
+
+          git config user.name 'jovie-conflict-preparer'
+          git config user.email 'jovie-conflict-preparer@users.noreply.github.com'
+          git config merge.conflictstyle zdiff3
+          set +e
+          git merge --no-commit --no-ff "$BASE_HEAD" > "$artifact_dir/merge.log" 2>&1
+          merge_rc=$?
+          set -e
+          if [[ "$merge_rc" -eq 0 ]]; then
+            observed_model='mechanical'
+            outcome='candidate'
+            detail='Git produced a clean exact-pair integration candidate without model judgment'
+          else
+            raw_conflict_paths="$artifact_dir/conflict-paths.z"
+            git diff --name-only --diff-filter=U -z > "$raw_conflict_paths"
+            if ! iconv -f UTF-8 -t UTF-8 "$raw_conflict_paths" >/dev/null; then
+              outcome='protected_conflict'
+              detail='the conflict path set contains invalid UTF-8 and cannot be represented by a literal FX edit rule'
+            else
+              conflict_files=$(jq -Rs 'split("\u0000") | map(select(length > 0))' \
+                < "$raw_conflict_paths")
+              competing_changes=$(git ls-files -u \
+                | jq -Rsc '
+                    split("\n")
+                    | map(select(length > 0) | capture("^(?<mode>[0-9]+) (?<blob>[0-9a-f]{40}) (?<stage>[23])\\t(?<file>.*)$"))
+                    | group_by(.file)
+                    | map({file:.[0].file,oursBlob:((map(select(.stage == "2"))[0].blob) // null),theirsBlob:((map(select(.stage == "3"))[0].blob) // null)})
+                  ')
+              conflict_count=$(jq 'length' <<<"$conflict_files")
+              if [[ "$conflict_count" -eq 0 ]]; then
+                detail='git failed before producing a typed conflict set'
+              elif jq -e 'any(
+                . == ".github/workflows" or startswith(".github/workflows/") or
+                . == "scripts/pr-conflict-handler.mjs" or
+                . == "scripts/lib/pr-conflict-handler.mjs" or
+                . == "scripts/run-affected-tests.mjs" or
+                . == "canon/invariants.jsonl" or
+                startswith("/") or . == ".." or startswith("../") or
+                contains("/../") or endswith("/..") or
+                (explode | any(. < 32 or . == 127)) or
+                test("(^|/)\\.git(/|$)") or
+                contains("*") or contains("?") or contains("[") or
+                contains("]") or contains("{") or contains("}") or contains("\\")
+              )' <<<"$conflict_files" >/dev/null || \
+                git ls-files -u | awk '$1 != "100644" && $1 != "100755" { unsafe=1 } END { exit(unsafe ? 0 : 1) }'; then
+                outcome='protected_conflict'
+                detail='the conflict touches the controller trust boundary or cannot be represented by a literal FX edit rule'
+              else
+                # Profile-owned rules override any project .fx.json. Only the
+                # exact typed conflict paths may be edited; terminal, network,
+                # MCP, deletion, rename, and every non-conflict path stay denied.
+                jq -n --argjson conflicts "$conflict_files" '
+                  {
+                    permission_mode:"ask",
+                    auto_upgrade:false,
+                    permission:{
+                      "*":"deny",
+                      read:(reduce $conflicts[] as $path ({"*":"deny"}; .[$path]="allow")),
+                      edit:(reduce $conflicts[] as $path ({"*":"deny"}; .[$path]="allow"))
+                    }
+                  }
+                ' > "$HOME/.fx/settings.json"
+                fx permissions --json > "$RUNNER_TEMP/fx-permissions-conflicts.json"
+                jq -e --argjson conflicts "$conflict_files" '
+                  .mode == "ask" and
+                  any(.rules[]; .permission == "*" and .pattern == "*" and .action == "deny") and
+                  any(.rules[]; .permission == "read" and .pattern == "*" and .action == "deny") and
+                  any(.rules[]; .permission == "edit" and .pattern == "*" and .action == "deny") and
+                  ([.rules[] | select(.action == "allow") | .permission] | all(. == "read" or . == "edit")) and
+                  ([.rules[] | select(.permission == "read" and .action == "allow") | .pattern] | sort) == ($conflicts | sort) and
+                  ([.rules[] | select(.permission == "edit" and .action == "allow") | .pattern] | sort) == ($conflicts | sort)
+                ' "$RUNNER_TEMP/fx-permissions-conflicts.json" >/dev/null
+                printf '%s\n' \
+                  'Resolve the current Git merge conflicts in this ephemeral checkout.' \
+                  'Invariant: JOV-INV-021' \
+                  "Repository: $REPOSITORY" \
+                  "PR: #$PR_NUMBER" \
+                  "Exact source head: $SOURCE_HEAD" \
+                  "Exact base head: $BASE_HEAD" \
+                  "Attempt: $ATTEMPT/$MAX_ATTEMPTS" \
+                  "Conflicting files: $(jq -r 'join(", ")' <<<"$conflict_files")" \
+                  'Preserve the objective behavior of both sides and add only directly required tests.' \
+                  'Do not commit, push, edit controller policy, weaken tests, add a hold, change PR state, or access credentials.' \
+                  'Terminal, network, MCP, deletion, rename, and non-conflict edits are denied by trusted profile policy.' \
+                  'Subjective taste is not a shipping gate; leave optional taste changes for a separate follow-up.' \
+                  'Finish with a coherent working tree. The trusted writer independently constructs and delivers the commit.' \
+                  > "$artifact_dir/prompt.txt"
+                outcome='model_required'
+                detail='exact typed conflict manifest is ready for credential-isolated FX'
+              fi
+            fi
+          fi
+
+          jq -n \
+            --argjson pr "$PR_NUMBER" --arg sourceHead "$SOURCE_HEAD" \
+            --arg baseHead "$BASE_HEAD" --arg baseRef "$BASE_REF" --arg headRef "$HEAD_REF" \
+            --argjson attempt "$ATTEMPT" --argjson maxAttempts "$MAX_ATTEMPTS" \
+            --arg cohortId "$COHORT_ID" --arg expectedModel "$FX_MODEL" \
+            --arg observedModel "$observed_model" --arg outcome "$outcome" \
+            --arg detail "$detail" --argjson conflictFiles "$conflict_files" \
+            --argjson competingChanges "$competing_changes" \
+            --arg patchSha256 "$patch_sha" --arg resolvedTreeOid "$resolved_tree" \
+            '{schema:"jovie-conflict-fx-artifact/v1",pr:$pr,sourceHead:$sourceHead,baseHead:$baseHead,baseRef:$baseRef,headRef:$headRef,attempt:$attempt,maxAttempts:$maxAttempts,cohortId:$cohortId,expectedModel:$expectedModel,observedModel:$observedModel,outcome:$outcome,detail:$detail,conflictFiles:$conflictFiles,competingChanges:$competingChanges,patchSha256:$patchSha256,resolvedTreeOid:$resolvedTreeOid}' \
+            > "$artifact_dir/receipt.json"
+          echo "model_required=$([[ "$outcome" == 'model_required' ]] && echo true || echo false)" >> "$GITHUB_OUTPUT"
+
+      - name: Run pinned stronger-model FX with no executable tools
+        id: model
+        if: steps.prepare.outputs.model_required == 'true'
+        continue-on-error: true
+        env:
+          AI_GATEWAY_API_KEY: ${{ secrets.AI_GATEWAY_API_KEY }}
+          FX_AUTO_UPGRADE: '0'
+          FX_DISABLE_KEYCHAIN: '1'
+          FX_MAX_AGENT_STEPS: '12'
+          FX_MODEL: openai/gpt-5.6-sol
+          FX_PERMISSION_MODE: ask
+          HOME: ${{ runner.temp }}/fx-home
+        run: |
+          set -euo pipefail
+          test "$(fx --version)" = '0.0.7'
+          fx permissions --json > "$RUNNER_TEMP/fx-permissions-before-ask.json"
+          conflicts=$(jq -c '.conflictFiles' "$RUNNER_TEMP/conflict-fx-artifact/receipt.json")
+          jq -e --argjson conflicts "$conflicts" '
+            .mode == "ask" and
+            any(.rules[]; .permission == "*" and .pattern == "*" and .action == "deny") and
+            ([.rules[] | select(.action == "allow") | .permission] | all(. == "read" or . == "edit")) and
+            ([.rules[] | select(.permission == "read" and .action == "allow") | .pattern] | sort) == ($conflicts | sort) and
+            ([.rules[] | select(.permission == "edit" and .action == "allow") | .pattern] | sort) == ($conflicts | sort)
+          ' "$RUNNER_TEMP/fx-permissions-before-ask.json" >/dev/null
+          FX_DISABLE_KEYCHAIN=1 fx status --json > "$RUNNER_TEMP/fx-status-before-ask.json"
+          jq -e '
+            .kind == "status" and
+            .permission_mode == "ask" and
+            .session_permission_grants == 0 and
+            .mcp.connection_check == "not_checked" and
+            .mcp.inspection_error == null and
+            all(.mcp.servers[]?;
+              .admission == "pending" and
+              .connection == "not_checked" and
+              .authentication == "not_checked"
+            )
+          ' "$RUNNER_TEMP/fx-status-before-ask.json" >/dev/null
+          prompt=$(<"$RUNNER_TEMP/conflict-fx-artifact/prompt.txt")
+          exec fx ask --json --no-save -- "$prompt" \
+            > "$RUNNER_TEMP/conflict-fx-artifact/fx-result.json"
+
+      - name: Package model result after credential scope ends
+        id: repair
+        if: always()
+        env:
+          MODEL_STEP_OUTCOME: ${{ steps.model.outcome }}
+          FX_MODEL: openai/gpt-5.6-sol
+          SOURCE_HEAD: ${{ matrix.headRefOid }}
+        run: |
+          set -euo pipefail
+          artifact_dir="$RUNNER_TEMP/conflict-fx-artifact"
+          receipt="$artifact_dir/receipt.json"
+          outcome=$(jq -r '.outcome' "$receipt")
+          if [[ "$outcome" == 'model_required' ]]; then
+            observed_model=$(jq -r '.model // ""' "$artifact_dir/fx-result.json" 2>/dev/null || true)
+            if [[ "$MODEL_STEP_OUTCOME" != 'success' ]]; then
+              outcome='fx_failed'
+              detail='FX exited unsuccessfully inside the credential-isolated step'
+            elif [[ "$observed_model" != "$FX_MODEL" ]]; then
+              outcome='model_mismatch'
+              detail="FX reported ${observed_model:-missing}; expected $FX_MODEL"
+            elif [[ "$(git rev-parse HEAD)" != "$SOURCE_HEAD" ]]; then
+              outcome='model_boundary_violation'
+              detail='FX changed commit history instead of only resolving the working tree'
+            else
+              git add --all
+              if [[ -n "$(git diff --name-only --diff-filter=U)" ]]; then
+                outcome='unresolved'
+                detail='FX returned with unmerged index entries'
+              else
+                outcome='candidate'
+                detail='FX produced a bounded candidate awaiting independent verification'
+              fi
+            fi
+            jq --arg observedModel "$observed_model" --arg outcome "$outcome" --arg detail "$detail" \
+              '.observedModel=$observedModel | .outcome=$outcome | .detail=$detail' \
+              "$receipt" > "$receipt.next"
+            mv "$receipt.next" "$receipt"
+          fi
+          rm "$artifact_dir/prompt.txt" 2>/dev/null || true
+          echo "outcome=$(jq -r '.outcome' "$receipt")" >> "$GITHUB_OUTPUT"
+
+      - name: Seal candidate artifact without executing PR code
+        if: always()
+        env:
+          SOURCE_HEAD: ${{ matrix.headRefOid }}
+          BASE_HEAD: ${{ matrix.baseRefOid }}
+        run: |
+          set -euo pipefail
+          artifact_dir="$RUNNER_TEMP/conflict-fx-artifact"
+          receipt="$artifact_dir/receipt.json"
+          patch="$artifact_dir/repair.patch"
+          [[ -f "$receipt" ]] || exit 0
+          [[ "$(jq -r '.outcome' "$receipt")" == 'candidate' ]] || exit 0
+          test "$(git rev-parse HEAD)" = "$SOURCE_HEAD"
+          git add --all
+          if [[ -n "$(git diff --name-only --diff-filter=U)" ]]; then
+            jq '.outcome="unresolved" | .detail="candidate retained unmerged index entries"' "$receipt" > "$receipt.next"
+            mv "$receipt.next" "$receipt"
+            exit 0
+          fi
+          if ! git diff --cached --check; then
+            jq '.outcome="invalid_diff" | .detail="candidate failed git diff --check"' "$receipt" > "$receipt.next"
+            mv "$receipt.next" "$receipt"
+            exit 0
+          fi
+          if git diff --cached --summary "$SOURCE_HEAD" | grep -E 'create mode (120000|160000)' >/dev/null; then
+            jq '.outcome="unsafe_entry" | .detail="candidate adds a symlink or submodule"' "$receipt" > "$receipt.next"
+            mv "$receipt.next" "$receipt"
+            exit 0
+          fi
+
+          resolved_tree=$(git write-tree)
+          git config user.name 'jovie-conflict-verifier'
+          git config user.email 'jovie-conflict-verifier@users.noreply.github.com'
+          candidate_commit=$(printf 'test(ci): verify exact conflict candidate\n' \
+            | git commit-tree "$resolved_tree" -p "$SOURCE_HEAD" -p "$BASE_HEAD")
+          git checkout --detach "$candidate_commit"
+          git diff --binary --full-index "$SOURCE_HEAD" "$candidate_commit" > "$patch"
+          patch_sha=$(sha256sum "$patch" | cut -d' ' -f1)
+
+          jq --arg patchSha256 "$patch_sha" --arg resolvedTreeOid "$resolved_tree" \
+            '.outcome="candidate" | .detail="candidate sealed without executing PR code; independent runner verification required" | .patchSha256=$patchSha256 | .resolvedTreeOid=$resolvedTreeOid | .verification={command:"deferred to isolated verification runner",exitCode:null}' \
+            "$receipt" > "$receipt.next"
+          mv "$receipt.next" "$receipt"
+
+      - name: Upload immutable conflict artifact
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: conflict-fx-candidate-${{ github.run_id }}-${{ github.run_attempt }}-pr-${{ matrix.prNumber }}-attempt-${{ matrix.attempt }}
+          path: ${{ runner.temp }}/conflict-fx-artifact
+          if-no-files-found: error
+          retention-days: 3
+
+  verify_conflict:
+    name: Independently verify PR #${{ matrix.prNumber }} resolution
+    needs: [plan, conflict_fx]
+    if: >-
+      always() &&
+      needs.plan.result == 'success' &&
+      needs.plan.outputs.apply == 'true' &&
+      needs.plan.outputs.fx_count != '0'
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    permissions:
+      contents: read
+    strategy:
+      fail-fast: false
+      max-parallel: ${{ fromJSON(needs.plan.outputs.adaptive_cap) }}
+      matrix:
+        include: ${{ fromJSON(needs.plan.outputs.fx_matrix) }}
+    steps:
+      - name: Checkout exact source head without credentials
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ matrix.headRefOid }}
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Download immutable untrusted candidate
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          name: conflict-fx-candidate-${{ github.run_id }}-${{ github.run_attempt }}-pr-${{ matrix.prNumber }}-attempt-${{ matrix.attempt }}
+          path: ${{ runner.temp }}/conflict-fx-verified
+
+      - name: Prevalidate and apply candidate on secret-free runner
+        id: candidate
+        env:
+          PR_NUMBER: ${{ matrix.prNumber }}
+          SOURCE_HEAD: ${{ matrix.headRefOid }}
+          BASE_HEAD: ${{ matrix.baseRefOid }}
+          BASE_REF: ${{ matrix.baseRefName }}
+          HEAD_REF: ${{ matrix.headRefName }}
+          ATTEMPT: ${{ matrix.attempt }}
+          MAX_ATTEMPTS: ${{ matrix.maxAttempts }}
+          EXPECTED_MODEL: openai/gpt-5.6-sol
+        run: |
+          set -euo pipefail
+          candidate_dir="$RUNNER_TEMP/conflict-fx-verified"
+          verification_dir="$RUNNER_TEMP/conflict-fx-verification"
+          receipt="$candidate_dir/receipt.json"
+          patch="$candidate_dir/repair.patch"
+          mkdir -p "$verification_dir"
+          receipt_sha=$(sha256sum "$receipt" | cut -d' ' -f1)
+          write_binding() {
+            local verified="$1" reason="$2" patch_sha="${3:-}" tree_oid="${4:-}"
+            jq -n --argjson pr "$PR_NUMBER" --arg sourceHead "$SOURCE_HEAD" \
+              --arg baseHead "$BASE_HEAD" --arg baseRef "$BASE_REF" --arg headRef "$HEAD_REF" \
+              --argjson attempt "$ATTEMPT" --argjson maxAttempts "$MAX_ATTEMPTS" \
+              --arg candidateReceiptSha256 "$receipt_sha" --arg patchSha256 "$patch_sha" \
+              --arg resolvedTreeOid "$tree_oid" --argjson verified "$verified" --arg reason "$reason" \
+              '{schema:"jovie-conflict-fx-verification/v1",pr:$pr,sourceHead:$sourceHead,baseHead:$baseHead,baseRef:$baseRef,headRef:$headRef,attempt:$attempt,maxAttempts:$maxAttempts,candidateReceiptSha256:$candidateReceiptSha256,patchSha256:$patchSha256,resolvedTreeOid:$resolvedTreeOid,verified:$verified,reason:$reason}' \
+              > "$verification_dir/verification.json"
+          }
+
+          test "$(git rev-parse HEAD)" = "$SOURCE_HEAD"
+          if ! jq -e --argjson pr "$PR_NUMBER" --arg source "$SOURCE_HEAD" \
+            --arg base "$BASE_HEAD" --arg baseRef "$BASE_REF" --arg ref "$HEAD_REF" \
+            --argjson attempt "$ATTEMPT" --argjson maxAttempts "$MAX_ATTEMPTS" \
+            --arg model "$EXPECTED_MODEL" \
+            '.schema == "jovie-conflict-fx-artifact/v1" and .pr == $pr and .sourceHead == $source and .baseHead == $base and .baseRef == $baseRef and .headRef == $ref and .attempt == $attempt and .maxAttempts == $maxAttempts and .expectedModel == $model' \
+            "$receipt" >/dev/null; then
+            write_binding false 'candidate envelope does not match the exact plan'
+            echo 'candidate=false' >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          if [[ "$(jq -r '.outcome' "$receipt")" != 'candidate' ]]; then
+            write_binding false "candidate outcome is $(jq -r '.outcome' "$receipt")"
+            echo 'candidate=false' >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          expected_patch_sha=$(jq -r '.patchSha256' "$receipt")
+          if [[ ! "$expected_patch_sha" =~ ^[0-9a-f]{64}$ ]] || \
+            [[ "$(sha256sum "$patch" | cut -d' ' -f1)" != "$expected_patch_sha" ]]; then
+            write_binding false 'candidate patch hash failed independent verification'
+            echo 'candidate=false' >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          if ! git apply --binary --index --whitespace=nowarn "$patch"; then
+            write_binding false 'candidate patch could not be applied to the exact source head' "$expected_patch_sha"
+            echo 'candidate=false' >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          if ! git diff --cached --check; then
+            write_binding false 'candidate failed independent git diff --check' "$expected_patch_sha"
+            echo 'candidate=false' >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          if git diff --cached --summary "$SOURCE_HEAD" | grep -E 'create mode (120000|160000)' >/dev/null; then
+            write_binding false 'candidate adds an unsafe symlink or submodule entry' "$expected_patch_sha"
+            echo 'candidate=false' >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          resolved_tree=$(git write-tree)
+          if [[ "$resolved_tree" != "$(jq -r '.resolvedTreeOid' "$receipt")" ]]; then
+            write_binding false 'candidate tree differs from its immutable receipt' "$expected_patch_sha" "$resolved_tree"
+            echo 'candidate=false' >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          if ! git cat-file -e "$BASE_HEAD^{commit}" 2>/dev/null; then
+            git fetch --no-tags origin "$BASE_HEAD"
+          fi
+          test "$(git rev-parse "$BASE_HEAD^{commit}")" = "$BASE_HEAD"
+          git show "$BASE_HEAD:scripts/run-affected-tests.mjs" \
+            > "$RUNNER_TEMP/trusted-run-affected-tests.mjs"
+          chmod 0444 "$RUNNER_TEMP/trusted-run-affected-tests.mjs"
+          {
+            echo 'candidate=true'
+            echo "candidate_receipt_sha=$receipt_sha"
+            echo "patch_sha=$expected_patch_sha"
+            echo "resolved_tree=$resolved_tree"
+          } >> "$GITHUB_OUTPUT"
+
+      - name: Execute PR code only inside an isolated credential-free container
+        if: steps.candidate.outputs.candidate == 'true'
+        env:
+          PR_NUMBER: ${{ matrix.prNumber }}
+          SOURCE_HEAD: ${{ matrix.headRefOid }}
+          BASE_HEAD: ${{ matrix.baseRefOid }}
+          BASE_REF: ${{ matrix.baseRefName }}
+          HEAD_REF: ${{ matrix.headRefName }}
+          ATTEMPT: ${{ matrix.attempt }}
+          MAX_ATTEMPTS: ${{ matrix.maxAttempts }}
+          CANDIDATE_RECEIPT_SHA: ${{ steps.candidate.outputs.candidate_receipt_sha }}
+          PATCH_SHA: ${{ steps.candidate.outputs.patch_sha }}
+          RESOLVED_TREE: ${{ steps.candidate.outputs.resolved_tree }}
+        run: |
+          set -euo pipefail
+          set +e
+          docker run --rm \
+            --cap-drop ALL \
+            --security-opt no-new-privileges \
+            --pids-limit 512 \
+            --env CI=true \
+            --env SOURCE_HEAD="$SOURCE_HEAD" \
+            --env HOME=/tmp/jovie-container-home \
+            --volume "$GITHUB_WORKSPACE:/workspace:rw" \
+            --volume "$RUNNER_TEMP/trusted-run-affected-tests.mjs:/workspace/scripts/run-affected-tests.mjs:ro" \
+            --workdir /workspace \
+            'node:22.23.2-bookworm@sha256:8a34c4ab3ea2c5cd194f07e317b2a8f09461d3c8b05c4e34c8ccd56d56024c4d' \
+            bash -lc 'corepack enable && corepack prepare pnpm@9.15.4 --activate && pnpm install --frozen-lockfile && node scripts/run-affected-tests.mjs --base "$SOURCE_HEAD" --max-workers 2'
+          verify_rc=$?
+          set -e
+          verified=false
+          reason="isolated affected verification exited $verify_rc"
+          if [[ "$verify_rc" -eq 0 ]]; then
+            verified=true
+            reason='candidate passed isolated credential-free affected verification'
+          fi
+          jq -n --argjson pr "$PR_NUMBER" \
+            --arg sourceHead "$SOURCE_HEAD" --arg baseHead "$BASE_HEAD" \
+            --arg baseRef "$BASE_REF" --arg headRef "$HEAD_REF" \
+            --argjson attempt "$ATTEMPT" --argjson maxAttempts "$MAX_ATTEMPTS" \
+            --arg candidateReceiptSha256 "$CANDIDATE_RECEIPT_SHA" \
+            --arg patchSha256 "$PATCH_SHA" \
+            --arg resolvedTreeOid "$RESOLVED_TREE" \
+            --argjson verified "$verified" --arg reason "$reason" \
+            '{schema:"jovie-conflict-fx-verification/v1",pr:$pr,sourceHead:$sourceHead,baseHead:$baseHead,baseRef:$baseRef,headRef:$headRef,attempt:$attempt,maxAttempts:$maxAttempts,candidateReceiptSha256:$candidateReceiptSha256,patchSha256:$patchSha256,resolvedTreeOid:$resolvedTreeOid,verified:$verified,reason:$reason}' \
+            > "$RUNNER_TEMP/conflict-fx-verification/verification.json"
+
+      - name: Upload isolated verification binding only
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: conflict-fx-verification-${{ github.run_id }}-${{ github.run_attempt }}-pr-${{ matrix.prNumber }}-attempt-${{ matrix.attempt }}
+          path: ${{ runner.temp }}/conflict-fx-verification
+          if-no-files-found: error
+          retention-days: 3
+
+  deliver:
+    name: Deliver PR #${{ matrix.prNumber }} resolution
+    needs: [plan, verify_conflict]
+    if: always() && needs.plan.result == 'success' && needs.plan.outputs.apply == 'true' && needs.plan.outputs.fx_count != '0'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      actions: read
+      contents: read
+      pull-requests: read
+    strategy:
+      fail-fast: false
+      max-parallel: ${{ fromJSON(needs.plan.outputs.adaptive_cap) }}
+      matrix:
+        include: ${{ fromJSON(needs.plan.outputs.fx_matrix) }}
+    steps:
+      - name: Checkout exact source head without credentials
+        id: checkout
+        continue-on-error: true
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ matrix.headRefOid }}
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Download immutable conflict artifact
+        id: download
+        continue-on-error: true
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          name: conflict-fx-candidate-${{ github.run_id }}-${{ github.run_attempt }}-pr-${{ matrix.prNumber }}-attempt-${{ matrix.attempt }}
+          path: ${{ runner.temp }}/conflict-fx-artifact
+
+      - name: Download isolated verification binding
+        id: verification
+        continue-on-error: true
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          name: conflict-fx-verification-${{ github.run_id }}-${{ github.run_attempt }}-pr-${{ matrix.prNumber }}-attempt-${{ matrix.attempt }}
+          path: ${{ runner.temp }}/conflict-fx-verification
+
+      - name: Validate immutable artifact before writer authority
+        id: prevalidate
+        env:
+          PR_NUMBER: ${{ matrix.prNumber }}
+          SOURCE_HEAD: ${{ matrix.headRefOid }}
+          BASE_HEAD: ${{ matrix.baseRefOid }}
+          BASE_REF: ${{ matrix.baseRefName }}
+          HEAD_REF: ${{ matrix.headRefName }}
+          ATTEMPT: ${{ matrix.attempt }}
+          MAX_ATTEMPTS: ${{ matrix.maxAttempts }}
+          EXPECTED_MODEL: openai/gpt-5.6-sol
+          CHECKOUT_OUTCOME: ${{ steps.checkout.outcome }}
+          DOWNLOAD_OUTCOME: ${{ steps.download.outcome }}
+          VERIFICATION_OUTCOME: ${{ steps.verification.outcome }}
+        run: |
+          set -euo pipefail
+          artifact_dir="$RUNNER_TEMP/conflict-fx-artifact"
+          receipt="$artifact_dir/receipt.json"
+          patch="$artifact_dir/repair.patch"
+          verification="$RUNNER_TEMP/conflict-fx-verification/verification.json"
+          echo 'trusted=false' >> "$GITHUB_OUTPUT"
+          echo 'deliverable=false' >> "$GITHUB_OUTPUT"
+          if [[ "$CHECKOUT_OUTCOME" != 'success' || "$DOWNLOAD_OUTCOME" != 'success' || ! -f "$receipt" || ! -f "$patch" ]]; then
+            exit 0
+          fi
+          jq -e --argjson pr "$PR_NUMBER" --arg source "$SOURCE_HEAD" --arg base "$BASE_HEAD" \
+            --arg baseRef "$BASE_REF" --arg ref "$HEAD_REF" --argjson attempt "$ATTEMPT" --argjson maxAttempts "$MAX_ATTEMPTS" \
+            --arg model "$EXPECTED_MODEL" \
+            '.schema == "jovie-conflict-fx-artifact/v1" and .pr == $pr and .sourceHead == $source and .baseHead == $base and .baseRef == $baseRef and .headRef == $ref and .attempt == $attempt and .maxAttempts == $maxAttempts and .expectedModel == $model' \
+            "$receipt" >/dev/null
+          echo 'trusted=true' >> "$GITHUB_OUTPUT"
+          if [[ "$(jq -r '.outcome' "$receipt")" != 'candidate' ]]; then
+            exit 0
+          fi
+          jq -e --arg model "$EXPECTED_MODEL" \
+            '(.observedModel == $model or .observedModel == "mechanical") and (.resolvedTreeOid | test("^[0-9a-f]{40}$")) and (.patchSha256 | test("^[0-9a-f]{64}$"))' \
+            "$receipt" >/dev/null
+          expected_patch_sha=$(jq -r '.patchSha256' "$receipt")
+          echo "$expected_patch_sha  $patch" | sha256sum --check --strict
+          [[ "$VERIFICATION_OUTCOME" == 'success' && -f "$verification" ]] || exit 0
+          receipt_sha=$(sha256sum "$receipt" | cut -d' ' -f1)
+          resolved_tree=$(jq -r '.resolvedTreeOid' "$receipt")
+          jq -e --argjson pr "$PR_NUMBER" --arg source "$SOURCE_HEAD" --arg base "$BASE_HEAD" \
+            --arg baseRef "$BASE_REF" --arg ref "$HEAD_REF" --argjson attempt "$ATTEMPT" \
+            --argjson maxAttempts "$MAX_ATTEMPTS" --arg receiptSha "$receipt_sha" \
+            --arg patchSha "$expected_patch_sha" --arg tree "$resolved_tree" \
+            '.schema == "jovie-conflict-fx-verification/v1" and .verified == true and .pr == $pr and .sourceHead == $source and .baseHead == $base and .baseRef == $baseRef and .headRef == $ref and .attempt == $attempt and .maxAttempts == $maxAttempts and .candidateReceiptSha256 == $receiptSha and .patchSha256 == $patchSha and .resolvedTreeOid == $tree' \
+            "$verification" >/dev/null || exit 0
+          echo 'deliverable=true' >> "$GITHUB_OUTPUT"
+
+      - name: Generate short-lived Jovie App writer token
+        id: app-token
+        if: steps.prevalidate.outputs.trusted == 'true'
+        uses: actions/create-github-app-token@bcd2ba49218906704ab6c1aa796996da409d3eb1 # v3.2.0
+        with:
+          app-id: ${{ vars.JOVIE_BOT_APP_ID }}
+          private-key: ${{ secrets.JOVIE_BOT_PRIVATE_KEY }}
+          permission-contents: write
+          permission-issues: write
+          permission-pull-requests: read
+          permission-statuses: write
+
+      - name: Validate, reread, and deliver once
+        if: always() && steps.app-token.outcome == 'success'
+        env:
+          GH_TOKEN: ${{ steps.app-token.outputs.token }}
+          GH_QUEUE_TOKEN: ${{ github.token }}
+          REPOSITORY: ${{ github.repository }}
+          PR_NUMBER: ${{ matrix.prNumber }}
+          SOURCE_HEAD: ${{ matrix.headRefOid }}
+          BASE_HEAD: ${{ matrix.baseRefOid }}
+          BASE_REF: ${{ matrix.baseRefName }}
+          HEAD_REF: ${{ matrix.headRefName }}
+          ATTEMPT: ${{ matrix.attempt }}
+          MAX_ATTEMPTS: ${{ matrix.maxAttempts }}
+          COHORT_ID: ${{ needs.plan.outputs.cohort_id }}
+          EXPECTED_MODEL: openai/gpt-5.6-sol
+          CHECKOUT_OUTCOME: ${{ steps.checkout.outcome }}
+          DOWNLOAD_OUTCOME: ${{ steps.download.outcome }}
+          DELIVERABLE: ${{ steps.prevalidate.outputs.deliverable }}
+          ADAPTIVE_CAP: ${{ needs.plan.outputs.adaptive_cap }}
+          EXPECTED_DRAFT: ${{ matrix.draftState }}
+          EXPECTED_AUTO_MERGE: ${{ matrix.autoMergeEnabled }}
+        run: |
+          set -euo pipefail
+          artifact_dir="$RUNNER_TEMP/conflict-fx-artifact"
+          receipt="$artifact_dir/receipt.json"
+          patch="$artifact_dir/repair.patch"
+          run_url="https://github.com/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}"
+          status_url="$run_url?base_ref=$(jq -nr --arg value "$BASE_REF" '$value | @uri')"
+
+          status_description() {
+            local outcome="$1" safe_cohort
+            safe_cohort=$(printf '%s' "$COHORT_ID" | tr -cd 'A-Za-z0-9_.-' | head -c 32)
+            printf 'jovie-conflict-fx/v1 cohort=%s cap=%s try=%s/%s result=%s base=%s' \
+              "${safe_cohort:-unknown}" "$ADAPTIVE_CAP" "$ATTEMPT" "$MAX_ATTEMPTS" "$outcome" "$BASE_HEAD"
+          }
+          post_status() {
+            local sha="$1" state="$2" outcome="$3" description
+            description=$(status_description "$outcome")
+            gh api -X POST "repos/$REPOSITORY/statuses/$sha" \
+              -f state="$state" -f context='Jovie Conflict FX' \
+              -f description="${description:0:140}" -f target_url="$status_url" >/dev/null
+          }
+          upsert_pr_comment() {
+            local marker="$1" body="$2" hidden existing
+            hidden="<!-- bot-comment:$marker -->"
+            body="$hidden"$'\n'"$body"
+            existing=$(gh api "repos/$REPOSITORY/issues/$PR_NUMBER/comments?per_page=100" --paginate \
+              --jq ".[] | select(.body | contains(\"$hidden\")) | .id" | head -1 || true)
+            if [[ -n "$existing" ]]; then
+              gh api -X PATCH "repos/$REPOSITORY/issues/comments/$existing" \
+                -f body="$body" >/dev/null
+            else
+              gh api -X POST "repos/$REPOSITORY/issues/$PR_NUMBER/comments" \
+                -f body="$body" >/dev/null
+            fi
+          }
+
+          artifact_outcome='artifact_missing'
+          detail='the immutable FX artifact was unavailable'
+          conflict_files='[]'
+          competing_changes='[]'
+          if [[ "$CHECKOUT_OUTCOME" == 'success' && "$DOWNLOAD_OUTCOME" == 'success' && -f "$receipt" && -f "$patch" ]] \
+            && jq -e --argjson pr "$PR_NUMBER" --arg source "$SOURCE_HEAD" \
+              --arg base "$BASE_HEAD" --arg baseRef "$BASE_REF" --arg ref "$HEAD_REF" \
+              --argjson attempt "$ATTEMPT" --argjson maxAttempts "$MAX_ATTEMPTS" \
+              --arg model "$EXPECTED_MODEL" \
+              '.schema == "jovie-conflict-fx-artifact/v1" and .pr == $pr and .sourceHead == $source and .baseHead == $base and .baseRef == $baseRef and .headRef == $ref and .attempt == $attempt and .maxAttempts == $maxAttempts and .expectedModel == $model' \
+              "$receipt" >/dev/null; then
+            artifact_outcome=$(jq -r '.outcome' "$receipt")
+            if [[ "$artifact_outcome" == 'candidate' && "$DELIVERABLE" == 'true' ]]; then
+              artifact_outcome='resolved'
+            fi
+            detail=$(jq -r '.detail' "$receipt")
+            conflict_files=$(jq -c '.conflictFiles // []' "$receipt")
+            competing_changes=$(jq -c '.competingChanges // []' "$receipt")
+          fi
+
+          if [[ "$artifact_outcome" != 'resolved' ]]; then
+            terminal_outcome='failed'
+            [[ "$ATTEMPT" -lt "$MAX_ATTEMPTS" ]] || terminal_outcome='exhausted'
+            post_status "$SOURCE_HEAD" failure "$terminal_outcome"
+            if [[ "$terminal_outcome" == 'exhausted' ]]; then
+              conflict_lines=$(jq -r 'if length == 0 then "- Unknown (no typed set was produced)" else map("- `" + . + "`") | join("\n") end' <<<"$conflict_files")
+              competing_lines=$(jq -r 'if length == 0 then "- No typed ours/theirs blob evidence was produced." else map("- `" + .file + "`: ours `" + (.oursBlob // "missing") + "`; theirs `" + (.theirsBlob // "missing") + "`") | join("\n") end' <<<"$competing_changes")
+              body=$(jq -nr --arg head "$SOURCE_HEAD" --arg base "$BASE_HEAD" \
+                --arg attempts "$ATTEMPT/$MAX_ATTEMPTS" --arg model "$EXPECTED_MODEL" \
+                --arg detail "$detail" --arg conflicts "$conflict_lines" --arg competing "$competing_lines" \
+                '["<!-- jovie-conflict-steering-exception/v1 -->","## Conflict FX bounded exhaustion","","- Exact head: `"+$head+"`","- Exact base: `"+$base+"`","- Attempts: `"+$attempts+"`","- Model: `"+$model+"`","- Closed-loop terminal for this exact pair: `true`","- Terminal detail: "+$detail,"","### Competing files",$conflicts,"","### Competing changes",$competing,"","No passive-human or taste hold was added. A changed source or base SHA starts a fresh bounded lease automatically. Any genuinely subjective choice belongs in a separate follow-up PR and never blocks this shipping PR."] | join("\n")')
+              upsert_pr_comment 'conflict-fx-exhaustion' "$body"
+            fi
+            echo "::warning::Conflict FX terminal outcome=$terminal_outcome detail=$detail"
+            exit 0
+          fi
+
+          jq -e --arg model "$EXPECTED_MODEL" \
+            '(.observedModel == $model or .observedModel == "mechanical") and (.resolvedTreeOid | test("^[0-9a-f]{40}$")) and (.patchSha256 | test("^[0-9a-f]{64}$"))' \
+            "$receipt" >/dev/null
+          expected_patch_sha=$(jq -r '.patchSha256' "$receipt")
+          test "$(sha256sum "$patch" | cut -d' ' -f1)" = "$expected_patch_sha"
+          test "$(git rev-parse HEAD)" = "$SOURCE_HEAD"
+          if ! git cat-file -e "$BASE_HEAD^{commit}" 2>/dev/null; then
+            git fetch --no-tags origin "$BASE_HEAD"
+          fi
+          git config user.name 'jovie-bot[bot]'
+          git config user.email 'jovie-bot[bot]@users.noreply.github.com'
+
+          # Reproduce the exact merge independently and freeze every
+          # non-conflicting index entry. The model may choose content only for
+          # Git's original conflict set; it cannot smuggle unrelated workflow,
+          # code, test, symlink, or submodule edits into the trusted patch.
+          expected_manifest="$RUNNER_TEMP/expected-merge-manifest.json"
+          candidate_manifest="$RUNNER_TEMP/candidate-merge-manifest.json"
+          conflict_files=$(jq -c '.conflictFiles // []' "$receipt")
+          set +e
+          git merge --no-commit --no-ff "$BASE_HEAD" > "$RUNNER_TEMP/writer-merge.log" 2>&1
+          writer_merge_rc=$?
+          set -e
+          live_conflict_paths="$RUNNER_TEMP/live-conflict-paths.z"
+          git diff --name-only --diff-filter=U -z > "$live_conflict_paths"
+          if ! iconv -f UTF-8 -t UTF-8 "$live_conflict_paths" >/dev/null; then
+            echo "::error::Live conflict path set contains invalid UTF-8 bytes."
+            exit 1
+          fi
+          live_conflict_files=$(jq -Rs 'split("\u0000") | map(select(length > 0))' \
+            < "$live_conflict_paths")
+          jq -e --argjson expected "$conflict_files" \
+            'sort == ($expected | sort)' <<<"$live_conflict_files" >/dev/null
+
+          build_index_manifest() {
+            local raw_file="$1" output_file="$2" reject_unsafe="$3"
+            if ! iconv -f UTF-8 -t UTF-8 "$raw_file" >/dev/null; then
+              echo "::error::Git index manifest contains invalid UTF-8 path bytes."
+              return 1
+            fi
+            RAW_MANIFEST="$raw_file" OUTPUT_MANIFEST="$output_file" \
+              CONFLICT_FILES="$conflict_files" REJECT_UNSAFE="$reject_unsafe" \
+              node --input-type=module <<'NODE'
+          import { readFileSync, writeFileSync } from 'node:fs';
+          const conflicts = new Set(
+            JSON.parse(process.env.CONFLICT_FILES).map(path =>
+              Buffer.from(path, 'utf8').toString('base64url')
+            )
+          );
+          const entries = [];
+          for (const record of readFileSync(process.env.RAW_MANIFEST)
+            .toString('utf8')
+            .split('\0')
+            .filter(Boolean)) {
+            const match = /^(\d+) ([0-9a-f]{40}) ([0-3])\t([\s\S]*)$/u.exec(record);
+            if (!match) throw new Error('malformed git index manifest');
+            const [, mode, oid, stage, path] = match;
+            const key = Buffer.from(path, 'utf8').toString('base64url');
+            if (conflicts.has(key)) {
+              if (
+                process.env.REJECT_UNSAFE === 'true' &&
+                ['120000', '160000'].includes(mode)
+              ) {
+                throw new Error('conflict candidate introduced an unsafe entry type');
+              }
+              continue;
+            }
+            entries.push({ path: key, mode, oid, stage });
+          }
+          entries.sort((a, b) => a.path.localeCompare(b.path));
+          writeFileSync(process.env.OUTPUT_MANIFEST, `${JSON.stringify(entries)}\n`, {
+            mode: 0o600,
+          });
+          NODE
+          }
+
+          git ls-files --stage -z > "$RUNNER_TEMP/expected-index.raw"
+          build_index_manifest "$RUNNER_TEMP/expected-index.raw" "$expected_manifest" false
+          if git rev-parse --quiet --verify MERGE_HEAD >/dev/null; then
+            git merge --abort
+          elif [[ "$writer_merge_rc" -eq 0 ]]; then
+            git checkout --detach "$SOURCE_HEAD"
+            git read-tree --reset -u "$SOURCE_HEAD"
+          else
+            echo "::error::Exact merge reproduction failed without a merge state."
+            exit 1
+          fi
+          test "$(git rev-parse HEAD)" = "$SOURCE_HEAD"
+          if [[ -s "$patch" ]]; then
+            git apply --binary --index --check "$patch"
+            git apply --binary --index "$patch"
+          fi
+          git diff --cached --check
+          git ls-files --stage -z > "$RUNNER_TEMP/candidate-index.raw"
+          build_index_manifest "$RUNNER_TEMP/candidate-index.raw" "$candidate_manifest" true
+          cmp --silent "$expected_manifest" "$candidate_manifest"
+          resolved_tree=$(git write-tree)
+          expected_tree=$(jq -r '.resolvedTreeOid' "$receipt")
+          test "$resolved_tree" = "$expected_tree"
+
+          message=$(printf 'chore(ci): resolve PR #%s conflict\n\nJOV-INV-021\nConflict-FX-Source: %s\nConflict-FX-Base: %s\nConflict-FX-Attempt: %s/%s\n' \
+            "$PR_NUMBER" "$SOURCE_HEAD" "$BASE_HEAD" "$ATTEMPT" "$MAX_ATTEMPTS")
+          resolved_commit=$(printf '%s' "$message" \
+            | git commit-tree "$resolved_tree" -p "$SOURCE_HEAD" -p "$BASE_HEAD")
+          test "$(git rev-parse "$resolved_commit^1")" = "$SOURCE_HEAD"
+          test "$(git rev-parse "$resolved_commit^2")" = "$BASE_HEAD"
+          git merge-base --is-ancestor "$SOURCE_HEAD" "$resolved_commit"
+          git merge-base --is-ancestor "$BASE_HEAD" "$resolved_commit"
+          git checkout --detach "$resolved_commit"
+
+          # Exact live identity is read immediately before the sole branch push.
+          live=$(gh api "repos/$REPOSITORY/pulls/$PR_NUMBER" \
+            --jq '{state:.state,draft:.draft,head:.head.sha,baseRef:.base.ref,ref:.head.ref,autoMerge:(.auto_merge != null),sameRepo:(.head.repo.full_name == .base.repo.full_name),fork:(.head.repo.fork // false)}')
+          # shellcheck disable=SC2016
+          live_base=$(GH_TOKEN="$GH_QUEUE_TOKEN" gh api graphql \
+            -f query='query($owner:String!,$name:String!,$qualifiedName:String!){repository(owner:$owner,name:$name){ref(qualifiedName:$qualifiedName){target{oid}}}}' \
+            -f owner="${REPOSITORY%%/*}" -f name="${REPOSITORY#*/}" \
+            -f qualifiedName="refs/heads/$BASE_REF" \
+            --jq '.data.repository.ref.target.oid // ""')
+          live=$(jq --arg base "$live_base" '. + {base:$base}' <<<"$live")
+          # shellcheck disable=SC2016
+          queue_before=$(GH_TOKEN="$GH_QUEUE_TOKEN" gh api graphql \
+            -f query='query($owner:String!,$name:String!,$number:Int!){repository(owner:$owner,name:$name){pullRequest(number:$number){autoMergeRequest{enabledAt} isInMergeQueue mergeQueueEntry{position}}}}' \
+            -f owner="${REPOSITORY%%/*}" -f name="${REPOSITORY#*/}" -F number="$PR_NUMBER" \
+            --jq '.data.repository.pullRequest | {autoMergeEnabled:(.autoMergeRequest != null),isInMergeQueue,mergeQueueEntryPresent:(.mergeQueueEntry != null)}')
+          if ! jq -e --arg head "$SOURCE_HEAD" --arg base "$BASE_HEAD" --arg baseRef "$BASE_REF" --arg ref "$HEAD_REF" \
+            --argjson draft "$EXPECTED_DRAFT" --argjson autoMerge "$EXPECTED_AUTO_MERGE" \
+            '.state == "open" and .draft == $draft and .autoMerge == $autoMerge and .sameRepo == true and .fork == false and .head == $head and .base == $base and .baseRef == $baseRef and .ref == $ref' \
+            <<<"$live" >/dev/null; then
+            post_status "$SOURCE_HEAD" error failed
+            echo "::notice::PR #$PR_NUMBER changed before delivery; refusing a stale push."
+            exit 0
+          fi
+          if jq -e '.isInMergeQueue == true or .mergeQueueEntryPresent == true' <<<"$queue_before" >/dev/null; then
+            post_status "$SOURCE_HEAD" error failed
+            echo "::notice::PR #$PR_NUMBER entered the native merge queue; refusing any head mutation."
+            exit 0
+          fi
+          auth=$(printf 'x-access-token:%s' "$GH_TOKEN" | base64 -w 0)
+          git -c http.https://github.com/.extraheader="AUTHORIZATION: basic $auth" \
+            push "https://github.com/$REPOSITORY.git" "HEAD:refs/heads/$HEAD_REF"
+
+          live_after=$(gh api "repos/$REPOSITORY/pulls/$PR_NUMBER" \
+            --jq '{state:.state,draft:.draft,head:.head.sha,baseRef:.base.ref,ref:.head.ref,autoMerge:(.auto_merge != null),sameRepo:(.head.repo.full_name == .base.repo.full_name),fork:(.head.repo.fork // false)}')
+          # shellcheck disable=SC2016
+          live_base_after=$(GH_TOKEN="$GH_QUEUE_TOKEN" gh api graphql \
+            -f query='query($owner:String!,$name:String!,$qualifiedName:String!){repository(owner:$owner,name:$name){ref(qualifiedName:$qualifiedName){target{oid}}}}' \
+            -f owner="${REPOSITORY%%/*}" -f name="${REPOSITORY#*/}" \
+            -f qualifiedName="refs/heads/$BASE_REF" \
+            --jq '.data.repository.ref.target.oid // ""')
+          live_after=$(jq --arg base "$live_base_after" '. + {base:$base}' <<<"$live_after")
+          # shellcheck disable=SC2016
+          queue_after=$(GH_TOKEN="$GH_QUEUE_TOKEN" gh api graphql \
+            -f query='query($owner:String!,$name:String!,$number:Int!){repository(owner:$owner,name:$name){pullRequest(number:$number){autoMergeRequest{enabledAt} isInMergeQueue mergeQueueEntry{position}}}}' \
+            -f owner="${REPOSITORY%%/*}" -f name="${REPOSITORY#*/}" -F number="$PR_NUMBER" \
+            --jq '.data.repository.pullRequest | {autoMergeEnabled:(.autoMergeRequest != null),isInMergeQueue,mergeQueueEntryPresent:(.mergeQueueEntry != null)}')
+          jq -e --arg head "$resolved_commit" --arg base "$BASE_HEAD" --arg baseRef "$BASE_REF" --arg ref "$HEAD_REF" \
+            --argjson draft "$EXPECTED_DRAFT" --argjson autoMerge "$EXPECTED_AUTO_MERGE" \
+            '.state == "open" and .draft == $draft and .autoMerge == $autoMerge and .sameRepo == true and .fork == false and .head == $head and .base == $base and .baseRef == $baseRef and .ref == $ref' \
+            <<<"$live_after" >/dev/null
+          # A head update can transiently change queue position while GitHub
+          # starts checks for the new commit. The invariant is that this lane
+          # never disables native auto-merge; it observes but does not mutate
+          # queue-entry placement.
+          jq -e --argjson before "$queue_before" \
+            '.autoMergeEnabled == $before.autoMergeEnabled' <<<"$queue_after" >/dev/null
+          if ! jq -e --argjson before "$queue_before" '. == $before' <<<"$queue_after" >/dev/null; then
+            echo "::notice::Native queue placement transitioned after the head update: before=$queue_before after=$queue_after"
+          fi
+
+          post_status "$SOURCE_HEAD" success success
+          post_status "$resolved_commit" success success
+          for label in needs-manual-rebase needs-conflict-resolution; do
+            encoded=$(printf '%s' "$label" | jq -sRr @uri)
+            gh api -X DELETE "repos/$REPOSITORY/issues/$PR_NUMBER/labels/$encoded" >/dev/null 2>&1 || true
+          done
+          echo "::notice::Delivered exact conflict resolution $SOURCE_HEAD -> $resolved_commit"
+          {
+            echo "### PR #$PR_NUMBER conflict repair"
+            echo
+            echo "- Source: \`$SOURCE_HEAD\`"
+            echo "- Base: \`$BASE_HEAD\`"
+            echo "- Delivered: \`$resolved_commit\`"
+            echo "- Model: \`$EXPECTED_MODEL\`"
+          } >> "$GITHUB_STEP_SUMMARY"
+
+  record_cohort:
+    name: Persist adaptive cohort and backlog receipt
+    needs: [plan, record_exception, conflict_fx, deliver]
+    if: >-
+      always() &&
+      needs.plan.result == 'success' &&
+      needs.plan.outputs.apply == 'true' &&
+      needs.plan.outputs.fx_count != '0'
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    permissions:
+      actions: read
+      contents: read
+      issues: read
+      pull-requests: read
+      statuses: read
+    steps:
+      - name: Checkout trusted main policy
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: main
+          persist-credentials: false
+
+      - name: Setup Node
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version-file: '.nvmrc'
+
+      - name: Generate short-lived Jovie App ledger token
+        id: app-token
+        uses: actions/create-github-app-token@bcd2ba49218906704ab6c1aa796996da409d3eb1 # v3.2.0
+        with:
+          app-id: ${{ vars.JOVIE_BOT_APP_ID }}
+          private-key: ${{ secrets.JOVIE_BOT_PRIVATE_KEY }}
+          permission-issues: write
+
+      - name: Reconcile exact outcomes and persist trusted cohort receipt
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_LEDGER_TOKEN: ${{ steps.app-token.outputs.token }}
+          GH_QUEUE_TOKEN: ${{ github.token }}
+          REPOSITORY: ${{ github.repository }}
+          TRACKING_ISSUE: '16794'
+          COHORT_ID: ${{ needs.plan.outputs.cohort_id }}
+          ADAPTIVE_TIER: ${{ needs.plan.outputs.adaptive_tier }}
+          BASELINE_P95_CI_LATENCY_MS: ${{ needs.plan.outputs.baseline_p95_ci_latency_ms }}
+          RUNNER_CAPACITY: ${{ needs.plan.outputs.runner_capacity }}
+          ACTIVE_CI: ${{ needs.plan.outputs.active_ci }}
+          QUEUED_CI: ${{ needs.plan.outputs.queued_ci }}
+          BEFORE_REPORT: ${{ needs.plan.outputs.before_report }}
+          FX_MATRIX: ${{ needs.plan.outputs.fx_matrix }}
+        run: |
+          set -euo pipefail
+          run_url="https://github.com/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}"
+          receipt="$RUNNER_TEMP/conflict-fx-cohort.json"
+          marker_file="$RUNNER_TEMP/conflict-fx-cohort-marker.txt"
+          after_plan="$RUNNER_TEMP/pr-conflict-handler-after.json"
+          after_log="$RUNNER_TEMP/pr-conflict-handler-after.log"
+          attempted=$(jq 'length' <<<"$FX_MATRIX")
+          successes=0
+          failures=0
+          stale_head_skips=0
+          poll_interval_seconds=30
+          poll_deadline_seconds=1200
+          max_ci_run_pages=5
+          max_cohort_size=40
+          printf '[]\n' > "$RUNNER_TEMP/ci-candidates.json"
+          : > "$RUNNER_TEMP/ci-latencies.txt"
+
+          COHORT_SIZE="$attempted" \
+          POLL_INTERVAL_SECONDS="$poll_interval_seconds" \
+          POLL_DEADLINE_SECONDS="$poll_deadline_seconds" \
+          MAX_CI_RUN_PAGES="$max_ci_run_pages" \
+          MAX_COHORT_SIZE="$max_cohort_size" \
+          node --input-type=module <<'NODE' > "$RUNNER_TEMP/conflict-cohort-read-budget.json"
+          import { computeConflictCohortReadBudget } from './scripts/lib/pr-conflict-handler.mjs';
+          const budget = computeConflictCohortReadBudget({
+            cohortSize: Number(process.env.COHORT_SIZE),
+            pollIntervalSeconds: Number(process.env.POLL_INTERVAL_SECONDS),
+            pollDeadlineSeconds: Number(process.env.POLL_DEADLINE_SECONDS),
+            maxCiRunPages: Number(process.env.MAX_CI_RUN_PAGES),
+            maxCohortSize: Number(process.env.MAX_COHORT_SIZE),
+          });
+          process.stdout.write(`${JSON.stringify(budget)}\n`);
+          NODE
+          jq -e '.withinRepositoryReadLimit == true' \
+            "$RUNNER_TEMP/conflict-cohort-read-budget.json" >/dev/null
+
+          conflict_status_for_sha() {
+            local sha="$1" base_ref="$2" encoded_base target
+            encoded_base=$(jq -nr --arg value "$base_ref" '$value | @uri')
+            target="${run_url}?base_ref=${encoded_base}"
+            gh api "repos/$REPOSITORY/commits/$sha/statuses?per_page=100" \
+              | jq -c --arg cohort "$COHORT_ID" --arg target "$target" '
+                [.[] | select(
+                  .context == "Jovie Conflict FX" and
+                  (.creator.type // "") == "Bot" and
+                  (.creator.login // "") == "jovie-bot[bot]" and
+                  .target_url == $target and
+                  (.description // "" | contains("cohort=" + $cohort + " "))
+                )] | sort_by(.created_at) | last // {}'
+          }
+
+          # Bind each successful delivery to both the exact source claim and
+          # the exact resolved head emitted by this run. A changed head without
+          # both trusted receipts is a stale-head failure, never clean evidence.
+          while IFS= read -r item; do
+            [[ -n "$item" ]] || continue
+            pr=$(jq -r '.prNumber' <<<"$item")
+            source_head=$(jq -r '.headRefOid' <<<"$item")
+            base_ref=$(jq -r '.baseRefName' <<<"$item")
+            source_status=$(conflict_status_for_sha "$source_head" "$base_ref")
+            live_head=$(gh api "repos/$REPOSITORY/pulls/$pr" --jq '.head.sha' 2>/dev/null || true)
+            if ! jq -e '.state == "success" and (.description // "" | contains("result=success"))' <<<"$source_status" >/dev/null; then
+              failures=$((failures + 1))
+              if [[ -n "$live_head" && "$live_head" != "$source_head" ]]; then
+                stale_head_skips=$((stale_head_skips + 1))
+              fi
+              continue
+            fi
+            if [[ -z "$live_head" || "$live_head" == "$source_head" ]]; then
+              failures=$((failures + 1))
+              continue
+            fi
+            resolved_status=$(conflict_status_for_sha "$live_head" "$base_ref")
+            if ! jq -e '.state == "success" and (.description // "" | contains("result=success"))' <<<"$resolved_status" >/dev/null; then
+              failures=$((failures + 1))
+              stale_head_skips=$((stale_head_skips + 1))
+              continue
+            fi
+            jq --argjson pr "$pr" --arg source "$source_head" --arg head "$live_head" \
+              '. + [{pr:$pr,sourceHead:$source,resolvedHead:$head}]' \
+              "$RUNNER_TEMP/ci-candidates.json" > "$RUNNER_TEMP/ci-candidates.next.json"
+            mv "$RUNNER_TEMP/ci-candidates.next.json" "$RUNNER_TEMP/ci-candidates.json"
+          done < <(jq -c '.[]' <<<"$FX_MATRIX")
+
+          # Wait only for the exact repaired heads' CI. This reporter does not
+          # gate delivery and does not introduce the retired ready-for-review
+          # flight; it converts those already-running checks into cohort data.
+          deadline=$((SECONDS + poll_deadline_seconds))
+          while [[ "$(jq 'length' "$RUNNER_TEMP/ci-candidates.json")" -gt 0 && "$SECONDS" -lt "$deadline" ]]; do
+            CANDIDATES_FILE="$RUNNER_TEMP/ci-candidates.json" \
+              node --input-type=module <<'NODE' > "$RUNNER_TEMP/conflict-cohort-live-heads.graphql"
+          import { readFileSync } from 'node:fs';
+          import { buildConflictCohortLiveHeadQuery } from './scripts/lib/pr-conflict-handler.mjs';
+          const candidates = JSON.parse(readFileSync(process.env.CANDIDATES_FILE, 'utf8'));
+          process.stdout.write(`${buildConflictCohortLiveHeadQuery(candidates)}\n`);
+          NODE
+            owner="${REPOSITORY%%/*}"
+            name="${REPOSITORY#*/}"
+            live_query=$(<"$RUNNER_TEMP/conflict-cohort-live-heads.graphql")
+            gh api graphql -f query="$live_query" -F owner="$owner" -F name="$name" \
+              > "$RUNNER_TEMP/conflict-cohort-live-heads-response.json"
+            CANDIDATES_FILE="$RUNNER_TEMP/ci-candidates.json" \
+            RESPONSE_FILE="$RUNNER_TEMP/conflict-cohort-live-heads-response.json" \
+              node --input-type=module <<'NODE' > "$RUNNER_TEMP/conflict-cohort-live-heads.json"
+          import { readFileSync } from 'node:fs';
+          import { reconcileConflictCohortLiveHeads } from './scripts/lib/pr-conflict-handler.mjs';
+          const candidates = JSON.parse(readFileSync(process.env.CANDIDATES_FILE, 'utf8'));
+          const response = JSON.parse(readFileSync(process.env.RESPONSE_FILE, 'utf8'));
+          process.stdout.write(`${JSON.stringify(reconcileConflictCohortLiveHeads({ candidates, response }))}\n`);
+          NODE
+
+            printf '[]\n' > "$RUNNER_TEMP/conflict-cohort-ci-pages.json"
+            for ((page = 1; page <= max_ci_run_pages; page++)); do
+              gh api "repos/$REPOSITORY/actions/workflows/ci.yml/runs?per_page=100&page=$page" \
+                > "$RUNNER_TEMP/conflict-cohort-ci-page.json"
+              jq -e '.workflow_runs | type == "array"' \
+                "$RUNNER_TEMP/conflict-cohort-ci-page.json" >/dev/null
+              jq -s '.[0] + [.[1]]' \
+                "$RUNNER_TEMP/conflict-cohort-ci-pages.json" \
+                "$RUNNER_TEMP/conflict-cohort-ci-page.json" \
+                > "$RUNNER_TEMP/conflict-cohort-ci-pages.next.json"
+              mv "$RUNNER_TEMP/conflict-cohort-ci-pages.next.json" \
+                "$RUNNER_TEMP/conflict-cohort-ci-pages.json"
+              if [[ "$(jq '.workflow_runs | length' "$RUNNER_TEMP/conflict-cohort-ci-page.json")" -lt 100 ]]; then
+                break
+              fi
+            done
+            CANDIDATES_FILE="$RUNNER_TEMP/ci-candidates.json" \
+            PAGES_FILE="$RUNNER_TEMP/conflict-cohort-ci-pages.json" \
+              node --input-type=module <<'NODE' > "$RUNNER_TEMP/conflict-cohort-ci-runs-by-head.json"
+          import { readFileSync } from 'node:fs';
+          import { indexLatestConflictCohortCiRuns } from './scripts/lib/pr-conflict-handler.mjs';
+          const candidates = JSON.parse(readFileSync(process.env.CANDIDATES_FILE, 'utf8'));
+          const pages = JSON.parse(readFileSync(process.env.PAGES_FILE, 'utf8'));
+          process.stdout.write(`${JSON.stringify(indexLatestConflictCohortCiRuns({ candidates, pages }))}\n`);
+          NODE
+
+            printf '[]\n' > "$RUNNER_TEMP/ci-candidates.next.json"
+            while IFS= read -r candidate; do
+              [[ -n "$candidate" ]] || continue
+              pr=$(jq -r '.pr' <<<"$candidate")
+              resolved_head=$(jq -r '.resolvedHead' <<<"$candidate")
+              live=$(jq -c --argjson pr "$pr" \
+                '[.[] | select(.pr == $pr)] | first // {}' \
+                "$RUNNER_TEMP/conflict-cohort-live-heads.json")
+              if [[ "$(jq -r '.healthy // false' <<<"$live")" != 'true' ]]; then
+                failures=$((failures + 1))
+                stale_head_skips=$((stale_head_skips + 1))
+                continue
+              fi
+
+              ci_run=$(jq -c --arg head "$resolved_head" '.[$head] // {}' \
+                "$RUNNER_TEMP/conflict-cohort-ci-runs-by-head.json")
+              if [[ "$(jq -r '.status // "missing"' <<<"$ci_run")" != 'completed' ]]; then
+                jq --argjson item "$candidate" '. + [$item]' \
+                  "$RUNNER_TEMP/ci-candidates.next.json" > "$RUNNER_TEMP/ci-candidates.append.json"
+                mv "$RUNNER_TEMP/ci-candidates.append.json" "$RUNNER_TEMP/ci-candidates.next.json"
+                continue
+              fi
+
+              latency_ms=$(jq '
+                if .created_at == null or .updated_at == null then 720001
+                else (((.updated_at | fromdateiso8601) - (.created_at | fromdateiso8601)) * 1000 | floor)
+                end' <<<"$ci_run")
+              if [[ "$(jq -r '.conclusion // "failure"' <<<"$ci_run")" != 'success' ]]; then
+                printf '%s\n' "$latency_ms" >> "$RUNNER_TEMP/ci-latencies.txt"
+                failures=$((failures + 1))
+                continue
+              fi
+
+              checks=$(gh api "repos/$REPOSITORY/commits/$resolved_head/check-runs?per_page=100")
+              commit_status=$(gh api "repos/$REPOSITORY/commits/$resolved_head/status")
+              required=$(jq -n --argjson checks "$checks" --argjson statuses "$commit_status" '
+                def latest_check($name):
+                  [$checks.check_runs[] | select(.name == $name)]
+                  | sort_by(.completed_at // .started_at // "") | last // {};
+                def latest_status($name):
+                  [$statuses.statuses[] | select(.context == $name)]
+                  | sort_by(.created_at // "") | last // {};
+                {prReady:latest_check("PR Ready"),migration:latest_check("Migration Guard"),forkGate:latest_status("Fork PR Gate")}')
+              if jq -e '
+                .prReady.status == "completed" and .prReady.conclusion == "success" and
+                .migration.status == "completed" and .migration.conclusion == "success" and
+                .forkGate.state == "success"' <<<"$required" >/dev/null; then
+                printf '%s\n' "$latency_ms" >> "$RUNNER_TEMP/ci-latencies.txt"
+                successes=$((successes + 1))
+              elif jq -e '
+                (.prReady.status == "completed" and .prReady.conclusion != "success") or
+                (.migration.status == "completed" and .migration.conclusion != "success") or
+                (.forkGate.state | IN("failure", "error"))' <<<"$required" >/dev/null; then
+                printf '%s\n' "$latency_ms" >> "$RUNNER_TEMP/ci-latencies.txt"
+                failures=$((failures + 1))
+              else
+                jq --argjson item "$candidate" '. + [$item]' \
+                  "$RUNNER_TEMP/ci-candidates.next.json" > "$RUNNER_TEMP/ci-candidates.append.json"
+                mv "$RUNNER_TEMP/ci-candidates.append.json" "$RUNNER_TEMP/ci-candidates.next.json"
+              fi
+            done < <(jq -c '.[]' "$RUNNER_TEMP/ci-candidates.json")
+            mv "$RUNNER_TEMP/ci-candidates.next.json" "$RUNNER_TEMP/ci-candidates.json"
+            if [[ "$(jq 'length' "$RUNNER_TEMP/ci-candidates.json")" -gt 0 && "$SECONDS" -lt "$deadline" ]]; then
+              sleep "$poll_interval_seconds"
+            fi
+          done
+
+          timed_out=$(jq 'length' "$RUNNER_TEMP/ci-candidates.json")
+          failures=$((failures + timed_out))
+          pending=0
+          test "$attempted" -eq $((successes + failures))
+          stale_head_skip_rate=$(jq -n --argjson stale "$stale_head_skips" --argjson total "$attempted" \
+            'if $total == 0 then 0 else $stale / $total end')
+
+          # P95 is computed only from exact repaired-head CI runs. Missing or
+          # timed-out samples fail low above the healthy threshold.
+          p95_ci_latency_ms=$(jq -Rs '
+            split("\n") | map(select(length > 0) | tonumber) | sort |
+            if length == 0 then 720001 else .[((length * 0.95 | ceil) - 1)] end' \
+            "$RUNNER_TEMP/ci-latencies.txt")
+          if [[ "$timed_out" -gt 0 ]]; then
+            p95_ci_latency_ms=720001
+          fi
+
+          # Capture the same typed backlog shape before and after the cohort.
+          # If the after audit fails, preserve the before receipt and force the
+          # cohort unhealthy rather than inventing improvement.
+          after_report="$BEFORE_REPORT"
+          backlog=$(jq -r '.states.DIRTY // 0' <<<"$BEFORE_REPORT")
+          if node scripts/pr-conflict-handler.mjs --dry-run \
+            --repo "$REPOSITORY" \
+            --max-concurrent 40 \
+            --runner-capacity "$RUNNER_CAPACITY" \
+            --active-ci "$ACTIVE_CI" \
+            --queued-ci "$QUEUED_CI" \
+            --cohort-id "$COHORT_ID" \
+            --history-issue "$TRACKING_ISSUE" \
+            --plan-file "$after_plan" \
+            --json > "$after_log" 2>&1; then
+            after_report=$(jq -c '{total:.summary.total,states:.summary.byState,actions:.summary.byAction}' "$after_plan")
+            backlog=$(jq -r '.capacity.adaptive.backlog // 0' "$after_plan")
+          else
+            p95_ci_latency_ms=720001
+            echo "::warning::After-cohort backlog audit failed; cohort forced unhealthy."
+          fi
+
+          clean=$(jq -n \
+            --argjson attempted "$attempted" \
+            --argjson failures "$failures" \
+            --argjson pending "$pending" \
+            --argjson stale "$stale_head_skips" \
+            --argjson p95 "$p95_ci_latency_ms" \
+            --argjson baseline "$BASELINE_P95_CI_LATENCY_MS" \
+            '$attempted > 0 and $failures == 0 and $pending == 0 and $stale == 0 and $p95 <= 720000 and ($baseline == 0 or $p95 <= ($baseline * 1.5))')
+          created_at=$(date -u +%Y-%m-%dT%H:%M:%SZ)
+          jq -n \
+            --arg schema 'jovie-conflict-fx-cohort/v1' \
+            --arg id "$COHORT_ID" \
+            --argjson cap "$ADAPTIVE_TIER" \
+            --argjson attempted "$attempted" \
+            --argjson successes "$successes" \
+            --argjson failures "$failures" \
+            --argjson pending "$pending" \
+            --argjson staleHeadSkips "$stale_head_skips" \
+            --argjson staleHeadSkipRate "$stale_head_skip_rate" \
+            --argjson p95CiLatencyMs "$p95_ci_latency_ms" \
+            --argjson baselineP95CiLatencyMs "$BASELINE_P95_CI_LATENCY_MS" \
+            --argjson runnerCapacity "$RUNNER_CAPACITY" \
+            --argjson activeCi "$ACTIVE_CI" \
+            --argjson queuedCi "$QUEUED_CI" \
+            --argjson backlog "$backlog" \
+            --argjson clean "$clean" \
+            --arg createdAt "$created_at" \
+            --arg runUrl "$run_url" \
+            '{schema:$schema,id:$id,cap:$cap,attempted:$attempted,successes:$successes,failures:$failures,pending:$pending,staleHeadSkips:$staleHeadSkips,staleHeadSkipRate:$staleHeadSkipRate,p95CiLatencyMs:$p95CiLatencyMs,baselineP95CiLatencyMs:$baselineP95CiLatencyMs,runnerCapacity:$runnerCapacity,activeCi:$activeCi,queuedCi:$queuedCi,backlog:$backlog,clean:$clean,createdAt:$createdAt,runUrl:$runUrl}' \
+            > "$receipt"
+
+          RECEIPT_FILE="$receipt" node --input-type=module <<'NODE' > "$marker_file"
+          import { readFileSync } from 'node:fs';
+          import { buildConflictFxCohortMarker } from './scripts/lib/pr-conflict-handler.mjs';
+          const receipt = JSON.parse(readFileSync(process.env.RECEIPT_FILE, 'utf8'));
+          process.stdout.write(`${buildConflictFxCohortMarker(receipt)}\n`);
+          NODE
+          marker=$(<"$marker_file")
+          hidden="<!-- bot-comment:conflict-fx-cohort-$COHORT_ID -->"
+          body=$(jq -nr \
+            --arg hidden "$hidden" \
+            --arg marker "$marker" \
+            --arg cohort "$COHORT_ID" \
+            --argjson receipt "$(<"$receipt")" \
+            --argjson before "$BEFORE_REPORT" \
+            --argjson after "$after_report" \
+            '[$hidden,"## Closed-loop conflict cohort `"+$cohort+"`","","- Tier / attempted: `"+($receipt.cap|tostring)+"` / `"+($receipt.attempted|tostring)+"`","- Success / failure / stale: `"+($receipt.successes|tostring)+"` / `"+($receipt.failures|tostring)+"` / `"+($receipt.staleHeadSkips|tostring)+"`","- CI p95 / baseline ms: `"+($receipt.p95CiLatencyMs|tostring)+"` / `"+($receipt.baselineP95CiLatencyMs|tostring)+"`","- Hosted capacity / active / queued: `"+($receipt.runnerCapacity|tostring)+"` / `"+($receipt.activeCi|tostring)+"` / `"+($receipt.queuedCi|tostring)+"`","- Clean: `"+($receipt.clean|tostring)+"`","","Before: `"+($before|tojson)+"`","","After: `"+($after|tojson)+"`","",$marker] | join("\n")')
+          comments=$(gh api "repos/$REPOSITORY/issues/$TRACKING_ISSUE/comments?per_page=100" \
+            --paginate --slurp)
+          existing=$(jq -er --arg hidden "$hidden" '
+            [.[][]? | select((.body // "") | contains($hidden)) | .id]
+            | if length > 1 then error("duplicate cohort receipts")
+              elif length == 1 then (.[0] | tostring)
+              else ""
+              end' <<<"$comments")
+          if [[ -n "$existing" ]]; then
+            GH_TOKEN="$GH_LEDGER_TOKEN" gh api -X PATCH "repos/$REPOSITORY/issues/comments/$existing" -f body="$body" >/dev/null
+          else
+            GH_TOKEN="$GH_LEDGER_TOKEN" gh api -X POST "repos/$REPOSITORY/issues/$TRACKING_ISSUE/comments" -f body="$body" >/dev/null
+          fi
+          {
+            echo '## Durable conflict cohort receipt'
+            echo
+            echo "- Cohort: \`$COHORT_ID\`"
+            echo "- Receipt: \`$(jq -c . "$receipt")\`"
+            echo "- Before: \`$BEFORE_REPORT\`"
+            echo "- After: \`$after_report\`"
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Upload durable cohort evidence
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: conflict-fx-cohort-${{ github.run_id }}-${{ github.run_attempt }}
+          path: |
+            ${{ runner.temp }}/conflict-fx-cohort.json
+            ${{ runner.temp }}/conflict-fx-cohort-marker.txt
+            ${{ runner.temp }}/pr-conflict-handler-after.json
+            ${{ runner.temp }}/pr-conflict-handler-after.log
+          if-no-files-found: warn
+          retention-days: 14

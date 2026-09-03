@@ -21,12 +21,12 @@ constraint; spawn noise is the cheapest capacity to buy back.
    that boots a runner just to `exit 0` (this is what the AI Orchestrator guard
    did for every non-`agent-ready` label event).
 
-3. **Fleet-wide scanners do not need per-push triggers.** Workflows that list
-   ALL open PRs and act on the fleet (merge-queue drain, auto-ready,
-   PR conflict handler) get zero extra coverage from `pull_request:
-   synchronize` — every push starts CI, whose completion already fires their
-   `workflow_run: [CI completed]` trigger. Per-push spawns just multiply
-   identical scans behind the shared mutex.
+3. **Fleet-wide scanners use the earliest event that changes their decision.**
+   Merge-queue drain and PR conflict handling can reconcile from CI events.
+   Auto-Ready is the exception: the owning agent's final source event must pair
+   ready + native auto-merge while checks are pending, so it listens to source
+   changes. No workflow listens to `ready_for_review`; an unchanged head never
+   earns a second CI flight.
 
 4. **Deduplicate event types that add no coverage.** Example: `issues:
    assigned` on Claude Code — the job only runs when the body/title contains
@@ -49,7 +49,7 @@ constraint; spawn noise is the cheapest capacity to buy back.
 | Workflow | Change |
 | --- | --- |
 | `github-ai-orchestrator.yml` | Guard's label check moved from in-runner script to job-level `if:` |
-| `auto-ready-agent-drafts.yml` | Dropped `pull_request: synchronize` (covered by `workflow_run: CI completed`) |
+| `auto-ready-agent-drafts.yml` | Historical: dropped `synchronize`; superseded by paired promotion before CI completion |
 | `merge-queue-autoenroll.yml` | Dropped `pull_request: synchronize` (same) |
 | `pr-conflict-handler.yml` | Dropped `pull_request: synchronize` (same; see #13347) |
 | `claude.yml` | Dropped `issues: assigned` (no coverage beyond `opened`); documented broad-trigger rationale |

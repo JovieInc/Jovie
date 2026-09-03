@@ -45,6 +45,22 @@ describe('visual CI harness', () => {
     expect(withDatabase).toContain('profile-claim');
   });
 
+  it('keeps the profile claim surface on the token-backed claim fixture', () => {
+    const claimSurface = getPublicSurfaceManifestForRuntimeSync({
+      database: true,
+    }).find(surface => surface.id === 'profile-claim');
+
+    expect(claimSurface?.resolvedPath).toBe(
+      '/e2eclaimartist/claim?token=e2e-prebuilt-claim-token'
+    );
+    expect(claimSurface?.resolvedPath).not.toContain('testartist');
+    expect(
+      claimSurface?.expectedRedirects?.some(pattern =>
+        pattern.test('/e2eclaimartist?claim=1')
+      )
+    ).toBe(true);
+  });
+
   it('keeps the new coverage gate forward-only during baseline audit', () => {
     const policy = JSON.parse(
       readFileSync(
@@ -224,5 +240,35 @@ describe('visual CI harness', () => {
     expect(helper).toContain("await page.waitForLoadState('networkidle'");
     expect(helper).toContain('page.locator(`a[href="${APP_ROUTES.SIGNIN}"]`)');
     expect(helper).not.toContain("getByRole('link', { name:");
+  });
+
+  it('gates Storybook screenshots on rendered stories, not network idle', () => {
+    const elevationSource = readFileSync(
+      resolve(webWorkspace, 'tests/e2e/storybook-elevation.spec.ts'),
+      'utf8'
+    );
+    const faqSource = readFileSync(
+      resolve(webWorkspace, 'tests/e2e/storybook-marketing-faq.spec.ts'),
+      'utf8'
+    );
+
+    for (const source of [elevationSource, faqSource]) {
+      expect(source).toContain("waitUntil: 'domcontentloaded'");
+      expect(source).not.toContain("waitUntil: 'networkidle'");
+    }
+
+    expect(elevationSource).toContain("page.locator('#storybook-root')");
+    expect(elevationSource).toContain(
+      'await expect(root).toBeVisible({ timeout: STORYBOOK_RENDER_TIMEOUT_MS })'
+    );
+    expect(elevationSource).toContain(
+      'await expect(root).not.toBeEmpty({ timeout: STORYBOOK_RENDER_TIMEOUT_MS })'
+    );
+    expect(faqSource).toContain(
+      'page.locator(\'[data-pen-contract="pAAhw"]\')'
+    );
+    expect(faqSource).toContain(
+      'await expect(section).toBeVisible({ timeout: STORYBOOK_RENDER_TIMEOUT_MS })'
+    );
   });
 });

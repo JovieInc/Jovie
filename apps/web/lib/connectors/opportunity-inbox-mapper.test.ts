@@ -3,6 +3,7 @@ import {
   buildOpportunityInboxData,
   mapSuggestedActionToInboxCard,
 } from './opportunity-inbox-mapper';
+import { WORKFLOW_CAPTURE_REQUEST_KIND } from './suggested-action-kinds';
 
 function verifiedBrandDealPayload(
   overrides: Record<string, unknown> = {}
@@ -45,6 +46,37 @@ function verifiedBrandDealPayload(
 }
 
 describe('mapSuggestedActionToInboxCard', () => {
+  it('maps typed workflow requests into a direct Record decision', () => {
+    const card = mapSuggestedActionToInboxCard({
+      id: 'capture-1',
+      kind: WORKFLOW_CAPTURE_REQUEST_KIND,
+      payload: {
+        schemaVersion: 1,
+        requestingTaskId: 'task-1',
+        requestKey: 'youtube-studio',
+        title: 'Record the YouTube Studio thumbnail flow',
+        instructions: 'Start a native experiment and stop before publishing.',
+        startUrl: 'https://studio.youtube.com',
+        requestedBy: 'jovie_agent',
+        requestedAt: '2026-08-28T10:00:00.000Z',
+        expiresAt: '2026-09-04T10:00:00.000Z',
+        redactionPolicy: 'manual-review-required',
+      },
+      rationale: 'Show Jovie the exact browser workflow.',
+      createdAt: new Date('2026-08-28T10:00:00.000Z'),
+    });
+
+    expect(card).toMatchObject({
+      category: 'workflow_capture',
+      typeLabel: 'Workflow',
+      primaryActionLabel: 'Record',
+      workflowCapture: {
+        startUrl: 'https://studio.youtube.com',
+        state: 'pending',
+      },
+    });
+  });
+
   it('maps verified brand deals into a provenance-aware Inbox decision', () => {
     const card = mapSuggestedActionToInboxCard({
       id: 'brand-deal-1',
@@ -138,6 +170,20 @@ describe('mapSuggestedActionToInboxCard', () => {
 });
 
 describe('buildOpportunityInboxData', () => {
+  it('keeps malformed workflow requests out of the Inbox', () => {
+    const data = buildOpportunityInboxData([
+      {
+        id: 'capture-malformed',
+        kind: WORKFLOW_CAPTURE_REQUEST_KIND,
+        payload: { title: 'Missing provenance and expiry' },
+        rationale: 'Malformed request.',
+        createdAt: new Date('2026-08-28T10:00:00.000Z'),
+      },
+    ]);
+
+    expect(data.cards).toEqual([]);
+  });
+
   it('keeps unverified brand-deal rows out of the user decision surface', () => {
     const data = buildOpportunityInboxData([
       {
@@ -221,8 +267,9 @@ describe('buildOpportunityInboxData', () => {
     expect(data.cards).toEqual([]);
     expect(data.emptyActionCards).toHaveLength(2);
     expect(data.emptyActionCards[0]?.id).toBe('connect-spotify');
+    expect(data.emptyActionCards[0]?.actionLabel).toBe('Connect Spotify');
     expect(data.emptyActionCards[0]?.href).toBe(
-      '/app/settings/artist-profile?tab=music'
+      '/app/dashboard/releases?connect=spotify'
     );
   });
 });

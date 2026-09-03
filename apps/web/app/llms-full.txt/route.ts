@@ -1,4 +1,5 @@
 import { APP_NAME, BASE_URL, LEGAL_ENTITY_NAME } from '@/constants/app';
+import { buildSiteLlmsGuidance } from '@/lib/agent/site-llms-guidance';
 import { PLAN_PRICES } from '@/lib/config/plan-prices';
 
 /**
@@ -24,7 +25,6 @@ export function GET() {
 - **Alternate domain**: meetjovie.com (301 redirects to jov.ie)
 - **Founded**: 2024 by Tim White
 - **Industry**: Music Technology / SaaS
-- **Instagram**: @meetjovie
 
 ## Brand Disambiguation
 
@@ -113,6 +113,8 @@ AI that knows your actual career data:
 - **Privacy Policy**: ${BASE_URL}/legal/privacy
 - **Terms of Service**: ${BASE_URL}/legal/terms
 
+${buildSiteLlmsGuidance()}
+
 ## Blog / Content
 
 ${APP_NAME}'s blog features long-form essays on music marketing and the independent artist experience:
@@ -129,11 +131,16 @@ Tim White is the founder of ${APP_NAME}. Background:
 - Ran campaigns for brands including Google and the NFL
 - Professional music producer
 
+## Public API
+
+- OpenAPI 3.1: ${BASE_URL}/openapi.json
+- Canonical contract: ${BASE_URL}/api/v1/openapi.json
+- Public artist profile: ${BASE_URL}/api/v1/{username}
+
 ## Contact
 
 - Website: ${BASE_URL}
 - Support: ${BASE_URL}/support
-- Instagram: @meetjovie
 `;
 
   return new Response(content, {

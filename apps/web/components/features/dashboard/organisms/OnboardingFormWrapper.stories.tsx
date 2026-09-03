@@ -5,6 +5,9 @@ const meta: Meta<typeof OnboardingFormWrapper> = {
   title: 'Dashboard/Organisms/OnboardingFormWrapper',
   component: OnboardingFormWrapper,
   parameters: {
+    jovie: {
+      uncoveredProps: ['loading'],
+    },
     layout: 'centered',
     backgrounds: {
       default: 'light',

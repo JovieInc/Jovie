@@ -12,6 +12,8 @@ export const OVIE_MCP_TOOLS = [
   'get_initiative',
   'get_feature_state',
   'certify_feature',
+  'request_workflow_capture',
+  'get_workflow_capture',
   'search_gbrain',
   'get_gbrain_page',
 ] as const;
@@ -22,10 +24,14 @@ export const OVIE_WRITE_TOOLS = [
   'record_decision',
   'create_initiative',
   'certify_feature',
+  'request_workflow_capture',
 ] as const;
 
 /** Read-only operating detail that is still founder-private. */
-export const OVIE_FOUNDER_TOOLS = ['get_invariant_stewardship'] as const;
+export const OVIE_FOUNDER_TOOLS = [
+  'get_invariant_stewardship',
+  'get_workflow_capture',
+] as const;
 
 export type CertLevel =
   | 'discovered'
@@ -35,6 +41,10 @@ export type CertLevel =
   | 'certified'
   | 'broadly-rolled-out'
   | 'trusted';
+
+export const INITIATIVE_CONFIDENCE = ['high', 'medium', 'low'] as const;
+
+export type InitiativeConfidence = (typeof INITIATIVE_CONFIDENCE)[number];
 
 export type InitiativeStatus =
   | 'proposed'
@@ -90,6 +100,7 @@ export type OvieInitiative = {
   readonly id: string;
   readonly kind: 'initiative';
   readonly status: InitiativeStatus;
+  readonly confidence: InitiativeConfidence;
   readonly handoff: OvieHandoff;
   readonly lane: OvieLane;
   readonly destination: OvieReceipt['destination'];
@@ -104,6 +115,18 @@ export type OvieInitiative = {
   readonly createdAt: string;
   readonly updatedAt: string;
   readonly evidence: readonly OvieEvidence[];
+};
+
+export type CertificationPassName =
+  | 'author'
+  | 'adversary'
+  | 'execute'
+  | 'backfill';
+
+export type CertificationPass = {
+  readonly n: 1 | 2 | 3 | 4;
+  readonly name: CertificationPassName;
+  readonly job: string;
 };
 
 export type OvieSummerTurnState = 'queued' | 'claimed' | 'completed' | 'failed';

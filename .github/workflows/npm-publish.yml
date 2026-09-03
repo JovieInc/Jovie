@@ -1,0 +1,326 @@
+name: Publish @jovie/cli to npm
+
+# Publication is a deliberate operator action. Keep this workflow manual-only;
+# a main push or pull request must never acquire npm publish authority.
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: npm-publish-cli-main
+  cancel-in-progress: false
+
+jobs:
+  publish:
+    name: Publish @jovie/cli
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    permissions:
+      contents: read
+      id-token: write
+    steps:
+      - name: Check out exact main
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: main
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Set up pnpm
+        uses: pnpm/action-setup@0977fd99725f1db4007ccb2928dbb4e90d06cc86 # v6.0.10
+        with:
+          version: 9.15.4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version-file: .nvmrc
+          cache: pnpm
+          cache-dependency-path: pnpm-lock.yaml
+          registry-url: https://registry.npmjs.org
+
+      - name: Verify exact main and unpublished release
+        id: release
+        shell: bash
+        env:
+          PACKAGE_NAME: '@jovie/cli'
+          REGISTRY_URL: https://registry.npmjs.org
+        run: |
+          set -euo pipefail
+
+          test "$GITHUB_REF" = refs/heads/main || {
+            echo "::error::This workflow may only publish from refs/heads/main."
+            exit 1
+          }
+          test "$(node --version)" = v22.23.2 || {
+            echo "::error::The release lane requires Node.js v22.23.2."
+            exit 1
+          }
+
+          git fetch --no-tags --depth=1 origin main
+          checked_out_sha="$(git rev-parse HEAD)"
+          current_main_sha="$(git rev-parse origin/main)"
+          [[ "$checked_out_sha" =~ ^[0-9a-f]{40}$ ]]
+          test "$checked_out_sha" = "$current_main_sha" || {
+            echo "::error::Checkout is not the exact current origin/main commit."
+            exit 1
+          }
+
+          release_version="$(tr -d '[:space:]' < VERSION)"
+          [[ "$release_version" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]] || {
+            echo "::error::VERSION is not a valid release version."
+            exit 1
+          }
+          export RELEASE_VERSION="$release_version"
+          node --input-type=module <<'NODE'
+          import { readFileSync } from 'node:fs';
+
+          const manifest = JSON.parse(
+            readFileSync('packages/jovie-cli/package.json', 'utf8')
+          );
+          const expectedVersion = process.env.RELEASE_VERSION;
+          const required = [
+            ['name', manifest.name === '@jovie/cli'],
+            ['private', manifest.private === false],
+            ['license', manifest.license === 'Apache-2.0'],
+            [
+              'repository.url',
+              manifest.repository?.url === 'git+https://github.com/JovieInc/Jovie.git',
+            ],
+            [
+              'repository.directory',
+              manifest.repository?.directory === 'packages/jovie-cli',
+            ],
+            ['publishConfig.access', manifest.publishConfig?.access === 'public'],
+            ['publishConfig.provenance', manifest.publishConfig?.provenance === true],
+            [
+              'publishConfig.registry',
+              manifest.publishConfig?.registry === 'https://registry.npmjs.org',
+            ],
+          ];
+          for (const [field, valid] of required) {
+            if (!valid) throw new Error(`Invalid @jovie/cli publication field: ${field}`);
+          }
+          if (manifest.version && manifest.version !== expectedVersion) {
+            throw new Error(
+              `Package version ${manifest.version} does not match VERSION ${expectedVersion}.`
+            );
+          }
+          NODE
+
+          version_path="$(node --input-type=module -e \
+            'process.stdout.write(encodeURIComponent(process.env.PACKAGE_NAME))')"
+          registry_status="$(curl --silent --show-error \
+            --connect-timeout 10 \
+            --max-time 30 \
+            --retry 2 \
+            --retry-delay 1 \
+            --retry-max-time 40 \
+            --output "$RUNNER_TEMP/npm-version.json" \
+            --write-out '%{http_code}' \
+            "$REGISTRY_URL/$version_path/$release_version")"
+          case "$registry_status" in
+            404)
+              echo "@jovie/cli@$release_version is not published; continuing."
+              ;;
+            200)
+              echo "::error::@jovie/cli@$release_version is already published."
+              exit 1
+              ;;
+            *)
+              echo "::error::Could not prove @jovie/cli@$release_version is unpublished (HTTP $registry_status)."
+              exit 1
+              ;;
+          esac
+          printf 'version=%s\n' "$release_version" >> "$GITHUB_OUTPUT"
+
+      - name: Install dependencies with the frozen lockfile
+        run: pnpm install --frozen-lockfile
+
+      - name: Test @jovie/cli with coverage
+        run: pnpm --filter @jovie/cli run test:coverage
+
+      - name: Typecheck @jovie/cli
+        run: pnpm --filter @jovie/cli run typecheck
+
+      - name: Build @jovie/cli
+        run: pnpm --filter @jovie/cli run build
+
+      - name: Run @jovie/cli package smoke
+        run: pnpm --filter @jovie/cli run pack:dry
+
+      - name: Stage the versioned package
+        id: package
+        shell: bash
+        env:
+          RELEASE_VERSION: ${{ steps.release.outputs.version }}
+        run: |
+          set -euo pipefail
+          staging_dir="$RUNNER_TEMP/jovie-cli-publish"
+          mkdir -p "$staging_dir"
+          cp packages/jovie-cli/package.json "$staging_dir/package.json"
+          cp -R packages/jovie-cli/dist "$staging_dir/dist"
+          cp packages/jovie-cli/README.md packages/jovie-cli/LICENSE "$staging_dir/"
+          export STAGING_DIR="$staging_dir"
+          node --input-type=module <<'NODE'
+          import { readFileSync, writeFileSync } from 'node:fs';
+
+          const manifestPath = `${process.env.STAGING_DIR}/package.json`;
+          const manifest = JSON.parse(readFileSync(manifestPath, 'utf8'));
+          manifest.version = process.env.RELEASE_VERSION;
+          writeFileSync(manifestPath, `${JSON.stringify(manifest, null, 2)}\n`);
+          NODE
+
+          test "$(node --input-type=module -e \
+            'const fs = await import("node:fs"); const p = JSON.parse(fs.readFileSync(process.env.STAGING_DIR + "/package.json", "utf8")); process.stdout.write(p.version)')" \
+            = "$RELEASE_VERSION"
+          (
+            cd "$staging_dir"
+            npm pack --dry-run --ignore-scripts --json > "$RUNNER_TEMP/jovie-cli-pack.json"
+          )
+          export PACK_RESULT="$RUNNER_TEMP/jovie-cli-pack.json"
+          node --input-type=module <<'NODE'
+          import { readFileSync } from 'node:fs';
+
+          const [pack] = JSON.parse(readFileSync(process.env.PACK_RESULT, 'utf8'));
+          if (
+            pack?.name !== '@jovie/cli' ||
+            pack.version !== process.env.RELEASE_VERSION ||
+            !pack.files?.some(file => file.path === 'dist/cli.js') ||
+            !pack.files?.some(file => file.path === 'LICENSE')
+          ) {
+            throw new Error('Versioned npm package smoke did not produce the expected CLI files.');
+          }
+          NODE
+          printf 'path=%s\n' "$staging_dir" >> "$GITHUB_OUTPUT"
+
+      - name: Publish with npm provenance
+        shell: bash
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+          PACKAGE_DIR: ${{ steps.package.outputs.path }}
+          RELEASE_VERSION: ${{ steps.release.outputs.version }}
+        run: |
+          set -euo pipefail
+          test -n "${NODE_AUTH_TOKEN:-}" || {
+            echo "::error::NPM_TOKEN is required; refusing to publish without credentials."
+            exit 1
+          }
+          test -n "$PACKAGE_DIR"
+          test "$(node --input-type=module -e \
+            'const fs = await import("node:fs"); const p = JSON.parse(fs.readFileSync(process.env.PACKAGE_DIR + "/package.json", "utf8")); process.stdout.write(p.version)')" \
+            = "$RELEASE_VERSION"
+          git fetch --no-tags --depth=1 origin main
+          checked_out_sha="$(git rev-parse HEAD)"
+          current_main_sha="$(git rev-parse origin/main)"
+          [[ "$checked_out_sha" =~ ^[0-9a-f]{40}$ ]]
+          test "$checked_out_sha" = "$current_main_sha" || {
+            echo "::error::Checkout drifted from current origin/main immediately before publication."
+            exit 1
+          }
+          npm publish --provenance --access public "$PACKAGE_DIR"
+
+      - name: Prove public registry release
+        shell: bash
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+          PACKAGE_NAME: '@jovie/cli'
+          REGISTRY_URL: https://registry.npmjs.org
+          RELEASE_VERSION: ${{ steps.release.outputs.version }}
+        run: |
+          set -euo pipefail
+          metadata_path="$RUNNER_TEMP/jovie-cli-public-metadata.json"
+          encoded_name="$(node --input-type=module -e \
+            'process.stdout.write(encodeURIComponent(process.env.PACKAGE_NAME))')"
+
+          registry_status=000
+          for attempt in {1..12}; do
+            registry_status="$(curl --silent --show-error \
+              --connect-timeout 10 \
+              --max-time 30 \
+              --output "$metadata_path" \
+              --write-out '%{http_code}' \
+              "$REGISTRY_URL/$encoded_name/$RELEASE_VERSION")"
+            test "$registry_status" = 200 && break
+            sleep 5
+          done
+          test "$registry_status" = 200 || {
+            echo "::error::Published version was not readable from the public registry (HTTP $registry_status)."
+            exit 1
+          }
+
+          export METADATA_PATH="$metadata_path"
+          node --input-type=module <<'NODE'
+          import { readFileSync } from 'node:fs';
+
+          const metadata = JSON.parse(readFileSync(process.env.METADATA_PATH, 'utf8'));
+          const required = [
+            ['name', metadata.name === process.env.PACKAGE_NAME],
+            ['version', metadata.version === process.env.RELEASE_VERSION],
+            ['repository.directory', metadata.repository?.directory === 'packages/jovie-cli'],
+            ['dist.integrity', typeof metadata.dist?.integrity === 'string'],
+            ['dist.tarball', typeof metadata.dist?.tarball === 'string'],
+            ['dist.attestations.url', typeof metadata.dist?.attestations?.url === 'string'],
+            ['dist.attestations.provenance', Boolean(metadata.dist?.attestations?.provenance)],
+            ['maintainers', Array.isArray(metadata.maintainers) && metadata.maintainers.length > 0],
+          ];
+          for (const [field, valid] of required) {
+            if (!valid) throw new Error(`Missing public @jovie/cli release receipt: ${field}`);
+          }
+          NODE
+
+          npm access list collaborators "$PACKAGE_NAME" \
+            --json \
+            --registry "$REGISTRY_URL" \
+            > "$RUNNER_TEMP/jovie-cli-collaborators.json"
+          export COLLABORATORS_PATH="$RUNNER_TEMP/jovie-cli-collaborators.json"
+          node --input-type=module <<'NODE'
+          import { readFileSync } from 'node:fs';
+
+          const collaborators = JSON.parse(
+            readFileSync(process.env.COLLABORATORS_PATH, 'utf8')
+          );
+          if (
+            !collaborators ||
+            typeof collaborators !== 'object' ||
+            !Object.values(collaborators).includes('read-write')
+          ) {
+            throw new Error('No read-write @jovie/cli owner or team assignment was proven.');
+          }
+          NODE
+
+          install_root="$(mktemp -d "$RUNNER_TEMP/jovie-cli-public-install.XXXXXX")"
+          npm install \
+            --prefix "$install_root" \
+            --ignore-scripts \
+            --no-audit \
+            --no-fund \
+            --package-lock=false \
+            --registry "$REGISTRY_URL" \
+            "$PACKAGE_NAME@$RELEASE_VERSION"
+          installed_cli="$install_root/node_modules/.bin/jovie"
+          test -x "$installed_cli"
+          test "$("$installed_cli" --version)" = "$RELEASE_VERSION"
+          "$installed_cli" --help | grep -F 'Read-only public Jovie resources'
+          "$installed_cli" api openapi \
+            --base-url https://jov.ie \
+            --json \
+            > "$RUNNER_TEMP/jovie-cli-public-openapi.json"
+          export OPENAPI_PATH="$RUNNER_TEMP/jovie-cli-public-openapi.json"
+          node --input-type=module <<'NODE'
+          import { readFileSync } from 'node:fs';
+
+          const contract = JSON.parse(readFileSync(process.env.OPENAPI_PATH, 'utf8'));
+          if (
+            typeof contract.openapi !== 'string' ||
+            !contract.openapi.startsWith('3.') ||
+            contract.info?.title !== 'Jovie Artist API'
+          ) {
+            throw new Error('Freshly installed CLI did not return the Jovie OpenAPI contract.');
+          }
+          NODE
+
+          echo "Public npm registry, provenance, ownership, fresh install, and runtime receipts passed." \
+            >> "$GITHUB_STEP_SUMMARY"

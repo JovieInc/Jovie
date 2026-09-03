@@ -23,9 +23,7 @@ describe('Checkbox', () => {
       const checkbox = screen.getByTestId('checkbox');
       expect(checkbox.className).toContain('h-4');
       expect(checkbox.className).toContain('w-4');
-      expect(checkbox.className).toContain(
-        'rounded-(--linear-app-radius-item)'
-      );
+      expect(checkbox.className).toContain('rounded-(--app-shell-radius-item)');
       expect(checkbox.className).toContain('border');
     });
   });

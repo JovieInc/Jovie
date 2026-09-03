@@ -228,13 +228,37 @@ const SECTION_RESOLUTIONS = {
     'MarketingHero',
     MARKETING_PEN_CONTRACT_IDS.section.hero,
     'data-pen-contract={MARKETING_PEN_CONTRACT_IDS.section.hero}',
-    3
+    3,
+    [
+      {
+        source: 'apps/web/components/marketing/MarketingPosterHero.tsx',
+        binding: '<MarketingHero',
+        occurrences: 1,
+        kind: 'source',
+      },
+      {
+        source: 'apps/web/components/marketing/homepage-v2/HomepageV2Route.tsx',
+        binding: '<MarketingHero',
+        occurrences: 1,
+        kind: 'source',
+      },
+    ]
   ),
   'logo-cloud': sourceRoot(
     'apps/web/components/features/home/HomeTrustSection.tsx',
     'HomeTrustSection',
     MARKETING_PEN_CONTRACT_IDS.section.logoCloud,
-    'data-pen-contract={MARKETING_PEN_CONTRACT_IDS.section.logoCloud}'
+    'data-pen-contract={MARKETING_PEN_CONTRACT_IDS.section.logoCloud}',
+    2,
+    [
+      {
+        source:
+          'apps/web/components/marketing/artist-profile/ArtistProfileLogoBar.tsx',
+        binding: '<HomeTrustSection',
+        occurrences: 1,
+        kind: 'source',
+      },
+    ]
   ),
   'feature-grid': sourceRoot(
     'apps/web/components/marketing/artist-profile/ArtistProfileOutcomesCarousel.tsx',
@@ -318,7 +342,7 @@ const SECTION_RESOLUTIONS = {
     'data-pen-contract={MARKETING_PEN_CONTRACT_IDS.section.faq}'
   ),
   cta: unresolved(
-    'A production shell root exists, but section.cta convergence is pending JOV-4954.'
+    'A production shell root exists, but section.cta convergence is pending JOV-5356.'
   ),
   'spec-wall': sourceRoot(
     'apps/web/components/marketing/artist-profile/ArtistProfileSpecWall.tsx',

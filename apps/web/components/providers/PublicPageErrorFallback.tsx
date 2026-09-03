@@ -25,9 +25,11 @@ export function PublicPageErrorFallback({
     <SystemBErrorFallback
       description='Try refreshing the page.'
       digest={error.digest}
-      actions={[
-        { type: 'button', label: RECOVERY_COPY.retryLabel, onClick: onRefresh },
-      ]}
+      action={{
+        type: 'button',
+        label: RECOVERY_COPY.retryLabel,
+        onClick: onRefresh,
+      }}
       role='alert'
       ariaLive='assertive'
     />

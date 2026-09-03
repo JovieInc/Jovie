@@ -65,9 +65,15 @@ const blobUploadMock = vi.hoisted(() => vi.fn());
 const libraryMutationMocks = vi.hoisted(() => ({
   archiveMerch: vi.fn().mockResolvedValue({ success: true }),
   archiveRelease: vi.fn().mockResolvedValue({ success: true }),
+  captureError: vi.fn(),
   restoreMerch: vi.fn().mockResolvedValue({ success: true }),
   restoreRelease: vi.fn().mockResolvedValue({ success: true }),
+  syncSpotify: vi.fn(),
   updateProfileVisibility: vi.fn().mockResolvedValue('hidden'),
+}));
+const feedbackMocks = vi.hoisted(() => ({
+  error: vi.fn(),
+  success: vi.fn(),
 }));
 
 const audioMock = vi.hoisted(() => {
@@ -100,7 +106,7 @@ vi.mock('@/components/organisms/release-sidebar/useTrackAudioPlayer', () => ({
 }));
 
 vi.mock('@vercel/blob/client', () => ({
-  upload: blobUploadMock,
+  uploadPresigned: blobUploadMock,
 }));
 
 vi.mock('@/app/app/(shell)/dashboard/releases/actions', () => ({
@@ -117,6 +123,17 @@ vi.mock('@/lib/library/profile-visibility/client-mutations', () => ({
   updateLibraryProfileVisibility: libraryMutationMocks.updateProfileVisibility,
 }));
 
+vi.mock('@/lib/error-tracking', () => ({
+  captureError: libraryMutationMocks.captureError,
+}));
+
+vi.mock('@/lib/queries', () => ({
+  useSyncReleasesFromSpotifyMutation: () => ({
+    isPending: false,
+    mutate: libraryMutationMocks.syncSpotify,
+  }),
+}));
+
 vi.mock('next/navigation', () => ({
   useRouter: () => ({
     push: vi.fn(),
@@ -127,9 +144,7 @@ vi.mock('next/navigation', () => ({
 }));
 
 vi.mock('sonner', () => ({
-  toast: {
-    error: vi.fn(),
-  },
+  toast: feedbackMocks,
 }));
 
 vi.mock('next/image', () => ({
@@ -203,11 +218,14 @@ function renderLibraryWithHeader(assets: readonly LibraryReleaseAsset[]) {
   );
 }
 
-function renderLibrary(assets: readonly LibraryReleaseAsset[]) {
+function renderLibrary(
+  assets: readonly LibraryReleaseAsset[],
+  props: Partial<ComponentProps<typeof LibrarySurface>> = {}
+) {
   return render(
     <TooltipProvider>
       <RightPanelProvider>
-        <LibrarySurface assets={assets} />
+        <LibrarySurface assets={assets} {...props} />
         <RightPanelOutlet />
       </RightPanelProvider>
     </TooltipProvider>
@@ -248,6 +266,24 @@ function clickGridView() {
   fireEvent.click(screen.getByRole('button', { name: 'Grid View' }));
 }
 
+function expectDesktop32Control(
+  control: HTMLElement,
+  { square = false }: { readonly square?: boolean } = {}
+) {
+  expect(control).toHaveClass(
+    'h-8',
+    'min-h-8',
+    'lg:before:h-8',
+    'lg:before:min-w-0'
+  );
+  expect(control).not.toHaveClass('h-7');
+  expect(control).not.toHaveClass('h-7.5');
+  if (square) {
+    expect(control).toHaveClass('w-8', 'min-w-8');
+    expect(control).not.toHaveClass('w-7');
+  }
+}
+
 describe('LibrarySurface', () => {
   const baseMatchMedia = window.matchMedia;
   const baseScrollYDescriptor = Object.getOwnPropertyDescriptor(
@@ -274,12 +310,16 @@ describe('LibrarySurface', () => {
     libraryMutationMocks.archiveMerch.mockResolvedValue({ success: true });
     libraryMutationMocks.archiveRelease.mockReset();
     libraryMutationMocks.archiveRelease.mockResolvedValue({ success: true });
+    libraryMutationMocks.captureError.mockReset();
     libraryMutationMocks.restoreRelease.mockReset();
     libraryMutationMocks.restoreRelease.mockResolvedValue({ success: true });
     libraryMutationMocks.restoreMerch.mockReset();
     libraryMutationMocks.restoreMerch.mockResolvedValue({ success: true });
     libraryMutationMocks.updateProfileVisibility.mockReset();
     libraryMutationMocks.updateProfileVisibility.mockResolvedValue('hidden');
+    libraryMutationMocks.syncSpotify.mockReset();
+    feedbackMocks.error.mockReset();
+    feedbackMocks.success.mockReset();
   });
 
   afterEach(() => {
@@ -362,7 +402,7 @@ describe('LibrarySurface', () => {
 
     expect(source).toContain('LIBRARY_CONTENT_INSET_CLASS');
     expect(source).toContain(
-      'px-(--linear-app-header-padding-x) py-(--linear-app-content-padding-y)'
+      'px-(--app-shell-header-padding-x) py-(--app-shell-content-padding-y)'
     );
     expect(source).toContain('LIBRARY_GRID_DENSITY_LAYOUT');
     expect(source).toContain('useLibraryGridDensity');
@@ -407,6 +447,64 @@ describe('LibrarySurface', () => {
     ).toHaveClass('text-2xl', 'font-semibold', 'text-primary-token');
   });
 
+  it('uses the canonical Spotify sync owner for an empty connected library', () => {
+    renderLibrary([], {
+      profileId: 'profile-1',
+      canSyncSpotify: true,
+    });
+
+    fireEvent.click(screen.getByTestId('library-sync-spotify-empty-state'));
+
+    expect(libraryMutationMocks.syncSpotify).toHaveBeenCalledTimes(1);
+    expect(screen.queryByRole('link', { name: 'Open Releases' })).toBeNull();
+  });
+
+  it('refreshes the empty library after a successful Spotify sync', () => {
+    libraryMutationMocks.syncSpotify.mockImplementation(
+      (_variables, options) => {
+        options.onSuccess({ success: true, message: 'Catalog synced' });
+      }
+    );
+    renderLibrary([], {
+      profileId: 'profile-1',
+      canSyncSpotify: true,
+    });
+
+    fireEvent.click(screen.getByTestId('library-sync-spotify-empty-state'));
+
+    expect(feedbackMocks.success).toHaveBeenCalledWith('Catalog synced');
+    expect(navigationMock.refresh).toHaveBeenCalledTimes(1);
+  });
+
+  it('keeps the sync recovery action available when Spotify sync fails', () => {
+    libraryMutationMocks.syncSpotify.mockImplementation(
+      (_variables, options) => {
+        options.onError(new Error('spotify unavailable'));
+      }
+    );
+    renderLibrary([], {
+      profileId: 'profile-1',
+      canSyncSpotify: true,
+    });
+
+    fireEvent.click(screen.getByTestId('library-sync-spotify-empty-state'));
+
+    expect(feedbackMocks.error).toHaveBeenCalledWith(
+      'Failed to sync from Spotify'
+    );
+    expect(libraryMutationMocks.captureError).toHaveBeenCalledWith(
+      'Failed to sync releases from Spotify',
+      expect.any(Error),
+      expect.objectContaining({
+        context: 'library-empty-state',
+        profileId: 'profile-1',
+      })
+    );
+    expect(
+      screen.getByTestId('library-sync-spotify-empty-state')
+    ).toBeEnabled();
+  });
+
   it('defaults to grid view on first load', () => {
     window.localStorage.removeItem(LIBRARY_VIEW_MODE_STORAGE_KEY);
     renderLibrary([buildAsset()]);
@@ -446,6 +544,54 @@ describe('LibrarySurface', () => {
     );
   });
 
+  it('keeps desktop Library toolbar controls at 32px without desktop 44px hit targets', () => {
+    window.matchMedia = vi.fn().mockImplementation(query => ({
+      matches: query === '(min-width: 1024px)',
+      media: query,
+      onchange: null,
+      addListener: vi.fn(),
+      removeListener: vi.fn(),
+      addEventListener: vi.fn(),
+      removeEventListener: vi.fn(),
+      dispatchEvent: vi.fn(),
+    }));
+    window.localStorage.setItem(LIBRARY_VIEW_MODE_STORAGE_KEY, 'grid');
+
+    renderLibrary([buildAsset()]);
+
+    expectDesktop32Control(screen.getByRole('button', { name: /^All/u }));
+    expectDesktop32Control(screen.getByRole('button', { name: /Audio/u }));
+    expectDesktop32Control(
+      screen.getByRole('button', { name: 'Show filters' }),
+      { square: true }
+    );
+    expectDesktop32Control(
+      screen.getByRole('button', { name: 'Sort by Release Date' }),
+      { square: true }
+    );
+    expectDesktop32Control(
+      screen.getByRole('button', { name: /Small cards/u }),
+      { square: true }
+    );
+    expectDesktop32Control(
+      screen.getByRole('button', { name: /Medium cards/u }),
+      { square: true }
+    );
+    expectDesktop32Control(
+      screen.getByRole('button', { name: /Large cards/u }),
+      { square: true }
+    );
+    expectDesktop32Control(screen.getByRole('button', { name: 'Grid View' }), {
+      square: true,
+    });
+    expectDesktop32Control(screen.getByRole('button', { name: 'List View' }), {
+      square: true,
+    });
+    expectDesktop32Control(screen.getByRole('button', { name: 'Table View' }), {
+      square: true,
+    });
+  });
+
   it('renders aspect-ratio-aware artwork frames in grid cards', () => {
     renderLibrary([
       buildAsset(),
@@ -478,6 +624,48 @@ describe('LibrarySurface', () => {
     expect(releaseCard?.className).toContain('aspect-square');
     expect(landscapeCard?.className).toContain('aspect-video');
     expect(portraitCard?.className).toContain('aspect-[9/16]');
+  });
+
+  it('keeps grid-card status chrome off the media frame', () => {
+    const { container } = renderLibrary([
+      buildAsset({
+        status: 'draft',
+        approvalStatus: 'needs_review',
+      }),
+    ]);
+    clickGridView();
+
+    const redFixture = document.createElement('article');
+    redFixture.innerHTML = [
+      '<div class="system-b-library-card-artwork">',
+      '<span class="system-b-library-card-status">Draft</span>',
+      '</div>',
+    ].join('');
+    expect(
+      redFixture.querySelector(
+        '.system-b-library-card-artwork .system-b-library-card-status'
+      )
+    ).not.toBeNull();
+
+    const cardButton = screen.getByRole('button', {
+      name: /View Take Me Over/u,
+    });
+    const artwork = cardButton.querySelector('.system-b-library-card-artwork');
+    const statusStack = screen.getByTestId(
+      'library-card-status-stack-release-1'
+    );
+
+    expect(artwork?.querySelector('.system-b-library-card-status')).toBeNull();
+    expect(statusStack).toContainElement(
+      screen.getByTestId('library-release-status-release-1')
+    );
+    expect(statusStack).toContainElement(
+      screen.getByTestId('library-approval-status-release-1')
+    );
+    expect(statusStack).toHaveClass('min-h-11');
+    expect(container.querySelector('.system-b-library-card')).toContainElement(
+      statusStack
+    );
   });
 
   it('surfaces Approval Status on list rows, grid cards, and filter chips (#10384)', async () => {
@@ -1040,7 +1228,7 @@ describe('LibrarySurface', () => {
       'focus-visible:ring-2 focus-visible:ring-(--linear-border-focus)/55'
     );
     expect(assetCardButton.className).toContain(
-      'focus-visible:ring-offset-(--linear-app-content-surface)'
+      'focus-visible:ring-offset-(--app-shell-content-surface)'
     );
     expect(assetCardButton.className).not.toContain('focus-visible:shadow');
 
@@ -1066,7 +1254,7 @@ describe('LibrarySurface', () => {
         'focus-visible:ring-2 focus-visible:ring-(--linear-border-focus)/55'
       );
       expect(element.className).toContain(
-        'focus-visible:ring-offset-(--linear-app-content-surface)'
+        'focus-visible:ring-offset-(--app-shell-content-surface)'
       );
       expect(element.className).not.toContain('focus-visible:shadow');
     }
@@ -1593,7 +1781,7 @@ describe('LibrarySurface', () => {
     const filterTrigger = screen.getByRole('button', {
       name: 'Show filters',
     });
-    expect(filterTrigger).toHaveClass('h-7', 'w-7');
+    expectDesktop32Control(filterTrigger, { square: true });
     expect(
       screen.queryByTestId('library-filter-active-indicator')
     ).not.toBeInTheDocument();
@@ -1703,7 +1891,7 @@ describe('LibrarySurface', () => {
     const contentFrame = screen.getByTestId('library-content-frame');
     const before = contentFrame.getBoundingClientRect();
     const trigger = screen.getByRole('button', { name: 'Show filters' });
-    expect(trigger).toHaveClass('h-7', 'w-7');
+    expectDesktop32Control(trigger, { square: true });
     expect(trigger.className).toContain('before:h-11');
     expect(trigger.className).toContain('before:min-w-11');
     expect(trigger.className).not.toMatch(/(?:^|\s)min-h-11(?:\s|$)/);

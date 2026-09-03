@@ -2,12 +2,12 @@
 # Also covers the previously orphaned visual specs (JOV-4039): auth modal/pages,
 # chat composer, and the public profile surface audit.
 #
-# Scheduled/manual baseline refresh. Source PR visual work is covered by the
-# deterministic queue Build + Layout gate; screenshot comparison stays off the
-# source and merge-queue runner paths. This workflow re-runs the suite with
-#     --update-snapshots and opens/updates a single auto-PR when baselines change
-#     (same JOVIE_BOT + merge-queue pattern as screenshots.yml). This is what heals
-#     the currently stale/missing baseline set without a human in the loop.
+# Scheduled/manual baseline refresh. This workflow is the only --update-snapshots
+# path and must not run on pull_request or merge_group (merge groups do not
+# provision Neon). JOV-5459 fail-closed missing-baseline/ENOENT compare lives in
+# ci.yml `ci-visual-snapshot-compare` and feeds merge-group PR Ready. Refresh
+# still self-heals stale/missing baselines via a single auto-PR (same JOVIE_BOT
+# + merge-queue pattern as screenshots.yml).
 #
 # Functional assertions in the spec (horizontal scroll, CTA clipping) still fail the
 # refresh run — a broken layout never silently becomes the new baseline.
@@ -309,12 +309,12 @@ jobs:
 
           if [ -n "$EXISTING_PR" ]; then
             echo "Updated existing PR #$EXISTING_PR via force-push"
-            gh pr edit --add-label "merge-queue" "$EXISTING_PR" || { echo "::error::Failed to add merge-queue label to $EXISTING_PR"; exit 1; }
+            echo "Native autoenroll owns queue mutation; the merge-queue label is retired."
           else
             PR_URL=$(gh pr create \
               --title "chore: refresh visual regression baselines" \
               --body "Auto-generated scheduled/manual baseline refresh triggered by ${GITHUB_SHA::8}. Generated on ubuntu-latest + Chromium (pinned via pnpm).")
-            gh pr edit --add-label "merge-queue" "$PR_URL" || { echo "::error::Failed to add merge-queue label to $PR_URL"; exit 1; }
+            echo "Opened $PR_URL. Native autoenroll owns queue mutation; the merge-queue label is retired."
           fi
 
       - name: Cleanup Neon branch

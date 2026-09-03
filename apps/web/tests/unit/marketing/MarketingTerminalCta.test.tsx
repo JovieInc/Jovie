@@ -1,8 +1,20 @@
+import { BUTTON_PEN_CONTRACT } from '@jovie/ui';
 import { render, screen } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
+import { HomepageV2FinalCta } from '@/components/marketing/homepage-v2/HomepageV2Ctas';
 import { MarketingFinalCTA } from '@/components/site/MarketingFinalCTA';
 import { MarketingFooterCta } from '@/components/site/MarketingFooterCta';
+import { MarketingTerminalCta } from '@/components/site/MarketingTerminalCta';
 import { MARKETING_PEN_CONTRACT_IDS } from '@/data/marketing/penContracts';
+
+const PRIMARY_BUTTON_MASTER =
+  BUTTON_PEN_CONTRACT.rootByVariantKey['button/primary/lg/idle'];
+
+if (!PRIMARY_BUTTON_MASTER) {
+  throw new Error(
+    'button/primary/lg/idle master is required for terminal CTAs'
+  );
+}
 
 vi.mock('next/link', () => ({
   default: ({
@@ -49,13 +61,17 @@ describe('Marketing terminal CTA wrappers', () => {
       'href',
       '/pricing'
     );
-    expect(
-      screen.getByRole('link', { name: 'Request Access' })
-    ).toHaveAttribute('data-variant', 'primary');
-    expect(screen.getByRole('link', { name: 'See Pricing' })).toHaveAttribute(
-      'data-variant',
-      'tertiary'
+    const primary = screen.getByRole('link', { name: 'Request Access' });
+    const secondary = screen.getByRole('link', { name: 'See Pricing' });
+    expect(primary).toHaveAttribute('data-variant', 'primary');
+    expect(primary).toHaveAttribute('data-size', 'lg');
+    expect(primary).toHaveAttribute(
+      'data-pen-contract',
+      PRIMARY_BUTTON_MASTER?.rootId
     );
+    expect(secondary).toHaveAttribute('data-variant', 'tertiary');
+    expect(secondary).toHaveAttribute('data-size', 'md');
+    expect(secondary).not.toHaveAttribute('data-pen-contract');
   });
 
   it('keeps footer analytics and emits only one primary action by default', () => {
@@ -80,9 +96,47 @@ describe('Marketing terminal CTA wrappers', () => {
       'data-analytics-source',
       'download_page_footer'
     );
+    expect(action).toHaveAttribute('data-variant', 'primary');
+    expect(action).toHaveAttribute('data-size', 'lg');
+    expect(action).toHaveAttribute(
+      'data-pen-contract',
+      PRIMARY_BUTTON_MASTER?.rootId
+    );
     expect(
       screen.getByTestId('marketing-footer-cta').querySelectorAll('a')
     ).toHaveLength(1);
+  });
+
+  it('keeps cinematic primary and optional secondary on the same Button family', () => {
+    render(
+      <MarketingTerminalCta
+        variant='cinematic'
+        title='Ready to install Jovie?'
+        ctaLabel='Download for Mac'
+        ctaHref='/download'
+        secondaryLabel='See Pricing'
+        secondaryHref='/pricing'
+        testId='marketing-terminal-cta-cinematic'
+        penContractId={MARKETING_PEN_CONTRACT_IDS.shell.footerCta}
+      />
+    );
+
+    const primary = screen.getByRole('link', { name: 'Download for Mac' });
+    const secondary = screen.getByRole('link', { name: 'See Pricing' });
+    expect(
+      screen.getByTestId('marketing-terminal-cta-cinematic')
+    ).toHaveAttribute(
+      'data-pen-contract',
+      MARKETING_PEN_CONTRACT_IDS.shell.footerCta
+    );
+    expect(primary).toHaveAttribute('data-variant', 'primary');
+    expect(primary).toHaveAttribute('data-size', 'lg');
+    expect(primary).toHaveAttribute(
+      'data-pen-contract',
+      PRIMARY_BUTTON_MASTER?.rootId
+    );
+    expect(secondary).toHaveAttribute('data-variant', 'tertiary');
+    expect(secondary).toHaveAttribute('data-size', 'md');
   });
 
   it('forwards prefetch={false} to the underlying link for binary redirect targets', () => {
@@ -98,5 +152,22 @@ describe('Marketing terminal CTA wrappers', () => {
     const action = screen.getByRole('link', { name: 'Download for Mac' });
     expect(action).toHaveAttribute('href', '/api/desktop/download');
     expect(action).toHaveAttribute('data-prefetch', 'false');
+  });
+
+  it('keeps the homepage terminal variant on the canonical family', () => {
+    render(<HomepageV2FinalCta />);
+
+    const section = screen.getByTestId('homepage-v2-final-cta');
+    const action = screen.getByTestId('homepage-v2-final-cta-primary');
+    expect(section).toHaveAttribute(
+      'data-pen-contract',
+      MARKETING_PEN_CONTRACT_IDS.shell.footerCta
+    );
+    expect(screen.getByTestId('homepage-v2-final-cta-heading')).toHaveAttribute(
+      'data-homepage-section-heading',
+      'true'
+    );
+    expect(action).toHaveAttribute('data-size', 'md');
+    expect(action).toHaveAttribute('data-cta-sign-up', 'true');
   });
 });

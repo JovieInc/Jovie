@@ -18,7 +18,7 @@ const meta = {
       source: 'apps/web/components/features/pitch/InvestorBrief.tsx',
       sourceExport: 'InvestorBrief',
       storyExport: 'Web188AnonymousFallback',
-      sourceSha: '02193d203a6dce76657f5e3988a173fc35ae07ff',
+      sourceSha: '8b0353fcbeb0cffef614fa47afbbbd8eeae48997',
       fixture: 'shipped null investorName fallback',
       proofTier: 'source-backed',
     },

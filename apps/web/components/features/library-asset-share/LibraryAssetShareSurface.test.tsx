@@ -39,6 +39,11 @@ describe('web-194 private asset share source contract', () => {
       'href',
       WEB194_PRIVATE_ASSET_VIEW.smartLinkPath
     );
+    expect(
+      screen.getByRole('img', {
+        name: `${WEB194_PRIVATE_ASSET_VIEW.title} artwork`,
+      })
+    ).toHaveClass('object-contain');
   });
 
   it('keeps private-token lookup and metadata in the server route', () => {

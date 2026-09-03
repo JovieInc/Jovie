@@ -20,10 +20,13 @@ import {
   type LibraryApprovalStatus,
 } from '@/lib/library/approval-status';
 import type { LibraryAssetShareViewModel } from '@/lib/library/asset-share';
+import type { LibraryMerchProductOption } from '@/lib/library/graph-types';
+import type { LibraryPostReleaseBundle } from '@/lib/library/post-release-types';
 import {
   isLibraryProfileVisibility,
   type LibraryProfileVisibility,
 } from '@/lib/library/profile-visibility';
+import type { LibraryRelationshipView } from '@/lib/library/track-drawer-types';
 import type { LibraryMerchCard } from '@/lib/merch/types';
 import { useReleasesQuery } from '@/lib/queries/useReleasesQuery';
 import type { PublicVideoListItem } from '@/lib/youtube-library/queries';
@@ -44,6 +47,9 @@ interface ReleaseCatalogPageClientProps {
   >;
   readonly creatorDocuments?: readonly CreatorDocumentListItem[];
   readonly youtubeVideos?: readonly PublicVideoListItem[];
+  readonly merchProducts?: readonly LibraryMerchProductOption[];
+  readonly relationships?: readonly LibraryRelationshipView[];
+  readonly postReleaseBundle?: LibraryPostReleaseBundle;
 }
 
 function toApprovalStatusMap(
@@ -78,6 +84,9 @@ export function ReleaseCatalogPageClient({
   assetShareByAssetId = {},
   creatorDocuments = [],
   youtubeVideos = [],
+  merchProducts = [],
+  relationships = [],
+  postReleaseBundle,
 }: ReleaseCatalogPageClientProps) {
   const { selectedProfile } = useDashboardData();
   const profileId = selectedProfile?.id ?? '';
@@ -153,6 +162,17 @@ export function ReleaseCatalogPageClient({
       <LibrarySurface
         profileId={profileId}
         artistHandle={artistHandle}
+        canSyncSpotify={spotifyConnected}
+        merchProducts={
+          merchProducts.length > 0
+            ? merchProducts
+            : merchCards.map(card => ({
+                id: card.id,
+                title: card.title,
+              }))
+        }
+        relationships={relationships}
+        postReleaseBundle={postReleaseBundle}
         assets={[
           ...buildLibraryReleaseAssets(
             [...releases, ...archivedReleases],

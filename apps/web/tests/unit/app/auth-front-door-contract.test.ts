@@ -4,13 +4,15 @@ import { APP_ROUTES } from '@/constants/routes';
 import { getHomepageFrontDoorCtaContract } from '@/data/homepageFrontDoorCta';
 
 describe('auth front-door contract', () => {
-  it('keeps waitlist-on homepage CTAs in request-access mode', () => {
+  it('locks waitlist-on homepage CTA to Get started → /start (JOV-5085 / JOV-5479)', () => {
     const contract = getHomepageFrontDoorCtaContract(true);
 
     expect(contract.primary).toEqual({
       label: 'Get started',
-      href: `${APP_ROUTES.START}?starter_prompt=Hey%2C+I+want+to+get+access+to+Jovie.`,
+      href: APP_ROUTES.START,
     });
+    expect(contract.primary.href).not.toMatch(/waitlist/i);
+    expect(contract.primary.href).not.toContain('starter_prompt');
     expect(contract.secondary).toBeNull();
     expect(contract.fallbackSupport).toBe(
       'Limited prelaunch access. We will email when you are in.'

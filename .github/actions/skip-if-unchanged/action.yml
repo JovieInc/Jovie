@@ -1,0 +1,41 @@
+name: Skip if unchanged SHA
+description: Skip scheduled work after a successful scheduled run on this exact SHA. Manual dispatch always runs.
+inputs:
+  workflow:
+    description: Workflow file or name used by gh run list --workflow
+    required: true
+outputs:
+  skip:
+    description: true when a scheduled tick would repeat the last successful SHA
+    value: ${{ steps.gate.outputs.skip }}
+runs:
+  using: composite
+  steps:
+    - id: gate
+      shell: bash
+      env:
+        GH_TOKEN: ${{ github.token }}
+        WORKFLOW: ${{ inputs.workflow }}
+        SHA: ${{ github.sha }}
+        EVENT: ${{ github.event_name }}
+        REPO: ${{ github.repository }}
+      run: |
+        set -euo pipefail
+        if [[ "$EVENT" != "schedule" ]]; then
+          echo "skip=false" >> "$GITHUB_OUTPUT"
+          echo "Scheduled skip unused for event=$EVENT"
+          exit 0
+        fi
+        if [[ ! "$SHA" =~ ^[0-9a-f]{40}$ ]]; then
+          echo "::error::skip-if-unchanged requires an exact 40-char SHA"
+          exit 1
+        fi
+        last="$(gh run list --repo "$REPO" --workflow "$WORKFLOW" --branch main --event schedule --status success --limit 30 --json headSha,conclusion \
+          --jq '[.[] | select(.conclusion=="success")] | .[0].headSha // empty')"
+        if [[ -n "$last" && "$last" == "$SHA" ]]; then
+          echo "skip=true" >> "$GITHUB_OUTPUT"
+          echo "No new SHA since last success ($SHA); skipping scheduled work."
+        else
+          echo "skip=false" >> "$GITHUB_OUTPUT"
+          echo "New or first SHA ($SHA); last success was ${last:-none}."
+        fi

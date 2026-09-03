@@ -6,11 +6,13 @@ import {
   bindDispatchLiveHead,
   emptyRollingCiState,
   failureFingerprint,
+  MAX_REPAIR_DELIVERIES,
   normalizeFailureEvents,
   parseMergeQueueFrontBranch,
   parseRollingCiState,
   planFailureDispatch,
   planGreenRecovery,
+  ROLLING_CI_POLICY_VERSION,
   renderDispatchComment,
   resolveCiWorkflowRun,
   resolveDispatchPullRequest,
@@ -18,6 +20,7 @@ import {
   TRUSTED_CI_WORKFLOW_PATH,
   TRUSTED_FAILURE_EVENTS,
   TRUSTED_PRODUCER_EVENTS,
+  TRUSTED_REPOSITORY,
 } from '../rolling-ci-dispatch.mjs';
 
 const head = 'a'.repeat(40);
@@ -81,8 +84,30 @@ function plan(eventValue = event(), extra = {}) {
 }
 
 describe('rolling CI failure dispatch', () => {
+  it('serializes same-PR remediation without cancelling a prepared writer', () => {
+    expect(WORKFLOW).toContain('cancel-in-progress: false');
+  });
+
+  it('fits the bounded FX retry contract inside the dispatch budget', () => {
+    expect(WORKFLOW).toContain('timeout-minutes: 30');
+    expect(WORKFLOW).toContain('--timeout 600');
+    expect(WORKFLOW).not.toContain('--timeout 1800');
+  });
+
+  it('requires a clean install baseline and independent repair verification', () => {
+    expect(WORKFLOW).toContain('Require a clean dependency baseline');
+    expect(WORKFLOW).toContain('git status --porcelain --untracked-files=all');
+    expect(WORKFLOW).toContain('Independently verify the guarded FX repair');
+    expect(WORKFLOW).toContain('run: pnpm ci:control:test');
+  });
+
+  it('does not report a guard or upload failure as merely launched', () => {
+    expect(WORKFLOW).toContain("outcome='failed_after_launch'");
+  });
+
   it('normalizes repository, PR, exact head, check, attempt, and fingerprint', () => {
     expect(event()).toMatchObject({
+      policyVersion: ROLLING_CI_POLICY_VERSION,
       repository: 'JovieInc/Jovie',
       pr: 17,
       head,
@@ -140,27 +165,29 @@ describe('rolling CI failure dispatch', () => {
     expect(run?.id).toBe(11);
   });
 
-  it('deliberate red: dispatch CLI still requires a writer on merge_group', () => {
+  it('deliberate red: dispatch CLI rejects merge_group even with a writer', () => {
     const result = spawnSync(process.execPath, [CLI], {
       input: JSON.stringify(
         dispatchInput({
-          writer: '',
+          writer: 'fx-hosted',
           source: { ...trustedSource, producerEvent: 'merge_group' },
         })
       ),
       encoding: 'utf8',
     });
     expect(result.status).not.toBe(0);
-    expect(result.stderr).toContain('writer is required');
+    expect(result.stderr).toContain(
+      'failure source is not an authenticated CI workflow_run'
+    );
   });
 
-  it('accepts native merge_group CI as an authenticated producer', () => {
-    expect(TRUSTED_PRODUCER_EVENTS).toEqual(['pull_request', 'merge_group']);
-    expect(
+  it('rejects native merge_group CI as a synthetic producer', () => {
+    expect(TRUSTED_PRODUCER_EVENTS).toEqual(['pull_request']);
+    expect(() =>
       event({
         source: { ...trustedSource, producerEvent: 'merge_group' },
-      }).source.producerEvent
-    ).toBe('merge_group');
+      })
+    ).toThrow('failure source is not an authenticated CI workflow_run');
     expect(
       resolveCiWorkflowRun({
         headSha: head,
@@ -176,11 +203,11 @@ describe('rolling CI failure dispatch', () => {
             run_attempt: 1,
           },
         ],
-      })?.id
-    ).toBe(13);
+      })
+    ).toBeNull();
   });
 
-  it('resolves the merge-queue front PR when workflow_run leaves pull_requests empty', () => {
+  it('recognizes but never admits a merge-queue synthetic ref', () => {
     const baseSha = 'c'.repeat(40);
     expect(
       parseMergeQueueFrontBranch(`gh-readonly-queue/main/pr-16180-${baseSha}`)
@@ -190,11 +217,7 @@ describe('rolling CI failure dispatch', () => {
         producerEvent: 'merge_group',
         headBranch: `refs/heads/gh-readonly-queue/main/pr-16180-${baseSha}`,
       })
-    ).toEqual({
-      prNumber: 16180,
-      source: 'merge_queue_front_ref',
-      baseSha,
-    });
+    ).toBeNull();
     expect(
       resolveDispatchPullRequest({
         producerEvent: 'pull_request',
@@ -207,7 +230,7 @@ describe('rolling CI failure dispatch', () => {
         liveHead: nextHead,
         expectedHead: head,
       })
-    ).toEqual({ liveHead: head, reason: 'merge_group_synthetic_head' });
+    ).toBeNull();
     expect(
       bindDispatchLiveHead({
         producerEvent: 'pull_request',
@@ -217,8 +240,8 @@ describe('rolling CI failure dispatch', () => {
     ).toBeNull();
   });
 
-  it('deliberate red: rejects the old pull_request-only producer gate', () => {
-    expect(TRUSTED_PRODUCER_EVENTS).toEqual(['pull_request', 'merge_group']);
+  it('deliberate red: rejects every producer except pull_request', () => {
+    expect(TRUSTED_PRODUCER_EVENTS).toEqual(['pull_request']);
     expect(() =>
       event({
         source: { ...trustedSource, producerEvent: 'push' },
@@ -229,36 +252,13 @@ describe('rolling CI failure dispatch', () => {
         source: { ...trustedSource, producerEvent: 'workflow_dispatch' },
       })
     ).toThrow('failure source is not an authenticated CI workflow_run');
-    const queueSha = 'c'.repeat(40);
-    const bound = bindDispatchLiveHead({
-      producerEvent: 'merge_group',
-      liveHead: nextHead,
-      expectedHead: queueSha,
-    });
-    expect(bound).toEqual({
-      liveHead: queueSha,
-      reason: 'merge_group_synthetic_head',
-    });
-    expect(
+    expect(() =>
       runDispatch(
         dispatchInput({
           source: { ...trustedSource, producerEvent: 'merge_group' },
-          liveHead: bound?.liveHead,
-          headSha: queueSha,
-          checks: [
-            {
-              name: 'ci-fast',
-              conclusion: 'failure',
-              headSha: queueSha,
-              checkSuiteId: 44,
-            },
-          ],
         })
       )
-    ).toMatchObject({
-      action: 'dispatch_implementer',
-      mutate: true,
-    });
+    ).toThrow('failure source is not an authenticated CI workflow_run');
   });
 
   it('deliberate red: rejects unauthenticated or PR-controlled events', () => {
@@ -370,16 +370,12 @@ describe('rolling CI failure dispatch', () => {
 
   it('deliberate red: bounds repeated repair deliveries', () => {
     let state = emptyRollingCiState(head);
-    for (let attempt = 1; attempt <= 3; attempt += 1) {
-      const next = plan(
-        event({ workflowRunId: 9000 + attempt, workflowRunAttempt: attempt }),
-        { priorState: state }
-      );
-      expect(next.mutate).toBe(true);
-      state = next.state;
-    }
+    expect(MAX_REPAIR_DELIVERIES).toBe(1);
+    const first = plan(event(), { priorState: state });
+    expect(first.mutate).toBe(true);
+    state = first.state;
     expect(
-      plan(event({ workflowRunId: 9010, workflowRunAttempt: 4 }), {
+      plan(event({ workflowRunId: 9010, workflowRunAttempt: 2 }), {
         priorState: state,
       })
     ).toMatchObject({
@@ -387,6 +383,102 @@ describe('rolling CI failure dispatch', () => {
       mutate: false,
       incident: { type: 'non_progressing_policy_cycle' },
     });
+  });
+
+  it('preserves an actionable failure when a later fingerprint is exhausted', () => {
+    const exhausted = runDispatch(
+      dispatchInput({
+        failedJobs: [{ name: 'z-exhausted', steps: ['Retry'] }],
+        checks: [
+          {
+            name: 'z-exhausted',
+            conclusion: 'failure',
+            headSha: head,
+            checkSuiteId: 44,
+          },
+        ],
+      })
+    );
+    const actionableFingerprint = failureFingerprint({
+      check: 'a-actionable',
+      failedSteps: ['Typecheck'],
+    });
+    const next = runDispatch(
+      dispatchInput({
+        workflowRunId: 9010,
+        workflowRunAttempt: 2,
+        failedJobs: [
+          { name: 'a-actionable', steps: ['Typecheck'] },
+          { name: 'z-exhausted', steps: ['Retry'] },
+        ],
+        checks: [
+          {
+            name: 'a-actionable',
+            conclusion: 'failure',
+            headSha: head,
+            checkSuiteId: 44,
+          },
+          {
+            name: 'z-exhausted',
+            conclusion: 'failure',
+            headSha: head,
+            checkSuiteId: 44,
+          },
+        ],
+        priorCommentBody: exhausted.body,
+      })
+    );
+
+    expect(next).toMatchObject({
+      action: 'dispatch_implementer',
+      mutate: true,
+      state: { claim: { fingerprint: actionableFingerprint } },
+    });
+    expect(next.body).toContain(
+      `- Failure fingerprint: \`${actionableFingerprint}\``
+    );
+  });
+
+  it('admits one failure per lease without consuming siblings', () => {
+    const firstFingerprint = failureFingerprint({
+      check: 'a-first',
+      failedSteps: ['Typecheck'],
+    });
+    const secondFingerprint = failureFingerprint({
+      check: 'b-second',
+      failedSteps: ['Unit tests'],
+    });
+    const next = runDispatch(
+      dispatchInput({
+        failedJobs: [
+          { name: 'a-first', steps: ['Typecheck'] },
+          { name: 'b-second', steps: ['Unit tests'] },
+        ],
+        checks: [
+          {
+            name: 'a-first',
+            conclusion: 'failure',
+            headSha: head,
+            checkSuiteId: 44,
+          },
+          {
+            name: 'b-second',
+            conclusion: 'failure',
+            headSha: head,
+            checkSuiteId: 44,
+          },
+        ],
+      })
+    );
+
+    expect(next).toMatchObject({
+      action: 'dispatch_implementer',
+      mutate: true,
+      state: { claim: { fingerprint: firstFingerprint } },
+    });
+    expect(next.state.failures[firstFingerprint]?.deliveryCount).toBe(1);
+    expect(next.state.failures[secondFingerprint]).toBeUndefined();
+    expect(next.state.deliveries).toHaveLength(1);
   });
 
   it('successful current-head rerun supersedes active repairs', () => {
@@ -415,9 +507,17 @@ describe('rolling CI failure dispatch', () => {
     const body = renderDispatchComment({ event: failure, plan: planned });
     expect(body).toContain('@tim (active implementer)');
     expect(planned.state.claim.key).toBe(
-      `JovieInc/Jovie:pr-17:${head}:ci-fast:${failure.fingerprint}`
+      `JovieInc/Jovie:pr-17:${head}:${failure.fingerprint}:${ROLLING_CI_POLICY_VERSION}`
     );
+    expect(planned.state.claim.policyVersion).toBe(ROLLING_CI_POLICY_VERSION);
     expect(parseRollingCiState(body)).toEqual(planned.state);
+  });
+
+  it('rejects LogYourBody even though the Cursor App is installed there', () => {
+    expect(TRUSTED_REPOSITORY).toBe('JovieInc/Jovie');
+    expect(() => event({ repository: 'JovieInc/LogYourBody' })).toThrow(
+      'repository must be JovieInc/Jovie'
+    );
   });
 
   it('supersedes the claim on a green rerun of the same head', () => {
@@ -482,10 +582,27 @@ describe('rolling CI dispatch CLI and workflow', () => {
       'contents: read',
       'pull-requests: write',
       'GH_TOKEN: ${{ github.token }}',
-      'secrets.CURSOR_API_KEY',
+      'secrets.AI_GATEWAY_API_KEY',
       'node scripts/lib/rolling-ci-fx.mjs',
       'scripts/lib/rolling-ci-handoff.mjs',
-      'Launch FX remediator',
+      'Install pinned FX',
+      'Run FX on the exact source head',
+      'Guard FX diff',
+      'Push guarded FX repair',
+      'FX_VERSION: v0.0.7',
+      'fx-linux-x86_64.tar.gz',
+      'c5787ea041d3b5521ec675f1ada78f30cf1b11021ffcac48b4969cf5beb65c45',
+      'fx ask --auto --json --no-save',
+      'git diff --cached --check',
+      'REMOTE_HEAD',
+      'actions/create-github-app-token@bcd2ba49218906704ab6c1aa796996da409d3eb1',
+      'steps.app-token.outputs.token',
+      'secrets.JOVIE_BOT_PRIVATE_KEY',
+      'pnpm install --frozen-lockfile',
+      'actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a',
+      'actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c',
+      'git diff --cached --binary --full-index',
+      'jovie-fx-repair-artifact/v1',
       'Record FX outcome',
       'fx_outcome',
       '::notice::FX outcome=',
@@ -495,16 +612,98 @@ describe('rolling CI dispatch CLI and workflow', () => {
       expect(WORKFLOW, token).toContain(token);
     }
     expect(WORKFLOW).toMatch(/^permissions: \{\}$/m);
-    expect(WORKFLOW).not.toContain('contents: write');
+    expect(WORKFLOW).not.toMatch(/^\s{6}contents: write$/m);
+    expect(WORKFLOW).not.toContain('secrets.CURSOR_API_KEY');
+    expect(WORKFLOW).not.toContain('launchCursorAgent');
+    expect(WORKFLOW).not.toContain(
+      'GH_TOKEN: ${{ github.token }}\n        run: fx ask'
+    );
+    expect(WORKFLOW).toContain('persist-credentials: false');
     expect(WORKFLOW).not.toMatch(/^\s{2}check_suite:\s*$/m);
     expect(WORKFLOW).not.toMatch(/^\s{2}check_run:\s*$/m);
-    expect(WORKFLOW).not.toContain('JOVIE_BOT_PRIVATE_KEY');
+    expect(WORKFLOW.indexOf('Run FX on the exact source head')).toBeLessThan(
+      WORKFLOW.indexOf('Generate short-lived Jovie App writer token')
+    );
     expect(WORKFLOW).not.toContain(
       'ref: ${{ github.event.workflow_run.head_sha }}'
     );
     expect(WORKFLOW).not.toMatch(
       /github\.event\.workflow_run\.event == 'pull_request' &&\s*\n\s*github\.event\.workflow_run\.path == '\.github\/workflows\/ci\.yml'/
     );
+  });
+
+  it('isolates every exact-source repair step from trusted sparse policy', () => {
+    const dispatchStart = WORKFLOW.indexOf('\n  dispatch:\n');
+    const writerStart = WORKFLOW.indexOf('\n  writer:\n');
+    expect(dispatchStart).toBeGreaterThan(-1);
+    expect(writerStart).toBeGreaterThan(dispatchStart);
+    const dispatchJob = WORKFLOW.slice(dispatchStart, writerStart);
+
+    const dispatchStep = name => {
+      const marker = `      - name: ${name}\n`;
+      expect(dispatchJob.split(marker), name).toHaveLength(2);
+      const start = dispatchJob.indexOf(marker);
+      const end = dispatchJob.indexOf('\n      - name:', start + marker.length);
+      expect(end, name).toBeGreaterThan(start);
+      return dispatchJob.slice(start, end);
+    };
+
+    const checkout = dispatchStep('Checkout exact source PR head');
+    expect(checkout).toContain('ref: ${{ steps.plan.outputs.source_head }}');
+    expect(checkout).toMatch(/^          path: source$/m);
+    expect(checkout).toMatch(/^          persist-credentials: false$/m);
+
+    const checkoutGuard = dispatchStep('Require full exact-source checkout');
+    expect(checkoutGuard).toContain('test -f package.json');
+    expect(checkoutGuard).toContain('test -f pnpm-lock.yaml');
+    expect(checkoutGuard).toContain(
+      'test "$(git rev-parse HEAD)" = "$SOURCE_HEAD"'
+    );
+
+    for (const stepName of [
+      'Require full exact-source checkout',
+      'Capture exact failed-run evidence',
+      'Restore source dependencies without model credentials',
+      'Require a clean dependency baseline',
+      'Run FX on the exact source head',
+      'Guard FX diff',
+      'Independently verify the guarded FX repair',
+      'Create immutable FX repair artifact',
+    ]) {
+      expect(dispatchStep(stepName), stepName).toMatch(
+        /^        working-directory: source$/m
+      );
+    }
+  });
+
+  it('keeps all repository write credentials outside the FX execution step', () => {
+    const fxStart = WORKFLOW.indexOf('Run FX on the exact source head');
+    const fxEnd = WORKFLOW.indexOf('Guard FX diff');
+    const writerStart = WORKFLOW.indexOf(
+      'Generate short-lived Jovie App writer token'
+    );
+    const writerJobStart = WORKFLOW.indexOf('\n  writer:\n');
+    expect(fxStart).toBeGreaterThan(-1);
+    expect(fxEnd).toBeGreaterThan(fxStart);
+    expect(writerStart).toBeGreaterThan(fxEnd);
+    expect(writerJobStart).toBeGreaterThan(fxEnd);
+    expect(writerStart).toBeGreaterThan(writerJobStart);
+
+    const fxStep = WORKFLOW.slice(fxStart, fxEnd);
+    expect(fxStep).toContain('secrets.AI_GATEWAY_API_KEY');
+    expect(fxStep).not.toContain('GH_TOKEN');
+    expect(fxStep).not.toContain('JOVIE_BOT_PRIVATE_KEY');
+    expect(fxStep).not.toContain('github.token');
+
+    const dispatchJob = WORKFLOW.slice(0, writerJobStart);
+    expect(dispatchJob).not.toContain('JOVIE_BOT_PRIVATE_KEY');
+    expect(dispatchJob).not.toContain('permission-contents: write');
+
+    const writerSteps = WORKFLOW.slice(writerStart);
+    expect(writerSteps).toContain('JOVIE_BOT_PRIVATE_KEY');
+    expect(writerSteps).toContain('steps.app-token.outputs.token');
+    expect(writerSteps).toContain('REMOTE_HEAD');
+    expect(writerSteps).toContain('HEAD:refs/heads/$HEAD_REF');
   });
 
   it('binds every jq payload value into the exact planner input', () => {
@@ -540,7 +739,9 @@ describe('rolling CI dispatch CLI and workflow', () => {
       conclusion: 'failure',
       checkSuiteId: 44,
       checks,
-      cursorApiKey: '',
+      fxAuthConfigured: true,
+      runnerLocalAvailable: true,
+      remoteMutationAllowed: false,
       source: {
         eventName: 'workflow_run',
         workflow: 'CI',
@@ -611,14 +812,52 @@ describe('rolling CI dispatch CLI and workflow', () => {
       '--arg',
       'trustedPolicyRef',
       values.source.trustedPolicyRef,
-      '--arg',
-      'cursorApiKey',
-      values.cursorApiKey,
+      '--argjson',
+      'fxAuthConfigured',
+      String(values.fxAuthConfigured),
+      '--argjson',
+      'runnerLocalAvailable',
+      String(values.runnerLocalAvailable),
       payloadFilter,
     ];
     const result = spawnSync('jq', jqArgs, { encoding: 'utf8' });
 
     expect(result.status, result.stderr).toBe(0);
     expect(JSON.parse(result.stdout)).toEqual(values);
+  });
+
+  it('reads every job from the exact workflow run attempt', () => {
+    expect(WORKFLOW).toContain(
+      'actions/runs/$WORKFLOW_RUN_ID/attempts/$WORKFLOW_RUN_ATTEMPT/jobs?per_page=100'
+    );
+
+    const failedJobsFilter = WORKFLOW.match(
+      /FAILED_JOBS=\$\(gh api [\s\S]*?--jq '([^']+)'\)/
+    )?.[1];
+    expect(failedJobsFilter).toBeDefined();
+
+    const jobs = Array.from({ length: 60 }, (_, index) => ({
+      name: `job-${index + 1}`,
+      conclusion: index === 59 ? 'failure' : 'success',
+      steps: [
+        {
+          name: index === 59 ? 'Late failing step' : 'Passing step',
+          conclusion: index === 59 ? 'failure' : 'success',
+        },
+      ],
+    }));
+    const result = spawnSync('jq', [failedJobsFilter], {
+      input: JSON.stringify({ jobs }),
+      encoding: 'utf8',
+    });
+
+    expect(result.status, result.stderr).toBe(0);
+    expect(JSON.parse(result.stdout)).toEqual([
+      {
+        name: 'job-60',
+        conclusion: 'failure',
+        steps: ['Late failing step'],
+      },
+    ]);
   });
 });

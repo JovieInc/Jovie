@@ -60,4 +60,28 @@ describe('stripe config legacy price mappings', () => {
     // Hardcoded ID still resolves when env points elsewhere
     expect(getPlanFromPriceId(FOUNDING_PRICE_ID)).toBe('pro');
   });
+
+  it('accepts the thumbnail founder price without listing it in general pricing', async () => {
+    const founderPriceId = 'price_youtube_thumbnails_founder';
+    vi.stubEnv('STRIPE_PRICE_PRO_MONTHLY', 'price_pro_monthly');
+    vi.stubEnv('STRIPE_PRICE_PRO_YEARLY', 'price_pro_yearly');
+    vi.stubEnv(
+      'STRIPE_PRICE_YOUTUBE_THUMBNAILS_FOUNDER_MONTHLY',
+      founderPriceId
+    );
+
+    const {
+      getActivePriceIds,
+      getAvailablePricing,
+      getPlanFromPriceId,
+      isYouTubeThumbnailFounderPriceId,
+    } = await import('@/lib/stripe/config');
+
+    expect(getActivePriceIds()).toContain(founderPriceId);
+    expect(getPlanFromPriceId(founderPriceId)).toBe('pro');
+    expect(isYouTubeThumbnailFounderPriceId(founderPriceId)).toBe(true);
+    expect(
+      getAvailablePricing().some(option => option.priceId === founderPriceId)
+    ).toBe(false);
+  });
 });

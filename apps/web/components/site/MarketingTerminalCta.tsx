@@ -19,8 +19,60 @@ export interface MarketingTerminalCtaProps {
   readonly className?: string;
   readonly decoration?: ReactNode;
   readonly testId: string;
-  readonly variant?: 'cinematic' | 'standard';
+  readonly headingTestId?: string;
+  readonly actionTestId?: string;
+  readonly ctaSignUp?: boolean;
+  readonly variant?: 'cinematic' | 'homepage-v2' | 'standard';
   readonly penContractId: MarketingPenContractId;
+}
+
+interface MarketingTerminalCtaActionConfig {
+  readonly href: string;
+  readonly label: string;
+  readonly variant: 'primary' | 'tertiary';
+  readonly size: 'lg' | 'md';
+  readonly prefetch?: boolean;
+  readonly className?: string;
+  readonly analyticsEvent?: string;
+  readonly analyticsSource?: string;
+  readonly trailing?: ReactNode;
+  readonly testId?: string;
+  readonly signUp?: boolean;
+}
+
+/**
+ * Single canonical action identity for terminal marketing CTAs. Both primary
+ * and optional secondary render through `@jovie/ui` Button asChild so Pen can
+ * map instances to the source-backed Button master instead of raw Link frames.
+ */
+function MarketingTerminalCtaAction({
+  href,
+  label,
+  variant,
+  size,
+  prefetch,
+  className,
+  analyticsEvent,
+  analyticsSource,
+  trailing,
+  testId,
+  signUp,
+}: Readonly<MarketingTerminalCtaActionConfig>) {
+  return (
+    <Button variant={variant} size={size} asChild className={className}>
+      <Link
+        href={href}
+        prefetch={prefetch}
+        data-analytics-event={analyticsEvent}
+        data-analytics-source={analyticsSource}
+        data-testid={testId}
+        data-cta-sign-up={signUp ? 'true' : undefined}
+      >
+        {label}
+        {trailing}
+      </Link>
+    </Button>
+  );
 }
 
 const styles = {
@@ -33,6 +85,18 @@ const styles = {
     body: 'mx-auto max-w-[36rem] text-balance text-lg leading-[1.45] text-white/[0.58]',
     actions: 'mt-2 flex flex-wrap items-center justify-center gap-3',
     primary: 'homepage-final-cta-action',
+  },
+  'homepage-v2': {
+    section:
+      'homepage-story-final-cta system-b-mounted-home-footer-cta relative isolate overflow-hidden',
+    content:
+      'homepage-final-cta-copy system-b-mounted-home-footer-cta-copy mx-auto',
+    title:
+      'homepage-final-cta-heading system-b-mounted-home-footer-cta-heading text-balance',
+    body: 'homepage-story-body mx-auto',
+    actions: 'contents',
+    primary:
+      'homepage-final-cta-action system-b-mounted-home-footer-cta-action',
   },
   standard: {
     section:
@@ -61,6 +125,9 @@ export function MarketingTerminalCta({
   className,
   decoration,
   testId,
+  headingTestId,
+  actionTestId,
+  ctaSignUp,
   variant = 'standard',
   penContractId,
 }: Readonly<MarketingTerminalCtaProps>) {
@@ -68,31 +135,54 @@ export function MarketingTerminalCta({
 
   const content = (
     <div className={variantStyles.content}>
-      <h2 className={variantStyles.title}>{title}</h2>
+      <h2
+        className={variantStyles.title}
+        data-testid={headingTestId}
+        data-homepage-section-heading={
+          variant === 'homepage-v2' ? true : undefined
+        }
+      >
+        {title}
+      </h2>
       {body ? <p className={variantStyles.body}>{body}</p> : null}
       <div className={variantStyles.actions}>
-        <Button
-          variant='primary'
-          size='lg'
-          asChild
-          className={variantStyles.primary}
-        >
-          <Link
+        {variant === 'homepage-v2' ? (
+          <MarketingTerminalCtaAction
             href={ctaHref}
+            label={ctaLabel}
+            variant='primary'
+            size='md'
             prefetch={prefetch}
-            data-analytics-event={ctaAnalyticsEvent}
-            data-analytics-source={ctaAnalyticsSource}
-          >
-            {ctaLabel}
-          </Link>
-        </Button>
+            className={variantStyles.primary}
+            analyticsEvent={ctaAnalyticsEvent}
+            analyticsSource={ctaAnalyticsSource}
+            testId={actionTestId}
+            signUp={ctaSignUp}
+          />
+        ) : (
+          <MarketingTerminalCtaAction
+            href={ctaHref}
+            label={ctaLabel}
+            variant='primary'
+            size='lg'
+            prefetch={prefetch}
+            className={variantStyles.primary}
+            analyticsEvent={ctaAnalyticsEvent}
+            analyticsSource={ctaAnalyticsSource}
+            testId={actionTestId}
+            signUp={ctaSignUp}
+          />
+        )}
         {secondaryLabel && secondaryHref ? (
-          <Button variant='tertiary' size='md' asChild className='gap-1'>
-            <Link href={secondaryHref} prefetch={prefetch}>
-              {secondaryLabel}
-              <span aria-hidden='true'>→</span>
-            </Link>
-          </Button>
+          <MarketingTerminalCtaAction
+            href={secondaryHref}
+            label={secondaryLabel}
+            variant='tertiary'
+            size='md'
+            prefetch={prefetch}
+            className='gap-1'
+            trailing={<span aria-hidden='true'>→</span>}
+          />
         ) : null}
       </div>
     </div>
@@ -105,8 +195,15 @@ export function MarketingTerminalCta({
       className={cn(variantStyles.section, className)}
     >
       {decoration}
-      {variant === 'cinematic' ? (
-        <MarketingContainer width='page' className='relative z-10'>
+      {variant === 'cinematic' || variant === 'homepage-v2' ? (
+        <MarketingContainer
+          width='page'
+          className={
+            variant === 'homepage-v2'
+              ? 'system-b-mounted-home-footer-cta-container'
+              : 'relative z-10'
+          }
+        >
           {content}
         </MarketingContainer>
       ) : (

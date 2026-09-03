@@ -150,6 +150,9 @@ async function collectLayoutMetrics(page: Page) {
     const nav = document.querySelector<HTMLElement>(
       '[data-testid="profile-tab-bar"]'
     );
+    const navRail = document.querySelector<HTMLElement>(
+      '[data-testid="profile-bottom-nav"]'
+    );
     const desktopCover = document.querySelector<HTMLElement>(
       '[data-testid="profile-desktop-cover"]'
     );
@@ -268,6 +271,7 @@ async function collectLayoutMetrics(page: Page) {
       desktopSecondaryGrid: box(desktopSecondaryGrid),
       scroll: box(scroll),
       nav: box(nav),
+      navRail: box(navRail),
       visibleLargeImages,
       actionTargets,
       textTargets,
@@ -291,6 +295,34 @@ test.describe('Public profile /tim layout hardening @regression', () => {
       APPROVAL_OUTPUT_SEGMENT,
       'PROFILE_LAYOUT_APPROVAL_DIR'
     );
+  });
+
+  test('390x844 compact dock separates visual and touch geometry', async ({
+    page,
+  }) => {
+    const viewport = VIEWPORTS.find(candidate => candidate.id === '390x844');
+    expect(viewport).toBeDefined();
+    await prepareProfilePage(page, viewport as LayoutViewport);
+
+    const metrics = await collectLayoutMetrics(page);
+    expect(metrics.navRail?.height ?? 0).toBeGreaterThanOrEqual(30);
+    expect(metrics.navRail?.height ?? 0).toBeLessThanOrEqual(34);
+
+    const tabNames = new Set(['Home', 'Music', 'Events', 'Alerts']);
+    const tabTargets = metrics.actionTargets.filter(target =>
+      tabNames.has(target.label)
+    );
+    expect(tabTargets).toHaveLength(4);
+    for (const target of tabTargets) {
+      expect(
+        target.width,
+        `${target.label} should stay at least 44px wide`
+      ).toBeGreaterThanOrEqual(44);
+      expect(
+        target.height,
+        `${target.label} should stay at least 44px tall`
+      ).toBeGreaterThanOrEqual(44);
+    }
   });
 
   for (const viewport of VIEWPORTS) {

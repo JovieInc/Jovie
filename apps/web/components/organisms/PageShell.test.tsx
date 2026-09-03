@@ -61,13 +61,13 @@ describe('PageShell compatibility contract', () => {
   it('keeps PageContent padding explicit and removable', () => {
     const { rerender } = render(<PageContent>Content</PageContent>);
     expect(screen.getByText('Content')).toHaveClass(
-      'px-(--linear-app-content-padding-x)',
-      'py-(--linear-app-content-padding-y)'
+      'px-(--app-shell-content-padding-x)',
+      'py-(--app-shell-content-padding-y)'
     );
 
     rerender(<PageContent noPadding>Content</PageContent>);
     expect(screen.getByText('Content')).not.toHaveClass(
-      'px-(--linear-app-content-padding-x)'
+      'px-(--app-shell-content-padding-x)'
     );
   });
 });

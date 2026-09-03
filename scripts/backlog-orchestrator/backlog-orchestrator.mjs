@@ -13,15 +13,15 @@
  *   node scripts/backlog-orchestrator/backlog-orchestrator.mjs reconcile --issue JOV-123
  *   node scripts/backlog-orchestrator/backlog-orchestrator.mjs reconcile --dry-run
  *   node scripts/backlog-orchestrator/backlog-orchestrator.mjs audit
- *   node scripts/backlog-orchestrator/backlog-orchestrator.mjs admit-next
- *   node scripts/backlog-orchestrator/backlog-orchestrator.mjs gate-next
- *   node scripts/backlog-orchestrator/backlog-orchestrator.mjs approve-plan --issue=JOV-123 --evidence-file=/path/evidence.json
+ *   node scripts/backlog-orchestrator/backlog-orchestrator.mjs remediate
  *   node scripts/backlog-orchestrator/backlog-orchestrator.mjs report
  */
 
+import { execFile } from 'node:child_process';
 import { readFileSync, writeFileSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { promisify } from 'node:util';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 
@@ -31,12 +31,14 @@ import { preAdmissionDecision } from './admission-policy.mjs';
 // module tooling. These are canonical sibling modules, not host-only copies.
 import * as admitter from './admitter.mjs';
 import * as backlogReduction from './backlog-reduction.mjs';
+import * as backlogRemediation from './backlog-remediation.mjs';
 import * as classifier from './classifier.mjs';
 import * as contextGate from './context-gate.mjs';
 import * as deterministicGates from './deterministic-gates.mjs';
 import * as gateNextHold from './gate-next-hold.mjs';
 import { cliGbrainClient } from './gbrain-client.mjs';
 import * as intakeReadiness from './intake-readiness.mjs';
+import * as laneCapacity from './lane-capacity.mjs';
 import * as linear from './linear-client.mjs';
 import * as ownershipInventory from './ownership-inventory.mjs';
 import * as planGate from './plan-gate.mjs';
@@ -54,6 +56,11 @@ import {
 } from './symphony-routing.mjs';
 import { buildAgentReadyTriageWatchdog } from './triage-router.mjs';
 import * as workstreamer from './workstreamer.mjs';
+
+const execFileAsync = promisify(execFile);
+const TEAM_FILE_CONFIG = JSON.parse(
+  readFileSync(new URL('./config.json', import.meta.url), 'utf8')
+);
 
 // ----- Config -----
 // Never write beside the checkout. In-tree `.orchestrator-cache.json` is the
@@ -137,16 +144,21 @@ Usage:
   node backlog-orchestrator.mjs reconcile --dry-run  Dry run (no mutations)
   node backlog-orchestrator.mjs reconcile --issue=JOV-123  Single issue
   node backlog-orchestrator.mjs audit                Full backlog audit (shadow)
-  node backlog-orchestrator.mjs admit-next            Admit next work item
-  node backlog-orchestrator.mjs gate-next             Plan, approve, and admit one safe issue
-  node backlog-orchestrator.mjs gate-next --dry-run   Show the next issue without mutations
+  node backlog-orchestrator.mjs remediate             Inventory, select a cohort, feed official Symphony
+  node backlog-orchestrator.mjs remediate --dry-run   Inventory and report without mutations
   node backlog-orchestrator.mjs intake-readiness      Classify changed intake work (always dry-run)
   node backlog-orchestrator.mjs backlog-reduction     Audit high-confidence duplicate reduction (dry-run)
-  node backlog-orchestrator.mjs approve-plan --issue=JOV-123 --evidence-file=/path/evidence.json
   node backlog-orchestrator.mjs approve-research --issue=JOV-123 --evidence-file=/path/research.json
   node backlog-orchestrator.mjs report                Generate shadow report
 `);
     return;
+  }
+
+  if (['admit-next', 'gate-next', 'approve-plan'].includes(command)) {
+    console.error(
+      `${command} is disabled; upstream openai/symphony owns Linear pickup and dispatch`
+    );
+    process.exit(78);
   }
 
   const cache = loadCache();
@@ -159,6 +171,8 @@ Usage:
     await runAdmitNext(cache, isDryRun);
   } else if (command === 'gate-next') {
     await runGateNext(isDryRun, issueArg);
+  } else if (command === 'remediate') {
+    await runRemediate(isDryRun);
   } else if (command === 'intake-readiness') {
     await runIntakeReadiness(cache, issueArg);
   } else if (command === 'backlog-reduction') {
@@ -508,6 +522,34 @@ async function admissionPreflight(team, candidate = null) {
   if (candidate) {
     const candidateTarget =
       ownershipInventory.resolveAdmissionTarget(candidate);
+    if (candidateTarget.decision !== 'admit') {
+      return {
+        open: false,
+        disposition: 'defer',
+        reasonCode: candidateTarget.reason || 'collision-domain-missing',
+        reason:
+          candidateTarget.reason || 'candidate collision domain unavailable',
+        load,
+        fleetGate,
+      };
+    }
+    const laneDecision = laneCapacity.evaluateLaneCapacity(
+      fleetGate.laneCapacity,
+      candidateTarget.target.collision_domains
+    );
+    if (!laneDecision.allowed) {
+      return {
+        open: false,
+        disposition: laneDecision.disposition,
+        reasonCode: laneDecision.code,
+        reason:
+          laneDecision.domain && Number.isInteger(laneDecision.ready)
+            ? `${laneDecision.code}: ${laneDecision.domain} (${laneDecision.ready}/${laneDecision.budget})`
+            : laneDecision.code,
+        load,
+        fleetGate,
+      };
+    }
     const active = symphonyIssues.filter(issue =>
       load.identifiers.includes(issue.identifier)
     );
@@ -529,6 +571,8 @@ async function admissionPreflight(team, candidate = null) {
     if (collisions.length > 0) {
       return {
         open: false,
+        disposition: 'defer',
+        reasonCode: 'collision-domain-leased',
         reason: `collision domain already leased by ${collisions.join(', ')}`,
         load,
         fleetGate,
@@ -600,6 +644,8 @@ async function evaluateGateCandidate(
       stage: 'collision-preflight',
       issue: selected.identifier,
       reason: collisionPreflight.reason,
+      reasonCode: collisionPreflight.reasonCode,
+      disposition: collisionPreflight.disposition,
       active: collisionPreflight.load.identifiers,
       fleetGate: collisionPreflight.fleetGate,
       staleLeaseRecovery,
@@ -705,11 +751,18 @@ async function evaluateGateCandidate(
       client: linear,
     });
   } else {
-    researchResult = {
-      status: 'already-approved',
-      fingerprint:
-        researchGate.researchGateReceipt(current).payload.fingerprint,
-    };
+    const researchReceipt = researchGate.researchGateReceipt(current);
+    if (!researchReceipt) {
+      researchResult = {
+        status: 'rejected',
+        reason: 'research-evidence-required',
+      };
+    } else {
+      researchResult = {
+        status: 'already-approved',
+        fingerprint: researchReceipt.payload.fingerprint,
+      };
+    }
   }
   if (researchResult.status === 'rejected') {
     return {
@@ -1117,6 +1170,182 @@ async function runTeamAdmitNext(team, isDryRun) {
   }
 
   return { team: team.key, staleLeaseRecovery, ...result };
+}
+
+function uniqueIssuesByIdentifier(issues) {
+  const selected = new Map();
+  for (const issue of issues) {
+    if (issue?.identifier && !selected.has(issue.identifier))
+      selected.set(issue.identifier, issue);
+  }
+  return [...selected.values()];
+}
+
+async function collectGitHubPullRequests() {
+  const fields =
+    'number,title,body,headRefName,state,mergeStateStatus,url,mergedAt,isDraft,statusCheckRollup';
+  const lists = await Promise.all(
+    ['open', 'merged'].map(async state => {
+      try {
+        const { stdout } = await execFileAsync(
+          'gh',
+          [
+            'pr',
+            'list',
+            '--repo',
+            'JovieInc/Jovie',
+            '--state',
+            state,
+            '--limit',
+            state === 'open' ? '100' : '50',
+            '--json',
+            fields,
+          ],
+          { timeout: 20_000 }
+        );
+        return JSON.parse(stdout);
+      } catch {
+        return null;
+      }
+    })
+  );
+  if (lists.some(list => list === null)) return null;
+  return lists.flat();
+}
+
+async function measureCloneLatencyMs() {
+  const started = Date.now();
+  try {
+    await execFileAsync(
+      'git',
+      ['ls-remote', '--heads', 'https://github.com/JovieInc/Jovie.git', 'main'],
+      { timeout: 20_000 }
+    );
+    return Date.now() - started;
+  } catch {
+    return null;
+  }
+}
+
+async function readOfficialSymphonyWorkers(maxConcurrent) {
+  try {
+    const response = await fetch(
+      backlogRemediation.OFFICIAL_SYMPHONY_STATE_URL,
+      {
+        signal: AbortSignal.timeout(5000),
+      }
+    );
+    if (!response.ok) return null;
+    const state = /** @type {{ running?: unknown[], retrying?: unknown[] }} */ (
+      await response.json()
+    );
+    if (!Array.isArray(state?.running) || !Array.isArray(state?.retrying))
+      return null;
+    return {
+      running: state.running.length,
+      retrying: state.retrying.length,
+      maxConcurrent,
+    };
+  } catch {
+    return null;
+  }
+}
+
+async function runRemediate(isDryRun) {
+  const team = TEAM_CONFIGS.find(item => item.key === 'JOV');
+  if (!team) throw new Error('jov-team-config-missing');
+  const [intake, active] = await Promise.all([
+    linear.fetchTeamGateCandidates(team.id),
+    linear.fetchTeamActiveIssues(team.id),
+  ]);
+  const issues = uniqueIssuesByIdentifier([...intake, ...active]);
+  const pullRequests = await collectGitHubPullRequests();
+  const cloneLatencyMs = await measureCloneLatencyMs();
+  const fleetGate = await fleetGateForTeam(team);
+  const rawReceipt = loadFleetGateReceipt(team);
+  const queue = rawReceipt?.signals?.queue;
+  const workers = await readOfficialSymphonyWorkers(
+    fleetGate.concurrency?.gem?.maxConcurrent
+  );
+  const provider = readCodexRotateCapacity();
+  const previous = loadCache().backlogRemediation || {};
+  const receipt = backlogRemediation.buildRemediationReceipt({
+    issues,
+    pullRequests: pullRequests || [],
+    mainSha: rawReceipt?.signals?.main?.sha || null,
+    capacitySignals: {
+      schema: backlogRemediation.CAPACITY_SCHEMA,
+      observedAt: new Date().toISOString(),
+      workers,
+      host: backlogRemediation.readHostPressure('/proc'),
+      provider: provider
+        ? { accounts: provider.accounts, ready: provider.ready }
+        : null,
+      cloneLatencyMs,
+      ci: {
+        saturating:
+          Number.isInteger(queue?.greenReadyPrs) &&
+          Number.isInteger(queue?.target) &&
+          queue.greenReadyPrs >= queue.target,
+        running: Number.isInteger(queue?.greenReadyPrs)
+          ? queue.greenReadyPrs
+          : null,
+        queued: Number.isInteger(queue?.eligiblePrs) ? queue.eligiblePrs : null,
+      },
+      pullRequests,
+      mergeQueue: {
+        health:
+          fleetGate.promotionMode === admitter.FLEET_PROMOTION_MODE.BLOCKED
+            ? 'blocked'
+            : fleetGate.state === admitter.FLEET_GATE_STATE.GREEN
+              ? 'healthy'
+              : 'degraded',
+        entries: Number.isInteger(queue?.eligiblePrs)
+          ? queue.eligiblePrs
+          : null,
+      },
+    },
+    previousCleanStreak: previous.cleanStreak || 0,
+    previousCohortSize: previous.cohortSize || 0,
+  });
+  const result = {
+    ...receipt,
+    mode: isDryRun ? 'dry-run' : 'mutating',
+    workpad: undefined,
+    workpadBody: receipt.workpad,
+    feed: receipt.feed,
+    workpadUpsert: null,
+  };
+  if (!isDryRun) {
+    result.workpadUpsert = await backlogRemediation.upsertRemediationWorkpad({
+      client: linear,
+      workpadIssue:
+        TEAM_FILE_CONFIG.remediation?.workpadIssue ||
+        backlogRemediation.DEFAULT_WORKPAD_ISSUE,
+      receipt,
+    });
+    if (receipt.cohort.selected.length > 0) {
+      result.feed = {
+        ...receipt.feed,
+        refresh: await backlogRemediation.feedOfficialSymphony({
+          url:
+            TEAM_FILE_CONFIG.remediation?.symphonyRefreshUrl ||
+            backlogRemediation.OFFICIAL_SYMPHONY_REFRESH_URL,
+        }),
+      };
+    }
+    const clean = receipt.capacity.allowed === true;
+    saveCache({
+      ...loadCache(),
+      backlogRemediation: {
+        fingerprint: receipt.fingerprint,
+        cleanStreak: clean ? (previous.cleanStreak || 0) + 1 : 0,
+        cohortSize: receipt.capacity.cohortSize,
+        observedAt: receipt.observedAt,
+      },
+    });
+  }
+  console.log(JSON.stringify(result, null, 2));
 }
 
 main().catch(err => {

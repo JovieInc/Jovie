@@ -155,6 +155,9 @@ export const APP_ROUTES = {
   COMPARE: '/compare',
   DEMO: '/demo',
   DEMO_VIDEO: '/demovideo',
+  DEVELOPERS: '/developers',
+  CLI: '/cli',
+  API_VERSIONING: '/api-versioning',
   ENGAGEMENT_ENGINE: '/engagement-engine',
   INVESTORS: '/investors',
   PITCH: '/pitch',
@@ -165,10 +168,13 @@ export const APP_ROUTES = {
   /** Legacy campaign URL. Kept only for inbound-link compatibility; do not use for new navigation. */
   LAUNCH_PRICING: '/launch/pricing',
   CHANGELOG: '/changelog',
+  ENGINEERING: '/engineering',
+  ENGINEERING_PREVIEW: '/engineering/preview',
   DOWNLOAD: '/download',
   SUPPORT: '/support',
   PAY: '/pay',
   INSTANT_MERCH: '/instant-merch',
+  YOUTUBE_THUMBNAILS: '/youtube-thumbnails',
 
   // Legal
   LEGAL_PRIVACY: '/legal/privacy',
@@ -212,6 +218,27 @@ export const APP_ROUTES = {
 } as const;
 
 export type AppRoute = (typeof APP_ROUTES)[keyof typeof APP_ROUTES];
+
+const SPOTIFY_CATALOG_CONNECTION_PARAM = 'connect';
+const SPOTIFY_CATALOG_CONNECTION_VALUE = 'spotify';
+
+export function buildSpotifyCatalogConnectionRoute(): string {
+  const params = new URLSearchParams({
+    [SPOTIFY_CATALOG_CONNECTION_PARAM]: SPOTIFY_CATALOG_CONNECTION_VALUE,
+  });
+
+  // The Spotify connection dialog is still owned by the shell releases route.
+  return `${APP_ROUTES.DASHBOARD_RELEASES}?${params.toString()}`;
+}
+
+export function shouldOpenSpotifyCatalogConnection(
+  searchParams: Pick<URLSearchParams, 'get'>
+): boolean {
+  return (
+    searchParams.get(SPOTIFY_CATALOG_CONNECTION_PARAM) ===
+    SPOTIFY_CATALOG_CONNECTION_VALUE
+  );
+}
 
 function normalizeLyricsReturnRoute(
   candidate: string | null | undefined

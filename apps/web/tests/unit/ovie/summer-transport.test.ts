@@ -310,4 +310,46 @@ describe('Summer transport (JOV-5212)', () => {
     const resumed = await relaunchCurrentSummerSession(store);
     expect(resumed.identity.sessionId).toBe(CURRENT_SUMMER_SESSION_ID);
   });
+
+  it('keeps unavailable transport turns retryable with the same client id', async () => {
+    const store = new MemoryOperatingStore();
+    const unavailableSpeaker: SummerSpeaker = {
+      id: 'summer',
+      runtime: 'mac',
+      async *speak() {
+        yield { type: 'error', state: 'unavailable' };
+      },
+    };
+
+    const unavailable = await collect(
+      runOvieSummerTurn({
+        receipts: [RECEIPT],
+        userText: 'Resume after timeout',
+        speaker: unavailableSpeaker,
+        store,
+        clientTurnId: 'timeout-1',
+      })
+    );
+
+    expect(
+      unavailable.rows.some(
+        row => (row as { state?: string }).state === 'unavailable'
+      )
+    ).toBe(true);
+    expect((await loadCurrentSummerSession(store))?.turns ?? []).toHaveLength(
+      0
+    );
+
+    const resumed = await collect(
+      runOvieSummerTurn({
+        receipts: [RECEIPT],
+        userText: 'Resume after timeout',
+        speaker: scriptedSummer({ replies: ['Recovered Summer.'] }),
+        store,
+        clientTurnId: 'timeout-1',
+      })
+    );
+    expect(resumed.text).toBe('Recovered Summer.');
+    expect((await loadCurrentSummerSession(store))?.turns).toHaveLength(1);
+  });
 });

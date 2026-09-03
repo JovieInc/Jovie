@@ -53,6 +53,29 @@ describe('NotFoundPageContent', () => {
     ).toBeInTheDocument();
   });
 
+  it('keeps the root and profile surfaces on their distinct code treatments', () => {
+    const { container, unmount } = render(
+      <NotFoundPageContent variant='generic' surface='root' />
+    );
+
+    expect(
+      container.querySelector('.system-b-root-not-found-code-wrap')
+    ).toBeInTheDocument();
+    expect(
+      container.querySelector('.system-b-root-not-found-code')
+    ).toHaveAttribute('aria-hidden', 'true');
+
+    unmount();
+    render(<NotFoundPageContent variant='generic' surface='profile' />);
+
+    expect(
+      document.querySelector('.system-b-public-profile-not-found-code-wrap')
+    ).not.toBeInTheDocument();
+    expect(
+      document.querySelector('.system-b-public-profile-not-found-code')
+    ).toHaveTextContent('404');
+  });
+
   it('does not render numeric link IDs or debug dumps', () => {
     const { container } = render(
       <NotFoundPageContent variant='profile-miss' surface='profile' />

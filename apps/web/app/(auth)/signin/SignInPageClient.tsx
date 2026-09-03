@@ -69,7 +69,7 @@ function SignInOauthErrorBanner() {
 
   return (
     <div
-      className='mb-4 rounded-(--linear-radius-sm) border border-destructive/30 bg-destructive/5 px-4 py-3 text-left'
+      className='mb-4 rounded-sm border border-destructive/30 bg-destructive/5 px-4 py-3 text-left'
       role='alert'
     >
       <p className='text-sm font-medium text-destructive'>{message}</p>
@@ -79,6 +79,10 @@ function SignInOauthErrorBanner() {
 
 /**
  * Sign-in page using the canonical AuthShell (JOV-2064).
+ *
+ * Full-route shell is the desktop split layout: editorial card at ≥1024px,
+ * intentionally excluded on mobile/tablet. Intercepted modal and desktop-return
+ * handoff use their own shells. See `auth-shell-layout-contract.ts`.
  *
  * Both the full-page route and the intercepted modal route render the same
  * AuthShell content model, so the typography, links, and provider list stay

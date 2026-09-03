@@ -82,6 +82,10 @@ export const OVERLAY_ITEM_RADIUS = 'rounded-(--system-b-radius-overlay-inner)';
 export const OVERLAY_ITEM_FOCUS =
   'focus-visible:outline-none focus-visible:bg-surface-1 focus-visible:ring-1 focus-visible:ring-inset focus-visible:ring-focus/35';
 
+/** Shared disabled affordance for Radix menu/select rows. */
+const MENU_ITEM_DISABLED_STATE =
+  'data-[disabled]:pointer-events-none data-[disabled]:cursor-not-allowed data-[disabled]:opacity-50';
+
 export const DROPDOWN_CONTENT_BASE = `z-50 min-w-48 overflow-hidden ${OVERLAY_CONTENT_RADIUS} ${OVERLAY_SURFACE_BASE} p-1`;
 
 /**
@@ -185,20 +189,6 @@ export const selectContentClasses = [
 // ============================================================================
 
 /**
- * Base styles for all menu items (action items)
- * Used by: DropdownMenuItem, ContextMenuItem, SelectItem
- */
-export const MENU_ITEM_BASE =
-  `relative flex min-h-8 cursor-default select-none items-center gap-2 ${OVERLAY_ITEM_RADIUS} px-2.5 py-1.5 text-app font-normal leading-5 outline-none ` +
-  'transition-colors duration-fast ease-interactive ' +
-  'text-secondary-token hover:bg-surface-1 hover:text-primary-token ' +
-  'data-[highlighted]:bg-surface-1 data-[highlighted]:text-primary-token ' +
-  'data-[disabled]:pointer-events-none data-[disabled]:opacity-50 ' +
-  `${OVERLAY_ITEM_FOCUS} ` +
-  '[&_svg]:pointer-events-none [&_svg]:h-4 [&_svg]:w-4 [&_svg]:shrink-0 [&_svg]:text-tertiary-token ' +
-  'hover:[&_svg]:text-primary-token data-[highlighted]:[&_svg]:text-primary-token';
-
-/**
  * Destructive variant for menu items (delete, remove actions)
  */
 export const MENU_ITEM_DESTRUCTIVE =
@@ -213,6 +203,26 @@ export const MENU_ITEM_DESTRUCTIVE =
 export const MENU_ITEM_SELECTED =
   'bg-surface-1 text-primary-token [&_svg]:text-primary-token';
 
+const MENU_ITEM_SELECTED_STATE =
+  'data-[selected=true]:bg-surface-1 data-[selected=true]:text-primary-token data-[selected=true]:[&_svg]:text-primary-token ' +
+  'data-[state=checked]:bg-surface-1 data-[state=checked]:text-primary-token data-[state=checked]:[&_svg]:text-primary-token';
+
+const MENU_ROW_INTERACTION_STATES = `${MENU_ITEM_SELECTED_STATE} ${MENU_ITEM_DISABLED_STATE}`;
+
+/**
+ * Base styles for all menu items (action items)
+ * Used by: DropdownMenuItem, ContextMenuItem, SelectItem
+ */
+export const MENU_ITEM_BASE =
+  `relative flex min-h-8 cursor-default select-none items-center gap-2 ${OVERLAY_ITEM_RADIUS} px-2.5 py-1.5 text-app font-normal leading-5 outline-none ` +
+  'transition-colors duration-fast ease-interactive ' +
+  'text-secondary-token hover:bg-surface-1 hover:text-primary-token ' +
+  'data-[highlighted]:bg-surface-1 data-[highlighted]:text-primary-token ' +
+  `${MENU_ROW_INTERACTION_STATES} ` +
+  `${OVERLAY_ITEM_FOCUS} ` +
+  '[&_svg]:pointer-events-none [&_svg]:h-4 [&_svg]:w-4 [&_svg]:shrink-0 [&_svg]:text-tertiary-token ' +
+  'hover:[&_svg]:text-primary-token data-[highlighted]:[&_svg]:text-primary-token';
+
 /**
  * Checkbox and radio item styles (with left indicator space)
  */
@@ -221,7 +231,7 @@ export const CHECKBOX_RADIO_ITEM_BASE =
   'transition-colors duration-fast ease-interactive ' +
   'text-secondary-token hover:bg-surface-1 hover:text-primary-token ' +
   'data-[highlighted]:bg-surface-1 data-[highlighted]:text-primary-token ' +
-  'data-[disabled]:pointer-events-none data-[disabled]:opacity-50 ' +
+  `${MENU_ROW_INTERACTION_STATES} ` +
   OVERLAY_ITEM_FOCUS;
 
 /**
@@ -233,7 +243,7 @@ export const SELECT_ITEM_BASE =
   'text-secondary-token ' +
   `${OVERLAY_ITEM_FOCUS} focus-visible:text-primary-token ` +
   'data-[highlighted]:bg-surface-1 data-[highlighted]:text-primary-token ' +
-  'data-[disabled]:pointer-events-none data-[disabled]:opacity-50';
+  MENU_ROW_INTERACTION_STATES;
 
 // ============================================================================
 // COMPACT SIZE VARIANT (table actions, context menus, sidebar menus)
@@ -247,7 +257,7 @@ export const MENU_ITEM_COMPACT =
   'transition-colors duration-fast ease-interactive ' +
   'text-secondary-token hover:bg-surface-1 hover:text-primary-token ' +
   'data-[highlighted]:bg-surface-1 data-[highlighted]:text-primary-token ' +
-  'data-[disabled]:pointer-events-none data-[disabled]:opacity-50 ' +
+  `${MENU_ROW_INTERACTION_STATES} ` +
   `${OVERLAY_ITEM_FOCUS} ` +
   '[&_svg]:pointer-events-none [&_svg]:h-4 [&_svg]:w-4 [&_svg]:shrink-0 [&_svg]:text-tertiary-token ' +
   'hover:[&_svg]:text-primary-token data-[highlighted]:[&_svg]:text-primary-token';
@@ -345,16 +355,6 @@ export const SELECT_TRIGGER_BASE =
  */
 export const MENU_ICON_TRIGGER_BASE =
   'inline-flex h-7 w-7 items-center justify-center rounded-full border border-transparent bg-transparent text-tertiary-token transition-colors duration-fast ease-interactive hover:bg-surface-1 hover:text-primary-token focus-visible:outline-none focus-visible:bg-surface-1 focus-visible:ring-1 focus-visible:ring-focus/50';
-
-/**
- * Overflow trigger variants for tab and drawer menus.
- */
-export const MENU_OVERFLOW_TRIGGER_BASE =
-  'relative inline-flex shrink-0 items-center justify-center rounded-full border bg-transparent text-xs font-medium tracking-normal text-tertiary-token transition-colors duration-fast ease-interactive hover:border-default hover:bg-surface-0 hover:text-primary-token focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus/35 focus-visible:ring-offset-1 focus-visible:ring-offset-surface-page';
-
-export const MENU_OVERFLOW_TRIGGER_DRAWER = 'min-h-7 border-subtle px-2';
-
-export const MENU_OVERFLOW_TRIGGER_SEGMENT = 'h-7 border-subtle px-2';
 
 // ============================================================================
 // SUB-CONTENT STYLES

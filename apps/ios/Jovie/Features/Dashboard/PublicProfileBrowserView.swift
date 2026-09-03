@@ -1,3 +1,4 @@
+import AVFoundation
 import SwiftUI
 import WebKit
 
@@ -146,6 +147,53 @@ struct PublicProfileURLPolicy: Equatable {
   }
 }
 
+/// Media contract for the in-app public profile / smart-link browser.
+///
+/// The hosted web app owns the single playback engine (JOV-3683 / JOV-5871);
+/// on iOS that engine runs inside this WKWebView. Without these flags iOS
+/// forces media into the fullscreen system player and rejects programmatic
+/// resume (lock-screen / Media Session `play`), which reads as a dead player.
+enum PublicProfileBrowserMediaPolicy {
+  static func configure(_ configuration: WKWebViewConfiguration) {
+    configuration.allowsInlineMediaPlayback = true
+    configuration.mediaTypesRequiringUserActionForPlayback = []
+  }
+}
+
+/// Audio-session contract for web playback surfaces. `.playback` keeps audio
+/// audible with the ringer switch off and lets it continue when the app
+/// backgrounds (paired with the `audio` background mode). Deactivation with
+/// `.notifyOthersOnDeactivation` hands focus back (e.g. resumes Music) when the
+/// browser is dismissed.
+enum WebPlaybackAudioSessionPolicy {
+  static let category: AVAudioSession.Category = .playback
+  static let mode: AVAudioSession.Mode = .default
+  static let deactivationOptions: AVAudioSession.SetActiveOptions = [
+    .notifyOthersOnDeactivation,
+  ]
+
+  @MainActor
+  static func activate() {
+    let session = AVAudioSession.sharedInstance()
+    do {
+      try session.setCategory(category, mode: mode)
+      try session.setActive(true)
+    } catch {
+      // Non-fatal: playback still works under the default session, just
+      // without silent-switch / background guarantees.
+    }
+  }
+
+  @MainActor
+  static func deactivate() {
+    do {
+      try AVAudioSession.sharedInstance().setActive(false, options: deactivationOptions)
+    } catch {
+      // Another session may already own the route; nothing to recover.
+    }
+  }
+}
+
 @MainActor
 final class PublicProfileBrowserModel: NSObject, ObservableObject, WKNavigationDelegate {
   @Published private(set) var isLoading = true
@@ -165,6 +213,7 @@ final class PublicProfileBrowserModel: NSObject, ObservableObject, WKNavigationD
 
     let configuration = WKWebViewConfiguration()
     configuration.websiteDataStore = .nonPersistent()
+    PublicProfileBrowserMediaPolicy.configure(configuration)
     webView = WKWebView(frame: .zero, configuration: configuration)
 
     super.init()
@@ -347,7 +396,11 @@ struct PublicProfileBrowserView: View {
     }
     .background(JovieColor.backgroundBase.ignoresSafeArea())
     .task {
+      WebPlaybackAudioSessionPolicy.activate()
       model.load()
+    }
+    .onDisappear {
+      WebPlaybackAudioSessionPolicy.deactivate()
     }
   }
 

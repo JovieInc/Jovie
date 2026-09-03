@@ -1,6 +1,5 @@
 import * as Sentry from '@sentry/nextjs';
 import { and, sql as drizzleSql, eq, inArray } from 'drizzle-orm';
-import { after } from 'next/server';
 import { db } from '@/lib/db';
 import {
   discogRecordings,
@@ -8,6 +7,8 @@ import {
   discogTracks,
 } from '@/lib/db/schema/content';
 import { captureError, captureWarning } from '@/lib/error-tracking';
+import { ensureImportedReleasePublishedByDefault } from '@/lib/library/approval-status.server';
+import { scheduleAfter } from '@/lib/next/schedule-after';
 import {
   buildSpotifyAlbumUrl,
   buildSpotifyTrackUrl,
@@ -178,21 +179,7 @@ async function discoverLinksForReleases(
 }
 
 function scheduleBackgroundDiscovery(task: () => Promise<void>): void {
-  try {
-    after(task);
-  } catch (error) {
-    if (
-      error instanceof Error &&
-      error.message.includes('outside a request scope')
-    ) {
-      queueMicrotask(() => {
-        void task();
-      });
-      return;
-    }
-
-    throw error;
-  }
+  scheduleAfter(task);
 }
 
 async function reconcileCollaboratorProfilesBestEffort(
@@ -706,8 +693,6 @@ async function fetchExistingTrackSlugs(
 async function processTracksForRelease(
   release: { id: string },
   creatorProfileId: string,
-  sanitizedTitle: string,
-  slug: string,
   fullAlbum: SpotifyAlbumFull,
   maxTracksPerRelease: number
 ): Promise<boolean> {
@@ -821,12 +806,10 @@ async function processTracksForRelease(
 
   // Update release explicit flag if any track is explicit
   if (hasExplicit) {
-    await upsertRelease({
-      creatorProfileId,
-      title: sanitizedTitle,
-      slug,
-      isExplicit: true,
-    });
+    await db
+      .update(discogReleases)
+      .set({ isExplicit: true, updatedAt: new Date() })
+      .where(eq(discogReleases.id, release.id));
   }
 
   return hasExplicit;
@@ -942,12 +925,15 @@ async function importSingleRelease(
     await processTracksForRelease(
       release,
       creatorProfileId,
-      metadata.sanitizedTitle,
-      slug,
       fullAlbum,
       maxTracksPerRelease
     );
   }
+
+  await ensureImportedReleasePublishedByDefault({
+    creatorProfileId,
+    releaseId: release.id,
+  });
 }
 
 /**

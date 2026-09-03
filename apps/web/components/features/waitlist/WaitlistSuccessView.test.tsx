@@ -9,8 +9,11 @@ import storyMeta, {
 
 describe('WaitlistSuccessView', () => {
   it('renders the truthful persisted-pending receipt used by /waitlist', () => {
-    render(<WaitlistSuccessView />);
+    const { container } = render(<WaitlistSuccessView />);
 
+    expect(
+      container.querySelector('[data-auth-chrome="splash-b"]')
+    ).not.toBeNull();
     expect(
       screen.getByRole('heading', { level: 1, name: "You're on the list" })
     ).toBeVisible();
@@ -69,7 +72,11 @@ describe('WaitlistSuccessView', () => {
       'if (access?.entryId && isWaitlistPendingStatus(access.status))'
     );
     expect(routeSource).toContain(
-      'return <WaitlistSuccessView email={authResult.context.email} />;'
+      "import { MarketingPageContractMarkers } from '@/components/site/MarketingPageContractMarkers';"
+    );
+    expect(routeSource).toContain('<WaitlistRouteWithContract>');
+    expect(routeSource).toContain(
+      '<WaitlistSuccessView email={authResult.context.email} />'
     );
     expect(routeSource).toContain('getWaitlistRouteRedirect');
     expect(routeSource).toContain('notFound()');

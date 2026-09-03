@@ -14,9 +14,9 @@ name: PR Size Guard
 # coverage, and the fixed 2500-line / 60-file cap are fail-closed in
 # pr-size-guard-policy.mjs.
 
-# PR size can only change on a source update (opened/synchronize/reopened) or
-# when a draft becomes ready for review, never on a label event. This guard is
-# a REQUIRED check, so re-running it on
+# PR size can only change on a source update (opened/synchronize/reopened),
+# never when an unchanged draft becomes ready or on a label event. This guard
+# is a REQUIRED check, so re-running it on
 # labeled/unlabeled is not just wasteful: rapid label churn (the autonomous
 # merge loop does this constantly) cancels the in-flight run via
 # cancel-in-progress, leaving a CANCELLED/QUEUED run as the latest for a
@@ -33,7 +33,7 @@ name: PR Size Guard
 # pr-size-guard-label-override.yml posts a passing check-run override.
 on:
   pull_request:
-    types: [opened, synchronize, reopened, ready_for_review]
+    types: [opened, synchronize, reopened]
   # Active native-queue required-context producer. Labels and policy inputs can
   # change after a source status turns green, so revalidate every member of the
   # exact synthetic group before reproducing the required context on the head.
@@ -84,9 +84,16 @@ jobs:
     timeout-minutes: 10
     if: github.event_name == 'pull_request'
     steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - name: Check out exact PR head
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
+          # pull_request defaults to refs/pull/<n>/merge. When main advances,
+          # that synthetic tree contains unrelated landed changes while the
+          # event's base SHA remains older, so repository hygiene can charge
+          # main growth to this PR. Source policy must inspect the exact head.
+          ref: ${{ github.event.pull_request.head.sha }}
           fetch-depth: 1
+          persist-credentials: false
 
       - name: Fetch PR base
         run: git fetch --no-tags --depth=1 origin "${{ github.event.pull_request.base.sha }}"

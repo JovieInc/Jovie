@@ -38,6 +38,13 @@ def provider(accounts: int = 8, locked: int = 4, available: int = 4) -> dict:
 
 
 RUNTIME = {"running": 4, "retrying": 0, "codexTotals": {"seconds_running": 100}}
+SCOPE = {
+    "kind": "gem-host-provider-accounts-workflow",
+    "host": "gem",
+    "workflow": "/workflows/jovie.md",
+    "runtimeUrl": "http://127.0.0.1:4041/api/v1/state",
+    "leaseGuard": "/bin/symphony-lease-guard",
+}
 
 
 class PressureParsingTests(unittest.TestCase):
@@ -113,6 +120,64 @@ class HysteresisTests(unittest.TestCase):
         self.assertEqual(target, (1, 0, "integrity-blocked"))
 
 
+class ResourceScopeStateTests(unittest.TestCase):
+    def test_load_state_reuses_only_matching_exact_resource_scope(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            path = pathlib.Path(tmp) / "state.json"
+            path.write_text(
+                MODULE.json.dumps(
+                    {
+                        "schema": MODULE.STATE_SCHEMA,
+                        "resourceScope": SCOPE,
+                        "target": 6,
+                        "lowStreak": 2,
+                        "lastChangeEpoch": 100.0,
+                    }
+                )
+            )
+
+            state = MODULE.load_state(path, current_target=4, scope=SCOPE)
+
+        self.assertEqual(state["resourceScope"], SCOPE)
+        self.assertEqual(state["target"], 6)
+        self.assertEqual(state["lowStreak"], 2)
+
+    def test_load_state_discards_unscoped_or_mismatched_resource_state(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            path = pathlib.Path(tmp) / "state.json"
+            path.write_text(
+                MODULE.json.dumps(
+                    {
+                        "schema": MODULE.STATE_SCHEMA,
+                        "target": 6,
+                        "lowStreak": 2,
+                        "lastChangeEpoch": 100.0,
+                    }
+                )
+            )
+
+            legacy = MODULE.load_state(path, current_target=4, scope=SCOPE)
+            path.write_text(
+                MODULE.json.dumps(
+                    {
+                        "schema": MODULE.STATE_SCHEMA,
+                        "resourceScope": {**SCOPE, "workflow": "/other.md"},
+                        "target": 6,
+                        "lowStreak": 2,
+                        "lastChangeEpoch": 100.0,
+                    }
+                )
+            )
+            mismatched = MODULE.load_state(path, current_target=4, scope=SCOPE)
+
+        self.assertEqual(legacy["resourceScope"], SCOPE)
+        self.assertEqual(legacy["target"], 4)
+        self.assertEqual(legacy["lowStreak"], 0)
+        self.assertEqual(mismatched["resourceScope"], SCOPE)
+        self.assertEqual(mismatched["target"], 4)
+        self.assertEqual(mismatched["lowStreak"], 0)
+
+
 class WorkflowMutationTests(unittest.TestCase):
     def test_rewrites_only_the_concurrency_scalar(self):
         source = "---\nagent:\n  max_concurrent_agents: 4\n  max_turns: 24\n---\nprompt\n"
@@ -128,6 +193,64 @@ class WorkflowMutationTests(unittest.TestCase):
             MODULE.write_workflow_atomic(path, "complete\n")
             self.assertEqual(path.read_text(), "complete\n")
             self.assertFalse((path.parent / ".WORKFLOW.md.tmp").exists())
+
+
+class WorkflowOverlayIdentityTests(unittest.TestCase):
+    SOURCE = "---\nagent:\n  max_concurrent_agents: 4\n  max_turns: 24\n---\nprompt\n"
+
+    def overlay(self, value: str) -> str:
+        return self.SOURCE.replace("max_concurrent_agents: 4", f"max_concurrent_agents: {value}")
+
+    def test_accepts_each_bounded_runtime_value(self):
+        for value in range(MODULE.MIN_CONCURRENCY, MODULE.MAX_CONCURRENCY + 1):
+            with self.subTest(value=value):
+                self.assertEqual(
+                    MODULE.verify_concurrency_overlay(self.SOURCE, self.overlay(str(value))),
+                    value,
+                )
+
+    def test_identical_source_is_accepted(self):
+        self.assertEqual(MODULE.verify_concurrency_overlay(self.SOURCE, self.SOURCE), 4)
+
+    def test_padded_runtime_concurrency_fails_closed(self):
+        for value in ("01", "08", "0001", "0008"):
+            with self.subTest(value=value):
+                with self.assertRaisesRegex(ValueError, "outside the bounded policy"):
+                    MODULE.verify_concurrency_overlay(self.SOURCE, self.overlay(value))
+
+    def test_missing_runtime_concurrency_fails_closed(self):
+        with self.assertRaisesRegex(ValueError, "exactly one max_concurrent_agents"):
+            MODULE.verify_concurrency_overlay(
+                self.SOURCE,
+                self.SOURCE.replace("  max_concurrent_agents: 4\n", ""),
+            )
+
+    def test_duplicated_runtime_concurrency_fails_closed(self):
+        with self.assertRaisesRegex(ValueError, "exactly one max_concurrent_agents"):
+            MODULE.verify_concurrency_overlay(
+                self.SOURCE,
+                self.SOURCE.replace(
+                    "  max_concurrent_agents: 4\n",
+                    "  max_concurrent_agents: 1\n  max_concurrent_agents: 2\n",
+                ),
+            )
+
+    def test_non_numeric_runtime_concurrency_fails_closed(self):
+        with self.assertRaisesRegex(ValueError, "exactly one max_concurrent_agents"):
+            MODULE.verify_concurrency_overlay(self.SOURCE, self.overlay("n"))
+
+    def test_zero_runtime_concurrency_fails_closed(self):
+        with self.assertRaisesRegex(ValueError, "outside the bounded policy"):
+            MODULE.verify_concurrency_overlay(self.SOURCE, self.overlay("0"))
+
+    def test_above_policy_runtime_concurrency_fails_closed(self):
+        with self.assertRaisesRegex(ValueError, "outside the bounded policy"):
+            MODULE.verify_concurrency_overlay(self.SOURCE, self.overlay("9"))
+
+    def test_any_other_workflow_drift_fails_closed(self):
+        drifted = self.overlay("1").replace("max_turns: 24", "max_turns: 99")
+        with self.assertRaisesRegex(ValueError, "beyond concurrency overlay"):
+            MODULE.verify_concurrency_overlay(self.SOURCE, drifted)
 
 
 if __name__ == "__main__":

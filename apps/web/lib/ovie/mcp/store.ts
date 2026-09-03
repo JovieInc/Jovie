@@ -1,5 +1,11 @@
 import { randomBytes } from 'node:crypto';
-import type { OvieDecision, OvieInitiative, OvieSummerTurn } from './types';
+import {
+  INITIATIVE_CONFIDENCE,
+  type InitiativeConfidence,
+  type OvieDecision,
+  type OvieInitiative,
+  type OvieSummerTurn,
+} from './types';
 
 const TTL_SECONDS = 60 * 60 * 24 * 14;
 const INDEX_CAP = 100;
@@ -533,7 +539,20 @@ function asInitiative(value: unknown): OvieInitiative | undefined {
   const rec = value as Partial<OvieInitiative>;
   if (rec.kind !== 'initiative' || typeof rec.id !== 'string') return undefined;
   if (!Array.isArray(rec.evidence) || !rec.handoff) return undefined;
-  return rec as OvieInitiative;
+  return {
+    ...rec,
+    confidence: normalizeInitiativeConfidence(rec.confidence),
+  } as OvieInitiative;
+}
+
+function normalizeInitiativeConfidence(value: unknown): InitiativeConfidence {
+  if (
+    typeof value === 'string' &&
+    (INITIATIVE_CONFIDENCE as readonly string[]).includes(value)
+  ) {
+    return value as InitiativeConfidence;
+  }
+  return 'medium';
 }
 
 function asDecision(value: unknown): OvieDecision | undefined {

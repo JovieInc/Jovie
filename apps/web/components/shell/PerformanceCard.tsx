@@ -23,7 +23,7 @@ const DEFAULT_RANGES: readonly RangeOption[] = [
 ];
 
 export interface PerformanceCardProps {
-  /** Caption above the headline metric (e.g. "Smart link", "Streams"). */
+  /** Caption above the headline metric (e.g. "Smart Link", "Streams"). */
   readonly title: string;
   /**
    * Suffix on the headline metric when not hovering (e.g. "clicks",
@@ -70,7 +70,7 @@ function formatDayOffset(offset: number): string {
  * @example
  * ```tsx
  * <PerformanceCard
- *   title='Smart link'
+ *   title='Smart Link'
  *   metricLabel='clicks'
  *   pointsByRange={{
  *     '7d': [12, 14, 11, 18, 22, 19, 24],
@@ -132,7 +132,7 @@ export function PerformanceCard({
           <div
             role='tablist'
             aria-label={`${title} range`}
-            className='flex items-center gap-0.5 p-0.5 rounded-full bg-(--surface-0)/70 border border-(--linear-app-shell-border)/70'
+            className='flex items-center gap-0.5 p-0.5 rounded-full bg-(--surface-0)/70 border border-(--app-shell-border)/70'
           >
             {surfacedRanges.map(r => {
               const on = r.key === range;

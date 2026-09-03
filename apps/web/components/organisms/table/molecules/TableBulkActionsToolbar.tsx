@@ -1,5 +1,6 @@
 'use client';
 
+// @coverage-via apps/web/tests/unit/components/table/TableBulkActionsToolbar.test.tsx
 import {
   Button,
   DropdownMenu,
@@ -81,11 +82,7 @@ export function TableBulkActionsToolbar({
                 key={action.label}
                 onClick={action.onClick}
                 disabled={action.disabled}
-                className={
-                  action.variant === 'destructive'
-                    ? 'text-destructive focus:text-destructive'
-                    : undefined
-                }
+                variant={action.variant}
               >
                 {action.icon && (
                   <span className='flex h-3.5 w-3.5 items-center justify-center [&>svg]:h-3.5 [&>svg]:w-3.5'>

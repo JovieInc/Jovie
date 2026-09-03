@@ -35,6 +35,7 @@ export interface HeaderNavProps {
   readonly authMode?: 'client' | 'public-static';
   readonly minimalAuth?: boolean;
   readonly minimalAuthVariant?: 'link' | 'pill';
+  readonly minimalAuthLabel?: 'Sign in' | 'Log in';
   readonly includePublicLoginInMobileNav?: boolean;
   readonly publicCta?: HeaderNavCta;
   readonly presentation?: 'default' | 'homepage-embedded' | 'marketing-glass';
@@ -51,7 +52,7 @@ export interface HeaderNavCta {
 export interface HeaderNavLinkItem {
   readonly href: string;
   readonly label: string;
-  readonly treatment?: 'wordmark';
+  readonly treatment?: 'wordmark' | 'leading';
 }
 
 export interface HeaderFlyoutMenu {
@@ -68,12 +69,14 @@ export interface HeaderFlyoutMenu {
 type PublicAuthActionsProps = Readonly<{
   readonly minimal?: boolean;
   readonly minimalVariant?: 'link' | 'pill';
+  readonly minimalLabel?: 'Sign in' | 'Log in';
   readonly publicCta?: HeaderNavCta;
 }>;
 
 function PublicAuthActions({
   minimal = false,
   minimalVariant = 'link',
+  minimalLabel = 'Sign in',
   publicCta = {
     href: APP_ROUTES.SIGNUP,
     label: 'Request Access',
@@ -93,7 +96,7 @@ function PublicAuthActions({
       );
     }
 
-    return <MarketingSignInLink variant='ghost' />;
+    return <MarketingSignInLink variant='ghost' label={minimalLabel} />;
   }
   return (
     <div className='flex items-center gap-2'>
@@ -107,7 +110,7 @@ function PublicAuthActions({
       </Button>
       <Button
         asChild
-        size='md'
+        size='marketing'
         variant='primary'
         className='focus-ring-themed shrink-0 whitespace-nowrap'
       >
@@ -307,6 +310,7 @@ export function HeaderNav({
   authMode = 'client',
   minimalAuth = false,
   minimalAuthVariant = 'link',
+  minimalAuthLabel = 'Sign in',
   includePublicLoginInMobileNav = true,
   publicCta,
   presentation = 'default',
@@ -462,17 +466,21 @@ export function HeaderNav({
   const hasMobileNavLinks =
     !hideNav && !hideDesktopNav && !!mobileLinks?.length;
   const leadingMarketingLinks = isMarketingGlass
-    ? navLinks?.filter(link => link.treatment === 'wordmark')
+    ? navLinks?.filter(
+        link => link.treatment === 'wordmark' || link.treatment === 'leading'
+      )
     : undefined;
   const trailingNavLinks = isMarketingGlass
-    ? navLinks?.filter(link => link.treatment !== 'wordmark')
+    ? navLinks?.filter(
+        link => link.treatment !== 'wordmark' && link.treatment !== 'leading'
+      )
     : navLinks;
   const renderNavLinks = (
     links: ReadonlyArray<HeaderNavLinkItem> | undefined
   ) =>
     links?.map(link => (
       <HeaderNavLink
-        key={link.href}
+        key={`${link.href}:${link.label}`}
         href={link.href}
         label={link.label}
         className={cn(
@@ -550,11 +558,11 @@ export function HeaderNav({
         backdropFilter:
           presentation === 'homepage-embedded' || isMarketingGlass
             ? 'none'
-            : `blur(var(--linear-blur-header))`,
+            : `blur(var(--blur-header))`,
         WebkitBackdropFilter:
           presentation === 'homepage-embedded' || isMarketingGlass
             ? 'none'
-            : `blur(var(--linear-blur-header))`,
+            : `blur(var(--blur-header))`,
         minWidth: 0,
         minHeight: 0,
         /* iOS safe area: push header content below the notch/Dynamic Island */
@@ -619,6 +627,7 @@ export function HeaderNav({
               <PublicAuthActions
                 minimal={minimalAuth}
                 minimalVariant={minimalAuthVariant}
+                minimalLabel={minimalAuthLabel}
                 publicCta={publicCta}
               />
             ) : (

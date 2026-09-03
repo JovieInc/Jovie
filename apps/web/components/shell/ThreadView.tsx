@@ -116,7 +116,7 @@ export function ThreadView({
 
       <div
         aria-hidden='true'
-        className='pointer-events-none absolute inset-x-0 bottom-0 h-28 bg-gradient-to-t from-(--linear-app-content-surface) via-(--linear-app-content-surface)/80 to-transparent'
+        className='pointer-events-none absolute inset-x-0 bottom-0 h-28 bg-gradient-to-t from-(--app-shell-content-surface) via-(--app-shell-content-surface)/80 to-transparent'
       />
       <div className='absolute inset-x-0 bottom-0'>
         {/* system-b-allow: safe-area inset requires calc(); no spacing token covers env() (JOV-3532) */}
@@ -127,7 +127,7 @@ export function ThreadView({
               onClick={scrollToBottom}
               aria-label='Scroll To Bottom'
               className={cn(
-                'absolute left-1/2 -top-10 z-10 grid h-8 w-8 -translate-x-1/2 place-items-center rounded-full border border-(--linear-app-shell-border) bg-(--linear-app-content-surface) text-secondary-token shadow-popover transition-colors duration-subtle ease-subtle hover:bg-surface-1 hover:text-primary-token focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/55'
+                'absolute left-1/2 -top-10 z-10 grid h-8 w-8 -translate-x-1/2 place-items-center rounded-full border border-(--app-shell-border) bg-(--app-shell-content-surface) text-secondary-token shadow-popover transition-colors duration-subtle ease-subtle hover:bg-surface-1 hover:text-primary-token focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/55'
               )}
             >
               <ArrowDown className='h-3.5 w-3.5' strokeWidth={2.25} />

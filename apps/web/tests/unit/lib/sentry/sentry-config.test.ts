@@ -91,6 +91,22 @@ describe('scrubPii', () => {
     expect(scrubPii(event as any)).toBeNull();
   });
 
+  it('drops Better Auth loopback host rejections without a request URL (JOV-5843)', () => {
+    const event = {
+      exception: {
+        values: [
+          {
+            type: 'BetterAuthError',
+            value:
+              'Host "localhost:3193" is not in the allowed hosts list. Allowed hosts: jov.ie, localhost:3100, localhost:3194.',
+          },
+        ],
+      },
+    };
+
+    expect(scrubPii(event as any)).toBeNull();
+  });
+
   it('should filter playwright-ci tagged noise', () => {
     const event = {
       tags: {
@@ -683,6 +699,22 @@ describe('getBaseClientConfig', () => {
       config.beforeSend({
         exception: {
           values: [{ type: 'Error', value: title }],
+        },
+      } as never)
+    ).toBeNull();
+  });
+
+  it('drops the JOV-5605 Vercel IPC socket refusal', () => {
+    const config = getBaseClientConfig();
+    expect(
+      config.beforeSend({
+        exception: {
+          values: [
+            {
+              type: 'Error',
+              value: 'connect ECONNREFUSED /opt/vercel/ipc.sock',
+            },
+          ],
         },
       } as never)
     ).toBeNull();

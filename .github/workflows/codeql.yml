@@ -14,7 +14,7 @@ name: CodeQL Security Analysis
 on:
   # Risk-tiered CI: CodeQL runs on the merged code (post-merge on main) + nightly
   # deep scan — NOT on every PR/merge-queue batch. Running 5-language CodeQL on
-  # each PR saturated the runner pool and stalled the Graphite queue (2026-06-22).
+  # each PR saturated the runner pool and stalled the merge queue (2026-06-22).
   # Hygiene (#10463): keep pull_request off — JS matrix budget is 360 min.
   push:
     branches: ['main']
@@ -52,7 +52,7 @@ jobs:
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
       - name: Initialize CodeQL
-        uses: github/codeql-action/init@ff2f1c621b7f889edc0d3c761ac2e6a3f8cdb0dd # v4.37.7
+        uses: github/codeql-action/init@cdf488f595d80d6e07e03d4674febd5ab45fa938 # v4.37.9
         with:
           languages: ${{ matrix.language }}
           build-mode: ${{ matrix.build-mode }}
@@ -60,6 +60,6 @@ jobs:
           queries: security-extended
 
       - name: Perform CodeQL Analysis
-        uses: github/codeql-action/analyze@db488ddef3bf6cb639b32c2e9a7c0a7ea8271d28 # v4.37.8
+        uses: github/codeql-action/analyze@cdf488f595d80d6e07e03d4674febd5ab45fa938 # v4.37.9
         with:
           category: '/language:${{matrix.language}}'

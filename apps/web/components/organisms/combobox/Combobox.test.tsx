@@ -36,8 +36,32 @@ const options = [
   { id: 'one', name: 'First Artist' },
   { id: 'two', name: 'Second Artist' },
 ];
+const legacyTextWhiteClass = ['text', 'white'].join('-');
 
 describe('Combobox', () => {
+  it('uses tokenized combobox input surface states', () => {
+    render(
+      <Combobox
+        options={options}
+        value={null}
+        onChange={vi.fn()}
+        onInputChange={vi.fn()}
+      />
+    );
+
+    const input = screen.getByLabelText('Search for an artist');
+    const surface = input.closest('[data-combobox-surface]');
+    expect(surface?.className).toContain('bg-surface-0');
+    expect(surface?.className).toContain('border-subtle');
+    expect(surface?.className).toContain('focus-within:ring-focus/25');
+    expect(input.className).toContain('text-primary-token');
+    expect(input.className).toContain('placeholder:text-tertiary-token');
+    expect(input.className).not.toContain(legacyTextWhiteClass);
+    expect(
+      screen.getByRole('button', { name: 'Open dropdown' }).className
+    ).toContain('text-tertiary-token');
+  });
+
   it('uses the canonical spinner while results are loading', () => {
     render(
       <Combobox

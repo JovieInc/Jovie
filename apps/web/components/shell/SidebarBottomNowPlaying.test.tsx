@@ -10,7 +10,7 @@ const fullTrack = {
 
 describe('SidebarBottomNowPlaying', () => {
   it('renders track title + artist + play button', () => {
-    render(
+    const { container } = render(
       <SidebarBottomNowPlaying
         track={fullTrack}
         isPlaying={false}
@@ -20,6 +20,11 @@ describe('SidebarBottomNowPlaying', () => {
     expect(screen.getByText('Lost in the Light')).toBeInTheDocument();
     expect(screen.getByText('Bahamas')).toBeInTheDocument();
     expect(screen.getByLabelText('Play')).toBeInTheDocument();
+    expect(
+      container.querySelector('[data-artwork-frame="thumbnail"]')
+    ).toBeInTheDocument();
+    expect(container.innerHTML).toContain('object-contain');
+    expect(container.innerHTML).not.toContain('object-cover');
   });
 
   it('renders the Pause button when isPlaying', () => {

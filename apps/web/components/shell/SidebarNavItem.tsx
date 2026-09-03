@@ -36,14 +36,12 @@ interface SidebarNavChromeOptions {
   readonly className?: string;
 }
 
-// Create actions are deliberately not a second selected-nav treatment. Keep
-// them compact and secondary so the active destination remains the strongest
-// signal in the rail.
+// Create actions stay compact. New Chat uses the primary tone so an enabled
+// create control cannot inherit muted/disabled icon chrome.
 const SIDEBAR_SECONDARY_CHROME =
   'w-fit grid-cols-[18px_auto] gap-x-1.5 px-2.5 text-sidebar-item-foreground font-medium hover:bg-sidebar-accent';
 
-// Retained for callers that explicitly need the established elevated action
-// treatment. Customer navigation uses the quiet secondary tone instead.
+// Elevated create treatment for the New Chat primary action.
 const SIDEBAR_PRIMARY_CHROME =
   'w-fit grid-cols-[18px_auto] gap-x-1.5 bg-sidebar-accent/40 px-2.5 text-sidebar-item-foreground font-medium shadow-none hover:bg-sidebar-accent/70';
 

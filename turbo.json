@@ -127,6 +127,13 @@
       "outputs": [],
       "env": ["NODE_ENV", "CI"]
     },
+    "test:ci": {
+      "description": "CI-matching web unit selector (same graph as test:fast; used by pnpm test:ci and node-runtime compatibility)",
+      "dependsOn": [],
+      "inputs": ["$TURBO_DEFAULT$", "vitest.config.*", "tests/**"],
+      "outputs": [],
+      "env": ["NODE_ENV", "CI"]
+    },
     "test:e2e": {
       "description": "Runs Playwright end-to-end browser tests (requires build to complete first)",
       "dependsOn": ["build"],

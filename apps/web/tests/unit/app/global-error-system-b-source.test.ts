@@ -41,6 +41,9 @@ describe('Global error System B source tokens', () => {
     expect(source).toContain("className='dark'");
     expect(source).toContain('SystemBErrorFallback');
     expect(source).toContain('system-b-error-fallback-body');
+    expect(source).toContain('action={{');
+    expect(source).not.toContain('actions={[');
+    expect(source).not.toContain('Go Home');
     expect(source).not.toContain('focus-ring-transparent-offset');
   });
 });

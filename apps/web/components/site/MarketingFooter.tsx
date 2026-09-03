@@ -7,6 +7,8 @@ import { BrandLogo } from '@/components/atoms/BrandLogo';
 import { APP_ROUTES } from '@/constants/routes';
 import { MARKETING_PEN_CONTRACT_IDS } from '@/data/marketing/penContracts';
 import {
+  MARKETING_CLI_LINK,
+  MARKETING_DEVELOPER_LINK,
   MARKETING_FOOTER_COLUMNS,
   MARKETING_LEGAL_LINKS,
   type MarketingFooterLink,
@@ -47,6 +49,7 @@ const PAGE_OWNS_FINAL_CTA_PATHS = new Set<string>([
   APP_ROUTES.LAUNCH,
   APP_ROUTES.DOWNLOAD,
   APP_ROUTES.SUPPORT,
+  APP_ROUTES.CLI,
 ]);
 
 interface MarketingFooterProps {
@@ -196,6 +199,15 @@ export function MarketingFooter({
           <span className='text-xs leading-[1.45] tracking-[-0.005em] text-white/[0.5]'>
             © {new Date().getFullYear()} Jovie Technology Inc.
           </span>
+          {isMinimal ? (
+            <nav
+              aria-label='Resources'
+              className='flex flex-wrap items-center gap-6'
+            >
+              <FooterLink link={MARKETING_DEVELOPER_LINK} />
+              <FooterLink link={MARKETING_CLI_LINK} />
+            </nav>
+          ) : null}
           <nav aria-label='Legal' className='flex flex-wrap items-center gap-6'>
             {MARKETING_LEGAL_LINKS.map(link => (
               <Link

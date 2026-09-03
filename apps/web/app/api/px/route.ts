@@ -1,10 +1,11 @@
 import crypto from 'node:crypto';
 import { eq } from 'drizzle-orm';
-import { after, NextRequest, NextResponse } from 'next/server';
+import { NextRequest, NextResponse } from 'next/server';
 import { db } from '@/lib/db';
 import { pixelEvents } from '@/lib/db/schema/pixels';
 import { creatorProfiles } from '@/lib/db/schema/profiles';
 import { captureError } from '@/lib/error-tracking';
+import { scheduleAfter } from '@/lib/next/schedule-after';
 import { createRateLimitHeaders, publicVisitLimiter } from '@/lib/rate-limit';
 import { ensureClaimRetargetingCreatives } from '@/lib/retargeting/claim-creatives';
 import { forwardEvent } from '@/lib/tracking/forwarding';
@@ -178,7 +179,7 @@ export async function POST(request: NextRequest) {
     // Forward to ad platforms after sending response (non-blocking).
     // On failure, the event stays in DB for retry by the cron job.
     if (insertedEvent) {
-      after(async () => {
+      scheduleAfter(async () => {
         try {
           const claimLink =
             eventType === 'page_view' ? getClaimRetargetingLink(pageUrl) : null;
