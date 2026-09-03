@@ -17,7 +17,7 @@ export const Empty: Story = {
     initialLinks: [],
   },
   render: args => (
-    <div className='flex h-[32rem] bg-(--app-shell-content-surface)'>
+    <div className='flex h-128 bg-(--app-shell-content-surface)'>
       <OpportunityInboxPageClient {...args} />
     </div>
   ),
@@ -46,7 +46,7 @@ export const WithCards: Story = {
     initialLinks: [],
   },
   render: args => (
-    <div className='flex h-[32rem] bg-(--app-shell-content-surface)'>
+    <div className='flex h-128 bg-(--app-shell-content-surface)'>
       <OpportunityInboxPageClient {...args} />
     </div>
   ),
