@@ -1,6 +1,5 @@
 'use client';
 
-import { type ColumnDef, createColumnHelper } from '@tanstack/react-table';
 import { ClipboardCopy, MessageSquareText } from 'lucide-react';
 import { useCallback, useMemo, useRef, useState } from 'react';
 import { TruncatedText } from '@/components/atoms/TruncatedText';
@@ -30,6 +29,8 @@ import {
 } from '@/features/admin/table/AdminTableHeader';
 import { AdminTableShell } from '@/features/admin/table/AdminTableShell';
 import { useDismissFeedbackMutation } from '@/lib/queries';
+import type { ColumnDef } from '@/lib/tanstack-v8-compat';
+import { createColumnHelper } from '@/lib/tanstack-v8-compat';
 import {
   buildFeedbackActions,
   feedbackActionsToContextMenuItems,
