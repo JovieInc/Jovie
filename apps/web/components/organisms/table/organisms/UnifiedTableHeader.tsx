@@ -1,6 +1,6 @@
 'use client';
 
-import type { HeaderGroup } from '@tanstack/react-table';
+import type { HeaderGroup } from '@/lib/tanstack-v8-compat';
 import { TableHeaderCell } from '../molecules/TableHeaderCell';
 import { presets } from '../table.styles';
 
