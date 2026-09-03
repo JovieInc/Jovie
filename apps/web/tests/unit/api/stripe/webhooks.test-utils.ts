@@ -199,6 +199,7 @@ vi.mock('@/lib/stripe/config', () => ({
 vi.mock('@/lib/env-server', () => ({
   env: {
     STRIPE_WEBHOOK_SECRET: 'whsec_test',
+    STRIPE_SECRET_KEY: 'sk_test_mock',
   },
 }));
 

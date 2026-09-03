@@ -1,8 +1,7 @@
 import type { Meta, StoryObj } from '@storybook/nextjs-vite';
 import { fn } from 'storybook/test';
-import { CHAT_EMPTY_SAMPLE_STORAGE_KEY } from './chat-empty-starters';
-import { ChatEmptyStateComposerRegion } from './components/ChatEmptyStateComposerRegion';
-import { JovieChat } from './JovieChat';
+import { CHAT_EMPTY_SAMPLE_STORAGE_KEY } from '../chat-empty-starters';
+import { ChatEmptyStateComposerRegion } from './ChatEmptyStateComposerRegion';
 
 function StoryComposerDock() {
   return (
@@ -19,14 +18,12 @@ function StoryComposerDock() {
 }
 
 const meta = {
-  title: 'Jovie/JovieChat',
-  component: JovieChat,
-  parameters: {
-    layout: 'fullscreen',
-    jovie: { uncoveredProps: ['isLoading'] },
-  },
+  title: 'Chat/EmptyState/ComposerRegion',
+  component: ChatEmptyStateComposerRegion,
+  parameters: { layout: 'fullscreen' },
   args: {
-    ambientOwnedByShell: true,
+    children: <StoryComposerDock />,
+    onSelectSample: fn(),
   },
   decorators: [
     Story => {
@@ -36,25 +33,26 @@ const meta = {
         // Story extraction can run without Web Storage.
       }
       return (
-        <div className='min-h-96 bg-base p-6'>
-          <Story />
+        <div className='flex min-h-96 justify-center bg-base p-6'>
+          <div className='w-full max-w-xl'>
+            <Story />
+          </div>
         </div>
       );
     },
   ],
-} satisfies Meta<typeof JovieChat>;
+} satisfies Meta<typeof ChatEmptyStateComposerRegion>;
 
 export default meta;
 type Story = StoryObj<typeof meta>;
 
-export const JustAskEmpty: Story = {
-  render: () => (
-    <ChatEmptyStateComposerRegion
-      stableDocked
-      showDockedWelcome
-      onSelectSample={fn()}
-    >
-      <StoryComposerDock />
-    </ChatEmptyStateComposerRegion>
-  ),
+export const JustAskCentered: Story = {};
+
+export const JustAskDocked: Story = {
+  args: {
+    stableDocked: true,
+    showDockedWelcome: true,
+    children: <StoryComposerDock />,
+    onSelectSample: fn(),
+  },
 };
