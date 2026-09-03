@@ -118,6 +118,66 @@ class MainReleaseReadySelectionTests(unittest.TestCase):
         )
         self.assertEqual(latest["started_at"], "2026-08-17T19:41:00Z")
 
+    def test_observe_main_treats_all_skipped_release_gate_as_unknown_not_red(self):
+        """A merge_group/cancelled attempt leaves only skipped source-gate
+        check-runs. That is no verdict: promotion freezes on unknown, but the
+        fleet must not flip to main-not-green / draft-only on it."""
+
+        def github_response(_repo: str, endpoint: str):
+            if endpoint == "branches/main":
+                return {"commit": {"sha": MAIN_SHA}}
+            if endpoint == f"commits/{MAIN_SHA}/status":
+                return {"state": "pending"}
+            if endpoint.startswith(f"commits/{MAIN_SHA}/check-runs?"):
+                return {
+                    "check_runs": [
+                        {
+                            "name": "Main Release Ready",
+                            "status": "completed",
+                            "conclusion": "skipped",
+                            "started_at": "2026-09-02T18:34:00Z",
+                            "completed_at": "2026-09-02T18:34:01Z",
+                        }
+                    ]
+                }
+            if endpoint.startswith("actions/runs?"):
+                return {"workflow_runs": []}
+            raise AssertionError(f"unexpected GitHub endpoint: {endpoint}")
+
+        with mock.patch.object(MODULE, "gh_json", side_effect=github_response):
+            observed = MODULE.observe_main("JovieInc/Jovie")
+
+        self.assertEqual(observed["status"], "unknown")
+        self.assertEqual(observed["sha"], MAIN_SHA)
+        self.assertEqual(observed["sourceGate"]["conclusion"], "skipped")
+        self.assertIn("no real attempt", observed["error"])
+
+    def test_observe_main_failure_is_still_red(self):
+        def github_response(_repo: str, endpoint: str):
+            if endpoint == "branches/main":
+                return {"commit": {"sha": MAIN_SHA}}
+            if endpoint == f"commits/{MAIN_SHA}/status":
+                return {"state": "failure"}
+            if endpoint.startswith(f"commits/{MAIN_SHA}/check-runs?"):
+                return {
+                    "check_runs": [
+                        {
+                            "name": "Main Release Ready",
+                            "status": "completed",
+                            "conclusion": "failure",
+                            "started_at": "2026-09-02T18:34:00Z",
+                            "completed_at": "2026-09-02T18:34:01Z",
+                        }
+                    ]
+                }
+            raise AssertionError(f"unexpected GitHub endpoint: {endpoint}")
+
+        with mock.patch.object(MODULE, "gh_json", side_effect=github_response):
+            observed = MODULE.observe_main("JovieInc/Jovie")
+
+        self.assertEqual(observed["status"], "red")
+        self.assertNotIn("error", observed)
+
     def test_observe_main_preserves_exact_sha_when_release_gate_is_missing(self):
         def github_response(_repo: str, endpoint: str):
             if endpoint == "branches/main":
