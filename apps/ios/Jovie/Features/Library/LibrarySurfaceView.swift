@@ -46,7 +46,16 @@ struct LibrarySurfaceView: View {
         listBody
       }
     }
-    .accessibilityIdentifier("library-surface")
+    // `.contain` keeps this container out of the child identifier space so
+    // home switcher / search keep `library-home-*` and `library-search`.
+    // Without it the container identifier overwrites those children and
+    // XCUITest cannot find the Catalog switcher (ci:2fa8414a).
+    .accessibilityElement(
+      children: LibraryControlMetrics.requiresPassthroughAccessibilityContainer
+        ? .contain
+        : .ignore
+    )
+    .accessibilityIdentifier(LibraryControlMetrics.accessibilityIdentifier)
     .scrollDismissesKeyboard(.interactively)
     .task {
       await reloadLocalVideos()
@@ -266,6 +275,12 @@ struct LibrarySurfaceView: View {
 enum LibraryControlMetrics {
   static let minimumTouchTarget: CGFloat = JovieIconButtonStyle.targetSize
   static let searchVisualHeight: CGFloat = 36
+  static let accessibilityIdentifier = "library-surface"
+  /// `LibrarySurfaceView` must be a passthrough accessibility container
+  /// (`.accessibilityElement(children: .contain)`): without it the container
+  /// identifier propagates to children and hides `library-home-catalog` /
+  /// `library-search` from XCUITest (merge-queue failure ci:2fa8414a).
+  static let requiresPassthroughAccessibilityContainer = true
 }
 
 private struct LibraryPillLabel: View {
