@@ -105,7 +105,14 @@ describe('HomepageCertifiedSections', () => {
       HOMEPAGE_CERTIFIED_FIGURES.ledgers.found?.length ?? -1
     );
 
-    for (const id of ['know', 'relationships', 'smarter', 'built']) {
+    const know = screen.getByTestId('homepage-section-know');
+    expect(know).toHaveAttribute('data-voice', 'quiet');
+    expect(know).toHaveAttribute('data-wash', 'true');
+    expect(know).toHaveTextContent(
+      HOMEPAGE_CERTIFIED_FIGURES.stats.know?.caption ?? 'missing'
+    );
+
+    for (const id of ['relationships', 'smarter', 'built']) {
       expect(screen.getByTestId(`homepage-section-${id}`)).toHaveAttribute(
         'data-voice',
         'display'
