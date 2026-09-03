@@ -116,7 +116,7 @@ export function InvestorUpdateReview({
     return () => window.clearTimeout(timer);
   }, [nowMs, state.latestApproval]);
 
-  async function mutate(body: Record<string, unknown>) {
+  async function mutate(body: Record<string, unknown>): Promise<boolean> {
     setPending(true);
     setError(null);
     try {
@@ -132,12 +132,14 @@ export function InvestorUpdateReview({
       setState(result);
       setNowMs(Date.now());
       setRevising(false);
+      return true;
     } catch (mutationError) {
       setError(
         mutationError instanceof Error
           ? mutationError.message
           : 'Update failed.'
       );
+      return false;
     } finally {
       setPending(false);
     }
@@ -149,13 +151,14 @@ export function InvestorUpdateReview({
     replacement: string | null = null
   ) {
     if (!state.draft) return;
-    await mutate({
+    const saved = await mutate({
       action: 'candidate_decision',
       draftId: state.draft.id,
       candidateId,
       decision,
       editedClaim: replacement,
     });
+    if (!saved) return;
     setEditingCandidateId(null);
     setEditedClaim('');
   }

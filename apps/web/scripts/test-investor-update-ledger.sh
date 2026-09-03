@@ -27,14 +27,14 @@ CREATE TABLE public.memory_source_records (
 );
 SQL
 psql -X -v ON_ERROR_STOP=1 "$database_name" \
-  -f drizzle/migrations/0098_hesitant_demogoblin.sql >/dev/null
+  -f drizzle/migrations/0100_hesitant_demogoblin.sql >/dev/null
 
 # Ratchet against the current tree: apply every later migration that can touch
 # this boundary, so a future trigger/constraint change cannot pass by replaying
 # only the original schema.
 while IFS= read -r migration; do
   migration_name="$(basename "$migration")"
-  [[ "$migration_name" > "0098_hesitant_demogoblin.sql" ]] || continue
+  [[ "$migration_name" > "0100_hesitant_demogoblin.sql" ]] || continue
   if grep -q -E 'investor_update_|investor_stakeholder_records' "$migration"; then
     psql -X -v ON_ERROR_STOP=1 "$database_name" -f "$migration" >/dev/null
   fi
