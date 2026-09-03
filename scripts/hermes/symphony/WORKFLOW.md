@@ -2,13 +2,16 @@
 tracker:
   kind: linear
   provider:
-    project_slug: "symphony-ui-pilot-96d6b9c5b2d5"
+    team_key: "JOV"
     api_key: $LINEAR_API_KEY
-  required_labels:
-    - symphony
+  excluded_labels:
+    - no-symphony
+    - needs-human
   active_states:
     - Todo
     - In Progress
+    - Rework
+    - Merging
   terminal_states:
     - Done
     - Canceled
@@ -60,6 +63,8 @@ You are an unattended Symphony coding agent on Jovie (`JovieInc/Jovie`). PATH in
 Ticket: `{{ issue.identifier }}` — {{ issue.title }}
 Status: {{ issue.state }}
 URL: {{ issue.url }}
+
+Intake is the Jovie Linear team. States: `Todo` = queued (move to `In Progress` before work); `In Progress` = continue; `Rework` = address review feedback on the existing PR; `Merging` = land the attached PR through the native merge queue. Issues labeled `no-symphony` or `needs-human` are never dispatched.
 
 {% if attempt %}Continuation attempt #{{ attempt }}. Resume; do not redo finished validation.{% endif %}
 

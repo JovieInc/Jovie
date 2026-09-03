@@ -23,7 +23,7 @@ UNIT_PATH = ROOT / "scripts/hermes/systemd/symphony-elixir.service"
 UNIT = UNIT_PATH.read_text(encoding="utf-8")
 UPDATER = (ROOT / "scripts/hermes/update-symphony-burrito.sh").read_text(encoding="utf-8")
 HELPER_PATH = ROOT / "scripts/hermes/symphony_official_runtime.py"
-LIVE_SLUG = "symphony-ui-pilot-96d6b9c5b2d5"
+LIVE_TEAM_KEY = "JOV"
 TOKEN_RE = re.compile(r"lin_(?:api_|oauth_)?[A-Za-z0-9]{12,}|api_key:\s*(?!\$LINEAR_API_KEY\b)\S+")
 
 
@@ -47,14 +47,17 @@ class OfficialSymphonyContractTests(unittest.TestCase):
         self.assertTrue(WORKFLOW_PATH.is_file())
         self.assertTrue(UNIT_PATH.is_file())
         self.assertIn("%h/.config/symphony/WORKFLOW.md", UNIT)
-        self.assertIn(f'project_slug: "{LIVE_SLUG}"', WORKFLOW)
+        self.assertIn(f'team_key: "{LIVE_TEAM_KEY}"', WORKFLOW)
+        self.assertNotIn("project_slug", WORKFLOW)
         self.assertNotIn("jovie-ba6736cbfbb9", WORKFLOW)
         self.assertIn("root: ~/symphony-elixir-workspaces", WORKFLOW)
         self.assertIn("timeout_ms: 900000", WORKFLOW)
         self.assertIn("max_concurrent_agents: 8", WORKFLOW)
         self.assertIn("api_key: $LINEAR_API_KEY", WORKFLOW)
-        self.assertIn("required_labels:", WORKFLOW)
-        self.assertIn("    - symphony", WORKFLOW)
+        self.assertNotIn("required_labels:", WORKFLOW)
+        self.assertIn("excluded_labels:", WORKFLOW)
+        self.assertIn("    - no-symphony", WORKFLOW)
+        self.assertIn("    - needs-human", WORKFLOW)
         self.assertRegex(
             WORKFLOW,
             re.compile(r"^\s+command: \./scripts/hermes/symphony-codex-router app-server$", re.M),
@@ -72,8 +75,8 @@ class OfficialSymphonyContractTests(unittest.TestCase):
         self.assertIn("76869538009648d5b282a4bb21c3d157", WORKFLOW)
         self.assertIn("enabled=false", WORKFLOW)
         self.assertIn("create_branch", WORKFLOW)
-        self.assertNotIn("- Merging", WORKFLOW)
-        self.assertNotIn("- Rework", WORKFLOW)
+        self.assertIn("- Merging", WORKFLOW)
+        self.assertIn("- Rework", WORKFLOW)
         self.assertNotIn("team:JOV", WORKFLOW)
         self.assertIsNone(TOKEN_RE.search(WORKFLOW))
         self.assertIn("--port 4041", UNIT)
@@ -106,8 +109,8 @@ class OfficialSymphonyContractTests(unittest.TestCase):
         )
         self.assertTrue(result["ok"], result)
         budget = result["budget"]
-        self.assertEqual(budget["pagesPerPoll"], 3)
-        self.assertEqual(budget["schedulerRequestsPerHour"], 360)
+        self.assertEqual(budget["pagesPerPoll"], 4)
+        self.assertEqual(budget["schedulerRequestsPerHour"], 480)
         self.assertLessEqual(budget["steadyStateRequestsPerHour"], 2500)
         missing_count = helper.validate_source(
             repo_root=ROOT,
@@ -124,13 +127,13 @@ class OfficialSymphonyContractTests(unittest.TestCase):
             helper.BudgetInputs(poll_interval_ms=5000, max_concurrent_agents=8)
         )
         self.assertFalse(unsafe_interval["withinBudget"])
-        self.assertEqual(unsafe_interval["schedulerRequestsPerHour"], 2160)
+        self.assertEqual(unsafe_interval["schedulerRequestsPerHour"], 2880)
         safe = helper.compute_budget(
             helper.BudgetInputs(poll_interval_ms=30000, max_concurrent_agents=8)
         )
         self.assertTrue(safe["withinBudget"], safe)
-        self.assertEqual(safe["schedulerRequestsPerHour"], 360)
-        self.assertEqual(safe["steadyStateRequestsPerHour"], 1100)
+        self.assertEqual(safe["schedulerRequestsPerHour"], 480)
+        self.assertEqual(safe["steadyStateRequestsPerHour"], 1220)
         unsafe_concurrency = helper.compute_budget(
             helper.BudgetInputs(poll_interval_ms=30000, max_concurrent_agents=55)
         )
@@ -255,7 +258,89 @@ class OfficialSymphonyContractTests(unittest.TestCase):
             self.assertEqual(payload["schema"], helper.RATE_LIMIT_GATE_SCHEMA)
             self.assertEqual(payload["kind"], "rate_limited")
 
-    def test_linear_eligible_count_uses_project_id_pagination(self):
+    def test_team_scope_validation_fails_closed(self):
+        """Malformed or legacy project-gated scope stops dispatch validation."""
+        helper = _load_helper()
+        with tempfile.TemporaryDirectory() as tmp:
+            variant = pathlib.Path(tmp) / "WORKFLOW.md"
+
+            def check(text):
+                variant.write_text(text, encoding="utf-8")
+                return helper.validate_source(
+                    repo_root=ROOT,
+                    workflow_path=variant,
+                    unit_path=UNIT_PATH,
+                    service_name="symphony-elixir.service",
+                    active_issues=helper.MEASURED_ACTIVE_ISSUES,
+                )
+
+            malformed = check(WORKFLOW.replace('team_key: "JOV"', 'team_key: "jov"'))
+            self.assertFalse(malformed["ok"])
+            self.assertIn(
+                "workflow_invalid:malformed tracker.provider.team_key:jov",
+                malformed["errors"],
+            )
+
+            missing = check(
+                WORKFLOW.replace('    team_key: "JOV"\n', "")
+            )
+            self.assertFalse(missing["ok"])
+            self.assertIn(
+                "workflow_invalid:missing tracker.provider.team_key", missing["errors"]
+            )
+
+            wrong_team = check(WORKFLOW.replace('team_key: "JOV"', 'team_key: "LYB"'))
+            self.assertFalse(wrong_team["ok"])
+            self.assertIn("workflow_team_key:LYB", wrong_team["errors"])
+
+            project_gated = check(
+                WORKFLOW.replace(
+                    '    team_key: "JOV"',
+                    '    team_key: "JOV"\n    project_slug: "symphony-ui-pilot-96d6b9c5b2d5"',
+                )
+            )
+            self.assertFalse(project_gated["ok"])
+            self.assertTrue(
+                any(
+                    error.startswith("workflow_project_slug_present:")
+                    for error in project_gated["errors"]
+                ),
+                project_gated["errors"],
+            )
+
+            labeled = check(
+                WORKFLOW.replace(
+                    "  excluded_labels:\n",
+                    "  required_labels:\n    - symphony\n  excluded_labels:\n",
+                )
+            )
+            self.assertFalse(labeled["ok"])
+            self.assertIn("workflow_required_labels_present:symphony", labeled["errors"])
+
+            no_exclusions = check(
+                WORKFLOW.replace(
+                    "  excluded_labels:\n    - no-symphony\n    - needs-human\n", ""
+                )
+            )
+            self.assertFalse(no_exclusions["ok"])
+            self.assertIn(
+                "workflow_excluded_label_missing:no-symphony", no_exclusions["errors"]
+            )
+            self.assertIn(
+                "workflow_excluded_label_missing:needs-human", no_exclusions["errors"]
+            )
+
+            missing_rework = check(WORKFLOW.replace("    - Rework\n", ""))
+            self.assertFalse(missing_rework["ok"])
+            self.assertTrue(
+                any(
+                    error.startswith("workflow_active_states:")
+                    for error in missing_rework["errors"]
+                ),
+                missing_rework["errors"],
+            )
+
+    def test_linear_eligible_count_uses_team_key_pagination(self):
         helper = _load_helper()
         calls = []
 
@@ -284,18 +369,16 @@ class OfficialSymphonyContractTests(unittest.TestCase):
                 return FakeResponse(
                     {
                         "data": {
-                            "project": {
-                                "issues": {
-                                    "nodes": [
-                                        {"state": {"name": "Todo"}},
-                                        {"state": {"name": "Backlog"}},
-                                        {"state": {"name": "In Progress"}},
-                                    ],
-                                    "pageInfo": {
-                                        "hasNextPage": True,
-                                        "endCursor": "cursor-1",
-                                    },
-                                }
+                            "issues": {
+                                "nodes": [
+                                    {"id": "issue-1"},
+                                    {"id": "issue-2"},
+                                    {"id": "issue-3"},
+                                ],
+                                "pageInfo": {
+                                    "hasNextPage": True,
+                                    "endCursor": "cursor-1",
+                                },
                             }
                         }
                     }
@@ -303,17 +386,15 @@ class OfficialSymphonyContractTests(unittest.TestCase):
             return FakeResponse(
                 {
                     "data": {
-                        "project": {
-                            "issues": {
-                                "nodes": [
-                                    {"state": {"name": "Todo"}},
-                                    {"state": {"name": "In Review"}},
-                                ],
-                                "pageInfo": {
-                                    "hasNextPage": False,
-                                    "endCursor": None,
-                                },
-                            }
+                        "issues": {
+                            "nodes": [
+                                {"id": "issue-4"},
+                                {"id": "issue-5"},
+                            ],
+                            "pageInfo": {
+                                "hasNextPage": False,
+                                "endCursor": None,
+                            },
                         }
                     }
                 }
@@ -322,10 +403,21 @@ class OfficialSymphonyContractTests(unittest.TestCase):
         with mock.patch.object(helper.urllib.request, "urlopen", side_effect=fake_urlopen):
             count = helper.fetch_linear_eligible_issue_count(api_key="lin_test")
 
-        self.assertEqual(count, 3)
+        self.assertEqual(count, 5)
         self.assertEqual(len(calls), 2)
-        self.assertEqual(calls[0]["variables"]["projectId"], helper.OFFICIAL_PROJECT_ID)
+        self.assertEqual(calls[0]["variables"]["teamKey"], helper.OFFICIAL_TEAM_KEY)
+        self.assertEqual(
+            calls[0]["variables"]["stateNames"], list(helper.ACTIVE_STATES)
+        )
+        self.assertNotIn("projectId", calls[0]["variables"])
         self.assertNotIn("projectSlug", calls[0]["variables"])
+
+    def test_linear_eligible_count_rejects_malformed_team_key(self):
+        helper = _load_helper()
+        with self.assertRaises(ValueError):
+            helper.fetch_linear_eligible_issue_count(
+                api_key="lin_test", team_key="jov"
+            )
 
     def test_rate_limit_gate_closes_descriptor_when_fdopen_fails(self):
         helper = _load_helper()
@@ -466,7 +558,7 @@ class OfficialSymphonyContractTests(unittest.TestCase):
 
     def test_updater_dry_run_and_config_copy_refuse_obsolete_shape(self):
         self.assertIn("linux_x86_64", UPDATER)
-        self.assertIn('SYMPHONY_VERSION="${SYMPHONY_VERSION:-v0.0.2}"', UPDATER)
+        self.assertIn('SYMPHONY_VERSION="${SYMPHONY_VERSION:-v0.0.2-jovie.2}"', UPDATER)
         self.assertIn("sha256", UPDATER)
         self.assertIn("symphony-elixir.service", UPDATER)
         self.assertNotIn("enable symphony-burrito.service", UPDATER)
@@ -527,7 +619,7 @@ class OfficialSymphonyContractTests(unittest.TestCase):
             env.pop("SYMPHONY_WORKFLOW_SRC")
             good = subprocess.run(["bash", str(updater), "--skip-binary", "--no-restart"], cwd=ROOT, env=env, capture_output=True, text=True)
             self.assertEqual(good.returncode, 0, good.stderr)
-            self.assertIn(LIVE_SLUG, existing.read_text())
+            self.assertIn(f'team_key: "{LIVE_TEAM_KEY}"', existing.read_text())
             unit = pathlib.Path(tmp) / "home/.config/systemd/user/symphony-elixir.service"
             helper = pathlib.Path(tmp) / "home/.local/bin/symphony-official-runtime"
             self.assertTrue(unit.is_file())

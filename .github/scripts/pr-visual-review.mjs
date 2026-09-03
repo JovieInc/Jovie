@@ -39,11 +39,14 @@ const AUTHENTICATED_SHELL_CAPTURE_FILE =
  * Authenticated `/app/chat` capture is for visual chat/shell surfaces.
  * API handlers, server turn execution, and onboarding helpers share the
  * "chat" path token but are not the workspace chrome the fixture proves.
+ * App Router `(shell)` is a route group, not chat chrome; real chat pages
+ * under that group still match `/chat/i`.
  */
 function isAuthenticatedChatUiChange(file) {
   if (!/chat|shell/i.test(file)) return false;
   if (/onboarding/i.test(file)) return false;
   if (/^apps\/web\/(app\/api\/|lib\/)/.test(file)) return false;
+  if (/\(shell\)/.test(file) && !/chat/i.test(file)) return false;
   return true;
 }
 

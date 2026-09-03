@@ -125,10 +125,15 @@ import {
   libraryApprovalStatusDotClasses,
 } from '@/lib/library/approval-status';
 import type { LibraryAssetShareViewModel } from '@/lib/library/asset-share';
+import type { LibraryMerchProductOption } from '@/lib/library/graph-types';
 import {
   libraryAssetMatchesStage,
   parseLibraryStageParam,
 } from '@/lib/library/lifecycle-stage';
+import {
+  EMPTY_LIBRARY_POST_RELEASE_BUNDLE,
+  type LibraryPostReleaseBundle,
+} from '@/lib/library/post-release-types';
 import { updateLibraryProfileVisibility } from '@/lib/library/profile-visibility/client-mutations';
 import {
   releaseStatusClasses,
@@ -145,6 +150,7 @@ import {
 import { archiveLibraryMerchCard, restoreLibraryMerchCard } from './actions';
 import { LibraryMediaThumbnail } from './LibraryMediaThumbnail';
 import {
+  attachLibraryProductGraph,
   formatLibraryDuration,
   formatLibraryReleaseDate,
   formatLibraryReleaseDateTitle,
@@ -2415,18 +2421,24 @@ function LibraryStatusBar({
   );
 }
 
+const EMPTY_MERCH_PRODUCTS: readonly LibraryMerchProductOption[] = [];
+
 export function LibrarySurface({
   assets,
   profileId = null,
   artistHandle = null,
   canSyncSpotify = false,
+  merchProducts = EMPTY_MERCH_PRODUCTS,
   relationships = EMPTY_RELATIONSHIPS,
+  postReleaseBundle = EMPTY_LIBRARY_POST_RELEASE_BUNDLE,
 }: {
   readonly assets: readonly LibraryReleaseAsset[];
   readonly profileId?: string | null;
   readonly artistHandle?: string | null;
   readonly canSyncSpotify?: boolean;
+  readonly merchProducts?: readonly LibraryMerchProductOption[];
   readonly relationships?: readonly LibraryRelationshipView[];
+  readonly postReleaseBundle?: LibraryPostReleaseBundle;
 }) {
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -2530,10 +2542,15 @@ export function LibrarySurface({
   }, []);
 
   // Version-stack duplicate ingests so each release renders as one row
-  // (JOV-3089); overrides then layer on top of the surviving canonical row.
+  // (JOV-3089); product-graph enrichment then attaches to the surviving
+  // canonical row so duplicate-version merch/post-release data is not dropped.
   const effectiveAssets = useMemo<readonly LibraryReleaseAsset[]>(
     () =>
-      stackLibraryReleaseVersions(assets).map((asset): LibraryReleaseAsset => {
+      attachLibraryProductGraph(stackLibraryReleaseVersions(assets), {
+        merchProducts,
+        relationships,
+        postReleaseBundle,
+      }).map((asset): LibraryReleaseAsset => {
         const previewUrl = audioOverrides[asset.id];
         const hasPreviewOverride = Boolean(previewUrl);
         const approvalStatus =
@@ -2577,7 +2594,10 @@ export function LibrarySurface({
       assets,
       audioOverrides,
       lifecycleStatusOverrides,
+      merchProducts,
+      postReleaseBundle,
       profileVisibilityOverrides,
+      relationships,
       shareOverrides,
     ]
   );
