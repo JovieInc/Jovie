@@ -1,4 +1,3 @@
-import { type ColumnDef, createColumnHelper } from '@tanstack/react-table';
 import { PageShell } from '@/components/organisms/PageShell';
 import {
   PAGE_TOOLBAR_META_TEXT_CLASS,
@@ -6,6 +5,8 @@ import {
   UnifiedTableSkeleton,
 } from '@/components/organisms/table';
 import { SKELETON_ROW_COUNT } from '@/lib/constants/layout';
+import type { ColumnDef } from '@/lib/tanstack-v8-compat';
+import { createColumnHelper } from '@/lib/tanstack-v8-compat';
 
 interface ReleaseTablePendingShellProps {
   readonly showHeader?: boolean;
