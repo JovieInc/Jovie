@@ -74,10 +74,9 @@ function canUseE2ETestAuthFallback(): boolean {
 }
 
 /**
- * Secretless visual capture and local E2E have no reachable waitlist store.
- * The user-row lookup already fail-softs in that mode; the parallel gate
- * prefetch must do the same or Promise.all rejects and the app shell
- * renders "Dashboard failed to load" (JOV-5387 PR visual review).
+ * Secretless visual capture and local E2E have no reachable waitlist store;
+ * fail soft like the user-row lookup or the app shell renders "Dashboard
+ * failed to load" (JOV-5387 PR visual review).
  */
 async function readWaitlistGateEnabledForAuthGate(): Promise<boolean> {
   try {

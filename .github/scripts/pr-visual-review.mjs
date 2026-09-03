@@ -172,8 +172,6 @@ function isFailedResourceConsoleError(message) {
  * refetches can 5xx after `waitForAuthenticatedShell` has already proven the
  * surface. Those must not fail the capture. Page errors, public-route 5xxs,
  * and document 5xxs to a different path stay blocking.
- */
-/**
  * @param {unknown} failure
  * @param {{ route?: string, baseUrl?: string } | null | undefined} [context]
  */

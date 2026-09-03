@@ -30,9 +30,8 @@ if (!Array.isArray(routes) || routes.length === 0)
 async function waitForAuthenticatedShell(page, route) {
   if (!route.startsWith('/app/')) return;
 
-  // Streaming can leave a second dashboard-header in the DOM. `.or().first()`
-  // waits on the first DOM node, which may stay hidden; wait until any match
-  // is visible instead so Playwright strict mode cannot fail closed.
+  // A second dashboard-header can stay hidden in the DOM; wait until any
+  // match is visible so Playwright strict mode cannot fail closed.
   const visibleShellChrome = page
     .locator(
       '[data-testid="dashboard-header"], [data-testid="dashboard-error"]'

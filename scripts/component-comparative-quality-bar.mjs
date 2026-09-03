@@ -99,11 +99,9 @@ export function resolveTrustedBaseEnrollment(repoRoot = REPO_ROOT) {
     if (!/^[0-9a-f]{40}$/.test(ref)) {
       throw new Error('trusted base did not resolve to a commit');
     }
-    // A PR branched before the comparative quality bar landed has a merge-base
-    // that predates the registry source. Reading from that base fails closed and
-    // permanently blocks such PRs. The trust property only requires a ref the PR
-    // head cannot modify, so fall back to origin/main (the integration target)
-    // when the merge-base does not yet contain the registry.
+    // A merge-base that predates the registry source fails closed forever.
+    // The trust property only requires a ref the PR head cannot modify, so
+    // fall back to origin/main (the integration target).
     const trustedRefs = [ref, 'origin/main'];
     let source;
     for (const candidate of trustedRefs) {

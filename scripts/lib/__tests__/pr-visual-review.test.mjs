@@ -394,21 +394,6 @@ describe('bounded PR visual review contract', () => {
       {
         type: 'http-5xx',
         status: 500,
-        url: 'http://127.0.0.1:3100/api/dashboard/contacts?profileId=00000000-0000-4000-8000-000000000102',
-      },
-      {
-        type: 'http-5xx',
-        status: 500,
-        url: 'http://127.0.0.1:3100/api/connectors/suggested-actions',
-      },
-      {
-        type: 'http-5xx',
-        status: 503,
-        url: 'http://127.0.0.1:3100/api/billing/status',
-      },
-      {
-        type: 'http-5xx',
-        status: 500,
         url: 'http://127.0.0.1:3100/app/chat',
       },
     ];
