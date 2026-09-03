@@ -337,7 +337,7 @@ export function buildDegradedHudMetrics(
 }
 
 async function fetchHudMetrics(mode: HudAccessMode): Promise<HudMetrics> {
-  const generatedAt = new Date();
+  const requestedAt = new Date();
 
   const branding = {
     startupName: env.HUD_STARTUP_NAME ?? 'Jovie',
@@ -359,8 +359,13 @@ async function fetchHudMetrics(mode: HudAccessMode): Promise<HudMetrics> {
     getAdminSentryMetrics(),
     checkDbHealth(),
     getHudDeployments(),
-    getHudAiOpsSummary(generatedAt),
+    getHudAiOpsSummary(requestedAt),
   ]);
+
+  // Stamp the payload after every producer resolves. Provider observations are
+  // allowed to be newer than request start, but never newer than the aggregate
+  // response that presents them.
+  const generatedAt = new Date();
 
   const financialStatus = calculateFinancialStatus(
     stripeMetrics,

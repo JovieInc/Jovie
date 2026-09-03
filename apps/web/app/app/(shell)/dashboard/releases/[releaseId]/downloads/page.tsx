@@ -8,7 +8,7 @@
  */
 
 import { buttonVariants } from '@jovie/ui';
-import { upload } from '@vercel/blob/client';
+import { uploadPresigned } from '@vercel/blob/client';
 import { useParams } from 'next/navigation';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { Icon } from '@/components/atoms/Icon';
@@ -97,7 +97,7 @@ export default function PromoDownloadsPage() {
 
       try {
         // Client-side upload to Vercel Blob
-        const blob = await upload(
+        const blob = await uploadPresigned(
           buildAudioBlobPath('promo_download', userId ?? 'unknown', file.name),
           file,
           {

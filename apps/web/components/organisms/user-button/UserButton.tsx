@@ -598,8 +598,8 @@ export function UserButton({
           src={userImageUrl}
           alt={displayName || 'User avatar'}
           name={displayName || userInitials}
-          size='xs'
-          className='h-5 w-5 shrink-0 ring-0 shadow-none'
+          size='sm'
+          className='shrink-0 ring-0 shadow-none'
         />
         <span className='sr-only'>Open user menu</span>
       </Button>

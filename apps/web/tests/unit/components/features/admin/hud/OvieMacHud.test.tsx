@@ -11,6 +11,12 @@ vi.mock('@/components/features/admin/hud/OvieLauncherRail', () => ({
   OvieLauncherRail: () => <div data-testid='ovie-launcher-rail' />,
 }));
 
+vi.mock('@/components/features/admin/design-lab', () => ({
+  DesignProposalReviewPanel: () => (
+    <div data-testid='ovie-taste-inbox'>Taste Inbox</div>
+  ),
+}));
+
 const BASE: OvieMacHudSnapshot = {
   alive: {
     status: 'dead',
@@ -54,6 +60,12 @@ describe('OvieMacHud', () => {
     );
     expect(screen.getAllByTestId(/ovie-mac-hud-/)).toHaveLength(3);
     expect(screen.getByTestId('ovie-launcher-rail')).toBeInTheDocument();
+    expect(screen.getByTestId('ovie-taste-inbox')).toHaveTextContent(
+      'Taste Inbox'
+    );
+    expect(
+      screen.getByRole('link', { name: 'Talk To Summer' })
+    ).toHaveAttribute('href', '/app/ov/chat');
   });
 
   it('keeps the three-card grid reserved when numbers are unavailable', () => {

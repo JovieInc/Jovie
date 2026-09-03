@@ -63,11 +63,11 @@ describe('LyricsList', () => {
       <LyricsList
         lines={SAMPLE_LINES}
         onEdit={() => undefined}
-        title='Track lyrics'
+        title='Track Lyrics'
         editLabel='Open editor'
       />
     );
-    expect(screen.getByText('Track lyrics')).toBeInTheDocument();
+    expect(screen.getByText('Track Lyrics')).toBeInTheDocument();
     expect(
       screen.getByRole('button', { name: 'Open editor' })
     ).toBeInTheDocument();

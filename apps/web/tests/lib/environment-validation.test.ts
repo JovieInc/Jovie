@@ -39,7 +39,7 @@ describe('Environment Validation', () => {
       );
     });
 
-    it('flags missing AI_GATEWAY_API_KEY as critical in preview', () => {
+    it('does not flag missing AI_GATEWAY_API_KEY as critical in preview (OIDC fallback)', () => {
       const originalVercelEnv = process.env.VERCEL_ENV;
       const originalGatewayKey = process.env.AI_GATEWAY_API_KEY;
       process.env.VERCEL_ENV = 'preview';
@@ -50,9 +50,9 @@ describe('Environment Validation', () => {
 
         expect(
           result.critical.some(message =>
-            message.includes('AI_GATEWAY_API_KEY is required')
+            message.includes('AI_GATEWAY_API_KEY')
           )
-        ).toBe(true);
+        ).toBe(false);
       } finally {
         if (originalVercelEnv) {
           process.env.VERCEL_ENV = originalVercelEnv;

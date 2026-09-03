@@ -2,7 +2,7 @@
  * Canonical feedback system for Jovie.
  *
  * - `toast` — ephemeral, bottom-right action feedback (3–5s auto-dismiss,
- *   manual close, max 3 stacked). Variants: success / error / info.
+ *   manual close, max 3 stacked). Variants: success / warning / error / info.
  * - `banner` / `Banner` — persistent top-of-page system status and
  *   announcements, dismissed by the user.
  *

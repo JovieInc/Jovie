@@ -2,7 +2,7 @@
   "schemaVersion": 1,
   "tool": "scripts/typecheck-scripts.mjs",
   "generatedAt": "2026-08-31T01:24:07.836Z",
-  "totalErrors": 167,
+  "totalErrors": 151,
   "files": {
     ".github/scripts/verify-main-release-readiness.mjs": {
       "TS2339": 3
@@ -93,9 +93,7 @@
     "scripts/lib/__tests__/main-release-readiness.test.mjs": {
       "TS2322": 5
     },
-    "scripts/lib/__tests__/merge-queue-backend.test.mjs": {
-      "TS2353": 4
-    },
+
     "scripts/lib/__tests__/merge-queue-guard.test.mjs": {
       "TS2322": 18
     },
@@ -138,10 +136,7 @@
     "scripts/linear-transition-issue.mjs": {
       "TS2339": 3
     },
-    "scripts/merge-queue-backend.mjs": {
-      "TS2339": 9,
-      "TS2353": 3
-    },
+
     "scripts/observability-issue-github.mjs": {
       "TS2345": 1
     },

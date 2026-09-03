@@ -16,13 +16,21 @@ export async function GET(): Promise<Response> {
     const entitlements = await getCurrentUserEntitlements();
     if (!entitlements.isAuthenticated) {
       return NextResponse.json(
-        { error: 'Unauthorized' },
+        {
+          error: 'Sign in to Ovie to load the Taste Inbox.',
+          code: 'ovie_taste_inbox_unauthorized',
+          action: 'sign_in',
+        },
         { status: 401, headers: NO_STORE_HEADERS }
       );
     }
     if (!entitlements.isAdmin) {
       return NextResponse.json(
-        { error: 'Forbidden' },
+        {
+          error: 'Reverify with an admin Ovie account to load the Taste Inbox.',
+          code: 'ovie_taste_inbox_forbidden',
+          action: 'reverify_admin',
+        },
         { status: 403, headers: NO_STORE_HEADERS }
       );
     }

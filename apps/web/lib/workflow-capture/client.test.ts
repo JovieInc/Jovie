@@ -3,7 +3,7 @@ import { uploadWorkflowCapture } from './client';
 
 const hoisted = vi.hoisted(() => ({ upload: vi.fn() }));
 
-vi.mock('@vercel/blob/client', () => ({ upload: hoisted.upload }));
+vi.mock('@vercel/blob/client', () => ({ uploadPresigned: hoisted.upload }));
 
 describe('uploadWorkflowCapture', () => {
   beforeEach(() => {

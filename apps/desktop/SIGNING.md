@@ -18,7 +18,7 @@ Without code signing:
 The desktop release pipeline is already built and runs automatically on push
 to `main`. It just needs these secrets to actually sign and notarize the
 output. When secrets are absent, the workflow still builds (unsigned DMG)
-but skips signing/notarization with a warning.
+but skips signing/notarization with a warning. Prod/staging register a LaunchAgent for closed-app updates.
 
 ## One-time setup (≈15 minutes)
 
@@ -116,6 +116,18 @@ codesign -dv --verbose=4 /Volumes/Jovie/Jovie.app
 spctl --assess -vv /Volumes/Jovie/Jovie.app
 # Expected: "accepted" + "source=Notarized Developer ID"
 ```
+
+To publish staging from exact current `main` after its `CI` run is green:
+
+```bash
+gh workflow run desktop-release.yml --ref main -f environment=staging
+```
+
+The workflow derives the next-patch
+`X.Y.(Z+1)-staging.<run-id>.<attempt>` version, updates only the
+`desktop-staging` rolling prerelease and `staging-mac.yml`, and binds its exact
+version, source revision, channel, and build time into the signed app's
+verifiable build identity. Production remains stable and unchanged.
 
 ## Recovering an existing installed (unsigned) app
 

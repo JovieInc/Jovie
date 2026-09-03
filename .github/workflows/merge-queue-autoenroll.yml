@@ -268,6 +268,8 @@ jobs:
           REPO: ${{ github.repository }}
           GH_RETRY_ATTEMPTS: 8
           GH_RETRY_MAX_DELAY: 60
+          GH_INVENTORY_RETRY_ATTEMPTS: 3
+          GH_INVENTORY_RETRY_MAX_DELAY: 15
           MERGE_QUEUE_BACKEND: ${{ vars.MERGE_QUEUE_BACKEND }}
           DRAIN_MUTATION_AUTHORIZATION: merge-queue-autoenroll
           MERGE_QUEUE_NATIVE_AUTHORIZATION: merge-queue-autoenroll
@@ -382,10 +384,10 @@ jobs:
             echo "delivery-control-failure dispatched for $failure #$pr_number at $head_sha (exit $drain_rc)"
             if [[ "$drain_rc" -eq 3 ]]; then
               echo "queue-noop is a controller disposition, not a product-quality failure"
-            else
-              echo "::warning::Merge-queue controller failed (exit $drain_rc); not failing the product PR check" >&2
+              exit 0
             fi
-            exit 0
+            echo "::error::dropped-controller-event fails closed (exit $drain_rc)" >&2
+            exit "$drain_rc"
           fi
 
           exit "$drain_rc"

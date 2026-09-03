@@ -3,6 +3,40 @@ import Testing
 @testable import Jovie
 
 struct AppShellIntentNavigationTests {
+  @Test func registeredFrequentActionsStayWithinTheTwoActivationBudget() {
+    #expect(FrequentActionInteractionBudget.maximumActivations == 2)
+    #expect(FrequentActionInteractionBudget.violations.isEmpty)
+    #expect(
+      FrequentActionInteractionBudget.inAppVoiceSubmit.deliberateActivationCount == 2
+    )
+    #expect(FrequentActionInteractionBudget.inAppVoiceSubmit.exception == nil)
+    #expect(
+      FrequentActionInteractionBudget.shortcutVoiceSubmit.deliberateActivationCount == 2
+    )
+    #expect(FrequentActionInteractionBudget.shortcutVoiceSubmit.exception == nil)
+  }
+
+  @Test func extraActivationFailsClosedWithoutANamedVisibleException() {
+    let unexplained = FrequentActionInteractionContract(
+      id: "test.unexplained",
+      deliberateActivationCount: 3,
+      completesOnFinalActivation: true,
+      exception: nil
+    )
+    let explainedRecovery = FrequentActionInteractionContract(
+      id: "test.recovery",
+      deliberateActivationCount: 3,
+      completesOnFinalActivation: true,
+      exception: FrequentActionException(
+        reason: .recovery,
+        explanation: "Review the recovered transcript before sending."
+      )
+    )
+
+    #expect(unexplained.satisfiesBudget == false)
+    #expect(explainedRecovery.satisfiesBudget)
+  }
+
   @Test func openChatSelectsChatTab() {
     var state = AppShellIntentNavigationState(
       selectedTab: .profile,

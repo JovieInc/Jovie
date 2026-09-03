@@ -41,8 +41,8 @@ describe('buildMobileInbox', () => {
           id: 'connect-spotify',
           title: 'Connect Spotify',
           body: 'Link your catalog so Jovie can spot releases.',
-          actionLabel: 'Connect catalog',
-          href: '/app/profiles',
+          actionLabel: 'Connect Spotify',
+          href: '/app/dashboard/releases?connect=spotify',
         },
       ],
     });
@@ -65,8 +65,8 @@ describe('buildMobileInbox', () => {
           id: 'connect-spotify',
           title: 'Connect Spotify',
           body: 'Link your catalog so Jovie can spot releases.',
-          actionLabel: 'Connect catalog',
-          continueOnWebPath: '/app/profiles',
+          actionLabel: 'Connect Spotify',
+          continueOnWebPath: '/app/dashboard/releases?connect=spotify',
         },
       ],
       chatPrompt:

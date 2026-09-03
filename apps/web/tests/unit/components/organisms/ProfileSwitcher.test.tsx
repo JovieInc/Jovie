@@ -25,7 +25,25 @@ vi.mock('@/app/app/(shell)/dashboard/DashboardDataContext', () => ({
 }));
 
 vi.mock('@/components/molecules/Avatar', () => ({
-  Avatar: ({ alt }: { alt: string }) => <span data-avatar-alt={alt} />,
+  Avatar: ({
+    alt,
+    className,
+    name,
+    size,
+  }: {
+    readonly alt: string;
+    readonly className?: string;
+    readonly name?: string;
+    readonly size?: string;
+  }) => (
+    <span
+      data-testid='profile-switcher-avatar'
+      data-avatar-alt={alt}
+      data-avatar-class={className ?? ''}
+      data-avatar-name={name ?? ''}
+      data-avatar-size={size ?? ''}
+    />
+  ),
 }));
 
 vi.mock('@/components/organisms/CreateProfileDialog', () => ({
@@ -108,6 +126,26 @@ describe('ProfileSwitcher sidebar workspace selection', () => {
       writable: true,
       configurable: true,
     });
+  });
+
+  it('uses canonical avatar sizes and fallback names for identity rows', () => {
+    render(<ProfileSwitcher />);
+
+    const avatars = screen.getAllByTestId('profile-switcher-avatar');
+    expect(avatars).toHaveLength(3);
+
+    expect(avatars[0]).toHaveAttribute('data-avatar-size', 'xs');
+    expect(avatars[0]).toHaveAttribute('data-avatar-name', 'Alpha Artist');
+    expect(avatars[1]).toHaveAttribute('data-avatar-size', 'sm');
+    expect(avatars[1]).toHaveAttribute('data-avatar-name', 'Alpha Artist');
+    expect(avatars[2]).toHaveAttribute('data-avatar-size', 'sm');
+    expect(avatars[2]).toHaveAttribute('data-avatar-name', 'Beta Artist');
+
+    for (const avatar of avatars) {
+      expect(avatar.getAttribute('data-avatar-class') ?? '').not.toMatch(
+        /\b(?:size|h|w)-/
+      );
+    }
   });
 
   it('refreshes App Router data instead of forcing a document reload', async () => {
