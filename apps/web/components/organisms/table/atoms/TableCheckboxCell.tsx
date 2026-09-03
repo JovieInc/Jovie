@@ -1,7 +1,7 @@
 'use client';
 
 import { Checkbox } from '@jovie/ui';
-import type { Row, Table } from '@tanstack/react-table';
+import type { Row, Table } from '@/lib/tanstack-v8-compat';
 import { cn } from '@/lib/utils';
 import { handleActivationKeyDown } from '@/lib/utils/keyboard';
 
