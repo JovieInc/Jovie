@@ -14,9 +14,9 @@
  */
 
 import { useDebouncer } from '@tanstack/react-pacer';
-import type { SortingState } from '@tanstack/react-table';
 import { useCallback, useMemo, useRef, useTransition } from 'react';
 import { type ReleaseSortField, useReleaseSortParams } from '@/lib/nuqs/hooks';
+import type { SortingState } from '@/lib/tanstack-v8-compat';
 
 /** Threshold above which sorting is debounced to prevent UI jank */
 const LARGE_DATASET_THRESHOLD = 50;
