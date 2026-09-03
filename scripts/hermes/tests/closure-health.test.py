@@ -430,6 +430,175 @@ class ClosureClassificationTests(unittest.TestCase):
             ],
         )
 
+    def test_declared_native_stack_is_not_a_duplicate_lane(self):
+        contract = (
+            "## Native stack contract (JOV-INV-020)\n"
+            "- Linear lane: JOV-5158\n"
+            "- Root: #16894 at 2a08234388c342c9c503bd622370f07bcf0b7201\n"
+        )
+        result = MODULE.classify_open_prs(
+            [
+                pr(
+                    30,
+                    title="feat: register thumbnail candidates",
+                    body=(
+                        contract
+                        + "- Immediate parent: #16894 at 2a08234388c342c9c503bd622370f07bcf0b7201"
+                    ),
+                    head_ref="codex/jov-5158-youtube-pilot-stack",
+                    merge_state="DIRTY",
+                    files=("scripts/shared.py", "scripts/a.py"),
+                ),
+                pr(
+                    31,
+                    title="feat: reconcile review decisions",
+                    body="Extends #30 with approve/reject.\n" + contract,
+                    head_ref="codex/jov-5158-youtube-decision-gate",
+                    queued=True,
+                    files=("scripts/shared.py", "scripts/b.py"),
+                ),
+                pr(
+                    32,
+                    title="feat: preview service (JOV-5862, 2/4)",
+                    body="Layer 2 of the JOV-5862 stack.",
+                    head_ref="eve/jov-5862-02-preview-service",
+                    files=("scripts/shared.py", "scripts/c.py"),
+                ),
+                pr(
+                    33,
+                    title="feat: preview route (JOV-5862, 3/4)",
+                    body="Layer 3 of the JOV-5862 stack.",
+                    head_ref="eve/jov-5862-03-preview-route",
+                    merge_state="DIRTY",
+                    files=("scripts/shared.py", "scripts/d.py"),
+                ),
+            ],
+            NOW,
+        )
+
+        self.assertEqual(result["duplicateIssueLanes"], [])
+        self.assertEqual(result["unclassified"], [])
+        health = MODULE.evaluate_closure_health(
+            snapshot(classifications=result),
+            previous=None,
+            now=NOW,
+        )
+        self.assertEqual(health["status"], "healthy")
+        self.assertNotIn("duplicate-issue-lanes-unresolved", health["reasons"])
+
+    def test_branch_chained_and_cumulative_nested_lanes_are_stack_evidence(self):
+        result = MODULE.classify_open_prs(
+            [
+                pr(
+                    34,
+                    title="feat: ship JOV-783",
+                    files=("scripts/a.py",),
+                    head_ref="stack/jov-783-root",
+                ),
+                pr(
+                    35,
+                    title="feat: ship JOV-783",
+                    files=("scripts/a.py", "scripts/b.py"),
+                    base_ref="stack/jov-783-root",
+                    head_ref="stack/jov-783-mid",
+                ),
+                pr(
+                    36,
+                    title="feat: ship JOV-783",
+                    merge_state="DIRTY",
+                    files=("scripts/a.py", "scripts/b.py", "scripts/c.py"),
+                ),
+            ],
+            NOW,
+        )
+
+        self.assertEqual(result["duplicateIssueLanes"], [])
+        health = MODULE.evaluate_closure_health(
+            snapshot(classifications=result),
+            previous=None,
+            now=NOW,
+        )
+        self.assertEqual(health["status"], "healthy")
+        self.assertNotIn("duplicate-issue-lanes-unresolved", health["reasons"])
+
+    def test_parallel_competing_lanes_with_identical_files_still_flag(self):
+        result = MODULE.classify_open_prs(
+            [
+                pr(
+                    37,
+                    title="feat: ship JOV-784",
+                    files=("scripts/shared.py", "scripts/a.py"),
+                ),
+                pr(
+                    38,
+                    title="feat: ship JOV-784",
+                    merge_state="DIRTY",
+                    files=("scripts/shared.py", "scripts/a.py"),
+                ),
+            ],
+            NOW,
+        )
+
+        self.assertEqual(
+            result["duplicateIssueLanes"],
+            [
+                {
+                    "issue": "JOV-784",
+                    "prs": [37, 38],
+                    "overlap": ["scripts/a.py", "scripts/shared.py"],
+                }
+            ],
+        )
+        health = MODULE.evaluate_closure_health(
+            snapshot(classifications=result),
+            previous=None,
+            now=NOW,
+        )
+        self.assertEqual(health["status"], "red")
+        self.assertIn("duplicate-issue-lanes-unresolved", health["reasons"])
+
+    def test_partial_stack_signals_fail_closed(self):
+        result = MODULE.classify_open_prs(
+            [
+                pr(
+                    39,
+                    title="feat: ship JOV-785",
+                    files=("scripts/shared.py", "scripts/a.py"),
+                ),
+                pr(
+                    40,
+                    title="feat: ship JOV-785",
+                    body="Extends #39.\n## Native stack contract (JOV-INV-020)",
+                    files=("scripts/shared.py", "scripts/b.py"),
+                ),
+                pr(
+                    41,
+                    title="feat: ship JOV-785",
+                    merge_state="DIRTY",
+                    files=("scripts/shared.py", "scripts/c.py"),
+                ),
+            ],
+            NOW,
+        )
+
+        self.assertEqual(
+            result["duplicateIssueLanes"],
+            [
+                {
+                    "issue": "JOV-785",
+                    "prs": [39, 40, 41],
+                    "overlap": ["scripts/shared.py"],
+                }
+            ],
+        )
+        health = MODULE.evaluate_closure_health(
+            snapshot(classifications=result),
+            previous=None,
+            now=NOW,
+        )
+        self.assertEqual(health["status"], "red")
+        self.assertIn("duplicate-issue-lanes-unresolved", health["reasons"])
+
     def test_renamed_file_evidence_fails_closed_as_unclassified(self):
         result = MODULE.classify_open_prs(
             [
