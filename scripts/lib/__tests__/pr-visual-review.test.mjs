@@ -7,10 +7,12 @@ import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
 import { evaluateVisualEvidence } from '../../../.github/scripts/pr-visual-evidence-gate.mjs';
 import {
+  blockingCaptureRuntimeFailures,
   buildReviewPrompt,
   classifyFinding,
   classifyReviewOutcome,
   inspectReviewBackendConfiguration,
+  isBlockingCaptureRuntimeFailure,
   normalizeBackendReview,
   readTrustedCapture,
   reviewWithConfiguredBackends,
@@ -368,8 +370,81 @@ describe('bounded PR visual review contract', () => {
     expect(capture).toContain("type: 'page-error'");
     expect(capture).toContain('response.status() >= 500');
     expect(capture).toContain('Captured route emitted runtime failures');
+    expect(capture).toContain('blockingCaptureRuntimeFailures');
     expect(capture).toContain('validateCaptureManifest');
     expect(capture).toContain('capture-validation.json');
+  });
+
+  it('keeps secretless authenticated API and same-document 5xxs from failing New Chat capture', () => {
+    const context = {
+      route: '/app/chat',
+      baseUrl: 'http://127.0.0.1:3100',
+    };
+    const noise = [
+      {
+        type: 'http-5xx',
+        status: 503,
+        url: 'http://127.0.0.1:3100/api/analytics/navigation',
+      },
+      {
+        type: 'console-error',
+        message:
+          'Failed to load resource: the server responded with a status of 503 (Service Unavailable)',
+      },
+      {
+        type: 'http-5xx',
+        status: 500,
+        url: 'http://127.0.0.1:3100/api/dashboard/contacts?profileId=00000000-0000-4000-8000-000000000102',
+      },
+      {
+        type: 'http-5xx',
+        status: 500,
+        url: 'http://127.0.0.1:3100/api/connectors/suggested-actions',
+      },
+      {
+        type: 'http-5xx',
+        status: 503,
+        url: 'http://127.0.0.1:3100/api/billing/status',
+      },
+      {
+        type: 'http-5xx',
+        status: 500,
+        url: 'http://127.0.0.1:3100/app/chat',
+      },
+    ];
+    expect(blockingCaptureRuntimeFailures(noise, context)).toEqual([]);
+    expect(
+      isBlockingCaptureRuntimeFailure(
+        { type: 'page-error', message: 'boom' },
+        context
+      )
+    ).toBe(true);
+    expect(
+      isBlockingCaptureRuntimeFailure(
+        {
+          type: 'http-5xx',
+          status: 500,
+          url: 'http://127.0.0.1:3100/signin',
+        },
+        context
+      )
+    ).toBe(true);
+    expect(
+      isBlockingCaptureRuntimeFailure(
+        {
+          type: 'http-5xx',
+          status: 500,
+          url: 'http://127.0.0.1:3100/api/billing/status',
+        },
+        { route: '/', baseUrl: context.baseUrl }
+      )
+    ).toBe(true);
+    expect(
+      isBlockingCaptureRuntimeFailure(
+        { type: 'console-error', message: 'Uncaught TypeError: exploded' },
+        context
+      )
+    ).toBe(true);
   });
 
   it('waits for the loaded authenticated New Chat shell instead of the streaming fallback', () => {

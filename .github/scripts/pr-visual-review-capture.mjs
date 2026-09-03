@@ -2,7 +2,10 @@
 import { mkdir, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import { chromium } from 'playwright';
-import { validateCaptureManifest } from './pr-visual-review.mjs';
+import {
+  blockingCaptureRuntimeFailures,
+  validateCaptureManifest,
+} from './pr-visual-review.mjs';
 
 const baseUrl = process.env.BASE_URL ?? 'http://127.0.0.1:3100';
 const routes = JSON.parse(process.env.PR_VISUAL_ROUTES ?? '[]');
@@ -180,9 +183,13 @@ try {
           /Welcome back|Continue with Google/.test(pageText)
         )
           throw new Error('Captured app route rendered sign-in shell');
-        if (runtimeFailures.length > 0) {
+        const blockingFailures = blockingCaptureRuntimeFailures(
+          runtimeFailures,
+          { route, baseUrl }
+        );
+        if (blockingFailures.length > 0) {
           throw new Error(
-            `Captured route emitted runtime failures: ${JSON.stringify(runtimeFailures)}`
+            `Captured route emitted runtime failures: ${JSON.stringify(blockingFailures)}`
           );
         }
         await page.screenshot({ path, fullPage: true });
@@ -193,6 +200,8 @@ try {
           status: 'captured',
         });
       } catch (error) {
+        const message = String(error.message ?? error);
+        console.error(`Capture failed ${route} ${viewportName}: ${message}`);
         try {
           await page.screenshot({ path, fullPage: true });
         } catch {
@@ -203,7 +212,7 @@ try {
           viewport: viewportName,
           path,
           status: 'failed',
-          error: String(error.message ?? error),
+          error: message,
         });
       } finally {
         await context.close();
@@ -226,5 +235,9 @@ if (!validation.ok) {
     join(outDir, 'capture-validation.json'),
     JSON.stringify(validation, null, 2)
   );
+  console.error('Visual capture validation failed:');
+  for (const failure of validation.failures) {
+    console.error(`- ${failure}`);
+  }
   process.exitCode = 1;
 }
