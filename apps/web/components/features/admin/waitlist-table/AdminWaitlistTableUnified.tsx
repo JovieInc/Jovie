@@ -11,7 +11,10 @@ import { AdminDataTable } from '@/features/admin/table/AdminDataTable';
 import { copyToClipboard } from '@/hooks/useClipboard';
 import type { WaitlistEntryRow } from '@/lib/admin/types';
 import { TABLE_MIN_WIDTHS, TABLE_ROW_HEIGHTS } from '@/lib/constants/layout';
-import type { ColumnDef } from '@/lib/tanstack-v8-compat';
+import type {
+  ColumnDef,
+  RowSelectionState,
+} from '@/lib/tanstack-v8-compat';
 import { createColumnHelper } from '@/lib/tanstack-v8-compat';
 import type { WaitlistTableProps } from './types';
 import { useApproveEntry } from './useApproveEntry';
@@ -79,8 +82,10 @@ export function AdminWaitlistTableUnified({
       : internalSelection;
 
   // Row selection state for TanStack Table
-  const rowSelection = useMemo(() => {
-    return Object.fromEntries(Array.from(selectedIds).map(id => [id, true]));
+  const rowSelection = useMemo<RowSelectionState>(() => {
+    return Object.fromEntries(
+      Array.from(selectedIds).map(id => [id, true as const])
+    );
   }, [selectedIds]);
 
   // Refs for selection state to avoid column recreation on every selection change
