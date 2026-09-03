@@ -108,5 +108,9 @@ describe('HomepageCertifiedSections', () => {
     expect(cta).toHaveAttribute('data-variant', 'primary');
     expect(screen.getAllByRole('button')).toHaveLength(1);
     expect(screen.queryAllByRole('link')).toHaveLength(0);
+
+    // Quiet wordmark signs the page off without becoming a second control.
+    const mark = screen.getByTestId('homepage-close-mark');
+    expect(mark.querySelector('svg')).toHaveAttribute('aria-hidden', 'true');
   });
 });
