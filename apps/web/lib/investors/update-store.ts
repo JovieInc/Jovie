@@ -420,7 +420,8 @@ export async function approveInvestorUpdateSnapshot(input: {
     const message = getDeepErrorMessage(error);
     if (
       message.includes('investor_update_revision_conflict') ||
-      message.includes('investor_update_decision_snapshot_stale')
+      message.includes('investor_update_decision_snapshot_stale') ||
+      message.includes('investor_update_decision_snapshot_invalid')
     ) {
       throw new InvestorUpdateWorkflowError(
         'approval_invalid',

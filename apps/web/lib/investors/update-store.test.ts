@@ -161,6 +161,33 @@ describe('investor update persistence boundaries', () => {
     ).rejects.toThrow('draft changed during approval');
   });
 
+  it('turns an invalid decision snapshot into a founder-visible re-review', async () => {
+    select
+      .mockReturnValueOnce(queryResult([draft]))
+      .mockReturnValueOnce(queryResult([candidate]))
+      .mockReturnValueOnce(queryResult([decision]));
+    const conflict = new Error('Failed query', {
+      cause: new Error('investor_update_decision_snapshot_invalid'),
+    });
+    insert.mockReturnValueOnce(insertResult([], conflict));
+
+    await expect(
+      approveInvestorUpdateSnapshot({
+        draftId: draft.id,
+        expectedRenderedCopy: renderedCopy,
+        segments,
+        recipientCount: 8,
+        trackingSettings: {
+          opens: false,
+          clicks: false,
+          privacyDisclosureVersion: null,
+          consentBasis: null,
+        },
+        userId: 'user_1',
+      })
+    ).rejects.toThrow('draft changed during approval');
+  });
+
   it('does not present an approval as current when the final revision read moved', async () => {
     select
       .mockReturnValueOnce(queryResult([draft]))
@@ -284,6 +311,7 @@ describe('investor update persistence boundaries', () => {
     expect(migration).toContain('FOR UPDATE');
     expect(migration).not.toContain('FOR SHARE');
     expect(migration).toContain('investor_update_revision_conflict');
+    expect(migration).toContain('investor_update_decision_snapshot_invalid');
     expect(migration).toContain('investor_update_decision_snapshot_stale');
     expect(migration).toContain('candidate_count <> latest_count');
     expect(migration).toContain('investor_update_candidates_immutable');

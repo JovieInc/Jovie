@@ -98,7 +98,7 @@ describe('authenticated app screen registry', () => {
     }
   });
 
-  it('assigns exactly 45 unique deterministic browser-safe story IDs', () => {
+  it('assigns exactly 46 unique deterministic browser-safe story IDs', () => {
     const references = APP_SCREEN_REGISTRY.filter(
       entry => entry.designReference
     );
@@ -175,7 +175,7 @@ describe('authenticated app screen registry', () => {
     expect(receipt.schema).toBe(APP_SCREEN_PEN_EXPORT_SCHEMA);
     expect(receipt.counts).toEqual({
       screens: APP_SCREEN_REGISTRY.length,
-      designReferences: 45,
+      designReferences: 46,
       components: APP_SCREEN_COMPONENT_REGISTRY.length,
       recipes: APP_SCREEN_RECIPE_REGISTRY.length,
       archetypes: 8,
