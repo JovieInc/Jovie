@@ -1,112 +1,377 @@
-name: iOS CI
+#!/usr/bin/env bash
+set -euo pipefail
 
-on:
-  # Full Xcode work is called by ci.yml only for an iOS-changing merge-group
-  # combined head or an unproven direct-main fallback. Source PRs receive the
-  # portable iOS contract inside ci-fast.
-  workflow_call:
-    inputs:
-      only_testing:
-        description: Optional xcodebuild -only-testing selector for focused CI reproduction.
-        required: false
-        type: string
-        default: ''
-      xcodebuild_timeout_seconds:
-        description: Internal xcodebuild timeout budget. Must be shorter than the action step timeout.
-        required: false
-        type: string
-        default: '1680'
-      concurrency-key:
-        description: Stable merge-queue PR identity; empty outside merge groups.
-        required: false
-        type: string
-  workflow_dispatch:
-    inputs:
-      only_testing:
-        description: Optional xcodebuild -only-testing selector for focused CI reproduction.
-        required: false
-        type: string
-        default: ''
-      xcodebuild_timeout_seconds:
-        description: Internal xcodebuild timeout budget. Must be shorter than the action step timeout.
-        required: false
-        type: string
-        default: '1680'
+ACTION="${1:-test}"
+if [[ $# -gt 0 ]]; then
+  shift
+fi
+if [[ "${1:-}" == "--" ]]; then
+  shift
+fi
+CODE_SIGNING_ALLOWED_VALUE="${CODE_SIGNING_ALLOWED:-NO}"
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+IOS_DIR="$(cd "$SCRIPT_DIR/.." && pwd)"
+PROJECT_PATH="$IOS_DIR/Jovie.xcodeproj"
+SCHEME="Jovie"
 
-permissions:
-  contents: read
+ios_now() {
+  date -u +%Y-%m-%dT%H:%M:%SZ
+}
 
-concurrency:
-  # A regenerated merge-group head supersedes the prior iOS flight for that PR.
-  # Manual/direct-main calls remain isolated by exact SHA and never cancel.
-  group: ios-ci-${{ github.workflow }}-${{ inputs.concurrency-key || github.ref }}
-  cancel-in-progress: ${{ inputs.concurrency-key != '' || github.ref != 'refs/heads/main' }}
+run_phase() {
+  local phase_name="$1"
+  shift
 
-jobs:
-  test:
-    name: Build And Test
-    runs-on: macos-26
-    # 30m build/test action budget + 15m screenshot capture budget + preflight
-    # headroom. The xcodebuild wrapper keeps its own 28m timeout so long-running
-    # build/test failures identify the active phase before the action cap.
-    timeout-minutes: 55
+  local started_at
+  local start_seconds
+  started_at="$(ios_now)"
+  start_seconds="$(date +%s)"
 
-    steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+  echo "::group::iOS phase: $phase_name"
+  echo "iOS phase started_at=$started_at name=\"$phase_name\""
 
-      - name: iOS best-practices lint
-        run: bash scripts/ios-best-practices-lint.sh apps/ios/Jovie
+  set +e
+  "$@"
+  local status=$?
+  set -e
 
-      - name: Test iOS release configuration scripts
-        run: |
-          node --test apps/ios/scripts/write-configuration.test.mjs \
-          apps/ios/scripts/run-xcodebuild.test.mjs \
-          apps/ios/scripts/validate-testflight-env.test.mjs \
-          apps/ios/scripts/validate-testflight-artifact.test.mjs
+  local end_seconds
+  end_seconds="$(date +%s)"
+  echo "iOS phase finished_at=$(ios_now) name=\"$phase_name\" status=$status duration_seconds=$((end_seconds - start_seconds))"
+  echo "::endgroup::"
 
-      - name: Ensure iOS local configuration exists
-        run: bash apps/ios/scripts/ensure-configuration.sh
+  return "$status"
+}
 
-      - name: Show Xcode version
-        run: xcodebuild -version
+run_with_timeout() {
+  local timeout_seconds="$1"
+  shift
 
-      - name: Validate app icon
-        run: bash apps/ios/scripts/validate-app-icon.sh
+  local start_time
+  start_time="$(date +%s)"
 
-      - name: Resolve Swift package dependencies
-        timeout-minutes: 5
-        run: bash apps/ios/scripts/run-xcodebuild.sh -resolvePackageDependencies -derivedDataPath .build/ios-ci
+  "$@" &
+  local command_pid=$!
 
-      - name: Build and test
-        # Recent macos-26 evidence: run 33424555816 needed about 18m15s
-        # before failing after the full 52-test UI suite, while run
-        # 33426523260 spent about 13m reaching UI tests and hit the old 20m
-        # step timeout mid-suite. Keep the gate fail-closed, but give Xcode
-        # the measured headroom and let the wrapper print the timed-out phase.
-        timeout-minutes: 30
-        env:
-          JOVIE_IOS_ONLY_TESTING: ${{ inputs.only_testing }}
-          JOVIE_IOS_XCODEBUILD_TIMEOUT_SECONDS: ${{ inputs.xcodebuild_timeout_seconds }}
-        run: |
-          args=(-derivedDataPath .build/ios-ci)
-          if [[ -n "$JOVIE_IOS_ONLY_TESTING" ]]; then
-            args+=("-only-testing:$JOVIE_IOS_ONLY_TESTING")
-          fi
-          bash apps/ios/scripts/run-xcodebuild.sh test "${args[@]}"
+  while kill -0 "$command_pid" 2>/dev/null; do
+    local now
+    now="$(date +%s)"
+    if ((now - start_time >= timeout_seconds)); then
+      kill "$command_pid" 2>/dev/null || true
+      sleep 1
+      kill -9 "$command_pid" 2>/dev/null || true
+      wait "$command_pid" 2>/dev/null || true
+      return 124
+    fi
 
-      - name: Capture simulator screenshots
-        timeout-minutes: 15
-        env:
-          IOS_SCREENSHOT_DERIVED_DATA: .build/ios-ci
-          IOS_SCREENSHOT_REUSE_BUILD: "1"
-          IOS_SCREENSHOT_CAPTURE_IPAD: "0"
-          IOS_SCREENSHOT_REQUIRE_IPAD: "0"
-        run: bash apps/ios/scripts/capture-screenshots.sh
+    sleep 1
+  done
 
-      - name: Upload simulator screenshots
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
-        with:
-          name: ios-screenshots
-          path: artifacts/ios-screenshots/*.png
-          if-no-files-found: error
-          retention-days: 5
+  wait "$command_pid"
+}
+
+run_phase_with_optional_timeout() {
+  local phase_name="$1"
+  local timeout_seconds="$2"
+  shift 2
+
+  if [[ -n "$timeout_seconds" ]]; then
+    if [[ ! "$timeout_seconds" =~ ^[0-9]+$ ]]; then
+      echo "Invalid timeout for $phase_name: $timeout_seconds" >&2
+      return 2
+    fi
+
+    run_phase "$phase_name" run_with_timeout "$timeout_seconds" "$@"
+    local status=$?
+    if [[ "$status" -eq 124 ]]; then
+      echo "iOS phase timed out after ${timeout_seconds}s: $phase_name" >&2
+    fi
+    return "$status"
+  fi
+
+  run_phase "$phase_name" "$@"
+}
+
+if [[ "$ACTION" == "-resolvePackageDependencies" ]]; then
+  echo "Resolving Swift package dependencies without a simulator destination..." >&2
+  run_phase "Resolve Swift package dependencies" \
+    xcodebuild "$ACTION" \
+      -project "$PROJECT_PATH" \
+      -scheme "$SCHEME" \
+      "$@" \
+      CODE_SIGNING_ALLOWED=NO
+  exit 0
+fi
+
+run_phase "Ensure iOS local configuration" "$SCRIPT_DIR/ensure-configuration.sh"
+
+pick_destination_from_simctl() {
+  local prefer_ios_prefix="${1:-}"
+  local prefer_name_pattern="${2:-}"
+  local devices_json
+  local simctl_stderr
+  simctl_stderr="$(mktemp)"
+
+  devices_json="$(xcrun simctl list devices available -j 2>"$simctl_stderr" || true)"
+  if [[ -z "$devices_json" ]]; then
+    if [[ -s "$simctl_stderr" ]]; then
+      cat "$simctl_stderr" >&2
+    fi
+    rm -f "$simctl_stderr"
+    return 0
+  fi
+
+  rm -f "$simctl_stderr"
+
+  printf '%s\n' "$devices_json" | PREFER_IOS_PREFIX="$prefer_ios_prefix" PREFER_NAME_PATTERN="$prefer_name_pattern" RUBYOPT= ruby -rjson -e '
+    prefer_ios_prefix = ENV.fetch("PREFER_IOS_PREFIX", "")
+    prefer_name_pattern = ENV.fetch("PREFER_NAME_PATTERN", "")
+    candidates = []
+
+    JSON.parse($stdin.read).fetch("devices", {}).each do |runtime, devices|
+      runtime_version = runtime.to_s[/iOS-([0-9-]+)/, 1]
+      next if runtime_version.nil?
+
+      os = runtime_version.tr("-", ".")
+
+      devices.each do |device|
+        next if device["isAvailable"] == false
+
+        name = device["name"].to_s
+        id = device["udid"].to_s
+        next if id.empty?
+        next unless prefer_ios_prefix.empty? || os.start_with?(prefer_ios_prefix)
+        next unless prefer_name_pattern.empty? || name.match?(Regexp.new(prefer_name_pattern))
+
+        candidates << {
+          "destination" => "platform=iOS Simulator,id=#{id}",
+          "name" => name,
+          "os_parts" => os.split(".").map(&:to_i),
+          # Prefer a conventional iPhone over a named form factor. The latter
+          # can be present during an Xcode migration but fail to create a
+          # usable test process (for example, a migrated iPhone Air).
+          "model_rank" => case name
+                          when /\AiPhone \d+\z/ then 3
+                          when /\AiPhone \d+ Pro(?: Max)?\z/ then 2
+                          when /\AiPhone \d+[ec]\z/ then 1
+                          else 0
+                          end,
+          "state_rank" => device["state"] == "Booted" ? 1 : 0
+        }
+      end
+    end
+
+    if candidates.any?
+      selected = candidates.max_by do |candidate|
+          [
+            candidate.fetch("os_parts"),
+            candidate.fetch("model_rank"),
+            candidate.fetch("state_rank"),
+            candidate.fetch("name")
+          ]
+      end
+
+      puts selected.fetch("destination")
+    end
+  ' || true
+}
+
+DESTINATIONS=""
+
+load_xcodebuild_destinations() {
+  local destinations_file
+  local destinations_stderr
+  destinations_file="$(mktemp)"
+  destinations_stderr="$(mktemp)"
+
+  if run_with_timeout "${JOVIE_IOS_DESTINATIONS_TIMEOUT:-30}" \
+    xcodebuild -showdestinations \
+      -project "$PROJECT_PATH" \
+      -scheme "$SCHEME" \
+      >"$destinations_file" 2>"$destinations_stderr"; then
+    DESTINATIONS="$(cat "$destinations_file")"
+  else
+    echo "Failed or timed out resolving xcodebuild destinations." >&2
+    if [[ -s "$destinations_stderr" ]]; then
+      cat "$destinations_stderr" >&2
+    fi
+    DESTINATIONS=""
+  fi
+
+  rm -f "$destinations_file" "$destinations_stderr"
+}
+
+pick_destination() {
+  local prefer_ios_prefix="${1:-}"
+  local prefer_name_pattern="${2:-}"
+
+  printf '%s\n' "$DESTINATIONS" | RUBYOPT= ruby -ne '
+    BEGIN { candidates = [] }
+
+    next unless $_ =~ /platform:iOS Simulator.*OS:([0-9.]+), name:([^}]+)/
+    os = Regexp.last_match(1)
+    name = Regexp.last_match(2).strip
+    id = $_[/id:([^,}]+)/, 1]&.strip
+    next if id.nil? || id.empty?
+
+    prefer_ios_prefix = ENV.fetch("PREFER_IOS_PREFIX", "")
+    prefer_name_pattern = ENV.fetch("PREFER_NAME_PATTERN", "")
+
+    next unless prefer_ios_prefix.empty? || os.start_with?(prefer_ios_prefix)
+    next unless prefer_name_pattern.empty? || name.match?(Regexp.new(prefer_name_pattern))
+
+    candidates << {
+      "destination" => "platform=iOS Simulator,id=#{id}",
+      "name" => name,
+      "os_parts" => os.split(".").map(&:to_i),
+      "model_rank" => case name
+                      when /\AiPhone \d+\z/ then 3
+                      when /\AiPhone \d+ Pro(?: Max)?\z/ then 2
+                      when /\AiPhone \d+[ec]\z/ then 1
+                      else 0
+                      end
+    }
+    END {
+      if candidates.any?
+        selected = candidates.max_by do |candidate|
+          [
+            candidate.fetch("os_parts"),
+            candidate.fetch("model_rank"),
+            candidate.fetch("name")
+          ]
+        end
+
+        puts selected.fetch("destination")
+      end
+    }
+  '
+}
+
+PREFERRED_IOS_PREFIX="${JOVIE_IOS_PREFER_OS_PREFIX:-26.}"
+
+echo "Resolving iOS Simulator destination..." >&2
+
+DESTINATION="$(
+  pick_destination_from_simctl "$PREFERRED_IOS_PREFIX" "^iPhone"
+)"
+
+if [[ -z "$DESTINATION" && "$PREFERRED_IOS_PREFIX" != "18." ]]; then
+  DESTINATION="$(
+    pick_destination_from_simctl "18." "^iPhone"
+  )"
+fi
+
+if [[ -z "$DESTINATION" ]]; then
+  DESTINATION="$(
+    pick_destination_from_simctl "" "^iPhone"
+  )"
+fi
+
+if [[ -z "$DESTINATION" ]]; then
+  DESTINATION="$(
+    pick_destination_from_simctl "18." ""
+  )"
+fi
+
+if [[ -z "$DESTINATION" ]]; then
+  DESTINATION="$(
+    pick_destination_from_simctl
+  )"
+fi
+
+if [[ -z "$DESTINATION" ]]; then
+  load_xcodebuild_destinations
+
+  DESTINATION="$(
+    PREFER_IOS_PREFIX="$PREFERRED_IOS_PREFIX" PREFER_NAME_PATTERN="^iPhone" pick_destination
+  )"
+fi
+
+if [[ -z "$DESTINATION" && "$PREFERRED_IOS_PREFIX" != "18." ]]; then
+  DESTINATION="$(
+    PREFER_IOS_PREFIX="18." PREFER_NAME_PATTERN="^iPhone" pick_destination
+  )"
+fi
+
+if [[ -z "$DESTINATION" ]]; then
+  DESTINATION="$(
+    PREFER_NAME_PATTERN="^iPhone" pick_destination
+  )"
+fi
+
+if [[ -z "$DESTINATION" ]]; then
+  DESTINATION="$(
+    PREFER_IOS_PREFIX="18." pick_destination
+  )"
+fi
+
+if [[ -z "$DESTINATION" ]]; then
+  DESTINATION="$(
+    pick_destination
+  )"
+fi
+
+if [[ -z "$DESTINATION" ]]; then
+  echo "Unable to find an iOS Simulator destination."
+  echo "$DESTINATIONS"
+  exit 1
+fi
+
+if [[ "$ACTION" == "destination" ]]; then
+  echo "$DESTINATION"
+  exit 0
+fi
+
+echo "Using destination: $DESTINATION"
+echo "Using CODE_SIGNING_ALLOWED=$CODE_SIGNING_ALLOWED_VALUE"
+
+FORWARDED_TEST_RUNNER_ENV=0
+
+forward_test_runner_env() {
+  local source_key="$1"
+  local value="${!source_key:-}"
+
+  if [[ -n "$value" ]]; then
+    export "TEST_RUNNER_${source_key}=$value"
+    FORWARDED_TEST_RUNNER_ENV=1
+  fi
+}
+
+for source_key in \
+  API_BASE_URL \
+  JOVIE_IOS_API_BASE_URL \
+  JOVIE_IOS_LAUNCH_PERFORMANCE \
+  JOVIE_IOS_LAUNCH_TIMEOUT_SECONDS \
+  JOVIE_IOS_LIVE_AUTH \
+  JOVIE_IOS_LIVE_AUTH_UI \
+  JOVIE_IOS_RUNTIME_PERFORMANCE \
+  JOVIE_IOS_RUNTIME_TIMEOUT_SECONDS
+do
+  forward_test_runner_env "$source_key"
+done
+
+if [[ "$FORWARDED_TEST_RUNNER_ENV" -eq 1 ]]; then
+  echo "Forwarding XCTest environment via TEST_RUNNER_*"
+fi
+
+DESTINATION_ID="${DESTINATION#*id=}"
+DESTINATION_ID="${DESTINATION_ID%%,*}"
+
+if [[ "$ACTION" == "test" && "${JOVIE_IOS_RESET_SIMULATOR:-1}" != "0" ]]; then
+  run_phase "Reset iOS Simulator" bash -c '
+    set -euo pipefail
+    destination_id="$1"
+    xcrun simctl shutdown "$destination_id" >/dev/null 2>&1 || true
+    xcrun simctl boot "$destination_id" >/dev/null 2>&1 || true
+    xcrun simctl bootstatus "$destination_id" -b
+    xcrun simctl terminate "$destination_id" ie.jov.Jovie >/dev/null 2>&1 || true
+  ' bash "$DESTINATION_ID"
+fi
+
+run_phase_with_optional_timeout "xcodebuild $ACTION" "${JOVIE_IOS_XCODEBUILD_TIMEOUT_SECONDS:-}" \
+  xcodebuild "$ACTION" \
+  -project "$PROJECT_PATH" \
+  -scheme "$SCHEME" \
+  -destination "$DESTINATION" \
+  "$@" \
+  CODE_SIGNING_ALLOWED="$CODE_SIGNING_ALLOWED_VALUE"
