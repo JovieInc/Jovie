@@ -120,6 +120,8 @@ decisionWriteback: model-experiment promotion receipt plus `optimization_experim
 rollback: revert to the control variant; do not auto-promote identity, legal, privacy, external publication, or material spend
 promotion: bounded-reversible
 
+Onboarding exposure (JOV-5694): `surface_library_opportunities` is a first-session readout of the same Library primitives (`repair_queue[]`, `collisions[]`, placement opportunities, observed rightsholders, attested downloads, disconnected stats). It reuses this contract instead of a parallel experiment. Exposure is the welcome-chat artifact behind `ONBOARDING_WOW_TASK_QUEUE`. Outcome, attribution, and decision writeback remain on the selected Library content card. The step never sends, never invents streams/revenue/license stats, and always renders Stats as `Not connected` until a wired dashboard supplies them. Rollback: disable `ONBOARDING_WOW_TASK_QUEUE`.
+
 Watch time per impression remains the default YouTube quality signal. CTR
 alone cannot automatically declare a winner. Artist hard constraints,
 disclosure, attested downloads, observed-only society data, and empty
