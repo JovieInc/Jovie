@@ -216,38 +216,26 @@ export async function loadYouTubeOptimizationSnapshot(input: {
       new Date(right.capturedAt).getTime() - new Date(left.capturedAt).getTime()
   );
   return {
-    thumbnails: thumbnails.map(
-      ({ id, kind, imageUrl, approvalStatus, experimentId, detectedAt }) => ({
-        id,
-        kind,
-        imageUrl,
-        approvalStatus,
-        experimentId,
-        detectedAt,
-      })
-    ),
-    metrics: latestFirst.map(
-      ({
-        window,
-        views,
-        watchTimeMinutes,
-        avgViewDurationSeconds,
-        capturedAt,
-      }) => ({
-        window,
-        views,
-        watchTimeMinutes,
-        avgViewDurationSeconds,
-        capturedAt,
-      })
-    ),
-    experiments: experiments.map(
-      ({ id, objective, status, winnerVariantKey }) => ({
-        id,
-        objective,
-        status,
-        winnerVariantKey,
-      })
-    ),
+    thumbnails: thumbnails.map(row => ({
+      id: row.id,
+      kind: row.kind,
+      imageUrl: row.imageUrl,
+      approvalStatus: row.approvalStatus,
+      experimentId: row.experimentId,
+      detectedAt: row.detectedAt,
+    })),
+    metrics: latestFirst.map(row => ({
+      window: row.window,
+      views: row.views,
+      watchTimeMinutes: row.watchTimeMinutes,
+      avgViewDurationSeconds: row.avgViewDurationSeconds,
+      capturedAt: row.capturedAt,
+    })),
+    experiments: experiments.map(row => ({
+      id: row.id,
+      objective: row.objective,
+      status: row.status,
+      winnerVariantKey: row.winnerVariantKey,
+    })),
   };
 }

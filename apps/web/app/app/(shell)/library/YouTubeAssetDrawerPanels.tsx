@@ -46,7 +46,10 @@ export function YouTubeMerchRelationshipEditor({
   const [localRelationships, setLocalRelationships] = useState(relationships);
   const [selectedMerchId, setSelectedMerchId] = useState('');
   const [isSaving, setIsSaving] = useState(false);
-  useEffect(() => setLocalRelationships(relationships), [relationships]);
+  useEffect(() => {
+    setLocalRelationships(relationships);
+    setSelectedMerchId('');
+  }, [relationships, videoId]);
   const tagged = localRelationships.filter(
     relationship =>
       relationship.status === 'active' && isMerchTag(relationship, videoId)
