@@ -1,8 +1,10 @@
 import { describe, expect, it } from 'vitest';
+import { MARKETING_EXACT_PUBLIC_ROUTE_TARGETS } from '@/data/marketing';
 import {
   assertVisualQaCoverageManifest,
   getVisualQaCoverageEntry,
   getVisualQaCoverageForCaptureSurface,
+  MARKETING_EXACT_ROUTE_VISUAL_QA_ENTRIES,
   VISUAL_QA_COVERAGE_MANIFEST,
   validateVisualQaCoverageManifest,
 } from '@/lib/agent-os/visual-qa/coverage';
@@ -56,5 +58,42 @@ describe('visual QA coverage manifest', () => {
       y: 0,
       width: 1,
     });
+  });
+
+  it('enrolls every exact marketing route at desktop and mobile with capture-time proof metadata', () => {
+    expect(MARKETING_EXACT_ROUTE_VISUAL_QA_ENTRIES).toHaveLength(
+      MARKETING_EXACT_PUBLIC_ROUTE_TARGETS.length * 2
+    );
+
+    for (const target of MARKETING_EXACT_PUBLIC_ROUTE_TARGETS) {
+      const entries = MARKETING_EXACT_ROUTE_VISUAL_QA_ENTRIES.filter(
+        entry =>
+          entry.source.kind === 'playwright-route' &&
+          entry.source.sourcePath === target.sourcePath
+      );
+      expect(entries.map(entry => entry.fixtureId)).toEqual([
+        'web-chromium-1440x900',
+        'web-chromium-390x844',
+      ]);
+      for (const entry of entries) {
+        expect(entry.source).toMatchObject({
+          route: target.fixturePath,
+          fixturePath: target.fixturePath,
+          expectedPath: target.expectedPath,
+          waitFor: target.expectedRuntimeSelector,
+          expectedRuntimeSelector: target.expectedRuntimeSelector,
+          sourceSha: 'capture-time-git-sha',
+          stateMatrix: target.stateMatrix,
+        });
+        expect(entry.qualityChecks).toEqual([
+          'accessibility',
+          'console-errors',
+          'focus-visible',
+          'horizontal-overflow',
+          'layout-stability',
+          'reduced-motion',
+        ]);
+      }
+    }
   });
 });
