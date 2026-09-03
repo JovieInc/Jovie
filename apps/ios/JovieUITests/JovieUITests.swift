@@ -93,6 +93,7 @@ final class JovieUITests: XCTestCase {
     XCTAssertTrue(app.buttons["dashboard-copy-url-button"].isEnabled)
     XCTAssertTrue(app.buttons["dashboard-share-profile-button"].isEnabled)
     XCTAssertTrue(app.buttons["Open Public Profile"].exists)
+    XCTAssertTrue(app.buttons["Open Public Profile"].isEnabled)
     attachScreenshot(named: "profile", app: app)
   }
 
@@ -107,6 +108,8 @@ final class JovieUITests: XCTestCase {
       app.buttons["Close Public Profile"].waitForExistence(timeout: 3),
       "Embedded public-profile browser did not open.\n\(app.debugDescription)"
     )
+    XCTAssertTrue(app.buttons["Back"].exists)
+    XCTAssertTrue(app.buttons["Forward"].exists)
     XCTAssertTrue(app.buttons["Reload"].exists)
     XCTAssertTrue(
       app.staticTexts["Public Profile"].waitForExistence(timeout: 3),
@@ -156,6 +159,8 @@ final class JovieUITests: XCTestCase {
     XCTAssertTrue(shareButton.exists)
     XCTAssertFalse(shareButton.isEnabled)
     XCTAssertTrue(app.staticTexts["Profile link unavailable"].exists)
+    XCTAssertTrue(app.buttons["Open Public Profile"].exists)
+    XCTAssertFalse(app.buttons["Open Public Profile"].isEnabled)
     XCTAssertTrue(
       app.buttons["QR unavailable"].exists,
       "Dashboard did not show the no-payload QR fallback.\n\(app.debugDescription)"

@@ -112,7 +112,7 @@ export function ProgressBar({
           className={cn(
             'h-full rounded-full bg-accent transition-[width] duration-subtle ease-out motion-reduce:transition-none',
             !hasDeterminateValue &&
-              'w-1/3 animate-[progress-indeterminate_1.5s_ease-in-out_infinite] motion-reduce:animate-none',
+              'w-1/3 animate-progress-indeterminate motion-reduce:animate-none',
             fillClassName
           )}
           style={hasDeterminateValue ? { width: `${percent}%` } : undefined}

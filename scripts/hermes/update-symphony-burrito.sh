@@ -7,9 +7,9 @@ set -euo pipefail
 
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 TARGET_HOME="${SYMPHONY_ELIXIR_HOME:-${SYMPHONY_BURRITO_HOME:-$HOME}}"
-SYMPHONY_VERSION="${SYMPHONY_VERSION:-v0.0.2}"
+SYMPHONY_VERSION="${SYMPHONY_VERSION:-v0.0.2-jovie.2}"
 ASSET_NAME_NEEDLE="${SYMPHONY_ASSET_NEEDLE:-linux_x86_64}"
-RELEASE_URL="${SYMPHONY_RELEASE_URL:-https://github.com/openai/symphony/releases/download/${SYMPHONY_VERSION}}"
+RELEASE_URL="${SYMPHONY_RELEASE_URL:-https://github.com/JovieInc/symphony/releases/download/${SYMPHONY_VERSION}}"
 BIN_NAME="symphony-${SYMPHONY_VERSION}-${ASSET_NAME_NEEDLE}"
 SUM_NAME="${BIN_NAME}.sha256"
 BIN_DST="${TARGET_HOME}/.local/bin/symphony"

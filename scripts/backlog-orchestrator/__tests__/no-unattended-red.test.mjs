@@ -60,7 +60,10 @@ const ROUTE = Object.freeze({
     toTier: 'standard',
   },
 });
+const REPO = 'JovieInc/Jovie';
+const LYB_REPO = 'JovieInc/LogYourBody';
 const signal = (stallClass, extra = {}) => ({
+  repository: REPO,
   stallClass,
   issue: `JOV-${stallClass}`,
   pr: 5390,
@@ -635,7 +638,10 @@ describe('no unattended red loop', () => {
     });
     assert.equal(requalified.stallClass, 'not-proven');
     assert.equal(requalified.reason, 'exact-head-changed-requalify');
-    const receipt = classifyAndOpenFromDelivery({ delivery_key: 'unknown-1', issue: 'JOV-20' }, { now: NOW });
+    const receipt = classifyAndOpenFromDelivery(
+      { repository: REPO, delivery_key: 'unknown-1', issue: 'JOV-20' },
+      { now: NOW }
+    );
     assert.equal(receipt.mode, 'collect-evidence');
     assert.equal(receipt.externalMutations, 0);
   });
@@ -721,6 +727,7 @@ describe('no unattended red loop', () => {
 
   it('deliberate red: anonymous stall identity ignores observation time', async () => {
     const anonymous = (stallClass, extra = {}) => ({
+      repository: extra.repository ?? REPO,
       stallClass,
       workflowName: extra.workflowName ?? 'CI',
       headSha: extra.headSha ?? HEAD,
@@ -780,7 +787,28 @@ describe('no unattended red loop', () => {
     }
   });
 
-  it('deliberate red: legacy anonymous duplicate projection emits one active queue item', () => {
+  it('deliberate red: identical PR numbers in different repositories use different loop keys', () => {
+    const jovie = classifyStall(
+      signal('queue-eviction', {
+        issue: null,
+        pr: 42,
+        repository: REPO,
+      }),
+      { now: NOW }
+    );
+    const logYourBody = classifyStall(
+      signal('queue-eviction', {
+        issue: null,
+        pr: 42,
+        repository: LYB_REPO,
+      }),
+      { now: NOW }
+    );
+    assert.notEqual(jovie.issueKey, logYourBody.issueKey);
+    assert.notEqual(loopKeyFor(jovie), loopKeyFor(logYourBody));
+  });
+
+  it('deliberate red: legacy anonymous duplicate projection without repository is omitted', () => {
     const later = '2026-08-29T01:00:00.000Z';
     const legacy = (observedAt, extra = {}) => ({
       schema: NO_UNATTENDED_RED_SCHEMA,
@@ -835,12 +863,11 @@ describe('no unattended red loop', () => {
       { now: NOW }
     );
     const dropped = queue.items.filter(item => item.stallClass === 'dropped-controller-event');
-    assert.equal(dropped.filter(item => item.headSha === HEAD && !item.issue).length, 1);
-    assert.equal(dropped.find(item => item.headSha === HEAD && !item.issue).outcome, 'escalated');
-    assert.equal(dropped.find(item => item.headSha === HEAD && !item.issue).observedAt, NOW);
-    assert.equal(dropped.filter(item => item.headSha === 'b'.repeat(40)).length, 1);
-    assert.equal(queue.items.filter(item => item.stallClass === 'missing-failing-checks').length, 1);
+    assert.equal(dropped.filter(item => item.headSha === HEAD && !item.issue).length, 0);
+    assert.equal(dropped.filter(item => item.headSha === 'b'.repeat(40)).length, 0);
+    assert.equal(queue.items.filter(item => item.stallClass === 'missing-failing-checks').length, 0);
     assert.equal(queue.items.filter(item => item.issue === 'JOV-5400').length, 1);
+    assert.equal(queue.items.every(item => item.repository), true);
     assert.equal(projectSummerQueue([], { now: NOW }).items.length, 0);
   });
 

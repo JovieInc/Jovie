@@ -73,9 +73,9 @@ const iconButtonVariants = cva(
         // Frosted - glassmorphic with backdrop blur
         frosted: cn(
           CIRCLE_CHROME_CLASSNAME,
-          'border border-subtle bg-[color-mix(in_srgb,var(--linear-bg-surface-1)_84%,transparent)] text-primary-token backdrop-blur-sm',
+          'border border-subtle bg-icon-button-frosted text-primary-token backdrop-blur-sm',
           'shadow-sm',
-          'hover:bg-[color-mix(in_srgb,var(--linear-bg-surface-2)_88%,transparent)]'
+          'hover:bg-icon-button-frosted-hover'
         ),
         // Ghost - transparent with hover background
         ghost: cn(
@@ -112,8 +112,8 @@ const iconButtonVariants = cva(
           CIRCLE_CHROME_CLASSNAME,
           'border border-transparent bg-transparent text-primary-token/78 backdrop-blur-xl',
           'shadow-none',
-          'hover:border-(--profile-pearl-border) hover:bg-[color:color-mix(in_srgb,var(--profile-pearl-bg)_88%,transparent)] hover:text-primary-token hover:shadow-[0_10px_24px_rgba(10,12,18,0.1)]',
-          'focus-visible:border-(--profile-pearl-border) focus-visible:bg-[color:color-mix(in_srgb,var(--profile-pearl-bg)_92%,transparent)] focus-visible:text-primary-token focus-visible:shadow-[0_10px_24px_rgba(10,12,18,0.12)]',
+          'hover:border-(--profile-pearl-border) hover:bg-icon-button-pearl-quiet-hover hover:text-primary-token hover:shadow-sm',
+          'focus-visible:border-(--profile-pearl-border) focus-visible:bg-icon-button-pearl-quiet-focus focus-visible:text-primary-token focus-visible:shadow-sm',
           'active:bg-(--profile-pearl-bg-active) active:text-primary-token'
         ),
         // Control - app shell toolbar chrome (28px control height)

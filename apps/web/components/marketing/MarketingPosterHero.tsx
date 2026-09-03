@@ -59,7 +59,10 @@ export function MarketingPosterHero({
       testId='homepage-hero-shell'
     >
       <div className='homepage-poster-hero__copy'>
-        <h1 id={headingId} className='homepage-poster-hero__headline'>
+        <h1
+          id={headingId}
+          className='homepage-poster-hero__headline marketing-h1-max-two-lines'
+        >
           {headline}
         </h1>
         <p className='homepage-poster-hero__subtitle'>{subtitle}</p>

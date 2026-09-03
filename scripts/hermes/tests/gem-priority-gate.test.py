@@ -346,13 +346,15 @@ def lane_capacity(
     ready: int = 0,
     budget: int = 15,
     observed_at: MODULE.datetime | None = None,
+    repository: str = "JovieInc/Jovie",
 ) -> dict[str, object]:
     return {
-        "schema": "jovie-lane-capacity/v1",
+        "schema": "jovie-lane-capacity/v2",
         "observedAt": MODULE.isoformat(observed_at or MODULE.utc_now()),
-        "global": {"ready": ready, "budget": budget},
+        "repositories": {repository: {"ready": ready, "budget": budget}},
         "defaultLaneBudget": 4,
         "lanes": {},
+        "sharedResources": {},
     }
 
 GREEN_SIGNALS: dict[str, object] = {
@@ -361,6 +363,7 @@ GREEN_SIGNALS: dict[str, object] = {
     "controller": {"status": "green"},
     "integrity": {"status": "clear"},
     "queue": {
+        "repository": "JovieInc/Jovie",
         "status": "known",
         "eligiblePrs": 0,
         "greenReadyPrs": 0,
@@ -369,6 +372,7 @@ GREEN_SIGNALS: dict[str, object] = {
     },
     "closureHealth": {
         "schema": "jovie-closure-health/v1",
+        "repository": "JovieInc/Jovie",
         "status": "healthy",
         "authority": "Summer",
         "newIssueIntakeAllowed": True,
@@ -815,7 +819,15 @@ class DeploymentBindingTests(unittest.TestCase):
             15,
             4,
         )
-        self.assertEqual(receipt["global"], {"ready": 1, "budget": 15})
+        self.assertNotIn("global", receipt)
+        self.assertEqual(
+            receipt["repositories"]["JovieInc/Jovie"], {"ready": 1, "budget": 15}
+        )
+        self.assertEqual(receipt["sharedResources"], {})
+        self.assertEqual(
+            receipt["lanes"]["lane:JovieInc/Jovie:symphony-control-plane"],
+            {"ready": 1, "budget": 4},
+        )
         self.assertEqual(
             receipt["lanes"]["risk:JovieInc/Jovie:control-plane"],
             {"ready": 1, "budget": 4},
@@ -824,6 +836,39 @@ class DeploymentBindingTests(unittest.TestCase):
             receipt["lanes"]["artifact:JovieInc/Jovie:apps/web"],
             {"ready": 1, "budget": 4},
         )
+        self.assertEqual(
+            receipt["lanes"]["lane:JovieInc/Jovie:web"],
+            {"ready": 1, "budget": 4},
+        )
+
+    def test_lane_receipt_populates_exact_resource_capacity(self):
+        now = MODULE.datetime(2026, 8, 28, 18, 0, tzinfo=MODULE.UTC)
+        receipt = MODULE.build_lane_capacity_receipt(
+            "JovieInc/Jovie",
+            [
+                {
+                    "files": [
+                        {"path": ".github/workflows/ios-testflight.yml"},
+                    ]
+                }
+            ],
+            now,
+            15,
+            1,
+        )
+
+        self.assertEqual(
+            receipt["sharedResources"]["github-actions:ios-testflight"],
+            {
+                "resource": "github-actions:ios-testflight",
+                "ready": 1,
+                "budget": 1,
+                "consumers": [
+                    "resource:JovieInc/Jovie:github-actions:ios-testflight"
+                ],
+            },
+        )
+        self.assertTrue(MODULE.valid_lane_capacity_receipt(receipt, now))
 
     def test_lane_receipt_rejects_stale_and_future_evidence(self):
         now = MODULE.datetime(2026, 8, 28, 18, 0, tzinfo=MODULE.UTC)
@@ -938,6 +983,25 @@ class DeploymentBindingTests(unittest.TestCase):
                 self.assertFalse(receipt["remediationAdmission"]["pushAllowed"])
                 self.assertEqual(receipt["remediationAdmission"]["maxConcurrent"], 1)
                 self.assertEqual(receipt["concurrency"]["gem"]["runtimeFloor"], 1)
+
+    def test_schema_valid_closure_health_without_stack_fields_stays_persistable(self):
+        receipt = self.evaluate(GREEN_SIGNALS)
+        closure = receipt["signals"]["closureHealth"]
+
+        self.assertEqual(closure["status"], "healthy")
+        self.assertEqual(closure["stackHealth"], MODULE.empty_stack_health())
+        self.assertEqual(closure["repairActions"], [])
+
+        malformed = dict(GREEN_SIGNALS)
+        malformed["closureHealth"] = {
+            **GREEN_SIGNALS["closureHealth"],
+            "stackHealth": {"maxDepth": 4},
+            "repairActions": {"rootPr": 1},
+        }
+        coerced = self.evaluate(malformed)["signals"]["closureHealth"]
+        self.assertEqual(coerced["status"], "healthy")
+        self.assertEqual(coerced["stackHealth"], MODULE.empty_stack_health())
+        self.assertEqual(coerced["repairActions"], [])
 
     def test_missing_closure_health_fails_new_intake_closed_without_stopping_promotion(self):
         signals = dict(GREEN_SIGNALS)
@@ -1102,7 +1166,9 @@ class DeploymentBindingTests(unittest.TestCase):
         self.assertEqual(live["status"], "known")
         self.assertEqual(live["source"], "live")
         self.assertEqual(written["schema"], "jovie-queue-snapshot/v2")
-        self.assertEqual(written["laneCapacity"]["schema"], "jovie-lane-capacity/v1")
+        self.assertEqual(written["repository"], "JovieInc/Jovie")
+        self.assertEqual(written["laneCapacity"]["schema"], "jovie-lane-capacity/v2")
+        self.assertEqual(written["laneCapacity"]["repositories"]["JovieInc/Jovie"]["ready"], 1)
         self.assertEqual(written["greenReadyPrs"], 1)
         self.assertEqual(cached["status"], "known")
         self.assertEqual(cached["source"], "last-known")
@@ -1267,6 +1333,7 @@ class DeploymentBindingTests(unittest.TestCase):
         signals = dict(GREEN_SIGNALS)
         signals["production"] = {"status": "green", "deployedSha": "b" * 7}
         signals["queue"] = {
+            "repository": "JovieInc/Jovie",
             "status": "known",
             "eligiblePrs": 400,
             "greenReadyPrs": 14,
@@ -1356,6 +1423,7 @@ class DeploymentBindingTests(unittest.TestCase):
         signals = dict(GREEN_SIGNALS)
         signals["production"] = {"status": "green", "deployedSha": "b" * 7}
         signals["queue"] = {
+            "repository": "JovieInc/Jovie",
             "status": "known",
             "eligiblePrs": 6,
             "greenReadyPrs": 1,
@@ -1369,6 +1437,7 @@ class DeploymentBindingTests(unittest.TestCase):
     def test_above_target_queue_remains_drainable_when_health_is_green(self):
         signals = dict(GREEN_SIGNALS)
         signals["queue"] = {
+            "repository": "JovieInc/Jovie",
             "status": "known",
             "eligiblePrs": 40,
             "greenReadyPrs": 15,

@@ -22,7 +22,8 @@ export const EXCLUDED_OWNERS = Object.freeze([
   'ios-shell',
 ]);
 export const RETAINED_SWEEP_WORKFLOWS = Object.freeze([
-  { path: '.github/workflows/screenshots.yml', cron: '0 9 * * *' },
+  // JOV-5852: screenshots.yml is path-complete on push to main + manual
+  // dispatch (its daily cron was retired); live external drift keeps a sweep.
   { path: '.github/workflows/visual-a11y.yml', cron: '37 7 * * *' },
 ]);
 
@@ -69,15 +70,20 @@ function parseRegistry(raw) {
 export const SCREEN_REGISTRY = Object.freeze(
   parseRegistry(
     `
-web.homepage|web|marketing-home|apps/web/app/(home)/page.tsx|desktop,mobile
+web.homepage|web|marketing-home|apps/web/app/(home)/page.tsx,apps/web/app/(home)/layout.tsx|desktop,mobile
+web.waitlist|web|marketing-waitlist|apps/web/app/waitlist/page.tsx,apps/web/app/waitlist/layout.tsx|desktop,mobile
 web.developers|web|developer-documentation|apps/web/app/(marketing)/developers/page.tsx|desktop,mobile
 web.api-versioning-policy|web|api-versioning-policy|apps/web/app/(marketing)/api-versioning/page.tsx|desktop,mobile
 web.cli-landing|web|cli-landing|apps/web/app/(marketing)/cli/page.tsx|desktop,mobile
 web.engineering-publication|web|engineering-publication|apps/web/app/(marketing)/engineering/|desktop,mobile
+web.changelog|web|changelog|apps/web/app/(marketing)/changelog/|desktop,mobile
 web.public-profile|web|public-profile|apps/web/app/[username]/page.tsx|desktop,mobile
 web.release-landing|web|release-landing|apps/web/app/r/[slug]/page.tsx,apps/web/app/r/[slug]/ReleaseLandingPage.tsx|desktop,mobile
 web.dashboard-releases|web|dashboard-releases|apps/web/app/app/(shell)/dashboard/releases/page.tsx|desktop,mobile
+web.library|web|library|apps/web/app/app/(shell)/library/page.tsx|desktop,mobile
 web.settings-artist-profile|web|settings-artist-profile|apps/web/app/app/(shell)/settings/artist-profile/page.tsx|desktop,mobile
+web.investor-updates|web|investor-updates|apps/web/app/app/(shell)/admin/investors/updates/page.tsx|desktop,mobile
+web.investor-pipeline|web|investor-pipeline|apps/web/app/app/(shell)/admin/investors/page.tsx|desktop,mobile
 web.start|web|organism.onboarding-chat|apps/web/app/(dynamic)/start/page.tsx|desktop,mobile
 web.app-root|web|screen.root|apps/web/app/app/(shell)/page.tsx|desktop,mobile
 web.jovie-work|web|screen.jovie.work|apps/web/app/app/(shell)/jovie-work/page.tsx|desktop,mobile
@@ -86,8 +92,9 @@ web.onboarding-checkout|web|onboarding-checkout|apps/web/app/onboarding/checkout
 web.billing-success|web|billing-success|apps/web/app/billing/success/page.tsx|desktop,mobile
 web.root-error-boundary|web|screen.errors.root|apps/web/app/error.tsx,apps/web/app/global-error.tsx|desktop,mobile
 macos-electron.hud|macos-electron|desktop-hud|apps/desktop/src/main.ts,apps/desktop/src/navigation.ts|desktop
-ios.dashboard|ios|ios-dashboard|apps/ios/Jovie/Features/Dashboard/DashboardView.swift|compact
+ios.dashboard|ios|ios-dashboard|apps/ios/Jovie/Features/Dashboard/DashboardView.swift,apps/ios/Jovie/Features/Dashboard/PublicProfileBrowserView.swift|compact
 ios.chat|ios|ios-chat|apps/ios/Jovie/Features/Chat/MobileChatView.swift|compact
+ios.library|ios|ios-library|apps/ios/Jovie/Features/Library/|compact
 macos-electron.ovie-door|macos-electron|ovie|apps/desktop/src/ovie-door.ts|desktop|x|Product-surface implementation owned by Ovie
 macos-electron.auth-security|macos-electron|auth-security|apps/desktop/src/desktop-auth-security.ts|desktop|x|Auth/security lane is out of scope
 web.auth|web|auth-security|apps/web/app/(auth)/|desktop,mobile|x|Auth/security lane is out of scope

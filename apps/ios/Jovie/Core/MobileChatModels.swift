@@ -46,9 +46,22 @@ enum MobileChatTimelineRole: String, Equatable, Sendable {
 enum MobileChatTimelineStatus: Equatable, Sendable {
   case idle
   case sending
+  case queued
+  case running
+  case retrying
   case streaming
   case failed
+  case canceled
   case completed
+
+  var isInFlight: Bool {
+    switch self {
+    case .sending, .queued, .running, .retrying, .streaming:
+      return true
+    case .idle, .failed, .canceled, .completed:
+      return false
+    }
+  }
 }
 
 struct MobileChatTimelineItem: Identifiable, Equatable, Sendable {
@@ -59,12 +72,15 @@ struct MobileChatTimelineItem: Identifiable, Equatable, Sendable {
   let clientTurnId: String?
   var requiresWebHandoff: Bool
   var handoffURL: URL?
+  var turnId: String? = nil
+  var eveWorkId: String? = nil
 }
 
 struct CachedChatSnapshot: Codable, Equatable, Sendable {
   let conversations: [MobileConversationSummary]
   let messagesByConversationID: [String: [MobileConversationMessage]]
   let cachedAt: Date
+  var activeConversationID: String? = nil
 }
 
 /// Newest-first transcript window. Numbers match `CHAT_TRANSCRIPT_WINDOW`
@@ -338,6 +354,7 @@ struct EyesFreeCaptureAPIResponse: Decodable, Equatable, Sendable {
 
 enum MobileChatStreamEvent: Equatable, Sendable {
   case turnReserved(conversationId: String, turnId: String, clientTurnId: String)
+  case turnState(clientTurnId: String, state: String, eveWorkId: String?)
   case assistantDelta(clientTurnId: String, text: String)
   case assistantCompleted(
     clientTurnId: String,

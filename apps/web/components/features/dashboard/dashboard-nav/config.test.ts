@@ -34,7 +34,7 @@ describe('canonical customer shell navigation', () => {
   it('keeps the canonical primary six in the DESIGN.md order', () => {
     expect(toContract(primaryNavigation)).toEqual(CANONICAL_NAVIGATION);
     expect(primaryNavigation.find(item => item.id === 'chat')?.tone).toBe(
-      'secondary'
+      'primary'
     );
     expect(primaryNavigation.every(item => item.tier === 'core')).toBe(true);
   });

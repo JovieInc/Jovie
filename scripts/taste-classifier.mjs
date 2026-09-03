@@ -469,7 +469,7 @@ Options:
 Classifications:
   taste-required  → llm-review label; ships autonomously, humans review post-ship in prod walkthroughs (2026-07-06 full-autonomy policy)
   llm-reviewable  → trigger stronger LLM review, no human gate
-  auto-ship       → add merge-queue label, ship it
+  auto-ship       → no extra label; native auto-enroll admits green heads
 `);
     process.exit(0);
   }
@@ -520,7 +520,6 @@ Classifications:
     const labelMap = {
       'taste-required': 'llm-review',
       'llm-reviewable': 'llm-review',
-      'auto-ship': 'merge-queue',
     };
     const label = labelMap[classification.classification];
     if (label) {
@@ -530,6 +529,10 @@ Classifications:
       } catch (err) {
         console.error(`Failed to apply label: ${err.message}`);
       }
+    } else {
+      console.log(
+        'auto-ship: no transport label; native auto-enroll owns admission'
+      );
     }
 
     // Post comment
@@ -544,11 +547,10 @@ Classifications:
     const labelMap = {
       'taste-required': 'llm-review',
       'llm-reviewable': 'llm-review',
-      'auto-ship': 'merge-queue',
     };
     console.log(
       '[dry-run] Would apply label:',
-      labelMap[classification.classification]
+      labelMap[classification.classification] ?? 'none (native auto-enroll)'
     );
   }
 }

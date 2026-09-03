@@ -27,6 +27,8 @@ MODULE = importlib.util.module_from_spec(SPEC)
 SPEC.loader.exec_module(MODULE)
 
 ACTIVE = frozenset(("todo", "in progress"))
+JOVIE_TOMBSTONE = "JovieInc/Jovie:JOV-5029"
+LYB_TOMBSTONE = "JovieInc/LogYourBody:LYB-5029"
 
 
 def make_issue(identifier: str, state: str, updated_epoch: float) -> dict:
@@ -132,7 +134,11 @@ class CheckCommandTests(unittest.TestCase):
         self.assertEqual(rc, 1)
         self.assertIn("LEASE_SUPPRESSED", self.last_stderr)
         state = self.load_state()
-        self.assertIn("JOV-5029", state["tombstones"])
+        self.assertIn(JOVIE_TOMBSTONE, state["tombstones"])
+        self.assertEqual(
+            state["tombstones"][JOVIE_TOMBSTONE]["repository"], "JovieInc/Jovie"
+        )
+        self.assertEqual(state["tombstones"][JOVIE_TOMBSTONE]["identifier"], "JOV-5029")
         self.assertEqual(state["counters"]["suppressedNonActive"], 1)
 
     def test_check_suppresses_stale_snapshot_and_allows_reopen(self):
@@ -141,12 +147,45 @@ class CheckCommandTests(unittest.TestCase):
         self.assertEqual(stale, 1)
         state = self.load_state()
         self.assertEqual(state["counters"]["suppressedStaleSnapshot"], 1)
-        self.assertIn("JOV-5029", state["tombstones"])
+        self.assertIn(JOVIE_TOMBSTONE, state["tombstones"])
         reopened = self.run_check("JOV-5029", make_issue("JOV-5029", "In Progress", 2500))
         self.assertEqual(reopened, 0)
         state = self.load_state()
-        self.assertNotIn("JOV-5029", state["tombstones"])
+        self.assertNotIn(JOVIE_TOMBSTONE, state["tombstones"])
         self.assertEqual(state["counters"]["reopened"], 1)
+
+    def test_check_scopes_tombstones_by_repository(self):
+        self.run_check("JOV-5029", make_issue("JOV-5029", "In Review", 1000))
+        self.run_check("LYB-5029", make_issue("LYB-5029", "In Review", 1000))
+        state = self.load_state()
+        self.assertEqual(
+            sorted(state["tombstones"]),
+            [JOVIE_TOMBSTONE, LYB_TOMBSTONE],
+        )
+
+    def test_load_state_migrates_identifier_only_tombstone_to_repository_scope(self):
+        state_file = pathlib.Path(self.tmp.name) / "leases.json"
+        state_file.write_text(
+            json.dumps(
+                {
+                    "tombstones": {
+                        "JOV-5029": {
+                            "state": "In Review",
+                            "observedAt": 2000,
+                            "issueUpdatedAtEpoch": 1000,
+                        }
+                    }
+                }
+            )
+        )
+
+        state = MODULE._load_state()
+
+        self.assertEqual(list(state["tombstones"]), [JOVIE_TOMBSTONE])
+        self.assertEqual(
+            state["tombstones"][JOVIE_TOMBSTONE]["repository"], "JovieInc/Jovie"
+        )
+        self.assertEqual(state["tombstones"][JOVIE_TOMBSTONE]["identifier"], "JOV-5029")
 
     def test_check_indeterminate_suppresses_and_counts(self):
         rc = self.run_check("JOV-5031", None)
@@ -185,7 +224,9 @@ class ActiveStatesTests(unittest.TestCase):
     def test_missing_workflow_falls_back_to_symphony_default(self):
         with mock.patch.dict(os.environ, {"SYMPHONY_WORKFLOW_PATH": "/nonexistent/WORKFLOW.md"}):
             states = MODULE._active_states()
-        self.assertEqual(states, frozenset(("todo", "in progress")))
+        self.assertEqual(
+            states, frozenset(("todo", "in progress", "rework", "merging"))
+        )
 
 
 def write_fake_process(
@@ -347,6 +388,9 @@ class ReportTests(unittest.TestCase):
                 {
                     "SYMPHONY_LEASE_GUARD_STATE_DIR": tmp,
                     "SYMPHONY_LEASE_GUARD_PROC_ROOT": "/nonexistent-proc",
+                    "SYMPHONY_FALLBACK_LEASE_DIR": str(
+                        pathlib.Path(tmp) / "no-fallback-leases"
+                    ),
                     "CODEX_ACCOUNTS_ROOT": str(pathlib.Path(tmp) / "no-accounts"),
                 },
             ):
@@ -359,6 +403,7 @@ class ReportTests(unittest.TestCase):
         self.assertIsNone(receipt["orphanLaunchers"])
         self.assertEqual(receipt["capacity"]["state"], "unknown")
         self.assertEqual(receipt["tombstones"], {})
+        self.assertEqual(receipt["issueTombstoneScope"], "repository-identifier")
         self.assertEqual(receipt["fallbackLocks"]["state"], "empty")
         self.assertEqual(receipt["fallbackLocks"]["count"], 0)
         for key in (

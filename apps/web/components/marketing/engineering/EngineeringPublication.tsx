@@ -76,7 +76,7 @@ function PageFrame({
     <section className='min-h-screen bg-page text-primary-token'>
       <MarketingHero variant='left'>
         <div className='text-sm font-medium text-tertiary-token'>{kicker}</div>
-        <h1 className='mb-4 mt-6 max-w-2xl text-4xl font-semibold text-balance text-primary-token sm:text-5xl'>
+        <h1 className='system-b-marketing-route-title mb-4 mt-6 max-w-2xl text-primary-token'>
           {title}
         </h1>
         <p className='mb-4 max-w-xl text-lg leading-relaxed text-secondary-token'>
