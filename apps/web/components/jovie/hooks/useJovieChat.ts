@@ -22,6 +22,7 @@ import { consumePendingChatPrompt } from '@/lib/chat/open-chat-with-prompt';
 import { trimMessagesForChatRequest } from '@/lib/chat/request-validation';
 import { buildChatThreadRoute } from '@/lib/chat/sync-chat-thread-url';
 import { isRecoverableToolErrorCode } from '@/lib/chat/tool-errors';
+import { CHAT_TRANSCRIPT_WINDOW_VARIANT_IDENTITY } from '@/lib/chat/transcript-window';
 import { recordUxLatency } from '@/lib/monitoring/interaction-latency';
 import { PACER_TIMING } from '@/lib/pacer/hooks/timing';
 import { queryKeys, useChatConversationQuery } from '@/lib/queries';
@@ -359,6 +360,7 @@ export function useJovieChat({
           nextState: summarizeTimelineState(nextState),
           ignoredAsStale,
           timestamp: Date.now(),
+          variantIdentity: CHAT_TRANSCRIPT_WINDOW_VARIANT_IDENTITY,
         };
 
         logger.info('chat_timeline.transition', payload, 'chat-timeline');
