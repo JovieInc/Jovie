@@ -75,9 +75,11 @@ describe('NewLandingPage', () => {
       '/pricing'
     );
     expect(screen.queryByRole('link', { name: 'Contact' })).toBeNull();
+    // Header utility CTA stays on the /start front door; the waitlist-first
+    // contract applies to owned hero/final CTAs, not the shared nav utilities.
     expect(screen.getByRole('link', { name: 'Find yourself' })).toHaveAttribute(
       'href',
-      'https://jov.ie/waitlist'
+      '/start'
     );
 
     render(<NewLandingPage />);
