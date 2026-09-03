@@ -11,6 +11,7 @@ type GetBlobPresignedToken = NonNullable<
 const CLIENT_ERROR_MESSAGES = new Set([
   'Creator profile not found',
   'Invalid audio upload pathname',
+  'Invalid file upload pathname',
   'Pro plan required for promo downloads',
 ]);
 
