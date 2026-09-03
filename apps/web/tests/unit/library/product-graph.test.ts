@@ -66,6 +66,70 @@ describe('library product graph stores', () => {
     ]);
   });
 
+  it('lists active post-release downloads for a profile', async () => {
+    chain([
+      {
+        id: 'dl-1',
+        releaseId: 'rel-1',
+        title: 'WAV',
+        fileName: 'neon.wav',
+      },
+    ]);
+    const { listLibraryPostReleaseBundle } = await import(
+      '@/lib/library/post-release-store'
+    );
+    await expect(listLibraryPostReleaseBundle('profile-1')).resolves.toEqual({
+      downloads: [
+        {
+          id: 'dl-1',
+          releaseId: 'rel-1',
+          title: 'WAV',
+          fileName: 'neon.wav',
+        },
+      ],
+      findings: [],
+      rightsholders: [],
+    });
+  });
+
+  it('lists stored artist rules for a profile', async () => {
+    chain([
+      {
+        id: 'rule-1',
+        category: 'brand',
+        ruleKey: 'no-face-crop',
+        instruction: 'Never crop a face.',
+        strength: 'hard_constraint',
+        scope: 'artist',
+        scopeValue: null,
+        allowOverride: false,
+        status: 'active',
+        provenance: { source: 'manual' },
+        confirmedAt: new Date('2026-09-01T00:00:00.000Z'),
+        createdAt: new Date('2026-09-01T00:00:00.000Z'),
+      },
+    ]);
+    const { listArtistRulesForProfile } = await import(
+      '@/lib/artist-rules/store'
+    );
+    await expect(listArtistRulesForProfile('profile-1')).resolves.toEqual([
+      {
+        id: 'rule-1',
+        category: 'brand',
+        ruleKey: 'no-face-crop',
+        instruction: 'Never crop a face.',
+        strength: 'hard_constraint',
+        scope: 'artist',
+        scopeValue: null,
+        allowOverride: false,
+        status: 'active',
+        provenanceSource: 'manual',
+        confirmedAt: '2026-09-01T00:00:00.000Z',
+        createdAt: '2026-09-01T00:00:00.000Z',
+      },
+    ]);
+  });
+
   it('does not cap the authenticated Library YouTube projection', () => {
     const source = readFileSync(
       join(process.cwd(), 'lib/youtube-library/queries.ts'),
