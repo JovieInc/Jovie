@@ -107,7 +107,7 @@ function DashboardAnalyticsMetricCard({
       headerClassName='gap-1'
       labelClassName='text-app text-secondary-token'
       valueClassName={cn(
-        'text-2xl font-semibold tracking-[-0.011em]',
+        'text-2xl font-semibold tracking-tight',
         suspect ? 'text-tertiary-token' : 'text-primary-token tabular-nums'
       )}
       subtitleClassName='text-2xs text-tertiary-token tabular-nums'
