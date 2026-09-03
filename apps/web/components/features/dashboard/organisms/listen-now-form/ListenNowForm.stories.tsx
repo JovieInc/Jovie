@@ -29,7 +29,7 @@ const meta = {
   },
   decorators: [
     Story => (
-      <div className='w-[42rem] max-w-[90vw]'>
+      <div className='w-full max-w-2xl'>
         <Story />
       </div>
     ),
