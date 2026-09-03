@@ -71,6 +71,79 @@ describe('workspace page optical seam contract', () => {
     expect(catalogColumns).not.toContain('pl-2.5');
   });
 
+  /**
+   * D2 — seam resolution (JOV-5865). Workspace surfaces read their x padding
+   * from the shared seam (`alignment.workspaceSeamX` / the
+   * `--app-shell-content-padding-x` token), never from off-grid literals
+   * (`px-3.5` = 14px, `px-2.5` / `pl-2.5` = 10px). Shrink-only: the literal
+   * count across the surface list may not grow; remaining count never fails.
+   */
+  const WORKSPACE_SEAM_SURFACES = [
+    // header
+    'components/features/dashboard/organisms/DashboardHeader.tsx',
+    'components/molecules/ContentSectionHeader.tsx',
+    // toolbar
+    'components/organisms/table/molecules/PageToolbar.tsx',
+    'components/organisms/table/molecules/TableBulkActionsToolbar.tsx',
+    'components/organisms/table/molecules/HeaderBulkActions.tsx',
+    // table / list first column + selection track
+    'components/organisms/table/table.styles.ts',
+    'components/organisms/table/atoms/TableCheckboxCell.tsx',
+    'components/organisms/table/atoms/AudienceRowSelectionCell.tsx',
+    'components/organisms/table/atoms/ShellListRowFrame.tsx',
+    'components/organisms/table/molecules/TableHeaderRow.tsx',
+    // status rows (Library catalog status column rides the shared seam)
+    'app/app/(shell)/library/LibrarySurface.tsx',
+    'components/features/library/library-catalog-columns.tsx',
+    // content panel
+    'components/organisms/AppShellContentPanel.tsx',
+  ] as const;
+  const OFF_GRID_X_PADDING =
+    /(?<![\w-])-?(?:px|pl|pr|ps|pe|p)-(?:2\.5|3\.5)(?![\w./%])/g;
+  // Locked to main a3ed9fee (2026-09-02): PageToolbar tab/menu control
+  // padding (px-2.5 ×2), LibrarySurface rail p-2.5 ×1, AppShellContentPanel
+  // outer inset px-2.5 ×1. Lower when a PR resolves them; never raise.
+  const OFF_GRID_X_PADDING_FLOOR = 4;
+
+  it('does not add off-grid x padding literals to workspace seam surfaces (shrink-only)', () => {
+    const perFile = new Map<string, number>();
+    let count = 0;
+    for (const relativePath of WORKSPACE_SEAM_SURFACES) {
+      const hits = read(relativePath).match(OFF_GRID_X_PADDING)?.length ?? 0;
+      if (hits > 0) perFile.set(relativePath, hits);
+      count += hits;
+    }
+    expect(
+      count,
+      `off-grid x padding literals on workspace seam surfaces rose to ${count} ` +
+        `(floor ${OFF_GRID_X_PADDING_FLOOR}). Resolve the seam instead ` +
+        `(alignment.workspaceSeamX or px-(--app-shell-content-padding-x)).\n` +
+        [...perFile.entries()].map(([f, n]) => `  ${f}: ${n}`).join('\n')
+    ).toBeLessThanOrEqual(OFF_GRID_X_PADDING_FLOOR);
+  });
+
+  it('resolves AppShellContentPanel content padding from the seam token, not literals', () => {
+    const panel = read('components/organisms/AppShellContentPanel.tsx');
+    const paddingMap = panel.match(
+      /PANEL_CONTENT_PADDING_CLASSNAME = \{([\s\S]*?)\} as const;/
+    );
+    expect(paddingMap, 'PANEL_CONTENT_PADDING_CLASSNAME map').not.toBeNull();
+    const body = paddingMap?.[1] ?? '';
+    expect(body).toContain('px-(--app-shell-content-padding-x)');
+    expect(body).toContain('p-(--app-shell-content-padding-x)');
+    expect(body).not.toMatch(/\bpx-3\.5\b|\bpy-3\.5\b|\bp-3\.5\b/);
+    // Every non-empty variant resolves a token; no bare numeric step remains.
+    expect(body).not.toMatch(/(?<![\w-(])(?:p|px|py)-\d/);
+  });
+
+  it('keeps the seam token family live (no fork to --linear-app-workspace-seam-x)', () => {
+    const css = read('styles/design-system.css');
+    expect(css).toContain('--app-shell-content-padding-x:');
+    expect(css).toContain('--app-shell-frame-seam:');
+    expect(css).toContain('--system-b-app-frame-seam:');
+    expect(css).not.toContain('--linear-app-workspace-seam-x');
+  });
+
   it('keeps the dashboard title on the workspace seam ahead of the visual rail-control order', () => {
     const header = read(
       'components/features/dashboard/organisms/DashboardHeader.tsx'
