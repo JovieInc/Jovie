@@ -122,10 +122,22 @@ struct AppShellChatFirstTests {
     #expect(MobileChatScrollPolicy.shouldShowJumpToLatest(isAtBottom: true) == false)
   }
 
-  @Test func composerSendStaysDisabledForEmptyOrInFlightDrafts() {
+  @Test func composerSendStaysDisabledForEmptyDraftsAndLiveWhileStreaming() {
     #expect(ChatComposerMetrics.isSendEnabled(trimmedDraft: "", isSending: false) == false)
-    #expect(ChatComposerMetrics.isSendEnabled(trimmedDraft: "Let's get it", isSending: true) == false)
+    #expect(ChatComposerMetrics.isSendEnabled(trimmedDraft: "", isSending: true) == false)
+    #expect(ChatComposerMetrics.isSendEnabled(trimmedDraft: "Let's get it", isSending: true))
     #expect(ChatComposerMetrics.isSendEnabled(trimmedDraft: "Let's get it", isSending: false))
+  }
+
+  @Test func transcriptWindowMatchesWebChatPolicy() {
+    #expect(ChatTranscriptWindow.virtualizeAfterMessageCount == 8)
+    #expect(ChatTranscriptWindow.overscanRowCount == 5)
+    #expect(ChatTranscriptWindow.initialMessageLimit == 40)
+    #expect(ChatTranscriptWindow.visibleTail(Array(1...45)) == Array(6...45))
+    #expect(ChatTranscriptWindow.hasOlderHistory(cachedCount: 10, fetchedHasMore: false) == false)
+    #expect(ChatTranscriptWindow.hasOlderHistory(cachedCount: 41, fetchedHasMore: false))
+    #expect(ChatTranscriptWindow.shouldOfferLoadEarlier(hasMoreOlder: true))
+    #expect(ChatTranscriptWindow.shouldOfferLoadEarlier(hasMoreOlder: false) == false)
   }
 
   @Test func emptyChatHomeLocksGreetingAndDocksComposer() {
