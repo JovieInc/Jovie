@@ -1,4 +1,4 @@
-<mcp-tool-result vendor="github">function parseOutput(output) {
+function parseOutput(output) {
   if (output && typeof output === 'object') return output;
 
   try {
@@ -5278,4 +5278,3 @@ module.exports = {
   assertToolResultShapeMatrix,
   assertEvalCaseInventoryCovered,
 };
-</mcp-tool-result>
