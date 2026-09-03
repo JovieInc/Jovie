@@ -393,14 +393,20 @@ export function validateInvestorUpdateSegments(input: {
 export function assertInvestorUpdateTrackingDisabled(
   settings: InvestorUpdateTrackingSettings
 ): InvestorUpdateTrackingSettings {
-  const parsed = investorUpdateTrackingSettingsSchema.parse(settings);
-  if (parsed.opens || parsed.clicks) {
+  const parsed = investorUpdateTrackingSettingsSchema.safeParse(settings);
+  if (!parsed.success) {
+    throw new InvestorUpdateWorkflowError(
+      'tracking_unsupported',
+      parsed.error.issues[0]?.message ?? 'Invalid tracking settings.'
+    );
+  }
+  if (parsed.data.opens || parsed.data.clicks) {
     throw new InvestorUpdateWorkflowError(
       'tracking_unsupported',
       'Investor update tracking is unavailable until a consent-aware substrate is approved.'
     );
   }
-  return parsed;
+  return parsed.data;
 }
 
 export function prepareInvestorUpdateFinalApproval(input: {

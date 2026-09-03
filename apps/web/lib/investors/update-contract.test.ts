@@ -181,6 +181,16 @@ describe('investor update approval contract', () => {
         consentBasis: 'consent',
       })
     ).toThrow(/consent-aware substrate/);
+
+    expect(() =>
+      assertInvestorUpdateTrackingDisabled({
+        opens: false,
+        clicks: false,
+        privacyDisclosureVersion: null,
+        consentBasis: null,
+        extraField: true,
+      } as never)
+    ).toThrow(InvestorUpdateWorkflowError);
   });
 
   it('requires all candidate decisions and byte-exact reviewed copy', () => {

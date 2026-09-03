@@ -45,6 +45,12 @@ export async function GET() {
   try {
     return NextResponse.json(await loadInvestorUpdateReviewState());
   } catch (error) {
+    if (error instanceof z.ZodError) {
+      return NextResponse.json(
+        { error: error.issues[0]?.message ?? 'Invalid request.' },
+        { status: 400 }
+      );
+    }
     if (error instanceof InvestorUpdateWorkflowError) {
       return NextResponse.json({ error: error.message }, { status: 409 });
     }

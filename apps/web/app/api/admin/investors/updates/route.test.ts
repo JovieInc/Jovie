@@ -16,6 +16,7 @@ vi.mock('@/lib/investors/update-store', () => ({
   approveInvestorUpdateSnapshot: mocks.approveSnapshot,
 }));
 
+import { z } from 'zod';
 import { InvestorUpdateWorkflowError } from '@/lib/investors/update-contract';
 import { GET, POST } from './route';
 
@@ -60,6 +61,23 @@ describe('/api/admin/investors/updates approval-only boundary', () => {
     await expect(response.json()).resolves.toEqual({
       error:
         'The draft changed during approval. Review the latest copy and approve again.',
+    });
+  });
+
+  it('returns 400 when review-state load raises a schema error', async () => {
+    mocks.loadState.mockRejectedValueOnce(
+      new z.ZodError([
+        {
+          code: 'custom',
+          path: ['trackingSettings'],
+          message: 'Invalid tracking settings.',
+        },
+      ])
+    );
+    const response = await GET();
+    expect(response.status).toBe(400);
+    await expect(response.json()).resolves.toEqual({
+      error: 'Invalid tracking settings.',
     });
   });
 
