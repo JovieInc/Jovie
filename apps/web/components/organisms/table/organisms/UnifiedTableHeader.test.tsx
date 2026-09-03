@@ -1,11 +1,11 @@
+import { fireEvent, render, screen } from '@testing-library/react';
+import { describe, expect, it, vi } from 'vitest';
 import {
   createColumnHelper,
   getCoreRowModel,
   getSortedRowModel,
   useReactTable,
-} from '@tanstack/react-table';
-import { fireEvent, render, screen } from '@testing-library/react';
-import { describe, expect, it, vi } from 'vitest';
+} from '@/lib/tanstack-v8-compat';
 import { UnifiedTableHeader } from './UnifiedTableHeader';
 
 type Row = { id: string; title: string; count: number };
@@ -39,14 +39,14 @@ function Harness({
     }),
   ];
 
-  const table = useReactTable({
+  const table = useReactTable<Row>({
     data: [
       { id: '1', title: 'Alpha', count: 2 },
       { id: '2', title: 'Beta', count: 1 },
     ],
     columns,
-    getCoreRowModel: getCoreRowModel(),
-    getSortedRowModel: getSortedRowModel(),
+    getCoreRowModel: getCoreRowModel<Row>(),
+    getSortedRowModel: getSortedRowModel<Row>(),
     initialState: initialSort ? { sorting: initialSort } : undefined,
     onSortingChange: onSortChange,
   });
