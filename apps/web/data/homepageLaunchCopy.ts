@@ -313,7 +313,16 @@ export const HOMEPAGE_CERTIFIED_FIGURES: HomepageCertifiedFigures = {
       },
     ],
   },
-  stats: {},
+  stats: {
+    know: {
+      items: [
+        { value: '1,284', label: 'people paying attention this month' },
+        { value: '61%', label: 'arrived from one link you shared' },
+        { value: '3', label: 'things they may want next' },
+      ],
+      caption: 'Example numbers, layout only.',
+    },
+  },
   routes: {},
 };
 // HOMEPAGE_CERTIFIED_FIGURES END
