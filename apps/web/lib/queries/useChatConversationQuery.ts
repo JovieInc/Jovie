@@ -1,6 +1,6 @@
 'use client';
 
-import { useQuery } from '@tanstack/react-query';
+import { type QueryClient, useQuery } from '@tanstack/react-query';
 import { fetchWithTimeout } from './fetch';
 import { queryKeys } from './keys';
 import type { ChatConversation } from './useChatConversationsQuery';
@@ -20,6 +20,7 @@ interface ConversationOptions {
 }
 
 export const CHAT_CONVERSATION_FETCH_TIMEOUT_MS = 60_000;
+const CHAT_CONVERSATION_STALE_TIME_MS = 10_000;
 
 async function fetchConversation(
   conversationId: string,
@@ -52,11 +53,28 @@ export function useChatConversationQuery({
     queryKey: queryKeys.chat.conversation(conversationId ?? ''),
     queryFn: ({ signal }) => fetchConversation(conversationId!, signal),
     enabled: enabled && !!conversationId,
-    staleTime: 10_000, // 10 seconds
+    staleTime: CHAT_CONVERSATION_STALE_TIME_MS,
     gcTime: 5 * 60 * 1000, // 5 minutes
     placeholderData: previous => previous,
     refetchOnWindowFocus: false,
     refetchInterval,
     refetchIntervalInBackground: false,
+  });
+}
+
+/**
+ * Warm the conversation cache ahead of navigation (sidebar hover/focus) so a
+ * thread switch paints from cache instead of a skeleton (JOV-5874). Shares the
+ * key, fetcher, and staleness window with `useChatConversationQuery`, so a
+ * fresh entry is a no-op and a hover never triggers a second in-flight fetch.
+ */
+export function prefetchChatConversation(
+  queryClient: QueryClient,
+  conversationId: string
+): Promise<void> {
+  return queryClient.prefetchQuery({
+    queryKey: queryKeys.chat.conversation(conversationId),
+    queryFn: ({ signal }) => fetchConversation(conversationId, signal),
+    staleTime: CHAT_CONVERSATION_STALE_TIME_MS,
   });
 }
