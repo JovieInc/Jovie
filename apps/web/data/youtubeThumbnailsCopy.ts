@@ -99,7 +99,9 @@ export const YOUTUBE_THUMBNAILS_EVENTS = {
 
 /** JOV-INV-012 contract on analytics, retouch, and YouTube experiments. */
 export const YOUTUBE_THUMBNAILS_OPTIMIZATION = {
+  experimentId: 'youtube-closed-loop',
   variantIdentity: 'youtube-thumbnails:paste-channel:v1',
+  parentVariantIdentity: 'youtube-closed-loop:paste-channel:v1',
   exposure: YOUTUBE_THUMBNAILS_EVENTS.EXPOSED,
   outcome: YOUTUBE_THUMBNAILS_EVENTS.APPLY_CLICKED,
   attribution: 'source=youtube-thumbnails',
