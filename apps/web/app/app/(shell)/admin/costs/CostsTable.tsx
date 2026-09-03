@@ -1,12 +1,13 @@
 'use client';
 
 import { IconButton } from '@jovie/ui';
-import { type ColumnDef, createColumnHelper } from '@tanstack/react-table';
 import { ExternalLink } from 'lucide-react';
 import { useMemo } from 'react';
 import { PageToolbar, TableEmptyState } from '@/components/organisms/table';
 import { AdminDataTable } from '@/features/admin/table/AdminDataTable';
 import { AdminTableShell } from '@/features/admin/table/AdminTableShell';
+import type { ColumnDef } from '@/lib/tanstack-v8-compat';
+import { createColumnHelper } from '@/lib/tanstack-v8-compat';
 
 // Local row shape (avoid server-only import from @/lib/admin/costs in client component)
 interface AdminCostRow {
