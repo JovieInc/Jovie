@@ -228,7 +228,7 @@ describe('ci-fast bounded parallel workflow', () => {
       'Guardrails skipped (no Jovie product files changed)'
     );
     expect(CI_FAST_SOURCE).toContain(
-      'Design conformance skipped (no Jovie product files changed)'
+      'Design conformance skipped (no design-domain files changed)'
     );
     expect(CI_FAST_SOURCE).toContain(
       'Design-system source ratchet skipped (no Jovie product files changed)'
@@ -380,7 +380,7 @@ describe('ci-fast bounded parallel workflow', () => {
     expect(structuralDecision).toContain('canon/invariants\\.jsonl');
     expect(structuralDecision).toContain('scripts/invariants/');
     expect(CI_FAST_SOURCE).toMatch(
-      /function runDesignConformance\(\)[\s\S]*LANE_COMMANDS\['design-conformance'\]/
+      /function runDesignConformance\([^)]*\)[\s\S]*LANE_COMMANDS\['design-conformance'\]/
     );
     expect(CI_FAST_SOURCE).toMatch(
       /function runDesignSystemSourceRatchet\(\)[\s\S]*LANE_COMMANDS\['design-system-source-ratchet'\]/
