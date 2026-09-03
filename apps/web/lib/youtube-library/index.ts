@@ -3,6 +3,10 @@
  */
 
 export {
+  type AuthorizedYouTubeChannelWorkspace,
+  loadAuthorizedYouTubeChannelWorkspace,
+} from './channel-workspace';
+export {
   type ClassificationResult,
   type ClassifyInput,
   classifyYouTubeVideo,
@@ -23,11 +27,13 @@ export {
   resolveReleaseLink,
 } from './isrc';
 export {
+  type ChannelVideoLedgerItem,
   type GetVideoMetricsInput,
   getThumbnailHistory,
   getVideoMetricsForProfile,
   getVideoPkForProfile,
   type ListVideosForProfileInput,
+  listChannelVideoLedgerForProfile,
   listPendingReleaseLinksForUser,
   listVideosForProfile,
   type PendingReleaseLinkItem,
@@ -55,11 +61,20 @@ export {
   type ThumbnailSyncPlan,
 } from './sync';
 export {
+  reconcileThumbnailCandidateDecision,
+  YouTubeThumbnailDecisionError,
+} from './thumbnail-decision';
+export {
   deriveThumbnailExperimentWinner,
   promoteThumbnailWinner,
   type ThumbnailExperimentState,
   type ThumbnailPromotion,
 } from './thumbnail-experiments';
+export {
+  deriveThumbnailCandidateReviewIds,
+  type RegisterThumbnailCandidateReviewResult,
+  registerThumbnailCandidateReview,
+} from './thumbnail-review';
 export type {
   YouTubeChannelVideo,
   YouTubeLibraryProvider,

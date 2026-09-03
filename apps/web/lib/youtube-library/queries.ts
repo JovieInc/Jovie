@@ -98,6 +98,27 @@ export interface PendingReleaseLinkItem {
   readonly createdAt: string;
 }
 
+export interface ChannelVideoLedgerItem {
+  readonly id: string;
+  readonly channelId: string;
+  readonly videoId: string;
+  readonly title: string;
+  readonly url: string;
+  readonly publishedAt: string | null;
+  readonly privacyStatus: string | null;
+  readonly thumbnailUrl: string | null;
+  readonly lastSyncedAt: string | null;
+  readonly apiMetrics: {
+    readonly window: 'lifetime';
+    readonly capturedAt: string;
+    readonly views: number | null;
+    readonly watchTimeMinutes: number | null;
+    readonly avgViewDurationSeconds: number | null;
+    readonly impressions: null;
+    readonly ctr: null;
+  } | null;
+}
+
 // ---------------------------------------------------------------------------
 // Helpers
 // ---------------------------------------------------------------------------
@@ -134,6 +155,19 @@ function pickDisplayThumbnails(
     if (effective) out.set(videoPk, effective.imageUrl);
   }
   return out;
+}
+
+function bestThumbnailFromSet(
+  thumbnails: YoutubeVideo['currentThumbnails']
+): string | null {
+  return (
+    thumbnails?.maxres?.url ??
+    thumbnails?.standard?.url ??
+    thumbnails?.high?.url ??
+    thumbnails?.medium?.url ??
+    thumbnails?.default?.url ??
+    null
+  );
 }
 
 function toPublicItem(
@@ -240,6 +274,81 @@ export async function listVideosForProfile(
           ? item.releaseLink !== null
           : item.releaseLink === null
     );
+}
+
+/**
+ * Uncapped, owner-facing projection for one exact authorized channel. The
+ * provider sync paginates the whole uploads playlist; this read never applies
+ * the public MCP 100-row cap and never mixes channels on the same profile.
+ */
+export async function listChannelVideoLedgerForProfile(input: {
+  readonly creatorProfileId: string;
+  readonly channelId: string;
+}): Promise<ChannelVideoLedgerItem[]> {
+  const videos = await db
+    .select()
+    .from(youtubeVideos)
+    .where(
+      and(
+        eq(youtubeVideos.creatorProfileId, input.creatorProfileId),
+        eq(youtubeVideos.channelId, input.channelId)
+      )
+    )
+    .orderBy(desc(youtubeVideos.publishedAt));
+  if (videos.length === 0) return [];
+
+  const videoIds = videos.map(video => video.id);
+  const [versions, metrics] = await Promise.all([
+    db
+      .select()
+      .from(youtubeThumbnailVersions)
+      .where(inArray(youtubeThumbnailVersions.videoId, videoIds)),
+    db
+      .select()
+      .from(youtubeVideoMetricSnapshots)
+      .where(
+        and(
+          inArray(youtubeVideoMetricSnapshots.videoId, videoIds),
+          eq(youtubeVideoMetricSnapshots.window, 'lifetime')
+        )
+      )
+      .orderBy(desc(youtubeVideoMetricSnapshots.capturedAt)),
+  ]);
+  const thumbnails = pickDisplayThumbnails(versions);
+  const latestMetricByVideo = new Map<string, YoutubeVideoMetricSnapshot>();
+  for (const metric of metrics) {
+    if (!latestMetricByVideo.has(metric.videoId)) {
+      latestMetricByVideo.set(metric.videoId, metric);
+    }
+  }
+
+  return videos.map(video => {
+    const metric = latestMetricByVideo.get(video.id) ?? null;
+    return {
+      id: video.id,
+      channelId: video.channelId,
+      videoId: video.videoId,
+      title: video.title,
+      url: video.url,
+      publishedAt: toIso(video.publishedAt),
+      privacyStatus: video.privacyStatus,
+      thumbnailUrl:
+        thumbnails.get(video.id) ??
+        bestThumbnailFromSet(video.currentThumbnails),
+      lastSyncedAt: toIso(video.lastSyncedAt),
+      apiMetrics: metric
+        ? {
+            window: 'lifetime' as const,
+            capturedAt: metric.capturedAt.toISOString(),
+            views: metric.views,
+            watchTimeMinutes: toNumber(metric.watchTimeMinutes),
+            avgViewDurationSeconds: toNumber(metric.avgViewDurationSeconds),
+            impressions: null,
+            ctr: null,
+          }
+        : null,
+    };
+  });
 }
 
 export interface GetVideoMetricsInput {

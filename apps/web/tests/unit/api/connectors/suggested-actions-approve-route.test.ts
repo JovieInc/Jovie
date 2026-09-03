@@ -38,6 +38,7 @@ const {
   mockCaptureError,
   mockLoggerInfo,
   mockLoggerError,
+  mockReconcileThumbnailCandidateDecision,
 } = vi.hoisted(() => {
   const mockDbUpdateReturning = vi.fn();
   const mockDbUpdateWhere = vi.fn(() => ({ returning: mockDbUpdateReturning }));
@@ -62,6 +63,7 @@ const {
     mockCaptureError: vi.fn(),
     mockLoggerInfo: vi.fn(),
     mockLoggerError: vi.fn(),
+    mockReconcileThumbnailCandidateDecision: vi.fn(),
   };
 });
 
@@ -123,6 +125,15 @@ vi.mock('@/lib/utils/logger', () => ({
   },
 }));
 
+vi.mock('@/lib/youtube-library', () => ({
+  reconcileThumbnailCandidateDecision: mockReconcileThumbnailCandidateDecision,
+  YouTubeThumbnailDecisionError: class YouTubeThumbnailDecisionError extends Error {
+    constructor(readonly code: string) {
+      super(code);
+    }
+  },
+}));
+
 // ---------------------------------------------------------------------------
 // Import the real handler + mocked schema stub after mocks are wired up
 // ---------------------------------------------------------------------------
@@ -173,6 +184,39 @@ const VERIFIED_BRAND_DEAL_PAYLOAD = {
   closeProbability: 0.6,
   repeatPotential: 1.5,
   creatorMinutes: 60,
+};
+
+const YOUTUBE_CANDIDATE_PAYLOAD = {
+  schemaVersion: 1,
+  title: 'Review thumbnail for A song',
+  creatorProfileId: '00000000-0000-4000-8000-000000000010',
+  channelId: 'UC-owned',
+  youtubeVideoId: 'video-1',
+  videoTitle: 'A song',
+  candidateThumbnailVersionId: '00000000-0000-4000-8000-000000000011',
+  candidateImageUrl: 'https://cdn.example.com/candidate.jpg',
+  currentThumbnailUrl: 'https://i.ytimg.com/current.jpg',
+  artifactSha256:
+    'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa',
+  apiMetrics: {
+    source: 'youtube-analytics-api',
+    window: 'lifetime',
+    capturedAt: '2026-09-01T12:00:00.000Z',
+    views: 1250,
+    watchTimeMinutes: 300,
+    avgViewDurationSeconds: 42,
+    impressions: null,
+    ctr: null,
+  },
+  publicationGate: {
+    state: 'blocked',
+    reason: 'direct-thumbnail-mutation-disabled-native-experiment-required',
+    requiredProof: [
+      'founder-candidate-approval',
+      'youtube-studio-native-experiment',
+      'provider-readback-receipt',
+    ],
+  },
 };
 
 function makeRequest() {
@@ -431,17 +475,20 @@ describe('POST /api/connectors/suggested-actions/[id]/approve (real handler)', (
     expect(mockEnqueueApprovedActionWorkflow).not.toHaveBeenCalled();
   });
 
-  it('CAS miss + thumbnail decision recovery stays approved for generation', async () => {
+  it('CAS miss retries thumbnail reconciliation and stays publication-blocked', async () => {
     mockRequireAuth.mockResolvedValue({ userId: USER_ID, error: null });
     mockDbSelectLimit.mockResolvedValueOnce([
       {
-        payload: { title: 'Candidate' },
+        payload: YOUTUBE_CANDIDATE_PAYLOAD,
         kind: 'youtube.thumbnail_candidate',
         signalType: null,
       },
     ]);
     mockDbUpdateReturning.mockResolvedValueOnce([]);
     mockRecoverOrphanedApprovedAction.mockResolvedValueOnce('decision-only');
+    mockReconcileThumbnailCandidateDecision.mockResolvedValueOnce({
+      state: 'approved-publication-blocked',
+    });
 
     const response = await POST(makeRequest(), makeParams(ACTION_ID));
 
@@ -449,7 +496,14 @@ describe('POST /api/connectors/suggested-actions/[id]/approve (real handler)', (
     expect(await response.json()).toEqual({
       ok: true,
       approvalId: ACTION_ID,
-      status: 'approved-for-generation',
+      status: 'approved-publication-blocked',
+    });
+    expect(mockReconcileThumbnailCandidateDecision).toHaveBeenCalledWith({
+      suggestedActionId: ACTION_ID,
+      userId: USER_ID,
+      payload: YOUTUBE_CANDIDATE_PAYLOAD,
+      decision: 'approved',
+      decidedAt: undefined,
     });
     expect(mockEnqueueApprovedActionWorkflow).not.toHaveBeenCalled();
   });
