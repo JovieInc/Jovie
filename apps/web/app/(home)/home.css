@@ -2517,6 +2517,21 @@ body:has(.home-viewport)::-webkit-scrollbar {
   min-width: 0;
 }
 
+/* The one quiet section with no figure (Built) narrows to the centre and
+   breathes, so it hands off to the centred close instead of reading as a
+   missing image. */
+.homepage-certified-section[data-voice="quiet"][data-figure="false"][data-media="false"]
+.homepage-certified-section__inner {
+  padding-block: clamp(var(--space-20), 11vw, var(--space-32));
+}
+
+.homepage-certified-section[data-voice="quiet"][data-figure="false"][data-media="false"]
+  .homepage-certified-section__copy {
+  max-width: 34rem;
+  margin-inline: auto;
+  text-align: center;
+}
+
 /* Ledger: a label and one line per row, on hairlines (Found, Smarter). */
 .homepage-certified-ledger {
   display: grid;
@@ -2596,6 +2611,7 @@ body:has(.home-viewport)::-webkit-scrollbar {
 .homepage-certified-routes {
   display: flex;
   flex-wrap: wrap;
+  column-gap: var(--space-3);
   margin: var(--space-5) 0 0;
   padding: 0;
   color: var(--color-text-tertiary-token);
@@ -2604,9 +2620,10 @@ body:has(.home-viewport)::-webkit-scrollbar {
   list-style: none;
 }
 
-.homepage-certified-routes__item + .homepage-certified-routes__item::before {
+/* Separator trails each step so a wrapped line never opens with a dot. */
+.homepage-certified-routes__item:not(:last-child)::after {
   content: "\00B7";
-  margin-inline: var(--space-3);
+  margin-inline-start: var(--space-3);
   color: var(--color-text-quaternary-token);
 }
 
@@ -2644,6 +2661,11 @@ body:has(.home-viewport)::-webkit-scrollbar {
     .homepage-certified-section__figure {
     grid-column: 1 / span 6;
     padding-inline: 0 var(--space-6);
+  }
+
+  .homepage-certified-section[data-voice="quiet"][data-figure="false"][data-media="false"]
+    .homepage-certified-section__copy {
+    grid-column: 4 / span 6;
   }
 
   /* One vertical hairline where the figure meets the copy column. */
