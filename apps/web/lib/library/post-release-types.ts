@@ -61,3 +61,10 @@ export interface LibraryPostReleaseBundle {
   readonly rightsholders: readonly LibraryRightsholderEvidenceView[];
   readonly stats: readonly LibraryProviderStatView[];
 }
+
+export const EMPTY_LIBRARY_POST_RELEASE_BUNDLE: LibraryPostReleaseBundle = {
+  downloads: [],
+  findings: [],
+  rightsholders: [],
+  stats: [],
+};

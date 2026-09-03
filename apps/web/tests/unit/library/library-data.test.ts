@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import type { LibraryReleaseAsset } from '@/app/app/(shell)/library/library-data';
 import {
+  attachLibraryProductGraph,
   buildLibraryDocumentAssets,
   buildLibraryMerchAssets,
   buildLibraryReleaseAssets,
@@ -482,5 +483,61 @@ describe('library version stacking (JOV-3089)', () => {
     expect(
       resolveLibraryLifecycleStage({ approvalStatus: 'needs_review' })
     ).toBe('in_progress');
+  });
+
+  it('attaches merch, relationships, and post-release state onto one-card assets', () => {
+    const video = buildLibraryYouTubeAssets(
+      [
+        {
+          id: 'yt-pk',
+          videoId: 'yt-1',
+          title: 'Neon Skyline',
+          url: 'https://youtube.com/watch?v=yt-1',
+          publishedAt: '2026-01-01T00:00:00.000Z',
+          durationSeconds: 200,
+          contentType: 'music_video',
+          classificationConfidence: 0.9,
+          thumbnailUrl: 'https://i.ytimg.com/vi/yt-1/hq.jpg',
+          privacyStatus: 'public',
+          releaseLink: { isrc: 'USABC2600001', releaseId: 'rel-1' },
+        },
+      ],
+      'Tim White'
+    )[0]!;
+    const release = buildLibraryReleaseAssets([
+      buildRelease({ id: 'rel-1', title: 'Neon Skyline' }),
+    ])[0]!;
+    const [enrichedVideo, enrichedRelease] = attachLibraryProductGraph(
+      [video, release],
+      {
+        merchProducts: [{ id: 'merch-1', title: 'Tour Tee' }],
+        relationships: [
+          {
+            id: 'rel-graph-1',
+            kind: 'features_merch',
+            subjectType: 'youtube_video',
+            subjectId: 'yt-1',
+            objectType: 'merch_product',
+            objectId: 'merch-1',
+            status: 'active',
+            createdAt: '2026-09-01T00:00:00.000Z',
+          },
+        ],
+        postReleaseBundle: {
+          downloads: [
+            {
+              id: 'dl-1',
+              releaseId: 'rel-1',
+              title: 'WAV',
+              fileName: 'neon.wav',
+            },
+          ],
+          findings: [],
+          rightsholders: [],
+        },
+      }
+    );
+    expect(enrichedVideo?.relatedMerchTitles).toEqual(['Tour Tee']);
+    expect(enrichedRelease?.postReleaseDownloadCount).toBe(1);
   });
 });

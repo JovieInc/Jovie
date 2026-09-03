@@ -29,6 +29,7 @@ export {
   getVideoPkForProfile,
   type ListVideosForProfileInput,
   listPendingReleaseLinksForUser,
+  listVideosForLibraryProjection,
   listVideosForProfile,
   type PendingReleaseLinkItem,
   type PublicVideoListItem,
