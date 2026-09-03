@@ -272,5 +272,4 @@ describe('OpportunityCardStack', () => {
     expect(onAccept).toHaveBeenCalledWith('yt-card-1');
     expect(onReject).toHaveBeenCalledWith('yt-card-1');
   });
-
 });
