@@ -7,7 +7,7 @@ on:
   workflow_call:
     inputs:
       concurrency-key:
-        description: Stable key used to coalesce superseded merge-group heads.
+        description: Stable merge-queue PR identity; empty outside merge groups.
         required: false
         type: string
   workflow_dispatch:
@@ -16,6 +16,8 @@ permissions:
   contents: read
 
 concurrency:
+  # A regenerated merge-group head supersedes the prior iOS flight for that PR.
+  # Manual/direct-main calls remain isolated by exact SHA and never cancel.
   group: ios-ci-${{ github.workflow }}-${{ inputs.concurrency-key || github.ref }}
   cancel-in-progress: ${{ inputs.concurrency-key != '' || github.ref != 'refs/heads/main' }}
 
@@ -41,30 +43,7 @@ jobs:
         run: bash apps/ios/scripts/ensure-configuration.sh
 
       - name: Show Xcode version
-        id: xcode-version
-        shell: bash
-        run: |
-          set -euo pipefail
-          xcodebuild -version
-          printf 'cache_key=%s\n' "$(xcodebuild -version | shasum -a 256 | cut -d ' ' -f 1)" >> "$GITHUB_OUTPUT"
-
-      # GitHub-hosted macOS jobs are isolated VMs. Cache only immutable SwiftPM
-      # resolution/checkouts, never the mutable build products in DerivedData.
-      # The Xcode version and Package.resolved are both part of the key so a
-      # toolchain or dependency change cannot restore an incompatible cache.
-      - name: Restore Swift package cache
-        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
-        with:
-          path: |
-            .build/ios-ci/SourcePackages
-            ~/Library/Caches/org.swift.swiftpm
-          key: >-
-            ${{ runner.os }}-swiftpm-
-            ${{ steps.xcode-version.outputs.cache_key }}-
-            ${{ hashFiles('apps/ios/Jovie.xcodeproj/project.xcworkspace/xcshareddata/swiftpm/Package.resolved') }}-
-            ${{ hashFiles('apps/ios/Jovie.xcodeproj/project.pbxproj') }}
-          restore-keys: |
-            ${{ runner.os }}-swiftpm-${{ steps.xcode-version.outputs.cache_key }}-${{ hashFiles('apps/ios/Jovie.xcodeproj/project.xcworkspace/xcshareddata/swiftpm/Package.resolved') }}-
+        run: xcodebuild -version
 
       - name: Validate app icon
         run: bash apps/ios/scripts/validate-app-icon.sh
