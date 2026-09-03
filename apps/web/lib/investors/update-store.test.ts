@@ -267,7 +267,7 @@ describe('investor update persistence boundaries', () => {
 
   it('locks approval snapshots and makes the evidence ledger append-only in SQL', async () => {
     const migration = await readFile(
-      join(process.cwd(), 'drizzle/migrations/0096_hesitant_demogoblin.sql'),
+      join(process.cwd(), 'drizzle/migrations/0098_hesitant_demogoblin.sql'),
       'utf8'
     );
 
