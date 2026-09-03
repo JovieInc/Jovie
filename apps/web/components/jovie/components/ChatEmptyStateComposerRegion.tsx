@@ -1,5 +1,6 @@
 'use client';
 
+import { Button } from '@jovie/ui';
 import { type ReactNode, useState } from 'react';
 
 import { cn } from '@/lib/utils';
@@ -70,17 +71,18 @@ export function ChatEmptyStateWelcome({
         {CHAT_EMPTY_HEADING}
       </h2>
       {onSelectSample ? (
-        <button
+        <Button
           type='button'
+          variant='ghost'
           aria-label={`Ask “${sample.prompt}”`}
-          className='w-full max-w-md rounded-2xl p-1 text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/55'
+          className='h-auto min-h-0 w-full max-w-md rounded-2xl p-1 text-left font-normal shadow-none before:hidden hover:bg-transparent hover:text-inherit active:bg-transparent [&>span]:flex [&>span]:w-full [&>span]:flex-col'
           data-testid='chat-empty-state-sample-button'
           onClick={() => onSelectSample(sample.prompt)}
         >
-          <div aria-hidden='true'>
+          <div aria-hidden='true' className='w-full'>
             <ChatEmptyStateSamplePreview sample={sample} />
           </div>
-        </button>
+        </Button>
       ) : (
         <ChatEmptyStateSamplePreview sample={sample} />
       )}

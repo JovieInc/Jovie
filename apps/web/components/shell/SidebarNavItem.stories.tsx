@@ -1,3 +1,4 @@
+import { Button } from '@jovie/ui';
 import type { Meta, StoryObj } from '@storybook/nextjs-vite';
 import { House, SquarePen } from 'lucide-react';
 import {
@@ -38,8 +39,9 @@ export const ActiveCollapsed: Story = {
 
 export const EnabledPrimaryCreate: Story = {
   render: () => (
-    <button
+    <Button
       type='button'
+      variant='ghost'
       className={getSidebarNavRowClassName({ tone: 'primary' })}
     >
       <SquarePen
@@ -47,6 +49,6 @@ export const EnabledPrimaryCreate: Story = {
         strokeWidth={2}
       />
       <span>New Chat</span>
-    </button>
+    </Button>
   ),
 };

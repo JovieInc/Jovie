@@ -43,6 +43,9 @@ describe('desktop New Chat grid anchors', () => {
     expect(chat).toContain('CHAT_EMPTY_VIEWPORT_CLASSNAME');
     expect(emptyRegion).toContain('DESKTOP_CONTENT_GRID_ANCHOR');
     expect(emptyRegion).toContain("ownsTopSpacing ? 'pt-0 pb-4 sm:pb-5'");
+    expect(emptyRegion).toContain("from '@jovie/ui'");
+    expect(emptyRegion).toContain('<Button');
+    expect(emptyRegion).not.toMatch(/<button(?=[\s/>])/);
     expect(loading).toContain('DESKTOP_CONTENT_GRID_ANCHOR');
     expect(loading).toContain('CHAT_EMPTY_VIEWPORT_CLASSNAME');
     expect(loading).toContain("data-top-spacing-owner='none'");
