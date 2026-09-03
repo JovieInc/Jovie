@@ -1,7 +1,7 @@
 import { render, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { HeroSpotifySearch } from '@/features/home/HeroSpotifySearch';
+import { HeroSpotifySearch } from '@/components/features/home/HeroSpotifySearch';
 import type { ArtistSearchState, SpotifyArtistResult } from '@/lib/queries';
 
 // jsdom doesn't implement scrollIntoView
