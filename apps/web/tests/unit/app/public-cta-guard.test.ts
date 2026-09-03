@@ -106,4 +106,13 @@ describe('public CTA guard', () => {
       'DEFAULT_MARKETING_CTA: MarketingHeaderCta = MARKETING_NAV_UTILITIES[1]'
     );
   });
+
+  it('keys marketing nav links by href+label so duplicate labels stay distinct', () => {
+    const headerNav = readFileSync(
+      join(ROOT, 'components/organisms/HeaderNav.tsx'),
+      'utf8'
+    );
+
+    expect(headerNav).toContain('key={`${link.href}:${link.label}`}');
+  });
 });
