@@ -135,6 +135,17 @@ const isHomepageSystemBGuardInput = file =>
   file.startsWith('apps/web/components/features/home/') ||
   file.startsWith('apps/web/components/marketing/homepage-v2/') ||
   HOMEPAGE_SYSTEM_B_GUARD_EXACT_INPUTS.has(file);
+const APP_SCREEN_CANVAS_GUARD_TESTS = [
+  'apps/web/tests/unit/design-system/app-screen-canvas-manifest.test.ts',
+];
+const APP_SCREEN_CANVAS_EXACT_INPUTS = new Set([
+  'apps/web/tests/unit/design-system/app-screen-canvas-source-guard.ts',
+]);
+const isAppScreenCanvasGuardInput = file =>
+  APP_SCREEN_CANVAS_EXACT_INPUTS.has(file) ||
+  file.startsWith('apps/web/app/app/(shell)/') ||
+  file.startsWith('apps/web/components/') ||
+  file.startsWith('apps/web/data/appScreens/');
 const AFFECTED_TEST_SELECTOR_MANIFEST = new Set([
   'scripts/run-affected-tests.mjs',
   'scripts/lib/__tests__/automation-verify.test.mjs',
@@ -248,6 +259,7 @@ const CI_CONTROL_SCRIPT_TESTS = [
   'scripts/lib/__tests__/ci-branching-guard.test.mjs',
   'scripts/lib/__tests__/merge-queue-guard.test.mjs',
   'scripts/lib/__tests__/pre-land-changelog.test.mjs',
+  'scripts/lib/__tests__/ownerless-recovery-policy.test.mjs',
   'scripts/lib/__tests__/ci-metrics-compute.test.mjs',
   'scripts/lib/__tests__/auto-ready-agent-drafts.test.mjs',
   'scripts/lib/__tests__/eval-main-health-action.test.mjs',
@@ -340,7 +352,11 @@ const MERGE_QUEUE_CONTROLLER_INPUTS = new Set([
   'scripts/lib/__tests__/merge-queue-guard.test.mjs',
   'scripts/lib/__tests__/pre-land-changelog.test.mjs',
   'scripts/lib/__tests__/pr-check-failures.test.mjs',
+  'scripts/lib/ownerless-recovery-policy.mjs',
+  'scripts/lib/pr-check-failures.mjs',
+  'scripts/lib/upsert-pr-comment.sh',
   'scripts/merge-queue-backend.mjs',
+  'scripts/ownerless-recovery-sweeper.mjs',
   'scripts/tests/test_gh_retry.py',
 ]);
 const MERGE_QUEUE_CONTROLLER_SCRIPT_TESTS = [
@@ -349,6 +365,7 @@ const MERGE_QUEUE_CONTROLLER_SCRIPT_TESTS = [
   'scripts/lib/__tests__/merge-group-workflow-contract.test.mjs',
   'scripts/lib/__tests__/merge-queue-backend.test.mjs',
   'scripts/lib/__tests__/merge-queue-guard.test.mjs',
+  'scripts/lib/__tests__/ownerless-recovery-policy.test.mjs',
   'scripts/lib/__tests__/pre-land-changelog.test.mjs',
   'scripts/lib/__tests__/pr-check-failures.test.mjs',
 ];
@@ -1417,6 +1434,10 @@ export function buildAffectedTestPlan(
   if (hasHomepageSystemBGuardInput) {
     mandatoryTests.push(...HOMEPAGE_SYSTEM_B_STYLE_GUARD_TESTS);
   }
+  const hasAppScreenCanvasGuardInput = files.some(isAppScreenCanvasGuardInput);
+  if (hasAppScreenCanvasGuardInput) {
+    mandatoryTests.push(...APP_SCREEN_CANVAS_GUARD_TESTS);
+  }
   if (
     files.some(file =>
       file.startsWith('apps/web/eslint-rules/canonical-ui-label-casing')
@@ -1532,6 +1553,11 @@ export function buildAffectedTestPlan(
     if (file.startsWith('apps/web/components/')) return true;
     if (file.startsWith('apps/web/app/')) return true;
     if (file.startsWith('packages/ui/')) return true;
+    if (
+      APP_SCREEN_CANVAS_EXACT_INPUTS.has(file) ||
+      file.startsWith('apps/web/data/appScreens/')
+    )
+      return true;
     // The route matrix is test infrastructure: it is imported by the
     // targeted route-coverage tests and is not product source that warrants
     // escalating every ordinary route-contract change to a full web suite.
@@ -1787,6 +1813,7 @@ export function buildAffectedTestPlan(
           (relatedFiles.length > 0 ||
             hasCiCancellationHealerChange ||
             hasHomepageSystemBGuardInput ||
+            hasAppScreenCanvasGuardInput ||
             isExactPrerequisiteTrain ||
             isExactVercelCongestionControl ||
             isExactAffectedTestSelector ||

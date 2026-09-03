@@ -90,6 +90,31 @@ describe('bounded PR visual review contract', () => {
       reason: 'ui-change',
       review_status: 'advisory',
     });
+    expect(
+      routeChangedFiles(['apps/web/components/jovie/JovieChat.tsx']).routes
+    ).toEqual(['/app/chat']);
+    expect(
+      routeChangedFiles(['apps/web/app/app/(shell)/chat/page.tsx']).routes
+    ).toEqual(['/app/chat']);
+  });
+
+  it('does not send API, server, or onboarding chat files to /app/chat', () => {
+    expect(
+      routeChangedFiles([
+        'apps/web/app/api/chat/route.ts',
+        'apps/web/app/api/chat/onboarding-handler.ts',
+        'apps/web/lib/chat/run.ts',
+        'apps/web/lib/mobile/chat/turn-handler.ts',
+        'apps/web/lib/ai/gateway-errors.ts',
+        'apps/web/components/features/onboarding/onboardingChatHelpers.ts',
+        'apps/web/components/jovie/utils.ts',
+      ])
+    ).toEqual({
+      shouldReview: true,
+      routes: ['/'],
+      reason: 'ui-change',
+      review_status: 'advisory',
+    });
   });
 
   it('routes the authenticated session boundary through chat instead of masking it with a public capture', () => {
