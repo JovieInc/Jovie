@@ -1,7 +1,11 @@
+import { readFileSync } from 'node:fs';
+import { resolve } from 'node:path';
 import React from 'react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { ChatUsageAlert } from '@/components/jovie/components/ChatUsageAlert';
 import { fastRender } from '@/tests/utils/fast-render';
+
+const appRoot = resolve(__dirname, '../../..');
 
 const mockUseChatUsageQuery = vi.fn();
 
@@ -18,6 +22,17 @@ vi.mock('@/components/molecules/UpgradeButton', () => ({
 describe('ChatUsageAlert', () => {
   beforeEach(() => {
     mockUseChatUsageQuery.mockReset();
+  });
+
+  it('keeps ChatUsageAlert as the canonical weekly usage alert owner', () => {
+    const chatUsageAlertSource = readFileSync(
+      resolve(appRoot, 'components/jovie/components/ChatUsageAlert.tsx'),
+      'utf8'
+    );
+
+    expect(chatUsageAlertSource).toContain('getChatUsageCopy');
+    expect(chatUsageAlertSource).toContain('aiWeeklyMessageLimit');
+    expect(chatUsageAlertSource).toContain('useChatUsageQuery');
   });
 
   it('shows warning state when near limit', () => {
