@@ -638,12 +638,52 @@ def _grok_ship_one_executable() -> str | None:
     return str(executable) if executable.is_file() and os.access(executable, os.X_OK) else None
 
 
-def _grok_limit() -> int:
+def _oidc_seat(entry: object) -> bool:
+    if not isinstance(entry, dict):
+        return False
+    return bool(entry.get("refresh_token") or entry.get("key") or entry.get("access_token"))
+
+
+def _grok_oauth_seats() -> int | None:
+    path = pathlib.Path.home() / ".grok" / "auth.json"
     try:
-        value = int(os.environ.get("SYMPHONY_GROK_MAX", DEFAULT_GROK_MAX))
-    except (TypeError, ValueError):
+        payload = json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, TypeError, ValueError):
+        return None
+    if not isinstance(payload, dict):
+        return None
+    return sum(1 for entry in payload.values() if _oidc_seat(entry))
+
+
+def _kimi_oauth_seats() -> int | None:
+    path = pathlib.Path.home() / ".kimi-code" / "credentials" / "kimi-code.json"
+    try:
+        payload = json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, TypeError, ValueError):
+        return None
+    return 1 if _oidc_seat(payload) else 0
+
+
+def _live_oauth_seats() -> int | None:
+    grok = _grok_oauth_seats()
+    kimi = _kimi_oauth_seats()
+    if grok is None and kimi is None:
+        return None
+    return (grok or 0) + (kimi or 0)
+
+
+def _grok_limit() -> int:
+    raw = os.environ.get("SYMPHONY_GROK_MAX")
+    if raw is not None:
+        try:
+            return max(0, min(int(raw), MAX_GROK_MAX))
+        except (TypeError, ValueError):
+            return DEFAULT_GROK_MAX
+    seats = _live_oauth_seats()
+    if seats is None or seats <= 0:
+        # Missing Grok/Kimi files, or Codex-only exhaustion, must not serial-pin.
         return DEFAULT_GROK_MAX
-    return max(0, min(value, MAX_GROK_MAX))
+    return max(1, min(MAX_GROK_MAX, max(DEFAULT_GROK_MAX, seats)))
 
 
 def _dotenv_value(raw: str) -> str | None:
