@@ -5,6 +5,7 @@ import { Check, Loader2, Upload, Video } from 'lucide-react';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { TeleprompterShowcaseInterstitial } from '@/components/jovie/components/TeleprompterShowcaseInterstitial';
 import { ContentSurfaceCard } from '@/components/molecules/ContentSurfaceCard';
+import { useAuthSafe } from '@/hooks/useJovieAuth';
 import { trackTeleprompterFunnel } from '@/lib/teleprompter/analytics';
 import { shouldShowTeleprompterShowcase } from '@/lib/teleprompter/persistence';
 import { startTeleprompterRecording } from '@/lib/teleprompter/recorder';
@@ -26,6 +27,7 @@ export function ChatVideoRecordingProposalCard({
   profileId,
   payload,
 }: ChatVideoRecordingProposalCardProps) {
+  const { userId } = useAuthSafe();
   const fileInputRef = useRef<HTMLInputElement>(null);
   const hoverTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const trackedProposalRef = useRef(false);
@@ -108,6 +110,7 @@ export function ChatVideoRecordingProposalCard({
       await uploadRecordableVideo({
         file,
         profileId,
+        ownerId: userId ?? 'unknown',
         kind: payload.kind,
         showcaseVariant: payload.showcaseVariant,
       });
