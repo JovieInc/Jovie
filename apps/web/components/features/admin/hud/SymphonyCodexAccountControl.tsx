@@ -188,13 +188,14 @@ export function SymphonyCodexAccountControl() {
             data-testid={`ovie-codex-account-row-${row.label}`}
             data-selected={selected === row.label ? 'true' : 'false'}
           >
-            <button
+            <Button
               type='button'
-              className='min-w-0 flex-1 truncate text-left text-app font-medium text-primary-token focus-ring-themed'
+              variant='tertiary'
+              className='min-w-0 flex-1 truncate rounded-none text-left text-primary-token'
               onClick={() => setSelected(row.label)}
             >
               {row.label}
-            </button>
+            </Button>
             <HudStatusPill
               label={CODEX_ACCOUNT_STATE_LABELS[row.state]}
               tone={STATE_TONE[row.state]}
