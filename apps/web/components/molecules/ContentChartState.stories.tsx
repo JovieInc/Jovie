@@ -1,3 +1,4 @@
+import { Button } from '@jovie/ui';
 import type { Meta, StoryObj } from '@storybook/nextjs-vite';
 import { ContentChartSkeleton, ContentChartState } from './ContentChartState';
 
@@ -32,7 +33,11 @@ export const Error: Story = {
     state: 'error',
     title: 'Chart unavailable',
     message: 'Could not load metrics.',
-    action: <button type='button'>Retry</button>,
+    action: (
+      <Button type='button' variant='secondary' size='sm'>
+        Retry
+      </Button>
+    ),
   },
 };
 
