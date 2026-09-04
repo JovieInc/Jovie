@@ -50,6 +50,14 @@ function extractPricingCss(source: string): string {
   return source.slice(start, end);
 }
 
+function extractFinalCtaComponentSource(source: string): string {
+  const start = source.indexOf('export function HomepageV2FinalCta(');
+
+  expect(start, 'homepage final CTA source exists').toBeGreaterThanOrEqual(0);
+
+  return source.slice(start);
+}
+
 describe('mounted homepage pricing System B source contract', () => {
   it('keeps mounted pricing markup on named System B primitives', () => {
     const source = extractPricingComponentSource(
@@ -79,6 +87,22 @@ describe('mounted homepage pricing System B source contract', () => {
     ]) {
       expect(source).toContain(className);
     }
+  });
+
+  it('keeps mounted homepage CTA headings explicitly clamped', () => {
+    const source = readFileSync(
+      path.join(webRoot, pricingComponentPath),
+      'utf8'
+    );
+    const terminalCtaSource = readFileSync(
+      path.join(webRoot, 'components/site/MarketingTerminalCta.tsx'),
+      'utf8'
+    );
+
+    // HomepageStoryHeader owns the mounted pricing/story headings.
+    expect(source).toContain('homepage-story-heading line-clamp-2');
+    // The mounted final CTA heading renders through MarketingTerminalCta.
+    expect(terminalCtaSource).toContain('line-clamp-2');
   });
 
   it('keeps mounted pricing CSS tokenized and stable', () => {
@@ -114,5 +138,21 @@ describe('mounted homepage pricing System B source contract', () => {
     expect(css).toContain('box-shadow: none;');
     expect(css).toContain('letter-spacing: 0;');
     expect(css).toContain('@media (max-width: 767px)');
+  });
+
+  it('delegates the final CTA to the canonical terminal CTA owner', () => {
+    const source = extractFinalCtaComponentSource(
+      readFileSync(path.join(webRoot, pricingComponentPath), 'utf8')
+    );
+
+    expect(source).toContain('<MarketingTerminalCta');
+    expect(source).toContain("variant='homepage-v2'");
+    expect(source).toContain(
+      'penContractId={MARKETING_PEN_CONTRACT_IDS.shell.footerCta}'
+    );
+    expect(source).toContain('testId={sectionTestId}');
+    expect(source).toContain('headingTestId={headingTestId}');
+    expect(source).toContain('actionTestId={actionTestId}');
+    expect(source).not.toContain('<section');
   });
 });

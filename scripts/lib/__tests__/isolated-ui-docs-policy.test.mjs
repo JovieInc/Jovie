@@ -442,6 +442,10 @@ describe('isolated UI/docs promotion policy', () => {
       resolve(REPO_ROOT, 'scripts/lib/isolated-ui-docs-policy.mjs'),
       'utf8'
     );
+    const evaluateFleetGate = readFileSync(
+      resolve(REPO_ROOT, 'scripts/hermes/evaluate-fleet-gate.sh'),
+      'utf8'
+    );
 
     expect(queueWorkflow).toContain('fleet-policy:');
     expect(queueWorkflow).toContain(
@@ -452,7 +456,11 @@ describe('isolated UI/docs promotion policy', () => {
     expect(queueWorkflow).toContain('merge-queue-drain-mutex');
     expect(queueWorkflow).toContain('isolated-only');
     expect(queueWorkflow).toContain('hold-intake');
-    expect(queueWorkflow).toContain('.promotionMode');
+    expect(queueWorkflow).toContain(
+      'uses: ./.github/actions/evaluate-fleet-gate'
+    );
+    expect(queueWorkflow).toContain('steps.policy.outputs.promotion_mode');
+    expect(evaluateFleetGate).toContain('.promotionMode');
     expect(productionWorkflow).toContain('fleet-promotion:');
     expect(productionWorkflow).toContain(
       "needs.fleet-promotion.outputs.deployment_allowed == 'true'"

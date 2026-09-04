@@ -10,6 +10,7 @@ export {
   fetchArtistLlms,
   fetchOpenApi,
   fetchSiteLlms,
+  JovieInputError,
   JovieRequestError,
   normalizeBaseUrl,
   validateUsername,

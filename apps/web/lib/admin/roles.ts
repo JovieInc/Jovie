@@ -4,6 +4,7 @@ import { cache } from 'react';
 import { checkUserStatus } from '@/lib/auth/status-checker';
 import { db } from '@/lib/db';
 import { users } from '@/lib/db/schema/auth';
+import { isVisualCaptureSyntheticAuthEnabled } from '@/lib/e2e/runtime';
 import { captureWarning } from '@/lib/error-tracking';
 import { getRedis } from '@/lib/redis';
 
@@ -51,6 +52,7 @@ export const isAdmin = cache(async function isAdmin(
   userId: string
 ): Promise<boolean> {
   if (!userId) return false;
+  if (isVisualCaptureSyntheticAuthEnabled()) return false;
 
   const redis = getRedis();
   const cacheKey = `${REDIS_KEY_PREFIX}${userId}`;

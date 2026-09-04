@@ -35,7 +35,39 @@ const AUTHENTICATED_CHAT_CAPTURE_ROUTE = '/app/chat';
 const AUTHENTICATED_SHELL_CAPTURE_FILE =
   /^(?:apps\/web\/(?:proxy|middleware)\.[cm]?[jt]s|apps\/web\/lib\/auth\/(?:gate|session|auth-session-cookies)\.[cm]?[jt]sx?|apps\/web\/app\/app(?:\/\(shell\))?\/layout\.[cm]?[jt]sx?)$/i;
 
+/**
+ * Authenticated `/app/chat` capture is for visual chat/shell surfaces.
+ * API handlers, server turn execution, and onboarding helpers share the
+ * "chat" path token but are not the workspace chrome the fixture proves.
+ * App Router `(shell)` is a route group, not chat chrome; real chat pages
+ * under that group still match `/chat/i`.
+ */
+function isAuthenticatedChatUiChange(file) {
+  if (!/chat|shell/i.test(file)) return false;
+  if (/onboarding/i.test(file)) return false;
+  if (/^apps\/web\/(app\/api\/|lib\/)/.test(file)) return false;
+  if (/\(shell\)/.test(file) && !/chat/i.test(file)) return false;
+  return true;
+}
+
 /** @typedef {{ apiKey?: string, baseUrl?: string, model?: string }} ReviewBackend */
+
+export function buildCaptureArtifactPaths({ outDir, route, viewportName }) {
+  const safeRoute =
+    String(route)
+      .replace(/[^a-z0-9]+/gi, '-')
+      .replace(/^-|-$/g, '') || 'home';
+  const safeViewport = String(viewportName)
+    .replace(/[^a-z0-9]+/gi, '-')
+    .replace(/^-|-$/g, '');
+  if (!safeViewport) throw new Error('Capture viewport name is required');
+
+  const artifactPath = `${safeRoute}-${safeViewport}.png`;
+  return {
+    artifactPath,
+    outputPath: join(outDir, artifactPath),
+  };
+}
 
 export function sanitizeForPrompt(value) {
   return String(value ?? '')
@@ -72,7 +104,7 @@ export function routeChangedFiles(files) {
       routes.add(PUBLIC_HOME_CAPTURE_ROUTE);
     else if (/dynamic|profile|username|artist/i.test(file))
       routes.add(PUBLIC_PROFILE_CAPTURE_ROUTE);
-    else if (/chat|shell/i.test(file))
+    else if (isAuthenticatedChatUiChange(file))
       routes.add(AUTHENTICATED_CHAT_CAPTURE_ROUTE);
     else routes.add(PUBLIC_HOME_CAPTURE_ROUTE);
   }
@@ -133,6 +165,67 @@ export function validateCaptureManifest(manifest, expected = {}) {
   }
 
   return { ok: failures.length === 0, failures };
+}
+
+function resolveCaptureFailureUrl(url, baseUrl) {
+  try {
+    return new URL(String(url), baseUrl ?? 'http://127.0.0.1');
+  } catch {
+    return null;
+  }
+}
+
+function isFailedResourceConsoleError(message) {
+  return /Failed to load resource: the server responded with a status of 5\d\d/.test(
+    String(message ?? '')
+  );
+}
+
+/**
+ * Secretless visual capture paints the authenticated shell against a noop
+ * database and no Redis. Best-effort `/api/*` fetches and same-document RSC
+ * refetches can 5xx after `waitForAuthenticatedShell` has already proven the
+ * surface. Those must not fail the capture. Page errors, public-route 5xxs,
+ * and document 5xxs to a different path stay blocking.
+ * @param {unknown} failure
+ * @param {{ route?: string, baseUrl?: string } | null | undefined} [context]
+ */
+export function isBlockingCaptureRuntimeFailure(failure, context) {
+  if (!failure || typeof failure !== 'object') return true;
+  const route = context?.route;
+  const baseUrl = context?.baseUrl;
+  const isAppRoute = typeof route === 'string' && route.startsWith('/app/');
+  if (!isAppRoute) return true;
+  if (!('type' in failure)) return true;
+  if (failure.type === 'page-error') return true;
+  if (failure.type === 'http-5xx') {
+    const url = resolveCaptureFailureUrl(
+      'url' in failure ? failure.url : undefined,
+      baseUrl
+    );
+    if (!url) return true;
+    if (url.pathname === '/api' || url.pathname.startsWith('/api/'))
+      return false;
+    const expected = resolveCaptureFailureUrl(route, baseUrl);
+    if (expected && url.pathname === expected.pathname) return false;
+    return true;
+  }
+  if (failure.type === 'console-error') {
+    return !isFailedResourceConsoleError(
+      'message' in failure ? failure.message : undefined
+    );
+  }
+  return true;
+}
+
+/**
+ * @param {unknown} failures
+ * @param {{ route?: string, baseUrl?: string } | null | undefined} [context]
+ */
+export function blockingCaptureRuntimeFailures(failures, context) {
+  return (Array.isArray(failures) ? failures : []).filter(failure =>
+    isBlockingCaptureRuntimeFailure(failure, context)
+  );
 }
 
 export function classifyReviewOutcome({

@@ -1,16 +1,18 @@
 #!/usr/bin/env node
 /**
- * Run the cheap CI cluster as labeled lanes with continue-on-failure semantics.
+ * Run the cheap CI cluster as labeled lanes.
  *
  * Used by the dedicated `ci-fast-typecheck` and `ci-fast-remaining` jobs in
  * `.github/workflows/ci.yml` (JOV-4477). Each hosted job checks out and installs
  * once, invokes one value from LANE_GROUPS, and publishes an isolated lane
  * artifact; the aggregate `ci-fast` job also requires the dedicated profile
- * browser admission job. Never aborts mid-group — always reports every
- * selected lane, writes
- * $GITHUB_STEP_SUMMARY, emits lane records for the harness, and exits non-zero
- * only after all selected lanes finish if any failed. Local callers may omit
- * the selector to retain the historical all-lanes behavior.
+ * browser admission job.
+ *
+ * Fail-fast: the first failed lane skips later lanes in the same group so
+ * biome/typecheck red does not pay for structural Playwright. Skipped-later
+ * lanes still emit a receipt. Set CI_FAST_FAIL_FAST=false to restore the
+ * historical run-every-lane report. Local callers may omit the selector to
+ * retain the all-lanes default.
  *
  * Usage:
  *   node scripts/ci-fast-lanes.mjs [with CI_FAST_LANE_GROUP=<group>]
@@ -21,12 +23,15 @@
  *   CI_FAST_LANES_OUT  — optional path for JSON lane results
  *   TURBO_SCM_BASE     — for typecheck --affected
  *   CI_FAST_SKIP_STRUCTURAL — "true" to skip the remaining group's structural lane
+ *   CI_FAST_ONLY_STRUCTURAL — "true" to run only the structural lane
+ *   CI_FAST_FAIL_FAST — "false" to run every selected lane even after a failure
  */
 
 import { spawnSync } from 'node:child_process';
 import { appendFileSync, writeFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { selectDesignConformanceChecks } from './design-conformance-paths.mjs';
 import {
   affectsJovieTypecheck,
   classifyCiRepoLanes,
@@ -379,31 +384,9 @@ function runTypecheck() {
 }
 
 function runScriptsTypecheck() {
-  // JOV-4327: scripts/ tree typecheck vs shrink-only baseline. Exclusive
-  // Jovie product PRs skip this Symphony/control-plane suite (JOV-5288).
-  const event = process.env.GITHUB_EVENT_NAME || '';
-  if (event !== 'workflow_dispatch' && !repoLanes().runSymphonyControl) {
-    return {
-      code: 0,
-      output:
-        'Scripts typecheck skipped (no Symphony/control-plane files changed)\n',
-      skipped: true,
-    };
-  }
-  const files = changedFiles([
-    'scripts/**/*.ts',
-    'scripts/**/*.mts',
-    'scripts/**/*.mjs',
-    'scripts/**/*.cts',
-    'scripts/tsconfig*.json',
-  ]);
-  if (files && files.length === 0) {
-    return {
-      code: 0,
-      output: 'No scripts typecheck paths changed\n',
-      skipped: true,
-    };
-  }
+  // JOV-4327: run the shrink-only scripts ratchet on every hydrated remaining
+  // job. The TypeScript project imports files outside scripts/, and baseline or
+  // resolver changes can alter its diagnostics without touching a path filter.
   return shell('pnpm run typecheck:scripts');
 }
 
@@ -504,26 +487,43 @@ function runDesignExceptionRegistry() {
   return shell(LANE_COMMANDS['design-exception-registry']);
 }
 
-function runDesignConformance() {
+/**
+ * @typedef {object} DesignConformanceOpts
+ * @property {string[] | null} [changedFileList]
+ * @property {(command: string) => {code: number, output: string, skipped?: boolean}} [execute]
+ */
+
+/**
+ * @param {DesignConformanceOpts} [opts]
+ */
+export function runDesignConformance(opts) {
+  const options = opts ?? {};
+  const execute = options.execute;
   const event = process.env.GITHUB_EVENT_NAME || '';
-  if (event !== 'workflow_dispatch' && !repoLanes().runJovieProduct) {
+  if (event === 'workflow_dispatch') {
+    return (execute ?? shell)(LANE_COMMANDS['design-conformance']);
+  }
+
+  const files =
+    'changedFileList' in options
+      ? options.changedFileList
+      : listAllChangedFiles();
+  if (files === null) {
+    return {
+      code: 1,
+      output: 'Design conformance failed: changed files unavailable\n',
+    };
+  }
+
+  if (!selectDesignConformanceChecks(files).applicable) {
     return {
       code: 0,
-      output: 'Design conformance skipped (no Jovie product files changed)\n',
+      output: 'Design conformance skipped (no design-domain files changed)\n',
       skipped: true,
     };
   }
-  const selected = selectedProductLanes();
-  if (!selected.has('operations') && !selected.has('web')) {
-    return {
-      code: 0,
-      output: 'No design product lane selected\n',
-      skipped: true,
-    };
-  }
-  // Always validate the normalized manifest. The selector inside the command
-  // reports affected design domains but never invokes Gem/Symphony/Ubuntu ops.
-  return shell(LANE_COMMANDS['design-conformance']);
+
+  return (execute ?? shell)(LANE_COMMANDS['design-conformance']);
 }
 
 function runIosFast() {
@@ -629,6 +629,7 @@ function runStructural() {
     'python3 scripts/hermes/tests/gem-priority-gate.test.py',
     'python3 scripts/hermes/tests/test_evaluate_fleet_gate.py',
     'python3 scripts/hermes/tests/test-model-router.py',
+    'python3 scripts/hermes/tests/symphony-github-poke.test.py',
     'node --test scripts/backlog-orchestrator/__tests__/pre-lease-gates.test.mjs',
     'node --test scripts/backlog-orchestrator/__tests__/gate-next-hold.test.mjs',
     'node --test scripts/backlog-orchestrator/__tests__/ownership-inventory.test.mjs',
@@ -653,6 +654,13 @@ function runStructural() {
     // Target Vitest directly so the deploy contract always executes and fails
     // closed when the file cannot be resolved or contains no tests.
     'pnpm --filter @jovie/web exec vitest run --config=vitest.config.mts tests/unit/ci/deploy-workflow.test.ts',
+    // Blocking UI invariants (Tim lock 2026-08-30, extended 2026-09-03 by
+    // JOV-5951, gbrain ops/reviewed-invariants/blocking-ui-invariants-v1),
+    // governed by certify-only-working-v1: unproven is hidden, not green.
+    // Target Vitest directly so the screen contracts always execute and fail
+    // closed when a file is missing or resolves to zero tests (visual ENOENT
+    // is FAIL, not advisory).
+    'pnpm --filter @jovie/web exec vitest run --config=vitest.config.mts tests/unit/design-system/one-primary-action-per-screen-v1.test.ts tests/unit/design-system/editorial-card-max-v1.test.ts tests/unit/design-system/mac-header-two-lines-v1.test.ts tests/unit/design-system/column-heading-line-clamp-1-v1.test.ts tests/unit/design-system/single-column-one-width-v1.test.ts tests/unit/design-system/one-chrome-layer-v1.test.ts tests/unit/design-system/one-notification-v1.test.ts tests/unit/design-system/one-modal-layer-v1.test.ts',
     'pnpm --filter @jovie/web run test:reliability-detectors',
   ];
   const parts = [
@@ -748,19 +756,44 @@ function writeLaneResults(results, laneGroup, setupError) {
   return outPath;
 }
 
+function failFastEnabled() {
+  return process.env.CI_FAST_FAIL_FAST !== 'false';
+}
+
 function main() {
   const laneGroup = process.env.CI_FAST_LANE_GROUP;
   /** @type {LaneResult[]} */
   const results = [];
   /** @type {string | undefined} */
   let setupError;
+  const failFast = failFastEnabled();
 
   try {
-    const selectedLanes = selectLanes(laneGroup);
+    let selectedLanes = selectLanes(laneGroup);
+    if (process.env.CI_FAST_ONLY_STRUCTURAL === 'true') {
+      selectedLanes = selectedLanes.filter(lane => lane.id === 'structural');
+    }
 
+    let failedFast = false;
     for (const lane of selectedLanes) {
       console.log(`\n======== lane: ${lane.id} ========`);
       const laneStartedAt = Date.now();
+
+      if (failedFast) {
+        const logExcerpt = 'skipped: earlier lane failed (fail-fast)';
+        console.log(`[ci-fast] ${lane.id}: skipped`);
+        console.log(logExcerpt);
+        results.push({
+          id: lane.id,
+          name: lane.name,
+          nextLocalCommand: lane.nextLocalCommand,
+          status: 'skipped',
+          logExcerpt,
+          durationMs: Math.max(0, Date.now() - laneStartedAt),
+        });
+        continue;
+      }
+
       let outcome;
       try {
         outcome = lane.run();
@@ -780,6 +813,7 @@ function main() {
 
       if (status === 'failure') {
         annotateFailure(lane, logExcerpt);
+        if (failFast) failedFast = true;
       }
 
       console.log(`[ci-fast] ${lane.id}: ${status}`);

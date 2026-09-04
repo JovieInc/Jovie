@@ -347,9 +347,8 @@ describe('merge_group workflow contract', () => {
     }
 
     const remaining = getJobBlock(CI_WORKFLOW, 'ci-fast-remaining');
-    expect(remaining).toContain(
-      'CI_FAST_SKIP_STRUCTURAL: ${{ steps.structural.outputs.skip }}'
-    );
+    expect(remaining).toContain("CI_FAST_SKIP_STRUCTURAL: 'true'");
+    expect(remaining).toContain("CI_FAST_ONLY_STRUCTURAL: 'true'");
     expect(remaining).toContain('github.event_name }}" != "pull_request"');
     expect(remaining).toContain('echo "skip=false"');
     expect(remaining).toContain('apps/web/\\.storybook/');
@@ -1172,7 +1171,7 @@ ${selectedGateScript}`,
     }
   });
 
-  it('coalesces a short release wave before exact authorization and mutation', () => {
+  it('applies event-driven supersession instead of a fixed release-wave sleep', () => {
     const coalesce = getJobBlock(
       PRODUCTION_CONTROLLER_WORKFLOW,
       'coalesce-production'
@@ -1186,11 +1185,28 @@ ${selectedGateScript}`,
     expect(coalesce).toContain(
       "github.event.workflow_run.event == 'push' && github.event.workflow_run.conclusion == 'success'"
     );
-    expect(coalesce).toContain("COALESCE_DELAY_SECONDS: '60'");
-    expect(coalesce).toContain('sleep "$COALESCE_DELAY_SECONDS"');
-    expect(coalesce).toContain('echo "is_current=false" >> "$GITHUB_OUTPUT"');
-    expect(coalesce).toContain('echo "is_current=true" >> "$GITHUB_OUTPUT"');
+    // No universal fixed delay: the bounded window derives from merge-queue
+    // depth and is capped inside the 5-minute job budget.
+    expect(coalesce).not.toContain('COALESCE_DELAY_SECONDS');
+    expect(coalesce).not.toContain('sleep 60');
+    expect(coalesce).toContain("COALESCE_PER_GENERATION_SECONDS: '30'");
+    expect(coalesce).toContain("COALESCE_MAX_SECONDS: '150'");
+    expect(coalesce).toContain('sleep "$wait_seconds"');
+    // Event sources: exact main and the merge queue only; no polling loop.
     expect(coalesce).toContain('commits/main');
+    expect(coalesce).toContain('mergeQueue(branch: "main")');
+    // Empty queue + current SHA proceeds without any wait.
+    expect(coalesce).toContain('if [ "$queue_depth" -eq 0 ]; then');
+    // Every decision emits a lineage receipt with reason, replacement SHA,
+    // time saved, and next state; any wait names benefit and deadline.
+    expect(coalesce).toContain('record_receipt');
+    expect(coalesce).toContain('time_saved_seconds');
+    expect(coalesce).toContain('expected_benefit');
+    expect(coalesce).toContain('deadline');
+    expect(coalesce).toContain('next_state');
+    expect(coalesce).toContain('$GITHUB_STEP_SUMMARY');
+    expect(coalesce).toContain('echo "is_current=false"');
+    expect(coalesce).toContain('echo "is_current=true" >> "$GITHUB_OUTPUT"');
     expect(authorize).toContain(
       'needs: [coalesce-production, fleet-promotion]'
     );
@@ -1483,8 +1499,18 @@ ${selectedGateScript}`,
     );
     expect(sizeGuard).toContain("MAX_LINES: ${{ vars.PR_MAX_LINES || '800' }}");
     expect(sizeGuard).not.toContain('members were size-checked as source PRs');
-    expect(getJobBlock(SIZE_GUARD_WORKFLOW, 'size')).toContain(
-      "github.event_name == 'pull_request'"
+    const sourceSizeGuard = getJobBlock(SIZE_GUARD_WORKFLOW, 'size');
+    expect(sourceSizeGuard).toContain("github.event_name == 'pull_request'");
+    expect(sourceSizeGuard).toContain('name: Check out exact PR head');
+    expect(sourceSizeGuard).toContain(
+      'ref: ${{ github.event.pull_request.head.sha }}'
+    );
+    expect(sourceSizeGuard).toContain('persist-credentials: false');
+    expect(sourceSizeGuard).toContain(
+      'git fetch --no-tags --depth=1 origin "${{ github.event.pull_request.base.sha }}"'
+    );
+    expect(sourceSizeGuard).toContain(
+      'repo-hygiene-guard.mjs --diff-base "${{ github.event.pull_request.base.sha }}"'
     );
     expect(MEMBER_POLICY).toContain('fetchComparison');
     expect(MEMBER_POLICY).toContain('fetchPullRequest');

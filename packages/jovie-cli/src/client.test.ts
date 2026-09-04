@@ -7,7 +7,7 @@ import {
   fetchArtistLlms,
   fetchOpenApi,
   fetchSiteLlms,
-  JovieRequestError,
+  JovieInputError,
   normalizeBaseUrl,
   validateUsername,
 } from './client.js';
@@ -38,8 +38,9 @@ describe('Jovie public resource client', () => {
       credentialsUrl,
       'https://jov.ie/api',
       'https://jov.ie/?token=secret',
+      'https://jov.ie/#private',
     ]) {
-      expect(() => normalizeBaseUrl(value)).toThrow(JovieRequestError);
+      expect(() => normalizeBaseUrl(value)).toThrow(JovieInputError);
     }
   });
 
@@ -54,7 +55,7 @@ describe('Jovie public resource client', () => {
       'artist/name',
       'artist name',
     ]) {
-      expect(() => validateUsername(value)).toThrow(JovieRequestError);
+      expect(() => validateUsername(value)).toThrow(JovieInputError);
     }
   });
 
@@ -136,5 +137,25 @@ describe('Jovie public resource client', () => {
       code: 'REQUEST_FAILED',
       message: 'GET https://jov.ie/llms.txt failed: socket unavailable',
     });
+
+    const nonErrorFetch: FetchImplementation = async () => {
+      throw 'connection closed';
+    };
+    await expect(
+      fetchSiteLlms(false, { fetchImpl: nonErrorFetch })
+    ).rejects.toMatchObject({
+      message: 'GET https://jov.ie/llms.txt failed: connection closed',
+    });
+  });
+
+  it('combines a caller cancellation signal with the request timeout', async () => {
+    const { calls, fetchImpl } = createFetch('# guide');
+    const controller = new AbortController();
+
+    await expect(
+      fetchSiteLlms(false, { fetchImpl, signal: controller.signal })
+    ).resolves.toBe('# guide');
+    expect(calls[0].init?.signal).toBeInstanceOf(AbortSignal);
+    expect(calls[0].init?.signal).not.toBe(controller.signal);
   });
 });

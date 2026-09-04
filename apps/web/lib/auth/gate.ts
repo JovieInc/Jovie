@@ -65,12 +65,43 @@ export interface AuthGateResult {
   };
 }
 
+export interface AuthGateIdentity {
+  readonly clerkUserId: string | null;
+  readonly email: string | null;
+}
+
 function canUseE2ETestAuthFallback(): boolean {
   return (
     process.env.E2E_USE_TEST_AUTH_BYPASS === '1' &&
     process.env.NEXT_PUBLIC_E2E_MODE === '1' &&
     process.env.VERCEL_ENV !== 'preview'
   );
+}
+
+/**
+ * Secretless visual capture and local E2E have no reachable waitlist store;
+ * fail soft like the user-row lookup or the app shell renders "Dashboard
+ * failed to load" (JOV-5387 PR visual review).
+ */
+async function readWaitlistGateEnabledForAuthGate(): Promise<boolean> {
+  try {
+    return await isWaitlistGateEnabled();
+  } catch (error) {
+    if (!canUseE2ETestAuthFallback()) {
+      throw error;
+    }
+
+    Sentry.addBreadcrumb({
+      category: 'auth-gate',
+      level: 'warning',
+      message:
+        'Using E2E test auth fallback after waitlist gate lookup failure',
+      data: {
+        error: error instanceof Error ? error.message : String(error),
+      },
+    });
+    return false;
+  }
 }
 
 function createE2ETestAuthGateResult(
@@ -482,10 +513,9 @@ async function handleMissingDbUser(
  * short-circuit the session read. The app user's `betterAuthUserId` is
  * resolved from the DB.
  */
-async function resolveAuthIdentity(knownAppUserId?: string): Promise<{
-  clerkUserId: string | null;
-  email: string | null;
-}> {
+async function resolveAuthIdentity(
+  knownAppUserId?: string
+): Promise<AuthGateIdentity> {
   // The secretless visual-capture runtime carries a Better Auth identity in
   // test cookies, but has no persisted app `users.id`. In that deliberately
   // synthetic mode it must win over a caller's cached app-id hint. Normal
@@ -542,6 +572,10 @@ async function resolveAuthIdentity(knownAppUserId?: string): Promise<{
     // must pass `knownAppUserId`.
     return { clerkUserId: null, email: null };
   }
+}
+
+export async function resolveRequestAuthIdentity(): Promise<AuthGateIdentity> {
+  return resolveAuthIdentity();
 }
 
 async function loadAuthGateRecord(
@@ -627,6 +661,12 @@ function toAuthGateProfile(
 export interface ResolveUserStateOptions {
   createDbUserIfMissing?: boolean;
   /**
+   * Pre-resolved Better Auth identity for callers that already performed the
+   * request session lookup. This preserves the canonical gate while avoiding a
+   * second auth-store read on the same route.
+   */
+  knownAuthIdentity?: AuthGateIdentity;
+  /**
    * Pre-resolved app `users.id` UUID. When provided, skips the Better Auth
    * session read (which calls `headers()` and must NOT be invoked inside
    * `unstable_cache` / `"use cache"` boundaries).
@@ -646,6 +686,7 @@ function serializeResolveUserStateOptions(
 ): string {
   return JSON.stringify({
     createDbUserIfMissing: options.createDbUserIfMissing ?? true,
+    knownAuthIdentity: options.knownAuthIdentity ?? null,
     knownClerkUserId: options.knownClerkUserId ?? null,
   });
 }
@@ -671,11 +712,17 @@ function serializeResolveUserStateOptions(
 async function resolveUserStateInternal(
   options: ResolveUserStateOptions = {}
 ): Promise<AuthGateResult> {
-  const { createDbUserIfMissing = true, knownClerkUserId } = options;
+  const {
+    createDbUserIfMissing = true,
+    knownAuthIdentity,
+    knownClerkUserId,
+  } = options;
 
   // 1. Resolve Better Auth identity and prefetch waitlist gate in parallel.
-  const identityPromise = resolveAuthIdentity(knownClerkUserId);
-  const waitlistGatePromise = isWaitlistGateEnabled();
+  const identityPromise = knownAuthIdentity
+    ? Promise.resolve(knownAuthIdentity)
+    : resolveAuthIdentity(knownClerkUserId);
+  const waitlistGatePromise = readWaitlistGateEnabledForAuthGate();
   const { clerkUserId, email } = await identityPromise;
 
   if (!clerkUserId) {
@@ -790,11 +837,13 @@ const resolveUserStateCached = cache(
   async (optionsKey: string): Promise<AuthGateResult> => {
     const parsed = JSON.parse(optionsKey) as {
       createDbUserIfMissing: boolean;
+      knownAuthIdentity: AuthGateIdentity | null;
       knownClerkUserId: string | null;
     };
 
     return resolveUserStateInternal({
       createDbUserIfMissing: parsed.createDbUserIfMissing,
+      knownAuthIdentity: parsed.knownAuthIdentity ?? undefined,
       knownClerkUserId: parsed.knownClerkUserId ?? undefined,
     });
   }

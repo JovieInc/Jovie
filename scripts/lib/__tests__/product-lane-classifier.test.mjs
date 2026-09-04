@@ -191,6 +191,32 @@ describe('product lane classifier', () => {
     ).toEqual(['ios', 'mac', 'web', 'cross-product']);
   });
 
+  it('keeps the iOS lane off lockfile-only churn', () => {
+    // Every dependabot group touches pnpm-lock.yaml; the iOS lane is native
+    // xcodebuild with no causal path from the JS install graph, so dependency
+    // bumps must not pay for it in the merge queue.
+    const lockfileOnly = classifyProductLanes(['pnpm-lock.yaml']);
+    expect(lockfileOnly.selectedLanes).not.toContain('ios');
+    expect(lockfileOnly.selectedLanes).toEqual(
+      expect.arrayContaining(['mac', 'web'])
+    );
+    expect(lockfileOnly.classifications[0]?.rule).toBe('shared-js-lockfile');
+
+    // A dependabot-shaped diff (manifest + lockfile) still skips iOS.
+    const dependabotBump = classifyProductLanes([
+      'apps/web/package.json',
+      'pnpm-lock.yaml',
+    ]);
+    expect(dependabotBump.selectedLanes).not.toContain('ios');
+
+    // Root package.json script edits keep full coverage (release wiring).
+    const rootManifest = classifyProductLanes(['package.json'], {
+      packageJsonBefore: JSON.stringify({ scripts: {} }),
+      packageJsonAfter: JSON.stringify({}),
+    });
+    expect(rootManifest.selectedLanes).toContain('ios');
+  });
+
   it('loads package script changes from the supplied git refs', () => {
     const root = mkdtempSync(join(tmpdir(), 'jovie-product-lane-git-'));
     const files = join(root, 'files.txt');

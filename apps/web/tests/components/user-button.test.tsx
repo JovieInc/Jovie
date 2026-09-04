@@ -17,6 +17,7 @@ vi.mock('@/lib/queries', () => ({
   usePortalMutation: vi.fn(),
   useFeedbackMutation: vi.fn(),
   useChatUsageQuery: vi.fn(),
+  useUsageSummaryQuery: vi.fn(),
 }));
 
 vi.mock('next/navigation', () => ({
@@ -64,6 +65,7 @@ import {
   useFeedbackMutation,
   usePortalMutation,
   usePricingOptionsQuery,
+  useUsageSummaryQuery,
 } from '@/lib/queries';
 
 const flushMicrotasks = async () => {
@@ -75,6 +77,7 @@ const flushMicrotasks = async () => {
 
 const mockUseBillingStatusQuery = vi.mocked(useBillingStatusQuery);
 const mockUseChatUsageQuery = vi.mocked(useChatUsageQuery);
+const mockUseUsageSummaryQuery = vi.mocked(useUsageSummaryQuery);
 const mockUsePricingOptionsQuery = vi.mocked(usePricingOptionsQuery);
 const mockUseCheckoutMutation = vi.mocked(useCheckoutMutation);
 const mockUsePortalMutation = vi.mocked(usePortalMutation);
@@ -147,17 +150,35 @@ describe('UserButton billing actions', () => {
     mockUseChatUsageQuery.mockReturnValue({
       data: {
         plan: 'free',
-        dailyLimit: 10,
+        weeklyLimit: 15,
         used: 4,
-        remaining: 6,
+        remaining: 11,
         resetAt: '2026-05-23T07:00:00.000Z',
-        monthlyLimit: 310,
-        monthlyUsed: 24,
-        monthlyRemaining: 286,
-        monthlyResetAt: '2026-06-01T00:00:00.000Z',
         isExhausted: false,
-        warningThreshold: 2,
+        warningThreshold: 3,
         isNearLimit: false,
+      },
+      isLoading: false,
+      error: null,
+    } as any);
+    mockUseUsageSummaryQuery.mockReturnValue({
+      data: {
+        plan: 'free',
+        planDisplayName: 'Free',
+        suggestions: {
+          used: 3,
+          limit: 15,
+          remaining: 12,
+          remainingPercent: 80,
+          resetAt: '2026-05-25T00:00:00.000Z',
+        },
+        liveActions: {
+          used: 1,
+          limit: 5,
+          remaining: 4,
+          resetAt: '2026-05-23T20:00:00.000Z',
+        },
+        remainingPercent: 80,
       },
       isLoading: false,
       error: null,
@@ -682,7 +703,7 @@ describe('UserButton billing actions', () => {
     await user.click(screen.getByText('Adele Adkins'));
 
     expect(screen.getByText('Usage remaining')).toBeInTheDocument();
-    expect(screen.getByText('60%')).toBeInTheDocument();
+    expect(screen.getByText('73%')).toBeInTheDocument();
     expect(screen.queryByText('Usage Stats')).not.toBeInTheDocument();
   });
 

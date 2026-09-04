@@ -1,6 +1,7 @@
 'use client';
 
 import { Button, type CommonDropdownItem, SimpleTooltip } from '@jovie/ui';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { type ColumnDef, createColumnHelper } from '@tanstack/react-table';
 import {
   ArrowDownRight,
@@ -18,12 +19,21 @@ import {
   MoreHorizontal,
   Orbit,
   Plus,
+  RefreshCw,
   Share2,
   UserRound,
 } from 'lucide-react';
 import Link from 'next/link';
 import { useRouter, useSearchParams } from 'next/navigation';
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import {
+  type RefObject,
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from 'react';
+import type { ProfileSuggestion } from '@/app/api/suggestions/route';
 import { BrandLogo } from '@/components/atoms/BrandLogo';
 import { EmptyCell } from '@/components/atoms/EmptyCell';
 import {
@@ -62,6 +72,7 @@ import {
   getConnectionStatus,
   sortProfileWorkspaceRows,
 } from '@/lib/profile-surfaces/workspace';
+import { fetchWithTimeout, queryKeys, STANDARD_CACHE } from '@/lib/queries';
 import { cn } from '@/lib/utils';
 import {
   AddConnectionRail,
@@ -72,15 +83,18 @@ import type {
   ProfilesWorkspaceData,
   ProfilesWorkspaceFilter,
   ProfileWorkspaceRow,
+  ProfileWorkspaceSurfaceRow,
 } from './data';
 
 const columnHelper = createColumnHelper<ProfileWorkspaceRow>();
 const DSP_FILTER_LABEL = 'DSPs';
+type ProfilesWorkspaceView = ProfilesWorkspaceFilter | 'suggested';
 const FILTERS: ReadonlyArray<{
-  id: ProfilesWorkspaceFilter;
+  id: ProfilesWorkspaceView;
   label: string;
 }> = [
   { id: 'all', label: 'All Pages' },
+  { id: 'suggested', label: 'Suggested' },
   { id: 'dsp', label: DSP_FILTER_LABEL },
   { id: 'social', label: 'Social' },
   { id: 'connector', label: 'Connectors' },
@@ -88,6 +102,219 @@ const FILTERS: ReadonlyArray<{
   { id: 'website', label: 'Websites' },
   { id: 'jovie', label: 'Jovie' },
 ];
+
+type ConnectionSuggestion = ProfileSuggestion & {
+  readonly type: 'dsp_match' | 'social_link';
+  readonly externalUrl: string;
+};
+
+interface SuggestionActionError {
+  readonly suggestionId: string;
+  readonly message: string;
+}
+
+interface SuggestedConnectionGroup {
+  readonly id: string;
+  readonly identity: string;
+  readonly suggestions: readonly ConnectionSuggestion[];
+}
+
+interface SuggestionsApiResponse {
+  readonly success: boolean;
+  readonly suggestions?: ProfileSuggestion[];
+  readonly error?: string;
+}
+
+interface SuggestionMutationResponse {
+  readonly success?: boolean;
+  readonly error?: string;
+}
+
+type SuggestionAction = 'accept' | 'reject';
+
+const CONNECTION_SUGGESTION_PLATFORM_PRIORITY: Readonly<
+  Record<string, number>
+> = {
+  instagram: 0,
+  tiktok: 1,
+  youtube: 2,
+  twitter: 3,
+  x: 3,
+  facebook: 4,
+  spotify: 10,
+  apple_music: 11,
+  youtube_music: 12,
+  soundcloud: 13,
+  bandcamp: 14,
+};
+
+const SUGGESTED_QUEUE_FOCUS_TARGET = 'suggested-connections-region';
+const SUGGESTED_CONNECTION_SKELETON_IDS = [
+  'suggested-connection-loading-1',
+  'suggested-connection-loading-2',
+  'suggested-connection-loading-3',
+] as const;
+
+function connectionSuggestionsQueryKey(profileId: string) {
+  return [...queryKeys.suggestions.list(profileId), 'connections-review'];
+}
+
+function isConnectionSuggestion(
+  suggestion: ProfileSuggestion
+): suggestion is ConnectionSuggestion {
+  return (
+    (suggestion.type === 'dsp_match' || suggestion.type === 'social_link') &&
+    typeof suggestion.externalUrl === 'string' &&
+    suggestion.externalUrl.trim().length > 0
+  );
+}
+
+async function fetchConnectionSuggestions(
+  profileId: string,
+  signal?: AbortSignal
+): Promise<ConnectionSuggestion[]> {
+  const data = await fetchWithTimeout<SuggestionsApiResponse>(
+    `/api/suggestions?profileId=${encodeURIComponent(profileId)}`,
+    { signal }
+  );
+
+  if (!data.success) {
+    throw new Error(data.error ?? 'Failed to load suggestions');
+  }
+
+  return (data.suggestions ?? []).filter(isConnectionSuggestion);
+}
+
+function compactUrlDisplay(value: string): string {
+  try {
+    const url = new URL(value);
+    const path = url.pathname
+      .split('/')
+      .findLast(segment => segment.length > 0)
+      ?.replace(/^@/, '');
+    if (path) return `@${path}`;
+    return url.hostname.replace(/^www\./, '');
+  } catch {
+    return value;
+  }
+}
+
+function suggestionIdentity(suggestion: ConnectionSuggestion): string {
+  const title = suggestion.title.trim();
+  if (title) return title;
+  if (suggestion.externalUrl) return compactUrlDisplay(suggestion.externalUrl);
+  return suggestion.platformLabel;
+}
+
+function suggestionIdentityKey(suggestion: ConnectionSuggestion): string {
+  return suggestionIdentity(suggestion).trim().toLowerCase().replace(/^@/, '');
+}
+
+function formatConfidence(confidence: number | null): string | null {
+  if (confidence === null) return null;
+  return `${Math.round(confidence * 100)}% match`;
+}
+
+function suggestionContext(suggestion: ConnectionSuggestion): string {
+  const confidence = formatConfidence(suggestion.confidence);
+  return [suggestion.subtitle, confidence].filter(Boolean).join(' · ');
+}
+
+function sortConnectionSuggestions(
+  suggestions: readonly ConnectionSuggestion[]
+): ConnectionSuggestion[] {
+  return [...suggestions].sort((left, right) => {
+    const identityDifference = suggestionIdentityKey(left).localeCompare(
+      suggestionIdentityKey(right)
+    );
+    if (identityDifference !== 0) return identityDifference;
+
+    const platformDifference =
+      (CONNECTION_SUGGESTION_PLATFORM_PRIORITY[left.platform] ?? 50) -
+      (CONNECTION_SUGGESTION_PLATFORM_PRIORITY[right.platform] ?? 50);
+    if (platformDifference !== 0) return platformDifference;
+
+    return (right.confidence ?? 0) - (left.confidence ?? 0);
+  });
+}
+
+function groupConnectionSuggestions(
+  suggestions: readonly ConnectionSuggestion[]
+): SuggestedConnectionGroup[] {
+  const groups = new Map<string, SuggestedConnectionGroup>();
+
+  for (const suggestion of sortConnectionSuggestions(suggestions)) {
+    const identity = suggestionIdentity(suggestion);
+    const id = suggestionIdentityKey(suggestion) || suggestion.id;
+    const existing = groups.get(id);
+    groups.set(id, {
+      id,
+      identity,
+      suggestions: existing
+        ? [...existing.suggestions, suggestion]
+        : [suggestion],
+    });
+  }
+
+  return [...groups.values()];
+}
+
+function suggestionActionEndpoint(
+  suggestion: ConnectionSuggestion,
+  action: SuggestionAction
+): string {
+  if (suggestion.type === 'dsp_match') {
+    return `/api/dsp/matches/${encodeURIComponent(suggestion.id)}/${
+      action === 'accept' ? 'confirm' : 'reject'
+    }`;
+  }
+
+  return `/api/suggestions/social-links/${encodeURIComponent(suggestion.id)}/${
+    action === 'accept' ? 'approve' : 'reject'
+  }`;
+}
+
+function suggestionFocusKey(
+  suggestionId: string,
+  action: SuggestionAction
+): string {
+  return `${suggestionId}:${action}`;
+}
+
+function findNextSuggestionFocusTarget(
+  suggestions: readonly ConnectionSuggestion[],
+  suggestionId: string
+): string {
+  const index = suggestions.findIndex(
+    suggestion => suggestion.id === suggestionId
+  );
+  const nextSuggestion = suggestions[index + 1] ?? suggestions[index - 1];
+  return nextSuggestion
+    ? suggestionFocusKey(nextSuggestion.id, 'accept')
+    : SUGGESTED_QUEUE_FOCUS_TARGET;
+}
+
+function suggestionToAcceptedRow(
+  suggestion: ConnectionSuggestion
+): ProfileWorkspaceSurfaceRow {
+  return {
+    id: `accepted:${suggestion.type}:${suggestion.id}`,
+    rowType: 'surface',
+    kind: suggestion.type === 'dsp_match' ? 'dsp' : 'social',
+    platform: suggestion.platform,
+    label: suggestion.platformLabel || suggestion.platform,
+    handle:
+      suggestion.type === 'social_link' ? suggestionIdentity(suggestion) : null,
+    url: suggestion.externalUrl,
+    trackedUrl: null,
+    qualificationStatus: 'qualified',
+    isOfficial: true,
+    monitoringState: 'unavailable',
+    rank: null,
+    previousRank: null,
+    lastObservedAt: null,
+  };
+}
 
 function kindLabel(row: ProfileWorkspaceRow): string {
   const labels = {
@@ -599,21 +826,399 @@ function PresenceOutcomeStrip({
   );
 }
 
+function SuggestedConnectionsLoading() {
+  return (
+    <div aria-busy='true' aria-live='polite' className='min-h-55'>
+      <span className='sr-only'>Loading Suggested Connections</span>
+      <div className='overflow-hidden rounded-lg border border-subtle bg-surface-1'>
+        {SUGGESTED_CONNECTION_SKELETON_IDS.map(id => (
+          <div
+            key={id}
+            className='flex min-h-16 items-center gap-3 border-b border-subtle px-3 py-2.5 last:border-b-0'
+          >
+            <div className='h-8 w-8 shrink-0 rounded-md bg-surface-2' />
+            <div className='min-w-0 flex-1 space-y-2'>
+              <div className='h-3 w-28 rounded-full bg-surface-2' />
+              <div className='h-3 w-44 max-w-full rounded-full bg-surface-2' />
+            </div>
+            <div className='hidden h-7 w-32 rounded-full bg-surface-2 sm:block' />
+          </div>
+        ))}
+      </div>
+      <span className='sr-only'>Loading suggested connections.</span>
+    </div>
+  );
+}
+
+function SuggestedConnectionsState({
+  heading,
+  description,
+  onRetry,
+  testId,
+}: Readonly<{
+  heading: string;
+  description: string;
+  onRetry?: () => void;
+  testId: string;
+}>) {
+  return (
+    <div className='min-h-55'>
+      <TableEmptyState
+        heading={heading}
+        description={description}
+        testId={testId}
+        actionSlot={
+          onRetry ? (
+            <Button
+              type='button'
+              variant='secondary'
+              size='sm'
+              onClick={onRetry}
+            >
+              <RefreshCw className='h-3.5 w-3.5' aria-hidden /> Try Again
+            </Button>
+          ) : undefined
+        }
+      />
+    </div>
+  );
+}
+
+function SuggestedConnectionRow({
+  suggestion,
+  actionError,
+  onAction,
+  registerActionRef,
+}: Readonly<{
+  suggestion: ConnectionSuggestion;
+  actionError: SuggestionActionError | null;
+  onAction: (
+    suggestion: ConnectionSuggestion,
+    action: SuggestionAction
+  ) => void;
+  registerActionRef: (
+    suggestionId: string,
+    action: SuggestionAction
+  ) => (node: HTMLButtonElement | null) => void;
+}>) {
+  const hasError = actionError?.suggestionId === suggestion.id;
+  const identity = suggestionIdentity(suggestion);
+  const context = hasError
+    ? actionError.message
+    : suggestionContext(suggestion);
+
+  return (
+    <li
+      data-testid='suggested-connection-row'
+      className='flex min-h-16 min-w-0 items-center justify-between gap-2 px-3 py-2.5'
+    >
+      <div className='flex min-w-0 items-center gap-2.5'>
+        <span className='flex h-8 w-8 shrink-0 items-center justify-center rounded-md border border-subtle bg-surface-0 text-secondary-token'>
+          <SocialIcon
+            platform={suggestion.platform}
+            className='h-4 w-4'
+            aria-hidden
+          />
+        </span>
+        <span className='min-w-0 flex-1'>
+          <span className='flex min-w-0 items-center gap-2'>
+            <span className='truncate text-sm font-medium text-primary-token'>
+              {suggestion.platformLabel}
+            </span>
+            <span className='truncate text-xs text-secondary-token'>
+              {identity}
+            </span>
+          </span>
+          <span
+            className={cn(
+              'mt-0.5 block min-h-4 truncate text-xs',
+              hasError ? 'text-error' : 'text-tertiary-token'
+            )}
+            role={hasError ? 'alert' : undefined}
+          >
+            {context}
+          </span>
+        </span>
+      </div>
+      <div className='grid grid-cols-2 gap-1.5 sm:flex sm:items-center sm:justify-end'>
+        <Button
+          ref={registerActionRef(suggestion.id, 'accept')}
+          type='button'
+          size='sm'
+          className='w-full whitespace-nowrap sm:w-auto'
+          onClick={() => onAction(suggestion, 'accept')}
+        >
+          <CircleCheck className='h-3.5 w-3.5' aria-hidden /> Add
+        </Button>
+        <Button
+          ref={registerActionRef(suggestion.id, 'reject')}
+          type='button'
+          variant='secondary'
+          size='sm'
+          className='w-full whitespace-nowrap sm:w-auto'
+          onClick={() => onAction(suggestion, 'reject')}
+        >
+          {/* ui-casing-allow: canonical sentence-case identity-rejection label, pinned by ProfilesWorkspace.test */}
+          <CircleX className='h-3.5 w-3.5' aria-hidden /> Not me
+        </Button>
+      </div>
+    </li>
+  );
+}
+
+function SuggestedConnectionsReview({
+  groups,
+  isLoading,
+  isError,
+  actionError,
+  onAction,
+  onRetry,
+  registerActionRef,
+  regionRef,
+}: Readonly<{
+  groups: readonly SuggestedConnectionGroup[];
+  isLoading: boolean;
+  isError: boolean;
+  actionError: SuggestionActionError | null;
+  onAction: (
+    suggestion: ConnectionSuggestion,
+    action: SuggestionAction
+  ) => void;
+  onRetry: () => void;
+  registerActionRef: (
+    suggestionId: string,
+    action: SuggestionAction
+  ) => (node: HTMLButtonElement | null) => void;
+  regionRef: RefObject<HTMLDivElement | null>;
+}>) {
+  return (
+    <section
+      ref={regionRef}
+      tabIndex={-1}
+      aria-label='Suggested Connections'
+      className='min-h-55 min-w-0 px-3 py-3 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-inset focus-visible:ring-focus/50'
+      data-testid='suggested-connections-review'
+    >
+      {isLoading ? <SuggestedConnectionsLoading /> : null}
+      {isError && groups.length === 0 ? (
+        <SuggestedConnectionsState
+          heading="Couldn't Load Suggestions"
+          description='Saved suggestions are still available. Try again.'
+          onRetry={onRetry}
+          testId='suggested-connections-error-state'
+        />
+      ) : null}
+      {!isLoading && !isError && groups.length === 0 ? (
+        <SuggestedConnectionsState
+          heading='No Suggested Connections'
+          description='Detected public identities will appear here for review.'
+          testId='suggested-connections-empty-state'
+        />
+      ) : null}
+      {!isLoading && groups.length > 0 ? (
+        <ul
+          aria-label='Suggested Connection Review Queue'
+          className='min-w-0 overflow-hidden rounded-lg border border-subtle bg-surface-1'
+        >
+          {groups.map(group => (
+            <li
+              key={group.id}
+              data-testid='suggested-connection-group'
+              data-suggestion-identity={group.id}
+              className='min-w-0 border-b border-subtle last:border-b-0'
+            >
+              <ul
+                aria-label={`${group.identity} suggestions`}
+                className='min-w-0 divide-y divide-subtle'
+              >
+                {group.suggestions.map(suggestion => (
+                  <SuggestedConnectionRow
+                    key={suggestion.id}
+                    suggestion={suggestion}
+                    actionError={actionError}
+                    onAction={onAction}
+                    registerActionRef={registerActionRef}
+                  />
+                ))}
+              </ul>
+            </li>
+          ))}
+        </ul>
+      ) : null}
+    </section>
+  );
+}
+
 export function ProfilesWorkspace({
   data,
 }: Readonly<{ data: ProfilesWorkspaceData | null }>) {
-  const [filter, setFilter] = useState<ProfilesWorkspaceFilter>('all');
+  const [filter, setFilter] = useState<ProfilesWorkspaceView>('all');
   const [selected, setSelected] = useState<ProfileWorkspaceRow | null>(null);
   const [isAddConnectionOpen, setIsAddConnectionOpen] = useState(false);
   const [pendingCandidate, setPendingCandidate] =
     useState<ConnectionIntakeCandidate | null>(null);
+  const [suggestionActionError, setSuggestionActionError] =
+    useState<SuggestionActionError | null>(null);
+  const [acceptedSuggestionRows, setAcceptedSuggestionRows] = useState<
+    ProfileWorkspaceSurfaceRow[]
+  >([]);
+  const suggestionActionRefs = useRef(new Map<string, HTMLButtonElement>());
+  const suggestedRegionRef = useRef<HTMLDivElement>(null);
+  const pendingSuggestionFocusTargetRef = useRef<string | null>(null);
   const router = useRouter();
   const searchParams = useSearchParams();
+  const queryClient = useQueryClient();
+  const profileId = data?.profileId ?? null;
+  const connectionSuggestionKey = useMemo(
+    () => connectionSuggestionsQueryKey(profileId ?? ''),
+    [profileId]
+  );
+  const connectionSuggestionsQuery = useQuery({
+    ...STANDARD_CACHE,
+    queryKey: connectionSuggestionKey,
+    queryFn: ({ signal }) =>
+      fetchConnectionSuggestions(profileId ?? '', signal),
+    enabled: Boolean(profileId),
+  });
+  const connectionSuggestions = useMemo(
+    () => connectionSuggestionsQuery.data ?? [],
+    [connectionSuggestionsQuery.data]
+  );
+  const suggestedGroups = useMemo(
+    () => groupConnectionSuggestions(connectionSuggestions),
+    [connectionSuggestions]
+  );
+  const visibleSuggestionFocusTargets = useMemo(
+    () =>
+      suggestedGroups
+        .flatMap(group =>
+          group.suggestions.flatMap(suggestion => [
+            suggestionFocusKey(suggestion.id, 'accept'),
+            suggestionFocusKey(suggestion.id, 'reject'),
+          ])
+        )
+        .join('|'),
+    [suggestedGroups]
+  );
   useEffect(() => {
-    if (searchParams.get('add') === 'service') {
-      router.replace(APP_ROUTES.SETTINGS_CONNECTORS);
-    }
+    if (searchParams.get('add') !== 'service') return;
+
+    setSelected(null);
+    setPendingCandidate(null);
+    setIsAddConnectionOpen(false);
+    setFilter('suggested');
+    router.replace(APP_ROUTES.PROFILES);
   }, [router, searchParams]);
+  useEffect(() => {
+    const target = pendingSuggestionFocusTargetRef.current;
+    if (!target) return;
+
+    const element =
+      target === SUGGESTED_QUEUE_FOCUS_TARGET
+        ? suggestedRegionRef.current
+        : suggestionActionRefs.current.get(target);
+    if (!element) return;
+
+    element.focus();
+    pendingSuggestionFocusTargetRef.current = null;
+  }, [visibleSuggestionFocusTargets]);
+  const registerSuggestionActionRef = useCallback(
+    (suggestionId: string, action: SuggestionAction) =>
+      (node: HTMLButtonElement | null) => {
+        const key = suggestionFocusKey(suggestionId, action);
+        if (node) {
+          suggestionActionRefs.current.set(key, node);
+          return;
+        }
+        suggestionActionRefs.current.delete(key);
+      },
+    []
+  );
+  const persistedAcceptedRows = useMemo(() => {
+    const currentSurfaceKeys = new Set(
+      (data?.rows ?? [])
+        .filter(row => row.rowType === 'surface')
+        .map(row => `${row.platform}:${row.url}`)
+    );
+
+    return acceptedSuggestionRows.filter(
+      row => !currentSurfaceKeys.has(`${row.platform}:${row.url}`)
+    );
+  }, [acceptedSuggestionRows, data?.rows]);
+  const handleSuggestionAction = useCallback(
+    async (suggestion: ConnectionSuggestion, action: SuggestionAction) => {
+      if (!profileId) return;
+
+      setSuggestionActionError(null);
+      await queryClient.cancelQueries({ queryKey: connectionSuggestionKey });
+      const previousSuggestions = queryClient.getQueryData<
+        ConnectionSuggestion[]
+      >(connectionSuggestionKey);
+      pendingSuggestionFocusTargetRef.current = findNextSuggestionFocusTarget(
+        connectionSuggestions,
+        suggestion.id
+      );
+      queryClient.setQueryData<ConnectionSuggestion[]>(
+        connectionSuggestionKey,
+        old => (old ?? []).filter(item => item.id !== suggestion.id)
+      );
+
+      try {
+        const response = await fetchWithTimeout<SuggestionMutationResponse>(
+          suggestionActionEndpoint(suggestion, action),
+          {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ profileId }),
+          }
+        );
+        if (response.success === false) {
+          throw new Error(response.error ?? 'Failed to update suggestion');
+        }
+
+        if (action === 'accept') {
+          const acceptedRow = suggestionToAcceptedRow(suggestion);
+          setAcceptedSuggestionRows(rows => [
+            acceptedRow,
+            ...rows.filter(row => row.id !== acceptedRow.id),
+          ]);
+          router.refresh();
+        }
+        await queryClient.invalidateQueries({
+          queryKey: queryKeys.suggestions.all,
+        });
+      } catch {
+        if (previousSuggestions) {
+          queryClient.setQueryData(
+            connectionSuggestionKey,
+            previousSuggestions
+          );
+        } else {
+          await queryClient.invalidateQueries({
+            queryKey: connectionSuggestionKey,
+          });
+        }
+        pendingSuggestionFocusTargetRef.current = suggestionFocusKey(
+          suggestion.id,
+          action
+        );
+        setSuggestionActionError({
+          suggestionId: suggestion.id,
+          message:
+            action === 'accept'
+              ? 'Could not add. Try again.'
+              : 'Could not dismiss. Try again.',
+        });
+      }
+    },
+    [
+      connectionSuggestionKey,
+      connectionSuggestions,
+      profileId,
+      queryClient,
+      router,
+    ]
+  );
   const pendingRow = useMemo<ProfileWorkspaceRow | null>(() => {
     if (!pendingCandidate) return null;
     return {
@@ -637,13 +1242,14 @@ export function ProfilesWorkspace({
     };
   }, [pendingCandidate]);
   const rows = useMemo(() => {
+    if (filter === 'suggested') return [];
     const sourceRows = pendingRow
-      ? [pendingRow, ...(data?.rows ?? [])]
-      : (data?.rows ?? []);
+      ? [pendingRow, ...persistedAcceptedRows, ...(data?.rows ?? [])]
+      : [...persistedAcceptedRows, ...(data?.rows ?? [])];
     return sortProfileWorkspaceRows(
       filterProfileWorkspaceRows(sourceRows, filter)
     );
-  }, [data?.rows, filter, pendingRow]);
+  }, [data?.rows, filter, pendingRow, persistedAcceptedRows]);
   const handleAddConnection = useCallback(() => {
     setSelected(null);
     setPendingCandidate(null);
@@ -821,6 +1427,8 @@ export function ProfilesWorkspace({
       isAddConnectionOpen ? (
         <AddConnectionRail
           data={data}
+          suggestedCount={connectionSuggestions.length}
+          suggestionsLoading={connectionSuggestionsQuery.isLoading}
           onClose={() => {
             setPendingCandidate(null);
             setIsAddConnectionOpen(false);
@@ -840,7 +1448,7 @@ export function ProfilesWorkspace({
             setIsAddConnectionOpen(false);
           }}
           onReviewSuggestions={() => {
-            setFilter('social');
+            setFilter('suggested');
             setSelected(null);
             setPendingCandidate(null);
             setIsAddConnectionOpen(false);
@@ -906,38 +1514,53 @@ export function ProfilesWorkspace({
       }
     >
       <PresenceOutcomeStrip data={data} />
-      <UnifiedTable
-        data={rows}
-        columns={columns as ColumnDef<ProfileWorkspaceRow, unknown>[]}
-        getRowId={row => row.id}
-        onRowClick={row => {
-          if (!row.id.startsWith('preview:')) setSelected(row);
-        }}
-        onRowContextMenu={(row, event) => {
-          if (row.id.startsWith('preview:')) {
-            event.preventDefault();
-            event.stopPropagation();
+      {filter === 'suggested' ? (
+        <SuggestedConnectionsReview
+          groups={suggestedGroups}
+          isLoading={connectionSuggestionsQuery.isLoading}
+          isError={connectionSuggestionsQuery.isError}
+          actionError={suggestionActionError}
+          onAction={handleSuggestionAction}
+          onRetry={() => {
+            void connectionSuggestionsQuery.refetch();
+          }}
+          registerActionRef={registerSuggestionActionRef}
+          regionRef={suggestedRegionRef}
+        />
+      ) : (
+        <UnifiedTable
+          data={rows}
+          columns={columns as ColumnDef<ProfileWorkspaceRow, unknown>[]}
+          getRowId={row => row.id}
+          onRowClick={row => {
+            if (!row.id.startsWith('preview:')) setSelected(row);
+          }}
+          onRowContextMenu={(row, event) => {
+            if (row.id.startsWith('preview:')) {
+              event.preventDefault();
+              event.stopPropagation();
+            }
+          }}
+          getContextMenuItems={getContextMenuItems}
+          rowHeight={56}
+          minWidth='390px'
+          isRowSelected={row =>
+            !row.id.startsWith('preview:') && selected?.id === row.id
           }
-        }}
-        getContextMenuItems={getContextMenuItems}
-        rowHeight={56}
-        minWidth='390px'
-        isRowSelected={row =>
-          !row.id.startsWith('preview:') && selected?.id === row.id
-        }
-        getRowClassName={row =>
-          cn(
-            'group/connection-row',
-            row.id.startsWith('preview:') && 'cursor-default'
-          )
-        }
-        emptyState={
-          <TableEmptyState
-            heading='No Presence in This Category'
-            description='Try another filter.'
-          />
-        }
-      />
+          getRowClassName={row =>
+            cn(
+              'group/connection-row',
+              row.id.startsWith('preview:') && 'cursor-default'
+            )
+          }
+          emptyState={
+            <TableEmptyState
+              heading='No Presence in This Category'
+              description='Try another filter.'
+            />
+          }
+        />
+      )}
     </PageShell>
   );
 }

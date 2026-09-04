@@ -14,6 +14,7 @@ import {
   isTrustedTestBypassRequest,
   TEST_MODE_COOKIE,
 } from '@/lib/auth/test-mode';
+import { isVisualCaptureSyntheticAuthEnabled } from '@/lib/e2e/runtime';
 import { NO_STORE_HEADERS } from '@/lib/http/headers';
 
 /**
@@ -84,7 +85,7 @@ export async function GET(request: NextRequest) {
     // still needs the test-mode cookie handoff to reach the requested route;
     // target-route failures remain fail-closed in the capture manifest.
     if (
-      process.env.E2E_VISUAL_CAPTURE_SYNTHETIC_AUTH !== '1' ||
+      !isVisualCaptureSyntheticAuthEnabled() ||
       sessionParam === 'better-auth'
     ) {
       throw error;

@@ -39,14 +39,10 @@ interface AccountPromptContext {
     readonly reason: string;
   } | null;
   readonly usage: {
-    readonly dailyLimit: number;
+    readonly weeklyLimit: number;
     readonly used: number;
     readonly remaining: number;
     readonly resetAt: string | null;
-    readonly monthlyLimit: number;
-    readonly monthlyUsed: number;
-    readonly monthlyRemaining: number;
-    readonly monthlyResetAt: string;
   } | null;
   readonly entitlements: {
     readonly aiCanUseTools: boolean;
@@ -92,7 +88,7 @@ export function buildSystemPrompt(
   releases: ReleasePromptContext[],
   options?: {
     aiCanUseTools: boolean;
-    aiDailyMessageLimit: number;
+    aiWeeklyMessageLimit: number;
     insightsEnabled?: boolean;
     knowledgeContext?: string;
     accountContext?: AccountPromptContext;
@@ -295,7 +291,7 @@ ${knowledgeContext}
 
 function buildPlanLimitationsSection(options?: {
   aiCanUseTools: boolean;
-  aiDailyMessageLimit: number;
+  aiWeeklyMessageLimit: number;
   accountContext?: AccountPromptContext;
 }): string {
   if (options?.accountContext?.billingVerification === 'unavailable') {
@@ -306,7 +302,7 @@ function buildPlanLimitationsSection(options?: {
   return `
 
 ## Plan Limitations (Free Tier)
-This artist is on the Free plan with ${options.aiDailyMessageLimit} messages per day. You can answer questions, give advice, upload profile photos (proposeAvatarUpload), add social links (proposeSocialLink), and remove social links (proposeSocialLinkRemoval). You do NOT have access to advanced tools (profile editing, canvas planning, promo strategy, release creation, pitch generation, bio writing, voice promo / cloned voice audio drops, or related artist suggestions). If the artist asks for something that requires an advanced tool, let them know briefly that it's available on the Pro plan.`;
+This artist is on the Free plan with ${options.aiWeeklyMessageLimit} messages per week. You can answer questions, give advice, upload profile photos (proposeAvatarUpload), add social links (proposeSocialLink), and remove social links (proposeSocialLinkRemoval). You do NOT have access to advanced tools (profile editing, canvas planning, promo strategy, release creation, pitch generation, bio writing, voice promo / cloned voice audio drops, or related artist suggestions). If the artist asks for something that requires an advanced tool, let them know briefly that it's available on the Pro plan.`;
 }
 
 function buildAccountAccessSection(
@@ -316,7 +312,7 @@ function buildAccountAccessSection(
 
   const merchLine = buildMerchAccessLine(accountContext);
   const usageLine = accountContext.usage
-    ? `${accountContext.usage.used} used, ${accountContext.usage.remaining} remaining of ${accountContext.usage.dailyLimit}`
+    ? `${accountContext.usage.used} used, ${accountContext.usage.remaining} remaining of ${accountContext.usage.weeklyLimit}`
     : 'Unavailable while billing verification is unavailable';
   const billingLine =
     accountContext.billingVerification === 'unavailable'
@@ -331,7 +327,7 @@ function buildAccountAccessSection(
 - **Account Email:** ${accountContext.email ?? 'Not available'}
 - **Plan:** ${accountContext.displayPlan}
 ${billingLine}
-- **AI Usage Today:** ${usageLine}
+- **AI Usage This Week:** ${usageLine}
 - **Merch Creation:** ${merchLine}
 - **Billing Portal:** ${accountContext.billing.hasStripeCustomer ? 'Available' : 'No Stripe billing account yet'}
 
@@ -357,7 +353,7 @@ function buildMerchAccessLine(accountContext: AccountPromptContext): string {
 
 function buildAnalyticsSection(options?: {
   aiCanUseTools: boolean;
-  aiDailyMessageLimit: number;
+  aiWeeklyMessageLimit: number;
   insightsEnabled?: boolean;
 }): string {
   if (options?.insightsEnabled) {

@@ -17,8 +17,7 @@ export {
 };
 
 export default defineAgent({
-  // Root settings apply to every channel in this Eve app. Keep the proven
-  // Jovie/Ovie model here; the read-only Summer identity is selected only by
-  // its explicit channel source and must not change unrelated sessions.
-  model: 'openai/gpt-5.4-mini',
+  // Summer is the live Photon/iMessage speaker on this Eve app. GLM 5.3 Flash
+  // is already on Eve Gateway OIDC (`zai/glm-5.3-flash`); do not buy keys.
+  model: 'zai/glm-5.3-flash',
 });

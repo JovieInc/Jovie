@@ -129,7 +129,10 @@ const PROFILE_MOBILE_SCREENS = [
     id: 'notifications',
     path: '/testartist?mode=subscribe',
     rootSelector: '[data-testid="profile-compact-surface"]',
-    readySelectors: ['[data-testid="profile-mobile-notifications-step-email"]'],
+    readySelectors: [
+      '[data-testid="profile-mobile-notifications-step-email"]',
+      '[data-testid="profile-primary-tab-subscribe"]',
+    ],
   },
 ] as const satisfies readonly MobileProfileScreen[];
 

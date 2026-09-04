@@ -23,6 +23,16 @@ on:
         required: false
         default: false
         type: boolean
+      preview_work_id:
+        description: Linear work id admitting the hosted exception, e.g. JOV-5941.
+        required: false
+        default: ''
+        type: string
+      preview_reason:
+        description: Why hosted isolation is required — evidence normal CI/staging cannot produce.
+        required: false
+        default: ''
+        type: string
 
 permissions:
   contents: read
@@ -1364,28 +1374,37 @@ jobs:
           else
             echo "skip=true" >> "$GITHUB_OUTPUT"
           fi
-      - name: Install actionlint (structural)
-        if: steps.structural.outputs.skip != 'true'
-        uses: rhysd/actionlint@914e7df21a07ef503a81201c76d2b11c789d3fca # v1.7.12
-      - name: Set up Python (structural regression tests)
-        if: steps.structural.outputs.skip != 'true'
-        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
-        with:
-          python-version: '3.12'
-      - name: Install pytest (structural regression tests)
-        if: steps.structural.outputs.skip != 'true'
-        run: python -m pip install --quiet --require-hashes -r .github/requirements/pytest.txt
-      - name: Setup Playwright (Chromium)
-        if: steps.structural.outputs.skip != 'true'
-        uses: ./.github/actions/setup-playwright
       - name: Run ci-fast lanes
         id: lanes
         env:
           CI_FAST_LANE_GROUP: remaining
           CI_PRODUCT_LANES: ${{ needs.ci-path-changes.outputs.selected_lanes }}
           TURBO_SCM_BASE: ${{ github.event_name == 'merge_group' && github.event.merge_group.base_sha || (github.event_name == 'push' && github.event.before || ((github.base_ref && format('origin/{0}', github.base_ref)) || '')) }}
-          CI_FAST_SKIP_STRUCTURAL: ${{ steps.structural.outputs.skip }}
+          CI_FAST_SKIP_STRUCTURAL: 'true'
           CI_FAST_LANES_OUT: ${{ runner.temp }}/ci-fast-lanes.json
+        run: node scripts/ci-fast-lanes.mjs
+      - name: Install actionlint (structural)
+        if: ${{ success() && steps.structural.outputs.skip != 'true' }}
+        uses: rhysd/actionlint@914e7df21a07ef503a81201c76d2b11c789d3fca # v1.7.12
+      - name: Set up Python (structural regression tests)
+        if: ${{ success() && steps.structural.outputs.skip != 'true' }}
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: '3.12'
+      - name: Install pytest (structural regression tests)
+        if: ${{ success() && steps.structural.outputs.skip != 'true' }}
+        run: python -m pip install --quiet --require-hashes -r .github/requirements/pytest.txt
+      - name: Setup Playwright (Chromium)
+        if: ${{ success() && steps.structural.outputs.skip != 'true' }}
+        uses: ./.github/actions/setup-playwright
+      - name: Run structural ci-fast lane
+        if: ${{ success() && steps.structural.outputs.skip != 'true' }}
+        env:
+          CI_FAST_LANE_GROUP: remaining
+          CI_PRODUCT_LANES: ${{ needs.ci-path-changes.outputs.selected_lanes }}
+          TURBO_SCM_BASE: ${{ github.event_name == 'merge_group' && github.event.merge_group.base_sha || (github.event_name == 'push' && github.event.before || ((github.base_ref && format('origin/{0}', github.base_ref)) || '')) }}
+          CI_FAST_ONLY_STRUCTURAL: 'true'
+          CI_FAST_LANES_OUT: ${{ runner.temp }}/ci-fast-lanes-structural.json
         run: node scripts/ci-fast-lanes.mjs
       - name: Upload ci-fast lane results
         if: ${{ !cancelled() }}
@@ -1393,7 +1412,9 @@ jobs:
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: ci-fast-lanes-remaining-${{ github.run_id }}-${{ github.run_attempt }}
-          path: ${{ runner.temp }}/ci-fast-lanes.json
+          path: |
+            ${{ runner.temp }}/ci-fast-lanes.json
+            ${{ runner.temp }}/ci-fast-lanes-structural.json
           retention-days: 7
           if-no-files-found: warn
 
@@ -1752,6 +1773,26 @@ jobs:
             exit 1
           fi
 
+      - name: Emit preview-env admission receipt
+        if: ${{ github.event_name != 'pull_request' || needs.ci-path-changes.outputs.run_neon == 'true' || needs.ci-path-changes.outputs.run_public_lighthouse == 'true' || steps.check-backend.outputs.needs_db == 'true' }}
+        run: |
+          set -euo pipefail
+          node scripts/ci/preview-env-admission.mjs emit-admission \
+            --kind neon-branch \
+            --work-id "${{ github.event.inputs.preview_work_id || 'manual-dispatch' }}" \
+            --sha "${{ github.sha }}" \
+            --policy "manual-dispatch" \
+            --reason "${{ github.event.inputs.preview_reason || 'Manually dispatched database-affecting evidence lane.' }}" \
+            --evidence "Database-affecting proof that cannot be obtained from normal CI or the shared staging database." \
+            --owner "${{ github.actor }}" \
+            --surface "ephemeral Neon branch ${{ steps.sanitize-branch.outputs.name }} (isolated database only)" \
+            --environment "${{ steps.sanitize-branch.outputs.name }}" \
+            --ttl-hours 2 \
+            --cleanup-trigger ttl \
+            --cleanup-proof "Branch absent from the Neon project branch inventory" \
+            --cost-budget "One Neon branch with at most 2h of endpoint compute per dispatch" \
+            --out "$RUNNER_TEMP/preview-env-admission-neon.json"
+
       - name: Upload Neon DB connection artifact
         if: ${{ github.event_name != 'pull_request' || needs.ci-path-changes.outputs.run_neon == 'true' || needs.ci-path-changes.outputs.run_public_lighthouse == 'true' || steps.check-backend.outputs.needs_db == 'true' }}
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
@@ -2021,6 +2062,7 @@ jobs:
                   tests/e2e/storybook-elevation.spec.ts \
                   tests/e2e/storybook-input.spec.ts \
                   tests/e2e/storybook-marketing-faq.spec.ts \
+                  tests/e2e/storybook-marketing-h1.spec.ts \
                   tests/e2e/storybook-skeleton.spec.ts \
                   --config=playwright.config.storybook.ts --project=chromium --reporter=line
               exit 0
@@ -4222,6 +4264,7 @@ jobs:
           export TURNSTILE_SECRET_KEY="1x0000000000000000000000000000000AA"
           export CLERK_SECRET_KEY="${{ secrets.CLERK_SECRET_KEY }}"
           export NEXT_PUBLIC_E2E_MODE=1
+          export E2E_TEST_MODE=1
           export NEXT_DISABLE_TOOLBAR=1
           export CHAT_LLM_FAILURE_INJECTION=1
           export E2E_CLERK_USER_ID="${{ secrets.E2E_CLERK_USER_ID }}"
@@ -5105,6 +5148,26 @@ jobs:
             exit 1
           fi
 
+      - name: Emit preview-env admission receipt
+        if: success()
+        run: |
+          set -euo pipefail
+          node scripts/ci/preview-env-admission.mjs emit-admission \
+            --kind vercel-preview \
+            --work-id "${{ github.event.inputs.preview_work_id || 'manual-dispatch' }}" \
+            --sha "${{ github.sha }}" \
+            --policy "manual-dispatch (inputs.run_preview_deploy=true)" \
+            --reason "${{ github.event.inputs.preview_reason || 'Manually dispatched hosted preview for exact-SHA evidence.' }}" \
+            --evidence "Exact production-candidate hosted proof or debugging evidence that normal CI and current staging cannot produce." \
+            --owner "${{ github.actor }}" \
+            --surface "Vercel preview deployment ${{ steps.pr_deploy.outputs.deployment_url }} pinned to the dispatched SHA" \
+            --environment "${{ steps.pr_deploy.outputs.deployment_url }}" \
+            --ttl-hours 24 \
+            --cleanup-trigger pr-closed \
+            --cleanup-proof "No QUEUED/BUILDING preview deployments remain for the ref; vercel-preview-cleanup removed deployments for the closed PR ref" \
+            --cost-budget "One Vercel preview build plus one deployment per dispatch" \
+            --out "$RUNNER_TEMP/preview-env-admission-vercel.json"
+
   # Deep Lighthouse runs only by manual dispatch. Production Lighthouse remains
   # a separate hosted post-deploy release probe.
 
@@ -5804,6 +5867,7 @@ jobs:
           export UPSTASH_REDIS_REST_URL="${{ secrets.UPSTASH_REDIS_REST_URL }}"
           export UPSTASH_REDIS_REST_TOKEN="${{ secrets.UPSTASH_REDIS_REST_TOKEN }}"
           export NEXT_PUBLIC_E2E_MODE=1
+          export E2E_TEST_MODE=1
           export NEXT_DISABLE_TOOLBAR=1
           export NEXT_PUBLIC_CLERK_MOCK=1
           export NEXT_PUBLIC_CLERK_PROXY_DISABLED=1

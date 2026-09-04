@@ -411,12 +411,13 @@ class FleetControllerInstallerContractTests(unittest.TestCase):
             "consumer": gem / "scripts/gem-pr-drain.py",
             "registry_module": gem / "scripts/gem_repo_registry.py",
             "registry_config": gem / "config/gem-repo-registry.json",
-            "workflow": symphony / "WORKFLOW.jovie-ui-pilot.md",
+            "workflow": symphony / "WORKFLOW.md",
             "attestation": gem / "state/gem-service-attestation.json",
         }
         (gem / "scripts").mkdir(parents=True)
         (gem / "config").mkdir(parents=True)
         symphony.mkdir(parents=True)
+        (home / ".config/symphony").mkdir(parents=True)
         (home / ".config/systemd/user").mkdir(parents=True)
         fake_bin.mkdir()
         paths["gate"].write_text("old gate\n", encoding="utf-8")
@@ -441,11 +442,11 @@ case "$*" in
   *"show-environment"*) exit 0 ;;
   *"is-active --quiet gem-pr-drain.timer"*) exit 1 ;;
   *"is-active --quiet gem-pr-drain.service"*) exit 1 ;;
-  *"restart symphony-ui-pilot.service"*)
+  *"daemon-reload"*)
     if { [ -n "${FAKE_WORKFLOW_OVERLAY_VALUE:-}" ] || [ "${FAKE_WORKFLOW_UNRELATED_DRIFT:-false}" = true ]; } &&
        [ ! -e "$FAKE_WORKFLOW_MUTATION_MARKER" ]; then
       if [ -n "${FAKE_WORKFLOW_OVERLAY_VALUE:-}" ]; then
-        sed "s/max_concurrent_agents: [1-8]$/max_concurrent_agents: ${FAKE_WORKFLOW_OVERLAY_VALUE}/" \
+        sed "s/max_concurrent_agents: [0-9][0-9]*$/max_concurrent_agents: ${FAKE_WORKFLOW_OVERLAY_VALUE}/" \
           "$FAKE_WORKFLOW_OVERLAY_TARGET" > "$FAKE_WORKFLOW_OVERLAY_TARGET.fake"
         mv "$FAKE_WORKFLOW_OVERLAY_TARGET.fake" "$FAKE_WORKFLOW_OVERLAY_TARGET"
       fi
@@ -454,16 +455,26 @@ case "$*" in
       fi
       : > "$FAKE_WORKFLOW_MUTATION_MARKER"
     fi
-    [ "${FAKE_RESTART_FAILURE:-false}" != true ]
+    exit 0
+    ;;
+  *"is-active --quiet symphony-elixir.service"*)
+    [ "${FAKE_RUNTIME_FAILURE:-false}" != true ]
     exit
     ;;
-  *"is-active --quiet symphony-ui-pilot.service"*) exit 0 ;;
+  *"show symphony-elixir.service --property=MainPID"*) printf '3131\n'; exit 0 ;;
+  *"show symphony-elixir.service --property=ControlGroup"*)
+    printf '/user.slice/user-1000.slice/user@1000.service/app.slice/symphony-elixir.service\n'
+    exit 0
+    ;;
 esac
 exit 0
 """,
             encoding="utf-8",
         )
         systemctl.chmod(0o755)
+        sleep = fake_bin / "sleep"
+        sleep.write_text("#!/bin/sh\nexit 0\n", encoding="utf-8")
+        sleep.chmod(0o755)
         curl = fake_bin / "curl"
         curl.write_text(
             "#!/bin/sh\n"
@@ -472,12 +483,28 @@ exit 0
             encoding="utf-8",
         )
         curl.chmod(0o755)
+        ss = fake_bin / "ss"
+        ss.write_text(
+            "#!/bin/sh\n"
+            "[ \"${FAKE_RUNTIME_FAILURE:-false}\" != true ] || exit 1\n"
+            "printf 'LISTEN 0 128 127.0.0.1:4041 0.0.0.0:* users:((\\\"beam.smp\\\",pid=4242,fd=42))\\n'\n",
+            encoding="utf-8",
+        )
+        ss.chmod(0o755)
+        proc_root = root / "proc"
+        for pid in ("3131", "4242"):
+            (proc_root / pid).mkdir(parents=True)
+            (proc_root / pid / "cgroup").write_text(
+                "0::/user.slice/user-1000.slice/user@1000.service/app.slice/symphony-elixir.service\n",
+                encoding="utf-8",
+            )
         env = {
             "HOME": str(home),
             "GEM_WORKSPACE": str(gem),
             "SYMPHONY_RUNTIME": str(symphony),
             "FAKE_WORKFLOW_MUTATION_MARKER": str(root / "workflow-mutated"),
             "FAKE_WORKFLOW_OVERLAY_TARGET": str(paths["workflow"]),
+            "GEM_PROC_ROOT": str(proc_root),
             "PATH": f"{fake_bin}:/usr/bin:/bin:/usr/sbin:/sbin",
         }
         return paths, env
@@ -495,7 +522,7 @@ exit 0
             ["bash", str(fixture / FLEET_INSTALLER.relative_to(ROOT)), str(fixture)],
             env={
                 **env,
-                "FAKE_RESTART_FAILURE": "true" if fail_restart else "false",
+                "FAKE_RUNTIME_FAILURE": "true" if fail_restart else "false",
                 "FAKE_WORKFLOW_OVERLAY_VALUE": workflow_overlay,
                 "FAKE_WORKFLOW_UNRELATED_DRIFT": (
                     "true" if unrelated_workflow_drift else "false"
@@ -582,8 +609,10 @@ exit 0
             attestation["policy"]["installedSha256"],
         )
         self.assertEqual(attestation["workflow"]["matchMode"], "exact")
-        self.assertEqual(attestation["workflow"]["sourceMaxConcurrentAgents"], 4)
-        self.assertEqual(attestation["workflow"]["installedMaxConcurrentAgents"], 4)
+        self.assertEqual(attestation["workflow"]["sourceMaxConcurrentAgents"], 8)
+        self.assertEqual(attestation["workflow"]["installedMaxConcurrentAgents"], 8)
+        self.assertEqual(attestation["listener"]["wrapperPid"], 3131)
+        self.assertEqual(attestation["listener"]["pid"], 4242)
 
     def test_install_attests_controller_owned_bounded_concurrency_overlay(self):
         with tempfile.TemporaryDirectory() as directory:
@@ -599,7 +628,7 @@ exit 0
         self.assertEqual(
             attestation["workflow"]["matchMode"], "bounded_concurrency_overlay"
         )
-        self.assertEqual(attestation["workflow"]["sourceMaxConcurrentAgents"], 4)
+        self.assertEqual(attestation["workflow"]["sourceMaxConcurrentAgents"], 8)
         self.assertEqual(attestation["workflow"]["installedMaxConcurrentAgents"], 1)
         self.assertNotEqual(
             attestation["workflow"]["sourceSha256"],
@@ -632,7 +661,7 @@ exit 0
         self.assertFalse(attestation_exists)
         self.assertIn("refusing stale Gem service attestation", process.stderr)
 
-    def test_failed_install_removes_a_new_policy_during_atomic_rollback(self):
+    def test_install_refuses_unhealthy_official_service_before_writes(self):
         with tempfile.TemporaryDirectory() as directory:
             fixture = self._fixture(directory)
             paths, env = self._runtime(directory)
@@ -642,6 +671,7 @@ exit 0
                 for name in ("gate", "closure", "consumer", "workflow", "registry_module", "registry_config")
             }
             policy_exists = paths["policy"].exists()
+            backup_root_exists = (pathlib.Path(directory) / "gem/state/backups").exists()
 
         self.assertNotEqual(process.returncode, 0)
         self.assertEqual(restored["gate"], "old gate\n")
@@ -651,7 +681,8 @@ exit 0
         self.assertIn("FileNotFoundError", restored["registry_module"])
         self.assertEqual(restored["registry_config"], "{}\n")
         self.assertFalse(policy_exists)
-        self.assertIn("fleet controller install rolled back", process.stderr)
+        self.assertFalse(backup_root_exists)
+        self.assertIn("official Symphony service symphony-elixir.service is not active", process.stderr)
 
     def test_fleet_installer_replaces_stale_registry_before_target_smoke(self):
         installer = FLEET_INSTALLER.read_text(encoding="utf-8")

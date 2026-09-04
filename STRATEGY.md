@@ -11,14 +11,15 @@ This replaces traditional ship cycles. The loop runs faster and more autonomousl
 1. **Plan:** An issue gets `tim-approved` label after planning review
 2. **Ship:** Codex CLI shipper (ChatGPT $200 sub) or Codex/veronica (OpenRouter/Anthropic) picks up approved issues
 3. **Review:** Automated CI + lint + tests only. Taste decisions are made at planning time, not code review
-4. **Merge:** Auto-merge when CI passes with `merge-queue` label
+4. **Merge:** Native GitHub merge queue admits green heads. No transport label.
 
 ### Agent Fleet
 - **Zoe** (OpenClaw): Communications & intelligence, outer-loop orchestration
 - **Eve** (HyperAgent + Fable 5): Planner / PM, specs issues, routes to build models
 - **Developer** (HyperAgent + Fable 5 -> Haiku): Implements from spec, opens PRs
 - **Codex CLI:** Active coder via ChatGPT sub
-- **Summer / Coder / Coder-Flash:** Hermes fleet for monitoring, analysis, cost management
+- **Summer:** Eve on Vercel is the canonical runtime; unavailable until exact-runtime durable identity, failure, and recurrence receipts prove it
+- **Coder / Coder-Flash:** retired labels; implementation routes through Symphony's identified workers
 
 ### Model Tiers
 | Tier | Model | Provider | Use |
@@ -35,7 +36,7 @@ This replaces traditional ship cycles. The loop runs faster and more autonomousl
 - `apps/web/`: Next.js web application (HUD, marketing, admin)
 - `apps/desktop/`: Electron desktop app
 - `apps/ios/`: Swift iOS app
-- `scripts/hermes/`: Hermes fleet agent code
+- `scripts/hermes/`: legacy-named Symphony/Gem operational tooling; not an active Hermes runtime dependency
 - `docs/solutions/`: Compound engineering solution docs
 - `docs/decisions/`: Architecture decision records
 

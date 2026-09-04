@@ -11,6 +11,9 @@ const meta: Meta<typeof MarketingPosterHero> = {
 export default meta;
 type Story = StoryObj<typeof meta>;
 
+const LONG_MARKETING_H1_FIXTURE =
+  'A deliberately long marketing headline that must keep every word available to assistive technology while never painting more than two visual lines at any supported viewport';
+
 export const Default: Story = {
   args: {
     headline: 'Your music. Still moving.',
@@ -24,5 +27,12 @@ export const Default: Story = {
         Credible product surface
       </div>
     ),
+  },
+};
+
+export const OverlongHeadline: Story = {
+  args: {
+    ...Default.args,
+    headline: LONG_MARKETING_H1_FIXTURE,
   },
 };

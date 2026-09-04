@@ -10,6 +10,57 @@ import {
 } from '@/lib/desktop/electron-bridge';
 import { cn } from '@/lib/utils';
 
+const DESKTOP_CHANNEL_LABELS = {
+  production: 'Stable',
+  staging: 'Canary',
+  local: 'Local',
+} as const;
+
+const DESKTOP_VERSION =
+  /^\d+\.\d+\.\d+(?:-[0-9A-Za-z.-]+)?(?:\+[0-9A-Za-z.-]+)?$/;
+const FULL_SOURCE_REVISION = /^[0-9a-f]{40}$/;
+
+type DesktopChannel = keyof typeof DESKTOP_CHANNEL_LABELS;
+
+interface DesktopReleaseIdentityLabel {
+  readonly ariaLabel: string;
+  readonly provenance: 'identified' | 'unverified';
+  readonly visibleLabel: string;
+}
+
+function isDesktopChannel(value: string | undefined): value is DesktopChannel {
+  return value !== undefined && value in DESKTOP_CHANNEL_LABELS;
+}
+
+function readDesktopReleaseIdentity(): DesktopReleaseIdentityLabel {
+  const dataset = globalThis.document?.documentElement.dataset;
+  const channel = dataset?.desktopChannel;
+  const channelLabel = isDesktopChannel(channel)
+    ? DESKTOP_CHANNEL_LABELS[channel]
+    : 'Desktop';
+  const version = dataset?.desktopVersion;
+  const hasVersion =
+    typeof version === 'string' && DESKTOP_VERSION.test(version);
+  const versionLabel = hasVersion ? version : 'Version Unknown';
+  const sourceRevision = dataset?.desktopSourceRevision;
+  const hasSourceRevision =
+    typeof sourceRevision === 'string' &&
+    FULL_SOURCE_REVISION.test(sourceRevision);
+  const sourceLabel = hasSourceRevision
+    ? sourceRevision.slice(0, 7)
+    : 'Unverified';
+  const provenance =
+    isDesktopChannel(channel) && hasVersion && hasSourceRevision
+      ? 'identified'
+      : 'unverified';
+
+  return {
+    ariaLabel: `${channelLabel} environment, version ${hasVersion ? version : 'unknown'}, source revision ${hasSourceRevision ? sourceRevision : 'unverified'}`,
+    provenance,
+    visibleLabel: `${channelLabel} · ${versionLabel} · ${sourceLabel}`,
+  };
+}
+
 /**
  * DesktopTitlebar — Electron-only titlebar drag region.
  *
@@ -22,6 +73,7 @@ import { cn } from '@/lib/utils';
  */
 export function DesktopTitlebar() {
   const isDesktop = useIsElectronRuntime();
+  const releaseIdentity = readDesktopReleaseIdentity();
   const { canGoBack, canGoForward, goBack, goForward } = useDesktopNavigation();
   // useContext (not useSidebar) so this is safe outside SidebarProvider (e.g. demo shell)
   const sidebarCtx = useContext(SidebarContext);
@@ -109,9 +161,20 @@ export function DesktopTitlebar() {
 
           <div
             data-testid='electron-titlebar-main-cell'
-            className='self-stretch'
+            className='flex min-w-0 self-stretch items-center justify-center px-3'
             style={{ WebkitAppRegion: 'drag' } as CSSProperties}
-          />
+          >
+            <span
+              aria-label={releaseIdentity.ariaLabel}
+              className='pointer-events-none inline-flex max-w-full items-center whitespace-nowrap rounded-md bg-surface-1 px-2 py-0.5 text-2xs font-medium tabular-nums text-secondary-token'
+              data-provenance={releaseIdentity.provenance}
+              data-testid='electron-release-identity'
+              role='status'
+              title={releaseIdentity.ariaLabel}
+            >
+              {releaseIdentity.visibleLabel}
+            </span>
+          </div>
         </>
       ) : null}
     </div>
