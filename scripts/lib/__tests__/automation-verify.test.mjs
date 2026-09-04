@@ -955,6 +955,7 @@ describe('automation-verify affected scope', () => {
       pythonUnittestTests: [
         'scripts/hermes/tests/symphony-additive-router.test.py',
         'scripts/hermes/tests/test-model-router.py',
+        'scripts/hermes/tests/symphony-github-poke.test.py',
       ],
       scriptVitestTests: ['scripts/lib/__tests__/automation-verify.test.mjs'],
     });
