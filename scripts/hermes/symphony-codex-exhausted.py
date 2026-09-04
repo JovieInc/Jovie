@@ -40,6 +40,9 @@ STALE_REMOUNT_SECONDS = 90 * 60  # product remounts (JOV-5235) still grok at 54 
 # Held live implement/remount locks are never TTL-expired.
 FALLBACK_LEASE_TTL_SECONDS = STALE_REMOUNT_SECONDS
 FALLBACK_LEASE_DIR = "~/.local/state/symphony-fallback/leases"
+# When Linear rate-limits the shared workspace key, every Linear call pauses
+# for this long instead of stampeding the exhausted budget (JOV drain 2026-09-03).
+LINEAR_BACKOFF_SECONDS = 15 * 60
 FALLBACK_GC_SCHEMA = "symphony-fallback-lease-gc/v1"
 FALLBACK_PICKUP_SCHEMA = "symphony-fallback-pickup/v1"
 FALLBACK_LOCK_NAME = re.compile(r"^((?:JOV|LYB)-\d+)\.lock$")
@@ -64,6 +67,7 @@ TYPED_PICKUP_REFUSE_REASONS = frozenset(
         "no_eligible_issue",
         "blocked",
         "state_not_admitted",
+        "closure_stop_line",
     )
 )
 # The upstream Elixir runtime is the sole owner of :4041 on Gem.  This
@@ -379,6 +383,31 @@ def _fleet_gate_allows_isolated() -> tuple[bool, str]:
     return True, f"fleet_gate_{state.lower()}"
 
 
+def _closure_intake_allowed() -> bool:
+    """Mirror grok-ship-one's new-work gate: closureAdmission.newIssueIntakeAllowed.
+
+    The sidecar must not lease NEW fallback work while the Summer closure
+    stop-line is closed — the leased worker would only die on grok-ship-one's
+    own stop-line check, burning a lease, Linear calls, and a unit launch for
+    nothing (live 2026-09-03: JOV-3583 exit 1 churn). Fail-closed when the
+    receipt is unreadable, matching grok-ship-one.
+    """
+    path = pathlib.Path(
+        os.path.expanduser(
+            os.environ.get(
+                "GEM_FLEET_GATE_RECEIPT",
+                "/home/timwhite/gem-workspace/state/gem-priority-gate/latest.json",
+            )
+        )
+    )
+    try:
+        receipt = json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, TypeError, ValueError):
+        return False
+    closure = receipt.get("closureAdmission")
+    return isinstance(closure, dict) and closure.get("newIssueIntakeAllowed") is True
+
+
 def _grok_units_after_survival_window() -> list[str] | None:
     time.sleep(
         _bounded_seconds(
@@ -635,12 +664,52 @@ def _grok_ship_one_executable() -> str | None:
     return str(executable) if executable.is_file() and os.access(executable, os.X_OK) else None
 
 
-def _grok_limit() -> int:
+def _oidc_seat(entry: object) -> bool:
+    if not isinstance(entry, dict):
+        return False
+    return bool(entry.get("refresh_token") or entry.get("key") or entry.get("access_token"))
+
+
+def _grok_oauth_seats() -> int | None:
+    path = pathlib.Path.home() / ".grok" / "auth.json"
     try:
-        value = int(os.environ.get("SYMPHONY_GROK_MAX", DEFAULT_GROK_MAX))
-    except (TypeError, ValueError):
+        payload = json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, TypeError, ValueError):
+        return None
+    if not isinstance(payload, dict):
+        return None
+    return sum(1 for entry in payload.values() if _oidc_seat(entry))
+
+
+def _kimi_oauth_seats() -> int | None:
+    path = pathlib.Path.home() / ".kimi-code" / "credentials" / "kimi-code.json"
+    try:
+        payload = json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, TypeError, ValueError):
+        return None
+    return 1 if _oidc_seat(payload) else 0
+
+
+def _live_oauth_seats() -> int | None:
+    grok = _grok_oauth_seats()
+    kimi = _kimi_oauth_seats()
+    if grok is None and kimi is None:
+        return None
+    return (grok or 0) + (kimi or 0)
+
+
+def _grok_limit() -> int:
+    raw = os.environ.get("SYMPHONY_GROK_MAX")
+    if raw is not None:
+        try:
+            return max(0, min(int(raw), MAX_GROK_MAX))
+        except (TypeError, ValueError):
+            return DEFAULT_GROK_MAX
+    seats = _live_oauth_seats()
+    if seats is None or seats <= 0:
+        # Missing Grok/Kimi files, or Codex-only exhaustion, must not serial-pin.
         return DEFAULT_GROK_MAX
-    return max(0, min(value, MAX_GROK_MAX))
+    return max(1, min(MAX_GROK_MAX, max(DEFAULT_GROK_MAX, seats)))
 
 
 def _dotenv_value(raw: str) -> str | None:
@@ -756,7 +825,48 @@ def _linear_issues_list_request(after: str | None = None) -> dict:
     return {"query": LINEAR_QUERY, "variables": variables}
 
 
+def _linear_backoff_path() -> pathlib.Path:
+    return pathlib.Path(
+        os.path.expanduser(
+            os.environ.get(
+                "SYMPHONY_LINEAR_BACKOFF",
+                "~/.local/state/symphony-fallback/linear-backoff.json",
+            )
+        )
+    )
+
+
+def _linear_backoff_active() -> bool:
+    try:
+        data = json.loads(_linear_backoff_path().read_text(encoding="utf-8"))
+        stamped = float(data.get("epoch", 0))
+    except (OSError, ValueError, TypeError):
+        return False
+    return (time.time() - stamped) < LINEAR_BACKOFF_SECONDS
+
+
+def _linear_note_ratelimited() -> None:
+    path = _linear_backoff_path()
+    try:
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text(json.dumps({"epoch": time.time()}), encoding="utf-8")
+    except OSError:
+        pass
+
+
+def _linear_clear_backoff() -> None:
+    try:
+        _linear_backoff_path().unlink(missing_ok=True)
+    except OSError:
+        pass
+
+
 def _linear_graphql(payload: dict) -> dict | None:
+    # A ratelimited shared Linear budget must not be stampeded by the timer
+    # loop: while a backoff stamp is fresh, skip the network entirely (every
+    # caller already fails closed on None).
+    if _linear_backoff_active():
+        return None
     key = os.environ.get("LINEAR_API_KEY") or _linear_api_key_from_file()
     if not key:
         return None
@@ -768,8 +878,20 @@ def _linear_graphql(payload: dict) -> dict | None:
     try:
         with urllib.request.urlopen(request, timeout=CONTROL_TIMEOUT_SECONDS) as response:
             body = json.load(response)
+    except urllib.error.HTTPError as exc:
+        # Linear signals rate limiting as HTTP 400/429 with a RATELIMITED code
+        # in the error body (observed live 2026-09-03: 2500 req/hr exhausted on
+        # Gem, every worker died on admission re-verify).
+        try:
+            detail = exc.read().decode("utf-8", "replace")
+        except (OSError, ValueError):
+            detail = ""
+        if exc.code == 429 or "RATELIMITED" in detail:
+            _linear_note_ratelimited()
+        return None
     except (OSError, ValueError, TypeError, urllib.error.URLError):
         return None
+    _linear_clear_backoff()
     return body if isinstance(body, dict) else None
 
 
@@ -1573,6 +1695,10 @@ def _launch_fallback_workers(
     lock_count = _fallback_lock_count()
     next_eligible = ""
     first_lease: str | None = None
+    # Mirror grok-ship-one's new-work stop-line so the sidecar never leases
+    # fresh work it would only launch into a refusal. Remounts of existing
+    # open PRs are continuation and stay exempt.
+    closure_intake_open = _closure_intake_allowed()
     for identifier in identifiers:
         if capacity_used >= limit:
             if next_eligible == "":
@@ -1590,6 +1716,16 @@ def _launch_fallback_workers(
         if legacy_unit in active_units or any(unit.startswith(fallback_prefix) for unit in active_units):
             continue
         verdict, _pr = _open_pr_verdict(identifier, open_prs)
+        if verdict != "remount" and not closure_intake_open:
+            _emit_pickup(
+                "refuse",
+                reason="closure_stop_line",
+                identifier=identifier,
+                lock_count=lock_count,
+                next_issue=next_eligible,
+            )
+            print(f"fallback skip {identifier} closure_stop_line", file=sys.stderr, flush=True)
+            continue
         lock_path = _fallback_lease_dir() / f"{identifier}.lock"
         held = _lock_held(lock_path) if lock_path.is_file() else False
         issue = None

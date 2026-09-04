@@ -1,6 +1,7 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import {
   DurableOperatingStore,
+  FailoverOperatingStore,
   memoryRecordBackend,
 } from '@/lib/ovie/mcp/store';
 import { OvieProgramError } from '@/lib/ovie/program';
@@ -322,5 +323,63 @@ describe('Ovie Summer conversation handoff', () => {
       })
     ).toThrow(OvieProgramError);
     expect(getBoundSummerSpeaker()).toBe(bound);
+  });
+
+  it('marks failures after durable enqueue as unknown and retryable', async () => {
+    const store = new DurableOperatingStore(memoryRecordBackend());
+    let getCalls = 0;
+    const unstableStore = new Proxy(store, {
+      get(target, property) {
+        if (property === 'getSummerTurn') {
+          return async (id: string) => {
+            getCalls += 1;
+            if (getCalls > 1) throw new Error('poll backend unavailable');
+            return target.getSummerTurn(id);
+          };
+        }
+        const value = Reflect.get(target, property);
+        return typeof value === 'function' ? value.bind(target) : value;
+      },
+    });
+    const speaker = createCurrentSummerQueueSpeaker(unstableStore);
+    const events: Array<{ type: string; state?: string }> = [];
+
+    for await (const event of speaker.speak({
+      userText: 'Queue once',
+      clientTurnId: 'unknown-after-enqueue',
+      history: [],
+    })) {
+      events.push(event);
+    }
+
+    expect(events).toContainEqual({ type: 'error', state: 'unknown' });
+    expect(await store.listSummerTurns()).toHaveLength(1);
+  });
+
+  it('does not report failure after the durable enqueue survives a cache write error', async () => {
+    const fallback = new DurableOperatingStore(memoryRecordBackend());
+    const primary = new DurableOperatingStore(memoryRecordBackend());
+    const originalPut = primary.putSummerTurn.bind(primary);
+    primary.putSummerTurn = async record => {
+      await originalPut(record);
+      throw new Error('cache acknowledgement failed');
+    };
+    const store = new FailoverOperatingStore({
+      primary,
+      fallback,
+      isPrimaryFailure: () => false,
+    });
+    const events: Array<{ type: string; state?: string }> = [];
+
+    for await (const event of createCurrentSummerQueueSpeaker(store).speak({
+      userText: 'Persist before cache failure',
+      clientTurnId: 'durable-before-cache-error',
+      history: [],
+    })) {
+      events.push(event);
+    }
+
+    expect(events).toContainEqual({ type: 'error', state: 'unknown' });
+    await expect(store.listSummerTurns()).resolves.toHaveLength(1);
   });
 });

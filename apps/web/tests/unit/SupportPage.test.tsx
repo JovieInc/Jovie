@@ -38,13 +38,16 @@ describe('SupportPage', () => {
     expect(contactButton).toHaveTextContent('Contact Support');
   });
 
-  it('uses secondary CTA styling on the light support section', () => {
+  it('renders the CTA on the canonical 32px marketing Button atom', () => {
     render(<SupportPage />);
 
     const contactButton = screen.getByRole('link', {
       name: /send email to support team/i,
     });
-    expect(contactButton).toHaveClass('public-action-secondary');
+    expect(contactButton).toHaveAttribute('data-variant', 'secondary');
+    expect(contactButton).toHaveAttribute('data-size', 'marketing');
+    expect(contactButton).toHaveClass('h-8', 'rounded-full');
+    expect(contactButton).not.toHaveClass('public-action-secondary');
     expect(contactButton).not.toHaveClass('public-action-primary');
   });
 
@@ -89,16 +92,22 @@ describe('SupportPage', () => {
     render(<SupportPage />);
 
     const heading = screen.getByRole('heading', { level: 1 });
+    // Compact route title owner ("type 28/620"): one shared class, no
+    // per-breakpoint Tailwind size ramp on the route.
     expect(heading).toHaveClass(
+      'system-b-marketing-route-title',
       'mt-6',
+      'text-primary-token'
+    );
+    for (const residue of [
       'text-4xl',
+      'sm:text-5xl',
+      'lg:text-6xl',
       'font-semibold',
       'tracking-tight',
-      'text-balance',
-      'text-primary-token',
-      'sm:text-5xl',
-      'lg:text-6xl'
-    );
+    ]) {
+      expect(heading).not.toHaveClass(residue);
+    }
 
     const sectionHeadings = screen.getAllByRole('heading', { level: 2 });
     expect(sectionHeadings).toHaveLength(3);
@@ -132,13 +141,25 @@ describe('SupportPage', () => {
     const cards = screen.getAllByRole('article');
     expect(cards).toHaveLength(3);
     for (const card of cards) {
+      // Canonical Card atom: concentric System B card radius, no raw rounded-2xl.
       expect(card).toHaveClass(
-        'rounded-2xl',
+        'rounded-(--system-b-radius-card)',
         'border',
         'border-subtle',
         'bg-surface-1',
         'p-6'
       );
+      expect(card).not.toHaveClass('rounded-2xl');
+    }
+
+    for (const action of screen
+      .getAllByRole('link')
+      .filter(link =>
+        /^(Visit|Send email)$/.test(link.textContent?.trim() ?? '')
+      )) {
+      expect(action).toHaveAttribute('data-size', 'marketing');
+      expect(action).toHaveClass('h-8', 'rounded-full');
+      expect(action).not.toHaveClass('public-action-inline');
     }
   });
 });

@@ -1,4 +1,5 @@
 import type { Meta, StoryObj } from '@storybook/nextjs-vite';
+import { APP_ROUTES } from '@/constants/routes';
 import { HeaderActionsProvider } from '@/contexts/HeaderActionsContext';
 import { RightPanelProvider } from '@/contexts/RightPanelContext';
 import { TableMetaProvider } from '@/contexts/TableMetaContext';
@@ -45,7 +46,7 @@ const meta = {
     nextjs: {
       appDirectory: true,
       navigation: {
-        pathname: '/app/dashboard/releases',
+        pathname: APP_ROUTES.DASHBOARD_RELEASES,
         query: { connect: 'spotify' },
       },
     },

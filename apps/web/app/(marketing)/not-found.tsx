@@ -29,7 +29,7 @@ export default function NotFound() {
         {/* Content */}
         <div className='-mt-16 relative'>
           {/* ui-casing-allow: marketing display headline */}
-          <h1 className='text-xl font-semibold text-primary-token tracking-tight mb-2'>
+          <h1 className='text-xl font-semibold text-primary-token tracking-tight mb-2 line-clamp-2'>
             Page not found
           </h1>
           <p className='text-app text-tertiary-token leading-relaxed mb-8'>

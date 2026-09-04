@@ -1,5 +1,7 @@
 # Automation Audit — Crons, Agent Workflows, KPI Alignment
 
+> **Retirement notice (2026-09-02):** Trigger.dev and Hermes references in this audit are historical. Neither is an active Jovie runtime or fallback. See [`docs/operations/SUMMER_RUNTIME_RETIREMENT.md`](./operations/SUMMER_RUNTIME_RETIREMENT.md) for current status.
+
 > **Issue:** JOV-1901
 > **Date:** 2026-07-18 control-plane refresh (original audit: 2026-05-07)
 > **Scope:** Production crons (`vercel.json` + `apps/web/app/api/cron/**`), GitHub Actions agent workflows

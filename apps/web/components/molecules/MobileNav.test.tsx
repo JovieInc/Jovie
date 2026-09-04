@@ -72,4 +72,10 @@ describe('MobileNav', () => {
     expect(source).toContain('var(--shadow-button)');
     expect(source).not.toContain('--linear-shadow-button');
   });
+
+  it('documents the sentence-case login label as an intentional casing exception', () => {
+    const source = readFileSync(resolve(__dirname, './MobileNav.tsx'), 'utf8');
+    expect(source).toContain('ui-casing-allow:');
+    expect(source).toContain("label: 'Log in'");
+  });
 });

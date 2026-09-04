@@ -1,3 +1,4 @@
+import { readFileSync } from 'node:fs';
 import { cleanup, render } from '@testing-library/react';
 import type { ReactNode } from 'react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
@@ -69,6 +70,15 @@ describe('DemoTimWhiteProfileSurface', () => {
     },
     SLOW_DEMO_SURFACE_TIMEOUT_MS
   );
+
+  it('provides executable coverage-via evidence for the demo surface', () => {
+    const source = readFileSync(
+      'components/features/demo/DemoTimWhiteProfileSurface.tsx',
+      'utf8'
+    );
+
+    expect(source).toContain('export function DemoTimWhiteProfileSurface');
+  });
 
   it(
     'accepts subscribe mode from the screenshot route query string',

@@ -9,7 +9,7 @@ const states = Object.keys(HOMEPAGE_PROFILE_SHOWCASE_STATES);
 export default function RendersIndexPage() {
   return (
     <div className='mx-auto max-w-2xl px-6 py-24'>
-      <h1 className='text-2xl font-semibold text-primary-token'>
+      <h1 className='text-2xl font-semibold text-primary-token line-clamp-2'>
         Marketing Renders
       </h1>
       <p className='mt-2 text-sm text-secondary-token'>
@@ -22,7 +22,7 @@ export default function RendersIndexPage() {
       </p>
 
       <div className='mt-8'>
-        <h2 className='text-sm font-medium text-primary-token'>
+        <h2 className='text-sm font-medium text-primary-token line-clamp-2'>
           Named Surfaces
         </h2>
         <div className='mt-3 grid gap-2'>

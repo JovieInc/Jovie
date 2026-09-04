@@ -1,9 +1,9 @@
 [Unit]
-Description=Run Symphony Grok sidecar every 20m
+Description=Run Symphony Grok sidecar every 5m
 
 [Timer]
 OnBootSec=2m
-OnUnitActiveSec=20m
+OnUnitInactiveSec=5min
 Persistent=true
 
 [Install]

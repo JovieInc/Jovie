@@ -123,7 +123,7 @@ export function FeatureShowcase() {
           {/* Section header */}
           <div className='reveal-on-scroll mb-12 max-w-150 lg:mb-16'>
             <p className='homepage-section-eyebrow'>The platform</p>
-            <h2 className='marketing-h2-linear mt-5 text-primary-token'>
+            <h2 className='marketing-h2-linear mt-5 text-primary-token line-clamp-2'>
               Everything Your Music Needs.
             </h2>
             <p className='marketing-lead-linear mt-4 text-secondary-token'>

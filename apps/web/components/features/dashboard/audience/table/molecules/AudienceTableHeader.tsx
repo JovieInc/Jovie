@@ -98,7 +98,7 @@ export function AudienceTableHeader({
       )}
     >
       <tr className='text-app font-caption tracking-normal text-secondary-token'>
-        <th className='w-14 border-b border-subtle px-4 py-2.5 text-left'>
+        <th className='w-14 border-b border-subtle px-4 py-2.5 text-left whitespace-nowrap'>
           <Checkbox
             aria-label='Select All'
             checked={headerCheckboxState}
@@ -117,7 +117,7 @@ export function AudienceTableHeader({
             <th
               key={column.key}
               className={cn(
-                'border-b border-subtle px-4 py-2.5',
+                'border-b border-subtle px-4 py-2.5 whitespace-nowrap',
                 columnAlign === 'right' ? 'text-right' : 'text-left'
               )}
             >

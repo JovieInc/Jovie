@@ -55,6 +55,8 @@ describe('MarketingHeader', () => {
       'href',
       '/signin'
     );
+    // Header utility CTA stays on the /start front door; the waitlist-first
+    // contract applies to owned hero/final CTAs, not the shared nav utilities.
     expect(screen.getByRole('link', { name: 'Find yourself' })).toHaveAttribute(
       'href',
       '/start'
@@ -95,9 +97,10 @@ describe('MarketingHeader', () => {
       'data-presentation',
       'marketing-glass'
     );
-    expect(
-      screen.getByRole('link', { name: 'Claim your profile' })
-    ).toHaveAttribute('href', 'https://jov.ie/waitlist');
+    expect(screen.getByRole('link', { name: 'Get started' })).toHaveAttribute(
+      'href',
+      'https://jov.ie/waitlist'
+    );
   });
 
   it('keeps the legacy artist-profile alias on the same shared chrome', () => {

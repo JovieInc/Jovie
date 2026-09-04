@@ -27,7 +27,7 @@ export function ArtistProfileOutcomeDuo({
     >
       <div className='homepage-profile-outcome-inner mx-auto w-full'>
         {/* ui-casing-allow: marketing display headline */}
-        <h2 className='homepage-profile-outcome-heading mx-auto text-center text-primary-token'>
+        <h2 className='homepage-profile-outcome-heading mx-auto text-center text-primary-token line-clamp-2'>
           {headline}
         </h2>
 

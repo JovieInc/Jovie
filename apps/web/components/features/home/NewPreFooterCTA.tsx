@@ -17,7 +17,7 @@ export function NewPreFooterCTA() {
             </div>
 
             {/* ui-casing-allow: marketing display headline */}
-            <h2 className='mt-6 text-3xl sm:text-4xl font-medium tracking-tight text-primary-token'>
+            <h2 className='mt-6 text-3xl sm:text-4xl font-medium tracking-tight text-primary-token line-clamp-2'>
               Ready to claim{' '}
               <span className='text-accent-token'>your @handle</span>?
             </h2>

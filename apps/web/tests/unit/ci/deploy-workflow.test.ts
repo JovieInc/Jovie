@@ -5202,6 +5202,22 @@ describe('production marker recovery workflow (JOV-4965)', () => {
     expect(preserve).toContain('marker_upload_required=false');
     expect(preserve).toContain('marker_upload_required=true');
     expect(preserve).toContain('artifacts?name=$marker_name&per_page=100');
+    // JOV-5864: an expired marker fails classification as expired_marker yet
+    // holds no downloadable bytes; recovery must not treat it as durable
+    // truth (deadlock) and must delete expired same-name stubs so the
+    // classifier never sees duplicate marker names.
+    expect(validate).toContain(
+      '[.artifacts[] | select(.expired == false)] | length'
+    );
+    expect(preserve).toContain(
+      '[.artifacts[] | select(.expired == false)] | length'
+    );
+    expect(preserve).toContain(
+      '[.artifacts[] | select(.expired == true) | .id] | .[]'
+    );
+    expect(preserve).toContain(
+      'gh api -X DELETE "repos/$REPO/actions/artifacts/$artifact_id"'
+    );
     expect(workflow).toContain(
       'name: production-generation-verified-${{ env.EXPECTED_SHA }}'
     );

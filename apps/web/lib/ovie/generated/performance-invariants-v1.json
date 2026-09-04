@@ -1,0 +1,3024 @@
+{
+  "schema": "jovie-performance-invariants/v1",
+  "slug": "jovie/coordination/performance-invariants-v1",
+  "authority": "provenance-only",
+  "canonicalRegistry": "canon/invariants.jsonl",
+  "invariantId": "JOV-INV-026",
+  "writer": "fable-5.1",
+  "auditor": "glm-5.3",
+  "remediator": "kimi-excluded",
+  "protectedPullRequest": 16419,
+  "landing": "native-github-merge-queue",
+  "cadence": {
+    "weekdayBeat": true,
+    "workflow": ".github/workflows/design-governance.yml",
+    "forbiddenIntervalMinutes": 15
+  },
+  "optimizationContract": {
+    "kind": "exception",
+    "class": "non-product",
+    "justification": "Control-plane plan, admission, or lease machinery with no user-facing page, link, asset, campaign, recommendation, or content variant."
+  },
+  "generatedAt": "2026-09-03T00:00:00.000Z",
+  "sourceHashes": {
+    "docs/performance/route-budgets.json": "sha256:1c8165cc93c2767a0cdfe17b532900901af8e5cdfe7ef8cbb00cf10d5d2627c9",
+    "apps/web/.lighthouserc.json": "sha256:5c3af699034bd2f828d8ea72c466b4a60f32c0580acf2620e6b0e739005ebda9",
+    "apps/web/.lighthouserc.pr.json": "sha256:a83d688de8b9197c051b531b2ebdfe26ec93d6b553a0ba9cba84bcd5f0dc74a6",
+    "apps/web/.lighthouserc.dashboard.pr.json": "sha256:3ca4e7ea268479b1fced0154550c9a1d95d4542e7e60747c4f2e6b09eec81238",
+    "apps/web/.lighthouserc.chat.pr.json": "sha256:835168d9b34b51989efc3cd101d2cb1abf2850b4ca3e2bdc4c481c4c91747bbd",
+    "apps/web/.lighthouserc.onboarding.pr.json": "sha256:917a41679fc0ef0e3a5420866dcf69c3f664f874503064351749f51e3ddd11cf",
+    "apps/web/.lighthouserc.admin.pr.json": "sha256:15fb013f3a6179d2b73c66d903e8e5783acf8bca99495e58ca5f8e7e15402e2e",
+    "apps/web/.lighthouserc.public-launch.json": "sha256:e90313e4d493b49363dc8fe32c3037037576029ca9c635a4b96cf9d166c9b63c",
+    "apps/web/.lighthouserc.build.json": "sha256:5e7077deac09a048ee7620ea8fac550f3c34ad52563bb5e854a261e7ca92322b",
+    "apps/web/scripts/performance-route-manifest.ts": "sha256:ebe2ce1d711880c7e37b0f2f146eff8ebf47872b7a7aeb93d31c2c16d4ea3bba"
+  },
+  "budgets": [
+    {
+      "route": "/",
+      "metric": "cls",
+      "surface": "homepage",
+      "direction": "max",
+      "budget": 0.05,
+      "level": "declared",
+      "source": "docs/performance/route-budgets.json",
+      "sources": [
+        {
+          "path": "docs/performance/route-budgets.json",
+          "value": 0.05,
+          "level": "declared"
+        },
+        {
+          "path": "apps/web/.lighthouserc.json",
+          "value": 0.25,
+          "level": "warn"
+        },
+        {
+          "path": "apps/web/.lighthouserc.pr.json",
+          "value": 0.1,
+          "level": "warn"
+        },
+        {
+          "path": "apps/web/scripts/performance-route-manifest.ts",
+          "value": 0.1,
+          "level": "declared"
+        }
+      ]
+    },
+    {
+      "route": "/",
+      "metric": "fcp_ms",
+      "surface": "homepage",
+      "direction": "max",
+      "budget": 1200,
+      "level": "declared",
+      "source": "docs/performance/route-budgets.json",
+      "sources": [
+        {
+          "path": "docs/performance/route-budgets.json",
+          "value": 1200,
+          "level": "declared"
+        },
+        {
+          "path": "apps/web/.lighthouserc.json",
+          "value": 3000,
+          "level": "warn"
+        },
+        {
+          "path": "apps/web/.lighthouserc.pr.json",
+          "value": 2500,
+          "level": "warn"
+        },
+        {
+          "path": "apps/web/scripts/performance-route-manifest.ts",
+          "value": 2000,
+          "level": "declared"
+        }
+      ]
+    },
+    {
+      "route": "/",
+      "metric": "initialJS_gzip_kb",
+      "surface": "homepage",
+      "direction": "max",
+      "budget": 150,
+      "level": "declared",
+      "source": "docs/performance/route-budgets.json",
+      "sources": [
+        {
+          "path": "docs/performance/route-budgets.json",
+          "value": 150,
+          "level": "declared"
+        }
+      ]
+    },
+    {
+      "route": "/",
+      "metric": "lcp_ms",
+      "surface": "homepage",
+      "direction": "max",
+      "budget": 2000,
+      "level": "declared",
+      "source": "docs/performance/route-budgets.json",
+      "sources": [
+        {
+          "path": "docs/performance/route-budgets.json",
+          "value": 2000,
+          "level": "declared"
+        },
+        {
+          "path": "apps/web/.lighthouserc.json",
+          "value": 4000,
+          "level": "warn"
+        },
+        {
+          "path": "apps/web/.lighthouserc.pr.json",
+          "value": 4000,
+          "level": "warn"
+        },
+        {
+          "path": "apps/web/scripts/performance-route-manifest.ts",
+          "value": 2500,
+          "level": "declared"
+        }
+      ]
+    },
+    {
+      "route": "/",
+      "metric": "performance_score",
+      "surface": "homepage",
+      "direction": "min",
+      "budget": 0.7,
+      "level": "warn",
+      "source": "apps/web/.lighthouserc.json",
+      "sources": [
+        {
+          "path": "apps/web/.lighthouserc.json",
+          "value": 0.7,
+          "level": "warn"
+        },
+        {
+          "path": "apps/web/.lighthouserc.pr.json",
+          "value": 0.4,
+          "level": "error"
+        }
+      ]
+    },
+    {
+      "route": "/",
+      "metric": "speed_index_ms",
+      "surface": "homepage",
+      "direction": "max",
+      "budget": 5000,
+      "level": "warn",
+      "source": "apps/web/.lighthouserc.pr.json",
+      "sources": [
+        {
+          "path": "apps/web/.lighthouserc.pr.json",
+          "value": 5000,
+          "level": "warn"
+        }
+      ]
+    },
+    {
+      "route": "/",
+      "metric": "tbt_ms",
+      "surface": "homepage",
+      "direction": "max",
+      "budget": 600,
+      "level": "warn",
+      "source": "apps/web/.lighthouserc.json",
+      "sources": [
+        {
+          "path": "apps/web/.lighthouserc.json",
+          "value": 600,
+          "level": "warn"
+        },
+        {
+          "path": "apps/web/.lighthouserc.pr.json",
+          "value": 1500,
+          "level": "warn"
+        }
+      ]
+    },
+    {
+      "route": "/",
+      "metric": "tti_ms",
+      "surface": "homepage",
+      "direction": "max",
+      "budget": 2500,
+      "level": "declared",
+      "source": "docs/performance/route-budgets.json",
+      "sources": [
+        {
+          "path": "docs/performance/route-budgets.json",
+          "value": 2500,
+          "level": "declared"
+        },
+        {
+          "path": "apps/web/.lighthouserc.json",
+          "value": 5000,
+          "level": "warn"
+        },
+        {
+          "path": "apps/web/.lighthouserc.pr.json",
+          "value": 4000,
+          "level": "warn"
+        }
+      ]
+    },
+    {
+      "route": "/[username]",
+      "metric": "cls",
+      "surface": "public-profile",
+      "direction": "max",
+      "budget": 0.05,
+      "level": "declared",
+      "source": "apps/web/scripts/performance-route-manifest.ts",
+      "sources": [
+        {
+          "path": "docs/performance/route-budgets.json",
+          "value": 0.1,
+          "level": "declared"
+        },
+        {
+          "path": "apps/web/scripts/performance-route-manifest.ts",
+          "value": 0.05,
+          "level": "declared"
+        }
+      ]
+    },
+    {
+      "route": "/[username]",
+      "metric": "fcp_ms",
+      "surface": "public-profile",
+      "direction": "max",
+      "budget": 800,
+      "level": "declared",
+      "source": "apps/web/scripts/performance-route-manifest.ts",
+      "sources": [
+        {
+          "path": "docs/performance/route-budgets.json",
+          "value": 1500,
+          "level": "declared"
+        },
+        {
+          "path": "apps/web/scripts/performance-route-manifest.ts",
+          "value": 800,
+          "level": "declared"
+        }
+      ]
+    },
+    {
+      "route": "/[username]",
+      "metric": "initialJS_gzip_kb",
+      "surface": "public-profile",
+      "direction": "max",
+      "budget": 180,
+      "level": "declared",
+      "source": "docs/performance/route-budgets.json",
+      "sources": [
+        {
+          "path": "docs/performance/route-budgets.json",
+          "value": 180,
+          "level": "declared"
+        }
+      ]
+    },
+    {
+      "route": "/[username]",
+      "metric": "lcp_ms",
+      "surface": "public-profile",
+      "direction": "max",
+      "budget": 1500,
+      "level": "declared",
+      "source": "apps/web/scripts/performance-route-manifest.ts",
+      "sources": [
+        {
+          "path": "docs/performance/route-budgets.json",
+          "value": 2500,
+          "level": "declared"
+        },
+        {
+          "path": "apps/web/scripts/performance-route-manifest.ts",
+          "value": 1500,
+          "level": "declared"
+        }
+      ]
+    },
+    {
+      "route": "/[username]",
+      "metric": "tti_ms",
+      "surface": "public-profile",
+      "direction": "max",
+      "budget": 3000,
+      "level": "declared",
+      "source": "docs/performance/route-budgets.json",
+      "sources": [
+        {
+          "path": "docs/performance/route-budgets.json",
+          "value": 3000,
+          "level": "declared"
+        }
+      ]
+    },
+    {
+      "route": "/[username]?mode=about",
+      "metric": "cls",
+      "surface": "public-profile",
+      "direction": "max",
+      "budget": 0.1,
+      "level": "declared",
+      "source": "apps/web/scripts/performance-route-manifest.ts",
+      "sources": [
+        {
+          "path": "apps/web/scripts/performance-route-manifest.ts",
+          "value": 0.1,
+          "level": "declared"
+        }
+      ]
+    },
+    {
+      "route": "/[username]?mode=about",
+      "metric": "fcp_ms",
+      "surface": "public-profile",
+      "direction": "max",
+      "budget": 2800,
+      "level": "declared",
+      "source": "apps/web/scripts/performance-route-manifest.ts",
+      "sources": [
+        {
+          "path": "apps/web/scripts/performance-route-manifest.ts",
+          "value": 2800,
+          "level": "declared"
+        }
+      ]
+    },
+    {
+      "route": "/[username]?mode=about",
+      "metric": "lcp_ms",
+      "surface": "public-profile",
+      "direction": "max",
+      "budget": 3300,
+      "level": "declared",
+      "source": "apps/web/scripts/performance-route-manifest.ts",
+      "sources": [
+        {
+          "path": "apps/web/scripts/performance-route-manifest.ts",
+          "value": 3300,
+          "level": "declared"
+        }
+      ]
+    },
+    {
+      "route": "/[username]?mode=contact",
+      "metric": "cls",
+      "surface": "public-profile",
+      "direction": "max",
+      "budget": 0.1,
+      "level": "declared",
+      "source": "apps/web/scripts/performance-route-manifest.ts",
+      "sources": [
+        {
+          "path": "apps/web/scripts/performance-route-manifest.ts",
+          "value": 0.1,
+          "level": "declared"
+        }
+      ]
+    },
+    {
+      "route": "/[username]?mode=contact",
+      "metric": "fcp_ms",
+      "surface": "public-profile",
+      "direction": "max",
+      "budget": 2800,
+      "level": "declared",
+      "source": "apps/web/scripts/performance-route-manifest.ts",
+      "sources": [
+        {
+          "path": "apps/web/scripts/performance-route-manifest.ts",
+          "value": 2800,
+          "level": "declared"
+        }
+      ]
+    },
+    {
+      "route": "/[username]?mode=contact",
+      "metric": "lcp_ms",
+      "surface": "public-profile",
+      "direction": "max",
+      "budget": 3300,
+      "level": "declared",
+      "source": "apps/web/scripts/performance-route-manifest.ts",
+      "sources": [
+        {
+          "path": "apps/web/scripts/performance-route-manifest.ts",
+          "value": 3300,
+          "level": "declared"
+        }
+      ]
+    },
+    {
+      "route": "/[username]?mode=pay",
+      "metric": "cls",
+      "surface": "public-profile",
+      "direction": "max",
+      "budget": 0.1,
+      "level": "declared",
+      "source": "apps/web/scripts/performance-route-manifest.ts",
+      "sources": [
+        {
+          "path": "apps/web/scripts/performance-route-manifest.ts",
+          "value": 0.1,
+          "level": "declared"
+        }
+      ]
+    },
+    {
+      "route": "/[username]?mode=pay",
+      "metric": "fcp_ms",
+      "surface": "public-profile",
+      "direction": "max",
+      "budget": 2800,
+      "level": "declared",
+      "source": "apps/web/scripts/performance-route-manifest.ts",
+      "sources": [
+        {
+          "path": "apps/web/scripts/performance-route-manifest.ts",
+          "value": 2800,
+          "level": "declared"
+        }
+      ]
+    },
+    {
+      "route": "/[username]?mode=pay",
+      "metric": "lcp_ms",
+      "surface": "public-profile",
+      "direction": "max",
+      "budget": 3300,
+      "level": "declared",
+      "source": "apps/web/scripts/performance-route-manifest.ts",
+      "sources": [
+        {
+          "path": "apps/web/scripts/performance-route-manifest.ts",
+          "value": 3300,
+          "level": "declared"
+        }
+      ]
+    },
+    {
+      "route": "/[username]?mode=releases",
+      "metric": "cls",
+      "surface": "public-profile",
+      "direction": "max",
+      "budget": 0.1,
+      "level": "declared",
+      "source": "apps/web/scripts/performance-route-manifest.ts",
+      "sources": [
+        {
+          "path": "apps/web/scripts/performance-route-manifest.ts",
+          "value": 0.1,
+          "level": "declared"
+        }
+      ]
+    },
+    {
+      "route": "/[username]?mode=releases",
+      "metric": "fcp_ms",
+      "surface": "public-profile",
+      "direction": "max",
+      "budget": 2800,
+      "level": "declared",
+      "source": "apps/web/scripts/performance-route-manifest.ts",
+      "sources": [
+        {
+          "path": "apps/web/scripts/performance-route-manifest.ts",
+          "value": 2800,
+          "level": "declared"
+        }
+      ]
+    },
+    {
+      "route": "/[username]?mode=releases",
+      "metric": "lcp_ms",
+      "surface": "public-profile",
+      "direction": "max",
+      "budget": 3300,
+      "level": "declared",
+      "source": "apps/web/scripts/performance-route-manifest.ts",
+      "sources": [
+        {
+          "path": "apps/web/scripts/performance-route-manifest.ts",
+          "value": 3300,
+          "level": "declared"
+        }
+      ]
+    },
+    {
+      "route": "/[username]/[slug]",
+      "metric": "cls",
+      "surface": "public-profile",
+      "direction": "max",
+      "budget": 0.1,
+      "level": "declared",
+      "source": "docs/performance/route-budgets.json",
+      "sources": [
+        {
+          "path": "docs/performance/route-budgets.json",
+          "value": 0.1,
+          "level": "declared"
+        },
+        {
+          "path": "apps/web/scripts/performance-route-manifest.ts",
+          "value": 0.1,
+          "level": "declared"
+        }
+      ]
+    },
+    {
+      "route": "/[username]/[slug]",
+      "metric": "fcp_ms",
+      "surface": "public-profile",
+      "direction": "max",
+      "budget": 1500,
+      "level": "declared",
+      "source": "docs/performance/route-budgets.json",
+      "sources": [
+        {
+          "path": "docs/performance/route-budgets.json",
+          "value": 1500,
+          "level": "declared"
+        },
+        {
+          "path": "apps/web/scripts/performance-route-manifest.ts",
+          "value": 2600,
+          "level": "declared"
+        }
+      ]
+    },
+    {
+      "route": "/[username]/[slug]",
+      "metric": "initialJS_gzip_kb",
+      "surface": "public-profile",
+      "direction": "max",
+      "budget": 180,
+      "level": "declared",
+      "source": "docs/performance/route-budgets.json",
+      "sources": [
+        {
+          "path": "docs/performance/route-budgets.json",
+          "value": 180,
+          "level": "declared"
+        }
+      ]
+    },
+    {
+      "route": "/[username]/[slug]",
+      "metric": "lcp_ms",
+      "surface": "public-profile",
+      "direction": "max",
+      "budget": 2500,
+      "level": "declared",
+      "source": "docs/performance/route-budgets.json",
+      "sources": [
+        {
+          "path": "docs/performance/route-budgets.json",
+          "value": 2500,
+          "level": "declared"
+        },
+        {
+          "path": "apps/web/scripts/performance-route-manifest.ts",
+          "value": 3200,
+          "level": "declared"
+        }
+      ]
+    },
+    {
+      "route": "/[username]/[slug]",
+      "metric": "tti_ms",
+      "surface": "public-profile",
+      "direction": "max",
+      "budget": 3000,
+      "level": "declared",
+      "source": "docs/performance/route-budgets.json",
+      "sources": [
+        {
+          "path": "docs/performance/route-budgets.json",
+          "value": 3000,
+          "level": "declared"
+        }
+      ]
+    },
+    {
+      "route": "/[username]/[slug]/[trackSlug]",
+      "metric": "cls",
+      "surface": "public-profile",
+      "direction": "max",
+      "budget": 0.1,
+      "level": "declared",
+      "source": "apps/web/scripts/performance-route-manifest.ts",
+      "sources": [
+        {
+          "path": "apps/web/scripts/performance-route-manifest.ts",
+          "value": 0.1,
+          "level": "declared"
+        }
+      ]
+    },
+    {
+      "route": "/[username]/[slug]/[trackSlug]",
+      "metric": "fcp_ms",
+      "surface": "public-profile",
+      "direction": "max",
+      "budget": 2600,
+      "level": "declared",
+      "source": "apps/web/scripts/performance-route-manifest.ts",
+      "sources": [
+        {
+          "path": "apps/web/scripts/performance-route-manifest.ts",
+          "value": 2600,
+          "level": "declared"
+        }
+      ]
+    },
+    {
+      "route": "/[username]/[slug]/[trackSlug]",
+      "metric": "lcp_ms",
+      "surface": "public-profile",
+      "direction": "max",
+      "budget": 3200,
+      "level": "declared",
+      "source": "apps/web/scripts/performance-route-manifest.ts",
+      "sources": [
+        {
+          "path": "apps/web/scripts/performance-route-manifest.ts",
+          "value": 3200,
+          "level": "declared"
+        }
+      ]
+    },
+    {
+      "route": "/[username]/[slug]/sounds",
+      "metric": "cls",
+      "surface": "public-profile",
+      "direction": "max",
+      "budget": 0.1,
+      "level": "declared",
+      "source": "apps/web/scripts/performance-route-manifest.ts",
+      "sources": [
+        {
+          "path": "apps/web/scripts/performance-route-manifest.ts",
+          "value": 0.1,
+          "level": "declared"
+        }
+      ]
+    },
+    {
+      "route": "/[username]/[slug]/sounds",
+      "metric": "fcp_ms",
+      "surface": "public-profile",
+      "direction": "max",
+      "budget": 2600,
+      "level": "declared",
+      "source": "apps/web/scripts/performance-route-manifest.ts",
+      "sources": [
+        {
+          "path": "apps/web/scripts/performance-route-manifest.ts",
+          "value": 2600,
+          "level": "declared"
+        }
+      ]
+    },
+    {
+      "route": "/[username]/[slug]/sounds",
+      "metric": "lcp_ms",
+      "surface": "public-profile",
+      "direction": "max",
+      "budget": 3200,
+      "level": "declared",
+      "source": "apps/web/scripts/performance-route-manifest.ts",
+      "sources": [
+        {
+          "path": "apps/web/scripts/performance-route-manifest.ts",
+          "value": 3200,
+          "level": "declared"
+        }
+      ]
+    },
+    {
+      "route": "/[username]/about",
+      "metric": "cls",
+      "surface": "public-profile",
+      "direction": "max",
+      "budget": 0.1,
+      "level": "declared",
+      "source": "apps/web/scripts/performance-route-manifest.ts",
+      "sources": [
+        {
+          "path": "apps/web/scripts/performance-route-manifest.ts",
+          "value": 0.1,
+          "level": "declared"
+        }
+      ]
+    },
+    {
+      "route": "/[username]/about",
+      "metric": "fcp_ms",
+      "surface": "public-profile",
+      "direction": "max",
+      "budget": 2800,
+      "level": "declared",
+      "source": "apps/web/scripts/performance-route-manifest.ts",
+      "sources": [
+        {
+          "path": "apps/web/scripts/performance-route-manifest.ts",
+          "value": 2800,
+          "level": "declared"
+        }
+      ]
+    },
+    {
+      "route": "/[username]/about",
+      "metric": "lcp_ms",
+      "surface": "public-profile",
+      "direction": "max",
+      "budget": 3300,
+      "level": "declared",
+      "source": "apps/web/scripts/performance-route-manifest.ts",
+      "sources": [
+        {
+          "path": "apps/web/scripts/performance-route-manifest.ts",
+          "value": 3300,
+          "level": "declared"
+        }
+      ]
+    },
+    {
+      "route": "/[username]/contact",
+      "metric": "cls",
+      "surface": "public-profile",
+      "direction": "max",
+      "budget": 0.1,
+      "level": "declared",
+      "source": "apps/web/scripts/performance-route-manifest.ts",
+      "sources": [
+        {
+          "path": "apps/web/scripts/performance-route-manifest.ts",
+          "value": 0.1,
+          "level": "declared"
+        }
+      ]
+    },
+    {
+      "route": "/[username]/contact",
+      "metric": "fcp_ms",
+      "surface": "public-profile",
+      "direction": "max",
+      "budget": 2800,
+      "level": "declared",
+      "source": "apps/web/scripts/performance-route-manifest.ts",
+      "sources": [
+        {
+          "path": "apps/web/scripts/performance-route-manifest.ts",
+          "value": 2800,
+          "level": "declared"
+        }
+      ]
+    },
+    {
+      "route": "/[username]/contact",
+      "metric": "lcp_ms",
+      "surface": "public-profile",
+      "direction": "max",
+      "budget": 3300,
+      "level": "declared",
+      "source": "apps/web/scripts/performance-route-manifest.ts",
+      "sources": [
+        {
+          "path": "apps/web/scripts/performance-route-manifest.ts",
+          "value": 3300,
+          "level": "declared"
+        }
+      ]
+    },
+    {
+      "route": "/[username]/notifications",
+      "metric": "cls",
+      "surface": "public-profile",
+      "direction": "max",
+      "budget": 0.1,
+      "level": "declared",
+      "source": "apps/web/scripts/performance-route-manifest.ts",
+      "sources": [
+        {
+          "path": "apps/web/scripts/performance-route-manifest.ts",
+          "value": 0.1,
+          "level": "declared"
+        }
+      ]
+    },
+    {
+      "route": "/[username]/notifications",
+      "metric": "fcp_ms",
+      "surface": "public-profile",
+      "direction": "max",
+      "budget": 2800,
+      "level": "declared",
+      "source": "apps/web/scripts/performance-route-manifest.ts",
+      "sources": [
+        {
+          "path": "apps/web/scripts/performance-route-manifest.ts",
+          "value": 2800,
+          "level": "declared"
+        }
+      ]
+    },
+    {
+      "route": "/[username]/notifications",
+      "metric": "lcp_ms",
+      "surface": "public-profile",
+      "direction": "max",
+      "budget": 3300,
+      "level": "declared",
+      "source": "apps/web/scripts/performance-route-manifest.ts",
+      "sources": [
+        {
+          "path": "apps/web/scripts/performance-route-manifest.ts",
+          "value": 3300,
+          "level": "declared"
+        }
+      ]
+    },
+    {
+      "route": "/[username]/performance-extra-path",
+      "metric": "cls",
+      "surface": "public-profile",
+      "direction": "max",
+      "budget": 0.1,
+      "level": "declared",
+      "source": "apps/web/scripts/performance-route-manifest.ts",
+      "sources": [
+        {
+          "path": "apps/web/scripts/performance-route-manifest.ts",
+          "value": 0.1,
+          "level": "declared"
+        }
+      ]
+    },
+    {
+      "route": "/[username]/performance-extra-path",
+      "metric": "fcp_ms",
+      "surface": "public-profile",
+      "direction": "max",
+      "budget": 2800,
+      "level": "declared",
+      "source": "apps/web/scripts/performance-route-manifest.ts",
+      "sources": [
+        {
+          "path": "apps/web/scripts/performance-route-manifest.ts",
+          "value": 2800,
+          "level": "declared"
+        }
+      ]
+    },
+    {
+      "route": "/[username]/performance-extra-path",
+      "metric": "lcp_ms",
+      "surface": "public-profile",
+      "direction": "max",
+      "budget": 3300,
+      "level": "declared",
+      "source": "apps/web/scripts/performance-route-manifest.ts",
+      "sources": [
+        {
+          "path": "apps/web/scripts/performance-route-manifest.ts",
+          "value": 3300,
+          "level": "declared"
+        }
+      ]
+    },
+    {
+      "route": "/[username]/shop",
+      "metric": "cls",
+      "surface": "public-profile",
+      "direction": "max",
+      "budget": 0.1,
+      "level": "declared",
+      "source": "apps/web/scripts/performance-route-manifest.ts",
+      "sources": [
+        {
+          "path": "apps/web/scripts/performance-route-manifest.ts",
+          "value": 0.1,
+          "level": "declared"
+        }
+      ]
+    },
+    {
+      "route": "/[username]/shop",
+      "metric": "fcp_ms",
+      "surface": "public-profile",
+      "direction": "max",
+      "budget": 2800,
+      "level": "declared",
+      "source": "apps/web/scripts/performance-route-manifest.ts",
+      "sources": [
+        {
+          "path": "apps/web/scripts/performance-route-manifest.ts",
+          "value": 2800,
+          "level": "declared"
+        }
+      ]
+    },
+    {
+      "route": "/[username]/shop",
+      "metric": "lcp_ms",
+      "surface": "public-profile",
+      "direction": "max",
+      "budget": 3300,
+      "level": "declared",
+      "source": "apps/web/scripts/performance-route-manifest.ts",
+      "sources": [
+        {
+          "path": "apps/web/scripts/performance-route-manifest.ts",
+          "value": 3300,
+          "level": "declared"
+        }
+      ]
+    },
+    {
+      "route": "/account",
+      "metric": "cls",
+      "surface": "public-profile",
+      "direction": "max",
+      "budget": 0.1,
+      "level": "declared",
+      "source": "apps/web/scripts/performance-route-manifest.ts",
+      "sources": [
+        {
+          "path": "apps/web/scripts/performance-route-manifest.ts",
+          "value": 0.1,
+          "level": "declared"
+        }
+      ]
+    },
+    {
+      "route": "/account",
+      "metric": "fcp_ms",
+      "surface": "public-profile",
+      "direction": "max",
+      "budget": 1800,
+      "level": "declared",
+      "source": "apps/web/scripts/performance-route-manifest.ts",
+      "sources": [
+        {
+          "path": "apps/web/scripts/performance-route-manifest.ts",
+          "value": 1800,
+          "level": "declared"
+        }
+      ]
+    },
+    {
+      "route": "/account",
+      "metric": "lcp_ms",
+      "surface": "public-profile",
+      "direction": "max",
+      "budget": 2800,
+      "level": "declared",
+      "source": "apps/web/scripts/performance-route-manifest.ts",
+      "sources": [
+        {
+          "path": "apps/web/scripts/performance-route-manifest.ts",
+          "value": 2800,
+          "level": "declared"
+        }
+      ]
+    },
+    {
+      "route": "/artist-selection",
+      "metric": "cls",
+      "surface": "public-profile",
+      "direction": "max",
+      "budget": 0.1,
+      "level": "declared",
+      "source": "apps/web/scripts/performance-route-manifest.ts",
+      "sources": [
+        {
+          "path": "apps/web/scripts/performance-route-manifest.ts",
+          "value": 0.1,
+          "level": "declared"
+        }
+      ]
+    },
+    {
+      "route": "/artist-selection",
+      "metric": "fcp_ms",
+      "surface": "public-profile",
+      "direction": "max",
+      "budget": 1800,
+      "level": "declared",
+      "source": "apps/web/scripts/performance-route-manifest.ts",
+      "sources": [
+        {
+          "path": "apps/web/scripts/performance-route-manifest.ts",
+          "value": 1800,
+          "level": "declared"
+        }
+      ]
+    },
+    {
+      "route": "/artist-selection",
+      "metric": "lcp_ms",
+      "surface": "public-profile",
+      "direction": "max",
+      "budget": 2800,
+      "level": "declared",
+      "source": "apps/web/scripts/performance-route-manifest.ts",
+      "sources": [
+        {
+          "path": "apps/web/scripts/performance-route-manifest.ts",
+          "value": 2800,
+          "level": "declared"
+        }
+      ]
+    },
+    {
+      "route": "/billing",
+      "metric": "cls",
+      "surface": "public-profile",
+      "direction": "max",
+      "budget": 0.1,
+      "level": "declared",
+      "source": "apps/web/scripts/performance-route-manifest.ts",
+      "sources": [
+        {
+          "path": "apps/web/scripts/performance-route-manifest.ts",
+          "value": 0.1,
+          "level": "declared"
+        }
+      ]
+    },
+    {
+      "route": "/billing",
+      "metric": "fcp_ms",
+      "surface": "public-profile",
+      "direction": "max",
+      "budget": 2000,
+      "level": "declared",
+      "source": "apps/web/scripts/performance-route-manifest.ts",
+      "sources": [
+        {
+          "path": "apps/web/scripts/performance-route-manifest.ts",
+          "value": 2000,
+          "level": "declared"
+        }
+      ]
+    },
+    {
+      "route": "/billing",
+      "metric": "lcp_ms",
+      "surface": "public-profile",
+      "direction": "max",
+      "budget": 3000,
+      "level": "declared",
+      "source": "apps/web/scripts/performance-route-manifest.ts",
+      "sources": [
+        {
+          "path": "apps/web/scripts/performance-route-manifest.ts",
+          "value": 3000,
+          "level": "declared"
+        }
+      ]
+    },
+    {
+      "route": "/start?resume=artist-confirm&handle=[username]",
+      "metric": "cls",
+      "surface": "public-profile",
+      "direction": "max",
+      "budget": 0.02,
+      "level": "declared",
+      "source": "apps/web/scripts/performance-route-manifest.ts",
+      "sources": [
+        {
+          "path": "apps/web/scripts/performance-route-manifest.ts",
+          "value": 0.02,
+          "level": "declared"
+        }
+      ]
+    },
+    {
+      "route": "/start?resume=artist-confirm&handle=[username]",
+      "metric": "fcp_ms",
+      "surface": "public-profile",
+      "direction": "max",
+      "budget": 900,
+      "level": "declared",
+      "source": "apps/web/scripts/performance-route-manifest.ts",
+      "sources": [
+        {
+          "path": "apps/web/scripts/performance-route-manifest.ts",
+          "value": 900,
+          "level": "declared"
+        }
+      ]
+    },
+    {
+      "route": "/start?resume=artist-confirm&handle=[username]",
+      "metric": "lcp_ms",
+      "surface": "public-profile",
+      "direction": "max",
+      "budget": 1300,
+      "level": "declared",
+      "source": "apps/web/scripts/performance-route-manifest.ts",
+      "sources": [
+        {
+          "path": "apps/web/scripts/performance-route-manifest.ts",
+          "value": 1300,
+          "level": "declared"
+        }
+      ]
+    },
+    {
+      "route": "/start?resume=dsp&handle=[username]",
+      "metric": "cls",
+      "surface": "public-profile",
+      "direction": "max",
+      "budget": 0.02,
+      "level": "declared",
+      "source": "apps/web/scripts/performance-route-manifest.ts",
+      "sources": [
+        {
+          "path": "apps/web/scripts/performance-route-manifest.ts",
+          "value": 0.02,
+          "level": "declared"
+        }
+      ]
+    },
+    {
+      "route": "/start?resume=dsp&handle=[username]",
+      "metric": "fcp_ms",
+      "surface": "public-profile",
+      "direction": "max",
+      "budget": 900,
+      "level": "declared",
+      "source": "apps/web/scripts/performance-route-manifest.ts",
+      "sources": [
+        {
+          "path": "apps/web/scripts/performance-route-manifest.ts",
+          "value": 900,
+          "level": "declared"
+        }
+      ]
+    },
+    {
+      "route": "/start?resume=dsp&handle=[username]",
+      "metric": "lcp_ms",
+      "surface": "public-profile",
+      "direction": "max",
+      "budget": 1300,
+      "level": "declared",
+      "source": "apps/web/scripts/performance-route-manifest.ts",
+      "sources": [
+        {
+          "path": "apps/web/scripts/performance-route-manifest.ts",
+          "value": 1300,
+          "level": "declared"
+        }
+      ]
+    },
+    {
+      "route": "/start?resume=handle&handle=[username]",
+      "metric": "cls",
+      "surface": "public-profile",
+      "direction": "max",
+      "budget": 0.02,
+      "level": "declared",
+      "source": "apps/web/scripts/performance-route-manifest.ts",
+      "sources": [
+        {
+          "path": "apps/web/scripts/performance-route-manifest.ts",
+          "value": 0.02,
+          "level": "declared"
+        }
+      ]
+    },
+    {
+      "route": "/start?resume=handle&handle=[username]",
+      "metric": "fcp_ms",
+      "surface": "public-profile",
+      "direction": "max",
+      "budget": 900,
+      "level": "declared",
+      "source": "apps/web/scripts/performance-route-manifest.ts",
+      "sources": [
+        {
+          "path": "apps/web/scripts/performance-route-manifest.ts",
+          "value": 900,
+          "level": "declared"
+        }
+      ]
+    },
+    {
+      "route": "/start?resume=handle&handle=[username]",
+      "metric": "lcp_ms",
+      "surface": "public-profile",
+      "direction": "max",
+      "budget": 1300,
+      "level": "declared",
+      "source": "apps/web/scripts/performance-route-manifest.ts",
+      "sources": [
+        {
+          "path": "apps/web/scripts/performance-route-manifest.ts",
+          "value": 1300,
+          "level": "declared"
+        }
+      ]
+    },
+    {
+      "route": "/start?resume=late-arrivals&handle=[username]",
+      "metric": "cls",
+      "surface": "public-profile",
+      "direction": "max",
+      "budget": 0.02,
+      "level": "declared",
+      "source": "apps/web/scripts/performance-route-manifest.ts",
+      "sources": [
+        {
+          "path": "apps/web/scripts/performance-route-manifest.ts",
+          "value": 0.02,
+          "level": "declared"
+        }
+      ]
+    },
+    {
+      "route": "/start?resume=late-arrivals&handle=[username]",
+      "metric": "fcp_ms",
+      "surface": "public-profile",
+      "direction": "max",
+      "budget": 900,
+      "level": "declared",
+      "source": "apps/web/scripts/performance-route-manifest.ts",
+      "sources": [
+        {
+          "path": "apps/web/scripts/performance-route-manifest.ts",
+          "value": 900,
+          "level": "declared"
+        }
+      ]
+    },
+    {
+      "route": "/start?resume=late-arrivals&handle=[username]",
+      "metric": "lcp_ms",
+      "surface": "public-profile",
+      "direction": "max",
+      "budget": 1300,
+      "level": "declared",
+      "source": "apps/web/scripts/performance-route-manifest.ts",
+      "sources": [
+        {
+          "path": "apps/web/scripts/performance-route-manifest.ts",
+          "value": 1300,
+          "level": "declared"
+        }
+      ]
+    },
+    {
+      "route": "/start?resume=profile-ready&handle=[username]",
+      "metric": "cls",
+      "surface": "public-profile",
+      "direction": "max",
+      "budget": 0.02,
+      "level": "declared",
+      "source": "apps/web/scripts/performance-route-manifest.ts",
+      "sources": [
+        {
+          "path": "apps/web/scripts/performance-route-manifest.ts",
+          "value": 0.02,
+          "level": "declared"
+        }
+      ]
+    },
+    {
+      "route": "/start?resume=profile-ready&handle=[username]",
+      "metric": "fcp_ms",
+      "surface": "public-profile",
+      "direction": "max",
+      "budget": 900,
+      "level": "declared",
+      "source": "apps/web/scripts/performance-route-manifest.ts",
+      "sources": [
+        {
+          "path": "apps/web/scripts/performance-route-manifest.ts",
+          "value": 900,
+          "level": "declared"
+        }
+      ]
+    },
+    {
+      "route": "/start?resume=profile-ready&handle=[username]",
+      "metric": "lcp_ms",
+      "surface": "public-profile",
+      "direction": "max",
+      "budget": 1300,
+      "level": "declared",
+      "source": "apps/web/scripts/performance-route-manifest.ts",
+      "sources": [
+        {
+          "path": "apps/web/scripts/performance-route-manifest.ts",
+          "value": 1300,
+          "level": "declared"
+        }
+      ]
+    },
+    {
+      "route": "/start?resume=releases&handle=[username]",
+      "metric": "cls",
+      "surface": "public-profile",
+      "direction": "max",
+      "budget": 0.02,
+      "level": "declared",
+      "source": "apps/web/scripts/performance-route-manifest.ts",
+      "sources": [
+        {
+          "path": "apps/web/scripts/performance-route-manifest.ts",
+          "value": 0.02,
+          "level": "declared"
+        }
+      ]
+    },
+    {
+      "route": "/start?resume=releases&handle=[username]",
+      "metric": "fcp_ms",
+      "surface": "public-profile",
+      "direction": "max",
+      "budget": 900,
+      "level": "declared",
+      "source": "apps/web/scripts/performance-route-manifest.ts",
+      "sources": [
+        {
+          "path": "apps/web/scripts/performance-route-manifest.ts",
+          "value": 900,
+          "level": "declared"
+        }
+      ]
+    },
+    {
+      "route": "/start?resume=releases&handle=[username]",
+      "metric": "lcp_ms",
+      "surface": "public-profile",
+      "direction": "max",
+      "budget": 1300,
+      "level": "declared",
+      "source": "apps/web/scripts/performance-route-manifest.ts",
+      "sources": [
+        {
+          "path": "apps/web/scripts/performance-route-manifest.ts",
+          "value": 1300,
+          "level": "declared"
+        }
+      ]
+    },
+    {
+      "route": "/start?resume=social&handle=[username]",
+      "metric": "cls",
+      "surface": "public-profile",
+      "direction": "max",
+      "budget": 0.02,
+      "level": "declared",
+      "source": "apps/web/scripts/performance-route-manifest.ts",
+      "sources": [
+        {
+          "path": "apps/web/scripts/performance-route-manifest.ts",
+          "value": 0.02,
+          "level": "declared"
+        }
+      ]
+    },
+    {
+      "route": "/start?resume=social&handle=[username]",
+      "metric": "fcp_ms",
+      "surface": "public-profile",
+      "direction": "max",
+      "budget": 900,
+      "level": "declared",
+      "source": "apps/web/scripts/performance-route-manifest.ts",
+      "sources": [
+        {
+          "path": "apps/web/scripts/performance-route-manifest.ts",
+          "value": 900,
+          "level": "declared"
+        }
+      ]
+    },
+    {
+      "route": "/start?resume=social&handle=[username]",
+      "metric": "lcp_ms",
+      "surface": "public-profile",
+      "direction": "max",
+      "budget": 1300,
+      "level": "declared",
+      "source": "apps/web/scripts/performance-route-manifest.ts",
+      "sources": [
+        {
+          "path": "apps/web/scripts/performance-route-manifest.ts",
+          "value": 1300,
+          "level": "declared"
+        }
+      ]
+    },
+    {
+      "route": "/start?resume=spotify&handle=[username]",
+      "metric": "cls",
+      "surface": "public-profile",
+      "direction": "max",
+      "budget": 0.02,
+      "level": "declared",
+      "source": "apps/web/scripts/performance-route-manifest.ts",
+      "sources": [
+        {
+          "path": "apps/web/scripts/performance-route-manifest.ts",
+          "value": 0.02,
+          "level": "declared"
+        }
+      ]
+    },
+    {
+      "route": "/start?resume=spotify&handle=[username]",
+      "metric": "fcp_ms",
+      "surface": "public-profile",
+      "direction": "max",
+      "budget": 900,
+      "level": "declared",
+      "source": "apps/web/scripts/performance-route-manifest.ts",
+      "sources": [
+        {
+          "path": "apps/web/scripts/performance-route-manifest.ts",
+          "value": 900,
+          "level": "declared"
+        }
+      ]
+    },
+    {
+      "route": "/start?resume=spotify&handle=[username]",
+      "metric": "lcp_ms",
+      "surface": "public-profile",
+      "direction": "max",
+      "budget": 1300,
+      "level": "declared",
+      "source": "apps/web/scripts/performance-route-manifest.ts",
+      "sources": [
+        {
+          "path": "apps/web/scripts/performance-route-manifest.ts",
+          "value": 1300,
+          "level": "declared"
+        }
+      ]
+    },
+    {
+      "route": "/start?resume=upgrade&handle=[username]",
+      "metric": "cls",
+      "surface": "public-profile",
+      "direction": "max",
+      "budget": 0.02,
+      "level": "declared",
+      "source": "apps/web/scripts/performance-route-manifest.ts",
+      "sources": [
+        {
+          "path": "apps/web/scripts/performance-route-manifest.ts",
+          "value": 0.02,
+          "level": "declared"
+        }
+      ]
+    },
+    {
+      "route": "/start?resume=upgrade&handle=[username]",
+      "metric": "fcp_ms",
+      "surface": "public-profile",
+      "direction": "max",
+      "budget": 900,
+      "level": "declared",
+      "source": "apps/web/scripts/performance-route-manifest.ts",
+      "sources": [
+        {
+          "path": "apps/web/scripts/performance-route-manifest.ts",
+          "value": 900,
+          "level": "declared"
+        }
+      ]
+    },
+    {
+      "route": "/start?resume=upgrade&handle=[username]",
+      "metric": "lcp_ms",
+      "surface": "public-profile",
+      "direction": "max",
+      "budget": 1300,
+      "level": "declared",
+      "source": "apps/web/scripts/performance-route-manifest.ts",
+      "sources": [
+        {
+          "path": "apps/web/scripts/performance-route-manifest.ts",
+          "value": 1300,
+          "level": "declared"
+        }
+      ]
+    },
+    {
+      "route": "/tim",
+      "metric": "cls",
+      "surface": "public-profile",
+      "direction": "max",
+      "budget": 0.05,
+      "level": "warn",
+      "source": "apps/web/.lighthouserc.json",
+      "sources": [
+        {
+          "path": "apps/web/.lighthouserc.json",
+          "value": 0.05,
+          "level": "warn"
+        }
+      ]
+    },
+    {
+      "route": "/tim",
+      "metric": "fcp_ms",
+      "surface": "public-profile",
+      "direction": "max",
+      "budget": 3000,
+      "level": "warn",
+      "source": "apps/web/.lighthouserc.json",
+      "sources": [
+        {
+          "path": "apps/web/.lighthouserc.json",
+          "value": 3000,
+          "level": "warn"
+        }
+      ]
+    },
+    {
+      "route": "/tim",
+      "metric": "lcp_ms",
+      "surface": "public-profile",
+      "direction": "max",
+      "budget": 4000,
+      "level": "warn",
+      "source": "apps/web/.lighthouserc.json",
+      "sources": [
+        {
+          "path": "apps/web/.lighthouserc.json",
+          "value": 4000,
+          "level": "warn"
+        }
+      ]
+    },
+    {
+      "route": "/tim",
+      "metric": "performance_score",
+      "surface": "public-profile",
+      "direction": "min",
+      "budget": 0.6,
+      "level": "warn",
+      "source": "apps/web/.lighthouserc.json",
+      "sources": [
+        {
+          "path": "apps/web/.lighthouserc.json",
+          "value": 0.6,
+          "level": "warn"
+        }
+      ]
+    },
+    {
+      "route": "/tim",
+      "metric": "tbt_ms",
+      "surface": "public-profile",
+      "direction": "max",
+      "budget": 600,
+      "level": "warn",
+      "source": "apps/web/.lighthouserc.json",
+      "sources": [
+        {
+          "path": "apps/web/.lighthouserc.json",
+          "value": 600,
+          "level": "warn"
+        }
+      ]
+    },
+    {
+      "route": "/tim",
+      "metric": "tti_ms",
+      "surface": "public-profile",
+      "direction": "max",
+      "budget": 5000,
+      "level": "warn",
+      "source": "apps/web/.lighthouserc.json",
+      "sources": [
+        {
+          "path": "apps/web/.lighthouserc.json",
+          "value": 5000,
+          "level": "warn"
+        }
+      ]
+    },
+    {
+      "route": "/waitlist",
+      "metric": "cls",
+      "surface": "public-profile",
+      "direction": "max",
+      "budget": 0.1,
+      "level": "declared",
+      "source": "apps/web/scripts/performance-route-manifest.ts",
+      "sources": [
+        {
+          "path": "apps/web/scripts/performance-route-manifest.ts",
+          "value": 0.1,
+          "level": "declared"
+        }
+      ]
+    },
+    {
+      "route": "/waitlist",
+      "metric": "fcp_ms",
+      "surface": "public-profile",
+      "direction": "max",
+      "budget": 1800,
+      "level": "declared",
+      "source": "apps/web/scripts/performance-route-manifest.ts",
+      "sources": [
+        {
+          "path": "apps/web/scripts/performance-route-manifest.ts",
+          "value": 1800,
+          "level": "declared"
+        }
+      ]
+    },
+    {
+      "route": "/waitlist",
+      "metric": "lcp_ms",
+      "surface": "public-profile",
+      "direction": "max",
+      "budget": 2600,
+      "level": "declared",
+      "source": "apps/web/scripts/performance-route-manifest.ts",
+      "sources": [
+        {
+          "path": "apps/web/scripts/performance-route-manifest.ts",
+          "value": 2600,
+          "level": "declared"
+        }
+      ]
+    },
+    {
+      "route": "/app",
+      "metric": "cls",
+      "surface": "signed-in-app",
+      "direction": "max",
+      "budget": 0.05,
+      "level": "declared",
+      "source": "apps/web/scripts/performance-route-manifest.ts",
+      "sources": [
+        {
+          "path": "apps/web/scripts/performance-route-manifest.ts",
+          "value": 0.05,
+          "level": "declared"
+        },
+        {
+          "path": "apps/web/scripts/performance-route-manifest.ts",
+          "value": 0.1,
+          "level": "declared"
+        },
+        {
+          "path": "apps/web/scripts/performance-route-manifest.ts",
+          "value": 0.1,
+          "level": "declared"
+        }
+      ]
+    },
+    {
+      "route": "/app",
+      "metric": "fcp_ms",
+      "surface": "signed-in-app",
+      "direction": "max",
+      "budget": 1500,
+      "level": "declared",
+      "source": "apps/web/scripts/performance-route-manifest.ts",
+      "sources": [
+        {
+          "path": "apps/web/scripts/performance-route-manifest.ts",
+          "value": 1500,
+          "level": "declared"
+        },
+        {
+          "path": "apps/web/scripts/performance-route-manifest.ts",
+          "value": 1800,
+          "level": "declared"
+        },
+        {
+          "path": "apps/web/scripts/performance-route-manifest.ts",
+          "value": 1800,
+          "level": "declared"
+        }
+      ]
+    },
+    {
+      "route": "/app",
+      "metric": "lcp_ms",
+      "surface": "signed-in-app",
+      "direction": "max",
+      "budget": 3000,
+      "level": "declared",
+      "source": "apps/web/scripts/performance-route-manifest.ts",
+      "sources": [
+        {
+          "path": "apps/web/scripts/performance-route-manifest.ts",
+          "value": 3000,
+          "level": "declared"
+        },
+        {
+          "path": "apps/web/scripts/performance-route-manifest.ts",
+          "value": 3000,
+          "level": "declared"
+        },
+        {
+          "path": "apps/web/scripts/performance-route-manifest.ts",
+          "value": 3000,
+          "level": "declared"
+        }
+      ]
+    },
+    {
+      "route": "/app/chat",
+      "metric": "cls",
+      "surface": "signed-in-app",
+      "direction": "max",
+      "budget": 0.02,
+      "level": "declared",
+      "source": "apps/web/scripts/performance-route-manifest.ts",
+      "sources": [
+        {
+          "path": "apps/web/scripts/performance-route-manifest.ts",
+          "value": 0.02,
+          "level": "declared"
+        }
+      ]
+    },
+    {
+      "route": "/app/chat",
+      "metric": "fcp_ms",
+      "surface": "signed-in-app",
+      "direction": "max",
+      "budget": 1500,
+      "level": "declared",
+      "source": "apps/web/scripts/performance-route-manifest.ts",
+      "sources": [
+        {
+          "path": "apps/web/scripts/performance-route-manifest.ts",
+          "value": 1500,
+          "level": "declared"
+        }
+      ]
+    },
+    {
+      "route": "/app/chat",
+      "metric": "lcp_ms",
+      "surface": "signed-in-app",
+      "direction": "max",
+      "budget": 3000,
+      "level": "declared",
+      "source": "apps/web/scripts/performance-route-manifest.ts",
+      "sources": [
+        {
+          "path": "apps/web/scripts/performance-route-manifest.ts",
+          "value": 3000,
+          "level": "declared"
+        }
+      ]
+    },
+    {
+      "route": "/app/chat",
+      "metric": "performance_score",
+      "surface": "signed-in-app",
+      "direction": "min",
+      "budget": 0.85,
+      "level": "error",
+      "source": "apps/web/.lighthouserc.chat.pr.json",
+      "sources": [
+        {
+          "path": "apps/web/.lighthouserc.chat.pr.json",
+          "value": 0.85,
+          "level": "error"
+        }
+      ]
+    },
+    {
+      "route": "/app/chat/[id]",
+      "metric": "cls",
+      "surface": "signed-in-app",
+      "direction": "max",
+      "budget": 0.02,
+      "level": "declared",
+      "source": "apps/web/scripts/performance-route-manifest.ts",
+      "sources": [
+        {
+          "path": "apps/web/scripts/performance-route-manifest.ts",
+          "value": 0.02,
+          "level": "declared"
+        }
+      ]
+    },
+    {
+      "route": "/app/chat/[id]",
+      "metric": "fcp_ms",
+      "surface": "signed-in-app",
+      "direction": "max",
+      "budget": 1500,
+      "level": "declared",
+      "source": "apps/web/scripts/performance-route-manifest.ts",
+      "sources": [
+        {
+          "path": "apps/web/scripts/performance-route-manifest.ts",
+          "value": 1500,
+          "level": "declared"
+        }
+      ]
+    },
+    {
+      "route": "/app/chat/[id]",
+      "metric": "lcp_ms",
+      "surface": "signed-in-app",
+      "direction": "max",
+      "budget": 3000,
+      "level": "declared",
+      "source": "apps/web/scripts/performance-route-manifest.ts",
+      "sources": [
+        {
+          "path": "apps/web/scripts/performance-route-manifest.ts",
+          "value": 3000,
+          "level": "declared"
+        }
+      ]
+    },
+    {
+      "route": "/app/dashboard/audience",
+      "metric": "cls",
+      "surface": "signed-in-app",
+      "direction": "max",
+      "budget": 0.1,
+      "level": "declared",
+      "source": "docs/performance/route-budgets.json",
+      "sources": [
+        {
+          "path": "docs/performance/route-budgets.json",
+          "value": 0.1,
+          "level": "declared"
+        }
+      ]
+    },
+    {
+      "route": "/app/dashboard/audience",
+      "metric": "fcp_ms",
+      "surface": "signed-in-app",
+      "direction": "max",
+      "budget": 2000,
+      "level": "declared",
+      "source": "docs/performance/route-budgets.json",
+      "sources": [
+        {
+          "path": "docs/performance/route-budgets.json",
+          "value": 2000,
+          "level": "declared"
+        }
+      ]
+    },
+    {
+      "route": "/app/dashboard/audience",
+      "metric": "initialJS_gzip_kb",
+      "surface": "signed-in-app",
+      "direction": "max",
+      "budget": 250,
+      "level": "declared",
+      "source": "docs/performance/route-budgets.json",
+      "sources": [
+        {
+          "path": "docs/performance/route-budgets.json",
+          "value": 250,
+          "level": "declared"
+        }
+      ]
+    },
+    {
+      "route": "/app/dashboard/audience",
+      "metric": "lcp_ms",
+      "surface": "signed-in-app",
+      "direction": "max",
+      "budget": 3500,
+      "level": "declared",
+      "source": "docs/performance/route-budgets.json",
+      "sources": [
+        {
+          "path": "docs/performance/route-budgets.json",
+          "value": 3500,
+          "level": "declared"
+        }
+      ]
+    },
+    {
+      "route": "/app/dashboard/audience",
+      "metric": "tti_ms",
+      "surface": "signed-in-app",
+      "direction": "max",
+      "budget": 4000,
+      "level": "declared",
+      "source": "docs/performance/route-budgets.json",
+      "sources": [
+        {
+          "path": "docs/performance/route-budgets.json",
+          "value": 4000,
+          "level": "declared"
+        }
+      ]
+    },
+    {
+      "route": "/app/dashboard/releases",
+      "metric": "cls",
+      "surface": "signed-in-app",
+      "direction": "max",
+      "budget": 0.06,
+      "level": "error",
+      "source": "apps/web/.lighthouserc.dashboard.pr.json",
+      "sources": [
+        {
+          "path": "docs/performance/route-budgets.json",
+          "value": 0.1,
+          "level": "declared"
+        },
+        {
+          "path": "apps/web/.lighthouserc.dashboard.pr.json",
+          "value": 0.06,
+          "level": "error"
+        }
+      ]
+    },
+    {
+      "route": "/app/dashboard/releases",
+      "metric": "fcp_ms",
+      "surface": "signed-in-app",
+      "direction": "max",
+      "budget": 1100,
+      "level": "error",
+      "source": "apps/web/.lighthouserc.dashboard.pr.json",
+      "sources": [
+        {
+          "path": "docs/performance/route-budgets.json",
+          "value": 2000,
+          "level": "declared"
+        },
+        {
+          "path": "apps/web/.lighthouserc.dashboard.pr.json",
+          "value": 1100,
+          "level": "error"
+        }
+      ]
+    },
+    {
+      "route": "/app/dashboard/releases",
+      "metric": "initialJS_gzip_kb",
+      "surface": "signed-in-app",
+      "direction": "max",
+      "budget": 250,
+      "level": "declared",
+      "source": "docs/performance/route-budgets.json",
+      "sources": [
+        {
+          "path": "docs/performance/route-budgets.json",
+          "value": 250,
+          "level": "declared"
+        }
+      ]
+    },
+    {
+      "route": "/app/dashboard/releases",
+      "metric": "lcp_ms",
+      "surface": "signed-in-app",
+      "direction": "max",
+      "budget": 3500,
+      "level": "declared",
+      "source": "docs/performance/route-budgets.json",
+      "sources": [
+        {
+          "path": "docs/performance/route-budgets.json",
+          "value": 3500,
+          "level": "declared"
+        },
+        {
+          "path": "apps/web/.lighthouserc.dashboard.pr.json",
+          "value": 3800,
+          "level": "error"
+        }
+      ]
+    },
+    {
+      "route": "/app/dashboard/releases",
+      "metric": "performance_score",
+      "surface": "signed-in-app",
+      "direction": "min",
+      "budget": 0.7,
+      "level": "error",
+      "source": "apps/web/.lighthouserc.dashboard.pr.json",
+      "sources": [
+        {
+          "path": "apps/web/.lighthouserc.dashboard.pr.json",
+          "value": 0.7,
+          "level": "error"
+        }
+      ]
+    },
+    {
+      "route": "/app/dashboard/releases",
+      "metric": "tbt_ms",
+      "surface": "signed-in-app",
+      "direction": "max",
+      "budget": 850,
+      "level": "error",
+      "source": "apps/web/.lighthouserc.dashboard.pr.json",
+      "sources": [
+        {
+          "path": "apps/web/.lighthouserc.dashboard.pr.json",
+          "value": 850,
+          "level": "error"
+        }
+      ]
+    },
+    {
+      "route": "/app/dashboard/releases",
+      "metric": "tti_ms",
+      "surface": "signed-in-app",
+      "direction": "max",
+      "budget": 4000,
+      "level": "declared",
+      "source": "docs/performance/route-budgets.json",
+      "sources": [
+        {
+          "path": "docs/performance/route-budgets.json",
+          "value": 4000,
+          "level": "declared"
+        }
+      ]
+    },
+    {
+      "route": "/start",
+      "metric": "cls",
+      "surface": "onboarding",
+      "direction": "max",
+      "budget": 0.02,
+      "level": "error",
+      "source": "apps/web/.lighthouserc.onboarding.pr.json",
+      "sources": [
+        {
+          "path": "apps/web/.lighthouserc.onboarding.pr.json",
+          "value": 0.02,
+          "level": "error"
+        },
+        {
+          "path": "apps/web/scripts/performance-route-manifest.ts",
+          "value": 0.02,
+          "level": "declared"
+        }
+      ]
+    },
+    {
+      "route": "/start",
+      "metric": "fcp_ms",
+      "surface": "onboarding",
+      "direction": "max",
+      "budget": 900,
+      "level": "declared",
+      "source": "apps/web/scripts/performance-route-manifest.ts",
+      "sources": [
+        {
+          "path": "apps/web/.lighthouserc.onboarding.pr.json",
+          "value": 1200,
+          "level": "error"
+        },
+        {
+          "path": "apps/web/scripts/performance-route-manifest.ts",
+          "value": 900,
+          "level": "declared"
+        }
+      ]
+    },
+    {
+      "route": "/start",
+      "metric": "lcp_ms",
+      "surface": "onboarding",
+      "direction": "max",
+      "budget": 1300,
+      "level": "declared",
+      "source": "apps/web/scripts/performance-route-manifest.ts",
+      "sources": [
+        {
+          "path": "apps/web/.lighthouserc.onboarding.pr.json",
+          "value": 2200,
+          "level": "error"
+        },
+        {
+          "path": "apps/web/scripts/performance-route-manifest.ts",
+          "value": 1300,
+          "level": "declared"
+        }
+      ]
+    },
+    {
+      "route": "/start",
+      "metric": "performance_score",
+      "surface": "onboarding",
+      "direction": "min",
+      "budget": 0.92,
+      "level": "error",
+      "source": "apps/web/.lighthouserc.onboarding.pr.json",
+      "sources": [
+        {
+          "path": "apps/web/.lighthouserc.onboarding.pr.json",
+          "value": 0.92,
+          "level": "error"
+        }
+      ]
+    },
+    {
+      "route": "/start",
+      "metric": "speed_index_ms",
+      "surface": "onboarding",
+      "direction": "max",
+      "budget": 2500,
+      "level": "error",
+      "source": "apps/web/.lighthouserc.onboarding.pr.json",
+      "sources": [
+        {
+          "path": "apps/web/.lighthouserc.onboarding.pr.json",
+          "value": 2500,
+          "level": "error"
+        }
+      ]
+    },
+    {
+      "route": "/start",
+      "metric": "tbt_ms",
+      "surface": "onboarding",
+      "direction": "max",
+      "budget": 350,
+      "level": "error",
+      "source": "apps/web/.lighthouserc.onboarding.pr.json",
+      "sources": [
+        {
+          "path": "apps/web/.lighthouserc.onboarding.pr.json",
+          "value": 350,
+          "level": "error"
+        }
+      ]
+    },
+    {
+      "route": "/start",
+      "metric": "tti_ms",
+      "surface": "onboarding",
+      "direction": "max",
+      "budget": 3500,
+      "level": "error",
+      "source": "apps/web/.lighthouserc.onboarding.pr.json",
+      "sources": [
+        {
+          "path": "apps/web/.lighthouserc.onboarding.pr.json",
+          "value": 3500,
+          "level": "error"
+        }
+      ]
+    },
+    {
+      "route": "/legal/(privacy|terms|cookies)",
+      "metric": "cls",
+      "surface": "legal",
+      "direction": "max",
+      "budget": 0.1,
+      "level": "error",
+      "source": "apps/web/.lighthouserc.pr.json",
+      "sources": [
+        {
+          "path": "apps/web/.lighthouserc.pr.json",
+          "value": 0.1,
+          "level": "error"
+        }
+      ]
+    },
+    {
+      "route": "/legal/(privacy|terms|cookies)",
+      "metric": "fcp_ms",
+      "surface": "legal",
+      "direction": "max",
+      "budget": 3000,
+      "level": "error",
+      "source": "apps/web/.lighthouserc.pr.json",
+      "sources": [
+        {
+          "path": "apps/web/.lighthouserc.pr.json",
+          "value": 3000,
+          "level": "error"
+        }
+      ]
+    },
+    {
+      "route": "/legal/(privacy|terms|cookies)",
+      "metric": "lcp_ms",
+      "surface": "legal",
+      "direction": "max",
+      "budget": 5000,
+      "level": "error",
+      "source": "apps/web/.lighthouserc.pr.json",
+      "sources": [
+        {
+          "path": "apps/web/.lighthouserc.pr.json",
+          "value": 5000,
+          "level": "error"
+        }
+      ]
+    },
+    {
+      "route": "/legal/(privacy|terms|cookies)",
+      "metric": "performance_score",
+      "surface": "legal",
+      "direction": "min",
+      "budget": 0.5,
+      "level": "error",
+      "source": "apps/web/.lighthouserc.pr.json",
+      "sources": [
+        {
+          "path": "apps/web/.lighthouserc.pr.json",
+          "value": 0.5,
+          "level": "error"
+        }
+      ]
+    },
+    {
+      "route": "/legal/(privacy|terms|cookies)",
+      "metric": "speed_index_ms",
+      "surface": "legal",
+      "direction": "max",
+      "budget": 4000,
+      "level": "error",
+      "source": "apps/web/.lighthouserc.pr.json",
+      "sources": [
+        {
+          "path": "apps/web/.lighthouserc.pr.json",
+          "value": 4000,
+          "level": "error"
+        }
+      ]
+    },
+    {
+      "route": "/legal/(privacy|terms|cookies)",
+      "metric": "tbt_ms",
+      "surface": "legal",
+      "direction": "max",
+      "budget": 1000,
+      "level": "error",
+      "source": "apps/web/.lighthouserc.pr.json",
+      "sources": [
+        {
+          "path": "apps/web/.lighthouserc.pr.json",
+          "value": 1000,
+          "level": "error"
+        }
+      ]
+    },
+    {
+      "route": "/legal/(privacy|terms|cookies)",
+      "metric": "tti_ms",
+      "surface": "legal",
+      "direction": "max",
+      "budget": 5000,
+      "level": "error",
+      "source": "apps/web/.lighthouserc.pr.json",
+      "sources": [
+        {
+          "path": "apps/web/.lighthouserc.pr.json",
+          "value": 5000,
+          "level": "error"
+        }
+      ]
+    },
+    {
+      "route": "/legal/privacy",
+      "metric": "cls",
+      "surface": "legal",
+      "direction": "max",
+      "budget": 0.05,
+      "level": "declared",
+      "source": "docs/performance/route-budgets.json",
+      "sources": [
+        {
+          "path": "docs/performance/route-budgets.json",
+          "value": 0.05,
+          "level": "declared"
+        }
+      ]
+    },
+    {
+      "route": "/legal/privacy",
+      "metric": "fcp_ms",
+      "surface": "legal",
+      "direction": "max",
+      "budget": 1200,
+      "level": "declared",
+      "source": "docs/performance/route-budgets.json",
+      "sources": [
+        {
+          "path": "docs/performance/route-budgets.json",
+          "value": 1200,
+          "level": "declared"
+        }
+      ]
+    },
+    {
+      "route": "/legal/privacy",
+      "metric": "initialJS_gzip_kb",
+      "surface": "legal",
+      "direction": "max",
+      "budget": 150,
+      "level": "declared",
+      "source": "docs/performance/route-budgets.json",
+      "sources": [
+        {
+          "path": "docs/performance/route-budgets.json",
+          "value": 150,
+          "level": "declared"
+        }
+      ]
+    },
+    {
+      "route": "/legal/privacy",
+      "metric": "lcp_ms",
+      "surface": "legal",
+      "direction": "max",
+      "budget": 2000,
+      "level": "declared",
+      "source": "docs/performance/route-budgets.json",
+      "sources": [
+        {
+          "path": "docs/performance/route-budgets.json",
+          "value": 2000,
+          "level": "declared"
+        }
+      ]
+    },
+    {
+      "route": "/legal/privacy",
+      "metric": "tti_ms",
+      "surface": "legal",
+      "direction": "max",
+      "budget": 2500,
+      "level": "declared",
+      "source": "docs/performance/route-budgets.json",
+      "sources": [
+        {
+          "path": "docs/performance/route-budgets.json",
+          "value": 2500,
+          "level": "declared"
+        }
+      ]
+    },
+    {
+      "route": "/app/admin/*",
+      "metric": "cls",
+      "surface": "admin",
+      "direction": "max",
+      "budget": 0.1,
+      "level": "error",
+      "source": "apps/web/.lighthouserc.admin.pr.json",
+      "sources": [
+        {
+          "path": "docs/performance/route-budgets.json",
+          "value": 0.15,
+          "level": "declared"
+        },
+        {
+          "path": "apps/web/.lighthouserc.admin.pr.json",
+          "value": 0.1,
+          "level": "error"
+        }
+      ]
+    },
+    {
+      "route": "/app/admin/*",
+      "metric": "fcp_ms",
+      "surface": "admin",
+      "direction": "max",
+      "budget": 2200,
+      "level": "error",
+      "source": "apps/web/.lighthouserc.admin.pr.json",
+      "sources": [
+        {
+          "path": "docs/performance/route-budgets.json",
+          "value": 2500,
+          "level": "declared"
+        },
+        {
+          "path": "apps/web/.lighthouserc.admin.pr.json",
+          "value": 2200,
+          "level": "error"
+        }
+      ]
+    },
+    {
+      "route": "/app/admin/*",
+      "metric": "initialJS_gzip_kb",
+      "surface": "admin",
+      "direction": "max",
+      "budget": 300,
+      "level": "declared",
+      "source": "docs/performance/route-budgets.json",
+      "sources": [
+        {
+          "path": "docs/performance/route-budgets.json",
+          "value": 300,
+          "level": "declared"
+        }
+      ]
+    },
+    {
+      "route": "/app/admin/*",
+      "metric": "lcp_ms",
+      "surface": "admin",
+      "direction": "max",
+      "budget": 4000,
+      "level": "error",
+      "source": "apps/web/.lighthouserc.admin.pr.json",
+      "sources": [
+        {
+          "path": "docs/performance/route-budgets.json",
+          "value": 4000,
+          "level": "declared"
+        },
+        {
+          "path": "apps/web/.lighthouserc.admin.pr.json",
+          "value": 4000,
+          "level": "error"
+        }
+      ]
+    },
+    {
+      "route": "/app/admin/*",
+      "metric": "performance_score",
+      "surface": "admin",
+      "direction": "min",
+      "budget": 0.6,
+      "level": "error",
+      "source": "apps/web/.lighthouserc.admin.pr.json",
+      "sources": [
+        {
+          "path": "apps/web/.lighthouserc.admin.pr.json",
+          "value": 0.6,
+          "level": "error"
+        }
+      ]
+    },
+    {
+      "route": "/app/admin/*",
+      "metric": "tbt_ms",
+      "surface": "admin",
+      "direction": "max",
+      "budget": 500,
+      "level": "error",
+      "source": "apps/web/.lighthouserc.admin.pr.json",
+      "sources": [
+        {
+          "path": "apps/web/.lighthouserc.admin.pr.json",
+          "value": 500,
+          "level": "error"
+        }
+      ]
+    },
+    {
+      "route": "/app/admin/*",
+      "metric": "tti_ms",
+      "surface": "admin",
+      "direction": "max",
+      "budget": 5000,
+      "level": "declared",
+      "source": "docs/performance/route-budgets.json",
+      "sources": [
+        {
+          "path": "docs/performance/route-budgets.json",
+          "value": 5000,
+          "level": "declared"
+        }
+      ]
+    },
+    {
+      "route": "//[",
+      "metric": "cls",
+      "surface": "other",
+      "direction": "max",
+      "budget": 0.05,
+      "level": "error",
+      "source": "apps/web/.lighthouserc.public-launch.json",
+      "sources": [
+        {
+          "path": "apps/web/.lighthouserc.public-launch.json",
+          "value": 0.1,
+          "level": "error"
+        },
+        {
+          "path": "apps/web/.lighthouserc.public-launch.json",
+          "value": 0.05,
+          "level": "error"
+        },
+        {
+          "path": "apps/web/.lighthouserc.public-launch.json",
+          "value": 0.1,
+          "level": "error"
+        },
+        {
+          "path": "apps/web/.lighthouserc.public-launch.json",
+          "value": 0.25,
+          "level": "error"
+        },
+        {
+          "path": "apps/web/.lighthouserc.public-launch.json",
+          "value": 0.1,
+          "level": "error"
+        }
+      ]
+    },
+    {
+      "route": "//[",
+      "metric": "lcp_ms",
+      "surface": "other",
+      "direction": "max",
+      "budget": 1500,
+      "level": "error",
+      "source": "apps/web/.lighthouserc.public-launch.json",
+      "sources": [
+        {
+          "path": "apps/web/.lighthouserc.public-launch.json",
+          "value": 7000,
+          "level": "error"
+        },
+        {
+          "path": "apps/web/.lighthouserc.public-launch.json",
+          "value": 1500,
+          "level": "error"
+        },
+        {
+          "path": "apps/web/.lighthouserc.public-launch.json",
+          "value": 5500,
+          "level": "error"
+        },
+        {
+          "path": "apps/web/.lighthouserc.public-launch.json",
+          "value": 8000,
+          "level": "error"
+        },
+        {
+          "path": "apps/web/.lighthouserc.public-launch.json",
+          "value": 6000,
+          "level": "error"
+        }
+      ]
+    },
+    {
+      "route": "//[",
+      "metric": "performance_score",
+      "surface": "other",
+      "direction": "min",
+      "budget": 0.9,
+      "level": "error",
+      "source": "apps/web/.lighthouserc.public-launch.json",
+      "sources": [
+        {
+          "path": "apps/web/.lighthouserc.public-launch.json",
+          "value": 0.4,
+          "level": "error"
+        },
+        {
+          "path": "apps/web/.lighthouserc.public-launch.json",
+          "value": 0.9,
+          "level": "error"
+        },
+        {
+          "path": "apps/web/.lighthouserc.public-launch.json",
+          "value": 0.75,
+          "level": "error"
+        },
+        {
+          "path": "apps/web/.lighthouserc.public-launch.json",
+          "value": 0.55,
+          "level": "error"
+        },
+        {
+          "path": "apps/web/.lighthouserc.public-launch.json",
+          "value": 0.7,
+          "level": "error"
+        }
+      ]
+    },
+    {
+      "route": "//[",
+      "metric": "tbt_ms",
+      "surface": "other",
+      "direction": "max",
+      "budget": 100,
+      "level": "error",
+      "source": "apps/web/.lighthouserc.public-launch.json",
+      "sources": [
+        {
+          "path": "apps/web/.lighthouserc.public-launch.json",
+          "value": 1500,
+          "level": "error"
+        },
+        {
+          "path": "apps/web/.lighthouserc.public-launch.json",
+          "value": 100,
+          "level": "error"
+        },
+        {
+          "path": "apps/web/.lighthouserc.public-launch.json",
+          "value": 1500,
+          "level": "error"
+        },
+        {
+          "path": "apps/web/.lighthouserc.public-launch.json",
+          "value": 1500,
+          "level": "error"
+        },
+        {
+          "path": "apps/web/.lighthouserc.public-launch.json",
+          "value": 1500,
+          "level": "error"
+        }
+      ]
+    },
+    {
+      "route": "/billing/cancel",
+      "metric": "cls",
+      "surface": "other",
+      "direction": "max",
+      "budget": 0.1,
+      "level": "declared",
+      "source": "apps/web/scripts/performance-route-manifest.ts",
+      "sources": [
+        {
+          "path": "apps/web/scripts/performance-route-manifest.ts",
+          "value": 0.1,
+          "level": "declared"
+        }
+      ]
+    },
+    {
+      "route": "/billing/cancel",
+      "metric": "fcp_ms",
+      "surface": "other",
+      "direction": "max",
+      "budget": 2000,
+      "level": "declared",
+      "source": "apps/web/scripts/performance-route-manifest.ts",
+      "sources": [
+        {
+          "path": "apps/web/scripts/performance-route-manifest.ts",
+          "value": 2000,
+          "level": "declared"
+        }
+      ]
+    },
+    {
+      "route": "/billing/cancel",
+      "metric": "lcp_ms",
+      "surface": "other",
+      "direction": "max",
+      "budget": 3000,
+      "level": "declared",
+      "source": "apps/web/scripts/performance-route-manifest.ts",
+      "sources": [
+        {
+          "path": "apps/web/scripts/performance-route-manifest.ts",
+          "value": 3000,
+          "level": "declared"
+        }
+      ]
+    },
+    {
+      "route": "/billing/success",
+      "metric": "cls",
+      "surface": "other",
+      "direction": "max",
+      "budget": 0.1,
+      "level": "declared",
+      "source": "apps/web/scripts/performance-route-manifest.ts",
+      "sources": [
+        {
+          "path": "apps/web/scripts/performance-route-manifest.ts",
+          "value": 0.1,
+          "level": "declared"
+        }
+      ]
+    },
+    {
+      "route": "/billing/success",
+      "metric": "fcp_ms",
+      "surface": "other",
+      "direction": "max",
+      "budget": 2000,
+      "level": "declared",
+      "source": "apps/web/scripts/performance-route-manifest.ts",
+      "sources": [
+        {
+          "path": "apps/web/scripts/performance-route-manifest.ts",
+          "value": 2000,
+          "level": "declared"
+        }
+      ]
+    },
+    {
+      "route": "/billing/success",
+      "metric": "lcp_ms",
+      "surface": "other",
+      "direction": "max",
+      "budget": 3000,
+      "level": "declared",
+      "source": "apps/web/scripts/performance-route-manifest.ts",
+      "sources": [
+        {
+          "path": "apps/web/scripts/performance-route-manifest.ts",
+          "value": 3000,
+          "level": "declared"
+        }
+      ]
+    },
+    {
+      "route": "/playlists/[slug]",
+      "metric": "cls",
+      "surface": "other",
+      "direction": "max",
+      "budget": 0.05,
+      "level": "declared",
+      "source": "docs/performance/route-budgets.json",
+      "sources": [
+        {
+          "path": "docs/performance/route-budgets.json",
+          "value": 0.05,
+          "level": "declared"
+        }
+      ]
+    },
+    {
+      "route": "/playlists/[slug]",
+      "metric": "fcp_ms",
+      "surface": "other",
+      "direction": "max",
+      "budget": 1200,
+      "level": "declared",
+      "source": "docs/performance/route-budgets.json",
+      "sources": [
+        {
+          "path": "docs/performance/route-budgets.json",
+          "value": 1200,
+          "level": "declared"
+        }
+      ]
+    },
+    {
+      "route": "/playlists/[slug]",
+      "metric": "initialJS_gzip_kb",
+      "surface": "other",
+      "direction": "max",
+      "budget": 150,
+      "level": "declared",
+      "source": "docs/performance/route-budgets.json",
+      "sources": [
+        {
+          "path": "docs/performance/route-budgets.json",
+          "value": 150,
+          "level": "declared"
+        }
+      ]
+    },
+    {
+      "route": "/playlists/[slug]",
+      "metric": "lcp_ms",
+      "surface": "other",
+      "direction": "max",
+      "budget": 2000,
+      "level": "declared",
+      "source": "docs/performance/route-budgets.json",
+      "sources": [
+        {
+          "path": "docs/performance/route-budgets.json",
+          "value": 2000,
+          "level": "declared"
+        }
+      ]
+    },
+    {
+      "route": "/playlists/[slug]",
+      "metric": "tti_ms",
+      "surface": "other",
+      "direction": "max",
+      "budget": 2500,
+      "level": "declared",
+      "source": "docs/performance/route-budgets.json",
+      "sources": [
+        {
+          "path": "docs/performance/route-budgets.json",
+          "value": 2500,
+          "level": "declared"
+        }
+      ]
+    },
+    {
+      "route": "/r/[slug]",
+      "metric": "cls",
+      "surface": "other",
+      "direction": "max",
+      "budget": 0.1,
+      "level": "declared",
+      "source": "docs/performance/route-budgets.json",
+      "sources": [
+        {
+          "path": "docs/performance/route-budgets.json",
+          "value": 0.1,
+          "level": "declared"
+        }
+      ]
+    },
+    {
+      "route": "/r/[slug]",
+      "metric": "fcp_ms",
+      "surface": "other",
+      "direction": "max",
+      "budget": 1500,
+      "level": "declared",
+      "source": "docs/performance/route-budgets.json",
+      "sources": [
+        {
+          "path": "docs/performance/route-budgets.json",
+          "value": 1500,
+          "level": "declared"
+        }
+      ]
+    },
+    {
+      "route": "/r/[slug]",
+      "metric": "initialJS_gzip_kb",
+      "surface": "other",
+      "direction": "max",
+      "budget": 180,
+      "level": "declared",
+      "source": "docs/performance/route-budgets.json",
+      "sources": [
+        {
+          "path": "docs/performance/route-budgets.json",
+          "value": 180,
+          "level": "declared"
+        }
+      ]
+    },
+    {
+      "route": "/r/[slug]",
+      "metric": "lcp_ms",
+      "surface": "other",
+      "direction": "max",
+      "budget": 2500,
+      "level": "declared",
+      "source": "docs/performance/route-budgets.json",
+      "sources": [
+        {
+          "path": "docs/performance/route-budgets.json",
+          "value": 2500,
+          "level": "declared"
+        }
+      ]
+    },
+    {
+      "route": "/r/[slug]",
+      "metric": "tti_ms",
+      "surface": "other",
+      "direction": "max",
+      "budget": 3000,
+      "level": "declared",
+      "source": "docs/performance/route-budgets.json",
+      "sources": [
+        {
+          "path": "docs/performance/route-budgets.json",
+          "value": 3000,
+          "level": "declared"
+        }
+      ]
+    },
+    {
+      "route": "*",
+      "metric": "cls",
+      "surface": "wildcard",
+      "direction": "max",
+      "budget": 0.1,
+      "level": "warn",
+      "source": "apps/web/.lighthouserc.build.json",
+      "sources": [
+        {
+          "path": "apps/web/.lighthouserc.build.json",
+          "value": 0.1,
+          "level": "warn"
+        }
+      ]
+    },
+    {
+      "route": "*",
+      "metric": "fcp_ms",
+      "surface": "wildcard",
+      "direction": "max",
+      "budget": 2500,
+      "level": "warn",
+      "source": "apps/web/.lighthouserc.build.json",
+      "sources": [
+        {
+          "path": "apps/web/.lighthouserc.build.json",
+          "value": 2500,
+          "level": "warn"
+        }
+      ]
+    },
+    {
+      "route": "*",
+      "metric": "lcp_ms",
+      "surface": "wildcard",
+      "direction": "max",
+      "budget": 3000,
+      "level": "warn",
+      "source": "apps/web/.lighthouserc.build.json",
+      "sources": [
+        {
+          "path": "apps/web/.lighthouserc.build.json",
+          "value": 3000,
+          "level": "warn"
+        }
+      ]
+    },
+    {
+      "route": "*",
+      "metric": "performance_score",
+      "surface": "wildcard",
+      "direction": "min",
+      "budget": 0.8,
+      "level": "warn",
+      "source": "apps/web/.lighthouserc.build.json",
+      "sources": [
+        {
+          "path": "apps/web/.lighthouserc.build.json",
+          "value": 0.8,
+          "level": "warn"
+        }
+      ]
+    },
+    {
+      "route": "*",
+      "metric": "speed_index_ms",
+      "surface": "wildcard",
+      "direction": "max",
+      "budget": 3000,
+      "level": "warn",
+      "source": "apps/web/.lighthouserc.build.json",
+      "sources": [
+        {
+          "path": "apps/web/.lighthouserc.build.json",
+          "value": 3000,
+          "level": "warn"
+        }
+      ]
+    },
+    {
+      "route": "*",
+      "metric": "tbt_ms",
+      "surface": "wildcard",
+      "direction": "max",
+      "budget": 500,
+      "level": "warn",
+      "source": "apps/web/.lighthouserc.build.json",
+      "sources": [
+        {
+          "path": "apps/web/.lighthouserc.build.json",
+          "value": 500,
+          "level": "warn"
+        }
+      ]
+    },
+    {
+      "route": "*",
+      "metric": "tti_ms",
+      "surface": "wildcard",
+      "direction": "max",
+      "budget": 2000,
+      "level": "warn",
+      "source": "apps/web/.lighthouserc.build.json",
+      "sources": [
+        {
+          "path": "apps/web/.lighthouserc.build.json",
+          "value": 2000,
+          "level": "warn"
+        }
+      ]
+    }
+  ],
+  "fingerprint": "sha256:1f10e54de983f7c2ee9f4f121171b98bcd9af58aebb0c826096a9f08cf11d5d5"
+}

@@ -24,7 +24,7 @@ export function ProblemStatement() {
           </div>
 
           {/* ui-casing-allow: marketing display headline */}
-          <h2 className='text-4xl font-medium tracking-tight text-primary-token sm:text-5xl lg:text-6xl'>
+          <h2 className='text-4xl font-medium tracking-tight text-primary-token sm:text-5xl lg:text-6xl line-clamp-2'>
             Musicians lose fans to bad profile experiences
           </h2>
 

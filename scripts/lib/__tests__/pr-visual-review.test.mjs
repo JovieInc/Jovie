@@ -559,6 +559,27 @@ describe('fail-closed visual evidence gate (JOV-5459)', () => {
     }
   });
 
+  it('treats a cancelled capture stage as failure, not success (fail-closed)', async () => {
+    const dir = await mkdtemp(join(tmpdir(), 'visual-gate-'));
+    try {
+      await writeFile(
+        join(dir, 'routing.json'),
+        JSON.stringify({ shouldReview: true })
+      );
+      await writeFile(join(dir, 'manifest.json'), JSON.stringify([]));
+
+      const cancelled = evaluateVisualEvidence({
+        artifactDir: dir,
+        stages: { build: 'success', server: 'success', capture: 'cancelled' },
+      });
+      expect(cancelled.ok).toBe(false);
+      expect(cancelled.status).toBe('unavailable');
+      expect(cancelled.failedStages).toEqual(['capture']);
+    } finally {
+      await rm(dir, { recursive: true, force: true });
+    }
+  });
+
   it('exits non-zero from the CLI on missing evidence and records the outcome file', async () => {
     const dir = await mkdtemp(join(tmpdir(), 'visual-gate-cli-'));
     try {

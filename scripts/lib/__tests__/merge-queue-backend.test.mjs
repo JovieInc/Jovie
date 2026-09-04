@@ -809,6 +809,40 @@ describe('queue workflow mutation safety', () => {
     expect(drain).toContain('enroll_if_still_eligible "$n" "$n" "$head_oid"');
   });
 
+  it('recovers missing-CI heads with a bounded, per-head-idempotent close+reopen', () => {
+    const workflow = readRepoFile(
+      '.github/workflows/merge-queue-autoenroll.yml'
+    );
+    const enroll = workflowStep(workflow, 'Enroll clean PRs');
+    const drain = readRepoFile('scripts/drain-pr-queue.sh');
+
+    expect(enroll).toContain("DRAIN_RECOVER_MISSING_CI: '1'");
+    expect(enroll).toContain("DRAIN_MISSING_CI_MAX_PER_RUN: '2'");
+    expect(enroll).toContain("DRAIN_MISSING_CI_MIN_AGE_MINUTES: '120'");
+
+    // Missing-only is the exact admission signal: every fresh blocker must be
+    // a `<required context> (missing)` entry, never a terminal red or pending.
+    expect(drain).toContain(
+      '=== RECOVER (missing source CI → bounded close+reopen) ==='
+    );
+    expect(drain).toContain('all(.[]; endswith(" (missing)"))');
+    expect(drain).toContain('check_failures_for_pr "$n"');
+    expect(drain).toContain('missing_ci_recovery_attempted "$n" "$head_oid"');
+    expect(drain).toContain(
+      "MISSING_CI_RECOVERY_MARKER='<!-- bot-comment:missing-ci-recovery -->'"
+    );
+    expect(drain).toContain('.commit.committer.date // empty');
+    expect(drain).toContain('DRAIN_MISSING_CI_MIN_AGE_MINUTES * 60');
+    expect(drain).toContain(
+      '[[ "$MISSING_CI_RECOVERED" -ge "$DRAIN_MISSING_CI_MAX_PER_RUN" ]]'
+    );
+    expect(drain).toContain('DRAIN_MISSING_CI_MAX_PER_RUN > 2');
+    expect(drain).toContain('pr close "$n" -R "$REPO"');
+    expect(drain).toContain('pr reopen "$n" -R "$REPO"');
+    // Hard holds, drafts, and the event-scoped admission target are excluded.
+    expect(drain).toContain('select((.n | tostring) != $admission_pr)');
+  });
+
   it('excludes stacked non-main PRs from admission and live eligibility', () => {
     const workflow = readRepoFile(
       '.github/workflows/merge-queue-autoenroll.yml'

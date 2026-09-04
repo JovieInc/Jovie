@@ -1508,6 +1508,51 @@ class FallbackTests(unittest.TestCase):
             self.assertIsNone(module._linear_identifiers())
         self.assertEqual(len(LinearHandler.requests), 2)
 
+    def test_grok_limit_autoscales_from_live_oauth_seats_not_codex(self):
+        module = self.load_controller_module()
+        with tempfile.TemporaryDirectory() as tmp:
+            home = pathlib.Path(tmp)
+            grok = home / ".grok"
+            grok.mkdir()
+            (grok / "auth.json").write_text(
+                json.dumps(
+                    {
+                        "https://auth.x.ai::one": {
+                            "auth_mode": "oidc",
+                            "refresh_token": "rt",
+                            "key": "k",
+                        }
+                    }
+                ),
+                encoding="utf-8",
+            )
+            kimi = home / ".kimi-code" / "credentials"
+            kimi.mkdir(parents=True)
+            (kimi / "kimi-code.json").write_text(
+                json.dumps({"access_token": "at", "refresh_token": "rt"}),
+                encoding="utf-8",
+            )
+            with mock.patch.object(module.pathlib.Path, "home", return_value=home):
+                with mock.patch.dict(os.environ):
+                    os.environ.pop("SYMPHONY_GROK_MAX", None)
+                    self.assertEqual(module._live_oauth_seats(), 2)
+                    self.assertEqual(module._grok_limit(), 4)
+                extra = {
+                    f"https://auth.x.ai::{index}": {
+                        "auth_mode": "oidc",
+                        "refresh_token": "rt",
+                        "key": "k",
+                    }
+                    for index in range(6)
+                }
+                (grok / "auth.json").write_text(json.dumps(extra), encoding="utf-8")
+                with mock.patch.dict(os.environ):
+                    os.environ.pop("SYMPHONY_GROK_MAX", None)
+                    self.assertEqual(module._live_oauth_seats(), 7)
+                    self.assertEqual(module._grok_limit(), 7)
+                with mock.patch.dict(os.environ, {"SYMPHONY_GROK_MAX": "0"}):
+                    self.assertEqual(module._grok_limit(), 0)
+
     def test_default_grok_limit_is_four_and_blocked_labels_are_gates(self):
         module = self.load_controller_module()
         self.assertEqual(module.DEFAULT_GROK_MAX, 4)
@@ -2284,6 +2329,59 @@ class FallbackTests(unittest.TestCase):
         self.assertEqual(used, 0)
         self.assertEqual(list(launched), [])
         self.assertEqual(launches, [])
+
+    def test_launch_mirrors_closure_stop_line_for_new_work_but_not_remount(self):
+        """While closureAdmission.newIssueIntakeAllowed is false, the sidecar
+        must not lease NEW work that grok-ship-one would refuse at its own
+        stop-line; remounts of open DIRTY heads stay exempt."""
+        module = self.load_controller_module()
+        self.gate.write_text(json.dumps({
+            "schema": "jovie-fleet-gate/v1",
+            "state": "AMBER",
+            "closureAdmission": {"newIssueIntakeAllowed": False},
+            "workAdmission": {"allowed": True, "newIssueLeaseAllowed": True},
+            "remediationAdmission": {"allowed": True, "pushAllowed": True},
+        }))
+        launches: list[list[str]] = []
+        new_issue = self._admitted_issue("JOV-5003", "In Progress")
+        new_issue["comments"] = {"nodes": []}
+        remount_issue = self._admitted_issue("JOV-4894", "In Review")
+        remount_issue["comments"] = {"nodes": []}
+        index = {
+            "JOV-4894": {
+                "number": 16211,
+                "head": "grok/JOV-4894-fix",
+                "repo": "JovieInc/Jovie",
+                "mergeStateStatus": "DIRTY",
+            }
+        }
+        issues = {"JOV-5003": new_issue, "JOV-4894": remount_issue}
+        with (
+            mock.patch.object(module, "_autonomous_open_pr_index", return_value=index),
+            mock.patch.object(
+                module, "_fetch_single_issue", side_effect=lambda ident: issues.get(ident)
+            ),
+            mock.patch.object(
+                module, "_control", side_effect=lambda command: launches.append(command) or True
+            ),
+        ):
+            launched, used = module._launch_fallback_workers(
+                ["JOV-5003", "JOV-4894"],
+                [],
+                "/bin/true",
+                "a" * 64,
+                {"selected": {"id": "grok"}},
+                2,
+            )
+        # New work refused before leasing; the DIRTY remount still launches.
+        self.assertEqual(used, 1)
+        self.assertEqual(len(launched), 1)
+        self.assertTrue(
+            any("JOV-4894" in arg for command in launches for arg in command), launches
+        )
+        self.assertFalse(
+            any("JOV-5003" in arg for command in launches for arg in command), launches
+        )
 
     def test_exhausted_remounts_github_dirty_head_when_linear_has_no_receipts(self):
         module = self.load_controller_module()
@@ -3352,6 +3450,18 @@ class FallbackLockGcTests(unittest.TestCase):
         self.root = pathlib.Path(self.tmp.name)
         self.leases = self.root / "leases"
         self.leases.mkdir()
+        self.gate = self.root / "fleet-gate.json"
+        self.gate.write_text(
+            json.dumps(
+                {
+                    "schema": "jovie-fleet-gate/v1",
+                    "state": "AMBER",
+                    "closureAdmission": {"newIssueIntakeAllowed": True},
+                    "workAdmission": {"allowed": True, "newIssueLeaseAllowed": True},
+                    "remediationAdmission": {"allowed": True, "pushAllowed": True},
+                }
+            )
+        )
         spec = importlib.util.spec_from_file_location("symphony_codex_exhausted_gc", CONTROLLER)
         assert spec is not None and spec.loader is not None
         self.module = importlib.util.module_from_spec(spec)
@@ -3363,6 +3473,7 @@ class FallbackLockGcTests(unittest.TestCase):
                 "SYMPHONY_FALLBACK_GC_RECEIPT": str(self.root / "gc.json"),
                 "SYMPHONY_FALLBACK_PICKUP_RECEIPT": str(self.root / "pickup.json"),
                 "SYMPHONY_OPEN_PR_INDEX": "empty",
+                "GEM_FLEET_GATE_RECEIPT": str(self.gate),
             },
         )
         self.env.start()
@@ -3606,6 +3717,67 @@ class FallbackLockGcTests(unittest.TestCase):
         # No JOV-/LYB- identifier segment in the branch name: not adoptable.
         self.assertNotIn(16854, [entry["number"] for entry in index.values()])
         self.assertEqual(index["JOV-5694"]["number"], 17090)
+
+    def test_linear_graphql_backs_off_on_ratelimit(self):
+        """A RATELIMITED response stamps a backoff; while fresh, no HTTP call
+        is even attempted (the per-timer reconcile must not stampede the
+        shared 2500 req/hr budget)."""
+        import urllib.error
+
+        backoff = self.root / "linear-backoff.json"
+        calls: list = []
+
+        def fake_urlopen(req, timeout=0):
+            calls.append(req)
+            raise urllib.error.HTTPError(
+                req.full_url,
+                400,
+                "Bad Request",
+                None,
+                io.BytesIO(b'{"errors":[{"extensions":{"code":"RATELIMITED"}}]}'),
+            )
+
+        with (
+            mock.patch.dict(
+                os.environ,
+                {"SYMPHONY_LINEAR_BACKOFF": str(backoff), "LINEAR_API_KEY": "test-key"},
+            ),
+            mock.patch.object(self.module.urllib.request, "urlopen", side_effect=fake_urlopen),
+        ):
+            self.assertIsNone(self.module._linear_graphql({"query": "x"}))
+            self.assertTrue(backoff.exists())
+            # Backoff fresh: the second call must not touch the network.
+            self.assertIsNone(self.module._linear_graphql({"query": "x"}))
+        self.assertEqual(len(calls), 1)
+
+    def test_linear_graphql_success_clears_stale_backoff(self):
+        backoff = self.root / "linear-backoff.json"
+        backoff.write_text(
+            json.dumps({"epoch": time.time() - self.module.LINEAR_BACKOFF_SECONDS - 5})
+        )
+
+        class _Resp:
+            def __enter__(self):
+                return self
+
+            def __exit__(self, *args):
+                return False
+
+            def read(self):
+                return b'{"data": {"viewer": {"id": "x"}}}'
+
+        with (
+            mock.patch.dict(
+                os.environ,
+                {"SYMPHONY_LINEAR_BACKOFF": str(backoff), "LINEAR_API_KEY": "test-key"},
+            ),
+            mock.patch.object(
+                self.module.urllib.request, "urlopen", side_effect=lambda req, timeout=0: _Resp()
+            ),
+        ):
+            body = self.module._linear_graphql({"query": "x"})
+        self.assertEqual(body["data"]["viewer"]["id"], "x")
+        self.assertFalse(backoff.exists())
 
     def test_pickup_check_refuses_in_review_and_admits_todo(self):
         stderr = io.StringIO()

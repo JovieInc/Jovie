@@ -24,6 +24,12 @@ describe('ComparisonPageContent', () => {
     expect(within(table).getAllByRole('row')).toHaveLength(
       data.features.length + 1
     );
+    for (const columnHeader of within(table).getAllByRole('columnheader')) {
+      expect(columnHeader).toHaveClass('whitespace-nowrap');
+    }
+    expect(within(table).getAllByRole('rowheader')[0]).toHaveClass(
+      'whitespace-nowrap'
+    );
     expect(
       screen.getByRole('heading', { level: 2, name: 'The Bottom Line' })
     ).toBeInTheDocument();

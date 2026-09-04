@@ -96,6 +96,14 @@ export type OvieDecision = {
   readonly createdAt: string;
 };
 
+export type OvieBlocker = {
+  readonly summary?: string;
+  readonly owner?: string;
+  readonly nextAction?: string;
+  /** ISO timestamp by which the next proof must be observed. */
+  readonly nextProofDeadline?: string;
+};
+
 export type OvieInitiative = {
   readonly id: string;
   readonly kind: 'initiative';
@@ -112,6 +120,8 @@ export type OvieInitiative = {
   readonly idempotencyKey?: string;
   readonly routingState?: OvieRoutingState;
   readonly routingReason?: string;
+  /** Persisted blocker facts. Present only while routingState is blocked. */
+  readonly blocker?: OvieBlocker;
   readonly createdAt: string;
   readonly updatedAt: string;
   readonly evidence: readonly OvieEvidence[];
@@ -165,6 +175,8 @@ export type OvieEvidence = {
   readonly ref?: string;
   /** Kanban task id or Linear identifier after the Mac lander writes. */
   readonly landed_ref?: string;
+  /** ISO timestamp when the evidence was observed by its writer. */
+  readonly observedAt?: string;
 };
 
 export type OvieMcpPrincipal = {

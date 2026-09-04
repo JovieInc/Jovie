@@ -61,7 +61,7 @@ export function MarketingPosterHero({
       <div className='homepage-poster-hero__copy'>
         <h1
           id={headingId}
-          className='homepage-poster-hero__headline marketing-h1-max-two-lines'
+          className='homepage-poster-hero__headline marketing-h1-max-two-lines line-clamp-2'
         >
           {headline}
         </h1>

@@ -1,15 +1,17 @@
-import { afterEach, describe, expect, test, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest';
 import { CanonicalUserState } from '@/lib/auth/canonical-user-state';
 
 const {
   mockGetWaitlistAccess,
   mockNotFound,
   mockRedirect,
+  mockResolveRequestAuthIdentity,
   mockResolveUserState,
 } = vi.hoisted(() => ({
   mockGetWaitlistAccess: vi.fn(),
   mockNotFound: vi.fn(),
   mockRedirect: vi.fn(),
+  mockResolveRequestAuthIdentity: vi.fn(),
   mockResolveUserState: vi.fn(),
 }));
 
@@ -27,10 +29,23 @@ vi.mock('next/navigation', () => ({
 vi.mock('@/lib/auth/gate', () => ({
   CanonicalUserState,
   getWaitlistAccess: mockGetWaitlistAccess,
+  resolveRequestAuthIdentity: mockResolveRequestAuthIdentity,
   resolveUserState: mockResolveUserState,
 }));
 
 describe('WaitlistPage', () => {
+  beforeEach(() => {
+    mockGetWaitlistAccess.mockReset();
+    mockNotFound.mockClear();
+    mockRedirect.mockClear();
+    mockResolveRequestAuthIdentity.mockReset();
+    mockResolveUserState.mockReset();
+    mockResolveRequestAuthIdentity.mockResolvedValue({
+      clerkUserId: 'user_1',
+      email: 'artist@example.com',
+    });
+  });
+
   afterEach(() => {
     vi.unstubAllEnvs();
   });
@@ -70,6 +85,10 @@ describe('WaitlistPage', () => {
   test('renders the public waitlist entry for signed-out visitors', async () => {
     mockRedirect.mockClear();
     mockNotFound.mockClear();
+    mockResolveRequestAuthIdentity.mockResolvedValue({
+      clerkUserId: null,
+      email: null,
+    });
     mockResolveUserState.mockResolvedValue({
       state: CanonicalUserState.UNAUTHENTICATED,
       context: { email: null },
@@ -86,6 +105,8 @@ describe('WaitlistPage', () => {
     expect(result.props.children.type).toBe(WaitlistPublicLanding);
     expect(mockRedirect).not.toHaveBeenCalled();
     expect(mockNotFound).not.toHaveBeenCalled();
+    expect(mockResolveRequestAuthIdentity).toHaveBeenCalledTimes(1);
+    expect(mockResolveUserState).not.toHaveBeenCalled();
     expect(mockGetWaitlistAccess).not.toHaveBeenCalled();
   });
 
@@ -104,6 +125,7 @@ describe('WaitlistPage', () => {
 
     expect(result.type.name).toBe('WaitlistRouteWithContract');
     expect(result.props.children.type).toBe(WaitlistPublicLanding);
+    expect(mockResolveRequestAuthIdentity).not.toHaveBeenCalled();
     expect(mockResolveUserState).not.toHaveBeenCalled();
     expect(mockRedirect).not.toHaveBeenCalled();
   });
@@ -127,6 +149,14 @@ describe('WaitlistPage', () => {
 
     const result = await WaitlistPage();
 
+    expect(mockResolveRequestAuthIdentity).toHaveBeenCalledTimes(1);
+    expect(mockResolveUserState).toHaveBeenCalledWith({
+      createDbUserIfMissing: false,
+      knownAuthIdentity: {
+        clerkUserId: 'user_1',
+        email: 'artist@example.com',
+      },
+    });
     expect(mockRedirect).not.toHaveBeenCalled();
     expect(mockNotFound).not.toHaveBeenCalled();
     expect(result.type.name).toBe('WaitlistRouteWithContract');

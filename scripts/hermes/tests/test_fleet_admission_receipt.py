@@ -274,6 +274,66 @@ class FleetAdmissionReceiptTests(unittest.TestCase):
         self.assertNotIn("stackHealth", blocked["signals"]["closureHealth"])
         self.assertNotIn("repairActions", blocked["signals"]["closureHealth"])
 
+    def test_unbound_repair_receipt_accepts_max_concurrent_above_one(self):
+        hold = evaluate_receipt(
+            production={"status": "green", "deployedSha": "b" * 40}
+        )
+        self.assertEqual(hold["promotionMode"], "hold-intake")
+        self.assertEqual(hold["productionUnboundRepairAdmission"]["maxConcurrent"], 4)
+        self.assertFalse(hold["productionUnboundRepairAdmission"]["deploymentsAllowed"])
+        self.assertEqual(hold["isolatedPromotionAdmission"].get("maxConcurrent"), 1)
+
+        scaled = dict(hold)
+        scaled["productionUnboundRepairAdmission"] = {
+            **hold["productionUnboundRepairAdmission"],
+            "maxConcurrent": 8,
+        }
+        projection = PROJECT.project_fleet_admission_receipt(scaled)
+        self.assertEqual(
+            projection["productionUnboundRepairAdmission"]["maxConcurrent"], 8
+        )
+        self.assertFalse(
+            projection["productionUnboundRepairAdmission"]["deploymentsAllowed"]
+        )
+        jq = shutil.which("jq")
+        self.assertIsNotNone(jq)
+        accepted = subprocess.run(
+            [jq, "-e", "--arg", "mode", "hold-intake", drain_authorization_jq()],
+            input=json.dumps(projection),
+            capture_output=True,
+            text=True,
+            check=False,
+        )
+        self.assertEqual(accepted.returncode, 0, accepted.stderr)
+
+        serial = dict(hold)
+        serial["productionUnboundRepairAdmission"] = {
+            **hold["productionUnboundRepairAdmission"],
+            "maxConcurrent": 1,
+        }
+        still_valid = PROJECT.project_fleet_admission_receipt(serial)
+        self.assertEqual(
+            still_valid["productionUnboundRepairAdmission"]["maxConcurrent"], 1
+        )
+
+        for invalid in (0, 11, True, "4"):
+            broken = dict(hold)
+            broken["productionUnboundRepairAdmission"] = {
+                **hold["productionUnboundRepairAdmission"],
+                "maxConcurrent": invalid,
+            }
+            with self.subTest(maxConcurrent=invalid):
+                with self.assertRaises(PROJECT.AdmissionProjectionError):
+                    PROJECT.project_fleet_admission_receipt(broken)
+
+        promote = dict(hold)
+        promote["productionUnboundRepairAdmission"] = {
+            **hold["productionUnboundRepairAdmission"],
+            "deploymentsAllowed": True,
+        }
+        with self.assertRaises(PROJECT.AdmissionProjectionError):
+            PROJECT.project_fleet_admission_receipt(promote)
+
     def test_cli_projects_stdin_and_fails_closed(self):
         receipt = inject_inventories(evaluate_receipt())
         ok = subprocess.run(

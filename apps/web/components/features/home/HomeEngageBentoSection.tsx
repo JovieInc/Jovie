@@ -11,7 +11,10 @@ export function HomeEngageBentoSection() {
     >
       <Container size='homepage'>
         <div className='mx-auto max-w-300'>
-          <h2 id='engage-bento-heading' className='homepage-chapter-title'>
+          <h2
+            id='engage-bento-heading'
+            className='homepage-chapter-title line-clamp-2'
+          >
             {HOME_ENGAGE_CONTENT.title}
           </h2>
           <p className='homepage-chapter-body mt-4 max-w-[42rem]'>

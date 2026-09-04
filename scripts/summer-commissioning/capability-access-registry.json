@@ -1,0 +1,392 @@
+{
+  "schema": "jovie.summer-capability-access-registry/v1",
+  "auditVersion": "2026-09-02.1",
+  "issue": "JOV-5853",
+  "auditedAt": "2026-09-02T04:11:01Z",
+  "sourceVersion": "53813e6ada1f0c229f67c366426105ad22553382",
+  "principal": {
+    "id": "summer",
+    "channel": "ovie",
+    "safeToolManifestDigest": "19ae65968cb4a1f068098c605d21b93cc8c2ad70200deeadd41180e6df5ce89f",
+    "policyDigest": "671cf970b10417139c6c996d14e207417caccf2870933879c2e0777deedf5fe2"
+  },
+  "capabilities": [
+    {
+      "id": "summer-access-gbrain",
+      "capability": "GBrain scoped company-context read",
+      "accessMode": "read-only; writes explicitly denied by current Summer policy",
+      "dataBoundary": "company-scoped pages through the Ovie GBrain client; no personal-agent state",
+      "hostEvidenceCountsAsSummer": false,
+      "state": {
+        "configured": true,
+        "authenticated": false,
+        "authorized": true,
+        "liveProbed": false,
+        "autonomousSafe": false
+      },
+      "evidence": [
+        {
+          "tier": "source",
+          "ref": "apps/web/lib/ovie/mcp/tools.ts",
+          "summary": "Ovie exposes read-only search and page tools and requires the gbrain-read capability."
+        },
+        {
+          "tier": "policy",
+          "ref": "apps/web/lib/ovie/identity.ts",
+          "summary": "The Ovie/Summer pack grants GBrain read and denies privileged GBrain write."
+        },
+        {
+          "tier": "gap",
+          "ref": "apps/web/lib/ovie/isolation.ts",
+          "summary": "Summer allows search_gbrain but not get_gbrain_page; no exact Summer-principal authentication or runtime receipt exists."
+        },
+        {
+          "tier": "host",
+          "ref": "host-probe://2026-09-02/gbrain-query-timeout",
+          "summary": "The host binary exists, but targeted queries timed out; host availability is not Summer authentication.",
+          "countsForSummer": false
+        }
+      ],
+      "leastPrivilegePacket": {
+        "status": "partial",
+        "owner": "GBrain runtime / Ovie identity",
+        "grants": [
+          "search company-scoped GBrain namespace",
+          "read an allowlisted company test page by slug"
+        ],
+        "explicitDenials": [
+          "GBrain write",
+          "personal-agent namespace",
+          "raw backing-store access"
+        ],
+        "reEvaluateWhen": "search_gbrain and get_gbrain_page share the Summer allowlist and an exact-principal signed read/refusal receipt exists"
+      },
+      "deterministicProbe": {
+        "id": "summer.access.gbrain-read",
+        "version": "1.0.0",
+        "fixture": "company-known-page-and-write-refusal/v1",
+        "expectedState": "configured_authenticated_authorized_live_probed_autonomous_safe",
+        "requiresSummerPrincipal": true,
+        "forbidsHostSubstitution": true,
+        "requiresAttestedReceipt": true
+      },
+      "blocker": "Exact Summer authentication and a signed read plus write-refusal probe are missing."
+    },
+    {
+      "id": "summer-access-sentry",
+      "capability": "Sentry issue, event, and query diagnostics",
+      "accessMode": "read-only",
+      "dataBoundary": "allowlisted Jovie projects and redacted synthetic issue/event fixtures only",
+      "hostEvidenceCountsAsSummer": false,
+      "state": {
+        "configured": false,
+        "authenticated": false,
+        "authorized": false,
+        "liveProbed": false,
+        "autonomousSafe": false
+      },
+      "evidence": [
+        {
+          "tier": "gap",
+          "ref": "apps/web/lib/ovie/isolation.ts",
+          "summary": "No Sentry tool is present in Summer's safe-tool manifest."
+        },
+        {
+          "tier": "host",
+          "ref": "host-probe://2026-09-02/sentry-cli-absent",
+          "summary": "The host has neither sentry-cli nor a named Sentry token in the current environment.",
+          "countsForSummer": false
+        }
+      ],
+      "leastPrivilegePacket": {
+        "status": "missing",
+        "owner": "Sentry diagnostics / Summer access",
+        "grants": [
+          "org:read for the Jovie organization",
+          "project:read and event:read for allowlisted Jovie projects",
+          "redacted issue and event query projection"
+        ],
+        "explicitDenials": [
+          "project administration",
+          "issue mutation",
+          "raw event payloads outside the fixture boundary"
+        ],
+        "reEvaluateWhen": "a Summer-safe server projection and restricted credential produce a signed synthetic-issue receipt"
+      },
+      "deterministicProbe": {
+        "id": "summer.access.sentry-read",
+        "version": "1.0.0",
+        "fixture": "sentry-synthetic-redacted-issue/v1",
+        "expectedState": "configured_authenticated_authorized_live_probed_autonomous_safe",
+        "requiresSummerPrincipal": true,
+        "forbidsHostSubstitution": true,
+        "requiresAttestedReceipt": true
+      },
+      "blocker": "No Summer Sentry projection, credential boundary, or live receipt exists."
+    },
+    {
+      "id": "summer-access-neon-postgres",
+      "capability": "Neon/Postgres least-privilege diagnostics",
+      "accessMode": "read-only diagnostic views",
+      "dataBoundary": "allowlisted health views with row and column redaction; no raw customer rows",
+      "hostEvidenceCountsAsSummer": false,
+      "state": {
+        "configured": false,
+        "authenticated": false,
+        "authorized": false,
+        "liveProbed": false,
+        "autonomousSafe": false
+      },
+      "evidence": [
+        {
+          "tier": "gap",
+          "ref": "scripts/summer-commissioning/registry.json#SUMMER-COMM-004",
+          "summary": "The canonical commissioning registry marks the application-data query missing and blocked."
+        },
+        {
+          "tier": "host",
+          "ref": "host-probe://2026-09-02/neonctl-absent",
+          "summary": "The host has neither neonctl nor named Neon/database credentials in the current environment.",
+          "countsForSummer": false
+        }
+      ],
+      "leastPrivilegePacket": {
+        "status": "missing",
+        "owner": "Summer data access",
+        "grants": [
+          "CONNECT to a diagnostics endpoint",
+          "SELECT on allowlisted redacted diagnostic views",
+          "transaction_read_only enforcement"
+        ],
+        "explicitDenials": [
+          "table DML or DDL",
+          "raw customer tables",
+          "role, schema, and extension administration"
+        ],
+        "reEvaluateWhen": "a dedicated read-only role and Summer-safe projection prove a known health row and rejected write"
+      },
+      "deterministicProbe": {
+        "id": "summer.access.neon-diagnostics",
+        "version": "1.0.0",
+        "fixture": "postgres-redacted-health-view-and-write-refusal/v1",
+        "expectedState": "configured_authenticated_authorized_live_probed_autonomous_safe",
+        "requiresSummerPrincipal": true,
+        "forbidsHostSubstitution": true,
+        "requiresAttestedReceipt": true
+      },
+      "blocker": "No Summer-safe diagnostic view, database role, or live receipt exists."
+    },
+    {
+      "id": "summer-access-stripe",
+      "capability": "Stripe account, customer, subscription, and health query",
+      "accessMode": "read-only restricted server projection",
+      "dataBoundary": "test-mode synthetic records or production redacted aggregates; no payment method or full customer content",
+      "hostEvidenceCountsAsSummer": false,
+      "state": {
+        "configured": false,
+        "authenticated": false,
+        "authorized": false,
+        "liveProbed": false,
+        "autonomousSafe": false
+      },
+      "evidence": [
+        {
+          "tier": "gap",
+          "ref": "scripts/summer-commissioning/registry.json#SUMMER-COMM-005",
+          "summary": "The canonical commissioning registry marks the Stripe/business query missing and blocked."
+        },
+        {
+          "tier": "host",
+          "ref": "host-probe://2026-09-02/stripe-binary-only",
+          "summary": "A host Stripe binary exists, but no named Stripe secret is present; this is not a Summer grant.",
+          "countsForSummer": false
+        }
+      ],
+      "leastPrivilegePacket": {
+        "status": "missing",
+        "owner": "Summer business data access",
+        "grants": [
+          "restricted read of account health",
+          "restricted read of customers and subscriptions through a redacted projection",
+          "test-mode synthetic fixture access"
+        ],
+        "explicitDenials": [
+          "charges, refunds, payouts, or subscription mutation",
+          "payment method or full customer payload exposure",
+          "API key or webhook administration"
+        ],
+        "reEvaluateWhen": "a restricted server credential and redacted Summer projection produce a signed test-mode receipt"
+      },
+      "deterministicProbe": {
+        "id": "summer.access.stripe-read",
+        "version": "1.0.0",
+        "fixture": "stripe-testmode-synthetic-customer-subscription/v1",
+        "expectedState": "configured_authenticated_authorized_live_probed_autonomous_safe",
+        "requiresSummerPrincipal": true,
+        "forbidsHostSubstitution": true,
+        "requiresAttestedReceipt": true
+      },
+      "blocker": "No Summer Stripe projection, restricted credential, or live receipt exists."
+    },
+    {
+      "id": "summer-access-github-linear",
+      "capability": "GitHub and Linear delivery visibility",
+      "accessMode": "read-only delivery projection",
+      "dataBoundary": "Jovie repositories, teams, projects, issues, pull requests, checks, and queue state",
+      "hostEvidenceCountsAsSummer": false,
+      "state": {
+        "configured": false,
+        "authenticated": false,
+        "authorized": false,
+        "liveProbed": false,
+        "autonomousSafe": false
+      },
+      "evidence": [
+        {
+          "tier": "gap",
+          "ref": "scripts/summer-commissioning/registry.json#SUMMER-COMM-006,SUMMER-COMM-007",
+          "summary": "Linear delivery and repository/PR lookup remain blocked and are absent from the Summer safe-tool manifest."
+        },
+        {
+          "tier": "host",
+          "ref": "host-probe://2026-09-02/github-authenticated",
+          "summary": "The host GitHub CLI is authenticated; that principal is not Summer and cannot satisfy this gate.",
+          "countsForSummer": false
+        }
+      ],
+      "leastPrivilegePacket": {
+        "status": "missing",
+        "owner": "Summer delivery visibility",
+        "grants": [
+          "GitHub App pull request, checks, actions, contents metadata, and merge-queue read",
+          "Linear team, project, issue, and workflow-state read",
+          "source-bound internal delivery projection"
+        ],
+        "explicitDenials": [
+          "issue, pull request, repository, or workflow mutation",
+          "GitHub contents write or Actions dispatch",
+          "Linear create, update, or comment"
+        ],
+        "reEvaluateWhen": "one Summer tool returns a known synthetic issue/PR with separate source, CI, queue, and terminal receipts"
+      },
+      "deterministicProbe": {
+        "id": "summer.access.github-linear-read",
+        "version": "1.0.0",
+        "fixture": "known-linear-issue-and-github-pr/v1",
+        "expectedState": "configured_authenticated_authorized_live_probed_autonomous_safe",
+        "requiresSummerPrincipal": true,
+        "forbidsHostSubstitution": true,
+        "requiresAttestedReceipt": true
+      },
+      "blocker": "Host GitHub authentication exists, but Summer has no provider projection, provider authorization, or live receipt."
+    },
+    {
+      "id": "summer-access-deployment-ci",
+      "capability": "Deployment and CI observability",
+      "accessMode": "read-only source-to-runtime projection",
+      "dataBoundary": "Jovie source SHA, CI checks, queue disposition, deployment version, and health receipts",
+      "hostEvidenceCountsAsSummer": false,
+      "state": {
+        "configured": false,
+        "authenticated": false,
+        "authorized": false,
+        "liveProbed": false,
+        "autonomousSafe": false
+      },
+      "evidence": [
+        {
+          "tier": "source",
+          "ref": "apps/web/lib/ovie/shipping-state/sources.ts",
+          "summary": "A shipping-state projection exists in source but is not exposed in Summer's safe-tool manifest."
+        },
+        {
+          "tier": "host",
+          "ref": "host-probe://2026-09-02/github-vercel-authenticated",
+          "summary": "The host GitHub and Vercel CLIs authenticate successfully; neither proves the Summer principal.",
+          "countsForSummer": false
+        }
+      ],
+      "leastPrivilegePacket": {
+        "status": "partial",
+        "owner": "Ovie shipping state / Summer operations",
+        "grants": [
+          "read exact source and CI check state",
+          "read native queue disposition",
+          "read exact deployment version and health receipt"
+        ],
+        "explicitDenials": [
+          "workflow dispatch or rerun",
+          "queue, branch, or deployment mutation",
+          "environment or secret administration"
+        ],
+        "reEvaluateWhen": "get_shipping_state is Summer-safe and an exact-principal receipt returns all proof tiers for a known deploy"
+      },
+      "deterministicProbe": {
+        "id": "summer.access.deployment-ci-read",
+        "version": "1.0.0",
+        "fixture": "known-source-ci-queue-deploy/v1",
+        "expectedState": "configured_authenticated_authorized_live_probed_autonomous_safe",
+        "requiresSummerPrincipal": true,
+        "forbidsHostSubstitution": true,
+        "requiresAttestedReceipt": true
+      },
+      "blocker": "The source projection exists, but Summer configuration, provider authorization, and live proof are missing."
+    },
+    {
+      "id": "summer-access-ovie-escalation",
+      "capability": "Ovie founder escalation",
+      "accessMode": "read-only blocker projection to the founder surface",
+      "dataBoundary": "privacy-safe blocker, evidence references, owner, gate, and requested founder decision",
+      "hostEvidenceCountsAsSummer": false,
+      "state": {
+        "configured": true,
+        "authenticated": false,
+        "authorized": true,
+        "liveProbed": false,
+        "autonomousSafe": false
+      },
+      "evidence": [
+        {
+          "tier": "source",
+          "ref": "scripts/summer-commissioning/registry.json#SUMMER-COMM-009",
+          "summary": "Failure-to-human-required escalation primitives exist, but the canonical capability remains untested."
+        },
+        {
+          "tier": "policy",
+          "ref": "apps/eve-pilot/identities/summer/instructions.md",
+          "summary": "Summer may state blockers and owners but remains read-only and may not impersonate external action."
+        },
+        {
+          "tier": "runtime",
+          "ref": "docs/operations/evidence/summer-mac-production-dogfood-2026-09-01.json",
+          "summary": "The installed production shell lacked the current Talk door, so an exact-current escalation was not exercised."
+        }
+      ],
+      "leastPrivilegePacket": {
+        "status": "partial",
+        "owner": "Ovie founder surface / Summer runtime",
+        "grants": [
+          "emit a privacy-safe blocker summary in the current founder conversation",
+          "include evidence references, owner, gate, and decision request",
+          "read back the persisted escalation receipt"
+        ],
+        "explicitDenials": [
+          "external message or notification",
+          "provider mutation",
+          "customer or personal content in the escalation"
+        ],
+        "reEvaluateWhen": "the exact packaged Summer principal emits and reads back a synthetic founder-required blocker receipt"
+      },
+      "deterministicProbe": {
+        "id": "summer.access.ovie-escalation",
+        "version": "1.0.0",
+        "fixture": "synthetic-founder-required-blocker/v1",
+        "expectedState": "configured_authenticated_authorized_live_probed_autonomous_safe",
+        "requiresSummerPrincipal": true,
+        "forbidsHostSubstitution": true,
+        "requiresAttestedReceipt": true
+      },
+      "blocker": "The source and policy path exist, but exact Summer authentication and a persisted live escalation receipt are missing."
+    }
+  ]
+}

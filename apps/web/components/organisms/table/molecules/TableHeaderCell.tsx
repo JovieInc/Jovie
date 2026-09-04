@@ -71,7 +71,8 @@ export function TableHeaderCell<TData>({
       className={cn(
         stickyHeaderClass,
         tableAlignment.text[align],
-        metaClassName
+        metaClassName,
+        'whitespace-nowrap'
       )}
       style={{
         width:

@@ -64,5 +64,6 @@ describe('JOV-5466 token retire', () => {
       'utf8'
     );
     expect(source).not.toMatch(/--linear-app-/);
+    expect(source).toContain('line-clamp-2');
   });
 });

@@ -4,6 +4,7 @@ import {
   buildHarnessReceipt,
   validateHarnessContract,
 } from './harness-contract.mjs';
+import { validatePerformanceFactory } from './performance-factory.mjs';
 import {
   readInvariantRegistry,
   validateInvariantRegistry,
@@ -11,14 +12,18 @@ import {
 
 // JOV-INV-024 composes the harness contract validator into this existing
 // process: no new service, workflow, CI job, or process is added.
+// JOV-INV-026 composes the performance factory the same way onto the
+// existing weekday governance beat.
 const harnessJson = process.argv.includes('--harness-json');
 
 const registry = readInvariantRegistry();
 const result = validateInvariantRegistry(registry);
 const harnessErrors = validateHarnessContract(registry);
+const performanceErrors = validatePerformanceFactory(undefined, { registry });
 const errors = [
   ...result.errors,
   ...harnessErrors.map(error => `harness-contract: ${error}`),
+  ...performanceErrors.map(error => `performance-factory: ${error}`),
 ];
 const ok = errors.length === 0 && result.blockers.length === 0;
 

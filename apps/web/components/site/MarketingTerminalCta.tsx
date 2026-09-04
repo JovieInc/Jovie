@@ -136,7 +136,7 @@ export function MarketingTerminalCta({
   const content = (
     <div className={variantStyles.content}>
       <h2
-        className={variantStyles.title}
+        className={`${variantStyles.title} line-clamp-2`}
         data-testid={headingTestId}
         data-homepage-section-heading={
           variant === 'homepage-v2' ? true : undefined

@@ -12,9 +12,7 @@ import { TIM_WHITE_PROFILE } from '@/lib/tim-white';
 
 describe('Tim White canonical mock identity', () => {
   it('uses the founder mockup avatar and canonical Spotify identity', () => {
-    expect(TIM_WHITE_PROFILE.avatarSrc).toBe(
-      '/images/avatars/tim-white-founder.jpg'
-    );
+    expect(TIM_WHITE_PROFILE.avatarSrc).toBe('/images/avatars/tim-white.jpg');
     expect(TIM_WHITE_PROFILE.spotifyArtistId).toBe(TIM_WHITE_SPOTIFY_ID);
     expect(TIM_WHITE_PROFILE.spotifyUrl).toBe(
       `https://open.spotify.com/artist/${TIM_WHITE_SPOTIFY_ID}`

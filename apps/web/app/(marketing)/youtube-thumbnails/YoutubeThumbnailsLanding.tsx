@@ -27,7 +27,7 @@ export function YoutubeThumbnailsLanding() {
           <h1
             id='youtube-thumbnails-hero-heading'
             data-testid='youtube-thumbnails-hero-heading'
-            className='marketing-h1-linear mt-5 max-w-3xl text-primary-token'
+            className='marketing-h1-linear mt-5 max-w-3xl text-primary-token line-clamp-2'
           >
             {copy.hero.title}
           </h1>
@@ -53,7 +53,7 @@ export function YoutubeThumbnailsLanding() {
               </p>
               <h2
                 id='approval-loop-heading'
-                className='mt-3 text-balance text-2xl font-semibold tracking-tight sm:text-3xl'
+                className='mt-3 text-balance text-2xl font-semibold tracking-tight sm:text-3xl line-clamp-2'
               >
                 {copy.workflow.title}
               </h2>
@@ -92,7 +92,7 @@ export function YoutubeThumbnailsLanding() {
               </p>
               <h2
                 id='thumbnail-safeguards-heading'
-                className='mt-3 text-balance text-2xl font-semibold tracking-tight sm:text-3xl'
+                className='mt-3 text-balance text-2xl font-semibold tracking-tight sm:text-3xl line-clamp-2'
               >
                 {copy.safeguards.title}
               </h2>
@@ -113,7 +113,7 @@ export function YoutubeThumbnailsLanding() {
               </p>
               <h2
                 id='youtube-thumbnails-included-heading'
-                className='mt-3 text-balance text-2xl font-semibold tracking-tight sm:text-3xl'
+                className='mt-3 text-balance text-2xl font-semibold tracking-tight sm:text-3xl line-clamp-2'
               >
                 {copy.included.title}
               </h2>

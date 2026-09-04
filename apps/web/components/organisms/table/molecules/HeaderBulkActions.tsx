@@ -40,7 +40,7 @@ export interface HeaderBulkActionsProps {
  * IconButton `sm` so geometry, focus, and the 44px hit target stay shared.
  *
  * @example
- * <th>
+ * <th className='whitespace-nowrap'>
  *   <div className="flex items-center gap-2">
  *     {selectedIds.size === 0 && <span>Release</span>}
  *     <HeaderBulkActions

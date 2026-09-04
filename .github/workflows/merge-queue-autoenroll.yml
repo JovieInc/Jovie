@@ -350,6 +350,15 @@ jobs:
           # integer re-caps event + recovery admissions per run.
           DRAIN_RECONCILE_MISSED_ADMISSION: ${{ steps.admission.outputs.deferred_release != '1' && (needs.fleet-policy.outputs.mode == 'normal' || needs.fleet-policy.outputs.mode == 'hold-intake' || needs.fleet-policy.outputs.mode == 'draft-only') && '1' || '0' }}
           DRAIN_QUEUE_REENTRY_MAX_PER_RUN: '0'
+          # A non-draft main PR whose required source checks never registered a
+          # check-run on its exact head can never turn green and never enroll
+          # (observed 2026-09-03 across multiple open PRs for 24h+). The drain
+          # re-fires source CI with a bounded close+reopen: at most two per run,
+          # heads at least two hours old, and never twice on the same exact head
+          # (bot-comment marker). Not an admission path, so no fleet-mode gate.
+          DRAIN_RECOVER_MISSING_CI: '1'
+          DRAIN_MISSING_CI_MAX_PER_RUN: '2'
+          DRAIN_MISSING_CI_MIN_AGE_MINUTES: '120'
           # `queue-deferred` has no typed provenance separating a temporary
           # pressure deferral from an explicit repair/human hold. Main-push
           # maintenance must preserve it until an owner explicitly releases it.
