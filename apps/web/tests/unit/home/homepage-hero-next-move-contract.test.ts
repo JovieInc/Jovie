@@ -37,10 +37,9 @@ describe('homepage hero contract (JOV-5864)', () => {
 
     expect(rejectedPhotoFixture).toMatch(rasterSourcePattern);
     expect(rejectedPhotoFixture).toMatch(cssImagePattern);
-    expect(`${heroSource}\n${componentSource}`).not.toMatch(
-      rasterSourcePattern
-    );
-    expect(heroCss).not.toMatch(cssImagePattern);
+    const heroImplementation = `${heroSource}\n${componentSource}\n${heroCss}`;
+    expect(heroImplementation).not.toMatch(rasterSourcePattern);
+    expect(heroImplementation).not.toMatch(cssImagePattern);
   });
 
   it('uses the exact locked headline and one-line support', () => {
