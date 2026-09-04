@@ -689,6 +689,32 @@ describe('Summer bottleneck loop', () => {
     ]);
   });
 
+  it('rejects a signed claim copied into the outcome path', async () => {
+    const shared = memoryStore();
+    const pending = harness(shared, {
+      dispatchToSymphony: vi.fn(async () => {
+        throw new Error('leave pending');
+      }),
+    });
+    await expect(
+      ingestSummerBottleneckSnapshot(snapshot(), pending.dependencies)
+    ).rejects.toThrow();
+    const claim = [...shared.records.values()].find(
+      record => record.schema === 'jovie.eve.summer-bottleneck-claim/v1'
+    );
+    expect(claim).toBeDefined();
+    shared.records.set(
+      `summer-bottleneck/outcomes/${String(claim?.fingerprint)}.json`,
+      claim!
+    );
+
+    await expect(
+      reconcileMissedSummerBottleneckEvents(harness(shared).dependencies)
+    ).resolves.toEqual([
+      expect.objectContaining({ decision: 'recovery-processing-failed' }),
+    ]);
+  });
+
   it('reconciles one missed event after a transient dispatch failure', async () => {
     const shared = memoryStore();
     const failed = harness(shared, {
@@ -1076,6 +1102,72 @@ describe('Summer bottleneck loop', () => {
     await expect(
       reconcileMissedSummerBottleneckEvents(proof.dependencies)
     ).resolves.toEqual([]);
+  });
+
+  it('surfaces a forged terminal instead of treating it as complete', async () => {
+    const shared = memoryStore();
+    const proof = harness(shared);
+    await ingestSummerBottleneckSnapshot(snapshot(), proof.dependencies);
+    const terminalPath = [...shared.records.keys()].find(path =>
+      path.includes('/terminal/')
+    );
+    expect(terminalPath).toBeDefined();
+    shared.records.set(terminalPath!, { terminal: true, signature: 'forged' });
+
+    await expect(
+      reconcileMissedSummerBottleneckEvents(proof.dependencies)
+    ).resolves.toEqual([
+      expect.objectContaining({
+        decision: 'invalid-terminal-conflict',
+        terminal: false,
+      }),
+    ]);
+    expect(
+      [...shared.records.keys()].some(path => path.includes('/conflicts/'))
+    ).toBe(true);
+  });
+
+  it('isolates a forged terminal with an already-conflicting conflict receipt', async () => {
+    const shared = memoryStore();
+    for (const [eventId, sourceVersion] of [
+      ['evt_conflict_poison_0001', 'f'.repeat(40)],
+      ['evt_conflict_poison_0002', '9'.repeat(40)],
+    ] as const) {
+      const failed = harness(shared, {
+        dispatchToSymphony: vi.fn(async () => {
+          throw new Error('leave pending');
+        }),
+      });
+      await expect(
+        ingestSummerBottleneckSnapshot(
+          snapshot({ eventId, sourceVersion }),
+          failed.dependencies
+        )
+      ).rejects.toThrow('leave pending');
+    }
+
+    const firstEventPath = [...shared.records.keys()]
+      .filter(path => path.includes('/events/'))
+      .sort((left, right) => left.localeCompare(right))[0];
+    expect(firstEventPath).toBeDefined();
+    shared.records.set(firstEventPath!.replace('/events/', '/terminal/'), {
+      terminal: true,
+      signature: 'forged',
+    });
+    shared.records.set(firstEventPath!.replace('/events/', '/conflicts/'), {
+      decision: 'different-conflict',
+      signature: 'forged',
+    });
+
+    const recovered = await reconcileMissedSummerBottleneckEvents(
+      harness(shared).dependencies
+    );
+    expect(recovered).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ decision: 'recovery-processing-failed' }),
+        expect.objectContaining({ decision: 'symphony-succeeded' }),
+      ])
+    );
   });
 
   it('skips forged or path-rebound event records during heartbeat reconciliation', async () => {
