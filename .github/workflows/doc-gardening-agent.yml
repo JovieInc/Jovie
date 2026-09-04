@@ -3,6 +3,7 @@
 # Scans gardening-only stale docs (docs/doc-gardening/**) and opens fix-up PRs
 # when freshness markers drift from computed repo facts.
 name: Doc Gardening Agent
+# clock-class: skip-if-unchanged
 
 on:
   schedule:

@@ -1,9 +1,13 @@
 name: Skip if unchanged SHA
-description: Skip scheduled work after a successful scheduled run on this exact SHA. Manual dispatch always runs.
+description: Skip scheduled work when this workflow already succeeded on this exact SHA. Manual dispatch always runs.
 inputs:
   workflow:
     description: Workflow file or name used by gh run list --workflow
     required: true
+  sha:
+    description: Exact git SHA to compare. Defaults to github.sha.
+    required: false
+    default: ${{ github.sha }}
 outputs:
   skip:
     description: true when a scheduled tick would repeat the last successful SHA
@@ -16,7 +20,7 @@ runs:
       env:
         GH_TOKEN: ${{ github.token }}
         WORKFLOW: ${{ inputs.workflow }}
-        SHA: ${{ github.sha }}
+        SHA: ${{ inputs.sha }}
         EVENT: ${{ github.event_name }}
         REPO: ${{ github.repository }}
       run: |

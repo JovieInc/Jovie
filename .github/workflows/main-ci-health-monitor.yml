@@ -1,4 +1,5 @@
 name: Main CI health monitor
+# clock-class: production-liveness
 
 on:
   schedule:

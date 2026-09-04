@@ -1,4 +1,5 @@
 name: Runner Heartbeat
+# clock-class: production-liveness
 
 on:
   # GitHub cron delivery is best-effort and can be delayed well past its nominal

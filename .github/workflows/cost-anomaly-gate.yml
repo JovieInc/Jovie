@@ -36,6 +36,7 @@
 #   history. Linear is the sole canonical tracker.
 
 name: Cost Anomaly Gate
+# clock-class: production-liveness
 
 on:
   schedule:
