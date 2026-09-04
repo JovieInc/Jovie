@@ -2391,7 +2391,7 @@ body:has(.home-viewport)::-webkit-scrollbar {
 @media (min-width: 900px) {
   .homepage-certified-section[data-media="true"]
     .homepage-certified-section__inner {
-    grid-template-columns: minmax(0, 7fr) minmax(0, 5fr);
+    grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 
   .homepage-certified-section[data-media="true"][data-align="end"]
@@ -5178,7 +5178,6 @@ body:has(.home-viewport)::-webkit-scrollbar {
 }
 
 .homepage-story-stack--proof-transition {
-  margin-top: calc(var(--space-8) * -1);
   overflow: visible;
   background: transparent;
 }
@@ -5696,10 +5695,6 @@ body:has(.home-viewport)::-webkit-scrollbar {
   .system-b-mounted-home-footer-cta {
     min-height: calc(var(--space-24) * 3.25);
     margin-top: var(--space-8);
-  }
-
-  .homepage-story-stack--proof-transition {
-    margin-top: calc(var(--space-6) * -1);
   }
 }
 

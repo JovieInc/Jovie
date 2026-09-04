@@ -42,8 +42,8 @@ describe('homepage hero contract (JOV-5864)', () => {
     expect(heroSource).not.toContain('primaryCta');
     expect(heroSource).not.toContain('secondaryCta');
     expect(heroSource).not.toMatch(/Get started|Drop more music|waitlist/i);
-    expect(pageSource).toContain('/images/hero/night-desk.webp');
-    expect(pageSource).toContain('/images/hero/night-desk-mobile.webp');
+    expect(pageSource).toContain('/images/hero/night-desk-clean.webp');
+    expect(pageSource).toContain('/images/hero/night-desk-mobile-clean.webp');
   });
 
   it('keeps the one-line H1 contract and the two-line phone fallback', () => {
@@ -88,7 +88,7 @@ describe('homepage hero contract (JOV-5864)', () => {
     expect(profilesSource).not.toContain('homepage-artist-outcome__copy');
   });
 
-  it('keeps homepage nav as wordmark plus Log in text only, with no Get started', () => {
+  it('uses the canonical icon header with full marketing navigation', () => {
     const headerSource = readFileSync(
       path.join(webRoot, 'components/site/MarketingHeader.tsx'),
       'utf8'
@@ -98,10 +98,12 @@ describe('homepage hero contract (JOV-5864)', () => {
       'utf8'
     );
 
-    expect(headerSource).toContain('minimalAuth={isMinimal || isHomepage}');
-    expect(headerSource).toContain("isHomepage ? 'Log in' : 'Sign in'");
-    expect(layoutSource).toContain("logoVariant='word'");
-    expect(layoutSource).toContain('showHomepageCenterNav={false}');
+    expect(headerSource).toContain('MARKETING_GLASS_DESKTOP_LINKS');
+    expect(headerSource).toContain("presentation === 'marketing-glass'");
+    expect(layoutSource).toContain("headerVariant='landing'");
+    expect(layoutSource).toContain("footerVariant='expanded'");
+    expect(layoutSource).not.toContain("logoVariant='word'");
+    expect(layoutSource).not.toContain('showHomepageCenterNav={false}');
 
     const css = readFileSync(path.join(webRoot, 'app/(home)/home.css'), 'utf8');
     expect(css).not.toMatch(
