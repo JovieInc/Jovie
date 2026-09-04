@@ -169,6 +169,11 @@ class ExecutionTruthTests(unittest.TestCase):
         self.assertLessEqual(len(lines), 20)
         self.assertTrue(all(len(strip(line)) == 430 for line in lines))
 
+    def test_full_canvas_does_not_scroll_last_line(self):
+        frame = paint(width=430, height=90)
+        self.assertEqual(frame.count("\n"), 89)
+        self.assertFalse(frame.endswith("\n"))
+
     def test_runtime_context_uses_only_bounded_local_readers(self):
         gate = {"schema": "symphony-linear-rate-limit-gate/v1", "recordedAt": STARTED, "resetAt": "2026-08-31T13:00:00Z"}
         with mock.patch.object(HUD.subprocess, "run", return_value=mock.Mock(returncode=0, stdout="active\n")) as run, mock.patch.object(HUD, "load_json_dict", return_value=gate), mock.patch.object(HUD.Path, "read_text", return_value='command: codex -c model="configured-sol"'):

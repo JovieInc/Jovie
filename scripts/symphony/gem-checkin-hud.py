@@ -2498,7 +2498,7 @@ def render(
     lines = lines[:rows]
     lines.extend([""] * max(0, rows - len(lines)))
     lines = [pad_visible(line, cols) for line in lines]
-    return f"\033[48;2;{BG[0]};{BG[1]};{BG[2]}m" + "\n".join(lines) + "\033[0m\n"
+    return f"\033[48;2;{BG[0]};{BG[1]};{BG[2]}m" + "\n".join(lines) + "\033[0m"
 
 
 def frame(
