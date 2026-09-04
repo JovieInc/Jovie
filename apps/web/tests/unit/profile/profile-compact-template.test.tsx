@@ -8,18 +8,11 @@ import {
   within,
 } from '@testing-library/react';
 import React from 'react';
-import {
-  afterEach,
-  beforeAll,
-  beforeEach,
-  describe,
-  expect,
-  it,
-  vi,
-} from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { PublicRelease } from '@/components/features/profile/releases/types';
 import type { PublicContact } from '@/types/contacts';
 import type { Artist } from '@/types/db';
+import { ProfileCompactTemplate } from '../../../components/features/profile/templates/ProfileCompactTemplate';
 
 const {
   mockCanonicalProfileDSPs,
@@ -239,16 +232,8 @@ function mockViewport(width: 'mobile' | 'desktop') {
   };
 }
 
-let ProfileCompactTemplate: typeof import('@/features/profile/templates/ProfileCompactTemplate').ProfileCompactTemplate;
-
 describe('ProfileCompactTemplate', () => {
   let originalMatchMedia: typeof window.matchMedia;
-
-  beforeAll(async () => {
-    ({ ProfileCompactTemplate } = await import(
-      '@/features/profile/templates/ProfileCompactTemplate'
-    ));
-  }, 120_000);
 
   beforeEach(() => {
     originalMatchMedia = window.matchMedia;

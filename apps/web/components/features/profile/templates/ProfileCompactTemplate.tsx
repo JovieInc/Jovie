@@ -1,3 +1,4 @@
+// @coverage-via apps/web/tests/unit/profile/profile-compact-template.test.tsx
 'use client';
 
 import dynamic from 'next/dynamic';

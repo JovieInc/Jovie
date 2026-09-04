@@ -1,7 +1,7 @@
 import { render, screen } from '@testing-library/react';
 import type { ReactNode } from 'react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { ClaimBanner } from '@/features/profile/ClaimBanner';
+import { ClaimBanner } from '../../../components/features/profile/ClaimBanner';
 
 vi.mock('@/lib/analytics', () => ({
   track: vi.fn(),

@@ -236,6 +236,39 @@ describe('ProfileDesktopSurface', () => {
     );
   });
 
+  it('omits fan-capture actions when fan capture is disabled', () => {
+    render(
+      <ProfileDesktopSurface
+        artist={artist}
+        socialLinks={[]}
+        contacts={contacts}
+        photoDownloadSizes={[]}
+        drawerOpen={false}
+        drawerView='menu'
+        activeMode='subscribe'
+        onModeSelect={vi.fn()}
+        onDrawerOpenChange={vi.fn()}
+        onDrawerViewChange={vi.fn()}
+        onOpenMenu={vi.fn()}
+        onPlayClick={vi.fn()}
+        profileHref='/timwhite'
+        allowFanCapture={false}
+        isSubscribed={false}
+        contentPrefs={contentPrefs}
+        onTogglePref={vi.fn()}
+        onUnsubscribe={vi.fn()}
+      />
+    );
+
+    expect(
+      screen.queryByRole('button', { name: 'Alerts' })
+    ).not.toBeInTheDocument();
+    expect(
+      screen.queryByTestId('mock-desktop-alerts-cta')
+    ).not.toBeInTheDocument();
+    expect(screen.getByTestId('profile-desktop-surface')).toBeInTheDocument();
+  });
+
   // Regression: JOV-4103 — desktop hero must render social media icons.
   it('renders hero social icons when Instagram and Twitter links are present', () => {
     render(

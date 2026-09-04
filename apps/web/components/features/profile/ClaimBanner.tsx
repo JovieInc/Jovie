@@ -1,3 +1,4 @@
+// @coverage-via apps/web/tests/components/profile/ClaimBanner.test.tsx
 'use client';
 
 import { ArrowRight, Sparkles } from 'lucide-react';
