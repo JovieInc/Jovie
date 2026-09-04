@@ -2465,6 +2465,8 @@ def render(
         lines = [header, *health_band, *pressure_lines[:1], *_compact_work_header(cols)]
         footer = [*_ship_path_lines(path, cols)[:1], _footer(symphony, cols, now=clock)]
     truth = execution_summary(symphony, cols, now=clock)
+    if cols >= 300 and rows >= 60 and review is not None and review > 0:
+        truth[0] = _rgb(FG, clip(ANSI_RE.sub("", truth[0]).rstrip() + f" | !  REVIEW QUEUE {review}", cols), bold=True)
     lines[1:1] = [truth[0], truth[2]] if compact else truth
     blocks = []
     for row in symphony.get("rows", []):
