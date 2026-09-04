@@ -22,6 +22,7 @@ export default defineConfig({
       '**/node_modules/**',
       'tests/summer-bottleneck-loop.test.ts',
       'tests/summer-photon-offline-proof.test.ts',
+      'tests/vercel-blob-bottleneck-runtime.test.ts',
     ],
     include: ['tests/**/*.test.ts'],
     environment: 'node',
