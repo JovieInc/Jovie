@@ -26,6 +26,9 @@ AUTHORITY = "Summer"
 CONTROLLER_RED_AFTER = timedelta(minutes=10)
 EMPTY_QUEUE_RED_AFTER = timedelta(minutes=15)
 UNCLASSIFIED_RED_AFTER = timedelta(minutes=15)
+# Merge-queue group rebuilds transiently mark entries UNMERGEABLE; only a
+# persistent entry past this threshold is real.
+UNMERGEABLE_QUEUE_RED_AFTER = timedelta(minutes=15)
 NO_MERGE_PROGRESS_AFTER = timedelta(hours=1)
 HOLD_EXPIRY = timedelta(days=7)
 STACK_MAX_DEPTH = 4  # JOV-INV-020
@@ -110,7 +113,9 @@ REPOSITORY_NAME = re.compile(r"^[^/\s]+/[^/\s]+$")
 # JOV-INV-020 native-stack evidence for the duplicate-lane detector (JOV-INV-011):
 # same-issue active writers that verifiably stack are one lane, not duplicates.
 STACK_CONTRACT_HEADING = re.compile(r"\bstack\s+contract\b", re.IGNORECASE)
-STACK_LAYER_DECLARATION = re.compile(r"\blayer\s+\d+\s+of\b", re.IGNORECASE)
+STACK_LAYER_DECLARATION = re.compile(
+    r"\blayer\s+\d+\s*(?:\bof\b|/)\s*\d+\b", re.IGNORECASE
+)
 STACK_PARENT_DECLARATION = re.compile(
     r"\b(?:immediate\s+parent|parent\s+pr|parent|extends|stacked\s+on|based\s+on"
     r"|builds\s+on|depends\s+on|supersedes)\b\s*:?\s*#(\d{1,9})\b",
@@ -1362,12 +1367,21 @@ def evaluate_closure_health(
     )
     repair_actions = repair_actions if isinstance(repair_actions, list) else []
 
+    unmergeable_queue_prs = sorted(
+        item.get("number")
+        for item in dispositions
+        if isinstance(item, dict)
+        and item.get("state") == "queued"
+        and item.get("queueState") == "UNMERGEABLE"
+        and isinstance(item.get("number"), int)
+    )
     active = {
         "controller": controller_status != "green",
         "emptyNativeQueue": bool(
             shape_valid and green_ready_prs > 0 and native_queue_count == 0
         ),
         "unclassified": bool(unclassified),
+        "unmergeableQueue": bool(unmergeable_queue_prs),
     }
     episodes: dict[str, Any] = {}
     durations: dict[str, timedelta] = {}
@@ -1398,15 +1412,10 @@ def evaluate_closure_health(
         }
         if roots != action_roots:
             reasons.append("draft-stack-repair-action-unavailable")
-    unmergeable_queue_prs = sorted(
-        item.get("number")
-        for item in dispositions
-        if isinstance(item, dict)
-        and item.get("state") == "queued"
-        and item.get("queueState") == "UNMERGEABLE"
-        and isinstance(item.get("number"), int)
-    )
-    if unmergeable_queue_prs:
+    if (
+        active["unmergeableQueue"]
+        and durations["unmergeableQueue"] >= UNMERGEABLE_QUEUE_RED_AFTER
+    ):
         reasons.append("native-queue-unmergeable")
     if active["controller"] and durations["controller"] >= CONTROLLER_RED_AFTER:
         reasons.append("queue-controller-red-over-10m")
@@ -1555,22 +1564,44 @@ def _observe_queue_controller(repo: str) -> dict[str, Any]:
     if not isinstance(runs, list) or not runs:
         return {"status": "unknown", "reason": "controller-run-missing"}
     latest = runs[0]
-    status = latest.get("status")
-    conclusion = latest.get("conclusion")
-    if status == "completed":
+    # Judge green/failed from the latest completed run, not the latest run:
+    # a busy fleet almost always has an in-progress autoenroll run, and a
+    # busy queue is not a stalled controller. Also skip `cancelled` runs:
+    # the autoenroll concurrency group supersedes older runs constantly, and
+    # supersession churn carries no health verdict. "recovering" covers the
+    # abnormal case where the fetched page has no verdict-bearing run at all;
+    # the CONTROLLER_RED_AFTER episode threshold guards real stalls.
+    verdict_runs = [
+        run
+        for run in runs
+        if isinstance(run, dict)
+        and run.get("status") == "completed"
+        and run.get("conclusion") not in (None, "cancelled")
+    ]
+    if verdict_runs:
+        judged = verdict_runs[0]
+        status = judged.get("status")
+        conclusion = judged.get("conclusion")
         controller_status = "green" if conclusion == "success" else "failed"
-    elif status in {"queued", "in_progress", "waiting", "pending"}:
-        controller_status = "recovering"
     else:
-        controller_status = "unknown"
-    return {
+        judged = latest
+        status = judged.get("status")
+        conclusion = judged.get("conclusion")
+        if status in {"queued", "in_progress", "waiting", "pending"} or status == "completed":
+            controller_status = "recovering"
+        else:
+            controller_status = "unknown"
+    receipt: dict[str, Any] = {
         "status": controller_status,
-        "runId": latest.get("id"),
+        "runId": judged.get("id"),
         "runStatus": status,
         "conclusion": conclusion,
-        "url": latest.get("html_url"),
-        "observedAt": latest.get("updated_at") or latest.get("created_at"),
+        "url": judged.get("html_url"),
+        "observedAt": judged.get("updated_at") or judged.get("created_at"),
     }
+    if judged is not latest and isinstance(latest, dict):
+        receipt["activeRunId"] = latest.get("id")
+    return receipt
 
 
 def observe_closure_health(

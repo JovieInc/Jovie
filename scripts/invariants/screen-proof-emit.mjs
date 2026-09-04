@@ -1,0 +1,137 @@
+#!/usr/bin/env node
+/**
+ * Emit a screen-browser-proof/v1 from an external render run (JOV-INV-018).
+ *
+ * The render runner (Playwright capture harness or the post-deploy renderer)
+ * produces an artifact bundle plus measured per-viewport evidence; this
+ * emitter binds the two by hashing the real bundle bytes and refuses to emit
+ * a proof the certification gate would not accept. Caller-authored proofs
+ * without real bytes can never be produced here.
+ *
+ * Usage:
+ *   node scripts/invariants/screen-proof-emit.mjs \
+ *     --screen=web.homepage \
+ *     --head-sha=<40hex> \
+ *     --run-url=https://github.com/JovieInc/Jovie/actions/runs/<id> \
+ *     --bundle=<dir of rendered stills> \
+ *     --measurements=<json: {capturedAt, viewports[], activeFlow, historyProof, visibleActions}> \
+ *     --out=<proof json> [--artifact-root=<dir>]
+ */
+
+import { readFileSync, writeFileSync } from 'node:fs';
+import { relative, resolve } from 'node:path';
+import { fileURLToPath } from 'node:url';
+import {
+  evaluateScreenProof,
+  hashArtifactBytes,
+  REPO_ROOT,
+  SCREEN_BROWSER_PROOF_SCHEMA,
+  SCREEN_REGISTRY,
+  verifyProofArtifact,
+} from './screen-certification.mjs';
+
+function parseArgs(argv) {
+  const values = {};
+  for (const arg of argv) {
+    if (!arg.startsWith('--')) throw new Error(`Unexpected argument: ${arg}`);
+    const eq = arg.indexOf('=');
+    if (eq === -1) throw new Error(`Missing value for ${arg}`);
+    values[arg.slice(2, eq)] = arg.slice(eq + 1);
+  }
+  return values;
+}
+
+export function emitScreenProof({
+  screenId,
+  headSha,
+  runUrl,
+  bundle,
+  measurements,
+  artifactRoot = REPO_ROOT,
+}) {
+  const screen = SCREEN_REGISTRY.find(
+    entry => entry.id === screenId && !entry.excluded
+  );
+  if (!screen) {
+    throw new Error(`screen ${screenId} is not a gated registry entry`);
+  }
+  if (typeof headSha !== 'string' || !/^[0-9a-f]{40}$/i.test(headSha)) {
+    throw new Error('head sha must be an exact 40-hex commit');
+  }
+  if (typeof runUrl !== 'string' || !/^https:\/\/[^\s]+$/i.test(runUrl)) {
+    throw new Error('run url must be an https URL');
+  }
+  const root = resolve(artifactRoot);
+  const bundleAbs = resolve(root, bundle);
+  if (bundleAbs !== root && !bundleAbs.startsWith(`${root}/`)) {
+    throw new Error(`render bundle escapes the artifact root: ${bundle}`);
+  }
+  const artifactPath = relative(root, bundleAbs).replace(/\\/g, '/');
+  const artifactDigest = hashArtifactBytes(bundleAbs);
+  if (artifactDigest === null) {
+    throw new Error(
+      `render bundle contains no readable artifact bytes: ${bundle}`
+    );
+  }
+  const proof = {
+    schema: SCREEN_BROWSER_PROOF_SCHEMA,
+    producer: 'external-render-runner',
+    screenId,
+    headSha: headSha.toLowerCase(),
+    tier: 'rendered-evidence',
+    runUrl,
+    artifactDigest,
+    artifactPath,
+    capturedAt: measurements?.capturedAt,
+    viewports: measurements?.viewports,
+    activeFlow: measurements?.activeFlow,
+    historyProof: measurements?.historyProof,
+    visibleActions: measurements?.visibleActions,
+  };
+  // Never emit a proof the gate would reject: run the exact evaluation with
+  // the real artifact verifier before writing anything.
+  const findings = evaluateScreenProof(proof, {
+    screen,
+    headSha,
+    verifyArtifact: candidate =>
+      verifyProofArtifact(candidate, { artifactRoot: root }),
+  });
+  if (findings.length > 0) {
+    throw new Error(
+      `refusing to emit a non-certifying proof: ${findings.join('; ')}`
+    );
+  }
+  return proof;
+}
+
+const isMain =
+  process.argv[1] &&
+  resolve(process.argv[1]) === fileURLToPath(import.meta.url);
+if (isMain) {
+  const args = parseArgs(process.argv.slice(2));
+  for (const required of [
+    'screen',
+    'head-sha',
+    'run-url',
+    'bundle',
+    'measurements',
+    'out',
+  ]) {
+    if (!args[required]) throw new Error(`--${required} is required`);
+  }
+  const measurements = JSON.parse(
+    readFileSync(resolve(args.measurements), 'utf8')
+  );
+  const proof = emitScreenProof({
+    screenId: args.screen,
+    headSha: args['head-sha'],
+    runUrl: args['run-url'],
+    bundle: args.bundle,
+    measurements,
+    artifactRoot: args['artifact-root'],
+  });
+  writeFileSync(resolve(args.out), `${JSON.stringify(proof, null, 2)}\n`);
+  process.stdout.write(
+    `[screen-proof-emit] ${proof.screenId} ${proof.artifactDigest} -> ${args.out}\n`
+  );
+}

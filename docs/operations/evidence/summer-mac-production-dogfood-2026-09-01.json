@@ -1,0 +1,47 @@
+{
+  "schema": "jovie.summer-dogfood-observation/v1",
+  "correlationId": "jov-5853:mac-production:20260902T001220Z",
+  "observedAt": "2026-09-02T00:12:30.278Z",
+  "environment": "production",
+  "accountContext": "existing-authorized-owner-jovie-session",
+  "privacy": {
+    "conversationContentRetained": false,
+    "credentialsRetained": false,
+    "accountIdentityRetained": false,
+    "unrelatedPersonalDataRetained": false
+  },
+  "desktop": {
+    "path": "/Applications/Jovie.app",
+    "bundleId": "app.jov.ie",
+    "version": "26.8.1",
+    "build": "26.8.1",
+    "codesignTimestamp": "2026-08-16T04:17:53-07:00",
+    "appAsarSha256": "3877b0a1e1d1073641af796caf4f415122c29f2a773c826c09a0559fc7734ada",
+    "sourceRevision": null,
+    "sourceProvenance": "unverified"
+  },
+  "web": {
+    "routeObserved": "https://jov.ie/hud",
+    "intendedRoute": "https://jov.ie/app/ov/chat",
+    "buildId": "jatMqeJI7KqlLs6cMv_7Z",
+    "version": "26.8.1",
+    "commitSha": "8d58cb6589d2776c3ba37dc118c845de4fff7dfc",
+    "environment": "production"
+  },
+  "probe": {
+    "requestAccepted": false,
+    "visibleSummerResponse": false,
+    "persistenceVerified": false,
+    "chatRecoveryVerified": false,
+    "outcome": "blocked",
+    "blocker": "The installed production shell has no Talk menu or /app/ov/chat route and the HUD launcher catalog is unavailable."
+  },
+  "boundedRecovery": {
+    "action": "retry-hud-launchers",
+    "startedAt": "2026-09-02T00:12:20.643Z",
+    "completedAt": "2026-09-02T00:12:30.278Z",
+    "result": "launcher-destinations-unavailable"
+  },
+  "smallestRepair": "Release and install a signed, notarized production shell containing the Ovie Talk door, then rerun the harmless /app/ov/chat probe in the existing owner session.",
+  "crossSurfaceCertification": "not_evaluated"
+}

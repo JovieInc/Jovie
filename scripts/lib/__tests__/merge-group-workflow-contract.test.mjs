@@ -1171,7 +1171,7 @@ ${selectedGateScript}`,
     }
   });
 
-  it('coalesces a short release wave before exact authorization and mutation', () => {
+  it('applies event-driven supersession instead of a fixed release-wave sleep', () => {
     const coalesce = getJobBlock(
       PRODUCTION_CONTROLLER_WORKFLOW,
       'coalesce-production'
@@ -1185,11 +1185,28 @@ ${selectedGateScript}`,
     expect(coalesce).toContain(
       "github.event.workflow_run.event == 'push' && github.event.workflow_run.conclusion == 'success'"
     );
-    expect(coalesce).toContain("COALESCE_DELAY_SECONDS: '60'");
-    expect(coalesce).toContain('sleep "$COALESCE_DELAY_SECONDS"');
-    expect(coalesce).toContain('echo "is_current=false" >> "$GITHUB_OUTPUT"');
-    expect(coalesce).toContain('echo "is_current=true" >> "$GITHUB_OUTPUT"');
+    // No universal fixed delay: the bounded window derives from merge-queue
+    // depth and is capped inside the 5-minute job budget.
+    expect(coalesce).not.toContain('COALESCE_DELAY_SECONDS');
+    expect(coalesce).not.toContain('sleep 60');
+    expect(coalesce).toContain("COALESCE_PER_GENERATION_SECONDS: '30'");
+    expect(coalesce).toContain("COALESCE_MAX_SECONDS: '150'");
+    expect(coalesce).toContain('sleep "$wait_seconds"');
+    // Event sources: exact main and the merge queue only; no polling loop.
     expect(coalesce).toContain('commits/main');
+    expect(coalesce).toContain('mergeQueue(branch: "main")');
+    // Empty queue + current SHA proceeds without any wait.
+    expect(coalesce).toContain('if [ "$queue_depth" -eq 0 ]; then');
+    // Every decision emits a lineage receipt with reason, replacement SHA,
+    // time saved, and next state; any wait names benefit and deadline.
+    expect(coalesce).toContain('record_receipt');
+    expect(coalesce).toContain('time_saved_seconds');
+    expect(coalesce).toContain('expected_benefit');
+    expect(coalesce).toContain('deadline');
+    expect(coalesce).toContain('next_state');
+    expect(coalesce).toContain('$GITHUB_STEP_SUMMARY');
+    expect(coalesce).toContain('echo "is_current=false"');
+    expect(coalesce).toContain('echo "is_current=true" >> "$GITHUB_OUTPUT"');
     expect(authorize).toContain(
       'needs: [coalesce-production, fleet-promotion]'
     );

@@ -94,7 +94,7 @@ export function CliLandingPage() {
           >
             <h2
               id='install-heading'
-              className='text-2xl font-semibold tracking-tight text-primary-token'
+              className='text-2xl font-semibold tracking-tight text-primary-token line-clamp-2'
             >
               Install
             </h2>
@@ -115,7 +115,7 @@ export function CliLandingPage() {
           <section id='commands' aria-labelledby='commands-heading'>
             <h2
               id='commands-heading'
-              className='text-2xl font-semibold tracking-tight text-primary-token'
+              className='text-2xl font-semibold tracking-tight text-primary-token line-clamp-2'
             >
               Commands
             </h2>

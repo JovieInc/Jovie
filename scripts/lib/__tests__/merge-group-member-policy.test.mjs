@@ -221,7 +221,7 @@ describe('merge-group member discovery', () => {
           Array.from({ length: 11 }, () => commit(HEAD, BASE, 102))
         ),
       })
-    ).toThrow(/exceeds trusted 10-member bound/);
+    ).toThrow(/exceeds trusted 5-member bound/);
   });
 
   it('requires current open main-bound PR metadata after discovery', () => {

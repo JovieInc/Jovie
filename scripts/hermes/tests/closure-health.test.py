@@ -486,6 +486,33 @@ class ClosureClassificationTests(unittest.TestCase):
         self.assertEqual(health["status"], "healthy")
         self.assertNotIn("duplicate-issue-lanes-unresolved", health["reasons"])
 
+    def test_native_stack_layer_slash_wording_is_not_a_duplicate_lane(self):
+        # Live shape from the JOV-5853 Summer stack (2026-09-04): bodies declare
+        # "native stack layer N/M" (no "of", no N/M in the title).
+        result = MODULE.classify_open_prs(
+            [
+                pr(
+                    40,
+                    title="feat(eve): bind Summer bottleneck runtime (JOV-5853)",
+                    body="JOV-5853 native stack layer 3/7.\n\nImmediate parent: #39 @ 337b440a3510c71dab03845fd2b926ec6e9a8b58\n",
+                    head_ref="codex/jov-5853-summer-stack-03-runtime",
+                    files=("scripts/shared.py", "scripts/runtime.py"),
+                ),
+                pr(
+                    41,
+                    title="fix(eve): harden Summer Blob adapters (JOV-5853)",
+                    body="JOV-5853 native stack layer 4/7.\n\nImmediate parent: #40 @ 337b440a3510c71dab03845fd2b926ec6e9a8b58\n",
+                    head_ref="codex/jov-5853-summer-stack-04-adapters",
+                    merge_state="DIRTY",
+                    files=("scripts/shared.py", "scripts/adapters.py"),
+                ),
+            ],
+            NOW,
+        )
+
+        self.assertEqual(result["duplicateIssueLanes"], [])
+        self.assertEqual(result["unclassified"], [])
+
     def test_branch_chained_and_cumulative_nested_lanes_are_stack_evidence(self):
         result = MODULE.classify_open_prs(
             [
@@ -957,34 +984,95 @@ class ClosureHealthEvaluationTests(unittest.TestCase):
         self.assertIn("no-merge-progress-over-1h", result["reasons"])
         self.assertFalse(result["newIssueIntakeAllowed"])
 
-    def test_unmergeable_native_queue_entry_is_immediate_red(self):
-        classifications = MODULE.classify_open_prs(
-            [
-                pr(
-                    7,
-                    title="fix: repair JOV-707",
-                    queued=True,
-                    queue_state="UNMERGEABLE",
-                )
-            ],
-            NOW,
+    def test_unmergeable_native_queue_episode_crosses_bounded_red_threshold(self):
+        churning = snapshot(
+            openPrs=1,
+            eligiblePrs=1,
+            greenReadyPrs=1,
+            classifications=MODULE.classify_open_prs(
+                [
+                    pr(
+                        7,
+                        title="fix: repair JOV-707",
+                        queued=True,
+                        queue_state="UNMERGEABLE",
+                    )
+                ],
+                NOW,
+            ),
         )
 
+        first = MODULE.evaluate_closure_health(churning, previous=None, now=NOW)
+        self.assertEqual(first["status"], "grace")
+        self.assertNotIn("native-queue-unmergeable", first["reasons"])
+        self.assertEqual(first["unmergeableNativeQueuePrs"], [7])
+        self.assertEqual(
+            first["episodes"]["unmergeableQueue"]["since"],
+            MODULE.isoformat(NOW),
+        )
+        self.assertFalse(first["newIssueIntakeAllowed"])
+
         result = MODULE.evaluate_closure_health(
-            snapshot(
-                openPrs=1,
-                eligiblePrs=1,
-                greenReadyPrs=1,
-                classifications=classifications,
-            ),
-            previous=None,
-            now=NOW,
+            churning,
+            previous=first,
+            now=NOW + timedelta(minutes=16),
         )
 
         self.assertEqual(result["status"], "red")
         self.assertIn("native-queue-unmergeable", result["reasons"])
         self.assertEqual(result["unmergeableNativeQueuePrs"], [7])
+        self.assertEqual(
+            result["episodes"]["unmergeableQueue"]["since"],
+            MODULE.isoformat(NOW),
+        )
         self.assertFalse(result["newIssueIntakeAllowed"])
+
+    def test_unmergeable_native_queue_episode_clears_when_mergeable(self):
+        churning = snapshot(
+            openPrs=1,
+            eligiblePrs=1,
+            greenReadyPrs=1,
+            classifications=MODULE.classify_open_prs(
+                [
+                    pr(
+                        7,
+                        title="fix: repair JOV-707",
+                        queued=True,
+                        queue_state="UNMERGEABLE",
+                    )
+                ],
+                NOW,
+            ),
+        )
+        first = MODULE.evaluate_closure_health(churning, previous=None, now=NOW)
+        self.assertIn("unmergeableQueue", first["episodes"])
+
+        cleared = MODULE.evaluate_closure_health(
+            snapshot(
+                openPrs=1,
+                eligiblePrs=1,
+                greenReadyPrs=1,
+                classifications=MODULE.classify_open_prs(
+                    [
+                        pr(
+                            7,
+                            title="fix: repair JOV-707",
+                            queued=True,
+                            queue_state="AWAITING_CHECKS",
+                        )
+                    ],
+                    NOW,
+                ),
+            ),
+            previous=first,
+            now=NOW + timedelta(minutes=5),
+        )
+
+        self.assertEqual(cleared["status"], "healthy")
+        self.assertNotIn("unmergeableQueue", cleared["episodes"])
+        self.assertNotIn("native-queue-unmergeable", cleared["reasons"])
+        self.assertEqual(cleared["unmergeableNativeQueuePrs"], [])
+        self.assertTrue(cleared["newIssueIntakeAllowed"])
 
     def test_unclassified_pr_crosses_fifteen_minute_deliberate_red(self):
         unclassified = snapshot(
@@ -1234,6 +1322,229 @@ class ClosureObservationTests(unittest.TestCase):
         self.assertEqual(
             result["repairActions"][0]["repository"], "JovieInc/LogYourBody"
         )
+
+    @staticmethod
+    def _controller_runs(*runs: dict[str, object]) -> mock.Mock:
+        return mock.Mock(stdout=MODULE.json.dumps({"workflow_runs": list(runs)}))
+
+    def test_in_progress_latest_run_judges_latest_completed_run(self):
+        completed_success = {
+            "id": 41,
+            "status": "completed",
+            "conclusion": "success",
+            "html_url": "https://example.test/run/41",
+            "updated_at": (NOW - timedelta(minutes=2)).isoformat(),
+        }
+        in_flight = {
+            "id": 42,
+            "status": "in_progress",
+            "conclusion": None,
+            "html_url": "https://example.test/run/42",
+            "updated_at": NOW.isoformat(),
+        }
+        with mock.patch.object(
+            MODULE.subprocess,
+            "run",
+            return_value=self._controller_runs(in_flight, completed_success),
+        ):
+            result = MODULE._observe_queue_controller("JovieInc/Jovie")
+
+        self.assertEqual(result["status"], "green")
+        self.assertEqual(result["runId"], 41)
+        self.assertEqual(result["runStatus"], "completed")
+        self.assertEqual(result["conclusion"], "success")
+        self.assertEqual(result["activeRunId"], 42)
+
+        health = MODULE.evaluate_closure_health(
+            snapshot(controller=result),
+            previous=None,
+            now=NOW,
+        )
+        self.assertEqual(health["status"], "healthy")
+        self.assertNotIn("controller", health["episodes"])
+        self.assertTrue(health["newIssueIntakeAllowed"])
+
+    def test_in_progress_latest_run_keeps_latest_completed_failure_red(self):
+        completed_failure = {
+            "id": 41,
+            "status": "completed",
+            "conclusion": "failure",
+            "html_url": "https://example.test/run/41",
+            "updated_at": (NOW - timedelta(minutes=2)).isoformat(),
+        }
+        in_flight = {
+            "id": 42,
+            "status": "queued",
+            "conclusion": None,
+            "html_url": "https://example.test/run/42",
+            "updated_at": NOW.isoformat(),
+        }
+        with mock.patch.object(
+            MODULE.subprocess,
+            "run",
+            return_value=self._controller_runs(in_flight, completed_failure),
+        ):
+            result = MODULE._observe_queue_controller("JovieInc/Jovie")
+
+        self.assertEqual(result["status"], "failed")
+        self.assertEqual(result["runId"], 41)
+        self.assertEqual(result["activeRunId"], 42)
+
+        stalled = snapshot(controller=result)
+        first = MODULE.evaluate_closure_health(stalled, previous=None, now=NOW)
+        self.assertEqual(first["status"], "grace")
+        self.assertFalse(first["newIssueIntakeAllowed"])
+        later = MODULE.evaluate_closure_health(
+            stalled,
+            previous=first,
+            now=NOW + timedelta(minutes=11),
+        )
+        self.assertEqual(later["status"], "red")
+        self.assertIn("queue-controller-red-over-10m", later["reasons"])
+
+    def test_only_active_runs_stay_recovering_without_completed_evidence(self):
+        runs = [
+            {
+                "id": 42,
+                "status": "in_progress",
+                "conclusion": None,
+                "html_url": "https://example.test/run/42",
+                "updated_at": NOW.isoformat(),
+            },
+            {
+                "id": 41,
+                "status": "queued",
+                "conclusion": None,
+                "html_url": "https://example.test/run/41",
+                "updated_at": (NOW - timedelta(minutes=1)).isoformat(),
+            },
+        ]
+        with mock.patch.object(
+            MODULE.subprocess,
+            "run",
+            return_value=self._controller_runs(*runs),
+        ):
+            result = MODULE._observe_queue_controller("JovieInc/Jovie")
+
+        self.assertEqual(result["status"], "recovering")
+        self.assertEqual(result["runId"], 42)
+        self.assertEqual(result["runStatus"], "in_progress")
+        self.assertNotIn("activeRunId", result)
+
+    def test_missing_runs_fail_closed(self):
+        with mock.patch.object(
+            MODULE.subprocess,
+            "run",
+            return_value=self._controller_runs(),
+        ):
+            result = MODULE._observe_queue_controller("JovieInc/Jovie")
+
+        self.assertEqual(
+            result,
+            {"status": "unknown", "reason": "controller-run-missing"},
+        )
+        health = MODULE.evaluate_closure_health(
+            snapshot(controller=result),
+            previous=None,
+            now=NOW,
+        )
+        self.assertEqual(health["status"], "grace")
+        self.assertFalse(health["newIssueIntakeAllowed"])
+
+    def test_cancelled_latest_run_judges_latest_verdict_run(self):
+        cancelled = {
+            "id": 43,
+            "status": "completed",
+            "conclusion": "cancelled",
+            "html_url": "https://example.test/run/43",
+            "updated_at": NOW.isoformat(),
+        }
+        completed_success = {
+            "id": 41,
+            "status": "completed",
+            "conclusion": "success",
+            "html_url": "https://example.test/run/41",
+            "updated_at": (NOW - timedelta(minutes=2)).isoformat(),
+        }
+        with mock.patch.object(
+            MODULE.subprocess,
+            "run",
+            return_value=self._controller_runs(cancelled, completed_success),
+        ):
+            result = MODULE._observe_queue_controller("JovieInc/Jovie")
+
+        self.assertEqual(result["status"], "green")
+        self.assertEqual(result["runId"], 41)
+        self.assertEqual(result["conclusion"], "success")
+
+        health = MODULE.evaluate_closure_health(
+            snapshot(controller=result),
+            previous=None,
+            now=NOW,
+        )
+        self.assertEqual(health["status"], "healthy")
+        self.assertNotIn("controller", health["episodes"])
+
+    def test_cancelled_latest_run_keeps_latest_verdict_failure_red(self):
+        cancelled = {
+            "id": 43,
+            "status": "completed",
+            "conclusion": "cancelled",
+            "html_url": "https://example.test/run/43",
+            "updated_at": NOW.isoformat(),
+        }
+        completed_failure = {
+            "id": 41,
+            "status": "completed",
+            "conclusion": "failure",
+            "html_url": "https://example.test/run/41",
+            "updated_at": (NOW - timedelta(minutes=2)).isoformat(),
+        }
+        with mock.patch.object(
+            MODULE.subprocess,
+            "run",
+            return_value=self._controller_runs(cancelled, completed_failure),
+        ):
+            result = MODULE._observe_queue_controller("JovieInc/Jovie")
+
+        self.assertEqual(result["status"], "failed")
+        self.assertEqual(result["runId"], 41)
+
+        stalled = snapshot(controller=result)
+        first = MODULE.evaluate_closure_health(stalled, previous=None, now=NOW)
+        self.assertEqual(first["status"], "grace")
+        later = MODULE.evaluate_closure_health(
+            stalled,
+            previous=first,
+            now=NOW + timedelta(minutes=11),
+        )
+        self.assertEqual(later["status"], "red")
+        self.assertIn("queue-controller-red-over-10m", later["reasons"])
+
+    def test_only_cancelled_and_active_runs_stay_recovering(self):
+        in_flight = {
+            "id": 44,
+            "status": "in_progress",
+            "conclusion": None,
+            "html_url": "https://example.test/run/44",
+            "updated_at": NOW.isoformat(),
+        }
+        cancelled = {
+            "id": 43,
+            "status": "completed",
+            "conclusion": "cancelled",
+            "html_url": "https://example.test/run/43",
+            "updated_at": (NOW - timedelta(minutes=1)).isoformat(),
+        }
+        with mock.patch.object(
+            MODULE.subprocess,
+            "run",
+            return_value=self._controller_runs(in_flight, cancelled),
+        ):
+            result = MODULE._observe_queue_controller("JovieInc/Jovie")
+
+        self.assertEqual(result["status"], "recovering")
+        self.assertEqual(result["runId"], 44)
 
 
 if __name__ == "__main__":
