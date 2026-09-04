@@ -1,11 +1,11 @@
 #!/usr/bin/env python3
-"""Typed compatibility boundary between Gem callers and the fleet gate."""
-
 from __future__ import annotations
 
 import json
 import hashlib
 import pathlib
+import re
+from datetime import datetime, timedelta, timezone
 from typing import Any
 
 
@@ -17,10 +17,114 @@ INDEPENDENT_REVIEW_SCOPE = "exact-main-head"
 CLOSURE_HEALTH_SCHEMA = "jovie-closure-health/v1"
 CLOSURE_HEALTH_AUTHORITY = "Summer"
 JOVIE_REPO = "JovieInc/Jovie"
+CAPACITY_SCHEMA = "gem-concurrency-evidence/v1"
+PROOF_SCHEMA = "symphony-useful-turn-proof/v1"
+CAPACITY_SOURCE = "execution-proven-useful-turns"
+CAPACITY_MAX_AGE = timedelta(hours=24)
+CAPACITY_MAX_TARGET = 40
+SHA256 = re.compile(r"^[0-9a-f]{64}$")
 
 
 class GateContractError(RuntimeError):
-    """The gate process and its typed receipt disagree or are malformed."""
+    pass
+
+
+def _parse_time(value: object) -> datetime | None:
+    if not isinstance(value, str):
+        return None
+    try:
+        return datetime.fromisoformat(value.replace("Z", "+00:00")).astimezone(
+            timezone.utc
+        )
+    except (ValueError, OverflowError):
+        return None
+
+
+def validate_useful_turn_proof(
+    value: object, now: datetime, max_age: timedelta = CAPACITY_MAX_AGE
+) -> tuple[dict[str, Any] | None, str]:
+    if not isinstance(value, dict) or value.get("schema") != PROOF_SCHEMA:
+        return None, "malformed"
+    strings = [value.get(key) for key in ("provider", "profile", "model")]
+    completed_at = _parse_time(value.get("completedAt"))
+    completion = any(
+        isinstance(value.get(key), int)
+        and not isinstance(value.get(key), bool)
+        and value.get(key) > 0
+        for key in ("outputBytes", "outputTokens")
+    )
+    if not all(isinstance(item, str) and item.strip() for item in strings):
+        return None, "malformed"
+    if value.get("rc") != 0:
+        return None, "failed"
+    if value.get("useful") is not True:
+        return None, "non-useful"
+    if not isinstance(value.get("outputDigest"), str) or not SHA256.fullmatch(
+        value["outputDigest"]
+    ):
+        return None, "missing-output-digest"
+    if not completion:
+        return None, "completion-unproven"
+    if completed_at is None or not timedelta(0) <= now - completed_at <= max_age:
+        return None, "stale-or-future"
+    return {
+        "schema": PROOF_SCHEMA,
+        "provider": strings[0].strip(),
+        "profile": strings[1].strip(),
+        "model": strings[2].strip(),
+        "rc": 0,
+        "useful": True,
+        "completedAt": completed_at.isoformat().replace("+00:00", "Z"),
+        "outputDigest": value["outputDigest"],
+        "outputBytes": value.get("outputBytes", 0),
+        "outputTokens": value.get("outputTokens", 0),
+    }, "accepted"
+
+
+def accepted_useful_turn_proofs(
+    rows: list[object], now: datetime, max_age: timedelta = CAPACITY_MAX_AGE
+) -> tuple[list[dict[str, Any]], dict[str, int]]:
+    by_seat: dict[tuple[str, str, str], dict[str, Any]] = {}
+    rejected: dict[str, int] = {}
+    for row in rows:
+        proof, reason = validate_useful_turn_proof(row, now, max_age)
+        if proof is None:
+            rejected[reason] = rejected.get(reason, 0) + 1
+            continue
+        seat = (proof["provider"], proof["profile"], proof["model"])
+        prior = by_seat.get(seat)
+        if prior is None or proof["completedAt"] > prior["completedAt"]:
+            by_seat[seat] = proof
+    return [by_seat[key] for key in sorted(by_seat)], rejected
+
+
+def validate_capacity_receipt(
+    value: object, now: datetime, max_age: timedelta = CAPACITY_MAX_AGE
+) -> tuple[bool, str, list[dict[str, Any]]]:
+    if not isinstance(value, dict) or value.get("schema") != CAPACITY_SCHEMA:
+        return False, "capacity-evidence-malformed", []
+    if value.get("source") != CAPACITY_SOURCE:
+        return False, "capacity-evidence-source-untrusted", []
+    observed_at = _parse_time(value.get("observedAt"))
+    if observed_at is None or not timedelta(0) <= now - observed_at <= max_age:
+        return False, "capacity-evidence-stale-or-future", []
+    rows = value.get("acceptedEvidence")
+    if not isinstance(rows, list):
+        return False, "capacity-evidence-proof-rows-missing", []
+    proofs, rejected = accepted_useful_turn_proofs(rows, now, max_age)
+    target = value.get("target")
+    if (
+        rejected
+        or len(proofs) != len(rows)
+        or target != len(proofs)
+        or not isinstance(target, int)
+        or isinstance(target, bool)
+        or target > CAPACITY_MAX_TARGET
+    ):
+        return False, "capacity-evidence-target-proof-mismatch", []
+    if not proofs or value.get("approved") is not True or value.get("severeIncidents") != 0:
+        return False, "capacity-evidence-zero-proof", []
+    return True, CAPACITY_SOURCE, proofs
 
 
 def _is_jovie_repo(repo: str) -> bool:
@@ -36,17 +140,13 @@ def _repo_key(repo: str) -> str:
 
 
 def gate_state_dir(root: pathlib.Path, repo: str) -> pathlib.Path:
-    """Keep the Jovie authority receipt stable across multi-repo drain cycles."""
     base = root / "state" / "gem-priority-gate"
     if _is_jovie_repo(repo):
         return base
-    # Sibling directories retain the gate's shared ROOT/state/integrity.json and
-    # ROOT/.gem-ship-paused-pr-queue authority while avoiding latest.json collisions.
     return base.with_name(f"{base.name}-{_repo_key(repo)}")
 
 
 def drain_state_dir(root: pathlib.Path, repo: str) -> pathlib.Path:
-    """Preserve Jovie's legacy artifact while isolating every other repository."""
     base = root / "state" / "gem-pr-drain"
     return base if _is_jovie_repo(repo) else base.with_name(f"{base.name}-{_repo_key(repo)}")
 
@@ -68,7 +168,6 @@ def _typed_allowed(receipt: dict[str, Any], consumer: str) -> bool:
 
 
 def validate_gate_result(returncode: int, stdout: str, consumer: str) -> dict[str, Any]:
-    """Validate schema and require exit 0/2 to match typed admission exactly."""
     try:
         receipt = json.loads(stdout)
     except json.JSONDecodeError as error:
@@ -210,12 +309,8 @@ def validate_gate_result(returncode: int, stdout: str, consumer: str) -> dict[st
         raise GateContractError("capacity evidence acceptance is missing or is not boolean")
     if not isinstance(new_mutation_allowed, bool):
         raise GateContractError("new mutation admission is missing or is not boolean")
-    # symphony-concurrency-autoscale-v1: mutation admission follows the
-    # fleet state, not the presence of a capacity file. Non-RED receipts
-    # always carry at least the runtime floor; RED (severe integrity) is the
-    # only state that zeroes mutation.
-    if new_mutation_allowed is not (state != "RED"):
-        raise GateContractError("new mutation admission must follow non-RED fleet state")
+    if new_mutation_allowed is not (state != "RED" and capacity_accepted):
+        raise GateContractError("new mutation admission requires execution-proven capacity")
     capacity_signal = receipt.get("signals", {}).get("concurrencyEvidence") or {}
     capacity_signal_accepted = (
         capacity_signal.get("accepted") if isinstance(capacity_signal, dict) else None
@@ -224,11 +319,19 @@ def validate_gate_result(returncode: int, stdout: str, consumer: str) -> dict[st
         raise GateContractError("capacity evidence signal acceptance is not boolean")
     if capacity_signal_accepted is not capacity_accepted:
         raise GateContractError("capacity evidence signal and admission disagree")
+    if capacity_accepted:
+        proof_rows = capacity_signal.get("acceptedEvidence")
+        if (
+            capacity_signal.get("source") != "execution-proven-useful-turns"
+            or not isinstance(proof_rows, list)
+            or capacity_signal.get("target") != len(proof_rows)
+        ):
+            raise GateContractError("accepted capacity lacks cross-checked useful-turn rows")
     runtime_floor = gem_concurrency.get("runtimeFloor")
     if isinstance(runtime_floor, bool) or runtime_floor != 1:
         raise GateContractError("runtimeFloor must admit exactly one local repair")
-    if push_allowed != (state != "RED"):
-        raise GateContractError("remote remediation must follow non-RED fleet state")
+    if push_allowed != (state != "RED" and capacity_accepted):
+        raise GateContractError("remote remediation requires execution-proven capacity")
     remote_update_listed = "expected-head-pr-update" in remediation.get("activities", [])
     if remote_update_listed is not push_allowed:
         raise GateContractError("remote remediation activity contradicts push admission")
@@ -239,16 +342,14 @@ def validate_gate_result(returncode: int, stdout: str, consumer: str) -> dict[st
     if isinstance(gem_maximum, bool) or not isinstance(gem_maximum, int) or gem_maximum < 0:
         raise GateContractError("Gem mutation concurrency must be a non-negative integer")
     if state != "RED":
-        if gem_maximum < runtime_floor:
-            raise GateContractError(
-                "capacity must never zero a non-RED factory (symphony-concurrency-autoscale-v1)"
-            )
-        if not capacity_accepted and gem_maximum != runtime_floor:
-            raise GateContractError("missing capacity evidence must run at the runtime floor")
+        if not capacity_accepted and gem_maximum != 0:
+            raise GateContractError("unproven capacity must close dispatch")
+        if capacity_accepted and gem_maximum < runtime_floor:
+            raise GateContractError("accepted capacity is below the configured floor")
         if maximum != gem_maximum:
             raise GateContractError("remediation concurrency contradicts Gem concurrency")
-    elif maximum != runtime_floor:
-        raise GateContractError("RED must bound local remediation to one")
+    elif maximum != 0:
+        raise GateContractError("RED must close dispatch")
     if remediation.get("authority") != "single-pr-writer-exact-head":
         raise GateContractError("remediation authority must require one exact-head writer")
     reasons = receipt.get("reasons")

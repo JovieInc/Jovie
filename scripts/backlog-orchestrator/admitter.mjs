@@ -409,12 +409,40 @@ function deploymentBound(mainSha, deployedSha) {
   );
 }
 
-/**
- * symphony-concurrency-autoscale-v1: concurrency autoscales from the live-seat
- * receipt with no upper clamp and no clean-run ratchet. Missing, malformed,
- * or stale evidence degrades to the runtime floor (one seat) instead of
- * zeroing the factory; only a RED fleet state blocks mutation.
- */
+function usefulTurnProofs(evidence, nowMs, maxAgeMs) {
+  if (
+    evidence?.schema !== GEM_CONCURRENCY_EVIDENCE_SCHEMA ||
+    evidence?.source !== 'execution-proven-useful-turns' ||
+    !Array.isArray(evidence?.acceptedEvidence) ||
+    !isFreshTimestamp(evidence?.observedAt, nowMs, maxAgeMs)
+  ) {
+    return null;
+  }
+  const seats = new Set();
+  for (const proof of evidence.acceptedEvidence) {
+    const strings = [proof?.provider, proof?.profile, proof?.model];
+    const completionProven =
+      (Number.isInteger(proof?.outputBytes) && proof.outputBytes > 0) ||
+      (Number.isInteger(proof?.outputTokens) && proof.outputTokens > 0);
+    if (
+      proof?.schema !== 'symphony-useful-turn-proof/v1' ||
+      strings.some(value => typeof value !== 'string' || !value.trim()) ||
+      proof?.rc !== 0 ||
+      proof?.useful !== true ||
+      !/^[0-9a-f]{64}$/.test(proof?.outputDigest || '') ||
+      !completionProven ||
+      !isFreshTimestamp(proof?.completedAt, nowMs, maxAgeMs)
+    ) {
+      return null;
+    }
+    const seat = strings.map(value => value.trim()).join('\u0000');
+    if (seats.has(seat)) return null;
+    seats.add(seat);
+  }
+  return evidence.target === seats.size ? [...seats] : null;
+}
+
+/** Use only fresh, digest-bound useful turns as dispatch capacity. */
 export function resolveGemConcurrency(
   evidence,
   {
@@ -424,24 +452,27 @@ export function resolveGemConcurrency(
 ) {
   const nowMs = Date.parse(now);
   const measuredTarget = evidence?.target;
+  const acceptedEvidence = usefulTurnProofs(evidence, nowMs, maxAgeMs);
   const evidenceAccepted =
-    evidence?.schema === GEM_CONCURRENCY_EVIDENCE_SCHEMA &&
+    acceptedEvidence !== null &&
     Number.isInteger(measuredTarget) &&
     measuredTarget >= CAPACITY_POLICY.minimum &&
+    measuredTarget <= CAPACITY_POLICY.maximum &&
     evidence?.approved === true &&
     evidence?.severeIncidents === 0 &&
     isFreshTimestamp(evidence?.observedAt, nowMs, maxAgeMs);
 
   return {
-    maxConcurrent: evidenceAccepted ? measuredTarget : CAPACITY_POLICY.minimum,
+    maxConcurrent: evidenceAccepted ? measuredTarget : 0,
     runtimeFloor: CAPACITY_POLICY.minimum,
     baseline: DEFAULT_GEM_CONCURRENCY,
     evidenceAccepted,
-    newMutationAllowed: true,
+    newMutationAllowed: evidenceAccepted,
     preserveQueuedWork: CAPACITY_POLICY.preserveQueuedWork,
+    acceptedEvidence: evidenceAccepted ? evidence.acceptedEvidence : [],
     reason: evidenceAccepted
-      ? 'live-seat-capacity'
-      : 'capacity-evidence-missing-runtime-floor',
+      ? 'execution-proven-useful-turns'
+      : 'capacity-evidence-unproven-dispatch-closed',
   };
 }
 
@@ -658,7 +689,10 @@ export function evaluateFleetGate(
         ? ['tests', 'review']
         : [
             ...(newMutationAllowed ? ['approved-issue-lease'] : []),
-            ...FLEET_AUTHORITY.AMBER,
+            ...FLEET_AUTHORITY.AMBER.filter(
+              activity =>
+                newMutationAllowed || activity !== 'isolated-implementation'
+            ),
           ];
   const holdIntakeAllowed =
     state === FLEET_GATE_STATE.AMBER &&
