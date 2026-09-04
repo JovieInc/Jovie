@@ -1516,7 +1516,7 @@ def evaluate(signals: dict[str, Any], observed_at: str) -> dict[str, Any]:
             if unbound_repair_allowed
             else None,
             "scope": "event-scoped-exact-pr-head-with-bound-repair-attestation",
-            "maxConcurrent": unbound_repair_concurrency,
+            "maxConcurrent": unbound_repair_concurrency if unbound_repair_allowed else 0,
             "deploymentsAllowed": False,
             "authority": "canonical-merge-queue-controller",
         },

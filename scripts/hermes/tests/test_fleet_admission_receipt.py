@@ -1,6 +1,4 @@
 #!/usr/bin/env python3
-"""Bounded fleet admission projection for Auto-Enroll transport."""
-
 from __future__ import annotations
 
 import base64
@@ -264,6 +262,7 @@ class FleetAdmissionReceiptTests(unittest.TestCase):
         self.assertFalse(blocked["isolatedPromotionAdmission"]["allowed"])
         self.assertNotIn("stackHealth", blocked["signals"]["closureHealth"])
         self.assertNotIn("repairActions", blocked["signals"]["closureHealth"])
+        self.assertEqual(blocked["productionUnboundRepairAdmission"]["maxConcurrent"], 0)
 
     def test_unbound_repair_receipt_accepts_max_concurrent_above_one(self):
         hold = evaluate_receipt(

@@ -168,7 +168,7 @@ def _require_unbound_repair_max_concurrent(value: object, *, allowed: bool) -> i
         or not isinstance(value, int)
         or value < 0
         or value > UNBOUND_REPAIR_MAX_CONCURRENT_CEILING
-        or (allowed and value == 0)
+        or (value == 0) == allowed
     ):
         raise AdmissionProjectionError("unbound repair maxConcurrent is invalid")
     return value
@@ -185,7 +185,7 @@ def _project_unbound_repair(value: object, promotion_mode: str) -> dict[str, Any
             "condition": None,
             "mainSha": None,
             "deployedSha": None,
-            "maxConcurrent": 1,
+            "maxConcurrent": 0,
             "deploymentsAllowed": False,
         }
     admission = _require_mapping(value, "productionUnboundRepairAdmission")
