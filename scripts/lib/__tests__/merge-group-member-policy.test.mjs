@@ -218,10 +218,10 @@ describe('merge-group member discovery', () => {
       resolveMergeGroupMembers({
         event: event(),
         comparison: comparison(
-          Array.from({ length: 11 }, () => commit(HEAD, BASE, 102))
+          Array.from({ length: 6 }, () => commit(HEAD, BASE, 102))
         ),
       })
-    ).toThrow(/exceeds trusted 10-member bound/);
+    ).toThrow(/exceeds trusted 5-member bound/);
   });
 
   it('requires current open main-bound PR metadata after discovery', () => {

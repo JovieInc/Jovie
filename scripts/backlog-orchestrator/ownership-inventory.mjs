@@ -18,7 +18,7 @@ export const LOGYOURBODY_EXECUTION_REPO = 'JovieInc/LogYourBody';
 const CONTROL_PLANE_PREFIXES = [
   'canon/',
   'scripts/backlog-orchestrator/',
-  'scripts/hermes/',
+  'scripts/symphony/',
 ];
 
 const WORK_SECTION_NAMES = [
@@ -125,7 +125,7 @@ export function laneForArtifact(artifact) {
     return 'web';
   if (
     normalized.startsWith('scripts/backlog-orchestrator/') ||
-    normalized.startsWith('scripts/hermes/') ||
+    normalized.startsWith('scripts/symphony/') ||
     normalized.startsWith('scripts/lib/ci-') ||
     normalized.startsWith('scripts/lib/merge-queue') ||
     normalized.startsWith('scripts/lib/merge-group') ||

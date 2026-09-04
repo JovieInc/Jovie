@@ -28,7 +28,7 @@ describe('product lane classifier', () => {
       packageJsonAfter: JSON.stringify({
         scripts: {
           'invariants:check':
-            'node scripts/invariants/validate.mjs && python3 scripts/hermes/tests/codex-account-probe.test.py',
+            'node scripts/invariants/validate.mjs && python3 scripts/symphony/tests/codex-account-probe.test.py',
           'ios:test': 'bash apps/ios/scripts/run-xcodebuild.sh test',
         },
       }),
@@ -76,9 +76,9 @@ describe('product lane classifier', () => {
 
     for (const addition of [
       'node scripts/untrusted.mjs',
-      'python3 scripts/hermes/tests/../untrusted.test.py',
-      'python3 scripts/hermes/tests/probe.test.py --flag',
-      'python3 scripts/hermes/tests/probe.test.py; node scripts/untrusted.mjs',
+      'python3 scripts/symphony/tests/../untrusted.test.py',
+      'python3 scripts/symphony/tests/probe.test.py --flag',
+      'python3 scripts/symphony/tests/probe.test.py; node scripts/untrusted.mjs',
     ]) {
       const beforeCommand = 'node scripts/invariants/validate.mjs';
       const untrustedAddition = classifyProductLanes(['package.json'], {
@@ -239,7 +239,7 @@ describe('product lane classifier', () => {
 
       writeFileSync(
         join(root, 'package.json'),
-        `${JSON.stringify({ scripts: { 'invariants:check': 'node before.mjs && python3 scripts/hermes/tests/codex-account-probe.test.py' } }, null, 2)}\n`
+        `${JSON.stringify({ scripts: { 'invariants:check': 'node before.mjs && python3 scripts/symphony/tests/codex-account-probe.test.py' } }, null, 2)}\n`
       );
       git(['add', 'package.json']);
       git(['commit', '-q', '-m', 'after']);
