@@ -14,8 +14,8 @@ const PATHS = Object.freeze({
   nur: 'scripts/backlog-orchestrator/no-unattended-red.mjs',
 });
 
-const HUMAN_ENROLL_BLOCK = /needs-human" or \. == "hold" or \. == "gated"/;
-const HUMAN_SELECTOR = /'needs-human',\s*'hold',\s*'gated'/;
+const ADVISORY_REVIEW_ENROLL_BLOCK = /needs-human" or \. == "gated"/;
+const ADVISORY_REVIEW_SELECTOR = /'needs-human',\s*'gated'/;
 const GRAPHITE_LIVE_TRANSPORT = /\bgt\s+(mq|stack|submit|merge)\b/;
 const RETIRED_QUEUE_LABEL = /then add `merge-queue`/;
 
@@ -59,14 +59,24 @@ export function validateFleetAutonomy(
   if (!drain.includes('RETARGET (base must be main)')) {
     errors.push('drain-pr-queue.sh must retarget non-main PRs onto main');
   }
-  if (HUMAN_ENROLL_BLOCK.test(drain)) {
+  if (ADVISORY_REVIEW_ENROLL_BLOCK.test(drain)) {
     errors.push(
-      'drain-pr-queue.sh must not skip enrollment for needs-human/hold/gated'
+      'drain-pr-queue.sh must not skip enrollment for needs-human/gated'
     );
   }
-  if (HUMAN_SELECTOR.test(backend)) {
+  if (ADVISORY_REVIEW_SELECTOR.test(backend)) {
     errors.push(
-      'merge-queue-backend.mjs must not treat needs-human/hold/gated as selector hard holds'
+      'merge-queue-backend.mjs must not treat needs-human/gated as selector hard holds'
+    );
+  }
+  if (!drain.includes('`hold`, queue-deferred')) {
+    errors.push(
+      'drain-pr-queue.sh must preserve the explicit founder-controlled hold label'
+    );
+  }
+  if (!backend.includes("'hold',\n  'queue-deferred'")) {
+    errors.push(
+      'merge-queue-backend.mjs must treat hold as a selector hard hold'
     );
   }
   if (!workflow.includes('name: PR targets main')) {

@@ -161,6 +161,7 @@ def _write_native_receipt_fakes(
               changelog-collision) printf '%s\\n' '{json.dumps(changelog_collision_result)}' ;;
               changelog-inventory) echo '{{"schema":"jovie-pre-land-changelog/v1","ok":true,"reason":"explicit","prs":[],"count":0}}' ;;
               changelog-drain) echo '{{"action":"keep","reason":"omits-changelog","reenqueue":false}}' ;;
+              reconcile-snapshot) cat >/dev/null; echo '{{"summary":{{"CLEAN":0,"UNSTABLE":0,"BLOCKED":0,"DIRTY":0,"hardGated":0,"nonMain":0}},"dequeue":[]}}' ;;
               --classify-queue) echo '[]' ;;
               *) echo "unexpected node args: $*" >&2; exit 2 ;;
             esac
@@ -377,6 +378,7 @@ def _write_null_creator_receipt_drain(
               changelog-collision) echo '{{"action":"allow","reason":"candidate-omits-changelog"}}' ;;
               changelog-inventory) echo '{{"schema":"jovie-pre-land-changelog/v1","ok":true,"reason":"explicit","prs":[],"count":0}}' ;;
               changelog-drain) echo '{{"action":"keep","reason":"omits-changelog","reenqueue":false}}' ;;
+              reconcile-snapshot) cat >/dev/null; echo '{{"summary":{{"CLEAN":0,"UNSTABLE":0,"BLOCKED":0,"DIRTY":0,"hardGated":0,"nonMain":0}},"dequeue":[]}}' ;;
               --classify-queue) echo '[]' ;;
               *) echo "unexpected node args: $*" >&2; exit 93 ;;
             esac
@@ -1039,6 +1041,7 @@ class TestExactHeadQueueReceipt:
                   changelog-collision) echo '{{"action":"allow","reason":"candidate-omits-changelog"}}' ;;
                   changelog-inventory) echo '{{"schema":"jovie-pre-land-changelog/v1","ok":true,"reason":"explicit","prs":[],"count":0}}' ;;
                   changelog-drain) echo '{{"action":"keep","reason":"omits-changelog","reenqueue":false}}' ;;
+                  reconcile-snapshot) cat >/dev/null; echo '{{"summary":{{"CLEAN":0,"UNSTABLE":0,"BLOCKED":0,"DIRTY":0,"hardGated":0,"nonMain":0}},"dequeue":[]}}' ;;
                   --classify-queue) echo '[]' ;;
                   *) echo "unexpected node args: $*" >&2; exit 93 ;;
                 esac
@@ -1114,6 +1117,7 @@ class TestExactHeadQueueReceipt:
                 case "${{2:-}}" in
                   preflight) exit 0 ;;
                   list-state) echo '{{"16070":{{"headRefOid":"{new_head}","isDraft":false,"mergeable":"MERGEABLE","mergeStateStatus":"CLEAN","baseRefName":"main","labels":{{"nodes":[]}},"queued":false,"isInMergeQueue":false,"mergeQueueEntry":null}}}}' ;;
+                  reconcile-snapshot) cat >/dev/null; echo '{{"summary":{{"CLEAN":0,"UNSTABLE":0,"BLOCKED":0,"DIRTY":0,"hardGated":0,"nonMain":0}},"dequeue":[]}}' ;;
                   max-queue-depth) echo 16 ;;
                   front-churn) echo '{{"action":"allow","reason":"new head has no failed attempt","evidence":null}}' ;;
                   unmergeable-eject) echo '{{"action":"keep","reason":"not-queued"}}' ;;
@@ -1200,6 +1204,7 @@ class TestExactHeadQueueReceipt:
                   explain-selector) cat >/dev/null; echo '{{"observed":true,"queued":false,"eligible":true,"reason":"eligible"}}' ;;
                   prove-receipt) echo '{{"ok":false,"state":{{"queued":false}},"explanation":{{"reason":"not-queued"}}}}' ;;
                   enroll) echo "classified product failure must not enroll" >&2; exit 91 ;;
+                  reconcile-snapshot) cat >/dev/null; echo '{{"summary":{{"CLEAN":0,"UNSTABLE":0,"BLOCKED":0,"DIRTY":0,"hardGated":0,"nonMain":0}},"dequeue":[]}}' ;;
                   dequeue) echo '{{"state":{{"queued":false}}}}' ;;
                   max-queue-depth) echo 16 ;;
                   front-churn) echo '{{"action":"block","reason":"unchanged head failed product checks","evidence":{{"failureClass":"repeated-product-check"}}}}' ;;
@@ -1299,6 +1304,7 @@ class TestExactHeadQueueReceipt:
                   dequeue) printf 'dequeue\n' >>'{mutation_order}'; echo '{{"state":{{"queued":false}}}}' ;;
                   max-queue-depth) echo 16 ;;
                   front-churn) echo '{{"action":"block","reason":"unchanged head failed product checks","evidence":{{"failureClass":"deterministic-product-check"}}}}' ;;
+                  reconcile-snapshot) cat >/dev/null; echo '{{"summary":{{"CLEAN":0,"UNSTABLE":0,"BLOCKED":0,"DIRTY":0,"hardGated":0,"nonMain":0}},"dequeue":[]}}' ;;
                   unmergeable-eject) echo '{{"action":"keep","reason":"not-unmergeable"}}' ;;
                   changelog-collision) echo '{{"action":"allow","reason":"candidate-omits-changelog"}}' ;;
                   changelog-inventory) echo '{{"schema":"jovie-pre-land-changelog/v1","ok":true,"reason":"explicit","prs":[],"count":0}}' ;;
@@ -1731,6 +1737,7 @@ class TestDrainPrQueueWiring:
                 case "${{2:-}}" in
                   preflight) exit 0 ;;
                   list-state) echo '{{"101":{{"headRefOid":"{head}","isDraft":false,"mergeable":"MERGEABLE","mergeStateStatus":"CLEAN","baseRefName":"main","labels":{{"nodes":[]}},"queued":false}}}}' ;;
+                  reconcile-snapshot) cat >/dev/null; echo '{{"summary":{{"CLEAN":0,"UNSTABLE":0,"BLOCKED":0,"DIRTY":0,"hardGated":0,"nonMain":0}},"dequeue":[]}}' ;;
                   enroll) echo '{{"state":{{"state":"OPEN","isDraft":false,"headRefOid":"{head}","mergeQueueEntry":{{"id":"MQE_1","state":"AWAITING_CHECKS","position":1}}}}}}' ;;
                   dequeue) echo '{{"state":{{"queued":false}}}}' ;;
                   max-queue-depth) echo 16 ;;
@@ -1860,6 +1867,7 @@ class TestDrainPrQueueWiring:
                     fi
                     echo '{{"state":{{"queued":false}}}}'
                     ;;
+                  reconcile-snapshot) cat >/dev/null; echo '{{"summary":{{"CLEAN":0,"UNSTABLE":0,"BLOCKED":0,"DIRTY":0,"hardGated":0,"nonMain":0}},"dequeue":[]}}' ;;
                   max-queue-depth) echo 16 ;;
                   unmergeable-eject) echo '{{"action":"keep","reason":"not-queued"}}' ;;
                   unmergeable-reenqueue) echo '{{"action":"allow","reason":"no-eject-receipt"}}' ;;
@@ -1959,6 +1967,7 @@ class TestDrainPrQueueWiring:
                     echo "{{\\"state\\":{{\\"state\\":\\"OPEN\\",\\"isDraft\\":false,\\"headRefOid\\":\\"$head_var\\",\\"mergeQueueEntry\\":{{\\"id\\":\\"MQE_${{3}}\\",\\"state\\":\\"AWAITING_CHECKS\\",\\"position\\":1}}}}}}"
                     ;;
                   dequeue) echo '{{"state":{{"queued":false}}}}' ;;
+                  reconcile-snapshot) cat >/dev/null; echo '{{"summary":{{"CLEAN":0,"UNSTABLE":0,"BLOCKED":0,"DIRTY":0,"hardGated":0,"nonMain":0}},"dequeue":[]}}' ;;
                   max-queue-depth) echo 16 ;;
                   unmergeable-eject) echo '{{"action":"keep","reason":"not-queued"}}' ;;
                   unmergeable-reenqueue) echo '{{"action":"allow","reason":"no-eject-receipt"}}' ;;
@@ -2111,6 +2120,7 @@ JSON
                   changelog-collision) echo '{{"action":"allow","reason":"candidate-omits-changelog"}}' ;;
                   changelog-inventory) echo '{{"schema":"jovie-pre-land-changelog/v1","ok":true,"reason":"explicit","prs":[],"count":0}}' ;;
                   changelog-drain) echo '{{"action":"keep","reason":"omits-changelog","reenqueue":false}}' ;;
+                  reconcile-snapshot) exec "{real_node}" "$@" ;;
                   --classify-queue) exec "{real_node}" "$@" ;;
                   *) echo "unexpected node args: $*" >&2; exit 2 ;;
                 esac
@@ -2265,6 +2275,7 @@ JSON
                 case "${{2:-}}" in
                   preflight) exit 0 ;;
                   list-state) echo '{{"1001":{{"headRefOid":"{snapshot_head}","isDraft":false,"mergeable":"MERGEABLE","mergeStateStatus":"CLEAN","baseRefName":"main","labels":{{"nodes":[]}},"queued":false}}}}' ;;
+                  reconcile-snapshot) cat >/dev/null; echo '{{"summary":{{"CLEAN":0,"UNSTABLE":0,"BLOCKED":0,"DIRTY":0,"hardGated":0,"nonMain":0}},"dequeue":[]}}' ;;
                   enroll) touch "{enrolled}"; exit 99 ;;
                   max-queue-depth) echo 16 ;;
                   unmergeable-eject) echo '{{"action":"keep","reason":"not-queued"}}' ;;
@@ -3023,7 +3034,7 @@ JSON
         result = _run_bash(_drain_command(tmp_path, extra_env="DRY_RUN=1"))
 
         assert result.returncode == 0, f"stdout={result.stdout}\nstderr={result.stderr}"
-        assert "=== DEQUEUE (hard gates" in result.stdout
+        assert "=== DEQUEUE (draft / held / source-red" in result.stdout
         assert "[dry-run] would -merge-queue on #16263" in result.stdout
         assert "would +merge-queue on #16263" not in result.stdout
         assert "{no-auto,merge-queue}" in result.stdout
@@ -3877,7 +3888,7 @@ JSON
         )
 
         assert result.returncode == 0, f"stdout={result.stdout}\nstderr={result.stderr}"
-        assert "=== DEQUEUE (hard gates" in result.stdout
+        assert "=== DEQUEUE (draft / held / source-red" in result.stdout
         assert "[dry-run] would -merge-queue on #102" in result.stdout
         assert "[dry-run] would -merge-queue on #103" in result.stdout
         assert "[dry-run] would +merge-queue on #101" in result.stdout

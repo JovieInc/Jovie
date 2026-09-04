@@ -13,6 +13,7 @@ import { describe, expect, it, vi } from 'vitest';
 import {
   CANONICAL_NATIVE_MUTATION_ACTOR,
   canAcceptExactHeadQueueReceipt,
+  classifyQueueReconciliation,
   DEFAULT_MERGE_QUEUE_BACKEND,
   dequeuePullRequest,
   enrollPullRequest,
@@ -20,6 +21,7 @@ import {
   explainExactHeadQueueReceipt,
   HARD_HOLD_LABELS,
   hasAuthoritativeExactHeadQueueReceipt,
+  isSourceRed,
   listPullRequestQueueStates,
   NO_AUTO_HOLD_LABELS,
   preflightMergeQueue,
@@ -83,6 +85,7 @@ function prState(overrides = {}) {
     number: 14359,
     state: 'OPEN',
     isDraft: false,
+    mergeStateStatus: 'CLEAN',
     headRefOid: HEAD,
     labels: { nodes: [] },
     isInMergeQueue: false,
@@ -662,7 +665,7 @@ describe('queue workflow mutation safety', () => {
       'NO_AUTO_HOLD_JQ=\'. == "no-auto" or . == "no-auto-merge" or . == "no-automerge"\''
     );
     expect(drain).toContain(
-      '(.state.labels.nodes // []) | map(.name) | any(. == "queue-deferred" or . == "needs-conflict-resolution" or . == "fast" or \'"$NO_AUTO_HOLD_JQ"\') | not'
+      '(.state.labels.nodes // []) | map(.name) | any(. == "hold" or . == "queue-deferred" or . == "needs-conflict-resolution" or . == "fast" or \'"$NO_AUTO_HOLD_JQ"\') | not'
     );
     expect(drain).toContain(
       'queue-noop: missing receipt: exact admission #$DRAIN_ADMISSION_PR at $DRAIN_ADMISSION_HEAD'
@@ -872,9 +875,9 @@ describe('queue workflow mutation safety', () => {
     expect(drain).toContain('.baseRefName == "main"');
     expect(drain).toContain('and (.base == "main")');
     expect(drain).toContain('select(.base=="main")');
-    expect(drain).toContain('def main_target: .base == "main"');
-    expect(drain).toContain('select(main_target and hard_gated)');
-    expect(drain).toContain('select(main_target | not)');
+    expect(drain).toContain('reconcile-snapshot <<<"$SNAP"');
+    expect(drain).toContain('"  hard-gated: \\(.hardGated)"');
+    expect(drain).toContain('"  non-main: \\(.nonMain)"');
   });
 
   it('revalidates the live head and hard gates before approval, then delegates enrollment', () => {
@@ -2044,6 +2047,7 @@ describe('exact-head queue receipt proof', () => {
     n: 16068,
     draft: false,
     m: 'MERGEABLE',
+    ms: 'CLEAN',
     base: 'main',
     fail: [],
     q: false,
@@ -2078,6 +2082,122 @@ describe('exact-head queue receipt proof', () => {
       },
     });
     expect(invokedEnrollment(runner)).toBe(false);
+  });
+
+  it('classifies exact native queue reconciliation from one parsed snapshot', () => {
+    const clean = { ...selectorRow, n: 17176, q: true, t: 'clean' };
+    const held = {
+      ...selectorRow,
+      n: 17175,
+      q: true,
+      t: 'founder held',
+      L: ['hold'],
+    };
+    const sourceRed = {
+      ...selectorRow,
+      n: 17195,
+      q: true,
+      t: 'source red',
+      ms: 'UNSTABLE',
+      fail: ['PR Ready'],
+    };
+
+    expect(classifyQueueReconciliation([clean, held, sourceRed])).toEqual({
+      summary: {
+        CLEAN: 2,
+        UNSTABLE: 1,
+        BLOCKED: 0,
+        DIRTY: 0,
+        hardGated: 1,
+        nonMain: 0,
+      },
+      dequeue: [
+        { n: 17175, t: 'founder held', reasons: ['held-by=hold'] },
+        {
+          n: 17195,
+          t: 'source red',
+          reasons: ['source-red=PR Ready'],
+        },
+      ],
+    });
+
+    expect(classifyQueueReconciliation([clean]).dequeue).toEqual([]);
+  });
+
+  it('rejects terminal source-check blockers without trusting aggregate merge state', () => {
+    const queuedSourceRed = prState({
+      mergeStateStatus: 'UNSTABLE',
+      isInMergeQueue: true,
+      mergeQueueEntry: QUEUE_ENTRY,
+      fail: ['PR Ready'],
+    });
+
+    expect(isSourceRed(queuedSourceRed)).toBe(true);
+    expect(canAcceptExactHeadQueueReceipt(queuedSourceRed, HEAD)).toBe(false);
+    expect(explainExactHeadQueueReceipt(queuedSourceRed, HEAD)).toEqual({
+      ok: false,
+      reason: 'source-red=PR Ready',
+    });
+    expect(
+      explainExactHeadAdmissionSelector({
+        snapshot: [{ ...selectorRow, ms: 'UNSTABLE', fail: ['PR Ready'] }],
+        admissionPr: 16068,
+        admissionHead: HEAD,
+        promotionMode: 'normal',
+        enrollSlots: 15,
+      })
+    ).toEqual({
+      observed: true,
+      queued: false,
+      eligible: false,
+      reason: 'failing-checks=PR Ready',
+    });
+  });
+
+  it('keeps aggregate UNSTABLE advisory when authoritative source blockers are empty', () => {
+    const queued = prState({
+      mergeStateStatus: 'UNSTABLE',
+      isInMergeQueue: true,
+      mergeQueueEntry: QUEUE_ENTRY,
+      fail: [],
+    });
+
+    expect(isSourceRed(queued)).toBe(false);
+    expect(canAcceptExactHeadQueueReceipt(queued, HEAD)).toBe(true);
+    expect(explainExactHeadQueueReceipt(queued, HEAD)).toEqual({
+      ok: true,
+      reason: 'queued',
+    });
+    expect(
+      explainExactHeadAdmissionSelector({
+        snapshot: [{ ...selectorRow, ms: 'UNSTABLE', fail: [] }],
+        admissionPr: 16068,
+        admissionHead: HEAD,
+        promotionMode: 'normal',
+        enrollSlots: 15,
+      })
+    ).toEqual({
+      observed: true,
+      queued: false,
+      eligible: true,
+      reason: 'eligible',
+    });
+  });
+
+  it('treats the exact hold label as native receipt and selector authority', () => {
+    const queuedHeld = prState({
+      labels: { nodes: [{ name: 'hold' }] },
+      isInMergeQueue: true,
+      mergeQueueEntry: QUEUE_ENTRY,
+    });
+
+    expect(HARD_HOLD_LABELS.has('hold')).toBe(true);
+    expect(SELECTOR_BLOCKING_LABELS.has('hold')).toBe(true);
+    expect(canAcceptExactHeadQueueReceipt(queuedHeld, HEAD)).toBe(false);
+    expect(explainExactHeadQueueReceipt(queuedHeld, HEAD)).toEqual({
+      ok: false,
+      reason: 'held-by=hold',
+    });
   });
 
   it('polls through delayed authoritative reads until the receipt appears', async () => {

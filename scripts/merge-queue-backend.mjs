@@ -54,14 +54,24 @@ export const NO_AUTO_HOLD_LABELS = Object.freeze([
   'no-auto-merge',
   'no-automerge',
 ]);
-// JOV-INV-023: human labels are not enrollment holds.
+// JOV-INV-023 keeps review/taste labels advisory and observation gaps
+// non-blocking. The explicit `hold` label is the founder-controlled exception:
+// current queue reconciliation must preserve it rather than auto-admit it.
 export const HARD_HOLD_LABELS = new Set([
+  'hold',
   'queue-deferred',
   'needs-conflict-resolution',
   'fast',
   ...NO_AUTO_HOLD_LABELS,
 ]);
+
+const QUEUE_RECONCILIATION_HOLD_LABELS = new Set([
+  'hold',
+  'queue-deferred',
+  ...NO_AUTO_HOLD_LABELS,
+]);
 export const SELECTOR_BLOCKING_LABELS = new Set([
+  'hold',
   'needs-conflict-resolution',
   'fast',
   ...NO_AUTO_HOLD_LABELS,
@@ -716,10 +726,75 @@ export function hardHoldLabels(state) {
   ];
 }
 
+function sourceRedBlockers(state) {
+  const blockers = Array.isArray(state?.fail) ? state.fail : [];
+  return blockers.filter(
+    blocker =>
+      typeof blocker === 'string' &&
+      blocker.length > 0 &&
+      blocker !== 'required check status unavailable' &&
+      !/ \((?:pending|missing|not successful|not complete|ambiguous latest attempt)\)$/.test(
+        blocker
+      )
+  );
+}
+
+export function isSourceRed(state) {
+  return sourceRedBlockers(state).length > 0;
+}
+
+export function classifyQueueReconciliation(snapshot) {
+  if (!Array.isArray(snapshot)) {
+    throw backendError(
+      'invalid_snapshot',
+      'Queue reconciliation snapshot must be an array'
+    );
+  }
+
+  const mainRows = snapshot.filter(row => row?.base === 'main');
+  const queuedRows = mainRows.filter(row => row?.q === true);
+  const hardGatedRows = mainRows.filter(row => {
+    const labels = Array.isArray(row?.L) ? row.L : [];
+    return labels.some(name => HARD_HOLD_LABELS.has(name));
+  });
+
+  const dequeue = queuedRows.flatMap(row => {
+    const labels = Array.isArray(row?.L) ? row.L : [];
+    const held = labels.filter(name =>
+      QUEUE_RECONCILIATION_HOLD_LABELS.has(name)
+    );
+    const reasons = [];
+    if (row?.draft === true) reasons.push('draft');
+    if (held.length > 0) reasons.push(`held-by=${held.join(',')}`);
+    if (isSourceRed(row)) {
+      reasons.push(`source-red=${sourceRedBlockers(row).join(',')}`);
+    }
+    return reasons.length === 0
+      ? []
+      : [{ n: row?.n, t: row?.t ?? '', reasons }];
+  });
+
+  const countState = state =>
+    queuedRows.filter(row => (row?.ms ?? '') === state).length;
+
+  return {
+    summary: {
+      CLEAN: countState('CLEAN'),
+      UNSTABLE: countState('UNSTABLE'),
+      BLOCKED: countState('BLOCKED'),
+      DIRTY: countState('DIRTY'),
+      hardGated: hardGatedRows.length,
+      nonMain: snapshot.length - mainRows.length,
+    },
+    dequeue,
+  };
+}
+
 export function canAcceptExactHeadQueueReceipt(state, expectedHeadOid) {
   return (
     hasAuthoritativeExactHeadQueueReceipt(state, expectedHeadOid) &&
-    hardHoldLabels(state).length === 0
+    hardHoldLabels(state).length === 0 &&
+    !isSourceRed(state)
   );
 }
 
@@ -779,6 +854,9 @@ export function explainExactHeadQueueReceipt(state, expectedHeadOid) {
   }
   if (held.length > 0) {
     parts.push(`held-by=${held.join(',')}`);
+  }
+  if (isSourceRed(state)) {
+    parts.push(`source-red=${sourceRedBlockers(state).join(',')}`);
   }
   return {
     ok: false,
@@ -953,7 +1031,7 @@ export async function proveExactHeadQueueReceipt({
     }
     if (
       hasAuthoritativeExactHeadQueueReceipt(state, expectedHead) &&
-      hardHoldLabels(state).length > 0
+      (hardHoldLabels(state).length > 0 || isSourceRed(state))
     ) {
       return {
         ok: false,
@@ -1015,6 +1093,12 @@ function assertEnrollCandidate(state, expectedHeadOid) {
       'held_pull_request',
       `PR #${state.number} is held by ${heldLabels.join(', ')}`,
       { labels: heldLabels }
+    );
+  }
+  if (isSourceRed(state)) {
+    throw backendError(
+      'source_red_pull_request',
+      `PR #${state.number} has terminal source blockers: ${sourceRedBlockers(state).join(', ')}`
     );
   }
 }
@@ -1260,7 +1344,7 @@ export async function runCli(
   // inherit MERGE_QUEUE_BACKEND=test-label-fixture and must still explain a
   // stale exact-head scope instead of failing closed on backend validation.
   const backend =
-    command === 'explain-selector'
+    command === 'explain-selector' || command === 'reconcile-snapshot'
       ? DEFAULT_MERGE_QUEUE_BACKEND
       : resolveMergeQueueBackend(
           env.MERGE_QUEUE_BACKEND ?? DEFAULT_MERGE_QUEUE_BACKEND
@@ -1295,6 +1379,7 @@ export async function runCli(
         promotionMode: args[2],
         enrollSlots: Number.parseInt(String(args[3]), 10),
       }),
+    'reconcile-snapshot': () => classifyQueueReconciliation(readStdinJson()),
     'prove-receipt': () =>
       proveExactHeadQueueReceipt({
         ...options,
@@ -1322,6 +1407,7 @@ export async function runCli(
       4,
       'explain-selector requires <number> <headSha> <promotionMode> <enrollSlots>',
     ],
+    'reconcile-snapshot': [0, 'reconcile-snapshot takes no arguments'],
     'prove-receipt': [2, 'prove-receipt requires <number> <headSha>'],
     enroll: [2, 'enroll requires <number> <headSha>'],
     dequeue: [1, 'dequeue requires <number>'],
@@ -1329,7 +1415,7 @@ export async function runCli(
   if (!Object.hasOwn(commands, command)) {
     throw backendError(
       'usage',
-      'Usage: merge-queue-backend.mjs <preflight|list-state|explain-selector|prove-receipt|enroll|dequeue>'
+      'Usage: merge-queue-backend.mjs <preflight|list-state|explain-selector|reconcile-snapshot|prove-receipt|enroll|dequeue>'
     );
   }
   const [argumentCount, usageMessage] = usage[command];

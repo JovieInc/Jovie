@@ -7,9 +7,9 @@ const RED_FILES = {
   'scripts/symphony/gem-priority-gate.py':
     'def observe_main(repo):\n    raise ValueError("Main Release Ready check is missing")\n',
   'scripts/drain-pr-queue.sh':
-    'select([.L[]] | any(. == "needs-human" or . == "hold" or . == "gated"))\ngt mq submit\n',
+    'select([.L[]] | any(. == "needs-human" or . == "gated"))\ngt mq submit\n',
   'scripts/merge-queue-backend.mjs':
-    "export const SELECTOR_BLOCKING_LABELS = new Set([\n  'needs-human',\n  'hold',\n  'gated',\n]);\n",
+    "export const SELECTOR_BLOCKING_LABELS = new Set([\n  'needs-human',\n  'gated',\n]);\n",
   '.github/workflows/pr-targets-main.yml':
     'name: Other\non:\n  pull_request:\n    branches: [main]\n',
   'scripts/backlog-orchestrator/admitter.mjs':
@@ -25,7 +25,7 @@ describe('JOV-INV-023 fleet autonomy', () => {
     assert.deepEqual(validateFleetAutonomy(), []);
   });
 
-  it('deliberate red: observation-gap freeze, human enrollment holds, and stacked bases are rejected', () => {
+  it('deliberate red: observation-gap freeze, advisory review holds, and stacked bases are rejected', () => {
     const errors = validateFleetAutonomy('/unused', {
       readFile: path => {
         if (!(path in RED_FILES)) throw new Error(`unexpected path ${path}`);
@@ -38,7 +38,8 @@ describe('JOV-INV-023 fleet autonomy', () => {
       /observe Main Release Ready from the CI workflow job/
     );
     assert.match(errors.join('\n'), /observation gap/);
-    assert.match(errors.join('\n'), /needs-human\/hold\/gated/);
+    assert.match(errors.join('\n'), /needs-human\/gated/);
+    assert.match(errors.join('\n'), /founder-controlled hold/);
     assert.match(errors.join('\n'), /every pull_request base/);
     assert.match(errors.join('\n'), /fail closed when base is not main/);
     assert.match(
