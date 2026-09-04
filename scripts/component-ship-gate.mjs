@@ -27,7 +27,7 @@ import { spawnSync } from 'node:child_process';
 import { existsSync } from 'node:fs';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import ts from 'typescript';
+import ts from 'typescript-legacy';
 import { runLiveStorybookCertification } from './component-live-storybook-certification.mjs';
 import { runRenderedCertification } from './component-rendered-certification.mjs';
 import {
