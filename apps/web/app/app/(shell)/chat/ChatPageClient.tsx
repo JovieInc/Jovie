@@ -24,6 +24,11 @@ import { NavigationDestinationReady } from '@/components/features/dashboard/Navi
 import { ChatWorkspaceSurface } from '@/components/jovie/ChatWorkspaceSurface';
 import type { FeatureIntroCatalog } from '@/components/jovie/feature-intro-contract';
 import { JovieChat } from '@/components/jovie/JovieChat';
+import {
+  CHAT_STARTER_ACTIONS,
+  type ChatStarterActionId,
+} from '@/components/jovie/starter-actions';
+import type { ChatActionCard } from '@/components/jovie/types';
 import { ContentSurfaceCard } from '@/components/molecules/ContentSurfaceCard';
 import { EmptyState } from '@/components/molecules/EmptyState';
 import { ErrorBoundary } from '@/components/providers/ErrorBoundary';
@@ -33,7 +38,6 @@ import { useSetHeaderActions } from '@/contexts/HeaderActionsContext';
 import { DASHBOARD_HEADER_ACTION_ICON_BUTTON_CLASS } from '@/features/dashboard/atoms/DashboardHeaderActionButton';
 import { RECOVERY_COPY } from '@/features/feedback/recovery-contract';
 import { useClipboard } from '@/hooks/useClipboard';
-import { CHAT_STARTER_CONVERSATIONS } from '@/lib/chat/new-chat-entry-contract';
 import {
   buildChatThreadRoute,
   isChatThreadSurfacePath,
@@ -70,7 +74,97 @@ type WelcomeChatBootstrapState =
   | 'done'
   | 'failed';
 
-type ActiveChatProfile = NonNullable<DashboardData['selectedProfile']>;
+type ChatActionProfile = NonNullable<DashboardData['selectedProfile']>;
+type ChatActionProfileCompletionSteps =
+  DashboardData['profileCompletion']['steps'];
+
+function normalizeCompletionPercentage(percentage: number): number {
+  if (!Number.isFinite(percentage)) {
+    return 0;
+  }
+
+  return Math.min(100, Math.max(0, Math.round(percentage)));
+}
+
+function profileDisplayName(profile: ChatActionProfile): string {
+  return (
+    profile.displayName?.trim() || profile.username?.trim() || 'this artist'
+  );
+}
+
+function hasProfileValue(value: string | null | undefined): boolean {
+  return typeof value === 'string' && value.trim().length > 0;
+}
+
+function hasConnectedMusicCatalog(profile: ChatActionProfile): boolean {
+  return (
+    hasProfileValue(profile.spotifyUrl) ||
+    hasProfileValue(profile.appleMusicUrl) ||
+    hasProfileValue(profile.youtubeUrl) ||
+    hasProfileValue(profile.spotifyId) ||
+    hasProfileValue(profile.appleMusicId) ||
+    hasProfileValue(profile.youtubeMusicId)
+  );
+}
+
+/**
+ * First-run / empty-thread scaffolding (JOV-3547). Always returns ≥3
+ * profile-aware starter actions so the empty chat never renders a bare
+ * "Ask Jovie..." box. Setup-gap cards lead when the profile is incomplete.
+ */
+export function buildChatActionCards({
+  profile,
+  profileCompletionPercentage,
+  profileCompletionSteps,
+}: {
+  readonly profile: ChatActionProfile;
+  readonly profileCompletionPercentage: number;
+  readonly profileCompletionSteps: ChatActionProfileCompletionSteps;
+}): readonly ChatActionCard[] {
+  const artistName = profileDisplayName(profile);
+  const completion = normalizeCompletionPercentage(profileCompletionPercentage);
+  const nextSetupStep = profileCompletionSteps[0]?.label;
+  const cards: ChatActionCard[] = [];
+
+  const addCard = (id: ChatStarterActionId, prompt?: string) => {
+    const action = CHAT_STARTER_ACTIONS[id];
+    cards.push({
+      id,
+      title: action.label,
+      body: action.description,
+      actionLabel: action.actionLabel,
+      prompt: prompt ?? action.prompt,
+    });
+  };
+
+  if (!hasConnectedMusicCatalog(profile)) {
+    addCard(
+      'build-artist-profile',
+      `Help me build my artist profile for ${artistName}. Start by connecting my music catalog and give me the next setup step.`
+    );
+  } else if (completion < 100) {
+    const nextStepContext = nextSetupStep
+      ? ` Start with ${nextSetupStep}.`
+      : '';
+    addCard(
+      'build-artist-profile',
+      `Help me build my artist profile for ${artistName}. Review the missing setup steps and prioritize the highest-impact update.${nextStepContext}`
+    );
+  }
+
+  addCard('plan-release', `Help me plan my next release for ${artistName}.`);
+  addCard(
+    'generate-album-art',
+    `Generate album art for my latest release as ${artistName}.`
+  );
+  addCard(
+    'review-signals',
+    `Review my signals as ${artistName} and help me see what is gaining traction.`
+  );
+
+  // Cap at 3 visible starters so the empty stack stays scannable.
+  return cards.slice(0, 3);
+}
 
 export function shouldRetryWelcomeChatBootstrap(
   status: number | null
@@ -227,6 +321,7 @@ export function ChatPageClient({
   conversationId,
   initialConversationTitle = null,
   isFirstSession = false,
+  featureIntroCatalog,
 }: ChatPageClientProps) {
   const {
     selectedProfile,
@@ -291,7 +386,7 @@ export function ChatPageClient({
           appleMusicId: null,
           youtubeUrl: null,
           youtubeMusicId: null,
-        } as ActiveChatProfile)
+        } as ChatActionProfile)
       : null;
   const activeProfile =
     selectedProfile ?? fallbackProfile ?? e2eFallbackProfile;
@@ -532,6 +627,18 @@ export function ChatPageClient({
   // We pass it as initialQuery so JovieChat can auto-submit it.
   const initialQuery =
     !env.IS_E2E && !initialQueryHandled && !conversationId ? rawQuery : null;
+
+  const chatActionCards = useMemo(
+    () =>
+      activeProfile
+        ? buildChatActionCards({
+            profile: activeProfile,
+            profileCompletionPercentage: profileCompletion.percentage,
+            profileCompletionSteps: profileCompletion.steps,
+          })
+        : [],
+    [activeProfile, profileCompletion.percentage, profileCompletion.steps]
+  );
 
   // Mark as handled after first render so re-renders don't re-submit
   useEffect(() => {
@@ -873,7 +980,8 @@ export function ChatPageClient({
             username={activeProfile.username ?? undefined}
             isFirstSession={isFirstSession || dashboardIsFirstSession || false}
             isProfileComplete={profileCompletion.percentage >= 100}
-            starterConversations={CHAT_STARTER_CONVERSATIONS}
+            actionCards={chatActionCards}
+            featureIntroCatalog={featureIntroCatalog}
             chatMode={chatMode}
             ambientOwnedByShell
           />

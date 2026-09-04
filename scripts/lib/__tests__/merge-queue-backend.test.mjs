@@ -47,7 +47,7 @@ const VALID_REPOSITORY = Object.freeze(
 );
 const VALID_RULESET = Object.freeze(
   JSON.parse(
-    `{"id":${RULESET_ID},"enforcement":"active","target":"branch","conditions":{"ref_name":{"include":["refs/heads/main"],"exclude":[]}},"bypass_actors":[],"rules":[{"type":"required_status_checks","parameters":{"strict_required_status_checks_policy":false,"required_status_checks":[{"context":"PR Ready"},{"context":"Migration Guard"},{"context":"Fork PR Gate"},{"context":"PR Size Guard"}]}},{"type":"merge_queue","parameters":{"check_response_timeout_minutes":60,"grouping_strategy":"ALLGREEN","max_entries_to_build":3,"max_entries_to_merge":10,"merge_method":"SQUASH","min_entries_to_merge":5,"min_entries_to_merge_wait_minutes":10}}]}`
+    `{"id":${RULESET_ID},"enforcement":"active","target":"branch","conditions":{"ref_name":{"include":["refs/heads/main"],"exclude":[]}},"bypass_actors":[],"rules":[{"type":"required_status_checks","parameters":{"strict_required_status_checks_policy":false,"required_status_checks":[{"context":"PR Ready"},{"context":"Migration Guard"},{"context":"Fork PR Gate"},{"context":"PR Size Guard"}]}},{"type":"merge_queue","parameters":{"check_response_timeout_minutes":20,"grouping_strategy":"ALLGREEN","max_entries_to_build":1,"max_entries_to_merge":5,"merge_method":"SQUASH","min_entries_to_merge":5,"min_entries_to_merge_wait_minutes":10}}]}`
   )
 );
 const VALID_WORKFLOW = `name: CI
@@ -70,9 +70,9 @@ const VALID_BRANCH_PROTECTION_REF = Object.freeze({
   minimumEntriesToMergeWaitTime: number,
 }} */
 const VALID_LIVE_QUEUE_CONFIGURATION = Object.freeze({
-  checkResponseTimeout: 3600,
-  maximumEntriesToBuild: 3,
-  maximumEntriesToMerge: 10,
+  checkResponseTimeout: 1200,
+  maximumEntriesToBuild: 1,
+  maximumEntriesToMerge: 5,
   mergeMethod: 'SQUASH',
   minimumEntriesToMerge: 5,
   minimumEntriesToMergeWaitTime: 10,
@@ -577,7 +577,9 @@ describe('queue workflow mutation safety', () => {
     expect(scope).toContain('.pull_request.head.sha');
     expect(scope).toContain('.pull_request.base.ref');
     expect(scope).toContain('.workflow_run.head_sha');
-    expect(scope).toContain('--json number,headRefOid,baseRefName,isDraft');
+    expect(scope).toContain('pulls?state=open&per_page=100');
+    expect(scope).toContain('headRefOid: .head.sha');
+    expect(scope).not.toContain('gh pr list');
     expect(scope).toContain('select(.baseRefName == "main")');
     expect(scope).toContain('No unique open main PR owns workflow_run head');
     expect(scope).toContain(
@@ -597,6 +599,17 @@ describe('queue workflow mutation safety', () => {
     expect(drain).toContain(
       'admission scope: maintenance-only (no new enrollment)'
     );
+    expect(drain).not.toContain('scripts/github-open-prs-snapshot.mjs');
+    expect(drain).toContain(
+      'inventory_native_queue_state "$DRAIN_ADMISSION_PR"'
+    );
+    expect(drain).toContain('inventory_native_queue_state');
+    expect(drain).toContain('native_state_to_snap');
+    // The remaining call is an isolated recovery/fixture path. Production
+    // inventory uses exact-target or paginated native queue state above.
+    expect(drain.match(/gh_retry pr list/gu)).toHaveLength(1);
+    expect(enroll).toContain('GH_INVENTORY_RETRY_ATTEMPTS: 3');
+    expect(enroll).toContain('GH_INVENTORY_RETRY_MAX_DELAY: 15');
     expect(drain).toContain(
       'admission scope: no primary target (bounded missed-admission recovery enabled)'
     );
@@ -616,9 +629,9 @@ describe('queue workflow mutation safety', () => {
     expect(drain).toContain(
       'UNMERGEABLE_EJECT_CONTEXT="jovie-native-unmergeable/v1"'
     );
-    expect(drain).toContain(
-      'qs: ($states[(.n | tostring)].mergeQueueEntry.state // null)'
-    );
+    expect(drain).toContain('qs: (.mergeQueueEntry.state // null)');
+    expect(drain).toContain('qp: (.mergeQueueEntry.position // null)');
+    expect(drain).toContain('select(.qp == 1)');
     expect(drain).toContain('unmergeable-eject');
     expect(drain).toContain('changelog-collision');
     expect(drain).toContain('changelog-inventory');
@@ -649,7 +662,7 @@ describe('queue workflow mutation safety', () => {
       'NO_AUTO_HOLD_JQ=\'. == "no-auto" or . == "no-auto-merge" or . == "no-automerge"\''
     );
     expect(drain).toContain(
-      '(.state.labels.nodes // []) | map(.name) | any(. == "needs-human" or . == "hold" or . == "gated" or . == "queue-deferred" or . == "needs-conflict-resolution" or . == "fast" or \'"$NO_AUTO_HOLD_JQ"\') | not'
+      '(.state.labels.nodes // []) | map(.name) | any(. == "queue-deferred" or . == "needs-conflict-resolution" or . == "fast" or \'"$NO_AUTO_HOLD_JQ"\') | not'
     );
     expect(drain).toContain(
       'queue-noop: missing receipt: exact admission #$DRAIN_ADMISSION_PR at $DRAIN_ADMISSION_HEAD'
@@ -673,9 +686,9 @@ describe('queue workflow mutation safety', () => {
       pullRequests: [
         {
           number: 16510,
-          headRefOid: HEAD,
-          baseRefName: 'main',
-          isDraft,
+          head: { sha: HEAD },
+          base: { ref: 'main' },
+          draft: isDraft,
         },
       ],
     });
@@ -699,9 +712,9 @@ describe('queue workflow mutation safety', () => {
       pullRequests: [
         {
           number: 16546,
-          headRefOid: OTHER_HEAD,
-          baseRefName: 'main',
-          isDraft: false,
+          head: { sha: OTHER_HEAD },
+          base: { ref: 'main' },
+          draft: false,
         },
       ],
     });
@@ -747,9 +760,9 @@ describe('queue workflow mutation safety', () => {
       pullRequests: [
         {
           number: 16546,
-          headRefOid: HEAD,
-          baseRefName: 'main',
-          isDraft: false,
+          head: { sha: HEAD },
+          base: { ref: 'main' },
+          draft: false,
         },
       ],
     });
@@ -798,17 +811,49 @@ describe('queue workflow mutation safety', () => {
       "needs.fleet-policy.outputs.mode == 'hold-intake'"
     );
     expect(enroll).toContain("needs.fleet-policy.outputs.mode == 'draft-only'");
-    expect(enroll).toContain("DRAIN_QUEUE_REENTRY_MAX_PER_RUN: '2'");
+    expect(enroll).toContain("DRAIN_QUEUE_REENTRY_MAX_PER_RUN: '0'");
     expect(drain).toContain('QUEUE_REENTRY_CONTEXT="jovie-queue-reentry/v1"');
     expect(drain).toContain('bounded exact-head native admission');
-    expect(drain).toContain('DRAIN_QUEUE_REENTRY_MAX_PER_RUN > 2');
+    expect(drain).toContain('DRAIN_QUEUE_REENTRY_MAX_PER_RUN" =~ ^[0-9]+$');
     expect(drain).toContain('queue_reentry_receipt_is_recoverable "$head_oid"');
     expect(drain).toContain('check_failures_for_pr "$n"');
-    expect(drain).toContain(
-      '[[ "$ENROLLED_THIS_RUN" -ge "$DRAIN_QUEUE_REENTRY_MAX_PER_RUN" ]]'
-    );
+    expect(drain).toContain('(( DRAIN_QUEUE_REENTRY_MAX_PER_RUN > 0 ))');
     expect(drain).toContain('select((.n | tostring) != $admission_pr)');
     expect(drain).toContain('enroll_if_still_eligible "$n" "$n" "$head_oid"');
+  });
+
+  it('recovers missing-CI heads with a bounded, per-head-idempotent close+reopen', () => {
+    const workflow = readRepoFile(
+      '.github/workflows/merge-queue-autoenroll.yml'
+    );
+    const enroll = workflowStep(workflow, 'Enroll clean PRs');
+    const drain = readRepoFile('scripts/drain-pr-queue.sh');
+
+    expect(enroll).toContain("DRAIN_RECOVER_MISSING_CI: '1'");
+    expect(enroll).toContain("DRAIN_MISSING_CI_MAX_PER_RUN: '2'");
+    expect(enroll).toContain("DRAIN_MISSING_CI_MIN_AGE_MINUTES: '120'");
+
+    // Missing-only is the exact admission signal: every fresh blocker must be
+    // a `<required context> (missing)` entry, never a terminal red or pending.
+    expect(drain).toContain(
+      '=== RECOVER (missing source CI → bounded close+reopen) ==='
+    );
+    expect(drain).toContain('all(.[]; endswith(" (missing)"))');
+    expect(drain).toContain('check_failures_for_pr "$n"');
+    expect(drain).toContain('missing_ci_recovery_attempted "$n" "$head_oid"');
+    expect(drain).toContain(
+      "MISSING_CI_RECOVERY_MARKER='<!-- bot-comment:missing-ci-recovery -->'"
+    );
+    expect(drain).toContain('.commit.committer.date // empty');
+    expect(drain).toContain('DRAIN_MISSING_CI_MIN_AGE_MINUTES * 60');
+    expect(drain).toContain(
+      '[[ "$MISSING_CI_RECOVERED" -ge "$DRAIN_MISSING_CI_MAX_PER_RUN" ]]'
+    );
+    expect(drain).toContain('DRAIN_MISSING_CI_MAX_PER_RUN > 2');
+    expect(drain).toContain('pr close "$n" -R "$REPO"');
+    expect(drain).toContain('pr reopen "$n" -R "$REPO"');
+    // Hard holds, drafts, and the event-scoped admission target are excluded.
+    expect(drain).toContain('select((.n | tostring) != $admission_pr)');
   });
 
   it('excludes stacked non-main PRs from admission and live eligibility', () => {
@@ -954,9 +999,12 @@ describe('queue workflow mutation safety', () => {
     expect(enroll).toContain('failure: $failure');
     expect(enroll).toContain('pr_number: ($pr_number | tonumber)');
     expect(enroll).toContain('head_sha: $head_sha');
-    expect(enroll).toContain('not failing the product PR check');
+    expect(enroll).toContain('GH_INVENTORY_RETRY_ATTEMPTS: 3');
+    expect(enroll).toContain('GH_INVENTORY_RETRY_MAX_DELAY: 15');
+    expect(enroll).toContain('dropped-controller-event fails closed');
+    expect(enroll).not.toContain('not failing the product PR check');
     expect(enroll.indexOf('gh api --method POST')).toBeLessThan(
-      enroll.indexOf('not failing the product PR check')
+      enroll.indexOf('dropped-controller-event fails closed')
     );
     expect(enroll).toContain('exit "$drain_rc"');
     expect(rebasePreflight).toContain(
@@ -969,9 +1017,40 @@ describe('queue workflow mutation safety', () => {
       'MERGE_QUEUE_NATIVE_AUTHORIZATION: merge-queue-autoenroll'
     );
     expect(
-      drain.indexOf('node scripts/merge-queue-backend.mjs preflight')
+      drain.indexOf('node scripts/merge-queue-backend.mjs preflight >/dev/null')
     ).toBeLessThan(
-      drain.indexOf('node scripts/merge-queue-backend.mjs list-state')
+      drain.indexOf('inventory_native_queue_state "$DRAIN_ADMISSION_PR"')
+    );
+    expect(drain).toContain('SNAP (exact-head #$DRAIN_ADMISSION_PR)');
+    expect(drain).toContain(
+      'inventory_native_queue_state "$DRAIN_ADMISSION_PR"'
+    );
+    expect(drain).toContain('native_state_to_snap');
+    expect(drain).toContain('GH_INVENTORY_RETRY_ATTEMPTS:-3');
+    expect(drain).toContain('=== RETARGET (base must be main) ===');
+    expect(drain).toContain(
+      '(.n | type == "number") and (.base | type == "string") and .base != "main"'
+    );
+    expect(drain).not.toContain(
+      'SNAP="$(gh_retry pr list -R "$REPO" --state open --limit 200'
+    );
+    expect(readRepoFile('.claude/commands/drain.md')).toContain(
+      'Graphite and Cursor are gone'
+    );
+    expect(readRepoFile('.claude/commands/drain.md')).not.toContain(
+      '--add-label merge-queue'
+    );
+    expect(readRepoFile('.claude/commands/clean.md')).not.toContain(
+      '--add-label merge-queue'
+    );
+    expect(readRepoFile('.claude/commands/sonar-fix.md')).not.toContain(
+      '--add-label merge-queue'
+    );
+    expect(readRepoFile('scripts/merge-queue-backend.mjs')).toContain(
+      'const INVENTORY_PAGE_SIZE = 30'
+    );
+    expect(readRepoFile('scripts/merge-queue-backend.mjs')).toContain(
+      'pullRequests(first:${INVENTORY_PAGE_SIZE},after:$endCursor,states:OPEN)'
     );
     expect(rebaseMutation).toContain("DRAIN_REMEDIATE_MAX_PER_RUN: '24'");
     expect(remediator).toContain("DRAIN_REMEDIATE_MAX_PER_RUN ?? '24'");
@@ -1035,7 +1114,7 @@ describe('native live preflight', () => {
               ...rule,
               parameters: {
                 ...rule.parameters,
-                max_entries_to_build: 1,
+                max_entries_to_build: 3,
               },
             }
           : rule
@@ -1061,7 +1140,7 @@ describe('native live preflight', () => {
     expect(liveGraphql.policyReadback).toMatchObject({
       matched: true,
       drift: [],
-      observed: { max_entries_to_build: 3 },
+      observed: { max_entries_to_build: 1 },
     });
   });
 
@@ -1074,7 +1153,7 @@ describe('native live preflight', () => {
     expect(result).toMatchObject({ ready: true });
     expect(result.policyReadback).toMatchObject({
       matched: true,
-      observed: { max_entries_to_build: 3 },
+      observed: { max_entries_to_build: 1 },
     });
     const liveConfigCall = runner.mock.calls.find(([args]) =>
       queryText(args).includes('MergeQueueLiveConfiguration')
@@ -1085,7 +1164,7 @@ describe('native live preflight', () => {
     expect(queryText(liveConfigCall)).toContain('maximumEntriesToBuild');
   });
 
-  it('does not fail enroll preflight when GraphQL checkResponseTimeout is seconds for a 60-minute lock', () => {
+  it('does not fail enroll preflight when GraphQL checkResponseTimeout is seconds for a 20-minute lock', () => {
     const liveUntilCutover = {
       ...VALID_RULESET,
       rules: VALID_RULESET.rules.map(rule =>
@@ -1108,7 +1187,7 @@ describe('native live preflight', () => {
       branchProtectionRef: VALID_BRANCH_PROTECTION_REF,
       liveQueueConfiguration: {
         ...VALID_LIVE_QUEUE_CONFIGURATION,
-        checkResponseTimeout: 3600,
+        checkResponseTimeout: 1200,
         minimumEntriesToMerge: 1,
         minimumEntriesToMergeWaitTime: 0,
       },
@@ -1116,7 +1195,7 @@ describe('native live preflight', () => {
     expect(falseDrift.ok).toBe(true);
     expect(
       falseDrift.policyReadback.observed.check_response_timeout_minutes
-    ).toBe(60);
+    ).toBe(20);
     expect(falseDrift.policyReadback.drift).toEqual([
       'min_entries_to_merge',
       'min_entries_to_merge_wait_minutes',
@@ -1141,18 +1220,18 @@ describe('native live preflight', () => {
     });
     expect(actualTimeoutDrift.ok).toBe(false);
     expect(actualTimeoutDrift.errors).toContain(
-      'merge_queue check_response_timeout_minutes must be 60'
+      'merge_queue check_response_timeout_minutes must be 20'
     );
     expect(actualTimeoutDrift.errors).toContain(
       'native queue policy readback drifted: check_response_timeout_minutes'
     );
   });
 
-  it('reads live GraphQL checkResponseTimeout seconds as 60 minutes', async () => {
+  it('reads live GraphQL checkResponseTimeout seconds as 20 minutes', async () => {
     const runner = createNativeRunner({
       liveQueueConfiguration: {
         ...VALID_LIVE_QUEUE_CONFIGURATION,
-        checkResponseTimeout: 3600,
+        checkResponseTimeout: 1200,
       },
     });
     await expect(
@@ -1163,7 +1242,7 @@ describe('native live preflight', () => {
     ).resolves.toMatchObject({
       ready: true,
       policyReadback: {
-        observed: { check_response_timeout_minutes: 60 },
+        observed: { check_response_timeout_minutes: 20 },
       },
     });
   });
@@ -1177,7 +1256,7 @@ describe('native live preflight', () => {
               ...rule,
               parameters: {
                 ...rule.parameters,
-                max_entries_to_build: 1,
+                max_entries_to_build: 3,
               },
             }
           : rule
@@ -1193,7 +1272,7 @@ describe('native live preflight', () => {
       ready: true,
       policyReadback: {
         matched: true,
-        observed: { max_entries_to_build: 3 },
+        observed: { max_entries_to_build: 1 },
       },
     });
   });
@@ -2069,7 +2148,7 @@ describe('exact-head queue receipt proof', () => {
     const queuedAndHeld = prState({
       isInMergeQueue: true,
       mergeQueueEntry: QUEUE_ENTRY,
-      labels: { nodes: [{ name: 'needs-human' }] },
+      labels: { nodes: [{ name: 'queue-deferred' }] },
     });
     expect(hasAuthoritativeExactHeadQueueReceipt(queuedAndHeld, HEAD)).toBe(
       true
@@ -2077,7 +2156,7 @@ describe('exact-head queue receipt proof', () => {
     expect(canAcceptExactHeadQueueReceipt(queuedAndHeld, HEAD)).toBe(false);
     expect(explainExactHeadQueueReceipt(queuedAndHeld, HEAD)).toEqual({
       ok: false,
-      reason: 'held-by=needs-human',
+      reason: 'held-by=queue-deferred',
     });
 
     const runner = createNativeRunner({ states: [queuedAndHeld] });
@@ -2088,7 +2167,7 @@ describe('exact-head queue receipt proof', () => {
     ).resolves.toMatchObject({
       ok: false,
       attempts: 1,
-      explanation: { ok: false, reason: 'held-by=needs-human' },
+      explanation: { ok: false, reason: 'held-by=queue-deferred' },
     });
     expect(invokedEnrollment(runner)).toBe(false);
   });
@@ -2273,5 +2352,29 @@ describe('authoritative native state listing', () => {
     ).resolves.toMatchObject({
       99: { backend: 'native', queued: true, id: PR_ID },
     });
+  });
+
+  it('reads exact-target queue state for one PR instead of the whole fleet', async () => {
+    const queued = prState({
+      number: 16909,
+      isInMergeQueue: true,
+      mergeQueueEntry: QUEUE_ENTRY,
+    });
+    const runner = createNativeRunner({ states: [queued] });
+    await expect(
+      listPullRequestQueueStates({
+        ...nativeOptions(runner),
+        exactPullRequestNumber: 16909,
+      })
+    ).resolves.toMatchObject({
+      16909: { backend: 'native', queued: true, number: 16909 },
+    });
+    const queries = runner.mock.calls.map(call => queryText(call[0]));
+    expect(
+      queries.some(query => query.includes('MergeQueuePullRequestState'))
+    ).toBe(true);
+    expect(
+      queries.some(query => query.includes('MergeQueueOpenPullRequestStates'))
+    ).toBe(false);
   });
 });

@@ -99,24 +99,30 @@ describe('Sheet', () => {
       render(<TestSheet open={true} />);
       const content = screen.getByTestId('sheet-content');
       expect(content.className).toContain('right-0');
+      expect(content.className).toContain('w-104');
+      expect(content.className).toContain('max-w-sheet-viewport');
     });
 
     it('renders on left side', () => {
       render(<TestSheet open={true} side='left' />);
       const content = screen.getByTestId('sheet-content');
       expect(content.className).toContain('left-0');
+      expect(content.className).toContain('w-104');
+      expect(content.className).toContain('max-w-sheet-viewport');
     });
 
     it('renders on top side', () => {
       render(<TestSheet open={true} side='top' />);
       const content = screen.getByTestId('sheet-content');
       expect(content.className).toContain('top-0');
+      expect(content.className).toContain('max-h-sheet-viewport');
     });
 
     it('renders on bottom side', () => {
       render(<TestSheet open={true} side='bottom' />);
       const content = screen.getByTestId('sheet-content');
       expect(content.className).toContain('bottom-0');
+      expect(content.className).toContain('max-h-sheet-viewport');
     });
   });
 
@@ -289,7 +295,7 @@ describe('Sheet', () => {
       render(<TestSheet open={true} />);
       const content = screen.getByTestId('sheet-content');
       expect(content.className).toContain('fixed');
-      expect(content.className).toContain('z-[65]');
+      expect(content.className).toContain('z-sheet');
       expect(content.className).toContain('bg-surface-elevated');
       expect(content.className).toContain('border-default');
       expect(content.className).toContain('shadow-popover');
@@ -299,6 +305,34 @@ describe('Sheet', () => {
       render(<TestSheet open={true} />);
       const content = screen.getByTestId('sheet-content');
       expect(content.className).toContain('transition');
+    });
+
+    it('uses canonical cinematic motion for side and bottom sheets', () => {
+      const { rerender } = render(<TestSheet open={true} side='right' />);
+      const rightContent = screen.getByTestId('sheet-content');
+
+      expect(rightContent).toHaveClass(
+        'duration-cinematic',
+        'ease-cinematic',
+        'motion-reduce:transition-none',
+        'data-[state=open]:slide-in-from-right'
+      );
+      expect(rightContent.className).not.toContain('duration-300');
+      expect(rightContent.className).not.toContain('duration-500');
+      expect(rightContent.className).not.toContain('ease-in-out');
+
+      rerender(<TestSheet open={true} side='bottom' />);
+      const bottomContent = screen.getByTestId('sheet-content');
+
+      expect(bottomContent).toHaveClass(
+        'duration-cinematic',
+        'ease-cinematic',
+        'motion-reduce:transition-none',
+        'data-[state=open]:slide-in-from-bottom'
+      );
+      expect(bottomContent.className).not.toContain('duration-300');
+      expect(bottomContent.className).not.toContain('duration-500');
+      expect(bottomContent.className).not.toContain('ease-in-out');
     });
   });
 });

@@ -40,21 +40,24 @@ describe('MarketingHeader', () => {
   it('renders marketing center navigation when the center-nav flag is enabled', () => {
     render(<MarketingHeader />);
 
-    expect(screen.getByRole('button', { name: /Features/ })).toBeVisible();
-    expect(screen.getByRole('button', { name: /Resources/ })).toBeVisible();
+    expect(screen.getByRole('link', { name: 'Product' })).toHaveAttribute(
+      'href',
+      '/artist-profiles'
+    );
+    expect(screen.getByRole('button', { name: /For/ })).toBeVisible();
+    expect(screen.getByRole('button', { name: /Tools/ })).toBeVisible();
     expect(screen.getByRole('link', { name: 'Pricing' })).toHaveAttribute(
       'href',
       '/pricing'
     );
-    expect(screen.getByRole('link', { name: 'Contact' })).toHaveAttribute(
-      'href',
-      '/support'
-    );
+    expect(screen.queryByRole('link', { name: 'Contact' })).toBeNull();
     expect(screen.getByRole('link', { name: 'Log in' })).toHaveAttribute(
       'href',
       '/signin'
     );
-    expect(screen.getByRole('link', { name: 'Get started' })).toHaveAttribute(
+    // Header utility CTA stays on the /start front door; the waitlist-first
+    // contract applies to owned hero/final CTAs, not the shared nav utilities.
+    expect(screen.getByRole('link', { name: 'Find yourself' })).toHaveAttribute(
       'href',
       '/start'
     );
@@ -67,7 +70,7 @@ describe('MarketingHeader', () => {
       document.querySelector('.marketing-glass-header__nav')?.children ?? []
     ).map(item => item.textContent);
 
-    expect(navItems).toEqual(['Jovie', 'Features', 'Resources', 'Pricing']);
+    expect(navItems).toEqual(['Jovie', 'Product', 'For', 'Tools', 'Pricing']);
     expect(
       document.querySelector(
         '.marketing-glass-header__nav .marketing-glass-header__brand-wordmark'
@@ -78,8 +81,8 @@ describe('MarketingHeader', () => {
         .getByTestId('site-logo-link')
         .querySelector('[data-brand-variant="jovie"]')
     ).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: /Features/ })).toBeVisible();
-    expect(screen.getByRole('button', { name: /Resources/ })).toBeVisible();
+    expect(screen.getByRole('button', { name: /For/ })).toBeVisible();
+    expect(screen.getByRole('button', { name: /Tools/ })).toBeVisible();
   });
 
   it('scopes homepage-style header overrides to the artist-profiles route', () => {
@@ -94,9 +97,10 @@ describe('MarketingHeader', () => {
       'data-presentation',
       'marketing-glass'
     );
-    expect(
-      screen.getByRole('link', { name: 'Claim your profile' })
-    ).toHaveAttribute('href', 'https://jov.ie/waitlist');
+    expect(screen.getByRole('link', { name: 'Get started' })).toHaveAttribute(
+      'href',
+      'https://jov.ie/waitlist'
+    );
   });
 
   it('keeps the legacy artist-profile alias on the same shared chrome', () => {
@@ -123,7 +127,7 @@ describe('MarketingHeader', () => {
       'href',
       '/signin'
     );
-    expect(screen.queryByRole('link', { name: 'Get started' })).toBeNull();
+    expect(screen.queryByRole('link', { name: 'Find yourself' })).toBeNull();
   });
 
   it('applies and cleans up homepage-style scroll treatment', () => {
@@ -160,7 +164,8 @@ describe('MarketingHeader', () => {
       />
     );
 
-    expect(screen.queryByRole('button', { name: /Features/ })).toBeNull();
+    expect(screen.queryByRole('button', { name: /For/ })).toBeNull();
+    expect(screen.queryByRole('button', { name: /Tools/ })).toBeNull();
     expect(screen.getByRole('link', { name: 'Product' })).toHaveAttribute(
       'href',
       '/artist-profiles'

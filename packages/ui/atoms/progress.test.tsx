@@ -21,10 +21,11 @@ describe('ProgressBar', () => {
     render(<ProgressBar indeterminate label='Importing' />);
 
     const bar = screen.getByRole('progressbar');
+    const indicator = bar.querySelector('[data-state="indeterminate"]');
     expect(bar).not.toHaveAttribute('aria-valuenow');
-    expect(
-      bar.querySelector('[data-state="indeterminate"]')
-    ).toBeInTheDocument();
+    expect(indicator).toBeInTheDocument();
+    expect(indicator).toHaveClass('animate-progress-indeterminate');
+    expect(indicator?.className).not.toContain('animate-[');
     expect(bar).toHaveAttribute('data-state', 'indeterminate');
     expect(bar).toHaveAttribute('data-part', 'track');
   });

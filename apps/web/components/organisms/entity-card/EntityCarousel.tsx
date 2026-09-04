@@ -237,6 +237,35 @@ export function EntityCarousel({
     };
   }, [prefersReducedMotion, items, leading, trailing]);
 
+  useEffect(() => {
+    const track = trackRef.current;
+    if (!showsProfileControls || !track) {
+      return;
+    }
+
+    const handleFocusIn = (event: FocusEvent) => {
+      const { target } = event;
+      if (!(target instanceof Element)) {
+        return;
+      }
+
+      const slot = target.closest<HTMLElement>('[data-carousel-slot-index]');
+      if (!slot || !track.contains(slot)) {
+        return;
+      }
+
+      const slotIndex = Number(slot.dataset.carouselSlotIndex);
+      if (!Number.isInteger(slotIndex)) {
+        return;
+      }
+
+      scrollToIndex(slotIndex);
+    };
+
+    track.addEventListener('focusin', handleFocusIn);
+    return () => track.removeEventListener('focusin', handleFocusIn);
+  }, [scrollToIndex, showsProfileControls]);
+
   if (items.length === 0 && !leading && !trailing) {
     return null;
   }
@@ -246,7 +275,6 @@ export function EntityCarousel({
   // exactly outside the viewport at rest. Portrait keeps a smaller gap for its
   // intentional card preview.
   const isProfileLandscape = layout === 'profile-landscape';
-  const hidesInactiveSlots = isProfileLandscape;
   const cardItemClassName = cn(
     CARD_ITEM_CLASSNAME,
     isProfileLandscape && 'w-full'
@@ -278,12 +306,9 @@ export function EntityCarousel({
         {leading ? (
           <li
             data-carousel-slot='leading'
+            data-carousel-slot-index={0}
             data-layout={layout}
             data-carousel-active={currentIndex === 0 ? 'true' : 'false'}
-            aria-hidden={
-              hidesInactiveSlots && currentIndex !== 0 ? true : undefined
-            }
-            inert={hidesInactiveSlots && currentIndex !== 0 ? true : undefined}
             className={cardItemClassName}
           >
             {leading}
@@ -299,10 +324,9 @@ export function EntityCarousel({
                 itemRefs.current[index] = node;
               }}
               data-carousel-index={index}
+              data-carousel-slot-index={slotIndex}
               data-layout={layout}
               data-carousel-active={isActive ? 'true' : 'false'}
-              aria-hidden={hidesInactiveSlots && !isActive ? true : undefined}
-              inert={hidesInactiveSlots && !isActive ? true : undefined}
               className={cardItemClassName}
             >
               <EntityCard
@@ -327,19 +351,10 @@ export function EntityCarousel({
         {trailing ? (
           <li
             data-carousel-slot='trailing'
+            data-carousel-slot-index={slotCount - 1}
             data-layout={layout}
             data-carousel-active={
               currentIndex === slotCount - 1 ? 'true' : 'false'
-            }
-            aria-hidden={
-              hidesInactiveSlots && currentIndex !== slotCount - 1
-                ? true
-                : undefined
-            }
-            inert={
-              hidesInactiveSlots && currentIndex !== slotCount - 1
-                ? true
-                : undefined
             }
             className={cardItemClassName}
           >

@@ -94,7 +94,7 @@ pnpm --filter @jovie/web run qa:marketing:route-health
 It follows `MARKETING_ROUTE_MANIFEST` and checks every concrete target for a
 successful response, no 404/boundary/auth wall/failed request/runtime or
 console error; recipe routes also prove shared header/footer. Wildcards need a
-fixture and `/waitlist → /start` is the only allowed redirect.
+fixture. `/waitlist` is a public waitlist-first page, not a redirect.
 
 It uses supported capture flags (`NEXT_DISABLE_TOOLBAR=1`,
 `NEXT_PUBLIC_E2E_MODE=1`, `PUBLIC_NOAUTH_SMOKE=1`) and asserts dev chrome is
@@ -228,6 +228,19 @@ Select models by the required capability and current role score; page recipes
 must never name a provider or model. Narrative planning happens before copy and
 must give every section a unique question, responsibility, belief change, and
 evidence object. A failed stage may repair at most three times.
+
+Jovie-owned generated brand imagery must embed Scene Palette v1 from
+`apps/web/data/marketing/imageColorPolicy.ts`
+(`jovie-image-color-policy/v1`). The invariant is: the camera must find the
+palette. Controllable wardrobe, props, furniture, paint, locations, signage,
+practical lights, vehicles, and set dressing must be chosen as an Ion, Ultra,
+Pulse, or low-chroma neutral scene color before capture/generation. Protected
+real-world, biological, cultural, safety, trademark, creator-owned, and
+identity-bearing colors stay truthful. Conflicts are art-directed, reframed,
+replaced, removed, reduced in salience, or rejected, never fixed with post-hoc
+recoloring or a fake grade. Product screenshots, customer evidence,
+documentary material, album art, merch artwork, and artist retouching remain
+truthful source material rather than palette-controlled set pieces.
 
 Only one candidate may reach Taste. It needs one digest-bound passing receipt
 for every gate in `MARKETING_TASTE_GATE_IDS`, including independent visual

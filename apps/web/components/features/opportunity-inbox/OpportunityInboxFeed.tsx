@@ -5,14 +5,17 @@ import { OpportunityRow } from '@/components/organisms/opportunity-card/Opportun
 import type { OpportunityRowState } from '@/components/organisms/opportunity-card/types';
 import type { OpportunityInboxCardViewModel } from '@/lib/connectors/opportunity-inbox-types';
 import { cn } from '@/lib/utils';
-import { OpportunityCardStack } from './OpportunityCardStack';
+import { FounderReviewStack } from './FounderReviewStack';
 import { OpportunityInboxReportCard } from './OpportunityInboxReportCard';
 import { WorkflowCaptureInboxCard } from './WorkflowCaptureInboxCard';
 
 export interface OpportunityInboxFeedProps {
   readonly cards: readonly OpportunityInboxCardViewModel[];
-  readonly onApprove: (id: string) => void;
-  readonly onDismiss: (id: string) => void;
+  readonly onApprove: (id: string) => void | Promise<void>;
+  readonly onDismiss: (id: string) => void | Promise<void>;
+  readonly onRecordedApprove?: (id: string) => Promise<void>;
+  readonly onRecordedDismiss?: (id: string) => Promise<void>;
+  readonly onRecordedNextStep?: (id: string) => Promise<void>;
   readonly onOpen?: (id: string) => void;
   readonly onFeedback: (
     id: string,
@@ -49,6 +52,9 @@ export function OpportunityInboxFeed({
   cards,
   onApprove,
   onDismiss,
+  onRecordedApprove,
+  onRecordedDismiss,
+  onRecordedNextStep,
   onOpen,
   onFeedback: _onFeedback,
   onNextStep,
@@ -67,7 +73,11 @@ export function OpportunityInboxFeed({
       card => card.category === 'workflow_capture'
     );
     const stackCards = cards.filter(
-      card => card.category !== 'workflow_capture'
+      (
+        card
+      ): card is OpportunityInboxCardViewModel & {
+        readonly sourceKind: string;
+      } => card.category !== 'workflow_capture' && Boolean(card.sourceKind)
     );
     return (
       <div className={className}>
@@ -79,20 +89,28 @@ export function OpportunityInboxFeed({
             onComplete={onCaptureCompleted ?? onDismiss}
           />
         ))}
-        <OpportunityCardStack
+        <FounderReviewStack
           cards={stackCards}
-          onAccept={id => {
+          onApprove={id => {
             onStackActionInitiated?.(id);
-            onApprove(id);
+            const card = stackCards.find(candidate => candidate.id === id);
+            if (card?.category === 'report') {
+              return (
+                onRecordedNextStep ??
+                onStackNextStep ??
+                onNextStep ??
+                onApprove
+              )(id);
+            } else {
+              return (onRecordedApprove ?? onApprove)(id);
+            }
           }}
           onReject={id => {
             onStackActionInitiated?.(id);
-            onDismiss(id);
+            return (onRecordedDismiss ?? onDismiss)(id);
           }}
-          onOpen={onOpen ?? onApprove}
-          onNextStep={onStackNextStep ?? onNextStep ?? onApprove}
+          onOpen={onOpen}
           pendingActionId={pendingActionId}
-          pendingNextStepId={pendingNextStepId}
           keyboardControlRef={stackKeyboardControlRef}
         />
       </div>

@@ -7,20 +7,21 @@
  */
 
 export const HUD_NEED_SECTION_IDS = [
-  'action-required',
   'cash-mrr',
-  'bottleneck',
+  'action-required',
   'shipper',
   'factory-health',
 ] as const;
 
 export const HUD_NOISE_SECTION_IDS = [
+  'bottleneck',
   'morning-walk',
   'design-jury',
   'velocity',
   'agent-runs',
   'what-shipped',
   'dispatch-details',
+  'env-exceptions',
 ] as const;
 
 export type HudNeedSectionId = (typeof HUD_NEED_SECTION_IDS)[number];
@@ -42,11 +43,12 @@ export const HUD_SECTION_TEST_IDS = {
   'agent-runs': 'hud-agent-runs',
   'what-shipped': 'what-shipped-card',
   'dispatch-details': 'hud-dispatch-details',
+  'env-exceptions': 'hud-section-env-exceptions',
 } as const satisfies Record<HudSectionId, string>;
 
 export const HUD_SECTION_LABELS = {
   'action-required': 'Needs Tim',
-  'cash-mrr': 'Survival',
+  'cash-mrr': 'Company Now',
   bottleneck: 'Bottleneck',
   shipper: 'Delivery',
   'factory-health': 'Operating chain',
@@ -56,6 +58,7 @@ export const HUD_SECTION_LABELS = {
   'agent-runs': 'Agent runs',
   'what-shipped': 'What shipped',
   'dispatch-details': 'Dispatch and diagnostics',
+  'env-exceptions': 'Env exceptions',
 } as const satisfies Record<HudSectionId, string>;
 
 export interface HudComposedSection {

@@ -46,9 +46,22 @@ enum MobileChatTimelineRole: String, Equatable, Sendable {
 enum MobileChatTimelineStatus: Equatable, Sendable {
   case idle
   case sending
+  case queued
+  case running
+  case retrying
   case streaming
   case failed
+  case canceled
   case completed
+
+  var isInFlight: Bool {
+    switch self {
+    case .sending, .queued, .running, .retrying, .streaming:
+      return true
+    case .idle, .failed, .canceled, .completed:
+      return false
+    }
+  }
 }
 
 struct MobileChatTimelineItem: Identifiable, Equatable, Sendable {
@@ -59,12 +72,15 @@ struct MobileChatTimelineItem: Identifiable, Equatable, Sendable {
   let clientTurnId: String?
   var requiresWebHandoff: Bool
   var handoffURL: URL?
+  var turnId: String? = nil
+  var eveWorkId: String? = nil
 }
 
 struct CachedChatSnapshot: Codable, Equatable, Sendable {
   let conversations: [MobileConversationSummary]
   let messagesByConversationID: [String: [MobileConversationMessage]]
   let cachedAt: Date
+  var activeConversationID: String? = nil
 }
 
 /// Deterministic fixture timeline used only by `.uiTestingChatEntityFixture`
@@ -142,7 +158,7 @@ enum MobileChatAllComponentsFixture {
   """
 
   static let merchProductOptionsJSON =
-    #"{"success":true,"generationId":"gen-1","options":[{"id":"opt-1","option_number":1,"design_name":"Neon Pulse Tee","product_type":"Tee","concept":"Bold neon typography.","mockup_urls":["https://cdn.test/neon.jpg"],"price_recommendation":{"sale_price":"$45.00"}}]}"#
+    #"{"success":true,"generationId":"gen-1","options":[{"id":"opt-1","option_number":1,"design_name":"Neon Pulse Tee","product_type":"Tee","concept":"Bold neon typography.","mockup_urls":["https://cdn.test/neon.jpg"],"price_recommendation":{"sale_price":"$45.00"}},{"id":"opt-2","option_number":2,"design_name":"Signal Bloom Hoodie","product_type":"Hoodie","concept":"Oversized signal-flower mark.","mockup_urls":[],"price_recommendation":{"sale_price":"$72.00"}},{"id":"opt-3","option_number":3,"design_name":"Tour Grid Cap","product_type":"Cap","concept":"Tour-date grid embroidery.","mockup_urls":[],"price_recommendation":{"sale_price":"$34.00"}}]}"#
 
   static var merchProductOptions: String {
     """
@@ -318,6 +334,7 @@ struct EyesFreeCaptureAPIResponse: Decodable, Equatable, Sendable {
 
 enum MobileChatStreamEvent: Equatable, Sendable {
   case turnReserved(conversationId: String, turnId: String, clientTurnId: String)
+  case turnState(clientTurnId: String, state: String, eveWorkId: String?)
   case assistantDelta(clientTurnId: String, text: String)
   case assistantCompleted(
     clientTurnId: String,

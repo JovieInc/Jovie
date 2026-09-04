@@ -223,17 +223,31 @@ def probe(m, timeout=20, st=None, now=None):
     try:
         result = subprocess.run(argv, capture_output=True, text=True, timeout=timeout)
         out = (result.stdout or "") + "\n" + (result.stderr or "")
+        forbidden = [
+            str(value).lower()
+            for value in (m.get("probe_forbidden_patterns") or [])
+            if isinstance(value, str) and value
+        ]
+        if any(pattern in out.lower() for pattern in forbidden):
+            return False, "auth_or_runtime_failed"
         if _quota_signal(out):
             if st is not None:
                 mark_pool_exhausted(st, m.get("pool"), m.get("pool_cooldown_seconds") or m.get("cooldown_seconds") or 1800, now)
             return False, "pool_exhausted"
         if m.get("probe_mode") == "exit-zero":
             return (result.returncode == 0, "ready" if result.returncode == 0 else "probe_failed")
+        if m.get("probe_mode") == "json-model-key":
+            try:
+                payload = json.loads(result.stdout)
+                models = payload.get("models")
+            except (AttributeError, TypeError, ValueError, json.JSONDecodeError):
+                return False, "probe_invalid_json"
+            ready = result.returncode == 0 and isinstance(models, dict) and m["model"] in models
+            return ready, "ready" if ready else "model_unlisted"
+        if result.returncode != 0: return False, "probe_failed"
         if m["provider"] == "ollama" and m["model"] not in result.stdout: return False, "model_missing"
         if m["provider"] == "grok" and m["model"] not in result.stdout: return False, "model_unlisted"
         if m["provider"] == "codex" and "GEM_MODEL_READY" not in result.stdout: return False, "auth_or_runtime_failed"
-        if result.returncode != 0 and m["provider"] in {"cursor", "kimi"}:
-            return False, "probe_failed"
         return True, "ready"
     except Exception as e: return False, type(e).__name__
 
@@ -348,13 +362,38 @@ def record_api_spend(st, family, amount):
     save_state(st)
 
 
-def choose(workflow, capability, allow_exceptions=False, path=None, exclude_pools=None):
+def parse_oauth_seats(payload):
+    """Return a non-negative live OAuth seat count from provider probe JSON."""
+    if isinstance(payload, dict):
+        for key in ("oauth_seats", "max_concurrent", "concurrency", "seats"):
+            value = payload.get(key)
+            if isinstance(value, int) and value >= 0:
+                return value
+        accounts = payload.get("accounts")
+        if isinstance(accounts, list) and accounts:
+            return len(accounts)
+        models = payload.get("models")
+        if isinstance(models, dict):
+            nested = parse_oauth_seats(models)
+            if nested is not None:
+                return nested
+            for item in models.values():
+                nested = parse_oauth_seats(item)
+                if nested is not None:
+                    return nested
+    return None
+
+
+def choose(workflow, capability, allow_exceptions=False, path=None, exclude_pools=None, include_ids=None):
     cfg, config_path = load(path); mm = model_map(cfg); st = state(); now = time.time()
     exclude_pools = tuple(exclude_pools or ())
+    include_ids = tuple(include_ids or ())
     chain = cfg["route_chains"][workflow]
     candidates = []
     ready = []
     for mid in chain:
+        if include_ids and mid not in include_ids:
+            continue
         m = mm[mid]
         if capability not in m["capabilities"]: continue
         if m.get("pool") in exclude_pools:
@@ -394,13 +433,17 @@ def choose(workflow, capability, allow_exceptions=False, path=None, exclude_pool
 
 def main():
     ap = argparse.ArgumentParser(); sub = ap.add_subparsers(dest="cmd", required=True)
-    c = sub.add_parser("choose"); c.add_argument("--workflow", choices=["remediation", "new_pr"], required=True); c.add_argument("--capability", default="mechanical"); c.add_argument("--allow-codex-exception", action="store_true"); c.add_argument("--exclude-pool", action="append", default=[]); c.add_argument("--config")
+    c = sub.add_parser("choose"); c.add_argument("--workflow", choices=["remediation", "new_pr"], required=True); c.add_argument("--capability", default="mechanical"); c.add_argument("--allow-codex-exception", action="store_true"); c.add_argument("--exclude-pool", action="append", default=[]); c.add_argument("--include-id", action="append", default=[]); c.add_argument("--config")
     p = sub.add_parser("probe"); p.add_argument("--config")
     v = sub.add_parser("validate"); v.add_argument("--config")
     args = ap.parse_args(); cfg, config_path = load(getattr(args, "config", None))
     if args.cmd == "probe":
-        print(json.dumps({m["id"]: {"ready": probe(m)[0], "reason": probe(m)[1]} for m in cfg["models"]}, indent=2)); return 0
+        results = {}
+        for model in cfg["models"]:
+            ready, reason = probe(model)
+            results[model["id"]] = {"ready": ready, "reason": reason}
+        print(json.dumps(results, indent=2)); return 0
     if args.cmd == "validate":
         print(json.dumps({"ok": True, "config": str(config_path), "models": len(cfg["models"])}, indent=2)); return 0
-    print(json.dumps(choose(args.workflow, args.capability, args.allow_codex_exception, args.config, args.exclude_pool), indent=2)); return 0
+    print(json.dumps(choose(args.workflow, args.capability, args.allow_codex_exception, args.config, args.exclude_pool, args.include_id), indent=2)); return 0
 if __name__ == "__main__": sys.exit(main())

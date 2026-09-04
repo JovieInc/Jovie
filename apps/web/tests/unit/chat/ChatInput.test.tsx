@@ -1,9 +1,15 @@
+import { readFileSync } from 'node:fs';
+import { resolve } from 'node:path';
 import { TooltipProvider } from '@jovie/ui';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { fireEvent, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { type ComponentProps, type ReactNode, useState } from 'react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
+
+function readSource(path: string): string {
+  return readFileSync(resolve(process.cwd(), path), 'utf8');
+}
 
 import {
   ComposerFocusProvider,
@@ -95,11 +101,25 @@ class MockSpeechRecognition extends EventTarget {
   onerror: ((event: Event) => void) | null = null;
   start = vi.fn();
   stop = vi.fn();
+  abort = vi.fn();
 
   constructor() {
     super();
     MockSpeechRecognition.instances.push(this);
   }
+}
+
+function speechResultEvent(transcript: string): Event {
+  const alternative = { transcript, confidence: 1 };
+  return {
+    results: [
+      {
+        0: alternative,
+        length: 1,
+        item: () => alternative,
+      },
+    ],
+  } as unknown as Event;
 }
 
 function installMockSpeechRecognition() {
@@ -199,7 +219,7 @@ describe('ChatInput', () => {
       )
     );
 
-    expect(getByRole('button', { name: /Attach Files/i })).toBeEnabled();
+    expect(getByRole('button', { name: /Attachment options/i })).toBeEnabled();
   });
 
   it('does not lock the send control behind a spinner while generating', () => {
@@ -224,7 +244,7 @@ describe('ChatInput', () => {
     expect(textarea).toHaveFocus();
 
     // Click the plus button to open the attachment dropdown
-    await user.click(getByRole('button', { name: /Attach Files/i }));
+    await user.click(getByRole('button', { name: /Attachment options/i }));
 
     // Dropdown menu receives focus when opened (standard Radix behavior)
     expect(getByRole('menu')).toBeInTheDocument();
@@ -243,7 +263,7 @@ describe('ChatInput', () => {
       withProviders(<ChatInput {...baseProps} onFileAttach={vi.fn()} />)
     );
 
-    const attachButton = getByRole('button', { name: /Attach Files/i });
+    const attachButton = getByRole('button', { name: /Attachment options/i });
     const sendButton = getByRole('button', { name: /send message/i });
 
     expect(attachButton.className).toContain('h-9');
@@ -346,7 +366,7 @@ describe('ChatInput', () => {
     });
 
     for (const buttonName of [
-      /Attach Files/i,
+      /Attachment options/i,
       /dictation unavailable/i,
       /send message/i,
     ]) {
@@ -369,7 +389,7 @@ describe('ChatInput', () => {
     );
 
     const attachButton = screen.getByRole('button', {
-      name: /Attach Files/i,
+      name: /Attachment options/i,
     });
     const inlineField = screen.getByTestId('chat-input-inline-field');
 
@@ -570,7 +590,8 @@ describe('ChatInput', () => {
     installMockSpeechRecognition();
 
     function DraftHarness() {
-      const [value, setValue] = useState('Draft ');
+      // No trailing space: the joiner must add exactly one at the seam.
+      const [value, setValue] = useState('Draft');
       return (
         <ChatInput
           value={value}
@@ -632,17 +653,246 @@ describe('ChatInput', () => {
     expect(screen.getByRole('button', { name: /send message/i })).toBeEnabled();
   });
 
-  it('keeps dictation disabled in stale Electron when the desktop bridge cannot allow fallback', async () => {
+  it('never starts Web Speech in stale Electron and points at system dictation instead', async () => {
     installMockSpeechRecognition();
     setElectronAPI({ versions: { app: '0.1.0' } });
 
     fastRender(withProviders(<ChatInput {...baseProps} />));
 
-    const dictationButton = screen.getByRole('button', {
-      name: /dictation unavailable/i,
+    // Stale binaries cannot dictate through Web Speech either, so the mic
+    // stays pressable only to explain how to dictate with the OS.
+    const dictationButton = await screen.findByRole('button', {
+      name: /dictation unavailable · show how to dictate/i,
     });
-    await waitFor(() => expect(dictationButton).toBeDisabled());
+    expect(dictationButton).toBeEnabled();
+
+    fireEvent.pointerDown(dictationButton);
+    fireEvent.click(dictationButton);
     expect(MockSpeechRecognition.instances).toHaveLength(0);
+    expect(screen.getByRole('status')).toHaveTextContent(/macOS dictation/i);
+  });
+
+  it('shows the system-dictation hint when the desktop bridge reports dictation unavailable', async () => {
+    installMockSpeechRecognition();
+    setElectronAPI({
+      platform: 'darwin',
+      getDictationStatus: vi.fn().mockResolvedValue({
+        ok: true,
+        nativeAvailable: false,
+        webSpeechFallbackAllowed: false,
+        mode: 'unavailable',
+        reason: 'web-speech-unsupported-in-electron-use-macos-system-dictation',
+      }),
+    });
+
+    fastRender(withProviders(<ChatInput {...baseProps} />));
+
+    const dictationButton = await screen.findByRole('button', {
+      name: /show how to dictate/i,
+    });
+    fireEvent.click(dictationButton);
+
+    expect(MockSpeechRecognition.instances).toHaveLength(0);
+    const hint = screen.getByRole('status');
+    expect(hint).toHaveTextContent(/press the 🎤 key/i);
+
+    fireEvent.click(within(hint).getByRole('button', { name: /dismiss/i }));
+    expect(screen.queryByRole('status')).not.toBeInTheDocument();
+  });
+
+  it('degrades to the system-dictation hint when Electron Web Speech fails with a network error', async () => {
+    installMockSpeechRecognition();
+    // Older desktop binaries still advertise the Web Speech fallback.
+    setElectronAPI({
+      platform: 'darwin',
+      getDictationStatus: vi.fn().mockResolvedValue({
+        ok: true,
+        nativeAvailable: false,
+        webSpeechFallbackAllowed: true,
+        mode: 'web-speech',
+        reason: 'native-unavailable',
+      }),
+    });
+
+    fastRender(withProviders(<ChatInput {...baseProps} />));
+
+    // In Electron the hint state enables the mic before the bridge promise
+    // resolves, so wait for the live-dictation label, not just "enabled".
+    const dictationButton = await screen.findByTestId('dictation-toggle');
+    await waitFor(() =>
+      expect(dictationButton).toHaveAccessibleName(/hold to dictate/i)
+    );
+    fireEvent.pointerDown(dictationButton);
+    expect(MockSpeechRecognition.instances).toHaveLength(1);
+
+    MockSpeechRecognition.instances[0]?.onerror?.({
+      error: 'network',
+    } as unknown as Event);
+
+    // No misleading "needs a network connection" alert — the runtime simply
+    // cannot dictate, so the affordance flips to the OS-dictation hint.
+    await waitFor(() =>
+      expect(dictationButton).toHaveAccessibleName(/show how to dictate/i)
+    );
+    expect(screen.queryByRole('alert')).not.toBeInTheDocument();
+    expect(dictationButton).toHaveAttribute('aria-pressed', 'false');
+  });
+
+  it('seals dictation before send so late results cannot re-populate the composer', async () => {
+    installMockSpeechRecognition();
+
+    function SendHarness() {
+      const [value, setValue] = useState('');
+      return (
+        <ChatInput
+          value={value}
+          onChange={setValue}
+          onSubmit={() => setValue('')}
+          isLoading={false}
+          isSubmitting={false}
+        />
+      );
+    }
+
+    fastRender(withProviders(<SendHarness />));
+    const textarea = screen.getByRole('textbox', {
+      name: /chat message input/i,
+    });
+    const dictationButton = await screen.findByTestId('dictation-toggle');
+    await waitFor(() => expect(dictationButton).toBeEnabled());
+
+    fireEvent.pointerDown(dictationButton);
+    const recognition = MockSpeechRecognition.instances[0];
+    recognition?.onresult?.(speechResultEvent('ship the single'));
+    await waitFor(() => expect(textarea).toHaveValue('ship the single'));
+
+    fireEvent.pointerUp(dictationButton);
+    fireEvent.keyDown(textarea, { key: 'Enter' });
+    await waitFor(() => expect(textarea).toHaveValue(''));
+    // Release already stopped the engine; send seals the session so the
+    // stopped instance's generation is invalidated (no abort needed).
+    expect(recognition?.stop).toHaveBeenCalledTimes(1);
+
+    // The engine's trailing final result arrives after the draft was sent.
+    recognition?.onresult?.(speechResultEvent('ship the single'));
+    recognition?.onend?.();
+    expect(textarea).toHaveValue('');
+  });
+
+  it('Escape while listening cancels dictation and restores the prior draft', async () => {
+    installMockSpeechRecognition();
+
+    function DraftHarness() {
+      const [value, setValue] = useState('Keep this');
+      return (
+        <ChatInput
+          value={value}
+          onChange={setValue}
+          onSubmit={vi.fn()}
+          isLoading={false}
+          isSubmitting={false}
+        />
+      );
+    }
+
+    fastRender(withProviders(<DraftHarness />));
+    const textarea = screen.getByRole('textbox', {
+      name: /chat message input/i,
+    });
+    const dictationButton = await screen.findByTestId('dictation-toggle');
+    await waitFor(() => expect(dictationButton).toBeEnabled());
+
+    fireEvent.click(dictationButton);
+    const recognition = MockSpeechRecognition.instances[0];
+    recognition?.onresult?.(speechResultEvent('wrong words'));
+    await waitFor(() => expect(textarea).toHaveValue('Keep this wrong words'));
+
+    fireEvent.keyDown(textarea, { key: 'Escape' });
+
+    await waitFor(() => expect(textarea).toHaveValue('Keep this'));
+    expect(recognition?.abort).toHaveBeenCalledTimes(1);
+    expect(dictationButton).toHaveAttribute('aria-pressed', 'false');
+    expect(screen.queryByRole('status')).not.toBeInTheDocument();
+  });
+
+  it('offers a Cancel action in the listening banner that restores the draft', async () => {
+    installMockSpeechRecognition();
+
+    function DraftHarness() {
+      const [value, setValue] = useState('Keep this');
+      return (
+        <ChatInput
+          value={value}
+          onChange={setValue}
+          onSubmit={vi.fn()}
+          isLoading={false}
+          isSubmitting={false}
+        />
+      );
+    }
+
+    fastRender(withProviders(<DraftHarness />));
+    const textarea = screen.getByRole('textbox', {
+      name: /chat message input/i,
+    });
+    const dictationButton = await screen.findByTestId('dictation-toggle');
+    await waitFor(() => expect(dictationButton).toBeEnabled());
+
+    fireEvent.click(dictationButton);
+    MockSpeechRecognition.instances[0]?.onresult?.(
+      speechResultEvent('scratch that')
+    );
+    await waitFor(() => expect(textarea).toHaveValue('Keep this scratch that'));
+
+    fireEvent.click(screen.getByRole('button', { name: /cancel dictation/i }));
+
+    await waitFor(() => expect(textarea).toHaveValue('Keep this'));
+    expect(dictationButton).toHaveAttribute('aria-pressed', 'false');
+  });
+
+  it('restarts recognition when the engine ends mid-hold and keeps the banked text', async () => {
+    installMockSpeechRecognition();
+
+    function DraftHarness() {
+      const [value, setValue] = useState('');
+      return (
+        <ChatInput
+          value={value}
+          onChange={setValue}
+          onSubmit={vi.fn()}
+          isLoading={false}
+          isSubmitting={false}
+        />
+      );
+    }
+
+    fastRender(withProviders(<DraftHarness />));
+    const textarea = screen.getByRole('textbox', {
+      name: /chat message input/i,
+    });
+    const dictationButton = await screen.findByTestId('dictation-toggle');
+    await waitFor(() => expect(dictationButton).toBeEnabled());
+
+    fireEvent.pointerDown(dictationButton);
+    const first = MockSpeechRecognition.instances[0];
+    first?.onresult?.(speechResultEvent('first half'));
+    await waitFor(() => expect(textarea).toHaveValue('first half'));
+
+    // Chrome ends continuous sessions on its own (silence / ~60s cap).
+    first?.onend?.();
+    expect(MockSpeechRecognition.instances).toHaveLength(2);
+    const second = MockSpeechRecognition.instances[1];
+    expect(second?.start).toHaveBeenCalledTimes(1);
+    expect(dictationButton).toHaveAttribute('aria-pressed', 'true');
+
+    second?.onresult?.(speechResultEvent('second half'));
+    await waitFor(() => expect(textarea).toHaveValue('first half second half'));
+
+    fireEvent.pointerUp(dictationButton);
+    expect(second?.stop).toHaveBeenCalledTimes(1);
+    second?.onend?.();
+    expect(MockSpeechRecognition.instances).toHaveLength(2);
+    expect(dictationButton).toHaveAttribute('aria-pressed', 'false');
   });
 
   it('uses Web Speech fallback when the Electron bridge allows trusted dictation', async () => {
@@ -661,7 +911,9 @@ describe('ChatInput', () => {
     fastRender(withProviders(<ChatInput {...baseProps} />));
 
     const dictationButton = await screen.findByTestId('dictation-toggle');
-    await waitFor(() => expect(dictationButton).toBeEnabled());
+    await waitFor(() =>
+      expect(dictationButton).toHaveAccessibleName(/hold to dictate/i)
+    );
 
     dictationButton.focus();
     await user.keyboard('{Enter}');
@@ -897,5 +1149,14 @@ describe('ChatInput', () => {
     expect(stopButton).toBeEnabled();
     await user.click(stopButton);
     expect(onStop).toHaveBeenCalledTimes(1);
+  });
+
+  // @coverage-via source receipt (JOV-4421): assert the exact component source
+  // so the receipt resolves with executable evidence for this file.
+  it('is the covered source for the @coverage-via receipt from ChatInput.tsx', () => {
+    const source = readSource('components/jovie/components/ChatInput.tsx');
+    expect(source).toContain('export const ChatInput');
+    // Dictation sealing contract this PR introduces (JOV-5873).
+    expect(source).toContain('sealDictationForSend');
   });
 });

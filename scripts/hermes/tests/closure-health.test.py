@@ -3,7 +3,9 @@
 from __future__ import annotations
 
 import importlib.util
+import json
 import pathlib
+import re
 import unittest
 from datetime import datetime, timedelta, timezone
 from unittest import mock
@@ -19,6 +21,107 @@ SPEC.loader.exec_module(MODULE)
 
 UTC = timezone.utc
 NOW = datetime(2026, 8, 28, 5, 0, tzinfo=UTC)
+DEFAULT_PROMOTION_EVIDENCE = object()
+
+
+def exact_green_promotion_evidence(number: int) -> dict[str, object]:
+    return {
+        "status": "complete",
+        "headOid": f"{number:040x}",
+        "baseOid": "a" * 40,
+        "comparisonStatus": "ahead",
+        "aheadBy": 1,
+        "behindBy": 0,
+        "requiredCheckNames": sorted(MODULE.EXPECTED_REQUIRED_CHECKS),
+        "requiredChecks": [
+            {
+                "name": name,
+                "kind": "required-check",
+                "sources": [
+                    (
+                        {
+                            "producer": "legacy-status",
+                            "name": name,
+                            "kind": "status-context",
+                            "state": "SUCCESS",
+                        }
+                        if name == "Fork PR Gate"
+                        else {
+                            "producer": "check-app:ci",
+                            "name": name,
+                            "kind": "check-run",
+                            "status": "COMPLETED",
+                            "conclusion": "SUCCESS",
+                        }
+                    )
+                ],
+            }
+            for name in sorted(MODULE.EXPECTED_REQUIRED_CHECKS)
+        ],
+    }
+
+
+def live_required_ruleset() -> list[dict[str, object]]:
+    return [
+        {
+            "type": "required_status_checks",
+            "ruleset_id": 10512119,
+            "parameters": {
+                "required_status_checks": [
+                    {"context": name}
+                    for name in sorted(MODULE.EXPECTED_REQUIRED_CHECKS)
+                ]
+            },
+        }
+    ]
+
+
+def exact_named_check_commit(
+    number: int, *, check_status: str = "COMPLETED", check_conclusion: str | None = "SUCCESS"
+) -> dict[str, object]:
+    status: dict[str, object] = {}
+    suite: dict[str, object] = {"app": {"id": "ci", "slug": "github-actions"}}
+    commit: dict[str, object] = {
+        "oid": f"{number:040x}",
+        "status": status,
+        "requiredSuites": {"totalCount": 1, "nodes": [suite]},
+    }
+    for index, name in enumerate(sorted(MODULE.EXPECTED_REQUIRED_CHECKS)):
+        suite[f"runs_{index}"] = {"totalCount": 0, "nodes": []}
+        if name == "Fork PR Gate":
+            status[f"legacy_{index}"] = {
+                "context": name,
+                "state": "SUCCESS",
+                "createdAt": "2026-08-30T16:00:00Z",
+            }
+            continue
+        suite[f"runs_{index}"] = {
+            "totalCount": 1,
+            "nodes": [
+                {
+                    "databaseId": 100 + index,
+                    "name": name,
+                    "status": check_status,
+                    "conclusion": check_conclusion,
+                }
+            ],
+        }
+    return commit
+
+
+def promotion_pr_state(number: int, *, head_oid: str | None = None) -> dict[str, object]:
+    return {
+        "state": "OPEN",
+        "headRefOid": head_oid or f"{number:040x}",
+        "baseRefName": "main",
+        "isDraft": False,
+        "isCrossRepository": False,
+        "mergeStateStatus": "CLEAN",
+        "updatedAt": NOW.isoformat(),
+        "author": {"login": "summer-test"},
+        "labels": {"totalCount": 0, "nodes": []},
+        "mergeQueueEntry": None,
+    }
 
 
 def pr(
@@ -42,6 +145,7 @@ def pr(
     head_ref: str | None = None,
     head_oid: str | None = None,
     created_at: datetime | None = None,
+    promotion_evidence: object = DEFAULT_PROMOTION_EVIDENCE,
 ) -> dict[str, object]:
     exact_head = head_oid or f"{number if isinstance(number, int) else 0:040x}"[-40:]
     payload: dict[str, object] = {
@@ -51,13 +155,18 @@ def pr(
         "baseRefName": base_ref,
         "headRefName": head_ref or f"symphony/test-pr-{number}",
         "headRefOid": exact_head,
+        "baseRefOid": "a" * 40,
+        "currentBaseOid": "a" * 40 if base_ref == "main" else None,
         "isDraft": draft,
         "isCrossRepository": cross_repository,
         "mergeStateStatus": merge_state,
         "createdAt": (created_at or updated_at - timedelta(hours=1)).isoformat(),
         "updatedAt": updated_at.isoformat(),
         "author": {"login": author},
-        "labels": {"nodes": [{"name": label} for label in labels]},
+        "labels": {
+            "totalCount": len(labels),
+            "nodes": [{"name": label} for label in labels],
+        },
         "mergeQueueEntry": (
             {
                 "position": 1,
@@ -68,6 +177,10 @@ def pr(
             else None
         ),
     }
+    if promotion_evidence is DEFAULT_PROMOTION_EVIDENCE:
+        payload["promotionEvidence"] = exact_green_promotion_evidence(number)
+    elif promotion_evidence is not None:
+        payload["promotionEvidence"] = promotion_evidence
     if files_payload is not None:
         payload["files"] = files_payload
         if changed_files is not None:
@@ -84,6 +197,7 @@ def pr(
 
 def snapshot(**overrides: object) -> dict[str, object]:
     value: dict[str, object] = {
+        "repository": "JovieInc/Jovie",
         "controller": {
             "status": "green",
             "runId": 42,
@@ -195,7 +309,9 @@ class ClosureClassificationTests(unittest.TestCase):
         self.assertEqual(result["repairActions"][0]["rootPr"], 101)
         action = result["repairActions"][0]
         self.assertEqual(action["memberHeads"][-1]["headSha"], layers[-1]["headRefOid"])
+        self.assertEqual(action["repository"], "JovieInc/Jovie")
         self.assertEqual(health["status"], "red")
+        self.assertEqual(health["repository"], "JovieInc/Jovie")
         self.assertIn("draft-stack-policy-violation", health["reasons"])
         self.assertFalse(health["newIssueIntakeAllowed"])
         self.assertTrue(health["promotionContinues"])
@@ -245,6 +361,10 @@ class ClosureClassificationTests(unittest.TestCase):
         self.assertEqual(
             [action["rootPr"] for action in result["repairActions"]], [121, 123]
         )
+        self.assertEqual(
+            {action["repository"] for action in result["repairActions"]},
+            {"JovieInc/Jovie"},
+        )
 
     def test_cyclic_draft_stack_emits_one_persistable_canonical_action(self):
         result = MODULE.classify_open_prs(
@@ -262,6 +382,14 @@ class ClosureClassificationTests(unittest.TestCase):
         self.assertEqual((path, action["maxDepth"]), ([131, 132], 2))
         self.assertEqual(len(path), len(set(path)))
         self.assertEqual([entry["pr"] for entry in action["memberHeads"]], path)
+
+    def test_required_check_contract_matches_source_ruleset(self):
+        ruleset = (ROOT / ".github/rulesets/branch-protection.yml").read_text(
+            encoding="utf-8"
+        )
+        source_contexts = frozenset(re.findall(r"- context: '([^']+)'", ruleset))
+
+        self.assertEqual(MODULE.EXPECTED_REQUIRED_CHECKS, source_contexts)
 
     def test_every_open_pr_receives_a_deterministic_lifecycle_disposition(self):
         result = MODULE.classify_open_prs(
@@ -283,6 +411,93 @@ class ClosureClassificationTests(unittest.TestCase):
         self.assertEqual(held["reason"], "draft")
         self.assertIsInstance(held["expiresAt"], str)
         self.assertEqual(result["unclassified"], [])
+
+    def test_clean_pr_with_stale_base_is_repair_not_promote(self):
+        evidence = exact_green_promotion_evidence(12)
+        evidence["behindBy"] = 3
+        result = MODULE.classify_open_prs(
+            [pr(12, title="fix: current JOV-112", promotion_evidence=evidence)], NOW
+        )
+
+        disposition = result["dispositions"][0]
+        self.assertEqual(disposition["state"], "repair")
+        self.assertEqual(disposition["reason"], "stale-base")
+        self.assertEqual(disposition["behindBy"], 3)
+
+    def test_clean_pr_requires_exact_live_required_check_set(self):
+        failing = exact_green_promotion_evidence(13)
+        failing["requiredChecks"][0]["sources"][0]["state"] = "FAILURE"  # type: ignore[index]
+        missing = exact_green_promotion_evidence(14)
+        missing["requiredChecks"] = missing["requiredChecks"][:-1]  # type: ignore[index]
+
+        result = MODULE.classify_open_prs(
+            [
+                pr(13, title="fix: checks JOV-113", promotion_evidence=failing),
+                pr(14, title="fix: checks JOV-114", promotion_evidence=missing),
+            ],
+            NOW,
+        )
+
+        dispositions = {item["number"]: item for item in result["dispositions"]}
+        self.assertEqual(dispositions[13]["reason"], "required-checks-not-green")
+        self.assertEqual(dispositions[14]["reason"], "required-check-evidence-missing")
+
+    def test_checkable_unstable_and_github_success_conclusions_can_promote(self):
+        evidence = exact_green_promotion_evidence(17)
+        check_runs = [
+            check["sources"][0]
+            for check in evidence["requiredChecks"]  # type: ignore[union-attr]
+            if check["sources"][0]["kind"] == "check-run"
+        ]
+        check_runs[0]["conclusion"] = "SKIPPED"
+        check_runs[1]["conclusion"] = "NEUTRAL"
+
+        result = MODULE.classify_open_prs(
+            [
+                pr(
+                    17,
+                    title="fix: advisory JOV-117",
+                    merge_state="UNSTABLE",
+                    promotion_evidence=evidence,
+                )
+            ],
+            NOW,
+        )
+
+        self.assertEqual(result["dispositions"][0]["state"], "promote")
+
+    def test_live_required_check_policy_drift_is_repair(self):
+        evidence = exact_green_promotion_evidence(18)
+        evidence["requiredCheckNames"] = [
+            *evidence["requiredCheckNames"],  # type: ignore[list-item]
+            "New Required Gate",
+        ]
+
+        result = MODULE.classify_open_prs(
+            [pr(18, title="fix: policy JOV-118", promotion_evidence=evidence)], NOW
+        )
+
+        self.assertEqual(
+            result["dispositions"][0]["reason"], "required-check-policy-drift"
+        )
+
+    def test_clean_pr_without_exact_evidence_is_repair_not_promote(self):
+        result = MODULE.classify_open_prs(
+            [pr(15, title="fix: evidence JOV-115", promotion_evidence=None)], NOW
+        )
+
+        disposition = result["dispositions"][0]
+        self.assertEqual(disposition["state"], "repair")
+        self.assertEqual(disposition["reason"], "promotion-evidence-missing")
+
+    def test_non_main_clean_pr_is_not_a_promotion_candidate(self):
+        result = MODULE.classify_open_prs(
+            [pr(16, title="fix: stacked JOV-116", base_ref="stack-parent")], NOW
+        )
+
+        disposition = result["dispositions"][0]
+        self.assertEqual(disposition["state"], "repair")
+        self.assertEqual(disposition["reason"], "non-main-base")
 
     def test_duplicate_issue_lanes_stop_the_line_without_guessing_a_loser(self):
         result = MODULE.classify_open_prs(
@@ -399,8 +614,10 @@ class ClosureClassificationTests(unittest.TestCase):
             previous=None,
             now=NOW,
         )
-        self.assertEqual(health["status"], "healthy")
-        self.assertTrue(health["newIssueIntakeAllowed"])
+        self.assertEqual(health["status"], "red")
+        self.assertFalse(health["newIssueIntakeAllowed"])
+        self.assertIn("internally-repairable-prs-open", health["reasons"])
+        self.assertNotIn("duplicate-issue-lanes-unresolved", health["reasons"])
 
     def test_only_overlapping_prs_are_duplicate_participants(self):
         result = MODULE.classify_open_prs(
@@ -422,6 +639,201 @@ class ClosureClassificationTests(unittest.TestCase):
                 }
             ],
         )
+
+    def test_declared_native_stack_is_not_a_duplicate_lane(self):
+        contract = (
+            "## Native stack contract (JOV-INV-020)\n"
+            "- Linear lane: JOV-5158\n"
+            "- Root: #16894 at 2a08234388c342c9c503bd622370f07bcf0b7201\n"
+        )
+        result = MODULE.classify_open_prs(
+            [
+                pr(
+                    30,
+                    title="feat: register thumbnail candidates",
+                    body=(
+                        contract
+                        + "- Immediate parent: #16894 at 2a08234388c342c9c503bd622370f07bcf0b7201"
+                    ),
+                    head_ref="codex/jov-5158-youtube-pilot-stack",
+                    files=("scripts/shared.py", "scripts/a.py"),
+                ),
+                pr(
+                    31,
+                    title="feat: reconcile review decisions",
+                    body="Extends #30 with approve/reject.\n" + contract,
+                    head_ref="codex/jov-5158-youtube-decision-gate",
+                    queued=True,
+                    files=("scripts/shared.py", "scripts/b.py"),
+                ),
+                pr(
+                    32,
+                    title="feat: preview service (JOV-5862, 2/4)",
+                    body="Layer 2 of the JOV-5862 stack.",
+                    head_ref="eve/jov-5862-02-preview-service",
+                    files=("scripts/shared.py", "scripts/c.py"),
+                ),
+                pr(
+                    33,
+                    title="feat: preview route (JOV-5862, 3/4)",
+                    body="Layer 3 of the JOV-5862 stack.",
+                    head_ref="eve/jov-5862-03-preview-route",
+                    files=("scripts/shared.py", "scripts/d.py"),
+                ),
+            ],
+            NOW,
+        )
+
+        self.assertEqual(result["duplicateIssueLanes"], [])
+        self.assertEqual(result["unclassified"], [])
+        health = MODULE.evaluate_closure_health(
+            snapshot(classifications=result),
+            previous=None,
+            now=NOW,
+        )
+        self.assertEqual(health["status"], "healthy")
+        self.assertNotIn("duplicate-issue-lanes-unresolved", health["reasons"])
+
+    def test_native_stack_layer_slash_wording_is_not_a_duplicate_lane(self):
+        # Live shape from the JOV-5853 Summer stack (2026-09-04): bodies declare
+        # "native stack layer N/M" (no "of", no N/M in the title).
+        result = MODULE.classify_open_prs(
+            [
+                pr(
+                    40,
+                    title="feat(eve): bind Summer bottleneck runtime (JOV-5853)",
+                    body="JOV-5853 native stack layer 3/7.\n\nImmediate parent: #39 @ 337b440a3510c71dab03845fd2b926ec6e9a8b58\n",
+                    head_ref="codex/jov-5853-summer-stack-03-runtime",
+                    files=("scripts/shared.py", "scripts/runtime.py"),
+                ),
+                pr(
+                    41,
+                    title="fix(eve): harden Summer Blob adapters (JOV-5853)",
+                    body="JOV-5853 native stack layer 4/7.\n\nImmediate parent: #40 @ 337b440a3510c71dab03845fd2b926ec6e9a8b58\n",
+                    head_ref="codex/jov-5853-summer-stack-04-adapters",
+                    merge_state="DIRTY",
+                    files=("scripts/shared.py", "scripts/adapters.py"),
+                ),
+            ],
+            NOW,
+        )
+
+        self.assertEqual(result["duplicateIssueLanes"], [])
+        self.assertEqual(result["unclassified"], [])
+
+    def test_branch_chained_and_cumulative_nested_lanes_are_stack_evidence(self):
+        result = MODULE.classify_open_prs(
+            [
+                pr(
+                    34,
+                    title="feat: ship JOV-783",
+                    files=("scripts/a.py",),
+                    head_ref="stack/jov-783-root",
+                ),
+                pr(
+                    35,
+                    title="feat: ship JOV-783",
+                    files=("scripts/a.py", "scripts/b.py"),
+                    base_ref="stack/jov-783-root",
+                    head_ref="stack/jov-783-mid",
+                ),
+                pr(
+                    36,
+                    title="feat: ship JOV-783",
+                    merge_state="DIRTY",
+                    files=("scripts/a.py", "scripts/b.py", "scripts/c.py"),
+                ),
+            ],
+            NOW,
+        )
+
+        self.assertEqual(result["duplicateIssueLanes"], [])
+        health = MODULE.evaluate_closure_health(
+            snapshot(classifications=result),
+            previous=None,
+            now=NOW,
+        )
+        self.assertEqual(health["status"], "red")
+        self.assertNotIn("duplicate-issue-lanes-unresolved", health["reasons"])
+        self.assertIn("internally-repairable-prs-open", health["reasons"])
+
+    def test_parallel_competing_lanes_with_identical_files_still_flag(self):
+        result = MODULE.classify_open_prs(
+            [
+                pr(
+                    37,
+                    title="feat: ship JOV-784",
+                    files=("scripts/shared.py", "scripts/a.py"),
+                ),
+                pr(
+                    38,
+                    title="feat: ship JOV-784",
+                    merge_state="DIRTY",
+                    files=("scripts/shared.py", "scripts/a.py"),
+                ),
+            ],
+            NOW,
+        )
+
+        self.assertEqual(
+            result["duplicateIssueLanes"],
+            [
+                {
+                    "issue": "JOV-784",
+                    "prs": [37, 38],
+                    "overlap": ["scripts/a.py", "scripts/shared.py"],
+                }
+            ],
+        )
+        health = MODULE.evaluate_closure_health(
+            snapshot(classifications=result),
+            previous=None,
+            now=NOW,
+        )
+        self.assertEqual(health["status"], "red")
+        self.assertIn("duplicate-issue-lanes-unresolved", health["reasons"])
+
+    def test_partial_stack_signals_fail_closed(self):
+        result = MODULE.classify_open_prs(
+            [
+                pr(
+                    39,
+                    title="feat: ship JOV-785",
+                    files=("scripts/shared.py", "scripts/a.py"),
+                ),
+                pr(
+                    40,
+                    title="feat: ship JOV-785",
+                    body="Extends #39.\n## Native stack contract (JOV-INV-020)",
+                    files=("scripts/shared.py", "scripts/b.py"),
+                ),
+                pr(
+                    41,
+                    title="feat: ship JOV-785",
+                    merge_state="DIRTY",
+                    files=("scripts/shared.py", "scripts/c.py"),
+                ),
+            ],
+            NOW,
+        )
+
+        self.assertEqual(
+            result["duplicateIssueLanes"],
+            [
+                {
+                    "issue": "JOV-785",
+                    "prs": [39, 40, 41],
+                    "overlap": ["scripts/shared.py"],
+                }
+            ],
+        )
+        health = MODULE.evaluate_closure_health(
+            snapshot(classifications=result),
+            previous=None,
+            now=NOW,
+        )
+        self.assertEqual(health["status"], "red")
+        self.assertIn("duplicate-issue-lanes-unresolved", health["reasons"])
 
     def test_renamed_file_evidence_fails_closed_as_unclassified(self):
         result = MODULE.classify_open_prs(
@@ -632,10 +1044,29 @@ class ClosureClassificationTests(unittest.TestCase):
                 {
                     "number": 10,
                     "issue": "JOV-778",
+                    "headOid": f"{10:040x}",
+                    "baseOid": "a" * 40,
+                    "eventBaseOid": "a" * 40,
+                    "baseRefName": "main",
                     "state": "close",
                     "reason": "duplicate",
                 }
             ],
+        )
+
+    def test_truncated_lifecycle_labels_fail_closed_before_disposition(self):
+        candidate = pr(11, title="feat: label proof JOV-779")
+        candidate["labels"] = {
+            "totalCount": 101,
+            "nodes": [{"name": f"label-{index}"} for index in range(100)],
+        }
+
+        result = MODULE.classify_open_prs([candidate], NOW)
+
+        self.assertEqual(result["dispositions"], [])
+        self.assertEqual(
+            result["unclassified"],
+            [{"number": 11, "reason": "label-evidence-truncated"}],
         )
 
     def test_malformed_identity_and_expired_hold_are_explicit(self):
@@ -687,6 +1118,32 @@ class ClosureHealthEvaluationTests(unittest.TestCase):
         self.assertEqual(result["authority"], "Summer")
         self.assertTrue(result["promotionContinues"])
         self.assertTrue(result["remediationContinues"])
+        self.assertEqual(result["stackHealth"], MODULE.empty_stack_health())
+        self.assertEqual(result["repairActions"], [])
+
+    def test_malformed_stack_health_stays_bounded_for_fleet_refresh_ingress(self):
+        result = MODULE.evaluate_closure_health(
+            snapshot(
+                classifications={
+                    "dispositions": [
+                        {"number": 1, "state": "promote"},
+                    ],
+                    "unclassified": [],
+                    "duplicateIssueLanes": [],
+                    "expiredHolds": [],
+                    "changedFileEvidence": [],
+                    "stackHealth": {"maxDepth": 4},
+                    "repairActions": {"rootPr": 1},
+                }
+            ),
+            previous=None,
+            now=NOW,
+        )
+
+        self.assertEqual(result["status"], "red")
+        self.assertIn("closure-observation-unknown", result["reasons"])
+        self.assertEqual(result["stackHealth"], MODULE.empty_stack_health())
+        self.assertEqual(result["repairActions"], [])
 
     def test_controller_and_empty_queue_episodes_cross_bounded_red_thresholds(self):
         stalled = snapshot(
@@ -755,34 +1212,95 @@ class ClosureHealthEvaluationTests(unittest.TestCase):
         self.assertIn("no-merge-progress-over-1h", result["reasons"])
         self.assertFalse(result["newIssueIntakeAllowed"])
 
-    def test_unmergeable_native_queue_entry_is_immediate_red(self):
-        classifications = MODULE.classify_open_prs(
-            [
-                pr(
-                    7,
-                    title="fix: repair JOV-707",
-                    queued=True,
-                    queue_state="UNMERGEABLE",
-                )
-            ],
-            NOW,
+    def test_unmergeable_native_queue_episode_crosses_bounded_red_threshold(self):
+        churning = snapshot(
+            openPrs=1,
+            eligiblePrs=1,
+            greenReadyPrs=1,
+            classifications=MODULE.classify_open_prs(
+                [
+                    pr(
+                        7,
+                        title="fix: repair JOV-707",
+                        queued=True,
+                        queue_state="UNMERGEABLE",
+                    )
+                ],
+                NOW,
+            ),
         )
 
+        first = MODULE.evaluate_closure_health(churning, previous=None, now=NOW)
+        self.assertEqual(first["status"], "grace")
+        self.assertNotIn("native-queue-unmergeable", first["reasons"])
+        self.assertEqual(first["unmergeableNativeQueuePrs"], [7])
+        self.assertEqual(
+            first["episodes"]["unmergeableQueue"]["since"],
+            MODULE.isoformat(NOW),
+        )
+        self.assertFalse(first["newIssueIntakeAllowed"])
+
         result = MODULE.evaluate_closure_health(
-            snapshot(
-                openPrs=1,
-                eligiblePrs=1,
-                greenReadyPrs=1,
-                classifications=classifications,
-            ),
-            previous=None,
-            now=NOW,
+            churning,
+            previous=first,
+            now=NOW + timedelta(minutes=16),
         )
 
         self.assertEqual(result["status"], "red")
         self.assertIn("native-queue-unmergeable", result["reasons"])
         self.assertEqual(result["unmergeableNativeQueuePrs"], [7])
+        self.assertEqual(
+            result["episodes"]["unmergeableQueue"]["since"],
+            MODULE.isoformat(NOW),
+        )
         self.assertFalse(result["newIssueIntakeAllowed"])
+
+    def test_unmergeable_native_queue_episode_clears_when_mergeable(self):
+        churning = snapshot(
+            openPrs=1,
+            eligiblePrs=1,
+            greenReadyPrs=1,
+            classifications=MODULE.classify_open_prs(
+                [
+                    pr(
+                        7,
+                        title="fix: repair JOV-707",
+                        queued=True,
+                        queue_state="UNMERGEABLE",
+                    )
+                ],
+                NOW,
+            ),
+        )
+        first = MODULE.evaluate_closure_health(churning, previous=None, now=NOW)
+        self.assertIn("unmergeableQueue", first["episodes"])
+
+        cleared = MODULE.evaluate_closure_health(
+            snapshot(
+                openPrs=1,
+                eligiblePrs=1,
+                greenReadyPrs=1,
+                classifications=MODULE.classify_open_prs(
+                    [
+                        pr(
+                            7,
+                            title="fix: repair JOV-707",
+                            queued=True,
+                            queue_state="AWAITING_CHECKS",
+                        )
+                    ],
+                    NOW,
+                ),
+            ),
+            previous=first,
+            now=NOW + timedelta(minutes=5),
+        )
+
+        self.assertEqual(cleared["status"], "healthy")
+        self.assertNotIn("unmergeableQueue", cleared["episodes"])
+        self.assertNotIn("native-queue-unmergeable", cleared["reasons"])
+        self.assertEqual(cleared["unmergeableNativeQueuePrs"], [])
+        self.assertTrue(cleared["newIssueIntakeAllowed"])
 
     def test_unclassified_pr_crosses_fifteen_minute_deliberate_red(self):
         unclassified = snapshot(
@@ -804,6 +1322,32 @@ class ClosureHealthEvaluationTests(unittest.TestCase):
 
         self.assertEqual(result["status"], "red")
         self.assertIn("unclassified-open-pr-over-15m", result["reasons"])
+
+    def test_previous_closure_history_is_scoped_to_repository(self):
+        previous = MODULE.evaluate_closure_health(
+            snapshot(
+                repository="JovieInc/Jovie",
+                nativeQueueCount=0,
+            ),
+            previous=None,
+            now=NOW,
+        )
+        current_now = NOW + timedelta(minutes=20)
+        current = MODULE.evaluate_closure_health(
+            snapshot(
+                repository="JovieInc/LogYourBody",
+                nativeQueueCount=0,
+            ),
+            previous=previous,
+            now=current_now,
+        )
+
+        self.assertEqual(previous["status"], "grace")
+        self.assertEqual(current["status"], "grace")
+        self.assertEqual(
+            current["episodes"]["emptyNativeQueue"]["since"],
+            MODULE.isoformat(current_now),
+        )
 
     def test_malformed_observation_and_expired_hold_fail_closed(self):
         result = MODULE.evaluate_closure_health(
@@ -830,11 +1374,375 @@ class ClosureHealthEvaluationTests(unittest.TestCase):
 
 
 class ClosureObservationTests(unittest.TestCase):
+    def test_promotion_evidence_binds_compare_checks_and_final_readback(self):
+        candidate = pr(
+            21,
+            title="fix: exact JOV-121",
+            promotion_evidence=None,
+        )
+        calls: list[list[str]] = []
+
+        def run(command: list[str], **_kwargs: object) -> mock.Mock:
+            calls.append(command)
+            if command[1:3] == ["api", "graphql"]:
+                payload = {
+                    "data": {
+                        "repository": {
+                            "base": {"target": {"oid": "a" * 40}},
+                            "pr_21": promotion_pr_state(21),
+                            "commit_21": exact_named_check_commit(21),
+                        }
+                    }
+                }
+            elif "rules/branches/main" in command[2]:
+                payload = live_required_ruleset()
+            elif "compare/" in command[2]:
+                payload = {
+                    "status": "ahead",
+                    "ahead_by": 1,
+                    "behind_by": 0,
+                    "base_commit": {"sha": "a" * 40},
+                }
+            else:
+                raise AssertionError(f"unexpected command: {command}")
+            return mock.Mock(returncode=0, stdout=json.dumps(payload))
+
+        observed = MODULE.observe_promotion_evidence(
+            "JovieInc/Jovie", [candidate], "a" * 40, run_impl=run
+        )[0]
+
+        evidence = observed["promotionEvidence"]
+        self.assertEqual(evidence["status"], "complete")
+        self.assertEqual(evidence["behindBy"], 0)
+        self.assertIn("rules/branches/main", calls[0][2])
+        self.assertEqual(calls[1][0:3], ["gh", "api", "graphql"])
+        self.assertIn(f"{'a' * 40}...{21:040x}", calls[2][2])
+        self.assertIn("rules/branches/main", calls[3][2])
+        self.assertEqual(calls[4][0:3], ["gh", "api", "graphql"])
+
+    def test_promotion_evidence_fails_closed_when_head_moves_during_observation(self):
+        candidate = pr(22, title="fix: race JOV-122", promotion_evidence=None)
+        graphql_calls = 0
+
+        def run(command: list[str], **_kwargs: object) -> mock.Mock:
+            nonlocal graphql_calls
+            if command[1:3] == ["api", "graphql"]:
+                graphql_calls += 1
+                final_readback = graphql_calls == 2
+                payload = {
+                    "data": {
+                        "repository": {
+                            "base": {"target": {"oid": "a" * 40}},
+                            "pr_22": promotion_pr_state(
+                                22,
+                                head_oid="f" * 40 if final_readback else None,
+                            ),
+                            "commit_22": exact_named_check_commit(22),
+                        }
+                    }
+                }
+            elif "rules/branches/main" in command[2]:
+                payload = live_required_ruleset()
+            elif "compare/" in command[2]:
+                payload = {
+                    "status": "ahead",
+                    "ahead_by": 1,
+                    "behind_by": 0,
+                    "base_commit": {"sha": "a" * 40},
+                }
+            else:
+                raise AssertionError(f"unexpected command: {command}")
+            return mock.Mock(returncode=0, stdout=json.dumps(payload))
+
+        observed = MODULE.observe_promotion_evidence(
+            "JovieInc/Jovie", [candidate], "a" * 40, run_impl=run
+        )[0]
+
+        self.assertEqual(observed["promotionEvidence"]["status"], "stale")
+
+    def test_final_readback_catches_same_sha_required_check_regression(self):
+        candidate = pr(24, title="fix: check race JOV-124", promotion_evidence=None)
+        graphql_calls = 0
+
+        def run(command: list[str], **_kwargs: object) -> mock.Mock:
+            nonlocal graphql_calls
+            if command[1:3] == ["api", "graphql"]:
+                graphql_calls += 1
+                payload = {
+                    "data": {
+                        "repository": {
+                            "base": {"target": {"oid": "a" * 40}},
+                            "pr_24": promotion_pr_state(24),
+                            "commit_24": exact_named_check_commit(
+                                24,
+                                check_status=(
+                                    "IN_PROGRESS" if graphql_calls == 2 else "COMPLETED"
+                                ),
+                                check_conclusion=(
+                                    None if graphql_calls == 2 else "SUCCESS"
+                                ),
+                            ),
+                        }
+                    }
+                }
+            elif "rules/branches/main" in command[2]:
+                payload = live_required_ruleset()
+            elif "compare/" in command[2]:
+                payload = {
+                    "status": "ahead",
+                    "ahead_by": 1,
+                    "behind_by": 0,
+                    "base_commit": {"sha": "a" * 40},
+                }
+            else:
+                raise AssertionError(f"unexpected command: {command}")
+            return mock.Mock(returncode=0, stdout=json.dumps(payload))
+
+        observed = MODULE.observe_promotion_evidence(
+            "JovieInc/Jovie", [candidate], "a" * 40, run_impl=run
+        )[0]
+        result = MODULE.classify_open_prs([observed], NOW)
+
+        self.assertEqual(graphql_calls, 2)
+        self.assertEqual(result["dispositions"][0]["state"], "repair")
+        self.assertEqual(
+            result["dispositions"][0]["reason"], "required-checks-not-green"
+        )
+
+    def test_promotion_evidence_fails_closed_on_live_required_policy_drift(self):
+        candidate = pr(23, title="fix: policy drift JOV-123", promotion_evidence=None)
+        calls: list[list[str]] = []
+
+        def run(command: list[str], **_kwargs: object) -> mock.Mock:
+            calls.append(command)
+            payload = live_required_ruleset()
+            payload[0]["parameters"]["required_status_checks"].append(  # type: ignore[index]
+                {"context": "New Required Gate"}
+            )
+            return mock.Mock(returncode=0, stdout=json.dumps(payload))
+
+        observed = MODULE.observe_promotion_evidence(
+            "JovieInc/Jovie", [candidate], "a" * 40, run_impl=run
+        )[0]
+
+        self.assertEqual(observed["promotionEvidence"]["status"], "policy-drift")
+        self.assertEqual(len(calls), 1)
+
+    def test_atomic_named_query_never_pages_the_mutable_rollup(self):
+        fields = MODULE._required_check_fields(MODULE.EXPECTED_REQUIRED_CHECKS)
+
+        self.assertNotIn("statusCheckRollup", fields)
+        self.assertNotIn("after:", fields)
+        self.assertIn(
+            f"requiredSuites:checkSuites(first:{MODULE.REQUIRED_CHECK_SUITE_PAGE})",
+            fields,
+        )
+        self.assertNotIn("checkSuites(first:50,filterBy", fields)
+        for name in MODULE.EXPECTED_REQUIRED_CHECKS:
+            self.assertIn(f"context(name:{json.dumps(name)})", fields)
+            self.assertIn(f"checkName:{json.dumps(name)}", fields)
+
+    def test_final_atomic_readback_applies_lifecycle_hard_stop(self):
+        candidate = pr(25, title="fix: lifecycle JOV-125", promotion_evidence=None)
+        initial_pr = {
+            **promotion_pr_state(25),
+            "headOid": f"{25:040x}",
+            "checkEvidenceStatus": "complete",
+            "requiredChecks": exact_green_promotion_evidence(25)["requiredChecks"],
+        }
+        final_pr = {
+            **initial_pr,
+            "isDraft": True,
+            "labels": {"totalCount": 1, "nodes": [{"name": "needs-human"}]},
+            "mergeQueueEntry": {
+                "position": 1,
+                "enqueuedAt": NOW.isoformat(),
+                "state": "AWAITING_CHECKS",
+            },
+        }
+        with mock.patch.object(
+            MODULE,
+            "_observe_live_required_checks",
+            return_value=MODULE.EXPECTED_REQUIRED_CHECKS,
+        ), mock.patch.object(
+            MODULE,
+            "_readback_promotion_state",
+            side_effect=[
+                {"baseOid": "a" * 40, "prs": {25: initial_pr}},
+                {"baseOid": "a" * 40, "prs": {25: final_pr}},
+            ],
+        ), mock.patch.object(
+            MODULE,
+            "_observe_one_comparison",
+            return_value={
+                "status": "complete",
+                "headOid": f"{25:040x}",
+                "baseOid": "a" * 40,
+                "comparisonStatus": "ahead",
+                "aheadBy": 1,
+                "behindBy": 0,
+            },
+        ):
+            observed = MODULE.observe_promotion_evidence(
+                "JovieInc/Jovie", [candidate], "a" * 40
+            )[0]
+
+        disposition = MODULE.classify_open_prs([observed], NOW)["dispositions"][0]
+        self.assertEqual(disposition["state"], "held")
+        self.assertEqual(disposition["reason"], "needs-human")
+
+    def test_final_atomic_readback_drops_a_now_closed_pr(self):
+        candidate = pr(26, title="fix: closed JOV-126", promotion_evidence=None)
+        current = {
+            **promotion_pr_state(26),
+            "headOid": f"{26:040x}",
+            "checkEvidenceStatus": "complete",
+            "requiredChecks": exact_green_promotion_evidence(26)["requiredChecks"],
+        }
+        with mock.patch.object(
+            MODULE,
+            "_observe_live_required_checks",
+            return_value=MODULE.EXPECTED_REQUIRED_CHECKS,
+        ), mock.patch.object(
+            MODULE,
+            "_readback_promotion_state",
+            side_effect=[
+                {"baseOid": "a" * 40, "prs": {26: current}},
+                {
+                    "baseOid": "a" * 40,
+                    "prs": {26: {**current, "state": "CLOSED"}},
+                },
+            ],
+        ), mock.patch.object(
+            MODULE,
+            "_observe_one_comparison",
+            return_value={
+                "status": "complete",
+                "headOid": f"{26:040x}",
+                "baseOid": "a" * 40,
+                "comparisonStatus": "ahead",
+                "aheadBy": 1,
+                "behindBy": 0,
+            },
+        ):
+            observed = MODULE.observe_promotion_evidence(
+                "JovieInc/Jovie", [candidate], "a" * 40
+            )
+
+        self.assertEqual(observed, [])
+
+    def test_more_than_25_green_candidates_are_all_compared(self):
+        candidates = [
+            pr(number, title=f"fix: bounded JOV-{number}", promotion_evidence=None)
+            for number in range(30, 56)
+        ]
+        state = {
+            "baseOid": "a" * 40,
+            "prs": {
+                number: {
+                    **promotion_pr_state(number),
+                    "headOid": f"{number:040x}",
+                    "checkEvidenceStatus": "complete",
+                    "requiredChecks": exact_green_promotion_evidence(number)[
+                        "requiredChecks"
+                    ],
+                }
+                for number in range(30, 56)
+            },
+        }
+        with mock.patch.object(
+            MODULE,
+            "_observe_live_required_checks",
+            return_value=MODULE.EXPECTED_REQUIRED_CHECKS,
+        ), mock.patch.object(
+            MODULE, "_readback_promotion_state", return_value=state
+        ), mock.patch.object(
+            MODULE,
+            "_observe_one_comparison",
+            side_effect=lambda _repo, candidate, base_oid, _deadline, **_kwargs: {
+                "status": "complete",
+                "headOid": candidate["headRefOid"],
+                "baseOid": base_oid,
+                "comparisonStatus": "ahead",
+                "aheadBy": 1,
+                "behindBy": 0,
+            },
+        ) as compare:
+            observed = MODULE.observe_promotion_evidence(
+                "JovieInc/Jovie", candidates, "a" * 40
+            )
+
+        self.assertEqual(
+            {item["promotionEvidence"]["status"] for item in observed},
+            {"complete"},
+        )
+        self.assertEqual(compare.call_count, 26)
+
+    def test_comparison_phase_has_one_aggregate_deadline(self):
+        candidates = [
+            pr(number, title=f"fix: deadline JOV-{number}", promotion_evidence=None)
+            for number in range(60, 63)
+        ]
+        state = {
+            "baseOid": "a" * 40,
+            "prs": {
+                number: {
+                    **promotion_pr_state(number),
+                    "headOid": f"{number:040x}",
+                    "checkEvidenceStatus": "complete",
+                    "requiredChecks": exact_green_promotion_evidence(number)[
+                        "requiredChecks"
+                    ],
+                }
+                for number in range(60, 63)
+            },
+        }
+
+        def expire_after_one(futures: object, *, timeout: float):
+            self.assertLessEqual(timeout, MODULE.PROMOTION_EVIDENCE_PHASE_SECONDS)
+            self.assertGreater(timeout, 0)
+            ordered = list(futures)
+            return {ordered[0]}, set(ordered[1:])
+
+        with mock.patch.object(
+            MODULE,
+            "_observe_live_required_checks",
+            return_value=MODULE.EXPECTED_REQUIRED_CHECKS,
+        ), mock.patch.object(
+            MODULE, "_readback_promotion_state", return_value=state
+        ), mock.patch.object(
+            MODULE,
+            "_observe_one_comparison",
+            side_effect=lambda _repo, candidate, base_oid, _deadline, **_kwargs: {
+                "status": "complete",
+                "headOid": candidate["headRefOid"],
+                "baseOid": base_oid,
+                "comparisonStatus": "ahead",
+                "aheadBy": 1,
+                "behindBy": 0,
+            },
+        ), mock.patch.object(
+            MODULE, "wait", side_effect=expire_after_one
+        ) as bounded_wait:
+            observed = MODULE.observe_promotion_evidence(
+                "JovieInc/Jovie", candidates, "a" * 40
+            )
+
+        self.assertEqual(
+            {
+                item["number"]: item["promotionEvidence"]["status"]
+                for item in observed
+            },
+            {60: "complete", 61: "deadline-exceeded", 62: "deadline-exceeded"},
+        )
+        self.assertEqual(bounded_wait.call_count, 1)
+
     def test_graphql_snapshot_aggregates_pages_and_requires_completeness(self):
         pages = [
             {
                 "data": {
                     "repository": {
+                        "main": {"target": {"oid": "a" * 40}},
                         "pullRequests": {
                             "totalCount": 2,
                             "nodes": [pr(1, title="feat: JOV-1")],
@@ -867,6 +1775,7 @@ class ClosureObservationTests(unittest.TestCase):
             result = MODULE._run_graphql_snapshot("JovieInc/Jovie")
 
         self.assertEqual([item["number"] for item in result["prs"]], [1, 2])
+        self.assertEqual(result["mainOid"], "a" * 40)
         self.assertEqual(result["latestMergeAt"], MODULE.isoformat(NOW))
         self.assertIn("owner=JovieInc", run.call_args.args[0])
         self.assertIn("name=Jovie", run.call_args.args[0])
@@ -875,8 +1784,11 @@ class ClosureObservationTests(unittest.TestCase):
             for argument in run.call_args.args[0]
             if argument.startswith("query=")
         )
-        self.assertIn("number title body baseRefName headRefName headRefOid", query_arg)
+        self.assertIn("number title body headRefName headRefOid", query_arg)
+        self.assertIn('main:ref(qualifiedName:"refs/heads/main")', query_arg)
+        self.assertIn("headRefOid baseRefName baseRefOid", query_arg)
         self.assertIn("isCrossRepository", query_arg)
+        self.assertIn("labels(first:100){totalCount nodes{name}}", query_arg)
         self.assertIn("changedFiles", query_arg)
         self.assertIn(f"files(first:{MODULE.CHANGED_FILES_PAGE})", query_arg)
         self.assertIn("nodes{path changeType}", query_arg)
@@ -928,6 +1840,25 @@ class ClosureObservationTests(unittest.TestCase):
                 {"status": "unknown", "reason": "controller-run-missing"},
             )
 
+    def test_live_observer_propagates_one_end_to_end_deadline(self):
+        expected_deadline = 10.0 + MODULE.CLOSURE_OBSERVATION_SECONDS
+        with mock.patch.object(
+            MODULE.time, "monotonic", return_value=10.0
+        ), mock.patch.object(
+            MODULE,
+            "_run_graphql_snapshot",
+            return_value={"prs": [], "mainOid": "a" * 40, "latestMergeAt": None},
+        ) as snapshot_read, mock.patch.object(
+            MODULE, "observe_promotion_evidence", return_value=[]
+        ) as promotion_read, mock.patch.object(
+            MODULE, "_observe_queue_controller", return_value={"status": "green"}
+        ) as controller_read:
+            MODULE.observe_closure_health("JovieInc/Jovie", previous=None, now=NOW)
+
+        self.assertEqual(snapshot_read.call_args.args[1], expected_deadline)
+        self.assertEqual(promotion_read.call_args.args[3], expected_deadline)
+        self.assertEqual(controller_read.call_args.args[1], expected_deadline)
+
     def test_live_observer_emits_typed_health_and_fails_closed_on_transport(self):
         prs = [
             pr(1, title="feat: JOV-1", queued=True),
@@ -938,6 +1869,7 @@ class ClosureObservationTests(unittest.TestCase):
             "_run_graphql_snapshot",
             return_value={
                 "prs": prs,
+                "mainOid": "a" * 40,
                 "latestMergeAt": (NOW - timedelta(minutes=30)).isoformat(),
             },
         ), mock.patch.object(
@@ -950,6 +1882,7 @@ class ClosureObservationTests(unittest.TestCase):
             )
 
         self.assertEqual(result["status"], "healthy")
+        self.assertEqual(result["repository"], "JovieInc/Jovie")
         self.assertEqual(result["openPrs"], 2)
         self.assertEqual(result["eligiblePrs"], 1)
         self.assertEqual(result["nativeQueueCount"], 1)
@@ -961,6 +1894,7 @@ class ClosureObservationTests(unittest.TestCase):
                 "JovieInc/Jovie", previous=None, now=NOW
             )
         self.assertEqual(failed["status"], "red")
+        self.assertEqual(failed["repository"], "JovieInc/Jovie")
         self.assertFalse(failed["newIssueIntakeAllowed"])
         self.assertEqual(failed["reasons"], ["closure-observation-unknown"])
         self.assertEqual(
@@ -974,6 +1908,260 @@ class ClosureObservationTests(unittest.TestCase):
         )
         self.assertEqual(failed["repairActions"], [])
         self.assertIn("bad snapshot", failed["error"])
+
+    def test_live_observer_passes_repository_to_stack_repair_actions(self):
+        prs = [
+            stack_pr(201, "main", body=STACK_BODY),
+            stack_pr(202, "stack/test-201"),
+            stack_pr(203, "stack/test-202"),
+            stack_pr(204, "stack/test-203"),
+            stack_pr(205, "stack/test-204"),
+        ]
+        with mock.patch.object(
+            MODULE,
+            "_run_graphql_snapshot",
+            return_value={
+                "prs": prs,
+                "mainOid": "a" * 40,
+                "latestMergeAt": (NOW - timedelta(minutes=30)).isoformat(),
+            },
+        ), mock.patch.object(
+            MODULE,
+            "_observe_queue_controller",
+            return_value={"status": "green", "runId": 42},
+        ):
+            result = MODULE.observe_closure_health(
+                "JovieInc/LogYourBody", previous=None, now=NOW
+            )
+
+        self.assertEqual(result["status"], "red")
+        self.assertEqual(result["repository"], "JovieInc/LogYourBody")
+        self.assertEqual(
+            result["repairActions"][0]["repository"], "JovieInc/LogYourBody"
+        )
+
+    @staticmethod
+    def _controller_runs(*runs: dict[str, object]) -> mock.Mock:
+        return mock.Mock(stdout=MODULE.json.dumps({"workflow_runs": list(runs)}))
+
+    def test_in_progress_latest_run_judges_latest_completed_run(self):
+        completed_success = {
+            "id": 41,
+            "status": "completed",
+            "conclusion": "success",
+            "html_url": "https://example.test/run/41",
+            "updated_at": (NOW - timedelta(minutes=2)).isoformat(),
+        }
+        in_flight = {
+            "id": 42,
+            "status": "in_progress",
+            "conclusion": None,
+            "html_url": "https://example.test/run/42",
+            "updated_at": NOW.isoformat(),
+        }
+        with mock.patch.object(
+            MODULE.subprocess,
+            "run",
+            return_value=self._controller_runs(in_flight, completed_success),
+        ):
+            result = MODULE._observe_queue_controller("JovieInc/Jovie")
+
+        self.assertEqual(result["status"], "green")
+        self.assertEqual(result["runId"], 41)
+        self.assertEqual(result["runStatus"], "completed")
+        self.assertEqual(result["conclusion"], "success")
+        self.assertEqual(result["activeRunId"], 42)
+
+        health = MODULE.evaluate_closure_health(
+            snapshot(controller=result),
+            previous=None,
+            now=NOW,
+        )
+        self.assertEqual(health["status"], "healthy")
+        self.assertNotIn("controller", health["episodes"])
+        self.assertTrue(health["newIssueIntakeAllowed"])
+
+    def test_in_progress_latest_run_keeps_latest_completed_failure_red(self):
+        completed_failure = {
+            "id": 41,
+            "status": "completed",
+            "conclusion": "failure",
+            "html_url": "https://example.test/run/41",
+            "updated_at": (NOW - timedelta(minutes=2)).isoformat(),
+        }
+        in_flight = {
+            "id": 42,
+            "status": "queued",
+            "conclusion": None,
+            "html_url": "https://example.test/run/42",
+            "updated_at": NOW.isoformat(),
+        }
+        with mock.patch.object(
+            MODULE.subprocess,
+            "run",
+            return_value=self._controller_runs(in_flight, completed_failure),
+        ):
+            result = MODULE._observe_queue_controller("JovieInc/Jovie")
+
+        self.assertEqual(result["status"], "failed")
+        self.assertEqual(result["runId"], 41)
+        self.assertEqual(result["activeRunId"], 42)
+
+        stalled = snapshot(controller=result)
+        first = MODULE.evaluate_closure_health(stalled, previous=None, now=NOW)
+        self.assertEqual(first["status"], "grace")
+        self.assertFalse(first["newIssueIntakeAllowed"])
+        later = MODULE.evaluate_closure_health(
+            stalled,
+            previous=first,
+            now=NOW + timedelta(minutes=11),
+        )
+        self.assertEqual(later["status"], "red")
+        self.assertIn("queue-controller-red-over-10m", later["reasons"])
+
+    def test_only_active_runs_stay_recovering_without_completed_evidence(self):
+        runs = [
+            {
+                "id": 42,
+                "status": "in_progress",
+                "conclusion": None,
+                "html_url": "https://example.test/run/42",
+                "updated_at": NOW.isoformat(),
+            },
+            {
+                "id": 41,
+                "status": "queued",
+                "conclusion": None,
+                "html_url": "https://example.test/run/41",
+                "updated_at": (NOW - timedelta(minutes=1)).isoformat(),
+            },
+        ]
+        with mock.patch.object(
+            MODULE.subprocess,
+            "run",
+            return_value=self._controller_runs(*runs),
+        ):
+            result = MODULE._observe_queue_controller("JovieInc/Jovie")
+
+        self.assertEqual(result["status"], "recovering")
+        self.assertEqual(result["runId"], 42)
+        self.assertEqual(result["runStatus"], "in_progress")
+        self.assertNotIn("activeRunId", result)
+
+    def test_missing_runs_fail_closed(self):
+        with mock.patch.object(
+            MODULE.subprocess,
+            "run",
+            return_value=self._controller_runs(),
+        ):
+            result = MODULE._observe_queue_controller("JovieInc/Jovie")
+
+        self.assertEqual(
+            result,
+            {"status": "unknown", "reason": "controller-run-missing"},
+        )
+        health = MODULE.evaluate_closure_health(
+            snapshot(controller=result),
+            previous=None,
+            now=NOW,
+        )
+        self.assertEqual(health["status"], "grace")
+        self.assertFalse(health["newIssueIntakeAllowed"])
+
+    def test_cancelled_latest_run_judges_latest_verdict_run(self):
+        cancelled = {
+            "id": 43,
+            "status": "completed",
+            "conclusion": "cancelled",
+            "html_url": "https://example.test/run/43",
+            "updated_at": NOW.isoformat(),
+        }
+        completed_success = {
+            "id": 41,
+            "status": "completed",
+            "conclusion": "success",
+            "html_url": "https://example.test/run/41",
+            "updated_at": (NOW - timedelta(minutes=2)).isoformat(),
+        }
+        with mock.patch.object(
+            MODULE.subprocess,
+            "run",
+            return_value=self._controller_runs(cancelled, completed_success),
+        ):
+            result = MODULE._observe_queue_controller("JovieInc/Jovie")
+
+        self.assertEqual(result["status"], "green")
+        self.assertEqual(result["runId"], 41)
+        self.assertEqual(result["conclusion"], "success")
+
+        health = MODULE.evaluate_closure_health(
+            snapshot(controller=result),
+            previous=None,
+            now=NOW,
+        )
+        self.assertEqual(health["status"], "healthy")
+        self.assertNotIn("controller", health["episodes"])
+
+    def test_cancelled_latest_run_keeps_latest_verdict_failure_red(self):
+        cancelled = {
+            "id": 43,
+            "status": "completed",
+            "conclusion": "cancelled",
+            "html_url": "https://example.test/run/43",
+            "updated_at": NOW.isoformat(),
+        }
+        completed_failure = {
+            "id": 41,
+            "status": "completed",
+            "conclusion": "failure",
+            "html_url": "https://example.test/run/41",
+            "updated_at": (NOW - timedelta(minutes=2)).isoformat(),
+        }
+        with mock.patch.object(
+            MODULE.subprocess,
+            "run",
+            return_value=self._controller_runs(cancelled, completed_failure),
+        ):
+            result = MODULE._observe_queue_controller("JovieInc/Jovie")
+
+        self.assertEqual(result["status"], "failed")
+        self.assertEqual(result["runId"], 41)
+
+        stalled = snapshot(controller=result)
+        first = MODULE.evaluate_closure_health(stalled, previous=None, now=NOW)
+        self.assertEqual(first["status"], "grace")
+        later = MODULE.evaluate_closure_health(
+            stalled,
+            previous=first,
+            now=NOW + timedelta(minutes=11),
+        )
+        self.assertEqual(later["status"], "red")
+        self.assertIn("queue-controller-red-over-10m", later["reasons"])
+
+    def test_only_cancelled_and_active_runs_stay_recovering(self):
+        in_flight = {
+            "id": 44,
+            "status": "in_progress",
+            "conclusion": None,
+            "html_url": "https://example.test/run/44",
+            "updated_at": NOW.isoformat(),
+        }
+        cancelled = {
+            "id": 43,
+            "status": "completed",
+            "conclusion": "cancelled",
+            "html_url": "https://example.test/run/43",
+            "updated_at": (NOW - timedelta(minutes=1)).isoformat(),
+        }
+        with mock.patch.object(
+            MODULE.subprocess,
+            "run",
+            return_value=self._controller_runs(in_flight, cancelled),
+        ):
+            result = MODULE._observe_queue_controller("JovieInc/Jovie")
+
+        self.assertEqual(result["status"], "recovering")
+        self.assertEqual(result["runId"], 44)
 
 
 if __name__ == "__main__":

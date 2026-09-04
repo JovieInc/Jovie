@@ -19,6 +19,15 @@ Triple labels block idle hosts.
 ## Proposed fix
 Use one revision-scoped admission receipt.
 
+- target_system: jovie-product
+- target_repo: JovieInc/Jovie
+- artifact: scripts/backlog-orchestrator/admission-gate.mjs
+- verification_authority: JovieInc/Jovie CI
+
+## Optimization exception
+- Class: non-product
+- Justification: This control-plane admission receipt ships no user-facing page, link, asset, campaign, recommendation, or content variant.
+
 ## Acceptance criteria
 * Receipts admit work without the three labels.
 * Protected work stays excluded.`,
@@ -139,6 +148,32 @@ describe('revision-scoped admission receipt', () => {
       count: 0,
       identifiers: [],
     });
+  });
+
+  it('rejects stale unscoped admission receipts that omit repository target fields', () => {
+    const original = admitted();
+    const body = admissionGate.buildAdmissionGateReceipt(original, {
+      now: NOW,
+    });
+    const payload = JSON.parse(body.split('\n')[1]);
+    for (const field of [
+      'target_system',
+      'target_repo',
+      'artifact',
+      'verification_authority',
+    ]) {
+      delete payload[field];
+    }
+    const unscoped = `${admissionGate.ADMISSION_GATE_PREFIX}\n${JSON.stringify(payload)}\n${admissionGate.ADMISSION_GATE_SUFFIX}`;
+    const candidate = {
+      ...original,
+      comments: { nodes: [{ body: unscoped }] },
+    };
+    assert.equal(
+      admissionGate.admissionGateReceipt(candidate, { now: NOW }),
+      null
+    );
+    assert.equal(admitter.hasAdmissionEvidence(candidate).eligible, false);
   });
 
   it('revokes admission when a human-review label appears', () => {

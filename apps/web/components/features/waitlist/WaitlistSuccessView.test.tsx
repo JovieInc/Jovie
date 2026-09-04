@@ -44,8 +44,8 @@ describe('WaitlistSuccessView', () => {
     render(<WaitlistSuccessView />);
 
     const resume = screen.getByRole('link', { name: 'Resume At Start' });
-    expect(resume).toHaveAttribute('data-size', 'lg');
-    expect(resume).toHaveClass('h-11');
+    expect(resume).toHaveAttribute('data-size', 'marketing');
+    expect(resume).toHaveClass('h-8');
   });
 
   it('keeps server state and redirects route-owned while the story uses the exact body', () => {
@@ -64,15 +64,18 @@ describe('WaitlistSuccessView', () => {
     expect(routeSource).toContain(
       "import { WaitlistSuccessView } from '@/components/features/waitlist/WaitlistSuccessView';"
     );
-    expect(routeSource).toContain(
-      'resolveUserState({ createDbUserIfMissing: false })'
-    );
+    expect(routeSource).toContain('resolveRequestAuthIdentity');
+    expect(routeSource).toContain('knownAuthIdentity: identity');
     expect(routeSource).toContain('redirect(waitlistRedirect)');
     expect(routeSource).toContain(
       'if (access?.entryId && isWaitlistPendingStatus(access.status))'
     );
     expect(routeSource).toContain(
-      'return <WaitlistSuccessView email={authResult.context.email} />;'
+      "import { MarketingPageContractMarkers } from '@/components/site/MarketingPageContractMarkers';"
+    );
+    expect(routeSource).toContain('<WaitlistRouteWithContract>');
+    expect(routeSource).toContain(
+      '<WaitlistSuccessView email={authResult.context.email} />'
     );
     expect(routeSource).toContain('getWaitlistRouteRedirect');
     expect(routeSource).toContain('notFound()');
@@ -102,9 +105,9 @@ describe('WaitlistSuccessView', () => {
     expect(outcomeSource).not.toContain('PRIMARY_CTA_CLASS');
     expect(outcomeSource).not.toContain('SECONDARY_BTN_CLASS');
     expect(outcomeSource).toContain(
-      "<Button asChild variant='primary' size='lg'>"
+      "<Button asChild variant='primary' size='marketing'>"
     );
     expect(outcomeSource).toContain("variant='secondary'");
-    expect(outcomeSource).toContain("size='lg'");
+    expect(outcomeSource).toContain("size='marketing'");
   });
 });

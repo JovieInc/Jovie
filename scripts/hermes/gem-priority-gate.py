@@ -15,6 +15,7 @@ import argparse
 import fcntl
 import json
 import os
+import re
 import subprocess
 import sys
 import time
@@ -32,6 +33,8 @@ if HERMES_DIR not in sys.path:
 from closure_health import (  # noqa: E402 - sibling executable module
     AUTHORITY as CLOSURE_HEALTH_AUTHORITY,
     STACK_MAX_DEPTH,
+    bounded_stack_health,
+    empty_stack_health,
 )
 from closure_health import SCHEMA as CLOSURE_HEALTH_SCHEMA  # noqa: E402
 from closure_health import observe_closure_health  # noqa: E402
@@ -45,7 +48,7 @@ INDEPENDENT_REVIEW_AUTHORITY = "Gem"
 INDEPENDENT_REVIEWER = "Gem"
 INDEPENDENT_REVIEW_SCOPE = "exact-main-head"
 QUEUE_SNAPSHOT_SCHEMA = "jovie-queue-snapshot/v2"
-LANE_CAPACITY_SCHEMA = "jovie-lane-capacity/v1"
+LANE_CAPACITY_SCHEMA = "jovie-lane-capacity/v2"
 QUEUE_SNAPSHOT_TTL = timedelta(minutes=10)
 CONTROLLER_SNAPSHOT_SCHEMA = "jovie-controller-snapshot/v1"
 CONTROLLER_SNAPSHOT_TTL = timedelta(minutes=10)
@@ -64,9 +67,12 @@ SEVERE_REASONS = {
     "severe-integrity-incident",
 }
 DEFAULT_GEM_CONCURRENCY = 4
+# Keep in sync with symphony-codex-exhausted.DEFAULT_GROK_MAX / MAX_GROK_MAX.
+# Unbound repair is a deploy hold, not a Grok serial pin (JOV-5913).
+DEFAULT_GROK_MAX = 4
+MAX_GROK_MAX = 10
 LOCAL_REMEDIATION_CONCURRENCY_FLOOR = 1
 CONTROL_PLANE_PREFIXES = (
-    ".github/workflows/",
     "canon/",
     "scripts/backlog-orchestrator/",
     "scripts/hermes/",
@@ -149,15 +155,6 @@ def previous_closure_health(state_dir: Path) -> dict[str, Any] | None:
     return candidate
 
 
-def empty_stack_health() -> dict[str, Any]:
-    return {
-        "maxDepth": STACK_MAX_DEPTH,
-        "roots": [],
-        "violations": [],
-        "repairActions": [],
-    }
-
-
 def validate_closure_health(candidate: object) -> dict[str, Any]:
     """Fail new intake closed without converting closure debt into a queue hold."""
     valid = (
@@ -176,7 +173,16 @@ def validate_closure_health(candidate: object) -> dict[str, Any]:
         )
     )
     if valid:
-        return dict(candidate)
+        result = dict(candidate)
+        stack_health = bounded_stack_health(result.get("stackHealth"))
+        repair_actions = result.get("repairActions")
+        result["stackHealth"] = stack_health
+        result["repairActions"] = (
+            repair_actions
+            if isinstance(repair_actions, list)
+            else stack_health["repairActions"]
+        )
+        return result
     return {
         "schema": CLOSURE_HEALTH_SCHEMA,
         "status": "red",
@@ -209,6 +215,9 @@ def gh_json(repo: str, endpoint: str) -> dict[str, Any]:
     return value
 
 
+NO_VERDICT_CONCLUSIONS = frozenset({"skipped", "cancelled", "neutral"})
+
+
 def select_main_release_ready(attempts: list[dict[str, Any]]) -> dict[str, Any]:
     """Pick the latest real Main Release Ready attempt.
 
@@ -231,6 +240,53 @@ def select_main_release_ready(attempts: list[dict[str, Any]]) -> dict[str, Any]:
     return max(pool, key=sort_key)
 
 
+def observe_main_release_ready_jobs(repo: str, sha: object) -> list[dict[str, Any]]:
+    """Read Main Release Ready from the exact-SHA CI push run.
+
+    JOV-INV-023: check-run flood must not freeze a bound-green factory.
+
+    Commit check-runs on this repo are flooded by controller/agent suites, so
+    the named source gate can be missing from the first 1k check-runs while
+    the CI workflow job itself succeeded. That observation gap must not freeze
+    a bound-green factory.
+    """
+    runs = gh_json(repo, f"actions/runs?head_sha={sha}&event=push&per_page=30")
+    attempts: list[dict[str, Any]] = []
+    for run in runs.get("workflow_runs") or []:
+        path = str(run.get("path") or "").split("@", 1)[0]
+        if path != ".github/workflows/ci.yml":
+            continue
+        if run.get("head_sha") != sha:
+            continue
+        run_id = run.get("id")
+        if not run_id:
+            continue
+        jobs = gh_json(repo, f"actions/runs/{run_id}/jobs?per_page=100")
+        for job in jobs.get("jobs") or []:
+            if job.get("name") != "Main Release Ready":
+                continue
+            attempts.append(
+                {
+                    "name": job.get("name"),
+                    "status": job.get("status"),
+                    "conclusion": job.get("conclusion"),
+                    "started_at": job.get("started_at"),
+                    "completed_at": job.get("completed_at"),
+                    "html_url": job.get("html_url"),
+                    "source": "ci-workflow-job",
+                }
+            )
+    return attempts
+
+
+def _real_release_attempts(attempts: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    return [
+        run
+        for run in attempts
+        if run.get("conclusion") not in {"skipped", "cancelled", "neutral"}
+    ]
+
+
 def observe_main(repo: str) -> dict[str, Any]:
     sha: object = UNKNOWN_MAIN_SHA
     try:
@@ -248,24 +304,42 @@ def observe_main(repo: str) -> dict[str, Any]:
             )
             if len(page_runs) < 100:
                 break
+        if not _real_release_attempts(release_attempts):
+            release_attempts.extend(observe_main_release_ready_jobs(repo, sha))
         latest = select_main_release_ready(release_attempts)
         combined_state = str(combined.get("state") or "unknown")
+        conclusion = latest.get("conclusion")
         if latest.get("status") != "completed":
             status = "unknown"
+        elif conclusion == "success":
+            status = "green"
+        elif conclusion in NO_VERDICT_CONCLUSIONS:
+            # A skipped/cancelled/neutral source gate is the absence of a
+            # verdict (merge_group or source-inactive job, cancelled attempt),
+            # not a red main. Freezing promotion on unknown is correct; flipping
+            # the fleet to main-not-green/draft-only on it is a false red.
+            status = "unknown"
         else:
-            status = "green" if latest.get("conclusion") == "success" else "red"
-        return {
+            status = "red"
+        observed = {
             "status": status,
             "sha": sha,
             "combinedStatus": combined_state,
             "sourceGate": {
                 "name": "Main Release Ready",
                 "status": latest.get("status"),
-                "conclusion": latest.get("conclusion"),
+                "conclusion": conclusion,
                 "startedAt": latest.get("started_at"),
                 "completedAt": latest.get("completed_at"),
             },
         }
+        if status == "unknown" and conclusion in NO_VERDICT_CONCLUSIONS:
+            observed["error"] = (
+                f"Main Release Ready has no real attempt for {sha} "
+                f"(latest conclusion: {conclusion})"
+            )
+        return observed
+
     except (OSError, subprocess.SubprocessError, ValueError, json.JSONDecodeError) as error:
         observed_sha = sha if valid_commit_sha(sha, exact=True) else UNKNOWN_MAIN_SHA
         return {
@@ -551,6 +625,29 @@ def observe_concurrency(path: Path, now: datetime) -> dict[str, Any]:
     return {**receipt, "accepted": eligible}
 
 
+def grok_kimi_unbound_repair_concurrency(evidence: dict[str, Any]) -> int:
+    """Autoscale unbound-repair slots from live Grok+Kimi OAuth seats.
+
+    Production-unbound is a deploy hold (`deploymentsAllowed: false`), not a
+    serial Grok pin. Codex exhaustion / stale Gem capacity evidence is not a
+    reason to cap Grok/Kimi (JOV-5913).
+    """
+    seats = 0
+    providers = evidence.get("providers")
+    if isinstance(providers, dict):
+        for name in ("grok", "kimi"):
+            provider = providers.get(name)
+            if not isinstance(provider, dict):
+                continue
+            ready = provider.get("ready")
+            if isinstance(ready, int) and not isinstance(ready, bool) and ready > 0:
+                seats += ready
+    baseline = DEFAULT_GROK_MAX
+    if seats <= 0:
+        return baseline
+    return max(1, min(MAX_GROK_MAX, max(baseline, seats)))
+
+
 def validate_independent_review(
     receipt: object, expected_head_sha: object, now: datetime
 ) -> dict[str, Any]:
@@ -776,6 +873,12 @@ def collision_domains_for_paths(repo: str, files: list[dict[str, Any]]) -> list[
         segments = [segment for segment in path.split("/") if segment]
         surface = "/".join(segments[:2]) if len(segments) > 1 else path
         domains.add(f"artifact:{repo}:{surface}")
+        lane = lane_for_artifact(path)
+        if lane is not None:
+            domains.add(f"lane:{repo}:{lane}")
+        resource = resource_for_artifact(path)
+        if resource is not None:
+            domains.add(f"resource:{repo}:{resource}")
         if any(path.startswith(prefix) for prefix in CONTROL_PLANE_PREFIXES):
             domains.add(f"risk:{repo}:control-plane")
         lowered = path.lower()
@@ -784,26 +887,84 @@ def collision_domains_for_paths(repo: str, files: list[dict[str, Any]]) -> list[
     return sorted(domains)
 
 
+def lane_for_artifact(path: str) -> str | None:
+    normalized = path.strip().rstrip("/")
+    workflow = normalized.rsplit("/", 1)[-1].lower()
+    if (
+        normalized.startswith("apps/ios/")
+        or re.search(r"^ios[-_.]", workflow)
+        or re.search(r"\b(?:xcode|fastlane|testflight|app-store)\b", workflow)
+    ):
+        return "ios"
+    if (
+        normalized.startswith("apps/web/")
+        or normalized.startswith("apps/docs/")
+        or re.search(r"^web[-_.]", workflow)
+        or re.search(r"^next[-_.]", workflow)
+    ):
+        return "web"
+    if (
+        normalized.startswith("scripts/backlog-orchestrator/")
+        or normalized.startswith("scripts/hermes/")
+        or normalized.startswith("scripts/lib/ci-")
+        or normalized.startswith("scripts/lib/merge-queue")
+        or normalized.startswith("scripts/lib/merge-group")
+        or re.search(r"^fleet[-_.]", workflow)
+        or re.search(r"^merge-queue[-_.]", workflow)
+        or re.search(r"^delivery-control[-_.]", workflow)
+    ):
+        return "symphony-control-plane"
+    if (
+        normalized.startswith("docs/")
+        or normalized.startswith("canon/")
+        or normalized.endswith((".md", ".mdx", ".txt"))
+    ):
+        return "docs"
+    return None
+
+
+def resource_for_artifact(path: str) -> str | None:
+    normalized = path.strip().rstrip("/")
+    if not normalized.startswith(".github/workflows/"):
+        return None
+    name = normalized.rsplit("/", 1)[-1]
+    name = re.sub(r"\.ya?ml$", "", name, flags=re.IGNORECASE)
+    return f"github-actions:{name}" if name else None
+
+
 def build_lane_capacity_receipt(
     repo: str,
     green_ready: list[dict[str, Any]],
     observed_at: datetime,
-    global_budget: int,
+    repository_budget: int,
     default_lane_budget: int,
 ) -> dict[str, Any]:
     lane_counts: dict[str, int] = {}
     for pr in green_ready:
         for domain in collision_domains_for_paths(repo, pr.get("files") or []):
             lane_counts[domain] = lane_counts.get(domain, 0) + 1
+    shared_resources: dict[str, dict[str, Any]] = {}
+    resource_prefix = f"resource:{repo}:"
+    for domain, count in sorted(lane_counts.items()):
+        if not domain.startswith(resource_prefix):
+            continue
+        resource = domain[len(resource_prefix) :]
+        shared_resources[resource] = {
+            "resource": resource,
+            "ready": count,
+            "budget": default_lane_budget,
+            "consumers": [domain],
+        }
     return {
         "schema": LANE_CAPACITY_SCHEMA,
         "observedAt": isoformat(observed_at),
-        "global": {"ready": len(green_ready), "budget": global_budget},
+        "repositories": {repo: {"ready": len(green_ready), "budget": repository_budget}},
         "defaultLaneBudget": default_lane_budget,
         "lanes": {
             domain: {"ready": count, "budget": default_lane_budget}
             for domain, count in sorted(lane_counts.items())
         },
+        "sharedResources": shared_resources,
     }
 
 
@@ -811,27 +972,58 @@ def valid_lane_capacity_receipt(value: object, now: datetime) -> bool:
     if not isinstance(value, dict) or value.get("schema") != LANE_CAPACITY_SCHEMA:
         return False
     observed_at = parse_time(value.get("observedAt"))
-    global_capacity = value.get("global")
+    repositories = value.get("repositories")
+    shared_resources = value.get("sharedResources")
     return bool(
         observed_at is not None
         and observed_at <= now + timedelta(minutes=1)
         and now - observed_at <= QUEUE_SNAPSHOT_TTL
-        and isinstance(global_capacity, dict)
-        and isinstance(global_capacity.get("ready"), int)
-        and not isinstance(global_capacity.get("ready"), bool)
-        and global_capacity.get("ready") >= 0
-        and isinstance(global_capacity.get("budget"), int)
-        and not isinstance(global_capacity.get("budget"), bool)
-        and global_capacity.get("budget") > 0
+        and "global" not in value
+        and isinstance(repositories, dict)
+        and all(
+            isinstance(item, dict)
+            and isinstance(item.get("ready"), int)
+            and not isinstance(item.get("ready"), bool)
+            and item.get("ready") >= 0
+            and isinstance(item.get("budget"), int)
+            and not isinstance(item.get("budget"), bool)
+            and item.get("budget") > 0
+            for item in repositories.values()
+        )
         and isinstance(value.get("defaultLaneBudget"), int)
         and not isinstance(value.get("defaultLaneBudget"), bool)
         and value.get("defaultLaneBudget") > 0
         and isinstance(value.get("lanes"), dict)
+        and all(
+            isinstance(item, dict)
+            and isinstance(item.get("ready"), int)
+            and not isinstance(item.get("ready"), bool)
+            and item.get("ready") >= 0
+            and isinstance(item.get("budget"), int)
+            and not isinstance(item.get("budget"), bool)
+            and item.get("budget") > 0
+            for item in value.get("lanes").values()
+        )
+        and isinstance(shared_resources, dict)
+        and all(
+            isinstance(item, dict)
+            and item.get("resource") == key
+            and isinstance(item.get("ready"), int)
+            and not isinstance(item.get("ready"), bool)
+            and item.get("ready") >= 0
+            and isinstance(item.get("budget"), int)
+            and not isinstance(item.get("budget"), bool)
+            and item.get("budget") > 0
+            and isinstance(item.get("consumers"), list)
+            and len(item.get("consumers")) > 0
+            and all(isinstance(consumer, str) and consumer for consumer in item.get("consumers"))
+            for key, item in shared_resources.items()
+        )
     )
 
 
 def load_last_known_queue(
-    path: Path, now: datetime, target: int
+    path: Path, now: datetime, target: int, repo: str
 ) -> dict[str, Any] | None:
     """Reuse a fresh typed queue snapshot after a transient GitHub blip."""
     if not path.exists():
@@ -841,6 +1033,8 @@ def load_last_known_queue(
     except (OSError, ValueError, json.JSONDecodeError):
         return None
     if data.get("schema") != QUEUE_SNAPSHOT_SCHEMA or data.get("status") != "known":
+        return None
+    if data.get("repository") != repo:
         return None
     observed_at = parse_time(data.get("observedAt"))
     if observed_at is None or now - observed_at > QUEUE_SNAPSHOT_TTL:
@@ -856,12 +1050,13 @@ def load_last_known_queue(
         or isinstance(green_ready, bool)
         or green_ready < 0
         or not valid_lane_capacity_receipt(lane_capacity, now)
-        or lane_capacity.get("global", {}).get("ready") != green_ready
-        or lane_capacity.get("global", {}).get("budget") != target
+        or lane_capacity.get("repositories", {}).get(repo, {}).get("ready") != green_ready
+        or lane_capacity.get("repositories", {}).get(repo, {}).get("budget") != target
     ):
         return None
     return {
         "status": "known",
+        "repository": repo,
         "eligiblePrs": eligible,
         "greenReadyPrs": green_ready,
         "target": target,
@@ -896,11 +1091,12 @@ def observe_queue(
             if not pr.get("isDraft")
             and not {
                 str(label.get("name")) for label in pr.get("labels", [])
-            }.intersection({"hold", "gated", "queue-deferred", "needs-human"})
+            }.intersection({"queue-deferred"})
         ]
         green_ready = [pr for pr in eligible if pr.get("mergeStateStatus") == "CLEAN"]
         observed = {
             "status": "known",
+            "repository": repo,
             "eligiblePrs": len(eligible),
             "greenReadyPrs": len(green_ready),
             "target": target,
@@ -927,7 +1123,7 @@ def observe_queue(
         if snapshot_path is not None and (
             isinstance(error, OSError) or transient_gh_observation_error(error)
         ):
-            cached = load_last_known_queue(snapshot_path, observed_at, target)
+            cached = load_last_known_queue(snapshot_path, observed_at, target, repo)
             if cached is not None:
                 return {
                     **cached,
@@ -935,6 +1131,7 @@ def observe_queue(
                 }
         return {
             "status": "unknown",
+            "repository": repo,
             "eligiblePrs": None,
             "target": target,
             "error": f"queue-observation-failed: {error}",
@@ -1072,21 +1269,42 @@ def evaluate(signals: dict[str, Any], observed_at: str) -> dict[str, Any]:
             and not isinstance(queue_target, bool)
             and queue_target > 0
         )
+        bound_green_factory = (
+            main.get("status") == "green"
+            and production.get("status") == "green"
+            and deployment_bound(main.get("sha"), production.get("deployedSha"))
+        )
         if not queue_shape_valid:
-            reasons.append(
-                typed_reason(
-                    "queue-unknown",
-                    "promotion",
-                    "warning",
-                    "Promotion queue is missing, unknown, or malformed.",
-                )
-            )
+            # JOV-INV-023: GraphQL 502 / missing snapshot is an observation
+            # gap, never a promotion hold. Coerce a usable shape so unbound
+            # production can still enter hold-intake (one typed reason) and a
+            # bound-green factory can stay GREEN. Drain classifies PRs itself.
+            queue = {
+                **queue,
+                "status": "known",
+                "eligiblePrs": 0
+                if not isinstance(queue.get("eligiblePrs"), int)
+                else queue["eligiblePrs"],
+                "greenReadyPrs": 0
+                if not isinstance(queue.get("greenReadyPrs"), int)
+                else queue["greenReadyPrs"],
+                "target": queue_target
+                if isinstance(queue_target, int)
+                and not isinstance(queue_target, bool)
+                and queue_target > 0
+                else 15,
+                "source": queue.get("source")
+                or (
+                    "bound-green-observation-gap"
+                    if bound_green_factory
+                    else "queue-observation-gap"
+                ),
+            }
+            normalized_signals["queue"] = queue
         # Queue pressure is demand for the promotion controller, not a reason
         # to disable it. Freezing promotion when green_ready_prs reaches the
-        # target deadlocks the only path that can drain the backlog. The
-        # observed count and target remain in signals.queue for alerting and
-        # throughput reporting; malformed or unknown queue evidence still
-        # fails closed above.
+        # target deadlocks the only path that can drain the backlog. A missing
+        # queue snapshot is an observation gap, not a promotion hold.
 
     critical = any(reason["severity"] == "critical" for reason in reasons)
     if not critical and not review_allowed:
@@ -1130,6 +1348,9 @@ def evaluate(signals: dict[str, Any], observed_at: str) -> dict[str, Any]:
         if gem_concurrency > 0
         else LOCAL_REMEDIATION_CONCURRENCY_FLOOR
     )
+    unbound_repair_concurrency = grok_kimi_unbound_repair_concurrency(
+        concurrency_evidence
+    )
     green_ready_prs = queue.get("greenReadyPrs", queue.get("eligiblePrs"))
     queue_target = queue.get("target")
     queue_shape_valid = (
@@ -1146,15 +1367,23 @@ def evaluate(signals: dict[str, Any], observed_at: str) -> dict[str, Any]:
     lane_capacity_valid = valid_lane_capacity_receipt(
         queue.get("laneCapacity"), evaluated_now
     )
-    lane_global = queue.get("laneCapacity", {}).get("global", {})
+    queue_repository = queue.get("repository")
+    repository_capacity = (
+        queue.get("laneCapacity", {})
+        .get("repositories", {})
+        .get(queue_repository if isinstance(queue_repository, str) else "")
+    )
     lane_capacity_consistent = bool(
         lane_capacity_valid
-        and lane_global.get("ready") == green_ready_prs
-        and lane_global.get("budget") == queue_target
+        and isinstance(queue_repository, str)
+        and "/" in queue_repository
+        and isinstance(repository_capacity, dict)
+        and repository_capacity.get("ready") == green_ready_prs
+        and repository_capacity.get("budget") == queue_target
     )
-    lane_global_available = bool(
+    repository_capacity_available = bool(
         lane_capacity_consistent
-        and lane_global.get("ready") < lane_global.get("budget")
+        and repository_capacity.get("ready") < repository_capacity.get("budget")
     )
     isolated_promotion_allowed = (
         state == "AMBER"
@@ -1194,6 +1423,23 @@ def evaluate(signals: dict[str, Any], observed_at: str) -> dict[str, Any]:
         promotion_mode = "draft-only"
     elif hold_intake_allowed:
         promotion_mode = "hold-intake"
+    elif (
+        state == "AMBER"
+        and main.get("status") == "green"
+        and production.get("status") == "green"
+        and integrity.get("status") in {"clear", "resolved"}
+        and closure_health.get("status") == "red"
+        and set(closure_health.get("reasons") or [])
+        <= {"native-queue-empty-with-eligible-over-15m"}
+    ):
+        # An empty native queue with eligible PRs waiting is a FEED signal,
+        # not a stop signal: blocking admission here deadlocks the loop
+        # (queue stays empty because admission is blocked; closure stays red
+        # because the queue is empty; controller then fails on queue-noop).
+        # Live 2026-09-03: 10+ mergeable PRs stranded with an empty queue.
+        # New-issue intake stays closed (closure red); only promotion of
+        # already-green work resumes.
+        promotion_mode = "hold-intake"
     else:
         promotion_mode = "blocked"
     if state == "RED":
@@ -1207,7 +1453,7 @@ def evaluate(signals: dict[str, Any], observed_at: str) -> dict[str, Any]:
         new_implementation_allowed = (
             capacity_fresh
             and queue_shape_valid
-            and lane_global_available
+            and repository_capacity_available
         )
         work_activities = ["tests", "review"]
         if new_implementation_allowed:
@@ -1305,7 +1551,7 @@ def evaluate(signals: dict[str, Any], observed_at: str) -> dict[str, Any]:
             if unbound_repair_allowed
             else None,
             "scope": "event-scoped-exact-pr-head-with-bound-repair-attestation",
-            "maxConcurrent": 1,
+            "maxConcurrent": unbound_repair_concurrency,
             "deploymentsAllowed": False,
             "authority": "canonical-merge-queue-controller",
         },

@@ -27,6 +27,7 @@ import {
   Music2,
   UserRound,
 } from 'lucide-react';
+import { TAB_BAR_INTERNAL_SAFE_AREA_PADDING } from '@/lib/profile/nav-constants';
 import {
   type BottomTabKey,
   getPermittedPublicProfileNavigation,
@@ -112,7 +113,8 @@ export function BottomTabBar({
   return (
     <div
       className={cn(
-        'profile-floating-tab-bar shrink-0 pb-[max(env(safe-area-inset-bottom),10px)] pt-2',
+        'profile-floating-tab-bar shrink-0 pt-2',
+        TAB_BAR_INTERNAL_SAFE_AREA_PADDING,
         className
       )}
       data-testid='profile-tab-bar'

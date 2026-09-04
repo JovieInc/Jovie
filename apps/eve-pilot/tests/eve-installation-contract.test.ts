@@ -9,10 +9,16 @@ describe('Eve installation contract', () => {
     const packageJson = JSON.parse(
       readFileSync(resolve(pilotRoot, 'package.json'), 'utf8')
     ) as {
+      packageManager?: string;
       dependencies?: { eve?: string };
     };
 
-    expect(packageJson.dependencies?.eve).toBe('0.39.0');
+    // Keep this pin in lockstep with the package.json dependency; dependabot
+    // bumps edit the manifest but not this test.
+    const EVE_PIN = '0.47.6';
+
+    expect(packageJson.packageManager).toBe('pnpm@9.15.4');
+    expect(packageJson.dependencies?.eve).toBe(EVE_PIN);
     expect(
       existsSync(resolve(pilotRoot, 'node_modules/eve/docs/README.md'))
     ).toBe(true);

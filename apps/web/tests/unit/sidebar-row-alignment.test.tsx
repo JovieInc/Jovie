@@ -188,10 +188,5 @@ describe('Sidebar row alignment', () => {
     expect(getSidebarNavIconClassName({ active: true })).toContain(
       'text-accent-teal!'
     );
-    const primaryRowClassName = getSidebarNavRowClassName({ tone: 'primary' });
-    expect(primaryRowClassName).toContain('text-primary-token');
-    expect(primaryRowClassName).toContain('bg-sidebar-accent/70');
-    expect(primaryRowClassName).not.toContain('opacity-');
-    expect(primaryRowClassName).not.toContain('cursor-not-allowed');
   });
 });

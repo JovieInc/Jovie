@@ -306,7 +306,7 @@ describe('DashboardNav', () => {
     ).toBeNull();
   });
 
-  it('keeps available New Chat primary without borrowing disabled styling', () => {
+  it('keeps inactive New Chat distinct from a selected navigation row', () => {
     mockUsePathname.mockReturnValue(APP_ROUTES.CALENDAR);
     const { getByRole } = renderDashboardNav({
       renderFn: fastRender,
@@ -315,10 +315,10 @@ describe('DashboardNav', () => {
     const chatLink = getByRole('link', { name: 'New Chat' });
     expect(chatLink).toHaveClass('w-fit');
     expect(chatLink).toHaveClass('rounded-full');
-    expect(chatLink).not.toHaveClass('bg-sidebar-accent/40');
-    expect(chatLink).toHaveClass('bg-sidebar-accent/70', 'text-primary-token');
+    expect(chatLink).toHaveClass('bg-sidebar-accent/40');
+    expect(chatLink).toHaveClass('text-sidebar-item-foreground');
     expect(chatLink).toHaveClass('font-medium');
-    expect(chatLink).not.toHaveClass('opacity-50', 'cursor-not-allowed');
+    expect(chatLink).not.toHaveClass('bg-sidebar-accent-active');
     expect(chatLink).not.toHaveClass(
       'shadow-[inset_0_1px_0_rgba(255,255,255,0.06)]'
     );

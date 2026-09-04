@@ -14,23 +14,21 @@ import { useOptionalChatEntityPanel } from '@/app/app/(shell)/chat/ChatEntityPan
 import { ChatThreadNavigationRail } from '@/components/features/chat/navigation-rail';
 import { track } from '@/lib/analytics';
 import { AUDIO_FILE_ACCEPT } from '@/lib/audio/constants';
-import {
-  type ChatStarterConversation,
-  validateChatStarterConversation,
-} from '@/lib/chat/new-chat-entry-contract';
 import type { OpportunityInboxCardViewModel } from '@/lib/connectors/opportunity-inbox-types';
 import { useAppFlag } from '@/lib/flags/client';
 import { usePendingOpportunityCardsQuery, usePlanGate } from '@/lib/queries';
 import { cn } from '@/lib/utils';
 import { deriveChatRailContextTargets } from './chat-context-rail';
+import { DESKTOP_CONTENT_GRID_ANCHOR } from './chat-empty-starters';
 import { resolveChatEmptyStateAffordance } from './chat-empty-state-contract';
 import { ChatDropZoneOverlay } from './components/ChatDropZoneOverlay';
 import { ChatEmptyStateWelcome } from './components/ChatEmptyStateComposerRegion';
 import { ChatEmptyStateOpportunityCards } from './components/ChatEmptyStateOpportunityCards';
 import { ChatPinnedOpportunityHeader } from './components/ChatPinnedOpportunityHeader';
 import { ChatProvidersRegistrar } from './components/ChatProvidersRegistrar';
-import { ChatStarterConversationRail } from './components/ChatStarterConversationRail';
+import { ChatStarterActionsRail } from './components/ChatStarterActionsRail';
 import { EntityResolutionProvider } from './components/EntityResolutionProvider';
+import { FeatureIntroHost } from './components/FeatureIntroCard';
 import {
   FEATURED_SKILL_SUGGESTIONS,
   SuggestedPrompts,
@@ -45,13 +43,19 @@ import {
   CHAT_COMPOSER_DOCK_CLASSNAME,
   CHAT_COMPOSER_SCROLL_FADE_CLASSNAME,
   CHAT_COMPOSER_THREAD_SCROLL_PADDING_CLASSNAME,
+  CHAT_EMPTY_TOP_SPACING_OWNER,
+  CHAT_EMPTY_VIEWPORT_CLASSNAME,
   ChatComposerSurface,
   ChatEmptyStateComposerRegion,
   ChatInlineError,
   ChatLoadingConversationSkeleton,
   ChatThreadMessages,
 } from './JovieChatSections';
-import type { JovieChatProps } from './types';
+import { CHAT_STARTER_ACTIONS } from './starter-actions';
+import type {
+  ChatActionCard as ChatActionCardModel,
+  JovieChatProps,
+} from './types';
 
 /** Window long threads early so short-but-growing chats stay at 60fps. */
 const VIRTUALIZATION_THRESHOLD = 8;
@@ -82,7 +86,8 @@ export function JovieChat({
   isFirstSession = false,
   isProfileComplete = false,
   chatMode,
-  starterConversations,
+  actionCards,
+  featureIntroCatalog,
   ambientOwnedByShell = false,
 }: JovieChatProps) {
   const initialQuerySubmitted = useRef(false);
@@ -90,6 +95,10 @@ export function JovieChat({
   const fileInputRef = useRef<HTMLInputElement>(null);
   const audioFileInputRef = useRef<HTMLInputElement>(null);
   const [composerPickerOpen, setComposerPickerOpen] = useState(false);
+  /** Local dismiss ledger for empty-state action cards (session-scoped). */
+  const [dismissedActionCardIds, setDismissedActionCardIds] = useState<
+    ReadonlySet<ChatActionCardModel['id']>
+  >(() => new Set());
   /**
    * Pinned opportunity card for empty-thread → card-open mode
    * (GH #13177 / #13174 / JOV-3933). Declared before useJovieChat so the
@@ -132,21 +141,39 @@ export function JovieChat({
     chatMode,
   });
 
+  const visibleActionCards = useMemo(() => {
+    if (!actionCards || actionCards.length === 0) return [];
+    return actionCards.filter(card => !dismissedActionCardIds.has(card.id));
+  }, [actionCards, dismissedActionCardIds]);
   const featuredSkillSuggestionCount = FEATURED_SKILL_SUGGESTIONS.length;
 
-  const handleSelectStarterConversation = useCallback(
-    (sample: ChatStarterConversation) => {
-      const violations = validateChatStarterConversation({
-        sample,
-        launchedPrompt: sample.userPrompt,
-      });
-      if (violations.length > 0) return;
+  // A configured primary card owns its action for the whole empty-state
+  // session, including after dismissal. Do not resurrect it as a lower-context
+  // secondary chip with a potentially conflicting capability state.
+  const promptRailExcludeActionIds = useMemo(
+    () => actionCards?.map(card => card.id) ?? [],
+    [actionCards]
+  );
 
-      track('chat_starter_conversation_selected', {
-        sample: sample.id,
-        surface: 'conversation-bubbles',
+  const handleDismissActionCard = useCallback((card: ChatActionCardModel) => {
+    track('chat_starter_action_dismissed', {
+      action: CHAT_STARTER_ACTIONS[card.id].telemetryKey,
+      surface: 'card',
+    });
+    setDismissedActionCardIds(prev => {
+      const next = new Set(prev);
+      next.add(card.id);
+      return next;
+    });
+  }, []);
+
+  const handleActOnActionCard = useCallback(
+    (card: ChatActionCardModel) => {
+      track('chat_starter_action_selected', {
+        action: CHAT_STARTER_ACTIONS[card.id].telemetryKey,
+        surface: 'card',
       });
-      handleSuggestedPrompt(sample.userPrompt);
+      handleSuggestedPrompt(card.prompt);
     },
     [handleSuggestedPrompt]
   );
@@ -443,7 +470,7 @@ export function JovieChat({
   const deepLinkOpportunityId = searchParams.get('opportunityId');
 
   // Empty-thread opportunity cards (GH #13177): only when there is no active
-  // conversation content yet. Zero pending → restore conversation samples + prompt rail
+  // conversation content yet. Zero pending → restore actionCards + prompt rail
   // first-run scaffolding (JOV-3547) instead of a bare composer.
   // Also load when deep-linking a pin from the inbox (JOV-3933).
   const conversationExists = Boolean(
@@ -508,20 +535,20 @@ export function JovieChat({
     opportunityCardCount: showEmptyOpportunityCards
       ? pendingOpportunityCards.length
       : 0,
-    starterConversationCount: starterConversations?.length ?? 0,
+    starterActionCount: visibleActionCards.length,
     suggestionCount: featuredSkillSuggestionCount,
   });
-  const showStarterConversations =
-    emptyStateAffordance === 'starter-conversations';
+  const showEmptyActionCards = emptyStateAffordance === 'starter-actions';
   const showEmptyPromptRail = emptyStateAffordance === 'suggestion-pills';
-  // Clean start screen (JOV-4878): when the stage is otherwise bare, fill the
-  // scroll region above the docked composer with the centered welcome (ambient
-  // brand logo + invitation). Hidden while the composer has intent so the
-  // composer owns attention; geometry never shifts (composer stays docked).
+  // JOV-5387: Just ask + executable sample is the shared empty-state heading.
+  // Starter-action cards and suggestion pills may sit below it; they must not
+  // replace it. Hidden while the composer has intent so the composer owns
+  // attention; geometry never shifts (composer stays docked).
   const showEmptyWelcome =
     !composerHasIntent &&
     (emptyStateAffordance === 'none' ||
-      emptyStateAffordance === 'suggestion-pills');
+      emptyStateAffordance === 'suggestion-pills' ||
+      emptyStateAffordance === 'starter-actions');
   const shouldReservePickerClearance = showBottomComposer && composerPickerOpen;
   const messageViewportPaddingBottom = shouldReservePickerClearance
     ? CHAT_PICKER_THREAD_CLEARANCE
@@ -638,6 +665,10 @@ export function JovieChat({
       chatInputProps={chatInputProps}
       chatMode={chatMode}
       showThreadView={showThreadView}
+      // one-chrome-layer-v1: prompt suggests / starter cards XOR status
+      // banners — the usage banner yields whenever the empty state is already
+      // showing a chrome affordance layer.
+      suppressUsageAlert={!showThreadView && emptyStateAffordance !== 'none'}
       isRateLimited={isRateLimited}
       showManifest={showManifest}
       manifestCollapsed={manifestCollapsed}
@@ -717,10 +748,10 @@ export function JovieChat({
         />
 
         {/* Persistent scroll viewport (flex-1) + morphing upper content.
-            Empty chat docks the composer beneath executable conversation
-            samples. Thread state owns the message viewport and persistent dock.
-            The drop overlay is clipped to this workspace so it cannot cover
-            the header, composer, sidebar, or entity rail. */}
+            Empty chat docks the composer; the feature-intro card sits above
+            it. Thread state owns the message viewport and the persistent
+            bottom dock. The drop overlay is clipped to this workspace so it
+            cannot cover the header, composer, sidebar, or entity rail. */}
         <div
           ref={dropZoneRef}
           className='relative flex flex-1 flex-col overflow-hidden'
@@ -731,8 +762,10 @@ export function JovieChat({
             ref={scrollContainerRef}
             data-testid='chat-message-scroll'
             className={cn(
-              'absolute inset-0 overflow-y-auto px-4 py-5 sm:px-5',
-              !showThreadView && 'flex flex-col',
+              'absolute inset-0 overflow-y-auto',
+              showThreadView
+                ? 'px-4 py-5 sm:px-5'
+                : CHAT_EMPTY_VIEWPORT_CLASSNAME,
               showBottomComposer &&
                 CHAT_COMPOSER_THREAD_SCROLL_PADDING_CLASSNAME
             )}
@@ -741,37 +774,53 @@ export function JovieChat({
               <div
                 className='flex min-h-0 flex-1 flex-col'
                 data-empty-affordance={emptyStateAffordance}
+                data-grid-anchor={DESKTOP_CONTENT_GRID_ANCHOR}
                 data-testid='chat-empty-state-viewport'
+                data-top-spacing-owner={CHAT_EMPTY_TOP_SPACING_OWNER}
               >
                 <ChatEmptyStateComposerRegion
                   stableDocked
                   showDockedWelcome={
                     showEmptyWelcome && emptyStateAffordance === 'none'
                   }
+                  onSelectSample={handleSuggestedPrompt}
                   above={
                     showEmptyOpportunityCards ? (
                       <ChatEmptyStateOpportunityCards
                         cards={pendingOpportunityCards}
                         onSelect={handleSelectOpportunityCard}
                       />
-                    ) : showStarterConversations ? (
+                    ) : showEmptyActionCards ? (
                       <div
-                        className='flex min-h-full w-full items-start pt-4 sm:pt-6'
-                        data-testid='chat-empty-state-conversation-slot'
+                        // single-column-one-width-v1: the empty-state column
+                        // inherits the 45rem content shell — no stepped max-w.
+                        className='mx-auto flex min-h-full w-full flex-col items-center justify-start gap-5 py-2 sm:py-3'
+                        data-testid='chat-empty-state-action-card-slot'
                       >
-                        <ChatStarterConversationRail
-                          samples={starterConversations ?? []}
-                          onSelect={handleSelectStarterConversation}
-                        />
+                        {showEmptyWelcome ? (
+                          <ChatEmptyStateWelcome
+                            onSelectSample={handleSuggestedPrompt}
+                          />
+                        ) : null}
+                        <div className='flex w-full min-h-0 flex-1 flex-col items-center justify-center'>
+                          <ChatStarterActionsRail
+                            cards={visibleActionCards}
+                            onAct={handleActOnActionCard}
+                            onDismiss={handleDismissActionCard}
+                          />
+                        </div>
                       </div>
                     ) : showEmptyPromptRail ? (
                       <div
-                        className='mx-auto flex min-h-full w-full max-w-[46rem] flex-col items-center pb-3'
+                        // single-column-one-width-v1: same shared column width.
+                        className='mx-auto flex min-h-full w-full flex-col items-center justify-start pb-3'
                         data-testid='chat-empty-state-soft-suggestions-slot'
                       >
-                        <div className='flex min-h-0 flex-1 flex-col items-center justify-center py-2 text-center'>
-                          {showEmptyWelcome ? <ChatEmptyStateWelcome /> : null}
-                        </div>
+                        {showEmptyWelcome ? (
+                          <ChatEmptyStateWelcome
+                            onSelectSample={handleSuggestedPrompt}
+                          />
+                        ) : null}
                         <SuggestedPrompts
                           onSelect={handleSuggestedPrompt}
                           isFirstSession={isFirstSession}
@@ -779,11 +828,20 @@ export function JovieChat({
                           layout='rail'
                           featuredOnly
                           dimmed={composerPickerOpen}
+                          excludeActionIds={promptRailExcludeActionIds}
                         />
                       </div>
                     ) : undefined
                   }
                 >
+                  {!composerHasIntent ? (
+                    <FeatureIntroHost
+                      catalog={featureIntroCatalog}
+                      onHighlightCTA={() => {
+                        inputRef.current?.focus();
+                      }}
+                    />
+                  ) : null}
                   {composerSurface}
                   {inlineChatError ? (
                     <div className='mt-3 w-full'>{inlineChatError}</div>

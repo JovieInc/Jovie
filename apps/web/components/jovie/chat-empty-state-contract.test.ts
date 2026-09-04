@@ -6,25 +6,22 @@ const emptyState = {
   conversationInProgress: false,
   composerHasIntent: false,
   opportunityCardCount: 0,
-  starterConversationCount: 0,
+  starterActionCount: 0,
   suggestionCount: 0,
 } as const;
 
 describe('resolveChatEmptyStateAffordance', () => {
-  it('prioritizes opportunities, then starter conversations, then featured suggestions', () => {
+  it('prioritizes opportunities, then starter actions, then featured suggestions', () => {
     expect(
       resolveChatEmptyStateAffordance({
         ...emptyState,
         opportunityCardCount: 1,
-        starterConversationCount: 3,
+        starterActionCount: 3,
       })
     ).toBe('opportunity-cards');
     expect(
-      resolveChatEmptyStateAffordance({
-        ...emptyState,
-        starterConversationCount: 3,
-      })
-    ).toBe('starter-conversations');
+      resolveChatEmptyStateAffordance({ ...emptyState, starterActionCount: 3 })
+    ).toBe('starter-actions');
     expect(
       resolveChatEmptyStateAffordance({ ...emptyState, suggestionCount: 1 })
     ).toBe('suggestion-pills');
@@ -39,7 +36,7 @@ describe('resolveChatEmptyStateAffordance', () => {
     expect(
       resolveChatEmptyStateAffordance({
         ...emptyState,
-        starterConversationCount: 3,
+        starterActionCount: 3,
         ...override,
       })
     ).toBe('none');

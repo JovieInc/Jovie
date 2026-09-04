@@ -1,0 +1,162 @@
+{
+  "schema": "jovie-preview-env-registry/v1",
+  "updatedBy": "JOV-5941",
+  "policy": "The normal path is local/CI proof -> main -> current staging. A PR never automatically creates a hosted Vercel preview or Neon branch. Hosted isolation exists only as an explicit, expiring exception admitted by the requires_preview risk policy or by manual dispatch, and every admitted environment carries the jovie-preview-env-admission/v1 contract plus a jovie-preview-env-cleanup/v1 receipt at teardown.",
+  "entries": [
+    {
+      "id": "ci-neon-db",
+      "workflow": ".github/workflows/ci.yml",
+      "job": "neon-db",
+      "kind": "neon-branch",
+      "ephemeral": true,
+      "admission": {
+        "policy": "manual-dispatch",
+        "reason": "Ephemeral Postgres branch for manually dispatched database-affecting evidence lanes (migration and authenticated smoke proof).",
+        "evidencePurpose": "Database-affecting proof that cannot be obtained from normal CI or the shared staging database.",
+        "owner": "ci-risk-classifier / release engineering",
+        "surface": "ephemeral Neon branch ci-neon-run-<run_id>-<attempt> (isolated database only)",
+        "ttlHours": 2,
+        "cleanupTrigger": "Neon branch TTL (expires_in_hours=2); neon-scheduled-cleanup daily heartbeat reconciles missed events",
+        "cleanupProof": "Branch absent from the Neon project branch inventory",
+        "costBudget": "One Neon branch with at most 2h of endpoint compute per dispatch"
+      }
+    },
+    {
+      "id": "ci-lighthouse-dashboard-neon",
+      "workflow": ".github/workflows/ci.yml",
+      "job": "ci-lighthouse-dashboard-pr",
+      "kind": "neon-branch",
+      "ephemeral": true,
+      "admission": {
+        "policy": "manual-dispatch",
+        "reason": "Fallback ephemeral branch for the manually dispatched dashboard Lighthouse lane when the shared neon-db producer is unavailable.",
+        "evidencePurpose": "Authenticated dashboard performance evidence against an isolated database.",
+        "owner": "ci-risk-classifier / release engineering",
+        "surface": "ephemeral Neon branch dashboard-lighthouse-<run_id>-<attempt> (isolated database only)",
+        "ttlHours": 2,
+        "cleanupTrigger": "Neon branch TTL; neon-scheduled-cleanup daily heartbeat reconciles missed events",
+        "cleanupProof": "Branch absent from the Neon project branch inventory",
+        "costBudget": "One Neon branch with at most 2h of endpoint compute per dispatch"
+      }
+    },
+    {
+      "id": "ci-golden-path-neon",
+      "workflow": ".github/workflows/ci.yml",
+      "job": "ci-golden-path",
+      "kind": "neon-branch",
+      "ephemeral": true,
+      "admission": {
+        "policy": "manual-dispatch",
+        "reason": "Fallback ephemeral branch for the manually dispatched golden-path launch-gate lane (JOV-3758) when the shared neon-db producer is unavailable.",
+        "evidencePurpose": "Full signup-to-checkout journey proof against an isolated database with real Clerk.",
+        "owner": "ci-risk-classifier / release engineering",
+        "surface": "ephemeral Neon branch golden-path-<run_id>-<attempt> (isolated database only)",
+        "ttlHours": 2,
+        "cleanupTrigger": "Neon branch TTL; neon-scheduled-cleanup daily heartbeat reconciles missed events",
+        "cleanupProof": "Branch absent from the Neon project branch inventory",
+        "costBudget": "One Neon branch with at most 2h of endpoint compute per dispatch"
+      }
+    },
+    {
+      "id": "ci-admin-smoke-neon",
+      "workflow": ".github/workflows/ci.yml",
+      "job": "ci-admin-smoke",
+      "kind": "neon-branch",
+      "ephemeral": true,
+      "admission": {
+        "policy": "manual-dispatch",
+        "reason": "Fallback ephemeral branch for the manually dispatched admin smoke lane when the shared neon-db producer is unavailable.",
+        "evidencePurpose": "Authenticated admin-surface smoke proof against an isolated database.",
+        "owner": "ci-risk-classifier / release engineering",
+        "surface": "ephemeral Neon branch admin-smoke-<run_id>-<attempt> (isolated database only)",
+        "ttlHours": 2,
+        "cleanupTrigger": "Neon branch TTL; neon-scheduled-cleanup daily heartbeat reconciles missed events",
+        "cleanupProof": "Branch absent from the Neon project branch inventory",
+        "costBudget": "One Neon branch with at most 2h of endpoint compute per dispatch"
+      }
+    },
+    {
+      "id": "ci-pr-vercel-preview",
+      "workflow": ".github/workflows/ci.yml",
+      "job": "ci-pr-vercel-preview",
+      "kind": "vercel-preview",
+      "ephemeral": true,
+      "admission": {
+        "policy": "manual-dispatch (inputs.run_preview_deploy=true)",
+        "reason": "Hosted preview for an explicitly dispatched exact SHA when local/CI/staging evidence is insufficient.",
+        "evidencePurpose": "Exact production-candidate hosted proof or debugging evidence that normal CI and current staging cannot produce.",
+        "owner": "dispatching engineer (github.actor)",
+        "surface": "Vercel preview deployment of @jovie/web pinned to the dispatched SHA",
+        "ttlHours": 24,
+        "cleanupTrigger": "vercel-preview-cleanup on pull_request closed; cancel-stale-vercel-previews reaps stuck builds",
+        "cleanupProof": "No QUEUED/BUILDING preview deployments remain for the ref; Vercel deployment retention expires the rest",
+        "costBudget": "One Vercel preview build plus one deployment per dispatch"
+      }
+    },
+    {
+      "id": "e2e-full-matrix-neon",
+      "workflow": ".github/workflows/e2e-full-matrix.yml",
+      "kind": "neon-branch",
+      "ephemeral": true,
+      "admission": {
+        "policy": "scheduled-evidence",
+        "reason": "Weekly full E2E matrix evidence lane with an isolated database.",
+        "evidencePurpose": "Scheduled deep E2E coverage that PR CI does not run.",
+        "owner": "ci scheduled evidence lanes / release engineering",
+        "surface": "ephemeral Neon branch e2e-full-<run_id>-* (isolated database only)",
+        "ttlHours": 2,
+        "cleanupTrigger": "Neon branch TTL; neon-scheduled-cleanup daily heartbeat reconciles missed events",
+        "cleanupProof": "Branch absent from the Neon project branch inventory",
+        "costBudget": "One Neon branch with at most 2h of endpoint compute per weekly run"
+      }
+    },
+    {
+      "id": "nightly-tests-neon",
+      "workflow": ".github/workflows/nightly-tests.yml",
+      "kind": "neon-branch",
+      "ephemeral": true,
+      "admission": {
+        "policy": "scheduled-evidence",
+        "reason": "Nightly test evidence lane with an isolated database.",
+        "evidencePurpose": "Scheduled nightly coverage that PR CI does not run.",
+        "owner": "ci scheduled evidence lanes / release engineering",
+        "surface": "ephemeral Neon branch nightly-e2e-<run_id> (isolated database only)",
+        "ttlHours": 2,
+        "cleanupTrigger": "Neon branch TTL; neon-scheduled-cleanup daily heartbeat reconciles missed events",
+        "cleanupProof": "Branch absent from the Neon project branch inventory",
+        "costBudget": "One Neon branch with at most 2h of endpoint compute per nightly run"
+      }
+    },
+    {
+      "id": "visual-regression-neon",
+      "workflow": ".github/workflows/visual-regression.yml",
+      "kind": "neon-branch",
+      "ephemeral": true,
+      "admission": {
+        "policy": "scheduled-evidence",
+        "reason": "Daily visual-regression evidence lane with an isolated database.",
+        "evidencePurpose": "Scheduled visual diff coverage that PR CI does not run.",
+        "owner": "ci scheduled evidence lanes / release engineering",
+        "surface": "ephemeral Neon branch visual-regression-<run_id> (isolated database only)",
+        "ttlHours": 2,
+        "cleanupTrigger": "Neon branch TTL; neon-scheduled-cleanup daily heartbeat reconciles missed events",
+        "cleanupProof": "Branch absent from the Neon project branch inventory",
+        "costBudget": "One Neon branch with at most 2h of endpoint compute per daily run"
+      }
+    },
+    {
+      "id": "production-release-standing",
+      "workflow": ".github/workflows/production-release.yml",
+      "kind": "staging",
+      "ephemeral": false,
+      "reason": "Standing staging (staging.jov.ie) and production (jov.ie) deployments are the default integrated surfaces, not exceptions; they are CLI-built and SHA-attested, never PR previews."
+    },
+    {
+      "id": "eve-pilot-shadow-standing",
+      "workflow": ".github/workflows/eve-pilot.yml",
+      "kind": "shadow",
+      "ephemeral": false,
+      "reason": "The jovie-eve-shadow Vercel project is a standing shadow endpoint aliased per release, not a PR preview."
+    }
+  ]
+}

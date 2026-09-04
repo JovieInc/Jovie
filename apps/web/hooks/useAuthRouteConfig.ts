@@ -10,7 +10,6 @@ import {
   isAdminPeopleView,
 } from '@/constants/admin-navigation';
 import { APP_ROUTES, isDemoRoutePath } from '@/constants/routes';
-import { CHAT_HOME_HEADING } from '@/lib/chat/new-chat-entry-contract';
 import { getBreadcrumbLabel } from '@/lib/constants/breadcrumb-labels';
 import type { AppShellMode, AppShellSection } from '@/types/app-shell';
 import type { DashboardBreadcrumbItem } from '@/types/dashboard';
@@ -134,10 +133,7 @@ export function useAuthRouteConfig(
     }
 
     // Use centralized label map with sentence case
-    const label =
-      pathname === APP_ROUTES.CHAT
-        ? CHAT_HOME_HEADING
-        : getBreadcrumbLabel(lastPart);
+    const label = getBreadcrumbLabel(lastPart);
 
     return [
       {

@@ -14,8 +14,12 @@ describe('HomepageV2FinalCta', () => {
       screen.getByTestId('homepage-v2-final-cta-primary')
     ).toHaveTextContent('Get started');
     expect(screen.getByTestId('homepage-v2-final-cta-primary')).toHaveAttribute(
+      'data-size',
+      'md'
+    );
+    expect(screen.getByTestId('homepage-v2-final-cta-primary')).toHaveAttribute(
       'href',
-      '/start'
+      'https://jov.ie/waitlist'
     );
     expect(
       screen.queryByTestId('homepage-v2-final-cta-secondary')

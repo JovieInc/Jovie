@@ -3,6 +3,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 const mockAuthorizeHud = vi.hoisted(() => vi.fn());
 const mockPublish = vi.hoisted(() => vi.fn());
+const mockReadCached = vi.hoisted(() => vi.fn());
 const mockCaptureError = vi.hoisted(() => vi.fn());
 const mockLoggerError = vi.hoisted(() => vi.fn());
 const mockCreateLiveReaders = vi.hoisted(() => vi.fn());
@@ -24,6 +25,7 @@ vi.mock('@/lib/ovie/shipping-state', async importOriginal => {
 
 vi.mock('@/lib/ovie/shipping-state/configured.server', () => ({
   publishConfiguredShippingState: mockPublish,
+  readCachedConfiguredShippingState: mockReadCached,
 }));
 
 vi.mock('@/lib/ovie/shipping-state/live', async importOriginal => {
@@ -61,12 +63,13 @@ describe('GET /api/hud/shipping-state', () => {
       readFile: mockReadFile,
       fetch: vi.fn(),
     });
-    mockPublish.mockResolvedValue({
+    mockReadCached.mockReturnValue({
       schema: 'ovie.shipping-state.v1',
       state: 'fresh',
       publishing: true,
       latencyMs: 12,
     });
+    mockPublish.mockResolvedValue({ schema: 'ovie.shipping-state.v1' });
   });
 
   it('returns 401 when HUD auth fails', async () => {
@@ -81,6 +84,7 @@ describe('GET /api/hud/shipping-state', () => {
       state: 'unauthorized',
     });
     expect(mockPublish).not.toHaveBeenCalled();
+    expect(mockReadCached).not.toHaveBeenCalled();
   });
 
   it('rejects path and actuation query parameters without reading files or dispatching', async () => {
@@ -96,11 +100,13 @@ describe('GET /api/hud/shipping-state', () => {
       state: 'error',
     });
     expect(mockPublish).not.toHaveBeenCalled();
+    expect(mockReadCached).not.toHaveBeenCalled();
     expect(mockReadFile).not.toHaveBeenCalled();
   });
 
-  it('publishes the read-only projection for authorized requests', async () => {
+  it('returns the local projection without waiting for reconciliation', async () => {
     mockAuthorizeHud.mockResolvedValue({ ok: true, mode: 'admin' });
+    mockPublish.mockReturnValue(new Promise(() => {}));
     const { GET } = await import('@/app/api/hud/shipping-state/route');
     const response = await GET(
       new NextRequest('http://localhost/api/hud/shipping-state')
@@ -111,7 +117,47 @@ describe('GET /api/hud/shipping-state', () => {
       schema: 'ovie.shipping-state.v1',
       publishing: true,
     });
+    expect(mockReadCached).toHaveBeenCalledTimes(1);
     expect(mockPublish).toHaveBeenCalledTimes(1);
+  });
+
+  it('serves per-source freshness read-only, never coercing stale or unknown to healthy', async () => {
+    mockAuthorizeHud.mockResolvedValue({ ok: true, mode: 'admin' });
+    mockReadCached.mockReturnValue({
+      schema: 'ovie.shipping-state.v1',
+      state: 'stale',
+      publishing: true,
+      latencyMs: 12,
+      sources: {
+        'fleet-receipt': {
+          sourceId: 'fleet-receipt',
+          state: 'stale',
+          observedAt: '2026-09-03T00:00:00.000Z',
+          freshnessDeadline: '2026-09-03T00:10:00.000Z',
+        },
+        'symphony-runtime': {
+          sourceId: 'symphony-runtime',
+          state: 'unknown',
+          observedAt: null,
+          freshnessDeadline: null,
+        },
+      },
+    });
+    const { GET } = await import('@/app/api/hud/shipping-state/route');
+    const response = await GET(
+      new NextRequest('http://localhost/api/hud/shipping-state')
+    );
+    expect(response.status).toBe(200);
+    expect(response.headers.get('Cache-Control')).toBe('no-store');
+    const body = await response.json();
+    expect(body.sources['fleet-receipt'].state).toBe('stale');
+    expect(body.sources['fleet-receipt'].freshnessDeadline).toBe(
+      '2026-09-03T00:10:00.000Z'
+    );
+    expect(body.sources['symphony-runtime'].state).toBe('unknown');
+    expect(body.sources['symphony-runtime'].observedAt).toBeNull();
+    expect(mockReadCached).toHaveBeenCalledTimes(1);
+    expect(mockReadFile).not.toHaveBeenCalled();
   });
 
   it('does not export actuation methods', async () => {

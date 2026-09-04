@@ -82,7 +82,7 @@ describe('SidebarThreadsSection', () => {
 
     expect(
       screen.getByRole('button', { name: 'New Chat' }).querySelector('svg')
-    ).toHaveClass('h-3', 'w-3', 'text-sidebar-muted/70');
+    ).toHaveClass('h-3', 'w-3', 'text-accent-teal!');
   });
 
   it('uses the full middle track at rest and layers chat actions over a visible cross-engine faded edge', () => {
@@ -297,11 +297,7 @@ describe('SidebarThreadsSection', () => {
       name: 'New Chat',
     });
 
-    expect(newThreadButton).toHaveClass(
-      'h-6',
-      'bg-sidebar-accent/70',
-      'hover:bg-sidebar-accent-active'
-    );
+    expect(newThreadButton).toHaveClass('h-6', 'hover:bg-sidebar-accent/70');
     expect(newThreadButton).not.toHaveClass('h-auto', 'hover:bg-transparent');
     fireEvent.click(newThreadButton);
     expect(onNewThread).toHaveBeenCalledTimes(1);

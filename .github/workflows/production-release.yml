@@ -1263,24 +1263,45 @@ jobs:
             VERCEL_DEPLOYMENT_POLL_INTERVAL_MS=3000 \
               node apps/web/scripts/vercel-protected-origin.cjs resolve-deployment
           )"
-          jq -e --arg id "$EXPECTED_DEPLOYMENT_ID" '
+          # resolve-deployment returns only after the exact candidate is READY;
+          # its bounded output intentionally contains identity, not raw Vercel
+          # lifecycle fields. Re-prove that returned identity here.
+          jq -e \
+            --arg id "$EXPECTED_DEPLOYMENT_ID" \
+            --arg url "$deployment_url" '
+            type == "object" and
             .id == $id and
-            (.readyState | ascii_upcase) == "READY"
+            .url == $url
           ' >/dev/null <<<"$exact_json" || {
-            echo "::error::Exact staging deployment is not READY."
+            echo "::error::Exact READY staging deployment identity did not converge."
             exit 1
           }
 
-          alias_json="$(./node_modules/.bin/vercel inspect staging.jov.ie \
-            --format=json --scope "$VERCEL_ORG_ID")"
-          jq -e --arg id "$EXPECTED_DEPLOYMENT_ID" '
-            .id == $id and
-            (.readyState | ascii_upcase) == "READY" and
-            (.target | ascii_downcase) == "preview"
-          ' >/dev/null <<<"$alias_json" || {
-            echo "::error::staging.jov.ie does not own the exact READY preview."
-            exit 1
-          }
+          for attempt in $(seq 1 15); do
+            alias_json="$(./node_modules/.bin/vercel inspect staging.jov.ie \
+              --format=json --scope "$VERCEL_ORG_ID" 2>/dev/null || true)"
+            if jq -e '
+              type == "object" and
+              (.id | type == "string") and
+              (.readyState | type == "string") and
+              (.target | type == "string")
+            ' >/dev/null 2>&1 <<<"$alias_json"; then
+              alias_id="$(jq -r '.id' <<<"$alias_json")"
+              alias_state="$(jq -r '.readyState | ascii_upcase' <<<"$alias_json")"
+              alias_target="$(jq -r '.target | ascii_downcase' <<<"$alias_json")"
+              if [ "$alias_id" = "$EXPECTED_DEPLOYMENT_ID" ] &&
+                [ "$alias_state" = "READY" ] &&
+                [ "$alias_target" = "preview" ]; then
+                echo "staging.jov.ie owns exact READY preview $alias_id."
+                break
+              fi
+            fi
+            if [ "$attempt" -eq 15 ]; then
+              echo "::error::staging.jov.ie did not converge to the exact READY preview."
+              exit 1
+            fi
+            sleep 4
+          done
 
           curl_args=(
             --fail --silent --show-error

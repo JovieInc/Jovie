@@ -19,6 +19,19 @@ describe('SidebarNavItem active chrome', () => {
     expect(icon).toContain('text-accent-teal!');
   });
 
+  it('keeps an enabled New Chat primary action off muted or disabled chrome', () => {
+    const row = getSidebarNavRowClassName({ tone: 'primary' });
+    const icon = getSidebarNavIconClassName({ tone: 'primary' });
+
+    expect(row).toContain('bg-sidebar-accent/40');
+    expect(row).toContain('text-sidebar-item-foreground');
+    expect(row).not.toContain('opacity-50');
+    expect(row).not.toContain('pointer-events-none');
+    expect(row).not.toContain('text-sidebar-muted');
+    expect(icon).toContain('text-accent-teal!');
+    expect(icon).not.toContain('text-sidebar-muted/70');
+  });
+
   it('keeps long labels inside the grid and preserves keyboard focus chrome', () => {
     const longLabel =
       'A deliberately long navigation destination that must fade instead of overflowing';
@@ -43,18 +56,5 @@ describe('SidebarNavItem active chrome', () => {
     expect(label.className).toContain('justify-self-stretch');
     expect(label.className).not.toContain('justify-self-start');
     expect(label.className).toContain('mask-image:linear-gradient');
-  });
-
-  it('renders primary tone as an available filled action', () => {
-    const row = getSidebarNavRowClassName({ tone: 'primary' });
-    const icon = getSidebarNavIconClassName({ tone: 'primary' });
-
-    expect(row).toContain('w-fit');
-    expect(row).toContain('bg-sidebar-accent/70');
-    expect(row).toContain('text-primary-token');
-    expect(row).toContain('hover:bg-sidebar-accent-active');
-    expect(row).not.toContain('opacity-');
-    expect(row).not.toContain('cursor-not-allowed');
-    expect(icon).toContain('text-accent-teal!');
   });
 });

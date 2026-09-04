@@ -50,15 +50,62 @@ describe('TableHeaderCell', () => {
     expect(th.className).toMatch(/text-right/);
   });
 
+  it('keeps column heading cells bounded to one line', () => {
+    renderInTable(<TableHeaderCell>Title</TableHeaderCell>);
+    expect(screen.getByRole('columnheader')).toHaveClass('whitespace-nowrap');
+  });
+
   it('applies center alignment class', () => {
     renderInTable(<TableHeaderCell align='center'>Status</TableHeaderCell>);
     expect(screen.getByRole('columnheader').className).toMatch(/text-center/);
+  });
+
+  it('lets consumer tone overrides replace the canonical header tone', () => {
+    renderInTable(
+      <TableHeaderCell className='text-primary-token'>Title</TableHeaderCell>
+    );
+
+    const th = screen.getByRole('columnheader');
+    expect(th).toHaveClass('text-primary-token');
+    expect(th).not.toHaveClass('text-secondary-token');
+  });
+
+  it('passes alignment through to sortable header button chrome', () => {
+    const onSort = vi.fn();
+    renderInTable(
+      <>
+        <TableHeaderCell sortable onSort={onSort}>
+          Left
+        </TableHeaderCell>
+        <TableHeaderCell sortable align='center' onSort={onSort}>
+          Center
+        </TableHeaderCell>
+        <TableHeaderCell sortable align='right' onSort={onSort}>
+          Right
+        </TableHeaderCell>
+      </>
+    );
+
+    expect(screen.getByRole('button', { name: /Left/ })).toHaveClass(
+      'justify-start',
+      'text-left'
+    );
+    expect(screen.getByRole('button', { name: /Center/ })).toHaveClass(
+      'justify-center',
+      'text-center'
+    );
+    expect(screen.getByRole('button', { name: /Right/ })).toHaveClass(
+      'justify-end',
+      'text-right'
+    );
   });
 
   it('is sticky by default with top: 0', () => {
     renderInTable(<TableHeaderCell>Title</TableHeaderCell>);
     const th = screen.getByRole('columnheader');
     expect(th.className).toMatch(/sticky/);
+    expect(th).toHaveClass('system-b-table-sticky-header');
+    expect(th).toHaveClass('py-1.5');
     expect(th).toHaveStyle({ top: '0px' });
   });
 

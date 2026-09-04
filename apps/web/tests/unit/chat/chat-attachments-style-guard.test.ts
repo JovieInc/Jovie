@@ -6,7 +6,7 @@ const guardedSources = [
   'components/jovie/components/ImageAttachmentChip.tsx',
   'components/jovie/components/ImagePreviewStrip.tsx',
   'components/jovie/components/ChatAvatarUploadCard.tsx',
-  'components/jovie/components/ChatStarterConversationCard.tsx',
+  'components/jovie/components/ChatActionCard.tsx',
   'components/jovie/components/ChatLinkConfirmationCard.tsx',
   'components/jovie/components/ChatLinkRemovalCard.tsx',
   'components/jovie/components/ScrollToBottom.tsx',
@@ -21,7 +21,7 @@ const forbiddenVisualPatterns = [
   /\b(?:z|max-h|max-w|min-h|min-w|h|w|rounded|shadow|drop-shadow|tracking|transition)-\[/,
 ] as const;
 
-describe('chat attachment and starter-conversation System B source contract', () => {
+describe('chat attachment and action System B source contract', () => {
   it('keeps image/link/avatar/scroll affordances on named System B primitives', () => {
     for (const sourcePath of guardedSources) {
       const source = readFileSync(resolve(process.cwd(), sourcePath), 'utf8');
@@ -32,16 +32,31 @@ describe('chat attachment and starter-conversation System B source contract', ()
     }
   });
 
-  it('reuses canonical transcript bubbles instead of a parallel starter-card style', () => {
-    const conversationCardSource = readFileSync(
-      resolve(
-        process.cwd(),
-        'components/jovie/components/ChatStarterConversationCard.tsx'
-      ),
+  it('defines chat action-card visual states in the design system source of truth', () => {
+    const actionCardSource = readFileSync(
+      resolve(process.cwd(), 'components/jovie/components/ChatActionCard.tsx'),
       'utf8'
     );
-    expect(conversationCardSource).toContain('system-b-chat-user-bubble');
-    expect(conversationCardSource).toContain('chat-starter-assistant-bubble');
-    expect(conversationCardSource).not.toContain('system-b-chat-action-card');
+    const designSystemSource = readFileSync(
+      resolve(process.cwd(), 'styles/system-b-app.css'),
+      'utf8'
+    );
+    const requiredClasses = [
+      'system-b-chat-action-card',
+      'system-b-chat-action-card-icon-shell',
+      'system-b-chat-action-card-icon',
+      'system-b-chat-action-card-copy',
+      'system-b-chat-action-card-title',
+      'system-b-chat-action-card-body',
+      'system-b-chat-action-card-primary',
+      'system-b-chat-action-card-primary-icon',
+      'system-b-chat-action-card-dismiss',
+      'system-b-chat-action-card-dismiss-icon',
+    ];
+
+    for (const className of requiredClasses) {
+      expect(actionCardSource).toContain(className);
+      expect(designSystemSource).toContain(`.${className}`);
+    }
   });
 });

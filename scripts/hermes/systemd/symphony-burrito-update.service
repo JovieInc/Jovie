@@ -1,8 +1,0 @@
-[Unit]
-Description=Refresh official openai/symphony linux_x86_64 burrito
-After=network-online.target
-
-[Service]
-Type=oneshot
-Environment=PATH=%h/.local/bin:%h/.hermes/bin:%h/.npm-global/bin:/usr/bin:/bin
-ExecStart=%h/Jovie/scripts/hermes/update-symphony-burrito.sh

@@ -5,24 +5,21 @@ is `MERGE_QUEUE_BACKEND=native`, and ruleset `Main Branch Protection`
 (`10512119`) owns queue admission and combined-head validation. Native GitHub is
 also the supported stack-construction path: dependent PRs may temporarily target
 their immediate parent, then are retargeted and rebased onto `main` after that
-parent lands. Graphite is not required and there is no second landing transport.
+parent lands. There is no second landing transport.
 
 ## How a PR lands
 
 1. Open a root PR against `main`. A dependent child may instead target its
    immediate parent while both are open, but it must remain draft and must not
-   receive `merge-queue` while that parent base is live.
+   be enrolled while that parent base is live. Do not add `merge-queue`.
 2. After the parent lands, retarget the child to `main`, rebase it from the
    recorded parent tip, and prove its exact remote head lease and semantic
-   ancestry. The owning agent's final action pairs marking ready with enabling
-   native auto-merge. Pending checks are valid; GitHub will not merge until the
-   existing source flight is green. If auto-merge cannot be enabled, automation
-   restores draft state rather than leaving a ready PR without merge intent.
+   ancestry. Mark the child ready. Native autoenroll owns queue mutation;
+   do not `gh pr merge` / `--auto` / `--admin`, and do not add `merge-queue`.
 3. `merge-queue-autoenroll.yml` revalidates the PR's current state, hard-gate
    labels, the first source CI flight, and exact head SHA. It enrolls through
    `scripts/merge-queue-backend.mjs` and proves authoritative queue state after
-   mutation. `ready_for_review` never launches a second source CI flight, and
-   Graphite/Cursor are not queue transports.
+   mutation. `ready_for_review` never launches a second source CI flight.
 4. GitHub creates a synthetic `merge_group` head against current `main` and
    waits for the same required contexts on that exact combined SHA.
 5. GitHub squash-merges the green queue entry. `linear-sync-on-merge.yml`
@@ -63,9 +60,9 @@ Checked-in source: `.github/rulesets/branch-protection.yml`.
 - Grouping strategy: `ALLGREEN`
 - Minimum entries to merge: `5` (typed cohort; GitHub waits for this size or the bounded timeout)
 - Minimum entries wait: `10` minutes (low-traffic timeout so a partial cohort can still land)
-- Maximum entries per merge: `10`
-- Maximum entries building concurrently: `3` (measured starting point after concurrent prefix waves inflated unit matrices from ~1–2 minutes to ~5–7 minutes)
-- Check response timeout: `60` minutes
+- Maximum entries per merge: `5` (synced to the live ruleset 10512119 readback on 2026-09-04, JOV-5867)
+- Maximum entries building concurrently: `1` — the live ruleset builds one combined head at a time (synced 2026-09-04, JOV-5867; do not restore the superseded 2026-08-15 three-prefix canary value)
+- Check response timeout: `20` minutes (synced to the live ruleset readback, JOV-5867)
 - Stale exact-production: `hold-intake` preserves the admitted cohort and continues isolated implementation. It must not freeze enroll of CLEAN unrelated PRs. `jovie-fleet-queue-hold/v1` is a bounded recovery selector (default 12m TTL) and must expire, succeed, or fail with a terminal reason — never sit pending.
 - Live ruleset `10512119` remains `min_entries_to_merge=1` / wait `0` until the post-merge apply. Source and preflight readback already describe the 5/10 cohort; auto-enroll stays up during that pending cutover.
 - Signed-commit and non-fast-forward rules: dormant/not applied. The checked-in
@@ -146,8 +143,8 @@ It fails closed if an open PR is missing from that authoritative snapshot.
 - Enroll live policy (JOV-5291): preflight reads GraphQL
   `mergeQueue.configuration.maximumEntriesToBuild` as live truth. Stale REST
   `max_entries_to_build` drift cannot fail `enroll` after the lock already
-  matches 3. Tell it worked: a CLEAN PR's `enroll` check stays green while
-  GraphQL reads 3.
+  matches 1. Tell it worked: a CLEAN PR's `enroll` check stays green while
+  GraphQL reads 1.
 - Front-item churn guard (JOV-5030): every native group build runs on
   `gh-readonly-queue/main/pr-<front>-<exactBaseSha>`, so recent `merge_group`
   CI runs identify which PR fronted each failed attempt and against which
@@ -166,11 +163,12 @@ It fails closed if an open PR is missing from that authoritative snapshot.
 `queue-deferred` is a mechanical hold placed at a draft's birth (Symphony) or
 under queue pressure (agent-pipeline). The label alone has no provenance, so
 every deferral posts a typed receipt — one upserted PR comment with the
-`<!-- bot-comment:queue-deferral -->` marker — recording the exact head, a
-typed reason (`symphony-birth-hold` or `queue-pressure`), its reason-bound
-source, and the deferral time. Only comments authored by the canonical Jovie
-bot or repository owner are authority. `scripts/lib/queue-deferral-receipt.mjs`
-is the canonical reader/writer; public comments cannot create release authority.
+`<!-- bot-comment:queue-deferral -->` marker — recording the repository, exact
+head, typed reason (`symphony-birth-hold` or `queue-pressure`), its
+reason-bound source, and the deferral time. Only comments authored by the
+canonical Jovie bot or repository owner are authority.
+`scripts/lib/queue-deferral-receipt.mjs` is the canonical reader/writer; public
+comments cannot create release authority.
 
 `queue-deferred-release.yml` runs after PR CI, successful production-controller
 completion, and the existing five-minute fleet-receipt refresh. That upstream
@@ -179,10 +177,10 @@ the repository is otherwise idle. It runs `scripts/release-queue-deferred.sh`:
 
 - **Report pass** — prints age and reason for every `queue-deferred` PR
   (not only agent-branch PRs) and raises a warning once a hold exceeds the
-  12-minute SLA. A missing or malformed receipt reports as
-  `untyped-ready-hold` and is released automatically when the live PR is
-  ready, mergeable, exact-head green, and a fresh GREEN fleet receipt
-  agrees. Human-policy labels (`needs:taste`, `net-new`, `outbound`,
+  12-minute SLA. A missing receipt reports as `untyped-ready-hold` and is
+  released automatically when the live PR is ready, mergeable, exact-head
+  green, and a fresh GREEN fleet receipt agrees. A malformed typed receipt
+  stays held. Human-policy labels (`needs:taste`, `net-new`, `outbound`,
   `needs-human`, …) report as `human-policy-hold:<label>` and stay held.
 - **Release pass** — only under a fresh (≤10-minute) `GREEN` fleet receipt
   with `promotionAdmission.allowed`, and only when the live PR is non-draft,

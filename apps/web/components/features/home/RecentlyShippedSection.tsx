@@ -84,7 +84,7 @@ export function RecentlyShippedSection() {
             <Badge variant='outline' size='xl'>
               Recently Shipped
             </Badge>
-            <h2 className='text-2xl md:text-3xl font-semibold tracking-tight'>
+            <h2 className='text-2xl md:text-3xl font-semibold tracking-tight line-clamp-2'>
               We Ship Fast
             </h2>
             <p className='text-sm md:text-base opacity-60 max-w-md'>

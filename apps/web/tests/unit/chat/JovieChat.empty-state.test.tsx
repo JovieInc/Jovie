@@ -1,9 +1,21 @@
-import { fireEvent, screen } from '@testing-library/react';
+import { fireEvent, screen, within } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
+import type { FeatureIntroCatalog } from '@/components/jovie/feature-intro-contract';
 import { JovieChat } from '@/components/jovie/JovieChat';
-import { CHAT_STARTER_CONVERSATIONS } from '@/lib/chat/new-chat-entry-contract';
 import { renderWithQueryClient } from '@/tests/utils/test-utils';
+
+const featureIntroCatalog: FeatureIntroCatalog = {
+  highlight: null,
+  whatsNewID: 'changelog:26.8.1',
+  whatsNewItems: [
+    {
+      id: '26.8.1:fixed:0',
+      text: 'Canceled sign-in stays recoverable.',
+      accent: 'accent',
+    },
+  ],
+};
 
 const mockChatState = {
   input: '',
@@ -203,7 +215,12 @@ describe('JovieChat empty state', () => {
 
   it('renders a stable docked composer with the centered welcome when no skill is featured', () => {
     const { container, getByTestId, queryByTestId, queryByText } =
-      renderWithQueryClient(<JovieChat profileId='profile-1' />);
+      renderWithQueryClient(
+        <JovieChat
+          profileId='profile-1'
+          featureIntroCatalog={featureIntroCatalog}
+        />
+      );
 
     expect(queryByTestId('chat-empty-state-top-signals')).toBeNull();
     expect(queryByTestId('chat-empty-thread-ornament')).toBeNull();
@@ -213,16 +230,45 @@ describe('JovieChat empty state', () => {
     const emptyViewport = getByTestId('chat-empty-state-viewport');
     expect(emptyViewport.className).toContain('flex-1');
     expect(emptyViewport).toHaveAttribute('data-empty-affordance', 'none');
+    // one-chrome-layer-v1: no suggest/card chrome layer is showing, so the
+    // single banner slot is allowed to render on the bare welcome.
+    expect(getByTestId('chat-usage')).toBeTruthy();
     expect(getByTestId('chat-empty-state-composer-region')).toBeTruthy();
-    // Clean start screen: one role-neutral heading, no mark or marketing card.
+    // Clean start screen (JOV-5387): Just ask + executable sample, no mark.
     expect(getByTestId('chat-empty-state-welcome')).toBeTruthy();
     expect(queryByTestId('chat-empty-state-logo')).toBeNull();
     expect(getByTestId('chat-empty-state-greeting').textContent).toBe(
       'Just ask'
     );
+    expect(queryByText(/artist/i)).toBeNull();
+    expect(getByTestId('chat-empty-state-sample-user').textContent).toBe(
+      'Plan my next release'
+    );
+    expect(getByTestId('chat-empty-state-viewport')).toHaveAttribute(
+      'data-top-spacing-owner',
+      'chat-empty-viewport'
+    );
+    expect(getByTestId('chat-empty-state-viewport')).toHaveAttribute(
+      'data-grid-anchor',
+      'desktop-content'
+    );
+    expect(getByTestId('chat-empty-state-composer-region')).toHaveAttribute(
+      'data-top-spacing-owner',
+      'none'
+    );
+    expect(queryByText("What's next?")).toBeNull();
     expect(getByTestId('chat-empty-state-centered-composer')).toBeTruthy();
-    expect(queryByTestId('feature-intro-card')).toBeNull();
-    expect(queryByTestId('chat-empty-state-conversation-slot')).toBeNull();
+    expect(getByTestId('chat-message-scroll').className).toContain('pt-0');
+    expect(getByTestId('feature-intro-card')).toHaveAttribute(
+      'data-mode',
+      'whatsNew'
+    );
+    expect(getByTestId('feature-intro-card')).toHaveAttribute(
+      'data-source-id',
+      'changelog:26.8.1'
+    );
+    // No action cards and no featured skills: welcome + intro card + docked composer.
+    expect(queryByTestId('chat-empty-state-action-card-slot')).toBeNull();
     expect(queryByTestId('chat-composer-dock')).toBeNull();
     expect(queryByTestId('chat-empty-state-soft-suggestions-slot')).toBeNull();
     expect(queryByTestId('suggested-prompts-rail')).toBeNull();
@@ -247,6 +293,20 @@ describe('JovieChat empty state', () => {
     expect(queryByText('Release link')).toBeNull();
   });
 
+  it('launches the visible sample prompt exactly when the sample is selected', () => {
+    const { getByRole, getByTestId } = renderWithQueryClient(
+      <JovieChat profileId='profile-1' />
+    );
+
+    const sample = getByTestId('chat-empty-state-sample');
+    const prompt = sample.getAttribute('data-sample-prompt');
+    expect(prompt).toBe('Plan my next release');
+    fireEvent.click(getByRole('button', { name: `Ask “${prompt}”` }));
+    expect(mockChatState.handleSuggestedPrompt).toHaveBeenCalledExactlyOnceWith(
+      prompt
+    );
+  });
+
   it('uses Ovie composer copy when chatMode is ov', () => {
     const { getByTestId, queryByText } = renderWithQueryClient(
       <JovieChat profileId='profile-1' chatMode='ov' />
@@ -258,34 +318,74 @@ describe('JovieChat empty state', () => {
     expect(queryByText('Ask Jovie to plan your next release...')).toBeNull();
   });
 
-  it('renders rotating conversation bubbles on the canonical composer grid', () => {
+  it('renders the canonical starter-actions rail without the legacy card map', () => {
     renderWithQueryClient(
       <JovieChat
         profileId='profile-1'
-        starterConversations={CHAT_STARTER_CONVERSATIONS}
+        actionCards={[
+          {
+            id: 'build-artist-profile',
+            title: 'Build Artist Profile',
+            body: 'Add Spotify, Apple Music, or YouTube Music so Jovie can plan from real releases.',
+            actionLabel: 'Build Profile',
+            prompt: 'Help me connect my music catalog.',
+          },
+          {
+            id: 'plan-release',
+            title: 'Plan a Release',
+            body: 'Map the next release.',
+            actionLabel: 'Start Planning',
+            prompt: 'Help me plan my next release.',
+          },
+          {
+            id: 'review-signals',
+            title: 'Review Signals',
+            body: 'Surface traction signals.',
+            actionLabel: 'Review Signals',
+            prompt: "What's working for me right now?",
+          },
+        ]}
       />
     );
 
+    expect(screen.getByText('Build Artist Profile')).toBeTruthy();
+    expect(screen.getByText(/Add Spotify/)).toBeTruthy();
     expect(
-      screen.getByText(CHAT_STARTER_CONVERSATIONS[0].userPrompt)
+      screen.getByTestId('chat-empty-state-action-card-slot')
     ).toBeTruthy();
+    expect(screen.getByTestId('chat-starter-actions-rail')).toBeTruthy();
+    expect(screen.getByTestId('chat-empty-state-greeting').textContent).toBe(
+      'Just ask'
+    );
+    expect(screen.getByTestId('chat-empty-state-sample-user').textContent).toBe(
+      'Plan my next release'
+    );
     expect(
-      screen.getByText(CHAT_STARTER_CONVERSATIONS[0].assistantReply)
+      screen.getByRole('button', { name: 'Ask “Plan my next release”' })
     ).toBeTruthy();
-    expect(
-      screen.getByTestId('chat-empty-state-conversation-slot')
-    ).toHaveClass('items-start', 'pt-4', 'sm:pt-6');
-    expect(
-      screen.getByTestId('chat-starter-conversation-rail')
-    ).toHaveAttribute('data-chat-grid-anchor', 'starter');
     expect(screen.getByTestId('chat-empty-state-viewport')).toHaveAttribute(
       'data-empty-affordance',
-      'starter-conversations'
+      'starter-actions'
     );
+    // one-chrome-layer-v1: starter-action chrome XOR the usage banner.
+    expect(screen.queryByTestId('chat-usage')).toBeNull();
     expect(
       screen.getByTestId('chat-empty-state-centered-composer')
     ).toBeTruthy();
-    // Docked layout: samples scroll above, composer stays at the bottom.
+    expect(screen.getByRole('heading', { name: 'Just ask' })).toBeTruthy();
+    expect(screen.getByTestId('chat-empty-state-greeting')).not.toHaveAttribute(
+      'aria-hidden',
+      'true'
+    );
+    expect(screen.getByTestId('chat-empty-state-welcome').className).toContain(
+      'shrink-0'
+    );
+    expect(screen.getByTestId('chat-empty-state-action-card-slot')).toHaveClass(
+      'flex-col',
+      'items-center',
+      'justify-start'
+    );
+    // Docked layout: cards scroll above, composer at bottom of usable area.
     const region = screen.getByTestId('chat-empty-state-composer-region');
     expect(region.getAttribute('data-layout')).toBe('docked');
     expect(screen.getByTestId('chat-empty-state-above-scroll')).toBeTruthy();
@@ -295,10 +395,29 @@ describe('JovieChat empty state', () => {
         .getAttribute('data-dock')
     ).toBe('bottom');
     expect(screen.queryByTestId('suggested-prompts-rail')).toBeNull();
-    expect(screen.queryByTestId('feature-intro-card')).toBeNull();
+    expect(screen.getAllByTestId('chat-action-card')).toHaveLength(1);
+    expect(
+      within(screen.getByTestId('chat-starter-actions-rail')).getByRole(
+        'button',
+        { name: 'Show More Starter Actions' }
+      )
+    ).toBeInTheDocument();
+    expect(
+      within(screen.getByTestId('chat-starter-actions-rail')).getAllByRole(
+        'button',
+        { name: /Show Starter Action/ }
+      )
+    ).toHaveLength(3);
+
+    fireEvent.click(
+      screen.getByRole('button', { name: 'Ask “Plan my next release”' })
+    );
+    expect(mockChatState.handleSuggestedPrompt).toHaveBeenCalledWith(
+      'Plan my next release'
+    );
   });
 
-  it('launches the exact visible user prompt from the selected sample', () => {
+  it('does not resurrect dismissed primary actions as chips or recenter the composer', () => {
     const gtag = vi.fn();
     Object.defineProperty(globalThis.window, 'gtag', {
       configurable: true,
@@ -308,26 +427,70 @@ describe('JovieChat empty state', () => {
     renderWithQueryClient(
       <JovieChat
         profileId='profile-1'
-        starterConversations={CHAT_STARTER_CONVERSATIONS}
+        isProfileComplete
+        actionCards={[
+          {
+            id: 'plan-release',
+            title: 'Plan a Release',
+            body: 'Map the next release.',
+            actionLabel: 'Start Planning',
+            prompt: 'Help me plan my next release.',
+          },
+          {
+            id: 'generate-album-art',
+            title: 'Generate Album Art',
+            body: 'Draft cover concepts.',
+            actionLabel: 'Generate Art',
+            prompt: 'Generate album art for my latest release.',
+          },
+          {
+            id: 'review-signals',
+            title: 'Review Signals',
+            body: 'Surface traction signals.',
+            actionLabel: 'Review Signals',
+            prompt: 'Help me see what is gaining traction.',
+          },
+        ]}
       />
     );
 
+    fireEvent.click(screen.getByRole('button', { name: 'Plan a Release' }));
     fireEvent.click(
-      screen.getByRole('button', {
-        name: `Start conversation: ${CHAT_STARTER_CONVERSATIONS[0].userPrompt}`,
-      })
+      screen.getByRole('button', { name: 'Dismiss Plan a Release' })
+    );
+    fireEvent.click(
+      screen.getByRole('button', { name: 'Dismiss Generate Album Art' })
+    );
+    fireEvent.click(
+      screen.getByRole('button', { name: 'Dismiss Review Signals' })
     );
 
-    expect(mockChatState.handleSuggestedPrompt).toHaveBeenCalledWith(
-      CHAT_STARTER_CONVERSATIONS[0].userPrompt
+    expect(screen.queryAllByTestId('chat-action-card')).toHaveLength(0);
+    expect(
+      screen.queryByTestId('chat-empty-state-action-card-slot')
+    ).toBeNull();
+    expect(
+      screen.queryByTestId('chat-empty-state-soft-suggestions-slot')
+    ).toBeNull();
+    expect(screen.getByTestId('chat-empty-state-viewport')).toHaveAttribute(
+      'data-empty-affordance',
+      'none'
+    );
+    expect(
+      screen.getByTestId('chat-empty-state-composer-region')
+    ).toHaveAttribute('data-layout', 'docked');
+    expect(screen.queryByLabelText('Plan a Release')).toBeNull();
+    expect(screen.queryByLabelText('Generate Album Art')).toBeNull();
+    expect(screen.queryByLabelText('Review Signals')).toBeNull();
+    expect(gtag).toHaveBeenCalledWith(
+      'event',
+      'chat_starter_action_selected',
+      expect.objectContaining({ action: 'plan_release', surface: 'card' })
     );
     expect(gtag).toHaveBeenCalledWith(
       'event',
-      'chat_starter_conversation_selected',
-      expect.objectContaining({
-        sample: CHAT_STARTER_CONVERSATIONS[0].id,
-        surface: 'conversation-bubbles',
-      })
+      'chat_starter_action_dismissed',
+      expect.objectContaining({ action: 'review_signals', surface: 'card' })
     );
   });
 
@@ -337,12 +500,20 @@ describe('JovieChat empty state', () => {
     const { getByTestId, queryByTestId, queryByText } = renderWithQueryClient(
       <JovieChat
         profileId='profile-1'
-        starterConversations={CHAT_STARTER_CONVERSATIONS}
+        actionCards={[
+          {
+            id: 'build-artist-profile',
+            title: 'Build Artist Profile',
+            body: 'Add Spotify, Apple Music, or YouTube Music so Jovie can plan from real releases.',
+            actionLabel: 'Build Profile',
+            prompt: 'Help me connect my music catalog.',
+          },
+        ]}
       />
     );
 
     expect(getByTestId('chat-empty-state-composer-region')).toBeTruthy();
-    expect(queryByTestId('chat-empty-state-conversation-slot')).toBeNull();
+    expect(queryByTestId('chat-empty-state-action-card-slot')).toBeNull();
     expect(queryByTestId('chat-composer-dock')).toBeNull();
     expect(queryByTestId('chat-empty-state-top-signals')).toBeNull();
     // Typing gives the composer full focus: welcome + logo hide too.
@@ -461,6 +632,8 @@ describe('JovieChat empty state', () => {
     expect(queryByTestId('chat-empty-state-soft-suggestions-slot')).toBeNull();
     expect(queryByTestId('chat-empty-state-welcome')).toBeNull();
     expect(queryByTestId('chat-empty-state-logo')).toBeNull();
+    // one-chrome-layer-v1: opportunity cards XOR the usage banner.
+    expect(queryByTestId('chat-usage')).toBeNull();
   });
 
   it('enters pinned-card mode when an opportunity card is tapped', () => {

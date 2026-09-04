@@ -1,6 +1,10 @@
 import { computeRatePercent } from '@/lib/analytics/metrics';
 import { canonicalizeSurfaceUrl } from '@/lib/profile-surfaces/contracts';
-import type { CitationEngine } from './citation-monitor';
+import {
+  CITATION_ENGINES,
+  type CitationEngine,
+  classifyCitationTrend,
+} from './citation-monitor';
 
 // Collectors own provider I/O, consent hydration, excerpt bounds, and persistence.
 export const ASSET_VISIBILITY_QUERY_SET_VERSION =
@@ -670,5 +674,723 @@ export function buildAssetVisibilityReport(input: {
       assetTrend,
       previous
     ),
+  };
+}
+
+// Observation parse/aggregate contract used by citation monitoring (JOV-5607).
+export const AEO_ASSET_VISIBILITY_VARIANT_IDENTITY =
+  'aeo-asset-visibility-contract:v1';
+export const AEO_ASSET_KINDS = [
+  'artist',
+  'music',
+  'video',
+  'merch',
+  'ticket',
+  'creator_product',
+] as const;
+
+export type AeoAssetKind = (typeof AEO_ASSET_KINDS)[number];
+export type AeoAssetPublicationState = 'public' | 'unpublished' | 'private';
+export type AeoConsentScope = 'public_query' | 'private_observation';
+type Nullable<T> = T | null;
+type SourceRef = { url: Nullable<string>; platform: Nullable<string> };
+type Status<T extends string> = { status: T };
+type ConsentMap = Readonly<Record<string, AeoAssetConsent | null>>;
+
+export type AeoRecommendationContext =
+  | 'cited_source'
+  | 'recommended_item'
+  | 'mentioned'
+  | 'unknown';
+export type AeoAssetRef = {
+  assetId: string;
+  kind: AeoAssetKind;
+  creatorScopeId: string;
+  title: string;
+  canonicalUrl: Nullable<string>;
+  publicationState: AeoAssetPublicationState;
+};
+export type AeoAssetConsent = {
+  creatorScopeId: string;
+  assetId: string;
+  scope: AeoConsentScope;
+  granted: boolean;
+};
+export type AeoQueryProvenance = {
+  querySetId: string;
+  querySetVersion: string;
+  engine: CitationEngine;
+  model: string;
+  promptVersion: string;
+  market: Nullable<string>;
+  locale: Nullable<string>;
+  creatorLifecycle: Nullable<string>;
+};
+export type AeoCompetitor = SourceRef & {
+  name: string;
+  position: Nullable<number>;
+};
+export type AeoRecommendationPresence =
+  | (Status<'appeared'> & {
+      position: Nullable<number>;
+      context: AeoRecommendationContext;
+    })
+  | Status<'absent' | 'unknown'>;
+export type AeoCitedSource = (Status<'known'> & SourceRef) | Status<'unknown'>;
+export type AeoCompetitorSet =
+  | (Status<'known'> & { items: readonly AeoCompetitor[] })
+  | Status<'unknown'>;
+export type AeoAssetObservation = {
+  runId: string;
+  observedAt: string;
+  asset: AeoAssetRef;
+  provenance: AeoQueryProvenance;
+  queryText: string;
+  presence: AeoRecommendationPresence;
+  citedSource: AeoCitedSource;
+  competitors: AeoCompetitorSet;
+};
+export type AeoPrepareOnlyAction = {
+  id: string;
+  kind: 'prepare_asset_for_recommendation' | 'prepare_competitive_context';
+  mode: 'prepare_only';
+  priority: number;
+  title: string;
+  rationale: string;
+  sourceEvidence: ReadonlyArray<{ runId: string; field: string }>;
+};
+export type AeoComparableTrend = {
+  comparable: boolean;
+  direction: 'up' | 'down' | 'steady' | 'incomparable';
+  delta: Nullable<number>;
+  reason: string;
+  mismatchedFields: readonly string[];
+};
+type RecordResult =
+  | { ok: true; observation: AeoAssetObservation }
+  | { ok: false; reason: string; assetId: Nullable<string> };
+type ActionReport = {
+  assetId: string;
+  creatorScopeId: string;
+  visibility: { observationCount: number; appearanceCount: number };
+  competitorComparison: {
+    items: readonly AeoCompetitor[];
+    outrankedBy: readonly string[];
+  };
+};
+type AggregateOptions = {
+  readonly previous?: readonly unknown[];
+  readonly consentByAssetId?: ConsentMap;
+  readonly consentByAssetKey?: ConsentMap;
+};
+
+const KINDS = new Set<string>(AEO_ASSET_KINDS);
+const ENGINES = new Set<string>(CITATION_ENGINES);
+const ID_KEYS = new Set(['fanId', 'audienceMemberId', 'email', 'phone']);
+const PROV = 'querySetId,querySetVersion,engine,model,promptVersion'.split(
+  ','
+) as (keyof AeoQueryProvenance)[];
+const CTX = new Set(
+  'cited_source,recommended_item,mentioned,unknown'.split(',')
+);
+
+const rec = (v: unknown): v is Record<string, unknown> =>
+  typeof v === 'object' && v !== null && !Array.isArray(v);
+const str = (v: unknown): string | null =>
+  typeof v === 'string' && v.trim().length > 0 ? v : null;
+const timestamp = (v: unknown): string | null => {
+  const value = str(v);
+  return value && Number.isFinite(Date.parse(value)) ? value : null;
+};
+const pos = (v: unknown): number | null =>
+  typeof v === 'number' && Number.isFinite(v) && v > 0 ? v : null;
+const ratio = (n: number, d: number): number =>
+  Number.isFinite(n) && Number.isFinite(d) && d > 0 ? n / d : 0;
+const rate = (n: number, d: number): number =>
+  computeRatePercent(n, d, 1) / 100;
+const uniq = (v: readonly (string | null)[]): readonly string[] => [
+  ...new Set(v.filter((x): x is string => x != null)),
+];
+const noId = (v: unknown): boolean =>
+  Array.isArray(v)
+    ? v.every(noId)
+    : !rec(v) ||
+      Object.entries(v).every(
+        ([key, value]) => !ID_KEYS.has(key) && noId(value)
+      );
+const rawAssetId = (v: unknown): string | null =>
+  rec(v) ? (rec(v.asset) ? str(v.asset.assetId) : str(v.profileUrl)) : null;
+const assetKey = (asset: Pick<AeoAssetRef, 'assetId' | 'creatorScopeId'>) =>
+  JSON.stringify([asset.creatorScopeId, asset.assetId]);
+
+export function isAeoAssetKind(v: unknown): v is AeoAssetKind {
+  return typeof v === 'string' && KINDS.has(v);
+}
+
+function isCitationEngine(v: unknown): v is CitationEngine {
+  return typeof v === 'string' && ENGINES.has(v);
+}
+
+function granted(
+  asset: AeoAssetRef,
+  consent: AeoAssetConsent | null,
+  scopes: readonly AeoConsentScope[]
+): boolean {
+  return Boolean(
+    consent?.granted &&
+      scopes.includes(consent.scope) &&
+      consent.assetId === asset.assetId &&
+      consent.creatorScopeId === asset.creatorScopeId
+  );
+}
+
+export function aeoProvenanceMismatches(
+  a: AeoQueryProvenance,
+  b: AeoQueryProvenance
+): readonly string[] {
+  const out: string[] = [];
+  for (const k of PROV) if (a[k] !== b[k]) out.push(k);
+  if ((a.market ?? '') !== (b.market ?? '')) out.push('market');
+  if ((a.locale ?? '') !== (b.locale ?? '')) out.push('locale');
+  if ((a.creatorLifecycle ?? '') !== (b.creatorLifecycle ?? '')) {
+    out.push('creatorLifecycle');
+  }
+  return out;
+}
+
+export function areAeoRunsComparable(
+  a: AeoQueryProvenance,
+  b: AeoQueryProvenance
+): boolean {
+  return aeoProvenanceMismatches(a, b).length === 0;
+}
+
+function parsePresence(
+  v: Record<string, unknown>
+): AeoRecommendationPresence | null {
+  if (v.status === 'absent' || v.status === 'unknown')
+    return { status: v.status };
+  if (v.status !== 'appeared' || !CTX.has(String(v.context))) return null;
+  return {
+    status: 'appeared',
+    position: pos(v.position),
+    context: v.context as AeoRecommendationContext,
+  };
+}
+
+function parseCited(v: Record<string, unknown>): AeoCitedSource | null {
+  if (v.status === 'unknown') return { status: 'unknown' };
+  if (v.status !== 'known') return null;
+  return { status: 'known', url: str(v.url), platform: str(v.platform) };
+}
+
+function parseComps(v: Record<string, unknown>): AeoCompetitorSet | null {
+  if (v.status === 'unknown') return { status: 'unknown' };
+  if (v.status !== 'known' || !Array.isArray(v.items)) return null;
+  const items: AeoCompetitor[] = [];
+  for (const item of v.items) {
+    if (!rec(item) || !str(item.name)) return null;
+    items.push({
+      name: item.name as string,
+      url: str(item.url),
+      platform: str(item.platform),
+      position: pos(item.position),
+    });
+  }
+  return { status: 'known', items };
+}
+
+export function parseAeoAssetObservation(
+  v: unknown
+): AeoAssetObservation | null {
+  if (!rec(v) || !noId(v)) return null;
+  const assetV = v.asset;
+  const provV = v.provenance;
+  const presV = v.presence;
+  const citedV = v.citedSource;
+  const compV = v.competitors;
+  if (!rec(assetV) || !rec(provV)) return null;
+  if (!rec(presV) || !rec(citedV) || !rec(compV)) return null;
+  const pub = assetV.publicationState;
+  const assetId = str(assetV.assetId);
+  const scope = str(assetV.creatorScopeId);
+  const title = str(assetV.title);
+  const qid = str(provV.querySetId);
+  const qver = str(provV.querySetVersion);
+  const engine = str(provV.engine);
+  const model = str(provV.model);
+  const prompt = str(provV.promptVersion);
+  const runId = str(v.runId);
+  const observedAt = timestamp(v.observedAt);
+  const queryText = str(v.queryText);
+  const presence = parsePresence(presV);
+  const citedSource = parseCited(citedV);
+  const competitors = parseComps(compV);
+  const pubState =
+    pub === 'public' || pub === 'unpublished' || pub === 'private' ? pub : null;
+  if (
+    !assetId ||
+    !isAeoAssetKind(assetV.kind) ||
+    !scope ||
+    !title ||
+    !pubState ||
+    ![qid, qver, model, prompt, runId, observedAt, queryText].every(Boolean) ||
+    !isCitationEngine(engine) ||
+    !presence ||
+    !citedSource ||
+    !competitors
+  ) {
+    return null;
+  }
+  return {
+    runId: runId as string,
+    observedAt: observedAt as string,
+    asset: {
+      assetId,
+      kind: assetV.kind,
+      creatorScopeId: scope,
+      title,
+      canonicalUrl: str(assetV.canonicalUrl),
+      publicationState: pubState,
+    },
+    provenance: {
+      querySetId: qid as string,
+      querySetVersion: qver as string,
+      engine,
+      model: model as string,
+      promptVersion: prompt as string,
+      market: str(provV.market),
+      locale: str(provV.locale),
+      creatorLifecycle: str(provV.creatorLifecycle),
+    },
+    queryText: queryText as string,
+    presence,
+    citedSource,
+    competitors,
+  };
+}
+
+export function recordAssetObservation(input: {
+  readonly observation: unknown;
+  readonly consent: AeoAssetConsent | null;
+}): RecordResult {
+  if (!noId(input.observation)) {
+    return {
+      ok: false,
+      reason: 'asset_observation_contains_disallowed_identifier',
+      assetId: rawAssetId(input.observation),
+    };
+  }
+  const observation = parseAeoAssetObservation(input.observation);
+  if (!observation) {
+    return {
+      ok: false,
+      reason: 'artist_only_monitor_cannot_satisfy_asset_contract',
+      assetId: rawAssetId(input.observation),
+    };
+  }
+  if (
+    observation.asset.publicationState !== 'public' &&
+    !granted(observation.asset, input.consent, [
+      'public_query',
+      'private_observation',
+    ])
+  ) {
+    return {
+      ok: false,
+      reason: 'private_asset_requires_explicit_consent',
+      assetId: observation.asset.assetId,
+    };
+  }
+  return { ok: true, observation };
+}
+
+export function scoreObservationCompleteness(o: AeoAssetObservation): number {
+  let known = 0;
+  if (o.presence.status === 'absent') known += 3;
+  else if (o.presence.status === 'unknown') known += 1;
+  else if (o.presence.status === 'appeared') {
+    known += 1;
+    if (o.presence.position != null) known += 1;
+    if (o.presence.context !== 'unknown') known += 1;
+  }
+  if (o.citedSource.status === 'known') known += 1;
+  if (o.competitors.status === 'known') known += 1;
+  return rate(known, 5);
+}
+
+function incomparable(
+  reason: string,
+  mismatchedFields: readonly string[] = []
+): AeoComparableTrend {
+  return {
+    comparable: false,
+    direction: 'incomparable',
+    delta: null,
+    reason,
+    mismatchedFields,
+  };
+}
+
+function trendOf(
+  curRate: number,
+  cur: AeoQueryProvenance | null,
+  prevRate: number | null,
+  prev: AeoQueryProvenance | null
+): AeoComparableTrend {
+  const empty = incomparable('no_comparable_prior_run');
+  if (!cur || !prev || prevRate == null) return empty;
+  const mismatched = aeoProvenanceMismatches(cur, prev);
+  if (mismatched.length > 0)
+    return incomparable('provenance_mismatch', mismatched);
+  return {
+    comparable: true,
+    direction: classifyCitationTrend(curRate, prevRate),
+    delta: Math.round((curRate - prevRate) * 1000) / 1000,
+    reason: 'comparable_query_set',
+    mismatchedFields: [],
+  };
+}
+
+const evidenceFor = (
+  runIds: readonly string[],
+  field: string
+): AeoPrepareOnlyAction['sourceEvidence'] =>
+  runIds.map(runId => ({ runId, field }));
+
+function actionsFor(
+  report: ActionReport,
+  evidence: {
+    readonly absentWithCompetitorsRunIds: readonly string[];
+    readonly outrankedByRunIds: readonly string[];
+  }
+): readonly AeoPrepareOnlyAction[] {
+  const out: AeoPrepareOnlyAction[] = [];
+  if (
+    report.visibility.observationCount > 0 &&
+    report.visibility.appearanceCount === 0 &&
+    evidence.absentWithCompetitorsRunIds.length > 0 &&
+    report.competitorComparison.items.length > 0
+  ) {
+    out.push({
+      id: `${report.creatorScopeId}:${report.assetId}:prepare_asset_for_recommendation`,
+      kind: 'prepare_asset_for_recommendation',
+      mode: 'prepare_only',
+      priority: 1,
+      title: 'Prepare this asset so answer engines can recommend it',
+      rationale: 'Asset did not appear while competitors were recommended.',
+      sourceEvidence: [
+        ...evidenceFor(evidence.absentWithCompetitorsRunIds, 'presence'),
+        ...evidenceFor(evidence.absentWithCompetitorsRunIds, 'competitors'),
+      ],
+    });
+  }
+  if (report.competitorComparison.outrankedBy.length > 0) {
+    out.push({
+      id: `${report.creatorScopeId}:${report.assetId}:prepare_competitive_context`,
+      kind: 'prepare_competitive_context',
+      mode: 'prepare_only',
+      priority: 2,
+      title: 'Prepare competitive context for this asset',
+      rationale: `Outranked by ${report.competitorComparison.outrankedBy.join(', ')}.`,
+      sourceEvidence: evidenceFor(evidence.outrankedByRunIds, 'competitors'),
+    });
+  }
+  return out;
+}
+
+type CompetitorCandidate = {
+  readonly item: AeoCompetitor;
+  readonly runId: string;
+};
+
+type AggregatedCompetitor = {
+  readonly item: AeoCompetitor;
+  readonly runIds: readonly string[];
+  readonly evidenceRunIds: readonly string[];
+};
+
+function aggregateCompetitors(
+  items: readonly CompetitorCandidate[]
+): readonly AggregatedCompetitor[] {
+  const byName = new Map<
+    string,
+    {
+      item: AeoCompetitor;
+      runIds: Set<string>;
+      evidenceRunIds: Set<string>;
+    }
+  >();
+  for (const item of items) {
+    const existing = byName.get(item.item.name);
+    if (!existing) {
+      byName.set(item.item.name, {
+        item: item.item,
+        runIds: new Set([item.runId]),
+        evidenceRunIds: new Set([item.runId]),
+      });
+      continue;
+    }
+
+    existing.runIds.add(item.runId);
+    if (
+      item.item.position != null &&
+      (existing.item.position == null ||
+        item.item.position < existing.item.position)
+    ) {
+      existing.item = item.item;
+      existing.evidenceRunIds = new Set([item.runId]);
+    } else if (
+      existing.item.position === item.item.position &&
+      existing.item.url === item.item.url &&
+      existing.item.platform === item.item.platform
+    ) {
+      existing.evidenceRunIds.add(item.runId);
+    }
+  }
+  return [...byName.values()].map(item => ({
+    item: item.item,
+    runIds: [...item.runIds],
+    evidenceRunIds: [...item.evidenceRunIds],
+  }));
+}
+
+const citedSourceScore = (source: AeoCitedSource): number =>
+  source.status === 'known'
+    ? Number(source.url != null) + Number(source.platform != null)
+    : 0;
+
+function latestRun(
+  rows: readonly AeoAssetObservation[]
+): readonly AeoAssetObservation[] {
+  const byRun = new Map<string, AeoAssetObservation[]>();
+  for (const row of rows) {
+    const list = byRun.get(row.runId) ?? [];
+    list.push(row);
+    byRun.set(row.runId, list);
+  }
+  let out: readonly AeoAssetObservation[] = [];
+  let latestTime = Number.NEGATIVE_INFINITY;
+  let latestId = '';
+  for (const group of byRun.values()) {
+    const nextTime = Math.max(...group.map(row => Date.parse(row.observedAt)));
+    const nextId = group[0]?.runId ?? '';
+    if (
+      nextTime > latestTime ||
+      (nextTime === latestTime && nextId > latestId)
+    ) {
+      latestTime = nextTime;
+      latestId = nextId;
+      out = group;
+    }
+  }
+  return out;
+}
+
+function summarize(
+  rows: readonly AeoAssetObservation[],
+  prev: readonly AeoAssetObservation[]
+) {
+  const first = rows[0];
+  let appearedN = 0;
+  let absentN = 0;
+  let best: number | null = null;
+  let ctx: AeoRecommendationContext | 'absent' = 'absent';
+  let src = { url: null as string | null, platform: null as string | null };
+  let srcScore = 0;
+  const comps: CompetitorCandidate[] = [];
+  const absentWithCompetitorsRunIds = new Set<string>();
+  for (const row of rows) {
+    if (row.presence.status === 'appeared') {
+      appearedN += 1;
+      if (row.presence.position != null) {
+        if (best == null || row.presence.position < best) {
+          best = row.presence.position;
+          ctx = row.presence.context;
+        }
+      } else if (best == null && ctx === 'absent') {
+        ctx = row.presence.context;
+      }
+    } else if (row.presence.status === 'absent') {
+      absentN += 1;
+      if (
+        row.competitors.status === 'known' &&
+        row.competitors.items.length > 0
+      ) {
+        absentWithCompetitorsRunIds.add(row.runId);
+      }
+    }
+    const nextSourceScore = citedSourceScore(row.citedSource);
+    if (row.citedSource.status === 'known' && nextSourceScore > srcScore) {
+      src = {
+        url: row.citedSource.url,
+        platform: row.citedSource.platform,
+      };
+      srcScore = nextSourceScore;
+    }
+    if (row.competitors.status === 'known') {
+      comps.push(
+        ...row.competitors.items.map(item => ({ item, runId: row.runId }))
+      );
+    }
+  }
+  const n = rows.length;
+  const knownPresenceN = appearedN + absentN;
+  const appearanceRate = ratio(appearedN, knownPresenceN);
+  const completeness = n
+    ? Math.round(
+        (rows.reduce((s, row) => s + scoreObservationCompleteness(row), 0) /
+          n) *
+          1000
+      ) / 1000
+    : 0;
+  const curP = first?.provenance ?? null;
+  const mixed =
+    curP != null &&
+    rows.some(row => !areAeoRunsComparable(curP, row.provenance));
+  const mixedFields = curP
+    ? uniq(rows.flatMap(row => aeoProvenanceMismatches(curP, row.provenance)))
+    : [];
+  const prevRun = latestRun(
+    prev.filter(row =>
+      curP && !mixed ? areAeoRunsComparable(curP, row.provenance) : false
+    )
+  );
+  const prevKnownPresence = prevRun.filter(
+    r => r.presence.status === 'appeared' || r.presence.status === 'absent'
+  );
+  const prevRate = prevKnownPresence.length
+    ? ratio(
+        prevKnownPresence.filter(r => r.presence.status === 'appeared').length,
+        prevKnownPresence.length
+      )
+    : null;
+  const currentTrendRate = ratio(appearedN, knownPresenceN);
+  const trend =
+    knownPresenceN === 0
+      ? incomparable('no_current_presence_measurement')
+      : mixed
+        ? incomparable('mixed_current_provenance', mixedFields)
+        : prev.length > 0 && prevRun.length === 0
+          ? trendOf(appearanceRate, curP, null, prev[0]?.provenance ?? null)
+          : trendOf(
+              currentTrendRate,
+              curP,
+              prevRate,
+              prevRun[0]?.provenance ?? null
+            );
+  const competitors = aggregateCompetitors(comps);
+  const outrankedBy = uniq(
+    competitors
+      .filter(
+        c => best != null && c.item.position != null && c.item.position < best
+      )
+      .map(c => c.item.name)
+  );
+  const outrankedByRunIds = uniq(
+    competitors.flatMap(c =>
+      best != null && c.item.position != null && c.item.position < best
+        ? c.evidenceRunIds
+        : []
+    )
+  );
+  const recommendationContext: AeoRecommendationContext =
+    ctx === 'absent' ? 'unknown' : ctx;
+  const draft = {
+    variantIdentity: AEO_ASSET_VISIBILITY_VARIANT_IDENTITY,
+    assetId: first?.asset.assetId ?? '',
+    assetKind: first?.asset.kind ?? 'artist',
+    creatorScopeId: first?.asset.creatorScopeId ?? '',
+    visibility: {
+      appeared: appearedN > 0,
+      appearanceCount: appearedN,
+      observationCount: n,
+      appearanceRate,
+    },
+    recommendation: { bestPosition: best, context: recommendationContext },
+    citedSource: src,
+    competitorComparison: {
+      items: competitors.map(c => c.item),
+      outrankedBy,
+      outranks: uniq(
+        competitors
+          .filter(
+            c =>
+              best != null && c.item.position != null && c.item.position > best
+          )
+          .map(c => c.item.name)
+      ),
+    },
+    trend,
+    observationCompleteness: completeness,
+  };
+  return {
+    ...draft,
+    actions: actionsFor(draft, {
+      absentWithCompetitorsRunIds: [...absentWithCompetitorsRunIds],
+      outrankedByRunIds,
+    }),
+  };
+}
+
+type Rejected = { readonly reason: string; readonly assetId: string | null };
+
+function consentFor(candidate: unknown, options: AggregateOptions) {
+  const rawAsset =
+    rec(candidate) && rec(candidate.asset) ? candidate.asset : null;
+  const assetId = rawAsset ? str(rawAsset.assetId) : null;
+  const creatorScopeId = rawAsset ? str(rawAsset.creatorScopeId) : null;
+  const key =
+    assetId && creatorScopeId ? JSON.stringify([creatorScopeId, assetId]) : '';
+  return assetId
+    ? (options.consentByAssetKey?.[key] ??
+        options.consentByAssetId?.[assetId] ??
+        null)
+    : null;
+}
+
+export function aggregateAssetVisibility(
+  observations: readonly unknown[],
+  options: AggregateOptions = {}
+) {
+  const rejected: Rejected[] = [];
+  const accepted: AeoAssetObservation[] = [];
+  for (const candidate of observations) {
+    const recorded = recordAssetObservation({
+      observation: candidate,
+      consent: consentFor(candidate, options),
+    });
+    if (!recorded.ok) {
+      rejected.push({ reason: recorded.reason, assetId: recorded.assetId });
+      continue;
+    }
+    accepted.push(recorded.observation);
+  }
+  const prev = (options.previous ?? []).flatMap(c => {
+    const recorded = recordAssetObservation({
+      observation: c,
+      consent: consentFor(c, options),
+    });
+    return recorded.ok ? [recorded.observation] : [];
+  });
+  const byAsset = new Map<string, AeoAssetObservation[]>();
+  for (const row of accepted) {
+    const key = assetKey(row.asset);
+    const list = byAsset.get(key) ?? [];
+    list.push(row);
+    byAsset.set(key, list);
+  }
+  return {
+    variantIdentity: AEO_ASSET_VISIBILITY_VARIANT_IDENTITY,
+    reports: [...byAsset.values()].map(rows => {
+      const first = rows[0];
+      return summarize(
+        rows,
+        first
+          ? prev.filter(row => assetKey(row.asset) === assetKey(first.asset))
+          : []
+      );
+    }),
+    rejected,
   };
 }

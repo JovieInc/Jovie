@@ -108,22 +108,6 @@
   );
 }
 
-:where(.system-b-chat-upload-manifest-bar) {
-  height: 3px;
-  background: color-mix(
-    in oklab,
-    var(--color-text-primary-token) 7%,
-    transparent
-  );
-  overflow: hidden;
-}
-
-:where(.system-b-chat-upload-manifest-bar-fill) {
-  height: 100%;
-  background: var(--color-border-focus);
-  transition: width 0.5s ease;
-}
-
 :where(.system-b-chat-upload-manifest-list) {
   padding: var(--space-2);
   max-height: 280px;
@@ -170,21 +154,6 @@
   align-items: center;
   justify-content: center;
   background: color-mix(in oklab, oklch(72% 0.19 149) 18%, transparent);
-}
-
-:where(.system-b-chat-upload-manifest-mini-bar) {
-  width: 46px;
-  height: 4px;
-  border-radius: 9999px;
-  background: color-mix(in oklab, white 8%, transparent);
-  overflow: hidden;
-  flex-shrink: 0;
-}
-
-:where(.system-b-chat-upload-manifest-mini-bar-fill) {
-  height: 100%;
-  background: var(--color-border-focus);
-  transition: width 0.5s ease;
 }
 
 /* ── Chat File Chips (ready state) ───────────────────────────────────── */

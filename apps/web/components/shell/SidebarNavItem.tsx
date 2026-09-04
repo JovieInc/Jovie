@@ -36,13 +36,14 @@ interface SidebarNavChromeOptions {
   readonly className?: string;
 }
 
-// Secondary actions stay compact so the active destination remains strongest.
+// Create actions stay compact. New Chat uses the primary tone so an enabled
+// create control cannot inherit muted/disabled icon chrome.
 const SIDEBAR_SECONDARY_CHROME =
   'w-fit grid-cols-[18px_auto] gap-x-1.5 px-2.5 text-sidebar-item-foreground font-medium hover:bg-sidebar-accent';
 
-// Available primary actions use primary-token copy and a filled surface.
+// Elevated create treatment for the New Chat primary action.
 const SIDEBAR_PRIMARY_CHROME =
-  'w-fit grid-cols-[18px_auto] gap-x-1.5 bg-sidebar-accent/70 px-2.5 text-primary-token font-medium shadow-none hover:bg-sidebar-accent-active';
+  'w-fit grid-cols-[18px_auto] gap-x-1.5 bg-sidebar-accent/40 px-2.5 text-sidebar-item-foreground font-medium shadow-none hover:bg-sidebar-accent/70';
 
 // Active state uses a quiet neutral fill with primary-token type and a Jovie teal icon.
 // Avoid a left rail or guide decoration so every shared sidebar consumer keeps

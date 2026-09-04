@@ -3,6 +3,7 @@ import { Button } from '@jovie/ui/atoms/button';
 import Link from 'next/link';
 import type { ElementType, ReactNode } from 'react';
 import { MarketingCtaPendingLabel } from './MarketingCtaPendingLabel';
+import { MarketingHero } from './MarketingHero';
 
 export interface MarketingPosterHeroCta {
   readonly label: ReactNode;
@@ -51,13 +52,17 @@ export function MarketingPosterHero({
       : {};
 
   return (
-    <section
+    <MarketingHero
+      variant='unstyled'
       className='homepage-poster-hero'
-      aria-labelledby={headingId}
-      data-testid='homepage-hero-shell'
+      headingId={headingId}
+      testId='homepage-hero-shell'
     >
       <div className='homepage-poster-hero__copy'>
-        <h1 id={headingId} className='homepage-poster-hero__headline'>
+        <h1
+          id={headingId}
+          className='homepage-poster-hero__headline marketing-h1-max-two-lines line-clamp-2'
+        >
           {headline}
         </h1>
         <p className='homepage-poster-hero__subtitle'>{subtitle}</p>
@@ -114,6 +119,6 @@ export function MarketingPosterHero({
       >
         {media}
       </div>
-    </section>
+    </MarketingHero>
   );
 }

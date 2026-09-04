@@ -7,7 +7,11 @@ type Row = { title: string };
 
 function mockHeader(
   label: string,
-  opts?: { placeholder?: boolean }
+  opts?: {
+    placeholder?: boolean;
+    align?: 'left' | 'center' | 'right';
+    className?: string;
+  }
 ): Header<Row, unknown> {
   return {
     id: label,
@@ -16,7 +20,10 @@ function mockHeader(
     column: {
       columnDef: {
         header: label,
-        meta: undefined,
+        meta:
+          opts?.align || opts?.className
+            ? { align: opts.align, className: opts.className }
+            : undefined,
       },
       getCanSort: () => true,
       getIsSorted: () => false,
@@ -65,5 +72,29 @@ describe('TableHeaderCell (molecule)', () => {
     renderCell({ onToggleSort });
     fireEvent.click(screen.getByRole('button', { name: /Title/i }));
     expect(onToggleSort).toHaveBeenCalled();
+  });
+
+  it('applies column meta alignment to sortable header chrome', () => {
+    renderCell({ header: mockHeader('Total', { align: 'right' }) });
+
+    const button = screen.getByRole('button', { name: /Total/i });
+    expect(screen.getByRole('columnheader')).toHaveClass('text-right');
+    expect(button).toHaveClass('justify-end', 'text-right');
+  });
+
+  it('lets column meta classes override the canonical header tone', () => {
+    renderCell({
+      header: mockHeader('Status', { className: 'text-primary-token' }),
+      canSort: false,
+    });
+
+    const header = screen.getByRole('columnheader');
+    expect(header).toHaveClass('text-primary-token');
+    expect(header).not.toHaveClass('text-secondary-token');
+  });
+
+  it('keeps column heading cells bounded to one line', () => {
+    const { container } = renderCell();
+    expect(container.querySelector('th')).toHaveClass('whitespace-nowrap');
   });
 });

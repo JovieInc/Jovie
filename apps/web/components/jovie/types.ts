@@ -4,9 +4,9 @@ import {
   type ToolUIPart,
   type UIMessage,
 } from 'ai';
-import type { ChatStarterConversation } from '@/lib/chat/new-chat-entry-contract';
 import { TOOL_UI_REGISTRY } from '@/lib/chat/tool-ui-registry';
 import type { ChatInsightSummary } from '@/types/insights';
+import type { FeatureIntroCatalog } from './feature-intro-contract';
 import {
   CHAT_STARTER_ACTION_ORDER,
   type ChatStarterActionId,
@@ -53,7 +53,7 @@ export interface JovieChatProps {
   readonly initialSkillId?: string;
   /** Callback when the conversation title changes (e.g. after auto-generation) */
   readonly onTitleChange?: (title: string | null) => void;
-  /** Profile display name for transcript identity and contextual tools. */
+  /** Artist display name for the welcome greeting */
   readonly displayName?: string;
   /** Artist avatar URL for user message bubbles */
   readonly avatarUrl?: string | null;
@@ -69,8 +69,10 @@ export interface JovieChatProps {
   readonly chatMode?: 'ov';
   /** Whether profile setup is complete, used to suppress setup quick actions. */
   readonly isProfileComplete?: boolean;
-  /** Role-neutral, executable conversation samples surfaced in an empty thread. */
-  readonly starterConversations?: readonly ChatStarterConversation[];
+  /** Contextual, production-backed actions surfaced in an empty thread */
+  readonly actionCards?: readonly ChatActionCard[];
+  /** Source-bound What's New card catalog derived by a server route. */
+  readonly featureIntroCatalog?: FeatureIntroCatalog;
   /**
    * When the app shell owns the ambient gradient (chat routes render it at
    * the shell frame level so it bleeds behind the header to the top of the
@@ -79,6 +81,14 @@ export interface JovieChatProps {
    * (profile page chat, experiments) keep the default self-owned gradient.
    */
   readonly ambientOwnedByShell?: boolean;
+}
+
+export interface ChatActionCard {
+  readonly id: ChatStarterActionId;
+  readonly title: string;
+  readonly body: string;
+  readonly actionLabel: string;
+  readonly prompt: string;
 }
 
 export type ChatConversationCreatePhase = 'reserved' | 'completed';

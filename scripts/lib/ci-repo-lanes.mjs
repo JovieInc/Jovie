@@ -55,6 +55,10 @@ const LANE_PREFIXES = Object.freeze([
     lanes: [CI_LANES.SYMPHONY_CONTROL],
   },
   {
+    prefix: 'scripts/verification/',
+    lanes: [CI_LANES.SYMPHONY_CONTROL],
+  },
+  {
     prefix: 'scripts/lib/ci-',
     lanes: [CI_LANES.SYMPHONY_CONTROL],
   },
@@ -93,6 +97,14 @@ const LANE_PREFIXES = Object.freeze([
   {
     prefix: 'scripts/tests/test_symphony',
     lanes: [CI_LANES.SYMPHONY_CONTROL],
+  },
+  {
+    prefix: 'scripts/lib/__tests__/component-',
+    lanes: [CI_LANES.JOVIE_PRODUCT, CI_LANES.SYMPHONY_CONTROL],
+  },
+  {
+    prefix: 'scripts/component-',
+    lanes: [CI_LANES.JOVIE_PRODUCT, CI_LANES.SYMPHONY_CONTROL],
   },
   {
     prefix: 'docs/company/',

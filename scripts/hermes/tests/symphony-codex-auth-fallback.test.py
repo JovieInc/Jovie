@@ -39,17 +39,29 @@ RUNTIME_NAMES = tuple(path.name for path in RUNTIME_ARTIFACTS)
 LAUNCHER_NAMES = (WRAPPER.name, CONTROLLER.name, SIDECAR.name, GROK_SHIP.name, CURSOR_STD.name)
 
 
+def _load_python_module(name: str, path: pathlib.Path):
+    spec = importlib.util.spec_from_file_location(name, path)
+    assert spec and spec.loader
+    module = importlib.util.module_from_spec(spec)
+    sys.modules[spec.name] = module
+    spec.loader.exec_module(module)
+    return module
+
+
 class OfficialServiceOwnershipContract(unittest.TestCase):
     def test_recovery_targets_only_official_elixir_service(self):
-        module = importlib.util.module_from_spec(
-            spec := importlib.util.spec_from_file_location("symphony_codex_exhausted", CONTROLLER)
+        module = _load_python_module("symphony_codex_exhausted", CONTROLLER)
+        official = _load_python_module(
+            "symphony_official_runtime", SOURCE_DIR / "symphony_official_runtime.py"
         )
-        assert spec and spec.loader
-        spec.loader.exec_module(module)
+        self.assertEqual(module.PRIMARY_SERVICE, official.OFFICIAL_SERVICE_NAME)
         self.assertEqual(module.PRIMARY_SERVICE, "symphony-elixir.service")
         self.assertEqual(module.OPTIONAL_SERVICES, ())
         self.assertNotIn("symphony-ui-pilot.service", module.SERVICES)
         self.assertNotIn("symphony-lyb.service", module.SERVICES)
+        for obsolete in official.OBSOLETE_TOKENS:
+            if obsolete.endswith(".service"):
+                self.assertNotIn(obsolete, module.SERVICES)
 
 
 OWNERSHIP_COVERAGE_MARKERS = (
@@ -599,7 +611,7 @@ class FallbackTests(unittest.TestCase):
         events = self.events.read_text().splitlines()
         launch_index = next(i for i, line in enumerate(events) if line.startswith("systemd-run"))
         self.assertNotIn(
-            "systemctl --user stop symphony-ui-pilot.service symphony-lyb.service",
+            "systemctl --user stop symphony-elixir.service symphony-lyb.service",
             events,
         )
         self.assertGreaterEqual(launch_index, 0, events)
@@ -763,7 +775,7 @@ class FallbackTests(unittest.TestCase):
                     self.assertTrue(
                         any(
                             command[:4] == ["systemctl", "--user", "is-active", "--quiet"]
-                            and "symphony-ui-pilot.service" in command
+                            and "symphony-elixir.service" in command
                             for command in controls
                         ),
                         controls,
@@ -824,6 +836,379 @@ class FallbackTests(unittest.TestCase):
             self.assertEqual(module.reconcile(), module.EXIT_SAFE_FAIL_CLOSED)
         self.assertEqual(controls, [])
 
+    def test_targeted_drain_launches_only_the_exact_eligible_issue(self):
+        module = self.load_controller_module()
+        captured: dict[str, object] = {}
+        selection = {"selected": {"id": "kimi-k3", "pool": "kimi"}}
+        def launch(identifiers, active, executable, bundle_revision, selected, limit, **kwargs):
+            captured.update(
+                identifiers=identifiers,
+                active=active,
+                executable=executable,
+                bundle_revision=bundle_revision,
+                selection=selected,
+                limit=limit,
+            )
+            providers = kwargs.get("unit_providers")
+            if isinstance(providers, dict):
+                providers["fallback-ship-JOV-2.service"] = "kimi"
+            return {"fallback-ship-JOV-2.service"}, 1
+        with (
+            mock.patch.object(module, "_grok_ship_one_executable", return_value="/bin/true"),
+            mock.patch.object(module, "_fleet_gate_allows_isolated", return_value=(True, "green")),
+            mock.patch.object(
+                module,
+                "_admitted_or_remount_identifiers",
+                return_value=["JOV-1", "JOV-2", "JOV-3"],
+            ),
+            mock.patch.object(
+                module, "_model_router_selection", return_value=(selection, "ready")
+            ),
+            mock.patch.object(module, "_bundle_revision", return_value="a" * 64),
+            mock.patch.object(module, "_grok_limit", return_value=7),
+            mock.patch.object(module, "_launch_fallback_workers", side_effect=launch),
+        ):
+            result = module._drain_included_pools([], "JOV-2")
+        self.assertEqual(captured["identifiers"], ["JOV-2"])
+        self.assertEqual(captured["limit"], 1)
+        self.assertEqual(
+            result,
+            "drain_started=1 pool=kimi model=kimi-k3 grok_started=0 kimi_started=1",
+        )
+    def test_targeted_drain_refuses_absent_issue_before_provider_probe(self):
+        module = self.load_controller_module()
+        selection = mock.Mock(return_value=({"selected": {}}, "ready"))
+        with (
+            mock.patch.object(module, "_grok_ship_one_executable", return_value="/bin/true"),
+            mock.patch.object(module, "_fleet_gate_allows_isolated", return_value=(True, "green")),
+            mock.patch.object(
+                module, "_admitted_or_remount_identifiers", return_value=["JOV-1"]
+            ),
+            mock.patch.object(module, "_model_router_selection", selection),
+        ):
+            result = module._drain_included_pools([], "JOV-2")
+        self.assertEqual(result, "drain_skipped=target_not_eligible:JOV-2")
+        selection.assert_not_called()
+    def test_targeted_drain_refuses_when_another_worker_owns_capacity(self):
+        module = self.load_controller_module()
+        selection = {"selected": {"id": "kimi-k3", "pool": "kimi"}}
+        with (
+            mock.patch.object(module, "_grok_ship_one_executable", return_value="/bin/true"),
+            mock.patch.object(module, "_fleet_gate_allows_isolated", return_value=(True, "green")),
+            mock.patch.object(
+                module, "_admitted_or_remount_identifiers", return_value=["JOV-2"]
+            ),
+            mock.patch.object(
+                module, "_model_router_selection", return_value=(selection, "ready")
+            ),
+            mock.patch.object(module, "_bundle_revision", return_value="a" * 64),
+            mock.patch.object(
+                module,
+                "_launch_fallback_workers",
+                return_value=(set(), 1),
+            ),
+        ):
+            result = module._drain_included_pools(
+                ["fallback-ship-JOV-1-aaaaaaaaaaaa.service"], "JOV-2"
+            )
+        self.assertEqual(result, "drain_skipped=target_not_started:JOV-2")
+    def test_ready_targeted_reconcile_fails_when_exact_issue_does_not_start(self):
+        module = self.load_controller_module()
+        stderr = io.StringIO()
+        with (
+            mock.patch.object(module, "gc_fallback_locks"),
+            mock.patch.object(module, "codex_canary_ready", return_value=(True, "ready")),
+            mock.patch.object(module, "_active_grok_units", return_value=[]),
+            mock.patch.object(module, "_start_jov_primary", return_value=True),
+            mock.patch.object(module, "_services_active", return_value=True),
+            mock.patch.object(
+                module,
+                "_drain_included_pools",
+                return_value="drain_skipped=target_not_started:JOV-2",
+            ),
+            contextlib.redirect_stderr(stderr),
+        ):
+            result = module.reconcile("JOV-2")
+        self.assertEqual(result, module.EXIT_SAFE_FAIL_CLOSED)
+        self.assertIn("target=JOV-2", stderr.getvalue())
+    def test_ready_targeted_reconcile_refuses_any_preexisting_fallback_worker(self):
+        module = self.load_controller_module()
+        start_primary = mock.Mock(return_value=True)
+        drain = mock.Mock(return_value="drain_started=1 pool=kimi model=kimi-k3")
+        stderr = io.StringIO()
+        with (
+            mock.patch.object(module, "gc_fallback_locks"),
+            mock.patch.object(module, "codex_canary_ready", return_value=(True, "ready")),
+            mock.patch.object(
+                module,
+                "_active_grok_units",
+                return_value=["fallback-ship-JOV-1-aaaaaaaaaaaa.service"],
+            ),
+            mock.patch.object(module, "_start_jov_primary", start_primary),
+            mock.patch.object(module, "_drain_included_pools", drain),
+            contextlib.redirect_stderr(stderr),
+        ):
+            result = module.reconcile("JOV-2")
+        self.assertEqual(result, module.EXIT_SAFE_FAIL_CLOSED)
+        self.assertIn("target_not_started=JOV-2 grok_ship_active", stderr.getvalue())
+        start_primary.assert_not_called()
+        drain.assert_not_called()
+    def test_ready_targeted_reconcile_succeeds_only_on_exact_start(self):
+        module = self.load_controller_module()
+        target_unit = "fallback-ship-JOV-2-aaaaaaaaaaaa.service"
+        stderr = io.StringIO()
+        def drain(_active, _target, launched):
+            launched.add(target_unit)
+            return "drain_started=1 pool=kimi model=kimi-k3"
+        with (
+            mock.patch.object(module, "gc_fallback_locks"),
+            mock.patch.object(module, "codex_canary_ready", return_value=(True, "ready")),
+            mock.patch.object(module, "_active_grok_units", return_value=[]),
+            mock.patch.object(module, "_start_jov_primary", return_value=True),
+            mock.patch.object(module, "_services_active", return_value=True),
+            mock.patch.object(
+                module,
+                "_drain_included_pools",
+                side_effect=drain,
+            ),
+            mock.patch.object(
+                module, "_grok_units_after_survival_window", return_value=[target_unit]
+            ),
+            contextlib.redirect_stderr(stderr),
+        ):
+            result = module.reconcile("JOV-2")
+        self.assertEqual(result, 0)
+        self.assertIn("drain_started=1 pool=kimi model=kimi-k3", stderr.getvalue())
+
+    def test_ready_targeted_reconcile_cleans_up_transient_exact_start(self):
+        module = self.load_controller_module()
+        target_unit = "fallback-ship-JOV-2-aaaaaaaaaaaa.service"
+        controls: list[list[str]] = []
+        stderr = io.StringIO()
+        def drain(_active, _target, launched):
+            launched.add(target_unit)
+            return "drain_started=1 pool=kimi model=kimi-k3"
+        with (
+            mock.patch.object(module, "gc_fallback_locks"),
+            mock.patch.object(module, "codex_canary_ready", return_value=(True, "ready")),
+            mock.patch.object(module, "_active_grok_units", return_value=[]),
+            mock.patch.object(module, "_start_jov_primary", return_value=True),
+            mock.patch.object(module, "_services_active", return_value=True),
+            mock.patch.object(module, "_drain_included_pools", side_effect=drain),
+            mock.patch.object(module, "_grok_units_after_survival_window", return_value=[]),
+            mock.patch.object(
+                module,
+                "_control",
+                side_effect=lambda command: controls.append(command) or True,
+            ),
+            contextlib.redirect_stderr(stderr),
+        ):
+            result = module.reconcile("JOV-2")
+        self.assertEqual(result, module.EXIT_SAFE_FAIL_CLOSED)
+        self.assertIn("target_not_survived=JOV-2", stderr.getvalue())
+        self.assertIn(
+            ["systemctl", "--user", "stop", target_unit],
+            controls,
+        )
+
+    def test_untargeted_drain_preserves_existing_capacity_and_issue_set(self):
+        module = self.load_controller_module()
+        captured: dict[str, object] = {}
+        selection = {"selected": {"id": "grok-4.6", "pool": "grok-build"}}
+        def launch(identifiers, active, executable, bundle_revision, selected, limit, **kwargs):
+            captured.update(identifiers=identifiers, limit=limit)
+            providers = kwargs.get("unit_providers")
+            if isinstance(providers, dict):
+                providers["fallback-ship-JOV-1.service"] = "grok"
+            return {"fallback-ship-JOV-1.service"}, 1
+        with (
+            mock.patch.object(module, "_grok_ship_one_executable", return_value="/bin/true"),
+            mock.patch.object(module, "_fleet_gate_allows_isolated", return_value=(True, "green")),
+            mock.patch.object(
+                module,
+                "_admitted_or_remount_identifiers",
+                return_value=["JOV-1", "JOV-2"],
+            ),
+            mock.patch.object(
+                module, "_model_router_selection", return_value=(selection, "ready")
+            ),
+            mock.patch.object(module, "_bundle_revision", return_value="a" * 64),
+            mock.patch.object(module, "_grok_limit", return_value=4),
+            mock.patch.object(module, "_kimi_limit", return_value=0),
+            mock.patch.object(module, "_launch_fallback_workers", side_effect=launch),
+        ):
+            module._drain_included_pools([])
+        self.assertEqual(captured["identifiers"], ["JOV-1", "JOV-2"])
+        self.assertEqual(captured["limit"], 4)
+
+    def test_exhausted_target_refuses_absent_issue_without_touching_runtime(self):
+        module = self.load_controller_module()
+        active = mock.Mock(return_value=[])
+        selection = mock.Mock(return_value=({"selected": {}}, "ready"))
+        stderr = io.StringIO()
+        with (
+            mock.patch.object(module, "_grok_ship_one_executable", return_value="/bin/true"),
+            mock.patch.object(
+                module, "_admitted_or_remount_identifiers", return_value=["JOV-1"]
+            ),
+            mock.patch.object(module, "_active_grok_units", active),
+            mock.patch.object(module, "_model_router_selection", selection),
+            contextlib.redirect_stderr(stderr),
+        ):
+            result = module._continue_exhausted_reconcile(
+                "all_accounts_cooldown", "JOV-2"
+            )
+        self.assertEqual(result, module.EXIT_SAFE_FAIL_CLOSED)
+        self.assertIn(
+            "target_not_eligible=JOV-2 symphony_unchanged", stderr.getvalue()
+        )
+        active.assert_not_called()
+        selection.assert_not_called()
+
+    def test_exhausted_target_refuses_when_unrelated_worker_owns_capacity(self):
+        module = self.load_controller_module()
+        final_active = mock.Mock()
+        stderr = io.StringIO()
+        selection = {"selected": {"id": "kimi-k3", "pool": "kimi"}}
+        with (
+            mock.patch.object(module, "_grok_ship_one_executable", return_value="/bin/true"),
+            mock.patch.object(
+                module, "_admitted_or_remount_identifiers", return_value=["JOV-2"]
+            ),
+            mock.patch.object(
+                module,
+                "_active_grok_units",
+                side_effect=[
+                    ["fallback-ship-JOV-1-aaaaaaaaaaaa.service"],
+                    final_active,
+                ],
+            ) as active,
+            mock.patch.object(module, "_fleet_gate_allows_isolated", return_value=(True, "green")),
+            mock.patch.object(
+                module, "_model_router_selection", return_value=(selection, "ready")
+            ),
+            mock.patch.object(module, "_bundle_revision", return_value="a" * 64),
+            mock.patch.object(
+                module, "_launch_fallback_workers", return_value=(set(), 1)
+            ),
+            contextlib.redirect_stderr(stderr),
+        ):
+            result = module._continue_exhausted_reconcile(
+                "all_accounts_cooldown", "JOV-2"
+            )
+        self.assertEqual(result, module.EXIT_SAFE_FAIL_CLOSED)
+        self.assertIn(
+            "target_not_started=JOV-2 symphony_unchanged", stderr.getvalue()
+        )
+        self.assertEqual(active.call_count, 1)
+
+    def test_exhausted_target_succeeds_only_when_exact_unit_survives(self):
+        module = self.load_controller_module()
+        target_unit = "fallback-ship-JOV-2-aaaaaaaaaaaa.service"
+        stderr = io.StringIO()
+        selection = {"selected": {"id": "kimi-k3", "pool": "kimi"}}
+        with (
+            mock.patch.object(module, "_grok_ship_one_executable", return_value="/bin/true"),
+            mock.patch.object(
+                module, "_admitted_or_remount_identifiers", return_value=["JOV-2"]
+            ),
+            mock.patch.object(module, "_active_grok_units", side_effect=[[], [target_unit]]),
+            mock.patch.object(module, "_fleet_gate_allows_isolated", return_value=(True, "green")),
+            mock.patch.object(module, "_model_router_selection", return_value=(selection, "ready")),
+            mock.patch.object(module, "_bundle_revision", return_value="a" * 64),
+            mock.patch.object(module, "_launch_fallback_workers", return_value=({target_unit}, 1)),
+            mock.patch.object(module, "_grok_units_after_survival_window", return_value=[target_unit]),
+            mock.patch.object(module, "_jov_active", return_value=True),
+            contextlib.redirect_stderr(stderr),
+        ):
+            result = module._continue_exhausted_reconcile("all_accounts_cooldown", "JOV-2")
+        self.assertEqual(result, 0)
+        self.assertIn("grok_started=0 kimi_started=1", stderr.getvalue())
+        self.assertIn("grok_survived=1", stderr.getvalue())
+
+    def test_exhausted_target_fails_if_survivor_set_is_not_exact(self):
+        module = self.load_controller_module()
+        target_unit = "fallback-ship-JOV-2-aaaaaaaaaaaa.service"
+        unrelated_unit = "fallback-ship-JOV-1-bbbbbbbbbbbb.service"
+        controls: list[list[str]] = []
+        stderr = io.StringIO()
+        selection = {"selected": {"id": "kimi-k3", "pool": "kimi"}}
+        with (
+            mock.patch.object(module, "_grok_ship_one_executable", return_value="/bin/true"),
+            mock.patch.object(
+                module, "_admitted_or_remount_identifiers", return_value=["JOV-2"]
+            ),
+            mock.patch.object(
+                module,
+                "_active_grok_units",
+                side_effect=[[], [unrelated_unit], [unrelated_unit]],
+            ),
+            mock.patch.object(module, "_fleet_gate_allows_isolated", return_value=(True, "green")),
+            mock.patch.object(module, "_model_router_selection", return_value=(selection, "ready")),
+            mock.patch.object(module, "_bundle_revision", return_value="a" * 64),
+            mock.patch.object(module, "_launch_fallback_workers", return_value=({target_unit}, 1)),
+            mock.patch.object(
+                module,
+                "_grok_units_after_survival_window",
+                return_value=[target_unit, unrelated_unit],
+            ),
+            mock.patch.object(
+                module,
+                "_control",
+                side_effect=lambda command: controls.append(command) or True,
+            ),
+            mock.patch.object(module, "_jov_active", return_value=True),
+            contextlib.redirect_stderr(stderr),
+        ):
+            result = module._continue_exhausted_reconcile("all_accounts_cooldown", "JOV-2")
+        self.assertEqual(result, module.EXIT_SAFE_FAIL_CLOSED)
+        self.assertIn(
+            "target_not_survived=JOV-2 symphony_active", stderr.getvalue()
+        )
+        self.assertIn(["systemctl", "--user", "stop", target_unit], controls)
+
+    def test_exhausted_target_not_survived_reports_restore_failure(self):
+        module = self.load_controller_module()
+        target_unit = "fallback-ship-JOV-2-aaaaaaaaaaaa.service"
+        unrelated_unit = "fallback-ship-JOV-1-bbbbbbbbbbbb.service"
+        stderr = io.StringIO()
+        selection = {"selected": {"id": "kimi-k3", "pool": "kimi"}}
+        with (
+            mock.patch.object(module, "_grok_ship_one_executable", return_value="/bin/true"),
+            mock.patch.object(
+                module, "_admitted_or_remount_identifiers", return_value=["JOV-2"]
+            ),
+            mock.patch.object(
+                module, "_active_grok_units", side_effect=[[], [unrelated_unit]]
+            ),
+            mock.patch.object(module, "_fleet_gate_allows_isolated", return_value=(True, "green")),
+            mock.patch.object(
+                module, "_model_router_selection", return_value=(selection, "ready")
+            ),
+            mock.patch.object(module, "_bundle_revision", return_value="a" * 64),
+            mock.patch.object(
+                module, "_launch_fallback_workers", return_value=({target_unit}, 1)
+            ),
+            mock.patch.object(
+                module,
+                "_grok_units_after_survival_window",
+                return_value=[unrelated_unit],
+            ),
+            mock.patch.object(module, "_cleanup_launched_units", return_value=True),
+            mock.patch.object(module, "_jov_active", return_value=False),
+            mock.patch.object(module, "_start_jov_primary", return_value=False),
+            contextlib.redirect_stderr(stderr),
+        ):
+            result = module._continue_exhausted_reconcile(
+                "all_accounts_cooldown", "JOV-2"
+            )
+
+        self.assertEqual(result, module.EXIT_DEGRADED)
+        self.assertIn(
+            "target_not_survived=JOV-2 symphony_api_restore_failed",
+            stderr.getvalue(),
+        )
+
     def test_non_finite_grok_durations_fall_back_to_safe_defaults(self):
         module = self.load_controller_module()
         cases = (
@@ -862,7 +1247,7 @@ class FallbackTests(unittest.TestCase):
             },
         }
 
-        def select():
+        def select(*_args, **_kwargs):
             events.append("model-router")
             return selection, "model_router_ready"
 
@@ -883,7 +1268,7 @@ class FallbackTests(unittest.TestCase):
             self.assertEqual(module.reconcile(), module.EXIT_SAFE_FAIL_CLOSED)
 
         self.assertIn("model-router", events)
-        self.assertNotIn("systemctl --user stop symphony-ui-pilot.service symphony-lyb.service", events)
+        self.assertNotIn("systemctl --user stop symphony-elixir.service symphony-lyb.service", events)
 
     def test_live_canary_requires_luna_and_exact_marker(self):
         canary = self.command("codex-rotate", "printf '%s\\n' \"$*\" > \"$GEM_EVENTS\"; printf 'GEM_MODEL_READY\\n'")
@@ -926,10 +1311,9 @@ class FallbackTests(unittest.TestCase):
         result = subprocess.run([destination / "symphony-grok-sidecar"], capture_output=True, text=True, env=self.env(GEM_CODEX_ROTATE_BIN=canary, GEM_EVENTS=self.events, GEM_CODEX_CANARY_TIMEOUT_SECONDS="5"), check=False)
         self.assertEqual(result.returncode, 0, result.stderr)
         self.assertEqual(self.events.read_text().splitlines(), [
-            "systemctl --user list-units --type=service --state=active grok-ship-*.service fallback-ship-*.service --no-legend --no-pager",
-            "systemctl --user start symphony-ui-pilot.service",
-            "systemctl --user start symphony-lyb.service",
-            "systemctl --user is-active --quiet symphony-ui-pilot.service",
+            "systemctl --user list-units --type=service --state=active grok-ship-*.service kimi-ship-*.service fallback-ship-*.service --no-legend --no-pager",
+            "systemctl --user start symphony-elixir.service",
+            "systemctl --user is-active --quiet symphony-elixir.service",
         ])
         self.assertIn("idle", result.stderr)
 
@@ -980,7 +1364,7 @@ class FallbackTests(unittest.TestCase):
         first_launch = next(i for i, line in enumerate(events) if line.startswith("systemd-run"))
         self.assertGreaterEqual(first_launch, 0, events)
         self.assertNotIn(
-            "systemctl --user stop symphony-ui-pilot.service symphony-lyb.service",
+            "systemctl --user stop symphony-elixir.service symphony-lyb.service",
             events,
         )
         self.assertEqual(len([line for line in events if line.startswith("systemd-run")]), 2)
@@ -1133,13 +1517,61 @@ class FallbackTests(unittest.TestCase):
             self.assertIsNone(module._linear_identifiers())
         self.assertEqual(len(LinearHandler.requests), 2)
 
+    def test_grok_limit_autoscales_from_live_oauth_seats_not_codex(self):
+        module = self.load_controller_module()
+        with tempfile.TemporaryDirectory() as tmp:
+            home = pathlib.Path(tmp)
+            grok = home / ".grok"
+            grok.mkdir()
+            (grok / "auth.json").write_text(
+                json.dumps(
+                    {
+                        "https://auth.x.ai::one": {
+                            "auth_mode": "oidc",
+                            "refresh_token": "rt",
+                            "key": "k",
+                        }
+                    }
+                ),
+                encoding="utf-8",
+            )
+            kimi = home / ".kimi-code" / "credentials"
+            kimi.mkdir(parents=True)
+            (kimi / "kimi-code.json").write_text(
+                json.dumps({"access_token": "at", "refresh_token": "rt"}),
+                encoding="utf-8",
+            )
+            with mock.patch.object(module.pathlib.Path, "home", return_value=home):
+                with mock.patch.dict(os.environ):
+                    os.environ.pop("SYMPHONY_GROK_MAX", None)
+                    self.assertEqual(module._live_oauth_seats(), 2)
+                    self.assertEqual(module._grok_limit(), 4)
+                extra = {
+                    f"https://auth.x.ai::{index}": {
+                        "auth_mode": "oidc",
+                        "refresh_token": "rt",
+                        "key": "k",
+                    }
+                    for index in range(6)
+                }
+                (grok / "auth.json").write_text(json.dumps(extra), encoding="utf-8")
+                with mock.patch.dict(os.environ):
+                    os.environ.pop("SYMPHONY_GROK_MAX", None)
+                    self.assertEqual(module._live_oauth_seats(), 7)
+                    self.assertEqual(module._grok_limit(), 7)
+                with mock.patch.dict(os.environ, {"SYMPHONY_GROK_MAX": "0"}):
+                    self.assertEqual(module._grok_limit(), 0)
+
     def test_default_grok_limit_is_four_and_blocked_labels_are_gates(self):
         module = self.load_controller_module()
         self.assertEqual(module.DEFAULT_GROK_MAX, 4)
         self.assertEqual(module.MAX_GROK_MAX, 10)
+        self.assertEqual(module.DEFAULT_KIMI_MAX, 4)
+        self.assertEqual(module.MAX_KIMI_MAX, 10)
         self.assertIn("blocked", module.BLOCKED_ADMISSION_LABELS)
         self.assertIn("needs-human", module.BLOCKED_ADMISSION_LABELS)
         self.assertIn("needs:human", module.BLOCKED_ADMISSION_LABELS)
+        self.assertIn("no-symphony", module.BLOCKED_ADMISSION_LABELS)
         for label in ("held", "decision-required", "manual-incident"):
             self.assertIn(label, module.BLOCKED_ADMISSION_LABELS)
         # admission_decision is one predicate shared front-to-back.
@@ -1272,7 +1704,7 @@ class FallbackTests(unittest.TestCase):
         events = self.events.read_text() if self.events.exists() else ""
         self.assertNotIn("systemd-run", events)
         self.assertNotIn("systemctl --user stop", events)
-        self.assertIn("systemctl --user start symphony-ui-pilot.service", events)
+        self.assertIn("systemctl --user start symphony-elixir.service", events)
         self.assertIn("symphony_restored", result.stderr)
 
     def test_zero_grok_capacity_preserves_symphony(self):
@@ -1295,6 +1727,7 @@ class FallbackTests(unittest.TestCase):
                 LINEAR_API_KEY="linear-secret",
                 LINEAR_API_URL=self.linear_url(),
                 SYMPHONY_GROK_MAX="0",
+                SYMPHONY_KIMI_MAX="0",
             ),
             check=False,
         )
@@ -1303,6 +1736,105 @@ class FallbackTests(unittest.TestCase):
         self.assertNotIn("systemd-run", events)
         self.assertNotIn("systemctl --user stop", events)
         self.assertIn("grok_capacity_zero symphony_unchanged", result.stderr)
+
+    def test_grok_max_does_not_steal_kimi_chairs(self):
+        module = self.load_controller_module()
+        launches: list[str] = []
+        grok_selection = {
+            "schema_version": 1,
+            "deterministic_first": True,
+            "selected": {
+                "id": "grok-4.6",
+                "provider": "grok",
+                "pool": "grok-build",
+                "model": "grok-4.6",
+                "executor": {"executable": "/bin/true", "argv": ["-p", "{prompt}"]},
+            },
+        }
+        kimi_selection = {
+            "schema_version": 1,
+            "deterministic_first": True,
+            "selected": {
+                "id": "kimi-k3",
+                "provider": "kimi",
+                "pool": "kimi",
+                "model": "kimi-code/k3",
+                "executor": {"executable": "/bin/true", "argv": ["-p", "{prompt}"]},
+            },
+        }
+        issue = {
+            "identifier": "JOV-5869",
+            "title": "CI repair failing checks",
+            "description": "create-bounded-ci-repair-pr",
+            "team": {"key": "JOV"},
+            "labels": {"nodes": [{"name": "symphony"}]},
+            "state": {"name": "In Review"},
+        }
+
+        def router(workflow="new_pr", include_ids=()):
+            if "kimi-k3" in include_ids:
+                return kimi_selection, "model_router_ready"
+            if "grok-4.6" in include_ids:
+                return grok_selection, "model_router_ready"
+            return grok_selection, "model_router_ready"
+
+        with (
+            mock.patch.object(module, "_autonomous_open_pr_index", return_value={}),
+            mock.patch.object(module, "_fetch_single_issue", return_value=issue),
+            mock.patch.object(
+                module,
+                "_issue_meta",
+                return_value=(True, "admitted", {"issue_revision": "rev"}),
+            ),
+            mock.patch.object(module, "_model_router_selection", side_effect=router),
+            mock.patch.object(module, "_grok_limit", return_value=0),
+            mock.patch.object(module, "_kimi_limit", return_value=2),
+            mock.patch.dict(
+                os.environ,
+                {"SYMPHONY_GROK_OAUTH_SEATS": "0", "SYMPHONY_KIMI_OAUTH_SEATS": "2"},
+            ),
+            mock.patch.object(
+                module,
+                "_control",
+                side_effect=lambda command: launches.append(command) or True,
+            ),
+        ):
+            launched, used = module._launch_fallback_workers(
+                ["JOV-5869"],
+                ["grok-ship-JOV-1.service", "grok-ship-JOV-2.service"],
+                "/bin/true",
+                "a" * 64,
+                grok_selection,
+                4,
+                selections={"grok": grok_selection, "kimi": kimi_selection},
+            )
+        self.assertEqual(len(launched), 1)
+        self.assertEqual(used, 3)
+        self.assertTrue(
+            any("SYMPHONY_FALLBACK_PROVIDER=kimi" in arg for command in launches for arg in command),
+            launches,
+        )
+
+    def test_live_oauth_probe_caps_kimi_seats_without_touching_grok_max(self):
+        module = self.load_controller_module()
+        kimi = self.command(
+            "kimi",
+            "printf '%s\\n' "
+            "'{\"models\":{\"kimi-code/k3\":{}},\"concurrency\":2}'\n",
+        )
+        with mock.patch.dict(
+            os.environ,
+            {
+                "SYMPHONY_OAUTH_SEATS_PROBE": "1",
+                "SYMPHONY_GROK_MAX": "8",
+                "SYMPHONY_KIMI_MAX": "8",
+                "GEM_KIMI_EXECUTABLE": str(kimi),
+                "GEM_GROK_EXECUTABLE": "/missing",
+            },
+            clear=False,
+        ):
+            self.assertEqual(module._provider_seat_limit("kimi"), 2)
+            self.assertEqual(module._provider_seat_limit("grok"), 8)
 
     def test_reconcile_respects_active_grok_concurrency_cap(self):
         self.set_all_accounts_cooldown()
@@ -1324,7 +1856,7 @@ class FallbackTests(unittest.TestCase):
             [self.install_runtime() / "symphony-grok-sidecar"], capture_output=True, text=True,
             env=self.env(GEM_CODEX_ROTATE_BIN=self.bin / "codex-rotate", GEM_EVENTS=self.events,
                          LINEAR_API_KEY="linear-secret", LINEAR_API_URL=url,
-                         SYMPHONY_GROK_MAX="5"),
+                         SYMPHONY_GROK_MAX="5", SYMPHONY_KIMI_MAX="0"),
             check=False,
         )
         self.assertEqual(result.returncode, 0, result.stderr)
@@ -1355,6 +1887,7 @@ class FallbackTests(unittest.TestCase):
             mock.patch.object(module, "_active_grok_units", side_effect=[[], [], []]),
             mock.patch.object(module, "_grok_canary_ready", return_value=(True, "grok_provider_ready")),
             mock.patch.object(module, "_grok_limit", return_value=2),
+            mock.patch.object(module, "_kimi_limit", return_value=0),
             mock.patch.object(module, "_fetch_single_issue", return_value=issue),
             mock.patch.object(module, "_issue_meta", return_value=(True, "admitted", {"issue_revision": "2026-08-14T19:00:00Z"})),
             mock.patch.object(module, "_control", side_effect=control),
@@ -1375,7 +1908,7 @@ class FallbackTests(unittest.TestCase):
         self.assertFalse(
             any(
                 command[:3] == ["systemctl", "--user", "stop"]
-                and "symphony-ui-pilot.service" in command
+                and "symphony-elixir.service" in command
                 for command in controls
             )
         )
@@ -1521,7 +2054,7 @@ class FallbackTests(unittest.TestCase):
         self.assertFalse(
             any(
                 command[:3] == ["systemctl", "--user", "stop"]
-                and "symphony-ui-pilot.service" in command
+                and "symphony-elixir.service" in command
                 for command in controls
             )
         )
@@ -1550,7 +2083,7 @@ class FallbackTests(unittest.TestCase):
         self.assertFalse(
             any(
                 command[:3] == ["systemctl", "--user", "stop"]
-                and "symphony-ui-pilot.service" in command
+                and "symphony-elixir.service" in command
                 for command in controls
             )
         )
@@ -1605,7 +2138,7 @@ class FallbackTests(unittest.TestCase):
 
         self.assertTrue(
             any(
-                "is-active" in command and "symphony-ui-pilot.service" in command
+                "is-active" in command and "symphony-elixir.service" in command
                 for command in controls
             ),
             controls,
@@ -1775,7 +2308,10 @@ class FallbackTests(unittest.TestCase):
             "JOV-4": {"number": 16214, "head": "grok/JOV-4-fix", "repo": "JovieInc/Jovie", "mergeStateStatus": "CLEAN"},
             "JOV-5": {"number": 16211, "head": "grok/JOV-5-fix", "repo": "JovieInc/Jovie", "mergeStateStatus": "DIRTY"},
         }
-        with mock.patch.object(module, "_pr_has_failing_check", side_effect=lambda repo, number: number in (16212, 16214)):
+        with (
+            mock.patch.object(module, "_pr_has_failing_check", side_effect=lambda repo, number: number in (16212, 16214)),
+            mock.patch.object(module, "_pr_has_product_failure_tombstone", return_value=False),
+        ):
             self.assertEqual(module._open_pr_verdict("JOV-1", index)[0], "skip")
             self.assertEqual(module._open_pr_verdict("JOV-2", index)[0], "remount")
             self.assertEqual(module._open_pr_verdict("JOV-3", index)[0], "none")
@@ -1791,6 +2327,83 @@ class FallbackTests(unittest.TestCase):
             }
         }
         self.assertEqual(module._open_pr_verdict("JOV-6", conflicting)[0], "remount")
+
+    def test_open_pr_verdict_remounts_clean_head_with_product_failure_tombstone(self):
+        # Live #16420: merge-group-only product failure (iOS build, full unit
+        # shards) leaves the head source-CLEAN while drain-pr-queue.sh
+        # tombstones it; the enrollment guard refuses re-admission. The sidecar
+        # must remount for real remediation instead of skipping forever.
+        module = self.load_controller_module()
+        index = {
+            "JOV-1": {"number": 16420, "head": "grok/JOV-1-fix", "repo": "JovieInc/Jovie", "mergeStateStatus": "CLEAN"},
+        }
+        tombstoned = {
+            "statusCheckRollup": [
+                {"name": "ci-fast", "conclusion": "SUCCESS", "status": "COMPLETED"},
+                {
+                    "context": "jovie-queue-product-failure/v1",
+                    "state": "SUCCESS",
+                    "description": "blocked:merge-group-product-failure",
+                },
+            ]
+        }
+        with mock.patch.object(module, "_gh_json", return_value=tombstoned):
+            self.assertEqual(module._open_pr_verdict("JOV-1", index)[0], "remount")
+
+    def test_open_pr_verdict_skips_clean_head_without_tombstone(self):
+        module = self.load_controller_module()
+        index = {
+            "JOV-1": {"number": 16420, "head": "grok/JOV-1-fix", "repo": "JovieInc/Jovie", "mergeStateStatus": "CLEAN"},
+        }
+        with mock.patch.object(module, "_gh_json", return_value={"statusCheckRollup": []}):
+            self.assertEqual(module._open_pr_verdict("JOV-1", index)[0], "skip")
+        # A rollup fetch failure must not remount a merge-queue-eligible head.
+        with mock.patch.object(module, "_gh_json", return_value=None):
+            self.assertEqual(module._open_pr_verdict("JOV-1", index)[0], "skip")
+
+    def test_open_pr_verdict_dirty_head_never_fetches_checks(self):
+        module = self.load_controller_module()
+        index = {
+            "JOV-2": {"number": 16211, "head": "grok/JOV-2-fix", "repo": "JovieInc/Jovie", "mergeStateStatus": "DIRTY"},
+        }
+        with (
+            mock.patch.object(module, "_pr_has_failing_check", side_effect=AssertionError("must not fetch")),
+            mock.patch.object(module, "_pr_has_product_failure_tombstone", side_effect=AssertionError("must not fetch")),
+        ):
+            self.assertEqual(module._open_pr_verdict("JOV-2", index)[0], "remount")
+
+    def test_product_failure_tombstone_matches_status_and_check_run_shapes(self):
+        module = self.load_controller_module()
+        check_run_shape = {
+            "statusCheckRollup": [
+                {
+                    "name": "jovie-queue-product-failure/v1",
+                    "status": "COMPLETED",
+                    "conclusion": "SUCCESS",
+                    "text": "blocked:merge-group-product-failure",
+                },
+            ]
+        }
+        with mock.patch.object(module, "_gh_json", return_value=check_run_shape):
+            self.assertTrue(module._pr_has_product_failure_tombstone("JovieInc/Jovie", 16420))
+
+    def test_product_failure_tombstone_ignores_near_misses(self):
+        module = self.load_controller_module()
+        near_misses = {
+            "statusCheckRollup": [
+                # Right context, but no blocked: description.
+                {"context": "jovie-queue-product-failure/v1", "state": "SUCCESS", "description": "merge-group passed"},
+                # Right description, wrong context.
+                {"context": "jovie-merge-queue/enroll", "description": "blocked:merge-group-product-failure"},
+                "not-a-dict",
+            ]
+        }
+        with mock.patch.object(module, "_gh_json", return_value=near_misses):
+            self.assertFalse(module._pr_has_product_failure_tombstone("JovieInc/Jovie", 16420))
+        with mock.patch.object(module, "_gh_json", return_value={"statusCheckRollup": "not-a-list"}):
+            self.assertFalse(module._pr_has_product_failure_tombstone("JovieInc/Jovie", 16420))
+        with mock.patch.object(module, "_gh_json", return_value=None):
+            self.assertFalse(module._pr_has_product_failure_tombstone("JovieInc/Jovie", 16420))
 
     def test_github_remount_identifiers_find_dirty_heads_without_linear(self):
         module = self.load_controller_module()
@@ -1908,6 +2521,59 @@ class FallbackTests(unittest.TestCase):
         self.assertEqual(used, 0)
         self.assertEqual(list(launched), [])
         self.assertEqual(launches, [])
+
+    def test_launch_mirrors_closure_stop_line_for_new_work_but_not_remount(self):
+        """While closureAdmission.newIssueIntakeAllowed is false, the sidecar
+        must not lease NEW work that grok-ship-one would refuse at its own
+        stop-line; remounts of open DIRTY heads stay exempt."""
+        module = self.load_controller_module()
+        self.gate.write_text(json.dumps({
+            "schema": "jovie-fleet-gate/v1",
+            "state": "AMBER",
+            "closureAdmission": {"newIssueIntakeAllowed": False},
+            "workAdmission": {"allowed": True, "newIssueLeaseAllowed": True},
+            "remediationAdmission": {"allowed": True, "pushAllowed": True},
+        }))
+        launches: list[list[str]] = []
+        new_issue = self._admitted_issue("JOV-5003", "In Progress")
+        new_issue["comments"] = {"nodes": []}
+        remount_issue = self._admitted_issue("JOV-4894", "In Review")
+        remount_issue["comments"] = {"nodes": []}
+        index = {
+            "JOV-4894": {
+                "number": 16211,
+                "head": "grok/JOV-4894-fix",
+                "repo": "JovieInc/Jovie",
+                "mergeStateStatus": "DIRTY",
+            }
+        }
+        issues = {"JOV-5003": new_issue, "JOV-4894": remount_issue}
+        with (
+            mock.patch.object(module, "_autonomous_open_pr_index", return_value=index),
+            mock.patch.object(
+                module, "_fetch_single_issue", side_effect=lambda ident: issues.get(ident)
+            ),
+            mock.patch.object(
+                module, "_control", side_effect=lambda command: launches.append(command) or True
+            ),
+        ):
+            launched, used = module._launch_fallback_workers(
+                ["JOV-5003", "JOV-4894"],
+                [],
+                "/bin/true",
+                "a" * 64,
+                {"selected": {"id": "grok"}},
+                2,
+            )
+        # New work refused before leasing; the DIRTY remount still launches.
+        self.assertEqual(used, 1)
+        self.assertEqual(len(launched), 1)
+        self.assertTrue(
+            any("JOV-4894" in arg for command in launches for arg in command), launches
+        )
+        self.assertFalse(
+            any("JOV-5003" in arg for command in launches for arg in command), launches
+        )
 
     def test_exhausted_remounts_github_dirty_head_when_linear_has_no_receipts(self):
         module = self.load_controller_module()
@@ -2280,6 +2946,12 @@ class FallbackTests(unittest.TestCase):
         self.assertIn(".npm-global/bin", path_args[0])
         self.assertIn("Environment=AUTOMATION_VERIFY_MAX_WORKERS=4", command)
         self.assertIn("Environment=AUTOMATION_VERIFY_SHARD_CONCURRENCY=2", command)
+        self.assertTrue(
+            any(arg.startswith("Environment=GEM_KIMI_EXECUTABLE=") for arg in command)
+        )
+        self.assertTrue(
+            any(arg.startswith("Environment=SYMPHONY_FALLBACK_PROVIDER=") for arg in command)
+        )
         ship = GROK_SHIP.read_text()
         self.assertIn('AUTOMATION_VERIFY_MAX_WORKERS="${AUTOMATION_VERIFY_MAX_WORKERS:-4}"', ship)
 
@@ -2976,6 +3648,18 @@ class FallbackLockGcTests(unittest.TestCase):
         self.root = pathlib.Path(self.tmp.name)
         self.leases = self.root / "leases"
         self.leases.mkdir()
+        self.gate = self.root / "fleet-gate.json"
+        self.gate.write_text(
+            json.dumps(
+                {
+                    "schema": "jovie-fleet-gate/v1",
+                    "state": "AMBER",
+                    "closureAdmission": {"newIssueIntakeAllowed": True},
+                    "workAdmission": {"allowed": True, "newIssueLeaseAllowed": True},
+                    "remediationAdmission": {"allowed": True, "pushAllowed": True},
+                }
+            )
+        )
         spec = importlib.util.spec_from_file_location("symphony_codex_exhausted_gc", CONTROLLER)
         assert spec is not None and spec.loader is not None
         self.module = importlib.util.module_from_spec(spec)
@@ -2987,6 +3671,7 @@ class FallbackLockGcTests(unittest.TestCase):
                 "SYMPHONY_FALLBACK_GC_RECEIPT": str(self.root / "gc.json"),
                 "SYMPHONY_FALLBACK_PICKUP_RECEIPT": str(self.root / "pickup.json"),
                 "SYMPHONY_OPEN_PR_INDEX": "empty",
+                "GEM_FLEET_GATE_RECEIPT": str(self.gate),
             },
         )
         self.env.start()
@@ -3106,6 +3791,191 @@ class FallbackLockGcTests(unittest.TestCase):
         )
         typed, red = self.module._typed_pickup_reason("not_a_real_reason")
         self.assertEqual((typed, red), ("unknown", True))
+
+    def test_pickup_allows_done_issue_remount_but_not_new_work(self):
+        """Linear Done + open DIRTY autonomous PR = state-sync error; remount
+        continues the GitHub-side work. Done without a remount target and
+        deliberate kills (canceled/duplicate) stay refused."""
+        refuse = self.module.pickup_refuse_reason
+        self.assertIsNone(
+            refuse(
+                "JOV-5874",
+                issue={"state": {"name": "Done"}},
+                pr_verdict="remount",
+                held=False,
+            )
+        )
+        self.assertEqual(
+            refuse(
+                "JOV-5874",
+                issue={"state": {"name": "Done"}},
+                pr_verdict="none",
+                held=False,
+            ),
+            "issue_done",
+        )
+        self.assertEqual(
+            refuse(
+                "JOV-5874",
+                issue={"state": {"name": "Canceled"}},
+                pr_verdict="remount",
+                held=False,
+            ),
+            "issue_canceled",
+        )
+
+    def test_expire_decision_keeps_live_done_remount_lock(self):
+        expire = self.module.expire_fallback_lock_decision
+        self.assertEqual(
+            expire(held=True, state_name="Done", pr_verdict="remount", age_seconds=10),
+            ("keep", "live_remount"),
+        )
+        self.assertEqual(
+            expire(held=False, state_name="Done", pr_verdict="remount", age_seconds=10),
+            ("expire", "issue_done"),
+        )
+        self.assertEqual(
+            expire(held=True, state_name="Canceled", pr_verdict="remount", age_seconds=10),
+            ("expire", "issue_canceled"),
+        )
+
+    def test_issue_meta_admits_done_state_for_remount_only(self):
+        issue = {
+            "id": "uuid-JOV-5874",
+            "identifier": "JOV-5874",
+            "title": "Recertify Grok Bot smoothness",
+            "description": "",
+            "url": "https://linear.example/JOV-5874",
+            "updatedAt": "2026-09-03T00:00:00Z",
+            "state": {"id": "JOV-done", "name": "Done"},
+            "team": {
+                "key": "JOV",
+                "states": {
+                    "nodes": [
+                        {"id": "JOV-progress", "name": "In Progress"},
+                        {"id": "JOV-review", "name": "In Review"},
+                    ]
+                },
+            },
+            "labels": {"nodes": []},
+            "comments": {"nodes": []},
+        }
+        ok, reason, meta = self.module._issue_meta(
+            issue, "JOV-5874", require_receipt=False, remount=True
+        )
+        self.assertTrue(ok, reason)
+        self.assertEqual(meta["original_state_name"], "Done")
+        ok, reason, _ = self.module._issue_meta(
+            issue, "JOV-5874", require_receipt=False, remount=False
+        )
+        self.assertFalse(ok)
+        self.assertEqual(reason, "state_not_admitted")
+        canceled = dict(issue, state={"id": "JOV-canceled", "name": "Canceled"})
+        ok, reason, _ = self.module._issue_meta(
+            canceled, "JOV-5874", require_receipt=False, remount=True
+        )
+        self.assertFalse(ok)
+        self.assertEqual(reason, "state_not_admitted")
+
+    def test_index_adopts_codex_lane_heads(self):
+        """Failed GPT-lane heads (codex/fable/fugu) join the remount index."""
+        payload = [
+            {
+                "number": 17017,
+                "headRefName": "codex/jov-5853-summer-stack-03-runtime",
+                "mergeStateStatus": "DIRTY",
+                "mergeable": "CONFLICTING",
+            },
+            {
+                "number": 17059,
+                "headRefName": "fable/jov-5865-optical-grid-ratchets",
+                "mergeStateStatus": "DIRTY",
+                "mergeable": "CONFLICTING",
+            },
+            {
+                "number": 16854,
+                "headRefName": "codex/quiet-hero-two-line-h1",
+                "mergeStateStatus": "DIRTY",
+                "mergeable": "CONFLICTING",
+            },
+            {
+                "number": 17090,
+                "headRefName": "fallback/JOV-5694-fix",
+                "mergeStateStatus": "CLEAN",
+                "mergeable": "MERGEABLE",
+            },
+        ]
+        with (
+            mock.patch.dict(os.environ, {"SYMPHONY_OPEN_PR_INDEX": ""}),
+            mock.patch.object(self.module, "_gh_json", return_value=payload),
+        ):
+            index = self.module._autonomous_open_pr_index(None)
+        self.assertEqual(index["JOV-5853"]["number"], 17017)
+        self.assertEqual(index["JOV-5865"]["head"], "fable/jov-5865-optical-grid-ratchets")
+        # No JOV-/LYB- identifier segment in the branch name: not adoptable.
+        self.assertNotIn(16854, [entry["number"] for entry in index.values()])
+        self.assertEqual(index["JOV-5694"]["number"], 17090)
+
+    def test_linear_graphql_backs_off_on_ratelimit(self):
+        """A RATELIMITED response stamps a backoff; while fresh, no HTTP call
+        is even attempted (the per-timer reconcile must not stampede the
+        shared 2500 req/hr budget)."""
+        import urllib.error
+
+        backoff = self.root / "linear-backoff.json"
+        calls: list = []
+
+        def fake_urlopen(req, timeout=0):
+            calls.append(req)
+            raise urllib.error.HTTPError(
+                req.full_url,
+                400,
+                "Bad Request",
+                None,
+                io.BytesIO(b'{"errors":[{"extensions":{"code":"RATELIMITED"}}]}'),
+            )
+
+        with (
+            mock.patch.dict(
+                os.environ,
+                {"SYMPHONY_LINEAR_BACKOFF": str(backoff), "LINEAR_API_KEY": "test-key"},
+            ),
+            mock.patch.object(self.module.urllib.request, "urlopen", side_effect=fake_urlopen),
+        ):
+            self.assertIsNone(self.module._linear_graphql({"query": "x"}))
+            self.assertTrue(backoff.exists())
+            # Backoff fresh: the second call must not touch the network.
+            self.assertIsNone(self.module._linear_graphql({"query": "x"}))
+        self.assertEqual(len(calls), 1)
+
+    def test_linear_graphql_success_clears_stale_backoff(self):
+        backoff = self.root / "linear-backoff.json"
+        backoff.write_text(
+            json.dumps({"epoch": time.time() - self.module.LINEAR_BACKOFF_SECONDS - 5})
+        )
+
+        class _Resp:
+            def __enter__(self):
+                return self
+
+            def __exit__(self, *args):
+                return False
+
+            def read(self):
+                return b'{"data": {"viewer": {"id": "x"}}}'
+
+        with (
+            mock.patch.dict(
+                os.environ,
+                {"SYMPHONY_LINEAR_BACKOFF": str(backoff), "LINEAR_API_KEY": "test-key"},
+            ),
+            mock.patch.object(
+                self.module.urllib.request, "urlopen", side_effect=lambda req, timeout=0: _Resp()
+            ),
+        ):
+            body = self.module._linear_graphql({"query": "x"})
+        self.assertEqual(body["data"]["viewer"]["id"], "x")
+        self.assertFalse(backoff.exists())
 
     def test_pickup_check_refuses_in_review_and_admits_todo(self):
         stderr = io.StringIO()

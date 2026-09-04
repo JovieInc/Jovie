@@ -21,8 +21,8 @@ function armFactoryWrite(turn: EvePilotBoundTurn): EvePilotBoundTurn {
 }
 
 describe('eve identity instruction packs', () => {
-  it('keeps the shared Jovie and Ovie agent model unchanged', () => {
-    expect(eveAgent).toEqual({ model: 'openai/gpt-5.4-mini' });
+  it('pins the Summer Photon speaker model on Eve Gateway OIDC', () => {
+    expect(eveAgent).toEqual({ model: 'zai/glm-5.3-flash' });
   });
 
   it('denies Jovie privileged gbrain write and Symphony heal at the Eve entry', () => {
@@ -49,6 +49,15 @@ describe('eve identity instruction packs', () => {
   it('lets Eve ingest/ack and read gbrain at the Ovie door entry', () => {
     const turn = bindEvePilotIdentity('ovie');
     expect(turn.instructions.includes('ingest and ack')).toBe(true);
+    expect(turn.instructions).toMatch(
+      /Engineering enters\s+Summer Linear intake/
+    );
+    expect(turn.instructions).toContain(
+      'stored and queued for Summer Linear intake'
+    );
+    expect(turn.instructions).not.toContain(
+      "including engineering, enter Summer's Kanban"
+    );
     expect(turn.instructions.toLowerCase()).not.toMatch(/you are ovie/);
     expect(() => turn.require('ingest-ack')).not.toThrow();
     expect(() => turn.require('gbrain-read')).not.toThrow();
@@ -71,6 +80,21 @@ describe('eve identity instruction packs', () => {
       EvePilotCapabilityDeniedError
     );
     expect(() => turn.require('gbrain-read')).toThrow(
+      EvePilotCapabilityDeniedError
+    );
+    expect(() => assertEvePilotFactoryLock(turn)).not.toThrow();
+  });
+
+  it('grants Summer only the bounded Symphony repair outbox capability', () => {
+    const turn = eveIdentityForChannel('ovie-summer-bottleneck');
+    expect(turn.pack).toMatchObject({
+      id: 'summer',
+      canDispatchBoundedSymphonyRepair: true,
+      canHealSymphony: false,
+      canPrivilegedWriteGbrain: false,
+    });
+    expect(() => turn.require('symphony-bounded-dispatch')).not.toThrow();
+    expect(() => turn.require('symphony-heal')).toThrow(
       EvePilotCapabilityDeniedError
     );
     expect(() => assertEvePilotFactoryLock(turn)).not.toThrow();
@@ -110,7 +134,11 @@ describe('eve identity instruction packs', () => {
     expect(eveIdentityForChannel('jovie-core-chat').pack.id).toBe('jovie');
     expect(eveIdentityForChannel('unknown-source').pack.id).toBe('jovie');
     expect(eveIdentityForChannel('ovie-summer-shadow').pack.id).toBe('summer');
-    expect(eveIdentityForChannel('photon').pack.id).toBe('ovie');
+    expect(eveIdentityForChannel('ovie-summer-bottleneck').pack.id).toBe(
+      'summer'
+    );
+    expect(eveIdentityForChannel('photon').pack.id).toBe('summer');
+    expect(eveIdentityForChannel('imessage').pack.id).toBe('summer');
     if (previous === undefined) {
       delete process.env.EVE_IDENTITY;
     } else {

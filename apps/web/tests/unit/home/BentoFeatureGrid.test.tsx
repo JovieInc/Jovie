@@ -1,6 +1,6 @@
 import { render, screen } from '@testing-library/react';
 import { describe, expect, it } from 'vitest';
-import { BentoFeatureGrid } from '@/features/home/BentoFeatureGrid';
+import { BentoFeatureGrid } from '@/components/features/home/BentoFeatureGrid';
 
 describe('BentoFeatureGrid', () => {
   it('renders the command-center heading and bento card copy', () => {

@@ -7,6 +7,7 @@ export type EvePilotIdentityId = 'jovie' | 'ovie' | 'summer';
 export type EvePilotCapability =
   | 'privileged-gbrain-write'
   | 'symphony-heal'
+  | 'symphony-bounded-dispatch'
   | 'gbrain-read'
   | 'ingest-ack';
 
@@ -15,6 +16,7 @@ export type EvePilotPack = {
   readonly role: 'artist' | 'founder' | 'company-operator';
   readonly canPrivilegedWriteGbrain: boolean;
   readonly canHealSymphony: boolean;
+  readonly canDispatchBoundedSymphonyRepair: boolean;
   readonly canIngestAck: boolean;
   readonly canReadGbrain: boolean;
 };
@@ -36,6 +38,7 @@ const JOVIE_PACK: EvePilotPack = {
   role: 'artist',
   canPrivilegedWriteGbrain: false,
   canHealSymphony: false,
+  canDispatchBoundedSymphonyRepair: false,
   canIngestAck: false,
   canReadGbrain: false,
 };
@@ -45,21 +48,23 @@ const OVIE_PACK: EvePilotPack = {
   role: 'founder',
   canPrivilegedWriteGbrain: false,
   canHealSymphony: false,
+  canDispatchBoundedSymphonyRepair: false,
   canIngestAck: true,
   canReadGbrain: true,
 };
 
 /**
  * First Vercel cutover phase: Summer can observe and reason about company
- * operations, but cannot yet mutate Linear, GitHub, GBrain, or Symphony.
- * The future receipt/outbox writer must be introduced as a separately tested
- * capability before any of those permissions are granted.
+ * operations. Its only mutation capability is the separately tested,
+ * source-bound Symphony repair outbox. General Linear, GitHub, GBrain, and
+ * Symphony mutation remains denied.
  */
 const SUMMER_SHADOW_PACK: EvePilotPack = {
   id: 'summer',
   role: 'company-operator',
   canPrivilegedWriteGbrain: false,
   canHealSymphony: false,
+  canDispatchBoundedSymphonyRepair: true,
   canIngestAck: false,
   canReadGbrain: false,
 };
@@ -70,6 +75,8 @@ function allowed(pack: EvePilotPack, capability: EvePilotCapability): boolean {
       return pack.canPrivilegedWriteGbrain;
     case 'symphony-heal':
       return pack.canHealSymphony;
+    case 'symphony-bounded-dispatch':
+      return pack.canDispatchBoundedSymphonyRepair;
     case 'gbrain-read':
       return pack.canReadGbrain;
     case 'ingest-ack':
@@ -122,22 +129,28 @@ export type EvePilotChannelSource =
   | 'imessage'
   | 'photon'
   | 'ovie-summer-shadow'
+  | 'ovie-summer-bottleneck'
   | 'jovie-core-chat'
   | string;
 
 /**
- * Telegram and iMessage are always the Ovie founder pack. Other sources may
- * use the Ovie runtime default, but Summer is bound only by its explicit
- * shadow source during the reversible Vercel pilot. Photon remains Ovie until
- * a separately proven cutover.
+ * Telegram remains the Ovie founder pack. Photon/iMessage is Summer's live
+ * talk channel. The ovie-summer-shadow and ovie-summer-bottleneck sources stay
+ * Summer for the OIDC observation and deterministic bottleneck paths. Other
+ * sources keep the Jovie runtime default.
  */
 export function eveIdentityIdForChannel(
   source?: EvePilotChannelSource
 ): EvePilotIdentityId {
-  if (source === 'telegram' || source === 'imessage' || source === 'photon') {
+  if (source === 'telegram') {
     return 'ovie';
   }
-  if (source === 'ovie-summer-shadow') return 'summer';
+  if (source === 'imessage' || source === 'photon') {
+    return 'summer';
+  }
+  if (source === 'ovie-summer-shadow' || source === 'ovie-summer-bottleneck') {
+    return 'summer';
+  }
   if (process.env.EVE_IDENTITY === 'ovie') return 'ovie';
   return 'jovie';
 }

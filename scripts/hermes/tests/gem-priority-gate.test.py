@@ -118,6 +118,66 @@ class MainReleaseReadySelectionTests(unittest.TestCase):
         )
         self.assertEqual(latest["started_at"], "2026-08-17T19:41:00Z")
 
+    def test_observe_main_treats_all_skipped_release_gate_as_unknown_not_red(self):
+        """A merge_group/cancelled attempt leaves only skipped source-gate
+        check-runs. That is no verdict: promotion freezes on unknown, but the
+        fleet must not flip to main-not-green / draft-only on it."""
+
+        def github_response(_repo: str, endpoint: str):
+            if endpoint == "branches/main":
+                return {"commit": {"sha": MAIN_SHA}}
+            if endpoint == f"commits/{MAIN_SHA}/status":
+                return {"state": "pending"}
+            if endpoint.startswith(f"commits/{MAIN_SHA}/check-runs?"):
+                return {
+                    "check_runs": [
+                        {
+                            "name": "Main Release Ready",
+                            "status": "completed",
+                            "conclusion": "skipped",
+                            "started_at": "2026-09-02T18:34:00Z",
+                            "completed_at": "2026-09-02T18:34:01Z",
+                        }
+                    ]
+                }
+            if endpoint.startswith("actions/runs?"):
+                return {"workflow_runs": []}
+            raise AssertionError(f"unexpected GitHub endpoint: {endpoint}")
+
+        with mock.patch.object(MODULE, "gh_json", side_effect=github_response):
+            observed = MODULE.observe_main("JovieInc/Jovie")
+
+        self.assertEqual(observed["status"], "unknown")
+        self.assertEqual(observed["sha"], MAIN_SHA)
+        self.assertEqual(observed["sourceGate"]["conclusion"], "skipped")
+        self.assertIn("no real attempt", observed["error"])
+
+    def test_observe_main_failure_is_still_red(self):
+        def github_response(_repo: str, endpoint: str):
+            if endpoint == "branches/main":
+                return {"commit": {"sha": MAIN_SHA}}
+            if endpoint == f"commits/{MAIN_SHA}/status":
+                return {"state": "failure"}
+            if endpoint.startswith(f"commits/{MAIN_SHA}/check-runs?"):
+                return {
+                    "check_runs": [
+                        {
+                            "name": "Main Release Ready",
+                            "status": "completed",
+                            "conclusion": "failure",
+                            "started_at": "2026-09-02T18:34:00Z",
+                            "completed_at": "2026-09-02T18:34:01Z",
+                        }
+                    ]
+                }
+            raise AssertionError(f"unexpected GitHub endpoint: {endpoint}")
+
+        with mock.patch.object(MODULE, "gh_json", side_effect=github_response):
+            observed = MODULE.observe_main("JovieInc/Jovie")
+
+        self.assertEqual(observed["status"], "red")
+        self.assertNotIn("error", observed)
+
     def test_observe_main_preserves_exact_sha_when_release_gate_is_missing(self):
         def github_response(_repo: str, endpoint: str):
             if endpoint == "branches/main":
@@ -126,6 +186,8 @@ class MainReleaseReadySelectionTests(unittest.TestCase):
                 return {"state": "success"}
             if endpoint.startswith(f"commits/{MAIN_SHA}/check-runs?"):
                 return {"check_runs": []}
+            if endpoint.startswith("actions/runs?"):
+                return {"workflow_runs": []}
             raise AssertionError(f"unexpected GitHub endpoint: {endpoint}")
 
         with mock.patch.object(MODULE, "gh_json", side_effect=github_response):
@@ -134,6 +196,49 @@ class MainReleaseReadySelectionTests(unittest.TestCase):
         self.assertEqual(observed["status"], "unknown")
         self.assertEqual(observed["sha"], MAIN_SHA)
         self.assertIn("Main Release Ready check is missing", observed["error"])
+
+    def test_observe_main_uses_ci_job_when_check_runs_are_flooded(self):
+        def github_response(_repo: str, endpoint: str):
+            if endpoint == "branches/main":
+                return {"commit": {"sha": MAIN_SHA}}
+            if endpoint == f"commits/{MAIN_SHA}/status":
+                return {"state": "success"}
+            if endpoint.startswith(f"commits/{MAIN_SHA}/check-runs?"):
+                return {"check_runs": [{"name": "enroll", "conclusion": "failure"}]}
+            if endpoint.startswith("actions/runs?"):
+                self.assertIn(f"head_sha={MAIN_SHA}", endpoint)
+                self.assertIn("event=push", endpoint)
+                return {
+                    "workflow_runs": [
+                        {
+                            "id": 33549740322,
+                            "path": ".github/workflows/ci.yml",
+                            "head_sha": MAIN_SHA,
+                            "event": "push",
+                        }
+                    ]
+                }
+            if endpoint.startswith("actions/runs/33549740322/jobs"):
+                return {
+                    "jobs": [
+                        {
+                            "name": "Main Release Ready",
+                            "status": "completed",
+                            "conclusion": "success",
+                            "started_at": "2026-09-01T19:30:00Z",
+                            "completed_at": "2026-09-01T19:30:04Z",
+                        }
+                    ]
+                }
+            raise AssertionError(f"unexpected GitHub endpoint: {endpoint}")
+
+        with mock.patch.object(MODULE, "gh_json", side_effect=github_response):
+            observed = MODULE.observe_main("JovieInc/Jovie")
+
+        self.assertEqual(observed["status"], "green")
+        self.assertEqual(observed["sha"], MAIN_SHA)
+        self.assertEqual(observed["sourceGate"]["conclusion"], "success")
+        self.assertEqual(observed["sourceGate"]["status"], "completed")
 
     def test_observe_main_uses_sentinel_when_branch_lookup_fails(self):
         with mock.patch.object(MODULE, "gh_json", side_effect=OSError("offline")):
@@ -241,13 +346,15 @@ def lane_capacity(
     ready: int = 0,
     budget: int = 15,
     observed_at: MODULE.datetime | None = None,
+    repository: str = "JovieInc/Jovie",
 ) -> dict[str, object]:
     return {
-        "schema": "jovie-lane-capacity/v1",
+        "schema": "jovie-lane-capacity/v2",
         "observedAt": MODULE.isoformat(observed_at or MODULE.utc_now()),
-        "global": {"ready": ready, "budget": budget},
+        "repositories": {repository: {"ready": ready, "budget": budget}},
         "defaultLaneBudget": 4,
         "lanes": {},
+        "sharedResources": {},
     }
 
 GREEN_SIGNALS: dict[str, object] = {
@@ -256,6 +363,7 @@ GREEN_SIGNALS: dict[str, object] = {
     "controller": {"status": "green"},
     "integrity": {"status": "clear"},
     "queue": {
+        "repository": "JovieInc/Jovie",
         "status": "known",
         "eligiblePrs": 0,
         "greenReadyPrs": 0,
@@ -264,6 +372,7 @@ GREEN_SIGNALS: dict[str, object] = {
     },
     "closureHealth": {
         "schema": "jovie-closure-health/v1",
+        "repository": "JovieInc/Jovie",
         "status": "healthy",
         "authority": "Summer",
         "newIssueIntakeAllowed": True,
@@ -710,7 +819,15 @@ class DeploymentBindingTests(unittest.TestCase):
             15,
             4,
         )
-        self.assertEqual(receipt["global"], {"ready": 1, "budget": 15})
+        self.assertNotIn("global", receipt)
+        self.assertEqual(
+            receipt["repositories"]["JovieInc/Jovie"], {"ready": 1, "budget": 15}
+        )
+        self.assertEqual(receipt["sharedResources"], {})
+        self.assertEqual(
+            receipt["lanes"]["lane:JovieInc/Jovie:symphony-control-plane"],
+            {"ready": 1, "budget": 4},
+        )
         self.assertEqual(
             receipt["lanes"]["risk:JovieInc/Jovie:control-plane"],
             {"ready": 1, "budget": 4},
@@ -719,6 +836,39 @@ class DeploymentBindingTests(unittest.TestCase):
             receipt["lanes"]["artifact:JovieInc/Jovie:apps/web"],
             {"ready": 1, "budget": 4},
         )
+        self.assertEqual(
+            receipt["lanes"]["lane:JovieInc/Jovie:web"],
+            {"ready": 1, "budget": 4},
+        )
+
+    def test_lane_receipt_populates_exact_resource_capacity(self):
+        now = MODULE.datetime(2026, 8, 28, 18, 0, tzinfo=MODULE.UTC)
+        receipt = MODULE.build_lane_capacity_receipt(
+            "JovieInc/Jovie",
+            [
+                {
+                    "files": [
+                        {"path": ".github/workflows/ios-testflight.yml"},
+                    ]
+                }
+            ],
+            now,
+            15,
+            1,
+        )
+
+        self.assertEqual(
+            receipt["sharedResources"]["github-actions:ios-testflight"],
+            {
+                "resource": "github-actions:ios-testflight",
+                "ready": 1,
+                "budget": 1,
+                "consumers": [
+                    "resource:JovieInc/Jovie:github-actions:ios-testflight"
+                ],
+            },
+        )
+        self.assertTrue(MODULE.valid_lane_capacity_receipt(receipt, now))
 
     def test_lane_receipt_rejects_stale_and_future_evidence(self):
         now = MODULE.datetime(2026, 8, 28, 18, 0, tzinfo=MODULE.UTC)
@@ -817,6 +967,40 @@ class DeploymentBindingTests(unittest.TestCase):
         self.assertTrue(receipt["remediationAdmission"]["allowed"])
         self.assertTrue(receipt["remediationAdmission"]["pushAllowed"])
 
+    def test_queue_empty_closure_red_feeds_hold_intake_not_blocked(self):
+        """native-queue-empty-with-eligible is a feed signal: blocking
+        admission deadlocks (queue stays empty BECAUSE admission is blocked).
+        With main/production green and integrity clear, promotion resumes in
+        hold-intake even while the controller signal is failed (today's
+        controller failure was itself caused by the blocked-mode queue-noop)."""
+        signals = dict(GREEN_SIGNALS)
+        signals["controller"] = {
+            "status": "failed",
+            "error": "queue-noop: promotion-mode=blocked",
+        }
+        signals["closureHealth"] = {
+            "schema": "jovie-closure-health/v1",
+            "status": "red",
+            "authority": "Summer",
+            "newIssueIntakeAllowed": False,
+            "promotionContinues": True,
+            "remediationContinues": True,
+            "reasons": ["native-queue-empty-with-eligible-over-15m"],
+        }
+        receipt = self.evaluate(signals)
+        self.assertEqual(receipt["state"], "AMBER")
+        self.assertEqual(receipt["promotionMode"], "hold-intake")
+        # New-issue intake stays closed; only promotion resumes.
+        self.assertFalse(receipt["closureAdmission"]["newIssueIntakeAllowed"])
+
+        # Any additional closure reason keeps the gate blocked.
+        signals["closureHealth"]["reasons"] = [
+            "native-queue-empty-with-eligible-over-15m",
+            "duplicate-issue-lanes-unresolved",
+        ]
+        receipt = self.evaluate(signals)
+        self.assertEqual(receipt["promotionMode"], "blocked")
+
     def test_stale_or_missing_capacity_blocks_new_and_remote_mutation(self):
         for evidence in (
             {**GREEN_SIGNALS["concurrencyEvidence"], "accepted": False},
@@ -833,6 +1017,25 @@ class DeploymentBindingTests(unittest.TestCase):
                 self.assertFalse(receipt["remediationAdmission"]["pushAllowed"])
                 self.assertEqual(receipt["remediationAdmission"]["maxConcurrent"], 1)
                 self.assertEqual(receipt["concurrency"]["gem"]["runtimeFloor"], 1)
+
+    def test_schema_valid_closure_health_without_stack_fields_stays_persistable(self):
+        receipt = self.evaluate(GREEN_SIGNALS)
+        closure = receipt["signals"]["closureHealth"]
+
+        self.assertEqual(closure["status"], "healthy")
+        self.assertEqual(closure["stackHealth"], MODULE.empty_stack_health())
+        self.assertEqual(closure["repairActions"], [])
+
+        malformed = dict(GREEN_SIGNALS)
+        malformed["closureHealth"] = {
+            **GREEN_SIGNALS["closureHealth"],
+            "stackHealth": {"maxDepth": 4},
+            "repairActions": {"rootPr": 1},
+        }
+        coerced = self.evaluate(malformed)["signals"]["closureHealth"]
+        self.assertEqual(coerced["status"], "healthy")
+        self.assertEqual(coerced["stackHealth"], MODULE.empty_stack_health())
+        self.assertEqual(coerced["repairActions"], [])
 
     def test_missing_closure_health_fails_new_intake_closed_without_stopping_promotion(self):
         signals = dict(GREEN_SIGNALS)
@@ -997,7 +1200,9 @@ class DeploymentBindingTests(unittest.TestCase):
         self.assertEqual(live["status"], "known")
         self.assertEqual(live["source"], "live")
         self.assertEqual(written["schema"], "jovie-queue-snapshot/v2")
-        self.assertEqual(written["laneCapacity"]["schema"], "jovie-lane-capacity/v1")
+        self.assertEqual(written["repository"], "JovieInc/Jovie")
+        self.assertEqual(written["laneCapacity"]["schema"], "jovie-lane-capacity/v2")
+        self.assertEqual(written["laneCapacity"]["repositories"]["JovieInc/Jovie"]["ready"], 1)
         self.assertEqual(written["greenReadyPrs"], 1)
         self.assertEqual(cached["status"], "known")
         self.assertEqual(cached["source"], "last-known")
@@ -1148,7 +1353,7 @@ class DeploymentBindingTests(unittest.TestCase):
                 "mainSha": MAIN_SHA,
                 "deployedSha": "b" * 7,
                 "scope": "event-scoped-exact-pr-head-with-bound-repair-attestation",
-                "maxConcurrent": 1,
+                "maxConcurrent": 4,
                 "deploymentsAllowed": False,
                 "authority": "canonical-merge-queue-controller",
             },
@@ -1158,10 +1363,49 @@ class DeploymentBindingTests(unittest.TestCase):
             {reason["code"] for reason in receipt["reasons"]},
         )
 
+    def test_unbound_repair_autoscales_from_live_oauth_seats_not_codex(self):
+        signals = dict(GREEN_SIGNALS)
+        signals["production"] = {"status": "green", "deployedSha": "b" * 7}
+        signals["concurrencyEvidence"] = {
+            **GREEN_SIGNALS["concurrencyEvidence"],
+            "accepted": False,
+            "target": 1,
+            "source": "live-oauth-cli-seats",
+            "providers": {
+                "codex": {"ready": 0, "reason": "usageLimitExceeded-excluded"},
+                "grok": {"enrolled": 1, "ready": 1, "reason": "oauth-enrolled"},
+                "kimi": {"enrolled": 1, "ready": 1, "reason": "oauth-enrolled"},
+            },
+        }
+
+        receipt = self.evaluate(signals)
+
+        self.assertEqual(receipt["promotionMode"], "hold-intake")
+        self.assertEqual(receipt["productionUnboundRepairAdmission"]["maxConcurrent"], 4)
+        self.assertFalse(receipt["productionUnboundRepairAdmission"]["deploymentsAllowed"])
+        self.assertEqual(receipt["isolatedPromotionAdmission"]["maxConcurrent"], 1)
+        self.assertEqual(receipt["remediationAdmission"]["maxConcurrent"], 1)
+
+        signals["concurrencyEvidence"] = {
+            **GREEN_SIGNALS["concurrencyEvidence"],
+            "target": 2,
+            "source": "live-oauth-cli-seats",
+            "providers": {
+                "codex": {"ready": 0, "reason": "usageLimitExceeded-excluded"},
+                "grok": {"enrolled": 6, "ready": 6, "reason": "oauth-enrolled"},
+                "kimi": {"enrolled": 2, "ready": 2, "reason": "oauth-enrolled"},
+            },
+        }
+        scaled = self.evaluate(signals)
+        self.assertEqual(scaled["productionUnboundRepairAdmission"]["maxConcurrent"], 8)
+        self.assertFalse(scaled["productionUnboundRepairAdmission"]["deploymentsAllowed"])
+        self.assertEqual(scaled["isolatedPromotionAdmission"]["maxConcurrent"], 1)
+
     def test_unbound_release_does_not_turn_total_open_prs_into_a_fleet_hold(self):
         signals = dict(GREEN_SIGNALS)
         signals["production"] = {"status": "green", "deployedSha": "b" * 7}
         signals["queue"] = {
+            "repository": "JovieInc/Jovie",
             "status": "known",
             "eligiblePrs": 400,
             "greenReadyPrs": 14,
@@ -1251,6 +1495,7 @@ class DeploymentBindingTests(unittest.TestCase):
         signals = dict(GREEN_SIGNALS)
         signals["production"] = {"status": "green", "deployedSha": "b" * 7}
         signals["queue"] = {
+            "repository": "JovieInc/Jovie",
             "status": "known",
             "eligiblePrs": 6,
             "greenReadyPrs": 1,
@@ -1264,6 +1509,7 @@ class DeploymentBindingTests(unittest.TestCase):
     def test_above_target_queue_remains_drainable_when_health_is_green(self):
         signals = dict(GREEN_SIGNALS)
         signals["queue"] = {
+            "repository": "JovieInc/Jovie",
             "status": "known",
             "eligiblePrs": 40,
             "greenReadyPrs": 15,
@@ -1286,18 +1532,36 @@ class DeploymentBindingTests(unittest.TestCase):
         one_landed = self.evaluate(signals)
         self.assertTrue(one_landed["workAdmission"]["newIssueLeaseAllowed"])
 
-    def test_malformed_queue_blocks_promotion_and_new_issue_leases(self):
+    def test_malformed_queue_does_not_freeze_a_bound_green_factory(self):
         signals = dict(GREEN_SIGNALS)
         signals["queue"] = {"status": "known"}
 
         receipt = self.evaluate(signals)
 
-        self.assertEqual(receipt["state"], "AMBER")
-        self.assertFalse(receipt["promotionAdmission"]["allowed"])
-        self.assertFalse(receipt["workAdmission"]["newIssueLeaseAllowed"])
-        self.assertIn(
+        self.assertEqual(receipt["state"], "GREEN")
+        self.assertEqual(receipt["promotionMode"], "normal")
+        self.assertTrue(receipt["promotionAdmission"]["allowed"])
+        self.assertNotIn(
             "queue-unknown",
             {reason["code"] for reason in receipt["reasons"]},
+        )
+
+    def test_malformed_queue_keeps_unbound_production_in_hold_intake(self):
+        signals = dict(GREEN_SIGNALS)
+        signals["production"] = {"status": "green", "deployedSha": "b" * 40}
+        signals["queue"] = {"status": "known"}
+
+        receipt = self.evaluate(signals)
+
+        self.assertEqual(receipt["state"], "AMBER")
+        self.assertEqual(receipt["promotionMode"], "hold-intake")
+        self.assertNotIn(
+            "queue-unknown",
+            {reason["code"] for reason in receipt["reasons"]},
+        )
+        self.assertEqual(
+            {reason["code"] for reason in receipt["reasons"]},
+            {"production-deployment-unbound"},
         )
 
     def test_controller_failure_blocks_deployment(self):
@@ -1317,14 +1581,18 @@ class DeploymentBindingTests(unittest.TestCase):
         self.assertFalse(receipt["isolatedPromotionAdmission"]["deploymentsAllowed"])
         self.assertFalse(receipt["deploymentAdmission"]["allowed"])
 
-    def test_unbound_production_plus_queue_unknown_stays_blocked(self):
+    def test_unbound_production_plus_queue_gap_stays_hold_intake(self):
         signals = dict(GREEN_SIGNALS)
         signals["production"] = {"status": "green", "deployedSha": "b" * 7}
         signals["queue"] = {"status": "known"}
         receipt = self.evaluate(signals)
         self.assertEqual(receipt["state"], "AMBER")
-        self.assertEqual(receipt["promotionMode"], "blocked")
-        self.assertFalse(receipt["alreadyAdmittedCohort"]["preserve"])
+        self.assertEqual(receipt["promotionMode"], "hold-intake")
+        self.assertTrue(receipt["alreadyAdmittedCohort"]["preserve"])
+        self.assertNotIn(
+            "queue-unknown",
+            {reason["code"] for reason in receipt["reasons"]},
+        )
 
 
 class IndependentReviewTests(unittest.TestCase):

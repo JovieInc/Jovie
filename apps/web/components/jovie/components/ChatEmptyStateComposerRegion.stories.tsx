@@ -1,42 +1,58 @@
 import type { Meta, StoryObj } from '@storybook/nextjs-vite';
+import { fn } from 'storybook/test';
+import { CHAT_EMPTY_SAMPLE_STORAGE_KEY } from '../chat-empty-starters';
 import { ChatEmptyStateComposerRegion } from './ChatEmptyStateComposerRegion';
 
-const composer = (
-  <div className='rounded-lg border border-border-token bg-surface-1 px-4 py-3 text-sm text-secondary-token'>
-    Ask Jovie anything
-  </div>
-);
+function StoryComposerDock() {
+  return (
+    <label className='system-b-chat-content-shell block rounded-2xl bg-surface-1 px-3 py-2 text-sm text-secondary-token'>
+      Message
+      <textarea
+        className='mt-1 w-full resize-none bg-transparent text-primary-token'
+        rows={2}
+        placeholder='Ask anything'
+        aria-label='Message'
+      />
+    </label>
+  );
+}
 
-const meta: Meta<typeof ChatEmptyStateComposerRegion> = {
-  title: 'Jovie/Components/ChatEmptyStateComposerRegion',
+const meta = {
+  title: 'Chat/EmptyState/ComposerRegion',
   component: ChatEmptyStateComposerRegion,
-  parameters: {
-    layout: 'fullscreen',
+  parameters: { layout: 'fullscreen' },
+  args: {
+    children: <StoryComposerDock />,
+    onSelectSample: fn(),
   },
   decorators: [
-    Story => (
-      <div className='h-[480px] bg-surface-0 p-4 text-primary-token'>
-        <Story />
-      </div>
-    ),
+    Story => {
+      try {
+        sessionStorage.removeItem(CHAT_EMPTY_SAMPLE_STORAGE_KEY);
+      } catch {
+        // Story extraction can run without Web Storage.
+      }
+      return (
+        <div className='flex min-h-96 justify-center bg-base p-6'>
+          <div className='w-full max-w-xl'>
+            <Story />
+          </div>
+        </div>
+      );
+    },
   ],
-  args: {
-    children: composer,
-  },
-};
+} satisfies Meta<typeof ChatEmptyStateComposerRegion>;
 
 export default meta;
 type Story = StoryObj<typeof meta>;
 
-export const Centered: Story = {};
+export const JustAskCentered: Story = {};
 
-export const DockedWithStarter: Story = {
+export const JustAskDocked: Story = {
   args: {
-    above: (
-      <div className='rounded-lg border border-border-token bg-surface-1 p-4 text-sm text-secondary-token'>
-        Sample conversation
-      </div>
-    ),
-    children: composer,
+    stableDocked: true,
+    showDockedWelcome: true,
+    children: <StoryComposerDock />,
+    onSelectSample: fn(),
   },
 };

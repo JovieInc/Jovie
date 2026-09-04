@@ -35,11 +35,11 @@ export function StoryBlogCard({
         className='block rounded-lg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-token'
       >
         <h2
-          className={
+          className={`${
             isFeatured
               ? 'mb-4 text-2xl font-semibold tracking-tight text-primary-token sm:text-3xl'
               : 'mb-3 text-lg font-semibold tracking-tight text-primary-token sm:text-xl'
-          }
+          } line-clamp-2`}
         >
           {post.title}
         </h2>

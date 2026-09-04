@@ -211,7 +211,12 @@ export const ProfileHomeRail = memo(function ProfileHomeRail({
     viewerLocation === undefined &&
     upcomingTourDates.length > 0 &&
     !releaseVisibility?.show;
-  const { location } = useUserLocation({ enabled: shouldResolveGeo });
+  // one-modal-layer-v1: never open the browser geolocation prompt from a
+  // passive rail — use cached/granted location only.
+  const { location } = useUserLocation({
+    enabled: shouldResolveGeo,
+    permissionMode: 'granted-only',
+  });
   const effectiveLocation = viewerLocation ?? location;
   const { nearbyDates } = useTourDateProximity(
     upcomingTourDates,

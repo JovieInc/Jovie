@@ -659,6 +659,12 @@ body {
   --transition-duration-cinematic: var(--duration-cinematic);
   --ease-subtle: cubic-bezier(0.25, 0.46, 0.45, 0.94);
   --ease-cinematic: cubic-bezier(0.32, 0.72, 0, 1);
+  --animate-progress-indeterminate: progress-indeterminate 1.5s ease-in-out
+    infinite;
+  /* Shared overlay layers — semantic names preserve the stacking contract
+     without encoding numeric z-index values at component call sites. */
+  --z-index-sheet: 65;
+  --z-index-tooltip: 150;
   /* Shadow tokens — register design-system.css shadows as Tailwind utilities */
   --shadow-sm: var(--shadow-sm);
   --shadow-md: var(--shadow-md);
@@ -679,6 +685,50 @@ body {
   --shadow-ring-surface-1: 0 0 0 3px var(--linear-bg-surface-1);
   --shadow-popover: 0 18px 48px rgba(0, 0, 0, 0.22);
   --shadow-panel-ring: inset 0 0 0 1px var(--linear-panel-ring);
+}
+
+@utility w-overlay-viewport {
+  width: calc(100vw - var(--space-8));
+}
+
+@utility max-h-overlay-viewport {
+  max-height: calc(100dvh - var(--space-8));
+}
+
+@utility max-w-sheet-viewport {
+  max-width: calc(100vw - var(--space-4));
+}
+
+@utility max-h-sheet-viewport {
+  max-height: calc(100dvh - var(--space-4));
+}
+
+@utility scale-press {
+  scale: var(--scale-press);
+}
+
+@utility bg-icon-button-frosted {
+  background-color: color-mix(in srgb, var(--color-surface-1) 84%, transparent);
+}
+
+@utility bg-icon-button-frosted-hover {
+  background-color: color-mix(in srgb, var(--color-surface-2) 88%, transparent);
+}
+
+@utility bg-icon-button-pearl-quiet-hover {
+  background-color: color-mix(
+    in srgb,
+    var(--profile-pearl-bg) 88%,
+    transparent
+  );
+}
+
+@utility bg-icon-button-pearl-quiet-focus {
+  background-color: color-mix(
+    in srgb,
+    var(--profile-pearl-bg) 92%,
+    transparent
+  );
 }
 
 /* ============================================
@@ -766,7 +816,7 @@ body {
   }
   /* Tactile press — transform only; never transition:all (DESIGN.md / JOV-3368) */
   .interactive-press {
-    @apply transition-transform duration-subtle ease-subtle active:scale-[var(--scale-press)] motion-reduce:active:scale-100;
+    @apply transition-transform duration-subtle ease-subtle active:scale-press motion-reduce:active:scale-100;
   }
   /* Button component styles */
   .btn {
@@ -888,6 +938,18 @@ body {
     font-feature-settings: var(--linear-font-features);
     font-variation-settings: "opsz" var(--linear-font-optical-sizing);
     text-wrap: balance;
+  }
+  /* Every public marketing H1 may paint at most two lines. The complete text
+     remains in the DOM and accessibility tree; this is a visual constraint,
+     not an alternate or shortened accessible label. The shell fallback stays
+     at zero specificity so an explicitly composed heading can override it. */
+  .marketing-h1-max-two-lines,
+  :where(.home-viewport, .system-b-marketing) :where(h1:not(.sr-only)) {
+    display: -webkit-box;
+    max-block-size: calc(2 * 1lh);
+    overflow: hidden;
+    -webkit-box-orient: vertical;
+    -webkit-line-clamp: 2;
   }
   @media (min-width: 768px) {
     .marketing-h1-linear {
@@ -2129,7 +2191,7 @@ body {
     );
   }
   .btn-press {
-    @apply transition-transform duration-subtle ease-subtle active:scale-[var(--scale-press)] motion-reduce:active:scale-100;
+    @apply transition-transform duration-subtle ease-subtle active:scale-press motion-reduce:active:scale-100;
   }
   /* Chat empty state — refined depth & motion */
   .chat-logo-mark {
@@ -2759,5 +2821,14 @@ body {
   }
   75% {
     transform: scaleY(0.42);
+  }
+}
+
+/* DictationWaveform sets its per-bar animation inline (deterministic
+   duration/phase per bar), so reduced-motion needs !important to win. The
+   strip still reads as "listening" via its opacity state. */
+@media (prefers-reduced-motion: reduce) {
+  .dictation-waveform-bar {
+    animation: none !important;
   }
 }

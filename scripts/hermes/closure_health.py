@@ -26,6 +26,9 @@ AUTHORITY = "Summer"
 CONTROLLER_RED_AFTER = timedelta(minutes=10)
 EMPTY_QUEUE_RED_AFTER = timedelta(minutes=15)
 UNCLASSIFIED_RED_AFTER = timedelta(minutes=15)
+# Merge-queue group rebuilds transiently mark entries UNMERGEABLE; only a
+# persistent entry past this threshold is real.
+UNMERGEABLE_QUEUE_RED_AFTER = timedelta(minutes=15)
 NO_MERGE_PROGRESS_AFTER = timedelta(hours=1)
 HOLD_EXPIRY = timedelta(days=7)
 STACK_MAX_DEPTH = 4  # JOV-INV-020
@@ -33,6 +36,39 @@ STACK_DEADLINE_MAX = timedelta(days=7)
 STACK_ROOT_BASE = "main"
 STACK_REPAIR_ACTION = "split-or-retarget-draft-stack"
 UTC = timezone.utc
+
+
+def empty_stack_health() -> dict[str, Any]:
+    """Bounded empty JOV-INV-020 stack contract for fail-closed receipts."""
+    return {
+        "maxDepth": STACK_MAX_DEPTH,
+        "roots": [],
+        "violations": [],
+        "repairActions": [],
+    }
+
+
+def bounded_stack_health(value: object) -> dict[str, Any]:
+    """Keep stack diagnostics persistable even when observation is incomplete."""
+    empty = empty_stack_health()
+    if not isinstance(value, dict):
+        return empty
+    max_depth = value.get("maxDepth")
+    roots = value.get("roots")
+    violations = value.get("violations")
+    repair_actions = value.get("repairActions")
+    return {
+        "maxDepth": (
+            max_depth
+            if isinstance(max_depth, int)
+            and not isinstance(max_depth, bool)
+            and max_depth > 0
+            else STACK_MAX_DEPTH
+        ),
+        "roots": roots if isinstance(roots, list) else [],
+        "violations": violations if isinstance(violations, list) else [],
+        "repairActions": repair_actions if isinstance(repair_actions, list) else [],
+    }
 ISSUE_REFERENCE = re.compile(r"\b(?:JOV|LYB)-\d+\b", re.IGNORECASE)
 EXPLICIT_ISSUE_MARKER = re.compile(
     r"<!--\s*linear-issue-(?:id|identifier)\s*:\s*((?:JOV|LYB)-\d+)\s*-->",
@@ -73,6 +109,19 @@ STACK_DEADLINE_MARKER = re.compile(
     r"<!--\s*stack-deadline\s*:\s*([^\s<]+)\s*-->", re.IGNORECASE
 )
 STACK_HEAD_SHA = re.compile(r"^[0-9a-f]{40}$", re.IGNORECASE)
+REPOSITORY_NAME = re.compile(r"^[^/\s]+/[^/\s]+$")
+# JOV-INV-020 native-stack evidence for the duplicate-lane detector (JOV-INV-011):
+# same-issue active writers that verifiably stack are one lane, not duplicates.
+STACK_CONTRACT_HEADING = re.compile(r"\bstack\s+contract\b", re.IGNORECASE)
+STACK_LAYER_DECLARATION = re.compile(
+    r"\blayer\s+\d+\s*(?:\bof\b|/)\s*\d+\b", re.IGNORECASE
+)
+STACK_PARENT_DECLARATION = re.compile(
+    r"\b(?:immediate\s+parent|parent\s+pr|parent|extends|stacked\s+on|based\s+on"
+    r"|builds\s+on|depends\s+on|supersedes)\b\s*:?\s*#(\d{1,9})\b",
+    re.IGNORECASE,
+)
+STACK_NUMBERED_TITLE = re.compile(r"(?<![\d/.])(\d{1,2})\s*/\s*(\d{1,2})(?![\d/])")
 
 
 def isoformat(value: datetime) -> str:
@@ -258,6 +307,7 @@ def _stack_path(numbers: list[int], prs_by_number: dict[int, dict[str, Any]]) ->
 
 
 def _stack_action(
+    repository: str,
     root: dict[str, Any],
     members: list[int],
     longest_path: list[int],
@@ -283,6 +333,7 @@ def _stack_action(
     ]
     root_head_sha = head_by_number[root_number]
     fingerprint = {
+        "repository": repository,
         "rootPr": root_number,
         "prNumbers": members,
         "memberHeads": member_heads,
@@ -297,6 +348,7 @@ def _stack_action(
     ).hexdigest()
     return {
         "schema": "jovie-stack-health-action/v1",
+        "repository": repository,
         "taskKey": task_key,
         "deliveryKey": f"closure-stack:{task_key}",
         "action": STACK_REPAIR_ACTION,
@@ -317,6 +369,7 @@ def _stack_action(
 
 
 def _draft_stack_health(
+    repository: str,
     prs: list[dict[str, Any]],
     prs_by_number: dict[int, dict[str, Any]],
     now: datetime,
@@ -458,6 +511,7 @@ def _draft_stack_health(
         if sorted_violations:
             action = (
                 _stack_action(
+                    repository,
                     root,
                     members,
                     longest_path,
@@ -789,13 +843,8 @@ def _readback_promotion_batch(
         commit = repository.get(f"commit_{number}")
         if not isinstance(pr, dict) or not isinstance(commit, dict):
             raise ValueError("GitHub promotion readback omitted pull request")
-        expected_head_oid = candidate.get("headRefOid")
-        if commit.get("oid") != expected_head_oid:
+        if commit.get("oid") != candidate.get("headRefOid"):
             raise ValueError("GitHub promotion readback returned the wrong commit")
-        if pr.get("headRefOid") != expected_head_oid:
-            raise ValueError(
-                "GitHub promotion readback returned the wrong pull request head"
-            )
         try:
             required_checks = _normalize_named_required_checks(commit, required_names)
             check_evidence_status = "complete"
@@ -908,9 +957,316 @@ def _required_checks_green(evidence: dict[str, Any]) -> bool:
     )
 
 
+def _native_stack_declaration(pr: dict[str, Any]) -> bool:
+    """JOV-INV-020: the PR itself declares membership in a native stack."""
+    body = pr.get("body") if isinstance(pr.get("body"), str) else ""
+    title = pr.get("title") if isinstance(pr.get("title"), str) else ""
+    if STACK_CONTRACT_HEADING.search(body):
+        return True
+    if STACK_INTEGRATOR_MARKER.search(body) or STACK_DEADLINE_MARKER.search(body):
+        return True
+    if STACK_LAYER_DECLARATION.search(body):
+        return True
+    match = STACK_NUMBERED_TITLE.search(title)
+    if match:
+        part, whole = int(match.group(1)), int(match.group(2))
+        return whole >= 2 and 1 <= part <= whole
+    return False
+
+
+def _native_stack_components(
+    numbers: list[int],
+    prs_by_number: dict[int, dict[str, Any]],
+    complete: dict[int, frozenset[str]],
+) -> dict[int, int]:
+    """Union same-issue PRs linked by positive JOV-INV-020 stack evidence.
+
+    Returns number -> component root. A singleton component means the PR has no
+    stack evidence and stays subject to duplicate-lane flagging (fail closed).
+    Evidence: an immediate-parent declaration naming a lane member, a branch
+    chain (base is a member's head), shared stack membership declarations, or
+    cumulative nesting (one changed-file set strictly contains the other).
+    """
+    parent: dict[int, int] = {number: number for number in numbers}
+
+    def find(number: int) -> int:
+        while parent[number] != number:
+            parent[number] = parent[parent[number]]
+            number = parent[number]
+        return number
+
+    def union(left: int, right: int) -> None:
+        parent[find(left)] = find(right)
+
+    members = {number: prs_by_number.get(number) for number in numbers}
+    heads: dict[str, int] = {}
+    for number in numbers:
+        pr = members[number]
+        head = pr.get("headRefName") if isinstance(pr, dict) else None
+        if isinstance(head, str) and head:
+            heads.setdefault(head, number)
+    for number in numbers:
+        pr = members[number]
+        if not isinstance(pr, dict):
+            continue
+        base = pr.get("baseRefName")
+        if (
+            isinstance(base, str)
+            and base != STACK_ROOT_BASE
+            and base in heads
+            and heads[base] != number
+        ):
+            union(number, heads[base])
+        body = pr.get("body") if isinstance(pr.get("body"), str) else ""
+        for declared in STACK_PARENT_DECLARATION.findall(body):
+            declared_number = int(declared)
+            if declared_number in members and declared_number != number:
+                union(number, declared_number)
+    declared = [
+        number
+        for number in numbers
+        if isinstance(members[number], dict)
+        and _native_stack_declaration(members[number])
+    ]
+    if len(declared) >= 2:
+        for number in declared[1:]:
+            union(declared[0], number)
+    for index, left in enumerate(numbers):
+        for right in numbers[index + 1 :]:
+            left_files = complete.get(left)
+            right_files = complete.get(right)
+            if left_files is None or right_files is None:
+                continue
+            if left_files < right_files or right_files < left_files:
+                union(left, right)
+    return {number: find(number) for number in numbers}
+
+
+
+def observe_promotion_evidence(
+    repo: str,
+    prs: list[dict[str, Any]],
+    current_base_oid: str,
+    deadline: float | None = None,
+    *,
+    run_impl: Any = subprocess.run,
+) -> list[dict[str, Any]]:
+    """Attach exact-head, live-policy evidence to every checkable candidate."""
+    observation_deadline = deadline or time.monotonic() + CLOSURE_OBSERVATION_SECONDS
+    observed: list[dict[str, Any]] = []
+    candidates: list[dict[str, Any]] = []
+    for pr in prs:
+        enriched = dict(pr)
+        if enriched.get("baseRefName") == "main":
+            enriched["currentBaseOid"] = current_base_oid
+        if _needs_promotion_evidence(enriched):
+            candidates.append(enriched)
+        observed.append(enriched)
+    if not candidates:
+        return observed
+    try:
+        live_required = _observe_live_required_checks(
+            repo, observation_deadline, run_impl=run_impl
+        )
+    except (OSError, subprocess.SubprocessError, ValueError, json.JSONDecodeError):
+        live_required = None
+    if live_required != EXPECTED_REQUIRED_CHECKS:
+        status = "policy-drift" if isinstance(live_required, frozenset) else "policy-error"
+        for candidate in candidates:
+            candidate["promotionEvidence"] = {
+                "status": status,
+                "headOid": candidate.get("headRefOid"),
+                "baseOid": current_base_oid,
+                "requiredCheckNames": sorted(live_required or []),
+            }
+        return observed
+    try:
+        readback = _readback_promotion_state(
+            repo,
+            candidates,
+            live_required,
+            observation_deadline,
+            run_impl=run_impl,
+        )
+    except (OSError, subprocess.SubprocessError, ValueError, json.JSONDecodeError):
+        readback = None
+    comparison_candidates: list[dict[str, Any]] = []
+    for candidate in candidates:
+        number = int(candidate["number"])
+        current = readback.get("prs", {}).get(number) if isinstance(readback, dict) else None
+        if (
+            not isinstance(readback, dict)
+            or readback.get("baseOid") != current_base_oid
+            or not isinstance(current, dict)
+            or current.get("headOid") != candidate.get("headRefOid")
+            or current.get("baseRefName") != "main"
+        ):
+            candidate["promotionEvidence"] = {
+                "status": "stale" if isinstance(readback, dict) else "error",
+                "headOid": candidate.get("headRefOid"),
+                "baseOid": current_base_oid,
+            }
+            continue
+        check_evidence_status = current.get("checkEvidenceStatus")
+        if check_evidence_status != "complete":
+            candidate["promotionEvidence"] = {
+                "status": (
+                    check_evidence_status
+                    if isinstance(check_evidence_status, str)
+                    and check_evidence_status
+                    else "malformed"
+                ),
+                "headOid": candidate.get("headRefOid"),
+                "baseOid": current_base_oid,
+            }
+            continue
+        candidate["promotionEvidence"] = {
+            "status": "complete",
+            "headOid": candidate.get("headRefOid"),
+            "baseOid": current_base_oid,
+            "requiredCheckNames": sorted(live_required),
+            "requiredChecks": current["requiredChecks"],
+        }
+        if _required_checks_green(candidate["promotionEvidence"]):
+            comparison_candidates.append(candidate)
+    comparison_candidates.sort(key=lambda item: int(item["number"]))
+    workers = min(PROMOTION_EVIDENCE_WORKERS, len(comparison_candidates))
+    if workers:
+        executor = ThreadPoolExecutor(max_workers=workers)
+        futures: dict[Future[dict[str, Any]], dict[str, Any]] = {}
+        completed: set[Future[dict[str, Any]]] = set()
+        pending: set[Future[dict[str, Any]]] = set()
+        try:
+            for candidate in comparison_candidates:
+                future = executor.submit(
+                    _observe_one_comparison,
+                    repo,
+                    candidate,
+                    current_base_oid,
+                    observation_deadline,
+                    run_impl=run_impl,
+                )
+                futures[future] = candidate
+            completed, pending = wait(
+                futures,
+                timeout=_remaining_timeout(
+                    observation_deadline, PROMOTION_EVIDENCE_PHASE_SECONDS
+                ),
+            )
+            for future in completed:
+                candidate = futures[future]
+                try:
+                    comparison = future.result()
+                except Exception:  # fail closed if a bounded evidence worker crashes
+                    comparison = {
+                        "status": "error",
+                        "headOid": candidate.get("headRefOid"),
+                        "baseOid": current_base_oid,
+                    }
+                evidence = candidate["promotionEvidence"]
+                if comparison.get("status") == "complete":
+                    evidence.update(
+                        {
+                            key: value
+                            for key, value in comparison.items()
+                            if key not in {"requiredCheckNames", "requiredChecks"}
+                        }
+                    )
+                else:
+                    candidate["promotionEvidence"] = comparison
+            for future in pending:
+                candidate = futures[future]
+                candidate["promotionEvidence"] = {
+                    "status": "deadline-exceeded",
+                    "headOid": candidate.get("headRefOid"),
+                    "baseOid": current_base_oid,
+                }
+                future.cancel()
+        except Exception:
+            for future, candidate in futures.items():
+                if future not in completed:
+                    candidate["promotionEvidence"] = {
+                        "status": "error",
+                        "headOid": candidate.get("headRefOid"),
+                        "baseOid": current_base_oid,
+                    }
+                    future.cancel()
+        finally:
+            # Comparison workers return values only, so ignored late results
+            # cannot overwrite the deadline disposition.
+            executor.shutdown(wait=False, cancel_futures=True)
+    try:
+        final_required = _observe_live_required_checks(
+            repo, observation_deadline, run_impl=run_impl
+        )
+        if final_required != live_required:
+            raise ValueError("GitHub required-check policy changed during observation")
+        final_readback = _readback_promotion_state(
+            repo,
+            candidates,
+            final_required,
+            observation_deadline,
+            run_impl=run_impl,
+        )
+    except (OSError, subprocess.SubprocessError, ValueError, json.JSONDecodeError):
+        final_readback = None
+    for candidate in candidates:
+        number = int(candidate["number"])
+        final = (
+            final_readback.get("prs", {}).get(number)
+            if isinstance(final_readback, dict)
+            else None
+        )
+        if isinstance(final, dict):
+            for key in (
+                "author",
+                "baseRefName",
+                "isCrossRepository",
+                "isDraft",
+                "labels",
+                "mergeQueueEntry",
+                "mergeStateStatus",
+                "updatedAt",
+            ):
+                candidate[key] = final.get(key)
+            if final.get("state") in {"CLOSED", "MERGED"}:
+                candidate["observedTerminalState"] = final["state"]
+                continue
+        if (
+            not isinstance(final_readback, dict)
+            or final_readback.get("baseOid") != current_base_oid
+            or not isinstance(final, dict)
+            or final.get("headOid") != candidate.get("headRefOid")
+            or final.get("baseRefName") != "main"
+            or final.get("state") != "OPEN"
+        ):
+            candidate["promotionEvidence"] = {
+                "status": "stale" if isinstance(final_readback, dict) else "error",
+                "headOid": candidate.get("headRefOid"),
+                "baseOid": current_base_oid,
+            }
+            continue
+        final_check_status = final.get("checkEvidenceStatus")
+        if final_check_status != "complete":
+            candidate["promotionEvidence"] = {
+                "status": (
+                    final_check_status
+                    if isinstance(final_check_status, str) and final_check_status
+                    else "malformed"
+                ),
+                "headOid": candidate.get("headRefOid"),
+                "baseOid": current_base_oid,
+            }
+            continue
+        evidence = candidate.get("promotionEvidence")
+        if isinstance(evidence, dict) and evidence.get("status") == "complete":
+            evidence["requiredCheckNames"] = sorted(final_required)
+            evidence["requiredChecks"] = final["requiredChecks"]
+    return [pr for pr in observed if "observedTerminalState" not in pr]
 def _duplicate_active_lanes(
     dispositions: list[dict[str, Any]],
     evidence_by_number: dict[int, dict[str, Any]],
+    prs_by_number: dict[int, dict[str, Any]],
 ) -> tuple[list[dict[str, Any]], list[dict[str, Any]]]:
     """Held/draft PRs are not writers. Split work is allowed only when disjoint."""
     active_by_issue: dict[str, list[int]] = {}
@@ -968,10 +1324,21 @@ def _duplicate_active_lanes(
                     )
                     seen_unclassified.add(number)
             continue
+        components = _native_stack_components(numbers, prs_by_number, complete)
+        component_sizes: dict[int, int] = {}
+        for root in components.values():
+            component_sizes[root] = component_sizes.get(root, 0) + 1
         overlap: set[str] = set()
         overlapping_numbers: set[int] = set()
         for index, left in enumerate(numbers):
             for right in numbers[index + 1 :]:
+                if (
+                    components[left] == components[right]
+                    and component_sizes[components[left]] > 1
+                ):
+                    # One declared JOV-INV-020 native stack is a single lane;
+                    # overlapping cumulative layers are not duplicates.
+                    continue
                 pair_overlap = complete[left] & complete[right]
                 if pair_overlap:
                     overlap |= pair_overlap
@@ -987,7 +1354,72 @@ def _duplicate_active_lanes(
     return duplicates, extra_unclassified
 
 
-def classify_open_prs(prs: list[dict[str, Any]], now: datetime) -> dict[str, Any]:
+def _promotion_disposition(
+    pr: dict[str, Any], base: dict[str, Any]
+) -> dict[str, Any]:
+    if pr.get("baseRefName") != "main":
+        return {**base, "state": "repair", "reason": "non-main-base"}
+    if pr.get("mergeStateStatus") not in CHECKABLE_MERGE_STATES:
+        return {
+            **base,
+            "state": "repair",
+            "reason": f"merge-state-{str(pr.get('mergeStateStatus') or 'unknown').lower()}",
+        }
+
+    evidence = pr.get("promotionEvidence")
+    if not isinstance(evidence, dict):
+        return {**base, "state": "repair", "reason": "promotion-evidence-missing"}
+    status = evidence.get("status")
+    if status != "complete":
+        suffix = status if isinstance(status, str) and status else "malformed"
+        return {**base, "state": "repair", "reason": f"promotion-evidence-{suffix}"}
+    if (
+        evidence.get("headOid") != pr.get("headRefOid")
+        or evidence.get("baseOid") != pr.get("currentBaseOid")
+    ):
+        return {**base, "state": "repair", "reason": "promotion-evidence-stale"}
+    required_names = evidence.get("requiredCheckNames")
+    if (
+        not isinstance(required_names, list)
+        or not all(isinstance(name, str) and name for name in required_names)
+        or len(required_names) != len(set(required_names))
+        or set(required_names) != EXPECTED_REQUIRED_CHECKS
+    ):
+        return {**base, "state": "repair", "reason": "required-check-policy-drift"}
+    checks = evidence.get("requiredChecks")
+    if not isinstance(checks, list):
+        return {**base, "state": "repair", "reason": "required-check-evidence-missing"}
+    check_names = {
+        item.get("name")
+        for item in checks
+        if isinstance(item, dict) and isinstance(item.get("name"), str)
+    }
+    if check_names != set(required_names) or len(checks) != len(check_names):
+        return {**base, "state": "repair", "reason": "required-check-evidence-missing"}
+    if not _required_checks_green(evidence):
+        return {**base, "state": "repair", "reason": "required-checks-not-green"}
+    behind_by = _non_negative_int(evidence.get("behindBy"))
+    if behind_by is None:
+        return {**base, "state": "repair", "reason": "promotion-evidence-malformed"}
+    if behind_by > 0:
+        return {
+            **base,
+            "state": "repair",
+            "reason": "stale-base",
+            "behindBy": behind_by,
+        }
+    return {
+        **base,
+        "state": "promote",
+        "reason": "exact-head-current-required-checks-green",
+        "behindBy": 0,
+        "requiredChecks": sorted(check_names),
+    }
+
+
+def classify_open_prs(
+    prs: list[dict[str, Any]], now: datetime, repository: str = "JovieInc/Jovie"
+) -> dict[str, Any]:
     """Map every usable open PR to close/repair/promote/queued/held."""
     refs_by_number: dict[int, list[str]] = {}
     unclassified: list[dict[str, Any]] = []
@@ -999,12 +1431,34 @@ def classify_open_prs(prs: list[dict[str, Any]], now: datetime) -> dict[str, Any
             unclassified.append({"number": number, "reason": "missing-pr-number"})
             continue
         usable.append(pr)
+        label_evidence = _label_evidence(pr)
+        if label_evidence.get("status") != "complete":
+            unclassified.append(
+                {
+                    "number": number,
+                    "reason": (
+                        "label-evidence-"
+                        f"{label_evidence.get('status') or 'malformed'}"
+                    ),
+                }
+            )
+            refs_by_number[number] = []
+            continue
         cross_repository = pr.get("isCrossRepository")
         if not isinstance(cross_repository, bool):
             refs_by_number[number] = []
             unclassified.append(
                 {"number": number, "reason": "missing-repository-provenance"}
             )
+            continue
+        if (
+            not isinstance(pr.get("baseRefName"), str)
+            or not pr.get("baseRefName")
+            or not _valid_oid(pr.get("headRefOid"))
+            or not _valid_oid(pr.get("baseRefOid"))
+        ):
+            refs_by_number[number] = []
+            unclassified.append({"number": number, "reason": "missing-ref-provenance"})
             continue
         if cross_repository:
             refs_by_number[number] = []
@@ -1032,26 +1486,11 @@ def classify_open_prs(prs: list[dict[str, Any]], now: datetime) -> dict[str, Any
         base = {
             "number": number,
             "issue": refs_by_number[number][0] if refs_by_number[number] else None,
+            "headOid": pr["headRefOid"],
+            "baseOid": pr.get("currentBaseOid") or pr["baseRefOid"],
+            "eventBaseOid": pr["baseRefOid"],
+            "baseRefName": pr["baseRefName"],
         }
-        queue_entry = pr.get("mergeQueueEntry")
-        if isinstance(queue_entry, dict):
-            queue_state = queue_entry.get("state")
-            enqueued_at = parse_time(queue_entry.get("enqueuedAt"))
-            if not isinstance(queue_state, str) or not queue_state or enqueued_at is None:
-                unclassified.append(
-                    {"number": number, "reason": "malformed-native-queue-entry"}
-                )
-                continue
-            dispositions.append(
-                {
-                    **base,
-                    "state": "queued",
-                    "reason": "native-queue-entry",
-                    "queueState": queue_state,
-                    "enqueuedAt": isoformat(enqueued_at),
-                }
-            )
-            continue
         close_reasons = sorted(labels.intersection(CLOSE_LABELS))
         if close_reasons:
             dispositions.append(
@@ -1072,30 +1511,53 @@ def classify_open_prs(prs: list[dict[str, Any]], now: datetime) -> dict[str, Any
                     "state": "held",
                     "owner": owner,
                     "reason": reason,
+                    "nextAction": "promote-or-supersede-before-expiry",
                     "expiresAt": isoformat(expiry),
                 }
             )
             if expiry <= now:
                 expired_holds.append(number)
             continue
-        if pr.get("mergeStateStatus") == "CLEAN":
-            dispositions.append({**base, "state": "promote", "reason": "clean-ready"})
-        else:
+        queue_entry = pr.get("mergeQueueEntry")
+        if isinstance(queue_entry, dict):
+            queue_state = queue_entry.get("state")
+            enqueued_at = parse_time(queue_entry.get("enqueuedAt"))
+            if not isinstance(queue_state, str) or not queue_state or enqueued_at is None:
+                unclassified.append(
+                    {"number": number, "reason": "malformed-native-queue-entry"}
+                )
+                continue
             dispositions.append(
                 {
                     **base,
-                    "state": "repair",
-                    "reason": f"merge-state-{str(pr.get('mergeStateStatus') or 'unknown').lower()}",
+                    "state": "queued",
+                    "reason": "native-queue-entry",
+                    "queueState": queue_state,
+                    "enqueuedAt": isoformat(enqueued_at),
                 }
             )
+            continue
+        dispositions.append(_promotion_disposition(pr, base))
 
     changed_file_evidence = [
         _changed_file_record(number, prs_by_number[number])
         for number in sorted(prs_by_number)
     ]
     evidence_by_number = {item["number"]: item for item in changed_file_evidence}
+    promotion_evidence = [
+        {
+            "number": number,
+            **(
+                prs_by_number[number]["promotionEvidence"]
+                if isinstance(prs_by_number[number].get("promotionEvidence"), dict)
+                else {"status": "missing"}
+            ),
+        }
+        for number in sorted(prs_by_number)
+        if _needs_promotion_evidence(prs_by_number[number])
+    ]
     duplicates, extra_unclassified = _duplicate_active_lanes(
-        dispositions, evidence_by_number
+        dispositions, evidence_by_number, prs_by_number
     )
     drop = {item["number"] for item in extra_unclassified}
     if drop:
@@ -1105,7 +1567,7 @@ def classify_open_prs(prs: list[dict[str, Any]], now: datetime) -> dict[str, Any
     counts = {state: 0 for state in ("close", "repair", "promote", "queued", "held")}
     for disposition in dispositions:
         counts[disposition["state"]] += 1
-    stack_health = _draft_stack_health(usable, prs_by_number, now)
+    stack_health = _draft_stack_health(repository, usable, prs_by_number, now)
     return {
         "dispositions": dispositions,
         "counts": counts,
@@ -1115,6 +1577,7 @@ def classify_open_prs(prs: list[dict[str, Any]], now: datetime) -> dict[str, Any
         "changedFileEvidence": changed_file_evidence,
         "stackHealth": stack_health,
         "repairActions": stack_health["repairActions"],
+        "promotionEvidence": promotion_evidence,
     }
 
 
@@ -1130,6 +1593,14 @@ def _episode_since(
     candidate = episode.get("since")
     parsed = parse_time(candidate)
     return parsed if parsed is not None and parsed <= now else now
+
+
+def _previous_for_repository(
+    previous: dict[str, Any] | None, repository: str | None
+) -> dict[str, Any] | None:
+    if not isinstance(previous, dict) or not isinstance(repository, str):
+        return None
+    return previous if previous.get("repository") == repository else None
 
 
 def _active_episode(
@@ -1150,6 +1621,9 @@ def evaluate_closure_health(
     now: datetime,
 ) -> dict[str, Any]:
     """Apply Summer's bounded stop-line without touching promotion authority."""
+    repository = snapshot.get("repository")
+    repository_valid = isinstance(repository, str) and REPOSITORY_NAME.fullmatch(repository)
+    scoped_previous = _previous_for_repository(previous, repository)
     classifications = snapshot.get("classifications")
     if not isinstance(classifications, dict):
         classifications = {}
@@ -1163,7 +1637,7 @@ def evaluate_closure_health(
         isinstance(value, int) and not isinstance(value, bool) and value >= 0
         for value in (open_prs, eligible_prs, green_ready_prs, native_queue_count)
     )
-    observer_unknown = not shape_valid or controller_status not in {
+    observer_unknown = not repository_valid or not shape_valid or controller_status not in {
         "green",
         "failed",
         "recovering",
@@ -1187,7 +1661,7 @@ def evaluate_closure_health(
                 for key in ("roots", "violations", "repairActions")
             )
     else:
-        stack_health = {"maxDepth": STACK_MAX_DEPTH, "roots": [], "violations": []}
+        stack_health = empty_stack_health()
     if repair_actions is None:
         repair_actions = []
     observer_unknown = observer_unknown or not isinstance(repair_actions, list)
@@ -1203,17 +1677,26 @@ def evaluate_closure_health(
     )
     repair_actions = repair_actions if isinstance(repair_actions, list) else []
 
+    unmergeable_queue_prs = sorted(
+        item.get("number")
+        for item in dispositions
+        if isinstance(item, dict)
+        and item.get("state") == "queued"
+        and item.get("queueState") == "UNMERGEABLE"
+        and isinstance(item.get("number"), int)
+    )
     active = {
         "controller": controller_status != "green",
         "emptyNativeQueue": bool(
             shape_valid and green_ready_prs > 0 and native_queue_count == 0
         ),
         "unclassified": bool(unclassified),
+        "unmergeableQueue": bool(unmergeable_queue_prs),
     }
     episodes: dict[str, Any] = {}
     durations: dict[str, timedelta] = {}
     for key, is_active in active.items():
-        episode, duration = _active_episode(previous, key, is_active, now)
+        episode, duration = _active_episode(scoped_previous, key, is_active, now)
         if episode is not None:
             episodes[key] = episode
         durations[key] = duration
@@ -1239,6 +1722,24 @@ def evaluate_closure_health(
         }
         if roots != action_roots:
             reasons.append("draft-stack-repair-action-unavailable")
+    repair_prs = sorted(
+        item.get("number")
+        for item in dispositions
+        if isinstance(item, dict)
+        and item.get("state") == "repair"
+        and isinstance(item.get("number"), int)
+    )
+    close_prs = sorted(
+        item.get("number")
+        for item in dispositions
+        if isinstance(item, dict)
+        and item.get("state") == "close"
+        and isinstance(item.get("number"), int)
+    )
+    if repair_prs:
+        reasons.append("internally-repairable-prs-open")
+    if close_prs:
+        reasons.append("closure-actions-pending")
     unmergeable_queue_prs = sorted(
         item.get("number")
         for item in dispositions
@@ -1247,7 +1748,10 @@ def evaluate_closure_health(
         and item.get("queueState") == "UNMERGEABLE"
         and isinstance(item.get("number"), int)
     )
-    if unmergeable_queue_prs:
+    if (
+        active["unmergeableQueue"]
+        and durations["unmergeableQueue"] >= UNMERGEABLE_QUEUE_RED_AFTER
+    ):
         reasons.append("native-queue-unmergeable")
     if active["controller"] and durations["controller"] >= CONTROLLER_RED_AFTER:
         reasons.append("queue-controller-red-over-10m")
@@ -1273,6 +1777,7 @@ def evaluate_closure_health(
     status = "red" if reasons else "grace" if grace_active else "healthy"
     return {
         "schema": SCHEMA,
+        "repository": repository if repository_valid else None,
         "status": status,
         "authority": AUTHORITY,
         "observedAt": isoformat(now),
@@ -1292,9 +1797,11 @@ def evaluate_closure_health(
         "greenReadyPrs": green_ready_prs if shape_valid else None,
         "nativeQueueCount": native_queue_count if shape_valid else None,
         "unmergeableNativeQueuePrs": unmergeable_queue_prs,
+        "repairPrs": repair_prs,
+        "closePrs": close_prs,
         "latestMergeAt": snapshot.get("latestMergeAt"),
-        "stackHealth": stack_health,
-        "repairActions": repair_actions,
+        "stackHealth": bounded_stack_health(stack_health),
+        "repairActions": repair_actions if isinstance(repair_actions, list) else [],
         "classifications": classifications,
     }
 
@@ -1306,16 +1813,21 @@ def _repo_parts(repo: str) -> tuple[str, str]:
     return pieces[0], pieces[1]
 
 
-def _run_graphql_snapshot(repo: str) -> dict[str, Any]:
+def _run_graphql_snapshot_once(
+    repo: str, deadline: float | None = None
+) -> dict[str, Any]:
+    observation_deadline = deadline or time.monotonic() + CLOSURE_OBSERVATION_SECONDS
     owner, name = _repo_parts(repo)
     query = """
 query($owner:String!,$name:String!,$endCursor:String){
   repository(owner:$owner,name:$name){
+    main:ref(qualifiedName:"refs/heads/main"){target{oid}}
     pullRequests(first:100,after:$endCursor,states:OPEN,orderBy:{field:CREATED_AT,direction:ASC}){
       totalCount
       pageInfo{hasNextPage endCursor}
       nodes{
-        number title body baseRefName headRefName headRefOid isDraft isCrossRepository mergeStateStatus createdAt updatedAt
+        number title body headRefName headRefOid baseRefName baseRefOid
+        isDraft isCrossRepository mergeStateStatus createdAt updatedAt
         author{login}
         labels(first:100){totalCount nodes{name}}
         mergeQueueEntry{position enqueuedAt state}
@@ -1346,7 +1858,7 @@ query($owner:String!,$name:String!,$endCursor:String){
         check=True,
         capture_output=True,
         text=True,
-        timeout=30,
+        timeout=_remaining_timeout(observation_deadline, 30),
     )
     pages = json.loads(completed.stdout)
     if not isinstance(pages, list) or not pages:
@@ -1354,6 +1866,11 @@ query($owner:String!,$name:String!,$endCursor:String){
     repository = pages[0].get("data", {}).get("repository")
     if not isinstance(repository, dict):
         raise ValueError("GitHub closure snapshot omitted repository")
+    main = repository.get("main")
+    main_target = main.get("target") if isinstance(main, dict) else None
+    main_oid = main_target.get("oid") if isinstance(main_target, dict) else None
+    if not _valid_oid(main_oid):
+        raise ValueError("GitHub closure snapshot omitted main OID")
     prs: list[dict[str, Any]] = []
     for page in pages:
         if page.get("errors"):
@@ -1374,11 +1891,27 @@ query($owner:String!,$name:String!,$endCursor:String){
     latest_merge = max((value for value in merged_times if value is not None), default=None)
     return {
         "prs": prs,
+        "mainOid": main_oid,
         "latestMergeAt": isoformat(latest_merge) if latest_merge is not None else None,
     }
 
 
-def _observe_queue_controller(repo: str) -> dict[str, Any]:
+def _run_graphql_snapshot(repo: str, deadline: float | None = None) -> dict[str, Any]:
+    """Retry a fleet read when open/close churn crosses a pagination boundary."""
+    observation_deadline = deadline or time.monotonic() + CLOSURE_OBSERVATION_SECONDS
+    last_error: ValueError | None = None
+    for _attempt in range(SNAPSHOT_ATTEMPTS):
+        try:
+            return _run_graphql_snapshot_once(repo, observation_deadline)
+        except ValueError as error:
+            last_error = error
+    raise last_error or ValueError("GitHub closure snapshot failed")
+
+
+def _observe_queue_controller(
+    repo: str, deadline: float | None = None
+) -> dict[str, Any]:
+    observation_deadline = deadline or time.monotonic() + CLOSURE_OBSERVATION_SECONDS
     completed = subprocess.run(
         [
             "gh",
@@ -1388,29 +1921,51 @@ def _observe_queue_controller(repo: str) -> dict[str, Any]:
         check=True,
         capture_output=True,
         text=True,
-        timeout=20,
+        timeout=_remaining_timeout(observation_deadline, 20),
     )
     payload = json.loads(completed.stdout)
     runs = payload.get("workflow_runs") if isinstance(payload, dict) else None
     if not isinstance(runs, list) or not runs:
         return {"status": "unknown", "reason": "controller-run-missing"}
     latest = runs[0]
-    status = latest.get("status")
-    conclusion = latest.get("conclusion")
-    if status == "completed":
+    # Judge green/failed from the latest completed run, not the latest run:
+    # a busy fleet almost always has an in-progress autoenroll run, and a
+    # busy queue is not a stalled controller. Also skip `cancelled` runs:
+    # the autoenroll concurrency group supersedes older runs constantly, and
+    # supersession churn carries no health verdict. "recovering" covers the
+    # abnormal case where the fetched page has no verdict-bearing run at all;
+    # the CONTROLLER_RED_AFTER episode threshold guards real stalls.
+    verdict_runs = [
+        run
+        for run in runs
+        if isinstance(run, dict)
+        and run.get("status") == "completed"
+        and run.get("conclusion") not in (None, "cancelled")
+    ]
+    if verdict_runs:
+        judged = verdict_runs[0]
+        status = judged.get("status")
+        conclusion = judged.get("conclusion")
         controller_status = "green" if conclusion == "success" else "failed"
-    elif status in {"queued", "in_progress", "waiting", "pending"}:
-        controller_status = "recovering"
     else:
-        controller_status = "unknown"
-    return {
+        judged = latest
+        status = judged.get("status")
+        conclusion = judged.get("conclusion")
+        if status in {"queued", "in_progress", "waiting", "pending"} or status == "completed":
+            controller_status = "recovering"
+        else:
+            controller_status = "unknown"
+    receipt: dict[str, Any] = {
         "status": controller_status,
-        "runId": latest.get("id"),
+        "runId": judged.get("id"),
         "runStatus": status,
         "conclusion": conclusion,
-        "url": latest.get("html_url"),
-        "observedAt": latest.get("updated_at") or latest.get("created_at"),
+        "url": judged.get("html_url"),
+        "observedAt": judged.get("updated_at") or judged.get("created_at"),
     }
+    if judged is not latest and isinstance(latest, dict):
+        receipt["activeRunId"] = latest.get("id")
+    return receipt
 
 
 def observe_closure_health(
@@ -1419,18 +1974,26 @@ def observe_closure_health(
     now: datetime,
 ) -> dict[str, Any]:
     """Read GitHub closure state and emit a typed Summer admission signal."""
+    deadline = time.monotonic() + CLOSURE_OBSERVATION_SECONDS
     try:
-        observed = _run_graphql_snapshot(repo)
-        prs = observed["prs"]
-        classifications = classify_open_prs(prs, now)
+        observed = _run_graphql_snapshot(repo, deadline)
+        prs = observe_promotion_evidence(
+            repo, observed["prs"], observed["mainOid"], deadline
+        )
+        classifications = classify_open_prs(prs, now, repo)
         labels_by_pr = {int(pr["number"]): _labels(pr) for pr in prs}
         eligible = [
             pr
             for pr in prs
-            if not pr.get("isDraft")
+            if _label_evidence(pr).get("status") == "complete"
+            and not pr.get("isDraft")
             and not labels_by_pr[int(pr["number"])].intersection(HOLD_LABELS)
         ]
-        green_ready = [pr for pr in eligible if pr.get("mergeStateStatus") == "CLEAN"]
+        green_ready = [
+            disposition
+            for disposition in classifications["dispositions"]
+            if disposition.get("state") == "promote"
+        ]
         native_queue = [pr for pr in prs if pr.get("mergeQueueEntry")]
         oldest_open = min(
             (parse_time(pr.get("createdAt")) for pr in prs),
@@ -1438,7 +2001,10 @@ def observe_closure_health(
             key=lambda value: value or now,
         )
         snapshot = {
+            "repository": repo,
             "controller": _observe_queue_controller(repo),
+
+            "controller": _observe_queue_controller(repo, deadline),
             "openPrs": len(prs),
             "eligiblePrs": len(eligible),
             "greenReadyPrs": len(green_ready),
@@ -1451,6 +2017,7 @@ def observe_closure_health(
     except (OSError, subprocess.SubprocessError, ValueError, json.JSONDecodeError) as error:
         return {
             "schema": SCHEMA,
+            "repository": repo,
             "status": "red",
             "authority": AUTHORITY,
             "observedAt": isoformat(now),
@@ -1468,12 +2035,7 @@ def observe_closure_health(
             # The observation is non-authoritative, so an empty action set
             # must not resolve prior work. It still has to satisfy the bounded
             # JOV-INV-020 ingress contract used by Fleet Gate Refresh.
-            "stackHealth": {
-                "maxDepth": STACK_MAX_DEPTH,
-                "roots": [],
-                "violations": [],
-                "repairActions": [],
-            },
+            "stackHealth": empty_stack_health(),
             "repairActions": [],
             "classifications": {
                 "dispositions": [],

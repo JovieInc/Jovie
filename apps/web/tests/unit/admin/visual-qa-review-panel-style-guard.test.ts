@@ -15,4 +15,17 @@ describe('VisualQaReviewPanel typography contract', () => {
     expect(panelSource).not.toContain('font-[560]');
     expect(panelSource.match(/font-semibold/g)).toHaveLength(3);
   });
+
+  it('routes transient feedback through the canonical feedback API', () => {
+    expect(panelSource).not.toContain("from 'sonner'");
+    expect(panelSource).toContain("from '@/components/feedback'");
+  });
+});
+
+describe('VisualQaReviewPanel reference id contract', () => {
+  it('precomputes sequential HUD-VQA ids without mutating render-scope state', () => {
+    expect(panelSource).toContain('surfaceReferenceIds');
+    expect(panelSource).not.toContain('surfaceIndex');
+    expect(panelSource).toContain("padStart(3, '0')");
+  });
 });
