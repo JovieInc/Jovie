@@ -628,6 +628,7 @@ function runStructural() {
     'python3 scripts/symphony/tests/gem-pr-drain.test.py',
     'python3 scripts/symphony/tests/gem-pr-rehabilitation-contract.test.py',
     'python3 scripts/symphony/tests/gem-priority-gate.test.py',
+    'COVERAGE_FILE="${RUNNER_TEMP:-/tmp}/jovie-summer-bottleneck-producer.coverage" python3 -m coverage run --branch scripts/symphony/tests/summer-bottleneck-producer.test.py && COVERAGE_FILE="${RUNNER_TEMP:-/tmp}/jovie-summer-bottleneck-producer.coverage" python3 -m coverage report --include="*/scripts/symphony/summer_bottleneck_producer.py" --show-missing --precision=2 --fail-under=80',
     'python3 scripts/symphony/tests/test_evaluate_fleet_gate.py',
     'python3 scripts/symphony/tests/test-model-router.py',
     'COVERAGE_FILE="${RUNNER_TEMP:-/tmp}/jovie-astra-readiness.coverage" python3 -m coverage run --branch scripts/symphony/tests/astra-readiness.test.py && COVERAGE_FILE="${RUNNER_TEMP:-/tmp}/jovie-astra-readiness.coverage" python3 -m coverage report --include="*/scripts/symphony/astra/astra_readiness.py" --show-missing --precision=2 --fail-under=90',
