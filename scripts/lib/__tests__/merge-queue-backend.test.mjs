@@ -1151,7 +1151,7 @@ describe('native live preflight', () => {
     expect(queryText(liveConfigCall)).toContain('maximumEntriesToBuild');
   });
 
-  it('does not fail enroll preflight when GraphQL checkResponseTimeout is seconds for a 60-minute lock', () => {
+  it('does not fail enroll preflight when GraphQL checkResponseTimeout is seconds for a 20-minute lock', () => {
     const liveUntilCutover = {
       ...VALID_RULESET,
       rules: VALID_RULESET.rules.map(rule =>
@@ -1214,7 +1214,7 @@ describe('native live preflight', () => {
     );
   });
 
-  it('reads live GraphQL checkResponseTimeout seconds as 60 minutes', async () => {
+  it('reads live GraphQL checkResponseTimeout seconds as 20 minutes', async () => {
     const runner = createNativeRunner({
       liveQueueConfiguration: {
         ...VALID_LIVE_QUEUE_CONFIGURATION,
@@ -1243,7 +1243,7 @@ describe('native live preflight', () => {
               ...rule,
               parameters: {
                 ...rule.parameters,
-                max_entries_to_build: 1,
+                max_entries_to_build: 3,
               },
             }
           : rule

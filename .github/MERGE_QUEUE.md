@@ -60,9 +60,9 @@ Checked-in source: `.github/rulesets/branch-protection.yml`.
 - Grouping strategy: `ALLGREEN`
 - Minimum entries to merge: `5` (typed cohort; GitHub waits for this size or the bounded timeout)
 - Minimum entries wait: `10` minutes (low-traffic timeout so a partial cohort can still land)
-- Maximum entries per merge: `10`
-- Maximum entries building concurrently: `3` (measured starting point after concurrent prefix waves inflated unit matrices from ~1–2 minutes to ~5–7 minutes)
-- Check response timeout: `60` minutes
+- Maximum entries per merge: `5` (synced to the live ruleset 10512119 readback on 2026-09-04, JOV-5867)
+- Maximum entries building concurrently: `1` — the live ruleset builds one combined head at a time (synced 2026-09-04, JOV-5867; do not restore the superseded 2026-08-15 three-prefix canary value)
+- Check response timeout: `20` minutes (synced to the live ruleset readback, JOV-5867)
 - Stale exact-production: `hold-intake` preserves the admitted cohort and continues isolated implementation. It must not freeze enroll of CLEAN unrelated PRs. `jovie-fleet-queue-hold/v1` is a bounded recovery selector (default 12m TTL) and must expire, succeed, or fail with a terminal reason — never sit pending.
 - Live ruleset `10512119` remains `min_entries_to_merge=1` / wait `0` until the post-merge apply. Source and preflight readback already describe the 5/10 cohort; auto-enroll stays up during that pending cutover.
 - Signed-commit and non-fast-forward rules: dormant/not applied. The checked-in
@@ -143,8 +143,8 @@ It fails closed if an open PR is missing from that authoritative snapshot.
 - Enroll live policy (JOV-5291): preflight reads GraphQL
   `mergeQueue.configuration.maximumEntriesToBuild` as live truth. Stale REST
   `max_entries_to_build` drift cannot fail `enroll` after the lock already
-  matches 3. Tell it worked: a CLEAN PR's `enroll` check stays green while
-  GraphQL reads 3.
+  matches 1. Tell it worked: a CLEAN PR's `enroll` check stays green while
+  GraphQL reads 1.
 - Front-item churn guard (JOV-5030): every native group build runs on
   `gh-readonly-queue/main/pr-<front>-<exactBaseSha>`, so recent `merge_group`
   CI runs identify which PR fronted each failed attempt and against which
