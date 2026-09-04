@@ -113,7 +113,7 @@ const RULES = /** @type {Array<[string, string, string[], RegExp]>} */ ([
 const ALL_LANES = [...PRODUCT_LANES, 'operations', 'cross-product'];
 const OPERATIONS_ONLY_PACKAGE_SCRIPTS = new Set(['invariants:check']);
 const OPERATIONS_ONLY_INVARIANT_ADDITION =
-  /^python3 scripts\/hermes\/tests\/[a-z0-9-]+\.test\.py$/;
+  /^python3 scripts\/symphony\/tests\/[a-z0-9-]+\.test\.py$/;
 
 const normalizePath = path =>
   String(path ?? '')
