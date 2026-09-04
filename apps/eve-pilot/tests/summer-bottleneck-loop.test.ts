@@ -566,6 +566,110 @@ describe('Summer bottleneck loop', () => {
     expect(heartbeat.dispatchToSymphony).toHaveBeenCalledTimes(1);
   });
 
+  it('reconciles a freshness-admitted event after a delayed heartbeat', async () => {
+    const shared = memoryStore();
+    const failed = harness(shared, {
+      dispatchToSymphony: vi.fn(async () => {
+        throw new Error('dispatch transport unavailable');
+      }),
+    });
+    await expect(
+      ingestSummerBottleneckSnapshot(snapshot(), failed.dependencies)
+    ).rejects.toThrow('dispatch transport unavailable');
+
+    const delayed = harness(shared, {
+      now: () => new Date(NOW.getTime() + 16 * 60 * 1000),
+    });
+    await expect(
+      reconcileMissedSummerBottleneckEvents(delayed.dependencies)
+    ).resolves.toEqual([
+      expect.objectContaining({ decision: 'symphony-succeeded' }),
+    ]);
+  });
+
+  it('does not strand a pending event behind more than 25 terminal events', async () => {
+    const shared = memoryStore();
+    const proof = harness(shared);
+    for (let index = 0; index < 26; index += 1) {
+      const baseline = snapshot({
+        eventId: `evt_terminal_${String(index).padStart(4, '0')}`,
+      });
+      await ingestSummerBottleneckSnapshot(
+        snapshot({
+          eventId: baseline.eventId,
+          release: {
+            blockedSince: null,
+            productionSha: SOURCE,
+            unverifiedMerges: 0,
+          },
+          ciAudit: {
+            classes: baseline.signals.ciAudit.classes.map(item => ({
+              ...item,
+              state: 'implemented',
+            })),
+          },
+        }),
+        proof.dependencies
+      );
+    }
+    const terminalPaths = [...shared.records.keys()].filter(path =>
+      path.includes('/terminal/')
+    );
+    expect(terminalPaths).toHaveLength(26);
+    shared.records.delete(terminalPaths[25]!);
+
+    await expect(
+      reconcileMissedSummerBottleneckEvents(proof.dependencies)
+    ).resolves.toEqual([
+      expect.objectContaining({ decision: 'healthy-noop', terminal: true }),
+    ]);
+  });
+
+  it('continues recovery after an earlier durable event is corrupted', async () => {
+    const shared = memoryStore();
+    const first = harness(shared, {
+      dispatchToSymphony: vi.fn(async () => {
+        throw new Error('leave first pending');
+      }),
+    });
+    await expect(
+      ingestSummerBottleneckSnapshot(
+        snapshot({ eventId: 'evt_poison_0001' }),
+        first.dependencies
+      )
+    ).rejects.toThrow();
+    const firstClaim = [...shared.records.keys()].find(path =>
+      path.includes('/claims/')
+    );
+    expect(firstClaim).toBeDefined();
+    shared.records.set(firstClaim!, { fingerprint: 'corrupted' });
+
+    const second = harness(shared, {
+      dispatchToSymphony: vi.fn(async () => {
+        throw new Error('leave second pending');
+      }),
+    });
+    await expect(
+      ingestSummerBottleneckSnapshot(
+        snapshot({
+          eventId: 'evt_poison_0002',
+          sourceVersion: 'c'.repeat(40),
+        }),
+        second.dependencies
+      )
+    ).rejects.toThrow();
+
+    const recovered = await reconcileMissedSummerBottleneckEvents(
+      harness(shared).dependencies
+    );
+    expect(recovered).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ decision: 'recovery-processing-failed' }),
+        expect.objectContaining({ decision: 'symphony-succeeded' }),
+      ])
+    );
+  });
+
   it('dispatches again on a later cadence only when source-bound state changes', async () => {
     const proof = harness();
     await ingestSummerBottleneckSnapshot(snapshot(), proof.dependencies);
