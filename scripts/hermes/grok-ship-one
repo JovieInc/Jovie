@@ -4,6 +4,7 @@
 set -euo pipefail
 
 ID="${1:?issue identifier required}"
+ADMITTED_AT="$(date -u +%FT%TZ)"
 case "$ID" in
   JOV-[0-9]*) TEAM=JOV; REPO=JovieInc/Jovie ;;
   LYB-[0-9]*) TEAM=LYB; REPO=JovieInc/LogYourBody ;;
@@ -133,6 +134,8 @@ ORIGINAL_STATE_ID="$(json_value original_state_id)"
 ORIGINAL_STATE_NAME="$(json_value original_state_name)"
 IN_PROGRESS_STATE_ID="$(json_value in_progress_state_id)"
 IN_REVIEW_STATE_ID="$(json_value in_review_state_id)"
+TODO_STATE_ID="$(json_value todo_state_id)"
+OWNER_ID="$(json_value owner_id)"
 ISSUE_REVISION="$(json_value issue_revision)"
 if [ "$ISSUE_REVISION" != "$SYMPHONY_FALLBACK_ISSUE_REVISION" ]; then
   echo "issue revision changed before lease acquisition" >&2
@@ -268,11 +271,31 @@ if payload.get("errors") or not ((payload.get("data") or {}).get("issueUpdate") 
 PY
 }
 
-changed_state=0
 original_state_lower="$(printf '%s' "$ORIGINAL_STATE_NAME" | tr '[:upper:]' '[:lower:]')"
 if [ "$original_state_lower" != "in progress" ]; then
   update_state "$IN_PROGRESS_STATE_ID"
-  changed_state=1
+fi
+
+# Capture the revision after this unit owns the claim. Compensation compares
+# against this exact revision, not the pre-transition snapshot.
+if CLAIM_META="$(symphony-codex-exhausted check-admission "$ID" 2>/dev/null)"; then
+  META="$CLAIM_META"
+else
+  echo "claimed issue could not be re-read" >&2
+  exit 2
+fi
+CLAIM_REVISION="$(json_value issue_revision)"
+CLAIM_STATE_ID="$(json_value original_state_id)"
+CLAIM_STATE_NAME="$(json_value original_state_name)"
+CLAIM_OWNER_ID="$(json_value owner_id)"
+if [ -z "$CLAIM_OWNER_ID" ]; then
+  CLAIM_OWNER_ID="$OWNER_ID"
+fi
+SAFE_STATE_ID="$ORIGINAL_STATE_ID"
+SAFE_STATE_NAME="$ORIGINAL_STATE_NAME"
+if [ "$original_state_lower" = "in progress" ]; then
+  SAFE_STATE_ID="$TODO_STATE_ID"
+  SAFE_STATE_NAME="Todo"
 fi
 
 if [ "$REMOUNT" = 1 ]; then
@@ -307,16 +330,22 @@ Do not merge, deploy, or bypass writer-owned promotion. If blocked, write BLOCKE
 fi
 
 RECEIPT="$RECEIPT_DIR/$ID.json"
-RECEIPT_PATH="$RECEIPT" RECEIPT_ID="$ID" RECEIPT_ISSUE_REVISION="$ISSUE_REVISION" \
+RECEIPT_PATH="$RECEIPT" RECEIPT_ID="$ID" RECEIPT_ISSUE_UUID="$ISSUE_UUID" \
+RECEIPT_ADMISSION_REVISION="$ISSUE_REVISION" RECEIPT_ISSUE_REVISION="$CLAIM_REVISION" \
 RECEIPT_BUNDLE_REVISION="$SYMPHONY_FALLBACK_BUNDLE_REVISION" RECEIPT_SELECTION="$SELECTION_JSON" \
-RECEIPT_BASE_REVISION="$(git -C "$WS" rev-parse HEAD)" RECEIPT_UNIT="$SYMPHONY_FALLBACK_UNIT" python3 - <<'PY'
+RECEIPT_BASE_REVISION="$(git -C "$WS" rev-parse HEAD)" RECEIPT_UNIT="$SYMPHONY_FALLBACK_UNIT" \
+RECEIPT_OWNER_ID="$CLAIM_OWNER_ID" RECEIPT_ORIGINAL_STATE_ID="$ORIGINAL_STATE_ID" \
+RECEIPT_ORIGINAL_STATE_NAME="$ORIGINAL_STATE_NAME" RECEIPT_CLAIM_STATE_ID="$CLAIM_STATE_ID" \
+RECEIPT_CLAIM_STATE_NAME="$CLAIM_STATE_NAME" RECEIPT_SAFE_STATE_ID="$SAFE_STATE_ID" \
+RECEIPT_SAFE_STATE_NAME="$SAFE_STATE_NAME" RECEIPT_ADMITTED_AT="$ADMITTED_AT" python3 - <<'PY'
 import hashlib, json, os, pathlib, re, tempfile, time
 selection = json.loads(os.environ["RECEIPT_SELECTION"])["selected"]
 identifier = os.environ["RECEIPT_ID"]
 issue_revision = os.environ["RECEIPT_ISSUE_REVISION"]
+admission_revision = os.environ["RECEIPT_ADMISSION_REVISION"]
 base_revision = os.environ["RECEIPT_BASE_REVISION"]
 bundle_revision = os.environ["RECEIPT_BUNDLE_REVISION"]
-expected_unit = f"fallback-ship-{identifier}-{hashlib.sha256(issue_revision.encode()).hexdigest()[:12]}"
+expected_unit = f"fallback-ship-{identifier}-{hashlib.sha256(admission_revision.encode()).hexdigest()[:12]}"
 if (
     not re.fullmatch(r"[0-9a-f]{40}", base_revision)
     or not re.fullmatch(r"[0-9a-f]{64}", bundle_revision)
@@ -324,9 +353,13 @@ if (
 ):
     raise SystemExit("fallback provenance is invalid")
 payload = {
-    "schema": "symphony-fallback-lease/v1",
+    "schema": "symphony-fallback-lease/v2",
     "observedAt": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
+    "admittedAt": os.environ["RECEIPT_ADMITTED_AT"],
+    "startedAt": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
     "identifier": identifier,
+    "issueId": os.environ["RECEIPT_ISSUE_UUID"],
+    "admissionRevision": admission_revision,
     "issueRevision": issue_revision,
     "baseRevision": base_revision,
     "bundleRevision": bundle_revision,
@@ -334,6 +367,11 @@ payload = {
     "provider": selection["provider"],
     "model": selection["model"],
     "modelId": selection["id"],
+    "ownerId": os.environ.get("RECEIPT_OWNER_ID") or None,
+    "originalState": {"id": os.environ["RECEIPT_ORIGINAL_STATE_ID"], "name": os.environ["RECEIPT_ORIGINAL_STATE_NAME"]},
+    "claimState": {"id": os.environ["RECEIPT_CLAIM_STATE_ID"], "name": os.environ["RECEIPT_CLAIM_STATE_NAME"]},
+    "safeState": {"id": os.environ.get("RECEIPT_SAFE_STATE_ID") or None, "name": os.environ.get("RECEIPT_SAFE_STATE_NAME") or None},
+    "heartbeat": {"phase": "agent_start", "observedAt": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime())},
     "ownership": "isolated-implementation-only",
     "forbidden": ["merge", "deploy", "direct-ready", "direct-auto-merge-without-proof", "remove-queue-deferred"],
 }
@@ -350,6 +388,35 @@ finally:
     if os.path.exists(temporary):
         os.unlink(temporary)
 PY
+
+write_terminal_outcome() { # write_terminal_outcome <category> <exit-code> [pr-number]
+  OUTCOME_CATEGORY="$1" OUTCOME_EXIT_CODE="$2" OUTCOME_PR_NUMBER="${3:-}" \
+  OUTCOME_DIR="$RECEIPT_DIR" OUTCOME_ID="$ID" OUTCOME_REVISION="$CLAIM_REVISION" \
+  OUTCOME_PROVIDER="$(python3 -c 'import json,sys; print(json.loads(sys.argv[1])["selected"]["provider"])' "$SELECTION_JSON")" \
+  OUTCOME_MODEL_ID="$(python3 -c 'import json,sys; print(json.loads(sys.argv[1])["selected"]["id"])' "$SELECTION_JSON")" \
+  python3 - <<'PY'
+import hashlib, json, os, pathlib, tempfile, time
+suffix = hashlib.sha256(os.environ["OUTCOME_REVISION"].encode()).hexdigest()[:12]
+path = pathlib.Path(os.environ["OUTCOME_DIR"]) / f'{os.environ["OUTCOME_ID"]}-{suffix}.outcome.json'
+payload = {
+    "schema": "symphony-fallback-outcome/v1",
+    "category": os.environ["OUTCOME_CATEGORY"],
+    "exitCode": int(os.environ["OUTCOME_EXIT_CODE"]),
+    "provider": os.environ["OUTCOME_PROVIDER"],
+    "modelId": os.environ["OUTCOME_MODEL_ID"],
+    "prNumber": int(os.environ["OUTCOME_PR_NUMBER"]) if os.environ.get("OUTCOME_PR_NUMBER") else None,
+    "observedAt": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
+}
+fd, temporary = tempfile.mkstemp(prefix=f".{path.name}.", dir=path.parent)
+try:
+    with os.fdopen(fd, "w") as handle:
+        json.dump(payload, handle, indent=2, sort_keys=True); handle.write("\n")
+        handle.flush(); os.fsync(handle.fileno())
+    os.replace(temporary, path)
+finally:
+    if os.path.exists(temporary): os.unlink(temporary)
+PY
+}
 
 if [ "$CHANGELOG_ONLY_REMOUNT" = 1 ]; then
   merge_state="$(printf '%s' "$EXISTING_MERGE_STATE" | tr '[:lower:]' '[:upper:]')"
@@ -466,6 +533,7 @@ if [ "$pr_count" -gt 0 ]; then
     echo "PR exists but number could not be proven" >&2
     exit 2
   fi
+  write_terminal_outcome success_pr_open "$rc" "$pr_number"
 
   read_pr_promotion_state() {
     local owner="${REPO%%/*}"
@@ -536,18 +604,24 @@ if [ "$pr_count" -gt 0 ]; then
       verified=false
     fi
     upsert_promotion_blocker "post-agent" "$promotion_reason" true "$verified" "$restored_state"
+    write_terminal_outcome promotion_blocked 2 "$pr_number"
     echo "END $ID rc=2 pr=open promotion=compensated reason=$promotion_reason $(date -u +%FT%TZ)" | tee -a "$LOG"
     exit 2
   fi
 
   upsert_promotion_blocker "post-agent" "writer-owned-promotion-missing:${promotion_reason}" false false "$promotion_state"
+  write_terminal_outcome promotion_blocked 2 "$pr_number"
   echo "END $ID rc=2 pr=open promotion=blocked reason=$promotion_reason $(date -u +%FT%TZ)" | tee -a "$LOG"
   exit 2
 fi
 
-if [ "$changed_state" -eq 1 ] && [ -n "$ORIGINAL_STATE_ID" ]; then
-  update_state "$ORIGINAL_STATE_ID"
+provider="$(python3 -c 'import json,sys; print(json.loads(sys.argv[1])["selected"]["provider"])' "$SELECTION_JSON")"
+if [ "$provider" = "kimi" ] && grep -Eiq '(403.{0,120}(weekly|usage|limit)|(weekly|usage limit).{0,120}403)' "$attempt_log"; then
+  terminal_category=provider_exhausted
+else
+  terminal_category=agent_failed_no_pr
 fi
-echo "END $ID rc=$rc pr=missing state=restored $(date -u +%FT%TZ)" | tee -a "$LOG"
+write_terminal_outcome "$terminal_category" "$rc"
+echo "END $ID rc=$rc pr=missing state=terminal_pending $(date -u +%FT%TZ)" | tee -a "$LOG"
 [ "$rc" -ne 0 ] && exit "$rc"
 exit 2

@@ -186,6 +186,36 @@ describe('official Symphony backlog remediation', () => {
     }
   });
 
+  it('honors an explicit engineering implementation admission while unresolved founder decisions remain blocked', () => {
+    const approvedDescription = `Admission classification — engineering implementation.
+
+Admission class: engineering-implementation
+
+The sole remaining blocker is executable implementation/delivery proof. The preview-exception contract is fixed; earlier founder steering is resolved.
+
+${SAFE_DESCRIPTION}`;
+    const approved = classifyRemediationCandidate(
+      issue('JOV-5995', {
+        title: 'Admission classification — engineering implementation',
+        description: approvedDescription,
+      }),
+      { now: NOW }
+    );
+    assert.equal(approved.selected, true);
+    assert.equal(approved.reason, 'bounded-isolated-code-shippable');
+
+    const unresolved = classifyRemediationCandidate(
+      issue('JOV-5996', {
+        title: 'Admission classification — engineering implementation',
+        description: approvedDescription,
+        labels: ['needs-decision'],
+      }),
+      { now: NOW }
+    );
+    assert.equal(unresolved.selected, false);
+    assert.equal(unresolved.reason, 'human-taste-or-steering');
+  });
+
   it('selects only bounded isolated issues and refuses overlapping ownership in a wave', () => {
     const independent = issue('JOV-32', {
       description: SAFE_DESCRIPTION.replace(

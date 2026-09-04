@@ -94,8 +94,14 @@ RUNTIME_NAMES = (
     "cursor-agent-std",
     "model-router.py",
     "model-registry.json",
+    "symphony-fallback-finalize.py",
 )
-LAUNCHER_NAMES = (*LEGACY_RUNTIME_NAMES, "grok-ship-one", "cursor-agent-std")
+LAUNCHER_NAMES = (
+    *LEGACY_RUNTIME_NAMES,
+    "grok-ship-one",
+    "cursor-agent-std",
+    "symphony-fallback-finalize.py",
+)
 # Labels are derived audit evidence, never independent admission blockers.
 # The machine-written admission-gate/v1 receipt is the source of truth.
 REQUIRED_ADMISSION_LABELS = frozenset()
@@ -171,6 +177,7 @@ query($id: String!) {
   issue(id: $id) {
     id identifier title description url updatedAt
     state { id name }
+    assignee { id }
     team { key states { nodes { id name } } }
     labels { nodes { name } }
     comments { nodes { body } }
@@ -1303,6 +1310,10 @@ def _issue_meta(
         "original_state_name": state.get("name") or "",
         "in_progress_state_id": states["in progress"],
         "in_review_state_id": states["in review"],
+        "todo_state_id": states.get("todo", ""),
+        "owner_id": (issue.get("assignee") or {}).get("id")
+        if isinstance(issue.get("assignee"), dict)
+        else None,
         "issue_revision": issue_revision,
     }
     return True, "admitted", meta
@@ -2177,9 +2188,11 @@ def _grok_command(
     grok_exe = _grok_executable() or str(pathlib.Path.home() / ".local/bin/grok")
     kimi_exe = _kimi_executable() or str(pathlib.Path.home() / ".local/bin/kimi")
     provider = _selection_provider(selection) or "grok"
+    finalizer = str(pathlib.Path(executable).with_name("symphony-fallback-finalize.py"))
     return [
         "systemd-run", "--user", f"--unit={unit}", "--collect",
         "-p", "Type=exec", "-p", f"Environment=PATH={pathlib.Path.home()}/.local/bin:{pathlib.Path.home()}/.npm-global/bin:/usr/local/bin:/usr/bin:/bin",
+        "-p", f"ExecStopPost={finalizer} {identifier}",
         "-p", "Environment=AUTOMATION_VERIFY_MAX_WORKERS=4",
         "-p", "Environment=AUTOMATION_VERIFY_SHARD_CONCURRENCY=2",
         "-p", f"Environment=GEM_GROK_EXECUTABLE={grok_exe}",
@@ -2580,7 +2593,16 @@ def _artifacts() -> dict[str, pathlib.Path]:
     if not registry.is_file():
         registry = root / "config" / "model-registry.json"
     return {
-        **{name: root / name for name in (*LEGACY_RUNTIME_NAMES, "grok-ship-one", "cursor-agent-std", "model-router.py")},
+        **{
+            name: root / name
+            for name in (
+                *LEGACY_RUNTIME_NAMES,
+                "grok-ship-one",
+                "cursor-agent-std",
+                "model-router.py",
+                "symphony-fallback-finalize.py",
+            )
+        },
         "model-registry.json": registry,
     }
 

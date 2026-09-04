@@ -61,6 +61,8 @@ class RegistryTests(unittest.TestCase):
                 model["probe_argv"],
                 ["{executable}", "provider", "list", "--json"],
             )
+            self.assertTrue(model["useful_probe_argv"])
+            self.assertEqual(model["useful_probe_marker"], "KIMI_USEFUL_READY")
 
     def test_remediation_rejects_executor_without_isolated_cwd(self):
         with tempfile.TemporaryDirectory() as td:
@@ -247,6 +249,79 @@ class RegistryTests(unittest.TestCase):
             reasons = {item["id"]: item.get("reason") for item in document["candidates"]}
             self.assertEqual(reasons["cursor-grok-4.6"], "pool_exhausted")
             self.assertEqual(reasons["grok-4.6"], "pool_exhausted")
+
+    def test_kimi_pool_recovers_only_after_a_useful_turn(self):
+        with tempfile.TemporaryDirectory() as td:
+            root = pathlib.Path(td)
+            kimi = self._ready(
+                root,
+                "kimi",
+                "if [ \"${1:-}\" = provider ]; then\n"
+                "  printf '%s\\n' '{\"providers\":{\"managed:kimi-code\":{}},\"models\":{\"kimi-code/k3\":{}}}'\n"
+                "else\n"
+                "  echo KIMI_USEFUL_READY\n"
+                "fi\n",
+            )
+            state_path = root / "state.json"
+            state_path.write_text(
+                json.dumps(
+                    {
+                        "pools": {
+                            "kimi": {
+                                "exhausted_until": 0,
+                                "recovery_required": True,
+                                "last_failure": "weekly_http_403",
+                                "uses": 0,
+                            }
+                        }
+                    }
+                )
+            )
+            result = self.run_router(
+                "choose",
+                "--workflow",
+                "remediation",
+                "--capability",
+                "mechanical",
+                "--include-id",
+                "kimi-k3",
+                env={
+                    "GEM_MODEL_ROUTER_STATE": str(state_path),
+                    "GEM_KIMI_EXECUTABLE": str(kimi),
+                },
+            )
+            self.assertEqual(json.loads(result.stdout)["selected"]["id"], "kimi-k3")
+            state = json.loads(state_path.read_text())
+            self.assertFalse(state["pools"]["kimi"]["recovery_required"])
+            self.assertEqual(state["pools"]["kimi"]["recovery_proof"], "useful_turn")
+
+    def test_generic_kimi_probe_cannot_clear_recovery_required(self):
+        with tempfile.TemporaryDirectory() as td:
+            root = pathlib.Path(td)
+            kimi = self._kimi_ready(root)
+            state_path = root / "state.json"
+            state_path.write_text(
+                json.dumps(
+                    {
+                        "pools": {
+                            "kimi": {
+                                "exhausted_until": 0,
+                                "recovery_required": True,
+                                "uses": 0,
+                            }
+                        }
+                    }
+                )
+            )
+            self.run_router(
+                "probe",
+                env={
+                    "GEM_MODEL_ROUTER_STATE": str(state_path),
+                    "GEM_KIMI_EXECUTABLE": str(kimi),
+                },
+            )
+            state = json.loads(state_path.read_text())
+            self.assertTrue(state["pools"]["kimi"]["recovery_required"])
 
     def test_same_quality_pools_load_balance_toward_the_lesser_used(self):
         with tempfile.TemporaryDirectory() as td:

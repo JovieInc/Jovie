@@ -43,6 +43,7 @@ MODEL_REGISTRY_SRC="$REPO_ROOT/scripts/hermes/config/model-registry.json"
 CAPABILITY_MANIFEST_SRC="$REPO_ROOT/scripts/hermes/config/symphony-reconciler-capabilities.json"
 RECONCILER_SERVICE_SRC="$REPO_ROOT/scripts/hermes/systemd/symphony-reconciler.service"
 RECONCILER_TIMER_SRC="$REPO_ROOT/scripts/hermes/systemd/symphony-reconciler.timer"
+TIMER_LIVENESS_SRC="$REPO_ROOT/scripts/hermes/verify-systemd-timer-cadence.py"
 DISK_RECLAIM_SRC="$REPO_ROOT/scripts/hermes/gem-disk-reclaim.py"
 DISK_RECLAIM_SERVICE_SRC="$REPO_ROOT/scripts/hermes/systemd/gem-disk-reclaim.service"
 DISK_RECLAIM_TIMER_SRC="$REPO_ROOT/scripts/hermes/systemd/gem-disk-reclaim.timer"
@@ -59,6 +60,7 @@ CAPABILITY_MANIFEST_DST="$TARGET_HOME/.local/lib/symphony-reconciler/symphony-re
 RUNTIME_RECEIPT_DST="$TARGET_HOME/.local/lib/symphony-reconciler/runtime-receipt.json"
 RECONCILER_SERVICE_DST="$TARGET_HOME/.config/systemd/user/symphony-reconciler.service"
 RECONCILER_TIMER_DST="$TARGET_HOME/.config/systemd/user/symphony-reconciler.timer"
+TIMER_LIVENESS_DST="$TARGET_HOME/.local/bin/verify-systemd-timer-cadence"
 DISK_RECLAIM_DST="$TARGET_HOME/.local/bin/gem-disk-reclaim"
 DISK_RECLAIM_SERVICE_DST="$TARGET_HOME/.config/systemd/user/gem-disk-reclaim.service"
 DISK_RECLAIM_TIMER_DST="$TARGET_HOME/.config/systemd/user/gem-disk-reclaim.timer"
@@ -140,6 +142,7 @@ if [ "$CHECK_ONLY" -eq 1 ]; then
     check_one "$CAPABILITY_MANIFEST_SRC" "$CAPABILITY_MANIFEST_DST" || rc=1
     check_one "$RECONCILER_SERVICE_SRC" "$RECONCILER_SERVICE_DST" || rc=1
     check_one "$RECONCILER_TIMER_SRC" "$RECONCILER_TIMER_DST" || rc=1
+    check_one "$TIMER_LIVENESS_SRC" "$TIMER_LIVENESS_DST" || rc=1
     check_one "$DISK_RECLAIM_SRC" "$DISK_RECLAIM_DST" || rc=1
     check_one "$DISK_RECLAIM_SERVICE_SRC" "$DISK_RECLAIM_SERVICE_DST" || rc=1
     check_one "$DISK_RECLAIM_TIMER_SRC" "$DISK_RECLAIM_TIMER_DST" || rc=1
@@ -183,6 +186,7 @@ if [ "$LEASE_GUARD_ONLY" -eq 0 ]; then
   echo "INSTALLED $RUNTIME_RECEIPT_DST"
   install_one "$RECONCILER_SERVICE_SRC" "$RECONCILER_SERVICE_DST"
   install_one "$RECONCILER_TIMER_SRC" "$RECONCILER_TIMER_DST"
+  install_one "$TIMER_LIVENESS_SRC" "$TIMER_LIVENESS_DST" 0755
   install_one "$DISK_RECLAIM_SERVICE_SRC" "$DISK_RECLAIM_SERVICE_DST"
   install_one "$DISK_RECLAIM_TIMER_SRC" "$DISK_RECLAIM_TIMER_DST"
   install_one "$CONTROLLER_SRC" "$CONTROLLER_DST" 0755
@@ -202,6 +206,13 @@ if [ "$DAEMON_RELOAD" -eq 1 ]; then
     # Timers only. Do not start/stop/restart the healthy main service.
     systemctl --user enable --now symphony-reconciler.timer
     echo "TIMER_ENABLED symphony-reconciler.timer"
+    "$TIMER_LIVENESS_DST" \
+      symphony-reconciler.timer \
+      --service symphony-reconciler.service \
+      --unit-file "$RECONCILER_TIMER_DST" \
+      --observe-cycles "${SYMPHONY_RECONCILER_PROOF_CYCLES:-2}" \
+      --poll-seconds "${SYMPHONY_RECONCILER_PROOF_POLL_SECONDS:-5}"
+    echo "TIMER_CADENCE_PROVEN symphony-reconciler.timer"
     systemctl --user enable --now gem-disk-reclaim.timer
     echo "TIMER_ENABLED gem-disk-reclaim.timer"
     systemctl --user enable --now symphony-concurrency-controller.timer
