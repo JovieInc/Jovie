@@ -1,0 +1,16 @@
+[Unit]
+Description=Gem bounded PR rehabilitation across allowlisted repositories
+After=network-online.target
+
+[Service]
+Type=oneshot
+WorkingDirectory=%h/gem-workspace
+Environment=HOME=%h
+Environment=GEM_WORKSPACE=%h/gem-workspace
+Environment=GEM_REPO_REGISTRY=%h/gem-workspace/config/gem-repo-registry.json
+Environment=GEM_MODEL_ROUTER=%h/gem-workspace/scripts/model-router.py
+Environment=GEM_MODEL_REGISTRY=%h/gem-workspace/config/model-registry.json
+Environment=GEM_GROK_EXECUTABLE=%h/.grok/bin/grok
+Environment=GEM_MODEL_PROBE_EXECUTABLE_TIMEOUT=5
+Environment=GEM_MODEL_PROBE_TOTAL_TIMEOUT=15
+ExecStart=/usr/bin/flock -n /tmp/gem-pr-drain.lock /usr/bin/python3 %h/gem-workspace/scripts/gem-repo-drain-cycle.py
