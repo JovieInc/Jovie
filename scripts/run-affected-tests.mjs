@@ -135,12 +135,49 @@ const isHomepageSystemBGuardInput = file =>
   file.startsWith('apps/web/components/features/home/') ||
   file.startsWith('apps/web/components/marketing/homepage-v2/') ||
   HOMEPAGE_SYSTEM_B_GUARD_EXACT_INPUTS.has(file);
+const APP_SCREEN_CANVAS_GUARD_TESTS = [
+  'apps/web/tests/unit/design-system/app-screen-canvas-manifest.test.ts',
+];
+const APP_SCREEN_CANVAS_EXACT_INPUTS = new Set([
+  'apps/web/tests/unit/design-system/app-screen-canvas-source-guard.ts',
+]);
+const isAppScreenCanvasGuardInput = file =>
+  APP_SCREEN_CANVAS_EXACT_INPUTS.has(file) ||
+  file.startsWith('apps/web/app/app/(shell)/') ||
+  file.startsWith('apps/web/components/') ||
+  file.startsWith('apps/web/data/appScreens/');
 const AFFECTED_TEST_SELECTOR_MANIFEST = new Set([
   'scripts/run-affected-tests.mjs',
   'scripts/lib/__tests__/automation-verify.test.mjs',
 ]);
 const AFFECTED_TEST_SELECTOR_TESTS = [
   'scripts/lib/__tests__/automation-verify.test.mjs',
+];
+const SUMMER_COMMISSIONING_PRIMARY_INPUTS = new Set([
+  'docs/operations/SUMMER_COMMISSIONING.md',
+  'docs/operations/SUMMER_PRODUCT_QUALITY_GOVERNOR.md',
+  'docs/operations/evidence/summer-mac-production-dogfood-2026-09-01.json',
+  'scripts/summer-commissioning/canonical-registry.test.mjs',
+  'scripts/summer-commissioning/commissioning.mjs',
+  'scripts/summer-commissioning/commissioning.test.mjs',
+  'scripts/summer-commissioning/contracts.mjs',
+  'scripts/summer-commissioning/contracts.test.mjs',
+  'scripts/summer-commissioning/product-quality-governor.mjs',
+  'scripts/summer-commissioning/product-quality-governor.test.mjs',
+  'scripts/summer-commissioning/receipt-trust.mjs',
+  'scripts/summer-commissioning/receipt-trust.test.mjs',
+  'scripts/summer-commissioning/registry.json',
+]);
+const SUMMER_COMMISSIONING_LANE = new Set([
+  ...SUMMER_COMMISSIONING_PRIMARY_INPUTS,
+  ...AFFECTED_TEST_SELECTOR_MANIFEST,
+]);
+const SUMMER_COMMISSIONING_NODE_TESTS = [
+  'scripts/summer-commissioning/canonical-registry.test.mjs',
+  'scripts/summer-commissioning/commissioning.test.mjs',
+  'scripts/summer-commissioning/contracts.test.mjs',
+  'scripts/summer-commissioning/product-quality-governor.test.mjs',
+  'scripts/summer-commissioning/receipt-trust.test.mjs',
 ];
 const SENTRY_AUTOFIX_RECURRENCE_PRIMARY_INPUTS = new Set([
   '.github/workflows/sentry-autofix-recurrence.yml',
@@ -241,12 +278,14 @@ const EVENT_DRIVEN_SHIPPER_MANIFEST = new Set([
 ]);
 const CI_CONTROL_SCRIPT_TESTS = [
   'scripts/lib/__tests__/automation-verify.test.mjs',
+  'scripts/lib/__tests__/pr-visual-capture-path.test.mjs',
   'scripts/lib/__tests__/pr-visual-review.test.mjs',
   'scripts/lib/__tests__/ci-harness.test.mjs',
   'scripts/lib/__tests__/ci-duration-ratchet.test.mjs',
   'scripts/lib/__tests__/ci-branching-guard.test.mjs',
   'scripts/lib/__tests__/merge-queue-guard.test.mjs',
   'scripts/lib/__tests__/pre-land-changelog.test.mjs',
+  'scripts/lib/__tests__/ownerless-recovery-policy.test.mjs',
   'scripts/lib/__tests__/ci-metrics-compute.test.mjs',
   'scripts/lib/__tests__/auto-ready-agent-drafts.test.mjs',
   'scripts/lib/__tests__/eval-main-health-action.test.mjs',
@@ -339,7 +378,11 @@ const MERGE_QUEUE_CONTROLLER_INPUTS = new Set([
   'scripts/lib/__tests__/merge-queue-guard.test.mjs',
   'scripts/lib/__tests__/pre-land-changelog.test.mjs',
   'scripts/lib/__tests__/pr-check-failures.test.mjs',
+  'scripts/lib/ownerless-recovery-policy.mjs',
+  'scripts/lib/pr-check-failures.mjs',
+  'scripts/lib/upsert-pr-comment.sh',
   'scripts/merge-queue-backend.mjs',
+  'scripts/ownerless-recovery-sweeper.mjs',
   'scripts/tests/test_gh_retry.py',
 ]);
 const MERGE_QUEUE_CONTROLLER_SCRIPT_TESTS = [
@@ -348,6 +391,7 @@ const MERGE_QUEUE_CONTROLLER_SCRIPT_TESTS = [
   'scripts/lib/__tests__/merge-group-workflow-contract.test.mjs',
   'scripts/lib/__tests__/merge-queue-backend.test.mjs',
   'scripts/lib/__tests__/merge-queue-guard.test.mjs',
+  'scripts/lib/__tests__/ownerless-recovery-policy.test.mjs',
   'scripts/lib/__tests__/pre-land-changelog.test.mjs',
   'scripts/lib/__tests__/pr-check-failures.test.mjs',
 ];
@@ -517,8 +561,10 @@ const GEM_PR_REHABILITATION_PYTEST_TESTS = [
 ];
 const GEM_CHECKIN_HUD_PRIMARY_INPUTS = new Set([
   'scripts/hermes/symphony/WORKFLOW.md',
+  'scripts/hermes/symphony_official_runtime.py',
   'scripts/hermes/gem-checkin-hud.py',
   'scripts/hermes/gem-checkin-tty1.sh',
+  'scripts/hermes/systemd/symphony-elixir.service',
   'scripts/hermes/systemd/symphony-burrito.service',
   'scripts/hermes/systemd/symphony-burrito-update.service',
   'scripts/hermes/systemd/symphony-burrito-update.timer',
@@ -889,6 +935,25 @@ export function buildAffectedTestPlan(
 ) {
   const files = unique(changedFiles.filter(Boolean)).sort();
   if (files.some(file => GLOBAL_TEST_INPUTS.has(file))) {
+    return { mode: 'full', relatedFiles: [], mandatoryTests: [] };
+  }
+  const isBoundedSummerCommissioningChange =
+    files.some(file => SUMMER_COMMISSIONING_PRIMARY_INPUTS.has(file)) &&
+    files.every(file => SUMMER_COMMISSIONING_LANE.has(file));
+  if (isBoundedSummerCommissioningChange) {
+    return {
+      mode: 'selected',
+      relatedFiles: [],
+      mandatoryTests: [],
+      selectedTests: [],
+      rootVitestTests: [],
+      pythonTests: [],
+      pythonUnittestTests: [],
+      scriptVitestTests: AFFECTED_TEST_SELECTOR_TESTS,
+      nodeTests: SUMMER_COMMISSIONING_NODE_TESTS,
+    };
+  }
+  if (files.some(file => SUMMER_COMMISSIONING_PRIMARY_INPUTS.has(file))) {
     return { mode: 'full', relatedFiles: [], mandatoryTests: [] };
   }
   const isBoundedBacklogRemediationChange =
@@ -1430,6 +1495,10 @@ export function buildAffectedTestPlan(
   if (hasHomepageSystemBGuardInput) {
     mandatoryTests.push(...HOMEPAGE_SYSTEM_B_STYLE_GUARD_TESTS);
   }
+  const hasAppScreenCanvasGuardInput = files.some(isAppScreenCanvasGuardInput);
+  if (hasAppScreenCanvasGuardInput) {
+    mandatoryTests.push(...APP_SCREEN_CANVAS_GUARD_TESTS);
+  }
   if (
     files.some(file =>
       file.startsWith('apps/web/eslint-rules/canonical-ui-label-casing')
@@ -1493,6 +1562,9 @@ export function buildAffectedTestPlan(
   ]);
   const pythonUnittestTests = unique([
     ...(isExactEventDrivenShipper ? EVENT_DRIVEN_SHIPPER_PYTHON_TESTS : []),
+    ...(files.some(file => file.includes('symphony-codex-account-control'))
+      ? ['scripts/hermes/tests/codex-account-probe.test.py']
+      : []),
   ]);
   const scriptVitestTests = unique([
     ...(isExactEventDrivenShipper ? EVENT_DRIVEN_SHIPPER_SCRIPT_TESTS : []),
@@ -1542,6 +1614,11 @@ export function buildAffectedTestPlan(
     if (file.startsWith('apps/web/components/')) return true;
     if (file.startsWith('apps/web/app/')) return true;
     if (file.startsWith('packages/ui/')) return true;
+    if (
+      APP_SCREEN_CANVAS_EXACT_INPUTS.has(file) ||
+      file.startsWith('apps/web/data/appScreens/')
+    )
+      return true;
     // The route matrix is test infrastructure: it is imported by the
     // targeted route-coverage tests and is not product source that warrants
     // escalating every ordinary route-contract change to a full web suite.
@@ -1797,6 +1874,7 @@ export function buildAffectedTestPlan(
           (relatedFiles.length > 0 ||
             hasCiCancellationHealerChange ||
             hasHomepageSystemBGuardInput ||
+            hasAppScreenCanvasGuardInput ||
             isExactPrerequisiteTrain ||
             isExactVercelCongestionControl ||
             isExactAffectedTestSelector ||

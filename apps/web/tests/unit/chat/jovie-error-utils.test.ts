@@ -9,6 +9,7 @@ import {
   messagePartsIncludeFailedTool,
   shouldSuppressChatPauseForToolFailure,
 } from '@/components/jovie/utils';
+import { GATEWAY_BUDGET_EXCEEDED_USER_MESSAGE } from '@/lib/ai/gateway-errors';
 
 describe('extractErrorMetadata', () => {
   it('infers AUTH_REQUIRED from a 401 Unauthorized JSON body', () => {
@@ -68,7 +69,7 @@ describe('extractErrorMetadata', () => {
 
   it('extracts metadata from prefixed JSON error messages', () => {
     const err = new Error(
-      'Error: {"error":"Rate limit exceeded","message":"You have reached your daily AI message limit. Upgrade to Pro for 100 messages per day.","errorCode":"RATE_LIMITED","retryAfter":3600,"requestId":"req_rate_limit"}'
+      'Error: {"error":"Rate limit exceeded","message":"You have reached your weekly AI message limit. Upgrade to Pro for 70 messages per week.","errorCode":"RATE_LIMITED","retryAfter":3600,"requestId":"req_rate_limit"}'
     );
 
     expect(extractErrorMetadata(err)).toEqual({
@@ -76,7 +77,7 @@ describe('extractErrorMetadata', () => {
       errorCode: 'RATE_LIMITED',
       requestId: 'req_rate_limit',
       message:
-        'You have reached your daily AI message limit. Upgrade to Pro for 100 messages per day.',
+        'You have reached your weekly AI message limit. Upgrade to Pro for 70 messages per week.',
     });
   });
 });
@@ -131,6 +132,20 @@ describe('getPreferredErrorMessage', () => {
 
     expect(getPreferredErrorMessage(error, 'server', {})).toBe(
       'Service is temporarily unavailable.'
+    );
+  });
+
+  it('does not leak a gateway budget wall to the chat user', () => {
+    const error = Object.assign(
+      new Error(
+        'API key budget exceeded. Current spend: $1.05, limit: $1.00. Please contact your administrator to increase the budget.'
+      ),
+      { name: 'GatewayInternalServerError' }
+    );
+
+    expect(getErrorType(error)).toBe('server');
+    expect(getPreferredErrorMessage(error, 'server', {})).toBe(
+      GATEWAY_BUDGET_EXCEEDED_USER_MESSAGE
     );
   });
 });

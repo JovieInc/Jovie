@@ -6,6 +6,51 @@ import UIKit
 @testable import Jovie
 
 struct VoiceCaptureServiceTests {
+  @Test func captureFormatGuardRejectsSilentInputNode() {
+    typealias Config = VoiceCaptureRecognitionConfig
+    #expect(!Config.isUsableCaptureFormat(sampleRate: 0, channelCount: 1))
+    #expect(!Config.isUsableCaptureFormat(sampleRate: 48_000, channelCount: 0))
+    #expect(Config.isUsableCaptureFormat(sampleRate: 48_000, channelCount: 1))
+  }
+
+  @Test func recognizerFailuresMapToPlainLanguageAndIgnoreOurOwnCancellation() {
+    let domain = VoiceCaptureFailureMessage.assistantDomain
+    #expect(VoiceCaptureFailureMessage.message(domain: domain, code: 216) == nil)
+    #expect(VoiceCaptureFailureMessage.message(domain: domain, code: 209) == nil)
+    #expect(
+      VoiceCaptureFailureMessage.message(domain: domain, code: 1110)
+        == VoiceCaptureFailureMessage.nothingHeardMessage
+    )
+    #expect(
+      VoiceCaptureFailureMessage.message(domain: domain, code: 1101)
+        == VoiceCaptureFailureMessage.onDeviceNotReadyMessage
+    )
+    #expect(
+      VoiceCaptureFailureMessage.message(
+        domain: NSURLErrorDomain,
+        code: NSURLErrorNotConnectedToInternet
+      ) == VoiceCaptureFailureMessage.networkMessage
+    )
+    #expect(
+      VoiceCaptureFailureMessage.message(domain: "SomeOtherDomain", code: 7)
+        == VoiceCaptureFailureMessage.genericMessage
+    )
+    let cancelled = NSError(domain: domain, code: 216)
+    #expect(VoiceCaptureFailureMessage.message(for: cancelled) == nil)
+  }
+
+  @Test func earlyStopPreservesUsableTranscriptOrOffersRetry() {
+    #expect(
+      VoiceCaptureSessionInterruption.resolve(transcript: "  ship the single  ")
+        == .preserveTranscript("ship the single")
+    )
+    #expect(VoiceCaptureSessionInterruption.resolve(transcript: " \n ") == .retry)
+  }
+
+  @Test func audioUnavailableHasUserFacingCopy() {
+    #expect(VoiceCaptureError.audioUnavailable.errorDescription?.isEmpty == false)
+  }
+
   @Test func teleprompterFollowsWordsAndRecoversAfterOffScriptSpeech() {
     var follower = KaraokeScriptFollower(
       script: "Today we are building a calmer path for independent artists"

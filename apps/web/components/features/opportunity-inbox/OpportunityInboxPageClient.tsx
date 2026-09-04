@@ -232,6 +232,36 @@ export function OpportunityInboxPageClient({
     [cards, dismissMutation, scheduleStackFocusRecovery]
   );
 
+  const handleRecordedApprove = useCallback(
+    async (id: string) => {
+      const card = cards.find(candidate => candidate.id === id);
+      setCards(current => current.filter(candidate => candidate.id !== id));
+      try {
+        await approveMutation.mutateAsync(id);
+      } catch (error) {
+        if (card) setCards(current => [card, ...current]);
+        scheduleStackFocusRecovery(id);
+        throw error;
+      }
+    },
+    [approveMutation, cards, scheduleStackFocusRecovery]
+  );
+
+  const handleRecordedDismiss = useCallback(
+    async (id: string) => {
+      const card = cards.find(candidate => candidate.id === id);
+      setCards(current => current.filter(candidate => candidate.id !== id));
+      try {
+        await dismissMutation.mutateAsync(id);
+      } catch (error) {
+        if (card) setCards(current => [card, ...current]);
+        scheduleStackFocusRecovery(id);
+        throw error;
+      }
+    },
+    [cards, dismissMutation, scheduleStackFocusRecovery]
+  );
+
   const handleCaptureCompleted = useCallback((id: string) => {
     setCards(current => current.filter(card => card.id !== id));
   }, []);
@@ -282,6 +312,16 @@ export function OpportunityInboxPageClient({
       });
     },
     [runNextStep, scheduleStackFocusRecovery]
+  );
+
+  const handleRecordedNextStep = useCallback(
+    async (id: string) => {
+      latestStackActionIdRef.current = id;
+      await nextStepMutation.mutateAsync(id);
+      setCards(current => current.filter(card => card.id !== id));
+      scheduleStackFocusRecovery(id);
+    },
+    [nextStepMutation, scheduleStackFocusRecovery]
   );
 
   const handleConfirmTourDate = (id: string) => {
@@ -472,6 +512,9 @@ export function OpportunityInboxPageClient({
                 cards={visibleCards}
                 onApprove={handleApprove}
                 onDismiss={handleDismiss}
+                onRecordedApprove={handleRecordedApprove}
+                onRecordedDismiss={handleRecordedDismiss}
+                onRecordedNextStep={handleRecordedNextStep}
                 onOpen={handleOpen}
                 onFeedback={handleFeedback}
                 onNextStep={handleNextStep}
@@ -496,7 +539,10 @@ export function OpportunityInboxPageClient({
           ) : null}
 
           {!hasReviewableItems ? (
-            <OpportunityInboxEmptyState actionCards={inbox.emptyActionCards} />
+            <OpportunityInboxEmptyState
+              actionCards={inbox.emptyActionCards}
+              founderMode={inboxHomeEnabled}
+            />
           ) : null}
 
           <OpportunityInboxConfirmedTourDates items={confirmedTourDates} />

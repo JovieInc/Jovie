@@ -1,5 +1,6 @@
 import { spawnSync } from 'node:child_process';
 import {
+  chmodSync,
   mkdirSync,
   mkdtempSync,
   readFileSync,
@@ -7,7 +8,7 @@ import {
   writeFileSync,
 } from 'node:fs';
 import { tmpdir } from 'node:os';
-import { join, resolve } from 'node:path';
+import { dirname, join, resolve } from 'node:path';
 import { describe, expect, it } from 'vitest';
 import {
   LANE_COMMANDS,
@@ -126,21 +127,111 @@ describe('ci-fast bounded parallel workflow', () => {
             CI_FAST_LANE_GROUP: 'typecheck',
             CI_FAST_LANES_OUT: outPath,
             CI_FAST_RUN_JOVIE_TYPECHECK: 'false',
+            CI_FAST_ONLY_STRUCTURAL: 'false',
             GITHUB_EVENT_NAME: 'pull_request',
             GITHUB_BASE_REF: 'main',
             TURBO_SCM_BASE: 'origin/main',
-            PATH: '/usr/bin:/bin',
+            PATH: repo,
           },
         }
       );
 
-      expect(result.status).toBe(0);
+      expect(result.status, `${result.stdout}\n${result.stderr}`).toBe(0);
       const payload = JSON.parse(readFileSync(outPath, 'utf8'));
       expect(payload.lanes).toEqual([
         expect.objectContaining({ id: 'typecheck', status: 'skipped' }),
       ]);
       expect(payload.lanes[0].logExcerpt).toContain(
         'ci-path-changes preselection'
+      );
+    } finally {
+      rmSync(repo, { recursive: true, force: true });
+    }
+  });
+
+  it.each([
+    {
+      name: 'a product-owned root script changes',
+      relativePath: 'scripts/product-tool.mjs',
+    },
+    {
+      name: 'the scripts baseline changes',
+      relativePath: 'scripts/typecheck-baseline.json',
+    },
+    {
+      name: 'an imported script outside the project root changes',
+      relativePath: '.github/scripts/product-tool.mjs',
+    },
+  ])('runs scripts typecheck when $name', ({ relativePath }) => {
+    const repo = mkdtempSync(join(tmpdir(), 'ci-fast-product-script-'));
+    const binDir = join(repo, 'bin');
+    const outPath = join(repo, 'ci-fast-lanes.json');
+    const changedPath = join(repo, relativePath);
+    const runGit = args =>
+      spawnSync('git', args, { cwd: repo, encoding: 'utf8' });
+    try {
+      mkdirSync(binDir, { recursive: true });
+      mkdirSync(dirname(changedPath), { recursive: true });
+      // Let unrelated lanes no-op while failing if the scripts lane dispatches
+      // anything except the repository's exact typecheck command.
+      writeFileSync(
+        join(binDir, 'pnpm'),
+        [
+          '#!/bin/sh',
+          'case "$*" in',
+          '  "run typecheck:scripts") ;;',
+          '  *typecheck:scripts*) exit 41 ;;',
+          'esac',
+          'printf "%s\\n" "$*"',
+          '',
+        ].join('\n')
+      );
+      chmodSync(join(binDir, 'pnpm'), 0o755);
+      writeFileSync(changedPath, 'export const value = 1;\n');
+      expect(runGit(['init', '--initial-branch=main']).status).toBe(0);
+      expect(
+        runGit(['config', 'user.email', 'ci-contract@jov.ie']).status
+      ).toBe(0);
+      expect(runGit(['config', 'user.name', 'CI Contract']).status).toBe(0);
+      expect(runGit(['add', '.']).status).toBe(0);
+      expect(runGit(['commit', '-m', 'base']).status).toBe(0);
+      const baseSha = runGit(['rev-parse', 'HEAD']).stdout.trim();
+      writeFileSync(changedPath, 'export const value = 2;\n');
+      expect(runGit(['add', '.']).status).toBe(0);
+      expect(runGit(['commit', '-m', 'change product tool']).status).toBe(0);
+
+      const result = spawnSync(
+        process.execPath,
+        [resolve(REPO_ROOT, 'scripts/ci-fast-lanes.mjs')],
+        {
+          cwd: repo,
+          encoding: 'utf8',
+          env: {
+            ...process.env,
+            CI_FAST_LANE_GROUP: 'remaining',
+            CI_FAST_LANES_OUT: outPath,
+            CI_FAST_SKIP_STRUCTURAL: 'true',
+            // Structural steps set CI_FAST_ONLY_STRUCTURAL=true in the runner
+            // env; spawned ci-fast-lanes.mjs children inherit it and would
+            // filter the lane list down to structural only. Pin it off here.
+            CI_FAST_ONLY_STRUCTURAL: 'false',
+            CI_PRODUCT_LANES: 'none',
+            GITHUB_EVENT_NAME: 'pull_request',
+            GITHUB_BASE_REF: 'main',
+            TURBO_SCM_BASE: baseSha,
+            PATH: `${binDir}:${process.env.PATH}`,
+          },
+        }
+      );
+
+      expect(result.status, `${result.stdout}\n${result.stderr}`).toBe(0);
+      const payload = JSON.parse(readFileSync(outPath, 'utf8'));
+      expect(payload.lanes).toContainEqual(
+        expect.objectContaining({
+          id: 'scripts-typecheck',
+          status: 'success',
+          logExcerpt: 'run typecheck:scripts',
+        })
       );
     } finally {
       rmSync(repo, { recursive: true, force: true });
@@ -183,12 +274,13 @@ describe('ci-fast bounded parallel workflow', () => {
             ...process.env,
             CI_FAST_LANE_GROUP: 'typecheck',
             CI_FAST_LANES_OUT: outPath,
+            CI_FAST_ONLY_STRUCTURAL: 'false',
             GITHUB_EVENT_NAME: 'pull_request',
             GITHUB_BASE_REF: 'main',
             TURBO_SCM_BASE: baseSha,
             // Model a false-negative preselector: setup was skipped, so pnpm
             // is intentionally unavailable. The lane must execute and fail.
-            PATH: '/usr/bin:/bin',
+            PATH: repo,
           },
         }
       );
@@ -221,14 +313,18 @@ describe('ci-fast bounded parallel workflow', () => {
     expect(CI_FAST_SOURCE).toContain(
       'Jovie product typecheck skipped (no product files changed)'
     );
-    expect(CI_FAST_SOURCE).toContain(
-      'Scripts typecheck skipped (no Symphony/control-plane files changed)'
+    const scriptsTypecheck = CI_FAST_SOURCE.slice(
+      CI_FAST_SOURCE.indexOf('function runScriptsTypecheck()'),
+      CI_FAST_SOURCE.indexOf('function runGuardrails()')
     );
+    expect(scriptsTypecheck).toContain('pnpm run typecheck:scripts');
+    expect(scriptsTypecheck).not.toContain('changedFiles');
+    expect(scriptsTypecheck).not.toContain('runSymphonyControl');
     expect(CI_FAST_SOURCE).toContain(
       'Guardrails skipped (no Jovie product files changed)'
     );
     expect(CI_FAST_SOURCE).toContain(
-      'Design conformance skipped (no Jovie product files changed)'
+      'Design conformance skipped (no design-domain files changed)'
     );
     expect(CI_FAST_SOURCE).toContain(
       'Design-system source ratchet skipped (no Jovie product files changed)'
@@ -380,7 +476,7 @@ describe('ci-fast bounded parallel workflow', () => {
     expect(structuralDecision).toContain('canon/invariants\\.jsonl');
     expect(structuralDecision).toContain('scripts/invariants/');
     expect(CI_FAST_SOURCE).toMatch(
-      /function runDesignConformance\(\)[\s\S]*LANE_COMMANDS\['design-conformance'\]/
+      /function runDesignConformance\([^)]*\)[\s\S]*LANE_COMMANDS\['design-conformance'\]/
     );
     expect(CI_FAST_SOURCE).toMatch(
       /function runDesignSystemSourceRatchet\(\)[\s\S]*LANE_COMMANDS\['design-system-source-ratchet'\]/
@@ -541,11 +637,67 @@ describe('ci-fast bounded parallel workflow', () => {
       expect(block).toContain(
         'CI_FAST_LANES_OUT: ${{ runner.temp }}/ci-fast-lanes.json'
       );
-      expect(block).toContain('path: ${{ runner.temp }}/ci-fast-lanes.json');
+      expect(block).toContain('${{ runner.temp }}/ci-fast-lanes.json');
       expect(block).toContain('if-no-files-found: warn');
       expect(block).toMatch(
         /github\.event_name == 'merge_group' && github\.event\.merge_group\.base_sha/
       );
+    }
+  });
+
+  it('defers structural Playwright/Python until cheap remaining lanes pass', () => {
+    const remaining = jobBlock(
+      'ci-fast-remaining',
+      'ci-profile-admission-browser'
+    );
+    const cheapLanes = remaining.indexOf('- name: Run ci-fast lanes');
+    const playwright = remaining.indexOf('Setup Playwright (Chromium)');
+    const structuralLane = remaining.indexOf(
+      '- name: Run structural ci-fast lane'
+    );
+    expect(cheapLanes).toBeGreaterThan(0);
+    expect(playwright).toBeGreaterThan(cheapLanes);
+    expect(structuralLane).toBeGreaterThan(playwright);
+    expect(remaining).toContain("CI_FAST_SKIP_STRUCTURAL: 'true'");
+    expect(remaining).toContain("CI_FAST_ONLY_STRUCTURAL: 'true'");
+    expect(remaining).toContain(
+      "if: ${{ success() && steps.structural.outputs.skip != 'true' }}"
+    );
+  });
+
+  it('fail-fast skips later remaining lanes after the first failure', () => {
+    const repo = mkdtempSync(join(tmpdir(), 'ci-fast-fail-fast-'));
+    const outPath = join(repo, 'ci-fast-lanes.json');
+    try {
+      const result = spawnSync(
+        process.execPath,
+        [resolve(REPO_ROOT, 'scripts/ci-fast-lanes.mjs')],
+        {
+          cwd: repo,
+          encoding: 'utf8',
+          env: {
+            ...process.env,
+            CI_FAST_LANE_GROUP: 'remaining',
+            CI_FAST_LANES_OUT: outPath,
+            CI_FAST_SKIP_STRUCTURAL: 'true',
+            CI_FAST_ONLY_STRUCTURAL: 'false',
+            PATH: repo,
+          },
+        }
+      );
+      expect(result.status).not.toBe(0);
+      const payload = JSON.parse(readFileSync(outPath, 'utf8'));
+      const failed = payload.lanes.filter(lane => lane.status === 'failure');
+      const skipped = payload.lanes.filter(
+        lane =>
+          lane.status === 'skipped' &&
+          String(lane.logExcerpt).includes('fail-fast')
+      );
+      expect(failed.length).toBe(1);
+      expect(skipped.length).toBeGreaterThan(0);
+      expect(payload.lanes.at(-1).status).toBe('skipped');
+    } finally {
+      rmSync(repo, { recursive: true, force: true });
     }
   });
 

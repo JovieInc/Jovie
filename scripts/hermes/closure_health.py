@@ -26,6 +26,9 @@ AUTHORITY = "Summer"
 CONTROLLER_RED_AFTER = timedelta(minutes=10)
 EMPTY_QUEUE_RED_AFTER = timedelta(minutes=15)
 UNCLASSIFIED_RED_AFTER = timedelta(minutes=15)
+# Merge-queue group rebuilds transiently mark entries UNMERGEABLE; only a
+# persistent entry past this threshold is real.
+UNMERGEABLE_QUEUE_RED_AFTER = timedelta(minutes=15)
 NO_MERGE_PROGRESS_AFTER = timedelta(hours=1)
 HOLD_EXPIRY = timedelta(days=7)
 STACK_MAX_DEPTH = 4  # JOV-INV-020
@@ -33,6 +36,39 @@ STACK_DEADLINE_MAX = timedelta(days=7)
 STACK_ROOT_BASE = "main"
 STACK_REPAIR_ACTION = "split-or-retarget-draft-stack"
 UTC = timezone.utc
+
+
+def empty_stack_health() -> dict[str, Any]:
+    """Bounded empty JOV-INV-020 stack contract for fail-closed receipts."""
+    return {
+        "maxDepth": STACK_MAX_DEPTH,
+        "roots": [],
+        "violations": [],
+        "repairActions": [],
+    }
+
+
+def bounded_stack_health(value: object) -> dict[str, Any]:
+    """Keep stack diagnostics persistable even when observation is incomplete."""
+    empty = empty_stack_health()
+    if not isinstance(value, dict):
+        return empty
+    max_depth = value.get("maxDepth")
+    roots = value.get("roots")
+    violations = value.get("violations")
+    repair_actions = value.get("repairActions")
+    return {
+        "maxDepth": (
+            max_depth
+            if isinstance(max_depth, int)
+            and not isinstance(max_depth, bool)
+            and max_depth > 0
+            else STACK_MAX_DEPTH
+        ),
+        "roots": roots if isinstance(roots, list) else [],
+        "violations": violations if isinstance(violations, list) else [],
+        "repairActions": repair_actions if isinstance(repair_actions, list) else [],
+    }
 ISSUE_REFERENCE = re.compile(r"\b(?:JOV|LYB)-\d+\b", re.IGNORECASE)
 EXPLICIT_ISSUE_MARKER = re.compile(
     r"<!--\s*linear-issue-(?:id|identifier)\s*:\s*((?:JOV|LYB)-\d+)\s*-->",
@@ -73,6 +109,17 @@ STACK_DEADLINE_MARKER = re.compile(
     r"<!--\s*stack-deadline\s*:\s*([^\s<]+)\s*-->", re.IGNORECASE
 )
 STACK_HEAD_SHA = re.compile(r"^[0-9a-f]{40}$", re.IGNORECASE)
+REPOSITORY_NAME = re.compile(r"^[^/\s]+/[^/\s]+$")
+# JOV-INV-020 native-stack evidence for the duplicate-lane detector (JOV-INV-011):
+# same-issue active writers that verifiably stack are one lane, not duplicates.
+STACK_CONTRACT_HEADING = re.compile(r"\bstack\s+contract\b", re.IGNORECASE)
+STACK_LAYER_DECLARATION = re.compile(r"\blayer\s+\d+\s+of\b", re.IGNORECASE)
+STACK_PARENT_DECLARATION = re.compile(
+    r"\b(?:immediate\s+parent|parent\s+pr|parent|extends|stacked\s+on|based\s+on"
+    r"|builds\s+on|depends\s+on|supersedes)\b\s*:?\s*#(\d{1,9})\b",
+    re.IGNORECASE,
+)
+STACK_NUMBERED_TITLE = re.compile(r"(?<![\d/.])(\d{1,2})\s*/\s*(\d{1,2})(?![\d/])")
 
 
 def isoformat(value: datetime) -> str:
@@ -258,6 +305,7 @@ def _stack_path(numbers: list[int], prs_by_number: dict[int, dict[str, Any]]) ->
 
 
 def _stack_action(
+    repository: str,
     root: dict[str, Any],
     members: list[int],
     longest_path: list[int],
@@ -283,6 +331,7 @@ def _stack_action(
     ]
     root_head_sha = head_by_number[root_number]
     fingerprint = {
+        "repository": repository,
         "rootPr": root_number,
         "prNumbers": members,
         "memberHeads": member_heads,
@@ -297,6 +346,7 @@ def _stack_action(
     ).hexdigest()
     return {
         "schema": "jovie-stack-health-action/v1",
+        "repository": repository,
         "taskKey": task_key,
         "deliveryKey": f"closure-stack:{task_key}",
         "action": STACK_REPAIR_ACTION,
@@ -317,6 +367,7 @@ def _stack_action(
 
 
 def _draft_stack_health(
+    repository: str,
     prs: list[dict[str, Any]],
     prs_by_number: dict[int, dict[str, Any]],
     now: datetime,
@@ -458,6 +509,7 @@ def _draft_stack_health(
         if sorted_violations:
             action = (
                 _stack_action(
+                    repository,
                     root,
                     members,
                     longest_path,
@@ -908,9 +960,95 @@ def _required_checks_green(evidence: dict[str, Any]) -> bool:
     )
 
 
+def _native_stack_declaration(pr: dict[str, Any]) -> bool:
+    """JOV-INV-020: the PR itself declares membership in a native stack."""
+    body = pr.get("body") if isinstance(pr.get("body"), str) else ""
+    title = pr.get("title") if isinstance(pr.get("title"), str) else ""
+    if STACK_CONTRACT_HEADING.search(body):
+        return True
+    if STACK_INTEGRATOR_MARKER.search(body) or STACK_DEADLINE_MARKER.search(body):
+        return True
+    if STACK_LAYER_DECLARATION.search(body):
+        return True
+    match = STACK_NUMBERED_TITLE.search(title)
+    if match:
+        part, whole = int(match.group(1)), int(match.group(2))
+        return whole >= 2 and 1 <= part <= whole
+    return False
+
+
+def _native_stack_components(
+    numbers: list[int],
+    prs_by_number: dict[int, dict[str, Any]],
+    complete: dict[int, frozenset[str]],
+) -> dict[int, int]:
+    """Union same-issue PRs linked by positive JOV-INV-020 stack evidence.
+
+    Returns number -> component root. A singleton component means the PR has no
+    stack evidence and stays subject to duplicate-lane flagging (fail closed).
+    Evidence: an immediate-parent declaration naming a lane member, a branch
+    chain (base is a member's head), shared stack membership declarations, or
+    cumulative nesting (one changed-file set strictly contains the other).
+    """
+    parent: dict[int, int] = {number: number for number in numbers}
+
+    def find(number: int) -> int:
+        while parent[number] != number:
+            parent[number] = parent[parent[number]]
+            number = parent[number]
+        return number
+
+    def union(left: int, right: int) -> None:
+        parent[find(left)] = find(right)
+
+    members = {number: prs_by_number.get(number) for number in numbers}
+    heads: dict[str, int] = {}
+    for number in numbers:
+        pr = members[number]
+        head = pr.get("headRefName") if isinstance(pr, dict) else None
+        if isinstance(head, str) and head:
+            heads.setdefault(head, number)
+    for number in numbers:
+        pr = members[number]
+        if not isinstance(pr, dict):
+            continue
+        base = pr.get("baseRefName")
+        if (
+            isinstance(base, str)
+            and base != STACK_ROOT_BASE
+            and base in heads
+            and heads[base] != number
+        ):
+            union(number, heads[base])
+        body = pr.get("body") if isinstance(pr.get("body"), str) else ""
+        for declared in STACK_PARENT_DECLARATION.findall(body):
+            declared_number = int(declared)
+            if declared_number in members and declared_number != number:
+                union(number, declared_number)
+    declared = [
+        number
+        for number in numbers
+        if isinstance(members[number], dict)
+        and _native_stack_declaration(members[number])
+    ]
+    if len(declared) >= 2:
+        for number in declared[1:]:
+            union(declared[0], number)
+    for index, left in enumerate(numbers):
+        for right in numbers[index + 1 :]:
+            left_files = complete.get(left)
+            right_files = complete.get(right)
+            if left_files is None or right_files is None:
+                continue
+            if left_files < right_files or right_files < left_files:
+                union(left, right)
+    return {number: find(number) for number in numbers}
+
+
 def _duplicate_active_lanes(
     dispositions: list[dict[str, Any]],
     evidence_by_number: dict[int, dict[str, Any]],
+    prs_by_number: dict[int, dict[str, Any]],
 ) -> tuple[list[dict[str, Any]], list[dict[str, Any]]]:
     """Held/draft PRs are not writers. Split work is allowed only when disjoint."""
     active_by_issue: dict[str, list[int]] = {}
@@ -968,10 +1106,21 @@ def _duplicate_active_lanes(
                     )
                     seen_unclassified.add(number)
             continue
+        components = _native_stack_components(numbers, prs_by_number, complete)
+        component_sizes: dict[int, int] = {}
+        for root in components.values():
+            component_sizes[root] = component_sizes.get(root, 0) + 1
         overlap: set[str] = set()
         overlapping_numbers: set[int] = set()
         for index, left in enumerate(numbers):
             for right in numbers[index + 1 :]:
+                if (
+                    components[left] == components[right]
+                    and component_sizes[components[left]] > 1
+                ):
+                    # One declared JOV-INV-020 native stack is a single lane;
+                    # overlapping cumulative layers are not duplicates.
+                    continue
                 pair_overlap = complete[left] & complete[right]
                 if pair_overlap:
                     overlap |= pair_overlap
@@ -987,7 +1136,9 @@ def _duplicate_active_lanes(
     return duplicates, extra_unclassified
 
 
-def classify_open_prs(prs: list[dict[str, Any]], now: datetime) -> dict[str, Any]:
+def classify_open_prs(
+    prs: list[dict[str, Any]], now: datetime, repository: str = "JovieInc/Jovie"
+) -> dict[str, Any]:
     """Map every usable open PR to close/repair/promote/queued/held."""
     refs_by_number: dict[int, list[str]] = {}
     unclassified: list[dict[str, Any]] = []
@@ -1095,7 +1246,7 @@ def classify_open_prs(prs: list[dict[str, Any]], now: datetime) -> dict[str, Any
     ]
     evidence_by_number = {item["number"]: item for item in changed_file_evidence}
     duplicates, extra_unclassified = _duplicate_active_lanes(
-        dispositions, evidence_by_number
+        dispositions, evidence_by_number, prs_by_number
     )
     drop = {item["number"] for item in extra_unclassified}
     if drop:
@@ -1105,7 +1256,7 @@ def classify_open_prs(prs: list[dict[str, Any]], now: datetime) -> dict[str, Any
     counts = {state: 0 for state in ("close", "repair", "promote", "queued", "held")}
     for disposition in dispositions:
         counts[disposition["state"]] += 1
-    stack_health = _draft_stack_health(usable, prs_by_number, now)
+    stack_health = _draft_stack_health(repository, usable, prs_by_number, now)
     return {
         "dispositions": dispositions,
         "counts": counts,
@@ -1132,6 +1283,14 @@ def _episode_since(
     return parsed if parsed is not None and parsed <= now else now
 
 
+def _previous_for_repository(
+    previous: dict[str, Any] | None, repository: str | None
+) -> dict[str, Any] | None:
+    if not isinstance(previous, dict) or not isinstance(repository, str):
+        return None
+    return previous if previous.get("repository") == repository else None
+
+
 def _active_episode(
     previous: dict[str, Any] | None,
     key: str,
@@ -1150,6 +1309,9 @@ def evaluate_closure_health(
     now: datetime,
 ) -> dict[str, Any]:
     """Apply Summer's bounded stop-line without touching promotion authority."""
+    repository = snapshot.get("repository")
+    repository_valid = isinstance(repository, str) and REPOSITORY_NAME.fullmatch(repository)
+    scoped_previous = _previous_for_repository(previous, repository)
     classifications = snapshot.get("classifications")
     if not isinstance(classifications, dict):
         classifications = {}
@@ -1163,7 +1325,7 @@ def evaluate_closure_health(
         isinstance(value, int) and not isinstance(value, bool) and value >= 0
         for value in (open_prs, eligible_prs, green_ready_prs, native_queue_count)
     )
-    observer_unknown = not shape_valid or controller_status not in {
+    observer_unknown = not repository_valid or not shape_valid or controller_status not in {
         "green",
         "failed",
         "recovering",
@@ -1187,7 +1349,7 @@ def evaluate_closure_health(
                 for key in ("roots", "violations", "repairActions")
             )
     else:
-        stack_health = {"maxDepth": STACK_MAX_DEPTH, "roots": [], "violations": []}
+        stack_health = empty_stack_health()
     if repair_actions is None:
         repair_actions = []
     observer_unknown = observer_unknown or not isinstance(repair_actions, list)
@@ -1203,17 +1365,26 @@ def evaluate_closure_health(
     )
     repair_actions = repair_actions if isinstance(repair_actions, list) else []
 
+    unmergeable_queue_prs = sorted(
+        item.get("number")
+        for item in dispositions
+        if isinstance(item, dict)
+        and item.get("state") == "queued"
+        and item.get("queueState") == "UNMERGEABLE"
+        and isinstance(item.get("number"), int)
+    )
     active = {
         "controller": controller_status != "green",
         "emptyNativeQueue": bool(
             shape_valid and green_ready_prs > 0 and native_queue_count == 0
         ),
         "unclassified": bool(unclassified),
+        "unmergeableQueue": bool(unmergeable_queue_prs),
     }
     episodes: dict[str, Any] = {}
     durations: dict[str, timedelta] = {}
     for key, is_active in active.items():
-        episode, duration = _active_episode(previous, key, is_active, now)
+        episode, duration = _active_episode(scoped_previous, key, is_active, now)
         if episode is not None:
             episodes[key] = episode
         durations[key] = duration
@@ -1239,15 +1410,10 @@ def evaluate_closure_health(
         }
         if roots != action_roots:
             reasons.append("draft-stack-repair-action-unavailable")
-    unmergeable_queue_prs = sorted(
-        item.get("number")
-        for item in dispositions
-        if isinstance(item, dict)
-        and item.get("state") == "queued"
-        and item.get("queueState") == "UNMERGEABLE"
-        and isinstance(item.get("number"), int)
-    )
-    if unmergeable_queue_prs:
+    if (
+        active["unmergeableQueue"]
+        and durations["unmergeableQueue"] >= UNMERGEABLE_QUEUE_RED_AFTER
+    ):
         reasons.append("native-queue-unmergeable")
     if active["controller"] and durations["controller"] >= CONTROLLER_RED_AFTER:
         reasons.append("queue-controller-red-over-10m")
@@ -1273,6 +1439,7 @@ def evaluate_closure_health(
     status = "red" if reasons else "grace" if grace_active else "healthy"
     return {
         "schema": SCHEMA,
+        "repository": repository if repository_valid else None,
         "status": status,
         "authority": AUTHORITY,
         "observedAt": isoformat(now),
@@ -1293,8 +1460,8 @@ def evaluate_closure_health(
         "nativeQueueCount": native_queue_count if shape_valid else None,
         "unmergeableNativeQueuePrs": unmergeable_queue_prs,
         "latestMergeAt": snapshot.get("latestMergeAt"),
-        "stackHealth": stack_health,
-        "repairActions": repair_actions,
+        "stackHealth": bounded_stack_health(stack_health),
+        "repairActions": repair_actions if isinstance(repair_actions, list) else [],
         "classifications": classifications,
     }
 
@@ -1395,22 +1562,44 @@ def _observe_queue_controller(repo: str) -> dict[str, Any]:
     if not isinstance(runs, list) or not runs:
         return {"status": "unknown", "reason": "controller-run-missing"}
     latest = runs[0]
-    status = latest.get("status")
-    conclusion = latest.get("conclusion")
-    if status == "completed":
+    # Judge green/failed from the latest completed run, not the latest run:
+    # a busy fleet almost always has an in-progress autoenroll run, and a
+    # busy queue is not a stalled controller. Also skip `cancelled` runs:
+    # the autoenroll concurrency group supersedes older runs constantly, and
+    # supersession churn carries no health verdict. "recovering" covers the
+    # abnormal case where the fetched page has no verdict-bearing run at all;
+    # the CONTROLLER_RED_AFTER episode threshold guards real stalls.
+    verdict_runs = [
+        run
+        for run in runs
+        if isinstance(run, dict)
+        and run.get("status") == "completed"
+        and run.get("conclusion") not in (None, "cancelled")
+    ]
+    if verdict_runs:
+        judged = verdict_runs[0]
+        status = judged.get("status")
+        conclusion = judged.get("conclusion")
         controller_status = "green" if conclusion == "success" else "failed"
-    elif status in {"queued", "in_progress", "waiting", "pending"}:
-        controller_status = "recovering"
     else:
-        controller_status = "unknown"
-    return {
+        judged = latest
+        status = judged.get("status")
+        conclusion = judged.get("conclusion")
+        if status in {"queued", "in_progress", "waiting", "pending"} or status == "completed":
+            controller_status = "recovering"
+        else:
+            controller_status = "unknown"
+    receipt: dict[str, Any] = {
         "status": controller_status,
-        "runId": latest.get("id"),
+        "runId": judged.get("id"),
         "runStatus": status,
         "conclusion": conclusion,
-        "url": latest.get("html_url"),
-        "observedAt": latest.get("updated_at") or latest.get("created_at"),
+        "url": judged.get("html_url"),
+        "observedAt": judged.get("updated_at") or judged.get("created_at"),
     }
+    if judged is not latest and isinstance(latest, dict):
+        receipt["activeRunId"] = latest.get("id")
+    return receipt
 
 
 def observe_closure_health(
@@ -1422,7 +1611,7 @@ def observe_closure_health(
     try:
         observed = _run_graphql_snapshot(repo)
         prs = observed["prs"]
-        classifications = classify_open_prs(prs, now)
+        classifications = classify_open_prs(prs, now, repo)
         labels_by_pr = {int(pr["number"]): _labels(pr) for pr in prs}
         eligible = [
             pr
@@ -1438,6 +1627,7 @@ def observe_closure_health(
             key=lambda value: value or now,
         )
         snapshot = {
+            "repository": repo,
             "controller": _observe_queue_controller(repo),
             "openPrs": len(prs),
             "eligiblePrs": len(eligible),
@@ -1451,6 +1641,7 @@ def observe_closure_health(
     except (OSError, subprocess.SubprocessError, ValueError, json.JSONDecodeError) as error:
         return {
             "schema": SCHEMA,
+            "repository": repo,
             "status": "red",
             "authority": AUTHORITY,
             "observedAt": isoformat(now),
@@ -1468,12 +1659,7 @@ def observe_closure_health(
             # The observation is non-authoritative, so an empty action set
             # must not resolve prior work. It still has to satisfy the bounded
             # JOV-INV-020 ingress contract used by Fleet Gate Refresh.
-            "stackHealth": {
-                "maxDepth": STACK_MAX_DEPTH,
-                "roots": [],
-                "violations": [],
-                "repairActions": [],
-            },
+            "stackHealth": empty_stack_health(),
             "repairActions": [],
             "classifications": {
                 "dispositions": [],

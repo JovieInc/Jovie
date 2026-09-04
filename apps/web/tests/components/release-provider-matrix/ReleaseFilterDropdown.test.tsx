@@ -206,7 +206,7 @@ vi.mock(
 // ── Import after mocks ──
 
 const { ReleaseFilterDropdown } = await import(
-  '@/features/dashboard/organisms/release-provider-matrix/ReleaseFilterDropdown'
+  '@/components/features/dashboard/organisms/release-provider-matrix/ReleaseFilterDropdown'
 );
 
 // ── Helpers ──
@@ -286,6 +286,14 @@ describe('ReleaseFilterDropdown', () => {
   });
 
   describe('popularity toggle', () => {
+    it('renders numeric-leading popularity labels in canonical Title Case', () => {
+      renderDropdown();
+
+      expect(screen.getByText('Low (0-33)')).toBeInTheDocument();
+      expect(screen.getByText('Medium (34-66)')).toBeInTheDocument();
+      expect(screen.getByText('High (67-100)')).toBeInTheDocument();
+    });
+
     it('adds popularity level when toggling on', async () => {
       const user = userEvent.setup();
       const { onFiltersChange } = renderDropdown();

@@ -510,6 +510,7 @@ export async function markInitiativeLanded(
         summary: ack,
         ref: landedRef,
         landed_ref: landedRef,
+        observedAt: now,
       },
     ],
   };

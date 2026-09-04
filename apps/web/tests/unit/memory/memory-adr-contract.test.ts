@@ -119,6 +119,7 @@ describe('MEMORY ADR contract (JOV-2705)', () => {
     const arch = readFileSync(MEMORY_CORE_ARCH_PATH, 'utf8');
     expect(arch).toContain('Issue: JOV-2705');
     expect(arch).toContain('Trigger.dev');
+    expect(arch).toContain('Retirement notice (2026-09-02)');
     // OpenAI Agents SDK kept as the superseded/lineage target...
     expect(arch).toContain('OpenAI Agents SDK');
     // ...with eve as the current selected harness (#12498).
@@ -151,6 +152,7 @@ describe('MEMORY ADR contract (JOV-2705)', () => {
     expect(audit).toContain('JOV-2705');
     expect(audit).toContain('MEMORY_CORE_ARCHITECTURE.md');
     expect(audit).toContain('Trigger.dev');
+    expect(audit).toContain('Retirement notice (2026-09-02)');
   });
 
   it('blocks product memory modules from importing AgentOS WDK workflow code', () => {

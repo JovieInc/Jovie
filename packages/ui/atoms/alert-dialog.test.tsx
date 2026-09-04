@@ -234,9 +234,7 @@ describe('AlertDialog', () => {
       render(<TestAlertDialog open={true} actionVariant='destructive' />);
       const action = screen.getByTestId('alert-dialog-action');
       expect(action.className).toContain('bg-error');
-      expect(action.className).toContain(
-        'text-[var(--color-error-foreground)]'
-      );
+      expect(action.className).toContain('text-error-foreground');
     });
   });
 

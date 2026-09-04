@@ -77,7 +77,7 @@ export const MARKETING_TOOLS_FLYOUT_LINKS = [
   {
     href: APP_ROUTES.YOUTUBE_THUMBNAILS,
     label: 'YouTube Thumbnails',
-    description: 'Package videos with thumbnail variants and testing intent.',
+    description: 'Paste your channel and see three thumbnails redone, free.',
   },
   {
     href: APP_ROUTES.CLI,

@@ -19,6 +19,19 @@ describe('SidebarNavItem active chrome', () => {
     expect(icon).toContain('text-accent-teal!');
   });
 
+  it('keeps an enabled New Chat primary action off muted or disabled chrome', () => {
+    const row = getSidebarNavRowClassName({ tone: 'primary' });
+    const icon = getSidebarNavIconClassName({ tone: 'primary' });
+
+    expect(row).toContain('bg-sidebar-accent/40');
+    expect(row).toContain('text-sidebar-item-foreground');
+    expect(row).not.toContain('opacity-50');
+    expect(row).not.toContain('pointer-events-none');
+    expect(row).not.toContain('text-sidebar-muted');
+    expect(icon).toContain('text-accent-teal!');
+    expect(icon).not.toContain('text-sidebar-muted/70');
+  });
+
   it('keeps long labels inside the grid and preserves keyboard focus chrome', () => {
     const longLabel =
       'A deliberately long navigation destination that must fade instead of overflowing';

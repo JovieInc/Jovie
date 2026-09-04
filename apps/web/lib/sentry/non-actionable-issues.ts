@@ -9,6 +9,10 @@
  * `after()` / Vercel `waitUntil` talking to a missing helper socket. Not an
  * application defect.
  *
+ * BetterAuthError loopback Host rejections (JOV-5843 / JOV-4381 / JOV-4384)
+ * are local/synthetic traffic, including events that reach prod Sentry with
+ * a localhost Host header and no request URL.
+ *
  * Opaque `{"error":{"name":"UpstashError"}}` titles are the JSON-stringified
  * form of an UpstashError whose `message` is non-enumerable (JOV-5182,
  * JOV-5183, JOV-5185, JOV-5186, JOV-5187, JOV-5209, JOV-5218, JOV-5220,
@@ -74,6 +78,16 @@ export const SPOTIFY_RELEASE_CREDIT_BOUND_IGNORE_ERRORS: ReadonlyArray<RegExp> =
  */
 export const VERCEL_IPC_SOCK_IGNORE_ERRORS: ReadonlyArray<RegExp> = [
   /connect ECONNREFUSED .*\/opt\/vercel\/ipc\.sock/,
+];
+
+/**
+ * Better Auth host allowlist throws when a loopback Host header is not in
+ * the frozen list (JOV-5843 / JOV-4381 / JOV-4384). That is local/synthetic
+ * traffic, including requests that reach prod Sentry with a localhost Host
+ * and no request URL. Drop at capture and webhook so it does not file Linear.
+ */
+export const LOOPBACK_BETTER_AUTH_HOST_IGNORE_ERRORS: ReadonlyArray<RegExp> = [
+  /Host "(?:localhost|127\.0\.0\.1|\[::1\])(?::\d+)?" is not in the allowed hosts list/i,
 ];
 
 function isSpotifyReleaseCreditBoundBag(value: unknown): boolean {
@@ -369,5 +383,38 @@ export function isNonActionableVercelIpcEvent(
 ): boolean {
   return collectSentryEventCaptureValues(event).some(
     value => typeof value === 'string' && isVercelIpcSockText(value)
+  );
+}
+
+function isLoopbackBetterAuthHostText(
+  value: string | null | undefined
+): boolean {
+  if (!value) return false;
+  return LOOPBACK_BETTER_AUTH_HOST_IGNORE_ERRORS.some(pattern =>
+    pattern.test(value)
+  );
+}
+
+/**
+ * True when a Sentry/Linear title is a Better Auth loopback Host rejection
+ * (JOV-5843). Real remote-host allowlist failures must not match.
+ */
+export function isNonActionableLoopbackBetterAuthHostIssue(
+  issue: SentryIssueSummary
+): boolean {
+  return (
+    isLoopbackBetterAuthHostText(issue.title) ||
+    isLoopbackBetterAuthHostText(issue.culprit)
+  );
+}
+
+/**
+ * True when a Sentry event is a Better Auth loopback Host rejection.
+ */
+export function isNonActionableLoopbackBetterAuthHostEvent(
+  event: SentryExceptionLike
+): boolean {
+  return collectSentryEventCaptureValues(event).some(
+    value => typeof value === 'string' && isLoopbackBetterAuthHostText(value)
   );
 }
