@@ -276,11 +276,11 @@ class FleetAdmissionReceiptTests(unittest.TestCase):
         scaled = dict(hold)
         scaled["productionUnboundRepairAdmission"] = {
             **hold["productionUnboundRepairAdmission"],
-            "maxConcurrent": 8,
+            "maxConcurrent": 40,
         }
         projection = PROJECT.project_fleet_admission_receipt(scaled)
         self.assertEqual(
-            projection["productionUnboundRepairAdmission"]["maxConcurrent"], 8
+            projection["productionUnboundRepairAdmission"]["maxConcurrent"], 40
         )
         self.assertFalse(
             projection["productionUnboundRepairAdmission"]["deploymentsAllowed"]
@@ -299,14 +299,14 @@ class FleetAdmissionReceiptTests(unittest.TestCase):
         serial = dict(hold)
         serial["productionUnboundRepairAdmission"] = {
             **hold["productionUnboundRepairAdmission"],
-            "maxConcurrent": 1,
+            "maxConcurrent": 0,
         }
         still_valid = PROJECT.project_fleet_admission_receipt(serial)
         self.assertEqual(
             still_valid["productionUnboundRepairAdmission"]["maxConcurrent"], 1
         )
 
-        for invalid in (0, 11, True, "4"):
+        for invalid in (41, True, "4"):
             broken = dict(hold)
             broken["productionUnboundRepairAdmission"] = {
                 **hold["productionUnboundRepairAdmission"],
