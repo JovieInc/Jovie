@@ -193,6 +193,24 @@ describe('JOV-INV-018 screen-certification/v2', () => {
     assert.deepEqual(rows, [['web.homepage', 'evidence-required']]);
   });
 
+  it('registers dedicated homepage sections without claiming shared marketing CSS', () => {
+    const screen = home();
+    const sources = [
+      'apps/web/components/homepage/HomepageCertifiedSections.tsx',
+      'apps/web/components/homepage/HomepageClose.tsx',
+    ];
+    assert.ok(sources.every(source => screen.sources.includes(source)));
+    assert.equal(screen.sources.includes('apps/web/styles/home.css'), false);
+    const result = evaluateChangedScreens({
+      changedFiles: sources.map(path => ({ path, status: 'M' })),
+      headSha: HEAD,
+    });
+    assert.deepEqual(result.issues, []);
+    assert.deepEqual(result.changedScreens, [
+      { id: 'web.homepage', verdict: 'evidence-required', findings: [] },
+    ]);
+  });
+
   it('fails closed until a trusted browser producer adapter is integrated', () => {
     const screen = home();
     const result = runScreenCertification({
