@@ -1432,7 +1432,7 @@ class DeploymentBindingTests(unittest.TestCase):
                 "mainSha": MAIN_SHA,
                 "deployedSha": "b" * 7,
                 "scope": "event-scoped-exact-pr-head-with-bound-repair-attestation",
-                "maxConcurrent": 10,
+                "maxConcurrent": 40,
                 "deploymentsAllowed": False,
                 "authority": "canonical-merge-queue-controller",
             },
