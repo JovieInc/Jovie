@@ -54,16 +54,21 @@ The source contract therefore treats these as different states:
 | Ordinary question/required response | `input_required` | Send one fingerprint-matched authorized response; never call it approval |
 | Proposed or auto-saved memory decision | `memory_decision_required` | Surface it; approve/reject only from an explicit matching memory decision |
 | Code-sandbox network domain | `approval_required` with domain scope | Surface the domain boundary; it grants no integration-write authority |
-| Old observation | `stale_status` | Reconcile the original thread once |
-| Lost MCP transport | `transport_unknown` | Reconcile the original thread once; disconnect is not cancellation |
+| Old observation | `stale_status` | Reconcile the issue, original thread, and existing PR once |
+| Lost MCP transport | `transport_unknown` | Reconcile the issue, original thread, and existing PR once; disconnect is not cancellation |
 | 401 | `provider_failure` | Authorized reconnect required |
 | 402 | `provider_failure` | Billing hold; no purchase or auto-recharge |
 | 403 | `provider_failure` | Inspect exact scope/resource/policy denial |
 | 429 | `provider_failure` | Honor one shared cooldown; no per-job retry storm |
-| 5xx | `provider_failure` | Reconcile the original thread once before replay |
+| 5xx | `provider_failure` | Reconcile the issue, original thread, and existing PR once before replay |
 | Running with no structured interaction | `running` | Continue bounded observation of the same thread |
-| Completed with useful-output, usage, and cost receipts | `useful_success` | Record terminal receipt |
-| Completed without those receipts | `terminal_unverified` | Reconcile receipts once, then retain `UNKNOWN` |
+| Remote completed with useful-output, usage, route, destination, and cost receipts | `remote_useful_success` | Settle trusted cost, then reconcile PR, merge, and required runtime; this is not landed |
+| Remote completed without those receipts | `terminal_unverified` | Reconcile the full issue lifecycle once, then retain `UNKNOWN` |
+| No PR found for the issue | `delivery_missing` | Reconcile delivery once before any retry |
+| PR exists and is open | `pr_open` | Recover and land the existing PR; never redispatch the issue |
+| PR merged without exact required-runtime proof | `merged_runtime_unverified` | Reconcile the existing merge/runtime; never redispatch the issue |
+| PR closed unmerged with owner and failure receipt | `delivery_failed` | Terminal explicit failure with owner/evidence |
+| Exact PR merge and required-runtime SHA receipt | `landed_verified` | Terminal success |
 
 Words such as “approve” in assistant prose are not approval evidence. A real
 approval requires a structured pending item. Memory receipts and proposed
@@ -74,7 +79,8 @@ learnings are not external-action approvals.
 1. The canonical router selects the exact provider/model for the task.
 2. `preflight` requires current account, payer, budget period, auth, thread
    scopes, model, balance, auto-recharge-off, per-query/period caps, useful
-   outcome, destination, idempotency key, and normalized request digest. The
+   outcome, issue, lease, destination, expected PR repository, required runtime,
+   idempotency key, and normalized request digest. The
    journal independently authenticates the budget snapshot HMAC over payer,
    account, period, cap, spend, balance, and observation time.
 3. Before any `create_thread` call, `reserve_dispatch` takes the canonical
@@ -87,24 +93,30 @@ learnings are not external-action approvals.
    retain exposure until signed reconciliation proves the original attempt
    absent or binds the existing thread.
 5. `register_dispatch` cannot create or backfill a reservation; it only confirms
-   an already authenticated thread binding. Observations preserve thread/key
-   identity, increase monotonically, and update `remote_state` without altering
-   the separate `exposure_state`.
+   an already authenticated thread binding. Remote and delivery observations
+   preserve issue, lease, attempt, thread, PR, merge, runtime, and key identity,
+   increase monotonically, and update `remote_state` without altering the
+   separate `exposure_state`.
 6. `classify` derives state from structured provider evidence; `plan` describes
    one admissible next action but always returns `execute: false`.
 7. The journal atomically reserves that exact action. Only the first reservation
    returns `execute: true`; a reconnect sees the existing reservation and does
    not repeat the mutation.
-8. Post-action completion must bind the reservation to a provider-result digest;
-   authorization or reservation alone is never recorded as execution.
+8. Post-action completion must bind the reservation to an HMAC-authenticated,
+   identity- and attempt-bound reconciliation receipt; authorization or
+   reservation alone is never recorded as execution.
 9. A single same-key create retry is allowed only after authenticated
-   provider-absence evidence, fresh budget facts, and exact full-identity
-   revalidation. A committed identical receipt remains idempotent after its
-   normal freshness window; changed evidence fails closed.
+   provider-absence evidence, fresh budget facts, exact full-identity
+   revalidation, and aggregate exposure reservation under the process lock. A
+   delivery retry additionally requires revision-current proof that the remote
+   job is absent or idempotently replayable and that no PR exists. A committed
+   identical receipt remains idempotent after its normal freshness window;
+   changed evidence fails closed.
 10. Completed, failed, declined, and cancelled outcomes release exposure only
     through an authenticated exact-cost or zero-cost terminal receipt bound to
     the full terminal observation digest. Unknown cost retains the reservation.
-    External delivery remains a separate tier.
+    Remote completion remains non-terminal: external delivery is independently
+    verified through PR, merge, and exact-runtime evidence.
 
 ## Verification boundary
 
@@ -114,7 +126,8 @@ approval matching, legitimate attended web fallback, stale/lost transport,
 replay rejection, process-raced aggregate reservation, canonical-path aliases,
 hard-link rejection, unpredictable attempts, authenticated create and terminal
 receipts, ambiguous-create reconciliation, delayed exact replay, all terminal
-outcomes, monotonic observations, and one safe retry. Synthetic tests prove the
+outcomes, monotonic remote/delivery observations, existing-PR recovery, one
+budgeted safe retry, and exact merge/runtime proof. Synthetic tests prove the
 source contract only; they do not prove live
 Hyperagent access, account balance, provider execution, useful output, cost,
 delivery, deployment, or exact-runtime behavior.

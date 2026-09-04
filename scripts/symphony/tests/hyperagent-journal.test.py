@@ -77,6 +77,10 @@ class HyperagentJournalTests(unittest.TestCase):
             "expected_paying_org": "workspace-a",
             "paying_org_id": "org-id-a",
             "expected_paying_org_id": "org-id-a",
+            "issue_id": "JOV-6005",
+            "lease_id": "lease-1",
+            "expected_pr_repository": "JovieInc/Jovie",
+            "required_runtime": "symphony-4041",
             "credits_expire_at": (self.now + timedelta(days=30)).isoformat(),
             "balance_checked_at": (self.now - timedelta(minutes=1)).isoformat(),
             "model_checked_at": (self.now - timedelta(minutes=1)).isoformat(),
@@ -209,6 +213,33 @@ class HyperagentJournalTests(unittest.TestCase):
         }
         value.update(updates)
         return value
+
+    def delivery(self, **updates):
+        value = {
+            "schema": lifecycle.DELIVERY_SCHEMA,
+            "observed_at": self.now.isoformat(),
+            "issue_id": self.envelope["issue_id"],
+            "lease_id": self.envelope["lease_id"],
+            "idempotency_key": self.envelope["idempotency_key"],
+            "expected_pr_repository": self.envelope["expected_pr_repository"],
+            "required_runtime": self.envelope["required_runtime"],
+            "pr_state": "not_found",
+        }
+        value.update(updates)
+        return value
+
+    def reconciliation_receipt(self, journal, action_id, outcome):
+        job = journal.data["jobs"][self.envelope["idempotency_key"]]
+        receipt = self.receipt(
+            lifecycle.RECONCILIATION_RECEIPT_SCHEMA,
+            journal.data["jobs"][self.envelope["idempotency_key"]]["actions"][-1]["action"],
+            job["current_attempt_identity"],
+            action_id=action_id,
+            evidence_sha256=hashlib.sha256(
+                lifecycle._canonical_json(outcome).encode()
+            ).hexdigest(),
+        )
+        return receipt
 
     def test_workflow_requires_precreate_reservation_and_authenticated_receipts(self):
         workflow = (ROOT / "scripts/symphony/WORKFLOW.md").read_text()
@@ -483,10 +514,10 @@ class HyperagentJournalTests(unittest.TestCase):
 
     def test_terminal_outcomes_settle_authenticated_exact_cost_and_release_exposure(self):
         cases = (
-            ("completed", "useful_success", 0.4),
-            ("failed", "terminal_failed", 0.1),
-            ("declined", "declined", 0.0),
-            ("cancelled", "cancelled", 0.0),
+            ("completed", "remote_useful_success", 0.4),
+            ("failed", "remote_failed", 0.1),
+            ("declined", "remote_declined", 0.0),
+            ("cancelled", "remote_cancelled", 0.0),
         )
         for terminal, state, cost in cases:
             with self.subTest(terminal=terminal), tempfile.TemporaryDirectory() as directory:
@@ -523,7 +554,7 @@ class HyperagentJournalTests(unittest.TestCase):
             failed = self.terminal_observation("failed")
             unsigned = self.receipt(
                 lifecycle.TERMINAL_RECEIPT_SCHEMA,
-                "terminal_failed",
+                "remote_failed",
                 reserved["attempt_identity"],
                 thread_id="thread-1",
                 cost_usd=0.0,
@@ -897,8 +928,19 @@ class HyperagentJournalTests(unittest.TestCase):
                 "job-1", 0, self.observation(transport_lost=True), self.now
             )
             first = journal.reserve_action_once("job-1")["reservation"]
+            outcome = {
+                "issue_id": "JOV-6005",
+                "lease_id": "lease-1",
+                "remote": "absent",
+                "pr": "not_found",
+                "observed_at": self.now.isoformat(),
+            }
             journal.record_action_result(
-                "job-1", first["id"], "f" * 64, "provider_absence"
+                "job-1",
+                first["id"],
+                self.reconciliation_receipt(journal, first["id"], outcome),
+                outcome,
+                self.now,
             )
             journal.observe(
                 "job-1",
@@ -961,7 +1003,7 @@ class HyperagentJournalTests(unittest.TestCase):
             for cost, usage in ((2.0, "e" * 64), (0.1, "short")):
                 receipt = self.receipt(
                     lifecycle.TERMINAL_RECEIPT_SCHEMA,
-                    "terminal_failed",
+                    "remote_failed",
                     reserved["attempt_identity"],
                     thread_id="thread-1",
                     cost_usd=cost,
@@ -974,7 +1016,7 @@ class HyperagentJournalTests(unittest.TestCase):
                     journal.settle_terminal("job-1", failed, receipt, self.now)
             valid = self.receipt(
                 lifecycle.TERMINAL_RECEIPT_SCHEMA,
-                "terminal_failed",
+                "remote_failed",
                 reserved["attempt_identity"],
                 thread_id="thread-1",
                 cost_usd=0.1,
@@ -998,7 +1040,7 @@ class HyperagentJournalTests(unittest.TestCase):
             useful_observation = self.terminal_observation()
             changed_cost = self.receipt(
                 lifecycle.TERMINAL_RECEIPT_SCHEMA,
-                "useful_success",
+                "remote_useful_success",
                 useful_reserved["attempt_identity"],
                 thread_id="thread-1",
                 cost_usd=0.3,
@@ -1049,6 +1091,342 @@ class HyperagentJournalTests(unittest.TestCase):
                         lifecycle.LifecycleError, "schema is invalid"
                     ):
                         self.journal(path)
+
+    def test_remote_completion_and_delivery_states_remain_distinct(self):
+        open_pr = self.delivery(
+            pr_state="open",
+            pr_url="https://github.com/JovieInc/Jovie/pull/1",
+            pr_head_sha="a" * 40,
+        )
+        self.assertEqual(
+            lifecycle.classify_delivery_observation(self.delivery(), self.now)["state"],
+            "delivery_missing",
+        )
+        self.assertEqual(
+            lifecycle.classify_delivery_observation(open_pr, self.now)["state"],
+            "pr_open",
+        )
+        merged = {**open_pr, "pr_state": "merged", "merge_sha": "b" * 40}
+        self.assertEqual(
+            lifecycle.classify_delivery_observation(merged, self.now)["state"],
+            "merged_runtime_unverified",
+        )
+        exact = {
+            **merged,
+            "runtime": {
+                "name": "symphony-4041",
+                "sha": "b" * 40,
+                "receipt_sha256": "c" * 64,
+            },
+        }
+        self.assertEqual(
+            lifecycle.classify_delivery_observation(exact, self.now)["state"],
+            "landed_verified",
+        )
+        self.assertEqual(
+            lifecycle.plan_resolution({"state": "pr_open"})["action"],
+            "recover_existing_pr",
+        )
+        self.assertEqual(
+            lifecycle.plan_resolution({"state": "merged_runtime_unverified"})[
+                "action"
+            ],
+            "reconcile_required_runtime_once",
+        )
+        self.assertTrue(
+            lifecycle.plan_resolution({"state": "landed_verified"})["terminal"]
+        )
+        malformed = (
+            ({"schema": "wrong"}, "invalid_delivery_schema"),
+            ({**self.delivery(), "issue_id": ""}, "missing_delivery_identity"),
+            ({**self.delivery(), "observed_at": "bad"}, "invalid_observed_at"),
+            (
+                {
+                    **self.delivery(),
+                    "observed_at": (self.now - timedelta(minutes=6)).isoformat(),
+                },
+                "delivery_observation_expired",
+            ),
+            ({**self.delivery(), "pr_state": "UNKNOWN"}, "pr_state_unknown"),
+            (
+                {
+                    **open_pr,
+                    "pr_url": "https://github.com/Other/Repo/pull/1",
+                },
+                "pr_identity_unproven",
+            ),
+            ({**open_pr, "pr_head_sha": "short"}, "pr_identity_unproven"),
+            ({**merged, "merge_sha": "short"}, "merge_identity_unproven"),
+            (
+                {**merged, "runtime": {"name": "wrong"}},
+                "exact_runtime_unproven",
+            ),
+            ({**self.delivery(), "pr_state": "closed_unmerged"}, "failure_ownership_unproven"),
+        )
+        for observation, reason in malformed:
+            self.assertEqual(
+                lifecycle.classify_delivery_observation(observation, self.now)[
+                    "reason"
+                ],
+                reason,
+            )
+        closed = self.delivery(
+            pr_state="closed_unmerged",
+            failure_owner="symphony-owner",
+            failure_receipt_sha256="d" * 64,
+            pr_url="https://github.com/JovieInc/Jovie/pull/1",
+            pr_head_sha="a" * 40,
+        )
+        self.assertEqual(
+            lifecycle.classify_delivery_observation(closed, self.now)["state"],
+            "delivery_failed",
+        )
+        self.assertEqual(
+            lifecycle.plan_resolution({"state": "running"})["action"],
+            "observe_same_thread",
+        )
+
+    def test_delivery_identity_revision_and_terminal_evidence_are_durable(self):
+        with tempfile.TemporaryDirectory() as directory:
+            path = pathlib.Path(directory) / "journal.json"
+            journal = self.journal(path)
+            self.reserve_and_bind(journal)
+            missing = self.delivery()
+            with self.assertRaises(lifecycle.LifecycleError):
+                journal.observe_delivery("missing", 0, missing, self.now)
+            with self.assertRaises(lifecycle.LifecycleError):
+                journal.observe_delivery("job-1", True, missing, self.now)
+            self.assertTrue(
+                journal.observe_delivery("job-1", 0, missing, self.now)["recorded"]
+            )
+            self.assertTrue(
+                journal.observe_delivery("job-1", 0, missing, self.now)["duplicate"]
+            )
+            with self.assertRaises(lifecycle.LifecycleError):
+                journal.observe_delivery(
+                    "job-1", 0, {**missing, "pr_state": "open"}, self.now
+                )
+            with self.assertRaises(lifecycle.LifecycleError):
+                journal.observe_delivery(
+                    "job-1", 1, {**missing, "lease_id": "other"}, self.now
+                )
+            exact = self.delivery(
+                pr_state="merged",
+                pr_url="https://github.com/JovieInc/Jovie/pull/1",
+                pr_head_sha="a" * 40,
+                merge_sha="b" * 40,
+                runtime={
+                    "name": "symphony-4041",
+                    "sha": "b" * 40,
+                    "receipt_sha256": "c" * 64,
+                },
+            )
+            journal.observe_delivery("job-1", 1, exact, self.now)
+            persisted = self.journal(path).data["jobs"]["job-1"]
+            self.assertEqual(persisted["state"], "landed_verified")
+            self.assertEqual(persisted["delivery"]["merge_sha"], "b" * 40)
+            with self.assertRaises(lifecycle.LifecycleError):
+                journal.observe_delivery("job-1", 2, missing, self.now)
+            with self.assertRaises(lifecycle.LifecycleError):
+                journal.observe_delivery("job-1", 2, exact, self.now)
+
+    def test_delivery_evidence_cannot_regress_or_change_pr_identity(self):
+        with tempfile.TemporaryDirectory() as directory:
+            journal = self.journal(pathlib.Path(directory) / "journal.json")
+            self.reserve_and_bind(journal)
+            journal.observe("job-1", 0, self.terminal_observation("failed"), self.now)
+            unknown = self.delivery(pr_state="UNKNOWN")
+            journal.observe_delivery("job-1", 0, unknown, self.now)
+            self.assertEqual(journal.data["jobs"]["job-1"]["state"], "remote_failed")
+            open_pr = self.delivery(
+                pr_state="open",
+                pr_url="https://github.com/JovieInc/Jovie/pull/1",
+                pr_head_sha="a" * 40,
+            )
+            journal.observe_delivery("job-1", 1, open_pr, self.now)
+            with self.assertRaises(lifecycle.LifecycleError):
+                journal.observe_delivery(
+                    "job-1", 2,
+                    {**open_pr, "pr_url": "https://github.com/JovieInc/Jovie/pull/2"},
+                    self.now,
+                )
+            with self.assertRaises(lifecycle.LifecycleError):
+                journal.observe_delivery("job-1", 2, unknown, self.now)
+
+    def test_issue_lease_and_delivery_contract_are_full_dispatch_identity(self):
+        with tempfile.TemporaryDirectory() as directory:
+            journal = self.journal(pathlib.Path(directory) / "journal.json")
+            journal.reserve_dispatch(self.envelope, self.now)
+            for field, value in (
+                ("issue_id", "JOV-OTHER"),
+                ("lease_id", "lease-other"),
+                ("expected_pr_repository", "Other/Repo"),
+                ("required_runtime", "other-runtime"),
+            ):
+                with self.assertRaisesRegex(lifecycle.LifecycleError, "identity changed"):
+                    journal.reserve_dispatch(
+                        self.budget_envelope(**{field: value}), self.now
+                    )
+
+    def test_signed_reconciliation_reserves_and_binds_one_budgeted_retry(self):
+        with tempfile.TemporaryDirectory() as directory:
+            path = pathlib.Path(directory) / "journal.json"
+            journal = self.journal(path)
+            first, _ = self.reserve_and_bind(journal)
+            failed = self.terminal_observation("failed")
+            journal.observe("job-1", 0, failed, self.now)
+            terminal = self.receipt(
+                lifecycle.TERMINAL_RECEIPT_SCHEMA,
+                "remote_failed",
+                first["attempt_identity"],
+                thread_id="thread-1",
+                cost_usd=0.0,
+                usage_receipt_sha256="e" * 64,
+                observation_sha256=hashlib.sha256(
+                    lifecycle._canonical_json(failed).encode()
+                ).hexdigest(),
+            )
+            journal.settle_terminal("job-1", failed, terminal, self.now)
+            journal.observe_delivery("job-1", 0, self.delivery(), self.now)
+            action = journal.reserve_action_once("job-1")["reservation"]
+            outcome = {
+                "issue_id": "JOV-6005", "lease_id": "lease-1",
+                "remote": "absent", "pr": "not_found",
+                "observed_at": self.now.isoformat(),
+            }
+            signed = self.reconciliation_receipt(journal, action["id"], outcome)
+            with self.assertRaises(lifecycle.LifecycleError):
+                journal.record_action_result(
+                    "job-1", action["id"],
+                    {**signed, "receipt_hmac_sha256": "0" * 64},
+                    outcome, self.now,
+                )
+            journal.record_action_result(
+                "job-1", action["id"], signed, outcome, self.now
+            )
+            retry = journal.reserve_retry_once("job-1", self.envelope, self.now)
+            self.assertTrue(retry["execute"])
+            self.assertEqual(retry["attempt"]["number"], 2)
+            self.assertFalse(
+                self.journal(path).reserve_retry_once(
+                    "job-1", self.envelope, self.now
+                )["execute"]
+            )
+            created = self.receipt(
+                lifecycle.CREATE_RECEIPT_SCHEMA,
+                "created",
+                retry["attempt_identity"],
+                thread_id="thread-2",
+            )
+            journal.bind_retry_thread(
+                "job-1", retry["attempt_identity"], created, self.now
+            )
+            self.assertEqual(journal.data["jobs"]["job-1"]["thread_id"], "thread-2")
+
+    def test_delivery_retry_rejects_existing_pr_and_changed_identity(self):
+        with tempfile.TemporaryDirectory() as directory:
+            journal = self.journal(pathlib.Path(directory) / "journal.json")
+            first, _ = self.reserve_and_bind(journal)
+            failed = self.terminal_observation("failed")
+            journal.observe("job-1", 0, failed, self.now)
+            terminal = self.receipt(
+                lifecycle.TERMINAL_RECEIPT_SCHEMA, "remote_failed",
+                first["attempt_identity"], thread_id="thread-1", cost_usd=0.0,
+                usage_receipt_sha256="e" * 64,
+                observation_sha256=hashlib.sha256(
+                    lifecycle._canonical_json(failed).encode()
+                ).hexdigest(),
+            )
+            journal.settle_terminal("job-1", failed, terminal, self.now)
+            action = journal.reserve_action_once("job-1")["reservation"]
+            outcome = {
+                "issue_id": "JOV-6005", "lease_id": "lease-1",
+                "remote": "absent", "pr": "open",
+                "pr_url": "https://github.com/JovieInc/Jovie/pull/1",
+                "pr_head_sha": "a" * 40,
+                "observed_at": self.now.isoformat(),
+            }
+            journal.record_action_result(
+                "job-1", action["id"],
+                self.reconciliation_receipt(journal, action["id"], outcome),
+                outcome, self.now,
+            )
+            with self.assertRaises(lifecycle.LifecycleError):
+                journal.reserve_retry_once("job-1", self.envelope, self.now)
+            with self.assertRaises(lifecycle.LifecycleError):
+                journal.reserve_retry_once(
+                    "job-1", self.budget_envelope(lease_id="lease-other"), self.now
+                )
+            with self.assertRaises(lifecycle.LifecycleError):
+                journal.reserve_retry_once("missing", self.envelope, self.now)
+
+    def test_reconciliation_receipt_rejects_each_untrusted_outcome_shape(self):
+        with tempfile.TemporaryDirectory() as directory:
+            for index, updates in enumerate(
+                (
+                    None,
+                    {"issue_id": "other"},
+                    {"remote": "existing", "thread_id": "other"},
+                    {"pr": "open", "pr_url": "bad", "pr_head_sha": "a" * 40},
+                    {
+                        "pr": "merged",
+                        "pr_url": "https://github.com/JovieInc/Jovie/pull/1",
+                        "pr_head_sha": "a" * 40,
+                        "merge_sha": "bad",
+                    },
+                    {
+                        "pr": "closed_unmerged",
+                        "pr_url": "https://github.com/JovieInc/Jovie/pull/1",
+                        "pr_head_sha": "a" * 40,
+                    },
+                )
+            ):
+                journal = self.journal(pathlib.Path(directory) / f"{index}.json")
+                self.reserve_and_bind(journal)
+                journal.observe(
+                    "job-1", 0, self.observation(transport_lost=True), self.now
+                )
+                action = journal.reserve_action_once("job-1")["reservation"]
+                base = {
+                    "issue_id": "JOV-6005",
+                    "lease_id": "lease-1",
+                    "remote": "absent",
+                    "pr": "not_found",
+                    "observed_at": self.now.isoformat(),
+                }
+                outcome = None if updates is None else {**base, **updates}
+                signed = (
+                    "f" * 64
+                    if outcome is None
+                    else self.reconciliation_receipt(journal, action["id"], outcome)
+                )
+                with self.assertRaises(lifecycle.LifecycleError):
+                    journal.record_action_result(
+                        "job-1", action["id"], signed, outcome, self.now
+                    )
+
+    def test_issue_and_delivery_reconciliations_are_independently_bounded(self):
+        with tempfile.TemporaryDirectory() as directory:
+            journal = self.journal(pathlib.Path(directory) / "journal.json")
+            self.reserve_and_bind(journal)
+            journal.observe("job-1", 0, self.observation(transport_lost=True), self.now)
+            issue = journal.reserve_action_once("job-1")["reservation"]
+            outcome = {
+                "issue_id": "JOV-6005", "lease_id": "lease-1",
+                "remote": "existing", "thread_id": "thread-1",
+                "pr": "not_found", "observed_at": self.now.isoformat(),
+            }
+            journal.record_action_result(
+                "job-1", issue["id"],
+                self.reconciliation_receipt(journal, issue["id"], outcome),
+                outcome, self.now,
+            )
+            journal.observe("job-1", 1, self.terminal_observation(), self.now)
+            journal.observe_delivery("job-1", 0, self.delivery(), self.now)
+            delivery = journal.reserve_action_once("job-1")["reservation"]
+            self.assertEqual(issue["action"], "reconcile_issue_lifecycle_once")
+            self.assertEqual(delivery["action"], "reconcile_delivery_once")
+            self.assertFalse(journal.reserve_action_once("job-1")["execute"])
 
 
 if __name__ == "__main__":
