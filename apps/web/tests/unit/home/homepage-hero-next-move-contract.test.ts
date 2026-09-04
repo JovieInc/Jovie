@@ -13,6 +13,36 @@ function readHeroCss(): string {
 }
 
 describe('homepage hero contract (JOV-5864)', () => {
+  it('rejects raster media regardless of how it is mounted', () => {
+    const pageSource = readFileSync(
+      path.join(webRoot, 'app/(home)/page.tsx'),
+      'utf8'
+    );
+    const componentSource = readFileSync(
+      path.join(webRoot, 'components/homepage/HomepageEditorialHero.tsx'),
+      'utf8'
+    );
+    const heroSource = pageSource.slice(
+      pageSource.indexOf('function HomepageHero()'),
+      pageSource.indexOf('function HomepageUnlockedSections()')
+    );
+    const heroCss = readHeroCss();
+    const rejectedPhotoFixture = `
+      <picture><img src='/stock-nightlife.webp' /></picture>
+      .homepage-editorial-hero { background: image-set(url('/stock.jpg') 1x); }
+    `;
+    const rasterSourcePattern =
+      /<(?:picture|img|video|canvas)\b|\.(?:avif|gif|jpe?g|png|webp)\b/i;
+    const cssImagePattern = /\b(?:url|image-set)\s*\(/i;
+
+    expect(rejectedPhotoFixture).toMatch(rasterSourcePattern);
+    expect(rejectedPhotoFixture).toMatch(cssImagePattern);
+    expect(`${heroSource}\n${componentSource}`).not.toMatch(
+      rasterSourcePattern
+    );
+    expect(heroCss).not.toMatch(cssImagePattern);
+  });
+
   it('uses the exact locked headline and one-line support', () => {
     expect(HOMEPAGE_LAUNCH_COPY.hero.headline).toBe(
       'Control how the world sees you.'
@@ -38,12 +68,10 @@ describe('homepage hero contract (JOV-5864)', () => {
     );
 
     expect(heroSource).toContain('search={HERO_COPY.search}');
-    expect(heroSource).toContain('backdrop={HERO_BACKDROP}');
     expect(heroSource).not.toContain('primaryCta');
     expect(heroSource).not.toContain('secondaryCta');
     expect(heroSource).not.toMatch(/Get started|Drop more music|waitlist/i);
-    expect(pageSource).toContain('/images/hero/night-desk-clean.webp');
-    expect(pageSource).toContain('/images/hero/night-desk-mobile-clean.webp');
+    expect(pageSource).not.toContain('/images/hero/');
   });
 
   it('keeps the one-line H1 contract and the two-line phone fallback', () => {

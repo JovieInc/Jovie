@@ -129,64 +129,50 @@ test.describe('Homepage', () => {
     await expect(toolsFlyout).toHaveCount(0);
   });
 
-  test('hero backdrop is one decorative full-bleed photo that loads first', async ({
+  test('hero backdrop is an image-free abstract field with centered content', async ({
     page,
   }) => {
     const backdrop = page.getByTestId('homepage-editorial-hero-backdrop');
 
     await expect(backdrop).toHaveAttribute('aria-hidden', 'true');
     await expect(backdrop).toHaveAttribute('data-hero-layer', 'decorative');
-    await expect(backdrop.locator('img')).toHaveCount(1);
-    await expect(backdrop.locator('img')).toHaveAttribute('alt', '');
-    await expect(backdrop.locator('img')).toHaveAttribute(
-      'fetchpriority',
-      'high'
+    await expect(backdrop).toHaveAttribute(
+      'data-hero-visual',
+      'abstract-light-field'
     );
-    await page.waitForFunction(() => {
-      const image = document.querySelector<HTMLImageElement>(
-        '[data-testid="homepage-editorial-hero-backdrop"] img'
-      );
-      if (!image) return false;
-      const rect = image.getBoundingClientRect();
-      if (
-        !image.complete ||
-        image.naturalWidth <= 0 ||
-        image.naturalHeight <= 0 ||
-        !image.currentSrc ||
-        rect.width < window.innerWidth - 1 ||
-        rect.height < window.innerHeight - 1
-      ) {
-        return false;
-      }
+    await expect(backdrop.locator('picture, img, video')).toHaveCount(0);
+    await expect(
+      backdrop.locator('.homepage-editorial-hero__light-well')
+    ).toHaveCount(1);
+    expect(
+      await backdrop
+        .locator('.homepage-editorial-hero__light-well')
+        .evaluate(element => {
+          const style = getComputedStyle(element);
+          const rect = element.getBoundingClientRect();
+          return {
+            backgroundImage: style.backgroundImage,
+            opacity: Number.parseFloat(style.opacity),
+            height: rect.height,
+            width: rect.width,
+          };
+        })
+    ).toMatchObject({
+      backgroundImage: expect.not.stringMatching(/^none$/),
+      opacity: expect.any(Number),
+      height: expect.any(Number),
+      width: expect.any(Number),
+    });
 
-      return true;
-    });
-    const imageState = await backdrop.locator('img').evaluate(image => {
-      const rect = image.getBoundingClientRect();
-      return {
-        currentSrc: image.currentSrc,
-        naturalHeight: image.naturalHeight,
-        naturalWidth: image.naturalWidth,
-        renderedHeight: rect.height,
-        renderedWidth: rect.width,
-      };
-    });
-    expect(imageState).toMatchObject({
-      naturalHeight: expect.any(Number),
-      naturalWidth: expect.any(Number),
-      renderedHeight: expect.any(Number),
-      renderedWidth: expect.any(Number),
-    });
-    expect(imageState.currentSrc).toContain('night-desk-clean');
-
-    // Type sits on top of the photo, inside the viewport.
-    const heading = page.getByRole('heading', {
-      name: 'Control how the world sees you.',
-    });
-    const headingBox = await heading.boundingBox();
+    const copyBox = await page
+      .locator('.homepage-editorial-hero__copy')
+      .boundingBox();
     const viewport = page.viewportSize();
-    expect(headingBox?.y ?? -1).toBeGreaterThan(0);
-    expect((headingBox?.y ?? 0) + (headingBox?.height ?? 0)).toBeLessThan(
+    const copyCenter = (copyBox?.x ?? 0) + (copyBox?.width ?? 0) / 2;
+    const viewportCenter = (viewport?.width ?? 0) / 2;
+    expect(Math.abs(copyCenter - viewportCenter)).toBeLessThanOrEqual(1);
+    expect(copyBox?.y ?? -1).toBeGreaterThan(0);
+    expect((copyBox?.y ?? 0) + (copyBox?.height ?? 0)).toBeLessThan(
       viewport?.height ?? 0
     );
   });
@@ -571,6 +557,52 @@ test.describe('Homepage', () => {
       });
 
       expect(overflow).toBeLessThanOrEqual(1);
+    }
+  });
+
+  test('keeps the hero centered and unclipped at 200% zoom equivalents', async ({
+    page,
+  }) => {
+    for (const viewport of [
+      { width: 720, height: 450 },
+      { width: 320, height: 406 },
+    ]) {
+      await page.setViewportSize(viewport);
+      await gotoHomepage(page);
+      await page.evaluate(() => document.fonts.ready);
+
+      const copy = page.locator('.homepage-editorial-hero__copy');
+      const copyBox = await copy.boundingBox();
+      const heroBox = await page
+        .getByTestId('homepage-hero-shell')
+        .boundingBox();
+      const copyCenter = (copyBox?.x ?? 0) + (copyBox?.width ?? 0) / 2;
+      expect(Math.abs(copyCenter - viewport.width / 2)).toBeLessThanOrEqual(8);
+      expect(copyBox?.y ?? -1).toBeGreaterThanOrEqual(heroBox?.y ?? 0);
+      expect((copyBox?.y ?? 0) + (copyBox?.height ?? 0)).toBeLessThanOrEqual(
+        (heroBox?.y ?? 0) + (heroBox?.height ?? 0) + 1
+      );
+
+      const horizontalOverflow = await page.evaluate(
+        () =>
+          document.documentElement.scrollWidth -
+          document.documentElement.clientWidth
+      );
+      expect(horizontalOverflow).toBeLessThanOrEqual(1);
+
+      const heading = page.getByRole('heading', {
+        name: 'Control how the world sees you.',
+      });
+      const headingLines = await heading.evaluate(element => {
+        const style = getComputedStyle(element);
+        return Math.ceil(
+          element.getBoundingClientRect().height /
+            Number.parseFloat(style.lineHeight) -
+            0.05
+        );
+      });
+      expect(headingLines).toBeLessThanOrEqual(3);
+      await expect(page.getByTestId('homepage-primary-cta')).toBeVisible();
     }
   });
 

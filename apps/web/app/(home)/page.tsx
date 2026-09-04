@@ -19,15 +19,6 @@ import { FEATURE_FLAGS } from '@/lib/flags/marketing-static';
 import { getMarketingExportImage } from '@/lib/screenshots/registry';
 import { HomepageQueryProvider } from './homepage-query-provider';
 
-const HERO_BACKDROP = {
-  desktopSrc: '/images/hero/night-desk-clean.webp',
-  desktopWidth: 1536,
-  desktopHeight: 1024,
-  mobileSrc: '/images/hero/night-desk-mobile-clean.webp',
-  mobileWidth: 737,
-  mobileHeight: 1024,
-} as const;
-
 // Real public-profile exports (jov.ie/timwhite) for the two sections that
 // show product. Every other section is type only.
 const CERTIFIED_PREVIEWS = {
@@ -161,7 +152,6 @@ function HomepageHero() {
       headline={HERO_COPY.headline}
       support={HERO_COPY.subhead}
       search={HERO_COPY.search}
-      backdrop={HERO_BACKDROP}
     />
   );
 }

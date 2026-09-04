@@ -1,6 +1,4 @@
-import path from 'node:path';
 import { render, screen } from '@testing-library/react';
-import sharp from 'sharp';
 import { describe, expect, it, vi } from 'vitest';
 import { HomepageEditorialHero } from '@/components/homepage/HomepageEditorialHero';
 import {
@@ -22,52 +20,6 @@ vi.mock('@/lib/queries/useArtistSearchQuery', () => ({
   }),
 }));
 
-const BACKDROP = {
-  desktopSrc: '/images/hero/night-desk-clean.webp',
-  desktopWidth: 1536,
-  desktopHeight: 1024,
-  mobileSrc: '/images/hero/night-desk-mobile-clean.webp',
-  mobileWidth: 737,
-  mobileHeight: 1024,
-} as const;
-
-const repoRoot = path.resolve(__dirname, '../../../../..');
-const BACKDROP_COPY_SAFE_BRIGHT_PIXEL_LIMIT = 0.01;
-
-async function readCopySafeBrightPixelRatio(input: string | Buffer) {
-  const image = sharp(input);
-  const metadata = await image.metadata();
-  const width = metadata.width ?? 0;
-  const height = metadata.height ?? 0;
-  if (width === 0 || height === 0) {
-    throw new Error('Hero backdrop must have measurable dimensions');
-  }
-
-  const { data, info } = await image
-    .extract({
-      left: Math.floor(width * 0.03),
-      top: Math.floor(height * 0.28),
-      width: Math.floor(width * 0.94),
-      height: Math.floor(height * 0.36),
-    })
-    .removeAlpha()
-    .raw()
-    .toBuffer({ resolveWithObject: true });
-
-  let brightPixels = 0;
-  for (let index = 0; index < data.length; index += info.channels) {
-    if (
-      (data[index] ?? 0) > 190 &&
-      (data[index + 1] ?? 0) > 190 &&
-      (data[index + 2] ?? 0) > 190
-    ) {
-      brightPixels += 1;
-    }
-  }
-
-  return brightPixels / (data.length / info.channels);
-}
-
 function renderHero() {
   return render(
     <HomepageEditorialHero
@@ -75,7 +27,6 @@ function renderHero() {
       headline='Control how the world sees you.'
       support='Find what the internet knows. Turn it into relationships.'
       search={{ placeholder: 'Search your name', action: 'Find me' }}
-      backdrop={BACKDROP}
     />
   );
 }
@@ -114,57 +65,20 @@ describe('HomepageEditorialHero', () => {
     expect(screen.getAllByRole('button')).toHaveLength(1);
   });
 
-  it('art-directs the backdrop as a decorative picture', () => {
+  it('keeps the centered hero abstract and free of distracting media', () => {
     renderHero();
 
     const backdrop = screen.getByTestId('homepage-editorial-hero-backdrop');
     expect(backdrop).toHaveAttribute('aria-hidden', 'true');
     expect(backdrop).toHaveAttribute('data-hero-layer', 'decorative');
-
-    const source = backdrop.querySelector('source');
-    expect(source).toHaveAttribute('media', '(max-width: 767px)');
-    expect(source?.getAttribute('srcset')).toContain('night-desk-mobile');
-
-    const img = backdrop.querySelector('img');
-    expect(img).toHaveAttribute('alt', '');
-    expect(img?.getAttribute('srcset') ?? img?.getAttribute('src')).toContain(
-      'night-desk'
+    expect(backdrop).toHaveAttribute(
+      'data-hero-visual',
+      'abstract-light-field'
     );
-    expect(img).toHaveAttribute('fetchpriority', 'high');
-  });
-
-  it('keeps decorative backdrop pixels free of baked hero UI', async () => {
-    const deliberateRed = await sharp({
-      create: {
-        width: 100,
-        height: 100,
-        channels: 3,
-        background: '#030407',
-      },
-    })
-      .composite([
-        {
-          input: Buffer.from(
-            '<svg width="100" height="100"><rect x="8" y="36" width="84" height="12" fill="white"/><rect x="18" y="58" width="64" height="8" fill="white"/></svg>'
-          ),
-        },
-      ])
-      .webp()
-      .toBuffer();
-
-    expect(await readCopySafeBrightPixelRatio(deliberateRed)).toBeGreaterThan(
-      BACKDROP_COPY_SAFE_BRIGHT_PIXEL_LIMIT
+    const hero = screen.getByTestId('homepage-hero-shell');
+    expect(hero.querySelectorAll('picture, img, video, canvas')).toHaveLength(
+      0
     );
-
-    for (const source of [BACKDROP.desktopSrc, BACKDROP.mobileSrc]) {
-      const ratio = await readCopySafeBrightPixelRatio(
-        path.join(repoRoot, 'apps/web/public', source)
-      );
-      expect(
-        ratio,
-        `${source} must remain a decorative copy-safe backdrop; visible hero copy and controls belong to the live active layer`
-      ).toBeLessThanOrEqual(BACKDROP_COPY_SAFE_BRIGHT_PIXEL_LIMIT);
-    }
   });
 });
 

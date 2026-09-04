@@ -6,15 +6,6 @@ import {
 } from '@/data/homepageCertifiedOptimization';
 import { HomepageCertifiedExposure } from './HomepageCertifiedExposure';
 
-export interface HomepageEditorialHeroBackdrop {
-  readonly desktopSrc: string;
-  readonly desktopWidth: number;
-  readonly desktopHeight: number;
-  readonly mobileSrc: string;
-  readonly mobileWidth: number;
-  readonly mobileHeight: number;
-}
-
 export interface HomepageEditorialHeroSearch {
   readonly placeholder: string;
   readonly action: string;
@@ -24,25 +15,18 @@ export interface HomepageEditorialHeroProps {
   readonly headline: string;
   readonly support: string;
   readonly search: HomepageEditorialHeroSearch;
-  readonly backdrop: HomepageEditorialHeroBackdrop;
   readonly headingId?: string;
 }
 
-const BACKDROP_MOBILE_MEDIA = '(max-width: 767px)';
-
 /**
- * Full-viewport editorial hero: one photo behind, one headline, one support
- * line, and the existing name search as the single conversion control.
- *
- * The backdrop is art-directed with a <picture> element. These precompressed
- * WebPs are delivered directly so the critical first paint never waits on a
- * redundant runtime image transformation.
+ * Full-viewport editorial hero: a quiet abstract light field, one headline,
+ * one support line, and the existing name search as the single conversion
+ * control. The backdrop is CSS-only so product meaning remains the focal point.
  */
 export function HomepageEditorialHero({
   headline,
   support,
   search,
-  backdrop,
   headingId = 'homepage-editorial-hero-heading',
 }: HomepageEditorialHeroProps) {
   return (
@@ -56,22 +40,11 @@ export function HomepageEditorialHero({
         className='homepage-editorial-hero__backdrop'
         aria-hidden='true'
         data-hero-layer='decorative'
+        data-hero-visual='abstract-light-field'
         data-testid='homepage-editorial-hero-backdrop'
       >
-        <picture>
-          <source media={BACKDROP_MOBILE_MEDIA} srcSet={backdrop.mobileSrc} />
-          <img
-            src={backdrop.desktopSrc}
-            width={backdrop.desktopWidth}
-            height={backdrop.desktopHeight}
-            alt=''
-            decoding='async'
-            fetchPriority='high'
-            loading='eager'
-          />
-        </picture>
+        <div className='homepage-editorial-hero__light-well' />
       </div>
-      <div className='homepage-editorial-hero__scrim' aria-hidden='true' />
       <div className='homepage-editorial-hero__copy' data-hero-layer='active'>
         <h1 id={headingId} className='homepage-editorial-hero__headline'>
           {headline}
