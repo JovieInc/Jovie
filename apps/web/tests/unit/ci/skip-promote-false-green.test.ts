@@ -32,6 +32,10 @@ const liveBindScriptPath = resolve(
   repoRoot,
   '.github/scripts/assert-live-production-bind.mjs'
 );
+const productionAliasVerifierPath = resolve(
+  repoRoot,
+  '.github/scripts/verify-production-alias.sh'
+);
 const screenshotHoldScriptPath = resolve(
   repoRoot,
   '.github/scripts/hold-screenshot-mq-during-controller.mjs'
@@ -210,8 +214,9 @@ describe('skip-promote false-green detector (JOV-5458)', () => {
     });
   });
 
-  it('Production Verified cannot skip-succeed without a live bind proof', () => {
+  it('Production Verified cannot preserve a superseded marker without a live bind proof', () => {
     const workflow = readFileSync(productionControllerPath, 'utf8');
+    const verifier = readFileSync(productionAliasVerifierPath, 'utf8');
     const authorize = getStepBlock(
       getJobBlock(workflow, 'authorize-production'),
       'Cross-prove exact successful push CI'
@@ -220,6 +225,10 @@ describe('skip-promote false-green detector (JOV-5458)', () => {
     const current = getStepBlock(
       verified,
       'Resolve current main before final verification'
+    );
+    const verify = getStepBlock(
+      verified,
+      'Require exact deployment and every post-deploy probe'
     );
     const finalize = getStepBlock(
       verified,
@@ -244,6 +253,11 @@ describe('skip-promote false-green detector (JOV-5458)', () => {
     expect(current).toContain(
       'RUN_WEB: ${{ needs.authorize-production.outputs.run_web }}'
     );
+    expect(current).toContain('superseded_before_marker=false');
+    expect(current).toContain('superseded_before_marker=true');
+    expect(current).toContain(
+      'exact production bind will be proven before marker preservation'
+    );
     expect(current).toContain(
       'node .github/scripts/assert-live-production-bind.mjs --main-sha "$current_sha"'
     );
@@ -254,6 +268,19 @@ describe('skip-promote false-green detector (JOV-5458)', () => {
       )
     );
     expect(current).not.toContain('neutral with no notification');
+    expect(verify).toContain('bash .github/scripts/verify-production-alias.sh');
+    expect(verify).not.toContain('neutral with no notification');
+    expect(finalize).toContain(
+      "steps.verify.outputs.canonical_verified == 'true'"
+    );
+    expect(finalize).toContain(
+      '[ "${{ steps.verify.outputs.canonical_deployment_id }}" = "$DEPLOYMENT_ID" ]'
+    );
+    expect(finalize).toContain(
+      '[ "${{ steps.verify.outputs.canonical_sha }}" = "$EXPECTED_SHA" ]'
+    );
+    expect(finalize).toContain('terminalReason');
+    expect(finalize).toContain('skipped_superseded');
     expect(finalize).toContain(
       'node .github/scripts/assert-live-production-bind.mjs --main-sha "$boundary_sha"'
     );
@@ -271,6 +298,8 @@ describe('skip-promote false-green detector (JOV-5458)', () => {
       finalize.indexOf('> "$RUNNER_TEMP/production-generation-verified.json"')
     );
     expect(finalize).not.toContain('neutral with no notification');
+    expect(verifier).toContain(PRODUCTION_BUILD_INFO_URL);
+    expect(verifier).toContain('commitSha');
   });
 
   it('Production Controller Health stays red until live bind on superseded or skip-success', () => {

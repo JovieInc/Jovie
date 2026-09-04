@@ -670,6 +670,14 @@ describe('automation-verify affected scope', () => {
     expect(script).not.toContain('turbo-local.mjs test --affected');
   });
 
+  it('runs the coverage ownership contract before expensive V8 collection', () => {
+    expect(runner).toContain('CI_CONTROL_WEB_TESTS');
+    expect(runner).toContain(
+      'apps/web/tests/unit/ci/test-coverage-audit-workflow.test.ts'
+    );
+    expect(runner).toContain('...CI_CONTROL_WEB_TESTS.map');
+  });
+
   it('routes the exact JOV-5006 ops diff to focused infrastructure contracts', () => {
     const plan = buildAffectedTestPlan(EVENT_DRIVEN_SHIPPER_PRIMARY_MANIFEST);
 
@@ -683,6 +691,7 @@ describe('automation-verify affected scope', () => {
         'scripts/lib/__tests__/pr-visual-capture-path.test.mjs',
         'scripts/lib/__tests__/pr-visual-review.test.mjs',
         'scripts/lib/__tests__/ci-harness.test.mjs',
+        'scripts/lib/__tests__/changed-test-coverage.test.mjs',
         'scripts/lib/__tests__/ci-duration-ratchet.test.mjs',
         'scripts/lib/__tests__/ci-branching-guard.test.mjs',
         'scripts/lib/__tests__/merge-queue-guard.test.mjs',
@@ -712,6 +721,7 @@ describe('automation-verify affected scope', () => {
         'scripts/lib/__tests__/rolling-ci-dispatch.test.mjs',
         'scripts/lib/__tests__/rolling-ci-fx.test.mjs',
         'scripts/lib/__tests__/actions-cache-gc.test.mjs',
+        'scripts/lib/__tests__/rolling-ci-pipeline.test.mjs',
         'scripts/lib/__tests__/queue-deferred-release.test.mjs',
         'scripts/lib/__tests__/queue-deferred-release-admission.test.mjs',
         'scripts/lib/__tests__/setup-worktree-health.test.mjs',
