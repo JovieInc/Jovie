@@ -1539,7 +1539,7 @@ describe('deterministic Symphony admission boundary', () => {
     );
   });
 
-  it('accepts only exact useful-turn proof rows and rejects OAuth source', () => {
+  it('rejects OAuth-derived and mismatched capacity evidence', () => {
     const now = '2026-09-02T19:20:00.000Z';
     for (const target of [1, 2, 8, 40]) {
       const live = admitter.resolveGemConcurrency(
