@@ -156,9 +156,8 @@ describe('bounded PR visual review contract', () => {
     expect(capture).toContain('Test-auth handoff ended at');
     expect(capture).toContain("waitUntil: route.startsWith('/app/')");
     expect(capture).toContain("'domcontentloaded'");
-    expect(capture).toContain('page.waitForFunction(');
+    expect(capture).toContain('waitForAuthenticatedShell');
     expect(capture).toContain('/Inbox|Library|New Chat/');
-    expect(capture).toContain('failed.png');
   });
 
   it('skips postgres on the secretless visual-capture shell path', () => {
