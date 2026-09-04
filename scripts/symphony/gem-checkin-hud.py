@@ -2460,6 +2460,10 @@ def render(
             "",
             _footer(symphony, cols, now=clock),
         ]
+    if compact and rows <= 32:
+        # Jobs outrank secondary shipping aggregates on short terminals.
+        lines = [header, *health_band, *pressure_lines[:1], *_compact_work_header(cols)]
+        footer = [*_ship_path_lines(path, cols)[:1], _footer(symphony, cols, now=clock)]
     truth = execution_summary(symphony, cols, now=clock)
     lines[1:1] = [truth[0], truth[2]] if compact else truth
     blocks = []

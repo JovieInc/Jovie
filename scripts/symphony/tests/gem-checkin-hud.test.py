@@ -143,6 +143,12 @@ class ExecutionTruthTests(unittest.TestCase):
         failed = {**row, "last_event": "turn_failed"}
         self.assertEqual(HUD.execution_state(failed, now=NOW), "SESSION / ERROR")
         self.assertIn("Executed: UNKNOWN", strip("\n".join(HUD.execution_lines(failed, 430, now=NOW))))
+        for width, height in ((80, 24), (120, 30)):
+            state["rows"] = [{**row, "id": f"JOV-{i}"} for i in range(4)]
+            compact = strip(paint(state, width=width, height=height))
+            self.assertIn("JOV-0", compact)
+            self.assertIn("gpt-5.6-sol", compact)
+            self.assertIn("SESSION / RECENT EVENT", compact)
         for width in (120, 200):
             state["rows"] = [{**row, "id": f"JOV-{i}", "kind": "queued"} for i in range(4)]
             text = strip(paint(state, width=width, height=40))
