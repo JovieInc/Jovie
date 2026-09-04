@@ -1370,6 +1370,8 @@ def evaluate(signals: dict[str, Any], observed_at: str) -> dict[str, Any]:
     unbound_repair_allowed = (
         hold_intake_allowed
         and review_allowed
+        and capacity_fresh
+        and gem_concurrency >= 1
         and valid_commit_sha(main.get("sha"), exact=True)
         and valid_commit_sha(production.get("deployedSha"))
     )

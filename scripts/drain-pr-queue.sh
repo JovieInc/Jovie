@@ -308,7 +308,9 @@ case "$DRAIN_PROMOTION_MODE" in
           .productionUnboundRepairAdmission.deployedSha == null
         end) and
         (.productionUnboundRepairAdmission.maxConcurrent | type == "number") and
-        (.productionUnboundRepairAdmission.maxConcurrent | IN(range(1;11))) and
+        (if .productionUnboundRepairAdmission.allowed then
+          (.productionUnboundRepairAdmission.maxConcurrent | IN(range(1;11)))
+        else (.productionUnboundRepairAdmission.maxConcurrent | IN(range(0;11))) end) and
         .productionUnboundRepairAdmission.deploymentsAllowed == false and
         .alreadyAdmittedCohort.preserve == true and
         .closureAdmission.authority == "Summer" and

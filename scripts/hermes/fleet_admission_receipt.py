@@ -162,12 +162,13 @@ def _project_isolated(value: object) -> dict[str, Any]:
     }
 
 
-def _require_unbound_repair_max_concurrent(value: object) -> int:
+def _require_unbound_repair_max_concurrent(value: object, *, allowed: bool) -> int:
     if (
         isinstance(value, bool)
         or not isinstance(value, int)
-        or value < 1
+        or value < 0
         or value > UNBOUND_REPAIR_MAX_CONCURRENT_CEILING
+        or (allowed and value == 0)
     ):
         raise AdmissionProjectionError("unbound repair maxConcurrent is invalid")
     return value
@@ -203,7 +204,7 @@ def _project_unbound_repair(value: object, promotion_mode: str) -> dict[str, Any
         ),
     }
     projected["maxConcurrent"] = _require_unbound_repair_max_concurrent(
-        projected["maxConcurrent"]
+        projected["maxConcurrent"], allowed=allowed
     )
     if projected["deploymentsAllowed"] is not False:
         raise AdmissionProjectionError("unbound repair deploymentsAllowed must be false")

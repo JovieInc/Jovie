@@ -1467,6 +1467,11 @@ class DeploymentBindingTests(unittest.TestCase):
         self.assertEqual(receipt["promotionMode"], "hold-intake")
         self.assertEqual(receipt["productionUnboundRepairAdmission"]["maxConcurrent"], 0)
         self.assertFalse(receipt["productionUnboundRepairAdmission"]["deploymentsAllowed"])
+        projection = subprocess.run(
+            ["python3", str(ROOT / "scripts/hermes/fleet_admission_receipt.py")],
+            input=json.dumps(receipt), capture_output=True, text=True, check=False,
+        )
+        self.assertEqual(projection.returncode, 0, projection.stderr)
         self.assertEqual(receipt["isolatedPromotionAdmission"]["maxConcurrent"], 1)
         self.assertEqual(receipt["remediationAdmission"]["maxConcurrent"], 0)
         self.assertFalse(receipt["remediationAdmission"]["pushAllowed"])
