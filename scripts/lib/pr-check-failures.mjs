@@ -139,7 +139,18 @@ export function isAdvisoryCheckName(name) {
 }
 
 export function isAdvisoryCheck(check) {
+  if (
+    REQUIRED_CHECK_NAMES.some(required =>
+      required.names.includes(normalizeCheckName(check))
+    )
+  ) {
+    return false;
+  }
+  // Only this recovery-dispatch job is operational evidence. Neither a generic
+  // sweep nor a future safety job in that workflow inherits the exception.
   return (
+    (check?.workflow === 'Ownerless Recovery Sweep' &&
+      check?.name === 'sweep') ||
     isAdvisoryCheckName(normalizeCheckName(check)) ||
     ADVISORY_CHECK_WORKFLOWS.includes(check?.workflow ?? '')
   );
@@ -208,14 +219,18 @@ export function collapseNewestCheckAttempts(checks) {
   const groups = new Map();
   for (const check of checks ?? []) {
     const name = normalizeCheckName(check);
-    const group = groups.get(name) ?? [];
+    // A rerun can supersede only the same workflow/job identity. Keep the
+    // public check name intact for required status/check-context matching.
+    const identity = JSON.stringify([check?.workflow || null, name]);
+    const group = groups.get(identity) ?? [];
     group.push(check);
-    groups.set(name, group);
+    groups.set(identity, group);
   }
 
   const collapsed = [];
   const ambiguousNames = [];
-  for (const [name, group] of groups) {
+  for (const group of groups.values()) {
+    const name = normalizeCheckName(group[0]);
     if (group.length === 1) {
       collapsed.push(group[0]);
       continue;

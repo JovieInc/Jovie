@@ -1,4 +1,12 @@
-import { readFileSync } from 'node:fs';
+import {
+  chmodSync,
+  mkdtempSync,
+  readFileSync,
+  rmSync,
+  writeFileSync,
+} from 'node:fs';
+import { tmpdir } from 'node:os';
+import { delimiter, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
 import {
@@ -7,6 +15,7 @@ import {
   classifyQueueCheckBlockers,
   collapseNewestCheckAttempts,
   extractTerminalFailures,
+  fetchRequiredCheckFailures,
   isAdvisoryCheck,
   isAgentBranch,
   isTerminalFailure,
@@ -131,6 +140,136 @@ describe('pr-check-failures', () => {
         fleetRefreshFailure,
       ])
     ).toEqual(['PR Ready', 'PR Ready (not successful)']);
+  });
+
+  describe('ownerless recovery workflow admission', () => {
+    const required = [
+      'PR Ready',
+      'Migration Guard',
+      'Fork PR Gate',
+      'PR Size Guard',
+    ].map(name => ({
+      name,
+      bucket: 'pass',
+      state: 'SUCCESS',
+    }));
+    const sweep = {
+      name: 'sweep',
+      workflow: 'Ownerless Recovery Sweep',
+      bucket: 'fail',
+      state: 'FAILURE',
+    };
+
+    it('ignores the operational workflow only with all required contexts green', () => {
+      expect(classifyQueueCheckBlockers([...required, sweep])).toEqual([]);
+      for (const workflow of ['Real Safety Workflow', undefined]) {
+        expect(
+          classifyQueueCheckBlockers([...required, { ...sweep, workflow }])
+        ).toEqual(['sweep']);
+      }
+      expect(ADVISORY_CHECK_NAMES).not.toContain('sweep');
+    });
+
+    it('does not erase an older safety failure with a newer advisory job of the same name', () => {
+      for (const workflow of ['Real Safety Workflow', undefined]) {
+        const older = {
+          ...sweep,
+          workflow,
+          startedAt: '2026-09-04T23:00:00Z',
+          completedAt: '2026-09-04T23:01:00Z',
+        };
+        const newer = {
+          ...sweep,
+          startedAt: '2026-09-04T23:02:00Z',
+          completedAt: '2026-09-04T23:03:00Z',
+        };
+        for (const attempts of [
+          [older, newer],
+          [newer, older],
+        ]) {
+          expect(
+            classifyQueueCheckBlockers([...required, ...attempts])
+          ).toEqual(['sweep']);
+          expect(collapseNewestCheckAttempts(attempts).checks).toHaveLength(2);
+        }
+      }
+    });
+
+    it('does not make another job in the recovery workflow advisory', () => {
+      const safety = { ...sweep, name: 'Release Safety Gate' };
+      expect(isAdvisoryCheck(safety)).toBe(false);
+      expect(classifyQueueCheckBlockers([...required, sweep, safety])).toEqual([
+        'Release Safety Gate',
+      ]);
+    });
+
+    it.each(
+      required.map(check => check.name)
+    )('never filters required %s from failure extraction', name => {
+      for (const workflow of [
+        sweep.workflow,
+        'Merge Queue Auto-Enroll',
+        'Fleet Gate Refresh',
+      ]) {
+        const failure = { ...sweep, name, workflow };
+        expect(isAdvisoryCheck(failure)).toBe(false);
+        expect(extractTerminalFailures([failure])).toEqual([name]);
+      }
+    });
+
+    it('preserves required-only CLI failures for both JSON success and nonzero results', async () => {
+      const root = mkdtempSync(join(tmpdir(), 'jovie-required-checks-'));
+      const previousPath = process.env.PATH;
+      const failures = required.map(check => ({
+        ...check,
+        workflow: sweep.workflow,
+        bucket: 'fail',
+        state: 'FAILURE',
+      }));
+      try {
+        process.env.PATH = `${root}${delimiter}${previousPath ?? ''}`;
+        for (const exit of [0, 1]) {
+          const gh = join(root, 'gh');
+          writeFileSync(
+            gh,
+            `#!/bin/sh\n[ "$1 $2 $4" = "pr checks --required" ] || exit 99\nprintf '%s\n' '${JSON.stringify(failures)}'\nexit ${exit}\n`
+          );
+          chmodSync(gh, 0o700);
+          expect(await fetchRequiredCheckFailures('example/repo', 123)).toEqual(
+            required.map(check => check.name).sort()
+          );
+        }
+      } finally {
+        if (previousPath === undefined) delete process.env.PATH;
+        else process.env.PATH = previousPath;
+        rmSync(root, { recursive: true, force: true });
+      }
+    });
+
+    it.each(
+      required.map(check => check.name)
+    )('preserves required failure, missing and pending for %s', name => {
+      const others = required.filter(check => check.name !== name);
+      for (const workflow of ['CI', sweep.workflow]) {
+        expect(
+          classifyQueueCheckBlockers([
+            ...others,
+            sweep,
+            { name, workflow, bucket: 'fail', state: 'FAILURE' },
+          ])
+        ).toContain(`${name} (not successful)`);
+      }
+      expect(classifyQueueCheckBlockers([...others, sweep])).toContain(
+        `${name} (missing)`
+      );
+      expect(
+        classifyQueueCheckBlockers([
+          ...others,
+          sweep,
+          { name, bucket: 'pending', state: 'PENDING' },
+        ])
+      ).toContain(`${name} (pending)`);
+    });
   });
 
   it('treats a red Fork PR Gate Controller receipt with SKIPPED twin as advisory (JOV-4782)', () => {
