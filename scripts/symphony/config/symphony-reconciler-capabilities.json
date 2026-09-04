@@ -1,0 +1,12 @@
+{
+  "schema": "symphony-runtime-capabilities/v1",
+  "runtime": "symphony-reconciler",
+  "capabilities": [
+    "workspace-observation",
+    "workspace-upgrade",
+    "immutable-runtime-revision",
+    "router-selection",
+    "isolated-repair"
+  ],
+  "requiredFiles": ["runtime", "router", "registry"]
+}

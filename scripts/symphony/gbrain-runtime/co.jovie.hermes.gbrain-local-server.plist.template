@@ -1,0 +1,44 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+    <key>Label</key>
+    <string>co.jovie.hermes.gbrain-local-server</string>
+    <key>ProgramArguments</key>
+    <array>
+        <string>{{JOVIE_REPO}}/scripts/symphony/gbrain-runtime/gbrain-serve-wrapper.sh</string>
+    </array>
+    <key>EnvironmentVariables</key>
+    <dict>
+        <key>PATH</key>
+        <string>{{HOME}}/.hermes/bin:{{HOME}}/.local/bin:/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin</string>
+        <key>GBRAIN_BIN</key>
+        <string>{{GBRAIN_BIN}}</string>
+        <key>GBRAIN_SERVE_BIND</key>
+        <string>127.0.0.1</string>
+        <key>GBRAIN_SERVE_PORT</key>
+        <string>7801</string>
+        <key>GBRAIN_POOL_SIZE</key>
+        <string>3</string>
+        <key>GBRAIN_DIRECT_POOL_SIZE</key>
+        <string>1</string>
+        <key>GBRAIN_MAX_CONNECTIONS</key>
+        <string>3</string>
+    </dict>
+    <key>RunAtLoad</key>
+    <true/>
+    <key>KeepAlive</key>
+    <dict>
+        <key>SuccessfulExit</key>
+        <false/>
+        <key>Crashed</key>
+        <true/>
+    </dict>
+    <key>ThrottleInterval</key>
+    <integer>30</integer>
+    <key>StandardOutPath</key>
+    <string>{{HOME}}/.hermes/logs/launchd/gbrain-local.log</string>
+    <key>StandardErrorPath</key>
+    <string>{{HOME}}/.hermes/logs/launchd/gbrain-local.err.log</string>
+</dict>
+</plist>
