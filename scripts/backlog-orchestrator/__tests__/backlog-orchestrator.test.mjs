@@ -1,6 +1,8 @@
 import assert from 'node:assert/strict';
-import { execFile } from 'node:child_process';
+import { execFile, execFileSync } from 'node:child_process';
+import { mkdtempSync, rmSync } from 'node:fs';
 import { access, mkdir, mkdtemp, readFile, writeFile } from 'node:fs/promises';
+import { tmpdir } from 'node:os';
 import { dirname, resolve } from 'node:path';
 import { describe, it } from 'node:test';
 import { fileURLToPath } from 'node:url';
@@ -9,6 +11,10 @@ import { promisify } from 'node:util';
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const ORCHESTRATOR_DIR = resolve(__dirname, '..');
 const execFileAsync = promisify(execFile);
+const proofDirectory = mkdtempSync(resolve(tmpdir(), 'jovie-proof-node-'));
+process.on('exit', () =>
+  rmSync(proofDirectory, { recursive: true, force: true })
+);
 
 const classifier = await import('../classifier.mjs');
 const { reconcileIssues } = await import('../reconcile.mjs');
@@ -971,27 +977,114 @@ describe('deterministic Symphony admission boundary', () => {
     target = 4,
     observedAt = '2026-08-09T05:00:00.000Z'
   ) {
-    return {
-      schema: admitter.GEM_CONCURRENCY_EVIDENCE_SCHEMA,
-      source: 'execution-proven-useful-turns',
-      target,
-      approved: target > 0,
-      severeIncidents: 0,
-      observedAt,
-      acceptedEvidence: Array.from({ length: target }, (_, index) => ({
-        schema: 'symphony-useful-turn-proof/v1',
-        provider: 'openai',
-        profile: String(index + 1).padStart(64, '0'),
-        model: 'gpt-5.6-sol',
-        rc: 0,
-        useful: true,
-        completedAt: observedAt,
-        outputDigest: `${index + 1}`.repeat(64).slice(0, 64),
-        outputBytes: 32,
-        outputTokens: 8,
-      })),
-    };
+    const fixture = JSON.parse(
+      execFileSync(
+        'python3',
+        [
+          resolve(ORCHESTRATOR_DIR, '../symphony/tests/proof_fixtures.py'),
+          String(target),
+          observedAt,
+          proofDirectory,
+        ],
+        { encoding: 'utf8' }
+      )
+    );
+    process.env.SYMPHONY_PROOF_CONTEXT = fixture.contextPath;
+    if (!process.env.PATH.startsWith(`${proofDirectory}:`))
+      process.env.PATH = `${proofDirectory}:${process.env.PATH}`;
+    return fixture.evidence;
   }
+
+  it('accepts only Python-attested v2 across both consumers', () => {
+    for (const target of [1, 40]) {
+      const evidence = capacityEvidence(target);
+      assert.equal(
+        evidence.acceptedEvidence[0].schema,
+        'symphony-useful-turn-proof/v2'
+      );
+      assert.equal(
+        admitter.resolveGemConcurrency(evidence, { now: evidence.observedAt })
+          .maxConcurrent,
+        target
+      );
+    }
+  });
+
+  it('rejects every cross-consumer proof substitution and missing local authority', () => {
+    const mutations = [
+      value => {
+        value.acceptedEvidence[0].schema = 'symphony-useful-turn-proof/v1';
+      },
+      value => {
+        value.acceptedEvidence[0].completedAt = '2026-08-01T00:00:00Z';
+      },
+      value => {
+        value.acceptedEvidence.push(value.acceptedEvidence[0]);
+        value.target = 2;
+      },
+      value => {
+        value.acceptedEvidence[0].provider = 'alternate';
+      },
+      value => {
+        value.acceptedEvidence[0].profile = 'f'.repeat(64);
+      },
+      value => {
+        value.acceptedEvidence[0].model = 'other';
+      },
+      value => {
+        value.acceptedEvidence[0].producer = 'self';
+      },
+      value => {
+        value.acceptedEvidence[0].probeId = 'e'.repeat(64);
+      },
+      value => {
+        value.acceptedEvidence[0].attested = false;
+      },
+      value => {
+        value.acceptedEvidence[0].outputDigest = 'a'.repeat(64);
+      },
+      value => {
+        value.runtime.binarySha256 = 'b'.repeat(64);
+      },
+      value => {
+        value.contractSha256 = 'c'.repeat(64);
+      },
+      value => {
+        value.acceptedEvidence[0].runtime.workflowSha256 = 'd'.repeat(64);
+      },
+      value => {
+        value.acceptedEvidence.push({
+          ...value.acceptedEvidence[0],
+          model: 'other',
+        });
+        value.target = 2;
+      },
+    ];
+    for (const mutate of mutations) {
+      const evidence = capacityEvidence(1);
+      mutate(evidence);
+      const result = admitter.resolveGemConcurrency(evidence, {
+        now: evidence.observedAt,
+      });
+      assert.equal(result.maxConcurrent, 0);
+      assert.equal(result.newMutationAllowed, false);
+    }
+    const evidence = capacityEvidence(1);
+    const context = process.env.SYMPHONY_PROOF_CONTEXT;
+    process.env.SYMPHONY_PROOF_CONTEXT = resolve(
+      proofDirectory,
+      'missing.json'
+    );
+    try {
+      assert.equal(
+        admitter.resolveGemConcurrency(evidence, { now: evidence.observedAt })
+          .maxConcurrent,
+        0
+      );
+    } finally {
+      process.env.SYMPHONY_PROOF_CONTEXT = context;
+    }
+  });
 
   it('does not multiply one provider profile by model name', () => {
     const evidence = capacityEvidence(2);
@@ -1064,7 +1157,9 @@ describe('deterministic Symphony admission boundary', () => {
         scope: admitter.INDEPENDENT_REVIEW_SCOPE,
         observedAt: '2026-08-09T05:00:00.000Z',
       },
-      concurrencyEvidence: capacityEvidence(),
+      concurrencyEvidence: Object.hasOwn(overrides, 'concurrencyEvidence')
+        ? Reflect.get(overrides, 'concurrencyEvidence')
+        : capacityEvidence(),
       observedAt: '2026-08-09T05:00:00.000Z',
       ...overrides,
     };

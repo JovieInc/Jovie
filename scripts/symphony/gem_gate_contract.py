@@ -132,7 +132,10 @@ def validate_useful_turn_proof(
         return None, "completion-unproven"
     if completed_at is None or not timedelta(0) <= now - completed_at <= max_age:
         return None, "stale-or-future"
+    if any(not isinstance(value.get(key), str) or not SHA256.fullmatch(value[key]) for key in ("runtimeGeneration", "codexSha256", "accountStateSha256")):
+        return None, "missing-live-bindings"
     return {
+        **{key: value[key] for key in ("runtimeGeneration", "codexSha256", "accountStateSha256")},
         "schema": PROOF_SCHEMA,
         "provider": strings[0],
         "profile": strings[1],

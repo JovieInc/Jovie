@@ -705,7 +705,7 @@ def configured_slots(
         except OSError:
             continue
         match = re.search(
-            r"^\s*max_concurrent_agents:\s*([1-9][0-9]*)\s*$",
+            r"^\s*max_concurrent_agents:\s*(0|[1-9][0-9]*)\s*$",
             content,
             re.MULTILINE,
         )

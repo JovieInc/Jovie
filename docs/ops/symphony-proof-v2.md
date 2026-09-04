@@ -19,6 +19,10 @@ completion before creating an exclusive, mode-0600 artifact keyed by probe ID.
 It emits the proof as JSON for the existing projector input. It does not enroll
 accounts, change credentials, recover cooldowns, start a service or schedule work.
 
+The JavaScript admitter invokes the same Python validator through a bounded JSON
+stdin subprocess; it has no independent v1 or self-attested acceptance path.
+The cross-consumer test passes producer output through this boundary with the
+external completion and service observation explicitly mocked by test-only code.
 The projector, gate and controller independently read `SYMPHONY_PROOF_CONTEXT`
 (default `/home/timwhite/gem-workspace/state/proof-context.json`). This operator-owned,
 mode-0600 file contains:
@@ -28,11 +32,21 @@ mode-0600 file contains:
   `binarySha256`, `workflowSha256`, `contractSha256`.
 - `sourceRoot`, `binaryPath`, `workflowPath`: independently remeasured local paths.
   The imported contract file must match `contractSha256`.
+- `codexPath`, `codexSha256`: exact executable path and digest. A caller-selected
+  replacement, symlink or changed executable cannot produce accepted evidence.
 - `observedAt`: enrollment observation, at most 600 seconds old, never future.
 - `accounts`: exact `provider`, `profile`, `model`, `agentProfile: coder`, and
   `accountPath`. Profile identity hashes the canonical account path and the auth
   and configuration file digests. A replacement invalidates existing proofs.
 - `attestationDir`: private mode-0700 directory owned by the executing OS principal.
+
+Each observation also verifies systemd's active official MainPID and ControlGroup,
+its `/proc` command line, process start time, cgroup membership and ownership of
+the listening socket on port 4041. Missing Linux/systemd observations fail closed.
+Proofs retain the process generation and enrolled executable digest. Every
+consumer rechecks current private account state; a cooldown, last error or changed
+cooldown generation invalidates existing capacity immediately, even inside the
+24-hour proof window. All enrolled accounts must be readable and healthy.
 
 The trusted context is not inferred from incoming proof rows or inventory claims.
 Missing, stale, contradictory or mismatched trust closes capacity. Completion
@@ -55,7 +69,8 @@ The Jovie reconciler keeps a current exit-78 failure terminal even when a routin
 receipt/generation changes. Repair requires cleared failure evidence and a new
 valid routing generation. Structured provider cooldowns preserve the exact
 `nextEligibleAt` in one durable deferred receipt, with one attempt, no alternate
-provider handoff and no repeated attempt growth. These are local reconciler
+provider handoff and no repeated attempt growth. At expiry, the same generation
+gets one scheduled reevaluation at that exact timestamp. These are local reconciler
 contracts; they do not establish that the external official scheduler honors them.
 
 PR #17213 remains intact: allowed production-unbound `maxConcurrent` is 1 through
@@ -66,7 +81,8 @@ changed by this source work.
 ## Verification
 
 The exact-head fleet CI job runs the canonical `scripts/symphony/tests` paths,
-including the gate, fleet receipt, evaluator, controller and recovery probe suites.
+including the gate, fleet receipt, evaluator, controller, recovery probe,
+reconciler, HUD and JavaScript admission suites.
 `python3 scripts/symphony/tests/run-proof-gate.py` executes the adversarial unittest
 selector and enforces 90% line coverage separately for the changed proof-contract
 functions, trust loader, producer and projector using Python's standard tracer.
@@ -74,7 +90,7 @@ Coverage is execution-derived, with executable/missing lines printed to CI logs.
 It is line coverage, not full branch coverage or live authenticated-runtime proof.
 
 Local aggregate `pnpm invariants:check` reached the final webhook Vitest selector
-after all 211 Node tests and preceding Python stages passed. That selector is
+after all 213 Node tests and preceding Python stages passed. That selector is
 blocked by absent worktree dependencies. Invoking the existing shared Vitest
 binary with the same worktree/config/selector also failed resolving
 `@vitejs/plugin-react`. No dependencies were installed and no checks were skipped.

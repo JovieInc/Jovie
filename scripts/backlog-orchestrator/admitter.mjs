@@ -7,6 +7,8 @@
  * fail-closed on ownership, plan evidence, and mutation read-back.
  */
 
+import { spawnSync } from 'node:child_process';
+import { fileURLToPath } from 'node:url';
 import { invariantPolicy } from '../invariants/registry.mjs';
 import { admissionGateReceipt } from './admission-gate.mjs';
 import { preAdmissionDecision } from './admission-policy.mjs';
@@ -440,30 +442,37 @@ function usefulTurnProofs(evidence, nowMs, maxAgeMs) {
   ) {
     return null;
   }
-  const seats = new Set();
-  for (const proof of evidence.acceptedEvidence) {
-    const completionProven =
-      (Number.isInteger(proof?.outputBytes) && proof.outputBytes > 0) ||
-      (Number.isInteger(proof?.outputTokens) && proof.outputTokens > 0);
-    if (
-      proof?.schema !== 'symphony-useful-turn-proof/v1' ||
-      !/^[a-z][a-z0-9._-]{0,63}$/.test(proof?.provider || '') ||
-      !/^[0-9a-f]{64}$/.test(proof?.profile || '') ||
-      !/^[A-Za-z0-9][A-Za-z0-9._/-]{0,127}$/.test(proof?.model || '') ||
-      proof?.rc !== 0 ||
-      proof?.useful !== true ||
-      typeof proof?.outputDigest !== 'string' ||
-      !/^[0-9a-f]{64}$/.test(proof.outputDigest) ||
-      !completionProven ||
-      !isFreshTimestamp(proof?.completedAt, nowMs, maxAgeMs)
-    ) {
-      return null;
-    }
-    const seat = `${proof.provider}\u0000${proof.profile}`;
-    if (seats.has(seat)) return null;
-    seats.add(seat);
+  // One contract implementation: rows cannot supply their own trust context.
+  // Python remeasures the private runtime/enrollment files and completion artifacts.
+  try {
+    const result = spawnSync(
+      'python3',
+      [
+        fileURLToPath(
+          new URL('../symphony/symphony_proof_context.py', import.meta.url)
+        ),
+      ],
+      {
+        input: JSON.stringify({
+          receipt: evidence,
+          now: new Date(nowMs).toISOString(),
+          maxAgeMs,
+        }),
+        encoding: 'utf8',
+        timeout: 10000,
+        maxBuffer: 1024 * 1024,
+      }
+    );
+    if (result.error || result.status !== 0) return null;
+    const verified = JSON.parse(result.stdout);
+    return verified.accepted === true &&
+      Array.isArray(verified.seats) &&
+      verified.seats.length === evidence.target
+      ? verified.seats
+      : null;
+  } catch {
+    return null;
   }
-  return evidence.target === seats.size ? [...seats] : null;
 }
 
 /** Use only fresh, digest-bound useful turns as dispatch capacity. */

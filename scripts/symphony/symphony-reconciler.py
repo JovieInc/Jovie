@@ -734,6 +734,12 @@ def controller_retry_decision(
             return {"state": "deferred", "retryable": False, "maxAttempts": 1,
                     "due_at": _iso(eligible), "nextEligibleAt": _iso(eligible), "attempt": 1,
                     "lease": None, "handoff": False, "providerAccount": None, "failure": failure}
+        if eligible is not None:
+            # Expiry permits one normal scheduler reevaluation, never an alternate handoff.
+            return {"state": "retrying", "retryable": True, "maxAttempts": 1,
+                    "due_at": _iso(eligible), "nextEligibleAt": _iso(eligible), "attempt": 1,
+                    "lease": None, "handoff": False, "providerAccount": None,
+                    "failure": {**failure, "retryable": True, "maxAttempts": 1}}
     generation = observation.get("generation")
     previous_generation = previous.get("generation") if previous else None
     # A changed generation/routing receipt cannot erase a current launcher failure.
@@ -1588,12 +1594,17 @@ def _reconcile_item(
     terminal = decision_state == "blocked"
     deterministic_terminal = terminal and launcher_failure.get("retryable") is False
     retry_exhausted = terminal and launcher_failure.get("exhausted") is True
+    if (deferred and previous and previous.get("generation") == generation
+        and previous.get("controllerState") == "deferred"
+        and previous.get("nextRetryAt") == decision.get("due_at")):
+        return False
     previous_launcher_failure = previous.get("launcherFailure") if previous else None
     if (
         previous
         and previous.get("generation") == generation
         and isinstance(previous_launcher_failure, dict)
         and previous_launcher_failure.get("retryable") is False
+        and previous_launcher_failure.get("class") not in {"provider-cooldown", "provider-unavailable"}
     ):
         _event(
             identifier,

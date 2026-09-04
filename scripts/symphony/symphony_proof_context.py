@@ -13,7 +13,7 @@ import os
 from pathlib import Path
 import stat
 import subprocess
-from datetime import datetime
+from datetime import datetime, timedelta
 
 import gem_gate_contract as contract
 
@@ -39,6 +39,55 @@ def profile_identity(path: Path) -> str:
     return hashlib.sha256(json.dumps(parts).encode()).hexdigest()
 
 
+PROC_ROOT = Path("/proc")
+
+
+def service_identity() -> tuple[int, str]:
+    result = subprocess.run(["systemctl", "show", contract.OFFICIAL_RUNTIME_SERVICE,
+        "--property=MainPID,ControlGroup,ActiveState"], capture_output=True, text=True, check=True, timeout=5)
+    fields = dict(line.split("=", 1) for line in result.stdout.splitlines() if "=" in line)
+    if fields.get("ActiveState") != "active" or int(fields.get("MainPID", 0)) <= 0:
+        raise ValueError("official runtime inactive")
+    return int(fields["MainPID"]), fields["ControlGroup"]
+
+
+def live_runtime(value: dict) -> str:
+    """Bind the official service PID, start time, cgroup and owned 4041 socket."""
+    pid, group = service_identity()
+    process = PROC_ROOT / str(pid)
+    before = (process / "stat").read_text().rsplit(")", 1)[1].split()[19]
+    groups = [line.split(":", 2)[2] for line in (process / "cgroup").read_text().splitlines()]
+    if not group or group not in groups:
+        raise ValueError("official runtime cgroup mismatch")
+    args = (process / "cmdline").read_bytes().decode().split("\0")
+    binary, workflow = str(Path(value["binaryPath"]).resolve()), str(Path(value["workflowPath"]).resolve())
+    if (binary not in args and str((process / "exe").resolve()) != binary) or workflow not in args:
+        raise ValueError("official runtime command mismatch")
+    sockets = {entry.readlink().name for entry in (process / "fd").iterdir() if entry.is_symlink()}
+    listeners = set()
+    for name in ("tcp", "tcp6"):
+        for line in (process / "net" / name).read_text().splitlines()[1:]:
+            fields = line.split()
+            if fields[1].rsplit(":", 1)[1] == "0FC9" and fields[3] == "0A":
+                listeners.add("socket:[" + fields[9] + "]")
+    after = (process / "stat").read_text().rsplit(")", 1)[1].split()[19]
+    if not sockets.intersection(listeners) or before != after or service_identity() != (pid, group):
+        raise ValueError("official runtime listener or generation mismatch")
+    return hashlib.sha256(json.dumps([pid, group, before]).encode()).hexdigest()
+
+
+def account_state(row: dict, now: datetime) -> str:
+    account = Path(row["accountPath"])
+    state = private_json(account.parent / "state.json")
+    if not isinstance(state, dict) or any(not isinstance(state.get(k, {}), dict) for k in ("cooldowns", "last_error")):
+        raise ValueError("invalid account state")
+    cooldown = state.get("cooldowns", {}).get(account.name, 0)
+    error = state.get("last_error", {}).get(account.name)
+    if type(cooldown) is not int or cooldown > now.timestamp() or error:
+        raise ValueError("account cooling or failed")
+    return hashlib.sha256(json.dumps([cooldown, error], sort_keys=True).encode()).hexdigest()
+
+
 def load_context(now: datetime, path: Path | None = None) -> dict:
     path = path or Path(os.environ.get("SYMPHONY_PROOF_CONTEXT", "/home/timwhite/gem-workspace/state/proof-context.json"))
     value = private_json(path)
@@ -53,6 +102,10 @@ def load_context(now: datetime, path: Path | None = None) -> dict:
         or digest(Path(value["binaryPath"])) != runtime["binarySha256"]
         or digest(Path(value["workflowPath"])) != runtime["workflowSha256"]):
         raise ValueError("runtime build mismatch")
+    generation = live_runtime(value)
+    runner = Path(value["codexPath"])
+    if runner.is_symlink() or not runner.is_file() or not os.access(runner, os.X_OK) or digest(runner) != value["codexSha256"]:
+        raise ValueError("untrusted completion executable")
     observed = contract._parse_time(value.get("observedAt"))
     if observed is None or not 0 <= (now - observed).total_seconds() <= 600:
         raise ValueError("stale enrollment")
@@ -74,7 +127,7 @@ def load_context(now: datetime, path: Path | None = None) -> dict:
         if seat in seats:
             raise ValueError("duplicate enrollment")
         seats.add(seat)
-        enrolled.append(dict(row))
+        enrolled.append({**row, "accountStateSha256": account_state(row, now)})
     artifacts = Path(value["attestationDir"])
     info = artifacts.lstat()
     if not stat.S_ISDIR(info.st_mode) or info.st_uid != os.getuid() or info.st_mode & 0o077:
@@ -84,10 +137,14 @@ def load_context(now: datetime, path: Path | None = None) -> dict:
         if not contract.SHA256.fullmatch(artifact.stem):
             continue
         try:
-            attestations[artifact.stem] = private_json(artifact)
-        except (OSError, ValueError):
+            proof = private_json(artifact)
+            seat = next((row for row in enrolled if row["profile"] == proof.get("profile") and row["provider"] == proof.get("provider")), None)
+            if (seat is not None and proof.get("accountStateSha256") == seat["accountStateSha256"]
+                and proof.get("runtimeGeneration") == generation and proof.get("codexSha256") == value["codexSha256"]):
+                attestations[artifact.stem] = proof
+        except (OSError, ValueError, AttributeError):
             continue
-    return {"runtime": runtime, "accounts": enrolled, "attestations": attestations,
+    return {"runtimeGeneration": generation, "codexPath": runner.resolve(), "codexSha256": value["codexSha256"], "runtime": runtime, "accounts": enrolled, "attestations": attestations,
             "attestationDir": artifacts, "contextPath": path}
 
 
@@ -98,9 +155,34 @@ def validation_args(context: dict) -> dict:
             "enrolled_seats": {(r["provider"], r["profile"], r["model"]) for r in context["accounts"]}}
 
 
-def validate_local_receipt(value: object, now: datetime):
+def validate_local_receipt(value: object, now: datetime, max_age=contract.CAPACITY_MAX_AGE):
     try:
         context = load_context(now)
     except (OSError, ValueError, KeyError, TypeError, subprocess.SubprocessError):
         return False, "capacity-evidence-trust-context-invalid", []
-    return contract.validate_capacity_receipt(value, now, **validation_args(context))
+    return contract.validate_capacity_receipt(value, now, max_age, **validation_args(context))
+
+
+def main() -> int:
+    """Canonical stdin boundary for the JavaScript admission consumer."""
+    import sys
+    try:
+        raw = sys.stdin.read(1_048_577)
+        if len(raw) > 1_048_576:
+            raise ValueError("capacity request too large")
+        request = json.loads(raw)
+        now = contract._parse_time(request.get("now"))
+        maximum = request.get("maxAgeMs")
+        if now is None or type(maximum) is not int or not 0 < maximum <= 86_400_000:
+            raise ValueError("invalid freshness bounds")
+        accepted, reason, rows = validate_local_receipt(request.get("receipt"), now, timedelta(milliseconds=maximum))
+        print(json.dumps({"accepted": accepted, "reason": reason,
+                          "seats": [row["provider"] + "\0" + row["profile"] for row in rows]}))
+        return 0
+    except (AttributeError, OSError, ValueError, TypeError):
+        print(json.dumps({"accepted": False, "reason": "capacity-request-invalid", "seats": []}))
+        return 78
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())

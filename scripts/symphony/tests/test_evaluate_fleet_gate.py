@@ -109,6 +109,21 @@ def run_wrapper(payload, *, consumer="fleet", expected_sha=None):
 
 
 class EvaluateFleetGateWrapperTests(unittest.TestCase):
+    def test_new_cooldown_invalidates_fresh_proof_before_remote_mutation(self):
+        import proof_fixtures as F
+        payload = signals()
+        row = payload["concurrencyEvidence"]["acceptedEvidence"][0]
+        account = pathlib.Path(F.ACCOUNTS[row["profile"]]["accountPath"])
+        state_path = account.parent / "state.json"
+        original = state_path.read_text()
+        try:
+            F.write_private(state_path, {"cooldowns": {account.name: 9999999999}})
+            _, _, receipt = run_wrapper(payload)
+            self.assertFalse(receipt["remediationAdmission"]["pushAllowed"])
+            self.assertFalse(receipt["workAdmission"]["newIssueLeaseAllowed"])
+        finally:
+            state_path.write_text(original)
+
     def test_script_and_action_are_the_single_evaluate_path(self):
         self.assertTrue(SCRIPT.is_file())
         self.assertTrue(os.access(SCRIPT, os.X_OK) or SCRIPT.exists())

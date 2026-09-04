@@ -19,6 +19,8 @@ from symphony_proof_context import load_context, profile_identity
 def produce(context_path: Path, account_path: Path, codex: Path, *, timeout: int = 30) -> dict:
     now = lambda: datetime.now(timezone.utc)
     context = load_context(now(), context_path)
+    if codex.is_symlink() or codex.resolve() != context["codexPath"]:
+        raise ValueError("completion executable not enrolled")
     rows = [r for r in context["accounts"] if Path(r["accountPath"]).resolve() == account_path.resolve()]
     if len(rows) != 1:
         raise ValueError("account not uniquely enrolled")
@@ -49,11 +51,11 @@ def produce(context_path: Path, account_path: Path, codex: Path, *, timeout: int
             if result.returncode != 0 or not raw or json.loads(raw) != expected:
                 raise ValueError("authenticated useful completion unproven")
         current = load_context(now(), context_path)
-        if (current["runtime"] != context["runtime"] or current["accounts"] != context["accounts"]
+        if (current["runtime"] != context["runtime"] or current["runtimeGeneration"] != context["runtimeGeneration"] or current["codexSha256"] != context["codexSha256"] or current["accounts"] != context["accounts"]
             or profile_identity(account_path) != row["profile"]
             or json.loads(state_path.read_text()) != state):
             raise ValueError("binding or cooldown changed during probe")
-        proof = {"schema": PROOF_SCHEMA, "producer": PROOF_SOURCE, "agentProfile": "coder",
+        proof = {"accountStateSha256": row["accountStateSha256"], "runtimeGeneration": context["runtimeGeneration"], "codexSha256": context["codexSha256"], "schema": PROOF_SCHEMA, "producer": PROOF_SOURCE, "agentProfile": "coder",
             "probeId": nonce, "attested": True, "runtime": context["runtime"],
             "contractSha256": context["runtime"]["contractSha256"],
             "provider": row["provider"], "profile": row["profile"], "model": row["model"],
