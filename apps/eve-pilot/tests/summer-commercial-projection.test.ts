@@ -9,6 +9,62 @@ import { m, NOW, snapshot } from './commercial-fixture';
 const project = (input = snapshot()) => projectSummerCommercial(input, NOW);
 
 describe('commercial recommendation boundary', () => {
+  it('keeps snapshot identity independent of source and candidate order', () => {
+    const input = snapshot();
+    input.sources.push({ ...input.sources[0], id: 'record-2' });
+    input.candidates.push({ ...input.candidates[0], id: 'profiles' });
+    const before = project(input).evidenceDigest;
+    input.sources.reverse();
+    input.candidates.reverse();
+    expect(project(input).evidenceDigest).toBe(before);
+  });
+  it('enforces exact source-age and effort boundaries', () => {
+    const input = snapshot();
+    input.sources[0].observedAt = new Date(
+      NOW.getTime() - 86400000
+    ).toISOString();
+    input.recordedFounderMinutesPerDay = m(210);
+    expect(project(input).verdict).toBe('recommendation');
+    input.recordedFounderMinutesPerDay = m(211);
+    expect(project(input).verdict).toBe('hold');
+    input.recordedFounderMinutesPerDay = m(210);
+    input.sources[0].observedAt = new Date(
+      NOW.getTime() - 86400001
+    ).toISOString();
+    expect(project(input).verdict).toBe('hold');
+  });
+  it('rejects stale infrastructure benefits even with current gates', () => {
+    const input = snapshot();
+    input.sources.push({
+      ...input.sources[0],
+      id: 'old',
+      observedAt: '2026-09-01T00:00:00Z',
+    });
+    input.candidates[0] = {
+      ...input.candidates[0],
+      kind: 'infrastructure',
+      repeatedUsefulJobs: { value: 10, sourceId: 'old' },
+      founderMinutesSaved: m(60),
+      implementationCostCents: m(0),
+      ongoingCostCents: m(0),
+      daysToBenefit: m(1),
+    };
+    expect(project(input).verdict).toBe('hold');
+    input.candidates[0].repeatedUsefulJobs = m(10);
+    input.candidates[0].usefulJobsPerWeekGain = m(3);
+    expect(project(input).infrastructureEvidence[0].usefulJobsPerWeekGain).toBe(
+      3
+    );
+    for (const key of ['incrementalSpendCents', 'ongoingCostCents'] as const) {
+      input.candidates[0][key] = m(1);
+      expect(project(input).verdict).toBe('hold');
+      input.candidates[0][key] = m(0);
+    }
+    input.candidates[0].additionalFounderMinutesPerDay = null;
+    expect(project(input).verdict).toBe('hold');
+    input.candidates[0].additionalFounderMinutesPerDay = m(241);
+    expect(project(input).verdict).toBe('hold');
+  });
   it('records losses without suppressing unrelated safe work', () => {
     const input = snapshot();
     input.availableCashAfterObligationsCents = m(-50000);
