@@ -83,6 +83,45 @@ test.describe('Pricing Page', () => {
     );
   });
 
+  test('keeps Pricing descenders inside the canonical H1 at breakpoints and 200% zoom', async ({
+    page,
+  }) => {
+    for (const viewport of [
+      { width: 390, height: 844 },
+      { width: 768, height: 1024 },
+      { width: 1440, height: 900 },
+    ]) {
+      await page.setViewportSize(viewport);
+      await page.goto('/pricing');
+      await waitForHydration(page);
+      await page.evaluate(() => document.fonts.ready);
+
+      for (const zoom of [1, 2]) {
+        await page.evaluate(value => {
+          document.documentElement.style.zoom = String(value);
+        }, zoom);
+
+        expect(
+          await page
+            .getByRole('heading', { name: 'Pricing', exact: true })
+            .evaluate(element => {
+              const style = getComputedStyle(element);
+              return {
+                clipped: element.scrollHeight > element.clientHeight + 1,
+                reserved:
+                  Number.parseFloat(style.paddingBottom) >=
+                  Number.parseFloat(style.fontSize) * 0.13,
+              };
+            })
+        ).toEqual({ clipped: false, reserved: true });
+      }
+
+      await page.evaluate(() => {
+        document.documentElement.style.zoom = '1';
+      });
+    }
+  });
+
   test('keeps campaign attribution when legacy launch pricing links redirect', async ({
     page,
   }) => {
