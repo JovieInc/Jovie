@@ -1,221 +1,297 @@
-import { createHash, sign } from 'node:crypto';
 import { getVercelOidcToken } from '@vercel/oidc';
 import { NextResponse } from 'next/server';
 import { z } from 'zod';
 import { verifyCronRequest } from '@/lib/cron/auth';
 import { env } from '@/lib/env';
+import { signSummerBottleneckSnapshot } from '@/lib/ovie/summer-bottleneck-producer';
 import { logger } from '@/lib/utils/logger';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
 
-const EVE_BOTTLENECK_ORIGIN =
-  'https://jovie-eve-shadow-qj7qmxggt-jovie.vercel.app';
-const JOVIE_PRODUCTION_SUBJECT =
-  'owner:jovie:project:jovie:environment:production';
+const EVE_BOTTLENECK_URL =
+  'https://jovie-eve-shadow-qj7qmxggt-jovie.vercel.app/ovie/v1/summer-bottleneck/events';
+const MAX_BODY_BYTES = 64 * 1024;
+const MAX_SIGNAL_AGE_MS = 15 * 60 * 1000;
+const MAX_CLOCK_SKEW_MS = 60 * 1000;
 const NO_STORE_HEADERS = { 'Cache-Control': 'no-store' } as const;
 const SHA = /^[0-9a-f]{40}$/u;
-const KEY_ID = /^[A-Za-z0-9][A-Za-z0-9._-]{2,63}$/u;
+const DIGEST = /^[0-9a-f]{64}$/u;
+const timestamp = z.string().datetime({ offset: true });
+const exactSha = z.string().regex(SHA);
+const safeCount = z.number().int().nonnegative().safe();
 
-const inputSchema = z
+const summerCiImprovementClassIds = [
+  'merge-group-flake-baseline-ratchet',
+  'controller-cascade-coalescing',
+  'auto-enroll-self-cancel-churn',
+  'controller-check-run-pagination-cap',
+  'obsolete-unaffected-native-lanes',
+  'affected-only-unit-selection',
+] as const;
+
+const sourceFields = {
+  observedAt: timestamp,
+  sourceDigest: z.string().regex(DIGEST),
+  sourceRevision: exactSha,
+};
+
+const ciAuditSchema = z
   .object({
-    audience: z.literal('internal-summer-governance-canary'),
-    eventId: z.string().regex(/^[A-Za-z0-9][A-Za-z0-9_-]{7,127}$/u),
-    observedAt: z.string().datetime({ offset: true }),
-    sourceVersion: z.string().regex(SHA),
+    schema: z.literal('jovie-ci-bottleneck-audit/v1'),
+    ...sourceFields,
+    classes: z
+      .array(
+        z
+          .object({
+            id: z.enum(summerCiImprovementClassIds),
+            state: z.enum(['open', 'partial', 'implemented']),
+            blockedSince: timestamp,
+            impact: z.number().int().positive().max(100),
+            owner: z.string().regex(/^[A-Za-z0-9][A-Za-z0-9:_-]{1,63}$/u),
+            handle: z.string().regex(/^[A-Za-z0-9][A-Za-z0-9:#/_-]{1,127}$/u),
+          })
+          .strict()
+      )
+      .length(summerCiImprovementClassIds.length),
   })
-  .strict();
+  .strict()
+  .superRefine((value, context) => {
+    const ids = value.classes.map(item => item.id);
+    if (
+      new Set(ids).size !== summerCiImprovementClassIds.length ||
+      summerCiImprovementClassIds.some(id => !ids.includes(id))
+    ) {
+      context.addIssue({
+        code: 'custom',
+        message: 'CI audit must contain every improvement class exactly once',
+        path: ['classes'],
+      });
+    }
+  });
 
-function canonical(value: unknown): string {
-  if (Array.isArray(value)) return `[${value.map(canonical).join(',')}]`;
-  if (value !== null && typeof value === 'object') {
-    return `{${Object.entries(value)
-      .sort(([left], [right]) => left.localeCompare(right))
-      .map(([key, child]) => `${JSON.stringify(key)}:${canonical(child)}`)
-      .join(',')}}`;
-  }
-  return JSON.stringify(value);
-}
+const unsignedSnapshotSchema = z
+  .object({
+    schema: z.literal('jovie.eve.summer-bottleneck-snapshot/v1'),
+    eventId: z.string().regex(/^[A-Za-z0-9][A-Za-z0-9_-]{7,127}$/u),
+    observedAt: timestamp,
+    sourceVersion: exactSha,
+    signals: z
+      .object({
+        closure: z
+          .object({
+            schema: z.literal('jovie.eve.summer-closure-projection/v1'),
+            sourceSchema: z.literal('jovie-closure-health/v1'),
+            ...sourceFields,
+            status: z.enum(['healthy', 'grace', 'red']),
+            blockedSince: timestamp.nullable(),
+            openPullRequests: safeCount,
+          })
+          .strict(),
+        queue: z
+          .object({
+            schema: z.literal('jovie.eve.summer-queue-projection/v1'),
+            sourceSchema: z.literal('github-merge-queue-entry/v1'),
+            ...sourceFields,
+            blockedSince: timestamp.nullable(),
+            eligibleCleanPrs: safeCount,
+            queuedPrs: safeCount,
+          })
+          .strict(),
+        release: z
+          .object({
+            schema: z.literal('jovie.eve.summer-release-projection/v1'),
+            sourceSchema: z.literal('jovie-controller-snapshot/v1'),
+            ...sourceFields,
+            blockedSince: timestamp.nullable(),
+            mainSha: exactSha,
+            productionSha: exactSha.nullable(),
+            unverifiedMerges: safeCount,
+          })
+          .strict(),
+        runner: z
+          .object({
+            schema: z.literal('jovie.eve.summer-runner-projection/v1'),
+            sourceSchema: z.literal('symphony-lease-guard-report/v1'),
+            ...sourceFields,
+            blockedSince: timestamp.nullable(),
+            capacityAvailable: safeCount,
+            queuedWork: safeCount,
+          })
+          .strict(),
+        ciAudit: ciAuditSchema,
+      })
+      .strict(),
+  })
+  .strict()
+  .superRefine((value, context) => {
+    const revisions = [
+      value.signals.closure.sourceRevision,
+      value.signals.queue.sourceRevision,
+      value.signals.release.sourceRevision,
+      value.signals.runner.sourceRevision,
+      value.signals.ciAudit.sourceRevision,
+      value.signals.release.mainSha,
+    ];
+    if (revisions.some(revision => revision !== value.sourceVersion)) {
+      context.addIssue({
+        code: 'custom',
+        message: 'every projection must bind to the exact snapshot source',
+        path: ['sourceVersion'],
+      });
+    }
+  });
+
+type UnsignedSnapshot = z.infer<typeof unsignedSnapshotSchema>;
 
 function json(body: Readonly<Record<string, unknown>>, status: number) {
   return NextResponse.json(body, { status, headers: NO_STORE_HEADERS });
 }
 
-function oidcSubject(token: string): string | null {
-  try {
-    const payload = JSON.parse(
-      Buffer.from(token.split('.')[1] ?? '', 'base64url').toString('utf8')
-    ) as { sub?: unknown };
-    return typeof payload.sub === 'string' ? payload.sub : null;
-  } catch {
-    return null;
+async function readBoundedJson(
+  body: ReadableStream<Uint8Array> | null,
+  contentLength: string | null
+): Promise<unknown> {
+  const declared = Number(contentLength);
+  if (Number.isFinite(declared) && declared > MAX_BODY_BYTES) {
+    throw new RangeError('body_too_large');
   }
+  if (!body) throw new SyntaxError('body_missing');
+  const reader = body.getReader();
+  const decoder = new TextDecoder();
+  let bytes = 0;
+  let text = '';
+  while (true) {
+    const { done, value } = await reader.read();
+    if (done) break;
+    bytes += value.byteLength;
+    if (bytes > MAX_BODY_BYTES) {
+      await reader.cancel();
+      throw new RangeError('body_too_large');
+    }
+    text += decoder.decode(value, { stream: true });
+  }
+  return JSON.parse(text + decoder.decode());
 }
 
-function digest(label: string, sourceVersion: string): string {
-  return createHash('sha256')
-    .update(`${label}\0${sourceVersion}`)
-    .digest('hex');
+function readInput(request: Request): Promise<unknown> {
+  return readBoundedJson(request.body, request.headers.get('content-length'));
 }
 
-function snapshot(input: z.infer<typeof inputSchema>) {
-  const source = (label: string) => ({
-    observedAt: input.observedAt,
-    sourceDigest: digest(label, input.sourceVersion),
-    sourceRevision: input.sourceVersion,
+function isFresh(snapshot: UnsignedSnapshot, nowMs = Date.now()): boolean {
+  if (!Number.isFinite(nowMs)) return false;
+  const timestamps = [
+    snapshot.observedAt,
+    snapshot.signals.closure.observedAt,
+    snapshot.signals.queue.observedAt,
+    snapshot.signals.release.observedAt,
+    snapshot.signals.runner.observedAt,
+    snapshot.signals.ciAudit.observedAt,
+  ];
+  return timestamps.every(value => {
+    const ageMs = nowMs - Date.parse(value);
+    return ageMs <= MAX_SIGNAL_AGE_MS && ageMs >= -MAX_CLOCK_SKEW_MS;
   });
-  return {
-    schema: 'jovie.eve.summer-bottleneck-snapshot/v1',
-    eventId: input.eventId,
-    observedAt: input.observedAt,
-    sourceVersion: input.sourceVersion,
-    signals: {
-      closure: {
-        schema: 'jovie.eve.summer-closure-projection/v1',
-        sourceSchema: 'jovie-closure-health/v1',
-        ...source('closure'),
-        status: 'healthy',
-        blockedSince: null,
-        openPullRequests: 0,
-      },
-      queue: {
-        schema: 'jovie.eve.summer-queue-projection/v1',
-        sourceSchema: 'github-merge-queue-entry/v1',
-        ...source('queue'),
-        blockedSince: null,
-        eligibleCleanPrs: 0,
-        queuedPrs: 0,
-      },
-      release: {
-        schema: 'jovie.eve.summer-release-projection/v1',
-        sourceSchema: 'jovie-controller-snapshot/v1',
-        ...source('release'),
-        blockedSince: input.observedAt,
-        mainSha: input.sourceVersion,
-        productionSha: null,
-        unverifiedMerges: 1,
-      },
-      runner: {
-        schema: 'jovie.eve.summer-runner-projection/v1',
-        sourceSchema: 'symphony-lease-guard-report/v1',
-        ...source('runner'),
-        blockedSince: null,
-        capacityAvailable: 0,
-        queuedWork: 0,
-      },
-      ciAudit: {
-        schema: 'jovie-ci-bottleneck-audit/v1',
-        ...source('ci-audit'),
-        classes: [
-          'merge-group-flake-baseline-ratchet',
-          'controller-cascade-coalescing',
-          'auto-enroll-self-cancel-churn',
-          'controller-check-run-pagination-cap',
-          'obsolete-unaffected-native-lanes',
-          'affected-only-unit-selection',
-        ].map((id, index) => ({
-          id,
-          state: 'implemented',
-          blockedSince: input.observedAt,
-          impact: index + 1,
-          owner: 'summer-canary',
-          handle: `canary:${index}`,
-        })),
-      },
-    },
-  } as const;
 }
 
+/** Authenticated Jovie-production bridge for one immutable Summer snapshot. */
 export async function POST(request: Request): Promise<NextResponse> {
   const authError = verifyCronRequest(request, {
     route: '/api/internal/ovie/summer-bottleneck',
     requireTrustedOrigin: true,
   });
   if (authError) return authError;
+
   if (env.VERCEL_ENV !== 'production') {
     return json({ ok: false, code: 'production_origin_required' }, 503);
   }
 
-  let parsed: z.infer<typeof inputSchema>;
+  let rawInput: unknown;
   try {
-    const result = inputSchema.safeParse(await request.json());
-    if (!result.success) return json({ ok: false, code: 'invalid_event' }, 422);
-    parsed = result.data;
-  } catch {
-    return json({ ok: false, code: 'invalid_json' }, 400);
+    rawInput = await readInput(request);
+  } catch (error) {
+    const oversized = error instanceof RangeError;
+    return json(
+      { ok: false, code: oversized ? 'body_too_large' : 'invalid_json' },
+      oversized ? 413 : 400
+    );
   }
 
-  const deployedSource = env.VERCEL_GIT_COMMIT_SHA;
-  const age = Date.now() - Date.parse(parsed.observedAt);
-  if (
-    !deployedSource ||
-    parsed.sourceVersion !== deployedSource ||
-    age < -60_000 ||
-    age > 15 * 60_000
-  ) {
-    return json({ ok: false, code: 'stale_or_wrong_source' }, 409);
+  const parsed = unsignedSnapshotSchema.safeParse(rawInput);
+  if (!parsed.success) {
+    return json({ ok: false, code: 'invalid_bottleneck_snapshot' }, 422);
+  }
+  if (!isFresh(parsed.data)) {
+    return json({ ok: false, code: 'stale_bottleneck_snapshot' }, 422);
   }
 
-  const privateKey = env.SUMMER_BOTTLENECK_PRODUCER_SIGNING_PRIVATE_KEY;
-  const keyId = env.SUMMER_BOTTLENECK_PRODUCER_SIGNING_KEY_ID;
-  if (!privateKey || !keyId || !KEY_ID.test(keyId)) {
-    return json({ ok: false, code: 'producer_signer_unavailable' }, 503);
+  const body = signSummerBottleneckSnapshot(
+    parsed.data,
+    env.SUMMER_BOTTLENECK_PRODUCER_SIGNING_PRIVATE_KEY,
+    env.SUMMER_BOTTLENECK_PRODUCER_SIGNING_KEY_ID
+  );
+  if (!body) {
+    logger.error('[ovie-summer-bottleneck] Producer signing key unavailable');
+    return json({ ok: false, code: 'producer_signing_unavailable' }, 503);
   }
 
   let oidcToken: string;
   try {
     oidcToken = await getVercelOidcToken();
   } catch {
-    return json({ ok: false, code: 'production_oidc_unavailable' }, 503);
+    logger.error('[ovie-summer-bottleneck] Vercel OIDC token unavailable');
+    return json({ ok: false, code: 'signed_origin_unavailable' }, 503);
   }
-  if (oidcSubject(oidcToken) !== JOVIE_PRODUCTION_SUBJECT) {
-    return json({ ok: false, code: 'wrong_oidc_audience' }, 503);
-  }
-
-  const unsigned = snapshot(parsed);
-  let signature: string;
-  try {
-    signature = sign(
-      null,
-      Buffer.from(
-        `jovie.eve.summer-bottleneck-snapshot/v1\0${canonical(unsigned)}`
-      ),
-      privateKey
-    ).toString('base64url');
-  } catch {
-    return json({ ok: false, code: 'producer_signer_invalid' }, 503);
+  if (!oidcToken) {
+    return json({ ok: false, code: 'signed_origin_unavailable' }, 503);
   }
 
   let upstream: Response;
   try {
-    upstream = await fetch(
-      new URL('/ovie/v1/summer-bottleneck/events', EVE_BOTTLENECK_ORIGIN),
-      {
-        method: 'POST',
-        headers: {
-          authorization: `Bearer ${oidcToken}`,
-          'content-type': 'application/json',
-        },
-        body: JSON.stringify({
-          ...unsigned,
-          producerAttestation: { algorithm: 'Ed25519', keyId, signature },
-        }),
-        signal: AbortSignal.timeout(15_000),
-      }
-    );
+    // No retry: an uncertain submission is resolved by Eve's immutable event ID.
+    upstream = await fetch(EVE_BOTTLENECK_URL, {
+      method: 'POST',
+      headers: {
+        authorization: `Bearer ${oidcToken}`,
+        'content-type': 'application/json',
+      },
+      body: JSON.stringify(body),
+      signal: AbortSignal.timeout(15_000),
+    });
   } catch {
     return json({ ok: false, code: 'eve_bottleneck_unavailable' }, 503);
   }
 
-  const body = await upstream.json().catch(() => null);
   if (upstream.status === 409) {
-    return json({ ok: false, code: 'replay_rejected', eve: body }, 409);
+    return json({ ok: false, code: 'replay_rejected' }, 409);
   }
   if (!upstream.ok) {
-    logger.error('[summer-bottleneck] Eve rejected signed producer event', {
+    logger.error('[ovie-summer-bottleneck] Eve rejected the snapshot', {
       status: upstream.status,
     });
     return json({ ok: false, code: 'eve_bottleneck_rejected' }, 502);
   }
-  return json({ ok: true, eve: body }, 202);
+
+  let upstreamBody: unknown;
+  try {
+    upstreamBody = await readBoundedJson(
+      upstream.body,
+      upstream.headers.get('content-length')
+    );
+  } catch {
+    return json({ ok: false, code: 'invalid_eve_response' }, 502);
+  }
+  const parsedUpstream = z
+    .object({
+      ok: z.literal(true),
+      receipt: z.object({
+        eventId: z.literal(parsed.data.eventId),
+        decision: z.string().min(1).max(64),
+      }),
+    })
+    .safeParse(upstreamBody);
+  if (!parsedUpstream.success) {
+    return json({ ok: false, code: 'invalid_eve_response' }, 502);
+  }
+  return json({ ok: true, eve: parsedUpstream.data }, 202);
 }
