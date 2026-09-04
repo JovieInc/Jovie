@@ -51,11 +51,15 @@ async function linearGraphql(
 }
 
 // Dedup by fingerprint in the title. Linear removed issueSearch.
+// stateName (optional): create new issues directly in that workflow state
+// (e.g. 'Todo') so P0 intakes skip the default Triage state, and promote a
+// matching non-terminal issue found sitting in that state's predecessor.
 export async function upsertLinearIssueByTitleFingerprint({
   fingerprint,
   title,
   description,
   priority = 1,
+  stateName = '',
   reopenTerminal = false,
   apiKey = process.env.LINEAR_API_KEY,
   fetchImpl = fetch,
@@ -97,6 +101,16 @@ export async function upsertLinearIssueByTitleFingerprint({
     ) ?? null;
 
   if (!match) {
+    let createInput = { title, description, priority };
+    if (stateName) {
+      const targetState = (found.data?.team?.states?.nodes ?? []).find(
+        state => state?.name === stateName
+      );
+      if (!targetState) {
+        return { ok: false, reason: 'linear_state_missing', body: stateName };
+      }
+      createInput = { ...createInput, stateId: targetState.id };
+    }
     const created = await linearGraphql(
       {
         query: `
@@ -104,19 +118,21 @@ export async function upsertLinearIssueByTitleFingerprint({
             $title: String!
             $description: String!
             $priority: Int
+            $stateId: String
           ) {
             issueCreate(input: {
               teamId: "${JOVIE_TEAM_ID}"
               title: $title
               description: $description
               priority: $priority
+              stateId: $stateId
             }) {
               success
               issue { id identifier url }
             }
           }
         `,
-        variables: { title, description, priority },
+        variables: createInput,
         apiKey,
         fetchImpl,
       },
@@ -146,9 +162,18 @@ export async function upsertLinearIssueByTitleFingerprint({
     states.find(state => state?.type === 'backlog');
   if (terminal && reopenTerminal && !backlogState)
     return { ok: false, reason: 'linear_backlog_state_missing' };
+  let promoteStateId = null;
+  if (stateName && !terminal) {
+    const targetState = states.find(state => state?.name === stateName);
+    if (!targetState) {
+      return { ok: false, reason: 'linear_state_missing', body: stateName };
+    }
+    if (match.state?.id !== targetState.id) promoteStateId = targetState.id;
+  }
   const input = {
     description,
     ...(terminal && reopenTerminal ? { stateId: backlogState.id } : {}),
+    ...(promoteStateId ? { stateId: promoteStateId } : {}),
   };
   const updated = await linearGraphql(
     {
@@ -178,6 +203,7 @@ export async function upsertLinearIssueByTitleFingerprint({
     ok: true,
     action: 'updated',
     reopened: terminal && reopenTerminal,
+    promoted: Boolean(promoteStateId),
     id: match.id,
     identifier: match.identifier,
     url: match.url,
