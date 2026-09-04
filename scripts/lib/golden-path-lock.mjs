@@ -1,24 +1,31 @@
 #!/usr/bin/env node
 /**
- * Fail-closed golden-path lock (JOV-5085): homepage Get started → /start →
- * logged-out first message sends → waitlist write only after verified auth.
- * Missing secrets fail closed. Merge gate never reads E2E_PROD.
+ * Fail-closed golden-path lock (JOV-5085 / JOV-5962): homepage name search
+ * (Search your name + Find me) → /start → logged-out first message sends →
+ * waitlist write only after verified auth. Missing secrets fail closed.
+ * Merge gate never reads E2E_PROD. Do not restore retired Get started on /.
  */
 
 export const GOLDEN_PATH_LOCK_SCHEMA = 'jovie-golden-path-lock/v1';
 export const GOLDEN_PATH_PROD_ORIGIN = 'https://jov.ie';
-export const GOLDEN_PATH_CTA_LABEL = 'Get started';
+export const GOLDEN_PATH_HERO_SEARCH_PLACEHOLDER = 'Search your name';
+export const GOLDEN_PATH_HERO_SEARCH_ACTION = 'Find me';
+export const GOLDEN_PATH_RETIRED_CTA_LABEL = 'Get started';
 export const GOLDEN_PATH_START_PATH = '/start';
 export const FAKE_RATE_LIMIT_COPY = 'Too many messages';
 export const CURSOR_AGENTS_URL = 'https://api.cursor.com/v0/agents';
 export const JOVIE_GITHUB_REPO = 'https://github.com/JovieInc/Jovie';
 export const GOLDEN_PATH_FINGERPRINT_PREFIX = 'golden-path-lock:prod';
+export const HOMEPAGE_CTA_FAIL_REASON = `homepage CTA must be name search ("${GOLDEN_PATH_HERO_SEARCH_PLACEHOLDER}" + "${GOLDEN_PATH_HERO_SEARCH_ACTION}") → ${GOLDEN_PATH_START_PATH}`;
+export const HOMEPAGE_CTA_RETIRED_REASON =
+  'retired Get started hero CTA must not compete with Find me → /start';
 
 export const MERGE_GATE_TEST_FILES = Object.freeze([
   'apps/web/tests/unit/api/chat/onboarding-handler.test.ts',
   'apps/web/tests/unit/onboarding/onboardingChatHelpers.errors.test.ts',
   'apps/web/tests/unit/app/auth-front-door-contract.test.ts',
   'apps/web/tests/unit/api/waitlist/waitlist.test.ts',
+  'apps/web/tests/unit/home/homepage-hero-next-move-contract.test.ts',
 ]);
 
 export const GOLDEN_PATH_LOCK_SELF_TEST =
@@ -38,7 +45,10 @@ export const GOLDEN_PATH_PATH_PREFIXES = Object.freeze([
   'apps/web/app/sign-in/',
   'apps/web/app/sign-up/',
   'apps/web/data/homepageFrontDoorCta.ts',
+  'apps/web/data/homepageLaunchCopy.ts',
+  'apps/web/data/homepageCertifiedOptimization.ts',
   'apps/web/data/marketingCtaIntents.ts',
+  'apps/web/components/homepage/',
   'apps/web/lib/flags/marketing-static.ts',
   'apps/web/components/features/onboarding/',
   'apps/web/lib/onboarding/',
@@ -88,19 +98,31 @@ export function evaluateHomepageHtml(html) {
       reason: 'homepage HTML was empty',
     };
   }
-  const hasLabel = html.includes(GOLDEN_PATH_CTA_LABEL);
+  const hasPlaceholder = html.includes(GOLDEN_PATH_HERO_SEARCH_PLACEHOLDER);
+  const hasAction = html.includes(GOLDEN_PATH_HERO_SEARCH_ACTION);
   const hasStartHref = /href\s*=\s*["'][^"']*\/start(?:[?"']|\/)/i.test(html);
-  if (!hasLabel || !hasStartHref) {
+  const retiredCtaPattern = new RegExp(
+    `<a\\b[^>]*>\\s*${GOLDEN_PATH_RETIRED_CTA_LABEL.replaceAll(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\s*</a>`,
+    'i'
+  );
+  if (retiredCtaPattern.test(html)) {
     return {
       id: 'homepage-cta',
       ok: false,
-      reason: `homepage CTA must be "${GOLDEN_PATH_CTA_LABEL}" → ${GOLDEN_PATH_START_PATH}`,
+      reason: HOMEPAGE_CTA_RETIRED_REASON,
+    };
+  }
+  if (!hasPlaceholder || !hasAction || !hasStartHref) {
+    return {
+      id: 'homepage-cta',
+      ok: false,
+      reason: HOMEPAGE_CTA_FAIL_REASON,
     };
   }
   return {
     id: 'homepage-cta',
     ok: true,
-    reason: `found ${GOLDEN_PATH_CTA_LABEL} → ${GOLDEN_PATH_START_PATH}`,
+    reason: `found name search ("${GOLDEN_PATH_HERO_SEARCH_PLACEHOLDER}" + "${GOLDEN_PATH_HERO_SEARCH_ACTION}") → ${GOLDEN_PATH_START_PATH}`,
   };
 }
 
@@ -367,13 +389,13 @@ export function buildAutofixPrompt({ fingerprint, checks, origin, receipt }) {
     '',
     'Locked path (do not invent a new product flow):',
     '1. https://jov.ie homepage',
-    '2. Get started → /start',
+    '2. Name search ("Search your name") + Find me → /start',
     '3. Logged-out first message actually sends (not 401, not a fake rate-limit)',
     '4. Waitlist write only after verified auth',
     '',
     `Fingerprint: ${fingerprint}`,
     `Origin: ${origin ?? GOLDEN_PATH_PROD_ORIGIN}`,
-    `Linear: JOV-5085 (lock) / JOV-5084 (prior 401-as-rate-limit class)`,
+    `Linear: JOV-5962 (prod break) / JOV-5085 (lock) / JOV-5084 (prior 401-as-rate-limit class)`,
     '',
     'Failed checks:',
     ...(lines.length > 0
@@ -381,14 +403,15 @@ export function buildAutofixPrompt({ fingerprint, checks, origin, receipt }) {
       : ['- (receipt reported failure without check ids)']),
     '',
     'Reproduce without signup secrets:',
-    `- GET ${origin ?? GOLDEN_PATH_PROD_ORIGIN} and require Get started → /start`,
+    `- GET ${origin ?? GOLDEN_PATH_PROD_ORIGIN} and require name search ("Search your name" + "Find me") → /start`,
     `- POST ${origin ?? GOLDEN_PATH_PROD_ORIGIN}/api/chat with {"messages":[{"role":"user","content":"hi"}]} — must not 401 and must not say "Too many messages"`,
     `- POST ${origin ?? GOLDEN_PATH_PROD_ORIGIN}/api/waitlist unauthenticated — must 401`,
     `- POST ${origin ?? GOLDEN_PATH_PROD_ORIGIN}/api/onboarding/claim unauthenticated — must 401`,
     `- GET ${origin ?? GOLDEN_PATH_PROD_ORIGIN}/api/billing/health — must 200 { healthy: true }`,
     `- POST ${origin ?? GOLDEN_PATH_PROD_ORIGIN}/api/stripe/webhooks unsigned — must 400`,
     '',
-    'Fix the product regression. Add or update a regression test. Do not skip because secrets are missing.',
+    'Fix the probe/product drift. Add or update a regression test. Do not skip because secrets are missing.',
+    'Do not revert Find me to Get started. The certified homepage (JOV-5864) is the locked product.',
     'Do not merge. Do not deploy. Tell Gem she missed this after the lock was on.',
     receipt ? `Receipt: ${JSON.stringify(receipt)}` : '',
   ]
