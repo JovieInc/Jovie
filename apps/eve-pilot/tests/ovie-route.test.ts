@@ -53,12 +53,12 @@ describe('Ovie iMessage allowlist', () => {
     expect(admitOvieIMessage(undefined, allowed)).toBe(false);
   });
 
-  it('binds iMessage and Photon to Ovie; Summer stays on the shadow route', () => {
+  it('binds private presentation channels to Summer', () => {
     const previous = process.env.EVE_IDENTITY;
-    delete process.env.EVE_IDENTITY;
-    expect(eveIdentityForChannel('imessage').pack.id).toBe('ovie');
-    expect(eveIdentityForChannel('photon').pack.id).toBe('ovie');
-    expect(eveIdentityForChannel('telegram').pack.id).toBe('ovie');
+    process.env.EVE_IDENTITY = 'summer';
+    expect(eveIdentityForChannel('imessage').pack.id).toBe('summer');
+    expect(eveIdentityForChannel('photon').pack.id).toBe('summer');
+    expect(eveIdentityForChannel('telegram').pack.id).toBe('summer');
     expect(eveIdentityForChannel('ovie-summer-shadow').pack.id).toBe('summer');
     if (previous === undefined) delete process.env.EVE_IDENTITY;
     else process.env.EVE_IDENTITY = previous;

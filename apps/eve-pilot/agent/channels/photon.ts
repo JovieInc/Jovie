@@ -1,17 +1,23 @@
+import { createHash } from 'node:crypto';
 import {
+  defaultPhotonAuth,
   type PhotonInboundMessageContext,
   type PhotonInboundResult,
   photonIMessageChannel,
 } from 'eve/channels/photon';
 
 import { admitOvieIMessage } from '../lib/imessage-allowlist';
-import { bindEvePilotIdentity } from '../select-identity';
+import {
+  bindEvePilotIdentity,
+  photonIdentityFromEnvironment,
+} from '../select-identity';
 
 type PhotonAuthor = {
   readonly handle?: string;
   readonly id?: string;
   readonly isBot?: boolean;
   readonly phone?: string;
+  readonly userId?: string;
 };
 
 function authorFrom(message: unknown): PhotonAuthor | undefined {
@@ -20,10 +26,6 @@ function authorFrom(message: unknown): PhotonAuthor | undefined {
   return record.author;
 }
 
-/**
- * Eve's photon adapter falls back to Vercel OIDC when webhookSecret is
- * missing/empty. That path 500s unsigned POST. HMAC 401 is the contract.
- */
 export const PHOTON_WEBHOOK_SECRET_UNCONFIGURED =
   'imessage-webhook-secret-unconfigured';
 export const PHOTON_PROJECT_ID_UNCONFIGURED =
@@ -46,7 +48,6 @@ export function photonCredentials(
   const projectId = environment.IMESSAGE_PROJECT_ID?.trim();
   const projectSecret = environment.IMESSAGE_PROJECT_SECRET?.trim();
   if (!projectId || !projectSecret) {
-    // Adapter init runs before HMAC. Throwing here 500s unsigned POST.
     return {
       projectId: PHOTON_PROJECT_ID_UNCONFIGURED,
       projectSecret: PHOTON_PROJECT_SECRET_UNCONFIGURED,
@@ -55,31 +56,75 @@ export function photonCredentials(
   return { projectId, projectSecret };
 }
 
-/**
- * Photon/iMessage is Ovie's live talk channel on this Eve app.
- * Summer is not a Photon route. Credentials are portable Photon env
- * vars, not Vercel Connect, Hermes, or Trigger.
- */
-export function onOvieIMessage(
-  _ctx: PhotonInboundMessageContext,
-  message: unknown
+function digest(value: string): string {
+  return createHash('sha256').update(value).digest('hex').slice(0, 16);
+}
+
+export function photonThreadBinding(
+  identity: 'jovie' | 'summer',
+  threadId: string
+): string {
+  return `${identity}:photon:${digest(threadId)}`;
+}
+
+export function photonUserName(
+  environment: Readonly<Record<string, string | undefined>> = process.env
+): 'Jovie' | 'Summer' | 'Eve (unconfigured)' {
+  const identity = photonIdentityFromEnvironment(environment);
+  if (identity === 'jovie') return 'Jovie';
+  if (identity === 'summer') return 'Summer';
+  return 'Eve (unconfigured)';
+}
+
+export function onPhotonIMessage(
+  ctx: PhotonInboundMessageContext,
+  message: unknown,
+  environment: Readonly<Record<string, string | undefined>> = process.env
 ): PhotonInboundResult {
-  if (!admitOvieIMessage(authorFrom(message))) return null;
-  const turn = bindEvePilotIdentity('ovie');
+  const identity = photonIdentityFromEnvironment(environment);
+  const author = authorFrom(message);
+  const credentials = photonCredentials(environment);
+  if (
+    !identity ||
+    !author ||
+    author.isBot ||
+    !author.userId?.trim() ||
+    photonWebhookSecret(environment) === PHOTON_WEBHOOK_SECRET_UNCONFIGURED ||
+    credentials.projectId === PHOTON_PROJECT_ID_UNCONFIGURED ||
+    credentials.projectSecret === PHOTON_PROJECT_SECRET_UNCONFIGURED
+  ) {
+    return null;
+  }
+  if (
+    identity === 'summer' &&
+    !admitOvieIMessage(
+      author,
+      undefined,
+      environment.OVIE_IMESSAGE_ALLOWED_SENDERS
+    )
+  ) {
+    return null;
+  }
+
+  const auth = defaultPhotonAuth(message as never);
+  const turn = bindEvePilotIdentity(identity);
+  const audience = identity === 'summer' ? 'private-company' : 'public-artist';
   return {
     auth: {
+      ...auth,
       attributes: {
-        fallback: 'true',
-        identity: 'ovie',
+        ...auth.attributes,
+        audience,
+        identity,
+        presentation: identity === 'summer' ? 'ovie' : 'jovie',
+        project_binding: digest(credentials.projectId),
+        provenance: 'photon-hmac',
         source: 'imessage',
+        thread_binding: photonThreadBinding(identity, ctx.thread.id),
       },
-      authenticator: 'photon-imessage',
-      issuer: 'photon',
-      principalId: 'ovie-imessage',
-      principalType: 'user',
     },
     context: [turn.instructions],
-    title: 'Ovie iMessage',
+    title: identity === 'summer' ? 'Summer via Ovie' : 'Jovie iMessage',
   };
 }
 
@@ -87,7 +132,7 @@ export default photonIMessageChannel({
   async credentials() {
     return photonCredentials();
   },
-  onMessage: onOvieIMessage,
-  userName: 'Ovie',
+  onMessage: onPhotonIMessage,
+  userName: photonUserName(),
   webhookSecret: photonWebhookSecret(),
 });

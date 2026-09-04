@@ -10,10 +10,10 @@ import { admitOvieTelegramMessage } from '../lib/telegram-allowlist';
 import { bindEvePilotIdentity } from '../select-identity';
 
 /**
- * Telegram is a fallback talk channel to the same Ovie identity. It is not
- * Jovie artist mode and not Summer-as-door.
+ * Telegram is a private fallback presentation surface for Summer. Ovie is
+ * never instantiated as an identity or runtime.
  */
-export function onOvieTelegramMessage(
+export function onSummerTelegramMessage(
   _ctx: TelegramContext,
   message: TelegramMessage
 ): TelegramInboundResult {
@@ -22,14 +22,15 @@ export function onOvieTelegramMessage(
   const auth = defaultTelegramAuth(message);
   if (!auth) return null;
 
-  const turn = bindEvePilotIdentity('ovie');
+  const turn = bindEvePilotIdentity('summer');
   return {
     auth: {
       ...auth,
       attributes: {
         ...auth.attributes,
         fallback: 'true',
-        identity: 'ovie',
+        identity: 'summer',
+        presentation: 'ovie',
         source: 'telegram',
       },
     },
@@ -39,5 +40,5 @@ export function onOvieTelegramMessage(
 
 export default telegramChannel({
   botUsername: process.env.OVIE_TELEGRAM_BOT_USERNAME?.replace(/^@/, ''),
-  onMessage: onOvieTelegramMessage,
+  onMessage: onSummerTelegramMessage,
 });
