@@ -64,12 +64,12 @@ jobs:
           GEM_CONTROLLER_EXPECTED_REVISION: ${{ github.event.workflow_run.head_sha }}
         run: |
           set -euo pipefail
-          bash scripts/hermes/update-symphony-burrito.sh --skip-binary
-          bash scripts/hermes/install-gem-fleet-controller.sh
-          bash scripts/hermes/install-gem-pr-rehabilitation.sh
-          install -D -m 0755 scripts/hermes/gem-disk-reclaim.py "$HOME/.local/bin/gem-disk-reclaim"
-          install -D -m 0644 scripts/hermes/systemd/gem-disk-reclaim.service "$HOME/.config/systemd/user/gem-disk-reclaim.service"
-          install -D -m 0644 scripts/hermes/systemd/gem-disk-reclaim.timer "$HOME/.config/systemd/user/gem-disk-reclaim.timer"
+          bash scripts/symphony/update-symphony-burrito.sh --skip-binary
+          bash scripts/symphony/install-gem-fleet-controller.sh
+          bash scripts/symphony/install-gem-pr-rehabilitation.sh
+          install -D -m 0755 scripts/symphony/gem-disk-reclaim.py "$HOME/.local/bin/gem-disk-reclaim"
+          install -D -m 0644 scripts/symphony/systemd/gem-disk-reclaim.service "$HOME/.config/systemd/user/gem-disk-reclaim.service"
+          install -D -m 0644 scripts/symphony/systemd/gem-disk-reclaim.timer "$HOME/.config/systemd/user/gem-disk-reclaim.timer"
           systemctl --user daemon-reload
           systemctl --user enable --now gem-disk-reclaim.timer
       - name: Verify runtime identity after reload
@@ -104,7 +104,7 @@ jobs:
           ' "$GEM_WORKSPACE/state/gem-pr-rehabilitation-attestation.json" >/dev/null
           systemctl --user is-enabled --quiet gem-pr-drain.timer
           systemctl --user is-active --quiet gem-pr-drain.timer
-          bash scripts/hermes/update-symphony-burrito.sh --check
+          bash scripts/symphony/update-symphony-burrito.sh --check
           systemctl --user is-enabled --quiet symphony-elixir.service
           systemctl --user is-active --quiet symphony-elixir.service
           test "$(systemctl --user show symphony-elixir.service --property=FragmentPath --value)" \

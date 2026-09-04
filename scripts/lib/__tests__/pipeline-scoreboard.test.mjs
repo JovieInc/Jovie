@@ -3,7 +3,7 @@ import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
 import { describe, expect, it } from 'vitest';
 
-import { buildDailyBriefingContext } from '../../hermes/jobs/daily-briefing.ts';
+import { buildDailyBriefingContext } from '../../symphony/jobs/daily-briefing.ts';
 import {
   buildPipelineScoreboard,
   buildSymphonyThroughputReceipt,
@@ -17,7 +17,7 @@ import {
   mergeGroupRunFrontPr,
   readLatestScoreboard,
   renderPipelineScoreboard,
-} from '../../hermes/lib/pipeline-scoreboard.ts';
+} from '../../symphony/lib/pipeline-scoreboard.ts';
 
 function issue(number, labels) {
   return {
@@ -73,8 +73,8 @@ function searchPage(
 const completeEvidence = { complete: true, reason: null, pages: 1 };
 
 /**
- * @param {import('../../hermes/lib/pipeline-scoreboard.ts').PipelineScoreboardWindow} window
- * @returns {import('../../hermes/lib/pipeline-scoreboard.ts').SymphonyThroughputReceipt}
+ * @param {import('../../symphony/lib/pipeline-scoreboard.ts').PipelineScoreboardWindow} window
+ * @returns {import('../../symphony/lib/pipeline-scoreboard.ts').SymphonyThroughputReceipt}
  */
 function insufficientSymphony(window) {
   return {
@@ -1522,7 +1522,7 @@ describe('pipeline scoreboard digest and schedule wiring', () => {
     const plist = readFileSync(
       resolve(
         repoRoot,
-        'scripts/hermes/launchd/co.jovie.hermes.cron-pipeline-scoreboard.plist.template'
+        'scripts/symphony/launchd/co.jovie.hermes.cron-pipeline-scoreboard.plist.template'
       ),
       'utf8'
     );
@@ -1531,24 +1531,24 @@ describe('pipeline scoreboard digest and schedule wiring', () => {
       'utf8'
     );
     const job = readFileSync(
-      resolve(repoRoot, 'scripts/hermes/jobs/pipeline-scoreboard.ts'),
+      resolve(repoRoot, 'scripts/symphony/jobs/pipeline-scoreboard.ts'),
       'utf8'
     );
 
     expect(packageJson.scripts['hermes:pipeline-scoreboard']).toBe(
-      'tsx scripts/hermes/jobs/pipeline-scoreboard.ts'
+      'tsx scripts/symphony/jobs/pipeline-scoreboard.ts'
     );
     expect(plist).toContain(
       '<string>co.jovie.hermes.cron-pipeline-scoreboard</string>'
     );
     expect(plist).toContain(
-      '<string>{{JOVIE_REPO}}/scripts/hermes/jobs/pipeline-scoreboard.ts</string>'
+      '<string>{{JOVIE_REPO}}/scripts/symphony/jobs/pipeline-scoreboard.ts</string>'
     );
     expect(plist).toContain('<key>StartInterval</key>');
     expect(plist).toContain('<integer>3600</integer>');
     expect(cronRegistry).toContain('co.jovie.hermes.cron-pipeline-scoreboard');
     expect(cronRegistry).toContain(
-      'scripts/hermes/jobs/pipeline-scoreboard.ts'
+      'scripts/symphony/jobs/pipeline-scoreboard.ts'
     );
     expect(job).toContain(
       'nodes{number title body headRefName baseRefName createdAt'

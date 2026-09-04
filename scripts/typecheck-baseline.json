@@ -46,27 +46,27 @@
       "TS2339": 1,
       "TS2362": 1
     },
-    "scripts/hermes/jobs/agent-config-health.ts": {
+    "scripts/symphony/jobs/agent-config-health.ts": {
       "TS1470": 1
     },
-    "scripts/hermes/jobs/agentcookie-sync.ts": {
+    "scripts/symphony/jobs/agentcookie-sync.ts": {
       "TS1470": 1
     },
-    "scripts/hermes/jobs/ci-failure-monitor.ts": {
+    "scripts/symphony/jobs/ci-failure-monitor.ts": {
       "TS1470": 2
     },
-    "scripts/hermes/jobs/codex-issue-shipper.ts": {
+    "scripts/symphony/jobs/codex-issue-shipper.ts": {
       "TS2339": 1,
       "TS2345": 1
     },
-    "scripts/hermes/jobs/daily-briefing.ts": {
+    "scripts/symphony/jobs/daily-briefing.ts": {
       "TS1470": 1
     },
-    "scripts/hermes/jobs/gbrain-health-summary.ts": {
+    "scripts/symphony/jobs/gbrain-health-summary.ts": {
       "TS1470": 1,
       "TS2345": 4
     },
-    "scripts/hermes/jobs/pr-stuck-monitor.ts": {
+    "scripts/symphony/jobs/pr-stuck-monitor.ts": {
       "TS1470": 1
     },
     "scripts/knowledge/distill.ts": {

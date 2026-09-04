@@ -17,7 +17,7 @@ import {
   selectSymphonyRoute,
 } from '../symphony-routing.mjs';
 
-const ROUTER = new URL('../../hermes/symphony-codex-router', import.meta.url)
+const ROUTER = new URL('../../symphony/symphony-codex-router', import.meta.url)
   .pathname;
 
 function fixture() {
@@ -72,7 +72,7 @@ function runRouter({ root, workspace, accounts, stub }, issue) {
       SYMPHONY_FALLBACK_LEASE_DIR: join(root, 'fallback-leases'),
       SYMPHONY_OPEN_PR_INDEX: 'empty',
       SYMPHONY_CODEX_EXHAUSTED: new URL(
-        '../../hermes/symphony-codex-exhausted.py',
+        '../../symphony/symphony-codex-exhausted.py',
         import.meta.url
       ).pathname,
       CODEX_ACCOUNTS_ROOT: accounts,

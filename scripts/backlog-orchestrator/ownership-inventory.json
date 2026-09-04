@@ -118,8 +118,8 @@
       "intended_repo": "existing-shipping-authority",
       "current_repo": "JovieInc/Jovie",
       "verification_authority": "JovieInc/Jovie CI",
-      "default_artifact": "scripts/hermes/",
-      "current_artifacts": ["scripts/hermes/"],
+      "default_artifact": "scripts/symphony/",
+      "current_artifacts": ["scripts/symphony/"],
       "adapter_artifacts": ["scripts/backlog-orchestrator/"],
       "jovie_admission": "allow-until-rehome",
       "later_slice": 4

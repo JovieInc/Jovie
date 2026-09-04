@@ -37,7 +37,7 @@ describe('lane capacity receipts', () => {
     ]);
     const decision = evaluateLaneCapacity(
       evidence,
-      collisionDomainsForPaths(['scripts/hermes/gem-priority-gate.py']),
+      collisionDomainsForPaths(['scripts/symphony/gem-priority-gate.py']),
       { now: NOW }
     );
     assert.equal(decision.allowed, true);
@@ -45,8 +45,8 @@ describe('lane capacity receipts', () => {
 
   it('blocks writers that share the control-plane lane collision domain', () => {
     const evidence = receipt([
-      readyPr(1, ['scripts/hermes/gem-priority-gate.py']),
-      readyPr(2, ['scripts/hermes/gem-priority-gate.py']),
+      readyPr(1, ['scripts/symphony/gem-priority-gate.py']),
+      readyPr(2, ['scripts/symphony/gem-priority-gate.py']),
     ]);
     const decision = evaluateLaneCapacity(
       evidence,
@@ -57,7 +57,7 @@ describe('lane capacity receipts', () => {
     );
     assert.deepEqual(
       collisionDomainsForPaths([
-        'scripts/hermes/gem-priority-gate.py',
+        'scripts/symphony/gem-priority-gate.py',
       ]).includes('risk:JovieInc/Jovie:control-plane'),
       true
     );

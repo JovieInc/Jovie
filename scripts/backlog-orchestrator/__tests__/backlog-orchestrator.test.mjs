@@ -1578,11 +1578,11 @@ describe('deterministic Symphony admission boundary', () => {
   it('versions the Gem controller and mechanically holds AMBER drafts from promotion', async () => {
     const controller = resolve(
       ORCHESTRATOR_DIR,
-      '../hermes/gem-priority-gate.py'
+      '../symphony/gem-priority-gate.py'
     );
     const workflow = resolve(
       ORCHESTRATOR_DIR,
-      '../hermes/WORKFLOW.jovie-ui-pilot.md'
+      '../symphony/WORKFLOW.jovie-ui-pilot.md'
     );
     const runController = async (signals, consumer = 'fleet') => {
       const controllerSignals = JSON.parse(JSON.stringify(signals));
@@ -1733,7 +1733,7 @@ describe('deterministic Symphony admission boundary', () => {
   it('stops and never redispatches an agent once its issue reaches In Review', async () => {
     const workflow = resolve(
       ORCHESTRATOR_DIR,
-      '../hermes/WORKFLOW.jovie-ui-pilot.md'
+      '../symphony/WORKFLOW.jovie-ui-pilot.md'
     );
     const workflowSource = await readFile(workflow, 'utf8');
     const frontmatter = workflowSource.match(/^---\n([\s\S]*?)\n---\n/);

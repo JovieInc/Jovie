@@ -5,7 +5,7 @@ import {
   parseHermesFallbackProviders,
   validateHermesConfigText,
   validateOpenClawConfig,
-} from '../../hermes/jobs/agent-config-health.ts';
+} from '../../symphony/jobs/agent-config-health.ts';
 
 describe('parseHermesFallbackProviders', () => {
   it('parses fallback provider entries from the Hermes config', () => {
