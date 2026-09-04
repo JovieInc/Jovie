@@ -9,8 +9,6 @@ from typing import Any
 
 SCHEMA = "jovie-fleet-gate/v1"
 CLOSURE_HEALTH_SCHEMA = "jovie-closure-health/v1"
-# Keep in sync with gem-priority-gate.MAX_GROK_MAX / symphony-codex-exhausted.MAX_GROK_MAX.
-UNBOUND_REPAIR_MAX_CONCURRENT_CEILING = 10
 PROMOTION_MODES = frozenset(
     {"normal", "isolated-only", "draft-only", "hold-intake", "blocked"}
 )
@@ -18,6 +16,11 @@ STATES = frozenset({"GREEN", "AMBER", "RED"})
 INTEGRITY_STATUSES = frozenset({"clear", "resolved", "active", "invalid"})
 CLOSURE_STATUSES = frozenset({"healthy", "grace", "red"})
 MAX_ADMISSION_JSON_BYTES = 32 * 1024
+# JOV-5913: unbound repair concurrency is seat-derived (live Grok/Kimi OAuth
+# probes in gem-priority-gate.py), bounded by the symphony-concurrency
+# controller policy window. It is never pinned to 1.
+UNBOUND_REPAIR_MIN_CONCURRENCY = 1
+UNBOUND_REPAIR_MAX_CONCURRENCY = 8
 DIAGNOSTIC_INVENTORY_KEYS = frozenset(
     {
         "classifications",
@@ -162,16 +165,6 @@ def _project_isolated(value: object) -> dict[str, Any]:
     }
 
 
-def _require_unbound_repair_max_concurrent(value: object) -> int:
-    if (
-        isinstance(value, bool)
-        or not isinstance(value, int)
-        or value < 1
-        or value > UNBOUND_REPAIR_MAX_CONCURRENT_CEILING
-    ):
-        raise AdmissionProjectionError("unbound repair maxConcurrent is invalid")
-    return value
-
 
 def _project_unbound_repair(value: object, promotion_mode: str) -> dict[str, Any]:
     if value is None:
@@ -202,11 +195,25 @@ def _project_unbound_repair(value: object, promotion_mode: str) -> dict[str, Any
             "productionUnboundRepairAdmission.deploymentsAllowed",
         ),
     }
-    projected["maxConcurrent"] = _require_unbound_repair_max_concurrent(
-        projected["maxConcurrent"]
-    )
+    max_concurrent = projected["maxConcurrent"]
+    if (
+        not isinstance(max_concurrent, int)
+        or isinstance(max_concurrent, bool)
+        or not UNBOUND_REPAIR_MIN_CONCURRENCY
+        <= max_concurrent
+        <= UNBOUND_REPAIR_MAX_CONCURRENCY
+    ):
+        raise AdmissionProjectionError(
+            f"unbound repair maxConcurrent must be an integer from "
+            f"{UNBOUND_REPAIR_MIN_CONCURRENCY} through "
+            f"{UNBOUND_REPAIR_MAX_CONCURRENCY}"
+        )
+    # Unbound production is a deploy hold only: repair concurrency may scale,
+    # but it never carries deployment authority.
     if projected["deploymentsAllowed"] is not False:
-        raise AdmissionProjectionError("unbound repair deploymentsAllowed must be false")
+        raise AdmissionProjectionError(
+            "unbound repair deploymentsAllowed must be false"
+        )
     if allowed:
         if projected["condition"] != "production-deployment-unbound":
             raise AdmissionProjectionError("allowed unbound repair is unbound")
@@ -217,7 +224,6 @@ def _project_unbound_repair(value: object, promotion_mode: str) -> dict[str, Any
     elif projected["condition"] is not None or projected["mainSha"] is not None or projected["deployedSha"] is not None:
         raise AdmissionProjectionError("denied unbound repair must not carry a bound identity")
     return projected
-
 
 def _project_closure_admission(value: object) -> dict[str, Any]:
     admission = _require_mapping(value, "closureAdmission")
