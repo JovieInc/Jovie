@@ -28,6 +28,10 @@ inputs:
     description: Permit image-only evidence for an explicitly public or visual lane
     required: false
     default: 'false'
+  public-images:
+    description: Retain decoded captures only when the producer declares the lane public
+    required: false
+    default: 'false'
   allow-markdown:
     description: Permit scanned Markdown for an explicitly documented report lane
     required: false
@@ -52,6 +56,7 @@ runs:
       shell: bash
       env:
         PLAYWRIGHT_ARTIFACT_ALLOW_IMAGES: ${{ inputs.allow-images }}
+        PLAYWRIGHT_ARTIFACT_ALLOW_PUBLIC_IMAGES: ${{ inputs.public-images }}
         PLAYWRIGHT_ARTIFACT_ALLOW_MARKDOWN: ${{ inputs.allow-markdown }}
         PLAYWRIGHT_ARTIFACT_PATHS: ${{ inputs.path }}
       working-directory: ${{ github.workspace }}

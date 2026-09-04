@@ -27,8 +27,8 @@ import {
   markdownContainsSecret,
   redactSecretValues,
   resolveArtifactFiles,
-  validPlaywrightPng,
 } from '../../../../../.github/scripts/guard-playwright-artifacts.mjs';
+import { validPlaywrightPng } from '../../../../../scripts/lib/playwright-png.mjs';
 
 const webRoot = resolve(import.meta.dirname, '../../..');
 const repoRoot = resolve(webRoot, '../..');
@@ -2386,6 +2386,8 @@ ${fixtureCheckout}
     );
     expect(action).toMatch(/\[\[ -f "\$producer_root\/current"/);
     expect(action).toMatch(/\[\[ -d "\$source_root"/);
+    expect(action).toMatch(/public-images:/);
+    expect(action).toMatch(/PLAYWRIGHT_ARTIFACT_ALLOW_PUBLIC_IMAGES/);
   });
 
   it('scans dynamically returned browser cookies and deletes their receipt', () => {
