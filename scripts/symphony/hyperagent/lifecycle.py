@@ -8,15 +8,28 @@ The canonical Symphony router remains the only dispatch-selection owner.
 from __future__ import annotations
 
 import argparse
+import fcntl
+import functools
+import hashlib
 import json
 import math
+import os
 import pathlib
+import tempfile
 from datetime import datetime, timezone
 
 SCHEMA = "symphony-hyperagent-lifecycle/v1"
+JOURNAL_SCHEMA = "symphony-hyperagent-journal/v1"
 MAX_OBSERVATION_AGE_SECONDS = 300
 TERMINAL_STATES = frozenset(
     {"useful_success", "terminal_failed", "declined", "cancelled"}
+)
+ACTIVE_STATES = frozenset(
+    {
+        "accepted", "running", "approval_required", "input_required",
+        "memory_decision_required", "stale_status", "transport_unknown",
+        "terminal_unverified", "provider_failure", "unknown",
+    }
 )
 PROVIDER_ACTIONS = {
     401: "authorized_reconnect_required",
@@ -28,6 +41,19 @@ PROVIDER_ACTIONS = {
 
 class LifecycleError(ValueError):
     pass
+
+
+def _locked_mutation(method):
+    @functools.wraps(method)
+    def wrapped(self, *args, **kwargs):
+        self.path.parent.mkdir(parents=True, exist_ok=True)
+        lock_path = self.path.with_suffix(self.path.suffix + ".lock")
+        with lock_path.open("a+") as lock:
+            fcntl.flock(lock.fileno(), fcntl.LOCK_EX)
+            self._load()
+            return method(self, *args, **kwargs)
+
+    return wrapped
 
 
 def _valid_sha256(value):
@@ -214,7 +240,7 @@ def classify_observation(observation, now=None):
                 not _valid_sha256(interaction.get("prompt_sha256"))
                 or not all(
                     isinstance(interaction.get(field), str) and interaction[field]
-                    for field in ("account_alias", "destination")
+                    for field in ("id", "account_alias", "destination")
                 )
                 or not _money(interaction.get("per_query_cap_usd"))
             ):
@@ -247,6 +273,8 @@ def classify_observation(observation, now=None):
         and observation.get("useful_outcome_verified") is True
         and _valid_sha256(observation.get("final_output_sha256"))
         and _valid_sha256(observation.get("usage_receipt_sha256"))
+        and _valid_sha256(observation.get("route_receipt_sha256"))
+        and _valid_sha256(observation.get("destination_receipt_sha256"))
         and _money(observation.get("cost_usd"))
     ):
         return {"state": "useful_success", "reason": "terminal_receipts_verified"}
@@ -310,7 +338,7 @@ def plan_resolution(classification, authority=None, oauth_scopes=()):
             return {
                 "action": "send_message_once", "execute": False,
                 "requires_journal_reservation": True,
-                "id": interaction["prompt_sha256"],
+                "id": interaction["id"],
             }
         return {"action": "surface_required_input", "execute": False}
     if state == "memory_decision_required":
@@ -351,6 +379,198 @@ def plan_resolution(classification, authority=None, oauth_scopes=()):
             "requires_journal_reservation": True,
         }
     return {"action": "hold_unknown", "execute": False}
+
+
+class LifecycleJournal:
+    """Atomic evidence ledger; it is not a queue, poller, or provider client."""
+
+    def __init__(self, path):
+        self.path = pathlib.Path(path)
+        self._load()
+
+    def _load(self):
+        try:
+            self.data = json.loads(self.path.read_text())
+        except FileNotFoundError:
+            self.data = {"schema": JOURNAL_SCHEMA, "jobs": {}}
+        except json.JSONDecodeError as error:
+            raise LifecycleError("journal is corrupt") from error
+        if self.data.get("schema") != JOURNAL_SCHEMA or not isinstance(
+            self.data.get("jobs"), dict
+        ):
+            raise LifecycleError("journal schema is invalid")
+
+    def _save(self):
+        self.path.parent.mkdir(parents=True, exist_ok=True)
+        descriptor, temporary = tempfile.mkstemp(
+            prefix=self.path.name + ".", dir=self.path.parent
+        )
+        try:
+            with os.fdopen(descriptor, "w") as handle:
+                json.dump(self.data, handle, sort_keys=True)
+                handle.flush()
+                os.fsync(handle.fileno())
+            os.replace(temporary, self.path)
+        finally:
+            if os.path.exists(temporary):
+                os.unlink(temporary)
+
+    @_locked_mutation
+    def register_dispatch(self, envelope, thread_id, now=None):
+        if validate_dispatch(envelope, now)["decision"] != "PROCEED":
+            raise LifecycleError("dispatch envelope is not admissible")
+        if not isinstance(thread_id, str) or not thread_id:
+            raise LifecycleError("thread_id is required")
+        key = envelope["idempotency_key"]
+        existing = self.data["jobs"].get(key)
+        identity = (envelope["request_sha256"], thread_id)
+        if existing:
+            if (existing["request_sha256"], existing["thread_id"]) != identity:
+                raise LifecycleError("idempotency key identity changed")
+            return {"recorded": False, "duplicate": True, "job": existing}
+        if any(
+            job["request_sha256"] == envelope["request_sha256"]
+            and job["state"] in ACTIVE_STATES
+            for job in self.data["jobs"].values()
+        ):
+            raise LifecycleError("related job is already active")
+        job = {
+            "thread_id": thread_id,
+            "provider": envelope["provider"],
+            "model_id": envelope["model_id"],
+            "request_sha256": envelope["request_sha256"],
+            "account_alias": envelope["account_alias"],
+            "destination": envelope["destination"],
+            "per_query_cap_usd": envelope["per_query_cap_usd"],
+            "state": "accepted",
+            "last_revision": -1,
+            "last_observation_sha256": None,
+            "classification": {"state": "accepted"},
+            "actions": [],
+            "retry_attempts": 0,
+        }
+        self.data["jobs"][key] = job
+        self._save()
+        return {"recorded": True, "duplicate": False, "job": job}
+
+    @_locked_mutation
+    def observe(self, key, revision, observation, now=None):
+        job = self.data["jobs"].get(key)
+        if not job:
+            raise LifecycleError("unknown idempotency key")
+        if not isinstance(revision, int) or isinstance(revision, bool) or revision < 0:
+            raise LifecycleError("revision must be a non-negative integer")
+        if observation.get("thread_id") != job["thread_id"] or observation.get(
+            "idempotency_key"
+        ) != key:
+            raise LifecycleError("observation job identity changed")
+        digest = hashlib.sha256(
+            json.dumps(observation, sort_keys=True, separators=(",", ":")).encode()
+        ).hexdigest()
+        if revision < job["last_revision"]:
+            raise LifecycleError("observation revision regressed")
+        if revision == job["last_revision"]:
+            if digest != job["last_observation_sha256"]:
+                raise LifecycleError("observation revision changed content")
+            return {"recorded": False, "duplicate": True, "classification": job["classification"]}
+        if job["state"] in TERMINAL_STATES:
+            raise LifecycleError("terminal job cannot receive a new observation")
+        classification = classify_observation(observation, now)
+        job.update(
+            state=classification["state"], last_revision=revision,
+            last_observation_sha256=digest, classification=classification,
+        )
+        self._save()
+        return {"recorded": True, "duplicate": False, "classification": classification}
+
+    @_locked_mutation
+    def reserve_action_once(self, key, authority=None, oauth_scopes=()):
+        job = self.data["jobs"].get(key)
+        if not job:
+            raise LifecycleError("unknown idempotency key")
+        planned = plan_resolution(job["classification"], authority, oauth_scopes)
+        if planned.get("requires_journal_reservation") is not True:
+            raise LifecycleError("current action is not admissible for reservation")
+        action = planned["action"]
+        action_id = planned.get("id") or f"{action}:{job['last_revision']}"
+        existing = next((item for item in job["actions"] if item["id"] == action_id), None)
+        if existing:
+            return {"execute": False, "duplicate": True, "reservation": existing}
+        if action.startswith("reconcile_") and any(
+            item["action"].startswith("reconcile_") for item in job["actions"]
+        ):
+            raise LifecycleError("reconciliation limit reached")
+        authority_sha256 = hashlib.sha256(
+            json.dumps(authority, sort_keys=True, separators=(",", ":")).encode()
+        ).hexdigest()
+        reservation = {
+            "id": action_id, "action": action, "status": "reserved",
+            "authority_sha256": authority_sha256,
+            "observation_revision": job["last_revision"],
+        }
+        job["actions"].append(reservation)
+        self._save()
+        return {"execute": True, "duplicate": False, "reservation": reservation}
+
+    @_locked_mutation
+    def record_action_result(self, key, action_id, provider_receipt_sha256, outcome=None):
+        job = self.data["jobs"].get(key)
+        if not job:
+            raise LifecycleError("unknown idempotency key")
+        if not _valid_sha256(provider_receipt_sha256):
+            raise LifecycleError("provider action receipt is required")
+        reservation = next((item for item in job["actions"] if item["id"] == action_id), None)
+        if not reservation:
+            raise LifecycleError("action was not reserved")
+        if reservation["action"].startswith("reconcile_") and outcome not in {
+            "provider_absence", "documented_idempotent_replay", "found_existing",
+        }:
+            raise LifecycleError("reconciliation outcome is invalid")
+        if not reservation["action"].startswith("reconcile_") and outcome is not None:
+            raise LifecycleError("non-reconciliation action cannot claim an outcome")
+        if reservation["status"] == "completed":
+            if (
+                reservation["provider_receipt_sha256"] != provider_receipt_sha256
+                or reservation.get("outcome") != outcome
+            ):
+                raise LifecycleError("action receipt changed")
+            return {"recorded": False, "duplicate": True}
+        reservation.update(
+            status="completed", provider_receipt_sha256=provider_receipt_sha256,
+            outcome=outcome,
+        )
+        self._save()
+        return {"recorded": True, "duplicate": False}
+
+    @_locked_mutation
+    def authorize_retry_once(self, key, authority):
+        job = self.data["jobs"].get(key)
+        if not job:
+            raise LifecycleError("unknown idempotency key")
+        if job["retry_attempts"] >= 1:
+            raise LifecycleError("retry limit reached")
+        retryable_state = job["state"] in {
+            "stale_status", "transport_unknown", "terminal_unverified",
+        } or (
+            job["state"] == "provider_failure"
+            and job["classification"].get("action") == "reconcile_original_thread"
+        )
+        reconciliation = next(
+            (
+                item for item in job["actions"]
+                if item["action"].startswith("reconcile_")
+                and item["status"] == "completed" and item.get("outcome") == authority
+                and item["observation_revision"] == job["last_revision"]
+            ),
+            None,
+        )
+        if not retryable_state or not reconciliation or authority not in {
+            "provider_absence", "documented_idempotent_replay",
+        }:
+            raise LifecycleError("safe retry authority is unproven")
+        job["retry_attempts"] += 1
+        self._save()
+        return {"idempotency_key": key, "attempt": 1, "authority": authority}
 
 
 def main():  # pragma: no cover - exercised by subprocess contract tests

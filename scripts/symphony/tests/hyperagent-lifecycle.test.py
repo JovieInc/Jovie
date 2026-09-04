@@ -250,7 +250,7 @@ class HyperagentLifecycleTests(unittest.TestCase):
 
     def test_input_memory_and_domain_are_not_collapsed_into_approval(self):
         input_interaction = {
-            "kind": "input", "prompt_sha256": "b" * 64,
+            "kind": "input", "id": "input-1", "prompt_sha256": "b" * 64,
             "account_alias": "workspace-a", "destination": "github-draft",
             "per_query_cap_usd": 1.0,
         }
@@ -279,8 +279,14 @@ class HyperagentLifecycleTests(unittest.TestCase):
                 lifecycle.plan_resolution(input_state, authority, scopes)["action"],
                 "surface_required_input",
             )
-        malformed_input = self.observation(interaction={"kind": "input", "prompt_sha256": "short"})
-        self.assertEqual(lifecycle.classify_observation(malformed_input, self.now)["state"], "unknown")
+        for interaction in (
+            {**input_interaction, "prompt_sha256": "short"},
+            {**input_interaction, "id": ""},
+        ):
+            malformed_input = self.observation(interaction=interaction)
+            self.assertEqual(
+                lifecycle.classify_observation(malformed_input, self.now)["state"], "unknown"
+            )
 
         memory = lifecycle.classify_observation(
             self.observation(interaction={"kind": "memory_decision", "id": "memory-1"}), self.now
@@ -318,6 +324,8 @@ class HyperagentLifecycleTests(unittest.TestCase):
             useful_outcome_verified=True,
             final_output_sha256="d" * 64,
             usage_receipt_sha256="e" * 64,
+            route_receipt_sha256="f" * 64,
+            destination_receipt_sha256="1" * 64,
             cost_usd=0.5,
         )
         classified = lifecycle.classify_observation(success, self.now)
@@ -325,7 +333,8 @@ class HyperagentLifecycleTests(unittest.TestCase):
         self.assertEqual(lifecycle.plan_resolution(classified)["action"], "record_terminal_receipt")
         for field, value in (
             ("useful_outcome_verified", False), ("final_output_sha256", "short"),
-            ("usage_receipt_sha256", "short"), ("cost_usd", "UNKNOWN"),
+            ("usage_receipt_sha256", "short"), ("route_receipt_sha256", "short"),
+            ("destination_receipt_sha256", "short"), ("cost_usd", "UNKNOWN"),
         ):
             failed = lifecycle.classify_observation({**success, field: value}, self.now)
             self.assertEqual(failed["state"], "terminal_unverified")
