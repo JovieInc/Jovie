@@ -178,7 +178,7 @@ async function measureHomepageProof(page: import('@playwright/test').Page) {
       method: 'axe-color-contrast',
       samples: contrastSamples,
     },
-    interaction: { passed: true, flow: 'autocomplete-keyboard-escape' },
+    observedInteractions: ['autocomplete-keyboard-escape'],
     overflow: { maxHorizontalPx: overflow },
   };
 }
@@ -260,7 +260,7 @@ test.describe('Homepage screen-proof measurements', () => {
   test.use({ storageState: { cookies: [], origins: [] } });
 
   for (const viewport of ['desktop', 'mobile'] as const) {
-    test(`records real cookie and browser metrics for / ${viewport}`, async ({
+    test(`records partial cookie and browser metrics for / ${viewport}`, async ({
       page,
     }, testInfo) => {
       test.setTimeout(120_000);
@@ -288,14 +288,26 @@ test.describe('Homepage screen-proof measurements', () => {
         `${JSON.stringify(
           {
             schema: 'screen-browser-measurements/v1',
-            status: 'unverified-measurement',
+            status: 'partial-browser-measurement',
+            certificationStatus: 'not-certifiable',
             screenId: 'web.homepage',
-            stateScope: 'homepage-cookie-state-observed',
+            stateScope: 'homepage-cookie-state-observed-partial',
             capturedAt: new Date().toISOString(),
             harnessGitSha,
             renderedSourceGitSha: null,
             renderedSourceProvenance: 'unavailable-local-server-checkout',
             viewport,
+            requiredHomepageContracts: {
+              complete: false,
+              missing: [
+                'canonical-header-and-information-architecture',
+                'closing-search',
+                'mobile-strip-and-menu',
+                'focus-restoration-and-cancel-state',
+                'reduced-motion-and-geometry',
+                'all-viewport-overflow-and-reflow',
+              ],
+            },
             ...measurements,
           },
           null,
