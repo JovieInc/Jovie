@@ -16,6 +16,9 @@ SPEC.loader.exec_module(astra)
 
 
 class AstraReadinessTests(unittest.TestCase):
+    ACCOUNT_SCOPE_SHA256 = "a" * 64
+    USEFUL_TURN_RECEIPT_SHA256 = "b" * 64
+
     def setUp(self):
         self.contract = astra.load_contract()
         self.request = {
@@ -142,8 +145,8 @@ class AstraReadinessTests(unittest.TestCase):
             "schema": "jovie-astra-capability/v1", "model": "gpt-6-astra", "available": True,
             "responses_transport": True, "dynamic_tool_async": True, "turn_steer": True,
             "thread_resume": True, "durable_pending_call_registry": True,
-            "evidence_accepted": True, "account_scope_sha256": "account-hash",
-            "useful_turn_receipt_sha256": "receipt-hash", "probed_at": now,
+            "evidence_accepted": True, "account_scope_sha256": self.ACCOUNT_SCOPE_SHA256,
+            "useful_turn_receipt_sha256": self.USEFUL_TURN_RECEIPT_SHA256, "probed_at": now,
         }
         capabilities = ["code", "tools"]
         complete["capabilities"] = capabilities
@@ -158,16 +161,40 @@ class AstraReadinessTests(unittest.TestCase):
         self.assertEqual(astra.activation_decision(True, complete, now, required_capabilities=["computer"])["reason"], "capability_mismatch")
         self.assertTrue(astra.activation_decision(True, complete, now, required_capabilities=capabilities)["selected"])
 
+    def test_activation_rejects_malformed_receipt_hashes(self):
+        now = time.time()
+        complete = {
+            "schema": "jovie-astra-capability/v1", "model": "gpt-6-astra", "available": True,
+            "responses_transport": True, "dynamic_tool_async": True, "turn_steer": True,
+            "thread_resume": True, "durable_pending_call_registry": True,
+            "evidence_accepted": True, "account_scope_sha256": self.ACCOUNT_SCOPE_SHA256,
+            "useful_turn_receipt_sha256": self.USEFUL_TURN_RECEIPT_SHA256,
+            "probed_at": now, "capabilities": ["code"],
+        }
+        for malformed in ("", "short", "g" * 64, "A" * 64, "a" * 63, "a" * 65):
+            for field in ("account_scope_sha256", "useful_turn_receipt_sha256"):
+                probe = {**complete, field: malformed}
+                decision = astra.activation_decision(
+                    True, probe, now, required_capabilities=["code"]
+                )
+                self.assertEqual(decision["reason"], "capability_unproven")
+                self.assertFalse(decision["selected"])
+
     def test_usage_limit_is_terminal_until_a_new_successful_probe(self):
         exhausted = {
             "schema": "jovie-astra-capability/v1", "model": "gpt-6-astra",
             "available": False, "failure": "usage_limit", "probed_at": time.time(),
-            "account_scope_sha256": "account-hash", "useful_turn_receipt_sha256": "receipt-hash",
+            "account_scope_sha256": self.ACCOUNT_SCOPE_SHA256,
+            "useful_turn_receipt_sha256": self.USEFUL_TURN_RECEIPT_SHA256,
         }
         decision = astra.activation_decision(True, exhausted, required_capabilities=["code"])
         self.assertEqual(decision["reason"], "capability_unavailable")
         self.assertFalse(decision["retryable"])
         exhausted["failure"] = "transient_network"
+        self.assertEqual(astra.activation_decision(True, exhausted, required_capabilities=["code"])["reason"], "capability_unproven")
+
+        exhausted["failure"] = "usage_limit"
+        exhausted["account_scope_sha256"] = "not-a-hash"
         self.assertEqual(astra.activation_decision(True, exhausted, required_capabilities=["code"])["reason"], "capability_unproven")
 
     def test_async_receipts_survive_restart_and_are_idempotent(self):

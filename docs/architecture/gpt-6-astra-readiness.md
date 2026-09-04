@@ -57,8 +57,9 @@ copy the policy prose into workflow templates.
 Before any route can select Astra, `activation_decision` requires an explicit
 enable flag and a fresh `jovie-astra-capability/v1` receipt proving account
 access, Responses transport, async dynamic tools, native steering, thread
-resume, a durable pending-call registry, accepted evidence, account-scope hash,
-and useful-turn receipt hash. Checked-in access stays `UNKNOWN`.
+resume, a durable pending-call registry, accepted evidence, and normalized
+64-character lowercase SHA-256 account-scope and useful-turn receipt hashes.
+Checked-in access stays `UNKNOWN`.
 The current Symphony surface fails this gate by design, so non-Astra selection
 is unchanged.
 

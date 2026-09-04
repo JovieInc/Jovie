@@ -20,6 +20,14 @@ class ContractError(ValueError):
     pass
 
 
+def _valid_sha256(value):
+    return (
+        isinstance(value, str)
+        and len(value) == 64
+        and all(character in "0123456789abcdef" for character in value)
+    )
+
+
 def load_contract(path=CONTRACT_PATH):
     data = json.loads(pathlib.Path(path).read_text())
     if data.get("schema") != "jovie-astra-readiness/v1":
@@ -123,8 +131,8 @@ def activation_decision(enabled, probe, now=None, contract=None, required_capabi
         and probe.get("model") == contract["model"]
         and probe.get("available") is False
         and probe.get("failure") in contract["activation"]["terminal_unavailable_reasons"]
-        and bool(probe.get("account_scope_sha256"))
-        and bool(probe.get("useful_turn_receipt_sha256"))
+        and _valid_sha256(probe.get("account_scope_sha256"))
+        and _valid_sha256(probe.get("useful_turn_receipt_sha256"))
     ):
         return {"selected": False, "reason": "capability_unavailable", "failure": probe["failure"], "retryable": False}
     now = time.time() if now is None else now
@@ -137,7 +145,9 @@ def activation_decision(enabled, probe, now=None, contract=None, required_capabi
     }
     if not isinstance(probe, dict) or any(probe.get(k) != v for k, v in required.items()):
         return {"selected": False, "reason": "capability_unproven"}
-    if not probe.get("account_scope_sha256") or not probe.get("useful_turn_receipt_sha256"):
+    if not _valid_sha256(probe.get("account_scope_sha256")) or not _valid_sha256(
+        probe.get("useful_turn_receipt_sha256")
+    ):
         return {"selected": False, "reason": "capability_unproven"}
     if not set(required_capabilities).issubset(set(probe.get("capabilities", []))):
         return {"selected": False, "reason": "capability_mismatch"}
