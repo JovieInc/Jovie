@@ -103,9 +103,22 @@ export async function POST(request: Request, { params }: RouteParams) {
       .returning({ id: suggestedActions.id, kind: suggestedActions.kind });
 
     if (updated.length === 0) {
+      const [existing] = await db
+        .select({ status: suggestedActions.status })
+        .from(suggestedActions)
+        .where(
+          and(eq(suggestedActions.id, id), eq(suggestedActions.userId, userId))
+        )
+        .limit(1);
+      if (existing?.status === 'rejected') {
+        return NextResponse.json(
+          { ok: true, approvalId: id, status: 'already-rejected' },
+          { status: 200, headers: NO_STORE_HEADERS }
+        );
+      }
       return NextResponse.json(
-        { error: 'already-decided' },
-        { status: 409, headers: NO_STORE_HEADERS }
+        { error: existing ? 'already-decided' : 'not-found' },
+        { status: existing ? 409 : 404, headers: NO_STORE_HEADERS }
       );
     }
 

@@ -50,6 +50,10 @@ function renderTitlebar() {
 describe('DesktopTitlebar', () => {
   beforeEach(() => {
     electronRuntimeMock.isElectronRuntime = true;
+    document.documentElement.removeAttribute('data-desktop-channel');
+    document.documentElement.removeAttribute('data-desktop-version');
+    document.documentElement.removeAttribute('data-desktop-source-revision');
+    document.documentElement.removeAttribute('data-desktop-built-at');
   });
 
   it('renders Electron titlebar navigation without duplicating sidebar notifications', () => {
@@ -129,5 +133,45 @@ describe('DesktopTitlebar', () => {
     expect(className).not.toMatch(/rounded-t/);
     expect(className).not.toMatch(/\bborder\b/);
     expect(className).not.toMatch(/linear-app-content-surface/);
+  });
+
+  it.each([
+    ['production', 'Stable'],
+    ['staging', 'Canary'],
+    ['local', 'Local'],
+  ])('renders the %s build as a persistent %s release identity', (channel, label) => {
+    document.documentElement.dataset.desktopChannel = channel;
+    document.documentElement.dataset.desktopVersion = '26.8.1';
+    document.documentElement.dataset.desktopSourceRevision =
+      '8e42ec8d79cbee578971636b78bb80dc32c78b39';
+    document.documentElement.dataset.desktopBuiltAt =
+      '2026-08-16T18:20:00.000Z';
+
+    renderTitlebar();
+
+    expect(screen.getByTestId('electron-release-identity')).toHaveTextContent(
+      `${label} · 26.8.1 · 8e42ec8`
+    );
+    expect(
+      screen.getByLabelText(
+        `${label} environment, version 26.8.1, source revision 8e42ec8d79cbee578971636b78bb80dc32c78b39`
+      )
+    ).toBeInTheDocument();
+  });
+
+  it('fails visibly when the installed shell cannot prove its baked identity', () => {
+    document.documentElement.dataset.desktopChannel = 'production';
+    document.documentElement.dataset.desktopVersion = '26.8.1';
+
+    renderTitlebar();
+
+    expect(screen.getByTestId('electron-release-identity')).toHaveTextContent(
+      'Stable · 26.8.1 · Unverified'
+    );
+    expect(
+      screen.getByLabelText(
+        'Stable environment, version 26.8.1, source revision unverified'
+      )
+    ).toBeInTheDocument();
   });
 });

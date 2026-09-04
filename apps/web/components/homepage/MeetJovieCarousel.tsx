@@ -89,6 +89,13 @@ export function ArtistProfileCardRow({
         onScroll={updateScrollState}
         ref={railRef}
       >
+        <button
+          className='homepage-artist-profiles__keyboard-scroll-control sr-only'
+          onClick={() => scrollRail('next')}
+          type='button'
+        >
+          Scroll Artist Profile Previews
+        </button>
         <ul
           aria-label='Jovie Artist Profile Previews'
           className='homepage-artist-profiles__track'

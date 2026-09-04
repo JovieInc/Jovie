@@ -38,7 +38,7 @@ describe('jovie CLI', () => {
     expect(stdout.read()).toContain('No login, API key');
   });
 
-  it('prints the pre-release version before command validation', async () => {
+  it('prints the source fallback version before command validation', async () => {
     const stdout = createOutput();
 
     await expect(
@@ -185,14 +185,74 @@ describe('jovie CLI', () => {
         stdout: parserError.output,
       })
     ).resolves.toBe(2);
-    expect(JSON.parse(parserError.read()).error.code).toBe('CLI_ERROR');
+    expect(JSON.parse(parserError.read()).error.code).toBe('USAGE_ERROR');
 
     const baseError = createOutput();
     await expect(
       runCli(['docs', 'llms', '--base-url', 'https://jov.ie/path'], {
         stderr: baseError.output,
       })
-    ).resolves.toBe(1);
+    ).resolves.toBe(2);
     expect(baseError.read()).toContain('Base URL must be');
+
+    const usernameError = createOutput();
+    await expect(
+      runCli(['artist', 'get', 'ab', '--json'], {
+        stdout: usernameError.output,
+      })
+    ).resolves.toBe(2);
+    expect(JSON.parse(usernameError.read())).toEqual({
+      error: {
+        code: 'INVALID_INPUT',
+        message:
+          'Username must be 3-30 characters and contain only letters, numbers, dots, underscores, or hyphens.',
+      },
+    });
+
+    const textParserError = createOutput();
+    await expect(
+      runCli(['docs', 'llms', '--unknown'], {
+        stderr: textParserError.output,
+      })
+    ).resolves.toBe(2);
+    expect(textParserError.read()).toContain('Run `jovie --help` for usage.');
+  });
+
+  it('rejects --full for the OpenAPI command before making a request', async () => {
+    const stderr = createOutput();
+    const fetch = createFetch('{"openapi":"3.1.0"}');
+
+    await expect(
+      runCli(['api', 'openapi', '--full'], {
+        fetchImpl: fetch.fetchImpl,
+        stderr: stderr.output,
+      })
+    ).resolves.toBe(2);
+    expect(fetch.urls).toEqual([]);
+    expect(stderr.read()).toContain('--full is only supported by docs llms');
+  });
+
+  it('keeps an unexpected response-body failure distinct from request failures', async () => {
+    const stdout = createOutput();
+    const fetchImpl: FetchImplementation = async () =>
+      ({
+        ok: true,
+        text: async () => {
+          throw new Error('body stream unavailable');
+        },
+      }) as unknown as Response;
+
+    await expect(
+      runCli(['docs', 'llms', '--json'], {
+        fetchImpl,
+        stdout: stdout.output,
+      })
+    ).resolves.toBe(1);
+    expect(JSON.parse(stdout.read())).toEqual({
+      error: {
+        code: 'CLI_ERROR',
+        message: 'body stream unavailable',
+      },
+    });
   });
 });

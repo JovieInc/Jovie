@@ -11,7 +11,7 @@ This replaces traditional ship cycles. The loop runs faster and more autonomousl
 1. **Plan:** An issue gets `tim-approved` label after planning review
 2. **Ship:** Codex CLI shipper (ChatGPT $200 sub) or Codex/veronica (OpenRouter/Anthropic) picks up approved issues
 3. **Review:** Automated CI + lint + tests only. Taste decisions are made at planning time, not code review
-4. **Merge:** Auto-merge when CI passes with `merge-queue` label
+4. **Merge:** Native GitHub merge queue admits green heads. No transport label.
 
 ### Agent Fleet
 - **Zoe** (OpenClaw): Communications & intelligence, outer-loop orchestration

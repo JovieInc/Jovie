@@ -15,7 +15,7 @@ function makeArtist(overrides: Partial<Artist> = {}): Artist {
     handle: 'tim',
     spotify_id: '4u',
     name: 'Tim White',
-    image_url: '/images/avatars/tim-white-founder.jpg',
+    image_url: '/images/avatars/tim-white.jpg',
     published: true,
     is_verified: true,
     is_featured: true,

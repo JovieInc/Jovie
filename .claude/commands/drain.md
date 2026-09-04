@@ -121,6 +121,5 @@ gh pr list --state open --json number,title --limit 100 \
 ```
 
 Flow-health targets: nothing non-draft sits unenrolled; no agent PR open >24h
-without a push; if a labeled PR isn't entering the queue, the intent-label →
-native-controller wiring is broken. Inspect authoritative GitHub queue state
-before retrying or changing labels.
+without a push. Inspect authoritative GitHub queue state, not labels, before
+retrying enrollment. The `merge-queue` label is not transport.

@@ -193,7 +193,7 @@ describe('Tooltip', () => {
     it('applies base styling classes (System B tokens)', () => {
       render(<TestTooltip open={true} />);
       const content = screen.getByTestId('tooltip-content');
-      expect(content.className).toContain('z-[150]');
+      expect(content.className).toContain('z-tooltip');
       expect(content.className).toContain(
         'rounded-(--system-b-radius-overlay)'
       );
@@ -209,15 +209,18 @@ describe('Tooltip', () => {
       expect(content.className).toContain('shadow-popover');
     });
 
-    it('uses a pill only for the explicit compact one-line contract', () => {
+    it('keeps compact labels on the shared rounded-rectangle contract', () => {
       render(
         <TestTooltip open={true} contentVariant='compact'>
           Save
         </TestTooltip>
       );
       const content = screen.getByTestId('tooltip-content');
-      expect(content.className).toContain('rounded-full');
+      expect(content.className).toContain(
+        'rounded-(--system-b-radius-overlay)'
+      );
       expect(content.className).toContain('whitespace-nowrap');
+      expect(content.className).not.toContain('rounded-full');
       expect(content.className).not.toContain('max-w-56');
     });
 

@@ -34,15 +34,6 @@ REMOTE_INTERVAL = max(60, int(os.environ.get("HUD_REMOTE_INTERVAL", "120")))
 FLEET_RECEIPT_STALE_SECONDS = 10 * 60
 FLEET_RECEIPT_FUTURE_SKEW_SECONDS = 5
 ACTIVE_WORK_STALLED_SECONDS = 90 * 60
-SYMPHONY_WORKFLOW_PATHS = (
-    Path(
-        os.environ.get(
-            "HUD_SYMPHONY_WORKFLOW",
-            "~/.config/symphony/WORKFLOW.md",
-        )
-    ).expanduser(),
-    Path("/home/timwhite/symphony-runtime/elixir/WORKFLOW.jovie-ui-pilot.md"),
-)
 STALE_AFTER = {
     "symphony": LOCAL_INTERVAL * 3,
     "fleet": FLEET_RECEIPT_STALE_SECONDS,
@@ -77,6 +68,26 @@ SUMMER_QUEUE_PATH = Path(
         "/home/timwhite/gem-workspace/state/jovie-delivery-controller/summer-queue.json",
     )
 ).expanduser()
+DEFAULT_WORKFLOW = Path(
+    os.environ.get("SYMPHONY_WORKFLOW_PATH", str(Path.home() / ".config/symphony/WORKFLOW.md"))
+).expanduser()
+REPO_WORKFLOW = Path(__file__).resolve().parent / "symphony" / "WORKFLOW.md"
+# JOV-5744: the polling budget binds to the official Symphony workflow only.
+# HUD_SYMPHONY_WORKFLOW may point the HUD at an alternate official copy; the
+# legacy ui-pilot workflow is no longer a fallback.
+SYMPHONY_WORKFLOW_PATHS: tuple[Path, ...] = tuple(
+    dict.fromkeys(
+        path
+        for path in (
+            Path(os.environ["HUD_SYMPHONY_WORKFLOW"]).expanduser()
+            if os.environ.get("HUD_SYMPHONY_WORKFLOW")
+            else None,
+            DEFAULT_WORKFLOW,
+            REPO_WORKFLOW,
+        )
+        if path is not None
+    )
+)
 WORKFLOWS = {
     "CI",
     "Production Controller",
@@ -677,8 +688,18 @@ def error_kind(text: Any) -> str:
     return "other"
 
 
-def configured_slots(paths: tuple[Path, ...] | None = None) -> int | None:
-    for path in paths or SYMPHONY_WORKFLOW_PATHS:
+def configured_slots(
+    paths: Path | tuple[Path, ...] | None = None,
+) -> int | None:
+    # Accept a single official workflow path (JOV-5744 polling budget binding)
+    # or an ordered tuple of candidates; fall back to the canonical search order.
+    if isinstance(paths, Path):
+        candidates: tuple[Path, ...] = (paths, *SYMPHONY_WORKFLOW_PATHS)
+    else:
+        candidates = paths or SYMPHONY_WORKFLOW_PATHS
+    for path in candidates:
+        if not path.is_file():
+            continue
         try:
             content = path.read_text(encoding="utf-8")
         except OSError:

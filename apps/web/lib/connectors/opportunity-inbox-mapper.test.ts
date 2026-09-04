@@ -192,6 +192,29 @@ describe('mapSuggestedActionToInboxCard', () => {
     });
   });
 
+  it('carries source-owned thumbnail evidence into the editorial review card', () => {
+    const card = mapSuggestedActionToInboxCard({
+      id: 'thumbnail-1',
+      kind: 'youtube.thumbnail_candidate',
+      payload: {
+        title: 'Refresh a weak YouTube thumbnail',
+        thumbnailUrl: 'https://i.ytimg.com/vi/example/hqdefault.jpg',
+        thumbnailAlt: 'Current thumbnail for the release video',
+      },
+      rationale: 'The default frame reads weakly at mobile size.',
+      createdAt: new Date('2026-09-01T10:00:00.000Z'),
+    });
+
+    expect(card).toMatchObject({
+      sourceKind: 'youtube.thumbnail_candidate',
+      visual: {
+        url: 'https://i.ytimg.com/vi/example/hqdefault.jpg',
+        alt: 'Current thumbnail for the release video',
+        fit: 'contain',
+      },
+    });
+  });
+
   it('uses the persisted signal_type when present', () => {
     const card = mapSuggestedActionToInboxCard({
       id: 'action-3',

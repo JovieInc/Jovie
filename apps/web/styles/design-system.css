@@ -76,6 +76,13 @@
   );
   --ds-marketing-title-leading: 1.08;
   --ds-marketing-title-tracking: 0;
+  /* Compact route title ("type 28/620", optical-grid-consistent-v1). Utility
+     routes (support, changelog, policy pages) use one fixed 28px/620 title
+     instead of the fluid display ramp; 28px sits on the 4px scale. */
+  --ds-marketing-route-title-size: 1.75rem;
+  --ds-marketing-route-title-weight: 620;
+  --ds-marketing-route-title-leading: 1.15;
+  --ds-marketing-route-title-tracking: -0.022em;
   --ds-marketing-lede-size: clamp(1.25rem, 1.6vw, 1.375rem);
   --ds-marketing-lede-leading: var(--leading-normal);
   --ds-marketing-lede-tracking: -0.015em;
@@ -242,6 +249,78 @@
   --page-pad: clamp(16px, 4vw, 32px);
   --cover-height: clamp(220px, 34svh, 400px);
   --content-max: 720px;
+  --color-text-primary-token: #f7f8f8;
+  --color-text-secondary-token: #d0d6e0;
+  --color-text-tertiary-token: #8a8f98;
+  --color-text-quaternary-token: #62666d;
+  --profile-stage-bg: #050608;
+  --profile-stage-overlay:
+    radial-gradient(
+      circle at 50% 12%,
+      rgba(255, 255, 255, 0.09),
+      transparent 20%
+    ),
+    linear-gradient(
+      180deg,
+      rgba(18, 20, 26, 0.18) 0%,
+      rgba(9, 10, 14, 0.68) 54%,
+      rgba(5, 6, 8, 0.92) 100%
+    );
+  --profile-stage-glow-a: rgba(255, 255, 255, 0.1);
+  --profile-stage-glow-b: rgba(38, 42, 54, 0.42);
+  --profile-content-bg: linear-gradient(
+    180deg,
+    rgba(14, 16, 20, 0.96),
+    rgba(10, 12, 16, 0.94)
+  );
+  --profile-panel-border: rgba(255, 255, 255, 0.09);
+  --profile-panel-shadow:
+    0 28px 72px rgba(0, 0, 0, 0.34), 0 12px 28px rgba(0, 0, 0, 0.18);
+  --profile-panel-gradient: linear-gradient(
+    180deg,
+    rgba(255, 255, 255, 0.06),
+    rgba(255, 255, 255, 0.02) 20%,
+    transparent 100%
+  );
+  --profile-drawer-bg: rgb(14, 16, 20);
+  --profile-drawer-highlight: linear-gradient(
+    180deg,
+    rgba(255, 255, 255, 0.08),
+    rgba(255, 255, 255, 0.02) 36%,
+    transparent 100%
+  );
+  --profile-pearl-bg: rgba(255, 255, 255, 0.12);
+  --profile-pearl-bg-hover: rgba(255, 255, 255, 0.16);
+  --profile-pearl-bg-active: rgba(255, 255, 255, 0.22);
+  --profile-pearl-border: rgba(255, 255, 255, 0.16);
+  --profile-pearl-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.12), 0 12px 28px rgba(0, 0, 0, 0.24);
+  --profile-pearl-primary-bg: rgba(255, 255, 255, 0.96);
+  --profile-pearl-primary-fg: rgba(8, 9, 10, 0.96);
+  --profile-accent-primary: rgba(255, 255, 255, 0.96);
+  --profile-accent-on-primary: rgba(8, 9, 10, 0.96);
+  --profile-accent-soft: rgba(255, 255, 255, 0.12);
+  --profile-accent-soft-strong: rgba(255, 255, 255, 0.18);
+  --profile-tab-active-bg: var(--profile-pearl-primary-bg);
+  --profile-tab-active-fg: var(--profile-pearl-primary-fg);
+  --profile-status-pill-bg: rgba(255, 255, 255, 0.12);
+  --profile-status-pill-border: rgba(255, 255, 255, 0.18);
+  --profile-status-pill-fg: rgba(255, 255, 255, 0.98);
+  --profile-rail-dot-active: rgba(255, 255, 255, 0.92);
+  --profile-rail-dot-inactive: rgba(255, 255, 255, 0.18);
+  --profile-composer-border: rgba(255, 255, 255, 0.1);
+  --profile-dock-bg: rgba(30, 32, 40, 0.52);
+  --profile-dock-border: rgba(255, 255, 255, 0.18);
+  --profile-dock-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.14), 0 14px 34px rgba(0, 0, 0, 0.3);
+  --profile-dock-active-bg: rgba(255, 255, 255, 0.16);
+  --profile-dock-active-border: rgba(255, 255, 255, 0.14);
+  --profile-dock-active-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.16);
+  --profile-dock-active-fg: rgba(255, 255, 255, 0.98);
+  --profile-dock-inactive-fg: rgba(255, 255, 255, 0.58);
+  --profile-dock-solid-bg: rgb(24, 26, 32);
+  --profile-dock-solid-border: rgba(255, 255, 255, 0.28);
+  color-scheme: dark;
 }
 
 .public-profile-layout-frame {
@@ -2251,6 +2330,102 @@ html[data-profile-initial-mode]
   );
 
   color-scheme: dark;
+}
+
+.system-b-marketing.dark {
+  --color-bg-base: #030407;
+  --color-bg-surface-0: #06080d;
+  --color-bg-surface-1: #0f1420;
+  --color-bg-surface-2: #151b2a;
+  --color-bg-surface-3: #1b2436;
+  --color-bg-page: #030407;
+  --color-bg-hover: rgba(168, 176, 195, 0.06);
+  --color-bg-elevated: #0a0d16;
+  --color-bg-input: #0f1420;
+  --color-bg-active: #151b2a;
+  --color-base: var(--color-bg-base);
+  --color-surface-0: var(--color-bg-surface-0);
+  --color-surface-1: var(--color-bg-surface-1);
+  --color-surface-2: var(--color-bg-surface-2);
+  --color-surface-3: var(--color-bg-surface-3);
+  --color-surface-page: var(--color-bg-page);
+  --color-surface-hover: var(--color-bg-hover);
+  --color-surface-elevated: var(--color-bg-elevated);
+  --color-surface-input: var(--color-bg-input);
+  --color-surface-active: var(--color-bg-active);
+  --color-text-primary-token: #f5f7fb;
+  --color-text-secondary-token: #d7dce8;
+  --color-text-tertiary-token: #a8b0c3;
+  --color-text-quaternary-token: #7d879d;
+  --color-primary-token: var(--color-text-primary-token);
+  --color-secondary-token: var(--color-text-secondary-token);
+  --color-tertiary-token: var(--color-text-tertiary-token);
+  --color-quaternary-token: var(--color-text-quaternary-token);
+  --color-accent-gray: #8d8d93;
+  --color-accent-gray-subtle: rgb(127 127 133 / 0.18);
+  --color-accent-blue: #11afff;
+  --color-accent-blue-subtle: rgba(17, 175, 255, 0.12);
+  --color-accent-purple: #a982ff;
+  --color-accent-purple-subtle: rgba(169, 130, 255, 0.12);
+  --color-accent-pink: #ff48d2;
+  --color-accent-pink-subtle: rgba(255, 72, 210, 0.12);
+  --color-accent-red: #ff677d;
+  --color-accent-red-subtle: rgba(255, 103, 125, 0.12);
+  --color-accent-orange: #ffc857;
+  --color-accent-orange-subtle: rgba(255, 200, 87, 0.12);
+  --color-accent-green: #39e58c;
+  --color-accent-green-subtle: rgba(57, 229, 140, 0.12);
+  --color-accent-teal: #24f6d2;
+  --color-accent-teal-subtle: rgba(36, 246, 210, 0.1);
+  --color-accent: #11afff;
+  --color-accent-hover: #3bc0ff;
+  --color-accent-active: #0088ff;
+  --color-accent-subtle: rgba(17, 175, 255, 0.12);
+  --color-border-subtle: rgba(168, 176, 195, 0.1);
+  --color-border-default: rgba(168, 176, 195, 0.16);
+  --color-border-strong: rgba(199, 237, 255, 0.26);
+  --color-subtle: var(--color-border-subtle);
+  --color-default: var(--color-border-default);
+  --color-strong: var(--color-border-strong);
+  --system-b-text-primary: var(--color-text-primary-token);
+  --system-b-bg-page: var(--color-bg-base);
+  --system-b-bg-surface-0: var(--color-bg-surface-0);
+  --system-b-bg-surface-1: var(--color-bg-surface-1);
+  --system-b-bg-surface-2: var(--color-bg-surface-2);
+  --system-b-app-shell-border: var(--color-border-default);
+  --system-b-app-frame-seam: var(--color-border-subtle);
+  --system-b-app-content-surface: var(--color-bg-elevated);
+  --system-b-entity-chip-release-accent: var(--color-accent);
+  --system-b-entity-chip-artist-accent: var(--color-accent-purple);
+  --system-b-entity-chip-track-accent: var(--color-accent-blue);
+  --system-b-entity-chip-event-accent: var(--color-accent-orange);
+  background-color: var(--color-bg-base);
+  color: var(--color-text-primary-token);
+  color-scheme: dark;
+}
+
+.system-b-marketing.dark :where(.bg-base) {
+  background-color: var(--color-bg-base);
+}
+
+.system-b-marketing.dark :where(.bg-surface-page) {
+  background-color: var(--color-bg-page);
+}
+
+.system-b-marketing.dark :where(.bg-surface-0) {
+  background-color: var(--color-bg-surface-0);
+}
+
+.system-b-marketing.dark :where(.bg-surface-1) {
+  background-color: var(--color-bg-surface-1);
+}
+
+.system-b-marketing.dark :where(.bg-surface-2) {
+  background-color: var(--color-bg-surface-2);
+}
+
+.system-b-marketing.dark :where(.bg-surface-3) {
+  background-color: var(--color-bg-surface-3);
 }
 
 html:not(.dark) .profile-intent-page :where(a, button, span),

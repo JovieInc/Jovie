@@ -15,6 +15,7 @@ export {
   resolveYouTubeCollaboratorClaims,
   type YouTubeCollaboratorClaim,
 } from './collaborators';
+export { hasConnectedYouTubeAccount } from './connection';
 export {
   type CatalogRecording,
   extractIsrcsFromText,
@@ -29,6 +30,7 @@ export {
   getVideoPkForProfile,
   type ListVideosForProfileInput,
   listPendingReleaseLinksForUser,
+  listVideosForLibraryProjection,
   listVideosForProfile,
   type PendingReleaseLinkItem,
   type PublicVideoListItem,

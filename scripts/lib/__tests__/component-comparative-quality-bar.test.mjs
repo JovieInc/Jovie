@@ -1,3 +1,4 @@
+import { execFileSync } from 'node:child_process';
 import { describe, expect, it } from 'vitest';
 import {
   ATOM_MOLECULE_INVENTORY_RATCHET,
@@ -11,6 +12,7 @@ import {
   evaluateComparativeSample,
   proposeAtomMoleculeInventoryRatchet,
   QUALITY_BAR_REFERENCES,
+  resolveTrustedBaseEnrollment,
   runComparativeQualityBar,
   validateApprovedOutcomeAlignment,
   validateComparativeQualityBar,
@@ -457,6 +459,26 @@ describe('component comparative quality bar', () => {
         },
       }).ok
     ).toBe(true);
+  });
+
+  it('resolves a trusted base enrollment even when the merge-base predates the registry', () => {
+    // Regression (ci:f4bd9bc60a2c6c3c188d): a PR branched before the comparative
+    // quality bar landed has a merge-base that does not contain the registry
+    // source, so reading trusted enrollment from that base fails closed and
+    // permanently blocks the PR. The trust property only requires a ref the PR
+    // head cannot modify, so the gate falls back to origin/main. Assert the
+    // resolver returns a usable trusted enrollment instead of failing closed.
+    expect(() =>
+      execFileSync('git', ['rev-parse', '--verify', 'origin/main'], {
+        encoding: 'utf8',
+      })
+    ).not.toThrow();
+
+    const enrollment = resolveTrustedBaseEnrollment();
+    expect(enrollment.ok).toBe(true);
+    expect(enrollment.ref).toMatch(/^[0-9a-f]{40}$/);
+    expect(Array.isArray(enrollment.baselines)).toBe(true);
+    expect(enrollment.baselines.length).toBeGreaterThan(0);
   });
 
   it('requires exactly one qualification control for every enrolled baseline', () => {

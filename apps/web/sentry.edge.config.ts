@@ -10,9 +10,11 @@ import {
   isNonProductionServerNoise,
 } from '@/lib/sentry/config';
 import {
+  isNonActionableLoopbackBetterAuthHostEvent,
   isNonActionableVercelIpcEvent,
   isTransientInfraHttpTransaction,
   isUpstashQuotaSentryEvent,
+  LOOPBACK_BETTER_AUTH_HOST_IGNORE_ERRORS,
   SPOTIFY_RELEASE_CREDIT_BOUND_IGNORE_ERRORS,
   UPSTASH_QUOTA_IGNORE_ERRORS,
   VERCEL_IPC_SOCK_IGNORE_ERRORS,
@@ -41,6 +43,9 @@ Sentry.init({
     if (isNonActionableVercelIpcEvent(event)) {
       return null;
     }
+    if (isNonActionableLoopbackBetterAuthHostEvent(event)) {
+      return null;
+    }
     return event;
   }),
 
@@ -49,6 +54,7 @@ Sentry.init({
     ...UPSTASH_QUOTA_IGNORE_ERRORS,
     ...SPOTIFY_RELEASE_CREDIT_BOUND_IGNORE_ERRORS,
     ...VERCEL_IPC_SOCK_IGNORE_ERRORS,
+    ...LOOPBACK_BETTER_AUTH_HOST_IGNORE_ERRORS,
     // Clerk SSR race condition: auth()/currentUser() called before request
     // context is available during edge/serverless cold starts. Not a code bug —
     // all usages are correctly in server components/actions/API routes.

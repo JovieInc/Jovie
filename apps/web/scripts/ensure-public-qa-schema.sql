@@ -13,6 +13,9 @@ CREATE TABLE IF NOT EXISTS "promo_downloads" (
   "file_mime_type" text NOT NULL,
   "artwork_url" text,
   "is_active" boolean DEFAULT true NOT NULL,
+  "rights_control_attested" boolean DEFAULT false NOT NULL,
+  "rights_control_attested_by" uuid,
+  "rights_control_attested_at" timestamp,
   "position" integer DEFAULT 0 NOT NULL,
   "metadata" jsonb DEFAULT '{}'::jsonb,
   "created_at" timestamp DEFAULT now() NOT NULL,
@@ -30,6 +33,13 @@ CREATE TABLE IF NOT EXISTS "promo_download_events" (
   "city" text,
   "downloaded_at" timestamp DEFAULT now() NOT NULL
 );
+
+ALTER TABLE "promo_downloads"
+  ADD COLUMN IF NOT EXISTS "rights_control_attested" boolean DEFAULT false NOT NULL;
+ALTER TABLE "promo_downloads"
+  ADD COLUMN IF NOT EXISTS "rights_control_attested_by" uuid;
+ALTER TABLE "promo_downloads"
+  ADD COLUMN IF NOT EXISTS "rights_control_attested_at" timestamp;
 
 CREATE UNIQUE INDEX IF NOT EXISTS "promo_downloads_release_id_slug_unique"
   ON "promo_downloads" USING btree ("release_id", "slug");

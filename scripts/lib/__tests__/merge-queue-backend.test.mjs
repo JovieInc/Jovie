@@ -47,7 +47,7 @@ const VALID_REPOSITORY = Object.freeze(
 );
 const VALID_RULESET = Object.freeze(
   JSON.parse(
-    `{"id":${RULESET_ID},"enforcement":"active","target":"branch","conditions":{"ref_name":{"include":["refs/heads/main"],"exclude":[]}},"bypass_actors":[],"rules":[{"type":"required_status_checks","parameters":{"strict_required_status_checks_policy":false,"required_status_checks":[{"context":"PR Ready"},{"context":"Migration Guard"},{"context":"Fork PR Gate"},{"context":"PR Size Guard"}]}},{"type":"merge_queue","parameters":{"check_response_timeout_minutes":60,"grouping_strategy":"ALLGREEN","max_entries_to_build":3,"max_entries_to_merge":10,"merge_method":"SQUASH","min_entries_to_merge":5,"min_entries_to_merge_wait_minutes":10}}]}`
+    `{"id":${RULESET_ID},"enforcement":"active","target":"branch","conditions":{"ref_name":{"include":["refs/heads/main"],"exclude":[]}},"bypass_actors":[],"rules":[{"type":"required_status_checks","parameters":{"strict_required_status_checks_policy":false,"required_status_checks":[{"context":"PR Ready"},{"context":"Migration Guard"},{"context":"Fork PR Gate"},{"context":"PR Size Guard"}]}},{"type":"merge_queue","parameters":{"check_response_timeout_minutes":20,"grouping_strategy":"ALLGREEN","max_entries_to_build":1,"max_entries_to_merge":5,"merge_method":"SQUASH","min_entries_to_merge":5,"min_entries_to_merge_wait_minutes":10}}]}`
   )
 );
 const VALID_WORKFLOW = `name: CI
@@ -70,9 +70,9 @@ const VALID_BRANCH_PROTECTION_REF = Object.freeze({
   minimumEntriesToMergeWaitTime: number,
 }} */
 const VALID_LIVE_QUEUE_CONFIGURATION = Object.freeze({
-  checkResponseTimeout: 3600,
-  maximumEntriesToBuild: 3,
-  maximumEntriesToMerge: 10,
+  checkResponseTimeout: 1200,
+  maximumEntriesToBuild: 1,
+  maximumEntriesToMerge: 5,
   mergeMethod: 'SQUASH',
   minimumEntriesToMerge: 5,
   minimumEntriesToMergeWaitTime: 10,
@@ -798,17 +798,49 @@ describe('queue workflow mutation safety', () => {
       "needs.fleet-policy.outputs.mode == 'hold-intake'"
     );
     expect(enroll).toContain("needs.fleet-policy.outputs.mode == 'draft-only'");
-    expect(enroll).toContain("DRAIN_QUEUE_REENTRY_MAX_PER_RUN: '2'");
+    expect(enroll).toContain("DRAIN_QUEUE_REENTRY_MAX_PER_RUN: '0'");
     expect(drain).toContain('QUEUE_REENTRY_CONTEXT="jovie-queue-reentry/v1"');
     expect(drain).toContain('bounded exact-head native admission');
-    expect(drain).toContain('DRAIN_QUEUE_REENTRY_MAX_PER_RUN > 2');
+    expect(drain).toContain('DRAIN_QUEUE_REENTRY_MAX_PER_RUN" =~ ^[0-9]+$');
     expect(drain).toContain('queue_reentry_receipt_is_recoverable "$head_oid"');
     expect(drain).toContain('check_failures_for_pr "$n"');
-    expect(drain).toContain(
-      '[[ "$ENROLLED_THIS_RUN" -ge "$DRAIN_QUEUE_REENTRY_MAX_PER_RUN" ]]'
-    );
+    expect(drain).toContain('(( DRAIN_QUEUE_REENTRY_MAX_PER_RUN > 0 ))');
     expect(drain).toContain('select((.n | tostring) != $admission_pr)');
     expect(drain).toContain('enroll_if_still_eligible "$n" "$n" "$head_oid"');
+  });
+
+  it('recovers missing-CI heads with a bounded, per-head-idempotent close+reopen', () => {
+    const workflow = readRepoFile(
+      '.github/workflows/merge-queue-autoenroll.yml'
+    );
+    const enroll = workflowStep(workflow, 'Enroll clean PRs');
+    const drain = readRepoFile('scripts/drain-pr-queue.sh');
+
+    expect(enroll).toContain("DRAIN_RECOVER_MISSING_CI: '1'");
+    expect(enroll).toContain("DRAIN_MISSING_CI_MAX_PER_RUN: '2'");
+    expect(enroll).toContain("DRAIN_MISSING_CI_MIN_AGE_MINUTES: '120'");
+
+    // Missing-only is the exact admission signal: every fresh blocker must be
+    // a `<required context> (missing)` entry, never a terminal red or pending.
+    expect(drain).toContain(
+      '=== RECOVER (missing source CI → bounded close+reopen) ==='
+    );
+    expect(drain).toContain('all(.[]; endswith(" (missing)"))');
+    expect(drain).toContain('check_failures_for_pr "$n"');
+    expect(drain).toContain('missing_ci_recovery_attempted "$n" "$head_oid"');
+    expect(drain).toContain(
+      "MISSING_CI_RECOVERY_MARKER='<!-- bot-comment:missing-ci-recovery -->'"
+    );
+    expect(drain).toContain('.commit.committer.date // empty');
+    expect(drain).toContain('DRAIN_MISSING_CI_MIN_AGE_MINUTES * 60');
+    expect(drain).toContain(
+      '[[ "$MISSING_CI_RECOVERED" -ge "$DRAIN_MISSING_CI_MAX_PER_RUN" ]]'
+    );
+    expect(drain).toContain('DRAIN_MISSING_CI_MAX_PER_RUN > 2');
+    expect(drain).toContain('pr close "$n" -R "$REPO"');
+    expect(drain).toContain('pr reopen "$n" -R "$REPO"');
+    // Hard holds, drafts, and the event-scoped admission target are excluded.
+    expect(drain).toContain('select((.n | tostring) != $admission_pr)');
   });
 
   it('excludes stacked non-main PRs from admission and live eligibility', () => {
@@ -1069,7 +1101,7 @@ describe('native live preflight', () => {
               ...rule,
               parameters: {
                 ...rule.parameters,
-                max_entries_to_build: 1,
+                max_entries_to_build: 3,
               },
             }
           : rule
@@ -1095,7 +1127,7 @@ describe('native live preflight', () => {
     expect(liveGraphql.policyReadback).toMatchObject({
       matched: true,
       drift: [],
-      observed: { max_entries_to_build: 3 },
+      observed: { max_entries_to_build: 1 },
     });
   });
 
@@ -1108,7 +1140,7 @@ describe('native live preflight', () => {
     expect(result).toMatchObject({ ready: true });
     expect(result.policyReadback).toMatchObject({
       matched: true,
-      observed: { max_entries_to_build: 3 },
+      observed: { max_entries_to_build: 1 },
     });
     const liveConfigCall = runner.mock.calls.find(([args]) =>
       queryText(args).includes('MergeQueueLiveConfiguration')
@@ -1119,7 +1151,7 @@ describe('native live preflight', () => {
     expect(queryText(liveConfigCall)).toContain('maximumEntriesToBuild');
   });
 
-  it('does not fail enroll preflight when GraphQL checkResponseTimeout is seconds for a 60-minute lock', () => {
+  it('does not fail enroll preflight when GraphQL checkResponseTimeout is seconds for a 20-minute lock', () => {
     const liveUntilCutover = {
       ...VALID_RULESET,
       rules: VALID_RULESET.rules.map(rule =>
@@ -1142,7 +1174,7 @@ describe('native live preflight', () => {
       branchProtectionRef: VALID_BRANCH_PROTECTION_REF,
       liveQueueConfiguration: {
         ...VALID_LIVE_QUEUE_CONFIGURATION,
-        checkResponseTimeout: 3600,
+        checkResponseTimeout: 1200,
         minimumEntriesToMerge: 1,
         minimumEntriesToMergeWaitTime: 0,
       },
@@ -1150,7 +1182,7 @@ describe('native live preflight', () => {
     expect(falseDrift.ok).toBe(true);
     expect(
       falseDrift.policyReadback.observed.check_response_timeout_minutes
-    ).toBe(60);
+    ).toBe(20);
     expect(falseDrift.policyReadback.drift).toEqual([
       'min_entries_to_merge',
       'min_entries_to_merge_wait_minutes',
@@ -1175,18 +1207,18 @@ describe('native live preflight', () => {
     });
     expect(actualTimeoutDrift.ok).toBe(false);
     expect(actualTimeoutDrift.errors).toContain(
-      'merge_queue check_response_timeout_minutes must be 60'
+      'merge_queue check_response_timeout_minutes must be 20'
     );
     expect(actualTimeoutDrift.errors).toContain(
       'native queue policy readback drifted: check_response_timeout_minutes'
     );
   });
 
-  it('reads live GraphQL checkResponseTimeout seconds as 60 minutes', async () => {
+  it('reads live GraphQL checkResponseTimeout seconds as 20 minutes', async () => {
     const runner = createNativeRunner({
       liveQueueConfiguration: {
         ...VALID_LIVE_QUEUE_CONFIGURATION,
-        checkResponseTimeout: 3600,
+        checkResponseTimeout: 1200,
       },
     });
     await expect(
@@ -1197,7 +1229,7 @@ describe('native live preflight', () => {
     ).resolves.toMatchObject({
       ready: true,
       policyReadback: {
-        observed: { check_response_timeout_minutes: 60 },
+        observed: { check_response_timeout_minutes: 20 },
       },
     });
   });
@@ -1211,7 +1243,7 @@ describe('native live preflight', () => {
               ...rule,
               parameters: {
                 ...rule.parameters,
-                max_entries_to_build: 1,
+                max_entries_to_build: 3,
               },
             }
           : rule
@@ -1227,7 +1259,7 @@ describe('native live preflight', () => {
       ready: true,
       policyReadback: {
         matched: true,
-        observed: { max_entries_to_build: 3 },
+        observed: { max_entries_to_build: 1 },
       },
     });
   });

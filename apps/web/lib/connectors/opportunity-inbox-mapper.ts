@@ -91,6 +91,34 @@ function whyFromRow(row: SuggestedActionRow, category?: string): string {
   return 'Jovie found a booking signal worth your review.';
 }
 
+function visualFromPayload(
+  payload: unknown,
+  fallbackAlt: string
+): OpportunityInboxCardViewModel['visual'] {
+  if (!payload || typeof payload !== 'object') return undefined;
+  const record = payload as Record<string, unknown>;
+  const candidate = [
+    record.thumbnailUrl,
+    record.imageUrl,
+    record.artworkUrl,
+    record.coverArtUrl,
+  ].find(value => typeof value === 'string' && value.trim());
+  if (typeof candidate !== 'string') return undefined;
+  try {
+    const parsed = new URL(candidate);
+    if (parsed.protocol !== 'https:' && parsed.protocol !== 'http:') {
+      return undefined;
+    }
+    const alt =
+      typeof record.thumbnailAlt === 'string' && record.thumbnailAlt.trim()
+        ? record.thumbnailAlt.trim()
+        : fallbackAlt;
+    return { url: parsed.toString(), alt, fit: 'contain' };
+  } catch {
+    return undefined;
+  }
+}
+
 export function mapSuggestedActionToInboxCard(
   row: SuggestedActionRow
 ): OpportunityInboxCardViewModel {
@@ -121,8 +149,11 @@ export function mapSuggestedActionToInboxCard(
         : workflowCapturePayload?.success
           ? 'workflow_capture'
           : classifySuggestedActionCategory(row);
+  const title = titleFromPayload(row.payload, category);
+  const visual = visualFromPayload(row.payload, title);
   return {
     id: row.id,
+    sourceKind: row.kind,
     signalType,
     // Report cards keep a fixed type label; all other cards use the typed
     // signal-category label (song / event / profile match / suggestion).
@@ -137,7 +168,7 @@ export function mapSuggestedActionToInboxCard(
               ? 'Brand Deal'
               : OPPORTUNITY_SIGNAL_TYPE_META[signalType].label,
     createdAt: row.createdAt.toISOString(),
-    title: titleFromPayload(row.payload, category),
+    title,
     why: brandDeal
       ? formatBrandDealOpportunityMetadata(brandDeal)
       : youtubeThumbnail
@@ -151,6 +182,7 @@ export function mapSuggestedActionToInboxCard(
         : primaryActionLabelFor(row.kind, category)),
     status: 'pending',
     category,
+    ...(visual ? { visual } : {}),
     ...(brandDeal ? { brandDealRankingScore: brandDeal.rankingScore } : {}),
     ...(report ? { report } : {}),
     ...(workflowCapturePayload?.success
