@@ -22,7 +22,9 @@ SCHEMA = "symphony-hyperagent-lifecycle/v1"
 DELIVERY_SCHEMA = "symphony-hyperagent-delivery/v1"
 JOURNAL_SCHEMA = "symphony-hyperagent-journal/v2"
 MAX_OBSERVATION_AGE_SECONDS = 300
-TERMINAL_STATES = frozenset({"landed_verified", "delivery_failed"})
+TERMINAL_STATES = frozenset(
+    {"landed_verified", "delivery_failed", "retry_dispatch_failed"}
+)
 REMOTE_TERMINAL_STATES = frozenset(
     {"remote_useful_success", "remote_failed", "remote_declined", "remote_cancelled"}
 )
@@ -644,6 +646,14 @@ class LifecycleJournal:
         if job["state"] in TERMINAL_STATES:
             raise LifecycleError("terminal job cannot receive delivery evidence")
         classification = classify_delivery_observation(observation, now)
+        latest_attempt = job["attempts"][-1]
+        recorded_latest = latest_attempt.get("unreconciled_thread_ids")
+        pending_superseded = (
+            latest_attempt["status"] == "superseded"
+            and (recorded_latest is None or bool(recorded_latest))
+        )
+        if classification["state"] in TERMINAL_STATES and pending_superseded:
+            raise LifecycleError("terminal delivery has unreconciled retry threads")
         allowed_from_proven = {
             "pr_open": {
                 "pr_open", "merged_runtime_unverified", "landed_verified",
@@ -692,10 +702,16 @@ class LifecycleJournal:
         job = self.data["jobs"].get(key)
         if not job:
             raise LifecycleError("unknown idempotency key")
+        latest_attempt = job["attempts"][-1]
+        recorded_latest = latest_attempt.get("unreconciled_thread_ids")
+        pending_superseded = (
+            latest_attempt["status"] == "superseded"
+            and (recorded_latest is None or bool(recorded_latest))
+        )
         delivery_resolved = _delivery_resolved(
             job["remote_state"], job["delivery_state"]
         )
-        classification = (
+        classification = {"state": "transport_unknown"} if pending_superseded else (
             job["delivery_classification"] if delivery_resolved else job["classification"]
         )
         planned = plan_resolution(classification, authority, oauth_scopes)
@@ -707,10 +723,47 @@ class LifecycleJournal:
             and job["attempts"][-1]["thread_id"] is None
         ):
             raise LifecycleError("retry thread is not bound")
-        attempt_number = job["attempts"][-1]["number"]
+        reconciling = action.startswith("reconcile_")
+        bound_attempt = latest_attempt if reconciling and pending_superseded else next(
+            (
+                item for item in reversed(job["attempts"])
+                if item["thread_id"] == job["thread_id"]
+            ),
+            None,
+        )
+        if bound_attempt is None:
+            raise LifecycleError("no attempt is bound to the current thread")
+        attempt_number = bound_attempt["number"]
+        if bound_attempt["status"] == "superseded":
+            recorded = bound_attempt.get("unreconciled_thread_ids")
+            reconcilable_thread_ids = set(
+                recorded if recorded is not None else {
+                    bound_attempt["thread_id"], job["thread_id"],
+                }
+            ) - {None}
+            for item in job["actions"]:
+                if (
+                    item["status"] == "completed"
+                    and item["attempt_number"] == attempt_number
+                    and item["action"].startswith("reconcile_")
+                ):
+                    reconcilable_thread_ids -= set(
+                        item.get("reconcilable_thread_ids") or [item.get("thread_id")]
+                    ) - {None}
+            reconcilable_thread_ids = sorted(reconcilable_thread_ids)
+        else:
+            reconcilable_thread_ids = (
+                [bound_attempt["thread_id"]] if bound_attempt["thread_id"] else []
+            )
+        if reconciling and not reconcilable_thread_ids:
+            raise LifecycleError("reconciliation attempt has no bound thread")
         suffix = planned.get("id") or (
             f"{job['last_revision']}:{job['delivery_revision']}"
         )
+        if reconciling and bound_attempt["status"] == "superseded":
+            suffix += ":" + hashlib.sha256(
+                json.dumps(reconcilable_thread_ids).encode()
+            ).hexdigest()[:12]
         action_id = f"attempt:{attempt_number}:{action}:{suffix}"
         existing = next((item for item in job["actions"] if item["id"] == action_id), None)
         if existing:
@@ -729,7 +782,7 @@ class LifecycleJournal:
                     "execute": False, "duplicate": True,
                     "reservation": incomplete,
                 }
-            if prior:
+            if prior and bound_attempt["status"] != "superseded":
                 raise LifecycleError("reconciliation limit reached")
         authority_sha256 = hashlib.sha256(
             json.dumps(authority, sort_keys=True, separators=(",", ":")).encode()
@@ -738,9 +791,13 @@ class LifecycleJournal:
             "id": action_id, "action": action, "status": "reserved",
             "authority_sha256": authority_sha256,
             "attempt_number": attempt_number,
+            "thread_id": bound_attempt["thread_id"],
+            "reconcilable_thread_ids": reconcilable_thread_ids,
             "observation_revision": job["last_revision"],
             "delivery_revision": job["delivery_revision"],
         }
+        if bound_attempt["status"] == "superseded":
+            bound_attempt["unreconciled_thread_ids"] = reconcilable_thread_ids
         job["actions"].append(reservation)
         self._save()
         return {"execute": True, "duplicate": False, "reservation": reservation}
@@ -779,8 +836,15 @@ class LifecycleJournal:
                 or (checked_at - observed_at).total_seconds() > MAX_OBSERVATION_AGE_SECONDS
             ):
                 raise LifecycleError("reconciliation outcome is invalid")
-            if outcome["remote"] == "existing" and outcome.get("thread_id") != job["thread_id"]:
+            candidates = reservation.get("reconcilable_thread_ids") or [
+                item for item in [reservation.get("thread_id")] if item
+            ]
+            if outcome["remote"] == "existing" and outcome.get("thread_id") not in candidates:
                 raise LifecycleError("reconciliation remote identity changed")
+            if len(candidates) > 1 and sorted(
+                outcome.get("reconciled_thread_ids") or []
+            ) != candidates:
+                raise LifecycleError("reconciliation candidate set is incomplete")
             if outcome["pr"] != "not_found" and (
                 not _valid_pr_url(outcome.get("pr_url"), job["expected_pr_repository"])
                 or not _valid_git_sha(outcome.get("pr_head_sha"))
@@ -788,6 +852,28 @@ class LifecycleJournal:
                 raise LifecycleError("reconciliation PR identity is invalid")
             if outcome["pr"] == "merged" and not _valid_git_sha(outcome.get("merge_sha")):
                 raise LifecycleError("reconciliation merge identity is invalid")
+            if reservation["action"] == "reconcile_required_runtime_once":
+                runtime = outcome.get("runtime")
+                proven = job["delivery"] or {}
+                if (
+                    outcome["pr"] != "merged"
+                    or outcome.get("merge_sha") != proven.get("merge_sha")
+                    or outcome.get("pr_url") != proven.get("pr_url")
+                    or outcome.get("pr_head_sha") != proven.get("pr_head_sha")
+                    or not isinstance(runtime, dict)
+                    or runtime.get("name") != job["required_runtime"]
+                    or runtime.get("sha") != outcome.get("merge_sha")
+                    or not _valid_sha256(runtime.get("receipt_sha256"))
+                ):
+                    raise LifecycleError("required runtime evidence is invalid")
+                job.update(
+                    state="landed_verified", delivery_state="landed_verified",
+                    delivery_classification={
+                        "state": "landed_verified",
+                        "reason": "merge_and_runtime_receipts_verified",
+                    },
+                    delivery={**(job["delivery"] or {}), "runtime": runtime},
+                )
             if outcome["pr"] == "closed_unmerged" and (
                 not isinstance(outcome.get("failure_owner"), str)
                 or not outcome["failure_owner"]
@@ -800,6 +886,14 @@ class LifecycleJournal:
             status="completed", provider_receipt_sha256=provider_receipt_sha256,
             outcome=outcome,
         )
+        attempt = next(
+            item for item in job["attempts"]
+            if item["number"] == reservation["attempt_number"]
+        )
+        if reservation["action"].startswith("reconcile_") and attempt["status"] == "superseded":
+            attempt["unreconciled_thread_ids"] = sorted(
+                set(attempt.get("unreconciled_thread_ids") or []) - set(candidates)
+            )
         self._save()
         return {"recorded": True, "duplicate": False}
 
@@ -849,7 +943,11 @@ class LifecycleJournal:
         job["attempts"][0].update(
             status=job["remote_state"], final_revision=job["last_revision"]
         )
-        attempt = {"number": 2, "thread_id": None, "status": "reserved"}
+        attempt = {
+            "number": 2, "thread_id": None, "status": "reserved",
+            "source_observation_revision": job["last_revision"],
+            "source_delivery_revision": job["delivery_revision"],
+        }
         job["attempts"].append(attempt)
         self._save()
         return {"idempotency_key": key, "execute": True, "duplicate": False, "attempt": attempt}
@@ -868,6 +966,57 @@ class LifecycleJournal:
             if attempt["thread_id"] != thread_id or attempt["provider_receipt_sha256"] != provider_receipt_sha256:
                 raise LifecycleError("retry thread identity changed")
             return {"recorded": False, "duplicate": True, "attempt": attempt}
+        if attempt["status"] == "superseded":
+            if attempt["thread_id"] is None:
+                attempt.update(
+                    thread_id=thread_id,
+                    provider_receipt_sha256=provider_receipt_sha256,
+                )
+                attempt["unreconciled_thread_ids"] = sorted({
+                    *(attempt.get("unreconciled_thread_ids") or []), thread_id,
+                })
+                for reservation in job["actions"]:
+                    if (
+                        reservation["attempt_number"] == attempt["number"]
+                        and reservation["action"].startswith("reconcile_")
+                        and reservation["status"] == "reserved"
+                    ):
+                        reservation["reconcilable_thread_ids"] = sorted({
+                            *(reservation.get("reconcilable_thread_ids") or []),
+                            thread_id,
+                        })
+                self._save()
+                return {
+                    "recorded": True, "duplicate": False, "superseded": True,
+                    "requires_reconciliation": True, "attempt": attempt,
+                }
+            if (
+                attempt["thread_id"] == thread_id
+                and attempt.get("provider_receipt_sha256") == provider_receipt_sha256
+            ):
+                return {
+                    "recorded": False, "duplicate": True,
+                    "superseded": True, "attempt": attempt,
+                }
+            raise LifecycleError("retry thread identity changed")
+        if attempt["status"] != "reserved":
+            raise LifecycleError("retry is no longer bindable")
+        if (
+            attempt.get("source_observation_revision") != job["last_revision"]
+            or attempt.get("source_delivery_revision") != job["delivery_revision"]
+        ):
+            attempt.update(
+                status="superseded", thread_id=thread_id,
+                provider_receipt_sha256=provider_receipt_sha256,
+                unreconciled_thread_ids=sorted({job["thread_id"], thread_id}),
+                superseded_by_observation_revision=job["last_revision"],
+                superseded_by_delivery_revision=job["delivery_revision"],
+            )
+            self._save()
+            return {
+                "recorded": True, "duplicate": False, "superseded": True,
+                "requires_reconciliation": True, "attempt": attempt,
+            }
         attempt.update(
             thread_id=thread_id, status="accepted",
             provider_receipt_sha256=provider_receipt_sha256,
@@ -877,6 +1026,61 @@ class LifecycleJournal:
             state=_aggregate_state("accepted", job["delivery_state"]),
             last_revision=-1, last_observation_sha256=None,
             classification={"state": "accepted"},
+        )
+        self._save()
+        return {"recorded": True, "duplicate": False, "attempt": attempt}
+
+    @_locked_mutation
+    def abandon_retry_dispatch(
+        self, key, failure_kind, failure_owner, failure_receipt_sha256
+    ):
+        job = self.data["jobs"].get(key)
+        if not job or len(job.get("attempts", [])) != 2:
+            raise LifecycleError("retry was not reserved")
+        attempt = job["attempts"][1]
+        failure = {
+            "kind": failure_kind, "owner": failure_owner,
+            "receipt_sha256": failure_receipt_sha256,
+        }
+        if (
+            failure_kind not in {"not_sent", "provider_rejected"}
+            or not isinstance(failure_owner, str) or not failure_owner
+            or not _valid_sha256(failure_receipt_sha256)
+        ):
+            raise LifecycleError("retry dispatch failure is unproven")
+        if attempt["status"] == "failed":
+            if attempt.get("failure") != failure:
+                raise LifecycleError("retry failure receipt changed")
+            return {"recorded": False, "duplicate": True, "attempt": attempt}
+        if attempt["status"] == "superseded":
+            return {
+                "recorded": False, "duplicate": False, "refused": True,
+                "superseded": True,
+                "requires_reconciliation": True, "attempt": attempt,
+            }
+        if (
+            attempt["status"] != "reserved" or attempt["thread_id"] is not None
+        ):
+            raise LifecycleError("retry dispatch failure is unproven")
+        if (
+            attempt.get("source_observation_revision") != job["last_revision"]
+            or attempt.get("source_delivery_revision") != job["delivery_revision"]
+        ):
+            attempt.update(
+                status="superseded",
+                unreconciled_thread_ids=[job["thread_id"]],
+                superseded_by_observation_revision=job["last_revision"],
+                superseded_by_delivery_revision=job["delivery_revision"],
+            )
+            self._save()
+            return {
+                "recorded": True, "duplicate": False, "superseded": True,
+                "requires_reconciliation": True, "attempt": attempt,
+            }
+        attempt.update(status="failed", failure=failure)
+        job.update(
+            state="retry_dispatch_failed", remote_state="retry_dispatch_failed",
+            classification={"state": "retry_dispatch_failed"}, failure=failure,
         )
         self._save()
         return {"recorded": True, "duplicate": False, "attempt": attempt}

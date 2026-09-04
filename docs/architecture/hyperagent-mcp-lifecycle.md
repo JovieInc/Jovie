@@ -68,6 +68,7 @@ The source contract therefore treats these as different states:
 | PR exists and is open | `pr_open` | Recover and land the existing PR; never redispatch the issue |
 | PR merged without exact required-runtime proof | `merged_runtime_unverified` | Reconcile the existing merge/runtime; never redispatch the issue |
 | PR closed unmerged with owner and failure receipt | `delivery_failed` | Terminal explicit failure with owner/evidence |
+| Retry definitively not sent or provider-rejected with owner and receipt | `retry_dispatch_failed` | Terminal explicit failure; ambiguous transport cannot use this transition |
 | Exact PR merge and required-runtime SHA receipt | `landed_verified` | Terminal success |
 
 Words such as “approve” in assistant prose are not approval evidence. A real
@@ -97,6 +98,12 @@ learnings are not external-action approvals.
 9. A single same-key retry can be reserved only when one revision-current
    receipt proves the remote job absent or idempotently replayable and proves no
    PR exists. The new thread is bound to attempt 2 before observations continue.
+   A retry proven not sent or provider-rejected may be abandoned only while no
+   retry thread is bound, and only with an owner and receipt; ambiguous
+   transport remains reserved for reconciliation.
+   A superseded retry admits one further reconciliation reservation per
+   unreconciled thread set, keyed by the candidate-thread digest, until every
+   candidate is reconciled.
 10. Remote useful completion is non-terminal. Success requires the existing PR
     merge SHA to equal the exact required-runtime SHA with a durable receipt.
 
@@ -113,10 +120,10 @@ approval matching, legitimate attended web fallback, stale/lost transport,
 401/402/403/429/5xx, terminal receipt gaps, journal corruption, duplicate jobs,
 monotonic remote/delivery observations, crash/reconnect reservation persistence,
 existing-PR recovery, matching provider-result receipts, one reconciliation,
-one bounded retry, retry-thread binding, and exact merge/runtime proof. Synthetic
-tests prove the source contract only; they do not prove live
-Hyperagent access, account balance, provider execution, useful output, cost,
-delivery, deployment, or exact-runtime behavior.
+one bounded retry, retry-thread binding/abandonment, reserved action receipts,
+and exact merge/runtime evidence. Synthetic tests prove the source contract
+only; they do not prove live Hyperagent access, account balance, provider
+execution, useful output, cost, delivery, deployment, or exact-runtime behavior.
 
 ## First-party sources
 

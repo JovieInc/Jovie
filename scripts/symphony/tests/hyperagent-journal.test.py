@@ -563,6 +563,8 @@ class HyperagentJournalTests(unittest.TestCase):
             journal.observe("job-1", 0, self.observation(transport_lost=True), self.now)
             issue = journal.reserve_action_once("job-1")["reservation"]
             self.assertEqual(issue["action"], "reconcile_issue_lifecycle_once")
+            issue.pop("reconcilable_thread_ids")
+            journal._save()
             journal.record_action_result(
                 "job-1", issue["id"], "e" * 64,
                 {
@@ -586,6 +588,199 @@ class HyperagentJournalTests(unittest.TestCase):
             self.assertFalse(duplicate["execute"])
             self.assertTrue(duplicate["duplicate"])
             self.assertEqual(duplicate["reservation"], delivery)
+
+    def test_required_runtime_reconciliation_needs_exact_bound_receipt(self):
+        with tempfile.TemporaryDirectory() as directory:
+            journal = self.journal(directory)
+            merged = self.delivery(
+                pr_state="merged", pr_url="https://github.com/JovieInc/Jovie/pull/1",
+                pr_head_sha="a" * 40, merge_sha="b" * 40,
+            )
+            journal.observe_delivery("job-1", 0, merged, self.now)
+            reservation = journal.reserve_action_once("job-1")["reservation"]
+            outcome = {
+                "issue_id": "JOV-6005", "lease_id": "lease-1",
+                "remote": "existing", "thread_id": "thread-1", "pr": "merged",
+                "pr_url": merged["pr_url"], "pr_head_sha": merged["pr_head_sha"],
+                "merge_sha": merged["merge_sha"], "observed_at": self.now.isoformat(),
+            }
+            with self.assertRaises(lifecycle.LifecycleError):
+                journal.record_action_result(
+                    "job-1", reservation["id"], "e" * 64, outcome, now=self.now
+                )
+            outcome["runtime"] = {
+                "name": "symphony-4041", "sha": "b" * 40,
+                "receipt_sha256": "f" * 64,
+            }
+            with self.assertRaises(lifecycle.LifecycleError):
+                journal.record_action_result(
+                    "job-1", reservation["id"], "e" * 64,
+                    {**outcome, "pr_url": "https://github.com/JovieInc/Jovie/pull/2"},
+                    now=self.now,
+                )
+            self.assertTrue(journal.record_action_result(
+                "job-1", reservation["id"], "e" * 64, outcome, now=self.now
+            )["recorded"])
+            self.assertEqual(journal.data["jobs"]["job-1"]["state"], "landed_verified")
+            self.assertEqual(journal.data["jobs"]["job-1"]["delivery"]["runtime"], outcome["runtime"])
+
+    def test_unbound_retry_can_only_end_with_definitive_owned_failure(self):
+        with tempfile.TemporaryDirectory() as directory:
+            journal = self.journal(directory)
+            journal.observe(
+                "job-1", 0,
+                self.observation(is_running=False, terminal_state="failed"), self.now,
+            )
+            journal.observe_delivery("job-1", 0, self.delivery(), self.now)
+            reservation = journal.reserve_action_once("job-1")["reservation"]
+            journal.record_action_result(
+                "job-1", reservation["id"], "e" * 64,
+                {"issue_id": "JOV-6005", "lease_id": "lease-1",
+                 "remote": "absent", "pr": "not_found",
+                 "observed_at": self.now.isoformat()}, now=self.now,
+            )
+            journal.reserve_retry_once("job-1", self.envelope, self.now)
+            with self.assertRaises(lifecycle.LifecycleError):
+                journal.abandon_retry_dispatch(
+                    "job-1", "transport_unknown", "symphony-owner", "f" * 64
+                )
+            failure = ("provider_rejected", "symphony-owner", "f" * 64)
+            self.assertTrue(journal.abandon_retry_dispatch("job-1", *failure)["recorded"])
+            self.assertTrue(journal.abandon_retry_dispatch("job-1", *failure)["duplicate"])
+            self.assertEqual(
+                lifecycle.plan_resolution(
+                    journal.data["jobs"]["job-1"]["classification"]
+                )["action"],
+                "record_terminal_receipt",
+            )
+            with self.assertRaises(lifecycle.LifecycleError):
+                journal.bind_retry_thread("job-1", "thread-2", "d" * 64)
+            with self.assertRaises(lifecycle.LifecycleError):
+                journal.observe(
+                    "job-1", 1, self.observation(), self.now
+                )
+
+    def test_new_delivery_evidence_supersedes_retry_abandonment(self):
+        with tempfile.TemporaryDirectory() as directory:
+            journal = self.journal(directory)
+            journal.observe(
+                "job-1", 0,
+                self.observation(is_running=False, terminal_state="failed"), self.now,
+            )
+            journal.observe_delivery("job-1", 0, self.delivery(), self.now)
+            reservation = journal.reserve_action_once("job-1")["reservation"]
+            journal.record_action_result(
+                "job-1", reservation["id"], "e" * 64,
+                {"issue_id": "JOV-6005", "lease_id": "lease-1",
+                 "remote": "absent", "pr": "not_found",
+                 "observed_at": self.now.isoformat()}, now=self.now,
+            )
+            journal.reserve_retry_once("job-1", self.envelope, self.now)
+            journal.observe_delivery(
+                "job-1", 1,
+                self.delivery(
+                    pr_state="open",
+                    pr_url="https://github.com/JovieInc/Jovie/pull/1",
+                    pr_head_sha="a" * 40,
+                ), self.now,
+            )
+            bound = journal.bind_retry_thread("job-1", "thread-2", "d" * 64)
+            self.assertTrue(bound["superseded"])
+            self.assertTrue(bound["requires_reconciliation"])
+            self.assertEqual(journal.data["jobs"]["job-1"]["thread_id"], "thread-1")
+            self.assertEqual(bound["attempt"]["thread_id"], "thread-2")
+            pending = journal.reserve_action_once("job-1")["reservation"]
+            self.assertEqual(pending["action"], "reconcile_issue_lifecycle_once")
+            exact = self.delivery(
+                pr_state="merged", pr_url="https://github.com/JovieInc/Jovie/pull/1",
+                pr_head_sha="a" * 40, merge_sha="b" * 40,
+                runtime={"name": "symphony-4041", "sha": "b" * 40,
+                         "receipt_sha256": "c" * 64},
+            )
+            with self.assertRaises(lifecycle.LifecycleError):
+                journal.observe_delivery("job-1", 2, exact, self.now)
+            result = journal.abandon_retry_dispatch(
+                "job-1", "provider_rejected", "symphony-owner", "f" * 64
+            )
+            self.assertTrue(result["superseded"])
+            self.assertTrue(result["refused"])
+            self.assertFalse(result["duplicate"])
+            self.assertTrue(result["requires_reconciliation"])
+            self.assertEqual(journal.data["jobs"]["job-1"]["state"], "pr_open")
+
+    def test_prechange_v2_retry_without_source_revisions_is_superseded(self):
+        with tempfile.TemporaryDirectory() as directory:
+            journal = self.journal(directory)
+            journal.observe("job-1", 0, self.observation(transport_lost=True), self.now)
+            reservation = journal.reserve_action_once("job-1")["reservation"]
+            journal.record_action_result(
+                "job-1", reservation["id"], "e" * 64,
+                {"issue_id": "JOV-6005", "lease_id": "lease-1",
+                 "remote": "absent", "pr": "not_found",
+                 "observed_at": self.now.isoformat()}, now=self.now,
+            )
+            journal.reserve_retry_once("job-1", self.envelope, self.now)
+            attempt = journal.data["jobs"]["job-1"]["attempts"][1]
+            attempt.pop("source_observation_revision")
+            attempt.pop("source_delivery_revision")
+            journal._save()
+            restarted = lifecycle.LifecycleJournal(
+                pathlib.Path(directory) / "journal.json"
+            )
+            result = restarted.abandon_retry_dispatch(
+                "job-1", "not_sent", "symphony-owner", "f" * 64
+            )
+            self.assertTrue(result["superseded"])
+            self.assertEqual(result["attempt"]["status"], "superseded")
+            reconciliation = restarted.reserve_action_once("job-1")["reservation"]
+            self.assertEqual(reconciliation["attempt_number"], 2)
+            self.assertIsNone(reconciliation["thread_id"])
+            self.assertEqual(
+                reconciliation["reconcilable_thread_ids"], ["thread-1"]
+            )
+            action_id = reconciliation["id"]
+            late = restarted.bind_retry_thread("job-1", "thread-2", "d" * 64)
+            self.assertTrue(late["requires_reconciliation"])
+            self.assertTrue(
+                restarted.bind_retry_thread(
+                    "job-1", "thread-2", "d" * 64
+                )["duplicate"]
+            )
+            with self.assertRaises(lifecycle.LifecycleError):
+                restarted.bind_retry_thread("job-1", "thread-3", "d" * 64)
+            reconciliation = next(
+                item for item in restarted.data["jobs"]["job-1"]["actions"]
+                if item["id"] == action_id
+            )
+            self.assertEqual(
+                reconciliation["reconcilable_thread_ids"], ["thread-1", "thread-2"]
+            )
+            partial = {
+                "issue_id": "JOV-6005", "lease_id": "lease-1",
+                "remote": "existing", "thread_id": "thread-2",
+                "reconciled_thread_ids": ["thread-2"], "pr": "not_found",
+                "observed_at": self.now.isoformat(),
+            }
+            with self.assertRaises(lifecycle.LifecycleError):
+                restarted.record_action_result(
+                    "job-1", action_id, "e" * 64, partial, now=self.now
+                )
+            with self.assertRaises(lifecycle.LifecycleError):
+                restarted.record_action_result(
+                    "job-1", action_id, "e" * 64,
+                    {**partial, "thread_id": "thread-9",
+                     "reconciled_thread_ids": ["thread-1", "thread-2"]},
+                    now=self.now,
+                )
+            restarted.record_action_result(
+                "job-1", action_id, "e" * 64,
+                {"issue_id": "JOV-6005", "lease_id": "lease-1",
+                 "remote": "existing", "thread_id": "thread-1",
+                 "reconciled_thread_ids": ["thread-1", "thread-2"],
+                 "pr": "not_found", "observed_at": self.now.isoformat()},
+                now=self.now,
+            )
+            self.assertFalse(restarted.reserve_action_once("job-1")["execute"])
 
 
 if __name__ == "__main__":
