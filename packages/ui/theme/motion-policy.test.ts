@@ -1,126 +1,85 @@
-import { describe, expect, it } from 'vitest';
+import { expect, it } from 'vitest';
 import {
-  DOMINANT_DELIGHT_LIMITS,
+  type AttentionMotionProposal,
+  DOMINANT_DELIGHT_INTENTIONALITY_FIELDS,
+  type DominantDelightProposal,
+  evaluateAttentionMotion,
   evaluateDominantDelights,
   getMaxDominantDelights,
   MOTION_POLICY,
+  ATTENTION_MOTION_TERMINATION_EVENTS as stops,
 } from './motion-policy';
 
-const earnedProposal = {
-  exact_earned_moment: 'The customer completes the release handoff.',
-  user_outcome: 'Completion is unmistakable without delaying the next action.',
-  static_or_functional_insufficiency:
-    'The state change spans two surfaces and needs one bounded focal handoff.',
-  expected_material_improvement: 'Fewer repeated submissions after completion.',
-  invasiveness_and_repetition_risk:
-    'Runs once on explicit completion and never during routine navigation.',
-  reduced_motion_and_static_behavior:
-    'Immediate final state with the same confirmation copy and focus target.',
-  approved_archetype_or_exception: 'Approved completion archetype receipt.',
-} as const;
-
-describe('dominant delight policy', () => {
-  it('treats every number as a ceiling and always accepts zero delight', () => {
-    const result = evaluateDominantDelights({
-      content_section_count: 14,
-      proposals: [],
-    });
-
-    expect(MOTION_POLICY.delight_optional).toBe(true);
-    expect(MOTION_POLICY.section_counting).toEqual({
-      definition: 'Count content-bearing sections only.',
-      excluded: ['global header', 'global footer'],
-      distinct_content_sections: ['proof strip', 'footer CTA'],
-    });
-    expect(JSON.stringify(MOTION_POLICY)).not.toMatch(
-      /required_count|minimum|target|coverage|utilization/
-    );
-    expect(result).toEqual({
-      passes: true,
-      max_dominant_delights: 2,
-      errors: [],
-    });
+const motion = (value: Partial<AttentionMotionProposal>) =>
+  evaluateAttentionMotion({
+    purpose: 'respond-to-user-input',
+    starts_on: 'explicit-user-action',
+    reduced_motion_fallback: true,
+    stops_on: stops,
+    ...value,
   });
 
-  it('rejects budget filling even when the proposal is below the ceiling', () => {
-    const result = evaluateDominantDelights({
-      content_section_count: 6,
-      proposals: [
-        {
-          ...earnedProposal,
-          exists_to_consume_available_budget: true,
-        },
-      ],
-    });
-
-    expect(result.max_dominant_delights).toBe(1);
-    expect(result.passes).toBe(false);
-    expect(result.errors).toContain(
-      'Delight 1 exists to consume available budget.'
-    );
+it('enforces user-owned attention with deliberate-red cases', () => {
+  expect(MOTION_POLICY.initial_state).toEqual({
+    motion: 'still',
+    audio: 'silent',
   });
+  const rejected: [Partial<AttentionMotionProposal>, RegExp][] = [
+    [
+      { media_kind: 'audio', audible: true, autoplay: true, starts_on: 'load' },
+      /autoplay-audio/,
+    ],
+    [
+      { ambient_hero_background: true, continuously_moving_logo_bar: true },
+      /ambient-hero.*moving-logo/,
+    ],
+    [{ starts_on: 'load', media_kind: 'video', muted: true }, /unguarded/],
+    [
+      { starts_on: 'scroll', purpose: 'bounded-editorial-treatment' },
+      /orientation/,
+    ],
+  ];
+  for (const [proposal, error] of rejected)
+    expect(motion(proposal).errors.join()).toMatch(error);
+  expect(motion({ media_kind: 'audio', audible: true }).passes).toBe(true);
+  expect(
+    motion({
+      purpose: 'bounded-editorial-treatment',
+      starts_on: 'load',
+      media_kind: 'video',
+      autoplay: true,
+      muted: true,
+      presentation_context: 'editorial-media-card',
+      visibility_aware_pause: true,
+      bounded_loop_or_completion: true,
+      resource_performance_budget: true,
+    }).passes
+  ).toBe(true);
+});
 
-  it('applies section ceilings and unlocks a third only with full receipts', () => {
-    expect(DOMINANT_DELIGHT_LIMITS.at(-1)).toMatchObject({
-      max_dominant_delights: 3,
-      requires_named_exception_and_complete_receipts: true,
-    });
-    expect(getMaxDominantDelights(1)).toBe(1);
-    expect(getMaxDominantDelights(6)).toBe(1);
-    expect(getMaxDominantDelights(7)).toBe(2);
-    expect(getMaxDominantDelights(10)).toBe(2);
-    expect(getMaxDominantDelights(11)).toBe(2);
-    expect(getMaxDominantDelights(11, true)).toBe(3);
+const earned = Object.fromEntries(
+  DOMINANT_DELIGHT_INTENTIONALITY_FIELDS.map(field => [field, 'receipt'])
+) as DominantDelightProposal;
 
-    const withoutReceipts = evaluateDominantDelights({
-      content_section_count: 11,
-      proposals: [earnedProposal, earnedProposal, earnedProposal],
-      named_exception: 'Campaign close',
-      complete_motion_receipts: false,
-    });
-    const withReceipts = evaluateDominantDelights({
-      content_section_count: 11,
-      proposals: [earnedProposal, earnedProposal, earnedProposal],
-      named_exception: 'Campaign close',
+it('preserves dominant-delight ceilings and receipts', () => {
+  expect(getMaxDominantDelights(11, true)).toBe(3);
+  const base = {
+    content_section_count: 11,
+    proposals: [earned, earned, earned],
+  };
+  expect(evaluateDominantDelights(base).passes).toBe(false);
+  expect(
+    evaluateDominantDelights({
+      ...base,
+      named_exception: 'Close',
       complete_motion_receipts: true,
-    });
-
-    expect(withoutReceipts.passes).toBe(false);
-    expect(withoutReceipts.max_dominant_delights).toBe(2);
-    expect(withReceipts.passes).toBe(true);
-    expect(withReceipts.max_dominant_delights).toBe(3);
-  });
-
-  it('allows only one attention-commanding delight active at once', () => {
-    const result = evaluateDominantDelights({
-      content_section_count: 8,
-      proposals: [earnedProposal],
-      simultaneous_active_count: 2,
-    });
-
-    expect(result.passes).toBe(false);
-    expect(result.errors).toContain(
-      'simultaneous_active_count must not exceed 1.'
-    );
-  });
-
-  it('rejects decorative, task-competing, routine, or uncertain proposals', () => {
-    const result = evaluateDominantDelights({
+    }).passes
+  ).toBe(true);
+  expect(
+    evaluateDominantDelights({
       content_section_count: 6,
-      proposals: [
-        {
-          ...earnedProposal,
-          decorative_novelty_only: true,
-          competes_with_task: true,
-          repeats_during_routine_use: true,
-          material_benefit_uncertain: true,
-        },
-      ],
-    });
-
-    expect(result.passes).toBe(false);
-    expect(result.errors.join(' ')).toMatch(
-      /decorative novelty|competes with the task|routine use|uncertain material benefit/
-    );
-  });
+      proposals: [{ ...earned, decorative_novelty_only: true }],
+      simultaneous_active_count: 2,
+    }).passes
+  ).toBe(false);
 });

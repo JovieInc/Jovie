@@ -717,6 +717,11 @@ canonical semantic or hit-target treatment; the icon itself is not decorated.
 
 ## Motion
 
+### Attention is user-owned
+
+Load still and silent. Earn motion through the executable exception and stop
+contract in [`motion-policy.ts`](packages/ui/theme/motion-policy.ts).
+
 ### Dominant delight policy
 
 The executable authority for dominant-delight ceilings, progressive delivery,
