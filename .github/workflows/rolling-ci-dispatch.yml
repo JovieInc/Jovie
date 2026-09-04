@@ -48,10 +48,10 @@ jobs:
             scripts/lib/rolling-ci-hosted-writer.mjs
             scripts/lib/upsert-pr-comment.sh
             .github/actions/evaluate-fleet-gate/action.yml
-            scripts/hermes/evaluate-fleet-gate.sh
-            scripts/hermes/fleet_admission_receipt.py
-            scripts/hermes/gem-priority-gate.py
-            scripts/hermes/closure_health.py
+            scripts/symphony/evaluate-fleet-gate.sh
+            scripts/symphony/fleet_admission_receipt.py
+            scripts/symphony/gem-priority-gate.py
+            scripts/symphony/closure_health.py
           sparse-checkout-cone-mode: false
 
       - name: Setup Node.js
@@ -576,10 +576,10 @@ jobs:
           path: trusted
           sparse-checkout: |
             scripts/lib/rolling-ci-hosted-writer.mjs
-            scripts/hermes/evaluate-fleet-gate.sh
-            scripts/hermes/fleet_admission_receipt.py
-            scripts/hermes/gem-priority-gate.py
-            scripts/hermes/closure_health.py
+            scripts/symphony/evaluate-fleet-gate.sh
+            scripts/symphony/fleet_admission_receipt.py
+            scripts/symphony/gem-priority-gate.py
+            scripts/symphony/closure_health.py
           sparse-checkout-cone-mode: false
 
       - name: Evaluate fresh writer gate
@@ -590,7 +590,7 @@ jobs:
           GH_TOKEN: ${{ github.token }}
           GEM_PRIORITY_GATE_REPO: ${{ github.repository }}
           FLEET_GATE_DRY_RUN: '1'
-        run: bash scripts/hermes/evaluate-fleet-gate.sh
+        run: bash scripts/symphony/evaluate-fleet-gate.sh
 
       - name: Commit hosted repair through trusted writer
         id: push
