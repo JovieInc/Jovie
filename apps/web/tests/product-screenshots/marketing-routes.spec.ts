@@ -92,8 +92,7 @@ async function measureHomepageProof(page: import('@playwright/test').Page) {
     'cookie consent must be observed, never hidden'
   ).toBeVisible({ timeout: TIMEOUTS.CONTENT_VISIBLE });
   const reject = banner.getByRole('button', {
-    name: 'Reject all',
-    exact: true,
+    name: /^reject all$/i,
   });
   await expect(reject).toBeVisible();
   await reject.click();
