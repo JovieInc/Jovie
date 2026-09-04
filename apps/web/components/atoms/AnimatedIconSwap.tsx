@@ -1,7 +1,7 @@
 'use client';
 
 import { AnimatePresence, motion, useReducedMotion } from 'motion/react';
-import type { ReactNode } from 'react';
+import { type ReactNode, useEffect, useState } from 'react';
 import {
   ICON_SWAP_TRANSITION,
   ICON_SWAP_VARIANTS,
@@ -42,9 +42,19 @@ export function AnimatedIconSwap({
   readonly className?: string;
 }) {
   const reducedMotion = useReducedMotion();
-  const variants = reducedMotion
-    ? ICON_SWAP_VARIANTS_REDUCED
-    : ICON_SWAP_VARIANTS;
+  const [hasMounted, setHasMounted] = useState(false);
+
+  useEffect(() => {
+    setHasMounted(true);
+  }, []);
+
+  // `useReducedMotion` cannot know the browser preference during SSR. Keep the
+  // server and first client render identical, then honor the preference after
+  // hydration so canonical navigation never emits a hydration mismatch.
+  const variants =
+    hasMounted && reducedMotion
+      ? ICON_SWAP_VARIANTS_REDUCED
+      : ICON_SWAP_VARIANTS;
 
   return (
     <span

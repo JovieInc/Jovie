@@ -93,7 +93,7 @@ test.describe('Homepage', () => {
     );
   });
 
-  test('header uses compact homepage presentation and text-only login', async ({
+  test('header uses the canonical marketing shell with full navigation', async ({
     page,
   }) => {
     const header = page.getByTestId('header-nav');
@@ -101,13 +101,13 @@ test.describe('Homepage', () => {
     await expect(header).toBeVisible();
     await expect(header).toHaveAttribute(
       'data-presentation',
-      'homepage-embedded'
+      'marketing-glass'
     );
     await expect(header.locator('a[href="/"]').first()).toBeVisible();
-    await expect(header.getByRole('link', { name: 'Product' })).toHaveCount(0);
-    await expect(header.getByRole('button', { name: 'For' })).toHaveCount(0);
-    await expect(header.getByRole('button', { name: 'Tools' })).toHaveCount(0);
-    await expect(header.getByRole('link', { name: 'Pricing' })).toHaveCount(0);
+    await expect(header.getByRole('link', { name: 'Product' })).toBeVisible();
+    await expect(header.getByRole('button', { name: 'For' })).toBeVisible();
+    await expect(header.getByRole('button', { name: 'Tools' })).toBeVisible();
+    await expect(header.getByRole('link', { name: 'Pricing' })).toBeVisible();
     await expect(header.getByRole('link', { name: 'Contact' })).toHaveCount(0);
     await expect(header.getByRole('link', { name: 'Log in' })).toHaveAttribute(
       'href',
@@ -115,32 +115,17 @@ test.describe('Homepage', () => {
     );
     await expect(
       header.getByRole('link', { name: 'Find yourself' })
-    ).toHaveCount(0);
-
-    await page.evaluate(() =>
-      window.scrollTo({ top: 320, behavior: 'instant' })
-    );
-    const floatingShell = header.locator('nav > div');
-    await expect
-      .poll(async () =>
-        floatingShell.evaluate(
-          element => element.getBoundingClientRect().height
-        )
-      )
-      .toBeLessThanOrEqual(44);
-
-    const floatingRadius = await floatingShell.evaluate(element =>
-      Number.parseFloat(getComputedStyle(element).borderRadius)
-    );
-    expect(floatingRadius).toBe(22);
+    ).toHaveAttribute('href', '/start');
   });
 
-  test('header flyouts are not mounted by default', async ({ page }) => {
+  test('canonical header flyouts stay closed until requested', async ({
+    page,
+  }) => {
     const header = page.getByTestId('header-nav');
     const toolsFlyout = page.locator('#marketing-header-flyout-tools');
 
-    await expect(header.getByRole('button', { name: 'For' })).toHaveCount(0);
-    await expect(header.getByRole('button', { name: 'Tools' })).toHaveCount(0);
+    await expect(header.getByRole('button', { name: 'For' })).toBeVisible();
+    await expect(header.getByRole('button', { name: 'Tools' })).toBeVisible();
     await expect(toolsFlyout).toHaveCount(0);
   });
 
@@ -150,6 +135,7 @@ test.describe('Homepage', () => {
     const backdrop = page.getByTestId('homepage-editorial-hero-backdrop');
 
     await expect(backdrop).toHaveAttribute('aria-hidden', 'true');
+    await expect(backdrop).toHaveAttribute('data-hero-layer', 'decorative');
     await expect(backdrop.locator('img')).toHaveCount(1);
     await expect(backdrop.locator('img')).toHaveAttribute('alt', '');
     await expect(backdrop.locator('img')).toHaveAttribute(
@@ -162,17 +148,36 @@ test.describe('Homepage', () => {
       );
       if (!image) return false;
       const rect = image.getBoundingClientRect();
-      return (
-        image.complete &&
-        image.naturalWidth > 0 &&
-        rect.width >= window.innerWidth - 1 &&
-        rect.height >= window.innerHeight - 1
-      );
+      if (
+        !image.complete ||
+        image.naturalWidth <= 0 ||
+        image.naturalHeight <= 0 ||
+        !image.currentSrc ||
+        rect.width < window.innerWidth - 1 ||
+        rect.height < window.innerHeight - 1
+      ) {
+        return false;
+      }
+
+      return true;
     });
-    await expect(backdrop.locator('img')).toHaveJSProperty(
-      'currentSrc',
-      /night-desk/
-    );
+    const imageState = await backdrop.locator('img').evaluate(image => {
+      const rect = image.getBoundingClientRect();
+      return {
+        currentSrc: image.currentSrc,
+        naturalHeight: image.naturalHeight,
+        naturalWidth: image.naturalWidth,
+        renderedHeight: rect.height,
+        renderedWidth: rect.width,
+      };
+    });
+    expect(imageState).toMatchObject({
+      naturalHeight: expect.any(Number),
+      naturalWidth: expect.any(Number),
+      renderedHeight: expect.any(Number),
+      renderedWidth: expect.any(Number),
+    });
+    expect(imageState.currentSrc).toContain('night-desk-clean');
 
     // Type sits on top of the photo, inside the viewport.
     const heading = page.getByRole('heading', {
@@ -189,6 +194,11 @@ test.describe('Homepage', () => {
   test('hero reveal is geometry-safe, interactive, and static under reduced motion', async ({
     page,
   }) => {
+    await expect(
+      page
+        .getByTestId('homepage-hero-shell')
+        .locator('[data-hero-layer="active"]')
+    ).toHaveCount(1);
     const copy = page.locator('.homepage-editorial-hero__copy');
     const before = await copy.boundingBox();
     expect(
@@ -257,6 +267,33 @@ test.describe('Homepage', () => {
     );
     expect(sectionTops.some(top => Number.isNaN(top))).toBe(false);
     expect(sectionTops).toEqual([...sectionTops].sort((a, b) => a - b));
+
+    const heroToProofBoundary = await page.evaluate(() => {
+      const hero = document.querySelector<HTMLElement>(
+        '[data-testid="homepage-hero-shell"]'
+      );
+      const stack = document.querySelector<HTMLElement>(
+        '[data-testid="homepage-story-stack"]'
+      );
+      const proofSection = document.querySelector<HTMLElement>(
+        '[data-testid="homepage-proof"]'
+      );
+      if (!(hero && stack && proofSection)) return null;
+      return {
+        gap:
+          stack.getBoundingClientRect().top -
+          hero.getBoundingClientRect().bottom,
+        proofOffset:
+          proofSection.getBoundingClientRect().top -
+          stack.getBoundingClientRect().top,
+      };
+    });
+    expect(heroToProofBoundary).not.toBeNull();
+    expect(heroToProofBoundary?.gap).toBeGreaterThanOrEqual(0);
+    expect(heroToProofBoundary?.gap).toBeLessThanOrEqual(1);
+    expect(
+      Math.abs(heroToProofBoundary?.proofOffset ?? Number.NaN)
+    ).toBeLessThanOrEqual(1);
 
     // Section 2 is a statement, never a logo strip.
     const proof = page.getByTestId('homepage-proof');
@@ -374,27 +411,54 @@ test.describe('Homepage', () => {
       [390, 844],
     ] as const) {
       await page.setViewportSize({ width, height });
-      await page.evaluate(() => document.fonts.ready);
-      const headingLines = await page
-        .locator(
-          '.homepage-editorial-hero__headline, [data-homepage-section-heading]'
-        )
-        .evaluateAll(headings =>
-          headings.map(heading => {
-            const style = getComputedStyle(heading);
-            return Math.ceil(
-              heading.getBoundingClientRect().height /
-                Number.parseFloat(style.lineHeight) -
-                0.05
-            );
-          })
+      await page.evaluate(async () => {
+        await document.fonts.ready;
+        await new Promise<void>(resolve =>
+          requestAnimationFrame(() => requestAnimationFrame(() => resolve()))
         );
+      });
+      const sectionHeadings = page.locator(
+        '.homepage-editorial-hero__headline, [data-homepage-section-heading]'
+      );
+      const headingLines = await sectionHeadings.evaluateAll(headings =>
+        headings.map(heading => {
+          const style = getComputedStyle(heading);
+          return Math.ceil(
+            heading.getBoundingClientRect().height /
+              Number.parseFloat(style.lineHeight) -
+              0.05
+          );
+        })
+      );
       expect(headingLines).toHaveLength(8);
-      expect(Math.max(...headingLines)).toBeLessThanOrEqual(2);
+      await expect
+        .poll(async () =>
+          Math.max(
+            ...(await sectionHeadings.evaluateAll(headings =>
+              headings.map(heading => {
+                const style = getComputedStyle(heading);
+                return Math.ceil(
+                  heading.getBoundingClientRect().height /
+                    Number.parseFloat(style.lineHeight) -
+                    0.05
+                );
+              })
+            ))
+          )
+        )
+        .toBeLessThanOrEqual(2);
     }
 
     const footer = page.getByTestId('marketing-footer');
     await expect(footer).toBeVisible();
+    await expect(
+      footer.getByRole('link', { name: 'Artist Profiles' })
+    ).toBeVisible();
+    await expect(
+      footer.getByRole('link', { name: 'Developers' })
+    ).toBeVisible();
+    await expect(footer.getByRole('link', { name: 'Privacy' })).toBeVisible();
+    await expect(footer.getByRole('link', { name: 'Terms' })).toBeVisible();
   });
 
   test('mobile keeps hero and product proof inside the viewport with direct auth CTAs', async ({
@@ -431,9 +495,7 @@ test.describe('Homepage', () => {
     expect(
       (searchBounds?.x ?? 0) + (searchBounds?.width ?? 0)
     ).toBeLessThanOrEqual(viewportWidth + 1);
-    await expect(
-      page.getByRole('button', { name: 'Find me', exact: true })
-    ).toBeVisible();
+    await expect(page.getByTestId('homepage-primary-cta')).toBeVisible();
 
     await page.evaluate(() => {
       const closeDevTools = document.querySelector<HTMLButtonElement>(
@@ -443,9 +505,11 @@ test.describe('Homepage', () => {
     });
 
     const header = page.getByTestId('header-nav');
-    await expect(page.getByRole('button', { name: 'Open menu' })).toHaveCount(
-      0
-    );
+    const openMenu = page.getByRole('button', { name: 'Open menu' });
+    await expect(openMenu).toBeVisible();
+    await openMenu.click();
+    const mobileNav = page.locator('#mobile-nav-panel');
+    await expect(mobileNav).toBeVisible();
     await expect(
       header.getByRole('link', { name: 'Get started', exact: true })
     ).toHaveCount(0);
@@ -453,8 +517,11 @@ test.describe('Homepage', () => {
       header.getByRole('link', { name: 'Find yourself', exact: true })
     ).toHaveCount(0);
     await expect(
-      header.getByRole('link', { name: 'Log in', exact: true })
+      mobileNav.getByRole('link', { name: 'Log in', exact: true })
     ).toHaveAttribute('href', '/signin');
+    await expect(
+      mobileNav.getByRole('link', { name: 'Find yourself', exact: true })
+    ).toHaveAttribute('href', '/start');
   });
 
   test('has no horizontal overflow across common viewports', async ({
@@ -463,8 +530,10 @@ test.describe('Homepage', () => {
     test.setTimeout(240_000);
 
     const viewports = [
+      { width: 375, height: 812 },
       { width: 390, height: 844 },
       { width: 430, height: 932 },
+      { width: 736, height: 863 },
       { width: 768, height: 1024 },
       { width: 1024, height: 768 },
       { width: 1280, height: 800 },
