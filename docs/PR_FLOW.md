@@ -96,8 +96,16 @@ before you open the PR (source: `.github/ci-harness/manifest.json` `riskRules`):
 | Anything else (logic, tests, docs, internal app) | Fast gate only → auto-merges when green. |
 
 - **Want a preview deploy?** Dispatch `CI` on the exact ref with
-  `run_preview_deploy=true`; external Vercel preview status remains
-  informational — see [`release.md`](../.claude/rules/release.md).
+  `run_preview_deploy=true` (optionally `preview_work_id` / `preview_reason`).
+  Hosted previews and ephemeral databases are explicit, expiring exceptions:
+  the Vercel Git integration never builds non-`main`/`production` refs, and
+  every admitted environment is recorded with the
+  `jovie-preview-env-admission/v1` contract and torn down with a
+  `jovie-preview-env-cleanup/v1` receipt (PR close →
+  `neon-ephemeral-branch-cleanup.yml` + `vercel-preview-cleanup.yml`; daily
+  `neon-scheduled-cleanup.yml` reconciles missed events). External Vercel
+  preview status remains informational — see
+  [`release.md`](../.claude/rules/release.md).
 
 ## 3. Merge: autonomous, per-PR, self-healing
 

@@ -4,9 +4,11 @@ import { fileURLToPath } from 'node:url';
 
 /**
  * Shared scanner for the blocking UI invariants locked by Tim on 2026-08-30
+ * and extended on 2026-09-03 (JOV-5951: single-column-one-width-v1,
+ * one-chrome-layer-v1, one-notification-v1, one-modal-layer-v1)
  * (gbrain ops/reviewed-invariants/blocking-ui-invariants-v1).
  *
- * Fail-closed contract shared by the four rule tests, governed by
+ * Fail-closed contract shared by the rule tests, governed by
  * certify-only-working-v1 (Tim, 2026-08-30): unproven is HIDDEN, not green —
  * a detector may only certify what it actually scanned and proved.
  *  - A missing scan root is a FAILURE (visual/source ENOENT is red, never

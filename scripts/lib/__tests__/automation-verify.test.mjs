@@ -713,6 +713,7 @@ describe('automation-verify affected scope', () => {
         'scripts/lib/__tests__/agent-qc-wires.test.mjs',
         'scripts/lib/__tests__/needs-human-autoclose.test.mjs',
         'scripts/lib/__tests__/production-lane-range.test.mjs',
+        'scripts/lib/__tests__/preview-env-contract.test.mjs',
         'scripts/lib/__tests__/hermes-launchd.test.mjs',
       ],
     });
@@ -955,6 +956,7 @@ describe('automation-verify affected scope', () => {
       pythonUnittestTests: [
         'scripts/hermes/tests/symphony-additive-router.test.py',
         'scripts/hermes/tests/test-model-router.py',
+        'scripts/hermes/tests/symphony-github-poke.test.py',
       ],
       scriptVitestTests: ['scripts/lib/__tests__/automation-verify.test.mjs'],
     });

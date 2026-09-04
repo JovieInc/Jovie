@@ -47,7 +47,7 @@ const VALID_REPOSITORY = Object.freeze(
 );
 const VALID_RULESET = Object.freeze(
   JSON.parse(
-    `{"id":${RULESET_ID},"enforcement":"active","target":"branch","conditions":{"ref_name":{"include":["refs/heads/main"],"exclude":[]}},"bypass_actors":[],"rules":[{"type":"required_status_checks","parameters":{"strict_required_status_checks_policy":false,"required_status_checks":[{"context":"PR Ready"},{"context":"Migration Guard"},{"context":"Fork PR Gate"},{"context":"PR Size Guard"}]}},{"type":"merge_queue","parameters":{"check_response_timeout_minutes":60,"grouping_strategy":"ALLGREEN","max_entries_to_build":3,"max_entries_to_merge":10,"merge_method":"SQUASH","min_entries_to_merge":5,"min_entries_to_merge_wait_minutes":10}}]}`
+    `{"id":${RULESET_ID},"enforcement":"active","target":"branch","conditions":{"ref_name":{"include":["refs/heads/main"],"exclude":[]}},"bypass_actors":[],"rules":[{"type":"required_status_checks","parameters":{"strict_required_status_checks_policy":false,"required_status_checks":[{"context":"PR Ready"},{"context":"Migration Guard"},{"context":"Fork PR Gate"},{"context":"PR Size Guard"}]}},{"type":"merge_queue","parameters":{"check_response_timeout_minutes":20,"grouping_strategy":"ALLGREEN","max_entries_to_build":1,"max_entries_to_merge":5,"merge_method":"SQUASH","min_entries_to_merge":5,"min_entries_to_merge_wait_minutes":10}}]}`
   )
 );
 const VALID_WORKFLOW = `name: CI
@@ -70,9 +70,9 @@ const VALID_BRANCH_PROTECTION_REF = Object.freeze({
   minimumEntriesToMergeWaitTime: number,
 }} */
 const VALID_LIVE_QUEUE_CONFIGURATION = Object.freeze({
-  checkResponseTimeout: 3600,
-  maximumEntriesToBuild: 3,
-  maximumEntriesToMerge: 10,
+  checkResponseTimeout: 1200,
+  maximumEntriesToBuild: 1,
+  maximumEntriesToMerge: 5,
   mergeMethod: 'SQUASH',
   minimumEntriesToMerge: 5,
   minimumEntriesToMergeWaitTime: 10,
@@ -577,7 +577,9 @@ describe('queue workflow mutation safety', () => {
     expect(scope).toContain('.pull_request.head.sha');
     expect(scope).toContain('.pull_request.base.ref');
     expect(scope).toContain('.workflow_run.head_sha');
-    expect(scope).toContain('--json number,headRefOid,baseRefName,isDraft');
+    expect(scope).toContain('pulls?state=open&per_page=100');
+    expect(scope).toContain('headRefOid: .head.sha');
+    expect(scope).not.toContain('gh pr list');
     expect(scope).toContain('select(.baseRefName == "main")');
     expect(scope).toContain('No unique open main PR owns workflow_run head');
     expect(scope).toContain(
@@ -597,6 +599,17 @@ describe('queue workflow mutation safety', () => {
     expect(drain).toContain(
       'admission scope: maintenance-only (no new enrollment)'
     );
+    expect(drain).not.toContain('scripts/github-open-prs-snapshot.mjs');
+    expect(drain).toContain(
+      'inventory_native_queue_state "$DRAIN_ADMISSION_PR"'
+    );
+    expect(drain).toContain('inventory_native_queue_state');
+    expect(drain).toContain('native_state_to_snap');
+    // The remaining call is an isolated recovery/fixture path. Production
+    // inventory uses exact-target or paginated native queue state above.
+    expect(drain.match(/gh_retry pr list/gu)).toHaveLength(1);
+    expect(enroll).toContain('GH_INVENTORY_RETRY_ATTEMPTS: 3');
+    expect(enroll).toContain('GH_INVENTORY_RETRY_MAX_DELAY: 15');
     expect(drain).toContain(
       'admission scope: no primary target (bounded missed-admission recovery enabled)'
     );
@@ -673,9 +686,9 @@ describe('queue workflow mutation safety', () => {
       pullRequests: [
         {
           number: 16510,
-          headRefOid: HEAD,
-          baseRefName: 'main',
-          isDraft,
+          head: { sha: HEAD },
+          base: { ref: 'main' },
+          draft: isDraft,
         },
       ],
     });
@@ -699,9 +712,9 @@ describe('queue workflow mutation safety', () => {
       pullRequests: [
         {
           number: 16546,
-          headRefOid: OTHER_HEAD,
-          baseRefName: 'main',
-          isDraft: false,
+          head: { sha: OTHER_HEAD },
+          base: { ref: 'main' },
+          draft: false,
         },
       ],
     });
@@ -747,9 +760,9 @@ describe('queue workflow mutation safety', () => {
       pullRequests: [
         {
           number: 16546,
-          headRefOid: HEAD,
-          baseRefName: 'main',
-          isDraft: false,
+          head: { sha: HEAD },
+          base: { ref: 'main' },
+          draft: false,
         },
       ],
     });
@@ -1101,7 +1114,7 @@ describe('native live preflight', () => {
               ...rule,
               parameters: {
                 ...rule.parameters,
-                max_entries_to_build: 1,
+                max_entries_to_build: 3,
               },
             }
           : rule
@@ -1127,7 +1140,7 @@ describe('native live preflight', () => {
     expect(liveGraphql.policyReadback).toMatchObject({
       matched: true,
       drift: [],
-      observed: { max_entries_to_build: 3 },
+      observed: { max_entries_to_build: 1 },
     });
   });
 
@@ -1140,7 +1153,7 @@ describe('native live preflight', () => {
     expect(result).toMatchObject({ ready: true });
     expect(result.policyReadback).toMatchObject({
       matched: true,
-      observed: { max_entries_to_build: 3 },
+      observed: { max_entries_to_build: 1 },
     });
     const liveConfigCall = runner.mock.calls.find(([args]) =>
       queryText(args).includes('MergeQueueLiveConfiguration')
@@ -1151,7 +1164,7 @@ describe('native live preflight', () => {
     expect(queryText(liveConfigCall)).toContain('maximumEntriesToBuild');
   });
 
-  it('does not fail enroll preflight when GraphQL checkResponseTimeout is seconds for a 60-minute lock', () => {
+  it('does not fail enroll preflight when GraphQL checkResponseTimeout is seconds for a 20-minute lock', () => {
     const liveUntilCutover = {
       ...VALID_RULESET,
       rules: VALID_RULESET.rules.map(rule =>
@@ -1174,7 +1187,7 @@ describe('native live preflight', () => {
       branchProtectionRef: VALID_BRANCH_PROTECTION_REF,
       liveQueueConfiguration: {
         ...VALID_LIVE_QUEUE_CONFIGURATION,
-        checkResponseTimeout: 3600,
+        checkResponseTimeout: 1200,
         minimumEntriesToMerge: 1,
         minimumEntriesToMergeWaitTime: 0,
       },
@@ -1182,7 +1195,7 @@ describe('native live preflight', () => {
     expect(falseDrift.ok).toBe(true);
     expect(
       falseDrift.policyReadback.observed.check_response_timeout_minutes
-    ).toBe(60);
+    ).toBe(20);
     expect(falseDrift.policyReadback.drift).toEqual([
       'min_entries_to_merge',
       'min_entries_to_merge_wait_minutes',
@@ -1207,18 +1220,18 @@ describe('native live preflight', () => {
     });
     expect(actualTimeoutDrift.ok).toBe(false);
     expect(actualTimeoutDrift.errors).toContain(
-      'merge_queue check_response_timeout_minutes must be 60'
+      'merge_queue check_response_timeout_minutes must be 20'
     );
     expect(actualTimeoutDrift.errors).toContain(
       'native queue policy readback drifted: check_response_timeout_minutes'
     );
   });
 
-  it('reads live GraphQL checkResponseTimeout seconds as 60 minutes', async () => {
+  it('reads live GraphQL checkResponseTimeout seconds as 20 minutes', async () => {
     const runner = createNativeRunner({
       liveQueueConfiguration: {
         ...VALID_LIVE_QUEUE_CONFIGURATION,
-        checkResponseTimeout: 3600,
+        checkResponseTimeout: 1200,
       },
     });
     await expect(
@@ -1229,7 +1242,7 @@ describe('native live preflight', () => {
     ).resolves.toMatchObject({
       ready: true,
       policyReadback: {
-        observed: { check_response_timeout_minutes: 60 },
+        observed: { check_response_timeout_minutes: 20 },
       },
     });
   });
@@ -1243,7 +1256,7 @@ describe('native live preflight', () => {
               ...rule,
               parameters: {
                 ...rule.parameters,
-                max_entries_to_build: 1,
+                max_entries_to_build: 3,
               },
             }
           : rule
@@ -1259,7 +1272,7 @@ describe('native live preflight', () => {
       ready: true,
       policyReadback: {
         matched: true,
-        observed: { max_entries_to_build: 3 },
+        observed: { max_entries_to_build: 1 },
       },
     });
   });

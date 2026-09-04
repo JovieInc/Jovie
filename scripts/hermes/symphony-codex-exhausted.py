@@ -35,6 +35,8 @@ MAX_GROK_SURVIVAL_SECONDS = 120.0
 CONTROL_TIMEOUT_SECONDS = 10.0
 DEFAULT_GROK_MAX = 4  # Gem 16c/62GB safely runs 4 concurrent grok-ship workers (per-unit idempotent, active units skipped)
 MAX_GROK_MAX = 10  # hard ceiling; 10 only via explicit SYMPHONY_GROK_MAX (free-tier Build quota / dispatch risk above 4)
+DEFAULT_KIMI_MAX = 4  # independent Max Kimi OAuth chairs; SYMPHONY_GROK_MAX must not consume these
+MAX_KIMI_MAX = 10
 STALE_REMOUNT_SECONDS = 90 * 60  # product remounts (JOV-5235) still grok at 54 min; 45 min would recycle live work
 # Unlocked leftover JOV-*.lock files older than this cannot keep pickup idle.
 # Held live implement/remount locks are never TTL-expired.
@@ -192,8 +194,18 @@ AUTONOMOUS_HEAD_RE = re.compile(
     r"|(?:codex|fable|fugu)/((?:jov|lyb)-\d+)(?:-.+)?)$"
 )
 FALLBACK_UNIT_RE = re.compile(
-    r"^(?:fallback-ship|grok-ship)-((?:JOV|LYB)-\d+)(?:-[0-9a-f]{12})?\.service$"
+    r"^(?:fallback-ship|grok-ship|kimi-ship)-((?:JOV|LYB)-\d+)(?:-[0-9a-f]{12})?\.service$"
 )
+REMEDIATOR_RE = re.compile(
+    r"\b(ci[- ]?(repair|failure|red|fix)|remediat(?:or|ion|e)|remount|"
+    r"failing checks?|create-bounded-ci-repair|bounded[- ]ci[- ]repair)\b",
+    re.I,
+)
+OAUTH_PROVIDERS = ("grok", "kimi")
+REMEDIATOR_MODEL_IDS = {
+    "grok": "grok-4.6",
+    "kimi": "kimi-k3",
+}
 GH_TIMEOUT_SECONDS = 20.0
 JOV_REPO = "JovieInc/Jovie"
 LYB_REPO = "JovieInc/LogYourBody"
@@ -251,11 +263,27 @@ def _bounded_seconds(name: str, default: float, maximum: float) -> float:
     return default if not math.isfinite(value) or value <= 0 else min(value, maximum)
 
 
+def _provider_executable(env_keys: tuple[str, ...], default: str) -> str | None:
+    for key in env_keys:
+        configured = os.environ.get(key)
+        if not configured:
+            continue
+        if pathlib.Path(configured).is_absolute():
+            return configured if os.access(configured, os.X_OK) else None
+        found = shutil.which(configured)
+        if found:
+            return found
+    if pathlib.Path(default).is_absolute():
+        return default if os.access(default, os.X_OK) else None
+    return shutil.which(default)
+
+
 def _grok_executable() -> str | None:
-    configured = os.environ.get("GEM_GROK_BIN", "grok")
-    if pathlib.Path(configured).is_absolute():
-        return configured if os.access(configured, os.X_OK) else None
-    return shutil.which(configured)
+    return _provider_executable(("GEM_GROK_BIN", "GEM_GROK_EXECUTABLE"), "grok")
+
+
+def _kimi_executable() -> str | None:
+    return _provider_executable(("GEM_KIMI_BIN", "GEM_KIMI_EXECUTABLE"), "kimi")
 
 
 def _grok_canary_ready() -> tuple[bool, str]:
@@ -305,7 +333,10 @@ def _bundle_revision() -> str | None:
         return None
 
 
-def _model_router_selection() -> tuple[dict | None, str]:
+def _model_router_selection(
+    workflow: str = "new_pr",
+    include_ids: tuple[str, ...] = (),
+) -> tuple[dict | None, str]:
     root = pathlib.Path(__file__).resolve().parent
     router = root / "model-router.py"
     registry = root / "model-registry.json"
@@ -321,9 +352,26 @@ def _model_router_selection() -> tuple[dict | None, str]:
     if grok_exe:
         env.setdefault("GEM_GROK_EXECUTABLE", grok_exe)
         env.setdefault("GEM_GROK_BIN", grok_exe)
+    kimi_exe = _kimi_executable()
+    if kimi_exe:
+        env.setdefault("GEM_KIMI_EXECUTABLE", kimi_exe)
+        env.setdefault("GEM_KIMI_BIN", kimi_exe)
+    command = [
+        sys.executable,
+        str(router),
+        "choose",
+        "--workflow",
+        workflow,
+        "--capability",
+        "code",
+        "--exclude-pool",
+        "codex",
+    ]
+    for model_id in include_ids:
+        command.extend(["--include-id", model_id])
     try:
         result = subprocess.run(
-            [sys.executable, str(router), "choose", "--workflow", "new_pr", "--capability", "code", "--exclude-pool", "codex"],
+            command,
             stdout=subprocess.PIPE,
             stderr=subprocess.PIPE,
             check=False,
@@ -351,12 +399,47 @@ def _model_router_selection() -> tuple[dict | None, str]:
         or not all(isinstance(value, str) for value in executor["argv"])
     ):
         return None, "model_router_no_fallback"
+    if include_ids and selected.get("id") not in include_ids:
+        return None, "model_router_no_fallback"
     executable = executor["executable"]
     resolved = executable if pathlib.Path(executable).is_absolute() else shutil.which(executable)
     if not resolved or not os.access(resolved, os.X_OK):
         return None, "model_router_executor_missing"
     executor["executable"] = resolved
     return payload, "model_router_ready"
+
+
+def _oauth_fallback_selections() -> tuple[dict[str, dict] | None, str]:
+    """Ready grok-4.6 and kimi-k3 selections from live OAuth, independently."""
+    selections: dict[str, dict] = {}
+    last_reason = "model_router_no_fallback"
+    for provider, model_id in REMEDIATOR_MODEL_IDS.items():
+        payload, reason = _model_router_selection(
+            workflow="remediation", include_ids=(model_id,)
+        )
+        last_reason = reason
+        selected = (payload or {}).get("selected") if payload else None
+        if (
+            payload is not None
+            and isinstance(selected, dict)
+            and selected.get("id") == model_id
+            and selected.get("provider") == provider
+        ):
+            selections[provider] = payload
+    if not selections:
+        payload, reason = _model_router_selection()
+        selected = (payload or {}).get("selected") if payload else None
+        if payload is None or not isinstance(selected, dict) or not selected.get("id"):
+            return None, reason
+        provider = selected.get("provider")
+        if provider in OAUTH_PROVIDERS:
+            selections[provider] = payload
+        else:
+            # Leftover included Cursor/etc. still drains; remediator work
+            # refuses this payload because the model id is not grok-4.6/kimi-k3.
+            selections["grok"] = payload
+        return selections, "oauth_ready"
+    return selections, "oauth_ready"
 
 
 def _fleet_gate_allows_isolated() -> tuple[bool, str]:
@@ -523,6 +606,7 @@ def _active_grok_units() -> list[str] | None:
             "--type=service",
             "--state=active",
             "grok-ship-*.service",
+            "kimi-ship-*.service",
             "fallback-ship-*.service",
             "--no-legend",
             "--no-pager",
@@ -533,6 +617,50 @@ def _active_grok_units() -> list[str] | None:
         return None
     decoded = result.stdout.decode(errors="replace")
     return [line.split()[0] for line in decoded.splitlines() if line.strip()]
+
+
+def _unit_provider(unit: str) -> str:
+    if "kimi-ship-" in unit:
+        return "kimi"
+    if unit.startswith("grok-ship-"):
+        return "grok"
+    result = _captured(
+        _systemctl("show", "--property=Environment", "--value", unit),
+        1.0,
+    )
+    if result is not None and result.returncode == 0:
+        text = result.stdout.decode(errors="replace")
+        if "SYMPHONY_FALLBACK_PROVIDER=kimi" in text:
+            return "kimi"
+        if "SYMPHONY_FALLBACK_PROVIDER=grok" in text:
+            return "grok"
+    return "grok"
+
+
+def _active_provider_counts(active: list[str]) -> dict[str, int]:
+    counts = {"grok": 0, "kimi": 0}
+    for unit in active:
+        provider = _unit_provider(unit)
+        if provider in counts:
+            counts[provider] += 1
+    return counts
+
+
+def _started_counts(
+    launched: set[str],
+    survived: list[str],
+    unit_providers: dict[str, str],
+    default_provider: str = "grok",
+) -> tuple[int, int]:
+    living = launched.intersection(survived)
+    fallback = default_provider if default_provider in OAUTH_PROVIDERS else "grok"
+    grok_started = sum(
+        1 for unit in living if unit_providers.get(unit, fallback) == "grok"
+    )
+    kimi_started = sum(
+        1 for unit in living if unit_providers.get(unit, fallback) == "kimi"
+    )
+    return grok_started, kimi_started
 
 
 def _unit_not_loaded(unit: str) -> bool:
@@ -664,6 +792,19 @@ def _grok_ship_one_executable() -> str | None:
     return str(executable) if executable.is_file() and os.access(executable, os.X_OK) else None
 
 
+def _env_seat_cap(name: str, default: int, hard_max: int) -> int:
+    try:
+        value = int(os.environ.get(name, default))
+    except (TypeError, ValueError):
+        return default
+    return max(0, min(value, hard_max))
+
+
+def _kimi_limit() -> int:
+    # Independent Max Kimi OAuth chairs; SYMPHONY_GROK_MAX must not consume these.
+    return _env_seat_cap("SYMPHONY_KIMI_MAX", DEFAULT_KIMI_MAX, MAX_KIMI_MAX)
+
+
 def _oidc_seat(entry: object) -> bool:
     if not isinstance(entry, dict):
         return False
@@ -691,6 +832,7 @@ def _kimi_oauth_seats() -> int | None:
 
 
 def _live_oauth_seats() -> int | None:
+    """Live Max Grok + Max Kimi OAuth chairs from local credential files."""
     grok = _grok_oauth_seats()
     kimi = _kimi_oauth_seats()
     if grok is None and kimi is None:
@@ -710,6 +852,96 @@ def _grok_limit() -> int:
         # Missing Grok/Kimi files, or Codex-only exhaustion, must not serial-pin.
         return DEFAULT_GROK_MAX
     return max(1, min(MAX_GROK_MAX, max(DEFAULT_GROK_MAX, seats)))
+
+
+def _parse_oauth_seats(payload: object) -> int | None:
+    if isinstance(payload, dict):
+        for key in ("oauth_seats", "max_concurrent", "concurrency", "seats"):
+            value = payload.get(key)
+            if isinstance(value, int) and value >= 0:
+                return value
+        accounts = payload.get("accounts")
+        if isinstance(accounts, list) and accounts:
+            return len(accounts)
+        models = payload.get("models")
+        nested = _parse_oauth_seats(models) if isinstance(models, dict) else None
+        if nested is not None:
+            return nested
+        if isinstance(models, dict):
+            for item in models.values():
+                nested = _parse_oauth_seats(item)
+                if nested is not None:
+                    return nested
+    return None
+
+
+def _probe_oauth_seats(provider: str) -> int | None:
+    """Per-provider live OAuth chairs via env pin or CLI probe. None means unverifiable."""
+    env_key = (
+        "SYMPHONY_GROK_OAUTH_SEATS" if provider == "grok" else "SYMPHONY_KIMI_OAUTH_SEATS"
+    )
+    raw = os.environ.get(env_key)
+    if raw is not None and raw != "":
+        try:
+            return max(0, int(raw))
+        except (TypeError, ValueError):
+            return None
+    if os.environ.get("SYMPHONY_OAUTH_SEATS_PROBE") != "1":
+        return None
+    executable = _grok_executable() if provider == "grok" else _kimi_executable()
+    if executable is None:
+        return None
+    if provider == "grok":
+        result = _captured([executable, "models"], CONTROL_TIMEOUT_SECONDS)
+        if result is None or result.returncode != 0:
+            return None
+        text = result.stdout.decode(errors="replace")
+        if "grok-4.6" not in text:
+            return None
+        try:
+            return _parse_oauth_seats(json.loads(text))
+        except (TypeError, ValueError, json.JSONDecodeError):
+            return None
+    result = _captured(
+        [executable, "provider", "list", "--json"], CONTROL_TIMEOUT_SECONDS
+    )
+    if result is None or result.returncode != 0:
+        return None
+    try:
+        payload = json.loads(result.stdout.decode())
+    except (TypeError, ValueError, json.JSONDecodeError):
+        return None
+    models = payload.get("models") if isinstance(payload, dict) else None
+    if not isinstance(models, dict) or "kimi-code/k3" not in models:
+        return None
+    return _parse_oauth_seats(payload)
+
+
+def _provider_seat_limit(provider: str) -> int:
+    env_cap = _grok_limit() if provider == "grok" else _kimi_limit()
+    oauth = _probe_oauth_seats(provider)
+    if oauth is None:
+        return env_cap
+    return min(env_cap, oauth)
+
+
+def _is_remediator_work(issue: dict | None, pr_verdict: str) -> bool:
+    if pr_verdict == "remount":
+        return True
+    if not isinstance(issue, dict):
+        return False
+    label_connection = issue.get("labels")
+    labels: list[str] = []
+    if isinstance(label_connection, dict):
+        for node in label_connection.get("nodes") or []:
+            if isinstance(node, dict) and isinstance(node.get("name"), str):
+                labels.append(node["name"])
+    title = issue.get("title") if isinstance(issue.get("title"), str) else ""
+    description = (
+        issue.get("description") if isinstance(issue.get("description"), str) else ""
+    )
+    text = f"{title} {description} {' '.join(labels)}"
+    return bool(REMEDIATOR_RE.search(text))
 
 
 def _dotenv_value(raw: str) -> str | None:
@@ -1707,6 +1939,45 @@ def pickup_check_command(identifier: str) -> int:
     return 0
 
 
+def _selection_provider(selection: dict | None) -> str | None:
+    selected = (selection or {}).get("selected") if isinstance(selection, dict) else None
+    if not isinstance(selected, dict):
+        return None
+    provider = selected.get("provider")
+    if provider in OAUTH_PROVIDERS:
+        return provider
+    model_id = str(selected.get("id") or "").lower()
+    if model_id.startswith("kimi"):
+        return "kimi"
+    if "grok" in model_id:
+        return "grok"
+    return None
+
+
+def _pick_provider(
+    remaining: dict[str, int],
+    selections: dict[str, dict],
+    remediator: bool,
+) -> str | None:
+    eligible = [
+        provider
+        for provider in OAUTH_PROVIDERS
+        if remaining.get(provider, 0) > 0 and provider in selections
+    ]
+    if remediator:
+        preferred = [
+            provider
+            for provider in eligible
+            if (selections[provider].get("selected") or {}).get("id")
+            == REMEDIATOR_MODEL_IDS[provider]
+        ]
+        if preferred:
+            eligible = preferred
+    if not eligible:
+        return None
+    return max(eligible, key=lambda provider: (remaining[provider], provider == "grok"))
+
+
 def _launch_fallback_workers(
     identifiers: list[str],
     active: list[str],
@@ -1714,12 +1985,27 @@ def _launch_fallback_workers(
     bundle_revision: str,
     selection: dict,
     limit: int,
+    selections: dict[str, dict] | None = None,
+    unit_providers: dict[str, str] | None = None,
 ) -> tuple[set[str], int]:
-    """Start isolated fallback units up to *limit*. Never stops Symphony."""
+    """Start isolated fallback units up to per-provider OAuth chairs.
+
+    ``limit`` is the total launch ceiling (targeted reconcile uses 1). Grok's
+    env cap never consumes Kimi's remaining chairs.
+    """
     open_prs = _autonomous_open_pr_index(None)
     gc_fallback_locks(open_prs=open_prs)
     active_units = set(_recycle_stale_remount_units(active, open_prs))
-    capacity_used = len(active_units)
+    provider_selections = dict(selections or {})
+    fallback_provider = _selection_provider(selection)
+    if fallback_provider and fallback_provider not in provider_selections:
+        provider_selections[fallback_provider] = selection
+    counts = _active_provider_counts(sorted(active_units))
+    remaining = {
+        "grok": max(0, _provider_seat_limit("grok") - counts["grok"]),
+        "kimi": max(0, _provider_seat_limit("kimi") - counts["kimi"]),
+    }
+    capacity_used = counts["grok"] + counts["kimi"]
     launched_units: set[str] = set()
     lock_count = _fallback_lock_count()
     next_eligible = ""
@@ -1729,7 +2015,9 @@ def _launch_fallback_workers(
     # open PRs are continuation and stay exempt.
     closure_intake_open = _closure_intake_allowed()
     for identifier in identifiers:
-        if capacity_used >= limit:
+        if len(launched_units) >= max(0, limit) or (
+            remaining["grok"] <= 0 and remaining["kimi"] <= 0
+        ):
             if next_eligible == "":
                 next_eligible = identifier
             _emit_pickup(
@@ -1818,10 +2106,25 @@ def _launch_fallback_workers(
             )
             print(f"fallback skip {identifier} {skip_label}", file=sys.stderr, flush=True)
             continue
+        remediator = _is_remediator_work(issue, verdict)
+        provider = _pick_provider(remaining, provider_selections, remediator)
+        if provider is None:
+            if next_eligible == "":
+                next_eligible = identifier
+            _emit_pickup(
+                "refuse",
+                reason="capacity_full",
+                identifier=identifier,
+                lock_count=lock_count,
+                next_issue=first_lease or next_eligible,
+            )
+            print(f"fallback skip {identifier} capacity_full", file=sys.stderr, flush=True)
+            continue
+        chosen = provider_selections[provider]
         command = _grok_command(
             identifier,
             executable,
-            selection,
+            chosen,
             meta["issue_revision"],
             bundle_revision,
         )
@@ -1835,8 +2138,12 @@ def _launch_fallback_workers(
             )
             print(f"fallback skip {identifier} grok_launch_failed", file=sys.stderr, flush=True)
             continue
-        launched_units.add(next(arg.removeprefix("--unit=") + ".service" for arg in command if arg.startswith("--unit=")))
+        unit = next(arg.removeprefix("--unit=") + ".service" for arg in command if arg.startswith("--unit="))
+        launched_units.add(unit)
+        remaining[provider] -= 1
         capacity_used += 1
+        if unit_providers is not None:
+            unit_providers[unit] = provider
         if first_lease is None:
             first_lease = identifier
             next_eligible = identifier
@@ -1868,6 +2175,8 @@ def _grok_command(
     encoded = base64.b64encode(json.dumps(selection, separators=(",", ":")).encode()).decode()
     unit = _fallback_unit(identifier, issue_revision)
     grok_exe = _grok_executable() or str(pathlib.Path.home() / ".local/bin/grok")
+    kimi_exe = _kimi_executable() or str(pathlib.Path.home() / ".local/bin/kimi")
+    provider = _selection_provider(selection) or "grok"
     return [
         "systemd-run", "--user", f"--unit={unit}", "--collect",
         "-p", "Type=exec", "-p", f"Environment=PATH={pathlib.Path.home()}/.local/bin:{pathlib.Path.home()}/.npm-global/bin:/usr/local/bin:/usr/bin:/bin",
@@ -1875,6 +2184,9 @@ def _grok_command(
         "-p", "Environment=AUTOMATION_VERIFY_SHARD_CONCURRENCY=2",
         "-p", f"Environment=GEM_GROK_EXECUTABLE={grok_exe}",
         "-p", f"Environment=GEM_GROK_BIN={grok_exe}",
+        "-p", f"Environment=GEM_KIMI_EXECUTABLE={kimi_exe}",
+        "-p", f"Environment=GEM_KIMI_BIN={kimi_exe}",
+        "-p", f"Environment=SYMPHONY_FALLBACK_PROVIDER={provider}",
         "-p", f"Environment=SYMPHONY_FALLBACK_SELECTION_B64={encoded}",
         "-p", f"Environment=SYMPHONY_FALLBACK_ISSUE_REVISION={issue_revision}",
         "-p", f"Environment=SYMPHONY_FALLBACK_BUNDLE_REVISION={bundle_revision}",
@@ -1974,28 +2286,60 @@ def _drain_included_pools(
         identifiers = [target_identifier]
     if not identifiers:
         return "drain_idle pool=unselected"
-    selection, selection_reason = _model_router_selection()
-    if selection is None:
+    selections, selection_reason = _oauth_fallback_selections()
+    if selections is None:
         return f"drain_skipped={selection_reason}"
-    pool = (selection.get("selected") or {}).get("pool") or "unknown"
-    if pool == "codex":
-        return "drain_skipped=codex_pool"
+    grok_limit = _grok_limit()
+    kimi_limit = _kimi_limit()
+    if grok_limit <= 0 and kimi_limit <= 0:
+        return "drain_skipped=grok_capacity_zero"
     bundle_revision = _bundle_revision()
     if bundle_revision is None:
         return "drain_skipped=bundle_revision_unavailable"
-    limit = 1 if target_identifier is not None else _grok_limit()
+    limit = 1 if target_identifier is not None else grok_limit + kimi_limit
     if limit <= 0:
         return "drain_skipped=grok_capacity_zero"
+    unit_providers: dict[str, str] = {}
+    primary = next(iter(selections.values()))
     launched, _used = _launch_fallback_workers(
-        identifiers, active, executable, bundle_revision, selection, limit
+        identifiers,
+        active,
+        executable,
+        bundle_revision,
+        primary,
+        limit,
+        selections=selections,
+        unit_providers=unit_providers,
     )
     if launched_out is not None:
         launched_out.update(launched)
+    grok_started = sum(1 for unit in launched if unit_providers.get(unit) == "grok")
+    kimi_started = sum(1 for unit in launched if unit_providers.get(unit) == "kimi")
+    models = ",".join(
+        sorted(
+            {
+                (payload.get("selected") or {}).get("id")
+                for payload in selections.values()
+                if (payload.get("selected") or {}).get("id")
+            }
+        )
+    )
+    pools = ",".join(
+        sorted(
+            {
+                (payload.get("selected") or {}).get("pool") or "unknown"
+                for payload in selections.values()
+            }
+        )
+    )
     if not launched:
         if target_identifier is not None:
             return f"drain_skipped=target_not_started:{target_identifier}"
-        return f"drain_idle pool={pool}"
-    return f"drain_started={len(launched)} pool={pool} model={selection['selected'].get('id')}"
+        return f"drain_idle pool={pools}"
+    return (
+        f"drain_started={len(launched)} pool={pools} model={models} "
+        f"grok_started={grok_started} kimi_started={kimi_started}"
+    )
 
 
 def _continue_exhausted_reconcile(
@@ -2063,8 +2407,10 @@ def _continue_exhausted_reconcile(
             file=sys.stderr,
         )
         return 0
-    limit = 1 if target_identifier is not None else _grok_limit()
-    if limit <= 0 and not active:
+    grok_limit = _grok_limit()
+    kimi_limit = _kimi_limit()
+    limit = 1 if target_identifier is not None else grok_limit + kimi_limit
+    if grok_limit <= 0 and kimi_limit <= 0 and not active:
         print(
             f"codex_exhausted {reason} grok_capacity_zero symphony_unchanged",
             file=sys.stderr,
@@ -2079,8 +2425,8 @@ def _continue_exhausted_reconcile(
         )
         return EXIT_SAFE_FAIL_CLOSED
 
-    selection, selection_reason = _model_router_selection()
-    if selection is None:
+    selections, selection_reason = _oauth_fallback_selections()
+    if selections is None:
         print(
             f"codex_exhausted {selection_reason} symphony_unchanged",
             file=sys.stderr,
@@ -2097,8 +2443,16 @@ def _continue_exhausted_reconcile(
     # Exclusive implementation is the fallback lease flock; the Codex launcher
     # exits 78 when that lock is held. Do not stop JOV: fleet-gate observes
     # :4041 on Gem, and a stopped scheduler freezes promotion (zero merge-queue slots).
+    unit_providers: dict[str, str] = {}
     launched_units, _capacity_used = _launch_fallback_workers(
-        identifiers, active, executable, bundle_revision, selection, limit
+        identifiers,
+        active,
+        executable,
+        bundle_revision,
+        next(iter(selections.values())),
+        limit,
+        selections=selections,
+        unit_providers=unit_providers,
     )
     if target_identifier is not None and not launched_units:
         print(
@@ -2128,7 +2482,13 @@ def _continue_exhausted_reconcile(
             )
             return EXIT_DEGRADED
         if survived:
-            started = len(launched_units.intersection(survived))
+            grok_started, kimi_started = _started_counts(
+                launched_units,
+                survived,
+                unit_providers,
+                _selection_provider(next(iter(selections.values()))) or "grok",
+            )
+            started = grok_started + kimi_started
             if target_identifier is not None and set(survived) != launched_units:
                 if not _cleanup_launched_units(launched_units):
                     print(
@@ -2153,12 +2513,12 @@ def _continue_exhausted_reconcile(
                 return EXIT_SAFE_FAIL_CLOSED
             if not _jov_active() and not _start_jov_primary():
                 print(
-                    f"codex_exhausted {reason} grok_started={started} grok_survived={len(survived)} symphony_api_restore_failed",
+                    f"codex_exhausted {reason} grok_started={grok_started} kimi_started={kimi_started} grok_survived={len(survived)} symphony_api_restore_failed",
                     file=sys.stderr,
                 )
                 return EXIT_DEGRADED
             print(
-                f"codex_exhausted {reason} grok_started={started} grok_survived={len(survived)}",
+                f"codex_exhausted {reason} grok_started={grok_started} kimi_started={kimi_started} grok_survived={len(survived)}",
                 file=sys.stderr,
             )
             return 0

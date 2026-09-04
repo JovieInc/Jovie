@@ -64,6 +64,7 @@ class UnitContractTests(unittest.TestCase):
         text = SERVICE.read_text(encoding="utf-8")
         self.assertEqual(ini_value(text, "Type"), "oneshot")
         self.assertEqual(ini_value(text, "ExecStart"), "%h/.local/bin/symphony-grok-sidecar")
+        self.assertIn("SYMPHONY_OAUTH_SEATS_PROBE=1", text)
         success = set((ini_value(text, "SuccessExitStatus") or "").split())
         self.assertEqual(
             success,
