@@ -275,10 +275,9 @@ export function hashArtifactBytes(artifactPath) {
 }
 
 /**
- * Trusted artifact verification for a screen-browser-proof/v1: the proof must
- * name the exact bundle the external render runner produced, and the gate
- * recomputes the sha256 over those real bytes. Caller-authored JSON without
- * verifiable bytes can never certify (JOV-INV-018).
+ * Legacy local-byte consistency helper. It proves only that a caller-selected
+ * path matches a caller-selected digest; it is deliberately not used by the
+ * certification gate and cannot establish browser-execution provenance.
  *
  * @param {any} proof
  * @param {{ artifactRoot?: string }} [options]
@@ -309,17 +308,25 @@ export function verifyProofArtifact(proof, { artifactRoot = REPO_ROOT } = {}) {
   return null;
 }
 
-/** @param {any} proof @param {{ screen: object, headSha: string, verifyArtifact?: (proof: any) => string | null }} context */
-export function evaluateScreenProof(
-  proof,
-  { screen, headSha, verifyArtifact }
-) {
+/**
+ * @param {any} proof
+ * @param {{ screen: object, headSha: string }} context
+ */
+export function evaluateScreenProof(proof, { screen, headSha }) {
   const findings = [];
   if (!isObject(proof) || proof.schema !== SCREEN_BROWSER_PROOF_SCHEMA) {
     return ['proof schema must be screen-browser-proof/v1'];
   }
   if (proof.producer !== 'external-render-runner') {
     findings.push('proof producer must be external-render-runner');
+  }
+  if (proof.status !== 'unverified-candidate') {
+    findings.push(
+      'proof status must be unverified-candidate before resolver verification'
+    );
+  }
+  if (proof.certificationStatus !== 'not-certified') {
+    findings.push('proof certificationStatus must be not-certified');
   }
   if (proof.screenId !== screen.id) {
     findings.push(
@@ -414,12 +421,12 @@ export function evaluateScreenProof(
   ) {
     findings.push('visible actions are required');
   }
-  // The verifier is the fail-closed default: only real rendered artifact
-  // bytes whose recomputed digest matches the proof can certify.
-  const artifactFinding = verifyArtifact
-    ? verifyArtifact(proof)
-    : 'trusted external artifact verification is not installed; supplied proof cannot certify';
-  if (artifactFinding) findings.push(artifactFinding);
+  // A local path and digest are caller-controlled. The existing Playwright
+  // transport does not yet expose a success-run resolver/decoded bundle, so
+  // external certification must fail closed until that adapter exists.
+  findings.push(
+    'trusted external browser producer integration is unavailable; supplied proof cannot certify'
+  );
   return findings;
 }
 
@@ -750,7 +757,6 @@ export function evaluateChangedScreens({
   headSha,
   proofs = [],
   requireExternalEvidence = false,
-  verifyArtifact = undefined,
 }) {
   const issues = [];
   const changedScreens = [];
@@ -801,7 +807,6 @@ export function evaluateChangedScreens({
     const findings = evaluateScreenProof(proof, {
       screen,
       headSha,
-      verifyArtifact,
     });
     if (findings.length > 0)
       issues.push(`${screen.id}: ${findings.join('; ')}`);
@@ -865,24 +870,21 @@ export function runScreenCertification(options = {}) {
     headSha,
     proofs: options.proofs,
     requireExternalEvidence: options.registrationOnly !== true,
-    verifyArtifact:
-      options.verifyArtifact ??
-      (proof =>
-        verifyProofArtifact(proof, {
-          artifactRoot: options.artifactRoot ?? repoRoot,
-        })),
   });
   issues.push(...changed.issues);
   const ok = issues.length === 0;
-  // Certification is real now: in the full gate, ok means every changed
-  // screen carried an exact-head proof whose rendered artifact bytes
-  // reverified. Registration-only audits and no-change runs never certify.
+  // The future trusted producer adapter may make external certification real.
+  // Registration-only audits and no-change runs never certify.
   const certified =
     ok &&
     options.registrationOnly !== true &&
     changed.changedScreens.length > 0;
   const status = !ok
-    ? 'blocked'
+    ? issues.some(issue =>
+        issue.includes('external browser producer integration is unavailable')
+      )
+      ? 'external-certification-unavailable'
+      : 'blocked'
     : certified
       ? 'certified'
       : changed.changedScreens.length > 0
