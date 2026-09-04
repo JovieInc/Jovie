@@ -29,7 +29,7 @@ const meta = {
       registryId: 'recipe.pricing',
       route: '/pricing',
       source: 'apps/web/components/organisms/PricingRecipeBody.tsx',
-      sourceSha: '00895196e53b823bb0311193b4af29f67b8849c1',
+      sourceSha: '62ba63b59268d61c4c9f3c7ea841f6f4dbb64b7b',
       fixture: 'production-visible-pricing-plans',
       omissions: [],
     },
