@@ -134,6 +134,7 @@ export const ServerEnvSchema = z.object({
   BLOB_READ_WRITE_TOKEN: z.string().optional(),
   BLOB_STORE_ID: z.string().optional(),
   BLOB_WEBHOOK_PUBLIC_KEY: z.string().optional(),
+  SUMMER_BOTTLENECK_EVE_EVENTS_URL: z.string().url().optional(),
   SUMMER_BOTTLENECK_PRODUCER_SIGNING_PRIVATE_KEY: z.string().optional(),
   SUMMER_BOTTLENECK_PRODUCER_SIGNING_KEY_ID: z.string().optional(),
 
@@ -492,6 +493,7 @@ export const ENV_KEYS = [
   'BLOB_READ_WRITE_TOKEN',
   'BLOB_STORE_ID',
   'BLOB_WEBHOOK_PUBLIC_KEY',
+  'SUMMER_BOTTLENECK_EVE_EVENTS_URL',
   'SUMMER_BOTTLENECK_PRODUCER_SIGNING_PRIVATE_KEY',
   'SUMMER_BOTTLENECK_PRODUCER_SIGNING_KEY_ID',
   'TELEGRAM_BOT_TOKEN',

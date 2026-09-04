@@ -9,8 +9,9 @@ import { logger } from '@/lib/utils/logger';
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
 
-const EVE_BOTTLENECK_URL =
-  'https://jovie-eve-shadow-qj7qmxggt-jovie.vercel.app/ovie/v1/summer-bottleneck/events';
+const EVE_BOTTLENECK_URL = z.literal(
+  'https://jovie-eve-shadow-ao5jifcht-jovie.vercel.app/ovie/v1/summer-bottleneck/events'
+);
 const MAX_BODY_BYTES = 64 * 1024;
 const MAX_SIGNAL_AGE_MS = 15 * 60 * 1000;
 const MAX_CLOCK_SKEW_MS = 60 * 1000;
@@ -206,6 +207,13 @@ export async function POST(request: Request): Promise<NextResponse> {
     return json({ ok: false, code: 'production_origin_required' }, 503);
   }
 
+  const eveBottleneckUrl = EVE_BOTTLENECK_URL.safeParse(
+    env.SUMMER_BOTTLENECK_EVE_EVENTS_URL
+  );
+  if (!eveBottleneckUrl.success) {
+    return json({ ok: false, code: 'eve_target_unavailable' }, 503);
+  }
+
   let rawInput: unknown;
   try {
     rawInput = await readInput(request);
@@ -249,7 +257,7 @@ export async function POST(request: Request): Promise<NextResponse> {
   let upstream: Response;
   try {
     // No retry: an uncertain submission is resolved by Eve's immutable event ID.
-    upstream = await fetch(EVE_BOTTLENECK_URL, {
+    upstream = await fetch(eveBottleneckUrl.data, {
       method: 'POST',
       headers: {
         authorization: `Bearer ${oidcToken}`,
