@@ -242,6 +242,8 @@ function mockViewport(width: 'mobile' | 'desktop') {
 let ProfileCompactTemplate: typeof import('@/features/profile/templates/ProfileCompactTemplate').ProfileCompactTemplate;
 
 describe('ProfileCompactTemplate', () => {
+  let originalMatchMedia: typeof window.matchMedia;
+
   beforeAll(async () => {
     ({ ProfileCompactTemplate } = await import(
       '@/features/profile/templates/ProfileCompactTemplate'
@@ -249,6 +251,7 @@ describe('ProfileCompactTemplate', () => {
   }, 120_000);
 
   beforeEach(() => {
+    originalMatchMedia = window.matchMedia;
     cleanup();
     mockCanonicalProfileDSPs.mockReturnValue([]);
     mockUseProfileShell.mockReset();
@@ -327,6 +330,7 @@ describe('ProfileCompactTemplate', () => {
   });
 
   afterEach(() => {
+    window.matchMedia = originalMatchMedia;
     vi.useRealTimers();
   });
 
@@ -1450,7 +1454,7 @@ describe('ProfileCompactTemplate', () => {
     });
   });
 
-  it('renders the compact profile shell at desktop widths', async () => {
+  it('switches the public profile to the desktop surface at 1180px+', async () => {
     const restoreViewport = mockViewport('desktop');
 
     render(
@@ -1463,8 +1467,17 @@ describe('ProfileCompactTemplate', () => {
     );
 
     await waitFor(() => {
-      expect(screen.getByTestId('profile-compact-shell')).toBeInTheDocument();
-      expect(mockProfileDesktopSurface).not.toHaveBeenCalled();
+      expect(screen.getByTestId('public-profile-layout-shell')).toHaveAttribute(
+        'data-layout',
+        'desktop'
+      );
+      expect(mockProfileDesktopSurface).toHaveBeenCalledWith(
+        expect.objectContaining({
+          artist: mockArtist,
+          activeMode: 'profile',
+          presentation: 'modal',
+        })
+      );
     });
 
     restoreViewport();
@@ -1484,10 +1497,10 @@ describe('ProfileCompactTemplate', () => {
     expect(shell).toHaveAttribute('data-interactive-ready', 'true');
 
     view.unmount();
-    expect(shell).not.toHaveAttribute('data-interactive-ready');
+    expect(screen.queryByTestId('profile-compact-shell')).toBeNull();
   });
 
-  it('keeps desktop widths on the compact surface across profile variants', async () => {
+  it('keeps desktop variants on the desktop surface', async () => {
     const restoreViewport = mockViewport('desktop');
 
     const variantProps = {
@@ -1541,8 +1554,9 @@ describe('ProfileCompactTemplate', () => {
     );
 
     await waitFor(() => {
-      expect(screen.getByTestId('profile-compact-shell')).toBeInTheDocument();
-      expect(mockProfileDesktopSurface).not.toHaveBeenCalled();
+      expect(mockProfileDesktopSurface).toHaveBeenLastCalledWith(
+        expect.objectContaining({ activeMode: 'pay' })
+      );
     });
 
     view.rerender(
@@ -1550,10 +1564,35 @@ describe('ProfileCompactTemplate', () => {
     );
 
     await waitFor(() => {
-      expect(mockProfilePrimaryTabPanel).toHaveBeenCalledWith(
-        expect.objectContaining({
-          mode: 'subscribe',
-        })
+      expect(mockProfileDesktopSurface).toHaveBeenLastCalledWith(
+        expect.objectContaining({ activeMode: 'subscribe' })
+      );
+    });
+
+    restoreViewport();
+  });
+
+  it('keeps an explicit embedded preview compact at desktop widths', async () => {
+    const restoreViewport = mockViewport('desktop');
+
+    render(
+      <ProfileCompactTemplate
+        mode='profile'
+        artist={mockArtist}
+        socialLinks={[]}
+        contacts={[]}
+        embeddedPreview
+      />
+    );
+
+    await waitFor(() => {
+      expect(screen.getByTestId('public-profile-layout-shell')).toHaveAttribute(
+        'data-layout',
+        'compact'
+      );
+      expect(screen.getByTestId('public-profile-layout-shell')).toHaveAttribute(
+        'data-profile-preview',
+        'true'
       );
       expect(mockProfileDesktopSurface).not.toHaveBeenCalled();
     });
@@ -1718,7 +1757,7 @@ describe('ProfileCompactTemplate', () => {
       });
     });
 
-    it('starts drawerPresentation from the server layout, then syncs desktop viewport after hydration', async () => {
+    it('starts on the server compact surface, then transfers desktop ownership after hydration', async () => {
       const restoreViewport = mockViewport('desktop');
 
       render(
@@ -1736,9 +1775,11 @@ describe('ProfileCompactTemplate', () => {
       expect(firstDrawerCall?.presentation).toBe('standalone');
 
       await waitFor(() => {
-        expect(mockProfileUnifiedDrawer).toHaveBeenLastCalledWith(
-          expect.objectContaining({ presentation: 'modal' })
-        );
+        expect(
+          screen.getByTestId('public-profile-layout-shell')
+        ).toHaveAttribute('data-layout', 'desktop');
+        expect(screen.queryByTestId('profile-compact-shell')).toBeNull();
+        expect(mockProfileDesktopSurface).toHaveBeenCalled();
       });
 
       restoreViewport();

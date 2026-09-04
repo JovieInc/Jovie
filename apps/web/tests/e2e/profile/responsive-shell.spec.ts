@@ -100,7 +100,7 @@ async function assertBottomTabBarState(
 ) {
   const tabBar = page.locator('[data-testid="profile-tab-bar"]').first();
 
-  if (route.showsBottomTabBar && viewport.isMobile) {
+  if (route.showsBottomTabBar && viewport.width < 1180) {
     await expect(
       tabBar,
       `${label} should render the bottom tab bar`
@@ -129,8 +129,9 @@ async function assertBottomTabBarState(
         ).toHaveAttribute('aria-label', expectedLabel);
       }
     }
-  } else if (!route.showsBottomTabBar) {
-    // Secondary task flows hide the tab bar. Allow it to be absent OR hidden.
+  } else {
+    // Secondary task flows and desktop composition hide the compact tab bar.
+    // Allow it to be absent OR CSS-hidden during the hydration handoff.
     const count = await tabBar.count();
     if (count > 0) {
       await expect(

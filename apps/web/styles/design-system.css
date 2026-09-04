@@ -376,8 +376,18 @@
 
 .public-profile-layout-desktop-shell {
   display: none;
+  max-height: calc(100dvh - 48px);
   min-width: 0;
   width: 100%;
+  flex-direction: column;
+}
+
+.profile-desktop-surface {
+  height: min(940px, calc(100dvh - 48px));
+}
+
+.profile-desktop-surface--banner {
+  height: min(872px, calc(100dvh - 116px));
 }
 
 .public-profile-layout-desktop-placeholder {
@@ -892,16 +902,25 @@ html[data-profile-initial-mode]
 }
 
 @media (min-width: 1180px) {
-  /* Match desktop max-width so SSR compact class produces the same frame width
-     as the JS-switched desktop class, eliminating layout shift on hydration. */
-  .public-profile-layout-frame--compact {
-    max-width: min(
-      100%,
-      calc(var(--profile-shell-max-width) + (var(--page-pad) * 2))
-    );
+  /* Public desktop owns a deliberate wide composition. CSS owns the boundary
+     so the compact surface is already absent before the responsive client
+     state hydrates. Embedded editor/demo previews remain compact. */
+  .profile-viewport:not(.profile-viewport--embedded)
+  .public-profile-layout-frame {
+    max-width: 1512px;
     padding-left: max(var(--page-pad), env(safe-area-inset-left));
     padding-right: max(var(--page-pad), env(safe-area-inset-right));
     padding-block: clamp(16px, 2vw, 24px);
+  }
+
+  .profile-viewport:not(.profile-viewport--embedded)
+    .public-profile-layout-compact-slot {
+    display: none;
+  }
+
+  .profile-viewport:not(.profile-viewport--embedded)
+    .public-profile-layout-desktop-shell {
+    display: flex;
   }
 }
 

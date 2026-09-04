@@ -76,6 +76,29 @@ describe('ClaimBanner', () => {
     expect(screen.getByText('Claim Profile')).toBeInTheDocument();
   });
 
+  it('keeps the verified claim label and icon in one intrinsic CTA', () => {
+    render(
+      <ClaimBanner
+        profileHandle='testartist'
+        displayName='The Extraordinary Midnight Radio Orchestra'
+        ctaHref='/testartist/claim?next=auth'
+        variant='verified_claim'
+      />
+    );
+
+    expect(screen.getByTestId('claim-banner-cta')).toHaveClass(
+      'min-h-11',
+      'shrink-0',
+      'whitespace-nowrap'
+    );
+    expect(screen.getByTestId('claim-banner-cta-label')).toHaveClass(
+      'whitespace-nowrap'
+    );
+    expect(screen.getByTestId('claim-banner-cta')).toHaveAccessibleName(
+      'Verify & Claim for The Extraordinary Midnight Radio Orchestra'
+    );
+  });
+
   it('renders an informational banner without a CTA when direct claim is unsupported', () => {
     render(<ClaimBanner profileHandle='testartist' variant='unsupported' />);
 

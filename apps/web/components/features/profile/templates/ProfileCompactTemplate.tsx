@@ -1,11 +1,11 @@
 'use client';
 
+import dynamic from 'next/dynamic';
 import {
   type CSSProperties,
   type ReactNode,
   useCallback,
   useEffect,
-  useLayoutEffect,
   useMemo,
   useRef,
   useState,
@@ -56,6 +56,22 @@ import type { NotificationContentType } from '@/types/notifications';
 import type { PressPhoto } from '@/types/press-photos';
 import { ProfileCompactSurface } from './ProfileCompactSurface';
 import { PublicProfileLayoutShell } from './PublicProfileLayoutShell';
+
+const ProfileDesktopSurface = dynamic(
+  () =>
+    import('./ProfileDesktopSurface').then(
+      module => module.ProfileDesktopSurface
+    ),
+  {
+    ssr: false,
+    loading: () => (
+      <div
+        className='public-profile-layout-desktop-placeholder'
+        aria-hidden='true'
+      />
+    ),
+  }
+);
 
 interface ProfileCompactTemplateProps {
   readonly mode: ProfileMode;
@@ -283,7 +299,6 @@ export function ProfileCompactTemplate({
   );
   const revealNotificationsRef = useRef<(() => void) | null>(null);
   const closeResetTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const compactShellRef = useRef<HTMLDivElement | null>(null);
   const drawerOpenRef = useRef(initialDrawerView !== null);
   const drawerViewRef = useRef<DrawerView>(initialDrawerView ?? 'menu');
   const lastSyncedModeRef = useRef<ProfileMode | null>(null);
@@ -326,9 +341,10 @@ export function ProfileCompactTemplate({
     const embeddedQuery = globalThis.matchMedia('(min-width: 768px)');
     const desktopQuery = globalThis.matchMedia('(min-width: 1180px)');
     const syncPresentation = () => {
-      setIsDesktopLayout(desktopQuery.matches);
+      const ownsDesktopLayout = desktopQuery.matches && !embeddedPreview;
+      setIsDesktopLayout(ownsDesktopLayout);
       setDrawerPresentation(
-        desktopQuery.matches
+        ownsDesktopLayout
           ? 'modal'
           : embeddedQuery.matches
             ? 'embedded'
@@ -356,7 +372,7 @@ export function ProfileCompactTemplate({
       embeddedQuery.removeListener(syncPresentation);
       desktopQuery.removeListener(syncPresentation);
     };
-  }, []);
+  }, [embeddedPreview]);
 
   const mergedDSPs = useMemo(
     () =>
@@ -661,19 +677,6 @@ export function ProfileCompactTemplate({
     globalThis.history.pushState(globalThis.history.state, '', href);
   }, [drawerOpen, drawerView, requestedMode, artist.handle, searchSuffix]);
 
-  // This is an interaction-readiness contract, not a visual side effect.
-  // Publish it after React commits the hydrated controls, before unrelated
-  // passive work can delay browser readiness probes.
-  useLayoutEffect(() => {
-    const shell = compactShellRef.current;
-    if (!shell) return;
-
-    shell.dataset.interactiveReady = 'true';
-    return () => {
-      delete shell.dataset.interactiveReady;
-    };
-  }, []);
-
   const profileHref = useMemo(
     () => getProfileModeHref(artist.handle, 'profile', searchSuffix),
     [artist.handle, searchSuffix]
@@ -814,14 +817,15 @@ export function ProfileCompactTemplate({
         showClaimFooter={showClaimFooter}
         claimFooterHref={claimFooterHref}
         embedded={embeddedPreview}
+        previewExitHref={profileHref}
         compactSurface={
           <div
-            ref={compactShellRef}
             className='public-profile-compact-shell relative flex h-full min-w-0 w-full flex-col overflow-hidden bg-(--profile-content-bg) md:mx-auto md:rounded-(--profile-shell-card-radius) md:border md:border-(--profile-panel-border) md:shadow-(--profile-panel-shadow)'
             data-testid='profile-compact-shell'
+            data-interactive-ready='true'
             data-public-profile-nav={publicProfileNavIds}
           >
-            {profileBanner ? (
+            {profileBanner && !isDesktopLayout ? (
               <div
                 className='relative z-20 w-full shrink-0'
                 data-testid='profile-shell-banner'
@@ -893,6 +897,46 @@ export function ProfileCompactTemplate({
               />
             </div>
           </div>
+        }
+        desktopBanner={isDesktopLayout ? profileBanner : null}
+        desktopSurface={
+          <ProfileDesktopSurface
+            presentation='modal'
+            artist={artist}
+            socialLinks={socialLinks}
+            contacts={contacts}
+            showPayButton={showPayButton}
+            latestRelease={latestRelease}
+            profileSettings={profileSettings}
+            alertOptInVariant={resolvedAlertOptInVariant}
+            allowFanCapture={allowFanCapture}
+            genres={genres}
+            pressPhotos={pressPhotos}
+            allowPhotoDownloads={allowPhotoDownloads}
+            photoDownloadSizes={photoDownloadSizes}
+            tourDates={tourDates}
+            viewerCountryCode={viewerCountryCode}
+            releases={releases}
+            drawerOpen={drawerOpen}
+            drawerView={drawerView}
+            activeMode={requestedMode}
+            onModeSelect={nextMode => {
+              clearCloseResetTimer();
+              setRequestedMode(nextMode);
+            }}
+            onAlertsModalClose={() => setRequestedMode('profile')}
+            onDrawerOpenChange={handleDrawerOpenChange}
+            onDrawerViewChange={handleDrawerViewChange}
+            onOpenMenu={() => openDrawerMode('menu')}
+            onPlayClick={handlePlayClick}
+            profileHref={profileHref}
+            isSubscribed={isSubscribed}
+            contentPrefs={contentPrefs}
+            onTogglePref={handleTogglePref}
+            onUnsubscribe={handleUnsubscribe}
+            isUnsubscribing={unsubMutation.isPending}
+            hasProfileBanner={Boolean(profileBanner)}
+          />
         }
       />
     </ProfileNotificationsContext.Provider>
