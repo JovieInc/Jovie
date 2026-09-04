@@ -82,6 +82,90 @@ export type SummerBottleneckRuntimeSecurity = {
   readonly symphonyOutcomeVerificationKeys: ReadonlyMap<string, string>;
 };
 
+export const SUMMER_BOTTLENECK_SECURITY_ENV = {
+  eveOutboxSigningKeyId: 'SUMMER_BOTTLENECK_EVE_OUTBOX_SIGNING_KEY_ID',
+  eveOutboxSigningPrivateKey:
+    'SUMMER_BOTTLENECK_EVE_OUTBOX_SIGNING_PRIVATE_KEY',
+  eveOutboxVerificationKeys:
+    'SUMMER_BOTTLENECK_EVE_OUTBOX_VERIFICATION_KEYS_JSON',
+  producerVerificationKeys: 'SUMMER_BOTTLENECK_PRODUCER_VERIFICATION_KEYS_JSON',
+  receiptSigningKey: 'SUMMER_BOTTLENECK_RECEIPT_SIGNING_KEY',
+  receiptSigningKeyId: 'SUMMER_BOTTLENECK_RECEIPT_SIGNING_KEY_ID',
+  symphonyOutcomeVerificationKeys:
+    'SUMMER_BOTTLENECK_SYMPHONY_OUTCOME_VERIFICATION_KEYS_JSON',
+} as const;
+
+function verificationKeys(value: string): ReadonlyMap<string, string> {
+  const parsed: unknown = JSON.parse(value);
+  if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) {
+    throw new Error('verification keys must be a JSON object');
+  }
+  const entries = Object.entries(parsed);
+  if (
+    entries.length === 0 ||
+    entries.some(
+      ([keyId, key]) =>
+        !KEY_ID.test(keyId) || typeof key !== 'string' || key.trim() === ''
+    )
+  ) {
+    throw new Error('verification keys are invalid');
+  }
+  return new Map(entries as [string, string][]);
+}
+
+export function summerBottleneckSecurityFromEnvironment(
+  environment: Readonly<Record<string, string | undefined>> = process.env
+): SummerBottleneckRuntimeSecurity | undefined {
+  const read = (name: string) => environment[name]?.trim();
+  const eveOutboxSigningPrivateKey = read(
+    SUMMER_BOTTLENECK_SECURITY_ENV.eveOutboxSigningPrivateKey
+  );
+  const eveOutboxSigningKeyId = read(
+    SUMMER_BOTTLENECK_SECURITY_ENV.eveOutboxSigningKeyId
+  );
+  const eveOutboxVerificationKeys = read(
+    SUMMER_BOTTLENECK_SECURITY_ENV.eveOutboxVerificationKeys
+  );
+  const producerVerificationKeys = read(
+    SUMMER_BOTTLENECK_SECURITY_ENV.producerVerificationKeys
+  );
+  const receiptSigningKey = read(
+    SUMMER_BOTTLENECK_SECURITY_ENV.receiptSigningKey
+  );
+  const receiptSigningKeyId = read(
+    SUMMER_BOTTLENECK_SECURITY_ENV.receiptSigningKeyId
+  );
+  const symphonyOutcomeVerificationKeys = read(
+    SUMMER_BOTTLENECK_SECURITY_ENV.symphonyOutcomeVerificationKeys
+  );
+  if (
+    !eveOutboxSigningPrivateKey ||
+    !eveOutboxSigningKeyId ||
+    !eveOutboxVerificationKeys ||
+    !producerVerificationKeys ||
+    !receiptSigningKey ||
+    !receiptSigningKeyId ||
+    !symphonyOutcomeVerificationKeys
+  ) {
+    return undefined;
+  }
+  try {
+    return {
+      eveOutboxSigningPrivateKey,
+      eveOutboxSigningKeyId,
+      eveOutboxVerificationKeys: verificationKeys(eveOutboxVerificationKeys),
+      producerVerificationKeys: verificationKeys(producerVerificationKeys),
+      receiptSigningKey,
+      receiptSigningKeyId,
+      symphonyOutcomeVerificationKeys: verificationKeys(
+        symphonyOutcomeVerificationKeys
+      ),
+    };
+  } catch {
+    return undefined;
+  }
+}
+
 function assertDedicatedSecurity(
   security: SummerBottleneckRuntimeSecurity | undefined
 ): asserts security is SummerBottleneckRuntimeSecurity {
@@ -170,7 +254,9 @@ export function signSymphonyRepairOutcome(
 
 export function createVercelBlobBottleneckDependencies(
   store: SummerBottleneckStore = createVercelBlobBottleneckStore(),
-  security?: SummerBottleneckRuntimeSecurity
+  security:
+    | SummerBottleneckRuntimeSecurity
+    | undefined = summerBottleneckSecurityFromEnvironment()
 ): SummerBottleneckDependencies {
   assertDedicatedSecurity(security);
   return {
