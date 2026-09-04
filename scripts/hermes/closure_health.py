@@ -1073,7 +1073,6 @@ def _finalize_observed_pr_state(
     *,
     run_impl: Any = subprocess.run,
 ) -> list[dict[str, Any]]:
-    """Bind every actionable PR to one final lifecycle and main readback."""
     if not observed:
         return []
     check_numbers = frozenset(int(pr["number"]) for pr in check_candidates)
@@ -1192,7 +1191,6 @@ def observe_promotion_evidence(
     *,
     run_impl: Any = subprocess.run,
 ) -> list[dict[str, Any]]:
-    """Attach exact-head, live-policy evidence to every checkable candidate."""
     observation_deadline = deadline or time.monotonic() + CLOSURE_OBSERVATION_SECONDS
     observed: list[dict[str, Any]] = []
     candidates: list[dict[str, Any]] = []
@@ -1349,8 +1347,6 @@ def observe_promotion_evidence(
                     }
                     future.cancel()
         finally:
-            # Comparison workers return values only, so ignored late results
-            # cannot overwrite the deadline disposition.
             executor.shutdown(wait=False, cancel_futures=True)
     return _finalize_observed_pr_state(
         repo,
@@ -2024,7 +2020,6 @@ query($owner:String!,$name:String!,$endCursor:String){
 
 
 def _run_graphql_snapshot(repo: str, deadline: float | None = None) -> dict[str, Any]:
-    """Retry a fleet read when open/close churn crosses a pagination boundary."""
     observation_deadline = deadline or time.monotonic() + CLOSURE_OBSERVATION_SECONDS
     last_error: ValueError | None = None
     for _attempt in range(SNAPSHOT_ATTEMPTS):
