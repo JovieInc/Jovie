@@ -149,16 +149,12 @@ rules:
       # production deploy latency. Live ruleset 10512119 stays 1/0 until the
       # post-merge apply + canary.
       min_entries_to_merge: 5
-      # 10→5 on 2026-09-04 to match the live ruleset 10512119 readback
-      # (JOV-5867). The live ruleset is the source of truth for this lock.
+      # Tim tightened the live ruleset 2026-09-04 (was 60/3/10): solo group
+      # builds, 20-minute check budget, 5-entry merge batches. This file is
+      # the source of truth the drain's drift guard checks against.
       max_entries_to_merge: 5
-      # 3→1 on 2026-09-04 to match the live ruleset 10512119 readback
-      # (JOV-5867): the queue builds one combined head at a time. Do not
-      # restore 3 (superseded 2026-08-15 three-prefix canary starting point).
       max_entries_to_build: 1
       min_entries_to_merge_wait_minutes: 10
-      # 60→20 on 2026-09-04 to match the live ruleset 10512119 readback
-      # (JOV-5867): 20-minute check-response window.
       check_response_timeout_minutes: 20
 
   # Dormant rules are intentionally absent from this applied payload:
