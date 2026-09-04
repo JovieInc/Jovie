@@ -19,6 +19,10 @@ describe('AppShellFrame', () => {
     expect(mainContent.closest('[data-app-shell-frame]')).toBeInTheDocument();
     const shellBody = mainContent.closest('[data-app-shell-body]');
     expect(shellBody).toHaveAttribute('data-shell-rail-motion', 'coordinated');
+    expect(shellBody).toHaveAttribute(
+      'data-electron-top-gap-owner',
+      'titlebar'
+    );
     expect(shellBody).toHaveClass(
       'transition-[gap,padding]',
       'duration-cinematic',
