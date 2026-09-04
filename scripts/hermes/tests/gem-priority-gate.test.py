@@ -672,6 +672,7 @@ class ConcurrencyObservationTests(unittest.TestCase):
                     MODULE,
                     "observe_queue",
                     return_value={
+                        "repository": "JovieInc/Jovie",
                         "status": "known",
                         "eligiblePrs": 0,
                         "greenReadyPrs": 0,
@@ -1047,7 +1048,7 @@ class DeploymentBindingTests(unittest.TestCase):
         receipt = self.evaluate(signals)
         self.assertEqual(receipt["promotionMode"], "blocked")
 
-    def test_stale_or_missing_capacity_blocks_new_and_remote_mutation(self):
+    def test_stale_or_missing_capacity_degrades_to_runtime_floor(self):
         for evidence in (
             {**GREEN_SIGNALS["concurrencyEvidence"], "accepted": False},
             None,
@@ -1058,9 +1059,11 @@ class DeploymentBindingTests(unittest.TestCase):
                 signals["concurrencyEvidence"] = evidence
                 receipt = self.evaluate(signals)
                 self.assertFalse(receipt["signals"]["concurrencyEvidence"]["accepted"])
-                self.assertFalse(receipt["workAdmission"]["newIssueLeaseAllowed"])
-                self.assertFalse(receipt["workAdmission"]["newImplementationAllowed"])
-                self.assertFalse(receipt["remediationAdmission"]["pushAllowed"])
+                # symphony-concurrency-autoscale-v1: missing evidence keeps the
+                # factory on the runtime floor instead of zeroing leases.
+                self.assertTrue(receipt["workAdmission"]["newIssueLeaseAllowed"])
+                self.assertTrue(receipt["workAdmission"]["newImplementationAllowed"])
+                self.assertTrue(receipt["remediationAdmission"]["pushAllowed"])
                 self.assertEqual(receipt["remediationAdmission"]["maxConcurrent"], 1)
                 self.assertEqual(receipt["concurrency"]["gem"]["runtimeFloor"], 1)
 
