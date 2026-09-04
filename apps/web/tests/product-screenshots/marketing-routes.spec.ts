@@ -13,6 +13,9 @@ import {
 import { resolveScreenshotSourceGitSha } from './source-provenance';
 
 const sourceGitSha = resolveScreenshotSourceGitSha();
+// This is the test harness checkout, not necessarily the checkout serving
+// BASE_URL. A local browser receipt must never relabel it as rendered source.
+const harnessGitSha = resolveScreenshotSourceGitSha();
 const HOMEPAGE_CONSENT_REQUIRED_COOKIE = 'jv_cc_required';
 const HOMEPAGE_BASE_URL = process.env.BASE_URL ?? 'http://localhost:3100';
 
@@ -262,8 +265,8 @@ test.describe('Homepage screen-proof measurements', () => {
     }, testInfo) => {
       test.setTimeout(120_000);
       expect(
-        sourceGitSha,
-        'Homepage metrics require a clean full source SHA'
+        harnessGitSha,
+        'Homepage metrics require a clean full harness SHA'
       ).toMatch(/^[0-9a-f]{40}$/);
 
       await page.clock.setFixedTime(new Date(SCREENSHOT_CLOCK_ISO));
@@ -289,7 +292,9 @@ test.describe('Homepage screen-proof measurements', () => {
             screenId: 'web.homepage',
             stateScope: 'homepage-cookie-state-observed',
             capturedAt: new Date().toISOString(),
-            sourceGitSha,
+            harnessGitSha,
+            renderedSourceGitSha: null,
+            renderedSourceProvenance: 'unavailable-local-server-checkout',
             viewport,
             ...measurements,
           },
