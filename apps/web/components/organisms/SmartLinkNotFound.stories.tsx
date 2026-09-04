@@ -1,7 +1,7 @@
 import type { Meta, StoryObj } from '@storybook/nextjs-vite';
 import SmartLinkNotFound from '@/app/[username]/[slug]/not-found';
 
-const SOURCE_SHA = '8b0353fcbeb0cffef614fa47afbbbd8eeae48997';
+const SOURCE_SHA = '00895196e53b823bb0311193b4af29f67b8849c1';
 const SOURCE_PATH = 'apps/web/app/[username]/[slug]/not-found.tsx';
 
 const meta = {
