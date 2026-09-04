@@ -236,7 +236,16 @@ describe('/hud page auth', () => {
       hasAdminRole: true,
       userId: 'admin_1',
     });
-    const macSnapshot = { alive: { status: 'dead' } };
+    const macSnapshot = {
+      alive: { status: 'dead' },
+      inFlightPullRequests: {
+        availability: 'not_configured',
+        totalOpen: 0,
+        items: [],
+        truncated: false,
+        errorMessage: null,
+      },
+    };
     getOvieMacHudSnapshotMock.mockResolvedValue(macSnapshot);
     const result = await HudPage({
       searchParams: Promise.resolve({ ovie: 'mac' }),

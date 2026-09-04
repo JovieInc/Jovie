@@ -21,6 +21,7 @@
 		A0J0V3632A0000000000000C /* CalendarSurfaceView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A0J0V3632A0000000000000B /* CalendarSurfaceView.swift */; };
 		A0J0V3632A0000000000000E /* InboxSurfaceView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A0J0V3632A0000000000000D /* InboxSurfaceView.swift */; };
 		A0J0V3632A00000000000010 /* AppShellTabBarTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A0J0V3632A0000000000000F /* AppShellTabBarTests.swift */; };
+		A0J0V58710000000000000002 /* PublicProfileBrowserMediaPolicyTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A0J0V58710000000000000001 /* PublicProfileBrowserMediaPolicyTests.swift */; };
 		045FC6E446AFF7FFD3ED0FE2 /* AppState.swift in Sources */ = {isa = PBXBuildFile; fileRef = 71445144CE0970267C0508C6 /* AppState.swift */; };
 		19328D236A7AE57920138038 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 47976CA8BC5B309FDB2B6215 /* Assets.xcassets */; };
 		296968C7C074659FBA3D85E9 /* Inter-Variable.ttf in Resources */ = {isa = PBXBuildFile; fileRef = A108B03BA602F4C24B54E590 /* Inter-Variable.ttf */; };
@@ -103,6 +104,7 @@
 		A13F86A7D4F0C7F83D2BB000 /* ScreenBrightnessManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3FA81B967152B211E5988375 /* ScreenBrightnessManager.swift */; };
 		ADC14533827EFD888D1ED50F /* QRCodeRenderer.swift in Sources */ = {isa = PBXBuildFile; fileRef = 000F426E1AB94DD5401C3341 /* QRCodeRenderer.swift */; };
 		B0B0995CD42EDBEAFBAABE04 /* JovieUITests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 611EE527D20DC6F6872CBF33 /* JovieUITests.swift */; };
+		A0C053710000000000000002 /* LibraryAccessibilityUITests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A0C053710000000000000001 /* LibraryAccessibilityUITests.swift */; };
 		BD6A822847064E6F3E3E5228 /* QRCodeRendererTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 448ADF9C21BB11784C6AD119 /* QRCodeRendererTests.swift */; };
 		BE57F23AE56E75A83692D03D /* VenueModeView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7DEB4AD6A6B0BBDE4A347E2D /* VenueModeView.swift */; };
 		C2C8C16A08954501FB61E562 /* APIClientTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4C8753F36E077F69D925EE26 /* APIClientTests.swift */; };
@@ -158,6 +160,7 @@
 		A0J0V3632A0000000000000B /* CalendarSurfaceView.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = CalendarSurfaceView.swift; sourceTree = "<group>"; };
 		A0J0V3632A0000000000000D /* InboxSurfaceView.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = InboxSurfaceView.swift; sourceTree = "<group>"; };
 		A0J0V3632A0000000000000F /* AppShellTabBarTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = AppShellTabBarTests.swift; sourceTree = "<group>"; };
+		A0J0V58710000000000000001 /* PublicProfileBrowserMediaPolicyTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = PublicProfileBrowserMediaPolicyTests.swift; sourceTree = "<group>"; };
 		000F426E1AB94DD5401C3341 /* QRCodeRenderer.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = QRCodeRenderer.swift; sourceTree = "<group>"; };
 		00BCF42EFB99B5DAB4E0F400 /* JovieApp.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = JovieApp.swift; sourceTree = "<group>"; };
 		0A40F1B3BFCC6AD8FF8EAF93 /* JovieAppIntents.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = JovieAppIntents.swift; sourceTree = "<group>"; };
@@ -181,6 +184,7 @@
 		549B9163EF50F377CA1A4C5B /* JovieTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = JovieTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		5615484B29C6B6E26EE5E92B /* IntentNavigationStoreTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = IntentNavigationStoreTests.swift; sourceTree = "<group>"; };
 		611EE527D20DC6F6872CBF33 /* JovieUITests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = JovieUITests.swift; sourceTree = "<group>"; };
+		A0C053710000000000000001 /* LibraryAccessibilityUITests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = LibraryAccessibilityUITests.swift; sourceTree = "<group>"; };
 		6FDEFEB6D7C1D0251FDA1E61 /* Foundation.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = Foundation.framework; path = Platforms/iPhoneOS.platform/Developer/SDKs/iPhoneOS18.0.sdk/System/Library/Frameworks/Foundation.framework; sourceTree = DEVELOPER_DIR; };
 		71290AE6A5F14D6941193B70 /* AppRouter.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = AppRouter.swift; sourceTree = "<group>"; };
 		71445144CE0970267C0508C6 /* AppState.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = AppState.swift; sourceTree = "<group>"; };
@@ -321,6 +325,7 @@
 			isa = PBXGroup;
 			children = (
 				611EE527D20DC6F6872CBF33 /* JovieUITests.swift */,
+				A0C053710000000000000001 /* LibraryAccessibilityUITests.swift */,
 			);
 			name = JovieUITests;
 			path = JovieUITests;
@@ -408,6 +413,7 @@
 				A0J0V36330000000000000003 /* AppShellDrawerThreadsFilterTests.swift */,
 				A0GH12170000000000000003 /* AppShellChatFirstTests.swift */,
 				A0J0V3632A0000000000000F /* AppShellTabBarTests.swift */,
+				A0J0V58710000000000000001 /* PublicProfileBrowserMediaPolicyTests.swift */,
 				A0J0V36380000000000000008 /* AudienceHighlightsRepositoryTests.swift */,
 				A0J0V3638000000000000000A /* MobileAudienceHighlightsResponseTests.swift */,
 				A0GH12706000000000000005 /* MobileActionLoopResponseTests.swift */,
@@ -800,6 +806,7 @@
 				A0J0V36330000000000000004 /* AppShellDrawerThreadsFilterTests.swift in Sources */,
 				A0GH12170000000000000004 /* AppShellChatFirstTests.swift in Sources */,
 				A0J0V3632A00000000000010 /* AppShellTabBarTests.swift in Sources */,
+				A0J0V58710000000000000002 /* PublicProfileBrowserMediaPolicyTests.swift in Sources */,
 				A0J0V36380000000000000009 /* AudienceHighlightsRepositoryTests.swift in Sources */,
 				A0J0V3638000000000000000B /* MobileAudienceHighlightsResponseTests.swift in Sources */,
 				A0GH12706000000000000006 /* MobileActionLoopResponseTests.swift in Sources */,
@@ -902,6 +909,7 @@
 			buildActionMask = 2147483647;
 			files = (
 				B0B0995CD42EDBEAFBAABE04 /* JovieUITests.swift in Sources */,
+				A0C053710000000000000002 /* LibraryAccessibilityUITests.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

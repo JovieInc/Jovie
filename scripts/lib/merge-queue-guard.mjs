@@ -15,7 +15,7 @@ export const REQUIRED_MERGE_STATUSES = [
 
 /** Canonical native merge-queue operating policy (controller + repo guardrails). */
 export const MERGE_QUEUE_POLICY = Object.freeze({
-  enqueueLabel: MERGE_QUEUE_LABEL,
+  enqueueLabel: null,
   // 12→16 on 2026-07-09 per JOV-3833 decision trigger (ready→merged p95 718m
   // vs 15m target after one week live; queue-depth deferral was a binding
   // constraint during merge waves). Re-evaluate if runner-pool saturation
@@ -62,14 +62,14 @@ export function isPendingNativeCohortCutoverField(field) {
 }
 
 export const NATIVE_QUEUE_POLICY = Object.freeze({
-  check_response_timeout_minutes: 60,
+  // Tim tightened the live ruleset 2026-09-04 (60/3/10 → 20/1/5): solo group
+  // builds with a 20-minute check budget and 5-entry merge batches. Repo is
+  // source of truth — this constant follows the founder's live decision so
+  // the drain's drift guard stops fail-closing on it.
+  check_response_timeout_minutes: 20,
   grouping_strategy: 'ALLGREEN',
-  // 8→3 on 2026-08-15 after a five-prefix wave showed contention: one unit
-  // matrix completed in ~1–2m while four peers inflated to ~5–7m and kept the
-  // critical path near 7m. Re-evaluate from same-method queue-wait and duration
-  // evidence after the three-prefix canary.
-  max_entries_to_build: 3,
-  max_entries_to_merge: 10,
+  max_entries_to_build: 1,
+  max_entries_to_merge: 5,
   merge_method: 'SQUASH',
   min_entries_to_merge: NATIVE_QUEUE_COHORT_POLICY.minEntriesToMerge,
   min_entries_to_merge_wait_minutes:
@@ -677,7 +677,7 @@ const KEYWORD_HOT_KEYS = [
     key: 'hot:ci-workflows',
     reason: 'CI/workflow control plane',
     pattern:
-      /\b(ci|workflow|github actions|merge queue|graphite|agent pipeline|actionlint)\b/i,
+      /\b(ci|workflow|github actions|merge queue|agent pipeline|actionlint)\b/i,
   },
   {
     key: 'hot:package-manifest',
@@ -1836,12 +1836,12 @@ export function parseMergeQueueTimeline(events, options = {}) {
   let mergedAt = null;
 
   for (const event of events ?? []) {
-    if (event.event === 'labeled' && event.label?.name === MERGE_QUEUE_LABEL) {
+    if (event.event === 'added_to_merge_queue' || event.event === 'enqueued') {
       queuedAt.push(event.created_at);
     }
     if (
-      event.event === 'unlabeled' &&
-      event.label?.name === MERGE_QUEUE_LABEL
+      event.event === 'removed_from_merge_queue' ||
+      event.event === 'dequeued'
     ) {
       dequeued.push({
         at: event.created_at,

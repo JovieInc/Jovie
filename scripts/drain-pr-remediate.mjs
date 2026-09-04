@@ -264,13 +264,12 @@ export async function remediateBlockedPrs(options, dependencies = {}) {
           'needs-conflict-resolution'
         );
       }
-      await labelPrImpl(options.repo, pr.number, 'merge-queue');
       await commentPrImpl(
         options.repo,
         pr.number,
-        `## Drain auto-rebase\n\nGitHub Update Branch rebased the exact PR head onto latest \`${baseRef}\` to re-trigger CI after a possible main-side fix.\n\nHead: \`${rebase.expectedHeadOid}\` → \`${rebase.observedHeadOid}\`\n\nFailing checks before rebase: ${pr.failures.join(', ')}`
+        `## Drain auto-rebase\n\nGitHub Update Branch rebased the exact PR head onto latest \`${baseRef}\` to re-trigger CI after a possible main-side fix.\n\nHead: \`${rebase.expectedHeadOid}\` → \`${rebase.observedHeadOid}\`\n\nFailing checks before rebase: ${pr.failures.join(', ')}\n\nNative auto-enroll revalidates this exact head. The merge-queue label is retired.`
       );
-      console.log(`    ✓ ${rebase.reason}; +merge-queue`);
+      console.log(`    ✓ ${rebase.reason}; native auto-enroll will revalidate`);
     } else {
       console.log(`    [dry-run] ${rebase.reason}`);
     }

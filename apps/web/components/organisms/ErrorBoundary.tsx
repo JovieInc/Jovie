@@ -2,9 +2,9 @@
 
 import { Button } from '@jovie/ui';
 import { AlertTriangle } from 'lucide-react';
-import { useRouter } from 'next/navigation';
 import { useEffect } from 'react';
 import { ErrorDetails } from '@/features/feedback/ErrorDetails';
+import { RECOVERY_COPY } from '@/features/feedback/recovery-contract';
 import { captureErrorInSentry } from '@/lib/errors/capture';
 
 interface ErrorBoundaryProps {
@@ -38,7 +38,6 @@ export default function ErrorBoundary({
   context,
   message = "We couldn't load this page. Give it another try, or head home.",
 }: ErrorBoundaryProps) {
-  const router = useRouter();
   const isSkewError = isDeploymentSkewError(error);
 
   useEffect(() => {
@@ -54,6 +53,10 @@ export default function ErrorBoundary({
   const displayMessage = isSkewError
     ? 'The app was just updated. Reload to continue.'
     : message;
+
+  const primaryAction = isSkewError
+    ? { label: 'Reload', onClick: () => globalThis.location.reload() }
+    : { label: RECOVERY_COPY.retryLabel, onClick: reset };
 
   return (
     <div
@@ -75,26 +78,9 @@ export default function ErrorBoundary({
           <p className='text-app text-tertiary-token'>{displayMessage}</p>
         </div>
 
-        <div className='flex justify-center gap-3'>
-          {isSkewError ? (
-            <Button
-              variant='primary'
-              size='sm'
-              onClick={() => globalThis.location.reload()}
-            >
-              Reload
-            </Button>
-          ) : (
-            <Button variant='primary' size='sm' onClick={reset}>
-              Try Again
-            </Button>
-          )}
-          <Button
-            variant='secondary'
-            size='sm'
-            onClick={() => router.push('/')}
-          >
-            Go Home
+        <div className='flex justify-center' data-recovery-actions=''>
+          <Button variant='primary' size='sm' onClick={primaryAction.onClick}>
+            {primaryAction.label}
           </Button>
         </div>
 

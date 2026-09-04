@@ -3,18 +3,21 @@ import { describe, expect, it, vi } from 'vitest';
 import type { OpportunityInboxCardViewModel } from '@/lib/connectors/opportunity-inbox-types';
 import { OpportunityInboxFeed } from './OpportunityInboxFeed';
 
-vi.mock('./OpportunityCardStack', () => ({
-  OpportunityCardStack: ({
+vi.mock('./FounderReviewStack', () => ({
+  FounderReviewStack: ({
     cards,
   }: {
     cards: readonly OpportunityInboxCardViewModel[];
   }) => (
-    <div data-testid='swipe-stack'>{cards.map(card => card.id).join(',')}</div>
+    <div data-testid='founder-stack'>
+      {cards.map(card => card.id).join(',')}
+    </div>
   ),
 }));
 
 const CAPTURE_CARD: OpportunityInboxCardViewModel = {
   id: 'capture-1',
+  sourceKind: 'jovie.workflow_capture.request',
   signalType: 'other',
   typeLabel: 'Workflow',
   createdAt: '2026-08-28T10:00:00.000Z',
@@ -42,7 +45,7 @@ const SUGGESTION_CARD: OpportunityInboxCardViewModel = {
 };
 
 describe('OpportunityInboxFeed workflow handoffs', () => {
-  it('keeps Record requests visible and outside the swipe decision stack', () => {
+  it('keeps Record requests visible and outside the founder decision stack', () => {
     render(
       <OpportunityInboxFeed
         cards={[CAPTURE_CARD, SUGGESTION_CARD]}
@@ -54,8 +57,10 @@ describe('OpportunityInboxFeed workflow handoffs', () => {
     );
 
     expect(screen.getByRole('button', { name: 'Record' })).toBeVisible();
-    expect(screen.getByTestId('swipe-stack')).toHaveTextContent('suggestion-1');
-    expect(screen.getByTestId('swipe-stack')).not.toHaveTextContent(
+    expect(screen.getByTestId('founder-stack')).toHaveTextContent(
+      'suggestion-1'
+    );
+    expect(screen.getByTestId('founder-stack')).not.toHaveTextContent(
       'capture-1'
     );
   });

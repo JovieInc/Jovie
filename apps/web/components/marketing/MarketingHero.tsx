@@ -2,7 +2,7 @@ import { Button } from '@jovie/ui/atoms/button';
 import Link from 'next/link';
 import type { ElementType, ReactNode } from 'react';
 import { HomeTrustSection } from '@/components/features/home/HomeTrustSection';
-import { LandingCTAButton } from '@/components/features/landing/LandingCTAButton';
+import { LandingCTAButton as LandingCtaLink } from '@/components/features/landing/LandingCTAButton';
 import { APP_ROUTES } from '@/constants/routes';
 import { MARKETING_PEN_CONTRACT_IDS } from '@/data/marketing/penContracts';
 import { cn } from '@/lib/utils';
@@ -41,8 +41,9 @@ export interface MarketingHeroShellProps extends MarketingHeroBaseProps {
    * - `centered`: single column, text centered, constrained to page width
    * - `left`: single column, text left-aligned, constrained to page width
    * - `split`: two-column grid on md+, text left / media right
+   * - `unstyled`: route-owned presentation delegated to this canonical root
    */
-  readonly variant: 'split' | 'centered' | 'left';
+  readonly variant: 'split' | 'centered' | 'left' | 'unstyled';
   readonly children: ReactNode;
 }
 
@@ -119,6 +120,51 @@ const shellVariantClasses = {
     'mx-auto grid max-w-320 grid-cols-1 items-center gap-10 px-6 sm:px-8 md:grid-cols-2 md:gap-16 lg:px-10',
 } as const;
 
+function MarketingHeroFrame({
+  className,
+  headingId,
+  testId,
+  children,
+}: Readonly<{
+  className: string;
+  headingId?: string;
+  testId?: string;
+  children: ReactNode;
+}>) {
+  return (
+    <section
+      data-pen-contract={MARKETING_PEN_CONTRACT_IDS.section.hero}
+      className={className}
+      aria-labelledby={headingId}
+      data-testid={testId}
+    >
+      {children}
+    </section>
+  );
+}
+
+function MarketingHeroTitle({
+  id,
+  testId,
+  className,
+  children,
+}: Readonly<{
+  id?: string;
+  testId?: string;
+  className: string;
+  children: ReactNode;
+}>) {
+  return (
+    <h1 id={id} data-testid={testId} className={cn('line-clamp-2', className)}>
+      {children}
+    </h1>
+  );
+}
+
+function MarketingHeroSubtitle({ children }: Readonly<{ children: string }>) {
+  return <p className='marketing-hero-subtitle'>{children}</p>;
+}
+
 function MarketingHeroShell({
   variant,
   className,
@@ -127,19 +173,19 @@ function MarketingHeroShell({
   testId,
 }: MarketingHeroShellProps) {
   return (
-    <section
-      data-pen-contract={MARKETING_PEN_CONTRACT_IDS.section.hero}
-      data-testid={testId}
-      aria-labelledby={headingId}
+    <MarketingHeroFrame
+      headingId={headingId}
+      testId={testId}
       className={cn(
-        'relative w-full',
-        'pt-20 pb-16 sm:pt-24 sm:pb-24 lg:pt-28 lg:pb-32',
-        shellVariantClasses[variant],
+        variant !== 'unstyled' && 'relative w-full',
+        variant !== 'unstyled' &&
+          'pt-20 pb-16 sm:pt-24 sm:pb-24 lg:pt-28 lg:pb-32',
+        variant !== 'unstyled' && shellVariantClasses[variant],
         className
       )}
     >
       {children}
-    </section>
+    </MarketingHeroFrame>
   );
 }
 
@@ -194,19 +240,21 @@ function MarketingHeroContent({
   const layout = media ? 'split' : align;
 
   return (
-    <section
-      data-pen-contract={MARKETING_PEN_CONTRACT_IDS.section.hero}
+    <MarketingHeroFrame
       className={cn('marketing-hero', `marketing-hero--${layout}`, className)}
-      aria-labelledby={headingId}
-      data-testid={testId}
+      headingId={headingId}
+      testId={testId}
     >
       <MarketingContainer width='page'>
         <div className='marketing-hero-inner'>
           <div className='marketing-hero-copy'>
-            <h1 id={headingId} className='marketing-hero-headline'>
+            <MarketingHeroTitle
+              id={headingId}
+              className='marketing-hero-headline marketing-h1-max-two-lines'
+            >
               {headline}
-            </h1>
-            <p className='marketing-hero-subtitle'>{subtitle}</p>
+            </MarketingHeroTitle>
+            <MarketingHeroSubtitle>{subtitle}</MarketingHeroSubtitle>
             <div className='marketing-hero-actions'>
               <MarketingHeroCtaLink
                 cta={primaryCta}
@@ -234,7 +282,7 @@ function MarketingHeroContent({
           )}
         </div>
       )}
-    </section>
+    </MarketingHeroFrame>
   );
 }
 
@@ -261,11 +309,10 @@ function MarketingHeroLanding({
   gridClassName,
 }: MarketingHeroLandingProps) {
   return (
-    <section
-      data-pen-contract={MARKETING_PEN_CONTRACT_IDS.section.hero}
+    <MarketingHeroFrame
       className='relative overflow-hidden pb-12 pt-[5.75rem] md:pb-16 md:pt-[6.25rem] lg:pb-20'
-      data-testid={testId ?? sectionTestId}
-      aria-labelledby={headingId}
+      headingId={headingId}
+      testId={testId ?? sectionTestId}
     >
       <div
         aria-hidden='true'
@@ -287,24 +334,24 @@ function MarketingHeroLanding({
           >
             <div className={cn('max-w-[34rem]', copyClassName)}>
               {eyebrow ? (
-                <p className='homepage-section-eyebrow'>{eyebrow}</p>
+                <span className='homepage-section-eyebrow'>{eyebrow}</span>
               ) : null}
-              <h1
+              <MarketingHeroTitle
                 id={headingId}
-                data-testid={titleTestId}
+                testId={titleTestId}
                 className={cn(
-                  'marketing-h1-linear mt-5 text-primary-token',
+                  'marketing-h1-linear marketing-h1-max-two-lines mt-5 text-primary-token',
                   titleClassName
                 )}
               >
                 {title}
-              </h1>
+              </MarketingHeroTitle>
               <div className='mt-5 max-w-[34rem] text-base leading-[1.7] text-secondary-token sm:text-lg'>
                 {body}
               </div>
 
               <div className='mt-8 flex flex-wrap items-center gap-3'>
-                <LandingCTAButton
+                <LandingCtaLink
                   href={primaryCtaHref}
                   label={primaryCtaLabel}
                   eventName={ctaEventName}
@@ -351,20 +398,22 @@ function MarketingHeroLanding({
           </div>
         </div>
       </MarketingContainer>
-    </section>
+    </MarketingHeroFrame>
   );
 }
 
 /**
  * The single marketing hero section primitive.
  *
- * Three modes, discriminated by required props:
+ * Four modes, discriminated by required props:
  * - Shell (`variant` + `children`): layout shell for content-heavy page
  *   heroes — support, about, blog, changelog, compare, alternatives, pay.
  * - Content (`headline` + `subtitle` + `primaryCta`): the canonical
  *   content-driven landing hero with dual CTA and logo-bar proof.
  * - Landing (`eyebrow` + `title` + `body` + `media`): feature-landing
  *   hero (`/voice`) over the Linear hero backdrop.
+ * - Unstyled shell (`variant='unstyled'`): canonical ownership for a
+ *   route-specific, already-approved presentation without changing its pixels.
  */
 export function MarketingHero(props: MarketingHeroProps) {
   if ('variant' in props) {

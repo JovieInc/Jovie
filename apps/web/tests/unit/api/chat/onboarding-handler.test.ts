@@ -299,6 +299,49 @@ describe('tryHandleAnonymousOnboardingChat', () => {
     expect(hoisted.captureExceptionMock).toHaveBeenCalled();
   });
 
+  it('alerts a distinct budget-exceeded event and still serves the scripted fallback', async () => {
+    vi.resetModules();
+    stubRuntimeEnv();
+    hoisted.executeChatTurnMock.mockRejectedValue(
+      Object.assign(
+        new Error(
+          'API key budget exceeded. Current spend: $1.05, limit: $1.00. Please contact your administrator to increase the budget.'
+        ),
+        { name: 'GatewayInternalServerError' }
+      )
+    );
+    const { tryHandleAnonymousOnboardingChat } = await import(
+      '@/app/api/chat/onboarding-handler'
+    );
+    const req = makeRequest({
+      mode: 'onboarding',
+      messages: [userMessage('hi, I want in')],
+    });
+    const result = await tryHandleAnonymousOnboardingChat(
+      req,
+      'req-budget-wall'
+    );
+
+    expect(result?.status).toBe(200);
+    expect(result?.headers.get('x-fallback-reason')).toBe('llm_error');
+    const body = await result?.text();
+    expect(body).toContain("I'm Jovie");
+    expect(body).not.toContain('API key budget exceeded');
+    expect(hoisted.captureExceptionMock).toHaveBeenCalledWith(
+      expect.objectContaining({
+        message: 'AI Gateway API key budget exceeded',
+        name: 'GatewayBudgetExceededError',
+      }),
+      expect.objectContaining({
+        tags: expect.objectContaining({
+          errorType: 'gateway_budget_exceeded',
+          alert: 'ai_gateway_budget',
+          chat_mode: 'onboarding',
+        }),
+      })
+    );
+  });
+
   it('opens the artist picker via fallback on a later turn when the LLM is down', async () => {
     vi.resetModules();
     stubRuntimeEnv();

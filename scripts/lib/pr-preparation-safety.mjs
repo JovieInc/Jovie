@@ -161,7 +161,7 @@ export function evaluateEligibility({ entry, plan, pr, livePolicy }) {
   )
     return no(
       'no_op_graphite_merge_queue',
-      'Graphite merge-queue branches are never preparation targets'
+      'retired gtmq_ merge-queue branches are never preparation targets'
     );
   if (
     pr.isCrossRepository ||

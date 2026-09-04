@@ -231,6 +231,7 @@ function isTitleCase(value) {
 
   const words = getWords(trimmed);
   for (const word of words) {
+    if (!/[A-Za-z]/.test(word)) continue;
     if (isAbbreviation(word) || isBrandWord(word)) continue;
     // Hyphenated compounds keep segments after the first lowercase, matching
     // toCanonicalWord ("Follow-up", not "Follow-Up") — without the hyphen

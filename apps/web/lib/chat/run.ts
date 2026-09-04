@@ -14,6 +14,12 @@ import {
   makeCoreChatResult,
 } from '@/lib/agents/core-chat-harness';
 import { defaultCoreChatHarness } from '@/lib/agents/eve-agent-adapter';
+import {
+  buildGatewayRetryChain,
+  createRotatingGatewayLanguageModel,
+  GATEWAY_BUDGET_EXCEEDED_ERROR_CODE,
+  isGatewayBudgetExceededError,
+} from '@/lib/ai/gateway-errors';
 import { gateway, streamText } from '@/lib/ai/sdk';
 import { buildAiTelemetry } from '@/lib/ai/telemetry';
 import type { ChatAccountContext } from '@/lib/chat/account-context';
@@ -315,7 +321,7 @@ export async function executeChatTurn(
       buildPinnedOpportunityBlock(pinnedOpportunity);
     systemPrompt = buildSystemPrompt(artistContext, releases, {
       aiCanUseTools: planLimits.booleans.aiCanUseTools,
-      aiDailyMessageLimit: planLimits.limits.aiDailyMessageLimit,
+      aiWeeklyMessageLimit: planLimits.limits.aiWeeklyMessageLimit,
       insightsEnabled,
       knowledgeContext: selectKnowledgeContextForTurn(uiMessages) || undefined,
       accountContext,
@@ -347,6 +353,69 @@ export async function executeChatTurn(
   const selectedModel = shouldUseLightModel
     ? CHAT_MODEL_LIGHT
     : resolveRotatedChatModel(modelRotationStep);
+  const gatewayRetryChain = buildGatewayRetryChain(selectedModel);
+  let gatewayBudgetAlerted = false;
+  const reportGatewayBudgetExceeded = (error: unknown) => {
+    if (gatewayBudgetAlerted) return;
+    gatewayBudgetAlerted = true;
+    telemetry?.setTags?.({
+      chat_gateway_budget_exceeded: 'true',
+      errorType: 'gateway_budget_exceeded',
+    });
+    telemetry?.addBreadcrumb?.({
+      category: 'ai-chat',
+      message: 'gateway_budget_exceeded',
+      level: 'error',
+      data: {
+        requestId,
+        conversationId: resolvedConversationId,
+        selectedModel,
+        retryChain: gatewayRetryChain.join(','),
+      },
+    });
+    const alertError = Object.assign(
+      new Error('AI Gateway API key budget exceeded'),
+      {
+        name: 'GatewayBudgetExceededError',
+        code: GATEWAY_BUDGET_EXCEEDED_ERROR_CODE,
+        cause: error,
+      }
+    );
+    void telemetry?.captureException?.(alertError, {
+      tags: {
+        feature: 'ai-chat',
+        errorType: 'gateway_budget_exceeded',
+        alert: 'ai_gateway_budget',
+      },
+      extra: {
+        userId,
+        requestId,
+        profileId: resolvedProfileId,
+        conversationId: resolvedConversationId,
+        selectedModel,
+        retryChain: gatewayRetryChain,
+      },
+    });
+  };
+  const rotatingModel = createRotatingGatewayLanguageModel({
+    models: gatewayRetryChain,
+    resolveModel: modelId => gateway(modelId),
+    onRotate: ({ from, to, error }) => {
+      telemetry?.setTags?.({
+        chat_model: to,
+        chat_gateway_rotated: 'true',
+      });
+      telemetry?.addBreadcrumb?.({
+        category: 'ai-chat',
+        message: 'gateway_provider_retry',
+        level: 'warning',
+        data: { from, to, requestId },
+      });
+      if (isGatewayBudgetExceededError(error)) {
+        reportGatewayBudgetExceeded(error);
+      }
+    },
+  });
 
   const toolNames = Object.keys(tools).sort((a, b) => a.localeCompare(b));
   const toolStepLimit = resolveChatToolStepLimit(
@@ -421,7 +490,7 @@ export async function executeChatTurn(
       ? (createStaticTextLanguageModel(
           PROMPT_DISCLOSURE_REFUSAL
         ) as unknown as LanguageModel)
-      : gateway(selectedModel),
+      : (rotatingModel as unknown as LanguageModel),
     system: systemPrompt,
     messages: modelMessages,
     tools: blockedForDisclosure ? undefined : tools,
@@ -535,16 +604,20 @@ export async function executeChatTurn(
 
       langfuseTrace.endError(error);
 
-      telemetry?.captureException?.(error, {
-        tags: { feature: 'ai-chat', errorType: 'streaming' },
-        extra: {
-          userId,
-          messageCount: uiMessages.length,
-          requestId,
-          profileId: resolvedProfileId,
-          conversationId: resolvedConversationId,
-        },
-      });
+      if (isGatewayBudgetExceededError(error)) {
+        reportGatewayBudgetExceeded(error);
+      } else {
+        telemetry?.captureException?.(error, {
+          tags: { feature: 'ai-chat', errorType: 'streaming' },
+          extra: {
+            userId,
+            messageCount: uiMessages.length,
+            requestId,
+            profileId: resolvedProfileId,
+            conversationId: resolvedConversationId,
+          },
+        });
+      }
       await onStreamError?.(error);
     },
   });

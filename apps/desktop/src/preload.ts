@@ -1,4 +1,5 @@
 import { contextBridge, ipcRenderer } from 'electron';
+import { BAKED_DESKTOP_BUILD_IDENTITY } from './build-identity.generated';
 const UPDATE_AVAILABLE_CHANNEL = 'update-available';
 const UPDATE_DOWNLOADED_CHANNEL = 'update-downloaded';
 const QUIT_AND_INSTALL_CHANNEL = 'quit-and-install';
@@ -36,6 +37,19 @@ function markElectronRuntime(): boolean {
 
   root.dataset.desktopRuntime = 'electron';
   root.dataset.electronPlatform = process.platform;
+  root.dataset.desktopChannel = BAKED_DESKTOP_BUILD_IDENTITY.channel;
+  root.dataset.desktopVersion = BAKED_DESKTOP_BUILD_IDENTITY.version;
+  if (BAKED_DESKTOP_BUILD_IDENTITY.sourceRevision) {
+    root.dataset.desktopSourceRevision =
+      BAKED_DESKTOP_BUILD_IDENTITY.sourceRevision;
+  } else {
+    delete root.dataset.desktopSourceRevision;
+  }
+  if (BAKED_DESKTOP_BUILD_IDENTITY.builtAt) {
+    root.dataset.desktopBuiltAt = BAKED_DESKTOP_BUILD_IDENTITY.builtAt;
+  } else {
+    delete root.dataset.desktopBuiltAt;
+  }
   return true;
 }
 

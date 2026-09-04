@@ -1,5 +1,12 @@
 name: Production Controller
 # Invariant consumer: JOV-INV-010.
+# controller-hop-exception: jovie-controller-hop/v1
+# accountable-writer: Symphony
+# capability-gap: Event-driven supersession must read live merge-queue depth,
+#   which exists only behind the GitHub GraphQL API; no static in-repo
+#   evidence can prove whether a newer eligible generation is queued.
+# revisit-trigger: Revisit when merge-queue state is carried on the
+#   workflow_run event payload or the controller moves to webhook dispatch.
 run-name: Production Controller ${{ github.event.workflow_run.head_sha }} from CI ${{ github.event.workflow_run.id }} attempt ${{ github.event.workflow_run.run_attempt }}
 
 on:
@@ -23,10 +30,13 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
-  # Hold only the read-only controller preflight for one bounded release-wave
-  # window. A newer main SHA supersedes this generation before exact CI
-  # authorization, so no staging deploy, migration, canary, promotion, or
-  # rollback mutation can start for a stale SHA.
+  # Event-driven supersession, not a fixed release-wave sleep: main itself is
+  # the release-lineage event log and the merge queue is the only place a
+  # newer eligible generation can already be validating or queued. This
+  # generation proceeds as soon as its exact SHA is current with an empty
+  # queue, and waits only a bounded queue-derived window when a newer
+  # generation is already approaching, so no staging deploy, migration,
+  # canary, promotion, or rollback mutation can start for a stale SHA.
   coalesce-production:
     name: Coalesce release wave
     if: ${{ github.event.workflow_run.event == 'push' && github.event.workflow_run.conclusion == 'success' }}
@@ -37,48 +47,146 @@ jobs:
     outputs:
       is_current: ${{ steps.coalesce.outputs.is_current }}
     steps:
-      - name: Wait for newer main to land
+      - name: Evaluate event-driven supersession
         id: coalesce
         env:
           GH_TOKEN: ${{ github.token }}
           EXPECTED_SHA: ${{ github.event.workflow_run.head_sha }}
           REPOSITORY: ${{ github.repository }}
-          # One bounded 60-second release-wave window. The immediate check
-          # avoids sleeping when this run is already stale.
-          COALESCE_DELAY_SECONDS: '60'
+          # The bounded window derives from queue state, never a universal
+          # constant: one increment per newer generation already validating in
+          # the merge queue, capped well inside the 5-minute job budget.
+          COALESCE_PER_GENERATION_SECONDS: '30'
+          COALESCE_MAX_SECONDS: '150'
+          # Retired fixed release-wave window; receipts record time saved
+          # against it.
+          FIXED_WINDOW_SECONDS_REPLACED: '60'
         shell: bash
         run: |
           set -euo pipefail
-          echo "is_current=false" >> "$GITHUB_OUTPUT"
+          queue_depth=0
+          {
+            echo "is_current=false"
+            echo "decision=superseded"
+            echo "replacement_sha=none"
+            echo "wait_seconds=0"
+            echo "time_saved_seconds=0"
+          } >> "$GITHUB_OUTPUT"
+
+          # Emit the release-lineage receipt: every decision records its
+          # reason, the replacement SHA, the time saved against the retired
+          # fixed window, and the next state. Any wait carries an explicit
+          # expected benefit and deadline.
+          record_receipt() {
+            local decision="$1" reason="$2" replacement_sha="$3" wait_seconds="$4" next_state="$5"
+            local time_saved_seconds=$(( FIXED_WINDOW_SECONDS_REPLACED - wait_seconds ))
+            if [ "$time_saved_seconds" -lt 0 ]; then
+              time_saved_seconds=0
+            fi
+            {
+              echo "decision=$decision"
+              echo "replacement_sha=$replacement_sha"
+              echo "wait_seconds=$wait_seconds"
+              echo "time_saved_seconds=$time_saved_seconds"
+            } >> "$GITHUB_OUTPUT"
+            local deadline="none"
+            if [ "$wait_seconds" -gt 0 ]; then
+              deadline="$(date -u -d "+${wait_seconds} seconds" +%Y-%m-%dT%H:%M:%SZ)"
+            fi
+            local expected_benefit="none: no newer eligible generation is validating or queued"
+            if [ "$wait_seconds" -gt 0 ]; then
+              expected_benefit="allow $queue_depth queued merge-group generation(s) to supersede before exact CI authorization"
+            fi
+            jq -n \
+              --arg generation "$EXPECTED_SHA" \
+              --arg decision "$decision" \
+              --arg reason "$reason" \
+              --arg replacement_sha "$replacement_sha" \
+              --argjson wait_seconds "$wait_seconds" \
+              --argjson time_saved_seconds "$time_saved_seconds" \
+              --arg expected_benefit "$expected_benefit" \
+              --arg deadline "$deadline" \
+              --arg next_state "$next_state" \
+              '{generation: $generation, decision: $decision, reason: $reason, replacementSha: $replacement_sha, waitSeconds: $wait_seconds, timeSavedSeconds: $time_saved_seconds, expectedBenefit: $expected_benefit, deadline: $deadline, nextState: $next_state}' \
+              > "$RUNNER_TEMP/release-lineage-receipt.json"
+            echo "::notice::Release lineage $EXPECTED_SHA decision=$decision reason=\"$reason\" replacement=$replacement_sha wait=${wait_seconds}s time_saved=${time_saved_seconds}s next=\"$next_state\""
+            {
+              echo "### Release lineage receipt"
+              echo '```json'
+              cat "$RUNNER_TEMP/release-lineage-receipt.json"
+              echo '```'
+            } >> "$GITHUB_STEP_SUMMARY"
+          }
+
           [[ "$EXPECTED_SHA" =~ ^[0-9a-f]{40}$ ]] || {
             echo "::error::Controller expected SHA must be a full commit."
             exit 1
           }
 
+          # Event 1: main advanced. An older not-yet-mutating generation is
+          # marked superseded, naming its replacement. Supersession is
+          # monotonic because main only moves forward and idempotent because
+          # no mutation has started for this lineage.
           current_main_sha="$(gh api "repos/$REPOSITORY/commits/main" --jq '.sha // empty')"
           [[ "$current_main_sha" =~ ^[0-9a-f]{40}$ ]] || {
-            echo "::error::Could not resolve exact current main during release coalescing."
+            echo "::error::Could not resolve exact current main during release supersession."
             exit 1
           }
           if [ "$current_main_sha" != "$EXPECTED_SHA" ]; then
-            echo "::notice::Controller generation $EXPECTED_SHA was superseded by $current_main_sha before the coalescing window."
+            record_receipt "superseded" "newer main landed before evaluation" "$current_main_sha" 0 "yield the production lease to controller generation $current_main_sha"
             exit 0
           fi
 
-          echo "Current main is $EXPECTED_SHA; waiting ${COALESCE_DELAY_SECONDS}s for the release wave to settle."
-          sleep "$COALESCE_DELAY_SECONDS"
+          # Event 2: the merge queue is the only signal of a newer eligible
+          # generation already validating or queued. An empty queue means no
+          # wait can avoid redundant work, so proceed immediately.
+          queue_json="$(gh api graphql \
+            -F owner="${REPOSITORY%%/*}" \
+            -F name="${REPOSITORY##*/}" \
+            -f query='query($owner: String!, $name: String!) {
+              repository(owner: $owner, name: $name) {
+                mergeQueue(branch: "main") {
+                  entries(first: 25) { nodes { position } }
+                }
+              }
+            }')" || {
+            echo "::error::Could not read the main merge queue during release supersession."
+            exit 1
+          }
+          queue_depth="$(jq -r '[(.data.repository.mergeQueue.entries.nodes // [])[] | select(.position | type == "number" and . >= 1)] | length' <<<"$queue_json")"
+          [[ "$queue_depth" =~ ^[0-9]+$ ]] || {
+            echo "::error::Merge queue evidence was malformed during release supersession."
+            exit 1
+          }
+
+          if [ "$queue_depth" -eq 0 ]; then
+            echo "is_current=true" >> "$GITHUB_OUTPUT"
+            record_receipt "proceed" "exact SHA is current and the merge queue is empty" "$EXPECTED_SHA" 0 "authorize exact CI evidence"
+            exit 0
+          fi
+
+          # Bounded coalescing: wait only because a newer generation is
+          # already validating. The window derives from queue depth and is
+          # capped; one bounded recheck at the deadline, no polling loop.
+          wait_seconds=$(( queue_depth * COALESCE_PER_GENERATION_SECONDS ))
+          if [ "$wait_seconds" -gt "$COALESCE_MAX_SECONDS" ]; then
+            wait_seconds="$COALESCE_MAX_SECONDS"
+          fi
+          echo "::notice::Release lineage $EXPECTED_SHA waits ${wait_seconds}s (queue_depth=$queue_depth, expected benefit: allow queued merge-group generations to supersede before exact CI authorization, deadline $(date -u -d "+${wait_seconds} seconds" +%Y-%m-%dT%H:%M:%SZ))."
+          sleep "$wait_seconds"
+
           current_main_sha="$(gh api "repos/$REPOSITORY/commits/main" --jq '.sha // empty')"
           [[ "$current_main_sha" =~ ^[0-9a-f]{40}$ ]] || {
-            echo "::error::Could not resolve exact current main at the end of release coalescing."
+            echo "::error::Could not resolve exact current main at the coalescing deadline."
             exit 1
           }
           if [ "$current_main_sha" != "$EXPECTED_SHA" ]; then
-            echo "::notice::Controller generation $EXPECTED_SHA was superseded by $current_main_sha during the coalescing window."
+            record_receipt "superseded" "newer main landed during the bounded coalescing window" "$current_main_sha" "$wait_seconds" "yield the production lease to controller generation $current_main_sha"
             exit 0
           fi
 
           echo "is_current=true" >> "$GITHUB_OUTPUT"
-          echo "Release coalescing completed for current main $EXPECTED_SHA."
+          record_receipt "proceed" "exact SHA stayed current through the bounded coalescing window" "$EXPECTED_SHA" "$wait_seconds" "authorize exact CI evidence"
 
   fleet-promotion:
     name: Authorize fleet deployment state
@@ -425,8 +533,15 @@ jobs:
               --mode "$lane_range_mode" \
               --json-out "$lane_range_json"
             selected_lanes="$(jq -r 'if (.selectedLanes | length) == 0 then "none" else (.selectedLanes | join(",")) end' "$lane_range_json")"
+            # Planner sets runWeb true when the range selects Web OR live SHA ≠
+            # current main (JOV-5821). Skip-promote stays fail-closed while
+            # unbound (JOV-5458 / JOV-5807).
             run_web="$(jq -r '.runWeb' "$lane_range_json")"
+            web_bind_reason="$(jq -r '.webBindReason // "none"' "$lane_range_json")"
             web_evidence_sha="$(jq -r '.webEvidenceSha // "none"' "$lane_range_json")"
+            if [ "$web_bind_reason" = "live_unbound" ]; then
+              echo "::notice::Live production $deployed_sha is unbound from current main $EXPECTED_SHA with sealed lanes $selected_lanes; forcing Web/Promote so skip-promote cannot occupy the bind."
+            fi
 
             final_main_sha="$(gh api "repos/$REPOSITORY/commits/main" --jq '.sha // empty')"
             [[ "$final_main_sha" =~ ^[0-9a-f]{40}$ ]] || {
@@ -449,7 +564,7 @@ jobs:
               echo "lane_receipt_artifact_id=$receipt_artifact_id"
               echo "authorized=true"
             } >> "$GITHUB_OUTPUT"
-            echo "Authorized production from exact CI run $source_run_id attempt $source_run_attempt over deployed range $deployed_sha..$EXPECTED_SHA."
+            echo "Authorized production from exact CI run $source_run_id attempt $source_run_attempt over deployed range $deployed_sha..$EXPECTED_SHA (Web=$run_web bind=$web_bind_reason)."
             exit 0
 
       - name: Preserve cumulative production lane evidence

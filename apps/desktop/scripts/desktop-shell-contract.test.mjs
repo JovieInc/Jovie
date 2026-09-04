@@ -496,6 +496,26 @@ test('preload marks the hosted app as Electron after the document root is ready'
   assert.match(preloadSource, /markElectronRuntime\(\)/);
   assert.match(preloadSource, /DOMContentLoaded/);
   assert.match(preloadSource, /dataset\.desktopRuntime = 'electron'/);
+  assert.match(
+    preloadSource,
+    /import \{ BAKED_DESKTOP_BUILD_IDENTITY \} from '\.\/build-identity\.generated';/
+  );
+  assert.match(
+    preloadSource,
+    /dataset\.desktopChannel = BAKED_DESKTOP_BUILD_IDENTITY\.channel/
+  );
+  assert.match(
+    preloadSource,
+    /dataset\.desktopVersion = BAKED_DESKTOP_BUILD_IDENTITY\.version/
+  );
+  assert.match(
+    preloadSource,
+    /dataset\.desktopSourceRevision =\s*BAKED_DESKTOP_BUILD_IDENTITY\.sourceRevision/
+  );
+  assert.match(
+    preloadSource,
+    /dataset\.desktopBuiltAt = BAKED_DESKTOP_BUILD_IDENTITY\.builtAt/
+  );
   assert.match(preloadSource, /startDesktopAuthHandoff/);
   assert.match(preloadSource, /openDesktopAuthUrl/);
   assert.match(preloadSource, /closeDesktopAuthWindow/);
@@ -525,16 +545,31 @@ test('desktop bridge exposes bounded dictation support', async () => {
   assert.match(mainSource, /ipcMain\.handle\(\s*DICTATION_STATUS_CHANNEL,/);
   assert.match(mainSource, /function getDesktopDictationStatus\(\)/);
   assert.match(mainSource, /nativeAvailable: false/);
-  assert.match(mainSource, /webSpeechFallbackAllowed: true/);
+  // Web Speech recognition is non-functional inside Electron (no Google
+  // speech keys → 'network' error on every start), so the shell must never
+  // advertise it as an allowed fallback; the renderer points at OS dictation.
+  assert.doesNotMatch(mainSource, /webSpeechFallbackAllowed: true/);
+  assert.match(mainSource, /use-(macos-)?system-dictation/);
   assert.match(mainSource, /shouldGrantTrustedAudioPermission/);
   assert.match(mainSource, /shouldGrantTrustedAudioPermissionCheck/);
   assert.match(mainSource, /backgroundThrottling: false/);
   assert.match(mainSource, /installDesktopCspWatchdog/);
+  const autoUpdateSource = await readFile(
+    join(desktopRoot, 'src/desktop-auto-update.ts'),
+    'utf8'
+  );
   assert.match(mainSource, /from '\.\/desktop-auto-update'/);
+  assert.match(mainSource, /hasNightlyUpdateFlag/);
+  assert.match(mainSource, /installNightlyUpdateLaunchAgent/);
   assert.match(mainSource, /shouldScheduleDesktopAutoUpdate\(/);
   assert.match(mainSource, /if \(APP_ENV === 'local'/);
   assert.match(mainSource, /autoUpdater\.allowDowngrade = false/);
+  assert.match(mainSource, /autoUpdater\.autoInstallOnAppQuit = true/);
   assert.match(mainSource, /if \(!desktopUpdatesSupported\(\)\)/);
+  assert.match(autoUpdateSource, /export const NIGHTLY_UPDATE_FLAG/);
+  assert.match(autoUpdateSource, /\/usr\/bin\/open/);
+  assert.match(autoUpdateSource, /app\.jov\.ie\.nightly-update/);
+  assert.match(autoUpdateSource, /appEnv === 'local'/);
   assert.match(mainSource, /autoUpdater\.allowPrerelease = true/);
   assert.match(mainSource, /sanitizeWindowState/);
   assert.match(mainSource, /bindPendingDesktopAuthCompletion/);

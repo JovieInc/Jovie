@@ -11,6 +11,11 @@ on:
       - 'canon/invariants.jsonl'
       - 'apps/web/lib/ovie/generated/invariant-stewardship.current-week.json'
       - 'scripts/invariant-stewardship/**'
+      - 'scripts/invariants/performance-factory.mjs'
+      - 'scripts/invariants/performance-budgets.mjs'
+      - 'apps/web/lib/ovie/generated/performance-invariants-v1.json'
+      - 'apps/web/.lighthouserc*.json'
+      - 'scripts/hermes/config/model-registry.json'
       - '.github/workflows/design-governance.yml'
   repository_dispatch:
     types: [founder-decision-recorded, invariant-enforcement-failed]
@@ -112,6 +117,10 @@ jobs:
         # Pure node + checked-in evidence. No external API calls, database,
         # queue, credentials, or package install.
         run: node scripts/invariant-stewardship/audit.mjs | tee invariant-stewardship-audit.json
+
+      - name: Project and audit performance invariants
+        # JOV-INV-026. Receipt only; do not steal the Kimi remediator.
+        run: node scripts/invariants/performance-factory.mjs | tee performance-invariants-factory.json
 
       - name: Upload invariant stewardship receipt
         if: always()

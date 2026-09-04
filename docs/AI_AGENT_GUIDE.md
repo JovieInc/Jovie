@@ -114,6 +114,15 @@ All routes live under `apps/web/app/api/`. Auth is via Clerk (`auth()`) unless n
 | `/api/cron/schedule-release-notifications` | GET | CRON_SECRET | Schedule release alerts |
 | `/api/cron/send-release-notifications` | GET | CRON_SECRET | Send release alerts |
 
+### Inbox Founder Reviews (authenticated founder surface)
+
+| Endpoint | Method | Auth | Purpose |
+|----------|--------|------|---------|
+| `/api/inbox/founder-reviews` | GET/POST | Clerk | List or persist owner-bound review receipts before Inbox decisions |
+| `/api/inbox/founder-reviews/upload-token` | POST | Clerk / signed Blob callback | Issue private-audio upload tokens and persist expiring cleanup leases |
+| `/api/inbox/founder-reviews/[id]/media` | GET/DELETE | Clerk | Stream or delete retained private audio for an owned receipt |
+| `/api/inbox/founder-reviews/[id]/outcome` | PATCH | Clerk | Persist failed action state or verify applied state from canonical suggested actions |
+
 ### Dashboard (authenticated creator)
 
 | Endpoint | Method | Auth | Purpose |

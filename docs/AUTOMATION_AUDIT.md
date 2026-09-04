@@ -1,5 +1,7 @@
 # Automation Audit — Crons, Agent Workflows, KPI Alignment
 
+> **Retirement notice (2026-09-02):** Trigger.dev and Hermes references in this audit are historical. Neither is an active Jovie runtime or fallback. See [`docs/operations/SUMMER_RUNTIME_RETIREMENT.md`](./operations/SUMMER_RUNTIME_RETIREMENT.md) for current status.
+
 > **Issue:** JOV-1901
 > **Date:** 2026-07-18 control-plane refresh (original audit: 2026-05-07)
 > **Scope:** Production crons (`vercel.json` + `apps/web/app/api/cron/**`), GitHub Actions agent workflows
@@ -130,7 +132,7 @@ until the observer-only definition lands and is proven.
 | **Desktop Release** | `desktop-release.yml` | Push/tag | Electron app build and auto-update CI | Per-release | **Keep** |
 | **iOS CI** | `ios-ci.yml` | Push/PR | iOS app build | Per-PR | **Keep** |
 | **E2E Full Matrix** | `e2e-full-matrix.yml` | `15 15 * * 1` UTC + manual | Full E2E matrix run across browsers | Weekly / on-demand | **Keep** |
-| **Screenshots** | `screenshots.yml` | path-filtered `push: main`, `0 9 * * *` UTC, manual | Generates product screenshots and opens/updates the screenshot PR | Post-merge + daily | **Keep** |
+| **Screenshots** | `screenshots.yml` | path-filtered `push: main`, manual | Generates product screenshots and opens/updates the screenshot PR | Post-merge | **Keep** |
 | **Fork PR Gate** | `fork-pr-gate.yml` | `pull_request` from fork | Safety gate for external fork PRs | Per-fork-PR | **Keep** |
 
 ---

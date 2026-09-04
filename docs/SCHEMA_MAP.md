@@ -52,6 +52,9 @@ Token read/write must go through `apps/web/lib/connectors/token-vault.ts` — ne
 | `creator-documents.ts` | `creatorDocuments`, `creatorDocumentRevisions`, `creatorRevisionClaims`, `creatorRevisionApprovals`, `creatorCaptureHandoffs` | Documents belong to `creatorProfiles`; revisions and evidence are immutable per document revision; approvals bind one exact revision to one capture handoff |
 | `pre-save.ts` | `preSaveTokens` | Links fans to upcoming releases |
 | `tour.ts` | `tourDates` | `tourDates.creatorProfileId` → `creatorProfiles` |
+| `library-content-graph.ts` | `artistRules`, `artistRuleEvents`, `artistRuleExceptions`, `creatorBrands`, `creatorOffers`, `libraryRelationships`, `optimizationExperiments` | Private creator graph; `optimizationExperiments` stores later experiment decisions. RLS-forced in 0096/0097 |
+| `library-presence.ts` | `libraryPresenceFindings`, `libraryRightsholderEvidence` | Post-release repair/collision queue and observed/attested rights evidence. Songview/MLC stay `observed`. Seeded Tim findings are queue inputs only |
+| `promo-downloads.ts` | `promoDownloads`, `promoDownloadEvents` | Active files require `rightsControlAttested` plus actor/timestamp; existing files fail closed until re-attested |
 
 ### Analytics & Tracking
 
@@ -119,7 +122,7 @@ Token read/write must go through `apps/web/lib/connectors/token-vault.ts` — ne
 
 | Schema File | Tables | Key Relations |
 |-------------|--------|---------------|
-| `investors.ts` | `investorLinks`, `investorSettings`, `investorViews` | Standalone investor portal tables; `investorViews.pagePath` stores page views and `/investor-portal#event/...` engagement paths (no separate event table) |
+| `investors.ts` | `investorLinks`, `investorSettings`, `investorViews`, `investorStakeholderRecords`, `investorUpdateDrafts`, `investorUpdateCandidates`, `investorUpdateCandidateDecisions`, `investorUpdateFinalApprovals`, `investorUpdateDeliveryEvents` | Portal tables plus append-only Taste Inbox ledger; candidates/source records → `memory_source_records`; decisions → candidates; approvals → drafts; delivery events → approvals. No send path. |
 
 ### Referrals
 
