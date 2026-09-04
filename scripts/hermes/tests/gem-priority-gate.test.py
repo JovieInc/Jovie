@@ -2028,8 +2028,7 @@ class WorkflowContractTests(unittest.TestCase):
         content = (self.WORKFLOWS / "fleet-gate-refresh.yml").read_text(encoding="utf-8")
         self.assertNotIn("schedule:", content)
         self.assertNotIn("cron:", content)
-        self.assertIn("pull_request:", content)
-        self.assertIn("merge_group:", content)
+        self.assertIn("pull_request_target:", content)
         self.assertIn("workflow_run:", content)
         self.assertIn(
             "workflows: [CI, Production Controller]",
@@ -2039,8 +2038,7 @@ class WorkflowContractTests(unittest.TestCase):
         self.assertNotIn("workflows: [CI, Production Controller, Queue-Deferred Release]", content)
         self.assertIn("push:", content)
         self.assertIn("branches: [main]", content)
-        self.assertIn("github.event.pull_request.head.sha", content)
-        self.assertIn("Validate exact candidate fleet policy", content)
+        self.assertIn("ref: main", content)
         self.assertIn("node-version: '22'", content)
         self.assertIn("./.github/actions/evaluate-fleet-gate", content)
         self.assertIn("dry-run: 'false'", content)

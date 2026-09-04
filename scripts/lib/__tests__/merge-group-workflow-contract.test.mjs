@@ -1670,7 +1670,6 @@ ${selectedGateScript}`,
       .sort();
     expect(mergeGroupWorkflows).toEqual([
       'ci.yml',
-      'fleet-gate-refresh.yml',
       'fork-pr-gate.yml',
       'pr-size-guard.yml',
       'pr-targets-main.yml',
