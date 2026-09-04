@@ -14,10 +14,16 @@ import { NextResponse } from 'next/server';
 import { requireAuth } from '@/lib/auth/require-auth';
 import { CACHE_TAGS } from '@/lib/cache/tags';
 import { recordInboxDecision } from '@/lib/connectors/inbox-decision';
+import { YOUTUBE_THUMBNAIL_CANDIDATE_KIND } from '@/lib/connectors/suggested-action-kinds';
+import { parseYouTubeThumbnailCandidate } from '@/lib/connectors/youtube-thumbnail-candidate';
 import { db } from '@/lib/db';
 import { suggestedActions } from '@/lib/db/schema/connectors';
 import { captureError } from '@/lib/error-tracking';
 import { logger } from '@/lib/utils/logger';
+import {
+  reconcileThumbnailCandidateDecision,
+  YouTubeThumbnailDecisionError,
+} from '@/lib/youtube-library';
 
 const NO_STORE_HEADERS = { 'Cache-Control': 'no-store' } as const;
 
@@ -42,6 +48,47 @@ export async function POST(request: Request, { params }: RouteParams) {
   }
 
   try {
+    const [candidate] = await db
+      .select({
+        kind: suggestedActions.kind,
+        payload: suggestedActions.payload,
+        status: suggestedActions.status,
+      })
+      .from(suggestedActions)
+      .where(
+        and(eq(suggestedActions.id, id), eq(suggestedActions.userId, userId))
+      )
+      .limit(1);
+    if (!candidate) {
+      return NextResponse.json(
+        { error: 'not-found' },
+        { status: 404, headers: NO_STORE_HEADERS }
+      );
+    }
+    const isYoutubeCandidate =
+      candidate.kind === YOUTUBE_THUMBNAIL_CANDIDATE_KIND;
+    if (
+      isYoutubeCandidate &&
+      !parseYouTubeThumbnailCandidate(candidate.kind, candidate.payload)
+    ) {
+      return NextResponse.json(
+        { error: 'invalid-youtube-thumbnail-candidate' },
+        { status: 422, headers: NO_STORE_HEADERS }
+      );
+    }
+    if (candidate.status === 'rejected' && isYoutubeCandidate) {
+      await reconcileThumbnailCandidateDecision({
+        suggestedActionId: id,
+        userId,
+        payload: candidate.payload,
+        decision: 'rejected',
+      });
+      return NextResponse.json(
+        { ok: true, approvalId: id, status: 'rejected' },
+        { status: 200, headers: NO_STORE_HEADERS }
+      );
+    }
+
     // CAS transition: pending → rejected (WHERE status='pending' AND userId=:userId)
     const updated = await db
       .update(suggestedActions)
@@ -75,6 +122,15 @@ export async function POST(request: Request, { params }: RouteParams) {
       );
     }
 
+    if (isYoutubeCandidate) {
+      await reconcileThumbnailCandidateDecision({
+        suggestedActionId: id,
+        userId,
+        payload: candidate.payload,
+        decision: 'rejected',
+      });
+    }
+
     logger.info('[reject] suggested_action dismissed', {
       approvalId: id,
       userId,
@@ -96,6 +152,12 @@ export async function POST(request: Request, { params }: RouteParams) {
       { status: 200, headers: NO_STORE_HEADERS }
     );
   } catch (err) {
+    if (err instanceof YouTubeThumbnailDecisionError) {
+      return NextResponse.json(
+        { error: err.code },
+        { status: 422, headers: NO_STORE_HEADERS }
+      );
+    }
     logger.error('[reject] Failed to dismiss suggested_action', err);
     await captureError('suggest-action reject failed', err, {
       route: '/api/connectors/suggested-actions/[id]/reject',

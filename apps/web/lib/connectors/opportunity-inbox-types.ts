@@ -7,7 +7,23 @@ export type OpportunityInboxCardCategory =
   | 'tour_date'
   | 'report'
   | 'brand_deal'
-  | 'workflow_capture';
+  | 'workflow_capture'
+  | 'youtube_thumbnail';
+
+export interface OpportunityInboxYoutubeThumbnailData {
+  readonly channelId: string;
+  readonly youtubeVideoId: string;
+  readonly currentThumbnailUrl: string | null;
+  readonly candidateImageUrl: string;
+  readonly artifactSha256: string;
+  readonly apiMetrics: {
+    readonly capturedAt: string;
+    readonly views: number | null;
+    readonly watchTimeMinutes: number | null;
+    readonly avgViewDurationSeconds: number | null;
+  };
+  readonly publicationBlockedReason: string;
+}
 
 export interface OpportunityInboxWorkflowCaptureData {
   readonly instructions: string;
@@ -65,6 +81,8 @@ export interface OpportunityInboxCardViewModel {
   readonly report?: OpportunityInboxReportData;
   /** Present only when category === 'workflow_capture'. */
   readonly workflowCapture?: OpportunityInboxWorkflowCaptureData;
+  /** Present only when category === 'youtube_thumbnail'. */
+  readonly youtubeThumbnail?: OpportunityInboxYoutubeThumbnailData;
 }
 
 export interface OpportunityInboxTourDateItem {

@@ -28,6 +28,34 @@ const CARDS = [
   },
 ];
 
+const YOUTUBE_THUMBNAIL_CARD = {
+  id: 'yt-card-1',
+  signalType: 'other' as const,
+  typeLabel: 'YouTube Thumbnail',
+  createdAt: '2026-09-01T12:00:00.000Z',
+  title: 'Review thumbnail for The Last Time',
+  why: 'Candidate staged for a native Studio experiment; approval records intent only.',
+  primaryActionLabel: 'Approve Candidate',
+  status: 'pending' as const,
+  category: 'youtube_thumbnail' as const,
+  youtubeThumbnail: {
+    channelId: 'UC90tJdD38139ytPUdEZVl1A',
+    youtubeVideoId: 'video-1',
+    currentThumbnailUrl: null,
+    candidateImageUrl: 'https://i.ytimg.com/vi/dQw4w9WgXcQ/maxresdefault.jpg',
+    artifactSha256:
+      'aab81dd7f28d4421478c03e4d0d62a58ef13db556c4c52beacf56f24f782ba01',
+    apiMetrics: {
+      capturedAt: '2026-09-01T12:00:00.000Z',
+      views: 128_450,
+      watchTimeMinutes: 438_900,
+      avgViewDurationSeconds: 205,
+    },
+    publicationBlockedReason:
+      'direct-thumbnail-mutation-disabled-native-experiment-required',
+  },
+};
+
 describe('OpportunityCardStack', () => {
   it('keeps stack-level keyboard commands direct and predictable', async () => {
     const user = userEvent.setup();
@@ -217,5 +245,29 @@ describe('OpportunityCardStack', () => {
 
     expect(keyboardControl).toHaveFocus();
     expect(screen.getByText('New single detected')).toBeInTheDocument();
+  });
+  it('renders a youtube thumbnail card and wires its approve and reject controls', async () => {
+    const user = userEvent.setup();
+    const onAccept = vi.fn();
+    const onReject = vi.fn();
+
+    render(
+      <OpportunityCardStack
+        cards={[YOUTUBE_THUMBNAIL_CARD]}
+        onAccept={onAccept}
+        onReject={onReject}
+        onOpen={vi.fn()}
+      />
+    );
+
+    expect(
+      screen.getByTestId('opportunity-inbox-youtube-thumbnail-yt-card-1')
+    ).toBeInTheDocument();
+
+    await user.click(screen.getByRole('button', { name: 'Approve Candidate' }));
+    await user.click(screen.getByRole('button', { name: 'Reject' }));
+
+    expect(onAccept).toHaveBeenCalledWith('yt-card-1');
+    expect(onReject).toHaveBeenCalledWith('yt-card-1');
   });
 });
