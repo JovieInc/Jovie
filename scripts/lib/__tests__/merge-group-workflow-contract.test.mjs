@@ -1544,6 +1544,7 @@ ${selectedGateScript}`,
       'ref: ${{ github.event.merge_group.base_sha }}'
     );
     expect(sizeGuard).toContain('persist-credentials: false');
+    expect(sizeGuard).toContain('scripts/lib/repo-hygiene-limits.mjs');
     expect(SIZE_GUARD_WORKFLOW).toContain('contents: read');
     expect(SIZE_GUARD_WORKFLOW).toContain('pull-requests: read');
     expect(sizeGuard).toContain('GH_TOKEN: ${{ github.token }}');
@@ -1553,6 +1554,8 @@ ${selectedGateScript}`,
     expect(sizeGuard).toContain(
       'node scripts/lib/merge-group-member-policy.mjs --policy=size'
     );
+    expect(MEMBER_POLICY).toContain('enforceCombinedTreePayload({ headSha })');
+    expect(MEMBER_POLICY).toContain("['ls-tree', '-r', '-l', '-z', headSha]");
     expect(sizeGuard).toContain("MAX_LINES: ${{ vars.PR_MAX_LINES || '800' }}");
     expect(sizeGuard).not.toContain('members were size-checked as source PRs');
     const sourceSizeGuard = getJobBlock(SIZE_GUARD_WORKFLOW, 'size');

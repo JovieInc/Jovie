@@ -1,15 +1,22 @@
 import { describe, expect, it } from 'vitest';
 import {
   assertCurrentPullRequest,
+  enforceCombinedTreePayload,
   evaluateForkMemberPolicy,
   evaluateSizeMemberPolicy,
+  parseTrackedRegularTree,
   resolveMergeGroupMembers,
 } from '../merge-group-member-policy.mjs';
+import { HYGIENE_LIMITS } from '../repo-hygiene-limits.mjs';
 
 const BASE = '1'.repeat(40);
 const FIRST = '2'.repeat(40);
 const HEAD = '3'.repeat(40);
 const SOURCE_101 = 'a'.repeat(40);
+
+function treeEntry(mode, type, size, path, oid = 'f'.repeat(40)) {
+  return `${mode} ${type} ${oid} ${size}\t${path}\0`;
+}
 
 function event(overrides = {}) {
   return {
@@ -247,6 +254,78 @@ describe('merge-group member discovery', () => {
     expect(() =>
       assertCurrentPullRequest(member, { ...current, state: 'closed' })
     ).toThrow(/changed or is malformed after group discovery/);
+  });
+});
+
+describe('merge-group combined-tree payload policy', () => {
+  it('counts exact regular-file blob bytes and ignores symlinks and submodules', () => {
+    expect(
+      parseTrackedRegularTree(
+        treeEntry('100644', 'blob', 7, 'README.md') +
+          treeEntry('100755', 'blob', 11, 'scripts/check.sh') +
+          treeEntry('120000', 'blob', 9, 'linked-doc') +
+          treeEntry('160000', 'commit', '-', 'vendor/example')
+      )
+    ).toEqual({ bytes: 18, files: 2 });
+  });
+
+  it('fails closed on malformed, truncated, duplicate, or unsupported tree evidence', () => {
+    expect(() => parseTrackedRegularTree('')).toThrow(/missing or truncated/);
+    expect(() =>
+      parseTrackedRegularTree(
+        treeEntry('100644', 'blob', 7, 'README.md').slice(0, -1)
+      )
+    ).toThrow(/missing or truncated/);
+    expect(() =>
+      parseTrackedRegularTree(
+        treeEntry('100644', 'blob', 7, 'README.md') +
+          treeEntry('100644', 'blob', 7, 'README.md')
+      )
+    ).toThrow(/repeats tracked path/);
+    expect(() =>
+      parseTrackedRegularTree(treeEntry('040000', 'blob', 7, 'directory'))
+    ).toThrow(/unsupported tracked mode/);
+  });
+
+  it('fetches and measures the exact synthetic head without executing its files', () => {
+    const commands = [];
+    const result = enforceCombinedTreePayload({
+      headSha: HEAD,
+      maxTrackedBytes: 20,
+      runGit(args) {
+        commands.push(args);
+        if (args[0] === 'rev-parse') return `${HEAD}\n`;
+        if (args[0] === 'ls-tree') {
+          return treeEntry('100644', 'blob', 20, 'payload.bin');
+        }
+        return '';
+      },
+    });
+
+    expect(result).toEqual({ bytes: 20, files: 1 });
+    expect(commands).toEqual([
+      ['fetch', '--no-tags', '--depth=1', 'origin', HEAD],
+      ['rev-parse', 'FETCH_HEAD'],
+      ['ls-tree', '-r', '-l', '-z', HEAD],
+    ]);
+  });
+
+  it('deliberately rejects an exact combined tree over the absolute budget', () => {
+    const overBudget = HYGIENE_LIMITS.maxTrackedBytes + 1;
+    expect(() =>
+      enforceCombinedTreePayload({
+        headSha: HEAD,
+        runGit(args) {
+          if (args[0] === 'rev-parse') return `${HEAD}\n`;
+          if (args[0] === 'ls-tree') {
+            return treeEntry('100644', 'blob', overBudget, 'payload.bin');
+          }
+          return '';
+        },
+      })
+    ).toThrow(
+      `${overBudget} bytes of tracked regular files exceeds the ${HYGIENE_LIMITS.maxTrackedBytes}-byte combined-tree budget`
+    );
   });
 });
 
