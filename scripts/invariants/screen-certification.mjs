@@ -212,6 +212,19 @@ function normalizeChanged(files) {
     .filter(Boolean);
 }
 
+function equalPathSets(candidate, expected) {
+  if (
+    !Array.isArray(candidate) ||
+    candidate.some(path => typeof path !== 'string')
+  )
+    return false;
+  const supplied = [...new Set(candidate.map(normalizeRepoPath))].sort();
+  return (
+    supplied.length === expected.length &&
+    supplied.every((path, index) => path === expected[index])
+  );
+}
+
 /** Deliberate-red fixture only. Never used to certify a changed surface. */
 function makeDeliberateRedProof(screen, headSha) {
   return {
@@ -935,12 +948,18 @@ export function runScreenCertificationFromArtifact({
   repoRoot = REPO_ROOT,
 } = {}) {
   const headSha = resolveHeadSha(undefined, repoRoot);
-  const changed = normalizeChanged(
-    changedFilesFromGit(resolveDiffBase(undefined, repoRoot), repoRoot)
-  );
   const screen = SCREEN_REGISTRY.find(
     entry => !entry.excluded && entry.id === screenId
   );
+  const resolved = resolveTrustedScreenProof({
+    artifactId,
+    context: {
+      headSha,
+      screenId,
+      viewports: screen?.viewports,
+    },
+  });
+  const changed = normalizeChanged(resolved.changedFiles);
   const ownedSources = changed
     .filter(file => classifyScreenPath(file.path).entry?.id === screenId)
     .map(file => file.path)
@@ -950,13 +969,16 @@ export function runScreenCertificationFromArtifact({
   );
   const baseline = runScreenCertification({
     repoRoot,
+    headSha,
     changedFiles: changed,
     registrationOnly: true,
   });
   if (
     !screen ||
+    !resolved.proof ||
     ownedSources.length === 0 ||
-    scoped.some(file => classifyScreenPath(file.path).entry?.id !== screenId)
+    scoped.some(file => classifyScreenPath(file.path).entry?.id !== screenId) ||
+    !equalPathSets(resolved.proof.sourcePaths, ownedSources)
   ) {
     return {
       ...baseline,
@@ -968,25 +990,16 @@ export function runScreenCertificationFromArtifact({
         status: 'external-certification-unavailable',
         issues: [
           ...baseline.receipt.issues,
+          ...(resolved.findings ?? []),
           'artifact certification source scope is invalid',
         ],
       },
     };
   }
-  const resolved = resolveTrustedScreenProof({
-    artifactId,
-    context: {
-      headSha,
-      screenId,
-      sourcePaths: ownedSources,
-      viewports: screen.viewports,
-    },
-  });
-  const findings = resolved.proof
-    ? evaluateScreenProof(resolved.proof, { screen, headSha }).filter(
-        finding => finding !== TRUST_UNAVAILABLE
-      )
-    : resolved.findings;
+  const findings = evaluateScreenProof(resolved.proof, {
+    screen,
+    headSha,
+  }).filter(finding => finding !== TRUST_UNAVAILABLE);
   const issues = [...baseline.receipt.issues, ...findings];
   const ok = issues.length === 0;
   return {

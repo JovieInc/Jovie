@@ -34,9 +34,77 @@ const paths = value =>
   )
     ? [...new Set(value)].sort()
     : null;
+const sha = value =>
+  typeof value === 'string' && /^[0-9a-f]{40}$/i.test(value)
+    ? value.toLowerCase()
+    : null;
 const equal = (left, right) =>
   left?.length === right?.length &&
   left.every((value, index) => value === right[index]);
+const compareStatus = Object.freeze({
+  added: 'A',
+  modified: 'M',
+  removed: 'D',
+  renamed: 'R',
+});
+function compareChangedFiles(compare, headCommit, sourceBaseSha, headSha) {
+  const files = compare?.files;
+  if (
+    !sha(sourceBaseSha) ||
+    sha(sourceBaseSha) === sha(headSha) ||
+    compare?.status !== 'ahead' ||
+    !Number.isSafeInteger(compare.ahead_by) ||
+    compare.ahead_by < 1 ||
+    compare.behind_by !== 0 ||
+    sha(compare.base_commit?.sha) !== sha(sourceBaseSha) ||
+    sha(compare.merge_base_commit?.sha) !== sha(sourceBaseSha) ||
+    sha(headCommit?.sha) !== sha(headSha) ||
+    !Number.isSafeInteger(compare.total_commits) ||
+    compare.total_commits < 1 ||
+    compare.total_commits > 250 ||
+    !Array.isArray(compare.commits) ||
+    compare.commits.length !== compare.total_commits ||
+    compare.commits.some(commit => !sha(commit?.sha)) ||
+    sha(compare.commits.at(-1)?.sha) !== sha(headSha) ||
+    !Array.isArray(files) ||
+    files.length === 0 ||
+    files.length >= 300
+  )
+    return null;
+  /** GitHub exposes at most 300 files here; exactly 300 is ambiguous. */
+  const changed = [];
+  for (const file of files) {
+    const status =
+      typeof file?.status === 'string' &&
+      Object.hasOwn(compareStatus, file.status)
+        ? compareStatus[file.status]
+        : null;
+    if (
+      !isObject(file) ||
+      typeof file.filename !== 'string' ||
+      !file.filename ||
+      file.filename.startsWith('/') ||
+      file.filename.includes('..') ||
+      !status
+    )
+      return null;
+    if (file.status === 'renamed') {
+      if (
+        typeof file.previous_filename !== 'string' ||
+        !file.previous_filename ||
+        file.previous_filename.startsWith('/') ||
+        file.previous_filename.includes('..')
+      )
+        return null;
+      changed.push({ path: file.previous_filename, status: 'R' });
+    }
+    changed.push({
+      path: file.filename,
+      status,
+    });
+  }
+  return changed;
+}
 function run(command, args, binary = false) {
   const result = spawnSync(command, args, {
     encoding: binary ? undefined : 'utf8',
@@ -94,16 +162,14 @@ function archive(archiveBytes, expected) {
 /** Owned GitHub transport; tests replace `gh` on PATH, never a verifier result. */
 export function resolveTrustedScreenProof({ artifactId, context }) {
   const now = Date.now();
-  const expectedSources = paths(context?.sourcePaths);
   const viewports = Array.isArray(context?.viewports)
     ? [...context.viewports].sort()
     : [];
   const fail = finding => ({ proof: null, findings: [finding] });
   if (
     !validId(artifactId) ||
-    !/^[0-9a-f]{40}$/i.test(context?.headSha ?? '') ||
+    !sha(context?.headSha) ||
     !context?.screenId ||
-    !expectedSources ||
     !viewports.length
   )
     return fail('controlled resolver request is invalid');
@@ -133,7 +199,7 @@ export function resolveTrustedScreenProof({ artifactId, context }) {
       workflowRun.head_branch !== 'main' ||
       workflowRun.head_sha?.toLowerCase() !== context.headSha.toLowerCase() ||
       workflowRun.path !== PRODUCER.workflow ||
-      !['push', 'workflow_dispatch'].includes(workflowRun.event) ||
+      workflowRun.event !== 'push' ||
       workflowRun.conclusion !== 'success' ||
       job?.length !== 1 ||
       !validId(job[0].id) ||
@@ -177,9 +243,15 @@ export function resolveTrustedScreenProof({ artifactId, context }) {
       proof.status !== 'unverified-candidate' ||
       proof.certificationStatus !== 'not-certified' ||
       proof.screenId !== context.screenId ||
-      proof.headSha?.toLowerCase() !== context.headSha.toLowerCase() ||
+      sha(proof.headSha) !== sha(context.headSha) ||
       proof.environment !== PRODUCER.environment ||
-      !equal(paths(proof.sourcePaths), expectedSources) ||
+      !paths(proof.sourcePaths) ||
+      !sha(proof.sourceBaseSha) ||
+      sha(proof.sourceBaseSha) === sha(context.headSha) ||
+      proof.stateScope !==
+        (context.screenId === 'web.homepage'
+          ? 'homepage-cookie-state-observed'
+          : 'bounded-public-route-transient-ui-suppressed') ||
       proof.runUrl !==
         `https://github.com/${PRODUCER.repository}/actions/runs/${runId}/attempts/${attempt}` ||
       proof.producerRunId !== runId ||
@@ -195,6 +267,27 @@ export function resolveTrustedScreenProof({ artifactId, context }) {
     )
       return fail(
         'candidate identity, capture, or decoded bundle is unavailable'
+      );
+    // sourceBaseSha is recorded from the trusted push event.before in the
+    // immutable artifact. The authoritative compare below rejects a base that
+    // is not the exact ancestor of this captured run head.
+    const compare = JSON.parse(
+      api(
+        `compare/${proof.sourceBaseSha.toLowerCase()}...${context.headSha.toLowerCase()}`
+      )
+    );
+    const headCommit = JSON.parse(
+      api(`commits/${context.headSha.toLowerCase()}`)
+    );
+    const changedFiles = compareChangedFiles(
+      compare,
+      headCommit,
+      proof.sourceBaseSha,
+      context.headSha
+    );
+    if (!changedFiles)
+      return fail(
+        'authoritative push source scope is unavailable or ambiguous'
       );
     const measured = new Map(
       Array.isArray(proof.viewports)
@@ -217,7 +310,7 @@ export function resolveTrustedScreenProof({ artifactId, context }) {
       })
     )
       return fail('required browser measurements are unavailable');
-    return { proof, findings: [] };
+    return { proof, changedFiles, findings: [] };
   } catch {
     return fail('controlled GitHub artifact resolver is unavailable');
   }
