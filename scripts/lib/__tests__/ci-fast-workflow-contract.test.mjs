@@ -363,6 +363,15 @@ describe('ci-fast bounded parallel workflow', () => {
     );
   });
 
+  it('runs the Astra readiness contract with branch coverage', () => {
+    expect(CI_FAST_SOURCE).toContain(
+      'python3 -m coverage run --branch scripts/symphony/tests/astra-readiness.test.py'
+    );
+    expect(CI_FAST_SOURCE).toContain(
+      '--include="*/scripts/symphony/astra/astra_readiness.py" --show-missing --precision=2 --fail-under=90'
+    );
+  });
+
   it('maps the exact hosted selector set to dedicated parallel jobs', () => {
     const hostedSelectors = HOSTED_GROUP_JOBS.map(({ jobId, nextJobId }) => {
       const block = jobBlock(jobId, nextJobId);
