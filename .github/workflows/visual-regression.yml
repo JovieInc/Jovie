@@ -5,9 +5,10 @@
 # Scheduled/manual baseline refresh. This workflow is the only --update-snapshots
 # path and must not run on pull_request or merge_group (merge groups do not
 # provision Neon). JOV-5459 fail-closed missing-baseline/ENOENT compare lives in
-# ci.yml `ci-visual-snapshot-compare` and feeds merge-group PR Ready. Refresh
-# still self-heals stale/missing baselines via a single auto-PR (same JOVIE_BOT
-# + merge-queue pattern as screenshots.yml).
+# ci.yml `ci-visual-snapshot-compare` and feeds source + merge-group PR Ready.
+# Skip is not a pass (JOV-5960). Refresh still self-heals stale/missing
+# baselines via a single auto-PR (same JOVIE_BOT + merge-queue pattern as
+# screenshots.yml).
 #
 # Functional assertions in the spec (horizontal scroll, CTA clipping) still fail the
 # refresh run — a broken layout never silently becomes the new baseline.

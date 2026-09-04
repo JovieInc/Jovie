@@ -51,5 +51,5 @@ const result = runVisualSnapshotCompare({
 if (!result.ok) fail(result);
 
 console.log(
-  'Visual snapshot compare passed: missing baseline/ENOENT is fail-closed.'
+  'Visual snapshot compare passed: missing baseline/ENOENT is fail-closed; skip is not a pass.'
 );

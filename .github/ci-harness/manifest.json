@@ -107,9 +107,9 @@
       "name": "Visual Snapshot Compare",
       "tier": "fast-gate",
       "mergeGate": true,
-      "gateStage": "merge-group",
+      "gateStage": "both",
       "nextLocalCommand": "node scripts/visual-snapshot-compare.mjs compare",
-      "remediation": "A missing visual baseline is a hard failure. Restore or commit the snapshot file. Do not pass --update-snapshots on the compare path; scheduled visual-regression.yml remains the refresh lane."
+      "remediation": "A missing visual baseline or a skipped compare is a hard failure on source PRs and combined heads, including homepage/marketing diffs. Restore or commit the snapshot file. Skip is not a pass. Do not pass --update-snapshots on the compare path; scheduled visual-regression.yml remains the refresh lane."
     },
     {
       "id": "drizzle-migration-guard",

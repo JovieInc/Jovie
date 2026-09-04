@@ -3,12 +3,15 @@ import { resolve } from 'node:path';
 import { describe, expect, it } from 'vitest';
 import {
   assertVisualCompareWorkflowContract,
+  classifyVisualGateJobResult,
   classifyVisualSnapshotOutcome,
   expectedSnapshotDir,
   inventoryMissingBaselines,
+  isHomepageMarketingPath,
   isMissingBaselineSignal,
   parseStaticScreenshotNames,
   runVisualSnapshotCompare,
+  touchesHomepageMarketing,
   VISUAL_COMPARE_MODE,
   VISUAL_REFRESH_MODE,
   VISUAL_SNAPSHOT_SPECS,
@@ -16,7 +19,7 @@ import {
 
 const REPO_ROOT = resolve(import.meta.dirname, '../../..');
 
-describe('visual snapshot compare (JOV-5459)', () => {
+describe('visual snapshot compare (JOV-5459 / JOV-5960)', () => {
   it('treats missing baseline/ENOENT as fail in compare mode', () => {
     expect(
       classifyVisualSnapshotOutcome({
@@ -36,6 +39,60 @@ describe('visual snapshot compare (JOV-5459)', () => {
         missingBaselinePaths: ['apps/web/tests/e2e/__snapshots__/missing.png'],
       })
     ).toMatchObject({ ok: false, reason: 'missing-baseline' });
+  });
+
+  it('treats a skipped GitHub job as fail, especially on homepage/marketing', () => {
+    expect(
+      classifyVisualGateJobResult({
+        result: 'skipped',
+        homepageMarketingTouched: true,
+      })
+    ).toMatchObject({
+      ok: false,
+      reason: 'homepage-marketing-skip-must-not-pass',
+    });
+    expect(classifyVisualGateJobResult({ result: 'skipped' })).toMatchObject({
+      ok: false,
+      reason: 'skip-must-not-pass',
+    });
+    expect(classifyVisualGateJobResult({ result: 'not_run' })).toMatchObject({
+      ok: false,
+      reason: 'skip-must-not-pass',
+    });
+    expect(classifyVisualGateJobResult({ result: '' })).toMatchObject({
+      ok: false,
+      reason: 'skip-must-not-pass',
+    });
+    expect(classifyVisualGateJobResult({ result: 'failure' })).toMatchObject({
+      ok: false,
+      reason: 'compare-failed',
+    });
+    expect(classifyVisualGateJobResult({ result: 'success' })).toMatchObject({
+      ok: true,
+      reason: 'matched',
+    });
+  });
+
+  it('classifies homepage and marketing paths that must not skip visual compare', () => {
+    expect(isHomepageMarketingPath('apps/web/app/(home)/page.tsx')).toBe(true);
+    expect(
+      isHomepageMarketingPath('apps/web/components/features/marketing/Hero.tsx')
+    ).toBe(true);
+    expect(
+      isHomepageMarketingPath('apps/web/data/homepageFrontDoorCta.ts')
+    ).toBe(true);
+    expect(isHomepageMarketingPath('apps/web/app/api/health/route.ts')).toBe(
+      false
+    );
+    expect(
+      touchesHomepageMarketing([
+        'scripts/lib/visual-snapshot-compare.mjs',
+        'apps/web/app/(marketing)/pricing/page.tsx',
+      ])
+    ).toBe(true);
+    expect(
+      touchesHomepageMarketing(['scripts/lib/visual-snapshot-compare.mjs'])
+    ).toBe(false);
   });
 
   it('never treats advisory success or --update-snapshots as a compare pass', () => {
