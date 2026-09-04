@@ -2129,8 +2129,6 @@ def observe_closure_health(
         )
         snapshot = {
             "repository": repo,
-            "controller": _observe_queue_controller(repo),
-
             "controller": _observe_queue_controller(repo, deadline),
             "openPrs": len(prs),
             "eligiblePrs": len(eligible),

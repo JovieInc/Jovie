@@ -2069,12 +2069,16 @@ class ClosureObservationTests(unittest.TestCase):
         self.assertIn("bad snapshot", failed["error"])
 
     def test_live_observer_passes_repository_to_stack_repair_actions(self):
+        stack_body = (
+            STACK_BODY
+            + "\n<!-- linear-issue-id: JOV-5123 -->"
+        )
         prs = [
-            stack_pr(201, "main", body=STACK_BODY),
-            stack_pr(202, "stack/test-201"),
-            stack_pr(203, "stack/test-202"),
-            stack_pr(204, "stack/test-203"),
-            stack_pr(205, "stack/test-204"),
+            stack_pr(201, "main", body=stack_body),
+            stack_pr(202, "stack/test-201", body=stack_body),
+            stack_pr(203, "stack/test-202", body=stack_body),
+            stack_pr(204, "stack/test-203", body=stack_body),
+            stack_pr(205, "stack/test-204", body=stack_body),
         ]
         with mock.patch.object(
             MODULE,
@@ -2088,6 +2092,20 @@ class ClosureObservationTests(unittest.TestCase):
             MODULE,
             "_observe_queue_controller",
             return_value={"status": "green", "runId": 42},
+        ), mock.patch.object(
+            MODULE,
+            "_readback_promotion_state",
+            return_value={
+                "baseOid": "a" * 40,
+                "prs": {
+                    int(item["number"]): {
+                        **item,
+                        "state": "OPEN",
+                        "headOid": item["headRefOid"],
+                    }
+                    for item in prs
+                },
+            },
         ):
             result = MODULE.observe_closure_health(
                 "JovieInc/LogYourBody", previous=None, now=NOW
