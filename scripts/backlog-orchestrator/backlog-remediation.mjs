@@ -38,6 +38,8 @@ const HOMEMADE_WRAPPER_MARKERS = Object.freeze([
 
 const TASTE_TEXT =
   /\b(?:taste|brand voice|founder[- ]steer|design[- ]direction|visual identity|steering)\b/i;
+const ENGINEERING_IMPLEMENTATION_ADMISSION =
+  /^\s*Admission class:\s*engineering-implementation\s*$/im;
 const EXTERNAL_MESSAGE_TEXT =
   /\b(?:telegram|slack message|send email|outbound email|tweet|dm blast|publish externally)\b/i;
 const CREDENTIAL_TEXT =
@@ -217,7 +219,11 @@ function explicitExclusion(issue) {
   const text = issueText(issue);
   const labels = labelsOf(issue);
   if (labels.includes('type:epic') || EPIC_TEXT.test(text)) return 'broad-epic';
-  if (TASTE_TEXT.test(text) || labels.includes('needs-decision'))
+  if (labels.includes('needs-decision')) return 'human-taste-or-steering';
+  const engineeringImplementation = ENGINEERING_IMPLEMENTATION_ADMISSION.test(
+    String(issue?.description || '')
+  );
+  if (TASTE_TEXT.test(text) && !engineeringImplementation)
     return 'human-taste-or-steering';
   if (EXTERNAL_MESSAGE_TEXT.test(text)) return 'external-messages';
   if (CREDENTIAL_TEXT.test(text)) return 'credential-or-provisioning';
