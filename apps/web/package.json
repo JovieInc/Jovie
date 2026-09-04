@@ -252,7 +252,7 @@
     "@tanstack/react-virtual": "^3.13.24",
     "@tiptap/core": "3.30.4",
     "@tiptap/extension-placeholder": "3.30.4",
-    "@tiptap/pm": "3.30.4",
+    "@tiptap/pm": "3.31.0",
     "@tiptap/react": "3.30.4",
     "@tiptap/starter-kit": "3.30.4",
     "@types/ws": "^8.18.1",
