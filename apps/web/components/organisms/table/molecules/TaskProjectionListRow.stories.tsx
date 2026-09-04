@@ -36,7 +36,9 @@ export const Selected: Story = {
     ...Default.args,
     isSelected: true,
     actionSlot: (
-      <span className='text-3xs text-secondary-token'>merge-queued → merged</span>
+      <span className='text-3xs text-secondary-token'>
+        merge-queued → merged
+      </span>
     ),
   },
 };
