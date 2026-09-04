@@ -4,9 +4,9 @@
 # Idempotent: re-renders Pro-only plist templates and bootstraps them.
 #
 # Usage:
-#   ./scripts/symphony/bootstrap-pro-launchd.sh
-#   ./scripts/symphony/bootstrap-pro-launchd.sh --reconfigure
-#   ./scripts/symphony/bootstrap-pro-launchd.sh --uninstall
+#   bash scripts/symphony/bootstrap-pro-launchd.sh
+#   bash scripts/symphony/bootstrap-pro-launchd.sh --reconfigure
+#   bash scripts/symphony/bootstrap-pro-launchd.sh --uninstall
 #
 set -euo pipefail
 

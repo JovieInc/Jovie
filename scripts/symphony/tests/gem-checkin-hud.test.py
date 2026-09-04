@@ -1094,7 +1094,7 @@ class UltrawideHudTests(unittest.TestCase):
     def test_gem_ship_hud_service_uses_repo_source_renderer(self):
         template = (ROOT / "scripts/symphony/systemd/gem-ship-hud.service.template").read_text(encoding="utf-8")
         installer = (ROOT / "scripts/symphony/install-gem-ship-hud.sh").read_text(encoding="utf-8")
-        self.assertIn("{{JOVIE_REPO}}/scripts/symphony/gem-checkin-tty1.sh", template)
+        self.assertIn("ExecStart=/bin/bash {{JOVIE_REPO}}/scripts/symphony/gem-checkin-tty1.sh", template)
         self.assertIn("WorkingDirectory={{JOVIE_REPO}}", template)
         self.assertNotIn(".local/bin/gem-ship-hud.py", template)
         self.assertIn("gem-ship-hud-activation/v1", installer)

@@ -112,7 +112,7 @@ class OfficialSymphonyContractTests(unittest.TestCase):
         self.assertIn("    - needs-human", WORKFLOW)
         self.assertRegex(
             WORKFLOW,
-            re.compile(r"^\s+command: \./scripts/symphony/symphony-codex-router app-server$", re.M),
+            re.compile(r"^\s+command: bash \./scripts/symphony/symphony-codex-router app-server$", re.M),
         )
         self.assertNotIn("codex app-server", WORKFLOW)
         self.assertIn("symphony-routing/v1", WORKFLOW)

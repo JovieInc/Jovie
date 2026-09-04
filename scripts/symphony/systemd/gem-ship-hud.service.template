@@ -6,7 +6,7 @@ Wants=network-online.target
 [Service]
 Type=simple
 WorkingDirectory={{JOVIE_REPO}}
-ExecStart={{JOVIE_REPO}}/scripts/symphony/gem-checkin-tty1.sh --width 430 --height 90
+ExecStart=/bin/bash {{JOVIE_REPO}}/scripts/symphony/gem-checkin-tty1.sh --width 430 --height 90
 Restart=always
 RestartSec=2
 StandardInput=null

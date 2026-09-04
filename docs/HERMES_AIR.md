@@ -346,7 +346,7 @@ If steady-state exceeds 6 GB, investigate before adding new jobs.
 ## Tearing Down (Hand This Machine Back)
 
 ```bash
-./scripts/symphony/bootstrap-air.sh --uninstall
+bash scripts/symphony/bootstrap-air.sh --uninstall
 ```
 
 Removes all launchd plists, drops `~/.hermes/`, leaves Doppler and Tailscale alone.

@@ -28,7 +28,7 @@ class OpenAISymphonyInstallTests(unittest.TestCase):
         )
         self.assertRegex(
             workflow,
-            re.compile(r"^\s+command: \./scripts/symphony/symphony-codex-router app-server$", re.M),
+            re.compile(r"^\s+command: bash \./scripts/symphony/symphony-codex-router app-server$", re.M),
         )
         self.assertIn("symphony-codex-router", workflow)
         self.assertIn("interval_ms: 30000", workflow)

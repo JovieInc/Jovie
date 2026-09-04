@@ -167,7 +167,7 @@ async function main(): Promise<void> {
     if (totalSpend > 0) {
       tripKillSwitch(totalSpend);
       await sendTelegram(
-        `Hermes-Air cost kill switch tripped.\nDetected $${totalSpend.toFixed(4)} in paid model spend in 24h. All non-watchdog services stopped.\nInvestigate ~/.hermes/logs/cost.jsonl then run ./scripts/symphony/bootstrap-air.sh --resume-after-cost-kill`
+        `Hermes-Air cost kill switch tripped.\nDetected $${totalSpend.toFixed(4)} in paid model spend in 24h. All non-watchdog services stopped.\nInvestigate ~/.hermes/logs/cost.jsonl then run bash scripts/symphony/bootstrap-air.sh --resume-after-cost-kill`
       );
     }
   });

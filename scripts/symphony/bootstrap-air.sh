@@ -4,10 +4,10 @@
 # Run on the Air, from a clone of this repo, with Doppler authed.
 #
 # Modes:
-#   ./scripts/symphony/bootstrap-air.sh                        # full install
-#   ./scripts/symphony/bootstrap-air.sh --reconfigure          # re-render configs only
-#   ./scripts/symphony/bootstrap-air.sh --uninstall            # remove launchd units + ~/.hermes
-#   ./scripts/symphony/bootstrap-air.sh --resume-after-cost-kill
+#   bash scripts/symphony/bootstrap-air.sh                        # full install
+#   bash scripts/symphony/bootstrap-air.sh --reconfigure          # re-render configs only
+#   bash scripts/symphony/bootstrap-air.sh --uninstall            # remove launchd units + ~/.hermes
+#   bash scripts/symphony/bootstrap-air.sh --resume-after-cost-kill
 #
 # See:
 #   .claude/rules/hermes-air.md
@@ -239,7 +239,7 @@ if [[ "$MODE" == "install" ]]; then
     log "agentcookie not found. To enable session/credential sync from the Pro:"
     log "  Install: https://github.com/mvanhorn/agentcookie"
     log "  Then set AGENTCOOKIE_ENCRYPT_KEY and AGENTCOOKIE_AIR_IP in Doppler"
-    log "  and re-run: ./scripts/symphony/bootstrap-air.sh --reconfigure"
+    log "  and re-run: bash scripts/symphony/bootstrap-air.sh --reconfigure"
     warn "Skipping agentcookie setup (not blocking — install manually when ready)"
   fi
 

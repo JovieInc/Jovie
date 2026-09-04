@@ -71,7 +71,7 @@ codex:
   # lease claim. The launcher re-fetches and re-verifies that receipt, binds
   # live capacity, materializes it atomically into the workspace, and fails
   # closed (exit 78) when any of that evidence is missing or drifted.
-  command: ./scripts/symphony/symphony-codex-router app-server
+  command: bash ./scripts/symphony/symphony-codex-router app-server
   approval_policy: never
   thread_sandbox: workspace-write
   turn_sandbox_policy:
