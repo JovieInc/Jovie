@@ -108,7 +108,7 @@ latency, geometry, whether a clear was required, and the continuity contract.
 The focused structural/golden contract is repeatable with:
 
 ```bash
-python3 scripts/hermes/tests/gem-checkin-hud.test.py
+python3 scripts/symphony/tests/gem-checkin-hud.test.py
 ```
 
 ## Pressure thresholds

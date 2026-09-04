@@ -10,7 +10,7 @@ A dedicated orchestration node that:
 - Retains a selected, private macOS Voice Memos shadow architecture for later activation. The watcher is disabled and must not process real memos until the activation gate below passes.
 - Persists shared company context to gbrain (Air-as-server, PGLite backend, exposed over Tailscale as a remote-MCP HTTP server). Raw Voice Memo audio and transcripts are excluded from that shared store.
 - Segments dumps into `memory` (gbrain only), `issue` (Linear), and `task` (sub-agent dispatch).
-- Files exactly one Linear issue for engineering/product/ops work using the canonical follow-up shape from `.claude/rules/linear.md` via `scripts/hermes/lib/tracker-client.ts`. Linear failures queue a Linear retry and fail closed; there is no GitHub fallback or dual-write.
+- Files exactly one Linear issue for engineering/product/ops work using the canonical follow-up shape from `.claude/rules/linear.md` via `scripts/symphony/lib/tracker-client.ts`. Linear failures queue a Linear retry and fail closed; there is no GitHub fallback or dual-write.
 - Routes non-engineering tasks (calendar moves, Airtable updates, emails) to the right sub-agent which calls the appropriate MCP.
 - Runs deterministic cron jobs: PR-stuck monitor, CI failure triage, HUD refresh, daily briefing, cost monitor, deterministic-tracker (self-improvement), free-model health.
 
@@ -38,7 +38,7 @@ A dedicated orchestration node that:
 
 ## Sub-Agent Profiles
 
-Profiles are defined in `~/.hermes/config.yaml` (template at `scripts/hermes/config.air.template.yaml`). Each profile is a Hermes sub-agent with a scoped skill loadout and MCP allowlist. Profiles never escalate; the chief profile routes incoming intent to the right one.
+Profiles are defined in `~/.hermes/config.yaml` (template at `scripts/symphony/config.air.template.yaml`). Each profile is a Hermes sub-agent with a scoped skill loadout and MCP allowlist. Profiles never escalate; the chief profile routes incoming intent to the right one.
 
 | Profile | Scope | MCPs allowed | Cannot do |
 |---|---|---|---|
@@ -58,7 +58,7 @@ This is the selected architecture, not an active service contract:
 5. Write raw artifacts and private proposals only to the dedicated no-embedding PGLite store and private object root. Run the adapter with ambient database and sync variables scrubbed, from a neutral private working directory, while holding `~/.hermes/state/heavy-job.lock`.
 6. Summer may later admit a constraint-relevant, sanitized company work packet. The raw audio, transcript, private classification, and unadmitted proposal never enter shared gbrain, GitHub, Telegram, or an executor prompt.
 
-The legacy `scripts/hermes/jobs/voice-memo-ingest.ts` watcher is not the activation source for this architecture and must remain unloaded.
+The legacy `scripts/symphony/jobs/voice-memo-ingest.ts` watcher is not the activation source for this architecture and must remain unloaded.
 
 ## Engineering Work Handoff (the only contract with the Pro)
 
@@ -96,10 +96,10 @@ Per `CLAUDE.md` → Workspace Topology: this Air is the **third workspace** alon
 
 ## Related Files
 
-- `scripts/hermes/bootstrap-air.sh` — installer
-- `scripts/hermes/config.air.template.yaml` — Hermes config template
-- `scripts/hermes/launchd/*.plist.template` — launchd unit templates (the legacy voice-memo watcher must remain unloaded)
-- `scripts/hermes/jobs/*.ts` — cron handlers
-- `scripts/hermes/lib/free-model-router.ts` — cost-safe model selection
+- `scripts/symphony/bootstrap-air.sh` — installer
+- `scripts/symphony/config.air.template.yaml` — Hermes config template
+- `scripts/symphony/launchd/*.plist.template` — launchd unit templates (the legacy voice-memo watcher must remain unloaded)
+- `scripts/symphony/jobs/*.ts` — cron handlers
+- `scripts/symphony/lib/free-model-router.ts` — cost-safe model selection
 - `docs/HERMES_AIR.md` — operator runbook
 - `.claude/plans/system-instruction-you-are-working-polished-gadget.md` — architecture decision record

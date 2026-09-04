@@ -29,7 +29,7 @@ describe('product lane classifier', () => {
       },
       {
         scripts: {
-          'invariants:check': `${before} && python3 scripts/hermes/tests/codex-account-probe.test.py`,
+          'invariants:check': `${before} && python3 scripts/symphony/tests/codex-account-probe.test.py`,
           'ios:test': 'xcodebuild test',
         },
       }
@@ -54,7 +54,7 @@ describe('product lane classifier', () => {
         {
           scripts: {
             'invariants:check':
-              'node scripts/invariants/validate.mjs && python3 scripts/hermes/tests/queue.test.py',
+              'node scripts/invariants/validate.mjs && python3 scripts/symphony/tests/queue.test.py',
           },
           devDependencies: { turbo: '2' },
         }
@@ -112,9 +112,9 @@ describe('product lane classifier', () => {
     const before = 'node scripts/invariants/validate.mjs';
     const unsafe = [
       'node scripts/untrusted.mjs',
-      'python3 scripts/hermes/tests/../untrusted.test.py',
-      'python3 scripts/hermes/tests/probe.test.py --flag',
-      'python3 scripts/hermes/tests/probe.test.py; node scripts/untrusted.mjs',
+      'python3 scripts/symphony/tests/../untrusted.test.py',
+      'python3 scripts/symphony/tests/probe.test.py --flag',
+      'python3 scripts/symphony/tests/probe.test.py; node scripts/untrusted.mjs',
     ];
     const receipts = [
       classifyProductLanes(['package.json']),
@@ -184,7 +184,7 @@ describe('product lane classifier', () => {
       git(['commit', '-q', '-m', 'before']);
       const base = git(['rev-parse', 'HEAD']);
       writePackage(
-        'node before.mjs && python3 scripts/hermes/tests/probe.test.py'
+        'node before.mjs && python3 scripts/symphony/tests/probe.test.py'
       );
       git(['add', 'package.json']);
       git(['commit', '-q', '-m', 'after']);

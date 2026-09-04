@@ -396,7 +396,7 @@
       "canonicalPath": [
         "terminal failure -> delivery state machine -> bounded remediation or human-required blocker",
         "scripts/backlog-orchestrator/delivery-state-machine.mjs",
-        "scripts/hermes/jobs/delivery-liveness-watchdog.ts"
+        "scripts/symphony/jobs/delivery-liveness-watchdog.ts"
       ],
       "implementationState": "already_works",
       "status": "untested",
@@ -433,7 +433,7 @@
           },
           {
             "kind": "file_contains",
-            "path": "scripts/hermes/jobs/delivery-liveness-watchdog.ts",
+            "path": "scripts/symphony/jobs/delivery-liveness-watchdog.ts",
             "value": "linear_in_progress_liveness_checked"
           }
         ]
@@ -497,7 +497,7 @@
       "capability": "Cheap heartbeat, liveness, and no-op reconciliation",
       "canonicalPath": [
         "low-cadence heartbeat -> state fingerprint -> no-op or targeted reconciliation -> observable receipt",
-        "scripts/hermes/launchd/co.jovie.hermes.watchdog.plist.template"
+        "scripts/symphony/launchd/co.jovie.hermes.watchdog.plist.template"
       ],
       "implementationState": "conflicting",
       "status": "blocked",
@@ -505,7 +505,7 @@
       "evidence": [
         {
           "kind": "source",
-          "ref": "scripts/hermes/launchd/co.jovie.hermes.watchdog.plist.template",
+          "ref": "scripts/symphony/launchd/co.jovie.hermes.watchdog.plist.template",
           "summary": "A watchdog exists, but no canonical Summer heartbeat/no-op receipt contract is present."
         },
         {
@@ -534,11 +534,11 @@
         "sourceAssertions": [
           {
             "kind": "file_exists",
-            "path": "scripts/hermes/launchd/co.jovie.hermes.watchdog.plist.template"
+            "path": "scripts/symphony/launchd/co.jovie.hermes.watchdog.plist.template"
           },
           {
             "kind": "file_contains",
-            "path": "scripts/hermes/launchd/co.jovie.hermes.watchdog.plist.template",
+            "path": "scripts/symphony/launchd/co.jovie.hermes.watchdog.plist.template",
             "value": "jovie.summer-heartbeat/v1"
           }
         ]

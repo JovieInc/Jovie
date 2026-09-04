@@ -15,7 +15,7 @@ on:
       - 'scripts/invariants/performance-budgets.mjs'
       - 'apps/web/lib/ovie/generated/performance-invariants-v1.json'
       - 'apps/web/.lighthouserc*.json'
-      - 'scripts/hermes/config/model-registry.json'
+      - 'scripts/symphony/config/model-registry.json'
       - '.github/workflows/design-governance.yml'
   repository_dispatch:
     types: [founder-decision-recorded, invariant-enforcement-failed]

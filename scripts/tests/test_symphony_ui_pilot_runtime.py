@@ -32,25 +32,25 @@ from http.server import BaseHTTPRequestHandler, HTTPServer
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[2]
-WORKFLOW = ROOT / "scripts/hermes/WORKFLOW.jovie-ui-pilot.md"
-UNIT = ROOT / "scripts/hermes/systemd/symphony-ui-pilot.service"
-GUARD = ROOT / "scripts/hermes/symphony-lease-guard"
-RECONCILER = ROOT / "scripts/hermes/symphony-reconciler.py"
-MODEL_ROUTER = ROOT / "scripts/hermes/model-router.py"
-MODEL_REGISTRY = ROOT / "scripts/hermes/config/model-registry.json"
-CAPABILITY_MANIFEST = ROOT / "scripts/hermes/config/symphony-reconciler-capabilities.json"
-RECONCILER_SERVICE = ROOT / "scripts/hermes/systemd/symphony-reconciler.service"
-RECONCILER_TIMER = ROOT / "scripts/hermes/systemd/symphony-reconciler.timer"
-DISK_RECLAIM = ROOT / "scripts/hermes/gem-disk-reclaim.py"
-DISK_RECLAIM_SERVICE = ROOT / "scripts/hermes/systemd/gem-disk-reclaim.service"
-DISK_RECLAIM_TIMER = ROOT / "scripts/hermes/systemd/gem-disk-reclaim.timer"
-CONTROLLER = ROOT / "scripts/hermes/symphony-concurrency-controller.py"
-CONTROLLER_SERVICE = ROOT / "scripts/hermes/systemd/symphony-concurrency-controller.service"
-CONTROLLER_TIMER = ROOT / "scripts/hermes/systemd/symphony-concurrency-controller.timer"
-INSTALLER = ROOT / "scripts/hermes/install-symphony-ui-pilot.sh"
-FLEET_INSTALLER = ROOT / "scripts/hermes/install-gem-fleet-controller.sh"
-REHAB_INSTALLER = ROOT / "scripts/hermes/install-gem-pr-rehabilitation.sh"
-USER_SYSTEMD_LIB = ROOT / "scripts/hermes/lib/user-systemd-context.sh"
+WORKFLOW = ROOT / "scripts/symphony/WORKFLOW.jovie-ui-pilot.md"
+UNIT = ROOT / "scripts/symphony/systemd/symphony-ui-pilot.service"
+GUARD = ROOT / "scripts/symphony/symphony-lease-guard"
+RECONCILER = ROOT / "scripts/symphony/symphony-reconciler.py"
+MODEL_ROUTER = ROOT / "scripts/symphony/model-router.py"
+MODEL_REGISTRY = ROOT / "scripts/symphony/config/model-registry.json"
+CAPABILITY_MANIFEST = ROOT / "scripts/symphony/config/symphony-reconciler-capabilities.json"
+RECONCILER_SERVICE = ROOT / "scripts/symphony/systemd/symphony-reconciler.service"
+RECONCILER_TIMER = ROOT / "scripts/symphony/systemd/symphony-reconciler.timer"
+DISK_RECLAIM = ROOT / "scripts/symphony/gem-disk-reclaim.py"
+DISK_RECLAIM_SERVICE = ROOT / "scripts/symphony/systemd/gem-disk-reclaim.service"
+DISK_RECLAIM_TIMER = ROOT / "scripts/symphony/systemd/gem-disk-reclaim.timer"
+CONTROLLER = ROOT / "scripts/symphony/symphony-concurrency-controller.py"
+CONTROLLER_SERVICE = ROOT / "scripts/symphony/systemd/symphony-concurrency-controller.service"
+CONTROLLER_TIMER = ROOT / "scripts/symphony/systemd/symphony-concurrency-controller.timer"
+INSTALLER = ROOT / "scripts/symphony/install-symphony-ui-pilot.sh"
+FLEET_INSTALLER = ROOT / "scripts/symphony/install-gem-fleet-controller.sh"
+REHAB_INSTALLER = ROOT / "scripts/symphony/install-gem-pr-rehabilitation.sh"
+USER_SYSTEMD_LIB = ROOT / "scripts/symphony/lib/user-systemd-context.sh"
 FLEET_WORKFLOW = ROOT / ".github/workflows/fleet-gate-refresh.yml"
 ACTIVATION_WORKFLOW = ROOT / ".github/workflows/gem-delivery-controller-activation.yml"
 ACTIONLINT_CONFIG = ROOT / ".github/actionlint.yaml"
@@ -330,8 +330,8 @@ def test_activation_exports_user_systemd_before_both_installers() -> None:
     official = activation.index(
         "update-symphony-burrito.sh --skip-binary"
     )
-    install = activation.index("bash scripts/hermes/install-gem-fleet-controller.sh")
-    rehab = activation.index("bash scripts/hermes/install-gem-pr-rehabilitation.sh")
+    install = activation.index("bash scripts/symphony/install-gem-fleet-controller.sh")
+    rehab = activation.index("bash scripts/symphony/install-gem-pr-rehabilitation.sh")
     assert establish < official < install < rehab
     assert "GITHUB_ENV" in activation
     assert "XDG_RUNTIME_DIR" in activation

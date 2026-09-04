@@ -4,7 +4,7 @@ import { describe, it } from 'node:test';
 import { validateFleetAutonomy } from './fleet-autonomy.mjs';
 
 const RED_FILES = {
-  'scripts/hermes/gem-priority-gate.py':
+  'scripts/symphony/gem-priority-gate.py':
     'def observe_main(repo):\n    raise ValueError("Main Release Ready check is missing")\n',
   'scripts/drain-pr-queue.sh':
     'select([.L[]] | any(. == "needs-human" or . == "hold" or . == "gated"))\ngt mq submit\n',

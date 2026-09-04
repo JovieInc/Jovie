@@ -37,8 +37,8 @@ These are machine-local Hermes jobs, not Vercel production crons. They run from 
 
 | Unit | Schedule | Purpose | Source |
 |------|----------|---------|--------|
-| `co.jovie.hermes.cron-pipeline-scoreboard` | retired | Hard-exits with `retired_linear_only` before reading or publishing historical GitHub-Issue funnel counts. The Linear-primary Gem HUD retains PR/Actions delivery reporting and fails closed when Linear backlog data is unavailable. | `scripts/hermes/jobs/pipeline-scoreboard.ts` |
-| `co.jovie.hermes.cron-gbrain-health-summary` | 07:15 local daily | Verifies the Tailscale-bound HTTP health endpoint, source freshness, and that exactly one server is running; retains `gbrain doctor` as an advisory diagnostic, writes `ops/gbrain-health/latest`, and posts the summary to Telegram/Slack. | `scripts/hermes/jobs/gbrain-health-summary.ts` |
+| `co.jovie.hermes.cron-pipeline-scoreboard` | retired | Hard-exits with `retired_linear_only` before reading or publishing historical GitHub-Issue funnel counts. The Linear-primary Gem HUD retains PR/Actions delivery reporting and fails closed when Linear backlog data is unavailable. | `scripts/symphony/jobs/pipeline-scoreboard.ts` |
+| `co.jovie.hermes.cron-gbrain-health-summary` | 07:15 local daily | Verifies the Tailscale-bound HTTP health endpoint, source freshness, and that exactly one server is running; retains `gbrain doctor` as an advisory diagnostic, writes `ops/gbrain-health/latest`, and posts the summary to Telegram/Slack. | `scripts/symphony/jobs/gbrain-health-summary.ts` |
 
 ## Production Schedule
 
