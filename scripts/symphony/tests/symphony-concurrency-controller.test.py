@@ -108,6 +108,9 @@ class UsefulTurnProjectionTests(unittest.TestCase):
             "outputBytes": 12,
         }
 
+    def inventory(self, proofs: list[dict]) -> dict:
+        return {"accounts": [{"provider": proof["provider"], "profile": proof["profile"]} for proof in proofs]}
+
     def test_newest_proof_is_selected_by_instant_not_timestamp_text(self):
         older = self.proof(datetime(2026, 9, 4, tzinfo=timezone.utc))
         newer = {**older, "completedAt": "2026-09-04T00:00:00.500000Z", "outputDigest": "f" * 64}
@@ -117,34 +120,35 @@ class UsefulTurnProjectionTests(unittest.TestCase):
 
     def test_projects_unique_fresh_turns_and_caps_at_forty(self):
         now = datetime(2026, 9, 4, tzinfo=timezone.utc)
-        receipt = CAPACITY.build_receipt(
-            [self.proof(now, str(index)) for index in range(42)], {}, now
-        )
+        proofs = [self.proof(now, str(index)) for index in range(42)]
+        receipt = CAPACITY.build_receipt(proofs, self.inventory(proofs), now)
         self.assertEqual(receipt["target"], 40)
         self.assertEqual(receipt["rejectedProofs"]["policy-cap"], 2)
 
     def test_inventory_and_stale_turns_never_create_capacity(self):
         now = datetime(2026, 9, 4, tzinfo=timezone.utc)
         receipt = CAPACITY.build_receipt(
-            [self.proof(now - timedelta(days=2))],
+            [self.proof(now - timedelta(days=2)), self.proof(now, "fresh")],
             {"accounts": [{"provider": "openai", "profile": hashlib.sha256(b"oauth").hexdigest()}]},
             now,
         )
         self.assertEqual(receipt["target"], 0)
         self.assertFalse(receipt["approved"])
+        self.assertEqual(receipt["rejectedProofs"]["not-enrolled"], 1)
 
     def test_models_do_not_multiply_one_credential_seat(self):
         now = datetime(2026, 9, 4, tzinfo=timezone.utc)
         first = self.proof(now)
         second = {**first, "model": "gpt-5.5", "outputDigest": "b" * 64}
-        receipt = CAPACITY.build_receipt([first, second], {}, now)
+        receipt = CAPACITY.build_receipt([first, second], self.inventory([first]), now)
         self.assertEqual(receipt["target"], 1)
 
     def test_boolean_return_code_and_incident_count_fail_closed(self):
         now = datetime(2026, 9, 4, tzinfo=timezone.utc)
         proof = {**self.proof(now), "rc": False}
         self.assertIsNone(CAPACITY.validate_proof(proof, now)[0])
-        receipt = CAPACITY.build_receipt([self.proof(now)], {}, now)
+        valid = self.proof(now)
+        receipt = CAPACITY.build_receipt([valid], self.inventory([valid]), now)
         receipt["severeIncidents"] = False
         self.assertFalse(CAPACITY.validate_receipt(receipt, now)[0])
 

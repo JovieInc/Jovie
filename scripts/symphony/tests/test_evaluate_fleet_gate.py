@@ -347,8 +347,9 @@ class EvaluateFleetGateWrapperTests(unittest.TestCase):
         job = workflow[start:workflow.index("\n  runner-image-offline-proof:", start)]
         for needle in (
             "pull_request:", "contents: read", "runs-on: ubuntu-latest",
-            "ref: ${{ github.event.pull_request.head.sha }}",
-            'test "$(git rev-parse HEAD)" = "${{ github.event.pull_request.head.sha }}"',
+            "github.event_name == 'pull_request' || github.event_name == 'merge_group'",
+            "ref: ${{ github.event.pull_request.head.sha || github.sha }}",
+            "symphony-concurrency-controller.test.py",
         ):
             self.assertIn(needle, workflow if needle in ("pull_request:", "contents: read") else job)
         for forbidden in (

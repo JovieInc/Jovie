@@ -32,7 +32,7 @@ class OpenAISymphonyInstallTests(unittest.TestCase):
         )
         self.assertIn("symphony-codex-router", workflow)
         self.assertIn("interval_ms: 30000", workflow)
-        self.assertIn("max_concurrent_agents: 8", workflow)
+        self.assertIn("max_concurrent_agents: 0", workflow)
         self.assertIn("port: 4041", workflow)
         self.assertIn("- Rework", workflow)
         self.assertIn("- Merging", workflow)
