@@ -1,8 +1,8 @@
 {
   "schemaVersion": 1,
   "tool": "scripts/typecheck-scripts.mjs",
-  "generatedAt": "2026-09-03T23:40:08.363Z",
-  "totalErrors": 459,
+  "generatedAt": "2026-09-04T00:05:00.000Z",
+  "totalErrors": 225,
   "files": {
     ".github/scripts/verify-main-release-readiness.mjs": {
       "TS2339": 3
@@ -18,8 +18,8 @@
       "TS2339": 2
     },
     "scripts/agent/preflight.test.mjs": {
-      "TS2322": 1,
-      "TS2339": 4
+      "TS2339": 4,
+      "TS2322": 1
     },
     "scripts/audit-test-coverage.ts": {
       "TS1470": 1
@@ -28,17 +28,14 @@
       "TS1470": 1
     },
     "scripts/browse-auth.ts": {
-      "TS1470": 1,
-      "TS2304": 2
+      "TS2304": 2,
+      "TS1470": 1
     },
     "scripts/ci/neon-orphan-reaper.mjs": {
       "TS2339": 2
     },
     "scripts/component-live-storybook-browser.mjs": {
       "TS2810": 2
-    },
-    "scripts/component-ship-gate.mjs": {
-      "TS2339": 175
     },
     "scripts/desktop-installed-apps-audit.mjs": {
       "TS2339": 6
@@ -53,8 +50,8 @@
       "TS2339": 2
     },
     "scripts/generated-artifact-retention.test.mjs": {
-      "TS2339": 1,
-      "TS2362": 1
+      "TS2362": 1,
+      "TS2339": 1
     },
     "scripts/hermes/jobs/agent-config-health.ts": {
       "TS1470": 1
@@ -66,15 +63,15 @@
       "TS1470": 2
     },
     "scripts/hermes/jobs/codex-issue-shipper.ts": {
-      "TS2339": 1,
-      "TS2741": 1
+      "TS2741": 1,
+      "TS2339": 1
     },
     "scripts/hermes/jobs/daily-briefing.ts": {
       "TS1470": 1
     },
     "scripts/hermes/jobs/gbrain-health-summary.ts": {
-      "TS1470": 1,
-      "TS2345": 4
+      "TS2345": 4,
+      "TS1470": 1
     },
     "scripts/hermes/jobs/pr-stuck-monitor.ts": {
       "TS1470": 1
@@ -92,10 +89,10 @@
       "TS1470": 1
     },
     "scripts/knowledge/fetch.ts": {
-      "TS1470": 1,
-      "TS2304": 2,
       "TS2307": 1,
-      "TS2584": 8
+      "TS1470": 1,
+      "TS2584": 8,
+      "TS2304": 2
     },
     "scripts/lib/__tests__/agent-config-health.test.mjs": {
       "TS2345": 1
@@ -145,9 +142,6 @@
     "scripts/lib/github-update-branch.mjs": {
       "TS2339": 1
     },
-    "scripts/lib/isolated-ui-docs-policy.mjs": {
-      "TS2339": 9
-    },
     "scripts/lib/merge-group-admission.mjs": {
       "TS2339": 2
     },
@@ -175,10 +169,6 @@
     "scripts/linear-transition-issue.mjs": {
       "TS2339": 3
     },
-    "scripts/merge-queue-backend.mjs": {
-      "TS2339": 49,
-      "TS2345": 1
-    },
     "scripts/observability-issue-github.mjs": {
       "TS2741": 1
     },
@@ -192,8 +182,8 @@
       "TS2304": 1
     },
     "scripts/send-changelog-email.mjs": {
-      "TS2307": 2,
-      "TS2339": 2
+      "TS2339": 2,
+      "TS2307": 2
     },
     "scripts/ship-swarm/next-batch.mjs": {
       "TS2339": 3
@@ -202,12 +192,12 @@
       "TS2339": 1
     },
     "scripts/turnstile-config.ts": {
-      "TS1470": 1,
-      "TS2540": 8
+      "TS2540": 8,
+      "TS1470": 1
     },
     "scripts/voice-stack-bake-off/validate-test-script.ts": {
-      "TS1470": 1,
-      "TS2307": 1
+      "TS2307": 1,
+      "TS1470": 1
     }
   }
 }
