@@ -1,3 +1,5 @@
+import { readFileSync } from 'node:fs';
+import { resolve } from 'node:path';
 import { describe, expect, it } from 'vitest';
 import eveAgent from '../agent/agent';
 import {
@@ -7,6 +9,7 @@ import {
   EvePilotCapabilityDeniedError,
   eveIdentityForChannel,
   eveIdentityForRuntime,
+  eveIdentityIdForChannel,
 } from '../agent/select-identity';
 
 function armFactoryWrite(turn: EvePilotBoundTurn): EvePilotBoundTurn {
@@ -119,7 +122,19 @@ describe('eve identity instruction packs', () => {
     expect(eveIdentityForChannel('jovie-core-chat').pack.id).toBe('jovie');
     expect(eveIdentityForChannel('unknown-source').pack.id).toBe('jovie');
     expect(eveIdentityForChannel('ovie-summer-shadow').pack.id).toBe('summer');
+    expect(eveIdentityIdForChannel('photon')).toBe('ovie');
+    expect(eveIdentityIdForChannel('imessage')).toBe('ovie');
     expect(eveIdentityForChannel('photon').pack.id).toBe('ovie');
+    const photon = readFileSync(
+      resolve(import.meta.dirname, '../agent/channels/photon.ts'),
+      'utf8'
+    );
+    expect(photon).toContain("bindEvePilotIdentity('ovie')");
+    const livePhoton = photon
+      .replace(/\/\*[\s\S]*?\*\//g, '')
+      .replace(/\/\/.*$/gm, '')
+      .toLowerCase();
+    expect(livePhoton).not.toMatch(/hermes|trigger\.dev|local-executor/);
     if (previous === undefined) {
       delete process.env.EVE_IDENTITY;
     } else {
