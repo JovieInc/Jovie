@@ -832,10 +832,19 @@ function runProducer(command) {
     maskValues(dynamicValues);
     const scanEnvironment = withDynamicSecretValues(process.env, dynamicValues);
     const configured = configuredPaths();
+    const producerOptions = options();
+    // Producer stages omit images by default, even when a job permits image
+    // inspection. Retaining a decoded image requires an explicit public-only
+    // declaration from the producer workflow; this keeps secret-bearing lanes
+    // from publishing captures by accident.
+    const allowPublicImages =
+      producerOptions.allowImages &&
+      process.env.PLAYWRIGHT_ARTIFACT_ALLOW_PUBLIC_IMAGES === 'true';
     const result = inspect(configured, scanEnvironment, {
-      ...options(),
+      ...producerOptions,
+      allowImages: allowPublicImages,
       allowEmptyPaths: !(process.env.PLAYWRIGHT_ARTIFACT_PATHS ?? '').trim(),
-      omitImages: true,
+      omitImages: !allowPublicImages,
     });
     if (result.findings.length) {
       poison(root);

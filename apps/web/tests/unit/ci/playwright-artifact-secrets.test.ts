@@ -2317,24 +2317,34 @@ ${fixtureCheckout}
       existsSync(join(currentStage(omittedRunner).stage, 'out/shot.png'))
     ).toBe(false);
     expect(runChild(imageWorkspace, omittedRunner, imageChild).status).toBe(0);
-    const allowedRunner = fixture();
+    const imagePermittedRunner = fixture();
     expect(
-      runChild(imageWorkspace, allowedRunner, imageChild, {
+      runChild(imageWorkspace, imagePermittedRunner, imageChild, {
         PLAYWRIGHT_ARTIFACT_ALLOW_IMAGES: 'true',
       }).status
     ).toBe(0);
     expect(
-      readFileSync(join(currentStage(allowedRunner).stage, 'out/shot.png'))
+      existsSync(join(currentStage(imagePermittedRunner).stage, 'out/shot.png'))
+    ).toBe(false);
+    const publicImageRunner = fixture();
+    expect(
+      runChild(imageWorkspace, publicImageRunner, imageChild, {
+        PLAYWRIGHT_ARTIFACT_ALLOW_IMAGES: 'true',
+        PLAYWRIGHT_ARTIFACT_ALLOW_PUBLIC_IMAGES: 'true',
+      }).status
+    ).toBe(0);
+    expect(
+      readFileSync(join(currentStage(publicImageRunner).stage, 'out/shot.png'))
     ).toEqual(png());
     expect(
       runChild(
         imageWorkspace,
-        allowedRunner,
+        publicImageRunner,
         "require('node:fs').writeFileSync('out/result.json','{\"next\":true}')"
       ).status
     ).toBe(0);
     expect(
-      existsSync(join(currentStage(allowedRunner).stage, 'out/shot.png'))
+      existsSync(join(currentStage(publicImageRunner).stage, 'out/shot.png'))
     ).toBe(false);
     expect(
       runChild(
