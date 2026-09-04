@@ -2489,6 +2489,8 @@ def render(
     if cols >= 300 and rows >= 60:
         # Retain queue rows below the recovered ultrawide job board.
         queue_rows = [_job_row(row, widths, now=clock, stage_baselines=stage_baselines) for row in mq.get("rows", [])]
+        if review is not None and review > 0:
+            queue_rows.insert(0, _rgb(ORANGE, clip(f"!  REVIEW QUEUE {review}", cols)))
         queue_budget = min(len(queue_rows), max(0, available - 9))
         work_rows = execution_board(symphony, cols, max(0, available - queue_budget), now=clock)
         work_rows.extend(queue_rows[:queue_budget])

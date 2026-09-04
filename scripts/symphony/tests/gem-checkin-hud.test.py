@@ -169,6 +169,11 @@ class ExecutionTruthTests(unittest.TestCase):
         self.assertLessEqual(len(lines), 20)
         self.assertTrue(all(len(strip(line)) == 430 for line in lines))
 
+    def test_ultrawide_preserves_review_queue(self):
+        for width, height in ((300, 60), (430, 90)):
+            text = strip(paint(review=7, width=width, height=height))
+            self.assertIn("!  REVIEW QUEUE 7", text)
+
     def test_full_canvas_does_not_scroll_last_line(self):
         frame = paint(width=430, height=90)
         self.assertEqual(frame.count("\n"), 89)
