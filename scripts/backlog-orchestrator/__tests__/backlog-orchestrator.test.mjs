@@ -1612,10 +1612,6 @@ describe('deterministic Symphony admission boundary', () => {
       ORCHESTRATOR_DIR,
       '../symphony/gem-priority-gate.py'
     );
-    const workflow = resolve(
-      ORCHESTRATOR_DIR,
-      '../symphony/WORKFLOW.jovie-ui-pilot.md'
-    );
     const runController = async (signals, consumer = 'fleet') => {
       const controllerSignals = JSON.parse(JSON.stringify(signals));
       controllerSignals.independentReview = {
@@ -1711,7 +1707,6 @@ runpy.run_path(controller, run_name="__main__")`,
       }),
       'promotion'
     );
-    const workflowSource = await readFile(workflow, 'utf8');
 
     assert.equal(amber.exitCode, 0);
     assert.equal(amber.receipt.state, 'AMBER');
@@ -1757,10 +1752,20 @@ runpy.run_path(controller, run_name="__main__")`,
       productionRed.receipt.isolatedPromotionAdmission.deploymentsAllowed,
       false
     );
-    assert.equal(amber.receipt.signals.concurrencyEvidence.source, 'execution-proven-useful-turns');
-    assert.ok(amber.receipt.signals.concurrencyEvidence.acceptedEvidence.every(proof => proof.schema === 'symphony-useful-turn-proof/v2'));
+    assert.equal(
+      amber.receipt.signals.concurrencyEvidence.source,
+      'execution-proven-useful-turns'
+    );
+    assert.ok(
+      amber.receipt.signals.concurrencyEvidence.acceptedEvidence.every(
+        proof => proof.schema === 'symphony-useful-turn-proof/v2'
+      )
+    );
     assert.match(
-      await readFile(resolve(ORCHESTRATOR_DIR, '../symphony/WORKFLOW.md'), 'utf8'),
+      await readFile(
+        resolve(ORCHESTRATOR_DIR, '../symphony/WORKFLOW.md'),
+        'utf8'
+      ),
       /max_concurrent_agents: 0/
     );
   });
@@ -1791,11 +1796,17 @@ runpy.run_path(controller, run_name="__main__")`,
     assert.ok(!activeStates.includes('In Review'));
 
     assert.match(
-      await readFile(resolve(ORCHESTRATOR_DIR, '../symphony/WORKFLOW.md'), 'utf8'),
+      await readFile(
+        resolve(ORCHESTRATOR_DIR, '../symphony/WORKFLOW.md'),
+        'utf8'
+      ),
       /max_concurrent_agents: 0/
     );
     assert.match(workflowSource, /Never merge or deploy manually/);
-    assert.match(workflowSource, /native controller rechecks before enrollment/);
+    assert.match(
+      workflowSource,
+      /native controller rechecks before enrollment/
+    );
   });
 
   it('keeps the Gem drain on typed fleet admission and fail-closes exit-code mismatches', async () => {
