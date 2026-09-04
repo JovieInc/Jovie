@@ -562,7 +562,7 @@ const GEM_PR_REHABILITATION_PYTEST_TESTS = [
   'scripts/tests/test_symphony_ui_pilot_runtime.py',
 ];
 const GEM_CHECKIN_HUD_PRIMARY_INPUTS = new Set([
-  'scripts/symphony/symphony/WORKFLOW.md',
+  'scripts/symphony/WORKFLOW.md',
   'scripts/symphony/symphony_official_runtime.py',
   'scripts/symphony/gem-checkin-hud.py',
   'scripts/symphony/gem-checkin-tty1.sh',
