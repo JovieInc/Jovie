@@ -1572,11 +1572,14 @@ def test_fleet_gate_refresh_skips_cancelled_ci_and_ignored_labels() -> None:
     assert "github.event.label.name == 'queue-deferred'" in block
     assert "github.event.label.name == 'needs-human'" in block
     assert "github.event.label.name == 'duplicate'" in block
-    assert "runs-on: [self-hosted, Linux, X64, jovie-fixed]" in block
+    assert "github.event_name == 'merge_group') && 'ubuntu-latest' || 'jovie-fixed'" in block
     assert "Persist stack policy repair actions" in block
     assert "--closure-health-file=" in block
     assert "delivery-state-machine.mjs" in block
-    assert "\n  pull_request_target:\n" in workflow and "\n  pull_request:\n" not in workflow and "converted_to_draft" in trigger and "github.event_name != 'pull_request_target'" in block and "steps.refresh.outputs.receipt_path" in block and "state/gem-priority-gate/latest.json" not in block
+    assert "\n  pull_request:\n" in workflow and "\n  merge_group:\n" in workflow and "converted_to_draft" in trigger and "github.event_name != 'pull_request'" in block and "steps.refresh.outputs.receipt_path" in block and "state/gem-priority-gate/latest.json" not in block
+    assert "github.event.pull_request.head.sha || github.event_name == 'merge_group' && github.sha || 'main'" in block
+    assert 'test "$(git rev-parse HEAD)" = "$expected"' in block
+    assert "gem-priority-gate.test.py" in block and "test_fleet_admission_receipt.py" in block
     assert "steps.stack-actions.outcome == 'success'" in block
 
 

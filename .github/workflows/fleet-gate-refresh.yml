@@ -1,20 +1,12 @@
 name: Fleet Gate Refresh
-# controller-hop-exception: jovie-controller-hop/v1
-# accountable-writer: Gem
-# necessary-trust-boundary: Protected Gem reads live state; pull_request_target checks out exact main, excluding candidate code.
-# revisit-trigger: Remove when Symphony emits this atomic receipt natively.
-
-# Event-driven one-writer refresh for the canonical Gem receipt. Work pickup is
-# owned by upstream OpenAI Symphony polling Linear directly; this workflow has
-# no issue admission or worker-dispatch path.
+# upstream OpenAI Symphony polling Linear directly
 
 on:
-  pull_request_target:
+  pull_request:
     types: [opened, edited, synchronize, converted_to_draft, closed, labeled, unlabeled, reopened]
+  merge_group:
+    types: [checks_requested]
   workflow_run:
-    # Do not listen to downstream Queue-Deferred Release: that creates a loop.
-    # Marker Recovery dispatches after durable bytes to stay within GitHub's
-    # three-level workflow_run chain ceiling.
     workflows: [CI, Production Controller]
     types: [completed]
   push:
@@ -31,16 +23,14 @@ concurrency:
 jobs:
   refresh:
     name: Refresh persisted fleet gate receipt
-    # Skip cancelled runs and merged-close duplicates. Label events matter only
-    # when they change green-ready depth or a queue/area hold.
     if: >-
       (github.event_name != 'workflow_run' ||
       github.event.workflow_run.conclusion != 'cancelled') &&
-      (github.event_name != 'pull_request_target' ||
+      (github.event_name != 'pull_request' ||
       github.event.action != 'closed' ||
       github.event.pull_request.merged != true) &&
       (
-        github.event_name != 'pull_request_target' ||
+        github.event_name != 'pull_request' ||
         (github.event.action != 'labeled' && github.event.action != 'unlabeled') ||
         github.event.label.name == 'hold' ||
         github.event.label.name == 'gated' ||
@@ -48,11 +38,11 @@ jobs:
         github.event.label.name == 'needs-human' ||
         github.event.label.name == 'duplicate'
       )
-    # The canonical receipt lives on the Gem host; exact-main gate code only.
-    runs-on: [self-hosted, Linux, X64, jovie-fixed]
+    runs-on: ${{ (github.event_name == 'pull_request' || github.event_name == 'merge_group') && 'ubuntu-latest' || 'jovie-fixed' }}
     timeout-minutes: 8
     steps:
       - name: Generate read-only Jovie Bot token
+        if: github.event_name != 'pull_request' && github.event_name != 'merge_group'
         id: app-token
         uses: actions/create-github-app-token@bcd2ba49218906704ab6c1aa796996da409d3eb1 # v3.2.0
         with:
@@ -60,24 +50,31 @@ jobs:
           private-key: ${{ secrets.JOVIE_BOT_PRIVATE_KEY }}
           permission-contents: read
           permission-pull-requests: read
-      - name: Checkout exact main gate code
+      - name: Checkout exact candidate or main gate code
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
-          ref: main
+          ref: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.sha || github.event_name == 'merge_group' && github.sha || 'main' }}
           persist-credentials: false
       - name: Setup Node.js
         uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
         with:
           node-version: '22'
+      - name: Validate exact candidate fleet policy
+        if: github.event_name == 'pull_request' || github.event_name == 'merge_group'
+        shell: bash
+        run: |
+          expected="${{ github.event_name == 'pull_request' && github.event.pull_request.head.sha || github.sha }}"
+          test "$(git rev-parse HEAD)" = "$expected"
+          python3 scripts/hermes/tests/gem-priority-gate.test.py
+          python3 scripts/hermes/tests/test_fleet_admission_receipt.py
       - name: Refresh canonical receipt
         id: refresh
+        if: github.event_name != 'pull_request' && github.event_name != 'merge_group'
         uses: ./.github/actions/evaluate-fleet-gate
         with:
           github-token: ${{ steps.app-token.outputs.token }}
           dry-run: 'false'
 
-      # Source PR/fork workflow definitions never execute their code here.
-      # Consume actions only after the reviewed CLI is present on main.
       - name: Persist stack policy repair actions (JOV-INV-020)
         id: stack-actions
         if: steps.refresh.outcome == 'success'
