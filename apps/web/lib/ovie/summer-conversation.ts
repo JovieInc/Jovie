@@ -132,6 +132,9 @@ export async function completeOvieSummerTurn(
   if (input.tool && !isSummerSafeTool(input.tool.name)) {
     throw new Error('Summer tool is not on the safe allowlist');
   }
+  if (input.tool && !input.tool.receiptId.trim()) {
+    throw new Error('Summer tool receipt is required');
+  }
   const next = await store.completeSummerTurn(input.id, {
     claimToken: input.claimToken,
     responseText,

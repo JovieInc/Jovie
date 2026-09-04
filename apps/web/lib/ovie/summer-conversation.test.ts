@@ -285,6 +285,21 @@ describe('Ovie Summer conversation handoff', () => {
       workerId: 'summer-mac',
       claimToken: 'tool-only-claim',
     });
+    for (const receiptId of ['', '   ']) {
+      const rejected = await respondToOvieSummerAction({
+        principal: founder,
+        store,
+        body: {
+          action: 'complete',
+          id,
+          claim_token: 'tool-only-claim',
+          response_text: '',
+          tool: { name: 'get_org_state', ok: true, receiptId, summary: 'org' },
+        },
+      });
+      expect(rejected.status).toBe(400);
+      expect(await store.getSummerTurn(id)).toMatchObject({ state: 'claimed' });
+    }
     await completeOvieSummerTurn(store, {
       id,
       claimToken: 'tool-only-claim',
