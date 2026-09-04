@@ -242,4 +242,33 @@ describe('durable Ovie Summer turn store', () => {
       claimToken: 'redis-claim',
     });
   });
+
+  it('keeps the fallback claimed record when an enqueue retry hits failover', async () => {
+    const fallback = new DurableOperatingStore(memoryRecordBackend());
+    const primary = new DurableOperatingStore(memoryRecordBackend());
+    const primaryError = new Error('primary unavailable');
+    const isPrimaryFailure = vi.fn(error => error === primaryError);
+    const store = new FailoverOperatingStore({
+      primary,
+      fallback,
+      isPrimaryFailure,
+      writeThrough: true,
+    });
+    await store.putSummerTurn(queued('turn_failover'));
+    await store.claimSummerTurn('turn_failover', liveClaim('current-claim'));
+    vi.spyOn(primary, 'putSummerTurn').mockRejectedValueOnce(primaryError);
+    await expect(
+      store.putSummerTurn(queued('turn_failover'))
+    ).resolves.toMatchObject({
+      state: 'claimed',
+      claimToken: 'current-claim',
+    });
+    expect(isPrimaryFailure).toHaveBeenCalledWith(primaryError);
+    await expect(
+      fallback.getSummerTurn('turn_failover')
+    ).resolves.toMatchObject({
+      state: 'claimed',
+      claimToken: 'current-claim',
+    });
+  });
 });

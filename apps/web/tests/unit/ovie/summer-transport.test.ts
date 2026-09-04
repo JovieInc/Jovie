@@ -3,6 +3,7 @@ import { denyEveAction, EveAuthorityError } from '@/lib/ovie/eve-authority';
 import { MemoryOperatingStore } from '@/lib/ovie/mcp/store';
 import { OvieProgramError } from '@/lib/ovie/program';
 import {
+  appendSummerTurn,
   CURRENT_SUMMER_SESSION_ID,
   loadCurrentSummerSession,
 } from '@/lib/ovie/summer-session';
@@ -309,6 +310,37 @@ describe('Summer transport (JOV-5212)', () => {
     enableSummerTransport();
     const resumed = await relaunchCurrentSummerSession(store);
     expect(resumed.identity.sessionId).toBe(CURRENT_SUMMER_SESSION_ID);
+  });
+
+  it('replaces a legacy canceled session row when reconnect recovers the Mac turn', async () => {
+    const store = new MemoryOperatingStore();
+    await appendSummerTurn(store, {
+      clientTurnId: 'legacy-cancel',
+      userText: 'Resume me',
+      assistantText: '',
+      eveWorkId: 'ini_work_1',
+      eveAcks: [RECEIPT.ack],
+      correlationId: 'ini_work_1:legacy-cancel',
+      state: 'canceled',
+      toolReceipt: null,
+      createdAt: new Date().toISOString(),
+    });
+    const recovered = await collect(
+      runOvieSummerTurn({
+        receipts: [RECEIPT],
+        userText: 'Resume me',
+        speaker: scriptedSummer({ replies: ['Recovered Summer.'] }),
+        store,
+        clientTurnId: 'legacy-cancel',
+      })
+    );
+    expect(recovered.text).toBe('Recovered Summer.');
+    const session = await loadCurrentSummerSession(store);
+    expect(session?.turns).toHaveLength(1);
+    expect(session?.turns[0]).toMatchObject({
+      assistantText: 'Recovered Summer.',
+      state: 'completed',
+    });
   });
 
   it('keeps unavailable transport turns retryable with the same client id', async () => {

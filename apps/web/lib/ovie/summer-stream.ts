@@ -48,6 +48,22 @@ export async function createSummerAssistantStreamResponse(input: {
         }
         if (event.type === 'tool') {
           metadata = { ...metadata, toolReceipt: event.receipt };
+          writer.write({
+            type: 'tool-input-available',
+            toolCallId: event.receipt.receiptId,
+            toolName: event.receipt.tool,
+            input: {},
+          });
+          writer.write({
+            type: 'tool-output-available',
+            toolCallId: event.receipt.receiptId,
+            output: {
+              success: event.receipt.ok,
+              summary: event.receipt.summary,
+              receiptId: event.receipt.receiptId,
+              ...(!event.receipt.ok ? { error: event.receipt.summary } : {}),
+            },
+          });
         }
       }
       writer.write({ type: 'text-end', id: textId });
