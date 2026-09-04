@@ -1,12 +1,66 @@
-import { afterEach, describe, expect, it } from 'vitest';
+import { generateKeyPairSync } from 'node:crypto';
+import { describe, expect, it } from 'vitest';
 import type {
   SummerBottleneckRecord,
   SummerBottleneckStore,
   SymphonyRepairTask,
 } from '../agent/lib/summer-bottleneck-loop';
-import { createVercelBlobBottleneckDependencies } from '../agent/lib/vercel-blob-bottleneck-runtime';
+import {
+  createVercelBlobBottleneckDependencies,
+  type SummerBottleneckRuntimeSecurity,
+  signSymphonyRepairOutcome,
+} from '../agent/lib/vercel-blob-bottleneck-runtime';
 
 const KEY = 'a'.repeat(64);
+const EVE_RECEIPT_KEY = 'r'.repeat(64);
+const eveKeys = generateKeyPairSync('ed25519');
+const symphonyKeys = generateKeyPairSync('ed25519');
+const producerKeys = generateKeyPairSync('ed25519');
+const EVE_OUTBOX_PRIVATE_KEY = eveKeys.privateKey
+  .export({
+    format: 'pem',
+    type: 'pkcs8',
+  })
+  .toString();
+const EVE_OUTBOX_PUBLIC_KEY = eveKeys.publicKey
+  .export({
+    format: 'pem',
+    type: 'spki',
+  })
+  .toString();
+const SYMPHONY_PRIVATE_KEY = symphonyKeys.privateKey
+  .export({
+    format: 'pem',
+    type: 'pkcs8',
+  })
+  .toString();
+const SYMPHONY_PUBLIC_KEY = symphonyKeys.publicKey
+  .export({
+    format: 'pem',
+    type: 'spki',
+  })
+  .toString();
+const PRODUCER_PUBLIC_KEY = producerKeys.publicKey
+  .export({
+    format: 'pem',
+    type: 'spki',
+  })
+  .toString();
+const security: SummerBottleneckRuntimeSecurity = {
+  receiptSigningKey: EVE_RECEIPT_KEY,
+  receiptSigningKeyId: 'eve-receipt-2026-09',
+  producerVerificationKeys: new Map([
+    ['jovie-production-2026-09', PRODUCER_PUBLIC_KEY],
+  ]),
+  eveOutboxSigningPrivateKey: EVE_OUTBOX_PRIVATE_KEY,
+  eveOutboxSigningKeyId: 'eve-outbox-2026-09',
+  eveOutboxVerificationKeys: new Map([
+    ['eve-outbox-2026-09', EVE_OUTBOX_PUBLIC_KEY],
+  ]),
+  symphonyOutcomeVerificationKeys: new Map([
+    ['symphony-outcome-2026-09', SYMPHONY_PUBLIC_KEY],
+  ]),
+};
 const task: SymphonyRepairTask = {
   schema: 'jovie-symphony-repair-task/v1',
   taskKey: KEY,
@@ -33,30 +87,72 @@ function storeHarness() {
     async read(pathname) {
       return records.get(pathname) ?? null;
     },
-    async list(prefix) {
-      return [...records.entries()]
+    async list(prefix, options) {
+      const entries = [...records.entries()]
         .filter(([pathname]) => pathname.startsWith(prefix))
         .map(([pathname, record]) => ({ pathname, record }));
+      return {
+        entries: entries.slice(0, options.limit),
+        hasMore: false,
+        scanned: Math.min(entries.length, options.limit),
+      };
+    },
+    async write(pathname, record) {
+      records.set(pathname, record);
     },
   };
   return { records, store };
 }
 
+function signedOutcome(overrides: SummerBottleneckRecord = {}) {
+  return signSymphonyRepairOutcome(
+    {
+      schema: 'jovie.symphony-repair-outcome/v1',
+      taskKey: KEY,
+      status: 'succeeded',
+      detail: 'release certification recovered',
+      completedAt: '2026-09-02T08:01:00.000Z',
+      source: {
+        action: task.action,
+        sourceVersion: task.source.sourceVersion,
+        snapshotDigest: task.source.snapshotDigest,
+      },
+      ...overrides,
+    },
+    SYMPHONY_PRIVATE_KEY,
+    'symphony-outcome-2026-09'
+  );
+}
+
 describe('Vercel Blob Summer bottleneck runtime', () => {
-  afterEach(() => {
-    delete process.env.EVE_CORE_CHAT_AUTH_TOKEN;
-  });
-
-  it('fails closed without existing Eve signing authority', () => {
+  it('fails closed without distinct dedicated signing authorities', () => {
     expect(() => createVercelBlobBottleneckDependencies()).toThrow(
-      'Eve receipt signing authority is unavailable'
+      'dedicated Summer and Symphony signing authority is unavailable'
     );
+    expect(() =>
+      createVercelBlobBottleneckDependencies(storeHarness().store, {
+        ...security,
+        eveOutboxVerificationKeys: new Map([
+          ['eve-outbox-2026-09', SYMPHONY_PUBLIC_KEY],
+        ]),
+      })
+    ).toThrow('dedicated Summer and Symphony signing authority is unavailable');
+    expect(() =>
+      createVercelBlobBottleneckDependencies(storeHarness().store, {
+        ...security,
+        producerVerificationKeys: new Map([
+          ['jovie-production-2026-09', SYMPHONY_PUBLIC_KEY],
+        ]),
+      })
+    ).toThrow('dedicated Summer and Symphony signing authority is unavailable');
   });
 
-  it('idempotently routes one source-bound task to the Symphony outbox', async () => {
-    process.env.EVE_CORE_CHAT_AUTH_TOKEN = 'existing-eve-auth-token-for-test';
+  it('idempotently persists one signed source-bound Symphony outbox item', async () => {
     const proof = storeHarness();
-    const runtime = createVercelBlobBottleneckDependencies(proof.store);
+    const runtime = createVercelBlobBottleneckDependencies(
+      proof.store,
+      security
+    );
 
     await expect(
       runtime.dispatchToSymphony(task, { idempotencyKey: KEY })
@@ -65,60 +161,48 @@ describe('Vercel Blob Summer bottleneck runtime', () => {
       runtime.dispatchToSymphony(task, { idempotencyKey: KEY })
     ).resolves.toEqual({ handle: `symphony:${KEY}` });
     expect(
-      [...proof.records.keys()].filter(path =>
-        path.includes('/symphony-outbox/')
-      )
-    ).toHaveLength(1);
+      proof.records.get(`summer-bottleneck/symphony-outbox/${KEY}.json`)
+    ).toMatchObject({
+      signature: expect.stringMatching(/^ed25519=[A-Za-z0-9_-]{86}$/u),
+      signatureKeyId: 'eve-outbox-2026-09',
+      task,
+    });
   });
 
-  it('rejects a task whose key does not match the idempotency envelope', async () => {
-    process.env.EVE_CORE_CHAT_AUTH_TOKEN = 'existing-eve-auth-token-for-test';
+  it('rejects a mismatched task key and a conflicting outbox record', async () => {
+    const proof = storeHarness();
     const runtime = createVercelBlobBottleneckDependencies(
-      storeHarness().store
+      proof.store,
+      security
     );
-
     await expect(
       runtime.dispatchToSymphony(task, { idempotencyKey: 'd'.repeat(64) })
     ).rejects.toThrow('Symphony task key does not match idempotency key');
-  });
-
-  it('rejects a conflicting durable task at the same outbox key', async () => {
-    process.env.EVE_CORE_CHAT_AUTH_TOKEN = 'existing-eve-auth-token-for-test';
-    const proof = storeHarness();
     proof.records.set(`summer-bottleneck/symphony-outbox/${KEY}.json`, {
-      schema: 'jovie.eve.symphony-repair-outbox/v1',
-      destination: 'symphony',
-      idempotencyKey: KEY,
-      status: 'ready',
-      task: {
-        ...task,
-        source: { ...task.source, snapshotDigest: 'd'.repeat(64) },
-      },
+      schema: 'forged',
     });
-    const runtime = createVercelBlobBottleneckDependencies(proof.store);
-
     await expect(
       runtime.dispatchToSymphony(task, { idempotencyKey: KEY })
     ).rejects.toThrow('Symphony outbox conflict');
   });
 
-  it('observes only a cross-bound terminal Symphony outcome', async () => {
-    process.env.EVE_CORE_CHAT_AUTH_TOKEN = 'existing-eve-auth-token-for-test';
+  it('accepts only a separately signed, exact-task-bound Symphony outcome', async () => {
     const proof = storeHarness();
-    const runtime = createVercelBlobBottleneckDependencies(proof.store);
+    const runtime = createVercelBlobBottleneckDependencies(
+      proof.store,
+      security
+    );
+    await runtime.dispatchToSymphony(task, { idempotencyKey: KEY });
     await expect(
       runtime.observeSymphonyOutcome({
         handle: `symphony:${KEY}`,
         idempotencyKey: KEY,
       })
     ).resolves.toEqual({ status: 'pending', detail: 'awaiting-symphony' });
-
-    proof.records.set(`summer-bottleneck/symphony-terminal/${KEY}.json`, {
-      schema: 'jovie.symphony-repair-outcome/v1',
-      taskKey: KEY,
-      status: 'succeeded',
-      detail: 'release certification recovered',
-    });
+    proof.records.set(
+      `summer-bottleneck/symphony-terminal/${KEY}.json`,
+      signedOutcome()
+    );
     await expect(
       runtime.observeSymphonyOutcome({
         handle: `symphony:${KEY}`,
@@ -130,36 +214,55 @@ describe('Vercel Blob Summer bottleneck runtime', () => {
     });
   });
 
-  it('rejects a cross-bound Symphony handle', async () => {
-    process.env.EVE_CORE_CHAT_AUTH_TOKEN = 'existing-eve-auth-token-for-test';
-    const runtime = createVercelBlobBottleneckDependencies(
-      storeHarness().store
-    );
-
-    await expect(
-      runtime.observeSymphonyOutcome({
-        handle: `symphony:${'d'.repeat(64)}`,
-        idempotencyKey: KEY,
-      })
-    ).rejects.toThrow('Symphony handle is not source-bound');
-  });
-
-  it('rejects malformed and cross-bound terminal outcomes', async () => {
-    process.env.EVE_CORE_CHAT_AUTH_TOKEN = 'existing-eve-auth-token-for-test';
+  it.each([
+    ['unsigned', { schema: 'jovie.symphony-repair-outcome/v1' }],
+    [
+      'cross-bound',
+      signedOutcome({
+        source: { ...task.source, action: 'different-action' },
+      }),
+    ],
+  ])('rejects an %s Symphony outcome', async (_name, outcome) => {
     const proof = storeHarness();
-    proof.records.set(`summer-bottleneck/symphony-terminal/${KEY}.json`, {
-      schema: 'jovie.symphony-repair-outcome/v1',
-      taskKey: 'd'.repeat(64),
-      status: 'succeeded',
-      detail: 'wrong task',
-    });
-    const runtime = createVercelBlobBottleneckDependencies(proof.store);
-
+    const runtime = createVercelBlobBottleneckDependencies(
+      proof.store,
+      security
+    );
+    await runtime.dispatchToSymphony(task, { idempotencyKey: KEY });
+    proof.records.set(
+      `summer-bottleneck/symphony-terminal/${KEY}.json`,
+      outcome
+    );
     await expect(
       runtime.observeSymphonyOutcome({
         handle: `symphony:${KEY}`,
         idempotencyKey: KEY,
       })
-    ).rejects.toThrow('Symphony outcome is malformed or cross-bound');
+    ).rejects.toThrow(
+      'Symphony outcome is malformed, unauthenticated, or cross-bound'
+    );
+  });
+
+  it('rejects a cross-bound handle or forged outbox', async () => {
+    const proof = storeHarness();
+    const runtime = createVercelBlobBottleneckDependencies(
+      proof.store,
+      security
+    );
+    await expect(
+      runtime.observeSymphonyOutcome({
+        handle: 'symphony:wrong',
+        idempotencyKey: KEY,
+      })
+    ).rejects.toThrow('Symphony handle is not source-bound');
+    proof.records.set(`summer-bottleneck/symphony-outbox/${KEY}.json`, {
+      schema: 'forged',
+    });
+    await expect(
+      runtime.observeSymphonyOutcome({
+        handle: `symphony:${KEY}`,
+        idempotencyKey: KEY,
+      })
+    ).rejects.toThrow('Symphony outbox is unavailable or unauthenticated');
   });
 });
