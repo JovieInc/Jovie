@@ -6,6 +6,8 @@ export default defineConfig({
       include: [
         'agent/instructions/summer-shadow.ts',
         'agent/lib/summer-shadow-ingress.ts',
+        'agent/lib/vercel-blob-bottleneck-runtime.ts',
+        'agent/lib/vercel-blob-shadow-store.ts',
       ],
       provider: 'v8',
       reporter: ['text', 'json-summary'],
@@ -16,13 +18,11 @@ export default defineConfig({
         statements: 85,
       },
     },
-    // Size-guard remedeate deferred matching suites for hop/runtime bulk; exclude
-    // main-restored fixtures that no longer match this layer's production schemas.
+    // JOV-5987: restore matching loop/photon suites after #17019/#17020 land.
     exclude: [
       '**/node_modules/**',
       'tests/summer-bottleneck-loop.test.ts',
       'tests/summer-photon-offline-proof.test.ts',
-      'tests/vercel-blob-bottleneck-runtime.test.ts',
     ],
     include: ['tests/**/*.test.ts'],
     environment: 'node',
