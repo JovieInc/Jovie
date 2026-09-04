@@ -440,7 +440,7 @@ def main() -> int:
     repo_root = Path(
         os.environ.get("HERMES_JOVIE_REPO", os.environ.get("JOVIE_REPO", Path.cwd()))
     ).resolve()
-    shipper_ts = repo_root / "scripts" / "hermes" / "jobs" / "codex-issue-shipper.ts"
+    shipper_ts = repo_root / "scripts/symphony/jobs/codex-issue-shipper.ts"
 
     if pause_active(hermes_home):
         log("SKIP: pause sentinel active")
