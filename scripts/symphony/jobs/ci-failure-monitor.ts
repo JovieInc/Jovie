@@ -1,0 +1,196 @@
+#!/usr/bin/env tsx
+/**
+ * CI Failure Monitor — Hermes-Air
+ *
+ * Watches recent failed workflow runs on main. Classifies against
+ * `known-flakes.json` for known flaky patterns; files Linear issues for
+ * recurring unknowns.
+ *
+ * Deterministic-first: only escalates to LLM when no signature matches.
+ */
+
+import { execFileSync } from 'node:child_process';
+import { existsSync, readFileSync } from 'node:fs';
+import { dirname, join } from 'node:path';
+import { fileURLToPath } from 'node:url';
+import {
+  classifyCiFailure,
+  classifyKnownCiFlake,
+  type KnownCiFlake,
+} from '../lib/ci-failure-classifier';
+import { ensureJovieRepoCwd } from '../lib/ensure-jovie-repo-cwd';
+import { gbrainLearn, gbrainSlug } from '../lib/gbrain';
+import { logJobEvent, withJobLogging } from '../lib/jobs-log';
+import { buildFollowUpBody, fileIssue } from '../lib/tracker-client';
+import { diagnoseCiFailure } from './ci-failure-diagnosis';
+
+const JOB = 'ci-failure-monitor';
+
+const __filename = fileURLToPath(import.meta.url);
+const KNOWN_FLAKES_PATH = join(dirname(__filename), 'known-flakes.json');
+
+interface WorkflowRun {
+  readonly databaseId: number;
+  readonly displayTitle: string;
+  readonly url: string;
+  readonly workflowName: string;
+  readonly conclusion: string;
+  readonly headBranch: string;
+  readonly createdAt: string;
+}
+
+function loadKnownFlakes(): ReadonlyArray<KnownCiFlake> {
+  if (!existsSync(KNOWN_FLAKES_PATH)) return [];
+  try {
+    const parsed = JSON.parse(readFileSync(KNOWN_FLAKES_PATH, 'utf8')) as {
+      readonly flakes: ReadonlyArray<KnownCiFlake>;
+    };
+    return parsed.flakes;
+  } catch {
+    return [];
+  }
+}
+
+function listRecentFailures(): ReadonlyArray<WorkflowRun> {
+  const json = execFileSync(
+    'gh',
+    [
+      'run',
+      'list',
+      '--limit',
+      '30',
+      '--branch',
+      'main',
+      '--status',
+      'failure',
+      '--json',
+      'databaseId,displayTitle,url,workflowName,conclusion,headBranch,createdAt',
+    ],
+    { encoding: 'utf8', timeout: 30_000 }
+  );
+  return JSON.parse(json) as ReadonlyArray<WorkflowRun>;
+}
+
+function logsForRun(runId: number): string {
+  try {
+    return execFileSync('gh', ['run', 'view', String(runId), '--log-failed'], {
+      encoding: 'utf8',
+      timeout: 60_000,
+      maxBuffer: 5 * 1024 * 1024,
+    });
+  } catch (err) {
+    return err instanceof Error ? err.message : String(err);
+  }
+}
+
+async function processFailure(
+  run: WorkflowRun,
+  flakes: ReadonlyArray<KnownCiFlake>
+): Promise<void> {
+  const log = logsForRun(run.databaseId);
+  const fixtureDiagnosis = classifyCiFailure(log);
+  const diagnosis = diagnoseCiFailure(log);
+  const known = classifyKnownCiFlake(log, run.workflowName, flakes);
+  const failureClass =
+    fixtureDiagnosis?.classification ?? diagnosis.failureClass;
+  const rootCause = fixtureDiagnosis?.rootCause ?? diagnosis.rootCause;
+  const remediation = fixtureDiagnosis?.remediation ?? diagnosis.remediation;
+
+  if (known) {
+    logJobEvent({
+      job: JOB,
+      event: 'known_flake',
+      runId: run.databaseId,
+      flakeId: known.id,
+    });
+    return;
+  }
+
+  if (fixtureDiagnosis) {
+    logJobEvent({
+      job: JOB,
+      event: 'failure_diagnosed',
+      runId: run.databaseId,
+      diagnosisId: fixtureDiagnosis.id,
+      classification: fixtureDiagnosis.classification,
+      retryable: fixtureDiagnosis.retryable,
+    });
+  }
+
+  // Broken fixtures and unknown failures both require a tracked repair.
+  const filed = await fileIssue({
+    title: fixtureDiagnosis
+      ? `Broken E2E fixture: ${run.workflowName} on main (run ${run.databaseId})`
+      : `CI failure: ${run.workflowName} on main (run ${run.databaseId})`,
+    description: buildFollowUpBody({
+      source: `ci-failure-monitor`,
+      sourceUrl: run.url,
+      followUp: fixtureDiagnosis
+        ? `${rootCause} ${remediation}`
+        : `Workflow "${run.workflowName}" failed on main at ${run.createdAt}. Title: ${run.displayTitle}. Deterministic diagnosis: ${failureClass}. ${rootCause} Recommended remediation: ${remediation}`,
+      whyItMatters: fixtureDiagnosis
+        ? 'Retrying cannot repair an invalid persisted-actor boundary and only consumes runner capacity while downstream ready selectors time out.'
+        : 'Unclassified CI failures on main block deploys and erode trust in the merge gate.',
+      classification: 'Required',
+      acceptanceCriteria: fixtureDiagnosis
+        ? 'The E2E helper provisions a persisted actor, the synthetic-ID UUID regression is covered, and the failed check passes without retrying the broken fixture.'
+        : 'Either a fix is merged OR a new signature is added to known-flakes.json with a documented reason.',
+    }),
+    source: `ci-failure-monitor:${run.databaseId}`,
+  });
+
+  logJobEvent({
+    job: JOB,
+    event: filed.success ? 'issue_filed' : 'file_failed',
+    runId: run.databaseId,
+    failureClass,
+    identifier: filed.identifier,
+    error: filed.error,
+  });
+
+  // Compound the failure signature to gbrain, keyed by workflow (idempotent → a
+  // recurring failure on the same workflow updates one page). Makes "has this
+  // workflow failed before, and how was it resolved" recallable.
+  gbrainLearn({
+    slug: `ci-failures/${gbrainSlug(run.workflowName)}`,
+    title: `CI failure: ${run.workflowName} on main`,
+    body: `Workflow "${run.workflowName}" failed on main.\n\n- Latest run: ${run.databaseId} (${run.createdAt})\n- Title: ${run.displayTitle}\n- Diagnosis: ${fixtureDiagnosis?.id ?? failureClass}\n- Failure class: ${failureClass}\n- Retryable: ${fixtureDiagnosis?.retryable ?? 'unknown'}\n- Root cause: ${rootCause}\n- Remediation: ${remediation}\n- URL: ${run.url}\n- Linear: ${filed.identifier ?? 'not filed'}`,
+    tags: [
+      'type:ci-failure',
+      `workflow:${gbrainSlug(run.workflowName)}`,
+      `failure-class:${failureClass}`,
+    ],
+    type: 'ci-failure',
+  });
+}
+
+async function main(): Promise<void> {
+  ensureJovieRepoCwd(import.meta.url);
+  await withJobLogging(JOB, async () => {
+    const flakes = loadKnownFlakes();
+    const failures = listRecentFailures();
+    logJobEvent({
+      job: JOB,
+      event: 'scanned',
+      failureCount: failures.length,
+      knownFlakeCount: flakes.length,
+    });
+    for (const run of failures) {
+      try {
+        await processFailure(run, flakes);
+      } catch (err) {
+        logJobEvent({
+          job: JOB,
+          event: 'process_failed',
+          runId: run.databaseId,
+          error: err instanceof Error ? err.message : String(err),
+        });
+      }
+    }
+  });
+}
+
+void main().catch(err => {
+  console.error(`[${JOB}] fatal:`, err);
+  process.exit(0);
+});
