@@ -55,22 +55,32 @@ describe('golden-path lock classifier', () => {
 });
 
 describe('golden-path lock evaluators', () => {
-  it('requires Get started to point at /start', () => {
+  it('requires the JOV-5864 name search as the homepage conversion', () => {
+    const certified = `<a href="/start">Find yourself</a>
+      <form><input placeholder="Search your name" /><button>Find me</button></form>`;
+    expect(evaluateHomepageHtml(certified)).toMatchObject({
+      id: 'homepage-cta',
+      ok: true,
+    });
     expect(
       evaluateHomepageHtml(
         '<a href="/start?starter_prompt=Hey">Get started</a>'
       )
-    ).toMatchObject({ id: 'homepage-cta', ok: true });
-    expect(
-      evaluateHomepageHtml('<a href="/signup">Get started</a>')
     ).toMatchObject({
       ok: false,
     });
     expect(
-      evaluateHomepageHtml('<a href="https://jov.ie/waitlist">Get started</a>')
+      evaluateHomepageHtml(
+        '<input placeholder="Search your name" /><button>Find me</button>'
+      )
     ).toMatchObject({
       ok: false,
-      reason: 'homepage CTA must be "Get started" → /start',
+      reason: expect.stringContaining('/start'),
+    });
+    expect(
+      evaluateHomepageHtml('<a href="https://jov.ie/waitlist">Find me</a>')
+    ).toMatchObject({
+      ok: false,
     });
     expect(evaluateHomepageHtml('')).toMatchObject({ ok: false });
   });
@@ -146,7 +156,8 @@ describe('golden-path lock evaluators', () => {
       stripeWebhookStatus: 400,
     };
     const ok = evaluateProdProbe({
-      homepageHtml: '<a href="/start">Get started</a>',
+      homepageHtml:
+        '<a href="/start">Find yourself</a><input placeholder="Search your name" /><button>Find me</button>',
       chatStatus: 403,
       chatBody: { errorCode: 'TURNSTILE_REQUIRED' },
       waitlistStatus: 401,
@@ -156,7 +167,8 @@ describe('golden-path lock evaluators', () => {
     expect(ok.checks).toHaveLength(6);
 
     const broken = evaluateProdProbe({
-      homepageHtml: '<a href="/start">Get started</a>',
+      homepageHtml:
+        '<a href="/start">Find yourself</a><input placeholder="Search your name" /><button>Find me</button>',
       chatStatus: 401,
       chatBody: { error: 'Unauthorized' },
       waitlistStatus: 401,
@@ -212,7 +224,8 @@ describe('golden-path lock receipts', () => {
 
   it('accepts a real prod-probe receipt', () => {
     const evaluated = evaluateProdProbe({
-      homepageHtml: '<a href="/start">Get started</a>',
+      homepageHtml:
+        '<a href="/start">Find yourself</a><input placeholder="Search your name" /><button>Find me</button>',
       chatStatus: 403,
       chatBody: { errorCode: 'TURNSTILE_REQUIRED' },
       waitlistStatus: 401,
@@ -307,25 +320,43 @@ describe('golden-path lock autofix planner', () => {
 });
 
 describe('golden-path Linear-only intake', () => {
-  it('creates exactly one canonical Linear record', async () => {
-    const fetchImpl = vi.fn(
-      async (_input, _init) =>
-        new Response(
-          JSON.stringify({
-            data: {
-              issueCreate: {
-                success: true,
-                issue: {
-                  id: 'linear-1',
-                  identifier: 'JOV-1001',
-                  url: 'https://linear.app/jovie/issue/JOV-1001',
-                },
+  const searchEmpty = () =>
+    new Response(
+      JSON.stringify({
+        data: {
+          team: {
+            states: { nodes: [{ id: 'todo-state', name: 'Todo' }] },
+          },
+          issues: { nodes: [] },
+        },
+      })
+    );
+
+  it('creates exactly one canonical Linear record straight into Todo (JOV-5966)', async () => {
+    const fetchImpl = vi.fn(async (_input, init) => {
+      const payload = JSON.parse(String(init.body));
+      if (payload.query.includes('FindIssueByFingerprint')) {
+        return searchEmpty();
+      }
+      expect(payload.query).toContain('mutation CreateDedupedLinearIssue');
+      expect(payload.variables).toMatchObject({ stateId: 'todo-state' });
+      expect(payload.variables.title).toContain('golden-path-lock:prod:test');
+      return new Response(
+        JSON.stringify({
+          data: {
+            issueCreate: {
+              success: true,
+              issue: {
+                id: 'linear-1',
+                identifier: 'JOV-1001',
+                url: 'https://linear.app/jovie/issue/JOV-1001',
               },
             },
-          }),
-          { status: 200 }
-        )
-    );
+          },
+        }),
+        { status: 200 }
+      );
+    });
 
     const result = await createGoldenPathLinearIssue(
       {
@@ -338,12 +369,64 @@ describe('golden-path Linear-only intake', () => {
 
     expect(result).toMatchObject({
       ok: true,
+      action: 'created',
       identifier: 'JOV-1001',
     });
-    expect(fetchImpl).toHaveBeenCalledTimes(1);
-    const payload = JSON.parse(String(fetchImpl.mock.calls[0][1].body));
-    expect(payload.query).toContain('mutation CreateGoldenPathLockIssue');
-    expect(payload.query).toContain('issueCreate');
+    expect(fetchImpl).toHaveBeenCalledTimes(2);
+  });
+
+  it('dedupes against the existing canonical issue instead of creating a clone (JOV-5966)', async () => {
+    const existing = {
+      id: 'linear-1',
+      identifier: 'JOV-1001',
+      url: 'https://linear.app/jovie/issue/JOV-1001',
+      title: 'P0: golden path broken in prod (golden-path-lock:prod:test)',
+      state: { id: 'todo-state', name: 'Todo', type: 'unstarted' },
+    };
+    const fetchImpl = vi.fn(async (_input, init) => {
+      const payload = JSON.parse(String(init.body));
+      if (payload.query.includes('FindIssueByFingerprint')) {
+        return new Response(
+          JSON.stringify({
+            data: {
+              team: { states: { nodes: [{ id: 'todo-state', name: 'Todo' }] } },
+              issues: { nodes: [existing] },
+            },
+          })
+        );
+      }
+      expect(payload.query).toContain('issueUpdate');
+      return new Response(
+        JSON.stringify({
+          data: {
+            issueUpdate: {
+              success: true,
+              issue: existing,
+            },
+          },
+        })
+      );
+    });
+
+    const result = await createGoldenPathLinearIssue(
+      {
+        fingerprint: 'golden-path-lock:prod:test',
+        prompt: 'Fix the failure — recurring probe break',
+        apiKey: 'linear-test-key',
+      },
+      fetchImpl
+    );
+
+    expect(result).toMatchObject({
+      ok: true,
+      action: 'updated',
+      identifier: 'JOV-1001',
+    });
+    expect(fetchImpl).toHaveBeenCalledTimes(2);
+    const updatePayload = JSON.parse(String(fetchImpl.mock.calls[1][1].body));
+    expect(updatePayload.variables.input.description).toContain(
+      'recurring probe break'
+    );
   });
 
   it('fails closed on a Linear rate limit without another tracker write', async () => {
@@ -362,7 +445,7 @@ describe('golden-path Linear-only intake', () => {
 
     expect(result).toMatchObject({
       ok: false,
-      reason: 'linear_issue_429',
+      reason: 'linear_search_429',
     });
     expect(fetchImpl).toHaveBeenCalledTimes(1);
   });
