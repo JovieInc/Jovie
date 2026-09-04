@@ -371,7 +371,7 @@ def capacity_evidence(target: int = 4, observed_at: str | None = None) -> dict[s
             {
                 "schema": "symphony-useful-turn-proof/v1",
                 "provider": "openai",
-                "profile": f"profile-{index}",
+                "profile": f"{index + 1:064x}",
                 "model": "gpt-5.6-sol",
                 "rc": 0,
                 "useful": True,
@@ -994,6 +994,19 @@ class DeploymentBindingTests(unittest.TestCase):
         evidence = capacity_evidence(1, MODULE.isoformat(now))
         evidence["severeIncidents"] = False
         self.assertFalse(MODULE.validate_capacity_receipt(evidence, now)[0])
+        for field, value in (
+            ("provider", " openai"),
+            ("profile", "profile-1"),
+            ("model", "gpt-5.6-sol "),
+            ("completedAt", "2026-09-04T00:00:00"),
+            ("completedAt", "2026-09-04T00:00:00+01:60"),
+            ("completedAt", "2026-02-30T00:00:00Z"),
+            ("completedAt", "2026-09-04T24:00:00Z"),
+        ):
+            evidence = capacity_evidence(1, MODULE.isoformat(now))
+            evidence["acceptedEvidence"][0][field] = value
+            with self.subTest(field=field):
+                self.assertFalse(MODULE.validate_capacity_receipt(evidence, now)[0])
 
     def test_observe_concurrency_rejects_oauth_source_and_target_mismatch(self):
         now = MODULE.utc_now()

@@ -38,6 +38,7 @@ OFFICIAL_WORKSPACE_ROOT = "~/symphony-elixir-workspaces"
 OFFICIAL_WORKFLOW_TARGET = "%h/.config/symphony/WORKFLOW.md"
 OFFICIAL_LOGS_ROOT = "%h/symphony-elixir-logs"
 OFFICIAL_MAX_CONCURRENT_AGENTS = 8
+OFFICIAL_WORKFLOW_INITIAL_CONCURRENCY = 0
 MIN_POLL_INTERVAL_MS = 30_000
 LINEAR_HOURLY_REQUEST_BUDGET = 2_500
 LINEAR_PAGE_SIZE = 50
@@ -512,7 +513,7 @@ def validate_source(
             errors.append(f"poll_interval_too_low:{workflow.poll_interval_ms}")
         if workflow.workspace_root != OFFICIAL_WORKSPACE_ROOT:
             errors.append(f"workflow_workspace_root:{workflow.workspace_root}")
-        if workflow.max_concurrent_agents != OFFICIAL_MAX_CONCURRENT_AGENTS:
+        if workflow.max_concurrent_agents != OFFICIAL_WORKFLOW_INITIAL_CONCURRENCY:
             errors.append(
                 f"workflow_max_concurrent_agents:{workflow.max_concurrent_agents}"
             )

@@ -71,7 +71,7 @@ def execution_capacity(target: int = 8) -> dict:
     return {
         "source": "execution-proven-useful-turns",
         "target": target,
-        "acceptedEvidence": [{"profile": f"profile-{index}"} for index in range(target)],
+        "acceptedEvidence": [{"profile": f"{index + 1:064x}"} for index in range(target)],
     }
 
 
@@ -94,18 +94,26 @@ class PressureParsingTests(unittest.TestCase):
 
 
 class UsefulTurnProjectionTests(unittest.TestCase):
-    def proof(self, now: datetime, profile: str = "one") -> dict:
+    def proof(self, now: datetime, profile: str = "1") -> dict:
+        profile_id = hashlib.sha256(profile.encode()).hexdigest()
         return {
             "schema": CAPACITY.PROOF_SCHEMA,
             "provider": "openai",
-            "profile": profile,
+            "profile": profile_id,
             "model": "gpt-5.6-sol",
             "rc": 0,
             "useful": True,
             "completedAt": CAPACITY.isoformat(now),
-            "outputDigest": hashlib.sha256(profile.encode()).hexdigest(),
+            "outputDigest": profile_id,
             "outputBytes": 12,
         }
+
+    def test_newest_proof_is_selected_by_instant_not_timestamp_text(self):
+        older = self.proof(datetime(2026, 9, 4, tzinfo=timezone.utc))
+        newer = {**older, "completedAt": "2026-09-04T00:00:00.500000Z", "outputDigest": "f" * 64}
+        proofs, rejected = CAPACITY.accepted_proofs([newer, older], datetime(2026, 9, 4, 0, 1, tzinfo=timezone.utc))
+        self.assertFalse(rejected)
+        self.assertEqual(proofs[0]["outputDigest"], "f" * 64)
 
     def test_projects_unique_fresh_turns_and_caps_at_forty(self):
         now = datetime(2026, 9, 4, tzinfo=timezone.utc)
@@ -119,7 +127,7 @@ class UsefulTurnProjectionTests(unittest.TestCase):
         now = datetime(2026, 9, 4, tzinfo=timezone.utc)
         receipt = CAPACITY.build_receipt(
             [self.proof(now - timedelta(days=2))],
-            {"accounts": [{"provider": "openai", "profile": "oauth"}]},
+            {"accounts": [{"provider": "openai", "profile": hashlib.sha256(b"oauth").hexdigest()}]},
             now,
         )
         self.assertEqual(receipt["target"], 0)

@@ -11,9 +11,8 @@ REAL_CODEX="${CODEX_REAL_BIN:-$HOME/.local/bin/codex}"
 LOG_FILE="${CODEX_ROTATE_LOG:-$ACCOUNTS_ROOT/rotate.log}"
 PROBE_TIMEOUT="${CODEX_ACCOUNT_PROBE_TIMEOUT:-15}"
 RECEIPT_TTL="${CODEX_ACCOUNT_READINESS_TTL_SECONDS:-600}"
-PROOF_LEDGER="${SYMPHONY_USEFUL_TURN_LEDGER:-/home/timwhite/gem-workspace/state/useful-turn-proofs.jsonl}"
 
-export ACCOUNTS_ROOT STATE_FILE REAL_CODEX LOG_FILE PROBE_TIMEOUT RECEIPT_TTL PROOF_LEDGER
+export ACCOUNTS_ROOT STATE_FILE REAL_CODEX LOG_FILE PROBE_TIMEOUT RECEIPT_TTL
 
 if [[ ! -f "$STATE_FILE" ]]; then
   exit 0
@@ -22,12 +21,10 @@ fi
 python3 <<'PY'
 import fcntl
 import contextlib
-import hashlib
 import json
 import os
 import subprocess
 import time
-import re
 from pathlib import Path
 
 ROOT = Path(os.environ["ACCOUNTS_ROOT"])
@@ -36,8 +33,7 @@ REAL_CODEX = os.environ["REAL_CODEX"]
 TIMEOUT = int(os.environ["PROBE_TIMEOUT"])
 TTL = int(os.environ["RECEIPT_TTL"])
 SOURCE = "authenticated_completion_probe/v1"
-READY_MARKER = "SYMPHONY_USEFUL_TURN provider-authorization"
-PROOF_LEDGER = Path(os.environ["PROOF_LEDGER"])
+READY_MARKER = "SYMPHONY_ACCOUNT_READY"
 
 
 @contextlib.contextmanager
@@ -121,8 +117,7 @@ def authenticated_probe(account):
                     "--sandbox",
                     "read-only",
                     "--skip-git-repo-check",
-                    "Analyze this incident: CPU is 20%, queue wait is 0s, and the provider returns HTTP 403. "
-                    f"Identify the bottleneck and reply exactly: {READY_MARKER}",
+                    f"Reply with exactly: {READY_MARKER}",
                 ],
                 env=env,
                 capture_output=True,
@@ -131,45 +126,13 @@ def authenticated_probe(account):
                 check=False,
             )
         except (OSError, subprocess.TimeoutExpired):
-            return None
+            return False
         if result.returncode != 0:
-            return None
-        return result.stdout.strip() if result.stdout.strip() == READY_MARKER else None
+            return False
+        return result.stdout.strip() == READY_MARKER
     finally:
         fcntl.flock(descriptor, fcntl.LOCK_UN)
         os.close(descriptor)
-
-
-def record_useful_turn(account, output, now):
-    try:
-        config = (ROOT / account / "config.toml").read_text(encoding="utf-8")
-        match = re.search(r'^\s*model\s*=\s*["\']([^"\']+)["\']\s*$', config, re.MULTILINE)
-        if not match:
-            return False
-        model = match.group(1).strip()
-        payload = {
-            "schema": "symphony-useful-turn-proof/v1",
-            "provider": "openai",
-            "profile": account,
-            "model": model,
-            "rc": 0,
-            "useful": True,
-            "completedAt": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime(now)),
-            "outputDigest": hashlib.sha256(output.encode()).hexdigest(),
-            "outputBytes": len(output.encode()),
-            "producer": "codex-account-probe/v2",
-        }
-        PROOF_LEDGER.parent.mkdir(parents=True, exist_ok=True)
-        with open(f"{PROOF_LEDGER}.lock", "a+", encoding="utf-8") as lock:
-            fcntl.flock(lock, fcntl.LOCK_EX)
-            with open(PROOF_LEDGER, "a", encoding="utf-8") as ledger:
-                ledger.write(json.dumps(payload, sort_keys=True) + "\n")
-                ledger.flush()
-                os.fsync(ledger.fileno())
-        os.chmod(PROOF_LEDGER, 0o600)
-        return True
-    except (OSError, TypeError, ValueError):
-        return False
 
 
 def recover(account, observed_cooldown, now):
@@ -204,8 +167,6 @@ def recover(account, observed_cooldown, now):
 
 now = int(time.time())
 for account, cooldown in read_candidates(now):
-    output = authenticated_probe(account)
-    if output and recover(account, cooldown, now):
-        if record_useful_turn(account, output, now):
-            print(f"RECOVERED {account}")
+    if authenticated_probe(account) and recover(account, cooldown, now):
+        print(f"RECOVERED {account}")
 PY

@@ -981,7 +981,7 @@ describe('deterministic Symphony admission boundary', () => {
       acceptedEvidence: Array.from({ length: target }, (_, index) => ({
         schema: 'symphony-useful-turn-proof/v1',
         provider: 'openai',
-        profile: `profile-${index + 1}`,
+        profile: String(index + 1).padStart(64, '0'),
         model: 'gpt-5.6-sol',
         rc: 0,
         useful: true,
@@ -1002,6 +1002,27 @@ describe('deterministic Symphony admission boundary', () => {
         .maxConcurrent,
       0
     );
+  });
+
+  it('rejects noncanonical proof identities and timezone-naive timestamps', () => {
+    for (const [field, value] of [
+      ['provider', ' openai'],
+      ['profile', 'profile-1'],
+      ['model', 'gpt-5.6-sol '],
+      ['completedAt', '2026-08-09T05:00:00'],
+      ['completedAt', '2026-08-09T05:00:00+01:60'],
+      ['completedAt', '2026-02-30T05:00:00Z'],
+      ['completedAt', '2026-08-09T24:00:00Z'],
+      ['outputDigest', ['a'.repeat(64)]],
+    ]) {
+      const evidence = capacityEvidence(1);
+      evidence.acceptedEvidence[0][field] = value;
+      assert.equal(
+        admitter.resolveGemConcurrency(evidence, { now: evidence.observedAt })
+          .maxConcurrent,
+        0
+      );
+    }
   });
 
   function fleetEvidence(overrides = {}) {
@@ -1776,7 +1797,7 @@ from gem_gate_contract import GateContractError, drain_state_dir, gate_state_dir
 receipt = {
     "schema": "jovie-fleet-gate/v1",
     "state": "AMBER",
-    "signals": {"main": {"status": "red", "sha": "a" * 40}, "closureHealth": {"schema": "jovie-closure-health/v1", "status": "healthy", "authority": "Summer", "newIssueIntakeAllowed": True, "promotionContinues": True, "remediationContinues": True, "reasons": []}, "independentReview": {"schema": "jovie-independent-review/v1", "accepted": False, "reason": "independent-review-receipt-missing"}, "concurrencyEvidence": {"accepted": True, "source": "execution-proven-useful-turns", "target": 1, "acceptedEvidence": [{"schema": "symphony-useful-turn-proof/v1", "provider": "openai", "profile": "profile-1", "model": "gpt-5.6-sol", "rc": 0, "useful": True, "completedAt": "2026-09-04T00:00:00Z", "outputDigest": "a" * 64, "outputBytes": 32, "outputTokens": 8}]}},
+    "signals": {"main": {"status": "red", "sha": "a" * 40}, "closureHealth": {"schema": "jovie-closure-health/v1", "status": "healthy", "authority": "Summer", "newIssueIntakeAllowed": True, "promotionContinues": True, "remediationContinues": True, "reasons": []}, "independentReview": {"schema": "jovie-independent-review/v1", "accepted": False, "reason": "independent-review-receipt-missing"}, "concurrencyEvidence": {"accepted": True, "source": "execution-proven-useful-turns", "target": 1, "acceptedEvidence": [{"schema": "symphony-useful-turn-proof/v1", "provider": "openai", "profile": "1" * 64, "model": "gpt-5.6-sol", "rc": 0, "useful": True, "completedAt": "2026-09-04T00:00:00Z", "outputDigest": "a" * 64, "outputBytes": 32, "outputTokens": 8}]}},
     "reasons": [{"code": "main-not-green", "layer": "promotion", "severity": "warning", "detail": "main red"}],
     "reviewAdmission": {"allowed": False, "required": True, "authority": "Gem", "scope": "exact-main-head", "headSha": None, "observedAt": None, "reviewId": None, "reviewer": None, "reason": "independent-review-receipt-missing"},
     "closureAdmission": {"allowed": True, "newIssueIntakeAllowed": True, "newImplementationAllowed": True, "fallbackPrGenerationAllowed": True, "authority": "Summer", "promotionContinues": True, "remediationContinues": True},

@@ -23,6 +23,9 @@ CAPACITY_SOURCE = "execution-proven-useful-turns"
 CAPACITY_MAX_AGE = timedelta(hours=24)
 CAPACITY_MAX_TARGET = 40
 SHA256 = re.compile(r"^[0-9a-f]{64}$")
+PROVIDER_ID = re.compile(r"^[a-z][a-z0-9._-]{0,63}$")
+MODEL_ID = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._/-]{0,127}$")
+ISO_TIMESTAMP = re.compile(r"^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d{1,6})?(?:Z|[+-](\d{2}):(\d{2}))$")
 
 
 class GateContractError(RuntimeError):
@@ -30,12 +33,14 @@ class GateContractError(RuntimeError):
 
 
 def _parse_time(value: object) -> datetime | None:
-    if not isinstance(value, str):
+    match = ISO_TIMESTAMP.fullmatch(value) if isinstance(value, str) else None
+    if match is None or (match[1] is not None and (int(match[1]) > 23 or int(match[2]) > 59)):
         return None
     try:
-        return datetime.fromisoformat(value.replace("Z", "+00:00")).astimezone(
-            timezone.utc
-        )
+        parsed = datetime.fromisoformat(value.replace("Z", "+00:00"))
+        if parsed.tzinfo is None:
+            return None
+        return parsed.astimezone(timezone.utc)
     except (ValueError, OverflowError):
         return None
 
@@ -53,7 +58,14 @@ def validate_useful_turn_proof(
         and value.get(key) > 0
         for key in ("outputBytes", "outputTokens")
     )
-    if not all(isinstance(item, str) and item.strip() for item in strings):
+    if (
+        not isinstance(strings[0], str)
+        or not PROVIDER_ID.fullmatch(strings[0])
+        or not isinstance(strings[1], str)
+        or not SHA256.fullmatch(strings[1])
+        or not isinstance(strings[2], str)
+        or not MODEL_ID.fullmatch(strings[2])
+    ):
         return None, "malformed"
     if type(value.get("rc")) is not int or value["rc"] != 0:
         return None, "failed"
@@ -69,9 +81,9 @@ def validate_useful_turn_proof(
         return None, "stale-or-future"
     return {
         "schema": PROOF_SCHEMA,
-        "provider": strings[0].strip(),
-        "profile": strings[1].strip(),
-        "model": strings[2].strip(),
+        "provider": strings[0],
+        "profile": strings[1],
+        "model": strings[2],
         "rc": 0,
         "useful": True,
         "completedAt": completed_at.isoformat().replace("+00:00", "Z"),
@@ -93,7 +105,7 @@ def accepted_useful_turn_proofs(
             continue
         seat = (proof["provider"], proof["profile"])
         prior = by_seat.get(seat)
-        if prior is None or proof["completedAt"] > prior["completedAt"]:
+        if prior is None or _parse_time(proof["completedAt"]) > _parse_time(prior["completedAt"]):
             by_seat[seat] = proof
     return [by_seat[key] for key in sorted(by_seat)], rejected
 

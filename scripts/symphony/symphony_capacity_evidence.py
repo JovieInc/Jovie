@@ -30,6 +30,8 @@ from gem_gate_contract import (  # noqa: E402 - installed sibling module
     CAPACITY_SCHEMA as RECEIPT_SCHEMA,
     CAPACITY_SOURCE as SOURCE,
     PROOF_SCHEMA,
+    PROVIDER_ID,
+    SHA256,
     accepted_useful_turn_proofs as accepted_proofs,
     validate_capacity_receipt as validate_receipt,
     validate_useful_turn_proof as validate_proof,
@@ -51,10 +53,15 @@ def _inventory_rows(value: object) -> list[dict[str, str]]:
         if not isinstance(row, dict):
             continue
         provider, profile = row.get("provider"), row.get("profile")
-        if isinstance(provider, str) and provider.strip() and isinstance(profile, str) and profile.strip():
-            enrolled[(provider.strip(), profile.strip())] = {
-                "provider": provider.strip(),
-                "profile": profile.strip(),
+        if (
+            isinstance(provider, str)
+            and PROVIDER_ID.fullmatch(provider)
+            and isinstance(profile, str)
+            and SHA256.fullmatch(profile)
+        ):
+            enrolled[(provider, profile)] = {
+                "provider": provider,
+                "profile": profile,
                 "status": "enrolled",
             }
     return [enrolled[key] for key in sorted(enrolled)]

@@ -37,7 +37,7 @@ def capacity_evidence(target: int = 4) -> dict[str, object]:
             {
                 "schema": "symphony-useful-turn-proof/v1",
                 "provider": "openai",
-                "profile": f"profile-{index}",
+                "profile": f"{index + 1:064x}",
                 "model": "gpt-5.6-sol",
                 "rc": 0,
                 "useful": True,
@@ -340,6 +340,31 @@ class EvaluateFleetGateWrapperTests(unittest.TestCase):
         self.assertIn("base64 -w0 <\"$admission\"", wrapper)
         self.assertNotIn("base64 -w0 <\"$receipt\"", wrapper)
         self.assertIn("has(\"classifications\") | not", wrapper)
+
+    def test_pr_head_validation_is_hosted_read_only_and_exact(self):
+        workflow = (ROOT / ".github/workflows/ci.yml").read_text()
+        start = workflow.index("  fleet-gate-pr-validation:")
+        job = workflow[start:workflow.index("\n  runner-image-offline-proof:", start)]
+        for needle in (
+            "pull_request:", "contents: read", "runs-on: ubuntu-latest",
+            "ref: ${{ github.event.pull_request.head.sha }}",
+            'test "$(git rev-parse HEAD)" = "${{ github.event.pull_request.head.sha }}"',
+        ):
+            self.assertIn(needle, workflow if needle in ("pull_request:", "contents: read") else job)
+        for forbidden in (
+            "pull_request_target:", "self-hosted", "create-github-app-token",
+            "--dry-run", "backlog-orchestrator.mjs",
+        ):
+            self.assertNotIn(forbidden, job)
+
+        canonical = (
+            ROOT / ".github/workflows/fleet-gate-refresh.yml"
+        ).read_text()
+        for needle in (
+            "pull_request_target:", "ref: main",
+            "runs-on: [self-hosted, Linux, X64, jovie-fixed]",
+        ):
+            self.assertIn(needle, canonical)
 
 
 if __name__ == "__main__":

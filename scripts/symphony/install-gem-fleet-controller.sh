@@ -22,7 +22,6 @@ readonly REGISTRY_MODULE_SOURCE="${SOURCE_ROOT}/scripts/symphony/gem_repo_regist
 readonly REGISTRY_CONFIG_SOURCE="${SOURCE_ROOT}/scripts/symphony/config/gem-repo-registry.json"
 readonly POLICY_SOURCE="${SOURCE_ROOT}/scripts/symphony/gem_rehabilitation_policy.py"
 readonly CAPACITY_SOURCE="${SOURCE_ROOT}/scripts/symphony/symphony_capacity_evidence.py"
-readonly PROBE_SOURCE="${SOURCE_ROOT}/scripts/symphony/codex-account-probe.sh"
 readonly CONCURRENCY_SOURCE="${SOURCE_ROOT}/scripts/symphony/symphony-concurrency-controller.py"
 readonly CONCURRENCY_SERVICE_SOURCE="${SOURCE_ROOT}/scripts/symphony/systemd/symphony-concurrency-controller.service"
 readonly CONCURRENCY_TIMER_SOURCE="${SOURCE_ROOT}/scripts/symphony/systemd/symphony-concurrency-controller.timer"
@@ -36,7 +35,6 @@ readonly REGISTRY_MODULE_TARGET="${GEM_ROOT}/scripts/gem_repo_registry.py"
 readonly REGISTRY_CONFIG_TARGET="${GEM_ROOT}/config/gem-repo-registry.json"
 readonly POLICY_TARGET="${GEM_ROOT}/scripts/gem_rehabilitation_policy.py"
 readonly CAPACITY_TARGET="${HOME}/.local/bin/symphony_capacity_evidence.py"
-readonly PROBE_TARGET="${HOME}/.local/bin/codex-account-probe"
 readonly CONCURRENCY_TARGET="${HOME}/.local/bin/symphony-concurrency-controller"
 readonly CONCURRENCY_SERVICE_TARGET="${HOME}/.config/systemd/user/symphony-concurrency-controller.service"
 readonly CONCURRENCY_TIMER_TARGET="${HOME}/.config/systemd/user/symphony-concurrency-controller.timer"
@@ -96,7 +94,6 @@ for source in \
   "${REGISTRY_CONFIG_SOURCE}" \
   "${POLICY_SOURCE}" \
   "${CAPACITY_SOURCE}" \
-  "${PROBE_SOURCE}" \
   "${CONCURRENCY_SOURCE}" \
   "${CONCURRENCY_SERVICE_SOURCE}" \
   "${CONCURRENCY_TIMER_SOURCE}" \
@@ -115,7 +112,6 @@ git -C "${SOURCE_ROOT}" diff --quiet -- \
   scripts/symphony/config/gem-repo-registry.json \
   scripts/symphony/gem_rehabilitation_policy.py \
   scripts/symphony/symphony_capacity_evidence.py \
-  scripts/symphony/codex-account-probe.sh \
   scripts/symphony/symphony-concurrency-controller.py \
   scripts/symphony/systemd/symphony-concurrency-controller.service \
   scripts/symphony/systemd/symphony-concurrency-controller.timer \
@@ -131,7 +127,6 @@ git -C "${SOURCE_ROOT}" diff --cached --quiet -- \
   scripts/symphony/config/gem-repo-registry.json \
   scripts/symphony/gem_rehabilitation_policy.py \
   scripts/symphony/symphony_capacity_evidence.py \
-  scripts/symphony/codex-account-probe.sh \
   scripts/symphony/symphony-concurrency-controller.py \
   scripts/symphony/systemd/symphony-concurrency-controller.service \
   scripts/symphony/systemd/symphony-concurrency-controller.timer \
@@ -174,7 +169,6 @@ if [[ "${VERIFY_ONLY}" == true ]]; then
     "${REGISTRY_CONFIG_SOURCE}" \
     "${POLICY_SOURCE}" \
     "${CAPACITY_SOURCE}" \
-    "${PROBE_SOURCE}" \
     "${CONCURRENCY_SOURCE}" \
     "${CONCURRENCY_SERVICE_SOURCE}" \
     "${CONCURRENCY_TIMER_SOURCE}" \
@@ -197,7 +191,6 @@ cp -p "${CONSUMER_TARGET}" "${BACKUP_DIR}/gem-pr-drain.py"
   cp -p "${POLICY_TARGET}" "${BACKUP_DIR}/gem_rehabilitation_policy.py"
 [[ ! -e "${CAPACITY_TARGET}" ]] || \
   cp -p "${CAPACITY_TARGET}" "${BACKUP_DIR}/symphony_capacity_evidence.py"
-[[ ! -e "${PROBE_TARGET}" ]] || cp -p "${PROBE_TARGET}" "${BACKUP_DIR}/codex-account-probe"
 [[ ! -e "${CONCURRENCY_TARGET}" ]] || \
   cp -p "${CONCURRENCY_TARGET}" "${BACKUP_DIR}/symphony-concurrency-controller"
 [[ ! -e "${CONCURRENCY_SERVICE_TARGET}" ]] || \
@@ -215,7 +208,6 @@ registry_module_existed=false
 registry_config_existed=false
 policy_existed=false
 capacity_existed=false
-probe_existed=false
 concurrency_existed=false
 concurrency_service_existed=false
 concurrency_timer_existed=false
@@ -229,7 +221,6 @@ install_complete=false
 [[ ! -e "${REGISTRY_CONFIG_TARGET}" ]] || registry_config_existed=true
 [[ ! -e "${POLICY_TARGET}" ]] || policy_existed=true
 [[ ! -e "${CAPACITY_TARGET}" ]] || capacity_existed=true
-[[ ! -e "${PROBE_TARGET}" ]] || probe_existed=true
 [[ ! -e "${CONCURRENCY_TARGET}" ]] || concurrency_existed=true
 [[ ! -e "${CONCURRENCY_SERVICE_TARGET}" ]] || concurrency_service_existed=true
 [[ ! -e "${CONCURRENCY_TIMER_TARGET}" ]] || concurrency_timer_existed=true
@@ -284,11 +275,6 @@ finish_or_rollback() {
         restore_atomic "${BACKUP_DIR}/symphony_capacity_evidence.py" "${CAPACITY_TARGET}"
       else
         rm -f "${CAPACITY_TARGET}"
-      fi
-      if [[ "${probe_existed}" == true ]]; then
-        restore_atomic "${BACKUP_DIR}/codex-account-probe" "${PROBE_TARGET}"
-      else
-        rm -f "${PROBE_TARGET}"
       fi
       if [[ "${concurrency_existed}" == true ]]; then
         restore_atomic "${BACKUP_DIR}/symphony-concurrency-controller" "${CONCURRENCY_TARGET}"
@@ -359,7 +345,6 @@ install_atomic "${REGISTRY_CONFIG_SOURCE}" "${REGISTRY_CONFIG_TARGET}" 0644
 install_atomic "${POLICY_SOURCE}" "${POLICY_TARGET}" 0644
 mkdir -p "$(dirname "${CAPACITY_TARGET}")" "$(dirname "${CONCURRENCY_SERVICE_TARGET}")"
 install_atomic "${CAPACITY_SOURCE}" "${CAPACITY_TARGET}" 0755
-install_atomic "${PROBE_SOURCE}" "${PROBE_TARGET}" 0755
 install_atomic "${CONCURRENCY_SOURCE}" "${CONCURRENCY_TARGET}" 0755
 install_atomic "${CONCURRENCY_SERVICE_SOURCE}" "${CONCURRENCY_SERVICE_TARGET}" 0644
 install_atomic "${CONCURRENCY_TIMER_SOURCE}" "${CONCURRENCY_TIMER_TARGET}" 0644
@@ -552,7 +537,6 @@ sha256sum \
   "${REGISTRY_CONFIG_TARGET}" \
   "${POLICY_TARGET}" \
   "${CAPACITY_TARGET}" \
-  "${PROBE_TARGET}" \
   "${CONCURRENCY_TARGET}" \
   "${CONCURRENCY_SERVICE_TARGET}" \
   "${CONCURRENCY_TIMER_TARGET}" \
