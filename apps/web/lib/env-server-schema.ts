@@ -185,6 +185,8 @@ export const ServerEnvSchema = z.object({
 
   // Cron job authentication
   CRON_SECRET: z.string().optional(),
+  SUMMER_BOTTLENECK_PRODUCER_SIGNING_KEY_ID: z.string().optional(),
+  SUMMER_BOTTLENECK_PRODUCER_SIGNING_PRIVATE_KEY: z.string().optional(),
   // Optional allowlist of additional hosts (comma-separated) whose
   // `x-forwarded-host` should be treated as trusted for cron routes.
   // Used for Jovie-owned preview aliases. Never trusts `*.vercel.app`.
@@ -519,6 +521,8 @@ export const ENV_KEYS = [
   'LEAD_ATTRIBUTION_SECRET',
   'URL_ENCRYPTION_KEY',
   'CRON_SECRET',
+  'SUMMER_BOTTLENECK_PRODUCER_SIGNING_KEY_ID',
+  'SUMMER_BOTTLENECK_PRODUCER_SIGNING_PRIVATE_KEY',
   'CRON_TRUSTED_HOSTS',
   'METADATA_HASH_KEY',
   'PII_ENCRYPTION_KEY',
