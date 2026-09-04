@@ -1363,6 +1363,101 @@ class ClosureObservationTests(unittest.TestCase):
         self.assertEqual(health["status"], "grace")
         self.assertFalse(health["newIssueIntakeAllowed"])
 
+    def test_cancelled_latest_run_judges_latest_verdict_run(self):
+        cancelled = {
+            "id": 43,
+            "status": "completed",
+            "conclusion": "cancelled",
+            "html_url": "https://example.test/run/43",
+            "updated_at": NOW.isoformat(),
+        }
+        completed_success = {
+            "id": 41,
+            "status": "completed",
+            "conclusion": "success",
+            "html_url": "https://example.test/run/41",
+            "updated_at": (NOW - timedelta(minutes=2)).isoformat(),
+        }
+        with mock.patch.object(
+            MODULE.subprocess,
+            "run",
+            return_value=self._controller_runs(cancelled, completed_success),
+        ):
+            result = MODULE._observe_queue_controller("JovieInc/Jovie")
+
+        self.assertEqual(result["status"], "green")
+        self.assertEqual(result["runId"], 41)
+        self.assertEqual(result["conclusion"], "success")
+
+        health = MODULE.evaluate_closure_health(
+            snapshot(controller=result),
+            previous=None,
+            now=NOW,
+        )
+        self.assertEqual(health["status"], "healthy")
+        self.assertNotIn("controller", health["episodes"])
+
+    def test_cancelled_latest_run_keeps_latest_verdict_failure_red(self):
+        cancelled = {
+            "id": 43,
+            "status": "completed",
+            "conclusion": "cancelled",
+            "html_url": "https://example.test/run/43",
+            "updated_at": NOW.isoformat(),
+        }
+        completed_failure = {
+            "id": 41,
+            "status": "completed",
+            "conclusion": "failure",
+            "html_url": "https://example.test/run/41",
+            "updated_at": (NOW - timedelta(minutes=2)).isoformat(),
+        }
+        with mock.patch.object(
+            MODULE.subprocess,
+            "run",
+            return_value=self._controller_runs(cancelled, completed_failure),
+        ):
+            result = MODULE._observe_queue_controller("JovieInc/Jovie")
+
+        self.assertEqual(result["status"], "failed")
+        self.assertEqual(result["runId"], 41)
+
+        stalled = snapshot(controller=result)
+        first = MODULE.evaluate_closure_health(stalled, previous=None, now=NOW)
+        self.assertEqual(first["status"], "grace")
+        later = MODULE.evaluate_closure_health(
+            stalled,
+            previous=first,
+            now=NOW + timedelta(minutes=11),
+        )
+        self.assertEqual(later["status"], "red")
+        self.assertIn("queue-controller-red-over-10m", later["reasons"])
+
+    def test_only_cancelled_and_active_runs_stay_recovering(self):
+        in_flight = {
+            "id": 44,
+            "status": "in_progress",
+            "conclusion": None,
+            "html_url": "https://example.test/run/44",
+            "updated_at": NOW.isoformat(),
+        }
+        cancelled = {
+            "id": 43,
+            "status": "completed",
+            "conclusion": "cancelled",
+            "html_url": "https://example.test/run/43",
+            "updated_at": (NOW - timedelta(minutes=1)).isoformat(),
+        }
+        with mock.patch.object(
+            MODULE.subprocess,
+            "run",
+            return_value=self._controller_runs(in_flight, cancelled),
+        ):
+            result = MODULE._observe_queue_controller("JovieInc/Jovie")
+
+        self.assertEqual(result["status"], "recovering")
+        self.assertEqual(result["runId"], 44)
+
 
 if __name__ == "__main__":
     unittest.main()
