@@ -213,6 +213,15 @@ test.describe('Homepage', () => {
       .toBe(1);
     expect(await copy.boundingBox()).toEqual(before);
 
+    const hydrationErrors: string[] = [];
+    page.on('console', message => {
+      if (
+        message.type() === 'error' &&
+        message.text().toLowerCase().includes('hydrat')
+      ) {
+        hydrationErrors.push(message.text());
+      }
+    });
     await page.emulateMedia({ reducedMotion: 'reduce' });
     await gotoHomepage(page);
     expect(
@@ -221,6 +230,7 @@ test.describe('Homepage', () => {
         return [style.animationName, style.opacity];
       })
     ).toEqual(['none', '1']);
+    expect(hydrationErrors).toEqual([]);
   });
 
   test('locks the nine certified sections, their order, heading lines, and CLS', async ({
