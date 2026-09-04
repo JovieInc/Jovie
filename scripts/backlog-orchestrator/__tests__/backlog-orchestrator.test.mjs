@@ -1016,7 +1016,7 @@ describe('deterministic Symphony admission boundary', () => {
       ['outputDigest', ['a'.repeat(64)]],
     ]) {
       const evidence = capacityEvidence(1);
-      evidence.acceptedEvidence[0][field] = value;
+      /** @type {any} */ (evidence.acceptedEvidence[0])[String(field)] = value;
       assert.equal(
         admitter.resolveGemConcurrency(evidence, { now: evidence.observedAt })
           .maxConcurrent,
