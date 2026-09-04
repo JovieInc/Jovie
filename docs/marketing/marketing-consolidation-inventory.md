@@ -1,13 +1,34 @@
 # Jovie public marketing consolidation inventory
 
-Status: Stage 1 source inventory and Stage 2 first-batch decision
-Owner: Gem / Symphony
+Status: Stage 3 owner-aligned packets prepared; Stage 4 browser certification blocked
+Owner: Marketing/UI consolidation lane (source); governed certification task (founder queue)
 Source snapshot: `origin/main` at `1ae47899e7456e94db0b4717f31329966b5c5597`
 Prepared: 2026-08-08
 
 This artifact is the saved handoff between the inventory, diagnosis, and
 implementation stages. It is intentionally source-first: route titles and
 historical screenshots are not treated as proof of current behavior.
+
+## Current lane update (2026-09-02)
+
+- `MARKETING_ROUTE_DISPOSITION_LEDGER` and
+  `MARKETING_EXACT_PUBLIC_ROUTE_TARGETS` are generated from
+  `MARKETING_ROUTE_MANIFEST`. The exact public target currently expands to 27
+  routes and 54 desktop/mobile capture cases; `/renders` harness routes and
+  non-page expectations stay excluded.
+- `/pay`, `/support`, and the signed-out public `/waitlist` state now have
+  source-backed component and runtime-selector bindings. This closes their
+  manifest evidence gap only. Authenticated waitlist behavior is not claimed.
+- Every exact public target is enrolled in the existing visual-QA and Product
+  Screenshots systems. Enrollment is not screenshot, diff, runtime, or founder
+  certification evidence.
+- The first exact-head browser attempt correctly failed closed on `/pay`: its
+  first main input has no visible keyboard focus indicator, the public capture
+  receives a same-origin `/api/ovie/summer` 404, and reduced-motion rendering
+  reports a `MobileNav` / `AnimatedIconSwap` hydration mismatch.
+- The governed certification task remains the sole founder-review queue owner.
+  No route is eligible for that queue until responsive, accessibility,
+  layout-stability, console/network, visual-diff, and exact-head evidence pass.
 
 ## Stage gates
 
@@ -25,6 +46,9 @@ Normative design and route sources are:
 
 - `apps/web/data/marketing/routeManifest.ts` (route-to-recipe/exemption
   binding and alias metadata).
+- `MARKETING_ROUTE_DISPOSITION_LEDGER` and
+  `MARKETING_EXACT_PUBLIC_ROUTE_TARGETS` in the same module (generated
+  disposition and exact public capture targets; never hand-maintained).
 - `apps/web/data/marketing/recipes.ts`, `sections.ts`, and `composition.ts`
   (page grammar, responsive contracts, motion budget, and section legality).
 - `apps/web/design/tokens.json`, `apps/web/design/system-release.json`,
@@ -62,17 +86,17 @@ not silently migrated in this batch.
 | `/artist-profile` | `(marketing)/artist-profile/page.tsx` | artist-lp | verified | alias of `/artist-profiles` | same `ArtistProfileLandingRoute` and chrome |
 | `/artist-notifications` | `(marketing)/artist-notifications/page.tsx` | feature | verified | — | `MarketingPageShell` + shared sections/containers |
 | `/download` | `(marketing)/download/page.tsx` | feature | verified | — | shared shell and containers; intentionally cinematic page surface |
-| `/pay` | `(marketing)/pay/page.tsx` | feature | unverified | — | delegates to `PayLanding`; body is outside the bounded route audit |
+| `/pay` | `(marketing)/pay/page.tsx` | feature | verified | — | `PayLanding` delegates its hero to `MarketingHero`; `[data-testid="pay-hero"]` is the public binding selector |
 | `/voice` | `(marketing)/voice/page.tsx` | feature | verified | noindex | shared `MarketingHero`, but local `max-w-5xl` section wrapper diverges from the canonical page grid |
 | `/instant-merch` | `(marketing)/instant-merch/page.tsx` | feature | verified | — | `MarketingPageShell` + shared containers |
 | `/launch` | `(marketing)/launch/page.tsx` | launch | verified | — | `MarketingPageShell` + shared containers; legacy visual fork remains a separate decision |
 | `/about` | `(marketing)/about/page.tsx` | seo | verified | — | shared `MarketingHero`/`MarketingContainer` |
-| `/support` | `(marketing)/support/page.tsx` | seo | unverified | — | uses shared primitives; `SupportChannels` section mapping needs a later parity pass |
+| `/support` | `(marketing)/support/page.tsx` | seo | verified | — | shared `MarketingHero` plus route support sections; `[data-testid="support-hero"]` is the public binding selector |
 | `/compare/*` | `(marketing)/compare/[slug]/page.tsx` | comparison | verified | — | shared comparison recipe and containers |
 | `/alternatives/*` | `(marketing)/alternatives/[slug]/page.tsx` | comparison | verified | — | shared comparison recipe and containers |
 | `/blog` | `(marketing)/blog/page.tsx` | blog-landing | verified | — | shared `MarketingHero`/`MarketingContainer` |
 | `/blog/category/*` | `(marketing)/blog/category/[slug]/page.tsx` | blog-landing | verified | — | shared `MarketingHero`/`MarketingContainer` |
-| `/waitlist` | `waitlist/page.tsx` | waitlist | unverified | auth-sensitive | redirect/auth state machine; do not change without auth-boundary tests |
+| `/waitlist` | `waitlist/page.tsx` | waitlist | verified | auth-sensitive | signed-out public state binds `AuthLayout` and `AuthShell` at `[data-testid="waitlist-public-landing"]`; authenticated redirects/states remain outside this claim |
 
 ### Sanctioned exempt/internal routes
 
@@ -120,9 +144,10 @@ Observed source signatures:
 - `/download` has a named cinematic surface and already uses canonical page
   containers; its surface treatment is an approved content choice, not a
   duplicate shell.
-- `/pay` delegates to a feature surface whose composition is not verified by
-  the manifest. `/waitlist` is an auth/redirect boundary, not a visual shell
-  candidate.
+- `/pay`, `/support`, and signed-out `/waitlist` have verified source
+  composition bindings. Their browser and visual certification remains
+  separate; `/waitlist` is still an auth/redirect boundary outside the
+  signed-out state.
 - Internal render routes intentionally use black/inline render-harness
   surfaces and remain out of marketing consolidation batches.
 - Artist Profiles already use `ArtistProfileLandingRoute`, shared containers,
@@ -151,8 +176,10 @@ performance fix.
 
 ### Later non-overlapping batches
 
-- B: reconcile `/pay` and `/support` manifest evidence after reading their real
-  feature bodies; add route-specific parity tests before visual changes.
+- B: source binding for `/pay`, `/support`, and signed-out `/waitlist` is
+  complete. Browser defects listed in the current lane update must pass through
+  the existing visual-QA and governed certification owners before any founder
+  review candidate exists.
 - C: artist-profile source-backed mobile pass (outcomes rail/ledger and any
   remaining bespoke motion) with narrow/desktop screenshots, reduced-motion,
   keyboard, and overflow evidence. Do not revive desktop-first layouts.

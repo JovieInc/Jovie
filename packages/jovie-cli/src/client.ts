@@ -13,6 +13,15 @@ export type ResourceOptions = {
   readonly timeoutMs?: number;
 };
 
+export class JovieInputError extends Error {
+  readonly code = 'INVALID_INPUT' as const;
+
+  constructor(message: string) {
+    super(message);
+    this.name = 'JovieInputError';
+  }
+}
+
 export class JovieRequestError extends Error {
   readonly code = 'REQUEST_FAILED' as const;
 
@@ -37,7 +46,7 @@ export function normalizeBaseUrl(baseUrl = DEFAULT_BASE_URL): string {
   try {
     url = new URL(baseUrl);
   } catch {
-    throw new JovieRequestError(`Invalid base URL: ${baseUrl}`, baseUrl);
+    throw new JovieInputError(`Invalid base URL: ${baseUrl}`);
   }
 
   if (
@@ -48,9 +57,8 @@ export function normalizeBaseUrl(baseUrl = DEFAULT_BASE_URL): string {
     url.hash ||
     (url.pathname !== '/' && url.pathname !== '')
   ) {
-    throw new JovieRequestError(
-      'Base URL must be an http(s) origin without credentials, a path, or query parameters.',
-      baseUrl
+    throw new JovieInputError(
+      'Base URL must be an http(s) origin without credentials, a path, or query parameters.'
     );
   }
 
@@ -141,9 +149,8 @@ export function validateUsername(username: string): string {
     normalized.length > 30 ||
     !/^[a-zA-Z0-9._-]+$/.test(normalized)
   ) {
-    throw new JovieRequestError(
-      'Username must be 3-30 characters and contain only letters, numbers, dots, underscores, or hyphens.',
-      `${DEFAULT_BASE_URL}/${encodeURIComponent(username)}`
+    throw new JovieInputError(
+      'Username must be 3-30 characters and contain only letters, numbers, dots, underscores, or hyphens.'
     );
   }
   return normalized;

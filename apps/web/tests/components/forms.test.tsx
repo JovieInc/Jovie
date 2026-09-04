@@ -40,6 +40,11 @@ describe('Form Accessibility and Validation', () => {
 
       // Check title is rendered
       expect(screen.getByText('Please fix the errors')).toBeInTheDocument();
+      const summary = screen.getByRole('alert');
+      expect(summary).toHaveClass('bg-error-subtle', 'border-error/20');
+      expect(summary).not.toHaveAttribute('aria-live');
+      expect(summary).not.toHaveAttribute('aria-atomic');
+      expect(summary.className).not.toMatch(/\b(?:bg|border|text|ring)-red-/);
 
       // Check error messages are rendered
       expect(screen.getByText('Name is required')).toBeInTheDocument();
@@ -48,6 +53,22 @@ describe('Form Accessibility and Validation', () => {
       // Check focus functionality
       fireEvent.click(screen.getByText('Name is required'));
       expect(onFocusField).toHaveBeenCalledWith('name');
+    });
+
+    it('uses a unique heading id for each rendered summary', () => {
+      render(
+        <>
+          <ErrorSummary errors={{ name: 'Name is required' }} />
+          <ErrorSummary errors={{ email: 'Email is invalid' }} />
+        </>
+      );
+
+      const labelledBy = screen
+        .getAllByRole('alert')
+        .map(summary => summary.getAttribute('aria-labelledby'));
+
+      expect(new Set(labelledBy).size).toBe(2);
+      expect(labelledBy.every(Boolean)).toBe(true);
     });
 
     it('does not render when there are no errors', () => {

@@ -84,7 +84,7 @@ export function RevenueLiftDashboardView({
         </p>
         <h2
           id='revenue-lift-irpaa-heading'
-          className='mt-1 text-sm font-medium text-primary-token'
+          className='mt-1 text-sm font-medium text-primary-token line-clamp-2'
         >
           Incremental Revenue Per Active Artist (IRPAA)
         </h2>
@@ -113,7 +113,7 @@ export function RevenueLiftDashboardView({
       <section aria-labelledby='revenue-lift-kpi-heading'>
         <h2
           id='revenue-lift-kpi-heading'
-          className='mb-3 text-sm font-medium text-primary-token'
+          className='mb-3 text-sm font-medium text-primary-token line-clamp-2'
         >
           KPI Tree
         </h2>
@@ -130,7 +130,7 @@ export function RevenueLiftDashboardView({
       <section aria-labelledby='revenue-lift-map-heading'>
         <h2
           id='revenue-lift-map-heading'
-          className='mb-3 text-sm font-medium text-primary-token'
+          className='mb-3 text-sm font-medium text-primary-token line-clamp-2'
         >
           Metric → Signal → VC Interpretation
         </h2>
@@ -138,10 +138,18 @@ export function RevenueLiftDashboardView({
           <table className='w-full min-w-[40rem] text-left text-sm'>
             <thead className='border-b border-subtle bg-surface-0 text-xs text-secondary-token'>
               <tr>
-                <th className='px-3 py-2 font-medium'>Metric</th>
-                <th className='px-3 py-2 font-medium'>Value</th>
-                <th className='px-3 py-2 font-medium'>Signal</th>
-                <th className='px-3 py-2 font-medium'>VC Interpretation</th>
+                <th className='px-3 py-2 font-medium whitespace-nowrap'>
+                  Metric
+                </th>
+                <th className='px-3 py-2 font-medium whitespace-nowrap'>
+                  Value
+                </th>
+                <th className='px-3 py-2 font-medium whitespace-nowrap'>
+                  Signal
+                </th>
+                <th className='px-3 py-2 font-medium whitespace-nowrap'>
+                  VC Interpretation
+                </th>
               </tr>
             </thead>
             <tbody>
@@ -180,7 +188,7 @@ export function RevenueLiftDashboardView({
       <section aria-labelledby='revenue-lift-cohort-heading'>
         <h2
           id='revenue-lift-cohort-heading'
-          className='mb-3 text-sm font-medium text-primary-token'
+          className='mb-3 text-sm font-medium text-primary-token line-clamp-2'
         >
           Per Artist Cohort
         </h2>
@@ -217,11 +225,21 @@ export function RevenueLiftDashboardView({
           <table className='w-full min-w-[32rem] text-left text-sm'>
             <thead className='border-b border-subtle bg-surface-0 text-xs text-secondary-token'>
               <tr>
-                <th className='px-3 py-2 font-medium'>User</th>
-                <th className='px-3 py-2 font-medium'>Cohort</th>
-                <th className='px-3 py-2 font-medium'>Signal</th>
-                <th className='px-3 py-2 font-medium'>Baseline</th>
-                <th className='px-3 py-2 font-medium'>Lift</th>
+                <th className='px-3 py-2 font-medium whitespace-nowrap'>
+                  User
+                </th>
+                <th className='px-3 py-2 font-medium whitespace-nowrap'>
+                  Cohort
+                </th>
+                <th className='px-3 py-2 font-medium whitespace-nowrap'>
+                  Signal
+                </th>
+                <th className='px-3 py-2 font-medium whitespace-nowrap'>
+                  Baseline
+                </th>
+                <th className='px-3 py-2 font-medium whitespace-nowrap'>
+                  Lift
+                </th>
               </tr>
             </thead>
             <tbody>
@@ -272,7 +290,7 @@ export function RevenueLiftDashboardView({
       <section aria-labelledby='revenue-lift-agents-heading'>
         <h2
           id='revenue-lift-agents-heading'
-          className='mb-3 text-sm font-medium text-primary-token'
+          className='mb-3 text-sm font-medium text-primary-token line-clamp-2'
         >
           Multi Agent Contribution
         </h2>
@@ -280,12 +298,24 @@ export function RevenueLiftDashboardView({
           <table className='w-full min-w-[36rem] text-left text-sm'>
             <thead className='border-b border-subtle bg-surface-0 text-xs text-secondary-token'>
               <tr>
-                <th className='px-3 py-2 font-medium'>Agent</th>
-                <th className='px-3 py-2 font-medium'>Tasks</th>
-                <th className='px-3 py-2 font-medium'>Success</th>
-                <th className='px-3 py-2 font-medium'>Override</th>
-                <th className='px-3 py-2 font-medium'>Cost / Opp</th>
-                <th className='px-3 py-2 font-medium'>Total Cost</th>
+                <th className='px-3 py-2 font-medium whitespace-nowrap'>
+                  Agent
+                </th>
+                <th className='px-3 py-2 font-medium whitespace-nowrap'>
+                  Tasks
+                </th>
+                <th className='px-3 py-2 font-medium whitespace-nowrap'>
+                  Success
+                </th>
+                <th className='px-3 py-2 font-medium whitespace-nowrap'>
+                  Override
+                </th>
+                <th className='px-3 py-2 font-medium whitespace-nowrap'>
+                  Cost / Opp
+                </th>
+                <th className='px-3 py-2 font-medium whitespace-nowrap'>
+                  Total Cost
+                </th>
               </tr>
             </thead>
             <tbody>

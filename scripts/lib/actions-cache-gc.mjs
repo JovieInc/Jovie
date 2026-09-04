@@ -3,7 +3,8 @@ import { pathToFileURL } from 'node:url';
 
 export const CACHE_COUNT_SOFT_LIMIT = 400;
 export const CACHE_BYTES_SOFT_LIMIT = 8 * 1024 * 1024 * 1024;
-export const PROTECTED_KEY = /pnpm|node-cache|playwright|setup-node/i;
+export const PROTECTED_KEY =
+  /pnpm|node-cache|playwright|setup-node|swiftpm|pip|electron-downloads/i;
 export const PROTECTED_MAX_AGE_MS = 14 * 24 * 60 * 60 * 1000;
 export const TURBO_KEEP_UNDER_BUDGET = 2;
 export const TURBO_KEEP_OVER_BUDGET = 1;
@@ -46,6 +47,11 @@ function evictRecord(cache, reason) {
     reason,
     size_in_bytes: cache.size_in_bytes ?? 0,
   };
+}
+
+function cacheSizeBytes(cache) {
+  const size = Number(cache?.size_in_bytes ?? 0);
+  return Number.isFinite(size) && size > 0 ? size : 0;
 }
 
 /** @param {Record<string, any>} [input] */
@@ -125,7 +131,7 @@ export function planCacheGc(input = {}) {
     }
   }
 
-  const keep = [];
+  let keep = [];
   for (const cache of afterTurbo) {
     const stale = nowMs - accessedAtMs(cache) > PROTECTED_MAX_AGE_MS;
     if (overBudget && isProtectedCacheKey(cache.key) && stale) {
@@ -135,9 +141,30 @@ export function planCacheGc(input = {}) {
     keep.push(cache);
   }
 
+  let keepBytes = keep.reduce(
+    (total, cache) => total + cacheSizeBytes(cache),
+    0
+  );
+  if (overBudget && keepBytes > CACHE_BYTES_SOFT_LIMIT) {
+    const budgetEvictions = new Set();
+    const leastRecentlyUsed = [...keep].sort(
+      (left, right) =>
+        accessedAtMs(left) - accessedAtMs(right) ||
+        cacheSizeBytes(right) - cacheSizeBytes(left)
+    );
+    for (const cache of leastRecentlyUsed) {
+      if (keepBytes <= CACHE_BYTES_SOFT_LIMIT) break;
+      budgetEvictions.add(cache.id);
+      keepBytes -= cacheSizeBytes(cache);
+      evict.push(evictRecord(cache, 'budget_lru'));
+    }
+    keep = keep.filter(cache => !budgetEvictions.has(cache.id));
+  }
+
   return {
     evict,
     keep,
+    keepBytes,
     overBudget,
     turboKeep,
     protectedRetained: keep.filter(cache => isProtectedCacheKey(cache.key))
@@ -249,6 +276,7 @@ async function main() {
     cacheCount: snapshot.caches.length,
     evictCount: plan.evict.length,
     keepCount: plan.keep.length,
+    keepBytes: plan.keepBytes,
     overBudget: plan.overBudget,
     turboKeep: plan.turboKeep,
     protectedRetained: plan.protectedRetained,

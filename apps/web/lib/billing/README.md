@@ -9,7 +9,7 @@ What's here:
 
 ## Plan tiers (canonical: `lib/entitlements/registry.ts`)
 
-- **Free** — limited analytics window, capped contacts, capped daily AI messages
+- **Free** — limited analytics window, capped contacts, capped weekly AI messages
 - **Pro** — $39/mo or $375/yr — verified badge, full analytics, notifications, pre-save campaigns
 - **Max** — $149/mo or $1430/yr — Pro plus team management, webhooks, white-label, email campaigns
 - **Trial** — 14-day reverse trial granting Pro-tier features (with a tighter notification cap, see `feedback_pricing_strategy` in memory)

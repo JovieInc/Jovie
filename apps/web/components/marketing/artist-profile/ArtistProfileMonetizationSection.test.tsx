@@ -29,9 +29,9 @@ describe('ArtistProfileMonetizationSection source contract', () => {
     expect(
       screen.getByRole('heading', {
         level: 2,
-        name: ARTIST_PROFILE_COPY.monetization.headline,
+        name: 'Get paid. Again and again.',
       })
-    ).toBeInTheDocument();
+    ).toHaveClass('line-clamp-2');
     expect(
       screen.getByText(ARTIST_PROFILE_COPY.monetization.subhead)
     ).toBeInTheDocument();

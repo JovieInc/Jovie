@@ -91,7 +91,7 @@ export function HomeV1Design() {
 
             <h1
               id='home-hero-heading'
-              className='max-w-[12ch] text-[56px] font-semibold leading-[0.88] text-white dark:text-white sm:text-[84px] lg:text-[116px] xl:text-[132px]'
+              className='max-w-[12ch] text-[56px] font-semibold leading-[0.88] text-white dark:text-white sm:text-[84px] lg:text-[116px] xl:text-[132px] line-clamp-2'
             >
               Release Work, Finally Organized.
             </h1>
@@ -109,7 +109,7 @@ export function HomeV1Design() {
                 {/* eslint-disable @jovie/canonical-ui-label-casing -- Preserve approved sentence-case homepage copy; this change only adds semantic heading markup. */}
                 <h2
                   id='home-request-heading'
-                  className='text-mid leading-6 text-white/78'
+                  className='text-mid leading-6 text-white/78 line-clamp-2'
                 >
                   Tell Jovie what you are releasing next. Your request becomes
                   the context we use to shape setup, profile work, and the

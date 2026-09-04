@@ -66,7 +66,7 @@ describe('homepage v2 (/new) System B source contract', () => {
     expect(source).toContain('text-tertiary-token');
     expect(source).toContain('public-action-primary');
     expect(source).toContain('public-action-secondary');
-    expect(source).toContain("data-testid='homepage-v2-shell'");
+    expect(source).toContain("testId='homepage-v2-shell'");
     expect(source).toContain("data-testid='homepage-v2-hero'");
   });
 });

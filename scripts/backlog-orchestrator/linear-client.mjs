@@ -20,7 +20,25 @@ export const LINEAR_MAX_ATTEMPTS = 3;
 export const LINEAR_RETRY_BASE_MS = 100;
 export const LINEAR_MAX_ERROR_BODY_LENGTH = 256;
 export const LINEAR_PAGE_SIZE = 50;
+export const LINEAR_MIN_PAGE_SIZE = 6;
 export const LINEAR_MAX_PAGES = 1000;
+// Linear rejects queries whose static complexity exceeds this ceiling with
+// HTTP 400 INPUT_ERROR "Query too complex"; the pagination layer answers by
+// halving the connection page size instead of dying.
+export const LINEAR_QUERY_COMPLEXITY_CEILING = 10_000;
+export const LINEAR_FLEET_CLOSURE_ISSUE_STATE_NAMES = Object.freeze([
+  'Triage',
+  'Backlog',
+  'Todo',
+  'In Progress',
+  'In Review',
+  'Done',
+  'Completed',
+  'Canceled',
+  'Cancelled',
+  'Closed',
+  'Duplicate',
+]);
 
 const RETRYABLE_STATUS = new Set([429, 500, 502, 503, 504]);
 const JSON_CONTENT_TYPE = /(^|;)\s*application\/json\s*(;|$)/i;
@@ -86,23 +104,54 @@ function paginationCoverage({
   };
 }
 
+const COMPLEXITY_ERROR_MESSAGE = /too complex/i;
+
+/**
+ * True when a Linear failure is the GraphQL query-complexity ceiling
+ * (HTTP 400 INPUT_ERROR "Query too complex"). Detection reads the transport
+ * error's message and redacted body so both the 400 path and a 200-with-errors
+ * path are caught; other INPUT_ERROR validation failures must not match.
+ * @param {any} error
+ */
+export function isLinearComplexityError(error) {
+  return COMPLEXITY_ERROR_MESSAGE.test(
+    [error?.message, error?.body].filter(Boolean).join('\n')
+  );
+}
+
 /**
  * Collect one complete Linear connection without silently truncating it.
  * The caller supplies the page query so this invariant remains source-blind
  * and unit-testable. A partial connection is an error, never an empty result.
+ *
+ * fetchPage receives (cursor, pageSize). When a page fetch fails against
+ * Linear's query complexity ceiling the SAME page is retried with a halved
+ * page size (50 → 25 → 12 → 6) and pagination then resumes at the reduced
+ * size; a page that still fails at the floor fails closed with a typed
+ * COMPLEXITY_FLOOR error naming the ceiling. All other failures keep the
+ * existing fail-fast PAGE_FETCH_FAILED semantics (rate limiting included).
  */
 export async function collectLinearConnectionPages(
   fetchPage,
-  { maxPages = LINEAR_MAX_PAGES } = {}
+  {
+    maxPages = LINEAR_MAX_PAGES,
+    initialPageSize = LINEAR_PAGE_SIZE,
+    minPageSize = LINEAR_MIN_PAGE_SIZE,
+  } = {}
 ) {
   if (!Number.isInteger(maxPages) || maxPages < 1)
     throw new TypeError('maxPages must be a positive integer');
+  if (!Number.isInteger(initialPageSize) || initialPageSize < 1)
+    throw new TypeError('initialPageSize must be a positive integer');
+  if (!Number.isInteger(minPageSize) || minPageSize < 1)
+    throw new TypeError('minPageSize must be a positive integer');
 
   const issues = [];
   const seenIds = new Set();
   const seenCursors = new Set();
   let cursor = null;
   let pages = 0;
+  let pageSize = initialPageSize;
 
   while (true) {
     if (pages >= maxPages) {
@@ -122,8 +171,26 @@ export async function collectLinearConnectionPages(
 
     let edge;
     try {
-      edge = await fetchPage(cursor);
+      edge = await fetchPage(cursor, pageSize);
     } catch (cause) {
+      if (isLinearComplexityError(cause)) {
+        if (pageSize > minPageSize) {
+          pageSize = Math.max(minPageSize, Math.floor(pageSize / 2));
+          continue;
+        }
+        const coverage = paginationCoverage({
+          complete: false,
+          pages,
+          scanned: issues.length,
+          hasNextPage: true,
+          endCursor: cursor,
+          reason: 'complexity-floor',
+        });
+        throw new LinearPaginationError(
+          `Linear pagination page exceeded the query complexity ceiling (${LINEAR_QUERY_COMPLEXITY_CEILING}) at the minimum page size (${minPageSize})`,
+          { code: 'COMPLEXITY_FLOOR', coverage, cause }
+        );
+      }
       const coverage = paginationCoverage({
         complete: false,
         pages,
@@ -460,23 +527,24 @@ export async function fetchTeamTriageIssues(
 /**
  * Fetch an exhaustive active-issue snapshot plus a machine-readable coverage
  * receipt. Callers must not treat a pagination error as an empty team.
+ * @param {string} teamId
+ * @param {{ graphqlImpl?: typeof graphql, maxPages?: number, stateNames?: readonly string[] }} [options]
  */
 export async function fetchTeamActiveIssueSnapshot(
   teamId,
-  { graphqlImpl = graphql, maxPages = LINEAR_MAX_PAGES } = {}
+  { graphqlImpl = graphql, maxPages = LINEAR_MAX_PAGES, stateNames } = {}
 ) {
+  const stateNameFilter = stateNames ? [...stateNames] : null;
   return collectLinearConnectionPages(
-    async cursor => {
+    async (cursor, pageSize) => {
       const data = await graphqlImpl(
         `
-      query($teamId: String!, $cursor: String) {
+      query($teamId: String!, $cursor: String, $pageSize: Int!, $stateNames: [String!] = ["Triage", "Backlog", "Todo", "In Progress", "In Review"]) {
         team(id: $teamId) {
           issues(
-            first: 50,
+            first: $pageSize,
             after: $cursor,
-            filter: {
-              state: { name: { in: ["Triage", "Backlog", "Todo", "In Progress", "In Review"] } }
-            }
+            filter: { state: { name: { in: $stateNames } } }
           ) {
             nodes {
               id
@@ -504,6 +572,10 @@ export async function fetchTeamActiveIssueSnapshot(
                 nodes { type relatedIssue { id identifier title } }
                 pageInfo { hasNextPage endCursor }
               }
+              attachments(first: 50) {
+                nodes { id title subtitle url sourceType metadata }
+                pageInfo { hasNextPage endCursor }
+              }
               state { id name type }
               comments(first: 50) {
                 nodes { id body createdAt }
@@ -515,12 +587,25 @@ export async function fetchTeamActiveIssueSnapshot(
         }
       }
     `,
-        { teamId, cursor }
+        stateNameFilter
+          ? { teamId, cursor, pageSize, stateNames: stateNameFilter }
+          : { teamId, cursor, pageSize }
       );
       return data?.team?.issues;
     },
     { maxPages }
   );
+}
+
+/**
+ * @param {string} teamId
+ * @param {{ graphqlImpl?: typeof graphql, maxPages?: number, stateNames?: readonly string[] }} [options]
+ */
+export async function fetchTeamFleetClosureIssueSnapshot(teamId, options = {}) {
+  return fetchTeamActiveIssueSnapshot(teamId, {
+    ...options,
+    stateNames: options.stateNames ?? LINEAR_FLEET_CLOSURE_ISSUE_STATE_NAMES,
+  });
 }
 
 /** Fetch only the issues while retaining exhaustive snapshot semantics. */

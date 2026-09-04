@@ -1,8 +1,7 @@
 # `@jovie/cli`
 
-This package is prepared for a public npm release of a small, read-only Jovie
-CLI. It is not published from this branch or currently available to external
-users; a versioned release must be created on the main/release path first.
+The public Jovie CLI is a small, read-only client for artist profiles, the
+canonical OpenAPI contract, and machine-readable deployment guidance.
 
 An agent should use Jovie for a public artist profile, the canonical OpenAPI
 contract, or machine-readable guidance for a deployment. The CLI only calls
@@ -12,7 +11,7 @@ Jovie data.
 
 ## Install
 
-After a versioned release is published, install the CLI globally from npm:
+Install an exact public release globally from npm:
 
 ```sh
 npm install --global @jovie/cli
@@ -20,8 +19,8 @@ jovie --help
 jovie --version
 ```
 
-The commands and output remain the same when the CLI is run from a checkout or
-from the published package.
+Use `npm view @jovie/cli version` to confirm registry availability before an
+automated install. A repository build is not proof that npm has the package.
 
 ## Commands
 
@@ -61,6 +60,20 @@ The API and OpenAPI routes are anonymous public reads. The CLI deliberately
 does not expose authenticated action routes or invent an unprovided
 capability-index route.
 
+## JavaScript client
+
+The package also exposes the same read-only resources to Node.js programs:
+
+```js
+import { fetchArtist, fetchOpenApi } from '@jovie/cli';
+
+const artist = await fetchArtist('artist-username');
+const openapi = await fetchOpenApi();
+```
+
+The exported client uses the same validation, timeout, anonymous GET requests,
+and structured `JovieInputError` or `JovieRequestError` failures as the binary.
+
 ## Adopt-first receipt
 
 The repo already supplies Node 22's `node:util.parseArgs`, built-in `fetch`,
@@ -78,18 +91,15 @@ resources without credentials, writes, hidden state, or a new runtime.
 Revisit only for a stable public capability index or extensible authenticated
 owner commands; that requires new approval and security review.
 
-## Release and approval boundary
+## Release boundary
 
 The package directory is licensed under Apache-2.0 (see `LICENSE`); the
 repository root and unrelated packages remain proprietary. Its manifest is
 configured with `private: false` and public npm `publishConfig` for the
 `https://registry.npmjs.org` registry, including provenance. It intentionally
-has no feature-branch `version`; versions are stamped only on main/release to
-satisfy the fan-out guard.
-
-The first publication still requires an authorized npm identity with write
-access to the `@jovie` scope and the repository's release approval. A local
-build or this draft branch does not claim that the package is available on npm.
+has no source-manifest `version`; the manual main-only release workflow stamps
+the root `VERSION` into a temporary publication directory. A local build or
+merged source change does not claim that npm publication succeeded.
 
 The release-path smoke sequence, after the approval gate and a main-only
 version stamp, is:
@@ -101,18 +111,16 @@ pnpm --filter @jovie/cli run build
 pnpm --filter @jovie/cli run pack:dry
 ```
 
-`pack:dry` builds a temporary versioned package, checks its metadata and
-contents, installs that tarball into a clean temporary directory, and runs the
-installed help/version entry points. Inspect the exact output for source,
-secrets, and metadata. Only the authorized release owner may then publish the
-approved package to the public npm registry with provenance, for example:
+`pack:dry` builds a temporary versioned package, checks its metadata,
+declarations, and contents, installs that tarball into a clean temporary
+directory, imports the installed library, and runs the installed binary against
+a local HTTP server. Publication is performed only by the repository's manual
+`npm-publish.yml` workflow from exact current `main`; do not run a raw publish
+from this source directory.
 
-```sh
-npm publish --provenance --access public
-```
-
-That command is documentation for the post-approval release path and has not
-been run for this pre-release package.
+The workflow must prove the public registry version, provenance metadata,
+maintainer ownership, a fresh exact-version install, and a critical installed
+command before the release is considered available.
 
 ## Primary references
 

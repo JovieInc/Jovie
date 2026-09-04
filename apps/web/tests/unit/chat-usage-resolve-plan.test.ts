@@ -44,7 +44,7 @@ describe('resolveChatUsagePlan', () => {
     expect(resolveChatUsagePlan('unknown')).toBe('free');
   });
 
-  it('maps trial to free (chat usage narrows to three-tier plan)', () => {
-    expect(resolveChatUsagePlan('trial')).toBe('free');
+  it('preserves trial so usage UI can show the 50/week quota', () => {
+    expect(resolveChatUsagePlan('trial')).toBe('trial');
   });
 });

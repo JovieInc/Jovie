@@ -71,6 +71,7 @@ export type ProfileWorkspaceRow =
   | ProfileWorkspaceConnectorRow;
 
 export interface ProfilesWorkspaceData {
+  readonly profileId: string;
   readonly artist: {
     readonly name: string;
     readonly username: string;
@@ -364,6 +365,7 @@ export async function loadProfilesWorkspaceData(input: {
   const currentResults = rankRows.filter(row => row.runId === latestRun?.id);
 
   return {
+    profileId: input.profileId,
     artist: {
       name:
         profileRows[0]?.displayName?.trim() || profileRows[0]?.username || '',
