@@ -9,6 +9,7 @@ import {
 } from 'eve/channels/auth';
 import {
   ingestSummerBottleneckSnapshot,
+  type SummerBottleneckDependencies,
   summerBottleneckSnapshotSchema,
 } from '../lib/summer-bottleneck-loop';
 import { createVercelBlobBottleneckDependencies } from '../lib/vercel-blob-bottleneck-runtime';
@@ -78,6 +79,66 @@ export async function readBoundedSummerBottleneckJson(
   return JSON.parse(body + decoder.decode());
 }
 
+type SummerBottleneckHandlerDependencies = {
+  readonly authenticate: (request: Request) => Promise<unknown>;
+  readonly createRuntime: () => SummerBottleneckDependencies;
+  readonly requireDispatchAuthority: () => void;
+};
+
+export async function handleSummerBottleneckRequest(
+  request: Request,
+  dependencies: SummerBottleneckHandlerDependencies = {
+    authenticate: incoming => routeAuth(incoming, ovieSummerBottleneckOidcAuth),
+    createRuntime: createVercelBlobBottleneckDependencies,
+    requireDispatchAuthority: () =>
+      bindEvePilotIdentity('summer').require('symphony-bounded-dispatch'),
+  }
+): Promise<Response> {
+  const auth = await dependencies.authenticate(request);
+  if (auth instanceof Response) return auth;
+  dependencies.requireDispatchAuthority();
+  let input: unknown;
+  try {
+    input = await readBoundedSummerBottleneckJson(request);
+  } catch (error) {
+    const oversized =
+      error instanceof Error && error.message === 'body-too-large';
+    return Response.json(
+      { ok: false, code: oversized ? 'body_too_large' : 'invalid_json' },
+      { status: oversized ? 413 : 400 }
+    );
+  }
+  const parsed = summerBottleneckSnapshotSchema.safeParse(input);
+  if (!parsed.success) {
+    return Response.json(
+      { ok: false, code: 'invalid_bottleneck_snapshot' },
+      { status: 422 }
+    );
+  }
+  let runtime: SummerBottleneckDependencies;
+  try {
+    runtime = dependencies.createRuntime();
+  } catch {
+    return Response.json(
+      { ok: false, code: 'bottleneck_runtime_unavailable' },
+      { status: 503 }
+    );
+  }
+  try {
+    const receipt = await ingestSummerBottleneckSnapshot(parsed.data, runtime);
+    const duplicate = receipt.decision === 'duplicate-replay-rejected';
+    return Response.json(
+      { ok: !duplicate, receipt },
+      { status: duplicate ? 409 : 202 }
+    );
+  } catch {
+    return Response.json(
+      { ok: false, code: 'bottleneck_processing_failed' },
+      { status: 503 }
+    );
+  }
+}
+
 export default defineChannel<SummerBottleneckChannelState>({
   state: {
     dispatchAuthority: 'bounded-repair',
@@ -87,52 +148,7 @@ export default defineChannel<SummerBottleneckChannelState>({
   metadata: state => state,
   routes: [
     POST('/ovie/v1/summer-bottleneck/events', async request => {
-      const auth = await routeAuth(request, ovieSummerBottleneckOidcAuth);
-      if (auth instanceof Response) return auth;
-      bindEvePilotIdentity('summer').require('symphony-bounded-dispatch');
-      let input: unknown;
-      try {
-        input = await readBoundedSummerBottleneckJson(request);
-      } catch (error) {
-        const oversized =
-          error instanceof Error && error.message === 'body-too-large';
-        return Response.json(
-          { ok: false, code: oversized ? 'body_too_large' : 'invalid_json' },
-          { status: oversized ? 413 : 400 }
-        );
-      }
-      const parsed = summerBottleneckSnapshotSchema.safeParse(input);
-      if (!parsed.success) {
-        return Response.json(
-          { ok: false, code: 'invalid_bottleneck_snapshot' },
-          { status: 422 }
-        );
-      }
-      let dependencies;
-      try {
-        dependencies = createVercelBlobBottleneckDependencies();
-      } catch {
-        return Response.json(
-          { ok: false, code: 'bottleneck_runtime_unavailable' },
-          { status: 503 }
-        );
-      }
-      try {
-        const receipt = await ingestSummerBottleneckSnapshot(
-          parsed.data,
-          dependencies
-        );
-        const duplicate = receipt.decision === 'duplicate-replay-rejected';
-        return Response.json(
-          { ok: !duplicate, receipt },
-          { status: duplicate ? 409 : 202 }
-        );
-      } catch {
-        return Response.json(
-          { ok: false, code: 'bottleneck_processing_failed' },
-          { status: 503 }
-        );
-      }
+      return handleSummerBottleneckRequest(request);
     }),
   ],
 });
