@@ -59,6 +59,7 @@ import {
   formatDesktopBuildIdentityDisplay,
   renderDesktopBuildIdentitySection,
   resolveDesktopBuildIdentity,
+  resolveDesktopBuildIdentityIpcRequest,
   toDesktopBuildIdentityJson,
 } from './build-identity';
 import { BAKED_DESKTOP_BUILD_IDENTITY } from './build-identity.generated';
@@ -214,6 +215,7 @@ const TRAY_ACTION_CHANNEL = 'tray-action';
 /** Renderer → main: first successful React paint of the hosted app (JOV-3595). */
 const APP_BOOTED_CHANNEL = 'app-booted';
 const LAUNCH_OPERATOR_CONTROL_CHANNEL = 'launch-operator-control';
+const GET_BUILD_IDENTITY_CHANNEL = 'get-build-identity';
 type UpdateChannel =
   | typeof UPDATE_AVAILABLE_CHANNEL
   | typeof UPDATE_DOWNLOADED_CHANNEL;
@@ -2422,6 +2424,18 @@ autoUpdater.on('error', () => {
     app.quit();
   }
 });
+
+// Return only the already-validated identity, and only to the trusted app origin.
+ipcMain.handle(
+  GET_BUILD_IDENTITY_CHANNEL,
+  (event: IpcMainInvokeEvent, ...args: unknown[]) => {
+    return resolveDesktopBuildIdentityIpcRequest({
+      trustedSender: isTrustedIpcSender(event),
+      args,
+      identity: desktopBuildIdentity,
+    });
+  }
+);
 
 // Allow renderer to trigger quit-and-install without exposing node access.
 ipcMain.handle(
