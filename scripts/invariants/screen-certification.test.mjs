@@ -102,6 +102,10 @@ describe('JOV-INV-018 screen-certification/v2', () => {
       kindOf('apps/ios/Jovie/Features/Library/LibrarySurfaceView.swift'),
       'registered'
     );
+    assert.equal(
+      kindOf('apps/ios/Jovie/Features/Chat/MobileChatView.swift'),
+      'registered'
+    );
     assert.equal(kindOf('apps/web/app/(home)/page.tsx'), 'registered');
     assert.equal(kindOf('apps/web/app/error.tsx'), 'registered');
     assert.equal(kindOf('apps/web/app/global-error.tsx'), 'registered');

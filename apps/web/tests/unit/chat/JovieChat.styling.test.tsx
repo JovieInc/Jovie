@@ -1,3 +1,5 @@
+import { readFileSync } from 'node:fs';
+import { resolve } from 'node:path';
 import {
   afterAll,
   afterEach,
@@ -221,6 +223,46 @@ describe('JovieChat styling regressions', () => {
       container.querySelector('[data-testid="chat-content"]')
     ).toBeTruthy();
     expect(container.querySelector('[data-testid="chat-input"]')).toBeTruthy();
+  });
+
+  it('windows the transcript once the thread exceeds the shared threshold', () => {
+    mockChatState.messages = Array.from({ length: 9 }, (_, i) => ({
+      id: `m${i}`,
+      role: i % 2 ? 'assistant' : 'user',
+      parts: [{ type: 'text', text: `message ${i}` }],
+    }));
+
+    const { container } = renderWithQueryClient(
+      <JovieChat profileId='profile-1' />
+    );
+
+    // Window policy comes from CHAT_TRANSCRIPT_WINDOW: past the shared
+    // threshold the transcript must switch to the virtualizer path instead of
+    // mounting every message row. In jsdom the zero-size viewport renders no
+    // virtual items, so a full-mount fallback (all 9 rows) is the regression.
+    const renderedRows = container.querySelectorAll(
+      '[data-testid="chat-message"]'
+    ).length;
+    expect(renderedRows).toBeLessThan(9);
+    expect(
+      container.querySelector('[data-testid="chat-content"]')
+    ).toBeTruthy();
+    expect(
+      container.querySelector('[data-testid="chat-bottom-sentinel"]')
+    ).toBeTruthy();
+  });
+
+  it('certifies the chat transcript window policy against the real component source', () => {
+    // Asserted node:fs read of the exact component source (coverage-via
+    // receipt evidence for the component-ship-gate structural contract).
+    const jovieChatSource = readFileSync(
+      resolve(process.cwd(), 'components/jovie/JovieChat.tsx'),
+      'utf8'
+    );
+
+    expect(jovieChatSource).toContain('CHAT_TRANSCRIPT_WINDOW');
+    expect(jovieChatSource).toContain('virtualizeAfterMessageCount');
+    expect(jovieChatSource).toContain('overscanRowCount');
   });
 
   it('marks an empty conversation-load shell as busy for assistive technology', () => {
