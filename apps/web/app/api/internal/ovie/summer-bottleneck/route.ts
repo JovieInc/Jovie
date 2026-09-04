@@ -10,7 +10,7 @@ export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
 
 const EVE_BOTTLENECK_URL =
-  'https://jovie-eve-shadow-staging.vercel.app/ovie/v1/summer-bottleneck/events';
+  'https://jovie-eve-shadow-qj7qmxggt-jovie.vercel.app/ovie/v1/summer-bottleneck/events';
 const MAX_BODY_BYTES = 64 * 1024;
 const MAX_SIGNAL_AGE_MS = 15 * 60 * 1000;
 const MAX_CLOCK_SKEW_MS = 60 * 1000;
