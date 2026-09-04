@@ -974,7 +974,7 @@ export function serializationKeysForFile(file) {
       reason: 'web library subsystem',
       file: normalized,
     });
-  } else if (normalized.startsWith('scripts/hermes/')) {
+  } else if (normalized.startsWith('scripts/symphony/')) {
     keys.push({
       key: `subsystem:${firstDirectory(normalized, 3)}`,
       reason: 'Hermes automation subsystem',
