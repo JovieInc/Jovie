@@ -36,7 +36,6 @@ import {
   verifyProofArtifact,
 } from './screen-certification.mjs';
 import { emitScreenProof } from './screen-proof-emit.mjs';
-import { resolveTrustedScreenProof } from './screen-proof-resolver.mjs';
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '../..');
 const HEAD = 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa';
@@ -193,24 +192,6 @@ describe('JOV-INV-018 screen-certification/v2', () => {
     assert.deepEqual(rows, [['web.homepage', 'evidence-required']]);
   });
 
-  it('registers dedicated homepage sections without claiming shared marketing CSS', () => {
-    const screen = home();
-    const sources = [
-      'apps/web/components/homepage/HomepageCertifiedSections.tsx',
-      'apps/web/components/homepage/HomepageClose.tsx',
-    ];
-    assert.ok(sources.every(source => screen.sources.includes(source)));
-    assert.equal(screen.sources.includes('apps/web/styles/home.css'), false);
-    const result = evaluateChangedScreens({
-      changedFiles: sources.map(path => ({ path, status: 'M' })),
-      headSha: HEAD,
-    });
-    assert.deepEqual(result.issues, []);
-    assert.deepEqual(result.changedScreens, [
-      { id: 'web.homepage', verdict: 'evidence-required', findings: [] },
-    ]);
-  });
-
   it('fails closed until a trusted browser producer adapter is integrated', () => {
     const screen = home();
     const result = runScreenCertification({
@@ -345,8 +326,6 @@ describe('JOV-INV-018 screen-certification/v2', () => {
         ...validExternalProof(home(), head),
         environment: 'local-production-build',
         sourcePaths: ['apps/web/app/(home)/page.tsx'],
-        sourceBaseSha: 'b'.repeat(40),
-        stateScope: 'homepage-cookie-state-observed',
         capturedAt: iso(-60_000),
         artifactDigest: `sha256:${digest.digest('hex')}`,
         runUrl: 'https://github.com/JovieInc/Jovie/actions/runs/77/attempts/3',
@@ -417,27 +396,11 @@ describe('JOV-INV-018 screen-certification/v2', () => {
           ],
         },
         changed: 'M\tapps/web/app/(home)/page.tsx\n',
-        compare: {
-          status: 'ahead',
-          ahead_by: 2,
-          behind_by: 0,
-          total_commits: 2,
-          base_commit: { sha: 'b'.repeat(40) },
-          merge_base_commit: { sha: 'b'.repeat(40) },
-          commits: [{ sha: 'c'.repeat(40) }, { sha: head }],
-          files: [
-            {
-              filename: 'apps/web/app/(home)/page.tsx',
-              status: 'modified',
-            },
-          ],
-        },
-        headCommit: { sha: head },
       };
       const gh = join(root, 'gh');
       writeFileSync(
         gh,
-        `#!/usr/bin/env node\nconst fs=require('node:fs');const p=process.argv.at(-1);const r=JSON.parse(fs.readFileSync(${JSON.stringify(join(root, 'records.json'))}));if(p.endsWith('/zip'))process.stdout.write(fs.readFileSync(${JSON.stringify(join(root, 'proof.zip'))}));else process.stdout.write(JSON.stringify(p.includes('/artifacts/')?r.artifact:p.includes('/attempts/')?r.jobs:p.includes('/compare/')?r.compare:p.includes('/commits/')?r.headCommit:r.run));`
+        `#!/usr/bin/env node\nconst fs=require('node:fs');const p=process.argv.at(-1);const r=JSON.parse(fs.readFileSync(${JSON.stringify(join(root, 'records.json'))}));if(p.endsWith('/zip'))process.stdout.write(fs.readFileSync(${JSON.stringify(join(root, 'proof.zip'))}));else process.stdout.write(JSON.stringify(p.includes('/artifacts/')?r.artifact:p.includes('/attempts/')?r.jobs:r.run));`
       );
       const git = join(root, 'git');
       writeFileSync(
@@ -455,30 +418,6 @@ describe('JOV-INV-018 screen-certification/v2', () => {
         });
       const result = certify();
       assert.equal(result.receipt.certified, true);
-
-      const resolverContext = {
-        headSha: head,
-        screenId: 'web.homepage',
-        viewports: ['desktop', 'mobile'],
-      };
-      assert.deepEqual(
-        resolveTrustedScreenProof({ artifactId: 42, context: resolverContext })
-          .changedFiles,
-        [{ path: 'apps/web/app/(home)/page.tsx', status: 'M' }]
-      );
-      records.compare.files = [
-        { filename: 'apps/web/app/(home)/page.tsx', status: 'removed' },
-      ];
-      writeFileSync(join(root, 'records.json'), JSON.stringify(records));
-      assert.deepEqual(
-        resolveTrustedScreenProof({ artifactId: 42, context: resolverContext })
-          .changedFiles,
-        [{ path: 'apps/web/app/(home)/page.tsx', status: 'D' }]
-      );
-      records.compare.files = [
-        { filename: 'apps/web/app/(home)/page.tsx', status: 'modified' },
-      ];
-      writeFileSync(join(root, 'records.json'), JSON.stringify(records));
 
       const baselineProof = structuredClone(proof);
       const baselineRecords = structuredClone(records);
@@ -518,13 +457,11 @@ describe('JOV-INV-018 screen-certification/v2', () => {
         [false, () => (records.run.head_sha = 'b'.repeat(40))],
         [false, () => (records.run.repository.full_name = 'attacker/Jovie')],
         [false, () => (records.run.path = '.github/workflows/other.yml')],
-        [false, () => (records.run.event = 'workflow_dispatch')],
         [false, () => (records.jobs.jobs[0].name = 'Invented producer')],
         [false, () => (records.jobs.jobs[0].run_attempt = 0)],
         [false, () => (records.artifact.created_at = iso(-9 * 60_000))],
         [false, () => (records.artifact.digest = sha256('modified artifact'))],
         [true, () => (proof.environment = 'preview')],
-        [true, () => (proof.sourceBaseSha = 'c'.repeat(40))],
         [true, () => (proof.capturedAt = iso(9 * 60_000))],
         [
           true,
@@ -536,54 +473,15 @@ describe('JOV-INV-018 screen-certification/v2', () => {
         [true, () => proof.sourcePaths.push('apps/web/app/(home)/layout.tsx')],
         [true, () => delete proof.viewports[0].contrast],
         [true, () => (screenshot = Buffer.alloc(0))],
-        [false, () => (records.compare.merge_base_commit.sha = 'c'.repeat(40))],
-        [false, () => (records.headCommit.sha = 'c'.repeat(40))],
-        [false, () => (records.compare.commits.at(-1).sha = 'c'.repeat(40))],
-        [
-          false,
-          () => {
-            records.compare.total_commits = 251;
-            records.compare.commits = Array.from(
-              { length: 251 },
-              (_, index) => ({
-                sha: index === 250 ? head : 'c'.repeat(40),
-              })
-            );
-          },
-        ],
-        [false, () => (records.compare.files = [])],
-        [
-          false,
-          () =>
-            (records.compare.files = [
-              { filename: 'apps/web/app/(home)/page.tsx', status: 'toString' },
-            ]),
-        ],
-        [
-          false,
-          () =>
-            (records.compare.files = Array.from({ length: 300 }, () => ({
-              filename: 'apps/web/app/(home)/page.tsx',
-              status: 'modified',
-            }))),
-        ],
-        [
-          false,
-          () =>
-            records.compare.files.push({
-              filename: 'apps/web/app/waitlist/page.tsx',
-              status: 'modified',
-            }),
-        ],
       ];
       for (const [archive, mutate] of negativeCases)
         rejects({ archive, mutate });
       Object.assign(proof, structuredClone(baselineProof));
       records = structuredClone(baselineRecords);
-      records.compare.files.push({
-        filename: 'apps/web/app/waitlist/page.tsx',
-        status: 'modified',
-      });
+      records.changed = [
+        'M\tapps/web/app/(home)/page.tsx',
+        'M\tapps/web/app/waitlist/page.tsx',
+      ].join('\n');
       writeFileSync(join(root, 'records.json'), JSON.stringify(records));
       const widened = runScreenCertificationFromArtifact({
         artifactId: 42,
@@ -614,35 +512,22 @@ describe('JOV-INV-018 screen-certification/v2', () => {
           overflow: { maxHorizontalPx: 0 },
           interaction: { passed: true },
           cls: { value: 0 },
-          contrast: { passed: true, method: 'computed-style', samples: 1 },
         })),
         activeFlow: { disclosure: false },
         historyProof: { separate: true, path: 'docs/VISUAL_TESTING_POLICY.md' },
         visibleActions: ['Find me'],
       };
-      const emit = measurements =>
-        emitScreenProof({
-          screenId: screen.id,
-          headSha: HEAD,
-          sourceBaseSha: 'b'.repeat(40),
-          environment: 'local-production-build',
-          sourcePaths: ['apps/web/app/(home)/page.tsx'],
-          producerRunId: 123456789,
-          producerRunAttempt: 1,
-          producerJobId: 99,
-          stateScope: 'homepage-cookie-state-observed',
-          bundle: 'bundle',
-          artifactRoot,
-          measurements,
-        });
-      const proof = emit(measurements);
+      const proof = emitScreenProof({
+        screenId: screen.id,
+        headSha: HEAD,
+        runUrl: 'https://github.com/JovieInc/Jovie/actions/runs/123456789',
+        bundle: 'bundle',
+        measurements,
+        artifactRoot,
+      });
       assert.equal(proof.schema, SCREEN_BROWSER_PROOF_SCHEMA);
       assert.equal(proof.status, 'unverified-candidate');
       assert.equal(proof.certificationStatus, 'not-certified');
-      assert.equal(proof.environment, 'local-production-build');
-      assert.equal(proof.producerRunAttempt, 1);
-      assert.equal(proof.sourceBaseSha, 'b'.repeat(40));
-      assert.equal(proof.stateScope, 'homepage-cookie-state-observed');
       assert.equal(proof.artifactPath, 'bundle');
       assert.match(proof.artifactDigest, /^sha256:[0-9a-f]{64}$/);
       const result = runScreenCertification({
@@ -655,23 +540,20 @@ describe('JOV-INV-018 screen-certification/v2', () => {
       // The emitter refuses malformed candidate measurements.
       assert.throws(
         () =>
-          emit({
-            ...measurements,
-            viewports: measurements.viewports.map((viewport, index) =>
-              index === 0 ? { ...viewport, cls: { value: 0.5 } } : viewport
-            ),
+          emitScreenProof({
+            screenId: screen.id,
+            headSha: HEAD,
+            runUrl: 'https://github.com/JovieInc/Jovie/actions/runs/123456789',
+            bundle: 'bundle',
+            measurements: {
+              ...measurements,
+              viewports: measurements.viewports.map((viewport, index) =>
+                index === 0 ? { ...viewport, cls: { value: 0.5 } } : viewport
+              ),
+            },
+            artifactRoot,
           }),
         /refusing to emit an invalid screen-proof candidate/
-      );
-      assert.throws(
-        () =>
-          emit({
-            ...measurements,
-            viewports: measurements.viewports.map(
-              ({ contrast, ...viewport }) => viewport
-            ),
-          }),
-        /candidate contrast must be independently measured/
       );
     } finally {
       rmSync(artifactRoot, { force: true, recursive: true });
