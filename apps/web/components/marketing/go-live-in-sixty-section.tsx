@@ -42,7 +42,7 @@ export function GoLiveInSixtySection() {
       <div className='relative mx-auto grid w-full max-w-(--homepage-section-max) gap-12 px-(--homepage-page-gutter) lg:grid-cols-[minmax(24rem,0.95fr)_minmax(0,1.05fr)] lg:items-end lg:gap-14'>
         <h2
           id='go-live-sixty-heading'
-          className='max-w-[12.5ch] text-[3rem] font-semibold leading-[0.94] tracking-[-0.035em] text-white dark:text-white sm:text-[4.15rem] lg:text-[4.55rem] lg:leading-[0.92] xl:text-[4.95rem]'
+          className='max-w-[12.5ch] text-[3rem] font-semibold leading-[0.94] tracking-[-0.035em] text-white dark:text-white sm:text-[4.15rem] lg:text-[4.55rem] lg:leading-[0.92] xl:text-[4.95rem] line-clamp-2'
         >
           Go Live. In 60 Seconds.
         </h2>

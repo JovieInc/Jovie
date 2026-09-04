@@ -1,5 +1,7 @@
 # Spike: go/no-go on Vercel `eve` agent SDK fit
 
+> **Retirement notice (2026-09-02):** Trigger.dev and Hermes references below are historical comparison points, not current components or fallbacks. Eve remains the intended Summer runtime, but no Summer Eve deployment is certified yet. See [`docs/operations/SUMMER_RUNTIME_RETIREMENT.md`](../operations/SUMMER_RUNTIME_RETIREMENT.md).
+
 > Recon spike for [#12499](https://github.com/JovieInc/Jovie/issues/12499); parent epic
 > [#12498](https://github.com/JovieInc/Jovie/issues/12498) (adopt `eve` as the Jovie **product**
 > agent layer — the artist-facing agent, *not* the internal ops stack). Writeup only; no runtime

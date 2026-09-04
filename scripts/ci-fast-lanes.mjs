@@ -654,6 +654,13 @@ function runStructural() {
     // Target Vitest directly so the deploy contract always executes and fails
     // closed when the file cannot be resolved or contains no tests.
     'pnpm --filter @jovie/web exec vitest run --config=vitest.config.mts tests/unit/ci/deploy-workflow.test.ts',
+    // Blocking UI invariants (Tim lock 2026-08-30, gbrain
+    // ops/reviewed-invariants/blocking-ui-invariants-v1), governed by
+    // certify-only-working-v1: unproven is hidden, not green. Target Vitest
+    // directly so the four screen contracts always execute and fail closed
+    // when a file is missing or resolves to zero tests (visual ENOENT is
+    // FAIL, not advisory).
+    'pnpm --filter @jovie/web exec vitest run --config=vitest.config.mts tests/unit/design-system/one-primary-action-per-screen-v1.test.ts tests/unit/design-system/editorial-card-max-v1.test.ts tests/unit/design-system/mac-header-two-lines-v1.test.ts tests/unit/design-system/column-heading-line-clamp-1-v1.test.ts',
     'pnpm --filter @jovie/web run test:reliability-detectors',
   ];
   const parts = [

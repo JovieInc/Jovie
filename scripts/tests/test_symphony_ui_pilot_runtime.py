@@ -363,7 +363,10 @@ def test_activation_requires_official_runtime_and_retires_custom_automation() ->
     assert "LoadState --value" in activation
     assert "symphony-ui-pilot.service" in activation
     assert "symphony-reconciler.timer" in activation
-    assert "symphony-grok-sidecar.timer" in activation
+    # The grok/kimi sidecar is the active coding lane, not a legacy unit;
+    # the activation mask-check must not retire it.
+    assert "symphony-grok-sidecar.service" not in activation
+    assert "symphony-grok-sidecar.timer" not in activation
     assert "ControlGroup --value" in activation
     assert "listener_pid" in activation
     assert "/proc/${listener_pid}/cgroup" in activation

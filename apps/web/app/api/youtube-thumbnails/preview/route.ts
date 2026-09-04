@@ -193,7 +193,13 @@ export async function POST(request: Request) {
       items,
     };
     void trackEvent(YOUTUBE_THUMBNAILS_EVENTS.PREVIEWED, {
+      experimentId: YOUTUBE_THUMBNAILS_OPTIMIZATION.experimentId,
       variantIdentity: YOUTUBE_THUMBNAILS_OPTIMIZATION.variantIdentity,
+      parentVariantIdentity:
+        YOUTUBE_THUMBNAILS_OPTIMIZATION.parentVariantIdentity,
+      channelId: result.channel.id,
+      platform: 'web',
+      contentVariant: 'paste-channel',
       mode: result.mode,
       itemCount: result.items.length,
       generatedCount: generated,
