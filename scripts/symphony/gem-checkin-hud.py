@@ -1729,6 +1729,8 @@ def _job_row(
         return _cells(color, widths, glyph, dash(row.get("position")), ident, dash(row.get("title")), "-", "-", "-", str(health["label"]), "-")
     if row.get("stale"):
         return _rgb(DIM, clip(f"STALE {row.get('id') or UNKNOWN} | historical attempt, current state UNKNOWN", sum(widths.values()) + 14))
+    if kind == "queued":
+        return _rgb(DIM, clip(f"QUEUED {row.get('id') or UNKNOWN} | {row.get('title') or UNKNOWN}", sum(widths.values()) + 14))
     if kind == "retrying":
         return _cells(PINK, widths, "↻", "-", dash(row.get("id")), dash(row.get("error") or row.get("title")), dash(row.get("attempt")), dash(row.get("turn")), compact_tokens(row.get("tokens_total"), row.get("tokens_in"), row.get("tokens_out")), due_label(row.get("due_at"), now=now), short_path(row.get("workspace")))
     if kind == "blocked":
@@ -2220,12 +2222,14 @@ def execution_state(row: dict[str, Any], *, now: datetime) -> str:
         return "SESSION / NO RECENT PROGRESS"
     if (_int(row.get("tokens_total")) or 0) <= 0:
         return "SESSION / NO TOKENS"
-    return "RUNNING / RECENT ACTIVITY"
+    if row.get("error") or row.get("last_event") in {"turn_failed", "turn_cancelled", "session_failed"}:
+        return "SESSION / ERROR"
+    return "SESSION / RECENT EVENT"
 
 
 def execution_lines(row: dict[str, Any], width: int, *, now: datetime) -> list[str]:
     stage = execution_state(row, now=now)
-    executed = stage == "RUNNING / RECENT ACTIVITY"
+    executed = stage == "SESSION / RECENT EVENT"
     model = row.get("executed_model") if executed else None
     provider = row.get("executed_provider") if executed else None
     account = row.get("executed_account_alias") if executed else None
@@ -2234,31 +2238,76 @@ def execution_lines(row: dict[str, Any], width: int, *, now: datetime) -> list[s
     progress = natural_time(row.get("last_event_at"), now=now)
     first = f"{row.get('id') or UNKNOWN}  {stage}  |  {row.get('title') or UNKNOWN}"
     second = f"  Executed: {model or UNKNOWN}  |  provider {provider or UNKNOWN}  |  account {account or UNKNOWN}  |  requested {row.get('requested_model') or UNKNOWN}"
-    third = f"  PID {row.get('pid') or UNKNOWN}  session {row.get('session_id') or UNKNOWN}  |  tokens {row.get('tokens_total') if row.get('tokens_total') is not None else UNKNOWN}  |  progress {progress}  |  {cause}  |  retry {retry}"
+    third = f"  PID {row.get('pid') or UNKNOWN}  session {row.get('session_id') or UNKNOWN}  |  tokens {row.get('tokens_total') if row.get('tokens_total') is not None else UNKNOWN}  |  last event {progress}  |  {cause}  |  retry {retry}"
     color = DIM if stage == "STALE" else BLUE if executed else ORANGE
+    if width < 160:
+        return [
+            _rgb(color, clip(f"{row.get('id') or UNKNOWN} {stage} | {row.get('title') or row.get('error') or UNKNOWN}", width), bold=True),
+            _rgb(FG, clip(f"model {model or UNKNOWN} | provider {provider or UNKNOWN} | account {account or UNKNOWN}", width)),
+            _rgb(DIM, clip(f"event {progress} | retry {retry} | {cause}", width)),
+        ]
     return [_rgb(color, clip(first, width), bold=True), _rgb(FG, clip(second, width)), _rgb(DIM, clip(third, width))]
 
 
 def execution_summary(symphony: dict[str, Any], width: int, *, now: datetime) -> list[str]:
     fresh = symphony.get("ok") and not symphony.get("stale")
-    recent = sum(execution_state(row, now=now) == "RUNNING / RECENT ACTIVITY" for row in symphony.get("rows", [])) if fresh else UNKNOWN
+    recent = sum(execution_state(row, now=now) == "SESSION / RECENT EVENT" for row in symphony.get("rows", [])) if fresh else UNKNOWN
     source = "FRESH" if fresh else "STALE / UNAVAILABLE"
     counts = "  ".join(f"{key} {symphony.get(key) if fresh and symphony.get(key) is not None else UNKNOWN}" for key in ("running", "queued", "retrying", "blocked"))
     action = "Inspect blocked/retrying attempts; worker recovery owner controls intake"
     if not fresh:
         action = "Restore official API through runtime owner; cached attempts are not running proof"
     elif not recent:
-        action = "No recent token activity evidenced; inspect launcher/capacity with runtime owner"
+        action = "No recent session events evidenced; inspect launcher/capacity with runtime owner"
     if symphony.get("linear_gate_until"):
         action = f"Linear rate limit gate until {symphony['linear_gate_until']} · runtime owner controls recovery"
     lines = [
         f"EXECUTION TRUTH  |  API {source}  |  service {symphony.get('service_state', UNKNOWN)}  |  remediation enabled UNKNOWN",
-        f"Recent session activity {recent} jobs  |  reserved {counts}  |  configured ceiling {symphony.get('cap') if symphony.get('cap') is not None else UNKNOWN} slots  |  usable capacity UNKNOWN",
+        f"Sessions with recent events {recent} jobs  |  reserved {counts}  |  configured ceiling {symphony.get('cap') if symphony.get('cap') is not None else UNKNOWN} slots  |  usable capacity UNKNOWN",
         f"NEXT  {action}",
         f"Source: :4041/api/v1/state · jobs/tokens · snapshot {natural_time(symphony.get('generated_at'), now=now)} · activity window 120s · shipped work requires separate receipts",
         f"Configuration only: model {symphony.get('configured_model', UNKNOWN)} · WORKFLOW.md | service/gate: systemd + linear-rate-limit.json · observed {natural_time(symphony.get('runtime_observed_at'), now=now)}",
     ]
     return [_rgb(ORANGE if not fresh else FG, clip(line, width), bold=index == 0) for index, line in enumerate(lines)]
+
+
+def execution_board(symphony: dict[str, Any], width: int, budget: int, *, now: datetime) -> list[str]:
+    """Recover the installed HUD's column compositor with evidence-based buckets."""
+    names = ("BLOCKED", "RETRYING", "ATTEMPTS", "QUEUED", "STALE")
+    columns: dict[str, list[dict[str, Any]]] = {name: [] for name in names}
+    for row in symphony.get("rows", []):
+        stage = execution_state(row, now=now)
+        bucket = "STALE" if row.get("stale") else stage if stage in columns else "ATTEMPTS"
+        columns[bucket].append(row)
+    gap = 3
+    col = (width - gap * (len(names) - 1)) // len(names)
+    widths = [col] * 4 + [width - col * 4 - gap * 4]
+    card_height = 7
+    limit = max(0, (budget - 2) // card_height)
+    bodies = []
+    for name, col_width in zip(names, widths):
+        items = columns[name]
+        lines = [_rgb(FG, clip(f"{name} · {len(items)} receipts", col_width), bold=True)]
+        for row in items[:limit]:
+            stage = execution_state(row, now=now)
+            active = stage == "SESSION / RECENT EVENT"
+            fields = [
+                f"{row.get('id') or UNKNOWN} · {stage}",
+                row.get("title") or UNKNOWN,
+                f"model {row.get('executed_model') if active and row.get('executed_model') else UNKNOWN}",
+                f"provider {row.get('executed_provider') if active and row.get('executed_provider') else UNKNOWN} · account {row.get('executed_account_alias') if active and row.get('executed_account_alias') else UNKNOWN}",
+                f"last event {natural_time(row.get('last_event_at'), now=now)} · tokens {row.get('tokens_total') if row.get('tokens_total') is not None else UNKNOWN}",
+                f"{row.get('error') or row.get('last_event') or UNKNOWN} · retry {due_label(row.get('due_at'), now=now) if row.get('due_at') else UNKNOWN}",
+                "",
+            ]
+            lines.extend(_rgb(ORANGE if index == 0 else DIM, clip(str(value), col_width), bold=index == 0) for index, value in enumerate(fields))
+        if len(items) > limit:
+            lines.append(_rgb(DIM, clip(f"… {len(items) - limit} more jobs", col_width)))
+        elif not items:
+            lines.append(_rgb(DIM, clip("No receipts" if symphony.get("ok") else "Current state UNKNOWN", col_width)))
+        bodies.append(lines)
+    height = min(budget, max(len(lines) for lines in bodies))
+    return [(" " * gap).join(pad_visible(lines[index], col_width) if index < len(lines) else " " * col_width for lines, col_width in zip(bodies, widths)) for index in range(height)]
 
 
 def current_execution_view(symphony: dict[str, Any], *, now: datetime) -> dict[str, Any]:
@@ -2413,20 +2462,32 @@ def render(
         ]
     truth = execution_summary(symphony, cols, now=clock)
     lines[1:1] = [truth[0], truth[2]] if compact else truth
-    if not compact:
-        work_rows = [line for row in symphony.get("rows", []) for line in [_job_row(row, widths, now=clock, stage_baselines=stage_baselines), *execution_lines(row, cols, now=clock)]]
-        work_rows.extend(_job_row(row, widths, now=clock, stage_baselines=stage_baselines) for row in mq.get("rows", []))
-        if review is not None and review > 0:
-            work_rows.append(_rgb(ORANGE, clip(f"!  REVIEW QUEUE {review}", cols)))
+    blocks = []
+    for row in symphony.get("rows", []):
+        detail = execution_lines(row, cols, now=clock)
+        blocks.append(detail if compact else [_job_row(row, widths, now=clock, stage_baselines=stage_baselines), *detail])
+    for row in mq.get("rows", []):
+        blocks.append([_compact_job_row(row, cols, now=clock, stage_baselines=stage_baselines) if compact else _job_row(row, widths, now=clock, stage_baselines=stage_baselines)])
+    if review is not None and review > 0:
+        blocks.append([_rgb(ORANGE, clip(f"!  REVIEW QUEUE {review}", cols))])
     available = max(0, rows - len(lines) - len(footer))
-    if not work_rows and available > 0:
+    # Preserve whole job cards and reserve an honest hidden-card count.
+    work_rows = []
+    for index, block in enumerate(blocks):
+        reserve = 1 if index < len(blocks) - 1 else 0
+        if len(work_rows) + len(block) + reserve > available:
+            if len(work_rows) < available:
+                work_rows.append(_rgb(DIM, clip(f"… {len(blocks) - index} more work items", cols)))
+            break
+        work_rows.extend(block)
+    if not blocks and available > 0:
         work_rows = [_rgb(DIM, clip("· No active work receipts", cols))]
-    if len(work_rows) > available:
-        hidden = len(work_rows) - available
-        if available <= 1:
-            work_rows = work_rows[:available]
-        else:
-            work_rows = [*work_rows[: available - 1], _rgb(DIM, clip(f"… {hidden + 1} more active receipts", cols))]
+    if cols >= 300 and rows >= 60:
+        # Retain queue rows below the recovered ultrawide job board.
+        queue_rows = [_job_row(row, widths, now=clock, stage_baselines=stage_baselines) for row in mq.get("rows", [])]
+        queue_budget = min(len(queue_rows), max(0, available - 9))
+        work_rows = execution_board(symphony, cols, max(0, available - queue_budget), now=clock)
+        work_rows.extend(queue_rows[:queue_budget])
     lines.extend(work_rows)
     lines.extend([""] * max(0, available - len(work_rows)))
     lines.extend(footer)

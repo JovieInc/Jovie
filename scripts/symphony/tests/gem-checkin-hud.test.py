@@ -93,8 +93,8 @@ class ExecutionTruthTests(unittest.TestCase):
         self.assertNotIn("stale", state["rows"][0])
         text = strip(paint(retained, width=430, height=90))
         self.assertIn("API STALE / UNAVAILABLE", text)
-        self.assertIn("Executed: UNKNOWN", text)
-        self.assertNotIn("RUNNING / RECENT ACTIVITY", text)
+        self.assertIn("model UNKNOWN", text)
+        self.assertNotIn("SESSION / RECENT EVENT", text)
 
     def test_missing_old_future_and_boundary_snapshots(self):
         for age, fresh in [(None, False), (31, False), (-11, False), (30, True), (0, True)]:
@@ -105,7 +105,7 @@ class ExecutionTruthTests(unittest.TestCase):
 
     def test_session_activity_needs_session_tokens_and_recent_event(self):
         row = {"kind": "running", "session_id": "session-1", "tokens_total": 12, "last_event_at": NOW.isoformat()}
-        self.assertEqual(HUD.execution_state(row, now=NOW), "RUNNING / RECENT ACTIVITY")
+        self.assertEqual(HUD.execution_state(row, now=NOW), "SESSION / RECENT EVENT")
         for change, expected in [({"session_id": None}, "STARTING / NO SESSION"), ({"tokens_total": 0}, "SESSION / NO TOKENS"), ({"last_event_at": None}, "SESSION / PROGRESS UNKNOWN"), ({"last_event_at": STARTED}, "SESSION / NO RECENT PROGRESS"), ({"kind": "blocked"}, "BLOCKED"), ({"kind": "retrying"}, "RETRYING"), ({"kind": "queued"}, "QUEUED"), ({"kind": "unexpected"}, "UNKNOWN")]:
             self.assertEqual(HUD.execution_state({**row, **change}, now=NOW), expected)
 
@@ -133,6 +133,35 @@ class ExecutionTruthTests(unittest.TestCase):
         self.assertIn("usable capacity UNKNOWN", text)
         self.assertIn("Linear rate limit gate until", text)
         self.assertIn("remediation enabled UNKNOWN", text)
+
+    def test_compact_shows_model_stage_and_whole_cards(self):
+        row = {"kind": "running", "id": "JOV-1", "title": "Visible work", "session_id": "session-1", "tokens_total": 10, "last_event_at": NOW.isoformat(), "executed_model": "gpt-5.6-sol"}
+        state = {"ok": True, "generated_at": NOW.isoformat(), "rows": [row], "running": 1}
+        text = strip(paint(state, width=120, height=40))
+        self.assertIn("gpt-5.6-sol", text)
+        self.assertIn("SESSION / RECENT EVENT", text)
+        failed = {**row, "last_event": "turn_failed"}
+        self.assertEqual(HUD.execution_state(failed, now=NOW), "SESSION / ERROR")
+        self.assertIn("Executed: UNKNOWN", strip("\n".join(HUD.execution_lines(failed, 430, now=NOW))))
+        for width in (120, 200):
+            state["rows"] = [{**row, "id": f"JOV-{i}", "kind": "queued"} for i in range(4)]
+            text = strip(paint(state, width=width, height=40))
+            self.assertIn("QUEUED", text)
+            self.assertNotIn("12 more", text)
+            for line in text.splitlines():
+                self.assertLessEqual(len(line), width)
+
+    def test_recovered_ultrawide_board_separates_retry_and_stale(self):
+        state = {"ok": False, "rows": [{"id": "JOV-1", "kind": "running", "stale": True, "model": "configured-sol"}, {"id": "JOV-2", "kind": "retrying", "due_at": "2026-08-31T12:05:00Z"}]}
+        lines = HUD.execution_board(state, 430, 20, now=NOW)
+        text = strip("\n".join(lines))
+        self.assertIn("STALE · 1 receipts", text)
+        self.assertIn("RETRYING · 1 receipts", text)
+        self.assertIn("model UNKNOWN", text)
+        self.assertIn("in 5m", text)
+        self.assertNotIn("configured-sol", text)
+        self.assertLessEqual(len(lines), 20)
+        self.assertTrue(all(len(strip(line)) == 430 for line in lines))
 
     def test_runtime_context_uses_only_bounded_local_readers(self):
         gate = {"schema": "symphony-linear-rate-limit-gate/v1", "recordedAt": STARTED, "resetAt": "2026-08-31T13:00:00Z"}
@@ -330,7 +359,7 @@ class UltrawideHudTests(unittest.TestCase):
         self.assertEqual(len(empty.splitlines()), 40)
         self.assertEqual(len(busy.splitlines()), 40)
         self.assertIn("CURRENT WORK", busy)
-        self.assertIn("more active receipts", busy)
+        self.assertIn("more work items", busy)
 
     def test_header_has_quiet_identity_description_and_natural_freshness(self):
         state, _ = fetch_state(official_state(generated_at="2026-08-31T11:58:00Z"))
@@ -975,7 +1004,8 @@ class UltrawideHudTests(unittest.TestCase):
                 height=40,
             )
         )
-        self.assertIn("BLOCKED · Release held", compact)
+        self.assertIn("BLOCKED", compact)
+        self.assertIn("Release held", compact)
         self.assertIn("#17/p3", compact)
 
         medium = strip(paint(review=3, width=200, height=40))
