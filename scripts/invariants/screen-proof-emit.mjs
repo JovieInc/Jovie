@@ -3,10 +3,9 @@
  * Emit a screen-browser-proof/v1 from an external render run (JOV-INV-018).
  *
  * The render runner (Playwright capture harness or the post-deploy renderer)
- * produces an artifact bundle plus measured per-viewport evidence; this
- * emitter binds the two by hashing the real bundle bytes and refuses to emit
- * a proof the certification gate would not accept. Caller-authored proofs
- * without real bytes can never be produced here.
+ * produces a candidate artifact bundle plus measured per-viewport evidence.
+ * This emitter does not certify the candidate: only the controlled producer
+ * resolver can bind it to an immutable Actions artifact and browser run.
  *
  * Usage:
  *   node scripts/invariants/screen-proof-emit.mjs \
@@ -27,7 +26,6 @@ import {
   REPO_ROOT,
   SCREEN_BROWSER_PROOF_SCHEMA,
   SCREEN_REGISTRY,
-  verifyProofArtifact,
 } from './screen-certification.mjs';
 
 function parseArgs(argv) {
@@ -76,6 +74,8 @@ export function emitScreenProof({
   const proof = {
     schema: SCREEN_BROWSER_PROOF_SCHEMA,
     producer: 'external-render-runner',
+    status: 'unverified-candidate',
+    certificationStatus: 'not-certified',
     screenId,
     headSha: headSha.toLowerCase(),
     tier: 'rendered-evidence',
@@ -88,17 +88,16 @@ export function emitScreenProof({
     historyProof: measurements?.historyProof,
     visibleActions: measurements?.visibleActions,
   };
-  // Never emit a proof the gate would reject: run the exact evaluation with
-  // the real artifact verifier before writing anything.
-  const findings = evaluateScreenProof(proof, {
-    screen,
-    headSha,
-    verifyArtifact: candidate =>
-      verifyProofArtifact(candidate, { artifactRoot: root }),
-  });
+  // Validate shape only. The caller owns these bytes and metrics, so the output
+  // remains explicitly unverified until a producer-owned adapter exists.
+  const findings = evaluateScreenProof(proof, { screen, headSha }).filter(
+    finding =>
+      finding !==
+      'trusted external browser producer integration is unavailable; supplied proof cannot certify'
+  );
   if (findings.length > 0) {
     throw new Error(
-      `refusing to emit a non-certifying proof: ${findings.join('; ')}`
+      `refusing to emit an invalid screen-proof candidate: ${findings.join('; ')}`
     );
   }
   return proof;
@@ -132,6 +131,6 @@ if (isMain) {
   });
   writeFileSync(resolve(args.out), `${JSON.stringify(proof, null, 2)}\n`);
   process.stdout.write(
-    `[screen-proof-emit] ${proof.screenId} ${proof.artifactDigest} -> ${args.out}\n`
+    `[screen-proof-emit] unverified-candidate ${proof.screenId} ${proof.artifactDigest} -> ${args.out}\n`
   );
 }
