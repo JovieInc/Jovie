@@ -408,11 +408,11 @@
   ],
   "route_chains": {
     "remediation": [
-      "cursor-grok-4.6",
       "grok-4.6",
+      "kimi-k3",
+      "cursor-grok-4.6",
       "codex-sol",
       "codex-terra",
-      "kimi-k3",
       "codex-luna",
       "cursor-luna",
       "kimi-coding",

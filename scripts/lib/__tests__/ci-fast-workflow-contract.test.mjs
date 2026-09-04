@@ -582,6 +582,7 @@ describe('ci-fast bounded parallel workflow', () => {
       'python3 scripts/hermes/tests/gem-priority-gate.test.py',
       'python3 scripts/hermes/tests/test_evaluate_fleet_gate.py',
       'python3 scripts/hermes/tests/test-model-router.py',
+      'python3 scripts/hermes/tests/symphony-github-poke.test.py',
     ]) {
       expect(CI_FAST_SOURCE).toContain(gemContractCommand);
     }

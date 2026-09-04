@@ -630,6 +630,7 @@ function runStructural() {
     'python3 scripts/hermes/tests/gem-priority-gate.test.py',
     'python3 scripts/hermes/tests/test_evaluate_fleet_gate.py',
     'python3 scripts/hermes/tests/test-model-router.py',
+    'python3 scripts/hermes/tests/symphony-github-poke.test.py',
     'node --test scripts/backlog-orchestrator/__tests__/pre-lease-gates.test.mjs',
     'node --test scripts/backlog-orchestrator/__tests__/gate-next-hold.test.mjs',
     'node --test scripts/backlog-orchestrator/__tests__/ownership-inventory.test.mjs',
