@@ -300,6 +300,9 @@ describe('POST /api/internal/ovie/summer-bottleneck', () => {
     mocks.getVercelOidcToken.mockRejectedValueOnce(new Error('unavailable'));
     expect((await POST(request(validSnapshot()))).status).toBe(503);
 
+    mocks.getVercelOidcToken.mockResolvedValueOnce('');
+    expect((await POST(request(validSnapshot()))).status).toBe(503);
+
     vi.stubGlobal(
       'fetch',
       vi.fn(async () => Response.json({}, { status: 500 }))
@@ -310,6 +313,18 @@ describe('POST /api/internal/ovie/summer-bottleneck', () => {
       ok: false,
       code: 'eve_bottleneck_rejected',
     });
+
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async () => new Response('not-json'))
+    );
+    expect((await POST(request(validSnapshot()))).status).toBe(502);
+
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async () => Promise.reject(new Error('down')))
+    );
+    expect((await POST(request(validSnapshot()))).status).toBe(503);
   });
 
   it.each([

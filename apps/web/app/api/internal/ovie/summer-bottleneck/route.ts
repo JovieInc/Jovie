@@ -194,7 +194,7 @@ export async function POST(request: Request): Promise<NextResponse> {
   });
   if (authError) return authError;
 
-  if (process.env.VERCEL_ENV !== 'production') {
+  if (env.VERCEL_ENV !== 'production') {
     return json({ ok: false, code: 'production_origin_required' }, 503);
   }
 
@@ -232,6 +232,9 @@ export async function POST(request: Request): Promise<NextResponse> {
     oidcToken = await getVercelOidcToken();
   } catch {
     logger.error('[ovie-summer-bottleneck] Vercel OIDC token unavailable');
+    return json({ ok: false, code: 'signed_origin_unavailable' }, 503);
+  }
+  if (!oidcToken) {
     return json({ ok: false, code: 'signed_origin_unavailable' }, 503);
   }
 
