@@ -84,6 +84,20 @@ export const CANONICAL_LIVE_STORIES = Object.freeze([
     importPath: 'packages/ui/atoms/Card.stories.tsx',
     owner: 'atom.card',
   }),
+  Object.freeze({
+    id: 'ui-atoms-skeleton--certification-matrix',
+    exportName: 'CertificationMatrix',
+    title: 'UI/Atoms/Skeleton',
+    importPath: 'packages/ui/atoms/skeleton.stories.tsx',
+    owner: 'atom.skeleton',
+  }),
+  Object.freeze({
+    id: 'ui-atoms-skeleton--loading-certification-matrix',
+    exportName: 'LoadingCertificationMatrix',
+    title: 'UI/Atoms/Skeleton',
+    importPath: 'packages/ui/atoms/skeleton.stories.tsx',
+    owner: 'molecule.loading-skeleton',
+  }),
 ]);
 
 const INVARIANT_SET = new Set(LIVE_INVARIANTS);
@@ -160,9 +174,9 @@ export function validateCanonicalStoryInventory(options = {}) {
   const repoRoot = options.repoRoot ?? REPO_ROOT;
   const stories = options.stories ?? CANONICAL_LIVE_STORIES;
   const issues = [];
-  if (!Array.isArray(stories) || stories.length !== 5) {
+  if (!Array.isArray(stories) || stories.length !== 7) {
     issues.push(
-      `canonical live inventory must declare exactly 5 seeded primitive stories; found ${Array.isArray(stories) ? stories.length : 0}`
+      `canonical live inventory must declare exactly 7 seeded primitive stories; found ${Array.isArray(stories) ? stories.length : 0}`
     );
   }
   const ids = new Set();
@@ -540,6 +554,7 @@ function contractFor(owner, extraNa = {}) {
   const concentric = owner === 'atom.card';
   const hover = owner === 'atom.button' || owner === 'atom.card';
   const applicable = LIVE_INVARIANTS.filter(id => {
+    if (Object.hasOwn(extraNa, id)) return false;
     if (id === 'keyboard' && !interactive) return false;
     if (id === 'concentric-radius' && !concentric) return false;
     if (id === 'hover-stability' && !hover) return false;
@@ -590,8 +605,15 @@ function observation(story, viewport, extra = {}) {
 }
 
 export function seededPassingObservations() {
-  const [badgeDefault, badgeTones, buttonPrimary, cardDefault, cardHoverable] =
-    CANONICAL_LIVE_STORIES;
+  const [
+    badgeDefault,
+    badgeTones,
+    buttonPrimary,
+    cardDefault,
+    cardHoverable,
+    skeletonMatrix,
+    loadingSkeletonMatrix,
+  ] = CANONICAL_LIVE_STORIES;
   const samples = [];
   for (const viewport of LIVE_VIEWPORTS.map(item => item.id)) {
     samples.push(
@@ -646,6 +668,24 @@ export function seededPassingObservations() {
         notApplicableReasons: {
           keyboard:
             'hover treatment only; this story does not expose an activation role',
+        },
+      }),
+      observation(skeletonMatrix, viewport, {
+        classes: 'skeleton h-6 w-full rounded-none',
+        radius: { token: 'rounded-none', px: 0 },
+        notApplicableReasons: {
+          'tokenized-padding': 'placeholder has no internal padding',
+          'aa-contrast': 'placeholder has no readable foreground',
+          copy: 'placeholder has no visible copy',
+        },
+      }),
+      observation(loadingSkeletonMatrix, viewport, {
+        classes: 'space-y-2 skeleton h-5 w-full rounded-md',
+        radius: { token: 'rounded-md', px: 6 },
+        notApplicableReasons: {
+          'tokenized-padding': 'owner has no internal padding',
+          'aa-contrast': 'status uses an accessible name',
+          copy: 'status uses an accessible name',
         },
       })
     );
