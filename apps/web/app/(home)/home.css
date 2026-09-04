@@ -2019,14 +2019,7 @@ body:has(.home-viewport)::-webkit-scrollbar {
   z-index: 0;
   overflow: hidden;
   pointer-events: none;
-  background:
-    linear-gradient(
-      180deg,
-      transparent 0 52%,
-      color-mix(in oklab, var(--system-b-text-primary) 4%, transparent) 52.1%,
-      transparent 52.3%
-    ),
-    var(--system-b-bg-page);
+  background: var(--system-b-bg-page);
 }
 
 .homepage-editorial-hero__light-well {
@@ -2050,12 +2043,6 @@ body:has(.home-viewport)::-webkit-scrollbar {
       ellipse at center,
       color-mix(in oklab, var(--system-b-text-primary) 2%, transparent) 0%,
       transparent 82%
-    ),
-    linear-gradient(
-      180deg,
-      transparent 48%,
-      color-mix(in oklab, var(--system-b-text-primary) 5%, transparent) 50%,
-      transparent 52%
     );
   opacity: 0.8;
 }
@@ -2143,6 +2130,12 @@ body:has(.home-viewport)::-webkit-scrollbar {
   );
 }
 
+.homepage-name-search__field--open {
+  z-index: 51;
+  border-bottom-color: transparent;
+  border-radius: var(--radius-pill) var(--radius-pill) 0 0;
+}
+
 .homepage-name-search__input {
   font-size: var(--text-lg);
   line-height: var(--leading-tight);
@@ -2162,7 +2155,13 @@ body:has(.home-viewport)::-webkit-scrollbar {
 }
 
 .homepage-name-search__results {
-  border-radius: var(--radius-xl);
+  top: calc(100% - 1px);
+  margin-top: 0;
+  border-top-color: transparent;
+  border-radius: 0 0 var(--radius-xl) var(--radius-xl);
+  background: var(--homepage-editorial-field);
+  backdrop-filter: blur(var(--space-3));
+  -webkit-backdrop-filter: blur(var(--space-3));
 }
 
 @media (max-width: 767px) {
@@ -2333,9 +2332,8 @@ body:has(.home-viewport)::-webkit-scrollbar {
 }
 
 .homepage-close {
-  /* Locked close pass: 28/32 Satoshi at 620, quiet wordmark, one low
-     night wash. Tokens only; the 620 sits between semibold and bold on
-     purpose — it is the approved still, not a new scale step. */
+  /* Locked close pass: 28/32 Satoshi at 620, one contained conversion,
+     substantial quiet space, and one bottom-clipped depth field. */
   --homepage-close-headline-weight: 620;
   --homepage-close-wash: color-mix(
     in oklab,
@@ -2349,11 +2347,14 @@ body:has(.home-viewport)::-webkit-scrollbar {
   );
 
   position: relative;
+  display: grid;
+  min-height: clamp(42rem, 92svh, 60rem);
+  align-items: start;
   isolation: isolate;
   overflow: clip;
   border-top: 1px solid var(--homepage-chapter-rule);
-  padding-block: clamp(var(--space-24), 10vw, var(--space-32))
-    clamp(var(--space-16), 8vw, var(--space-24));
+  padding: clamp(var(--space-24), 10vw, var(--space-32))
+    var(--homepage-grid-gutter) 0;
 }
 
 .homepage-close::before {
@@ -2376,6 +2377,8 @@ body:has(.home-viewport)::-webkit-scrollbar {
 }
 
 .homepage-close__inner {
+  position: relative;
+  z-index: 1;
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -2402,13 +2405,46 @@ body:has(.home-viewport)::-webkit-scrollbar {
   margin-top: var(--space-8);
 }
 
-/* Quiet wordmark: the section signs off, it does not link anywhere. */
-.homepage-close__mark {
-  --linear-text-primary: var(--color-text-tertiary-token);
-  display: flex;
-  justify-content: center;
-  margin-top: var(--space-20);
-  color: var(--color-text-tertiary-token);
+.homepage-close__depth {
+  position: absolute;
+  bottom: -18%;
+  left: 50%;
+  width: min(76rem, 132vw);
+  height: 46%;
+  overflow: hidden;
+  border: 1px solid
+    color-mix(in oklab, var(--system-b-text-primary) 8%, transparent);
+  border-radius: 50% 50% 0 0;
+  background:
+    radial-gradient(
+      ellipse at 50% 0%,
+      color-mix(in oklab, var(--color-accent-blue) 13%, transparent),
+      transparent 58%
+    ),
+    linear-gradient(
+      180deg,
+      color-mix(in oklab, var(--system-b-text-primary) 3%, transparent),
+      transparent 48%
+    );
+  pointer-events: none;
+  transform: translateX(-50%);
+}
+
+.homepage-close__depth::before,
+.homepage-close__depth::after {
+  position: absolute;
+  content: "";
+  border: 1px solid
+    color-mix(in oklab, var(--system-b-text-primary) 6%, transparent);
+  border-radius: 50% 50% 0 0;
+}
+
+.homepage-close__depth::before {
+  inset: 14% 10% -12%;
+}
+
+.homepage-close__depth::after {
+  inset: 31% 22% -24%;
 }
 
 @media (min-width: 900px) {
@@ -2446,11 +2482,8 @@ body:has(.home-viewport)::-webkit-scrollbar {
   }
 
   .homepage-close {
-    padding-block: var(--space-24) var(--space-16);
-  }
-
-  .homepage-close__mark {
-    margin-top: var(--space-16);
+    min-height: clamp(40rem, 88svh, 48rem);
+    padding-top: var(--space-24);
   }
 }
 
@@ -3357,16 +3390,7 @@ body:has(.home-viewport)::-webkit-scrollbar {
   }
 }
 
-/* =============================================================================
-   FRAME-SKIN — cinematic editorial monochrome design layer
-   -----------------------------------------------------------------------------
-   Page-scoped via the .frame-skin class. Frame.io-inspired: deep near-black
-   base, hairline section dividers, off-white text, magazine-scale section
-   padding, subtle SVG film grain at 4%. Used by /artist-profiles. No
-   saturated color, no gradient-as-color — only edge-lighting at seams.
-   Tokens deliberately match the existing primary-token / secondary-token
-   contract, so child components inherit the new palette without rewires.
-   ========================================================================= */
+/* Artist-profile cinematic skin. */
 
 .frame-skin {
   /* Palette */
@@ -3394,8 +3418,6 @@ body:has(.home-viewport)::-webkit-scrollbar {
   isolation: isolate;
 }
 
-/* Subtle film grain — SVG noise as data URI, blended on top at 4% opacity.
-   Pointer events are off; the grain sits under content but over the bg. */
 .frame-skin::before {
   content: "";
   position: absolute;
@@ -3408,8 +3430,6 @@ body:has(.home-viewport)::-webkit-scrollbar {
   z-index: 0;
 }
 
-/* Soft top edge-light at the page seam — frame.io-style ambient glow.
-   Restrained: ~3% white falling off in 320px. */
 .frame-skin::after {
   content: "";
   position: absolute;
@@ -3429,9 +3449,6 @@ body:has(.home-viewport)::-webkit-scrollbar {
   z-index: 1;
 }
 
-/* Override the default token system inside the skin so child components that
-   read primary-/secondary-/tertiary-token automatically pick up the frame.io
-   palette without bespoke per-component changes. */
 .frame-skin {
   --primary-token: var(--frame-text);
   --secondary-token: var(--frame-text-secondary);
@@ -3447,48 +3464,27 @@ body:has(.home-viewport)::-webkit-scrollbar {
   --linear-border-subtle: var(--frame-hairline);
 }
 
-/* Section shell — magazine-scale padding + hairline top divider between
-   adjacent sections. The first section keeps a clean top edge so the hero
-   reads as a single confident moment. */
 .frame-skin .frame-section {
   padding-top: var(--frame-section-y);
   padding-bottom: var(--frame-section-y);
 }
 
-/* Hairline divider between adjacent sections.
-   ArtistProfileLandingPage wraps each section in a <div data-testid="...">,
-   so .frame-section elements are NOT direct siblings of each other —
-   the wrapper divs are. Apply the border on the wrapper instead. The hero
-   (ArtistProfileHeroAdaptiveIntro) renders a bare <section>, so the first
-   wrapped section (which has a preceding <section> sibling, not a div)
-   is correctly excluded by the `> div + div` adjacency. */
 .frame-skin > div + div {
   border-top: 1px solid var(--frame-hairline);
 }
 
-/* Editorial eyebrow — neutral base. Per project design guidance, marketing
-   pages must NOT use all-caps labels or tracked-caps as default styling, so
-   the base class only sets neutral typography (size + line-height). The
-   caps/tracking/weight treatment is opt-in via the `.frame-eyebrow--caps`
-   modifier or by living inside `.frame-skin` (which scopes the cinematic
-   editorial design layer to /artist-profiles). */
 .frame-eyebrow {
   display: inline-block;
   font-size: 0.6875rem; /* 11px */
   line-height: 1;
 }
 
-/* Opt-in editorial caps treatment. Use this modifier when a surface
-   explicitly wants the tracked-caps eyebrow without inheriting the full
-   .frame-skin design layer. */
 .frame-eyebrow--caps {
   text-transform: uppercase;
   font-weight: 500;
   letter-spacing: 0.18em;
 }
 
-/* Inside the cinematic design layer, eyebrows always render as tracked caps
-   in the off-white tertiary token. */
 .frame-skin .frame-eyebrow {
   text-transform: uppercase;
   font-size: var(--frame-eyebrow-size);
@@ -3497,8 +3493,6 @@ body:has(.home-viewport)::-webkit-scrollbar {
   color: var(--frame-text-tertiary);
 }
 
-/* Editorial caption — used under hero/figure pairings.
-   13px / 1.55 leading / off-white at 42%. */
 .frame-skin .frame-caption {
   font-size: var(--frame-caption-size);
   line-height: 1.55;
@@ -3506,7 +3500,6 @@ body:has(.home-viewport)::-webkit-scrollbar {
   letter-spacing: -0.01em;
 }
 
-/* Hairline rule — explicit dividers when needed inside compositions. */
 .frame-skin .frame-rule {
   display: block;
   height: 1px;
@@ -3718,11 +3711,6 @@ body:has(.home-viewport)::-webkit-scrollbar {
   color: var(--color-text-primary-token);
 }
 
-/* Pin the workspace chapter to the shared homepage content column
-   (--ds-public-content-max with --homepage-page-gutter gutters). The
-   cinematic-monolith rule uses a wider chapter gutter; this overrides it
-   (two-class selector wins over its single-class rule later in the file)
-   so the workspace edges align with the hero media and trust strip. */
 .system-b-mounted-home-workspace .system-b-mounted-home-workspace-inner {
   width: min(
     var(--ds-public-content-max),
@@ -3730,9 +3718,6 @@ body:has(.home-viewport)::-webkit-scrollbar {
   );
 }
 
-/* Section title on the shared marketing title ramp — the same System B
-   hierarchy step as every other homepage chapter. The ramp is fluid, so
-   no per-breakpoint overrides live here. */
 .system-b-mounted-home-workspace .system-b-mounted-home-workspace-headline {
   max-width: none;
   color: var(--color-text-primary-token);
@@ -3746,8 +3731,6 @@ body:has(.home-viewport)::-webkit-scrollbar {
   visibility: hidden;
 }
 
-/* Product-shot frame: hairline seam + app-frame radius, flat System B
-   surface, no elevation — the screenshot reads as product, not card. */
 .system-b-mounted-home-workspace .system-b-mounted-home-workspace-media {
   border: var(--space-px) solid var(--system-b-app-frame-seam);
   border-radius: var(--radius-xl);
@@ -3755,9 +3738,6 @@ body:has(.home-viewport)::-webkit-scrollbar {
   box-shadow: none;
 }
 
-/* Numbered callouts: quiet three-step rhythm under the shot. The
-   cinematic-monolith block owns the flat rule grid; this layer owns the
-   type — eyebrow-spec numerals, semibold titles, secondary bodies. */
 .system-b-mounted-home-workspace .system-b-mounted-home-workspace-callout {
   gap: var(--space-2);
   color: var(--color-text-primary-token);
@@ -3776,10 +3756,8 @@ body:has(.home-viewport)::-webkit-scrollbar {
   font-variant-numeric: tabular-nums;
 }
 
-/* Quiet feature-accent rotation on the step numerals — color lives on small
-   text only, matching the outcome-card title rules. */
 .system-b-mounted-home-workspace-callout:nth-child(1)
-.system-b-mounted-home-workspace-callout-label {
+  .system-b-mounted-home-workspace-callout-label {
   color: var(--color-accent-blue);
 }
 
@@ -3829,8 +3807,6 @@ body:has(.home-viewport)::-webkit-scrollbar {
   width: 100%;
   margin-inline: auto;
   overflow: hidden;
-  /* Bridge, not a full chapter: half the shared chapter space keeps the
-     strip on the same vertical beat as the rest of the page. */
   padding-block: calc(var(--homepage-chapter-space) / 2);
   padding-inline: var(--homepage-page-gutter);
   background: var(--system-b-bg-page);
@@ -3841,8 +3817,6 @@ body:has(.home-viewport)::-webkit-scrollbar {
   > .system-b-mounted-home-trust-strip[data-presentation="inline-strip"]
   > .system-b-mounted-home-trust-strip-inner {
   width: 100%;
-  /* Lock the strip onto the shared homepage content column so its edges
-     land on the same grid lines as the hero media and workspace sections. */
   max-width: var(--ds-public-content-max);
   margin-inline: auto;
   padding-inline: 0;
@@ -3955,8 +3929,6 @@ body:has(.home-viewport)::-webkit-scrollbar {
   }
 }
 
-/* Subtle staggered rise-in on load (transform/opacity only — zero layout
-   shift), matching the hero. Disabled under prefers-reduced-motion. */
 @keyframes system-b-mounted-home-trust-strip-rise {
   from {
     opacity: 0;
@@ -4018,8 +3990,6 @@ body:has(.home-viewport)::-webkit-scrollbar {
   color: var(--color-text-primary-token);
 }
 
-/* Closing light: a low, wide glow behind the final ask so the page closes on
-   the same cinematic register as the hero product stage. */
 .system-b-mounted-home-footer-cta::before {
   position: absolute;
   inset: auto 10% -32%;
@@ -4047,8 +4017,6 @@ body:has(.home-viewport)::-webkit-scrollbar {
   text-align: center;
 }
 
-/* Closing beat: hero-scale Satoshi display so the page ends on the same
-   typographic register it opened with. */
 .system-b-mounted-home-footer-cta-heading {
   max-width: 14ch;
   margin: 0;
@@ -4067,8 +4035,6 @@ body:has(.home-viewport)::-webkit-scrollbar {
   letter-spacing: 0;
 }
 
-/* Subtle staggered rise-in, matching the hero. Transform/opacity only —
-   zero layout shift; fully disabled under prefers-reduced-motion. */
 @keyframes homepage-footer-cta-rise {
   from {
     opacity: 0;
@@ -4106,9 +4072,6 @@ body:has(.home-viewport)::-webkit-scrollbar {
 }
 
 .home-viewport .system-b-mounted-home-footer > div {
-  /* Lock the footer onto the shared homepage content column: the box spans
-     --ds-public-content-max inside --homepage-page-gutter gutters, matching
-     the hero media, trust strip, and workspace grid lines. */
   width: min(
     var(--ds-public-content-max),
     calc(100% - var(--homepage-page-gutter) * 2)
@@ -4159,7 +4122,6 @@ body:has(.home-viewport)::-webkit-scrollbar {
   letter-spacing: 0;
 }
 
-/* Quiet tertiary legal links that lift to primary only on intent. */
 .home-viewport .system-b-mounted-home-footer .mf-legal-link {
   color: var(--color-text-tertiary-token);
   letter-spacing: 0;
@@ -4187,12 +4149,7 @@ body:has(.home-viewport)::-webkit-scrollbar {
 
 /* SYSTEM B MOUNTED HOME FOOTER CTA PRIMITIVES END */
 
-/* FOOTER CTA ABYSS (decorative layer — lives outside the flat primitives
-   block by design, same contract as the hero stage gradients). Two hairline
-   grids on a perspective floor, receding toward a vanishing point below the
-   fold. Cyan at whisper opacity — felt, not seen. The plane is oversized so
-   rotation and drift never expose an edge, and the top mask lets the lines
-   dissolve upward into the page. */
+/* Footer CTA depth field. */
 .system-b-mounted-home-footer-cta-abyss {
   position: absolute;
   inset: auto 0 0;

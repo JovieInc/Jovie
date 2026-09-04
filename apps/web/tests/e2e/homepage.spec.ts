@@ -91,6 +91,80 @@ test.describe('Homepage', () => {
     expect(heroBox?.height ?? 0).toBeGreaterThanOrEqual(
       (viewport?.height ?? 0) - 1
     );
+    const frames = page.locator(
+      '[data-aura-contained="true"][data-aura-motion="static"]'
+    );
+    await expect(frames).toHaveCount(2);
+    expect(
+      await frames
+        .first()
+        .locator(':scope > [aria-hidden="true"]')
+        .evaluate(element => [
+          getComputedStyle(element).overflow,
+          getComputedStyle(element, '::before').animationName,
+        ])
+    ).toEqual(['hidden', 'none']);
+  });
+
+  test('expands editorial autocomplete as one attached branded control', async ({
+    page,
+  }) => {
+    await page.setViewportSize({ width: 1129, height: 842 });
+    await page.route('**/api/spotify/search**', route =>
+      route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify([
+          {
+            id: 'artist-1',
+            name: 'Taylor Swift',
+            url: 'https://open.spotify.com/artist/artist-1',
+            followers: 1000,
+            verified: true,
+            isClaimed: true,
+          },
+        ]),
+      })
+    );
+
+    const hero = page.getByTestId('homepage-hero-shell');
+    const input = hero.getByPlaceholder('Search your name');
+    await expect(input).toHaveAttribute('spellcheck', 'false');
+    await input.fill('Taylor');
+
+    const dropdown = hero.locator('[data-dropdown-presentation="attached"]');
+    await expect(dropdown).toBeVisible();
+    const spotifyMark = dropdown.getByTestId('spotify-paste-url-brand');
+    await expect(spotifyMark.locator('svg')).toBeVisible();
+    expect(
+      await spotifyMark
+        .locator('svg')
+        .evaluate(el => getComputedStyle(el).color)
+    ).not.toBe('rgb(0, 0, 0)');
+    const geometry = await dropdown.evaluate(element => {
+      const result = element.getBoundingClientRect();
+      const field = element.previousElementSibling?.getBoundingClientRect();
+      return [
+        Math.abs(result.top - (field?.bottom ?? 0)),
+        Math.abs(result.left - (field?.left ?? 0)),
+        Math.abs(result.right - (field?.right ?? 0)),
+        result.bottom <= innerHeight,
+      ];
+    });
+    expect(geometry[0]).toBeLessThanOrEqual(1.5);
+    expect(geometry.slice(1)).toEqual([0, 0, true]);
+    expect(await page.evaluate(() => window.scrollY)).toBe(0);
+    await input.press('ArrowDown');
+    const selected = dropdown.getByRole('option', { name: /Taylor Swift/i });
+    await expect(selected).toHaveAttribute('aria-selected', 'true');
+    await expect(input).toHaveAttribute('aria-activedescendant', /result-0$/);
+    expect(await page.evaluate(() => window.scrollY)).toBe(0);
+    await input.press('Escape');
+    await expect(dropdown).toHaveCount(0);
+    await input.fill('Taylor Swift');
+    await expect(dropdown).toBeVisible();
+    await hero.getByRole('heading').click({ position: { x: 1, y: 1 } });
+    await expect(dropdown).toHaveCount(0);
   });
 
   test('header uses the canonical marketing shell with full navigation', async ({
@@ -393,6 +467,15 @@ test.describe('Homepage', () => {
     await expect(page.getByText('Drop more music')).toHaveCount(0);
     await expect(page.getByTestId('homepage-faq')).toHaveCount(0);
     await expect(page.getByTestId('homepage-v2-final-cta')).toHaveCount(0);
+    await expect(page.getByTestId('homepage-close-mark')).toHaveCount(0);
+    await expect(page.getByTestId('homepage-close-depth')).toHaveAttribute(
+      'aria-hidden',
+      'true'
+    );
+    const closeBox = await close.boundingBox();
+    expect(closeBox?.height ?? 0).toBeGreaterThanOrEqual(
+      (page.viewportSize()?.height ?? 0) * 0.87
+    );
 
     if (browserName === 'chromium') {
       expect(

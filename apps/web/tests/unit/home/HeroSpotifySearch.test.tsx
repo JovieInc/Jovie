@@ -60,6 +60,7 @@ const ARTISTS: SpotifyArtistResult[] = [
     followers: 95_000_000,
     popularity: 100,
     verified: true,
+    isClaimed: true,
   },
   {
     id: 'artist-2',
@@ -115,6 +116,7 @@ describe('HeroSpotifySearch', () => {
     it('renders combobox role on input', () => {
       renderComponent();
       expect(getInput()).toHaveAttribute('role', 'combobox');
+      expect(getInput()).toHaveAttribute('spellcheck', 'false');
     });
 
     it('namespaces result option ids per instance when rendered twice', async () => {
@@ -230,6 +232,22 @@ describe('HeroSpotifySearch', () => {
       await user.type(getInput(), 'Taylor');
       expect(screen.getByRole('listbox')).toBeInTheDocument();
       expect(screen.getByText('Taylor Swift')).toBeInTheDocument();
+    });
+
+    it('closes results on an outside pointer interaction', async () => {
+      mockHookReturn.results = ARTISTS;
+      mockHookReturn.state = 'success';
+      render(
+        <div>
+          <HeroSpotifySearch appearance='editorial' />
+          <button type='button'>Outside</button>
+        </div>
+      );
+      const user = userEvent.setup();
+
+      await user.type(getInput(), 'Taylor');
+      await user.click(screen.getByRole('button', { name: 'Outside' }));
+      expect(screen.queryByRole('listbox')).not.toBeInTheDocument();
     });
 
     it('shows loading skeleton', async () => {
@@ -389,6 +407,16 @@ describe('HeroSpotifySearch', () => {
         within(phoebeButton).queryByTestId('verified-badge')
       ).not.toBeInTheDocument();
     });
+
+    it('renders neutral Jovie identity with the accent role', async () => {
+      renderComponent();
+      const user = userEvent.setup();
+      await user.type(getInput(), 'Taylor');
+
+      const badge = screen.getByText('On Jovie');
+      expect(badge).toHaveAttribute('data-semantic-tone', 'identity');
+      expect(badge).toHaveClass('bg-accent/10', 'text-accent');
+    });
   });
 
   describe('URL detection', () => {
@@ -435,17 +463,24 @@ describe('HeroSpotifySearch', () => {
       expect(lastOption).toHaveTextContent('Paste a Spotify URL instead');
     });
 
+    it('uses the canonical Spotify asset rather than a generic link icon', async () => {
+      renderComponent();
+      const user = userEvent.setup();
+      await user.type(getInput(), 'Taylor');
+
+      const brand = screen.getByTestId('spotify-paste-url-brand');
+      expect(brand.querySelector('.system-b-dsp-logo-icon')).toBeVisible();
+      expect(brand.querySelector('[data-lucide="link-2"]')).toBeNull();
+    });
+
     it('click clears input and focuses it', async () => {
       renderComponent();
       const user = userEvent.setup();
       const input = getInput();
       await user.type(input, 'Taylor');
-      // Text appears in both a hidden <option> and visible <button>; click the button
-      const pasteButtons = screen.getAllByText('Paste a Spotify URL instead');
-      const visibleButton = pasteButtons.find(
-        el => el.closest('button') !== null
-      )!;
-      await user.click(visibleButton);
+      await user.click(
+        screen.getByRole('option', { name: /Paste a Spotify URL instead/i })
+      );
       expect(mockClear).toHaveBeenCalled();
       expect(input).toHaveValue('');
     });
@@ -484,8 +519,8 @@ describe('HeroSpotifySearch', () => {
       const user = userEvent.setup();
       await user.type(getInput(), 'Taylor');
       const options = screen.getAllByRole('option');
-      // 1 disabled placeholder + 3 artists + 1 paste URL = 5
-      expect(options).toHaveLength(5);
+      expect(options).toHaveLength(4);
+      expect(options[0]).toHaveAttribute('aria-selected', 'false');
     });
 
     it('active selection updates with keyboard navigation', async () => {

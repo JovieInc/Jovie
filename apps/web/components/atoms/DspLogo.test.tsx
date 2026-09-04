@@ -43,6 +43,32 @@ describe('DspLogo', () => {
     });
   });
 
+  it('can render the canonical mark without a duplicate visible label', () => {
+    const { container } = render(
+      <DspLogo provider='spotify' showLabel={false} />
+    );
+
+    expect(container.querySelector('.system-b-dsp-logo-icon')).toBeVisible();
+    expect(container.querySelector('.system-b-dsp-logo-label')).toBeNull();
+  });
+
+  it('can render the registry brand color at full emphasis', () => {
+    const { container } = render(
+      <DspLogo provider='spotify' emphasis='brand' showLabel={false} />
+    );
+
+    const logo = container.querySelector('.system-b-dsp-logo');
+    const icon = container.querySelector('.system-b-dsp-logo-icon');
+    expect(logo).toHaveStyle({
+      color: 'var(--color-brand-spotify)',
+      display: 'inline-flex',
+    });
+    expect(icon).toHaveStyle({
+      width: '20px',
+      height: '20px',
+    });
+  });
+
   it('renders nothing for an unmapped provider', () => {
     const { container } = render(<DspLogo provider='amazon' />);
     expect(container).toBeEmptyDOMElement();
