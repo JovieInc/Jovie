@@ -278,6 +278,7 @@
     "tsx": "^4.23.1",
     "turbo": "^2.9.14",
     "typescript": "^7.0.2",
+      "typescript-legacy": "npm:typescript@5.9.3",
     "vercel": "56.3.2",
     "vitest": "4.1.10"
   },
