@@ -27,8 +27,8 @@ import {
   markdownContainsSecret,
   redactSecretValues,
   resolveArtifactFiles,
-  validPlaywrightPng,
 } from '../../../../../.github/scripts/guard-playwright-artifacts.mjs';
+import { validPlaywrightPng } from '../../../../../scripts/lib/playwright-png.mjs';
 
 const webRoot = resolve(import.meta.dirname, '../../..');
 const repoRoot = resolve(webRoot, '../..');
@@ -2317,30 +2317,53 @@ ${fixtureCheckout}
       existsSync(join(currentStage(omittedRunner).stage, 'out/shot.png'))
     ).toBe(false);
     expect(runChild(imageWorkspace, omittedRunner, imageChild).status).toBe(0);
-    const allowedRunner = fixture();
+    const imagePermittedRunner = fixture();
     expect(
-      runChild(imageWorkspace, allowedRunner, imageChild, {
+      runChild(imageWorkspace, imagePermittedRunner, imageChild, {
         PLAYWRIGHT_ARTIFACT_ALLOW_IMAGES: 'true',
       }).status
     ).toBe(0);
     expect(
-      readFileSync(join(currentStage(allowedRunner).stage, 'out/shot.png'))
+      existsSync(join(currentStage(imagePermittedRunner).stage, 'out/shot.png'))
+    ).toBe(false);
+    const publicOnlyRunner = fixture();
+    expect(
+      runChild(imageWorkspace, publicOnlyRunner, imageChild, {
+        PLAYWRIGHT_ARTIFACT_ALLOW_PUBLIC_IMAGES: 'true',
+      }).status
+    ).toBe(0);
+    expect(
+      existsSync(join(currentStage(publicOnlyRunner).stage, 'out/shot.png'))
+    ).toBe(false);
+    const publicImageRunner = fixture();
+    expect(
+      runChild(imageWorkspace, publicImageRunner, imageChild, {
+        PLAYWRIGHT_ARTIFACT_ALLOW_IMAGES: 'true',
+        PLAYWRIGHT_ARTIFACT_ALLOW_PUBLIC_IMAGES: 'true',
+      }).status
+    ).toBe(0);
+    expect(
+      readFileSync(join(currentStage(publicImageRunner).stage, 'out/shot.png'))
     ).toEqual(png());
     expect(
       runChild(
         imageWorkspace,
-        allowedRunner,
+        publicImageRunner,
         "require('node:fs').writeFileSync('out/result.json','{\"next\":true}')"
       ).status
     ).toBe(0);
     expect(
-      existsSync(join(currentStage(allowedRunner).stage, 'out/shot.png'))
+      existsSync(join(currentStage(publicImageRunner).stage, 'out/shot.png'))
     ).toBe(false);
     expect(
       runChild(
         fixture(),
         fixture(),
-        "const f=require('node:fs');f.mkdirSync('out',{recursive:true});f.writeFileSync('out/shot.png','fake')"
+        "const f=require('node:fs');f.mkdirSync('out',{recursive:true});f.writeFileSync('out/shot.png','fake')",
+        {
+          PLAYWRIGHT_ARTIFACT_ALLOW_IMAGES: 'true',
+          PLAYWRIGHT_ARTIFACT_ALLOW_PUBLIC_IMAGES: 'true',
+        }
       ).status
     ).toBe(1);
     expect(
@@ -2376,6 +2399,8 @@ ${fixtureCheckout}
     );
     expect(action).toMatch(/\[\[ -f "\$producer_root\/current"/);
     expect(action).toMatch(/\[\[ -d "\$source_root"/);
+    expect(action).toMatch(/public-images:/);
+    expect(action).toMatch(/PLAYWRIGHT_ARTIFACT_ALLOW_PUBLIC_IMAGES/);
   });
 
   it('scans dynamically returned browser cookies and deletes their receipt', () => {
