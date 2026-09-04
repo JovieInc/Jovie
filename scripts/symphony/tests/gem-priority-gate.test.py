@@ -1438,7 +1438,7 @@ class DeploymentBindingTests(unittest.TestCase):
             },
         )
         projection = subprocess.run(
-            ["python3", str(ROOT / "scripts/hermes/fleet_admission_receipt.py")],
+            ["python3", str(ROOT / "scripts/symphony/fleet_admission_receipt.py")],
             input=json.dumps(receipt), capture_output=True, text=True, check=False,
         )
         self.assertEqual(projection.returncode, 0, projection.stderr)
@@ -1468,7 +1468,7 @@ class DeploymentBindingTests(unittest.TestCase):
         self.assertEqual(receipt["productionUnboundRepairAdmission"]["maxConcurrent"], 0)
         self.assertFalse(receipt["productionUnboundRepairAdmission"]["deploymentsAllowed"])
         projection = subprocess.run(
-            ["python3", str(ROOT / "scripts/hermes/fleet_admission_receipt.py")],
+            ["python3", str(ROOT / "scripts/symphony/fleet_admission_receipt.py")],
             input=json.dumps(receipt), capture_output=True, text=True, check=False,
         )
         self.assertEqual(projection.returncode, 0, projection.stderr)
