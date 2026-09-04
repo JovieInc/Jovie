@@ -62,6 +62,15 @@ describe('Photon lane contract', () => {
   it.each([
     ['invalid lane', msg('artist'), { ...env, EVE_IDENTITY: 'ovie' }],
     ['missing credentials', msg('artist'), { EVE_IDENTITY: 'jovie' }],
+    [
+      'missing webhook secret',
+      msg('artist'),
+      {
+        EVE_IDENTITY: 'jovie',
+        IMESSAGE_PROJECT_ID: 'existing-project',
+        IMESSAGE_PROJECT_SECRET: 'existing-secret',
+      },
+    ],
     ['bot', msg('service', undefined, true), { ...env, EVE_IDENTITY: 'jovie' }],
     [
       'missing user',

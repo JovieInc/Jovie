@@ -89,6 +89,7 @@ export function onPhotonIMessage(
     !author ||
     author.isBot ||
     !author.userId?.trim() ||
+    photonWebhookSecret(environment) === PHOTON_WEBHOOK_SECRET_UNCONFIGURED ||
     credentials.projectId === PHOTON_PROJECT_ID_UNCONFIGURED ||
     credentials.projectSecret === PHOTON_PROJECT_SECRET_UNCONFIGURED
   ) {
