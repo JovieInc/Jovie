@@ -5,7 +5,7 @@ import {
   BUTTON_SIZE_NAMES,
   BUTTON_VARIANT_NAMES,
 } from '@jovie/ui';
-import * as ts from 'typescript';
+import * as ts from 'typescript-legacy';
 import { describe, expect, it } from 'vitest';
 import {
   BUTTON_PEN_PROPAGATION_FIXTURES,
