@@ -30,6 +30,9 @@ class HyperagentLifecycleTests(unittest.TestCase):
             "agent_name": "Developer",
             "agent_mode": "auto",
             "model_id": "live-cheapest-capable",
+            "budget_period_id": "2026-09",
+            "budget_period_receipt_sha256": "9" * 64,
+            "budget_period_checked_at": (self.now - timedelta(minutes=1)).isoformat(),
             "model_price_usd": 0.5,
             "runtime": "hyperagent-sandbox",
             "runtime_compatible": True,
@@ -50,6 +53,8 @@ class HyperagentLifecycleTests(unittest.TestCase):
             "auto_recharge_enabled": False,
             "paying_org": "workspace-a",
             "expected_paying_org": "workspace-a",
+            "paying_org_id": "org-id-a",
+            "expected_paying_org_id": "org-id-a",
             "credits_expire_at": (self.now + timedelta(days=30)).isoformat(),
             "balance_checked_at": (self.now - timedelta(minutes=1)).isoformat(),
             "model_checked_at": (self.now - timedelta(minutes=1)).isoformat(),
@@ -102,6 +107,8 @@ class HyperagentLifecycleTests(unittest.TestCase):
         for field in (
             "account_alias", "expected_account_alias", "workspace_id", "agent_id",
             "agent_name", "model_id", "runtime", "paying_org", "expected_paying_org",
+            "paying_org_id", "expected_paying_org_id", "budget_period_id",
+            "budget_period_receipt_sha256", "budget_period_checked_at",
             "credits_expire_at",
             "idempotency_key", "useful_outcome",
             "destination", "expected_destination", "balance_checked_at",
@@ -318,7 +325,7 @@ class HyperagentLifecycleTests(unittest.TestCase):
 
     def test_input_memory_and_domain_are_not_collapsed_into_approval(self):
         input_interaction = {
-            "kind": "input", "prompt_sha256": "b" * 64,
+            "kind": "input", "id": "input-1", "prompt_sha256": "b" * 64,
             "account_alias": "workspace-a", "destination": "local-artifact",
             "per_query_cap_usd": 1.0,
         }
@@ -367,8 +374,14 @@ class HyperagentLifecycleTests(unittest.TestCase):
                 )["state"],
                 "unknown",
             )
-        malformed_input = self.observation(interaction={"kind": "input", "prompt_sha256": "short"})
-        self.assertEqual(lifecycle.classify_observation(malformed_input, self.now)["state"], "unknown")
+        for interaction in (
+            {**input_interaction, "prompt_sha256": "short"},
+            {**input_interaction, "id": ""},
+        ):
+            malformed_input = self.observation(interaction=interaction)
+            self.assertEqual(
+                lifecycle.classify_observation(malformed_input, self.now)["state"], "unknown"
+            )
 
         memory = lifecycle.classify_observation(
             self.observation(interaction={"kind": "memory_decision", "id": "memory-1"}), self.now
@@ -422,6 +435,8 @@ class HyperagentLifecycleTests(unittest.TestCase):
             useful_outcome_verified=True,
             final_output_sha256="d" * 64,
             usage_receipt_sha256="e" * 64,
+            route_receipt_sha256="f" * 64,
+            destination_receipt_sha256="1" * 64,
             cost_usd=0.5,
         )
         expected_job = self.expected_job()
@@ -430,7 +445,8 @@ class HyperagentLifecycleTests(unittest.TestCase):
         self.assertEqual(lifecycle.plan_resolution(classified)["action"], "record_terminal_receipt")
         for field, value in (
             ("useful_outcome_verified", False), ("final_output_sha256", "short"),
-            ("usage_receipt_sha256", "short"), ("cost_usd", "UNKNOWN"),
+            ("usage_receipt_sha256", "short"), ("route_receipt_sha256", "short"),
+            ("destination_receipt_sha256", "short"), ("cost_usd", "UNKNOWN"),
         ):
             failed = lifecycle.classify_observation({**success, field: value}, self.now, expected_job)
             self.assertEqual(failed["state"], "terminal_unverified")
@@ -531,6 +547,7 @@ class HyperagentLifecycleTests(unittest.TestCase):
                 **self.envelope,
                 "balance_checked_at": actual_now.isoformat(),
                 "model_checked_at": actual_now.isoformat(),
+                "budget_period_checked_at": actual_now.isoformat(),
                 "credits_expire_at": (actual_now + timedelta(days=30)).isoformat(),
             }
             envelope.write_text(json.dumps(current))

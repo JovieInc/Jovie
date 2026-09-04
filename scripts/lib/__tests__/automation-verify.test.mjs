@@ -124,12 +124,15 @@ const FLEET_PROMOTION_GATE_LANE = [
 ];
 const HYPERAGENT_LIFECYCLE_LANE = [
   '.github/workflows/ci.yml',
+  'docs/architecture/hyperagent-mcp-lifecycle.md',
+  'scripts/symphony/WORKFLOW.md',
+  'scripts/symphony/hyperagent/lifecycle.py',
+  'scripts/symphony/tests/hyperagent-journal.test.py',
+  'scripts/symphony/tests/hyperagent-lifecycle.test.py',
   'scripts/ci-fast-lanes.mjs',
   'scripts/lib/__tests__/automation-verify.test.mjs',
   'scripts/lib/__tests__/ci-fast-workflow-contract.test.mjs',
   'scripts/run-affected-tests.mjs',
-  'scripts/symphony/hyperagent/lifecycle.py',
-  'scripts/symphony/tests/hyperagent-lifecycle.test.py',
 ];
 const GEM_PR_REHABILITATION_LANE = [
   '.github/requirements/pytest.in',
@@ -914,6 +917,45 @@ describe('automation-verify affected scope', () => {
     ).toBe('full');
   });
 
+  it('selects the bounded Hyperagent lifecycle and CI contracts', () => {
+    expect(buildAffectedTestPlan(HYPERAGENT_LIFECYCLE_LANE)).toMatchObject({
+      mode: 'selected',
+      selectedTests: [],
+      pythonUnittestTests: [
+        'scripts/symphony/tests/hyperagent-journal.test.py',
+        'scripts/symphony/tests/hyperagent-lifecycle.test.py',
+      ],
+      scriptVitestTests: [
+        'scripts/lib/__tests__/automation-verify.test.mjs',
+        'scripts/lib/__tests__/ci-fast-workflow-contract.test.mjs',
+      ],
+    });
+    expect(
+      buildAffectedTestPlan(['scripts/symphony/WORKFLOW.md'])
+    ).toMatchObject({
+      mode: 'selected',
+      pythonUnittestTests: [
+        'scripts/symphony/tests/hyperagent-journal.test.py',
+        'scripts/symphony/tests/hyperagent-lifecycle.test.py',
+      ],
+    });
+    expect(
+      buildAffectedTestPlan(['docs/architecture/hyperagent-mcp-lifecycle.md'])
+    ).toMatchObject({
+      mode: 'selected',
+      pythonUnittestTests: [
+        'scripts/symphony/tests/hyperagent-journal.test.py',
+        'scripts/symphony/tests/hyperagent-lifecycle.test.py',
+      ],
+    });
+    expect(
+      buildAffectedTestPlan([
+        ...HYPERAGENT_LIFECYCLE_LANE,
+        'apps/ios/Jovie/RootView.swift',
+      ]).mode
+    ).toBe('full');
+  });
+
   it('selects every Gem PR rehabilitation contract without unrelated product tests', () => {
     const plan = buildAffectedTestPlan(GEM_PR_REHABILITATION_LANE);
     expect(plan).toMatchObject({
@@ -939,26 +981,6 @@ describe('automation-verify affected scope', () => {
     expect(
       buildAffectedTestPlan([
         ...GEM_PR_REHABILITATION_LANE,
-        'apps/ios/Jovie/RootView.swift',
-      ]).mode
-    ).toBe('full');
-  });
-
-  it('selects the bounded Hyperagent lifecycle contract', () => {
-    expect(buildAffectedTestPlan(HYPERAGENT_LIFECYCLE_LANE)).toMatchObject({
-      mode: 'selected',
-      selectedTests: [],
-      pythonUnittestTests: [
-        'scripts/symphony/tests/hyperagent-lifecycle.test.py',
-      ],
-      scriptVitestTests: [
-        'scripts/lib/__tests__/automation-verify.test.mjs',
-        'scripts/lib/__tests__/ci-fast-workflow-contract.test.mjs',
-      ],
-    });
-    expect(
-      buildAffectedTestPlan([
-        ...HYPERAGENT_LIFECYCLE_LANE,
         'apps/ios/Jovie/RootView.swift',
       ]).mode
     ).toBe('full');

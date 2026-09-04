@@ -504,19 +504,29 @@ const FLEET_PROMOTION_GATE_PYTEST_TESTS = [
   'scripts/symphony/tests/test_evaluate_fleet_gate.py',
   'scripts/symphony/tests/test_fleet_admission_receipt.py',
 ];
+const HYPERAGENT_LIFECYCLE_PRIMARY_INPUTS = new Set([
+  'docs/architecture/hyperagent-mcp-lifecycle.md',
+  'scripts/symphony/WORKFLOW.md',
+  'scripts/symphony/hyperagent/lifecycle.py',
+  'scripts/symphony/tests/hyperagent-journal.test.py',
+  'scripts/symphony/tests/hyperagent-lifecycle.test.py',
+]);
 const HYPERAGENT_LIFECYCLE_LANE = new Set([
+  ...HYPERAGENT_LIFECYCLE_PRIMARY_INPUTS,
   '.github/workflows/ci.yml',
   'scripts/ci-fast-lanes.mjs',
   'scripts/lib/__tests__/automation-verify.test.mjs',
   'scripts/lib/__tests__/ci-fast-workflow-contract.test.mjs',
   'scripts/run-affected-tests.mjs',
-  'scripts/symphony/hyperagent/lifecycle.py',
-  'scripts/symphony/tests/hyperagent-lifecycle.test.py',
 ]);
-const HYPERAGENT_LIFECYCLE_PRIMARY_INPUTS = new Set([
-  'scripts/symphony/hyperagent/lifecycle.py',
+const HYPERAGENT_LIFECYCLE_PYTHON_TESTS = [
+  'scripts/symphony/tests/hyperagent-journal.test.py',
   'scripts/symphony/tests/hyperagent-lifecycle.test.py',
-]);
+];
+const HYPERAGENT_LIFECYCLE_SCRIPT_TESTS = [
+  'scripts/lib/__tests__/automation-verify.test.mjs',
+  'scripts/lib/__tests__/ci-fast-workflow-contract.test.mjs',
+];
 const GEM_PR_REHABILITATION_LANE = new Set([
   '.github/requirements/pytest.in',
   '.github/requirements/pytest.txt',
@@ -1084,13 +1094,8 @@ export function buildAffectedTestPlan(
       selectedTests: [],
       rootVitestTests: [],
       pythonTests: [],
-      pythonUnittestTests: [
-        'scripts/symphony/tests/hyperagent-lifecycle.test.py',
-      ],
-      scriptVitestTests: [
-        'scripts/lib/__tests__/automation-verify.test.mjs',
-        'scripts/lib/__tests__/ci-fast-workflow-contract.test.mjs',
-      ],
+      pythonUnittestTests: HYPERAGENT_LIFECYCLE_PYTHON_TESTS,
+      scriptVitestTests: HYPERAGENT_LIFECYCLE_SCRIPT_TESTS,
       nodeTests: [],
     };
   }
