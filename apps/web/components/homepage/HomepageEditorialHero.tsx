@@ -1,4 +1,5 @@
 // @coverage-via apps/web/tests/unit/home/HomepageEditorialHero.test.tsx
+import { getImageProps } from 'next/image';
 import { HeroSpotifySearch } from '@/components/features/home/HeroSpotifySearch';
 import {
   HOMEPAGE_CERTIFIED_CONTEXT,
@@ -34,9 +35,9 @@ const BACKDROP_MOBILE_MEDIA = '(max-width: 767px)';
  * Full-viewport editorial hero: one photo behind, one headline, one support
  * line, and the existing name search as the single conversion control.
  *
- * The backdrop is art-directed with a <picture> element. These precompressed
- * WebPs are delivered directly so the critical first paint never waits on a
- * redundant runtime image transformation.
+ * The backdrop is art-directed with a <picture> element because next/image
+ * cannot switch sources per viewport; getImageProps keeps both sources on the
+ * optimizer pipeline.
  */
 export function HomepageEditorialHero({
   headline,
@@ -45,6 +46,25 @@ export function HomepageEditorialHero({
   backdrop,
   headingId = 'homepage-editorial-hero-heading',
 }: HomepageEditorialHeroProps) {
+  const shared = {
+    alt: '',
+    priority: true,
+    quality: 85,
+    sizes: '100vw',
+  } as const;
+  const { props: desktop } = getImageProps({
+    ...shared,
+    src: backdrop.desktopSrc,
+    width: backdrop.desktopWidth,
+    height: backdrop.desktopHeight,
+  });
+  const { props: mobile } = getImageProps({
+    ...shared,
+    src: backdrop.mobileSrc,
+    width: backdrop.mobileWidth,
+    height: backdrop.mobileHeight,
+  });
+
   return (
     <section
       className='homepage-editorial-hero'
@@ -55,24 +75,19 @@ export function HomepageEditorialHero({
       <div
         className='homepage-editorial-hero__backdrop'
         aria-hidden='true'
-        data-hero-layer='decorative'
         data-testid='homepage-editorial-hero-backdrop'
       >
         <picture>
-          <source media={BACKDROP_MOBILE_MEDIA} srcSet={backdrop.mobileSrc} />
-          <img
-            src={backdrop.desktopSrc}
-            width={backdrop.desktopWidth}
-            height={backdrop.desktopHeight}
-            alt=''
-            decoding='async'
-            fetchPriority='high'
-            loading='eager'
+          <source
+            media={BACKDROP_MOBILE_MEDIA}
+            srcSet={mobile.srcSet}
+            sizes={mobile.sizes}
           />
+          <img {...desktop} alt='' decoding='async' fetchPriority='high' />
         </picture>
       </div>
       <div className='homepage-editorial-hero__scrim' aria-hidden='true' />
-      <div className='homepage-editorial-hero__copy' data-hero-layer='active'>
+      <div className='homepage-editorial-hero__copy'>
         <h1 id={headingId} className='homepage-editorial-hero__headline'>
           {headline}
         </h1>

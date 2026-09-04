@@ -20,10 +20,10 @@ import { getMarketingExportImage } from '@/lib/screenshots/registry';
 import { HomepageQueryProvider } from './homepage-query-provider';
 
 const HERO_BACKDROP = {
-  desktopSrc: '/images/hero/night-desk-clean.webp',
+  desktopSrc: '/images/hero/night-desk.webp',
   desktopWidth: 1536,
   desktopHeight: 1024,
-  mobileSrc: '/images/hero/night-desk-mobile-clean.webp',
+  mobileSrc: '/images/hero/night-desk-mobile.webp',
   mobileWidth: 737,
   mobileHeight: 1024,
 } as const;

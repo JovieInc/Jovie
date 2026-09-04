@@ -23,10 +23,10 @@ vi.mock('@/lib/queries/useArtistSearchQuery', () => ({
 }));
 
 const BACKDROP = {
-  desktopSrc: '/images/hero/night-desk-clean.webp',
+  desktopSrc: '/images/hero/night-desk.webp',
   desktopWidth: 1536,
   desktopHeight: 1024,
-  mobileSrc: '/images/hero/night-desk-mobile-clean.webp',
+  mobileSrc: '/images/hero/night-desk-mobile.webp',
   mobileWidth: 737,
   mobileHeight: 1024,
 } as const;
@@ -96,10 +96,6 @@ describe('HomepageEditorialHero', () => {
         'Find what the internet knows. Turn it into relationships.'
       )
     ).toBeInTheDocument();
-    expect(
-      document.querySelectorAll('[data-hero-layer="active"]')
-    ).toHaveLength(1);
-
     const input = screen.getByRole('combobox');
     expect(input).toHaveAttribute('placeholder', 'Search your name');
 
@@ -119,8 +115,6 @@ describe('HomepageEditorialHero', () => {
 
     const backdrop = screen.getByTestId('homepage-editorial-hero-backdrop');
     expect(backdrop).toHaveAttribute('aria-hidden', 'true');
-    expect(backdrop).toHaveAttribute('data-hero-layer', 'decorative');
-
     const source = backdrop.querySelector('source');
     expect(source).toHaveAttribute('media', '(max-width: 767px)');
     expect(source?.getAttribute('srcset')).toContain('night-desk-mobile');

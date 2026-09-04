@@ -42,8 +42,8 @@ describe('homepage hero contract (JOV-5864)', () => {
     expect(heroSource).not.toContain('primaryCta');
     expect(heroSource).not.toContain('secondaryCta');
     expect(heroSource).not.toMatch(/Get started|Drop more music|waitlist/i);
-    expect(pageSource).toContain('/images/hero/night-desk-clean.webp');
-    expect(pageSource).toContain('/images/hero/night-desk-mobile-clean.webp');
+    expect(pageSource).toContain('/images/hero/night-desk.webp');
+    expect(pageSource).toContain('/images/hero/night-desk-mobile.webp');
   });
 
   it('keeps the one-line H1 contract and the two-line phone fallback', () => {
