@@ -67,6 +67,17 @@ env:
   # steps. Job-level concurrency is evaluated before assignment, where github.job is null.
 
 jobs:
+  proof-v2-substrate:
+    name: Validate exact PR head proof v2
+    if: github.event_name == 'pull_request' || github.event_name == 'merge_group'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          persist-credentials: false
+      - run: python3 scripts/symphony/tests/run-proof-gate.py
+
   runner-image-offline-proof:
     name: Build and verify runner image offline
     if: >-
