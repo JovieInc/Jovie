@@ -163,4 +163,123 @@ describe('upsertLinearIssueByTitleFingerprint', () => {
       JSON.parse(String(fetchImpl.mock.calls.at(-1)[1].body)).variables.input
     ).toEqual({ description: 'terminal remains closed' });
   });
+
+  it('creates directly in the named state and promotes a Triage match (JOV-5966)', async () => {
+    const states = [
+      { id: 'triage-state', name: 'Triage', type: 'triage' },
+      { id: 'todo-state', name: 'Todo', type: 'started' },
+    ];
+    let nodes = [];
+    const fetchImpl = vi.fn(async (_url, init) => {
+      const payload = JSON.parse(String(init.body));
+      if (payload.query.includes('FindIssueByFingerprint')) {
+        return new Response(
+          JSON.stringify({
+            data: {
+              team: { states: { nodes: states } },
+              issues: { nodes },
+            },
+          })
+        );
+      }
+      if (payload.query.includes('issueCreate')) {
+        return new Response(JSON.stringify(created));
+      }
+      return new Response(
+        JSON.stringify({
+          data: {
+            issueUpdate: {
+              success: true,
+              issue: created.data.issueCreate.issue,
+            },
+          },
+        })
+      );
+    });
+
+    const first = await upsertLinearIssueByTitleFingerprint({
+      fingerprint,
+      title: `[${fingerprint}] crash`,
+      description: 'body',
+      apiKey: 'lin-key',
+      stateName: 'Todo',
+      fetchImpl,
+    });
+    expect(first).toMatchObject({ ok: true, action: 'created' });
+    expect(
+      JSON.parse(String(fetchImpl.mock.calls[1][1].body)).variables.stateId
+    ).toBe('todo-state');
+
+    nodes = [
+      {
+        id: 'lin-1',
+        identifier: 'JOV-9001',
+        url: 'https://linear.app/jovie/issue/JOV-9001',
+        title: `[${fingerprint}] crash`,
+        state: { id: 'triage-state', name: 'Triage', type: 'triage' },
+      },
+    ];
+    const second = await upsertLinearIssueByTitleFingerprint({
+      fingerprint,
+      title: `[${fingerprint}] crash`,
+      description: 'second occurrence',
+      apiKey: 'lin-key',
+      stateName: 'Todo',
+      fetchImpl,
+    });
+    expect(second).toMatchObject({
+      ok: true,
+      action: 'updated',
+      promoted: true,
+    });
+    expect(
+      JSON.parse(String(fetchImpl.mock.calls.at(-1)[1].body)).variables.input
+        .stateId
+    ).toBe('todo-state');
+
+    // Default callers (no stateName) keep the legacy create-without-state shape.
+    const legacy = await upsertLinearIssueByTitleFingerprint({
+      fingerprint,
+      title: `[${fingerprint}] crash`,
+      description: 'legacy',
+      apiKey: 'lin-key',
+      fetchImpl,
+    });
+    expect(legacy).toMatchObject({ ok: true, action: 'updated' });
+    expect(
+      JSON.parse(String(fetchImpl.mock.calls.at(-1)[1].body)).variables.input
+    ).toEqual({ description: 'legacy' });
+  });
+
+  it('fails closed when a named state cannot be resolved', async () => {
+    const fetchImpl = vi.fn(async (_url, init) => {
+      const payload = JSON.parse(String(init.body));
+      if (payload.query.includes('FindIssueByFingerprint')) {
+        return new Response(
+          JSON.stringify({
+            data: {
+              team: { states: { nodes: [] } },
+              issues: { nodes: [] },
+            },
+          })
+        );
+      }
+      return new Response('{}');
+    });
+    await expect(
+      upsertLinearIssueByTitleFingerprint({
+        fingerprint,
+        title: `[${fingerprint}] crash`,
+        description: 'body',
+        apiKey: 'lin-key',
+        stateName: 'Todo',
+        fetchImpl,
+      })
+    ).resolves.toEqual({
+      ok: false,
+      reason: 'linear_state_missing',
+      body: 'Todo',
+    });
+    expect(fetchImpl).toHaveBeenCalledTimes(1);
+  });
 });
