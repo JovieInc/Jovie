@@ -2,6 +2,11 @@ import 'server-only';
 
 import * as Sentry from '@sentry/nextjs';
 import {
+  gateRetouchIdentity,
+  RETOUCH_IDENTITY_ERROR_CODE,
+  RETOUCH_IDENTITY_REFUSAL_MESSAGE,
+} from './identity-rules';
+import {
   completeRetouchJob,
   countRetouchJobsSince,
   createRetouchJob,
@@ -144,6 +149,10 @@ export async function executeRetouch(params: {
     if (error instanceof RetouchNoImageReturnedError) {
       // The model declined to edit — typically the white-space.md identity
       // guardrails (low-quality or ambiguous input). Not an application error.
+      const gated = gateRetouchIdentity({
+        identityConfidence: 'ambiguous',
+        imageReturned: false,
+      });
       await failRetouchJob({
         jobId,
         error: `${error.code}: ${error.modelText}`,
@@ -151,9 +160,8 @@ export async function executeRetouch(params: {
       });
       return {
         success: false,
-        errorCode: 'IDENTITY_GUARDRAIL_REFUSAL',
-        error:
-          "This photo couldn't be retouched while preserving your likeness. Try a clearer, well-lit photo where your face is fully visible.",
+        errorCode: gated.errorCode ?? RETOUCH_IDENTITY_ERROR_CODE,
+        error: RETOUCH_IDENTITY_REFUSAL_MESSAGE,
         retryable: true,
       };
     }
