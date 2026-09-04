@@ -12,7 +12,7 @@ import { tmpdir } from 'node:os';
 import { resolve } from 'node:path';
 import { performance } from 'node:perf_hooks';
 import { afterEach, describe, expect, it } from 'vitest';
-import { diagnoseCiFailure } from '../../../../../scripts/hermes/jobs/ci-failure-diagnosis';
+import { diagnoseCiFailure } from '../../../../../scripts/symphony/jobs/ci-failure-diagnosis';
 
 const repoRoot = resolve(import.meta.dirname, '../../../../..');
 const readHostFile = (name: string) =>

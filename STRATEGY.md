@@ -36,7 +36,7 @@ This replaces traditional ship cycles. The loop runs faster and more autonomousl
 - `apps/web/`: Next.js web application (HUD, marketing, admin)
 - `apps/desktop/`: Electron desktop app
 - `apps/ios/`: Swift iOS app
-- `scripts/hermes/`: legacy-named Symphony/Gem operational tooling; not an active Hermes runtime dependency
+- `scripts/symphony/`: legacy-named Symphony/Gem operational tooling; not an active Hermes runtime dependency
 - `docs/solutions/`: Compound engineering solution docs
 - `docs/decisions/`: Architecture decision records
 
