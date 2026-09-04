@@ -271,12 +271,16 @@ describe('JOV-INV-018 screen-certification/v2', () => {
         visibleActions: ['Certify'],
       };
       assert.equal(verifyProofArtifact(proof, { artifactRoot }), null);
-      const result = evaluateScreenProof(proof, {
+      const attemptedCallerVerifier = {
         screen,
         headSha: HEAD,
         verifyArtifact: candidate =>
           verifyProofArtifact(candidate, { artifactRoot }),
-      });
+      };
+      const result = evaluateScreenProof(
+        proof,
+        /** @type {any} */ (attemptedCallerVerifier)
+      );
       assert.match(result.join('\n'), /unverified-candidate/);
       assert.match(result.join('\n'), /not-certified/);
       assert.match(
