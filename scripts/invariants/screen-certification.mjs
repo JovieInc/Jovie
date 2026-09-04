@@ -12,6 +12,7 @@ import {
 } from 'node:fs';
 import { dirname, join, relative, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { resolveTrustedScreenProof } from './screen-proof-resolver.mjs';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 export const REPO_ROOT = resolve(__dirname, '../..');
@@ -916,6 +917,92 @@ export function runScreenCertification(options = {}) {
         path: item.path,
         retained: true,
       })),
+    },
+  };
+}
+
+const TRUST_UNAVAILABLE =
+  'trusted external browser producer integration is unavailable; supplied proof cannot certify';
+
+/**
+ * External-certification entrypoint. Unlike legacy proof-file evaluation, this
+ * owns resolution from an immutable artifact ID and has no verifier callback.
+ * @param {{ artifactId?: number; screenId?: string; repoRoot?: string }} options
+ */
+export function runScreenCertificationFromArtifact({
+  artifactId,
+  screenId,
+  repoRoot = REPO_ROOT,
+} = {}) {
+  const headSha = resolveHeadSha(undefined, repoRoot);
+  const changed = normalizeChanged(
+    changedFilesFromGit(resolveDiffBase(undefined, repoRoot), repoRoot)
+  );
+  const screen = SCREEN_REGISTRY.find(
+    entry => !entry.excluded && entry.id === screenId
+  );
+  const ownedSources = changed
+    .filter(file => classifyScreenPath(file.path).entry?.id === screenId)
+    .map(file => file.path)
+    .sort();
+  const scoped = changed.filter(
+    file => classifyScreenPath(file.path).kind === 'registered'
+  );
+  const baseline = runScreenCertification({
+    repoRoot,
+    changedFiles: changed,
+    registrationOnly: true,
+  });
+  if (
+    !screen ||
+    ownedSources.length === 0 ||
+    scoped.some(file => classifyScreenPath(file.path).entry?.id !== screenId)
+  ) {
+    return {
+      ...baseline,
+      ok: false,
+      receipt: {
+        ...baseline.receipt,
+        ok: false,
+        certified: false,
+        status: 'external-certification-unavailable',
+        issues: [
+          ...baseline.receipt.issues,
+          'artifact certification source scope is invalid',
+        ],
+      },
+    };
+  }
+  const resolved = resolveTrustedScreenProof({
+    artifactId,
+    context: {
+      headSha,
+      screenId,
+      sourcePaths: ownedSources,
+      viewports: screen.viewports,
+    },
+  });
+  const findings = resolved.proof
+    ? evaluateScreenProof(resolved.proof, { screen, headSha }).filter(
+        finding => finding !== TRUST_UNAVAILABLE
+      )
+    : resolved.findings;
+  const issues = [...baseline.receipt.issues, ...findings];
+  const ok = issues.length === 0;
+  return {
+    ok,
+    schema: SCREEN_CERT_SCHEMA,
+    receipt: {
+      ...baseline.receipt,
+      gate: SCREEN_CERT_GATE,
+      ok,
+      certified: ok,
+      registrationOnly: false,
+      status: ok ? 'certified' : 'external-certification-unavailable',
+      issues,
+      changedScreens: [
+        { id: screenId, verdict: ok ? 'pass' : 'block', findings },
+      ],
     },
   };
 }

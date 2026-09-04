@@ -1,6 +1,8 @@
 import assert from 'node:assert/strict';
+import { spawnSync } from 'node:child_process';
 import { createHash } from 'node:crypto';
 import {
+  chmodSync,
   mkdirSync,
   mkdtempSync,
   readFileSync,
@@ -21,6 +23,7 @@ import {
   PROTECTED_REVENUE_SCREEN_SOURCES,
   RETAINED_SWEEP_WORKFLOWS,
   runScreenCertification,
+  runScreenCertificationFromArtifact,
   SCREEN_BROWSER_PROOF_SCHEMA,
   SCREEN_CERT_INVARIANT_ID,
   SCREEN_CERT_SCHEMA,
@@ -42,6 +45,8 @@ const protectedSources = () => Object.keys(PROTECTED_REVENUE_SCREEN_SOURCES);
 const kindOf = path => classifyScreenPath(path).kind;
 const digestFile = path =>
   `sha256:${createHash('sha256').update(readFileSync(path)).digest('hex')}`;
+const sha256 = bytes =>
+  `sha256:${createHash('sha256').update(bytes).digest('hex')}`;
 function validExternalProof(screen = gated()[0], headSha = HEAD) {
   return {
     schema: SCREEN_BROWSER_PROOF_SCHEMA,
@@ -289,6 +294,203 @@ describe('JOV-INV-018 screen-certification/v2', () => {
       );
     } finally {
       rmSync(artifactRoot, { force: true, recursive: true });
+    }
+  });
+
+  it('uses owned GitHub artifact transport for the explicit resolver entry (unit proof only)', () => {
+    const root = mkdtempSync(join(tmpdir(), 'screen-resolver-gh-'));
+    const priorPath = process.env.PATH;
+    try {
+      const head = spawnSync('git', ['rev-parse', 'HEAD'], {
+        cwd: ROOT,
+        encoding: 'utf8',
+      }).stdout.trim();
+      const image = readFileSync(
+        join(ROOT, 'docs/screenshots/gem-symphony-hud-430x90.png')
+      );
+      /** @type {[string, Buffer][]} */
+      const images = [
+        ['screenshots/desktop.png', image],
+        ['screenshots/mobile.png', image],
+      ];
+      const digest = createHash('sha256');
+      for (const [name, bytes] of images) {
+        digest.update(name);
+        digest.update('\0');
+        digest.update(bytes);
+        digest.update('\0');
+      }
+      const now = Date.now();
+      const iso = offset => new Date(now + offset).toISOString();
+      const proof = {
+        ...validExternalProof(home(), head),
+        environment: 'local-production-build',
+        sourcePaths: ['apps/web/app/(home)/page.tsx'],
+        capturedAt: iso(-60_000),
+        artifactDigest: `sha256:${digest.digest('hex')}`,
+        runUrl: 'https://github.com/JovieInc/Jovie/actions/runs/77/attempts/3',
+        producerRunId: 77,
+        producerRunAttempt: 3,
+        producerJobId: 99,
+        viewports: ['desktop', 'mobile'].map(id => ({
+          id,
+          decision: 'pass',
+          rendered: true,
+          axe: { violations: 0 },
+          overflow: { maxHorizontalPx: 0 },
+          interaction: { passed: true },
+          cls: { value: 0 },
+          contrast: { passed: true },
+        })),
+      };
+      writeFileSync(join(root, 'screen-proof.json'), JSON.stringify(proof));
+      for (const [name, bytes] of images) {
+        mkdirSync(dirname(join(root, name)), { recursive: true });
+        writeFileSync(join(root, name), bytes);
+      }
+      assert.equal(
+        spawnSync(
+          'zip',
+          [
+            '-q',
+            'proof.zip',
+            'screen-proof.json',
+            ...images.map(([name]) => name),
+          ],
+          { cwd: root }
+        ).status,
+        0
+      );
+      const zip = readFileSync(join(root, 'proof.zip'));
+      let records = {
+        artifact: {
+          id: 42,
+          name: 'screen-browser-proof',
+          expired: false,
+          digest: sha256(zip),
+          created_at: iso(-30_000),
+          workflow_run: { id: 77 },
+        },
+        run: {
+          id: 77,
+          run_attempt: 3,
+          repository: { full_name: 'JovieInc/Jovie' },
+          head_branch: 'main',
+          head_sha: head,
+          path: '.github/workflows/screenshots.yml',
+          event: 'push',
+          conclusion: 'success',
+        },
+        jobs: {
+          jobs: [
+            {
+              id: 99,
+              name: 'Generate Screenshots',
+              run_id: 77,
+              run_attempt: 3,
+              head_sha: head,
+              conclusion: 'success',
+              started_at: iso(-90_000),
+              completed_at: iso(-10_000),
+            },
+          ],
+        },
+        changed: 'M\tapps/web/app/(home)/page.tsx\n',
+      };
+      const gh = join(root, 'gh');
+      writeFileSync(
+        gh,
+        `#!/usr/bin/env node\nconst fs=require('node:fs');const p=process.argv.at(-1);const r=JSON.parse(fs.readFileSync(${JSON.stringify(join(root, 'records.json'))}));if(p.endsWith('/zip'))process.stdout.write(fs.readFileSync(${JSON.stringify(join(root, 'proof.zip'))}));else process.stdout.write(JSON.stringify(p.includes('/artifacts/')?r.artifact:p.includes('/attempts/')?r.jobs:r.run));`
+      );
+      const git = join(root, 'git');
+      writeFileSync(
+        git,
+        `#!/usr/bin/env node\nconst fs=require('node:fs');const a=process.argv.slice(2),r=JSON.parse(fs.readFileSync(${JSON.stringify(join(root, 'records.json'))}));if(a[0]==='rev-parse')process.stdout.write(r.run.head_sha);else if(a[0]==='diff')process.stdout.write(r.changed);else process.exit(1);`
+      );
+      writeFileSync(join(root, 'records.json'), JSON.stringify(records));
+      chmodSync(gh, 0o755);
+      chmodSync(git, 0o755);
+      process.env.PATH = `${root}:${priorPath}`;
+      const certify = () =>
+        runScreenCertificationFromArtifact({
+          artifactId: 42,
+          screenId: 'web.homepage',
+        });
+      const result = certify();
+      assert.equal(result.receipt.certified, true);
+
+      const baselineProof = structuredClone(proof);
+      const baselineRecords = structuredClone(records);
+      let screenshot = image;
+      const rebuild = () => {
+        writeFileSync(join(root, 'screen-proof.json'), JSON.stringify(proof));
+        for (const [name] of images)
+          writeFileSync(join(root, name), screenshot);
+        rmSync(join(root, 'proof.zip'));
+        assert.equal(
+          spawnSync(
+            'zip',
+            [
+              '-q',
+              'proof.zip',
+              'screen-proof.json',
+              ...images.map(([name]) => name),
+            ],
+            { cwd: root }
+          ).status,
+          0
+        );
+        records.artifact.digest = sha256(readFileSync(join(root, 'proof.zip')));
+      };
+      /** @param {{ mutate: () => void; archive?: boolean }} test */
+      const rejects = ({ mutate, archive = false }) => {
+        Object.assign(proof, structuredClone(baselineProof));
+        records = structuredClone(baselineRecords);
+        screenshot = image;
+        mutate();
+        if (archive) rebuild();
+        writeFileSync(join(root, 'records.json'), JSON.stringify(records));
+        assert.equal(certify().receipt.certified, false);
+      };
+      /** @type {[boolean, () => void][]} */
+      const negativeCases = [
+        [false, () => (records.run.head_sha = 'b'.repeat(40))],
+        [false, () => (records.run.repository.full_name = 'attacker/Jovie')],
+        [false, () => (records.run.path = '.github/workflows/other.yml')],
+        [false, () => (records.jobs.jobs[0].name = 'Invented producer')],
+        [false, () => (records.jobs.jobs[0].run_attempt = 0)],
+        [false, () => (records.artifact.created_at = iso(-9 * 60_000))],
+        [false, () => (records.artifact.digest = sha256('modified artifact'))],
+        [true, () => (proof.environment = 'preview')],
+        [true, () => (proof.capturedAt = iso(9 * 60_000))],
+        [
+          true,
+          () => {
+            proof.producerRunId = 999;
+            proof.runUrl = 'https://example.test/invented-run';
+          },
+        ],
+        [true, () => proof.sourcePaths.push('apps/web/app/(home)/layout.tsx')],
+        [true, () => delete proof.viewports[0].contrast],
+        [true, () => (screenshot = Buffer.alloc(0))],
+      ];
+      for (const [archive, mutate] of negativeCases)
+        rejects({ archive, mutate });
+      Object.assign(proof, structuredClone(baselineProof));
+      records = structuredClone(baselineRecords);
+      records.changed = [
+        'M\tapps/web/app/(home)/page.tsx',
+        'M\tapps/web/app/waitlist/page.tsx',
+      ].join('\n');
+      writeFileSync(join(root, 'records.json'), JSON.stringify(records));
+      const widened = runScreenCertificationFromArtifact({
+        artifactId: 42,
+        screenId: 'web.homepage',
+      });
+      assert.deepEqual([widened.ok, widened.receipt.ok], [false, false]);
+    } finally {
+      process.env.PATH = priorPath;
+      rmSync(root, { force: true, recursive: true });
     }
   });
 
