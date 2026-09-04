@@ -2326,6 +2326,15 @@ ${fixtureCheckout}
     expect(
       existsSync(join(currentStage(imagePermittedRunner).stage, 'out/shot.png'))
     ).toBe(false);
+    const publicOnlyRunner = fixture();
+    expect(
+      runChild(imageWorkspace, publicOnlyRunner, imageChild, {
+        PLAYWRIGHT_ARTIFACT_ALLOW_PUBLIC_IMAGES: 'true',
+      }).status
+    ).toBe(0);
+    expect(
+      existsSync(join(currentStage(publicOnlyRunner).stage, 'out/shot.png'))
+    ).toBe(false);
     const publicImageRunner = fixture();
     expect(
       runChild(imageWorkspace, publicImageRunner, imageChild, {
@@ -2350,7 +2359,11 @@ ${fixtureCheckout}
       runChild(
         fixture(),
         fixture(),
-        "const f=require('node:fs');f.mkdirSync('out',{recursive:true});f.writeFileSync('out/shot.png','fake')"
+        "const f=require('node:fs');f.mkdirSync('out',{recursive:true});f.writeFileSync('out/shot.png','fake')",
+        {
+          PLAYWRIGHT_ARTIFACT_ALLOW_IMAGES: 'true',
+          PLAYWRIGHT_ARTIFACT_ALLOW_PUBLIC_IMAGES: 'true',
+        }
       ).status
     ).toBe(1);
     expect(
