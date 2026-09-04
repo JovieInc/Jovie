@@ -26,6 +26,9 @@ AUTHORITY = "Summer"
 CONTROLLER_RED_AFTER = timedelta(minutes=10)
 EMPTY_QUEUE_RED_AFTER = timedelta(minutes=15)
 UNCLASSIFIED_RED_AFTER = timedelta(minutes=15)
+# Merge-queue group rebuilds transiently mark entries UNMERGEABLE; only a
+# persistent entry past this threshold is real.
+UNMERGEABLE_QUEUE_RED_AFTER = timedelta(minutes=15)
 NO_MERGE_PROGRESS_AFTER = timedelta(hours=1)
 HOLD_EXPIRY = timedelta(days=7)
 STACK_MAX_DEPTH = 4  # JOV-INV-020
@@ -1362,12 +1365,21 @@ def evaluate_closure_health(
     )
     repair_actions = repair_actions if isinstance(repair_actions, list) else []
 
+    unmergeable_queue_prs = sorted(
+        item.get("number")
+        for item in dispositions
+        if isinstance(item, dict)
+        and item.get("state") == "queued"
+        and item.get("queueState") == "UNMERGEABLE"
+        and isinstance(item.get("number"), int)
+    )
     active = {
         "controller": controller_status != "green",
         "emptyNativeQueue": bool(
             shape_valid and green_ready_prs > 0 and native_queue_count == 0
         ),
         "unclassified": bool(unclassified),
+        "unmergeableQueue": bool(unmergeable_queue_prs),
     }
     episodes: dict[str, Any] = {}
     durations: dict[str, timedelta] = {}
@@ -1398,15 +1410,10 @@ def evaluate_closure_health(
         }
         if roots != action_roots:
             reasons.append("draft-stack-repair-action-unavailable")
-    unmergeable_queue_prs = sorted(
-        item.get("number")
-        for item in dispositions
-        if isinstance(item, dict)
-        and item.get("state") == "queued"
-        and item.get("queueState") == "UNMERGEABLE"
-        and isinstance(item.get("number"), int)
-    )
-    if unmergeable_queue_prs:
+    if (
+        active["unmergeableQueue"]
+        and durations["unmergeableQueue"] >= UNMERGEABLE_QUEUE_RED_AFTER
+    ):
         reasons.append("native-queue-unmergeable")
     if active["controller"] and durations["controller"] >= CONTROLLER_RED_AFTER:
         reasons.append("queue-controller-red-over-10m")
