@@ -56,29 +56,30 @@ export function photonCredentials(
 }
 
 /**
- * iMessage is Summer's live talk channel on this Eve app.
- * Credentials are portable Photon env vars, not Vercel Connect.
+ * Photon/iMessage is Ovie's live talk channel on this Eve app.
+ * Summer is not a Photon route. Credentials are portable Photon env
+ * vars, not Vercel Connect, Hermes, or Trigger.
  */
-export function onSummerIMessage(
+export function onOvieIMessage(
   _ctx: PhotonInboundMessageContext,
   message: unknown
 ): PhotonInboundResult {
   if (!admitOvieIMessage(authorFrom(message))) return null;
-  const turn = bindEvePilotIdentity('summer');
+  const turn = bindEvePilotIdentity('ovie');
   return {
     auth: {
       attributes: {
         fallback: 'true',
-        identity: 'summer',
+        identity: 'ovie',
         source: 'imessage',
       },
       authenticator: 'photon-imessage',
       issuer: 'photon',
-      principalId: 'summer-imessage',
+      principalId: 'ovie-imessage',
       principalType: 'user',
     },
     context: [turn.instructions],
-    title: 'Summer iMessage',
+    title: 'Ovie iMessage',
   };
 }
 
@@ -86,7 +87,7 @@ export default photonIMessageChannel({
   async credentials() {
     return photonCredentials();
   },
-  onMessage: onSummerIMessage,
-  userName: 'Summer',
+  onMessage: onOvieIMessage,
+  userName: 'Ovie',
   webhookSecret: photonWebhookSecret(),
 });

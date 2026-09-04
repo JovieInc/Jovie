@@ -92,7 +92,7 @@ describe('Eve framework smoke', () => {
     expect(manifest.devDependencies?.vercel).toBe('56.3.2');
   });
 
-  it('discovers Eve with Ovie Telegram and Summer iMessage channels offline', () => {
+  it('discovers Eve with Ovie Telegram and Ovie iMessage channels offline', () => {
     const isolatedRoot = mkdtempSync(join(tmpdir(), 'jovie-eve-smoke-'));
     const networkSentinel = join(isolatedRoot, 'network-blocked');
 
