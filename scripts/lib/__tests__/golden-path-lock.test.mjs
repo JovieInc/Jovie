@@ -14,11 +14,21 @@ import {
   evaluateStripeWebhookLiveness,
   evaluateWaitlistUnauth,
   findOwnedAgents,
+  GOLDEN_PATH_HERO_SEARCH_ACTION,
+  GOLDEN_PATH_HERO_SEARCH_PLACEHOLDER,
   GOLDEN_PATH_LOCK_SCHEMA,
+  HOMEPAGE_CTA_FAIL_REASON,
+  HOMEPAGE_CTA_RETIRED_REASON,
   MERGE_GATE_TEST_FILES,
   planAutofix,
   validateReceipt,
 } from '../golden-path-lock.mjs';
+
+const CERTIFIED_HOMEPAGE_HTML = `
+  <input placeholder="${GOLDEN_PATH_HERO_SEARCH_PLACEHOLDER}" />
+  <button type="button" data-testid="homepage-primary-cta">${GOLDEN_PATH_HERO_SEARCH_ACTION}</button>
+  <a href="/start" data-primary-cta="true">Find yourself</a>
+`;
 
 describe('golden-path lock test files', () => {
   it('keeps merge-gate files inside the web package', () => {
@@ -36,6 +46,7 @@ describe('golden-path lock classifier', () => {
       'apps/web/app/start/page.tsx',
       'apps/web/app/api/waitlist/route.ts',
       'apps/web/data/homepageFrontDoorCta.ts',
+      'apps/web/data/homepageLaunchCopy.ts',
       'README.md',
     ]);
     expect(classified.touchesGoldenPath).toBe(true);
@@ -44,6 +55,7 @@ describe('golden-path lock classifier', () => {
       'apps/web/app/start/page.tsx',
       'apps/web/app/api/waitlist/route.ts',
       'apps/web/data/homepageFrontDoorCta.ts',
+      'apps/web/data/homepageLaunchCopy.ts',
     ]);
   });
 
@@ -55,22 +67,39 @@ describe('golden-path lock classifier', () => {
 });
 
 describe('golden-path lock evaluators', () => {
-  it('requires Get started to point at /start', () => {
+  it('requires the certified name search + Find me → /start', () => {
+    expect(evaluateHomepageHtml(CERTIFIED_HOMEPAGE_HTML)).toMatchObject({
+      id: 'homepage-cta',
+      ok: true,
+      reason: expect.stringContaining(GOLDEN_PATH_HERO_SEARCH_ACTION),
+    });
     expect(
       evaluateHomepageHtml(
         '<a href="/start?starter_prompt=Hey">Get started</a>'
       )
-    ).toMatchObject({ id: 'homepage-cta', ok: true });
+    ).toMatchObject({
+      ok: false,
+      reason: HOMEPAGE_CTA_RETIRED_REASON,
+    });
     expect(
       evaluateHomepageHtml('<a href="/signup">Get started</a>')
     ).toMatchObject({
       ok: false,
+      reason: HOMEPAGE_CTA_RETIRED_REASON,
     });
     expect(
       evaluateHomepageHtml('<a href="https://jov.ie/waitlist">Get started</a>')
     ).toMatchObject({
       ok: false,
-      reason: 'homepage CTA must be "Get started" → /start',
+      reason: HOMEPAGE_CTA_RETIRED_REASON,
+    });
+    expect(
+      evaluateHomepageHtml(
+        `<input placeholder="${GOLDEN_PATH_HERO_SEARCH_PLACEHOLDER}" /><button>Find me</button>`
+      )
+    ).toMatchObject({
+      ok: false,
+      reason: HOMEPAGE_CTA_FAIL_REASON,
     });
     expect(evaluateHomepageHtml('')).toMatchObject({ ok: false });
   });
@@ -146,7 +175,7 @@ describe('golden-path lock evaluators', () => {
       stripeWebhookStatus: 400,
     };
     const ok = evaluateProdProbe({
-      homepageHtml: '<a href="/start">Get started</a>',
+      homepageHtml: CERTIFIED_HOMEPAGE_HTML,
       chatStatus: 403,
       chatBody: { errorCode: 'TURNSTILE_REQUIRED' },
       waitlistStatus: 401,
@@ -156,7 +185,7 @@ describe('golden-path lock evaluators', () => {
     expect(ok.checks).toHaveLength(6);
 
     const broken = evaluateProdProbe({
-      homepageHtml: '<a href="/start">Get started</a>',
+      homepageHtml: CERTIFIED_HOMEPAGE_HTML,
       chatStatus: 401,
       chatBody: { error: 'Unauthorized' },
       waitlistStatus: 401,
@@ -212,7 +241,7 @@ describe('golden-path lock receipts', () => {
 
   it('accepts a real prod-probe receipt', () => {
     const evaluated = evaluateProdProbe({
-      homepageHtml: '<a href="/start">Get started</a>',
+      homepageHtml: CERTIFIED_HOMEPAGE_HTML,
       chatStatus: 403,
       chatBody: { errorCode: 'TURNSTILE_REQUIRED' },
       waitlistStatus: 401,
@@ -283,6 +312,10 @@ describe('golden-path lock autofix planner', () => {
     expect(plan.request.target.autoCreatePr).toBe(true);
     expect(plan.request.prompt.text).toContain('not 401');
     expect(plan.request.prompt.text).toContain('Too many messages');
+    expect(plan.request.prompt.text).toContain('Find me');
+    expect(plan.request.prompt.text).toContain(
+      'Do not revert Find me to Get started'
+    );
     expect(buildAutofixPrompt({ fingerprint: 'x', checks })).toContain(
       'Tell Gem she missed this'
     );
