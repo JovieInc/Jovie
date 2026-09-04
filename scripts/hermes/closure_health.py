@@ -1555,22 +1555,44 @@ def _observe_queue_controller(repo: str) -> dict[str, Any]:
     if not isinstance(runs, list) or not runs:
         return {"status": "unknown", "reason": "controller-run-missing"}
     latest = runs[0]
-    status = latest.get("status")
-    conclusion = latest.get("conclusion")
-    if status == "completed":
+    # Judge green/failed from the latest completed run, not the latest run:
+    # a busy fleet almost always has an in-progress autoenroll run, and a
+    # busy queue is not a stalled controller. Also skip `cancelled` runs:
+    # the autoenroll concurrency group supersedes older runs constantly, and
+    # supersession churn carries no health verdict. "recovering" covers the
+    # abnormal case where the fetched page has no verdict-bearing run at all;
+    # the CONTROLLER_RED_AFTER episode threshold guards real stalls.
+    verdict_runs = [
+        run
+        for run in runs
+        if isinstance(run, dict)
+        and run.get("status") == "completed"
+        and run.get("conclusion") not in (None, "cancelled")
+    ]
+    if verdict_runs:
+        judged = verdict_runs[0]
+        status = judged.get("status")
+        conclusion = judged.get("conclusion")
         controller_status = "green" if conclusion == "success" else "failed"
-    elif status in {"queued", "in_progress", "waiting", "pending"}:
-        controller_status = "recovering"
     else:
-        controller_status = "unknown"
-    return {
+        judged = latest
+        status = judged.get("status")
+        conclusion = judged.get("conclusion")
+        if status in {"queued", "in_progress", "waiting", "pending"} or status == "completed":
+            controller_status = "recovering"
+        else:
+            controller_status = "unknown"
+    receipt: dict[str, Any] = {
         "status": controller_status,
-        "runId": latest.get("id"),
+        "runId": judged.get("id"),
         "runStatus": status,
         "conclusion": conclusion,
-        "url": latest.get("html_url"),
-        "observedAt": latest.get("updated_at") or latest.get("created_at"),
+        "url": judged.get("html_url"),
+        "observedAt": judged.get("updated_at") or judged.get("created_at"),
     }
+    if judged is not latest and isinstance(latest, dict):
+        receipt["activeRunId"] = latest.get("id")
+    return receipt
 
 
 def observe_closure_health(
