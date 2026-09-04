@@ -36,6 +36,7 @@ import {
   verifyProofArtifact,
 } from './screen-certification.mjs';
 import { emitScreenProof } from './screen-proof-emit.mjs';
+import { resolveTrustedScreenProof } from './screen-proof-resolver.mjs';
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '../..');
 const HEAD = 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa';
@@ -297,9 +298,10 @@ describe('JOV-INV-018 screen-certification/v2', () => {
     }
   });
 
-  it('uses owned GitHub artifact transport for the explicit resolver entry (unit proof only)', () => {
+  it('tests owned GitHub artifact transport directly while the gate remains fail closed without source continuity', () => {
     const root = mkdtempSync(join(tmpdir(), 'screen-resolver-gh-'));
     const priorPath = process.env.PATH;
+    const priorDiffBase = process.env.SCREEN_CERT_DIFF_BASE;
     try {
       const head = spawnSync('git', ['rev-parse', 'HEAD'], {
         cwd: ROOT,
@@ -411,13 +413,33 @@ describe('JOV-INV-018 screen-certification/v2', () => {
       chmodSync(gh, 0o755);
       chmodSync(git, 0o755);
       process.env.PATH = `${root}:${priorPath}`;
+      process.env.SCREEN_CERT_DIFF_BASE = 'c'.repeat(40);
       const certify = () =>
         runScreenCertificationFromArtifact({
           artifactId: 42,
           screenId: 'web.homepage',
         });
+      const resolveProof = () =>
+        resolveTrustedScreenProof({
+          artifactId: 42,
+          context: {
+            headSha: head,
+            screenId: 'web.homepage',
+            sourcePaths: ['apps/web/app/(home)/page.tsx'],
+            viewports: home().viewports,
+          },
+        });
       const result = certify();
-      assert.equal(result.receipt.certified, true);
+      assert.deepEqual([result.ok, result.receipt.certified], [false, false]);
+      assert.equal(result.receipt.status, 'external-certification-unavailable');
+      assert.match(
+        result.receipt.issues.join('\n'),
+        /authoritative GitHub event source continuity/
+      );
+      assert.ok(
+        resolveProof().proof,
+        'fixture must exercise resolver acceptance'
+      );
 
       const baselineProof = structuredClone(proof);
       const baselineRecords = structuredClone(records);
@@ -450,7 +472,7 @@ describe('JOV-INV-018 screen-certification/v2', () => {
         mutate();
         if (archive) rebuild();
         writeFileSync(join(root, 'records.json'), JSON.stringify(records));
-        assert.equal(certify().receipt.certified, false);
+        assert.equal(resolveProof().proof, null);
       };
       /** @type {[boolean, () => void][]} */
       const negativeCases = [
@@ -490,6 +512,8 @@ describe('JOV-INV-018 screen-certification/v2', () => {
       assert.deepEqual([widened.ok, widened.receipt.ok], [false, false]);
     } finally {
       process.env.PATH = priorPath;
+      if (priorDiffBase === undefined) delete process.env.SCREEN_CERT_DIFF_BASE;
+      else process.env.SCREEN_CERT_DIFF_BASE = priorDiffBase;
       rmSync(root, { force: true, recursive: true });
     }
   });

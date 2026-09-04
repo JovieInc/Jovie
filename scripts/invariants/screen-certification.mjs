@@ -12,7 +12,6 @@ import {
 } from 'node:fs';
 import { dirname, join, relative, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { resolveTrustedScreenProof } from './screen-proof-resolver.mjs';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 export const REPO_ROOT = resolve(__dirname, '../..');
@@ -921,12 +920,10 @@ export function runScreenCertification(options = {}) {
   };
 }
 
-const TRUST_UNAVAILABLE =
-  'trusted external browser producer integration is unavailable; supplied proof cannot certify';
-
 /**
- * External-certification entrypoint. Unlike legacy proof-file evaluation, this
- * owns resolution from an immutable artifact ID and has no verifier callback.
+ * Reserved external-certification entrypoint. It accepts no verifier callback
+ * and remains unavailable until the dependent authoritative source-continuity
+ * adapter binds a GitHub push event to the immutable artifact.
  * @param {{ artifactId?: number; screenId?: string; repoRoot?: string }} options
  */
 export function runScreenCertificationFromArtifact({
@@ -935,74 +932,37 @@ export function runScreenCertificationFromArtifact({
   repoRoot = REPO_ROOT,
 } = {}) {
   const headSha = resolveHeadSha(undefined, repoRoot);
-  const changed = normalizeChanged(
-    changedFilesFromGit(resolveDiffBase(undefined, repoRoot), repoRoot)
-  );
   const screen = SCREEN_REGISTRY.find(
     entry => !entry.excluded && entry.id === screenId
   );
-  const ownedSources = changed
-    .filter(file => classifyScreenPath(file.path).entry?.id === screenId)
-    .map(file => file.path)
-    .sort();
-  const scoped = changed.filter(
-    file => classifyScreenPath(file.path).kind === 'registered'
-  );
-  const baseline = runScreenCertification({
-    repoRoot,
-    changedFiles: changed,
-    registrationOnly: true,
-  });
-  if (
-    !screen ||
-    ownedSources.length === 0 ||
-    scoped.some(file => classifyScreenPath(file.path).entry?.id !== screenId)
-  ) {
-    return {
-      ...baseline,
-      ok: false,
-      receipt: {
-        ...baseline.receipt,
-        ok: false,
-        certified: false,
-        status: 'external-certification-unavailable',
-        issues: [
-          ...baseline.receipt.issues,
-          'artifact certification source scope is invalid',
-        ],
-      },
-    };
-  }
-  const resolved = resolveTrustedScreenProof({
-    artifactId,
-    context: {
-      headSha,
-      screenId,
-      sourcePaths: ownedSources,
-      viewports: screen.viewports,
-    },
-  });
-  const findings = resolved.proof
-    ? evaluateScreenProof(resolved.proof, { screen, headSha }).filter(
-        finding => finding !== TRUST_UNAVAILABLE
-      )
-    : resolved.findings;
-  const issues = [...baseline.receipt.issues, ...findings];
-  const ok = issues.length === 0;
+  // An immutable artifact alone cannot establish which push event introduced
+  // the registered source change. The post-run GitHub compare binding belongs
+  // to the dependent continuity slice; do not substitute local git history.
+  void artifactId;
+  const issue =
+    'artifact certification is unavailable until authoritative GitHub event source continuity is verified';
   return {
-    ok,
+    ok: false,
     schema: SCREEN_CERT_SCHEMA,
     receipt: {
-      ...baseline.receipt,
       gate: SCREEN_CERT_GATE,
-      ok,
-      certified: ok,
+      invariant: SCREEN_CERT_INVARIANT_ID,
+      headSha,
+      baseSha: null,
+      ok: false,
+      certified: false,
       registrationOnly: false,
-      status: ok ? 'certified' : 'external-certification-unavailable',
-      issues,
-      changedScreens: [
-        { id: screenId, verdict: ok ? 'pass' : 'block', findings },
-      ],
+      status: 'external-certification-unavailable',
+      issues: [issue],
+      changedScreens: screen
+        ? [{ id: screenId, verdict: 'block', findings: [issue] }]
+        : [],
+      excludedChanges: [],
+      fixtures: [],
+      sweeps: RETAINED_SWEEP_WORKFLOWS.map(item => ({
+        path: item.path,
+        retained: true,
+      })),
     },
   };
 }
