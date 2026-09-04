@@ -14,7 +14,7 @@ import { describe, expect, it } from 'vitest';
 const REPO_ROOT = join(import.meta.dirname, '..', '..', '..');
 const INSTALL_HELPER = join(
   REPO_ROOT,
-  'scripts/hermes/lib/install-launchd-artifacts.sh'
+  'scripts/symphony/lib/install-launchd-artifacts.sh'
 );
 
 function installLaunchdFixtures({ pythonSource, plistSource }) {
@@ -91,7 +91,7 @@ describe('hermes launchd pro templates', () => {
   it('renders codex kanban ship plist with 15m schedule and ship-loop entrypoint', () => {
     const templatePath = join(
       REPO_ROOT,
-      'scripts/hermes/launchd/pro/co.jovie.hermes.cron-codex-kanban-ship.plist.template'
+      'scripts/symphony/launchd/pro/co.jovie.hermes.cron-codex-kanban-ship.plist.template'
     );
     const rendered = renderTemplate(templatePath, {
       '{{HOME}}': '/Users/tester',
@@ -104,7 +104,7 @@ describe('hermes launchd pro templates', () => {
     );
     expect(rendered).toContain('<integer>900</integer>');
     expect(rendered).toContain(
-      '/Users/tester/Jovie/scripts/hermes/ship-loop.sh'
+      '/Users/tester/Jovie/scripts/symphony/ship-loop.sh'
     );
     expect(rendered).toContain(
       '/Users/tester/.hermes/logs/launchd/cron-codex-kanban-ship.log'
@@ -123,7 +123,7 @@ describe('hermes gh monitor launchd templates', () => {
   it('ci monitor plist sets WorkingDirectory to the Jovie repo', () => {
     const templatePath = join(
       REPO_ROOT,
-      'scripts/hermes/launchd/co.jovie.hermes.cron-ci-monitor.plist.template'
+      'scripts/symphony/launchd/co.jovie.hermes.cron-ci-monitor.plist.template'
     );
     const rendered = renderTemplate(templatePath, mapping);
 
@@ -131,7 +131,7 @@ describe('hermes gh monitor launchd templates', () => {
       '<string>co.jovie.hermes.cron-ci-monitor</string>'
     );
     expect(rendered).toContain(
-      '/Users/tester/Jovie/scripts/hermes/jobs/ci-failure-monitor.ts'
+      '/Users/tester/Jovie/scripts/symphony/jobs/ci-failure-monitor.ts'
     );
     expect(rendered).toContain('<key>WorkingDirectory</key>');
     expect(rendered).toContain('<string>/Users/tester/Jovie</string>');
@@ -140,7 +140,7 @@ describe('hermes gh monitor launchd templates', () => {
   it('pr monitor plist sets WorkingDirectory to the Jovie repo', () => {
     const templatePath = join(
       REPO_ROOT,
-      'scripts/hermes/launchd/co.jovie.hermes.cron-pr-monitor.plist.template'
+      'scripts/symphony/launchd/co.jovie.hermes.cron-pr-monitor.plist.template'
     );
     const rendered = renderTemplate(templatePath, mapping);
 
@@ -148,7 +148,7 @@ describe('hermes gh monitor launchd templates', () => {
       '<string>co.jovie.hermes.cron-pr-monitor</string>'
     );
     expect(rendered).toContain(
-      '/Users/tester/Jovie/scripts/hermes/jobs/pr-stuck-monitor.ts'
+      '/Users/tester/Jovie/scripts/symphony/jobs/pr-stuck-monitor.ts'
     );
     expect(rendered).toContain('<key>WorkingDirectory</key>');
     expect(rendered).toContain('<string>/Users/tester/Jovie</string>');
@@ -157,7 +157,7 @@ describe('hermes gh monitor launchd templates', () => {
 
 describe('shipper-gated entrypoint', () => {
   it('compiles every Python launchd entrypoint', () => {
-    const entrypoints = readdirSync(join(REPO_ROOT, 'scripts/hermes')).filter(
+    const entrypoints = readdirSync(join(REPO_ROOT, 'scripts/symphony')).filter(
       entry => entry.endsWith('.py')
     );
     const pycache = mkdtempSync(join(tmpdir(), 'hermes-pycache-'));
@@ -167,7 +167,7 @@ describe('shipper-gated entrypoint', () => {
     for (const entrypoint of entrypoints) {
       const result = spawnSync(
         'python3',
-        ['-m', 'py_compile', join(REPO_ROOT, 'scripts/hermes', entrypoint)],
+        ['-m', 'py_compile', join(REPO_ROOT, 'scripts/symphony', entrypoint)],
         {
           encoding: 'utf8',
           env: { ...process.env, PYTHONPYCACHEPREFIX: pycache },
@@ -180,7 +180,7 @@ describe('shipper-gated entrypoint', () => {
 
   it('documents gbrain and grok preflight gates', () => {
     const script = readFileSync(
-      join(REPO_ROOT, 'scripts/hermes/shipper-gated-entrypoint.py'),
+      join(REPO_ROOT, 'scripts/symphony/shipper-gated-entrypoint.py'),
       'utf8'
     );
     expect(script).toContain('pause_active');
@@ -192,7 +192,7 @@ describe('shipper-gated entrypoint', () => {
 
   it('keeps provider abort events dynamic for every supported provider', () => {
     const script = readFileSync(
-      join(REPO_ROOT, 'scripts/hermes/shipper-gated-entrypoint.py'),
+      join(REPO_ROOT, 'scripts/symphony/shipper-gated-entrypoint.py'),
       'utf8'
     );
     expect(script).toContain('stale_checkout_abort');
@@ -206,7 +206,7 @@ describe('shipper-gated entrypoint', () => {
       [
         '-c',
         `import json, runpy
-module = runpy.run_path(${JSON.stringify(join(REPO_ROOT, 'scripts/hermes/shipper-gated-entrypoint.py'))})
+module = runpy.run_path(${JSON.stringify(join(REPO_ROOT, 'scripts/symphony/shipper-gated-entrypoint.py'))})
 print(json.dumps([module['provider_abort_event'](provider) for provider in ('codex', 'claude', 'grok')]))`,
       ],
       { encoding: 'utf8' }
@@ -223,7 +223,7 @@ print(json.dumps([module['provider_abort_event'](provider) for provider in ('cod
   it('codex issue shipper launchd plist uses the gated entrypoint', () => {
     const templatePath = join(
       REPO_ROOT,
-      'scripts/hermes/launchd/co.jovie.hermes.cron-codex-issue-shipper.plist.template'
+      'scripts/symphony/launchd/co.jovie.hermes.cron-codex-issue-shipper.plist.template'
     );
     const rendered = renderTemplate(templatePath, {
       '{{HOME}}': '/Users/tester',
@@ -296,7 +296,7 @@ describe('hermes launchd artifact installation', () => {
     'bootstrap-pro-launchd.sh',
   ])('%s installs launchd artifacts through the validated stage', bootstrapName => {
     const bootstrap = readFileSync(
-      join(REPO_ROOT, 'scripts/hermes', bootstrapName),
+      join(REPO_ROOT, 'scripts/symphony', bootstrapName),
       'utf8'
     );
 
@@ -309,7 +309,7 @@ describe('hermes launchd artifact installation', () => {
 describe('ship-loop pause semantics', () => {
   it('documents pause sentinels in the wrapper script', () => {
     const script = readFileSync(
-      join(REPO_ROOT, 'scripts/hermes/ship-loop.sh'),
+      join(REPO_ROOT, 'scripts/symphony/ship-loop.sh'),
       'utf8'
     );
     expect(script).toContain('HERMES_PAUSE');

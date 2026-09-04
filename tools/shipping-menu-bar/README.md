@@ -40,7 +40,7 @@ The app polls `~/.hermes/logs/jobs.jsonl` every 15 seconds and checks `launchctl
 
 ## Shipper integration
 
-The shipper (`scripts/hermes/jobs/codex-issue-shipper.ts`) checks for the pause sentinel at the top of each run. If `~/.hermes/shipping-paused` exists, it logs a `paused_skip` event and exits cleanly without scanning or dispatching.
+The shipper (`scripts/symphony/jobs/codex-issue-shipper.ts`) checks for the pause sentinel at the top of each run. If `~/.hermes/shipping-paused` exists, it logs a `paused_skip` event and exits cleanly without scanning or dispatching.
 
 ## Menu layout
 

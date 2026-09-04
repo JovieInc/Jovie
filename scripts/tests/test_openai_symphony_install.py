@@ -15,7 +15,7 @@ ROOT = Path(__file__).resolve().parents[2]
 class OpenAISymphonyInstallTests(unittest.TestCase):
     def test_official_workflow_and_elixir_installer(self) -> None:
         self.assertFalse((ROOT / "WORKFLOW.md").exists())
-        workflow = (ROOT / "scripts/hermes/symphony/WORKFLOW.md").read_text()
+        workflow = (ROOT / "scripts/symphony/symphony/WORKFLOW.md").read_text()
         self.assertIn('team_key: "JOV"', workflow)
         self.assertIn("api_key: $LINEAR_API_KEY", workflow)
         self.assertNotIn("project_slug", workflow)
@@ -28,7 +28,7 @@ class OpenAISymphonyInstallTests(unittest.TestCase):
         )
         self.assertRegex(
             workflow,
-            re.compile(r"^\s+command: \./scripts/hermes/symphony-codex-router app-server$", re.M),
+            re.compile(r"^\s+command: \./scripts/symphony/symphony-codex-router app-server$", re.M),
         )
         self.assertIn("symphony-codex-router", workflow)
         self.assertIn("interval_ms: 30000", workflow)
@@ -43,7 +43,7 @@ class OpenAISymphonyInstallTests(unittest.TestCase):
         self.assertIn("macos_arm64", installer)
         self.assertIn("shasum -a 256 -c", installer)
         self.assertIn('"$SYMPHONY_INSTALL_DIR/symphony"', installer)
-        updater = (ROOT / "scripts/hermes/update-symphony-burrito.sh").read_text()
+        updater = (ROOT / "scripts/symphony/update-symphony-burrito.sh").read_text()
         self.assertIn('SYMPHONY_VERSION="${SYMPHONY_VERSION:-v0.0.2-jovie.2}"', updater)
         self.assertIn("github.com/JovieInc/symphony/releases/download", updater)
         self.assertIn("symphony-elixir.service", updater)

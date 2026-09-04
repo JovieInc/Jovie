@@ -1530,7 +1530,7 @@ def test_retired_merge_queue_label_has_no_active_producers() -> None:
         REPO_ROOT / ".github/rulesets/branch-protection.yml",
         WORKFLOWS / "agent-pipeline.yml",
         REPO_ROOT / "scripts/release-queue-deferred.sh",
-        REPO_ROOT / "scripts/hermes/lib/codex-issue-shipper.ts",
+        REPO_ROOT / "scripts/symphony/lib/codex-issue-shipper.ts",
     ]
     forbidden = re.compile(
         r"--(?:add|remove)-label\s+[\"']?merge-queue|"
@@ -1606,7 +1606,7 @@ def test_heartbeat_is_the_only_scheduled_generic_fixed_runner_consumer() -> None
 def test_fleet_controllers_share_one_evaluate_action() -> None:
     """FGR, QDR, merge-queue, and production-controller must not copy-paste the gate CLI."""
     action = ".github/actions/evaluate-fleet-gate"
-    script = REPO_ROOT / "scripts/hermes/evaluate-fleet-gate.sh"
+    script = REPO_ROOT / "scripts/symphony/evaluate-fleet-gate.sh"
     assert script.is_file(), "shared evaluate script missing"
     callers = (
         ("fleet-gate-refresh.yml", "refresh", "refresh"),
@@ -1617,7 +1617,7 @@ def test_fleet_controllers_share_one_evaluate_action() -> None:
     for workflow, job_name, _step in callers:
         text = (WORKFLOWS / workflow).read_text(encoding="utf-8")
         assert f"uses: ./{action}" in text, workflow
-        assert "python3 scripts/hermes/gem-priority-gate.py" not in text, workflow
+        assert "python3 scripts/symphony/gem-priority-gate.py" not in text, workflow
     production = (WORKFLOWS / "production-controller.yml").read_text(encoding="utf-8")
     assert "consumer: deployment" in production
     assert "expected-sha: ${{ github.event.workflow_run.head_sha }}" in production

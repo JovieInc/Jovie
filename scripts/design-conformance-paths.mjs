@@ -46,7 +46,7 @@ const DESIGN_FILE_EXTENSIONS = new Set([
 
 const UBUNTU_OPERATIONS_PREFIXES = Object.freeze([
   'scripts/backlog-orchestrator/',
-  'scripts/hermes/',
+  'scripts/symphony/',
 ]);
 
 function normalizePath(value) {

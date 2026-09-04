@@ -347,19 +347,19 @@ describe('ci-fast bounded parallel workflow', () => {
 
   it('runs the official Symphony recovery ownership contract with exact changed-line coverage', () => {
     expect(PACKAGE_JSON.scripts['invariants:check']).toContain(
-      'python3 scripts/hermes/tests/symphony-codex-auth-fallback.test.py OfficialServiceOwnershipContract OfficialServiceCoverageContract'
+      'python3 scripts/symphony/tests/symphony-codex-auth-fallback.test.py OfficialServiceOwnershipContract OfficialServiceCoverageContract'
     );
     expect(CI_FAST_SOURCE).toContain(
       'COVERAGE_FILE="${RUNNER_TEMP:-/tmp}/jovie-symphony-recovery.coverage"'
     );
     expect(CI_FAST_SOURCE).toContain(
-      'python3 -m coverage run --branch scripts/hermes/tests/symphony-codex-auth-fallback.test.py OfficialServiceOwnershipContract'
+      'python3 -m coverage run --branch scripts/symphony/tests/symphony-codex-auth-fallback.test.py OfficialServiceOwnershipContract'
     );
     expect(CI_FAST_SOURCE).toContain(
       'python3 -m coverage json -o "${RUNNER_TEMP:-/tmp}/jovie-symphony-recovery.json"'
     );
     expect(CI_FAST_SOURCE).toContain(
-      'python3 scripts/hermes/tests/symphony-codex-auth-fallback.test.py --verify-ownership-coverage "${RUNNER_TEMP:-/tmp}/jovie-symphony-recovery.json"'
+      'python3 scripts/symphony/tests/symphony-codex-auth-fallback.test.py --verify-ownership-coverage "${RUNNER_TEMP:-/tmp}/jovie-symphony-recovery.json"'
     );
   });
 
@@ -554,7 +554,7 @@ describe('ci-fast bounded parallel workflow', () => {
     );
 
     expect(remaining).toContain(
-      'scripts/hermes/(closure_health\\.py$|config/(gem-repo-registry|model-registry)\\.json$|evaluate-fleet-gate\\.sh$|fleet_admission_receipt\\.py$|gbrain-runtime/|gem-|gem_|install-gem-(fleet-controller|pr-rehabilitation)\\.sh$|model-router\\.py$|symphony-reconciler\\.py$|systemd/gem-pr-drain\\.(service|timer)$)'
+      'scripts/symphony/(closure_health\\.py$|config/(gem-repo-registry|model-registry)\\.json$|evaluate-fleet-gate\\.sh$|fleet_admission_receipt\\.py$|gbrain-runtime/|gem-|gem_|install-gem-(fleet-controller|pr-rehabilitation)\\.sh$|model-router\\.py$|symphony-reconciler\\.py$|systemd/gem-pr-drain\\.(service|timer)$)'
     );
     expect(remaining).toContain('gbrain-runtime-assets|merge-group');
     expect(CI_FAST_SOURCE).toContain(
@@ -564,24 +564,24 @@ describe('ci-fast bounded parallel workflow', () => {
     expect(CI_FAST_SOURCE).toContain('elif [ "${CI:-}" = "true" ]');
     expect(CI_FAST_SOURCE).not.toContain('elif [[');
     expect(remaining).toContain(
-      'scripts/hermes/tests/(closure-health\\.test\\.py$|gem-(pr-drain|ops-hud|pr-rehabilitation-contract|priority-gate|rehabilitation-policy)\\.test\\.py$|symphony-reconciler\\.test\\.py$|test(-model-router|_evaluate_fleet_gate|_fleet_admission_receipt)\\.py$)'
+      'scripts/symphony/tests/(closure-health\\.test\\.py$|gem-(pr-drain|ops-hud|pr-rehabilitation-contract|priority-gate|rehabilitation-policy)\\.test\\.py$|symphony-reconciler\\.test\\.py$|test(-model-router|_evaluate_fleet_gate|_fleet_admission_receipt)\\.py$)'
     );
     expect(CI_FAST_SOURCE).toContain(
-      'coverage run --branch scripts/hermes/tests/gem-rehabilitation-policy.test.py'
+      'coverage run --branch scripts/symphony/tests/gem-rehabilitation-policy.test.py'
     );
     expect(CI_FAST_SOURCE).toContain(
-      'coverage report --include="*/scripts/hermes/gem_rehabilitation_policy.py" --fail-under=90'
+      'coverage report --include="*/scripts/symphony/gem_rehabilitation_policy.py" --fail-under=90'
     );
     expect(CI_FAST_SOURCE).toContain(
       "node --test --test-name-pattern='keeps the Gem drain on typed fleet admission' scripts/backlog-orchestrator/__tests__/backlog-orchestrator.test.mjs"
     );
     for (const gemContractCommand of [
-      'python3 scripts/hermes/tests/gem-pr-drain.test.py',
-      'python3 scripts/hermes/tests/gem-pr-rehabilitation-contract.test.py',
-      'python3 scripts/hermes/tests/gem-priority-gate.test.py',
-      'python3 scripts/hermes/tests/test_evaluate_fleet_gate.py',
-      'python3 scripts/hermes/tests/test-model-router.py',
-      'python3 scripts/hermes/tests/symphony-github-poke.test.py',
+      'python3 scripts/symphony/tests/gem-pr-drain.test.py',
+      'python3 scripts/symphony/tests/gem-pr-rehabilitation-contract.test.py',
+      'python3 scripts/symphony/tests/gem-priority-gate.test.py',
+      'python3 scripts/symphony/tests/test_evaluate_fleet_gate.py',
+      'python3 scripts/symphony/tests/test-model-router.py',
+      'python3 scripts/symphony/tests/symphony-github-poke.test.py',
     ]) {
       expect(CI_FAST_SOURCE).toContain(gemContractCommand);
     }
@@ -866,26 +866,26 @@ describe('ci-fast bounded parallel workflow', () => {
       'scripts/tests/test_runner_routing.py',
       'scripts/tests/test_symphony_ui_pilot_runtime.py',
       'scripts/tests/test_symphony_reconciler_runtime.py',
-      'scripts/hermes/closure_health.py',
-      'scripts/hermes/config/gem-repo-registry.json',
-      'scripts/hermes/config/model-registry.json',
-      'scripts/hermes/evaluate-fleet-gate.sh',
-      'scripts/hermes/fleet_admission_receipt.py',
-      'scripts/hermes/install-gem-fleet-controller.sh',
-      'scripts/hermes/model-router.py',
-      'scripts/hermes/symphony-reconciler.py',
-      'scripts/hermes/systemd/gem-pr-drain.service',
-      'scripts/hermes/systemd/gem-pr-drain.timer',
-      'scripts/hermes/tests/closure-health.test.py',
-      'scripts/hermes/tests/gem-pr-drain.test.py',
-      'scripts/hermes/tests/gem-ops-hud.test.py',
-      'scripts/hermes/tests/gem-pr-rehabilitation-contract.test.py',
-      'scripts/hermes/tests/gem-priority-gate.test.py',
-      'scripts/hermes/tests/gem-rehabilitation-policy.test.py',
-      'scripts/hermes/tests/symphony-reconciler.test.py',
-      'scripts/hermes/tests/test-model-router.py',
-      'scripts/hermes/tests/test_evaluate_fleet_gate.py',
-      'scripts/hermes/tests/test_fleet_admission_receipt.py',
+      'scripts/symphony/closure_health.py',
+      'scripts/symphony/config/gem-repo-registry.json',
+      'scripts/symphony/config/model-registry.json',
+      'scripts/symphony/evaluate-fleet-gate.sh',
+      'scripts/symphony/fleet_admission_receipt.py',
+      'scripts/symphony/install-gem-fleet-controller.sh',
+      'scripts/symphony/model-router.py',
+      'scripts/symphony/symphony-reconciler.py',
+      'scripts/symphony/systemd/gem-pr-drain.service',
+      'scripts/symphony/systemd/gem-pr-drain.timer',
+      'scripts/symphony/tests/closure-health.test.py',
+      'scripts/symphony/tests/gem-pr-drain.test.py',
+      'scripts/symphony/tests/gem-ops-hud.test.py',
+      'scripts/symphony/tests/gem-pr-rehabilitation-contract.test.py',
+      'scripts/symphony/tests/gem-priority-gate.test.py',
+      'scripts/symphony/tests/gem-rehabilitation-policy.test.py',
+      'scripts/symphony/tests/symphony-reconciler.test.py',
+      'scripts/symphony/tests/test-model-router.py',
+      'scripts/symphony/tests/test_evaluate_fleet_gate.py',
+      'scripts/symphony/tests/test_fleet_admission_receipt.py',
     ]) {
       expect(selectsStructural.test(mergeQueueControllerPath)).toBe(true);
     }

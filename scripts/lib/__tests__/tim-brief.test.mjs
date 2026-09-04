@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { formatTimBrief } from '../../hermes/lib/tim-brief.ts';
+import { formatTimBrief } from '../../symphony/lib/tim-brief.ts';
 
 describe('formatTimBrief', () => {
   it('returns empty string for no items', () => {

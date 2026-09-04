@@ -24,7 +24,7 @@ const EXPECTATIONS = [
     ],
   },
   {
-    path: 'scripts/hermes/gem-priority-gate.py',
+    path: 'scripts/symphony/gem-priority-gate.py',
     includes: [
       'LANE_CAPACITY_SCHEMA = "jovie-lane-capacity/v2"',
       '"repositories": {repo: {"ready": len(green_ready), "budget": repository_budget}}',
@@ -105,7 +105,7 @@ const EXPECTATIONS = [
     ],
   },
   {
-    path: 'scripts/hermes/closure_health.py',
+    path: 'scripts/symphony/closure_health.py',
     includes: [
       '"repository": repository',
       '"repository": repository if repository_valid else None',
@@ -113,7 +113,7 @@ const EXPECTATIONS = [
     ],
   },
   {
-    path: 'scripts/hermes/symphony-lease-guard',
+    path: 'scripts/symphony/symphony-lease-guard',
     includes: [
       'REPOSITORY = re.compile',
       'def _repository_for_identifier',
@@ -122,7 +122,7 @@ const EXPECTATIONS = [
     ],
   },
   {
-    path: 'scripts/hermes/symphony-concurrency-controller.py',
+    path: 'scripts/symphony/symphony-concurrency-controller.py',
     includes: [
       'def resource_scope(args: argparse.Namespace)',
       '"kind": "gem-host-provider-accounts-workflow"',

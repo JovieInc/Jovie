@@ -60,7 +60,7 @@ export const OFFICIAL_TIER_POLICY = TIER_POLICY;
 
 const registry = JSON.parse(
   readFileSync(
-    new URL('../hermes/config/model-registry.json', import.meta.url),
+    new URL('../symphony/config/model-registry.json', import.meta.url),
     'utf8'
   )
 );

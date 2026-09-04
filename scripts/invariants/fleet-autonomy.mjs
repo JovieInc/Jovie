@@ -5,7 +5,7 @@ import { fileURLToPath } from 'node:url';
 const DEFAULT_ROOT = fileURLToPath(new URL('../../', import.meta.url));
 
 const PATHS = Object.freeze({
-  gate: 'scripts/hermes/gem-priority-gate.py',
+  gate: 'scripts/symphony/gem-priority-gate.py',
   drain: 'scripts/drain-pr-queue.sh',
   backend: 'scripts/merge-queue-backend.mjs',
   workflow: '.github/workflows/pr-targets-main.yml',

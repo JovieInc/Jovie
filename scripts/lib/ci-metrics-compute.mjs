@@ -6,7 +6,7 @@
  * queue reliability, not merge wiring"); latency percentiles are SECONDARY
  * diagnostics. No experiment loop, no auto keep/rollback lives here — this
  * module only computes numbers from already-fetched GitHub data so the I/O job
- * (scripts/hermes/jobs/ci-metrics.ts) and unit tests share one tested core.
+ * (scripts/symphony/jobs/ci-metrics.ts) and unit tests share one tested core.
  *
  * Percentiles use the same nearest-rank method as the duration ratchet, so the
  * gate p95 we report agrees with .github/workflows/ci-duration-ratchet.yml.

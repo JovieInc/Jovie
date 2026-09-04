@@ -28,8 +28,8 @@ function helperPath(): string {
   if (configured) return configured;
   const cwd = process.cwd();
   return cwd.endsWith('/apps/web')
-    ? join(cwd, '../../scripts/hermes/symphony-codex-account-control.py')
-    : join(cwd, 'scripts/hermes/symphony-codex-account-control.py');
+    ? join(cwd, '../../scripts/symphony/symphony-codex-account-control.py')
+    : join(cwd, 'scripts/symphony/symphony-codex-account-control.py');
 }
 
 export type CodexAccountControlRunner = (
