@@ -1539,6 +1539,17 @@ describe('deterministic Symphony admission boundary', () => {
     );
   });
 
+  it('does not multiply one provider profile by model name', () => {
+    const evidence = capacityEvidence(2);
+    evidence.acceptedEvidence[1].profile = evidence.acceptedEvidence[0].profile;
+    evidence.acceptedEvidence[1].model = 'gpt-5.5';
+    assert.equal(
+      admitter.resolveGemConcurrency(evidence, { now: evidence.observedAt })
+        .maxConcurrent,
+      0
+    );
+  });
+
   it('rejects OAuth-derived and mismatched capacity evidence', () => {
     const now = '2026-09-02T19:20:00.000Z';
     for (const target of [1, 2, 8, 40]) {

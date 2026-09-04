@@ -238,7 +238,7 @@ function isFreshTimestamp(value, nowMs, maxAgeMs) {
   const observedMs = Date.parse(value || '');
   return (
     Number.isFinite(observedMs) &&
-    observedMs <= nowMs + 60_000 &&
+    observedMs <= nowMs &&
     nowMs - observedMs <= maxAgeMs
   );
 }
@@ -436,7 +436,10 @@ function usefulTurnProofs(evidence, nowMs, maxAgeMs) {
     ) {
       return null;
     }
-    const seat = strings.map(value => value.trim()).join('\u0000');
+    const seat = strings
+      .slice(0, 2)
+      .map(value => value.trim())
+      .join('\u0000');
     if (seats.has(seat)) return null;
     seats.add(seat);
   }

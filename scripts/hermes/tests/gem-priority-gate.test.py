@@ -982,6 +982,19 @@ class DeploymentBindingTests(unittest.TestCase):
                 self.assertEqual(receipt["concurrency"]["gem"]["reason"], "execution-proven-useful-turns")
                 self.assertTrue(receipt["workAdmission"]["newIssueLeaseAllowed"])
 
+    def test_one_profile_cannot_multiply_seats_or_use_boolean_zero(self):
+        now = MODULE.utc_now()
+        evidence = capacity_evidence(2, MODULE.isoformat(now))
+        evidence["acceptedEvidence"][1]["profile"] = evidence["acceptedEvidence"][0]["profile"]
+        evidence["acceptedEvidence"][1]["model"] = "gpt-5.5"
+        self.assertFalse(MODULE.validate_capacity_receipt(evidence, now)[0])
+        evidence = capacity_evidence(1, MODULE.isoformat(now))
+        evidence["acceptedEvidence"][0]["rc"] = False
+        self.assertFalse(MODULE.validate_capacity_receipt(evidence, now)[0])
+        evidence = capacity_evidence(1, MODULE.isoformat(now))
+        evidence["severeIncidents"] = False
+        self.assertFalse(MODULE.validate_capacity_receipt(evidence, now)[0])
+
     def test_observe_concurrency_rejects_oauth_source_and_target_mismatch(self):
         now = MODULE.utc_now()
         with tempfile.TemporaryDirectory() as tmp:
