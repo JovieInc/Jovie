@@ -181,7 +181,7 @@
   border: 1px solid var(--marketing-glass-text);
   border-radius: 999px;
   background: var(--marketing-glass-text);
-  color: rgb(255 255 255);
+  color: var(--linear-text-inverse);
   font-family: var(--marketing-font-body);
   font-size: 0.79rem;
   font-weight: var(--font-weight-medium);

@@ -16,7 +16,7 @@ type Story = StoryObj<typeof meta>;
 export const StaticContainedAura: Story = {
   render: () => (
     <InputAuraFrame className='w-80 p-1'>
-      <div className='relative rounded-lg bg-neutral-950 px-4 py-3 text-sm text-white'>
+      <div className='relative rounded-lg bg-primary px-4 py-3 text-sm text-primary-foreground'>
         Search your artist name
       </div>
     </InputAuraFrame>
