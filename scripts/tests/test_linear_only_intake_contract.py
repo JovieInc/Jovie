@@ -77,7 +77,11 @@ def test_active_facades_are_linear_only_and_fail_closed() -> None:
     assert "fileLinearIssue" in qa and "fileGithubIssue" not in qa
     golden = read(ROOT / "scripts/golden-path-lock.mjs")
     intake = read(ROOT / "scripts/lib/golden-path-intake.mjs")
-    assert intake.count("mutation CreateGoldenPathLockIssue") == 1
+    # JOV-5966: golden-path intake dedupes by fingerprint before create and
+    # lands the P0 directly in Todo (skips Triage) via the shared upsert.
+    assert "upsertLinearIssueByTitleFingerprint" in intake
+    assert "issueCreate" not in intake and "issueUpdate" not in intake
+    assert "stateName" in intake
     assert "createGoldenPathLinearIssue" in golden and "createGithubIssue" not in golden
     observability_linear = read(ROOT / "scripts/observability-issue-linear.mjs")
     assert "upsertLinearIssueByTitleFingerprint" in observability_linear
@@ -89,6 +93,8 @@ def test_active_facades_are_linear_only_and_fail_closed() -> None:
     assert autofix.index("createGoldenPathLinearIssue") < autofix.index("if (!linear.ok)")
     gate = autofix.index("if (!linear.ok)")
     assert gate < autofix.index("cursorRequest", gate)
+    # The dedupe result must be visible in the run log, not just created.
+    assert "Deduped golden-path Linear intake" in autofix
 
 def test_local_and_manual_github_issue_shippers_are_source_guarded() -> None:
     shipper = read(ROOT / "scripts/hermes/jobs/codex-issue-shipper.ts")
