@@ -48,7 +48,7 @@ import {
   shellQuote,
   shouldEscalateRetry,
   worktreeHasWork,
-} from '../../hermes/lib/codex-issue-shipper.ts';
+} from '../../symphony/lib/codex-issue-shipper.ts';
 
 const config = {
   maxIssuesPerRun: 2,
@@ -1001,7 +1001,7 @@ describe('agent fallback chain', () => {
 describe('agent failure disposition', () => {
   /**
    * @type {Array<[string, number | null, NodeJS.Signals | null, string,
-   *   import('../../hermes/lib/codex-issue-shipper.ts').AgentFailureDisposition]>}
+   *   import('../../symphony/lib/codex-issue-shipper.ts').AgentFailureDisposition]>}
    */
   const cases = [
     [
@@ -1133,7 +1133,7 @@ describe('agent failure disposition', () => {
     expect(consumesTaskRetryBudget('system_retryable')).toBe(false);
   });
 
-  /** @type {import('../../hermes/lib/codex-issue-shipper.ts').AgentFailureDisposition[]} */
+  /** @type {import('../../symphony/lib/codex-issue-shipper.ts').AgentFailureDisposition[]} */
   const incidentDispositions = ['provider_cooldown', 'system_retryable'];
 
   it.each(
@@ -1290,12 +1290,12 @@ describe('checkout freshness gate', () => {
 
   it('flags shipper-critical dirty paths as non-recoverable detritus', () => {
     expect(
-      isShipperCriticalPath('scripts/hermes/jobs/codex-issue-shipper.ts')
+      isShipperCriticalPath('scripts/symphony/jobs/codex-issue-shipper.ts')
     ).toBe(true);
     expect(dirtyPathsAreRecoverableDetritus(['DESIGN.md'])).toBe(true);
     expect(
       dirtyPathsAreRecoverableDetritus([
-        'scripts/hermes/jobs/codex-issue-shipper.ts',
+        'scripts/symphony/jobs/codex-issue-shipper.ts',
       ])
     ).toBe(false);
   });
@@ -1340,7 +1340,7 @@ describe('checkout freshness gate', () => {
         originMainSha: 'abc',
         dirty: true,
       },
-      ['scripts/hermes/jobs/codex-issue-shipper.ts']
+      ['scripts/symphony/jobs/codex-issue-shipper.ts']
     );
     expect(plan.proceed).toBe(false);
     expect(plan.attemptRecovery).toBe(false);
