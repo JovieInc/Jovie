@@ -1,4 +1,8 @@
 name: Rolling CI Dispatch
+# controller-hop-exception: jovie-controller-hop/v1
+# accountable-writer: Gem
+# necessary-trust-boundary: Hosted workflow_run controller serializes exact-head CI remediation for same-repo Jovie PRs; Cursor has no write token and a trusted writer applies patches.
+# removal-trigger: Remove when CI self-heals failed exact-head runs without a hosted remediation hop and this workflow is unused.
 
 on:
   workflow_run:
