@@ -17,7 +17,7 @@ import { tmpdir } from 'node:os';
 import { dirname, join, resolve } from 'node:path';
 import { crc32, deflateSync } from 'node:zlib';
 import type { PlaywrightTestConfig } from '@playwright/test';
-import ts from 'typescript';
+import ts from 'typescript-legacy';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import {
   artifactContainsSecret,
