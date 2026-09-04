@@ -71,7 +71,9 @@ describe('scripts typecheck baseline no longer pins the fixed TS2305s', () => {
     const files = baseline.files;
     // pipeline-scoreboard had TS2305 as its only error, so the file entry
     // leaves the baseline entirely.
-    expect(files['scripts/symphony/jobs/pipeline-scoreboard.ts']).toBeUndefined();
+    expect(
+      files['scripts/symphony/jobs/pipeline-scoreboard.ts']
+    ).toBeUndefined();
     // The others keep their unrelated baselined errors; only TS2305 leaves.
     expect(
       files['scripts/symphony/jobs/agentcookie-sync.ts']?.TS2305
