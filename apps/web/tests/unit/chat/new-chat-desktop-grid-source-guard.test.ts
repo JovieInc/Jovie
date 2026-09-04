@@ -48,8 +48,11 @@ describe('desktop New Chat grid anchors', () => {
     expect(emptyRegion).toContain('shrink-0');
     expect(emptyRegion).not.toMatch(/<button(?=[\s/>])/);
     expect(chat).toContain(
-      'mx-auto flex min-h-full w-full max-w-[46rem] flex-col items-center justify-start gap-5 py-2 sm:py-3'
+      'mx-auto flex min-h-full w-full flex-col items-center justify-start gap-5 py-2 sm:py-3'
     );
+    // single-column-one-width-v1: empty-state column layers share the one
+    // content-shell width — no stepped arbitrary max-width.
+    expect(chat).not.toMatch(/max-w-\[/);
     expect(loading).toContain('DESKTOP_CONTENT_GRID_ANCHOR');
     expect(loading).toContain('CHAT_EMPTY_VIEWPORT_CLASSNAME');
     expect(loading).toContain("data-top-spacing-owner='none'");

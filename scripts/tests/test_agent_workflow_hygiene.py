@@ -707,7 +707,10 @@ def test_conflict_handler_reserves_app_token_for_bounded_mutations() -> None:
     fleet = (
         REPO_ROOT / "scripts/pr-conflict-handler.mjs"
     ).read_text(encoding="utf-8")
+    assert "fetchOpenPrSummariesRest" in fleet
+    assert "hydrateOpenPrGraphqlMetadata" in fleet
     assert "hydrateOpenPrStatusContexts" in fleet
+    assert "'pr',\n    'list'" not in fleet
     assert "statusCheckRollup'].join" not in fleet
     assert "GH_TOKEN: ${{ github.token }}" in ledger
     assert "GH_LEDGER_TOKEN: ${{ steps.app-token.outputs.token }}" in ledger

@@ -65,7 +65,7 @@ export default function DevelopersPage() {
 
       <MarketingHero variant='left'>
         <p className='text-sm font-medium text-tertiary-token'>Developers</p>
-        <h1 className='system-b-marketing-route-title mt-6 max-w-3xl text-primary-token'>
+        <h1 className='system-b-marketing-route-title mt-6 max-w-3xl text-primary-token line-clamp-2'>
           Public artist data, in the open.
         </h1>
         <p className='mt-6 max-w-2xl text-lg leading-relaxed text-secondary-token'>
@@ -94,7 +94,7 @@ export default function DevelopersPage() {
           <section aria-labelledby='quickstart-heading'>
             <h2
               id='quickstart-heading'
-              className='text-2xl font-semibold tracking-tight text-primary-token'
+              className='text-2xl font-semibold tracking-tight text-primary-token line-clamp-2'
             >
               Quickstart
             </h2>
@@ -116,7 +116,7 @@ export default function DevelopersPage() {
           <section aria-labelledby='resources-heading'>
             <h2
               id='resources-heading'
-              className='text-2xl font-semibold tracking-tight text-primary-token'
+              className='text-2xl font-semibold tracking-tight text-primary-token line-clamp-2'
             >
               Machine-readable resources
             </h2>
@@ -140,7 +140,7 @@ export default function DevelopersPage() {
           <section aria-labelledby='scope-heading'>
             <h2
               id='scope-heading'
-              className='text-2xl font-semibold tracking-tight text-primary-token'
+              className='text-2xl font-semibold tracking-tight text-primary-token line-clamp-2'
             >
               Public by design
             </h2>

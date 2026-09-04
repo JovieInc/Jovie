@@ -80,6 +80,7 @@ vi.mock('@/lib/youtube-thumbnails/generate', () => ({
 }));
 
 import { POST } from '@/app/api/youtube-thumbnails/preview/route';
+import { trackEvent } from '@/lib/analytics/runtime-aware';
 import { PreviewAbuseError } from '@/lib/youtube-thumbnails/abuse';
 
 const CHANNEL = {
@@ -155,6 +156,16 @@ describe('POST /api/youtube-thumbnails/preview', () => {
     ).toBe(true);
     expect(generateThumbnailRedoMock).not.toHaveBeenCalled();
     expect(consumeGenerationAllowanceMock).not.toHaveBeenCalled();
+    expect(trackEvent).toHaveBeenCalledWith(
+      'youtube_thumbnails_previewed',
+      expect.objectContaining({
+        experimentId: 'youtube-closed-loop',
+        variantIdentity: 'youtube-thumbnails:paste-channel:v1',
+        parentVariantIdentity: 'youtube-closed-loop:paste-channel:v1',
+        channelId: CHANNEL.channelId,
+        contentVariant: 'paste-channel',
+      })
+    );
   });
 
   it('generates three before/after redos when the flag is on', async () => {

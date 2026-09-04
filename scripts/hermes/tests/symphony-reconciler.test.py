@@ -40,10 +40,10 @@ def stale_capacity_receipt() -> dict[str, object]:
         },
         "concurrency": {
             "gem": {
-                "maxConcurrent": 0,
+                "maxConcurrent": 1,
                 "runtimeFloor": 1,
                 "evidenceAccepted": False,
-                "newMutationAllowed": False,
+                "newMutationAllowed": True,
             }
         },
     }
@@ -68,12 +68,14 @@ class StaleCapacityLocalRemediationTests(unittest.TestCase):
                 (1, "fleet_gate_stale_capacity_local_only"),
             )
 
-    def test_stale_capacity_rejects_remote_or_new_intake_permissions(self):
+    def test_floor_receipt_admits_one_local_repair_regardless_of_intake_fields(self):
+        """symphony-concurrency-autoscale-v1: missing evidence runs at the
+        runtime floor with push and new leases allowed; the local alternate
+        repair lane stays bounded to exactly one attempt."""
         for field, value in (
             ("pushAllowed", True),
             ("newIssueLeaseAllowed", True),
             ("newImplementationAllowed", True),
-            ("maxConcurrent", 0),
             ("maxConcurrent", 2),
         ):
             with self.subTest(field=field), tempfile.TemporaryDirectory() as tmp:
@@ -84,6 +86,21 @@ class StaleCapacityLocalRemediationTests(unittest.TestCase):
                     else receipt["workAdmission"]
                 )
                 target[field] = value
+                if field == "maxConcurrent":
+                    receipt["concurrency"]["gem"]["maxConcurrent"] = value
+                gate = pathlib.Path(tmp) / "gate.json"
+                gate.write_text(json.dumps(receipt), encoding="utf-8")
+                limit, _reason = MODULE._stale_capacity_local_remediation_limit(gate)
+                self.assertEqual(limit, 1)
+
+    def test_zero_capacity_receipt_never_admits_local_repair(self):
+        for section in ("remediationAdmission", "concurrency"):
+            with self.subTest(section=section), tempfile.TemporaryDirectory() as tmp:
+                receipt = stale_capacity_receipt()
+                if section == "concurrency":
+                    receipt["concurrency"]["gem"]["maxConcurrent"] = 0
+                else:
+                    receipt["remediationAdmission"]["maxConcurrent"] = 0
                 gate = pathlib.Path(tmp) / "gate.json"
                 gate.write_text(json.dumps(receipt), encoding="utf-8")
                 limit, _reason = MODULE._stale_capacity_local_remediation_limit(gate)

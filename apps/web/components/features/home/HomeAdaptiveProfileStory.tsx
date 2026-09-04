@@ -46,7 +46,7 @@ export function HomeHero({
             <h1
               id='home-hero-heading'
               className={cn(
-                'marketing-h1-linear text-primary-token',
+                'marketing-h1-linear text-primary-token line-clamp-2',
                 variant === 'artist-profile' &&
                   'homepage-hero-artist-profile-title'
               )}

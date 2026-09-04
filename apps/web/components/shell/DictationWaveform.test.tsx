@@ -30,4 +30,19 @@ describe('DictationWaveform', () => {
     expect(firstBar.style.animation).toContain('dict-bar');
     expect(firstBar.style.opacity).toBe('1');
   });
+
+  // Source contract: bars carry the `dictation-waveform-bar` hook class so
+  // globals.css can halt the inline animation under prefers-reduced-motion
+  // (inline `animation` otherwise wins the cascade; JOV-5873).
+  it('exposes the reduced-motion halting hook class on every bar', async () => {
+    const fs = await import('node:fs');
+    const path = await import('node:path');
+    const source = fs.readFileSync(
+      path.join(import.meta.dirname, 'DictationWaveform.tsx'),
+      'utf8'
+    );
+    expect(source).toContain(
+      "className='dictation-waveform-bar block w-1 rounded-full bg-cyan-300/85'"
+    );
+  });
 });

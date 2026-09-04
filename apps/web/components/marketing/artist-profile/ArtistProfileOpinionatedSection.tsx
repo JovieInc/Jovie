@@ -20,7 +20,13 @@ export function ArtistProfileOpinionatedSection({
       <div className='mx-auto max-w-public-content'>
         <div className='grid items-center gap-10 lg:grid-cols-[minmax(0,0.78fr)_minmax(26rem,1fr)] lg:gap-20'>
           <div className='max-w-2xl'>
-            <h2 className={cn(SHELL_H2_CLASS, 'ap-opinionated__headline')}>
+            <h2
+              className={cn(
+                SHELL_H2_CLASS,
+                'ap-opinionated__headline',
+                'line-clamp-2'
+              )}
+            >
               {opinionated.headline}
             </h2>
             <p className={cn(SHELL_LEAD_CLASS, 'mt-6 max-w-xl')}>

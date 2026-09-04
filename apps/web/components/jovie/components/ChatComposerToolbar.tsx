@@ -230,35 +230,48 @@ export function ComposerAttachButton({
 export interface ComposerMicButtonProps {
   readonly isListening: boolean;
   readonly isSupported: boolean;
+  /**
+   * When dictation is unavailable but the OS offers its own (Electron
+   * desktop), the mic stays pressable and shows this guidance on press.
+   */
+  readonly unavailableHint?: string | null;
   readonly onPreserveFocus: (
     event: React.MouseEvent<HTMLButtonElement>
   ) => void;
   readonly onPushStart: () => void;
   readonly onPushEnd: () => void;
   readonly onToggle: () => void;
+  readonly onUnavailable?: () => void;
 }
 
 export function ComposerMicButton({
   isListening,
   isSupported,
+  unavailableHint = null,
   onPreserveFocus,
   onPushStart,
   onPushEnd,
   onToggle,
+  onUnavailable,
 }: ComposerMicButtonProps) {
   const suppressClickToggleRef = useRef(false);
+  const hasHint = !isSupported && Boolean(unavailableHint);
 
   const label = isSupported
     ? isListening
       ? 'Release to stop dictation'
       : 'Hold to dictate'
-    : 'Dictation unavailable';
+    : hasHint
+      ? 'Dictation unavailable · show how to dictate'
+      : 'Dictation unavailable';
 
   const tooltip = isSupported
     ? isListening
       ? 'Release to stop dictation'
       : 'Hold to dictate · press to toggle'
-    : 'Dictation unavailable in this browser';
+    : hasHint
+      ? (unavailableHint as string)
+      : 'Dictation unavailable in this browser';
 
   const handlePointerDown = useCallback(
     (event: React.PointerEvent<HTMLButtonElement>) => {
@@ -280,12 +293,16 @@ export function ComposerMicButton({
   }, [isSupported, onPushEnd]);
 
   const handleClick = useCallback(() => {
+    if (!isSupported) {
+      if (hasHint) onUnavailable?.();
+      return;
+    }
     if (suppressClickToggleRef.current) {
       suppressClickToggleRef.current = false;
       return;
     }
     onToggle();
-  }, [onToggle]);
+  }, [hasHint, isSupported, onToggle, onUnavailable]);
 
   return (
     <SimpleTooltip content={tooltip}>
@@ -298,7 +315,7 @@ export function ComposerMicButton({
         onPointerCancel={handlePointerEnd}
         onPointerLeave={isListening ? handlePointerEnd : undefined}
         onClick={handleClick}
-        disabled={!isSupported}
+        disabled={!isSupported && !hasHint}
         data-testid='dictation-toggle'
         data-active={isListening ? 'true' : undefined}
         className={cn(

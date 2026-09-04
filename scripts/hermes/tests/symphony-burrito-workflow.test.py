@@ -1274,14 +1274,17 @@ class OfficialSymphonyContractTests(unittest.TestCase):
         for unit in (
             "symphony-ui-pilot.service",
             "symphony-reconciler.service",
-            "symphony-grok-sidecar.service",
             "symphony-reconciler.timer",
-            "symphony-grok-sidecar.timer",
             "symphony-burrito.service",
             "symphony-burrito-update.service",
             "symphony-burrito-update.timer",
         ):
             self.assertIn(unit, UPDATER)
+        # The grok/kimi sidecar is the ACTIVE coding lane (Tim, 2026-09-03),
+        # owned by install-symphony-grok-sidecar.sh — the updater must never
+        # retire or mask it, so it must not appear in LEGACY_UNITS.
+        legacy_block = UPDATER.split("LEGACY_UNITS=(", 1)[1].split(")", 1)[0]
+        self.assertNotIn("symphony-grok-sidecar", legacy_block)
         self.assertIn('temporary="${dst}.tmp.$$"', UPDATER)
         self.assertIn('mv "$temporary" "$dst"', UPDATER)
         self.assertIn("PROMOTION_ROLLED_BACK", UPDATER)

@@ -20,6 +20,7 @@ export function IGComparisonAside() {
       <Container size='homepage'>
         <div className='text-center heading-gap-linear'>
           <h2
+            className='line-clamp-2'
             style={{
               fontSize: 'var(--linear-h2-size)',
               fontWeight: 'var(--linear-font-weight-bold)',

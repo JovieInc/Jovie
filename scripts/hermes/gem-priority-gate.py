@@ -38,6 +38,7 @@ from closure_health import (  # noqa: E402 - sibling executable module
 )
 from closure_health import SCHEMA as CLOSURE_HEALTH_SCHEMA  # noqa: E402
 from closure_health import observe_closure_health  # noqa: E402
+from gem_gate_contract import validate_capacity_receipt  # noqa: E402
 
 
 SCHEMA = "jovie-fleet-gate/v1"
@@ -583,6 +584,7 @@ def observe_integrity(path: Path) -> dict[str, Any]:
 
 
 def observe_concurrency(path: Path, now: datetime) -> dict[str, Any]:
+    """Accept only fresh, cross-checked useful-turn proof rows."""
     if not path.exists():
         return {
             "schema": CONCURRENCY_SCHEMA,
@@ -603,22 +605,8 @@ def observe_concurrency(path: Path, now: datetime) -> dict[str, Any]:
             "accepted": False,
             "reason": "capacity-evidence-malformed",
         }
-    observed_at = parse_time(receipt.get("observedAt"))
-    target = receipt.get("target")
-    required_clean_runs = 20 if isinstance(target, int) and target > 4 else 1
-    eligible = (
-        receipt.get("schema") == CONCURRENCY_SCHEMA
-        and isinstance(target, int)
-        and not isinstance(target, bool)
-        and 1 <= target <= 8
-        and receipt.get("approved") is True
-        and isinstance(receipt.get("cleanRuns"), int)
-        and receipt["cleanRuns"] >= required_clean_runs
-        and receipt.get("severeIncidents") == 0
-        and observed_at is not None
-        and timedelta(0) <= now - observed_at <= timedelta(hours=24)
-    )
-    return {**receipt, "accepted": eligible}
+    accepted, reason, proofs = validate_capacity_receipt(receipt, now)
+    return {**receipt, "accepted": accepted, "reason": reason, "acceptedEvidence": proofs}
 
 
 def validate_independent_review(
@@ -1141,16 +1129,20 @@ def evaluate(signals: dict[str, Any], observed_at: str) -> dict[str, Any]:
     closure_health = validate_closure_health(signals.get("closureHealth"))
     closure_intake_allowed = closure_health["newIssueIntakeAllowed"] is True
     concurrency_evidence_value = signals.get("concurrencyEvidence")
-    concurrency_evidence = (
-        concurrency_evidence_value
-        if isinstance(concurrency_evidence_value, dict)
-        and isinstance(concurrency_evidence_value.get("accepted"), bool)
-        else {
-            "schema": CONCURRENCY_SCHEMA,
-            "accepted": False,
-            "reason": "capacity-evidence-missing-malformed-or-stale",
-        }
+    capacity_now = parse_time(observed_at) or utc_now()
+    capacity_accepted, capacity_reason, capacity_proofs = validate_capacity_receipt(
+        concurrency_evidence_value, capacity_now
     )
+    concurrency_evidence = {
+        **(
+            concurrency_evidence_value
+            if isinstance(concurrency_evidence_value, dict)
+            else {"schema": CONCURRENCY_SCHEMA}
+        ),
+        "accepted": capacity_accepted,
+        "reason": capacity_reason,
+        "acceptedEvidence": capacity_proofs,
+    }
     normalized_signals = {
         **signals,
         "closureHealth": closure_health,
@@ -1308,19 +1300,19 @@ def evaluate(signals: dict[str, Any], observed_at: str) -> dict[str, Any]:
     evidence = concurrency_evidence
     capacity_fresh = evidence.get("accepted") is True
     measured_target = evidence.get("target")
+    # Useful-turn proofs are the only concurrency authority. The configured
+    # floor remains visible for compatibility but never becomes a usable seat.
     gem_concurrency = (
         measured_target
         if capacity_fresh
         and isinstance(measured_target, int)
         and not isinstance(measured_target, bool)
-        and 1 <= measured_target <= 8
+        and measured_target >= LOCAL_REMEDIATION_CONCURRENCY_FLOOR
         else 0
     )
-    remediation_concurrency = (
-        gem_concurrency
-        if gem_concurrency > 0
-        else LOCAL_REMEDIATION_CONCURRENCY_FLOOR
-    )
+    capacity_fresh = capacity_fresh and gem_concurrency == measured_target
+    remediation_concurrency = gem_concurrency
+    unbound_repair_concurrency = gem_concurrency
     green_ready_prs = queue.get("greenReadyPrs", queue.get("eligiblePrs"))
     queue_target = queue.get("target")
     queue_shape_valid = (
@@ -1393,20 +1385,36 @@ def evaluate(signals: dict[str, Any], observed_at: str) -> dict[str, Any]:
         promotion_mode = "draft-only"
     elif hold_intake_allowed:
         promotion_mode = "hold-intake"
+    elif (
+        state == "AMBER"
+        and main.get("status") == "green"
+        and production.get("status") == "green"
+        and integrity.get("status") in {"clear", "resolved"}
+        and closure_health.get("status") == "red"
+        and set(closure_health.get("reasons") or [])
+        <= {"native-queue-empty-with-eligible-over-15m"}
+    ):
+        # An empty native queue with eligible PRs waiting is a FEED signal,
+        # not a stop signal: blocking admission here deadlocks the loop
+        # (queue stays empty because admission is blocked; closure stays red
+        # because the queue is empty; controller then fails on queue-noop).
+        # Live 2026-09-03: 10+ mergeable PRs stranded with an empty queue.
+        # New-issue intake stays closed (closure red); only promotion of
+        # already-green work resumes.
+        promotion_mode = "hold-intake"
     else:
         promotion_mode = "blocked"
     if state == "RED":
         work_activities: list[str] = []
-    elif not closure_intake_allowed or not capacity_fresh:
+    elif not closure_intake_allowed:
         # Existing validation/review work remains useful, but no new
         # implementation or fallback PR may begin while Summer holds intake
-        # or capacity evidence is missing/stale.
+        # (JOV-INV-011). Capacity evidence no longer gates intake: missing
+        # evidence runs at the runtime floor (symphony-concurrency-autoscale-v1).
         work_activities = ["tests", "review"]
     else:
         new_implementation_allowed = (
-            capacity_fresh
-            and queue_shape_valid
-            and repository_capacity_available
+            capacity_fresh and queue_shape_valid and repository_capacity_available
         )
         work_activities = ["tests", "review"]
         if new_implementation_allowed:
@@ -1428,6 +1436,8 @@ def evaluate(signals: dict[str, Any], observed_at: str) -> dict[str, Any]:
         "focused-tests",
         "review",
     ]
+    # Remediation is liveness: decoupled from capacity evidence and from Summer
+    # closure, so duplicate lanes cannot freeze Grok/Kimi remediations.
     remediation_push_allowed = state != "RED" and capacity_fresh
     cohort = already_admitted_cohort_semantics(promotion_mode)
     if not closure_intake_allowed:
@@ -1504,7 +1514,7 @@ def evaluate(signals: dict[str, Any], observed_at: str) -> dict[str, Any]:
             if unbound_repair_allowed
             else None,
             "scope": "event-scoped-exact-pr-head-with-bound-repair-attestation",
-            "maxConcurrent": 1,
+            "maxConcurrent": unbound_repair_concurrency,
             "deploymentsAllowed": False,
             "authority": "canonical-merge-queue-controller",
         },
@@ -1531,11 +1541,11 @@ def evaluate(signals: dict[str, Any], observed_at: str) -> dict[str, Any]:
                 "runtimeFloor": LOCAL_REMEDIATION_CONCURRENCY_FLOOR,
                 "baseline": DEFAULT_GEM_CONCURRENCY,
                 "evidenceAccepted": capacity_fresh,
-                "newMutationAllowed": capacity_fresh,
+                "newMutationAllowed": state != "RED" and capacity_fresh,
                 "preserveQueuedWork": True,
-                "reason": "recent-approved-measured-capacity"
+                "reason": "execution-proven-useful-turns"
                 if capacity_fresh
-                else "capacity-evidence-missing-malformed-or-stale",
+                else "capacity-evidence-unproven-dispatch-closed",
             },
             "symphonyImplementation": "event-driven-backpressure",
         },
@@ -1747,7 +1757,7 @@ def failed_evaluation_receipt(
                 "focused-tests",
                 "review",
             ],
-            "maxConcurrent": LOCAL_REMEDIATION_CONCURRENCY_FLOOR,
+            "maxConcurrent": 0,
             "authority": "single-pr-writer-exact-head",
         },
         "deploymentAdmission": {
@@ -1887,13 +1897,15 @@ def observe_signals(args: argparse.Namespace, now: datetime) -> dict[str, Any]:
     main = observe_main(args.repo)
     concurrency = observe_concurrency(concurrency_path, now)
     measured_target = concurrency.get("target")
+    # Lane budget follows live seats; without accepted evidence it falls to
+    # the runtime floor, never to zero (symphony-concurrency-autoscale-v1).
     default_lane_budget = (
         measured_target
         if concurrency.get("accepted") is True
         and isinstance(measured_target, int)
         and not isinstance(measured_target, bool)
-        and 1 <= measured_target <= 8
-        else 0
+        and measured_target >= LOCAL_REMEDIATION_CONCURRENCY_FLOOR
+        else LOCAL_REMEDIATION_CONCURRENCY_FLOOR
     )
     review_path = (
         args.independent_review_receipt

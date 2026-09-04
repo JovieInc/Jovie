@@ -230,6 +230,9 @@ describe('JovieChat empty state', () => {
     const emptyViewport = getByTestId('chat-empty-state-viewport');
     expect(emptyViewport.className).toContain('flex-1');
     expect(emptyViewport).toHaveAttribute('data-empty-affordance', 'none');
+    // one-chrome-layer-v1: no suggest/card chrome layer is showing, so the
+    // single banner slot is allowed to render on the bare welcome.
+    expect(getByTestId('chat-usage')).toBeTruthy();
     expect(getByTestId('chat-empty-state-composer-region')).toBeTruthy();
     // Clean start screen (JOV-5387): Just ask + executable sample, no mark.
     expect(getByTestId('chat-empty-state-welcome')).toBeTruthy();
@@ -364,6 +367,8 @@ describe('JovieChat empty state', () => {
       'data-empty-affordance',
       'starter-actions'
     );
+    // one-chrome-layer-v1: starter-action chrome XOR the usage banner.
+    expect(screen.queryByTestId('chat-usage')).toBeNull();
     expect(
       screen.getByTestId('chat-empty-state-centered-composer')
     ).toBeTruthy();
@@ -627,6 +632,8 @@ describe('JovieChat empty state', () => {
     expect(queryByTestId('chat-empty-state-soft-suggestions-slot')).toBeNull();
     expect(queryByTestId('chat-empty-state-welcome')).toBeNull();
     expect(queryByTestId('chat-empty-state-logo')).toBeNull();
+    // one-chrome-layer-v1: opportunity cards XOR the usage banner.
+    expect(queryByTestId('chat-usage')).toBeNull();
   });
 
   it('enters pinned-card mode when an opportunity card is tapped', () => {

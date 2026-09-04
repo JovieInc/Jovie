@@ -440,8 +440,11 @@ test.describe('Golden Path: Anonymous Chat -> Signup -> Claim -> Live Profile', 
       timeout: 30_000,
     });
 
-    // The collapsed homepage routes onboarding through /start chat.
-    await expect(page.getByTestId('homepage-hero-command-center')).toBeVisible({
+    // The certified homepage (JOV-5864) routes onboarding through /start chat;
+    // the hero's conversion control is the name search, not a command center.
+    await expect(
+      page.getByTestId('homepage-editorial-hero-search')
+    ).toBeVisible({
       timeout: 20_000,
     });
 

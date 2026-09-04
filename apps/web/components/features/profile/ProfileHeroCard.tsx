@@ -141,12 +141,12 @@ export function ArtistHero({
           <div className='flex items-start gap-2'>
             {spotlightLabel && spotlightValue ? (
               <div className={`${heroPearlClassName} rounded-full px-3.5 py-2`}>
-                <p className='text-[0.72rem] font-semibold tracking-wide text-white/52'>
+                <span className='block text-[0.72rem] font-semibold tracking-wide text-white/52'>
                   {spotlightLabel}
-                </p>
-                <p className='mt-0.5 text-app font-semibold tracking-[-0.015em] text-white/90 md:text-sm'>
+                </span>
+                <span className='mt-0.5 block text-app font-semibold tracking-[-0.015em] text-white/90 md:text-sm'>
                   {spotlightValue}
-                </p>
+                </span>
               </div>
             ) : null}
           </div>
@@ -195,9 +195,9 @@ export function ArtistHero({
           <div className='flex items-start justify-between gap-4'>
             <div className='min-w-0 space-y-2 text-left'>
               {eyebrow ? (
-                <p className='text-xs font-semibold tracking-wide text-white/58'>
+                <span className='block text-xs font-semibold tracking-wide text-white/58'>
                   {eyebrow}
-                </p>
+                </span>
               ) : null}
 
               <h1

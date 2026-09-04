@@ -64,6 +64,7 @@ class UnitContractTests(unittest.TestCase):
         text = SERVICE.read_text(encoding="utf-8")
         self.assertEqual(ini_value(text, "Type"), "oneshot")
         self.assertEqual(ini_value(text, "ExecStart"), "%h/.local/bin/symphony-grok-sidecar")
+        self.assertIn("SYMPHONY_OAUTH_SEATS_PROBE=1", text)
         success = set((ini_value(text, "SuccessExitStatus") or "").split())
         self.assertEqual(
             success,
@@ -79,7 +80,11 @@ class UnitContractTests(unittest.TestCase):
     def test_timer_matches_live_schedule(self):
         text = TIMER.read_text(encoding="utf-8")
         self.assertEqual(ini_value(text, "OnBootSec"), "2m")
-        self.assertEqual(ini_value(text, "OnUnitActiveSec"), "20m")
+        # Canonical cadence is 5min-after-inactive, matching the fleet's host
+        # drop-in (Tim, 2026-09-03); the old 20m OnUnitActiveSec starved the
+        # active grok/kimi coding lane.
+        self.assertIsNone(ini_value(text, "OnUnitActiveSec"))
+        self.assertEqual(ini_value(text, "OnUnitInactiveSec"), "5min")
         self.assertEqual(ini_value(text, "Persistent"), "true")
         self.assertEqual(ini_value(text, "WantedBy"), "timers.target")
 

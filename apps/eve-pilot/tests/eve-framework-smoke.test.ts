@@ -92,7 +92,7 @@ describe('Eve framework smoke', () => {
     expect(manifest.devDependencies?.vercel).toBe('56.3.2');
   });
 
-  it('discovers Eve with Ovie Telegram and Summer iMessage channels offline', () => {
+  it('discovers Eve with Summer presentation and Photon channels offline', () => {
     const isolatedRoot = mkdtempSync(join(tmpdir(), 'jovie-eve-smoke-'));
     const networkSentinel = join(isolatedRoot, 'network-blocked');
 
@@ -137,13 +137,13 @@ describe('Eve framework smoke', () => {
         diagnostics: { errors: 0, warnings: 0 },
         skills: ['jovie-action-boundary'],
         subagents: [],
-        schedules: [],
       });
       // Eve 0.47 registers a growing set of built-in tools (bash, read_file,
       // web_search, agent, ...). Pin only the pilot-owned capability surface —
       // the Jovie capability manifest tool must be discovered alongside the
       // framework's built-ins, never replaced by them.
       expect(info.tools).toContain('jovie_capability_manifest');
+      expect(info.schedules).toContain('summer-bottleneck-heartbeat');
 
       // Eve 0.47 ships additional built-in HTTP channels (the `home` landing
       // surface, `/eve/v1/health`, connection callbacks, activity/task-input

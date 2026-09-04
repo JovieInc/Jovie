@@ -418,13 +418,20 @@ def test_workflow_waits_for_readiness_and_aliases_only_after_canary() -> None:
     assert preview_deploy_index < preview_wait_index
 
 
+def _pr_preview_readiness_block(workflow: str) -> str:
+    """Slice the ci-pr-vercel-preview readiness step, anchored after the step name.
+
+    The Neon lane has its own "Emit preview-env admission receipt" step earlier
+    in the workflow, so the end marker must be searched after the readiness step.
+    """
+    start = workflow.index("- name: Wait for PR preview readiness")
+    end = workflow.index("- name: Emit preview-env admission receipt", start)
+    return workflow[start:end]
+
+
 def test_pr_preview_readiness_requires_terminal_ready_state() -> None:
     workflow = CI_WORKFLOW.read_text()
-    readiness = workflow[
-        workflow.index("- name: Wait for PR preview readiness") : workflow.index(
-            "  # Deep Lighthouse runs"
-        )
-    ]
+    readiness = _pr_preview_readiness_block(workflow)
 
     assert "set -euo pipefail" in readiness
     assert "--wait" in readiness
@@ -440,11 +447,7 @@ def test_pr_preview_readiness_script_fails_closed_for_every_non_ready_state(
     tmp_path: Path,
 ) -> None:
     workflow = CI_WORKFLOW.read_text()
-    readiness = workflow[
-        workflow.index("- name: Wait for PR preview readiness") : workflow.index(
-            "  # Deep Lighthouse runs"
-        )
-    ]
+    readiness = _pr_preview_readiness_block(workflow)
     script = textwrap.dedent(readiness.split("        run: |\n", 1)[1])
 
     fake_vercel = tmp_path / "node_modules/.bin/vercel"

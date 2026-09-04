@@ -4,6 +4,11 @@
 **Founder correction:** 2026-08-19/20  
 **Status:** Canonical. Supersedes conflicting historical issue prose, docs, configs, agent output, and PR descriptions.
 
+**Runtime status (2026-09-02):** Hermes and Trigger.dev are retired. The
+recoverable local Summer profile is offline. Eve is the approved durable target,
+but no Eve-backed Summer conversation is commissioned until the identity,
+deployment, persistence, privacy, failure, and recurrence receipts pass.
+
 Machine-checked contract: `apps/web/lib/ovie/program.ts`.
 
 ## Canonical flow

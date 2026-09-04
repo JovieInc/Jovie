@@ -98,6 +98,116 @@ export function normalizeRestPullRequest(detail, statusCheckRollup) {
   };
 }
 
+export async function fetchOpenPrSummariesRest({ repo, limit = 200, request }) {
+  if (!Number.isSafeInteger(limit) || limit < 1 || limit > 500) {
+    throw new Error('open PR limit must be between 1 and 500');
+  }
+  const summaries = [];
+  const seen = new Set();
+  for (let page = 1; summaries.length < limit; page += 1) {
+    const pageSize = Math.min(100, limit - summaries.length);
+    const batch = await request(
+      `repos/${repo}/pulls?state=open&per_page=${pageSize}&page=${page}`
+    );
+    if (!Array.isArray(batch) || batch.length > pageSize) {
+      throw new Error('REST open-PR response was not a complete page');
+    }
+    for (const summary of batch) {
+      if (!Number.isSafeInteger(summary?.number) || summary.number < 1) {
+        throw new Error('REST open-PR response omitted a PR number');
+      }
+      if (seen.has(summary.number)) {
+        throw new Error(
+          `REST open-PR response duplicated PR #${summary.number}`
+        );
+      }
+      seen.add(summary.number);
+      summaries.push(normalizeRestPullRequest(summary, []));
+    }
+    if (batch.length < pageSize) break;
+  }
+  return summaries.slice(0, limit);
+}
+
+export async function hydrateOpenPrGraphqlMetadata({
+  repo,
+  prs,
+  request,
+  batchSize = 25,
+  maxConcurrency = 2,
+}) {
+  if (!Number.isSafeInteger(batchSize) || batchSize < 1 || batchSize > 50) {
+    throw new Error('metadata hydration batchSize must be between 1 and 50');
+  }
+  if (
+    !Number.isSafeInteger(maxConcurrency) ||
+    maxConcurrency < 1 ||
+    maxConcurrency > 4
+  ) {
+    throw new Error(
+      'metadata hydration maxConcurrency must be between 1 and 4'
+    );
+  }
+  const [owner, name] = repo.split('/');
+  if (!owner || !name) throw new Error('repo must be OWNER/NAME');
+  const hydrated = prs.map(pr => ({ ...pr }));
+
+  const offsets = [];
+  for (let offset = 0; offset < hydrated.length; offset += batchSize) {
+    offsets.push(offset);
+  }
+  for (let wave = 0; wave < offsets.length; wave += maxConcurrency) {
+    await Promise.all(
+      offsets.slice(wave, wave + maxConcurrency).map(async offset => {
+        const batch = hydrated.slice(offset, offset + batchSize);
+        const selections = batch
+          .map((pr, index) => {
+            if (!Number.isSafeInteger(pr.number) || pr.number < 1) {
+              throw new Error('open PR metadata is missing a PR number');
+            }
+            return `p${index}:pullRequest(number:${pr.number}){number baseRefName baseRefOid headRefName headRefOid headRepository{name nameWithOwner} headRepositoryOwner{login} isCrossRepository mergeable mergeStateStatus autoMergeRequest{enabledAt enabledBy{login} mergeMethod} changedFiles additions deletions maintainerCanModify}`;
+          })
+          .join(' ');
+        const response = await request({
+          owner,
+          name,
+          query: `query($owner:String!,$name:String!){repository(owner:$owner,name:$name){${selections}}}`,
+        });
+        const repository = response?.data?.repository;
+        if (!repository || typeof repository !== 'object') {
+          throw new Error('GraphQL open-PR metadata omitted repository data');
+        }
+
+        for (let index = 0; index < batch.length; index += 1) {
+          const expected = batch[index];
+          const metadata = repository[`p${index}`];
+          if (!metadata || metadata.number !== expected.number) {
+            throw new Error(
+              `GraphQL open-PR metadata omitted PR #${expected.number}`
+            );
+          }
+          if (
+            !/^[0-9a-f]{40}$/u.test(metadata.headRefOid ?? '') ||
+            !/^[0-9a-f]{40}$/u.test(metadata.baseRefOid ?? '') ||
+            !metadata.headRefName ||
+            !metadata.baseRefName
+          ) {
+            throw new Error(
+              `GraphQL open-PR metadata for PR #${expected.number} omitted exact refs`
+            );
+          }
+          hydrated[offset + index] = {
+            ...expected,
+            ...metadata,
+            statusCheckRollup: expected.statusCheckRollup ?? [],
+          };
+        }
+      })
+    );
+  }
+  return hydrated;
+}
+
 async function fetchCompleteCollection({
   request,
   endpoint,
@@ -185,18 +295,7 @@ export async function hydrateOpenPrStatusContexts({
 }
 
 export async function fetchOpenPrsRest({ repo, limit = 200, request }) {
-  const summaries = [];
-  for (let page = 1; summaries.length < limit; page += 1) {
-    const pageSize = Math.min(100, limit - summaries.length);
-    const batch = await request(
-      `repos/${repo}/pulls?state=open&per_page=${pageSize}&page=${page}`
-    );
-    if (!Array.isArray(batch)) {
-      throw new Error('REST open-PR response was not an array');
-    }
-    summaries.push(...batch);
-    if (batch.length < pageSize) break;
-  }
+  const summaries = await fetchOpenPrSummariesRest({ repo, limit, request });
 
   const prs = [];
   for (const summary of summaries.slice(0, limit)) {

@@ -21,3 +21,11 @@ export function isDeterministicFanCaptureOtpEnabled(): boolean {
     publicEnv.NEXT_PUBLIC_E2E_MODE === '1'
   );
 }
+
+/**
+ * Secretless PR visual capture. The capture job has no database or Clerk
+ * secrets; shell loaders must not wait on postgres before painting chrome.
+ */
+export function isVisualCaptureSyntheticAuthEnabled(): boolean {
+  return process.env.E2E_VISUAL_CAPTURE_SYNTHETIC_AUTH === '1';
+}

@@ -17,7 +17,8 @@ export {
 };
 
 export default defineAgent({
-  // Summer is the live Photon/iMessage speaker on this Eve app. GLM 5.3 Flash
-  // is already on Eve Gateway OIDC (`zai/glm-5.3-flash`); do not buy keys.
+  // Eve Gateway OIDC speaker for this isolated pilot. GLM 5.3 Flash is
+  // already wired (`zai/glm-5.3-flash`); do not buy keys. Photon/iMessage
+  // binds Ovie; Summer is not this root model.
   model: 'zai/glm-5.3-flash',
 });

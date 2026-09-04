@@ -362,13 +362,38 @@ def record_api_spend(st, family, amount):
     save_state(st)
 
 
-def choose(workflow, capability, allow_exceptions=False, path=None, exclude_pools=None):
+def parse_oauth_seats(payload):
+    """Return a non-negative live OAuth seat count from provider probe JSON."""
+    if isinstance(payload, dict):
+        for key in ("oauth_seats", "max_concurrent", "concurrency", "seats"):
+            value = payload.get(key)
+            if isinstance(value, int) and value >= 0:
+                return value
+        accounts = payload.get("accounts")
+        if isinstance(accounts, list) and accounts:
+            return len(accounts)
+        models = payload.get("models")
+        if isinstance(models, dict):
+            nested = parse_oauth_seats(models)
+            if nested is not None:
+                return nested
+            for item in models.values():
+                nested = parse_oauth_seats(item)
+                if nested is not None:
+                    return nested
+    return None
+
+
+def choose(workflow, capability, allow_exceptions=False, path=None, exclude_pools=None, include_ids=None):
     cfg, config_path = load(path); mm = model_map(cfg); st = state(); now = time.time()
     exclude_pools = tuple(exclude_pools or ())
+    include_ids = tuple(include_ids or ())
     chain = cfg["route_chains"][workflow]
     candidates = []
     ready = []
     for mid in chain:
+        if include_ids and mid not in include_ids:
+            continue
         m = mm[mid]
         if capability not in m["capabilities"]: continue
         if m.get("pool") in exclude_pools:
@@ -408,7 +433,7 @@ def choose(workflow, capability, allow_exceptions=False, path=None, exclude_pool
 
 def main():
     ap = argparse.ArgumentParser(); sub = ap.add_subparsers(dest="cmd", required=True)
-    c = sub.add_parser("choose"); c.add_argument("--workflow", choices=["remediation", "new_pr"], required=True); c.add_argument("--capability", default="mechanical"); c.add_argument("--allow-codex-exception", action="store_true"); c.add_argument("--exclude-pool", action="append", default=[]); c.add_argument("--config")
+    c = sub.add_parser("choose"); c.add_argument("--workflow", choices=["remediation", "new_pr"], required=True); c.add_argument("--capability", default="mechanical"); c.add_argument("--allow-codex-exception", action="store_true"); c.add_argument("--exclude-pool", action="append", default=[]); c.add_argument("--include-id", action="append", default=[]); c.add_argument("--config")
     p = sub.add_parser("probe"); p.add_argument("--config")
     v = sub.add_parser("validate"); v.add_argument("--config")
     args = ap.parse_args(); cfg, config_path = load(getattr(args, "config", None))
@@ -420,5 +445,5 @@ def main():
         print(json.dumps(results, indent=2)); return 0
     if args.cmd == "validate":
         print(json.dumps({"ok": True, "config": str(config_path), "models": len(cfg["models"])}, indent=2)); return 0
-    print(json.dumps(choose(args.workflow, args.capability, args.allow_codex_exception, args.config, args.exclude_pool), indent=2)); return 0
+    print(json.dumps(choose(args.workflow, args.capability, args.allow_codex_exception, args.config, args.exclude_pool, args.include_id), indent=2)); return 0
 if __name__ == "__main__": sys.exit(main())

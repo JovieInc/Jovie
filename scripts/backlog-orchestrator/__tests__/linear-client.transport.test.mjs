@@ -6,11 +6,11 @@ import { reconcileIssues } from '../reconcile.mjs';
 
 const jsonResponse = (
   body,
-  { status = 200, contentType = 'application/json' } = {}
+  { status = 200, contentType = 'application/json', headers = {} } = {}
 ) => ({
   ok: status >= 200 && status < 300,
   status,
-  headers: new Headers({ 'content-type': contentType }),
+  headers: new Headers({ 'content-type': contentType, ...headers }),
   text: async () => (typeof body === 'string' ? body : JSON.stringify(body)),
 });
 
@@ -225,6 +225,201 @@ describe('Gem Linear transport', () => {
         id: 'issue-1',
         stateId: 'state-1',
       });
+    });
+  });
+});
+
+describe('Gem Linear rate-limit backoff', () => {
+  const rateLimitedResponse = ({ status = 400, headers = {} } = {}) =>
+    jsonResponse(
+      {
+        errors: [
+          {
+            message: 'Rate limit exceeded',
+            extensions: { code: 'RATELIMITED', statusCode: 429 },
+          },
+        ],
+      },
+      { status, headers }
+    );
+
+  it('retries a RATELIMITED 400 on the rate-limit budget and then succeeds', async () => {
+    await withKey('ratelimit-secret', async () => {
+      let attempts = 0;
+      const sleeps = [];
+      const data = await linear.graphql(
+        'query RateLimited { viewer { id } }',
+        {},
+        {
+          rateLimitBaseMs: 50,
+          randomImpl: () => 0,
+          fetchImpl: async () => {
+            attempts += 1;
+            return attempts === 1
+              ? rateLimitedResponse()
+              : jsonResponse({ data: { ok: true } });
+          },
+          sleepImpl: async ms => sleeps.push(ms),
+        }
+      );
+      assert.deepEqual(data, { ok: true });
+      assert.equal(attempts, 2);
+      assert.deepEqual(sleeps, [50]);
+    });
+  });
+
+  it('fails fast on a non-rate-limited 400 without retrying', async () => {
+    await withKey('plain-400-secret', async () => {
+      let attempts = 0;
+      const sleeps = [];
+      await assert.rejects(
+        linear.graphql(
+          'query Plain400 { viewer { id } }',
+          {},
+          {
+            fetchImpl: async () => {
+              attempts += 1;
+              return jsonResponse(
+                { errors: [{ message: 'bad request' }] },
+                { status: 400 }
+              );
+            },
+            sleepImpl: async ms => sleeps.push(ms),
+          }
+        ),
+        error => {
+          const err = /** @type {any} */ (error);
+          return err.code === 'HTTP' && err.attempts === 1;
+        }
+      );
+      assert.equal(attempts, 1);
+      assert.deepEqual(sleeps, []);
+    });
+  });
+
+  it('honors Retry-After and X-RateLimit-*-Reset hints over the backoff floor', async () => {
+    await withKey('hint-secret', async () => {
+      for (const headers of [
+        { 'retry-after': '30' },
+        { 'x-ratelimit-requests-reset': String(Date.now() + 45_000) },
+      ]) {
+        const sleeps = [];
+        const data = await linear.graphql(
+          'query Hints { viewer { id } }',
+          {},
+          {
+            rateLimitBaseMs: 50,
+            randomImpl: () => 0,
+            fetchImpl: (() => {
+              let calls = 0;
+              return async () => {
+                calls += 1;
+                return calls === 1
+                  ? rateLimitedResponse({ status: 429, headers })
+                  : jsonResponse({ data: { ok: true } });
+              };
+            })(),
+            sleepImpl: async ms => sleeps.push(ms),
+          }
+        );
+        assert.deepEqual(data, { ok: true });
+        assert.equal(sleeps.length, 1);
+        assert.ok(sleeps[0] >= 29_000 && sleeps[0] <= 46_000);
+      }
+    });
+  });
+
+  it('applies bounded jitter on top of the exponential backoff', async () => {
+    await withKey('jitter-secret', async () => {
+      const sleeps = [];
+      let attempts = 0;
+      const data = await linear.graphql(
+        'query Jitter { viewer { id } }',
+        {},
+        {
+          rateLimitBaseMs: 100,
+          randomImpl: () => 1,
+          fetchImpl: async () => {
+            attempts += 1;
+            return attempts === 1
+              ? rateLimitedResponse()
+              : jsonResponse({ data: { ok: true } });
+          },
+          sleepImpl: async ms => sleeps.push(ms),
+        }
+      );
+      assert.deepEqual(data, { ok: true });
+      assert.deepEqual(sleeps, [125]);
+    });
+  });
+
+  it('exhausts the attempt ceiling and throws with attempts/resetAt detail', async () => {
+    await withKey('exhausted-secret', async () => {
+      let attempts = 0;
+      const sleeps = [];
+      const before = Date.now();
+      await assert.rejects(
+        linear.graphql(
+          'query Exhausted { viewer { id } }',
+          {},
+          {
+            rateLimitMaxAttempts: 3,
+            rateLimitBaseMs: 50,
+            randomImpl: () => 0,
+            fetchImpl: async () => {
+              attempts += 1;
+              return rateLimitedResponse({ headers: { 'retry-after': '5' } });
+            },
+            sleepImpl: async ms => sleeps.push(ms),
+          }
+        ),
+        error => {
+          const err = /** @type {any} */ (error);
+          assert.equal(err.name, 'LinearTransportError');
+          assert.equal(err.code, 'RATE_LIMITED');
+          assert.equal(err.attempts, 3);
+          assert.equal(err.metadata.retryable, false);
+          assert.equal(err.metadata.waitedMs, 10_000);
+          assert.ok(err.metadata.resetAt >= before + 5_000);
+          return true;
+        }
+      );
+      assert.equal(attempts, 3);
+      assert.deepEqual(sleeps, [5_000, 5_000]);
+    });
+  });
+
+  it('bounds the total wait and fails closed instead of overrunning', async () => {
+    await withKey('bounded-secret', async () => {
+      let attempts = 0;
+      const sleeps = [];
+      await assert.rejects(
+        linear.graphql(
+          'query Bounded { viewer { id } }',
+          {},
+          {
+            rateLimitMaxAttempts: 10,
+            rateLimitBaseMs: 1_000,
+            rateLimitMaxTotalWaitMs: 1_200,
+            randomImpl: () => 0,
+            fetchImpl: async () => {
+              attempts += 1;
+              return rateLimitedResponse();
+            },
+            sleepImpl: async ms => sleeps.push(ms),
+          }
+        ),
+        error => {
+          const err = /** @type {any} */ (error);
+          return (
+            err.code === 'RATE_LIMITED' &&
+            err.attempts === 2 &&
+            err.metadata.waitedMs === 1_000
+          );
+        }
+      );
+      assert.equal(attempts, 2);
+      assert.deepEqual(sleeps, [1_000]);
     });
   });
 });

@@ -283,7 +283,7 @@ export function DeeplinksGrid() {
                     One profile. Every way fans support you.
                   </span>
 
-                  <h2 className='marketing-h2-linear text-primary-token'>
+                  <h2 className='marketing-h2-linear text-primary-token line-clamp-2'>
                     The Right Action For Every Fan.
                   </h2>
 
@@ -442,7 +442,7 @@ export function DeeplinksGrid() {
               <span className='inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-xs font-medium tracking-tight text-tertiary-token border border-subtle'>
                 One profile. Every way fans support you.
               </span>
-              <h2 className='marketing-h2-linear text-primary-token'>
+              <h2 className='marketing-h2-linear text-primary-token line-clamp-2'>
                 The Right Action For Every Fan.
               </h2>
               <p className='max-w-100 marketing-lead-linear text-secondary-token'>

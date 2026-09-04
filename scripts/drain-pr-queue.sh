@@ -45,6 +45,9 @@
 #   DRAIN_MISSING_CI_MAX_PER_RUN  close+reopen cap per run (1-2, default 2)
 #   DRAIN_MISSING_CI_MIN_AGE_MINUTES  minimum head commit age before a
 #     close+reopen is attempted (default 120)
+#   DRAIN_GROUP_STARVED_MINUTES  minimum age of the latest added_to_merge_queue
+#     timeline event before an AWAITING_CHECKS entry with no merge-group ci.yml
+#     run is dequeued so re-enrollment refires checks_requested (default 20)
 #   MERGE_QUEUE_BACKEND  native (default); test-label-fixture is test-only
 set -euo pipefail
 
@@ -224,6 +227,13 @@ DRAIN_QUEUE_REENTRY_MAX_PER_RUN="${DRAIN_QUEUE_REENTRY_MAX_PER_RUN:-0}"
 DRAIN_RECOVER_MISSING_CI="${DRAIN_RECOVER_MISSING_CI:-0}"
 DRAIN_MISSING_CI_MAX_PER_RUN="${DRAIN_MISSING_CI_MAX_PER_RUN:-2}"
 DRAIN_MISSING_CI_MIN_AGE_MINUTES="${DRAIN_MISSING_CI_MIN_AGE_MINUTES:-120}"
+# Starved-group class (2026-09-03, PR #16420): a native merge group's
+# checks_requested event can fail to produce any ci.yml run, leaving the entry
+# at AWAITING_CHECKS with zero receipts. The non-progressing front pass only
+# acts on failure evidence, so this silently blocks every follower. Dequeue
+# (never re-enqueue here; the ENROLL path re-admits the still-green head and
+# the fresh group's checks_requested refires CI), age-gated and capped.
+DRAIN_GROUP_STARVED_MINUTES="${DRAIN_GROUP_STARVED_MINUTES:-20}"
 MISSING_CI_RECOVERY_MARKER='<!-- bot-comment:missing-ci-recovery -->'
 MISSING_CI_RECOVERY_ACTOR='jovie-bot[bot]'
 QUEUE_REENTRY_CONTEXT="jovie-queue-reentry/v1"
@@ -297,7 +307,8 @@ case "$DRAIN_PROMOTION_MODE" in
           .productionUnboundRepairAdmission.mainSha == null and
           .productionUnboundRepairAdmission.deployedSha == null
         end) and
-        .productionUnboundRepairAdmission.maxConcurrent == 1 and
+        (.productionUnboundRepairAdmission.maxConcurrent | type == "number") and
+        (.productionUnboundRepairAdmission.maxConcurrent | IN(range(1;11))) and
         .productionUnboundRepairAdmission.deploymentsAllowed == false and
         .alreadyAdmittedCohort.preserve == true and
         .closureAdmission.authority == "Summer" and
@@ -374,6 +385,11 @@ fi
 if [[ ! "$DRAIN_MISSING_CI_MIN_AGE_MINUTES" =~ ^[1-9][0-9]*$ ]] \
   || (( DRAIN_MISSING_CI_MIN_AGE_MINUTES > 1440 )); then
   echo "::error::DRAIN_MISSING_CI_MIN_AGE_MINUTES must be an integer from 1 through 1440" >&2
+  exit 2
+fi
+if [[ ! "$DRAIN_GROUP_STARVED_MINUTES" =~ ^[1-9][0-9]*$ ]] \
+  || (( DRAIN_GROUP_STARVED_MINUTES > 1440 )); then
+  echo "::error::DRAIN_GROUP_STARVED_MINUTES must be an integer from 1 through 1440" >&2
   exit 2
 fi
 if [[ -z "$DRAIN_ADMISSION_PR" && -z "$DRAIN_ADMISSION_HEAD" ]]; then
@@ -2046,6 +2062,64 @@ if waiting_lane_allows_clean_enroll || [[ "$DRAIN_PROMOTION_MODE" == "blocked" &
   done < <(echo "$SNAP" | jq -c '.[]
     | select(.q == true)
     | select(.qp == 1)
+    | select(.base == "main")
+    | select(.draft | not)
+    | select(([.L[]] | any(.=="queue-deferred" or '"$NO_AUTO_HOLD_JQ"')) | not)')
+fi
+
+# --- DEQUEUE: starved merge groups (PR #16420, 2026-09-03) ---
+# An AWAITING_CHECKS native entry whose merge group never produced a ci.yml
+# run is the 'missing evidence' gap the non-progressing pass above cannot
+# close: there is no failure receipt and there never will be one, so the entry
+# sits forever and silently blocks every follower. Recover only on proven
+# evidence: the already-fetched merge_group run inventory has NO run on this
+# PR's group branch, AND the PR's latest added_to_merge_queue timeline event
+# is older than DRAIN_GROUP_STARVED_MINUTES. Any failed read skips the entry —
+# never mutate on unproven evidence. Dequeue only; the normal ENROLL path
+# re-admits the still-green head, and the fresh group's checks_requested
+# refires CI. Capped at 2 per run so a timeline-API anomaly cannot clear the
+# whole queue in one pass.
+if [[ "$MERGE_QUEUE_BACKEND" == "native" ]] \
+  && { waiting_lane_allows_clean_enroll || [[ "$DRAIN_PROMOTION_MODE" == "blocked" && "$DRAIN_FREEZE_EXISTING_QUEUE" == "0" ]]; }; then
+  echo "=== DEQUEUE (starved group: AWAITING_CHECKS with no merge-group CI run) ==="
+  STARVED_DEQUEUED=0
+  while read -r pr; do
+    if [[ "$STARVED_DEQUEUED" -ge 2 ]]; then
+      echo "  ~ reached starved-group dequeue cap (2)"
+      break
+    fi
+    n=$(jq -r '.n' <<<"$pr"); t=$(jq -r '.t' <<<"$pr")
+    if jq -e --arg prefix "gh-readonly-queue/main/pr-${n}-" '
+      any(.[]; (.headBranch // "") | startswith($prefix))
+    ' <<<"$MERGE_GROUP_RUNS_JSON" >/dev/null; then
+      continue
+    fi
+    if ! timeline_json="$(gh_retry api "repos/${REPO}/issues/${n}/timeline" --paginate --slurp 2>/dev/null)"; then
+      echo "  #$n  $t  ~ timeline read failed; leaving queued"
+      continue
+    fi
+    queued_at="$(jq -r '
+      [ .[][]? | select(.event == "added_to_merge_queue") | .created_at ]
+      | sort | last // empty
+    ' <<<"$timeline_json" 2>/dev/null || true)"
+    queued_epoch="$(jq -rn --arg d "$queued_at" 'try ($d | fromdateiso8601) catch empty' 2>/dev/null || true)"
+    if [[ ! "$queued_epoch" =~ ^[0-9]+$ ]]; then
+      echo "  #$n  $t  ~ no readable added_to_merge_queue event; leaving queued"
+      continue
+    fi
+    age_seconds=$(( $(date -u +%s) - queued_epoch ))
+    if (( age_seconds < DRAIN_GROUP_STARVED_MINUTES * 60 )); then
+      continue
+    fi
+    echo "  #$n  $t  ✗ starved-group: AWAITING_CHECKS for $((age_seconds / 60))m with no merge-group CI run"
+    if ! dequeue_strict "$n"; then
+      echo "::error::Failed to prove starved-group PR #$n is outside native merge queue" >&2
+      exit 1
+    fi
+    STARVED_DEQUEUED=$((STARVED_DEQUEUED + 1))
+  done < <(echo "$SNAP" | jq -c '.[]
+    | select(.q == true)
+    | select(.qs == "AWAITING_CHECKS")
     | select(.base == "main")
     | select(.draft | not)
     | select(([.L[]] | any(.=="queue-deferred" or '"$NO_AUTO_HOLD_JQ"')) | not)')

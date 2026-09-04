@@ -33,12 +33,12 @@ export function HeroLinear({ fullScreen = false }: Readonly<HeroLinearProps>) {
       <div className='relative z-10 flex flex-1 flex-col justify-center pb-6 pt-10 md:pb-8 md:pt-12'>
         <div className='mx-auto w-full max-w-linear-content px-5 sm:px-6 lg:px-0'>
           <div className='hero-stagger'>
-            <p className='homepage-section-eyebrow'>
+            <span className='homepage-section-eyebrow'>
               Built for independent artists
-            </p>
+            </span>
             <h1
               id='hero-heading'
-              className='marketing-h1-linear mt-4 text-primary-token leading-[1]'
+              className='marketing-h1-linear mt-4 text-primary-token leading-[1] line-clamp-2'
               data-testid='hero-heading'
             >
               Drop More Music.
@@ -57,9 +57,9 @@ export function HeroLinear({ fullScreen = false }: Readonly<HeroLinearProps>) {
                 Request Access
               </Link>
             </div>
-            <p className='mt-3 text-2xs tracking-wide text-quaternary-token'>
+            <span className='mt-3 block text-2xs tracking-wide text-quaternary-token'>
               Private launch access. No credit card required.
-            </p>
+            </span>
           </div>
         </div>
       </div>

@@ -61,7 +61,7 @@ export default async function ChangelogReleasePage({
         >
           Changelog
         </Link>
-        <h1 className='system-b-marketing-route-title mb-4 mt-6 max-w-2xl text-primary-token'>
+        <h1 className='system-b-marketing-route-title mb-4 mt-6 max-w-2xl text-primary-token line-clamp-2'>
           {APP_NAME} Version {release.version}
         </h1>
       </MarketingHero>

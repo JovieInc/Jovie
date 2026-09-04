@@ -33,12 +33,14 @@ CHECK_ONLY=0
 RUNTIME_READBACK=0
 RETIRE_LEGACY=0
 MIN_RESTART_NEXT_POLL_MS="${SYMPHONY_MIN_RESTART_NEXT_POLL_MS:-5000}"
+# Genuinely retired units only. The grok/kimi sidecar
+# (symphony-grok-sidecar.{service,timer}) is the ACTIVE coding lane while
+# Codex seats are exhausted (Tim, 2026-09-03) and is installed/owned by
+# scripts/hermes/install-symphony-grok-sidecar.sh — never mask it here.
 LEGACY_UNITS=(
   symphony-ui-pilot.service
   symphony-reconciler.service
-  symphony-grok-sidecar.service
   symphony-reconciler.timer
-  symphony-grok-sidecar.timer
   symphony-burrito.service
   symphony-burrito-update.service
   symphony-burrito-update.timer

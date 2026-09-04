@@ -12,7 +12,7 @@ export function BlogRelatedPosts({ posts, authors }: BlogRelatedPostsProps) {
 
   return (
     <section aria-label='Related posts'>
-      <h2 className='text-xl font-semibold tracking-tight text-primary-token mb-6'>
+      <h2 className='text-xl font-semibold tracking-tight text-primary-token mb-6 line-clamp-2'>
         Keep reading
       </h2>
       <div className='grid grid-cols-1 md:grid-cols-2 gap-6'>

@@ -493,6 +493,18 @@ test('preload marks the hosted app as Electron after the document root is ready'
   assert.match(preloadSource, /function installElectronRuntimeMarker\(\)/);
   assert.match(preloadSource, /installElectronRuntimeMarker\(\);/);
   assert.match(preloadSource, /contextBridge\.exposeInMainWorld/);
+  assert.match(
+    preloadSource,
+    /getBuildIdentity: \(\) => ipcRenderer\.invoke\(GET_BUILD_IDENTITY_CHANNEL\)/
+  );
+  assert.match(
+    mainSource,
+    /const GET_BUILD_IDENTITY_CHANNEL = 'get-build-identity'/
+  );
+  assert.match(mainSource, /ipcMain\.handle\(\s*GET_BUILD_IDENTITY_CHANNEL/);
+  assert.match(mainSource, /resolveDesktopBuildIdentityIpcRequest\(\{/);
+  assert.match(mainSource, /trustedSender: isTrustedIpcSender\(event\)/);
+  assert.match(mainSource, /args,\s*identity: desktopBuildIdentity/);
   assert.match(preloadSource, /markElectronRuntime\(\)/);
   assert.match(preloadSource, /DOMContentLoaded/);
   assert.match(preloadSource, /dataset\.desktopRuntime = 'electron'/);
@@ -545,7 +557,11 @@ test('desktop bridge exposes bounded dictation support', async () => {
   assert.match(mainSource, /ipcMain\.handle\(\s*DICTATION_STATUS_CHANNEL,/);
   assert.match(mainSource, /function getDesktopDictationStatus\(\)/);
   assert.match(mainSource, /nativeAvailable: false/);
-  assert.match(mainSource, /webSpeechFallbackAllowed: true/);
+  // Web Speech recognition is non-functional inside Electron (no Google
+  // speech keys → 'network' error on every start), so the shell must never
+  // advertise it as an allowed fallback; the renderer points at OS dictation.
+  assert.doesNotMatch(mainSource, /webSpeechFallbackAllowed: true/);
+  assert.match(mainSource, /use-(macos-)?system-dictation/);
   assert.match(mainSource, /shouldGrantTrustedAudioPermission/);
   assert.match(mainSource, /shouldGrantTrustedAudioPermissionCheck/);
   assert.match(mainSource, /backgroundThrottling: false/);

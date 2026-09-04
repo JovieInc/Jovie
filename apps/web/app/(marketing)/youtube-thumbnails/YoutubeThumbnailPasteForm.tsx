@@ -30,7 +30,10 @@ export function YoutubeThumbnailPasteForm({
 
   useEffect(() => {
     const context = {
+      experimentId: YOUTUBE_THUMBNAILS_OPTIMIZATION.experimentId,
       variantIdentity: YOUTUBE_THUMBNAILS_OPTIMIZATION.variantIdentity,
+      parentVariantIdentity:
+        YOUTUBE_THUMBNAILS_OPTIMIZATION.parentVariantIdentity,
       platform: 'web',
       contentVariant: 'paste-channel',
     };
@@ -164,8 +167,11 @@ export function YoutubeThumbnailPasteForm({
               data-testid='youtube-thumbnails-apply-cta'
               onClick={() =>
                 track(YOUTUBE_THUMBNAILS_EVENTS.APPLY_CLICKED, {
+                  experimentId: YOUTUBE_THUMBNAILS_OPTIMIZATION.experimentId,
                   variantIdentity:
                     YOUTUBE_THUMBNAILS_OPTIMIZATION.variantIdentity,
+                  parentVariantIdentity:
+                    YOUTUBE_THUMBNAILS_OPTIMIZATION.parentVariantIdentity,
                 })
               }
             >

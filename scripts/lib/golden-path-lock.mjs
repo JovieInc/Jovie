@@ -1,13 +1,15 @@
 #!/usr/bin/env node
 /**
- * Fail-closed golden-path lock (JOV-5085): homepage Get started → /start →
+ * Fail-closed golden-path lock (JOV-5085): homepage name search
+ * (Search your name → Find me, JOV-5864 certified homepage) → /start →
  * logged-out first message sends → waitlist write only after verified auth.
  * Missing secrets fail closed. Merge gate never reads E2E_PROD.
  */
 
 export const GOLDEN_PATH_LOCK_SCHEMA = 'jovie-golden-path-lock/v1';
 export const GOLDEN_PATH_PROD_ORIGIN = 'https://jov.ie';
-export const GOLDEN_PATH_CTA_LABEL = 'Get started';
+export const GOLDEN_PATH_HERO_SEARCH_PLACEHOLDER = 'Search your name';
+export const GOLDEN_PATH_HERO_SEARCH_ACTION = 'Find me';
 export const GOLDEN_PATH_START_PATH = '/start';
 export const FAKE_RATE_LIMIT_COPY = 'Too many messages';
 export const CURSOR_AGENTS_URL = 'https://api.cursor.com/v0/agents';
@@ -88,19 +90,23 @@ export function evaluateHomepageHtml(html) {
       reason: 'homepage HTML was empty',
     };
   }
-  const hasLabel = html.includes(GOLDEN_PATH_CTA_LABEL);
+  // JOV-5864 certified homepage: the hero's only conversion control is the
+  // name search — placeholder "Search your name" + submit "Find me" — with a
+  // /start handoff still present for the onboarding route.
+  const hasPlaceholder = html.includes(GOLDEN_PATH_HERO_SEARCH_PLACEHOLDER);
+  const hasAction = html.includes(GOLDEN_PATH_HERO_SEARCH_ACTION);
   const hasStartHref = /href\s*=\s*["'][^"']*\/start(?:[?"']|\/)/i.test(html);
-  if (!hasLabel || !hasStartHref) {
+  if (!hasPlaceholder || !hasAction || !hasStartHref) {
     return {
       id: 'homepage-cta',
       ok: false,
-      reason: `homepage CTA must be "${GOLDEN_PATH_CTA_LABEL}" → ${GOLDEN_PATH_START_PATH}`,
+      reason: `homepage conversion must be the name search ("${GOLDEN_PATH_HERO_SEARCH_PLACEHOLDER}" → "${GOLDEN_PATH_HERO_SEARCH_ACTION}") with a ${GOLDEN_PATH_START_PATH} handoff`,
     };
   }
   return {
     id: 'homepage-cta',
     ok: true,
-    reason: `found ${GOLDEN_PATH_CTA_LABEL} → ${GOLDEN_PATH_START_PATH}`,
+    reason: `found name search "${GOLDEN_PATH_HERO_SEARCH_PLACEHOLDER}" → "${GOLDEN_PATH_HERO_SEARCH_ACTION}" and ${GOLDEN_PATH_START_PATH} handoff`,
   };
 }
 
@@ -367,7 +373,7 @@ export function buildAutofixPrompt({ fingerprint, checks, origin, receipt }) {
     '',
     'Locked path (do not invent a new product flow):',
     '1. https://jov.ie homepage',
-    '2. Get started → /start',
+    `2. Name search ("${GOLDEN_PATH_HERO_SEARCH_PLACEHOLDER}" → "${GOLDEN_PATH_HERO_SEARCH_ACTION}", JOV-5864 certified homepage) → ${GOLDEN_PATH_START_PATH}`,
     '3. Logged-out first message actually sends (not 401, not a fake rate-limit)',
     '4. Waitlist write only after verified auth',
     '',
@@ -381,7 +387,7 @@ export function buildAutofixPrompt({ fingerprint, checks, origin, receipt }) {
       : ['- (receipt reported failure without check ids)']),
     '',
     'Reproduce without signup secrets:',
-    `- GET ${origin ?? GOLDEN_PATH_PROD_ORIGIN} and require Get started → /start`,
+    `- GET ${origin ?? GOLDEN_PATH_PROD_ORIGIN} and require the name search "${GOLDEN_PATH_HERO_SEARCH_PLACEHOLDER}" → "${GOLDEN_PATH_HERO_SEARCH_ACTION}" plus a ${GOLDEN_PATH_START_PATH} handoff (JOV-5864 certified homepage; never revert to Get started or waitlist-first)`,
     `- POST ${origin ?? GOLDEN_PATH_PROD_ORIGIN}/api/chat with {"messages":[{"role":"user","content":"hi"}]} — must not 401 and must not say "Too many messages"`,
     `- POST ${origin ?? GOLDEN_PATH_PROD_ORIGIN}/api/waitlist unauthenticated — must 401`,
     `- POST ${origin ?? GOLDEN_PATH_PROD_ORIGIN}/api/onboarding/claim unauthenticated — must 401`,

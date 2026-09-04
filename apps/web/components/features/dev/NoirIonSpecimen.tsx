@@ -262,9 +262,15 @@ export function NoirIonSpecimen() {
                     color: 'var(--noir-ion-text-muted)',
                   }}
                 >
-                  <th className='px-3 py-2 font-medium'>State</th>
-                  <th className='px-3 py-2 font-medium'>Track</th>
-                  <th className='px-3 py-2 font-medium'>Status</th>
+                  <th className='px-3 py-2 font-medium whitespace-nowrap'>
+                    State
+                  </th>
+                  <th className='px-3 py-2 font-medium whitespace-nowrap'>
+                    Track
+                  </th>
+                  <th className='px-3 py-2 font-medium whitespace-nowrap'>
+                    Status
+                  </th>
                 </tr>
               </thead>
               <tbody>

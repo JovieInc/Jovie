@@ -1,6 +1,6 @@
 {
   "buildCommand": "cd ../.. && pnpm turbo build --filter=@jovie/should-i-make",
   "installCommand": "cd ../.. && corepack enable && corepack pnpm install",
-  "ignoreCommand": "git diff HEAD^ HEAD --quiet -- . ../../packages/",
+  "ignoreCommand": "bash -c 'R=$VERCEL_GIT_COMMIT_REF;if [[ $R == main || $R == production ]]; then git diff HEAD^ HEAD --quiet -- . ../../packages/; else exit 0; fi'",
   "outputDirectory": ".next"
 }

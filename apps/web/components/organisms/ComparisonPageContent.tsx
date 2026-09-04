@@ -40,19 +40,19 @@ export function ComparisonPageContent({
                 <tr className='border-b border-border-primary'>
                   <th
                     scope='col'
-                    className='pb-3 pr-4 text-left font-medium text-secondary-token'
+                    className='pb-3 pr-4 text-left font-medium text-secondary-token whitespace-nowrap'
                   >
                     Feature
                   </th>
                   <th
                     scope='col'
-                    className='pb-3 px-4 text-center font-medium text-primary-token'
+                    className='pb-3 px-4 text-center font-medium text-primary-token whitespace-nowrap'
                   >
                     {APP_NAME}
                   </th>
                   <th
                     scope='col'
-                    className='pb-3 pl-4 text-center font-medium text-secondary-token'
+                    className='pb-3 pl-4 text-center font-medium text-secondary-token whitespace-nowrap'
                   >
                     {data.competitor}
                   </th>
@@ -63,7 +63,7 @@ export function ComparisonPageContent({
                   <tr key={feature.name}>
                     <th
                       scope='row'
-                      className='py-3 pr-4 text-left font-normal text-secondary-token'
+                      className='py-3 pr-4 text-left font-normal text-secondary-token whitespace-nowrap'
                     >
                       {feature.name}
                       {feature.note && (

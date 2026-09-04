@@ -6,11 +6,13 @@ import {
   annotateNativeMergeQueue,
   fetchNativeMergeQueue,
 } from './lib/github-merge-queue.mjs';
-import { hydrateOpenPrStatusContexts } from './lib/github-open-prs-rest.mjs';
+import {
+  fetchOpenPrSummariesRest,
+  hydrateOpenPrGraphqlMetadata,
+  hydrateOpenPrStatusContexts,
+} from './lib/github-open-prs-rest.mjs';
 import { tryGitHubRebase } from './lib/github-update-branch.mjs';
 import {
-  bindOpenPrsToLiveBaseRefs,
-  buildLiveBaseRefQuery,
   buildPlan,
   DEFAULT_BLOCKED_LABEL,
   DEFAULT_REQUIRED_CHECKS,
@@ -107,8 +109,12 @@ function parseArgs(argv) {
   if (!Number.isInteger(options.maxConcurrent) || options.maxConcurrent < 1) {
     throw new Error('--max-concurrent must be a positive integer');
   }
-  if (!Number.isInteger(options.limit) || options.limit < 1) {
-    throw new Error('--limit must be a positive integer');
+  if (
+    !Number.isInteger(options.limit) ||
+    options.limit < 1 ||
+    options.limit > 500
+  ) {
+    throw new Error('--limit must be an integer between 1 and 500');
   }
   for (const key of ['runnerCapacity', 'activeCi', 'queuedCi']) {
     if (!Number.isInteger(options[key]) || options[key] < 0) {
@@ -133,7 +139,7 @@ Options:
   --apply                      Execute safe mutations (labels, exact-head GitHub rebase)
   --repo OWNER/REPO            Repository (default: JovieInc/Jovie)
   --max-concurrent N           Operator ceiling above adaptive 2→10→40 cohorts (default: 40)
-  --limit N                    Max open PRs to inspect (default: 200)
+  --limit N                    Max open PRs to inspect, 1-500 (default: 200)
   --runner-capacity N          Observed GitHub-hosted runner pool size (fail-low default: 2)
   --active-ci N                Current in-progress Actions runs (default: 0)
   --queued-ci N                Current queued Actions runs (default: 0)
@@ -184,9 +190,8 @@ async function ghJson(args, { retries = 3, token } = {}) {
       return JSON.parse(stdout);
     } catch (error) {
       const stderr = error.stderr ?? '';
-      // Retry transient API failures, not just rate limits: the bulk
-      // `gh pr list --json statusCheckRollup` GraphQL query times out or
-      // errors under load at blitz-scale open-PR counts (#13347).
+      // Retry transient API failures, not just rate limits: even bounded REST
+      // pages and GraphQL metadata batches can fail during provider incidents.
       const transient =
         /rate limit|secondary rate|abuse|something went wrong|timeout|timed out|502|503|504|connection reset|unexpected end of JSON/i.test(
           `${stderr}${error.message ?? ''}`
@@ -210,30 +215,6 @@ async function ghJson(args, { retries = 3, token } = {}) {
 }
 
 async function fetchOpenPrs(options) {
-  const fields = [
-    'number',
-    'title',
-    'url',
-    'author',
-    'createdAt',
-    'updatedAt',
-    'isDraft',
-    'autoMergeRequest',
-    'mergeable',
-    'mergeStateStatus',
-    'baseRefName',
-    'baseRefOid',
-    'headRefName',
-    'headRefOid',
-    'headRepository',
-    'headRepositoryOwner',
-    'isCrossRepository',
-    'labels',
-    'changedFiles',
-    'additions',
-    'deletions',
-    'maintainerCanModify',
-  ];
   const request = ({ owner, name, query }) =>
     ghJson([
       'api',
@@ -245,34 +226,23 @@ async function fetchOpenPrs(options) {
       '-F',
       `name=${name}`,
     ]);
-  // Metadata without statusCheckRollup is a small paginated GraphQL query.
-  // Hydrate only the trusted commit-status receipts needed for actual
-  // conflicts, with bounded parallelism. This avoids the former 3*N REST
-  // inventory fanout while preserving exact head/base identity.
-  const metadata = await ghJson([
-    'pr',
-    'list',
-    '--repo',
-    options.repo,
-    '--state',
-    'open',
-    '--limit',
-    String(options.limit),
-    '--json',
-    fields.join(','),
-  ]);
+  const restRequest = endpoint => ghJson(['api', '--method', 'GET', endpoint]);
+  // Enumerate with REST so fleet size and large PR bodies cannot turn one
+  // generated `gh pr list` GraphQL connection into a controller-wide 502.
+  // REST omits mergeability and diff totals, so hydrate those exact-identity
+  // fields in small GraphQL batches before any classification or mutation.
+  const summaries = await fetchOpenPrSummariesRest({
+    repo: options.repo,
+    limit: options.limit,
+    request: restRequest,
+  });
+  const liveMetadata = await hydrateOpenPrGraphqlMetadata({
+    repo: options.repo,
+    prs: summaries,
+    request,
+    batchSize: 25,
+  });
   const [owner, name] = options.repo.split('/');
-  const liveMetadata =
-    metadata.length === 0
-      ? []
-      : bindOpenPrsToLiveBaseRefs({
-          prs: metadata,
-          response: await request({
-            owner,
-            name,
-            query: buildLiveBaseRefQuery(metadata),
-          }),
-        });
   const prs = await hydrateOpenPrStatusContexts({
     repo: options.repo,
     prs: liveMetadata,

@@ -6,6 +6,7 @@ import {
 import {
   createWebSpeechTranscriber,
   isWebSpeechTranscriptionSupported,
+  joinDictationText,
 } from './transcriber';
 
 class MockSpeechRecognition extends EventTarget {
@@ -19,11 +20,25 @@ class MockSpeechRecognition extends EventTarget {
   onerror: ((event: Event) => void) | null = null;
   start = vi.fn();
   stop = vi.fn();
+  abort = vi.fn();
 
   constructor() {
     super();
     MockSpeechRecognition.instances.push(this);
   }
+}
+
+function resultEventFor(transcript: string): Event {
+  const alternative = { transcript, confidence: 1 };
+  return {
+    results: [
+      {
+        0: alternative,
+        length: 1,
+        item: () => alternative,
+      },
+    ],
+  } as unknown as Event;
 }
 
 function installMockSpeechRecognition() {
@@ -129,5 +144,81 @@ describe('transcriber', () => {
       p50Ms: 175,
       p95Ms: 175,
     });
+  });
+
+  it('keeps delivering the final result after a graceful stop', () => {
+    installMockSpeechRecognition();
+    const onTranscript = vi.fn();
+    const onEnd = vi.fn();
+    const transcriber = createWebSpeechTranscriber({ onTranscript, onEnd });
+
+    transcriber.start();
+    const recognition = MockSpeechRecognition.instances[0];
+    transcriber.stop();
+    expect(recognition?.stop).toHaveBeenCalledTimes(1);
+    expect(recognition?.abort).not.toHaveBeenCalled();
+
+    recognition?.onresult?.(resultEventFor('final words'));
+    recognition?.onend?.();
+
+    expect(onTranscript).toHaveBeenCalledWith('final words');
+    expect(onEnd).toHaveBeenCalledTimes(1);
+  });
+
+  it('cancel aborts recognition and drops late results and end events', () => {
+    installMockSpeechRecognition();
+    const onTranscript = vi.fn();
+    const onEnd = vi.fn();
+    const onError = vi.fn();
+    const transcriber = createWebSpeechTranscriber({
+      onTranscript,
+      onEnd,
+      onError,
+    });
+
+    transcriber.start();
+    const recognition = MockSpeechRecognition.instances[0];
+    transcriber.cancel();
+    expect(recognition?.abort).toHaveBeenCalledTimes(1);
+
+    recognition?.onresult?.(resultEventFor('should be dropped'));
+    recognition?.onerror?.({ error: 'aborted' } as unknown as Event);
+    recognition?.onend?.();
+
+    expect(onTranscript).not.toHaveBeenCalled();
+    expect(onError).not.toHaveBeenCalled();
+    expect(onEnd).not.toHaveBeenCalled();
+  });
+
+  it('a fresh start supersedes a stopped instance so its late events cannot leak', () => {
+    installMockSpeechRecognition();
+    const onTranscript = vi.fn();
+    const onEnd = vi.fn();
+    const transcriber = createWebSpeechTranscriber({ onTranscript, onEnd });
+
+    transcriber.start();
+    transcriber.stop();
+    transcriber.start();
+    expect(MockSpeechRecognition.instances).toHaveLength(2);
+    const [stale, live] = MockSpeechRecognition.instances;
+
+    stale?.onresult?.(resultEventFor('stale'));
+    stale?.onend?.();
+    expect(onTranscript).not.toHaveBeenCalled();
+    expect(onEnd).not.toHaveBeenCalled();
+
+    live?.onresult?.(resultEventFor('live'));
+    live?.onend?.();
+    expect(onTranscript).toHaveBeenCalledWith('live');
+    expect(onEnd).toHaveBeenCalledTimes(1);
+  });
+
+  it('joinDictationText inserts exactly one space at the seam', () => {
+    expect(joinDictationText('', 'hello')).toBe('hello');
+    expect(joinDictationText('Draft', '')).toBe('Draft');
+    expect(joinDictationText('Draft', 'hello')).toBe('Draft hello');
+    expect(joinDictationText('Draft ', 'hello')).toBe('Draft hello');
+    expect(joinDictationText('Draft', ' hello')).toBe('Draft hello');
+    expect(joinDictationText('Line\n', 'hello')).toBe('Line\nhello');
   });
 });

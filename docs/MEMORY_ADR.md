@@ -1,5 +1,7 @@
 # MEMORY ADR — Split Product Memory Workflows from Internal AgentOS WDK
 
+> **Retirement notice (2026-09-02):** Trigger.dev and Hermes are retired Jovie tooling. The decision below is preserved as historical architecture lineage and must not be used as current runtime guidance. Current truth is recorded in [`docs/operations/SUMMER_RUNTIME_RETIREMENT.md`](./operations/SUMMER_RUNTIME_RETIREMENT.md).
+
 > Issue: JOV-2705
 > Status: Accepted
 > Date: 2026-06-27

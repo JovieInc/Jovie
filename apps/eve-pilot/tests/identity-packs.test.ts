@@ -1,3 +1,5 @@
+import { readFileSync } from 'node:fs';
+import { resolve } from 'node:path';
 import { describe, expect, it } from 'vitest';
 import eveAgent from '../agent/agent';
 import {
@@ -7,6 +9,7 @@ import {
   EvePilotCapabilityDeniedError,
   eveIdentityForChannel,
   eveIdentityForRuntime,
+  eveIdentityIdForChannel,
 } from '../agent/select-identity';
 
 function armFactoryWrite(turn: EvePilotBoundTurn): EvePilotBoundTurn {
@@ -21,7 +24,7 @@ function armFactoryWrite(turn: EvePilotBoundTurn): EvePilotBoundTurn {
 }
 
 describe('eve identity instruction packs', () => {
-  it('pins the Summer Photon speaker model on Eve Gateway OIDC', () => {
+  it('pins the Eve Gateway OIDC speaker model without a Summer root label', () => {
     expect(eveAgent).toEqual({ model: 'zai/glm-5.3-flash' });
   });
 
@@ -42,25 +45,14 @@ describe('eve identity instruction packs', () => {
       assertEvePilotFactoryLock(armFactoryWrite(bindEvePilotIdentity('jovie')))
     ).toThrow(EvePilotCapabilityDeniedError);
     expect(() =>
-      assertEvePilotFactoryLock(armFactoryWrite(bindEvePilotIdentity('ovie')))
+      assertEvePilotFactoryLock(armFactoryWrite(bindEvePilotIdentity('summer')))
     ).toThrow(EvePilotCapabilityDeniedError);
   });
 
-  it('lets Eve ingest/ack and read gbrain at the Ovie door entry', () => {
-    const turn = bindEvePilotIdentity('ovie');
-    expect(turn.instructions.includes('ingest and ack')).toBe(true);
-    expect(turn.instructions).toMatch(
-      /Engineering enters\s+Summer Linear intake/
-    );
-    expect(turn.instructions).toContain(
-      'stored and queued for Summer Linear intake'
-    );
-    expect(turn.instructions).not.toContain(
-      "including engineering, enter Summer's Kanban"
-    );
-    expect(turn.instructions.toLowerCase()).not.toMatch(/you are ovie/);
-    expect(() => turn.require('ingest-ack')).not.toThrow();
-    expect(() => turn.require('gbrain-read')).not.toThrow();
+  it('binds private presentation to Summer without an Ovie identity', () => {
+    const turn = bindEvePilotIdentity('summer');
+    expect(turn.instructions).toContain('You are Summer');
+    expect(turn.instructions).toContain('Do not speak as Ovie or Jovie');
     expect(() => turn.require('privileged-gbrain-write')).toThrow(
       EvePilotCapabilityDeniedError
     );
@@ -98,12 +90,14 @@ describe('eve identity instruction packs', () => {
     }
   });
 
-  it('binds Telegram to Ovie even when the runtime default is Jovie', () => {
+  it('binds Telegram presentation to Summer even when runtime defaults to Jovie', () => {
     const previous = process.env.EVE_IDENTITY;
     delete process.env.EVE_IDENTITY;
     const turn = eveIdentityForChannel('telegram');
-    expect(turn.pack.id).toBe('ovie');
-    expect(() => turn.require('ingest-ack')).not.toThrow();
+    expect(turn.pack.id).toBe('summer');
+    expect(() => turn.require('ingest-ack')).toThrow(
+      EvePilotCapabilityDeniedError
+    );
     expect(() => assertEvePilotFactoryLock(turn)).not.toThrow();
     if (previous === undefined) {
       delete process.env.EVE_IDENTITY;
@@ -112,14 +106,26 @@ describe('eve identity instruction packs', () => {
     }
   });
 
-  it('refuses a Summer runtime default outside the explicit shadow route', () => {
+  it('binds one explicit deployment identity and never falls back across lanes', () => {
     const previous = process.env.EVE_IDENTITY;
     process.env.EVE_IDENTITY = 'summer';
-    expect(eveIdentityForRuntime().pack.id).toBe('jovie');
-    expect(eveIdentityForChannel('jovie-core-chat').pack.id).toBe('jovie');
-    expect(eveIdentityForChannel('unknown-source').pack.id).toBe('jovie');
+    expect(eveIdentityForRuntime().pack.id).toBe('summer');
+    expect(eveIdentityForChannel('jovie-core-chat').pack.id).toBe('summer');
+    expect(eveIdentityForChannel('unknown-source').pack.id).toBe('summer');
     expect(eveIdentityForChannel('ovie-summer-shadow').pack.id).toBe('summer');
+    expect(eveIdentityIdForChannel('photon')).toBe('summer');
+    expect(eveIdentityIdForChannel('imessage')).toBe('summer');
     expect(eveIdentityForChannel('photon').pack.id).toBe('summer');
+    const photon = readFileSync(
+      resolve(import.meta.dirname, '../agent/channels/photon.ts'),
+      'utf8'
+    );
+    expect(photon).toContain('bindEvePilotIdentity(identity)');
+    const livePhoton = photon
+      .replace(/\/\*[\s\S]*?\*\//g, '')
+      .replace(/\/\/.*$/gm, '')
+      .toLowerCase();
+    expect(livePhoton).not.toMatch(/hermes|trigger\.dev|local-executor/);
     if (previous === undefined) {
       delete process.env.EVE_IDENTITY;
     } else {

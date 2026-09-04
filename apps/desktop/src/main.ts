@@ -59,6 +59,7 @@ import {
   formatDesktopBuildIdentityDisplay,
   renderDesktopBuildIdentitySection,
   resolveDesktopBuildIdentity,
+  resolveDesktopBuildIdentityIpcRequest,
   toDesktopBuildIdentityJson,
 } from './build-identity';
 import { BAKED_DESKTOP_BUILD_IDENTITY } from './build-identity.generated';
@@ -214,6 +215,7 @@ const TRAY_ACTION_CHANNEL = 'tray-action';
 /** Renderer → main: first successful React paint of the hosted app (JOV-3595). */
 const APP_BOOTED_CHANNEL = 'app-booted';
 const LAUNCH_OPERATOR_CONTROL_CHANNEL = 'launch-operator-control';
+const GET_BUILD_IDENTITY_CHANNEL = 'get-build-identity';
 type UpdateChannel =
   | typeof UPDATE_AVAILABLE_CHANNEL
   | typeof UPDATE_DOWNLOADED_CHANNEL;
@@ -672,16 +674,22 @@ function findLegacyAuthReturnRouteInArgv(argv: readonly string[]): string | null
   return null;
 }
 
+// Chromium's Web Speech recognition backend needs Google API keys that
+// Electron cannot ship, so `webkitSpeechRecognition` exists in the renderer
+// but every start() fails with a 'network' error (electron/electron#46143,
+// #7749). Advertising it as a fallback made the composer mic look live and
+// fail on every press. Report it unavailable so the renderer points at OS
+// dictation instead — macOS dictation types into any focused field here.
 function getDesktopDictationStatus(): DesktopDictationStatus {
   return {
     ok: true,
     nativeAvailable: false,
-    webSpeechFallbackAllowed: true,
-    mode: 'web-speech',
+    webSpeechFallbackAllowed: false,
+    mode: 'unavailable',
     reason:
       process.platform === 'darwin'
-        ? 'native-macos-dictation-is-system-owned-web-speech-fallback-enabled'
-        : 'native-dictation-unavailable-web-speech-fallback-enabled',
+        ? 'web-speech-unsupported-in-electron-use-macos-system-dictation'
+        : 'web-speech-unsupported-in-electron-use-system-dictation',
   };
 }
 
@@ -2416,6 +2424,18 @@ autoUpdater.on('error', () => {
     app.quit();
   }
 });
+
+// Return only the already-validated identity, and only to the trusted app origin.
+ipcMain.handle(
+  GET_BUILD_IDENTITY_CHANNEL,
+  (event: IpcMainInvokeEvent, ...args: unknown[]) => {
+    return resolveDesktopBuildIdentityIpcRequest({
+      trustedSender: isTrustedIpcSender(event),
+      args,
+      identity: desktopBuildIdentity,
+    });
+  }
+);
 
 // Allow renderer to trigger quit-and-install without exposing node access.
 ipcMain.handle(

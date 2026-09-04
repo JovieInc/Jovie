@@ -12,7 +12,7 @@ export function PricingPreview() {
       <Container size='md'>
         <div className='text-center mb-12'>
           <h2
-            className='text-3xl sm:text-4xl font-medium tracking-tight text-primary-token'
+            className='text-3xl sm:text-4xl font-medium tracking-tight text-primary-token line-clamp-2'
             style={FONT_SYNTHESIS_STYLE}
           >
             {/* ui-casing-allow: marketing display headline */}

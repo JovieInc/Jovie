@@ -275,7 +275,10 @@ export function TourDrawerContent({
   readonly renderMode?: ProfileRenderMode;
   readonly className?: string;
 }>) {
-  const { location } = useUserLocation();
+  // one-modal-layer-v1: passive tour surfaces never open the browser
+  // geolocation prompt — granted-only reads cached/granted location and
+  // otherwise falls back to chronological order.
+  const { location } = useUserLocation({ permissionMode: 'granted-only' });
   const { nearbyDates, allDates } = useTourDateProximity(tourDates, location);
   const resolvedEmptyStateSourceContext: NotificationSourceContext =
     emptyStateSourceContext ?? {

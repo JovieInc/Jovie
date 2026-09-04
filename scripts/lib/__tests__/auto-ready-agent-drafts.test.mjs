@@ -252,10 +252,11 @@ describe('Auto-Ready provenance selector', () => {
       reason: 'trusted-fx-child',
     });
     expect(parseFxSourceHeadTrailer(fxCommit().message)).toBe(parent);
-    expect(fxWorkflow).toContain(`git config user.name "${FX_WRITER_NAME}"`);
-    expect(fxWorkflow).toContain(`git config user.email "${FX_WRITER_EMAIL}"`);
-    expect(fxWorkflow).toContain(`-m "FX-Source-Head: $SOURCE_HEAD"`);
+    // Hosted writer moved to GraphQL createCommitOnBranch via rolling-ci-fx.
     expect(fxWorkflow).toContain(TRUSTED_FX_WORKFLOW_NAME);
+    expect(fxWorkflow).toContain(
+      'node scripts/lib/rolling-ci-fx.mjs hosted-commit'
+    );
   });
 
   it('rejects a stale proof even on an agent prefix', () => {

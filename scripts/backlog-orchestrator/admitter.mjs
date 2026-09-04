@@ -71,10 +71,10 @@ const SEVERE_INTEGRITY_REASONS = new Set([
 const CAPACITY_POLICY = invariantPolicy('JOV-INV-007');
 const FLEET_AUTHORITY = invariantPolicy('JOV-INV-008');
 const DEFAULT_GEM_CONCURRENCY = CAPACITY_POLICY.baseline;
-const MAX_EVIDENCE_BACKED_GEM_CONCURRENCY = CAPACITY_POLICY.maximum;
 const CONTROLLER_RECEIPT_MAX_AGE_MS = 10 * 60 * 1000;
 const CONCURRENCY_EVIDENCE_MAX_AGE_MS =
   CAPACITY_POLICY.freshnessHours * 60 * 60 * 1000;
+const CAPACITY_MAX_TARGET = 40;
 export const FLEET_PROMOTION_MODE = Object.freeze({
   NORMAL: 'normal',
   ISOLATED_ONLY: 'isolated-only',
@@ -238,7 +238,7 @@ function isFreshTimestamp(value, nowMs, maxAgeMs) {
   const observedMs = Date.parse(value || '');
   return (
     Number.isFinite(observedMs) &&
-    observedMs <= nowMs + 60_000 &&
+    observedMs <= nowMs &&
     nowMs - observedMs <= maxAgeMs
   );
 }
@@ -410,11 +410,43 @@ function deploymentBound(mainSha, deployedSha) {
   );
 }
 
-/**
- * Runtime may preserve already-queued work at its safe floor, but a new Linear
- * mutation requires a fresh approved capacity receipt. Missing, malformed, or
- * stale evidence therefore grants zero new leases rather than inventing four.
- */
+function usefulTurnProofs(evidence, nowMs, maxAgeMs) {
+  if (
+    evidence?.schema !== GEM_CONCURRENCY_EVIDENCE_SCHEMA ||
+    evidence?.source !== 'execution-proven-useful-turns' ||
+    !Array.isArray(evidence?.acceptedEvidence) ||
+    !isFreshTimestamp(evidence?.observedAt, nowMs, maxAgeMs)
+  ) {
+    return null;
+  }
+  const seats = new Set();
+  for (const proof of evidence.acceptedEvidence) {
+    const strings = [proof?.provider, proof?.profile, proof?.model];
+    const completionProven =
+      (Number.isInteger(proof?.outputBytes) && proof.outputBytes > 0) ||
+      (Number.isInteger(proof?.outputTokens) && proof.outputTokens > 0);
+    if (
+      proof?.schema !== 'symphony-useful-turn-proof/v1' ||
+      strings.some(value => typeof value !== 'string' || !value.trim()) ||
+      proof?.rc !== 0 ||
+      proof?.useful !== true ||
+      !/^[0-9a-f]{64}$/.test(proof?.outputDigest || '') ||
+      !completionProven ||
+      !isFreshTimestamp(proof?.completedAt, nowMs, maxAgeMs)
+    ) {
+      return null;
+    }
+    const seat = strings
+      .slice(0, 2)
+      .map(value => value.trim())
+      .join('\u0000');
+    if (seats.has(seat)) return null;
+    seats.add(seat);
+  }
+  return evidence.target === seats.size ? [...seats] : null;
+}
+
+/** Use only fresh, digest-bound useful turns as dispatch capacity. */
 export function resolveGemConcurrency(
   evidence,
   {
@@ -424,18 +456,13 @@ export function resolveGemConcurrency(
 ) {
   const nowMs = Date.parse(now);
   const measuredTarget = evidence?.target;
-  const requiredCleanRuns =
-    measuredTarget > DEFAULT_GEM_CONCURRENCY
-      ? CAPACITY_POLICY.cleanRunsForMaximum
-      : 1;
+  const acceptedEvidence = usefulTurnProofs(evidence, nowMs, maxAgeMs);
   const evidenceAccepted =
-    evidence?.schema === GEM_CONCURRENCY_EVIDENCE_SCHEMA &&
+    acceptedEvidence !== null &&
     Number.isInteger(measuredTarget) &&
     measuredTarget >= CAPACITY_POLICY.minimum &&
-    measuredTarget <= MAX_EVIDENCE_BACKED_GEM_CONCURRENCY &&
+    measuredTarget <= CAPACITY_MAX_TARGET &&
     evidence?.approved === true &&
-    Number.isInteger(evidence?.cleanRuns) &&
-    evidence.cleanRuns >= requiredCleanRuns &&
     evidence?.severeIncidents === 0 &&
     isFreshTimestamp(evidence?.observedAt, nowMs, maxAgeMs);
 
@@ -446,9 +473,10 @@ export function resolveGemConcurrency(
     evidenceAccepted,
     newMutationAllowed: evidenceAccepted,
     preserveQueuedWork: CAPACITY_POLICY.preserveQueuedWork,
+    acceptedEvidence: evidenceAccepted ? evidence.acceptedEvidence : [],
     reason: evidenceAccepted
-      ? 'recent-approved-measured-capacity'
-      : 'capacity-evidence-missing-malformed-or-stale',
+      ? 'execution-proven-useful-turns'
+      : 'capacity-evidence-unproven-dispatch-closed',
   };
 }
 
@@ -665,7 +693,10 @@ export function evaluateFleetGate(
         ? ['tests', 'review']
         : [
             ...(newMutationAllowed ? ['approved-issue-lease'] : []),
-            ...FLEET_AUTHORITY.AMBER,
+            ...FLEET_AUTHORITY.AMBER.filter(
+              activity =>
+                newMutationAllowed || activity !== 'isolated-implementation'
+            ),
           ];
   const holdIntakeAllowed =
     state === FLEET_GATE_STATE.AMBER &&

@@ -34,6 +34,49 @@ describe('verification child environment', () => {
   });
 });
 
+describe('Summer commissioning affected-test lane', () => {
+  it('selects the fail-closed commissioning suite for every contract input', () => {
+    const plan = buildAffectedTestPlan([
+      'docs/operations/SUMMER_COMMISSIONING.md',
+      'docs/operations/SUMMER_PRODUCT_QUALITY_GOVERNOR.md',
+      'docs/operations/evidence/summer-mac-production-dogfood-2026-09-01.json',
+      'scripts/summer-commissioning/canonical-registry.test.mjs',
+      'scripts/summer-commissioning/commissioning.mjs',
+      'scripts/summer-commissioning/commissioning.test.mjs',
+      'scripts/summer-commissioning/contracts.mjs',
+      'scripts/summer-commissioning/contracts.test.mjs',
+      'scripts/summer-commissioning/product-quality-governor.mjs',
+      'scripts/summer-commissioning/product-quality-governor.test.mjs',
+      'scripts/summer-commissioning/receipt-trust.mjs',
+      'scripts/summer-commissioning/receipt-trust.test.mjs',
+      'scripts/summer-commissioning/registry.json',
+      'scripts/run-affected-tests.mjs',
+      'scripts/lib/__tests__/automation-verify.test.mjs',
+    ]);
+
+    expect(plan.mode).toBe('selected');
+    expect(plan.nodeTests).toEqual([
+      'scripts/summer-commissioning/canonical-registry.test.mjs',
+      'scripts/summer-commissioning/commissioning.test.mjs',
+      'scripts/summer-commissioning/contracts.test.mjs',
+      'scripts/summer-commissioning/product-quality-governor.test.mjs',
+      'scripts/summer-commissioning/receipt-trust.test.mjs',
+    ]);
+    expect(plan.scriptVitestTests).toContain(
+      'scripts/lib/__tests__/automation-verify.test.mjs'
+    );
+  });
+
+  it('fails closed to the full suite when commissioning changes mix scopes', () => {
+    const plan = buildAffectedTestPlan([
+      'scripts/summer-commissioning/commissioning.mjs',
+      'scripts/unrelated.mjs',
+    ]);
+
+    expect(plan.mode).toBe('full');
+  });
+});
+
 const SYMPHONY_THROUGHPUT_CONTROL_MANIFEST = [
   '.husky/pre-push',
   'scripts/automation-verify.sh',
@@ -88,6 +131,7 @@ const GEM_PR_REHABILITATION_LANE = [
   'scripts/hermes/config/gem-repo-registry.json',
   'scripts/hermes/config/model-registry.json',
   'scripts/hermes/closure_health.py',
+  'scripts/hermes/gem-disk-reclaim.py',
   'scripts/hermes/gem-pr-drain.py',
   'scripts/hermes/gem-ops-hud.py',
   'scripts/hermes/gem-priority-gate.py',
@@ -97,10 +141,14 @@ const GEM_PR_REHABILITATION_LANE = [
   'scripts/hermes/gem_rehabilitation_policy.py',
   'scripts/hermes/install-gem-fleet-controller.sh',
   'scripts/hermes/install-gem-pr-rehabilitation.sh',
+  'scripts/hermes/install-symphony-ui-pilot.sh',
   'scripts/hermes/model-router.py',
   'scripts/hermes/symphony-reconciler.py',
+  'scripts/hermes/systemd/gem-disk-reclaim.service',
+  'scripts/hermes/systemd/gem-disk-reclaim.timer',
   'scripts/hermes/systemd/gem-pr-drain.service',
   'scripts/hermes/systemd/gem-pr-drain.timer',
+  'scripts/hermes/tests/test_gem_disk_reclaim.py',
   'scripts/hermes/tests/gem-pr-drain.test.py',
   'scripts/hermes/tests/gem-ops-hud.test.py',
   'scripts/hermes/tests/gem-pr-rehabilitation-contract.test.py',
@@ -110,6 +158,7 @@ const GEM_PR_REHABILITATION_LANE = [
   'scripts/hermes/tests/symphony-reconciler.test.py',
   'scripts/backlog-orchestrator/__tests__/backlog-orchestrator.test.mjs',
   'scripts/hermes/tests/test-model-router.py',
+  'scripts/tests/test_symphony_ui_pilot_runtime.py',
   'scripts/ci-fast-lanes.mjs',
   'scripts/lib/__tests__/automation-verify.test.mjs',
   'scripts/lib/__tests__/ci-fast-workflow-contract.test.mjs',
@@ -670,6 +719,7 @@ describe('automation-verify affected scope', () => {
         'scripts/lib/__tests__/agent-qc-wires.test.mjs',
         'scripts/lib/__tests__/needs-human-autoclose.test.mjs',
         'scripts/lib/__tests__/production-lane-range.test.mjs',
+        'scripts/lib/__tests__/preview-env-contract.test.mjs',
         'scripts/lib/__tests__/hermes-launchd.test.mjs',
       ],
     });
@@ -858,8 +908,10 @@ describe('automation-verify affected scope', () => {
     expect(plan).toMatchObject({
       mode: 'selected',
       selectedTests: [],
+      pythonTests: ['scripts/tests/test_symphony_ui_pilot_runtime.py'],
       pythonUnittestTests: [
         'scripts/hermes/tests/closure-health.test.py',
+        'scripts/hermes/tests/test_gem_disk_reclaim.py',
         'scripts/hermes/tests/gem-priority-gate.test.py',
         'scripts/hermes/tests/gem-pr-drain.test.py',
         'scripts/hermes/tests/gem-ops-hud.test.py',
@@ -912,6 +964,7 @@ describe('automation-verify affected scope', () => {
       pythonUnittestTests: [
         'scripts/hermes/tests/symphony-additive-router.test.py',
         'scripts/hermes/tests/test-model-router.py',
+        'scripts/hermes/tests/symphony-github-poke.test.py',
       ],
       scriptVitestTests: ['scripts/lib/__tests__/automation-verify.test.mjs'],
     });

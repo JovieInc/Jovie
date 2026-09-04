@@ -10,6 +10,10 @@ import {
   lt,
   or,
 } from 'drizzle-orm';
+import {
+  machineCertifyPremadeProfile,
+  projectLeadEvidence,
+} from '@/lib/acquisition';
 import { db } from '@/lib/db';
 import {
   type LeadPipelineSettings,
@@ -127,6 +131,17 @@ export async function runAutoApprove(
   let errors = 0;
 
   for (const lead of eligibleLeads) {
+    const certification = machineCertifyPremadeProfile(
+      projectLeadEvidence(lead)
+    );
+    if (!certification.passed) {
+      pipelineLog('auto-approve', 'Skipping machine-cert failure', {
+        leadId: lead.id,
+        failures: certification.failures.map(item => item.id),
+      });
+      continue;
+    }
+
     try {
       const result = await approveLead(lead);
       if (result.ingestion?.success === false) {

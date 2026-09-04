@@ -89,6 +89,22 @@ describe('mounted homepage pricing System B source contract', () => {
     }
   });
 
+  it('keeps mounted homepage CTA headings explicitly clamped', () => {
+    const source = readFileSync(
+      path.join(webRoot, pricingComponentPath),
+      'utf8'
+    );
+    const terminalCtaSource = readFileSync(
+      path.join(webRoot, 'components/site/MarketingTerminalCta.tsx'),
+      'utf8'
+    );
+
+    // HomepageStoryHeader owns the mounted pricing/story headings.
+    expect(source).toContain('homepage-story-heading line-clamp-2');
+    // The mounted final CTA heading renders through MarketingTerminalCta.
+    expect(terminalCtaSource).toContain('line-clamp-2');
+  });
+
   it('keeps mounted pricing CSS tokenized and stable', () => {
     const css = extractPricingCss(
       readFileSync(path.join(webRoot, cssPath), 'utf8')

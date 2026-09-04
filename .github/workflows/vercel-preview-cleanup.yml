@@ -1,0 +1,81 @@
+name: Vercel Preview Cleanup
+
+on:
+  pull_request:
+    types: [closed]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: vercel-preview-cleanup-${{ github.event.pull_request.number }}
+  cancel-in-progress: false
+
+jobs:
+  cleanup-pr-previews:
+    name: Cancel and delete preview deployments for closed PR
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 1
+          persist-credentials: false
+
+      - name: Validate Vercel configuration
+        id: validate
+        env:
+          VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
+          VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
+          VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
+        run: |
+          if [ -z "${VERCEL_TOKEN}" ] || [ -z "${VERCEL_ORG_ID}" ] || [ -z "${VERCEL_PROJECT_ID}" ]; then
+            echo "Vercel API credentials missing (expected on fork PRs); skipping cleanup." >&2
+            echo "skip=true" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          echo "skip=false" >> "$GITHUB_OUTPUT"
+
+      - name: Cancel and delete preview deployments for the closed PR ref
+        if: steps.validate.outputs.skip != 'true'
+        env:
+          VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
+          VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
+          VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
+          PR_HEAD_REF: ${{ github.event.pull_request.head.ref }}
+        run: |
+          set -euo pipefail
+          node .github/scripts/cleanup-pr-vercel-previews.mjs | tee "$RUNNER_TEMP/vercel-preview-cleanup.json"
+
+      - name: Emit preview-env cleanup receipt
+        if: ${{ steps.validate.outputs.skip != 'true' && always() }}
+        env:
+          PR_MERGED: ${{ github.event.pull_request.merged }}
+          PR_HEAD_REF: ${{ github.event.pull_request.head.ref }}
+        run: |
+          set -euo pipefail
+          if [ "$PR_MERGED" = "true" ]; then
+            CLEANUP_TRIGGER="merged"
+          else
+            CLEANUP_TRIGGER="pr-closed"
+          fi
+          CLEANUP_FILE="$RUNNER_TEMP/vercel-preview-cleanup.json"
+          if [ -s "$CLEANUP_FILE" ] && RESULT="$(tail -n 1 "$CLEANUP_FILE" | jq -er 'select(type == "object" and has("canceled") and has("deleted"))' 2>/dev/null)"; then
+            CANCELED="$(jq -r '.canceled | join(",")' <<<"$RESULT")"
+            DELETED="$(jq -r '.deleted | join(",")' <<<"$RESULT")"
+            if [ -z "$CANCELED" ] && [ -z "$DELETED" ]; then
+              PROOF="No preview deployments remained for the ref"
+            else
+              PROOF="No QUEUED/BUILDING preview deployments remain for the ref; canceled: ${CANCELED:-none}; deleted: ${DELETED:-none}"
+            fi
+          else
+            PROOF="Cleanup step did not produce a result; no preview deployments confirmed removed for the ref"
+          fi
+          node scripts/ci/preview-env-admission.mjs emit-cleanup \
+            --kind vercel-preview \
+            --environment "preview deployments for ref ${PR_HEAD_REF}" \
+            --cleanup-trigger "$CLEANUP_TRIGGER" \
+            --proof "$PROOF" \
+            --cleaned-by "vercel-preview-cleanup.yml" \
+            --out "$RUNNER_TEMP/preview-env-cleanup-vercel.json"

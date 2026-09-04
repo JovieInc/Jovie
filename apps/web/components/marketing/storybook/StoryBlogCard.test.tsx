@@ -9,9 +9,9 @@ describe('StoryBlogCard', () => {
   it('renders title, excerpt, and author for the default variant', () => {
     render(<StoryBlogCard post={post} />);
 
-    expect(
-      screen.getByRole('heading', { name: post.title })
-    ).toBeInTheDocument();
+    const heading = screen.getByRole('heading', { name: post.title });
+    expect(heading).toBeInTheDocument();
+    expect(heading).toHaveClass('line-clamp-2');
     expect(screen.getByText(post.excerpt)).toBeInTheDocument();
     expect(screen.getByText(post.author)).toBeInTheDocument();
     expect(screen.getByText(post.category)).toBeInTheDocument();
@@ -25,9 +25,9 @@ describe('StoryBlogCard', () => {
       <StoryBlogCard post={post} variant='featured' />
     );
 
-    expect(
-      screen.getByRole('heading', { name: post.title })
-    ).toBeInTheDocument();
+    const heading = screen.getByRole('heading', { name: post.title });
+    expect(heading).toBeInTheDocument();
+    expect(heading).toHaveClass('line-clamp-2');
     // featured uses larger padding / radius classes
     expect(container.querySelector('article')?.className).toMatch(/p-8/);
   });

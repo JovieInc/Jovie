@@ -40,6 +40,11 @@ describe('FridayRhythmSection', () => {
     expect(
       screen.getAllByRole('heading', { name: 'Make Every Friday Count' })
     ).toHaveLength(2);
+    for (const heading of screen.getAllByRole('heading', {
+      name: 'Make Every Friday Count',
+    })) {
+      expect(heading).toHaveClass('line-clamp-2');
+    }
     expect(
       screen.getAllByRole('img', {
         name: /Jovie rhythm model showing 3 of 52 Fridays active/i,

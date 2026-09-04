@@ -17,6 +17,7 @@ describe('youtube thumbnail detector (JOV-3935)', () => {
     {
       videoId: 'b',
       title: 'Auto frame',
+      thumbnailUrl: 'https://i.ytimg.com/vi/b/hqdefault.jpg',
       isDefaultThumbnail: true,
       qualityScore: null,
     },
@@ -50,6 +51,10 @@ describe('youtube thumbnail detector (JOV-3935)', () => {
       PROJECTED_IMPACT_RANGE.maxPercent
     );
     expect(payload?.primaryActionLabel).toBe('Generate variants');
+    expect(payload?.thumbnailUrl).toBe(
+      'https://i.ytimg.com/vi/b/hqdefault.jpg'
+    );
+    expect(payload?.thumbnailAlt).toBe('Current thumbnail for Auto frame');
   });
 
   it('returns null when nothing is weak', () => {

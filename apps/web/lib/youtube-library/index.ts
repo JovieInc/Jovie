@@ -62,6 +62,11 @@ export {
   type ThumbnailExperimentState,
   type ThumbnailPromotion,
 } from './thumbnail-experiments';
+export {
+  deriveThumbnailCandidateReviewIds,
+  type RegisterThumbnailCandidateReviewResult,
+  registerThumbnailCandidateReview,
+} from './thumbnail-review';
 export type {
   YouTubeChannelVideo,
   YouTubeLibraryProvider,

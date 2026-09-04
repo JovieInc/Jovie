@@ -50,10 +50,21 @@ const RULES = /** @type {Array<[string, string, string[], RegExp]>} */ ([
     /^packages\/auth-routing\//,
   ],
   [
+    // Lockfile-only churn (every dependabot group) changes the JS install
+    // graph. The iOS lane is native xcodebuild with no causal path from it —
+    // unlike the desktop lane, which bundles web output. Dropping ios here
+    // removes 25-70 minutes of Swift CI from every dependency-only
+    // merge-group head (2026-09-04 queue evidence).
+    'shared-js-lockfile',
+    'shared-contract',
+    ['mac', 'web'],
+    /^pnpm-lock\.yaml$/,
+  ],
+  [
     'shared-js-workspace',
     'shared-contract',
     PRODUCT_LANES,
-    /^(package\.json|pnpm-lock\.yaml|pnpm-workspace\.yaml|turbo\.json|tsconfig\.json|vitest\.config\.mts|biome\.json|\.node-version|\.npmrc|\.nvmrc|patches\/)/,
+    /^(package\.json|pnpm-workspace\.yaml|turbo\.json|tsconfig\.json|vitest\.config\.mts|biome\.json|\.node-version|\.npmrc|\.nvmrc|patches\/)/,
   ],
   [
     'shared-release-admission',

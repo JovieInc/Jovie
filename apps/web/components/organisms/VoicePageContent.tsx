@@ -146,7 +146,7 @@ export function VoicePageContent() {
             <p className='text-secondary-token'>
               The same voice that fans already know, now available on demand.
             </p>
-            <Button asChild variant='primary' className='mt-2'>
+            <Button asChild variant='secondary' className='mt-2'>
               <Link href={APP_ROUTES.START} data-testid='voice-final-cta'>
                 Clone my voice now
               </Link>

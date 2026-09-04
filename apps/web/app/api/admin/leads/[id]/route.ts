@@ -1,5 +1,10 @@
 import { eq } from 'drizzle-orm';
 import { type NextRequest, NextResponse } from 'next/server';
+import {
+  acquisitionFunnelAttribution,
+  captureAcquisitionRejection,
+  experimentIdForLeadSource,
+} from '@/lib/acquisition';
 import { db } from '@/lib/db';
 import { leads } from '@/lib/db/schema/leads';
 import { getCurrentUserEntitlements } from '@/lib/entitlements/server';
@@ -53,6 +58,27 @@ export async function PATCH(
     // For rejection, just update status directly
     if (validated.data.status === 'rejected') {
       const now = new Date();
+      const [existing] = await db
+        .select()
+        .from(leads)
+        .where(eq(leads.id, id))
+        .limit(1);
+      if (!existing) {
+        return NextResponse.json(
+          { error: 'Lead not found' },
+          { status: 404, headers: NO_STORE_HEADERS }
+        );
+      }
+
+      const experimentId = experimentIdForLeadSource(existing.sourcePlatform);
+      const rejection = captureAcquisitionRejection({
+        candidateId: id,
+        experimentId,
+        reason: validated.data.reason ?? 'other',
+        notes: validated.data.notes,
+        capability: validated.data.capability,
+      });
+
       const [updated] = await db
         .update(leads)
         .set({
@@ -70,11 +96,19 @@ export async function PATCH(
         );
       }
 
-      pipelineLog('reject', 'Lead rejected', { leadId: id });
+      pipelineLog('reject', 'Lead rejected', {
+        leadId: id,
+        reason: rejection.reason,
+        productGap: rejection.productGap,
+      });
       await recordLeadFunnelEvent(
         {
           leadId: id,
           eventType: 'rejected',
+          ...acquisitionFunnelAttribution(experimentId),
+          metadata: {
+            rejection,
+          },
         },
         { idempotent: true }
       );

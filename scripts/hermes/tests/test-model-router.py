@@ -46,7 +46,7 @@ class RegistryTests(unittest.TestCase):
         )
         self.assertEqual(
             cfg["route_chains"]["remediation"][:3],
-            ["cursor-grok-4.6", "grok-4.6", "codex-sol"],
+            ["grok-4.6", "kimi-k3", "cursor-grok-4.6"],
         )
         self.assertGreater(
             cfg["route_chains"]["new_pr"].index("qwen-coder-local"),
@@ -351,6 +351,39 @@ class RegistryTests(unittest.TestCase):
                 selected["executor"]["argv"],
                 ["-m", "{model}", "-p", "{prompt}"],
             )
+
+    def test_include_id_keeps_kimi_from_being_stolen_by_grok(self):
+        with tempfile.TemporaryDirectory() as td:
+            root = pathlib.Path(td)
+            grok = self._grok_ready(root)
+            kimi = self._kimi_ready(root)
+            result = self.run_router(
+                "choose", "--workflow", "remediation", "--capability", "code",
+                "--include-id", "kimi-k3",
+                env={
+                    "GEM_MODEL_ROUTER_STATE": str(root / "state.json"),
+                    "GEM_GROK_EXECUTABLE": str(grok),
+                    "GEM_KIMI_EXECUTABLE": str(kimi),
+                    "GEM_PR_DRAIN_QWEN": "/missing",
+                    "GEM_PR_DRAIN_CODEX": "/missing",
+                },
+            )
+            selected = json.loads(result.stdout)["selected"]
+            self.assertEqual(selected["id"], "kimi-k3")
+
+    def test_kimi_probe_json_reports_oauth_seats(self):
+        from importlib.machinery import SourceFileLoader
+        router = SourceFileLoader("model_router", str(ROUTER)).load_module()
+        self.assertEqual(
+            router.parse_oauth_seats(
+                {"models": {"kimi-code/k3": {}}, "concurrency": 3}
+            ),
+            3,
+        )
+        self.assertEqual(
+            router.parse_oauth_seats({"accounts": [{}, {}]}),
+            2,
+        )
 
     def test_kimi_version_only_output_does_not_prove_subscription_model(self):
         with tempfile.TemporaryDirectory() as td:

@@ -19,7 +19,8 @@ shadow theater.
   permissions.
 - Do not impersonate a completed external action or accept a placeholder card
   as evidence.
-- Photon/iMessage is Summer's live talk channel. Telegram remains Ovie.
+- Photon/iMessage is Summer's live talk channel. Telegram is a private Ovie
+  presentation surface for Summer; Ovie is never an agent identity.
 - Do not access personal data or personal-agent state. Use only company-scoped,
   explicitly authorized evidence.
 
@@ -29,3 +30,13 @@ Before this identity can orchestrate a mutation, the Jovie-owned durable
 receipt/outbox must accept signed events, survive a rate limit, replay exactly
 once, and expose a source-to-terminal receipt. Linear may project coordination
 state but is not the delivery authority.
+
+## Bounded bottleneck lane
+
+The separate `ovie-summer-bottleneck` source is deterministic and does not use
+this instruction text to choose or execute work. It may write exactly one
+source-bound `jovie-symphony-repair-task/v1` outbox item for the currently
+allowlisted release-certification starvation repair. Exact-source CI, native
+queue, production, and runtime gates remain authoritative. All other
+bottlenecks are held with an owner and visible escalation; no general Symphony
+heal, Linear, GitHub, deployment, permission, or GBrain write is granted.

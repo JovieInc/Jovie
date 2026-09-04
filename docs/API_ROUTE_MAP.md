@@ -329,6 +329,15 @@
 | `/api/insights/generate` | POST | `auth` | Trigger AI insight generation |
 | `/api/insights/summary` | GET | `auth` | Top-3 insights summary for dashboard widget |
 
+### Inbox Founder Reviews
+
+| Route | Methods | Auth | Description |
+|-------|---------|------|-------------|
+| `/api/inbox/founder-reviews` | GET, POST | `auth` | List or create owner-bound Inbox review receipts before a canonical decision is applied |
+| `/api/inbox/founder-reviews/upload-token` | POST | `auth` / signed Blob callback | Issue a private-audio upload token and record its expiring cleanup lease on completion |
+| `/api/inbox/founder-reviews/[id]/media` | GET, DELETE | `auth` | Stream byte ranges from retained private audio or delete it from an owned receipt |
+| `/api/inbox/founder-reviews/[id]/outcome` | PATCH | `auth` | Record a failed canonical action or verify an applied outcome against owned suggested-action state |
+
 ### Investors
 
 | Route | Methods | Auth | Description |
@@ -524,8 +533,8 @@
 | Auth Type | Route Count |
 |-----------|-------------|
 | `admin` | ~38 |
-| `auth` | ~62 |
+| `auth` | ~66 |
 | `public` | ~35 |
 | `cron` | ~16 |
 | `webhook` | ~9 |
-| **Total** | **~159** |
+| **Total** | **~163** |

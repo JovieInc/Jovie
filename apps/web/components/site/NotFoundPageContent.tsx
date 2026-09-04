@@ -38,7 +38,7 @@ export function NotFoundPageContent({
       )}
 
       <div className={`${prefix}-copy`}>
-        <h1 className={`${prefix}-title`}>{copy.title}</h1>
+        <h1 className={`line-clamp-2 ${prefix}-title`}>{copy.title}</h1>
         <p className={`${prefix}-description`}>{copy.description}</p>
 
         <div className={`${prefix}-actions`}>

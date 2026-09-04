@@ -20,7 +20,11 @@ export function TourDatesList({
   tourDates,
   handle,
 }: Readonly<TourDatesListProps>) {
-  const { location, isLoading, error } = useUserLocation();
+  // one-modal-layer-v1: never open the browser geolocation prompt from a
+  // passive list — use cached/granted location only.
+  const { location, isLoading, error } = useUserLocation({
+    permissionMode: 'granted-only',
+  });
   const { nearbyDates, allDates } = useTourDateProximity(tourDates, location);
 
   // On the public tour page, nearby dates sort to top (no duplication)

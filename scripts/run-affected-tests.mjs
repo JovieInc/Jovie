@@ -153,6 +153,32 @@ const AFFECTED_TEST_SELECTOR_MANIFEST = new Set([
 const AFFECTED_TEST_SELECTOR_TESTS = [
   'scripts/lib/__tests__/automation-verify.test.mjs',
 ];
+const SUMMER_COMMISSIONING_PRIMARY_INPUTS = new Set([
+  'docs/operations/SUMMER_COMMISSIONING.md',
+  'docs/operations/SUMMER_PRODUCT_QUALITY_GOVERNOR.md',
+  'docs/operations/evidence/summer-mac-production-dogfood-2026-09-01.json',
+  'scripts/summer-commissioning/canonical-registry.test.mjs',
+  'scripts/summer-commissioning/commissioning.mjs',
+  'scripts/summer-commissioning/commissioning.test.mjs',
+  'scripts/summer-commissioning/contracts.mjs',
+  'scripts/summer-commissioning/contracts.test.mjs',
+  'scripts/summer-commissioning/product-quality-governor.mjs',
+  'scripts/summer-commissioning/product-quality-governor.test.mjs',
+  'scripts/summer-commissioning/receipt-trust.mjs',
+  'scripts/summer-commissioning/receipt-trust.test.mjs',
+  'scripts/summer-commissioning/registry.json',
+]);
+const SUMMER_COMMISSIONING_LANE = new Set([
+  ...SUMMER_COMMISSIONING_PRIMARY_INPUTS,
+  ...AFFECTED_TEST_SELECTOR_MANIFEST,
+]);
+const SUMMER_COMMISSIONING_NODE_TESTS = [
+  'scripts/summer-commissioning/canonical-registry.test.mjs',
+  'scripts/summer-commissioning/commissioning.test.mjs',
+  'scripts/summer-commissioning/contracts.test.mjs',
+  'scripts/summer-commissioning/product-quality-governor.test.mjs',
+  'scripts/summer-commissioning/receipt-trust.test.mjs',
+];
 const SENTRY_AUTOFIX_RECURRENCE_PRIMARY_INPUTS = new Set([
   '.github/workflows/sentry-autofix-recurrence.yml',
   '.github/workflows/sentry-autofix.yml',
@@ -291,6 +317,7 @@ const CI_CONTROL_SCRIPT_TESTS = [
   'scripts/lib/__tests__/agent-qc-wires.test.mjs',
   'scripts/lib/__tests__/needs-human-autoclose.test.mjs',
   'scripts/lib/__tests__/production-lane-range.test.mjs',
+  'scripts/lib/__tests__/preview-env-contract.test.mjs',
 ];
 const PRODUCT_LANE_FOUNDATION_PRIMARY_INPUTS = new Set([
   'scripts/lib/product-lane-classifier.mjs',
@@ -486,6 +513,7 @@ const GEM_PR_REHABILITATION_LANE = new Set([
   'scripts/hermes/config/gem-repo-registry.json',
   'scripts/hermes/config/model-registry.json',
   'scripts/hermes/closure_health.py',
+  'scripts/hermes/gem-disk-reclaim.py',
   'scripts/hermes/gem-pr-drain.py',
   'scripts/hermes/gem-ops-hud.py',
   'scripts/hermes/gem-priority-gate.py',
@@ -495,10 +523,14 @@ const GEM_PR_REHABILITATION_LANE = new Set([
   'scripts/hermes/gem_rehabilitation_policy.py',
   'scripts/hermes/install-gem-fleet-controller.sh',
   'scripts/hermes/install-gem-pr-rehabilitation.sh',
+  'scripts/hermes/install-symphony-ui-pilot.sh',
   'scripts/hermes/model-router.py',
   'scripts/hermes/symphony-reconciler.py',
+  'scripts/hermes/systemd/gem-disk-reclaim.service',
+  'scripts/hermes/systemd/gem-disk-reclaim.timer',
   'scripts/hermes/systemd/gem-pr-drain.service',
   'scripts/hermes/systemd/gem-pr-drain.timer',
+  'scripts/hermes/tests/test_gem_disk_reclaim.py',
   'scripts/hermes/tests/gem-pr-drain.test.py',
   'scripts/hermes/tests/gem-ops-hud.test.py',
   'scripts/hermes/tests/gem-pr-rehabilitation-contract.test.py',
@@ -508,6 +540,8 @@ const GEM_PR_REHABILITATION_LANE = new Set([
   'scripts/hermes/tests/symphony-reconciler.test.py',
   'scripts/backlog-orchestrator/__tests__/backlog-orchestrator.test.mjs',
   'scripts/hermes/tests/test-model-router.py',
+  'scripts/tests/test_symphony_ui_pilot_runtime.py',
+  'scripts/hermes/tests/symphony-github-poke.test.py',
   'scripts/ci-fast-lanes.mjs',
   'scripts/lib/__tests__/automation-verify.test.mjs',
   'scripts/lib/__tests__/ci-fast-workflow-contract.test.mjs',
@@ -515,6 +549,7 @@ const GEM_PR_REHABILITATION_LANE = new Set([
 ]);
 const GEM_PR_REHABILITATION_PYTHON_TESTS = [
   'scripts/hermes/tests/closure-health.test.py',
+  'scripts/hermes/tests/test_gem_disk_reclaim.py',
   'scripts/hermes/tests/gem-priority-gate.test.py',
   'scripts/hermes/tests/gem-pr-drain.test.py',
   'scripts/hermes/tests/gem-ops-hud.test.py',
@@ -522,6 +557,9 @@ const GEM_PR_REHABILITATION_PYTHON_TESTS = [
   'scripts/hermes/tests/gem-rehabilitation-policy.test.py',
   'scripts/hermes/tests/symphony-reconciler.test.py',
   'scripts/hermes/tests/test-model-router.py',
+];
+const GEM_PR_REHABILITATION_PYTEST_TESTS = [
+  'scripts/tests/test_symphony_ui_pilot_runtime.py',
 ];
 const GEM_CHECKIN_HUD_PRIMARY_INPUTS = new Set([
   'scripts/hermes/symphony/WORKFLOW.md',
@@ -555,16 +593,19 @@ const SYMPHONY_ADDITIVE_ROUTER_LANE = new Set([
   'scripts/hermes/model-router.py',
   'scripts/hermes/tests/symphony-codex-auth-fallback.test.py',
   'scripts/hermes/tests/test-model-router.py',
+  'scripts/hermes/tests/symphony-github-poke.test.py',
   ...AFFECTED_TEST_SELECTOR_MANIFEST,
 ]);
 const SYMPHONY_ADDITIVE_ROUTER_PYTHON_TESTS = [
   'scripts/hermes/tests/symphony-additive-router.test.py',
   'scripts/hermes/tests/test-model-router.py',
+  'scripts/hermes/tests/symphony-github-poke.test.py',
 ];
 const GEM_PR_REHABILITATION_PRIMARY_INPUTS = new Set([
   'scripts/hermes/config/gem-repo-registry.json',
   'scripts/hermes/config/model-registry.json',
   'scripts/hermes/closure_health.py',
+  'scripts/hermes/gem-disk-reclaim.py',
   'scripts/hermes/gem-pr-drain.py',
   'scripts/hermes/gem-ops-hud.py',
   'scripts/hermes/gem-repo-drain-cycle.py',
@@ -573,9 +614,13 @@ const GEM_PR_REHABILITATION_PRIMARY_INPUTS = new Set([
   'scripts/hermes/symphony-reconciler.py',
   'scripts/hermes/install-gem-fleet-controller.sh',
   'scripts/hermes/install-gem-pr-rehabilitation.sh',
+  'scripts/hermes/install-symphony-ui-pilot.sh',
+  'scripts/hermes/systemd/gem-disk-reclaim.service',
+  'scripts/hermes/systemd/gem-disk-reclaim.timer',
   'scripts/hermes/model-router.py',
   'scripts/hermes/systemd/gem-pr-drain.service',
   'scripts/hermes/systemd/gem-pr-drain.timer',
+  'scripts/hermes/tests/test_gem_disk_reclaim.py',
   'scripts/hermes/tests/gem-pr-drain.test.py',
   'scripts/hermes/tests/gem-ops-hud.test.py',
   'scripts/hermes/tests/gem-pr-rehabilitation-contract.test.py',
@@ -583,6 +628,7 @@ const GEM_PR_REHABILITATION_PRIMARY_INPUTS = new Set([
   'scripts/hermes/tests/test-model-router.py',
   'scripts/hermes/tests/closure-health.test.py',
   'scripts/hermes/tests/symphony-reconciler.test.py',
+  'scripts/tests/test_symphony_ui_pilot_runtime.py',
 ]);
 const NO_UNATTENDED_RED_PRIMARY_INPUTS = new Set([
   'scripts/backlog-orchestrator/no-unattended-red.mjs',
@@ -895,6 +941,25 @@ export function buildAffectedTestPlan(
   if (files.some(file => GLOBAL_TEST_INPUTS.has(file))) {
     return { mode: 'full', relatedFiles: [], mandatoryTests: [] };
   }
+  const isBoundedSummerCommissioningChange =
+    files.some(file => SUMMER_COMMISSIONING_PRIMARY_INPUTS.has(file)) &&
+    files.every(file => SUMMER_COMMISSIONING_LANE.has(file));
+  if (isBoundedSummerCommissioningChange) {
+    return {
+      mode: 'selected',
+      relatedFiles: [],
+      mandatoryTests: [],
+      selectedTests: [],
+      rootVitestTests: [],
+      pythonTests: [],
+      pythonUnittestTests: [],
+      scriptVitestTests: AFFECTED_TEST_SELECTOR_TESTS,
+      nodeTests: SUMMER_COMMISSIONING_NODE_TESTS,
+    };
+  }
+  if (files.some(file => SUMMER_COMMISSIONING_PRIMARY_INPUTS.has(file))) {
+    return { mode: 'full', relatedFiles: [], mandatoryTests: [] };
+  }
   const isBoundedBacklogRemediationChange =
     files.some(file => BACKLOG_REMEDIATION_PRIMARY_INPUTS.has(file)) &&
     files.every(file => BACKLOG_REMEDIATION_LANE.has(file));
@@ -1046,7 +1111,7 @@ export function buildAffectedTestPlan(
       mandatoryTests: [],
       selectedTests: [],
       rootVitestTests: [],
-      pythonTests: [],
+      pythonTests: GEM_PR_REHABILITATION_PYTEST_TESTS,
       pythonUnittestTests: GEM_PR_REHABILITATION_PYTHON_TESTS,
       scriptVitestTests: [
         'scripts/lib/__tests__/automation-verify.test.mjs',

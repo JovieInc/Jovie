@@ -57,7 +57,7 @@ export default function AppNotFound() {
           </svg>
         </div>
 
-        <h1 className='text-sm font-medium text-primary-token mb-1'>
+        <h1 className='text-sm font-medium text-primary-token mb-1 line-clamp-2'>
           Not Found
         </h1>
         <p className='text-app text-tertiary-token'>

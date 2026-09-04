@@ -1,6 +1,8 @@
 import { describe, expect, it } from 'vitest';
 import {
+  fetchOpenPrSummariesRest,
   fetchOpenPrsRest,
+  hydrateOpenPrGraphqlMetadata,
   hydrateOpenPrStatusContexts,
   normalizeRestPullRequest,
 } from '../github-open-prs-rest.mjs';
@@ -44,12 +46,124 @@ function detail(number, sha = `sha-${number}`) {
 }
 
 describe('REST open PR inventory', () => {
+  it('uses REST for enumeration and bounded GraphQL batches for omitted metadata', async () => {
+    const restCalls = [];
+    const graphqlCalls = [];
+    let activeGraphql = 0;
+    let maxActiveGraphql = 0;
+    const exactSha = number => number.toString(16).padStart(40, '0');
+    const restRequest = async endpoint => {
+      restCalls.push(endpoint);
+      if (endpoint.includes('page=1')) {
+        return Array.from({ length: 76 }, (_, index) =>
+          detail(index + 1, exactSha(index + 1))
+        );
+      }
+      return [];
+    };
+    const summaries = await fetchOpenPrSummariesRest({
+      repo: 'JovieInc/Jovie',
+      limit: 200,
+      request: restRequest,
+    });
+    const request = async ({ query }) => {
+      activeGraphql += 1;
+      maxActiveGraphql = Math.max(maxActiveGraphql, activeGraphql);
+      graphqlCalls.push(query);
+      await Promise.resolve();
+      const repository = {};
+      for (const match of query.matchAll(
+        /p(\d+):pullRequest\(number:(\d+)\)/gu
+      )) {
+        const alias = `p${match[1]}`;
+        const number = Number(match[2]);
+        repository[alias] = {
+          number,
+          baseRefName: 'main',
+          baseRefOid: 'f'.repeat(40),
+          headRefName: `codex/pr-${number}`,
+          headRefOid: exactSha(number),
+          headRepository: {
+            name: 'Jovie',
+            nameWithOwner: 'JovieInc/Jovie',
+          },
+          headRepositoryOwner: { login: 'JovieInc' },
+          isCrossRepository: false,
+          mergeable: 'MERGEABLE',
+          mergeStateStatus: 'CLEAN',
+          autoMergeRequest: null,
+          changedFiles: number,
+          additions: number * 2,
+          deletions: number,
+          maintainerCanModify: true,
+        };
+      }
+      activeGraphql -= 1;
+      return { data: { repository } };
+    };
+
+    const hydrated = await hydrateOpenPrGraphqlMetadata({
+      repo: 'JovieInc/Jovie',
+      prs: summaries,
+      request,
+      batchSize: 25,
+      maxConcurrency: 3,
+    });
+
+    expect(restCalls).toHaveLength(1);
+    expect(graphqlCalls).toHaveLength(4);
+    expect(maxActiveGraphql).toBe(3);
+    expect(graphqlCalls.every(query => !query.includes('body'))).toBe(true);
+    expect(hydrated).toHaveLength(76);
+    expect(hydrated[75]).toMatchObject({
+      number: 76,
+      mergeable: 'MERGEABLE',
+      mergeStateStatus: 'CLEAN',
+      changedFiles: 76,
+      headRefOid: exactSha(76),
+      baseRefOid: 'f'.repeat(40),
+    });
+  });
+
+  it('fails closed when exact GraphQL metadata omits an enumerated PR', async () => {
+    await expect(
+      hydrateOpenPrGraphqlMetadata({
+        repo: 'JovieInc/Jovie',
+        prs: [{ number: 99 }],
+        request: async () => ({ data: { repository: { p0: null } } }),
+      })
+    ).rejects.toThrow('GraphQL open-PR metadata omitted PR #99');
+  });
+
+  it('rejects unbounded GraphQL hydration concurrency', async () => {
+    await expect(
+      hydrateOpenPrGraphqlMetadata({
+        repo: 'JovieInc/Jovie',
+        prs: [],
+        request: async () => ({ data: { repository: {} } }),
+        maxConcurrency: 5,
+      })
+    ).rejects.toThrow(
+      'metadata hydration maxConcurrency must be between 1 and 4'
+    );
+  });
+
+  it('rejects an unbounded open PR inventory limit', async () => {
+    await expect(
+      fetchOpenPrSummariesRest({
+        repo: 'JovieInc/Jovie',
+        limit: 501,
+        request: async () => [],
+      })
+    ).rejects.toThrow('open PR limit must be between 1 and 500');
+  });
+
   it('paginates without GraphQL and hydrates exact-head checks', async () => {
     const calls = [];
     const request = async endpoint => {
       calls.push(endpoint);
       if (endpoint.includes('/pulls?')) {
-        return endpoint.includes('page=1')
+        return endpoint.endsWith('&page=1')
           ? Array.from({ length: 100 }, (_, index) => ({ number: index + 1 }))
           : [{ number: 101 }];
       }

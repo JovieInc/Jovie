@@ -146,9 +146,15 @@ The `synthetic-monitoring.yml` workflow runs production canaries against jov.ie 
 
 ## Neon Database
 
-- **Ephemeral branches** - Created per PR for isolated testing
-- **Cleanup** - `neon-ephemeral-branch-cleanup.yml` deletes branches when PRs close
+- **Ephemeral branches** - Created only by manual dispatch or scheduled evidence lanes (never automatically per PR) as explicit, expiring exceptions carrying the `jovie-preview-env-admission/v1` contract (JOV-5941; registry: `.github/preview-env-registry.json`)
+- **Cleanup** - `neon-ephemeral-branch-cleanup.yml` deletes branches when PRs close and emits a `jovie-preview-env-cleanup/v1` receipt; the daily `neon-scheduled-cleanup.yml` heartbeat reconciles missed cleanup events
 - **Protected branch** - `main` is the production database branch
+
+## Hosted Previews
+
+- **No automatic PR previews** - the Vercel Git integration skips every non-`main`/`production` ref (`ignoreCommand` in each `vercel.json`); a PR creates zero hosted previews
+- **Admitted previews** - dispatch `CI` on the exact ref with `run_preview_deploy=true`; the job emits a `jovie-preview-env-admission/v1` receipt pinned to the exact dispatched SHA
+- **Cleanup** - `vercel-preview-cleanup.yml` cancels/deletes preview deployments when PRs close and emits a `jovie-preview-env-cleanup/v1` receipt
 
 ## Agent Push-to-PR Bridge
 

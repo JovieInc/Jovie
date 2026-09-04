@@ -1,0 +1,16 @@
+{
+  "schema": "jovie.summer-runtime-retirement-receipt/v1",
+  "effectiveAt": "2026-09-02T04:32:56Z",
+  "environment": "Tim White local macOS host",
+  "archivePath": "/Users/timwhite/.hermes/retired/summer-hermes-20260902T043256Z",
+  "machineReceiptPath": "/Users/timwhite/.hermes/retired/summer-hermes-20260902T043256Z/RETIREMENT_RECEIPT.json",
+  "disabledLabels": [
+    "ai.hermes.gateway-summer",
+    "ai.hermes.summer-auto-update",
+    "ai.jovie.summer-idle-kick"
+  ],
+  "preservedUnrelatedLabel": "co.jovie.hermes.gbrain-worker",
+  "dataDeleted": false,
+  "externalMessagingChanged": false,
+  "result": "retired-recoverably"
+}

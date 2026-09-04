@@ -2,7 +2,7 @@ import type { Meta, StoryObj } from '@storybook/nextjs-vite';
 import { MarketingHero, type MarketingHeroContentProps } from './MarketingHero';
 
 export const MARKETING_HERO_SOURCE_SHA =
-  '8b0353fcbeb0cffef614fa47afbbbd8eeae48997';
+  '00895196e53b823bb0311193b4af29f67b8849c1';
 
 /**
  * The checked-in canonical default from `lib/sections/variants/hero.tsx`.

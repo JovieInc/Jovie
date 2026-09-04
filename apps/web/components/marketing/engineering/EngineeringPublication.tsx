@@ -76,7 +76,7 @@ function PageFrame({
     <section className='min-h-screen bg-page text-primary-token'>
       <MarketingHero variant='left'>
         <div className='text-sm font-medium text-tertiary-token'>{kicker}</div>
-        <h1 className='system-b-marketing-route-title mb-4 mt-6 max-w-2xl text-primary-token'>
+        <h1 className='system-b-marketing-route-title mb-4 mt-6 max-w-2xl text-primary-token line-clamp-2'>
           {title}
         </h1>
         <p className='mb-4 max-w-xl text-lg leading-relaxed text-secondary-token'>
@@ -124,7 +124,7 @@ export function EngineeringIndex({
               <li key={story.slug}>
                 <article className='space-y-3'>
                   <StoryMeta record={story} preview={preview} />
-                  <h2 className='text-2xl font-semibold text-primary-token'>
+                  <h2 className='line-clamp-2 text-2xl font-semibold text-primary-token'>
                     <Link
                       href={`${indexHref}/${story.slug}`}
                       className='transition-colors hover:text-secondary-token'
@@ -180,7 +180,9 @@ export function EngineeringArticle({
         </div>
         {record.source && record.source.evidence.length > 0 ? (
           <section aria-label='Evidence Receipts' className='mt-8 space-y-3'>
-            <h2 className='text-sm font-medium text-primary-token'>Evidence</h2>
+            <h2 className='line-clamp-1 text-sm font-medium text-primary-token'>
+              Evidence
+            </h2>
             <ul className='space-y-2'>
               {record.source.evidence.map(item => (
                 <li key={item.id} className='text-sm text-secondary-token'>

@@ -9,7 +9,7 @@ export function ValuePropsSection() {
           <div className='homepage-section-intro reveal-on-scroll'>
             <div>
               <p className='marketing-kicker'>Why artists switch</p>
-              <h2 className='marketing-h2-linear mt-6 max-w-[12ch] text-primary-token'>
+              <h2 className='marketing-h2-linear mt-6 max-w-[12ch] text-primary-token line-clamp-2'>
                 {/* ui-casing-allow: marketing display headline */}
                 Built for releases, not just links.
               </h2>

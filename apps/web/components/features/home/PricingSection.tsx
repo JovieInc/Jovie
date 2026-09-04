@@ -54,7 +54,7 @@ export function PricingSection() {
         <div className='homepage-section-shell'>
           <div className='homepage-section-intro reveal-on-scroll'>
             <div className='flex max-w-[22rem] flex-col gap-4 lg:max-w-none'>
-              <h2 className='marketing-h2-linear max-w-[10ch] text-primary-token md:max-w-[12ch] lg:max-w-none'>
+              <h2 className='marketing-h2-linear max-w-[10ch] text-primary-token md:max-w-[12ch] lg:max-w-none line-clamp-2'>
                 Simple Pricing.
               </h2>
             </div>
