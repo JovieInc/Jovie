@@ -8,6 +8,8 @@ export default defineConfig({
         'agent/lib/summer-bottleneck-loop.ts',
         'agent/lib/summer-photon-offline-proof.ts',
         'agent/lib/summer-shadow-ingress.ts',
+        'agent/lib/vercel-blob-bottleneck-runtime.ts',
+        'agent/lib/vercel-blob-shadow-store.ts',
       ],
       provider: 'v8',
       reporter: ['text', 'json-summary'],
