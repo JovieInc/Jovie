@@ -74,6 +74,7 @@ const DEFAULT_GEM_CONCURRENCY = CAPACITY_POLICY.baseline;
 const CONTROLLER_RECEIPT_MAX_AGE_MS = 10 * 60 * 1000;
 const CONCURRENCY_EVIDENCE_MAX_AGE_MS =
   CAPACITY_POLICY.freshnessHours * 60 * 60 * 1000;
+const CAPACITY_MAX_TARGET = 40;
 export const FLEET_PROMOTION_MODE = Object.freeze({
   NORMAL: 'normal',
   ISOLATED_ONLY: 'isolated-only',
@@ -457,7 +458,7 @@ export function resolveGemConcurrency(
     acceptedEvidence !== null &&
     Number.isInteger(measuredTarget) &&
     measuredTarget >= CAPACITY_POLICY.minimum &&
-    measuredTarget <= CAPACITY_POLICY.maximum &&
+    measuredTarget <= CAPACITY_MAX_TARGET &&
     evidence?.approved === true &&
     evidence?.severeIncidents === 0 &&
     isFreshTimestamp(evidence?.observedAt, nowMs, maxAgeMs);

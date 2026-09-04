@@ -967,7 +967,10 @@ describe('deterministic Symphony admission boundary', () => {
     };
   }
 
-  function capacityEvidence(target = 4, observedAt = '2026-08-09T05:00:00.000Z') {
+  function capacityEvidence(
+    target = 4,
+    observedAt = '2026-08-09T05:00:00.000Z'
+  ) {
     return {
       schema: admitter.GEM_CONCURRENCY_EVIDENCE_SCHEMA,
       source: 'execution-proven-useful-turns',
@@ -1531,20 +1534,27 @@ describe('deterministic Symphony admission boundary', () => {
     assert.equal(gate.workAdmission.allowed, true);
     assert.equal(gate.workAdmission.newIssueLeaseAllowed, false);
     assert.equal(gate.concurrency.gem.maxConcurrent, 0);
-    assert.ok(!gate.workAdmission.activities.includes('isolated-implementation'));
+    assert.ok(
+      !gate.workAdmission.activities.includes('isolated-implementation')
+    );
   });
 
   it('accepts only exact useful-turn proof rows and rejects OAuth source', () => {
     const now = '2026-09-02T19:20:00.000Z';
     for (const target of [1, 2, 8, 40]) {
-      const live = admitter.resolveGemConcurrency(capacityEvidence(target, '2026-09-02T19:19:00.000Z'), { now });
+      const live = admitter.resolveGemConcurrency(
+        capacityEvidence(target, '2026-09-02T19:19:00.000Z'),
+        { now }
+      );
       assert.equal(live.maxConcurrent, target);
       assert.equal(live.evidenceAccepted, true);
     }
     const useful = capacityEvidence(1, '2026-09-02T19:19:00.000Z');
     assert.equal(
-      admitter.resolveGemConcurrency({ ...useful, source: 'live-oauth-cli-seats' }, { now })
-        .maxConcurrent,
+      admitter.resolveGemConcurrency(
+        { ...useful, source: 'live-oauth-cli-seats' },
+        { now }
+      ).maxConcurrent,
       0
     );
     assert.equal(
