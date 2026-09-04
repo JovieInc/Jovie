@@ -6,7 +6,6 @@ export default defineConfig({
       include: [
         'agent/instructions/summer-shadow.ts',
         'agent/lib/summer-shadow-ingress.ts',
-        'agent/lib/vercel-blob-shadow-store.ts',
       ],
       provider: 'v8',
       reporter: ['text', 'json-summary'],
