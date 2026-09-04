@@ -1,3 +1,5 @@
+import { readFileSync } from 'node:fs';
+import { resolve } from 'node:path';
 import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { describe, expect, it, vi } from 'vitest';
@@ -31,6 +33,19 @@ vi.mock('next/link', () => ({
 }));
 
 describe('SeeItInActionCarousel', () => {
+  it('renders bounded section copy for the showcase', () => {
+    render(<SeeItInActionCarousel />);
+
+    expect(
+      screen.getByRole('heading', { level: 2, name: 'See It In Action' })
+    ).toHaveClass('marketing-h2-linear', 'line-clamp-2');
+    expect(
+      screen.getByText(
+        "Tim White's profile, releases, and smart links all powered by Jovie."
+      )
+    ).toHaveClass('marketing-lead-linear', 'text-secondary-token');
+  });
+
   it('renders the Tim White profile card', () => {
     render(<SeeItInActionCarousel />);
 
@@ -100,5 +115,17 @@ describe('SeeItInActionCarousel', () => {
     expect(
       screen.getByRole('link', { name: /All platforms/i })
     ).toHaveAttribute('href', '/tim/never-say-a-word?noredirect=1');
+  });
+
+  it('uses canonical duration tokens instead of --linear-duration-*', () => {
+    const source = readFileSync(
+      resolve(
+        __dirname,
+        '../../../../components/features/home/SeeItInActionCarousel.tsx'
+      ),
+      'utf8'
+    );
+    expect(source).toContain('duration-(--duration-normal)');
+    expect(source).not.toMatch(/--linear-duration-/);
   });
 });

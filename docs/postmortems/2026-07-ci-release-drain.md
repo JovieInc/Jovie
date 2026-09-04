@@ -74,9 +74,8 @@ PR policy must not demand that evidence early. Trigger admission prevents a
 single event from recursively creating source, merge-group, and main retries.
 
 Native queue mode has no legacy label state: `merge-queue` is never added,
-interpreted, or retained. Graphite is a separate explicit backend, never an
-implicit label-driven side effect, and may not rewrite a native-enrolled exact
-head.
+interpreted, or retained. Native GitHub queue membership is the only enrollment
+signal.
 
 `@v1` is a moving major-version channel, not an immutable binding. Third-party
 GitHub Actions are SHA-pinned. The centralized `JovieInc/ci` template advances
@@ -159,7 +158,7 @@ fail-closed and is inherited through the canonical fresh-scaffold contract.
 
 ## Canonical Phase A/B topology
 
-**Phase A — admission and exact integration.** Source `pull_request` runs deterministic required admission contexts on every applicable PR (or one stable aggregate). `merge_group` owns exact combined-head unit/build/layout evidence. Native mode never reads or writes `merge-queue`; Graphite is selected only through an explicit backend.
+**Phase A — admission and exact integration.** Source `pull_request` runs deterministic required admission contexts on every applicable PR (or one stable aggregate). `merge_group` owns exact combined-head unit/build/layout evidence. Native mode never reads or writes `merge-queue`.
 
 **Phase B — main release and post-deploy proof.** Main promotion requires exact current-main/workflow provenance, then one serialized production-mutation owner deploys and probes immutable public output. Sentry read scope, Doppler freshness, redirect/content assertions, Lighthouse matches, and marker freshness are separate gates. Heavy/nondeterministic work stays post-merge, scheduled, or explicitly dispatched.
 
@@ -173,7 +172,7 @@ fail-closed and is inherited through the canonical fresh-scaffold contract.
 | --- | --- | --- | --- | --- |
 | `ci-release/source-pr-queue-evidence` | A / CI control plane | Contract stack | Source regression and stable required context. | #14497 after #14496. |
 | `ci-release/duplicate-ci-retry-loop` | A / trigger admission | Contract stack | One authoritative event/ref route. | #14497 after #14496. |
-| `ci-release/legacy-merge-queue-label` | A / queue enrollment | Contract stack | Native label absent; Graphite explicit. | Native queue owner. |
+| `ci-release/legacy-merge-queue-label` | A / queue enrollment | Contract stack | Native label absent. | Native queue owner. |
 | `ci-release/async-update-branch-bounds` | A / PR mutation | Upstream open | Exact head, structured result, bounded subprocess. | #14495 open/blocked at `72f0d865…`. |
 | `ci-release/pr-files-index-head-base-staleness` | A / PR files/index admission | Upstream dedicated repair | Merged immutable SHA and behavioral receipt prove REST/GraphQL head/base bind before files; mismatch is bounded `index_pending` only. | Dedicated exact-main coder; required before Phase-B release; this docs lane implements no runtime repair. |
 | `ci-release/prepush-exact-main-scope-selection` | A / pre-push scope selection | Contract dependency | Exact-main branch resolves destination/upstream default and proves sole parent/merge-base before affected scope; divergent, unknown, or force targets run full verification. | Current hook untouched; canonical pre-push owner must provide merged immutable SHA and behavioral receipt. |

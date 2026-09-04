@@ -6,6 +6,10 @@ import { and, desc, sql as drizzleSql, eq, isNull } from 'drizzle-orm';
 import { NextResponse } from 'next/server';
 import { z } from 'zod';
 import {
+  isGatewayBudgetExceededError,
+  resolveChatStreamErrorMessage,
+} from '@/lib/ai/gateway-errors';
+import {
   decideFallbackTurn,
   type FallbackTurn,
 } from '@/lib/chat/onboarding-script/engine';
@@ -606,7 +610,10 @@ export async function tryHandleAnonymousOnboardingChat(
       },
       // Mid-stream failures cannot swap the Response for the scripted
       // fallback; the lint-clean script line is the recovery copy instead.
-      onError: () => STREAM_ERROR_LINE.text,
+      onError: error =>
+        isGatewayBudgetExceededError(error)
+          ? resolveChatStreamErrorMessage(error)
+          : STREAM_ERROR_LINE.text,
     });
   } catch (error) {
     if (isClientDisconnect(error, req.signal)) {
@@ -618,14 +625,34 @@ export async function tryHandleAnonymousOnboardingChat(
     // The LLM failure still pages — the fallback masks the user impact, not
     // the incident. The logger line keeps the failure visible in local dev,
     // where Sentry is a no-op and the fallback would otherwise hide it.
+    const budgetExceeded = isGatewayBudgetExceededError(error);
     logger.error(
-      '[onboarding-chat] LLM turn failed; serving scripted fallback',
+      budgetExceeded
+        ? '[onboarding-chat] AI Gateway budget exceeded; serving scripted fallback'
+        : '[onboarding-chat] LLM turn failed; serving scripted fallback',
       { error, requestId, turnCount }
     );
-    Sentry.captureException(error, {
-      tags: { feature: 'ai-chat', chat_mode: 'onboarding' },
-      extra: { sessionId: sessionId.slice(0, 8), requestId, turnCount },
-    });
+    Sentry.captureException(
+      budgetExceeded
+        ? Object.assign(new Error('AI Gateway API key budget exceeded'), {
+            name: 'GatewayBudgetExceededError',
+            cause: error,
+          })
+        : error,
+      {
+        tags: {
+          feature: 'ai-chat',
+          chat_mode: 'onboarding',
+          ...(budgetExceeded
+            ? {
+                errorType: 'gateway_budget_exceeded',
+                alert: 'ai_gateway_budget',
+              }
+            : {}),
+        },
+        extra: { sessionId: sessionId.slice(0, 8), requestId, turnCount },
+      }
+    );
     try {
       return await serveScriptedFallback('llm_error');
     } catch (fallbackError) {
@@ -810,9 +837,19 @@ async function persistAnonymousAssistantRecord({
       scriptLineKey,
       createdAt: now,
     })
-    .onConflictDoNothing({
+    .onConflictDoUpdate({
       target: [chatMessages.conversationId, chatMessages.clientMessageId],
-      where: drizzleSql`${chatMessages.clientMessageId} IS NOT NULL`,
+      targetWhere: drizzleSql`${chatMessages.clientMessageId} IS NOT NULL`,
+      set: {
+        content:
+          content ||
+          (toolCalls && toolCalls.length > 0
+            ? ''
+            : 'Done. What would you like to do next?'),
+        toolCalls,
+        assistantSource,
+        scriptLineKey,
+      },
     });
 
   await db

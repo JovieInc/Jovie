@@ -220,6 +220,11 @@ describe('DesktopAuthRouteHandoff', () => {
     expect(
       screen.getByTestId('desktop-auth-route-handoff')
     ).toBeInTheDocument();
+    expect(screen.getByTestId('desktop-auth-route-handoff')).toHaveAttribute(
+      'data-auth-shell-kind',
+      'desktop-return-handoff'
+    );
+    expect(screen.queryByTestId('auth-brand-panel')).not.toBeInTheDocument();
     expect(openDesktopAuthUrlMock).not.toHaveBeenCalled();
     expect(screen.getAllByText('Continue in Browser')).toHaveLength(1);
 

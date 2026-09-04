@@ -1,11 +1,6 @@
-import { spawn } from 'node:child_process';
-import { createHash } from 'node:crypto';
-import { join } from 'node:path';
-import type { Readable, Writable } from 'node:stream';
-
-const DEFAULT_POLL_INTERVAL_MS = 5_000;
-const DEFAULT_RUNTIME_TIMEOUT_MS = 90_000;
-const MAX_RESPONSE_BYTES = 128 * 1024;
+export const SUMMER_LOCAL_RUNTIME_STATUS = 'retired-awaiting-eve' as const;
+export const SUMMER_LOCAL_RUNTIME_ERROR =
+  'summer-local-runtime-retired-eve-unavailable' as const;
 
 type SummerPendingTurn = {
   readonly id: string;
@@ -16,27 +11,6 @@ type SummerPendingTurn = {
 type SummerClaimedTurn = SummerPendingTurn & {
   readonly claim_token: string;
 };
-
-type SummerChild = {
-  readonly stdin: Writable;
-  readonly stdout: Readable;
-  readonly stderr: Readable;
-  once(event: 'error', listener: (error: Error) => void): SummerChild;
-  once(
-    event: 'close',
-    listener: (code: number | null, signal: NodeJS.Signals | null) => void
-  ): SummerChild;
-  kill(signal?: NodeJS.Signals): boolean;
-};
-
-type SpawnSummer = (
-  executable: string,
-  args: readonly string[],
-  options: {
-    readonly shell: false;
-    readonly stdio: readonly ['pipe', 'pipe', 'pipe'];
-  }
-) => SummerChild;
 
 export type SummerBridgeReceipt = {
   readonly cycle: number;
@@ -61,59 +35,6 @@ type SummerBridgeFetch = (
   init?: RequestInit
 ) => Promise<Response>;
 
-function conversationSessionName(conversationId: string): string {
-  const digest = createHash('sha256')
-    .update(conversationId)
-    .digest('hex')
-    .slice(0, 24);
-  return `ovie-founder-${digest}`;
-}
-
-async function readJson(response: Response): Promise<Record<string, unknown>> {
-  const body: unknown = await response.json().catch(() => null);
-  return body && typeof body === 'object'
-    ? (body as Record<string, unknown>)
-    : {};
-}
-
-function asPendingTurns(body: Record<string, unknown>): SummerPendingTurn[] {
-  if (body.ok !== true || !Array.isArray(body.turns)) return [];
-  return body.turns.filter((value): value is SummerPendingTurn => {
-    if (!value || typeof value !== 'object') return false;
-    const row = value as Record<string, unknown>;
-    return (
-      typeof row.id === 'string' &&
-      typeof row.conversation_id === 'string' &&
-      typeof row.user_text === 'string'
-    );
-  });
-}
-
-function asClaimedTurn(
-  body: Record<string, unknown>
-): SummerClaimedTurn | undefined {
-  if (body.ok !== true || !body.turn || typeof body.turn !== 'object') {
-    return undefined;
-  }
-  const turn = body.turn as Record<string, unknown>;
-  if (
-    typeof turn.id !== 'string' ||
-    typeof turn.conversation_id !== 'string' ||
-    typeof turn.user_text !== 'string' ||
-    typeof turn.claim_token !== 'string'
-  ) {
-    return undefined;
-  }
-  return turn as SummerClaimedTurn;
-}
-
-/** Keep aligned with apps/web/lib/ovie/isolation.ts SUMMER_SAFE_TOOLS. */
-const SUMMER_SAFE_TOOLS = [
-  'get_org_state',
-  'inspect_kanban',
-  'search_gbrain',
-] as const;
-
 const SUMMER_TOOL_FENCE = /```summer-tool\s*\r?\n([\s\S]*?)\r?\n```/;
 
 export type SummerRuntimeTool = {
@@ -127,10 +48,6 @@ export type SummerRuntimeCompletion = {
   readonly responseText: string;
   readonly tool?: SummerRuntimeTool;
 };
-
-function isSummerSafeTool(name: string): boolean {
-  return (SUMMER_SAFE_TOOLS as readonly string[]).includes(name);
-}
 
 export function parseSummerRuntimeCompletion(
   stdout: string
@@ -161,99 +78,19 @@ export function parseSummerRuntimeCompletion(
   return { responseText };
 }
 
-function ignoreStreamError(): void {
-  // EPIPE after SIGTERM, or a closed stdout/stderr, must not crash the app.
-}
-
-export async function invokeSummerRuntime(input: {
+/**
+ * The local executor is deliberately unavailable after the founder-retired
+ * runtime was archived. Eve must earn exact identity, deployment, persistence,
+ * privacy, failure, and recurrence proof before another executor is wired.
+ */
+export async function invokeSummerRuntime(_input: {
   readonly homeDirectory: string;
   readonly turn: SummerClaimedTurn;
-  readonly spawnProcess?: SpawnSummer;
+  readonly spawnProcess?: unknown;
   readonly timeoutMs?: number;
   readonly signal?: AbortSignal;
 }): Promise<SummerRuntimeCompletion> {
-  const spawnProcess = input.spawnProcess ?? (spawn as unknown as SpawnSummer);
-  const executable = join(input.homeDirectory, '.hermes', 'bin', 'hermes');
-  const child = spawnProcess(
-    executable,
-    [
-      '-p',
-      'summer',
-      'chat',
-      '-Q',
-      '-c',
-      conversationSessionName(input.turn.conversation_id),
-      '--create-if-missing',
-      '--query-file',
-      '-',
-      '--source',
-      'tool',
-    ],
-    { shell: false, stdio: ['pipe', 'pipe', 'pipe'] }
-  );
-  return new Promise<SummerRuntimeCompletion>((resolve, reject) => {
-    let stdout = '';
-    let stdoutBytes = 0;
-    let settled = false;
-    let timer: NodeJS.Timeout | undefined;
-    const abort = () => {
-      child.kill('SIGTERM');
-      finish(new Error('summer-runtime-canceled'));
-    };
-    const finish = (
-      error?: Error,
-      response?: SummerRuntimeCompletion
-    ): void => {
-      if (settled) return;
-      settled = true;
-      if (timer) clearTimeout(timer);
-      input.signal?.removeEventListener('abort', abort);
-      if (error) reject(error);
-      else resolve(response ?? { responseText: '' });
-    };
-    timer = setTimeout(() => {
-      child.kill('SIGTERM');
-      finish(new Error('summer-runtime-timeout'));
-    }, input.timeoutMs ?? DEFAULT_RUNTIME_TIMEOUT_MS);
-    child.stdin.on('error', ignoreStreamError);
-    child.stdout.on('error', ignoreStreamError);
-    child.stderr.on('error', ignoreStreamError);
-    // Drain stderr so Hermes cannot fill the pipe and deadlock. Diagnostics
-    // never become founder conversation text.
-    child.stderr.on('data', () => undefined);
-    if (input.signal?.aborted) abort();
-    else input.signal?.addEventListener('abort', abort, { once: true });
-    child.stdout.on('data', chunk => {
-      const text = String(chunk);
-      stdoutBytes += Buffer.byteLength(text);
-      if (stdoutBytes > MAX_RESPONSE_BYTES) {
-        child.kill('SIGTERM');
-        finish(new Error('summer-runtime-output-limit'));
-        return;
-      }
-      stdout += text;
-    });
-    child.once('error', error => finish(error));
-    child.once('close', code => {
-      if (code !== 0) {
-        finish(new Error(`summer-runtime-exit-${code ?? 'signal'}`));
-        return;
-      }
-      const completion = parseSummerRuntimeCompletion(stdout);
-      if (!completion.responseText) {
-        finish(new Error('summer-runtime-empty-response'));
-        return;
-      }
-      if (completion.tool && !isSummerSafeTool(completion.tool.name)) {
-        finish(new Error('summer-unsafe-tool'));
-        return;
-      }
-      finish(undefined, completion);
-    });
-    if (!settled) {
-      child.stdin.end(input.turn.user_text);
-    }
-  });
+  throw new Error(SUMMER_LOCAL_RUNTIME_ERROR);
 }
 
 export function createSummerRuntimeBridge(input: {
@@ -262,141 +99,35 @@ export function createSummerRuntimeBridge(input: {
   readonly homeDirectory: string;
   readonly fetch: SummerBridgeFetch;
   readonly workerId: string;
-  readonly spawnProcess?: SpawnSummer;
   readonly pollIntervalMs?: number;
+  readonly timeoutMs?: number;
   readonly onReceipt?: (receipt: SummerBridgeReceipt) => void;
 }): SummerRuntimeBridge {
-  let timer: NodeJS.Timeout | undefined;
-  let activeRuntime: AbortController | undefined;
-  let running = false;
+  let started = false;
   let cycle = 0;
-  const endpoint = new URL('/api/ovie/summer', input.appOrigin).toString();
-
-  const post = (body: Record<string, unknown>) =>
-    input.fetch(endpoint, {
-      method: 'POST',
-      credentials: 'include',
-      headers: { 'content-type': 'application/json' },
-      body: JSON.stringify(body),
-    });
 
   const runCycle = async (): Promise<SummerBridgeReceipt> => {
     cycle += 1;
-    if (input.platform !== 'darwin' || running) {
-      return { cycle, state: 'idle' };
-    }
-    running = true;
-    let receipt: SummerBridgeReceipt = { cycle, state: 'idle' };
-    try {
-      const pendingResponse = await input.fetch(endpoint, {
-        credentials: 'include',
-      });
-      if (!pendingResponse.ok) {
-        receipt = {
-          cycle,
-          state: 'http-error',
-          errorCode: `pending-${pendingResponse.status}`,
-        };
-        return receipt;
-      }
-      const [pending] = asPendingTurns(await readJson(pendingResponse));
-      if (!pending) return receipt;
-      const claimResponse = await post({
-        action: 'claim',
-        id: pending.id,
-        worker_id: input.workerId,
-      });
-      if (claimResponse.status === 409) {
-        receipt = { cycle, state: 'claim-conflict', turnId: pending.id };
-        return receipt;
-      }
-      if (!claimResponse.ok) {
-        receipt = {
-          cycle,
-          state: 'http-error',
-          turnId: pending.id,
-          errorCode: `claim-${claimResponse.status}`,
-        };
-        return receipt;
-      }
-      const claimed = asClaimedTurn(await readJson(claimResponse));
-      if (!claimed) {
-        receipt = {
-          cycle,
-          state: 'http-error',
-          turnId: pending.id,
-          errorCode: 'claim-invalid',
-        };
-        return receipt;
-      }
-      let completion: SummerRuntimeCompletion;
-      try {
-        activeRuntime = new AbortController();
-        completion = await invokeSummerRuntime({
-          homeDirectory: input.homeDirectory,
-          turn: claimed,
-          spawnProcess: input.spawnProcess,
-          signal: activeRuntime.signal,
-        });
-      } catch (error) {
-        const errorCode =
-          error instanceof Error ? error.message : 'runtime-error';
-        await post({
-          action: 'fail',
-          id: claimed.id,
-          claim_token: claimed.claim_token,
-          failure_code: errorCode,
-        }).catch(() => undefined);
-        receipt = {
-          cycle,
-          state: 'runtime-error',
-          turnId: claimed.id,
-          errorCode,
-        };
-        return receipt;
-      } finally {
-        activeRuntime = undefined;
-      }
-      const completed = await post({
-        action: 'complete',
-        id: claimed.id,
-        claim_token: claimed.claim_token,
-        response_text: completion.responseText,
-        ...(completion.tool ? { tool: completion.tool } : {}),
-      });
-      if (!completed.ok) {
-        receipt = {
-          cycle,
-          state: 'http-error',
-          turnId: claimed.id,
-          errorCode: `complete-${completed.status}`,
-        };
-        return receipt;
-      }
-      receipt = { cycle, state: 'completed', turnId: claimed.id };
-      return receipt;
-    } catch {
-      receipt = { cycle, state: 'http-error', errorCode: 'request-failed' };
-      return receipt;
-    } finally {
-      running = false;
-      input.onReceipt?.(receipt);
-    }
+    const receipt: SummerBridgeReceipt =
+      input.platform === 'darwin'
+        ? {
+            cycle,
+            state: 'runtime-error',
+            errorCode: SUMMER_LOCAL_RUNTIME_ERROR,
+          }
+        : { cycle, state: 'idle' };
+    input.onReceipt?.(receipt);
+    return receipt;
   };
 
   return {
     start() {
-      if (input.platform !== 'darwin' || timer) return;
+      if (started) return;
+      started = true;
       void runCycle();
-      timer = setInterval(
-        () => void runCycle(),
-        input.pollIntervalMs ?? DEFAULT_POLL_INTERVAL_MS
-      );
     },
     stop() {
-      if (timer) clearInterval(timer);
-      timer = undefined;
-      activeRuntime?.abort();
+      started = false;
     },
     runCycle,
   };

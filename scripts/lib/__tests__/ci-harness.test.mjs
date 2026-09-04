@@ -33,10 +33,13 @@ const EXPECTED_MERGE_GATE_NAMES = [
   'CI Risk Classifier',
   'Secret Scan (gitleaks + trufflehog)',
   'Golden Path Lock',
+  'Visual Snapshot Compare',
   'Migration Guard',
   'Unit Tests',
   'Build + Layout (combined)',
   'iOS Build + Test (combined)',
+  'Mac Build + Test (combined)',
+  'Cross-Product Integration (combined)',
   'Promptfoo Evals (deterministic)',
   'Golden Eval Set (deterministic)',
 ];
@@ -227,6 +230,7 @@ describe('ci-harness manifest', () => {
       'ci-layout-guard',
       'ci-build-layout',
       'ci-ios',
+      'ci-macos',
       'ci-promptfoo-evals',
       'ci-golden-eval-set',
     ]) {
@@ -518,12 +522,14 @@ describe('ci-harness manifest', () => {
     expect(mergeReady).toContain('ci-unit-tests');
     expect(mergeReady).toContain('ci-build-layout');
     expect(mergeReady).toContain('ci-ios');
+    expect(mergeReady).toContain('ci-macos');
+    expect(mergeReady).toContain('ci-cross-product-integration');
     expect(mergeReady).toContain('drizzle-migration-guard');
     expect(mergeReady).not.toContain(
       'RUN_TEST="${{ needs.ci-path-changes.outputs.run_test }}"'
     );
     expect(mergeReady).toContain(
-      'Unit Test shards did not pass on the non-empty merge-group combined head'
+      '$name did not pass for its selected product lane'
     );
     expect(unitTests).toContain('run: echo "run_full_ci=true"');
   });
@@ -592,6 +598,7 @@ describe('ci-harness risk classifier', () => {
       'pnpm run test:web:smoke',
       'pnpm run build:web',
     ]);
+    expect(riskLocalCommands(high).join('\n')).not.toContain('needs-human');
 
     const medium = classifyCiRisk(
       ['apps/web/components/features/profile/ProfileCompactSurface.tsx'],
@@ -613,6 +620,31 @@ describe('ci-harness risk classifier', () => {
     expect(low.blocksUnattendedAutoMerge).toBe(false);
     expect(low.matchedRules).toEqual([]);
     expect(riskLocalCommands(low)).toEqual(['pnpm ci:harness:check']);
+  });
+
+  it('never recommends needs-human even if a rule still declares the dead block flag', () => {
+    const risk = classifyCiRisk(['apps/web/lib/auth/gate.ts'], {
+      ...manifest,
+      riskRules: [
+        {
+          id: 'auth-identity',
+          title: 'Auth and identity',
+          level: 'high',
+          reason: 'synthetic',
+          requiresSmoke: true,
+          requiresPreview: true,
+          blocksUnattendedAutoMerge: true,
+          patterns: ['^apps/web/lib/auth/'],
+        },
+      ],
+    });
+    expect(risk.blocksUnattendedAutoMerge).toBe(true);
+    expect(risk.recommendedLabels).toEqual([]);
+    expect(riskLocalCommands(risk)).toEqual([
+      'pnpm ci:harness:check',
+      'pnpm run test:web:smoke',
+      'pnpm run build:web',
+    ]);
   });
 
   it('requires smoke and preview for auth changes (autonomous merge)', () => {

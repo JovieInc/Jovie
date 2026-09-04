@@ -29,6 +29,12 @@ export const OVIE_OPS_PRESENTATIONS = {
     density: 'kiosk',
     presentationMode: 'token',
   },
+  mac: {
+    search: 'ovie=mac',
+    density: 'shell',
+    presentationMode: 'mac',
+    component: 'OvieMacHud',
+  },
 } as const;
 
 export const OVIE_OPS_COMPAT_ALIASES = {

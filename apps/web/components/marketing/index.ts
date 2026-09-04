@@ -17,6 +17,13 @@ export { FaqSection } from './FaqSection';
 export { FeatureAccordion } from './FeatureAccordion';
 export type { FigCardProps } from './FigCard';
 export { FigCard } from './FigCard';
+export type {
+  MarketingBentoCard,
+  MarketingBentoCardAction,
+  MarketingBentoPreviewAspect,
+  MarketingBentoSectionProps,
+} from './MarketingBentoSection';
+export { MarketingBentoSection } from './MarketingBentoSection';
 export type { MarketingContainerProps } from './MarketingContainer';
 export { MarketingContainer } from './MarketingContainer';
 export type { MarketingContentShellProps } from './MarketingContentShell';
@@ -38,6 +45,7 @@ export type { MarketingMetricCardProps } from './MarketingMetricCard';
 export { MarketingMetricCard } from './MarketingMetricCard';
 export type { MarketingPageShellProps } from './MarketingPageShell';
 export { MarketingPageShell } from './MarketingPageShell';
+export { MarketingPlatformSpecBento } from './MarketingPlatformSpecBento';
 export type {
   MarketingPosterHeroCta,
   MarketingPosterHeroProps,
@@ -50,6 +58,7 @@ export type {
   MarketingSectionIntroProps,
 } from './MarketingSectionIntro';
 export { MarketingSectionIntro } from './MarketingSectionIntro';
+export { MarketingShippedSitesShowcase } from './MarketingShippedSitesShowcase';
 export type { MarketingSnapRailProps } from './MarketingSnapRail';
 export { MarketingSnapRail } from './MarketingSnapRail';
 export type {

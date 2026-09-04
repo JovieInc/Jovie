@@ -47,6 +47,9 @@ LOW_IO_FULL_AVG10 = 2.0
 HIGH_IO_FULL_AVG10 = 10.0
 SEVERE_IO_FULL_AVG10 = 20.0
 CONCURRENCY_LINE = re.compile(r"^(\s*max_concurrent_agents:\s*)([0-9]+)(\s*)$", re.MULTILINE)
+CANONICAL_CONCURRENCY = frozenset(
+    str(value) for value in range(MIN_CONCURRENCY, MAX_CONCURRENCY + 1)
+)
 
 
 def utc_now() -> str:
@@ -66,6 +69,16 @@ def write_json_atomic(path: pathlib.Path, value: dict[str, Any], mode: int = 0o6
     temporary.write_text(json.dumps(value, indent=2, sort_keys=True) + "\n", encoding="utf-8")
     os.chmod(temporary, mode)
     os.replace(temporary, path)
+
+
+def resource_scope(args: argparse.Namespace) -> dict[str, str]:
+    return {
+        "kind": "gem-host-provider-accounts-workflow",
+        "host": os.uname().nodename,
+        "workflow": str(args.workflow),
+        "runtimeUrl": str(args.runtime_url),
+        "leaseGuard": str(args.lease_guard),
+    }
 
 
 def parse_pressure(text: str, kind: str) -> float | None:
@@ -179,6 +192,28 @@ def render_target(text: str, target: int) -> str:
     return CONCURRENCY_LINE.sub(lambda match: f"{match.group(1)}{target}{match.group(3)}", text, count=1)
 
 
+def verify_concurrency_overlay(source_text: str, installed_text: str) -> int:
+    """Require byte identity except a single bounded max_concurrent_agents overlay.
+
+    The pressure controller rewrites only that scalar on the installed workflow.
+    Any other difference, a missing or duplicated line, a non-numeric value, a
+    zero-padded numeral, or a runtime value outside 1..8 fails closed.
+    """
+    source_matches = list(CONCURRENCY_LINE.finditer(source_text))
+    installed_matches = list(CONCURRENCY_LINE.finditer(installed_text))
+    if len(source_matches) != 1:
+        raise ValueError("source workflow must contain exactly one max_concurrent_agents scalar")
+    if len(installed_matches) != 1:
+        raise ValueError("installed workflow must contain exactly one max_concurrent_agents scalar")
+    source_raw = source_matches[0].group(2)
+    installed_raw = installed_matches[0].group(2)
+    if source_raw not in CANONICAL_CONCURRENCY or installed_raw not in CANONICAL_CONCURRENCY:
+        raise ValueError("installed concurrency is outside the bounded policy")
+    if render_target(installed_text, int(source_raw)) != source_text:
+        raise ValueError("workflow drift beyond concurrency overlay")
+    return int(installed_raw)
+
+
 def write_workflow_atomic(path: pathlib.Path, text: str) -> None:
     temporary = path.with_name(f".{path.name}.tmp")
     temporary.write_text(text, encoding="utf-8")
@@ -186,14 +221,17 @@ def write_workflow_atomic(path: pathlib.Path, text: str) -> None:
     os.replace(temporary, path)
 
 
-def load_state(path: pathlib.Path, current_target: int) -> dict[str, Any]:
+def load_state(
+    path: pathlib.Path, current_target: int, scope: dict[str, str]
+) -> dict[str, Any]:
     try:
         value = read_json(path)
     except (OSError, ValueError, json.JSONDecodeError):
         value = {}
-    if value.get("schema") != STATE_SCHEMA:
+    if value.get("schema") != STATE_SCHEMA or value.get("resourceScope") != scope:
         return {
             "schema": STATE_SCHEMA,
+            "resourceScope": scope,
             "target": current_target,
             "lowStreak": 0,
             "lastChangeEpoch": 0.0,
@@ -209,6 +247,7 @@ def load_state(path: pathlib.Path, current_target: int) -> dict[str, Any]:
         last_change = 0.0
     return {
         "schema": STATE_SCHEMA,
+        "resourceScope": scope,
         "target": target,
         "lowStreak": low_streak,
         "lastChangeEpoch": float(last_change),
@@ -283,7 +322,8 @@ def choose_target(
 def run(args: argparse.Namespace) -> dict[str, Any]:
     now_epoch = time.time()
     workflow_text, current = read_current_target(args.workflow)
-    state = load_state(args.state, current)
+    scope = resource_scope(args)
+    state = load_state(args.state, current, scope)
     proc_root = args.proc_root
     sample = {
         "cpuCount": read_cpu_count(),
@@ -309,6 +349,7 @@ def run(args: argparse.Namespace) -> dict[str, Any]:
         write_workflow_atomic(args.workflow, render_target(workflow_text, target))
     next_state = {
         "schema": STATE_SCHEMA,
+        "resourceScope": scope,
         "target": target,
         "lowStreak": low_streak,
         "lastChangeEpoch": now_epoch if changed else state.get("lastChangeEpoch", 0.0),
@@ -317,6 +358,7 @@ def run(args: argparse.Namespace) -> dict[str, Any]:
         write_json_atomic(args.state, next_state)
     receipt = {
         "schema": SCHEMA,
+        "resourceScope": scope,
         "observedAt": utc_now(),
         "mode": "dry-run" if args.dry_run else "applied",
         "current": current,
@@ -347,7 +389,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument(
         "--workflow",
         type=pathlib.Path,
-        default=home / "symphony-runtime/elixir/WORKFLOW.jovie-ui-pilot.md",
+        default=home / ".config/symphony/WORKFLOW.md",
     )
     parser.add_argument(
         "--state",
@@ -371,12 +413,32 @@ def parse_args() -> argparse.Namespace:
     )
     parser.add_argument("--proc-root", type=pathlib.Path, default=pathlib.Path("/proc"))
     parser.add_argument("--runtime-url", default="http://127.0.0.1:4041/api/v1/state")
+    parser.add_argument(
+        "--verify-workflow-overlay",
+        nargs=2,
+        metavar=("SOURCE", "INSTALLED"),
+        type=pathlib.Path,
+        help="exit 0 when INSTALLED matches SOURCE except a bounded concurrency overlay",
+    )
     return parser.parse_args()
 
 
 def main() -> int:
     try:
-        receipt = run(parse_args())
+        args = parse_args()
+        if args.verify_workflow_overlay is not None:
+            source_path, installed_path = args.verify_workflow_overlay
+            try:
+                target = verify_concurrency_overlay(
+                    source_path.read_text(encoding="utf-8"),
+                    installed_path.read_text(encoding="utf-8"),
+                )
+            except (OSError, ValueError):
+                print(f"DRIFT {installed_path}")
+                return 1
+            print(f"OK {installed_path} (runtime max_concurrent_agents={target})")
+            return 0
+        receipt = run(args)
         print(json.dumps(receipt, indent=2, sort_keys=True))
         return 0
     except (OSError, ValueError, json.JSONDecodeError) as error:

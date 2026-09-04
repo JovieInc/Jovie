@@ -153,7 +153,9 @@ export async function POST(request: NextRequest) {
       source: rawSource,
     } = parsedBody.data;
     const checkoutSource =
-      rawSource === 'onboarding' ? 'onboarding' : undefined;
+      rawSource === 'onboarding' || rawSource === 'youtube_thumbnails'
+        ? rawSource
+        : undefined;
 
     if (!priceId || typeof priceId !== 'string') {
       return jsonError('Invalid price ID', 400);
@@ -222,6 +224,9 @@ export async function POST(request: NextRequest) {
     if (checkoutSource === 'onboarding') {
       successUrl = `${baseUrl}${onboardingReturnTo}&upgrade=success&session_id={CHECKOUT_SESSION_ID}${planIdSuffix}`;
       cancelUrl = `${baseUrl}${onboardingReturnTo}&upgrade=cancel`;
+    } else if (checkoutSource === 'youtube_thumbnails') {
+      successUrl = `${baseUrl}/billing/youtube-thumbnails/success?session_id={CHECKOUT_SESSION_ID}`;
+      cancelUrl = `${baseUrl}/billing/youtube-thumbnails?checkout=cancel`;
     } else {
       successUrl = `${baseUrl}/billing/success?session_id={CHECKOUT_SESSION_ID}${planIdSuffix}`;
       cancelUrl = `${baseUrl}/billing/cancel`;

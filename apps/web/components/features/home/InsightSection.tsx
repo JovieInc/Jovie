@@ -12,13 +12,14 @@ export function InsightSection() {
       <Container size='homepage'>
         <div className='max-w-3xl mx-auto text-center'>
           <h2
+            className='line-clamp-2'
             style={{
               fontSize: 'var(--linear-h2-size)',
               fontWeight: 'var(--linear-font-weight-medium)',
               lineHeight: 'var(--linear-h2-leading)',
               letterSpacing: 'var(--linear-h2-tracking)',
               color: 'var(--linear-text-primary)',
-              marginBottom: 'var(--linear-space-8)',
+              marginBottom: 'var(--space-8)',
             }}
           >
             {/* ui-casing-allow: marketing display headline */}

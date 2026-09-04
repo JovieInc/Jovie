@@ -79,7 +79,11 @@ class UnitContractTests(unittest.TestCase):
     def test_timer_matches_live_schedule(self):
         text = TIMER.read_text(encoding="utf-8")
         self.assertEqual(ini_value(text, "OnBootSec"), "2m")
-        self.assertEqual(ini_value(text, "OnUnitActiveSec"), "20m")
+        # Canonical cadence is 5min-after-inactive, matching the fleet's host
+        # drop-in (Tim, 2026-09-03); the old 20m OnUnitActiveSec starved the
+        # active grok/kimi coding lane.
+        self.assertIsNone(ini_value(text, "OnUnitActiveSec"))
+        self.assertEqual(ini_value(text, "OnUnitInactiveSec"), "5min")
         self.assertEqual(ini_value(text, "Persistent"), "true")
         self.assertEqual(ini_value(text, "WantedBy"), "timers.target")
 
@@ -100,7 +104,9 @@ class ExitClassificationTests(unittest.TestCase):
         gate.write_text(json.dumps({
             "schema": "jovie-fleet-gate/v1",
             "state": "AMBER",
-            "workAdmission": {"allowed": True},
+            "closureAdmission": {"newIssueIntakeAllowed": True},
+            "workAdmission": {"allowed": True, "newIssueLeaseAllowed": True},
+            "remediationAdmission": {"allowed": True, "pushAllowed": True},
         }), encoding="utf-8")
         environment = mock.patch.dict(os.environ, {
             "GEM_FLEET_GATE_RECEIPT": str(gate),

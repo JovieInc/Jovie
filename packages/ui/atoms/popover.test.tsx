@@ -140,16 +140,26 @@ describe('Popover', () => {
 
       const trigger = screen.getByRole('button', { name: /open popover/i });
 
-      // Trigger should expose basic ARIA metadata
+      // Trigger should expose dialog metadata while closed.
       expect(trigger).toHaveAttribute('aria-haspopup', 'dialog');
-      expect(trigger).toHaveAttribute('aria-controls');
+      expect(trigger).toHaveAttribute('aria-expanded', 'false');
+      const closedControlsId = trigger.getAttribute('aria-controls');
+      if (closedControlsId) {
+        expect(
+          document.getElementById(closedControlsId)
+        ).not.toBeInTheDocument();
+      }
 
       fireEvent.click(trigger);
 
       // After opening, content should be rendered and associated via a role
+      expect(trigger).toHaveAttribute('aria-expanded', 'true');
+      expect(trigger).toHaveAttribute('aria-controls');
+      const controlsId = trigger.getAttribute('aria-controls');
       const contentNode = screen.getByText('Test popover content');
       const contentWithRole = contentNode.closest('[role]');
       expect(contentWithRole).toBeInTheDocument();
+      expect(contentWithRole).toHaveAttribute('id', controlsId);
     });
 
     it('manages focus correctly - does not trap focus like Dialog', () => {

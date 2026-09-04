@@ -2,7 +2,7 @@ name: UI Story Coverage Audit
 
 on:
   pull_request:
-    types: [opened, synchronize, reopened, ready_for_review]
+    types: [opened, synchronize, reopened]
     paths:
       - 'apps/web/app/**/*.tsx'
       - 'apps/web/components/**'
@@ -144,7 +144,10 @@ jobs:
           # in merge readiness or production authorization.
           exit 0
       - name: Upload authoritative audit report
-        if: always()
+        # always() except cancellation: a cancelled run (e.g. superseded by a
+        # newer push) never produced a report, and if-no-files-found:error
+        # would convert that cancellation into a failing PR check.
+        if: ${{ always() && !cancelled() }}
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: ui-story-coverage-audit-${{ github.run_id }}-${{ github.run_attempt }}

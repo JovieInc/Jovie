@@ -31,7 +31,7 @@ describe('authenticated app screen registry', () => {
     expect(APP_SCREEN_REGISTRY.map(entry => entry.source).sort()).toEqual(
       listPageSources(shellRoot)
     );
-    expect(APP_SCREEN_REGISTRY).toHaveLength(94);
+    expect(APP_SCREEN_REGISTRY).toHaveLength(95);
   });
 
   it('has a valid registered recipe and component composition', () => {
@@ -39,6 +39,21 @@ describe('authenticated app screen registry', () => {
     expect(new Set(APP_SCREEN_REGISTRY.map(entry => entry.kind))).toEqual(
       new Set(['canonical', 'alias', 'legacy', 'operator'])
     );
+  });
+
+  it('maps every design-reference screen to one product archetype and keeps projections null', () => {
+    const references = APP_SCREEN_REGISTRY.filter(
+      entry => entry.designReference
+    );
+    expect(references).toHaveLength(46);
+    for (const screen of references) {
+      expect(screen.archetypeId, screen.route).not.toBeNull();
+    }
+    for (const screen of APP_SCREEN_REGISTRY.filter(
+      entry => !entry.designReference
+    )) {
+      expect(screen.archetypeId, screen.route).toBeNull();
+    }
   });
 
   it('backs every registered component with its real Storybook title', () => {
@@ -83,14 +98,14 @@ describe('authenticated app screen registry', () => {
     }
   });
 
-  it('assigns exactly 45 unique deterministic browser-safe story IDs', () => {
+  it('assigns exactly 46 unique deterministic browser-safe story IDs', () => {
     const references = APP_SCREEN_REGISTRY.filter(
       entry => entry.designReference
     );
     // Source-of-truth pin: the Pen lane must derive this count from the
     // export receipt, never hardcode it. /app/ov/ops and /app/admin redirect
     // to /hud.
-    expect(references).toHaveLength(45);
+    expect(references).toHaveLength(46);
     const storyIds = references.map(entry => {
       expect(entry.story, entry.route).not.toBeNull();
       return entry.story?.id as string;
@@ -160,9 +175,10 @@ describe('authenticated app screen registry', () => {
     expect(receipt.schema).toBe(APP_SCREEN_PEN_EXPORT_SCHEMA);
     expect(receipt.counts).toEqual({
       screens: APP_SCREEN_REGISTRY.length,
-      designReferences: 45,
+      designReferences: 46,
       components: APP_SCREEN_COMPONENT_REGISTRY.length,
       recipes: APP_SCREEN_RECIPE_REGISTRY.length,
+      archetypes: 8,
     });
     expect(receipt.screens).toHaveLength(APP_SCREEN_REGISTRY.length);
     expect(receipt.components).toEqual(
@@ -401,7 +417,7 @@ describe('authenticated app screen registry', () => {
     ).toContain('unexpected-redirect-receipt');
   });
 
-  it('keeps success, warning, and error on Mint, Gold, and Flare aliases', () => {
+  it('keeps success, warning, and danger on Mint, Orange, and Red aliases', () => {
     const tokens = fs.readFileSync(
       path.join(repoRoot, 'apps/web/styles/design-system.css'),
       'utf8'
@@ -409,6 +425,7 @@ describe('authenticated app screen registry', () => {
     expect(tokens).toMatch(/--color-success:\s*var\(--color-accent-green\);/);
     expect(tokens).toMatch(/--color-warning:\s*var\(--color-accent-orange\);/);
     expect(tokens).toMatch(/--color-error:\s*var\(--color-accent-red\);/);
-    expect(tokens).not.toMatch(/--color-(?:success|warning|error):\s*#/);
+    expect(tokens).toMatch(/--color-danger:\s*var\(--color-error\);/);
+    expect(tokens).not.toMatch(/--color-(?:success|warning|error|danger):\s*#/);
   });
 });

@@ -92,6 +92,33 @@ export async function upsertLibraryApprovalStatus(input: {
   return row?.approvalStatus ?? input.approvalStatus;
 }
 
+/**
+ * Publish a provider-authoritative release on first import.
+ *
+ * The conflict path deliberately does nothing: once an artist has changed
+ * approval or visibility, a later provider sync must preserve that choice.
+ */
+export async function ensureImportedReleasePublishedByDefault(input: {
+  readonly creatorProfileId: string;
+  readonly releaseId: string;
+}): Promise<void> {
+  await db
+    .insert(libraryAssetApprovalStatuses)
+    .values({
+      creatorProfileId: input.creatorProfileId,
+      assetId: input.releaseId,
+      itemKind: 'release',
+      approvalStatus: 'approved',
+      profileVisibility: 'visible',
+    })
+    .onConflictDoNothing({
+      target: [
+        libraryAssetApprovalStatuses.creatorProfileId,
+        libraryAssetApprovalStatuses.assetId,
+      ],
+    });
+}
+
 export async function getLibraryApprovalStatusForAsset(input: {
   readonly creatorProfileId: string;
   readonly assetId: string;

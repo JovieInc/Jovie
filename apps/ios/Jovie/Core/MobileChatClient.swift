@@ -7,11 +7,20 @@ protocol MobileChatClientProtocol: Sendable {
     _ request: MobileChatTurnRequest,
     onEvent: (@Sendable (MobileChatStreamEvent) async -> Void)?
   ) async throws -> [MobileChatStreamEvent]
+  func submitEyesFreeCapture(
+    _ request: EyesFreeCaptureAPIRequest
+  ) async throws -> EyesFreeCaptureAPIResponse
 }
 
 extension MobileChatClientProtocol {
   func sendTurn(_ request: MobileChatTurnRequest) async throws -> [MobileChatStreamEvent] {
     try await sendTurn(request, onEvent: nil)
+  }
+
+  func submitEyesFreeCapture(
+    _ request: EyesFreeCaptureAPIRequest
+  ) async throws -> EyesFreeCaptureAPIResponse {
+    throw MobileChatClientError.invalidResponse
   }
 }
 
@@ -46,6 +55,17 @@ enum MobileChatNDJSONParser {
         conversationId: conversationId,
         turnId: turnId,
         clientTurnId: clientTurnId
+      )
+
+    case "turn.state":
+      guard
+        let clientTurnId = json["clientTurnId"] as? String,
+        let state = json["state"] as? String
+      else { throw MobileChatClientError.decodingFailed }
+      return .turnState(
+        clientTurnId: clientTurnId,
+        state: state,
+        eveWorkId: json["eveWorkId"] as? String
       )
 
     case "assistant.delta":
@@ -135,12 +155,14 @@ struct MobileChatClient: MobileChatClientProtocol, Sendable {
   private let decoder: JSONDecoder
   private let encoder: JSONEncoder
   private let requestTimeout: TimeInterval
+  private let workspace: MobileWorkspaceMode
 
   init(
     baseURL: URL,
     session: URLSession = URLSession(configuration: .jovieMobile),
     tokenProvider: TokenProviding,
-    requestTimeout: TimeInterval = 30
+    requestTimeout: TimeInterval = 30,
+    workspace: MobileWorkspaceMode = .jovie
   ) {
     self.baseURL = baseURL
     self.session = session
@@ -148,17 +170,13 @@ struct MobileChatClient: MobileChatClientProtocol, Sendable {
     self.decoder = JSONDecoder()
     self.encoder = JSONEncoder()
     self.requestTimeout = requestTimeout
+    self.workspace = workspace
   }
 
   func listConversations(limit: Int = 20) async throws -> [MobileConversationSummary] {
-    var components = URLComponents(
-      url: baseURL.appending(path: "/api/mobile/v1/chat/conversations"),
-      resolvingAgainstBaseURL: false
-    )
-    components?.queryItems = [URLQueryItem(name: "limit", value: String(limit))]
-    guard let url = components?.url else {
-      throw MobileChatClientError.invalidResponse
-    }
+    var queryItems = [URLQueryItem(name: "limit", value: String(limit))]
+    appendWorkspaceQuery(to: &queryItems)
+    let url = try makeURL(path: "/api/mobile/v1/chat/conversations", queryItems: queryItems)
 
     let response: MobileConversationListResponse = try await sendJSON(
       request: try await authorizedRequest(url: url, method: "GET"),
@@ -168,14 +186,12 @@ struct MobileChatClient: MobileChatClientProtocol, Sendable {
   }
 
   func fetchConversation(id: String, limit: Int = 100) async throws -> MobileConversationDetailResponse {
-    var components = URLComponents(
-      url: baseURL.appending(path: "/api/mobile/v1/chat/conversations/\(id)"),
-      resolvingAgainstBaseURL: false
+    var queryItems = [URLQueryItem(name: "limit", value: String(limit))]
+    appendWorkspaceQuery(to: &queryItems)
+    let url = try makeURL(
+      path: "/api/mobile/v1/chat/conversations/\(id)",
+      queryItems: queryItems
     )
-    components?.queryItems = [URLQueryItem(name: "limit", value: String(limit))]
-    guard let url = components?.url else {
-      throw MobileChatClientError.invalidResponse
-    }
 
     return try await sendJSON(
       request: try await authorizedRequest(url: url, method: "GET"),
@@ -230,6 +246,76 @@ struct MobileChatClient: MobileChatClientProtocol, Sendable {
 
     NativeSessionTokenStore.refresh(from: response)
     return try await readStreamEvents(from: bytes, onEvent: onEvent)
+  }
+
+  func submitEyesFreeCapture(
+    _ request: EyesFreeCaptureAPIRequest
+  ) async throws -> EyesFreeCaptureAPIResponse {
+    try await submitEyesFreeCapture(request, forceRefresh: false)
+  }
+
+  private func submitEyesFreeCapture(
+    _ request: EyesFreeCaptureAPIRequest,
+    forceRefresh: Bool,
+    tokenOverride: String? = nil
+  ) async throws -> EyesFreeCaptureAPIResponse {
+    var urlRequest = try await authorizedRequest(
+      url: baseURL.appending(path: "/api/mobile/v1/eyes-free-capture"),
+      method: "POST",
+      forceRefresh: forceRefresh,
+      tokenOverride: tokenOverride
+    )
+    urlRequest.setValue("application/json", forHTTPHeaderField: "Content-Type")
+    urlRequest.httpBody = try encoder.encode(request)
+
+    let (data, response) = try await performData(for: urlRequest)
+
+    guard let httpResponse = response as? HTTPURLResponse else {
+      throw MobileChatClientError.invalidResponse
+    }
+
+    if httpResponse.statusCode == 401, !forceRefresh {
+      let token = try await retryTokenOrTerminal(after: failedBearerToken(from: urlRequest))
+      return try await submitEyesFreeCapture(
+        request,
+        forceRefresh: true,
+        tokenOverride: token
+      )
+    }
+    if httpResponse.statusCode == 401 {
+      NativeSessionTokenStore.clear()
+      throw MobileChatClientError.requestFailed(statusCode: 401)
+    }
+
+    if (200 ... 409).contains(httpResponse.statusCode),
+       let decoded = try? decoder.decode(EyesFreeCaptureAPIResponse.self, from: data)
+    {
+      NativeSessionTokenStore.refresh(from: response)
+      return decoded
+    }
+    guard (200 ... 299).contains(httpResponse.statusCode) else {
+      throw MobileChatClientError.requestFailed(statusCode: httpResponse.statusCode)
+    }
+    throw MobileChatClientError.decodingFailed
+  }
+
+  private func appendWorkspaceQuery(to queryItems: inout [URLQueryItem]) {
+    guard workspace == .ovie else { return }
+    queryItems.append(URLQueryItem(name: "workspace", value: workspace.rawValue))
+  }
+
+  private func makeURL(path: String, queryItems: [URLQueryItem]) throws -> URL {
+    var components = URLComponents(
+      url: baseURL.appending(path: path),
+      resolvingAgainstBaseURL: false
+    )
+    if !queryItems.isEmpty {
+      components?.queryItems = queryItems
+    }
+    guard let url = components?.url else {
+      throw MobileChatClientError.invalidResponse
+    }
+    return url
   }
 
   private func authorizedRequest(

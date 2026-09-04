@@ -52,7 +52,7 @@ export const Basic: Story = {
   ),
 };
 
-/** Compact labels use the shared pill contract; explanatory content uses the shared rounded rectangle. */
+/** Compact labels stay single-line; all tooltip content uses the shared rounded rectangle. */
 export const ContentShapes: Story = {
   render: () => (
     <div className='flex flex-col items-center gap-6'>

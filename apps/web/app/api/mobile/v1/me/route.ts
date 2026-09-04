@@ -1,5 +1,10 @@
 import { NextResponse } from 'next/server';
 import { getAppUrl, getProfileUrl } from '@/constants/domains';
+import { isAdmin as checkAdminRole } from '@/lib/admin/roles';
+import {
+  type AppShellContract,
+  getAppShellContract,
+} from '@/lib/app-shell/workspaces';
 import { isProfileComplete } from '@/lib/auth/profile-completeness';
 import { getSessionContext, SESSION_ERRORS } from '@/lib/auth/session';
 import { captureError } from '@/lib/error-tracking';
@@ -21,9 +26,11 @@ export interface MobileMeResponse {
   continueOnWebUrl: string;
   appleWalletProfilePassAvailable: boolean;
   chatEnabled: boolean;
+  isAdmin: boolean;
+  appShell: AppShellContract;
 }
 
-function buildWaitlistPendingResponse(): NextResponse {
+function buildWaitlistPendingResponse(isAdmin: boolean): NextResponse {
   const payload: MobileMeResponse = {
     state: 'waitlist_pending',
     displayName: null,
@@ -34,6 +41,8 @@ function buildWaitlistPendingResponse(): NextResponse {
     continueOnWebUrl: getAppUrl(),
     appleWalletProfilePassAvailable: false,
     chatEnabled: false,
+    isAdmin,
+    appShell: getAppShellContract({ isAdmin }),
   };
 
   return NextResponse.json(payload, {
@@ -42,10 +51,13 @@ function buildWaitlistPendingResponse(): NextResponse {
   });
 }
 
-function buildNeedsOnboardingResponse(profile?: {
-  readonly displayName: string | null;
-  readonly username: string | null;
-}): NextResponse {
+function buildNeedsOnboardingResponse(
+  isAdmin: boolean,
+  profile?: {
+    readonly displayName: string | null;
+    readonly username: string | null;
+  }
+): NextResponse {
   const payload: MobileMeResponse = {
     state: 'needs_onboarding',
     displayName: profile?.displayName ?? null,
@@ -56,6 +68,8 @@ function buildNeedsOnboardingResponse(profile?: {
     continueOnWebUrl: getAppUrl(),
     appleWalletProfilePassAvailable: false,
     chatEnabled: false,
+    isAdmin,
+    appShell: getAppShellContract({ isAdmin }),
   };
 
   return NextResponse.json(payload, {
@@ -86,7 +100,7 @@ export async function GET(request: Request) {
         error instanceof TypeError &&
         error.message === SESSION_ERRORS.USER_NOT_FOUND
       ) {
-        return buildNeedsOnboardingResponse();
+        return buildNeedsOnboardingResponse(false);
       }
       throw error;
     }
@@ -101,6 +115,8 @@ export async function GET(request: Request) {
       );
     }
 
+    const isAdminUser = await checkAdminRole(userId);
+
     if (session.user.userStatus === 'waitlist_pending') {
       const capabilities =
         request.headers.get('x-jovie-mobile-capabilities')?.split(',') ?? [];
@@ -109,14 +125,14 @@ export async function GET(request: Request) {
           capability => capability.trim() === WAITLIST_PENDING_CAPABILITY
         )
       ) {
-        return buildWaitlistPendingResponse();
+        return buildWaitlistPendingResponse(isAdminUser);
       }
-      return buildNeedsOnboardingResponse();
+      return buildNeedsOnboardingResponse(isAdminUser);
     }
 
     const { profile } = session;
     if (!profile) {
-      return buildNeedsOnboardingResponse();
+      return buildNeedsOnboardingResponse(isAdminUser);
     }
 
     if (
@@ -128,7 +144,7 @@ export async function GET(request: Request) {
         onboardingCompletedAt: profile.onboardingCompletedAt,
       })
     ) {
-      return buildNeedsOnboardingResponse({
+      return buildNeedsOnboardingResponse(isAdminUser, {
         displayName: profile.displayName,
         username: profile.username,
       });
@@ -156,6 +172,8 @@ export async function GET(request: Request) {
       continueOnWebUrl: getAppUrl(),
       appleWalletProfilePassAvailable,
       chatEnabled,
+      isAdmin: isAdminUser,
+      appShell: getAppShellContract({ isAdmin: isAdminUser }),
     };
 
     return NextResponse.json(payload, {

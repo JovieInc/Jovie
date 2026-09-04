@@ -23,18 +23,18 @@ export async function AdminConversionFunnelSection() {
       <ContentSectionHeader
         title='User conversion funnel'
         subtitle='All-time: signup → profile → complete → subscribers → paid'
-        className='min-h-0 px-(--linear-app-header-padding-x) py-3'
+        className='min-h-0 px-(--app-shell-header-padding-x) py-3'
       />
 
       {funnel.errors.length > 0 ? (
-        <div className='px-(--linear-app-content-padding-x) pb-(--linear-app-content-padding-y)'>
+        <div className='px-(--app-shell-content-padding-x) pb-(--app-shell-content-padding-y)'>
           <p className='text-xs text-(--color-danger)'>
             {funnel.errors.join('; ')}
           </p>
         </div>
       ) : null}
 
-      <div className='grid gap-3 px-(--linear-app-content-padding-x) py-(--linear-app-content-padding-y) sm:grid-cols-5'>
+      <div className='grid gap-3 px-(--app-shell-content-padding-x) py-(--app-shell-content-padding-y) sm:grid-cols-5'>
         {funnel.stages.map((stage, i) => (
           <ContentMetricCard
             key={stage.key}
@@ -60,9 +60,9 @@ export function AdminConversionFunnelSectionSkeleton() {
       <ContentSectionHeaderSkeleton
         titleWidth='w-40'
         descriptionWidth='w-64'
-        className='min-h-0 px-(--linear-app-header-padding-x) py-3'
+        className='min-h-0 px-(--app-shell-header-padding-x) py-3'
       />
-      <div className='grid gap-3 px-(--linear-app-content-padding-x) py-(--linear-app-content-padding-y) sm:grid-cols-5'>
+      <div className='grid gap-3 px-(--app-shell-content-padding-x) py-(--app-shell-content-padding-y) sm:grid-cols-5'>
         {FUNNEL_SKELETON_KEYS.map(metricKey => (
           <ContentMetricCardSkeleton key={metricKey} />
         ))}

@@ -30,7 +30,7 @@ export const centeredContentStyles = {
   // fails to composite: https://github.com/shadcn-ui/ui/issues/7507
   position: 'fixed left-1/2 top-1/2 z-50 [translate:-50%_-50%]',
   layout:
-    'grid max-h-[calc(100dvh-2rem)] w-[calc(100vw-2rem)] max-w-lg gap-5 overflow-y-auto overscroll-contain',
+    'grid max-h-overlay-viewport w-overlay-viewport max-w-lg gap-5 overflow-y-auto overscroll-contain',
   surface:
     'border border-default bg-surface-elevated p-5 text-primary-token shadow-popover sm:p-6',
   // fade + zoom only; slide animations conflict with the translate centering
@@ -75,18 +75,18 @@ export const footerStyles = {
  * Title styles for modal components.
  */
 export const titleStyles = {
-  base: 'text-[16px] font-[510] leading-snug tracking-[-0.015em] text-primary-token',
+  base: 'text-base font-medium leading-snug tracking-tight text-primary-token',
 } as const;
 
 /**
  * Description styles for modal components.
  */
 export const descriptionStyles = {
-  base: 'text-[13px] leading-relaxed text-secondary-token',
+  base: 'text-app leading-relaxed text-secondary-token',
 } as const;
 
 /**
  * Shared sheet/drawer surface anatomy. Position and motion remain side-specific.
  */
 export const sheetSurfaceStyles =
-  'fixed z-[65] grid gap-5 overflow-y-auto overscroll-contain border-default bg-surface-elevated p-5 text-primary-token shadow-popover';
+  'fixed z-sheet grid gap-5 overflow-y-auto overscroll-contain border-default bg-surface-elevated p-5 text-primary-token shadow-popover';

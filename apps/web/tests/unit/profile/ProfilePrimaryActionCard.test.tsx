@@ -4,7 +4,7 @@ import {
   ProfilePrimaryActionCard,
   type ProfilePrimaryActionCardRelease,
   resolveProfilePrimaryActionCardState,
-} from '@/features/profile/ProfilePrimaryActionCard';
+} from '@/components/features/profile/ProfilePrimaryActionCard';
 import type { TourDateViewModel } from '@/lib/tour-dates/types';
 import type { Artist } from '@/types/db';
 
@@ -15,7 +15,7 @@ function makeArtist(overrides: Partial<Artist> = {}): Artist {
     handle: 'tim',
     spotify_id: '4u',
     name: 'Tim White',
-    image_url: '/images/avatars/tim-white-founder.jpg',
+    image_url: '/images/avatars/tim-white.jpg',
     published: true,
     is_verified: true,
     is_featured: true,
@@ -230,9 +230,9 @@ describe('ProfilePrimaryActionCard', () => {
     expect(screen.getByText('Tim White')).toBeInTheDocument();
     expect(screen.getByText('w/ Cosmic Gate')).toBeInTheDocument();
     expect(screen.getByText('Listen')).toBeInTheDocument();
-    expect(
-      screen.getByRole('img', { name: 'The Deep End artwork' })
-    ).toBeInTheDocument();
+    const artwork = screen.getByRole('img', { name: 'The Deep End artwork' });
+    expect(artwork).toHaveClass('object-contain');
+    expect(artwork).not.toHaveClass('object-cover');
   });
 
   it('keeps same-day date-only tours eligible for the next-tour fallback', () => {
@@ -279,6 +279,12 @@ describe('ProfilePrimaryActionCard', () => {
       'href',
       '/tim/the-deep-end'
     );
+    expect(
+      document.querySelector('[data-artwork-frame="thumbnail"]')
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole('img', { name: 'The Deep End artwork' })
+    ).toHaveClass('object-contain');
   });
 
   it('falls back to the listen route when no play handler is provided', () => {

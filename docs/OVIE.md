@@ -27,6 +27,7 @@ Presentation modes of the same component and metrics contract:
 | Shell | `/hud` | `shell` | `shell` |
 | Fullscreen | `/hud?fs=1` | `kiosk` | `shell` |
 | Kiosk | `/hud?kiosk=<token>` | `kiosk` | `token` |
+| Packaged Mac Ovie (JOV-5298) | `/hud?ovie=mac` | `shell` | `mac` (`OvieMacHud`) |
 
 Compatibility aliases, never independent screens:
 
@@ -44,7 +45,7 @@ walk capture, dispatch, and developer controls stay in disclosure.
 
 | Surface | Role |
 |---|---|
-| Packaged Mac/iOS door | Talk + ops presentation. Conversational authority is Summer, after Eve intake. Default installed entry is `/hud`. |
+| Packaged Mac/iOS door | Talk + ops presentation. Conversational authority is Summer, after Eve intake. Packaged Ovie menu opens `/hud?ovie=mac`. |
 | `/hud` | One Ops screen. Fullscreen `?fs=1`. Unattended TV `?kiosk=TOKEN`. |
 | `/app/ov/chat` | Entitled operator door. Must not fall through to artist Jovie chat or self-identify as Ovie. |
 
@@ -57,6 +58,15 @@ the typed fleet receipt. JOV-5249 consumes freshness UX. Shutdown retains the
 expired last-known marker. No Mac-journal fallback, merged-PR-as-shipped, or
 dispatch/retry/cancel/restart surface.
 
+The Summer Kanban projection (`SummerKanbanCard` in
+`apps/web/lib/ovie/summer-kanban.ts`, JOV-5761) extends the same conventions:
+every card carries per-source freshness in the shipping-state observation
+vocabulary (`fresh` / `stale` / `unknown`, never fresh on missing data), the
+accountable next action and next proof derived from its routing state and
+reason, and the terminal evidence reference once the card lands. All three are
+derived at read time from the existing initiative record — nothing is stored —
+and Eve remains denied from card transitions.
+
 If you are already signed in as admin, Fullscreen fetches `/api/hud/kiosk-session` and writes the token onto the URL so the same tab can be bookmarked or thrown on a display.
 
 ## History
@@ -64,7 +74,9 @@ If you are already signed in as admin, Fullscreen fetches `/api/hud/kiosk-sessio
 The original Ovie plan was a standalone Swift menu-bar app at
 [`JovieInc/ovie`](https://github.com/JovieInc/ovie). After founder direction
 (2026-07), that plan was deprecated: the Swift codebase is a **launcher
-only**, and the repo is **archived (read-only)** on GitHub.
+only**, and the repo is **archived (read-only)** on GitHub. There is no Swift
+Mac product transition in this checkout. Current stack and proposed
+Swift-control slugs: [`docs/macos/swift-control-invariants.md`](macos/swift-control-invariants.md).
 
 - Deprecation issue: [#12894](https://github.com/JovieInc/Jovie/issues/12894)
 - HUD surface: `apps/web/app/hud/page.tsx`

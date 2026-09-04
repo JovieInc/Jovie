@@ -72,11 +72,11 @@ create SwiftUI types or authorize a duplicate implementation.
 
 | Family | iOS owner | Web owner | macOS owner | Parity finding |
 | --- | --- | --- | --- | --- |
-| Surfaces | `JovieColor.backgroundBase/surface0...3`, `JovieTheme.swift:L4-L24` | `surfaces` and `JovieColor` aliases, `packages/ui/theme/tokens.ts:L17-L30,L319-L328` | No Jovie token layer; native menu styling, `MenuMonitorApp.swift:L45-L96` | `verified-source` within each platform; no shared native/macOS module is present in this checkout. |
-| Text | `JovieColor` plus `JovieFont`, `JovieTheme.swift:L10-L12,L56-L75` | Inter body/interface and Satoshi display roles, `tokens.ts:L229-L272` | System menu font plus monospaced status output, `MenuMonitorApp.swift:L77-L83` | iOS is Inter-first; macOS is an operator surface and is not a product typography parity target. No serif is introduced. |
+| Surfaces | `JovieColor.backgroundBase/surface0...3`, `JovieTheme.swift:L4-L24` | `surfaces` and `JovieColor` aliases, `packages/ui/theme/tokens.ts:L17-L30,L319-L328` | No Jovie token layer; native menu styling, `MenuMonitorApp.swift` | `verified-source` within each platform; no shared native/macOS module is present in this checkout. |
+| Text | `JovieColor` plus `JovieFont`, `JovieTheme.swift:L10-L12,L56-L75` | Inter body/interface and Satoshi display roles, `tokens.ts:L229-L272` | System menu font plus monospaced status output, `MenuMonitorApp.swift` | iOS is Inter-first; macOS is an operator surface and is not a product typography parity target. No serif is introduced. |
 | Spacing/radius | `JovieSpacing` 4/8/12/16/24/32 and `JovieRadius` 6/8/12/16/pill, `JovieTheme.swift:L78-L93` | spacing/radius tokens, `tokens.ts:L162-L177,L203-L224` | System menu layout | Semantic overlap exists, but values are independently owned. |
 | Motion | `JovieMotion`, including reduce-motion consumers, `JovieTheme.swift:L95-L122` | duration/easing/transition tokens, `tokens.ts:L288-L317` | No custom motion contract | iOS ports web motion names but still owns Swift values. |
-| Controls | `JoviePillButtonStyle` and `JovieIconButtonStyle`, `JovieTheme.swift:L182-L222` | shared UI `Button`/link primitives and state matrix | Native `Button` rows, `MenuMonitorApp.swift:L67-L95` | iOS has 44-point icon frames; the canonical 32-visible-inside-44-target rule is an acceptance constraint for handoff, not proof that every existing icon has been measured. |
+| Controls | `JoviePillButtonStyle` and `JovieIconButtonStyle`, `JovieTheme.swift:L182-L222` | shared UI `Button`/link primitives and state matrix | Native `Button` rows, `MenuMonitorApp.swift` | iOS has 44-point icon frames; the canonical 32-visible-inside-44-target rule is an acceptance constraint for handoff, not proof that every existing icon has been measured. |
 | Entity accents | `EntityAccent`, `JovieTheme.swift:L26-L53` | web CSS entity accent mapping referenced by the iOS source and mobile token contract | Not applicable | `verified-contract` for chat entity semantics; no macOS equivalent. |
 | Elevation | Drawer is recessed base; `shellContent` is raised during drawer presentation, `AppShellLeftDrawer.swift:L38-L43` and `AppShellView.swift:L325-L394` | Shell/page/sidebar share the canvas; main content is one raised plane, `AppShellFrame.tsx:L60-L106`; audio tray is a semantic sibling, `L145-L152` | Menu-bar surface only | Handoff invariant: page and sidebar share elevation, main content is one level above, and additional levels are semantic only (QR plate, sheet, overlay). |
 
@@ -130,7 +130,7 @@ Profile is historical ledger drift, not a reason to change the current code.
 | --- | --- | --- | --- |
 | `ios.chat-composer` | `ChatComposerBar` | Plus/workflow trigger, 52-point text-entry lane, 52-point send target, slash palette, workflow sheet; slash rows use background-only pressed feedback | `apps/ios/Jovie/Features/Chat/ChatComposerBar.swift:L3-L113,L130-L363`; `ComposerWorkflowSheet.swift:L3-L141` |
 | `ios.entity-sheet` | `EntityContextSheet` | Cover/title/kind, visibility row, deterministic stat grid, Edit In Chat, Copy Link, medium/large detents; stats are explicitly placeholder and visibility has no backend save | `apps/ios/Jovie/Features/AppShell/EntityContextSheet.swift:L4-L55,L57-L221` |
-| `ios.talk-overlay` | `TalkOverlayView` | Starting, recording, reviewing; fixed transcript/draft region; reserved error region; Cancel and Use Draft; draft is editable and never auto-sent | `apps/ios/Jovie/Features/AppShell/TalkOverlayView.swift:L3-L24,L26-L133,L135-L291`; shell handoff at `AppShellView.swift:L255-L269` |
+| `ios.talk-overlay` | `TalkOverlayView` | Starting, recording, submitting, unavailable, and recovery review; fixed transcript/draft region; reserved error region; Cancel and Send; normal mic and App Shortcut paths submit on the second activation; editable draft is failure recovery only | `apps/ios/Jovie/Features/AppShell/TalkOverlayView.swift`; shell policy at `AppShellView.swift`; executable budget at `AppShellIntentNavigation.swift` |
 | `ios.workflow-sheet` | `ComposerWorkflowSheet` | Six workflow actions, two-column grid, sheet presentation, 92-point tile target, 36-point icon frame | `apps/ios/Jovie/Features/Chat/ComposerWorkflowSheet.swift:L3-L141` |
 
 ## iOS atom, molecule, and organism ownership
@@ -138,11 +138,11 @@ Profile is historical ledger drift, not a reason to change the current code.
 | Classification | Canonical owner | Consumers | Ownership rule |
 | --- | --- | --- | --- |
 | Atom | `JovieColor`, `JovieFont`, `JovieSpacing`, `JovieRadius`, `JovieMotion` | All native iOS product surfaces | Extend this token owner only after prior-art review; do not create feature-local colors, fonts, or spacing registries. `JovieTheme.swift:L4-L122`. |
-| Atom | `JoviePillButtonStyle` | Dashboard, auth, onboarding, audience, calendar, inbox, entity, Talk | Canonical full-width pill action; `JovieTheme.swift:L182-L206`. |
-| Atom | `JovieIconButtonStyle` | Shell gear, settings close, chat scroll-to-bottom | Canonical 44-point circular icon target; `JovieTheme.swift:L208-L222`. |
+| Atom | `JoviePillButtonStyle` | Dashboard, auth, onboarding, audience, calendar, inbox, library, entity, Talk | Canonical full-width pill action in `JovieTheme.swift`. |
+| Atom | `JovieIconButtonStyle` | Shell gear, settings close, chat scroll-to-bottom, Library control hit frames | Canonical 44-point circular icon target in `JovieTheme.swift`. |
 | Atom | `JovieLogoMark` and QR plate modifier | Splash, auth, QR surfaces | Logo and QR plate are shared source owners; `JovieTheme.swift:L124-L180,L244-L256`. |
 | Atom | `EntityAccent` | Inline chat entity chips | Only for entity-kind parity; do not reuse as generic iOS accents; `JovieTheme.swift:L26-L53`. |
-| Atom | `JoviePressFeedbackButtonStyle` | AppShell tab bar and drawer rows | Canonical owner for the exact `.72`/scale/subtle recipe; `JovieTheme.swift:L224-L242`; verified by `AppShellTabBarTests.swift:L69-L72`. |
+| Atom | `JoviePressFeedbackButtonStyle` | AppShell tab bar, drawer rows, and Settings rows | Canonical owner for the opacity/scale/subtle recipe in `JovieTheme.swift`; Settings preserves `.7` through the style parameter, verified by `AppShellTabBarTests.swift`. |
 | Molecule | `DashboardAvatarView` | Shell toolbar, drawer account, dashboard | Cached avatar with surface fallback; `apps/ios/Jovie/Features/Dashboard/DashboardView.swift:L5-L20`. |
 | Molecule | `QRCodeCardView` | Dashboard and venue mode | One square QR/loading/unavailable footprint; `QRCodeCardView.swift:L4-L65`. |
 | Molecule | `DrawerThreadRow`/`DrawerSurfaceButton` | Left drawer | Drawer-local rows; do not copy into another navigation surface; `AppShellLeftDrawer.swift:L243-L280,L378-L425`. |
@@ -157,22 +157,24 @@ Profile is historical ledger drift, not a reason to change the current code.
 
 ## macOS screen and state registry
 
-The checkout contains one macOS product target: `MenuMonitor`, a menu-bar-only
-operator tool. It is not a public artist profile, a creator app shell, or a
-macOS rendering of the iOS product surface.
+The checkout contains one macOS **Swift** target: `MenuMonitor`, a
+menu-bar-only operator tool. The Mac product / Ovie shell is Electron in
+`apps/desktop`, not this Swift package. MenuMonitor is not a public artist
+profile, a creator app shell, or a macOS rendering of the iOS product surface.
+See [`docs/macos/swift-control-invariants.md`](../macos/swift-control-invariants.md).
 
 | ID | Surface and owner | Source evidence | States verified in source | Adaptive behavior | Parity/proof |
 | --- | --- | --- | --- | --- | --- |
-| `macos.menu-monitor` | Menu bar label and menu; `MenuMonitorApp`, `MenuMonitorMenu` | `apps/macos/MenuMonitor/Sources/MenuMonitor/MenuMonitorApp.swift:L4-L20,L23-L43,L45-L100`; target platform `Package.swift:L4-L17` | Count badge 0/positive/99+, refreshed timestamp, error text, status output, restart/status/dashboard/refresh/quit actions | Menu-bar-only accessory app; no responsive width/size-class contract; macOS 14 target | `verified-source`; not product UI parity. |
-| `macos.shipping-store` | Poll/fail-closed/action state model; `ShippingStatusStore` | `apps/macos/MenuMonitor/Sources/MenuMonitor/ShippingStatusStore.swift:L4-L71,L73-L111` | Counts loaded from Linear-backed Symphony status; status errors remain explicit with no GitHub Issue fallback; action message, status output, 30-second polling | Main-actor state with detached utility work; shell/process output is operator-only | `verified-source`; `actionMessage` is published but not rendered by `MenuMonitorMenu` (state gap). |
+| `macos.menu-monitor` | Menu bar label and menu; `MenuMonitorApp`, `MenuMonitorMenu`, `MenuMonitorPresentation` | `apps/macos/MenuMonitor/Sources/MenuMonitor/MenuMonitorApp.swift`; `apps/macos/MenuMonitor/Sources/MenuMonitor/MenuMonitorPresentation.swift`; target platform `Package.swift` | Initial loading, fresh zero/positive/99+ count states, unavailable `!`, stale metrics qualified as last known, refreshed timestamp, explicit error cue, action feedback, status output, restart/status/dashboard/refresh/quit actions | Menu-bar-only accessory app; no responsive width/size-class contract; macOS 14 target | `verified-source-and-test`; native presentation semantics are covered by `MenuMonitorConformanceTests`. |
+| `macos.shipping-store` | Poll/fail-closed/action state model; `ShippingStatusStore` | `apps/macos/MenuMonitor/Sources/MenuMonitor/ShippingStatusStore.swift` | Counts loaded from Linear-backed Symphony status; status errors remain explicit with no GitHub Issue fallback; action message, status output, 30-second polling | Main-actor state with detached utility work; shell/process output is operator-only | `verified-source`; the menu consumes every published presentation field without changing operational ownership. |
 
-### macOS state gap
+### macOS presentation ownership
 
-`ShippingStatusStore.actionMessage` is set during restart and status actions at
-`ShippingStatusStore.swift:L62-L106`, but `MenuMonitorMenu` renders only counts,
-`lastError`, `statusOutput`, and timestamps at `MenuMonitorApp.swift:L48-L83`.
-The source therefore has an unpresented action-progress/completion state. This
-is a source finding, not an implementation request in this slice.
+`MenuMonitorPresentation` is the single macOS owner for count grammar, initial
+loading, last-success/error, action feedback, status output, and menu-bar
+accessibility copy. `ShippingStatusStore` remains the sole owner of polling,
+counts, freshness data, and operator actions. The conformance test fails if raw
+metric strings or an unrendered presentation state are reintroduced.
 
 ## Cross-platform and public/app parity
 
@@ -219,16 +221,15 @@ not treated as interchangeable:
 
 | Owner | Evidence | Difference |
 | --- | --- | --- |
-| `JoviePressFeedbackButtonStyle` | `JovieTheme.swift:L224-L242` | Canonical `.72`/scale/animation recipe used by the tab bar and drawer |
-| `JovieIconButtonStyle` | `JovieTheme.swift:L208-L222` | Same `.72`/scale/animation plus 44-point circular icon geometry |
-| `SettingsRowButtonStyle` | `SettingsView.swift:L211-L221` | Same scale/animation but opacity `.7` |
-| `LibraryCardButtonStyle` | `LibrarySurfaceView.swift:L168-L175` | Same scale/animation but opacity `.8` |
-| `ComposerSlashRowButtonStyle` | `ChatComposerBar.swift:L352-L362` | Intentionally different: background highlight only, no scale |
+| `JoviePressFeedbackButtonStyle` | `JovieTheme.swift` | Canonical `.72`/scale/animation recipe used by the tab bar and drawer |
+| `JovieIconButtonStyle` | `JovieTheme.swift` | Same `.72`/scale/animation plus 44-point circular icon geometry |
+| `MobileChatMerchActionButtonStyle` | `MobileChatMerchOptionsView.swift` | Intentionally different: capsule fill opacity only, no scale |
+| `ComposerSlashRowButtonStyle` | `ChatComposerBar.swift` | Intentionally different: background highlight only, no scale |
 
 The exact duplicate consolidation is implemented in this slice and its
-canonical default is covered by `SharedPressFeedbackStyleTests`. The `.7`/`.8`
-variants and the filled/icon geometry styles remain separate because their
-opacity or geometry differs; no broad style rewrite was performed.
+canonical default is covered by `SharedPressFeedbackStyleTests`. Settings keeps
+its `.7` behavior through the shared style's explicit Settings parameter; the
+merch, composer, and filled/icon geometry variants retain distinct semantics.
 
 ### Verification result
 
@@ -277,8 +278,6 @@ opacity or geometry differs; no broad style rewrite was performed.
    web audience route redirects to Contacts, `audience/page.tsx:L7-L31`. This
    is a semantic/IA mismatch that should remain visible in any cross-platform
    mapping.
-8. **macOS feedback gap.** `actionMessage` is published and updated but not
-   rendered, as described in [macOS state gap](#macos-state-gap).
 
 ## State coverage and missing-state register
 
@@ -294,7 +293,7 @@ opacity or geometry differs; no broad style rewrite was performed.
 | Chat | Empty/transcript | Thinking/streaming | Online/offline empty copy | Failed turn retry and composer error slot | Offline cached history/draft guidance | Scroll, slash palette, workflow sheet, entity chips, web handoff | No native public chat route; ready profile required. |
 | Settings | Loaded | Logout spinner | Not applicable | External link failure is delegated to system/browser | Not explicit | Disabled logout, rows, close | No explicit in-view link failure state. |
 | Talk/entity/workflow overlays | Default/review | Starting/recording | Empty transcript error | Reserved error slot / permission copy | Not explicit | Sheets, detents, review, editable draft | Pen presence and persistence unknown. |
-| macOS MenuMonitor | Counts/status | No explicit loading state | Zero-count badge | Kanban fallback/error text | Fallback is explicit | Actions/status output | `actionMessage` is not rendered; no loading indicator. |
+| macOS MenuMonitor | Counts/status | Explicit initial refresh label; metrics withheld until first success | Zero-count state without a badge | Explicit unavailable cue plus retry | Last-success metrics are qualified as last known and unavailable `!` remains visible | Native buttons, action feedback, status output, menu-bar accessibility value | No public-product parity; this remains a compact operator-only menu. |
 
 ## Deterministic Pen handoff contract
 
@@ -331,7 +330,7 @@ frame is a source-mapped review target. The companion machine-readable file is
 | `ios-chat-locked` | Compact/medium founder-locked Chat | Transcript, composer, empty copy, tool/entity cards | empty/offline/streaming/retry/handoff | Composer bottom inset; no source drift | `locked source reference` |
 | `ios-settings` | Compact/medium settings route | Account card, links, build rows, logout | loaded/logout busy/disabled | Scrollable single-column rows; 44-point icon target | `source-mapped` |
 | `ios-talk-context` | Compact/medium semantic overlays | Talk full-screen review, entity sheet, workflow sheet | starting/recording/reviewing, medium/large sheet, workflow actions | Overlay above raised content plane; reserve transcript/error areas | `source-mapped` |
-| `macos-menu-monitor` | macOS menu-bar operator surface | Shipping label, counts, error/fallback, actions/status output | zero/positive/99+, refreshed/error/fallback/action output | No iOS/web frame reuse; menu-bar-only | `source-mapped`, operator-only |
+| `macos-menu-monitor` | macOS menu-bar operator surface | Shipping label, counts, last-known/error, action feedback, status output | initial loading, zero/positive/99+, refreshed, unavailable, stale last-known, action feedback/output | No iOS/web frame reuse; menu-bar-only | `source-mapped`, operator-only |
 
 ## Coordinator acceptance gates
 
@@ -343,7 +342,8 @@ The handoff is complete only when all of these remain true:
 3. Chat and Calendar remain founder-locked and source-mapped only.
 4. The elevation invariant is visible in the mapped anatomy.
 5. State coverage distinguishes source-verified states from proposed states.
-6. Preview-backed Library, placeholder-backed Entity Context, audience route
-   split, and macOS action feedback gap remain explicitly labeled.
+6. Preview-backed Library, placeholder-backed Entity Context, and audience
+   route split remain explicitly labeled. Mac presentation states stay under
+   `MenuMonitorPresentation`.
 7. No new SwiftUI view, modifier, token, or Pen component is created merely to
    make the registry look complete.

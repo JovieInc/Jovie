@@ -1,5 +1,5 @@
-import { Badge } from '@jovie/ui';
-import { cn } from '@/lib/utils';
+import { Badge, type BadgeProps } from '@jovie/ui';
+import type { ReactNode } from 'react';
 
 const STATUS_BADGE_TONES = {
   blue: 'info',
@@ -14,24 +14,18 @@ const STATUS_BADGE_SIZES = {
   sm: 'sm',
   md: 'md',
   lg: 'lg',
-} as const;
-
-const STATUS_BADGE_SIZE_CLASSES = {
-  sm: 'px-3 py-1 text-xs',
-  md: 'px-4 py-2 text-sm',
-  lg: 'px-5 py-2.5 text-base',
-} as const;
+} as const satisfies Record<string, BadgeProps['size']>;
 
 export type StatusBadgeVariant = keyof typeof STATUS_BADGE_TONES;
 export type StatusBadgeSize = keyof typeof STATUS_BADGE_SIZES;
 
 export interface StatusBadgeProps {
   /** Badge text content */
-  readonly children: React.ReactNode;
+  readonly children: ReactNode;
   /** Color variant for the badge */
   readonly variant?: StatusBadgeVariant;
   /** Optional icon to display before text */
-  readonly icon?: React.ReactNode;
+  readonly icon?: ReactNode;
   /** Size variant */
   readonly size?: StatusBadgeSize;
   /** Additional CSS classes */
@@ -54,14 +48,10 @@ export function StatusBadge({
       aria-live={dynamic ? 'polite' : undefined}
       tone={STATUS_BADGE_TONES[variant]}
       size={STATUS_BADGE_SIZES[size]}
-      className={cn(
-        'gap-2 font-medium',
-        STATUS_BADGE_SIZE_CLASSES[size],
-        className
-      )}
+      className={className}
     >
       {icon && <span className='shrink-0'>{icon}</span>}
-      <span>{children}</span>
+      <span className='min-w-0'>{children}</span>
     </Badge>
   );
 }

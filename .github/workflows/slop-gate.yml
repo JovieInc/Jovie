@@ -41,13 +41,15 @@ jobs:
         uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
         with:
           python-version: '3.12'
+          cache: pip
+          cache-dependency-path: .github/requirements/pytest.txt
 
       - name: Get changed copy files
         id: changed
         run: |
           # Files changed vs. base branch that match copy patterns.
           # --diff-filter=d excludes deleted files (can't slopcheck a removed file).
-          # CHANGELOG.md is excluded: it is append-only and /ship-generated, so the
+          # CHANGELOG.md is excluded: it is release-path-owned and not a PR artifact, so the
           # whole-file slop score only ever grows and always fails regardless of the
           # new entry's quality. Changelog copy quality is governed by the changelog
           # format rules in .claude/rules/release.md, not this marketing-copy gate.
@@ -93,6 +95,8 @@ jobs:
         uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
         with:
           python-version: '3.12'
+          cache: pip
+          cache-dependency-path: .github/requirements/pytest.txt
 
       - name: Install pytest
         run: python -m pip install --quiet --require-hashes -r .github/requirements/pytest.txt

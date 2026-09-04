@@ -382,6 +382,21 @@ export const RATE_LIMITERS = {
     trafficClass: 'anonymous',
   } satisfies RateLimitConfig,
 
+  /**
+   * Public artist API: 100 requests per minute per IP. Keep this bucket
+   * separate from `publicProfile`: that limiter also protects profile-view
+   * telemetry and is consumed twice by that route (IP plus handle:IP).
+   */
+  publicArtistApi: {
+    name: 'Public Artist API',
+    limit: 100,
+    window: '1 m',
+    prefix: 'public:artist-api',
+    analytics: false,
+    algorithm: 'fixed-window',
+    trafficClass: 'anonymous',
+  } satisfies RateLimitConfig,
+
   /** Public click: 50 requests per minute per IP */
   publicClick: {
     name: 'Public Click',
@@ -698,34 +713,45 @@ export const RATE_LIMITERS = {
     trafficClass: 'authenticated',
   } satisfies RateLimitConfig,
 
-  /** AI Chat daily quota (Free): derived from ENTITLEMENT_REGISTRY */
-  aiChatDailyFree: {
-    name: 'AI Chat Daily (Free)',
-    limit: ENTITLEMENT_REGISTRY.free.limits.aiDailyMessageLimit,
-    window: '1 d',
-    prefix: 'ai:chat:daily:free',
+  /** AI Chat weekly quota (Free): derived from ENTITLEMENT_REGISTRY */
+  aiChatWeeklyFree: {
+    name: 'AI Chat Weekly (Free)',
+    limit: ENTITLEMENT_REGISTRY.free.limits.aiWeeklyMessageLimit,
+    window: '7 d',
+    prefix: 'ai:chat:weekly:free',
     analytics: true,
     algorithm: 'sliding-window',
     trafficClass: 'authenticated',
   } satisfies RateLimitConfig,
 
-  /** AI Chat daily quota (Pro): derived from ENTITLEMENT_REGISTRY */
-  aiChatDailyPro: {
-    name: 'AI Chat Daily (Pro)',
-    limit: ENTITLEMENT_REGISTRY.pro.limits.aiDailyMessageLimit,
-    window: '1 d',
-    prefix: 'ai:chat:daily:pro',
+  /** AI Chat weekly quota (Trial): derived from ENTITLEMENT_REGISTRY */
+  aiChatWeeklyTrial: {
+    name: 'AI Chat Weekly (Trial)',
+    limit: ENTITLEMENT_REGISTRY.trial.limits.aiWeeklyMessageLimit,
+    window: '7 d',
+    prefix: 'ai:chat:weekly:trial',
     analytics: true,
     algorithm: 'sliding-window',
     trafficClass: 'authenticated',
   } satisfies RateLimitConfig,
 
-  /** AI Chat daily quota (Max): derived from ENTITLEMENT_REGISTRY */
-  aiChatDailyMax: {
-    name: 'AI Chat Daily (Max)',
-    limit: ENTITLEMENT_REGISTRY.max.limits.aiDailyMessageLimit,
-    window: '1 d',
-    prefix: 'ai:chat:daily:max',
+  /** AI Chat weekly quota (Pro): derived from ENTITLEMENT_REGISTRY */
+  aiChatWeeklyPro: {
+    name: 'AI Chat Weekly (Pro)',
+    limit: ENTITLEMENT_REGISTRY.pro.limits.aiWeeklyMessageLimit,
+    window: '7 d',
+    prefix: 'ai:chat:weekly:pro',
+    analytics: true,
+    algorithm: 'sliding-window',
+    trafficClass: 'authenticated',
+  } satisfies RateLimitConfig,
+
+  /** AI Chat weekly quota (Max): derived from ENTITLEMENT_REGISTRY */
+  aiChatWeeklyMax: {
+    name: 'AI Chat Weekly (Max)',
+    limit: ENTITLEMENT_REGISTRY.max.limits.aiWeeklyMessageLimit,
+    window: '7 d',
+    prefix: 'ai:chat:weekly:max',
     analytics: true,
     algorithm: 'sliding-window',
     trafficClass: 'authenticated',
@@ -848,6 +874,78 @@ export const RATE_LIMITERS = {
     analytics: true,
     algorithm: 'sliding-window',
     trafficClass: 'authenticated',
+  } satisfies RateLimitConfig,
+
+  inspectPressSource: {
+    name: 'Inspect Press Source',
+    limit: 5,
+    window: '1 m',
+    prefix: 'inspect_press_source',
+    analytics: true,
+    algorithm: 'sliding-window',
+    trafficClass: 'authenticated',
+  } satisfies RateLimitConfig,
+
+  inspectPressSourceHourly: {
+    name: 'Inspect Press Source Hourly',
+    limit: 20,
+    window: '1 h',
+    prefix: 'inspect_press_source_hourly',
+    analytics: true,
+    algorithm: 'sliding-window',
+    trafficClass: 'authenticated',
+  } satisfies RateLimitConfig,
+
+  // ---------------------------------------------------------------------------
+  // YouTube thumbnail paste-channel preview (JOV-5862) — anonymous, fail-closed
+  // ---------------------------------------------------------------------------
+
+  /** Per-IP burst on channel lookups: 6 per minute. Hard block beyond. */
+  youtubeThumbnailPreviewBurst: {
+    name: 'YouTube Thumbnail Preview Burst',
+    limit: 6,
+    window: '1 m',
+    prefix: 'yt_thumb_preview_burst',
+    analytics: false,
+    algorithm: 'fixed-window',
+    trafficClass: 'anonymous',
+    requireRedis: true,
+  } satisfies RateLimitConfig,
+
+  /** Cooldown between model generations per visitor: 1 per minute. */
+  youtubeThumbnailPreviewCooldown: {
+    name: 'YouTube Thumbnail Preview Cooldown',
+    limit: 1,
+    window: '1 m',
+    prefix: 'yt_thumb_preview_cooldown',
+    analytics: false,
+    algorithm: 'fixed-window',
+    trafficClass: 'anonymous',
+    requireRedis: true,
+  } satisfies RateLimitConfig,
+
+  /** Free generations per visitor (IP + device): 3 per 30 days. Server-counted. */
+  youtubeThumbnailPreviewVisitor: {
+    name: 'YouTube Thumbnail Preview Visitor',
+    limit: 3,
+    window: '30 d',
+    prefix: 'yt_thumb_preview_visitor',
+    analytics: false,
+    algorithm: 'fixed-window',
+    trafficClass: 'anonymous',
+    requireRedis: true,
+  } satisfies RateLimitConfig,
+
+  /** Free generations per YouTube channel: 3 per 30 days. First cap wins. */
+  youtubeThumbnailPreviewChannel: {
+    name: 'YouTube Thumbnail Preview Channel',
+    limit: 3,
+    window: '30 d',
+    prefix: 'yt_thumb_preview_channel',
+    analytics: false,
+    algorithm: 'fixed-window',
+    trafficClass: 'anonymous',
+    requireRedis: true,
   } satisfies RateLimitConfig,
 } as const;
 

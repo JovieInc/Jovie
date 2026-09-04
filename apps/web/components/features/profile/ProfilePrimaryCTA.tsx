@@ -66,6 +66,22 @@ type ProfilePrimaryCTAProps = {
 
 const ctaLinkClass = `${profilePrimaryPillClassName} w-full gap-2 px-8`;
 
+function ProfilePrimaryExternalLink({
+  href,
+  children,
+}: Readonly<{
+  href: string;
+  children: React.ReactNode;
+}>) {
+  return (
+    <Button asChild variant='primary' size='marketing' className='w-full'>
+      <a href={href} target='_blank' rel='noopener noreferrer'>
+        {children}
+      </a>
+    </Button>
+  );
+}
+
 export function ProfilePrimaryCTA({
   artist,
   socialLinks,
@@ -129,11 +145,9 @@ export function ProfilePrimaryCTA({
   if (nextAction.kind === 'tickets') {
     return (
       <div className='space-y-4'>
-        <Button asChild variant='primary' size='lg' className='w-full'>
-          <a href={nextAction.url} target='_blank' rel='noopener noreferrer'>
-            Find tickets
-          </a>
-        </Button>
+        <ProfilePrimaryExternalLink href={nextAction.url}>
+          Find tickets
+        </ProfilePrimaryExternalLink>
       </div>
     );
   }
@@ -141,11 +155,9 @@ export function ProfilePrimaryCTA({
   if (nextAction.kind === 'shop') {
     return (
       <div className='space-y-4'>
-        <Button asChild variant='primary' size='lg' className='w-full'>
-          <a href={nextAction.url} target='_blank' rel='noopener noreferrer'>
-            Shop merch
-          </a>
-        </Button>
+        <ProfilePrimaryExternalLink href={nextAction.url}>
+          Shop merch
+        </ProfilePrimaryExternalLink>
       </div>
     );
   }

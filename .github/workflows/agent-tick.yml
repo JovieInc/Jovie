@@ -10,7 +10,7 @@
 #
 # CONSOLIDATED WORKFLOWS (removed their cron schedules; kept workflow_dispatch):
 #   agent-landing-sweep      — sweep eligible agent PRs into the merge queue
-#   auto-ready-agent-drafts  — flip green agent draft PRs to "ready for review"
+#   auto-ready-agent-drafts  — audit writer-owned PR promotion drift
 #   github-ai-dispatcher     — dispatch agent-ready issues to the orchestrator
 #
 # RESTORED STANDALONE CRONS (no longer consolidated here):
@@ -81,8 +81,7 @@ jobs:
                 title: .title,
                 head_ref: .head.ref,
                 head_sha: .head.sha,
-                labels: [.labels[].name],
-                queued: ([.labels[].name] | any(. == "merge-queue"))
+                labels: [.labels[].name]
               }]')
 
           TOTAL=$(echo "$ALL_PRS" | jq 'length')
@@ -101,8 +100,10 @@ jobs:
             exit 0
           fi
 
-          READY_COUNT=$(echo "$ALL_PRS" | jq '[.[] | select(.queued == true)] | length')
-          echo "PRs already in merge queue: $READY_COUNT / $READY_THRESHOLD"
+          # Native autoenroll owns queue membership. This sweep does not enroll
+          # and must not read the retired merge-queue label as queued state.
+          READY_COUNT=0
+          echo "Native autoenroll owns queue membership; sweep does not enroll ($READY_THRESHOLD cap unused)."
 
           if [[ "$READY_COUNT" -ge "$READY_THRESHOLD" ]]; then
             echo "Queue pressure is high ($READY_COUNT / $READY_THRESHOLD). Skipping sweep."
@@ -116,15 +117,10 @@ jobs:
             PR_NUMBER=$(echo "$PR" | jq -r '.number')
             PR_TITLE=$(echo "$PR" | jq -r '.title')
             PR_SHA=$(echo "$PR" | jq -r '.head_sha')
-            PR_QUEUED=$(echo "$PR" | jq -r '.queued')
             LABELS=$(echo "$PR" | jq -r '[.labels[]] | join(",")')
 
             echo ""
             echo "--- PR #$PR_NUMBER: $PR_TITLE ---"
-
-            if [[ "$PR_QUEUED" == "true" ]]; then
-              echo "Already in merge queue. Skipping."; SKIPPED=$((SKIPPED + 1)); continue
-            fi
 
             if echo "$LABELS" | grep -q "needs-human"; then
               echo "Has needs-human label. Skipping."; SKIPPED=$((SKIPPED + 1)); continue
@@ -146,29 +142,12 @@ jobs:
               echo "CodeRabbit blocking. Skipping."; SKIPPED=$((SKIPPED + 1)); continue
             fi
 
-            if ! CHANGED_FILES=$(gh pr diff "$PR_NUMBER" --repo "$GH_REPO" --name-only 2>/dev/null); then
-              echo "Could not fetch changed files. Skipping."; SKIPPED=$((SKIPPED + 1)); continue
-            fi
-
-            printf '%s\n' "$CHANGED_FILES" > "$RUNNER_TEMP/agent-landing-$PR_NUMBER-changed-files.txt"
-            node scripts/ci-harness.mjs classify-risk --files "$RUNNER_TEMP/agent-landing-$PR_NUMBER-changed-files.txt" \
-              > "$RUNNER_TEMP/agent-landing-$PR_NUMBER-ci-risk.json"
-
-            if [[ "$(jq -r '.blocksUnattendedAutoMerge' "$RUNNER_TEMP/agent-landing-$PR_NUMBER-ci-risk.json")" == "true" ]]; then
-              echo "CI harness blocks unattended auto-merge. Skipping."; SKIPPED=$((SKIPPED + 1)); continue
-            fi
-
             if [[ $((READY_COUNT + LANDED)) -ge "$READY_THRESHOLD" ]]; then
               echo "Queue pressure threshold reached. Stopping."; break
             fi
 
-            echo "All gates passed for PR #$PR_NUMBER. Requesting native merge-queue enrollment..."
-            if gh pr edit "$PR_NUMBER" --add-label "merge-queue"; then
-              echo "Added PR #$PR_NUMBER to merge queue."; LANDED=$((LANDED + 1))
-            else
-              echo "::warning::Failed to add merge-queue label to PR #$PR_NUMBER"
-              SKIPPED=$((SKIPPED + 1))
-            fi
+            echo "All gates passed for PR #$PR_NUMBER. Native autoenroll owns queue mutation; the merge-queue label is retired."
+            LANDED=$((LANDED + 1))
           done < <(echo "$AGENT_PRS" | jq -c '.[]')
 
           echo ""
@@ -176,14 +155,15 @@ jobs:
 
   # --------------------------------------------------------------------------
   # JOB: auto-ready
-  # Formerly: auto-ready-agent-drafts.yml (every 15 min + events)
+  # Observer-only audit for writer-owned promotion drift. Manual recovery lives
+  # in auto-ready-agent-drafts.yml; successful promotion belongs to the writer.
   # --------------------------------------------------------------------------
   auto-ready:
-    name: Auto-Ready Agent Drafts
+    name: Audit Writer-Owned Promotion Drift
     runs-on: ubuntu-latest
     timeout-minutes: 10
     permissions:
-      pull-requests: write
+      pull-requests: read
       contents: read
       checks: read
 
@@ -197,12 +177,13 @@ jobs:
       - name: Verify GitHub CLI
         run: gh --version
 
-      - name: Auto-ready green agent drafts
+      - name: Audit proven writer-owned promotion drift
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           REPO: ${{ github.repository }}
           GH_RETRY_ATTEMPTS: 8
           GH_RETRY_MAX_DELAY: 60
+          DRY_RUN: '1'
         run: bash scripts/auto-ready-agent-drafts.sh
 
   # --------------------------------------------------------------------------

@@ -41,6 +41,7 @@ const BASE_SELECTION = {
   kind: suggestedActions.kind,
   payload: suggestedActions.payload,
   rationale: suggestedActions.rationale,
+  executionResult: suggestedActions.executionResult,
   createdAt: suggestedActions.createdAt,
 } as const;
 

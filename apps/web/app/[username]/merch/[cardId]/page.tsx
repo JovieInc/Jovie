@@ -3,13 +3,13 @@ import type { Metadata } from 'next';
 import Image from 'next/image';
 import Link from 'next/link';
 import { notFound } from 'next/navigation';
-import { after } from 'next/server';
 import { PublicPageShell } from '@/components/site/PublicPageShell';
 import { getMerchMvpEnabled } from '@/lib/flags/profile-variant';
 import {
   getPublicMerchCard,
   incrementMerchCardView,
 } from '@/lib/merch/service';
+import { scheduleAfter } from '@/lib/next/schedule-after';
 import { generateMerchStructuredData } from '@/lib/seo/structured-data';
 import { safeJsonLdStringify } from '@/lib/utils/json-ld';
 import { uuidSchema } from '@/lib/validation/schemas/base';
@@ -107,9 +107,12 @@ export default async function MerchProductPage({
   const artistName = profile.displayName || profile.username;
   const imageUrl = card.primaryImageUrl || card.mockupUrls[0] || '';
 
-  after(() => {
-    void incrementMerchCardView(card.id).catch(() => undefined);
-  });
+  scheduleAfter(
+    () => {
+      void incrementMerchCardView(card.id).catch(() => undefined);
+    },
+    { fallback: 'skip' }
+  );
 
   const productJsonLd = generateMerchStructuredData({
     title: card.title,

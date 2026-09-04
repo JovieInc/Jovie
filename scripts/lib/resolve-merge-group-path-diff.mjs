@@ -102,9 +102,12 @@ export function diffNameOnlyThreeDot(git, baseSha, headSha) {
   if (mergeBase.status !== 0) {
     return { ok: false, files: [] };
   }
-  const diff = git(['diff', '--name-only', `${baseSha}...${headSha}`], {
-    allowFailure: true,
-  });
+  const diff = git(
+    ['diff', '--no-renames', '--name-only', `${baseSha}...${headSha}`],
+    {
+      allowFailure: true,
+    }
+  );
   if (diff.status !== 0) {
     return { ok: false, files: [] };
   }
@@ -253,6 +256,8 @@ export function formatMetaEnv(result) {
   return [
     `IS_NOOP=${result.isNoop ? 'true' : 'false'}`,
     `SOURCE=${result.source}`,
+    `PATH_DIFF_BASE_SHA=${result.baseSha ?? ''}`,
+    `PATH_DIFF_HEAD_SHA=${result.headSha}`,
     '',
   ].join('\n');
 }

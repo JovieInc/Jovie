@@ -52,9 +52,9 @@ export const LIBRARY_DEMO_NOW_MS = new Date(
 // design-system.css and picked up automatically via the dark theme.
 const CARBON_VARS: React.CSSProperties = {
   ['--linear-bg-page' as string]: '#06070a',
-  ['--linear-app-content-surface' as string]: '#0a0c0f',
-  ['--linear-app-shell-border' as string]: '#171a20',
-  ['--linear-app-shell-radius' as string]: '12px',
+  ['--app-shell-content-surface' as string]: '#0a0c0f',
+  ['--app-shell-border' as string]: '#171a20',
+  ['--app-shell-radius' as string]: '12px',
   ['--surface-0' as string]: '#0a0b0e',
   ['--surface-1' as string]: '#101216',
   ['--surface-2' as string]: '#161a20',
@@ -320,7 +320,7 @@ const LIBRARY_ASSET_SEEDS: readonly AssetSeed[] = [
       'press-kit',
       'Tim White press photo 01',
       'alt_crop',
-      '/images/avatars/tim-white-founder.jpg',
+      '/images/avatars/tim-white.jpg',
       'Tim White press photo 01',
     ],
     [
@@ -973,7 +973,7 @@ export function LeftRail({
   }
 
   return (
-    <aside className='h-full overflow-y-auto border-r border-(--linear-app-shell-border) bg-(--surface-0) flex flex-col'>
+    <aside className='h-full overflow-y-auto border-r border-(--app-shell-border) bg-(--surface-0) flex flex-col'>
       {/* Brand row height matches the canvas header (h-12) so the
           sidebar wordmark and the canvas Library h1 share one row. */}
       <div className='shrink-0 px-3 h-12 flex items-center'>
@@ -1134,7 +1134,7 @@ function TopBar({
   count: number;
 }) {
   return (
-    <header className='shrink-0 h-12 px-4 flex items-center gap-3 border-b border-(--linear-app-shell-border) bg-(--linear-bg-page)/95 backdrop-blur-xl'>
+    <header className='shrink-0 h-12 px-4 flex items-center gap-3 border-b border-(--app-shell-border) bg-(--linear-bg-page)/95 backdrop-blur-xl'>
       <h1
         className='text-sm font-semibold text-primary-token'
         style={{ letterSpacing: '-0.01em' }}
@@ -1173,7 +1173,7 @@ function SearchInput({
         'flex items-center gap-2 h-8 px-2.5 rounded-md border transition-colors duration-subtle ease-out',
         focused
           ? 'border-cyan-400/40 bg-(--surface-1)/70'
-          : 'border-(--linear-app-shell-border) bg-(--surface-0) hover:border-white/10'
+          : 'border-(--app-shell-border) bg-(--surface-0) hover:border-white/10'
       )}
     >
       <Search
@@ -1198,13 +1198,13 @@ function SearchInput({
         <button
           type='button'
           onClick={() => onChange('')}
-          className='shrink-0 inline-flex items-center h-5 px-1.5 rounded text-3xs font-caption uppercase tracking-[0.06em] text-tertiary-token hover:text-primary-token bg-(--surface-2)/60 border border-(--linear-app-shell-border) transition-colors duration-subtle ease-out'
+          className='shrink-0 inline-flex items-center h-5 px-1.5 rounded text-3xs font-caption uppercase tracking-[0.06em] text-tertiary-token hover:text-primary-token bg-(--surface-2)/60 border border-(--app-shell-border) transition-colors duration-subtle ease-out'
           aria-label='Clear Search'
         >
           Clear
         </button>
       ) : (
-        <kbd className='shrink-0 inline-flex items-center h-5 px-1.5 rounded text-3xs font-caption uppercase tracking-[0.06em] text-quaternary-token bg-(--surface-2)/60 border border-(--linear-app-shell-border)'>
+        <kbd className='shrink-0 inline-flex items-center h-5 px-1.5 rounded text-3xs font-caption uppercase tracking-[0.06em] text-quaternary-token bg-(--surface-2)/60 border border-(--app-shell-border)'>
           /
         </kbd>
       )}
@@ -1234,7 +1234,7 @@ export function SortDropdown({
       trigger={
         <button
           type='button'
-          className='inline-flex items-center gap-1.5 h-7 px-2.5 rounded-md text-xs text-secondary-token hover:text-primary-token border border-(--linear-app-shell-border) bg-(--surface-0) hover:bg-surface-1/60 transition-colors duration-subtle ease-out data-[state=open]:text-primary-token'
+          className='inline-flex items-center gap-1.5 h-7 px-2.5 rounded-md text-xs text-secondary-token hover:text-primary-token border border-(--app-shell-border) bg-(--surface-0) hover:bg-surface-1/60 transition-colors duration-subtle ease-out data-[state=open]:text-primary-token'
         >
           <ArrowUpDown className='h-3 w-3' strokeWidth={2.25} />
           <span>{labels[sort]}</span>
@@ -1263,7 +1263,7 @@ export function ViewToggle({
   onView: (v: ViewMode) => void;
 }) {
   return (
-    <div className='inline-flex h-7 rounded-md border border-(--linear-app-shell-border) bg-(--surface-0) p-0.5'>
+    <div className='inline-flex h-7 rounded-md border border-(--app-shell-border) bg-(--surface-0) p-0.5'>
       <button
         type='button'
         onClick={() => onView('grid')}
@@ -1359,10 +1359,10 @@ function AssetCard({
   return (
     <div
       className={cn(
-        'group relative flex flex-col overflow-hidden rounded-lg border bg-(--linear-app-content-surface) text-left transition-colors duration-subtle ease-out focus-within:ring-1 focus-within:ring-cyan-400/40',
+        'group relative flex flex-col overflow-hidden rounded-lg border bg-(--app-shell-content-surface) text-left transition-colors duration-subtle ease-out focus-within:ring-1 focus-within:ring-cyan-400/40',
         selected
           ? 'border-cyan-400/50'
-          : 'border-(--linear-app-shell-border) hover:border-white/15'
+          : 'border-(--app-shell-border) hover:border-white/15'
       )}
     >
       {selected && (
@@ -1483,7 +1483,7 @@ export function Table({
   return (
     <div className='px-2 py-2'>
       <div
-        className='grid items-center px-2 py-1.5 text-3xs uppercase tracking-[0.06em] text-quaternary-token border-b border-(--linear-app-shell-border) sticky top-0 bg-(--linear-bg-page)/95 backdrop-blur z-10'
+        className='grid items-center px-2 py-1.5 text-3xs uppercase tracking-[0.06em] text-quaternary-token border-b border-(--app-shell-border) sticky top-0 bg-(--linear-bg-page)/95 backdrop-blur z-10'
         style={{
           gridTemplateColumns: '32px 48px 1fr 100px 80px 1fr 100px 110px 28px',
         }}
@@ -1635,7 +1635,7 @@ export function Drawer({
   return (
     <aside
       aria-hidden={!open}
-      className='h-full overflow-hidden border-l border-(--linear-app-shell-border) bg-(--surface-0)'
+      className='h-full overflow-hidden border-l border-(--app-shell-border) bg-(--surface-0)'
       style={{
         opacity: open ? 1 : 0,
         transition: `opacity ${DURATION_CINEMATIC}ms ${EASE_CINEMATIC}`,
@@ -1643,7 +1643,7 @@ export function Drawer({
     >
       {asset && (
         <div className='h-full overflow-y-auto'>
-          <div className='sticky top-0 z-10 flex items-center justify-between px-3 h-10 border-b border-(--linear-app-shell-border) bg-(--surface-0)/95 backdrop-blur'>
+          <div className='sticky top-0 z-10 flex items-center justify-between px-3 h-10 border-b border-(--app-shell-border) bg-(--surface-0)/95 backdrop-blur'>
             <span className='text-3xs uppercase tracking-[0.06em] text-tertiary-token'>
               Asset
             </span>
@@ -1677,7 +1677,7 @@ export function Drawer({
           </div>
 
           <div className='p-3'>
-            <div className='rounded-lg overflow-hidden border border-(--linear-app-shell-border) bg-black dark:bg-black'>
+            <div className='rounded-lg overflow-hidden border border-(--app-shell-border) bg-black dark:bg-black'>
               <Poster asset={asset} />
             </div>
           </div>
@@ -1688,19 +1688,19 @@ export function Drawer({
                 <input
                   value={draftTitle}
                   onChange={e => setDraftTitle(e.target.value)}
-                  className='w-full bg-(--surface-1)/80 border border-(--linear-app-shell-border) rounded-md px-2 py-1.5 text-sm font-semibold text-primary-token outline-none focus:border-cyan-400/40'
+                  className='w-full bg-(--surface-1)/80 border border-(--app-shell-border) rounded-md px-2 py-1.5 text-sm font-semibold text-primary-token outline-none focus:border-cyan-400/40'
                 />
                 <textarea
                   value={draftAlt}
                   onChange={e => setDraftAlt(e.target.value)}
                   rows={2}
-                  className='w-full bg-(--surface-1)/80 border border-(--linear-app-shell-border) rounded-md px-2 py-1.5 text-xs text-secondary-token outline-none focus:border-cyan-400/40 resize-none'
+                  className='w-full bg-(--surface-1)/80 border border-(--app-shell-border) rounded-md px-2 py-1.5 text-xs text-secondary-token outline-none focus:border-cyan-400/40 resize-none'
                   placeholder='Alt text'
                 />
                 <input
                   value={draftTags}
                   onChange={e => setDraftTags(e.target.value)}
-                  className='w-full bg-(--surface-1)/80 border border-(--linear-app-shell-border) rounded-md px-2 py-1.5 text-xs text-secondary-token outline-none focus:border-cyan-400/40'
+                  className='w-full bg-(--surface-1)/80 border border-(--app-shell-border) rounded-md px-2 py-1.5 text-xs text-secondary-token outline-none focus:border-cyan-400/40'
                   placeholder='Comma-separated tags'
                 />
                 <div className='flex items-center gap-1.5 pt-1'>
@@ -1719,7 +1719,7 @@ export function Drawer({
                       setDraftTags(asset.tags.join(', '));
                       setEditing(false);
                     }}
-                    className='h-7 px-3 rounded-md text-xs text-secondary-token hover:text-primary-token border border-(--linear-app-shell-border) bg-(--surface-0) hover:bg-surface-1/60 transition-colors duration-subtle ease-out'
+                    className='h-7 px-3 rounded-md text-xs text-secondary-token hover:text-primary-token border border-(--app-shell-border) bg-(--surface-0) hover:bg-surface-1/60 transition-colors duration-subtle ease-out'
                   >
                     Cancel
                   </button>
@@ -1756,7 +1756,7 @@ export function Drawer({
                 return (
                   <span
                     key={trimmed}
-                    className='inline-flex items-center h-5 px-1.5 rounded text-3xs font-caption text-tertiary-token bg-(--surface-2)/60 border border-(--linear-app-shell-border)'
+                    className='inline-flex items-center h-5 px-1.5 rounded text-3xs font-caption text-tertiary-token bg-(--surface-2)/60 border border-(--app-shell-border)'
                   >
                     {trimmed}
                   </span>
@@ -1774,7 +1774,7 @@ export function Drawer({
               {asset.channels.map(c => (
                 <span
                   key={c}
-                  className='inline-flex items-center h-6 px-2 rounded-md text-2xs text-secondary-token bg-(--surface-1)/70 border border-(--linear-app-shell-border)'
+                  className='inline-flex items-center h-6 px-2 rounded-md text-2xs text-secondary-token bg-(--surface-1)/70 border border-(--app-shell-border)'
                 >
                   {CHANNEL_LABELS[c]}
                 </span>
@@ -1838,7 +1838,7 @@ export function Drawer({
             />
           </DrawerSection>
 
-          <div className='px-3 py-3 sticky bottom-0 bg-gradient-to-t from-(--surface-0) via-(--surface-0)/95 to-transparent border-t border-(--linear-app-shell-border)'>
+          <div className='px-3 py-3 sticky bottom-0 bg-gradient-to-t from-(--surface-0) via-(--surface-0)/95 to-transparent border-t border-(--app-shell-border)'>
             <div className='grid grid-cols-3 gap-1.5'>
               <DownloadButton label='Original' sub='Source · 1080×1920' />
               <DownloadButton label='Preview' sub='Web · 720p' />
@@ -1863,7 +1863,7 @@ function DrawerSection({
   children: React.ReactNode;
 }) {
   return (
-    <section className='px-4 py-3 border-t border-(--linear-app-shell-border)/70'>
+    <section className='px-4 py-3 border-t border-(--app-shell-border)/70'>
       <p className='text-3xs uppercase tracking-[0.08em] text-quaternary-token font-semibold pb-2'>
         {label}
       </p>
@@ -1875,7 +1875,7 @@ function DrawerSection({
 function ReleaseMoment({ asset }: { asset: Asset }) {
   const release = RELEASES.find(r => r.id === asset.release);
   return (
-    <div className='flex items-center gap-2.5 p-2 rounded-md bg-(--surface-1)/60 border border-(--linear-app-shell-border)'>
+    <div className='flex items-center gap-2.5 p-2 rounded-md bg-(--surface-1)/60 border border-(--app-shell-border)'>
       <span
         className='h-7 w-7 rounded-md grid place-items-center'
         style={{ background: `${release?.color}22`, color: release?.color }}
@@ -1919,7 +1919,7 @@ function VersionStack({ asset }: { asset: Asset }) {
             'flex items-center gap-2 px-2 py-1.5 rounded-md border transition-colors duration-subtle ease-out',
             v.current
               ? 'border-cyan-400/30 bg-cyan-400/[0.06]'
-              : 'border-(--linear-app-shell-border) bg-(--surface-0) hover:bg-surface-1/40'
+              : 'border-(--app-shell-border) bg-(--surface-0) hover:bg-surface-1/40'
           )}
         >
           <span
@@ -1986,7 +1986,7 @@ function DownloadButton({
         'flex flex-col items-start gap-0.5 h-12 px-2.5 rounded-md transition-colors duration-subtle ease-out text-left',
         primary
           ? 'bg-cyan-300 text-black dark:text-white hover:bg-cyan-200'
-          : 'border border-(--linear-app-shell-border) bg-(--surface-0) text-secondary-token hover:bg-surface-1/60 hover:text-primary-token'
+          : 'border border-(--app-shell-border) bg-(--surface-0) text-secondary-token hover:bg-surface-1/60 hover:text-primary-token'
       )}
     >
       <span className='text-2xs font-medium leading-none'>{label}</span>
@@ -2012,7 +2012,7 @@ function SecondaryAction({
   return (
     <button
       type='button'
-      className='flex-1 inline-flex items-center justify-center gap-1.5 h-7 rounded-md text-2xs text-secondary-token border border-(--linear-app-shell-border) bg-(--surface-0) hover:bg-surface-1/60 hover:text-primary-token transition-colors duration-subtle ease-out'
+      className='flex-1 inline-flex items-center justify-center gap-1.5 h-7 rounded-md text-2xs text-secondary-token border border-(--app-shell-border) bg-(--surface-0) hover:bg-surface-1/60 hover:text-primary-token transition-colors duration-subtle ease-out'
     >
       <Icon className='h-3 w-3' strokeWidth={2.25} />
       {label}
@@ -2041,7 +2041,7 @@ export function StatusBar({
   // Kbd hint footer was visual noise — those shortcuts surface in tooltips
   // on the controls themselves, no need to repeat them here.
   return (
-    <footer className='shrink-0 h-7 px-3 flex items-center gap-3 border-t border-(--linear-app-shell-border) text-3xs uppercase tracking-[0.06em] text-quaternary-token bg-(--surface-0)/60'>
+    <footer className='shrink-0 h-7 px-3 flex items-center gap-3 border-t border-(--app-shell-border) text-3xs uppercase tracking-[0.06em] text-quaternary-token bg-(--surface-0)/60'>
       <span className='tabular-nums'>
         {count} of {total}
       </span>
@@ -2075,7 +2075,7 @@ export function EmptyState({ onClear }: { onClear: () => void }) {
           <button
             type='button'
             onClick={onClear}
-            className='inline-flex items-center h-7 px-3 rounded-md text-xs text-primary-token bg-(--surface-1) border border-(--linear-app-shell-border) hover:bg-surface-2/80 transition-colors duration-subtle ease-out'
+            className='inline-flex items-center h-7 px-3 rounded-md text-xs text-primary-token bg-(--surface-1) border border-(--app-shell-border) hover:bg-surface-2/80 transition-colors duration-subtle ease-out'
           >
             Clear all filters
           </button>

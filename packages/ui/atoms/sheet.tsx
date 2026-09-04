@@ -37,28 +37,27 @@ SheetOverlay.displayName = SheetPrimitive.Overlay.displayName;
 const sheetVariants = cva(
   [
     sheetSurfaceStyles,
-    'transition ease-in-out',
+    'transition-transform duration-cinematic ease-cinematic',
     'data-[state=open]:animate-in data-[state=closed]:animate-out',
-    'data-[state=closed]:duration-300 data-[state=open]:duration-500',
-    'motion-reduce:animate-none motion-reduce:transition-opacity',
+    'motion-reduce:animate-none motion-reduce:transition-none',
   ].join(' '),
   {
     variants: {
       side: {
         top: [
-          'inset-x-0 top-0 max-h-[calc(100dvh-1rem)] border-b',
+          'inset-x-0 top-0 max-h-sheet-viewport border-b',
           'data-[state=closed]:slide-out-to-top data-[state=open]:slide-in-from-top',
         ].join(' '),
         bottom: [
-          'inset-x-0 bottom-0 max-h-[calc(100dvh-1rem)] border-t',
+          'inset-x-0 bottom-0 max-h-sheet-viewport border-t',
           'data-[state=closed]:slide-out-to-bottom data-[state=open]:slide-in-from-bottom',
         ].join(' '),
         left: [
-          'inset-y-0 left-0 h-full w-[min(26rem,calc(100vw-1rem))] border-r',
+          'inset-y-0 left-0 h-full w-104 max-w-sheet-viewport border-r',
           'data-[state=closed]:slide-out-to-left data-[state=open]:slide-in-from-left',
         ].join(' '),
         right: [
-          'inset-y-0 right-0 h-full w-[min(26rem,calc(100vw-1rem))] border-l',
+          'inset-y-0 right-0 h-full w-104 max-w-sheet-viewport border-l',
           'data-[state=closed]:slide-out-to-right data-[state=open]:slide-in-from-right',
         ].join(' '),
       },

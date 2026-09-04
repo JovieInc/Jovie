@@ -17,6 +17,7 @@ const RESERVED_FIRST_SEGMENTS = new Set([
   'blog',
   'brand',
   'changelog',
+  'cli',
   'demo',
   'download',
   'exp',
@@ -29,6 +30,7 @@ const RESERVED_FIRST_SEGMENTS = new Set([
   'waitlist',
   '_next',
   'favicon.ico',
+  'openapi.json',
   'robots.txt',
   'sitemap.xml',
 ]);

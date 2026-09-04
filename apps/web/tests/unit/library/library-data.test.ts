@@ -1,8 +1,11 @@
 import { describe, expect, it } from 'vitest';
 import type { LibraryReleaseAsset } from '@/app/app/(shell)/library/library-data';
 import {
+  attachLibraryProductGraph,
+  buildLibraryDocumentAssets,
   buildLibraryMerchAssets,
   buildLibraryReleaseAssets,
+  buildLibraryYouTubeAssets,
   formatLibraryDuration,
   formatLibraryReleaseDate,
   formatLibraryReleaseDateTitle,
@@ -16,6 +19,7 @@ import {
   stackLibraryReleaseVersions,
 } from '@/app/app/(shell)/library/library-data';
 import type { ReleaseViewModel } from '@/lib/discography/types';
+import { resolveLibraryLifecycleStage } from '@/lib/library/lifecycle-stage';
 import type { LibraryMerchCard } from '@/lib/merch/types';
 
 function buildRelease(
@@ -217,6 +221,7 @@ describe('library data', () => {
     expect(buildLibraryMerchAssets(cards, 'Tim White')).toEqual([
       expect.objectContaining({
         id: 'merch-merch-1',
+        source: { provider: 'merch', canonicalId: 'merch-1' },
         title: 'Never Say A Word Hoodie',
         artist: 'Tim White',
         artworkUrl: 'https://cdn.example.com/hoodie.png',
@@ -422,5 +427,171 @@ describe('library version stacking (JOV-3089)', () => {
     ]);
 
     expect(stackLibraryReleaseVersions(assets)).toHaveLength(2);
+  });
+
+  it('projects creator documents and YouTube videos as library items without duplicating media', () => {
+    const [document] = buildLibraryDocumentAssets(
+      [
+        {
+          id: 'doc-1',
+          title: 'Chorus hook',
+          kind: 'idea',
+          stage: 'private_draft',
+          currentRevision: 1,
+          content: { type: 'doc', content: [] },
+          plainText: 'hook',
+          updatedAt: '2026-08-28T00:00:00.000Z',
+        },
+      ],
+      'Tim White'
+    );
+    const [video] = buildLibraryYouTubeAssets(
+      [
+        {
+          id: 'yt-pk',
+          videoId: 'yt-1',
+          title: 'Neon Skyline',
+          url: 'https://youtube.com/watch?v=yt-1',
+          publishedAt: '2026-01-01T00:00:00.000Z',
+          durationSeconds: 200,
+          contentType: 'music_video',
+          classificationConfidence: 0.9,
+          thumbnailUrl: 'https://i.ytimg.com/vi/yt-1/hq.jpg',
+          privacyStatus: 'public',
+          releaseLink: { isrc: 'USABC2600001', releaseId: 'rel-1' },
+        },
+      ],
+      'Tim White'
+    );
+
+    expect(document?.itemKind).toBe('document');
+    expect(document?.catalogType).toBe('document');
+    expect(libraryAssetMatchesView(document!, 'documents')).toBe(true);
+    expect(libraryAssetMatchesView(document!, 'releases')).toBe(false);
+    expect(video?.itemKind).toBe('video');
+    expect(video?.catalogType).toBe('media');
+    expect(video?.source).toEqual({
+      provider: 'youtube',
+      canonicalId: 'yt-1',
+    });
+    expect(video?.linkedReleaseId).toBe('rel-1');
+    expect(libraryAssetMatchesView(video!, 'media')).toBe(true);
+    expect(libraryAssetMatchesView(video!, 'videos')).toBe(true);
+    expect(resolveLibraryLifecycleStage(document!)).toBe('idea');
+    expect(resolveLibraryLifecycleStage(video!)).toBe('out');
+    expect(resolveLibraryLifecycleStage({ status: 'draft' })).toBe('idea');
+    expect(
+      resolveLibraryLifecycleStage({ approvalStatus: 'needs_review' })
+    ).toBe('in_progress');
+  });
+
+  it('attaches merch, relationships, and post-release state onto one-card assets', () => {
+    const video = buildLibraryYouTubeAssets(
+      [
+        {
+          id: 'yt-pk',
+          videoId: 'yt-1',
+          title: 'Neon Skyline',
+          url: 'https://youtube.com/watch?v=yt-1',
+          publishedAt: '2026-01-01T00:00:00.000Z',
+          durationSeconds: 200,
+          contentType: 'music_video',
+          classificationConfidence: 0.9,
+          thumbnailUrl: 'https://i.ytimg.com/vi/yt-1/hq.jpg',
+          privacyStatus: 'public',
+          releaseLink: { isrc: 'USABC2600001', releaseId: 'rel-1' },
+        },
+      ],
+      'Tim White'
+    )[0]!;
+    const release = buildLibraryReleaseAssets([
+      buildRelease({ id: 'rel-1', title: 'Neon Skyline' }),
+    ])[0]!;
+    const [enrichedVideo, enrichedRelease] = attachLibraryProductGraph(
+      [video, release],
+      {
+        merchProducts: [{ id: 'merch-1', title: 'Tour Tee' }],
+        relationships: [
+          {
+            id: 'rel-graph-1',
+            kind: 'features_merch',
+            subjectType: 'youtube_video',
+            subjectId: 'yt-1',
+            objectType: 'merch_product',
+            objectId: 'merch-1',
+            status: 'active',
+            createdAt: '2026-09-01T00:00:00.000Z',
+          },
+        ],
+        postReleaseBundle: {
+          downloads: [
+            {
+              id: 'dl-1',
+              releaseId: 'rel-1',
+              title: 'WAV',
+              fileName: 'neon.wav',
+            },
+          ],
+          findings: [],
+          rightsholders: [],
+          stats: [],
+        },
+      }
+    );
+    expect(enrichedVideo?.relatedMerchTitles).toEqual(['Tour Tee']);
+    expect(enrichedRelease?.postReleaseDownloadCount).toBe(1);
+  });
+
+  it('attaches product-graph state after version stacking so canonical rows keep it', () => {
+    const assets = buildLibraryReleaseAssets([
+      buildRelease({
+        id: 'sparse',
+        title: 'All This Noise EP',
+        totalTracks: 0,
+        releaseDate: '2026-01-01T00:00:00.000Z',
+      }),
+      buildRelease({
+        id: 'full',
+        title: 'All This Noise (Remixed)',
+        totalTracks: 6,
+        releaseDate: '2026-02-01T00:00:00.000Z',
+      }),
+    ]);
+    const stacked = attachLibraryProductGraph(
+      stackLibraryReleaseVersions(assets),
+      {
+        merchProducts: [{ id: 'merch-1', title: 'Tour Tee' }],
+        relationships: [
+          {
+            id: 'rel-graph-1',
+            kind: 'features_merch',
+            subjectType: 'release',
+            subjectId: 'full',
+            objectType: 'merch_product',
+            objectId: 'merch-1',
+            status: 'active',
+            createdAt: '2026-09-01T00:00:00.000Z',
+          },
+        ],
+        postReleaseBundle: {
+          downloads: [
+            {
+              id: 'dl-1',
+              releaseId: 'full',
+              title: 'WAV',
+              fileName: 'noise.wav',
+            },
+          ],
+          findings: [],
+          rightsholders: [],
+          stats: [],
+        },
+      }
+    );
+
+    expect(stacked.map(asset => asset.id)).toEqual(['full']);
+    expect(stacked[0]?.relatedMerchTitles).toEqual(['Tour Tee']);
+    expect(stacked[0]?.relationshipCount).toBe(1);
+    expect(stacked[0]?.postReleaseDownloadCount).toBe(1);
   });
 });

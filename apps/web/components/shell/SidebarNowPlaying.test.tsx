@@ -20,6 +20,9 @@ describe('SidebarNowPlaying', () => {
     );
     expect(screen.getByText('Lost in the Light')).toBeInTheDocument();
     expect(screen.getByText('Bahamas')).toBeInTheDocument();
+    expect(
+      document.querySelector('[data-artwork-frame="thumbnail"]')
+    ).toBeInTheDocument();
   });
 
   it('renders nothing when track has no title and no artwork', () => {

@@ -1,49 +1,101 @@
 name: Dependabot Auto-Merge
 
-# Auto-merges Dependabot PRs for semver patch + minor bumps after CI green.
-# Major bumps still route to Tim manually (per .github/dependabot.yml ignore list).
-# Re-evaluate (per CLAUDE.md conditional-decision rule): if any patch/minor
-# auto-merge causes a Sentry-gated rollback, narrow scope to patch-only OR
-# require manual review. Added 2026-05-18 per autoplan R2.3.
+# controller-hop-exception: jovie-controller-hop/v1
+# accountable-writer: Gem
+# necessary-trust-boundary: pull_request_target reads trusted base policy before reconciling Dependabot-authored PR state.
+# revisit-trigger: Remove this hop when Dependabot exposes equivalent exact-head recreate and native-admission policy hooks.
+
+# Keeps safe Dependabot work durable until native merge-queue admission. The
+# event actor is not the authority: maintainer and controller synchronizations
+# must preserve policy derived from the PR author and Dependabot metadata.
+#
+# Ship now: patch/minor updates queue automatically; confirmed conflicts are
+# recreated; unmerged closes without a durable hold are reopened. Majors are
+# visible but held for migration/release review.
+# Re-evaluate when: a patch/minor update with these receipts causes a rollback.
+# Then: narrow the affected package family, not the global safe-update lane
+# (JOV-5465).
 
 on:
-  pull_request:
-    types: [opened, reopened, synchronize, ready_for_review]
+  # Write-capable reconciliation must execute the default-branch workflow and
+  # trusted base policy, never action refs proposed by the dependency PR.
+  pull_request_target:
+    types: [opened, reopened, synchronize, labeled, unlabeled, closed]
 
 permissions: {}
 
 jobs:
   auto-merge:
-    if: github.actor == 'dependabot[bot]' && github.event.pull_request.draft == false
+    if: >-
+      github.event.pull_request.user.login == 'dependabot[bot]' &&
+      github.event.pull_request.base.ref == 'main'
     # Metadata and queue-intent API calls must not consume a fixed test runner.
     runs-on: ubuntu-latest
     permissions:
-      contents: write
+      contents: read
       pull-requests: write
     steps:
       - name: Fetch Dependabot metadata
         id: meta
         uses: dependabot/fetch-metadata@25dd0e34f4fe68f24cc83900b1fe3fe149efef98 # v3.1.0
         with:
-          github-token: ${{ secrets.GITHUB_TOKEN }}
+          github-token: ${{ github.token }}
 
-      - name: Request native merge-queue enrollment (patch + minor)
-        if: steps.meta.outputs.update-type == 'version-update:semver-patch' || steps.meta.outputs.update-type == 'version-update:semver-minor'
+      - name: Checkout trusted reconciliation policy
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.event.pull_request.base.sha }}
+          fetch-depth: 1
+          persist-credentials: false
+          sparse-checkout: scripts/dependabot-update-policy.mjs
+          sparse-checkout-cone-mode: false
+
+      - name: Classify exact Dependabot event
+        id: policy
         env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          DEPENDABOT_UPDATE_TYPE: ${{ steps.meta.outputs.update-type }}
+        run: node scripts/dependabot-update-policy.mjs
+
+      - name: Leave native autoenroll as the queue writer (patch + minor)
+        if: steps.policy.outputs.decision == 'queue'
+        env:
+          PR_URL: ${{ github.event.pull_request.html_url }}
+          DEPENDENCY_NAMES: ${{ steps.meta.outputs.dependency-names }}
+          UPDATE_TYPE: ${{ steps.meta.outputs.update-type }}
+        run: |
+          echo "Dependency: $DEPENDENCY_NAMES"
+          echo "Update type: $UPDATE_TYPE"
+          echo "Opened $PR_URL. Native autoenroll owns queue mutation; the merge-queue label is retired."
+
+      - name: Recreate confirmed-conflict safe update
+        if: steps.policy.outputs.decision == 'recreate'
+        env:
+          GH_TOKEN: ${{ github.token }}
           PR_URL: ${{ github.event.pull_request.html_url }}
         run: |
-          echo "Dependency: ${{ steps.meta.outputs.dependency-names }}"
-          echo "Update type: ${{ steps.meta.outputs.update-type }}"
-          # The label is durable intent; Merge Queue Auto-Enroll owns the
-          # exact-head GitHub native queue mutation.
-          gh pr edit --add-label "merge-queue" "$PR_URL"
+          gh pr comment "$PR_URL" --body "@dependabot recreate"
 
-      - name: Note major bump requires manual review
-        if: steps.meta.outputs.update-type == 'version-update:semver-major'
+      - name: Release recreated exact head to native autoenroll
+        if: steps.policy.outputs.decision == 'queue-recovered'
         env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_TOKEN: ${{ github.token }}
           PR_URL: ${{ github.event.pull_request.html_url }}
         run: |
-          echo "Major bump for ${{ steps.meta.outputs.dependency-names }} — manual review required"
-          gh pr comment "$PR_URL" --body "Major version bump detected. Auto-merge skipped — manual review required per CLAUDE.md conditional-decision rule (re-evaluate trigger: if any major bump auto-merge causes a Sentry-gated rollback)."
+          gh pr edit --remove-label "needs-conflict-resolution" "$PR_URL"
+
+      - name: Reopen safe update closed without a durable hold
+        if: steps.policy.outputs.decision == 'reopen-recreate'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          PR_URL: ${{ github.event.pull_request.html_url }}
+        run: |
+          gh pr reopen "$PR_URL"
+          gh pr comment "$PR_URL" --body "@dependabot recreate"
+
+      - name: Note visible major for migration and release review
+        if: steps.policy.outputs.decision == 'hold-major'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          PR_URL: ${{ github.event.pull_request.html_url }}
+        run: |
+          gh pr comment "$PR_URL" --body "Major dependency update detected. Migration notes, targeted compatibility tests, and release/runtime proof are requested; native admission remains controlled by exact-head CI and the merge queue."

@@ -10,6 +10,9 @@ files:
   - assets/icon.png
   - assets/icon-staging.png
   - package.json
+extraResources:
+  - from: build/build-identity.json
+    to: build-identity.json
 mac:
   category: public.app-category.music
   darkModeSupport: true

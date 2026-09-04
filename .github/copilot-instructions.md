@@ -10,12 +10,12 @@ This repository uses GitHub Copilot (including the Coding Agent) to propose and 
 - **Auth**: Clerk (migrated from Supabase Auth)
 - **Database**: Neon PostgreSQL with Drizzle ORM (migrated from Supabase)
 - **Package Manager**: pnpm 9.15.4 (exact version required - NOT npm or yarn)
-- **Node.js**: 22.23.1 required (see `.nvmrc`)
+- **Node.js**: 22.23.2 required (see `.nvmrc`)
 - **Env validation**: `lib/env.ts` (Zod-based validation)
 - **Branches**: `develop` (work) → `preview` (staging) → `production`
 - **CI gates**: `lint`, `typecheck`, `test`, `build`, and e2e
 
-> **IMPORTANT FOR AI AGENTS**: Verify `node --version` shows v22.23.1+ (22.x) and `pnpm --version` shows 9.15.4 BEFORE running any commands. Using older Node versions will cause failures.
+> **IMPORTANT FOR AI AGENTS**: Verify `node --version` shows v22.23.2+ (22.x) and `pnpm --version` shows 9.15.4 BEFORE running any commands. Using older Node versions will cause failures.
 
 ## Critical Setup Requirements
 
@@ -32,7 +32,7 @@ Run these commands in order for a fresh repository clone:
 ./scripts/setup.sh
 
 # 1. VERIFY NODE VERSION FIRST (must be v22.x)
-node --version  # Expected: v22.23.1 or higher
+node --version  # Expected: v22.23.2 or higher
 
 # 2. Ensure exact pnpm version via Corepack
 corepack enable pnpm
@@ -487,7 +487,7 @@ This repo includes [gstack](https://github.com/garrytan/gstack) as a git submodu
 
 | Skill | Purpose |
 |-------|---------|
-| `/ship` | Automated release: merge main, run tests, review diff, bump VERSION, update CHANGELOG, commit, push, create PR |
+| `/ship` | Automated PR preparation: merge main, run tests, review diff, commit, push, create/update PR; no pre-land CHANGELOG |
 | `/review` | Pre-landing PR review for SQL safety, trust boundary violations, side effects |
 | `/plan-ceo-review` | Founder mode: rethink problems, find the 10-star product |
 | `/plan-eng-review` | Eng manager mode: lock in execution plans with architecture and edge cases |

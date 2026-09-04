@@ -2,6 +2,7 @@ import 'server-only';
 
 import { randomUUID } from 'node:crypto';
 import type { ToolSet, UIMessage } from 'ai';
+import { classifyChatStreamFailure } from '@/lib/ai/gateway-errors';
 import { getSessionContext } from '@/lib/auth/session';
 import { resolveChatAccountContext } from '@/lib/chat/account-context';
 import { sanitizeAssistantResponse } from '@/lib/chat/prompt-disclosure-guard';
@@ -41,6 +42,8 @@ import {
   embedMobileMerchArtifactsInContent,
   mobileMerchToolEventsFromResults,
 } from '@/lib/mobile/chat/tool-artifacts';
+import { handleMobileOvChatTurn } from '@/lib/mobile/chat/turn-handler-ov';
+import { isOvConversationTitle } from '@/lib/mobile/workspace';
 import { checkAiChatRateLimitForPlan } from '@/lib/rate-limit';
 
 function buildUiMessagesFromHistory(
@@ -126,7 +129,32 @@ export async function handleMobileChatTurn(
     );
   }
 
+  if (parsed.chatMode === 'ov') {
+    return handleMobileOvChatTurn({
+      userId,
+      profileId: session.profile.id,
+      parsed,
+      signal,
+    });
+  }
+
   const profileId = session.profile.id;
+
+  if (parsed.conversationId) {
+    const existing = await getMobileConversationDetail({
+      conversationId: parsed.conversationId,
+      creatorProfileId: profileId,
+      limit: 1,
+    });
+    if (existing && isOvConversationTitle(existing.conversation.title)) {
+      return errorNdjsonResponse(
+        400,
+        'WORKSPACE_MISMATCH',
+        'That conversation belongs to Ovie mode.'
+      );
+    }
+  }
+
   const reservation = await reserveChatTurn({
     conversationId: parsed.conversationId ?? null,
     clientTurnId: parsed.clientTurnId,
@@ -351,16 +379,14 @@ export async function handleMobileChatTurn(
     signal,
     requestId,
     onStreamError: async error => {
-      const message =
-        error instanceof Error ? error.message : 'The assistant stream failed.';
+      const failure = classifyChatStreamFailure(error);
       await persistTerminalAssistantMessage({
         conversationId: reservation.conversationId,
         turnId: reservation.turn.id,
         status: 'failed_model_error',
-        content:
-          'Jovie hit a temporary issue while processing your message. Please retry.',
-        errorCode: 'CHAT_STREAM_FAILED',
-        errorMessage: message,
+        content: failure.userMessage,
+        errorCode: failure.errorCode,
+        errorMessage: failure.errorMessage,
       });
     },
   });
@@ -435,12 +461,12 @@ export async function handleMobileChatTurn(
           turnId: reservation.turn.id,
           text: finalText,
         });
-      } catch {
+      } catch (error) {
+        const failure = classifyChatStreamFailure(error);
         enqueue({
           type: 'error',
-          errorCode: 'CHAT_STREAM_FAILED',
-          message:
-            'Jovie hit a temporary issue while processing your message. Please retry.',
+          errorCode: failure.errorCode,
+          message: failure.userMessage,
         });
       } finally {
         controller.close();

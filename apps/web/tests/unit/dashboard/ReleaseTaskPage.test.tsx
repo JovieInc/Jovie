@@ -97,7 +97,7 @@ describe('ReleaseTaskPage', () => {
     });
   });
 
-  it('renders release tasks inside the canonical page shell toolbar', () => {
+  it('renders release tasks with a canonical toolbar back link and release context', () => {
     render(
       <ReleaseTaskPage
         profileId='profile_1'
@@ -110,9 +110,15 @@ describe('ReleaseTaskPage', () => {
       'aria-label',
       'The Deep End tasks'
     );
-    expect(screen.getByText('Releases')).toBeVisible();
-    expect(screen.getByText('The Deep End')).toBeVisible();
-    expect(screen.getByText('Tasks')).toBeVisible();
+    const toolbarContext = screen.getByTestId('release-task-toolbar-context');
+    expect(
+      within(toolbarContext).getByRole('link', { name: 'Back to releases' })
+    ).toHaveAttribute('href', '/app/releases');
+    expect(within(toolbarContext).getByText('The Deep End')).toHaveClass(
+      'min-w-0',
+      'truncate'
+    );
+    expect(within(toolbarContext).queryByText('Tasks')).not.toBeInTheDocument();
     expect(screen.getByTestId('release-task-checklist')).toHaveTextContent(
       'release_1'
     );
@@ -124,9 +130,12 @@ describe('ReleaseTaskPage', () => {
       'rounded-lg',
       'border',
       'border-(--app-shell-border)',
-      'bg-surface-1',
+      'bg-surface-0',
       'p-1',
       'shadow-app-control'
+    );
+    expect(screen.getByTestId('release-task-up-next-card')).not.toHaveClass(
+      'bg-surface-1'
     );
   });
 
@@ -236,9 +245,12 @@ describe('ReleaseTaskPage', () => {
       'rounded-lg',
       'border',
       'border-(--app-shell-border)',
-      'bg-surface-1',
+      'bg-surface-0',
       'p-3',
       'shadow-app-control'
     );
+    expect(
+      screen.getByTestId('release-task-skeleton-summary-card')
+    ).not.toHaveClass('bg-surface-1');
   });
 });

@@ -46,9 +46,22 @@ enum MobileChatTimelineRole: String, Equatable, Sendable {
 enum MobileChatTimelineStatus: Equatable, Sendable {
   case idle
   case sending
+  case queued
+  case running
+  case retrying
   case streaming
   case failed
+  case canceled
   case completed
+
+  var isInFlight: Bool {
+    switch self {
+    case .sending, .queued, .running, .retrying, .streaming:
+      return true
+    case .idle, .failed, .canceled, .completed:
+      return false
+    }
+  }
 }
 
 struct MobileChatTimelineItem: Identifiable, Equatable, Sendable {
@@ -59,12 +72,15 @@ struct MobileChatTimelineItem: Identifiable, Equatable, Sendable {
   let clientTurnId: String?
   var requiresWebHandoff: Bool
   var handoffURL: URL?
+  var turnId: String? = nil
+  var eveWorkId: String? = nil
 }
 
 struct CachedChatSnapshot: Codable, Equatable, Sendable {
   let conversations: [MobileConversationSummary]
   let messagesByConversationID: [String: [MobileConversationMessage]]
   let cachedAt: Date
+  var activeConversationID: String? = nil
 }
 
 /// Deterministic fixture timeline used only by `.uiTestingChatEntityFixture`
@@ -142,7 +158,7 @@ enum MobileChatAllComponentsFixture {
   """
 
   static let merchProductOptionsJSON =
-    #"{"success":true,"generationId":"gen-1","options":[{"id":"opt-1","option_number":1,"design_name":"Neon Pulse Tee","product_type":"Tee","concept":"Bold neon typography.","mockup_urls":["https://cdn.test/neon.jpg"],"price_recommendation":{"sale_price":"$45.00"}}]}"#
+    #"{"success":true,"generationId":"gen-1","options":[{"id":"opt-1","option_number":1,"design_name":"Neon Pulse Tee","product_type":"Tee","concept":"Bold neon typography.","mockup_urls":["https://cdn.test/neon.jpg"],"price_recommendation":{"sale_price":"$45.00"}},{"id":"opt-2","option_number":2,"design_name":"Signal Bloom Hoodie","product_type":"Hoodie","concept":"Oversized signal-flower mark.","mockup_urls":[],"price_recommendation":{"sale_price":"$72.00"}},{"id":"opt-3","option_number":3,"design_name":"Tour Grid Cap","product_type":"Cap","concept":"Tour-date grid embroidery.","mockup_urls":[],"price_recommendation":{"sale_price":"$34.00"}}]}"#
 
   static var merchProductOptions: String {
     """
@@ -262,10 +278,63 @@ struct MobileChatTurnRequest: Encodable, Sendable {
   let clientMessageId: String
   let text: String
   let source: String
+  let chatMode: String?
+
+  init(
+    conversationId: String?,
+    clientTurnId: String,
+    clientMessageId: String,
+    text: String,
+    source: String,
+    chatMode: String? = nil
+  ) {
+    self.conversationId = conversationId
+    self.clientTurnId = clientTurnId
+    self.clientMessageId = clientMessageId
+    self.text = text
+    self.source = source
+    self.chatMode = chatMode
+  }
+
+  enum CodingKeys: String, CodingKey {
+    case conversationId
+    case clientTurnId
+    case clientMessageId
+    case text
+    case source
+    case chatMode
+  }
+
+  func encode(to encoder: Encoder) throws {
+    var container = encoder.container(keyedBy: CodingKeys.self)
+    try container.encodeIfPresent(conversationId, forKey: .conversationId)
+    try container.encode(clientTurnId, forKey: .clientTurnId)
+    try container.encode(clientMessageId, forKey: .clientMessageId)
+    try container.encode(text, forKey: .text)
+    try container.encode(source, forKey: .source)
+    try container.encodeIfPresent(chatMode, forKey: .chatMode)
+  }
+}
+
+struct EyesFreeCaptureAPIRequest: Encodable, Sendable {
+  let destination: String
+  let transcript: String
+  let clientTurnId: String
+  let clientMessageId: String
+}
+
+struct EyesFreeCaptureAPIResponse: Decodable, Equatable, Sendable {
+  let destination: String
+  let status: String
+  let conversationId: String?
+  let turnId: String?
+  let readback: String
+  let errorCode: String?
 }
 
 enum MobileChatStreamEvent: Equatable, Sendable {
   case turnReserved(conversationId: String, turnId: String, clientTurnId: String)
+  case turnState(clientTurnId: String, state: String, eveWorkId: String?)
   case assistantDelta(clientTurnId: String, text: String)
   case assistantCompleted(
     clientTurnId: String,

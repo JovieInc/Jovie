@@ -348,6 +348,18 @@ export async function attributeLeadPaidConversionByClerkUserId(
 
   if (!user) return;
 
+  await attributeLeadPaidConversionByAppUserId(user.id, subscriptionId);
+}
+
+/**
+ * Attribute a paid conversion using the canonical app `users.id`.
+ * Better Auth checkout metadata carries this UUID directly; legacy Clerk
+ * callers remain explicit through attributeLeadPaidConversionByClerkUserId.
+ */
+export async function attributeLeadPaidConversionByAppUserId(
+  appUserId: string,
+  subscriptionId: string
+): Promise<void> {
   const [lead] = await db
     .select({
       id: leads.id,
@@ -355,7 +367,7 @@ export async function attributeLeadPaidConversionByClerkUserId(
       paidSubscriptionId: leads.paidSubscriptionId,
     })
     .from(leads)
-    .where(eq(leads.signupUserId, user.id))
+    .where(eq(leads.signupUserId, appUserId))
     .limit(1);
 
   if (!lead || lead.paidAt) {
@@ -377,7 +389,7 @@ export async function attributeLeadPaidConversionByClerkUserId(
       leadId: lead.id,
       eventType: 'paid_converted',
       metadata: {
-        signupUserId: user.id,
+        signupUserId: appUserId,
         stripeSubscriptionId: subscriptionId,
       },
     },

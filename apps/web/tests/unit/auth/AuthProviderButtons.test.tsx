@@ -3,7 +3,7 @@ import { describe, expect, it } from 'vitest';
 import {
   AuthProviderButtonSlot,
   AuthProviderButtonSlots,
-} from '@/features/auth';
+} from '@/components/features/auth/AuthProviderButtons';
 import { getEnabledAuthOAuthProviders } from '@/lib/auth/oauth-providers';
 
 describe('AuthProviderButtonSlots', () => {
@@ -16,6 +16,7 @@ describe('AuthProviderButtonSlots', () => {
       .getByText('Loading social sign-in options')
       .closest('fieldset');
     expect(slots).not.toBeNull();
+    expect(slots).toHaveClass('gap-3');
     expect(
       within(slots!).getByRole('button', {
         name: 'Continue with Google loading',
@@ -36,5 +37,32 @@ describe('AuthProviderButtonSlots', () => {
     expect(
       screen.getByRole('button', { name: 'Continue with Google' })
     ).toBeEnabled();
+    expect(
+      screen.getByRole('button', { name: 'Continue with Google' }).className
+    ).toContain('shadow-button');
+    expect(
+      screen.getByRole('button', { name: 'Continue with Google' }).className
+    ).toContain('h-8');
+    expect(
+      screen.getByRole('button', { name: 'Continue with Google' }).className
+    ).toContain('min-h-8');
+    expect(
+      screen.getByRole('button', { name: 'Continue with Google' }).className
+    ).toContain('gap-(--space-2)');
+    expect(
+      screen.getByRole('button', { name: 'Continue with Google' }).className
+    ).not.toContain('--linear-gap-');
+    expect(
+      screen.getByRole('button', { name: 'Continue with Google' }).className
+    ).toContain('before:h-11');
+    expect(
+      screen.getByRole('button', { name: 'Continue with Google' }).className
+    ).toContain('before:min-w-11');
+    expect(
+      screen.getByRole('button', { name: 'Continue with Google' }).className
+    ).not.toContain('--linear-shadow-button');
+    expect(
+      screen.getByRole('button', { name: 'Continue with Google' }).className
+    ).not.toContain('--linear-button-height-md');
   });
 });

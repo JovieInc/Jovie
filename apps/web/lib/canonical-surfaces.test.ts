@@ -33,6 +33,24 @@ describe('canonical surface registry', () => {
     }
   });
 
+  it('pins the audited live owners', () => {
+    expect(getCanonicalSurface('homepage').sourceComponent).toContain(
+      'HomepageEditorialHero'
+    );
+    expect(getCanonicalSurface('homepage').routeOwner).toContain(
+      'PublicPageShell'
+    );
+    expect(getCanonicalSurface('public-profile').sourceComponent).toContain(
+      'StaticArtistPage'
+    );
+    expect(getCanonicalSurface('release-landing').sourceComponent).toContain(
+      'ReleaseLandingPage'
+    );
+    expect(getCanonicalSurface('dashboard-releases').sourceComponent).toContain(
+      'ShellReleasesView'
+    );
+  });
+
   it('pins the current review routes', () => {
     expect(getCanonicalSurface('homepage').reviewRoute).toBe('/');
     expect(getCanonicalSurface('public-profile').reviewRoute).toBe(

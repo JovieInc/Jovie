@@ -1,6 +1,12 @@
 import { Badge, Button } from '@jovie/ui';
 import type { ColumnDef } from '@tanstack/react-table';
-import { CheckCircle2, CircleSlash, Plus, Settings2 } from 'lucide-react';
+import {
+  CheckCircle2,
+  CircleSlash,
+  FileCheck2,
+  Plus,
+  Settings2,
+} from 'lucide-react';
 import type { Metadata } from 'next';
 import Link from 'next/link';
 import { Suspense } from 'react';
@@ -111,6 +117,12 @@ export default async function InvestorPipelinePage() {
       actions={
         <div className='flex items-center gap-2'>
           <Button variant='secondary' size='sm' asChild>
+            <Link href={APP_ROUTES.ADMIN_INVESTOR_UPDATES}>
+              <FileCheck2 className='mr-1.5 h-3.5 w-3.5' />
+              Updates
+            </Link>
+          </Button>
+          <Button variant='secondary' size='sm' asChild>
             <Link href={APP_ROUTES.ADMIN_INVESTORS_SETTINGS}>
               <Settings2 className='mr-1.5 h-3.5 w-3.5' />
               Settings
@@ -133,7 +145,7 @@ async function InvestorPipelineTable() {
   if (links.length === 0) {
     return (
       <ContentSurfaceCard className='overflow-hidden p-0'>
-        <div className='px-(--linear-app-header-padding-x) py-6 text-app text-secondary-token'>
+        <div className='px-(--app-shell-header-padding-x) py-6 text-app text-secondary-token'>
           No investor links yet.
         </div>
       </ContentSurfaceCard>

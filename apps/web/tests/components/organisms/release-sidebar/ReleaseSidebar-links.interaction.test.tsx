@@ -120,15 +120,18 @@ vi.mock('@/components/molecules/drawer', () => ({
     subtitle,
     meta,
     actions,
+    image,
     stableLayout,
   }: {
     title: string;
     subtitle?: React.ReactNode;
     meta?: React.ReactNode;
     actions?: React.ReactNode;
+    image?: React.ReactNode;
     stableLayout?: boolean;
   }) => (
     <div data-testid='entity-header-card' data-stable-layout={stableLayout}>
+      {image}
       <h2 className='text-sm line-clamp-1 min-h-6'>{title}</h2>
       {subtitle}
       <div data-testid='entity-header-meta-slot'>{meta}</div>
@@ -169,7 +172,19 @@ vi.mock('@/components/molecules/drawer', () => ({
     <div data-testid='async-toggle'>{label}</div>
   ),
   DrawerCardActionBar: () => <div data-testid='drawer-card-action-bar' />,
-  DrawerMediaThumb: () => <div data-testid='drawer-media-thumb' />,
+  DrawerMediaThumb: ({
+    sizeClassName,
+    imageClassName,
+  }: {
+    sizeClassName?: string;
+    imageClassName?: string;
+  }) => (
+    <div
+      data-testid='drawer-media-thumb'
+      data-image-class-name={imageClassName}
+      className={sizeClassName}
+    />
+  ),
   DrawerSurfaceCard: ({
     children,
     className,
@@ -637,6 +652,24 @@ describe('ReleaseSidebar inspector cards', () => {
       within(header).getByRole('heading', { name: mockRelease.title })
     ).toHaveClass('text-sm', 'line-clamp-1', 'min-h-6');
     expect(screen.getByTestId('entity-header-meta-slot')).toBeInTheDocument();
+  });
+
+  it('keeps static artwork fit and hover radius on the 40px contract', () => {
+    render(<ReleaseSidebar release={mockRelease} {...defaultProps} />);
+
+    const thumbnail = screen.getByTestId('drawer-media-thumb');
+    expect(thumbnail).toHaveClass('h-10', 'w-10', 'rounded-xs');
+    expect(thumbnail).not.toHaveClass('rounded-lg');
+    expect(thumbnail).toHaveAttribute(
+      'data-image-class-name',
+      'object-contain'
+    );
+
+    const previewButton = screen.getByRole('button', {
+      name: 'No preview available',
+    });
+    expect(previewButton).toHaveClass('rounded-xs');
+    expect(previewButton).not.toHaveClass('rounded-lg');
   });
 
   it('resets the active tab to Details when the release changes', async () => {

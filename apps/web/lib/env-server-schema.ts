@@ -128,8 +128,12 @@ export const ServerEnvSchema = z.object({
   // Bandsintown configuration
   BANDSINTOWN_APP_ID: z.string().optional(),
 
-  // Vercel Blob
+  // Vercel Blob — production/preview authenticate via OIDC
+  // (VERCEL_OIDC_TOKEN + BLOB_STORE_ID); the static token is the local-dev
+  // fallback only.
   BLOB_READ_WRITE_TOKEN: z.string().optional(),
+  BLOB_STORE_ID: z.string().optional(),
+  BLOB_WEBHOOK_PUBLIC_KEY: z.string().optional(),
 
   // Telegram Bot (for asset ingestion webhook)
   TELEGRAM_BOT_TOKEN: z.string().optional(),
@@ -156,6 +160,13 @@ export const ServerEnvSchema = z.object({
   STRIPE_PRICE_PRO_MONTHLY: z.string().startsWith('price_').optional(),
   STRIPE_PRICE_PRO_ANNUAL: z.string().startsWith('price_').optional(),
   STRIPE_PRICE_PRO_YEARLY: z.string().startsWith('price_').optional(),
+
+  // Product-specific founder offer. Maps to Pro base entitlements while the
+  // exact price ID remains the YouTube thumbnail entitlement source of truth.
+  STRIPE_PRICE_YOUTUBE_THUMBNAILS_FOUNDER_MONTHLY: z
+    .string()
+    .startsWith('price_')
+    .optional(),
 
   // Stripe price IDs for Growth tier (legacy, kept for backward compat)
   STRIPE_PRICE_GROWTH_MONTHLY: z.string().startsWith('price_').optional(),
@@ -325,6 +336,8 @@ export const ServerEnvSchema = z.object({
   GOOGLE_OAUTH_CLIENT_SECRET: z.string().optional(),
   /** Base URL for the Google OAuth redirect URI, e.g. https://jov.ie/api/connectors/google */
   GOOGLE_OAUTH_REDIRECT_URI_BASE: z.string().url().optional(),
+  /** Base URL for the YouTube OAuth redirect URI, e.g. https://jov.ie/api/connectors/youtube */
+  YOUTUBE_OAUTH_REDIRECT_URI_BASE: z.string().url().optional(),
   /** Days before/after today to fetch Calendar events (default: 90 past, 365 future) */
   GOOGLE_CALENDAR_DEFAULT_WINDOW_DAYS: z.string().optional(),
   /** Days of Gmail history to scan for booking signals (default: 30) */
@@ -406,6 +419,12 @@ export const ServerEnvSchema = z.object({
    */
   OUTBOUND_SMS_ENABLED: z.string().optional(),
   /**
+   * Live send for the one-time artist first-sale SMS.
+   * Unset/false is dry-run: the webhook still claims the milestone and logs,
+   * but does not call Twilio. OUTBOUND_SMS_ENABLED remains the provider gate.
+   */
+  FIRST_SALE_TEXT_LIVE: z.string().optional(),
+  /**
    * Demo override that bypasses the existing SMS Pro-gating in
    * subscribeToNotificationsDomain when set to 'true'. Off by default;
    * intended for the YC demo window only. See autoplan decision row #32 / F7.
@@ -469,6 +488,8 @@ export const ENV_KEYS = [
   'APPLE_WALLET_APNS_PRODUCTION',
   'BANDSINTOWN_APP_ID',
   'BLOB_READ_WRITE_TOKEN',
+  'BLOB_STORE_ID',
+  'BLOB_WEBHOOK_PUBLIC_KEY',
   'TELEGRAM_BOT_TOKEN',
   'TELEGRAM_WEBHOOK_SECRET',
   'STRIPE_SECRET_KEY',
@@ -485,6 +506,7 @@ export const ENV_KEYS = [
   'STRIPE_PRICE_PRO_MONTHLY',
   'STRIPE_PRICE_PRO_ANNUAL',
   'STRIPE_PRICE_PRO_YEARLY',
+  'STRIPE_PRICE_YOUTUBE_THUMBNAILS_FOUNDER_MONTHLY',
   'STRIPE_PRICE_GROWTH_MONTHLY',
   'STRIPE_PRICE_GROWTH_YEARLY',
   'STRIPE_PRICE_MAX_MONTHLY',
@@ -606,10 +628,12 @@ export const ENV_KEYS = [
   'TWILIO_VERIFY_SERVICE_SID',
   'NATIVE_SMS_ENABLED',
   'OUTBOUND_SMS_ENABLED',
+  'FIRST_SALE_TEXT_LIVE',
   'SMS_DEMO_BYPASS_PRO_GATE',
   'GOOGLE_OAUTH_CLIENT_ID',
   'GOOGLE_OAUTH_CLIENT_SECRET',
   'GOOGLE_OAUTH_REDIRECT_URI_BASE',
+  'YOUTUBE_OAUTH_REDIRECT_URI_BASE',
   'GOOGLE_CALENDAR_DEFAULT_WINDOW_DAYS',
   'GMAIL_HISTORY_WINDOW_DAYS',
   'AI_CONNECTORS_DAILY_TOKEN_BUDGET',

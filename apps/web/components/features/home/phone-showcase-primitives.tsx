@@ -69,7 +69,7 @@ export function PhoneTourMobileSection() {
             <span className='inline-flex items-center gap-1.5 rounded-full border border-subtle px-3 py-1 text-xs font-medium tracking-tight text-tertiary-token'>
               One profile. Every way fans support you.
             </span>
-            <h2 className='marketing-h2-linear text-primary-token'>
+            <h2 className='marketing-h2-linear text-primary-token line-clamp-2'>
               The Right Action For Every Fan.
             </h2>
             <p className='max-w-100 marketing-lead-linear text-secondary-token'>

@@ -59,14 +59,17 @@ function isUnavailablePage(text: string): boolean {
 }
 
 function artistNameLocator(page: Page) {
-  return page.getByText('Dua Lipa', { exact: true }).first();
+  return page.getByRole('heading', { name: 'Dua Lipa', level: 1 });
 }
 
 async function assertProfilePageHealthy(page: Page) {
+  // innerText is the visible-user contract. textContent includes hidden
+  // fallback/template copy (including stale "profile not found") and would
+  // false-skip a healthy production profile.
   const bodyText =
     (await page
       .locator('body')
-      .textContent()
+      .innerText()
       .catch(() => '')) ?? '';
   expect(
     bodyText.toLowerCase().includes('application error') ||

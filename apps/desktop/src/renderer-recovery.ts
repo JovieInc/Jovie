@@ -13,6 +13,11 @@
 // backgroundColor forever. The boot watchdog covers that path: after a real
 // app navigation finishes, the hosted web app must ping `app-booted` within
 // RENDERER_BOOT_WATCHDOG_MS or we show the recovery shell.
+//
+// JOV-5339: that recovery page used to always say "check your connection".
+// Classify the real failure, retry transient local compile/restart misses,
+// and never clobber a session that already painted because a later HMR ping
+// was skipped.
 
 export type RendererRecoveryAction = 'ignore' | 'reload' | 'failure-page';
 
@@ -22,18 +27,459 @@ export type RendererRecoveryAction = 'ignore' | 'reload' | 'failure-page';
 // abnormal-exit, launch-failed, integrity-failure) is a real loss of the view.
 const NON_CRASH_REASONS = new Set(['clean-exit']);
 
-/** How long to wait after did-finish-load for the renderer app-booted ping. */
+/**
+ * Production / preview wait after did-finish-load for `app-booted`.
+ * Local first-compile is longer — see `LOCAL_RENDERER_BOOT_WATCHDOG_MS`.
+ */
 export const RENDERER_BOOT_WATCHDOG_MS = 14_000;
 
 /**
- * How long to wait after a main-frame hosted navigation *starts* for the load
- * to finish or fail. JOV-3595 only armed after `did-finish-load`, so a hung
- * or intercepted first navigation (ready-to-show already revealed the near-
- * black backgroundColor) stayed black forever. This deadline covers that gap.
+ * Production / preview wait after a main-frame hosted navigation starts.
+ * JOV-3595 only armed after `did-finish-load`, so a hung first navigation
+ * stayed black. Local first-compile is longer — see
+ * `LOCAL_RENDERER_LOAD_WATCHDOG_MS`.
  */
 export const RENDERER_LOAD_WATCHDOG_MS = 18_000;
 
+/**
+ * Local Next compiles and Fast Refresh routinely exceed the packaged
+ * watchdogs. Keep recovery for production/staging (JOV-5086); Jovie Local
+ * must wait for the hosted shell instead of swapping in the failure page.
+ */
+export function shouldArmRendererWatchdogsForAppEnv(appEnv: string): boolean {
+  return appEnv !== 'local';
+}
+
+/**
+ * Measured on Tim's Mac 5:42 PT (JOV-5339): Next.js printed Ready in
+ * 457ms, then first GET / sat in "Compiling / ..." and returned HTTP
+ * 200 only after ~15.5s. An 8s curl got 0 bytes. An 18s load watchdog
+ * plus a following 14s boot watchdog paints recovery on a healthy
+ * `dev:web:local` compile. Local skips these timers entirely
+ * (`shouldArmRendererWatchdogsForAppEnv`); keep the longer values for
+ * any remaining local probe that is still armed.
+ */
+export const LOCAL_RENDERER_LOAD_WATCHDOG_MS = 60_000;
+
+/**
+ * Local boot wait after Chromium commits. First compile can still be
+ * hydrating / streaming after the 200.
+ */
+export const LOCAL_RENDERER_BOOT_WATCHDOG_MS = 45_000;
+
+export function rendererWatchdogMs(
+  appEnv: 'production' | 'staging' | 'local'
+): {
+  bootMs: number;
+  loadMs: number;
+} {
+  if (appEnv === 'local') {
+    return {
+      bootMs: LOCAL_RENDERER_BOOT_WATCHDOG_MS,
+      loadMs: LOCAL_RENDERER_LOAD_WATCHDOG_MS,
+    };
+  }
+  return {
+    bootMs: RENDERER_BOOT_WATCHDOG_MS,
+    loadMs: RENDERER_LOAD_WATCHDOG_MS,
+  };
+}
+
+/**
+ * Chromium net errors that mean "the local Next server is not reachable yet"
+ * rather than a broken app. Electron often wins the race with `next dev`.
+ */
+const TRANSIENT_LOCAL_NET_ERROR_CODES = new Set([
+  -7, // ERR_TIMED_OUT
+  -21, // ERR_NETWORK_CHANGED
+  -100, // ERR_CONNECTION_CLOSED
+  -101, // ERR_CONNECTION_RESET
+  -102, // ERR_CONNECTION_REFUSED
+  -103, // ERR_CONNECTION_ABORTED
+  -104, // ERR_CONNECTION_FAILED
+  -106, // ERR_INTERNET_DISCONNECTED
+  -109, // ERR_ADDRESS_UNREACHABLE
+  -118, // ERR_CONNECTION_TIMED_OUT
+  -324, // ERR_EMPTY_RESPONSE
+]);
+
+/** Stay on splash and retry while local Next is still coming up (~60s). */
+export const LOCAL_HOSTED_LOAD_RETRY_LIMIT = 30;
+export const LOCAL_HOSTED_LOAD_RETRY_DELAY_MS = 2_000;
+
+export type LocalMainFrameLoadFailureAction = 'retry' | 'failure-page';
+
+export function decideLocalMainFrameLoadFailure(input: {
+  readonly errorCode: number;
+  readonly retryCount: number;
+}): LocalMainFrameLoadFailureAction {
+  if (
+    TRANSIENT_LOCAL_NET_ERROR_CODES.has(input.errorCode) &&
+    input.retryCount < LOCAL_HOSTED_LOAD_RETRY_LIMIT
+  ) {
+    return 'retry';
+  }
+  return 'failure-page';
+}
+
+export type LocalHostedLoadFailureResult =
+  | { readonly action: 'retry'; readonly attempt: number }
+  | { readonly action: 'failure-page'; readonly attempt: number };
+
+export type LocalHostedDocumentAction =
+  | 'ignore'
+  | 'preserve-retry'
+  | 'complete-retry';
+
+export interface LocalHostedLoadRetryController {
+  readonly onMainFrameLoadFailure: (input: {
+    readonly errorCode: number;
+    readonly retryUrl: string;
+  }) => LocalHostedLoadFailureResult;
+  readonly onHostedNavigationStarted: () => void;
+  readonly onMainFrameDocumentCommitted: (input: {
+    readonly isHostedAppDocument: boolean;
+  }) => LocalHostedDocumentAction;
+  readonly reset: () => void;
+  readonly dispose: () => void;
+}
+
+export function createLocalHostedLoadRetryController(input: {
+  readonly retry: (url: string) => void;
+  readonly isWindowDestroyed: () => boolean;
+}): LocalHostedLoadRetryController {
+  let retryCount = 0;
+  let retryTimer: ReturnType<typeof setTimeout> | null = null;
+  let recoveryActive = false;
+
+  const clearPendingRetry = (): void => {
+    if (retryTimer === null) return;
+    clearTimeout(retryTimer);
+    retryTimer = null;
+  };
+
+  const reset = (): void => {
+    retryCount = 0;
+    recoveryActive = false;
+    clearPendingRetry();
+  };
+
+  return {
+    onMainFrameLoadFailure: ({ errorCode, retryUrl }) => {
+      recoveryActive = true;
+      const action = decideLocalMainFrameLoadFailure({ errorCode, retryCount });
+      if (action === 'failure-page') {
+        clearPendingRetry();
+        return { action, attempt: retryCount };
+      }
+
+      retryCount += 1;
+      clearPendingRetry();
+      retryTimer = setTimeout(() => {
+        retryTimer = null;
+        if (input.isWindowDestroyed()) return;
+        input.retry(retryUrl);
+      }, LOCAL_HOSTED_LOAD_RETRY_DELAY_MS);
+      return { action, attempt: retryCount };
+    },
+    onHostedNavigationStarted: clearPendingRetry,
+    onMainFrameDocumentCommitted: ({ isHostedAppDocument }) => {
+      if (!recoveryActive) return 'ignore';
+      if (!isHostedAppDocument) return 'preserve-retry';
+      reset();
+      return 'complete-retry';
+    },
+    reset,
+    dispose: reset,
+  };
+}
+
 export type RendererWatchdogExpiryAction = 'ignore' | 'failure-page';
+
+export type DesktopLoadFailureKind =
+  | 'offline'
+  | 'local-server-down'
+  | 'host-unreachable'
+  | 'timed-out'
+  | 'crashed'
+  | 'unresponsive'
+  | 'http-error'
+  | 'unknown';
+
+export type DesktopLoadFailureReason =
+  | 'did-fail-load'
+  | 'load-watchdog'
+  | 'boot-watchdog'
+  | 'crashed'
+  | 'unresponsive';
+
+export interface DesktopLoadFailureView {
+  readonly kind: DesktopLoadFailureKind;
+  readonly heading: string;
+  readonly body: string;
+}
+
+export type HostedLoadRetryAction = 'retry' | 'failure-page';
+
+// Chromium net errors. Only the codes we classify — never treat every
+// did-fail-load as "check your connection".
+const ERR_NETWORK_CHANGED = -21;
+const ERR_CONNECTION_CLOSED = -100;
+const ERR_CONNECTION_RESET = -101;
+const ERR_CONNECTION_REFUSED = -102;
+const ERR_CONNECTION_ABORTED = -103;
+const ERR_CONNECTION_FAILED = -104;
+const ERR_NAME_NOT_RESOLVED = -105;
+const ERR_INTERNET_DISCONNECTED = -106;
+const ERR_ADDRESS_UNREACHABLE = -109;
+const ERR_CONNECTION_TIMED_OUT = -118;
+const ERR_PROXY_CONNECTION_FAILED = -130;
+const ERR_NAME_RESOLUTION_FAILED = -137;
+const ERR_NETWORK_ACCESS_DENIED = -138;
+const ERR_EMPTY_RESPONSE = -324;
+const ERR_TIMED_OUT = -7;
+
+const OFFLINE_ERROR_CODES = new Set([
+  ERR_NETWORK_CHANGED,
+  ERR_INTERNET_DISCONNECTED,
+  ERR_NETWORK_ACCESS_DENIED,
+]);
+
+const LOCAL_SERVER_DOWN_ERROR_CODES = new Set([
+  ERR_CONNECTION_CLOSED,
+  ERR_CONNECTION_RESET,
+  ERR_CONNECTION_REFUSED,
+  ERR_CONNECTION_ABORTED,
+  ERR_CONNECTION_FAILED,
+  ERR_EMPTY_RESPONSE,
+]);
+
+const TIMEOUT_ERROR_CODES = new Set([ERR_TIMED_OUT, ERR_CONNECTION_TIMED_OUT]);
+
+const UNREACHABLE_ERROR_CODES = new Set([
+  ERR_NAME_NOT_RESOLVED,
+  ERR_ADDRESS_UNREACHABLE,
+  ERR_PROXY_CONNECTION_FAILED,
+  ERR_NAME_RESOLUTION_FAILED,
+]);
+
+export function isLoopbackAppUrl(appUrl: string): boolean {
+  try {
+    const hostname = new URL(appUrl).hostname.toLowerCase();
+    return (
+      hostname === 'localhost' || hostname === '127.0.0.1' || hostname === '::1'
+    );
+  } catch {
+    return false;
+  }
+}
+
+/** `dev:web:local` is :3100; older Jovie Local binaries baked :3112. */
+export const LOCAL_DEV_FALLBACK_PORTS = [3100, 3112] as const;
+
+/** Recapture 5:52 PT: recovery stayed up after GET / 200 in 0.73s. */
+export const RECOVERY_UNLATCH_POLL_MS = 1_000;
+
+export function hostedUrlCandidates(
+  appUrl: string,
+  hostedUrl: string
+): readonly string[] {
+  const unique = new Set<string>([hostedUrl]);
+  if (!isLoopbackAppUrl(appUrl)) {
+    return [...unique];
+  }
+
+  try {
+    const base = new URL(hostedUrl);
+    for (const port of LOCAL_DEV_FALLBACK_PORTS) {
+      const next = new URL(base.toString());
+      next.port = String(port);
+      unique.add(next.toString());
+    }
+  } catch {
+    return [...unique];
+  }
+
+  return [...unique];
+}
+
+export function isLocalDevSiblingOrigin(url: string, appUrl: string): boolean {
+  try {
+    const target = new URL(url);
+    const app = new URL(appUrl);
+    if (target.protocol !== 'http:' || app.protocol !== 'http:') {
+      return false;
+    }
+    if (target.hostname.toLowerCase() !== app.hostname.toLowerCase()) {
+      return false;
+    }
+    if (!isLoopbackAppUrl(appUrl)) {
+      return false;
+    }
+    const targetPort = Number(target.port || '80');
+    const appPort = Number(app.port || '80');
+    const allowed = new Set<number>([...LOCAL_DEV_FALLBACK_PORTS, appPort]);
+    return allowed.has(targetPort);
+  } catch {
+    return false;
+  }
+}
+
+export function decideRecoveryUnlatch(input: {
+  readonly showingFailurePage: boolean;
+  readonly booted: boolean;
+  readonly windowDestroyed: boolean;
+  readonly reachableHostedUrl: string | null;
+}): 'ignore' | 'reload-hosted' {
+  if (
+    input.windowDestroyed ||
+    input.booted ||
+    !input.showingFailurePage ||
+    !input.reachableHostedUrl
+  ) {
+    return 'ignore';
+  }
+  return 'reload-hosted';
+}
+
+export function classifyDesktopLoadFailure(input: {
+  readonly reason: DesktopLoadFailureReason;
+  readonly errorCode?: number;
+  readonly appEnv: 'production' | 'staging' | 'local';
+  readonly appUrl: string;
+  readonly hostReachable?: boolean;
+}): DesktopLoadFailureKind {
+  if (input.reason === 'crashed') return 'crashed';
+  if (input.reason === 'unresponsive') return 'unresponsive';
+
+  const localHost = input.appEnv === 'local' || isLoopbackAppUrl(input.appUrl);
+
+  if (input.reason === 'load-watchdog' || input.reason === 'boot-watchdog') {
+    if (input.hostReachable === true) return 'timed-out';
+    return localHost ? 'local-server-down' : 'offline';
+  }
+
+  const errorCode = input.errorCode;
+  if (typeof errorCode === 'number') {
+    if (OFFLINE_ERROR_CODES.has(errorCode)) return 'offline';
+    if (TIMEOUT_ERROR_CODES.has(errorCode)) return 'timed-out';
+    if (LOCAL_SERVER_DOWN_ERROR_CODES.has(errorCode)) {
+      return localHost ? 'local-server-down' : 'host-unreachable';
+    }
+    if (UNREACHABLE_ERROR_CODES.has(errorCode)) {
+      return localHost ? 'local-server-down' : 'host-unreachable';
+    }
+    if (errorCode === -353) return 'http-error';
+  }
+
+  return 'unknown';
+}
+
+export function describeDesktopLoadFailure(
+  kind: DesktopLoadFailureKind,
+  appUrl: string
+): DesktopLoadFailureView {
+  let host = 'the Jovie host';
+  try {
+    host = new URL(appUrl).host;
+  } catch {
+    // Keep the generic host label.
+  }
+
+  switch (kind) {
+    case 'offline':
+      return {
+        kind,
+        heading: 'Jovie couldn’t load',
+        body: 'Check your connection, then try again.',
+      };
+    case 'local-server-down':
+      return {
+        kind,
+        heading: 'Jovie couldn’t load',
+        body: `Local Jovie isn’t running at ${host}.`,
+      };
+    case 'host-unreachable':
+      return {
+        kind,
+        heading: 'Jovie couldn’t load',
+        body: `Couldn’t reach ${host}. Retry, or open Jovie in a browser.`,
+      };
+    case 'timed-out':
+      return {
+        kind,
+        heading: 'Jovie didn’t finish starting',
+        body: 'The host is reachable, but this window didn’t finish loading.',
+      };
+    case 'crashed':
+      return {
+        kind,
+        heading: 'Jovie crashed',
+        body: 'The window closed unexpectedly. Try again.',
+      };
+    case 'unresponsive':
+      return {
+        kind,
+        heading: 'Jovie stopped responding',
+        body: 'The window froze. Try again.',
+      };
+    case 'http-error':
+      return {
+        kind,
+        heading: 'Jovie couldn’t load',
+        body: 'The Jovie host returned an error. Try again.',
+      };
+    case 'unknown':
+      return {
+        kind,
+        heading: 'Jovie couldn’t load',
+        body: 'Something went wrong while loading. Try again.',
+      };
+  }
+}
+
+/**
+ * Transient local compile/restart failures should reload the hosted URL
+ * instead of immediately painting a false offline screen.
+ */
+export function decideHostedLoadRetry(input: {
+  readonly kind: DesktopLoadFailureKind;
+  readonly retryCount: number;
+  readonly maxRetries: number;
+}): HostedLoadRetryAction {
+  if (input.retryCount >= input.maxRetries) return 'failure-page';
+  if (
+    input.kind === 'local-server-down' ||
+    input.kind === 'timed-out' ||
+    input.kind === 'host-unreachable' ||
+    input.kind === 'unknown'
+  ) {
+    return 'retry';
+  }
+  return 'failure-page';
+}
+
+/**
+ * Chromium commits `chrome-error://chromewebdata/` after a failed hosted
+ * navigation. That finish event is not a hosted app load: it must not reset
+ * the local retry budget or cancel a pending retry timer (JOV-5474).
+ */
+export function isChromiumErrorDocument(url: string): boolean {
+  return url.startsWith('chrome-error:');
+}
+
+export type DidFinishLoadRecoveryAction = 'ignore' | 'hosted-finished';
+
+/**
+ * Only a verified hosted (or app-owned) finish may clear local retry state.
+ * A Chromium error document finishing after `did-fail-load` is not that.
+ */
+export function decideDidFinishLoadRecovery(input: {
+  readonly url: string;
+}): DidFinishLoadRecoveryAction {
+  if (isChromiumErrorDocument(input.url)) return 'ignore';
+  return 'hosted-finished';
+}
 
 export type RendererBootWatchdogAfterLoadAction =
   | 'already-booted'
@@ -67,8 +513,10 @@ export function decideRendererRecovery(input: {
  * Only arm the boot watchdog for real hosted navigations on the app origin —
  * the app origin is the only one that ever sends the app-booted ping, so
  * arming for any other http(s) URL is a guaranteed false-positive.
- * Skip data: recovery pages, about:blank, and devtools so the failure shell
- * cannot re-trigger itself and auth blanks don't false-alarm.
+ * Skip data: recovery pages, about:blank, Chromium error documents, and
+ * devtools so the failure shell cannot re-trigger itself, a chrome-error
+ * interstitial cannot cancel local retry (JOV-5474), and auth blanks
+ * don't false-alarm.
  */
 export function shouldArmRendererBootWatchdog(
   url: string,
@@ -77,11 +525,14 @@ export function shouldArmRendererBootWatchdog(
   if (!url) return false;
   if (url === 'about:blank') return false;
   if (url.startsWith('data:')) return false;
+  if (isChromiumErrorDocument(url)) return false;
   if (url.startsWith('devtools:')) return false;
 
   try {
     const parsed = new URL(url);
-    return parsed.origin === appOrigin;
+    return (
+      parsed.origin === appOrigin || isLocalDevSiblingOrigin(url, appOrigin)
+    );
   } catch {
     return false;
   }
@@ -130,8 +581,15 @@ export function decideRendererWatchdogExpiry(input: {
   readonly booted: boolean;
   readonly windowDestroyed: boolean;
   readonly skipForAuthHandoff: boolean;
+  readonly everBooted?: boolean;
+  readonly reason?: 'load' | 'boot';
 }): RendererWatchdogExpiryAction {
   if (input.windowDestroyed || input.booted || input.skipForAuthHandoff) {
+    return 'ignore';
+  }
+  // A session that already painted must not be replaced by a false offline
+  // page because a later HMR or in-app navigation missed a second ping.
+  if (input.reason === 'boot' && input.everBooted) {
     return 'ignore';
   }
   return 'failure-page';

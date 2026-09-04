@@ -5,9 +5,13 @@ import * as admissionGate from '../admission-gate.mjs';
 import * as deterministicGates from '../deterministic-gates.mjs';
 import {
   ADMISSION_TARGET_FIELDS,
+  admissionTargetsCollide,
   authoritativeBehaviorOwners,
+  collisionDomainsForPaths,
+  laneForArtifact,
   loadOwnershipInventory,
   resolveAdmissionTarget,
+  resourceForArtifact,
 } from '../ownership-inventory.mjs';
 import * as planGate from '../plan-gate.mjs';
 import { planEvidenceFor, withPreLeaseReceipts } from './pre-lease.mjs';
@@ -21,6 +25,10 @@ function issue(overrides = {}) {
     title: 'Bound a Jovie admission adapter',
     description: `## Proposed fix
 Keep repository-aware admission in scripts/backlog-orchestrator/admission-gate.mjs.
+
+## Optimization exception
+- Class: non-product
+- Justification: This control-plane ownership adapter ships no user-facing page, link, asset, campaign, recommendation, or content variant.
 
 ## Acceptance criteria
 * New packets name target fields.`,
@@ -179,6 +187,60 @@ Write the inventory later slices consume.
     for (const field of ADMISSION_TARGET_FIELDS) {
       assert.equal(payload[field], evidence.target[field]);
     }
+  });
+
+  it('rejects a lease collision while allowing unrelated product concurrency', () => {
+    const jovieWeb = resolveAdmissionTarget(
+      issue({
+        description: `## Proposed fix
+Change apps/web/lib/ovie/summer-kanban.ts.
+
+## Acceptance criteria
+* Focused test passes.`,
+      })
+    ).target;
+    const jovieWebPeer = resolveAdmissionTarget(
+      issue({
+        identifier: 'JOV-5307',
+        description: `## Proposed fix
+Change apps/web/lib/ovie/summer-transport.ts.
+
+## Acceptance criteria
+* Focused test passes.`,
+      })
+    ).target;
+    const logYourBody = resolveAdmissionTarget(
+      issue({
+        identifier: 'LYB-900',
+        team: { key: 'LYB' },
+        description: `## Proposed fix
+Change JovieInc/LogYourBody.
+
+## Acceptance criteria
+* Focused test passes.`,
+      })
+    ).target;
+
+    assert.equal(admissionTargetsCollide(jovieWeb, jovieWebPeer), true);
+    assert.equal(admissionTargetsCollide(jovieWeb, logYourBody), false);
+    assert.ok(jovieWeb.collision_domains.length > 0);
+  });
+
+  it('adds lane and exact-resource domains without treating every workflow as control-plane risk', () => {
+    assert.equal(laneForArtifact('apps/ios/App/AppDelegate.swift'), 'ios');
+    assert.equal(laneForArtifact('apps/web/app/page.tsx'), 'web');
+    assert.equal(
+      resourceForArtifact('.github/workflows/ios-testflight.yml'),
+      'github-actions:ios-testflight'
+    );
+    assert.deepEqual(
+      collisionDomainsForPaths(['.github/workflows/ios-testflight.yml']),
+      [
+        'artifact:JovieInc/Jovie:.github/workflows',
+        'lane:JovieInc/Jovie:ios',
+        'resource:JovieInc/Jovie:github-actions:ios-testflight',
+      ]
+    );
   });
 
   it('keeps LYB packets on LogYourBody', () => {

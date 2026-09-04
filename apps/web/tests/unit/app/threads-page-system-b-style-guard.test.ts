@@ -14,9 +14,9 @@ const colorMixPattern = /color-mix\(/i;
 const inlineLinearSurfacePattern =
   /\b(?:bg|border)-\[[^\]\n]*--linear-[^\]\n]*\]/;
 const legacyFrameSeamPattern =
-  /border-\[color-mix\(in_oklab,var\(--linear-app-frame-seam\)[^\]]+\)\]/;
+  /border-\[color-mix\(in_oklab,var\(--app-shell-frame-seam\)[^\]]+\)\]/;
 const legacyContentSurfacePattern =
-  /bg-\[color-mix\(in_oklab,var\(--linear-app-content-surface\)[^\]]+\)\]/;
+  /bg-\[color-mix\(in_oklab,var\(--app-shell-content-surface\)[^\]]+\)\]/;
 
 describe('threads page System B source contract', () => {
   it('keeps threads chrome on named System B primitives', async () => {

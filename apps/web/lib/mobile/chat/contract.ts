@@ -13,6 +13,7 @@ export interface MobileChatTurnRequest {
   readonly clientMessageId?: unknown;
   readonly text?: unknown;
   readonly source?: unknown;
+  readonly chatMode?: unknown;
 }
 
 export interface ParsedMobileChatTurnRequest {
@@ -21,7 +22,16 @@ export interface ParsedMobileChatTurnRequest {
   readonly clientMessageId: string;
   readonly text: string;
   readonly source: MobileChatTurnSource;
+  readonly chatMode: 'ov' | null;
 }
+
+export type MobileChatTurnLifecycle =
+  | 'queued'
+  | 'running'
+  | 'retrying'
+  | 'failed'
+  | 'canceled'
+  | 'completed';
 
 export type MobileChatNdjsonEvent =
   | {
@@ -29,6 +39,13 @@ export type MobileChatNdjsonEvent =
       readonly conversationId: string;
       readonly turnId: string;
       readonly clientTurnId: string;
+      readonly eveWorkId?: string | null;
+    }
+  | {
+      readonly type: 'turn.state';
+      readonly clientTurnId: string;
+      readonly state: MobileChatTurnLifecycle;
+      readonly eveWorkId?: string | null;
     }
   | {
       readonly type: 'assistant.delta';
@@ -92,6 +109,7 @@ export function parseMobileChatTurnRequest(
     clientMessageId: value.clientMessageId,
     text: value.text.trim(),
     source: value.source,
+    chatMode: null,
   };
 }
 

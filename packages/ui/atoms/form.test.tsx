@@ -238,7 +238,7 @@ describe('Form', () => {
     it('applies muted foreground styling', () => {
       render(<TestForm />);
       const description = screen.getByText('Your public display name.');
-      expect(description.className).toContain('text-[13px]');
+      expect(description.className).toContain('text-app');
       expect(description.className).toContain('text-tertiary-token');
     });
 
@@ -290,10 +290,14 @@ describe('Form', () => {
   });
 
   describe('FormMessage', () => {
-    it('does not render when no error and no children', () => {
-      render(<TestForm />);
-      // FormMessage should not appear when there are no errors
+    it('reserves feedback space when no error and no children', () => {
+      const { container } = render(<TestForm />);
       expect(screen.queryByText('Email is required')).not.toBeInTheDocument();
+      const feedbackSlot = container.querySelector(
+        '[data-slot="form-message-feedback"]'
+      );
+      expect(feedbackSlot).toHaveClass('min-h-5');
+      expect(feedbackSlot).toBeEmptyDOMElement();
     });
 
     it('renders error message on validation failure', async () => {
@@ -313,11 +317,11 @@ describe('Form', () => {
 
       const message = await screen.findByText('Email is required');
       expect(message.className).toContain('text-destructive');
-      expect(message.className).toContain('text-[13px]');
+      expect(message.className).toContain('text-app');
       expect(message.className).toContain('font-medium');
       expect(message).toHaveAttribute('role', 'alert');
-      expect(message).toHaveAttribute('aria-live', 'polite');
-      expect(message).toHaveAttribute('aria-atomic', 'true');
+      expect(message).not.toHaveAttribute('aria-live');
+      expect(message).not.toHaveAttribute('aria-atomic');
       expect(message).toHaveAttribute('data-slot', 'form-message');
     });
 

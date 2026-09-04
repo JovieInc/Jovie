@@ -2,14 +2,16 @@
 # GitHub-native PR queue drain. Native enrollment uses exact-head admission and
 # authoritative queue state without reading, writing, or requiring a transport
 # label. A label-backed fixture exists only for isolated shell tests.
-# Autonomous shipping (2026-07-06): taste gates are advisory. Durable hard holds
-# are hold/gated/needs-human, queue-deferred, and the no-auto tombstone family.
+# Autonomous shipping (2026-07-06): taste and human labels are advisory.
+# Durable mechanical holds are queue-deferred and the no-auto tombstone family.
+# needs-human / hold / gated do not skip enrollment. Conflicts are repaired.
+# JOV-INV-023: retarget every PR onto main; do not freeze on observation gaps.
 #
 # It deliberately does NOT:
 #   - directly merge a PR (native enrollment uses `gh pr merge --auto`; the
 #     queue still owns integration validation and the eventual merge)
 #   - retarget to integration/loop-* (agents ship straight to main now)
-#   - close ordinary PRs (surfaced for a human instead — see the SURFACE bucket)
+#   - close ordinary PRs (drafts and queue-deferred are reported, not closed)
 #
 # Buckets that need code work (CONFLICT / BLOCKED) are printed for the
 # /drain command to fan out per-PR worktree agents (cheap model for mechanical
@@ -22,15 +24,30 @@
 #   DRAIN_MAX_SECONDS  hard wall-clock budget between GitHub calls (default 900)
 #   DRAIN_ISOLATION_EVAL_TIMEOUT_SECONDS  hard cap per exact-head isolation
 #     evaluator process (default 45)
+#   DRAIN_MERGEABLE_RECHECK_ATTEMPTS / DRAIN_MERGEABLE_RECHECK_SECONDS
+#     bounded live reread for GitHub's transient UNKNOWN mergeability window
+#     immediately before exact-head enrollment (defaults 6 / 2)
 #   DRAIN_ADMISSION_PR / DRAIN_ADMISSION_HEAD  optional exact new-admission
 #     scope; when both are empty this run is maintenance-only
-#   DRAIN_RECONCILE_MISSED_ADMISSION  permit one bounded exact-green recovery
+#   GH_INVENTORY_RETRY_ATTEMPTS / GH_INVENTORY_RETRY_MAX_DELAY  cap the
+#     oversized fleet-read class (default 3 / 15). Do not reuse mutation
+#     GH_RETRY_ATTEMPTS=8 on SNAP / list-state.
+#   DRAIN_RECONCILE_MISSED_ADMISSION  permit bounded exact-green recovery
 #     pass for admission events replaced while pending in the workflow mutex
-#   DRAIN_QUEUE_REENTRY_MAX_PER_RUN  total event + recovery admission cap (1-2)
+#   DRAIN_QUEUE_REENTRY_MAX_PER_RUN  total event + recovery admission cap;
+#     0 = uncapped (bounded only by native queue depth), positive N re-caps
 #   DRAIN_PROMOTION_MODE  normal, isolated-only, draft-only, hold-intake, or blocked
-#   DRAIN_FLEET_GATE_B64  fresh typed fleet receipt; mandatory outside normal
+#   DRAIN_FLEET_GATE_B64  bounded admission projection; required outside normal
 #   DRAIN_RECOVER_FLEET_HOLDS  exact production-controller recovery event only
 #   FLEET_HOLD_TTL_SECONDS  pending jovie-fleet-queue-hold/v1 deadline (default 720)
+#   DRAIN_RECOVER_MISSING_CI  bounded close+reopen recovery for non-draft PRs
+#     whose required source checks never registered on the exact head (default 0)
+#   DRAIN_MISSING_CI_MAX_PER_RUN  close+reopen cap per run (1-2, default 2)
+#   DRAIN_MISSING_CI_MIN_AGE_MINUTES  minimum head commit age before a
+#     close+reopen is attempted (default 120)
+#   DRAIN_GROUP_STARVED_MINUTES  minimum age of the latest added_to_merge_queue
+#     timeline event before an AWAITING_CHECKS entry with no merge-group ci.yml
+#     run is dequeued so re-enrollment refires checks_requested (default 20)
 #   MERGE_QUEUE_BACKEND  native (default); test-label-fixture is test-only
 set -euo pipefail
 
@@ -43,6 +60,11 @@ if [[ "$DRY_RUN" != "1" ]]; then
       exit 2
       ;;
   esac
+  if [[ "${DRAIN_MUTATION_AUTHORIZATION:-}" == "merge-queue-autoenroll" \
+    && -z "${GH_MUTATION_TOKEN:-}" ]]; then
+    echo "::error::Refusing live drain without GH_MUTATION_TOKEN" >&2
+    exit 2
+  fi
 fi
 if [[ -n "${DRAIN_EXPECT_GH:-}" ]]; then
   resolved_gh="$(command -v gh || true)"
@@ -54,6 +76,84 @@ fi
 
 # shellcheck source=./scripts/lib/gh-retry.sh
 source "$(dirname "${BASH_SOURCE[0]}")/lib/gh-retry.sh"
+
+# Read the fleet with the workflow-scoped token and reserve the GitHub App
+# installation token for commands that actually mutate repository state. The
+# subshell keeps the read identity authoritative for every subsequent call.
+gh_mutate_retry() {
+  local mutation_token="${GH_MUTATION_TOKEN:-}"
+  if [[ -z "$mutation_token" && "${DRAIN_MUTATION_AUTHORIZATION:-}" == "test-fixture" ]]; then
+    mutation_token="${GH_TOKEN:-test-fixture-token}"
+  fi
+  if [[ -z "$mutation_token" ]]; then
+    echo "::error::GitHub mutation refused without GH_MUTATION_TOKEN" >&2
+    return 2
+  fi
+  (
+    export GH_TOKEN="$mutation_token"
+    gh_retry "$@"
+  )
+}
+
+# Inventory-class GitHub reads (SNAP / list-state). Cap this class so a
+# 502/504/timeout on an oversized fleet query cannot retry eight times and
+# starve the enrollment mutation.
+gh_inventory_retry() {
+  GH_RETRY_ATTEMPTS="${GH_INVENTORY_RETRY_ATTEMPTS:-3}" \
+  GH_RETRY_MAX_DELAY="${GH_INVENTORY_RETRY_MAX_DELAY:-15}" \
+    gh_retry "$@"
+}
+
+native_state_to_snap() {
+  jq -c '
+    [ to_entries[] | .key as $k | .value | {
+      n: (.number // (try ($k | tonumber) catch empty) // null),
+      t: ((.title // "")[0:48]),
+      draft: (.isDraft == true),
+      m: .mergeable,
+      ms: (.mergeStateStatus // "UNKNOWN"),
+      head: .headRefName,
+      headOid: ((.headRefOid // "") | ascii_downcase),
+      base: (.baseRefName // "main"),
+      body: (.body // ""),
+      L: [((.labels.nodes // [])[] | .name)],
+      fail: [],
+      q: (.queued == true),
+      qs: (.mergeQueueEntry.state // null),
+      qp: (.mergeQueueEntry.position // null),
+      oid: .headRefOid
+    } | select(.n | type == "number") ]
+  '
+}
+
+inventory_native_queue_state() {
+  local attempts="${GH_INVENTORY_RETRY_ATTEMPTS:-3}"
+  local base_delay="${GH_RETRY_BASE_DELAY:-2}"
+  local max_delay="${GH_INVENTORY_RETRY_MAX_DELAY:-15}"
+  local attempt=1
+  local out_file err_file err delay
+  out_file="$(mktemp)"
+  err_file="$(mktemp)"
+  # shellcheck disable=SC2064
+  trap "rm -f '$out_file' '$err_file'" RETURN
+  while [[ "$attempt" -le "$attempts" ]]; do
+    if node scripts/merge-queue-backend.mjs list-state "$@" >"$out_file" 2>"$err_file"; then
+      cat "$out_file"
+      return 0
+    fi
+    err="$(<"$err_file")"
+    if [[ "$attempt" -eq "$attempts" ]] || ! gh_retry_is_transient_error "$err"; then
+      echo "$err" >&2
+      return 1
+    fi
+    delay=$((base_delay * (2 ** (attempt - 1))))
+    [[ "$delay" -gt "$max_delay" ]] && delay="$max_delay"
+    echo "  [gh-retry] list-state attempt $attempt/$attempts failed (transient); retrying in ${delay}s…" >&2
+    sleep "$delay"
+    attempt=$((attempt + 1))
+  done
+  return 1
+}
 
 REPO="${REPO:-JovieInc/Jovie}"
 MERGE_QUEUE_BACKEND="${MERGE_QUEUE_BACKEND:-native}"
@@ -72,9 +172,18 @@ case "$MERGE_QUEUE_BACKEND" in
 esac
 DRAIN_MAX_SECONDS="${DRAIN_MAX_SECONDS:-900}"
 DRAIN_ISOLATION_EVAL_TIMEOUT_SECONDS="${DRAIN_ISOLATION_EVAL_TIMEOUT_SECONDS:-45}"
+DRAIN_MERGEABLE_RECHECK_ATTEMPTS="${DRAIN_MERGEABLE_RECHECK_ATTEMPTS:-6}"
+DRAIN_MERGEABLE_RECHECK_SECONDS="${DRAIN_MERGEABLE_RECHECK_SECONDS:-2}"
 if [[ ! "$DRAIN_ISOLATION_EVAL_TIMEOUT_SECONDS" =~ ^[1-9][0-9]*$ ]] \
   || (( DRAIN_ISOLATION_EVAL_TIMEOUT_SECONDS > DRAIN_MAX_SECONDS )); then
   echo "::error::DRAIN_ISOLATION_EVAL_TIMEOUT_SECONDS must be positive and no larger than DRAIN_MAX_SECONDS" >&2
+  exit 2
+fi
+if [[ ! "$DRAIN_MERGEABLE_RECHECK_ATTEMPTS" =~ ^[1-9][0-9]*$ ]] \
+  || (( DRAIN_MERGEABLE_RECHECK_ATTEMPTS > 10 )) \
+  || [[ ! "$DRAIN_MERGEABLE_RECHECK_SECONDS" =~ ^[0-9]+$ ]] \
+  || (( DRAIN_MERGEABLE_RECHECK_SECONDS > 30 )); then
+  echo "::error::DRAIN_MERGEABLE_RECHECK_ATTEMPTS must be 1-10 and DRAIN_MERGEABLE_RECHECK_SECONDS must be 0-30" >&2
   exit 2
 fi
 DRAIN_STARTED_AT="$SECONDS"
@@ -104,14 +213,33 @@ FLEET_HOLD_TTL_SECONDS="${FLEET_HOLD_TTL_SECONDS:-720}"
 # A completed CI merge_group has no source PR head to admit, but it is the
 # authoritative signal that GitHub may just have ejected unmerged cohort
 # members while main advanced. Separately, GitHub may replace an older pending
-# admission run in this workflow's one mutex. A surviving pass may recover a
-# tiny exact-green cohort without requiring a prior receipt; both recovery
-# sources share one cap and the same exact-head enrollment gate.
+# admission run in this workflow's one mutex. A surviving pass may recover the
+# exact-green cohort without requiring a prior receipt; both recovery sources
+# share the same admission bound and the same exact-head enrollment gate.
 DRAIN_RECONCILE_QUEUE_REENTRY="${DRAIN_RECONCILE_QUEUE_REENTRY:-0}"
 DRAIN_RECONCILE_MISSED_ADMISSION="${DRAIN_RECONCILE_MISSED_ADMISSION:-0}"
-DRAIN_QUEUE_REENTRY_MAX_PER_RUN="${DRAIN_QUEUE_REENTRY_MAX_PER_RUN:-2}"
+DRAIN_QUEUE_REENTRY_MAX_PER_RUN="${DRAIN_QUEUE_REENTRY_MAX_PER_RUN:-0}"
+# Missing-CI class (2026-09-03): a non-draft main PR can sit for days with zero
+# check-runs for the required source contexts on its exact head, so it never
+# becomes green and never enrolls. Close+reopen re-fires the pull_request source
+# CI triggers. Bounded per run and idempotent per exact head through a
+# bot-comment marker, so a broken CI workflow cannot be re-triggered forever.
+DRAIN_RECOVER_MISSING_CI="${DRAIN_RECOVER_MISSING_CI:-0}"
+DRAIN_MISSING_CI_MAX_PER_RUN="${DRAIN_MISSING_CI_MAX_PER_RUN:-2}"
+DRAIN_MISSING_CI_MIN_AGE_MINUTES="${DRAIN_MISSING_CI_MIN_AGE_MINUTES:-120}"
+# Starved-group class (2026-09-03, PR #16420): a native merge group's
+# checks_requested event can fail to produce any ci.yml run, leaving the entry
+# at AWAITING_CHECKS with zero receipts. The non-progressing front pass only
+# acts on failure evidence, so this silently blocks every follower. Dequeue
+# (never re-enqueue here; the ENROLL path re-admits the still-green head and
+# the fresh group's checks_requested refires CI), age-gated and capped.
+DRAIN_GROUP_STARVED_MINUTES="${DRAIN_GROUP_STARVED_MINUTES:-20}"
+MISSING_CI_RECOVERY_MARKER='<!-- bot-comment:missing-ci-recovery -->'
+MISSING_CI_RECOVERY_ACTOR='jovie-bot[bot]'
 QUEUE_REENTRY_CONTEXT="jovie-queue-reentry/v1"
 UNMERGEABLE_EJECT_CONTEXT="jovie-native-unmergeable/v1"
+PRODUCT_FAILURE_CONTEXT="jovie-queue-product-failure/v1"
+PRODUCT_FAILURE_DESCRIPTION="blocked:merge-group-product-failure"
 LAST_ENROLL_SKIP_REASON=""
 # JOV-5276: no-auto* is a durable tombstone. Unlike queue-deferred, this
 # controller never strips these labels, including hold-intake missed-admission
@@ -131,15 +259,15 @@ case "$DRAIN_PROMOTION_MODE" in
       exit 2
     fi
     if ! FLEET_GATE_JSON="$(node -e '
-      const value = Buffer.from(process.argv[1], "base64").toString("utf8");
-      const receipt = JSON.parse(value);
+      const value = process.env.DRAIN_FLEET_GATE_B64 || "";
+      const receipt = JSON.parse(Buffer.from(value, "base64").toString("utf8"));
       const observed = Date.parse(receipt.observedAt || "");
       const now = Date.now();
       if (!Number.isFinite(observed) || observed > now + 60_000 || now - observed > 600_000) {
         throw new Error("stale fleet receipt");
       }
       process.stdout.write(JSON.stringify(receipt));
-    ' "$DRAIN_FLEET_GATE_B64" 2>/dev/null)"; then
+    ' 2>/dev/null)"; then
       echo "::error::Refusing $DRAIN_PROMOTION_MODE with a malformed or stale fleet receipt" >&2
       exit 2
     fi
@@ -179,10 +307,20 @@ case "$DRAIN_PROMOTION_MODE" in
           .productionUnboundRepairAdmission.mainSha == null and
           .productionUnboundRepairAdmission.deployedSha == null
         end) and
-        .productionUnboundRepairAdmission.maxConcurrent == 1 and
+        (.productionUnboundRepairAdmission.maxConcurrent | type == "number") and
+        (.productionUnboundRepairAdmission.maxConcurrent | IN(range(1;11))) and
         .productionUnboundRepairAdmission.deploymentsAllowed == false and
         .alreadyAdmittedCohort.preserve == true and
-        .alreadyAdmittedCohort.newIntakeAllowed == true
+        .closureAdmission.authority == "Summer" and
+        (.closureAdmission.status | IN("healthy", "grace", "red")) and
+        (.closureAdmission.newIssueIntakeAllowed | type == "boolean") and
+        .closureAdmission.newIssueIntakeAllowed == (.closureAdmission.status == "healthy") and
+        .closureAdmission.allowed == .closureAdmission.newIssueIntakeAllowed and
+        .closureAdmission.newImplementationAllowed == .closureAdmission.newIssueIntakeAllowed and
+        .closureAdmission.fallbackPrGenerationAllowed == .closureAdmission.newIssueIntakeAllowed and
+        .closureAdmission.promotionContinues == true and
+        .closureAdmission.remediationContinues == true and
+        .alreadyAdmittedCohort.newIntakeAllowed == .closureAdmission.newIssueIntakeAllowed
       else
         .promotionAdmission.allowed == false and
         .isolatedPromotionAdmission.allowed == false
@@ -231,9 +369,27 @@ if [[ "$DRAIN_RECONCILE_MISSED_ADMISSION" == "1" ]]; then
       ;;
   esac
 fi
-if [[ ! "$DRAIN_QUEUE_REENTRY_MAX_PER_RUN" =~ ^[1-9][0-9]*$ ]] \
-  || (( DRAIN_QUEUE_REENTRY_MAX_PER_RUN > 2 )); then
-  echo "::error::DRAIN_QUEUE_REENTRY_MAX_PER_RUN must be an integer from 1 through 2" >&2
+if [[ ! "$DRAIN_QUEUE_REENTRY_MAX_PER_RUN" =~ ^[0-9]+$ ]]; then
+  echo "::error::DRAIN_QUEUE_REENTRY_MAX_PER_RUN must be a non-negative integer (0 = uncapped, bounded by native queue depth)" >&2
+  exit 2
+fi
+if [[ "$DRAIN_RECOVER_MISSING_CI" != "0" && "$DRAIN_RECOVER_MISSING_CI" != "1" ]]; then
+  echo "::error::DRAIN_RECOVER_MISSING_CI must be 0 or 1" >&2
+  exit 2
+fi
+if [[ ! "$DRAIN_MISSING_CI_MAX_PER_RUN" =~ ^[1-9][0-9]*$ ]] \
+  || (( DRAIN_MISSING_CI_MAX_PER_RUN > 2 )); then
+  echo "::error::DRAIN_MISSING_CI_MAX_PER_RUN must be an integer from 1 through 2" >&2
+  exit 2
+fi
+if [[ ! "$DRAIN_MISSING_CI_MIN_AGE_MINUTES" =~ ^[1-9][0-9]*$ ]] \
+  || (( DRAIN_MISSING_CI_MIN_AGE_MINUTES > 1440 )); then
+  echo "::error::DRAIN_MISSING_CI_MIN_AGE_MINUTES must be an integer from 1 through 1440" >&2
+  exit 2
+fi
+if [[ ! "$DRAIN_GROUP_STARVED_MINUTES" =~ ^[1-9][0-9]*$ ]] \
+  || (( DRAIN_GROUP_STARVED_MINUTES > 1440 )); then
+  echo "::error::DRAIN_GROUP_STARVED_MINUTES must be an integer from 1 through 1440" >&2
   exit 2
 fi
 if [[ -z "$DRAIN_ADMISSION_PR" && -z "$DRAIN_ADMISSION_HEAD" ]]; then
@@ -267,6 +423,22 @@ deferred_release_receipt_for_pr() {  # <pr>
   node "$QUEUE_DEFERRED_RELEASE_LIB" extract <<<"$body" 2>/dev/null || true
 }
 
+# Returns 0 when a prior bot-authored close+reopen attempt already exists for
+# this exact head, or when the comment evidence is unreadable (fail closed:
+# never risk re-triggering a head twice on a transport error).
+missing_ci_recovery_attempted() {  # <pr> <head>
+  local n="$1" head="$2" raw
+  if ! raw="$(gh_retry api "repos/${REPO}/issues/${n}/comments" --paginate --slurp 2>/dev/null)"; then
+    return 0
+  fi
+  jq -e --arg marker "$MISSING_CI_RECOVERY_MARKER" --arg actor "$MISSING_CI_RECOVERY_ACTOR" --arg head "$head" '
+    [ .[][]?
+      | select(.user.login == $actor)
+      | select((.body | type == "string") and (.body | contains($marker)) and (.body | contains($head)))
+    ] | length > 0
+  ' <<<"$raw" >/dev/null 2>&1
+}
+
 # The production-unbound exception is a typed exact PR/head/current-main
 # statement, revalidated before and after native enrollment. Source checks and
 # hard holds remain independent enrollment gates.
@@ -290,14 +462,40 @@ AGENT_RE='^(tim/|codex/|agent/|claude/|linear/|feat/|dependabot/)'
 
 label() {  # label <num> <label>
   [[ "$DRY_RUN" == "1" ]] && { echo "    [dry-run] would +$2 on #$1"; return 0; }
-  gh_retry pr edit "$1" -R "$REPO" --add-label "$2" >/dev/null 2>&1 \
+  gh_mutate_retry pr edit "$1" -R "$REPO" --add-label "$2" >/dev/null 2>&1 \
     && echo "    +$2 on #$1" || echo "    !! failed to add $2 on #$1"
 }
 
 unlabel() {  # unlabel <num> <label>
   [[ "$DRY_RUN" == "1" ]] && { echo "    [dry-run] would -$2 on #$1"; return 0; }
-  gh_retry pr edit "$1" -R "$REPO" --remove-label "$2" >/dev/null 2>&1 \
-    && echo "    -$2 on #$1" || echo "    !! failed to remove $2 on #$1"
+  if gh_mutate_retry pr edit "$1" -R "$REPO" --remove-label "$2" >/dev/null 2>&1; then
+    echo "    -$2 on #$1"
+    return 0
+  fi
+  echo "    !! failed to remove $2 on #$1"
+  return 1
+}
+
+reconcile_resolved_conflict_label() {  # <num> <expected-head>
+  local n="$1" expected_head="$2" current
+  if ! current="$(gh_retry pr view "$n" -R "$REPO" \
+    --json headRefOid,mergeable,labels 2>/dev/null)"; then
+    echo "    ~ could not verify stale conflict label for #$n; leaving it in place"
+    return 1
+  fi
+  if ! jq -e --arg head "$expected_head" '
+    ((.headRefOid // "") | ascii_downcase) == $head
+    and .mergeable == "MERGEABLE"
+    and ([.labels[].name] | index("needs-conflict-resolution")) != null
+  ' <<<"$current" >/dev/null; then
+    echo "    ~ exact head is not positively mergeable for #$n; preserving conflict label"
+    return 1
+  fi
+  if unlabel "$n" needs-conflict-resolution; then
+    return 0
+  fi
+  echo "    ~ needs-conflict-resolution remains active on #$n; preserving current queue state until retry"
+  return 1
 }
 
 fleet_hold_target_url() {
@@ -324,7 +522,12 @@ fleet_hold_expires_at() {
   ' "$FLEET_HOLD_TTL_SECONDS"
 }
 
-fleet_hold_null_creator_has_provenance() {  # <head> <status-json>
+# Combined commit-status payloads often return creator:null even when the
+# matching plural status is jovie-bot[bot]. Trust that production shape only
+# through this fail-closed proof: expected bot avatar/status URL plus the
+# exact trusted Auto-Enroll workflow run, repository, workflow path, and head
+# SHA. Never accept context, state, or description alone.
+null_creator_receipt_has_provenance() {  # <head> <status-json>
   local head="$1" status="$2" run_id target_url status_url
   local app_identity app_avatar run
   [[ "$head" =~ ^[0-9a-f]{40}$ ]] || return 1
@@ -372,6 +575,14 @@ fleet_hold_null_creator_has_provenance() {  # <head> <status-json>
     ' <<<"$run" >/dev/null
 }
 
+receipt_actor_is_trusted() {  # <head> <status-json>
+  local head="$1" status="$2"
+  if jq -e '.creator.type == "Bot"' <<<"$status" >/dev/null; then
+    return 0
+  fi
+  null_creator_receipt_has_provenance "$head" "$status"
+}
+
 fleet_hold_latest() {  # fleet_hold_latest <head> → latest status JSON or empty
   local head="$1" statuses latest
   [[ "$head" =~ ^[0-9a-f]{40}$ ]] || return 1
@@ -387,11 +598,7 @@ fleet_hold_latest() {  # fleet_hold_latest <head> → latest status JSON or empt
   ' <<<"$statuses" 2>/dev/null)"; then
     return 1
   fi
-  if jq -e '.creator.type == "Bot"' <<<"$latest" >/dev/null; then
-    printf '%s\n' "$latest"
-    return 0
-  fi
-  if fleet_hold_null_creator_has_provenance "$head" "$latest"; then
+  if receipt_actor_is_trusted "$head" "$latest"; then
     printf '%s\n' "$latest"
     return 0
   fi
@@ -413,7 +620,7 @@ write_fleet_hold_status() {  # write_fleet_hold_status <head> <state> <descripti
   if ! target_url="$(fleet_hold_target_url)"; then
     return 1
   fi
-  gh_retry api -X POST "repos/$REPO/statuses/$head" \
+  gh_mutate_retry api -X POST "repos/$REPO/statuses/$head" \
     -f state="$state" \
     -f context="$FLEET_HOLD_CONTEXT" \
     -f description="$description" \
@@ -490,20 +697,24 @@ clear_fleet_hold() {  # clear_fleet_hold <num> <head>
 # own; recovery still re-reads current PR state, current source checks, and the
 # native queue postcondition.
 queue_reentry_receipt_is_recoverable() {  # <head>
-  local head="$1" statuses
+  local head="$1" statuses latest
   [[ "$head" =~ ^[0-9a-f]{40}$ ]] || return 1
   if ! statuses="$(gh_retry api "repos/$REPO/commits/$head/status" 2>/dev/null)"; then
     return 1
   fi
-  jq -e --arg context "$QUEUE_REENTRY_CONTEXT" --arg repo "$REPO" '
+  latest="$(jq -c --arg context "$QUEUE_REENTRY_CONTEXT" --arg repo "$REPO" '
     [ .statuses[]? | select(.context == $context) ]
     | sort_by(.updated_at)
     | last
-    | .state == "success"
-      and (.creator.type == "Bot")
-      and (.description == "Native queue admission recorded at exact head")
-      and (.target_url | test("^https://github\\.com/" + $repo + "/actions/runs/[1-9][0-9]*$"))
-  ' <<<"$statuses" >/dev/null
+    | select(
+        . != null
+        and .state == "success"
+        and (.description == "Native queue admission recorded at exact head")
+        and (.target_url | test("^https://github\\.com/" + ($repo | gsub("/"; "\\/")) + "/actions/runs/[1-9][0-9]*$"))
+      )
+  ' <<<"$statuses" 2>/dev/null)" || true
+  [[ -n "$latest" ]] || return 1
+  receipt_actor_is_trusted "$head" "$latest"
 }
 
 record_queue_reentry_receipt() {  # <pr> <expected-head>
@@ -537,7 +748,7 @@ record_queue_reentry_receipt() {  # <pr> <expected-head>
     echo "    ⏸ #$n head changed before queue re-entry receipt; compensating enrollment"
     return 2
   fi
-  if ! gh_retry api -X POST "repos/$REPO/statuses/$live_head" \
+  if ! gh_mutate_retry api -X POST "repos/$REPO/statuses/$live_head" \
     -f state=success \
     -f context="$QUEUE_REENTRY_CONTEXT" \
     -f description="Native queue admission recorded at exact head" \
@@ -552,24 +763,26 @@ record_queue_reentry_receipt() {  # <pr> <expected-head>
 # CLEAN source PR UNSTABLE. They bind the exact head and refuse re-enrollment
 # until that head moves (JOV-5291).
 unmergeable_eject_receipt_head() {  # <head>
-  local head="$1" statuses
+  local head="$1" statuses latest
   [[ "$head" =~ ^[0-9a-f]{40}$ ]] || return 0
   if ! statuses="$(gh_retry api "repos/$REPO/commits/$head/status" 2>/dev/null)"; then
     return 0
   fi
-  jq -r --arg context "$UNMERGEABLE_EJECT_CONTEXT" --arg head "$head" --arg repo "$REPO" '
+  latest="$(jq -c --arg context "$UNMERGEABLE_EJECT_CONTEXT" --arg repo "$REPO" '
     [ .statuses[]? | select(.context == $context) ]
     | sort_by(.updated_at)
     | last
     | select(
         . != null
         and .state == "success"
-        and (.creator.type == "Bot")
         and (.description | startswith("ejected:"))
-        and (.target_url | test("^https://github\\.com/" + $repo + "/actions/runs/[1-9][0-9]*$"))
+        and (.target_url | test("^https://github\\.com/" + ($repo | gsub("/"; "\\/")) + "/actions/runs/[1-9][0-9]*$"))
       )
-    | $head
-  ' <<<"$statuses"
+  ' <<<"$statuses" 2>/dev/null)" || true
+  if [[ -n "$latest" ]] && receipt_actor_is_trusted "$head" "$latest"; then
+    printf '%s\n' "$head"
+  fi
+  return 0
 }
 
 record_unmergeable_eject_receipt() {  # <pr> <expected-head> <reason>
@@ -606,7 +819,7 @@ record_unmergeable_eject_receipt() {  # <pr> <expected-head> <reason>
     return 2
   fi
   description="ejected:${reason}"
-  if ! gh_retry api -X POST "repos/$REPO/statuses/$live_head" \
+  if ! gh_mutate_retry api -X POST "repos/$REPO/statuses/$live_head" \
     -f state=success \
     -f context="$UNMERGEABLE_EJECT_CONTEXT" \
     -f description="$description" \
@@ -615,6 +828,86 @@ record_unmergeable_eject_receipt() {  # <pr> <expected-head> <reason>
     return 1
   fi
   echo "    +$UNMERGEABLE_EJECT_CONTEXT $description on #$n at $live_head"
+}
+
+# JOV-INV-011: a product-failure tombstone is a success status so the source PR remains
+# CLEAN while Gem and Summer retain exact-head failure memory after bounded
+# Actions history rolls over. A new source commit is the only automatic reset.
+product_failure_receipt_head() {  # <head>
+  local head="$1" statuses latest
+  [[ "$head" =~ ^[0-9a-f]{40}$ ]] || return 1
+  if ! statuses="$(gh_retry api "repos/$REPO/commits/$head/status" 2>/dev/null)"; then
+    return 2
+  fi
+  if ! jq -e '.statuses | type == "array"' <<<"$statuses" >/dev/null 2>&1; then
+    return 2
+  fi
+  latest="$(jq -c \
+    --arg context "$PRODUCT_FAILURE_CONTEXT" \
+    --arg description "$PRODUCT_FAILURE_DESCRIPTION" \
+    --arg repo "$REPO" '
+      [ .statuses[]? | select(.context == $context) ]
+      | sort_by(.updated_at)
+      | last
+      | select(
+          . != null
+          and .state == "success"
+          and .description == $description
+          and (.target_url | test("^https://github\\.com/" + ($repo | gsub("/"; "\\/")) + "/actions/runs/[1-9][0-9]*$"))
+        )
+    ' <<<"$statuses" 2>/dev/null)" || true
+  if [[ -n "$latest" ]] && receipt_actor_is_trusted "$head" "$latest"; then
+    printf '%s\n' "$head"
+  fi
+  return 0
+}
+
+record_product_failure_receipt() {  # <pr> <expected-head>
+  local n="$1" expected_head="$2" current live_head target_url receipt_head receipt_rc
+  if [[ ! "$expected_head" =~ ^[0-9a-f]{40}$ ]]; then
+    echo "    !! cannot record product-failure tombstone for #$n without an exact head" >&2
+    return 1
+  fi
+  if [[ "$DRY_RUN" == "1" ]]; then
+    echo "    [dry-run] would record $PRODUCT_FAILURE_CONTEXT on #$n at $expected_head"
+    return 0
+  fi
+  set +e
+  receipt_head="$(product_failure_receipt_head "$expected_head")"
+  receipt_rc=$?
+  set -e
+  if [[ "$receipt_rc" -eq 0 && "$receipt_head" == "$expected_head" ]]; then
+    echo "    =$PRODUCT_FAILURE_CONTEXT on #$n at $expected_head (already recorded)"
+    return 0
+  fi
+  if [[ "$receipt_rc" -eq 2 ]]; then
+    echo "    !! could not read product-failure tombstone state for #$n" >&2
+    return 1
+  fi
+  if ! target_url="$(fleet_hold_target_url)"; then
+    echo "    !! canonical workflow run identity is missing for product-failure tombstone #$n" >&2
+    return 1
+  fi
+  if ! current="$(gh_retry pr view "$n" -R "$REPO" --json state,headRefOid 2>/dev/null)"; then
+    echo "    !! could not refresh #$n before recording product-failure tombstone" >&2
+    return 1
+  fi
+  live_head="$(jq -r '(.headRefOid // "") | ascii_downcase' <<<"$current")"
+  if ! jq -e --arg head "$expected_head" '
+    .state == "OPEN" and ((.headRefOid // "") | ascii_downcase) == $head
+  ' <<<"$current" >/dev/null; then
+    echo "    ⏸ #$n head changed before product-failure tombstone"
+    return 2
+  fi
+  if ! gh_mutate_retry api -X POST "repos/$REPO/statuses/$live_head" \
+    -f state=success \
+    -f context="$PRODUCT_FAILURE_CONTEXT" \
+    -f description="$PRODUCT_FAILURE_DESCRIPTION" \
+    -f target_url="$target_url" >/dev/null; then
+    echo "    !! failed to record exact-head product-failure tombstone for #$n" >&2
+    return 1
+  fi
+  echo "    +$PRODUCT_FAILURE_CONTEXT $PRODUCT_FAILURE_DESCRIPTION on #$n at $live_head"
 }
 
 pr_changed_paths_json() {  # <num> → JSON string array or null
@@ -631,8 +924,9 @@ pr_changed_paths_json() {  # <num> → JSON string array or null
 }
 
 changelog_collision_decision_for_pr() {  # <num>
-  local n="$1" candidate queued members='[]' files
+  local n="$1" candidate queued members='[]' files branch
   candidate="$(pr_changed_paths_json "$n")"
+  branch="$(echo "$SNAP" | jq -r --argjson n "$n" '.[] | select(.n == $n) | .head // empty')"
   while read -r queued; do
     [[ -n "$queued" ]] || continue
     files="$(pr_changed_paths_json "$queued")"
@@ -640,8 +934,8 @@ changelog_collision_decision_for_pr() {  # <num>
       '. + [{prNumber:$pr, files:$files}]' <<<"$members")"
   done < <(echo "$SNAP" | jq -r --argjson self "$n" \
     '.[] | select(.q == true) | select(.n != $self) | .n')
-  CHANGELOG_COLLISION_JSON="$(jq -nc --argjson candidateFiles "$candidate" --argjson queuedMemberFiles "$members" \
-    '{candidateFiles:$candidateFiles, queuedMemberFiles:$queuedMemberFiles}')" \
+  CHANGELOG_COLLISION_JSON="$(jq -nc --argjson candidateFiles "$candidate" --argjson queuedMemberFiles "$members" --arg branch "$branch" \
+    '{candidateFiles:$candidateFiles, queuedMemberFiles:$queuedMemberFiles, branch:$branch}')" \
     node scripts/ci-merge-queue-check.mjs changelog-collision
 }
 
@@ -656,8 +950,7 @@ deferred_state_is_releasable() {  # state json <expected head> <expected base>
     and .autoMergeRequest != null
     and ([.labels[].name] | index("queue-deferred")) != null
     and ([.labels[].name] | any(
-      . == "needs-human" or . == "hold" or . == "gated"
-      or . == "fast" or . == "needs-conflict-resolution"
+      . == "fast" or . == "needs-conflict-resolution"
       or '"$NO_AUTO_HOLD_JQ"'
     ) | not)
   ' <<<"$1" >/dev/null
@@ -666,7 +959,7 @@ deferred_state_is_releasable() {  # state json <expected head> <expected base>
 restore_deferred_hold() {  # restore_deferred_hold <num>
   local n="$1"
   [[ "$DRY_RUN" == "1" ]] && return 0
-  if gh_retry pr edit "$n" -R "$REPO" --add-label queue-deferred >/dev/null 2>&1; then
+  if gh_mutate_retry pr edit "$n" -R "$REPO" --add-label queue-deferred >/dev/null 2>&1; then
     echo "    +queue-deferred on #$n (compensated changed release state)"
     return 0
   fi
@@ -751,7 +1044,7 @@ reconcile_deferred_auto_merge_after_main_push() {
       echo "    [dry-run] would -queue-deferred on #$n"
       continue
     fi
-    if ! gh_retry pr edit "$n" -R "$REPO" --remove-label queue-deferred >/dev/null 2>&1; then
+    if ! gh_mutate_retry pr edit "$n" -R "$REPO" --remove-label queue-deferred >/dev/null 2>&1; then
       echo "    !! failed to remove queue-deferred on #$n" >&2
       continue
     fi
@@ -768,8 +1061,7 @@ reconcile_deferred_auto_merge_after_main_push() {
         and .autoMergeRequest != null
         and ([.labels[].name] | index("queue-deferred")) == null
         and ([.labels[].name] | any(
-          . == "needs-human" or . == "hold" or . == "gated"
-          or . == "fast" or . == "needs-conflict-resolution"
+          . == "fast" or . == "needs-conflict-resolution"
           or '"$NO_AUTO_HOLD_JQ"'
         ) | not)
       ' <<<"$after" >/dev/null; then
@@ -786,22 +1078,43 @@ reconcile_deferred_auto_merge_after_main_push() {
 # a queue-deferred hold cannot be overwritten by this controller.
 enroll_if_still_eligible() {  # enroll_if_still_eligible <num> [authorized-pr authorized-head]
   local n="$1" authorized_pr="${2:-$DRAIN_ADMISSION_PR}" authorized_head="${3:-$DRAIN_ADMISSION_HEAD}"
-  local current enrollment_receipt head_oid expected_head json_fields queue_position queue_state
+  local current enrollment_receipt head_oid expected_head json_fields live_head mergeability_attempt mergeability_state queue_position queue_state
   LAST_ENROLL_SKIP_REASON=""
   json_fields="state,isDraft,mergeable,labels,headRefOid,baseRefName,body"
-  if ! current="$(gh_retry pr view "$n" -R "$REPO" \
-    --json "$json_fields" 2>/dev/null)"; then
-    echo "    !! could not refresh #$n eligibility; refusing enrollment" >&2
-    return 1
-  fi
+  for ((mergeability_attempt = 1; mergeability_attempt <= DRAIN_MERGEABLE_RECHECK_ATTEMPTS; mergeability_attempt++)); do
+    if ! current="$(gh_retry pr view "$n" -R "$REPO" \
+      --json "$json_fields" 2>/dev/null)"; then
+      echo "    !! could not refresh #$n eligibility; refusing enrollment" >&2
+      return 1
+    fi
+    mergeability_state="$(jq -r '.mergeable // "UNKNOWN"' <<<"$current")"
+    [[ "$mergeability_state" == "MERGEABLE" ]] && break
+    [[ "$mergeability_state" == "UNKNOWN" ]] || break
+    live_head="$(jq -r '.headRefOid // empty' <<<"$current" | tr '[:upper:]' '[:lower:]')"
+    if [[ "$n" != "$authorized_pr" || "$live_head" != "$authorized_head" ]] \
+      || ! jq -e '
+        .state == "OPEN"
+        and (.isDraft | not)
+        and .baseRefName == "main"
+        and ([.labels[].name] | any(
+          . == "needs-conflict-resolution" or . == "fast"
+          or '"$NO_AUTO_HOLD_JQ"'
+        ) | not)
+      ' <<<"$current" >/dev/null; then
+      break
+    fi
+    if (( mergeability_attempt < DRAIN_MERGEABLE_RECHECK_ATTEMPTS )); then
+      echo "    ~ mergeable=UNKNOWN for #$n at $live_head; bounded live reread $mergeability_attempt/$DRAIN_MERGEABLE_RECHECK_ATTEMPTS"
+      sleep "$DRAIN_MERGEABLE_RECHECK_SECONDS"
+    fi
+  done
   if ! jq -e --arg backend "$MERGE_QUEUE_BACKEND" '
     .state == "OPEN"
     and (.isDraft | not)
     and .mergeable == "MERGEABLE"
     and .baseRefName == "main"
     and ([.labels[].name] | any(
-      . == "needs-human" or . == "hold" or . == "gated"
-      or . == "needs-conflict-resolution"
+      . == "needs-conflict-resolution"
       or . == "fast" or ($backend == "test-label-fixture" and . == "merge-queue")
       or '"$NO_AUTO_HOLD_JQ"'
     ) | not)
@@ -817,7 +1130,7 @@ enroll_if_still_eligible() {  # enroll_if_still_eligible <num> [authorized-pr au
     if [[ "$DRY_RUN" == "1" ]]; then
       echo "    [dry-run] would -queue-deferred on #$n (exact admission)"
     else
-      if ! gh_retry pr edit "$n" -R "$REPO" --remove-label queue-deferred >/dev/null 2>&1; then
+      if ! gh_mutate_retry pr edit "$n" -R "$REPO" --remove-label queue-deferred >/dev/null 2>&1; then
         echo "    !! failed to remove queue-deferred on #$n" >&2
         return 1
       fi
@@ -842,13 +1155,28 @@ enroll_if_still_eligible() {  # enroll_if_still_eligible <num> [authorized-pr au
   # suppresses the unchanged source head across base movement and elapsed
   # time. Unclassified infrastructure failures retain the bounded retry.
   # A new source commit is the recovery signal; unknown evidence never mutates.
-  local churn_action
-  churn_action="$(front_churn_action "$n" "$expected_head")"
-  if [[ "$churn_action" == "block" ]]; then
-    echo "    ⏸ unchanged head has a classified/repeated merge-group failure; refusing re-enrollment for #$n until recovery policy allows it"
-    LAST_ENROLL_SKIP_REASON="front-churn"
-    return 2
-  fi
+  local churn_disposition
+  churn_disposition="$(front_churn_disposition "$n" "$expected_head")"
+  case "$churn_disposition" in
+    block-product)
+      if ! record_product_failure_receipt "$n" "$expected_head"; then
+        echo "    !! refusing enrollment without durable product-failure memory for #$n" >&2
+        return 1
+      fi
+      echo "    ⏸ unchanged head has a durable classified/repeated merge-group failure; refusing re-enrollment for #$n until the source head moves"
+      LAST_ENROLL_SKIP_REASON="product-failure-tombstone"
+      return 2
+      ;;
+    block-transient)
+      echo "    ⏸ unchanged head is inside the bounded unclassified failure cooldown; refusing re-enrollment for #$n"
+      LAST_ENROLL_SKIP_REASON="front-churn"
+      return 2
+      ;;
+    receipt-unknown)
+      echo "    !! product-failure tombstone state is unavailable for #$n; refusing enrollment" >&2
+      return 1
+      ;;
+  esac
   if [[ "$MERGE_QUEUE_BACKEND" == "native" ]]; then
     local eject_head reenqueue_decision reenqueue_action collision_decision collision_action
     eject_head="$(unmergeable_eject_receipt_head "$expected_head")"
@@ -866,8 +1194,8 @@ enroll_if_still_eligible() {  # enroll_if_still_eligible <num> [authorized-pr au
     collision_decision="$(changelog_collision_decision_for_pr "$n")"
     collision_action="$(jq -r '.action // empty' <<<"$collision_decision")"
     if [[ "$collision_action" == "skip" ]]; then
-      echo "    ⏸ CHANGELOG.md already queued with $(jq -r '.collidingPrs | join(",")' <<<"$collision_decision"); refusing ALLGREEN group collision for #$n"
-      LAST_ENROLL_SKIP_REASON="changelog-collision"
+      echo "    ⏸ pre-land CHANGELOG.md edit is prohibited ($(jq -r '.reason' <<<"$collision_decision")) for #$n; refusing native queue admission without bypassing CI"
+      LAST_ENROLL_SKIP_REASON="$(jq -r '.reason // "pre-land-changelog"' <<<"$collision_decision")"
       return 2
     fi
   fi
@@ -897,8 +1225,9 @@ enroll_if_still_eligible() {  # enroll_if_still_eligible <num> [authorized-pr au
   elif [[ "$DRAIN_PROMOTION_MODE" == "deferred-release-only" ]]; then
     local release_receipt
     release_receipt="$(deferred_release_receipt_for_pr "$n")"
-    if ! jq -e --arg head "$expected_head" --argjson pr "$n" '
+    if ! jq -e --arg repo "$REPO" --arg head "$expected_head" --argjson pr "$n" '
       .schema == "jovie-queue-deferred-release/v1" and
+      .repository == $repo and
       .pr == $pr and
       .head == $head and
       .mode == "deferred-release-only"
@@ -961,8 +1290,7 @@ enroll_if_still_eligible() {  # enroll_if_still_eligible <num> [authorized-pr au
       and .baseRefName == "main"
       and ((.headRefOid // "") | ascii_downcase) == $expected_head
       and ([.labels[].name] | any(
-        . == "needs-human" or . == "hold" or . == "gated"
-        or . == "queue-deferred" or . == "needs-conflict-resolution"
+        . == "queue-deferred" or . == "needs-conflict-resolution"
         or . == "fast"
         or '"$NO_AUTO_HOLD_JQ"'
       ) | not)
@@ -976,9 +1304,9 @@ enroll_if_still_eligible() {  # enroll_if_still_eligible <num> [authorized-pr au
     fi
     if [[ "$DRAIN_PROMOTION_MODE" == "deferred-release-only" ]]; then
       release_receipt="$(deferred_release_receipt_for_pr "$n")"
-      if ! jq -e --arg head "$expected_head" --argjson pr "$n" '
+      if ! jq -e --arg repo "$REPO" --arg head "$expected_head" --argjson pr "$n" '
         .schema == "jovie-queue-deferred-release/v1" and
-        .pr == $pr and .head == $head and .mode == "deferred-release-only"
+        .repository == $repo and .pr == $pr and .head == $head and .mode == "deferred-release-only"
       ' <<<"$release_receipt" >/dev/null 2>&1; then
         echo "    ⏸ controller release evidence changed during native enrollment for #$n; compensating"
         dequeue_strict "$n" || return 1
@@ -1043,47 +1371,41 @@ enroll_if_still_eligible() {  # enroll_if_still_eligible <num> [authorized-pr au
     return 0
   fi
   # native-queue-transport:enrollment:end
-  if ! gh_retry pr edit "$n" -R "$REPO" --add-label merge-queue >/dev/null; then
-    echo "    !! failed to add merge-queue on #$n" >&2
-    return 1
-  fi
-  if ! current="$(gh_retry pr view "$n" -R "$REPO" \
-    --json state,isDraft,mergeable,labels 2>/dev/null)"; then
-    echo "    !! could not verify #$n after enrollment" >&2
-    if ! dequeue_strict "$n"; then
-      echo "    !! CRITICAL: could not prove failed enrollment was compensated for #$n" >&2
+  # Isolated adapter only: startup requires the explicit test-fixture mutation
+  # authorization, and the production native transport above never enters it.
+  if [[ "$MERGE_QUEUE_BACKEND" == "test-label-fixture" ]]; then
+    if ! gh_mutate_retry pr edit "$n" -R "$REPO" --add-label merge-queue >/dev/null; then
+      echo "    !! failed to add merge-queue on #$n" >&2
+      return 1
     fi
+    if ! current="$(gh_retry pr view "$n" -R "$REPO" \
+      --json state,isDraft,mergeable,labels 2>/dev/null)"; then
+      echo "    !! could not verify #$n after fixture enrollment" >&2
+      return 1
+    fi
+    if jq -e '
+      .state == "OPEN"
+      and (.isDraft | not)
+      and .mergeable == "MERGEABLE"
+      and ([.labels[].name] | index("merge-queue"))
+    ' <<<"$current" >/dev/null; then
+      echo "    +merge-queue on #$n"
+      return 0
+    fi
+    echo "    !! fixture enrollment verification failed for #$n" >&2
     return 1
   fi
-  if jq -e '
-    .state == "OPEN"
-    and (.isDraft | not)
-    and .mergeable == "MERGEABLE"
-    and ([.labels[].name] | index("merge-queue"))
-    and ([.labels[].name] | any(
-      . == "needs-human" or . == "hold" or . == "gated"
-      or . == "queue-deferred" or . == "needs-conflict-resolution"
-      or . == "fast"
-      or '"$NO_AUTO_HOLD_JQ"'
-    ) | not)
-  ' <<<"$current" >/dev/null; then
-    echo "    +merge-queue on #$n"
-    return 0
-  fi
-  echo "    !! enrollment verification failed for #$n" >&2
-  if ! dequeue_strict "$n"; then
-    echo "    !! CRITICAL: could not prove failed enrollment was compensated for #$n" >&2
-  fi
+  echo "::error::Refusing non-native enrollment; the merge-queue label is retired" >&2
   return 1
 }
 
 dequeue_strict() {  # dequeue_strict <num>
   local n="$1" current
   if [[ "$DRY_RUN" == "1" ]]; then
-    if [[ "$MERGE_QUEUE_BACKEND" == "native" ]]; then
-      echo "    [dry-run] would dequeue #$n from native"
-    else
+    if [[ "$MERGE_QUEUE_BACKEND" == "test-label-fixture" ]]; then
       echo "    [dry-run] would -merge-queue on #$n"
+    else
+      echo "    [dry-run] would dequeue #$n from native"
     fi
     return 0
   fi
@@ -1097,20 +1419,25 @@ dequeue_strict() {  # dequeue_strict <num>
     return 0
   fi
   # native-queue-transport:dequeue:end
-  if ! gh_retry pr edit "$n" -R "$REPO" --remove-label merge-queue >/dev/null; then
-    echo "    !! failed to remove merge-queue hold violation from #$n" >&2
+  # Keep legacy-label simulation available only to the isolated fixture backend.
+  if [[ "$MERGE_QUEUE_BACKEND" == "test-label-fixture" ]]; then
+    if ! gh_mutate_retry pr edit "$n" -R "$REPO" --remove-label merge-queue >/dev/null; then
+      echo "    !! failed to remove merge-queue fixture label from #$n" >&2
+      return 1
+    fi
+    if ! current="$(gh_retry pr view "$n" -R "$REPO" --json labels 2>/dev/null)"; then
+      echo "    !! could not verify fixture label removal for #$n" >&2
+      return 1
+    fi
+    if jq -e '([.labels[].name] | index("merge-queue")) == null' \
+      <<<"$current" >/dev/null; then
+      echo "    -merge-queue on #$n"
+      return 0
+    fi
+    echo "    !! fixture label remains on #$n after removal" >&2
     return 1
   fi
-  if ! current="$(gh_retry pr view "$n" -R "$REPO" --json labels 2>/dev/null)"; then
-    echo "    !! could not verify merge-queue removal for held PR #$n" >&2
-    return 1
-  fi
-  if jq -e '([.labels[].name] | index("merge-queue")) == null' \
-    <<<"$current" >/dev/null; then
-    echo "    -merge-queue on #$n"
-    return 0
-  fi
-  echo "    !! held PR #$n still has merge-queue after removal" >&2
+  echo "::error::Refusing non-native dequeue; the merge-queue label is retired" >&2
   return 1
 }
 
@@ -1170,48 +1497,106 @@ check_failures_for_pr() {  # check_failures_for_pr <num>
 
 reconcile_deferred_auto_merge_after_main_push
 
-SNAP="$(gh_retry pr list -R "$REPO" --state open --limit 200 \
-  --json number,title,body,isDraft,mergeable,mergeStateStatus,labels,headRefName,headRefOid,baseRefName --jq '
-  [ .[] | {
-    n: .number,
-    t: (.title[0:48]),
-    draft: .isDraft,
-    m: .mergeable,
-    ms: (.mergeStateStatus // "UNKNOWN"),
-    head: .headRefName,
-    headOid: ((.headRefOid // "") | ascii_downcase),
-    base: .baseRefName,
-    body: (.body // ""),
-    L: [.labels[].name],
-    fail: []
-  } ]')"
-
-# Resolve authoritative queue membership once for the snapshot. In native
-# mode labels are only intent/audit evidence and must never be treated as queue
-# state. Fail closed if GitHub omits any open PR from the GraphQL snapshot.
+# Exact-head admission reads one PR. Maintenance pages native queue state
+# (first:30) instead of two `gh pr list --limit 200` fleet dumps before enroll.
 if [[ "$MERGE_QUEUE_BACKEND" == "native" ]]; then
   if [[ "$DRY_RUN" != "1" ]]; then
     node scripts/merge-queue-backend.mjs preflight >/dev/null
   fi
-  NATIVE_QUEUE_STATE="$(node scripts/merge-queue-backend.mjs list-state)"
-  if ! jq -e --argjson states "$NATIVE_QUEUE_STATE" '
-    all(.[]; ($states[(.n | tostring)] | type) == "object")
-  ' <<<"$SNAP" >/dev/null; then
-    echo "::error::Native queue state omitted an open PR; refusing partial drain" >&2
-    exit 1
+  if [[ -n "$DRAIN_ADMISSION_PR" ]]; then
+    echo "=== SNAP (exact-head #$DRAIN_ADMISSION_PR) ==="
+    if ! NATIVE_QUEUE_STATE="$(inventory_native_queue_state "$DRAIN_ADMISSION_PR")"; then
+      echo "::error::Exact-target native queue read failed for #$DRAIN_ADMISSION_PR" >&2
+      exit 1
+    fi
+  else
+    echo "=== SNAP (paged inventory) ==="
+    if ! NATIVE_QUEUE_STATE="$(inventory_native_queue_state)"; then
+      echo "::error::Paged native queue inventory failed" >&2
+      exit 1
+    fi
   fi
-  SNAP="$(jq -c --argjson states "$NATIVE_QUEUE_STATE" '
-    map(. + {
-      q: ($states[(.n | tostring)].queued == true),
-      qs: ($states[(.n | tostring)].mergeQueueEntry.state // null),
-      oid: $states[(.n | tostring)].headRefOid
-    })
-  ' <<<"$SNAP")"
+  SNAP="$(native_state_to_snap <<<"$NATIVE_QUEUE_STATE")"
 else
+  SNAP="$(gh_inventory_retry pr list -R "$REPO" --state open --limit 200 \
+    --json number,title,body,isDraft,mergeable,mergeStateStatus,labels,headRefName,headRefOid,baseRefName --jq '
+    [ .[] | {
+      n: .number,
+      t: (.title[0:48]),
+      draft: .isDraft,
+      m: .mergeable,
+      ms: (.mergeStateStatus // "UNKNOWN"),
+      head: .headRefName,
+      headOid: ((.headRefOid // "") | ascii_downcase),
+      base: .baseRefName,
+      body: (.body // ""),
+      L: [.labels[].name],
+      fail: []
+    } ]')"
   SNAP="$(jq -c '
     map(. + {q: (((.L // []) | index("merge-queue")) != null)})
   ' <<<"$SNAP")"
+fi
 
+echo "=== RETARGET (base must be main) ==="
+retargeted=0
+while IFS= read -r pr; do
+  n="$(jq -r '.n' <<<"$pr")"
+  base="$(jq -r '.base' <<<"$pr")"
+  t="$(jq -r '.t' <<<"$pr")"
+  if [[ ! "$n" =~ ^[1-9][0-9]*$ || -z "$base" || "$base" == "null" ]]; then
+    continue
+  fi
+  echo "  #$n  $t  $base → main"
+  if [[ "$DRY_RUN" == "1" ]]; then
+    echo "    [dry-run] would gh pr edit $n --base main"
+  else
+    if ! gh_retry pr edit "$n" -R "$REPO" --base main >/dev/null; then
+      echo "::error::Failed to retarget #$n from $base to main" >&2
+      exit 1
+    fi
+  fi
+  retargeted=$((retargeted + 1))
+done < <(jq -c '
+  .[]
+  | select((.n | type == "number") and (.base | type == "string") and .base != "main")
+' <<<"$SNAP")
+if [[ "$retargeted" -eq 0 ]]; then
+  echo "  (none)"
+elif [[ "$DRY_RUN" != "1" ]]; then
+  if [[ "$MERGE_QUEUE_BACKEND" == "native" ]]; then
+    if [[ -n "$DRAIN_ADMISSION_PR" ]]; then
+      if ! NATIVE_QUEUE_STATE="$(inventory_native_queue_state "$DRAIN_ADMISSION_PR")"; then
+        echo "::error::Exact-target native queue reread failed after retarget for #$DRAIN_ADMISSION_PR" >&2
+        exit 1
+      fi
+    else
+      if ! NATIVE_QUEUE_STATE="$(inventory_native_queue_state)"; then
+        echo "::error::Paged native queue inventory failed after retarget" >&2
+        exit 1
+      fi
+    fi
+    SNAP="$(native_state_to_snap <<<"$NATIVE_QUEUE_STATE")"
+  else
+    SNAP="$(gh_inventory_retry pr list -R "$REPO" --state open --limit 200 \
+      --json number,title,body,isDraft,mergeable,mergeStateStatus,labels,headRefName,headRefOid,baseRefName --jq '
+      [ .[] | {
+        n: .number,
+        t: (.title[0:48]),
+        draft: .isDraft,
+        m: .mergeable,
+        ms: (.mergeStateStatus // "UNKNOWN"),
+        head: .headRefName,
+        headOid: ((.headRefOid // "") | ascii_downcase),
+        base: .baseRefName,
+        body: (.body // ""),
+        L: [.labels[].name],
+        fail: []
+      } ]')"
+    SNAP="$(jq -c '
+      map(. + {q: (((.L // []) | index("merge-queue")) != null)})
+    ' <<<"$SNAP")"
+  fi
 fi
 
 # Merge-group churn evidence (JOV-5030). Each native group build runs on
@@ -1225,30 +1610,71 @@ MERGE_GROUP_RUNS_JSON="[]"
 if [[ "$MERGE_QUEUE_BACKEND" == "native" ]]; then
   MAIN_HEAD_SHA="$(gh_retry api "repos/${REPO}/git/ref/heads/main" --jq '.object.sha // empty' 2>/dev/null || true)"
   MAIN_HEAD_SHA="$(printf '%s' "$MAIN_HEAD_SHA" | tr '[:upper:]' '[:lower:]')"
-  MERGE_GROUP_RUNS_JSON="$(gh_retry api "repos/${REPO}/actions/workflows/ci.yml/runs?event=merge_group&per_page=50" \
-    --jq '[.workflow_runs[]? | {id, headBranch, status, conclusion, headSha, createdAt, updatedAt}]' 2>/dev/null || echo '[]')"
+  MERGE_GROUP_RUNS_JSON="$(gh_retry api "repos/${REPO}/actions/workflows/ci.yml/runs?event=merge_group&per_page=100" \
+    --jq '[.workflow_runs[]? | {id, headBranch: .head_branch, status, conclusion, headSha: .head_sha, createdAt: .created_at, updatedAt: .updated_at}]' 2>/dev/null || echo '[]')"
   export MERGE_GROUP_RUNS_JSON
 fi
 
-# front_churn_action <num> <head_oid> → prints allow|block|unknown.
-front_churn_action() {
+# front_churn_disposition <num> <head_oid> → prints
+# allow|block-product|block-transient|unknown|receipt-unknown.
+# Annotate recent failed fronts, not only the latest run. A single-run
+# failedSteps payload never reaches MERGE_GROUP_CHURN_FAILURE_THRESHOLD=2, so
+# unit-test merge_group failures re-enrolled forever as main moved (#16238,
+# reproduced by #16441 on 2026-08-27).
+front_churn_disposition() {
   local n="$1" head_oid="$2" committed run_id jobs_json runs_json
-  if [[ "$MERGE_QUEUE_BACKEND" != "native" || ! "$MAIN_HEAD_SHA" =~ ^[0-9a-f]{40}$ ]]; then
+  local receipt_head receipt_rc decision action failure_class active_run_id
+  if [[ "$MERGE_QUEUE_BACKEND" != "native" ]]; then
+    echo "unknown"
+    return 0
+  fi
+  if [[ ! "$MAIN_HEAD_SHA" =~ ^[0-9a-f]{40}$ ]]; then
     echo "unknown"
     return 0
   fi
   committed="$(gh_retry api "repos/${REPO}/commits/${head_oid}" --jq '.commit.committer.date // empty' 2>/dev/null || true)"
   runs_json="$MERGE_GROUP_RUNS_JSON"
-  run_id="$(jq -r --arg prefix "gh-readonly-queue/main/pr-${n}-" '
-    [.[]
-      | select((.headBranch // "") | startswith($prefix))
-      | select(.status == "completed")
-      | select(.conclusion == "failure" or .conclusion == "timed_out"
-        or .conclusion == "action_required" or .conclusion == "startup_failure"
-        or .conclusion == "stale")]
-    | sort_by(.createdAt) | reverse | .[0].id // empty
-  ' <<<"$runs_json")"
-  if [[ "$run_id" =~ ^[1-9][0-9]*$ ]]; then
+  # A controller pass can race a newer native group that is still running.
+  # Consult that already-fetched read-only evidence before honoring a durable
+  # failure tombstone; otherwise an older failure can eject the newer group
+  # before it publishes its terminal result (#17013, 2026-09-02).
+  if jq -e --arg prefix "gh-readonly-queue/main/pr-${n}-" --arg committed "$committed" '
+    any(.[];
+      ((.headBranch // "") | startswith($prefix))
+      and (.status == "queued" or .status == "in_progress"
+        or .status == "waiting" or .status == "pending"
+        or .status == "requested")
+      and (($committed == "") or ((.createdAt // "") >= $committed)))
+  ' <<<"$runs_json" >/dev/null; then
+    decision="$(MERGE_GROUP_RUNS_JSON="$runs_json" \
+      node scripts/ci-merge-queue-check.mjs front-churn \
+      --pr="$n" --base="$MAIN_HEAD_SHA" --head-committed-at="$committed" 2>/dev/null || true)"
+    action="$(jq -r '.action // "unknown"' <<<"$decision" 2>/dev/null || echo unknown)"
+    active_run_id="$(jq -r '.evidence.activeRunId // empty' <<<"$decision" 2>/dev/null || true)"
+    if [[ "$action" == "allow" && "$active_run_id" =~ ^[1-9][0-9]*$ ]]; then
+      echo "allow"
+      return 0
+    fi
+  fi
+  set +e
+  receipt_head="$(product_failure_receipt_head "$head_oid")"
+  receipt_rc=$?
+  set -e
+  if [[ "$receipt_rc" -eq 2 ]]; then
+    echo "receipt-unknown"
+    return 0
+  fi
+  if [[ "$receipt_rc" -eq 0 && "$receipt_head" == "$head_oid" ]]; then
+    echo "block-product"
+    return 0
+  fi
+  while IFS= read -r run_id; do
+    [[ "$run_id" =~ ^[1-9][0-9]*$ ]] || continue
+    if jq -e --argjson run_id "$run_id" '
+      any(.[]; .id == $run_id and (.failedSteps | type == "array"))
+    ' <<<"$runs_json" >/dev/null; then
+      continue
+    fi
     jobs_json="$(gh_retry api "repos/${REPO}/actions/runs/${run_id}/jobs?per_page=100" --paginate \
       --jq '[.jobs[]? | .steps[]? | select(.conclusion == "failure") | .name]' 2>/dev/null || echo '[]')"
     if jq -e 'type == "array" and all(.[]; type == "string")' <<<"$jobs_json" >/dev/null; then
@@ -1256,10 +1682,35 @@ front_churn_action() {
         map(if .id == $run_id then . + {failedSteps: $failed_steps} else . end)
       ' <<<"$runs_json")"
     fi
+  done < <(jq -r --arg prefix "gh-readonly-queue/main/pr-${n}-" '
+    [.[]
+      | select((.headBranch // "") | startswith($prefix))
+      | select(.status == "completed")
+      | select(.conclusion == "failure" or .conclusion == "timed_out"
+        or .conclusion == "action_required" or .conclusion == "startup_failure"
+        or .conclusion == "stale")]
+    | sort_by(.createdAt) | reverse | .[0:8][]? | .id
+  ' <<<"$runs_json")
+  MERGE_GROUP_RUNS_JSON="$runs_json"
+  if ! decision="$(MERGE_GROUP_RUNS_JSON="$runs_json" \
+    node scripts/ci-merge-queue-check.mjs front-churn \
+      --pr="$n" --base="$MAIN_HEAD_SHA" --head-committed-at="$committed" 2>/dev/null)"; then
+    echo "unknown"
+    return 0
   fi
-  MERGE_GROUP_RUNS_JSON="$runs_json" node scripts/ci-merge-queue-check.mjs front-churn \
-    --pr="$n" --base="$MAIN_HEAD_SHA" --head-committed-at="$committed" 2>/dev/null \
-    | jq -r '.action // "unknown"'
+  action="$(jq -r '.action // "unknown"' <<<"$decision" 2>/dev/null || echo unknown)"
+  failure_class="$(jq -r '.evidence.failureClass // empty' <<<"$decision" 2>/dev/null || true)"
+  if [[ "$action" == "block" \
+    && ( "$failure_class" == "deterministic-product-check" \
+      || "$failure_class" == "repeated-product-check" ) ]]; then
+    echo "block-product"
+  elif [[ "$action" == "block" ]]; then
+    echo "block-transient"
+  elif [[ "$action" == "allow" || "$action" == "unknown" ]]; then
+    echo "$action"
+  else
+    echo "unknown"
+  fi
 }
 
 # Production-red mode permits one exact-head exception. Evaluate only native
@@ -1323,7 +1774,7 @@ while IFS= read -r pr; do
     and (.base == "main")
     and (.m == "MERGEABLE")
     and (
-      (([.L[]] | any(. == "needs-human" or . == "hold" or . == "gated" or . == "fast" or '"$NO_AUTO_HOLD_JQ"')) | not)
+      (([.L[]] | any(. == "fast" or '"$NO_AUTO_HOLD_JQ"')) | not)
       and (
         (([.L[]] | index("queue-deferred")) == null)
         or ((.n | tostring) == $admission_pr)
@@ -1342,6 +1793,26 @@ while IFS= read -r pr; do
 done < <(jq -c '.[]' <<<"$SNAP")
 SNAP="$ENRICHED"
 
+# A source-head push can make GitHub briefly report CONFLICTING while it
+# recomputes mergeability. The conflict label outlives that transient and used
+# to eject an exact active merge-group head even after GitHub returned the same
+# source SHA to MERGEABLE. Re-read the exact head before clearing the label and
+# update this run's snapshot so admission and dequeue consume the same positive
+# evidence. Unknown or changed-head evidence never mutates.
+echo "=== RECONCILE (resolved exact-head conflict labels) ==="
+while read -r pr; do
+  n="$(jq -r '.n' <<<"$pr")"
+  head_oid="$(jq -r '.headOid // ""' <<<"$pr" | tr '[:upper:]' '[:lower:]')"
+  [[ "$head_oid" =~ ^[0-9a-f]{40}$ ]] || continue
+  if reconcile_resolved_conflict_label "$n" "$head_oid"; then
+    SNAP="$(jq -c --argjson n "$n" '
+      map(if .n == $n then .L = [.L[] | select(. != "needs-conflict-resolution")] else . end)
+    ' <<<"$SNAP")"
+  fi
+done < <(echo "$SNAP" | jq -c '.[]
+  | select(.m == "MERGEABLE")
+  | select([.L[]] | any(. == "needs-conflict-resolution"))')
+
 # isolated-only (production-red) may keep one freshly proven isolated entry
 # and dequeues ordinary members. Waiting lanes — hold-intake, draft-only /
 # main-not-green, and blocked-unknown — must not dequeue CLEAN unrelated PRs
@@ -1357,7 +1828,7 @@ echo "$SNAP" | jq -r '
   def labels: (.L // []);
   def main_target: .base == "main";
   def queued: .q == true;
-  def hard_gated: labels | any(. == "needs-human" or . == "hold" or . == "gated" or . == "queue-deferred" or '"$NO_AUTO_HOLD_JQ"');
+  def hard_gated: labels | any(. == "queue-deferred" or '"$NO_AUTO_HOLD_JQ"');
   [
     "  CLEAN: " + ([.[] | select(main_target and queued and (.ms // "") == "CLEAN")] | length | tostring),
     "  UNSTABLE: " + ([.[] | select(main_target and queued and (.ms // "") == "UNSTABLE")] | length | tostring),
@@ -1378,7 +1849,7 @@ while read -r pr; do
     fi
 done < <(echo "$SNAP" | jq -c '.[]
   | select(.q == true)
-  | select(.draft or ([.L[]] | any(. == "needs-human" or . == "hold" or . == "gated" or . == "queue-deferred" or '"$NO_AUTO_HOLD_JQ"')))')
+  | select(.draft or ([.L[]] | any(. == "queue-deferred" or '"$NO_AUTO_HOLD_JQ"')))')
 
 # A production-red exception is intentionally WIP 1. Keep at most one queued
 # PR whose exact base/head/full diff still satisfies the semantic classifier;
@@ -1396,7 +1867,7 @@ if [[ "$DRAIN_PROMOTION_MODE" == "isolated-only" || "$DRAIN_FREEZE_EXISTING_QUEU
         | select(.draft | not)
         | select(.m == "MERGEABLE")
         | select(.fail | length == 0)
-        | select(([.L[]] | any(. == "needs-human" or . == "hold" or . == "gated" or . == "queue-deferred" or '"$NO_AUTO_HOLD_JQ"')) | not)
+        | select(([.L[]] | any(. == "queue-deferred" or '"$NO_AUTO_HOLD_JQ"')) | not)
         | .n ] | sort | first // empty')"
     [[ -n "$ISOLATED_KEEP_PR" ]] && echo "  preserving exact isolated PR #$ISOLATED_KEEP_PR (WIP 1)"
   fi
@@ -1431,7 +1902,7 @@ if [[ "$DRAIN_PROMOTION_MODE" == "isolated-only" || "$DRAIN_FREEZE_EXISTING_QUEU
   done < <(echo "$SNAP" | jq -c '.[]
     | select(.q == true)
     | select(.draft | not)
-    | select(([.L[]] | any(. == "needs-human" or . == "hold" or . == "gated" or . == "queue-deferred" or '"$NO_AUTO_HOLD_JQ"')) | not)')
+    | select(([.L[]] | any(. == "queue-deferred" or '"$NO_AUTO_HOLD_JQ"')) | not)')
 fi
 
 # --- DEQUEUE: parked UNMERGEABLE native entries (JOV-5291) ---
@@ -1470,17 +1941,52 @@ if waiting_lane_allows_clean_enroll \
     fi
   done < <(echo "$SNAP" | jq -c '.[]
     | select(.q == true)
-    | select(.qs == "UNMERGEABLE")
+    | select(([.L[]] | any(.=="queue-deferred" or '"$NO_AUTO_HOLD_JQ"')) | not)')
+fi
+
+# --- INVENTORY + DEQUEUE: pre-land CHANGELOG.md (JOV-5378) ---
+# Implementation PRs must not edit CHANGELOG.md. Queued members that still
+# carry the file are dequeued with reenqueue=false. Enrollment skip is a
+# classified skip, not a CI bypass.
+echo "=== INVENTORY (pre-land CHANGELOG.md) ==="
+echo "=== DEQUEUE (pre-land CHANGELOG.md → drain without CI bypass) ==="
+if waiting_lane_allows_clean_enroll \
+  || [[ "$DRAIN_PROMOTION_MODE" == "blocked" && "$DRAIN_FREEZE_EXISTING_QUEUE" == "0" ]]; then
+  changelog_open='[]'
+  while read -r pr; do
+    n=$(jq -r '.n' <<<"$pr"); t=$(jq -r '.t' <<<"$pr")
+    head_ref="$(jq -r '.head // empty' <<<"$pr")"
+    files="$(pr_changed_paths_json "$n")"
+    changelog_open="$(jq -c --argjson n "$n" --argjson files "$files" --arg head "$head_ref" \
+      '. + [{number:$n, files:$files, headRefName:$head, queued:true}]' <<<"$changelog_open")"
+    drain_decision="$(CHANGELOG_COLLISION_JSON="$(jq -nc --argjson files "$files" --argjson queued true --arg branch "$head_ref" \
+      '{files:$files, queued:$queued, branch:$branch}')" \
+      node scripts/ci-merge-queue-check.mjs changelog-drain)"
+    drain_action="$(jq -r '.action // empty' <<<"$drain_decision")"
+    if [[ "$drain_action" != "dequeue" ]]; then
+      continue
+    fi
+    echo "  #$n  $t  ✗ pre-land-changelog"
+    if ! dequeue_strict "$n"; then
+      echo "::error::Failed to prove CHANGELOG PR #$n is outside native merge queue" >&2
+      exit 1
+    fi
+  done < <(echo "$SNAP" | jq -c '.[]
+    | select(.q == true)
     | select(.draft | not)
-    | select(([.L[]] | any(.=="needs-human" or .=="hold" or .=="gated" or .=="queue-deferred" or '"$NO_AUTO_HOLD_JQ"')) | not)')
+    | select(([.L[]] | any(.=="queue-deferred" or '"$NO_AUTO_HOLD_JQ"')) | not)')
+  inventory="$(CHANGELOG_COLLISION_JSON="$(jq -nc --argjson openPrs "$changelog_open" '{openPrs:$openPrs}')" \
+    node scripts/ci-merge-queue-check.mjs changelog-inventory)"
+  echo "  inventory count=$(jq -r '.count' <<<"$inventory") reason=$(jq -r '.reason' <<<"$inventory")"
+  echo "$inventory" | jq -r '.prs[]? | "  #\(.number)  \(.headRefName // "unknown")  queued=\(.queued)"'
 fi
 
 # --- DEQUEUE: only GENUINELY un-mergeable PRs (conflict or real failing checks) ---
 # Do NOT dequeue on mergeStateStatus alone. A MERGEABLE PR flickers to BLOCKED
 # whenever a required check has a zombie `cancelled`/`queued` run left behind by
 # `concurrency: cancel-in-progress` (the ruleset evaluates required checks by
-# name and a non-success duplicate pins it BLOCKED). Stripping merge-queue on
-# that transient state un-enrolled green PRs every 20 min and starved the queue
+# name and a non-success duplicate pins it BLOCKED). Dequeueing on that
+# transient state un-enrolled green PRs every 20 min and starved the queue
 # for 6h on 2026-06-22. The raw `mergeable` field has the same flicker:
 # GitHub recomputes it asynchronously every time main advances, reporting
 # UNKNOWN for the recompute window — on 2026-07-09 that churned three clean
@@ -1491,9 +1997,9 @@ echo "=== DEQUEUE (conflict / failing → queue removal) ==="
 echo "$SNAP" | jq -c --arg promotion_mode "$DRAIN_PROMOTION_MODE" --arg freeze "$DRAIN_FREEZE_EXISTING_QUEUE" '.[]
   | select($promotion_mode == "normal" or $promotion_mode == "hold-intake" or $promotion_mode == "draft-only" or ($promotion_mode == "blocked" and $freeze == "0"))
   | select(.q == true)
-  | select(([.L[]] | any(.=="needs-human" or .=="hold" or .=="gated" or .=="queue-deferred" or '"$NO_AUTO_HOLD_JQ"')) | not)
+  | select(([.L[]] | any(.=="queue-deferred" or '"$NO_AUTO_HOLD_JQ"')) | not)
   | select(
-      ([.L[]] | any(.=="needs-conflict-resolution"))
+      (([.L[]] | any(.=="needs-conflict-resolution")) and .m != "MERGEABLE")
       or (.m == "CONFLICTING")
       or (
         (.fail|length>0)
@@ -1507,19 +2013,15 @@ echo "$SNAP" | jq -c --arg promotion_mode "$DRAIN_PROMOTION_MODE" --arg freeze "
     n=$(jq -r '.n' <<<"$pr"); t=$(jq -r '.t' <<<"$pr")
     reason=$(jq -r '
       [
-        (if ([.L[]] | any(.=="needs-conflict-resolution")) then "needs-conflict-resolution" else empty end),
+        (if ([.L[]] | any(.=="needs-conflict-resolution")) and .m != "MERGEABLE" then "needs-conflict-resolution" else empty end),
         (if .m == "CONFLICTING" then "mergeable=CONFLICTING" else empty end),
         (if (.fail|length)>0 then "checks=" + (.fail|join(",")) else empty end)
       ] | join("; ")
     ' <<<"$pr")
     echo "  #$n  $t  ✗ $reason"
-    if [[ "$MERGE_QUEUE_BACKEND" == "native" ]]; then
-      if ! dequeue_strict "$n"; then
-        echo "::error::Failed to prove PR #$n is outside native merge queue" >&2
-        exit 1
-      fi
-    else
-      unlabel "$n" merge-queue
+    if ! dequeue_strict "$n"; then
+      echo "::error::Failed to prove PR #$n is outside the configured queue backend" >&2
+      exit 1
     fi
   done
 
@@ -1537,19 +2039,90 @@ if waiting_lane_allows_clean_enroll || [[ "$DRAIN_PROMOTION_MODE" == "blocked" &
     n=$(jq -r '.n' <<<"$pr"); t=$(jq -r '.t' <<<"$pr")
     head_oid="$(jq -r '.headOid // ""' <<<"$pr")"
     [[ "$head_oid" =~ ^[0-9a-f]{40}$ ]] || continue
-    churn_action="$(front_churn_action "$n" "$head_oid")"
-    if [[ "$churn_action" == "block" ]]; then
-      echo "  #$n  $t  ✗ unchanged head has a classified/repeated merge-group failure"
+    churn_disposition="$(front_churn_disposition "$n" "$head_oid")"
+    if [[ "$churn_disposition" == "block-product" ]]; then
+      echo "  #$n  $t  ✗ unchanged head has a durable classified/repeated merge-group failure"
+      if ! record_product_failure_receipt "$n" "$head_oid"; then
+        echo "::error::Failed to record product-failure tombstone for #$n at $head_oid" >&2
+        exit 1
+      fi
       if ! dequeue_strict "$n"; then
         echo "::error::Failed to prove non-progressing front PR #$n is outside native merge queue" >&2
         exit 1
       fi
+    elif [[ "$churn_disposition" == "block-transient" ]]; then
+      echo "  #$n  $t  ✗ bounded unclassified merge-group failure cooldown"
+      if ! dequeue_strict "$n"; then
+        echo "::error::Failed to prove transiently non-progressing PR #$n is outside native merge queue" >&2
+        exit 1
+      fi
+    elif [[ "$churn_disposition" == "receipt-unknown" ]]; then
+      echo "  #$n  $t  ~ product-failure tombstone state unavailable; leaving queued"
     fi
   done < <(echo "$SNAP" | jq -c '.[]
     | select(.q == true)
+    | select(.qp == 1)
     | select(.base == "main")
     | select(.draft | not)
-    | select(([.L[]] | any(.=="needs-human" or .=="hold" or .=="gated" or .=="queue-deferred" or '"$NO_AUTO_HOLD_JQ"')) | not)')
+    | select(([.L[]] | any(.=="queue-deferred" or '"$NO_AUTO_HOLD_JQ"')) | not)')
+fi
+
+# --- DEQUEUE: starved merge groups (PR #16420, 2026-09-03) ---
+# An AWAITING_CHECKS native entry whose merge group never produced a ci.yml
+# run is the 'missing evidence' gap the non-progressing pass above cannot
+# close: there is no failure receipt and there never will be one, so the entry
+# sits forever and silently blocks every follower. Recover only on proven
+# evidence: the already-fetched merge_group run inventory has NO run on this
+# PR's group branch, AND the PR's latest added_to_merge_queue timeline event
+# is older than DRAIN_GROUP_STARVED_MINUTES. Any failed read skips the entry —
+# never mutate on unproven evidence. Dequeue only; the normal ENROLL path
+# re-admits the still-green head, and the fresh group's checks_requested
+# refires CI. Capped at 2 per run so a timeline-API anomaly cannot clear the
+# whole queue in one pass.
+if [[ "$MERGE_QUEUE_BACKEND" == "native" ]] \
+  && { waiting_lane_allows_clean_enroll || [[ "$DRAIN_PROMOTION_MODE" == "blocked" && "$DRAIN_FREEZE_EXISTING_QUEUE" == "0" ]]; }; then
+  echo "=== DEQUEUE (starved group: AWAITING_CHECKS with no merge-group CI run) ==="
+  STARVED_DEQUEUED=0
+  while read -r pr; do
+    if [[ "$STARVED_DEQUEUED" -ge 2 ]]; then
+      echo "  ~ reached starved-group dequeue cap (2)"
+      break
+    fi
+    n=$(jq -r '.n' <<<"$pr"); t=$(jq -r '.t' <<<"$pr")
+    if jq -e --arg prefix "gh-readonly-queue/main/pr-${n}-" '
+      any(.[]; (.headBranch // "") | startswith($prefix))
+    ' <<<"$MERGE_GROUP_RUNS_JSON" >/dev/null; then
+      continue
+    fi
+    if ! timeline_json="$(gh_retry api "repos/${REPO}/issues/${n}/timeline" --paginate --slurp 2>/dev/null)"; then
+      echo "  #$n  $t  ~ timeline read failed; leaving queued"
+      continue
+    fi
+    queued_at="$(jq -r '
+      [ .[][]? | select(.event == "added_to_merge_queue") | .created_at ]
+      | sort | last // empty
+    ' <<<"$timeline_json" 2>/dev/null || true)"
+    queued_epoch="$(jq -rn --arg d "$queued_at" 'try ($d | fromdateiso8601) catch empty' 2>/dev/null || true)"
+    if [[ ! "$queued_epoch" =~ ^[0-9]+$ ]]; then
+      echo "  #$n  $t  ~ no readable added_to_merge_queue event; leaving queued"
+      continue
+    fi
+    age_seconds=$(( $(date -u +%s) - queued_epoch ))
+    if (( age_seconds < DRAIN_GROUP_STARVED_MINUTES * 60 )); then
+      continue
+    fi
+    echo "  #$n  $t  ✗ starved-group: AWAITING_CHECKS for $((age_seconds / 60))m with no merge-group CI run"
+    if ! dequeue_strict "$n"; then
+      echo "::error::Failed to prove starved-group PR #$n is outside native merge queue" >&2
+      exit 1
+    fi
+    STARVED_DEQUEUED=$((STARVED_DEQUEUED + 1))
+  done < <(echo "$SNAP" | jq -c '.[]
+    | select(.q == true)
+    | select(.qs == "AWAITING_CHECKS")
+    | select(.base == "main")
+    | select(.draft | not)
+    | select(([.L[]] | any(.=="queue-deferred" or '"$NO_AUTO_HOLD_JQ"')) | not)')
 fi
 
 # --- ENROLL: non-draft, mergeable, no FAILING checks, not opted-out, not queued ---
@@ -1621,7 +2194,7 @@ while read -r pr; do
     and (.m == "MERGEABLE")
     and (.base == "main")
     and ((.fail // []) | length == 0)
-    and (([.L[]] | any(. == "needs-human" or . == "hold" or . == "gated" or . == "queue-deferred" or . == "needs-conflict-resolution" or . == "fast" or '"$NO_AUTO_HOLD_JQ"')) | not)
+    and (([.L[]] | any(. == "queue-deferred" or . == "needs-conflict-resolution" or . == "fast" or '"$NO_AUTO_HOLD_JQ"')) | not)
   ' <<<"$pr" >/dev/null; then
     clean_eligible=1
   fi
@@ -1678,7 +2251,7 @@ done < <(echo "$SNAP" | jq -c --arg admission_pr "$DRAIN_ADMISSION_PR" --arg pro
   | select(.base=="main")
   | select(.fail|length==0)
   | select(.q | not)
-  | select([.L[]] | any(.=="needs-human" or .=="hold" or .=="gated" or .=="needs-conflict-resolution" or .=="fast" or '"$NO_AUTO_HOLD_JQ"') | not)
+  | select([.L[]] | any(.=="needs-conflict-resolution" or .=="fast" or '"$NO_AUTO_HOLD_JQ"') | not)
   | select(
       ([.L[]] | index("queue-deferred") == null)
       or ((.n | tostring) == $admission_pr)
@@ -1714,7 +2287,7 @@ if [[ -n "$DRAIN_ADMISSION_PR" && "$ENROLLED_THIS_RUN" -eq 0 ]]; then
       and (.state.mergeQueueEntry.state | IN("QUEUED", "AWAITING_CHECKS", "MERGEABLE", "UNMERGEABLE", "LOCKED"))
       and (.state.mergeQueueEntry.position | type == "number" and floor == . and . > 0)
       and ((.state.headRefOid // "") | ascii_downcase) == $head
-      and ((.state.labels.nodes // []) | map(.name) | any(. == "needs-human" or . == "hold" or . == "gated" or . == "queue-deferred" or . == "needs-conflict-resolution" or . == "fast" or '"$NO_AUTO_HOLD_JQ"') | not)
+      and ((.state.labels.nodes // []) | map(.name) | any(. == "queue-deferred" or . == "needs-conflict-resolution" or . == "fast" or '"$NO_AUTO_HOLD_JQ"') | not)
     ' --arg head "$DRAIN_ADMISSION_HEAD" <<<"$LIVE_NATIVE_RECEIPT" >/dev/null; then
       ADMISSION_ALREADY_QUEUED="true"
       echo "  #$DRAIN_ADMISSION_PR  ~ delayed native receipt at $DRAIN_ADMISSION_HEAD (state $(jq -r '.state.mergeQueueEntry.state' <<<"$LIVE_NATIVE_RECEIPT"), position $(jq -r '.state.mergeQueueEntry.position' <<<"$LIVE_NATIVE_RECEIPT"))"
@@ -1723,9 +2296,16 @@ if [[ -n "$DRAIN_ADMISSION_PR" && "$ENROLLED_THIS_RUN" -eq 0 ]]; then
     fi
   fi
   if [[ "$DRY_RUN" != "1" && "$ADMISSION_TARGET_OBSERVED" == "true" && "$ADMISSION_ALREADY_QUEUED" != "true" ]]; then
-    if [[ "$LAST_ENROLL_SKIP_REASON" == "changelog-collision" \
+    if [[ "$LAST_ENROLL_SKIP_REASON" == "product-failure-tombstone" ]]; then
+      echo "  #$DRAIN_ADMISSION_PR  ⏸ $LAST_ENROLL_SKIP_REASON (durable exact-head product failure; source repair required)"
+    elif [[ "$LAST_ENROLL_SKIP_REASON" == "changelog-collision" \
+      || "$LAST_ENROLL_SKIP_REASON" == "pre-land-changelog" \
+      || "$LAST_ENROLL_SKIP_REASON" == "preland-changelog" \
+      || "$LAST_ENROLL_SKIP_REASON" == "preland-changelog-prohibited" \
       || "$LAST_ENROLL_SKIP_REASON" == "unmergeable-tombstone" ]]; then
       echo "  #$DRAIN_ADMISSION_PR  ⏸ $LAST_ENROLL_SKIP_REASON (classified skip; enroll is not a product-quality failure)"
+      echo "::error::queue-noop: classified-skip: exact admission #$DRAIN_ADMISSION_PR at $DRAIN_ADMISSION_HEAD ($LAST_ENROLL_SKIP_REASON; native admission refused, hard gate preserved)" >&2
+      exit 3
     elif [[ "$ADMISSION_ELIGIBLE" == "true" ]]; then
       echo "::error::queue-noop: missing receipt: exact admission #$DRAIN_ADMISSION_PR at $DRAIN_ADMISSION_HEAD (${ADMISSION_MISSING_REASON:-missing-receipt})" >&2
       exit 3
@@ -1751,7 +2331,8 @@ if [[ "$DRAIN_RECONCILE_QUEUE_REENTRY" == "1" || "$DRAIN_RECONCILE_MISSED_ADMISS
   echo "=== RECOVER (bounded exact-head native admission) ==="
   while read -r pr; do
     stop_if_budget_exhausted && break
-    if [[ "$ENROLLED_THIS_RUN" -ge "$DRAIN_QUEUE_REENTRY_MAX_PER_RUN" ]]; then
+    if (( DRAIN_QUEUE_REENTRY_MAX_PER_RUN > 0 )) \
+      && [[ "$ENROLLED_THIS_RUN" -ge "$DRAIN_QUEUE_REENTRY_MAX_PER_RUN" ]]; then
       echo "  ~ reached total exact admission cap ($DRAIN_QUEUE_REENTRY_MAX_PER_RUN)"
       break
     fi
@@ -1799,7 +2380,7 @@ if [[ "$DRAIN_RECONCILE_QUEUE_REENTRY" == "1" || "$DRAIN_RECONCILE_MISSED_ADMISS
     | select(.m == "MERGEABLE")
     | select(.base == "main")
     | select(.fail | length == 0)
-    | select([.L[]] | any(. == "needs-human" or . == "hold" or . == "gated" or . == "needs-conflict-resolution" or . == "fast" or '"$NO_AUTO_HOLD_JQ"') | not)
+    | select([.L[]] | any(. == "needs-conflict-resolution" or . == "fast" or '"$NO_AUTO_HOLD_JQ"') | not)
     | select(
         ([.L[]] | index("queue-deferred") == null)
         or (
@@ -1852,7 +2433,84 @@ if [[ "$DRAIN_RECOVER_FLEET_HOLDS" == "1" ]]; then
     | select(.m == "MERGEABLE")
     | select(.base == "main")
     | select(.fail | length == 0)
-    | select([.L[]] | any(. == "needs-human" or . == "hold" or . == "gated" or . == "queue-deferred" or . == "needs-conflict-resolution" or . == "fast" or '"$NO_AUTO_HOLD_JQ"') | not)')
+    | select([.L[]] | any(. == "queue-deferred" or . == "needs-conflict-resolution" or . == "fast" or '"$NO_AUTO_HOLD_JQ"') | not)')
+fi
+
+# --- MISSING CI: required source checks never registered on the exact head ---
+# The snapshot classifier reports one `<context> (missing)` blocker per absent
+# required context. A non-draft main PR whose fresh blockers are ALL of that
+# shape has no check-runs at all for the required contexts (distinct from any
+# terminal red, pending, or unavailable status) and can never turn green on its
+# own; close+reopen re-fires the pull_request source CI triggers. Bounded per
+# run, age-gated so an in-flight first CI flight is never interrupted, and
+# idempotent per exact head via a bot-comment marker so a durably broken
+# workflow is not re-triggered forever. The event-scoped admission target is
+# excluded: its own exact-head path owns the outcome.
+if [[ "$DRAIN_RECOVER_MISSING_CI" == "1" ]]; then
+  echo "=== RECOVER (missing source CI → bounded close+reopen) ==="
+  MISSING_CI_RECOVERED=0
+  while read -r pr; do
+    stop_if_budget_exhausted && break
+    if [[ "$MISSING_CI_RECOVERED" -ge "$DRAIN_MISSING_CI_MAX_PER_RUN" ]]; then
+      echo "  ~ reached missing-CI recovery cap ($DRAIN_MISSING_CI_MAX_PER_RUN)"
+      break
+    fi
+    n="$(jq -r '.n' <<<"$pr")"
+    t="$(jq -r '.t' <<<"$pr")"
+    head_oid="$(jq -r '.headOid // ""' <<<"$pr" | tr '[:upper:]' '[:lower:]')"
+    # The snapshot's check result can be stale. Re-read the exact current head
+    # and require every blocker to still be a missing required context.
+    fresh_failures="$(check_failures_for_pr "$n")"
+    if ! jq -e '
+      type == "array" and length > 0 and all(.[]; endswith(" (missing)"))
+    ' <<<"$fresh_failures" >/dev/null 2>&1; then
+      echo "  #$n  $t  ⏸ current exact-head blockers are not missing-only"
+      continue
+    fi
+    committed="$(gh_retry api "repos/${REPO}/commits/${head_oid}" --jq '.commit.committer.date // empty' 2>/dev/null || true)"
+    committed_epoch="$(jq -rn --arg d "$committed" 'try ($d | fromdateiso8601) catch empty' 2>/dev/null || true)"
+    min_age_seconds=$((DRAIN_MISSING_CI_MIN_AGE_MINUTES * 60))
+    if [[ ! "$committed_epoch" =~ ^[0-9]+$ ]] \
+      || (( $(date -u +%s) - committed_epoch < min_age_seconds )); then
+      echo "  #$n  $t  ⏸ head younger than ${DRAIN_MISSING_CI_MIN_AGE_MINUTES}m (or age unreadable)"
+      continue
+    fi
+    if missing_ci_recovery_attempted "$n" "$head_oid"; then
+      echo "  #$n  $t  ⏸ close+reopen already attempted at $head_oid"
+      continue
+    fi
+    if [[ "$DRY_RUN" == "1" ]]; then
+      echo "  #$n  $t  [dry-run] would comment + close/reopen to re-trigger source CI at $head_oid"
+      MISSING_CI_RECOVERED=$((MISSING_CI_RECOVERED + 1))
+      continue
+    fi
+    if ! gh_mutate_retry pr comment "$n" -R "$REPO" --body "$MISSING_CI_RECOVERY_MARKER
+Required source checks never registered a run for head $head_oid, so this PR could never become enrollable. Closing and reopening to re-fire the pull_request CI triggers. This recovery is attempted at most once per exact head." >/dev/null; then
+      echo "::error::Failed to record missing-CI recovery intent on #$n" >&2
+      exit 1
+    fi
+    if ! gh_mutate_retry pr close "$n" -R "$REPO" >/dev/null; then
+      echo "::error::Failed to close #$n for missing-CI recovery" >&2
+      exit 1
+    fi
+    if ! gh_mutate_retry pr reopen "$n" -R "$REPO" >/dev/null; then
+      echo "::error::Closed #$n for missing-CI recovery but failed to reopen it" >&2
+      exit 1
+    fi
+    echo "  #$n  $t  ↻ closed+reopened to re-trigger source CI at $head_oid"
+    MISSING_CI_RECOVERED=$((MISSING_CI_RECOVERED + 1))
+  done < <(echo "$SNAP" | jq -c --arg admission_pr "$DRAIN_ADMISSION_PR" '[ .[]
+    | select((.n | tostring) != $admission_pr)
+    | select(.q | not)
+    | select(.draft | not)
+    | select(.m == "MERGEABLE")
+    | select(.base == "main")
+    | select((.fail | length) > 0)
+    | select(.fail | all(.[]; endswith(" (missing)")))
+    | select([.L[]] | any(. == "queue-deferred" or . == "needs-conflict-resolution" or . == "fast" or '"$NO_AUTO_HOLD_JQ"') | not)
+    | select((.headOid // "") | test("^[0-9a-f]{40}$"))
+    | {n, t, headOid}
+  ] | sort_by(.n)[]')
 fi
 
 # --- CONFLICT: needs rebase (agent branches only) → label + hand to fix agent ---
@@ -1861,13 +2519,13 @@ echo "$SNAP" | jq -r --arg re "$AGENT_RE" '.[]
   | select(.m=="CONFLICTING")
   | select(.base=="main")
   | select(.head|test($re))
-  | select([.L[]] | any(.=="needs-human" or .=="hold" or .=="gated" or .=="queue-deferred" or '"$NO_AUTO_HOLD_JQ"') | not)
+  | select([.L[]] | any(.=="queue-deferred" or .=="needs-conflict-resolution" or '"$NO_AUTO_HOLD_JQ"') | not)
   | "  #\(.n)  \(.t)  [\(.head)]"'
 echo "$SNAP" | jq -r --arg re "$AGENT_RE" '.[]
   | select(.m=="CONFLICTING")
   | select(.base=="main")
   | select(.head|test($re))
-  | select([.L[]] | any(.=="needs-human" or .=="hold" or .=="gated" or .=="queue-deferred" or '"$NO_AUTO_HOLD_JQ"') | not) | .n' \
+  | select([.L[]] | any(.=="queue-deferred" or .=="needs-conflict-resolution" or '"$NO_AUTO_HOLD_JQ"') | not) | .n' \
 | while read -r n; do [[ -n "$n" ]] && label "$n" needs-conflict-resolution; done
 
 # --- BLOCKED: mergeable but red checks → hand to fix agent ---
@@ -1875,13 +2533,13 @@ echo "=== BLOCKED (red checks → fix agent) ==="
 echo "$SNAP" | jq -r '.[]
   | select(.draft|not) | select(.m=="MERGEABLE") | select(.fail|length>0)
   | select(.base=="main")
-  | select([.L[]] | any(.=="needs-human" or .=="hold" or .=="gated" or .=="queue-deferred" or '"$NO_AUTO_HOLD_JQ"') | not)
+  | select([.L[]] | any(.=="queue-deferred" or '"$NO_AUTO_HOLD_JQ"') | not)
   | "  #\(.n)  \(.t)  ✗ \(.fail|join(", "))"'
 
-# --- SURFACE: human-gated / superseded → report only, never auto-close ---
-echo "=== SURFACE (human decision; not touched) ==="
+# --- SURFACE: drafts / mechanical deferrals → report only, never auto-close ---
+echo "=== SURFACE (drafts and queue-deferred; not closed) ==="
 echo "$SNAP" | jq -r '.[]
-  | select(.draft or ([.L[]] | any(.=="needs-human" or .=="hold" or .=="gated" or .=="queue-deferred" or '"$NO_AUTO_HOLD_JQ"')))
+  | select(.draft or ([.L[]] | any(.=="queue-deferred" or '"$NO_AUTO_HOLD_JQ"')))
   | "  #\(.n)  \(.t)  {\(.L|join(","))}"'
 
 echo "=== done (DRY_RUN=$DRY_RUN) ==="

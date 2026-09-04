@@ -1,11 +1,11 @@
 'use client';
 
-import { Button, TooltipShortcut } from '@jovie/ui';
+import { IconButton, TooltipShortcut } from '@jovie/ui';
 import { Icon, type IconName } from '@/components/atoms/Icon';
 import { cn } from '@/lib/utils';
 
 export const RAIL_TOGGLE_BUTTON_CLASS =
-  'h-7 w-7 rounded-full border-transparent bg-transparent px-0 text-tertiary-token shadow-none transition-[background-color,color,box-shadow] duration-subtle hover:border-transparent hover:bg-surface-0 hover:text-primary-token focus-visible:border-transparent focus-visible:bg-surface-0 focus-visible:ring-2 focus-visible:ring-ring/55 active:border-transparent active:bg-surface-0';
+  'text-tertiary-token aria-pressed:bg-interactive-active aria-pressed:text-primary-token';
 
 interface RailToggleButtonProps {
   readonly side: 'left' | 'right';
@@ -47,10 +47,10 @@ export function RailToggleButton({
         : 'PanelRightOpen';
 
   const button = (
-    <Button
+    <IconButton
       type='button'
-      variant='ghost'
-      size='icon'
+      variant='secondary'
+      size='sm'
       aria-label={label}
       aria-expanded={open}
       aria-pressed={open}
@@ -67,7 +67,7 @@ export function RailToggleButton({
         aria-hidden='true'
         data-testid={iconTestId}
       />
-    </Button>
+    </IconButton>
   );
 
   return (

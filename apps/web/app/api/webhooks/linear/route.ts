@@ -1,30 +1,26 @@
 /**
  * Linear Webhook Handler
  *
- * Bridges Linear → GitHub repository_dispatch so Claude Code can pick up work
- * autonomously. Two trigger types:
+ * Invariant consumer: JOV-INV-005.
  *
- * 1. JOV issue create/update in Triage, Backlog, Todo, or To Do → dispatches
- *    `linear-intake-changed`. The downstream controller performs the full,
- *    label-free authoritative read before any admission decision.
- * 2. CodeRabbit posts an implementation-plan comment → dispatches
+ * Bridges Linear → GitHub repository_dispatch when CodeRabbit posts an
+ * implementation-plan comment. It dispatches
  *    `linear_plan_ready` (with verify_required / simplify_bounded / model_tier
  *    parsed from the comment body's automation contract)
+ *
+ * Issue pickup is owned by upstream OpenAI Symphony polling Linear directly.
  *
  * Auth: HMAC-SHA256 verification against LINEAR_WEBHOOK_SECRET via the
  * `linear-signature` header. Missing → 400, invalid → 401.
  *
- * Dedupe: provider `Linear-Delivery` identity is locked in Redis for six
- * hours. Known GitHub dispatch failures release the lock so Linear can retry.
- * An ambiguous timeout keeps the lock and returns a stable 200
- * reconcile-required acknowledgement so the delivery is not replayed. If Redis
- * is unavailable, we 503 rather than risk double-dispatching.
+ * Dedupe: provider webhook identity (with a deterministic fallback) held for
+ * six hours. Definite dispatch rejection releases the lock; an ambiguous
+ * timeout stays locked for the reconciliation backstop instead of replaying.
  *
  * Side effects: POSTs to
  * `https://api.github.com/repos/{owner}/{repo}/dispatches` with
  * GH_DISPATCH_TOKEN. Repo defaults to JovieInc/Jovie unless
- * VERCEL_GIT_REPO_OWNER / VERCEL_GIT_REPO_SLUG override. `client_payload`
- * stays within GitHub's 10 top-level key bound.
+ * VERCEL_GIT_REPO_OWNER / VERCEL_GIT_REPO_SLUG override.
  */
 
 import { createHmac, timingSafeEqual } from 'node:crypto';
@@ -42,60 +38,9 @@ import {
 export const runtime = 'nodejs';
 
 const NO_STORE_HEADERS = { 'Cache-Control': 'no-store' } as const;
-export const LINEAR_DISPATCH_DEDUPE_TTL_SECONDS = 6 * 60 * 60;
-export const GITHUB_REPOSITORY_DISPATCH_MAX_CLIENT_PAYLOAD_KEYS = 10;
-const DISPATCH_TIMEOUT_MS = 10000;
-
-export interface LinearGithubDispatchContract {
-  verify_required: boolean;
-  simplify_bounded: boolean;
-  model_tier: 'premium' | 'economy';
-}
-
-export interface LinearGithubDispatchPayload {
-  delivery_id: string;
-  issue_id: string;
-  issue_identifier: string | null;
-  issue_updated_at: string | null;
-  team_key: string | null;
-  state_name: string | null;
-  intake_action: string | null;
-  plan_ready: boolean;
-  contract: LinearGithubDispatchContract;
-}
-
-export function buildLinearGithubDispatchPayload(input: {
-  deliveryId: string;
-  issueId: string;
-  issueIdentifier: string | null;
-  issueUpdatedAt: string | null;
-  teamKey: string | null;
-  stateName: string | null;
-  intakeAction: string | null;
-  planReady: boolean;
-  contract: LinearGithubDispatchContract;
-}): LinearGithubDispatchPayload {
-  const clientPayload: LinearGithubDispatchPayload = {
-    delivery_id: input.deliveryId,
-    issue_id: input.issueId,
-    issue_identifier: input.issueIdentifier,
-    issue_updated_at: input.issueUpdatedAt,
-    team_key: input.teamKey,
-    state_name: input.stateName,
-    intake_action: input.intakeAction,
-    plan_ready: input.planReady,
-    contract: input.contract,
-  };
-  if (
-    Object.keys(clientPayload).length >
-    GITHUB_REPOSITORY_DISPATCH_MAX_CLIENT_PAYLOAD_KEYS
-  ) {
-    throw new Error(
-      'GitHub repository_dispatch client_payload exceeds the 10-key bound'
-    );
-  }
-  return clientPayload;
-}
+const DEDUPE_TTL_SECONDS = 6 * 60 * 60;
+const DISPATCH_TIMEOUT_MS = 4500;
+const MAX_PROVIDER_EVENT_AGE_MS = 6 * 60 * 60 * 1000;
 
 interface LinearIssueState {
   id?: string;
@@ -137,6 +82,8 @@ interface LinearWebhookPayload {
   updatedFrom?: {
     stateId?: string;
   };
+  webhookId?: string;
+  webhookTimestamp?: string | number;
 }
 
 interface AutomationContract {
@@ -161,25 +108,6 @@ function verifySignature(
   } catch {
     return false;
   }
-}
-
-function isJovieIntakeIssueEvent(payload: LinearWebhookPayload): boolean {
-  if (
-    payload.type !== 'Issue' ||
-    (payload.action !== 'create' && payload.action !== 'update')
-  ) {
-    return false;
-  }
-
-  const issueData = payload.data as LinearIssueData | undefined;
-  const stateName = issueData?.state?.name?.trim().toLowerCase();
-  const teamKey = issueData?.team?.key?.trim().toUpperCase();
-  return (
-    teamKey === 'JOV' &&
-    Boolean(
-      stateName && ['triage', 'backlog', 'todo', 'to do'].includes(stateName)
-    )
-  );
 }
 
 function isCodeRabbitPlanComment(payload: LinearWebhookPayload): boolean {
@@ -224,19 +152,30 @@ function parseAutomationContract(body: string): AutomationContract {
 }
 
 function getAutomationContract(
-  payload: LinearWebhookPayload,
-  isPlanReadyEvent: boolean
+  payload: LinearWebhookPayload
 ): AutomationContract {
-  if (!isPlanReadyEvent) {
-    return {
-      verifyRequired: true,
-      simplifyBounded: true,
-      modelTier: 'premium',
-    };
-  }
-
   const commentData = payload.data as LinearCommentData | undefined;
   return parseAutomationContract(commentData?.body ?? '');
+}
+
+function providerTimestamp(payload: LinearWebhookPayload): string | null {
+  if (payload.webhookTimestamp === undefined) return null;
+  const numeric = Number(payload.webhookTimestamp);
+  const parsed = Number.isFinite(numeric)
+    ? numeric < 10_000_000_000
+      ? numeric * 1000
+      : numeric
+    : Date.parse(String(payload.webhookTimestamp));
+  return Number.isFinite(parsed) ? new Date(parsed).toISOString() : null;
+}
+
+function staleProviderEvent(
+  timestamp: string | null,
+  now = Date.now()
+): boolean {
+  if (!timestamp) return false;
+  const observed = Date.parse(timestamp);
+  return observed > now + 60_000 || now - observed > MAX_PROVIDER_EVENT_AGE_MS;
 }
 
 export async function POST(request: NextRequest) {
@@ -276,10 +215,9 @@ export async function POST(request: NextRequest) {
 
     const payload = JSON.parse(body) as LinearWebhookPayload;
 
-    const isIntakeIssueEvent = isJovieIntakeIssueEvent(payload);
     const isPlanReadyEvent = isCodeRabbitPlanComment(payload);
 
-    if (!isIntakeIssueEvent && !isPlanReadyEvent) {
+    if (!isPlanReadyEvent) {
       return NextResponse.json(
         { received: true, ignored: true },
         { headers: NO_STORE_HEADERS }
@@ -295,20 +233,30 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const deliveryId = request.headers.get('linear-delivery')?.trim() ?? '';
-    if (!deliveryId) {
+    const observedAt = providerTimestamp(payload);
+    if (payload.webhookTimestamp !== undefined && !observedAt) {
       return NextResponse.json(
-        { error: 'Missing delivery identity' },
+        { error: 'Invalid provider timestamp' },
         { status: 400, headers: NO_STORE_HEADERS }
       );
     }
+    if (staleProviderEvent(observedAt)) {
+      return NextResponse.json(
+        { received: true, ignored: true, reason: 'stale-provider-event' },
+        { headers: NO_STORE_HEADERS }
+      );
+    }
 
-    const dedupeKey = deliveryId;
+    const providerDeliveryId =
+      payload.webhookId?.trim() ||
+      request.headers.get('linear-delivery')?.trim() ||
+      request.headers.get('linear-event')?.trim();
+    const dedupeKey = `${providerDeliveryId || `${issueId}:${issueData?.updatedAt ?? payload.createdAt ?? ''}`}:plan`;
     dedupeKeyForRetry = dedupeKey;
     const dedupeResult = await acquireRecentDispatch(
       'linear',
       dedupeKey,
-      LINEAR_DISPATCH_DEDUPE_TTL_SECONDS
+      DEDUPE_TTL_SECONDS
     );
     dedupeAcquired = dedupeResult.acquired;
 
@@ -326,29 +274,14 @@ export async function POST(request: NextRequest) {
 
     if (!dedupeAcquired) {
       return NextResponse.json(
-        { received: true, deduplicated: true },
+        { received: true, deduplicated: true, eventId: dedupeKey },
         { headers: NO_STORE_HEADERS }
       );
     }
 
     const owner = env.VERCEL_GIT_REPO_OWNER ?? 'JovieInc';
     const repo = env.VERCEL_GIT_REPO_SLUG ?? 'Jovie';
-    const automationContract = getAutomationContract(payload, isPlanReadyEvent);
-    const clientPayload = buildLinearGithubDispatchPayload({
-      deliveryId,
-      issueId,
-      issueIdentifier: issueData?.identifier ?? null,
-      issueUpdatedAt: issueData?.updatedAt ?? null,
-      teamKey: issueData?.team?.key ?? null,
-      stateName: issueData?.state?.name ?? null,
-      intakeAction: payload.action ?? null,
-      planReady: isPlanReadyEvent,
-      contract: {
-        verify_required: automationContract.verifyRequired,
-        simplify_bounded: automationContract.simplifyBounded,
-        model_tier: automationContract.modelTier,
-      },
-    });
+    const automationContract = getAutomationContract(payload);
 
     const dispatchResponse = await serverFetch(
       `https://api.github.com/repos/${owner}/${repo}/dispatches`,
@@ -360,10 +293,23 @@ export async function POST(request: NextRequest) {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
-          event_type: isPlanReadyEvent
-            ? 'linear_plan_ready'
-            : 'linear-intake-changed',
-          client_payload: clientPayload,
+          event_type: 'linear_plan_ready',
+          client_payload: {
+            delivery_id: providerDeliveryId ?? dedupeKey,
+            provider_timestamp: observedAt ?? payload.createdAt ?? null,
+            issue_id: issueId,
+            issue_identifier: issueData?.identifier ?? null,
+            issue_updated_at: issueData?.updatedAt ?? null,
+            team_key: issueData?.team?.key ?? null,
+            state_name: issueData?.state?.name ?? null,
+            action: payload.action ?? null,
+            automation: {
+              plan_ready: isPlanReadyEvent,
+              verify_required: automationContract.verifyRequired,
+              simplify_bounded: automationContract.simplifyBounded,
+              model_tier: automationContract.modelTier,
+            },
+          },
         }),
         timeoutMs: DISPATCH_TIMEOUT_MS,
         context: 'GitHub repository dispatch for Linear webhook',
@@ -385,7 +331,7 @@ export async function POST(request: NextRequest) {
     }
 
     return NextResponse.json(
-      { received: true, dispatched: true },
+      { received: true, dispatched: true, eventId: dedupeKey },
       { headers: NO_STORE_HEADERS }
     );
   } catch (error) {
@@ -402,15 +348,15 @@ async function handleLinearWebhookError(
     await captureCriticalError('Linear webhook dispatch timed out', error, {
       route: '/api/webhooks/linear',
       timeoutMs: error.timeoutMs,
-      deliveryId: dedupeKeyForRetry,
     });
     return NextResponse.json(
       {
         received: true,
-        dispatched: 'ambiguous',
-        reconcile_required: true,
+        dispatchState: 'ambiguous',
+        reconcileRequired: true,
+        eventId: dedupeKeyForRetry,
       },
-      { headers: NO_STORE_HEADERS }
+      { status: 202, headers: NO_STORE_HEADERS }
     );
   }
 

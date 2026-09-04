@@ -115,7 +115,7 @@ export function UtmBuilderDialog({
           </div>
         ))}
 
-        <div className='rounded-lg border border-(--linear-app-frame-seam) bg-surface-0 px-2.5 py-2'>
+        <div className='rounded-lg border border-(--app-shell-frame-seam) bg-surface-0 px-2.5 py-2'>
           <p className='break-all font-mono text-2xs leading-5 text-secondary-token'>
             {resultUrl}
           </p>

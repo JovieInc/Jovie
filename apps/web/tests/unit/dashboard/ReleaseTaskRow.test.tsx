@@ -2,6 +2,7 @@ import { fireEvent, render, screen } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
 import { ReleaseTaskCompactRow } from '@/components/features/dashboard/release-tasks/ReleaseTaskCompactRow';
 import { ReleaseTaskRow } from '@/components/features/dashboard/release-tasks/ReleaseTaskRow';
+import { ReleaseTaskCheckbox } from '@/components/features/dashboard/release-tasks/ReleaseTaskRowPrimitives';
 import type { ReleaseTaskView } from '@/lib/release-tasks/types';
 
 function createTask(overrides: Partial<ReleaseTaskView> = {}): ReleaseTaskView {
@@ -55,6 +56,26 @@ describe('ReleaseTaskRow', () => {
     );
 
     expect(onToggle).toHaveBeenCalledWith('task_1', true);
+  });
+
+  it('renders the release task checkbox through the canonical control state contract', () => {
+    render(
+      <ReleaseTaskCheckbox
+        task={createTask({ status: 'done' })}
+        isDone
+        onToggle={vi.fn()}
+      />
+    );
+
+    const checkbox = screen.getByRole('checkbox', {
+      name: 'Mark "Pitch playlist editors" as incomplete',
+    });
+
+    expect(checkbox.tagName).toBe('BUTTON');
+    expect(checkbox).toHaveAttribute('data-state', 'checked');
+    expect(checkbox.className).toContain('data-[state=checked]:bg-btn-primary');
+    expect(checkbox.className).toContain('before:h-11');
+    expect(checkbox.className).not.toContain('accent-accent');
   });
 
   it('disables the shared checkbox for automated tasks', () => {

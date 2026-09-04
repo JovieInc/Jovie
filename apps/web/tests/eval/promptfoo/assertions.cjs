@@ -2618,7 +2618,9 @@ function assertPromptContextAccountSummary(output) {
     return fail('prompt did not include verified billing state');
   }
   if (
-    !/- \*\*AI Usage Today:\*\* 7 used, 93 remaining of 100/i.test(systemPrompt)
+    !/- \*\*AI Usage This Week:\*\* 7 used, 63 remaining of 70/i.test(
+      systemPrompt
+    )
   ) {
     return fail('prompt did not include deterministic usage summary');
   }
@@ -2664,7 +2666,7 @@ function assertPromptContextMissingAccountOmitted(output) {
     return fail('missing-account prompt included account access section');
   }
   if (
-    /Account Email|Billing Portal|Billing Verification|AI Usage Today/i.test(
+    /Account Email|Billing Portal|Billing Verification|AI Usage This Week/i.test(
       systemPrompt
     )
   ) {
@@ -2688,8 +2690,8 @@ function assertPromptContextFreePlanLimitations(output) {
   if (!payload.hasPlanLimitationsSection) {
     return fail('free prompt did not include plan limitations');
   }
-  if (!/Free plan with 10 messages per day/i.test(systemPrompt)) {
-    return fail('free prompt did not include the free daily limit');
+  if (!/Free plan with 15 messages per week/i.test(systemPrompt)) {
+    return fail('free prompt did not include the free weekly limit');
   }
   for (const toolName of [
     'proposeAvatarUpload',
@@ -3672,6 +3674,26 @@ function assertSkillPromptContractCovered(output) {
     );
   }
 
+  const smartLinkSwitch = payload.smartLinkSwitch ?? {};
+  if (!smartLinkSwitch || typeof smartLinkSwitch !== 'object') {
+    return fail('skill prompt contract missing smartLinkSwitch payload');
+  }
+  if (smartLinkSwitch.skillId !== 'smart_link_switch_live') {
+    return fail(
+      'smartLinkSwitch payload is not tied to smart_link_switch_live'
+    );
+  }
+  const missingSmartLinkSwitchFacts = Array.isArray(
+    smartLinkSwitch.missingFacts
+  )
+    ? smartLinkSwitch.missingFacts
+    : [];
+  if (missingSmartLinkSwitchFacts.length > 0) {
+    return fail(
+      `smart link switch evidence floor missing facts: ${missingSmartLinkSwitchFacts.join(', ')}`
+    );
+  }
+
   return pass();
 }
 
@@ -3714,6 +3736,22 @@ function assertFanEmailRuleCase(output) {
   if (fanEmail.ruleCasePassed !== true) {
     return fail(
       `fan email rule case failed: ${String(fanEmail.ruleCase)} ${String(fanEmail.ruleCaseReason)}`
+    );
+  }
+  return pass();
+}
+
+function assertSmartLinkSwitchRuleCase(output) {
+  const payload = parseOutput(output);
+  const smartLinkSwitch = payload.smartLinkSwitch ?? {};
+  if (smartLinkSwitch.skillId !== 'smart_link_switch_live') {
+    return fail(
+      'smart link switch rule case is not tied to smart_link_switch_live'
+    );
+  }
+  if (smartLinkSwitch.ruleCasePassed !== true) {
+    return fail(
+      `smart link switch rule case failed: ${String(smartLinkSwitch.ruleCase)} ${String(smartLinkSwitch.ruleCaseReason)}`
     );
   }
   return pass();
@@ -5211,6 +5249,7 @@ module.exports = {
   assertPackagingFormatSplitCase,
   assertChannelPlaylistRuleCase,
   assertFanEmailRuleCase,
+  assertSmartLinkSwitchRuleCase,
   assertAlbumArtProviderContractCovered,
   assertAiToolPromptContractCovered,
   assertChatTitleContractCovered,

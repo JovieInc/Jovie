@@ -27,7 +27,7 @@ const CTA_BUTTON_STYLE: CSSProperties = {
   color: 'var(--linear-btn-primary-fg)',
   backgroundColor: 'var(--linear-btn-primary-bg)',
   border: '1px solid var(--linear-btn-primary-border)',
-  boxShadow: 'var(--linear-shadow-button)',
+  boxShadow: 'var(--shadow-button)',
 };
 
 const OVERLAY_STYLE: CSSProperties = {
@@ -67,7 +67,8 @@ function buildNavLinks(
   }
 
   if (!showAuthenticatedAction && includePublicLogin) {
-    baseLinks.push({ href: APP_ROUTES.SIGNIN, label: 'Log In' });
+    // ui-casing-allow: canonical sentence-case auth label; MobileNav.test asserts 'Log In' must not appear
+    baseLinks.push({ href: APP_ROUTES.SIGNIN, label: 'Log in' });
   }
 
   return baseLinks;

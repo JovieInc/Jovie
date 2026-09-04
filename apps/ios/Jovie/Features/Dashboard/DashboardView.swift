@@ -225,10 +225,10 @@ struct DashboardView: View {
   }
 
   private func publicProfileDestination(from value: String?) -> PublicProfileBrowserDestination? {
-    guard let value else { return nil }
-    let policy = PublicProfileURLPolicy(publicProfileURL: value)
-      ?? PublicProfileURLPolicy(webBaseURL: webBaseURL)
-    guard let policy, let url = policy.validatedURL(from: value) else { return nil }
+    guard let value,
+          let policy = PublicProfileURLPolicy(publicProfileURL: value),
+          let url = policy.validatedURL(from: value)
+    else { return nil }
     return PublicProfileBrowserDestination(url: url, policy: policy)
   }
 

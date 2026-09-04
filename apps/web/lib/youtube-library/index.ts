@@ -9,6 +9,14 @@ export {
   type YouTubeVideoContentType,
 } from './classify';
 export {
+  COLLABORATOR_AUTO_APPROVE_CONFIDENCE,
+  planYouTubeImportArtifacts,
+  reconcileVerifiedCollaboratorCredit,
+  resolveYouTubeCollaboratorClaims,
+  type YouTubeCollaboratorClaim,
+} from './collaborators';
+export { hasConnectedYouTubeAccount } from './connection';
+export {
   type CatalogRecording,
   extractIsrcsFromText,
   type ResolvedReleaseLink,
@@ -22,6 +30,7 @@ export {
   getVideoPkForProfile,
   type ListVideosForProfileInput,
   listPendingReleaseLinksForUser,
+  listVideosForLibraryProjection,
   listVideosForProfile,
   type PendingReleaseLinkItem,
   type PublicVideoListItem,
@@ -47,6 +56,12 @@ export {
   syncChannelVideos,
   type ThumbnailSyncPlan,
 } from './sync';
+export {
+  deriveThumbnailExperimentWinner,
+  promoteThumbnailWinner,
+  type ThumbnailExperimentState,
+  type ThumbnailPromotion,
+} from './thumbnail-experiments';
 export type {
   YouTubeChannelVideo,
   YouTubeLibraryProvider,

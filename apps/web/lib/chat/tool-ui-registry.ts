@@ -67,6 +67,14 @@ export const TOOL_UI_REGISTRY = {
     successTitle: 'Bio imported',
     errorTitle: "Couldn't import that bio",
   },
+  inspectPressSource: {
+    label: 'Press source',
+    uiHint: 'status',
+    renderer: 'status',
+    loadingTitle: 'Inspecting that source…',
+    successTitle: 'Source inspected',
+    errorTitle: "Couldn't inspect that source",
+  },
   checkCanvasStatus: {
     label: 'Canvas',
     uiHint: 'status',
@@ -355,6 +363,14 @@ export const TOOL_UI_REGISTRY = {
     loadingTitle: 'Researching your artist presence…',
     successTitle: 'Artist research ready',
     errorTitle: "Couldn't research this artist",
+  },
+  surfaceLibraryOpportunities: {
+    label: 'Library opportunities',
+    uiHint: 'artifact',
+    renderer: 'artifact',
+    loadingTitle: 'Checking your Library presence…',
+    successTitle: 'Library opportunities ready',
+    errorTitle: "Couldn't load Library opportunities",
   },
   assembleArtistProfile: {
     label: 'Profile assembly',

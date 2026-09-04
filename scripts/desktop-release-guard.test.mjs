@@ -5,10 +5,16 @@ import { readFileSync } from 'node:fs';
 import { createRequire } from 'node:module';
 import test from 'node:test';
 import {
+  assertStagingVersionTransition,
   expectedDesktopAssetNames,
   validateReleaseAssets,
 } from './desktop-release-assets.mjs';
-import { evaluateDesktopReleaseGuard } from './desktop-release-guard.mjs';
+import {
+  evaluateDesktopReleaseGuard,
+  formatReleaseStampFailureDetails,
+  readGitObjectContent,
+} from './desktop-release-guard.mjs';
+import { discoverVersionedManifests, planStamp } from './version-stamp.mjs';
 
 const desktopRequire = createRequire(
   new URL('../apps/desktop/package.json', import.meta.url)
@@ -53,11 +59,15 @@ function hash(buffer, algorithm, encoding) {
   return createHash(algorithm).update(buffer).digest(encoding);
 }
 
-function desktopReleaseFixture() {
-  const version = '26.7.1';
+function desktopReleaseFixture(environment = 'production') {
+  const version =
+    environment === 'staging' ? '26.7.2-staging.17823456789.1' : '26.7.1';
   const releaseSha = 'a'.repeat(40);
-  const dmgName = `Jovie-${version}-universal.dmg`;
-  const zipName = `Jovie-${version}-universal.zip`;
+  const prefix = environment === 'staging' ? 'Jovie-Staging' : 'Jovie';
+  const channelFile =
+    environment === 'staging' ? 'staging-mac.yml' : 'latest-mac.yml';
+  const dmgName = `${prefix}-${version}-universal.dmg`;
+  const zipName = `${prefix}-${version}-universal.zip`;
   const buffers = new Map([
     [dmgName, Buffer.from('signed dmg bytes')],
     [`${dmgName}.blockmap`, Buffer.from('dmg blockmap')],
@@ -78,26 +88,88 @@ function desktopReleaseFixture() {
     'releaseDate: 2026-07-29T00:00:00.000Z',
     '',
   ].join('\n');
-  buffers.set('latest-mac.yml', Buffer.from(updater));
+  buffers.set(channelFile, Buffer.from(updater));
 
   const release = {
     id: 123,
-    tag_name: `v${version}`,
+    tag_name: environment === 'staging' ? 'desktop-staging' : `v${version}`,
     target_commitish: releaseSha,
     name: version,
     draft: true,
-    prerelease: false,
+    prerelease: environment === 'staging',
     published_at: null,
-    assets: expectedDesktopAssetNames(version).map((name, index) => ({
-      id: index + 1,
-      name,
-      state: 'uploaded',
-      size: buffers.get(name).length,
-      digest: `sha256:${hash(buffers.get(name), 'sha256', 'hex')}`,
-      url: `https://api.github.com/assets/${index + 1}`,
-    })),
+    assets: expectedDesktopAssetNames(version, environment).map(
+      (name, index) => ({
+        id: index + 1,
+        name,
+        state: 'uploaded',
+        size: buffers.get(name).length,
+        digest: `sha256:${hash(buffers.get(name), 'sha256', 'hex')}`,
+        url: `https://api.github.com/assets/${index + 1}`,
+      })
+    ),
   };
-  return { buffers, release, releaseSha, version };
+  return { buffers, environment, release, releaseSha, version };
+}
+
+const releaseStampManifests = discoverVersionedManifests();
+const deterministicReleaseStampFiles = [
+  'CHANGELOG.md',
+  'VERSION',
+  'version.json',
+  ...releaseStampManifests,
+];
+const releaseStampBaseVersion = '26.8.1';
+const releaseStampNextVersion = '26.8.2';
+const releaseStampDateISO = '2026-08-31';
+
+function releaseManifest(path, version = releaseStampBaseVersion) {
+  return `${JSON.stringify(
+    {
+      name: path === 'package.json' ? 'jovie-monorepo' : path.split('/')[1],
+      version,
+      private: true,
+      scripts: { test: 'node --test' },
+    },
+    null,
+    2
+  )}\n`;
+}
+
+function releaseStampContents(headOverrides = {}) {
+  const base = {
+    'CHANGELOG.md':
+      '# Changelog\n\n## [Unreleased]\n\n### Fixed\n- Guard repair.\n\n## [26.8.1] - 2026-08-30\n',
+    VERSION: `${releaseStampBaseVersion}\n`,
+    'version.json': `${JSON.stringify(
+      { version: releaseStampBaseVersion },
+      null,
+      2
+    )}\n`,
+  };
+  for (const manifest of releaseStampManifests) {
+    base[manifest] = releaseManifest(manifest);
+  }
+
+  const head = { ...base };
+  for (const write of planStamp({
+    currentVersion: releaseStampBaseVersion,
+    nextVersion: releaseStampNextVersion,
+    manifests: releaseStampManifests.map(path => ({
+      content: base[path],
+      path,
+    })),
+    versionFile: base.VERSION,
+    changelog: base['CHANGELOG.md'],
+    dateISO: releaseStampDateISO,
+  })) {
+    head[write.path] = write.content;
+  }
+
+  return {
+    getBaseContent: path => base[path],
+    getHeadContent: path => ({ ...head, ...headOverrides })[path],
+  };
 }
 
 test('desktop builder can parse Electron macOS property lists', () => {
@@ -131,14 +203,14 @@ test('passes when no desktop files changed', () => {
   assert.deepEqual(result.desktopFiles, []);
 });
 
-test('fails when desktop files changed without a release trigger', () => {
+test('passes when desktop files defer release state to the post-land publisher', () => {
   const result = evaluateDesktopReleaseGuard([
     'apps/desktop/src/main.ts',
     'apps/desktop/electron-builder.yml',
   ]);
 
-  assert.equal(result.passed, false);
-  assert.deepEqual(result.releaseHandlingFiles, []);
+  assert.equal(result.passed, true);
+  assert.deepEqual(result.prelandReleaseStateFiles, []);
 });
 
 test('passes when only desktop contract tests changed', () => {
@@ -161,24 +233,24 @@ test('passes when only desktop smoke harnesses changed', () => {
   assert.deepEqual(result.desktopFiles, []);
 });
 
-test('still fails when a desktop test changes with release-impacting desktop code', () => {
+test('still passes when a desktop test changes with release-impacting desktop code', () => {
   const result = evaluateDesktopReleaseGuard([
     'apps/desktop/scripts/desktop-icon-contract.test.mjs',
     'apps/desktop/src/main.ts',
   ]);
 
-  assert.equal(result.passed, false);
+  assert.equal(result.passed, true);
   assert.deepEqual(result.desktopFiles, ['apps/desktop/src/main.ts']);
 });
 
-test('passes when desktop changes include unreleased changelog notes', () => {
+test('fails when desktop changes include a pre-land changelog artifact', () => {
   const result = evaluateDesktopReleaseGuard([
     'apps/desktop/src/main.ts',
     'CHANGELOG.md',
   ]);
 
-  assert.equal(result.passed, true);
-  assert.deepEqual(result.releaseHandlingFiles, ['CHANGELOG.md']);
+  assert.equal(result.passed, false);
+  assert.deepEqual(result.prelandReleaseStateFiles, ['CHANGELOG.md']);
 });
 
 test('passes when desktop changes include explicit release workflow handling', () => {
@@ -188,8 +260,133 @@ test('passes when desktop changes include explicit release workflow handling', (
   ]);
 
   assert.equal(result.passed, true);
-  assert.deepEqual(result.releaseHandlingFiles, [
-    '.github/workflows/desktop-release.yml',
+  assert.deepEqual(result.prelandReleaseStateFiles, []);
+});
+
+test('fails when desktop changes include a pre-land version artifact', () => {
+  const result = evaluateDesktopReleaseGuard([
+    'apps/desktop/src/main.ts',
+    'VERSION',
+  ]);
+
+  assert.equal(result.passed, false);
+  assert.deepEqual(result.prelandReleaseStateFiles, ['VERSION']);
+  assert.deepEqual(formatReleaseStampFailureDetails(result), []);
+});
+
+test('passes explicit release deterministic fan-out with desktop package only', () => {
+  const result = evaluateDesktopReleaseGuard({
+    branch: 'release/2026-08-31',
+    changedFiles: deterministicReleaseStampFiles,
+    versionedManifests: releaseStampManifests,
+    ...releaseStampContents(),
+  });
+
+  assert.equal(result.passed, true);
+  assert.equal(result.releaseStampAuthorized, true);
+  assert.deepEqual(result.releaseStampContentViolations, []);
+  assert.deepEqual(result.desktopFiles, ['apps/desktop/package.json']);
+  assert.deepEqual(result.releaseStampMissingFiles, []);
+  assert.deepEqual(result.releaseStampExtraFiles, []);
+});
+
+test('preserves git object bytes for release-stamp content validation', () => {
+  const version = readGitObjectContent('HEAD', 'VERSION');
+
+  assert.equal(
+    version,
+    readFileSync(new URL('../VERSION', import.meta.url), 'utf8')
+  );
+  assert.equal(version?.endsWith('\n'), true);
+});
+
+test('fails deterministic fan-out on a feature branch', () => {
+  const result = evaluateDesktopReleaseGuard({
+    branch: 'tim/jov-5748-release-stamp',
+    changedFiles: deterministicReleaseStampFiles,
+    versionedManifests: releaseStampManifests,
+    ...releaseStampContents(),
+  });
+
+  assert.equal(result.passed, false);
+  assert.equal(result.releaseStampAuthorized, false);
+  assert.deepEqual(result.desktopFiles, ['apps/desktop/package.json']);
+  assert.deepEqual(result.prelandReleaseStateFiles, [
+    'CHANGELOG.md',
+    'VERSION',
+  ]);
+  assert.deepEqual(formatReleaseStampFailureDetails(result), []);
+});
+
+test('fails release fan-out bundled with desktop source changes', () => {
+  const result = evaluateDesktopReleaseGuard({
+    branch: 'release/2026-08-31',
+    changedFiles: [
+      ...deterministicReleaseStampFiles,
+      'apps/desktop/src/main.ts',
+    ],
+    versionedManifests: releaseStampManifests,
+    ...releaseStampContents(),
+  });
+
+  assert.equal(result.passed, false);
+  assert.equal(result.releaseStampAuthorized, false);
+  assert.deepEqual(result.desktopFiles, [
+    'apps/desktop/package.json',
+    'apps/desktop/src/main.ts',
+  ]);
+  assert.deepEqual(result.releaseStampExtraFiles, ['apps/desktop/src/main.ts']);
+  assert.deepEqual(formatReleaseStampFailureDetails(result), [
+    'Release-stamp extra files:',
+    '- apps/desktop/src/main.ts',
+  ]);
+});
+
+test('reports release fan-out missing files in guard diagnostics', () => {
+  const result = evaluateDesktopReleaseGuard({
+    branch: 'release/2026-08-31',
+    changedFiles: deterministicReleaseStampFiles.filter(
+      file => file !== 'version.json'
+    ),
+    versionedManifests: releaseStampManifests,
+    ...releaseStampContents(),
+  });
+
+  assert.equal(result.passed, false);
+  assert.equal(result.releaseStampAuthorized, false);
+  assert.deepEqual(result.releaseStampMissingFiles, ['version.json']);
+  assert.deepEqual(formatReleaseStampFailureDetails(result), [
+    'Release-stamp missing files:',
+    '- version.json',
+  ]);
+});
+
+test('fails release fan-out when desktop package changes more than version', () => {
+  const desktopPackage = JSON.parse(
+    releaseStampContents().getHeadContent('apps/desktop/package.json')
+  );
+  desktopPackage.scripts.build = 'electron-builder';
+  const result = evaluateDesktopReleaseGuard({
+    branch: 'release/2026-08-31',
+    changedFiles: deterministicReleaseStampFiles,
+    versionedManifests: releaseStampManifests,
+    ...releaseStampContents({
+      'apps/desktop/package.json': `${JSON.stringify(
+        desktopPackage,
+        null,
+        2
+      )}\n`,
+    }),
+  });
+
+  assert.equal(result.passed, false);
+  assert.equal(result.releaseStampAuthorized, false);
+  assert.deepEqual(result.releaseStampContentViolations, [
+    'apps/desktop/package.json changed more than the version field',
+  ]);
+  assert.deepEqual(formatReleaseStampFailureDetails(result), [
+    'Release-stamp content violations:',
+    '- apps/desktop/package.json changed more than the version field',
   ]);
 });
 
@@ -379,19 +576,36 @@ test('automatic desktop publishing selects VERSION changes only', () => {
   assert.equal(paths?.includes('VERSION'), true);
 });
 
-test('desktop staging is a bounded artifact and production is separately proven', () => {
+test('desktop staging publishes an exact signed prerelease and production stays separately proven', () => {
+  const authorize = step(
+    job(desktopWorkflow, 'authorize-release'),
+    'Cross-prove exact production evidence'
+  );
   const build = job(desktopWorkflow, 'build');
   const publish = step(build, 'Publish production desktop release');
+  const stagingPublish = step(build, 'Publish staging desktop prerelease');
+  const stagingVerify = step(build, 'Verify staging desktop artifact set');
   const stagingUpload = step(build, 'Upload staging desktop package');
   const marker = job(desktopWorkflow, 'record-production-publish');
 
+  assertPatterns(authorize, [
+    /actions\/workflows\/ci\.yml/,
+    /\.name == "CI"/,
+    /\.path == "\.github\/workflows\/ci\.yml"/,
+    /\.head_sha == \$sha/,
+    /\.conclusion == "success"/,
+  ]);
   assertPatterns(build, [
     /needs: \[authorize-release\]/,
     /ref: \$\{\{ needs\.authorize-release\.outputs\.release_sha \}\}/,
     /package:staging/,
     /package:production/,
+    /sync-version\.mjs[\s\S]*--staging-version/,
+    /Validate rolling staging prerelease/,
+    /Require staging signing and notarization credentials/,
     /desktop-release-assets\.mjs upload-and-publish/,
     /dist\/latest-mac\.yml/,
+    /dist\/staging-mac\.yml/,
   ]);
   assertPatterns(publish, [
     /repos\/\$\{\{ github\.repository \}\}\/commits\/main/,
@@ -401,11 +615,27 @@ test('desktop staging is a bounded artifact and production is separately proven'
   assertPatterns(stagingUpload, [
     /if: env\.ENVIRONMENT == 'staging'/,
     /desktop-staging-/,
+    /staging-mac\.yml/,
     /retention-days: 7/,
   ]);
-  // publish is null in electron-builder.staging.yml, so staging produces no
-  // auto-update metadata (staging-mac.yml) and must not try to upload it.
-  assert.doesNotMatch(stagingUpload, /staging-mac\.yml/);
+  assertPatterns(stagingPublish, [
+    /commits\/main/,
+    /desktop-release-assets\.mjs upload-and-publish/,
+    /--environment staging/,
+    /--version "\$\{\{ steps\.staging-version\.outputs\.version \}\}"/,
+  ]);
+  assertPatterns(stagingVerify, [
+    /codesign --verify --deep --strict/,
+    /spctl --assess --type execute/,
+    /xcrun stapler validate/,
+    /build-identity\.json/,
+    /record\.sourceRevision === sha/,
+    /--print-build-identity/,
+    /app-update\.yml/,
+    /provider:\[\[:space:\]\]\*generic/,
+    /releases\/download\/desktop-staging/,
+    /channel:\[\[:space:\]\]\*staging/,
+  ]);
   assert.doesNotMatch(stagingUpload, /desktop-production-published|GH_TOKEN/);
   assert.ok(
     publish.indexOf('commits/main') <
@@ -414,6 +644,10 @@ test('desktop staging is a bounded artifact and production is separately proven'
   assert.ok(
     build.indexOf('Prepare private production draft') <
       build.indexOf('Package production desktop app')
+  );
+  assert.ok(
+    build.indexOf('Validate rolling staging prerelease') <
+      build.indexOf('Package staging desktop app')
   );
   assert.doesNotMatch(build, /Upload production desktop publish marker/);
   assertPatterns(marker, [
@@ -463,4 +697,58 @@ test('desktop release proof rejects zero-asset and mismatched-digest releases', 
     () => validateReleaseAssets({ ...wrongTarget, draft: true }),
     /authorized commit/
   );
+});
+
+test('staging release proof binds prerelease assets and channel metadata', () => {
+  const valid = desktopReleaseFixture('staging');
+  assert.doesNotThrow(() => validateReleaseAssets({ ...valid, draft: true }));
+
+  const stableEnvelope = desktopReleaseFixture('staging');
+  stableEnvelope.release.prerelease = false;
+  assert.throws(
+    () => validateReleaseAssets({ ...stableEnvelope, draft: true }),
+    /prerelease state/
+  );
+
+  const wrongChannel = desktopReleaseFixture('staging');
+  const manifest = wrongChannel.buffers.get('staging-mac.yml');
+  wrongChannel.buffers.delete('staging-mac.yml');
+  wrongChannel.buffers.set('latest-mac.yml', manifest);
+  assert.throws(
+    () => validateReleaseAssets({ ...wrongChannel, draft: true }),
+    /Artifact bytes are missing for staging-mac\.yml/
+  );
+});
+
+test('staging release versions advance beyond installed and current-feed versions', () => {
+  const valid = {
+    installedVersion: '26.8.1',
+    version: '26.8.2-staging.17823456790.1',
+  };
+  assert.doesNotThrow(() =>
+    assertStagingVersionTransition({
+      ...valid,
+      currentFeedVersion: '26.8.2-staging.17823456789.1',
+    })
+  );
+  for (const { input, message } of [
+    {
+      input: {
+        ...valid,
+        currentFeedVersion: '26.8.2-staging.17823456790.1',
+        version: '26.8.2-staging.17823456789.1',
+      },
+      message: /not newer than current feed/,
+    },
+    {
+      input: { ...valid, version: '26.8.1-staging.17823456791.1' },
+      message: /next-patch/,
+    },
+    {
+      input: { ...valid, version: '26.8.1+staging.17823456791.1' },
+      message: /valid prerelease/,
+    },
+  ]) {
+    assert.throws(() => assertStagingVersionTransition(input), message);
+  }
 });

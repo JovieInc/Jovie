@@ -15,9 +15,31 @@ describe('SupportPageContent', () => {
   it('renders the exact shipped body in hero, channels, FAQ, CTA order', () => {
     const { container } = render(<SupportPageContent />);
 
-    expect(
-      screen.getByRole('heading', { level: 1, name: "We're Here To Help." })
-    ).toBeVisible();
+    const heading = screen.getByRole('heading', {
+      level: 1,
+      name: "We're Here To Help.",
+    });
+    expect(heading).toBeVisible();
+    // Compact route title owner ("type 28/620"): one shared class, no
+    // per-breakpoint Tailwind size ramp on the route.
+    expect(heading).toHaveClass(
+      'system-b-marketing-route-title',
+      'mt-6',
+      'text-primary-token'
+    );
+    for (const residue of [
+      'text-4xl',
+      'sm:text-5xl',
+      'lg:text-6xl',
+      'font-semibold',
+      'tracking-tight',
+    ]) {
+      expect(heading).not.toHaveClass(residue);
+    }
+    expect(screen.getByTestId('support-hero')).toHaveAttribute(
+      'aria-labelledby',
+      'support-hero-heading'
+    );
     const sectionHeadings = Array.from(container.querySelectorAll('section'))
       .map(section => section.querySelector('h1, h2')?.textContent?.trim())
       .filter((heading): heading is string => heading !== undefined);
@@ -35,7 +57,11 @@ describe('SupportPageContent', () => {
       .filter(link =>
         /^(Visit|Send email)$/.test(link.textContent?.trim() ?? '')
       )) {
+      // Canonical 32px marketing Button atom; it owns the 44px touch target.
+      expect(action).toHaveAttribute('data-size', 'marketing');
+      expect(action).toHaveClass('h-8', 'rounded-full');
       expect(action).toHaveClass('before:h-11', 'before:min-w-11');
+      expect(action).not.toHaveClass('public-action-inline');
     }
     expect(
       screen.getByRole('link', { name: /send email to support team/i })
@@ -109,12 +135,12 @@ describe('SupportPageContent', () => {
       source: 'apps/web/components/organisms/SupportPageContent.tsx',
       sourceExport: 'SupportPageContent',
       storyExport: 'Web040Support',
-      sourceSha: '70cb3b51b852a25213911ffe78cc81c35a73f788',
+      sourceSha: '8b0353fcbeb0cffef614fa47afbbbd8eeae48997',
       proofScope: 'system-b-body-only',
       implementation: 'exact-production-body',
     });
     expect(storySource).toContain(
-      "sourceSha: '70cb3b51b852a25213911ffe78cc81c35a73f788'"
+      "sourceSha: '8b0353fcbeb0cffef614fa47afbbbd8eeae48997'"
     );
     expect(storySource).toContain("proofScope: 'system-b-body-only'");
     expect(storySource).toContain("sourceExport: 'SupportPageContent'");

@@ -191,6 +191,29 @@ describe('IconButton', () => {
     );
   });
 
+  it('keeps destructive color on top of quiet secondary chrome', () => {
+    render(
+      <IconButton
+        ariaLabel='Delete row'
+        destructive
+        size='lg'
+        variant='secondary'
+      >
+        <svg aria-hidden='true' />
+      </IconButton>
+    );
+
+    const button = screen.getByRole('button', { name: 'Delete row' });
+    expect(button).toHaveAttribute('data-destructive', 'true');
+    expect(button).toHaveAttribute('data-size', 'icon-lg');
+    expect(button.className).toContain('text-error');
+    expect(button.className).toContain('hover:bg-error-subtle');
+    expect(button.className).toContain('overflow-visible');
+    expect(button.className).toContain('before:h-11');
+    expect(button.className).toContain('rounded-full');
+    expect(button.className).not.toContain('text-secondary-token');
+  });
+
   it('uses the shared subtle motion contract for circular chrome', () => {
     render(
       <IconButton ariaLabel='Surface action' variant='surface'>
@@ -202,5 +225,41 @@ describe('IconButton', () => {
     expect(button.className).toContain('duration-subtle');
     expect(button.className).toContain('ease-subtle');
     expect(button.className).not.toContain('ease-out');
+  });
+
+  it('uses named frosted background utilities', () => {
+    render(
+      <IconButton ariaLabel='Frosted action' variant='frosted'>
+        <svg aria-hidden='true' />
+      </IconButton>
+    );
+
+    const button = screen.getByRole('button', { name: 'Frosted action' });
+    expect(button.className).toContain('bg-icon-button-frosted');
+    expect(button.className).toContain('hover:bg-icon-button-frosted-hover');
+    expect(button.className).not.toMatch(/bg-\[/);
+  });
+
+  it('uses shared quiet-control elevation for pearl interaction depth', () => {
+    render(
+      <IconButton ariaLabel='Quiet pearl action' variant='pearlQuiet'>
+        <svg aria-hidden='true' />
+      </IconButton>
+    );
+
+    const button = screen.getByRole('button', {
+      name: 'Quiet pearl action',
+    });
+    expect(button.className).toContain(
+      'hover:bg-icon-button-pearl-quiet-hover'
+    );
+    expect(button.className).toContain(
+      'focus-visible:bg-icon-button-pearl-quiet-focus'
+    );
+    expect(button.className).toContain('hover:shadow-sm');
+    expect(button.className).toContain('focus-visible:shadow-sm');
+    expect(button.className).not.toContain('profile-pearl-shadow');
+    expect(button.className).not.toMatch(/bg-\[/);
+    expect(button.className).not.toMatch(/(?:hover|focus-visible):shadow-\[/);
   });
 });

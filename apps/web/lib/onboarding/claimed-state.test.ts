@@ -41,6 +41,10 @@ describe('claimed onboarding state', () => {
         action: 'check_handle',
         handle: '@davidguetta',
       }),
+      event('checkHandle', {
+        action: 'handle_confirmed',
+        handle: '@davidguettaofficial',
+      }),
       event('proposeSocialLink', {
         action: 'propose_social_link',
         url: 'https://instagram.com/davidguetta',
@@ -60,7 +64,7 @@ describe('claimed onboarding state', () => {
         popularity: 84,
       })
     );
-    expect(state.handle).toBe('davidguetta');
+    expect(state.handle).toBe('davidguettaofficial');
     expect(state.socialLinks).toEqual(['https://instagram.com/davidguetta']);
     expect(state.interviewSignals).toEqual([
       { audienceBand: 'over_500k', releaseStage: 'ongoing_rollout' },

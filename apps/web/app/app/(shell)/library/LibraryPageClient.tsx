@@ -3,13 +3,24 @@
 import { Button, ConfirmDialog } from '@jovie/ui';
 import { usePathname, useRouter, useSearchParams } from 'next/navigation';
 import { type KeyboardEvent, useRef, useState } from 'react';
+import type { ArtistRuleView } from '@/lib/artist-rules/types';
 import type { CreatorDocumentListItem } from '@/lib/creator-documents/types';
 import type { ReleaseViewModel } from '@/lib/discography/types';
 import type { LibraryAssetShareViewModel } from '@/lib/library/asset-share';
+import {
+  LIBRARY_LIFECYCLE_STAGES,
+  LIBRARY_STAGE_LABELS,
+  parseLibraryStageParam,
+} from '@/lib/library/lifecycle-stage';
+import type { LibraryPostReleaseBundle } from '@/lib/library/post-release-types';
 import type { LibraryProfileVisibility } from '@/lib/library/profile-visibility';
+import type { LibraryRelationshipView } from '@/lib/library/track-drawer-types';
 import type { LibraryMerchCard } from '@/lib/merch/types';
+import type { PublicVideoListItem } from '@/lib/youtube-library/queries';
 import { ReleaseCatalogPageClient } from '../dashboard/releases/ReleaseCatalogPageClient';
 import { CreatorDocumentsWorkspace } from './CreatorDocumentsWorkspace';
+
+const STAGE_TABS = ['all', ...LIBRARY_LIFECYCLE_STAGES] as const;
 
 export function LibraryPageClient({
   creatorProfileId,
@@ -22,6 +33,11 @@ export function LibraryPageClient({
   creatorDocuments = [],
   creatorDocumentsNextCursor = null,
   creatorDocumentsLoadFailed = false,
+  youtubeVideos = [],
+  youtubeConnected = false,
+  initialArtistRules = [],
+  relationships = [],
+  postReleaseBundle,
 }: {
   readonly creatorProfileId: string;
   readonly merchCards: readonly LibraryMerchCard[];
@@ -37,31 +53,40 @@ export function LibraryPageClient({
   readonly creatorDocuments?: readonly CreatorDocumentListItem[];
   readonly creatorDocumentsNextCursor?: string | null;
   readonly creatorDocumentsLoadFailed?: boolean;
+  readonly youtubeVideos?: readonly PublicVideoListItem[];
+  readonly youtubeConnected?: boolean;
+  readonly initialArtistRules?: readonly ArtistRuleView[];
+  readonly relationships?: readonly LibraryRelationshipView[];
+  readonly postReleaseBundle?: LibraryPostReleaseBundle;
 }) {
   const pathname = usePathname();
   const router = useRouter();
   const searchParams = useSearchParams();
   const [hasUnsavedDocumentDraft, setHasUnsavedDocumentDraft] = useState(false);
-  const [pendingMode, setPendingMode] = useState<'assets' | 'documents' | null>(
-    null
-  );
+  const [pendingMode, setPendingMode] = useState<
+    (typeof STAGE_TABS)[number] | null
+  >(null);
   const discardDocumentDraftsRef = useRef<(() => void) | null>(null);
-  const mode =
-    searchParams.get('section') === 'documents' ? 'documents' : 'assets';
-  const applyMode = (nextMode: 'assets' | 'documents') => {
-    if (nextMode !== mode && hasUnsavedDocumentDraft) {
+  const stage = parseLibraryStageParam(
+    searchParams.get('stage') ?? searchParams.get('section')
+  );
+  const documentId = searchParams.get('document');
+  const applyMode = (nextMode: (typeof STAGE_TABS)[number]) => {
+    if (documentId && hasUnsavedDocumentDraft) {
       discardDocumentDraftsRef.current?.();
     }
     const next = new URLSearchParams(searchParams.toString());
-    if (nextMode === 'assets') next.delete('section');
-    else next.set('section', 'documents');
+    next.delete('section');
+    next.delete('document');
+    if (nextMode === 'all') next.delete('stage');
+    else next.set('stage', nextMode);
     const query = next.toString();
     router.replace(query ? `${pathname}?${query}` : pathname, {
       scroll: false,
     });
   };
-  const setMode = (nextMode: 'assets' | 'documents') => {
-    if (nextMode !== mode && hasUnsavedDocumentDraft) {
+  const setMode = (nextMode: (typeof STAGE_TABS)[number]) => {
+    if (documentId && hasUnsavedDocumentDraft) {
       setPendingMode(nextMode);
       return;
     }
@@ -94,45 +119,36 @@ export function LibraryPageClient({
     <div className='flex min-h-0 flex-1 flex-col'>
       <div
         role='tablist'
-        aria-label='Library Sections'
+        aria-label='Library Stages'
+        data-testid='library-stage-tabs'
         className='flex h-10 shrink-0 items-center gap-1 border-b border-subtle px-3'
+        data-youtube-connected={youtubeConnected ? 'true' : 'false'}
+        data-artist-rule-count={String(initialArtistRules.length)}
       >
-        <Button
-          type='button'
-          size='sm'
-          variant='ghost'
-          id='library-assets-tab'
-          role='tab'
-          aria-selected={mode === 'assets'}
-          aria-controls='library-assets-panel'
-          tabIndex={mode === 'assets' ? 0 : -1}
-          onKeyDown={handleTabKeyDown}
-          onClick={() => setMode('assets')}
-          className='rounded-md px-3 py-1 text-sm text-secondary-token aria-selected:bg-surface-1 aria-selected:text-primary-token'
-        >
-          Assets
-        </Button>
-        <Button
-          type='button'
-          size='sm'
-          variant='ghost'
-          id='library-documents-tab'
-          role='tab'
-          aria-selected={mode === 'documents'}
-          aria-controls='library-documents-panel'
-          tabIndex={mode === 'documents' ? 0 : -1}
-          onKeyDown={handleTabKeyDown}
-          onClick={() => setMode('documents')}
-          className='rounded-md px-3 py-1 text-sm text-secondary-token aria-selected:bg-surface-1 aria-selected:text-primary-token'
-        >
-          Ideas &amp; Scripts
-        </Button>
+        {STAGE_TABS.map(tab => (
+          <Button
+            key={tab}
+            type='button'
+            size='sm'
+            variant='ghost'
+            id={`library-stage-${tab}-tab`}
+            role='tab'
+            aria-selected={stage === tab}
+            aria-controls='library-catalog-panel'
+            tabIndex={stage === tab ? 0 : -1}
+            onKeyDown={handleTabKeyDown}
+            onClick={() => setMode(tab)}
+            className='rounded-md px-3 py-1 text-sm text-secondary-token aria-selected:bg-surface-1 aria-selected:text-primary-token'
+          >
+            {LIBRARY_STAGE_LABELS[tab]}
+          </Button>
+        ))}
       </div>
-      {mode === 'documents' ? (
+      {documentId ? (
         <div
-          id='library-documents-panel'
+          id='library-catalog-panel'
           role='tabpanel'
-          aria-labelledby='library-documents-tab'
+          aria-labelledby={`library-stage-${stage}-tab`}
           className='flex min-h-0 flex-1'
         >
           <CreatorDocumentsWorkspace
@@ -149,9 +165,9 @@ export function LibraryPageClient({
         </div>
       ) : (
         <div
-          id='library-assets-panel'
+          id='library-catalog-panel'
           role='tabpanel'
-          aria-labelledby='library-assets-tab'
+          aria-labelledby={`library-stage-${stage}-tab`}
           className='flex min-h-0 flex-1'
         >
           <ReleaseCatalogPageClient
@@ -162,6 +178,14 @@ export function LibraryPageClient({
             approvalStatusByAssetId={approvalStatusByAssetId}
             profileVisibilityByAssetId={profileVisibilityByAssetId}
             assetShareByAssetId={assetShareByAssetId}
+            creatorDocuments={creatorDocuments}
+            youtubeVideos={youtubeVideos}
+            merchProducts={merchCards.map(card => ({
+              id: card.id,
+              title: card.title,
+            }))}
+            relationships={relationships}
+            postReleaseBundle={postReleaseBundle}
           />
         </div>
       )}

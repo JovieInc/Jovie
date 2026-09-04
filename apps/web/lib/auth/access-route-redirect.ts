@@ -147,9 +147,10 @@ export function getStartRouteRedirect(
 }
 
 /**
- * Redirect destination for /waitlist. Pre-receipt authenticated states recover
- * to /start. WAITLIST_PENDING stays so the page can render a durable receipt
- * or fail closed without false confirmation.
+ * Redirect destination for /waitlist. Unauthenticated visitors stay so the
+ * public waitlist-first handoff can render. Pre-receipt authenticated states
+ * recover to /start. WAITLIST_PENDING stays so the page can render a durable
+ * receipt or fail closed without false confirmation.
  *
  * Paired with `getStartRouteRedirect`: a state must not bounce /start →
  * /waitlist → /start. Proxy already leaves /start un-rewritten for waitlist
@@ -166,12 +167,12 @@ export function getWaitlistRouteRedirect(
     case CanonicalUserState.ACTIVE:
       return APP_ROUTES.DASHBOARD;
     case CanonicalUserState.UNAUTHENTICATED:
+    case CanonicalUserState.WAITLIST_PENDING:
+      return null;
     case CanonicalUserState.NEEDS_DB_USER:
     case CanonicalUserState.NEEDS_WAITLIST_SUBMISSION:
     case CanonicalUserState.NEEDS_ONBOARDING:
       return APP_ROUTES.START;
-    case CanonicalUserState.WAITLIST_PENDING:
-      return null;
     default:
       return APP_ROUTES.START;
   }

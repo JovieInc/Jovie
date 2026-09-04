@@ -119,11 +119,13 @@ Labels are part of the CI control plane, not just project organization. Apply in
   extended-smoke lanes do not auto-start from source-PR paths or risk
   classification. No PR label allocates the evidence set. These heavyweight
   lanes stay outside required source `PR Ready`; the native merge queue enforces
-  deterministic combined-head unit/build/layout and path-selected iOS evidence.
+  deterministic combined-head evidence for only the selected product lanes.
 - `testing`, `deep-ci`, `launch-candidate`, and `deploy-preview` are metadata only. They have no CI fan-out semantics.
 
-- Add `needs-human` when the PR should be held for human review or automation must stop. This is for physical actions only a human can perform (sign agreement, rotate key, flip dashboard toggle).
-- If a PR has `needs-human`, do **NOT** enable or preserve auto-merge. Treat the label as a hard stop for unattended automation until a human clears it.
+- Do not use `needs-human` as a PR enrollment hold. If completion requires a
+  physical action only a human can perform (sign an agreement, rotate a key,
+  flip a dashboard toggle), ship the code path disabled or keep the external
+  action unsubmitted and track that authority gate separately.
 - **Do NOT use `needs-human` for taste/design issues** — taste is advisory and routes to LLM review, not a human queue.
 
 - Use `automerge` only for clearly safe PRs that fit the auto-merge guardrails below.
@@ -155,7 +157,7 @@ Not all PRs are safe for auto-merge. PRs touching high-risk paths require manual
 
 | Change Type | Examples |
 |-------------|---------|
-| Docs / copy / README | Markdown files, changelog, legal copy |
+| Docs / copy / README | Markdown files and legal copy; never pre-land `CHANGELOG.md` |
 | Tests (unit, integration, e2e) | `*.test.ts`, `*.spec.ts`, test fixtures |
 | Style-only | CSS, design tokens, Tailwind config |
 | Dependency bumps (non-breaking) | Lockfile-only, patch/minor version bumps |
@@ -168,14 +170,11 @@ When in doubt, skip auto-merge and request review.
 1. **Open a draft PR early** — push your first meaningful commit and create a draft PR immediately.
 2. **Iterate** — push frequently, let CI catch issues, fix and push again.
 3. **When ready to ship:** run `/qa` → `/review` → `/ship` (skip `/qa` or `/review` if already run manually).
-4. `/ship` handles: tests, review, CHANGELOG `[Unreleased]` notes, commit, push, PR creation/update. It must **not** bump the version fan-out (`VERSION`, `version.json`, `package.json` versions, dated CHANGELOG headings) — see "Version Stamping (main-only)" below.
+4. `/ship` handles tests, review, commit, push, and PR creation/update. It must **not** edit `CHANGELOG.md` or bump the version fan-out (`VERSION`, `version.json`, package versions) — see "Version Stamping (main-only)" and "Changelog" below.
 5. `/land-and-deploy` handles: merge, CI wait, deploy verification.
-6. Apply `merge-queue` after the PR is ready. The live
-   `MERGE_QUEUE_BACKEND=native` controller treats the label as intent/audit
-   evidence, revalidates the exact head, and enrolls through GitHub's queue:
-   ```bash
-   gh pr edit --add-label merge-queue
-   ```
+6. Leave queue mutation to the live native controller after the PR is ready.
+   Do not add, read, or retain the retired `merge-queue` label; authoritative
+   membership is `isInMergeQueue` plus a positioned `mergeQueueEntry`.
 
 ## Conventional Commits Required
 
@@ -261,6 +260,9 @@ BOT REVIEWS
 - Staging URL: https://staging.jov.ie (Vercel preview alias)
 - Deploy controller: `.github/workflows/production-controller.yml` authorizes
   the exact successful `CI` attempt and holds the repo-wide production lease;
+  supersession is event-driven (exact main + merge-queue state), so a current
+  generation with an empty queue proceeds without a fixed delay and any
+  bounded wait derives from queue depth with an explicit benefit and deadline;
   `.github/workflows/production-release.yml` owns staging, canary, promotion,
   observational gates, and the sole rollback job.
 - Merge method: squash (merge queue)
@@ -297,14 +299,20 @@ BOT REVIEWS
 - `VERSION`
 - `version.json`
 - the `version` field of root + workspace `package.json` files (`apps/*`, `packages/*`)
-- dated release headings in `CHANGELOG.md` (e.g. `## [26.6.61] - 2026-06-28`)
+- any `CHANGELOG.md` edit (dated headings and `[Unreleased]` notes alike)
 
 **What feature branches MAY do:**
 
-- Add release notes under the `## [Unreleased]` section of `CHANGELOG.md`.
 - Edit `package.json` for dependency/script changes — only the `version` field is protected.
+- Record factual release evidence in the Linear issue and PR body. They may not
+  create a branch-local changelog or release-note fragment.
+- Desktop PRs may change `apps/desktop` without `CHANGELOG.md` or `VERSION`.
+  `scripts/desktop-release-guard.mjs` admits that desktop-only shape, fails
+  closed on those pre-land artifacts, and still allows explicit
+  `.github/workflows/desktop-release.yml` maintenance. Recorded handoff
+  evidence does not override the pre-land CHANGELOG ban.
 
-**Enforcement:** `scripts/version-fanout-guard.mjs` runs in CI (`ci-deterministic` job) and fails any non-`main` branch that writes the fan-out. It auto-skips on `main`, `master`, `production`, and `release/*`, `hotfix/*`, `train/*`, `integration/*` branches (the release/integration path). Run locally with `pnpm version:fanout-guard`.
+**Enforcement:** `scripts/version-fanout-guard.mjs` runs in CI (`ci-deterministic` job) and fails any non-`main` branch that writes the fan-out, including any `CHANGELOG.md` edit. Pre-land CHANGELOG diffs also fail merge-queue admission (`scripts/lib/pre-land-changelog.mjs`); native admission independently rejects every PR that touches `CHANGELOG.md`, including legacy/release-prefixed branches. The fan-out guard auto-skips on `main`, `master`, `production`, and `release/*`, `hotfix/*`, `train/*`, `integration/*` branches (the release/integration path). Run locally with `pnpm version:fanout-guard`.
 
 **Stamping on main:** After merge to `main` (or from the release workflow), run:
 
@@ -317,11 +325,23 @@ pnpm version:check        # validate consistency
 
 ## Changelog
 
-**During development, only add notes under the `## [Unreleased]` section of `CHANGELOG.md`.** The `/ship` workflow appends `[Unreleased]` entries automatically from the diff and commit history. The dated release heading is stamped on the main/release path by `pnpm version:stamp` — never add a dated `## [X.Y.Z] - DATE` heading on a feature branch.
+**Implementation PRs must not add or edit `CHANGELOG.md`.** The file is
+release state, not branch state. Branch-local Unreleased notes collide in
+native ALLGREEN merge groups (GitHub's server merge ignores local
+`merge=union`). A user-visible change earns exactly one What's New bullet only
+after land/runtime proof, written through the existing release/UI receipt path
+(`apps/web/components/jovie/feature-intro-catalog.ts` plus the post-land
+`pnpm version:stamp` path). Internal-only work emits no vanity bullet. Linear
+and the landed PR remain the source evidence; no changelog fragments or
+parallel release-note store.
 
-`CHANGELOG.md` uses `merge=union` in `.gitattributes` to auto-resolve merge conflicts between concurrent PRs.
+The legacy `merge=union` attribute is not admission authority. GitHub's native
+merge queue does not honor it, and native admission rejects the file before a
+group can collide. The dated release heading is stamped on the main/release
+path by `pnpm version:stamp` — never add a dated `## [X.Y.Z] - DATE` heading
+on a feature branch.
 
-**Customer-friendly format:** The changelog is rendered on the public `/changelog` page, RSS feed, and subscriber emails. Follow these conventions:
+**Customer-friendly format:** The changelog is rendered on the public `/changelog` page, RSS feed, and subscriber emails. Follow these conventions on the stamp/release path:
 
 - **Summary blockquote:** Add `> plain-language summary` (max 3 sentences) right after the version heading. Written for non-technical users (artists, fans, investors).
 - **`[internal]` prefix:** Tag developer-facing entries with `- [internal] ...`. These are hidden from the public page, RSS feed, and emails but preserved for developer reference.
@@ -334,6 +354,17 @@ pnpm version:check        # validate consistency
 
 **Spam protection:** `changelog:send` enforces a 24-hour cooldown between product update emails. If subscribers were emailed within the last 24h, the send is skipped automatically. Use `--force` to override for critical announcements.
 
+## Production Release Routing Invariant
+
+A coalesced release wave must never route from only the newest merge receipt.
+The Production Controller anchors to the exact SHA currently served by the
+canonical production alias, requires its payload-bound verified deployment
+marker, and classifies the complete first-parent delta to current main. When
+that range affects Web, the latest Web-affecting combined head must have one
+exact passing product-lane receipt before any production mutation. A no-op
+marker is authoritative only when it records the deployed base, contains no
+Web lane, and is bound to the exact controller attempt.
+
 <!-- ci-harness:start -->
 ## CI Agent Harness
 
@@ -344,9 +375,9 @@ Generated from `.github/ci-harness/manifest.json`. Do not hand-edit this block; 
 | Stage | Exact responsibility |
 | --- | --- |
 | Source PR | Deterministic path + brand classification, risk classification, `ci-fast`, diff secret scan, and `Golden Path Lock`. `Migration Guard`, `Fork PR Gate`, and `PR Size Guard` remain separate required contexts. |
-| Native merge queue | Re-run deterministic gates on the exact `merge_group` head, then require five affected unit shards, one hosted build + layout workspace, path-selected Xcode, and model-free semantic evals. |
+| Native merge queue | Re-run deterministic gates on the exact `merge_group` head, then require only path-selected Web unit/build, Mac test/package, iOS Xcode, shared-contract integration, and model-free semantic evidence. |
 | Queue-proven main | Reuse the exact successful merge-group `PR Ready` proof and skip duplicate fallback work. |
-| Direct/admin main | Fail closed through path/risk/fast/secret/migration, all five unit shards, and the combined hosted build + layout job; skipped placeholders are invalid. |
+| Direct/admin main | Fail closed through path/risk/fast/secret/migration plus every product lane selected by the exact push diff; skipped selected lanes and executed unselected lanes are invalid. |
 | Production release | One reusable staging/canary/promotion/rollback DAG under one non-cancelling caller lease. |
 | Post-deploy | Hosted public, auth, homepage, and explicitly provisioned Lighthouse probes settle into `Production Verified` before notification. |
 | Scheduled/manual/event | Exhaustive E2E, Neon, a11y, performance, eval, visual, slop, brand, and repair/report loops. |
@@ -355,11 +386,11 @@ Generated from `.github/ci-harness/manifest.json`. Do not hand-edit this block; 
 
 | Tier | Purpose | Merge-gate jobs |
 | --- | --- | --- |
-| Source Fast Gate | Cheap deterministic checks required on each source PR and repeated on the synthetic combined head. | `Path Changes` (both), `ci-fast` (both), `Secret Scan (gitleaks + trufflehog)` (both), `Golden Path Lock` (both), `Migration Guard` (both), `Unit Tests` (merge-group) |
+| Source Fast Gate | Cheap deterministic checks required on each source PR and repeated on the synthetic combined head. | `Path Changes` (both), `ci-fast` (both), `Secret Scan (gitleaks + trufflehog)` (both), `Golden Path Lock` (both), `Visual Snapshot Compare` (merge-group), `Migration Guard` (both), `Unit Tests` (merge-group) |
 | Structural Contract | Mechanical architecture, workflow, docs, and repo-rule checks. | `CI Risk Classifier` (both) |
 | Explicit Deep Evidence | Manual, scheduled, or event-driven deep evidence that never starts from or delays ordinary PR Ready. | none |
 | Preview Evidence | Hosted manual/event visual, a11y, performance, and preview evidence outside the source-PR event. | none |
-| Combined Integration | Affected unit, one hosted build-plus-layout workspace, path-selected Xcode, and model-free semantic evals for GitHub's exact merge-group head. | `Build + Layout (combined)` (merge-group), `iOS Build + Test (combined)` (merge-group), `Promptfoo Evals (deterministic)` (merge-group), `Golden Eval Set (deterministic)` (merge-group) |
+| Combined Integration | Affected unit, one hosted build-plus-layout workspace, path-selected Xcode, and model-free semantic evals for GitHub's exact merge-group head. | `Build + Layout (combined)` (merge-group), `iOS Build + Test (combined)` (merge-group), `Mac Build + Test (combined)` (merge-group), `Cross-Product Integration (combined)` (merge-group), `Promptfoo Evals (deterministic)` (merge-group), `Golden Eval Set (deterministic)` (merge-group) |
 | Production Release | Each exact successful main CI attempt feeds one fixed production-mutation FIFO from authorization through staging, promotion, centralized rollback, immutable probes, canonical proof, marker, and best-effort notification; one hosted monitor retry is bounded to controller attempt 1. | none |
 | Post-deploy Verification | Hosted public, homepage, and Lighthouse probes target the immutable release URL under the controller lease; authenticated exact-build smoke uses one allowlisted Better Auth identity and a fresh protected verification-store OTP before promotion, while public Better Auth/OAuth gates remain blocking. When a controller generation is superseded before those in-lease probes run, a read-only follow-up re-probes the landed canonical production deployment outside the lease. | none |
 | Scheduled Cleanup | Report-first cleanup loops for flakes, coverage drift, harness health, and main-CI repair. | none |
@@ -375,10 +406,13 @@ Source `PR Ready` may require only `source-pr`/`both` jobs below. Merge-group `P
 | `CI Risk Classifier` | both | structural-contract | `pnpm ci:harness:check` |
 | `Secret Scan (gitleaks + trufflehog)` | both | fast-gate | `./scripts/security/scan-secrets.sh ci-pr origin/main` |
 | `Golden Path Lock` | both | fast-gate | `node scripts/golden-path-lock.mjs merge-gate` |
+| `Visual Snapshot Compare` | merge-group | fast-gate | `node scripts/visual-snapshot-compare.mjs compare` |
 | `Migration Guard` | both | fast-gate | `cd apps/web && ./scripts/check-migrations.sh && ./scripts/validate-migrations.sh` |
 | `Unit Tests` | merge-group | fast-gate | `pnpm --filter=@jovie/web run test:fast` |
 | `Build + Layout (combined)` | merge-group | combined-integration | `pnpm run build:web && pnpm --filter @jovie/web exec playwright test tests/e2e/hud-scroll.spec.ts --config=playwright.config.noauth.ts --project=chromium` |
 | `iOS Build + Test (combined)` | merge-group | combined-integration | `pnpm run ios:lint && pnpm run ios:test` |
+| `Mac Build + Test (combined)` | merge-group | combined-integration | `pnpm --filter @jovie/desktop run typecheck && pnpm --filter @jovie/desktop run test && pnpm --filter @jovie/desktop run package:staging` |
+| `Cross-Product Integration (combined)` | merge-group | combined-integration | `pnpm --filter @jovie/auth-routing test && pnpm --filter @jovie/action-contracts test && pnpm --filter @jovie/audio-contracts test` |
 | `Promptfoo Evals (deterministic)` | merge-group | combined-integration | `pnpm run evals` |
 | `Golden Eval Set (deterministic)` | merge-group | combined-integration | `pnpm run evals:golden` |
 

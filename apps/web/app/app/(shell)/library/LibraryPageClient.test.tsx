@@ -13,7 +13,7 @@ vi.mock('next/navigation', () => ({
   useSearchParams: () => new URLSearchParams(search.value),
 }));
 vi.mock('../dashboard/releases/ReleaseCatalogPageClient', () => ({
-  ReleaseCatalogPageClient: () => <div>Assets panel</div>,
+  ReleaseCatalogPageClient: () => <div>Catalog panel</div>,
 }));
 vi.mock('./CreatorDocumentsWorkspace', () => ({
   CreatorDocumentsWorkspace: ({
@@ -37,60 +37,70 @@ vi.mock('./CreatorDocumentsWorkspace', () => ({
 
 import { LibraryPageClient } from './LibraryPageClient';
 
-describe('LibraryPageClient sections', () => {
+describe('LibraryPageClient stages', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     search.value = '';
   });
 
-  it('uses accessible tabs and persists the document section in the URL', () => {
-    render(<LibraryPageClient creatorProfileId='profile-1' merchCards={[]} />);
-
-    expect(screen.getByRole('tab', { name: 'Assets' })).toHaveAttribute(
-      'aria-selected',
-      'true'
-    );
-    fireEvent.click(screen.getByRole('tab', { name: 'Ideas & Scripts' }));
-    expect(replace).toHaveBeenCalledWith('/app/library?section=documents', {
-      scroll: false,
-    });
-  });
-
-  it('restores the document panel from the URL', () => {
-    search.value = 'section=documents';
+  it('presents All / Ideas / In Progress / Out instead of a separate Ideas destination', () => {
     render(<LibraryPageClient creatorProfileId='profile-1' merchCards={[]} />);
 
     expect(
-      screen.getByRole('tab', { name: 'Ideas & Scripts' })
-    ).toHaveAttribute('aria-selected', 'true');
-    expect(screen.getByRole('tabpanel')).toHaveTextContent('Documents panel');
-  });
-
-  it('uses roving focus and arrow keys across library tabs', () => {
-    render(<LibraryPageClient creatorProfileId='profile-1' merchCards={[]} />);
-
-    const assets = screen.getByRole('tab', { name: 'Assets' });
-    const documents = screen.getByRole('tab', { name: 'Ideas & Scripts' });
-    expect(assets).toHaveAttribute('tabindex', '0');
-    expect(documents).toHaveAttribute('tabindex', '-1');
-
-    assets.focus();
-    fireEvent.keyDown(assets, { key: 'ArrowRight' });
-
-    expect(documents).toHaveFocus();
-    expect(replace).toHaveBeenCalledWith('/app/library?section=documents', {
+      screen.getByRole('tablist', { name: 'Library Stages' })
+    ).toBeInTheDocument();
+    expect(screen.getByRole('tab', { name: 'All' })).toHaveAttribute(
+      'aria-selected',
+      'true'
+    );
+    expect(screen.getByTestId('library-stage-tabs')).toHaveAttribute(
+      'data-youtube-connected',
+      'false'
+    );
+    expect(screen.queryByRole('tab', { name: 'Ideas & Scripts' })).toBeNull();
+    expect(screen.queryByRole('tab', { name: 'Assets' })).toBeNull();
+    fireEvent.click(screen.getByRole('tab', { name: 'Ideas' }));
+    expect(replace).toHaveBeenCalledWith('/app/library?stage=idea', {
       scroll: false,
     });
   });
 
-  it('guards leaving the document section with an unsaved draft', () => {
+  it('restores the Ideas stage from the URL, including the legacy documents section', () => {
     search.value = 'section=documents';
+    render(<LibraryPageClient creatorProfileId='profile-1' merchCards={[]} />);
+
+    expect(screen.getByRole('tab', { name: 'Ideas' })).toHaveAttribute(
+      'aria-selected',
+      'true'
+    );
+    expect(screen.getByRole('tabpanel')).toHaveTextContent('Catalog panel');
+  });
+
+  it('uses roving focus and arrow keys across stage tabs', () => {
+    render(<LibraryPageClient creatorProfileId='profile-1' merchCards={[]} />);
+
+    const all = screen.getByRole('tab', { name: 'All' });
+    const ideas = screen.getByRole('tab', { name: 'Ideas' });
+    expect(all).toHaveAttribute('tabindex', '0');
+    expect(ideas).toHaveAttribute('tabindex', '-1');
+
+    all.focus();
+    fireEvent.keyDown(all, { key: 'ArrowRight' });
+
+    expect(ideas).toHaveFocus();
+    expect(replace).toHaveBeenCalledWith('/app/library?stage=idea', {
+      scroll: false,
+    });
+  });
+
+  it('guards leaving a document editor with an unsaved draft', () => {
+    search.value = 'document=doc-1';
     render(<LibraryPageClient creatorProfileId='profile-1' merchCards={[]} />);
     fireEvent.click(
       screen.getByRole('button', { name: 'Mark document dirty' })
     );
 
-    fireEvent.click(screen.getByRole('tab', { name: 'Assets' }));
+    fireEvent.click(screen.getByRole('tab', { name: 'All' }));
     fireEvent.click(screen.getByRole('button', { name: 'Cancel' }));
 
     expect(replace).not.toHaveBeenCalled();
@@ -98,13 +108,13 @@ describe('LibraryPageClient sections', () => {
   });
 
   it('purges persisted drafts after confirmed destructive navigation', () => {
-    search.value = 'section=documents';
+    search.value = 'document=doc-1';
     render(<LibraryPageClient creatorProfileId='profile-1' merchCards={[]} />);
     fireEvent.click(
       screen.getByRole('button', { name: 'Mark document dirty' })
     );
 
-    fireEvent.click(screen.getByRole('tab', { name: 'Assets' }));
+    fireEvent.click(screen.getByRole('tab', { name: 'All' }));
     fireEvent.click(screen.getByRole('button', { name: 'Discard' }));
 
     expect(discardDrafts).toHaveBeenCalledOnce();

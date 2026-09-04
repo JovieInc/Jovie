@@ -1,3 +1,5 @@
+import { evaluatePreLandChangelogAdmission } from './pre-land-changelog.mjs';
+
 export const MERGE_QUEUE_LABEL = 'merge-queue';
 export const FAST_TRACK_LABEL = 'fast';
 export const FAST_TRACK_UI_LABEL = 'fast-track-ui';
@@ -13,7 +15,7 @@ export const REQUIRED_MERGE_STATUSES = [
 
 /** Canonical native merge-queue operating policy (controller + repo guardrails). */
 export const MERGE_QUEUE_POLICY = Object.freeze({
-  enqueueLabel: MERGE_QUEUE_LABEL,
+  enqueueLabel: null,
   // 12→16 on 2026-07-09 per JOV-3833 decision trigger (ready→merged p95 718m
   // vs 15m target after one week live; queue-depth deferral was a binding
   // constraint during merge waves). Re-evaluate if runner-pool saturation
@@ -60,14 +62,14 @@ export function isPendingNativeCohortCutoverField(field) {
 }
 
 export const NATIVE_QUEUE_POLICY = Object.freeze({
-  check_response_timeout_minutes: 60,
+  // Tim tightened the live ruleset 2026-09-04 (60/3/10 → 20/1/5): solo group
+  // builds with a 20-minute check budget and 5-entry merge batches. Repo is
+  // source of truth — this constant follows the founder's live decision so
+  // the drain's drift guard stops fail-closing on it.
+  check_response_timeout_minutes: 20,
   grouping_strategy: 'ALLGREEN',
-  // 8→3 on 2026-08-15 after a five-prefix wave showed contention: one unit
-  // matrix completed in ~1–2m while four peers inflated to ~5–7m and kept the
-  // critical path near 7m. Re-evaluate from same-method queue-wait and duration
-  // evidence after the three-prefix canary.
-  max_entries_to_build: 3,
-  max_entries_to_merge: 10,
+  max_entries_to_build: 1,
+  max_entries_to_merge: 5,
   merge_method: 'SQUASH',
   min_entries_to_merge: NATIVE_QUEUE_COHORT_POLICY.minEntriesToMerge,
   min_entries_to_merge_wait_minutes:
@@ -158,6 +160,25 @@ export const CHANGELOG_COLLISION_PATH = 'CHANGELOG.md';
 const ENUM_POLICY_FIELDS = new Set(['merge_method', 'grouping_strategy']);
 
 /**
+ * Map GraphQL `checkResponseTimeout` onto REST minutes. Values inside the
+ * REST minute range are still seconds when they come from GraphQL, so whole
+ * minute second values convert. Non-minute values stay unchanged so drift is
+ * still visible instead of rounded away.
+ *
+ * @param {unknown} value
+ * @returns {unknown}
+ */
+export function mapGraphqlCheckResponseTimeoutToMinutes(value) {
+  if (typeof value !== 'number' || !Number.isFinite(value) || value < 0) {
+    return value;
+  }
+  if (Number.isInteger(value) && value >= 60 && value % 60 === 0) {
+    return value / 60;
+  }
+  return value;
+}
+
+/**
  * Normalize REST snake_case or GraphQL camelCase queue parameters onto the
  * canonical `NATIVE_QUEUE_POLICY` keys. Unknown keys are dropped.
  *
@@ -173,9 +194,13 @@ export function normalizeNativeQueuePolicyParameters(observed = {}) {
   for (const [key, value] of Object.entries(observed)) {
     const restKey = NATIVE_QUEUE_GRAPHQL_POLICY_FIELDS[key] ?? key;
     if (!Object.hasOwn(NATIVE_QUEUE_POLICY, restKey)) continue;
+    if (value === null || value === undefined) continue;
     let mapped = value;
     if (ENUM_POLICY_FIELDS.has(restKey) && typeof value === 'string') {
       mapped = value.toUpperCase();
+    }
+    if (key === 'checkResponseTimeout') {
+      mapped = mapGraphqlCheckResponseTimeoutToMinutes(mapped);
     }
     normalized[restKey] = mapped;
   }
@@ -184,7 +209,8 @@ export function normalizeNativeQueuePolicyParameters(observed = {}) {
 
 /**
  * GraphQL live configuration wins for every field it actually returns. REST
- * keeps fields GraphQL omits (notably `grouping_strategy`).
+ * keeps fields GraphQL omits (notably `grouping_strategy`) or returns as
+ * null. GraphQL `checkResponseTimeout` is converted from seconds first.
  *
  * @param {Record<string, unknown> | null | undefined} restParameters
  * @param {Record<string, unknown> | null | undefined} liveQueueConfiguration
@@ -311,41 +337,52 @@ export function unmergeableReenqueueDecision({
 }
 
 /**
- * ALLGREEN groups merge queued PRs together. GitHub's server merge ignores
- * local `merge=union`, so two Unreleased CHANGELOG edits park the later
- * entry UNMERGEABLE while the source PR stays MERGEABLE vs main.
+ * CHANGELOG.md is post-land release state, never a PR artifact. Historical
+ * PRs may predate the source-CI guard, so native admission independently
+ * rejects every candidate that still touches it. Queued members are retained
+ * only as diagnostic evidence while the legacy backlog drains.
  *
- * Unknown evidence never skips (same fail-open as front-item churn).
+ * Implementation PRs that touch CHANGELOG.md are skipped at admission
+ * (JOV-5378). Stamp/release heads still serialize against a queued
+ * CHANGELOG member. Unknown evidence never skips.
  *
  * @param {{
  *   candidateFiles?: unknown,
  *   queuedMemberFiles?: unknown,
+ *   branch?: unknown,
  * }} [input]
  */
 export function changelogGroupCollisionDecision({
   candidateFiles,
   queuedMemberFiles,
+  branch,
 } = {}) {
-  if (!Array.isArray(candidateFiles) || !Array.isArray(queuedMemberFiles)) {
+  const admission = evaluatePreLandChangelogAdmission({
+    changedFiles: candidateFiles,
+    branch,
+  });
+  if (admission.action === 'unknown') {
     return { action: 'unknown', reason: 'changelog-evidence-unavailable' };
   }
-  const touchesChangelog = files =>
-    Array.isArray(files) && files.includes(CHANGELOG_COLLISION_PATH);
-  if (!touchesChangelog(candidateFiles)) {
+  if (admission.action === 'reject') {
+    return { action: 'skip', reason: 'pre-land-changelog' };
+  }
+  if (admission.reason === 'omits-changelog') {
     return { action: 'allow', reason: 'candidate-omits-changelog' };
+  }
+  if (!Array.isArray(queuedMemberFiles)) {
+    return { action: 'unknown', reason: 'changelog-evidence-unavailable' };
   }
   const colliding = queuedMemberFiles.filter(
     member =>
       Number.isInteger(member?.prNumber) &&
       member.prNumber > 0 &&
-      touchesChangelog(member.files)
+      Array.isArray(member.files) &&
+      member.files.includes(CHANGELOG_COLLISION_PATH)
   );
-  if (colliding.length === 0) {
-    return { action: 'allow', reason: 'no-queued-changelog-member' };
-  }
   return {
     action: 'skip',
-    reason: 'changelog-collision',
+    reason: 'preland-changelog-prohibited',
     collidingPrs: colliding.map(member => member.prNumber),
   };
 }
@@ -460,12 +497,20 @@ export const FORBIDDEN_PINNED_JOB_CONTEXTS = Object.freeze([
   'Secret Scan (gitleaks + trufflehog)',
   'CI / Golden Path Lock',
   'Golden Path Lock',
+  'CI / Visual Snapshot Compare',
+  'Visual Snapshot Compare',
   'CI / Layout Guard',
   'Layout Guard',
   'CI / Build + Layout (combined)',
   'Build + Layout (combined)',
   'CI / iOS Build + Test (combined)',
   'iOS Build + Test (combined)',
+  'CI / Mac Build + Test (combined)',
+  'Mac Build + Test (combined)',
+  'CI / Cross-Product Integration (combined)',
+  'Cross-Product Integration (combined)',
+  'CI / macOS MenuMonitor Build + Test (combined)',
+  'macOS MenuMonitor Build + Test (combined)',
   'CI / Promptfoo Evals (deterministic)',
   'Promptfoo Evals (deterministic)',
   'CI / Golden Eval Set (deterministic)',
@@ -632,7 +677,7 @@ const KEYWORD_HOT_KEYS = [
     key: 'hot:ci-workflows',
     reason: 'CI/workflow control plane',
     pattern:
-      /\b(ci|workflow|github actions|merge queue|graphite|agent pipeline|actionlint)\b/i,
+      /\b(ci|workflow|github actions|merge queue|agent pipeline|actionlint)\b/i,
   },
   {
     key: 'hot:package-manifest',
@@ -1791,12 +1836,12 @@ export function parseMergeQueueTimeline(events, options = {}) {
   let mergedAt = null;
 
   for (const event of events ?? []) {
-    if (event.event === 'labeled' && event.label?.name === MERGE_QUEUE_LABEL) {
+    if (event.event === 'added_to_merge_queue' || event.event === 'enqueued') {
       queuedAt.push(event.created_at);
     }
     if (
-      event.event === 'unlabeled' &&
-      event.label?.name === MERGE_QUEUE_LABEL
+      event.event === 'removed_from_merge_queue' ||
+      event.event === 'dequeued'
     ) {
       dequeued.push({
         at: event.created_at,
@@ -1909,9 +1954,17 @@ export const DETERMINISTIC_MERGE_GROUP_FAILURE_STEPS = new Set([
 export const RETRYABLE_PRODUCT_FAILURE_STEPS = new Set([
   'Run unit tests',
   'Run packages/ui unit tests',
+  'Build and test',
 ]);
 export const MERGE_GROUP_CHURN_FAILURE_THRESHOLD = 2;
 export const MERGE_GROUP_CHURN_COOLDOWN_MS = 5 * 60 * 1000;
+export const ACTIVE_MERGE_GROUP_STATUSES = new Set([
+  'queued',
+  'in_progress',
+  'waiting',
+  'pending',
+  'requested',
+]);
 
 export function parseMergeQueueFrontBranch(branch) {
   const match =
@@ -1969,6 +2022,39 @@ export function frontItemChurnDecision({
     .map(({ run }) => run)
     .sort((a, b) => String(b.createdAt).localeCompare(String(a.createdAt)));
 
+  const headMs = Date.parse(headCommittedAt);
+  const failuresForCurrentHead = Number.isFinite(headMs)
+    ? allFailedFrontedRuns.filter(run => Date.parse(run.createdAt) >= headMs)
+    : allFailedFrontedRuns;
+  const latestActiveForCurrentHead = mergeGroupRuns
+    .map(run => ({ run, front: parseMergeQueueFrontBranch(run?.headBranch) }))
+    .filter(
+      ({ run, front }) =>
+        front?.prNumber === prNumber &&
+        ACTIVE_MERGE_GROUP_STATUSES.has(run.status) &&
+        (!Number.isFinite(headMs) || Date.parse(run.createdAt) >= headMs)
+    )
+    .map(({ run }) => run)
+    .sort((a, b) => String(b.createdAt).localeCompare(String(a.createdAt)))[0];
+  if (
+    latestActiveForCurrentHead &&
+    (failuresForCurrentHead.length === 0 ||
+      String(latestActiveForCurrentHead.createdAt).localeCompare(
+        String(failuresForCurrentHead[0].createdAt)
+      ) > 0)
+  ) {
+    return {
+      action: 'allow',
+      reason:
+        'a newer merge-group attempt for the unchanged head is still active; incomplete evidence cannot eject it',
+      evidence: {
+        activeRunId: latestActiveForCurrentHead.id ?? null,
+        activeStartedAt: latestActiveForCurrentHead.createdAt ?? null,
+        activeStatus: latestActiveForCurrentHead.status ?? null,
+      },
+    };
+  }
+
   if (allFailedFrontedRuns.length === 0) {
     return {
       action: 'allow',
@@ -1977,10 +2063,6 @@ export function frontItemChurnDecision({
     };
   }
 
-  const headMs = Date.parse(headCommittedAt);
-  const failuresForCurrentHead = Number.isFinite(headMs)
-    ? allFailedFrontedRuns.filter(run => Date.parse(run.createdAt) >= headMs)
-    : allFailedFrontedRuns;
   if (failuresForCurrentHead.length === 0) {
     const lastFailed = allFailedFrontedRuns[0];
     return {
@@ -2044,7 +2126,18 @@ export function frontItemChurnDecision({
       RETRYABLE_PRODUCT_FAILURE_STEPS.has(step)
     )
   );
-  if (retryableProductFailures.length >= MERGE_GROUP_CHURN_FAILURE_THRESHOLD) {
+  // Count sibling failed attempts once any run proves a retryable product
+  // failure. Some sibling runs expose only aggregate Build and test failures;
+  // a moving main SHA must not reset the one-retry allowance forever (#16238,
+  // reproduced by #16441 on 2026-08-27).
+  const retryableAttemptCount =
+    retryableProductFailures.length === 0
+      ? 0
+      : Math.max(
+          retryableProductFailures.length,
+          failuresForCurrentHead.length
+        );
+  if (retryableAttemptCount >= MERGE_GROUP_CHURN_FAILURE_THRESHOLD) {
     const lastFailed = retryableProductFailures[0];
     const front = parseMergeQueueFrontBranch(lastFailed.headBranch);
     return {
@@ -2053,7 +2146,7 @@ export function frontItemChurnDecision({
         'unchanged head has repeated product-validation failures; re-enrollment would duplicate the same merge-group work until the source head moves',
       evidence: {
         failureClass: 'repeated-product-check',
-        failedAttempts: retryableProductFailures.length,
+        failedAttempts: retryableAttemptCount,
         lastFailedRunId: lastFailed.id ?? null,
         lastFailedAt: lastFailed.createdAt ?? null,
         failedSteps: lastFailed.failedSteps,

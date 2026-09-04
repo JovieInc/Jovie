@@ -1,3 +1,4 @@
+// @coverage-via apps/web/tests/unit/design-system/linear-token-retire-jov-5465.test.ts
 'use client';
 
 import { Check, ChevronRight, Mail, Zap } from 'lucide-react';
@@ -47,7 +48,7 @@ export function ReleaseNotificationsSection() {
                 Automatic
               </span>
 
-              <h2 className='mt-5 marketing-h2-linear text-primary-token'>
+              <h2 className='mt-5 marketing-h2-linear text-primary-token line-clamp-2'>
                 New Release?
                 <br />
                 Your Fans Already Know.
@@ -92,7 +93,7 @@ export function ReleaseNotificationsSection() {
                 style={{
                   border: '1px solid var(--linear-border-subtle)',
                   backgroundColor: 'var(--linear-bg-surface-0)',
-                  boxShadow: 'var(--linear-shadow-card-elevated)',
+                  boxShadow: 'var(--shadow-card-elevated)',
                 }}
               >
                 {/* Shine border overlay */}
@@ -205,7 +206,7 @@ export function ReleaseNotificationsSection() {
                       {/* Listen Now button */}
                       <button
                         type='button'
-                        className='mt-4 flex w-full items-center justify-center gap-2 rounded-lg px-4 py-2.5 text-app font-semibold transition-colors duration-(--linear-duration-normal) ease-subtle'
+                        className='mt-4 flex w-full items-center justify-center gap-2 rounded-lg px-4 py-2.5 text-app font-semibold transition-colors duration-(--duration-normal) ease-subtle'
                         style={{
                           background:
                             'linear-gradient(135deg, oklch(72% 0.16 75), oklch(68% 0.14 60))',

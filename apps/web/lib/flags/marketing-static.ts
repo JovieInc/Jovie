@@ -23,12 +23,11 @@ export const FEATURE_FLAGS = {
   SHOW_HOMEPAGE_V2_FINAL_CTA: true,
   SHOW_HOMEPAGE_GO_LIVE_SECTION: true,
   SHOW_HOMEPAGE_FAQ: true,
-  // Prelaunch waitlist gate. When true, public-front-door CTAs on the
-  // marketing homepage render as "Request access" (waitlisting everyone who
-  // comes in). When false, they revert to "Claim your free profile". The
-  // server-side waitlist gate (`isWaitlistGateEnabled`) handles routing once
-  // a user hits /signup; this flag only controls marketing copy. Flip to
-  // false to open the doors.
+  // Prelaunch waitlist gate. When true, public-front-door CTAs render as
+  // "Get started" and land on /waitlist. When false, they revert to
+  // "Claim your free profile". The server-side waitlist gate
+  // (`isWaitlistGateEnabled`) still owns post-auth routing. Flip to false
+  // to open the doors.
   WAITLIST_ENABLED: true,
   SHOW_HOMEPAGE_V2_FOOTER_LINKS: true,
   SHOW_ARTIST_PROFILE_PAY_FLOW_VIDEO: true,

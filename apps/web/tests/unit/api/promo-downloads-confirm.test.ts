@@ -19,7 +19,8 @@ const hoisted = vi.hoisted(() => {
   return {
     requireAuthMock: vi.fn(),
     getSessionContextMock: vi.fn(),
-    handleUploadMock: vi.fn(),
+    handleUploadPresignedMock: vi.fn(),
+    issueSignedTokenMock: vi.fn(),
     selectMock,
     selectWhereMock,
     selectLimitMock,
@@ -31,7 +32,11 @@ const hoisted = vi.hoisted(() => {
 });
 
 vi.mock('@vercel/blob/client', () => ({
-  handleUpload: hoisted.handleUploadMock,
+  handleUploadPresigned: hoisted.handleUploadPresignedMock,
+}));
+
+vi.mock('@vercel/blob', () => ({
+  issueSignedToken: hoisted.issueSignedTokenMock,
 }));
 
 vi.mock('@/lib/auth/require-auth', () => ({
@@ -132,8 +137,13 @@ describe('promo downloads API', () => {
   });
 
   it('issues a token scoped to the registry-derived promo policy', async () => {
-    hoisted.handleUploadMock.mockResolvedValue({
-      type: 'blob.generate-client-token',
+    hoisted.handleUploadPresignedMock.mockResolvedValue({
+      type: 'blob.generate-presigned-url',
+    });
+    hoisted.issueSignedTokenMock.mockResolvedValue({
+      delegationToken: 'delegation',
+      clientSigningToken: 'signing',
+      validUntil: Date.now() + 60_000,
     });
 
     const { POST } = await import(
@@ -142,19 +152,21 @@ describe('promo downloads API', () => {
     const response = await POST(
       new Request('http://localhost/api/promo-downloads/upload-token', {
         method: 'POST',
-        body: JSON.stringify({ type: 'blob.generate-client-token' }),
+        body: JSON.stringify({ type: 'blob.generate-presigned-url' }),
       }) as never
     );
 
     expect(response.status).toBe(200);
-    const options = hoisted.handleUploadMock.mock.calls[0][0];
-    const token = await options.onBeforeGenerateToken(
-      'jovie/audio/promo_download/clerk_user_123/track.mp3'
+    const options = hoisted.handleUploadPresignedMock.mock.calls[0][0];
+    const { urlOptions } = await options.getSignedToken(
+      'jovie/audio/promo_download/clerk_user_123/track.mp3',
+      null,
+      false
     );
-    expect(token.maximumSizeInBytes).toBe(
+    expect(urlOptions.maximumSizeInBytes).toBe(
       AUDIO_UPLOAD_POLICIES.promo_download.maxFileSizeBytes
     );
-    expect(new Set(token.allowedContentTypes)).toEqual(
+    expect(new Set(urlOptions.allowedContentTypes)).toEqual(
       new Set(SUPPORTED_AUDIO_MIME_TYPES)
     );
   });
@@ -167,7 +179,10 @@ describe('promo downloads API', () => {
 
     expect(response.status).toBe(201);
     expect(hoisted.insertValuesMock).toHaveBeenCalledWith(
-      expect.objectContaining({ fileMimeType: 'audio/mpeg' })
+      expect.objectContaining({
+        fileMimeType: 'audio/mpeg',
+        isActive: false,
+      })
     );
   });
 

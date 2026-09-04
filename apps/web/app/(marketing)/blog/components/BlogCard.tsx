@@ -50,7 +50,7 @@ export function BlogCard({ post, author, variant = 'default' }: BlogCardProps) {
           className='block focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-token rounded-lg'
         >
           {/* Title */}
-          <h2 className='text-2xl sm:text-3xl font-semibold tracking-tight text-primary-token mb-4 group-hover:text-primary-token transition-colors'>
+          <h2 className='text-2xl sm:text-3xl font-semibold tracking-tight text-primary-token mb-4 group-hover:text-primary-token transition-colors line-clamp-2'>
             {post.title}
           </h2>
 
@@ -113,7 +113,7 @@ export function BlogCard({ post, author, variant = 'default' }: BlogCardProps) {
         className='block focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-token rounded-lg'
       >
         {/* Title */}
-        <h2 className='text-lg sm:text-xl font-semibold tracking-tight text-primary-token mb-3 group-hover:text-primary-token transition-colors'>
+        <h2 className='text-lg sm:text-xl font-semibold tracking-tight text-primary-token mb-3 group-hover:text-primary-token transition-colors line-clamp-2'>
           {post.title}
         </h2>
 

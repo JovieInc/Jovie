@@ -1,6 +1,6 @@
 'use client';
 
-import { Switch } from '@jovie/ui';
+import { Button, Switch } from '@jovie/ui';
 import {
   BadgeCheck,
   Bell,
@@ -342,8 +342,6 @@ export function ProfileDesktopSurface({
   // otherwise the toggle is meaningless and confuses unsubscribed visitors.
   const artistEmailReady = readArtistEmailReadyFromSettings(artist.settings);
   const showArtistEmailRow = isSubscribed && artistEmailReady;
-  const primaryActionControlClassName =
-    'inline-flex h-11 items-center gap-2 rounded-full bg-white dark:bg-surface-1 px-4 text-app font-semibold tracking-tight text-black dark:text-white transition-colors duration-subtle hover:bg-white dark:bg-surface-1/88';
   const PrimaryActionIcon = primaryAction.kind === 'tour' ? CalendarDays : Play;
   let primaryActionElement: React.ReactNode;
   if (primaryAction.kind === 'subscribe') {
@@ -357,20 +355,9 @@ export function ProfileDesktopSurface({
         onManageNotifications={() => onModeSelect('subscribe')}
       />
     );
-  } else if (primaryAction.href) {
-    primaryActionElement = (
-      <a href={primaryAction.href} className={primaryActionControlClassName}>
-        <PrimaryActionIcon className='h-4 w-4' />
-        {primaryAction.label}
-      </a>
-    );
   } else {
-    primaryActionElement = (
-      <button
-        type='button'
-        onClick={() => onModeSelect(primaryAction.mode)}
-        className={primaryActionControlClassName}
-      >
+    const primaryActionContent = (
+      <>
         <PrimaryActionIcon
           className={cn(
             'h-4 w-4',
@@ -378,7 +365,26 @@ export function ProfileDesktopSurface({
           )}
         />
         {primaryAction.label}
-      </button>
+      </>
+    );
+    primaryActionElement = (
+      <Button
+        {...(primaryAction.href
+          ? { asChild: true }
+          : {
+              type: 'button' as const,
+              onClick: () => onModeSelect(primaryAction.mode),
+            })}
+        variant='primary'
+        size='marketing'
+        className='gap-2 px-4'
+      >
+        {primaryAction.href ? (
+          <a href={primaryAction.href}>{primaryActionContent}</a>
+        ) : (
+          primaryActionContent
+        )}
+      </Button>
     );
   }
 

@@ -144,6 +144,13 @@ import {
 import { resolvePitchDestination } from '@/lib/services/pitch/targets';
 import { type PitchInput, PLATFORM_LIMITS } from '@/lib/services/pitch/types';
 import { buildRetouchPrompt } from '@/lib/services/retouching/style';
+import {
+  evaluateAllSmartLinkSwitchRuleCases,
+  evaluateSmartLinkSwitchRuleCase,
+  SMART_LINK_SWITCH_LIVE_RULES,
+  SMART_LINK_SWITCH_RULE_CASE_IDS,
+  type SmartLinkSwitchRuleCaseId,
+} from '@/lib/services/smart-link-switch/switch-rules';
 import { RECORDABLE_VIDEO_KINDS } from '@/lib/teleprompter/types';
 import { detectPlatform } from '@/lib/utils/platform-detection/detector';
 import { validateSocialLinkUrl } from '@/lib/utils/url-validation';
@@ -354,6 +361,12 @@ const ADVANCED_TOOL_SCHEMAS = {
       url: z.string().url(),
     }),
   },
+  inspectPressSource: {
+    description: 'Inspect a public https article or press-release URL.',
+    inputSchema: z.object({
+      url: z.string().url(),
+    }),
+  },
   checkCanvasStatus: {
     description:
       "Check which of the artist's releases have Spotify Canvas videos set and which are missing them.",
@@ -489,6 +502,13 @@ const ADVANCED_TOOL_SCHEMAS = {
       stepId: z.string().optional(),
     }),
   },
+  surfaceLibraryOpportunities: {
+    description:
+      'Onboarding presence-build Library opportunities artifact. System-emitted tool event, not a model-invoked chat tool.',
+    inputSchema: z.object({
+      stepId: z.string().optional(),
+    }),
+  },
   assembleArtistProfile: {
     description:
       'Onboarding presence-build profile assembly artifact. System-emitted tool event, not a model-invoked chat tool.',
@@ -549,6 +569,7 @@ const PROFILE_RELEASE_TOOL_NAMES = [
 const ALWAYS_PAID_TOOL_NAMES = [
   'proposeProfileEdit',
   'importBioFromUrl',
+  'inspectPressSource',
   'checkCanvasStatus',
   'suggestRelatedArtists',
   'writeWorldClassBio',
@@ -559,6 +580,7 @@ const ALWAYS_PAID_TOOL_NAMES = [
   'formatLyrics',
   'proposeVideoRecording',
   'researchArtistPresence',
+  'surfaceLibraryOpportunities',
   'assembleArtistProfile',
   'generateSmartLink',
   'draftWelcomePost',
@@ -744,6 +766,15 @@ const TOOL_RESULT_REQUIRED_KEYS: Record<string, readonly string[]> = {
     'summary',
   ],
   importBioFromUrl: ['ok', 'candidateBio', 'sourceUrl', 'sourceTitle'],
+  inspectPressSource: [
+    'ok',
+    'sourceUrl',
+    'freshness',
+    'factualVerification',
+    'contentTrust',
+    'headline',
+    'bodyEvidence',
+  ],
   markCanvasUploaded: ['success', 'action', 'releaseTitle', 'summary'],
   openBillingPortal: ['success', 'portalUrl', 'fallbackUrl'],
   optimizeMerchCards: ['success', 'action', 'optimized'],
@@ -783,6 +814,7 @@ const TOOL_RESULT_REQUIRED_KEYS: Record<string, readonly string[]> = {
   unpauseMerchCard: ['success', 'action', 'merchCardId'],
   writeWorldClassBio: ['success', 'action', 'bio', 'summary'],
   researchArtistPresence: ['action', 'stepId', 'title', 'summary'],
+  surfaceLibraryOpportunities: ['action', 'stepId', 'title', 'summary'],
   assembleArtistProfile: ['action', 'stepId', 'title', 'summary'],
   generateSmartLink: ['action', 'stepId', 'title', 'summary'],
   draftWelcomePost: ['action', 'stepId', 'title', 'summary'],
@@ -3601,12 +3633,8 @@ function buildEvalPromptAccountContext(
   const billingVerification = toPromptBillingVerification(
     vars.billingVerification
   );
-  const dailyLimit = planLimits.limits.aiDailyMessageLimit;
+  const weeklyLimit = planLimits.limits.aiWeeklyMessageLimit;
   const used = typeof vars.usageUsed === 'number' ? vars.usageUsed : 7;
-  const monthlyLimit =
-    typeof vars.monthlyLimit === 'number' ? vars.monthlyLimit : dailyLimit * 30;
-  const monthlyUsed =
-    typeof vars.monthlyUsed === 'number' ? vars.monthlyUsed : used * 4;
   const planMismatch =
     vars.planMismatch === 'legacy-founding'
       ? {
@@ -3630,14 +3658,10 @@ function buildEvalPromptAccountContext(
       billingVerification === 'unavailable'
         ? null
         : {
-            dailyLimit,
+            weeklyLimit,
             used,
-            remaining: Math.max(dailyLimit - used, 0),
+            remaining: Math.max(weeklyLimit - used, 0),
             resetAt: '2026-05-26T07:00:00.000Z',
-            monthlyLimit,
-            monthlyUsed,
-            monthlyRemaining: Math.max(monthlyLimit - monthlyUsed, 0),
-            monthlyResetAt: '2026-06-01T07:00:00.000Z',
           },
     entitlements: {
       aiCanUseTools:
@@ -3703,7 +3727,7 @@ function evaluateSystemPromptContract(prompt: string, vars: EvalVars) {
         : undefined;
   const systemPrompt = buildSystemPrompt(artistContext, releases, {
     aiCanUseTools,
-    aiDailyMessageLimit: planLimits.limits.aiDailyMessageLimit,
+    aiWeeklyMessageLimit: planLimits.limits.aiWeeklyMessageLimit,
     insightsEnabled: toBoolean(vars.insightsEnabled, plan !== 'free'),
     knowledgeContext,
     accountContext,
@@ -4100,6 +4124,18 @@ function defaultToolResult(toolName: string, input: unknown): unknown {
         sourceUrl: args.url,
         sourceTitle: 'Luna Waves press kit',
       };
+    case 'inspectPressSource':
+      return {
+        ok: true,
+        sourceUrl: args.url,
+        contentTrust: 'untrusted',
+        factualVerification: false,
+        freshness: 'fresh',
+        headline:
+          '<untrusted-source url="https://lunawaves.example/press">Tour dates announced</untrusted-source>',
+        bodyEvidence:
+          '<untrusted-source url="https://lunawaves.example/press">North American dates start in October.</untrusted-source>',
+      };
     case 'checkCanvasStatus':
       return {
         success: true,
@@ -4350,6 +4386,7 @@ function defaultToolResult(toolName: string, input: unknown): unknown {
         summary: 'Pitch ready.',
       };
     case 'researchArtistPresence':
+    case 'surfaceLibraryOpportunities':
     case 'assembleArtistProfile':
     case 'generateSmartLink':
     case 'draftWelcomePost':
@@ -4838,7 +4875,7 @@ function semanticToolInputErrors(toolName: string, input: unknown): string[] {
     }
   }
 
-  if (toolName === 'importBioFromUrl') {
+  if (toolName === 'importBioFromUrl' || toolName === 'inspectPressSource') {
     const url = typeof args.url === 'string' ? args.url.trim() : '';
     try {
       const parsed = new URL(url);
@@ -4948,6 +4985,8 @@ function sampleToolInput(toolName: string): Record<string, unknown> {
       };
     case 'importBioFromUrl':
       return { url: 'https://lunawaves.example/press-kit' };
+    case 'inspectPressSource':
+      return { url: 'https://lunawaves.example/press' };
     case 'checkCanvasStatus':
       return { includeAll: true };
     case 'suggestRelatedArtists':
@@ -4987,6 +5026,7 @@ function sampleToolInput(toolName: string): Record<string, unknown> {
           'Hey everyone, Neon Reef is out now. Thank you so much for listening.',
       };
     case 'researchArtistPresence':
+    case 'surfaceLibraryOpportunities':
     case 'assembleArtistProfile':
     case 'generateSmartLink':
     case 'draftWelcomePost':
@@ -5802,7 +5842,7 @@ function evaluateSkillPromptContract(vars: EvalVars) {
   const chatPitchPrompt = buildSystemPrompt(
     buildTestArtistContext(),
     buildTestReleases(),
-    { aiCanUseTools: true, aiDailyMessageLimit: 20 }
+    { aiCanUseTools: true, aiWeeklyMessageLimit: 20 }
   );
   const incompleteChecklist = getPitchChecklistStatus({
     artistName: 'Luna Waves',
@@ -5935,8 +5975,22 @@ function evaluateSkillPromptContract(vars: EvalVars) {
   const requestedFanEmailRule = requestedFanEmailRuleCase
     ? evaluateFanEmailRuleCase(requestedFanEmailRuleCase)
     : null;
+  const smartLinkSwitchRuleCases = evaluateAllSmartLinkSwitchRuleCases();
+  const requestedSmartLinkSwitchRuleCase =
+    typeof vars.smartLinkSwitchRuleCase === 'string' &&
+    (SMART_LINK_SWITCH_RULE_CASE_IDS as readonly string[]).includes(
+      vars.smartLinkSwitchRuleCase
+    )
+      ? (vars.smartLinkSwitchRuleCase as SmartLinkSwitchRuleCaseId)
+      : null;
+  const requestedSmartLinkSwitchRule = requestedSmartLinkSwitchRuleCase
+    ? evaluateSmartLinkSwitchRuleCase(requestedSmartLinkSwitchRuleCase)
+    : null;
   const fanEmailPlaybook = registryPathContent(
     'docs/playbooks/release-day-announcement.playbook.md'
+  );
+  const releasePlannerPlaybook = registryPathContent(
+    'docs/playbooks/jovie-release-planner.playbook.md'
   );
   const packagingPromptFacts = {
     evidenceNotVibes: textIncludesAll(PACKAGING_AUDIT_SYSTEM_PROMPT, [
@@ -6065,6 +6119,57 @@ function evaluateSkillPromptContract(vars: EvalVars) {
     oneCta:
       fanEmailRuleCases.find(item => item.id === 'one-cta')?.passed === true,
   };
+  const smartLinkSwitchPromptFacts = {
+    noPlaceholderUrl: textIncludesAll(SMART_LINK_SWITCH_LIVE_RULES, [
+      'Never invent a jov.ie URL',
+      'placeholder',
+      'STOP',
+    ]),
+    onlySwitchExisting: textIncludesAll(SMART_LINK_SWITCH_LIVE_RULES, [
+      'already exists',
+      'Do not mint a new live link',
+    ]),
+    alreadyLiveNoop: textIncludesAll(SMART_LINK_SWITCH_LIVE_RULES, [
+      'Already-live is a no-op keep',
+      'Do not mint a second live link',
+    ]),
+    resolvedDspsOnly: textIncludesAll(SMART_LINK_SWITCH_LIVE_RULES, [
+      'Cite only DSPs actually resolved',
+      'never invent DSP coverage',
+    ]),
+    missingLinkSkips: textIncludesAll(SMART_LINK_SWITCH_LIVE_RULES, [
+      'skip switch',
+      'Run still succeeds',
+    ]),
+    playbookEncodesGate: textIncludesAll(fanEmailPlaybook, [
+      'Never invent a jov.ie URL',
+      'already-live',
+      'skip switch',
+      'Cite only DSPs',
+    ]),
+    plannerEncodesGate: textIncludesAll(releasePlannerPlaybook, [
+      'Never invent a jov.ie URL',
+      'no-op keep',
+      'Do not mint',
+    ]),
+    placeholderRefused:
+      smartLinkSwitchRuleCases.find(item => item.id === 'placeholder-refused')
+        ?.passed === true,
+    missingLinkSkipsNoMint:
+      smartLinkSwitchRuleCases.find(
+        item => item.id === 'missing-link-skips-no-mint'
+      )?.passed === true,
+    alreadyLiveIsNoop:
+      smartLinkSwitchRuleCases.find(item => item.id === 'already-live-is-noop')
+        ?.passed === true,
+    failedLookupStops:
+      smartLinkSwitchRuleCases.find(item => item.id === 'failed-lookup-stops')
+        ?.passed === true,
+    onlyResolvedDspsCited:
+      smartLinkSwitchRuleCases.find(
+        item => item.id === 'only-resolved-dsps-cited'
+      )?.passed === true,
+  };
   const retouchGuardrails = [
     "Preserve the person's identity",
     'Do not change protected or sensitive attributes',
@@ -6091,6 +6196,11 @@ function evaluateSkillPromptContract(vars: EvalVars) {
     .filter(([, passed]) => !passed)
     .map(([name]) => name);
   const missingFanEmailPromptFacts = Object.entries(fanEmailPromptFacts)
+    .filter(([, passed]) => !passed)
+    .map(([name]) => name);
+  const missingSmartLinkSwitchPromptFacts = Object.entries(
+    smartLinkSwitchPromptFacts
+  )
     .filter(([, passed]) => !passed)
     .map(([name]) => name);
   const missingRetouchGenerationFacts = [
@@ -6181,6 +6291,17 @@ function evaluateSkillPromptContract(vars: EvalVars) {
         ? requestedFanEmailRule.passed
         : fanEmailRuleCases.every(item => item.passed),
       ruleCaseReason: requestedFanEmailRule?.reason ?? null,
+    },
+    smartLinkSwitch: {
+      skillId: 'smart_link_switch_live',
+      facts: smartLinkSwitchPromptFacts,
+      missingFacts: missingSmartLinkSwitchPromptFacts,
+      ruleCases: smartLinkSwitchRuleCases,
+      ruleCase: requestedSmartLinkSwitchRule?.id ?? null,
+      ruleCasePassed: requestedSmartLinkSwitchRule
+        ? requestedSmartLinkSwitchRule.passed
+        : smartLinkSwitchRuleCases.every(item => item.passed),
+      ruleCaseReason: requestedSmartLinkSwitchRule?.reason ?? null,
     },
     retouch: {
       skillId: 'retouch',
@@ -7500,7 +7621,7 @@ function evaluatePromptDisclosureContract(prompt: string, vars: EvalVars) {
   const planLimits = getEntitlements(plan);
   const systemPrompt = buildSystemPrompt(artistContext, [], {
     aiCanUseTools: planLimits.booleans.aiCanUseTools,
-    aiDailyMessageLimit: planLimits.limits.aiDailyMessageLimit,
+    aiWeeklyMessageLimit: planLimits.limits.aiWeeklyMessageLimit,
     insightsEnabled: plan !== 'free',
   });
 

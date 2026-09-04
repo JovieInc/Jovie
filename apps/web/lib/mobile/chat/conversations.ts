@@ -5,6 +5,8 @@ import {
   listCreatorConversations,
 } from '@/lib/chat/conversation-queries';
 import { embedMobileMerchArtifactsInContent } from '@/lib/mobile/chat/tool-artifacts';
+import { isOvConversationTitle } from '@/lib/mobile/workspace';
+import type { AppShellMode } from '@/types/app-shell';
 
 export interface MobileConversationSummary {
   readonly id: string;
@@ -29,8 +31,19 @@ export interface MobileConversationMessage {
 export async function listMobileConversations(input: {
   readonly creatorProfileId: string;
   readonly limit?: number;
+  readonly workspace?: AppShellMode;
 }): Promise<readonly MobileConversationSummary[]> {
-  return listCreatorConversations(input);
+  const conversations = await listCreatorConversations({
+    creatorProfileId: input.creatorProfileId,
+    limit: 50,
+  });
+  const ov = input.workspace === 'ov';
+  return conversations
+    .filter(conversation => {
+      const isOv = isOvConversationTitle(conversation.title);
+      return ov ? isOv : !isOv;
+    })
+    .slice(0, input.limit ?? 20);
 }
 
 export async function getMobileConversationDetail(input: {

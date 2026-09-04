@@ -41,20 +41,20 @@ export const FORM_LAYOUT = {
  * Keeps public flows aligned with the app-shell card and pill system.
  */
 export const AUTH_SURFACE = {
-  card: 'rounded-xl border border-(--linear-app-frame-seam) bg-[color-mix(in_oklab,var(--linear-app-content-surface)_96%,var(--linear-bg-surface-0))] shadow-none',
+  card: 'rounded-xl border border-(--app-shell-frame-seam) bg-[color-mix(in_oklab,var(--app-shell-content-surface)_96%,var(--linear-bg-surface-0))] shadow-none',
   fieldShell:
-    'flex w-full items-center gap-3 rounded-full border border-(--linear-app-frame-seam) bg-[color-mix(in_oklab,var(--linear-app-content-surface)_94%,var(--linear-bg-surface-0))] px-4 py-3 shadow-[inset_0_1px_0_rgba(255,255,255,0.03)] transition-[background-color,border-color,box-shadow] duration-subtle hover:border-default hover:bg-surface-0 focus-within:border-(--linear-border-focus) focus-within:bg-surface-0 focus-within:ring-2 focus-within:ring-(--linear-border-focus)/16',
+    'flex w-full items-center gap-3 rounded-full border border-(--app-shell-frame-seam) bg-[color-mix(in_oklab,var(--app-shell-content-surface)_94%,var(--linear-bg-surface-0))] px-4 py-3 shadow-[inset_0_1px_0_rgba(255,255,255,0.03)] transition-[background-color,border-color,box-shadow] duration-subtle hover:border-default hover:bg-surface-0 focus-within:border-(--linear-border-focus) focus-within:bg-surface-0 focus-within:ring-2 focus-within:ring-(--linear-border-focus)/16',
   fieldShellError: 'border-destructive/60',
   fieldInput:
     'min-w-0 flex-1 bg-transparent text-[14px] leading-5 text-primary-token placeholder:text-tertiary-token focus-visible:outline-none',
   pillOption:
-    'inline-flex min-h-8 items-center justify-center rounded-full border border-(--linear-app-frame-seam) bg-transparent px-3 text-[12px] font-[510] tracking-[-0.012em] text-secondary-token transition-[background-color,border-color,color,box-shadow] duration-subtle hover:border-default hover:bg-surface-1 hover:text-primary-token focus-visible:outline-none focus-visible:border-(--linear-border-focus) focus-visible:ring-2 focus-visible:ring-(--linear-border-focus)/16',
+    'inline-flex min-h-8 items-center justify-center rounded-full border border-(--app-shell-frame-seam) bg-transparent px-3 text-[12px] font-[510] tracking-[-0.012em] text-secondary-token transition-[background-color,border-color,color,box-shadow] duration-subtle hover:border-default hover:bg-surface-1 hover:text-primary-token focus-visible:outline-none focus-visible:border-(--linear-border-focus) focus-visible:ring-2 focus-visible:ring-(--linear-border-focus)/16',
   pillOptionActive:
     'border-default bg-surface-1 text-primary-token shadow-[0_1px_1px_rgba(0,0,0,0.04)]',
   inlineAction:
-    'inline-flex h-8 items-center justify-center gap-1.5 rounded-full border border-(--linear-app-frame-seam) bg-transparent px-3 text-[12px] font-[510] tracking-[-0.012em] text-secondary-token transition-[background-color,border-color,color,box-shadow] duration-subtle hover:border-default hover:bg-surface-1 hover:text-primary-token focus-visible:outline-none focus-visible:border-(--linear-border-focus) focus-visible:ring-2 focus-visible:ring-(--linear-border-focus)/16 disabled:pointer-events-none disabled:opacity-50',
+    'inline-flex h-8 items-center justify-center gap-1.5 rounded-full border border-(--app-shell-frame-seam) bg-transparent px-3 text-[12px] font-[510] tracking-[-0.012em] text-secondary-token transition-[background-color,border-color,color,box-shadow] duration-subtle hover:border-default hover:bg-surface-1 hover:text-primary-token focus-visible:outline-none focus-visible:border-(--linear-border-focus) focus-visible:ring-2 focus-visible:ring-(--linear-border-focus)/16 disabled:pointer-events-none disabled:opacity-50',
   subtlePill:
-    'inline-flex items-center gap-1.5 rounded-full border border-(--linear-app-frame-seam) bg-surface-1/80 px-2.5 py-1 text-[11px] font-[510] text-secondary-token',
+    'inline-flex items-center gap-1.5 rounded-full border border-(--app-shell-frame-seam) bg-surface-1/80 px-2.5 py-1 text-[11px] font-[510] text-secondary-token',
 } as const;
 
 /**
@@ -71,15 +71,18 @@ export const AUTH_CLASSES = {
   oauthButtonMobile:
     'touch-manipulation select-none [-webkit-tap-highlight-color:transparent] transition-[opacity] duration-subtle active:opacity-[0.92]',
   /**
-   * Full-width auth CTA overlay for the canonical `@jovie/ui` Button.
-   * Preserves the legacy AuthButton geometry (full-width pill at
-   * `--linear-button-height-md` with a 40px floor and 16px padding), mobile
-   * touch behavior, and the System B non-positional press feedback. Pair
-   * with the Button `static` prop so press feedback stays opacity-based,
-   * never transform.
+   * Shared full-width CTA overlay for canonical `@jovie/ui` Button callers.
+   * Leave Button size ownership with the caller so dashboard onboarding does
+   * not inherit splash-B auth entrypoint geometry.
    */
   authCta:
-    'w-full h-(--linear-button-height-md) min-h-10 px-4 select-none touch-manipulation [-webkit-tap-highlight-color:transparent] active:opacity-90 disabled:opacity-70',
+    'w-full px-4 text-sm font-[510] select-none touch-manipulation [-webkit-tap-highlight-color:transparent] active:opacity-90 disabled:opacity-70',
+  /**
+   * Auth entrypoint CTA geometry: 32px visible pill inside Button's 44px
+   * invisible tap layer.
+   */
+  authEntryCta:
+    'w-full h-8 min-h-8 px-4 text-sm font-[510] select-none touch-manipulation [-webkit-tap-highlight-color:transparent] active:opacity-90 disabled:opacity-70',
 } as const;
 
 /**

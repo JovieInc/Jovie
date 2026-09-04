@@ -1,4 +1,4 @@
-/** Repository-aware ownership inventory for JOV-5278 slice 1. */
+/** Repository-aware ownership inventory for JOV-5278 slice 1. JOV-INV-007. */
 
 import { readFileSync } from 'node:fs';
 
@@ -15,6 +15,11 @@ export const ADMISSION_TARGET_FIELDS = Object.freeze([
 ]);
 export const JOVIE_EXECUTION_REPO = 'JovieInc/Jovie';
 export const LOGYOURBODY_EXECUTION_REPO = 'JovieInc/LogYourBody';
+const CONTROL_PLANE_PREFIXES = [
+  'canon/',
+  'scripts/backlog-orchestrator/',
+  'scripts/hermes/',
+];
 
 const WORK_SECTION_NAMES = [
   'Proposed fix',
@@ -91,6 +96,64 @@ function artifactMatches(prefix, path) {
   );
 }
 
+function basename(path) {
+  return (
+    String(path || '')
+      .split('/')
+      .filter(Boolean)
+      .at(-1) || ''
+  );
+}
+
+export function laneForArtifact(artifact) {
+  const normalized = String(artifact || '')
+    .trim()
+    .replace(/\/$/, '');
+  const workflow = basename(normalized).toLowerCase();
+  if (
+    normalized.startsWith('apps/ios/') ||
+    /^ios[-_.]/.test(workflow) ||
+    /\b(?:xcode|fastlane|testflight|app-store)\b/.test(workflow)
+  )
+    return 'ios';
+  if (
+    normalized.startsWith('apps/web/') ||
+    normalized.startsWith('apps/docs/') ||
+    /^web[-_.]/.test(workflow) ||
+    /^next[-_.]/.test(workflow)
+  )
+    return 'web';
+  if (
+    normalized.startsWith('scripts/backlog-orchestrator/') ||
+    normalized.startsWith('scripts/hermes/') ||
+    normalized.startsWith('scripts/lib/ci-') ||
+    normalized.startsWith('scripts/lib/merge-queue') ||
+    normalized.startsWith('scripts/lib/merge-group') ||
+    /^fleet[-_.]/.test(workflow) ||
+    /^merge-queue[-_.]/.test(workflow) ||
+    /^delivery-control[-_.]/.test(workflow)
+  )
+    return 'symphony-control-plane';
+  if (
+    normalized.startsWith('docs/') ||
+    normalized.startsWith('canon/') ||
+    normalized.endsWith('.md') ||
+    normalized.endsWith('.mdx') ||
+    normalized.endsWith('.txt')
+  )
+    return 'docs';
+  return null;
+}
+
+export function resourceForArtifact(artifact) {
+  const normalized = String(artifact || '')
+    .trim()
+    .replace(/\/$/, '');
+  if (!normalized.startsWith('.github/workflows/')) return null;
+  const name = basename(normalized).replace(/\.(?:ya?ml)$/i, '');
+  return name ? `github-actions:${name}` : null;
+}
+
 function longestMatch(paths, prefixes) {
   let winner = null;
   for (const path of paths) {
@@ -118,7 +181,55 @@ export function admissionTargetPacket(value) {
     verification_authority: String(value.verification_authority || '').trim(),
   };
   if (ADMISSION_TARGET_FIELDS.some(field => !packet[field])) return null;
-  return packet;
+  return {
+    ...packet,
+    collision_domains: collisionDomainsForTarget(packet),
+  };
+}
+
+export function collisionDomainsForTarget(target) {
+  const repo = String(target?.target_repo || '').trim();
+  const artifact = String(target?.artifact || '')
+    .trim()
+    .replace(/\/$/, '');
+  if (!repo || !artifact) return [];
+  const segments = artifact.split('/').filter(Boolean);
+  const surface =
+    segments.length > 1 ? segments.slice(0, 2).join('/') : artifact;
+  const domains = [`artifact:${repo}:${surface}`];
+  const lane = laneForArtifact(artifact);
+  if (lane) domains.push(`lane:${repo}:${lane}`);
+  const resource = resourceForArtifact(artifact);
+  if (resource) domains.push(`resource:${repo}:${resource}`);
+  if (
+    CONTROL_PLANE_PREFIXES.some(prefix => artifactMatches(prefix, artifact))
+  ) {
+    domains.push(`risk:${repo}:control-plane`);
+  }
+  if (/\b(?:drizzle\/migrations|migration|schema)\b/i.test(artifact)) {
+    domains.push(`risk:${repo}:database-schema`);
+  }
+  return domains.sort();
+}
+
+export function collisionDomainsForPaths(
+  paths,
+  { repo = JOVIE_EXECUTION_REPO } = {}
+) {
+  return uniqueStrings(
+    (Array.isArray(paths) ? paths : []).flatMap(path =>
+      collisionDomainsForTarget({ target_repo: repo, artifact: path })
+    )
+  ).sort();
+}
+
+export function admissionTargetsCollide(left, right) {
+  const leftDomains = new Set(
+    left?.collision_domains || collisionDomainsForTarget(left)
+  );
+  return (right?.collision_domains || collisionDomainsForTarget(right)).some(
+    domain => leftDomains.has(domain)
+  );
 }
 
 export function sameAdmissionTarget(left, right) {
@@ -245,12 +356,12 @@ function packetForSystem(system, artifact) {
       (system.adapter_artifacts || []).some(prefix =>
         artifactMatches(prefix, artifact)
       ));
-  return {
+  return admissionTargetPacket({
     target_system: system.target_system,
     target_repo: jovieExecutable ? system.current_repo : system.intended_repo,
     artifact: artifact || system.default_artifact,
     verification_authority: system.verification_authority,
-  };
+  });
 }
 
 function canAdmitToJovie(system, artifact) {

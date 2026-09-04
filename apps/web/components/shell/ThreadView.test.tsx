@@ -85,6 +85,7 @@ describe('ThreadView shell contract', () => {
     );
 
     expect(source).toContain('px-app-header');
+    expect(source).toContain('line-clamp-2');
     expect(source).toContain('max-w-[44rem]');
     expect(source).toContain('env(safe-area-inset-bottom)');
     expect(source).toContain('shadow-popover');
@@ -92,5 +93,12 @@ describe('ThreadView shell contract', () => {
     expect(source).not.toContain('px-8');
     expect(source).not.toContain('focus-visible:ring-primary-token');
     expect(source).not.toContain('transition-all');
+  });
+});
+
+describe('JOV-5466 token retire', () => {
+  it('does not keep retired --linear-app-* tokens', () => {
+    const source = readFileSync(resolve(__dirname, './ThreadView.tsx'), 'utf8');
+    expect(source).not.toMatch(/--linear-app-/);
   });
 });

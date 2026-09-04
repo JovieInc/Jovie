@@ -143,6 +143,13 @@ headings) stays Inter. This deviation is approved as of 2026-04-28 — the
 hero needed a wider, heavier display character to match the Frame.io-inspired
 poster composition; Inter at 80px reads narrow and tech-y in this context.
 
+**Marketing H1 visual-line contract:** public marketing and homepage H1s paint
+at most two visual lines. The complete authored text stays in the DOM and
+accessibility tree; this is a visual constraint, not a shortened accessible
+name. Do not lock superseded Quiet-hero copy (`Own your story…`) or competing
+Get started / Drop Music CTAs onto `/` — name search `Find me` is the certified
+primary conversion (#17055 / JOV-5864).
+
 ### Font Weights
 
 | Name | Value | Usage |
@@ -369,9 +376,11 @@ To fix a violation:
 
 ## Color System
 
-> **Canonical source:** Token values in the tables below are mirrored from
-> `apps/web/styles/design-system.css` (the single source of truth). When tokens
-> change in CSS, update these tables in the same PR — do not invent values here.
+> **Canonical source:** Authored OKLCH values live in
+> `apps/web/design/oklch-palette.json` (JOV-5388). Hex in CSS is the sRGB
+> projection of those tokens. `apps/web/styles/design-system.css` remains the
+> live emitter. When a locked color changes, update the registry, CSS
+> projection, and these tables in the same PR — do not invent values here.
 
 ### Theme Generation
 
@@ -440,8 +449,8 @@ remap product tokens to prior anchors without a second theme provider).
 | Pulse (pink) | `#FF48D2` | `rgba(255,72,210,.12)` | Launch or creative-status state only |
 | Aqua (cyan) | `#24F6D2` | `rgba(36,246,210,.10)` | System signal, sync, API/tool state (`--color-info`) |
 | Mint (green) | `#39E58C` | `rgba(57,229,140,.12)` | Success |
-| Gold | `#FFC857` | `rgba(255,200,87,.12)` | Warning |
-| Flare (coral) | `#FF677D` | `rgba(255,103,125,.12)` | Danger / error |
+| Orange | `#FFC857` | `rgba(255,200,87,.12)` | Warning |
+| Red | `#FF677D` | `rgba(255,103,125,.12)` | Danger / error |
 
 CTAs remain high-contrast light pills (not saturated Ion fills) per the
 neutral-CTA rule. Ion carries focus, links, selection, and active navigation.
@@ -470,6 +479,52 @@ Specimen: Storybook `Design System/Noir Ion Specimen`.
 | Login button bg | `rgba(255,255,255,0.1)` | Subtle glass |
 | Header bg | `transparent` | Blur backdrop |
 
+### Generated Brand Imagery - Scene Palette v1
+
+Founder-approved 2026-08-21: **the camera must find the palette**. For
+Jovie-owned, intentionally art-directed or generated brand imagery, every
+high-salience controllable color must be chosen as a physically plausible
+Jovie scene hue or low-chroma neutral before capture/generation. Human biology
+and identity-bearing objects keep truthful real-world color.
+
+This does **not** change production UI hue anchors. The UI keeps the current
+Noir Ion anchors; generated scene work uses softer scene references so color
+can exist as light, material, wardrobe, set dressing, and atmosphere.
+
+| Role | Current UI anchor | Scene reference | Hue corridor |
+|------|-------------------|-----------------|--------------|
+| Ion | `oklch(71.95% 0.1626 240.25)` / `#11AFFF` | `oklch(72% 0.14 240)` / `#3FAFF3` | 220-258 |
+| Ultra | `oklch(69.82% 0.1792 295.80)` / `#A982FF` | `oklch(70% 0.15 296)` / `#A789F0` | 276-314 |
+| Pulse | `oklch(70.73% 0.2552 339.69)` / `#FF48D2` | `oklch(71% 0.19 340)` / `#EB6AC6` | 322-358 |
+
+Operational source: `apps/web/data/marketing/imageColorPolicy.ts`
+(`jovie-image-color-policy/v1`). That policy owns Scene Palette v1, the
+neutral rule, protected classes, reflection/source consistency, subject
+separation, skin/material protection, failure actions, and the post-merge
+30-image validation tier.
+
+Rules:
+- Controllable wardrobe, props, furniture, paint, locations, signage,
+  practical lights, vehicles, and set dressing use a scene hue or low-chroma
+  neutral before generation/capture.
+- Natural, biological, semantic, safety, cultural, trademark, creator-owned,
+  and identity-bearing colors stay truthful.
+- A conflicting protected object is reframed, replaced, removed, reduced in
+  salience, or rejected. It is never falsified with recoloring.
+- Emitted light, spill, haze, glass, chrome, puddles, and reflections must
+  agree with one physically plausible source.
+- Subject/background separation is evaluated through OKLCH lightness, chroma,
+  hue, wardrobe, edge light, focus, and composition. No material is banned by
+  default.
+- Skin keeps believable hue, texture, pores, and local specular response.
+  Prevent oily or clipped highlights through lighting, exposure, material,
+  makeup, and restrained local correction.
+- Grading is restrained finishing. It cannot fake set design or rewrite
+  material response.
+- Saturated green, yellow-green, orange, and red are not decorative
+  controllable scene colors. Protected real-world occurrences remain truthful
+  and visually subordinate, or the composition changes.
+
 ### Semantic feature colors (never decorative)
 
 These colors identify named product states or data categories. They are never
@@ -483,7 +538,7 @@ Ion (JOV-4635).
 | `--accent-beauty` | `#d61a7f` | `#FF48D2` (Pulse) | Beauty/Design |
 | `--accent-links` | `#0f9b8e` | `#24F6D2` (Aqua) | Smart Links / system |
 | `--accent-speed` | `#2f9e44` | `#39E58C` (Mint) | Speed / success |
-| `--accent-pro` | `#ff9800` | `#FFC857` (Gold) | Pro Tools / warning |
+| `--accent-pro` | `#ff9800` | `#FFC857` (Orange) | Pro Tools / warning |
 
 **Usage rules:**
 - Assign an accent only to a named semantic state or data category
@@ -511,11 +566,18 @@ Pure neutral HSL — no hue tint. Used across both systems.
 
 ### Semantic Status Colors
 
-| Token | Value | Usage |
-|-------|-------|-------|
-| Success | `oklch(72% 0.2 145)` | Green — confirmations |
-| Warning | `oklch(82% 0.17 85)` | Amber — cautions |
-| Error | `oklch(65% 0.2 25)` | Red — errors, destructive |
+Mint = success, Orange = warning, Red = danger. Authored OKLCH lives in
+`apps/web/design/oklch-palette.json`; hex is the sRGB lock. Dark accents use
+hue-specific energy bands (no equal-lightness target, no pastel chroma cap).
+Derived colors are equal-step interpolation or symmetric focals only; gradients
+must declare those endpoints. Elevation is `surface-0`…`surface-3` (dark
+recessed→raised; light peaks at surface-1). Guard: `pnpm design:oklch-palette:check`.
+
+| Token | Light OKLCH | Dark OKLCH | Usage |
+|-------|-------------|------------|-------|
+| Success (Mint) | `oklch(61.72% 0.1624 146.43)` | `oklch(81.65% 0.1857 155.04)` | Confirmations |
+| Warning (Orange) | `oklch(77.03% 0.1741 64.05)` | `oklch(86.15% 0.1423 82.66)` | Cautions |
+| Danger (Red) | `oklch(61.14% 0.2422 24.90)` | `oklch(71.03% 0.1852 14.41)` | Errors, destructive |
 
 ---
 
@@ -683,6 +745,14 @@ These are surface-side aliases of `--ds-motion-*` tokens (DS_FOUNDATION_V1).
 
 ### Interaction feedback
 
+- Frequent actions normally finish end-to-end within two deliberate
+  activations, and in one when their input is already complete. A capture may
+  use one activation to start and one to finish and submit. A third step is an
+  exception, never an unexamined default: name review, safety, ambiguity,
+  irreversible impact, or recovery, make that reason visible or documented,
+  and encode it in the surface's executable interaction contract or focused
+  behavior test. Editing after voice capture is a recovery path; successful
+  capture submits on its finishing activation.
 - Press feedback uses the shared `--scale-press` token. The canonical value is
   `0.98`: enough tactile response to register without visible shrink or jump.
 - Press compression is opt-in. Use it only when an action has no immediate
@@ -809,6 +879,8 @@ Destructive actions use `destructive` on any variant. Examples: primary destruct
 
 Marketing text pills use a 32px visible control with a 44px minimum hit target.
 Do not change the generic app scale to reproduce that marketing geometry.
+CTA labels use medium (`--font-weight-medium` / 510). Do not keep them at
+semibold (~590) and do not drop medium surfaces to book/400.
 
 ### Sidebar (App Shell)
 
@@ -1036,8 +1108,8 @@ mark intentional marketing sentence-case headlines with
 
 | Surface | Routes / entrypoints | Layout / shell | Design system |
 |---------|---------------------|----------------|---------------|
-| Homepage / chat-intake | `(home)/*`, `components/homepage/*` | `(home)/layout.tsx` with `MarketingHeader` (minimal) + `MarketingFooter` | System B |
-| Secondary marketing | `(marketing)/blog/*`, `changelog/*`, `support/*`, `pricing/*`, `launch/*`, `ai/*`, `engagement-engine/*`, `investors/*`, `tips/*` | `(marketing)/layout.tsx` + page-specific nested layouts | Unified system, editorial language |
+| Homepage / chat-intake | `(home)/*`, `components/homepage/*` | `(home)/layout.tsx` with `PublicPageShell` | System B |
+| Secondary marketing | `(marketing)/blog/*`, `changelog/*`, `support/*`, `pricing/*`, `launch/*`, `ai/*`, `engagement-engine/*`, `investors/*`, `tips/*` | `(marketing)/layout.tsx` + page-specific nested layouts. `/ai` and `/investors` are live marketing pages excluded from the canonical review set. | Unified system, editorial language |
 | Legal / informational | `(dynamic)/legal/*` | Legal layout | Unified system, editorial language |
 | Product app shell | `app/(shell)/*` | Authenticated app shell | System B |
 | Auth funnel | `(auth)/*` | `AuthLayout` | System B |
@@ -1065,7 +1137,10 @@ mark intentional marketing sentence-case headlines with
 
 | File | Responsibility |
 |------|----------------|
-| `apps/web/styles/design-system.css` | **Canonical token source** — all width, surface, and color values in this doc mirror CSS here |
+| `apps/web/design/oklch-palette.json` | **Authored OKLCH palette** — locked light/dark semantics, elevation, and hex projections (JOV-5388) |
+| `apps/web/design/tokens.json` | **Machine-readable base-token source** — compiler-owned brand, gray, and radius values plus explicit migration divergences |
+| `apps/web/styles/generated/design-tokens.css` | **Generated base-token emitter** — CSS projection of `design/tokens.json`; never hand-edit |
+| `apps/web/styles/design-system.css` | **Live semantic emitter** — imports generated base tokens and projects unmigrated semantic/color properties; color hex must match the OKLCH registry |
 | `apps/web/styles/linear-tokens.css` | Marketing-specific Linear-extracted tokens |
 | `apps/web/styles/theme.css` | Feature accents & animations only |
 | `apps/web/app/globals.css` | Tailwind registration + shared utilities |
@@ -1079,7 +1154,7 @@ mark intentional marketing sentence-case headlines with
 | `apps/web/components/organisms/table/molecules/PageToolbar.tsx` | Canonical workspace toolbar and action hierarchy |
 | `apps/web/components/homepage/*` | Homepage chat-intake implementation (System B) |
 | `apps/web/components/features/home/*` | Legacy marketing-home components (still used by `(marketing)/new/*`) |
-| `apps/web/app/(home)/layout.tsx` | Homepage shell — `MarketingHeader` (minimal) + `MarketingFooter` |
+| `apps/web/app/(home)/layout.tsx` | Homepage shell — `PublicPageShell` |
 
 ---
 
@@ -1110,3 +1185,4 @@ mark intentional marketing sentence-case headlines with
 | 2026-04-11 | Ban gold colors | Gold signals prestige-seeking. Not appropriate for Jovie's DJ audience. |
 | 2026-06-18 | **Unify on one design system, two languages.** Retire System A; conform whole app to System B tokens. | Founder-directed (supersedes the 2026-04-22 "defer 3 months" note). Target = one token foundation, one palette, one core typeface (Inter), expressed as a compact product language + an editorial marketing language. Aligns with gbrain "design system review" canon ("not two design systems — one system, two languages"). Editorial layouts are preserved; surfaces are reskinned onto System B tokens, each with a `*-system-b-style-guard` test + a global shrink-only ratchet. |
 | 2026-06-18 | Retire DM Sans; Inter is the sole body/UI face; Satoshi kept for display only | One core typeface for the unified system. Satoshi remains the single approved display exception (hero / large editorial headings), generalizing the 2026-04-28 homepage-hero exception. DM Sans `next/font` load removed from `app/layout.tsx`; `--font-body` and `--marketing-font-body` repoint to Inter. |
+| 2026-09-03 | Public marketing H1s paint at most two visual lines | Layout contract only. Complete authored text remains accessible. Does not land superseded Quiet-hero copy or competing homepage CTAs. |

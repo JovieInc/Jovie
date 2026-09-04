@@ -1,3 +1,4 @@
+// @coverage-via apps/web/tests/unit/auth/AuthProviderButtons.test.tsx
 import type { PrimaryAuthOAuthProvider } from '@/lib/auth/oauth-providers';
 import { getAuthOAuthProviderLabel } from '@/lib/auth/oauth-providers';
 import { cn } from '@/lib/utils';
@@ -40,12 +41,13 @@ export function AuthProviderButtonSlot({
       data-auth-provider-pending={pending ? 'true' : undefined}
       onClick={onClick}
       className={cn(
-        'flex h-(--linear-button-height-md) min-h-(--linear-button-height-md) w-full items-center justify-center gap-(--linear-gap-buttons) rounded-full border px-(--linear-space-4) text-caption font-caption tracking-normal',
+        'relative flex h-8 min-h-8 w-full items-center justify-center gap-(--space-2) rounded-full border px-(--space-4) text-sm font-[510] tracking-normal',
+        'before:absolute before:left-1/2 before:top-1/2 before:h-11 before:min-w-11 before:w-full before:-translate-x-1/2 before:-translate-y-1/2 before:content-[""]',
         'transition-[background-color,border-color,color,box-shadow,opacity] duration-subtle ease-out',
         'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-(--linear-border-focus)/40',
         isDisabled && 'cursor-wait opacity-75',
         provider === 'google'
-          ? 'border-(--linear-btn-primary-border) bg-(--linear-btn-primary-bg) text-(--linear-btn-primary-fg) shadow-(--linear-shadow-button) hover:bg-(--linear-btn-primary-hover)'
+          ? 'border-(--linear-btn-primary-border) bg-(--linear-btn-primary-bg) text-(--linear-btn-primary-fg) shadow-button hover:bg-(--linear-btn-primary-hover)'
           : 'border-subtle bg-surface-1 text-primary-token hover:border-default hover:bg-surface-0'
       )}
     >
@@ -61,7 +63,7 @@ export function AuthProviderButtonSlots({
   return (
     <fieldset
       data-auth-provider-slots
-      className='grid grid-cols-1 gap-1.5'
+      className='grid grid-cols-1 gap-3'
       aria-busy='true'
     >
       <legend className='sr-only'>Loading social sign-in options</legend>

@@ -1,15 +1,18 @@
 #!/usr/bin/env bash
 # Auto-Ready Agent Drafts
 #
-# Finds agent-owned draft PRs that are MERGEABLE with zero failing terminal
-# checks and flips them to "ready for review". The merge-queue autoenroll
-# workflow then picks them up.
+# Recovers only author-proofed writer promotion drift. Branch-name prefixes,
+# trusted bot authors, and FX provenance are discovery noise, never promotion
+# authorization. The only valid recovery pairs `ready` and native auto-merge
+# intent in one bounded action after a `jovie-writer-pr-proof/v1` receipt is
+# present for the exact head. Existing source checks may still be pending;
+# GitHub keeps the merge blocked until they pass.
 #
-# Opt out per-PR with any of: needs-human, hold, gated, queue-deferred, fast.
+# Opt out per-PR with taste/security/hold labels, controlled-proof/canary
+# markers, or any of: needs-human, hold, gated, queue-deferred, fast.
 #
 # Env:
 #   DRY_RUN=1                 classify and print only; flip no PRs
-#   ATTEMPT_COOLDOWN_HOURS    min hours between flip attempts per PR (default 6)
 set -euo pipefail
 
 # shellcheck source=./scripts/lib/gh-retry.sh
@@ -17,22 +20,81 @@ source "$(dirname "${BASH_SOURCE[0]}")/lib/gh-retry.sh"
 
 REPO="${REPO:-JovieInc/Jovie}"
 DRY_RUN="${DRY_RUN:-0}"
-# Idempotency guard (#13342): one marker comment per PR, edited in place, and a
-# hard cap of one flip attempt per PR per ATTEMPT_COOLDOWN_HOURS. Without this,
-# a PR the token cannot actually flip (see #13122) gets an identical
-# "Enrolling in merge queue" comment every cron cycle — 221 in 12h observed.
+SCRIPT_DIR="$(dirname "${BASH_SOURCE[0]}")"
+PROVENANCE_LIB="$SCRIPT_DIR/lib/auto-ready-provenance.mjs"
+# Idempotency guard (#13342): one marker comment per PR, edited in place.
+# Per-pass mutation is bounded below; there is no workflow sleep or cooldown.
 READY_MARKER="auto-ready"
-ATTEMPT_COOLDOWN_HOURS="${ATTEMPT_COOLDOWN_HOURS:-6}"
-HOLD_LABEL_RE='^(needs-human|hold|gated|queue-deferred|fast)$'
-now_epoch="$(date -u +%s)"
+HOLD_LABEL_RE="$(node "$PROVENANCE_LIB" hold-re)"
 
-mark_ready() {  # mark_ready <num> — returns non-zero when the flip call failed
-  [[ "$DRY_RUN" == "1" ]] && { echo "    [dry-run] would mark #$1 ready"; return 0; }
-  if gh_retry pr ready "$1" -R "$REPO" >/dev/null 2>&1; then
-    echo "    ✓ marked #$1 ready"
+# Mutation budget: the paired ready + native auto-merge request runs at most
+# once per PR per controller pass. If auto-merge cannot be enabled after the
+# ready transition, restore draft state so ready-without-auto-merge is never a
+# controller-produced terminal state. A later pass also repairs the only
+# interruption window: trusted ready PRs with neither auto-merge nor queue state.
+promote_with_auto_merge() {  # promote_with_auto_merge <num> <expected-head>
+  local n="$1"
+  local expected_head="$2"
+  if [[ ! "$expected_head" =~ ^[0-9a-f]{40}$ ]]; then
+    echo "    !! refusing promotion without an exact head SHA"
+    return 1
+  fi
+  if [[ "${READY_ATTEMPTED_FOR:-}" == "$n" ]]; then
+    echo "    !! refusing a second paired promotion for #$n in this pass"
+    return 1
+  fi
+  READY_ATTEMPTED_FOR="$n"
+  if [[ "$DRY_RUN" == "1" ]]; then
+    echo "    [dry-run] would mark #$n ready and enable native auto-merge"
     return 0
   fi
-  echo "    !! failed to mark #$1 ready"
+
+  if ! gh_retry pr ready "$n" -R "$REPO" >/dev/null 2>&1; then
+    echo "    !! failed to mark #$n ready; auto-merge was not requested"
+    return 1
+  fi
+  if gh_retry pr merge "$n" -R "$REPO" --auto --squash \
+    --match-head-commit "$expected_head" >/dev/null 2>&1; then
+    echo "    ✓ marked #$n ready and enabled native auto-merge"
+    return 0
+  fi
+
+  echo "    !! auto-merge request failed after ready; restoring #$n to draft"
+  if ! undo_ready "$n"; then
+    echo "    !! fail-closed compensation failed for #$n"
+    return 2
+  fi
+  return 1
+}
+
+recover_ready_without_auto_merge() {  # recover_ready_without_auto_merge <num> <expected-head>
+  local n="$1"
+  local expected_head="$2"
+  if [[ ! "$expected_head" =~ ^[0-9a-f]{40}$ ]]; then
+    echo "    !! refusing recovery without an exact head SHA"
+    return 1
+  fi
+  if [[ "${READY_ATTEMPTED_FOR:-}" == "$n" ]]; then
+    echo "    !! refusing a second paired recovery for #$n in this pass"
+    return 1
+  fi
+  READY_ATTEMPTED_FOR="$n"
+  if [[ "$DRY_RUN" == "1" ]]; then
+    echo "    [dry-run] would recover ready #$n by enabling native auto-merge"
+    return 0
+  fi
+
+  if gh_retry pr merge "$n" -R "$REPO" --auto --squash \
+    --match-head-commit "$expected_head" >/dev/null 2>&1; then
+    echo "    ✓ recovered ready #$n by enabling native auto-merge"
+    return 0
+  fi
+
+  echo "    !! ready #$n still lacks auto-merge; restoring it to draft"
+  if ! undo_ready "$n"; then
+    echo "    !! fail-closed recovery failed for #$n"
+    return 2
+  fi
   return 1
 }
 
@@ -43,42 +105,38 @@ upsert_status_comment() {  # upsert_status_comment <num> <body>
     && echo "    ✓ upserted status comment on #$1" || echo "    !! failed to upsert status comment on #$1"
 }
 
-# Hours since the last auto-ready attempt marker comment on this PR. Empty
-# output means "never attempted" (treated as cooldown-elapsed).
-last_attempt_age_hours() {  # last_attempt_age_hours <num>
-  local n="$1"
-  local updated_at
-  updated_at="$(gh_retry api "repos/${REPO}/issues/${n}/comments" --paginate \
-    --jq "[.[] | select(.body | contains(\"<!-- bot-comment:${READY_MARKER} -->\")) | .updated_at] | last" \
-    2>/dev/null | grep -E '^[0-9]{4}-' | tail -n1 || true)"
-  [[ -z "$updated_at" || "$updated_at" == "null" ]] && { echo ""; return 0; }
-  local updated_epoch
-  updated_epoch="$(date -u -d "$updated_at" +%s 2>/dev/null \
-    || python3 -c "import datetime,sys; print(int(datetime.datetime.strptime(sys.argv[1], '%Y-%m-%dT%H:%M:%SZ').replace(tzinfo=datetime.timezone.utc).timestamp()))" "$updated_at")"
-  echo $(( (now_epoch - updated_epoch) / 3600 ))
-}
-
 # Read mutation-critical fields in one API snapshot. Discovery is never
 # authorization: every promotion is pinned to this exact head and live labels.
 read_state() {  # read_state <num>
-  gh_retry pr view "$1" -R "$REPO" \
-    --json isDraft,headRefOid,headRefName,labels,mergeable,state \
-    --jq '{draft: .isDraft, head: .headRefOid, branch: .headRefName, labels: [.labels[].name], mergeable: .mergeable, state: .state}'
+  local n="$1"
+  local owner="${REPO%%/*}"
+  local name="${REPO#*/}"
+  [[ -n "$owner" && -n "$name" && "$owner" != "$name" ]]
+  gh_retry api graphql \
+    -f query='query($owner:String!,$name:String!,$number:Int!){repository(owner:$owner,name:$name){pullRequest(number:$number){isDraft headRefOid headRefName body state autoMergeRequest{enabledAt} isInMergeQueue mergeQueueEntry{id} labels(first:100){nodes{name}}}}}' \
+    -f owner="$owner" \
+    -f name="$name" \
+    -F number="$n" \
+    --jq '.data.repository.pullRequest | {draft: .isDraft, head: ((.headRefOid // "") | ascii_downcase), branch: .headRefName, body: (.body // ""), labels: [.labels.nodes[].name], state: .state, autoMerge: (.autoMergeRequest != null), queued: (.isInMergeQueue == true or .mergeQueueEntry != null)}'
 }
 
-state_is_eligible_draft() {  # state_is_eligible_draft <json> <expected-head> <expected-branch>
+state_needs_pairing() {  # state_needs_pairing <json> <expected-head> <expected-branch>
   jq -e --arg expected_head "$2" --arg expected_branch "$3" --arg hold_re "$HOLD_LABEL_RE" '
     .state == "OPEN"
-    and .draft == true
     and .head == $expected_head
     and .branch == $expected_branch
-    and .mergeable == "MERGEABLE"
     and ([.labels[] | select(test($hold_re))] | length == 0)
+    and (
+      (.draft == true and .autoMerge == false and .queued == false)
+      or
+      (.draft == false and .autoMerge == false and .queued == false)
+    )
   ' <<<"$1" >/dev/null
 }
 
 undo_ready() {  # undo_ready <num> — fail closed and verify the compensation
   local n="$1"
+  gh_retry pr merge "$n" -R "$REPO" --disable-auto >/dev/null 2>&1 || true
   if ! gh_retry pr ready "$n" -R "$REPO" --undo >/dev/null 2>&1; then
     echo "    !! compensating draft restore failed for #$n"
     return 1
@@ -89,7 +147,7 @@ undo_ready() {  # undo_ready <num> — fail closed and verify the compensation
     echo "    !! could not verify compensating draft restore for #$n"
     return 1
   fi
-  if jq -e '.state != "OPEN" or .draft == true' <<<"$restored" >/dev/null; then
+  if jq -e '.state != "OPEN" or (.draft == true and .autoMerge == false and .queued == false)' <<<"$restored" >/dev/null; then
     echo "    ✓ compensated: restored #$n to draft"
     return 0
   fi
@@ -98,132 +156,192 @@ undo_ready() {  # undo_ready <num> — fail closed and verify the compensation
   return 1
 }
 
-check_failures_for_pr() {  # check_failures_for_pr <num>
-  local n="$1"
-  local attempts="${GH_RETRY_ATTEMPTS:-5}"
-  local base_delay="${GH_RETRY_BASE_DELAY:-2}"
-  local max_delay="${GH_RETRY_MAX_DELAY:-30}"
-  local attempt=1
-  local raw_file out_file err_file err delay
-  raw_file="$(mktemp)"
-  out_file="$(mktemp)"
-  err_file="$(mktemp)"
-
-  while [[ "$attempt" -le "$attempts" ]]; do
-    : >"$raw_file"
-    : >"$out_file"
-    : >"$err_file"
-    if gh pr checks "$n" -R "$REPO" --json name,bucket,state,workflow,description,startedAt,completedAt >"$raw_file" 2>"$err_file"; then
-      if jq -e 'type == "array"' "$raw_file" >/dev/null 2>&1 \
-        && node "$(dirname "${BASH_SOURCE[0]}")/lib/pr-check-failures.mjs" \
-          --classify-auto-ready <"$raw_file" >"$out_file"; then
-        cat "$out_file"
-        rm -f "$raw_file" "$out_file" "$err_file"
-        return 0
-      fi
-    elif jq -e 'type == "array"' "$raw_file" >/dev/null 2>&1 \
-      && node "$(dirname "${BASH_SOURCE[0]}")/lib/pr-check-failures.mjs" \
-        --classify-auto-ready <"$raw_file" >"$out_file"; then
-      cat "$out_file"
-      rm -f "$raw_file" "$out_file" "$err_file"
-      return 0
-    fi
-
-    err="$(<"$err_file")"
-    if [[ "$attempt" -eq "$attempts" ]] || ! gh_retry_is_transient_error "$err"; then
-      [[ -n "$err" ]] && echo "  !! could not read required checks for #$n: $err" >&2
-      jq -cn --arg reason "required check status unavailable" '[$reason]'
-      rm -f "$raw_file" "$out_file" "$err_file"
-      return 0
-    fi
-
-    delay=$((base_delay * (2 ** (attempt - 1))))
-    [[ "$delay" -gt "$max_delay" ]] && delay="$max_delay"
-    echo "  [gh-retry] pr checks #$n attempt $attempt/$attempts failed (transient); retrying in ${delay}s…" >&2
-    sleep "$delay"
-    attempt=$((attempt + 1))
-  done
-
-  rm -f "$raw_file" "$out_file" "$err_file"
-  jq -cn --arg reason "required check status unavailable" '[$reason]'
+fetch_head_commit() {  # fetch_head_commit <sha>
+  gh_retry api "repos/${REPO}/commits/${1}" --jq '{
+    sha: (.sha // "" | ascii_downcase),
+    message: (.commit.message // ""),
+    parentShas: [(.parents // [])[].sha | ascii_downcase],
+    authorName: (.commit.author.name // ""),
+    authorEmail: (.commit.author.email // ""),
+    authorLogin: (.author.login // ""),
+    committerName: (.commit.committer.name // ""),
+    committerEmail: (.commit.committer.email // ""),
+    committerLogin: (.committer.login // ""),
+    verified: (.commit.verification.verified // false)
+  }'
 }
 
-echo "=== AUTO-READY: scanning for green agent drafts ==="
+fetch_fx_run() {  # fetch_fx_run <parent-sha>
+  gh_retry api "repos/${REPO}/actions/workflows/rolling-ci-dispatch.yml/runs?head_sha=${1}&status=completed&per_page=10" --jq '
+    [.workflow_runs[]
+      | select(.conclusion == "success")
+      | select((.path // "") | test("rolling-ci-dispatch\\.yml$"))
+      | {
+          workflowPath: (.path // ""),
+          workflowName: (.name // ""),
+          conclusion: .conclusion,
+          event: (.event // ""),
+          actorLogin: (.actor.login // ""),
+          headSha: ((.head_sha // "") | ascii_downcase)
+        }
+    ] | first // null'
+}
+
+classify_promotion() {  # classify_promotion <json>
+  node "$PROVENANCE_LIB" classify <<<"$1"
+}
+
+build_promotion_input() {  # build_promotion_input <pr> <author> <title> <branch> <labels-json> <head> <body> [commit-json] [fx-run-json]
+  local pr_number="$1" author="$2" title="$3" branch="$4" labels_json="$5" head="$6" body="$7"
+  local commit_json="${8:-null}"
+  local fx_run_json="${9:-null}"
+  jq -nc \
+    --argjson prNumber "$pr_number" \
+    --arg author "$author" \
+    --arg title "$title" \
+    --arg branch "$branch" \
+    --argjson labels "$labels_json" \
+    --arg head "$head" \
+    --arg body "$body" \
+    --argjson commit "$commit_json" \
+    --argjson fxRun "$fx_run_json" \
+    '{
+      prNumber: $prNumber,
+      authorLogin: $author,
+      title: $title,
+      branch: $branch,
+      labels: $labels,
+      headSha: $head,
+      body: $body,
+      commit: $commit,
+      fxRun: $fxRun
+    }'
+}
+
+resolve_promotion() {  # resolve_promotion <pr> <author> <title> <branch> <labels-json> <head> <body>
+  local pr_number="$1" author="$2" title="$3" branch="$4" labels_json="$5" head="$6" body="$7"
+  local input verdict reason commit_json fx_run_json trailer
+  input="$(build_promotion_input "$pr_number" "$author" "$title" "$branch" "$labels_json" "$head" "$body")"
+  verdict="$(classify_promotion "$input")"
+  reason="$(jq -r '.reason' <<<"$verdict")"
+  if [[ "$(jq -r '.eligible' <<<"$verdict")" == "true" || "$reason" != "commit-provenance-required" ]]; then
+    echo "$verdict"
+    return 0
+  fi
+  if ! commit_json="$(fetch_head_commit "$head" 2>/dev/null)"; then
+    jq -nc '{eligible:false, reason:"commit-unavailable"}'
+    return 0
+  fi
+  trailer="$(jq -r '.message // ""' <<<"$commit_json" | node "$PROVENANCE_LIB" trailer | tr -d '[:space:]')"
+  fx_run_json="null"
+  if [[ -n "$trailer" ]]; then
+    fx_run_json="$(fetch_fx_run "$trailer" 2>/dev/null || echo null)"
+    [[ -z "$fx_run_json" ]] && fx_run_json="null"
+  fi
+  input="$(build_promotion_input "$pr_number" "$author" "$title" "$branch" "$labels_json" "$head" "$body" "$commit_json" "$fx_run_json")"
+  classify_promotion "$input"
+}
+
+echo "=== AUTO-READY: scanning trusted-bot and FX-repaired PRs ==="
 
 SNAP="$(gh_retry pr list -R "$REPO" --state open --limit 200 \
-  --json number,title,isDraft,mergeable,mergeStateStatus,labels,headRefName,headRefOid --jq '
+  --json number,title,isDraft,labels,headRefName,headRefOid,author,body --jq '
   [ .[] | {
     n: .number,
-    t: (.title[0:48]),
+    t: .title,
     draft: .isDraft,
-    m: .mergeable,
-    ms: (.mergeStateStatus // "UNKNOWN"),
     head: .headRefName,
-    oid: .headRefOid,
+    oid: ((.headRefOid // "") | ascii_downcase),
+    body: (.body // ""),
+    author: (.author.login // ""),
     L: [.labels[].name]
   } ]')"
 
-# Flip green agent drafts to ready
-echo "=== FLIP: draft + agent + mergeable + 0 failing checks → ready ==="
-echo "$SNAP" | jq -c '.[]
-  | select(.draft)
-  | select(.m == "MERGEABLE")
-  | select((.head | test("^(tim/|codex/|agent/|claude/|linear/|codegen-bot/)")))
-  | select([.L[]] | any(. == "needs-human" or . == "hold" or . == "gated" or . == "queue-deferred" or . == "fast") | not)' \
+# Pair ready + auto-merge only for writer-proofed exact heads, and reconcile a
+# proofed ready PR if an owning writer died between the two mutations. Branch
+# prefixes, bot authors, and FX children never authorize missing proof. Pending
+# checks are expected and remain GitHub merge gates.
+echo "=== PAIR: writer proof → ready + native auto-merge ==="
+echo "$SNAP" | jq -c --arg hold_re "$HOLD_LABEL_RE" '.[]
+  | select([.L[] | select(test($hold_re))] | length == 0)' \
   | while read -r pr; do
+    READY_ATTEMPTED_FOR=""
     n=$(jq -r '.n' <<<"$pr"); t=$(jq -r '.t' <<<"$pr")
     expected_head=$(jq -r '.oid' <<<"$pr")
     expected_branch=$(jq -r '.head' <<<"$pr")
-    echo "  #$n  $t"
+    author_login=$(jq -r '.author' <<<"$pr")
+    labels_json=$(jq -c '.L' <<<"$pr")
+    pr_body=$(jq -r '.body // ""' <<<"$pr")
+    echo "  #$n  ${t:0:48}"
 
-    # Idempotency guard (#13342): at most one attempt per PR per cooldown window.
-    attempt_age_h="$(last_attempt_age_hours "$n")"
-    if [[ -n "$attempt_age_h" && "$attempt_age_h" -lt "$ATTEMPT_COOLDOWN_HOURS" ]]; then
-      echo "    ~ last attempt ${attempt_age_h}h ago (< ${ATTEMPT_COOLDOWN_HOURS}h cooldown); skipping"
+    snapshot_verdict="$(resolve_promotion "$n" "$author_login" "$t" "$expected_branch" "$labels_json" "$expected_head" "$pr_body")"
+    if [[ "$(jq -r '.eligible' <<<"$snapshot_verdict")" != "true" ]]; then
+      echo "    ~ provenance $(jq -r '.reason' <<<"$snapshot_verdict"); leaving PR unchanged"
       continue
     fi
 
     # The list snapshot is discovery only. Re-read the exact head, draft bit,
-    # mergeability, and live labels before consulting checks.
+    # and live labels before mutation.
     if ! before="$(read_state "$n" 2>/dev/null)"; then
-      echo "    ~ could not read live PR state; leaving draft"
+      echo "    ~ could not read live PR state; leaving PR unchanged"
       continue
     fi
-    if ! state_is_eligible_draft "$before" "$expected_head" "$expected_branch"; then
-      echo "    ~ live state no longer matches the eligible draft snapshot; leaving draft"
+    if ! state_needs_pairing "$before" "$expected_head" "$expected_branch"; then
+      echo "    ~ live state does not need paired promotion or recovery; leaving PR unchanged"
+      continue
+    fi
+    live_labels="$(jq -c '.labels' <<<"$before")"
+    live_body="$(jq -r '.body // ""' <<<"$before")"
+    live_verdict="$(resolve_promotion "$n" "$author_login" "$t" "$expected_branch" "$live_labels" "$expected_head" "$live_body")"
+    if [[ "$(jq -r '.eligible' <<<"$live_verdict")" != "true" ]]; then
+      echo "    ~ live provenance $(jq -r '.reason' <<<"$live_verdict"); leaving PR unchanged"
       continue
     fi
 
-    fail="$(check_failures_for_pr "$n")"
-    if [[ "$(jq 'length' <<<"$fail")" -ne 0 ]]; then
-      echo "    ~ required checks are not exact-head green: $(jq -r 'join(", ")' <<<"$fail")"
-      continue
-    fi
-
-    # Checks and labels can change while the API call above is in flight. This
-    # second snapshot is the actual mutation precondition.
+    # Labels and head provenance can change while classification is in flight.
+    # This second snapshot is the actual mutation precondition.
     if ! before_mutation="$(read_state "$n" 2>/dev/null)"; then
-      echo "    ~ could not re-read live PR state before mutation; leaving draft"
+      echo "    ~ could not re-read live PR state before mutation; leaving PR unchanged"
       continue
     fi
-    if ! state_is_eligible_draft "$before_mutation" "$expected_head" "$expected_branch"; then
-      echo "    ~ head, labels, or draft state changed before mutation; leaving draft"
+    if ! state_needs_pairing "$before_mutation" "$expected_head" "$expected_branch"; then
+      echo "    ~ head, labels, or pair state changed before mutation; leaving PR unchanged"
+      continue
+    fi
+    mutation_labels="$(jq -c '.labels' <<<"$before_mutation")"
+    mutation_body="$(jq -r '.body // ""' <<<"$before_mutation")"
+    mutation_verdict="$(resolve_promotion "$n" "$author_login" "$t" "$expected_branch" "$mutation_labels" "$expected_head" "$mutation_body")"
+    if [[ "$(jq -r '.eligible' <<<"$mutation_verdict")" != "true" ]]; then
+      echo "    ~ provenance changed before mutation ($(jq -r '.reason' <<<"$mutation_verdict")); leaving PR unchanged"
       continue
     fi
 
-    if ! mark_ready "$n"; then
-      upsert_status_comment "$n" "⚠️ Auto-ready: all required checks are passing, but marking this PR ready for review **failed** (likely a token-permission gap — see #13122). A human needs to flip it to ready. Will retry in ${ATTEMPT_COOLDOWN_HOURS}h. _(last attempt: $(date -u +%Y-%m-%dT%H:%M:%SZ))_"
+    mutation_was_draft="$(jq -r '.draft' <<<"$before_mutation")"
+    pair_status=0
+    if [[ "$mutation_was_draft" == "true" ]]; then
+      promote_with_auto_merge "$n" "$expected_head" || pair_status=$?
+    else
+      recover_ready_without_auto_merge "$n" "$expected_head" || pair_status=$?
+    fi
+    if [[ "$pair_status" -ne 0 ]]; then
+      upsert_status_comment "$n" "⚠️ Auto-ready: the paired ready + native auto-merge action failed. If ready succeeded but auto-merge did not, the controller attempted to restore draft state. A manual recovery run may retry after the writer proof/head is still current. _(last attempt: $(date -u +%Y-%m-%dT%H:%M:%SZ))_"
+      if [[ "$pair_status" -eq 2 ]]; then
+        echo "    !! stopping: #$n could not be returned to a closed-loop state"
+        exit 2
+      fi
       continue
     fi
 
     [[ "$DRY_RUN" == "1" ]] && continue
 
-    # Verify the exact head and live labels after the mutation. If a hold label
-    # or new head raced the promotion, restore draft status immediately so the
-    # now-unproven revision cannot be enrolled.
+    # Verify exact head, live labels, and auto-merge intent after the paired
+    # mutation. If any raced the promotion, restore draft status immediately.
     if ! after="$(read_state "$n" 2>/dev/null)"; then
-      undo_ready "$n" || true
-      upsert_status_comment "$n" "⚠️ Auto-ready: the ready transition could not be verified, so a compensating draft restore was attempted. Re-run after the current head and labels stabilize. _(last attempt: $(date -u +%Y-%m-%dT%H:%M:%SZ))_"
+      if ! undo_ready "$n"; then
+        upsert_status_comment "$n" "🚨 Auto-ready: post-mutation state was unreadable and fail-closed draft restoration could not be verified. The controller stopped instead of claiming success. _(failed at $(date -u +%Y-%m-%dT%H:%M:%SZ))_"
+        exit 2
+      fi
+      upsert_status_comment "$n" "⚠️ Auto-ready: the paired mutation could not be verified, so the PR was restored to draft. Re-run after the current head and labels stabilize. _(last attempt: $(date -u +%Y-%m-%dT%H:%M:%SZ))_"
       continue
     fi
 
@@ -231,15 +349,22 @@ echo "$SNAP" | jq -c '.[]
     branch_after="$(jq -r '.branch // ""' <<<"$after")"
     draft_after="$(jq -r '.draft' <<<"$after")"
     state_after="$(jq -r '.state // "UNKNOWN"' <<<"$after")"
+    auto_merge_after="$(jq -r '.autoMerge' <<<"$after")"
+    queued_after="$(jq -r '.queued' <<<"$after")"
     held_after="$(jq -r --arg hold_re "$HOLD_LABEL_RE" '[.labels[] | select(test($hold_re))] | join(",")' <<<"$after")"
 
-    if [[ "$state_after" == "OPEN" && "$draft_after" == "false" && "$head_after" == "$expected_head" && "$branch_after" == "$expected_branch" && -z "$held_after" ]]; then
-      upsert_status_comment "$n" "🤖 Auto-ready: all required checks passing — marked ready for review and enrolling in merge queue. _(verified ready at $(date -u +%Y-%m-%dT%H:%M:%SZ))_"
-    elif [[ "$state_after" == "OPEN" && "$draft_after" == "false" ]]; then
-      undo_ready "$n" || true
-      upsert_status_comment "$n" "⚠️ Auto-ready: the PR changed during promotion (head=\`${head_after:0:12}\`, holds=\`${held_after:-none}\`), so it was restored to draft. Re-run checks on the live head before promoting it again. _(last attempt: $(date -u +%Y-%m-%dT%H:%M:%SZ))_"
+    if [[ "$state_after" != "OPEN" ]]; then
+      upsert_status_comment "$n" "🤖 Auto-ready: the exact head reached terminal state=${state_after} during paired verification. _(verified at $(date -u +%Y-%m-%dT%H:%M:%SZ))_"
+    elif [[ "$draft_after" == "false" && ( "$auto_merge_after" == "true" || "$queued_after" == "true" ) && "$head_after" == "$expected_head" && "$branch_after" == "$expected_branch" && -z "$held_after" ]]; then
+      upsert_status_comment "$n" "🤖 Auto-ready: marked ready and enabled native auto-merge on the exact head. Existing checks may still be pending; GitHub will merge only after they pass. _(verified at $(date -u +%Y-%m-%dT%H:%M:%SZ))_"
+    elif [[ "$draft_after" == "false" ]]; then
+      if ! undo_ready "$n"; then
+        upsert_status_comment "$n" "🚨 Auto-ready: paired verification failed and fail-closed draft restoration could not be verified. The controller stopped instead of claiming success. _(failed at $(date -u +%Y-%m-%dT%H:%M:%SZ))_"
+        exit 2
+      fi
+      upsert_status_comment "$n" "⚠️ Auto-ready: paired promotion verification failed (head=\`${head_after:0:12}\`, holds=\`${held_after:-none}\`, auto-merge=\`${auto_merge_after}\`, queued=\`${queued_after}\`), so the controller attempted to restore draft state. _(last attempt: $(date -u +%Y-%m-%dT%H:%M:%SZ))_"
     else
-      upsert_status_comment "$n" "⚠️ Auto-ready: \`gh pr ready\` reported success but the verified state is state=${state_after}, draft=${draft_after}. No queue enrollment was claimed. _(last attempt: $(date -u +%Y-%m-%dT%H:%M:%SZ))_"
+      upsert_status_comment "$n" "⚠️ Auto-ready: the paired action reported success but verification found state=${state_after}, draft=${draft_after}, auto-merge=${auto_merge_after}, queued=${queued_after}. No queue enrollment was claimed. _(last attempt: $(date -u +%Y-%m-%dT%H:%M:%SZ))_"
     fi
   done
 

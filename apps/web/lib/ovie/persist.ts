@@ -2,8 +2,9 @@
  * Durable Ovie dump persist + Mac lander pending/landed helpers (JOV-5215).
  *
  * Persist the receipt first, then ack. Chat/MCP share OperatingStore.
- * Dump never spawns a worker. Company items go to the Summer-owned Kanban.
- * Eve does not Linear-route or dispatch Symphony.
+ * Dump never spawns a worker. Operations items go to Summer's Kanban;
+ * engineering is queued for Summer's Linear intake. Eve does not create
+ * Linear work or dispatch Symphony.
  * Mac lander: GET /api/ovie/pending then POST /api/ovie/landed.
  * Destination writer is ovie-intake-to-kanban.py.
  * Kanban idempotency_key is ovie-<initiative_id>; created-by ovie.
@@ -13,17 +14,19 @@ import { createHash } from 'node:crypto';
 import {
   classifyOvieItem,
   DEST_KANBAN,
+  DEST_LINEAR,
   destinationForOvieLane,
   getOvieIntakeMode,
   OVIE_BLOCKED_ACK,
-  OVIE_QUEUED_ACK,
   OVIE_UNAVAILABLE_ACK,
   type OvieReceipt,
   ovieAckForHandle,
   persistOvieReceipt,
+  queuedAckForDestination,
   recordOvieAckLatency,
   type SpawnFn,
 } from '@/lib/ovie/ingest';
+import { normalizeLegacyEngineeringInitiativeForStore } from '@/lib/ovie/legacy-routing';
 import { newRecordId, type OperatingStore } from '@/lib/ovie/mcp/store';
 import type { OvieInitiative, OvieRoutingState } from '@/lib/ovie/mcp/types';
 import { isSummerKanbanLane } from '@/lib/ovie/summer-kanban';
@@ -82,31 +85,51 @@ export function isInitiativeLanded(initiative: OvieInitiative): boolean {
 
 export function initiativeAckView(initiative: OvieInitiative) {
   const destinationHandle = destinationHandleOf(initiative);
+  let queuedFor: 'summer-linear-intake' | 'summer-lander' | undefined;
+  if (!destinationHandle) {
+    queuedFor =
+      initiative.destination === 'linear'
+        ? 'summer-linear-intake'
+        : 'summer-lander';
+  }
   return {
     ...initiative,
     destinationHandle,
     ack: ackForInitiative(initiative, destinationHandle),
     complete: Boolean(destinationHandle),
     workerSpawned: false as const,
-    queuedFor: destinationHandle ? undefined : ('summer-lander' as const),
+    queuedFor,
   };
 }
 
 function ackForRoutingState(
   state: OvieRoutingState | undefined,
-  destinationHandle: string | null
+  destinationHandle: string | null,
+  destination: OvieInitiative['destination']
 ): string {
   if (destinationHandle) return ovieAckForHandle(destinationHandle);
   if (state === 'unavailable') return OVIE_UNAVAILABLE_ACK;
   if (state === 'blocked') return OVIE_BLOCKED_ACK;
-  return OVIE_QUEUED_ACK;
+  return queuedAckForDestination(destination);
 }
 
 function ackForInitiative(
   initiative: OvieInitiative,
   destinationHandle: string | null = destinationHandleOf(initiative)
 ): string {
-  return ackForRoutingState(initiative.routingState, destinationHandle);
+  return ackForRoutingState(
+    initiative.routingState,
+    destinationHandle,
+    initiative.destination
+  );
+}
+
+function initialAckForRoutingState(
+  destination: OvieInitiative['destination'],
+  routingState: OvieRoutingState
+): string {
+  if (routingState === 'unavailable') return OVIE_UNAVAILABLE_ACK;
+  return queuedAckForDestination(destination);
 }
 
 export function receiptToInitiative(
@@ -126,6 +149,7 @@ export function receiptToInitiative(
     id,
     kind: 'initiative',
     status: routingState === 'unavailable' ? 'failed' : 'accepted',
+    confidence: 'medium',
     handoff: {
       title: receipt.text.slice(0, 120) || receipt.ack,
       intent: receipt.text,
@@ -186,7 +210,12 @@ export async function inspectOvieIntake(
 ): Promise<OvieReceipt | undefined> {
   const workId = ovieWorkIdFromKey(idempotencyKey);
   const existing = await store.getInitiative(workId);
-  return existing ? receiptFromInitiative(existing) : undefined;
+  const normalized = existing
+    ? await normalizeLegacyEngineeringInitiativeForStore(store, existing, {
+        persistence: 'best-effort',
+      })
+    : undefined;
+  return normalized ? receiptFromInitiative(normalized) : undefined;
 }
 
 async function restoreQueued(
@@ -201,13 +230,13 @@ async function restoreQueued(
     routingReason: undefined,
     receipts: record.receipts.map(receipt => ({
       ...receipt,
-      ack: OVIE_QUEUED_ACK,
+      ack: queuedAckForDestination(record.destination),
       routingState: 'queued',
     })),
     evidence: [
       {
         kind: 'receipt',
-        summary: OVIE_QUEUED_ACK,
+        summary: queuedAckForDestination(record.destination),
         ref: record.destination,
       },
     ],
@@ -222,6 +251,12 @@ async function finishCompanyRoute(
   routeCompany: OvieDumpOptions['routeCompany']
 ): Promise<OvieInitiative> {
   if (record.destination !== DEST_KANBAN || !isSummerKanbanLane(record.lane)) {
+    if (
+      record.routingState === 'unavailable' &&
+      record.routingReason === 'receipt-only fail-closed'
+    ) {
+      return restoreQueued(store, record);
+    }
     return record;
   }
   try {
@@ -263,7 +298,8 @@ async function finishCompanyRoute(
 
 /**
  * Classify, persist one initiative per item, then ack. Spawn is ignored.
- * Company items are visible on the Summer Kanban via the same work IDs.
+ * Operations items are visible on Summer's Kanban via the same work IDs;
+ * engineering remains a durable receipt for Summer's Linear intake.
  */
 export async function applyOvieDump(
   items: readonly string[],
@@ -277,7 +313,14 @@ export async function applyOvieDump(
     const started = performance.now();
     const key = options.idempotencyKeys?.[index] ?? defaultOvieDumpKey(text);
     const workId = ovieWorkIdFromKey(key);
-    const existing = await options.store.getInitiative(workId);
+    const storedExisting = await options.store.getInitiative(workId);
+    const existing = storedExisting
+      ? await normalizeLegacyEngineeringInitiativeForStore(
+          options.store,
+          storedExisting,
+          { persistence: 'best-effort' }
+        )
+      : undefined;
     if (existing) {
       const recovered =
         mode === 'receipt-only'
@@ -305,8 +348,7 @@ export async function applyOvieDump(
       mode === 'receipt-only' ? 'unavailable' : 'queued';
     const routingReason =
       mode === 'receipt-only' ? 'receipt-only fail-closed' : undefined;
-    const ack =
-      routingState === 'unavailable' ? OVIE_UNAVAILABLE_ACK : OVIE_QUEUED_ACK;
+    const ack = initialAckForRoutingState(destination, routingState);
     const classified: OvieReceipt = {
       text,
       lane,
@@ -387,7 +429,14 @@ export async function listPendingInitiatives(
   store: OperatingStore
 ): Promise<readonly OvieInitiative[]> {
   const rows = await store.listInitiatives();
-  return rows.filter(row => !isInitiativeLanded(row));
+  const normalized = await Promise.all(
+    rows.map(row =>
+      normalizeLegacyEngineeringInitiativeForStore(store, row, {
+        persistence: 'best-effort',
+      })
+    )
+  );
+  return normalized.filter(row => !isInitiativeLanded(row));
 }
 
 export type LandInitiativeInput = {
@@ -406,14 +455,39 @@ export function resolveLandedHandle(input: LandInitiativeInput): string {
   );
 }
 
+function isLinearLandedReference(value: string): boolean {
+  return (
+    /^JOV-\d+$/i.test(value) ||
+    /^https:\/\/linear\.app\/jovie\/issue\/JOV-\d+(?:\b|\/)/i.test(value)
+  );
+}
+
+function resolveLandedHandleForInitiative(
+  initiative: OvieInitiative,
+  input: LandInitiativeInput
+): string {
+  if (initiative.destination !== DEST_LINEAR) return resolveLandedHandle(input);
+  const linearId = input.linear_id?.trim();
+  if (linearId) return linearId;
+  const landedRef = input.landed_ref?.trim() ?? '';
+  return isLinearLandedReference(landedRef) ? landedRef : '';
+}
+
 export async function markInitiativeLanded(
   store: OperatingStore,
   input: LandInitiativeInput
 ): Promise<OvieInitiative | undefined> {
-  const landedRef = resolveLandedHandle(input);
-  if (!landedRef) throw new Error('landed_ref is required');
-  const current = await store.getInitiative(input.id);
-  if (!current) return undefined;
+  const submittedRef = resolveLandedHandle(input);
+  if (!submittedRef) throw new Error('landed_ref is required');
+  const storedCurrent = await store.getInitiative(input.id);
+  if (!storedCurrent) return undefined;
+  const current = await normalizeLegacyEngineeringInitiativeForStore(
+    store,
+    storedCurrent,
+    { persistence: 'best-effort' }
+  );
+  const landedRef = resolveLandedHandleForInitiative(current, input);
+  if (!landedRef) throw new Error('linear_id is required');
   if (isInitiativeLanded(current)) return current;
   const now = new Date().toISOString();
   const ack = ovieAckForHandle(landedRef);
@@ -436,6 +510,7 @@ export async function markInitiativeLanded(
         summary: ack,
         ref: landedRef,
         landed_ref: landedRef,
+        observedAt: now,
       },
     ],
   };
@@ -459,7 +534,7 @@ export function toPendingInitiativeView(
     idempotency_key: ovieIdempotencyKey(initiative.id),
     created_by: OVIE_CREATED_BY,
     landed: false,
-    ack: ovieAckForHandle(null),
+    ack: ackForInitiative(initiative, null),
     destinationHandle: null,
   };
 }

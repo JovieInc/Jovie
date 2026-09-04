@@ -61,6 +61,8 @@ const SYSTEM_RESERVED_SEGMENTS = new Set([
   'og',
   'go',
   'out',
+  'robots.txt',
+  'sitemap.xml',
   '__clerk',
   'clerk',
   'phpmyadmin',
@@ -68,6 +70,9 @@ const SYSTEM_RESERVED_SEGMENTS = new Set([
   'sentry-example-page',
   'sentry-example-api',
   'investor-portal',
+  'llms.txt',
+  'llms-full.txt',
+  'openapi.json',
   'wordpress',
   'wp',
   'wp-admin',
@@ -209,7 +214,6 @@ export function categorizePath(pathname: string): PathCategory {
     isAppShellPath ||
     isAccountPath ||
     isBillingPath ||
-    isWaitlistPath ||
     isOnboardingCheckoutPath;
 
   const needsNonce =

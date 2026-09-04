@@ -51,14 +51,14 @@ describe('HeaderNav flyout interactions', () => {
     expect(loginLink).toHaveAttribute('href', '/signin');
     expect(loginLink.parentElement).toHaveClass('gap-2');
     // Default public CTA (no publicCta override) remains Request Access.
-    // Homepage MarketingHeader passes its own "Get started" label separately.
+    // MarketingHeader supplies route-specific CTA labels separately.
     expect(
       screen.getByRole('link', { name: 'Request Access' })
     ).toHaveAttribute('href', '/signup');
     const publicCta = screen.getByRole('link', { name: 'Request Access' });
     expect(publicCta).not.toHaveAttribute('data-pen-contract');
     expect(publicCta).toHaveAttribute('data-variant', 'primary');
-    expect(publicCta).toHaveAttribute('data-size', 'md');
+    expect(publicCta).toHaveAttribute('data-size', 'marketing');
   });
 
   it('uses the canonical Button for the minimal pill sign-in action', () => {

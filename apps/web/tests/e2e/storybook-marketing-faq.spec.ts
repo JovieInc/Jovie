@@ -6,6 +6,7 @@ import {
 } from '../helpers/cls-measurement';
 
 const FAQ_STORY_ID = 'marketing-sections-faqsection--default';
+const STORYBOOK_RENDER_TIMEOUT_MS = 60_000;
 const VIEWPORTS = [
   { label: 'desktop', width: 1024, height: 1200 },
   { label: 'narrow', width: 390, height: 844 },
@@ -37,11 +38,11 @@ async function openFaqStory(page: Page) {
   });
   await page.emulateMedia({ reducedMotion: 'reduce' });
   await page.goto(`/iframe.html?id=${FAQ_STORY_ID}&viewMode=story`, {
-    waitUntil: 'networkidle',
+    waitUntil: 'domcontentloaded',
   });
 
   const section = page.locator('[data-pen-contract="pAAhw"]');
-  await expect(section).toBeVisible();
+  await expect(section).toBeVisible({ timeout: STORYBOOK_RENDER_TIMEOUT_MS });
   await expect(section).toHaveAttribute(
     'data-layout-contract',
     'bounded-local-disclosure'

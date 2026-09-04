@@ -32,7 +32,7 @@
     {
       "id": "atom.button",
       "state": "source-bound",
-      "revision": 3,
+      "revision": 5,
       "platforms": ["web"],
       "source": "packages/ui/atoms/button.tsx",
       "contractSource": "packages/ui/atoms/button-contract.ts",
@@ -40,12 +40,25 @@
       "storySources": ["packages/ui/atoms/button.stories.tsx"],
       "testSources": ["packages/ui/atoms/button.test.tsx"],
       "penRootId": "g3IC1",
-      "sourceDigest": "0a211ccfb8226b568c475757b9fdc58ba2cf8ece22dfcb870b258fe8f3380eb3"
+      "sourceDigest": "ad084aac2895a7527bab3fef55aaf0ea45136141e8431224d18fe45c6a099a47"
+    },
+    {
+      "id": "atom.input",
+      "state": "source-bound",
+      "revision": 1,
+      "platforms": ["web"],
+      "source": "packages/ui/atoms/input.tsx",
+      "tokenSources": ["packages/ui/theme/tokens.ts"],
+      "storySources": ["packages/ui/atoms/input.stories.tsx"],
+      "testSources": ["packages/ui/atoms/input.test.tsx"],
+      "penRootId": null,
+      "sourceDigest": "f244d5e43b26b5d8ee7668eb45933a955cd51781e9a4a9e144eee7cdd4e4dff2"
     }
   ],
   "legacy": {
     "unboundComponentIds": [
       "atom.brand-logo",
+      "atom.icon-button",
       "atom.link",
       "atom.logo",
       "atom.logo-link"

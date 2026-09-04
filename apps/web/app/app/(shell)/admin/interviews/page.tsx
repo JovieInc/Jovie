@@ -45,7 +45,7 @@ export default async function AdminInterviewsPage() {
     >
       <ContentSurfaceCard className='overflow-hidden p-0'>
         {rows.length === 0 ? (
-          <div className='px-(--linear-app-header-padding-x) py-6 text-app text-secondary-token'>
+          <div className='px-(--app-shell-header-padding-x) py-6 text-app text-secondary-token'>
             No interviews yet.
           </div>
         ) : (
@@ -61,7 +61,7 @@ export default async function AdminInterviewsPage() {
               return (
                 <details
                   key={row.id}
-                  className='group px-(--linear-app-header-padding-x) py-3'
+                  className='group px-(--app-shell-header-padding-x) py-3'
                 >
                   <summary className='flex cursor-pointer list-none items-start justify-between gap-4'>
                     <div className='min-w-0 flex-1'>

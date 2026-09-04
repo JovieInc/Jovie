@@ -1,4 +1,5 @@
 import { expect, test } from '@playwright/test';
+import { PUBLIC_WAITLIST_URL } from '@/data/homepageFrontDoorCta';
 import { isClerkRedirectUrl } from './utils/smoke-test-utils';
 
 /**
@@ -52,7 +53,10 @@ test.describe('Onboarding Flow', () => {
         .catch(() => false);
 
       if (isGetStartedVisible) {
-        await expect(getStartedLink).toHaveAttribute('href', '/signup');
+        await expect(getStartedLink).toHaveAttribute(
+          'href',
+          PUBLIC_WAITLIST_URL
+        );
       }
 
       console.log(

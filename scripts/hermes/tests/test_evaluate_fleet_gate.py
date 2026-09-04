@@ -3,6 +3,7 @@
 
 from __future__ import annotations
 
+import base64
 import json
 import os
 import pathlib
@@ -40,12 +41,40 @@ def signals(**overrides):
         "controller": {"status": "green"},
         "integrity": {"status": "clear"},
         "queue": {
+            "repository": "JovieInc/Jovie",
             "status": "known",
             "eligiblePrs": 0,
             "greenReadyPrs": 0,
             "target": 15,
+            "laneCapacity": {
+                "schema": "jovie-lane-capacity/v2",
+                "observedAt": now_iso(),
+                "repositories": {"JovieInc/Jovie": {"ready": 0, "budget": 15}},
+                "defaultLaneBudget": 4,
+                "lanes": {},
+                "sharedResources": {},
+            },
+        },
+        "closureHealth": {
+            "schema": "jovie-closure-health/v1",
+            "repository": "JovieInc/Jovie",
+            "status": "healthy",
+            "authority": "Summer",
+            "newIssueIntakeAllowed": True,
+            "promotionContinues": True,
+            "remediationContinues": True,
+            "reasons": [],
         },
         "independentReview": review,
+        "concurrencyEvidence": {
+            "schema": "gem-concurrency-evidence/v1",
+            "target": 4,
+            "approved": True,
+            "cleanRuns": 1,
+            "severeIncidents": 0,
+            "observedAt": now_iso(),
+            "accepted": True,
+        },
     }
     payload.update(overrides)
     return payload
@@ -94,6 +123,7 @@ class EvaluateFleetGateWrapperTests(unittest.TestCase):
         self.assertEqual(code, 0)
         self.assertEqual(receipt["state"], "AMBER")
         self.assertEqual(outputs["work_allowed"], "true")
+        self.assertEqual(outputs["new_issue_intake_allowed"], "true")
         self.assertEqual(outputs["promotion_allowed"], "false")
         self.assertEqual(outputs["gate_rc"], "0")
 
@@ -101,6 +131,7 @@ class EvaluateFleetGateWrapperTests(unittest.TestCase):
         self.assertEqual(code, 0)
         self.assertEqual(receipt["state"], "GREEN")
         self.assertEqual(outputs["work_allowed"], "true")
+        self.assertEqual(outputs["new_issue_intake_allowed"], "true")
         self.assertEqual(outputs["promotion_allowed"], "true")
         self.assertEqual(outputs["mode"], "normal")
 
@@ -116,6 +147,7 @@ class EvaluateFleetGateWrapperTests(unittest.TestCase):
         self.assertEqual(code, 0)
         self.assertEqual(receipt["state"], "RED")
         self.assertEqual(outputs["work_allowed"], "false")
+        self.assertEqual(outputs["new_issue_intake_allowed"], "false")
         self.assertEqual(outputs["gate_rc"], "2")
 
     def test_missing_review_still_allows_isolated_lease(self):
@@ -131,6 +163,48 @@ class EvaluateFleetGateWrapperTests(unittest.TestCase):
         self.assertEqual(code, 0)
         self.assertTrue(receipt["workAdmission"]["newIssueLeaseAllowed"])
         self.assertEqual(outputs["promotion_allowed"], "false")
+
+    def test_summer_closure_stop_line_emits_no_new_intake_but_keeps_work_lane_live(self):
+        closure = {
+            "schema": "jovie-closure-health/v1",
+            "status": "red",
+            "authority": "Summer",
+            "newIssueIntakeAllowed": False,
+            "promotionContinues": True,
+            "remediationContinues": True,
+            "reasons": ["duplicate-issue-lanes-unresolved"],
+        }
+
+        code, outputs, receipt = run_wrapper(signals(closureHealth=closure))
+
+        self.assertEqual(code, 0)
+        self.assertEqual(outputs["work_allowed"], "true")
+        self.assertEqual(outputs["new_issue_intake_allowed"], "false")
+        self.assertEqual(outputs["promotion_allowed"], "true")
+        self.assertTrue(receipt["remediationAdmission"]["pushAllowed"])
+
+    def test_unknown_main_with_exact_sha_is_schema_valid_and_blocks_promotion(self):
+        code, outputs, receipt = run_wrapper(
+            signals(main={"status": "unknown", "sha": SHA})
+        )
+
+        self.assertEqual(code, 0)
+        self.assertEqual(receipt["signals"]["main"]["sha"], SHA)
+        self.assertEqual(receipt["state"], "AMBER")
+        self.assertFalse(receipt["promotionAdmission"]["allowed"])
+        self.assertEqual(outputs["promotion_allowed"], "false")
+        self.assertEqual(outputs["gate_rc"], "0")
+
+    def test_expected_sha_binds_fleet_consumer_to_exact_main(self):
+        code, outputs, receipt = run_wrapper(signals(), expected_sha=SHA)
+        self.assertEqual(code, 0)
+        self.assertEqual(receipt["signals"]["main"]["sha"], SHA)
+        self.assertEqual(outputs["mode"], "normal")
+
+        code, outputs, receipt = run_wrapper(signals(), expected_sha="b" * 40)
+        self.assertEqual(code, 2)
+        self.assertEqual(receipt["signals"]["main"]["sha"], SHA)
+        self.assertNotEqual(outputs.get("mode"), "normal")
 
     def test_deployment_consumer_uses_deployment_admission_not_promotion(self):
         action = (ROOT / ".github/actions/evaluate-fleet-gate/action.yml").read_text()
@@ -190,6 +264,62 @@ class EvaluateFleetGateWrapperTests(unittest.TestCase):
         code, outputs, receipt = run_wrapper(signals(), consumer="promotion")
         self.assertEqual(code, 2)
         self.assertEqual(receipt, {})
+
+    def test_wrapper_transports_a_bounded_admission_projection(self):
+        files = [f"apps/web/generated/File{index:04d}.tsx" for index in range(80)]
+        closure = {
+            **signals()["closureHealth"],
+            "classifications": {
+                "changedFileEvidence": [{"number": 1, "status": "complete", "files": files}],
+                "duplicateIssueLanes": [{"issue": "JOV-1", "prs": [1, 2], "overlap": files}],
+            },
+            "episodes": {"controller": {"since": now_iso(), "active": True}},
+        }
+        code, outputs, receipt = run_wrapper(signals(closureHealth=closure))
+        self.assertEqual(code, 0)
+        self.assertIn("classifications", receipt["signals"]["closureHealth"])
+        projection = json.loads(base64.b64decode(outputs["receipt_b64"]))
+        self.assertNotIn("classifications", projection["signals"]["closureHealth"])
+        self.assertNotIn("episodes", projection["signals"]["closureHealth"])
+        self.assertEqual(projection["promotionMode"], "normal")
+        self.assertLess(len(outputs["receipt_b64"]), 32_768)
+
+    def test_queue_consumers_pass_only_the_bounded_projection(self):
+        action = (ROOT / ".github/actions/evaluate-fleet-gate/action.yml").read_text()
+        autoenroll = (
+            ROOT / ".github/workflows/merge-queue-autoenroll.yml"
+        ).read_text()
+        deferred_release = (
+            ROOT / ".github/workflows/queue-deferred-release.yml"
+        ).read_text()
+        wrapper = SCRIPT.read_text()
+        self.assertIn(
+            "DRAIN_FLEET_GATE_B64: ${{ needs.fleet-policy.outputs.receipt_b64 }}",
+            autoenroll,
+        )
+        for needle in (
+            "main_sha: ${{ steps.main-head.outputs.sha }}",
+            "expected-sha: ${{ steps.main-head.outputs.sha }}",
+            "ref: ${{ needs.fleet-policy.outputs.main_sha }}",
+        ):
+            self.assertIn(needle, autoenroll)
+        for workflow in (autoenroll, deferred_release):
+            self.assertIn(
+                "receipt_b64: ${{ steps.policy.outputs.receipt_b64 }}", workflow
+            )
+        self.assertIn("Base64 bounded admission projection", action)
+        self.assertIn(
+            "value: ${{ steps.evaluate.outputs.receipt_b64 }}",
+            action,
+        )
+        self.assertIn(
+            'needs.fleet-policy.outputs.receipt_b64 }}" | base64 -d',
+            deferred_release,
+        )
+        self.assertIn("fleet_admission_receipt.py", wrapper)
+        self.assertIn("base64 -w0 <\"$admission\"", wrapper)
+        self.assertNotIn("base64 -w0 <\"$receipt\"", wrapper)
+        self.assertIn("has(\"classifications\") | not", wrapper)
 
 
 if __name__ == "__main__":

@@ -126,6 +126,8 @@ vi.mock('better-auth/cookies', () => ({
   getSessionCookie: mocks.getSessionCookie,
 }));
 vi.mock('@/constants/app', () => ({
+  APP_NAME: 'Jovie',
+  BASE_URL: 'https://jov.ie',
   AUDIENCE_ANON_COOKIE: 'audience_anon',
   AUDIENCE_IDENTIFIED_COOKIE: 'audience_identified',
   AUDIENCE_SPOTIFY_PREFERRED_COOKIE: 'audience_spotify_preferred',
@@ -136,6 +138,7 @@ vi.mock('@/constants/app', () => ({
 }));
 vi.mock('@/constants/domains', () => ({
   BASE_URL: 'https://jov.ie',
+  DOCS_URL: 'https://docs.jov.ie',
   HOSTNAME: 'jov.ie',
   STAGING_HOSTNAMES: new Set(['staging.jov.ie', 'main.jov.ie']),
 }));
@@ -676,13 +679,12 @@ describe('proxy.ts middleware', () => {
       expect(res.headers.get('location')).toContain('resume=spotify');
     });
 
-    it('redirects unauthenticated GET /waitlist to /start', async () => {
+    it('lets unauthenticated GET /waitlist render the public front door', async () => {
       const req = createUnauthenticatedRequest({ pathname: '/waitlist' });
       const res = await callMiddleware(req);
 
-      expect(res.status).toBeGreaterThanOrEqual(300);
-      expect(res.status).toBeLessThan(400);
-      expect(isRedirectTo(res, '/start')).toBe(true);
+      expect(res.status).toBeLessThan(300);
+      expect(res.headers.get('location')).toBeNull();
     });
 
     it('allows unauthenticated access to public paths', async () => {
@@ -695,6 +697,7 @@ describe('proxy.ts middleware', () => {
     it('does not run the audience block lookup for reserved public routes', async () => {
       const reservedRoutes = [
         '/start',
+        '/waitlist',
         '/pricing',
         '/about',
         '/investors',
@@ -1759,6 +1762,19 @@ describe('proxy.ts middleware', () => {
       expect(location).toContain('jov.ie');
       expect(location).toContain('/some-page');
     });
+
+    it('preserves the redirect when an agent prefers Markdown', async () => {
+      const req = createUnauthenticatedRequest({
+        pathname: '/',
+        hostname: 'meetjovie.com',
+        headers: { Accept: 'text/markdown' },
+      });
+      const res = await callMiddleware(req);
+
+      expect(res.status).toBe(301);
+      expect(res.headers.get('location')).toContain('https://jov.ie/');
+      expect(res.headers.get('content-type')).toBeNull();
+    });
   });
 
   describe('support.jov.ie redirect', () => {
@@ -1851,6 +1867,21 @@ describe('proxy.ts middleware', () => {
       expect(res.headers.get('location')).toContain(
         'https://jov.ie/investor-portal'
       );
+    });
+
+    it('preserves the redirect when an agent prefers Markdown', async () => {
+      const req = createUnauthenticatedRequest({
+        pathname: '/',
+        hostname: 'investors.jov.ie',
+        headers: { Accept: 'text/markdown' },
+      });
+      const res = await callMiddleware(req);
+
+      expect(res.status).toBe(301);
+      expect(res.headers.get('location')).toContain(
+        'https://jov.ie/investor-portal'
+      );
+      expect(res.headers.get('content-type')).toBeNull();
     });
   });
 });

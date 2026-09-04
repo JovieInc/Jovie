@@ -11,12 +11,14 @@ const mockFetchReleaseCreditsAction = vi.fn();
 // @jovie/ui: ReleaseSidebar uses SegmentControl; ReleaseDspLinks (real) uses
 // Button, Input, Label, Select*, SimpleTooltip.
 vi.mock('@jovie/ui', async () => {
+  const actual = await vi.importActual<typeof import('@jovie/ui')>('@jovie/ui');
   const React = await import('react');
   const SelectContext = React.createContext<
     ((value: string) => void) | undefined
   >(undefined);
 
   return {
+    ...actual,
     Button: ({ children, ...props }: React.ComponentProps<'button'>) => (
       <button type='button' {...props}>
         {children}

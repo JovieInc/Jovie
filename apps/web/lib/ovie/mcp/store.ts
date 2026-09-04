@@ -1,5 +1,11 @@
 import { randomBytes } from 'node:crypto';
-import type { OvieDecision, OvieInitiative, OvieSummerTurn } from './types';
+import {
+  INITIATIVE_CONFIDENCE,
+  type InitiativeConfidence,
+  type OvieDecision,
+  type OvieInitiative,
+  type OvieSummerTurn,
+} from './types';
 
 const TTL_SECONDS = 60 * 60 * 24 * 14;
 const INDEX_CAP = 100;
@@ -11,7 +17,7 @@ export type OperatingStore = {
   putInitiative(record: OvieInitiative): Promise<void>;
   getInitiative(id: string): Promise<OvieInitiative | undefined>;
   listInitiatives(): Promise<readonly OvieInitiative[]>;
-  putSummerTurn(record: OvieSummerTurn): Promise<void>;
+  putSummerTurn(record: OvieSummerTurn): Promise<OvieSummerTurn>;
   getSummerTurn(id: string): Promise<OvieSummerTurn | undefined>;
   listSummerTurns(): Promise<readonly OvieSummerTurn[]>;
   claimSummerTurn(
@@ -20,6 +26,7 @@ export type OperatingStore = {
       readonly workerId: string;
       readonly claimToken: string;
       readonly expiresAt: string;
+      readonly ttlSeconds: number;
     }
   ): Promise<OvieSummerTurn | undefined>;
   completeSummerTurn(
@@ -44,6 +51,17 @@ export type OperatingStore = {
 export type RecordBackend = {
   get(key: string): Promise<unknown>;
   set(key: string, value: unknown): Promise<void>;
+  setIfAbsent(
+    key: string,
+    value: unknown,
+    ttlSeconds: number
+  ): Promise<boolean>;
+  compareAndSet(
+    key: string,
+    expectedValue: string,
+    nextValue: string,
+    ttlSeconds: number
+  ): Promise<boolean>;
   lpush(key: string, value: string): Promise<void>;
   lrange(key: string, start: number, stop: number): Promise<string[]>;
 };
@@ -54,12 +72,36 @@ export function memoryRecordBackend(bags?: {
 }): RecordBackend {
   const records = bags?.records ?? new Map<string, unknown>();
   const lists = bags?.lists ?? new Map<string, string[]>();
+  const expiresAt = new Map<string, number>();
+  const purgeExpired = (key: string) => {
+    const expiry = expiresAt.get(key);
+    if (expiry !== undefined && expiry <= Date.now()) {
+      expiresAt.delete(key);
+      records.delete(key);
+    }
+  };
   return {
     async get(key) {
+      purgeExpired(key);
       return records.has(key) ? records.get(key) : null;
     },
     async set(key, value) {
+      expiresAt.delete(key);
       records.set(key, value);
+    },
+    async setIfAbsent(key, value, ttlSeconds) {
+      purgeExpired(key);
+      if (records.has(key)) return false;
+      records.set(key, value);
+      expiresAt.set(key, Date.now() + ttlSeconds * 1000);
+      return true;
+    },
+    async compareAndSet(key, expectedValue, nextValue, ttlSeconds) {
+      purgeExpired(key);
+      if (records.get(key) !== expectedValue) return false;
+      records.set(key, nextValue);
+      expiresAt.set(key, Date.now() + ttlSeconds * 1000);
+      return true;
     },
     async lpush(key, value) {
       const next = [value, ...(lists.get(key) ?? [])].slice(0, INDEX_CAP);
@@ -111,10 +153,23 @@ export class DurableOperatingStore implements OperatingStore {
     return rows.filter((row): row is OvieInitiative => Boolean(row)).reverse();
   }
 
-  async putSummerTurn(record: OvieSummerTurn): Promise<void> {
+  async putSummerTurn(record: OvieSummerTurn): Promise<OvieSummerTurn> {
+    const created = await this.backend.setIfAbsent(
+      summerTurnKey(record.id),
+      record,
+      TTL_SECONDS
+    );
+    if (created) {
+      await this.backend.lpush(SUMMER_TURN_INDEX, record.id);
+      return record;
+    }
     const existing = await this.getSummerTurn(record.id);
-    await this.backend.set(summerTurnKey(record.id), record);
-    if (!existing) await this.backend.lpush(SUMMER_TURN_INDEX, record.id);
+    if (!existing) {
+      throw new Error(
+        `Summer turn ${record.id} exists without a valid durable record`
+      );
+    }
+    return existing;
   }
 
   async getSummerTurn(id: string): Promise<OvieSummerTurn | undefined> {
@@ -139,6 +194,31 @@ export class DurableOperatingStore implements OperatingStore {
     if (!current || (current.state !== 'queued' && !expiredClaim)) {
       return undefined;
     }
+    const claimKey = summerTurnClaimKey(id);
+    const claimLease = summerTurnClaimLeaseValue(claim);
+    let acquired = await this.backend.setIfAbsent(
+      claimKey,
+      claimLease,
+      claim.ttlSeconds
+    );
+    if (!acquired) {
+      const storedLeaseValue = await this.backend.get(claimKey);
+      const storedLease = asSummerTurnClaimLease(storedLeaseValue);
+      if (
+        !storedLease ||
+        Date.parse(storedLease.expiresAt) > Date.now() ||
+        typeof storedLeaseValue !== 'string'
+      ) {
+        return undefined;
+      }
+      acquired = await this.backend.compareAndSet(
+        claimKey,
+        storedLeaseValue,
+        claimLease,
+        claim.ttlSeconds
+      );
+    }
+    if (!acquired) return undefined;
     const next: OvieSummerTurn = {
       ...current,
       state: 'claimed',
@@ -147,9 +227,8 @@ export class DurableOperatingStore implements OperatingStore {
       claimExpiresAt: claim.expiresAt,
       updatedAt: new Date().toISOString(),
     };
-    await this.putSummerTurn(next);
-    const stored = await this.getSummerTurn(id);
-    return stored?.claimToken === claim.claimToken ? stored : undefined;
+    await this.writeSummerTurn(next);
+    return next;
   }
 
   async completeSummerTurn(
@@ -166,6 +245,9 @@ export class DurableOperatingStore implements OperatingStore {
     ) {
       return undefined;
     }
+    if (!(await this.fenceSummerClaim(id, current, 'completed'))) {
+      return undefined;
+    }
     const next: OvieSummerTurn = {
       ...current,
       state: 'completed',
@@ -173,7 +255,7 @@ export class DurableOperatingStore implements OperatingStore {
       tool: completion.tool,
       updatedAt: completion.completedAt,
     };
-    await this.putSummerTurn(next);
+    await this.writeSummerTurn(next);
     return next;
   }
 
@@ -185,14 +267,39 @@ export class DurableOperatingStore implements OperatingStore {
     if (!matchesActiveClaim(current, failure.claimToken, failure.failedAt)) {
       return undefined;
     }
+    if (!(await this.fenceSummerClaim(id, current, 'failed'))) {
+      return undefined;
+    }
     const next: OvieSummerTurn = {
       ...current,
       state: 'failed',
       failureCode: failure.failureCode,
       updatedAt: failure.failedAt,
     };
-    await this.putSummerTurn(next);
+    await this.writeSummerTurn(next);
     return next;
+  }
+
+  private async fenceSummerClaim(
+    id: string,
+    current: OvieSummerTurn,
+    marker: 'completed' | 'failed'
+  ): Promise<boolean> {
+    const claimKey = summerTurnClaimKey(id);
+    const claimLease = summerTurnClaimLeaseValue({
+      claimToken: current.claimToken ?? '',
+      expiresAt: current.claimExpiresAt ?? '',
+    });
+    const fenceMarker = `${marker}:${current.claimToken}`;
+    const alreadyFenced = (await this.backend.get(claimKey)) === fenceMarker;
+    return (
+      alreadyFenced ||
+      this.backend.compareAndSet(claimKey, claimLease, fenceMarker, TTL_SECONDS)
+    );
+  }
+
+  private async writeSummerTurn(record: OvieSummerTurn): Promise<void> {
+    await this.backend.set(summerTurnKey(record.id), record);
   }
 }
 
@@ -243,7 +350,7 @@ export class FailoverOperatingStore implements OperatingStore {
     return this.list('listInitiatives');
   }
 
-  putSummerTurn(record: OvieSummerTurn): Promise<void> {
+  putSummerTurn(record: OvieSummerTurn): Promise<OvieSummerTurn> {
     return this.putSummerCanonical(record);
   }
 
@@ -273,9 +380,12 @@ export class FailoverOperatingStore implements OperatingStore {
     return this.mutateSummer(store => store.failSummerTurn(...args));
   }
 
-  private async putSummerCanonical(record: OvieSummerTurn): Promise<void> {
-    await this.options.fallback.putSummerTurn(record);
-    await this.cacheSummerTurn(record);
+  private async putSummerCanonical(
+    record: OvieSummerTurn
+  ): Promise<OvieSummerTurn> {
+    const persisted = await this.options.fallback.putSummerTurn(record);
+    await this.cacheSummerTurn(persisted);
+    return persisted;
   }
 
   private async mutateSummer(
@@ -372,6 +482,45 @@ function summerTurnKey(id: string): string {
   return `ovie:mcp:v1:summer-turn:${id}`;
 }
 
+function summerTurnClaimKey(id: string): string {
+  return `ovie:mcp:v1:summer-turn:${id}:claim`;
+}
+
+type SummerTurnClaimLease = {
+  readonly claimToken: string;
+  readonly expiresAt: string;
+};
+
+function summerTurnClaimLeaseValue(lease: SummerTurnClaimLease): string {
+  return JSON.stringify({
+    claimToken: lease.claimToken,
+    expiresAt: lease.expiresAt,
+  });
+}
+
+function asSummerTurnClaimLease(
+  value: unknown
+): SummerTurnClaimLease | undefined {
+  if (typeof value !== 'string') return undefined;
+  try {
+    const parsed = JSON.parse(value) as Partial<SummerTurnClaimLease>;
+    if (
+      typeof parsed.claimToken !== 'string' ||
+      !parsed.claimToken ||
+      typeof parsed.expiresAt !== 'string' ||
+      !Number.isFinite(Date.parse(parsed.expiresAt))
+    ) {
+      return undefined;
+    }
+    return {
+      claimToken: parsed.claimToken,
+      expiresAt: parsed.expiresAt,
+    };
+  } catch {
+    return undefined;
+  }
+}
+
 function matchesActiveClaim(
   current: OvieSummerTurn | undefined,
   claimToken: string,
@@ -390,7 +539,20 @@ function asInitiative(value: unknown): OvieInitiative | undefined {
   const rec = value as Partial<OvieInitiative>;
   if (rec.kind !== 'initiative' || typeof rec.id !== 'string') return undefined;
   if (!Array.isArray(rec.evidence) || !rec.handoff) return undefined;
-  return rec as OvieInitiative;
+  return {
+    ...rec,
+    confidence: normalizeInitiativeConfidence(rec.confidence),
+  } as OvieInitiative;
+}
+
+function normalizeInitiativeConfidence(value: unknown): InitiativeConfidence {
+  if (
+    typeof value === 'string' &&
+    (INITIATIVE_CONFIDENCE as readonly string[]).includes(value)
+  ) {
+    return value as InitiativeConfidence;
+  }
+  return 'medium';
 }
 
 function asDecision(value: unknown): OvieDecision | undefined {

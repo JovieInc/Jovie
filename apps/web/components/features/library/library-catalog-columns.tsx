@@ -1,5 +1,7 @@
 'use client';
 
+// @coverage-via apps/web/tests/unit/library/LibraryCatalogWaveformCell.test.tsx
+
 import { type ColumnDef, createColumnHelper } from '@tanstack/react-table';
 import { memo, useMemo } from 'react';
 import { LibraryMediaThumbnail } from '@/app/app/(shell)/library/LibraryMediaThumbnail';
@@ -9,7 +11,6 @@ import {
   type LibraryReleaseAsset,
 } from '@/app/app/(shell)/library/library-data';
 import { libraryWaveformPeaks } from '@/app/app/(shell)/library/library-waveform-peaks';
-import { ArtworkFrame } from '@/components/atoms/ArtworkFrame';
 import { alignment } from '@/components/organisms/table/table.styles';
 import {
   type DspAvatarItem,
@@ -38,6 +39,11 @@ export function formatLibraryItemType(asset: LibraryReleaseAsset): string {
   if (asset.itemKind === 'merch') {
     return asset.productType?.trim() || 'Merch';
   }
+  if (asset.itemKind === 'document') {
+    return asset.itemStatusLabel ?? 'Document';
+  }
+  if (asset.catalogType === 'social') return 'Social';
+  if (asset.itemKind === 'video') return 'Video';
   return formatReleaseType(asset.releaseType);
 }
 
@@ -78,12 +84,11 @@ export const LibraryCatalogArtworkCell = memo(
     readonly asset: LibraryReleaseAsset;
   }) {
     return (
-      <ArtworkFrame
-        size='thumbnail'
+      <LibraryMediaThumbnail
+        asset={asset}
+        size='row'
         className='system-b-library-artwork-shell block h-9 w-9'
-      >
-        <LibraryMediaThumbnail asset={asset} size='row' />
-      </ArtworkFrame>
+      />
     );
   }
 );

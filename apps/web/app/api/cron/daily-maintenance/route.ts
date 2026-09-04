@@ -14,6 +14,8 @@
  * - Data retention: Sundays only (heavy operation)
  * - Under-enriched discography sweep: every day (bounded batch)
  * - AI crawler analytics sync: every day (Cloudflare GraphQL, GH-12748)
+ * - Release outcome reconciliation: every day (bounded 30-day snapshots)
+ * - Founder-review upload lease cleanup: every day (private Blob orphans)
  *
  * Each sub-job runs in an independent try-catch so one failure
  * doesn't block the others.
@@ -26,8 +28,10 @@ import { runDataRetentionCleanup } from '@/lib/analytics/data-retention';
 import { verifyCronRequest } from '@/lib/cron/auth';
 import { sweepUnderEnrichedProfilesForCron } from '@/lib/discography/re-enrich';
 import { captureError } from '@/lib/error-tracking';
+import { cleanupFounderReviewUploadLeases } from '@/lib/founder-review/server';
 import { runOnboardingScriptAggregation } from '@/lib/onboarding/script-aggregation';
 import { runProfileSearchMonitoring } from '@/lib/profile-search/runner';
+import { reconcileReleaseWorkflowRunOutcomes } from '@/lib/release-to-revenue/outcome-reconciliation';
 import { logger } from '@/lib/utils/logger';
 import { runWaitlistAutoAccept } from '@/lib/waitlist/auto-accept';
 import { runReconciliation } from '../billing-reconciliation/route';
@@ -141,7 +145,35 @@ export async function GET(request: Request) {
     syncAiCrawlerAnalyticsCron
   );
 
-  // 10. Data retention — Sundays only (heavy operation)
+  // 10. Release outcome reconciliation — bounded daily snapshots until mature.
+  results.releaseOutcomeReconciliation = await runSubJob(
+    'releaseOutcomeReconciliation',
+    async () => {
+      const summary = await reconcileReleaseWorkflowRunOutcomes();
+      if (summary.failed > 0) {
+        throw new Error(
+          `${summary.failed} release outcome reconciliation${summary.failed === 1 ? '' : 's'} failed`
+        );
+      }
+      return summary;
+    }
+  );
+
+  // 11. Expired founder-review audio uploads that never bound to a receipt.
+  results.founderReviewUploadLeases = await runSubJob(
+    'founderReviewUploadLeases',
+    async () => {
+      const summary = await cleanupFounderReviewUploadLeases();
+      if (summary.failed > 0) {
+        throw new Error(
+          `${summary.failed} founder-review upload lease${summary.failed === 1 ? '' : 's'} quarantined for manual cleanup`
+        );
+      }
+      return summary;
+    }
+  );
+
+  // 12. Data retention — Sundays only (heavy operation)
   const isSunday = new Date().getDay() === 0;
   results.dataRetention = isSunday
     ? await runSubJob('dataRetention', runDataRetentionCleanup)

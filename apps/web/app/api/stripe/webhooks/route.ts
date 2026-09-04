@@ -22,6 +22,7 @@
  * - Handlers are registered in lib/stripe/webhooks/registry.ts
  */
 
+import { createHash } from 'node:crypto';
 import * as Sentry from '@sentry/nextjs';
 import { and, eq, isNull, lt, or } from 'drizzle-orm';
 import { NextRequest, NextResponse } from 'next/server';
@@ -44,6 +45,59 @@ export const runtime = 'nodejs';
 
 const NO_STORE_HEADERS = { 'Cache-Control': 'no-store' } as const;
 const WEBHOOK_PROCESSING_LEASE_MS = 5 * 60 * 1000;
+
+/**
+ * Build attribution context for a signature verification failure.
+ *
+ * Verification failed, so nothing in the payload can be trusted — the event
+ * ID parsed from the raw body is diagnostic-only and must never drive
+ * processing. Endpoint mode and a truncated secret fingerprint let us
+ * attribute secret/deploy skew bursts (JOV-5851, JOV-1617) in Sentry without
+ * logging the secret itself.
+ */
+function buildSignatureFailureContext(
+  body: string,
+  signatureHeader: string,
+  webhookSecret: string
+): Record<string, unknown> {
+  let unverifiedEventId: string | undefined;
+  try {
+    const parsed: unknown = JSON.parse(body);
+    if (
+      parsed !== null &&
+      typeof parsed === 'object' &&
+      typeof (parsed as { id?: unknown }).id === 'string'
+    ) {
+      unverifiedEventId = (parsed as { id: string }).id;
+    }
+  } catch {
+    // Body was not JSON — nothing to attribute.
+  }
+
+  const signatureTimestamp = /(?:^|,)t=(\d+)/.exec(signatureHeader)?.[1];
+  const signatureSchemeCount = (signatureHeader.match(/(?:^|,)v\d+=/g) ?? [])
+    .length;
+
+  const secretKey = env.STRIPE_SECRET_KEY?.trim();
+  const endpointMode = secretKey?.startsWith('sk_live_')
+    ? 'live'
+    : secretKey?.startsWith('sk_test_')
+      ? 'test'
+      : 'unknown';
+
+  return {
+    route: '/api/stripe/webhooks',
+    error_class: 'stripe_signature_verification_failed',
+    unverifiedEventId,
+    endpointMode,
+    signatureTimestamp,
+    signatureSchemeCount,
+    webhookSecretFingerprint: createHash('sha256')
+      .update(webhookSecret)
+      .digest('hex')
+      .slice(0, 12),
+  };
+}
 
 export async function POST(request: NextRequest) {
   const webhookSecret = env.STRIPE_WEBHOOK_SECRET?.trim();
@@ -85,9 +139,11 @@ export async function POST(request: NextRequest) {
     try {
       event = stripe.webhooks.constructEvent(body, signature, webhookSecret);
     } catch (error) {
-      await captureCriticalError('Invalid Stripe webhook signature', error, {
-        route: '/api/stripe/webhooks',
-      });
+      await captureCriticalError(
+        'Invalid Stripe webhook signature',
+        error,
+        buildSignatureFailureContext(body, signature, webhookSecret)
+      );
       return NextResponse.json(
         { error: 'Invalid signature' },
         { status: 400, headers: NO_STORE_HEADERS }
@@ -105,6 +161,8 @@ export async function POST(request: NextRequest) {
     // If the claim fails, the unprocessed record remains and Stripe's retry
     // will re-attempt without requiring a transaction.
     let leaseClaimed = false;
+    let leaseStartedAt: Date | null = null;
+    let webhookRecordId: string | null = null;
     try {
       // Attempt insert; unique constraint on stripeEventId handles duplicates
       const [insertedRecord] = await db
@@ -118,8 +176,6 @@ export async function POST(request: NextRequest) {
         })
         .onConflictDoNothing()
         .returning({ id: stripeWebhookEvents.id });
-
-      let webhookRecordId: string;
 
       if (insertedRecord) {
         // New event — use the newly inserted record
@@ -158,9 +214,10 @@ export async function POST(request: NextRequest) {
       // with a compare-and-set lease closes that race without requiring a
       // transaction, which the Neon HTTP driver does not support.
       const leaseCutoff = new Date(Date.now() - WEBHOOK_PROCESSING_LEASE_MS);
+      leaseStartedAt = new Date();
       const [claimedRecord] = await db
         .update(stripeWebhookEvents)
-        .set({ processingStartedAt: new Date() })
+        .set({ processingStartedAt: leaseStartedAt })
         .where(
           and(
             eq(stripeWebhookEvents.id, webhookRecordId),
@@ -174,11 +231,15 @@ export async function POST(request: NextRequest) {
         .returning({ id: stripeWebhookEvents.id });
 
       if (!claimedRecord) {
-        // Another request owns the active lease. Acknowledge the duplicate so
-        // Stripe does not retry while the original request is still running.
+        // Another request owns the active lease, but it has not durably
+        // completed yet. A 2xx here could make Stripe stop retrying before the
+        // owner fails, so keep this delivery retryable until processed_at exists.
         return NextResponse.json(
-          { received: true },
-          { headers: NO_STORE_HEADERS }
+          { error: 'Webhook processing in progress' },
+          {
+            status: 503,
+            headers: { ...NO_STORE_HEADERS, 'Retry-After': '5' },
+          }
         );
       }
       leaseClaimed = true;
@@ -187,19 +248,38 @@ export async function POST(request: NextRequest) {
       await processWebhookEvent(event, stripeCreatedAt);
 
       // Mark event as processed
-      await db
+      const [processedRecord] = await db
         .update(stripeWebhookEvents)
         .set({ processedAt: new Date(), processingStartedAt: null })
-        .where(eq(stripeWebhookEvents.id, webhookRecordId));
+        .where(
+          and(
+            eq(stripeWebhookEvents.id, webhookRecordId),
+            eq(stripeWebhookEvents.processingStartedAt, leaseStartedAt),
+            isNull(stripeWebhookEvents.processedAt)
+          )
+        )
+        .returning({ id: stripeWebhookEvents.id });
+
+      if (!processedRecord) {
+        throw new Error(
+          'Webhook processing lease ownership was lost before completion'
+        );
+      }
     } catch (processingError) {
       // Release the lease on handled failures so Stripe retries immediately;
       // an abrupt process exit still self-heals when the lease expires.
-      if (leaseClaimed) {
+      if (leaseClaimed && leaseStartedAt && webhookRecordId) {
         try {
           await db
             .update(stripeWebhookEvents)
             .set({ processingStartedAt: null })
-            .where(eq(stripeWebhookEvents.stripeEventId, event.id));
+            .where(
+              and(
+                eq(stripeWebhookEvents.id, webhookRecordId),
+                eq(stripeWebhookEvents.processingStartedAt, leaseStartedAt),
+                isNull(stripeWebhookEvents.processedAt)
+              )
+            );
         } catch (leaseReleaseError) {
           logger.warn('Stripe webhook lease release failed', {
             eventId: event.id,

@@ -10,7 +10,7 @@ struct MobileChatMessageRow: View {
   var onRecordVideo: (MobileChatVideoProposalPayload) -> Void = { _ in }
 
   private var isStreamingAssistant: Bool {
-    item.role == .assistant && item.status == .streaming
+    item.role == .assistant && item.status.isInFlight
   }
 
   private var assistantSegments: [MobileChatRenderableSegment] {
@@ -35,7 +35,7 @@ struct MobileChatMessageRow: View {
           .foregroundStyle(JovieColor.textPrimary)
       }
 
-      if item.status == .failed {
+      if item.status == .failed || item.status == .canceled {
         Button("Retry", action: onRetry)
           .font(JovieFont.body(size: 14, weight: .semibold))
           .foregroundStyle(JovieColor.textPrimary)
@@ -189,6 +189,7 @@ struct ChatComposerView: View {
   @FocusState.Binding var isComposerFocused: Bool
   let isSending: Bool
   let isOffline: Bool
+  var workspaceMode: MobileWorkspaceMode = .jovie
   let onSend: () -> Void
   var onMic: () -> Void = {}
   let onSelectWorkflow: (ComposerWorkflowAction) -> Void
@@ -198,14 +199,21 @@ struct ChatComposerView: View {
     ChatComposerBar(
       draft: $draft,
       isFocused: $isComposerFocused,
-      placeholder: isOffline ? "Ask Jovie (offline)" : "Ask Jovie",
+      placeholder: composerPlaceholder,
       isSending: isSending,
-      isPlusEnabled: ChatComposerMetrics.isPlusEnabled(isSending: isSending),
+      isPlusEnabled: workspaceMode == .jovie && ChatComposerMetrics.isPlusEnabled(isSending: isSending),
       onSend: onSend,
       onMic: onMic,
       onSelectWorkflow: onSelectWorkflow,
       onDraftEdited: onDraftEdited
     )
+    .accessibilityValue(isOffline ? "Offline" : "")
+  }
+
+  private var composerPlaceholder: String {
+    workspaceMode == .ovie
+      ? (isOffline ? workspaceMode.composerOfflinePlaceholder : workspaceMode.askChatLabel)
+      : ChatComposerCopy.emptyPlaceholder
   }
 }
 

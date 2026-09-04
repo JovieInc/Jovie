@@ -1,5 +1,6 @@
 'use client';
 
+import { AVATAR_RING_CLASSNAME } from '@jovie/ui';
 import { Avatar } from '@/components/molecules/Avatar';
 import { cn } from '@/lib/utils';
 
@@ -45,12 +46,8 @@ export function ArtistAvatarStack({
           key={artist.id}
           src={artist.avatarUrl}
           alt={artist.displayName}
-          size='xs'
-          className={cn(
-            'size-5 shrink-0 rounded-full',
-            'ring-2 ring-(--linear-bg-page)',
-            index > 0 && '-ml-1.5'
-          )}
+          size='sm'
+          className={cn(AVATAR_RING_CLASSNAME, index > 0 && '-ml-1.5')}
         />
       ))}
       {overflowCount > 0 && (

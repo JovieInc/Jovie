@@ -69,7 +69,10 @@ describe('@critical PaymentHandler - misc', () => {
     handler = new PaymentHandler();
 
     mockGetPlanFromPriceId.mockReturnValue('standard');
-    mockUpdateUserBillingStatus.mockResolvedValue({ success: true });
+    mockUpdateUserBillingStatus.mockResolvedValue({
+      success: true,
+      appUserId: 'app_user_test',
+    });
     mockInvalidateBillingCache.mockResolvedValue(undefined);
   });
 

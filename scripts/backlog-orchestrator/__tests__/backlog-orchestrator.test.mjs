@@ -954,6 +954,19 @@ describe('deterministic Symphony admission boundary', () => {
     };
   }
 
+  function laneCapacity(ready = 1, budget = 15) {
+    return {
+      schema: 'jovie-lane-capacity/v2',
+      observedAt: '2026-08-09T05:00:00.000Z',
+      repositories: {
+        'JovieInc/Jovie': { ready, budget },
+      },
+      defaultLaneBudget: 4,
+      lanes: {},
+      sharedResources: {},
+    };
+  }
+
   function fleetEvidence(overrides = {}) {
     return {
       main: {
@@ -967,10 +980,21 @@ describe('deterministic Symphony admission boundary', () => {
       controller: { status: 'green' },
       integrity: { status: 'clear' },
       queue: {
+        repository: 'JovieInc/Jovie',
         status: 'known',
         eligiblePrs: 6,
         greenReadyPrs: 1,
         target: 15,
+        laneCapacity: laneCapacity(1, 15),
+      },
+      closureHealth: {
+        schema: 'jovie-closure-health/v1',
+        status: 'healthy',
+        authority: 'Summer',
+        newIssueIntakeAllowed: true,
+        promotionContinues: true,
+        remediationContinues: true,
+        reasons: [],
       },
       independentReview: {
         schema: admitter.INDEPENDENT_REVIEW_RECEIPT_SCHEMA,
@@ -981,6 +1005,15 @@ describe('deterministic Symphony admission boundary', () => {
         headSha: 'a3eeefdd4dc681d1c9b5b4385720d661f5129137',
         scope: admitter.INDEPENDENT_REVIEW_SCOPE,
         observedAt: '2026-08-09T05:00:00.000Z',
+      },
+      concurrencyEvidence: {
+        schema: admitter.GEM_CONCURRENCY_EVIDENCE_SCHEMA,
+        target: 4,
+        approved: true,
+        cleanRuns: 1,
+        severeIncidents: 0,
+        observedAt: '2026-08-09T05:00:00.000Z',
+        accepted: true,
       },
       observedAt: '2026-08-09T05:00:00.000Z',
       ...overrides,
@@ -993,14 +1026,16 @@ describe('deterministic Symphony admission boundary', () => {
     });
   }
 
-  it('backpressures only at fifteen green ready-to-merge PRs', () => {
+  it('leaves per-lane backpressure to the candidate preflight', () => {
     const fleetGate = admitter.evaluateFleetGate(
       fleetEvidence({
         queue: {
+          repository: 'JovieInc/Jovie',
           status: 'known',
           eligiblePrs: 40,
           greenReadyPrs: 15,
           target: 15,
+          laneCapacity: laneCapacity(15, 15),
         },
       }),
       { now: '2026-08-09T05:01:00.000Z' }
@@ -1016,15 +1051,106 @@ describe('deterministic Symphony admission boundary', () => {
     const oneLanded = admitter.evaluateFleetGate(
       fleetEvidence({
         queue: {
+          repository: 'JovieInc/Jovie',
           status: 'known',
           eligiblePrs: 39,
           greenReadyPrs: 14,
           target: 15,
+          laneCapacity: laneCapacity(14, 15),
         },
       }),
       { now: '2026-08-09T05:01:00.000Z' }
     );
     assert.equal(oneLanded.workAdmission.newIssueLeaseAllowed, true);
+  });
+
+  it('fails lane admission closed when the scoped receipt disagrees with queue evidence', () => {
+    const fleetGate = admitter.evaluateFleetGate(
+      fleetEvidence({
+        queue: {
+          repository: 'JovieInc/Jovie',
+          status: 'known',
+          eligiblePrs: 6,
+          greenReadyPrs: 1,
+          target: 15,
+          laneCapacity: laneCapacity(0, 15),
+        },
+      }),
+      { now: '2026-08-09T05:01:00.000Z' }
+    );
+
+    assert.equal(fleetGate.laneCapacity, null);
+    assert.equal(fleetGate.state, 'AMBER');
+    assert.equal(
+      fleetGate.reasons.some(
+        reason => reason.code === 'queue-lane-capacity-invalid'
+      ),
+      true
+    );
+
+    const staleSchema = admitter.evaluateFleetGate(
+      fleetEvidence({
+        queue: {
+          repository: 'JovieInc/Jovie',
+          status: 'known',
+          eligiblePrs: 6,
+          greenReadyPrs: 1,
+          target: 15,
+          laneCapacity: {
+            ...laneCapacity(1, 15),
+            schema: 'jovie-lane-capacity/v1',
+          },
+        },
+      }),
+      { now: '2026-08-09T05:01:00.000Z' }
+    );
+    assert.equal(staleSchema.laneCapacity, null);
+    assert.equal(
+      staleSchema.reasons.some(
+        reason =>
+          reason.code === 'queue-lane-capacity-invalid' &&
+          reason.detail.includes('jovie-lane-capacity/v1')
+      ),
+      true
+    );
+  });
+
+  it('blocks a new lease when Summer closure health is red while promotion stays live', () => {
+    const fleetGate = admitter.evaluateFleetGate(
+      fleetEvidence({
+        closureHealth: {
+          schema: 'jovie-closure-health/v1',
+          status: 'red',
+          authority: 'Summer',
+          newIssueIntakeAllowed: false,
+          promotionContinues: true,
+          remediationContinues: true,
+          reasons: ['duplicate-issue-lanes-unresolved'],
+        },
+      }),
+      { now: '2026-08-09T05:01:00.000Z' }
+    );
+
+    assert.equal(fleetGate.state, 'GREEN');
+    assert.equal(fleetGate.closureAdmission.newIssueIntakeAllowed, false);
+    assert.equal(fleetGate.workAdmission.newIssueLeaseAllowed, false);
+    assert.ok(
+      !fleetGate.workAdmission.activities.includes('isolated-implementation')
+    );
+    assert.equal(fleetGate.promotionAdmission.allowed, true);
+  });
+
+  it('fails missing Summer closure evidence closed only for new intake', () => {
+    const evidence = fleetEvidence();
+    delete evidence.closureHealth;
+    const fleetGate = admitter.evaluateFleetGate(evidence, {
+      now: '2026-08-09T05:01:00.000Z',
+    });
+
+    assert.equal(fleetGate.state, 'GREEN');
+    assert.equal(fleetGate.closureAdmission.newIssueIntakeAllowed, false);
+    assert.equal(fleetGate.workAdmission.newIssueLeaseAllowed, false);
+    assert.equal(fleetGate.promotionAdmission.allowed, true);
   });
 
   it('continues new isolated leases when healthy production is behind exact main', async () => {
@@ -1075,11 +1201,28 @@ describe('deterministic Symphony admission boundary', () => {
     assert.equal(fleetGate.workAdmission.newIssueLeaseAllowed, true);
   });
 
-  it('blocks already-admitted cohort preservation when unbound production has extra amber reasons', () => {
+  it('keeps hold-intake when unbound production only has a queue snapshot gap', () => {
     const fleetGate = admitter.evaluateFleetGate(
       fleetEvidence({
         production: { status: 'green', deployedSha: 'bda0d88' },
         queue: { status: 'known' },
+      }),
+      { now: '2026-08-09T05:01:00.000Z' }
+    );
+
+    assert.equal(fleetGate.state, 'AMBER');
+    assert.equal(fleetGate.promotionMode, 'hold-intake');
+    assert.equal(fleetGate.alreadyAdmittedCohort.preserve, true);
+    assert.ok(
+      !fleetGate.reasons.some(reason => reason.code === 'queue-unknown')
+    );
+  });
+
+  it('blocks already-admitted cohort preservation when unbound production has extra amber reasons', () => {
+    const fleetGate = admitter.evaluateFleetGate(
+      fleetEvidence({
+        production: { status: 'green', deployedSha: 'bda0d88' },
+        controller: { status: 'failed' },
       }),
       { now: '2026-08-09T05:01:00.000Z' }
     );
@@ -1323,12 +1466,12 @@ describe('deterministic Symphony admission boundary', () => {
         reason => reason.code === 'invalid-integrity-receipt'
       )
     );
-    assert.equal(invalidQueue.state, 'AMBER');
+    assert.equal(invalidQueue.state, 'GREEN');
+    assert.equal(invalidQueue.promotionMode, 'normal');
     assert.equal(invalidQueue.workAdmission.allowed, true);
-    assert.equal(invalidQueue.workAdmission.newIssueLeaseAllowed, true);
-    assert.equal(invalidQueue.promotionAdmission.allowed, false);
+    assert.equal(invalidQueue.promotionAdmission.allowed, true);
     assert.ok(
-      invalidQueue.reasons.some(reason => reason.code === 'queue-unknown')
+      !invalidQueue.reasons.some(reason => reason.code === 'queue-unknown')
     );
   });
 
@@ -1358,7 +1501,38 @@ describe('deterministic Symphony admission boundary', () => {
     assert.ok(stale.reasons.some(reason => reason.code === 'controller-stale'));
   });
 
-  it('keeps Gem at four unless recent clean evidence explicitly proves eight', () => {
+  it('blocks a new lease when capacity evidence is missing or stale', () => {
+    const now = '2026-08-09T05:01:00.000Z';
+    const approved = {
+      schema: admitter.GEM_CONCURRENCY_EVIDENCE_SCHEMA,
+      target: 8,
+      approved: true,
+      cleanRuns: 20,
+      severeIncidents: 0,
+      observedAt: '2026-08-09T05:00:00.000Z',
+    };
+    const missing = admitter.resolveGemConcurrency(null, { now });
+    const stale = admitter.resolveGemConcurrency(
+      { ...approved, observedAt: '2026-08-07T05:00:00.000Z' },
+      { now }
+    );
+    assert.equal(missing.maxConcurrent, 0);
+    assert.equal(missing.newMutationAllowed, false);
+    assert.equal(missing.preserveQueuedWork, true);
+    assert.equal(stale.maxConcurrent, 0);
+    assert.equal(stale.newMutationAllowed, false);
+    const gate = admitter.evaluateFleetGate(
+      fleetEvidence({ concurrencyEvidence: null }),
+      { now }
+    );
+    assert.equal(gate.workAdmission.allowed, true);
+    assert.equal(gate.workAdmission.newIssueLeaseAllowed, false);
+    assert.ok(
+      gate.workAdmission.activities.includes('isolated-implementation')
+    );
+  });
+
+  it('accepts only fresh measured capacity and requires twenty clean runs above baseline', () => {
     const now = '2026-08-09T05:01:00.000Z';
     const approved = {
       schema: admitter.GEM_CONCURRENCY_EVIDENCE_SCHEMA,
@@ -1369,13 +1543,9 @@ describe('deterministic Symphony admission boundary', () => {
       observedAt: '2026-08-09T05:00:00.000Z',
     };
     assert.equal(
-      admitter.resolveGemConcurrency(null, { now }).maxConcurrent,
-      4
-    );
-    assert.equal(
       admitter.resolveGemConcurrency({ ...approved, cleanRuns: 19 }, { now })
         .maxConcurrent,
-      4
+      0
     );
     assert.equal(
       admitter.resolveGemConcurrency(approved, { now }).maxConcurrent,
@@ -1398,6 +1568,10 @@ describe('deterministic Symphony admission boundary', () => {
         ...controllerSignals.independentReview,
         observedAt: new Date().toISOString(),
       };
+      if (controllerSignals.queue?.laneCapacity) {
+        controllerSignals.queue.laneCapacity.observedAt =
+          new Date().toISOString();
+      }
       try {
         const { stdout } = await execFileAsync(
           'python3',
@@ -1490,9 +1664,9 @@ describe('deterministic Symphony admission boundary', () => {
       )
     );
     assert.equal(invalidQueue.exitCode, 0);
-    assert.equal(invalidQueue.receipt.state, 'AMBER');
+    assert.equal(invalidQueue.receipt.state, 'GREEN');
     assert.equal(invalidQueue.receipt.workAdmission.allowed, true);
-    assert.equal(invalidQueue.receipt.promotionAdmission.allowed, false);
+    assert.equal(invalidQueue.receipt.promotionAdmission.allowed, true);
     assert.equal(recovered.exitCode, 0);
     assert.equal(recovered.receipt.state, 'GREEN');
     assert.equal(recovered.receipt.promotionAdmission.allowed, true);
@@ -1581,18 +1755,22 @@ from gem_gate_contract import GateContractError, drain_state_dir, gate_state_dir
 receipt = {
     "schema": "jovie-fleet-gate/v1",
     "state": "AMBER",
-    "signals": {"main": {"status": "red", "sha": "a" * 40}, "independentReview": {"schema": "jovie-independent-review/v1", "accepted": False, "reason": "independent-review-receipt-missing"}},
+    "signals": {"main": {"status": "red", "sha": "a" * 40}, "closureHealth": {"schema": "jovie-closure-health/v1", "status": "healthy", "authority": "Summer", "newIssueIntakeAllowed": True, "promotionContinues": True, "remediationContinues": True, "reasons": []}, "independentReview": {"schema": "jovie-independent-review/v1", "accepted": False, "reason": "independent-review-receipt-missing"}, "concurrencyEvidence": {"accepted": True}},
     "reasons": [{"code": "main-not-green", "layer": "promotion", "severity": "warning", "detail": "main red"}],
     "reviewAdmission": {"allowed": False, "required": True, "authority": "Gem", "scope": "exact-main-head", "headSha": None, "observedAt": None, "reviewId": None, "reviewer": None, "reason": "independent-review-receipt-missing"},
-    "workAdmission": {"allowed": True, "newIssueLeaseAllowed": True},
+    "closureAdmission": {"allowed": True, "newIssueIntakeAllowed": True, "newImplementationAllowed": True, "fallbackPrGenerationAllowed": True, "authority": "Summer", "promotionContinues": True, "remediationContinues": True},
+    "workAdmission": {"allowed": True, "newIssueLeaseAllowed": True, "newImplementationAllowed": True, "activities": ["approved-issue-lease"]},
     "promotionAdmission": {"allowed": False},
     "remediationAdmission": {
         "allowed": True,
         "localAllowed": True,
         "pushAllowed": True,
+        "activities": ["expected-head-pr-update"],
         "maxConcurrent": 1,
+        "activities": ["expected-head-pr-update"],
         "authority": "single-pr-writer-exact-head",
     },
+    "concurrency": {"gem": {"evidenceAccepted": True, "newMutationAllowed": True, "maxConcurrent": 1, "runtimeFloor": 1}},
     "ownership": {"review": "Gem", "directGemPickup": False},
 }
 validate_gate_result(0, json.dumps(receipt), "fleet")
@@ -1617,6 +1795,14 @@ except GateContractError:
     pass
 else:
     raise AssertionError("RED plus work allowed must fail closed")
+closure_bypass = json.loads(json.dumps(receipt))
+closure_bypass["signals"]["closureHealth"].update({"status": "red", "newIssueIntakeAllowed": False, "reasons": ["duplicate-issue-lanes-unresolved"]})
+try:
+    validate_gate_result(0, json.dumps(closure_bypass), "fleet")
+except GateContractError:
+    pass
+else:
+    raise AssertionError("closure signal/admission contradiction must fail closed")
 for invalid in (0, True, None):
     malformed = json.loads(json.dumps(receipt))
     malformed["remediationAdmission"]["maxConcurrent"] = invalid
@@ -1665,18 +1851,21 @@ def by_github(_repo):
 receipt = {
     "schema": "jovie-fleet-gate/v1",
     "state": "RED",
-    "signals": {"main": {"status": "red", "sha": "a" * 40}, "independentReview": {"schema": "jovie-independent-review/v1", "accepted": False, "reason": "independent-review-receipt-malformed"}},
+    "signals": {"main": {"status": "red", "sha": "a" * 40}, "closureHealth": {"schema": "jovie-closure-health/v1", "status": "red", "authority": "Summer", "newIssueIntakeAllowed": False, "promotionContinues": True, "remediationContinues": True, "reasons": ["gate-evaluation-failed"]}, "independentReview": {"schema": "jovie-independent-review/v1", "accepted": False, "reason": "independent-review-receipt-malformed"}, "concurrencyEvidence": {"accepted": False}},
     "reasons": [{"code": "repository-or-artifact-corruption", "layer": "integrity", "severity": "critical", "detail": "test"}],
     "reviewAdmission": {"allowed": False, "required": True, "authority": "Gem", "scope": "exact-main-head", "headSha": None, "observedAt": None, "reviewId": None, "reviewer": None, "reason": "independent-review-receipt-malformed"},
-    "workAdmission": {"allowed": False, "newIssueLeaseAllowed": False},
+    "closureAdmission": {"allowed": False, "newIssueIntakeAllowed": False, "newImplementationAllowed": False, "fallbackPrGenerationAllowed": False, "authority": "Summer", "promotionContinues": True, "remediationContinues": True},
+    "workAdmission": {"allowed": False, "newIssueLeaseAllowed": False, "newImplementationAllowed": False, "activities": []},
     "promotionAdmission": {"allowed": False},
     "remediationAdmission": {
         "allowed": True,
         "localAllowed": True,
         "pushAllowed": False,
-        "maxConcurrent": 1,
+        "maxConcurrent": 0,
+        "activities": ["workspace-rehabilitation"],
         "authority": "single-pr-writer-exact-head",
     },
+    "concurrency": {"gem": {"evidenceAccepted": False, "newMutationAllowed": False, "maxConcurrent": 0, "runtimeFloor": 1}},
     "ownership": {"review": "Gem", "directGemPickup": False},
 }
 print(json.dumps(receipt))
@@ -1723,18 +1912,22 @@ print(json.dumps(result))
 receipt = {
     "schema": "jovie-fleet-gate/v1",
     "state": "AMBER",
-    "signals": {"main": {"status": "red", "sha": "a" * 40}, "independentReview": {"schema": "jovie-independent-review/v1", "accepted": False, "reason": "independent-review-receipt-missing"}},
+    "signals": {"main": {"status": "red", "sha": "a" * 40}, "closureHealth": {"schema": "jovie-closure-health/v1", "status": "healthy", "authority": "Summer", "newIssueIntakeAllowed": True, "promotionContinues": True, "remediationContinues": True, "reasons": []}, "independentReview": {"schema": "jovie-independent-review/v1", "accepted": False, "reason": "independent-review-receipt-missing"}, "concurrencyEvidence": {"accepted": True}},
     "reasons": [{"code": "main-not-green", "layer": "promotion", "severity": "warning", "detail": "test"}],
     "reviewAdmission": {"allowed": False, "required": True, "authority": "Gem", "scope": "exact-main-head", "headSha": None, "observedAt": None, "reviewId": None, "reviewer": None, "reason": "independent-review-receipt-missing"},
-    "workAdmission": {"allowed": True, "newIssueLeaseAllowed": True},
+    "closureAdmission": {"allowed": True, "newIssueIntakeAllowed": True, "newImplementationAllowed": True, "fallbackPrGenerationAllowed": True, "authority": "Summer", "promotionContinues": True, "remediationContinues": True},
+    "workAdmission": {"allowed": True, "newIssueLeaseAllowed": True, "newImplementationAllowed": True, "activities": ["approved-issue-lease"]},
     "promotionAdmission": {"allowed": False},
     "remediationAdmission": {
         "allowed": True,
         "localAllowed": True,
         "pushAllowed": True,
+        "activities": ["expected-head-pr-update"],
         "maxConcurrent": 1,
+        "activities": ["expected-head-pr-update"],
         "authority": "single-pr-writer-exact-head",
     },
+    "concurrency": {"gem": {"evidenceAccepted": True, "newMutationAllowed": True, "maxConcurrent": 1, "runtimeFloor": 1}},
     "ownership": {"review": "Gem", "directGemPickup": False},
 }
 print(json.dumps(receipt))
@@ -1809,6 +2002,48 @@ print(json.dumps({"behind": behind, "clean": clean, "calls": calls}))
     assert.ok(start >= 0 && end > start);
     assert.ok(
       body.indexOf('recoverStaleLeases') < body.indexOf('admissionPreflight')
+    );
+    assert.match(body, /gateNextHold\.admitNextFromPool/);
+    assert.match(body, /gateNextHold\.loadIssueHolds/);
+  });
+
+  it('collision-checks each pool candidate before plan or context', async () => {
+    const source = await readFile(
+      resolve(ORCHESTRATOR_DIR, 'backlog-orchestrator.mjs'),
+      'utf8'
+    );
+    const start = source.indexOf('async function evaluateGateCandidate');
+    const end = source.indexOf('async function runTeamGateNext', start);
+    const body = source.slice(start, end);
+    assert.ok(start >= 0 && end > start);
+    assert.match(body, /stage: 'collision-preflight'/);
+    assert.ok(
+      body.indexOf('admissionPreflight(team, selected)') <
+        body.indexOf('buildDeterministicPlanEvidence')
+    );
+    assert.match(body, /admissionPreflight\(team, current\)/);
+  });
+
+  it('rechecks refreshed research receipts before reading fingerprints', async () => {
+    const source = await readFile(
+      resolve(ORCHESTRATOR_DIR, 'backlog-orchestrator.mjs'),
+      'utf8'
+    );
+    const start = source.indexOf('async function evaluateGateCandidate');
+    const end = source.indexOf('async function runTeamGateNext', start);
+    const body = source.slice(start, end);
+    assert.ok(start >= 0 && end > start);
+    assert.match(
+      body,
+      /const researchReceipt = researchGate\.researchGateReceipt\(current\)/
+    );
+    assert.ok(
+      body.indexOf('if (!researchReceipt)') <
+        body.indexOf('fingerprint: researchReceipt.payload.fingerprint')
+    );
+    assert.doesNotMatch(
+      body,
+      /researchGate\.researchGateReceipt\(current\)\.payload/
     );
   });
 

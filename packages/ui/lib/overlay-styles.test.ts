@@ -52,9 +52,9 @@ describe('overlay-styles', () => {
     it('layout includes grid and max-width', () => {
       expect(centeredContentStyles.layout).toContain('grid');
       expect(centeredContentStyles.layout).toContain('max-w-lg');
-      expect(centeredContentStyles.layout).toContain(
-        'max-h-[calc(100dvh-2rem)]'
-      );
+      expect(centeredContentStyles.layout).toContain('max-h-overlay-viewport');
+      expect(centeredContentStyles.layout).toContain('w-overlay-viewport');
+      expect(centeredContentStyles.layout).not.toContain('calc(');
       expect(centeredContentStyles.layout).toContain('overscroll-contain');
     });
 
@@ -118,14 +118,16 @@ describe('overlay-styles', () => {
 
   describe('titleStyles', () => {
     it('base includes font sizing', () => {
-      expect(titleStyles.base).toContain('text-[16px]');
-      expect(titleStyles.base).toContain('font-[510]');
+      expect(titleStyles.base).toContain('text-base');
+      expect(titleStyles.base).toContain('font-medium');
+      expect(titleStyles.base).toContain('tracking-tight');
+      expect(titleStyles.base).not.toContain('--ds-marketing');
     });
   });
 
   describe('descriptionStyles', () => {
     it('base includes muted text color', () => {
-      expect(descriptionStyles.base).toContain('text-[13px]');
+      expect(descriptionStyles.base).toContain('text-app');
       expect(descriptionStyles.base).toContain('text-secondary-token');
       expect(descriptionStyles.base).toContain('leading-relaxed');
     });
@@ -137,6 +139,7 @@ describe('overlay-styles', () => {
       expect(sheetSurfaceStyles).toContain('border-default');
       expect(sheetSurfaceStyles).toContain('shadow-popover');
       expect(sheetSurfaceStyles).toContain('overscroll-contain');
+      expect(sheetSurfaceStyles).toContain('z-sheet');
     });
   });
 });

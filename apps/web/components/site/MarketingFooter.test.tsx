@@ -52,6 +52,9 @@ describe('MarketingFooter', () => {
       'href',
       '/investors'
     );
+    expect(screen.getByRole('heading', { name: 'Product' })).toHaveClass(
+      'line-clamp-2'
+    );
     expect(screen.getByRole('link', { name: 'Status' })).toHaveAttribute(
       'href',
       'https://status.jov.ie'
@@ -72,6 +75,21 @@ describe('MarketingFooter', () => {
     expect(
       screen.queryByRole('heading', { name: 'Connect' })
     ).not.toBeInTheDocument();
+  });
+
+  it('keeps developer resources discoverable in the minimal homepage footer', () => {
+    mockUsePathname.mockReturnValue('/');
+
+    render(<MarketingFooter variant='minimal' />);
+
+    expect(screen.getByRole('link', { name: 'Developers' })).toHaveAttribute(
+      'href',
+      '/developers'
+    );
+    expect(screen.getByRole('link', { name: 'CLI' })).toHaveAttribute(
+      'href',
+      '/cli'
+    );
   });
 
   it.each([

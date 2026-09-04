@@ -55,7 +55,7 @@ All deleted components are now re-exported from `@/components/organisms/table` t
 These files remain in `admin/table/` as they contain admin-specific logic:
 
 **Components**:
-- `AdminCreatorsFooter.tsx`
+- `AdminTablePagination.tsx`
 - `AdminCreatorsTableHeader.tsx`
 - `AdminCreatorsTableHeaderActions.tsx`
 - `AdminCreatorsToolbar.tsx`

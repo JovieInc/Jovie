@@ -245,27 +245,29 @@ struct APIClientTests {
   }
 
   @Test func surfacesTerminalProfileCompletionUnauthorizedAfterRefresh() async throws {
-    let tokenProvider = MockTokenProvider(tokens: ["stale-token", "fresh-token"])
-    MockURLProtocol.requestHandler = { request in
-      let response = HTTPURLResponse(
-        url: request.url!,
-        statusCode: 401,
-        httpVersion: nil,
-        headerFields: nil
-      )!
-      return (response, Data())
-    }
+    try await withNativeSessionTokenStoreTestIsolation {
+      let tokenProvider = MockTokenProvider(tokens: ["stale-token", "fresh-token"])
+      MockURLProtocol.requestHandler = { request in
+        let response = HTTPURLResponse(
+          url: request.url!,
+          statusCode: 401,
+          httpVersion: nil,
+          headerFields: nil
+        )!
+        return (response, Data())
+      }
 
-    let client = APIClient(
-      baseURL: URL(string: "https://jov.ie")!,
-      session: makeSession(),
-      tokenProvider: tokenProvider
-    )
+      let client = APIClient(
+        baseURL: URL(string: "https://jov.ie")!,
+        session: makeSession(),
+        tokenProvider: tokenProvider
+      )
 
-    await #expect(throws: APIClientError.requestFailed(statusCode: 401)) {
-      try await client.completeProfile(displayName: "Tim White", username: "tim")
+      await #expect(throws: APIClientError.requestFailed(statusCode: 401)) {
+        try await client.completeProfile(displayName: "Tim White", username: "tim")
+      }
+      #expect(await tokenProvider.recordedForceRefreshValues() == [false, true])
     }
-    #expect(await tokenProvider.recordedForceRefreshValues() == [false, true])
   }
 
   @Test func fetchesActionLoopInboxWithBearerToken() async throws {
@@ -293,6 +295,30 @@ struct APIClientTests {
 
     #expect(response.pendingCount == 1)
     #expect(response.items.count == 1)
+  }
+
+  @Test func fetchesOvieInboxWithWorkspaceQuery() async throws {
+    let tokenProvider = MockTokenProvider(tokens: ["token-1"])
+    MockURLProtocol.requestHandler = { request in
+      #expect(request.url?.path == "/api/mobile/v1/inbox")
+      #expect(request.url?.query?.contains("workspace=ov") == true)
+      let response = HTTPURLResponse(
+        url: request.url!,
+        statusCode: 200,
+        httpVersion: nil,
+        headerFields: nil
+      )!
+      let data = try JSONEncoder().encode(MobileActionLoopInboxResponse.preview)
+      return (response, data)
+    }
+
+    let client = APIClient(
+      baseURL: URL(string: "https://jov.ie")!,
+      session: makeSession(),
+      tokenProvider: tokenProvider
+    )
+
+    _ = try await client.fetchActionLoopInbox(workspace: .ovie)
   }
 
   @Test func fetchesActionLoopCalendarWithBearerToken() async throws {

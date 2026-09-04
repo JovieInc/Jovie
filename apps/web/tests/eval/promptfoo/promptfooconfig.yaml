@@ -1548,6 +1548,7 @@ tests:
           - generateCanvasPlan
           - generateReleasePitch
           - importBioFromUrl
+          - inspectPressSource
           - findMerchSources
           - manageTasks
           - markCanvasUploaded
@@ -1578,6 +1579,7 @@ tests:
           - unpauseMerchCard
           - writeWorldClassBio
           - researchArtistPresence
+          - surfaceLibraryOpportunities
           - assembleArtistProfile
           - generateSmartLink
           - draftWelcomePost
@@ -1903,6 +1905,76 @@ tests:
         value: file://assertions.cjs:assertDeterministicNoSpend
       - type: javascript
         value: file://assertions.cjs:assertFanEmailRuleCase
+
+  - description: Smart link switch refuses placeholder URLs
+    metadata:
+      cost: deterministic
+    vars:
+      input: "Smart link switch gate: placeholder refused"
+      target: skill-prompt-contract
+      skillPromptCase: release-pitch-retouch-prompts
+      smartLinkSwitchRuleCase: placeholder-refused
+    assert:
+      - type: javascript
+        value: file://assertions.cjs:assertDeterministicNoSpend
+      - type: javascript
+        value: file://assertions.cjs:assertSmartLinkSwitchRuleCase
+
+  - description: Smart link switch skips when no existing link
+    metadata:
+      cost: deterministic
+    vars:
+      input: "Smart link switch gate: missing link skips no mint"
+      target: skill-prompt-contract
+      skillPromptCase: release-pitch-retouch-prompts
+      smartLinkSwitchRuleCase: missing-link-skips-no-mint
+    assert:
+      - type: javascript
+        value: file://assertions.cjs:assertDeterministicNoSpend
+      - type: javascript
+        value: file://assertions.cjs:assertSmartLinkSwitchRuleCase
+
+  - description: Smart link switch keeps an already-live link
+    metadata:
+      cost: deterministic
+    vars:
+      input: "Smart link switch gate: already-live is no-op"
+      target: skill-prompt-contract
+      skillPromptCase: release-pitch-retouch-prompts
+      smartLinkSwitchRuleCase: already-live-is-noop
+    assert:
+      - type: javascript
+        value: file://assertions.cjs:assertDeterministicNoSpend
+      - type: javascript
+        value: file://assertions.cjs:assertSmartLinkSwitchRuleCase
+
+  - description: Smart link switch STOPs on failed lookup
+    metadata:
+      cost: deterministic
+    vars:
+      input: "Smart link switch gate: failed lookup STOPs"
+      target: skill-prompt-contract
+      skillPromptCase: release-pitch-retouch-prompts
+      smartLinkSwitchRuleCase: failed-lookup-stops
+    assert:
+      - type: javascript
+        value: file://assertions.cjs:assertDeterministicNoSpend
+      - type: javascript
+        value: file://assertions.cjs:assertSmartLinkSwitchRuleCase
+
+  - description: Smart link switch cites only resolved DSPs
+    metadata:
+      cost: deterministic
+    vars:
+      input: "Smart link switch gate: only resolved DSPs cited"
+      target: skill-prompt-contract
+      skillPromptCase: release-pitch-retouch-prompts
+      smartLinkSwitchRuleCase: only-resolved-dsps-cited
+    assert:
+      - type: javascript
+        value: file://assertions.cjs:assertDeterministicNoSpend
+      - type: javascript
+        value: file://assertions.cjs:assertSmartLinkSwitchRuleCase
 
   - description: AI chat tool prompt builders preserve no-text and factual guardrails
     metadata:
@@ -2927,6 +2999,27 @@ tests:
       - type: javascript
         value: file://assertions.cjs:assertToolExecuted
 
+  - description: Tool contract accepts paid press source inspection
+    metadata:
+      cost: deterministic
+    vars:
+      input: "Look at this press release URL and tell me if it is recent."
+      target: tool-contract
+      toolName: inspectPressSource
+      mode: app
+      plan: pro
+      toolInput:
+        url: https://lunawaves.example/press
+    assert:
+      - type: javascript
+        value: file://assertions.cjs:assertDeterministicNoSpend
+      - type: javascript
+        value: file://assertions.cjs:assertToolAvailable
+      - type: javascript
+        value: file://assertions.cjs:assertToolSchemaValid
+      - type: javascript
+        value: file://assertions.cjs:assertToolExecuted
+
   - description: Tool contract accepts paid task management
     metadata:
       cost: deterministic
@@ -3198,6 +3291,27 @@ tests:
       plan: pro
       toolInput:
         stepId: draft_welcome_post
+    assert:
+      - type: javascript
+        value: file://assertions.cjs:assertDeterministicNoSpend
+      - type: javascript
+        value: file://assertions.cjs:assertToolAvailable
+      - type: javascript
+        value: file://assertions.cjs:assertToolSchemaValid
+      - type: javascript
+        value: file://assertions.cjs:assertToolExecuted
+
+  - description: Tool contract accepts presence-build Library opportunities artifact event
+    metadata:
+      cost: deterministic
+    vars:
+      input: "Presence-build Library opportunities artifact."
+      target: tool-contract
+      toolName: surfaceLibraryOpportunities
+      mode: app
+      plan: pro
+      toolInput:
+        stepId: surface_library_opportunities
     assert:
       - type: javascript
         value: file://assertions.cjs:assertDeterministicNoSpend

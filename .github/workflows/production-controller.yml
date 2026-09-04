@@ -1,4 +1,12 @@
 name: Production Controller
+# Invariant consumer: JOV-INV-010.
+# controller-hop-exception: jovie-controller-hop/v1
+# accountable-writer: Symphony
+# capability-gap: Event-driven supersession must read live merge-queue depth,
+#   which exists only behind the GitHub GraphQL API; no static in-repo
+#   evidence can prove whether a newer eligible generation is queued.
+# revisit-trigger: Revisit when merge-queue state is carried on the
+#   workflow_run event payload or the controller moves to webhook dispatch.
 run-name: Production Controller ${{ github.event.workflow_run.head_sha }} from CI ${{ github.event.workflow_run.id }} attempt ${{ github.event.workflow_run.run_attempt }}
 
 on:
@@ -22,10 +30,13 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
-  # Hold only the read-only controller preflight for one bounded release-wave
-  # window. A newer main SHA supersedes this generation before exact CI
-  # authorization, so no staging deploy, migration, canary, promotion, or
-  # rollback mutation can start for a stale SHA.
+  # Event-driven supersession, not a fixed release-wave sleep: main itself is
+  # the release-lineage event log and the merge queue is the only place a
+  # newer eligible generation can already be validating or queued. This
+  # generation proceeds as soon as its exact SHA is current with an empty
+  # queue, and waits only a bounded queue-derived window when a newer
+  # generation is already approaching, so no staging deploy, migration,
+  # canary, promotion, or rollback mutation can start for a stale SHA.
   coalesce-production:
     name: Coalesce release wave
     if: ${{ github.event.workflow_run.event == 'push' && github.event.workflow_run.conclusion == 'success' }}
@@ -36,48 +47,146 @@ jobs:
     outputs:
       is_current: ${{ steps.coalesce.outputs.is_current }}
     steps:
-      - name: Wait for newer main to land
+      - name: Evaluate event-driven supersession
         id: coalesce
         env:
           GH_TOKEN: ${{ github.token }}
           EXPECTED_SHA: ${{ github.event.workflow_run.head_sha }}
           REPOSITORY: ${{ github.repository }}
-          # One bounded 60-second release-wave window. The immediate check
-          # avoids sleeping when this run is already stale.
-          COALESCE_DELAY_SECONDS: '60'
+          # The bounded window derives from queue state, never a universal
+          # constant: one increment per newer generation already validating in
+          # the merge queue, capped well inside the 5-minute job budget.
+          COALESCE_PER_GENERATION_SECONDS: '30'
+          COALESCE_MAX_SECONDS: '150'
+          # Retired fixed release-wave window; receipts record time saved
+          # against it.
+          FIXED_WINDOW_SECONDS_REPLACED: '60'
         shell: bash
         run: |
           set -euo pipefail
-          echo "is_current=false" >> "$GITHUB_OUTPUT"
+          queue_depth=0
+          {
+            echo "is_current=false"
+            echo "decision=superseded"
+            echo "replacement_sha=none"
+            echo "wait_seconds=0"
+            echo "time_saved_seconds=0"
+          } >> "$GITHUB_OUTPUT"
+
+          # Emit the release-lineage receipt: every decision records its
+          # reason, the replacement SHA, the time saved against the retired
+          # fixed window, and the next state. Any wait carries an explicit
+          # expected benefit and deadline.
+          record_receipt() {
+            local decision="$1" reason="$2" replacement_sha="$3" wait_seconds="$4" next_state="$5"
+            local time_saved_seconds=$(( FIXED_WINDOW_SECONDS_REPLACED - wait_seconds ))
+            if [ "$time_saved_seconds" -lt 0 ]; then
+              time_saved_seconds=0
+            fi
+            {
+              echo "decision=$decision"
+              echo "replacement_sha=$replacement_sha"
+              echo "wait_seconds=$wait_seconds"
+              echo "time_saved_seconds=$time_saved_seconds"
+            } >> "$GITHUB_OUTPUT"
+            local deadline="none"
+            if [ "$wait_seconds" -gt 0 ]; then
+              deadline="$(date -u -d "+${wait_seconds} seconds" +%Y-%m-%dT%H:%M:%SZ)"
+            fi
+            local expected_benefit="none: no newer eligible generation is validating or queued"
+            if [ "$wait_seconds" -gt 0 ]; then
+              expected_benefit="allow $queue_depth queued merge-group generation(s) to supersede before exact CI authorization"
+            fi
+            jq -n \
+              --arg generation "$EXPECTED_SHA" \
+              --arg decision "$decision" \
+              --arg reason "$reason" \
+              --arg replacement_sha "$replacement_sha" \
+              --argjson wait_seconds "$wait_seconds" \
+              --argjson time_saved_seconds "$time_saved_seconds" \
+              --arg expected_benefit "$expected_benefit" \
+              --arg deadline "$deadline" \
+              --arg next_state "$next_state" \
+              '{generation: $generation, decision: $decision, reason: $reason, replacementSha: $replacement_sha, waitSeconds: $wait_seconds, timeSavedSeconds: $time_saved_seconds, expectedBenefit: $expected_benefit, deadline: $deadline, nextState: $next_state}' \
+              > "$RUNNER_TEMP/release-lineage-receipt.json"
+            echo "::notice::Release lineage $EXPECTED_SHA decision=$decision reason=\"$reason\" replacement=$replacement_sha wait=${wait_seconds}s time_saved=${time_saved_seconds}s next=\"$next_state\""
+            {
+              echo "### Release lineage receipt"
+              echo '```json'
+              cat "$RUNNER_TEMP/release-lineage-receipt.json"
+              echo '```'
+            } >> "$GITHUB_STEP_SUMMARY"
+          }
+
           [[ "$EXPECTED_SHA" =~ ^[0-9a-f]{40}$ ]] || {
             echo "::error::Controller expected SHA must be a full commit."
             exit 1
           }
 
+          # Event 1: main advanced. An older not-yet-mutating generation is
+          # marked superseded, naming its replacement. Supersession is
+          # monotonic because main only moves forward and idempotent because
+          # no mutation has started for this lineage.
           current_main_sha="$(gh api "repos/$REPOSITORY/commits/main" --jq '.sha // empty')"
           [[ "$current_main_sha" =~ ^[0-9a-f]{40}$ ]] || {
-            echo "::error::Could not resolve exact current main during release coalescing."
+            echo "::error::Could not resolve exact current main during release supersession."
             exit 1
           }
           if [ "$current_main_sha" != "$EXPECTED_SHA" ]; then
-            echo "::notice::Controller generation $EXPECTED_SHA was superseded by $current_main_sha before the coalescing window."
+            record_receipt "superseded" "newer main landed before evaluation" "$current_main_sha" 0 "yield the production lease to controller generation $current_main_sha"
             exit 0
           fi
 
-          echo "Current main is $EXPECTED_SHA; waiting ${COALESCE_DELAY_SECONDS}s for the release wave to settle."
-          sleep "$COALESCE_DELAY_SECONDS"
+          # Event 2: the merge queue is the only signal of a newer eligible
+          # generation already validating or queued. An empty queue means no
+          # wait can avoid redundant work, so proceed immediately.
+          queue_json="$(gh api graphql \
+            -F owner="${REPOSITORY%%/*}" \
+            -F name="${REPOSITORY##*/}" \
+            -f query='query($owner: String!, $name: String!) {
+              repository(owner: $owner, name: $name) {
+                mergeQueue(branch: "main") {
+                  entries(first: 25) { nodes { position } }
+                }
+              }
+            }')" || {
+            echo "::error::Could not read the main merge queue during release supersession."
+            exit 1
+          }
+          queue_depth="$(jq -r '[(.data.repository.mergeQueue.entries.nodes // [])[] | select(.position | type == "number" and . >= 1)] | length' <<<"$queue_json")"
+          [[ "$queue_depth" =~ ^[0-9]+$ ]] || {
+            echo "::error::Merge queue evidence was malformed during release supersession."
+            exit 1
+          }
+
+          if [ "$queue_depth" -eq 0 ]; then
+            echo "is_current=true" >> "$GITHUB_OUTPUT"
+            record_receipt "proceed" "exact SHA is current and the merge queue is empty" "$EXPECTED_SHA" 0 "authorize exact CI evidence"
+            exit 0
+          fi
+
+          # Bounded coalescing: wait only because a newer generation is
+          # already validating. The window derives from queue depth and is
+          # capped; one bounded recheck at the deadline, no polling loop.
+          wait_seconds=$(( queue_depth * COALESCE_PER_GENERATION_SECONDS ))
+          if [ "$wait_seconds" -gt "$COALESCE_MAX_SECONDS" ]; then
+            wait_seconds="$COALESCE_MAX_SECONDS"
+          fi
+          echo "::notice::Release lineage $EXPECTED_SHA waits ${wait_seconds}s (queue_depth=$queue_depth, expected benefit: allow queued merge-group generations to supersede before exact CI authorization, deadline $(date -u -d "+${wait_seconds} seconds" +%Y-%m-%dT%H:%M:%SZ))."
+          sleep "$wait_seconds"
+
           current_main_sha="$(gh api "repos/$REPOSITORY/commits/main" --jq '.sha // empty')"
           [[ "$current_main_sha" =~ ^[0-9a-f]{40}$ ]] || {
-            echo "::error::Could not resolve exact current main at the end of release coalescing."
+            echo "::error::Could not resolve exact current main at the coalescing deadline."
             exit 1
           }
           if [ "$current_main_sha" != "$EXPECTED_SHA" ]; then
-            echo "::notice::Controller generation $EXPECTED_SHA was superseded by $current_main_sha during the coalescing window."
+            record_receipt "superseded" "newer main landed during the bounded coalescing window" "$current_main_sha" "$wait_seconds" "yield the production lease to controller generation $current_main_sha"
             exit 0
           fi
 
           echo "is_current=true" >> "$GITHUB_OUTPUT"
-          echo "Release coalescing completed for current main $EXPECTED_SHA."
+          record_receipt "proceed" "exact SHA stayed current through the bounded coalescing window" "$EXPECTED_SHA" "$wait_seconds" "authorize exact CI evidence"
 
   fleet-promotion:
     name: Authorize fleet deployment state
@@ -128,10 +237,16 @@ jobs:
       expected_sha: ${{ steps.authorize.outputs.expected_sha }}
       already_verified: ${{ steps.authorize.outputs.already_verified }}
       marker_recovery: ${{ steps.authorize.outputs.marker_recovery }}
+      run_web: ${{ steps.authorize.outputs.run_web }}
+      selected_lanes: ${{ steps.authorize.outputs.selected_lanes }}
+      deployed_sha: ${{ steps.authorize.outputs.deployed_sha }}
+      web_evidence_sha: ${{ steps.authorize.outputs.web_evidence_sha }}
+      lane_receipt_artifact_id: ${{ steps.authorize.outputs.lane_receipt_artifact_id }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           ref: ${{ github.event.workflow_run.head_sha }}
+          fetch-depth: 0
           persist-credentials: false
       - name: Cross-prove exact successful push CI
         id: authorize
@@ -148,6 +263,7 @@ jobs:
           TRIGGER_RUN_STATUS: ${{ github.event.workflow_run.status }}
           TRIGGER_RUN_CONCLUSION: ${{ github.event.workflow_run.conclusion }}
           TRIGGER_HEAD_REPOSITORY: ${{ github.event.workflow_run.head_repository.full_name }}
+          PRODUCTION_BUILD_INFO_URL: https://jov.ie/api/health/build-info
         shell: bash
         run: |
           set -euo pipefail
@@ -156,7 +272,12 @@ jobs:
             echo "is_current=false"
             echo "already_verified=false"
             echo "marker_recovery=false"
+            echo "run_web=false"
+            echo "selected_lanes=none"
+            echo "deployed_sha="
+            echo "web_evidence_sha=none"
           } >> "$GITHUB_OUTPUT"
+          marker_recovery=false
           [[ "$EXPECTED_SHA" =~ ^[0-9a-f]{40}$ ]] || {
             echo "::error::Controller expected SHA must be a full commit."
             exit 1
@@ -234,6 +355,10 @@ jobs:
           marker_reason="$(jq -r '.reason' <<<"$marker_state_json")"
           case "$marker_state" in
             verified)
+              marker_deployment_id="$(jq -r '.deploymentId // ""' <<<"$marker_state_json")"
+              if [ "$marker_deployment_id" = "not-applicable" ]; then
+                node .github/scripts/assert-live-production-bind.mjs --main-sha "$EXPECTED_SHA"
+              fi
               echo "already_verified=true" >> "$GITHUB_OUTPUT"
               echo "::notice::Exact production generation $EXPECTED_SHA is already verified by its payload-bound historical attempt."
               exit 0
@@ -249,6 +374,7 @@ jobs:
                 echo "::error::Only the exact full controller attempt 2 may consume an interrupted-marker recovery."
                 exit 1
               fi
+              marker_recovery=true
               echo "marker_recovery=true" >> "$GITHUB_OUTPUT"
               ;;
             none)
@@ -338,6 +464,85 @@ jobs:
               exit 1
             fi
 
+            receipt_name="product-lane-release-${EXPECTED_SHA}-${source_run_attempt}"
+            artifacts_json="$(gh api "repos/$REPOSITORY/actions/runs/$source_run_id/artifacts?per_page=100")"
+            receipt_artifact_id="$(jq -r --arg name "$receipt_name" '
+              [.artifacts[] | select(.expired == false and .name == $name)]
+              | if length == 1 then .[0].id else empty end
+            ' <<<"$artifacts_json")"
+            [[ "$receipt_artifact_id" =~ ^[1-9][0-9]*$ ]] || {
+              echo "::error::Exact CI attempt lacks one sealed product-lane release receipt."
+              exit 1
+            }
+            receipt_dir="$RUNNER_TEMP/product-lane-release"
+            mkdir -p "$receipt_dir"
+            gh api "repos/$REPOSITORY/actions/artifacts/$receipt_artifact_id/zip" > "$receipt_dir/receipt.zip"
+            unzip -q "$receipt_dir/receipt.zip" -d "$receipt_dir"
+            jq -e --arg sha "$EXPECTED_SHA" --arg run "$source_run_id" '
+              .provenance.sha == $sha and
+              .releaseRouting.sourceMainRunId == $run and
+              .aggregatePassed == true and
+              (.selectedLanes | type == "array")
+            ' "$receipt_dir/release.json" >/dev/null || {
+              echo "::error::Product-lane release receipt failed exact-run validation."
+              exit 1
+            }
+
+            # A release wave can collapse several rapid main pushes. Anchor to
+            # the exact deployment currently serving the canonical alias, prove
+            # that checkpoint with its durable controller marker, then route
+            # from the complete still-unreleased first-parent range.
+            build_info_json="$(curl --fail --silent --show-error \
+              --connect-timeout 5 --max-time 15 --retry 2 --retry-all-errors \
+              "$PRODUCTION_BUILD_INFO_URL")"
+            deployed_sha="$(jq -er '
+              .commitSha
+              | select(type == "string" and test("^[0-9a-f]{40}$"))
+            ' <<<"$build_info_json")" || {
+              echo "::error::Canonical production build info omitted an exact deployed SHA."
+              exit 1
+            }
+            lane_range_mode=range
+            if [ "$marker_recovery" = true ] && [ "$deployed_sha" = "$EXPECTED_SHA" ]; then
+              # Attempt 1 can promote the exact build before its durable marker is
+              # uploaded. The actor-bound recovery proof above authorizes attempt
+              # 2 to reuse the exact current receipt without asking that missing
+              # marker to prove itself.
+              lane_range_mode=marker-recovery
+              echo "::notice::Recovering the exact current production receipt after alias promotion."
+            else
+              deployed_marker_json="$(node .github/scripts/production-marker-state.mjs \
+                --sha "$deployed_sha" \
+                --repo "$REPOSITORY" \
+                --controller-workflow-id "$controller_workflow_id")"
+              jq -e '
+                .state == "verified" and
+                (.deploymentId | type == "string" and test("^dpl_[A-Za-z0-9]+$"))
+              ' >/dev/null <<<"$deployed_marker_json" || {
+                echo "::error::Canonical production SHA lacks one exact verified deployment marker."
+                exit 1
+              }
+            fi
+
+            lane_range_json="$RUNNER_TEMP/production-lane-range.json"
+            node scripts/lib/production-lane-range.mjs \
+              --repo "$REPOSITORY" \
+              --deployed-sha "$deployed_sha" \
+              --current-sha "$EXPECTED_SHA" \
+              --current-receipt "$receipt_dir/release.json" \
+              --mode "$lane_range_mode" \
+              --json-out "$lane_range_json"
+            selected_lanes="$(jq -r 'if (.selectedLanes | length) == 0 then "none" else (.selectedLanes | join(",")) end' "$lane_range_json")"
+            # Planner sets runWeb true when the range selects Web OR live SHA ≠
+            # current main (JOV-5821). Skip-promote stays fail-closed while
+            # unbound (JOV-5458 / JOV-5807).
+            run_web="$(jq -r '.runWeb' "$lane_range_json")"
+            web_bind_reason="$(jq -r '.webBindReason // "none"' "$lane_range_json")"
+            web_evidence_sha="$(jq -r '.webEvidenceSha // "none"' "$lane_range_json")"
+            if [ "$web_bind_reason" = "live_unbound" ]; then
+              echo "::notice::Live production $deployed_sha is unbound from current main $EXPECTED_SHA with sealed lanes $selected_lanes; forcing Web/Promote so skip-promote cannot occupy the bind."
+            fi
+
             final_main_sha="$(gh api "repos/$REPOSITORY/commits/main" --jq '.sha // empty')"
             [[ "$final_main_sha" =~ ^[0-9a-f]{40}$ ]] || {
               echo "::error::Could not resolve exact main at the production authorization boundary."
@@ -352,10 +557,24 @@ jobs:
             {
               echo "source_ci_run_id=$source_run_id"
               echo "source_ci_run_attempt=$source_run_attempt"
+              echo "selected_lanes=$selected_lanes"
+              echo "run_web=$run_web"
+              echo "deployed_sha=$deployed_sha"
+              echo "web_evidence_sha=$web_evidence_sha"
+              echo "lane_receipt_artifact_id=$receipt_artifact_id"
               echo "authorized=true"
             } >> "$GITHUB_OUTPUT"
-            echo "Authorized production from exact CI run $source_run_id attempt $source_run_attempt."
+            echo "Authorized production from exact CI run $source_run_id attempt $source_run_attempt over deployed range $deployed_sha..$EXPECTED_SHA (Web=$run_web bind=$web_bind_reason)."
             exit 0
+
+      - name: Preserve cumulative production lane evidence
+        if: ${{ steps.authorize.outputs.authorized == 'true' }}
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: production-lane-range-${{ steps.authorize.outputs.expected_sha }}-${{ github.run_attempt }}
+          path: ${{ runner.temp }}/production-lane-range.json
+          if-no-files-found: error
+          retention-days: 30
 
       - name: Write one-shot production marker recovery lease
         if: ${{ steps.authorize.outputs.marker_recovery == 'true' && steps.authorize.outputs.authorized == 'true' }}
@@ -381,7 +600,7 @@ jobs:
   production-release:
     name: Production Release
     needs: [authorize-production]
-    if: ${{ always() && needs.authorize-production.result == 'success' && needs.authorize-production.outputs.authorized == 'true' }}
+    if: ${{ always() && needs.authorize-production.result == 'success' && needs.authorize-production.outputs.authorized == 'true' && needs.authorize-production.outputs.run_web == 'true' }}
     uses: ./.github/workflows/production-release.yml
     permissions:
       contents: read
@@ -656,12 +875,11 @@ jobs:
         always() &&
         github.event.workflow_run.event == 'push' &&
         needs.authorize-production.result == 'success' &&
-        needs.authorize-production.outputs.authorized == 'true' &&
         needs.authorize-production.outputs.already_verified != 'true'
       }}
     # The workflow-level production lease is still held here. Every probe
     # targets the immutable deployment URL, and no newer generation can mutate
-    # canonical production until this final current-main proof completes.
+    # canonical production until this final marker decision completes.
     runs-on: ubuntu-latest
     timeout-minutes: 10
     permissions:
@@ -669,38 +887,52 @@ jobs:
     outputs:
       verified: ${{ steps.finalize.outputs.verified || 'false' }}
     steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+          fetch-depth: 1
       - name: Resolve current main before final verification
         id: current
         env:
           GH_TOKEN: ${{ github.token }}
           EXPECTED_SHA: ${{ needs.authorize-production.outputs.expected_sha }}
+          PRODUCTION_BUILD_INFO_URL: https://jov.ie/api/health/build-info
+          RUN_WEB: ${{ needs.authorize-production.outputs.run_web }}
         run: |
           set -euo pipefail
+          {
+            echo "superseded_before_marker=false"
+          } >> "$GITHUB_OUTPUT"
           current_sha="$(gh api "repos/${{ github.repository }}/commits/main" --jq '.sha // empty')"
           [[ "$current_sha" =~ ^[0-9a-f]{40}$ ]] || {
             echo "::error::Could not resolve an exact current main SHA."
             exit 1
           }
           if [ "$current_sha" != "$EXPECTED_SHA" ]; then
-            echo "::notice::Post-deploy verification for $EXPECTED_SHA was superseded by $current_sha; neutral with no notification."
+            echo "::warning::Post-deploy verification for $EXPECTED_SHA was superseded by $current_sha; exact production bind will be proven before marker preservation."
+            if [ "$RUN_WEB" != true ]; then
+              node .github/scripts/assert-live-production-bind.mjs --main-sha "$current_sha"
+            fi
             echo "is_current=false" >> "$GITHUB_OUTPUT"
+            echo "superseded_before_marker=true" >> "$GITHUB_OUTPUT"
+            exit 0
           else
             echo "is_current=true" >> "$GITHUB_OUTPUT"
           fi
 
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-        if: steps.current.outputs.is_current == 'true'
+        if: ${{ (steps.current.outputs.is_current == 'true' || steps.current.outputs.superseded_before_marker == 'true') && needs.authorize-production.outputs.run_web == 'true' }}
         with:
           ref: ${{ needs.authorize-production.outputs.expected_sha }}
           fetch-depth: 1
           persist-credentials: false
 
       - uses: ./.github/actions/setup-node-pnpm
-        if: steps.current.outputs.is_current == 'true'
+        if: ${{ (steps.current.outputs.is_current == 'true' || steps.current.outputs.superseded_before_marker == 'true') && needs.authorize-production.outputs.run_web == 'true' }}
 
       - name: Require exact deployment and every post-deploy probe
         id: verify
-        if: steps.current.outputs.is_current == 'true'
+        if: ${{ (steps.current.outputs.is_current == 'true' || steps.current.outputs.superseded_before_marker == 'true') && needs.authorize-production.outputs.run_web == 'true' }}
         shell: bash
         env:
           GH_TOKEN: ${{ github.token }}
@@ -718,6 +950,7 @@ jobs:
             echo "canonical_verified=false"
             echo "canonical_deployment_id="
             echo "canonical_sha="
+            echo "superseded_after_public_bind=false"
           } >> "$GITHUB_OUTPUT"
           if [ "${{ needs.authorize-production.result }}" != "success" ] ||
             [ "${{ needs.authorize-production.outputs.authorized }}" != "true" ]; then
@@ -771,8 +1004,8 @@ jobs:
             exit 1
           fi
           if [ "$boundary_sha" != "$EXPECTED_COMMIT_SHA" ]; then
-            echo "Main advanced to $boundary_sha before canonical verification; neutral with no notification."
-            exit 0
+            echo "::notice::Main advanced to $boundary_sha before canonical verification; exact production bind for $EXPECTED_COMMIT_SHA will be preserved and not used as proof for the newer main SHA."
+            echo "superseded_after_public_bind=true" >> "$GITHUB_OUTPUT"
           fi
 
           bash .github/scripts/verify-production-alias.sh
@@ -785,28 +1018,71 @@ jobs:
 
       - name: Finalize exact current release generation
         id: finalize
-        if: ${{ always() && steps.current.outputs.is_current == 'true' }}
+        if: ${{ always() && (steps.current.outputs.is_current == 'true' || steps.verify.outputs.canonical_verified == 'true') }}
         env:
           GH_TOKEN: ${{ github.token }}
           EXPECTED_SHA: ${{ needs.authorize-production.outputs.expected_sha }}
           DEPLOYMENT_ID: ${{ needs.production-release.outputs.production_deployment_id }}
           AUTH_SMOKE_STATUS: ${{ needs.ci-post-deploy-auth-smoke.outputs.auth_smoke_status }}
+          RUN_WEB: ${{ needs.authorize-production.outputs.run_web }}
+          SELECTED_LANES: ${{ needs.authorize-production.outputs.selected_lanes }}
+          DEPLOYED_SHA: ${{ needs.authorize-production.outputs.deployed_sha }}
+          WEB_EVIDENCE_SHA: ${{ needs.authorize-production.outputs.web_evidence_sha }}
         shell: bash
         run: |
           set -euo pipefail
           echo "verified=false" >> "$GITHUB_OUTPUT"
+          superseded_after_public_bind=false
 
-          # API uncertainty fails before finalization; a newer main SHA exits
-          # neutral. Marker write-through happens in this same step so a
-          # successful verification cannot complete without local marker bytes
-          # (upload is the only remaining durable step). JOV-4442.
+          # API uncertainty fails before finalization. If main advanced after
+          # successful promotion, preserve a marker only from the exact public
+          # bind proof gathered while this controller still holds the production
+          # FIFO. Marker write-through happens in this same step so successful
+          # verification cannot complete without local marker bytes. JOV-4442.
           boundary_sha="$(gh api "repos/${{ github.repository }}/commits/main" --jq '.sha // empty')"
           if [[ ! "$boundary_sha" =~ ^[0-9a-f]{40}$ ]]; then
             echo "::error::Could not resolve exact main at the finalization boundary."
             exit 1
           fi
           if [ "$boundary_sha" != "$EXPECTED_SHA" ]; then
-            echo "Main advanced to $boundary_sha before finalization; neutral."
+            if [ "$RUN_WEB" = true ] &&
+              [ "${{ steps.verify.outcome }}" = "success" ] &&
+              [ "${{ steps.verify.outputs.canonical_verified }}" = "true" ] &&
+              [ "${{ steps.verify.outputs.canonical_deployment_id }}" = "$DEPLOYMENT_ID" ] &&
+              [ "${{ steps.verify.outputs.canonical_sha }}" = "$EXPECTED_SHA" ]; then
+              superseded_after_public_bind=true
+              echo "::notice::Main advanced to $boundary_sha before finalization; preserving the exact verified marker for superseded production generation $EXPECTED_SHA."
+            else
+              echo "::error::Main advanced to $boundary_sha before finalization without exact public bind proof for $EXPECTED_SHA."
+              exit 1
+            fi
+          fi
+          if [ "${{ needs.authorize-production.outputs.authorized }}" != "true" ]; then
+            echo "::error::Exact source CI authorization is required before finalizing production verification."
+            exit 1
+          fi
+
+          if [ "$RUN_WEB" != true ]; then
+            node .github/scripts/assert-live-production-bind.mjs --main-sha "$boundary_sha"
+            for result in \
+              "${{ needs.production-release.result }}" \
+              "${{ needs.ci-public-profile-smoke.result }}" \
+              "${{ needs.ci-post-deploy-auth-smoke.result }}" \
+              "${{ needs.lighthouse-ci.result }}"; do
+              [ "$result" = skipped ] || { echo "::error::Unselected Web release lane ran ($result)."; exit 1; }
+            done
+            jq -n \
+              --arg sha "$EXPECTED_SHA" \
+              --arg lanes "$SELECTED_LANES" \
+              --arg deployed_sha "$DEPLOYED_SHA" \
+              --arg web_evidence_sha "$WEB_EVIDENCE_SHA" \
+              --arg controller_run "${{ github.run_id }}" \
+              --arg controller_attempt "${{ github.run_attempt }}" \
+              --arg terminal_reason "skipped_no_web" \
+              '{sha: $sha, deploymentId: "not-applicable", deploymentBaseSha: $deployed_sha, webEvidenceSha: $web_evidence_sha, selectedLanes: (if $lanes == "none" then [] else ($lanes | split(",")) end), controllerRun: $controller_run, controllerAttempt: $controller_attempt, authSmoke: "not-applicable", terminalReason: $terminal_reason}' \
+              > "$RUNNER_TEMP/production-generation-verified.json"
+            echo "verified=true" >> "$GITHUB_OUTPUT"
+            echo "Web release skipped by the sealed product-lane receipt."
             exit 0
           fi
 
@@ -820,6 +1096,10 @@ jobs:
               echo "::error::Cannot write verified marker without an exact deployment ID."
               exit 1
             }
+            terminal_reason=promoted
+            if [ "$superseded_after_public_bind" = true ]; then
+              terminal_reason=skipped_superseded
+            fi
             # Write-through: marker payload is produced only on verified success
             # in the same step that sets verified=true (no separate skippable write).
             jq -n \
@@ -828,7 +1108,11 @@ jobs:
               --arg controller_run "${{ github.run_id }}" \
               --arg controller_attempt "${{ github.run_attempt }}" \
               --arg auth_smoke "$AUTH_SMOKE_STATUS" \
-              '{sha: $sha, deploymentId: $deployment_id, controllerRun: $controller_run, controllerAttempt: $controller_attempt, authSmoke: $auth_smoke}' \
+              --arg deployed_sha "$DEPLOYED_SHA" \
+              --arg web_evidence_sha "$WEB_EVIDENCE_SHA" \
+              --arg lanes "$SELECTED_LANES" \
+              --arg terminal_reason "$terminal_reason" \
+              '{sha: $sha, deploymentId: $deployment_id, deploymentBaseSha: $deployed_sha, webEvidenceSha: $web_evidence_sha, selectedLanes: (if $lanes == "none" then [] else ($lanes | split(",")) end), controllerRun: $controller_run, controllerAttempt: $controller_attempt, authSmoke: $auth_smoke, terminalReason: $terminal_reason}' \
               > "$RUNNER_TEMP/production-generation-verified.json"
             test -s "$RUNNER_TEMP/production-generation-verified.json" || {
               echo "::error::Verified marker write-through produced an empty file."
@@ -850,7 +1134,7 @@ jobs:
           retention-days: 30
 
       - name: Notify exact verified production generation
-        if: ${{ steps.finalize.outputs.verified == 'true' }}
+        if: ${{ steps.finalize.outputs.verified == 'true' && needs.authorize-production.outputs.run_web == 'true' && steps.current.outputs.is_current == 'true' }}
         env:
           SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
         shell: bash

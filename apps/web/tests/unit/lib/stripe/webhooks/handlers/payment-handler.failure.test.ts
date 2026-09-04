@@ -68,7 +68,10 @@ describe('@critical PaymentHandler - payment failed', () => {
     handler = new PaymentHandler();
 
     mockGetPlanFromPriceId.mockReturnValue('standard');
-    mockUpdateUserBillingStatus.mockResolvedValue({ success: true });
+    mockUpdateUserBillingStatus.mockResolvedValue({
+      success: true,
+      appUserId: 'app_user_test',
+    });
     mockInvalidateBillingCache.mockResolvedValue(undefined);
   });
 
@@ -534,6 +537,7 @@ describe('@critical PaymentHandler - payment failed', () => {
       success: true,
       skipped: true,
       reason: 'stale_event',
+      appUserId: 'app_user_skipped',
     });
 
     const context: WebhookContext = {

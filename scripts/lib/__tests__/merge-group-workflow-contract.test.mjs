@@ -1,5 +1,6 @@
 import { spawnSync } from 'node:child_process';
 import {
+  chmodSync,
   mkdirSync,
   mkdtempSync,
   readdirSync,
@@ -8,10 +9,12 @@ import {
   writeFileSync,
 } from 'node:fs';
 import { tmpdir } from 'node:os';
-import { join, resolve } from 'node:path';
+import { delimiter, join, resolve } from 'node:path';
 import { afterEach, describe, expect, it } from 'vitest';
+import { runMergeGroupStorybookCertification } from '../../component-merge-group-storybook-cert.mjs';
 import {
   createGitRunner,
+  formatMetaEnv,
   LIVE_MAIN_FETCH_REF,
   resolveMergeGroupPathDiff,
 } from '../resolve-merge-group-path-diff.mjs';
@@ -19,6 +22,10 @@ import {
 const REPO_ROOT = resolve(import.meta.dirname, '..', '..', '..');
 const CI_WORKFLOW = readFileSync(
   resolve(REPO_ROOT, '.github/workflows/ci.yml'),
+  'utf8'
+);
+const IOS_CI_WORKFLOW = readFileSync(
+  resolve(REPO_ROOT, '.github/workflows/ios-ci.yml'),
   'utf8'
 );
 const PRODUCTION_RELEASE_WORKFLOW = readFileSync(
@@ -129,6 +136,27 @@ function parseExactCiFastFailureOperands(script) {
   return operands;
 }
 
+function workflowDeclaresReadyForReviewType(source) {
+  const lines = source.split('\n');
+  for (let index = 0; index < lines.length; index += 1) {
+    const match = lines[index].match(/^(\s*)types:\s*(.*?)\s*$/);
+    if (!match) continue;
+
+    const indentation = match[1].length;
+    const declaration = [match[2].replace(/\s+#.*$/, '')];
+    for (let next = index + 1; next < lines.length; next += 1) {
+      const line = lines[next];
+      if (line.trim() === '' || /^\s*#/.test(line)) continue;
+      const nextIndentation = line.match(/^\s*/)?.[0].length ?? 0;
+      if (nextIndentation <= indentation) break;
+      declaration.push(line.replace(/\s+#.*$/, '').trim());
+    }
+
+    if (/\bready_for_review\b/.test(declaration.join(' '))) return true;
+  }
+  return false;
+}
+
 describe('merge_group workflow contract', () => {
   it('accepts reordered exact ci-fast failure operands', () => {
     expect(
@@ -163,32 +191,79 @@ describe('merge_group workflow contract', () => {
       'MERGE_GROUP_HEAD_SHA="${{ github.event.merge_group.head_sha }}"'
     );
     expect(CI_WORKFLOW).toContain(
-      'node scripts/lib/resolve-merge-group-path-diff.mjs'
+      'git show "${MERGE_GROUP_BASE_SHA}:scripts/lib/resolve-merge-group-path-diff.mjs"'
     );
+    expect(CI_WORKFLOW).toContain('node "$TRUSTED_PATH_DIFF_RESOLVER"');
+    expect(CI_WORKFLOW).not.toContain(
+      'node scripts/lib/resolve-merge-group-path-diff.mjs \\'
+    );
+    expect(CI_WORKFLOW).not.toContain('source "$PATH_DIFF_DIR/meta.env"');
+    expect(CI_WORKFLOW).toContain(
+      'git show "${MERGE_GROUP_BASE_SHA}:scripts/lib/ci-repo-lanes.mjs"'
+    );
+    expect(CI_WORKFLOW).toContain('node "$TRUSTED_CI_REPO_LANES"');
+    expect(CI_WORKFLOW).not.toContain('node scripts/lib/ci-repo-lanes.mjs');
     expect(CI_WORKFLOW).toContain('--base "$MERGE_GROUP_BASE_SHA"');
     expect(CI_WORKFLOW).toContain('--head "$MERGE_GROUP_HEAD_SHA"');
     expect(PATH_DIFF_HELPER).toContain(
-      "['diff', '--name-only', `${baseSha}...${headSha}`]"
+      "['diff', '--no-renames', '--name-only', `${baseSha}...${headSha}`]"
     );
     expect(CI_WORKFLOW).not.toContain('withgraphite/graphite-ci-action');
     expect(CI_WORKFLOW).not.toContain('steps.graphite');
   });
 
-  it('re-emits every required source context when a draft becomes reviewable', () => {
-    const readyForReviewTrigger =
-      'types: [opened, synchronize, reopened, ready_for_review]';
+  it('runs source checks once per revision and never on ready_for_review', () => {
+    const sourceRevisionTrigger = 'types: [opened, synchronize, reopened]';
 
-    // A synchronize that occurs while a PR is still a draft cannot be reused
-    // for branch protection. Every source producer must therefore subscribe
-    // to the ready_for_review event on the exact unchanged head.
-    expect(CI_WORKFLOW).toContain(readyForReviewTrigger);
-    expect(SIZE_GUARD_WORKFLOW).toContain(readyForReviewTrigger);
+    // Draft state does not change the source SHA. The original source checks
+    // remain authoritative when the owner pairs ready with native auto-merge.
+    expect(CI_WORKFLOW).toContain(sourceRevisionTrigger);
+    expect(SIZE_GUARD_WORKFLOW).toContain(sourceRevisionTrigger);
     expect(FORK_GATE_WORKFLOW).toContain(
-      `pull_request:\n    ${readyForReviewTrigger}`
+      `pull_request:\n    ${sourceRevisionTrigger}`
     );
     expect(FORK_GATE_WORKFLOW).toContain(
-      `pull_request_target:\n    ${readyForReviewTrigger}`
+      `pull_request_target:\n    ${sourceRevisionTrigger}`
     );
+    expect(CI_WORKFLOW).not.toContain('ready_for_review');
+    expect(SIZE_GUARD_WORKFLOW).not.toContain('ready_for_review');
+    expect(FORK_GATE_WORKFLOW).not.toContain('ready_for_review');
+    expect(CI_WORKFLOW).toMatch(/merge_group:\n\s+types: \[checks_requested\]/);
+    expect(SIZE_GUARD_WORKFLOW).toMatch(
+      /merge_group:\n\s+types: \[checks_requested\]/
+    );
+    expect(FORK_GATE_WORKFLOW).toMatch(
+      /merge_group:\n\s+types: \[checks_requested\]/
+    );
+  });
+
+  it('does not launch any workflow from an unchanged ready transition', () => {
+    const workflowDir = resolve(REPO_ROOT, '.github/workflows');
+    const offenders = readdirSync(workflowDir)
+      .filter(file => file.endsWith('.yml') || file.endsWith('.yaml'))
+      .filter(file => {
+        const source = readFileSync(resolve(workflowDir, file), 'utf8');
+        return workflowDeclaresReadyForReviewType(source);
+      });
+
+    expect(offenders).toEqual([]);
+  });
+
+  it('rejects every valid YAML spelling of a ready_for_review type', () => {
+    const unsafeDeclarations = [
+      'types: [opened, ready_for_review]',
+      'types: ready_for_review',
+      'types:\n  - opened\n  - ready_for_review',
+      'types: [\n  opened,\n  ready_for_review\n]',
+    ];
+    for (const declaration of unsafeDeclarations) {
+      expect(workflowDeclaresReadyForReviewType(declaration)).toBe(true);
+    }
+    expect(
+      workflowDeclaresReadyForReviewType(
+        'types:\n  - opened\n  - synchronize\n  - reopened'
+      )
+    ).toBe(false);
   });
 
   it('quarantines fixed unit capacity until all named warm receipts exist', () => {
@@ -222,17 +297,39 @@ describe('merge_group workflow contract', () => {
     expect(admission).toContain("github.event_name == 'merge_group'");
     expect(admission).toContain('runs-on: ubuntu-latest');
     expect(admission).toContain('timeout-minutes: 2');
+    expect(admission).toContain(
+      "admitted: ${{ steps.admission.outputs.admitted || 'false' }}"
+    );
     expect(admission).toContain('checks: read');
     expect(admission).toContain('contents: read');
+    expect(admission).toContain(
+      "pr_number: ${{ steps.admission.outputs.pr_number || '' }}"
+    );
+    expect(admission).toContain('pull-requests: read');
     expect(admission).toContain('ref: main');
+    expect(admission).toContain('node "$policy" --print-contract-version');
+    expect(admission).toContain("admitted_value=\"$(sed -n 's/^admitted=//p'");
+    expect(admission).toContain("$admitted_value\" != 'true'");
+    expect(admission).toContain("$admitted_value\" != 'false'");
+    expect(admission).toContain("echo 'admitted=true'");
+    expect(admission).toContain(
+      'refs/heads/gh-readonly-queue/main/pr-([1-9][0-9]*)-[0-9a-f]{40}'
+    );
+    expect(admission).toContain('echo "pr_number=${BASH_REMATCH[1]}"');
+    expect(admission).toContain('echo "synthetic_head_sha=$GITHUB_SHA"');
+    expect(admission).toContain(
+      "echo 'current_queue_state=LEGACY_EXACT_REF_BOOTSTRAP'"
+    );
     expect(admission).not.toContain(
       'ref: ${{ github.event.merge_group.base_sha }}'
     );
     expect(admission).toContain('persist-credentials: false');
+    expect(admission).toContain('id: admission');
     expect(admission).toContain('GH_TOKEN: ${{ github.token }}');
     expect(admission).toContain(
-      'run: node scripts/lib/merge-group-admission.mjs'
+      "policy='scripts/lib/merge-group-admission.mjs'"
     );
+    expect(admission).toContain('node "$policy"');
     expect(admission).not.toContain('secrets.');
 
     for (const jobId of ['ci-fast-typecheck', 'ci-fast-remaining']) {
@@ -244,12 +341,31 @@ describe('merge_group workflow contract', () => {
       expect(job, jobId).toContain(
         "needs.ci-merge-group-admission.result == 'success'"
       );
+      expect(job, jobId).toContain(
+        "needs.ci-merge-group-admission.outputs.admitted == 'true'"
+      );
     }
+
+    const remaining = getJobBlock(CI_WORKFLOW, 'ci-fast-remaining');
+    expect(remaining).toContain("CI_FAST_SKIP_STRUCTURAL: 'true'");
+    expect(remaining).toContain("CI_FAST_ONLY_STRUCTURAL: 'true'");
+    expect(remaining).toContain('github.event_name }}" != "pull_request"');
+    expect(remaining).toContain('echo "skip=false"');
+    expect(remaining).toContain('apps/web/\\.storybook/');
+    expect(remaining).toContain('apps/web/package\\.json$');
+    expect(remaining).toContain('apps/web/scripts/');
+    expect(remaining).toContain('chromatic\\.config\\.json$');
+    expect(remaining).toContain('package\\.json$');
+    expect(remaining).toContain('shared-ui-visual-arbitrary');
+    expect(remaining).toContain('scripts/doc-freshness-lint');
+    expect(remaining).toContain('apps/web/tests/');
 
     for (const jobId of [
       'ci-unit-tests',
       'ci-build-layout',
       'ci-ios',
+      'ci-macos',
+      'ci-cross-product-integration',
       'ci-promptfoo-evals',
       'ci-golden-eval-set',
     ]) {
@@ -259,6 +375,9 @@ describe('merge_group workflow contract', () => {
       expect(job, jobId).toContain("github.event_name != 'merge_group'");
       expect(job, jobId).toContain(
         "needs.ci-merge-group-admission.result == 'success'"
+      );
+      expect(job, jobId).toContain(
+        "needs.ci-merge-group-admission.outputs.admitted == 'true'"
       );
     }
 
@@ -271,6 +390,9 @@ describe('merge_group workflow contract', () => {
     expect(ciFast).toContain(
       "needs.ci-merge-group-admission.result == 'success'"
     );
+    expect(ciFast).toContain(
+      "needs.ci-merge-group-admission.outputs.admitted == 'true'"
+    );
     expect(ciFast).toContain('TYPECHECK_RESULT');
     expect(ciFast).toContain('REMAINING_RESULT');
     expect(ciFast).toContain('PROFILE_BROWSER_RESULT');
@@ -278,12 +400,12 @@ describe('merge_group workflow contract', () => {
     expect(ciFast).toContain('exit 1');
     const units = getJobBlock(CI_WORKFLOW, 'ci-unit-tests');
     expect(units).not.toContain('ci-unit-runner-route');
-    expect(units).toContain(
-      "github.event_name == 'push' && github.ref == 'refs/heads/main'"
+    expect(units).toMatch(
+      /github\.event_name == 'push' &&\s+github\.ref == 'refs\/heads\/main'/
     );
     const buildLayout = getJobBlock(CI_WORKFLOW, 'ci-build-layout');
-    expect(buildLayout).toContain(
-      "github.event_name == 'push' && github.ref == 'refs/heads/main'"
+    expect(buildLayout).toMatch(
+      /github\.event_name == 'push' &&\s+github\.ref == 'refs\/heads\/main'/
     );
 
     for (const jobId of [
@@ -302,6 +424,11 @@ describe('merge_group workflow contract', () => {
     const aggregate = getJobBlock(CI_WORKFLOW, 'ci-merge-group-ready');
     const sourceAggregate = getJobBlock(CI_WORKFLOW, 'ci-pr-ready');
     const unitTests = getJobBlock(CI_WORKFLOW, 'ci-unit-tests');
+    const unitJobHeader = unitTests.slice(0, unitTests.indexOf('    runs-on:'));
+    const triggerBlock = CI_WORKFLOW.slice(
+      0,
+      CI_WORKFLOW.indexOf('\npermissions:')
+    );
     expect(aggregate).toContain(
       "github.event_name == 'merge_group' && 'PR Ready'"
     );
@@ -313,15 +440,31 @@ describe('merge_group workflow contract', () => {
     expect(aggregate).toContain('ci-unit-tests');
     expect(aggregate).toContain('ci-build-layout');
     expect(aggregate).toContain('ci-ios');
+    expect(aggregate).toContain('ci-macos');
+    expect(aggregate).toContain('ci-cross-product-integration');
+    expect(aggregate).toContain('ci-product-lane-receipt');
     expect(aggregate).toContain('ci-promptfoo-evals');
     expect(aggregate).toContain('ci-golden-eval-set');
     expect(aggregate).toContain('ci-golden-path-lock');
+    expect(aggregate).toContain('ci-visual-snapshot-compare');
     expect(aggregate).toContain('drizzle-migration-guard');
+    expect(aggregate).toContain('ADMISSION_ADMITTED=');
+    expect(aggregate).toContain('ADMISSION_OBSOLETE=');
+    expect(aggregate).toContain('ADMISSION_QUEUE_STATE=');
+    expect(aggregate).toContain(
+      'Obsolete merge-group neutralized before selected product lanes'
+    );
+    expect(aggregate).toContain(
+      '"$ADMISSION_ADMITTED" == "false" && "$ADMISSION_OBSOLETE" == "true"'
+    );
+    expect(aggregate).toContain(
+      'Merge-group admission succeeded without a valid admitted/obsolete disposition'
+    );
     expect(aggregate).toContain('BUILD_LAYOUT_RESULT');
     expect(aggregate).toContain('RUN_PROMPTFOO');
     expect(aggregate).toContain('RUN_GOLDEN_EVAL');
     expect(aggregate).toContain(
-      'Unit Test shards did not pass on the non-empty merge-group combined head'
+      '$name did not pass for its selected product lane'
     );
     expect(aggregate).not.toContain(
       'RUN_TEST="${{ needs.ci-path-changes.outputs.run_test }}"'
@@ -336,13 +479,43 @@ describe('merge_group workflow contract', () => {
     expect(unitTests).not.toContain(
       "needs.ci-path-changes.outputs.run_test == 'true'"
     );
+    expect(unitTests).toContain(
+      "needs.ci-path-changes.outputs.run_web == 'true'"
+    );
+    // JOV-5288 repo lanes skip Jovie app suites in ci-fast; Web unit shards
+    // stay on the product-lane `run_web` gate so iOS/Mac-only diffs do not
+    // wait on Web units.
+    expect(unitTests).not.toContain('run_jovie_product');
     expect(unitTests).toContain('run: echo "run_full_ci=true"');
     expect(unitTests).toContain("github.event_name == 'merge_group'");
-    expect(unitTests).toContain(
-      "github.event_name == 'push' && github.ref == 'refs/heads/main'"
+    expect(unitTests).toMatch(
+      /github\.event_name == 'push' &&\s+github\.ref == 'refs\/heads\/main'/
     );
     expect(unitTests).toContain("github.event_name == 'workflow_dispatch'");
     expect(unitTests).not.toContain("github.event_name == 'pull_request'");
+    expect(unitJobHeader).toContain('always() &&\n      !cancelled() &&');
+    expect(unitJobHeader).not.toContain('continue-on-error');
+    expect(unitTests).toContain(
+      "fail-fast: ${{ github.event_name == 'merge_group' }}"
+    );
+    expect(unitTests).not.toContain('fail-fast: true');
+    expect(unitTests).not.toContain('fail-fast: false');
+    expect(unitTests).toContain('Preserve failed unit-shard diagnosis');
+    expect(unitTests).toContain(
+      "if: ${{ failure() && !cancelled() && steps.check_changes.outputs.run_full_ci == 'true' }}"
+    );
+    expect(unitTests).toContain(
+      'unit-test-failure-${{ github.run_id }}-${{ github.run_attempt }}-${{ strategy.job-index }}'
+    );
+    expect(unitTests).toContain(
+      'uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1'
+    );
+    expect(unitTests).toContain('path: apps/web/test-report.*.junit.xml');
+    expect(unitTests).toContain('if-no-files-found: warn');
+    expect(unitTests).toContain('retention-days: 14');
+    expect(triggerBlock).not.toMatch(
+      /^\s+(?:workflow_run|check_run|check_suite):/m
+    );
     expect(aggregate).not.toMatch(
       /github\.event\.pull_request|github\.(base_ref|head_ref)/
     );
@@ -357,6 +530,8 @@ describe('merge_group workflow contract', () => {
       'ci-unit-tests',
       'ci-build-layout',
       'ci-ios',
+      'ci-macos',
+      'ci-cross-product-integration',
       'ci-promptfoo-evals',
       'ci-golden-eval-set',
     ]) {
@@ -376,6 +551,52 @@ describe('merge_group workflow contract', () => {
     expect(unitTests).toContain(
       "shard: ['1/10', '2/10', '3/10', '4/10', '5/10', '6/10', '7/10', '8/10', '9/10', '10/10']"
     );
+
+    const macos = getJobBlock(CI_WORKFLOW, 'ci-macos');
+    expect(macos).toContain('runs-on: macos-26');
+    expect(macos).toContain(
+      "format('ci-macos-pr-{0}', needs.ci-merge-group-admission.outputs.pr_number)"
+    );
+    expect(macos).toContain(
+      "format('ci-macos-{0}-{1}', github.run_id, github.run_attempt)"
+    );
+    expect(macos).toContain(
+      "cancel-in-progress: ${{ github.event_name == 'merge_group' && needs.ci-merge-group-admission.outputs.pr_number != '' }}"
+    );
+    expect(CI_WORKFLOW).toContain('node "$TRUSTED_PRODUCT_LANE_CLASSIFIER"');
+    expect(CI_WORKFLOW).not.toContain('.github/workflows/macos-ci.yml');
+    expect(macos).toContain("github.event_name == 'merge_group'");
+    expect(macos).not.toContain("github.event_name == 'pull_request'");
+    expect(macos).toContain(
+      'swift test --package-path apps/macos/MenuMonitor --enable-code-coverage'
+    );
+    expect(macos).toContain(
+      'swift build --package-path apps/macos/MenuMonitor -c release'
+    );
+    expect(macos).toContain(
+      '--staging-version "$GITHUB_RUN_ID" "$GITHUB_RUN_ATTEMPT"'
+    );
+    expect(macos).toContain('id: desktop-staging-identity');
+    expect(macos).toContain('echo "version=$version" >> "$GITHUB_OUTPUT"');
+    expect(macos).toContain(
+      'DESKTOP_VERSION="${{ steps.desktop-staging-identity.outputs.version }}"'
+    );
+    expect(macos).toContain('JOVIE_DESKTOP_SOURCE_REVISION="$GITHUB_SHA"');
+    expect(macos).toContain(
+      'version="${{ steps.desktop-staging-identity.outputs.version }}"'
+    );
+    expect(macos).not.toContain(
+      'echo "DESKTOP_VERSION=$version" >> "$GITHUB_ENV"'
+    );
+    expect(
+      macos.indexOf('Bind staging package identity to the exact CI attempt')
+    ).toBeLessThan(macos.indexOf('Test and package exact Mac head'));
+    expect(
+      macos.indexOf(
+        'DESKTOP_VERSION="${{ steps.desktop-staging-identity.outputs.version }}"'
+      )
+    ).toBeGreaterThan(macos.indexOf('pnpm --filter @jovie/desktop run test'));
+    expect(macos).toContain('pnpm --filter @jovie/desktop run package:staging');
     expect(unitTests).toContain(
       "github.event_name == 'merge_group' && matrix.shard == '4/10'"
     );
@@ -439,13 +660,11 @@ describe('merge_group workflow contract', () => {
     expect(pathChanges).toContain(
       'MERGE_GROUP_HEAD_SHA="${{ github.event.merge_group.head_sha }}"'
     );
-    expect(pathChanges).toContain(
-      'node scripts/lib/resolve-merge-group-path-diff.mjs'
-    );
+    expect(pathChanges).toContain('node "$TRUSTED_PATH_DIFF_RESOLVER"');
     expect(pathChanges).toContain('--base "$MERGE_GROUP_BASE_SHA"');
     expect(pathChanges).toContain('--head "$MERGE_GROUP_HEAD_SHA"');
     expect(PATH_DIFF_HELPER).toContain(
-      "['diff', '--name-only', `${baseSha}...${headSha}`]"
+      "['diff', '--no-renames', '--name-only', `${baseSha}...${headSha}`]"
     );
     expect(PATH_DIFF_HELPER).toContain(LIVE_MAIN_FETCH_REF);
     expect(PATH_DIFF_HELPER).not.toContain('github.event.before');
@@ -453,6 +672,21 @@ describe('merge_group workflow contract', () => {
     expect(pathChanges).toContain('IS_NOOP');
     expect(pathChanges).toContain(
       "is_noop_merge_group: ${{ steps.detect.outputs.is_noop_merge_group || 'false' }}"
+    );
+    expect(pathChanges).toContain(
+      "run_jovie_product: ${{ steps.detect.outputs.run_jovie_product || 'false' }}"
+    );
+    expect(pathChanges).toContain(
+      "run_jovie_typecheck: ${{ steps.detect.outputs.run_jovie_typecheck || 'true' }}"
+    );
+    expect(pathChanges).toContain(
+      "run_symphony_control: ${{ steps.detect.outputs.run_symphony_control || 'false' }}"
+    );
+    expect(pathChanges).toContain(
+      "run_summer_ops: ${{ steps.detect.outputs.run_summer_ops || 'false' }}"
+    );
+    expect(pathChanges).toContain(
+      'node "$TRUSTED_CI_REPO_LANES" --emit-github-output'
     );
     expect(pathChanges).toContain(
       'echo "is_noop_merge_group=true" >> "$GITHUB_OUTPUT"'
@@ -527,33 +761,74 @@ describe('merge_group workflow contract', () => {
     );
   });
 
-  it('short-circuits only expensive lanes for a typed empty-diff merge group', () => {
+  it('selects product lanes independently and fails closed on selected lane results', () => {
     const pathChanges = getJobBlock(CI_WORKFLOW, 'ci-path-changes');
     const units = getJobBlock(CI_WORKFLOW, 'ci-unit-tests');
     const buildLayout = getJobBlock(CI_WORKFLOW, 'ci-build-layout');
+    const ios = getJobBlock(CI_WORKFLOW, 'ci-ios');
+    const macos = getJobBlock(CI_WORKFLOW, 'ci-macos');
+    const crossProduct = getJobBlock(
+      CI_WORKFLOW,
+      'ci-cross-product-integration'
+    );
     const aggregate = getJobBlock(CI_WORKFLOW, 'ci-merge-group-ready');
 
     expect(pathChanges).toContain(
       "is_noop_merge_group: ${{ steps.detect.outputs.is_noop_merge_group || 'false' }}"
     );
-    for (const [name, job] of [
-      ['ci-unit-tests', units],
-      ['ci-build-layout', buildLayout],
-    ]) {
-      expect(job, name).toContain(
-        "needs.ci-path-changes.outputs.is_noop_merge_group != 'true'"
-      );
-      expect(job, name).toContain("github.event_name == 'merge_group'");
-    }
-
+    expect(pathChanges).toContain('product-lane-classifier.mjs');
+    expect(pathChanges).toContain('persist-credentials: false');
+    expect(pathChanges).toContain(
+      'git show "${DIFF_BASE}:scripts/brand-scrub.py"'
+    );
+    expect(pathChanges).toContain('python3 "$TRUSTED_BRAND_SCRUBBER"');
+    expect(pathChanges).not.toContain('python3 scripts/brand-scrub.py');
+    expect(pathChanges).toContain(
+      'git show "${CLASSIFICATION_BASE_REF}:scripts/lib/product-lane-classifier.mjs"'
+    );
+    expect(pathChanges).toContain('node "$TRUSTED_PRODUCT_LANE_CLASSIFIER"');
+    expect(pathChanges).not.toContain(
+      'node scripts/lib/product-lane-classifier.mjs \\'
+    );
+    expect(pathChanges).toContain('--base-ref "$CLASSIFICATION_BASE_REF"');
+    expect(pathChanges).toContain('--head-ref "$CLASSIFICATION_HEAD_REF"');
+    expect(pathChanges).toContain(
+      'CLASSIFICATION_BASE_REF="$PATH_DIFF_BASE_SHA"'
+    );
+    expect(pathChanges).toContain(
+      'CLASSIFICATION_HEAD_REF="$PATH_DIFF_HEAD_SHA"'
+    );
+    expect(pathChanges).toContain(
+      'git merge-base --is-ancestor "$PATH_DIFF_BASE_SHA" "$PATH_DIFF_HEAD_SHA"'
+    );
+    expect(pathChanges).toContain(
+      'CLASSIFICATION_BASE_REF="origin/${{ github.base_ref }}"'
+    );
+    expect(pathChanges).toContain('CLASSIFICATION_BASE_REF="$PUSH_BASE_SHA"');
+    expect(pathChanges).toContain(
+      "run_web: ${{ steps.detect.outputs.run_web || 'false' }}"
+    );
+    expect(pathChanges).toContain(
+      "run_macos: ${{ steps.detect.outputs.run_macos || 'false' }}"
+    );
+    expect(pathChanges).toContain(
+      "run_cross_product: ${{ steps.detect.outputs.run_cross_product || 'false' }}"
+    );
+    expect(units).toContain("outputs.run_web == 'true'");
+    expect(buildLayout).toContain("outputs.run_web == 'true'");
+    expect(ios).toContain("outputs.run_ios == 'true'");
+    expect(macos).toContain("outputs.run_macos == 'true'");
+    expect(crossProduct).toContain("outputs.run_cross_product == 'true'");
+    expect(getJobBlock(CI_WORKFLOW, 'ci-fast-remaining')).toContain(
+      'CI_PRODUCT_LANES: ${{ needs.ci-path-changes.outputs.selected_lanes }}'
+    );
     expect(aggregate).toContain(
       'NOOP_GROUP="${{ needs.ci-path-changes.outputs.is_noop_merge_group }}"'
     );
+    expect(aggregate).toContain('SELECTED_LANES=');
+    expect(aggregate).toContain('Shared-contract impact');
     expect(aggregate).toContain(
-      'Typed no-op merge group must skip Unit Tests and Build + Layout'
-    );
-    expect(aggregate).toContain(
-      'Build + Layout did not pass on the non-empty merge-group combined head'
+      'Cross-Product Integration:$RUN_CROSS_PRODUCT:$CROSS_PRODUCT_RESULT'
     );
 
     for (const jobId of [
@@ -562,92 +837,118 @@ describe('merge_group workflow contract', () => {
       'ci-fast',
       'ci-secret-scan',
       'ci-golden-path-lock',
+      'ci-visual-snapshot-compare',
       'drizzle-migration-guard',
     ]) {
       expect(getJobBlock(CI_WORKFLOW, jobId), jobId).not.toContain(
-        "needs.ci-path-changes.outputs.is_noop_merge_group != 'true'"
+        "needs.ci-path-changes.outputs.run_web == 'true'"
       );
     }
 
-    const heavyGateStart = aggregate.indexOf(
-      '          if [[ "$NOOP_GROUP" == "true" ]]; then'
+    const loopStart = aggregate.indexOf(
+      '          for selected_gate in \\\n            "Web Unit Tests:'
     );
-    const heavyGateEnd = aggregate.indexOf(
-      '          if [[ "$RUN_IOS" == "true"',
-      heavyGateStart
-    );
-    expect(heavyGateStart).toBeGreaterThanOrEqual(0);
-    expect(heavyGateEnd).toBeGreaterThan(heavyGateStart);
-    const heavyGateScript = aggregate
-      .slice(heavyGateStart, heavyGateEnd)
+    const loopEnd = aggregate.indexOf('          done', loopStart);
+    expect(loopStart).toBeGreaterThanOrEqual(0);
+    expect(loopEnd).toBeGreaterThan(loopStart);
+    const selectedGateScript = aggregate
+      .slice(loopStart, loopEnd + '          done'.length)
       .replace(/^ {10}/gm, '');
 
-    for (const testCase of [
-      {
-        name: 'typed no-op accepts both heavy lanes skipped',
-        noop: 'true',
-        unit: 'skipped',
-        build: 'skipped',
-        status: 0,
-      },
-      {
-        name: 'typed no-op rejects a unit success placeholder',
-        noop: 'true',
-        unit: 'success',
-        build: 'skipped',
-        status: 1,
-      },
-      {
-        name: 'typed no-op rejects a build success placeholder',
-        noop: 'true',
-        unit: 'skipped',
-        build: 'success',
-        status: 1,
-      },
-      {
-        name: 'non-empty group accepts both heavy lanes green',
-        noop: 'false',
-        unit: 'success',
-        build: 'success',
-        status: 0,
-      },
-      {
-        name: 'unset output fails closed as a non-empty group',
-        noop: '',
-        unit: 'skipped',
-        build: 'skipped',
-        status: 1,
-      },
-      {
-        name: 'malformed output fails closed as a non-empty group',
-        noop: 'TRUE',
-        unit: 'skipped',
-        build: 'skipped',
-        status: 1,
-      },
-    ]) {
+    const cases = `unselected Web accepts skipped jobs|false|skipped|skipped|false|skipped|0
+unselected Web rejects unit execution|false|success|skipped|false|skipped|1
+unselected Web rejects build execution|false|skipped|success|false|skipped|1
+healthy Web passes with iOS skipped|true|success|success|false|skipped|0
+selected Web rejects skipped jobs|true|skipped|skipped|false|skipped|1
+selected Web rejects failed unit shard|true|failure|success|false|skipped|1
+selected Web rejects cancelled unit siblings|true|cancelled|success|false|skipped|1
+deliberate-red iOS fails with Web skipped|false|skipped|skipped|true|failure|1`;
+    for (const testCase of cases.split('\n')) {
+      const [name, web, unit, build, runIos, iosResult, status] =
+        testCase.split('|');
       const result = spawnSync(
         'bash',
         [
           '-euo',
           'pipefail',
           '-c',
-          `NOOP_GROUP="$1"
+          `RUN_WEB="$1"
 UNIT_RESULT="$2"
 BUILD_LAYOUT_RESULT="$3"
-${heavyGateScript}`,
-          'merge-group-heavy-gate',
-          testCase.noop,
-          testCase.unit,
-          testCase.build,
+RUN_IOS="$4"
+IOS_RESULT="$5"
+RUN_MACOS=false
+MACOS_RESULT=skipped
+RUN_CROSS_PRODUCT=false
+CROSS_PRODUCT_RESULT=skipped
+${selectedGateScript}`,
+          'product-lane-gate',
+          web,
+          unit,
+          build,
+          runIos,
+          iosResult,
         ],
         { encoding: 'utf8' }
       );
       expect(
         result.status,
-        `${testCase.name}\nstdout: ${result.stdout}\nstderr: ${result.stderr}`
-      ).toBe(testCase.status);
+        `${name}\nstdout: ${result.stdout}\nstderr: ${result.stderr}`
+      ).toBe(Number(status));
     }
+  });
+
+  it('builds the exact product-lane receipt with a valid immutable run URL', () => {
+    const receipt = getJobBlock(CI_WORKFLOW, 'ci-product-lane-receipt');
+    expect(receipt).toContain(
+      '--arg run "$GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID"'
+    );
+    const queryLine = receipt
+      .split('\n')
+      .find(line => line.includes("'{lanes:"));
+    expect(queryLine).toBeDefined();
+    const query = queryLine.trim().replace(/^'/, '').replace(/' \\$/, '');
+    const runUrl = 'https://github.com/JovieInc/Jovie/actions/runs/33198607319';
+    const result = spawnSync(
+      'jq',
+      [
+        '-n',
+        '--argjson',
+        'ios',
+        '["skipped","skipped"]',
+        '--argjson',
+        'mac',
+        '["skipped","skipped"]',
+        '--argjson',
+        'web',
+        '["success","success","success"]',
+        '--argjson',
+        'operations',
+        '["skipped"]',
+        '--argjson',
+        'cross',
+        '["skipped"]',
+        '--arg',
+        'receipt',
+        'product-lane-final-exact-head-1',
+        '--arg',
+        'run',
+        runUrl,
+        query,
+      ],
+      { encoding: 'utf8' }
+    );
+    expect(
+      result.status,
+      `stdout: ${result.stdout}\nstderr: ${result.stderr}`
+    ).toBe(0);
+    expect(JSON.parse(result.stdout)).toMatchObject({
+      receiptArtifact: 'product-lane-final-exact-head-1',
+      run: runUrl,
+      lanes: {
+        web: ['success', 'success', 'success'],
+      },
+    });
   });
 
   it('starts Build+Layout combined-head server with pinned loopback HOSTNAME (JOV-4446)', () => {
@@ -669,7 +970,208 @@ ${heavyGateScript}`,
     expect(buildLayout).not.toContain('actions/download-artifact');
   });
 
-  it('coalesces a short release wave before exact authorization and mutation', () => {
+  it('supersedes stale iOS flights by stable queue PR identity (JOV-5800)', () => {
+    const workflowHeader = IOS_CI_WORKFLOW.slice(
+      0,
+      IOS_CI_WORKFLOW.indexOf('\njobs:')
+    );
+    const iosCaller = getJobBlock(CI_WORKFLOW, 'ci-ios');
+
+    expect(workflowHeader).toContain('concurrency-key:');
+    expect(workflowHeader).toContain('required: false');
+    expect(workflowHeader).toContain('type: string');
+    expect(workflowHeader).toContain(
+      'group: ios-ci-${{ github.workflow }}-${{ inputs.concurrency-key || github.ref }}'
+    );
+    expect(workflowHeader).toContain(
+      "cancel-in-progress: ${{ inputs.concurrency-key != '' || github.ref != 'refs/heads/main' }}"
+    );
+    expect(iosCaller).toContain(
+      "concurrency-key: ${{ github.event_name == 'merge_group' && needs.ci-merge-group-admission.outputs.pr_number != '' && format('pr-{0}', needs.ci-merge-group-admission.outputs.pr_number) || '' }}"
+    );
+  });
+
+  it('fails closed unless every changed component renders in live Storybook on the exact merge-group diff', () => {
+    const buildLayout = getJobBlock(CI_WORKFLOW, 'ci-build-layout');
+    const certification = buildLayout.indexOf(
+      'node "$GITHUB_WORKSPACE/scripts/component-merge-group-storybook-cert.mjs"'
+    );
+    const geometry = buildLayout.indexOf(
+      'pnpm exec playwright test',
+      certification
+    );
+
+    expect(buildLayout).toContain(
+      'MERGE_GROUP_DIFF_BASE_SHA: ${{ needs.ci-path-changes.outputs.path_diff_base_sha }}'
+    );
+    expect(buildLayout).toContain('fetch-depth: 0');
+    expect(buildLayout).not.toContain('fetch-depth: 2');
+    const pathChanges = getJobBlock(CI_WORKFLOW, 'ci-path-changes');
+    expect(pathChanges).toContain(
+      'path_diff_base_sha: ${{ steps.detect.outputs.path_diff_base_sha'
+    );
+    expect(pathChanges).toContain(
+      'echo "path_diff_base_sha=$PATH_DIFF_BASE_SHA" >> "$GITHUB_OUTPUT"'
+    );
+    expect(buildLayout).not.toContain(
+      'component-merge-group-storybook-cert.mjs" || true'
+    );
+    expect(certification).toBeGreaterThanOrEqual(0);
+    expect(certification).toBeLessThan(geometry);
+  });
+
+  it('executes only the exact changed-component rendered phase for merge groups', () => {
+    const calls = [];
+    const spawn = (command, args) => {
+      calls.push({ command, args });
+      return { status: 0 };
+    };
+    const result = runMergeGroupStorybookCertification({
+      eventName: 'merge_group',
+      baseSha: 'a'.repeat(40),
+      repoRoot: REPO_ROOT,
+      storybookUrl: 'http://localhost:6006',
+      spawn,
+    });
+
+    expect(result.skipped).toBe(false);
+    expect(calls).toEqual([
+      {
+        command: 'git',
+        args: ['cat-file', '-e', `${'a'.repeat(40)}^{commit}`],
+      },
+      {
+        command: 'git',
+        args: ['merge-base', '--is-ancestor', 'a'.repeat(40), 'HEAD'],
+      },
+      {
+        command: 'pnpm',
+        args: [
+          'component-ship-gate',
+          `--diff-base=${'a'.repeat(40)}`,
+          '--skip-quality',
+          '--skip-ratchet',
+          '--skip-rendered-cert',
+          '--skip-live-storybook',
+          '--storybook-url=http://localhost:6006',
+        ],
+      },
+    ]);
+  });
+
+  it('skips non-merge events and fails closed on malformed, missing, or red merge-group evidence', () => {
+    const nonMergeCalls = [];
+    expect(
+      runMergeGroupStorybookCertification({
+        eventName: 'push',
+        spawn: (...args) => {
+          nonMergeCalls.push(args);
+          return { status: 0 };
+        },
+      })
+    ).toMatchObject({ skipped: true });
+    expect(nonMergeCalls).toEqual([]);
+    expect(() =>
+      runMergeGroupStorybookCertification({
+        eventName: 'merge_group',
+        baseSha: 'missing',
+      })
+    ).toThrow(/exact base SHA/);
+    expect(() =>
+      runMergeGroupStorybookCertification({
+        eventName: 'merge_group',
+        baseSha: 'b'.repeat(40),
+        spawn: () => ({ status: 1 }),
+      })
+    ).toThrow(/base is unavailable/);
+
+    let call = 0;
+    expect(() =>
+      runMergeGroupStorybookCertification({
+        eventName: 'merge_group',
+        baseSha: 'c'.repeat(40),
+        spawn: () => ({ status: call++ < 2 ? 0 : 1 }),
+      })
+    ).toThrow(/certification failed/);
+  });
+
+  it('propagates CLI failures and skips pnpm outside merge groups', () => {
+    const root = mkdtempSync(join(tmpdir(), 'jovie-storybook-cli-'));
+    const bin = join(root, 'bin');
+    const marker = join(root, 'pnpm-called');
+    mkdirSync(bin);
+    const gitStub = join(bin, 'git');
+    const pnpmStub = join(bin, 'pnpm');
+    writeFileSync(gitStub, '#!/bin/sh\nexit 0\n');
+    writeFileSync(pnpmStub, `#!/bin/sh\ntouch "${marker}"\nexit 23\n`);
+    chmodSync(gitStub, 0o755);
+    chmodSync(pnpmStub, 0o755);
+    const env = {
+      ...process.env,
+      PATH: `${bin}${delimiter}${process.env.PATH || ''}`,
+      GITHUB_WORKSPACE: REPO_ROOT,
+      MERGE_GROUP_DIFF_BASE_SHA: 'd'.repeat(40),
+    };
+
+    try {
+      const malformed = spawnSync(
+        process.execPath,
+        [
+          resolve(
+            REPO_ROOT,
+            'scripts/component-merge-group-storybook-cert.mjs'
+          ),
+        ],
+        {
+          encoding: 'utf8',
+          env: {
+            ...env,
+            GITHUB_EVENT_NAME: 'merge_group',
+            MERGE_GROUP_DIFF_BASE_SHA: 'malformed',
+          },
+        }
+      );
+      expect(malformed.status).not.toBe(0);
+
+      const redGate = spawnSync(
+        process.execPath,
+        [
+          resolve(
+            REPO_ROOT,
+            'scripts/component-merge-group-storybook-cert.mjs'
+          ),
+        ],
+        {
+          encoding: 'utf8',
+          env: { ...env, GITHUB_EVENT_NAME: 'merge_group' },
+        }
+      );
+      expect(redGate.status).not.toBe(0);
+      expect(readFileSync(marker, 'utf8')).toBe('');
+
+      rmSync(marker, { force: true });
+      const nonMerge = spawnSync(
+        process.execPath,
+        [
+          resolve(
+            REPO_ROOT,
+            'scripts/component-merge-group-storybook-cert.mjs'
+          ),
+        ],
+        {
+          encoding: 'utf8',
+          env: { ...env, GITHUB_EVENT_NAME: 'push' },
+        }
+      );
+      expect(nonMerge.status).toBe(0);
+      expect(nonMerge.stdout).toContain('skipped outside merge_group');
+      expect(() => readFileSync(marker)).toThrow();
+    } finally {
+      rmSync(root, { recursive: true, force: true });
+    }
+  });
+
+  it('applies event-driven supersession instead of a fixed release-wave sleep', () => {
     const coalesce = getJobBlock(
       PRODUCTION_CONTROLLER_WORKFLOW,
       'coalesce-production'
@@ -683,11 +1185,28 @@ ${heavyGateScript}`,
     expect(coalesce).toContain(
       "github.event.workflow_run.event == 'push' && github.event.workflow_run.conclusion == 'success'"
     );
-    expect(coalesce).toContain("COALESCE_DELAY_SECONDS: '60'");
-    expect(coalesce).toContain('sleep "$COALESCE_DELAY_SECONDS"');
-    expect(coalesce).toContain('echo "is_current=false" >> "$GITHUB_OUTPUT"');
-    expect(coalesce).toContain('echo "is_current=true" >> "$GITHUB_OUTPUT"');
+    // No universal fixed delay: the bounded window derives from merge-queue
+    // depth and is capped inside the 5-minute job budget.
+    expect(coalesce).not.toContain('COALESCE_DELAY_SECONDS');
+    expect(coalesce).not.toContain('sleep 60');
+    expect(coalesce).toContain("COALESCE_PER_GENERATION_SECONDS: '30'");
+    expect(coalesce).toContain("COALESCE_MAX_SECONDS: '150'");
+    expect(coalesce).toContain('sleep "$wait_seconds"');
+    // Event sources: exact main and the merge queue only; no polling loop.
     expect(coalesce).toContain('commits/main');
+    expect(coalesce).toContain('mergeQueue(branch: "main")');
+    // Empty queue + current SHA proceeds without any wait.
+    expect(coalesce).toContain('if [ "$queue_depth" -eq 0 ]; then');
+    // Every decision emits a lineage receipt with reason, replacement SHA,
+    // time saved, and next state; any wait names benefit and deadline.
+    expect(coalesce).toContain('record_receipt');
+    expect(coalesce).toContain('time_saved_seconds');
+    expect(coalesce).toContain('expected_benefit');
+    expect(coalesce).toContain('deadline');
+    expect(coalesce).toContain('next_state');
+    expect(coalesce).toContain('$GITHUB_STEP_SUMMARY');
+    expect(coalesce).toContain('echo "is_current=false"');
+    expect(coalesce).toContain('echo "is_current=true" >> "$GITHUB_OUTPUT"');
     expect(authorize).toContain(
       'needs: [coalesce-production, fleet-promotion]'
     );
@@ -744,7 +1263,16 @@ ${heavyGateScript}`,
 
     expect(verified).toContain("github.event.workflow_run.event == 'push'");
     expect(verified).toContain(
-      "needs.authorize-production.outputs.authorized == 'true'"
+      "needs.authorize-production.result == 'success'"
+    );
+    expect(verified).toContain(
+      "needs.authorize-production.outputs.already_verified != 'true'"
+    );
+    expect(verified).not.toContain(
+      "needs.authorize-production.outputs.authorized == 'true' &&"
+    );
+    expect(verified).toContain(
+      '[ "${{ needs.authorize-production.outputs.authorized }}" != "true" ]'
     );
     expect(verified).not.toContain('concurrency:');
     expect(CI_WORKFLOW).not.toContain('  deploy-notify:');
@@ -971,8 +1499,18 @@ ${heavyGateScript}`,
     );
     expect(sizeGuard).toContain("MAX_LINES: ${{ vars.PR_MAX_LINES || '800' }}");
     expect(sizeGuard).not.toContain('members were size-checked as source PRs');
-    expect(getJobBlock(SIZE_GUARD_WORKFLOW, 'size')).toContain(
-      "github.event_name == 'pull_request'"
+    const sourceSizeGuard = getJobBlock(SIZE_GUARD_WORKFLOW, 'size');
+    expect(sourceSizeGuard).toContain("github.event_name == 'pull_request'");
+    expect(sourceSizeGuard).toContain('name: Check out exact PR head');
+    expect(sourceSizeGuard).toContain(
+      'ref: ${{ github.event.pull_request.head.sha }}'
+    );
+    expect(sourceSizeGuard).toContain('persist-credentials: false');
+    expect(sourceSizeGuard).toContain(
+      'git fetch --no-tags --depth=1 origin "${{ github.event.pull_request.base.sha }}"'
+    );
+    expect(sourceSizeGuard).toContain(
+      'repo-hygiene-guard.mjs --diff-base "${{ github.event.pull_request.base.sha }}"'
     );
     expect(MEMBER_POLICY).toContain('fetchComparison');
     expect(MEMBER_POLICY).toContain('fetchPullRequest');
@@ -1021,10 +1559,12 @@ ${heavyGateScript}`,
       'ci-fast',
       'ci-build-layout',
       'ci-ios',
+      'ci-macos',
       'ci-promptfoo-evals',
       'ci-golden-eval-set',
       'ci-secret-scan',
       'ci-golden-path-lock',
+      'ci-visual-snapshot-compare',
       'drizzle-migration-guard',
       'ci-unit-tests',
       'ci-merge-group-ready',
@@ -1076,6 +1616,7 @@ ${heavyGateScript}`,
       'ci.yml',
       'fork-pr-gate.yml',
       'pr-size-guard.yml',
+      'pr-targets-main.yml',
     ]);
     expect(getJobBlock(FORK_GATE_WORKFLOW, 'merge-group-gate')).not.toContain(
       'secrets.'
@@ -1225,6 +1766,23 @@ ${heavyGateScript}`,
   });
 });
 
+describe('PR targets main (no stacked bases)', () => {
+  const workflow = readFileSync(
+    resolve(REPO_ROOT, '.github/workflows/pr-targets-main.yml'),
+    'utf8'
+  );
+
+  it('fails closed on any pull_request base other than main and passes merge_group', () => {
+    expect(workflow).toContain('name: PR targets main');
+    expect(workflow).toMatch(/^on:\n  pull_request:\n    types:/m);
+    expect(workflow).not.toMatch(/branches:\s*\[main/);
+    expect(workflow).toContain('merge_group:');
+    expect(workflow).toContain('"$base" != "main"');
+    expect(workflow).toContain('PRs must target main');
+    expect(workflow).toContain('Retarget the pull request base to main');
+  });
+});
+
 describe('resolveMergeGroupPathDiff coalesced heads (JOV-4905)', () => {
   const tempRoots = [];
 
@@ -1297,12 +1855,27 @@ describe('resolveMergeGroupPathDiff coalesced heads (JOV-4905)', () => {
   it('recomputes against live main when the event-base range is empty', () => {
     const { origin, seed, rootSha } = createFixture();
     git(seed, ['switch', '-q', '-c', 'feature']);
-    const headSha = writeAndCommit(
+    writeAndCommit(
       seed,
       'apps/web/product.ts',
       'export const ready = true;\n',
       'add product'
     );
+    writeAndCommit(
+      seed,
+      'apps/web/product.ts',
+      'export const ready = "still";\n',
+      'coalesce product once'
+    );
+    const headSha = writeAndCommit(
+      seed,
+      'apps/web/product.ts',
+      'export const ready = "exact";\n',
+      'coalesce product twice'
+    );
+    expect(
+      Number(git(seed, ['rev-list', '--count', `${rootSha}..${headSha}`]))
+    ).toBeGreaterThan(2);
     git(seed, ['push', '-q', 'origin', `${rootSha}:refs/heads/main`]);
     git(seed, ['push', '-q', 'origin', `${headSha}:refs/heads/feature`]);
 
@@ -1331,8 +1904,27 @@ describe('resolveMergeGroupPathDiff coalesced heads (JOV-4905)', () => {
       source: 'live_main_merge_base',
       isNoop: false,
       files: ['apps/web/product.ts'],
+      baseSha: rootSha,
       headSha,
     });
+    expect(formatMetaEnv(result)).toContain(`PATH_DIFF_BASE_SHA=${rootSha}`);
+    expect(formatMetaEnv(result)).toContain(`PATH_DIFF_HEAD_SHA=${headSha}`);
+
+    const calls = [];
+    runMergeGroupStorybookCertification({
+      eventName: 'merge_group',
+      baseSha: result.baseSha,
+      repoRoot: work,
+      spawn: (command, args, options) => {
+        calls.push({ command, args });
+        return command === 'pnpm'
+          ? { status: 0 }
+          : spawnSync(command, args, options);
+      },
+    });
+    const gateCall = calls.find(call => call.command === 'pnpm');
+    expect(gateCall?.args).toContain(`--diff-base=${rootSha}`);
+    expect(gateCall?.args).not.toContain(`--diff-base=${headSha}`);
   });
 
   it('treats a valid empty live-main range as a typed no-op', () => {

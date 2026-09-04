@@ -25,7 +25,7 @@ describe('AppShellFrame', () => {
       'ease-cinematic',
       'motion-reduce:transition-none'
     );
-    expect(mainContent).toHaveClass('lg:shadow-(--linear-app-shell-shadow)');
+    expect(mainContent).toHaveClass('lg:shadow-(--app-shell-shadow)');
     expect(mainContent).toHaveClass('bg-(--app-shell-content-surface)');
     expect(mainContent).not.toHaveClass('bg-(--color-bg-surface-0)/90');
     // #main-content keeps its full rounded shell radius — no Electron override
@@ -95,7 +95,7 @@ describe('AppShellFrame', () => {
     );
   });
 
-  it('marks composer focus on the shell frame for chrome retreat styles', () => {
+  it('marks composer focus on the shell frame without changing rail geometry', () => {
     render(
       <AppShellFrame
         sidebar={<aside>Sidebar</aside>}

@@ -1,12 +1,14 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-const { mockDbSelect, mockCaptureWarning } = vi.hoisted(() => ({
+const { mockDbInsert, mockDbSelect, mockCaptureWarning } = vi.hoisted(() => ({
+  mockDbInsert: vi.fn(),
   mockDbSelect: vi.fn(),
   mockCaptureWarning: vi.fn(),
 }));
 
 vi.mock('@/lib/db', () => ({
   db: {
+    insert: mockDbInsert,
     select: mockDbSelect,
   },
 }));
@@ -16,6 +18,8 @@ vi.mock('@/lib/db/schema/library', () => ({
     assetId: 'asset_id',
     approvalStatus: 'approval_status',
     creatorProfileId: 'creator_profile_id',
+    itemKind: 'item_kind',
+    profileVisibility: 'profile_visibility',
   },
 }));
 
@@ -69,6 +73,7 @@ describe('getLibraryApprovalStatusMapForProfile', () => {
 
   beforeEach(async () => {
     vi.resetModules();
+    mockDbInsert.mockClear();
     mockDbSelect.mockClear();
     mockCaptureWarning.mockClear();
 
@@ -77,6 +82,31 @@ describe('getLibraryApprovalStatusMapForProfile', () => {
       mod.getLibraryApprovalStatusMapForProfile;
     isMissingLibraryApprovalStatusTableError =
       mod.isMissingLibraryApprovalStatusTableError;
+  });
+
+  it('publishes a provider-imported release only when no artist state exists', async () => {
+    const onConflictDoNothing = vi.fn().mockResolvedValue(undefined);
+    const values = vi.fn().mockReturnValue({ onConflictDoNothing });
+    mockDbInsert.mockReturnValue({ values });
+
+    const { ensureImportedReleasePublishedByDefault } = await import(
+      '@/lib/library/approval-status.server'
+    );
+    await ensureImportedReleasePublishedByDefault({
+      creatorProfileId: 'profile-1',
+      releaseId: 'release-1',
+    });
+
+    expect(values).toHaveBeenCalledWith({
+      creatorProfileId: 'profile-1',
+      assetId: 'release-1',
+      itemKind: 'release',
+      approvalStatus: 'approved',
+      profileVisibility: 'visible',
+    });
+    expect(onConflictDoNothing).toHaveBeenCalledWith({
+      target: ['creator_profile_id', 'asset_id'],
+    });
   });
 
   it('returns explicit approval statuses keyed by asset id (happy path unchanged)', async () => {

@@ -67,6 +67,8 @@ interface AuthShellProps {
    * /start for sign-up).
    */
   readonly fallbackRedirectUrl?: string;
+  /** Keep public landing surfaces from opening Google-owned prompt chrome. */
+  readonly suppressOneTap?: boolean;
   /**
    * Override the link target for the opposite auth mode. Defaults to the
    * canonical `/signin` / `/support` route with the current search params
@@ -118,6 +120,7 @@ export function AuthShell(props: Readonly<AuthShellProps>) {
   const {
     mode,
     fallbackRedirectUrl,
+    suppressOneTap = false,
     oppositeModeUrl,
     forceOppositeModeHardNavigation = false,
     compact = false,
@@ -282,7 +285,12 @@ export function AuthShell(props: Readonly<AuthShellProps>) {
     >
       <GoogleOneTap
         mode={mode}
-        suppress={!hasHydrated || pendingProvider !== null || otpStepActive}
+        suppress={
+          suppressOneTap ||
+          !hasHydrated ||
+          pendingProvider !== null ||
+          otpStepActive
+        }
         callbackURL={fallbackRedirectUrl}
       />
       <AuthOAuthStartSurface
@@ -359,7 +367,7 @@ function AuthOAuthStartSurface({
       {hasProviders ? (
         <fieldset
           data-auth-provider-slots
-          className='grid grid-cols-1 gap-1.5'
+          className='grid grid-cols-1 gap-3'
           aria-busy={providersBusy ? 'true' : undefined}
         >
           <legend className='sr-only'>Social sign-in options</legend>
@@ -445,7 +453,10 @@ function AuthModeSwitchLink({
     'focus-ring-themed rounded-md text-primary-token underline underline-offset-2';
 
   return (
-    <span className='mt-5 block text-center text-app text-secondary-token'>
+    <span
+      data-auth-mode-switch
+      className='mt-5 block text-center text-app text-secondary-token'
+    >
       {prompt}{' '}
       {forceHardNavigation ? (
         <a href={oppositeModeUrl} className={className}>
@@ -473,7 +484,7 @@ function AuthLegalText({ mode }: Readonly<{ mode: AuthShellMode }>) {
   return (
     <p
       data-auth-legal-copy
-      className='mx-auto mt-4 max-w-sm text-center text-2xs leading-5 text-secondary-token'
+      className='mx-auto mt-8 max-w-sm text-center text-2xs leading-5 text-secondary-token'
     >
       <span data-auth-legal-prefix className='block'>
         By {mode === 'sign-up' ? 'signing up' : 'continuing'}, you agree to our

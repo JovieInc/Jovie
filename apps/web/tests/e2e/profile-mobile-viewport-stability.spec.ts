@@ -129,7 +129,10 @@ const PROFILE_MOBILE_SCREENS = [
     id: 'notifications',
     path: '/testartist?mode=subscribe',
     rootSelector: '[data-testid="profile-compact-surface"]',
-    readySelectors: ['[data-testid="profile-mobile-notifications-step-email"]'],
+    readySelectors: [
+      '[data-testid="profile-mobile-notifications-step-email"]',
+      '[data-testid="profile-primary-tab-subscribe"]',
+    ],
   },
 ] as const satisfies readonly MobileProfileScreen[];
 
@@ -1111,7 +1114,7 @@ test.describe('Public Profile Home Carousel @smoke @critical', () => {
 
         const surface = document.createElement('div');
         surface.className =
-          'rounded-2xl border border-(--linear-app-frame-seam) bg-surface-1 px-4 py-3 shadow-card';
+          'rounded-2xl border border-(--app-shell-frame-seam) bg-surface-1 px-4 py-3 shadow-card';
         const content = document.createElement('div');
         content.className = 'min-w-0';
         const copy = document.createElement('p');
@@ -1157,7 +1160,7 @@ test.describe('Public Profile Home Carousel @smoke @critical', () => {
               variant === 'choice'
                 ? '1px solid var(--linear-btn-primary-bg)'
                 : '1px solid var(--linear-border-default)',
-            borderRadius: 'var(--linear-radius-sm)',
+            borderRadius: 'var(--radius-sm)',
             fontSize: '12px',
             fontWeight: 'var(--linear-font-weight-medium)',
             padding: variant === 'choice' ? '6px 8px' : '6px',

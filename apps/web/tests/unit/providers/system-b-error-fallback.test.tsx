@@ -4,6 +4,7 @@ import { fileURLToPath } from 'node:url';
 import { render, screen } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
 import { SystemBErrorFallback } from '@/components/providers/SystemBErrorFallback';
+import { inspectRecoveryActions } from '@/tests/utils/recovery-actions';
 
 const appRoot = join(dirname(fileURLToPath(import.meta.url)), '../../..');
 const sourcePath = join(
@@ -26,17 +27,14 @@ const hardcodedSvgFillPattern = new RegExp(
 );
 
 describe('SystemBErrorFallback', () => {
-  it('renders one quiet error fallback with stable actions', () => {
+  it('renders one quiet error fallback with one stable action', () => {
     const reset = vi.fn();
 
-    render(
+    const { container } = render(
       <SystemBErrorFallback
         description='An unexpected error occurred.'
         digest='digest-1'
-        actions={[
-          { type: 'button', label: 'Try again', onClick: reset },
-          { type: 'link', label: 'Go Home', href: '/', variant: 'secondary' },
-        ]}
+        action={{ type: 'button', label: 'Try again', onClick: reset }}
       />
     );
 
@@ -50,10 +48,26 @@ describe('SystemBErrorFallback', () => {
       'data-variant',
       'primary'
     );
-    expect(screen.getByRole('link', { name: 'Go Home' })).toHaveAttribute(
+    expect(screen.getAllByRole('button')).toHaveLength(1);
+    expect(screen.queryByRole('link')).not.toBeInTheDocument();
+    expect(inspectRecoveryActions(container).issues).toEqual([]);
+  });
+
+  it('renders a link action as one control without nested interactivity', () => {
+    const { container } = render(
+      <SystemBErrorFallback
+        description='An unexpected error occurred.'
+        action={{ type: 'link', label: 'Try again', href: '/' }}
+      />
+    );
+
+    expect(screen.getByRole('link', { name: 'Try again' })).toHaveAttribute(
       'href',
       '/'
     );
+    expect(screen.queryByRole('button')).not.toBeInTheDocument();
+    expect(container.querySelector('a button, button a')).toBeNull();
+    expect(inspectRecoveryActions(container).issues).toEqual([]);
   });
 
   it('keeps the error digest behind an opt-in support disclosure', () => {
@@ -61,7 +75,7 @@ describe('SystemBErrorFallback', () => {
       <SystemBErrorFallback
         description='An unexpected error occurred.'
         digest='digest-1'
-        actions={[{ type: 'button', label: 'Try again', onClick: () => {} }]}
+        action={{ type: 'button', label: 'Try again', onClick: () => {} }}
       />
     );
 
@@ -86,6 +100,11 @@ describe('SystemBErrorFallback', () => {
     expect(source).toContain('JOVIE_ICON_PATH');
     expect(source).toContain("fill='currentColor'");
     expect(source).toContain('system-b-error-fallback__action-link');
+    expect(source).toContain('readonly action: SystemBErrorFallbackAction');
+    expect(source).not.toContain('readonly actions:');
+    expect(source).not.toContain('actions.map');
+    expect(source).toContain('asChild');
+    expect(source).not.toMatch(/<a\b[^>]*>\s*<Button\b/);
   });
 
   it('backs the primitive with System B tokens in the source of truth', async () => {

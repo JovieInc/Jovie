@@ -1,3 +1,4 @@
+// @coverage-via apps/web/tests/unit/design-system/linear-token-retire-jov-5465.test.ts
 import { Badge } from '@jovie/ui/atoms/badge';
 import { Button } from '@jovie/ui/atoms/button';
 import { Check } from 'lucide-react';
@@ -53,9 +54,8 @@ export function PricingSection() {
         <div className='homepage-section-shell'>
           <div className='homepage-section-intro reveal-on-scroll'>
             <div className='flex max-w-[22rem] flex-col gap-4 lg:max-w-none'>
-              <h2 className='marketing-h2-linear max-w-[10ch] text-primary-token md:max-w-[12ch] lg:max-w-none'>
-                {/* ui-casing-allow: marketing sentence-style headline */}
-                Simple pricing.
+              <h2 className='marketing-h2-linear max-w-[10ch] text-primary-token md:max-w-[12ch] lg:max-w-none line-clamp-2'>
+                Simple Pricing.
               </h2>
             </div>
             <p className='homepage-section-copy marketing-lead-linear text-secondary-token'>
@@ -74,7 +74,7 @@ export function PricingSection() {
               style={{
                 backgroundColor: 'var(--linear-bg-surface-0)',
                 border: '1px solid var(--linear-border-subtle)',
-                boxShadow: 'var(--linear-shadow-card)',
+                boxShadow: 'var(--shadow-card)',
               }}
             >
               <p className='text-sm font-medium tracking-tight text-tertiary-token'>
@@ -128,7 +128,7 @@ export function PricingSection() {
               style={{
                 backgroundColor: 'var(--linear-bg-surface-0)',
                 border: '1px solid var(--linear-border-subtle)',
-                boxShadow: 'var(--linear-shadow-card-elevated)',
+                boxShadow: 'var(--shadow-card-elevated)',
               }}
             >
               <div className='flex items-center justify-between'>

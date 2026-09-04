@@ -25,7 +25,10 @@ enum AvatarImageCache {
 /// the main actor. Avatars are tiny on screen, so we downsample to a small
 /// thumbnail to keep memory and compositing cheap.
 enum AvatarImageLoader {
-  static func load(_ url: URL) async -> UIImage? {
+  static func load(
+    _ url: URL,
+    thumbnailSize: CGSize = CGSize(width: 96, height: 96)
+  ) async -> UIImage? {
     guard let (data, response) = try? await URLSession.shared.data(from: url) else {
       return nil
     }
@@ -41,9 +44,7 @@ enum AvatarImageLoader {
     }
 
     // The async overload prepares the thumbnail off the main thread.
-    let thumbnail = await image.byPreparingThumbnail(
-      ofSize: CGSize(width: 96, height: 96)
-    ) ?? image
+    let thumbnail = await image.byPreparingThumbnail(ofSize: thumbnailSize) ?? image
     AvatarImageCache.store(thumbnail, for: url)
     return thumbnail
   }

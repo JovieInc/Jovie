@@ -105,6 +105,7 @@ describe('Rate Limit Config', () => {
           'trackingClicks',
           'trackingVisits',
           'publicProfile',
+          'publicArtistApi',
           'publicProfileCaptureDismissal',
           'publicProfilePacEvent',
           'health',
@@ -112,6 +113,10 @@ describe('Rate Limit Config', () => {
           'spotifySearch',
           'spotifyClaim',
           'aiChat',
+          'aiChatWeeklyFree',
+          'aiChatWeeklyTrial',
+          'aiChatWeeklyPro',
+          'aiChatWeeklyMax',
         ];
 
         for (const limiter of requiredLimiters) {
@@ -158,6 +163,29 @@ describe('Rate Limit Config', () => {
         expect(RATE_LIMITERS.spotifyClaim.window).toContain('h');
       });
 
+      it('binds every plan-aware AI quota to an isolated seven-day window', () => {
+        expect(RATE_LIMITERS.aiChatWeeklyFree).toMatchObject({
+          limit: 15,
+          window: '7 d',
+          prefix: 'ai:chat:weekly:free',
+        });
+        expect(RATE_LIMITERS.aiChatWeeklyTrial).toMatchObject({
+          limit: 50,
+          window: '7 d',
+          prefix: 'ai:chat:weekly:trial',
+        });
+        expect(RATE_LIMITERS.aiChatWeeklyPro).toMatchObject({
+          limit: 70,
+          window: '7 d',
+          prefix: 'ai:chat:weekly:pro',
+        });
+        expect(RATE_LIMITERS.aiChatWeeklyMax).toMatchObject({
+          limit: 250,
+          window: '7 d',
+          prefix: 'ai:chat:weekly:max',
+        });
+      });
+
       it('should throttle the public claim-token entry route per IP', () => {
         // The unauthenticated /claim/[token] route runs several DB reads plus
         // lead/cookie writes per hit — the throttle must not be silently dropped.
@@ -185,6 +213,19 @@ describe('Rate Limit Config', () => {
         expect(pac.algorithm).toBe('fixed-window');
         expect(capture.prefix).not.toBe(pac.prefix);
         expect(capture.limit + pac.limit).toBe(RATE_LIMITERS.general.limit);
+      });
+
+      it('isolates the public artist API from profile-view telemetry', () => {
+        const profile = RATE_LIMITERS.publicProfile;
+        const artistApi = RATE_LIMITERS.publicArtistApi;
+
+        expect(artistApi.limit).toBe(100);
+        expect(artistApi.window).toBe('1 m');
+        expect(artistApi.prefix).toBe('public:artist-api');
+        expect(artistApi.trafficClass).toBe('anonymous');
+        expect(artistApi.algorithm).toBe('fixed-window');
+        expect(artistApi.analytics).toBe(false);
+        expect(artistApi.prefix).not.toBe(profile.prefix);
       });
     });
 

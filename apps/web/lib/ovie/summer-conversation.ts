@@ -72,8 +72,14 @@ export async function enqueueOvieSummerTurn(
     createdAt: now,
     updatedAt: now,
   };
-  await store.putSummerTurn(turn);
-  return turn;
+  const persisted = await store.putSummerTurn(turn);
+  if (
+    persisted.conversationId !== conversationId ||
+    persisted.userText !== userText
+  ) {
+    throw new OvieSummerTurnError('conflict', id);
+  }
+  return persisted;
 }
 
 export async function listOvieSummerTurnsForLander(
@@ -104,6 +110,7 @@ export async function claimOvieSummerTurn(
     workerId: input.workerId,
     claimToken: input.claimToken ?? randomUUID(),
     expiresAt: new Date(now.getTime() + ttlSeconds * 1000).toISOString(),
+    ttlSeconds,
   });
 }
 

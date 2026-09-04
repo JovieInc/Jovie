@@ -6,6 +6,7 @@ import { BASE_URL } from '@/constants/app';
 import { APP_ROUTES } from '@/constants/routes';
 import { getAlternativeSlugs } from '@/content/alternatives';
 import { getComparisonSlugs } from '@/content/comparisons';
+import { PUBLIC_ARTIST_API_POLICY_URL } from '@/lib/api/v1/contract';
 import { getBlogPosts, slugifyCategory } from '@/lib/blog/getBlogPosts';
 import { CACHE_TAGS } from '@/lib/cache/tags';
 import { getChangelogReleases } from '@/lib/changelog-source';
@@ -17,6 +18,7 @@ import {
 } from '@/lib/db/schema/content';
 import { joviePlaylists } from '@/lib/db/schema/playlists';
 import { creatorProfiles } from '@/lib/db/schema/profiles';
+import { getPublishedEngineeringStories } from '@/lib/engineering-publication';
 import { env } from '@/lib/env-server';
 import { isPublicProfileIndexable } from '@/lib/profile/public-profile-indexing-policy';
 import { publicReleaseEligibilitySqlPredicate } from '@/lib/profile/public-release-eligibility';
@@ -157,11 +159,13 @@ const getSitemapCatalog = unstable_cache(
 );
 
 export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
-  const [catalog, blogPosts, changelogReleases] = await Promise.all([
-    getSitemapCatalog(),
-    getBlogPosts(),
-    getChangelogReleases(),
-  ]);
+  const [catalog, blogPosts, changelogReleases, engineeringStories] =
+    await Promise.all([
+      getSitemapCatalog(),
+      getBlogPosts(),
+      getChangelogReleases(),
+      getPublishedEngineeringStories(),
+    ]);
 
   const now = new Date();
 
@@ -179,6 +183,45 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
       priority: 0.8,
     },
     {
+      url: `${BASE_URL}${APP_ROUTES.DEVELOPERS}`,
+      lastModified: now,
+      changeFrequency: 'monthly',
+      priority: 0.7,
+    },
+    {
+      url: `${BASE_URL}${APP_ROUTES.CLI}`,
+      lastModified: now,
+      changeFrequency: 'monthly',
+      priority: 0.7,
+    },
+    {
+      url: PUBLIC_ARTIST_API_POLICY_URL,
+      lastModified: now,
+      changeFrequency: 'monthly',
+      priority: 0.6,
+    },
+    // These public, root-level machine-readable resources are linked from the
+    // developer guide and are intentionally distinct from the noindex /api/*
+    // surface.
+    {
+      url: `${BASE_URL}/openapi.json`,
+      lastModified: now,
+      changeFrequency: 'monthly',
+      priority: 0.6,
+    },
+    {
+      url: `${BASE_URL}/llms.txt`,
+      lastModified: now,
+      changeFrequency: 'monthly',
+      priority: 0.6,
+    },
+    {
+      url: `${BASE_URL}/llms-full.txt`,
+      lastModified: now,
+      changeFrequency: 'monthly',
+      priority: 0.5,
+    },
+    {
       url: `${BASE_URL}/blog`,
       lastModified: now,
       changeFrequency: 'weekly',
@@ -189,6 +232,12 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
       lastModified: now,
       changeFrequency: 'weekly',
       priority: 0.7,
+    },
+    {
+      url: `${BASE_URL}${APP_ROUTES.YOUTUBE_THUMBNAILS}`,
+      lastModified: now,
+      changeFrequency: 'weekly',
+      priority: 0.8,
     },
     {
       url: `${BASE_URL}/support`,
@@ -208,6 +257,24 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
       changeFrequency: 'weekly',
       priority: 0.5,
     },
+    {
+      url: `${BASE_URL}${APP_ROUTES.ENGINEERING}`,
+      lastModified: now,
+      changeFrequency: 'weekly',
+      priority: 0.5,
+    },
+    ...engineeringStories.flatMap(story =>
+      story.source
+        ? [
+            {
+              url: `${BASE_URL}${APP_ROUTES.ENGINEERING}/${story.slug}`,
+              lastModified: new Date(`${story.source.date}T00:00:00Z`),
+              changeFrequency: 'monthly' as const,
+              priority: 0.4,
+            },
+          ]
+        : []
+    ),
     {
       url: `${BASE_URL}/legal/privacy`,
       lastModified: now,

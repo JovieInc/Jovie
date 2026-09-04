@@ -1,3 +1,4 @@
+import { OVIE_OAUTH_PROTECTED_RESOURCE_METADATA_PATH } from './oauth-contract';
 import { parseJsonRpc, rpcError, rpcOk } from './protocol';
 import type { OperatingStore } from './store';
 import { getDefaultOperatingStore } from './store';
@@ -10,8 +11,7 @@ import {
   type OvieMcpPrincipal,
 } from './types';
 
-export const UNAUTHENTICATED_WWW_AUTHENTICATE =
-  'Bearer realm="ovie", resource_metadata="/.well-known/oauth-protected-resource/api/ovie/mcp"';
+export const UNAUTHENTICATED_WWW_AUTHENTICATE = `Bearer realm="ovie", resource_metadata="${OVIE_OAUTH_PROTECTED_RESOURCE_METADATA_PATH}"`;
 
 export type OvieMcpHandleResult = {
   readonly status: number;

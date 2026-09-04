@@ -322,67 +322,67 @@
       "cssVar": "--radius-none",
       "value": "0",
       "status": "canonical",
-      "emittedBy": "styles/design-system.css"
+      "emittedBy": "styles/generated/design-tokens.css"
     },
     {
       "cssVar": "--radius-xs",
       "value": "2px",
       "status": "canonical",
-      "emittedBy": "styles/design-system.css"
+      "emittedBy": "styles/generated/design-tokens.css"
     },
     {
       "cssVar": "--radius-default",
       "value": "4px",
       "status": "canonical",
-      "emittedBy": "styles/design-system.css"
+      "emittedBy": "styles/generated/design-tokens.css"
     },
     {
       "cssVar": "--radius-sm",
       "value": "8px",
       "status": "canonical",
-      "emittedBy": "styles/design-system.css"
+      "emittedBy": "styles/generated/design-tokens.css"
     },
     {
       "cssVar": "--radius-md",
       "value": "10px",
       "status": "canonical",
-      "emittedBy": "styles/design-system.css"
+      "emittedBy": "styles/generated/design-tokens.css"
     },
     {
       "cssVar": "--radius-lg",
       "value": "12px",
       "status": "canonical",
-      "emittedBy": "styles/design-system.css"
+      "emittedBy": "styles/generated/design-tokens.css"
     },
     {
       "cssVar": "--radius-xl",
       "value": "16px",
       "status": "canonical",
-      "emittedBy": "styles/design-system.css"
+      "emittedBy": "styles/generated/design-tokens.css"
     },
     {
       "cssVar": "--radius-2xl",
       "value": "20px",
       "status": "canonical",
-      "emittedBy": "styles/design-system.css"
+      "emittedBy": "styles/generated/design-tokens.css"
     },
     {
       "cssVar": "--radius-3xl",
       "value": "24px",
       "status": "canonical",
-      "emittedBy": "styles/design-system.css"
+      "emittedBy": "styles/generated/design-tokens.css"
     },
     {
       "cssVar": "--radius-pill",
       "value": "9999px",
       "status": "canonical",
-      "emittedBy": "styles/design-system.css"
+      "emittedBy": "styles/generated/design-tokens.css"
     },
     {
       "cssVar": "--radius-full",
       "value": "9999px",
       "status": "canonical",
-      "emittedBy": "styles/design-system.css"
+      "emittedBy": "styles/generated/design-tokens.css"
     },
     {
       "cssVar": "--linear-duration-fast",

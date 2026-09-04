@@ -49,15 +49,15 @@ in the merge queue, while network/deploy/exhaustive depth runs later.
 | Tier | Jobs | Trigger |
 |---|---|---|
 | **PR gate** (must stay fast) | typecheck, lint, portable iOS contract, structural contract, diff secret scan, Golden Path Lock, size/fork/migration policy | every PR — deterministic, path-aware |
-| **Merge queue** | combined-head `ci-fast`, five affected unit shards, one hosted build + layout workspace, path-selected hosted Xcode build/test, path-selected model-free Promptfoo/golden evals, diff secret scan, Golden Path Lock, migration policy | GitHub `merge_group` synthetic head |
+| **Merge queue** | combined-head `ci-fast`, path-selected Web unit/build, Mac test/package artifact, iOS Xcode build/test, shared-contract integration, path-selected model-free Promptfoo/golden evals, diff secret scan, Golden Path Lock, migration policy | GitHub `merge_group` synthetic head |
 | **Release (`main`)** | exact queue proof or fail-closed direct-main fallback, then successful exact CI-attempt authorization into one `production-mutation` FIFO spanning staging, promotion, one centralized rollback owner, and final verification | completed successful `CI` workflow run for `main`; one bounded controller retry |
 | **Post-deploy** | hosted public, homepage, and live Lighthouse probes against the immutable deployment URL while the controller retains its lease; authenticated smoke is explicit optional evidence until credentials exist; final current-main/canonical check; `Production Verified` marker; event-driven Golden Path Prod Autofix (Cursor-direct, fail-closed) | successful current production release |
 | **Deep / nightly** | CodeQL, Trivy, full-history secret scans, Scorecard, SonarCloud, full E2E matrix, exhaustive suites, weekly Slop Gate (advisory copy smell on main) | schedule, event, or explicit manual dispatch |
 
 Rules:
 - **Heavy scans never gate a source PR or a merge-queue batch.** Running CodeQL
-  ×5 + the full security suite per-PR saturated the runner pool and made Graphite
-  retry-storm itself into a 6-hour stall. CodeQL / Trivy / Scorecard scan the
+  ×5 + the full security suite per-PR saturated the runner pool and made the
+  native queue retry-storm itself into a 6-hour stall. CodeQL / Trivy / Scorecard scan the
   *merged* code on `main` + nightly. **Slop Gate** is the same class: a weekly
   post-merge copy-smell report on `main`. Taste/copy judgment is post-ship
   (`taste-classifier` + production walkthroughs). Do not add slopcheck to
@@ -67,8 +67,10 @@ Rules:
   within seconds of hitting `main`, so it is EVENT-class and must be caught
   pre-merge. The full-history secret scan stays nightly.
 - **The source PR gate stays deterministic and cheap.** The merge queue is the
-  integration gate for the exact combined head. It owns affected unit shards,
-  build, and deterministic layout evidence. Preview, Neon, E2E, Lighthouse,
+  integration gate for the exact combined head. A fail-closed changed-path
+  receipt selects Web, Mac, iOS, operations/tooling, and shared-contract lanes;
+  it owns only the selected product evidence plus deterministic global checks.
+  Preview, Neon, E2E, Lighthouse,
   a11y, Storybook, golden-path, preview, and extended-smoke work never starts
   from a source-PR event or risk label. Run it through a hosted manual,
   scheduled, or repository event after the fast source gate. No PR label fans
@@ -103,12 +105,19 @@ before you open the PR (source: `.github/ci-harness/manifest.json` `riskRules`):
   `merge-queue-autoenroll` first revalidates the PR associated with the
   triggering PR/CI event at that event's exact published head. Because GitHub's
   shared concurrency group retains only one pending run, every surviving pass
-  may also recover a tiny deterministic cohort whose source-required checks are
+  may also recover a deterministic cohort whose source-required checks are
   freshly green. The event target, native re-entry, and missed-event recovery
-  share a hard cap of two admissions per run, the App-backed controller remains
+  share one admission path bounded only by native queue depth (a positive
+  `DRAIN_QUEUE_REENTRY_MAX_PER_RUN` re-caps admissions per run; default `0` =
+  uncapped), the App-backed controller remains
   the sole writer, and every mutation rechecks the live head, labels, base,
-  queue depth, and native postcondition. Enrollment uses GitHub's native queue;
-  `merge-queue` remains intent/audit evidence only. You don't merge by hand.
+  queue depth, and native postcondition. Enrollment uses GitHub's native queue
+  only. The `merge-queue` label is retired and must not be added, read, or
+  retained. You don't merge by hand.
+  Each proven native enrollment emits a `pull_request: enqueued` continuation.
+  Its already-queued exact-head target is an idempotent no-op while the surviving
+  pass advances the next bounded cohort; when no eligible remainder exists, no
+  new enrollment event is created and the chain converges.
 - **The queue tolerates transient state.** A PR is only dequeued on a real merge
   conflict, `needs-conflict-resolution`, or a **terminal** failing check
   (`FAILURE`/`ERROR`/`TIMED_OUT`/`ACTION_REQUIRED`). A `pending`/`queued`/`cancelled`
@@ -127,6 +136,18 @@ queued after mutation. Hard-gated, conflicting, or terminal-red entries are
 dequeued through the native API and then have their audit label removed.
 Pending, queued, and cancelled check runs are not terminal failures, preventing
 dequeue/re-enroll loops during ordinary CI cancellation or main movement.
+An agent conflict that already carries `needs-conflict-resolution` is reported
+without repeating the same label mutation on every drain pass.
+When a non-draft main PR's required source checks never registered any
+check-run on its exact head (missing, not failing), the drain re-fires source
+CI with a bounded close+reopen: at most two per run, heads at least two hours
+old, and never twice on the same exact head (a bot-comment marker is the
+idempotency record). Terminal red checks still route to the fix agent instead.
+When a merge-group run proves a classified product failure, Gem writes the
+bot-authored `jovie-queue-product-failure/v1` status before dequeue or admission
+refusal. That success status preserves source-head cleanliness while acting as
+an exact-head tombstone after bounded Actions history rolls over; only a new
+source commit resets the product-failure memory.
 
 ### Fleet degradation policy
 
@@ -142,6 +163,46 @@ work may exist only as a draft. Unknown or stale production/main/controller/
 integrity evidence and severe integrity incidents admit nothing. The exception
 never permits business logic, auth, data, API, runtime, dependency, config, or
 control-plane changes, and a path-only classification is insufficient.
+
+### Summer closure-health stop-line
+
+Summer owns closure health; Gem remains the only native-queue and promotion
+writer. The closure observer classifies every open PR as `close`, `repair`,
+`promote`, `queued`, or `held` with an owner, reason, and seven-day expiry.
+`close` requires the repository's explicit `duplicate` lifecycle label;
+matching titles or Linear issue IDs never prove semantic redundancy.
+Summer grants no new issue lease, new implementation, or fallback PR generation
+unless the typed closure receipt is healthy. Missing or malformed closure
+evidence fails new intake closed.
+
+Closure health is red when the sole queue controller stays non-green for more
+than 10 minutes, the native queue stays empty with eligible clean PRs for more
+than 15 minutes, an open PR stays unclassified for more than 15 minutes,
+overlapping active artifacts for one Linear issue remain unresolved, an
+explicit hold expires, or no PR merges for one hour while open PRs remain.
+Held or draft PRs are not duplicate active writers; hold expiry governs them
+separately. Multiple active PRs for one issue are allowed only when
+changed-file sets are disjoint, and a duplicate receipt names only PRs that
+participate in an overlap. Only same-repository PRs may assert a Linear lane
+identity; cross-repository markers are ignored, while missing repository
+provenance fails closed. Missing, malformed, truncated, or rename-ambiguous
+changed-file evidence makes the complete multi-active lane unclassified. A
+native queue entry becoming
+`UNMERGEABLE` is red immediately: a nonempty queue is not progress. A grace
+episode also pauses new intake until the writer and queue prove progress. This
+stop-line never disables native promotion, exact-head PR remediation, tests, or
+review; those are the mechanisms that recover closure health. The executable
+authority is `JOV-INV-011` in `canon/invariants.jsonl`.
+
+Draft stacks are a bounded exception with a four-layer maximum. A root must name
+an integrator, expose a promotion path through open exact-base parents, retain a
+clean ancestor chain, and carry an unexpired deadline no more than seven days
+after root creation. Any depth-five stack or missing/expired contract is red
+immediately: new intake stops while promotion and remediation remain live. The
+observer emits one idempotent `split-or-retarget-draft-stack` action per
+violating root through the existing delivery repair-task and No Unattended Red
+path. That receipt is consumed evidence only; it never mutates a pull request
+automatically. The executable stack contract is `JOV-INV-020`.
 
 ### Update Branch control-plane safety
 
@@ -203,16 +264,16 @@ timed-out, or API-uncertain evidence succeeds with `ubuntu-latest`; the hosted
 
 ## What broke on 2026-06-22
 
-The queue stalled for 6 hours and looked like "Graphite is paused." It wasn't.
-Three compounding bugs on a finite runner pool:
+The queue stalled for 6 hours. It was not a paused merge product. Three
+compounding bugs on a finite runner pool:
 
 1. **Stacked-codemod pileup** — a token sweep shipped as 63 base-on-base PRs; the
    queue landed them bottom-up at full CI each → never drained. Collapsed in #11689.
 2. **Drain churn** — `drain-pr-queue.sh` counted zombie `cancelled`/`queued` checks
-   as failures and stripped `merge-queue` from green PRs every 20 min, so no PR
-   stayed enrolled long enough to land. Fixed in #11727/#11730.
+   as failures and dequeued green PRs every 20 min, so no PR stayed enrolled long
+   enough to land. Fixed in #11727/#11730.
 3. **CI-tiering runaway** — CodeQL ×5 + the security suite ran on every PR **and**
-   every Graphite batch; batches couldn't get runner slots, timed out, and Graphite
+   every combined-head batch; batches couldn't get runner slots, timed out, and
    retried every few minutes — each retry spawning another full run that saturated
    the runners further. Fixed in #11735 by moving scans off the PR path.
 
@@ -236,9 +297,12 @@ existed. Contract:
    stale or duplicate deliveries are rejected.
 4. One remediation writer holds the PR lease. Implementer first.
    FX is the recovery tier after handoff or abandonment.
-   `Rolling CI Dispatch` subscribes to `check_suite`, `workflow_run`, and
-   `check_run` failures and launches Cursor-direct exact-head repair when
-   the implementer lease is not live. It does not check out PR code.
+   `Rolling CI Dispatch` subscribes only to completed `CI` `workflow_run`
+   events for `pull_request` and `merge_group`, then launches Cursor-direct
+   exact-head repair when the implementer lease is not live. It must not
+   subscribe to generic `check_suite` or `check_run` events because its own
+   completed checks can recursively re-enter the dispatcher. It does not
+   check out PR code.
    `Actions Cache GC` evicts stale or duplicate turbo caches without
    deleting live pnpm, node-cache, or playwright caches.
 5. A new commit or green rerun supersedes obsolete repairs.
@@ -265,7 +329,9 @@ Before you open a PR:
 4. **Publish the draft first** (`JOVIE_PUSH_PHASE=publication`), consume rolling
    CI, then qualify the final exact, current head before ready. Don't hand-merge;
    the queue does it.
-5. If a PR's base branch was deleted, **retarget to `main`** before debugging a
+5. **Do not add or edit `CHANGELOG.md`.** Implementation PRs that touch it fail
+   admission. What's New is written after land/runtime proof. Linear is SoR.
+6. If a PR's base branch was deleted, **retarget to `main`** before debugging a
    "conflict."
 
 Related: [`pr-stacking.md`](../.claude/rules/pr-stacking.md),

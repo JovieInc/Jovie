@@ -158,7 +158,7 @@ function getTriggerClassName(
     return subscriptionPrimaryLinkClassName;
   }
 
-  return `${subscriptionPrimaryActionClassName} h-12 w-full justify-center gap-2 px-6`;
+  return `${subscriptionPrimaryActionClassName} w-full justify-center gap-2 px-6`;
 }
 
 export function ProfileInlineNotificationsCTA({

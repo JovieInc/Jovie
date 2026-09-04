@@ -10,9 +10,9 @@ import { db } from '@/lib/db';
 import { suggestedActions } from '@/lib/db/schema/connectors';
 import { captureError } from '@/lib/error-tracking';
 import { logger } from '@/lib/utils/logger';
+import { YOUTUBE_THUMBNAIL_PLAYBOOK_KIND } from '../suggested-action-kinds';
 
-export const YOUTUBE_THUMBNAIL_PLAYBOOK_KIND =
-  'youtube.thumbnail_experiment' as const;
+export { YOUTUBE_THUMBNAIL_PLAYBOOK_KIND } from '../suggested-action-kinds';
 
 /** Industry-sourced projected CTR lift range for packaging improvements. */
 export const PROJECTED_IMPACT_RANGE = {
@@ -51,6 +51,8 @@ export interface ThumbnailOpportunityPayload {
   readonly title: string;
   readonly why: string;
   readonly primaryActionLabel: string;
+  readonly thumbnailUrl?: string;
+  readonly thumbnailAlt?: string;
 }
 
 const DEFAULT_WEAK_QUALITY = 0.45;
@@ -86,6 +88,7 @@ export function buildThumbnailOpportunityPayload(
       ? 'Refresh a weak YouTube thumbnail'
       : `Refresh ${count} weak YouTube thumbnails`;
   const why = `${count} video${count === 1 ? '' : 's'} on your channel still use default or low-signal thumbnails. Custom packaging typically lifts CTR ${PROJECTED_IMPACT_RANGE.minPercent}–${PROJECTED_IMPACT_RANGE.maxPercent}% (${PROJECTED_IMPACT_RANGE.source}).`;
+  const visualVideo = weak.find(video => video.thumbnailUrl);
 
   return {
     playbook: YOUTUBE_THUMBNAIL_PLAYBOOK_KIND,
@@ -100,6 +103,12 @@ export function buildThumbnailOpportunityPayload(
     title,
     why,
     primaryActionLabel: 'Generate variants',
+    ...(visualVideo?.thumbnailUrl
+      ? {
+          thumbnailUrl: visualVideo.thumbnailUrl,
+          thumbnailAlt: `Current thumbnail for ${visualVideo.title}`,
+        }
+      : {}),
   };
 }
 

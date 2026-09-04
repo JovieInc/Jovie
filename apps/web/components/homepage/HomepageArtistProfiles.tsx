@@ -10,37 +10,34 @@ export type HomepageArtistProfileCardImage = {
   readonly alt: string;
 };
 
-export type HomepageArtistProfileCard =
+export type HomepageArtistProfilePreview =
   | {
-      readonly id: 'sell-out';
-      readonly title: 'Sell Out';
-      readonly body: string;
+      readonly id: 'tour';
+      readonly label: 'Tour';
       readonly image: HomepageArtistProfileCardImage;
     }
   | {
-      readonly id: 'capture-fans';
-      readonly title: 'Capture Fans';
-      readonly body: string;
+      readonly id: 'subscribe';
+      readonly label: 'Subscribe';
       readonly image: HomepageArtistProfileCardImage;
     }
   | {
-      readonly id: 'get-paid';
-      readonly title: 'Get Paid';
-      readonly body: string;
+      readonly id: 'pay';
+      readonly label: 'Pay';
       readonly image: HomepageArtistProfileCardImage;
     }
   | {
-      readonly id: 'drop-music';
-      readonly title: 'Drop Music';
-      readonly body: string;
+      readonly id: 'presave';
+      readonly label: 'Presave';
       readonly image: HomepageArtistProfileCardImage;
     };
 
-export type HomepageArtistProfileCards = readonly HomepageArtistProfileCard[];
+export type HomepageArtistProfilePreviews =
+  readonly HomepageArtistProfilePreview[];
 
 export function HomepageArtistProfiles({
-  cards,
-}: Readonly<{ cards: HomepageArtistProfileCards }>) {
+  previews,
+}: Readonly<{ previews: HomepageArtistProfilePreviews }>) {
   return (
     <section
       aria-labelledby='homepage-artist-profiles-heading'
@@ -67,7 +64,7 @@ export function HomepageArtistProfiles({
           <Link href={APP_ROUTES.ARTIST_PROFILES}>Explore Artist Profiles</Link>
         </Button>
       </div>
-      <ArtistProfileCardRow cards={cards} />
+      <ArtistProfileCardRow previews={previews} />
     </section>
   );
 }

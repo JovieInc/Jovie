@@ -1,9 +1,16 @@
-import { act, fireEvent, render, screen } from '@testing-library/react';
+import {
+  act,
+  fireEvent,
+  render,
+  screen,
+  waitFor,
+} from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { OpportunityInboxPageClient } from './OpportunityInboxPageClient';
 
 const mutateMock = vi.fn();
+const mutateAsyncMock = vi.fn().mockResolvedValue({ ok: true });
 let inboxHomeEnabled = false;
 
 vi.mock('next/navigation', () => ({
@@ -17,6 +24,52 @@ vi.mock('next/navigation', () => ({
 
 vi.mock('@/lib/flags/client', () => ({
   useAppFlag: () => inboxHomeEnabled,
+}));
+
+vi.mock('@/lib/founder-review/client', () => ({
+  listFounderReviewReceipts: vi.fn().mockResolvedValue([]),
+  deleteFounderReviewAudio: vi.fn(),
+  uploadFounderReviewAudio: vi.fn(),
+  createFounderReviewClient: vi.fn().mockImplementation(async review => ({
+    id: review.segmentId,
+    target: review.target,
+    decision: review.decision,
+    recording: { mediaAvailable: false },
+    actionOutcome: {
+      status:
+        review.decision === 'approved' || review.decision === 'rejected'
+          ? 'pending'
+          : 'not-applicable',
+      updatedAt: '2026-09-01T18:00:08.000Z',
+      errorCode: null,
+    },
+  })),
+  updateFounderReviewActionOutcome: vi.fn().mockImplementation(async input => ({
+    id: input.receiptId,
+    target: {
+      type: 'inbox-card',
+      id: 'card-1',
+      title: 'Saved founder review',
+      sourceKind: 'test.suggestion',
+      category: 'suggestion',
+    },
+    decision: 'approved',
+    recording: { mediaAvailable: false },
+    actionOutcome: {
+      status: input.status,
+      updatedAt: '2026-09-01T18:00:08.000Z',
+      errorCode: input.errorCode,
+    },
+  })),
+}));
+
+vi.mock('@/lib/chat/transcriber', () => ({
+  createWebSpeechTranscriber: () => ({
+    isSupported: false,
+    start: vi.fn(),
+    stop: vi.fn(),
+    dispose: vi.fn(),
+  }),
 }));
 
 vi.mock('@/features/dashboard/organisms/PreviewDataHydrator', () => ({
@@ -38,21 +91,25 @@ vi.mock('@/lib/queries/useOpportunityInboxMutations', () => ({
       isPending: false,
       variables: undefined,
       mutate: mutateMock,
+      mutateAsync: mutateAsyncMock,
     },
     dismissMutation: {
       isPending: false,
       variables: undefined,
       mutate: mutateMock,
+      mutateAsync: mutateAsyncMock,
     },
     feedbackMutation: {
       isPending: false,
       variables: undefined,
       mutate: mutateMock,
+      mutateAsync: mutateAsyncMock,
     },
     nextStepMutation: {
       isPending: false,
       variables: undefined,
       mutate: mutateMock,
+      mutateAsync: mutateAsyncMock,
     },
   }),
 }));
@@ -94,6 +151,8 @@ describe('OpportunityInboxPageClient', () => {
   afterEach(() => {
     inboxHomeEnabled = false;
     mutateMock.mockReset();
+    mutateAsyncMock.mockReset();
+    mutateAsyncMock.mockResolvedValue({ ok: true });
     tourDateMutateMock.mockReset();
   });
 
@@ -142,6 +201,7 @@ describe('OpportunityInboxPageClient', () => {
           cards: [
             {
               id: 'card-1',
+              sourceKind: 'test.suggestion',
               signalType: 'other' as const,
               typeLabel: 'Suggestion',
               createdAt: '2026-06-28T10:00:00.000Z',
@@ -171,6 +231,7 @@ describe('OpportunityInboxPageClient', () => {
           cards: [
             {
               id: 'brand-deal-1',
+              sourceKind: 'test.suggestion',
               signalType: 'brand_deal',
               typeLabel: 'Brand Deal',
               createdAt: '2026-07-29T10:00:00.000Z',
@@ -182,6 +243,7 @@ describe('OpportunityInboxPageClient', () => {
             },
             {
               id: 'song-1',
+              sourceKind: 'test.suggestion',
               signalType: 'new_song',
               typeLabel: 'New Song',
               createdAt: '2026-07-29T09:00:00.000Z',
@@ -222,8 +284,8 @@ describe('OpportunityInboxPageClient', () => {
               id: 'connect-spotify',
               title: 'Connect Spotify',
               body: 'Link your catalog so Jovie can spot releases.',
-              actionLabel: 'Connect catalog',
-              href: '/app/profiles',
+              actionLabel: 'Connect Spotify',
+              href: '/app/dashboard/releases?connect=spotify',
             },
           ],
         }}
@@ -236,8 +298,8 @@ describe('OpportunityInboxPageClient', () => {
     expect(screen.queryByRole('heading', { name: 'Inbox' })).toBeNull();
     expect(screen.getByText('Your Inbox Is Clear')).toBeInTheDocument();
     expect(
-      screen.getByRole('link', { name: 'Connect catalog' })
-    ).toHaveAttribute('href', '/app/profiles');
+      screen.getByRole('link', { name: 'Connect Spotify' })
+    ).toHaveAttribute('href', '/app/dashboard/releases?connect=spotify');
   });
 
   it('filters cards by signal type and restores them on All', () => {
@@ -247,6 +309,7 @@ describe('OpportunityInboxPageClient', () => {
           cards: [
             {
               id: 'song-1',
+              sourceKind: 'test.suggestion',
               signalType: 'new_song' as const,
               typeLabel: 'New Song',
               createdAt: '2026-06-28T10:00:00.000Z',
@@ -258,6 +321,7 @@ describe('OpportunityInboxPageClient', () => {
             },
             {
               id: 'event-1',
+              sourceKind: 'test.suggestion',
               signalType: 'new_event' as const,
               typeLabel: 'New Event',
               createdAt: '2026-06-28T10:00:00.000Z',
@@ -306,6 +370,7 @@ describe('OpportunityInboxPageClient', () => {
           cards: [
             {
               id: 'song-1',
+              sourceKind: 'test.suggestion',
               signalType: 'new_song' as const,
               typeLabel: 'New Song',
               createdAt: '2026-06-28T10:00:00.000Z',
@@ -317,6 +382,7 @@ describe('OpportunityInboxPageClient', () => {
             },
             {
               id: 'event-1',
+              sourceKind: 'test.suggestion',
               signalType: 'new_event' as const,
               typeLabel: 'New Event',
               createdAt: '2026-06-28T10:00:00.000Z',
@@ -377,6 +443,7 @@ describe('OpportunityInboxPageClient', () => {
           cards: [
             {
               id: 'card-1',
+              sourceKind: 'test.suggestion',
               signalType: 'other' as const,
               typeLabel: 'Suggestion',
               createdAt: '2026-06-28T10:00:00.000Z',
@@ -410,6 +477,7 @@ describe('OpportunityInboxPageClient', () => {
             cards: [
               {
                 id: 'card-1',
+                sourceKind: 'test.suggestion',
                 signalType: 'other' as const,
                 typeLabel: 'Suggestion',
                 createdAt: '2026-06-28T10:00:00.000Z',
@@ -447,6 +515,7 @@ describe('OpportunityInboxPageClient', () => {
           cards: [
             {
               id: 'card-1',
+              sourceKind: 'test.suggestion',
               signalType: 'other' as const,
               typeLabel: 'Suggestion',
               createdAt: '2026-06-28T10:00:00.000Z',
@@ -478,6 +547,7 @@ describe('OpportunityInboxPageClient', () => {
           cards: [
             {
               id: 'song-1',
+              sourceKind: 'test.suggestion',
               signalType: 'new_song' as const,
               typeLabel: 'New Song',
               createdAt: '2026-06-28T10:00:00.000Z',
@@ -489,6 +559,7 @@ describe('OpportunityInboxPageClient', () => {
             },
             {
               id: 'event-1',
+              sourceKind: 'test.suggestion',
               signalType: 'new_event' as const,
               typeLabel: 'New Event',
               createdAt: '2026-06-28T10:00:00.000Z',
@@ -524,6 +595,7 @@ describe('OpportunityInboxPageClient', () => {
           cards: [
             {
               id: 'card-1',
+              sourceKind: 'test.suggestion',
               signalType: 'other' as const,
               typeLabel: 'Suggestion',
               createdAt: '2026-06-28T10:00:00.000Z',
@@ -545,7 +617,7 @@ describe('OpportunityInboxPageClient', () => {
     expect(
       screen.getByTestId('opportunity-inbox-empty-state')
     ).toBeInTheDocument();
-    expect(screen.getByRole('link', { name: 'Start A Chat' })).toHaveFocus();
+    expect(screen.getByRole('button', { name: 'Start Session' })).toHaveFocus();
   });
 
   it('returns focus to recovery after completing the last report next step', async () => {
@@ -561,6 +633,7 @@ describe('OpportunityInboxPageClient', () => {
           cards: [
             {
               id: 'report-1',
+              sourceKind: 'test.suggestion',
               signalType: 'other' as const,
               typeLabel: 'Report',
               createdAt: '2026-07-04T10:00:00.000Z',
@@ -589,12 +662,12 @@ describe('OpportunityInboxPageClient', () => {
       />
     );
 
-    await user.click(screen.getByTestId('opportunity-inbox-report-next-step'));
+    await user.click(screen.getByRole('button', { name: 'Approve' }));
 
     expect(
       screen.getByTestId('opportunity-inbox-empty-state')
     ).toBeInTheDocument();
-    expect(screen.getByRole('link', { name: 'Start A Chat' })).toHaveFocus();
+    expect(screen.getByRole('button', { name: 'Start Session' })).toHaveFocus();
   });
 
   it('does not restore stack focus after a failed report next step', async () => {
@@ -603,6 +676,7 @@ describe('OpportunityInboxPageClient', () => {
     mutateMock.mockImplementation((_id, options) => {
       options?.onError?.();
     });
+    mutateAsyncMock.mockRejectedValueOnce(new Error('next step failed'));
 
     render(
       <OpportunityInboxPageClient
@@ -610,6 +684,7 @@ describe('OpportunityInboxPageClient', () => {
           cards: [
             {
               id: 'report-1',
+              sourceKind: 'test.suggestion',
               signalType: 'other' as const,
               typeLabel: 'Report',
               createdAt: '2026-07-04T10:00:00.000Z',
@@ -638,7 +713,7 @@ describe('OpportunityInboxPageClient', () => {
       />
     );
 
-    await user.click(screen.getByTestId('opportunity-inbox-report-next-step'));
+    await user.click(screen.getByRole('button', { name: 'Approve' }));
     const songs = screen.getByRole('button', { name: 'Songs' });
     await user.click(songs);
 
@@ -655,6 +730,7 @@ describe('OpportunityInboxPageClient', () => {
     mutateMock.mockImplementation((_id, options) => {
       options?.onError?.();
     });
+    mutateAsyncMock.mockRejectedValueOnce(new Error('decision failed'));
 
     render(
       <OpportunityInboxPageClient
@@ -662,6 +738,7 @@ describe('OpportunityInboxPageClient', () => {
           cards: [
             {
               id: 'card-1',
+              sourceKind: 'test.suggestion',
               signalType: 'other' as const,
               typeLabel: 'Suggestion',
               createdAt: '2026-06-28T10:00:00.000Z',
@@ -690,9 +767,12 @@ describe('OpportunityInboxPageClient', () => {
     const user = userEvent.setup();
     inboxHomeEnabled = true;
     let rejectAction: (() => void) | undefined;
-    mutateMock.mockImplementation((_id, options) => {
-      rejectAction = options?.onError;
-    });
+    mutateAsyncMock.mockImplementationOnce(
+      () =>
+        new Promise((_resolve, reject) => {
+          rejectAction = () => reject(new Error('decision failed'));
+        })
+    );
 
     render(
       <OpportunityInboxPageClient
@@ -700,6 +780,7 @@ describe('OpportunityInboxPageClient', () => {
           cards: [
             {
               id: 'card-1',
+              sourceKind: 'test.suggestion',
               signalType: 'other' as const,
               typeLabel: 'Suggestion',
               createdAt: '2026-06-28T10:00:00.000Z',
@@ -717,15 +798,17 @@ describe('OpportunityInboxPageClient', () => {
 
     screen.getByRole('button', { name: 'Review Current Opportunity' }).focus();
     await user.keyboard('{ArrowRight}');
-    expect(screen.getByRole('link', { name: 'Start A Chat' })).toHaveFocus();
+    expect(screen.getByRole('button', { name: 'Start Session' })).toHaveFocus();
 
     act(() => {
       rejectAction?.();
     });
 
-    expect(
-      screen.getByRole('button', { name: 'Review Current Opportunity' })
-    ).toHaveFocus();
+    await waitFor(() =>
+      expect(
+        screen.getByRole('button', { name: 'Review Current Opportunity' })
+      ).toHaveFocus()
+    );
   });
 
   it('renders pending tour-date cards and confirms optimistically', () => {

@@ -205,6 +205,37 @@ describe('POST /api/stripe/checkout', () => {
     expect(mockCreateCheckoutSession).toHaveBeenCalledTimes(1);
   });
 
+  it('returns thumbnail founder checkout to the product-specific flow', async () => {
+    mockGetCachedAuth.mockResolvedValue({ userId: 'user_123' });
+    mockCreateCheckoutSession.mockResolvedValue({
+      id: 'cs_thumbnail_founder',
+      url: 'https://checkout.stripe.com/pay/cs_thumbnail_founder',
+    });
+
+    const request = new NextRequest('http://localhost/api/stripe/checkout', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        priceId: 'price_123',
+        source: 'youtube_thumbnails',
+      }),
+    });
+
+    const response = await POST(request);
+
+    expect(response.status).toBe(200);
+    expect(mockCreateCheckoutSession).toHaveBeenCalledWith(
+      expect.objectContaining({
+        successUrl: expect.stringMatching(
+          /\/billing\/youtube-thumbnails\/success\?session_id=\{CHECKOUT_SESSION_ID\}$/
+        ),
+        cancelUrl: expect.stringMatching(
+          /\/billing\/youtube-thumbnails\?checkout=cancel$/
+        ),
+      })
+    );
+  });
+
   it('retries transient Stripe errors and preserves idempotency key', async () => {
     mockGetCachedAuth.mockResolvedValue({ userId: 'user_123' });
 

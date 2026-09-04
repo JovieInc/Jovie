@@ -9,120 +9,75 @@ import {
   type HeaderNavCta,
 } from '@/components/organisms/HeaderNav';
 import { APP_ROUTES } from '@/constants/routes';
-import { getHomepageFrontDoorCtaContract } from '@/data/homepageFrontDoorCta';
-import { HOMEPAGE_LAUNCH_COPY } from '@/data/homepageLaunchCopy';
 import { MARKETING_PEN_CONTRACT_IDS } from '@/data/marketing/penContracts';
 import { MARKETING_CTA_INTENTS } from '@/data/marketingCtaIntents';
-import { MARKETING_NAV_LINKS } from '@/data/marketingNavigation';
+import {
+  MARKETING_FOR_FLYOUT_LINKS,
+  MARKETING_NAV_LINKS,
+  MARKETING_NAV_UTILITIES,
+  MARKETING_TOOLS_FLYOUT_LINKS,
+  type MarketingNavLink,
+} from '@/data/marketingNavigation';
 import { FEATURE_FLAGS } from '@/lib/flags/marketing-static';
 
 export type MarketingHeaderVariant = 'landing' | 'minimal' | 'homepage';
-export interface MarketingHeaderNavLink {
-  readonly href: string;
-  readonly label: string;
-  readonly treatment?: 'wordmark';
+export interface MarketingHeaderNavLink extends MarketingNavLink {
+  readonly treatment?: 'wordmark' | 'leading';
 }
 export type MarketingHeaderCta = HeaderNavCta;
 
-const DEFAULT_STAGED_HOMEPAGE_NAV_LINKS: readonly MarketingHeaderNavLink[] = [
-  { href: APP_ROUTES.ARTIST_PROFILES, label: 'Artist Profiles' },
-  { href: APP_ROUTES.PRICING, label: 'Pricing' },
-  { href: APP_ROUTES.SUPPORT, label: 'Support' },
-] as const;
-const STAGED_NAV_PATHS = new Set<string>([
-  APP_ROUTES.LANDING_NEW,
-  APP_ROUTES.PRICING,
-]);
+const NAV_LINK_BY_LABEL = Object.fromEntries(
+  MARKETING_NAV_LINKS.map(link => [link.label, link])
+) as Readonly<
+  Record<(typeof MARKETING_NAV_LINKS)[number]['label'], MarketingNavLink>
+>;
+
 const MARKETING_GLASS_DESKTOP_LINKS: readonly MarketingHeaderNavLink[] = [
   { href: APP_ROUTES.HOME, label: 'Jovie', treatment: 'wordmark' },
-  { href: APP_ROUTES.PRICING, label: 'Pricing' },
+  {
+    href: NAV_LINK_BY_LABEL.Product.href,
+    label: NAV_LINK_BY_LABEL.Product.label,
+    treatment: 'leading',
+  },
+  {
+    href: NAV_LINK_BY_LABEL.Pricing.href,
+    label: NAV_LINK_BY_LABEL.Pricing.label,
+  },
 ] as const;
 const MARKETING_GLASS_FLYOUTS: readonly HeaderFlyoutMenu[] = [
   {
-    id: 'features',
-    label: 'Features',
-    heading: 'Release system',
-    links: [
-      {
-        href: APP_ROUTES.ARTIST_PROFILES,
-        label: 'Smart Release Links',
-        description: 'One fan path for every drop.',
-      },
-      {
-        href: APP_ROUTES.LAUNCH,
-        label: 'Pre Saves & Countdowns',
-        description: 'Before and after release day.',
-      },
-      {
-        href: APP_ROUTES.ARTIST_PROFILES,
-        label: 'Artist Profiles',
-        description: 'Built to convert, not decorate.',
-      },
-      {
-        href: `${APP_ROUTES.ARTIST_PROFILES}#capture-every-fan`,
-        label: 'Capture Every Fan',
-        description: 'Turn traffic into an audience.',
-      },
-      {
-        href: APP_ROUTES.ARTIST_NOTIFICATIONS,
-        label: 'Automatic Fan Notifications',
-        description: 'Fans opt in once and come back.',
-      },
-      {
-        href: APP_ROUTES.LAUNCH,
-        label: 'Tour City Routing',
-        description: 'Show the right city first.',
-      },
-    ],
+    id: 'for',
+    label: NAV_LINK_BY_LABEL.For.label,
+    heading: 'One system for every audience',
+    links: MARKETING_FOR_FLYOUT_LINKS,
   },
   {
-    id: 'resources',
-    label: 'Resources',
-    heading: 'Insights & solutions',
-    links: [
-      {
-        href: APP_ROUTES.BLOG,
-        label: 'Blog',
-        description: 'Releases, ideas, behind the scenes.',
-      },
-      {
-        href: APP_ROUTES.COMPARE,
-        label: 'Compare',
-        description: 'See where Jovie fits.',
-      },
-      {
-        href: APP_ROUTES.CHANGELOG,
-        label: 'Changelog',
-        description: 'What shipped this week.',
-      },
-      {
-        href: APP_ROUTES.SUPPORT,
-        label: 'Help Center',
-        description: 'Guides and answers.',
-      },
-      {
-        href: 'https://status.jov.ie',
-        label: 'Status',
-        description: 'System health.',
-      },
-    ],
+    id: 'tools',
+    label: NAV_LINK_BY_LABEL.Tools.label,
+    heading: 'Live tools',
+    links: MARKETING_TOOLS_FLYOUT_LINKS,
   },
 ] as const;
 const MARKETING_GLASS_MOBILE_LINKS: readonly MarketingHeaderNavLink[] = [
   { href: APP_ROUTES.HOME, label: 'Jovie' },
+  {
+    href: NAV_LINK_BY_LABEL.Product.href,
+    label: NAV_LINK_BY_LABEL.Product.label,
+  },
   ...MARKETING_GLASS_FLYOUTS.flatMap(menu =>
     menu.links.map(link => ({ href: link.href, label: link.label }))
   ),
-  { href: APP_ROUTES.PRICING, label: 'Pricing' },
+  {
+    href: NAV_LINK_BY_LABEL.Pricing.href,
+    label: NAV_LINK_BY_LABEL.Pricing.label,
+  },
 ] as const;
-const DEFAULT_MARKETING_CTA: MarketingHeaderCta =
-  getHomepageFrontDoorCtaContract(FEATURE_FLAGS.WAITLIST_ENABLED).primary;
+const DEFAULT_MARKETING_CTA: MarketingHeaderCta = MARKETING_NAV_UTILITIES[1];
 const MARKETING_HEADER_CTA_BY_PATH: Readonly<
   Partial<Record<string, MarketingHeaderCta>>
 > = {
   [APP_ROUTES.ARTIST_PROFILES]: MARKETING_CTA_INTENTS.claimProfile,
   [APP_ROUTES.ARTIST_PROFILE_LEGACY]: MARKETING_CTA_INTENTS.claimProfile,
-  [APP_ROUTES.LANDING_NEW]: HOMEPAGE_LAUNCH_COPY.hero.primaryCta,
 };
 
 export interface MarketingHeaderProps
@@ -172,10 +127,7 @@ export function MarketingHeader({
   variant = 'landing',
 }: MarketingHeaderProps) {
   const pathname = usePathname();
-  const showStagedNav = pathname !== null && STAGED_NAV_PATHS.has(pathname);
-  const resolvedNavLinks =
-    navLinks ??
-    (showStagedNav ? DEFAULT_STAGED_HOMEPAGE_NAV_LINKS : MARKETING_NAV_LINKS);
+  const resolvedNavLinks = navLinks ?? MARKETING_NAV_LINKS;
   const isMinimal = variant === 'minimal';
   const isHomepage = variant === 'homepage';
   const isArtistProfiles =
@@ -219,8 +171,9 @@ export function MarketingHeader({
       authMode='public-static'
       hideNav={isMinimal}
       hideDesktopNav={hideCenterNav}
-      minimalAuth={isMinimal}
+      minimalAuth={isMinimal || isHomepage}
       minimalAuthVariant='link'
+      minimalAuthLabel={isHomepage ? 'Log in' : 'Sign in'}
       includePublicLoginInMobileNav
       containerSize='homepage'
       presentation={presentation}
@@ -228,7 +181,7 @@ export function MarketingHeader({
       publicCta={resolvedPrimaryCta}
       mobileNavLinks={navConfig.mobileNavLinks}
       navLinks={navConfig.desktopNavLinks}
-      showContactLink={centerNavEnabled && !usesHomepageChrome}
+      showContactLink={false}
     />
   );
 }

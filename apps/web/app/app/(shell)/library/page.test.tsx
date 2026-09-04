@@ -7,11 +7,25 @@ const mocks = vi.hoisted(() => ({
   getLibraryAssetShareMapForProfile: vi.fn(),
   getLibraryMerchCardsForProfile: vi.fn(),
   getLibraryProfileStateMapForProfile: vi.fn(),
+  listArtistRulesForProfile: vi.fn(),
   listCreatorDocuments: vi.fn(),
+  listLibraryPostReleaseBundle: vi.fn(),
+  listLibraryRelationshipsForProfile: vi.fn(),
+  listVideosForLibraryProjection: vi.fn(),
   loadAppShellRouteContext: vi.fn(),
   loadArchivedReleaseMatrixForProfile: vi.fn(),
   loadArtistHandleForProfile: vi.fn(),
   requireCreatorDocumentAccess: vi.fn(),
+}));
+
+vi.mock('@/lib/db', () => ({
+  db: {
+    select: vi.fn(() => ({
+      from: vi.fn(() => ({
+        where: vi.fn(() => ({ limit: vi.fn(() => Promise.resolve([])) })),
+      })),
+    })),
+  },
 }));
 
 vi.mock('@/lib/creator-documents/access', () => ({
@@ -27,6 +41,15 @@ vi.mock('@/lib/library/asset-share.server', () => ({
   getLibraryAssetShareMapForProfile: mocks.getLibraryAssetShareMapForProfile,
   loadArtistHandleForProfile: mocks.loadArtistHandleForProfile,
 }));
+vi.mock('@/lib/library/graph-store', () => ({
+  listLibraryRelationshipsForProfile: mocks.listLibraryRelationshipsForProfile,
+}));
+vi.mock('@/lib/library/post-release-store', () => ({
+  listLibraryPostReleaseBundle: mocks.listLibraryPostReleaseBundle,
+}));
+vi.mock('@/lib/artist-rules/store', () => ({
+  listArtistRulesForProfile: mocks.listArtistRulesForProfile,
+}));
 vi.mock('@/lib/library/profile-visibility.server', () => ({
   getLibraryProfileStateMapForProfile:
     mocks.getLibraryProfileStateMapForProfile,
@@ -37,6 +60,9 @@ vi.mock('@/lib/merch/service', () => ({
 vi.mock('@/lib/queries/server', () => ({
   getDehydratedState: vi.fn(() => ({})),
   getQueryClient: vi.fn(() => ({ fetchQuery: mocks.fetchQuery })),
+}));
+vi.mock('@/lib/youtube-library', () => ({
+  listVideosForLibraryProjection: mocks.listVideosForLibraryProjection,
 }));
 vi.mock('@/lib/releases/release-matrix-loader', () => ({
   loadArchivedReleaseMatrixForProfile:
@@ -97,6 +123,15 @@ describe('LibraryPage private document boundary', () => {
       documents: [privateDocument],
       nextCursor: 'older-documents',
     });
+    mocks.listVideosForLibraryProjection.mockResolvedValue([]);
+    mocks.listArtistRulesForProfile.mockResolvedValue([]);
+    mocks.listLibraryRelationshipsForProfile.mockResolvedValue([]);
+    mocks.listLibraryPostReleaseBundle.mockResolvedValue({
+      downloads: [],
+      findings: [],
+      rightsholders: [],
+      stats: [],
+    });
     mocks.fetchQuery.mockResolvedValue([]);
     mocks.loadArchivedReleaseMatrixForProfile.mockResolvedValue([]);
     mocks.getLibraryMerchCardsForProfile.mockResolvedValue([]);
@@ -106,7 +141,7 @@ describe('LibraryPage private document boundary', () => {
   });
 
   it('authorizes the selected profile before listing private documents', async () => {
-    await renderLibraryPage('documents');
+    await renderLibraryPage();
 
     expect(mocks.requireCreatorDocumentAccess).toHaveBeenCalledWith({
       userId: 'user_1',
@@ -117,14 +152,20 @@ describe('LibraryPage private document boundary', () => {
     ).toBeLessThan(mocks.listCreatorDocuments.mock.invocationCallOrder[0] ?? 0);
   });
 
-  it('loads private documents independently from asset data', async () => {
-    const result = await renderLibraryPage('documents');
+  it('loads private documents and asset data for the unified Library', async () => {
+    const result = await renderLibraryPage();
 
     expect(getClientProps(result)).toMatchObject({
       creatorDocuments: [privateDocument],
       creatorDocumentsNextCursor: 'older-documents',
       creatorDocumentsLoadFailed: false,
+      youtubeVideos: [],
+      youtubeConnected: false,
+      relationships: [],
+      initialArtistRules: [],
     });
+    expect(mocks.fetchQuery).toHaveBeenCalled();
+    expect(mocks.getLibraryMerchCardsForProfile).toHaveBeenCalled();
   });
 
   it('does not query or render private documents when authorization fails', async () => {
@@ -132,7 +173,7 @@ describe('LibraryPage private document boundary', () => {
       new Error('Unauthorized')
     );
 
-    const result = await renderLibraryPage('documents');
+    const result = await renderLibraryPage();
 
     expect(mocks.listCreatorDocuments).not.toHaveBeenCalled();
     expect(getClientProps(result)).toMatchObject({
@@ -140,24 +181,19 @@ describe('LibraryPage private document boundary', () => {
       creatorDocumentsNextCursor: null,
       creatorDocumentsLoadFailed: true,
     });
+    expect(mocks.fetchQuery).toHaveBeenCalled();
   });
 
-  it('does not load or serialize documents for the default Assets tab', async () => {
-    const result = await renderLibraryPage();
+  it('loads the uncapped YouTube projection and graph slices together', async () => {
+    await renderLibraryPage();
 
-    expect(mocks.requireCreatorDocumentAccess).not.toHaveBeenCalled();
-    expect(mocks.listCreatorDocuments).not.toHaveBeenCalled();
-    expect(getClientProps(result)).toMatchObject({
-      creatorDocuments: [],
-      creatorDocumentsNextCursor: null,
-      creatorDocumentsLoadFailed: false,
+    expect(mocks.listVideosForLibraryProjection).toHaveBeenCalledWith({
+      creatorProfileId: profileId,
     });
-  });
-
-  it('does not load asset payloads for the Documents tab', async () => {
-    await renderLibraryPage('documents');
-
-    expect(mocks.fetchQuery).not.toHaveBeenCalled();
-    expect(mocks.getLibraryMerchCardsForProfile).not.toHaveBeenCalled();
+    expect(mocks.listLibraryRelationshipsForProfile).toHaveBeenCalledWith(
+      profileId
+    );
+    expect(mocks.listLibraryPostReleaseBundle).toHaveBeenCalledWith(profileId);
+    expect(mocks.listArtistRulesForProfile).toHaveBeenCalledWith(profileId);
   });
 });

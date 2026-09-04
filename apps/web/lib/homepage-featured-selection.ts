@@ -80,7 +80,7 @@ async function queryHomepageFeaturedCandidates(): Promise<
       id: row.id,
       handle: row.username,
       name: row.displayName || row.username,
-      src: transformImageUrl(row.avatarUrl || '/android-chrome-192x192.png', {
+      src: transformImageUrl(row.avatarUrl || '/avatars/default-user.png', {
         width: 256,
         height: 256,
         quality: 70,

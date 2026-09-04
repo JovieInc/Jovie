@@ -53,7 +53,7 @@ export function SuggestionCard({
   return (
     <article
       className={cn(
-        'group/sug relative min-h-37 w-full overflow-hidden rounded-2xl border border-white/[0.05] bg-(--linear-app-content-surface)',
+        'group/sug relative min-h-37 w-full overflow-hidden rounded-2xl border border-white/[0.05] bg-(--app-shell-content-surface)',
         className
       )}
       style={{
@@ -64,7 +64,7 @@ export function SuggestionCard({
     >
       <div className='grid min-h-[inherit] grid-cols-1 items-center gap-4 px-5 py-5 sm:grid-cols-[minmax(0,1fr)_auto] sm:px-7'>
         <div className='min-w-0'>
-          <h2 className='text-pretty text-base font-semibold leading-[1.3] text-primary-token sm:text-base'>
+          <h2 className='text-pretty text-base font-semibold leading-[1.3] text-primary-token sm:text-base line-clamp-2'>
             {title}
           </h2>
           <p className='mt-2 max-w-[48ch] text-pretty text-xs leading-[1.55] text-tertiary-token'>

@@ -1,6 +1,10 @@
 # Design Tokens
 
-> Single source of truth: `apps/web/styles/design-system.css`
+> Canonical machine-readable source for migrated base-token families:
+> `apps/web/design/tokens.json`. The compiler emits CSS, TypeScript, and the
+> agent manifest; generated files are never edited by hand. Color projection
+> remains owned by `apps/web/design/oklch-palette.json` and
+> `apps/web/styles/design-system.css` until its divergence-safe migration wave.
 
 ## Overview
 
@@ -18,9 +22,24 @@ The current canonical surface contract lives in
 
 ## Token Files
 
+### `apps/web/design/tokens.json`
+
+This is the authored source for token families already moved into the compiler:
+
+- generated brand constants
+- the shared gray scale
+- the System B radius scale
+
+Run `pnpm --filter @jovie/web run tokens:build` after editing it. The compiler
+writes `styles/generated/design-tokens.css`,
+`lib/design/generated/design-tokens.ts`, and
+`lib/design/generated/design-tokens.manifest.json`. CI freshness is enforced by
+`tokens:check`; do not hand-edit those outputs.
+
 ### `apps/web/styles/design-system.css`
 
-This is the repo-owned source of truth for:
+This is the live semantic emitter and projection layer for token families that
+have not yet moved into the compiler:
 
 - color tokens
 - surface tokens
@@ -32,7 +51,9 @@ This is the repo-owned source of truth for:
 - duration tokens
 - shell V1 semantic aliases for app chrome geometry and audio/sidebar chrome
 
-Add new core tokens here.
+It imports the generated CSS. Do not redefine generated brand, gray, or radius
+tokens here. A new token belongs in its existing canonical registry; if its
+family is compiler-owned, extend `tokens.json` and rebuild the outputs.
 
 ### `apps/web/styles/theme.css`
 
@@ -131,16 +152,20 @@ The four current canonical design-system surfaces are defined in
 
 This contract is used to align design review and screenshot/admin tooling.
 
-Routes that are explicitly not design-system surfaces:
+Routes that are explicitly not in the canonical review set:
 
 - `/ai`
 - `/investors`
 
-Both are redirects, not designed review surfaces.
+Both are live marketing pages, not canonical design-system review surfaces.
 
 ## Rules
 
-- Add shared design tokens in `design-system.css`.
+- Add generated brand, gray, and radius tokens in `design/tokens.json` and
+  rebuild; never duplicate them in `design-system.css`.
+- Keep authored OKLCH color values in `design/oklch-palette.json` and their live
+  projection in `design-system.css` until the color migration wave moves that
+  ownership explicitly.
 - Keep `theme.css` as an extension layer, not a competing token source.
 - Reuse `components/marketing/*` for shared marketing-page primitives.
 - Reuse `components/organisms/public-surface/*` for shared public-facing shell
@@ -244,6 +269,6 @@ re-render the route title (JOV-3527;
 - Creating a second reusable marketing component family outside
   `components/marketing/*`
 - Treating `/artist-profiles` as the public profile canonical surface
-- Treating `/ai` or `/investors` as design surfaces instead of redirects
+- Treating `/ai` or `/investors` as canonical review surfaces
 - Adding bare `borderRadius: N` or `rounded-[Npx]` on composer/header surfaces
   (use `SYSTEM_B_RADIUS_PX` / named utilities; see source guards above)

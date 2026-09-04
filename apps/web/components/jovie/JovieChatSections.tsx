@@ -8,6 +8,8 @@ import {
   CHAT_COMPOSER_SCROLL_FADE_CLASSNAME,
   CHAT_COMPOSER_THREAD_SCROLL_PADDING_CLASSNAME,
   CHAT_CONTENT_SHELL_CLASSNAME,
+  CHAT_EMPTY_TOP_SPACING_OWNER,
+  CHAT_EMPTY_VIEWPORT_CLASSNAME,
   CHAT_MESSAGE_CONTENT_SHELL_CLASSNAME,
 } from './chat-layout';
 import {
@@ -130,7 +132,7 @@ export function ChatComposerSurface({
 
       <ChatInput
         {...chatInputProps}
-        placeholder={composerPlaceholderForChatMode(chatMode)} // ui-casing-allow: brand placeholder
+        placeholder={composerPlaceholderForChatMode(chatMode)}
         variant={showThreadView ? 'compact' : 'hero'}
       />
     </div>
@@ -366,5 +368,7 @@ export {
   CHAT_COMPOSER_DOCK_CLASSNAME,
   CHAT_COMPOSER_SCROLL_FADE_CLASSNAME,
   CHAT_COMPOSER_THREAD_SCROLL_PADDING_CLASSNAME,
+  CHAT_EMPTY_TOP_SPACING_OWNER,
+  CHAT_EMPTY_VIEWPORT_CLASSNAME,
   ChatEmptyStateComposerRegion,
 };

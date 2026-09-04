@@ -5,31 +5,29 @@ is `MERGE_QUEUE_BACKEND=native`, and ruleset `Main Branch Protection`
 (`10512119`) owns queue admission and combined-head validation. Native GitHub is
 also the supported stack-construction path: dependent PRs may temporarily target
 their immediate parent, then are retargeted and rebased onto `main` after that
-parent lands. Graphite is not required and there is no second landing transport.
+parent lands. There is no second landing transport.
 
 ## How a PR lands
 
 1. Open a root PR against `main`. A dependent child may instead target its
    immediate parent while both are open, but it must remain draft and must not
-   receive `merge-queue` while that parent base is live.
+   be enrolled while that parent base is live. Do not add `merge-queue`.
 2. After the parent lands, retarget the child to `main`, rebase it from the
-   recorded parent tip, prove its exact remote head lease and semantic ancestry,
-   then mark it ready and apply `merge-queue`. Automation normally does this;
-   humans can use `gh pr edit <pr> --add-label merge-queue` only after that proof.
-3. Before labeling, the operator must verify the child targets `main` and that
-   its exact head is the rebased SHA. `merge-queue-autoenroll.yml` then
-   revalidates the PR's current state, hard-gate labels, terminal checks, and
-   exact head SHA. It enrolls through `scripts/merge-queue-backend.mjs` and
-   proves authoritative queue state after mutation. The label remains intent/
-   audit evidence, never queue truth.
+   recorded parent tip, and prove its exact remote head lease and semantic
+   ancestry. Mark the child ready. Native autoenroll owns queue mutation;
+   do not `gh pr merge` / `--auto` / `--admin`, and do not add `merge-queue`.
+3. `merge-queue-autoenroll.yml` revalidates the PR's current state, hard-gate
+   labels, the first source CI flight, and exact head SHA. It enrolls through
+   `scripts/merge-queue-backend.mjs` and proves authoritative queue state after
+   mutation. `ready_for_review` never launches a second source CI flight.
 4. GitHub creates a synthetic `merge_group` head against current `main` and
    waits for the same required contexts on that exact combined SHA.
 5. GitHub squash-merges the green queue entry. `linear-sync-on-merge.yml`
    transitions its Linear issue to `Done`.
 
-Do not manually merge queue-eligible PRs or use a second transport. The normal
-operator action is the intent label; the controller owns exact-head enrollment,
-dequeue compensation, and postcondition checks.
+Do not manually merge queue-eligible PRs or use a second transport. Native
+auto-merge records merge-when-ready intent; the controller owns exact-head
+enrollment and postcondition checks.
 
 ## Required contexts and CI stages
 
@@ -127,11 +125,21 @@ It fails closed if an open PR is missing from that authoritative snapshot.
   resolves the source PR from `gh-readonly-queue/main/pr-<n>-<baseSha>`, and
   launches FX against that source branch. Tell it worked: a failed merge_group
   CI run starts Rolling CI Dispatch and reaches `Launch FX remediator`.
-- CHANGELOG ALLGREEN collision (JOV-5291): GitHub's server merge ignores local
-  union drivers. Two Unreleased `CHANGELOG.md` edits in one group park the
-  later entry. Admission skips a CHANGELOG-touching PR while another CHANGELOG
-  member is already queued. This is a classified skip, not an `enroll` product
-  failure (it must not mark the PR UNSTABLE).
+  Runner-class failures (checkout, infra, flake) still launch FX and record a
+  named Actions outcome (`launched` / `repaired` / `skipped_stale` /
+  `writer_missing` / `no_key` / `needs_human`) even when an implementer lease
+  is live or `LIVE_AUTHOR` is blank (JOV-5335).
+- Pre-land CHANGELOG prohibition (JOV-5291 / JOV-5378): GitHub's server merge
+  ignores local union drivers, so two Unreleased `CHANGELOG.md` edits in one
+  group park the later entry. Implementation PRs never edit `CHANGELOG.md`.
+  Source CI rejects the diff (`scripts/lib/pre-land-changelog.mjs` +
+  `scripts/version-fanout-guard.mjs`), native admission independently skips any
+  legacy candidate that still touches the file, and queued members are drained
+  without bypassing CI. Stamp/release heads still serialize against a queued
+  CHANGELOG member. User-visible changes earn exactly one What's New bullet
+  only after land/runtime proof through the release/UI path. This is a
+  classified skip, not an `enroll` product failure (it must not mark the PR
+  UNSTABLE).
 - Enroll live policy (JOV-5291): preflight reads GraphQL
   `mergeQueue.configuration.maximumEntriesToBuild` as live truth. Stale REST
   `max_entries_to_build` drift cannot fail `enroll` after the lock already
@@ -155,11 +163,12 @@ It fails closed if an open PR is missing from that authoritative snapshot.
 `queue-deferred` is a mechanical hold placed at a draft's birth (Symphony) or
 under queue pressure (agent-pipeline). The label alone has no provenance, so
 every deferral posts a typed receipt — one upserted PR comment with the
-`<!-- bot-comment:queue-deferral -->` marker — recording the exact head, a
-typed reason (`symphony-birth-hold` or `queue-pressure`), its reason-bound
-source, and the deferral time. Only comments authored by the canonical Jovie
-bot or repository owner are authority. `scripts/lib/queue-deferral-receipt.mjs`
-is the canonical reader/writer; public comments cannot create release authority.
+`<!-- bot-comment:queue-deferral -->` marker — recording the repository, exact
+head, typed reason (`symphony-birth-hold` or `queue-pressure`), its
+reason-bound source, and the deferral time. Only comments authored by the
+canonical Jovie bot or repository owner are authority.
+`scripts/lib/queue-deferral-receipt.mjs` is the canonical reader/writer; public
+comments cannot create release authority.
 
 `queue-deferred-release.yml` runs after PR CI, successful production-controller
 completion, and the existing five-minute fleet-receipt refresh. That upstream
@@ -168,10 +177,10 @@ the repository is otherwise idle. It runs `scripts/release-queue-deferred.sh`:
 
 - **Report pass** — prints age and reason for every `queue-deferred` PR
   (not only agent-branch PRs) and raises a warning once a hold exceeds the
-  12-minute SLA. A missing or malformed receipt reports as
-  `untyped-ready-hold` and is released automatically when the live PR is
-  ready, mergeable, exact-head green, and a fresh GREEN fleet receipt
-  agrees. Human-policy labels (`needs:taste`, `net-new`, `outbound`,
+  12-minute SLA. A missing receipt reports as `untyped-ready-hold` and is
+  released automatically when the live PR is ready, mergeable, exact-head
+  green, and a fresh GREEN fleet receipt agrees. A malformed typed receipt
+  stays held. Human-policy labels (`needs:taste`, `net-new`, `outbound`,
   `needs-human`, …) report as `human-policy-hold:<label>` and stay held.
 - **Release pass** — only under a fresh (≤10-minute) `GREEN` fleet receipt
   with `promotionAdmission.allowed`, and only when the live PR is non-draft,

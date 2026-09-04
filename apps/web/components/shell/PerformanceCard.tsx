@@ -4,6 +4,7 @@ import { ArrowDown, ArrowUp } from 'lucide-react';
 import { useMemo, useState } from 'react';
 import { cn } from '@/lib/utils';
 import { Sparkline, type SparklineTrend } from './Sparkline';
+import { SHELL_CAPTION_CLASSNAME } from './shell-caption';
 
 export type PerformanceRangeKey = '24h' | '7d' | '30d' | '90d' | 'YTD';
 
@@ -14,15 +15,15 @@ interface RangeOption {
 }
 
 const DEFAULT_RANGES: readonly RangeOption[] = [
-  { key: '24h', label: '24h', days: 1 },
-  { key: '7d', label: '7d', days: 7 },
-  { key: '30d', label: '30d', days: 30 },
-  { key: '90d', label: '90d', days: 90 },
+  { key: '24h', label: '24h', days: 1 }, // ui-casing-allow: compact range pill
+  { key: '7d', label: '7d', days: 7 }, // ui-casing-allow: compact range pill
+  { key: '30d', label: '30d', days: 30 }, // ui-casing-allow: compact range pill
+  { key: '90d', label: '90d', days: 90 }, // ui-casing-allow: compact range pill
   { key: 'YTD', label: 'YTD', days: 120 },
 ];
 
 export interface PerformanceCardProps {
-  /** Caption above the headline metric (e.g. "Smart link", "Streams"). */
+  /** Caption above the headline metric (e.g. "Smart Link", "Streams"). */
   readonly title: string;
   /**
    * Suffix on the headline metric when not hovering (e.g. "clicks",
@@ -69,7 +70,7 @@ function formatDayOffset(offset: number): string {
  * @example
  * ```tsx
  * <PerformanceCard
- *   title='Smart link'
+ *   title='Smart Link'
  *   metricLabel='clicks'
  *   pointsByRange={{
  *     '7d': [12, 14, 11, 18, 22, 19, 24],
@@ -126,14 +127,12 @@ export function PerformanceCard({
   return (
     <div className={className}>
       <div className='flex items-center justify-between mb-2'>
-        <p className='text-3xs uppercase tracking-[0.08em] text-quaternary-token font-semibold'>
-          {title}
-        </p>
+        <p className={SHELL_CAPTION_CLASSNAME}>{title}</p>
         {surfacedRanges.length > 1 && (
           <div
             role='tablist'
             aria-label={`${title} range`}
-            className='flex items-center gap-0.5 p-0.5 rounded-full bg-(--surface-0)/70 border border-(--linear-app-shell-border)/70'
+            className='flex items-center gap-0.5 p-0.5 rounded-full bg-(--surface-0)/70 border border-(--app-shell-border)/70'
           >
             {surfacedRanges.map(r => {
               const on = r.key === range;

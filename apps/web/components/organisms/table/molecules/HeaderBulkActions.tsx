@@ -6,6 +6,7 @@ import {
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuTrigger,
+  IconButton,
 } from '@jovie/ui';
 import { X } from 'lucide-react';
 import type { ReactNode } from 'react';
@@ -35,9 +36,11 @@ export interface HeaderBulkActionsProps {
  *
  * Only renders when selectedCount > 0. Shows "X selected", Actions dropdown,
  * and clear button. Designed to be placed in the first data column header.
+ * Labeled Actions stays on Button `sm` (28px). Icon-only dismiss uses
+ * IconButton `sm` so geometry, focus, and the 44px hit target stay shared.
  *
  * @example
- * <th>
+ * <th className='whitespace-nowrap'>
  *   <div className="flex items-center gap-2">
  *     {selectedIds.size === 0 && <span>Release</span>}
  *     <HeaderBulkActions
@@ -60,14 +63,14 @@ export function HeaderBulkActions({
   }
 
   return (
-    <div className={cn('flex items-center gap-2 h-7', className)}>
+    <div className={cn('flex h-7 items-center gap-2', className)}>
       <span className='whitespace-nowrap text-2xs font-caption tabular-nums text-secondary-token'>
         {selectedCount} selected
       </span>
       {bulkActions.length > 0 && (
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
-            <Button variant='secondary' size='sm' className='h-7 normal-case'>
+            <Button variant='secondary' size='sm'>
               Actions
             </Button>
           </DropdownMenuTrigger>
@@ -77,30 +80,25 @@ export function HeaderBulkActions({
                 key={action.label}
                 onClick={action.onClick}
                 disabled={action.disabled}
-                className={cn(
-                  'flex items-center gap-2',
-                  action.variant === 'destructive' &&
-                    'text-destructive focus:text-destructive'
-                )}
+                variant={action.variant}
               >
-                {action.icon && <span className='h-4 w-4'>{action.icon}</span>}
-                <span>{action.label}</span>
+                {action.icon}
+                {action.label}
               </DropdownMenuItem>
             ))}
           </DropdownMenuContent>
         </DropdownMenu>
       )}
-      {onClearSelection && (
-        <Button
-          variant='ghost'
+      {onClearSelection ? (
+        <IconButton
+          variant='secondary'
           size='sm'
           onClick={onClearSelection}
-          className='h-7 w-7 rounded-full border border-transparent p-0 text-tertiary-token transition-[background-color,border-color,color] duration-subtle hover:border-subtle hover:bg-surface-1 hover:text-primary-token'
-          aria-label='Clear Selection'
+          ariaLabel='Clear Selection'
         >
-          <X className='h-3.5 w-3.5' />
-        </Button>
-      )}
+          <X aria-hidden='true' />
+        </IconButton>
+      ) : null}
     </div>
   );
 }

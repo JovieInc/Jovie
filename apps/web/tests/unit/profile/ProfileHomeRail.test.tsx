@@ -18,7 +18,7 @@ function makeArtist(overrides: Partial<Artist> = {}): Artist {
     handle: 'tim',
     spotify_id: '4u',
     name: 'Tim White',
-    image_url: '/images/avatars/tim-white-founder.jpg',
+    image_url: '/images/avatars/tim-white.jpg',
     published: true,
     is_verified: true,
     is_featured: true,
@@ -205,7 +205,15 @@ describe('ProfileHomeRail', () => {
     const pacMedia = pacCard.querySelector('.aspect-square');
     expect(pacMedia?.className).toContain('self-stretch');
     expect(pacMedia?.className).toContain('w-auto');
-    expect(pacMedia?.className).toContain('rounded-(--profile-action-radius)');
+    expect(pacMedia?.className).toContain('rounded-lg');
+    expect(pacMedia?.className).not.toContain(
+      'rounded-(--profile-action-radius)'
+    );
+    const pacArtwork = screen.getByRole('img', {
+      name: 'Never Say A Word artwork',
+    });
+    expect(pacArtwork).toHaveClass('object-contain');
+    expect(pacArtwork).not.toHaveClass('object-cover');
     expect(screen.getByRole('link', { name: 'Listen' })).toHaveClass(
       'h-11',
       'px-3',

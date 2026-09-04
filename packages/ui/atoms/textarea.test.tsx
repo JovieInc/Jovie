@@ -105,21 +105,21 @@ describe('Textarea', () => {
       render(<Textarea textareaSize='sm' data-testid='textarea' />);
       const textarea = screen.getByTestId('textarea');
       expect(textarea.className).toContain('text-xs');
-      expect(textarea.className).toContain('min-h-[60px]');
+      expect(textarea.className).toContain('min-h-15');
     });
 
     it('applies md size classes by default', () => {
       render(<Textarea data-testid='textarea' />);
       const textarea = screen.getByTestId('textarea');
-      expect(textarea.className).toContain('text-[13px]');
-      expect(textarea.className).toContain('min-h-[80px]');
+      expect(textarea.className).toContain('text-app');
+      expect(textarea.className).toContain('min-h-20');
     });
 
     it('applies lg size classes', () => {
       render(<Textarea textareaSize='lg' data-testid='textarea' />);
       const textarea = screen.getByTestId('textarea');
-      expect(textarea.className).toContain('text-[13px]');
-      expect(textarea.className).toContain('min-h-[120px]');
+      expect(textarea.className).toContain('text-app');
+      expect(textarea.className).toContain('min-h-30');
     });
 
     it('merges custom className', () => {

@@ -2,9 +2,55 @@ import AVFoundation
 import Foundation
 import Speech
 import Testing
+import UIKit
 @testable import Jovie
 
 struct VoiceCaptureServiceTests {
+  @Test func captureFormatGuardRejectsSilentInputNode() {
+    typealias Config = VoiceCaptureRecognitionConfig
+    #expect(!Config.isUsableCaptureFormat(sampleRate: 0, channelCount: 1))
+    #expect(!Config.isUsableCaptureFormat(sampleRate: 48_000, channelCount: 0))
+    #expect(Config.isUsableCaptureFormat(sampleRate: 48_000, channelCount: 1))
+  }
+
+  @Test func recognizerFailuresMapToPlainLanguageAndIgnoreOurOwnCancellation() {
+    let domain = VoiceCaptureFailureMessage.assistantDomain
+    #expect(VoiceCaptureFailureMessage.message(domain: domain, code: 216) == nil)
+    #expect(VoiceCaptureFailureMessage.message(domain: domain, code: 209) == nil)
+    #expect(
+      VoiceCaptureFailureMessage.message(domain: domain, code: 1110)
+        == VoiceCaptureFailureMessage.nothingHeardMessage
+    )
+    #expect(
+      VoiceCaptureFailureMessage.message(domain: domain, code: 1101)
+        == VoiceCaptureFailureMessage.onDeviceNotReadyMessage
+    )
+    #expect(
+      VoiceCaptureFailureMessage.message(
+        domain: NSURLErrorDomain,
+        code: NSURLErrorNotConnectedToInternet
+      ) == VoiceCaptureFailureMessage.networkMessage
+    )
+    #expect(
+      VoiceCaptureFailureMessage.message(domain: "SomeOtherDomain", code: 7)
+        == VoiceCaptureFailureMessage.genericMessage
+    )
+    let cancelled = NSError(domain: domain, code: 216)
+    #expect(VoiceCaptureFailureMessage.message(for: cancelled) == nil)
+  }
+
+  @Test func earlyStopPreservesUsableTranscriptOrOffersRetry() {
+    #expect(
+      VoiceCaptureSessionInterruption.resolve(transcript: "  ship the single  ")
+        == .preserveTranscript("ship the single")
+    )
+    #expect(VoiceCaptureSessionInterruption.resolve(transcript: " \n ") == .retry)
+  }
+
+  @Test func audioUnavailableHasUserFacingCopy() {
+    #expect(VoiceCaptureError.audioUnavailable.errorDescription?.isEmpty == false)
+  }
+
   @Test func teleprompterFollowsWordsAndRecoversAfterOffScriptSpeech() {
     var follower = KaraokeScriptFollower(
       script: "Today we are building a calmer path for independent artists"
@@ -118,6 +164,78 @@ struct VoiceCaptureServiceTests {
     }
   }
 
+  @MainActor
+  @Test func cancelKeepsRestartBlockedUntilPrivateTakeTeardownFinishes() async throws {
+    let root = FileManager.default.temporaryDirectory
+      .appendingPathComponent(UUID().uuidString, isDirectory: true)
+    defer { try? FileManager.default.removeItem(at: root) }
+    let store = VlogSessionStore(rootURL: root)
+    let controller = SuspendingTeleprompterCaptureController()
+    controller.suspendCancel = true
+    let viewModel = TeleprompterViewModel(
+      proposal: .quickVlog,
+      store: store,
+      captureController: controller
+    )
+
+    await viewModel.startRecording()
+    #expect(viewModel.isRecording)
+    #expect(controller.startCallCount == 1)
+    #expect(store.recent().count == 1)
+
+    let cancelTask = Task { @MainActor in
+      await viewModel.cancelRecording()
+    }
+    await controller.waitUntilCancelStarts()
+
+    #expect(viewModel.isFinishing)
+    #expect(!viewModel.isRecording)
+    await viewModel.startRecording()
+    await viewModel.stopRecording()
+    #expect(await viewModel.cancelRecording() == false)
+    #expect(controller.startCallCount == 1)
+    #expect(store.recent().count == 1)
+
+    controller.resumeCancel()
+    #expect(await cancelTask.value)
+    #expect(!viewModel.isFinishing)
+    #expect(store.recent().isEmpty)
+  }
+
+  @MainActor
+  @Test func cancelInvalidatesAStartThatFinishesAfterDismissal() async throws {
+    let root = FileManager.default.temporaryDirectory
+      .appendingPathComponent(UUID().uuidString, isDirectory: true)
+    defer { try? FileManager.default.removeItem(at: root) }
+    let store = VlogSessionStore(rootURL: root)
+    let controller = SuspendingTeleprompterCaptureController()
+    controller.suspendStart = true
+    let viewModel = TeleprompterViewModel(
+      proposal: .quickVlog,
+      store: store,
+      captureController: controller
+    )
+
+    let startTask = Task { @MainActor in
+      await viewModel.startRecording()
+    }
+    await controller.waitUntilStartBegins()
+    #expect(viewModel.isStarting)
+    #expect(store.recent().count == 1)
+
+    #expect(await viewModel.cancelRecording())
+    #expect(viewModel.isStarting)
+    #expect(!viewModel.isRecording)
+    #expect(store.recent().isEmpty)
+
+    controller.resumeStart()
+    await startTask.value
+    #expect(!viewModel.isStarting)
+    #expect(!viewModel.isRecording)
+    #expect(controller.cancelCallCount == 2)
+    #expect(store.recent().isEmpty)
+  }
+
   #if !targetEnvironment(simulator)
     @MainActor
     @Test func cameraPreviewDoesNotActivateAudioCaptureBeforeRecord() async throws {
@@ -185,12 +303,32 @@ struct VoiceCaptureServiceTests {
     #expect(result.latencyMilliseconds == 120)
   }
 
+  @Test func eyesFreeGateKeepsSummerFounderOnlyAndSurfacesOfflineRetry() {
+    func gate(
+      destination: EyesFreeCaptureDestination,
+      canUseSummer: Bool,
+      isOffline: Bool
+    ) -> EyesFreeCaptureGate {
+      EyesFreeCaptureGate.resolve(
+        isSignedIn: true,
+        chatEnabled: true,
+        isOffline: isOffline,
+        destination: destination,
+        canUseSummer: canUseSummer
+      )
+    }
+    #expect(gate(destination: .jovie, canUseSummer: false, isOffline: false) == .ready)
+    #expect(gate(destination: .summer, canUseSummer: false, isOffline: false) == .summerForbidden)
+    #expect(gate(destination: .jovie, canUseSummer: true, isOffline: true) == .offline)
+    #expect(EyesFreeCaptureGate.summerForbidden.message.contains("founder"))
+  }
+
   @Test func emptyTranscriptErrorCopyIsUserFacing() {
     #expect(VoiceCaptureError.emptyTranscript.errorDescription == "Nothing heard.")
   }
 
-  @Test func voiceMemoInsertIsDraftNotAutoSend() {
-    // Contract: Talk overlay → AppShell uses shellHandoff (draft only, never auto-send).
+  @Test func failedVoiceCompletionCanPreserveARecoveryDraftWithoutAutoSend() {
+    // Recovery contract: a direct-completion failure preserves editable text.
     let handoff = VoiceMemoActionDraft.shellHandoff(
       fromTranscript: "  schedule release next Friday  "
     )
@@ -466,5 +604,66 @@ struct VoiceCaptureServiceTests {
     let queuedCount = store.queuedPromptFeedback().count
     viewModel.submitPromptFeedback(.idle)
     #expect(store.queuedPromptFeedback().count == queuedCount)
+  }
+}
+
+@MainActor
+private final class SuspendingTeleprompterCaptureController: TeleprompterCaptureControlling {
+  let captureSession = AVCaptureSession()
+  var isUsingOnDeviceRecognition = false
+  var isSpeechRecognitionActive = false
+  var onPartialTranscript: ((String) -> Void)?
+  var suspendStart = false
+  var suspendCancel = false
+  private(set) var startCallCount = 0
+  private(set) var cancelCallCount = 0
+
+  private var startContinuation: CheckedContinuation<Void, Never>?
+  private var cancelContinuation: CheckedContinuation<Void, Never>?
+
+  func startPreview() async throws {}
+
+  func start(videoURL _: URL) async throws {
+    startCallCount += 1
+    guard suspendStart else { return }
+    await withCheckedContinuation { continuation in
+      startContinuation = continuation
+    }
+  }
+
+  func stop() async throws -> TeleprompterCaptureResult {
+    throw TeleprompterCaptureError.notRecording
+  }
+
+  func cancel() async {
+    cancelCallCount += 1
+    guard suspendCancel else { return }
+    await withCheckedContinuation { continuation in
+      cancelContinuation = continuation
+    }
+  }
+
+  func applyDeviceOrientation(_: UIDeviceOrientation) {}
+
+  func waitUntilStartBegins() async {
+    while startCallCount == 0 || startContinuation == nil {
+      await Task.yield()
+    }
+  }
+
+  func waitUntilCancelStarts() async {
+    while cancelCallCount == 0 || cancelContinuation == nil {
+      await Task.yield()
+    }
+  }
+
+  func resumeStart() {
+    startContinuation?.resume()
+    startContinuation = nil
+  }
+
+  func resumeCancel() {
+    cancelContinuation?.resume()
+    cancelContinuation = nil
   }
 }

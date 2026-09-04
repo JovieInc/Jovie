@@ -6,6 +6,9 @@ const meta: Meta<typeof AuthLayout> = {
   component: AuthLayout,
   parameters: {
     layout: 'fullscreen',
+    jovie: {
+      uncoveredProps: ['isKeyboardVisible', 'formRef'],
+    },
   },
 };
 
@@ -50,6 +53,21 @@ export const SignUp: Story = {
     footerPrompt: 'Already have an account?',
     footerLinkText: 'Sign in',
     footerLinkHref: '/signin',
+    children: <SampleForm />,
+  },
+};
+
+export const SplashB: Story = {
+  args: {
+    formTitle: 'Get started',
+    formTitleClassName: 'sr-only',
+    showFormTitle: false,
+    showFooterPrompt: false,
+    showLogo: true,
+    contentPlacement: 'center',
+    showcaseVariant: 'page',
+    chrome: 'splash-b',
+    layoutVariant: 'stack',
     children: <SampleForm />,
   },
 };

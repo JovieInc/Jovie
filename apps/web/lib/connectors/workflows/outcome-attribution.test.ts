@@ -10,6 +10,7 @@ vi.mock('@/lib/release-to-revenue/gmv-attribution', () => ({
 }));
 
 vi.mock('@/lib/metrics/artist-revenue-cohorts', () => ({
+  BASELINE_WINDOW_DAYS: 30,
   ensureJovieActiveCohort: mockEnsureJovieActiveCohort,
 }));
 
@@ -24,6 +25,7 @@ import {
   computeWorkflowRunOutcomeDeltas,
   getAutomationAttributedRevenueForRun,
   recordWorkflowRunOutcome,
+  resolveReleaseOutcomeMeasurementState,
   sumArtistAutomationAttributedRevenue,
 } from './outcome-attribution';
 
@@ -45,6 +47,23 @@ const releaseStepOutputs = {
     links: [],
   },
   storeListing: { merchCardIds: ['card-1'] },
+  distributionDrafts: {
+    releaseLink: 'https://jov.ie/tim/night-drive',
+    merchDropLink: 'https://jov.ie/tim/merch/card-1',
+    items: [
+      {
+        id: 'draft-1',
+        channel: 'social_post' as const,
+        platform: 'instagram' as const,
+        variant: 'announcement' as const,
+        body: 'Night Drive is out now.',
+        status: 'dispatched' as const,
+        createdAt: '2026-06-20T12:00:00.000Z',
+        decidedAt: '2026-06-20T13:00:00.000Z',
+        dispatchedAt: '2026-06-20T13:00:00.000Z',
+      },
+    ],
+  },
 };
 
 function mockSelectChain(rows: unknown[]) {
@@ -58,6 +77,14 @@ function mockSelectChain(rows: unknown[]) {
       ),
     }),
   };
+}
+
+function mockOutcomeWrite(row: Record<string, unknown>) {
+  const returning = vi.fn().mockResolvedValue([row]);
+  const onConflictDoUpdate = vi.fn().mockReturnValue({ returning });
+  const values = vi.fn().mockReturnValue({ onConflictDoUpdate, returning });
+  mockDbInsert.mockReturnValue({ values });
+  return { onConflictDoUpdate, values };
 }
 
 describe('computeWorkflowRunOutcomeDeltas', () => {
@@ -76,6 +103,7 @@ describe('computeWorkflowRunOutcomeDeltas', () => {
 
   it('returns zeroed deltas for connector execute_approved_action runs', async () => {
     const deltas = await computeWorkflowRunOutcomeDeltas({
+      workflowRunId: 'run-connector-1',
       kind: 'execute_approved_action',
       userId: 'user-1',
       createdAt: new Date('2026-06-19T00:00:00.000Z'),
@@ -104,11 +132,13 @@ describe('computeWorkflowRunOutcomeDeltas', () => {
       .mockReturnValueOnce(mockSelectChain([{ count: 3 }]));
 
     const deltas = await computeWorkflowRunOutcomeDeltas({
+      workflowRunId: 'run-1',
       kind: 'release_to_revenue',
       userId: 'user-1',
       createdAt: new Date('2026-06-19T00:00:00.000Z'),
       stepOutputs: releaseStepOutputs,
       completedAt: new Date('2026-06-21T00:00:00.000Z'),
+      asOf: new Date('2026-06-25T00:00:00.000Z'),
     });
 
     expect(deltas).toMatchObject({
@@ -121,10 +151,76 @@ describe('computeWorkflowRunOutcomeDeltas', () => {
       newFansDelta: 3,
     });
     expect(deltas.window.start).toEqual(new Date('2026-06-20T12:00:00.000Z'));
+    expect(deltas.window.end).toEqual(new Date('2026-06-25T00:00:00.000Z'));
     expect(mockBuildReleaseGmvRowForRun).toHaveBeenCalledWith({
-      workflowRunId: 'pending',
+      workflowRunId: 'run-1',
       stepOutputs: releaseStepOutputs,
+      window: {
+        start: new Date('2026-06-20T12:00:00.000Z'),
+        end: new Date('2026-06-25T00:00:00.000Z'),
+      },
     });
+  });
+
+  it('caps a release outcome at the canonical 30-day maturity point', async () => {
+    mockDbSelect
+      .mockReturnValueOnce(mockSelectChain([{ count: 0 }]))
+      .mockReturnValueOnce(mockSelectChain([{ count: 0 }]))
+      .mockReturnValueOnce(mockSelectChain([{ count: 0 }]));
+
+    const deltas = await computeWorkflowRunOutcomeDeltas({
+      workflowRunId: 'run-1',
+      kind: 'release_to_revenue',
+      userId: 'user-1',
+      createdAt: new Date('2026-06-19T00:00:00.000Z'),
+      stepOutputs: releaseStepOutputs,
+      completedAt: new Date('2026-06-21T00:00:00.000Z'),
+      asOf: new Date('2026-08-20T00:00:00.000Z'),
+    });
+
+    expect(deltas.window).toEqual({
+      start: new Date('2026-06-20T12:00:00.000Z'),
+      end: new Date('2026-07-20T12:00:00.000Z'),
+    });
+  });
+});
+
+describe('resolveReleaseOutcomeMeasurementState', () => {
+  const windowStart = new Date('2026-06-20T12:00:00.000Z');
+  const zeroMetrics = {
+    gmvDeltaCents: 0,
+    clickDelta: 0,
+    dspClickDelta: 0,
+    newFansDelta: 0,
+  };
+
+  it.each([
+    {
+      name: 'measuring before maturity even with an early signal',
+      windowEnd: new Date('2026-07-20T11:59:59.999Z'),
+      metrics: { ...zeroMetrics, dspClickDelta: 1 },
+      expected: 'measuring',
+    },
+    {
+      name: 'measured_zero at maturity with no result',
+      windowEnd: new Date('2026-07-20T12:00:00.000Z'),
+      metrics: zeroMetrics,
+      expected: 'measured_zero',
+    },
+    {
+      name: 'measured_positive at maturity with a result',
+      windowEnd: new Date('2026-07-20T12:00:00.000Z'),
+      metrics: { ...zeroMetrics, newFansDelta: 1 },
+      expected: 'measured_positive',
+    },
+  ] as const)('$name', ({ expected, metrics, windowEnd }) => {
+    expect(
+      resolveReleaseOutcomeMeasurementState({
+        windowStart,
+        windowEnd,
+        ...metrics,
+      })
+    ).toBe(expected);
   });
 });
 
@@ -142,7 +238,7 @@ describe('recordWorkflowRunOutcome', () => {
     });
   });
 
-  it('writes one durable outcome row when a completed run is recorded', async () => {
+  it('writes one durable outcome row for the first real release activation', async () => {
     const completedRun = {
       id: 'run-1',
       kind: 'release_to_revenue',
@@ -160,26 +256,22 @@ describe('recordWorkflowRunOutcome', () => {
       .mockReturnValueOnce(mockSelectChain([{ count: 2 }]))
       .mockReturnValueOnce(mockSelectChain([{ count: 1 }]));
 
-    mockDbInsert.mockReturnValue({
-      values: vi.fn().mockReturnValue({
-        returning: vi.fn().mockResolvedValue([
-          {
-            workflowRunId: 'run-1',
-            userId: 'user-1',
-            releaseId: 'release-1',
-            suggestedActionId: null,
-            gmvDeltaCents: 1800,
-            clickDelta: 4,
-            dspClickDelta: 2,
-            newFansDelta: 1,
-            windowStart: new Date('2026-06-20T12:00:00.000Z'),
-            windowEnd: new Date('2026-06-21T00:00:00.000Z'),
-          },
-        ]),
-      }),
+    const write = mockOutcomeWrite({
+      workflowRunId: 'run-1',
+      userId: 'user-1',
+      releaseId: 'release-1',
+      suggestedActionId: null,
+      gmvDeltaCents: 1800,
+      clickDelta: 4,
+      dspClickDelta: 2,
+      newFansDelta: 1,
+      windowStart: new Date('2026-06-20T12:00:00.000Z'),
+      windowEnd: new Date('2026-06-25T00:00:00.000Z'),
     });
 
-    const outcome = await recordWorkflowRunOutcome('run-1');
+    const outcome = await recordWorkflowRunOutcome('run-1', {
+      asOf: new Date('2026-06-25T00:00:00.000Z'),
+    });
 
     expect(outcome).toMatchObject({
       workflowRunId: 'run-1',
@@ -191,23 +283,24 @@ describe('recordWorkflowRunOutcome', () => {
       newFansDelta: 1,
     });
     expect(mockDbInsert).toHaveBeenCalledTimes(1);
+    expect(write.onConflictDoUpdate).toHaveBeenCalledTimes(1);
     expect(mockEnsureJovieActiveCohort).toHaveBeenCalledWith({
       userId: 'user-1',
-      activatedAt: new Date('2026-06-21T00:00:00.000Z'),
+      activatedAt: new Date('2026-06-20T13:00:00.000Z'),
     });
   });
 
-  it('is idempotent when an outcome row already exists', async () => {
+  it('preserves immutable early-return behavior for generic workflows', async () => {
     const existingOutcome = {
-      workflowRunId: 'run-1',
+      workflowRunId: 'run-connector-1',
       userId: 'user-1',
-      releaseId: 'release-1',
-      suggestedActionId: null,
-      gmvDeltaCents: 900,
-      clickDelta: 1,
-      dspClickDelta: 1,
+      releaseId: null,
+      suggestedActionId: 'approval-1',
+      gmvDeltaCents: 0,
+      clickDelta: 0,
+      dspClickDelta: 0,
       newFansDelta: 0,
-      windowStart: new Date('2026-06-20T12:00:00.000Z'),
+      windowStart: new Date('2026-06-19T00:00:00.000Z'),
       windowEnd: new Date('2026-06-21T00:00:00.000Z'),
     };
 
@@ -215,25 +308,101 @@ describe('recordWorkflowRunOutcome', () => {
       .mockReturnValueOnce(
         mockSelectChain([
           {
-            id: 'run-1',
-            kind: 'release_to_revenue',
+            id: 'run-connector-1',
+            kind: 'execute_approved_action',
             userId: 'user-1',
             status: 'completed',
             createdAt: new Date('2026-06-19T00:00:00.000Z'),
             updatedAt: new Date('2026-06-21T00:00:00.000Z'),
-            stepOutputs: releaseStepOutputs,
+            stepOutputs: { approvalId: 'approval-1' },
           },
         ])
       )
       .mockReturnValueOnce(mockSelectChain([{ id: 'outcome-1' }]))
       .mockReturnValueOnce(mockSelectChain([existingOutcome]));
 
-    const outcome = await recordWorkflowRunOutcome('run-1');
+    const outcome = await recordWorkflowRunOutcome('run-connector-1');
+
+    expect(outcome).toMatchObject({
+      workflowRunId: 'run-connector-1',
+      suggestedActionId: 'approval-1',
+    });
+    expect(mockDbInsert).not.toHaveBeenCalled();
+    expect(mockEnsureJovieActiveCohort).not.toHaveBeenCalled();
+  });
+
+  it('recomputes and upserts an existing release outcome without reactivating the cohort', async () => {
+    const completedRun = {
+      id: 'run-1',
+      kind: 'release_to_revenue',
+      userId: 'user-1',
+      status: 'completed',
+      createdAt: new Date('2026-06-19T00:00:00.000Z'),
+      updatedAt: new Date('2026-06-21T00:00:00.000Z'),
+      stepOutputs: releaseStepOutputs,
+    };
+    mockDbSelect
+      .mockReturnValueOnce(mockSelectChain([completedRun]))
+      .mockReturnValueOnce(mockSelectChain([{ id: 'outcome-1' }]))
+      .mockReturnValueOnce(mockSelectChain([{ count: 12 }]))
+      .mockReturnValueOnce(mockSelectChain([{ count: 7 }]))
+      .mockReturnValueOnce(mockSelectChain([{ count: 3 }]));
+    const write = mockOutcomeWrite({
+      workflowRunId: 'run-1',
+      userId: 'user-1',
+      releaseId: 'release-1',
+      suggestedActionId: null,
+      gmvDeltaCents: 1800,
+      clickDelta: 12,
+      dspClickDelta: 7,
+      newFansDelta: 3,
+      windowStart: new Date('2026-06-20T12:00:00.000Z'),
+      windowEnd: new Date('2026-07-20T12:00:00.000Z'),
+    });
+
+    const outcome = await recordWorkflowRunOutcome('run-1', {
+      asOf: new Date('2026-08-20T00:00:00.000Z'),
+    });
 
     expect(outcome).toMatchObject({
       workflowRunId: 'run-1',
-      gmvDeltaCents: 900,
+      clickDelta: 12,
+      dspClickDelta: 7,
+      newFansDelta: 3,
+      windowEnd: new Date('2026-07-20T12:00:00.000Z'),
     });
+    expect(write.onConflictDoUpdate).toHaveBeenCalledTimes(1);
+    expect(mockEnsureJovieActiveCohort).not.toHaveBeenCalled();
+  });
+
+  it('does not persist or activate an all-rejected release run', async () => {
+    const rejectedStepOutputs = {
+      ...releaseStepOutputs,
+      distributionDrafts: {
+        ...releaseStepOutputs.distributionDrafts,
+        items: releaseStepOutputs.distributionDrafts.items.map(draft => ({
+          ...draft,
+          status: 'rejected' as const,
+          dispatchedAt: undefined,
+        })),
+      },
+    };
+    mockDbSelect.mockReturnValueOnce(
+      mockSelectChain([
+        {
+          id: 'run-1',
+          kind: 'release_to_revenue',
+          userId: 'user-1',
+          status: 'completed',
+          createdAt: new Date('2026-06-19T00:00:00.000Z'),
+          updatedAt: new Date('2026-06-21T00:00:00.000Z'),
+          stepOutputs: rejectedStepOutputs,
+        },
+      ])
+    );
+
+    await expect(recordWorkflowRunOutcome('run-1')).resolves.toBeNull();
+    expect(mockDbSelect).toHaveBeenCalledTimes(1);
     expect(mockDbInsert).not.toHaveBeenCalled();
     expect(mockEnsureJovieActiveCohort).not.toHaveBeenCalled();
   });

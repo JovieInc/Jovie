@@ -69,7 +69,7 @@ export function DeferredSection({
             minWidth: placeholderWidth,
             backgroundColor: 'var(--linear-bg-surface-0)',
             opacity: 0.4,
-            borderRadius: 'var(--linear-radius-lg)',
+            borderRadius: 'var(--radius-lg)',
           }}
         />
       )}

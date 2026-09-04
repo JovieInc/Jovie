@@ -7,8 +7,8 @@
 
 import * as Sentry from '@sentry/nextjs';
 import type { Ratelimit } from '@upstash/ratelimit';
-import { after } from 'next/server';
 import { env } from '@/lib/env-server';
+import { scheduleAfter } from '@/lib/next/schedule-after';
 import {
   closeRedisQuotaCircuit,
   isRedisQuotaCircuitOpen,
@@ -155,7 +155,7 @@ export class RateLimiter {
         // alive long enough to complete it — without this the promise is
         // deferred to the next invocation, bloating that trace by 54+ seconds.
         if (result.pending) {
-          after(() => result.pending.catch(console.error));
+          scheduleAfter(() => result.pending.catch(console.error));
         }
         // Sentry's metric aggregator turns this bounded-cardinality count into
         // a pre-failure command-volume signal. Values use the provider's

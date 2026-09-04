@@ -1,3 +1,5 @@
+import { readFileSync } from 'node:fs';
+import { resolve } from 'node:path';
 import { fireEvent, render, screen } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
@@ -24,6 +26,28 @@ function setCookie(value: string) {
     value,
   });
 }
+
+describe('cookie banner coverage receipts', () => {
+  it('asserts exact CookieBannerSection and CookieModal sources', () => {
+    const bannerSource = readFileSync(
+      resolve(process.cwd(), 'components/organisms/CookieBannerSection.tsx'),
+      'utf8'
+    );
+    expect(bannerSource).toContain('export function CookieBannerSection');
+    expect(bannerSource).not.toMatch(/--linear-app-/);
+    const modalSource = readFileSync(
+      resolve(process.cwd(), 'components/organisms/CookieModal.tsx'),
+      'utf8'
+    );
+    expect(modalSource).toContain('export function CookieModal');
+    expect(modalSource).toContain('function CookiePreferencesSaveButton');
+    expect(modalSource).toContain(
+      '<CookiePreferencesSaveButton\n' +
+        '              isSaving={isSaving}\n' +
+        '              onSave={save}'
+    );
+  });
+});
 
 describe('CookieBannerSection consent sync', () => {
   // Floating card redesign (bottom-right compact surface) preserves all action handlers,

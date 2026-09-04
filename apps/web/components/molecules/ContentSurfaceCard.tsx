@@ -8,16 +8,16 @@ import {
 import { cn } from '@/lib/utils';
 
 const contentSurfaceCardVariants = cva(
-  'border border-(--app-shell-border) bg-surface-1 shadow-none',
+  'border border-(--app-shell-border) shadow-none',
   {
     variants: {
       surface: {
-        default: 'rounded-xl',
-        details: 'rounded-xl',
-        marketing: 'rounded-xl',
-        nested: 'rounded-lg',
-        settings: 'rounded-xl',
-        table: 'rounded-xl',
+        default: 'rounded-xl bg-surface-1',
+        details: 'rounded-xl bg-surface-1',
+        marketing: 'rounded-xl bg-surface-1',
+        nested: 'rounded-lg bg-surface-0',
+        settings: 'rounded-xl bg-surface-1',
+        table: 'rounded-xl bg-surface-1',
       },
     },
     defaultVariants: {
@@ -27,8 +27,7 @@ const contentSurfaceCardVariants = cva(
 );
 
 /** @deprecated Use `contentSurfaceCardVariants` instead for new code. */
-export const CONTENT_SURFACE_CARD_CLASSNAME =
-  'rounded-xl border border-(--app-shell-border) bg-surface-1 shadow-none';
+export const CONTENT_SURFACE_CARD_CLASSNAME = contentSurfaceCardVariants();
 
 export interface ContentSurfaceCardProps
   extends Omit<ComponentPropsWithoutRef<'div'>, 'children'>,

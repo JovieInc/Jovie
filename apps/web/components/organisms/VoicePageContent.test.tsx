@@ -76,6 +76,10 @@ describe('VoicePageContent source contract', () => {
       resolve(process.cwd(), 'app/(marketing)/voice/page.tsx'),
       'utf8'
     );
+    const componentSource = readFileSync(
+      resolve(__dirname, './VoicePageContent.tsx'),
+      'utf8'
+    );
 
     expect(routeSource).toContain(
       "import { VoicePageContent } from '@/components/organisms/VoicePageContent';"
@@ -87,9 +91,13 @@ describe('VoicePageContent source contract', () => {
     expect(voiceMeta.parameters.pen).toEqual({
       registryId: 'web-041-voice',
       route: '/voice',
-      sourceSha: 'e21d2e01bc80d7e0146a071207c406e1cd762bd3',
+      sourceSha: '8b0353fcbeb0cffef614fa47afbbbd8eeae48997',
       proofScope: 'exact-production-body',
     });
+    expect(componentSource).toContain(
+      "<Button asChild variant='secondary' className='mt-2'>"
+    );
+    expect(componentSource).toContain("data-testid='voice-final-cta'");
     expect(Web041Voice).toEqual({});
   });
 });

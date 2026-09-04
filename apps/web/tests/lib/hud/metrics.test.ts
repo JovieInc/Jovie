@@ -33,6 +33,7 @@ vi.mock('@/lib/admin/mercury-metrics', () => ({
     balanceUsd: 10000,
     burnRateUsd: 2000,
     burnWindowDays: 30,
+    burnRateAvailable: true,
     isConfigured: true,
     isAvailable: true,
   })),
@@ -78,6 +79,7 @@ vi.mock('@/lib/hud/ai-ops', () => ({
 }));
 
 afterEach(() => {
+  vi.useRealTimers();
   vi.restoreAllMocks();
 });
 
@@ -235,6 +237,38 @@ describe('getHudMetrics', () => {
     expect(metrics.sources.stripe.fetchedAtIso).toBe(metrics.generatedAtIso);
   });
 
+  it('stamps the aggregate payload after producer observations resolve', async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date('2026-08-22T18:00:00.000Z'));
+    mockGetHudDeployments.mockResolvedValueOnce({
+      availability: 'not_configured',
+      current: null,
+      recent: [],
+    });
+    vi.mocked(getAdminStripeOverviewMetrics).mockImplementationOnce(
+      async () => {
+        vi.setSystemTime(new Date('2026-08-22T18:00:01.000Z'));
+        return {
+          mrrUsd: 1000,
+          activeSubscribers: 25,
+          mrrGrowth30dUsd: 50,
+          isConfigured: true,
+          isAvailable: true,
+          observedAtIso: '2026-08-22T18:00:01.000Z',
+        };
+      }
+    );
+
+    const metrics = await getHudMetrics('admin');
+
+    expect(metrics.sources.stripe.fetchedAtIso).toBe(
+      '2026-08-22T18:00:01.000Z'
+    );
+    expect(Date.parse(metrics.generatedAtIso)).toBeGreaterThanOrEqual(
+      Date.parse(metrics.sources.stripe.fetchedAtIso)
+    );
+  });
+
   it('returns degraded metrics when an upstream fetch times out', async () => {
     mockGetHudDeployments.mockResolvedValueOnce({
       availability: 'not_configured',
@@ -300,5 +334,55 @@ describe('getHudMetrics', () => {
     );
     expect(metrics.sources.stripe.state).toBe('unavailable');
     expect(metrics.sources.stripe.nextStep).toContain('retry');
+  });
+
+  it('fails the composed financial status closed when Mercury burn is degraded', async () => {
+    mockGetHudDeployments.mockResolvedValueOnce({
+      availability: 'not_configured',
+      current: null,
+      recent: [],
+    });
+    vi.mocked(getAdminMercuryMetrics).mockResolvedValueOnce({
+      balanceUsd: 10_000,
+      burnRateUsd: 0,
+      burnWindowDays: 30,
+      burnRateAvailable: false,
+      isConfigured: true,
+      isAvailable: true,
+      defaultStatus: 'unknown',
+      errorMessage: 'Mercury transaction window timed out.',
+    });
+
+    const metrics = await getHudMetrics('admin');
+
+    expect(metrics.overview.financialDataAvailable).toBe(false);
+    expect(metrics.overview.defaultStatus).toBe('unknown');
+    expect(metrics.overview.runwayMonths).toBeNull();
+    expect(metrics.overview.defaultStatusDetail).toContain(
+      'Mercury transactions (degraded)'
+    );
+    expect(metrics.sources.mercury.state).toBe('degraded');
+  });
+
+  it('fails closed when a legacy Mercury producer omits completeness metadata', async () => {
+    mockGetHudDeployments.mockResolvedValueOnce({
+      availability: 'not_configured',
+      current: null,
+      recent: [],
+    });
+    vi.mocked(getAdminMercuryMetrics).mockResolvedValueOnce({
+      balanceUsd: 10_000,
+      burnRateUsd: 0,
+      burnWindowDays: 30,
+      isConfigured: true,
+      isAvailable: true,
+      defaultStatus: 'alive',
+    } as never);
+
+    const metrics = await getHudMetrics('admin');
+
+    expect(metrics.overview.financialDataAvailable).toBe(false);
+    expect(metrics.overview.defaultStatus).toBe('unknown');
+    expect(metrics.overview.runwayMonths).toBeNull();
   });
 });

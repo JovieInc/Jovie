@@ -37,7 +37,7 @@ export function WhatYouGetSection() {
       <Container size='homepage'>
         <div className='max-w-5xl mx-auto'>
           <h2
-            className='text-center heading-gap-linear text-primary-token'
+            className='text-center heading-gap-linear text-primary-token line-clamp-2'
             style={{
               fontSize: 'var(--linear-h2-size)',
               fontWeight: 'var(--linear-font-weight-medium)',
@@ -51,7 +51,7 @@ export function WhatYouGetSection() {
 
           <div
             className='grid grid-cols-1 sm:grid-cols-2 max-w-2xl mx-auto'
-            style={{ gap: 'var(--linear-space-10)' }}
+            style={{ gap: 'var(--space-10)' }}
           >
             {features.map(feature => {
               const Icon = feature.icon;
@@ -59,7 +59,7 @@ export function WhatYouGetSection() {
                 <div
                   key={feature.title}
                   className='flex items-start'
-                  style={{ gap: 'var(--linear-space-3)' }}
+                  style={{ gap: 'var(--space-3)' }}
                 >
                   <div className='flex items-center justify-center w-4 h-4 shrink-0 mt-1'>
                     <Icon
@@ -73,7 +73,7 @@ export function WhatYouGetSection() {
                       style={{
                         fontSize: 'var(--linear-body-sm-size)',
                         fontWeight: 'var(--linear-font-weight-medium)',
-                        marginBottom: 'var(--linear-space-1)',
+                        marginBottom: 'var(--space-1)',
                       }}
                     >
                       {feature.title}

@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Fail-closed Symphony lease guard (JOV-5031).
+"""Fail-closed Symphony lease guard (JOV-5031, JOV-INV-007).
 
 Two duties:
 
@@ -11,9 +11,8 @@ Two duties:
    active state cannot redispatch it. Only a newer explicit active-state
    transition (issue.updatedAt newer than the tombstoned observation) reopens
    the lease. A run is aborted (exit 1) only on positive evidence of a
-   non-active or stale state; an indeterminate tracker read admits the run and
-   is counted, matching the fleet rule that a failed observation is not proof
-   of a state change.
+   non-active or stale state. An indeterminate tracker read suppresses a new
+   session for reconciliation; it never erases or kills already-running work.
 
 2. `report` — emits the live lease health receipt consumed by the fleet gate:
    tombstone/counter state, orphan-launcher count (codex-rotate app-server
@@ -40,13 +39,14 @@ from datetime import datetime, timezone
 SCHEMA = "symphony-lease-guard/v1"
 REPORT_SCHEMA = "symphony-lease-guard-report/v1"
 DEFAULT_STATE_DIR = "~/.local/state/symphony-lease-guard"
-DEFAULT_WORKFLOW = "~/symphony-runtime/elixir/WORKFLOW.jovie-ui-pilot.md"
-FALLBACK_ACTIVE_STATES = ("Todo", "In Progress")
+DEFAULT_WORKFLOW = "~/.config/symphony/WORKFLOW.md"
+FALLBACK_ACTIVE_STATES = ("Todo", "In Progress", "Rework", "Merging")
 LINEAR_API = "https://api.linear.app/graphql"
 LINEAR_ENV_PATH = "~/.config/symphony/linear.env"
 CONTROL_TIMEOUT_SECONDS = 10.0
 DOTENV_ASSIGNMENT = re.compile(r"^(?:export[ \t]+)?([A-Za-z_][A-Za-z0-9_]*)=(.*)$")
 IDENTIFIER = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._-]*$")
+REPOSITORY = re.compile(r"^[^/\s]+/[^/\s]+$")
 ORPHAN_MARGIN_SECONDS = 120.0
 
 ISSUE_QUERY = """
@@ -81,6 +81,32 @@ def _default_counters() -> dict[str, int]:
     }
 
 
+def _repository_for_identifier(identifier: str) -> str:
+    if identifier.upper().startswith("LYB-"):
+        return "JovieInc/LogYourBody"
+    return "JovieInc/Jovie"
+
+
+def _tombstone_key(identifier: str, repository: str | None = None) -> str:
+    repo = repository if repository and REPOSITORY.fullmatch(repository) else _repository_for_identifier(identifier)
+    return f"{repo}:{identifier}"
+
+
+def _normalized_tombstone_key(key: str, entry: dict) -> tuple[str, str, str] | None:
+    if ":" in key:
+        repository, identifier = key.rsplit(":", 1)
+        if REPOSITORY.fullmatch(repository) and IDENTIFIER.fullmatch(identifier):
+            return repository, identifier, key
+    if IDENTIFIER.fullmatch(key):
+        repository = entry.get("repository") if isinstance(entry.get("repository"), str) else None
+        return (
+            repository if repository and REPOSITORY.fullmatch(repository) else _repository_for_identifier(key),
+            key,
+            _tombstone_key(key, repository),
+        )
+    return None
+
+
 def _load_state() -> dict:
     try:
         raw = json.loads(_state_file().read_text(encoding="utf-8"))
@@ -104,7 +130,13 @@ def _load_state() -> dict:
             and isinstance(entry.get("observedAt"), (int, float))
             and isinstance(entry.get("issueUpdatedAtEpoch"), (int, float))
         ):
-            tombstones[identifier] = {
+            parsed = _normalized_tombstone_key(identifier, entry)
+            if parsed is None:
+                continue
+            repository, issue_identifier, key = parsed
+            tombstones[key] = {
+                "repository": repository,
+                "identifier": issue_identifier,
                 "state": entry["state"],
                 "observedAt": entry["observedAt"],
                 "issueUpdatedAtEpoch": entry["issueUpdatedAtEpoch"],
@@ -269,7 +301,7 @@ def lease_decision(
     not None; clear_existing removes the entry (deliberate reopen).
     """
     if issue is None:
-        return "admit", "indeterminate", tombstone, False
+        return "suppress", "indeterminate", tombstone, False
     state_name = issue["state"]
     if state_name.strip().lower() in active_states:
         if tombstone is None:
@@ -304,15 +336,23 @@ def check(identifier: str) -> int:
     counters = state["counters"]
     counters["checks"] += 1
     issue = _fetch_issue(identifier)
+    repository = _repository_for_identifier(identifier)
+    key = _tombstone_key(identifier, repository)
     decision, reason, tombstone, clear = lease_decision(
-        identifier, issue, state["tombstones"].get(identifier), _active_states(), time.time()
+        identifier, issue, state["tombstones"].get(key), _active_states(), time.time()
     )
+    if tombstone is not None:
+        tombstone = {
+            **tombstone,
+            "repository": repository,
+            "identifier": identifier,
+        }
     if clear:
-        state["tombstones"].pop(identifier, None)
+        state["tombstones"].pop(key, None)
     elif tombstone is not None:
-        state["tombstones"][identifier] = tombstone
+        state["tombstones"][key] = tombstone
     counter_key = {
-        ("admit", "indeterminate"): "indeterminate",
+        ("suppress", "indeterminate"): "indeterminate",
         ("admit", "active"): "admitted",
         ("admit", "reopened"): "reopened",
     }.get((decision, reason))
@@ -425,13 +465,27 @@ def capacity_state() -> dict:
         cooldowns = stored.get("cooldowns") if isinstance(stored, dict) else None
     except (OSError, TypeError, ValueError):
         return {"state": "unknown", "reason": "account_state_unreadable"}
+    readiness = stored.get("readiness") if isinstance(stored, dict) else None
+    fresh_readiness = 0
     cooling = 0
     for name in accounts:
         try:
             until = int((cooldowns or {}).get(name) or 0)
         except (TypeError, ValueError):
             until = 0
-        if until > now:
+        receipt = readiness.get(name) if isinstance(readiness, dict) else None
+        try:
+            ready = (
+                isinstance(receipt, dict)
+                and receipt.get("source") == "authenticated_completion_probe/v1"
+                and int(receipt.get("checkedAt")) <= now
+                and int(receipt.get("expiresAt")) > now
+            )
+        except (TypeError, ValueError):
+            ready = False
+        if until > now and ready:
+            fresh_readiness += 1
+        elif until > now:
             cooling += 1
     locked = 0
     locks_dir = root / "locks"
@@ -460,6 +514,7 @@ def capacity_state() -> dict:
         "locked": locked,
         "cooldown": cooling,
         "available": available,
+        "freshReadiness": fresh_readiness,
     }
 
 
@@ -509,6 +564,7 @@ def report() -> int:
     receipt = {
         "schema": REPORT_SCHEMA,
         "ts": datetime.now(timezone.utc).isoformat().replace("+00:00", "Z"),
+        "issueTombstoneScope": "repository-identifier",
         "tombstones": state["tombstones"],
         "counters": state["counters"],
         "orphanLaunchers": count_orphan_launchers(),

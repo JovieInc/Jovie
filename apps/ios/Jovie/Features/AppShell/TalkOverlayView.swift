@@ -2,13 +2,18 @@ import SwiftUI
 
 /// Full-screen Talk overlay (JOV-3636 / #10380). Single global voice entry from
 /// the shell Talk FAB — composer has no mic. On-device Speech captures a memo;
-/// the transcript becomes an editable action draft via `onInsertDraft` (chat
-/// composer), never auto-sent.
+/// the second activation finishes and submits it. `onInsertDraft` preserves a
+/// transcript only when direct completion fails and needs explicit recovery.
 struct TalkOverlayView: View {
   @Bindable var voiceCaptureService: VoiceCaptureService
   let onCancel: () -> Void
-  /// Inserts transcript into the chat action draft surface for editing.
+  /// Recovery-only: inserts a preserved transcript into the editable composer.
   let onInsertDraft: (String) -> Void
+  /// Normal and App Shortcut paths submit on the second deliberate activation.
+  var autoSubmit = true
+  var unavailableMessage: String? = nil
+  var listeningCue: String = EyesFreeCaptureDestination.jovie.listeningCue
+  var onSubmit: (String) -> Void = { _ in }
 
   @State private var phase: Phase = .starting
   @State private var reviewDraft = ""
@@ -21,6 +26,8 @@ struct TalkOverlayView: View {
     case starting
     case recording
     case reviewing
+    case submitting
+    case unavailable
   }
 
   var body: some View {
@@ -119,7 +126,7 @@ struct TalkOverlayView: View {
           }
           .buttonStyle(JoviePillButtonStyle(filled: true))
           .disabled(!canPrimary || isPrimaryBusy)
-          // Stable id used by UI tests (primary action: Done / Use Draft).
+          // Stable id used by UI tests (primary action: Send / recovery draft).
           .accessibilityIdentifier("talk-overlay-send")
         }
         .padding(.horizontal, JovieSpacing.xLarge)
@@ -128,6 +135,12 @@ struct TalkOverlayView: View {
     }
     .accessibilityIdentifier("talk-overlay")
     .task {
+      if let unavailableMessage {
+        localError = unavailableMessage
+        phase = .unavailable
+        EyesFreeReadback.speak(unavailableMessage)
+        return
+      }
       await startIfNeeded()
     }
   }
@@ -137,30 +150,52 @@ struct TalkOverlayView: View {
   }
 
   private var titleText: String {
-    phase == .reviewing ? "Draft" : "Talk"
+    phase == .reviewing ? "Recover" : phase == .unavailable ? "Unavailable" : "Talk"
+  }
+
+  /// Capture stopped early (interruption, route loss, recognizer finished or
+  /// failed) with nothing usable — the primary action becomes Retry.
+  private var isPausedWithoutTranscript: Bool {
+    // `!isPrimaryBusy` keeps this false during finish()'s settle window,
+    // where isRecording is already false but the send is in flight.
+    phase == .recording && !isPrimaryBusy
+      && !voiceCaptureService.isRecording && !voiceCaptureService.canFinish
+  }
+
+  /// start() threw (permissions, recognizer, audio session). Offer Retry
+  /// instead of parking the user on a disabled "Starting…".
+  private var isStartFailed: Bool {
+    phase == .starting && localError != nil && !voiceCaptureService.isRecording
   }
 
   private var statusText: String {
     switch phase {
-    case .starting:
-      "Starting…"
-    case .recording:
-      "Listening…"
-    case .reviewing:
-      "Edit, then use as action draft"
+    case .starting: "Starting…"
+    case .recording: voiceCaptureService.isRecording ? listeningCue : "Paused"
+    case .reviewing: "Review recovered transcript"
+    case .submitting: "Sending…"
+    case .unavailable: unavailableMessage ?? EyesFreeCaptureGate.unavailableMessage
     }
   }
 
   private var primaryActionTitle: String {
-    phase == .reviewing ? "Use Draft" : "Done"
+    if phase == .reviewing { return "Use Draft" }
+    if phase == .submitting { return "Sending" }
+    if phase == .unavailable { return "Retry" }
+    if isPausedWithoutTranscript || isStartFailed { return "Retry" }
+    if phase == .recording, autoSubmit { return "Send" }
+    return "Done"
   }
 
   private var canPrimary: Bool {
     switch phase {
     case .starting:
+      isStartFailed
+    case .submitting, .unavailable:
       false
     case .recording:
-      VoiceMemoActionDraft.isReady(voiceCaptureService.transcriptPreview)
+      isPausedWithoutTranscript
+        || VoiceMemoActionDraft.isReady(voiceCaptureService.transcriptPreview)
     case .reviewing:
       VoiceMemoActionDraft.isReady(reviewDraft)
     }
@@ -183,12 +218,16 @@ struct TalkOverlayView: View {
       "Listening"
     case .reviewing:
       "Transcript ready"
+    case .submitting:
+      "Sending capture"
+    case .unavailable:
+      "Capture unavailable"
     }
   }
 
   @ViewBuilder
   private var recognitionModeCaption: some View {
-    if phase == .recording || phase == .reviewing {
+    if phase == .recording || phase == .reviewing || phase == .submitting {
       if voiceCaptureService.isUsingOnDeviceRecognition {
         Text("On-device transcription")
           .accessibilityIdentifier("talk-overlay-on-device")
@@ -231,6 +270,11 @@ struct TalkOverlayView: View {
 
   private func startIfNeeded() async {
     guard phase == .starting || phase == .recording else { return }
+    guard unavailableMessage == nil else {
+      phase = .unavailable
+      localError = unavailableMessage
+      return
+    }
     guard !voiceCaptureService.isRecording else {
       phase = .recording
       return
@@ -238,6 +282,9 @@ struct TalkOverlayView: View {
     phase = .starting
     localError = nil
     do {
+      if autoSubmit {
+        EyesFreeReadback.speak(listeningCue)
+      }
       try await voiceCaptureService.start()
       phase = .recording
     } catch {
@@ -262,9 +309,24 @@ struct TalkOverlayView: View {
 
     switch phase {
     case .starting:
+      guard isStartFailed else { return }
+      localError = nil
+      await startIfNeeded()
+    case .unavailable, .submitting:
       return
     case .recording:
-      await finishIntoReview()
+      if isPausedWithoutTranscript {
+        voiceCaptureService.cancel()
+        localError = nil
+        phase = .starting
+        await startIfNeeded()
+        return
+      }
+      if autoSubmit {
+        await finishAndSubmit()
+      } else {
+        await finishIntoReview()
+      }
     case .reviewing:
       let draft = VoiceMemoActionDraft.make(fromTranscript: reviewDraft)
       guard VoiceMemoActionDraft.isReady(draft) else {
@@ -272,6 +334,29 @@ struct TalkOverlayView: View {
         return
       }
       onInsertDraft(draft)
+    }
+  }
+
+  private func finishAndSubmit() async {
+    let recoverableTranscript = VoiceMemoActionDraft.make(
+      fromTranscript: voiceCaptureService.transcriptPreview
+    )
+    do {
+      let result = try await voiceCaptureService.finish()
+      localError = nil
+      phase = .submitting
+      onSubmit(result.transcript)
+    } catch {
+      localError = (error as? LocalizedError)?.errorDescription
+        ?? "Nothing heard."
+      voiceCaptureService.cancel()
+      if VoiceMemoActionDraft.isReady(recoverableTranscript) {
+        reviewDraft = recoverableTranscript
+        phase = .reviewing
+        return
+      }
+      phase = .starting
+      await startIfNeeded()
     }
   }
 

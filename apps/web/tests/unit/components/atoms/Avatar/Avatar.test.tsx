@@ -1,8 +1,13 @@
-import { getInitials } from '@jovie/ui';
+import { readFileSync } from 'node:fs';
+import path from 'node:path';
+import { AVATAR_SIZE_MAP, AVATAR_SIZE_NAMES, getInitials } from '@jovie/ui';
 import { fireEvent, render, screen } from '@testing-library/react';
 import Image from 'next/image';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { Avatar } from '@/components/molecules/Avatar';
+
+const avatarHasWrapperSizingClass = (source: string) =>
+  /<Avatar\b[^>]*\bclassName=['"][^'"]*\b(?:size|h|w)-/.test(source);
 
 // Mock Next.js Image component with proper event handling
 vi.mock('next/image', () => ({
@@ -91,7 +96,7 @@ describe('Avatar Component', () => {
       expect(innerDiv).toBeInTheDocument();
     });
 
-    it('applies correct size classes', () => {
+    it('applies canonical size pixels from the shared contract', () => {
       const { container, rerender } = render(
         <Avatar
           src='https://example.com/avatar.jpg'
@@ -102,10 +107,11 @@ describe('Avatar Component', () => {
       );
 
       let innerDiv = container.querySelector('[aria-hidden="true"]');
-      expect(innerDiv).toHaveClass('size-8');
       expect(innerDiv).toHaveAttribute('data-slot', 'app-avatar');
       expect(innerDiv).toHaveAttribute('data-size', 'sm');
-      expect(innerDiv).toHaveStyle({ width: '32px', height: '32px' });
+      expect(innerDiv).toHaveAttribute('data-shape', 'person');
+      expect(innerDiv).toHaveClass('rounded-full');
+      expect(innerDiv).toHaveStyle({ width: '20px', height: '20px' });
 
       rerender(
         <Avatar
@@ -117,34 +123,40 @@ describe('Avatar Component', () => {
       );
 
       innerDiv = container.querySelector('[aria-hidden="true"]');
-      expect(innerDiv).toHaveClass('size-16');
-      expect(innerDiv).toHaveStyle({ width: '64px', height: '64px' });
+      expect(innerDiv).toHaveAttribute('data-size', 'lg');
+      expect(innerDiv).toHaveStyle({ width: '32px', height: '32px' });
     });
 
-    it('applies correct rounded classes', () => {
+    it('keeps person avatars circular and artwork rounded-square', () => {
       const { container, rerender } = render(
         <Avatar
           src='https://example.com/avatar.jpg'
           alt='User avatar'
           name='John Doe'
-          rounded='sm'
         />
       );
 
       let innerDiv = container.querySelector('[aria-hidden="true"]');
-      expect(innerDiv).toHaveClass('rounded-sm');
+      expect(innerDiv).toHaveClass('rounded-full');
+      expect(innerDiv).toHaveAttribute('data-shape', 'person');
 
       rerender(
         <Avatar
-          src='https://example.com/avatar.jpg'
-          alt='User avatar'
-          name='John Doe'
-          rounded='full'
+          src='https://example.com/release.jpg'
+          alt='Release artwork'
+          name='Midnight Echo'
+          size='2xl'
+          shape='artwork'
         />
       );
 
       innerDiv = container.querySelector('[aria-hidden="true"]');
-      expect(innerDiv).toHaveClass('rounded-full');
+      expect(innerDiv).toHaveAttribute('data-shape', 'artwork');
+      expect(innerDiv).toHaveClass('rounded-lg');
+      expect(innerDiv).not.toHaveClass('rounded-full');
+      const artworkImage = screen.getByTestId('avatar-image');
+      expect(artworkImage).toHaveClass('rounded-lg', 'object-contain');
+      expect(artworkImage).not.toHaveClass('rounded-full', 'object-cover');
     });
   });
 
@@ -256,6 +268,28 @@ describe('Avatar Component', () => {
       expect(wrapper).toHaveClass('custom-avatar-class');
     });
 
+    it('keeps the app frame on the canonical size when a caller passes sizing classes', () => {
+      const { container } = render(
+        <Avatar
+          src={null}
+          alt='User avatar'
+          name='Tim White'
+          size='xs'
+          className='size-10 h-10 w-10'
+        />
+      );
+
+      const frame = container.querySelector('[data-slot="app-avatar-frame"]');
+      expect(frame).toHaveAttribute('data-size', 'xs');
+      expect(frame).toHaveAttribute('data-shape', 'person');
+      expect(frame).toHaveClass('size-10', 'h-10', 'w-10');
+      expect(frame).toHaveStyle({ width: '16px', height: '16px' });
+
+      const avatar = container.querySelector('[data-slot="app-avatar"]');
+      expect(avatar).toHaveStyle({ width: '16px', height: '16px' });
+      expect(screen.getByText('TW')).toBeInTheDocument();
+    });
+
     it('accepts custom style props', () => {
       const customStyle = { border: '2px solid red', opacity: '0.5' };
 
@@ -304,6 +338,56 @@ describe('Avatar Component', () => {
       // Before onLoad is triggered, shimmer should be visible
       const shimmer = document.querySelector('.skeleton');
       expect(shimmer).toBeInTheDocument();
+    });
+
+    it('does not keep a duplicated size table in the web adapter', () => {
+      const adapterSource = readFileSync(
+        path.resolve(process.cwd(), 'components/molecules/Avatar/Avatar.tsx'),
+        'utf8'
+      );
+      const uploadableSource = readFileSync(
+        path.resolve(
+          process.cwd(),
+          'components/organisms/AvatarUploadable.tsx'
+        ),
+        'utf8'
+      );
+
+      expect(adapterSource).not.toMatch(/const SIZE_MAP\s*=/);
+      expect(adapterSource).not.toMatch(/rounded\?:/);
+      expect(adapterSource).toContain('getAvatarSizePx');
+      expect(uploadableSource).not.toMatch(/const SIZE_MAP\s*=/);
+      expect(uploadableSource).toContain('getAvatarSizePx');
+
+      for (const size of AVATAR_SIZE_NAMES) {
+        expect(typeof AVATAR_SIZE_MAP[size].px).toBe('number');
+      }
+    });
+
+    it('keeps observed identity-row callers off wrapper sizing classes', () => {
+      const observedIdentitySources = [
+        'components/organisms/user-button/UserButton.tsx',
+        'components/organisms/ProfileSwitcher.tsx',
+        'components/features/admin/admin-releases-table/AdminReleasesTableUnified.tsx',
+      ] as const;
+
+      for (const sourcePath of observedIdentitySources) {
+        const source = readFileSync(path.resolve(process.cwd(), sourcePath), {
+          encoding: 'utf8',
+        });
+        expect(avatarHasWrapperSizingClass(source)).toBe(false);
+      }
+    });
+
+    it('binds wrapper sizing detection to the Avatar opening tag', () => {
+      expect(
+        avatarHasWrapperSizingClass(
+          "<Avatar className='shrink-0' />\n<div className='min-w-0' />"
+        )
+      ).toBe(false);
+      expect(
+        avatarHasWrapperSizingClass("<Avatar className='shrink-0 h-8' />")
+      ).toBe(true);
     });
 
     it('hides loading shimmer after image loads', () => {

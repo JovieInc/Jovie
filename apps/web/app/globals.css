@@ -66,7 +66,7 @@ html[data-desktop-runtime="electron"] {
   --electron-traffic-light-safe-width: 72px;
   --electron-traffic-light-x: 20px;
   --electron-traffic-light-y: 17px;
-  --electron-sidebar-width: var(--linear-app-sidebar-width);
+  --electron-sidebar-width: var(--app-shell-sidebar-width);
   --electron-sidebar-collapsed-width: 52px;
 }
 
@@ -89,9 +89,9 @@ html[data-desktop-runtime="electron"] [data-electron-titlebar="true"] {
   z-index: 60;
   display: grid;
   grid-template-columns: var(--electron-sidebar-width) minmax(0, 1fr);
-  column-gap: var(--linear-app-shell-gap);
+  column-gap: var(--app-shell-gap);
   align-items: center;
-  padding-right: var(--linear-app-shell-gap);
+  padding-right: var(--app-shell-gap);
   flex-shrink: 0;
   height: var(--electron-titlebar-height);
   user-select: none;
@@ -119,12 +119,12 @@ html[data-desktop-runtime="electron"]
 }
 
 /* Titlebar rail alignment for the canonical app shell — the app-shell-body has
-   p-[--linear-app-shell-gap] on all sides, so the sidebar column starts at
+   p-[--app-shell-gap] on all sides, so the sidebar column starts at
    gap offset from the left edge. Mirror that offset in the titlebar so the
    sidebar-cell left edge aligns with the sidebar rail. */
 html[data-desktop-runtime="electron"] [data-app-shell-frame="true"]
   [data-electron-titlebar="true"] {
-  padding-left: var(--linear-app-shell-gap);
+  padding-left: var(--app-shell-gap);
   grid-template-columns: var(--electron-sidebar-width) minmax(0, 1fr);
 }
 
@@ -652,6 +652,12 @@ body {
   --transition-duration-cinematic: var(--duration-cinematic);
   --ease-subtle: cubic-bezier(0.25, 0.46, 0.45, 0.94);
   --ease-cinematic: cubic-bezier(0.32, 0.72, 0, 1);
+  --animate-progress-indeterminate: progress-indeterminate 1.5s ease-in-out
+    infinite;
+  /* Shared overlay layers — semantic names preserve the stacking contract
+     without encoding numeric z-index values at component call sites. */
+  --z-index-sheet: 65;
+  --z-index-tooltip: 150;
   /* Shadow tokens — register design-system.css shadows as Tailwind utilities */
   --shadow-sm: var(--shadow-sm);
   --shadow-md: var(--shadow-md);
@@ -672,6 +678,50 @@ body {
   --shadow-ring-surface-1: 0 0 0 3px var(--linear-bg-surface-1);
   --shadow-popover: 0 18px 48px rgba(0, 0, 0, 0.22);
   --shadow-panel-ring: inset 0 0 0 1px var(--linear-panel-ring);
+}
+
+@utility w-overlay-viewport {
+  width: calc(100vw - var(--space-8));
+}
+
+@utility max-h-overlay-viewport {
+  max-height: calc(100dvh - var(--space-8));
+}
+
+@utility max-w-sheet-viewport {
+  max-width: calc(100vw - var(--space-4));
+}
+
+@utility max-h-sheet-viewport {
+  max-height: calc(100dvh - var(--space-4));
+}
+
+@utility scale-press {
+  scale: var(--scale-press);
+}
+
+@utility bg-icon-button-frosted {
+  background-color: color-mix(in srgb, var(--color-surface-1) 84%, transparent);
+}
+
+@utility bg-icon-button-frosted-hover {
+  background-color: color-mix(in srgb, var(--color-surface-2) 88%, transparent);
+}
+
+@utility bg-icon-button-pearl-quiet-hover {
+  background-color: color-mix(
+    in srgb,
+    var(--profile-pearl-bg) 88%,
+    transparent
+  );
+}
+
+@utility bg-icon-button-pearl-quiet-focus {
+  background-color: color-mix(
+    in srgb,
+    var(--profile-pearl-bg) 92%,
+    transparent
+  );
 }
 
 /* ============================================
@@ -759,7 +809,7 @@ body {
   }
   /* Tactile press — transform only; never transition:all (DESIGN.md / JOV-3368) */
   .interactive-press {
-    @apply transition-transform duration-subtle ease-subtle active:scale-[var(--scale-press)] motion-reduce:active:scale-100;
+    @apply transition-transform duration-subtle ease-subtle active:scale-press motion-reduce:active:scale-100;
   }
   /* Button component styles */
   .btn {
@@ -882,6 +932,18 @@ body {
     font-variation-settings: "opsz" var(--linear-font-optical-sizing);
     text-wrap: balance;
   }
+  /* Every public marketing H1 may paint at most two lines. The complete text
+     remains in the DOM and accessibility tree; this is a visual constraint,
+     not an alternate or shortened accessible label. The shell fallback stays
+     at zero specificity so an explicitly composed heading can override it. */
+  .marketing-h1-max-two-lines,
+  :where(.home-viewport, .system-b-marketing) :where(h1:not(.sr-only)) {
+    display: -webkit-box;
+    max-block-size: calc(2 * 1lh);
+    overflow: hidden;
+    -webkit-box-orient: vertical;
+    -webkit-line-clamp: 2;
+  }
   @media (min-width: 768px) {
     .marketing-h1-linear {
       font-size: var(--linear-h1-size-md);
@@ -996,7 +1058,8 @@ body {
     border-color: var(--color-border-subtle);
   }
   .marketing-cta {
-    @apply relative inline-flex items-center justify-center rounded bg-btn-primary text-btn-primary-foreground px-6 py-3 text-sm font-semibold transition-colors duration-normal;
+    @apply relative inline-flex items-center justify-center rounded bg-btn-primary text-btn-primary-foreground px-6 py-3 text-sm transition-colors duration-normal;
+    font-weight: var(--font-weight-medium);
   }
   .public-action-primary {
     display: inline-flex;
@@ -1009,7 +1072,7 @@ body {
     color: rgb(6, 7, 10);
     padding: 0 1.45rem;
     font-size: 14px;
-    font-weight: 650;
+    font-weight: var(--font-weight-medium);
     letter-spacing: 0;
     text-decoration: none;
     transition:
@@ -1046,7 +1109,7 @@ body {
     color: var(--linear-text-primary);
     padding: 0 1.35rem;
     font-size: 14px;
-    font-weight: 620;
+    font-weight: var(--font-weight-medium);
     letter-spacing: 0;
     text-decoration: none;
     transition:
@@ -1316,7 +1379,7 @@ body {
     font-weight: var(--linear-font-weight-medium, 510);
     letter-spacing: -0.013em;
     color: var(--linear-text-secondary);
-    transition: color var(--linear-duration-fast) var(--linear-ease);
+    transition: color var(--duration-fast) var(--ease-interactive);
   }
   .section-title-link:hover {
     color: var(--linear-text-primary);
@@ -1345,12 +1408,12 @@ body {
     color: var(--linear-text-secondary);
     background: transparent;
     border: 1px solid var(--linear-border-subtle);
-    border-radius: var(--linear-radius-sm, 8px);
+    border-radius: var(--radius-sm, 8px);
     cursor: pointer;
     transition:
-      background-color var(--linear-duration-fast) var(--linear-ease),
-      border-color var(--linear-duration-fast) var(--linear-ease),
-      color var(--linear-duration-fast) var(--linear-ease);
+      background-color var(--duration-fast) var(--ease-interactive),
+      border-color var(--duration-fast) var(--ease-interactive),
+      color var(--duration-fast) var(--ease-interactive);
     letter-spacing: -0.011em;
   }
   .accordion-trigger:hover {
@@ -1364,7 +1427,7 @@ body {
   }
   .accordion-trigger .accordion-icon {
     margin-left: auto;
-    transition: transform 0.2s var(--linear-ease);
+    transition: transform 0.2s var(--ease-interactive);
     font-size: 13px;
     color: var(--linear-text-quaternary);
   }
@@ -1507,7 +1570,7 @@ body {
     align-items: center;
     justify-content: center;
     height: var(--linear-button-height-sm);
-    padding: 0 var(--linear-space-4);
+    padding: 0 var(--space-4);
     font-size: var(--linear-caption-size);
     font-weight: 450;
     line-height: var(--linear-caption-leading);
@@ -1580,15 +1643,15 @@ body {
   }
   /* Smaller section spacing for tighter groupings */
   .section-spacing-linear-sm {
-    padding-top: var(--linear-space-12);
-    padding-bottom: var(--linear-space-12);
+    padding-top: var(--space-12);
+    padding-bottom: var(--space-12);
     @media (min-width: 768px) {
-      padding-top: var(--linear-space-16);
-      padding-bottom: var(--linear-space-16);
+      padding-top: var(--space-16);
+      padding-bottom: var(--space-16);
     }
     @media (min-width: 1024px) {
-      padding-top: var(--linear-space-20);
-      padding-bottom: var(--linear-space-20);
+      padding-top: var(--space-20);
+      padding-bottom: var(--space-20);
     }
   }
   .section-gap-linear {
@@ -1690,8 +1753,8 @@ body {
       0 0 0 1px rgba(255, 255, 255, 0.02),
       0 24px 60px rgba(0, 0, 0, 0.28);
     transition:
-      transform 0.3s var(--linear-ease),
-      box-shadow 0.3s var(--linear-ease);
+      transform 0.3s var(--ease-interactive),
+      box-shadow 0.3s var(--ease-interactive);
   }
   .homepage-surface-card:hover {
     transform: translateY(-2px);
@@ -1787,7 +1850,7 @@ body {
   /* Bento grid for feature showcase */
   .bento-grid {
     display: grid;
-    gap: var(--linear-gap-cards);
+    gap: var(--space-6);
     grid-template-columns: 1fr;
     @media (min-width: 768px) {
       grid-template-columns: 1fr 1fr;
@@ -1827,8 +1890,8 @@ body {
       0 0 0 1px rgba(255, 255, 255, 0.02),
       0 24px 60px rgba(0, 0, 0, 0.3);
     transition:
-      transform 0.3s var(--linear-ease),
-      box-shadow 0.3s var(--linear-ease);
+      transform 0.3s var(--ease-interactive),
+      box-shadow 0.3s var(--ease-interactive);
   }
   .bento-card:hover {
     transform: translateY(-2px);
@@ -1871,7 +1934,7 @@ body {
     inset: 0;
     pointer-events: none;
     opacity: 0.5;
-    transition: opacity 0.3s var(--linear-ease);
+    transition: opacity 0.3s var(--ease-interactive);
   }
   .bento-card:hover .bento-card-glow {
     opacity: 0.7;
@@ -2121,7 +2184,7 @@ body {
     );
   }
   .btn-press {
-    @apply transition-transform duration-subtle ease-subtle active:scale-[var(--scale-press)] motion-reduce:active:scale-100;
+    @apply transition-transform duration-subtle ease-subtle active:scale-press motion-reduce:active:scale-100;
   }
   /* Chat empty state — refined depth & motion */
   .chat-logo-mark {
@@ -2338,7 +2401,7 @@ body {
 }
 
 [data-sonner-toast] {
-  --border-radius: var(--linear-radius-lg);
+  --border-radius: var(--radius-lg);
   box-shadow: var(--shadow-lg);
   font-family: var(--font-sans), system-ui, sans-serif;
   font-feature-settings: var(--linear-font-features);
@@ -2368,7 +2431,7 @@ body {
   background: var(--color-bg-surface-1);
   border-color: var(--color-border-subtle);
   color: var(--color-text-tertiary-token);
-  border-radius: var(--linear-radius-sm);
+  border-radius: var(--radius-sm);
   transition:
     background 150ms ease,
     color 150ms ease;
@@ -2751,5 +2814,14 @@ body {
   }
   75% {
     transform: scaleY(0.42);
+  }
+}
+
+/* DictationWaveform sets its per-bar animation inline (deterministic
+   duration/phase per bar), so reduced-motion needs !important to win. The
+   strip still reads as "listening" via its opacity state. */
+@media (prefers-reduced-motion: reduce) {
+  .dictation-waveform-bar {
+    animation: none !important;
   }
 }

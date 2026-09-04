@@ -1,6 +1,9 @@
+import { readFileSync } from 'node:fs';
+import { resolve } from 'node:path';
 import { render, screen } from '@testing-library/react';
 import type { ReactNode } from 'react';
 import { describe, expect, it, vi } from 'vitest';
+import { ArtistProfileLandingPage } from '@/components/marketing/artist-profile/ArtistProfileLandingPage';
 import { ARTIST_PROFILE_COPY } from '@/data/artistProfileCopy';
 import {
   ARTIST_PROFILE_SECTION_ORDER,
@@ -236,14 +239,21 @@ function expectArtistProfileSectionOrder(flags: ArtistProfileSectionFlags) {
 async function renderArtistProfileLandingPage(
   flags: ArtistProfileSectionFlags
 ) {
-  const { ArtistProfileLandingPage } = await import(
-    '@/components/marketing/artist-profile'
-  );
-
   render(<ArtistProfileLandingPage copy={ARTIST_PROFILE_COPY} flags={flags} />);
 }
 
 describe('ArtistProfilesPage', () => {
+  it('asserts the exact ArtistProfileLandingPage source', () => {
+    expect(
+      readFileSync(
+        resolve(
+          process.cwd(),
+          'components/marketing/artist-profile/ArtistProfileLandingPage.tsx'
+        ),
+        'utf8'
+      )
+    ).toContain('export function ArtistProfileLandingPage');
+  });
   it('exports the static artist-profiles SEO contract and renders through the marketing shell', async () => {
     const {
       default: ArtistProfilesPage,
@@ -304,6 +314,12 @@ describe('ArtistProfilesPage', () => {
       screen.getByRole('link', { name: /See Instant Merch/i })
     ).toHaveAttribute('href', '/instant-merch');
     expect(ARTIST_PROFILE_COPY.faq.items).toHaveLength(4);
+    expect(
+      screen.getByRole('heading', { name: 'Live Artist Sites' })
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole('heading', { name: 'The Artist Platform' })
+    ).toBeInTheDocument();
     expect(
       screen.getByTestId(ARTIST_PROFILE_SECTION_TEST_IDS.releaseCycle)
     ).toBeInTheDocument();

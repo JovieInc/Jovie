@@ -7,8 +7,183 @@ import Testing
 actor NativeSessionTokenStoreTestLock {
   static let shared = NativeSessionTokenStoreTestLock()
 
+  private var isHeld = false
+  private var waiters: [CheckedContinuation<Void, Never>] = []
+
   func withExclusive<T: Sendable>(_ body: @Sendable () async throws -> T) async rethrows -> T {
-    try await body()
+    await acquire()
+    defer { release() }
+    return try await body()
+  }
+
+  private func acquire() async {
+    guard isHeld else {
+      isHeld = true
+      return
+    }
+
+    await withCheckedContinuation { continuation in
+      waiters.append(continuation)
+    }
+  }
+
+  private func release() {
+    if waiters.isEmpty {
+      isHeld = false
+      return
+    }
+
+    waiters.removeFirst().resume()
+  }
+}
+
+func withNativeSessionTokenStoreTestIsolation<T: Sendable>(
+  _ body: @Sendable () async throws -> T
+) async rethrows -> T {
+  try await NativeSessionTokenStoreTestLock.shared.withExclusive {
+    NativeSessionTokenStore.clear()
+    defer { NativeSessionTokenStore.clear() }
+    return try await body()
+  }
+}
+
+private actor NativeSessionTokenStoreTestObservation {
+  struct Record: Equatable, Sendable {
+    let savedToken: String
+    let loadedToken: String?
+  }
+
+  private var activeSections = 0
+  private var maxActiveSections = 0
+  private var records: [Record] = []
+
+  func beginSection() {
+    activeSections += 1
+    maxActiveSections = max(maxActiveSections, activeSections)
+  }
+
+  func endSection(savedToken: String, loadedToken: String?) {
+    records.append(Record(savedToken: savedToken, loadedToken: loadedToken))
+    activeSections -= 1
+  }
+
+  func result() -> (maxActiveSections: Int, records: [Record]) {
+    (maxActiveSections, records)
+  }
+}
+
+private actor NativeSessionTokenStoreTestGate {
+  private var isOpen = false
+  private var waiters: [CheckedContinuation<Void, Never>] = []
+
+  func wait() async {
+    guard !isOpen else { return }
+    await withCheckedContinuation { continuation in
+      waiters.append(continuation)
+    }
+  }
+
+  func open() {
+    guard !isOpen else { return }
+    isOpen = true
+    waiters.forEach { $0.resume() }
+    waiters.removeAll()
+  }
+}
+
+@Suite(.serialized)
+struct NativeSessionTokenStoreTestLockTests {
+  @Test func serializesConcurrentAsyncCriticalSectionsWithoutStoreClobbering() async {
+    let observation = NativeSessionTokenStoreTestObservation()
+    let tokens = ["first-critical-section", "second-critical-section"]
+    let firstEntered = NativeSessionTokenStoreTestGate()
+    let releaseFirst = NativeSessionTokenStoreTestGate()
+
+    await withTaskGroup(of: Void.self) { group in
+      group.addTask {
+        await NativeSessionTokenStoreTestLock.shared.withExclusive {
+          await observation.beginSection()
+          NativeSessionTokenStore.save(
+            token: tokens[0],
+            userID: tokens[0],
+            expiresAt: Date().addingTimeInterval(60 * 60)
+          )
+          await firstEntered.open()
+          await releaseFirst.wait()
+          let loadedToken = NativeSessionTokenStore.load()?.token
+          await observation.endSection(savedToken: tokens[0], loadedToken: loadedToken)
+        }
+      }
+
+      await firstEntered.wait()
+      group.addTask {
+        await NativeSessionTokenStoreTestLock.shared.withExclusive {
+          await observation.beginSection()
+          NativeSessionTokenStore.save(
+            token: tokens[1],
+            userID: tokens[1],
+            expiresAt: Date().addingTimeInterval(60 * 60)
+          )
+          let loadedToken = NativeSessionTokenStore.load()?.token
+          await observation.endSection(savedToken: tokens[1], loadedToken: loadedToken)
+        }
+      }
+
+      // Give a broken pass-through actor enough time to enter the second
+      // section while the first one is deliberately suspended.
+      try? await Task.sleep(for: .milliseconds(50))
+      let beforeRelease = await observation.result()
+      #expect(beforeRelease.maxActiveSections == 1)
+      #expect(beforeRelease.records.isEmpty)
+      await releaseFirst.open()
+    }
+
+    let result = await observation.result()
+    #expect(result.maxActiveSections == 1)
+    #expect(result.records.count == tokens.count)
+    #expect(result.records.map(\.savedToken).sorted() == tokens.sorted())
+    #expect(result.records.map(\.loadedToken).compactMap { $0 }.sorted() == tokens.sorted())
+
+    await NativeSessionTokenStoreTestLock.shared.withExclusive {
+      NativeSessionTokenStore.clear()
+    }
+  }
+
+  @Test func serializesFixtureAndTerminalClearAcrossTestSuites() async {
+    let firstEntered = NativeSessionTokenStoreTestGate()
+    let releaseFirst = NativeSessionTokenStoreTestGate()
+
+    await withTaskGroup(of: Void.self) { group in
+      group.addTask {
+        await NativeSessionTokenStoreTestLock.shared.withExclusive {
+          NativeSessionTokenStore.save(
+            token: "fixture-token",
+            userID: "fixture-user",
+            expiresAt: Date().addingTimeInterval(60 * 60)
+          )
+          await firstEntered.open()
+          await releaseFirst.wait()
+          #expect(NativeSessionTokenStore.load()?.token == "fixture-token")
+        }
+      }
+
+      await firstEntered.wait()
+      group.addTask {
+        await NativeSessionTokenStoreTestLock.shared.withExclusive {
+          NativeSessionTokenStore.clear()
+        }
+      }
+
+      // A broken or omitted test lock lets the terminal-unauthorized fixture
+      // clear the first suite's token while its async request is suspended.
+      try? await Task.sleep(for: .milliseconds(50))
+      #expect(NativeSessionTokenStore.load()?.token == "fixture-token")
+      await releaseFirst.open()
+    }
+
+    await NativeSessionTokenStoreTestLock.shared.withExclusive {
+      NativeSessionTokenStore.clear()
+    }
   }
 }
 
@@ -121,7 +296,8 @@ struct MobileChatClientTests {
       requestRecorder.record(request)
 
       let ndjson = """
-      {"type":"turn.reserved","conversationId":"conv_1","turnId":"turn_1","clientTurnId":"client_turn_1"}
+      {"type":"turn.reserved","conversationId":"conv_1","turnId":"turn_1","clientTurnId":"client_turn_1","eveWorkId":"ini_eve_1"}
+      {"type":"turn.state","clientTurnId":"client_turn_1","state":"queued","eveWorkId":"ini_eve_1"}
       {"type":"assistant.delta","clientTurnId":"client_turn_1","text":"Hel"}
       {"type":"ignored.event","clientTurnId":"client_turn_1"}
       {"type":"assistant.completed","clientTurnId":"client_turn_1","conversationId":"conv_1","turnId":"turn_1","text":"Hello"}
@@ -144,6 +320,7 @@ struct MobileChatClientTests {
 
     #expect(events == [
       .turnReserved(conversationId: "conv_1", turnId: "turn_1", clientTurnId: "client_turn_1"),
+      .turnState(clientTurnId: "client_turn_1", state: "queued", eveWorkId: "ini_eve_1"),
       .assistantDelta(clientTurnId: "client_turn_1", text: "Hel"),
       .assistantCompleted(
         clientTurnId: "client_turn_1",
@@ -474,5 +651,75 @@ struct MobileChatClientTests {
     let loaded = await cache.load(for: "user_chat_cache")
 
     #expect(loaded == snapshot)
+  }
+
+  @Test func ovieChatCacheDoesNotCollideWithArtistCache() async {
+    let cache = ChatCache(defaults: UserDefaults(suiteName: "ie.jov.Jovie.tests.chat-cache-ws")!)
+    await cache.remove(for: "user_ws")
+    func snapshot(_ id: String, _ title: String) -> CachedChatSnapshot {
+      CachedChatSnapshot(
+        conversations: [
+          MobileConversationSummary(
+            id: id,
+            title: title,
+            createdAt: "2026-06-01T00:00:00.000Z",
+            updatedAt: "2026-06-02T00:00:00.000Z",
+            latestMessageRole: "assistant",
+            latestTurnStatus: "completed"
+          ),
+        ],
+        messagesByConversationID: [:],
+        cachedAt: Date(timeIntervalSince1970: 1_700_000_000)
+      )
+    }
+    let artist = snapshot("conv_artist", "Launch plan")
+    let ovie = snapshot("conv_ov", "OV | Summer")
+    await cache.store(artist, for: "user_ws", workspace: .jovie)
+    await cache.store(ovie, for: "user_ws", workspace: .ovie)
+    #expect(await cache.load(for: "user_ws", workspace: .jovie) == artist)
+    #expect(await cache.load(for: "user_ws", workspace: .ovie) == ovie)
+  }
+
+  @Test func turnRequestEncodesChatModeOnlyWhenOvie() throws {
+    func json(_ request: MobileChatTurnRequest) throws -> [String: Any] {
+      let data = try JSONEncoder().encode(request)
+      return try JSONSerialization.jsonObject(with: data) as? [String: Any] ?? [:]
+    }
+    let artist = try json(
+      MobileChatTurnRequest(
+        conversationId: nil,
+        clientTurnId: "client_turn_1",
+        clientMessageId: "client_message_1",
+        text: "What should I do next?",
+        source: "typed"
+      )
+    )
+    let ovie = try json(
+      MobileChatTurnRequest(
+        conversationId: nil,
+        clientTurnId: "client_turn_1",
+        clientMessageId: "client_message_1",
+        text: "Need a taste decision",
+        source: "typed",
+        chatMode: "ov"
+      )
+    )
+    #expect(artist["chatMode"] == nil)
+    #expect(ovie["chatMode"] as? String == "ov")
+  }
+
+  @Test func eyesFreeRequestEncodesClosedDestination() throws {
+    let data = try JSONEncoder().encode(
+      EyesFreeCaptureAPIRequest(
+        destination: "summer",
+        transcript: "what is blocked",
+        clientTurnId: "turn_1234",
+        clientMessageId: "msg_1234"
+      )
+    )
+    let json = try JSONSerialization.jsonObject(with: data) as? [String: Any]
+    #expect(json?["destination"] as? String == "summer")
+    #expect(json?["transcript"] as? String == "what is blocked")
+    #expect(json?["clientTurnId"] as? String == "turn_1234")
   }
 }

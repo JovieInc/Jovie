@@ -3,6 +3,7 @@ import { forbidden, unauthorized } from 'next/navigation';
 import { HudDashboardClient } from '@/app/app/(shell)/admin/ops/HudDashboardClient';
 import { HudFullscreenControl } from '@/components/features/admin/hud/HudFullscreenControl';
 import { HudNoiseDisclosure } from '@/components/features/admin/hud/HudNoiseDisclosure';
+import { OvieMacHud } from '@/components/features/admin/hud/OvieMacHud';
 import { AdminPage } from '@/components/features/admin/layout/AdminPage';
 import { OperationalControlPanel } from '@/components/features/admin/OperationalControlPanel';
 import { StandaloneProductPage } from '@/components/organisms/StandaloneProductPage';
@@ -11,6 +12,7 @@ import { getCurrentAdminPageAccess } from '@/lib/admin/page-access';
 import { authorizeHud } from '@/lib/auth/hud';
 import { env } from '@/lib/env-server';
 import { getHudMetrics } from '@/lib/hud/metrics';
+import { getOvieMacHudSnapshot } from '@/lib/hud/ovie-mac-hud.server';
 import { OVIE_OPS_PRODUCT_NAME } from '@/lib/ovie/ops-entrypoint';
 import { NOINDEX_ROBOTS } from '@/lib/seo/noindex-metadata';
 
@@ -30,9 +32,7 @@ function firstString(value: string | string[] | undefined): string | null {
 
 /**
  * Canonical Ops screen: /hud.
- * ?fs=1 is fullscreen for a signed-in admin.
- * ?kiosk=TOKEN is the unattended TV path.
- * Both are presentation modes of HudDashboardClient, not separate products.
+ * ?fs=1 fullscreen. ?kiosk=TOKEN TV. ?ovie=mac packaged Mac (three YC metrics).
  */
 export default async function HudPage({
   searchParams,
@@ -41,6 +41,7 @@ export default async function HudPage({
   const kioskToken = firstString(params.kiosk);
   const fullscreen =
     firstString(params.fs) === '1' || firstString(params.mode) === 'kiosk';
+  const macHud = firstString(params.ovie) === 'mac';
 
   const tokenAuth = kioskToken ? await authorizeHud(kioskToken) : null;
   const tokenOk = tokenAuth?.ok === true && tokenAuth.mode === 'kiosk';
@@ -53,6 +54,11 @@ export default async function HudPage({
     const adminAccess = await getCurrentAdminPageAccess();
     if (!adminAccess.isAuthenticated) unauthorized();
     if (!adminAccess.hasAdminRole) forbidden();
+  }
+
+  if (macHud && !tokenOk) {
+    const snapshot = await getOvieMacHudSnapshot();
+    return <OvieMacHud snapshot={snapshot} />;
   }
 
   const [metrics, funnel] = await Promise.all([

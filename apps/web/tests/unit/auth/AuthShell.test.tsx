@@ -101,6 +101,7 @@ describe('AuthShell — Better Auth SSO + email-code contract', () => {
   it('keeps OAuth buttons disabled until client hydration attaches handlers', async () => {
     const serverMarkup = renderToStaticMarkup(<AuthShell mode='sign-in' />);
     expect(serverMarkup).toContain('data-auth-shell-hydrated="false"');
+    expect(serverMarkup).toContain('grid grid-cols-1 gap-3');
     // SSR emits `disabled=""` before the provider slot attribute.
     expect(serverMarkup).toMatch(
       /disabled=""[^>]*data-auth-provider-slot="google"/
@@ -134,6 +135,15 @@ describe('AuthShell — Better Auth SSO + email-code contract', () => {
         callbackURL: '/signup',
         context: 'signup',
       });
+    });
+  });
+
+  it('suppresses One Tap on public auth landing surfaces', async () => {
+    oneTapConfiguredState.value = true;
+    render(<AuthShell mode='sign-up' suppressOneTap />);
+
+    await waitFor(() => {
+      expect(oneTapMock).not.toHaveBeenCalled();
     });
   });
 

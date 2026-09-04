@@ -17,7 +17,7 @@ const customizeButtonStyle: CSSProperties = {
   backgroundColor: 'var(--linear-bg-button)',
   color: 'var(--linear-text-primary)',
   border: '1px solid var(--linear-border-default)',
-  borderRadius: 'var(--linear-radius-sm)',
+  borderRadius: 'var(--radius-sm)',
   fontSize: '12px',
   fontWeight: 'var(--linear-font-weight-medium)',
   padding: '6px 10px',
@@ -30,7 +30,7 @@ const choiceButtonStyle: CSSProperties = {
   backgroundColor: 'var(--linear-btn-primary-bg)',
   color: 'var(--linear-btn-primary-fg)',
   border: '1px solid var(--linear-btn-primary-bg)',
-  borderRadius: 'var(--linear-radius-sm)',
+  borderRadius: 'var(--radius-sm)',
   fontSize: '12px',
   fontWeight: 'var(--linear-font-weight-medium)',
   padding: '6px 12px',
@@ -49,7 +49,7 @@ export function CookieActions({
   const containerClass = compact
     ? `cookie-actions--compact flex shrink-0 flex-row flex-wrap items-center ${className}`
     : `flex shrink-0 flex-col sm:flex-row sm:flex-wrap ${className}`;
-  const containerGap = compact ? '4px' : 'var(--linear-space-2)';
+  const containerGap = compact ? '4px' : 'var(--space-2)';
 
   const customizeStyle: CSSProperties = compact
     ? {

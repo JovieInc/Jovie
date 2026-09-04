@@ -1,6 +1,6 @@
 import { render, screen } from '@testing-library/react';
 import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
-import { HomePageNarrative } from '@/features/home/HomePageNarrative';
+import { HomePageNarrative } from '@/components/features/home/HomePageNarrative';
 
 vi.mock('@/features/home/HomeAdaptiveProfileStory', () => ({
   HomeAdaptiveProfileStory: () => (

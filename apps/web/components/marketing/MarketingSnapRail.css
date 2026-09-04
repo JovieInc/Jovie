@@ -53,16 +53,16 @@
  */
 
 /* ============================================
-   MARKETING MODE - Linear Theme Bridge
+   MARKETING MODE - editorial type bridge
    ============================================
 
-   Activate Linear styling on marketing pages by adding
+   Activate editorial marketing type on public pages by adding
    [data-theme="linear"] to a parent element or the semantic
    .system-b-marketing wrapper. The legacy .linear-marketing class is
    retired (System A teardown, 2026-07-21).
 
-   This maps Linear tokens to the existing design system
-   variables for seamless integration.
+   Marketing inherits the canonical System B semantic tokens from
+   design-system.css. This bridge owns editorial typography only.
 */
 
 [data-theme="linear"],
@@ -73,98 +73,79 @@
   --marketing-font-display:
     var(--font-satoshi), "Satoshi", -apple-system, "system-ui", sans-serif;
   --marketing-font-body: var(--font-sans);
-
-  /* Map Linear text colors to design system */
-  --color-text-primary-token: var(--linear-text-primary);
-  --color-text-secondary-token: var(--linear-text-secondary);
-  --color-text-tertiary-token: var(--linear-text-tertiary);
-
-  /* Map Linear backgrounds to design system */
-  --color-bg-base: var(--linear-bg-page);
-  --color-bg-surface-0: var(--linear-bg-surface-0);
-  --color-bg-surface-1: var(--linear-bg-surface-1);
-  --color-bg-surface-2: var(--linear-bg-surface-2);
-
-  /* Map Linear borders to design system */
-  --color-border-subtle: var(--linear-border-subtle);
-  --color-border-default: var(--linear-border-default);
-  --color-border-strong: var(--linear-border-strong);
-
-  /* Map Linear buttons to design system */
-  --color-btn-primary-bg: var(--linear-btn-primary-bg);
-  --color-btn-primary-fg: var(--linear-btn-primary-fg);
-  --color-btn-secondary-bg: var(--linear-btn-secondary-bg);
-  --color-btn-secondary-fg: var(--linear-btn-secondary-fg);
-
-  /* Map Linear interactive states */
-  --color-interactive-hover: var(--linear-bg-hover);
-
-  /* Map Linear page bg and focus ring */
-  --color-bg-page: var(--linear-bg-page);
-  --color-border-focus: var(--linear-border-focus);
 }
 
 .system-b-marketing.dark,
 .home-viewport.dark,
 .system-b-root-not-found-page.dark {
-  --linear-text-primary: #f7f8f8;
-  --linear-text-secondary: #d0d6e0;
-  --linear-text-tertiary: #8a8f98;
-  --linear-text-quaternary: #62666d;
-  --linear-bg-page: #06070a;
-  --linear-bg-surface-0: #0a0b0e;
-  --linear-bg-surface-1: #101216;
-  --linear-bg-surface-2: #161a20;
-  --linear-bg-button: #2a2c32;
-  --linear-bg-footer: #06070a;
-  --linear-border-subtle: rgba(255, 255, 255, 0.07);
-  --linear-border-default: rgba(255, 255, 255, 0.11);
-  --linear-border-strong: rgba(255, 255, 255, 0.18);
+  color-scheme: dark;
+}
 
-  --color-text-primary-token: var(--linear-text-primary);
-  --color-text-secondary-token: var(--linear-text-secondary);
-  --color-text-tertiary-token: var(--linear-text-tertiary);
-  --color-text-quaternary-token: var(--linear-text-quaternary);
-  --color-bg-base: var(--linear-bg-page);
-  --color-bg-surface-0: var(--linear-bg-surface-0);
-  --color-bg-surface-1: var(--linear-bg-surface-1);
-  --color-bg-surface-2: var(--linear-bg-surface-2);
-  --color-bg-page: var(--linear-bg-page);
-  --color-bg-elevated: var(--linear-bg-surface-0);
-  --color-bg-input: var(--linear-bg-surface-1);
-  --color-bg-button: var(--linear-bg-button);
-  --color-bg-hover: rgba(255, 255, 255, 0.04);
-  --color-bg-active: var(--linear-bg-surface-2);
-  --color-bg-tooltip: var(--linear-bg-button);
-  --color-border-subtle: var(--linear-border-subtle);
-  --color-border-default: var(--linear-border-default);
-  --color-border-strong: var(--linear-border-strong);
+.system-b-marketing.dark {
+  --color-bg-base: #030407;
+  --color-bg-surface-0: #06080d;
+  --color-bg-surface-1: #0f1420;
+  --color-bg-surface-2: #151b2a;
+  --color-bg-surface-3: #1b2436;
+  --color-bg-page: #030407;
+  --color-bg-hover: rgba(168, 176, 195, 0.06);
+  --color-bg-elevated: #0a0d16;
+  --color-bg-input: #0f1420;
+  --color-bg-active: #151b2a;
   --color-base: var(--color-bg-base);
   --color-surface-0: var(--color-bg-surface-0);
   --color-surface-1: var(--color-bg-surface-1);
   --color-surface-2: var(--color-bg-surface-2);
-  --color-surface-3: var(--color-bg-button);
+  --color-surface-3: var(--color-bg-surface-3);
   --color-surface-page: var(--color-bg-page);
   --color-surface-hover: var(--color-bg-hover);
   --color-surface-elevated: var(--color-bg-elevated);
   --color-surface-input: var(--color-bg-input);
   --color-surface-active: var(--color-bg-active);
-  --color-surface-button: var(--color-bg-button);
-  --color-surface-tooltip: var(--color-bg-tooltip);
+  --color-text-primary-token: #f5f7fb;
+  --color-text-secondary-token: #d7dce8;
+  --color-text-tertiary-token: #a8b0c3;
+  --color-text-quaternary-token: #7d879d;
   --color-primary-token: var(--color-text-primary-token);
   --color-secondary-token: var(--color-text-secondary-token);
   --color-tertiary-token: var(--color-text-tertiary-token);
   --color-quaternary-token: var(--color-text-quaternary-token);
-  --color-muted-token: var(--color-text-secondary-token);
-  --color-foreground: var(--color-text-primary-token);
-  --color-muted-foreground: var(--color-text-secondary-token);
+  --color-accent-gray: #8d8d93;
+  --color-accent-gray-subtle: rgb(127 127 133 / 0.18);
+  --color-accent-blue: #11afff;
+  --color-accent-blue-subtle: rgba(17, 175, 255, 0.12);
+  --color-accent-purple: #a982ff;
+  --color-accent-purple-subtle: rgba(169, 130, 255, 0.12);
+  --color-accent-pink: #ff48d2;
+  --color-accent-pink-subtle: rgba(255, 72, 210, 0.12);
+  --color-accent-red: #ff677d;
+  --color-accent-red-subtle: rgba(255, 103, 125, 0.12);
+  --color-accent-orange: #ffc857;
+  --color-accent-orange-subtle: rgba(255, 200, 87, 0.12);
+  --color-accent-green: #39e58c;
+  --color-accent-green-subtle: rgba(57, 229, 140, 0.12);
+  --color-accent-teal: #24f6d2;
+  --color-accent-teal-subtle: rgba(36, 246, 210, 0.1);
+  --color-accent: #11afff;
+  --color-accent-hover: #3bc0ff;
+  --color-accent-active: #0088ff;
+  --color-accent-subtle: rgba(17, 175, 255, 0.12);
+  --color-border-subtle: rgba(168, 176, 195, 0.1);
+  --color-border-default: rgba(168, 176, 195, 0.16);
+  --color-border-strong: rgba(199, 237, 255, 0.26);
+  --color-subtle: var(--color-border-subtle);
+  --color-default: var(--color-border-default);
+  --color-strong: var(--color-border-strong);
   --system-b-text-primary: var(--color-text-primary-token);
   --system-b-bg-page: var(--color-bg-base);
   --system-b-bg-surface-0: var(--color-bg-surface-0);
   --system-b-bg-surface-1: var(--color-bg-surface-1);
   --system-b-bg-surface-2: var(--color-bg-surface-2);
-  --public-shell-bg: var(--color-bg-base);
-  --public-shell-text: var(--color-text-primary-token);
-
-  color-scheme: dark;
+  --system-b-app-shell-border: var(--color-border-default);
+  --system-b-app-frame-seam: var(--color-border-subtle);
+  --system-b-app-content-surface: var(--color-bg-elevated);
+  --system-b-entity-chip-release-accent: var(--color-accent);
+  --system-b-entity-chip-artist-accent: var(--color-accent-purple);
+  --system-b-entity-chip-track-accent: var(--color-accent-blue);
+  --system-b-entity-chip-event-accent: var(--color-accent-orange);
 }

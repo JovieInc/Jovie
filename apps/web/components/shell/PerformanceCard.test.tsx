@@ -1,3 +1,5 @@
+import { readFileSync } from 'node:fs';
+import { resolve } from 'node:path';
 import { fireEvent, render, screen } from '@testing-library/react';
 import { describe, expect, it } from 'vitest';
 import { PerformanceCard } from './PerformanceCard';
@@ -6,21 +8,24 @@ describe('PerformanceCard', () => {
   it('renders the title and metric label', () => {
     render(
       <PerformanceCard
-        title='Smart link'
+        title='Smart Link'
         metricLabel='clicks'
         pointsByRange={{ '7d': [10, 12, 14, 16, 18, 20, 22] }}
         trend='up'
         delta={12}
       />
     );
-    expect(screen.getByText('Smart link')).toBeInTheDocument();
+    const title = screen.getByText('Smart Link');
+    expect(title).toBeInTheDocument();
+    expect(title.className).toContain('tracking-normal');
+    expect(title.className).not.toMatch(/\buppercase\b/);
     expect(screen.getByText('clicks')).toBeInTheDocument();
   });
 
   it('hides the range selector when only one range is supplied', () => {
     render(
       <PerformanceCard
-        title='Smart link'
+        title='Smart Link'
         metricLabel='clicks'
         pointsByRange={{ '7d': [10, 12, 14] }}
         trend='up'
@@ -33,7 +38,7 @@ describe('PerformanceCard', () => {
   it('renders a tab for every supplied range', () => {
     render(
       <PerformanceCard
-        title='Smart link'
+        title='Smart Link'
         metricLabel='clicks'
         pointsByRange={{
           '7d': [1, 2],
@@ -50,7 +55,7 @@ describe('PerformanceCard', () => {
   it('switches the active range when a tab is clicked', () => {
     render(
       <PerformanceCard
-        title='Smart link'
+        title='Smart Link'
         metricLabel='clicks'
         pointsByRange={{ '7d': [1, 2], '30d': [3, 4] }}
         trend='flat'
@@ -70,7 +75,7 @@ describe('PerformanceCard', () => {
   it('shows the down arrow when trend is down', () => {
     const { container } = render(
       <PerformanceCard
-        title='Smart link'
+        title='Smart Link'
         metricLabel='clicks'
         pointsByRange={{ '7d': [10, 8, 6] }}
         trend='down'
@@ -84,7 +89,7 @@ describe('PerformanceCard', () => {
   it('falls back to the first surfaced range when initialRange is missing', () => {
     render(
       <PerformanceCard
-        title='Smart link'
+        title='Smart Link'
         metricLabel='clicks'
         pointsByRange={{ '30d': [1, 2, 3], '90d': [4, 5, 6, 7] }}
         trend='up'
@@ -95,5 +100,15 @@ describe('PerformanceCard', () => {
     expect(
       screen.getByRole('tab', { name: '30d', selected: true })
     ).toBeInTheDocument();
+  });
+});
+
+describe('JOV-5466 token retire', () => {
+  it('does not keep retired --linear-app-* tokens', () => {
+    const source = readFileSync(
+      resolve(__dirname, './PerformanceCard.tsx'),
+      'utf8'
+    );
+    expect(source).not.toMatch(/--linear-app-/);
   });
 });

@@ -299,9 +299,12 @@ async function execAudienceBlockPipeline(
   pipeline: AudienceBlockPipeline
 ): Promise<AudienceBlockPipelineEntry[]> {
   const commands = readAudienceBlockPipelineCommands(pipeline);
-  const request = pipeline.client?.request;
-  if (typeof request === 'function' && commands) {
-    const res = await request({
+  const client = pipeline.client;
+  if (client && typeof client.request === 'function' && commands) {
+    // Call through the client so Upstash HttpClient keeps `this` (headers,
+    // fetch, etc.). Extracting `client.request` and invoking it unbound
+    // throws `Cannot read properties of undefined (reading 'headers')`.
+    const res = await client.request({
       path: ['pipeline'],
       body: commands.map(command => command.command),
     });

@@ -1,14 +1,12 @@
+import { readFileSync } from 'node:fs';
+import { join } from 'node:path';
 import * as Sentry from '@sentry/nextjs';
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
-import { useRouter } from 'next/navigation';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import ErrorBoundary from '@/components/organisms/ErrorBoundary';
+import { RECOVERY_COPY } from '@/features/feedback/recovery-contract';
 import { isSentryInitialized } from '@/lib/sentry/init';
-
-// Mock dependencies
-vi.mock('next/navigation', () => ({
-  useRouter: vi.fn(),
-}));
+import { inspectRecoveryActions } from '@/tests/utils/recovery-actions';
 
 vi.mock('@sentry/nextjs', () => ({
   captureException: vi.fn(),
@@ -20,8 +18,9 @@ vi.mock('@/lib/sentry/init', () => ({
   getSentryMode: vi.fn().mockReturnValue('enabled'),
 }));
 
+const ROOT = process.cwd();
+
 describe('ErrorBoundary', () => {
-  const mockPush = vi.fn();
   const mockReset = vi.fn();
   const mockError = new Error('Test error message');
 
@@ -30,9 +29,6 @@ describe('ErrorBoundary', () => {
 
   beforeEach(() => {
     vi.clearAllMocks();
-    (useRouter as ReturnType<typeof vi.fn>).mockReturnValue({
-      push: mockPush,
-    });
     // Mock console.error to avoid noise in test output
     console.error = vi.fn();
   });
@@ -74,8 +70,8 @@ describe('ErrorBoundary', () => {
       expect(screen.getByText(customMessage)).toBeInTheDocument();
     });
 
-    it('displays Try again and Go home buttons', () => {
-      render(
+    it('displays one Try again recovery action', () => {
+      const { container } = render(
         <ErrorBoundary
           error={mockError}
           reset={mockReset}
@@ -84,11 +80,34 @@ describe('ErrorBoundary', () => {
       );
 
       expect(
-        screen.getByRole('button', { name: /try again/i })
-      ).toBeInTheDocument();
+        screen.getAllByRole('button', { name: RECOVERY_COPY.retryLabel })
+      ).toHaveLength(1);
       expect(
-        screen.getByRole('button', { name: /go home/i })
+        screen.queryByRole('button', { name: /go home/i })
+      ).not.toBeInTheDocument();
+      expect(inspectRecoveryActions(container).issues).toEqual([]);
+    });
+
+    it('renders deployment skew as one reload recovery without capturing it', () => {
+      const deploymentSkewError = new Error('Failed to find Server Action');
+
+      render(
+        <ErrorBoundary
+          error={deploymentSkewError}
+          reset={mockReset}
+          context='Test Context'
+        />
+      );
+
+      expect(screen.getByText('App Updated')).toBeInTheDocument();
+      expect(
+        screen.getByText('The app was just updated. Reload to continue.')
       ).toBeInTheDocument();
+      expect(screen.getAllByRole('button', { name: 'Reload' })).toHaveLength(1);
+      expect(
+        screen.queryByRole('button', { name: /go home/i })
+      ).not.toBeInTheDocument();
+      expect(Sentry.captureException).not.toHaveBeenCalled();
     });
 
     it('renders AlertTriangle icon with aria-hidden', () => {
@@ -133,7 +152,7 @@ describe('ErrorBoundary', () => {
       expect(icon).toHaveAttribute('aria-hidden', 'true');
     });
 
-    it('buttons are keyboard accessible', () => {
+    it('the recovery action is keyboard accessible', () => {
       render(
         <ErrorBoundary
           error={mockError}
@@ -143,10 +162,8 @@ describe('ErrorBoundary', () => {
       );
 
       const tryAgainButton = screen.getByRole('button', { name: /try again/i });
-      const goHomeButton = screen.getByRole('button', { name: /go home/i });
 
       expect(tryAgainButton).toHaveAttribute('type', 'button');
-      expect(goHomeButton).toHaveAttribute('type', 'button');
     });
   });
 
@@ -262,22 +279,7 @@ describe('ErrorBoundary', () => {
       expect(mockReset).toHaveBeenCalledTimes(1);
     });
 
-    it('navigates to home when Go home button is clicked', () => {
-      render(
-        <ErrorBoundary
-          error={mockError}
-          reset={mockReset}
-          context='Test Context'
-        />
-      );
-
-      const goHomeButton = screen.getByRole('button', { name: /go home/i });
-      fireEvent.click(goHomeButton);
-
-      expect(mockPush).toHaveBeenCalledWith('/');
-    });
-
-    it('supports keyboard navigation for buttons', () => {
+    it('supports keyboard activation for the recovery action', () => {
       render(
         <ErrorBoundary
           error={mockError}
@@ -287,16 +289,11 @@ describe('ErrorBoundary', () => {
       );
 
       const tryAgainButton = screen.getByRole('button', { name: /try again/i });
-      const goHomeButton = screen.getByRole('button', { name: /go home/i });
 
       // Simulate Enter key press
       fireEvent.keyDown(tryAgainButton, { key: 'Enter' });
       fireEvent.click(tryAgainButton);
       expect(mockReset).toHaveBeenCalled();
-
-      fireEvent.keyDown(goHomeButton, { key: 'Enter' });
-      fireEvent.click(goHomeButton);
-      expect(mockPush).toHaveBeenCalled();
     });
   });
 
@@ -401,7 +398,7 @@ describe('ErrorBoundary', () => {
       );
     });
 
-    it('renders buttons with correct variant styling', () => {
+    it('renders the recovery action with primary styling', () => {
       render(
         <ErrorBoundary
           error={mockError}
@@ -411,14 +408,23 @@ describe('ErrorBoundary', () => {
       );
 
       const tryAgainButton = screen.getByRole('button', { name: /try again/i });
-      const goHomeButton = screen.getByRole('button', { name: /go home/i });
 
       // Button uses CVA with Tailwind classes (variant='primary', size='sm')
       expect(tryAgainButton).toHaveAttribute('data-variant', 'primary');
       expect(tryAgainButton).toHaveClass('bg-btn-primary');
-      // Button uses CVA with Tailwind classes (variant='secondary', size='sm')
-      expect(goHomeButton).toHaveAttribute('data-variant', 'secondary');
-      expect(goHomeButton).toHaveClass('bg-btn-secondary');
+    });
+
+    it('keeps the primary action shape stable for failure and deployment-skew states', () => {
+      const source = readFileSync(
+        join(ROOT, 'components/organisms/ErrorBoundary.tsx'),
+        'utf8'
+      );
+
+      expect(source).toContain('const primaryAction = isSkewError');
+      expect(source).toContain("label: 'Reload'");
+      expect(source).toContain('onClick: () => globalThis.location.reload()');
+      expect(source).toContain('label: RECOVERY_COPY.retryLabel');
+      expect(source).toContain('onClick: reset');
     });
   });
 });

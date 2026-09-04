@@ -7,6 +7,7 @@ import {
   buildAffectedTestPlan,
   buildFullSuiteCommands,
   buildSelectedTestCommands,
+  buildVerificationEnv,
   runCommandStatus,
 } from '../../run-affected-tests.mjs';
 
@@ -20,16 +21,78 @@ const script = readFileSync(
   'utf8'
 );
 
+describe('verification child environment', () => {
+  it('removes hook-local Git routing while preserving unrelated variables', () => {
+    expect(
+      buildVerificationEnv({
+        GIT_DIR: '.',
+        GIT_WORK_TREE: '/wrong/worktree',
+        GIT_INDEX_FILE: '/wrong/index',
+        PATH: '/repo/bin',
+      })
+    ).toEqual({ PATH: '/repo/bin' });
+  });
+});
+
+describe('Summer commissioning affected-test lane', () => {
+  it('selects the fail-closed commissioning suite for every contract input', () => {
+    const plan = buildAffectedTestPlan([
+      'docs/operations/SUMMER_COMMISSIONING.md',
+      'docs/operations/SUMMER_PRODUCT_QUALITY_GOVERNOR.md',
+      'docs/operations/evidence/summer-mac-production-dogfood-2026-09-01.json',
+      'scripts/summer-commissioning/canonical-registry.test.mjs',
+      'scripts/summer-commissioning/commissioning.mjs',
+      'scripts/summer-commissioning/commissioning.test.mjs',
+      'scripts/summer-commissioning/contracts.mjs',
+      'scripts/summer-commissioning/contracts.test.mjs',
+      'scripts/summer-commissioning/product-quality-governor.mjs',
+      'scripts/summer-commissioning/product-quality-governor.test.mjs',
+      'scripts/summer-commissioning/receipt-trust.mjs',
+      'scripts/summer-commissioning/receipt-trust.test.mjs',
+      'scripts/summer-commissioning/registry.json',
+      'scripts/run-affected-tests.mjs',
+      'scripts/lib/__tests__/automation-verify.test.mjs',
+    ]);
+
+    expect(plan.mode).toBe('selected');
+    expect(plan.nodeTests).toEqual([
+      'scripts/summer-commissioning/canonical-registry.test.mjs',
+      'scripts/summer-commissioning/commissioning.test.mjs',
+      'scripts/summer-commissioning/contracts.test.mjs',
+      'scripts/summer-commissioning/product-quality-governor.test.mjs',
+      'scripts/summer-commissioning/receipt-trust.test.mjs',
+    ]);
+    expect(plan.scriptVitestTests).toContain(
+      'scripts/lib/__tests__/automation-verify.test.mjs'
+    );
+  });
+
+  it('fails closed to the full suite when commissioning changes mix scopes', () => {
+    const plan = buildAffectedTestPlan([
+      'scripts/summer-commissioning/commissioning.mjs',
+      'scripts/unrelated.mjs',
+    ]);
+
+    expect(plan.mode).toBe('full');
+  });
+});
+
 const SYMPHONY_THROUGHPUT_CONTROL_MANIFEST = [
   '.husky/pre-push',
   'scripts/automation-verify.sh',
   'scripts/backlog-orchestrator/__tests__/backlog-orchestrator.test.mjs',
   'scripts/backlog-orchestrator/__tests__/deterministic-gates.test.mjs',
+  'scripts/backlog-orchestrator/__tests__/gate-next-hold.test.mjs',
   'scripts/backlog-orchestrator/admitter.mjs',
   'scripts/backlog-orchestrator/backlog-orchestrator.mjs',
   'scripts/backlog-orchestrator/deterministic-gates.mjs',
+  'scripts/backlog-orchestrator/gate-next-hold.mjs',
   'scripts/hermes/codex-rotate',
+  'scripts/hermes/codex-account-probe.sh',
+  'scripts/hermes/symphony-lease-guard',
+  'scripts/hermes/tests/codex-account-probe.test.py',
   'scripts/hermes/tests/codex-rotate.test.py',
+  'scripts/hermes/tests/symphony-lease-guard.test.py',
   'scripts/lib/__tests__/automation-verify.test.mjs',
   'scripts/lib/__tests__/pre-push-gate.test.mjs',
   'scripts/run-affected-tests.mjs',
@@ -48,9 +111,14 @@ const CI_UI_DRIFT_GUARDRAIL_INPUTS = [
   'scripts/setup.sh',
 ];
 const FLEET_PROMOTION_GATE_LANE = [
+  '.github/actions/evaluate-fleet-gate/action.yml',
   'apps/web/tests/unit/api/health/deploy.critical.test.ts',
+  'scripts/hermes/evaluate-fleet-gate.sh',
+  'scripts/hermes/fleet_admission_receipt.py',
   'scripts/hermes/gem-priority-gate.py',
   'scripts/hermes/tests/gem-priority-gate.test.py',
+  'scripts/hermes/tests/test_evaluate_fleet_gate.py',
+  'scripts/hermes/tests/test_fleet_admission_receipt.py',
   'scripts/lib/__tests__/automation-verify.test.mjs',
   'scripts/run-affected-tests.mjs',
 ];
@@ -59,8 +127,10 @@ const GEM_PR_REHABILITATION_LANE = [
   '.github/requirements/pytest.txt',
   '.github/workflows/gem-delivery-controller-activation.yml',
   '.github/workflows/ci.yml',
+  'docs/PR_FLOW.md',
   'scripts/hermes/config/gem-repo-registry.json',
   'scripts/hermes/config/model-registry.json',
+  'scripts/hermes/closure_health.py',
   'scripts/hermes/gem-pr-drain.py',
   'scripts/hermes/gem-ops-hud.py',
   'scripts/hermes/gem-priority-gate.py',
@@ -71,6 +141,7 @@ const GEM_PR_REHABILITATION_LANE = [
   'scripts/hermes/install-gem-fleet-controller.sh',
   'scripts/hermes/install-gem-pr-rehabilitation.sh',
   'scripts/hermes/model-router.py',
+  'scripts/hermes/symphony-reconciler.py',
   'scripts/hermes/systemd/gem-pr-drain.service',
   'scripts/hermes/systemd/gem-pr-drain.timer',
   'scripts/hermes/tests/gem-pr-drain.test.py',
@@ -78,6 +149,8 @@ const GEM_PR_REHABILITATION_LANE = [
   'scripts/hermes/tests/gem-pr-rehabilitation-contract.test.py',
   'scripts/hermes/tests/gem-priority-gate.test.py',
   'scripts/hermes/tests/gem-rehabilitation-policy.test.py',
+  'scripts/hermes/tests/closure-health.test.py',
+  'scripts/hermes/tests/symphony-reconciler.test.py',
   'scripts/backlog-orchestrator/__tests__/backlog-orchestrator.test.mjs',
   'scripts/hermes/tests/test-model-router.py',
   'scripts/ci-fast-lanes.mjs',
@@ -86,18 +159,29 @@ const GEM_PR_REHABILITATION_LANE = [
   'scripts/run-affected-tests.mjs',
 ];
 const MERGE_QUEUE_CONTROLLER_INPUTS = [
+  '.github/actions/evaluate-fleet-gate/action.yml',
   '.github/workflows/merge-queue-autoenroll.yml',
   'docs/PR_FLOW.md',
   'scripts/ci-merge-queue-check.mjs',
   'scripts/drain-pr-queue.sh',
+  'scripts/hermes/evaluate-fleet-gate.sh',
+  'scripts/hermes/fleet_admission_receipt.py',
+  'scripts/hermes/tests/test_evaluate_fleet_gate.py',
+  'scripts/hermes/tests/test_fleet_admission_receipt.py',
   'scripts/lib/merge-queue-guard.mjs',
+  'scripts/lib/pre-land-changelog.mjs',
   'scripts/lib/resolve-merge-group-path-diff.mjs',
   'scripts/lib/__tests__/ci-fast-workflow-contract.test.mjs',
   'scripts/lib/__tests__/merge-group-workflow-contract.test.mjs',
   'scripts/lib/__tests__/merge-queue-backend.test.mjs',
   'scripts/lib/__tests__/merge-queue-guard.test.mjs',
+  'scripts/lib/__tests__/pre-land-changelog.test.mjs',
   'scripts/lib/__tests__/pr-check-failures.test.mjs',
+  'scripts/lib/ownerless-recovery-policy.mjs',
+  'scripts/lib/pr-check-failures.mjs',
+  'scripts/lib/upsert-pr-comment.sh',
   'scripts/merge-queue-backend.mjs',
+  'scripts/ownerless-recovery-sweeper.mjs',
   'scripts/tests/test_gh_retry.py',
 ];
 const MERGE_QUEUE_CONTROLLER_SCRIPT_TESTS = [
@@ -106,7 +190,27 @@ const MERGE_QUEUE_CONTROLLER_SCRIPT_TESTS = [
   'scripts/lib/__tests__/merge-group-workflow-contract.test.mjs',
   'scripts/lib/__tests__/merge-queue-backend.test.mjs',
   'scripts/lib/__tests__/merge-queue-guard.test.mjs',
+  'scripts/lib/__tests__/ownerless-recovery-policy.test.mjs',
+  'scripts/lib/__tests__/pre-land-changelog.test.mjs',
   'scripts/lib/__tests__/pr-check-failures.test.mjs',
+];
+const MERGE_GROUP_ADMISSION_INPUTS = [
+  'scripts/lib/merge-group-admission.mjs',
+  'scripts/lib/__tests__/merge-group-admission.test.mjs',
+];
+const MERGE_GROUP_ADMISSION_COMPANIONS = [
+  '.github/workflows/ci.yml',
+  '.github/workflows/ios-ci.yml',
+  'apps/web/tests/unit/ci/deploy-workflow.test.ts',
+  'scripts/lib/__tests__/merge-group-workflow-contract.test.mjs',
+];
+const MERGE_GROUP_ADMISSION_WEB_TESTS = [
+  'apps/web/tests/unit/ci/deploy-workflow.test.ts',
+];
+const MERGE_GROUP_ADMISSION_SCRIPT_TESTS = [
+  'scripts/lib/__tests__/automation-verify.test.mjs',
+  'scripts/lib/__tests__/merge-group-admission.test.mjs',
+  'scripts/lib/__tests__/merge-group-workflow-contract.test.mjs',
 ];
 
 const PREREQUISITE_TRAIN_CORNERS = [
@@ -171,6 +275,30 @@ const AFFECTED_TEST_SELECTOR_MANIFEST = [
   'scripts/run-affected-tests.mjs',
   'scripts/lib/__tests__/automation-verify.test.mjs',
 ];
+const GEM_CHECKIN_HUD_LANE = [
+  'scripts/hermes/symphony/WORKFLOW.md',
+  'scripts/hermes/symphony_official_runtime.py',
+  'scripts/hermes/gem-checkin-hud.py',
+  'scripts/hermes/gem-checkin-tty1.sh',
+  'scripts/hermes/systemd/symphony-elixir.service',
+  'scripts/hermes/systemd/symphony-burrito.service',
+  'scripts/hermes/systemd/symphony-burrito-update.service',
+  'scripts/hermes/systemd/symphony-burrito-update.timer',
+  'scripts/hermes/update-symphony-burrito.sh',
+  'scripts/hermes/tests/gem-checkin-hud.test.py',
+  'scripts/hermes/tests/symphony-burrito-workflow.test.py',
+  '.github/workflows/reusable-ci-lint.yml',
+  ...AFFECTED_TEST_SELECTOR_MANIFEST,
+];
+const SENTRY_AUTOFIX_RECURRENCE_LANE = [
+  '.github/workflows/sentry-autofix-recurrence.yml',
+  '.github/workflows/sentry-autofix.yml',
+  'scripts/sentry-autofix-recurrence.mjs',
+  'scripts/lib/__tests__/sentry-autofix-recurrence.test.mjs',
+  'scripts/lib/__tests__/sentry-autofix-workflow-contract.test.mjs',
+  'scripts/tests/test_agent_workflow_hygiene.py',
+  ...AFFECTED_TEST_SELECTOR_MANIFEST,
+];
 const SAFE_PR_REMEDIATION_LANE = [
   '.github/workflows/safe-pr-remediation.yml',
   'scripts/lib/safe-pr-remediation.mjs',
@@ -184,9 +312,11 @@ const ROLLING_CI_FX_CACHE_GC_LANE = [
   'scripts/lib/actions-cache-gc.mjs',
   'scripts/lib/rolling-ci-dispatch.mjs',
   'scripts/lib/rolling-ci-fx.mjs',
+  'scripts/lib/rolling-ci-hosted-writer.mjs',
   'scripts/lib/__tests__/actions-cache-gc.test.mjs',
   'scripts/lib/__tests__/rolling-ci-dispatch.test.mjs',
   'scripts/lib/__tests__/rolling-ci-fx.test.mjs',
+  'scripts/lib/__tests__/rolling-ci-hosted-writer.test.mjs',
   'scripts/lib/__tests__/rolling-ci-handoff.test.mjs',
   ...AFFECTED_TEST_SELECTOR_MANIFEST,
 ];
@@ -393,6 +523,45 @@ const NEON_ATTEMPT_ARTIFACT_MANIFEST = [
 ];
 
 describe('automation-verify affected scope', () => {
+  it('keeps the product-lane foundation out of unrelated Web ratchets', () => {
+    const plan = buildAffectedTestPlan([
+      '.claude/rules/release.md',
+      '.github/workflows/README.md',
+      'docs/PR_FLOW.md',
+      'docs/TESTING_STRATEGY.md',
+      'scripts/lib/__tests__/automation-verify.test.mjs',
+      'scripts/lib/__tests__/merge-queue-backend.test.mjs',
+      'scripts/lib/__tests__/merge-queue-guard.test.mjs',
+      'scripts/lib/__tests__/merge-group-workflow-contract.test.mjs',
+      'scripts/lib/__tests__/product-lane-classifier.test.mjs',
+      'scripts/lib/ci-harness.mjs',
+      'scripts/lib/merge-queue-guard.mjs',
+      'scripts/lib/product-lane-classifier.mjs',
+      'scripts/lib/product-lane-finalize.mjs',
+      'scripts/lib/resolve-merge-group-path-diff.mjs',
+      'scripts/run-affected-tests.mjs',
+    ]);
+
+    expect(plan.mode).toBe('selected');
+    expect(plan.selectedTests).toEqual([]);
+    expect(plan.scriptVitestTests).toContain(
+      'scripts/lib/__tests__/product-lane-classifier.test.mjs'
+    );
+    expect(plan.scriptVitestTests).toContain(
+      'scripts/lib/__tests__/merge-queue-backend.test.mjs'
+    );
+    expect(plan.nodeTests).toEqual(['scripts/typecheck-scripts.mjs']);
+  });
+
+  it('fails back to the full Web suite when the foundation adds a Web path', () => {
+    expect(
+      buildAffectedTestPlan([
+        'scripts/lib/product-lane-classifier.mjs',
+        'apps/web/lib/unknown.ts',
+      ]).mode
+    ).toBe('full');
+  });
+
   it('does not require retired Graphite source authorization artifacts', () => {
     for (const retiredPath of [
       '.github/workflows/gtmq-source-authorization.yml',
@@ -505,20 +674,31 @@ describe('automation-verify affected scope', () => {
       pythonUnittestTests: ['scripts/hermes/tests/gem-priority-gate.test.py'],
       scriptVitestTests: [
         'scripts/lib/__tests__/automation-verify.test.mjs',
+        'scripts/lib/__tests__/pr-visual-capture-path.test.mjs',
         'scripts/lib/__tests__/pr-visual-review.test.mjs',
         'scripts/lib/__tests__/ci-harness.test.mjs',
         'scripts/lib/__tests__/ci-duration-ratchet.test.mjs',
         'scripts/lib/__tests__/ci-branching-guard.test.mjs',
         'scripts/lib/__tests__/merge-queue-guard.test.mjs',
+        'scripts/lib/__tests__/pre-land-changelog.test.mjs',
+        'scripts/lib/__tests__/ownerless-recovery-policy.test.mjs',
         'scripts/lib/__tests__/ci-metrics-compute.test.mjs',
         'scripts/lib/__tests__/auto-ready-agent-drafts.test.mjs',
         'scripts/lib/__tests__/eval-main-health-action.test.mjs',
         'scripts/lib/__tests__/pr-check-failures.test.mjs',
         'scripts/lib/__tests__/pr-conflict-handler.test.mjs',
+        'scripts/lib/__tests__/github-open-prs-rest.test.mjs',
+        'scripts/lib/__tests__/github-merge-queue.test.mjs',
         'scripts/lib/__tests__/ci-fast-workflow-contract.test.mjs',
+        'scripts/lib/__tests__/codeql-workflow-contract.test.mjs',
+        'scripts/lib/__tests__/design-exception-registry.test.mjs',
+        'scripts/lib/__tests__/design-system-source-ratchet.test.mjs',
+        'scripts/lib/__tests__/ci-repo-lanes.test.mjs',
+        'scripts/lib/__tests__/merge-group-admission.test.mjs',
         'scripts/lib/__tests__/merge-group-workflow-contract.test.mjs',
         'scripts/lib/__tests__/lockfile-specifier-preflight.test.mjs',
         'scripts/lib/__tests__/sentry-autofix-workflow-contract.test.mjs',
+        'scripts/lib/__tests__/sentry-autofix-recurrence.test.mjs',
         'scripts/lib/__tests__/golden-path-lock.test.mjs',
         'scripts/lib/__tests__/golden-path-prod-autofix-workflow-contract.test.mjs',
         'scripts/lib/__tests__/queue-deferral-receipt.test.mjs',
@@ -532,6 +712,7 @@ describe('automation-verify affected scope', () => {
         'scripts/lib/__tests__/linear-issue-intake.test.mjs',
         'scripts/lib/__tests__/agent-qc-wires.test.mjs',
         'scripts/lib/__tests__/needs-human-autoclose.test.mjs',
+        'scripts/lib/__tests__/production-lane-range.test.mjs',
         'scripts/lib/__tests__/hermes-launchd.test.mjs',
       ],
     });
@@ -604,16 +785,48 @@ describe('automation-verify affected scope', () => {
       nodeTests: [
         'scripts/backlog-orchestrator/__tests__/backlog-orchestrator.test.mjs',
         'scripts/backlog-orchestrator/__tests__/deterministic-gates.test.mjs',
+        'scripts/backlog-orchestrator/__tests__/gate-next-hold.test.mjs',
       ],
       scriptVitestTests: [
         'scripts/lib/__tests__/automation-verify.test.mjs',
         'scripts/lib/__tests__/pre-push-gate.test.mjs',
       ],
-      pythonUnittestTests: ['scripts/hermes/tests/codex-rotate.test.py'],
+      pythonUnittestTests: [
+        'scripts/hermes/tests/codex-account-probe.test.py',
+        'scripts/hermes/tests/codex-rotate.test.py',
+        'scripts/hermes/tests/symphony-lease-guard.test.py',
+      ],
     });
     expect(
       buildAffectedTestPlan([
         ...SYMPHONY_THROUGHPUT_CONTROL_MANIFEST,
+        'scripts/backlog-orchestrator/unknown.mjs',
+      ]).mode
+    ).toBe('full');
+  });
+
+  it('selects the official Symphony backlog remediation lane', () => {
+    expect(
+      buildAffectedTestPlan([
+        'scripts/backlog-orchestrator/backlog-remediation.mjs',
+      ])
+    ).toMatchObject({
+      mode: 'selected',
+      nodeTests: [
+        'scripts/backlog-orchestrator/__tests__/backlog-remediation.test.mjs',
+      ],
+      scriptVitestTests: ['scripts/lib/__tests__/automation-verify.test.mjs'],
+    });
+    expect(
+      buildAffectedTestPlan([
+        'scripts/backlog-orchestrator/backlog-remediation.mjs',
+        '.github/workflows/fleet-gate-refresh.yml',
+        'scripts/run-affected-tests.mjs',
+      ]).mode
+    ).toBe('selected');
+    expect(
+      buildAffectedTestPlan([
+        'scripts/backlog-orchestrator/backlog-remediation.mjs',
         'scripts/backlog-orchestrator/unknown.mjs',
       ]).mode
     ).toBe('full');
@@ -649,6 +862,10 @@ describe('automation-verify affected scope', () => {
         selectedTests: [
           'apps/web/tests/unit/api/health/deploy.critical.test.ts',
         ],
+        pythonTests: [
+          'scripts/hermes/tests/test_evaluate_fleet_gate.py',
+          'scripts/hermes/tests/test_fleet_admission_receipt.py',
+        ],
         pythonUnittestTests: ['scripts/hermes/tests/gem-priority-gate.test.py'],
         scriptVitestTests: ['scripts/lib/__tests__/automation-verify.test.mjs'],
       });
@@ -661,17 +878,37 @@ describe('automation-verify affected scope', () => {
     ).toBe('full');
   });
 
+  it('selects the bounded Gem check-in HUD + burrito contracts and fails closed on unrelated files', () => {
+    expect(buildAffectedTestPlan(GEM_CHECKIN_HUD_LANE)).toMatchObject({
+      mode: 'selected',
+      selectedTests: [],
+      pythonUnittestTests: [
+        'scripts/hermes/tests/gem-checkin-hud.test.py',
+        'scripts/hermes/tests/symphony-burrito-workflow.test.py',
+      ],
+      scriptVitestTests: ['scripts/lib/__tests__/automation-verify.test.mjs'],
+    });
+    expect(
+      buildAffectedTestPlan([
+        ...GEM_CHECKIN_HUD_LANE,
+        'apps/ios/Jovie/RootView.swift',
+      ]).mode
+    ).toBe('full');
+  });
+
   it('selects every Gem PR rehabilitation contract without unrelated product tests', () => {
     const plan = buildAffectedTestPlan(GEM_PR_REHABILITATION_LANE);
     expect(plan).toMatchObject({
       mode: 'selected',
       selectedTests: [],
       pythonUnittestTests: [
+        'scripts/hermes/tests/closure-health.test.py',
         'scripts/hermes/tests/gem-priority-gate.test.py',
         'scripts/hermes/tests/gem-pr-drain.test.py',
         'scripts/hermes/tests/gem-ops-hud.test.py',
         'scripts/hermes/tests/gem-pr-rehabilitation-contract.test.py',
         'scripts/hermes/tests/gem-rehabilitation-policy.test.py',
+        'scripts/hermes/tests/symphony-reconciler.test.py',
         'scripts/hermes/tests/test-model-router.py',
       ],
       scriptVitestTests: [
@@ -687,6 +924,114 @@ describe('automation-verify affected scope', () => {
     ).toBe('full');
   });
 
+  it('maps model-router-only changes to the Gem rehabilitation contracts', () => {
+    const plan = buildAffectedTestPlan([
+      'scripts/hermes/model-router.py',
+      'scripts/hermes/config/model-registry.json',
+      'scripts/hermes/tests/test-model-router.py',
+    ]);
+    expect(plan.mode).toBe('selected');
+    expect(plan.pythonUnittestTests).toContain(
+      'scripts/hermes/tests/test-model-router.py'
+    );
+    expect(plan.scriptVitestTests).toContain(
+      'scripts/lib/__tests__/automation-verify.test.mjs'
+    );
+  });
+
+  it('maps the additive Symphony router boundary to its two regression suites', () => {
+    const plan = buildAffectedTestPlan([
+      'scripts/hermes/config/model-registry.json',
+      'scripts/hermes/model-router.py',
+      'scripts/hermes/symphony-codex-exhausted.py',
+      'scripts/hermes/tests/symphony-additive-router.test.py',
+      'scripts/hermes/tests/symphony-codex-auth-fallback.test.py',
+      'scripts/hermes/tests/test-model-router.py',
+      'scripts/run-affected-tests.mjs',
+      'scripts/lib/__tests__/automation-verify.test.mjs',
+    ]);
+    expect(plan).toMatchObject({
+      mode: 'selected',
+      pythonUnittestTests: [
+        'scripts/hermes/tests/symphony-additive-router.test.py',
+        'scripts/hermes/tests/test-model-router.py',
+      ],
+      scriptVitestTests: ['scripts/lib/__tests__/automation-verify.test.mjs'],
+    });
+  });
+
+  it('does not narrow arbitrary edits to the legacy Symphony controller suite', () => {
+    expect(
+      buildAffectedTestPlan([
+        'scripts/hermes/tests/symphony-codex-auth-fallback.test.py',
+      ]).mode
+    ).toBe('full');
+  });
+
+  it('routes a closure-health source-only repair to its Python regression suite', () => {
+    expect(
+      buildAffectedTestPlan(['scripts/hermes/closure_health.py'])
+    ).toMatchObject({
+      mode: 'selected',
+      pythonUnittestTests: expect.arrayContaining([
+        'scripts/hermes/tests/closure-health.test.py',
+      ]),
+      scriptVitestTests: expect.arrayContaining([
+        'scripts/lib/__tests__/automation-verify.test.mjs',
+        'scripts/lib/__tests__/ci-fast-workflow-contract.test.mjs',
+      ]),
+    });
+  });
+
+  it('selects the No Unattended Red contracts without unrelated product tests', () => {
+    const lane = [
+      'scripts/backlog-orchestrator/no-unattended-red.mjs',
+      'scripts/backlog-orchestrator/delivery-state-machine.mjs',
+      'scripts/backlog-orchestrator/__tests__/no-unattended-red.test.mjs',
+      'scripts/backlog-orchestrator/__tests__/delivery-state-machine.test.mjs',
+      '.github/workflows/delivery-control-receipts.yml',
+      '.github/workflows/fleet-gate-refresh.yml',
+      'canon/invariants.jsonl',
+      'scripts/hermes/closure_health.py',
+      'scripts/hermes/gem-ops-hud.py',
+      'scripts/hermes/tests/closure-health.test.py',
+      'scripts/hermes/tests/gem-priority-gate.test.py',
+      'scripts/hermes/tests/gem-ops-hud.test.py',
+      'scripts/lib/ownerless-recovery-policy.mjs',
+      'scripts/lib/__tests__/ownerless-recovery-policy.test.mjs',
+      'scripts/lib/__tests__/queue-deferred-release.test.mjs',
+      'scripts/invariants/registry.test.mjs',
+      'scripts/tests/test_agent_workflow_hygiene.py',
+      ...AFFECTED_TEST_SELECTOR_MANIFEST,
+    ];
+    expect(buildAffectedTestPlan(lane)).toMatchObject({
+      mode: 'selected',
+      selectedTests: [],
+      pythonTests: ['scripts/tests/test_agent_workflow_hygiene.py'],
+      pythonUnittestTests: [
+        'scripts/hermes/tests/closure-health.test.py',
+        'scripts/hermes/tests/gem-priority-gate.test.py',
+        'scripts/hermes/tests/gem-ops-hud.test.py',
+      ],
+      scriptVitestTests: [
+        'scripts/lib/__tests__/automation-verify.test.mjs',
+        'scripts/lib/__tests__/ownerless-recovery-policy.test.mjs',
+        'scripts/lib/__tests__/queue-deferred-release.test.mjs',
+      ],
+      nodeTests: [
+        'scripts/backlog-orchestrator/__tests__/delivery-state-machine.test.mjs',
+        'scripts/backlog-orchestrator/__tests__/no-unattended-red.test.mjs',
+        'scripts/invariants/registry.test.mjs',
+      ],
+    });
+    expect(
+      buildAffectedTestPlan([
+        ...lane,
+        'scripts/backlog-orchestrator/unknown-red-peer.mjs',
+      ]).mode
+    ).toBe('full');
+  });
+
   it('selects the bounded FX webhook + Actions cache GC contract and fails closed on unrelated files', () => {
     expect(buildAffectedTestPlan(ROLLING_CI_FX_CACHE_GC_LANE)).toMatchObject({
       mode: 'selected',
@@ -697,6 +1042,7 @@ describe('automation-verify affected scope', () => {
         'scripts/lib/__tests__/automation-verify.test.mjs',
         'scripts/lib/__tests__/rolling-ci-dispatch.test.mjs',
         'scripts/lib/__tests__/rolling-ci-fx.test.mjs',
+        'scripts/lib/__tests__/rolling-ci-hosted-writer.test.mjs',
         'scripts/lib/__tests__/rolling-ci-handoff.test.mjs',
       ],
       nodeTests: ['scripts/typecheck-scripts.mjs'],
@@ -705,6 +1051,28 @@ describe('automation-verify affected scope', () => {
       buildAffectedTestPlan([
         ...ROLLING_CI_FX_CACHE_GC_LANE,
         'apps/web/lib/unknown-fx-cache-peer.ts',
+      ]).mode
+    ).toBe('full');
+  });
+
+  it('selects the bounded sentry autofix recurrence contract and fails closed on unrelated files', () => {
+    expect(buildAffectedTestPlan(SENTRY_AUTOFIX_RECURRENCE_LANE)).toMatchObject(
+      {
+        mode: 'selected',
+        selectedTests: [],
+        pythonUnittestTests: ['scripts/tests/test_agent_workflow_hygiene.py'],
+        scriptVitestTests: [
+          'scripts/lib/__tests__/sentry-autofix-recurrence.test.mjs',
+          'scripts/lib/__tests__/sentry-autofix-workflow-contract.test.mjs',
+          'scripts/lib/__tests__/automation-verify.test.mjs',
+        ],
+        nodeTests: ['scripts/typecheck-scripts.mjs'],
+      }
+    );
+    expect(
+      buildAffectedTestPlan([
+        ...SENTRY_AUTOFIX_RECURRENCE_LANE,
+        'apps/web/lib/unknown-sentry-recurrence-peer.ts',
       ]).mode
     ).toBe('full');
   });
@@ -726,6 +1094,19 @@ describe('automation-verify affected scope', () => {
         'apps/web/lib/unknown-safe-remediation-peer.ts',
       ]).mode
     ).toBe('full');
+  });
+
+  it('keeps reconciler-only changes inside the bounded rehabilitation lane', () => {
+    for (const changedPath of [
+      'scripts/hermes/symphony-reconciler.py',
+      'scripts/hermes/tests/symphony-reconciler.test.py',
+    ]) {
+      const plan = buildAffectedTestPlan([changedPath]);
+      expect(plan.mode).toBe('selected');
+      expect(plan.pythonUnittestTests).toContain(
+        'scripts/hermes/tests/symphony-reconciler.test.py'
+      );
+    }
   });
 
   it('routes fleet controller installer repairs to the Gem rehabilitation lane', () => {
@@ -778,9 +1159,10 @@ describe('automation-verify affected scope', () => {
       'apps/web/tests/unit/profile/profile-card-layout.test.tsx',
       'apps/web/tests/unit/profile/profile-compact-surface-hero-layout.test.ts',
       'apps/web/tests/unit/design-system/arbitrary-values-ratchet.test.ts',
+      'apps/web/tests/unit/design-system/app-screen-canvas-manifest.test.ts',
       'apps/web/eslint-rules/canonical-ui-label-casing.test.ts',
     ]);
-    expect(plan.selectedTests).toHaveLength(5);
+    expect(plan.selectedTests).toHaveLength(6);
   });
 
   it('maps the seed confirmation boundary diff to focused behavior tests', () => {
@@ -948,8 +1330,45 @@ describe('automation-verify affected scope', () => {
 
     expect(plan.mode).toBe('selected');
     expect(plan.scriptVitestTests).toEqual(MERGE_QUEUE_CONTROLLER_SCRIPT_TESTS);
-    expect(plan.pythonTests).toEqual(['scripts/tests/test_gh_retry.py']);
+    expect(plan.pythonTests).toEqual([
+      'scripts/hermes/tests/test_evaluate_fleet_gate.py',
+      'scripts/hermes/tests/test_fleet_admission_receipt.py',
+      'scripts/tests/test_gh_retry.py',
+    ]);
     expect(plan.selectedTests).toEqual([]);
+  });
+
+  it('keeps the merge-group admission diff on its runtime and workflow contracts', () => {
+    const plan = buildAffectedTestPlan([
+      ...MERGE_GROUP_ADMISSION_INPUTS,
+      ...MERGE_GROUP_ADMISSION_COMPANIONS,
+      ...AFFECTED_TEST_SELECTOR_MANIFEST,
+    ]);
+
+    expect(plan.mode).toBe('selected');
+    expect(plan.scriptVitestTests).toEqual(MERGE_GROUP_ADMISSION_SCRIPT_TESTS);
+    expect(plan.pythonTests).toEqual([]);
+    expect(plan.selectedTests).toEqual(MERGE_GROUP_ADMISSION_WEB_TESTS);
+  });
+
+  it.each(
+    MERGE_GROUP_ADMISSION_INPUTS
+  )('maps the merge-group admission input %s independently', input => {
+    const plan = buildAffectedTestPlan([input]);
+
+    expect(plan.mode).toBe('selected');
+    expect(plan.scriptVitestTests).toEqual(MERGE_GROUP_ADMISSION_SCRIPT_TESTS);
+    expect(plan.pythonTests).toEqual([]);
+    expect(plan.selectedTests).toEqual(MERGE_GROUP_ADMISSION_WEB_TESTS);
+  });
+
+  it('fails closed when merge-group admission changes include unknown automation', () => {
+    expect(
+      buildAffectedTestPlan([
+        'scripts/lib/merge-group-admission.mjs',
+        'scripts/lib/unknown-admission-transport.mjs',
+      ]).mode
+    ).toBe('full');
   });
 
   it.each(
@@ -959,7 +1378,11 @@ describe('automation-verify affected scope', () => {
 
     expect(plan.mode).toBe('selected');
     expect(plan.scriptVitestTests).toEqual(MERGE_QUEUE_CONTROLLER_SCRIPT_TESTS);
-    expect(plan.pythonTests).toEqual(['scripts/tests/test_gh_retry.py']);
+    expect(plan.pythonTests).toEqual([
+      'scripts/hermes/tests/test_evaluate_fleet_gate.py',
+      'scripts/hermes/tests/test_fleet_admission_receipt.py',
+      'scripts/tests/test_gh_retry.py',
+    ]);
   });
 
   it('fails closed when merge-queue controller changes include unknown automation', () => {
@@ -1017,6 +1440,7 @@ describe('automation-verify affected scope', () => {
       'apps/web/tests/unit/events/insert.test.ts',
       'apps/web/tests/unit/testing/seed-test-data-import-boundary.test.ts',
       'apps/web/tests/unit/design-system/arbitrary-values-ratchet.test.ts',
+      'apps/web/tests/unit/design-system/app-screen-canvas-manifest.test.ts',
       ...PREREQUISITE_TRAIN_TESTS,
     ]);
     expect(plan.selectedTests).toEqual([
@@ -1025,6 +1449,7 @@ describe('automation-verify affected scope', () => {
       'apps/web/tests/unit/events/insert.test.ts',
       'apps/web/tests/unit/testing/seed-test-data-import-boundary.test.ts',
       'apps/web/tests/unit/design-system/arbitrary-values-ratchet.test.ts',
+      'apps/web/tests/unit/design-system/app-screen-canvas-manifest.test.ts',
     ]);
     expect(plan.selectedTests).not.toContain(
       'apps/web/tests/e2e/claim-prebuilt.smoke.spec.ts'
@@ -1247,6 +1672,28 @@ describe('automation-verify affected scope', () => {
     );
   });
 
+  it('deliberately selects the canvas guard for a source-only shell component change', () => {
+    const plan = buildAffectedTestPlan([
+      'apps/web/components/features/opportunity-inbox/OpportunityInboxPageClient.tsx',
+    ]);
+
+    expect(plan.mode).toBe('selected');
+    expect(plan.mandatoryTests).toEqual(
+      expect.arrayContaining([
+        'apps/web/tests/unit/design-system/app-screen-canvas-manifest.test.ts',
+      ])
+    );
+  });
+
+  it('selects the canvas guard for app-screen registry contract changes', () => {
+    const plan = buildAffectedTestPlan(['apps/web/data/appScreens/canvas.ts']);
+
+    expect(plan.mode).toBe('selected');
+    expect(plan.selectedTests).toEqual([
+      'apps/web/tests/unit/design-system/app-screen-canvas-manifest.test.ts',
+    ]);
+  });
+
   it('keeps the authenticated accessibility repair on focused unit coverage', () => {
     const plan = buildAffectedTestPlan([
       ...AUTHENTICATED_A11Y_REPAIR_CORE,
@@ -1262,6 +1709,7 @@ describe('automation-verify affected scope', () => {
       'apps/web/tests/unit/onboarding/OnboardingChat.turnstile.test.tsx',
       'apps/web/tests/unit/sidebar-row-alignment.test.tsx',
       'apps/web/tests/unit/design-system/arbitrary-values-ratchet.test.ts',
+      'apps/web/tests/unit/design-system/app-screen-canvas-manifest.test.ts',
     ]);
     expect(plan.scriptVitestTests).toEqual([
       'scripts/lib/__tests__/automation-verify.test.mjs',

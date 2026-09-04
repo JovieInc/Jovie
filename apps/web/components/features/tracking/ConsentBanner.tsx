@@ -1,3 +1,4 @@
+// @coverage-via apps/web/tests/unit/design-system/linear-token-retire-jov-5465.test.ts
 'use client';
 
 import { X } from 'lucide-react';
@@ -22,7 +23,7 @@ const secondaryButtonStyle: CSSProperties = {
   fontSize: '12px',
   fontWeight: 'var(--linear-font-weight-medium)',
   padding: '4px 10px',
-  borderRadius: 'var(--linear-radius-sm)',
+  borderRadius: 'var(--radius-sm)',
   height: '28px',
 };
 
@@ -32,7 +33,7 @@ const primaryButtonStyle: CSSProperties = {
   fontSize: '12px',
   fontWeight: 'var(--linear-font-weight-medium)',
   padding: '4px 10px',
-  borderRadius: 'var(--linear-radius-sm)',
+  borderRadius: 'var(--radius-sm)',
   height: '28px',
 };
 
@@ -94,7 +95,7 @@ export function ConsentBanner({ className }: ConsentBannerProps) {
         backgroundColor:
           'color-mix(in oklch, var(--linear-bg-surface-0) 95%, transparent)',
         borderTop: '1px solid var(--linear-border-subtle)',
-        boxShadow: 'var(--linear-shadow-card)',
+        boxShadow: 'var(--shadow-card)',
       }}
       aria-label='Cookie Consent'
     >
@@ -125,7 +126,7 @@ export function ConsentBanner({ className }: ConsentBannerProps) {
 
         <div
           className='flex items-center shrink-0'
-          style={{ gap: 'var(--linear-space-2)' }}
+          style={{ gap: 'var(--space-2)' }}
         >
           <button
             type='button'
@@ -149,7 +150,7 @@ export function ConsentBanner({ className }: ConsentBannerProps) {
             className='h-8 w-8 sm:hidden flex items-center justify-center transition-opacity hover:opacity-80 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-accent'
             style={{
               color: 'var(--linear-text-secondary)',
-              borderRadius: 'var(--linear-radius-sm)',
+              borderRadius: 'var(--radius-sm)',
             }}
             aria-label='Close'
           >

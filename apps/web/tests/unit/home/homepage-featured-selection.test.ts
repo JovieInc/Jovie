@@ -60,7 +60,7 @@ describe('homepage featured selection', () => {
       id: 'tim-id',
       handle: 'tim',
       name: 'Tim White',
-      src: '/images/avatars/tim-white-founder.jpg',
+      src: '/images/avatars/tim-white.jpg',
       tagline: 'Founder',
       genres: ['Electronic'],
       latestReleaseTitle: null,
@@ -71,7 +71,7 @@ describe('homepage featured selection', () => {
         id: 'tim-id',
         handle: 'tim',
         name: 'Tim White',
-        src: '/images/avatars/tim-white-founder.jpg',
+        src: '/images/avatars/tim-white.jpg',
         tagline: 'Founder',
         genres: ['Electronic'],
         latestReleaseTitle: null,
@@ -109,7 +109,7 @@ describe('homepage featured selection', () => {
                 username: 'claimed-dj',
                 displayName: 'Claimed DJ',
                 bio: 'Claimed',
-                avatarUrl: '/claimed-dj.jpg',
+                avatarUrl: null,
                 genres: ['Dance'],
                 isClaimed: true,
                 spotifyPopularity: 88,
@@ -151,6 +151,9 @@ describe('homepage featured selection', () => {
     expect(
       result.claimedFeaturedCandidates.map(candidate => candidate.handle)
     ).toEqual(['claimed-dj']);
+    expect(result.claimedFeaturedCandidates[0]?.src).toBe(
+      '/avatars/default-user.png'
+    );
   });
 
   it('does not query claimed featured candidates unless explicitly requested', async () => {
@@ -158,7 +161,7 @@ describe('homepage featured selection', () => {
       id: 'tim-id',
       handle: 'tim',
       name: 'Tim White',
-      src: '/images/avatars/tim-white-founder.jpg',
+      src: '/images/avatars/tim-white.jpg',
       tagline: 'Founder',
       genres: ['Electronic'],
       latestReleaseTitle: null,
@@ -169,7 +172,7 @@ describe('homepage featured selection', () => {
         id: 'tim-id',
         handle: 'tim',
         name: 'Tim White',
-        src: '/images/avatars/tim-white-founder.jpg',
+        src: '/images/avatars/tim-white.jpg',
         tagline: 'Founder',
         genres: ['Electronic'],
         latestReleaseTitle: null,

@@ -5,7 +5,10 @@ import { Stat } from './Stat';
 describe('Stat', () => {
   it('renders the label and value', () => {
     render(<Stat label='Clicks' value='1,247' />);
-    expect(screen.getByText('Clicks')).toBeInTheDocument();
+    const caption = screen.getByText('Clicks');
+    expect(caption).toBeInTheDocument();
+    expect(caption.className).toContain('tracking-normal');
+    expect(caption.className).not.toMatch(/\buppercase\b/);
     expect(screen.getByText('1,247')).toBeInTheDocument();
   });
 

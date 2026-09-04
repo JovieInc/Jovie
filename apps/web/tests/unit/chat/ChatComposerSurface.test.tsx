@@ -166,12 +166,12 @@ afterEach(() => {
 });
 
 describe('ChatComposerSurface accessibility states', () => {
-  it('renders the product-voice empty placeholder', () => {
+  it('renders an empty composer with no placeholder', () => {
     renderComposer();
 
     expect(
       screen.getByRole('textbox', { name: 'Chat Message Input' })
-    ).toHaveAttribute('placeholder', 'Ask Jovie to plan your next release...');
+    ).not.toHaveAttribute('placeholder');
   });
 
   it('uses Ovie composer copy when the ov pack is selected', () => {
@@ -190,7 +190,7 @@ describe('ChatComposerSurface accessibility states', () => {
     expect(send).toBeDisabled();
     expect(send).toHaveClass('h-9', 'w-9');
 
-    const attach = screen.getByRole('button', { name: 'Attach Files' });
+    const attach = screen.getByRole('button', { name: 'Attachment options' });
     expect(attach).toBeEnabled();
     expect(attach).toHaveAttribute('aria-haspopup', 'menu');
     await user.hover(attach);
@@ -267,7 +267,9 @@ describe('ChatComposerSurface accessibility states', () => {
     const onAudioAttach = vi.fn();
     renderComposer({ onAudioAttach });
 
-    await user.click(screen.getByRole('button', { name: 'Attach Files' }));
+    await user.click(
+      screen.getByRole('button', { name: 'Attachment options' })
+    );
     await user.click(await screen.findByTestId('chat-composer-upload-song'));
     expect(onAudioAttach).toHaveBeenCalledOnce();
   });

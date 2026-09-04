@@ -3,15 +3,18 @@ name: Delivery Control Receipts
 # This workflow is evidence and repair-task ingress only. It is deliberately
 # separate from the native queue mutex so a cancelled/competing queue workflow
 # still leaves a durable next-owner receipt instead of silently stalling.
+# JOV-INV-017: event-trigger classification is immediate. Missed-event recovery
+# is the next causal CI/queue/production completion or dispatch, not a clock.
 on:
   repository_dispatch:
     types: [delivery-control-failure]
   workflow_run:
-    workflows: ['Merge Queue Auto-Enroll']
+    workflows:
+      - Merge Queue Auto-Enroll
+      - PR Size Guard
+      - CI
+      - Production Controller
     types: [completed]
-  schedule:
-    # Missed-event reconciliation only; it does not select or admit work.
-    - cron: '23 * * * *'
 
 permissions:
   contents: read
@@ -24,7 +27,7 @@ jobs:
   receipt:
     # Successful queue runs already carry their own exact-head receipt. Every
     # non-success terminal run must become a repair task. Repository dispatch
-    # and reconciliation are explicit ingress paths.
+    # and repository dispatch are explicit ingress paths.
     if: >-
       github.event_name != 'workflow_run' ||
       github.event.workflow_run.conclusion != 'success'
@@ -39,18 +42,10 @@ jobs:
       - name: Setup Node.js
         uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
         with:
-          node-version: '22.23.1'
+          node-version-file: '.nvmrc'
       - name: Persist a classified terminal receipt and repair task
-        env:
-          GEM_WORKSPACE: /home/timwhite/gem-workspace
         shell: bash
         run: |
           set -euo pipefail
-          if [[ "${{ github.event_name }}" == 'schedule' ]]; then
-            node scripts/backlog-orchestrator/delivery-state-machine.mjs \
-              --reconcile \
-              --heartbeat-file="$GEM_WORKSPACE/state/symphony-event-admission-heartbeat.json"
-          else
-            node scripts/backlog-orchestrator/delivery-state-machine.mjs \
-              --event-file="$GITHUB_EVENT_PATH"
-          fi
+          node scripts/backlog-orchestrator/delivery-state-machine.mjs \
+            --event-file="$GITHUB_EVENT_PATH"

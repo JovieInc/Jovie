@@ -74,10 +74,29 @@ describe('ChatLoading (chat home)', () => {
 
     expect(screen.queryByRole('textbox')).toBeNull();
     expect(screen.queryByRole('button')).toBeNull();
-    // Product-voice placeholder is decorative under the busy shell.
-    const placeholder = screen.getByText(
-      'Ask Jovie to plan your next release...'
+    expect(
+      screen.queryByText('Ask Jovie to plan your next release...')
+    ).toBeNull();
+    expect(screen.getByTestId('chat-empty-state-greeting').textContent).toBe(
+      'Just ask'
     );
-    expect(placeholder.closest('[aria-hidden="true"]')).not.toBeNull();
+    expect(screen.getByTestId('chat-empty-state-sample-user').textContent).toBe(
+      'Plan my next release'
+    );
+    expect(
+      screen
+        .getByTestId('chat-empty-state-sample')
+        .getAttribute('data-sample-prompt')
+    ).toBe('Plan my next release');
+    expect(screen.getByTestId('chat-loading')).toHaveAttribute(
+      'aria-busy',
+      'true'
+    );
+    expect(
+      screen.getByTestId('chat-empty-state-welcome').parentElement
+    ).toHaveAttribute('data-grid-anchor', 'desktop-content');
+    expect(
+      screen.getByTestId('chat-empty-state-welcome').parentElement
+    ).toHaveAttribute('data-top-spacing-owner', 'none');
   });
 });

@@ -93,12 +93,12 @@ export function AudienceTableHeader({
   return (
     <thead
       className={cn(
-        'sticky top-0 z-20 bg-(--linear-app-content-surface) shadow-inset-divider',
+        'sticky top-0 z-20 bg-(--app-shell-content-surface) shadow-inset-divider',
         headerElevated && 'shadow-inset-divider'
       )}
     >
       <tr className='text-app font-caption tracking-normal text-secondary-token'>
-        <th className='w-14 border-b border-subtle px-4 py-2.5 text-left'>
+        <th className='w-14 border-b border-subtle px-4 py-2.5 text-left whitespace-nowrap'>
           <Checkbox
             aria-label='Select All'
             checked={headerCheckboxState}
@@ -117,7 +117,7 @@ export function AudienceTableHeader({
             <th
               key={column.key}
               className={cn(
-                'border-b border-subtle px-4 py-2.5',
+                'border-b border-subtle px-4 py-2.5 whitespace-nowrap',
                 columnAlign === 'right' ? 'text-right' : 'text-left'
               )}
             >

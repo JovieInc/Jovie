@@ -31,7 +31,7 @@ const PANEL_CONTENT_PADDING_CLASSNAME = {
   none: '',
   compact: 'px-3 py-3 sm:px-3.5 sm:py-3.5',
   default:
-    'px-(--linear-app-content-padding-x) py-(--linear-app-content-padding-y)',
+    'px-(--app-shell-content-padding-x) py-(--app-shell-content-padding-y)',
 } as const;
 
 export function AppShellContentPanel({

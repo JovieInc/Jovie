@@ -3,6 +3,7 @@ import userEvent from '@testing-library/user-event';
 import type { HTMLAttributes, ReactNode, SVGProps } from 'react';
 import { describe, expect, it, vi } from 'vitest';
 import { FridayRhythmSection } from '@/components/marketing/friday-rhythm-section';
+import { PUBLIC_WAITLIST_URL } from '@/data/homepageFrontDoorCta';
 
 vi.mock('motion/react', () => ({
   motion: {
@@ -39,6 +40,11 @@ describe('FridayRhythmSection', () => {
     expect(
       screen.getAllByRole('heading', { name: 'Make Every Friday Count' })
     ).toHaveLength(2);
+    for (const heading of screen.getAllByRole('heading', {
+      name: 'Make Every Friday Count',
+    })) {
+      expect(heading).toHaveClass('line-clamp-2');
+    }
     expect(
       screen.getAllByRole('img', {
         name: /Jovie rhythm model showing 3 of 52 Fridays active/i,
@@ -48,8 +54,9 @@ describe('FridayRhythmSection', () => {
       name: 'Build Your Release Rhythm',
     });
     expect(rhythmCta).toHaveAttribute('href');
-    // Front-door CTA uses the shared homepage start path (no starter_prompt).
-    expect(rhythmCta.getAttribute('href')).toMatch(/^\/start(\?|$)/);
+    // Front-door CTA lands on the founder-locked public waitlist (splash-B
+    // waitlist-first handoff), not the in-app /start path.
+    expect(rhythmCta.getAttribute('href')).toBe(PUBLIC_WAITLIST_URL);
     expect(screen.queryByText('Less')).not.toBeInTheDocument();
     expect(screen.queryByText('More')).not.toBeInTheDocument();
   });

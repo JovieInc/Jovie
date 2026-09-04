@@ -114,20 +114,27 @@ function calculateFinancialStatus(
   stripeMetrics: Awaited<ReturnType<typeof getAdminStripeOverviewMetrics>>,
   mercuryMetrics: Awaited<ReturnType<typeof getAdminMercuryMetrics>>
 ): FinancialStatus {
-  const canCalculate = stripeMetrics.isAvailable && mercuryMetrics.isAvailable;
+  const canCalculate =
+    stripeMetrics.isAvailable &&
+    mercuryMetrics.isAvailable &&
+    mercuryMetrics.burnRateAvailable === true;
 
   if (!canCalculate) {
+    const mercuryStatus =
+      mercuryMetrics.isAvailable && mercuryMetrics.burnRateAvailable === false
+        ? 'Mercury transactions (degraded)'
+        : getServiceStatus(
+            'Mercury',
+            mercuryMetrics.isConfigured,
+            mercuryMetrics.isAvailable
+          );
     const missingServices = [
       getServiceStatus(
         'Stripe',
         stripeMetrics.isConfigured,
         stripeMetrics.isAvailable
       ),
-      getServiceStatus(
-        'Mercury',
-        mercuryMetrics.isConfigured,
-        mercuryMetrics.isAvailable
-      ),
+      mercuryStatus,
     ].filter((s): s is string => s !== null);
 
     return {
@@ -197,6 +204,7 @@ export function buildDegradedHudMetrics(
     balanceUsd: 0,
     burnRateUsd: 0,
     burnWindowDays: 30,
+    burnRateAvailable: false,
     isConfigured: true,
     isAvailable: false,
     defaultStatus: 'unknown' as const,
@@ -329,7 +337,7 @@ export function buildDegradedHudMetrics(
 }
 
 async function fetchHudMetrics(mode: HudAccessMode): Promise<HudMetrics> {
-  const generatedAt = new Date();
+  const requestedAt = new Date();
 
   const branding = {
     startupName: env.HUD_STARTUP_NAME ?? 'Jovie',
@@ -351,15 +359,22 @@ async function fetchHudMetrics(mode: HudAccessMode): Promise<HudMetrics> {
     getAdminSentryMetrics(),
     checkDbHealth(),
     getHudDeployments(),
-    getHudAiOpsSummary(generatedAt),
+    getHudAiOpsSummary(requestedAt),
   ]);
+
+  // Stamp the payload after every producer resolves. Provider observations are
+  // allowed to be newer than request start, but never newer than the aggregate
+  // response that presents them.
+  const generatedAt = new Date();
 
   const financialStatus = calculateFinancialStatus(
     stripeMetrics,
     mercuryMetrics
   );
   const financialDataAvailable =
-    stripeMetrics.isAvailable && mercuryMetrics.isAvailable;
+    stripeMetrics.isAvailable &&
+    mercuryMetrics.isAvailable &&
+    mercuryMetrics.burnRateAvailable === true;
 
   const operationsStatus: HudMetrics['operations'] = {
     status: dbHealth.healthy ? 'ok' : 'degraded',

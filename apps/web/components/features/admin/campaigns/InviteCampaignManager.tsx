@@ -1,5 +1,7 @@
 'use client';
 
+// @coverage-via apps/web/tests/unit/app/campaign-admin-table-normalization.test.ts
+
 import {
   AlertDialog,
   AlertDialogAction,
@@ -101,12 +103,12 @@ function CampaignSection({
         title={title}
         subtitle={subtitle}
         actions={actions}
-        className='min-h-0 px-(--linear-app-header-padding-x) py-3'
+        className='min-h-0 px-(--app-shell-header-padding-x) py-3'
         actionsClassName='w-auto shrink-0'
       />
       <div
         className={cn(
-          'space-y-4 px-(--linear-app-content-padding-x) py-(--linear-app-content-padding-y)',
+          'space-y-4 px-(--app-shell-content-padding-x) py-(--app-shell-content-padding-y)',
           bodyClassName
         )}
       >
@@ -465,31 +467,29 @@ export function InviteCampaignManager({
         subtitle='Invite-to-claim performance across recent sends'
       >
         <div className='grid gap-3 md:grid-cols-4'>
-          {/* eslint-disable @jovie/canonical-ui-label-casing -- Pre-existing metric labels; copy changes are out of JOV-4869 scope. */}
           <CampaignMetric
-            label='Invites sent'
+            label='Invites Sent'
             value={campaignOverview?.invites.sent ?? 0}
             subtitle='Total delivered'
           />
           <CampaignMetric
-            label='Unique click-throughs'
+            label='Unique Click-throughs'
             value={campaignOverview?.engagement.uniqueClicks ?? 0}
             subtitle='Visitors who engaged'
             valueClassName='text-info'
           />
           <CampaignMetric
-            label='Profiles claimed'
+            label='Profiles Claimed'
             value={campaignOverview?.conversion.profilesClaimed ?? 0}
             subtitle='Successful conversions'
             valueClassName='text-success'
           />
           <CampaignMetric
-            label='Claim conversion rate'
+            label='Claim Conversion Rate'
             value={`${(campaignOverview?.conversion.claimRate ?? 0).toFixed(1)}%`}
             subtitle='Invite to claim'
             valueClassName='text-accent'
           />
-          {/* eslint-enable @jovie/canonical-ui-label-casing */}
         </div>
       </CampaignSection>
 
@@ -553,25 +553,23 @@ export function InviteCampaignManager({
           <div className='space-y-4'>
             {/* Stats */}
             <div className='grid gap-3 md:grid-cols-3'>
-              {/* eslint-disable @jovie/canonical-ui-label-casing -- Pre-existing metric labels; copy changes are out of JOV-4869 scope. */}
               <CampaignMetric
-                label='Total eligible'
+                label='Total Eligible'
                 value={preview.totalEligible}
                 subtitle={`Score >= ${preview.threshold}`}
               />
               <CampaignMetric
-                label='With contact email'
+                label='With Contact Email'
                 value={preview.sample.withEmails}
                 subtitle='Ready to send'
                 valueClassName='text-success'
               />
               <CampaignMetric
-                label='Missing email'
+                label='Missing Email'
                 value={preview.sample.withoutEmails}
                 subtitle='Needs enrichment first'
                 valueClassName='text-warning'
               />
-              {/* eslint-enable @jovie/canonical-ui-label-casing */}
             </div>
 
             {/* Sample Profiles */}

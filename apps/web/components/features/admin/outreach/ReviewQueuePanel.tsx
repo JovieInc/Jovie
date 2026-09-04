@@ -1,5 +1,7 @@
 'use client';
 
+// @coverage-via apps/web/tests/unit/app/outreach-admin-table-normalization.test.ts
+
 import { Badge, Spinner as LoadingSpinner } from '@jovie/ui';
 import {
   type CellContext,
@@ -111,8 +113,7 @@ function createReviewQueueColumns(
       size: 92,
     }) as ColumnDef<ReviewLead, unknown>,
     reviewQueueColumnHelper.accessor('fitScore', {
-      // eslint-disable-next-line @jovie/canonical-ui-label-casing -- Pre-existing column header; copy change is out of JOV-4869 scope.
-      header: 'Fit score',
+      header: 'Fit Score',
       cell: ({ getValue }) => (
         <span className='tabular-nums'>{getValue() ?? '-'}</span>
       ),
@@ -262,7 +263,7 @@ export function ReviewQueuePanel() {
               {total} queued
             </span>
           }
-          className='min-h-0 px-(--linear-app-header-padding-x) py-3'
+          className='min-h-0 px-(--app-shell-header-padding-x) py-3'
           actionsClassName='shrink-0'
         />
 
@@ -284,7 +285,7 @@ export function ReviewQueuePanel() {
         />
 
         {totalPages > 1 && (
-          <div className='border-t border-subtle px-(--linear-app-content-padding-x) py-2'>
+          <div className='border-t border-subtle px-(--app-shell-content-padding-x) py-2'>
             <AdminTablePagination
               page={page}
               totalPages={totalPages}

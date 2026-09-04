@@ -1,15 +1,21 @@
 name: Auto-Fix Lint on Agent Drafts
+# controller-hop-exception: jovie-controller-hop/v1
+# accountable-writer: Gem
+# necessary-trust-boundary: Hosted workflow repairs same-repo agent-draft lint after CI completes; no clock loop and no second queue writer.
+# removal-trigger: Remove when agent drafts self-format before push and this repair path is unused.
 
 # When an agent-owned draft PR has a failing Lint/Biome check, this workflow
-# checks out the PR head, runs `pnpm biome check --write .` on changed files,
-# and pushes the mechanical fixes back. If typecheck fails (semantic error),
-# it skips and comments instead.
+# checks out the same-repo PR head, runs `pnpm biome check --write .` on
+# changed files, and pushes the mechanical fixes back. If typecheck fails
+# (semantic error), it skips and comments instead.
 #
-# Only fires on agent branches. Human PRs are left alone.
+# Same-repo agent branches only. Fork heads are never installed. Human PRs
+# are left alone.
 
 on:
-  schedule:
-    - cron: '*/30 * * * *'
+  workflow_run:
+    workflows: ['CI']
+    types: [completed]
   workflow_dispatch:
 
 concurrency:
@@ -23,14 +29,26 @@ permissions:
 
 jobs:
   auto-fix-lint:
+    if: >-
+      github.event_name == 'workflow_dispatch' ||
+      (
+        github.event.workflow_run.event == 'pull_request' &&
+        github.event.workflow_run.conclusion == 'failure' &&
+        github.event.workflow_run.pull_requests[0].number != null
+      )
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          # Policy code only. Never persist credentials into the trusted checkout;
+          # the script authenticates git push with GH_TOKEN for same-repo heads.
+          persist-credentials: false
 
       - name: Auto-fix biome lint on agent drafts
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           REPO: ${{ github.repository }}
+          TARGET_PR_NUMBER: ${{ github.event.workflow_run.pull_requests[0].number }}
           GH_RETRY_ATTEMPTS: 8
           GH_RETRY_MAX_DELAY: 60
         run: bash scripts/auto-fix-lint-agent-drafts.sh

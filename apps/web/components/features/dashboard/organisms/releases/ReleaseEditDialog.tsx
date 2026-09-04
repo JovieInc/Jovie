@@ -81,7 +81,7 @@ export function ReleaseEditDialog({
             {/* Release info header */}
             <DrawerSurfaceCard
               variant='card'
-              className='rounded-lg border border-subtle bg-(--linear-app-content-surface) p-3.5'
+              className='rounded-lg border border-subtle bg-(--app-shell-content-surface) p-3.5'
             >
               <EntityHeaderCard
                 image={
@@ -127,7 +127,7 @@ export function ReleaseEditDialog({
                   <DrawerSurfaceCard
                     key={`${release.id}-${provider.key}`}
                     variant='card'
-                    className='rounded-lg border border-subtle bg-(--linear-app-content-surface) p-2.5'
+                    className='rounded-lg border border-subtle bg-(--app-shell-content-surface) p-2.5'
                   >
                     <div className='flex items-center justify-between gap-2'>
                       <div className='flex items-center gap-2'>

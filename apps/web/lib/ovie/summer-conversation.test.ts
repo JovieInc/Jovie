@@ -1,8 +1,10 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import {
   DurableOperatingStore,
+  FailoverOperatingStore,
   memoryRecordBackend,
 } from '@/lib/ovie/mcp/store';
+import { OvieProgramError } from '@/lib/ovie/program';
 import {
   claimOvieSummerTurn,
   completeOvieSummerTurn,
@@ -13,9 +15,14 @@ import {
   respondToOvieSummerAction,
   respondToOvieSummerPending,
 } from '@/lib/ovie/summer-http';
-import { createCurrentSummerQueueSpeaker } from '@/lib/ovie/summer-queue-speaker';
+import {
+  bindCurrentSummerQueueSpeaker,
+  createCurrentSummerQueueSpeaker,
+} from '@/lib/ovie/summer-queue-speaker';
 import { loadCurrentSummerSession } from '@/lib/ovie/summer-session';
 import {
+  bindCurrentSummerSpeaker,
+  getBoundSummerSpeaker,
   resetSummerTransportRuntime,
   runOvieSummerTurn,
 } from '@/lib/ovie/summer-transport';
@@ -33,7 +40,7 @@ describe('Ovie Summer conversation handoff', () => {
 
   it('binds Eve work, recovers expired claims, and streams fenced Mac completion', async () => {
     const store = new DurableOperatingStore(memoryRecordBackend());
-    await enqueueOvieSummerTurn(store, {
+    const first = await enqueueOvieSummerTurn(store, {
       id: 'turn_live',
       userText: 'What should we ship first?',
       receipts: [
@@ -48,6 +55,12 @@ describe('Ovie Summer conversation handoff', () => {
         },
       ],
     });
+    await expect(
+      enqueueOvieSummerTurn(store, {
+        id: 'turn_live',
+        userText: 'What should we ship first?',
+      })
+    ).resolves.toEqual(first);
     await expect(
       enqueueOvieSummerTurn(store, { id: 'turn_live', userText: 'Different' })
     ).rejects.toBeInstanceOf(OvieSummerTurnError);
@@ -250,5 +263,123 @@ describe('Ovie Summer conversation handoff', () => {
     expect(session?.turns).toHaveLength(1);
     expect(session?.turns[0]?.eveWorkId).toBe('ini_work_resume');
     expect(session?.identity.memoryNamespace).toBe('summer');
+  });
+
+  it('fails a fenced Mac claim and refuses a stale token', async () => {
+    const store = new DurableOperatingStore(memoryRecordBackend());
+    await enqueueOvieSummerTurn(store, {
+      id: 'turn_fail',
+      userText: 'Fail this founder turn.',
+    });
+    const claim = await respondToOvieSummerAction({
+      principal: founder,
+      store,
+      body: { action: 'claim', id: 'turn_fail', worker_id: 'summer-mac' },
+    });
+    const token = ((await claim.json()) as { turn: { claim_token: string } })
+      .turn.claim_token;
+    expect(
+      (
+        await respondToOvieSummerAction({
+          principal: founder,
+          store,
+          body: {
+            action: 'fail',
+            id: 'turn_fail',
+            claim_token: 'stale-claim',
+            failure_code: 'summer-runtime-exit-1',
+          },
+        })
+      ).status
+    ).toBe(409);
+    const failed = await respondToOvieSummerAction({
+      principal: founder,
+      store,
+      body: {
+        action: 'fail',
+        id: 'turn_fail',
+        claim_token: token,
+        failure_code: 'summer-runtime-exit-1',
+      },
+    });
+    expect(failed.status).toBe(200);
+    await expect(store.getSummerTurn('turn_fail')).resolves.toMatchObject({
+      state: 'failed',
+      failureCode: 'summer-runtime-exit-1',
+    });
+  });
+
+  it('binds one queue speaker and refuses a competing fallback', () => {
+    const store = new DurableOperatingStore(memoryRecordBackend());
+    const bound = bindCurrentSummerQueueSpeaker(store);
+    expect(bound).toMatchObject({ id: 'summer', runtime: 'mac' });
+    expect(getBoundSummerSpeaker()).toBe(bound);
+    expect(bindCurrentSummerQueueSpeaker(store)).toBe(bound);
+    expect(() =>
+      bindCurrentSummerSpeaker({
+        id: 'mock' as unknown as 'summer',
+        runtime: 'mac',
+        async *speak() {},
+      })
+    ).toThrow(OvieProgramError);
+    expect(getBoundSummerSpeaker()).toBe(bound);
+  });
+
+  it('marks failures after durable enqueue as unknown and retryable', async () => {
+    const store = new DurableOperatingStore(memoryRecordBackend());
+    let getCalls = 0;
+    const unstableStore = new Proxy(store, {
+      get(target, property) {
+        if (property === 'getSummerTurn') {
+          return async (id: string) => {
+            getCalls += 1;
+            if (getCalls > 1) throw new Error('poll backend unavailable');
+            return target.getSummerTurn(id);
+          };
+        }
+        const value = Reflect.get(target, property);
+        return typeof value === 'function' ? value.bind(target) : value;
+      },
+    });
+    const speaker = createCurrentSummerQueueSpeaker(unstableStore);
+    const events: Array<{ type: string; state?: string }> = [];
+
+    for await (const event of speaker.speak({
+      userText: 'Queue once',
+      clientTurnId: 'unknown-after-enqueue',
+      history: [],
+    })) {
+      events.push(event);
+    }
+
+    expect(events).toContainEqual({ type: 'error', state: 'unknown' });
+    expect(await store.listSummerTurns()).toHaveLength(1);
+  });
+
+  it('does not report failure after the durable enqueue survives a cache write error', async () => {
+    const fallback = new DurableOperatingStore(memoryRecordBackend());
+    const primary = new DurableOperatingStore(memoryRecordBackend());
+    const originalPut = primary.putSummerTurn.bind(primary);
+    primary.putSummerTurn = async record => {
+      await originalPut(record);
+      throw new Error('cache acknowledgement failed');
+    };
+    const store = new FailoverOperatingStore({
+      primary,
+      fallback,
+      isPrimaryFailure: () => false,
+    });
+    const events: Array<{ type: string; state?: string }> = [];
+
+    for await (const event of createCurrentSummerQueueSpeaker(store).speak({
+      userText: 'Persist before cache failure',
+      clientTurnId: 'durable-before-cache-error',
+      history: [],
+    })) {
+      events.push(event);
+    }
+
+    expect(events).toContainEqual({ type: 'error', state: 'unknown' });
+    await expect(store.listSummerTurns()).resolves.toHaveLength(1);
   });
 });

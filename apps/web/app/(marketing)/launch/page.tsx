@@ -19,7 +19,7 @@ import {
 import type { Metadata } from 'next';
 import Link from 'next/link';
 import { MarketingContainer, MarketingPageShell } from '@/components/marketing';
-import { APP_NAME, BASE_URL } from '@/constants/app';
+import { APP_NAME, BASE_URL, LEGAL_ENTITY_NAME } from '@/constants/app';
 import { APP_ROUTES } from '@/constants/routes';
 import { AiDemo } from '@/features/home/AiDemo';
 import { AuthRedirectHandler } from '@/features/home/AuthRedirectHandler';
@@ -31,6 +31,7 @@ import {
   buildWebsiteSchema,
 } from '@/lib/constants/schemas';
 import { publicEnv } from '@/lib/env-public';
+import { cn } from '@/lib/utils';
 
 // Marketing pages must remain fully static.
 export const revalidate = false;
@@ -108,8 +109,6 @@ export async function generateMetadata(): Promise<Metadata> {
           height: 630,
         },
       ],
-      creator: '@jovie',
-      site: '@jovie',
     },
     robots: {
       index: true,
@@ -147,10 +146,9 @@ const SOFTWARE_SCHEMA = buildSoftwareSchema(
 );
 
 const ORGANIZATION_SCHEMA = buildOrganizationSchema({
-  legalName: 'Jovie Inc',
+  legalName: LEGAL_ENTITY_NAME,
   description:
     'An AI-powered operating system for indie artists — smart links, link-in-bio, fan notifications, and AI assistant in one platform.',
-  sameAs: ['https://twitter.com/jovie', 'https://instagram.com/jovie'],
 });
 
 const PLATFORM_LOGOS = [
@@ -412,7 +410,10 @@ function SectionIntro({
   return (
     <div className='system-b-launch-section-intro'>
       <p className='system-b-launch-kicker'>{eyebrow}</p>
-      <h2 id={headingId} className='system-b-launch-section-title'>
+      <h2
+        id={headingId}
+        className={cn('system-b-launch-section-title', 'line-clamp-2')}
+      >
         {title}
       </h2>
       <p className='system-b-launch-section-copy'>{body}</p>
@@ -452,7 +453,10 @@ export default function LaunchPage() {
             <div className='system-b-launch-hero-grid'>
               <div className='system-b-launch-hero-copy'>
                 <p className='system-b-launch-kicker'>Launch</p>
-                <h1 id='hero-heading' className='system-b-launch-hero-title'>
+                <h1
+                  id='hero-heading'
+                  className={cn('system-b-launch-hero-title', 'line-clamp-2')}
+                >
                   {/* ui-casing-allow: marketing display headline */}
                   Your entire music career. One intelligent link.
                 </h1>
@@ -509,7 +513,10 @@ export default function LaunchPage() {
         >
           <MarketingContainer width='page'>
             <div className='system-b-launch-thesis'>
-              <h2 id='thesis-heading' className='system-b-launch-thesis-title'>
+              <h2
+                id='thesis-heading'
+                className={cn('system-b-launch-thesis-title', 'line-clamp-2')}
+              >
                 {/* ui-casing-allow: marketing display headline */}
                 Paste one Spotify link. Get smart links, fan notifications, and
                 a link-in-bio that converts in seconds.
@@ -755,7 +762,11 @@ export default function LaunchPage() {
                             'Source',
                             'Last action',
                           ].map(heading => (
-                            <th key={heading} scope='col'>
+                            <th
+                              key={heading}
+                              scope='col'
+                              className='line-clamp-1'
+                            >
                               {heading}
                             </th>
                           ))}
@@ -844,7 +855,7 @@ export default function LaunchPage() {
           className='system-b-launch-final'
         >
           <MarketingContainer width='page'>
-            <h2 id='cta-heading'>
+            <h2 id='cta-heading' className='line-clamp-2'>
               {/* ui-casing-allow: marketing display headline */}
               Your music deserves better than a stack of links.
             </h2>

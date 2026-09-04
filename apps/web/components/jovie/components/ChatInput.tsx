@@ -1,5 +1,8 @@
 'use client';
 
+// @coverage-via apps/web/tests/unit/chat/ChatInput.test.tsx
+
+import { Button } from '@jovie/ui';
 import { motion, useReducedMotion } from 'motion/react';
 import {
   forwardRef,
@@ -19,13 +22,15 @@ import {
   shouldChunkLargePaste,
 } from '@/lib/chat/large-text-paste';
 import { serializeEntity, serializeSkill } from '@/lib/chat/tokens';
-import type { TranscriberErrorCode } from '@/lib/chat/transcriber';
+import {
+  joinDictationText,
+  type TranscriberErrorCode,
+} from '@/lib/chat/transcriber';
 import { SYSTEM_B_RADIUS_PX } from '@/lib/design/system-b-radius';
 import { useEntityRecents } from '@/lib/queries/useEntityRecents';
 import { cn } from '@/lib/utils';
 
 import {
-  CHAT_COMPOSER_EMPTY_PLACEHOLDER,
   CHAT_COMPOSER_FORM_ARIA_LABEL,
   CHAT_COMPOSER_INPUT_ARIA_LABEL,
 } from '../chat-composer-copy';
@@ -158,9 +163,11 @@ function pickerKindArticle(
 function dictationErrorMessage(code: TranscriberErrorCode): string {
   switch (code) {
     case 'not-allowed':
-    case 'service-not-allowed':
     case 'audio-capture':
       return 'Microphone access was denied. You can keep typing your message.';
+    case 'service-not-allowed':
+      // Safari surfaces this when Siri & Dictation is off system-wide.
+      return 'Dictation is turned off for this browser. Enable it in system settings, or keep typing.';
     case 'no-speech':
       return "Didn't catch speech — try again or keep typing.";
     case 'network':
@@ -170,16 +177,28 @@ function dictationErrorMessage(code: TranscriberErrorCode): string {
   }
 }
 
+// Canonical ghost Button (raw-button ratchet); text-2xs keeps the banner quiet.
+const DICTATION_BANNER_BUTTON_CLASS =
+  'h-auto shrink-0 px-2 py-1 text-2xs text-primary-token';
+
 function DictationStatusBanner({
   isListening,
   error,
+  hint,
   onDismissError,
+  onDismissHint,
+  onCancel,
 }: {
   readonly isListening: boolean;
   readonly error: TranscriberErrorCode | null;
+  /** System-dictation guidance shown after tapping an unavailable mic. */
+  readonly hint: string | null;
   readonly onDismissError: () => void;
+  readonly onDismissHint: () => void;
+  /** Abort the live session and restore the pre-dictation draft. */
+  readonly onCancel: () => void;
 }) {
-  if (!isListening && !error) return null;
+  if (!isListening && !error && !hint) return null;
 
   if (error) {
     return (
@@ -188,13 +207,35 @@ function DictationStatusBanner({
         className='flex items-center justify-between gap-3 px-3 py-2 text-xs text-tertiary-token'
       >
         <span>{dictationErrorMessage(error)}</span>
-        <button
+        <Button
           type='button'
+          variant='ghost'
+          size='sm'
           onClick={onDismissError}
-          className='shrink-0 rounded-md px-2 py-1 text-2xs text-primary-token hover:bg-surface-1/60'
+          className={DICTATION_BANNER_BUTTON_CLASS}
         >
           Dismiss
-        </button>
+        </Button>
+      </div>
+    );
+  }
+
+  if (!isListening && hint) {
+    return (
+      <div
+        role='status'
+        className='flex items-center justify-between gap-3 px-3 py-2 text-xs text-tertiary-token'
+      >
+        <span>{hint}</span>
+        <Button
+          type='button'
+          variant='ghost'
+          size='sm'
+          onClick={onDismissHint}
+          className={DICTATION_BANNER_BUTTON_CLASS}
+        >
+          Dismiss
+        </Button>
       </div>
     );
   }
@@ -206,12 +247,22 @@ function DictationStatusBanner({
       className='flex items-center gap-3 px-3 py-2'
     >
       <DictationWaveform active bars={16} className='h-6 w-28' />
-      <div className='min-w-0'>
+      <div className='min-w-0 flex-1'>
         <div className='text-xs font-medium text-primary-token'>Listening</div>
         <div className='text-2xs text-tertiary-token'>
-          Speak now — release the mic when finished
+          Speak now — release or tap the mic to finish
         </div>
       </div>
+      <Button
+        type='button'
+        variant='ghost'
+        size='sm'
+        onClick={onCancel}
+        className={DICTATION_BANNER_BUTTON_CLASS}
+        aria-label='Cancel dictation'
+      >
+        Cancel
+      </Button>
     </div>
   );
 }
@@ -225,7 +276,7 @@ export const ChatInput = forwardRef<HTMLTextAreaElement, ChatInputProps>(
       onInterruptAndSend,
       isLoading,
       isSubmitting,
-      placeholder = CHAT_COMPOSER_EMPTY_PLACEHOLDER,
+      placeholder = '',
       variant = 'default',
       onFileAttach,
       onAudioAttach,
@@ -307,6 +358,12 @@ export const ChatInput = forwardRef<HTMLTextAreaElement, ChatInputProps>(
       latestValueRef.current = value;
     }, [value]);
 
+    const scheduleTextareaRefocus = useCallback(() => {
+      globalThis.setTimeout(() => {
+        internalTextareaRef.current?.focus();
+      }, 0);
+    }, []);
+
     useEffect(() => {
       const textarea = internalTextareaRef.current;
       if (!textarea) return;
@@ -370,7 +427,10 @@ export const ChatInput = forwardRef<HTMLTextAreaElement, ChatInputProps>(
     const handlePickerClose = useCallback(() => {
       onPickerOpenChange?.(false);
       picker.close();
-    }, [onPickerOpenChange, picker]);
+      // Closing the slash picker can reflow the hero row and blur the textarea.
+      // Queue focus after the picker state commit so typing can continue.
+      scheduleTextareaRefocus();
+    }, [onPickerOpenChange, picker, scheduleTextareaRefocus]);
 
     // Slash trigger detection: open root picker when `/` follows a word
     // boundary; switch to entity picker when a skill commit demands it; or
@@ -528,25 +588,47 @@ export const ChatInput = forwardRef<HTMLTextAreaElement, ChatInputProps>(
       isSupported: isDictationSupported,
       isListening,
       error: dictationError,
+      unavailableHint: dictationUnavailableHint,
       clearError: clearDictationError,
       start: startDictation,
       stop: stopDictation,
+      cancel: cancelDictation,
       toggle: toggleDictation,
     } = useSpeechRecognition({
       onTranscript: sessionTranscript => {
-        onChange(dictationBaselineRef.current + sessionTranscript);
+        onChange(
+          joinDictationText(dictationBaselineRef.current, sessionTranscript)
+        );
       },
     });
-
-    const scheduleTextareaRefocus = useCallback(() => {
-      globalThis.setTimeout(() => {
-        internalTextareaRef.current?.focus();
-      }, 0);
-    }, []);
+    const [showDictationHint, setShowDictationHint] = useState(false);
 
     const captureDictationBaseline = useCallback(() => {
       dictationBaselineRef.current = value;
     }, [value]);
+
+    // Abort the live session and put the draft back exactly as it was before
+    // the mic went down. Escape, the banner's Cancel, and pointer-cancel all
+    // land here.
+    const handleMicCancel = useCallback(() => {
+      if (!isListening) return;
+      cancelDictation();
+      onChange(dictationBaselineRef.current);
+    }, [cancelDictation, isListening, onChange]);
+
+    // Sending must seal dictation first: Web Speech keeps streaming after the
+    // draft is cleared, and a late result would re-insert the sent text into
+    // the empty composer. cancel() is a no-op when nothing is active.
+    const sealDictationForSend = useCallback(() => {
+      cancelDictation();
+    }, [cancelDictation]);
+
+    const handleMicUnavailable = useCallback(() => {
+      setShowDictationHint(true);
+    }, []);
+    const dismissDictationHint = useCallback(() => {
+      setShowDictationHint(false);
+    }, []);
 
     const handleMicPushStart = useCallback(() => {
       if (isListening) return;
@@ -572,8 +654,10 @@ export const ChatInput = forwardRef<HTMLTextAreaElement, ChatInputProps>(
         // Empty / blocked drafts must not submit — send is disabled, but native
         // form events and programmatic submits can still reach this handler.
         if (canSend) {
+          sealDictationForSend();
           onSubmit(e);
         } else if (canInterruptAndSend) {
+          sealDictationForSend();
           onInterruptAndSend?.();
         } else {
           return;
@@ -586,13 +670,18 @@ export const ChatInput = forwardRef<HTMLTextAreaElement, ChatInputProps>(
         onInterruptAndSend,
         onSubmit,
         scheduleTextareaRefocus,
+        sealDictationForSend,
       ]
     );
 
     const handleSendClick = useCallback(() => {
-      if (canSend) onSubmit();
-      else if (canInterruptAndSend) onInterruptAndSend?.();
-      else return;
+      if (canSend) {
+        sealDictationForSend();
+        onSubmit();
+      } else if (canInterruptAndSend) {
+        sealDictationForSend();
+        onInterruptAndSend?.();
+      } else return;
       scheduleTextareaRefocus();
     }, [
       canInterruptAndSend,
@@ -600,11 +689,19 @@ export const ChatInput = forwardRef<HTMLTextAreaElement, ChatInputProps>(
       onInterruptAndSend,
       onSubmit,
       scheduleTextareaRefocus,
+      sealDictationForSend,
     ]);
 
     const handleKeyDown = useCallback(
       (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
         if (e.nativeEvent.isComposing) return;
+        // Escape while dictating cancels the session and restores the draft
+        // without dropping focus — the composer stays where the user was.
+        if (e.key === 'Escape' && isListening) {
+          e.preventDefault();
+          handleMicCancel();
+          return;
+        }
         // SlashCommandMenu owns Escape while the picker is open (capture phase).
         if (e.key === 'Escape' && picker.state.status === 'closed') {
           e.preventDefault();
@@ -620,6 +717,7 @@ export const ChatInput = forwardRef<HTMLTextAreaElement, ChatInputProps>(
           (canSend || canInterruptAndSend)
         ) {
           e.preventDefault();
+          sealDictationForSend();
           if (canInterruptAndSend) onInterruptAndSend?.();
           else onSubmit();
           scheduleTextareaRefocus();
@@ -646,6 +744,9 @@ export const ChatInput = forwardRef<HTMLTextAreaElement, ChatInputProps>(
         picker.state,
         scheduleTextareaRefocus,
         setComposerFocused,
+        isListening,
+        handleMicCancel,
+        sealDictationForSend,
       ]
     );
 
@@ -718,23 +819,6 @@ export const ChatInput = forwardRef<HTMLTextAreaElement, ChatInputProps>(
     // Container the slash key listener cares about when the picker is closed.
     // (The active-listener inside SlashCommandMenu only mounts while open.)
 
-    // Refocus textarea when the picker closes so typing can continue.
-    // We track "picker was open last render" to scope the focus restore: the
-    // AttachDropdown (Radix) also restores focus on close, and racing with it
-    // can leave focus on the dropdown trigger. Deferring to a 0ms timeout
-    // lets Radix run first, then we put focus back where it belongs.
-    const wasPickerOpenRef = useRef(isPickerOpen);
-    useEffect(() => {
-      const wasOpen = wasPickerOpenRef.current;
-      wasPickerOpenRef.current = isPickerOpen;
-      if (!isPickerOpen && wasOpen && isFocused) {
-        const handle = setTimeout(() => {
-          internalTextareaRef.current?.focus();
-        }, 0);
-        return () => clearTimeout(handle);
-      }
-    }, [isPickerOpen, isFocused]);
-
     useLayoutEffect(() => {
       onPickerOpenChange?.(picker.state.status !== 'closed');
     }, [picker.state.status, onPickerOpenChange]);
@@ -743,10 +827,21 @@ export const ChatInput = forwardRef<HTMLTextAreaElement, ChatInputProps>(
       <DictationStatusBanner
         isListening={isListening}
         error={dictationError}
+        hint={showDictationHint ? dictationUnavailableHint : null}
         onDismissError={clearDictationError}
+        onDismissHint={dismissDictationHint}
+        onCancel={handleMicCancel}
       />
     );
-    const showDictationBanner = isListening || Boolean(dictationError);
+    const showDictationBanner =
+      isListening ||
+      Boolean(dictationError) ||
+      (showDictationHint && Boolean(dictationUnavailableHint));
+    // The mic slot stays mounted when the desktop can point at system
+    // dictation, so the hint has somewhere to land.
+    const hasDictationAffordance =
+      dictationEnabled &&
+      (isDictationSupported || Boolean(dictationUnavailableHint));
     const inputRowProps = {
       containerRef,
       hiddenDivRef,
@@ -771,7 +866,9 @@ export const ChatInput = forwardRef<HTMLTextAreaElement, ChatInputProps>(
       handlePreserveFocus,
       dictationEnabled,
       isDictationSupported: dictationEnabled && isDictationSupported,
+      dictationUnavailableHint,
       isListening,
+      handleMicUnavailable,
       handleMicPushStart,
       handleMicPushEnd,
       handleMicToggle,
@@ -897,7 +994,7 @@ export const ChatInput = forwardRef<HTMLTextAreaElement, ChatInputProps>(
                   ) : null}
                   {/* Grid accordion reserves height while animating dictation
                       banner in/out — avoids the ~64px jump (JOV-11948). */}
-                  {dictationEnabled && isDictationSupported ? (
+                  {hasDictationAffordance ? (
                     <div
                       className={cn(
                         'grid transition-[grid-template-rows] duration-subtle ease-in-out',
@@ -954,7 +1051,7 @@ export const ChatInput = forwardRef<HTMLTextAreaElement, ChatInputProps>(
 
                 {/* Grid accordion reserves height while animating dictation
                     banner in/out — avoids the ~64px jump (JOV-11948). */}
-                {dictationEnabled && isDictationSupported ? (
+                {hasDictationAffordance ? (
                   <div
                     className={cn(
                       'grid transition-[grid-template-rows] duration-subtle ease-in-out',
@@ -1033,7 +1130,9 @@ interface InputRowProps {
   ) => void;
   readonly dictationEnabled: boolean;
   readonly isDictationSupported: boolean;
+  readonly dictationUnavailableHint: string | null;
   readonly isListening: boolean;
+  readonly handleMicUnavailable: () => void;
   readonly handleMicPushStart: () => void;
   readonly handleMicPushEnd: () => void;
   readonly handleMicToggle: () => void;
@@ -1086,7 +1185,9 @@ function InputRow({
   handlePreserveFocus,
   dictationEnabled,
   isDictationSupported,
+  dictationUnavailableHint,
   isListening,
+  handleMicUnavailable,
   handleMicPushStart,
   handleMicPushEnd,
   handleMicToggle,
@@ -1160,7 +1261,7 @@ function InputRow({
             ref={internalTextareaRef}
             value={value}
             onChange={e => onChange(e.target.value)}
-            placeholder={placeholder}
+            placeholder={placeholder || undefined}
             rows={1}
             animate={reducedMotion ? undefined : { height: measuredHeight }}
             transition={reducedMotion ? undefined : SPRING_HEIGHT}
@@ -1238,10 +1339,12 @@ function InputRow({
               <ComposerMicButton
                 isListening={isListening}
                 isSupported={isDictationSupported}
+                unavailableHint={dictationUnavailableHint}
                 onPreserveFocus={handlePreserveFocus}
                 onPushStart={handleMicPushStart}
                 onPushEnd={handleMicPushEnd}
                 onToggle={handleMicToggle}
+                onUnavailable={handleMicUnavailable}
               />
             ) : null}
 

@@ -99,7 +99,7 @@ Rate limits are dedicated to this skill because one chat tool call generates thr
 
 ## Troubleshooting
 
-If generation fails immediately, verify `XAI_API_KEY` is present in Doppler/dev and that the configured xAI image model supports AI SDK `generateImage`. If candidates render but apply fails, verify `BLOB_READ_WRITE_TOKEN` and that the generated manifest exists under the expected Blob prefix.
+If generation fails immediately, verify `XAI_API_KEY` is present in Doppler/dev and that the configured xAI image model supports AI SDK `generateImage`. If candidates render but apply fails, verify Blob auth (Vercel OIDC via `BLOB_STORE_ID` in deployed envs, or the static `BLOB_READ_WRITE_TOKEN` in local dev) and that the generated manifest exists under the expected Blob prefix.
 
 ## Known Limitations
 

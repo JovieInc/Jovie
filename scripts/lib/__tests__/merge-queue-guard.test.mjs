@@ -25,6 +25,7 @@ import {
   isAutonomousBranch,
   MERGE_QUEUE_ENROLL_HOT_PATH_FORBIDDEN,
   MERGE_QUEUE_REPO_PATHS,
+  mapGraphqlCheckResponseTimeoutToMinutes,
   mergeNativeQueuePolicyObservations,
   NATIVE_BRANCH_PROTECTION_POLICY,
   NATIVE_QUEUE_COHORT_POLICY,
@@ -476,7 +477,7 @@ describe('aggregate required checks', () => {
     expect(visualWorkflowYaml).not.toContain('vars.CI_FAST_RUNNER');
   });
 
-  it('runs FAQ disclosure geometry in the combined layout gate', () => {
+  it('runs required Storybook geometry contracts in the combined layout gate', () => {
     const ciWorkflowYaml = readFileSync(
       resolve(REPO_ROOT, MERGE_QUEUE_REPO_PATHS.ciWorkflow),
       'utf8'
@@ -488,6 +489,9 @@ describe('aggregate required checks', () => {
 
     expect(combinedLayoutBlock).toMatch(
       /tests\/e2e\/storybook-marketing-faq\.spec\.ts/
+    );
+    expect(combinedLayoutBlock).toMatch(
+      /tests\/e2e\/storybook-skeleton\.spec\.ts/
     );
     expect(combinedLayoutBlock).toMatch(
       /--config=playwright\.config\.storybook\.ts/
@@ -688,8 +692,7 @@ describe('merge queue telemetry parser', () => {
   it('records queued duration, evictions, requeues, staleness, and speculative reruns', () => {
     const metrics = parseMergeQueueTimeline([
       {
-        event: 'labeled',
-        label: { name: 'merge-queue' },
+        event: 'added_to_merge_queue',
         created_at: '2026-06-20T01:00:00Z',
       },
       {
@@ -703,19 +706,17 @@ describe('merge queue telemetry parser', () => {
         created_at: '2026-06-20T01:30:00Z',
       },
       {
-        event: 'unlabeled',
-        label: { name: 'merge-queue' },
-        actor: { login: 'graphite-app[bot]' },
+        event: 'removed_from_merge_queue',
+        actor: { login: 'jovie-bot[bot]' },
         created_at: '2026-06-20T01:31:00Z',
       },
       {
-        event: 'labeled',
-        label: { name: 'merge-queue' },
+        event: 'added_to_merge_queue',
         created_at: '2026-06-20T02:00:00Z',
       },
       {
         event: 'commented',
-        body: 'CI failed after Graphite speculative rerun',
+        body: 'CI failed after native speculative rerun',
         created_at: '2026-06-20T02:10:00Z',
       },
       {
@@ -739,8 +740,7 @@ describe('merge queue telemetry parser', () => {
         created_at: '2026-06-20T01:00:00Z',
       },
       {
-        event: 'labeled',
-        label: { name: 'merge-queue' },
+        event: 'added_to_merge_queue',
         created_at: '2026-06-20T01:05:00Z',
       },
       {
@@ -1742,14 +1742,7 @@ describe('remediation mutations', () => {
       123,
       'needs-conflict-resolution'
     );
-    expect(labelPrImpl).toHaveBeenCalledWith(
-      'JovieInc/Jovie',
-      123,
-      'merge-queue'
-    );
-    expect(removeLabelPrImpl.mock.invocationCallOrder[0]).toBeLessThan(
-      labelPrImpl.mock.invocationCallOrder[0]
-    );
+    expect(labelPrImpl).not.toHaveBeenCalled();
     expect(commentPrImpl).toHaveBeenCalledOnce();
   });
 });
@@ -1841,6 +1834,141 @@ describe('merge-group front-item churn guard (JOV-5030)', () => {
     expect(decision.action).toBe('allow');
   });
 
+  it('blocks when drain evidence only annotates the latest repeated unit-test failure', () => {
+    // Live #16238: drain attached failedSteps to the latest merge_group run
+    // only. Each ejection retried on a new main SHA, so the unclassified
+    // sibling attempt kept re-entering the queue.
+    const decision = frontItemChurnDecision({
+      prNumber: 16238,
+      currentBaseSha: NEW_BASE,
+      headCommittedAt: '2026-08-20T00:00:00.000Z',
+      observedAt: '2026-08-20T03:30:00.000Z',
+      mergeGroupRuns: [
+        groupRun(
+          16238,
+          BASE,
+          'failure',
+          '2026-08-20T02:41:31.000Z',
+          'completed'
+        ),
+        groupRun(
+          16238,
+          NEW_BASE,
+          'failure',
+          '2026-08-20T03:21:50.000Z',
+          'completed',
+          ['Run unit tests']
+        ),
+      ],
+    });
+    expect(decision.action).toBe('block');
+    expect(decision.reason).toContain('unchanged head');
+    expect(decision.evidence.failureClass).toBe('repeated-product-check');
+    expect(decision.evidence.failedAttempts).toBe(2);
+  });
+
+  it('suppresses an unchanged iOS source head after repeated build failures', () => {
+    // Live #16441 failed the iOS `Build and test` step four times without a
+    // source commit. Each queue rebuild changed the synthetic group base, so
+    // treating the step as unclassified admitted the same broken head again.
+    const decision = frontItemChurnDecision({
+      prNumber: 16441,
+      currentBaseSha: BASE,
+      headCommittedAt: '2026-08-23T00:00:00.000Z',
+      observedAt: '2026-08-28T13:21:30.000Z',
+      mergeGroupRuns: [
+        groupRun(
+          16441,
+          NEW_BASE,
+          'failure',
+          '2026-08-28T13:01:50.000Z',
+          'completed',
+          ['Build and test']
+        ),
+        groupRun(
+          16441,
+          BASE,
+          'failure',
+          '2026-08-28T13:10:32.000Z',
+          'completed',
+          ['Build and test']
+        ),
+      ],
+    });
+    expect(decision.action).toBe('block');
+    expect(decision.reason).toContain('unchanged head');
+    expect(decision.evidence.failureClass).toBe('repeated-product-check');
+    expect(decision.evidence.failedAttempts).toBe(2);
+  });
+
+  it('blocks repeated aggregate failures after one run proves the unchanged head fails unit tests', () => {
+    // Reproduced by live #16441 on 2026-08-27: one merge_group run exposed the
+    // unit-test failure while sibling attempts exposed only aggregate failures.
+    // Each ejection retried on a new main SHA, so the unclassified exact-base
+    // path re-enrolled the same head after every product failure.
+    const decision = frontItemChurnDecision({
+      prNumber: 16441,
+      currentBaseSha: NEW_BASE,
+      headCommittedAt: '2026-08-20T00:00:00.000Z',
+      observedAt: '2026-08-20T03:30:00.000Z',
+      mergeGroupRuns: [
+        groupRun(
+          16441,
+          BASE,
+          'failure',
+          '2026-08-20T02:41:31.000Z',
+          'completed',
+          ['Run unit tests']
+        ),
+        groupRun(
+          16441,
+          NEW_BASE,
+          'failure',
+          '2026-08-20T03:21:50.000Z',
+          'completed',
+          ['Build and test', 'Evaluate combined-head checks']
+        ),
+      ],
+    });
+    expect(decision.action).toBe('block');
+    expect(decision.reason).toContain('unchanged head');
+    expect(decision.evidence.failureClass).toBe('repeated-product-check');
+    expect(decision.evidence.failedAttempts).toBe(2);
+  });
+
+  it('annotates recent failed merge-group fronts, not only the latest run', () => {
+    const drain = readFileSync(
+      resolve(REPO_ROOT, 'scripts/drain-pr-queue.sh'),
+      'utf8'
+    );
+    expect(drain).toContain('sort_by(.createdAt) | reverse | .[0:8][]? | .id');
+    expect(drain).not.toContain(
+      'sort_by(.createdAt) | reverse | .[0].id // empty'
+    );
+    expect(drain).toContain('runs?event=merge_group&per_page=100');
+    expect(drain).toContain(
+      'PRODUCT_FAILURE_CONTEXT="jovie-queue-product-failure/v1"'
+    );
+    expect(drain).toContain('null_creator_receipt_has_provenance');
+    expect(drain).toContain('receipt_actor_is_trusted');
+    expect(drain).not.toContain('fleet_hold_null_creator_has_provenance');
+    expect(drain).toContain('block-product');
+    expect(drain).toContain('block-transient');
+  });
+
+  it('normalizes GitHub REST run fields before matching failed fronts', () => {
+    const drain = readFileSync(
+      resolve(REPO_ROOT, 'scripts/drain-pr-queue.sh'),
+      'utf8'
+    );
+    expect(drain).toContain(
+      '{id, headBranch: .head_branch, status, conclusion, headSha: .head_sha, createdAt: .created_at, updatedAt: .updated_at}'
+    );
+    expect(drain).not.toContain(
+      '{id, headBranch, status, conclusion, headSha, createdAt, updatedAt}'
+    );
+  });
+
   it('clears an earlier failure when the latest unchanged-head attempt succeeds', () => {
     const decision = frontItemChurnDecision({
       prNumber: 15849,
@@ -1861,6 +1989,88 @@ describe('merge-group front-item churn guard (JOV-5030)', () => {
     });
     expect(decision.action).toBe('allow');
     expect(decision.reason).toContain('succeeded');
+  });
+
+  it('keeps a newer in-progress attempt queued instead of replaying stale failures', () => {
+    // Live #17013: a standalone exact-main group started at 11:13:03, the
+    // controller ejected it at 11:15:46 based on older failures, and the same
+    // group completed successfully at 11:21:14. Incomplete newer evidence must
+    // win until GitHub publishes a terminal conclusion.
+    const active = groupRun(
+      17013,
+      BASE,
+      null,
+      '2026-09-02T11:13:03.000Z',
+      'in_progress'
+    );
+    const decision = frontItemChurnDecision({
+      prNumber: 17013,
+      currentBaseSha: BASE,
+      headCommittedAt: '2026-09-02T10:00:00.000Z',
+      observedAt: '2026-09-02T11:15:46.000Z',
+      mergeGroupRuns: [
+        groupRun(
+          17013,
+          NEW_BASE,
+          'failure',
+          '2026-09-02T11:01:00.000Z',
+          'completed',
+          ['Run unit tests']
+        ),
+        active,
+      ],
+    });
+
+    expect(decision.action).toBe('allow');
+    expect(decision.reason).toContain('still active');
+    expect(decision.evidence).toEqual({
+      activeRunId: active.id,
+      activeStartedAt: '2026-09-02T11:13:03.000Z',
+      activeStatus: 'in_progress',
+    });
+  });
+
+  it('does not let an older active attempt hide a newer terminal failure', () => {
+    const decision = frontItemChurnDecision({
+      prNumber: 17013,
+      currentBaseSha: BASE,
+      headCommittedAt: '2026-09-02T10:00:00.000Z',
+      observedAt: '2026-09-02T11:15:46.000Z',
+      mergeGroupRuns: [
+        groupRun(17013, BASE, null, '2026-09-02T11:01:00.000Z', 'in_progress'),
+        groupRun(
+          17013,
+          NEW_BASE,
+          'failure',
+          '2026-09-02T11:13:03.000Z',
+          'completed',
+          ['Run deterministic brand safety scan']
+        ),
+      ],
+    });
+
+    expect(decision.action).toBe('block');
+    expect(decision.evidence.failureClass).toBe('deterministic-product-check');
+  });
+
+  it('protects an active current-head attempt when older failures rolled out of history', () => {
+    const active = groupRun(
+      17013,
+      BASE,
+      null,
+      '2026-09-02T11:13:03.000Z',
+      'in_progress'
+    );
+    const decision = frontItemChurnDecision({
+      prNumber: 17013,
+      currentBaseSha: BASE,
+      headCommittedAt: '2026-09-02T10:00:00.000Z',
+      observedAt: '2026-09-02T11:15:46.000Z',
+      mergeGroupRuns: [active],
+    });
+
+    expect(decision.action).toBe('allow');
+    expect(decision.evidence.activeRunId).toBe(active.id);
   });
 
   it('keeps the failing source head suppressed after elapsed time', () => {
@@ -2033,7 +2243,7 @@ describe('native merge-queue cohort (JOV-5047)', () => {
       deterministicMemberFailure: 'isolate-and-remove',
       transientFailure: 'bounded-retry',
     });
-    expect(NATIVE_QUEUE_POLICY.max_entries_to_build).toBe(3);
+    expect(NATIVE_QUEUE_POLICY.max_entries_to_build).toBe(1);
     expect(NATIVE_QUEUE_POLICY.min_entries_to_merge).toBe(5);
     expect(NATIVE_QUEUE_POLICY.min_entries_to_merge_wait_minutes).toBe(10);
     expect(
@@ -2116,6 +2326,90 @@ describe('native merge-queue cohort (JOV-5047)', () => {
     expect(graphqlReadback.observed.max_entries_to_build).toBe(3);
   });
 
+  it('converts GraphQL checkResponseTimeout seconds onto REST minutes (JOV-5315)', () => {
+    expect(mapGraphqlCheckResponseTimeoutToMinutes(3600)).toBe(60);
+    expect(mapGraphqlCheckResponseTimeoutToMinutes(60)).toBe(1);
+    expect(mapGraphqlCheckResponseTimeoutToMinutes(120)).toBe(2);
+    expect(mapGraphqlCheckResponseTimeoutToMinutes(360)).toBe(6);
+    expect(mapGraphqlCheckResponseTimeoutToMinutes(1800)).toBe(30);
+    expect(
+      normalizeNativeQueuePolicyParameters({ checkResponseTimeout: 3600 })
+    ).toMatchObject({ check_response_timeout_minutes: 60 });
+    expect(
+      normalizeNativeQueuePolicyParameters({ checkResponseTimeout: 120 })
+    ).toMatchObject({ check_response_timeout_minutes: 2 });
+    expect(
+      normalizeNativeQueuePolicyParameters({
+        check_response_timeout_minutes: 60,
+      })
+    ).toMatchObject({ check_response_timeout_minutes: 60 });
+    expect(
+      mergeNativeQueuePolicyObservations(
+        { ...NATIVE_QUEUE_POLICY },
+        { checkResponseTimeout: 3600 }
+      )
+    ).toMatchObject({ check_response_timeout_minutes: 60 });
+    expect(
+      mergeNativeQueuePolicyObservations(
+        { ...NATIVE_QUEUE_POLICY },
+        { checkResponseTimeout: null }
+      )
+    ).toMatchObject({ check_response_timeout_minutes: 20 });
+    const secondsReadback = buildNativeQueuePolicyReadback({
+      ...NATIVE_QUEUE_POLICY,
+      checkResponseTimeout: 1200,
+    });
+    expect(secondsReadback.observed.check_response_timeout_minutes).toBe(20);
+    expect(secondsReadback.drift).not.toContain(
+      'check_response_timeout_minutes'
+    );
+    const liveGraphql = validateLiveMergeQueueRuleset(
+      {
+        bypass_actors: [],
+        rules: [
+          {
+            type: 'required_status_checks',
+            parameters: {
+              strict_required_status_checks_policy: false,
+              required_status_checks: [
+                'PR Ready',
+                'Migration Guard',
+                'Fork PR Gate',
+                'PR Size Guard',
+              ].map(context => ({ context })),
+            },
+          },
+          {
+            type: 'merge_queue',
+            parameters: {
+              ...NATIVE_QUEUE_POLICY,
+              min_entries_to_merge: 1,
+              min_entries_to_merge_wait_minutes: 0,
+            },
+          },
+        ],
+      },
+      {
+        backend: 'native',
+        liveQueueConfiguration: {
+          checkResponseTimeout: 1200,
+          maximumEntriesToBuild: 1,
+          maximumEntriesToMerge: 5,
+          mergeMethod: 'SQUASH',
+          minimumEntriesToMerge: 1,
+          minimumEntriesToMergeWaitTime: 0,
+        },
+      }
+    );
+    expect(NATIVE_QUEUE_COHORT_POLICY.liveRulesetCutover).toBe('pending');
+    expect(liveGraphql.ok).toBe(true);
+    expect(
+      liveGraphql.errors.some(error =>
+        error.includes('check_response_timeout_minutes')
+      )
+    ).toBe(false);
+  });
+
   it('ejects UNMERGEABLE native entries and refuses to re-enqueue the same head', () => {
     const head = 'a'.repeat(40);
     expect(
@@ -2162,7 +2456,7 @@ describe('native merge-queue cohort (JOV-5047)', () => {
     ).toBe('allow');
   });
 
-  it('skips ALLGREEN enrollment when CHANGELOG.md already sits in the queued group', () => {
+  it('skips every pre-land CHANGELOG.md candidate', () => {
     expect(CHANGELOG_COLLISION_PATH).toBe('CHANGELOG.md');
     expect(
       changelogGroupCollisionDecision({
@@ -2170,11 +2464,31 @@ describe('native merge-queue cohort (JOV-5047)', () => {
         queuedMemberFiles: [
           { prNumber: 16352, files: ['CHANGELOG.md', 'docs/x.md'] },
         ],
+        branch: 'fallback/JOV-5378-fix',
       })
     ).toMatchObject({
       action: 'skip',
-      reason: 'changelog-collision',
+      reason: 'pre-land-changelog',
+    });
+    expect(
+      changelogGroupCollisionDecision({
+        candidateFiles: ['CHANGELOG.md'],
+        queuedMemberFiles: [{ prNumber: 16352, files: ['CHANGELOG.md'] }],
+        branch: 'cursor/stamp-26-8-0-version-stamp-ab12',
+      })
+    ).toMatchObject({
+      action: 'skip',
+      reason: 'preland-changelog-prohibited',
       collidingPrs: [16352],
+    });
+    expect(
+      changelogGroupCollisionDecision({
+        candidateFiles: ['CHANGELOG.md'],
+        queuedMemberFiles: [],
+      })
+    ).toMatchObject({
+      action: 'skip',
+      reason: 'pre-land-changelog',
     });
     expect(
       changelogGroupCollisionDecision({
@@ -2185,8 +2499,8 @@ describe('native merge-queue cohort (JOV-5047)', () => {
     expect(
       changelogGroupCollisionDecision({
         candidateFiles: ['CHANGELOG.md'],
-      }).action
-    ).toBe('unknown');
+      })
+    ).toMatchObject({ action: 'skip', reason: 'pre-land-changelog' });
   });
 
   it('skips a superseded Production Controller generation and promotes only exact main', () => {

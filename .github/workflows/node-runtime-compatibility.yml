@@ -1,0 +1,128 @@
+name: Node Runtime Compatibility
+on:
+  schedule:
+    - cron: '47 16 * * 1'
+  workflow_dispatch:
+permissions:
+  actions: read
+  contents: read
+concurrency:
+  group: node-runtime-compatibility
+  cancel-in-progress: true
+jobs:
+  policy:
+    name: Resolve official Node policy
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    outputs:
+      matrix: ${{ steps.resolve.outputs.matrix }}
+      candidate_major: ${{ steps.resolve.outputs.candidate_major }}
+      candidate_status: ${{ steps.resolve.outputs.candidate_status }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version-file: '.nvmrc'
+      - name: Validate checked-in runtime contract
+        run: node scripts/node-runtime-policy.mjs validate
+      - name: Resolve official releases and freshness
+        id: resolve
+        run: node scripts/node-runtime-policy.mjs resolve
+  compatibility:
+    name: Node ${{ matrix.version }} (${{ matrix.ring }})
+    needs: policy
+    runs-on: ubuntu-24.04
+    timeout-minutes: 75
+    continue-on-error: ${{ !matrix.blocking }}
+    strategy:
+      fail-fast: false
+      matrix: ${{ fromJSON(needs.policy.outputs.matrix) }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: pnpm/action-setup@0977fd99725f1db4007ccb2928dbb4e90d06cc86 # v6.0.10
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: ${{ matrix.version }}
+          cache: pnpm
+          cache-dependency-path: pnpm-lock.yaml
+      - name: Install the exact lockfile
+        env:
+          ONNXRUNTIME_NODE_INSTALL: skip
+        run: pnpm install --frozen-lockfile
+      - name: Check declared engines and native dependencies
+        run: node scripts/node-runtime-policy.mjs runtime-smoke
+      - name: Run runtime policy contracts
+        run: >-
+          pnpm --filter @jovie/web exec vitest run
+          tests/unit/ci/node-runtime-contract.test.ts
+          tests/unit/ci/node-runtime-policy.test.ts
+      - name: Run the production web unit suite
+        run: pnpm --filter @jovie/web run test:ci
+      - name: Typecheck the production web workspace
+        run: pnpm --filter @jovie/web run typecheck -- --pretty false
+      - name: Build the production web workspace
+        env:
+          NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY: pk_test_ZHVtbXktdGVzdC1jb3ZlcmFnZS5jbGVyay5hY2NvdW50cy5kZXYk
+          NEXT_IGNORE_ESLINT: '1'
+          NEXT_IGNORE_TYPECHECK: '1'
+          NEXT_PRIVATE_SKIP_SIZE_CHECK: 'true'
+          SKIP_SKILLS_CATALOG_SYNC: '1'
+        run: pnpm --filter @jovie/web run build
+  promotion-readiness:
+    name: Open promotion work after sustained green
+    needs: [policy, compatibility]
+    if: ${{ needs.policy.result == 'success' && needs.compatibility.result == 'success' && github.ref_name == github.event.repository.default_branch }}
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    permissions:
+      actions: read
+      contents: read
+      issues: write
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - name: Evaluate sustained-green promotion trigger
+        id: readiness
+        env:
+          GH_TOKEN: ${{ github.token }}
+          CANDIDATE_MAJOR: ${{ needs.policy.outputs.candidate_major }}
+          CANDIDATE_STATUS: ${{ needs.policy.outputs.candidate_status }}
+        run: |
+          required_runs="$(jq -r '.promotion.minimumConsecutiveGreenRuns' config/node-runtime-policy.json)"
+          required_soak_days="$(jq -r '.promotion.minimumSoakDays' config/node-runtime-policy.json)"
+          prior_needed="$((required_runs - 1))"
+          history="$(gh api "repos/${GITHUB_REPOSITORY}/actions/workflows/node-runtime-compatibility.yml/runs?status=completed&per_page=30")"
+          policy_changed="$(gh api "repos/${GITHUB_REPOSITORY}/commits?path=config/node-runtime-policy.json&per_page=1" --jq '.[0].commit.committer.date')"
+          prior_green="$(jq -c --argjson limit "$prior_needed" --arg branch "${{ github.event.repository.default_branch }}" --arg cutoff "$policy_changed" '[.workflow_runs[] | select(.head_branch == $branch and .created_at >= $cutoff and (.event == "schedule" or .event == "workflow_dispatch"))][:$limit] | if length == $limit and all(.conclusion == "success") then . else [] end' <<<"$history")"
+          prior_count="$(jq 'length' <<<"$prior_green")"
+          oldest_prior="$(jq -r 'if length == 0 then empty else map(.created_at) | min end' <<<"$prior_green")"
+          green_runs="$((prior_count + 1))"
+          soak_days="$(node -e 'const starts=process.argv.slice(1).filter(Boolean).map(Date.parse); console.log(starts.length ? Math.floor((Date.now()-Math.max(...starts))/86400000) : 0)' "$oldest_prior" "$policy_changed")"
+          ready="$(CANDIDATE_MAJOR="$CANDIDATE_MAJOR" CANDIDATE_STATUS="$CANDIDATE_STATUS" GREEN_RUNS="$green_runs" SOAK_DAYS="$soak_days" node scripts/node-runtime-policy.mjs promotion-ready)"
+          {
+            echo "ready=$ready"
+            echo "green_runs=$green_runs"
+            echo "soak_days=$soak_days"
+          } >> "$GITHUB_OUTPUT"
+          {
+            echo "### Node ${CANDIDATE_MAJOR} promotion readiness"
+            echo "- Status: ${CANDIDATE_STATUS}"
+            echo "- Consecutive green runs: ${green_runs}/${required_runs}"
+            echo "- Green soak: ${soak_days}/${required_soak_days} days"
+            echo "- Ready: ${ready}"
+          } >> "$GITHUB_STEP_SUMMARY"
+      - name: Open idempotent promotion issue
+        if: steps.readiness.outputs.ready == 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          CANDIDATE_MAJOR: ${{ needs.policy.outputs.candidate_major }}
+          GREEN_RUNS: ${{ steps.readiness.outputs.green_runs }}
+          SOAK_DAYS: ${{ steps.readiness.outputs.soak_days }}
+        run: |
+          title="Promote production default to Node ${CANDIDATE_MAJOR} LTS"
+          if gh issue list --state open --search "${title} in:title" --json title --jq '.[].title' | grep -Fxq "$title"; then
+            echo "Promotion issue already exists."
+            exit 0
+          fi
+          gh issue create \
+            --title "$title" \
+            --body "The Node runtime compatibility invariant has recorded ${GREEN_RUNS} consecutive green candidate runs across ${SOAK_DAYS} days. Follow docs/engineering/NODE_RUNTIME_LIFECYCLE.md: open a pin-change PR, run preview, promote the exact build, and retain the prior verified deployment for the bounded rollback window."

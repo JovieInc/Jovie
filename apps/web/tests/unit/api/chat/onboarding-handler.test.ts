@@ -17,6 +17,7 @@ const hoisted = vi.hoisted(() => ({
   dbInsertMock: vi.fn(),
   dbUpdateMock: vi.fn(),
   dbSelectRowsMock: vi.fn(),
+  dbOnConflictDoUpdateMock: vi.fn(),
 }));
 
 vi.mock('server-only', () => ({}));
@@ -109,6 +110,8 @@ function installDefaultDbMocks() {
     values: () => ({
       returning: vi.fn().mockResolvedValue([{ id: 'conv_anonymous' }]),
       onConflictDoNothing: vi.fn().mockResolvedValue(undefined),
+      onConflictDoUpdate:
+        hoisted.dbOnConflictDoUpdateMock.mockResolvedValue(undefined),
     }),
   }));
   hoisted.dbUpdateMock.mockImplementation(() => ({
@@ -296,6 +299,49 @@ describe('tryHandleAnonymousOnboardingChat', () => {
     expect(hoisted.captureExceptionMock).toHaveBeenCalled();
   });
 
+  it('alerts a distinct budget-exceeded event and still serves the scripted fallback', async () => {
+    vi.resetModules();
+    stubRuntimeEnv();
+    hoisted.executeChatTurnMock.mockRejectedValue(
+      Object.assign(
+        new Error(
+          'API key budget exceeded. Current spend: $1.05, limit: $1.00. Please contact your administrator to increase the budget.'
+        ),
+        { name: 'GatewayInternalServerError' }
+      )
+    );
+    const { tryHandleAnonymousOnboardingChat } = await import(
+      '@/app/api/chat/onboarding-handler'
+    );
+    const req = makeRequest({
+      mode: 'onboarding',
+      messages: [userMessage('hi, I want in')],
+    });
+    const result = await tryHandleAnonymousOnboardingChat(
+      req,
+      'req-budget-wall'
+    );
+
+    expect(result?.status).toBe(200);
+    expect(result?.headers.get('x-fallback-reason')).toBe('llm_error');
+    const body = await result?.text();
+    expect(body).toContain("I'm Jovie");
+    expect(body).not.toContain('API key budget exceeded');
+    expect(hoisted.captureExceptionMock).toHaveBeenCalledWith(
+      expect.objectContaining({
+        message: 'AI Gateway API key budget exceeded',
+        name: 'GatewayBudgetExceededError',
+      }),
+      expect.objectContaining({
+        tags: expect.objectContaining({
+          errorType: 'gateway_budget_exceeded',
+          alert: 'ai_gateway_budget',
+          chat_mode: 'onboarding',
+        }),
+      })
+    );
+  });
+
   it('opens the artist picker via fallback on a later turn when the LLM is down', async () => {
     vi.resetModules();
     stubRuntimeEnv();
@@ -343,6 +389,20 @@ describe('tryHandleAnonymousOnboardingChat', () => {
     expect(result?.status).toBe(200);
     expect(result?.headers.get('x-fallback-reason')).toBe('injected');
     expect(hoisted.executeChatTurnMock).not.toHaveBeenCalled();
+    expect(hoisted.dbOnConflictDoUpdateMock).toHaveBeenCalledWith(
+      expect.objectContaining({
+        target: expect.any(Array),
+        targetWhere: expect.anything(),
+        set: expect.objectContaining({
+          assistantSource: 'script',
+          content: expect.any(String),
+          scriptLineKey: expect.stringMatching(/^greet:v\d+$/),
+        }),
+      })
+    );
+    const conflictUpdate =
+      hoisted.dbOnConflictDoUpdateMock.mock.calls.at(-1)?.[0];
+    expect(conflictUpdate?.set).toHaveProperty('toolCalls');
   });
 
   it('ignores the injection header when the env flag is not set', async () => {

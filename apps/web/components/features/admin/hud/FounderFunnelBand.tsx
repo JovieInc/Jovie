@@ -250,12 +250,12 @@ export function FounderFunnelBand({
         title='Bottleneck'
         subtitle='Death-step in onboarding chat to paid.'
         density='compact'
-        className='min-h-0 px-(--linear-app-header-padding-x) py-3'
+        className='min-h-0 px-(--app-shell-header-padding-x) py-3'
         actions={<RangeSelector value={range} onChange={setRange} />}
       />
       <div
         className={cn(
-          'px-(--linear-app-content-padding-x) py-(--linear-app-content-padding-y)',
+          'px-(--app-shell-content-padding-x) py-(--app-shell-content-padding-y)',
           FUNNEL_BODY_CLASS
         )}
       >

@@ -18,9 +18,11 @@ import { env } from '@/lib/env';
 import { captureCriticalError } from '@/lib/error-tracking';
 import { ServerFetchTimeoutError, serverFetch } from '@/lib/http/server-fetch';
 import {
+  isNonActionableLoopbackBetterAuthHostIssue,
   isNonActionableSpotifyReleaseCreditBoundIssue,
   isNonActionableUpstashErrorBag,
   isNonActionableUpstashIssue,
+  isNonActionableVercelIpcIssue,
   isTransientInfraHttpIssue,
 } from '@/lib/sentry/non-actionable-issues';
 import { logger } from '@/lib/utils/logger';
@@ -273,6 +275,32 @@ export async function POST(request: NextRequest) {
       );
       return NextResponse.json(
         { received: true, skipped: true, reason: 'non-actionable-upstash' },
+        { headers: NO_STORE_HEADERS }
+      );
+    }
+
+    if (isNonActionableVercelIpcIssue({ title, culprit })) {
+      logger.info(
+        '[Sentry Webhook] Skipping autofix for Vercel IPC socket refusal',
+        { issueId, title, culprit }
+      );
+      return NextResponse.json(
+        { received: true, skipped: true, reason: 'vercel-ipc-sock' },
+        { headers: NO_STORE_HEADERS }
+      );
+    }
+
+    if (isNonActionableLoopbackBetterAuthHostIssue({ title, culprit })) {
+      logger.info(
+        '[Sentry Webhook] Skipping autofix for Better Auth loopback host rejection',
+        { issueId, title, culprit }
+      );
+      return NextResponse.json(
+        {
+          received: true,
+          skipped: true,
+          reason: 'loopback-better-auth-host',
+        },
         { headers: NO_STORE_HEADERS }
       );
     }

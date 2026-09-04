@@ -1,3 +1,5 @@
+import { readFileSync } from 'node:fs';
+import { resolve } from 'node:path';
 import { fireEvent, render, screen } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
 import { SuggestionCard } from './SuggestionCard';
@@ -52,5 +54,16 @@ describe('SuggestionCard', () => {
     );
     fireEvent.click(screen.getByRole('button', { name: 'Not now' }));
     expect(onDismiss).toHaveBeenCalledOnce();
+  });
+});
+
+describe('JOV-5466 token retire', () => {
+  it('does not keep retired --linear-app-* tokens', () => {
+    const source = readFileSync(
+      resolve(__dirname, './SuggestionCard.tsx'),
+      'utf8'
+    );
+    expect(source).not.toMatch(/--linear-app-/);
+    expect(source).toContain('line-clamp-2');
   });
 });

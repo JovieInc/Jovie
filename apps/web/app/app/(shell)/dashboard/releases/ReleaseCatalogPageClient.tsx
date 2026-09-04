@@ -6,23 +6,30 @@ import {
   LibrarySurface,
 } from '@/app/app/(shell)/library/LibrarySurface';
 import {
+  buildLibraryDocumentAssets,
   buildLibraryMerchAssets,
   buildLibraryReleaseAssets,
+  buildLibraryYouTubeAssets,
 } from '@/app/app/(shell)/library/library-data';
 import { ShellReleasesView } from '@/components/features/dashboard/organisms/release-provider-matrix/shell-releases/ShellReleasesView';
 import { PageErrorState } from '@/features/feedback/PageErrorState';
+import type { CreatorDocumentListItem } from '@/lib/creator-documents/types';
 import type { ReleaseViewModel } from '@/lib/discography/types';
 import {
   isLibraryApprovalStatus,
   type LibraryApprovalStatus,
 } from '@/lib/library/approval-status';
 import type { LibraryAssetShareViewModel } from '@/lib/library/asset-share';
+import type { LibraryMerchProductOption } from '@/lib/library/graph-types';
+import type { LibraryPostReleaseBundle } from '@/lib/library/post-release-types';
 import {
   isLibraryProfileVisibility,
   type LibraryProfileVisibility,
 } from '@/lib/library/profile-visibility';
+import type { LibraryRelationshipView } from '@/lib/library/track-drawer-types';
 import type { LibraryMerchCard } from '@/lib/merch/types';
 import { useReleasesQuery } from '@/lib/queries/useReleasesQuery';
+import type { PublicVideoListItem } from '@/lib/youtube-library/queries';
 import { primaryProviderKeys, providerConfig } from './config';
 import { ReleaseTableSkeleton } from './loading';
 
@@ -38,6 +45,11 @@ interface ReleaseCatalogPageClientProps {
   readonly assetShareByAssetId?: Readonly<
     Record<string, LibraryAssetShareViewModel>
   >;
+  readonly creatorDocuments?: readonly CreatorDocumentListItem[];
+  readonly youtubeVideos?: readonly PublicVideoListItem[];
+  readonly merchProducts?: readonly LibraryMerchProductOption[];
+  readonly relationships?: readonly LibraryRelationshipView[];
+  readonly postReleaseBundle?: LibraryPostReleaseBundle;
 }
 
 function toApprovalStatusMap(
@@ -70,6 +82,11 @@ export function ReleaseCatalogPageClient({
   approvalStatusByAssetId = {},
   profileVisibilityByAssetId = {},
   assetShareByAssetId = {},
+  creatorDocuments = [],
+  youtubeVideos = [],
+  merchProducts = [],
+  relationships = [],
+  postReleaseBundle,
 }: ReleaseCatalogPageClientProps) {
   const { selectedProfile } = useDashboardData();
   const profileId = selectedProfile?.id ?? '';
@@ -145,6 +162,17 @@ export function ReleaseCatalogPageClient({
       <LibrarySurface
         profileId={profileId}
         artistHandle={artistHandle}
+        canSyncSpotify={spotifyConnected}
+        merchProducts={
+          merchProducts.length > 0
+            ? merchProducts
+            : merchCards.map(card => ({
+                id: card.id,
+                title: card.title,
+              }))
+        }
+        relationships={relationships}
+        postReleaseBundle={postReleaseBundle}
         assets={[
           ...buildLibraryReleaseAssets(
             [...releases, ...archivedReleases],
@@ -153,6 +181,18 @@ export function ReleaseCatalogPageClient({
           ).map(withShare),
           ...buildLibraryMerchAssets(
             [...merchCards, ...archivedMerchCards],
+            artistName,
+            approvalStatusMap,
+            profileVisibilityMap
+          ).map(withShare),
+          ...buildLibraryYouTubeAssets(
+            youtubeVideos,
+            artistName,
+            approvalStatusMap,
+            profileVisibilityMap
+          ).map(withShare),
+          ...buildLibraryDocumentAssets(
+            creatorDocuments,
             artistName,
             approvalStatusMap,
             profileVisibilityMap
