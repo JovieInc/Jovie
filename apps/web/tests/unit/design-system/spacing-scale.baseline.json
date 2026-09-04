@@ -2,7 +2,7 @@
   "$comment": "Shrink-only floors for off-4px-grid Tailwind spacing steps (JOV-5865). Lower a number when a PR removes drift; never raise one. conservative (10px/14px steps) is armed: growth fails CI. strict is reported only until Tim thumbs it. Floors remeasured against origin/main 07101675f after restoring AppShellContentPanel compact (detectors-only; no product UI).",
   "conservative": {
     "armed": true,
-    "count": 748,
+    "count": 747,
     "perFamily": {
       "marketing": 114,
       "web-shell": 295,
