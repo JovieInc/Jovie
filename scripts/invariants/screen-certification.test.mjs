@@ -238,7 +238,7 @@ describe('JOV-INV-018 screen-certification/v2', () => {
     }
   });
 
-  it('rejects the audit plain-text future proof even when local bytes match', () => {
+  it('does not certify caller-authored proof without rendered artifact bytes', () => {
     const artifactRoot = mkdtempSync(join(tmpdir(), 'screen-cert-audit-'));
     try {
       const artifactPath = 'not-rendered.txt';
