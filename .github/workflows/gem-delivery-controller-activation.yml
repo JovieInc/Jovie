@@ -67,6 +67,11 @@ jobs:
           bash scripts/hermes/update-symphony-burrito.sh --skip-binary
           bash scripts/hermes/install-gem-fleet-controller.sh
           bash scripts/hermes/install-gem-pr-rehabilitation.sh
+          install -D -m 0755 scripts/hermes/gem-disk-reclaim.py "$HOME/.local/bin/gem-disk-reclaim"
+          install -D -m 0644 scripts/hermes/systemd/gem-disk-reclaim.service "$HOME/.config/systemd/user/gem-disk-reclaim.service"
+          install -D -m 0644 scripts/hermes/systemd/gem-disk-reclaim.timer "$HOME/.config/systemd/user/gem-disk-reclaim.timer"
+          systemctl --user daemon-reload
+          systemctl --user enable --now gem-disk-reclaim.timer
       - name: Verify runtime identity after reload
         env:
           GEM_WORKSPACE: /home/timwhite/gem-workspace
@@ -136,4 +141,16 @@ jobs:
           listener_cmdline="$(tr '\0' ' ' < "/proc/${listener_pid}/cmdline")"
           grep -Fq '.burrito/symphony_erts-' <<<"$listener_cmdline"
           grep -Fq -- '--port 4041' <<<"$listener_cmdline"
-          ! grep -Fq 'symphony-ui-pilot' <<<"$listener_cmdline"
+          if grep -Fq 'symphony-ui-pilot' <<<"$listener_cmdline"; then
+            printf 'official listener cmdline still names symphony-ui-pilot\n' >&2
+            exit 1
+          fi
+          systemctl --user is-enabled --quiet gem-disk-reclaim.timer
+          systemctl --user is-active --quiet gem-disk-reclaim.timer
+          test "$(systemctl --user show gem-disk-reclaim.timer --property=FragmentPath --value)" \
+            = "$HOME/.config/systemd/user/gem-disk-reclaim.timer"
+          python3 "$HOME/.local/bin/gem-disk-reclaim" --dry-run --timeout-seconds 60 \
+            --receipt "$RUNNER_TEMP/gem-disk-reclaim-dry-run.json" \
+            --disk-receipt "$RUNNER_TEMP/gem-disk-capacity-dry-run.json" \
+            --capacity-receipt "$RUNNER_TEMP/gem-concurrency-dry-run.json" \
+            | jq -e '.schema == "gem-disk-reclaim/v1" and (.status | IN("ok", "warning", "critical"))' >/dev/null

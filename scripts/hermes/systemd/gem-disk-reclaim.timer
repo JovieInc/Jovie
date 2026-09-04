@@ -1,0 +1,12 @@
+[Unit]
+Description=Run Gem bounded disk/log reclaim every fifteen minutes
+
+[Timer]
+OnBootSec=5m
+OnUnitActiveSec=15min
+RandomizedDelaySec=2m
+Persistent=true
+Unit=gem-disk-reclaim.service
+
+[Install]
+WantedBy=timers.target
