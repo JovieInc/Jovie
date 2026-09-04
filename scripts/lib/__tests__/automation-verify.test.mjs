@@ -873,7 +873,9 @@ describe('automation-verify affected scope', () => {
           'scripts/symphony/tests/test_evaluate_fleet_gate.py',
           'scripts/symphony/tests/test_fleet_admission_receipt.py',
         ],
-        pythonUnittestTests: ['scripts/symphony/tests/gem-priority-gate.test.py'],
+        pythonUnittestTests: [
+          'scripts/symphony/tests/gem-priority-gate.test.py',
+        ],
         scriptVitestTests: ['scripts/lib/__tests__/automation-verify.test.mjs'],
       });
     }
