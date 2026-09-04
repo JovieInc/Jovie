@@ -51,7 +51,13 @@ describe('eve identity instruction packs', () => {
 
   it('binds private presentation to Summer without an Ovie identity', () => {
     const turn = bindEvePilotIdentity('summer');
-    expect(turn.instructions).toContain('You are Summer');
+    expect(turn.instructions).toContain('You are Summer Jovi — AI Agent');
+    expect(turn.instructions).toContain(
+      'presentation name is never a routing key or recipient selector'
+    );
+    expect(turn.instructions).toContain(
+      'Photon and all external-recipient messaging are disabled'
+    );
     expect(turn.instructions).toContain('Do not speak as Ovie or Jovie');
     expect(() => turn.require('privileged-gbrain-write')).toThrow(
       EvePilotCapabilityDeniedError

@@ -7,8 +7,10 @@ import type {
 } from '../agent/lib/summer-bottleneck-loop';
 import {
   createVercelBlobBottleneckDependencies,
+  SUMMER_BOTTLENECK_SECURITY_ENV,
   type SummerBottleneckRuntimeSecurity,
   signSymphonyRepairOutcome,
+  summerBottleneckSecurityFromEnvironment,
 } from '../agent/lib/vercel-blob-bottleneck-runtime';
 
 const KEY = 'a'.repeat(64);
@@ -60,6 +62,23 @@ const security: SummerBottleneckRuntimeSecurity = {
   symphonyOutcomeVerificationKeys: new Map([
     ['symphony-outcome-2026-09', SYMPHONY_PUBLIC_KEY],
   ]),
+};
+const securityEnvironment = {
+  [SUMMER_BOTTLENECK_SECURITY_ENV.eveOutboxSigningPrivateKey]:
+    EVE_OUTBOX_PRIVATE_KEY,
+  [SUMMER_BOTTLENECK_SECURITY_ENV.eveOutboxSigningKeyId]:
+    security.eveOutboxSigningKeyId,
+  [SUMMER_BOTTLENECK_SECURITY_ENV.eveOutboxVerificationKeys]: JSON.stringify({
+    [security.eveOutboxSigningKeyId]: EVE_OUTBOX_PUBLIC_KEY,
+  }),
+  [SUMMER_BOTTLENECK_SECURITY_ENV.producerVerificationKeys]: JSON.stringify({
+    'jovie-production-2026-09': PRODUCER_PUBLIC_KEY,
+  }),
+  [SUMMER_BOTTLENECK_SECURITY_ENV.receiptSigningKey]: EVE_RECEIPT_KEY,
+  [SUMMER_BOTTLENECK_SECURITY_ENV.receiptSigningKeyId]:
+    security.receiptSigningKeyId,
+  [SUMMER_BOTTLENECK_SECURITY_ENV.symphonyOutcomeVerificationKeys]:
+    JSON.stringify({ 'symphony-outcome-2026-09': SYMPHONY_PUBLIC_KEY }),
 };
 const SOURCE_VERSION = 'b'.repeat(40);
 const SNAPSHOT_DIGEST = 'c'.repeat(64);
@@ -135,6 +154,31 @@ function signedOutcome(overrides: SummerBottleneckRecord = {}) {
 }
 
 describe('Vercel Blob Summer bottleneck runtime', () => {
+  it('loads only a complete, typed security bundle from the environment', () => {
+    expect(summerBottleneckSecurityFromEnvironment({})).toBeUndefined();
+    expect(
+      summerBottleneckSecurityFromEnvironment(securityEnvironment)
+    ).toMatchObject({
+      eveOutboxSigningKeyId: 'eve-outbox-2026-09',
+      receiptSigningKeyId: 'eve-receipt-2026-09',
+    });
+  });
+
+  it('rejects malformed or incomplete verification-key bindings', () => {
+    expect(
+      summerBottleneckSecurityFromEnvironment({
+        ...securityEnvironment,
+        [SUMMER_BOTTLENECK_SECURITY_ENV.producerVerificationKeys]: '{',
+      })
+    ).toBeUndefined();
+    expect(
+      summerBottleneckSecurityFromEnvironment({
+        ...securityEnvironment,
+        [SUMMER_BOTTLENECK_SECURITY_ENV.producerVerificationKeys]: '{}',
+      })
+    ).toBeUndefined();
+  });
+
   it('fails closed without distinct dedicated signing authorities', () => {
     expect(() => createVercelBlobBottleneckDependencies()).toThrow(
       'dedicated Summer and Symphony signing authority is unavailable'
