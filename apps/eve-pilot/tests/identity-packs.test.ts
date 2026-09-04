@@ -21,7 +21,7 @@ function armFactoryWrite(turn: EvePilotBoundTurn): EvePilotBoundTurn {
 }
 
 describe('eve identity instruction packs', () => {
-  it('pins the Summer Photon speaker model on Eve Gateway OIDC', () => {
+  it('pins the Eve Gateway OIDC speaker model without a Summer root label', () => {
     expect(eveAgent).toEqual({ model: 'zai/glm-5.3-flash' });
   });
 
@@ -85,21 +85,6 @@ describe('eve identity instruction packs', () => {
     expect(() => assertEvePilotFactoryLock(turn)).not.toThrow();
   });
 
-  it('grants Summer only the bounded Symphony repair outbox capability', () => {
-    const turn = eveIdentityForChannel('ovie-summer-bottleneck');
-    expect(turn.pack).toMatchObject({
-      id: 'summer',
-      canDispatchBoundedSymphonyRepair: true,
-      canHealSymphony: false,
-      canPrivilegedWriteGbrain: false,
-    });
-    expect(() => turn.require('symphony-bounded-dispatch')).not.toThrow();
-    expect(() => turn.require('symphony-heal')).toThrow(
-      EvePilotCapabilityDeniedError
-    );
-    expect(() => assertEvePilotFactoryLock(turn)).not.toThrow();
-  });
-
   it('binds the runtime pack at Eve load (default Jovie)', () => {
     const previous = process.env.EVE_IDENTITY;
     delete process.env.EVE_IDENTITY;
@@ -134,11 +119,7 @@ describe('eve identity instruction packs', () => {
     expect(eveIdentityForChannel('jovie-core-chat').pack.id).toBe('jovie');
     expect(eveIdentityForChannel('unknown-source').pack.id).toBe('jovie');
     expect(eveIdentityForChannel('ovie-summer-shadow').pack.id).toBe('summer');
-    expect(eveIdentityForChannel('ovie-summer-bottleneck').pack.id).toBe(
-      'summer'
-    );
-    expect(eveIdentityForChannel('photon').pack.id).toBe('summer');
-    expect(eveIdentityForChannel('imessage').pack.id).toBe('summer');
+    expect(eveIdentityForChannel('photon').pack.id).toBe('ovie');
     if (previous === undefined) {
       delete process.env.EVE_IDENTITY;
     } else {

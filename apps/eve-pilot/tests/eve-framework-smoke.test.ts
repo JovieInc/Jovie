@@ -92,7 +92,7 @@ describe('Eve framework smoke', () => {
     expect(manifest.devDependencies?.vercel).toBe('56.3.2');
   });
 
-  it('discovers Eve with Ovie Telegram and Summer iMessage channels offline', () => {
+  it('discovers Eve with Ovie Telegram and Ovie iMessage channels offline', () => {
     const isolatedRoot = mkdtempSync(join(tmpdir(), 'jovie-eve-smoke-'));
     const networkSentinel = join(isolatedRoot, 'network-blocked');
 
@@ -197,14 +197,6 @@ describe('Eve framework smoke', () => {
       expect(hasChannel('photon', 'chat-sdk', 'POST', '/eve/v1/photon')).toBe(
         true
       );
-      expect(
-        hasChannel(
-          'summer-bottleneck',
-          'defineChannel',
-          'POST',
-          '/ovie/v1/summer-bottleneck/events'
-        )
-      ).toBe(true);
       expect(
         hasChannel(
           'summer-shadow',
