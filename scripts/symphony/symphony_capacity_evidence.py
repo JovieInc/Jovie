@@ -1,8 +1,6 @@
 #!/usr/bin/env python3
 """Project fresh, digest-bound useful-turn proofs into dispatch capacity (JOV-INV-007)."""
-
 from __future__ import annotations
-
 import argparse
 import json
 import os
@@ -10,13 +8,11 @@ import pathlib
 import sys
 from datetime import datetime, timezone
 from typing import Any
-
 HERMES_DIR = pathlib.Path(__file__).resolve().parent
 CONTRACT_DIRS = (HERMES_DIR, pathlib.Path(os.environ.get("GEM_WORKSPACE", "/home/timwhite/gem-workspace")) / "scripts")
 for contract_dir in reversed(CONTRACT_DIRS):
     if str(contract_dir) not in sys.path:
         sys.path.insert(0, str(contract_dir))
-
 from gem_gate_contract import (  # noqa: E402 - installed sibling module
     CAPACITY_MAX_TARGET as MAX_TARGET,
     CAPACITY_SCHEMA as RECEIPT_SCHEMA,
