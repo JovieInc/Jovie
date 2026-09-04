@@ -1,7 +1,7 @@
 name: Ownerless Recovery Sweep
 on:
   pull_request:
-    types: [opened, reopened, ready_for_review, unlabeled]
+    types: [opened, reopened, unlabeled]
   workflow_dispatch:
 permissions:
   contents: read
