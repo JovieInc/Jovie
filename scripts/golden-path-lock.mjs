@@ -370,21 +370,6 @@ async function runAutofix(args) {
     }
   }
 
-  const plan = planAutofix({
-    cursorApiKey: apiKey,
-    existingAgentIds,
-    fingerprint: receipt.fingerprint,
-    checks: receipt.checks,
-    origin: receipt.origin,
-    receipt,
-  });
-
-  if (plan.action === 'fail_closed') {
-    fail(
-      'Golden-path prod break cannot autofix: CURSOR_API_KEY is missing. Detect without a ship lock is a hole.'
-    );
-  }
-
   const prompt = buildAutofixPrompt({
     fingerprint: receipt.fingerprint,
     checks: receipt.checks,
@@ -399,6 +384,27 @@ async function runAutofix(args) {
     fail(
       `Linear intake failed closed: ${linear.reason}. No GitHub fallback or Cursor dispatch was attempted.`,
       JSON.stringify(linear.body ?? null)
+    );
+  }
+  if (linear.action === 'updated') {
+    console.error(
+      `Deduped golden-path Linear intake ${linear.identifier} fingerprint=${receipt.fingerprint} (no clone filed)`
+    );
+  }
+
+  const plan = planAutofix({
+    cursorApiKey: apiKey,
+    existingAgentIds,
+    openIssueUrl: linear.url ?? '',
+    fingerprint: receipt.fingerprint,
+    checks: receipt.checks,
+    origin: receipt.origin,
+    receipt,
+  });
+
+  if (plan.action === 'fail_closed') {
+    fail(
+      'Golden-path prod break cannot autofix: CURSOR_API_KEY is missing. Detect without a ship lock is a hole.'
     );
   }
 
