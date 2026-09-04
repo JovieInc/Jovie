@@ -9,7 +9,7 @@ import {
   writeFileSync,
 } from 'node:fs';
 import { tmpdir } from 'node:os';
-import { delimiter, join, resolve } from 'node:path';
+import { delimiter, dirname, join, resolve } from 'node:path';
 import { afterEach, describe, expect, it } from 'vitest';
 import { runMergeGroupStorybookCertification } from '../../component-merge-group-storybook-cert.mjs';
 import {
@@ -1508,6 +1508,47 @@ ${selectedGateScript}`,
     expect(controller).toContain('.state == "DISMISSED"');
     expect(controller).toContain('.commit_id == $head_sha');
     expect(controller).toContain('.author_association == "COLLABORATOR"');
+  });
+
+  it.each([
+    ['fork', FORK_GATE_WORKFLOW, 'merge-group-gate'],
+    ['size', SIZE_GUARD_WORKFLOW, 'merge-group-size'],
+  ])('loads the complete %s policy import closure from its sparse checkout', (_policy, workflow, job) => {
+    const block = getJobBlock(workflow, job);
+    const sparse = block.match(/sparse-checkout: \|\n((?: {12}.+\n)+)/);
+    expect(sparse, 'trusted policy sparse checkout').not.toBeNull();
+    const paths = sparse[1]
+      .trim()
+      .split('\n')
+      .map(line => line.trim());
+    const root = mkdtempSync(join(tmpdir(), 'jovie-policy-checkout-'));
+    const load = () =>
+      spawnSync(
+        process.execPath,
+        [
+          '--input-type=module',
+          '-e',
+          "await import('./scripts/lib/merge-group-member-policy.mjs')",
+        ],
+        { cwd: root, encoding: 'utf8' }
+      );
+    try {
+      for (const path of paths) {
+        const target = resolve(root, path);
+        mkdirSync(dirname(target), { recursive: true });
+        writeFileSync(target, readFileSync(resolve(REPO_ROOT, path)));
+      }
+      // Node discovers all transitive static imports in the actual policy.
+      const complete = load();
+      expect(complete.status, complete.stderr).toBe(0);
+      rmSync(resolve(root, 'scripts/lib/repo-hygiene-limits.mjs'));
+      const incomplete = load();
+      expect(incomplete.status).not.toBe(0);
+      expect(incomplete.stderr).toContain('ERR_MODULE_NOT_FOUND');
+      expect(incomplete.stderr).toContain('repo-hygiene-limits.mjs');
+    } finally {
+      rmSync(root, { recursive: true, force: true });
+    }
   });
 
   it('revalidates mutable member policy on the exact combined head', () => {
