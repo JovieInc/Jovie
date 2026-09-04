@@ -61,18 +61,28 @@ const security: SummerBottleneckRuntimeSecurity = {
     ['symphony-outcome-2026-09', SYMPHONY_PUBLIC_KEY],
   ]),
 };
+const SOURCE_VERSION = 'b'.repeat(40);
+const SNAPSHOT_DIGEST = 'c'.repeat(64);
 const task: SymphonyRepairTask = {
   schema: 'jovie-symphony-repair-task/v1',
   taskKey: KEY,
   createdAt: '2026-09-02T08:00:00.000Z',
   owner: 'symphony',
   route: 'symphony',
+  authority: 'source-repair-only-no-direct-pr-queue-or-deploy-mutation',
   action: 'reconcile-release-certification-starvation',
   issue: 'JOV-5853',
   safety: 'exact-source-ci-native-queue-production-gates-remain-required',
+  selected: {
+    id: 'release-certification-starvation',
+    sourceRevision: SOURCE_VERSION,
+    sourceDigest: SNAPSHOT_DIGEST,
+    owner: 'release-controller',
+    handle: 'audit:release-certification',
+  },
   source: {
-    sourceVersion: 'b'.repeat(40),
-    snapshotDigest: 'c'.repeat(64),
+    sourceVersion: SOURCE_VERSION,
+    snapshotDigest: SNAPSHOT_DIGEST,
   },
 };
 
