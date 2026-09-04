@@ -727,10 +727,26 @@ def controller_retry_decision(
         observation.get("error") or observation.get("reason"),
         observation,
     )
+    sentinel = parse_launcher_sentinel(observation.get("error") or observation.get("launcherFailure"))
+    if isinstance(sentinel, dict) and sentinel.get("class") in {"provider-cooldown", "provider-unavailable"}:
+        eligible = _parse_time(sentinel.get("nextEligibleAt"))
+        if eligible is not None and eligible > _now():
+            return {"state": "deferred", "retryable": False, "maxAttempts": 1,
+                    "due_at": _iso(eligible), "nextEligibleAt": _iso(eligible), "attempt": 1,
+                    "lease": None, "handoff": False, "providerAccount": None, "failure": failure}
+        if eligible is not None:
+            # Expiry permits one normal scheduler reevaluation, never an alternate handoff.
+            return {"state": "retrying", "retryable": True, "maxAttempts": 1,
+                    "due_at": _iso(eligible), "nextEligibleAt": _iso(eligible), "attempt": 1,
+                    "lease": None, "handoff": False, "providerAccount": None,
+                    "failure": {**failure, "retryable": True, "maxAttempts": 1}}
     generation = observation.get("generation")
     previous_generation = previous.get("generation") if previous else None
+    # A changed generation/routing receipt cannot erase a current launcher failure.
     repaired = bool(
-        _valid_materialized_routing_receipt(
+        previous
+        and not observation.get("error")
+        and _valid_materialized_routing_receipt(
             routing_receipt,
             observation.get("issue_identifier"),
         )
@@ -738,7 +754,8 @@ def controller_retry_decision(
         and generation != previous_generation
     )
     if (
-        _valid_materialized_routing_receipt(
+        not observation.get("error")
+        and _valid_materialized_routing_receipt(
             routing_receipt,
             observation.get("issue_identifier"),
         )
@@ -1494,7 +1511,7 @@ def _reconcile_item(
     decision = controller_retry_decision(
         {
             **item,
-            "error": error,
+            "error": item.get("error"),
             "generation": generation,
             "attempt": attempt,
         },
@@ -1573,15 +1590,21 @@ def _reconcile_item(
         )
         return False
     retry_scheduled = decision_state == "retrying"
+    deferred = decision_state == "deferred"
     terminal = decision_state == "blocked"
     deterministic_terminal = terminal and launcher_failure.get("retryable") is False
     retry_exhausted = terminal and launcher_failure.get("exhausted") is True
+    if (deferred and previous and previous.get("generation") == generation
+        and previous.get("controllerState") == "deferred"
+        and previous.get("nextRetryAt") == decision.get("due_at")):
+        return False
     previous_launcher_failure = previous.get("launcherFailure") if previous else None
     if (
         previous
         and previous.get("generation") == generation
         and isinstance(previous_launcher_failure, dict)
         and previous_launcher_failure.get("retryable") is False
+        and previous_launcher_failure.get("class") not in {"provider-cooldown", "provider-unavailable"}
     ):
         _event(
             identifier,
@@ -1593,10 +1616,11 @@ def _reconcile_item(
             retry_at=None,
         )
         return False
-    next_retry = _parse_time(decision.get("due_at")) if retry_scheduled else None
+    next_retry = _parse_time(decision.get("due_at")) if retry_scheduled or deferred else None
     previous_retry = _parse_time(previous.get("nextRetryAt")) if previous else None
     repeated = (
-        alternate_permitted
+        decision.get("handoff") is not False
+        and alternate_permitted
         and not returned_previous_local_repair
         and (retry_scheduled or retry_exhausted)
         and _is_repeated_or_conflict(item, source, state_before)
@@ -1628,7 +1652,9 @@ def _reconcile_item(
         "status": "not_due",
     }
     transition = (
-        "admitted_generation_ready"
+        "provider_cooldown_deferred"
+        if deferred
+        else "admitted_generation_ready"
         if decision_state == "ready"
         else
         "bounded_retry_exhausted"
@@ -1638,7 +1664,9 @@ def _reconcile_item(
         else "normal_retry_scheduled"
     )
     next_action = (
-        "normal_model_run_admitted_generation"
+        "await_provider_next_eligible"
+        if deferred
+        else "normal_model_run_admitted_generation"
         if decision_state == "ready"
         else
         "manual_or_environment_repair"
@@ -1790,6 +1818,8 @@ def _reconcile_item(
         "retryable": policy_retryable,
         "maxAttempts": decision["maxAttempts"],
     }
+    if deferred:
+        retry_policy["nextEligibleAt"] = decision["nextEligibleAt"]
     if local_repair_attempted or returned_previous_local_repair:
         retry_policy.update(
             {

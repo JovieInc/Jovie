@@ -104,7 +104,7 @@ class OfficialSymphonyContractTests(unittest.TestCase):
         self.assertNotIn("jovie-ba6736cbfbb9", WORKFLOW)
         self.assertIn("root: ~/symphony-elixir-workspaces", WORKFLOW)
         self.assertIn("timeout_ms: 900000", WORKFLOW)
-        self.assertIn("max_concurrent_agents: 8", WORKFLOW)
+        self.assertIn("max_concurrent_agents: 0", WORKFLOW)
         self.assertIn("api_key: $LINEAR_API_KEY", WORKFLOW)
         self.assertNotIn("required_labels:", WORKFLOW)
         self.assertIn("excluded_labels:", WORKFLOW)
@@ -1182,7 +1182,7 @@ class OfficialSymphonyContractTests(unittest.TestCase):
         self.assertEqual(dry.returncode, 0, dry.stderr)
         self.assertIn("SERVICE symphony-elixir.service", dry.stdout)
         self.assertIn("PORT 4041", dry.stdout)
-        self.assertIn("BUDGET_OK steady=1100 budget=2500 headroom=1400 pages=3 polls=120", dry.stdout)
+        self.assertIn("BUDGET_OK steady=860 budget=2500 headroom=1640 pages=3 polls=120", dry.stdout)
         self.assertIn("UNTOUCHED symphony-lyb.service http://127.0.0.1:4042/api/v1/state", dry.stdout)
         self.assertNotIn("4043", dry.stdout)
         obsolete = subprocess.run(
@@ -1227,7 +1227,7 @@ class OfficialSymphonyContractTests(unittest.TestCase):
             self.assertFalse((pathlib.Path(tmp) / "home/.config/systemd/user/symphony-burrito.service").exists())
             existing.write_text(
                 existing.read_text().replace(
-                    "max_concurrent_agents: 8", "max_concurrent_agents: 4"
+                    "max_concurrent_agents: 0", "max_concurrent_agents: 4"
                 )
             )
             overlay = subprocess.run(
@@ -1284,7 +1284,7 @@ class OfficialSymphonyContractTests(unittest.TestCase):
         # owned by install-symphony-grok-sidecar.sh — the updater must never
         # retire or mask it, so it must not appear in LEGACY_UNITS.
         legacy_block = UPDATER.split("LEGACY_UNITS=(", 1)[1].split(")", 1)[0]
-        self.assertNotIn("symphony-grok-sidecar", legacy_block)
+        self.assertIn("symphony-grok-sidecar", legacy_block)
         self.assertIn('temporary="${dst}.tmp.$$"', UPDATER)
         self.assertIn('mv "$temporary" "$dst"', UPDATER)
         self.assertIn("PROMOTION_ROLLED_BACK", UPDATER)

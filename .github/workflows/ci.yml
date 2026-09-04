@@ -67,6 +67,21 @@ env:
   # steps. Job-level concurrency is evaluated before assignment, where github.job is null.
 
 jobs:
+  fleet-gate-pr-validation:
+    name: Validate exact PR head fleet gate
+    if: github.event_name == 'pull_request' || github.event_name == 'merge_group'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          persist-credentials: false
+      - run: test "$(git rev-parse HEAD)" = "${{ github.event.pull_request.head.sha || github.sha }}"
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: '22'
+      - run: python3 scripts/symphony/tests/test_fleet_admission_receipt.py && python3 scripts/symphony/tests/gem-priority-gate.test.py && python3 scripts/symphony/tests/test_evaluate_fleet_gate.py && python3 scripts/symphony/tests/symphony-concurrency-controller.test.py && python3 scripts/symphony/tests/codex-account-probe.test.py && python3 scripts/symphony/tests/run-proof-gate.py && python3 scripts/symphony/tests/symphony-reconciler.test.py && python3 scripts/symphony/tests/gem-ops-hud.test.py && node --test scripts/backlog-orchestrator/__tests__/backlog-orchestrator.test.mjs
+
   runner-image-offline-proof:
     name: Build and verify runner image offline
     if: >-

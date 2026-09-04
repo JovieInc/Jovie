@@ -358,31 +358,7 @@ def lane_capacity(
         "sharedResources": {},
     }
 
-def capacity_evidence(target: int = 4, observed_at: str | None = None) -> dict[str, object]:
-    observed = observed_at or MODULE.isoformat(MODULE.utc_now())
-    return {
-        "schema": "gem-concurrency-evidence/v1",
-        "source": "execution-proven-useful-turns",
-        "target": target,
-        "approved": target > 0,
-        "severeIncidents": 0,
-        "observedAt": observed,
-        "acceptedEvidence": [
-            {
-                "schema": "symphony-useful-turn-proof/v1",
-                "provider": "openai",
-                "profile": f"profile-{index}",
-                "model": "gpt-5.6-sol",
-                "rc": 0,
-                "useful": True,
-                "completedAt": observed,
-                "outputDigest": hashlib.sha256(str(index).encode()).hexdigest(),
-                "outputBytes": 32,
-                "outputTokens": 8,
-            }
-            for index in range(1, target + 1)
-        ],
-    }
+from proof_fixtures import evidence as capacity_evidence
 
 
 GREEN_SIGNALS: dict[str, object] = {
@@ -994,6 +970,19 @@ class DeploymentBindingTests(unittest.TestCase):
         evidence = capacity_evidence(1, MODULE.isoformat(now))
         evidence["severeIncidents"] = False
         self.assertFalse(MODULE.validate_capacity_receipt(evidence, now)[0])
+        for field, value in (
+            ("provider", " openai"),
+            ("profile", "profile-1"),
+            ("model", "gpt-5.6-sol "),
+            ("completedAt", "2026-09-04T00:00:00"),
+            ("completedAt", "2026-09-04T00:00:00+01:60"),
+            ("completedAt", "2026-02-30T00:00:00Z"),
+            ("completedAt", "2026-09-04T24:00:00Z"),
+        ):
+            evidence = capacity_evidence(1, MODULE.isoformat(now))
+            evidence["acceptedEvidence"][0][field] = value
+            with self.subTest(field=field):
+                self.assertFalse(MODULE.validate_capacity_receipt(evidence, now)[0])
 
     def test_observe_concurrency_rejects_oauth_source_and_target_mismatch(self):
         now = MODULE.utc_now()
@@ -1698,17 +1687,7 @@ class IndependentReviewTests(unittest.TestCase):
     def evaluate(self, review: object) -> dict[str, object]:
         signals = dict(GREEN_SIGNALS)
         signals["independentReview"] = review
-        evidence = signals.get("concurrencyEvidence")
-        if isinstance(evidence, dict):
-            observed = MODULE.isoformat(self.NOW)
-            signals["concurrencyEvidence"] = {
-                **evidence,
-                "observedAt": observed,
-                "acceptedEvidence": [
-                    {**proof, "completedAt": observed}
-                    for proof in evidence.get("acceptedEvidence", [])
-                ],
-            }
+        signals["concurrencyEvidence"] = capacity_evidence(4, MODULE.isoformat(self.NOW))
         queue = signals.get("queue")
         if isinstance(queue, dict):
             signals["queue"] = {

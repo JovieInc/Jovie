@@ -1,7 +1,7 @@
 name: HA CI remediator poke
 # controller-hop-exception: jovie-controller-hop/v1
 # accountable-writer: Symphony
-# necessary-trust-boundary: GitHub-hosted CI failure events must wake Gem Symphony refresh plus the Grok/Kimi sidecar; Hyperagent is general product throughput, not the remediator queue.
+# necessary-trust-boundary: GitHub-hosted CI failure events must wake official Gem Symphony; Hyperagent is general product throughput, not the remediator queue.
 # removal-trigger: Delete when Symphony ingests GitHub CI workflow_run failures natively without a poke hop.
 # idempotency-contract (JOV-5921): at most one delivered poke per PR + head SHA.
 #   - Workflow-level concurrency serializes same-key runs (FIFO, no cancel), so
@@ -79,4 +79,3 @@ jobs:
           # GitHub poke enters Symphony on :4041. Do not restart burrito.
           # Do not touch LYB :4042. HA remediator webhook is not the queue.
           curl -fsS -X POST --max-time 5 http://127.0.0.1:4041/api/v1/refresh >/dev/null
-          systemctl --user --no-block start symphony-grok-sidecar.service

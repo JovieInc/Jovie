@@ -64,7 +64,7 @@ def test_symphony_poke_contract_unchanged() -> None:
     workflow = _text()
 
     assert "http://127.0.0.1:4041/api/v1/refresh" in workflow
-    assert "symphony-grok-sidecar.service" in workflow
+    assert "symphony-grok-sidecar.service" not in workflow
     assert "Do not restart burrito" in workflow
     assert "Do not touch LYB :4042" in workflow
     # Hyperagent webhook is not the remediator queue on this path.

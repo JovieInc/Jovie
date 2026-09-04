@@ -4,6 +4,7 @@ After=symphony-elixir.service
 
 [Service]
 Type=oneshot
+ExecStartPre=/usr/bin/python3 %h/.local/bin/symphony_capacity_evidence.py
 ExecStart=%h/.local/bin/symphony-concurrency-controller
 Nice=10
 

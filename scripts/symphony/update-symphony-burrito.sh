@@ -148,7 +148,7 @@ def normalized(path):
     if len(matches) != 1:
         return None
     value = int(matches[0][1])
-    if not 1 <= value <= 8:
+    if not 0 <= value <= 40:
         return None
     return pattern.sub(r"\g<1>__RUNTIME_OVERLAY__\g<3>", text)
 

@@ -86,6 +86,7 @@ def _production_unbound_hold_receipt(
         "schema": "jovie-fleet-gate/v1",
         "state": "AMBER",
         "promotionMode": "hold-intake",
+        "concurrency": {"gem": {"evidenceAccepted": True, "maxConcurrent": 1}},
         "observedAt": datetime.now(timezone.utc).isoformat(),
         "closureAdmission": _summer_closure_admission(
             intake_allowed=intake_allowed, status=closure_status
@@ -2595,6 +2596,7 @@ JSON
             "schema": "jovie-fleet-gate/v1",
             "state": "AMBER",
             "promotionMode": "hold-intake",
+            "concurrency": {"gem": {"evidenceAccepted": True, "maxConcurrent": 1}},
             "observedAt": datetime.now(timezone.utc).isoformat(),
             "closureAdmission": _summer_closure_admission(),
             "signals": {
@@ -2684,6 +2686,7 @@ JSON
             "schema": "jovie-fleet-gate/v1",
             "state": "AMBER",
             "promotionMode": "hold-intake",
+            "concurrency": {"gem": {"evidenceAccepted": True, "maxConcurrent": 1}},
             "observedAt": datetime.now(timezone.utc).isoformat(),
             "closureAdmission": _summer_closure_admission(),
             "signals": {
@@ -2773,6 +2776,7 @@ JSON
             "schema": "jovie-fleet-gate/v1",
             "state": "AMBER",
             "promotionMode": "hold-intake",
+            "concurrency": {"gem": {"evidenceAccepted": True, "maxConcurrent": 1}},
             "observedAt": datetime.now(timezone.utc).isoformat(),
             "closureAdmission": _summer_closure_admission(),
             "signals": {
@@ -2864,6 +2868,7 @@ JSON
             "schema": "jovie-fleet-gate/v1",
             "state": "AMBER",
             "promotionMode": "hold-intake",
+            "concurrency": {"gem": {"evidenceAccepted": True, "maxConcurrent": 1}},
             "observedAt": datetime.now(timezone.utc).isoformat(),
             "closureAdmission": _summer_closure_admission(),
             "signals": {
@@ -3427,6 +3432,7 @@ JSON
             "schema": "jovie-fleet-gate/v1",
             "state": "AMBER",
             "promotionMode": "hold-intake",
+            "concurrency": {"gem": {"evidenceAccepted": True, "maxConcurrent": 1}},
             "observedAt": datetime.now(timezone.utc).isoformat(),
             "closureAdmission": _summer_closure_admission(),
             "signals": {
@@ -3521,6 +3527,7 @@ JSON
             "schema": "jovie-fleet-gate/v1",
             "state": "AMBER",
             "promotionMode": "hold-intake",
+            "concurrency": {"gem": {"evidenceAccepted": True, "maxConcurrent": 1}},
             "observedAt": datetime.now(timezone.utc).isoformat(),
             "closureAdmission": _summer_closure_admission(),
             "signals": {
@@ -3670,6 +3677,7 @@ JSON
             "schema": "jovie-fleet-gate/v1",
             "state": "AMBER",
             "promotionMode": "hold-intake",
+            "concurrency": {"gem": {"evidenceAccepted": True, "maxConcurrent": 1}},
             "observedAt": datetime.now(timezone.utc).isoformat(),
             "closureAdmission": _summer_closure_admission(),
             "signals": {

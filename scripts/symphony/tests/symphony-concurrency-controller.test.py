@@ -2,11 +2,13 @@
 
 from __future__ import annotations
 
+import hashlib
 import importlib.util
 import pathlib
 import re
 import tempfile
 import unittest
+from datetime import datetime, timedelta, timezone
 
 
 ROOT = pathlib.Path(__file__).resolve().parents[3]
@@ -20,6 +22,13 @@ if SPEC is None or SPEC.loader is None:
     raise RuntimeError(f"could not load {SOURCE}")
 MODULE = importlib.util.module_from_spec(SPEC)
 SPEC.loader.exec_module(MODULE)
+CAPACITY_SOURCE = ROOT / "scripts/symphony/symphony_capacity_evidence.py"
+CAPACITY_SPEC = importlib.util.spec_from_file_location(
+    "symphony_capacity_evidence", CAPACITY_SOURCE
+)
+assert CAPACITY_SPEC and CAPACITY_SPEC.loader
+CAPACITY = importlib.util.module_from_spec(CAPACITY_SPEC)
+CAPACITY_SPEC.loader.exec_module(CAPACITY)
 
 
 def low_sample(cpu_count: int = 8) -> dict:
@@ -58,6 +67,14 @@ def provider(accounts: int = 8, locked: int = 4, available: int = 4) -> dict:
     }
 
 
+def execution_capacity(target: int = 8) -> dict:
+    return {
+        "source": "execution-proven-useful-turns",
+        "target": target,
+        "acceptedEvidence": [{"profile": f"{index + 1:064x}"} for index in range(target)],
+    }
+
+
 RUNTIME = {"running": 4, "retrying": 0, "codexTotals": {"seconds_running": 100}}
 SCOPE = {
     "kind": "gem-host-provider-accounts-workflow",
@@ -65,6 +82,7 @@ SCOPE = {
     "workflow": "/workflows/jovie.md",
     "runtimeUrl": "http://127.0.0.1:4041/api/v1/state",
     "leaseGuard": "/bin/symphony-lease-guard",
+    "capacityEvidence": "/state/concurrency.json",
 }
 
 
@@ -75,6 +93,58 @@ class PressureParsingTests(unittest.TestCase):
         self.assertEqual(MODULE.parse_pressure(text, "full"), 0.5)
 
 
+import proof_fixtures as FIX
+
+
+class UsefulTurnProjectionTests(unittest.TestCase):
+    def proof(self, now, profile="1"):
+        return FIX.proof(now, profile)
+
+    def inventory(self, proofs):
+        return {"accounts": FIX.context(proofs)["accounts"]}
+
+    def test_newest_proof_is_selected_by_instant_not_timestamp_text(self):
+        older = self.proof(datetime(2026, 9, 4, tzinfo=timezone.utc))
+        newer = {**older, "completedAt": "2026-09-04T00:00:00.500000Z", "outputDigest": "f" * 64}
+        proofs, rejected = CAPACITY.accepted_proofs([newer, older], datetime(2026, 9, 4, 0, 1, tzinfo=timezone.utc))
+        self.assertFalse(proofs)
+        self.assertIn("unattested", rejected)
+
+    def test_projects_unique_fresh_turns_and_caps_at_forty(self):
+        now = datetime(2026, 9, 4, tzinfo=timezone.utc)
+        proofs = [self.proof(now, str(index)) for index in range(42)]
+        receipt = CAPACITY.build_receipt(proofs, self.inventory(proofs), now, context=FIX.context(proofs))
+        self.assertEqual(receipt["target"], 40)
+        self.assertEqual(receipt["rejectedProofs"]["policy-cap"], 2)
+
+    def test_inventory_and_stale_turns_never_create_capacity(self):
+        now = datetime(2026, 9, 4, tzinfo=timezone.utc)
+        receipt = CAPACITY.build_receipt(
+            [self.proof(now - timedelta(days=2)), self.proof(now, "fresh")],
+            {"accounts": [{"provider": "openai", "profile": hashlib.sha256(b"oauth").hexdigest()}]},
+            now,
+        )
+        self.assertEqual(receipt["target"], 0)
+        self.assertFalse(receipt["approved"])
+        self.assertIn("trust-context-missing", receipt["rejectedProofs"])
+
+    def test_models_do_not_multiply_one_credential_seat(self):
+        now = datetime(2026, 9, 4, tzinfo=timezone.utc)
+        first = self.proof(now)
+        second = {**first, "model": "gpt-5.5", "outputDigest": "b" * 64}
+        receipt = CAPACITY.build_receipt([first, second], self.inventory([first]), now, context=FIX.context([first]))
+        self.assertEqual(receipt["target"], 1)
+
+    def test_boolean_return_code_and_incident_count_fail_closed(self):
+        now = datetime(2026, 9, 4, tzinfo=timezone.utc)
+        proof = {**self.proof(now), "rc": False}
+        self.assertIsNone(CAPACITY.validate_proof(proof, now)[0])
+        valid = self.proof(now)
+        receipt = CAPACITY.build_receipt([valid], self.inventory([valid]), now, context=FIX.context([valid]))
+        receipt["severeIncidents"] = False
+        self.assertFalse(CAPACITY.validate_receipt(receipt, now)[0])
+
+
 class HysteresisTests(unittest.TestCase):
     def decide(self, current: int, low_streak: int, sample: dict | None = None):
         return MODULE.choose_target(
@@ -82,6 +152,7 @@ class HysteresisTests(unittest.TestCase):
             state={"lowStreak": low_streak, "lastChangeEpoch": 0.0},
             sample=sample or low_sample(),
             provider=provider(),
+            execution_capacity=execution_capacity(),
             runtime=RUNTIME,
             integrity_allowed=True,
             now_epoch=1000.0,
@@ -100,7 +171,7 @@ class HysteresisTests(unittest.TestCase):
     def test_severe_pressure_falls_to_minimum(self):
         sample = low_sample()
         sample["availableMemoryBytes"] = 2 * 1024**3
-        self.assertEqual(self.decide(6, 2, sample), (1, 0, "severe-pressure"))
+        self.assertEqual(self.decide(6, 2, sample), (0, 0, "severe-pressure"))
 
     def test_provider_capacity_caps_scale_up(self):
         target = MODULE.choose_target(
@@ -108,6 +179,7 @@ class HysteresisTests(unittest.TestCase):
             state={"lowStreak": 2, "lastChangeEpoch": 0.0},
             sample=low_sample(),
             provider=provider(accounts=4, locked=3, available=1),
+            execution_capacity=execution_capacity(),
             runtime=RUNTIME,
             integrity_allowed=True,
             now_epoch=1000.0,
@@ -122,11 +194,12 @@ class HysteresisTests(unittest.TestCase):
                     state={"lowStreak": 2, "lastChangeEpoch": 0.0},
                     sample=low_sample(),
                     provider=missing_provider,
+                    execution_capacity=execution_capacity(),
                     runtime=missing_runtime,
                     integrity_allowed=True,
                     now_epoch=1000.0,
                 )
-                self.assertEqual(target, (1, 0, "required-telemetry-unavailable"))
+                self.assertEqual(target, (0, 0, "required-telemetry-unavailable"))
 
     def test_integrity_block_fails_closed(self):
         target = MODULE.choose_target(
@@ -134,11 +207,38 @@ class HysteresisTests(unittest.TestCase):
             state={"lowStreak": 2, "lastChangeEpoch": 0.0},
             sample=low_sample(),
             provider=provider(),
+            execution_capacity=execution_capacity(),
             runtime=RUNTIME,
             integrity_allowed=False,
             now_epoch=1000.0,
         )
-        self.assertEqual(target, (1, 0, "integrity-blocked"))
+        self.assertEqual(target, (0, 0, "integrity-blocked"))
+
+    def test_execution_proof_contracts_provider_ceiling(self):
+        target = MODULE.choose_target(
+            current=2,
+            state={"lowStreak": 2, "lastChangeEpoch": 0.0},
+            sample=low_sample(),
+            provider=provider(accounts=4, locked=2, available=2),
+            execution_capacity=execution_capacity(1),
+            runtime=RUNTIME,
+            integrity_allowed=True,
+            now_epoch=1000.0,
+        )
+        self.assertEqual(target, (1, 0, "capacity-ceiling-contracted"))
+
+    def test_missing_execution_proof_closes_dispatch_to_zero(self):
+        target = MODULE.choose_target(
+            current=2,
+            state={"lowStreak": 2, "lastChangeEpoch": 0.0},
+            sample=low_sample(),
+            provider=provider(),
+            execution_capacity=None,
+            runtime=RUNTIME,
+            integrity_allowed=True,
+            now_epoch=1000.0,
+        )
+        self.assertEqual(target, (0, 0, "required-telemetry-unavailable"))
 
 
 class ResourceScopeStateTests(unittest.TestCase):
@@ -260,13 +360,12 @@ class WorkflowOverlayIdentityTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, "exactly one max_concurrent_agents"):
             MODULE.verify_concurrency_overlay(self.SOURCE, self.overlay("n"))
 
-    def test_zero_runtime_concurrency_fails_closed(self):
-        with self.assertRaisesRegex(ValueError, "outside the bounded policy"):
-            MODULE.verify_concurrency_overlay(self.SOURCE, self.overlay("0"))
+    def test_zero_runtime_concurrency_closes_dispatch(self):
+        self.assertEqual(MODULE.verify_concurrency_overlay(self.SOURCE, self.overlay("0")), 0)
 
     def test_above_policy_runtime_concurrency_fails_closed(self):
         with self.assertRaisesRegex(ValueError, "outside the bounded policy"):
-            MODULE.verify_concurrency_overlay(self.SOURCE, self.overlay("9"))
+            MODULE.verify_concurrency_overlay(self.SOURCE, self.overlay("41"))
 
     def test_any_other_workflow_drift_fails_closed(self):
         drifted = self.overlay("1").replace("max_turns: 24", "max_turns: 99")
@@ -297,6 +396,10 @@ class SystemdActivationTests(unittest.TestCase):
             ini_value(text, "ExecStart"),
             "%h/.local/bin/symphony-concurrency-controller",
         )
+        self.assertEqual(
+            ini_value(text, "ExecStartPre"),
+            "/usr/bin/python3 %h/.local/bin/symphony_capacity_evidence.py",
+        )
         self.assertEqual(ini_value(text, "After"), "symphony-elixir.service")
         # Exit 2 (unreadable or drifted workflow) must stay a real unit
         # failure; only clean runs are success.
@@ -321,21 +424,10 @@ class SystemdActivationTests(unittest.TestCase):
         self.assertEqual(ini_value(text, "Persistent"), "true")
         self.assertEqual(ini_value(text, "WantedBy"), "timers.target")
 
-    def test_installer_installs_and_enables_like_sibling_units(self):
+    def test_legacy_pilot_installer_cannot_activate_official_controller(self):
         text = INSTALLER.read_text(encoding="utf-8")
-        self.assertIn(
-            'CONTROLLER_SRC="$REPO_ROOT/scripts/symphony/symphony-concurrency-controller.py"',
-            text,
-        )
-        self.assertIn('install_one "$CONTROLLER_SRC" "$CONTROLLER_DST" 0755', text)
-        self.assertIn('install_one "$CONTROLLER_SERVICE_SRC" "$CONTROLLER_SERVICE_DST"', text)
-        self.assertIn('install_one "$CONTROLLER_TIMER_SRC" "$CONTROLLER_TIMER_DST"', text)
-        self.assertIn('check_one "$CONTROLLER_SERVICE_SRC" "$CONTROLLER_SERVICE_DST"', text)
-        self.assertIn('check_one "$CONTROLLER_TIMER_SRC" "$CONTROLLER_TIMER_DST"', text)
-        self.assertIn(
-            "systemctl --user enable --now symphony-concurrency-controller.timer",
-            text,
-        )
+        self.assertNotIn('install_one "$CONTROLLER_SRC"', text)
+        self.assertNotIn("enable --now symphony-concurrency-controller.timer", text)
 
 
 if __name__ == "__main__":

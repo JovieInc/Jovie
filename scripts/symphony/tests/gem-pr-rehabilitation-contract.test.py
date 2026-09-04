@@ -44,6 +44,30 @@ SPEC.loader.exec_module(REGISTRY)
 
 
 class RegistryContractTests(unittest.TestCase):
+    def test_canonical_fleet_installer_deploys_execution_capacity_artifacts(self):
+        installer = FLEET_INSTALLER.read_text(encoding="utf-8")
+        self.assertIn("scripts/symphony/symphony_capacity_evidence.py", installer)
+        self.assertIn("scripts/symphony/symphony_proof_context.py", installer)
+        self.assertIn("scripts/symphony/symphony-concurrency-controller.py", installer)
+        self.assertIn(
+            "scripts/symphony/systemd/symphony-concurrency-controller.service",
+            installer,
+        )
+        self.assertIn(
+            "scripts/symphony/systemd/symphony-concurrency-controller.timer",
+            installer,
+        )
+        self.assertIn(
+            '${HOME}/.local/bin/symphony_capacity_evidence.py', installer
+        )
+        self.assertIn(
+            '${HOME}/.local/bin/symphony-concurrency-controller', installer
+        )
+        self.assertNotIn(
+            'systemctl --user enable --now "symphony-concurrency-controller.timer"',
+            installer,
+        )
+
     def test_jovie_stabilization_is_allowlisted_without_changing_issue_policy(self):
         policy = REGISTRY.by_github("JovieInc/Jovie")
         self.assertTrue(policy.pr_drain)
@@ -438,6 +462,7 @@ class FleetControllerInstallerContractTests(unittest.TestCase):
         systemctl = fake_bin / "systemctl"
         systemctl.write_text(
             """#!/bin/sh
+printf '%s\n' "$*" >> "${FAKE_SYSTEMCTL_LOG:-/dev/null}"
 case "$*" in
   *"show-environment"*) exit 0 ;;
   *"is-active --quiet gem-pr-drain.timer"*) exit 1 ;;
@@ -505,9 +530,21 @@ exit 0
             "FAKE_WORKFLOW_MUTATION_MARKER": str(root / "workflow-mutated"),
             "FAKE_WORKFLOW_OVERLAY_TARGET": str(paths["workflow"]),
             "GEM_PROC_ROOT": str(proc_root),
+            "FAKE_SYSTEMCTL_LOG": str(root / "systemctl.log"),
             "PATH": f"{fake_bin}:/usr/bin:/bin:/usr/sbin:/sbin",
         }
         return paths, env
+
+    def test_repeated_install_preserves_separately_owned_sidecar_masks(self):
+        with tempfile.TemporaryDirectory() as directory:
+            fixture = self._fixture(directory)
+            _paths, env = self._runtime(directory)
+            self.assertEqual(self._install(fixture, env).returncode, 0)
+            self.assertEqual(self._install(fixture, env).returncode, 0)
+            calls = pathlib.Path(env["FAKE_SYSTEMCTL_LOG"]).read_text()
+        for unit in ("symphony-grok-sidecar.timer", "symphony-grok-sidecar.service"):
+            self.assertEqual(calls.count(f"mask {unit}"), 0)
+            self.assertEqual(calls.count(f"disable --now {unit}"), 0)
 
     def _install(
         self,
@@ -577,6 +614,7 @@ exit 0
             fixture = self._fixture(directory)
             paths, env = self._runtime(directory)
             process = self._install(fixture, env)
+            installed_context = (pathlib.Path(env["GEM_WORKSPACE"]) / "scripts/symphony_proof_context.py").read_bytes()
             installed_policy = paths["policy"].read_bytes()
             installed_closure = paths["closure"].read_bytes()
             installed_registry = paths["registry_module"].read_bytes()
@@ -601,6 +639,7 @@ exit 0
             (HERMES / "config/gem-repo-registry.json").read_bytes(),
         )
         self.assertIn(b"def resolve_registry_path", installed_registry)
+        self.assertEqual(installed_context, (HERMES / "symphony_proof_context.py").read_bytes())
         self.assertTrue(attestation["policy"]["matches"])
         self.assertTrue(attestation["gate"]["matches"])
         self.assertTrue(attestation["closureHealth"]["matches"])
@@ -609,37 +648,29 @@ exit 0
             attestation["policy"]["installedSha256"],
         )
         self.assertEqual(attestation["workflow"]["matchMode"], "exact")
-        self.assertEqual(attestation["workflow"]["sourceMaxConcurrentAgents"], 8)
-        self.assertEqual(attestation["workflow"]["installedMaxConcurrentAgents"], 8)
+        self.assertEqual(attestation["workflow"]["sourceMaxConcurrentAgents"], 0)
+        self.assertEqual(attestation["workflow"]["installedMaxConcurrentAgents"], 0)
         self.assertEqual(attestation["listener"]["wrapperPid"], 3131)
         self.assertEqual(attestation["listener"]["pid"], 4242)
 
-    def test_install_attests_controller_owned_bounded_concurrency_overlay(self):
+    def test_install_rejects_runtime_overlay_during_exact_install(self):
         with tempfile.TemporaryDirectory() as directory:
             fixture = self._fixture(directory)
             paths, env = self._runtime(directory)
             process = self._install(fixture, env, workflow_overlay="1")
             installed_workflow = paths["workflow"].read_text(encoding="utf-8")
-            attestation = json.loads(paths["attestation"].read_text(encoding="utf-8"))
+            attestation_exists = paths["attestation"].exists()
 
-        self.assertEqual(process.returncode, 0, process.stderr)
-        self.assertIn("max_concurrent_agents: 1", installed_workflow)
-        self.assertTrue(attestation["workflow"]["matches"])
-        self.assertEqual(
-            attestation["workflow"]["matchMode"], "bounded_concurrency_overlay"
-        )
-        self.assertEqual(attestation["workflow"]["sourceMaxConcurrentAgents"], 8)
-        self.assertEqual(attestation["workflow"]["installedMaxConcurrentAgents"], 1)
-        self.assertNotEqual(
-            attestation["workflow"]["sourceSha256"],
-            attestation["workflow"]["installedSha256"],
-        )
+        self.assertNotEqual(process.returncode, 0)
+        self.assertEqual(installed_workflow, "old workflow\n")
+        self.assertFalse(attestation_exists)
+        self.assertIn("refusing stale Gem service attestation", process.stderr)
 
     def test_install_rejects_out_of_bounds_concurrency_overlay(self):
         with tempfile.TemporaryDirectory() as directory:
             fixture = self._fixture(directory)
             paths, env = self._runtime(directory)
-            process = self._install(fixture, env, workflow_overlay="9")
+            process = self._install(fixture, env, workflow_overlay="41")
             restored_workflow = paths["workflow"].read_text(encoding="utf-8")
             attestation_exists = paths["attestation"].exists()
 

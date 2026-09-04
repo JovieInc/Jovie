@@ -24,31 +24,10 @@ def now_iso() -> str:
     return datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
 
 
-def capacity_evidence(target: int = 4) -> dict[str, object]:
-    observed_at = now_iso()
-    return {
-        "schema": "gem-concurrency-evidence/v1",
-        "source": "execution-proven-useful-turns",
-        "target": target,
-        "approved": target > 0,
-        "severeIncidents": 0,
-        "observedAt": observed_at,
-        "acceptedEvidence": [
-            {
-                "schema": "symphony-useful-turn-proof/v1",
-                "provider": "openai",
-                "profile": f"profile-{index}",
-                "model": "gpt-5.6-sol",
-                "rc": 0,
-                "useful": True,
-                "completedAt": observed_at,
-                "outputDigest": hashlib.sha256(str(index).encode()).hexdigest(),
-                "outputBytes": 32,
-                "outputTokens": 8,
-            }
-            for index in range(1, target + 1)
-        ],
-    }
+from proof_fixtures import evidence
+
+def capacity_evidence(target=4):
+    return evidence(target, now_iso())
 
 
 def signals(**overrides):
@@ -130,6 +109,21 @@ def run_wrapper(payload, *, consumer="fleet", expected_sha=None):
 
 
 class EvaluateFleetGateWrapperTests(unittest.TestCase):
+    def test_new_cooldown_invalidates_fresh_proof_before_remote_mutation(self):
+        import proof_fixtures as F
+        payload = signals()
+        row = payload["concurrencyEvidence"]["acceptedEvidence"][0]
+        account = pathlib.Path(F.ACCOUNTS[row["profile"]]["accountPath"])
+        state_path = account.parent / "state.json"
+        original = state_path.read_text()
+        try:
+            F.write_private(state_path, {"cooldowns": {account.name: 9999999999}})
+            _, _, receipt = run_wrapper(payload)
+            self.assertFalse(receipt["remediationAdmission"]["pushAllowed"])
+            self.assertFalse(receipt["workAdmission"]["newIssueLeaseAllowed"])
+        finally:
+            state_path.write_text(original)
+
     def test_script_and_action_are_the_single_evaluate_path(self):
         self.assertTrue(SCRIPT.is_file())
         self.assertTrue(os.access(SCRIPT, os.X_OK) or SCRIPT.exists())
@@ -340,6 +334,32 @@ class EvaluateFleetGateWrapperTests(unittest.TestCase):
         self.assertIn("base64 -w0 <\"$admission\"", wrapper)
         self.assertNotIn("base64 -w0 <\"$receipt\"", wrapper)
         self.assertIn("has(\"classifications\") | not", wrapper)
+
+    def test_pr_head_validation_is_hosted_read_only_and_exact(self):
+        workflow = (ROOT / ".github/workflows/ci.yml").read_text()
+        start = workflow.index("  fleet-gate-pr-validation:")
+        job = workflow[start:workflow.index("\n  runner-image-offline-proof:", start)]
+        for needle in (
+            "pull_request:", "contents: read", "runs-on: ubuntu-latest",
+            "github.event_name == 'pull_request' || github.event_name == 'merge_group'",
+            "ref: ${{ github.event.pull_request.head.sha || github.sha }}",
+            "symphony-concurrency-controller.test.py",
+        ):
+            self.assertIn(needle, workflow if needle in ("pull_request:", "contents: read") else job)
+        for forbidden in (
+            "pull_request_target:", "self-hosted", "create-github-app-token",
+            "--dry-run", "backlog-orchestrator.mjs",
+        ):
+            self.assertNotIn(forbidden, job)
+
+        canonical = (
+            ROOT / ".github/workflows/fleet-gate-refresh.yml"
+        ).read_text()
+        for needle in (
+            "pull_request_target:", "ref: main",
+            "runs-on: [self-hosted, Linux, X64, jovie-fixed]",
+        ):
+            self.assertIn(needle, canonical)
 
 
 if __name__ == "__main__":

@@ -28,7 +28,7 @@ class CodexAccountProbeTests(unittest.TestCase):
             (account / "auth.json").write_text("{}\n")
             (account / "config.toml").write_text('model = "test"\n')
         self.codex = self.root / "codex"
-        self.codex.write_text("#!/usr/bin/env bash\nprintf '%s\\n' \"${PROBE_RESPONSE:-SYMPHONY_ACCOUNT_READY}\"\nexit \"${PROBE_EXIT:-0}\"\n")
+        self.codex.write_text("#!/usr/bin/env python3\nimport os,sys,pathlib\nargs=sys.argv\np=pathlib.Path(args[args.index('--output-last-message')+1])\np.write_text(args[-1].split('Reply with exactly: ',1)[1] if os.environ.get('PROBE_RESPONSE','SYMPHONY_ACCOUNT_READY') == 'SYMPHONY_ACCOUNT_READY' else os.environ['PROBE_RESPONSE'])\nsys.exit(int(os.environ.get('PROBE_EXIT','0')))\n")
         self.codex.chmod(0o755)
 
     def tearDown(self):
@@ -65,6 +65,25 @@ class CodexAccountProbeTests(unittest.TestCase):
         state = json.loads((self.accounts / "state.json").read_text())
         self.assertEqual(state["cooldowns"]["account-a"], original)
         self.assertEqual(state["cooldowns"]["account-b"], original)
+        self.assertNotIn("readiness", state)
+
+    def test_stdout_marker_without_final_message_does_not_recover(self):
+        original = self.write_state()
+        self.codex.write_text("#!/usr/bin/env bash\necho SYMPHONY_ACCOUNT_READY\n")
+        result = self.run_probe()
+        self.assertEqual(result.returncode, 0)
+        state = json.loads((self.accounts / "state.json").read_text())
+        self.assertEqual(state["cooldowns"]["account-a"], original)
+        self.assertNotIn("readiness", state)
+
+    def test_env_cannot_redirect_account_and_limiter_race_wins(self):
+        original = self.write_state()
+        (self.accounts / "account-a" / "env").write_text("CODEX_HOME=/tmp/wrong-account\n")
+        self.codex.write_text("#!/usr/bin/env python3\nimport os,sys,pathlib,json\np=pathlib.Path(os.environ['CODEX_HOME'])\nassert p.name in ('account-a','account-b')\ns=p.parent/'state.json'\nv=json.loads(s.read_text())\nv['last_error'][p.name]='new-limit-event'\ns.write_text(json.dumps(v))\na=sys.argv\npathlib.Path(a[a.index('--output-last-message')+1]).write_text(a[-1].split('Reply with exactly: ',1)[1])\n")
+        result = self.run_probe()
+        self.assertEqual(result.returncode, 0, result.stderr)
+        state = json.loads((self.accounts / "state.json").read_text())
+        self.assertEqual(state["cooldowns"]["account-a"], original)
         self.assertNotIn("readiness", state)
 
     def test_held_account_lock_prevents_probe_and_preserves_cooldown(self):

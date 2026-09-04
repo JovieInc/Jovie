@@ -1,6 +1,8 @@
 import assert from 'node:assert/strict';
-import { execFile } from 'node:child_process';
+import { execFile, execFileSync } from 'node:child_process';
+import { mkdtempSync, rmSync } from 'node:fs';
 import { access, mkdir, mkdtemp, readFile, writeFile } from 'node:fs/promises';
+import { tmpdir } from 'node:os';
 import { dirname, resolve } from 'node:path';
 import { describe, it } from 'node:test';
 import { fileURLToPath } from 'node:url';
@@ -9,6 +11,10 @@ import { promisify } from 'node:util';
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const ORCHESTRATOR_DIR = resolve(__dirname, '..');
 const execFileAsync = promisify(execFile);
+const proofDirectory = mkdtempSync(resolve(tmpdir(), 'jovie-proof-node-'));
+process.on('exit', () =>
+  rmSync(proofDirectory, { recursive: true, force: true })
+);
 
 const classifier = await import('../classifier.mjs');
 const { reconcileIssues } = await import('../reconcile.mjs');
@@ -971,27 +977,146 @@ describe('deterministic Symphony admission boundary', () => {
     target = 4,
     observedAt = '2026-08-09T05:00:00.000Z'
   ) {
-    return {
-      schema: admitter.GEM_CONCURRENCY_EVIDENCE_SCHEMA,
-      source: 'execution-proven-useful-turns',
-      target,
-      approved: target > 0,
-      severeIncidents: 0,
-      observedAt,
-      acceptedEvidence: Array.from({ length: target }, (_, index) => ({
-        schema: 'symphony-useful-turn-proof/v1',
-        provider: 'openai',
-        profile: `profile-${index + 1}`,
-        model: 'gpt-5.6-sol',
-        rc: 0,
-        useful: true,
-        completedAt: observedAt,
-        outputDigest: `${index + 1}`.repeat(64).slice(0, 64),
-        outputBytes: 32,
-        outputTokens: 8,
-      })),
-    };
+    const fixture = JSON.parse(
+      execFileSync(
+        'python3',
+        [
+          resolve(ORCHESTRATOR_DIR, '../symphony/tests/proof_fixtures.py'),
+          String(target),
+          observedAt,
+          proofDirectory,
+        ],
+        { encoding: 'utf8' }
+      )
+    );
+    process.env.SYMPHONY_PROOF_CONTEXT = fixture.contextPath;
+    if (!process.env.PATH.startsWith(`${proofDirectory}:`))
+      process.env.PATH = `${proofDirectory}:${process.env.PATH}`;
+    return fixture.evidence;
   }
+
+  it('accepts only Python-attested v2 across both consumers', () => {
+    for (const target of [1, 40]) {
+      const evidence = capacityEvidence(target);
+      assert.equal(
+        evidence.acceptedEvidence[0].schema,
+        'symphony-useful-turn-proof/v2'
+      );
+      assert.equal(
+        admitter.resolveGemConcurrency(evidence, { now: evidence.observedAt })
+          .maxConcurrent,
+        target
+      );
+    }
+  });
+
+  it('rejects every cross-consumer proof substitution and missing local authority', () => {
+    const mutations = [
+      value => {
+        value.acceptedEvidence[0].schema = 'symphony-useful-turn-proof/v1';
+      },
+      value => {
+        value.acceptedEvidence[0].completedAt = '2026-08-01T00:00:00Z';
+      },
+      value => {
+        value.acceptedEvidence.push(value.acceptedEvidence[0]);
+        value.target = 2;
+      },
+      value => {
+        value.acceptedEvidence[0].provider = 'alternate';
+      },
+      value => {
+        value.acceptedEvidence[0].profile = 'f'.repeat(64);
+      },
+      value => {
+        value.acceptedEvidence[0].model = 'other';
+      },
+      value => {
+        value.acceptedEvidence[0].producer = 'self';
+      },
+      value => {
+        value.acceptedEvidence[0].probeId = 'e'.repeat(64);
+      },
+      value => {
+        value.acceptedEvidence[0].attested = false;
+      },
+      value => {
+        value.acceptedEvidence[0].outputDigest = 'a'.repeat(64);
+      },
+      value => {
+        value.runtime.binarySha256 = 'b'.repeat(64);
+      },
+      value => {
+        value.contractSha256 = 'c'.repeat(64);
+      },
+      value => {
+        value.acceptedEvidence[0].runtime.workflowSha256 = 'd'.repeat(64);
+      },
+      value => {
+        value.acceptedEvidence.push({
+          ...value.acceptedEvidence[0],
+          model: 'other',
+        });
+        value.target = 2;
+      },
+    ];
+    for (const mutate of mutations) {
+      const evidence = capacityEvidence(1);
+      mutate(evidence);
+      const result = admitter.resolveGemConcurrency(evidence, {
+        now: evidence.observedAt,
+      });
+      assert.equal(result.maxConcurrent, 0);
+      assert.equal(result.newMutationAllowed, false);
+    }
+    const evidence = capacityEvidence(1);
+    const context = process.env.SYMPHONY_PROOF_CONTEXT;
+    process.env.SYMPHONY_PROOF_CONTEXT = resolve(
+      proofDirectory,
+      'missing.json'
+    );
+    try {
+      assert.equal(
+        admitter.resolveGemConcurrency(evidence, { now: evidence.observedAt })
+          .maxConcurrent,
+        0
+      );
+    } finally {
+      process.env.SYMPHONY_PROOF_CONTEXT = context;
+    }
+  });
+
+  it('does not multiply one provider profile by model name', () => {
+    const evidence = capacityEvidence(2);
+    evidence.acceptedEvidence[1].profile = evidence.acceptedEvidence[0].profile;
+    evidence.acceptedEvidence[1].model = 'gpt-5.5';
+    assert.equal(
+      admitter.resolveGemConcurrency(evidence, { now: evidence.observedAt })
+        .maxConcurrent,
+      0
+    );
+  });
+
+  it('rejects noncanonical proof identities and timezone-naive timestamps', () => {
+    for (const [field, value] of [
+      ['provider', ' openai'],
+      ['profile', 'profile-1'],
+      ['model', 'gpt-5.6-sol '],
+      ['completedAt', '2026-08-09T05:00:00'],
+      ['completedAt', '2026-08-09T05:00:00+01:60'],
+      ['completedAt', '2026-02-30T05:00:00Z'],
+      ['completedAt', '2026-08-09T24:00:00Z'],
+      ['outputDigest', ['a'.repeat(64)]],
+    ]) {
+      const evidence = capacityEvidence(1);
+      /** @type {any} */ (evidence.acceptedEvidence[0])[String(field)] = value;
+      assert.equal(
+        admitter.resolveGemConcurrency(evidence, { now: evidence.observedAt })
+          .maxConcurrent,
+        0
+      );
+    }
+  });
 
   function fleetEvidence(overrides = {}) {
     return {
@@ -1032,7 +1157,9 @@ describe('deterministic Symphony admission boundary', () => {
         scope: admitter.INDEPENDENT_REVIEW_SCOPE,
         observedAt: '2026-08-09T05:00:00.000Z',
       },
-      concurrencyEvidence: capacityEvidence(),
+      concurrencyEvidence: Object.hasOwn(overrides, 'concurrencyEvidence')
+        ? Reflect.get(overrides, 'concurrencyEvidence')
+        : capacityEvidence(),
       observedAt: '2026-08-09T05:00:00.000Z',
       ...overrides,
     };
@@ -1580,10 +1707,6 @@ describe('deterministic Symphony admission boundary', () => {
       ORCHESTRATOR_DIR,
       '../symphony/gem-priority-gate.py'
     );
-    const workflow = resolve(
-      ORCHESTRATOR_DIR,
-      '../symphony/WORKFLOW.jovie-ui-pilot.md'
-    );
     const runController = async (signals, consumer = 'fleet') => {
       const controllerSignals = JSON.parse(JSON.stringify(signals));
       controllerSignals.independentReview = {
@@ -1607,6 +1730,17 @@ describe('deterministic Symphony admission boundary', () => {
         const { stdout } = await execFileAsync(
           'python3',
           [
+            '-c',
+            `import json, pathlib, runpy, sys
+sys.path.insert(0, str(pathlib.Path(sys.argv[1]).parent / "tests"))
+from proof_fixtures import evidence
+controller = sys.argv.pop(1)
+sys.argv[0] = controller
+index = sys.argv.index("--evaluate-json") + 1
+signals = json.loads(sys.argv[index])
+signals["concurrencyEvidence"] = evidence(4)
+sys.argv[index] = json.dumps(signals)
+runpy.run_path(controller, run_name="__main__")`,
             controller,
             '--evaluate-json',
             JSON.stringify(controllerSignals),
@@ -1668,7 +1802,6 @@ describe('deterministic Symphony admission boundary', () => {
       }),
       'promotion'
     );
-    const workflowSource = await readFile(workflow, 'utf8');
 
     assert.equal(amber.exitCode, 0);
     assert.equal(amber.receipt.state, 'AMBER');
@@ -1714,20 +1847,22 @@ describe('deterministic Symphony admission boundary', () => {
       productionRed.receipt.isolatedPromotionAdmission.deploymentsAllowed,
       false
     );
-    assert.match(workflowSource, /Always open a non-draft PR/);
-    assert.match(workflowSource, /Do not create draft PRs/);
-    assert.match(workflowSource, /including when the gate is `GREEN`/);
-    assert.match(workflowSource, /gh pr edit --add-label queue-deferred/);
-    assert.match(
-      workflowSource,
-      /fresh `GREEN` receipt or the exact isolated exception/
+    assert.equal(
+      amber.receipt.signals.concurrencyEvidence.source,
+      'execution-proven-useful-turns'
+    );
+    assert.ok(
+      amber.receipt.signals.concurrencyEvidence.acceptedEvidence.every(
+        proof => proof.schema === 'symphony-useful-turn-proof/v2'
+      )
     );
     assert.match(
-      workflowSource,
-      /Labels and path-only classification are not eligibility evidence/
+      await readFile(
+        resolve(ORCHESTRATOR_DIR, '../symphony/WORKFLOW.md'),
+        'utf8'
+      ),
+      /max_concurrent_agents: 0/
     );
-    assert.match(workflowSource, /max_concurrent_agents: 4/);
-    assert.doesNotMatch(workflowSource, /Open a non-draft PR/);
   });
 
   it('stops and never redispatches an agent once its issue reaches In Review', async () => {
@@ -1755,19 +1890,18 @@ describe('deterministic Symphony admission boundary', () => {
     assert.deepEqual(activeStates, ['Todo', 'In Progress']);
     assert.ok(!activeStates.includes('In Review'));
 
-    // Capacity and lease invariants are preserved: four concurrent agents,
-    // each bound to one issue and one workspace.
-    assert.match(workflowSource, /max_concurrent_agents: 4/);
-
-    // The ownership boundary is documented: Symphony implements through
-    // draft PR / In Review; Gem + GitHub own review, fleet-gate promotion,
-    // queue, merge, deploy, and receipts, and keep the PR externally
-    // monitorable without holding a Symphony slot.
+    assert.match(
+      await readFile(
+        resolve(ORCHESTRATOR_DIR, '../symphony/WORKFLOW.md'),
+        'utf8'
+      ),
+      /max_concurrent_agents: 0/
+    );
+    assert.match(workflowSource, /Never merge or deploy manually/);
     assert.match(
       workflowSource,
-      /Gem \+ GitHub own everything after that point: review,/
+      /native controller rechecks before enrollment/
     );
-    assert.match(workflowSource, /externally monitorable/);
   });
 
   it('keeps the Gem drain on typed fleet admission and fail-closes exit-code mismatches', async () => {
@@ -1781,12 +1915,14 @@ import json
 import pathlib
 import sys
 sys.path.insert(0, sys.argv[1])
+sys.path.insert(0, str(pathlib.Path(sys.argv[1]) / "tests"))
+from proof_fixtures import evidence
 from gem_gate_contract import GateContractError, drain_state_dir, gate_state_dir, validate_gate_result
 
 receipt = {
     "schema": "jovie-fleet-gate/v1",
     "state": "AMBER",
-    "signals": {"main": {"status": "red", "sha": "a" * 40}, "closureHealth": {"schema": "jovie-closure-health/v1", "status": "healthy", "authority": "Summer", "newIssueIntakeAllowed": True, "promotionContinues": True, "remediationContinues": True, "reasons": []}, "independentReview": {"schema": "jovie-independent-review/v1", "accepted": False, "reason": "independent-review-receipt-missing"}, "concurrencyEvidence": {"accepted": True, "source": "execution-proven-useful-turns", "target": 1, "acceptedEvidence": [{"schema": "symphony-useful-turn-proof/v1", "provider": "openai", "profile": "profile-1", "model": "gpt-5.6-sol", "rc": 0, "useful": True, "completedAt": "2026-09-04T00:00:00Z", "outputDigest": "a" * 64, "outputBytes": 32, "outputTokens": 8}]}},
+    "signals": {"main": {"status": "red", "sha": "a" * 40}, "closureHealth": {"schema": "jovie-closure-health/v1", "status": "healthy", "authority": "Summer", "newIssueIntakeAllowed": True, "promotionContinues": True, "remediationContinues": True, "reasons": []}, "independentReview": {"schema": "jovie-independent-review/v1", "accepted": False, "reason": "independent-review-receipt-missing"}, "concurrencyEvidence": {"accepted": True, "source": "execution-proven-useful-turns", "target": 1, "acceptedEvidence": [{"schema": "symphony-useful-turn-proof/v1", "provider": "openai", "profile": "1" * 64, "model": "gpt-5.6-sol", "rc": 0, "useful": True, "completedAt": "2026-09-04T00:00:00Z", "outputDigest": "a" * 64, "outputBytes": 32, "outputTokens": 8}]}},
     "reasons": [{"code": "main-not-green", "layer": "promotion", "severity": "warning", "detail": "main red"}],
     "reviewAdmission": {"allowed": False, "required": True, "authority": "Gem", "scope": "exact-main-head", "headSha": None, "observedAt": None, "reviewId": None, "reviewer": None, "reason": "independent-review-receipt-missing"},
     "closureAdmission": {"allowed": True, "newIssueIntakeAllowed": True, "newImplementationAllowed": True, "fallbackPrGenerationAllowed": True, "authority": "Summer", "promotionContinues": True, "remediationContinues": True},
@@ -1804,6 +1940,7 @@ receipt = {
     "concurrency": {"gem": {"evidenceAccepted": True, "newMutationAllowed": True, "maxConcurrent": 1, "runtimeFloor": 1}},
     "ownership": {"review": "Gem", "directGemPickup": False},
 }
+receipt["signals"]["concurrencyEvidence"] = {**evidence(1), "accepted": True}
 validate_gate_result(0, json.dumps(receipt), "fleet")
 validate_gate_result(0, json.dumps(receipt), "remediation")
 validate_gate_result(2, json.dumps(receipt), "promotion")
@@ -1899,6 +2036,9 @@ receipt = {
     "concurrency": {"gem": {"evidenceAccepted": False, "newMutationAllowed": False, "maxConcurrent": 0, "runtimeFloor": 1}},
     "ownership": {"review": "Gem", "directGemPickup": False},
 }
+import os
+if receipt["signals"]["concurrencyEvidence"]["accepted"]:
+    receipt["signals"]["concurrencyEvidence"] = {**json.loads(os.environ["TEST_CAPACITY_JSON"]), "accepted": True}
 print(json.dumps(receipt))
 raise SystemExit(0)
 `
@@ -1961,6 +2101,9 @@ receipt = {
     "concurrency": {"gem": {"evidenceAccepted": True, "newMutationAllowed": True, "maxConcurrent": 1, "runtimeFloor": 1}},
     "ownership": {"review": "Gem", "directGemPickup": False},
 }
+import os
+if receipt["signals"]["concurrencyEvidence"]["accepted"]:
+    receipt["signals"]["concurrencyEvidence"] = {**json.loads(os.environ["TEST_CAPACITY_JSON"]), "accepted": True}
 print(json.dumps(receipt))
 raise SystemExit(0)
 `
@@ -1971,6 +2114,12 @@ import json
 import pathlib
 import sys
 consumer = pathlib.Path(sys.argv[1])
+sys.path.insert(0, str(consumer.parent / "tests"))
+from proof_fixtures import evidence
+capacity = evidence(1)
+# Keep the private fixture alive through both gate subprocesses.
+import os
+os.environ["TEST_CAPACITY_JSON"] = json.dumps(capacity)
 spec = importlib.util.spec_from_file_location("gem_pr_drain", consumer)
 module = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(module)

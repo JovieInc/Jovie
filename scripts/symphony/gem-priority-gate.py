@@ -38,7 +38,7 @@ from closure_health import (  # noqa: E402 - sibling executable module
 )
 from closure_health import SCHEMA as CLOSURE_HEALTH_SCHEMA  # noqa: E402
 from closure_health import observe_closure_health  # noqa: E402
-from gem_gate_contract import validate_capacity_receipt  # noqa: E402
+from symphony_proof_context import validate_local_receipt as validate_capacity_receipt  # noqa: E402
 
 
 SCHEMA = "jovie-fleet-gate/v1"

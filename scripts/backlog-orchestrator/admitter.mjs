@@ -7,6 +7,8 @@
  * fail-closed on ownership, plan evidence, and mutation read-back.
  */
 
+import { spawnSync } from 'node:child_process';
+import { fileURLToPath } from 'node:url';
 import { invariantPolicy } from '../invariants/registry.mjs';
 import { admissionGateReceipt } from './admission-gate.mjs';
 import { preAdmissionDecision } from './admission-policy.mjs';
@@ -235,7 +237,28 @@ function evaluateClosureAdmission(candidate) {
 }
 
 function isFreshTimestamp(value, nowMs, maxAgeMs) {
-  const observedMs = Date.parse(value || '');
+  const match =
+    typeof value === 'string' &&
+    /^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2}):(\d{2})(?:\.\d{1,6})?(?:Z|[+-](\d{2}):(\d{2}))$/.exec(
+      value
+    );
+  if (!match) return false;
+  const [, year, month, day, hour, minute, second, offsetHour, offsetMinute] =
+    match.map(Number);
+  const calendar = new Date(
+    Date.UTC(year, month - 1, day, hour, minute, second)
+  );
+  if (
+    calendar.getUTCFullYear() !== year ||
+    calendar.getUTCMonth() !== month - 1 ||
+    calendar.getUTCDate() !== day ||
+    calendar.getUTCHours() !== hour ||
+    calendar.getUTCMinutes() !== minute ||
+    calendar.getUTCSeconds() !== second ||
+    (Number.isFinite(offsetHour) && (offsetHour > 23 || offsetMinute > 59))
+  )
+    return false;
+  const observedMs = Date.parse(value);
   return (
     Number.isFinite(observedMs) &&
     observedMs <= nowMs &&
@@ -419,31 +442,37 @@ function usefulTurnProofs(evidence, nowMs, maxAgeMs) {
   ) {
     return null;
   }
-  const seats = new Set();
-  for (const proof of evidence.acceptedEvidence) {
-    const strings = [proof?.provider, proof?.profile, proof?.model];
-    const completionProven =
-      (Number.isInteger(proof?.outputBytes) && proof.outputBytes > 0) ||
-      (Number.isInteger(proof?.outputTokens) && proof.outputTokens > 0);
-    if (
-      proof?.schema !== 'symphony-useful-turn-proof/v1' ||
-      strings.some(value => typeof value !== 'string' || !value.trim()) ||
-      proof?.rc !== 0 ||
-      proof?.useful !== true ||
-      !/^[0-9a-f]{64}$/.test(proof?.outputDigest || '') ||
-      !completionProven ||
-      !isFreshTimestamp(proof?.completedAt, nowMs, maxAgeMs)
-    ) {
-      return null;
-    }
-    const seat = strings
-      .slice(0, 2)
-      .map(value => value.trim())
-      .join('\u0000');
-    if (seats.has(seat)) return null;
-    seats.add(seat);
+  // One contract implementation: rows cannot supply their own trust context.
+  // Python remeasures the private runtime/enrollment files and completion artifacts.
+  try {
+    const result = spawnSync(
+      'python3',
+      [
+        fileURLToPath(
+          new URL('../symphony/symphony_proof_context.py', import.meta.url)
+        ),
+      ],
+      {
+        input: JSON.stringify({
+          receipt: evidence,
+          now: new Date(nowMs).toISOString(),
+          maxAgeMs,
+        }),
+        encoding: 'utf8',
+        timeout: 10000,
+        maxBuffer: 1024 * 1024,
+      }
+    );
+    if (result.error || result.status !== 0) return null;
+    const verified = JSON.parse(result.stdout);
+    return verified.accepted === true &&
+      Array.isArray(verified.seats) &&
+      verified.seats.length === evidence.target
+      ? verified.seats
+      : null;
+  } catch {
+    return null;
   }
-  return evidence.target === seats.size ? [...seats] : null;
 }
 
 /** Use only fresh, digest-bound useful turns as dispatch capacity. */

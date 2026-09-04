@@ -1494,6 +1494,9 @@ class SourceContractTests(unittest.TestCase):
 
             self.assertEqual(hud.configured_slots((official, legacy)), 40)
 
+            official.write_text("max_concurrent_agents: 0\n", encoding="utf-8")
+            self.assertEqual(hud.configured_slots((official, legacy)), 0)
+
             official.unlink()
             self.assertEqual(hud.configured_slots((official, legacy)), 1)
 

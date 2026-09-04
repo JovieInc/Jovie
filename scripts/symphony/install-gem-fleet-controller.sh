@@ -16,20 +16,30 @@ readonly BACKUP_DIR="${GEM_ROOT}/state/backups/fleet-controller-${STAMP}"
 
 readonly GATE_SOURCE="${SOURCE_ROOT}/scripts/symphony/gem-priority-gate.py"
 readonly CLOSURE_SOURCE="${SOURCE_ROOT}/scripts/symphony/closure_health.py"
+readonly PROOF_CONTEXT_SOURCE="${SOURCE_ROOT}/scripts/symphony/symphony_proof_context.py"
 readonly CONTRACT_SOURCE="${SOURCE_ROOT}/scripts/symphony/gem_gate_contract.py"
 readonly CONSUMER_SOURCE="${SOURCE_ROOT}/scripts/symphony/gem-pr-drain.py"
 readonly REGISTRY_MODULE_SOURCE="${SOURCE_ROOT}/scripts/symphony/gem_repo_registry.py"
 readonly REGISTRY_CONFIG_SOURCE="${SOURCE_ROOT}/scripts/symphony/config/gem-repo-registry.json"
 readonly POLICY_SOURCE="${SOURCE_ROOT}/scripts/symphony/gem_rehabilitation_policy.py"
+readonly CAPACITY_SOURCE="${SOURCE_ROOT}/scripts/symphony/symphony_capacity_evidence.py"
+readonly CONCURRENCY_SOURCE="${SOURCE_ROOT}/scripts/symphony/symphony-concurrency-controller.py"
+readonly CONCURRENCY_SERVICE_SOURCE="${SOURCE_ROOT}/scripts/symphony/systemd/symphony-concurrency-controller.service"
+readonly CONCURRENCY_TIMER_SOURCE="${SOURCE_ROOT}/scripts/symphony/systemd/symphony-concurrency-controller.timer"
 readonly WORKFLOW_SOURCE="${SOURCE_ROOT}/scripts/symphony/WORKFLOW.md"
 readonly SERVICE_UNIT_SOURCE="${SOURCE_ROOT}/scripts/symphony/systemd/symphony-elixir.service"
 readonly GATE_TARGET="${GEM_ROOT}/scripts/gem-priority-gate.py"
 readonly CLOSURE_TARGET="${GEM_ROOT}/scripts/closure_health.py"
+readonly PROOF_CONTEXT_TARGET="${GEM_ROOT}/scripts/symphony_proof_context.py"
 readonly CONTRACT_TARGET="${GEM_ROOT}/scripts/gem_gate_contract.py"
 readonly CONSUMER_TARGET="${GEM_ROOT}/scripts/gem-pr-drain.py"
 readonly REGISTRY_MODULE_TARGET="${GEM_ROOT}/scripts/gem_repo_registry.py"
 readonly REGISTRY_CONFIG_TARGET="${GEM_ROOT}/config/gem-repo-registry.json"
 readonly POLICY_TARGET="${GEM_ROOT}/scripts/gem_rehabilitation_policy.py"
+readonly CAPACITY_TARGET="${HOME}/.local/bin/symphony_capacity_evidence.py"
+readonly CONCURRENCY_TARGET="${HOME}/.local/bin/symphony-concurrency-controller"
+readonly CONCURRENCY_SERVICE_TARGET="${HOME}/.config/systemd/user/symphony-concurrency-controller.service"
+readonly CONCURRENCY_TIMER_TARGET="${HOME}/.config/systemd/user/symphony-concurrency-controller.timer"
 readonly WORKFLOW_TARGET="${SYMPHONY_ROOT}/WORKFLOW.md"
 readonly SERVICE_UNIT_TARGET="${HOME}/.config/systemd/user/symphony-elixir.service"
 # shellcheck source=lib/user-systemd-context.sh
@@ -81,10 +91,15 @@ for source in \
   "${GATE_SOURCE}" \
   "${CLOSURE_SOURCE}" \
   "${CONTRACT_SOURCE}" \
+  "${PROOF_CONTEXT_SOURCE}" \
   "${CONSUMER_SOURCE}" \
   "${REGISTRY_MODULE_SOURCE}" \
   "${REGISTRY_CONFIG_SOURCE}" \
   "${POLICY_SOURCE}" \
+  "${CAPACITY_SOURCE}" \
+  "${CONCURRENCY_SOURCE}" \
+  "${CONCURRENCY_SERVICE_SOURCE}" \
+  "${CONCURRENCY_TIMER_SOURCE}" \
   "${WORKFLOW_SOURCE}" \
   "${SERVICE_UNIT_SOURCE}"
 do
@@ -95,10 +110,15 @@ git -C "${SOURCE_ROOT}" diff --quiet -- \
   scripts/symphony/gem-priority-gate.py \
   scripts/symphony/closure_health.py \
   scripts/symphony/gem_gate_contract.py \
+  scripts/symphony/symphony_proof_context.py \
   scripts/symphony/gem-pr-drain.py \
   scripts/symphony/gem_repo_registry.py \
   scripts/symphony/config/gem-repo-registry.json \
   scripts/symphony/gem_rehabilitation_policy.py \
+  scripts/symphony/symphony_capacity_evidence.py \
+  scripts/symphony/symphony-concurrency-controller.py \
+  scripts/symphony/systemd/symphony-concurrency-controller.service \
+  scripts/symphony/systemd/symphony-concurrency-controller.timer \
   scripts/symphony/WORKFLOW.md \
   scripts/symphony/systemd/symphony-elixir.service \
   scripts/symphony/lib/user-systemd-context.sh
@@ -106,10 +126,15 @@ git -C "${SOURCE_ROOT}" diff --cached --quiet -- \
   scripts/symphony/gem-priority-gate.py \
   scripts/symphony/closure_health.py \
   scripts/symphony/gem_gate_contract.py \
+  scripts/symphony/symphony_proof_context.py \
   scripts/symphony/gem-pr-drain.py \
   scripts/symphony/gem_repo_registry.py \
   scripts/symphony/config/gem-repo-registry.json \
   scripts/symphony/gem_rehabilitation_policy.py \
+  scripts/symphony/symphony_capacity_evidence.py \
+  scripts/symphony/symphony-concurrency-controller.py \
+  scripts/symphony/systemd/symphony-concurrency-controller.service \
+  scripts/symphony/systemd/symphony-concurrency-controller.timer \
   scripts/symphony/lib/user-systemd-context.sh \
   scripts/symphony/WORKFLOW.md \
   scripts/symphony/systemd/symphony-elixir.service
@@ -131,9 +156,12 @@ python3 -m py_compile \
   "${GATE_SOURCE}" \
   "${CLOSURE_SOURCE}" \
   "${CONTRACT_SOURCE}" \
+  "${PROOF_CONTEXT_SOURCE}" \
   "${CONSUMER_SOURCE}" \
   "${REGISTRY_MODULE_SOURCE}" \
-  "${POLICY_SOURCE}"
+  "${POLICY_SOURCE}" \
+  "${CAPACITY_SOURCE}" \
+  "${CONCURRENCY_SOURCE}"
 python3 -m json.tool "${REGISTRY_CONFIG_SOURCE}" >/dev/null
 smoke_consumer_import "${CONSUMER_SOURCE}"
 if [[ "${VERIFY_ONLY}" == true ]]; then
@@ -142,10 +170,15 @@ if [[ "${VERIFY_ONLY}" == true ]]; then
     "${GATE_SOURCE}" \
     "${CLOSURE_SOURCE}" \
     "${CONTRACT_SOURCE}" \
+    "${PROOF_CONTEXT_SOURCE}" \
     "${CONSUMER_SOURCE}" \
     "${REGISTRY_MODULE_SOURCE}" \
     "${REGISTRY_CONFIG_SOURCE}" \
     "${POLICY_SOURCE}" \
+    "${CAPACITY_SOURCE}" \
+    "${CONCURRENCY_SOURCE}" \
+    "${CONCURRENCY_SERVICE_SOURCE}" \
+    "${CONCURRENCY_TIMER_SOURCE}" \
     "${WORKFLOW_SOURCE}" \
     "${SERVICE_UNIT_SOURCE}"
   exit 0
@@ -156,6 +189,7 @@ mkdir -p "${BACKUP_DIR}" "${GEM_ROOT}/scripts" "${GEM_ROOT}/config" "$(dirname "
 cp -p "${GATE_TARGET}" "${BACKUP_DIR}/gem-priority-gate.py"
 [[ ! -e "${CLOSURE_TARGET}" ]] || cp -p "${CLOSURE_TARGET}" "${BACKUP_DIR}/closure_health.py"
 cp -p "${CONSUMER_TARGET}" "${BACKUP_DIR}/gem-pr-drain.py"
+[[ ! -e "${PROOF_CONTEXT_TARGET}" ]] || cp -p "${PROOF_CONTEXT_TARGET}" "${BACKUP_DIR}/symphony_proof_context.py"
 [[ ! -e "${CONTRACT_TARGET}" ]] || cp -p "${CONTRACT_TARGET}" "${BACKUP_DIR}/gem_gate_contract.py"
 [[ ! -e "${REGISTRY_MODULE_TARGET}" ]] || \
   cp -p "${REGISTRY_MODULE_TARGET}" "${BACKUP_DIR}/gem_repo_registry.py"
@@ -163,24 +197,43 @@ cp -p "${CONSUMER_TARGET}" "${BACKUP_DIR}/gem-pr-drain.py"
   cp -p "${REGISTRY_CONFIG_TARGET}" "${BACKUP_DIR}/gem-repo-registry.json"
 [[ ! -e "${POLICY_TARGET}" ]] || \
   cp -p "${POLICY_TARGET}" "${BACKUP_DIR}/gem_rehabilitation_policy.py"
+[[ ! -e "${CAPACITY_TARGET}" ]] || \
+  cp -p "${CAPACITY_TARGET}" "${BACKUP_DIR}/symphony_capacity_evidence.py"
+[[ ! -e "${CONCURRENCY_TARGET}" ]] || \
+  cp -p "${CONCURRENCY_TARGET}" "${BACKUP_DIR}/symphony-concurrency-controller"
+[[ ! -e "${CONCURRENCY_SERVICE_TARGET}" ]] || \
+  cp -p "${CONCURRENCY_SERVICE_TARGET}" "${BACKUP_DIR}/symphony-concurrency-controller.service"
+[[ ! -e "${CONCURRENCY_TIMER_TARGET}" ]] || \
+  cp -p "${CONCURRENCY_TIMER_TARGET}" "${BACKUP_DIR}/symphony-concurrency-controller.timer"
 [[ ! -e "${WORKFLOW_TARGET}" ]] || cp -p "${WORKFLOW_TARGET}" "${BACKUP_DIR}/WORKFLOW.md"
 [[ ! -e "${SERVICE_UNIT_TARGET}" ]] || cp -p "${SERVICE_UNIT_TARGET}" "${BACKUP_DIR}/symphony-elixir.service"
 
 timer_was_active=false
+concurrency_timer_was_active=false
 closure_existed=false
+proof_context_existed=false
 contract_existed=false
 registry_module_existed=false
 registry_config_existed=false
 policy_existed=false
+capacity_existed=false
+concurrency_existed=false
+concurrency_service_existed=false
+concurrency_timer_existed=false
 workflow_existed=false
 service_unit_existed=false
 install_started=false
 install_complete=false
+[[ ! -e "${PROOF_CONTEXT_TARGET}" ]] || proof_context_existed=true
 [[ ! -e "${CONTRACT_TARGET}" ]] || contract_existed=true
 [[ ! -e "${CLOSURE_TARGET}" ]] || closure_existed=true
 [[ ! -e "${REGISTRY_MODULE_TARGET}" ]] || registry_module_existed=true
 [[ ! -e "${REGISTRY_CONFIG_TARGET}" ]] || registry_config_existed=true
 [[ ! -e "${POLICY_TARGET}" ]] || policy_existed=true
+[[ ! -e "${CAPACITY_TARGET}" ]] || capacity_existed=true
+[[ ! -e "${CONCURRENCY_TARGET}" ]] || concurrency_existed=true
+[[ ! -e "${CONCURRENCY_SERVICE_TARGET}" ]] || concurrency_service_existed=true
+[[ ! -e "${CONCURRENCY_TIMER_TARGET}" ]] || concurrency_timer_existed=true
 [[ ! -e "${WORKFLOW_TARGET}" ]] || workflow_existed=true
 [[ ! -e "${SERVICE_UNIT_TARGET}" ]] || service_unit_existed=true
 
@@ -208,6 +261,11 @@ finish_or_rollback() {
       else
         rm -f "${CLOSURE_TARGET}"
       fi
+      if [[ "${proof_context_existed}" == true ]]; then
+        restore_atomic "${BACKUP_DIR}/symphony_proof_context.py" "${PROOF_CONTEXT_TARGET}"
+      else
+        rm -f "${PROOF_CONTEXT_TARGET}"
+      fi
       if [[ "${contract_existed}" == true ]]; then
         restore_atomic "${BACKUP_DIR}/gem_gate_contract.py" "${CONTRACT_TARGET}"
       else
@@ -228,6 +286,26 @@ finish_or_rollback() {
       else
         rm -f "${POLICY_TARGET}"
       fi
+      if [[ "${capacity_existed}" == true ]]; then
+        restore_atomic "${BACKUP_DIR}/symphony_capacity_evidence.py" "${CAPACITY_TARGET}"
+      else
+        rm -f "${CAPACITY_TARGET}"
+      fi
+      if [[ "${concurrency_existed}" == true ]]; then
+        restore_atomic "${BACKUP_DIR}/symphony-concurrency-controller" "${CONCURRENCY_TARGET}"
+      else
+        rm -f "${CONCURRENCY_TARGET}"
+      fi
+      if [[ "${concurrency_service_existed}" == true ]]; then
+        restore_atomic "${BACKUP_DIR}/symphony-concurrency-controller.service" "${CONCURRENCY_SERVICE_TARGET}"
+      else
+        rm -f "${CONCURRENCY_SERVICE_TARGET}"
+      fi
+      if [[ "${concurrency_timer_existed}" == true ]]; then
+        restore_atomic "${BACKUP_DIR}/symphony-concurrency-controller.timer" "${CONCURRENCY_TIMER_TARGET}"
+      else
+        rm -f "${CONCURRENCY_TIMER_TARGET}"
+      fi
       if [[ "${service_unit_existed}" == true ]]; then
         restore_atomic "${BACKUP_DIR}/symphony-elixir.service" "${SERVICE_UNIT_TARGET}"
       else
@@ -237,6 +315,9 @@ finish_or_rollback() {
     fi
     if [[ "${timer_was_active}" == true ]]; then
       systemctl --user start "${TIMER}" >/dev/null 2>&1 || true
+    fi
+    if [[ "${concurrency_timer_was_active}" == true ]]; then
+      systemctl --user start symphony-concurrency-controller.timer >/dev/null 2>&1 || true
     fi
     printf 'fleet controller install rolled back; backup=%s\n' "${BACKUP_DIR}" >&2
   fi
@@ -248,6 +329,11 @@ if systemctl --user is-active --quiet "${TIMER}"; then
   timer_was_active=true
   systemctl --user stop "${TIMER}"
 fi
+if systemctl --user is-active --quiet symphony-concurrency-controller.timer; then
+  concurrency_timer_was_active=true
+  systemctl --user stop symphony-concurrency-controller.timer
+fi
+systemctl --user stop symphony-concurrency-controller.service >/dev/null 2>&1 || true
 for _ in $(seq 1 20); do
   systemctl --user is-active --quiet gem-pr-drain.service || break
   sleep 1
@@ -267,11 +353,17 @@ install_atomic() {
 install_started=true
 install_atomic "${GATE_SOURCE}" "${GATE_TARGET}" 0755
 install_atomic "${CLOSURE_SOURCE}" "${CLOSURE_TARGET}" 0755
+install_atomic "${PROOF_CONTEXT_SOURCE}" "${PROOF_CONTEXT_TARGET}" 0644
 install_atomic "${CONTRACT_SOURCE}" "${CONTRACT_TARGET}" 0644
 install_atomic "${CONSUMER_SOURCE}" "${CONSUMER_TARGET}" 0755
 install_atomic "${REGISTRY_MODULE_SOURCE}" "${REGISTRY_MODULE_TARGET}" 0755
 install_atomic "${REGISTRY_CONFIG_SOURCE}" "${REGISTRY_CONFIG_TARGET}" 0644
 install_atomic "${POLICY_SOURCE}" "${POLICY_TARGET}" 0644
+mkdir -p "$(dirname "${CAPACITY_TARGET}")" "$(dirname "${CONCURRENCY_SERVICE_TARGET}")"
+install_atomic "${CAPACITY_SOURCE}" "${CAPACITY_TARGET}" 0755
+install_atomic "${CONCURRENCY_SOURCE}" "${CONCURRENCY_TARGET}" 0755
+install_atomic "${CONCURRENCY_SERVICE_SOURCE}" "${CONCURRENCY_SERVICE_TARGET}" 0644
+install_atomic "${CONCURRENCY_TIMER_SOURCE}" "${CONCURRENCY_TIMER_TARGET}" 0644
 install_atomic "${WORKFLOW_SOURCE}" "${WORKFLOW_TARGET}" 0644
 mkdir -p "$(dirname "${SERVICE_UNIT_TARGET}")"
 install_atomic "${SERVICE_UNIT_SOURCE}" "${SERVICE_UNIT_TARGET}" 0644
@@ -281,7 +373,10 @@ python3 -m py_compile \
   "${CONTRACT_TARGET}" \
   "${CONSUMER_TARGET}" \
   "${REGISTRY_MODULE_TARGET}" \
-  "${POLICY_TARGET}"
+  "${POLICY_TARGET}" \
+  "${CAPACITY_TARGET}" \
+  "${CONCURRENCY_TARGET}"
+GEM_WORKSPACE="${GEM_ROOT}" python3 "${CAPACITY_TARGET}" --help >/dev/null
 python3 -m json.tool "${REGISTRY_CONFIG_TARGET}" >/dev/null
 smoke_consumer_import "${CONSUMER_TARGET}"
 
@@ -324,6 +419,14 @@ export \
   GATE_TARGET_SHA \
   CLOSURE_SOURCE_SHA \
   CLOSURE_TARGET_SHA \
+  CAPACITY_SOURCE \
+  CAPACITY_TARGET \
+  CONCURRENCY_SOURCE \
+  CONCURRENCY_TARGET \
+  CONCURRENCY_SERVICE_SOURCE \
+  CONCURRENCY_SERVICE_TARGET \
+  CONCURRENCY_TIMER_SOURCE \
+  CONCURRENCY_TIMER_TARGET \
   SERVICE_PID \
   LISTENER_PID \
   SERVICE_CONTROL_GROUP \
@@ -341,11 +444,10 @@ destination = root / "state" / "gem-service-attestation.json"
 destination.parent.mkdir(parents=True, exist_ok=True)
 temporary = destination.with_suffix(".json.tmp")
 
-# The pressure controller owns exactly one bounded runtime overlay. It may
-# update this value while the official workflow hot-reloads, so attest that
-# semantic overlay without restarting or replacing the running Elixir process.
+# Installation always pins dispatch closed. The controller may later create a
+# separately validated runtime overlay from fresh useful-turn evidence.
 concurrency_pattern = re.compile(
-    r"^(\s*max_concurrent_agents:\s*)([1-8])(\s*)$",
+    r"^(\s*max_concurrent_agents:\s*)([0-9]|[1-3][0-9]|40)(\s*)$",
     re.MULTILINE,
 )
 workflow_source_bytes = pathlib.Path(os.environ["WORKFLOW_SOURCE"]).read_bytes()
@@ -362,15 +464,7 @@ if len(source_matches) == 1 and len(installed_matches) == 1:
     source_concurrency = int(source_matches[0].group(2))
     installed_concurrency = int(installed_matches[0].group(2))
 
-    def normalized(text: str) -> str:
-        return concurrency_pattern.sub(
-            lambda match: f"{match.group(1)}<runtime>{match.group(3)}", text
-        )
-
-    workflow_matches = (
-        installed_concurrency <= source_concurrency
-        and normalized(workflow_source) == normalized(workflow_installed)
-    )
+    workflow_matches = workflow_source == workflow_installed and source_concurrency == 0
     if workflow_matches:
         workflow_match_mode = (
             "exact"
@@ -422,9 +516,18 @@ receipt = {
         "matches": os.environ["CLOSURE_SOURCE_SHA"] == os.environ["CLOSURE_TARGET_SHA"],
     },
 }
+for key, source_name, target_name in (
+    ("capacityProjector", "CAPACITY_SOURCE", "CAPACITY_TARGET"),
+    ("concurrencyController", "CONCURRENCY_SOURCE", "CONCURRENCY_TARGET"),
+    ("concurrencyService", "CONCURRENCY_SERVICE_SOURCE", "CONCURRENCY_SERVICE_TARGET"),
+    ("concurrencyTimer", "CONCURRENCY_TIMER_SOURCE", "CONCURRENCY_TIMER_TARGET"),
+):
+    source_digest = hashlib.sha256(pathlib.Path(os.environ[source_name]).read_bytes()).hexdigest()
+    target_digest = hashlib.sha256(pathlib.Path(os.environ[target_name]).read_bytes()).hexdigest()
+    receipt[key] = {"sourceSha256": source_digest, "installedSha256": target_digest, "matches": source_digest == target_digest}
 if not all(
     receipt[artifact]["matches"]
-    for artifact in ("workflow", "unit", "policy", "gate", "closureHealth")
+    for artifact in ("workflow", "unit", "policy", "gate", "closureHealth", "capacityProjector", "concurrencyController", "concurrencyService", "concurrencyTimer")
 ):
     raise SystemExit("refusing stale Gem service attestation")
 temporary.write_text(json.dumps(receipt, sort_keys=True) + "\n", encoding="utf-8")
@@ -433,6 +536,9 @@ PY
 
 if [[ "${timer_was_active}" == true ]]; then
   systemctl --user start "${TIMER}"
+fi
+if [[ "${concurrency_timer_was_active}" == true ]]; then
+  systemctl --user start symphony-concurrency-controller.timer
 fi
 
 install_complete=true
@@ -446,5 +552,9 @@ sha256sum \
   "${REGISTRY_MODULE_TARGET}" \
   "${REGISTRY_CONFIG_TARGET}" \
   "${POLICY_TARGET}" \
+  "${CAPACITY_TARGET}" \
+  "${CONCURRENCY_TARGET}" \
+  "${CONCURRENCY_SERVICE_TARGET}" \
+  "${CONCURRENCY_TIMER_TARGET}" \
   "${WORKFLOW_TARGET}" \
   "${SERVICE_UNIT_TARGET}"
