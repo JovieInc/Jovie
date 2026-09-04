@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import {
+  onContainedPhotonIMessage,
   onPhotonIMessage,
   photonThreadBinding,
   photonUserName,
@@ -16,6 +17,10 @@ const msg = (userId: string, phone?: string, isBot = false) => ({
 });
 
 describe('Photon lane contract', () => {
+  it('keeps the registered live channel contained with no reply', () => {
+    expect(onContainedPhotonIMessage()).toBeNull();
+  });
+
   it('binds public Jovie with redacted signed provenance', () => {
     const result = onPhotonIMessage(ctx(), msg('artist-1'), {
       ...env,

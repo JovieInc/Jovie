@@ -128,11 +128,16 @@ export function onPhotonIMessage(
   };
 }
 
+/** Incident containment: authenticate the webhook, but never start an Eve reply. */
+export function onContainedPhotonIMessage(): null {
+  return null;
+}
+
 export default photonIMessageChannel({
   async credentials() {
     return photonCredentials();
   },
-  onMessage: onPhotonIMessage,
+  onMessage: onContainedPhotonIMessage,
   userName: photonUserName(),
   webhookSecret: photonWebhookSecret(),
 });
