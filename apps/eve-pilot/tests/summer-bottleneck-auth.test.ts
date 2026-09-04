@@ -1,5 +1,6 @@
 import { generateKeyPairSync } from 'node:crypto';
 import { describe, expect, it, vi } from 'vitest';
+import { signSummerBottleneckSnapshot } from '../../web/lib/ovie/summer-bottleneck-producer';
 import {
   handleSummerBottleneckRequest,
   JOVIE_PRODUCTION_OIDC_SUBJECT,
@@ -10,7 +11,11 @@ import type {
   SummerBottleneckDependencies,
   SummerBottleneckRecord,
 } from '../agent/lib/summer-bottleneck-loop';
-import { signSummerBottleneckProducerAttestation } from '../agent/lib/summer-bottleneck-loop';
+import {
+  signSummerBottleneckProducerAttestation,
+  summerBottleneckSnapshotSchema,
+  verifySummerBottleneckProducerAttestation,
+} from '../agent/lib/summer-bottleneck-loop';
 
 const SOURCE = 'a'.repeat(40);
 const NOW = '2026-09-02T08:00:00.000Z';
@@ -134,6 +139,23 @@ function runtime(): SummerBottleneckDependencies {
 }
 
 describe('Summer bottleneck OIDC boundary', () => {
+  it('accepts the Jovie producer attestation without contract translation', () => {
+    const { producerAttestation: _ignored, ...unsigned } = validSnapshot();
+    const signed = signSummerBottleneckSnapshot(
+      unsigned,
+      PRODUCER_PRIVATE_KEY,
+      PRODUCER_KEY_ID
+    );
+    const parsed = summerBottleneckSnapshotSchema.parse(signed);
+
+    expect(
+      verifySummerBottleneckProducerAttestation(
+        parsed,
+        new Map([[PRODUCER_KEY_ID, PRODUCER_PUBLIC_KEY]])
+      )
+    ).toBe(true);
+  });
+
   it('pins the only accepted external subject to Jovie production', () => {
     expect(JOVIE_PRODUCTION_OIDC_SUBJECT).toBe(
       'owner:jovie:project:jovie:environment:production'

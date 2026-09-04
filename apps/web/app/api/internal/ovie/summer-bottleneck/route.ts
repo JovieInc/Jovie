@@ -19,6 +19,7 @@ const SHA = /^[0-9a-f]{40}$/u;
 const DIGEST = /^[0-9a-f]{64}$/u;
 const timestamp = z.string().datetime({ offset: true });
 const exactSha = z.string().regex(SHA);
+const safeCount = z.number().int().nonnegative().safe();
 
 const summerCiImprovementClassIds = [
   'merge-group-flake-baseline-ratchet',
@@ -84,7 +85,7 @@ const unsignedSnapshotSchema = z
             ...sourceFields,
             status: z.enum(['healthy', 'grace', 'red']),
             blockedSince: timestamp.nullable(),
-            openPullRequests: z.number().int().nonnegative(),
+            openPullRequests: safeCount,
           })
           .strict(),
         queue: z
@@ -93,8 +94,8 @@ const unsignedSnapshotSchema = z
             sourceSchema: z.literal('github-merge-queue-entry/v1'),
             ...sourceFields,
             blockedSince: timestamp.nullable(),
-            eligibleCleanPrs: z.number().int().nonnegative(),
-            queuedPrs: z.number().int().nonnegative(),
+            eligibleCleanPrs: safeCount,
+            queuedPrs: safeCount,
           })
           .strict(),
         release: z
@@ -105,7 +106,7 @@ const unsignedSnapshotSchema = z
             blockedSince: timestamp.nullable(),
             mainSha: exactSha,
             productionSha: exactSha.nullable(),
-            unverifiedMerges: z.number().int().nonnegative(),
+            unverifiedMerges: safeCount,
           })
           .strict(),
         runner: z
@@ -114,8 +115,8 @@ const unsignedSnapshotSchema = z
             sourceSchema: z.literal('symphony-lease-guard-report/v1'),
             ...sourceFields,
             blockedSince: timestamp.nullable(),
-            capacityAvailable: z.number().int().nonnegative(),
-            queuedWork: z.number().int().nonnegative(),
+            capacityAvailable: safeCount,
+            queuedWork: safeCount,
           })
           .strict(),
         ciAudit: ciAuditSchema,
@@ -147,13 +148,16 @@ function json(body: Readonly<Record<string, unknown>>, status: number) {
   return NextResponse.json(body, { status, headers: NO_STORE_HEADERS });
 }
 
-async function readInput(request: Request): Promise<unknown> {
-  const declared = Number(request.headers.get('content-length'));
+async function readBoundedJson(
+  body: ReadableStream<Uint8Array> | null,
+  contentLength: string | null
+): Promise<unknown> {
+  const declared = Number(contentLength);
   if (Number.isFinite(declared) && declared > MAX_BODY_BYTES) {
     throw new RangeError('body_too_large');
   }
-  if (!request.body) throw new SyntaxError('body_missing');
-  const reader = request.body.getReader();
+  if (!body) throw new SyntaxError('body_missing');
+  const reader = body.getReader();
   const decoder = new TextDecoder();
   let bytes = 0;
   let text = '';
@@ -168,6 +172,10 @@ async function readInput(request: Request): Promise<unknown> {
     text += decoder.decode(value, { stream: true });
   }
   return JSON.parse(text + decoder.decode());
+}
+
+function readInput(request: Request): Promise<unknown> {
+  return readBoundedJson(request.body, request.headers.get('content-length'));
 }
 
 function isFresh(snapshot: UnsignedSnapshot, nowMs = Date.now()): boolean {
@@ -266,9 +274,24 @@ export async function POST(request: Request): Promise<NextResponse> {
 
   let upstreamBody: unknown;
   try {
-    upstreamBody = await upstream.json();
+    upstreamBody = await readBoundedJson(
+      upstream.body,
+      upstream.headers.get('content-length')
+    );
   } catch {
     return json({ ok: false, code: 'invalid_eve_response' }, 502);
   }
-  return json({ ok: true, eve: upstreamBody }, 202);
+  const parsedUpstream = z
+    .object({
+      ok: z.literal(true),
+      receipt: z.object({
+        eventId: z.literal(parsed.data.eventId),
+        decision: z.string().min(1).max(64),
+      }),
+    })
+    .safeParse(upstreamBody);
+  if (!parsedUpstream.success) {
+    return json({ ok: false, code: 'invalid_eve_response' }, 502);
+  }
+  return json({ ok: true, eve: parsedUpstream.data }, 202);
 }

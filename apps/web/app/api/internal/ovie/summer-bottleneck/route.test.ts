@@ -165,7 +165,10 @@ describe('POST /api/internal/ovie/summer-bottleneck', () => {
   it('signs a strict snapshot that Eve accepts and sends it to the fixed target once', async () => {
     const fetch = vi.fn<typeof globalThis.fetch>(async () =>
       Response.json(
-        { ok: true, receipt: { decision: 'accepted' } },
+        {
+          ok: true,
+          receipt: { eventId: validSnapshot().eventId, decision: 'accepted' },
+        },
         { status: 202 }
       )
     );
@@ -266,6 +269,35 @@ describe('POST /api/internal/ovie/summer-bottleneck', () => {
         },
       },
     ],
+    [
+      'unsafe counter',
+      {
+        ...validSnapshot(),
+        signals: {
+          ...validSnapshot().signals,
+          queue: {
+            ...validSnapshot().signals.queue,
+            queuedPrs: Number.MAX_SAFE_INTEGER + 1,
+          },
+        },
+      },
+    ],
+    [
+      'duplicate CI class',
+      {
+        ...validSnapshot(),
+        signals: {
+          ...validSnapshot().signals,
+          ciAudit: {
+            ...validSnapshot().signals.ciAudit,
+            classes: validSnapshot().signals.ciAudit.classes.map(item => ({
+              ...item,
+              id: 'merge-group-flake-baseline-ratchet',
+            })),
+          },
+        },
+      },
+    ],
   ])('rejects %s before signing', async (_name, body) => {
     const response = await POST(request(body));
 
@@ -316,7 +348,13 @@ describe('POST /api/internal/ovie/summer-bottleneck', () => {
 
     vi.stubGlobal(
       'fetch',
-      vi.fn(async () => new Response('not-json'))
+      vi.fn(async () => Response.json({ ok: false }))
+    );
+    expect((await POST(request(validSnapshot()))).status).toBe(502);
+
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async () => new Response('x'.repeat(65 * 1024)))
     );
     expect((await POST(request(validSnapshot()))).status).toBe(502);
 
