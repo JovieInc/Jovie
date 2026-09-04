@@ -78,6 +78,20 @@ describe('golden-path lock evaluators', () => {
       reason: expect.stringContaining('/start'),
     });
     expect(
+      evaluateHomepageHtml(
+        '<a href="/start">Find yourself</a><input placeholder="Search your name" />'
+      )
+    ).toMatchObject({
+      ok: false,
+    });
+    expect(
+      evaluateHomepageHtml(
+        '<a href="/start">Find yourself</a><button>Find me</button>'
+      )
+    ).toMatchObject({
+      ok: false,
+    });
+    expect(
       evaluateHomepageHtml('<a href="https://jov.ie/waitlist">Find me</a>')
     ).toMatchObject({
       ok: false,
