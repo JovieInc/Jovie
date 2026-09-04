@@ -71,6 +71,7 @@ export const AppShellFrame = memo(function AppShellFrame({
       <DesktopTitlebar />
       <div
         data-app-shell-body='true'
+        data-electron-top-gap-owner='titlebar'
         data-shell-rail-motion='coordinated'
         className={cn(
           // Allocation belongs to the shell, not individual routes. Keeping the
