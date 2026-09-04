@@ -1312,7 +1312,7 @@ def evaluate(signals: dict[str, Any], observed_at: str) -> dict[str, Any]:
     )
     capacity_fresh = capacity_fresh and gem_concurrency == measured_target
     remediation_concurrency = gem_concurrency
-    unbound_repair_concurrency = gem_concurrency
+    unbound_repair_concurrency = min(gem_concurrency, 40)
     green_ready_prs = queue.get("greenReadyPrs", queue.get("eligiblePrs"))
     queue_target = queue.get("target")
     queue_shape_valid = (
@@ -1370,6 +1370,8 @@ def evaluate(signals: dict[str, Any], observed_at: str) -> dict[str, Any]:
     unbound_repair_allowed = (
         hold_intake_allowed
         and review_allowed
+        and capacity_fresh
+        and gem_concurrency >= 1
         and valid_commit_sha(main.get("sha"), exact=True)
         and valid_commit_sha(production.get("deployedSha"))
     )
@@ -1514,7 +1516,7 @@ def evaluate(signals: dict[str, Any], observed_at: str) -> dict[str, Any]:
             if unbound_repair_allowed
             else None,
             "scope": "event-scoped-exact-pr-head-with-bound-repair-attestation",
-            "maxConcurrent": unbound_repair_concurrency,
+            "maxConcurrent": unbound_repair_concurrency if unbound_repair_allowed else 0,
             "deploymentsAllowed": False,
             "authority": "canonical-merge-queue-controller",
         },

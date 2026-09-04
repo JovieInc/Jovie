@@ -1,9 +1,8 @@
 #!/usr/bin/env python3
-"""Bounded fleet admission projection for Auto-Enroll transport."""
-
 from __future__ import annotations
 
 import base64
+import hashlib
 import importlib.util
 import json
 import os
@@ -36,6 +35,21 @@ GATE_SPEC.loader.exec_module(GATE_MODULE)
 
 def now_iso() -> str:
     return datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
+
+
+def capacity_evidence(target: int = 4) -> dict[str, object]:
+    observed = now_iso()
+    return {
+        "schema": "gem-concurrency-evidence/v1", "source": "execution-proven-useful-turns",
+        "target": target, "approved": target > 0, "severeIncidents": 0, "observedAt": observed,
+        "acceptedEvidence": [{
+            "schema": "symphony-useful-turn-proof/v1", "provider": "openai",
+            "profile": f"{index + 1:064x}", "model": "gpt-5.6-sol", "rc": 0,
+            "useful": True, "completedAt": observed,
+            "outputDigest": hashlib.sha256(str(index).encode()).hexdigest(),
+            "outputBytes": 32, "outputTokens": 8,
+        } for index in range(target)],
+    }
 
 
 def signals(**overrides):
@@ -81,15 +95,7 @@ def signals(**overrides):
             "reasons": [],
         },
         "independentReview": review,
-        "concurrencyEvidence": {
-            "schema": "gem-concurrency-evidence/v1",
-            "target": 4,
-            "approved": True,
-            "cleanRuns": 1,
-            "severeIncidents": 0,
-            "observedAt": now_iso(),
-            "accepted": True,
-        },
+        "concurrencyEvidence": capacity_evidence(),
     }
     payload.update(overrides)
     return payload
@@ -169,25 +175,8 @@ class FleetAdmissionReceiptTests(unittest.TestCase):
             ({}, "normal"),
             ({"production": {"status": "red", "deployedSha": SHA}}, "isolated-only"),
             ({"main": {"status": "red", "sha": SHA}}, "draft-only"),
-            (
-                {
-                    "production": {
-                        "status": "green",
-                        "deployedSha": "b" * 40,
-                    }
-                },
-                "hold-intake",
-            ),
-            (
-                {
-                    "integrity": {
-                        "status": "active",
-                        "reason": "credential-compromise",
-                        "detail": "keys leaked",
-                    }
-                },
-                "blocked",
-            ),
+            ({"production": {"status": "green", "deployedSha": "b" * 40}}, "hold-intake"),
+            ({"integrity": {"status": "active", "reason": "credential-compromise", "detail": "keys leaked"}}, "blocked"),
         ]
         jq = shutil.which("jq")
         self.assertIsNotNone(jq)
@@ -273,6 +262,7 @@ class FleetAdmissionReceiptTests(unittest.TestCase):
         self.assertFalse(blocked["isolatedPromotionAdmission"]["allowed"])
         self.assertNotIn("stackHealth", blocked["signals"]["closureHealth"])
         self.assertNotIn("repairActions", blocked["signals"]["closureHealth"])
+        self.assertEqual(blocked["productionUnboundRepairAdmission"]["maxConcurrent"], 0)
 
     def test_unbound_repair_receipt_accepts_max_concurrent_above_one(self):
         hold = evaluate_receipt(
@@ -286,11 +276,11 @@ class FleetAdmissionReceiptTests(unittest.TestCase):
         scaled = dict(hold)
         scaled["productionUnboundRepairAdmission"] = {
             **hold["productionUnboundRepairAdmission"],
-            "maxConcurrent": 8,
+            "maxConcurrent": 40,
         }
         projection = PROJECT.project_fleet_admission_receipt(scaled)
         self.assertEqual(
-            projection["productionUnboundRepairAdmission"]["maxConcurrent"], 8
+            projection["productionUnboundRepairAdmission"]["maxConcurrent"], 40
         )
         self.assertFalse(
             projection["productionUnboundRepairAdmission"]["deploymentsAllowed"]
@@ -316,7 +306,7 @@ class FleetAdmissionReceiptTests(unittest.TestCase):
             still_valid["productionUnboundRepairAdmission"]["maxConcurrent"], 1
         )
 
-        for invalid in (0, 11, True, "4"):
+        for invalid in (0, 41, True, "4"):
             broken = dict(hold)
             broken["productionUnboundRepairAdmission"] = {
                 **hold["productionUnboundRepairAdmission"],

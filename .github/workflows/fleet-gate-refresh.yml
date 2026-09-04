@@ -1,4 +1,8 @@
 name: Fleet Gate Refresh
+# controller-hop-exception: jovie-controller-hop/v1
+# accountable-writer: Gem
+# necessary-trust-boundary: Protected Gem reads live state; pull_request_target checks out exact main, excluding candidate code.
+# revisit-trigger: Remove when Symphony emits this atomic receipt natively.
 
 # Event-driven one-writer refresh for the canonical Gem receipt. Work pickup is
 # owned by upstream OpenAI Symphony polling Linear directly; this workflow has
@@ -8,12 +12,9 @@ on:
   pull_request_target:
     types: [opened, edited, synchronize, converted_to_draft, closed, labeled, unlabeled, reopened]
   workflow_run:
-    # Queue-Deferred Release is downstream of this gate. Listening to it here
-    # formed a reciprocal workflow_run loop that could retrigger both
-    # controllers without a new upstream capacity signal. Marker Recovery is
-    # upstream evidence. Marker Recovery starts a fresh workflow_dispatch after
-    # durable bytes so Queue-Deferred Release stays within GitHub's three-level
-    # workflow_run chain ceiling.
+    # Do not listen to downstream Queue-Deferred Release: that creates a loop.
+    # Marker Recovery dispatches after durable bytes to stay within GitHub's
+    # three-level workflow_run chain ceiling.
     workflows: [CI, Production Controller]
     types: [completed]
   push:
@@ -30,12 +31,8 @@ concurrency:
 jobs:
   refresh:
     name: Refresh persisted fleet gate receipt
-    # Skip cancelled workflow_run so a superseded CI does not occupy a
-    # 8-minute jovie-fixed slot. A merged PR also emits push(main); skip
-    # its redundant closed event so one landing cannot enqueue two
-    # admission attempts. Unmerged closure still frees green-ready
-    # capacity. Labeled/unlabeled only run when the label can change
-    # green-ready depth or a queue/area hold.
+    # Skip cancelled runs and merged-close duplicates. Label events matter only
+    # when they change green-ready depth or a queue/area hold.
     if: >-
       (github.event_name != 'workflow_run' ||
       github.event.workflow_run.conclusion != 'cancelled') &&

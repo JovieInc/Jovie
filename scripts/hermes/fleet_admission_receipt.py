@@ -10,7 +10,7 @@ from typing import Any
 SCHEMA = "jovie-fleet-gate/v1"
 CLOSURE_HEALTH_SCHEMA = "jovie-closure-health/v1"
 # Keep in sync with gem-priority-gate.MAX_GROK_MAX / symphony-codex-exhausted.MAX_GROK_MAX.
-UNBOUND_REPAIR_MAX_CONCURRENT_CEILING = 10
+UNBOUND_REPAIR_MAX_CONCURRENT_CEILING = 40
 PROMOTION_MODES = frozenset(
     {"normal", "isolated-only", "draft-only", "hold-intake", "blocked"}
 )
@@ -162,12 +162,13 @@ def _project_isolated(value: object) -> dict[str, Any]:
     }
 
 
-def _require_unbound_repair_max_concurrent(value: object) -> int:
+def _require_unbound_repair_max_concurrent(value: object, *, allowed: bool) -> int:
     if (
         isinstance(value, bool)
         or not isinstance(value, int)
-        or value < 1
+        or value < 0
         or value > UNBOUND_REPAIR_MAX_CONCURRENT_CEILING
+        or (value == 0) == allowed
     ):
         raise AdmissionProjectionError("unbound repair maxConcurrent is invalid")
     return value
@@ -184,7 +185,7 @@ def _project_unbound_repair(value: object, promotion_mode: str) -> dict[str, Any
             "condition": None,
             "mainSha": None,
             "deployedSha": None,
-            "maxConcurrent": 1,
+            "maxConcurrent": 0,
             "deploymentsAllowed": False,
         }
     admission = _require_mapping(value, "productionUnboundRepairAdmission")
@@ -203,7 +204,7 @@ def _project_unbound_repair(value: object, promotion_mode: str) -> dict[str, Any
         ),
     }
     projected["maxConcurrent"] = _require_unbound_repair_max_concurrent(
-        projected["maxConcurrent"]
+        projected["maxConcurrent"], allowed=allowed
     )
     if projected["deploymentsAllowed"] is not False:
         raise AdmissionProjectionError("unbound repair deploymentsAllowed must be false")
