@@ -50,7 +50,10 @@ import {
   isMissingCreatorDistributionEventsTableError,
   resolveBioLinkActivationStatus,
 } from '@/lib/distribution/instagram-activation';
-import { isE2EFastOnboardingEnabled } from '@/lib/e2e/runtime';
+import {
+  isE2EFastOnboardingEnabled,
+  isVisualCaptureSyntheticAuthEnabled,
+} from '@/lib/e2e/runtime';
 import { getCurrentUserEntitlements } from '@/lib/entitlements/server';
 import {
   type InboxNavigationAvailability,
@@ -592,6 +595,15 @@ function canUseE2EDashboardFallback(clerkUserId: string): boolean {
   );
 }
 
+function shouldUseVisualCaptureSyntheticDashboard(
+  clerkUserId: string
+): boolean {
+  return (
+    isVisualCaptureSyntheticAuthEnabled() &&
+    canUseE2EDashboardFallback(clerkUserId)
+  );
+}
+
 function createE2EDashboardCoreData(clerkUserId: string): CoreData {
   const now = new Date();
   const userId = '00000000-0000-4000-8000-000000000101';
@@ -896,6 +908,10 @@ async function fetchDashboardCoreWithSession(
     readonly allowMissingUserProvisioning?: boolean;
   }
 ): Promise<CoreData> {
+  if (shouldUseVisualCaptureSyntheticDashboard(clerkUserId)) {
+    return createE2EDashboardCoreData(clerkUserId);
+  }
+
   try {
     const base = await withDbSessionTx(
       async (tx, sessionUserId) =>
@@ -1141,6 +1157,10 @@ async function fetchDashboardEssentialWithSession(
     readonly allowMissingUserProvisioning?: boolean;
   }
 ): Promise<CoreData> {
+  if (shouldUseVisualCaptureSyntheticDashboard(clerkUserId)) {
+    return createE2EDashboardCoreData(clerkUserId);
+  }
+
   try {
     return await withDbSessionTx(
       async (tx, sessionUserId) =>
@@ -1197,6 +1217,10 @@ async function fetchDashboardShellWithSession(
     readonly allowMissingUserProvisioning?: boolean;
   }
 ): Promise<CoreData> {
+  if (shouldUseVisualCaptureSyntheticDashboard(clerkUserId)) {
+    return createE2EDashboardCoreData(clerkUserId);
+  }
+
   try {
     // Keep shell reads inside the transaction-scoped session. RLS depends on
     // app.clerk_user_id being set on the same pooled connection as the profile

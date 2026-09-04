@@ -18,6 +18,7 @@ const TRAY_SET_STATE_CHANNEL = 'tray-set-state';
 const TRAY_ACTION_CHANNEL = 'tray-action';
 const APP_BOOTED_CHANNEL = 'app-booted';
 const LAUNCH_OPERATOR_CONTROL_CHANNEL = 'launch-operator-control';
+const GET_BUILD_IDENTITY_CHANNEL = 'get-build-identity';
 
 interface MinimalDocument {
   readonly documentElement?: {
@@ -79,6 +80,7 @@ installElectronRuntimeMarker();
 contextBridge.exposeInMainWorld('electronAPI', {
   platform: process.platform,
   electronVersion: process.versions.electron,
+  getBuildIdentity: () => ipcRenderer.invoke(GET_BUILD_IDENTITY_CHANNEL),
 
     /** Fires when electron-updater detects a new version is available for download. */
     onUpdateAvailable: (cb: () => void) => {

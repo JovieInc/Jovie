@@ -577,7 +577,9 @@ describe('queue workflow mutation safety', () => {
     expect(scope).toContain('.pull_request.head.sha');
     expect(scope).toContain('.pull_request.base.ref');
     expect(scope).toContain('.workflow_run.head_sha');
-    expect(scope).toContain('--json number,headRefOid,baseRefName,isDraft');
+    expect(scope).toContain('pulls?state=open&per_page=100');
+    expect(scope).toContain('headRefOid: .head.sha');
+    expect(scope).not.toContain('gh pr list');
     expect(scope).toContain('select(.baseRefName == "main")');
     expect(scope).toContain('No unique open main PR owns workflow_run head');
     expect(scope).toContain(
@@ -597,6 +599,17 @@ describe('queue workflow mutation safety', () => {
     expect(drain).toContain(
       'admission scope: maintenance-only (no new enrollment)'
     );
+    expect(drain).not.toContain('scripts/github-open-prs-snapshot.mjs');
+    expect(drain).toContain(
+      'inventory_native_queue_state "$DRAIN_ADMISSION_PR"'
+    );
+    expect(drain).toContain('inventory_native_queue_state');
+    expect(drain).toContain('native_state_to_snap');
+    // The remaining call is an isolated recovery/fixture path. Production
+    // inventory uses exact-target or paginated native queue state above.
+    expect(drain.match(/gh_retry pr list/gu)).toHaveLength(1);
+    expect(enroll).toContain('GH_INVENTORY_RETRY_ATTEMPTS: 3');
+    expect(enroll).toContain('GH_INVENTORY_RETRY_MAX_DELAY: 15');
     expect(drain).toContain(
       'admission scope: no primary target (bounded missed-admission recovery enabled)'
     );
@@ -673,9 +686,9 @@ describe('queue workflow mutation safety', () => {
       pullRequests: [
         {
           number: 16510,
-          headRefOid: HEAD,
-          baseRefName: 'main',
-          isDraft,
+          head: { sha: HEAD },
+          base: { ref: 'main' },
+          draft: isDraft,
         },
       ],
     });
@@ -699,9 +712,9 @@ describe('queue workflow mutation safety', () => {
       pullRequests: [
         {
           number: 16546,
-          headRefOid: OTHER_HEAD,
-          baseRefName: 'main',
-          isDraft: false,
+          head: { sha: OTHER_HEAD },
+          base: { ref: 'main' },
+          draft: false,
         },
       ],
     });
@@ -747,9 +760,9 @@ describe('queue workflow mutation safety', () => {
       pullRequests: [
         {
           number: 16546,
-          headRefOid: HEAD,
-          baseRefName: 'main',
-          isDraft: false,
+          head: { sha: HEAD },
+          base: { ref: 'main' },
+          draft: false,
         },
       ],
     });

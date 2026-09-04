@@ -672,6 +672,7 @@ class ConcurrencyObservationTests(unittest.TestCase):
                     MODULE,
                     "observe_queue",
                     return_value={
+                        "repository": "JovieInc/Jovie",
                         "status": "known",
                         "eligiblePrs": 0,
                         "greenReadyPrs": 0,
@@ -705,11 +706,14 @@ class ConcurrencyObservationTests(unittest.TestCase):
                 "reason": "capacity-evidence-missing",
             },
         )
-        self.assertEqual(queue_observer.call_args.args[2], 0)
+        # Missing evidence budgets the lane at the runtime floor, never zero.
+        self.assertEqual(queue_observer.call_args.args[2], 1)
         receipt = MODULE.evaluate(signals, MODULE.isoformat(now))
         self.assertEqual(receipt["signals"]["main"]["sha"], MAIN_SHA)
-        self.assertFalse(receipt["workAdmission"]["newIssueLeaseAllowed"])
+        # Runtime floor: one seat stays open even without capacity evidence.
+        self.assertTrue(receipt["workAdmission"]["newIssueLeaseAllowed"])
         self.assertEqual(receipt["remediationAdmission"]["maxConcurrent"], 1)
+        self.assertEqual(receipt["concurrency"]["gem"]["maxConcurrent"], 1)
 
 
 def fallback_seat_signal(grok: bool, kimi: bool) -> dict[str, object]:
@@ -1115,7 +1119,9 @@ class DeploymentBindingTests(unittest.TestCase):
             "expected-head-pr-update", receipt["remediationAdmission"]["activities"]
         )
 
-    def test_stale_capacity_preserves_one_local_repair_but_blocks_new_and_remote_mutation(self):
+    def test_stale_capacity_runs_at_the_runtime_floor_instead_of_zero(self):
+        """symphony-concurrency-autoscale-v1: missing/stale evidence never
+        zeroes the factory. One seat stays open for leases and remediation."""
         signals = dict(GREEN_SIGNALS)
         signals["concurrencyEvidence"] = {
             **GREEN_SIGNALS["concurrencyEvidence"],
@@ -1126,24 +1132,25 @@ class DeploymentBindingTests(unittest.TestCase):
         receipt = self.evaluate(signals)
 
         self.assertEqual(receipt["state"], "GREEN")
-        self.assertFalse(receipt["workAdmission"]["newIssueLeaseAllowed"])
-        self.assertFalse(receipt["workAdmission"]["newImplementationAllowed"])
+        self.assertTrue(receipt["workAdmission"]["newIssueLeaseAllowed"])
+        self.assertTrue(receipt["workAdmission"]["newImplementationAllowed"])
         self.assertTrue(receipt["remediationAdmission"]["allowed"])
         self.assertTrue(receipt["remediationAdmission"]["localAllowed"])
-        self.assertFalse(receipt["remediationAdmission"]["pushAllowed"])
+        self.assertTrue(receipt["remediationAdmission"]["pushAllowed"])
         self.assertEqual(receipt["remediationAdmission"]["maxConcurrent"], 1)
-        self.assertNotIn(
+        self.assertIn(
             "expected-head-pr-update", receipt["remediationAdmission"]["activities"]
         )
-        self.assertEqual(receipt["concurrency"]["gem"]["maxConcurrent"], 0)
+        self.assertEqual(receipt["concurrency"]["gem"]["maxConcurrent"], 1)
         self.assertEqual(receipt["concurrency"]["gem"]["runtimeFloor"], 1)
-        self.assertFalse(receipt["concurrency"]["gem"]["newMutationAllowed"])
-        self.assertNotIn(
-            "isolated-implementation", receipt["workAdmission"]["activities"]
+        self.assertFalse(receipt["concurrency"]["gem"]["evidenceAccepted"])
+        self.assertTrue(receipt["concurrency"]["gem"]["newMutationAllowed"])
+        self.assertEqual(
+            receipt["concurrency"]["gem"]["reason"],
+            "capacity-evidence-missing-runtime-floor",
         )
-        self.assertNotIn("draft-pr", receipt["workAdmission"]["activities"])
 
-    def test_missing_or_malformed_capacity_normalizes_to_local_only_receipt(self):
+    def test_missing_or_malformed_capacity_normalizes_to_the_runtime_floor(self):
         for evidence in (None, {"schema": "malformed"}):
             with self.subTest(evidence=evidence):
                 signals = dict(GREEN_SIGNALS)
@@ -1152,12 +1159,52 @@ class DeploymentBindingTests(unittest.TestCase):
                 receipt = self.evaluate(signals)
 
                 self.assertFalse(receipt["signals"]["concurrencyEvidence"]["accepted"])
-                self.assertFalse(receipt["workAdmission"]["newIssueLeaseAllowed"])
-                self.assertFalse(receipt["workAdmission"]["newImplementationAllowed"])
-                self.assertFalse(receipt["remediationAdmission"]["pushAllowed"])
+                self.assertTrue(receipt["workAdmission"]["newIssueLeaseAllowed"])
+                self.assertTrue(receipt["remediationAdmission"]["pushAllowed"])
                 self.assertEqual(receipt["remediationAdmission"]["maxConcurrent"], 1)
-                self.assertEqual(receipt["concurrency"]["gem"]["maxConcurrent"], 0)
+                self.assertEqual(receipt["concurrency"]["gem"]["maxConcurrent"], 1)
                 self.assertEqual(receipt["concurrency"]["gem"]["runtimeFloor"], 1)
+
+    def test_live_seats_are_accepted_without_a_clamp_or_clean_run_ratchet(self):
+        """No 1..8 clamp and no 20-clean-run cap: the live-seat target is the
+        concurrency (Codex + Grok + Kimi seats from the autoscale writer)."""
+        for target in (2, 8, 12, 40):
+            with self.subTest(target=target):
+                signals = dict(GREEN_SIGNALS)
+                signals["concurrencyEvidence"] = {
+                    **GREEN_SIGNALS["concurrencyEvidence"],
+                    "target": target,
+                    "cleanRuns": 0,
+                    "source": "live-oauth-cli-seats",
+                }
+                receipt = self.evaluate(signals)
+                self.assertTrue(receipt["concurrency"]["gem"]["evidenceAccepted"])
+                self.assertEqual(receipt["concurrency"]["gem"]["maxConcurrent"], target)
+                self.assertEqual(receipt["remediationAdmission"]["maxConcurrent"], target)
+                self.assertEqual(receipt["concurrency"]["gem"]["reason"], "live-seat-capacity")
+                self.assertTrue(receipt["workAdmission"]["newIssueLeaseAllowed"])
+
+    def test_observe_concurrency_accepts_live_seats_without_clamp(self):
+        now = MODULE.utc_now()
+        with tempfile.TemporaryDirectory() as tmp:
+            path = pathlib.Path(tmp) / "concurrency.json"
+            for target, expected in ((12, True), (1, True), (0, False)):
+                with self.subTest(target=target):
+                    path.write_text(
+                        json.dumps(
+                            {
+                                "schema": MODULE.CONCURRENCY_SCHEMA,
+                                "source": "live-oauth-cli-seats",
+                                "target": target,
+                                "approved": True,
+                                "severeIncidents": 0,
+                                "observedAt": MODULE.isoformat(now),
+                            }
+                        ),
+                        encoding="utf-8",
+                    )
+                    evidence = MODULE.observe_concurrency(path, now)
+                    self.assertEqual(evidence["accepted"], expected)
 
     def test_closure_health_red_blocks_new_issue_lease_without_blocking_queue_or_remediation(self):
         signals = dict(GREEN_SIGNALS)
@@ -1216,7 +1263,7 @@ class DeploymentBindingTests(unittest.TestCase):
         receipt = self.evaluate(signals)
         self.assertEqual(receipt["promotionMode"], "blocked")
 
-    def test_stale_or_missing_capacity_blocks_new_and_remote_mutation(self):
+    def test_stale_or_missing_capacity_degrades_to_runtime_floor(self):
         for evidence in (
             {**GREEN_SIGNALS["concurrencyEvidence"], "accepted": False},
             None,
@@ -1227,9 +1274,11 @@ class DeploymentBindingTests(unittest.TestCase):
                 signals["concurrencyEvidence"] = evidence
                 receipt = self.evaluate(signals)
                 self.assertFalse(receipt["signals"]["concurrencyEvidence"]["accepted"])
-                self.assertFalse(receipt["workAdmission"]["newIssueLeaseAllowed"])
-                self.assertFalse(receipt["workAdmission"]["newImplementationAllowed"])
-                self.assertFalse(receipt["remediationAdmission"]["pushAllowed"])
+                # symphony-concurrency-autoscale-v1: missing evidence keeps the
+                # factory on the runtime floor instead of zeroing leases.
+                self.assertTrue(receipt["workAdmission"]["newIssueLeaseAllowed"])
+                self.assertTrue(receipt["workAdmission"]["newImplementationAllowed"])
+                self.assertTrue(receipt["remediationAdmission"]["pushAllowed"])
                 self.assertEqual(receipt["remediationAdmission"]["maxConcurrent"], 1)
                 self.assertEqual(receipt["concurrency"]["gem"]["runtimeFloor"], 1)
 
