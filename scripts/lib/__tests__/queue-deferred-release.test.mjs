@@ -32,13 +32,16 @@ const STACK_TRIGGER_TYPES =
   'types: [opened, edited, synchronize, converted_to_draft, closed, labeled, unlabeled, reopened]';
 const STACK_EVENT_GUARD =
   /pull_request:[\s\S]*if: steps\.refresh\.outcome == 'success'[\s\S]*steps\.refresh\.outputs\.receipt_path/;
-const EXACT_GATE_REF = "ref: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.sha || github.event_name == 'merge_group' && github.sha || 'main' }}";
+const EXACT_GATE_REF =
+  "ref: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.sha || github.event_name == 'merge_group' && github.sha || 'main' }}";
 
 function assertTrustedStackHealthContract(value) {
   expect(value).toContain(STACK_TRIGGER_TYPES);
   expect(value).toMatch(STACK_EVENT_GUARD);
   expect(value).toContain(EXACT_GATE_REF);
-  expect(value).toContain("if: github.event_name != 'pull_request' && github.event_name != 'merge_group'");
+  expect(value).toContain(
+    "if: github.event_name != 'pull_request' && github.event_name != 'merge_group'"
+  );
   expect(value).toContain(
     'node "$GITHUB_WORKSPACE/scripts/backlog-orchestrator/delivery-state-machine.mjs"'
   );
@@ -139,10 +142,7 @@ describe('queue-deferred release closed loop (JOV-5054)', () => {
         STACK_TRIGGER_TYPES,
         'types: [closed, labeled, unlabeled, reopened]'
       ),
-      fleetGateRefreshWorkflow.replace(
-        EXACT_GATE_REF,
-        'ref: main'
-      ),
+      fleetGateRefreshWorkflow.replace(EXACT_GATE_REF, 'ref: main'),
       fleetGateRefreshWorkflow.replace(
         '${{ steps.refresh.outputs.receipt_path }}',
         'state/gem-priority-gate/latest.json'
