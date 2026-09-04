@@ -146,9 +146,9 @@ describe('Ovie MCP handler', () => {
   });
 
   it('binds Ovie, not artist Jovie', () => {
-    expect(eveIdentityForMcpDoor().id).toBe('ovie');
-    expect(eveIdentityForMcpDoor().role).toBe('founder');
-    expect(bindEveIdentityForTurn('ovie').pack.id).toBe('ovie');
+    expect(eveIdentityForMcpDoor().id).toBe('summer');
+    expect(eveIdentityForMcpDoor().role).toBe('company-operator');
+    expect(bindEveIdentityForTurn('summer').pack.id).toBe('summer');
     expect(() =>
       bindEveIdentityForTurn('jovie').require('ingest-ack')
     ).toThrow();
@@ -594,7 +594,7 @@ describe('Ovie MCP handler', () => {
       uncertified_launch_critical: Array<{ id: string }>;
       session_handoff: { decisions: string[]; initiatives: unknown[] };
     }>(result.body);
-    expect(body.identity).toBe('ovie');
+    expect(body.identity).toBe('summer');
     expect(body.uncertified_launch_critical.length).toBeGreaterThan(0);
     expect(body.session_handoff).toMatchObject({
       decisions: expect.any(Array),

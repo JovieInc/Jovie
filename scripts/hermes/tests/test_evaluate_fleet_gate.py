@@ -4,6 +4,7 @@
 from __future__ import annotations
 
 import base64
+import hashlib
 import json
 import os
 import pathlib
@@ -21,6 +22,33 @@ SHA = "a3eeefdd4dc681d1c9b5b4385720d661f5129137"
 
 def now_iso() -> str:
     return datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
+
+
+def capacity_evidence(target: int = 4) -> dict[str, object]:
+    observed_at = now_iso()
+    return {
+        "schema": "gem-concurrency-evidence/v1",
+        "source": "execution-proven-useful-turns",
+        "target": target,
+        "approved": target > 0,
+        "severeIncidents": 0,
+        "observedAt": observed_at,
+        "acceptedEvidence": [
+            {
+                "schema": "symphony-useful-turn-proof/v1",
+                "provider": "openai",
+                "profile": f"profile-{index}",
+                "model": "gpt-5.6-sol",
+                "rc": 0,
+                "useful": True,
+                "completedAt": observed_at,
+                "outputDigest": hashlib.sha256(str(index).encode()).hexdigest(),
+                "outputBytes": 32,
+                "outputTokens": 8,
+            }
+            for index in range(1, target + 1)
+        ],
+    }
 
 
 def signals(**overrides):
@@ -66,15 +94,7 @@ def signals(**overrides):
             "reasons": [],
         },
         "independentReview": review,
-        "concurrencyEvidence": {
-            "schema": "gem-concurrency-evidence/v1",
-            "target": 4,
-            "approved": True,
-            "cleanRuns": 1,
-            "severeIncidents": 0,
-            "observedAt": now_iso(),
-            "accepted": True,
-        },
+        "concurrencyEvidence": capacity_evidence(),
     }
     payload.update(overrides)
     return payload

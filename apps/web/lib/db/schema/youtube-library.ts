@@ -90,6 +90,8 @@ export interface YouTubeThumbnailProvenance {
   generator?: string;
   prompt?: string;
   model?: string;
+  /** SHA-256 of the immutable candidate artifact; required for review candidates. */
+  artifactSha256?: string;
 }
 
 // ============================================================================

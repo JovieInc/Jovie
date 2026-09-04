@@ -84,6 +84,13 @@ html[data-desktop-runtime="electron"] [data-app-shell-frame="true"] {
   box-sizing: border-box;
 }
 
+/* Electron titlebar owns top inset; do not stack a second top gap. */
+html[data-desktop-runtime="electron"]
+[data-app-shell-body="true"][data-electron-top-gap-owner="titlebar"] {
+  padding-top: 0;
+  transition-property: gap, padding-right, padding-bottom, padding-left;
+}
+
 html[data-desktop-runtime="electron"] [data-electron-titlebar="true"] {
   -webkit-app-region: drag;
   z-index: 60;

@@ -37,7 +37,8 @@ jobs:
         run: |
           node --test apps/ios/scripts/write-configuration.test.mjs \
           apps/ios/scripts/validate-testflight-env.test.mjs \
-          apps/ios/scripts/validate-testflight-artifact.test.mjs
+          apps/ios/scripts/validate-testflight-artifact.test.mjs \
+          apps/ios/scripts/settings-style-guard.test.mjs
 
       - name: Ensure iOS local configuration exists
         run: bash apps/ios/scripts/ensure-configuration.sh

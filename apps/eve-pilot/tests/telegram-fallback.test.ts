@@ -1,7 +1,7 @@
 import type { TelegramMessage } from 'eve/channels/telegram';
 import { afterEach, describe, expect, it } from 'vitest';
 
-import { onOvieTelegramMessage } from '../agent/channels/telegram';
+import { onSummerTelegramMessage } from '../agent/channels/telegram';
 import {
   admitOvieTelegramMessage,
   parseOvieTelegramAllowedUserIds,
@@ -86,21 +86,20 @@ describe('Ovie Telegram fallback identity', () => {
     }
   });
 
-  it('binds Telegram to the Ovie pack even when the runtime default is Jovie', () => {
+  it('binds Telegram to Summer while Ovie stays presentation-only', () => {
     delete process.env.EVE_IDENTITY;
-    expect(eveIdentityForChannel('telegram').pack.id).toBe('ovie');
+    expect(eveIdentityForChannel('telegram').pack.id).toBe('summer');
     expect(eveIdentityForChannel('jovie-core-chat').pack.id).toBe('jovie');
-    const instructions = bindEvePilotIdentity('ovie').instructions;
-    expect(instructions).toContain("You are Eve on Tim's Ovie door");
-    expect(instructions).toContain('Do not self-identify as Ovie');
-    expect(instructions.toLowerCase()).not.toMatch(/you are ovie/);
+    const instructions = bindEvePilotIdentity('summer').instructions;
+    expect(instructions).toContain('You are Summer');
+    expect(instructions).toContain('Do not speak as Ovie or Jovie');
   });
 
-  it('dispatches allowlisted Telegram mail as Ovie, not Jovie', () => {
+  it('dispatches allowlisted Telegram mail as Summer via Ovie presentation', () => {
     process.env.OVIE_TELEGRAM_ALLOWED_USER_IDS = TIM_ID;
     delete process.env.EVE_IDENTITY;
 
-    const admitted = onOvieTelegramMessage(
+    const admitted = onSummerTelegramMessage(
       { telegram: {} as never },
       message({})
     );
@@ -109,18 +108,17 @@ describe('Ovie Telegram fallback identity', () => {
       principalId: `telegram:${TIM_ID}`,
       principalType: 'user',
       attributes: {
-        identity: 'ovie',
+        identity: 'summer',
+        presentation: 'ovie',
         source: 'telegram',
         fallback: 'true',
       },
     });
-    expect(admitted?.context?.[0]).toContain("You are Eve on Tim's Ovie door");
-    expect(admitted?.context?.[0]).toContain('Do not self-identify as Ovie');
-    expect(admitted?.context?.[0]).toContain('ingest and ack');
-    expect(admitted?.context?.[0]?.toLowerCase()).not.toMatch(/you are ovie/);
+    expect(admitted?.context?.[0]).toContain('You are Summer');
+    expect(admitted?.context?.[0]).toContain('Do not speak as Ovie or Jovie');
 
     expect(
-      onOvieTelegramMessage(
+      onSummerTelegramMessage(
         { telegram: {} as never },
         message({ fromId: 'someone-else' })
       )

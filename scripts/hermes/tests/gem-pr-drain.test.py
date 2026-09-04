@@ -89,9 +89,8 @@ class JovieOwnershipTests(unittest.TestCase):
         self.assertFalse(MODULE.repo_drain_enabled("other/repo", False))
         self.assertTrue(MODULE.repo_drain_enabled("other/repo", True))
 
-    def test_stale_capacity_receipt_runs_remote_drain_at_the_runtime_floor(self):
-        """symphony-concurrency-autoscale-v1: missing/stale capacity evidence
-        never zeroes the drain. One seat stays open for remote remediation."""
+    def test_stale_capacity_receipt_closes_remote_drain(self):
+        """Missing or stale useful-turn evidence cannot authorize mutation."""
         receipt = stale_capacity_receipt()
         first = self._open_pr(
             1, mergeable_state="behind", created_at="2026-08-28T20:00:00Z"
@@ -120,37 +119,22 @@ class JovieOwnershipTests(unittest.TestCase):
 
         document = json.loads(stdout.getvalue())
         self.assertEqual(exit_code, 0, document)
-        self.assertEqual(document["capacity"], 1)
-        self.assertEqual(len(document["selected"]), 1)
-        self.assertNotEqual(document.get("remediation_admission"), "local_only")
-        # New leases here are governed by lane capacity (no laneCapacity in this
-        # fixture), not by capacity evidence; remediation itself stays live.
-        self.assertTrue(receipt["remediationAdmission"]["pushAllowed"])
-        self.assertEqual(receipt["concurrency"]["gem"]["maxConcurrent"], 1)
+        self.assertEqual(document["capacity"], 0)
+        self.assertEqual(document["selected"], [])
         update_one.assert_not_called()
         remote.assert_not_called()
 
-    def test_floor_capacity_contract_rejects_zero_or_mismatched_mutation(self):
+    def test_closed_capacity_contract_rejects_mismatched_mutation(self):
         receipt = stale_capacity_receipt()
         validated = MODULE.validate_gate_result(0, json.dumps(receipt), "remediation")
-        self.assertEqual(MODULE.effective_capacity(8, validated), 1)
+        self.assertEqual(MODULE.effective_capacity(8, validated), 0)
         self.assertEqual(validated["concurrency"]["gem"]["runtimeFloor"], 1)
         for field, value, expected in (
-            ("pushAllowed", False, "remote remediation must follow non-RED fleet state"),
-            ("maxConcurrent", 0, "capacity must never zero a non-RED factory"),
             ("maxConcurrent", 2, "remediation concurrency contradicts Gem concurrency"),
         ):
             with self.subTest(field=field, value=value):
                 broken = json.loads(json.dumps(receipt))
                 broken["remediationAdmission"][field] = value
-                if field == "pushAllowed":
-                    broken["remediationAdmission"]["activities"] = [
-                        activity
-                        for activity in broken["remediationAdmission"]["activities"]
-                        if activity != "expected-head-pr-update"
-                    ]
-                if field == "maxConcurrent" and value == 0:
-                    broken["concurrency"]["gem"]["maxConcurrent"] = 0
                 with self.assertRaisesRegex(RuntimeError, expected):
                     MODULE.validate_gate_result(0, json.dumps(broken), "remediation")
 
@@ -158,7 +142,7 @@ class JovieOwnershipTests(unittest.TestCase):
         receipt = GATE_MODULE.failed_evaluation_receipt(ValueError("capacity unavailable"))
         validated = MODULE.validate_gate_result(0, json.dumps(receipt), "remediation")
         self.assertEqual(validated["state"], "RED")
-        self.assertEqual(validated["remediationAdmission"]["maxConcurrent"], 1)
+        self.assertEqual(validated["remediationAdmission"]["maxConcurrent"], 0)
         self.assertEqual(MODULE.effective_capacity(8, validated), 0)
 
     def test_typed_remediation_capacity_caps_host_parallelism(self):
@@ -177,7 +161,7 @@ class JovieOwnershipTests(unittest.TestCase):
                     },
                 )
 
-    def test_floor_capacity_authenticates_exactly_one_remote_writer(self):
+    def test_unproven_capacity_authenticates_no_remote_writer(self):
         receipt = stale_capacity_receipt()
         first = self._open_pr(
             1, mergeable_state="behind", created_at="2026-08-28T20:00:00Z"
@@ -222,19 +206,15 @@ class JovieOwnershipTests(unittest.TestCase):
 
         document = json.loads(stdout.getvalue())
         self.assertEqual(exit_code, 0, document)
-        self.assertEqual(document["capacity"], 1)
-        self.assertEqual(len(document["selected"]), 1)
-        self.assertEqual(update_one.call_count, 1)
-        self.assertEqual(
-            [item["number"] for item in document["processed"] if item.get("action") == "api_update_branch"],
-            [document["selected"][0]["number"]],
-        )
+        self.assertEqual(document["capacity"], 0)
+        self.assertEqual(document["selected"], [])
+        update_one.assert_not_called()
 
     def test_push_blocked_remediation_capacity_is_zero(self):
         gate = {"remediationAdmission": {"pushAllowed": False, "maxConcurrent": 1}}
         self.assertEqual(MODULE.effective_capacity(8, gate), 0)
 
-    def test_floor_receipt_rejects_push_disabled_outside_red(self):
+    def test_closed_receipt_accepts_push_disabled_outside_red(self):
         receipt = stale_capacity_receipt()
         receipt["remediationAdmission"]["pushAllowed"] = False
         receipt["remediationAdmission"]["activities"] = [
@@ -243,11 +223,8 @@ class JovieOwnershipTests(unittest.TestCase):
             if activity != "expected-head-pr-update"
         ]
 
-        with self.assertRaisesRegex(
-            RuntimeError,
-            "remote remediation must follow non-RED fleet state",
-        ):
-            MODULE.validate_gate_result(0, json.dumps(receipt), "remediation")
+        validated = MODULE.validate_gate_result(0, json.dumps(receipt), "remediation")
+        self.assertEqual(MODULE.effective_capacity(8, validated), 0)
 
     def test_floor_receipt_rejects_remediation_above_gem_concurrency(self):
         receipt = stale_capacity_receipt()
