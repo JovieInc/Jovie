@@ -1,5 +1,6 @@
 'use client';
 
+// @coverage-via apps/web/tests/unit/dashboard/TaskListRow.test.tsx
 import { UserAvatar } from '@jovie/ui';
 import { Disc3, Sparkles, Tag } from 'lucide-react';
 import { memo, type ReactNode } from 'react';

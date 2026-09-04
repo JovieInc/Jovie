@@ -1,5 +1,6 @@
 'use client';
 
+// @coverage-via apps/web/tests/unit/components/features/admin/hud/OperationalTasksPanel.test.tsx
 import { useQuery } from '@tanstack/react-query';
 import {
   CircleAlert,
