@@ -486,6 +486,33 @@ class ClosureClassificationTests(unittest.TestCase):
         self.assertEqual(health["status"], "healthy")
         self.assertNotIn("duplicate-issue-lanes-unresolved", health["reasons"])
 
+    def test_native_stack_layer_slash_wording_is_not_a_duplicate_lane(self):
+        # Live shape from the JOV-5853 Summer stack (2026-09-04): bodies declare
+        # "native stack layer N/M" (no "of", no N/M in the title).
+        result = MODULE.classify_open_prs(
+            [
+                pr(
+                    40,
+                    title="feat(eve): bind Summer bottleneck runtime (JOV-5853)",
+                    body="JOV-5853 native stack layer 3/7.\n\nImmediate parent: #39 @ 337b440a3510c71dab03845fd2b926ec6e9a8b58\n",
+                    head_ref="codex/jov-5853-summer-stack-03-runtime",
+                    files=("scripts/shared.py", "scripts/runtime.py"),
+                ),
+                pr(
+                    41,
+                    title="fix(eve): harden Summer Blob adapters (JOV-5853)",
+                    body="JOV-5853 native stack layer 4/7.\n\nImmediate parent: #40 @ 337b440a3510c71dab03845fd2b926ec6e9a8b58\n",
+                    head_ref="codex/jov-5853-summer-stack-04-adapters",
+                    merge_state="DIRTY",
+                    files=("scripts/shared.py", "scripts/adapters.py"),
+                ),
+            ],
+            NOW,
+        )
+
+        self.assertEqual(result["duplicateIssueLanes"], [])
+        self.assertEqual(result["unclassified"], [])
+
     def test_branch_chained_and_cumulative_nested_lanes_are_stack_evidence(self):
         result = MODULE.classify_open_prs(
             [

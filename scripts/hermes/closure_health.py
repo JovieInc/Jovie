@@ -113,7 +113,9 @@ REPOSITORY_NAME = re.compile(r"^[^/\s]+/[^/\s]+$")
 # JOV-INV-020 native-stack evidence for the duplicate-lane detector (JOV-INV-011):
 # same-issue active writers that verifiably stack are one lane, not duplicates.
 STACK_CONTRACT_HEADING = re.compile(r"\bstack\s+contract\b", re.IGNORECASE)
-STACK_LAYER_DECLARATION = re.compile(r"\blayer\s+\d+\s+of\b", re.IGNORECASE)
+STACK_LAYER_DECLARATION = re.compile(
+    r"\blayer\s+\d+\s*(?:\bof\b|/)\s*\d+\b", re.IGNORECASE
+)
 STACK_PARENT_DECLARATION = re.compile(
     r"\b(?:immediate\s+parent|parent\s+pr|parent|extends|stacked\s+on|based\s+on"
     r"|builds\s+on|depends\s+on|supersedes)\b\s*:?\s*#(\d{1,9})\b",
