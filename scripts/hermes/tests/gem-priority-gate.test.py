@@ -1409,6 +1409,7 @@ class DeploymentBindingTests(unittest.TestCase):
     def test_stale_deployment_sha_freezes_promotion_but_allows_catchup_deploy(self):
         signals = dict(GREEN_SIGNALS)
         signals["production"] = {"status": "green", "deployedSha": "b" * 7}
+        signals["concurrencyEvidence"] = capacity_evidence(40)
         receipt = self.evaluate(signals)
         self.assertEqual(receipt["state"], "AMBER")
         self.assertEqual(receipt["promotionMode"], "hold-intake")
@@ -1431,11 +1432,16 @@ class DeploymentBindingTests(unittest.TestCase):
                 "mainSha": MAIN_SHA,
                 "deployedSha": "b" * 7,
                 "scope": "event-scoped-exact-pr-head-with-bound-repair-attestation",
-                "maxConcurrent": 4,
+                "maxConcurrent": 10,
                 "deploymentsAllowed": False,
                 "authority": "canonical-merge-queue-controller",
             },
         )
+        projection = subprocess.run(
+            ["python3", str(ROOT / "scripts/hermes/fleet_admission_receipt.py")],
+            input=json.dumps(receipt), capture_output=True, text=True, check=False,
+        )
+        self.assertEqual(projection.returncode, 0, projection.stderr)
         self.assertIn(
             "production-deployment-unbound",
             {reason["code"] for reason in receipt["reasons"]},

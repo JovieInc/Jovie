@@ -1312,7 +1312,7 @@ def evaluate(signals: dict[str, Any], observed_at: str) -> dict[str, Any]:
     )
     capacity_fresh = capacity_fresh and gem_concurrency == measured_target
     remediation_concurrency = gem_concurrency
-    unbound_repair_concurrency = gem_concurrency
+    unbound_repair_concurrency = min(gem_concurrency, 10)
     green_ready_prs = queue.get("greenReadyPrs", queue.get("eligiblePrs"))
     queue_target = queue.get("target")
     queue_shape_valid = (
