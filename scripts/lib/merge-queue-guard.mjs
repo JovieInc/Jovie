@@ -62,18 +62,13 @@ export function isPendingNativeCohortCutoverField(field) {
 }
 
 export const NATIVE_QUEUE_POLICY = Object.freeze({
-  // 20 minutes on 2026-09-04: live ruleset 10512119 was tightened to a
-  // 20-minute check-response window (JOV-5867 readback sync). Merge-group
-  // required contexts complete well under this on the fast lane; the previous
-  // 60-minute lock only matched the pre-tightening live value.
+  // Tim tightened the live ruleset 2026-09-04 (60/3/10 → 20/1/5): solo group
+  // builds with a 20-minute check budget and 5-entry merge batches. Repo is
+  // source of truth — this constant follows the founder's live decision so
+  // the drain's drift guard stops fail-closing on it.
   check_response_timeout_minutes: 20,
   grouping_strategy: 'ALLGREEN',
-  // 3→1 on 2026-09-04 to match the live ruleset 10512119 readback (JOV-5867):
-  // the queue now builds one combined head at a time. The live ruleset is the
-  // source of truth for this lock; do not restore 3 (superseded 2026-08-15
-  // three-prefix canary starting point).
   max_entries_to_build: 1,
-  // 10→5 on 2026-09-04 to match the live ruleset 10512119 readback (JOV-5867).
   max_entries_to_merge: 5,
   merge_method: 'SQUASH',
   min_entries_to_merge: NATIVE_QUEUE_COHORT_POLICY.minEntriesToMerge,
