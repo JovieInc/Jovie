@@ -2175,7 +2175,7 @@ body:has(.home-viewport)::-webkit-scrollbar {
 
   /* Two lines on phones, never three. */
   .homepage-editorial-hero__headline {
-    max-width: 11ch;
+    max-width: 13ch;
     font-size: clamp(2.35rem, 10.6vw, 2.75rem);
     line-height: 1.06;
     white-space: normal;
