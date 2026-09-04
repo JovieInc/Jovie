@@ -15,7 +15,7 @@ import {
   MARKETING_FOR_FLYOUT_LINKS,
   MARKETING_NAV_LINKS,
   MARKETING_NAV_UTILITIES,
-  MARKETING_TOOLS_FLYOUT_LINKS,
+  MARKETING_PRODUCT_FLYOUT_LINKS,
   type MarketingNavLink,
 } from '@/data/marketingNavigation';
 import { FEATURE_FLAGS } from '@/lib/flags/marketing-static';
@@ -33,12 +33,7 @@ const NAV_LINK_BY_LABEL = Object.fromEntries(
 >;
 
 const MARKETING_GLASS_DESKTOP_LINKS: readonly MarketingHeaderNavLink[] = [
-  { href: APP_ROUTES.HOME, label: 'Jovie', treatment: 'wordmark' },
-  {
-    href: NAV_LINK_BY_LABEL.Product.href,
-    label: NAV_LINK_BY_LABEL.Product.label,
-    treatment: 'leading',
-  },
+  { href: NAV_LINK_BY_LABEL.Tools.href, label: NAV_LINK_BY_LABEL.Tools.label },
   {
     href: NAV_LINK_BY_LABEL.Pricing.href,
     label: NAV_LINK_BY_LABEL.Pricing.label,
@@ -46,16 +41,16 @@ const MARKETING_GLASS_DESKTOP_LINKS: readonly MarketingHeaderNavLink[] = [
 ] as const;
 const MARKETING_GLASS_FLYOUTS: readonly HeaderFlyoutMenu[] = [
   {
+    id: 'product',
+    label: NAV_LINK_BY_LABEL.Product.label,
+    heading: 'One system, many doors',
+    links: MARKETING_PRODUCT_FLYOUT_LINKS,
+  },
+  {
     id: 'for',
     label: NAV_LINK_BY_LABEL.For.label,
     heading: 'One system for every audience',
     links: MARKETING_FOR_FLYOUT_LINKS,
-  },
-  {
-    id: 'tools',
-    label: NAV_LINK_BY_LABEL.Tools.label,
-    heading: 'Live tools',
-    links: MARKETING_TOOLS_FLYOUT_LINKS,
   },
 ] as const;
 const MARKETING_GLASS_MOBILE_LINKS: readonly MarketingHeaderNavLink[] = [
@@ -67,6 +62,10 @@ const MARKETING_GLASS_MOBILE_LINKS: readonly MarketingHeaderNavLink[] = [
   ...MARKETING_GLASS_FLYOUTS.flatMap(menu =>
     menu.links.map(link => ({ href: link.href, label: link.label }))
   ),
+  {
+    href: NAV_LINK_BY_LABEL.Tools.href,
+    label: NAV_LINK_BY_LABEL.Tools.label,
+  },
   {
     href: NAV_LINK_BY_LABEL.Pricing.href,
     label: NAV_LINK_BY_LABEL.Pricing.label,
@@ -109,7 +108,11 @@ function resolveNavConfig(
     };
   }
   if (centerNavDisabled) {
-    return { flyoutMenus: undefined, mobileNavLinks: [], desktopNavLinks: [] };
+    return {
+      flyoutMenus: undefined,
+      mobileNavLinks: [],
+      desktopNavLinks: [],
+    };
   }
   return {
     flyoutMenus: MARKETING_GLASS_FLYOUTS,

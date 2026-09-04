@@ -34,8 +34,12 @@ describe('support route header contract', () => {
     expect(headerSource).toContain(
       'DEFAULT_MARKETING_CTA: MarketingHeaderCta = MARKETING_NAV_UTILITIES[1]'
     );
-    expect(headerSource).toContain("treatment: 'wordmark'");
-    expect(headerSource).toContain('MARKETING_GLASS_FLYOUTS');
+    expect(headerSource).toContain("presentation === 'marketing-glass'");
+    expect(headerSource).toContain("? 'icon'");
+    expect(headerSource).toContain("{ href: APP_ROUTES.HOME, label: 'Jovie' }");
+    expect(headerSource).toContain('...MARKETING_NAV_LINKS');
+    expect(headerSource).not.toContain('MARKETING_GLASS_FLYOUTS');
+    expect(headerSource).not.toContain('flyoutMenus={navConfig.flyoutMenus}');
     expect(headerSource).toContain('showContactLink={false}');
     expect(registrySource).not.toContain('marketing-header-content');
     expect(landingStart).toBeGreaterThanOrEqual(0);

@@ -1,20 +1,5 @@
-/*
- * Marketing-glass header chrome.
- *
- * Moved out of apps/web/app/(home)/home.css for JOV-2145: the route-group
- * stylesheet was only loaded on pages inside `(home)` and `(marketing)`,
- * leaving `app/not-found.tsx` (and any other root-segment mount of
- * MarketingHeader) to render the flyout menus as unstyled walls of text.
- *
- * Colocating these rules with the renderer (HeaderNav.tsx imports this
- * file) guarantees they travel with the component regardless of where it
- * mounts. Next.js dedupes CSS imports across mount points, so importing
- * this from a `'use client'` component is the canonical pattern.
- *
- * NOTE: rules here MUST stay scoped to the marketing-glass-header BEM
- * tree. Any change that affects other surfaces belongs in globals.css
- * or design-system.css.
- */
+/* Canonical public header chrome. The legacy BEM name is retained so every
+ * marketing route keeps one owner while the visual contract evolves. */
 
 .artist-profiles-home-header[data-presentation="homepage-embedded"] nav {
   --homepage-embedded-gutter: clamp(var(--space-5), 2.2vw, var(--space-8));
@@ -66,21 +51,22 @@
 }
 
 .marketing-glass-header {
-  --marketing-glass-top: clamp(0.42rem, 0.8vw, 0.62rem);
-  --marketing-glass-height: 2.72rem;
+  --marketing-glass-top: 0rem;
+  --marketing-glass-height: 3.75rem;
   --marketing-glass-gutter: max(
     clamp(0.9rem, 2vw, 1.5rem),
     calc(var(--homepage-page-gutter, 1.75rem) - 0.75rem)
   );
-  --marketing-glass-shell: transparent;
-  --marketing-glass-shell-scrolled: rgba(12, 13, 15, 0.74);
-  --marketing-glass-border: rgba(255, 255, 255, 0.1);
-  --marketing-glass-border-strong: rgba(255, 255, 255, 0.13);
-  --marketing-glass-text: rgba(255, 255, 255, 0.92);
-  --marketing-glass-muted: rgba(255, 255, 255, 0.58);
+  --marketing-glass-shell: rgb(255 255 255);
+  --marketing-glass-shell-scrolled: rgb(255 255 255);
+  --marketing-glass-border: rgb(0 0 0 / 0.08);
+  --marketing-glass-border-strong: rgb(0 0 0 / 0.1);
+  --marketing-glass-text: rgb(12 12 13);
+  --marketing-glass-muted: rgb(12 12 13 / 0.62);
   --marketing-glass-subtle: transparent;
   top: calc(var(--marketing-glass-top) + env(safe-area-inset-top)) !important;
   pointer-events: none;
+  background: var(--marketing-glass-shell) !important;
   color: var(--marketing-glass-text);
 }
 
@@ -88,14 +74,12 @@
   pointer-events: auto;
   display: flex;
   min-height: var(--marketing-glass-height);
-  max-width: min(
-    90rem,
-    calc(100vw - var(--marketing-glass-gutter) * 2)
-  ) !important;
+  max-width: min(90rem, 100vw) !important;
   align-items: center;
   padding-inline: clamp(1.35rem, 2.3vw, 2rem) !important;
-  border: 1px solid transparent;
-  border-radius: 999px;
+  border: 0;
+  border-bottom: 1px solid var(--marketing-glass-border);
+  border-radius: 0;
   background: var(--marketing-glass-shell);
   box-shadow: none;
   backdrop-filter: none;
@@ -118,24 +102,19 @@
   .marketing-glass-header__shell {
   border-color: var(--marketing-glass-border-strong);
   background: var(--marketing-glass-shell-scrolled);
-  box-shadow:
-    0 12px 34px rgba(0, 0, 0, 0.45),
-    inset 0 1px 0 rgba(255, 255, 255, 0.1);
-  backdrop-filter: blur(20px) saturate(165%);
-  -webkit-backdrop-filter: blur(20px) saturate(165%);
+  box-shadow: 0 1px 0 rgb(0 0 0 / 0.04);
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
 }
 
 .marketing-glass-header__nav {
-  position: absolute;
-  top: 50%;
-  left: 50%;
+  position: static;
   gap: 0.1rem;
   margin-left: 0;
   padding: 0;
   border: 0;
   border-radius: 0;
   background: transparent;
-  transform: translate(-50%, -50%);
 }
 
 .marketing-glass-header__nav-item {
@@ -150,7 +129,7 @@
   justify-content: center;
   gap: 0.3rem;
   border-radius: 999px;
-  color: rgba(255, 255, 255, 0.7);
+  color: var(--marketing-glass-muted);
   font-family: var(--marketing-font-body);
   font-size: 0.79rem;
   font-weight: 540;
@@ -188,8 +167,8 @@
 .marketing-glass-header__nav-link--active,
 .marketing-glass-header__text-link:hover,
 .marketing-glass-header__text-link:focus-visible {
-  color: #ffffff;
-  background: rgba(255, 255, 255, 0.1);
+  color: var(--marketing-glass-text);
+  background: rgb(0 0 0 / 0.05);
 }
 
 .marketing-glass-header__cta {
@@ -199,10 +178,10 @@
   align-items: center;
   justify-content: center;
   padding-inline: 0.94rem;
-  border: 1px solid rgba(255, 255, 255, 0.92);
+  border: 1px solid var(--marketing-glass-text);
   border-radius: 999px;
-  background: #ffffff;
-  color: #050506;
+  background: var(--marketing-glass-text);
+  color: var(--linear-text-inverse);
   font-family: var(--marketing-font-body);
   font-size: 0.79rem;
   font-weight: var(--font-weight-medium);
@@ -210,7 +189,7 @@
   line-height: 1;
   text-decoration: none;
   white-space: nowrap;
-  box-shadow: 0 8px 24px rgba(255, 255, 255, 0.1);
+  box-shadow: none;
   transition:
     background-color 140ms ease,
     border-color 140ms ease;
@@ -218,8 +197,12 @@
 
 .marketing-glass-header__cta:hover,
 .marketing-glass-header__cta:focus-visible {
-  border-color: #ffffff;
-  background: rgba(255, 255, 255, 0.9);
+  border-color: rgb(38 38 40);
+  background: rgb(38 38 40);
+}
+
+.marketing-glass-header button[aria-controls="mobile-nav-panel"] {
+  color: var(--marketing-glass-text);
 }
 
 .marketing-glass-header__flyout {
@@ -258,22 +241,18 @@
 
 .marketing-glass-header__flyout-inner {
   overflow: hidden;
-  border: 1px solid rgba(255, 255, 255, 0.115);
+  border: 1px solid var(--marketing-glass-border-strong);
   border-radius: 1.15rem;
-  background:
-    linear-gradient(180deg, rgba(255, 255, 255, 0.045), transparent 42%),
-    #0d0e11;
-  box-shadow:
-    0 28px 74px rgba(0, 0, 0, 0.56),
-    inset 0 1px 0 rgba(255, 255, 255, 0.08);
-  backdrop-filter: blur(26px) saturate(170%);
-  -webkit-backdrop-filter: blur(26px) saturate(170%);
+  background: rgb(255 255 255);
+  box-shadow: 0 22px 60px rgb(0 0 0 / 0.14);
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
 }
 
 .marketing-glass-header__flyout-heading {
   margin: 0;
   padding: 1.15rem 1.2rem 0;
-  color: rgba(255, 255, 255, 0.42);
+  color: rgb(12 12 13 / 0.5);
   font-family: var(--marketing-font-body);
   font-size: 0.72rem;
   font-weight: 650;
@@ -298,7 +277,7 @@
   padding: 0.72rem 0.78rem;
   border: 1px solid transparent;
   border-radius: 0.75rem;
-  color: #ffffff;
+  color: var(--marketing-glass-text);
   text-decoration: none;
   transition:
     background-color 140ms ease,
@@ -307,13 +286,13 @@
 
 .marketing-glass-header__flyout-link:hover,
 .marketing-glass-header__flyout-link:focus-visible {
-  border-color: rgba(255, 255, 255, 0.12);
-  background: rgba(255, 255, 255, 0.07);
+  border-color: var(--marketing-glass-border-strong);
+  background: rgb(0 0 0 / 0.04);
 }
 
 .marketing-glass-header__flyout-number {
   display: none;
-  color: rgba(255, 255, 255, 0.36);
+  color: rgb(12 12 13 / 0.42);
   font-family: var(--marketing-font-body);
   font-size: 0.68rem;
   font-weight: 700;
@@ -327,7 +306,7 @@
 }
 
 .marketing-glass-header__flyout-label {
-  color: rgba(255, 255, 255, 0.94);
+  color: var(--marketing-glass-text);
   font-family: var(--marketing-font-display);
   font-size: 0.96rem;
   font-weight: 620;
@@ -336,7 +315,7 @@
 
 .marketing-glass-header__flyout-description {
   margin-top: 0.22rem;
-  color: rgba(255, 255, 255, 0.56);
+  color: var(--marketing-glass-muted);
   font-family: var(--marketing-font-body);
   font-size: 0.77rem;
   font-weight: 450;
@@ -358,9 +337,9 @@
 
 @media (max-width: 767px) {
   .marketing-glass-header {
-    --marketing-glass-top: 0.6rem;
+    --marketing-glass-top: 0rem;
     --marketing-glass-height: 3.15rem;
-    --marketing-glass-gutter: 1rem;
+    --marketing-glass-gutter: 0rem;
   }
 
   .marketing-glass-header__shell {

@@ -30,16 +30,14 @@ describe('MarketingPricingPlans', () => {
     expect(
       screen.getByRole('link', { name: 'Claim your profile' })
     ).toHaveAttribute('href', '/signup?plan=free');
-    expect(
-      screen
-        .getAllByRole('link', { name: 'Start Free Trial' })
-        .map(link => link.getAttribute('href'))
-    ).toContain('/signup?plan=pro');
-    expect(
-      screen
-        .getAllByRole('link', { name: 'Start Free Trial' })
-        .map(link => link.getAttribute('href'))
-    ).toContain('/signup?plan=max');
+    expect(screen.getByRole('link', { name: 'Choose Pro' })).toHaveAttribute(
+      'href',
+      '/signup?plan=pro'
+    );
+    expect(screen.getByRole('link', { name: 'Choose Max' })).toHaveAttribute(
+      'href',
+      '/signup?plan=max'
+    );
     expect(
       screen.getAllByRole('link').map(link => link.getAttribute('href'))
     ).not.toContain('/signup?plan=team');

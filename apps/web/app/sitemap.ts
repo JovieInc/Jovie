@@ -6,6 +6,7 @@ import { BASE_URL } from '@/constants/app';
 import { APP_ROUTES } from '@/constants/routes';
 import { getAlternativeSlugs } from '@/content/alternatives';
 import { getComparisonSlugs } from '@/content/comparisons';
+import { MARKETING_INFORMATION_PAGES } from '@/data/marketingInformationArchitecture';
 import { PUBLIC_ARTIST_API_POLICY_URL } from '@/lib/api/v1/contract';
 import { getBlogPosts, slugifyCategory } from '@/lib/blog/getBlogPosts';
 import { CACHE_TAGS } from '@/lib/cache/tags';
@@ -233,6 +234,12 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
       changeFrequency: 'weekly',
       priority: 0.7,
     },
+    ...MARKETING_INFORMATION_PAGES.map(page => ({
+      url: `${BASE_URL}${page.path}`,
+      lastModified: now,
+      changeFrequency: 'monthly' as const,
+      priority: page.status === 'live' ? 0.8 : 0.6,
+    })),
     {
       url: `${BASE_URL}${APP_ROUTES.YOUTUBE_THUMBNAILS}`,
       lastModified: now,

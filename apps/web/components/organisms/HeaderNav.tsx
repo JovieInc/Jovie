@@ -552,7 +552,7 @@ export function HeaderNav({
       className={cn(
         'header-nav',
         isMarketingGlass
-          ? 'marketing-glass-header fixed top-0 left-0 right-0 w-full'
+          ? 'marketing-glass-header absolute top-0 left-0 right-0 w-full'
           : 'fixed top-0 left-0 right-0 w-full transition-colors duration-subtle motion-reduce:transition-none',
         presentation === 'homepage-embedded' || isMarketingGlass
           ? 'border-b border-transparent'
@@ -606,13 +606,13 @@ export function HeaderNav({
             />
           </div>
 
-          {isHomepagePresentation ? navLinksMarkup : null}
+          {isHomepagePresentation || isMarketingGlass ? navLinksMarkup : null}
 
           {/* Spacer pushes nav + auth to the right */}
           <div className='flex-1' aria-hidden='true' />
 
           {/* Nav links - desktop only, right-aligned */}
-          {isHomepagePresentation ? null : navLinksMarkup}
+          {isHomepagePresentation || isMarketingGlass ? null : navLinksMarkup}
 
           {/* Divider between nav and auth - desktop only */}
           {hasDesktopNavLinks &&

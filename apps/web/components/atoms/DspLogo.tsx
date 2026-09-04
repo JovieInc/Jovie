@@ -9,6 +9,10 @@ interface DspLogoProps {
   readonly className?: string;
   /** Height of the logo in pixels. Width scales proportionally. */
   readonly height?: number;
+  /** Keep the canonical mark while omitting its duplicate visible label. */
+  readonly showLabel?: boolean;
+  /** Use the registry brand color at full strength on dark marketing surfaces. */
+  readonly emphasis?: 'muted' | 'brand';
 }
 
 /**
@@ -145,6 +149,8 @@ function DspLogoInner({
   provider,
   className = '',
   height = 20,
+  showLabel = true,
+  emphasis = 'muted',
 }: Readonly<DspLogoProps>) {
   const config = DSP_LOGO_CONFIG[provider];
   if (!config) return null;
@@ -153,6 +159,15 @@ function DspLogoInner({
     '--system-b-dsp-logo-brand-color': config.color,
     '--system-b-dsp-logo-icon-size': `${height}px`,
     '--system-b-dsp-logo-label-size': `${height * 0.75}px`,
+    display: 'inline-flex',
+    alignItems: 'center',
+    color: emphasis === 'brand' ? config.color : undefined,
+  } as CSSProperties;
+
+  const iconStyle = {
+    width: `${height}px`,
+    height: `${height}px`,
+    flexShrink: 0,
   } as CSSProperties;
 
   return (
@@ -162,10 +177,13 @@ function DspLogoInner({
         fill='currentColor'
         aria-hidden='true'
         className='system-b-dsp-logo-icon'
+        style={iconStyle}
       >
         <path d={config.iconPath} />
       </svg>
-      <span className='system-b-dsp-logo-label'>{config.name}</span>
+      {showLabel ? (
+        <span className='system-b-dsp-logo-label'>{config.name}</span>
+      ) : null}
     </span>
   );
 }

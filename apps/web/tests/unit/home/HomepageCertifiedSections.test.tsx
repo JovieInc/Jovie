@@ -109,8 +109,10 @@ describe('HomepageCertifiedSections', () => {
     expect(screen.getAllByRole('button')).toHaveLength(1);
     expect(screen.queryAllByRole('link')).toHaveLength(0);
 
-    // Quiet wordmark signs the page off without becoming a second control.
-    const mark = screen.getByTestId('homepage-close-mark');
-    expect(mark.querySelector('svg')).toHaveAttribute('aria-hidden', 'true');
+    expect(screen.queryByTestId('homepage-close-mark')).not.toBeInTheDocument();
+    expect(screen.getByTestId('homepage-close-depth')).toHaveAttribute(
+      'aria-hidden',
+      'true'
+    );
   });
 });

@@ -6,7 +6,7 @@ import {
   MARKETING_FOR_FLYOUT_LINKS,
   MARKETING_NAV_LINKS,
   MARKETING_NAV_UTILITIES,
-  MARKETING_TOOLS_FLYOUT_LINKS,
+  MARKETING_PRODUCT_FLYOUT_LINKS,
 } from '@/data/marketingNavigation';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
@@ -46,7 +46,16 @@ function routeFileExistsFor(href: string) {
   }
 
   visit(appRoot);
-  return actualRoutes.has(href);
+  return (
+    actualRoutes.has(href) ||
+    [...actualRoutes].some(route => {
+      const optionalCatchAll = route.match(/^(.*)\/\[\[\.\.\.[^\]]+\]\]$/u);
+      return optionalCatchAll
+        ? href === optionalCatchAll[1] ||
+            href.startsWith(`${optionalCatchAll[1]}/`)
+        : false;
+    })
+  );
 }
 
 describe('primary marketing navigation contract', () => {
@@ -62,31 +71,16 @@ describe('primary marketing navigation contract', () => {
   it('keeps utility links exact and ordered', () => {
     expect(MARKETING_NAV_UTILITIES).toEqual([
       { href: '/signin', label: 'Log in' },
-      { href: '/start', label: 'Find yourself' },
-    ]);
-  });
-
-  it('keeps audience and tools flyouts declared in marketing navigation data', () => {
-    expect(MARKETING_FOR_FLYOUT_LINKS.map(link => link.label)).toEqual([
-      'Artists',
-      'Founders',
-      'Creators',
-      'Authors',
-    ]);
-    expect(MARKETING_TOOLS_FLYOUT_LINKS.map(link => link.label)).toEqual([
-      'Fan Notifications',
-      'Instant Merch',
-      'YouTube Thumbnails',
-      'CLI',
+      { href: '/start', label: 'Get started' },
     ]);
   });
 
   it('keeps every primary nav link pointed at a route the app can serve', () => {
     for (const link of [
       ...MARKETING_NAV_LINKS,
-      ...MARKETING_NAV_UTILITIES,
+      ...MARKETING_PRODUCT_FLYOUT_LINKS,
       ...MARKETING_FOR_FLYOUT_LINKS,
-      ...MARKETING_TOOLS_FLYOUT_LINKS,
+      ...MARKETING_NAV_UTILITIES,
     ]) {
       expect(routeFileExistsFor(link.href), link.href).toBe(true);
     }
@@ -96,8 +90,8 @@ describe('primary marketing navigation contract', () => {
     for (const exportName of [
       'MARKETING_NAV_LINKS',
       'MARKETING_NAV_UTILITIES',
+      'MARKETING_PRODUCT_FLYOUT_LINKS',
       'MARKETING_FOR_FLYOUT_LINKS',
-      'MARKETING_TOOLS_FLYOUT_LINKS',
     ]) {
       expect(headerSource).toContain(exportName);
     }

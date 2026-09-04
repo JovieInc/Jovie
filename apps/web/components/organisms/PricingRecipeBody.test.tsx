@@ -5,7 +5,7 @@ import { renderToStaticMarkup } from 'react-dom/server';
 import { describe, expect, it } from 'vitest';
 import { MarketingPricingPlans } from '@/components/features/pricing/MarketingPricingPlans';
 import { getVisibleMarketingPricingPlans } from '@/data/marketingPricingPlans';
-import { PricingRecipeBody } from './PricingRecipeBody';
+import { PRICING_FAQ_ITEMS, PricingRecipeBody } from './PricingRecipeBody';
 import { PRICING_RECIPE_STORY_REQUEST_ACCESS_COPY } from './PricingRecipeBody.stories';
 
 const paidPlans = getVisibleMarketingPricingPlans().filter(
@@ -34,18 +34,7 @@ describe('PricingRecipeBody', () => {
     expect(
       screen.getByRole('heading', { level: 1, name: 'Pricing' })
     ).toBeVisible();
-    expect(
-      screen.getByRole('heading', {
-        level: 2,
-        name: 'Artist profiles built to convert',
-      })
-    ).toBeVisible();
-    expect(
-      screen.getByRole('heading', {
-        level: 2,
-        name: 'Capture fans once. Bring them back automatically.',
-      })
-    ).toBeVisible();
+    expect(screen.queryByText('Artist profiles built to convert')).toBeNull();
     expect(screen.getByTestId('plans-slot')).toBeVisible();
     expect(screen.getByTestId('comparison-slot')).toBeVisible();
     expect(screen.getByText(expectedRequestAccessCopy)).toBeVisible();
@@ -58,6 +47,13 @@ describe('PricingRecipeBody', () => {
     expect(
       screen.getByRole('link', { name: 'Start Pro trial' })
     ).toHaveAttribute('href', '/signup?plan=pro');
+    expect(
+      screen.getByRole('heading', { name: 'Questions, answered' })
+    ).toBeVisible();
+    for (const item of PRICING_FAQ_ITEMS) {
+      expect(screen.getByRole('button', { name: item.question })).toBeVisible();
+    }
+    expect(screen.getByText('Why Jovie exists')).toBeVisible();
   });
 
   it('keeps the story closing copy derived from exact production plan data', () => {
@@ -96,7 +92,7 @@ describe('PricingRecipeBody', () => {
     );
   });
 
-  it('shares one route/story body and records shipped zero-proof omissions', () => {
+  it('shares one route/story body and records truthful proof plus FAQ', () => {
     const routeSource = readFileSync(
       resolve(process.cwd(), 'app/(marketing)/pricing/page.tsx'),
       'utf8'
@@ -132,12 +128,11 @@ describe('PricingRecipeBody', () => {
       'comparisonChart={<PricingComparisonChart />}'
     );
 
-    expect(bodySource).not.toContain('FaqSection');
+    expect(bodySource).toContain('FaqSection');
+    expect(bodySource).toContain('ARTIST_PROFILE_SOCIAL_PROOF.founderQuote');
     expect(bodySource).not.toContain('SocialProof');
     expect(bodySource).not.toContain('LogoCloud');
-    expect(storySource).toContain(
-      "omissions: ['logo-cloud', 'social-proof', 'faq']"
-    );
+    expect(storySource).not.toContain("'faq'");
   });
 
   it('records true provenance for the recipe.pricing story sourceSha', () => {
@@ -152,7 +147,7 @@ describe('PricingRecipeBody', () => {
     const match = storySource.match(/sourceSha: '([0-9a-f]{40})'/);
     expect(match).not.toBeNull();
     const sourceSha = match?.[1] as string;
-    expect(sourceSha).toBe('00895196e53b823bb0311193b4af29f67b8849c1');
+    expect(sourceSha).toBe('62ba63b59268d61c4c9f3c7ea841f6f4dbb64b7b');
     expect(storySource).toContain(
       "source: 'apps/web/components/organisms/PricingRecipeBody.tsx'"
     );

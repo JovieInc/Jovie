@@ -2,7 +2,7 @@
 'use client';
 
 import { Button } from '@jovie/ui/atoms/button';
-import { BadgeCheck, Link2, Search } from 'lucide-react';
+import { BadgeCheck, Search } from 'lucide-react';
 import Image from 'next/image';
 import { useRouter } from 'next/navigation';
 import {
@@ -13,6 +13,7 @@ import {
   useRef,
   useState,
 } from 'react';
+import { DspLogo } from '@/components/atoms/DspLogo';
 import { SocialIcon } from '@/components/atoms/SocialIcon';
 import { APP_ROUTES } from '@/constants/routes';
 import { track } from '@/lib/analytics';
@@ -286,6 +287,25 @@ export function HeroSpotifySearch({
     return searchQuery.length >= 1;
   }, [showResults, state, results.length, searchQuery.length]);
 
+  useEffect(() => {
+    if (!shouldShowDropdown) return;
+
+    const handleOutsidePointerDown = (event: PointerEvent) => {
+      if (containerRef.current?.contains(event.target as Node)) return;
+      setShowResults(false);
+      setActiveIndex(-1);
+    };
+
+    document.addEventListener('pointerdown', handleOutsidePointerDown, true);
+    return () => {
+      document.removeEventListener(
+        'pointerdown',
+        handleOutsidePointerDown,
+        true
+      );
+    };
+  }, [shouldShowDropdown]);
+
   const trimmedQuery = searchQuery.trim();
   const isLoading = state === 'loading';
   // Default: show the button once the user has typed; disable while loading.
@@ -355,7 +375,13 @@ export function HeroSpotifySearch({
       <label htmlFor={inputId} className='sr-only'>
         Search Spotify artists or paste a link
       </label>
-      <InputAuraFrame className={isEditorial ? 'rounded-full' : undefined}>
+      <InputAuraFrame
+        className={
+          isEditorial
+            ? cn('rounded-full', shouldShowDropdown && 'rounded-b-none')
+            : undefined
+        }
+      >
         <div className={fieldClassName}>
           {isEditorial ? null : (
             <div className='flex items-center justify-center size-6 rounded-full shrink-0 bg-brand-spotify-subtle'>
@@ -391,6 +417,7 @@ export function HeroSpotifySearch({
             autoCapitalize='none'
             autoCorrect='off'
             autoComplete='off'
+            spellCheck={false}
             className={cn(
               'min-w-0 flex-1 bg-transparent text-primary-token focus-visible:outline-none',
               isEditorial ? 'homepage-name-search__input' : 'text-sm'
@@ -414,57 +441,17 @@ export function HeroSpotifySearch({
         {/* Dropdown results — inside InputAuraFrame so group-focus-within stays active while interacting */}
         {shouldShowDropdown && (
           <div
+            id={resultsId}
+            role='listbox'
+            aria-label='Spotify Artist Results'
+            data-dropdown-presentation={isEditorial ? 'attached' : 'detached'}
             className={cn(
-              'absolute z-50 w-full mt-2 rounded-xl border border-default overflow-hidden bg-surface-0 shadow-lg',
-              isEditorial && 'homepage-name-search__results text-left'
+              'absolute z-50 w-full overflow-hidden border border-default bg-surface-0 shadow-lg',
+              isEditorial
+                ? 'homepage-name-search__results text-left'
+                : 'mt-2 rounded-xl'
             )}
           >
-            <select
-              id={resultsId}
-              className='sr-only'
-              size={Math.min(totalItems, 6)}
-              aria-label='Spotify Artist Results'
-              value={
-                activeIndex === pasteUrlIndex
-                  ? '__paste__'
-                  : (results[activeIndex]?.id ?? '')
-              }
-              onChange={event => {
-                if (event.target.value === '__paste__') {
-                  handlePasteUrlClick();
-                  return;
-                }
-                const selectedArtist = results.find(
-                  artist => artist.id === event.target.value
-                );
-                if (selectedArtist) {
-                  handleArtistSelect(selectedArtist);
-                }
-              }}
-            >
-              <option value='' disabled>
-                Select an artist
-              </option>
-              {results.map((artist, index) => (
-                <option
-                  key={artist.id}
-                  id={`${resultsId}-result-${index}`}
-                  value={artist.id}
-                >
-                  {artist.name}
-                  {artist.followers
-                    ? ` — ${formatFollowers(artist.followers)}`
-                    : ''}
-                </option>
-              ))}
-              <option
-                id={`${resultsId}-result-${pasteUrlIndex}`}
-                value='__paste__'
-              >
-                Paste a Spotify URL instead
-              </option>
-            </select>
-
             {/* Loading skeleton */}
             {state === 'loading' && results.length === 0 && (
               <div className='p-3 space-y-2'>
@@ -499,16 +486,15 @@ export function HeroSpotifySearch({
 
             {/* Artist results */}
             {results.length > 0 && (
-              <div
-                ref={resultsListRef}
-                className='max-h-64 overflow-y-auto'
-                aria-hidden='true'
-              >
+              <div ref={resultsListRef} className='max-h-64 overflow-y-auto'>
                 {results.map((artist, index) => (
                   <button
                     key={artist.id}
+                    id={`${resultsId}-result-${index}`}
                     type='button'
-                    tabIndex={0}
+                    role='option'
+                    aria-selected={index === activeIndex}
+                    tabIndex={-1}
                     className={cn(
                       'flex items-center gap-3 p-3 cursor-pointer transition-colors border-0 bg-transparent w-full text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-black/10 dark:focus-visible:ring-white/20 focus-visible:ring-inset',
                       index === activeIndex && 'bg-surface-1'
@@ -551,13 +537,16 @@ export function HeroSpotifySearch({
                       ) : null}
                     </div>
                     {artist.isClaimed && (
-                      <span className='shrink-0 rounded-full bg-brand-spotify-subtle px-2 py-0.5 text-3xs font-semibold text-brand-spotify'>
+                      <span
+                        className='shrink-0 rounded-full bg-accent/10 px-2 py-0.5 text-3xs font-semibold text-accent'
+                        data-semantic-tone='identity'
+                      >
                         On Jovie
                       </span>
                     )}
                     {artist.verified && (
                       <div
-                        className='shrink-0 text-brand-spotify'
+                        className='shrink-0 text-info'
                         data-testid='verified-badge'
                       >
                         <BadgeCheck className='h-4 w-4' aria-hidden='true' />
@@ -570,8 +559,11 @@ export function HeroSpotifySearch({
 
             {/* "Paste URL" option */}
             <button
+              id={`${resultsId}-result-${pasteUrlIndex}`}
               type='button'
-              tabIndex={0}
+              role='option'
+              aria-selected={activeIndex === pasteUrlIndex}
+              tabIndex={-1}
               className={cn(
                 'flex items-center gap-3 p-3 cursor-pointer transition-colors bg-transparent w-full text-left border-t border-subtle focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-black/10 dark:focus-visible:ring-white/20 focus-visible:ring-inset',
                 activeIndex === pasteUrlIndex && 'bg-surface-1'
@@ -582,10 +574,15 @@ export function HeroSpotifySearch({
               }
               onMouseEnter={() => setActiveIndex(pasteUrlIndex)}
             >
-              <div className='w-10 h-10 rounded-full flex items-center justify-center bg-surface-1'>
-                <Link2
-                  className='h-5 w-5 text-tertiary-token'
-                  aria-hidden='true'
+              <div
+                className='flex h-10 w-10 items-center justify-center rounded-full bg-surface-1'
+                data-testid='spotify-paste-url-brand'
+              >
+                <DspLogo
+                  provider='spotify'
+                  height={20}
+                  showLabel={false}
+                  emphasis='brand'
                 />
               </div>
               <div className='flex-1'>

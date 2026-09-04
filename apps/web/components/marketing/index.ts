@@ -53,6 +53,8 @@ export type {
 export { MarketingPosterHero } from './MarketingPosterHero';
 export type { MarketingSectionFrameProps } from './MarketingSectionFrame';
 export { MarketingSectionFrame } from './MarketingSectionFrame';
+export type { MarketingSectionHeadingProps } from './MarketingSectionHeading';
+export { MarketingSectionHeading } from './MarketingSectionHeading';
 export type {
   MarketingSectionIntroBadge,
   MarketingSectionIntroProps,

@@ -91,6 +91,80 @@ test.describe('Homepage', () => {
     expect(heroBox?.height ?? 0).toBeGreaterThanOrEqual(
       (viewport?.height ?? 0) - 1
     );
+    const frames = page.locator(
+      '[data-aura-contained="true"][data-aura-motion="static"]'
+    );
+    await expect(frames).toHaveCount(2);
+    expect(
+      await frames
+        .first()
+        .locator(':scope > [aria-hidden="true"]')
+        .evaluate(element => [
+          getComputedStyle(element).overflow,
+          getComputedStyle(element, '::before').animationName,
+        ])
+    ).toEqual(['hidden', 'none']);
+  });
+
+  test('expands editorial autocomplete as one attached branded control', async ({
+    page,
+  }) => {
+    await page.setViewportSize({ width: 1129, height: 842 });
+    await page.route('**/api/spotify/search**', route =>
+      route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify([
+          {
+            id: 'artist-1',
+            name: 'Taylor Swift',
+            url: 'https://open.spotify.com/artist/artist-1',
+            followers: 1000,
+            verified: true,
+            isClaimed: true,
+          },
+        ]),
+      })
+    );
+
+    const hero = page.getByTestId('homepage-hero-shell');
+    const input = hero.getByPlaceholder('Search your name');
+    await expect(input).toHaveAttribute('spellcheck', 'false');
+    await input.fill('Taylor');
+
+    const dropdown = hero.locator('[data-dropdown-presentation="attached"]');
+    await expect(dropdown).toBeVisible();
+    const spotifyMark = dropdown.getByTestId('spotify-paste-url-brand');
+    await expect(spotifyMark.locator('svg')).toBeVisible();
+    expect(
+      await spotifyMark
+        .locator('svg')
+        .evaluate(el => getComputedStyle(el).color)
+    ).not.toBe('rgb(0, 0, 0)');
+    const geometry = await dropdown.evaluate(element => {
+      const result = element.getBoundingClientRect();
+      const field = element.previousElementSibling?.getBoundingClientRect();
+      return [
+        Math.abs(result.top - (field?.bottom ?? 0)),
+        Math.abs(result.left - (field?.left ?? 0)),
+        Math.abs(result.right - (field?.right ?? 0)),
+        result.bottom <= innerHeight,
+      ];
+    });
+    expect(geometry[0]).toBeLessThanOrEqual(1.5);
+    expect(geometry.slice(1)).toEqual([0, 0, true]);
+    expect(await page.evaluate(() => window.scrollY)).toBe(0);
+    await input.press('ArrowDown');
+    const selected = dropdown.getByRole('option', { name: /Taylor Swift/i });
+    await expect(selected).toHaveAttribute('aria-selected', 'true');
+    await expect(input).toHaveAttribute('aria-activedescendant', /result-0$/);
+    expect(await page.evaluate(() => window.scrollY)).toBe(0);
+    await input.press('Escape');
+    await expect(dropdown).toHaveCount(0);
+    await input.fill('Taylor Swift');
+    await expect(dropdown).toBeVisible();
+    await hero.getByRole('heading').click({ position: { x: 1, y: 1 } });
+    await expect(dropdown).toHaveCount(0);
   });
 
   test('header uses the canonical marketing shell with full navigation', async ({
@@ -103,10 +177,15 @@ test.describe('Homepage', () => {
       'data-presentation',
       'marketing-glass'
     );
-    await expect(header.locator('a[href="/"]').first()).toBeVisible();
+    const desktopNav = header.locator('.marketing-glass-header__nav');
+    await expect(desktopNav.getByRole('link')).toHaveText([
+      'Jovie',
+      'Customers',
+      'Product',
+      'Pricing',
+    ]);
     await expect(header.getByRole('link', { name: 'Product' })).toBeVisible();
-    await expect(header.getByRole('button', { name: 'For' })).toBeVisible();
-    await expect(header.getByRole('button', { name: 'Tools' })).toBeVisible();
+    await expect(header.getByRole('link', { name: 'Customers' })).toBeVisible();
     await expect(header.getByRole('link', { name: 'Pricing' })).toBeVisible();
     await expect(header.getByRole('link', { name: 'Contact' })).toHaveCount(0);
     await expect(header.getByRole('link', { name: 'Log in' })).toHaveAttribute(
@@ -114,19 +193,20 @@ test.describe('Homepage', () => {
       '/signin'
     );
     await expect(
-      header.getByRole('link', { name: 'Find yourself' })
+      header.getByRole('link', { name: 'Get started' })
     ).toHaveAttribute('href', '/start');
   });
 
-  test('canonical header flyouts stay closed until requested', async ({
+  test('canonical header keeps deprecated flyouts out of the decision path', async ({
     page,
   }) => {
     const header = page.getByTestId('header-nav');
-    const toolsFlyout = page.locator('#marketing-header-flyout-tools');
 
-    await expect(header.getByRole('button', { name: 'For' })).toBeVisible();
-    await expect(header.getByRole('button', { name: 'Tools' })).toBeVisible();
-    await expect(toolsFlyout).toHaveCount(0);
+    await expect(header.getByRole('button', { name: 'For' })).toHaveCount(0);
+    await expect(header.getByRole('button', { name: 'Tools' })).toHaveCount(0);
+    await expect(page.locator('[id^="marketing-header-flyout-"]')).toHaveCount(
+      0
+    );
   });
 
   test('hero backdrop is an image-free abstract field with centered content', async ({
@@ -389,10 +469,19 @@ test.describe('Homepage', () => {
       page.getByRole('button', { name: 'Find me', exact: true })
     ).toHaveCount(2);
     await expect(page.getByRole('button', { name: /^Search$/ })).toHaveCount(0);
-    await expect(page.getByText('Get started')).toHaveCount(0);
+    await expect(page.locator('main').getByText('Get started')).toHaveCount(0);
     await expect(page.getByText('Drop more music')).toHaveCount(0);
     await expect(page.getByTestId('homepage-faq')).toHaveCount(0);
     await expect(page.getByTestId('homepage-v2-final-cta')).toHaveCount(0);
+    await expect(page.getByTestId('homepage-close-mark')).toHaveCount(0);
+    await expect(page.getByTestId('homepage-close-depth')).toHaveAttribute(
+      'aria-hidden',
+      'true'
+    );
+    const closeBox = await close.boundingBox();
+    expect(closeBox?.height ?? 0).toBeGreaterThanOrEqual(
+      (page.viewportSize()?.height ?? 0) * 0.87
+    );
 
     if (browserName === 'chromium') {
       expect(
@@ -418,12 +507,13 @@ test.describe('Homepage', () => {
       );
       const headingLines = await sectionHeadings.evaluateAll(headings =>
         headings.map(heading => {
-          const style = getComputedStyle(heading);
-          return Math.ceil(
-            heading.getBoundingClientRect().height /
-              Number.parseFloat(style.lineHeight) -
-              0.05
-          );
+          const range = document.createRange();
+          range.selectNodeContents(heading);
+          return new Set(
+            Array.from(range.getClientRects())
+              .filter(rect => rect.width > 0 && rect.height > 0)
+              .map(rect => Math.round(rect.top))
+          ).size;
         })
       );
       expect(headingLines).toHaveLength(8);
@@ -432,12 +522,13 @@ test.describe('Homepage', () => {
           Math.max(
             ...(await sectionHeadings.evaluateAll(headings =>
               headings.map(heading => {
-                const style = getComputedStyle(heading);
-                return Math.ceil(
-                  heading.getBoundingClientRect().height /
-                    Number.parseFloat(style.lineHeight) -
-                    0.05
-                );
+                const range = document.createRange();
+                range.selectNodeContents(heading);
+                return new Set(
+                  Array.from(range.getClientRects())
+                    .filter(rect => rect.width > 0 && rect.height > 0)
+                    .map(rect => Math.round(rect.top))
+                ).size;
               })
             ))
           )
@@ -474,12 +565,13 @@ test.describe('Homepage', () => {
     // One sentence never wraps onto three lines, even on a phone.
     await page.evaluate(() => document.fonts.ready);
     const headingLines = await heading.evaluate(element => {
-      const style = getComputedStyle(element);
-      return Math.ceil(
-        element.getBoundingClientRect().height /
-          Number.parseFloat(style.lineHeight) -
-          0.05
-      );
+      const range = document.createRange();
+      range.selectNodeContents(element);
+      return new Set(
+        Array.from(range.getClientRects())
+          .filter(rect => rect.width > 0 && rect.height > 0)
+          .map(rect => Math.round(rect.top))
+      ).size;
     });
     expect(headingLines).toBeLessThanOrEqual(2);
 
@@ -516,7 +608,7 @@ test.describe('Homepage', () => {
       mobileNav.getByRole('link', { name: 'Log in', exact: true })
     ).toHaveAttribute('href', '/signin');
     await expect(
-      mobileNav.getByRole('link', { name: 'Find yourself', exact: true })
+      mobileNav.getByRole('link', { name: 'Get started', exact: true })
     ).toHaveAttribute('href', '/start');
   });
 
@@ -594,12 +686,13 @@ test.describe('Homepage', () => {
         name: 'Control how the world sees you.',
       });
       const headingLines = await heading.evaluate(element => {
-        const style = getComputedStyle(element);
-        return Math.ceil(
-          element.getBoundingClientRect().height /
-            Number.parseFloat(style.lineHeight) -
-            0.05
-        );
+        const range = document.createRange();
+        range.selectNodeContents(element);
+        return new Set(
+          Array.from(range.getClientRects())
+            .filter(rect => rect.width > 0 && rect.height > 0)
+            .map(rect => Math.round(rect.top))
+        ).size;
       });
       expect(headingLines).toBeLessThanOrEqual(3);
       await expect(page.getByTestId('homepage-primary-cta')).toBeVisible();

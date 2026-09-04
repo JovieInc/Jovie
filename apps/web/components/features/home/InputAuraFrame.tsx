@@ -1,3 +1,4 @@
+// @coverage-via apps/web/tests/unit/home/HeroSpotifySearch.test.tsx
 import type { ReactNode } from 'react';
 import { cn } from '@/lib/utils';
 
@@ -11,17 +12,17 @@ export function InputAuraFrame({
   className,
 }: Readonly<InputAuraFrameProps>) {
   return (
-    <div className={cn('group/aura relative', className)}>
+    <div
+      className={cn('group/aura relative isolate rounded-xl', className)}
+      data-aura-contained='true'
+      data-aura-motion='static'
+    >
       <div
         aria-hidden='true'
         className={cn(
-          'pointer-events-none absolute -inset-1.5 overflow-hidden rounded-xl opacity-40 blur-[5px]',
-          'transition-opacity duration-cinematic group-focus-within/aura:opacity-100',
-          "before:absolute before:left-1/2 before:top-1/2 before:h-150 before:w-150 before:-translate-x-1/2 before:-translate-y-1/2 before:rotate-[82deg] before:content-['']",
-          'before:bg-[conic-gradient(transparent,var(--color-accent-purple),transparent_10%,transparent_50%,var(--color-accent-pink),transparent_60%)]',
-          'before:transition-transform before:duration-[4000ms] before:ease-out',
-          'group-focus-within/aura:before:rotate-[442deg]',
-          'motion-reduce:before:transition-none motion-reduce:group-focus-within/aura:before:rotate-[82deg]'
+          'pointer-events-none absolute inset-0 overflow-hidden rounded-[inherit] opacity-100',
+          "before:absolute before:inset-x-[8%] before:inset-y-[-90%] before:rounded-full before:bg-[linear-gradient(90deg,transparent_0%,var(--color-accent-purple)_34%,var(--color-accent-blue)_66%,transparent_100%)] before:opacity-50 before:blur-[14px] before:content-['']",
+          "after:absolute after:inset-px after:rounded-[inherit] after:border after:border-white/[0.04] after:content-['']"
         )}
       />
       {children}

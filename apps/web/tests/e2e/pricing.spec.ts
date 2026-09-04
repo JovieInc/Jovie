@@ -42,13 +42,8 @@ test.describe('Pricing Page', () => {
     // Check main heading
     await expect(page.locator('h1')).toHaveText('Pricing');
     await expect(
-      page.getByRole('heading', { name: 'Artist profiles built to convert' })
-    ).toBeVisible();
-    await expect(
-      page.getByRole('heading', {
-        name: 'Capture fans once. Bring them back automatically.',
-      })
-    ).toBeVisible();
+      page.getByText('Artist profiles built to convert')
+    ).toHaveCount(0);
 
     // Check that the canonical pricing tiers are visible
     await expect(page.getByTestId('marketing-pricing-plan-free')).toContainText(
@@ -81,6 +76,57 @@ test.describe('Pricing Page', () => {
     await expect(page.getByTestId('marketing-pricing-plan-team')).toHaveCount(
       0
     );
+    await expect(
+      page.getByRole('navigation', { name: 'Choose A Plan' })
+    ).toHaveAttribute('data-sticky-plan-header', 'true');
+    await expect(
+      page.getByRole('heading', { name: 'Questions, answered' })
+    ).toBeVisible();
+
+    const header = page.getByTestId('header-nav');
+    await expect(header).toHaveCSS('position', 'absolute');
+    await expect(header).toHaveCSS('background-color', 'rgb(255, 255, 255)');
+    await expect(page.getByRole('link', { name: 'Customers' })).toBeVisible();
+    await expect(page.getByRole('link', { name: 'Get started' })).toBeVisible();
+  });
+
+  test('keeps Pricing descenders inside the canonical H1 at breakpoints and 200% zoom', async ({
+    page,
+  }) => {
+    for (const viewport of [
+      { width: 390, height: 844 },
+      { width: 768, height: 1024 },
+      { width: 1440, height: 900 },
+    ]) {
+      await page.setViewportSize(viewport);
+      await page.goto('/pricing');
+      await waitForHydration(page);
+      await page.evaluate(() => document.fonts.ready);
+
+      for (const zoom of [1, 2]) {
+        await page.evaluate(value => {
+          document.documentElement.style.zoom = String(value);
+        }, zoom);
+
+        expect(
+          await page
+            .getByRole('heading', { name: 'Pricing', exact: true })
+            .evaluate(element => {
+              const style = getComputedStyle(element);
+              return {
+                clipped: element.scrollHeight > element.clientHeight + 1,
+                reserved:
+                  Number.parseFloat(style.paddingBottom) >=
+                  Number.parseFloat(style.fontSize) * 0.13,
+              };
+            })
+        ).toEqual({ clipped: false, reserved: true });
+      }
+
+      await page.evaluate(() => {
+        document.documentElement.style.zoom = '1';
+      });
+    }
   });
 
   test('keeps campaign attribution when legacy launch pricing links redirect', async ({
@@ -147,5 +193,41 @@ test.describe('Pricing Page', () => {
     // Verify page has substantial content (pricing details)
     const bodyText = await page.locator('body').textContent();
     expect(bodyText && bodyText.length > 500).toBe(true);
+  });
+
+  test('keeps plan decisions sticky without colliding or shifting', async ({
+    page,
+  }) => {
+    const decisionBar = page.getByRole('navigation', { name: 'Choose A Plan' });
+    await decisionBar.evaluate(element => {
+      const top = element.getBoundingClientRect().top + window.scrollY;
+      document.documentElement.style.scrollBehavior = 'auto';
+      window.scrollTo(0, top + 480);
+    });
+    await page.evaluate(() => new Promise(requestAnimationFrame));
+
+    const geometryBefore = await decisionBar.boundingBox();
+    const headerGeometry = await page.getByTestId('header-nav').boundingBox();
+    expect(geometryBefore?.y).toBeGreaterThanOrEqual(0);
+    expect(geometryBefore?.y).toBeLessThanOrEqual(2);
+    expect(headerGeometry?.y ?? 0).toBeLessThan(0);
+
+    await page
+      .getByRole('switch', { name: 'Toggle Annual Billing' })
+      .evaluate(button => button.click());
+    const geometryAfter = await decisionBar.boundingBox();
+    expect(geometryAfter).toEqual(geometryBefore);
+
+    await page.setViewportSize({ width: 390, height: 844 });
+    await page.goto('/pricing');
+    await waitForHydration(page);
+    await expect(
+      decisionBar.locator('.system-b-pricing-decision-plan[data-active="true"]')
+    ).toBeVisible();
+    expect(
+      await page.evaluate(
+        () => document.documentElement.scrollWidth <= window.innerWidth
+      )
+    ).toBe(true);
   });
 });

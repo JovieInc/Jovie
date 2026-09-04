@@ -1,7 +1,14 @@
 'use client';
 
+import { Button, NativeSelect } from '@jovie/ui';
 import { Check, Minus } from 'lucide-react';
+import Link from 'next/link';
 import { Fragment, useState } from 'react';
+import {
+  getMarketingPlanCtaLabel,
+  getMarketingPlanHref,
+  getVisibleMarketingPricingPlans,
+} from '@/data/marketingPricingPlans';
 import {
   type ComparisonFeature,
   ENTITLEMENT_REGISTRY,
@@ -132,19 +139,21 @@ export function PricingComparisonChart() {
       ? Math.round(max.marketing.price.yearly / 12)
       : (max.marketing.price?.monthly ?? 0);
 
-  const planOptions: { id: PlanColumn; name: string; price: string }[] = [
-    { id: 'free', name: free.marketing.displayName, price: '$0' },
-    { id: 'pro', name: pro.marketing.displayName, price: `$${proPrice}/mo` },
-    ...(maxPlanEnabled
-      ? [
-          {
-            id: 'max' as PlanColumn,
-            name: max.marketing.displayName,
-            price: `$${maxPrice}/mo`,
-          },
-        ]
-      : []),
-  ];
+  const planOptions = getVisibleMarketingPricingPlans()
+    .filter(plan => plan.id !== 'max' || maxPlanEnabled)
+    .map(plan => {
+      const price =
+        plan.id === 'free'
+          ? '$0'
+          : `$${plan.id === 'pro' ? proPrice : maxPrice}/mo`;
+      return {
+        id: plan.id as PlanColumn,
+        name: ENTITLEMENT_REGISTRY[plan.id].marketing.displayName,
+        price,
+        ctaLabel: getMarketingPlanCtaLabel(plan),
+        href: getMarketingPlanHref(plan.id),
+      };
+    });
   const selectedPlanOption =
     planOptions.find(option => option.id === selectedPlan) ?? planOptions[0];
 
@@ -157,17 +166,19 @@ export function PricingComparisonChart() {
         >
           Monthly
         </span>
-        <button
+        <Button
           type='button'
           role='switch'
           aria-checked={isAnnual}
           aria-label='Toggle Annual Billing'
           onClick={() => setIsAnnual(value => !value)}
-          className='system-b-pricing-switch'
-          data-state={isAnnual ? 'annual' : 'monthly'}
+          className='system-b-pricing-switch h-6 w-11 min-w-11 border border-subtle bg-surface-2 p-0 text-transparent hover:bg-surface-3'
+          data-billing={isAnnual ? 'annual' : 'monthly'}
+          size='icon-sm'
+          variant='ghost'
         >
           <span className='system-b-pricing-switch-thumb' />
-        </button>
+        </Button>
         <span
           className='system-b-pricing-billing-label'
           data-active={isAnnual ? 'true' : undefined}
@@ -180,7 +191,7 @@ export function PricingComparisonChart() {
       </div>
 
       <div className='system-b-pricing-mobile-selector'>
-        <select
+        <NativeSelect
           aria-label='Select Plan To Compare'
           value={selectedPlan}
           onChange={event => {
@@ -190,14 +201,34 @@ export function PricingComparisonChart() {
             }
           }}
           className='system-b-pricing-select'
-        >
-          {planOptions.map(option => (
-            <option key={option.id} value={option.id}>
-              {option.name} - {option.price}
-            </option>
-          ))}
-        </select>
+          placeholder='Select plan'
+          options={planOptions.map(option => ({
+            value: option.id,
+            label: `${option.name} - ${option.price}`,
+          }))}
+        />
       </div>
+
+      <nav
+        aria-label='Choose A Plan'
+        data-sticky-plan-header='true'
+        className='system-b-pricing-decision-bar'
+      >
+        <span className='system-b-pricing-decision-label'>Choose a plan</span>
+        {planOptions.map(option => (
+          <div
+            key={option.id}
+            data-active={selectedPlan === option.id ? 'true' : undefined}
+            className='system-b-pricing-decision-plan'
+          >
+            <strong>{option.name}</strong>
+            <span>{option.price}</span>
+            <Link href={option.href} prefetch={false}>
+              {option.ctaLabel}
+            </Link>
+          </div>
+        ))}
+      </nav>
 
       <div className='system-b-pricing-table-shell' data-variant='desktop'>
         <table className='system-b-pricing-table'>

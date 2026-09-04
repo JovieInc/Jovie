@@ -18,6 +18,12 @@
   background: var(--color-bg-surface-0);
 }
 
+.m-shipped-sites__card {
+  display: grid;
+  height: 100%;
+  grid-template-rows: auto auto 1fr;
+}
+
 .m-shipped-sites__frame--desktop {
   aspect-ratio: 4 / 5;
 }

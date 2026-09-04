@@ -587,8 +587,9 @@ describe('marketing route manifest integrity', () => {
     expect(pricingReport.actualSectionIds).toEqual([
       'hero',
       'pricing',
-      'social-proof',
+      'logo-cloud',
       'comparison',
+      'faq',
       'cta',
     ]);
     expect(pricingReport.expectedSectionIds).toEqual([

@@ -37,7 +37,7 @@ export function MarketingShippedSitesShowcase({
           {SHIPPED_SITE_TILES.map(tile => {
             const image = getShippedSiteImage(tile.scenarioId);
             const shot = (
-              <article>
+              <article className='m-shipped-sites__card'>
                 <div
                   className={cn(
                     'm-shipped-sites__frame relative overflow-hidden rounded-xl border border-subtle',
@@ -52,6 +52,10 @@ export function MarketingShippedSitesShowcase({
                     sizes='(min-width: 1280px) 28vw, (min-width: 640px) 45vw, 92vw'
                   />
                 </div>
+                <p className='mt-3 font-mono text-3xs leading-relaxed text-tertiary-token'>
+                  {image.route} · {image.viewport} · {image.crop} ·{' '}
+                  {image.gitSha ? image.gitSha.slice(0, 8) : 'build unknown'}
+                </p>
                 <div className='mt-4 flex items-baseline justify-between gap-3 border-t border-subtle pt-3'>
                   <div className='min-w-0'>
                     <h3 className='truncate text-sm font-semibold text-primary-token'>

@@ -131,7 +131,7 @@ describe('public CTA guard', () => {
       '<HeaderPrimaryAuthLink href={publicCta.href} label={publicCta.label} />'
     );
     expect(marketingNavigation).toContain("label: 'Log in'");
-    expect(marketingNavigation).toContain("label: 'Find yourself'");
+    expect(marketingNavigation).toContain("label: 'Get started'");
     expect(marketingHeader).toContain(
       'DEFAULT_MARKETING_CTA: MarketingHeaderCta = MARKETING_NAV_UTILITIES[1]'
     );
@@ -146,5 +146,31 @@ describe('public CTA guard', () => {
     // Duplicate hrefs (e.g. two labels routing to the same page) must not
     // collide on the React key.
     expect(headerNav).toContain('key={`${link.href}:${link.label}`}');
+  });
+
+  it('keeps the marketing header in document flow so it cannot cover the hero', () => {
+    const headerNav = readFileSync(
+      join(ROOT, 'components/organisms/HeaderNav.tsx'),
+      'utf8'
+    );
+
+    expect(headerNav).toContain(
+      "? 'marketing-glass-header absolute top-0 left-0 right-0 w-full'"
+    );
+    expect(headerNav).not.toContain(
+      "? 'marketing-glass-header fixed top-0 left-0 right-0 w-full'"
+    );
+  });
+
+  it('keeps the compact-menu control visible on the white marketing shell', () => {
+    const headerCss = readFileSync(
+      join(ROOT, 'components/organisms/HeaderNav.css'),
+      'utf8'
+    );
+
+    expect(headerCss).toContain(
+      '.marketing-glass-header button[aria-controls="mobile-nav-panel"]'
+    );
+    expect(headerCss).toContain('color: var(--marketing-glass-text);');
   });
 });
