@@ -118,6 +118,8 @@ native_state_to_snap() {
       body: (.body // ""),
       L: [((.labels.nodes // [])[] | .name)],
       fail: [],
+      humanQueueHold: (.humanQueueHold == true),
+      humanQueueIntentUnknown: (.humanQueueIntentUnknown == true),
       q: (.queued == true),
       qs: (.mergeQueueEntry.state // null),
       qp: (.mergeQueueEntry.position // null),
@@ -1402,8 +1404,8 @@ enroll_if_still_eligible() {  # enroll_if_still_eligible <num> [authorized-pr au
   return 1
 }
 
-dequeue_strict() {  # dequeue_strict <num>
-  local n="$1" current
+dequeue_strict() {  # dequeue_strict <num> [expected-head]
+  local n="$1" expected_head="${2:-}" current dequeue_receipt
   if [[ "$DRY_RUN" == "1" ]]; then
     if [[ "$MERGE_QUEUE_BACKEND" == "test-label-fixture" ]]; then
       echo "    [dry-run] would -merge-queue on #$n"
@@ -1414,7 +1416,16 @@ dequeue_strict() {  # dequeue_strict <num>
   fi
   # native-queue-transport:dequeue:start
   if [[ "$MERGE_QUEUE_BACKEND" == "native" ]]; then
-    if ! node scripts/merge-queue-backend.mjs dequeue "$n" >/dev/null; then
+    if [[ -n "$expected_head" ]]; then
+      if ! dequeue_receipt="$(node scripts/merge-queue-backend.mjs dequeue-ineligible "$n" "$expected_head")"; then
+        echo "    !! failed to revalidate and dequeue ineligible PR #$n" >&2
+        return 1
+      fi
+      if [[ "$(jq -r '.skipped // false' <<<"$dequeue_receipt")" == "true" ]]; then
+        echo "    =native-queue on #$n ($(jq -r '.reason' <<<"$dequeue_receipt")); stale dequeue suppressed"
+        return 0
+      fi
+    elif ! dequeue_receipt="$(node scripts/merge-queue-backend.mjs dequeue "$n")"; then
       echo "    !! failed to prove native dequeue for held PR #$n" >&2
       return 1
     fi
@@ -1849,9 +1860,10 @@ if [[ "$(jq '.dequeue | length' <<<"$QUEUE_RECONCILIATION")" -eq 0 ]]; then
 fi
 while read -r pr; do
   n=$(jq -r '.n' <<<"$pr"); t=$(jq -r '.t' <<<"$pr")
+  head_oid=$(jq -r '.headOid // ""' <<<"$pr" | tr '[:upper:]' '[:lower:]')
   reason=$(jq -r '.reasons | join("; ")' <<<"$pr")
   echo "  #$n  $t  ✗ $reason"
-  if ! dequeue_strict "$n"; then
+  if ! dequeue_strict "$n" "$head_oid"; then
     echo "::error::Failed to prove ineligible PR #$n is outside merge queue" >&2
     exit 1
   fi
@@ -2131,14 +2143,13 @@ if [[ "$MERGE_QUEUE_BACKEND" == "native" ]] \
     | select(([.L[]] | any(.=="queue-deferred" or '"$NO_AUTO_HOLD_JQ"')) | not)')
 fi
 
-# --- ENROLL: non-draft, mergeable, no FAILING checks, not opted-out, not queued ---
-# Enroll on mergeable + no actually-failing checks. We deliberately do NOT require
+# --- ENROLL: non-draft, mergeable, complete-green checks, not opted-out, not queued ---
+# Enroll on mergeable + complete-green source checks. We deliberately do NOT require
 # mergeStateStatus==CLEAN: zombie cancelled/queued required-check runs (from
 # cancel-in-progress) pin otherwise-green PRs at BLOCKED, and gating enrollment on
-# CLEAN meant those PRs never entered the queue. Enrolling a not-yet-green PR is
-# safe — the backend re-validates and the dequeue step above removes any that truly
-# fail. `.fail` only counts terminal failing checks, not pending/queued ones.
-echo "=== ENROLL (mergeable + not failing → queue admission) ==="
+# CLEAN meant those PRs never entered the queue. The backend binds the evidence to
+# the exact head and refuses pending, missing, ambiguous, or terminal-red checks.
+echo "=== ENROLL (mergeable + complete green → queue admission) ==="
 # Honor the checked-in queue policy's maxQueueDepth. Use process substitution rather
 # than a pipe so ENROLLED_THIS_RUN remains in the parent shell and the cap is
 # actually enforced.
@@ -2200,6 +2211,8 @@ while read -r pr; do
     and (.m == "MERGEABLE")
     and (.base == "main")
     and ((.fail // []) | length == 0)
+    and (.humanQueueHold != true)
+    and (.humanQueueIntentUnknown != true)
     and (([.L[]] | any(. == "hold" or . == "queue-deferred" or . == "needs-conflict-resolution" or . == "fast" or '"$NO_AUTO_HOLD_JQ"')) | not)
   ' <<<"$pr" >/dev/null; then
     clean_eligible=1
@@ -2256,6 +2269,8 @@ done < <(echo "$SNAP" | jq -c --arg admission_pr "$DRAIN_ADMISSION_PR" --arg pro
   | select(.m=="MERGEABLE")
   | select(.base=="main")
   | select(.fail|length==0)
+  | select(.humanQueueHold != true)
+  | select(.humanQueueIntentUnknown != true)
   | select(.q | not)
   | select([.L[]] | any(.=="hold" or .=="needs-conflict-resolution" or .=="fast" or '"$NO_AUTO_HOLD_JQ"') | not)
   | select(
@@ -2283,7 +2298,7 @@ if [[ -n "$DRAIN_ADMISSION_PR" && "$ENROLLED_THIS_RUN" -eq 0 ]]; then
   # never membership. A live hard-hold label added after SNAP is not a
   # successful receipt. Only an unheld exact-head receipt suppresses the error.
   if [[ "$MERGE_QUEUE_BACKEND" == "native" && "$DRY_RUN" != "1" \
-    && "$ADMISSION_TARGET_OBSERVED" == "true" && "$ADMISSION_ALREADY_QUEUED" != "true" ]]; then
+    && "$ADMISSION_TARGET_OBSERVED" == "true" ]]; then
     LIVE_NATIVE_RECEIPT="$(node scripts/merge-queue-backend.mjs prove-receipt \
       "$DRAIN_ADMISSION_PR" "$DRAIN_ADMISSION_HEAD")"
     if jq -e '
@@ -2293,11 +2308,15 @@ if [[ -n "$DRAIN_ADMISSION_PR" && "$ENROLLED_THIS_RUN" -eq 0 ]]; then
       and (.state.mergeQueueEntry.state | IN("QUEUED", "AWAITING_CHECKS", "MERGEABLE", "UNMERGEABLE", "LOCKED"))
       and (.state.mergeQueueEntry.position | type == "number" and floor == . and . > 0)
       and ((.state.headRefOid // "") | ascii_downcase) == $head
+      and ((.state.fail // []) | length == 0)
+      and (.state.humanQueueHold != true)
+      and (.state.humanQueueIntentUnknown != true)
       and ((.state.labels.nodes // []) | map(.name) | any(. == "hold" or . == "queue-deferred" or . == "needs-conflict-resolution" or . == "fast" or '"$NO_AUTO_HOLD_JQ"') | not)
     ' --arg head "$DRAIN_ADMISSION_HEAD" <<<"$LIVE_NATIVE_RECEIPT" >/dev/null; then
       ADMISSION_ALREADY_QUEUED="true"
       echo "  #$DRAIN_ADMISSION_PR  ~ delayed native receipt at $DRAIN_ADMISSION_HEAD (state $(jq -r '.state.mergeQueueEntry.state' <<<"$LIVE_NATIVE_RECEIPT"), position $(jq -r '.state.mergeQueueEntry.position' <<<"$LIVE_NATIVE_RECEIPT"))"
     else
+      ADMISSION_ALREADY_QUEUED="false"
       ADMISSION_MISSING_REASON="$(jq -r '.explanation.reason // "missing-receipt"' <<<"$LIVE_NATIVE_RECEIPT")"
     fi
   fi
@@ -2386,6 +2405,8 @@ if [[ "$DRAIN_RECONCILE_QUEUE_REENTRY" == "1" || "$DRAIN_RECONCILE_MISSED_ADMISS
     | select(.m == "MERGEABLE")
     | select(.base == "main")
     | select(.fail | length == 0)
+    | select(.humanQueueHold != true)
+    | select(.humanQueueIntentUnknown != true)
     | select([.L[]] | any(. == "hold" or . == "needs-conflict-resolution" or . == "fast" or '"$NO_AUTO_HOLD_JQ"') | not)
     | select(
         ([.L[]] | index("queue-deferred") == null)
@@ -2439,6 +2460,8 @@ if [[ "$DRAIN_RECOVER_FLEET_HOLDS" == "1" ]]; then
     | select(.m == "MERGEABLE")
     | select(.base == "main")
     | select(.fail | length == 0)
+    | select(.humanQueueHold != true)
+    | select(.humanQueueIntentUnknown != true)
     | select([.L[]] | any(. == "hold" or . == "queue-deferred" or . == "needs-conflict-resolution" or . == "fast" or '"$NO_AUTO_HOLD_JQ"') | not)')
 fi
 
@@ -2513,6 +2536,8 @@ Required source checks never registered a run for head $head_oid, so this PR cou
     | select(.base == "main")
     | select((.fail | length) > 0)
     | select(.fail | all(.[]; endswith(" (missing)")))
+    | select(.humanQueueHold != true)
+    | select(.humanQueueIntentUnknown != true)
     | select([.L[]] | any(. == "hold" or . == "queue-deferred" or . == "needs-conflict-resolution" or . == "fast" or '"$NO_AUTO_HOLD_JQ"') | not)
     | select((.headOid // "") | test("^[0-9a-f]{40}$"))
     | {n, t, headOid}

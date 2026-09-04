@@ -115,6 +115,13 @@ export const ADVISORY_CHECK_WORKFLOWS = Object.freeze([
   'Fleet Gate Refresh',
 ]);
 
+const ADVISORY_CHECK_IDENTITIES = new Set([
+  // Recovery dispatch is an operational controller, not source validation.
+  // Scope this narrowly: another job in this workflow, or another workflow's
+  // job also named `sweep`, must still fail closed.
+  'Ownerless Recovery Sweep\0sweep',
+]);
+
 export const REQUIRED_CHECK_NAMES = Object.freeze(
   parseRequiredStatusChecksFromYaml(branchProtectionYaml).map(name => ({
     context: name,
@@ -139,20 +146,18 @@ export function isAdvisoryCheckName(name) {
 }
 
 export function isAdvisoryCheck(check) {
+  const name = normalizeCheckName(check);
+  const workflow = check?.workflow ?? '';
   if (
-    REQUIRED_CHECK_NAMES.some(required =>
-      required.names.includes(normalizeCheckName(check))
-    )
+    REQUIRED_CHECK_NAMES.some(required => required.names.includes(name)) ||
+    MERGE_GATE_CHECK_NAMES.includes(name)
   ) {
     return false;
   }
-  // Only this recovery-dispatch job is operational evidence. Neither a generic
-  // sweep nor a future safety job in that workflow inherits the exception.
   return (
-    (check?.workflow === 'Ownerless Recovery Sweep' &&
-      check?.name === 'sweep') ||
-    isAdvisoryCheckName(normalizeCheckName(check)) ||
-    ADVISORY_CHECK_WORKFLOWS.includes(check?.workflow ?? '')
+    isAdvisoryCheckName(name) ||
+    ADVISORY_CHECK_WORKFLOWS.includes(workflow) ||
+    ADVISORY_CHECK_IDENTITIES.has(`${workflow}\0${name}`)
   );
 }
 
@@ -265,30 +270,25 @@ export function collapseNewestCheckAttempts(checks) {
       continue;
     }
 
-    const ranked = candidates.map(check => ({
-      check,
-      startedAt: attemptTimestamp(check, 'startedAt'),
-      completedAt: attemptTimestamp(check, 'completedAt'),
-      observedAt: null,
-    }));
+    const ranked = candidates.map(check => {
+      const startedAt = attemptTimestamp(check, 'startedAt');
+      const completedAt = attemptTimestamp(check, 'completedAt');
+      return {
+        check,
+        startedAt,
+        completedAt,
+        // An in-progress attempt legitimately has no completion timestamp. Its
+        // start still supersedes an older completed attempt.
+        observedAt: isPendingCheck(check) ? startedAt : completedAt,
+      };
+    });
     const missingTimestamps = ranked.some(
-      attempt => attempt.startedAt === null || attempt.completedAt === null
+      attempt => attempt.startedAt === null || attempt.observedAt === null
     );
     if (missingTimestamps) {
-      // Prefer a unique successful attempt over fail-closed noise when clocks
-      // are missing; only fail closed if terminal red is also present.
-      const successes = candidates.filter(isSuccessfulCheck);
-      const failures = candidates.filter(isTerminalFailure);
-      if (successes.length >= 1 && failures.length === 0) {
-        collapsed.push(successes[0]);
-        continue;
-      }
       ambiguousNames.push(name);
-      ambiguousChecks.push({ name, workflow: group[0]?.workflow });
+      ambiguousChecks.push(group[0]);
       continue;
-    }
-    for (const attempt of ranked) {
-      attempt.observedAt = Math.max(attempt.startedAt, attempt.completedAt);
     }
     ranked.sort(
       (left, right) =>
@@ -313,7 +313,7 @@ export function collapseNewestCheckAttempts(checks) {
       const topFailure = top.filter(isTerminalFailure);
       if (topFailure.length > 0 && topSuccess.length > 0) {
         ambiguousNames.push(name);
-        ambiguousChecks.push({ name, workflow: group[0]?.workflow });
+        ambiguousChecks.push(top[0]);
         continue;
       }
       if (topFailure.length > 0) {
@@ -337,18 +337,29 @@ export function collapseNewestCheckAttempts(checks) {
   };
 }
 
-/** Positive readiness proof shared by auto-ready and queue enrollment. */
-export function classifyQueueCheckBlockers(checks) {
+/** Typed positive-readiness blockers shared by auto-ready and queue enrollment. */
+export function classifyQueueCheckBlockerRecords(checks) {
   const latest = collapseNewestCheckAttempts(checks);
   const allChecks = latest.checks;
   // Native enrollment is fail-closed for every terminal red check unless the
   // exact check name is explicitly advisory. A canonical allow-list is unsafe:
   // newly added safety jobs (for example Brand Scrub) would otherwise be
   // silently ignored until this controller was updated.
-  const blockers = new Set(extractTerminalFailures(allChecks));
+  const blockers = new Map();
+  const addBlocker = (kind, name, message = name) => {
+    blockers.set(message, { kind, name, message });
+  };
+  for (const name of extractTerminalFailures(allChecks)) {
+    addBlocker('terminal', name);
+  }
   for (const check of latest.ambiguousChecks) {
+    const name = normalizeCheckName(check);
     if (!isAdvisoryCheck(check)) {
-      blockers.add(`${normalizeCheckName(check)} (ambiguous latest attempt)`);
+      addBlocker(
+        'ambiguous-latest-attempt',
+        name,
+        `${name} (ambiguous latest attempt)`
+      );
     }
   }
 
@@ -357,14 +368,18 @@ export function classifyQueueCheckBlockers(checks) {
       required.names.includes(normalizeCheckName(check))
     );
     if (matches.length === 0) {
-      blockers.add(`${required.context} (missing)`);
+      addBlocker('missing', required.context, `${required.context} (missing)`);
       continue;
     }
     if (matches.some(isPendingCheck)) {
-      blockers.add(`${required.context} (pending)`);
+      addBlocker('pending', required.context, `${required.context} (pending)`);
     }
     if (!matches.some(isSuccessfulCheck)) {
-      blockers.add(`${required.context} (not successful)`);
+      addBlocker(
+        'not-successful',
+        required.context,
+        `${required.context} (not successful)`
+      );
     }
   }
 
@@ -374,16 +389,25 @@ export function classifyQueueCheckBlockers(checks) {
     );
     if (matches.length === 0) continue;
     if (matches.some(isPendingCheck)) {
-      blockers.add(`${name} (pending)`);
+      addBlocker('pending', name, `${name} (pending)`);
     }
     if (
       !matches.some(check => isSuccessfulCheck(check) || isSkippedCheck(check))
     ) {
-      blockers.add(`${name} (not complete)`);
+      addBlocker('not-complete', name, `${name} (not complete)`);
     }
   }
 
-  return [...blockers].sort();
+  return [...blockers.values()].sort((left, right) =>
+    left.message.localeCompare(right.message)
+  );
+}
+
+/** Positive readiness proof shared by auto-ready and queue enrollment. */
+export function classifyQueueCheckBlockers(checks) {
+  return classifyQueueCheckBlockerRecords(checks).map(
+    blocker => blocker.message
+  );
 }
 
 async function ghJson(args, { repo } = {}) {

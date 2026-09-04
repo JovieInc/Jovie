@@ -1722,6 +1722,114 @@ class TestGhRetryHelper:
 
 
 class TestDrainPrQueueWiring:
+    @pytest.mark.parametrize("skip_reason", ["head-changed", "eligibility-recovered"])
+    def test_native_reconciliation_passes_exact_head_and_honors_stale_dequeue_noop(
+        self, tmp_path: Path, skip_reason: str
+    ) -> None:
+        head = "d" * 40
+        fleet_receipt = {
+            "schema": "jovie-fleet-gate/v1",
+            "promotionMode": "isolated-only",
+            "observedAt": datetime.now(timezone.utc).isoformat(),
+            "signals": {
+                "main": {"status": "green"},
+                "production": {"status": "red"},
+            },
+            "isolatedPromotionAdmission": {
+                "allowed": True,
+                "deploymentsAllowed": False,
+            },
+        }
+        encoded_fleet_receipt = base64.b64encode(
+            json.dumps(fleet_receipt).encode()
+        ).decode()
+        calls = tmp_path / "dequeue-ineligible-calls"
+        calls.write_text("", encoding="utf-8")
+        plain_calls = tmp_path / "dequeue-calls"
+        plain_calls.write_text("", encoding="utf-8")
+        fake_node = tmp_path / "node"
+        fake_node.write_text(
+            textwrap.dedent(
+                f"""\
+                #!/usr/bin/env bash
+                set -euo pipefail
+                if [[ "${{1:-}}" == "-e" ]]; then
+                  exec /opt/homebrew/bin/node "$@"
+                fi
+                case "${{2:-}}" in
+                  preflight) exit 0 ;;
+                  list-state) echo '{{"101":{{"headRefOid":"{head}","isDraft":false,"mergeable":"MERGEABLE","mergeStateStatus":"CLEAN","baseRefName":"main","labels":{{"nodes":[{{"name":"hold"}}]}},"queued":true,"isInMergeQueue":true,"mergeQueueEntry":{{"id":"MQE_101","state":"QUEUED","position":1}},"humanQueueHold":false,"fail":["PR Ready"]}}}}' ;;
+                  reconcile-snapshot) cat >/dev/null; echo '{{"summary":{{"CLEAN":1,"UNSTABLE":0,"BLOCKED":0,"DIRTY":0,"hardGated":1,"nonMain":0}},"dequeue":[{{"n":101,"t":"Held exact head","headOid":"{head}","reasons":["held-by=hold"]}}]}}' ;;
+                  dequeue-ineligible)
+                    printf '%s %s\n' "${{3:-}}" "${{4:-}}" >>'{calls}'
+                    echo '{{"skipped":true,"reason":"{skip_reason}","state":{{"queued":true}}}}'
+                    ;;
+                  dequeue)
+                    printf '%s\n' "${{3:-}}" >>'{plain_calls}'
+                    echo '{{"state":{{"queued":false}}}}'
+                    ;;
+                  front-churn) echo '{{"action":"allow","reason":"no classified failure"}}' ;;
+                  max-queue-depth) echo 16 ;;
+                  unmergeable-eject) echo '{{"action":"keep","reason":"not-queued"}}' ;;
+                  unmergeable-reenqueue) echo '{{"action":"allow","reason":"no-eject-receipt"}}' ;;
+                  changelog-collision) echo '{{"action":"allow","reason":"candidate-omits-changelog"}}' ;;
+                  changelog-inventory) echo '{{"schema":"jovie-pre-land-changelog/v1","ok":true,"reason":"explicit","prs":[],"count":0}}' ;;
+                  changelog-drain) echo '{{"action":"keep","reason":"omits-changelog","reenqueue":false}}' ;;
+                  --classify-queue) echo '[]' ;;
+                  *) echo "unexpected node args: $*" >&2; exit 2 ;;
+                esac
+                """
+            ),
+            encoding="utf-8",
+        )
+        fake_node.chmod(fake_node.stat().st_mode | stat.S_IXUSR)
+        fake_gh = tmp_path / "gh"
+        fake_gh.write_text(
+            textwrap.dedent(
+                f"""\
+                #!/usr/bin/env bash
+                set -euo pipefail
+                if [[ "$1 $2" == "pr list" ]]; then
+                  echo '[{{"n":101,"t":"Held exact head","draft":false,"m":"MERGEABLE","ms":"CLEAN","head":"codex/held","headOid":"{head}","base":"main","body":"","L":["hold"],"fail":[]}}]'
+                  exit 0
+                fi
+                if [[ "$1 $2" == "pr checks" ]]; then
+                  echo '[{{"name":"PR Ready","bucket":"pass","state":"SUCCESS"}},{{"name":"Migration Guard","bucket":"pass","state":"SUCCESS"}},{{"name":"Fork PR Gate","bucket":"pass","state":"SUCCESS"}},{{"name":"PR Size Guard","bucket":"pass","state":"SUCCESS"}},{{"name":"Brand Scrub","bucket":"fail","state":"FAILURE"}}]'
+                  exit 0
+                fi
+                if [[ "$1 $2" == "pr view" ]]; then
+                  echo '{{"state":"OPEN","headRefOid":"{head}"}}'
+                  exit 0
+                fi
+                if [[ "$1" == "api" && " $* " == *" -X POST "* ]]; then
+                  echo '{{}}'
+                  exit 0
+                fi
+                echo "unexpected gh args: $*" >&2
+                exit 2
+                """
+            ),
+            encoding="utf-8",
+        )
+        fake_gh.chmod(fake_gh.stat().st_mode | stat.S_IXUSR)
+
+        result = _run_bash(
+            _drain_command(
+                tmp_path,
+                backend="native",
+                extra_env=(
+                    "DRAIN_PROMOTION_MODE=isolated-only "
+                    f"DRAIN_FLEET_GATE_B64={encoded_fleet_receipt} "
+                    "GITHUB_RUN_ID=77 GITHUB_SERVER_URL=https://github.com"
+                ),
+            )
+        )
+
+        assert result.returncode == 0, f"stdout={result.stdout}\nstderr={result.stderr}"
+        assert calls.read_text(encoding="utf-8").strip() == f"101 {head}"
+        assert plain_calls.read_text(encoding="utf-8").strip() == "101"
+        assert f"({skip_reason}); stale dequeue suppressed" in result.stdout
+
     def test_exact_admission_rereads_transient_unknown_mergeability(
         self, tmp_path: Path
     ) -> None:
@@ -2102,7 +2210,15 @@ JSON
                       echo '{{"observed":true,"queued":false,"eligible":true,"reason":"eligible"}}'
                     fi
                     ;;
-                  prove-receipt) echo '{{"ok":false,"state":{{"queued":false}},"explanation":{{"reason":"not-queued"}}}}' ;;
+                  prove-receipt)
+                    number="${{3:?}}"
+                    head_var="${{4:?}}"
+                    if grep -qx -- "$number" "{enrolled}"; then
+                      printf '{{"ok":true,"state":{{"isInMergeQueue":true,"queued":true,"headRefOid":"%s","labels":{{"nodes":[]}},"fail":[],"mergeQueueEntry":{{"id":"MQE_%s","state":"AWAITING_CHECKS","position":1}}}},"explanation":{{"reason":"queued"}}}}\n' "$head_var" "$number"
+                    else
+                      echo '{{"ok":false,"state":{{"queued":false}},"explanation":{{"reason":"not-queued"}}}}'
+                    fi
+                    ;;
                   enroll)
                     number="${{3:?}}"
                     head_var="${{4:?}}"

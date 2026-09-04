@@ -112,6 +112,20 @@ describe('pr-check-failures', () => {
         { ...controllerFailure, workflow: 'Real Safety Workflow' },
       ])
     ).toEqual(['enroll']);
+
+    expect(
+      classifyQueueCheckBlockers([
+        ...required,
+        {
+          bucket: 'fail',
+          state: 'FAILURE',
+          name: 'PR Ready',
+          workflow: 'Merge Queue Auto-Enroll',
+          startedAt: '2026-09-04T23:22:00Z',
+          completedAt: '2026-09-04T23:23:00Z',
+        },
+      ])
+    ).toEqual(['PR Ready']);
   });
 
   it('keeps failed fleet-refresh receipts out of product gate classification', () => {
@@ -566,6 +580,32 @@ describe('pr-check-failures', () => {
     expect(
       classifyQueueCheckBlockers([...required, oldSuccess, newerPending])
     ).toEqual([]);
+
+    expect(
+      classifyQueueCheckBlockers([
+        ...required,
+        oldSuccess,
+        { ...newerPending, completedAt: null },
+      ])
+    ).toEqual([]);
+
+    expect(
+      classifyQueueCheckBlockers([
+        ...required.slice(1),
+        {
+          ...required[0],
+          bucket: 'pending',
+          state: 'IN_PROGRESS',
+          startedAt: '2026-07-12T01:04:00Z',
+          completedAt: null,
+        },
+        {
+          ...required[0],
+          startedAt: '2026-07-12T01:00:00Z',
+          completedAt: '2026-07-12T01:01:00Z',
+        },
+      ])
+    ).toEqual(['PR Ready (not successful)', 'PR Ready (pending)']);
 
     expect(
       collapseNewestCheckAttempts([

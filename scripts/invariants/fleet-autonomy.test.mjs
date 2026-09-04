@@ -1,7 +1,11 @@
 import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
+import { resolve } from 'node:path';
 import { describe, it } from 'node:test';
 
 import { validateFleetAutonomy } from './fleet-autonomy.mjs';
+
+const REPO_ROOT = resolve(import.meta.dirname, '..', '..');
 
 const RED_FILES = {
   'scripts/symphony/gem-priority-gate.py':
@@ -23,6 +27,21 @@ const RED_FILES = {
 describe('JOV-INV-023 fleet autonomy', () => {
   it('accepts the checked-in drain, fleet gate, and main-only PR contract', () => {
     assert.deepEqual(validateFleetAutonomy(), []);
+  });
+
+  it('accepts a reformatted hard-hold set', () => {
+    assert.deepEqual(
+      validateFleetAutonomy('/unused', {
+        readFile: path => {
+          if (path === 'scripts/merge-queue-backend.mjs') {
+            return 'export const HARD_HOLD_LABELS=new Set(["queue-deferred", "hold"]);';
+          }
+          const source = readFileSync(resolve(REPO_ROOT, path), 'utf8');
+          return source;
+        },
+      }),
+      []
+    );
   });
 
   it('deliberate red: observation-gap freeze, advisory review holds, and stacked bases are rejected', () => {

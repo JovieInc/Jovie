@@ -42,6 +42,33 @@ const PR_ID = 'PR_kwDO_native_pr';
 const ENTRY_ID = 'MQE_kwDO_native_entry';
 const QUEUE_ENTRY = { id: ENTRY_ID, state: 'QUEUED', position: 1 };
 const AUTO_MERGE = { enabledAt: '2026-07-15T00:00:00Z' };
+const SOURCE_CHECK_NAMES = [
+  'PR Ready',
+  'Migration Guard',
+  'Fork PR Gate',
+  'PR Size Guard',
+];
+const sourceCheckRollup = (head, overrides = {}) => ({
+  nodes: [
+    {
+      commit: {
+        oid: head,
+        statusCheckRollup: {
+          contexts: {
+            nodes: SOURCE_CHECK_NAMES.map(name => ({
+              __typename: 'StatusContext',
+              context: name,
+              state: 'SUCCESS',
+              createdAt: '2026-07-15T00:00:00Z',
+            })),
+            pageInfo: { hasNextPage: false },
+          },
+        },
+      },
+    },
+  ],
+  ...overrides,
+});
 const VALID_REPOSITORY = Object.freeze(
   JSON.parse(
     '{"default_branch":"main","allow_auto_merge":true,"allow_squash_merge":true}'
@@ -80,7 +107,7 @@ const VALID_LIVE_QUEUE_CONFIGURATION = Object.freeze({
   minimumEntriesToMergeWaitTime: 10,
 });
 function prState(overrides = {}) {
-  return {
+  const state = {
     id: PR_ID,
     number: 14359,
     state: 'OPEN',
@@ -91,8 +118,16 @@ function prState(overrides = {}) {
     isInMergeQueue: false,
     mergeQueueEntry: null,
     autoMergeRequest: null,
+    reviewDecision: null,
+    reviews: { nodes: [], pageInfo: { hasPreviousPage: false } },
+    timelineItems: { nodes: [], pageInfo: { hasPreviousPage: false } },
     ...overrides,
   };
+  state.labels.pageInfo ??= { hasNextPage: false };
+  if (!Object.hasOwn(overrides, 'commits')) {
+    state.commits = sourceCheckRollup(state.headRefOid);
+  }
+  return state;
 }
 const nativeStatePayload = state => ({
   data: { repository: { pullRequest: state } },
@@ -110,6 +145,7 @@ function createNativeRunner({
   branchProtectionRef = VALID_BRANCH_PROTECTION_REF,
   liveQueueConfiguration = VALID_LIVE_QUEUE_CONFIGURATION,
   states = [],
+  checkPages = [],
   listPages = null,
   enableResult = ok({ data: {} }),
   viewerPayload = /** @type {unknown} */ ({
@@ -117,6 +153,7 @@ function createNativeRunner({
   }),
 } = {}) {
   const stateQueue = [...states];
+  const checkPageQueue = [...checkPages];
   const restResponses = new Map([
     [`repos/${REPOSITORY}/rulesets/${RULESET_ID}`, ruleset],
     [`repos/${REPOSITORY}`, repository],
@@ -163,6 +200,11 @@ function createNativeRunner({
         ]
       );
     }
+    if (query.includes('MergeQueueCommitCheckContexts')) {
+      const page = checkPageQueue.shift();
+      if (!page) throw new Error('Test runner exhausted check context pages');
+      return ok({ data: { repository: { object: page } } });
+    }
     if (query.includes('MergeQueuePullRequestState')) {
       const state = stateQueue.shift();
       if (!state) throw new Error('Test runner exhausted PR states');
@@ -196,6 +238,14 @@ const dequeue = runner => dequeuePullRequest(nativeOptions(runner));
 const invokedEnrollment = runner =>
   runner.mock.calls.some(([args]) =>
     queryText(args).includes('enablePullRequestAutoMerge')
+  );
+const invokedDequeue = runner =>
+  runner.mock.calls.some(([args]) =>
+    queryText(args).includes('dequeuePullRequest')
+  );
+const invokedAutoMergeDisable = runner =>
+  runner.mock.calls.some(([args]) =>
+    queryText(args).includes('disablePullRequestAutoMerge')
   );
 const invokedNativeMutation = runner =>
   runner.mock.calls.some(([args]) =>
@@ -416,10 +466,14 @@ describe('merge queue backend resolution', () => {
     expect(runner).not.toHaveBeenCalled();
   });
 
-  it('refuses native CLI mutation without the dedicated authorization', async () => {
+  it.each([
+    ['enroll', ['enroll', '14359', HEAD]],
+    ['dequeue', ['dequeue', '14359']],
+    ['dequeue-ineligible', ['dequeue-ineligible', '14359', HEAD]],
+  ])('refuses native CLI %s without the dedicated authorization', async (_name, argv) => {
     const runner = vi.fn();
     await expect(
-      runCli(['enroll', '14359', HEAD], {
+      runCli(argv, {
         env: { MERGE_QUEUE_BACKEND: 'native', GITHUB_REPOSITORY: REPOSITORY },
         runner,
         write: vi.fn(),
@@ -1821,16 +1875,28 @@ describe('native enrollment', () => {
       autoMergeRequest: AUTO_MERGE,
       labels: { nodes: [{ name: label }] },
     });
+    const heldAfterDequeue = prState({
+      autoMergeRequest: AUTO_MERGE,
+      labels: queuedAndHeld.labels,
+    });
+    const heldAfterDisable = prState({ labels: queuedAndHeld.labels });
     const runner = createNativeRunner({
-      states: [prState(), queuedAndHeld],
+      states: [
+        prState(),
+        queuedAndHeld,
+        queuedAndHeld,
+        heldAfterDequeue,
+        heldAfterDisable,
+      ],
     });
     await expect(
       enroll(runner, { postconditionAttempts: 2, wait: async () => {} })
     ).rejects.toMatchObject({
       code: 'held_pull_request',
-      details: { labels: [label] },
+      details: { labels: [label], compensated: true },
     });
     expect(invokedEnrollment(runner)).toBe(true);
+    expect(invokedDequeue(runner)).toBe(true);
   });
 
   it('refuses a delayed queue entry when a hard hold appears after SNAP', async () => {
@@ -1840,24 +1906,401 @@ describe('native enrollment', () => {
       autoMergeRequest: AUTO_MERGE,
       labels: { nodes: [{ name: 'queue-deferred' }] },
     });
+    const heldAfterDequeue = prState({
+      autoMergeRequest: AUTO_MERGE,
+      labels: queuedAndHeld.labels,
+    });
+    const heldAfterDisable = prState({ labels: queuedAndHeld.labels });
     const runner = createNativeRunner({
-      states: [prState(), queuedAndHeld],
+      states: [
+        prState(),
+        queuedAndHeld,
+        queuedAndHeld,
+        heldAfterDequeue,
+        heldAfterDisable,
+      ],
     });
     await expect(
       enroll(runner, { postconditionAttempts: 2, wait: async () => {} })
     ).rejects.toMatchObject({
       code: 'held_pull_request',
-      details: { labels: ['queue-deferred'] },
+      details: { labels: ['queue-deferred'], compensated: true },
+    });
+    expect(invokedEnrollment(runner)).toBe(true);
+    expect(invokedDequeue(runner)).toBe(true);
+  });
+
+  it('compensates when source checks turn terminal red after enrollment', async () => {
+    const commits = sourceCheckRollup(HEAD);
+    commits.nodes[0].commit.statusCheckRollup.contexts.nodes[0].state =
+      'FAILURE';
+    const queuedAndRed = prState({
+      isInMergeQueue: true,
+      mergeQueueEntry: QUEUE_ENTRY,
+      commits,
+    });
+    const unqueuedAndRed = prState({ commits });
+    const runner = createNativeRunner({
+      states: [
+        prState(),
+        queuedAndRed,
+        queuedAndRed,
+        queuedAndRed,
+        unqueuedAndRed,
+      ],
+    });
+
+    await expect(
+      enroll(runner, { postconditionAttempts: 2, wait: async () => {} })
+    ).rejects.toMatchObject({
+      code: 'source_red_pull_request',
+      details: {
+        blockers: ['PR Ready'],
+        compensated: true,
+        compensationState: { queued: false },
+      },
+    });
+    expect(invokedEnrollment(runner)).toBe(true);
+    expect(invokedDequeue(runner)).toBe(true);
+  });
+
+  it('treats a terminal failed check with a pending-looking name as source red', async () => {
+    const commits = sourceCheckRollup(HEAD);
+    commits.nodes[0].commit.statusCheckRollup.contexts.nodes.push({
+      __typename: 'StatusContext',
+      context: 'Release (pending)',
+      state: 'FAILURE',
+      createdAt: '2026-07-15T00:00:01Z',
+    });
+    const runner = createNativeRunner({
+      states: [
+        prState({
+          commits,
+          isInMergeQueue: true,
+          mergeQueueEntry: QUEUE_ENTRY,
+        }),
+      ],
+    });
+
+    const receipt = await proveExactHeadQueueReceipt(
+      nativeOptions(runner, {
+        expectedHeadOid: HEAD,
+        postconditionAttempts: 1,
+      })
+    );
+
+    expect(receipt.state.fail).toContain('Release (pending)');
+    expect(receipt.state.checkBlockers).toContainEqual({
+      kind: 'terminal',
+      name: 'Release (pending)',
+      message: 'Release (pending)',
+    });
+    expect(isSourceRed(receipt.state)).toBe(true);
+    expect(receipt).toMatchObject({
+      ok: false,
+      explanation: { reason: 'source-red=Release (pending)' },
+    });
+  });
+
+  it('removes only the auto-merge intent it created when a replacement head becomes queued', async () => {
+    const queuedAndHeld = prState({
+      isInMergeQueue: true,
+      mergeQueueEntry: QUEUE_ENTRY,
+      autoMergeRequest: { enabledAt: '2026-07-15T00:00:00Z' },
+      labels: { nodes: [{ name: 'hold' }] },
+    });
+    const replacementHead = prState({
+      headRefOid: OTHER_HEAD,
+      isInMergeQueue: true,
+      mergeQueueEntry: QUEUE_ENTRY,
+      autoMergeRequest: { enabledAt: '2026-07-15T00:00:00Z' },
+      labels: queuedAndHeld.labels,
+    });
+    const runner = createNativeRunner({
+      states: [
+        prState(),
+        queuedAndHeld,
+        replacementHead,
+        prState({
+          headRefOid: OTHER_HEAD,
+          isInMergeQueue: false,
+          mergeQueueEntry: null,
+          autoMergeRequest: null,
+          labels: queuedAndHeld.labels,
+        }),
+      ],
+    });
+
+    await expect(
+      enroll(runner, { postconditionAttempts: 2, wait: async () => {} })
+    ).rejects.toMatchObject({
+      code: 'held_pull_request',
+      details: {
+        compensated: true,
+        compensationReason: 'stale-head-auto-merge-disabled',
+        compensationState: { headRefOid: OTHER_HEAD, queued: false },
+      },
+    });
+    expect(invokedEnrollment(runner)).toBe(true);
+    expect(invokedDequeue(runner)).toBe(false);
+    expect(invokedAutoMergeDisable(runner)).toBe(true);
+  });
+
+  it('accepts an exact queued head that recovers before compensation', async () => {
+    const queuedAndHeld = prState({
+      isInMergeQueue: true,
+      mergeQueueEntry: QUEUE_ENTRY,
+      labels: { nodes: [{ name: 'hold' }] },
+    });
+    const queuedAndRecovered = prState({
+      isInMergeQueue: true,
+      mergeQueueEntry: QUEUE_ENTRY,
+    });
+    const runner = createNativeRunner({
+      states: [prState(), queuedAndHeld, queuedAndRecovered],
+    });
+
+    await expect(
+      enroll(runner, { postconditionAttempts: 2, wait: async () => {} })
+    ).resolves.toMatchObject({
+      changed: true,
+      reconciledAfterTransientIneligibility: true,
+      state: { headRefOid: HEAD, queued: true },
+    });
+    expect(invokedEnrollment(runner)).toBe(true);
+    expect(invokedDequeue(runner)).toBe(false);
+  });
+
+  it.each([
+    ['missing exact commit', { commits: { nodes: [] } }],
+    ['head mismatch', { commits: sourceCheckRollup(OTHER_HEAD) }],
+    [
+      'truncated contexts',
+      {
+        commits: (() => {
+          const commits = sourceCheckRollup(HEAD);
+          commits.nodes[0].commit.statusCheckRollup.contexts.pageInfo.hasNextPage = true;
+          return commits;
+        })(),
+      },
+    ],
+  ])('fails closed on %s source-check evidence', async (_name, overrides) => {
+    const runner = createNativeRunner({ states: [prState(overrides)] });
+
+    await expect(enroll(runner)).rejects.toMatchObject({
+      code: 'incomplete_source_check_state',
+    });
+    expect(invokedEnrollment(runner)).toBe(false);
+  });
+
+  it('paginates an immutable source-check rollup and rereads the head before enrollment', async () => {
+    const commits = sourceCheckRollup(HEAD);
+    const stableNodes = structuredClone(
+      commits.nodes[0].commit.statusCheckRollup.contexts.nodes
+    );
+    commits.nodes[0].commit.statusCheckRollup.contexts.pageInfo = {
+      hasNextPage: true,
+      endCursor: 'page-1',
+    };
+    const runner = createNativeRunner({
+      states: [
+        prState({ commits }),
+        prState(),
+        prState({
+          isInMergeQueue: true,
+          mergeQueueEntry: QUEUE_ENTRY,
+        }),
+      ],
+      checkPages: [
+        {
+          oid: HEAD,
+          statusCheckRollup: {
+            contexts: {
+              nodes: [],
+              pageInfo: { hasNextPage: false, endCursor: null },
+            },
+          },
+        },
+        {
+          oid: HEAD,
+          statusCheckRollup: {
+            contexts: {
+              nodes: stableNodes,
+              pageInfo: { hasNextPage: false, endCursor: null },
+            },
+          },
+        },
+      ],
+    });
+
+    await expect(enroll(runner)).resolves.toMatchObject({
+      changed: true,
+      state: { headRefOid: HEAD, queued: true },
     });
     expect(invokedEnrollment(runner)).toBe(true);
   });
 
+  it('fails closed when source checks change between complete paginated reads', async () => {
+    const commits = sourceCheckRollup(HEAD);
+    const stableNodes = structuredClone(
+      commits.nodes[0].commit.statusCheckRollup.contexts.nodes
+    );
+    commits.nodes[0].commit.statusCheckRollup.contexts.pageInfo = {
+      hasNextPage: true,
+      endCursor: 'page-1',
+    };
+    const runner = createNativeRunner({
+      states: [prState({ commits })],
+      checkPages: [
+        {
+          oid: HEAD,
+          statusCheckRollup: {
+            contexts: {
+              nodes: [],
+              pageInfo: { hasNextPage: false, endCursor: null },
+            },
+          },
+        },
+        {
+          oid: HEAD,
+          statusCheckRollup: {
+            contexts: {
+              nodes: [
+                ...stableNodes,
+                {
+                  __typename: 'StatusContext',
+                  context: 'New Safety Gate',
+                  state: 'PENDING',
+                  createdAt: '2026-09-04T23:28:59Z',
+                },
+              ],
+              pageInfo: { hasNextPage: false, endCursor: null },
+            },
+          },
+        },
+      ],
+    });
+
+    await expect(enroll(runner)).rejects.toMatchObject({
+      code: 'incomplete_source_check_state',
+    });
+    expect(invokedEnrollment(runner)).toBe(false);
+  });
+
+  it('classifies a terminal failure found on source-check page two', async () => {
+    const commits = sourceCheckRollup(HEAD);
+    const stableNodes = structuredClone(
+      commits.nodes[0].commit.statusCheckRollup.contexts.nodes
+    );
+    const terminalFailure = {
+      __typename: 'StatusContext',
+      context: 'Brand Scrub',
+      state: 'FAILURE',
+      createdAt: '2026-09-04T23:28:59Z',
+    };
+    commits.nodes[0].commit.statusCheckRollup.contexts.pageInfo = {
+      hasNextPage: true,
+      endCursor: 'page-1',
+    };
+    const runner = createNativeRunner({
+      states: [prState({ commits }), prState()],
+      checkPages: [
+        {
+          oid: HEAD,
+          statusCheckRollup: {
+            contexts: {
+              nodes: [terminalFailure],
+              pageInfo: { hasNextPage: false, endCursor: null },
+            },
+          },
+        },
+        {
+          oid: HEAD,
+          statusCheckRollup: {
+            contexts: {
+              nodes: [...stableNodes, terminalFailure],
+              pageInfo: { hasNextPage: false, endCursor: null },
+            },
+          },
+        },
+      ],
+    });
+
+    await expect(enroll(runner)).rejects.toMatchObject({
+      code: 'source_red_pull_request',
+      details: { blockers: ['Brand Scrub'] },
+    });
+    expect(invokedEnrollment(runner)).toBe(false);
+  });
+
+  it('fails closed when the head changes while source checks are paginated', async () => {
+    const commits = sourceCheckRollup(HEAD);
+    const stableNodes = structuredClone(
+      commits.nodes[0].commit.statusCheckRollup.contexts.nodes
+    );
+    commits.nodes[0].commit.statusCheckRollup.contexts.pageInfo = {
+      hasNextPage: true,
+      endCursor: 'page-1',
+    };
+    const runner = createNativeRunner({
+      states: [prState({ commits }), prState({ headRefOid: OTHER_HEAD })],
+      checkPages: [
+        {
+          oid: HEAD,
+          statusCheckRollup: {
+            contexts: {
+              nodes: [],
+              pageInfo: { hasNextPage: false, endCursor: null },
+            },
+          },
+        },
+        {
+          oid: HEAD,
+          statusCheckRollup: {
+            contexts: {
+              nodes: stableNodes,
+              pageInfo: { hasNextPage: false, endCursor: null },
+            },
+          },
+        },
+      ],
+    });
+
+    await expect(enroll(runner)).rejects.toMatchObject({
+      code: 'head_changed',
+    });
+    expect(invokedEnrollment(runner)).toBe(false);
+  });
+
+  it('fails closed when source-check pagination repeats a cursor', async () => {
+    const commits = sourceCheckRollup(HEAD);
+    commits.nodes[0].commit.statusCheckRollup.contexts.pageInfo = {
+      hasNextPage: true,
+      endCursor: 'page-1',
+    };
+    const repeatedPage = {
+      oid: HEAD,
+      statusCheckRollup: {
+        contexts: {
+          nodes: [],
+          pageInfo: { hasNextPage: true, endCursor: 'page-1' },
+        },
+      },
+    };
+    const runner = createNativeRunner({
+      states: [prState({ commits })],
+      checkPages: [repeatedPage],
+    });
+
+    await expect(enroll(runner)).rejects.toMatchObject({
+      code: 'incomplete_source_check_state',
+    });
+    expect(invokedEnrollment(runner)).toBe(false);
+  });
+
   it('rejects auto-merge success without an authoritative native queue entry', async () => {
     const runner = createNativeRunner({
-      states: [
-        prState({ autoMergeRequest: AUTO_MERGE }),
-        prState({ autoMergeRequest: AUTO_MERGE }),
-      ],
+      states: [prState(), prState({ autoMergeRequest: AUTO_MERGE }), prState()],
     });
     await expect(
       enroll(runner, { postconditionAttempts: 1 })
@@ -1869,9 +2312,44 @@ describe('native enrollment', () => {
           mergeQueueEntry: null,
           queued: false,
         },
+        compensated: true,
+        compensationState: {
+          autoMergeRequest: null,
+          mergeQueueEntry: null,
+          queued: false,
+        },
       },
     });
     expect(invokedEnrollment(runner)).toBe(true);
+    expect(invokedAutoMergeDisable(runner)).toBe(true);
+  });
+
+  it('removes its auto-merge intent when the head changes before queue entry', async () => {
+    const runner = createNativeRunner({
+      states: [
+        prState(),
+        prState({ headRefOid: OTHER_HEAD, autoMergeRequest: AUTO_MERGE }),
+        prState({ headRefOid: OTHER_HEAD }),
+      ],
+    });
+
+    await expect(
+      enroll(runner, { postconditionAttempts: 1 })
+    ).rejects.toMatchObject({
+      code: 'head_changed',
+      details: {
+        compensated: true,
+        compensationReason: 'stale-head-auto-merge-disabled',
+        compensationState: {
+          headRefOid: OTHER_HEAD,
+          autoMergeRequest: null,
+          queued: false,
+        },
+      },
+    });
+    expect(invokedEnrollment(runner)).toBe(true);
+    expect(invokedAutoMergeDisable(runner)).toBe(true);
+    expect(invokedDequeue(runner)).toBe(false);
   });
 
   it('no-ops only after GraphQL proves queue state and position', async () => {
@@ -2040,6 +2518,379 @@ describe('native dequeue', () => {
       code: 'dequeue_postcondition_failed',
     });
   });
+
+  it('dequeues only when the exact head is still held', async () => {
+    const held = prState({
+      isInMergeQueue: true,
+      mergeQueueEntry: QUEUE_ENTRY,
+      labels: { nodes: [{ name: 'hold' }] },
+    });
+    const runner = createNativeRunner({
+      states: [held, held, prState({ labels: held.labels })],
+    });
+
+    await expect(
+      dequeuePullRequest(
+        nativeOptions(runner, {
+          expectedHeadOid: HEAD,
+          requireIneligible: true,
+        })
+      )
+    ).resolves.toMatchObject({ changed: true, state: { queued: false } });
+    expect(invokedDequeue(runner)).toBe(true);
+  });
+
+  it('suppresses a stale dequeue when the queued head changed', async () => {
+    const runner = createNativeRunner({
+      states: [
+        prState({
+          headRefOid: OTHER_HEAD,
+          isInMergeQueue: true,
+          mergeQueueEntry: QUEUE_ENTRY,
+          labels: { nodes: [{ name: 'hold' }] },
+        }),
+      ],
+    });
+
+    await expect(
+      dequeuePullRequest(
+        nativeOptions(runner, {
+          expectedHeadOid: HEAD,
+          requireIneligible: true,
+        })
+      )
+    ).resolves.toMatchObject({
+      changed: false,
+      skipped: true,
+      reason: 'head-changed',
+    });
+    expect(invokedDequeue(runner)).toBe(false);
+  });
+
+  it('reports an unqueued replacement head as a stale dequeue', async () => {
+    const runner = createNativeRunner({
+      states: [prState({ headRefOid: OTHER_HEAD })],
+    });
+
+    await expect(
+      dequeuePullRequest(
+        nativeOptions(runner, {
+          expectedHeadOid: HEAD,
+          requireIneligible: true,
+        })
+      )
+    ).resolves.toMatchObject({
+      changed: false,
+      skipped: true,
+      reason: 'head-changed',
+      state: { headRefOid: OTHER_HEAD, queued: false },
+    });
+    expect(invokedDequeue(runner)).toBe(false);
+  });
+
+  it('suppresses a stale dequeue when the head changes during pre-write revalidation', async () => {
+    const held = prState({
+      isInMergeQueue: true,
+      mergeQueueEntry: QUEUE_ENTRY,
+      labels: { nodes: [{ name: 'hold' }] },
+    });
+    const replacement = prState({
+      headRefOid: OTHER_HEAD,
+      isInMergeQueue: true,
+      mergeQueueEntry: QUEUE_ENTRY,
+    });
+    const runner = createNativeRunner({ states: [held, replacement] });
+
+    await expect(
+      dequeuePullRequest(
+        nativeOptions(runner, {
+          expectedHeadOid: HEAD,
+          requireIneligible: true,
+        })
+      )
+    ).resolves.toMatchObject({
+      changed: false,
+      skipped: true,
+      reason: 'head-changed',
+      state: { headRefOid: OTHER_HEAD, queued: true },
+    });
+    expect(invokedDequeue(runner)).toBe(false);
+  });
+
+  it('detects a head race after dequeue and restores an eligible replacement head', async () => {
+    const held = prState({
+      isInMergeQueue: true,
+      mergeQueueEntry: QUEUE_ENTRY,
+      labels: { nodes: [{ name: 'hold' }] },
+    });
+    const replacementOut = prState({ headRefOid: OTHER_HEAD });
+    const replacementQueued = prState({
+      headRefOid: OTHER_HEAD,
+      isInMergeQueue: true,
+      mergeQueueEntry: QUEUE_ENTRY,
+    });
+    const runner = createNativeRunner({
+      states: [held, held, replacementOut, replacementOut, replacementQueued],
+    });
+
+    await expect(
+      dequeuePullRequest(
+        nativeOptions(runner, {
+          expectedHeadOid: HEAD,
+          requireIneligible: true,
+        })
+      )
+    ).rejects.toMatchObject({
+      code: 'head_changed_during_dequeue',
+      details: {
+        expectedHeadOid: HEAD,
+        state: { headRefOid: OTHER_HEAD, queued: false },
+        restoration: {
+          receipt: { state: { headRefOid: OTHER_HEAD, queued: true } },
+        },
+      },
+    });
+    expect(invokedDequeue(runner)).toBe(true);
+    expect(invokedEnrollment(runner)).toBe(true);
+  });
+
+  it('suppresses a stale dequeue when the exact head recovered eligibility', async () => {
+    const runner = createNativeRunner({
+      states: [
+        prState({
+          isInMergeQueue: true,
+          mergeQueueEntry: QUEUE_ENTRY,
+        }),
+      ],
+    });
+
+    await expect(
+      dequeuePullRequest(
+        nativeOptions(runner, {
+          expectedHeadOid: HEAD,
+          requireIneligible: true,
+        })
+      )
+    ).resolves.toMatchObject({
+      changed: false,
+      skipped: true,
+      reason: 'eligibility-recovered',
+    });
+    expect(invokedDequeue(runner)).toBe(false);
+  });
+});
+
+describe('human queue intent', () => {
+  const humanRemoval = {
+    __typename: 'RemovedFromMergeQueueEvent',
+    actor: { __typename: 'User' },
+    createdAt: '2026-09-04T22:28:20Z',
+    reason: 'manual',
+  };
+  const botAdd = {
+    __typename: 'AddedToMergeQueueEvent',
+    actor: { __typename: 'Bot' },
+    createdAt: '2026-09-04T22:36:20Z',
+  };
+  const humanAdd = {
+    __typename: 'AddedToMergeQueueEvent',
+    actor: { __typename: 'User' },
+    createdAt: '2026-09-04T22:40:00Z',
+  };
+
+  it('keeps a human dequeue sticky across a later bot re-enrollment', async () => {
+    const state = prState({
+      isInMergeQueue: true,
+      mergeQueueEntry: QUEUE_ENTRY,
+      labels: { nodes: [{ name: 'needs-human' }] },
+      timelineItems: {
+        nodes: [humanRemoval, botAdd],
+        pageInfo: { hasPreviousPage: false },
+      },
+    });
+    const runner = createNativeRunner({
+      states: [
+        state,
+        state,
+        prState({ labels: state.labels, timelineItems: state.timelineItems }),
+      ],
+    });
+
+    await expect(
+      dequeuePullRequest(
+        nativeOptions(runner, {
+          expectedHeadOid: HEAD,
+          requireIneligible: true,
+        })
+      )
+    ).resolves.toMatchObject({ changed: true, state: { queued: false } });
+    expect(invokedDequeue(runner)).toBe(true);
+  });
+
+  it('does not let a head-unbound human queue add supersede the dequeue', async () => {
+    const state = prState({
+      isInMergeQueue: true,
+      mergeQueueEntry: QUEUE_ENTRY,
+      labels: { nodes: [{ name: 'needs-human' }] },
+      timelineItems: {
+        nodes: [humanRemoval, botAdd, humanAdd],
+        pageInfo: { hasPreviousPage: false },
+      },
+    });
+    const runner = createNativeRunner({ states: [state] });
+
+    await expect(
+      enrollPullRequest(nativeOptions(runner, { expectedHeadOid: HEAD }))
+    ).rejects.toMatchObject({
+      code: 'held_pull_request',
+      details: { labels: ['needs-human'] },
+    });
+    expect(invokedDequeue(runner)).toBe(false);
+  });
+
+  it('allows an exact-head human approval to supersede the dequeue', async () => {
+    const state = prState({
+      isInMergeQueue: true,
+      mergeQueueEntry: QUEUE_ENTRY,
+      labels: { nodes: [{ name: 'needs-human' }] },
+      reviewDecision: 'APPROVED',
+      reviews: {
+        nodes: [
+          {
+            state: 'APPROVED',
+            submittedAt: '2026-09-04T22:45:00Z',
+            author: { __typename: 'User' },
+            commit: { oid: HEAD },
+          },
+        ],
+        pageInfo: { hasPreviousPage: false },
+      },
+      timelineItems: {
+        nodes: [humanRemoval, botAdd],
+        pageInfo: { hasPreviousPage: false },
+      },
+    });
+    const runner = createNativeRunner({ states: [state] });
+
+    await expect(
+      enrollPullRequest(nativeOptions(runner, { expectedHeadOid: HEAD }))
+    ).resolves.toMatchObject({
+      changed: false,
+      state: { exactHeadHumanApproved: true, humanQueueHold: false },
+    });
+  });
+
+  it('does not let an approval on an older head clear a human dequeue', async () => {
+    const state = prState({
+      labels: { nodes: [{ name: 'needs-human' }] },
+      reviewDecision: 'APPROVED',
+      reviews: {
+        nodes: [
+          {
+            state: 'APPROVED',
+            submittedAt: '2026-09-04T22:45:00Z',
+            author: { __typename: 'User' },
+            commit: { oid: OTHER_HEAD },
+          },
+        ],
+        pageInfo: { hasPreviousPage: false },
+      },
+      timelineItems: {
+        nodes: [humanRemoval],
+        pageInfo: { hasPreviousPage: false },
+      },
+    });
+    const runner = createNativeRunner({ states: [state] });
+
+    await expect(enroll(runner)).rejects.toMatchObject({
+      code: 'held_pull_request',
+      details: { labels: ['needs-human'] },
+    });
+    expect(invokedEnrollment(runner)).toBe(false);
+  });
+
+  it('keeps a later manual dequeue sticky after an older exact-head approval', async () => {
+    const state = prState({
+      labels: { nodes: [{ name: 'needs-human' }] },
+      reviewDecision: 'APPROVED',
+      reviews: {
+        nodes: [
+          {
+            state: 'APPROVED',
+            submittedAt: '2026-09-04T22:20:00Z',
+            author: { __typename: 'User' },
+            commit: { oid: HEAD },
+          },
+        ],
+        pageInfo: { hasPreviousPage: false },
+      },
+      timelineItems: {
+        nodes: [humanRemoval, botAdd],
+        pageInfo: { hasPreviousPage: false },
+      },
+    });
+    const runner = createNativeRunner({ states: [state] });
+
+    await expect(enroll(runner)).rejects.toMatchObject({
+      code: 'held_pull_request',
+      details: { labels: ['needs-human'] },
+    });
+    expect(invokedEnrollment(runner)).toBe(false);
+  });
+
+  it('fails closed when truncated human history cannot prove the latest intent', async () => {
+    const state = prState({
+      labels: { nodes: [{ name: 'needs-human' }] },
+      reviews: { nodes: [], pageInfo: { hasPreviousPage: true } },
+    });
+    const runner = createNativeRunner({ states: [state] });
+
+    await expect(enroll(runner)).rejects.toMatchObject({
+      code: 'held_pull_request',
+      details: { labels: ['needs-human-history-incomplete'] },
+    });
+    expect(invokedEnrollment(runner)).toBe(false);
+  });
+
+  it('fails closed when authoritative labels are truncated', async () => {
+    const state = prState({
+      labels: { nodes: [], pageInfo: { hasNextPage: true } },
+    });
+    const runner = createNativeRunner({ states: [state] });
+
+    await expect(enroll(runner)).rejects.toMatchObject({
+      code: 'incomplete_queue_state',
+    });
+    expect(invokedEnrollment(runner)).toBe(false);
+  });
+
+  it('does not let a bot approval clear a human dequeue', async () => {
+    const state = prState({
+      labels: { nodes: [{ name: 'needs-human' }] },
+      reviewDecision: 'APPROVED',
+      reviews: {
+        nodes: [
+          {
+            state: 'APPROVED',
+            author: { __typename: 'Bot' },
+            commit: { oid: HEAD },
+          },
+        ],
+        pageInfo: { hasPreviousPage: false },
+      },
+      timelineItems: {
+        nodes: [humanRemoval],
+        pageInfo: { hasPreviousPage: false },
+      },
+    });
+    const runner = createNativeRunner({ states: [state] });
+
+    await expect(enroll(runner)).rejects.toMatchObject({
+      code: 'held_pull_request',
+      details: { labels: ['needs-human'] },
+    });
+    expect(invokedEnrollment(runner)).toBe(false);
+  });
 });
 
 describe('exact-head queue receipt proof', () => {
@@ -2101,22 +2952,44 @@ describe('exact-head queue receipt proof', () => {
       ms: 'UNSTABLE',
       fail: ['PR Ready'],
     };
+    const humanDequeued = {
+      ...selectorRow,
+      n: 17216,
+      q: true,
+      t: 'human dequeued',
+      L: ['needs-human'],
+      humanQueueHold: true,
+    };
 
-    expect(classifyQueueReconciliation([clean, held, sourceRed])).toEqual({
+    expect(
+      classifyQueueReconciliation([clean, held, sourceRed, humanDequeued])
+    ).toEqual({
       summary: {
-        CLEAN: 2,
+        CLEAN: 3,
         UNSTABLE: 1,
         BLOCKED: 0,
         DIRTY: 0,
-        hardGated: 1,
+        hardGated: 2,
         nonMain: 0,
       },
       dequeue: [
-        { n: 17175, t: 'founder held', reasons: ['held-by=hold'] },
+        {
+          n: 17175,
+          t: 'founder held',
+          headOid: HEAD,
+          reasons: ['held-by=hold'],
+        },
         {
           n: 17195,
           t: 'source red',
+          headOid: HEAD,
           reasons: ['source-red=PR Ready'],
+        },
+        {
+          n: 17216,
+          t: 'human dequeued',
+          headOid: HEAD,
+          reasons: ['held-by=needs-human'],
         },
       ],
     });

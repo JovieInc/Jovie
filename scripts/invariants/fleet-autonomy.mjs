@@ -19,6 +19,19 @@ const ADVISORY_REVIEW_SELECTOR = /'needs-human',\s*'gated'/;
 const GRAPHITE_LIVE_TRANSPORT = /\bgt\s+(mq|stack|submit|merge)\b/;
 const RETIRED_QUEUE_LABEL = /then add `merge-queue`/;
 
+function setIncludesLiteral(source, exportName, value) {
+  const initializer = source.match(
+    new RegExp(
+      `export\\s+const\\s+${exportName}\\s*=\\s*new\\s+Set\\s*\\(\\s*\\[([\\s\\S]*?)\\]\\s*\\)`
+    )
+  )?.[1];
+  if (initializer === undefined) return false;
+  const escaped = value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  return new RegExp(`(?:^|[,\\s])['"]${escaped}['"](?:[,\\s]|$)`).test(
+    initializer
+  );
+}
+
 /** JOV-INV-023: fleet observation gaps and non-main PR bases must not freeze shipping. */
 export function validateFleetAutonomy(
   repoRoot = DEFAULT_ROOT,
@@ -74,7 +87,7 @@ export function validateFleetAutonomy(
       'drain-pr-queue.sh must preserve the explicit founder-controlled hold label'
     );
   }
-  if (!backend.includes("'hold',\n  'queue-deferred'")) {
+  if (!setIncludesLiteral(backend, 'HARD_HOLD_LABELS', 'hold')) {
     errors.push(
       'merge-queue-backend.mjs must treat hold as a selector hard hold'
     );

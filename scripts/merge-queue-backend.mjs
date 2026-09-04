@@ -9,6 +9,7 @@ import {
   mergeNativeQueuePolicyObservations,
   NATIVE_QUEUE_POLICY,
 } from './lib/merge-queue-guard.mjs';
+import { classifyQueueCheckBlockerRecords } from './lib/pr-check-failures.mjs';
 
 // The live repository variable and active ruleset both use GitHub native.
 // Keep bare read-only/local callers aligned with that canon; mutations still
@@ -42,7 +43,12 @@ const NATIVE_QUEUE_ENTRY_STATES = new Set([
 ]);
 
 const INVENTORY_PAGE_SIZE = 30;
-const PULL_REQUEST_STATE_FIELDS = `id number state isDraft title body mergeable mergeStateStatus headRefName headRefOid baseRefName labels(first:100){nodes{name}} isInMergeQueue mergeQueueEntry { id state position } autoMergeRequest { enabledAt }`;
+const MAX_SOURCE_CHECK_CONTEXT_PAGES = 20;
+const PULL_REQUEST_INVENTORY_FIELDS = `id number state isDraft title body mergeable mergeStateStatus headRefName headRefOid baseRefName labels(first:100){nodes{name} pageInfo{hasNextPage}} isInMergeQueue mergeQueueEntry { id state position } autoMergeRequest { enabledAt } reviewDecision`;
+const HUMAN_QUEUE_INTENT_FIELDS = `reviews(last:100){nodes{state submittedAt commit{oid} author{__typename}} pageInfo{hasPreviousPage}} timelineItems(last:100,itemTypes:[ADDED_TO_MERGE_QUEUE_EVENT,REMOVED_FROM_MERGE_QUEUE_EVENT]){nodes{__typename ... on AddedToMergeQueueEvent{createdAt actor{__typename}} ... on RemovedFromMergeQueueEvent{createdAt actor{__typename} reason}} pageInfo{hasPreviousPage}}`;
+const PULL_REQUEST_STATE_FIELDS = `${PULL_REQUEST_INVENTORY_FIELDS} ${HUMAN_QUEUE_INTENT_FIELDS}`;
+const SOURCE_CHECK_CONTEXT_FIELDS = `nodes{__typename ... on CheckRun{name status conclusion startedAt completedAt checkSuite{workflowRun{workflow{name}}}} ... on StatusContext{context state createdAt}} pageInfo{hasNextPage endCursor}`;
+const SOURCE_CHECK_STATE_FIELDS = `commits(last:1){nodes{commit{oid statusCheckRollup{contexts(first:100){${SOURCE_CHECK_CONTEXT_FIELDS}}}}}}`;
 const REQUIRED_NATIVE_STATE_FIELDS =
   `id number state isDraft headRefOid labels isInMergeQueue mergeQueueEntry autoMergeRequest`.split(
     ' '
@@ -82,7 +88,9 @@ const CLEAN_ADMITTING_PROMOTION_MODES = new Set([
   'draft-only',
 ]);
 const PULL_REQUEST_STATE_QUERY = `query MergeQueuePullRequestState($owner:String!,$name:String!,$number:Int!){repository(owner:$owner,name:$name){pullRequest(number:$number){${PULL_REQUEST_STATE_FIELDS}}}}`;
-const OPEN_PULL_REQUEST_STATES_QUERY = `query MergeQueueOpenPullRequestStates($owner:String!,$name:String!,$endCursor:String){repository(owner:$owner,name:$name){pullRequests(first:${INVENTORY_PAGE_SIZE},after:$endCursor,states:OPEN){nodes{${PULL_REQUEST_STATE_FIELDS}} pageInfo{hasNextPage endCursor}}}}`;
+const PULL_REQUEST_STATE_WITH_CHECKS_QUERY = `query MergeQueuePullRequestState($owner:String!,$name:String!,$number:Int!){repository(owner:$owner,name:$name){pullRequest(number:$number){${PULL_REQUEST_STATE_FIELDS} ${SOURCE_CHECK_STATE_FIELDS}}}}`;
+const COMMIT_CHECK_CONTEXTS_QUERY = `query MergeQueueCommitCheckContexts($owner:String!,$name:String!,$oid:GitObjectID!,$endCursor:String){repository(owner:$owner,name:$name){object(oid:$oid){... on Commit{oid statusCheckRollup{contexts(first:100,after:$endCursor){${SOURCE_CHECK_CONTEXT_FIELDS}}}}}}}`;
+const OPEN_PULL_REQUEST_STATES_QUERY = `query MergeQueueOpenPullRequestStates($owner:String!,$name:String!,$endCursor:String){repository(owner:$owner,name:$name){pullRequests(first:${INVENTORY_PAGE_SIZE},after:$endCursor,states:OPEN){nodes{${PULL_REQUEST_INVENTORY_FIELDS}} pageInfo{hasNextPage endCursor}}}}`;
 const BRANCH_PROTECTION_QUERY = `query MergeQueueBranchProtection($owner:String!,$name:String!,$refName:String!){repository(owner:$owner,name:$name){ref(qualifiedName:$refName){name branchProtectionRule{id}}}}`;
 const LIVE_QUEUE_CONFIGURATION_QUERY = `query MergeQueueLiveConfiguration($owner:String!,$name:String!,$branch:String!){repository(owner:$owner,name:$name){mergeQueue(branch:$branch){configuration{checkResponseTimeout maximumEntriesToBuild maximumEntriesToMerge mergeMethod minimumEntriesToMerge minimumEntriesToMergeWaitTime}}}}`;
 const NATIVE_MUTATION_ACTOR_QUERY =
@@ -538,7 +546,207 @@ async function assertCanonicalNativeMutationActor(runner) {
   return observedActor;
 }
 
-function normalizeNativePullRequest(pr) {
+function normalizeSourceCheckState(pr) {
+  const commits = pr?.commits?.nodes;
+  if (!Array.isArray(commits) || commits.length !== 1) {
+    throw backendError(
+      'incomplete_source_check_state',
+      'Native queue state is missing the exact source commit check rollup'
+    );
+  }
+  const commit = commits[0]?.commit;
+  if (
+    typeof commit?.oid !== 'string' ||
+    commit.oid.toLowerCase() !== String(pr?.headRefOid ?? '').toLowerCase()
+  ) {
+    throw backendError(
+      'incomplete_source_check_state',
+      'Source check rollup is not bound to the current pull request head'
+    );
+  }
+  const contexts = commit?.statusCheckRollup?.contexts;
+  if (
+    !Array.isArray(contexts?.nodes) ||
+    contexts?.pageInfo?.hasNextPage !== false
+  ) {
+    throw backendError(
+      'incomplete_source_check_state',
+      'Source check rollup is missing or may be truncated'
+    );
+  }
+  const bucketForState = state => {
+    const normalized = String(state ?? '').toUpperCase();
+    if (normalized === 'SUCCESS') return 'pass';
+    if (normalized === 'SKIPPED' || normalized === 'NEUTRAL') {
+      return 'skipping';
+    }
+    if (
+      /^(FAILURE|ERROR|TIMED_OUT|ACTION_REQUIRED|STARTUP_FAILURE)$/.test(
+        normalized
+      )
+    ) {
+      return 'fail';
+    }
+    return 'pending';
+  };
+  const checks = contexts.nodes.map(context => {
+    if (context?.__typename === 'CheckRun') {
+      const state =
+        context.status === 'COMPLETED' ? context.conclusion : context.status;
+      return {
+        name: context.name,
+        state,
+        bucket: bucketForState(state),
+        workflow: context.checkSuite?.workflowRun?.workflow?.name ?? '',
+        startedAt: context.startedAt,
+        completedAt: context.completedAt,
+      };
+    }
+    if (context?.__typename === 'StatusContext') {
+      return {
+        name: context.context,
+        state: context.state,
+        bucket: bucketForState(context.state),
+        startedAt: context.createdAt,
+        completedAt: context.createdAt,
+      };
+    }
+    throw backendError(
+      'incomplete_source_check_state',
+      'Source check rollup contains an unknown context type'
+    );
+  });
+  return classifyQueueCheckBlockerRecords(checks);
+}
+
+function sourceCheckContextDigest(nodes) {
+  return JSON.stringify((nodes ?? []).map(node => JSON.stringify(node)).sort());
+}
+
+async function readCompleteCommitCheckContexts({
+  runner,
+  owner,
+  name,
+  head,
+  description,
+}) {
+  const nodes = [];
+  let endCursor = null;
+  const seenCursors = new Set();
+  for (let pageCount = 0; ; pageCount += 1) {
+    if (pageCount > MAX_SOURCE_CHECK_CONTEXT_PAGES) {
+      throw backendError(
+        'incomplete_source_check_state',
+        'Source check rollup verification exceeded its page limit'
+      );
+    }
+    const pagePayload = assertGraphqlResponse(
+      await runGhJson(
+        runner,
+        graphqlArgs(COMMIT_CHECK_CONTEXTS_QUERY, {
+          owner,
+          name,
+          oid: head,
+          endCursor,
+        }),
+        description
+      ),
+      description
+    );
+    const pageCommit = pagePayload?.data?.repository?.object;
+    const page = pageCommit?.statusCheckRollup?.contexts;
+    if (
+      String(pageCommit?.oid ?? '').toLowerCase() !== head ||
+      !Array.isArray(page?.nodes) ||
+      typeof page?.pageInfo?.hasNextPage !== 'boolean'
+    ) {
+      throw backendError(
+        'incomplete_source_check_state',
+        'Source check rollup verification returned incomplete commit evidence'
+      );
+    }
+    nodes.push(...page.nodes);
+    if (page.pageInfo.hasNextPage !== true) return nodes;
+    endCursor = page.pageInfo.endCursor;
+    if (
+      typeof endCursor !== 'string' ||
+      endCursor.length === 0 ||
+      seenCursors.has(endCursor)
+    ) {
+      throw backendError(
+        'incomplete_source_check_state',
+        'Source check rollup verification did not advance its cursor'
+      );
+    }
+    seenCursors.add(endCursor);
+  }
+}
+
+function humanQueueIntent(pr) {
+  const labels = Array.isArray(pr?.labels?.nodes) ? pr.labels.nodes : [];
+  if (!labels.some(label => label?.name === 'needs-human')) {
+    return { approved: false, hold: false, unknown: false };
+  }
+  const reviews = pr?.reviews;
+  const timeline = pr?.timelineItems;
+  if (!Array.isArray(reviews?.nodes) || !Array.isArray(timeline?.nodes)) {
+    return { approved: false, hold: false, unknown: true };
+  }
+  const head = String(pr?.headRefOid ?? '').toLowerCase();
+  const decisions = [];
+  if (pr?.reviewDecision === 'APPROVED') {
+    for (const review of reviews.nodes) {
+      if (
+        review?.state === 'APPROVED' &&
+        review?.author?.__typename === 'User' &&
+        String(review?.commit?.oid ?? '').toLowerCase() === head
+      ) {
+        decisions.push({ type: 'approval', at: review.submittedAt });
+      }
+    }
+  }
+  for (const event of timeline.nodes) {
+    if (event?.actor?.__typename !== 'User') continue;
+    if (
+      event?.__typename === 'RemovedFromMergeQueueEvent' &&
+      event.reason === 'manual'
+    ) {
+      decisions.push({ type: 'manual-removal', at: event.createdAt });
+    }
+  }
+  const timestamp = value => {
+    const parsed = Date.parse(String(value ?? ''));
+    return Number.isFinite(parsed) ? parsed : null;
+  };
+  const datedDecisions = decisions
+    .map(decision => ({ ...decision, timestamp: timestamp(decision.at) }))
+    .filter(decision => decision.timestamp !== null)
+    .sort((left, right) => left.timestamp - right.timestamp);
+  const latest = datedDecisions.at(-1);
+
+  const hiddenHistoryCouldBeNewer = connection => {
+    if (connection?.pageInfo?.hasPreviousPage !== true) return false;
+    const visibleTimestamps = connection.nodes
+      .map(node => timestamp(node?.submittedAt ?? node?.createdAt))
+      .filter(value => value !== null);
+    if (!latest || visibleTimestamps.length === 0) return true;
+    return latest.timestamp < Math.min(...visibleTimestamps);
+  };
+  const unknown =
+    decisions.length !== datedDecisions.length ||
+    hiddenHistoryCouldBeNewer(reviews) ||
+    hiddenHistoryCouldBeNewer(timeline);
+  if (unknown || !latest) {
+    return { approved: false, hold: false, unknown };
+  }
+  return {
+    approved: latest.type === 'approval',
+    hold: latest.type === 'manual-removal',
+    unknown: false,
+  };
+}
+
+function normalizeNativePullRequest(pr, { includeSourceChecks = false } = {}) {
   const missing = REQUIRED_NATIVE_STATE_FIELDS.filter(
     field => !Object.hasOwn(pr ?? {}, field)
   );
@@ -548,10 +756,14 @@ function normalizeNativePullRequest(pr) {
       `Native queue state is incomplete: ${missing.join(', ') || 'isInMergeQueue'}`
     );
   }
-  if (!Array.isArray(pr.labels?.nodes)) {
+  if (
+    !Array.isArray(pr.labels?.nodes) ||
+    typeof pr.labels?.pageInfo?.hasNextPage !== 'boolean' ||
+    pr.labels.pageInfo.hasNextPage
+  ) {
     throw backendError(
       'incomplete_queue_state',
-      'Native queue state is missing authoritative labels'
+      'Native queue state is missing complete authoritative labels'
     );
   }
   if (
@@ -569,22 +781,38 @@ function normalizeNativePullRequest(pr) {
   const hasAuthoritativeQueueEntry = Boolean(
     pr.isInMergeQueue === true && pr.mergeQueueEntry !== null
   );
-  return {
+  const intent = humanQueueIntent(pr);
+  const normalized = {
     ...pr,
     backend: 'native',
     autoMergeEnabled: pr.autoMergeRequest !== null,
     queued: hasAuthoritativeQueueEntry,
+    exactHeadHumanApproved: intent.approved,
+    humanQueueHold: intent.hold,
+    humanQueueIntentUnknown: intent.unknown,
   };
+  if (includeSourceChecks) {
+    normalized.checkBlockers = normalizeSourceCheckState(pr);
+    normalized.fail = normalized.checkBlockers.map(blocker => blocker.message);
+  }
+  return normalized;
 }
 
-async function readNativePullRequestState({ runner, repository, number }) {
+async function readNativePullRequestState({
+  runner,
+  repository,
+  number,
+  includeSourceChecks = false,
+}) {
   const { owner, name } = parseRepositorySlug(repository);
   const description = `reading native queue state for PR #${number}`;
   const payload = assertGraphqlResponse(
     await runGhJson(
       runner,
       graphqlArgs(
-        PULL_REQUEST_STATE_QUERY,
+        includeSourceChecks
+          ? PULL_REQUEST_STATE_WITH_CHECKS_QUERY
+          : PULL_REQUEST_STATE_QUERY,
         { owner, name, number },
         { typed: ['number'] }
       ),
@@ -596,7 +824,112 @@ async function readNativePullRequestState({ runner, repository, number }) {
   if (!pr) {
     throw backendError('pull_request_not_found', `PR #${number} was not found`);
   }
-  return normalizeNativePullRequest(pr);
+  if (
+    includeSourceChecks &&
+    pr?.commits?.nodes?.[0]?.commit?.statusCheckRollup?.contexts?.pageInfo
+      ?.hasNextPage === true
+  ) {
+    const head = String(pr.headRefOid ?? '').toLowerCase();
+    const commit = pr.commits.nodes[0]?.commit;
+    if (String(commit?.oid ?? '').toLowerCase() !== head) {
+      throw backendError(
+        'incomplete_source_check_state',
+        'Source check rollup is not bound to the current pull request head'
+      );
+    }
+    const contexts = commit.statusCheckRollup.contexts;
+    let endCursor = contexts.pageInfo.endCursor;
+    const seenCursors = new Set();
+    let pageCount = 0;
+    while (contexts.pageInfo.hasNextPage === true) {
+      if (typeof endCursor !== 'string' || endCursor.length === 0) {
+        throw backendError(
+          'incomplete_source_check_state',
+          'Source check rollup pagination is missing its end cursor'
+        );
+      }
+      if (
+        seenCursors.has(endCursor) ||
+        pageCount >= MAX_SOURCE_CHECK_CONTEXT_PAGES
+      ) {
+        throw backendError(
+          'incomplete_source_check_state',
+          'Source check rollup pagination did not terminate safely'
+        );
+      }
+      seenCursors.add(endCursor);
+      pageCount += 1;
+      const pagePayload = assertGraphqlResponse(
+        await runGhJson(
+          runner,
+          graphqlArgs(COMMIT_CHECK_CONTEXTS_QUERY, {
+            owner,
+            name,
+            oid: head,
+            endCursor,
+          }),
+          description
+        ),
+        description
+      );
+      const pageCommit = pagePayload?.data?.repository?.object;
+      const page = pageCommit?.statusCheckRollup?.contexts;
+      if (
+        String(pageCommit?.oid ?? '').toLowerCase() !== head ||
+        !Array.isArray(page?.nodes) ||
+        typeof page?.pageInfo?.hasNextPage !== 'boolean'
+      ) {
+        throw backendError(
+          'incomplete_source_check_state',
+          'Source check rollup pagination returned incomplete commit evidence'
+        );
+      }
+      contexts.nodes.push(...page.nodes);
+      contexts.pageInfo = page.pageInfo;
+      endCursor = page.pageInfo.endCursor;
+    }
+
+    const verifiedNodes = await readCompleteCommitCheckContexts({
+      runner,
+      owner,
+      name,
+      head,
+      description,
+    });
+    if (
+      sourceCheckContextDigest(contexts.nodes) !==
+      sourceCheckContextDigest(verifiedNodes)
+    ) {
+      throw backendError(
+        'incomplete_source_check_state',
+        `PR #${number} source checks changed while their rollup was paginated`
+      );
+    }
+    contexts.nodes = verifiedNodes;
+
+    const latestPayload = assertGraphqlResponse(
+      await runGhJson(
+        runner,
+        graphqlArgs(
+          PULL_REQUEST_STATE_QUERY,
+          { owner, name, number },
+          { typed: ['number'] }
+        ),
+        description
+      ),
+      description
+    );
+    const latest = latestPayload?.data?.repository?.pullRequest;
+    if (!latest || String(latest.headRefOid ?? '').toLowerCase() !== head) {
+      throw backendError(
+        'head_changed',
+        `PR #${number} head changed while source checks were paginated`
+      );
+    }
+    latest.commits = pr.commits;
+    return normalizeNativePullRequest(latest, { includeSourceChecks: true });
+  }
+  return normalizeNativePullRequest(pr, { includeSourceChecks });
 }
 
 /**
@@ -612,6 +945,7 @@ export async function readPullRequestQueueState({
   repository = DEFAULT_REPOSITORY,
   number,
   runner = createGhRunner(),
+  includeSourceChecks = false,
 } = {}) {
   requireNativeBackend(backend);
   const parsedNumber = parsePullRequestNumber(number);
@@ -619,6 +953,7 @@ export async function readPullRequestQueueState({
     runner,
     repository,
     number: parsedNumber,
+    includeSourceChecks,
   });
 }
 
@@ -686,6 +1021,16 @@ export async function listPullRequestQueueStates({
       'Native queue page has no PR nodes'
     );
   }
+  for (const state of Object.values(states)) {
+    const labels = state.labels.nodes.map(label => label?.name);
+    if (labels.includes('needs-human')) {
+      states[String(state.number)] = await readNativePullRequestState({
+        runner,
+        repository,
+        number: state.number,
+      });
+    }
+  }
   return states;
 }
 
@@ -726,17 +1071,41 @@ export function hardHoldLabels(state) {
   ];
 }
 
-function sourceRedBlockers(state) {
-  const blockers = Array.isArray(state?.fail) ? state.fail : [];
-  return blockers.filter(
-    blocker =>
-      typeof blocker === 'string' &&
-      blocker.length > 0 &&
-      blocker !== 'required check status unavailable' &&
-      !/ \((?:pending|missing|not successful|not complete|ambiguous latest attempt)\)$/.test(
-        blocker
-      )
+function sourceCheckBlockers(state) {
+  return (Array.isArray(state?.fail) ? state.fail : []).filter(
+    blocker => typeof blocker === 'string' && blocker.length > 0
   );
+}
+
+function sourceCheckBlockerRecords(state) {
+  if (Array.isArray(state?.checkBlockers)) {
+    return state.checkBlockers.filter(
+      blocker =>
+        blocker &&
+        typeof blocker === 'object' &&
+        typeof blocker.kind === 'string' &&
+        typeof blocker.message === 'string'
+    );
+  }
+  // Legacy snapshots carried only display strings. They cannot distinguish a
+  // generated suffix from a literal check name, so fail closed as terminal.
+  return sourceCheckBlockers(state).map(message => ({
+    kind: 'terminal',
+    name: message,
+    message,
+  }));
+}
+
+function hasHumanQueueBlocker(state) {
+  return (
+    state?.humanQueueHold === true || state?.humanQueueIntentUnknown === true
+  );
+}
+
+function sourceRedBlockers(state) {
+  return sourceCheckBlockerRecords(state)
+    .filter(blocker => blocker.kind === 'terminal')
+    .map(blocker => blocker.message);
 }
 
 export function isSourceRed(state) {
@@ -755,7 +1124,10 @@ export function classifyQueueReconciliation(snapshot) {
   const queuedRows = mainRows.filter(row => row?.q === true);
   const hardGatedRows = mainRows.filter(row => {
     const labels = Array.isArray(row?.L) ? row.L : [];
-    return labels.some(name => HARD_HOLD_LABELS.has(name));
+    return (
+      labels.some(name => HARD_HOLD_LABELS.has(name)) ||
+      hasHumanQueueBlocker(row)
+    );
   });
 
   const dequeue = queuedRows.flatMap(row => {
@@ -766,12 +1138,23 @@ export function classifyQueueReconciliation(snapshot) {
     const reasons = [];
     if (row?.draft === true) reasons.push('draft');
     if (held.length > 0) reasons.push(`held-by=${held.join(',')}`);
+    if (row?.humanQueueHold === true) reasons.push('held-by=needs-human');
+    if (row?.humanQueueIntentUnknown === true) {
+      reasons.push('unknown-human-queue-intent=needs-human');
+    }
     if (isSourceRed(row)) {
       reasons.push(`source-red=${sourceRedBlockers(row).join(',')}`);
     }
     return reasons.length === 0
       ? []
-      : [{ n: row?.n, t: row?.t ?? '', reasons }];
+      : [
+          {
+            n: row?.n,
+            t: row?.t ?? '',
+            headOid: row?.headOid ?? '',
+            reasons,
+          },
+        ];
   });
 
   const countState = state =>
@@ -794,7 +1177,8 @@ export function canAcceptExactHeadQueueReceipt(state, expectedHeadOid) {
   return (
     hasAuthoritativeExactHeadQueueReceipt(state, expectedHeadOid) &&
     hardHoldLabels(state).length === 0 &&
-    !isSourceRed(state)
+    !hasHumanQueueBlocker(state) &&
+    sourceCheckBlockers(state).length === 0
   );
 }
 
@@ -857,6 +1241,12 @@ export function explainExactHeadQueueReceipt(state, expectedHeadOid) {
   }
   if (isSourceRed(state)) {
     parts.push(`source-red=${sourceRedBlockers(state).join(',')}`);
+  } else if (state?.humanQueueHold === true) {
+    parts.push('human-queue-hold=needs-human');
+  } else if (state?.humanQueueIntentUnknown === true) {
+    parts.push('human-queue-intent-unknown=needs-human');
+  } else if (sourceCheckBlockers(state).length > 0) {
+    parts.push(`source-checks=${sourceCheckBlockers(state).join(',')}`);
   }
   return {
     ok: false,
@@ -938,6 +1328,10 @@ export function explainExactHeadAdmissionSelector({
     : [];
   const held = labels.filter(name => SELECTOR_BLOCKING_LABELS.has(name));
   if (held.length > 0) reasons.push(`held-by=${held.join(',')}`);
+  if (row.humanQueueHold === true) reasons.push('held-by=needs-human');
+  if (row.humanQueueIntentUnknown === true) {
+    reasons.push('unknown-human-queue-intent=needs-human');
+  }
   const slots = Number(enrollSlots);
   if (!Number.isInteger(slots) || slots <= 0) {
     reasons.push('queue-depth-cap');
@@ -1017,6 +1411,7 @@ export async function proveExactHeadQueueReceipt({
     repository,
     number: parsedNumber,
     runner,
+    includeSourceChecks: true,
   };
   let state;
   for (let attempt = 1; attempt <= attempts; attempt += 1) {
@@ -1076,29 +1471,44 @@ function assertEnrollCandidate(state, expectedHeadOid) {
   if (state.state !== 'OPEN' || state.isDraft !== false) {
     throw backendError(
       'ineligible_pull_request',
-      `PR #${state.number} must be open and ready for review before enrollment`
+      `PR #${state.number} must be open and ready for review before enrollment`,
+      { state }
     );
   }
   if (state.headRefOid.toLowerCase() !== expectedHeadOid) {
     throw backendError(
       'head_changed',
-      `PR #${state.number} head changed from ${expectedHeadOid} to ${state.headRefOid}`
+      `PR #${state.number} head changed from ${expectedHeadOid} to ${state.headRefOid}`,
+      { state }
     );
   }
   const heldLabels = state.labels.nodes
     .map(label => label?.name)
     .filter(name => HARD_HOLD_LABELS.has(name));
+  if (state.humanQueueHold === true) heldLabels.push('needs-human');
+  if (state.humanQueueIntentUnknown === true) {
+    heldLabels.push('needs-human-history-incomplete');
+  }
   if (heldLabels.length > 0) {
     throw backendError(
       'held_pull_request',
       `PR #${state.number} is held by ${heldLabels.join(', ')}`,
-      { labels: heldLabels }
+      { labels: heldLabels, state }
     );
   }
   if (isSourceRed(state)) {
     throw backendError(
       'source_red_pull_request',
-      `PR #${state.number} has terminal source blockers: ${sourceRedBlockers(state).join(', ')}`
+      `PR #${state.number} has terminal source blockers: ${sourceRedBlockers(state).join(', ')}`,
+      { blockers: sourceRedBlockers(state), state }
+    );
+  }
+  const checkBlockers = sourceCheckBlockers(state);
+  if (checkBlockers.length > 0) {
+    throw backendError(
+      'source_checks_not_green',
+      `PR #${state.number} does not have complete green source checks: ${checkBlockers.join(', ')}`,
+      { blockers: checkBlockers, state }
     );
   }
 }
@@ -1113,10 +1523,10 @@ async function pollEnrollmentPostcondition({
   let state;
   for (let attempt = 1; attempt <= attempts; attempt += 1) {
     state = await readPullRequestQueueState(stateOptions);
+    assertEnrollCandidate(state, expectedHeadOid);
     if (enrollmentPostcondition(state, expectedHeadOid)) {
       return { attempts: attempt, state };
     }
-    assertEnrollCandidate(state, expectedHeadOid);
     if (attempt < attempts) await wait(delayMs);
   }
   return { attempts, state };
@@ -1162,6 +1572,7 @@ export async function enrollPullRequest({
     repository,
     number: parsedNumber,
     runner,
+    includeSourceChecks: true,
   };
 
   await preflightMergeQueue({
@@ -1183,6 +1594,27 @@ export async function enrollPullRequest({
       state: before,
     };
   }
+  const shouldRemoveAutoMergeIntent = before.autoMergeRequest === null;
+  const disableCreatedAutoMergeIntent = async state => {
+    if (!shouldRemoveAutoMergeIntent || state?.autoMergeRequest === null) {
+      return state;
+    }
+    await runGraphqlMutation(
+      mutationRunner,
+      DISABLE_AUTO_MERGE_MUTATION,
+      { pullRequestId: state.id },
+      `removing unproven auto-merge intent for PR #${parsedNumber}`
+    );
+    const cleaned = await readPullRequestQueueState(stateOptions);
+    if (!dequeuePostcondition(cleaned)) {
+      throw backendError(
+        'enrollment_compensation_failed',
+        `PR #${parsedNumber} retained unproven auto-merge intent after cleanup`,
+        { state: cleaned }
+      );
+    }
+    return cleaned;
+  };
 
   let mutationError = null;
   try {
@@ -1195,13 +1627,91 @@ export async function enrollPullRequest({
   } catch (error) {
     mutationError = error;
   }
-  const observation = await pollEnrollmentPostcondition({
-    stateOptions,
-    expectedHeadOid: expectedHead,
-    attempts: postconditionAttempts,
-    delayMs: postconditionDelayMs,
-    wait,
-  });
+  let observation;
+  try {
+    observation = await pollEnrollmentPostcondition({
+      stateOptions,
+      expectedHeadOid: expectedHead,
+      attempts: postconditionAttempts,
+      delayMs: postconditionDelayMs,
+      wait,
+    });
+  } catch (error) {
+    const rejectedState = error?.details?.state;
+    if (
+      rejectedState?.isInMergeQueue === true ||
+      rejectedState?.mergeQueueEntry != null ||
+      (shouldRemoveAutoMergeIntent && rejectedState?.autoMergeRequest != null)
+    ) {
+      let compensation;
+      try {
+        if (
+          shouldRemoveAutoMergeIntent &&
+          rejectedState.headRefOid.toLowerCase() !== expectedHead
+        ) {
+          compensation = {
+            changed: true,
+            reason: 'stale-head-auto-merge-disabled',
+            state: await disableCreatedAutoMergeIntent(rejectedState),
+          };
+        } else {
+          compensation = await dequeuePullRequest({
+            backend: resolvedBackend,
+            repository,
+            number: parsedNumber,
+            runner,
+            mutationRunner,
+            expectedHeadOid: expectedHead,
+            requireIneligible: true,
+          });
+          if (
+            compensation.skipped === true &&
+            compensation.reason === 'head-changed' &&
+            shouldRemoveAutoMergeIntent &&
+            compensation.state?.autoMergeRequest != null
+          ) {
+            compensation = {
+              changed: true,
+              reason: 'stale-head-auto-merge-disabled',
+              state: await disableCreatedAutoMergeIntent(compensation.state),
+            };
+          }
+        }
+      } catch (compensationError) {
+        throw backendError(
+          'enrollment_compensation_failed',
+          `PR #${parsedNumber} became ineligible during enrollment and could not be dequeued`,
+          {
+            cause: errorEvidence(error),
+            compensationError: errorEvidence(compensationError),
+            state: rejectedState,
+          }
+        );
+      }
+      if (
+        compensation.skipped === true &&
+        compensation.reason === 'eligibility-recovered' &&
+        canAcceptExactHeadQueueReceipt(compensation.state, expectedHead)
+      ) {
+        return {
+          backend: resolvedBackend,
+          changed: true,
+          mutationActor,
+          postconditionAttempts: 1,
+          reconciledAfterTransientIneligibility: true,
+          state: compensation.state,
+        };
+      }
+      throw backendError(error.code, error.message, {
+        ...error.details,
+        compensated: dequeuePostcondition(compensation.state),
+        compensationSkipped: compensation.skipped === true,
+        compensationReason: compensation.reason,
+        compensationState: compensation.state,
+      });
+    }
+    throw error;
+  }
   if (enrollmentPostcondition(observation.state, expectedHead)) {
     return {
       backend: resolvedBackend,
@@ -1211,6 +1721,29 @@ export async function enrollPullRequest({
       reconciledAfterCommandError: Boolean(mutationError),
       state: observation.state,
     };
+  }
+  let compensationState = null;
+  if (
+    shouldRemoveAutoMergeIntent &&
+    observation.state?.autoMergeRequest != null &&
+    observation.state?.isInMergeQueue !== true &&
+    observation.state?.mergeQueueEntry == null
+  ) {
+    try {
+      compensationState = await disableCreatedAutoMergeIntent(
+        observation.state
+      );
+    } catch (error) {
+      if (error?.code === 'enrollment_compensation_failed') throw error;
+      throw backendError(
+        'enrollment_compensation_failed',
+        `PR #${parsedNumber} could not remove unproven auto-merge intent`,
+        {
+          cause: errorEvidence(error),
+          state: observation.state,
+        }
+      );
+    }
   }
   const mutationErrorDetails = mutationError
     ? errorEvidence(mutationError)
@@ -1224,6 +1757,10 @@ export async function enrollPullRequest({
     {
       mutationError: mutationErrorDetails,
       postconditionAttempts: observation.attempts,
+      compensated: compensationState
+        ? dequeuePostcondition(compensationState)
+        : false,
+      compensationState,
       state: observation.state,
     }
   );
@@ -1236,6 +1773,23 @@ async function runGraphqlMutation(runner, query, variables, description) {
   );
 }
 
+export function currentQueueReconciliationReasons(state) {
+  const reasons = [];
+  if (state?.isDraft === true) reasons.push('draft');
+  const held = hardHoldLabels(state).filter(label =>
+    QUEUE_RECONCILIATION_HOLD_LABELS.has(label)
+  );
+  if (held.length > 0) reasons.push(`held-by=${held.join(',')}`);
+  if (state?.humanQueueHold === true) reasons.push('held-by=needs-human');
+  if (state?.humanQueueIntentUnknown === true) {
+    reasons.push('unknown-human-queue-intent=needs-human');
+  }
+  if (isSourceRed(state)) {
+    reasons.push(`source-red=${sourceRedBlockers(state).join(',')}`);
+  }
+  return reasons;
+}
+
 /**
  * @param {{
  *   backend?: string,
@@ -1243,6 +1797,8 @@ async function runGraphqlMutation(runner, query, variables, description) {
  *   number?: string | number,
  *   runner?: (args: any) => Promise<{ code: number, stdout: string, stderr: string }>,
  *   mutationRunner?: (args: any) => Promise<{ code: number, stdout: string, stderr: string }>,
+ *   expectedHeadOid?: string,
+ *   requireIneligible?: boolean,
  * }} [input]
  */
 export async function dequeuePullRequest({
@@ -1251,6 +1807,8 @@ export async function dequeuePullRequest({
   number,
   runner = createGhRunner(),
   mutationRunner = runner,
+  expectedHeadOid,
+  requireIneligible = false,
 } = {}) {
   const resolvedBackend = requireNativeBackend(backend);
   const parsedNumber = parsePullRequestNumber(number);
@@ -1261,8 +1819,22 @@ export async function dequeuePullRequest({
     repository,
     number: parsedNumber,
     runner,
+    includeSourceChecks: requireIneligible,
   };
+  const expectedHead = requireIneligible
+    ? parseExpectedHeadOid(expectedHeadOid)
+    : null;
   const before = await readPullRequestQueueState(stateOptions);
+  if (requireIneligible && before.headRefOid.toLowerCase() !== expectedHead) {
+    return {
+      backend: resolvedBackend,
+      changed: false,
+      skipped: true,
+      reason: 'head-changed',
+      mutationActor,
+      state: before,
+    };
+  }
   if (dequeuePostcondition(before)) {
     return {
       backend: resolvedBackend,
@@ -1271,9 +1843,77 @@ export async function dequeuePullRequest({
       state: before,
     };
   }
+  if (requireIneligible) {
+    const reasons = currentQueueReconciliationReasons(before);
+    if (reasons.length === 0) {
+      return {
+        backend: resolvedBackend,
+        changed: false,
+        skipped: true,
+        reason: 'eligibility-recovered',
+        mutationActor,
+        state: before,
+      };
+    }
+  }
 
   const mutationErrors = [];
+  const restoreQueueState = async state => {
+    try {
+      return {
+        receipt: await enrollPullRequest({
+          backend: resolvedBackend,
+          repository,
+          number: parsedNumber,
+          expectedHeadOid: state.headRefOid,
+          runner,
+          mutationRunner,
+        }),
+      };
+    } catch (error) {
+      return { error: errorEvidence(error) };
+    }
+  };
+  const assertExpectedHeadAfterMutation = async (state, phase) => {
+    if (!requireIneligible || state.headRefOid.toLowerCase() === expectedHead) {
+      return;
+    }
+    const restoration = dequeuePostcondition(state)
+      ? await restoreQueueState(state)
+      : { notNeeded: true };
+    throw backendError(
+      'head_changed_during_dequeue',
+      `PR #${parsedNumber} head changed during ${phase}; exact-head dequeue cannot be proven`,
+      { expectedHeadOid: expectedHead, state, restoration }
+    );
+  };
+
+  let current = before;
   if (before.isInMergeQueue || before.mergeQueueEntry !== null) {
+    if (requireIneligible) {
+      current = await readPullRequestQueueState(stateOptions);
+      if (current.headRefOid.toLowerCase() !== expectedHead) {
+        return {
+          backend: resolvedBackend,
+          changed: false,
+          skipped: true,
+          reason: 'head-changed',
+          mutationActor,
+          state: current,
+        };
+      }
+      const reasons = currentQueueReconciliationReasons(current);
+      if (reasons.length === 0) {
+        return {
+          backend: resolvedBackend,
+          changed: false,
+          skipped: true,
+          reason: 'eligibility-recovered',
+          mutationActor,
+          state: current,
+        };
+      }
+    }
     try {
       // GitHub's DequeuePullRequestInput.id is the PullRequest node ID.
       await runGraphqlMutation(
@@ -1287,8 +1927,34 @@ export async function dequeuePullRequest({
     }
   }
 
-  let current = await readPullRequestQueueState(stateOptions);
+  current = await readPullRequestQueueState(stateOptions);
+  await assertExpectedHeadAfterMutation(current, 'queue removal');
+  if (requireIneligible) {
+    const reasons = currentQueueReconciliationReasons(current);
+    if (reasons.length === 0) {
+      const restoration = await restoreQueueState(current);
+      if (restoration.error) {
+        throw backendError(
+          'dequeue_compensation_failed',
+          `PR #${parsedNumber} recovered eligibility after queue removal and could not be restored`,
+          { state: current, restoration }
+        );
+      }
+      return {
+        backend: resolvedBackend,
+        changed: false,
+        skipped: true,
+        reason: 'eligibility-recovered',
+        mutationActor,
+        state: restoration.receipt.state,
+      };
+    }
+  }
   if (current.autoMergeRequest !== null) {
+    if (requireIneligible) {
+      current = await readPullRequestQueueState(stateOptions);
+      await assertExpectedHeadAfterMutation(current, 'auto-merge revalidation');
+    }
     try {
       await runGraphqlMutation(
         mutationRunner,
@@ -1300,9 +1966,13 @@ export async function dequeuePullRequest({
       mutationErrors.push(error);
     }
     current = await readPullRequestQueueState(stateOptions);
+    await assertExpectedHeadAfterMutation(current, 'auto-merge disable');
   }
 
-  if (dequeuePostcondition(current)) {
+  if (
+    dequeuePostcondition(current) &&
+    (!requireIneligible || current.headRefOid.toLowerCase() === expectedHead)
+  ) {
     return {
       backend: resolvedBackend,
       changed: true,
@@ -1399,6 +2069,14 @@ export async function runCli(
         number: args[0],
         mutationRunner: resolvedMutationRunner,
       }),
+    'dequeue-ineligible': () =>
+      dequeuePullRequest({
+        ...options,
+        number: args[0],
+        expectedHeadOid: args[1],
+        requireIneligible: true,
+        mutationRunner: resolvedMutationRunner,
+      }),
   };
   const usage = {
     preflight: [0, 'preflight takes no arguments'],
@@ -1411,11 +2089,12 @@ export async function runCli(
     'prove-receipt': [2, 'prove-receipt requires <number> <headSha>'],
     enroll: [2, 'enroll requires <number> <headSha>'],
     dequeue: [1, 'dequeue requires <number>'],
+    'dequeue-ineligible': [2, 'dequeue-ineligible requires <number> <headSha>'],
   };
   if (!Object.hasOwn(commands, command)) {
     throw backendError(
       'usage',
-      'Usage: merge-queue-backend.mjs <preflight|list-state|explain-selector|reconcile-snapshot|prove-receipt|enroll|dequeue>'
+      'Usage: merge-queue-backend.mjs <preflight|list-state|explain-selector|reconcile-snapshot|prove-receipt|enroll|dequeue|dequeue-ineligible>'
     );
   }
   const [argumentCount, usageMessage] = usage[command];
@@ -1427,7 +2106,9 @@ export async function runCli(
     throw backendError('usage', usageMessage);
   }
   if (
-    (command === 'enroll' || command === 'dequeue') &&
+    (command === 'enroll' ||
+      command === 'dequeue' ||
+      command === 'dequeue-ineligible') &&
     backend === 'native' &&
     !NATIVE_MUTATION_AUTHORIZATIONS.has(env.MERGE_QUEUE_NATIVE_AUTHORIZATION)
   ) {
