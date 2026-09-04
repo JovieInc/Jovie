@@ -33,6 +33,12 @@ export const summerCiImprovementClassIds = [
   'affected-only-unit-selection',
 ] as const;
 
+export type SummerCiImprovementClassId =
+  (typeof summerCiImprovementClassIds)[number];
+export type SymphonyRepairAction =
+  | 'reconcile-release-certification-starvation'
+  | 'remediate-selected-ci-audit-class';
+
 const ciClassId = z.enum(summerCiImprovementClassIds);
 const ciAuditSchema = z
   .object({
@@ -216,20 +222,64 @@ export type SummerBottleneckStore = {
   write(pathname: string, record: SummerBottleneckRecord): Promise<void>;
 };
 
-export type SymphonyRepairTask = {
-  readonly schema: 'jovie-symphony-repair-task/v1';
-  readonly taskKey: string;
-  readonly createdAt: string;
-  readonly owner: 'symphony';
-  readonly route: 'symphony';
-  readonly action: 'reconcile-release-certification-starvation';
-  readonly issue: 'JOV-5853';
-  readonly safety: 'exact-source-ci-native-queue-production-gates-remain-required';
-  readonly source: {
-    readonly sourceVersion: string;
-    readonly snapshotDigest: string;
-  };
-};
+export const symphonyRepairTaskSchema = z
+  .object({
+    schema: z.literal('jovie-symphony-repair-task/v1'),
+    taskKey: z.string().regex(DIGEST),
+    createdAt: timestamp,
+    owner: z.literal('symphony'),
+    route: z.literal('symphony'),
+    authority: z.literal(
+      'source-repair-only-no-direct-pr-queue-or-deploy-mutation'
+    ),
+    action: z.enum([
+      'reconcile-release-certification-starvation',
+      'remediate-selected-ci-audit-class',
+    ]),
+    issue: z.literal('JOV-5853'),
+    safety: z.literal(
+      'exact-source-ci-native-queue-production-gates-remain-required'
+    ),
+    selected: z
+      .object({
+        id: z.union([z.literal('release-certification-starvation'), ciClassId]),
+        sourceRevision: exactSha,
+        sourceDigest: z.string().regex(DIGEST),
+        owner: z.string().regex(/^[A-Za-z0-9][A-Za-z0-9:_-]{1,63}$/u),
+        handle: z.string().regex(/^[A-Za-z0-9][A-Za-z0-9:#/_-]{1,127}$/u),
+      })
+      .strict(),
+    source: z
+      .object({
+        sourceVersion: exactSha,
+        snapshotDigest: z.string().regex(DIGEST),
+      })
+      .strict(),
+  })
+  .strict()
+  .superRefine((task, context) => {
+    const isRelease = task.selected.id === 'release-certification-starvation';
+    if (
+      (isRelease &&
+        task.action !== 'reconcile-release-certification-starvation') ||
+      (!isRelease && task.action !== 'remediate-selected-ci-audit-class')
+    ) {
+      context.addIssue({
+        code: 'custom',
+        message: 'repair action is not bound to the selected bottleneck',
+        path: ['action'],
+      });
+    }
+    if (task.selected.sourceRevision !== task.source.sourceVersion) {
+      context.addIssue({
+        code: 'custom',
+        message: 'selected source revision is cross-bound',
+        path: ['selected', 'sourceRevision'],
+      });
+    }
+  });
+
+export type SymphonyRepairTask = z.infer<typeof symphonyRepairTaskSchema>;
 
 export type SummerBottleneckDependencies = {
   readonly dispatchToSymphony: (
@@ -262,6 +312,7 @@ type Candidate = {
   readonly impact: number;
   readonly inEnvelope: boolean;
   readonly sourceRevision: string;
+  readonly sourceDigest: string;
   readonly owner: string;
   readonly handle: string;
 };
@@ -328,6 +379,7 @@ function candidate(
   blockedSince: string | null,
   impact: number,
   sourceRevision: string,
+  sourceDigest: string,
   nowMs: number,
   inEnvelope = false,
   owner = 'Summer',
@@ -342,6 +394,7 @@ function candidate(
     blockedMs,
     impact,
     sourceRevision,
+    sourceDigest,
     inEnvelope,
     owner,
     handle,
@@ -361,6 +414,7 @@ export function rankSummerBottlenecks(
           closure.blockedSince,
           closure.openPullRequests * 80,
           closure.sourceRevision,
+          closure.sourceDigest,
           nowMs
         )
       : null,
@@ -370,6 +424,7 @@ export function rankSummerBottlenecks(
           queue.blockedSince,
           queue.eligibleCleanPrs * 60,
           queue.sourceRevision,
+          queue.sourceDigest,
           nowMs
         )
       : null,
@@ -379,6 +434,7 @@ export function rankSummerBottlenecks(
           release.blockedSince,
           release.unverifiedMerges * 100,
           release.sourceRevision,
+          release.sourceDigest,
           nowMs,
           true,
           'Summer',
@@ -393,8 +449,9 @@ export function rankSummerBottlenecks(
             item.blockedSince,
             item.impact,
             ciAudit.sourceRevision,
+            ciAudit.sourceDigest,
             nowMs,
-            false,
+            true,
             item.owner,
             item.handle
           )
@@ -405,6 +462,7 @@ export function rankSummerBottlenecks(
           runner.blockedSince,
           runner.queuedWork * 40,
           runner.sourceRevision,
+          runner.sourceDigest,
           nowMs
         )
       : null,
@@ -436,9 +494,40 @@ function fingerprintFor(
   return digest({
     bottleneck: selected.id,
     blockedSince: selected.blockedSince,
+    ...(summerCiImprovementClassIds.some(id => id === selected.id)
+      ? { repairEnvelope: 'ci-audit-source-repair-v1' }
+      : {}),
     signal,
     sourceVersion: snapshot.sourceVersion,
   });
+}
+
+type RepairSelection =
+  | {
+      readonly id: 'release-certification-starvation';
+      readonly action: 'reconcile-release-certification-starvation';
+    }
+  | {
+      readonly id: SummerCiImprovementClassId;
+      readonly action: 'remediate-selected-ci-audit-class';
+    };
+
+function isSummerCiImprovementClassId(
+  id: Candidate['id']
+): id is SummerCiImprovementClassId {
+  return summerCiImprovementClassIds.some(knownId => knownId === id);
+}
+
+function repairSelectionFor(selected: Candidate): RepairSelection | null {
+  if (selected.id === 'release-certification-starvation') {
+    return {
+      id: selected.id,
+      action: 'reconcile-release-certification-starvation',
+    };
+  }
+  return isSummerCiImprovementClassId(selected.id)
+    ? { id: selected.id, action: 'remediate-selected-ci-audit-class' }
+    : null;
 }
 
 function signedReceipt(
@@ -572,6 +661,7 @@ async function processStoredSnapshot(
   }
 
   const fingerprint = fingerprintFor(snapshot, selected);
+  const repairSelection = repairSelectionFor(selected);
   const recordPaths = paths(snapshot, fingerprint);
   const completed = await dependencies.store.read(recordPaths.outcome!);
   if (completed) {
@@ -605,8 +695,8 @@ async function processStoredSnapshot(
     {
       ...baseReceipt(snapshot, dependencies, selected, fingerprint, ranking),
       schema: 'jovie.eve.summer-bottleneck-claim/v1',
-      decision: selected.inEnvelope ? 'claimed' : 'held',
-      terminal: !selected.inEnvelope,
+      decision: selected.inEnvelope && repairSelection ? 'claimed' : 'held',
+      terminal: !(selected.inEnvelope && repairSelection),
     },
     recordPaths.claim
   );
@@ -628,7 +718,7 @@ async function processStoredSnapshot(
     }
   }
 
-  if (!selected.inEnvelope) {
+  if (!selected.inEnvelope || !repairSelection) {
     const outcome = signFor(
       dependencies,
       {
@@ -664,9 +754,17 @@ async function processStoredSnapshot(
     createdAt: snapshot.observedAt,
     owner: 'symphony',
     route: 'symphony',
-    action: 'reconcile-release-certification-starvation',
+    authority: 'source-repair-only-no-direct-pr-queue-or-deploy-mutation',
+    action: repairSelection.action,
     issue: 'JOV-5853',
     safety: 'exact-source-ci-native-queue-production-gates-remain-required',
+    selected: {
+      id: repairSelection.id,
+      sourceRevision: selected.sourceRevision,
+      sourceDigest: selected.sourceDigest,
+      owner: selected.owner,
+      handle: selected.handle,
+    },
     source: {
       sourceVersion: snapshot.sourceVersion,
       snapshotDigest: digest(snapshot),
