@@ -142,7 +142,7 @@ Profile is historical ledger drift, not a reason to change the current code.
 | Atom | `JovieIconButtonStyle` | Shell gear, settings close, chat scroll-to-bottom, Library control hit frames | Canonical 44-point circular icon target in `JovieTheme.swift`. |
 | Atom | `JovieLogoMark` and QR plate modifier | Splash, auth, QR surfaces | Logo and QR plate are shared source owners; `JovieTheme.swift:L124-L180,L244-L256`. |
 | Atom | `EntityAccent` | Inline chat entity chips | Only for entity-kind parity; do not reuse as generic iOS accents; `JovieTheme.swift:L26-L53`. |
-| Atom | `JoviePressFeedbackButtonStyle` | AppShell tab bar, drawer rows, and Settings rows | Canonical owner for the opacity/scale/subtle recipe in `JovieTheme.swift`; Settings preserves `.7` through the style parameter, verified by `AppShellTabBarTests.swift` and `SettingsStyleGuardTests.swift`. |
+| Atom | `JoviePressFeedbackButtonStyle` | AppShell tab bar and drawer rows | Canonical owner for the opacity/scale/subtle recipe in `JovieTheme.swift`, verified by `AppShellTabBarTests.swift`. Not usable on Settings `List` rows: a custom `ButtonStyle` on a list-row `Link`/`Button` swallows taps on iOS 26 (UITest-verified), so those rows keep native press feedback. |
 | Molecule | `DashboardAvatarView` | Shell toolbar, drawer account, dashboard | Cached avatar with surface fallback; `apps/ios/Jovie/Features/Dashboard/DashboardView.swift:L5-L20`. |
 | Molecule | `QRCodeCardView` | Dashboard and venue mode | One square QR/loading/unavailable footprint; `QRCodeCardView.swift:L4-L65`. |
 | Molecule | `DrawerThreadRow`/`DrawerSurfaceButton` | Left drawer | Drawer-local rows; do not copy into another navigation surface; `AppShellLeftDrawer.swift:L243-L280,L378-L425`. |
@@ -221,7 +221,7 @@ not treated as interchangeable:
 
 | Owner | Evidence | Difference |
 | --- | --- | --- |
-| `JoviePressFeedbackButtonStyle` | `JovieTheme.swift` | Canonical `.72`/scale/animation recipe used by the tab bar, drawer, and Settings links |
+| `JoviePressFeedbackButtonStyle` | `JovieTheme.swift` | Canonical `.72`/scale/animation recipe used by the tab bar and drawer |
 | `JovieIconButtonStyle` | `JovieTheme.swift` | Same `.72`/scale/animation plus 44-point circular icon geometry |
 | `MobileChatMerchActionButtonStyle` | `MobileChatMerchOptionsView.swift` | Intentionally different: capsule fill opacity only, no scale |
 | `ComposerSlashRowButtonStyle` | `ChatComposerBar.swift` | Intentionally different: background highlight only, no scale |

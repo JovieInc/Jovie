@@ -100,9 +100,12 @@ struct SettingsStyleGuardTests {
     #expect(source.contains("LabeledContent"))
     #expect(source.contains(".jovieSurface(radius: JovieRadius.medium"))
     #expect(source.contains(".jovieSurface(radius: JovieRadius.medium, interactive: true)"))
-    #expect(source.contains("JoviePressFeedbackButtonStyle()"))
     #expect(source.contains("SettingsLayout.reservedActionMinHeight"))
     #expect(!source.contains(".textCase(.uppercase)"))
+    // A custom ButtonStyle on a List-row Link/Button swallows taps on iOS 26
+    // (UITest-verified in the JOV-5202 merge-group lane), so Settings rows
+    // must keep the native press feedback.
+    #expect(!source.contains(".buttonStyle(JoviePressFeedbackButtonStyle"))
     #expect(!source.contains("SettingsRowButtonStyle"))
     #expect(!source.contains("JovieColor.surface0, in: RoundedRectangle"))
     #expect(!source.contains("if isLoggingOut {\n          ProgressView()"))

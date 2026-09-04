@@ -160,10 +160,7 @@ describe('cross-surface UI ownership registry', () => {
       nativeButtonBindings?.find(
         binding => binding.swiftType === 'JoviePressFeedbackButtonStyle'
       )?.consumerPaths
-    ).toEqual([
-      'apps/ios/Jovie/Features/AppShell/AppShellLeftDrawer.swift',
-      'apps/ios/Jovie/Features/Settings/SettingsView.swift',
-    ]);
+    ).toEqual(['apps/ios/Jovie/Features/AppShell/AppShellLeftDrawer.swift']);
     expect(
       nativeIconBindings?.find(
         binding => binding.swiftType === 'JovieIconButtonStyle'

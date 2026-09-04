@@ -1,9 +1,5 @@
 import SwiftUI
 
-enum SettingsInteraction {
-  static let rowPressedOpacity: Double = 0.7
-}
-
 struct AppBuildInfo: Equatable {
   let version: String
   let build: String
@@ -117,11 +113,6 @@ struct SettingsView: View {
         } label: {
           LabeledContent("Workspace", value: workspaceMode.displayName)
         }
-        .buttonStyle(
-          JoviePressFeedbackButtonStyle(
-            pressedOpacity: SettingsInteraction.rowPressedOpacity
-          )
-        )
         .accessibilityIdentifier("settings-workspace-switch")
         .accessibilityLabel("Workspace \(workspaceMode.displayName)")
         .accessibilityHint("Switches between Jovie and Ovie")
@@ -227,7 +218,9 @@ private struct SettingsLinkRow: View {
       .padding(.horizontal, JovieSpacing.medium)
       .padding(.vertical, JovieSpacing.medium)
     }
-    .buttonStyle(JoviePressFeedbackButtonStyle())
+    // No custom ButtonStyle here: any custom style on a List-row Link/Button
+    // swallows the tap on iOS 26 (UITest-verified), so rows keep the native
+    // press feedback.
     .tint(JovieColor.textPrimary)
     .accessibilityLabel(title)
   }

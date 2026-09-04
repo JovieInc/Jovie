@@ -354,6 +354,17 @@ final class JovieUITests: XCTestCase {
     }
 
     let logoutButton = app.buttons["Log Out"]
+    // The native Link rows are taller than the old button rows, so on cold
+    // merge-group runners the logout row can still be virtualized out of the
+    // accessibility tree when the value-row assertions finish. Reveal it
+    // before measuring its frame (iOS merge-group lane exit 65).
+    if !logoutButton.waitForExistence(timeout: 2) {
+      app.swipeUp()
+    }
+    XCTAssertTrue(
+      logoutButton.waitForExistence(timeout: 3),
+      "Log Out row did not appear in the accessibility tree.\n\(app.debugDescription)"
+    )
     let idleFrame = logoutButton.frame
     logoutButton.tap()
 

@@ -24,9 +24,12 @@ test('iOS Settings uses native links, LabeledContent, and Liquid Glass', () => {
   assert.match(source, /Link\(destination:/);
   assert.match(source, /LabeledContent/);
   assert.match(source, /\.jovieSurface\(radius: JovieRadius\.medium/);
-  assert.match(source, /JoviePressFeedbackButtonStyle\(\)/);
   assert.match(source, /SettingsLayout\.reservedActionMinHeight/);
   assert.doesNotMatch(source, /\.textCase\(\.uppercase\)/);
+  // A custom ButtonStyle on a List-row Link/Button swallows taps on iOS 26
+  // (UITest-verified in the JOV-5202 merge-group lane), so Settings rows
+  // must keep the native press feedback.
+  assert.doesNotMatch(source, /\.buttonStyle\(JoviePressFeedbackButtonStyle/);
   assert.doesNotMatch(source, /SettingsRowButtonStyle/);
   assert.doesNotMatch(source, /JovieColor\.surface0, in: RoundedRectangle/);
   assert.doesNotMatch(source, /URL\(string: "https:\/\/jov\.ie\/support"\)!/);

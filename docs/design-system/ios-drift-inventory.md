@@ -33,7 +33,7 @@ Owner: `apps/ios/Jovie/Features/Settings/SettingsView.swift`.
 | Custom URL buttons | `Button` + `openURL` + force unwraps | Native `Link` + `SettingsExternalURL` |
 | Custom value rows | Hand-rolled `HStack` | Native `LabeledContent` |
 | All-caps section titles | `.textCase(.uppercase)` | Title Case (`DESIGN.md`) |
-| Private press style | `SettingsRowButtonStyle` (opacity `.7`) | Canonical `JoviePressFeedbackButtonStyle` |
+| Private press style | `SettingsRowButtonStyle` (opacity `.7`) | Native `List` row feedback; any custom `ButtonStyle` on a list-row `Link`/`Button` swallows taps on iOS 26 (UITest-verified), and the guards now forbid it |
 | Logout layout shift | Spinner mounted only while busy | Both labels stay mounted; spinner is opacity-gated; `SettingsLayout.reservedActionMinHeight` |
 
 Eval:
