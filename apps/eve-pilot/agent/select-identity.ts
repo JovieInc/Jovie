@@ -134,19 +134,16 @@ export type EvePilotChannelSource =
   | string;
 
 /**
- * Telegram remains the Ovie founder pack. Photon/iMessage is Summer's live
- * talk channel. The ovie-summer-shadow and ovie-summer-bottleneck sources stay
- * Summer for the OIDC observation and deterministic bottleneck paths. Other
- * sources keep the Jovie runtime default.
+ * Telegram, Photon, and iMessage are the Ovie founder talk pack.
+ * Summer stays on the isolated operator/shadow/schedule surface only
+ * (`ovie-summer-shadow`, `ovie-summer-bottleneck`). Other sources keep
+ * the Jovie runtime default. No Hermes or Trigger fallback.
  */
 export function eveIdentityIdForChannel(
   source?: EvePilotChannelSource
 ): EvePilotIdentityId {
-  if (source === 'telegram') {
+  if (source === 'telegram' || source === 'imessage' || source === 'photon') {
     return 'ovie';
-  }
-  if (source === 'imessage' || source === 'photon') {
-    return 'summer';
   }
   if (source === 'ovie-summer-shadow' || source === 'ovie-summer-bottleneck') {
     return 'summer';
