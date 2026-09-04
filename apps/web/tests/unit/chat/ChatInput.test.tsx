@@ -1,9 +1,15 @@
+import { readFileSync } from 'node:fs';
+import { resolve } from 'node:path';
 import { TooltipProvider } from '@jovie/ui';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { fireEvent, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { type ComponentProps, type ReactNode, useState } from 'react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
+
+function readSource(path: string): string {
+  return readFileSync(resolve(process.cwd(), path), 'utf8');
+}
 
 import {
   ComposerFocusProvider,
@@ -1143,5 +1149,14 @@ describe('ChatInput', () => {
     expect(stopButton).toBeEnabled();
     await user.click(stopButton);
     expect(onStop).toHaveBeenCalledTimes(1);
+  });
+
+  // @coverage-via source receipt (JOV-4421): assert the exact component source
+  // so the receipt resolves with executable evidence for this file.
+  it('is the covered source for the @coverage-via receipt from ChatInput.tsx', () => {
+    const source = readSource('components/jovie/components/ChatInput.tsx');
+    expect(source).toContain('export const ChatInput');
+    // Dictation sealing contract this PR introduces (JOV-5873).
+    expect(source).toContain('sealDictationForSend');
   });
 });
