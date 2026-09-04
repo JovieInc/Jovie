@@ -2196,7 +2196,10 @@ class FallbackTests(unittest.TestCase):
             "JOV-4": {"number": 16214, "head": "grok/JOV-4-fix", "repo": "JovieInc/Jovie", "mergeStateStatus": "CLEAN"},
             "JOV-5": {"number": 16211, "head": "grok/JOV-5-fix", "repo": "JovieInc/Jovie", "mergeStateStatus": "DIRTY"},
         }
-        with mock.patch.object(module, "_pr_has_failing_check", side_effect=lambda repo, number: number in (16212, 16214)):
+        with (
+            mock.patch.object(module, "_pr_has_failing_check", side_effect=lambda repo, number: number in (16212, 16214)),
+            mock.patch.object(module, "_pr_has_product_failure_tombstone", return_value=False),
+        ):
             self.assertEqual(module._open_pr_verdict("JOV-1", index)[0], "skip")
             self.assertEqual(module._open_pr_verdict("JOV-2", index)[0], "remount")
             self.assertEqual(module._open_pr_verdict("JOV-3", index)[0], "none")
@@ -2212,6 +2215,83 @@ class FallbackTests(unittest.TestCase):
             }
         }
         self.assertEqual(module._open_pr_verdict("JOV-6", conflicting)[0], "remount")
+
+    def test_open_pr_verdict_remounts_clean_head_with_product_failure_tombstone(self):
+        # Live #16420: merge-group-only product failure (iOS build, full unit
+        # shards) leaves the head source-CLEAN while drain-pr-queue.sh
+        # tombstones it; the enrollment guard refuses re-admission. The sidecar
+        # must remount for real remediation instead of skipping forever.
+        module = self.load_controller_module()
+        index = {
+            "JOV-1": {"number": 16420, "head": "grok/JOV-1-fix", "repo": "JovieInc/Jovie", "mergeStateStatus": "CLEAN"},
+        }
+        tombstoned = {
+            "statusCheckRollup": [
+                {"name": "ci-fast", "conclusion": "SUCCESS", "status": "COMPLETED"},
+                {
+                    "context": "jovie-queue-product-failure/v1",
+                    "state": "SUCCESS",
+                    "description": "blocked:merge-group-product-failure",
+                },
+            ]
+        }
+        with mock.patch.object(module, "_gh_json", return_value=tombstoned):
+            self.assertEqual(module._open_pr_verdict("JOV-1", index)[0], "remount")
+
+    def test_open_pr_verdict_skips_clean_head_without_tombstone(self):
+        module = self.load_controller_module()
+        index = {
+            "JOV-1": {"number": 16420, "head": "grok/JOV-1-fix", "repo": "JovieInc/Jovie", "mergeStateStatus": "CLEAN"},
+        }
+        with mock.patch.object(module, "_gh_json", return_value={"statusCheckRollup": []}):
+            self.assertEqual(module._open_pr_verdict("JOV-1", index)[0], "skip")
+        # A rollup fetch failure must not remount a merge-queue-eligible head.
+        with mock.patch.object(module, "_gh_json", return_value=None):
+            self.assertEqual(module._open_pr_verdict("JOV-1", index)[0], "skip")
+
+    def test_open_pr_verdict_dirty_head_never_fetches_checks(self):
+        module = self.load_controller_module()
+        index = {
+            "JOV-2": {"number": 16211, "head": "grok/JOV-2-fix", "repo": "JovieInc/Jovie", "mergeStateStatus": "DIRTY"},
+        }
+        with (
+            mock.patch.object(module, "_pr_has_failing_check", side_effect=AssertionError("must not fetch")),
+            mock.patch.object(module, "_pr_has_product_failure_tombstone", side_effect=AssertionError("must not fetch")),
+        ):
+            self.assertEqual(module._open_pr_verdict("JOV-2", index)[0], "remount")
+
+    def test_product_failure_tombstone_matches_status_and_check_run_shapes(self):
+        module = self.load_controller_module()
+        check_run_shape = {
+            "statusCheckRollup": [
+                {
+                    "name": "jovie-queue-product-failure/v1",
+                    "status": "COMPLETED",
+                    "conclusion": "SUCCESS",
+                    "text": "blocked:merge-group-product-failure",
+                },
+            ]
+        }
+        with mock.patch.object(module, "_gh_json", return_value=check_run_shape):
+            self.assertTrue(module._pr_has_product_failure_tombstone("JovieInc/Jovie", 16420))
+
+    def test_product_failure_tombstone_ignores_near_misses(self):
+        module = self.load_controller_module()
+        near_misses = {
+            "statusCheckRollup": [
+                # Right context, but no blocked: description.
+                {"context": "jovie-queue-product-failure/v1", "state": "SUCCESS", "description": "merge-group passed"},
+                # Right description, wrong context.
+                {"context": "jovie-merge-queue/enroll", "description": "blocked:merge-group-product-failure"},
+                "not-a-dict",
+            ]
+        }
+        with mock.patch.object(module, "_gh_json", return_value=near_misses):
+            self.assertFalse(module._pr_has_product_failure_tombstone("JovieInc/Jovie", 16420))
+        with mock.patch.object(module, "_gh_json", return_value={"statusCheckRollup": "not-a-list"}):
+            self.assertFalse(module._pr_has_product_failure_tombstone("JovieInc/Jovie", 16420))
+        with mock.patch.object(module, "_gh_json", return_value=None):
+            self.assertFalse(module._pr_has_product_failure_tombstone("JovieInc/Jovie", 16420))
 
     def test_github_remount_identifiers_find_dirty_heads_without_linear(self):
         module = self.load_controller_module()

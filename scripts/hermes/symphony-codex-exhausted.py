@@ -1220,16 +1220,26 @@ def _admitted_or_remount_identifiers() -> list[str] | None:
 
 _REMOUNT_IGNORE_FAILURES = frozenset({"enroll", "PR Ready"})
 
+# drain-pr-queue.sh record_product_failure_receipt tombstones a head whose
+# merge-group-only product checks (iOS build, full unit shards) failed. The
+# tombstone is a SUCCESS commit status (JOV-INV-011), so the source PR stays
+# CLEAN while the enrollment guard refuses re-admission — without an explicit
+# check the sidecar skipped such heads forever (live #16420, 2026-09-03).
+PRODUCT_FAILURE_TOMBSTONE_CONTEXT = "jovie-queue-product-failure/v1"
 
-def _pr_has_failing_check(repo: str, number: int) -> bool:
+
+def _pr_status_check_rollup(repo: str, number: int) -> list | None:
     payload = _gh_json(
         ["gh", "pr", "view", str(number), "--repo", repo, "--json", "statusCheckRollup"]
     )
     if not isinstance(payload, dict):
-        return False
-    checks = payload.get("statusCheckRollup") or []
-    if not isinstance(checks, list):
-        return False
+        return None
+    checks = payload.get("statusCheckRollup")
+    return checks if isinstance(checks, list) else None
+
+
+def _pr_has_failing_check(repo: str, number: int) -> bool:
+    checks = _pr_status_check_rollup(repo, number) or []
     pending = False
     failing = False
     for check in checks:
@@ -1249,6 +1259,19 @@ def _pr_has_failing_check(repo: str, number: int) -> bool:
     return failing and not pending
 
 
+def _pr_has_product_failure_tombstone(repo: str, number: int) -> bool:
+    """True when the head carries the queue controller's product-failure tombstone."""
+    for check in _pr_status_check_rollup(repo, number) or []:
+        if not isinstance(check, dict):
+            continue
+        # Check runs carry name/text; commit statuses carry context/description.
+        name = check.get("name") or check.get("context")
+        description = check.get("description") or check.get("text") or ""
+        if name == PRODUCT_FAILURE_TOMBSTONE_CONTEXT and str(description).startswith("blocked:"):
+            return True
+    return False
+
+
 def _open_pr_verdict(identifier: str, index: dict[str, dict]) -> tuple[str, dict | None]:
     """Return (none|skip|remount, pr). skip = inflight green/pending open PR."""
     pr = index.get(identifier)
@@ -1263,6 +1286,12 @@ def _open_pr_verdict(identifier: str, index: dict[str, dict]) -> tuple[str, dict
     # CLEAN heads are already merge-queue eligible. Remounting them fights
     # github-merge-queue and can knock a green autonomous PR out of the queue.
     if status == "CLEAN" and mergeable != "CONFLICTING":
+        # Exception: a merge-group-only product failure leaves the head
+        # source-CLEAN, but drain-pr-queue.sh tombstones it and the enrollment
+        # guard refuses re-admission, so skip would park the PR forever (live
+        # #16420). The tombstone needs real remediation, not re-enrollment.
+        if _pr_has_product_failure_tombstone(repo, number):
+            return "remount", pr
         return "skip", pr
     # DIRTY/BEHIND after a sibling merge is not product-CI-red, but the head
     # cannot enroll until it merges main. Live #16211 was skipped as inflight
