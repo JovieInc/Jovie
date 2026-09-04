@@ -37,7 +37,7 @@ const EXPECTED_MERGE_GATE_NAMES = [
   'Migration Guard',
   'Unit Tests',
   'Build + Layout (combined)',
-  'iOS Build + Test (combined)',
+  'iOS Fast Unit + Coverage (combined)',
   'Mac Build + Test (combined)',
   'Cross-Product Integration (combined)',
   'Promptfoo Evals (deterministic)',
@@ -201,6 +201,12 @@ describe('ci-harness manifest', () => {
         `expected forbidden pin for merge-gate job "${name}"`
       ).toBe(true);
     }
+    expect(FORBIDDEN_PINNED_JOB_CONTEXTS).toEqual(
+      expect.arrayContaining([
+        'CI / iOS Build + Test (combined)',
+        'iOS Build + Test (combined)',
+      ])
+    );
   });
 
   it('keeps required source PR Ready deterministic and runner-light', () => {

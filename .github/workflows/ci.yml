@@ -2093,11 +2093,11 @@ jobs:
           allow-images: 'true'
           retention-days: 7
 
-  # Full Xcode work belongs on the synthetic combined head, never the source
-  # PR. The same reusable lane is the fail-closed fallback for direct/admin
-  # main commits that touch iOS.
+  # The coverage-bearing iOS unit gate belongs on the synthetic combined head,
+  # never the source PR. Full simulator UI/screenshot regression is preserved
+  # as a release-blocking TestFlight predecessor instead of delaying merges.
   ci-ios:
-    name: iOS Build + Test (combined)
+    name: iOS Fast Unit + Coverage (combined)
     needs: [ci-path-changes, ci-merge-group-admission]
     if: >-
       always() &&
@@ -5255,7 +5255,7 @@ jobs:
             echo "| ci-fast | $FAST_RESULT |"
             echo "| Unit Tests | $UNIT_RESULT |"
             echo "| Build + Layout (same hosted workspace) | $BUILD_LAYOUT_RESULT |"
-            echo "| iOS Build + Test | $IOS_RESULT |"
+            echo "| iOS Fast Unit + Coverage | $IOS_RESULT |"
             echo "| Mac Build + Test | $MACOS_RESULT |"
             echo "| Cross-Product Integration | $CROSS_PRODUCT_RESULT |"
             echo "| Product Lane Receipt | $LANE_RECEIPT_RESULT |"
@@ -5305,7 +5305,7 @@ jobs:
           for selected_gate in \
             "Web Unit Tests:$RUN_WEB:$UNIT_RESULT" \
             "Web Build + Layout:$RUN_WEB:$BUILD_LAYOUT_RESULT" \
-            "iOS Build + Test:$RUN_IOS:$IOS_RESULT" \
+            "iOS Fast Unit + Coverage:$RUN_IOS:$IOS_RESULT" \
             "Mac Build + Test:$RUN_MACOS:$MACOS_RESULT" \
             "Cross-Product Integration:$RUN_CROSS_PRODUCT:$CROSS_PRODUCT_RESULT"; do
             name="${selected_gate%%:*}"
@@ -6018,7 +6018,7 @@ jobs:
               "Migration Guard:$MIGRATION_RESULT" \
               "Unit Tests:$UNIT_RESULT" \
               "Build + Layout:$BUILD_LAYOUT_RESULT" \
-              "iOS Build + Test:$IOS_RESULT" \
+              "iOS Fast Unit + Coverage:$IOS_RESULT" \
               "Mac Build + Test:$MACOS_RESULT" \
               "Cross-Product Integration:$CROSS_PRODUCT_RESULT" \
               "Product Lane Receipt:$LANE_RECEIPT_RESULT" \
@@ -6058,7 +6058,7 @@ jobs:
           for selected_gate in \
             "Web Unit Tests:$RUN_WEB:$UNIT_RESULT" \
             "Web Build + Layout:$RUN_WEB:$BUILD_LAYOUT_RESULT" \
-            "iOS Build + Test:$RUN_IOS:$IOS_RESULT" \
+            "iOS Fast Unit + Coverage:$RUN_IOS:$IOS_RESULT" \
             "Mac Build + Test:$RUN_MACOS:$MACOS_RESULT" \
             "Cross-Product Integration:$RUN_CROSS_PRODUCT:$CROSS_PRODUCT_RESULT"; do
             name="${selected_gate%%:*}"

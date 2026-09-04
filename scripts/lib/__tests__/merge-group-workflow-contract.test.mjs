@@ -28,6 +28,21 @@ const IOS_CI_WORKFLOW = readFileSync(
   resolve(REPO_ROOT, '.github/workflows/ios-ci.yml'),
   'utf8'
 );
+const IOS_TESTFLIGHT_WORKFLOW = readFileSync(
+  resolve(REPO_ROOT, '.github/workflows/ios-testflight.yml'),
+  'utf8'
+);
+const IOS_UNIT_TEST_RUNNER = readFileSync(
+  resolve(REPO_ROOT, 'apps/ios/scripts/run-unit-tests.sh'),
+  'utf8'
+);
+const IOS_UNIT_TEST_SCHEME = readFileSync(
+  resolve(
+    REPO_ROOT,
+    'apps/ios/Jovie.xcodeproj/xcshareddata/xcschemes/JovieUnitTests.xcscheme'
+  ),
+  'utf8'
+);
 const PRODUCTION_RELEASE_WORKFLOW = readFileSync(
   resolve(REPO_ROOT, '.github/workflows/production-release.yml'),
   'utf8'
@@ -989,6 +1004,47 @@ ${selectedGateScript}`,
     expect(iosCaller).toContain(
       "concurrency-key: ${{ github.event_name == 'merge_group' && needs.ci-merge-group-admission.outputs.pr_number != '' && format('pr-{0}', needs.ci-merge-group-admission.outputs.pr_number) || '' }}"
     );
+  });
+
+  it('keeps merge-group iOS fast while TestFlight requires the full regression', () => {
+    const iosHeader = IOS_CI_WORKFLOW.slice(
+      0,
+      IOS_CI_WORKFLOW.indexOf('\njobs:')
+    );
+    const iosGate = getJobBlock(IOS_CI_WORKFLOW, 'test');
+    const releaseRegression = getJobBlock(
+      IOS_TESTFLIGHT_WORKFLOW,
+      'full-regression'
+    );
+    const beta = getJobBlock(IOS_TESTFLIGHT_WORKFLOW, 'beta');
+
+    expect(iosHeader).toContain('full-regression:');
+    expect(iosHeader).toContain('default: false');
+    expect(iosGate).toContain('Run fast unit and coverage gate');
+    expect(iosGate).toContain('bash apps/ios/scripts/run-unit-tests.sh');
+    expect(iosGate).toContain('bash apps/ios/scripts/check_coverage.sh');
+    expect(iosGate).toContain('JOVIE_IOS_RESET_SIMULATOR: "0"');
+    expect(iosGate).toContain('if: ${{ !inputs.full-regression }}');
+    expect(iosGate).toContain('Run full simulator regression');
+    expect(iosGate).toContain('if: ${{ inputs.full-regression }}');
+    expect(iosGate).toContain('Capture simulator screenshots');
+    expect(IOS_UNIT_TEST_RUNNER).toContain(
+      'JOVIE_IOS_RESULT_BUNDLE_PATH="$RESULT_BUNDLE"'
+    );
+    expect(IOS_UNIT_TEST_RUNNER).toContain('JOVIE_IOS_SCHEME="JovieUnitTests"');
+    expect(IOS_UNIT_TEST_RUNNER).not.toContain(
+      '-resultBundlePath "$RESULT_BUNDLE"'
+    );
+    expect(IOS_UNIT_TEST_SCHEME).toMatch(/BlueprintName\s*=\s*"JovieTests"/);
+    expect(IOS_UNIT_TEST_SCHEME).not.toContain('JovieUITests');
+
+    expect(releaseRegression).toContain('uses: ./.github/workflows/ios-ci.yml');
+    expect(releaseRegression).toContain('full-regression: true');
+    expect(releaseRegression).toContain(
+      'checkout-ref: ${{ needs.authorize-release.outputs.release_sha }}'
+    );
+    expect(beta).toContain('needs: [authorize-release, full-regression]');
+    expect(beta).toContain("needs.full-regression.result == 'success'");
   });
 
   it('fails closed unless every changed component renders in live Storybook on the exact merge-group diff', () => {

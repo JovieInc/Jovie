@@ -93,7 +93,7 @@
       },
       "pr": {
         "web": "merge-group Unit Tests (ci-unit-tests shards)",
-        "ios": "merge-group ci-ios → ios-ci.yml unit/UI tests"
+        "ios": "merge-group ci-ios → ios-ci.yml unit tests + coverage; TestFlight requires the full UI/screenshot regression"
       }
     },
     {
@@ -144,7 +144,7 @@
       "preCommitHook": ".husky/pre-commit (shared secret + conflict rungs)",
       "prePushHook": "pnpm run ios:lint via scripts/hooks when Swift files staged",
       "prWorkflow": ".github/workflows/ci.yml",
-      "notes": "Source PRs run the portable iOS Fast Contract. Exact merge-group and direct-main fallback heads call .github/workflows/ios-ci.yml for hosted Xcode build/test evidence."
+      "notes": "Source PRs run the portable iOS Fast Contract. Exact merge-group and direct-main fallback heads call .github/workflows/ios-ci.yml for hosted unit + coverage evidence; TestFlight calls the same workflow in full-regression mode before upload."
     }
   }
 }

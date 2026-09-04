@@ -35,7 +35,7 @@ Branch protection pins aggregate contexts only—never individual CI jobs.
 
 | Context | Source PR | Native `merge_group` |
 | --- | --- | --- |
-| `PR Ready` | Path selection, risk classification, `ci-fast` (including the portable iOS contract), diff secret scan, Golden Path Lock | Path selection, risk classification, `ci-fast`, five affected unit shards, one hosted build + layout workspace, path-selected hosted Xcode build/test, diff secret scan, Golden Path Lock |
+| `PR Ready` | Path selection, risk classification, `ci-fast` (including the portable iOS contract), diff secret scan, Golden Path Lock | Path selection, risk classification, `ci-fast`, five affected unit shards, one hosted build + layout workspace, path-selected iOS unit + coverage, diff secret scan, Golden Path Lock |
 | `Migration Guard` | Path-gated migration policy | Re-emitted and evaluated on the combined head |
 | `Fork PR Gate` | Human approval policy for external forks | Revalidates every exact group member before emitting the combined-head context |
 | `PR Size Guard` | Source-diff size policy | Revalidates every exact group member before emitting the combined-head context |
@@ -46,6 +46,8 @@ never start from the source-PR event and are not required source `PR Ready`
 leaves. No PR label fans out CI. Full security and CodeQL scans remain
 post-merge/nightly;
 the fast diff secret scan gates source and combined heads.
+The full iOS simulator UI and screenshot regression runs only for an authorized
+iOS TestFlight generation and must pass before upload.
 
 ## Canonical native configuration
 

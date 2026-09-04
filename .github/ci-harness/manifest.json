@@ -140,12 +140,12 @@
     },
     {
       "id": "ci-ios",
-      "name": "iOS Build + Test (combined)",
+      "name": "iOS Fast Unit + Coverage (combined)",
       "tier": "combined-integration",
       "mergeGate": true,
       "gateStage": "merge-group",
-      "nextLocalCommand": "pnpm run ios:lint && pnpm run ios:test",
-      "remediation": "Repair the path-selected Xcode build or test regression on the exact combined head; source PRs run only the portable iOS fast contract."
+      "nextLocalCommand": "pnpm run ios:lint && bash apps/ios/scripts/run-unit-tests.sh && bash apps/ios/scripts/check_coverage.sh",
+      "remediation": "Repair the path-selected iOS unit or coverage regression on the exact combined head; the full simulator UI/screenshot regression remains required before TestFlight upload."
     },
     {
       "id": "ci-macos",

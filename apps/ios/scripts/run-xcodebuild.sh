@@ -12,7 +12,7 @@ CODE_SIGNING_ALLOWED_VALUE="${CODE_SIGNING_ALLOWED:-NO}"
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 IOS_DIR="$(cd "$SCRIPT_DIR/.." && pwd)"
 PROJECT_PATH="$IOS_DIR/Jovie.xcodeproj"
-SCHEME="Jovie"
+SCHEME="${JOVIE_IOS_SCHEME:-Jovie}"
 
 ios_now() {
   date -u +%Y-%m-%dT%H:%M:%SZ

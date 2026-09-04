@@ -607,6 +607,7 @@ describe('deploy workflow Vercel env resolution', () => {
     const workflowHeader = testflight.slice(0, testflight.indexOf('\njobs:'));
     const authorization = getJobBlock(testflight, 'authorize-release');
     const beta = getJobBlock(testflight, 'beta');
+    const fullRegression = getJobBlock(testflight, 'full-regression');
     const uploadMarker = getJobBlock(testflight, 'record-upload');
 
     expect(trigger).toContain('workflow_dispatch:');
@@ -719,7 +720,13 @@ describe('deploy workflow Vercel env resolution', () => {
       "'.github/workflows/ios-testflight.yml'"
     );
 
-    expect(beta).toContain('needs: [authorize-release]');
+    expect(fullRegression).toContain('uses: ./.github/workflows/ios-ci.yml');
+    expect(fullRegression).toContain('full-regression: true');
+    expect(fullRegression).toContain(
+      'checkout-ref: ${{ needs.authorize-release.outputs.release_sha }}'
+    );
+    expect(beta).toContain('needs: [authorize-release, full-regression]');
+    expect(beta).toContain("needs.full-regression.result == 'success'");
     expect(beta).toContain(
       "needs.authorize-release.outputs.should_release == 'true'"
     );
