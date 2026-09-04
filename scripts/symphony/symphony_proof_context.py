@@ -43,7 +43,7 @@ PROC_ROOT = Path("/proc")
 
 
 def service_identity() -> tuple[int, str]:
-    result = subprocess.run(["systemctl", "show", contract.OFFICIAL_RUNTIME_SERVICE,
+    result = subprocess.run(["systemctl", "--user", "show", contract.OFFICIAL_RUNTIME_SERVICE,
         "--property=MainPID,ControlGroup,ActiveState"], capture_output=True, text=True, check=True, timeout=5)
     fields = dict(line.split("=", 1) for line in result.stdout.splitlines() if "=" in line)
     if fields.get("ActiveState") != "active" or int(fields.get("MainPID", 0)) <= 0:

@@ -1619,7 +1619,8 @@ def _reconcile_item(
     next_retry = _parse_time(decision.get("due_at")) if retry_scheduled or deferred else None
     previous_retry = _parse_time(previous.get("nextRetryAt")) if previous else None
     repeated = (
-        alternate_permitted
+        decision.get("handoff") is not False
+        and alternate_permitted
         and not returned_previous_local_repair
         and (retry_scheduled or retry_exhausted)
         and _is_repeated_or_conflict(item, source, state_before)

@@ -155,11 +155,12 @@ class ProofBoundaryTests(unittest.TestCase):
 class LiveBindingTests(unittest.TestCase):
     def test_systemd_identity_requires_active_service(self):
         for output, valid in (("MainPID=123\nControlGroup=/system.slice/symphony-elixir.service\nActiveState=active", True), ("MainPID=0\nActiveState=active", False), ("MainPID=123\nActiveState=inactive", False)):
-            with mock.patch.object(T.subprocess, "run", return_value=subprocess.CompletedProcess([], 0, output, "")):
+            with mock.patch.object(T.subprocess, "run", return_value=subprocess.CompletedProcess([], 0, output, "")) as run:
                 if valid:
                     self.assertEqual(T.service_identity()[0], 123)
                 else:
                     with self.assertRaises(ValueError): T.service_identity()
+                run.assert_called_once_with(["systemctl", "--user", "show", C.OFFICIAL_RUNTIME_SERVICE, "--property=MainPID,ControlGroup,ActiveState"], capture_output=True, text=True, check=True, timeout=5)
 
     def test_live_runtime_requires_pid_cgroup_command_listener_and_stable_generation(self):
         with tempfile.TemporaryDirectory() as directory:
@@ -337,17 +338,20 @@ class RetryTests(unittest.TestCase):
         eligible = (datetime.now(timezone.utc) + timedelta(hours=1)).isoformat()
         item = {"issue_identifier": "JOV-9999", "attempt": 8, "error": {"schema": "symphony-launcher-failure/v1", "class": "provider-cooldown", "retryable": False, "nextEligibleAt": eligible}}
         saved = []
-        with mock.patch.object(self.module, "_workspace_state", return_value={"valid": False}), mock.patch.object(self.module, "_read_receipt", side_effect=lambda _: saved[-1] if saved else None), mock.patch.object(self.module, "_write_receipt", side_effect=lambda _, receipt: saved.append(receipt)), mock.patch.object(self.module, "_event"):
+        with mock.patch.object(self.module, "_workspace_state", return_value={"valid": True}), mock.patch.object(self.module, "_read_receipt", side_effect=lambda _: saved[-1] if saved else None), mock.patch.object(self.module, "_write_receipt", side_effect=lambda _, receipt: saved.append(receipt)), mock.patch.object(self.module, "_event"), mock.patch.object(self.module, "_alternate_repair", side_effect=AssertionError("alternate repair forbidden")) as repair:
             for _ in range(8):
-                self.module._reconcile_item(item, "retrying", False, runtime={"runtimeRevision": "fixture"})
+                self.module._reconcile_item(item, "retrying", True, runtime={"runtimeRevision": "fixture"})
         self.assertEqual(len(saved), 1)
         self.assertEqual(saved[0]["controllerState"], "deferred")
         self.assertEqual(saved[0]["attempt"], 1)
         self.assertEqual(saved[0]["nextRetryAt"], self.module._iso(self.module._parse_time(eligible)))
         self.assertEqual(saved[0]["nextAutomatedAction"], "await_provider_next_eligible")
         self.assertFalse(saved[0]["retryPolicy"]["retryable"])
-        with mock.patch.object(self.module, "_now", return_value=self.module._parse_time(eligible)), mock.patch.object(self.module, "_workspace_state", return_value={"valid": False}), mock.patch.object(self.module, "_read_receipt", side_effect=lambda _: saved[-1]), mock.patch.object(self.module, "_write_receipt", side_effect=lambda _, receipt: saved.append(receipt)), mock.patch.object(self.module, "_event"):
-            self.module._reconcile_item(item, "retrying", False, runtime={"runtimeRevision": "fixture"})
+        with mock.patch.object(self.module, "_now", return_value=self.module._parse_time(eligible)), mock.patch.object(self.module, "_workspace_state", return_value={"valid": True}), mock.patch.object(self.module, "_read_receipt", side_effect=lambda _: saved[-1]), mock.patch.object(self.module, "_write_receipt", side_effect=lambda _, receipt: saved.append(receipt)), mock.patch.object(self.module, "_event"), mock.patch.object(self.module, "_alternate_repair", side_effect=AssertionError("alternate repair forbidden")) as repair:
+            self.module._reconcile_item(item, "retrying", True, runtime={"runtimeRevision": "fixture"})
+        repair.assert_not_called()
+        self.assertEqual(saved[-1]["generation"], saved[0]["generation"])
+        self.assertEqual(saved[-1]["nextAutomatedAction"], "normal_model_retry")
         self.assertEqual(len(saved), 2)
         self.assertEqual(saved[-1]["controllerState"], "retrying")
         self.assertEqual(saved[-1]["nextRetryAt"], self.module._iso(self.module._parse_time(eligible)))
