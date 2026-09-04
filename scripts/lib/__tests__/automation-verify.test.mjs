@@ -1875,7 +1875,7 @@ describe('automation-verify affected scope', () => {
           'vitest.config.mts',
           'run',
           'lib/__tests__/automation-verify.test.mjs',
-          'hermes/lib/__tests__/ci-failure-diagnosis.test.ts',
+          'symphony/lib/__tests__/ci-failure-diagnosis.test.ts',
           '--maxWorkers',
           '2',
         ],
