@@ -1440,6 +1440,34 @@ def evaluate(signals: dict[str, Any], observed_at: str) -> dict[str, Any]:
         # New-issue intake stays closed (closure red); only promotion of
         # already-green work resumes.
         promotion_mode = "hold-intake"
+    elif (
+        state == "AMBER"
+        and main.get("status") == "green"
+        and production.get("status") == "green"
+        and integrity.get("status") in {"clear", "resolved"}
+        and {reason["code"] for reason in reasons}
+        <= {"controller-failure", "production-deployment-unbound"}
+        and (
+            closure_health.get("status") != "red"
+            or set(closure_health.get("reasons") or [])
+            <= {"native-queue-empty-with-eligible-over-15m"}
+        )
+    ):
+        # A parked controller is a capacity condition, not a crash: the
+        # Symphony elixir burrito parks while every Codex seat is in
+        # usage-limit cooldown, and the :4041 probe can only report
+        # "failed" (connection refused), indistinguishable from a crash.
+        # Merging already-green PRs needs zero Codex capacity, so with
+        # main + production green, integrity clear, a fresh exact-head
+        # review (a stale review adds its own reason and fails the subset
+        # guard), and no reason outside the controller/unbound pair,
+        # promotion resumes in hold-intake. Live 2026-09-04 01:20Z:
+        # state=AMBER, promotionMode=blocked, reasons=[controller-failure,
+        # production-deployment-unbound] with main/production/integrity
+        # green — autoenroll admitted nothing and the queue stalled. Any
+        # additional reason, an unknown controller, or non-feed closure
+        # debt still blocks.
+        promotion_mode = "hold-intake"
     else:
         promotion_mode = "blocked"
     if state == "RED":

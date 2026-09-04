@@ -1001,6 +1001,89 @@ class DeploymentBindingTests(unittest.TestCase):
         receipt = self.evaluate(signals)
         self.assertEqual(receipt["promotionMode"], "blocked")
 
+    def test_capacity_parked_controller_feeds_hold_intake(self):
+        """Live 2026-09-04 01:20Z receipt: main green, production green but
+        unbound, integrity clear, queue known, controller failed — the
+        Symphony burrito parked on Codex usage-limit cooldown. Promotion of
+        already-green PRs needs zero Codex capacity, so AMBER degrades to
+        hold-intake instead of stalling the merge queue in blocked."""
+        signals = dict(GREEN_SIGNALS)
+        signals["production"] = {"status": "green", "deployedSha": "b" * 40}
+        signals["controller"] = {
+            "status": "failed",
+            "error": "controller-observation-failed: Connection refused",
+        }
+        receipt = self.evaluate(signals)
+        self.assertEqual(receipt["state"], "AMBER")
+        self.assertEqual(receipt["promotionMode"], "hold-intake")
+        self.assertEqual(
+            {reason["code"] for reason in receipt["reasons"]},
+            {"controller-failure", "production-deployment-unbound"},
+        )
+        # Deployment authority still requires a live green controller.
+        self.assertFalse(receipt["deploymentAdmission"]["allowed"])
+
+    def test_capacity_parked_controller_with_bound_production_feeds_hold_intake(self):
+        signals = dict(GREEN_SIGNALS)
+        signals["controller"] = {
+            "status": "failed",
+            "error": "controller-observation-failed: Connection refused",
+        }
+        receipt = self.evaluate(signals)
+        self.assertEqual(receipt["state"], "AMBER")
+        self.assertEqual(receipt["promotionMode"], "hold-intake")
+        self.assertEqual(
+            {reason["code"] for reason in receipt["reasons"]},
+            {"controller-failure"},
+        )
+
+    def test_capacity_parked_controller_with_extra_reason_stays_blocked(self):
+        # production red adds production-not-green, outside the allowed pair.
+        signals = dict(GREEN_SIGNALS)
+        signals["production"] = {"status": "red"}
+        signals["controller"] = {"status": "failed"}
+        receipt = self.evaluate(signals)
+        self.assertEqual(receipt["promotionMode"], "blocked")
+
+    def test_capacity_parked_controller_with_red_main_stays_off_hold_intake(self):
+        signals = dict(GREEN_SIGNALS)
+        signals["main"] = {"status": "red", "sha": MAIN_SHA}
+        signals["controller"] = {"status": "failed"}
+        receipt = self.evaluate(signals)
+        self.assertEqual(receipt["promotionMode"], "draft-only")
+
+    def test_capacity_parked_controller_with_closure_debt_stays_blocked(self):
+        signals = dict(GREEN_SIGNALS)
+        signals["controller"] = {"status": "failed"}
+        signals["closureHealth"] = {
+            "schema": "jovie-closure-health/v1",
+            "status": "red",
+            "authority": "Summer",
+            "newIssueIntakeAllowed": False,
+            "promotionContinues": True,
+            "remediationContinues": True,
+            "reasons": ["duplicate-issue-lanes-unresolved"],
+        }
+        receipt = self.evaluate(signals)
+        self.assertEqual(receipt["promotionMode"], "blocked")
+
+    def test_unknown_controller_stays_blocked(self):
+        # controller-unknown is not in the capacity-park reason pair: an
+        # unclassified controller observation still freezes promotion.
+        signals = dict(GREEN_SIGNALS)
+        signals["controller"] = {"status": "unknown"}
+        receipt = self.evaluate(signals)
+        self.assertEqual(receipt["promotionMode"], "blocked")
+
+    def test_capacity_parked_controller_with_stale_review_stays_blocked(self):
+        # A non-accepted exact-head review adds its own reason, which fails
+        # the {controller-failure, production-deployment-unbound} subset.
+        signals = dict(GREEN_SIGNALS)
+        signals["controller"] = {"status": "failed"}
+        signals["independentReview"] = None
+        receipt = self.evaluate(signals)
+        self.assertEqual(receipt["promotionMode"], "blocked")
+
     def test_stale_or_missing_capacity_blocks_new_and_remote_mutation(self):
         for evidence in (
             {**GREEN_SIGNALS["concurrencyEvidence"], "accepted": False},
@@ -1271,7 +1354,11 @@ class DeploymentBindingTests(unittest.TestCase):
         receipt = MODULE.evaluate(signals, MODULE.isoformat(now))
         self.assertEqual(receipt["promotionMode"], "hold-intake")
 
-    def test_failed_controller_observation_blocks_hold_intake(self):
+    def test_failed_controller_observation_with_only_capacity_reasons_feeds_hold_intake(self):
+        # A failed :4041 probe with main/production green and no reason
+        # outside {controller-failure, production-deployment-unbound} is the
+        # Codex-capacity park shape (live 2026-09-04 01:20Z): promotion
+        # resumes in hold-intake instead of stalling the queue in blocked.
         now = MODULE.datetime(2026, 8, 19, 22, 40, tzinfo=MODULE.UTC)
         signals = dict(GREEN_SIGNALS)
         signals["production"] = {"status": "green", "deployedSha": "b" * 40}
@@ -1284,7 +1371,7 @@ class DeploymentBindingTests(unittest.TestCase):
             "error": "controller-observation-failed: Connection refused",
         }
         receipt = MODULE.evaluate(signals, MODULE.isoformat(now))
-        self.assertEqual(receipt["promotionMode"], "blocked")
+        self.assertEqual(receipt["promotionMode"], "hold-intake")
 
     def test_queue_observation_does_not_reuse_stale_or_auth_last_known(self):
         timeout = subprocess.CalledProcessError(
