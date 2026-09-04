@@ -66,14 +66,23 @@ describe('test coverage audit workflow', () => {
     expect(generateIndex).toBeGreaterThan(checkIndex);
   });
 
-  it('does not put coverage collection on the merge-queue unit path', () => {
+  it('keeps standard unit shards coverage-off while the exact-head lane collects', () => {
     const ciWorkflow = readFileSync(
       resolve(repoRoot, '.github/workflows/ci.yml'),
       'utf8'
     );
+    const unitJob = ciWorkflow.slice(
+      ciWorkflow.indexOf('  ci-unit-tests:'),
+      ciWorkflow.indexOf('  ci-exact-head-coverage:')
+    );
+    const coverageJob = ciWorkflow.slice(
+      ciWorkflow.indexOf('  ci-exact-head-coverage:'),
+      ciWorkflow.indexOf('  ci-a11y:')
+    );
 
-    expect(ciWorkflow).not.toContain('test:coverage:diff');
-    expect(ciWorkflow).not.toContain('test:coverage');
+    expect(unitJob).not.toContain('test:coverage');
+    expect(coverageJob).toContain('pnpm --filter @jovie/web test:coverage');
+    expect(coverageJob).not.toContain('test:coverage:diff');
   });
 
   it('alerts Slack on failure and does not file GitHub issues', () => {

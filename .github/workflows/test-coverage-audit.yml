@@ -62,7 +62,8 @@ jobs:
       - name: Check RED-surface coverage drift
         # Compare the just-collected coverage against the committed snapshot
         # before rewriting it. Exits 1 on RED-surface drops ≥3pp.
-        # Merge-queue unit shards stay coverage-off by PR_FLOW doctrine.
+        # Standard merge-queue unit shards stay coverage-off; the separate
+        # Exact-head Coverage gate owns promotion evidence on PR/queue heads.
         run: pnpm run test:coverage:diff
 
       - name: Generate heatmap

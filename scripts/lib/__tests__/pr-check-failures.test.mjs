@@ -200,6 +200,7 @@ describe('pr-check-failures', () => {
       'Secret Scan (gitleaks + trufflehog)',
       'Golden Path Lock',
       'Migration Guard',
+      'Exact-head Coverage',
     ]);
     expect(ADVISORY_CHECK_NAMES).toContain('Preview Deploy');
     expect(ADVISORY_CHECK_NAMES).toContain(
