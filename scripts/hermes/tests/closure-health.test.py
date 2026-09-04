@@ -957,34 +957,95 @@ class ClosureHealthEvaluationTests(unittest.TestCase):
         self.assertIn("no-merge-progress-over-1h", result["reasons"])
         self.assertFalse(result["newIssueIntakeAllowed"])
 
-    def test_unmergeable_native_queue_entry_is_immediate_red(self):
-        classifications = MODULE.classify_open_prs(
-            [
-                pr(
-                    7,
-                    title="fix: repair JOV-707",
-                    queued=True,
-                    queue_state="UNMERGEABLE",
-                )
-            ],
-            NOW,
+    def test_unmergeable_native_queue_episode_crosses_bounded_red_threshold(self):
+        churning = snapshot(
+            openPrs=1,
+            eligiblePrs=1,
+            greenReadyPrs=1,
+            classifications=MODULE.classify_open_prs(
+                [
+                    pr(
+                        7,
+                        title="fix: repair JOV-707",
+                        queued=True,
+                        queue_state="UNMERGEABLE",
+                    )
+                ],
+                NOW,
+            ),
         )
 
+        first = MODULE.evaluate_closure_health(churning, previous=None, now=NOW)
+        self.assertEqual(first["status"], "grace")
+        self.assertNotIn("native-queue-unmergeable", first["reasons"])
+        self.assertEqual(first["unmergeableNativeQueuePrs"], [7])
+        self.assertEqual(
+            first["episodes"]["unmergeableQueue"]["since"],
+            MODULE.isoformat(NOW),
+        )
+        self.assertFalse(first["newIssueIntakeAllowed"])
+
         result = MODULE.evaluate_closure_health(
-            snapshot(
-                openPrs=1,
-                eligiblePrs=1,
-                greenReadyPrs=1,
-                classifications=classifications,
-            ),
-            previous=None,
-            now=NOW,
+            churning,
+            previous=first,
+            now=NOW + timedelta(minutes=16),
         )
 
         self.assertEqual(result["status"], "red")
         self.assertIn("native-queue-unmergeable", result["reasons"])
         self.assertEqual(result["unmergeableNativeQueuePrs"], [7])
+        self.assertEqual(
+            result["episodes"]["unmergeableQueue"]["since"],
+            MODULE.isoformat(NOW),
+        )
         self.assertFalse(result["newIssueIntakeAllowed"])
+
+    def test_unmergeable_native_queue_episode_clears_when_mergeable(self):
+        churning = snapshot(
+            openPrs=1,
+            eligiblePrs=1,
+            greenReadyPrs=1,
+            classifications=MODULE.classify_open_prs(
+                [
+                    pr(
+                        7,
+                        title="fix: repair JOV-707",
+                        queued=True,
+                        queue_state="UNMERGEABLE",
+                    )
+                ],
+                NOW,
+            ),
+        )
+        first = MODULE.evaluate_closure_health(churning, previous=None, now=NOW)
+        self.assertIn("unmergeableQueue", first["episodes"])
+
+        cleared = MODULE.evaluate_closure_health(
+            snapshot(
+                openPrs=1,
+                eligiblePrs=1,
+                greenReadyPrs=1,
+                classifications=MODULE.classify_open_prs(
+                    [
+                        pr(
+                            7,
+                            title="fix: repair JOV-707",
+                            queued=True,
+                            queue_state="AWAITING_CHECKS",
+                        )
+                    ],
+                    NOW,
+                ),
+            ),
+            previous=first,
+            now=NOW + timedelta(minutes=5),
+        )
+
+        self.assertEqual(cleared["status"], "healthy")
+        self.assertNotIn("unmergeableQueue", cleared["episodes"])
+        self.assertNotIn("native-queue-unmergeable", cleared["reasons"])
+        self.assertEqual(cleared["unmergeableNativeQueuePrs"], [])
+        self.assertTrue(cleared["newIssueIntakeAllowed"])
 
     def test_unclassified_pr_crosses_fifteen_minute_deliberate_red(self):
         unclassified = snapshot(
