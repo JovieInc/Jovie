@@ -67,9 +67,10 @@ jobs:
           sparse-checkout: |
             scripts/lib/merge-group-member-policy.mjs
             scripts/lib/pr-size-guard-policy.mjs
+            scripts/lib/repo-hygiene-limits.mjs
           sparse-checkout-cone-mode: false
 
-      - name: Revalidate every merge-group member's size policy
+      - name: Enforce combined-tree payload and member size policy
         env:
           # The synthetic head controls this workflow definition. Never expose
           # an App private key here; the read-only ephemeral token is enough.

@@ -1,6 +1,8 @@
+import { execFileSync } from 'node:child_process';
 import { readFile } from 'node:fs/promises';
 import { pathToFileURL } from 'node:url';
 import { evaluatePrSizePolicy } from './pr-size-guard-policy.mjs';
+import { HYGIENE_LIMITS } from './repo-hygiene-limits.mjs';
 
 const SHA_PATTERN = /^[0-9a-f]{40}$/;
 const GENERATED_PR_TRAILER_PATTERN = /\(#(\d+)\)$/;
@@ -15,6 +17,8 @@ const OPINIONATED_REVIEW_STATES = new Set([
 ]);
 const SIZE_EXCLUSION_PATTERN =
   /pnpm-lock\.yaml|package-lock\.json|yarn\.lock|\.lock$|\/generated\/|\.gen\.|__snapshots__\/|\.snap$|\.svg$|\.po$|\/dist\/|\/build\/|\.min\.|drizzle\/migrations\/meta\//;
+const REGULAR_FILE_MODES = new Set(['100644', '100755']);
+const MAX_GIT_OUTPUT_BYTES = 64 * 1024 * 1024;
 
 export class MergeGroupPolicyEvidenceError extends Error {
   constructor(message) {
@@ -300,6 +304,82 @@ export function evaluateSizeMemberPolicy({ pr, files, maxLines, maxFiles }) {
   });
 }
 
+export function parseTrackedRegularTree(lsTree) {
+  if (typeof lsTree !== 'string' || !lsTree.endsWith('\0')) {
+    fail('combined tree listing is missing or truncated');
+  }
+
+  const seenPaths = new Set();
+  let bytes = 0;
+  let files = 0;
+  for (const entry of lsTree.slice(0, -1).split('\0')) {
+    const match = entry.match(
+      /^([0-7]{6}) (blob|commit) ([0-9a-f]{40}) +(-|\d+)\t([^\0]+)$/s
+    );
+    if (!match) fail('combined tree listing contains malformed evidence');
+
+    const [, mode, type, , sizeText, path] = match;
+    if (seenPaths.has(path))
+      fail(`combined tree repeats tracked path: ${path}`);
+    seenPaths.add(path);
+
+    if (REGULAR_FILE_MODES.has(mode)) {
+      if (type !== 'blob' || !/^\d+$/.test(sizeText)) {
+        fail(`combined tree has invalid regular-file evidence: ${path}`);
+      }
+      const size = Number(sizeText);
+      if (!Number.isSafeInteger(size)) {
+        fail(`combined tree file size is unsafe: ${path}`);
+      }
+      bytes += size;
+      if (!Number.isSafeInteger(bytes)) {
+        fail('combined tree byte total is unsafe');
+      }
+      files += 1;
+      continue;
+    }
+
+    const supportedNonRegular =
+      (mode === '120000' && type === 'blob' && /^\d+$/.test(sizeText)) ||
+      (mode === '160000' && type === 'commit' && sizeText === '-');
+    if (!supportedNonRegular) {
+      fail(`combined tree has unsupported tracked mode ${mode}: ${path}`);
+    }
+  }
+  return { bytes, files };
+}
+
+export function enforceCombinedTreePayload({
+  headSha,
+  maxTrackedBytes = HYGIENE_LIMITS.maxTrackedBytes,
+  runGit = args =>
+    execFileSync('git', args, {
+      encoding: 'utf8',
+      maxBuffer: MAX_GIT_OUTPUT_BYTES,
+      stdio: ['ignore', 'pipe', 'pipe'],
+    }),
+}) {
+  requireSha(headSha, 'merge_group.head_sha');
+  if (!Number.isSafeInteger(maxTrackedBytes) || maxTrackedBytes < 1) {
+    fail('combined tree byte budget is invalid');
+  }
+
+  runGit(['fetch', '--no-tags', '--depth=1', 'origin', headSha]);
+  const fetchedHead = String(runGit(['rev-parse', 'FETCH_HEAD'])).trim();
+  if (fetchedHead !== headSha)
+    fail('fetched combined head does not match event');
+
+  const result = parseTrackedRegularTree(
+    runGit(['ls-tree', '-r', '-l', '-z', headSha])
+  );
+  if (result.bytes > maxTrackedBytes) {
+    fail(
+      `${result.bytes} bytes of tracked regular files exceeds the ${maxTrackedBytes}-byte combined-tree budget`
+    );
+  }
+  return result;
+}
+
 function splitRepository(fullName) {
   const parts = fullName.split('/');
   if (parts.length !== 2 || parts.some(part => !part))
@@ -396,6 +476,13 @@ async function runPolicy() {
 
   const event = JSON.parse(await readFile(eventPath, 'utf8'));
   const { baseSha, headSha, repository } = validateMergeGroupEvent(event);
+
+  if (policy === 'size') {
+    const payload = enforceCombinedTreePayload({ headSha });
+    console.log(
+      `Combined tree: PASS — ${payload.bytes} tracked regular-file bytes across ${payload.files} files.`
+    );
+  }
 
   const comparison = await fetchComparison(repository, baseSha, headSha, token);
   const members = resolveMergeGroupMembers({ event, comparison });
