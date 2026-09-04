@@ -20,6 +20,13 @@ const ovieSummerShadowInputSchema = z
     message: z.string().trim().min(1).max(4000),
     evidence: z.array(z.string().url().max(2048)).max(16).default([]),
     requestedCapability: z.literal('core_chat').optional(),
+    // Eve owns strict snapshot validation; this bridge only forwards bounded reports.
+    commercialSnapshot: z
+      .object({
+        schema: z.literal('jovie.summer-commercial.snapshot/v1'),
+      })
+      .passthrough()
+      .optional(),
   })
   .strict();
 
@@ -101,6 +108,9 @@ export async function POST(request: Request): Promise<NextResponse> {
           occurredAt: new Date().toISOString(),
           message: parsed.data.message,
           evidence: parsed.data.evidence,
+          ...(parsed.data.commercialSnapshot
+            ? { commercialSnapshot: parsed.data.commercialSnapshot }
+            : {}),
           ...(parsed.data.requestedCapability
             ? { requestedCapability: parsed.data.requestedCapability }
             : {}),
@@ -125,6 +135,9 @@ export async function POST(request: Request): Promise<NextResponse> {
   if (upstream.status === 429) {
     return json({ ok: false, code: 'budget_rejected', eve: upstreamBody }, 429);
   }
+  if (upstream.status === 422 && parsed.data.commercialSnapshot) {
+    return json({ ok: false, code: 'invalid_commercial_snapshot' }, 422);
+  }
   if (!upstream.ok) {
     logger.error('[ovie-summer-shadow] Eve rejected the signed origin', {
       status: upstream.status,
@@ -148,17 +161,22 @@ export async function GET(request: Request): Promise<Response> {
   }
 
   const requestUrl = new URL(request.url);
+  const eventId = requestUrl.searchParams.get('eventId');
   const sessionId = requestUrl.searchParams.get('sessionId');
   const conversationId = requestUrl.searchParams.get('conversationId');
   const startIndexValue = requestUrl.searchParams.get('startIndex') ?? '0';
   const startIndex = Number(startIndexValue);
+  if (eventId !== null && !/^[A-Za-z0-9][A-Za-z0-9_-]{7,127}$/u.test(eventId)) {
+    return json({ ok: false, code: 'invalid_event_id' }, 400);
+  }
   if (
-    !sessionId ||
-    !/^ses_[A-Za-z0-9_-]+$/u.test(sessionId) ||
-    !conversationId ||
-    !/^[A-Za-z0-9][A-Za-z0-9_-]{7,127}$/u.test(conversationId) ||
-    !Number.isSafeInteger(startIndex) ||
-    startIndex < 0
+    eventId === null &&
+    (!sessionId ||
+      !/^ses_[A-Za-z0-9_-]+$/u.test(sessionId) ||
+      !conversationId ||
+      !/^[A-Za-z0-9][A-Za-z0-9_-]{7,127}$/u.test(conversationId) ||
+      !Number.isSafeInteger(startIndex) ||
+      startIndex < 0)
   ) {
     return json({ ok: false, code: 'invalid_stream_request' }, 400);
   }
@@ -173,11 +191,15 @@ export async function GET(request: Request): Promise<Response> {
   let upstream: Response;
   try {
     const upstreamUrl = new URL(
-      `/ovie/v1/summer-shadow/sessions/${encodeURIComponent(sessionId)}/stream`,
+      eventId !== null
+        ? `/ovie/v1/summer-shadow/commercial/${encodeURIComponent(eventId)}`
+        : `/ovie/v1/summer-shadow/sessions/${encodeURIComponent(sessionId ?? '')}/stream`,
       EVE_SHADOW_ORIGIN
     );
-    upstreamUrl.searchParams.set('conversationId', conversationId);
-    upstreamUrl.searchParams.set('startIndex', String(startIndex));
+    if (eventId === null) {
+      upstreamUrl.searchParams.set('conversationId', conversationId ?? '');
+      upstreamUrl.searchParams.set('startIndex', String(startIndex));
+    }
     upstream = await fetch(upstreamUrl, {
       headers: { authorization: `Bearer ${oidcToken}` },
       signal: AbortSignal.timeout(20_000),
@@ -187,6 +209,18 @@ export async function GET(request: Request): Promise<Response> {
   }
 
   if (!upstream.ok || !upstream.body) {
+    if (eventId !== null && [404, 503].includes(upstream.status)) {
+      return json(
+        {
+          ok: false,
+          code:
+            upstream.status === 404
+              ? 'commercial_receipt_not_found'
+              : 'commercial_proof_unavailable',
+        },
+        upstream.status
+      );
+    }
     return json({ ok: false, code: 'eve_stream_rejected' }, 502);
   }
 
@@ -194,7 +228,8 @@ export async function GET(request: Request): Promise<Response> {
     status: 200,
     headers: {
       'cache-control': 'no-store',
-      'content-type': 'application/x-ndjson',
+      'content-type':
+        eventId !== null ? 'application/json' : 'application/x-ndjson',
     },
   });
 }

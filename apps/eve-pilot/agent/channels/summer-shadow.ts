@@ -7,11 +7,15 @@ import {
   verifyVercelOidc,
   withAuthChallenges,
 } from 'eve/channels/auth';
+import { createSummerCommercialReadback } from '../lib/summer-commercial-readback';
 import {
   createSummerShadowIngressHandler,
   summerShadowKey,
 } from '../lib/summer-shadow-ingress';
-import { persistImmutableShadowRecord } from '../lib/vercel-blob-shadow-store';
+import {
+  persistImmutableShadowRecord,
+  readImmutableShadowRecord,
+} from '../lib/vercel-blob-shadow-store';
 
 export const JOVIE_PRODUCTION_OIDC_SUBJECT = vercelSubject({
   teamSlug: 'jovie',
@@ -72,6 +76,15 @@ export default defineChannel<SummerShadowChannelState>({
   },
   turnPolicy: 'queue',
   routes: [
+    GET(
+      '/ovie/v1/summer-shadow/commercial/:eventId',
+      async (request, { params }) =>
+        createSummerCommercialReadback({
+          authenticate: incoming =>
+            routeAuth(incoming, ovieSummerShadowOidcAuth),
+          read: readImmutableShadowRecord,
+        })(request, params.eventId)
+    ),
     POST('/ovie/v1/summer-shadow/events', async (request, { from }) => {
       const handler = createSummerShadowIngressHandler({
         authenticate: incoming => routeAuth(incoming, ovieSummerShadowOidcAuth),

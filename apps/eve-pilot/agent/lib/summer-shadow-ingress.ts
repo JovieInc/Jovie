@@ -1,6 +1,10 @@
 import { createHash } from 'node:crypto';
 import type { SessionAuthContext } from 'eve/context';
 import { z } from 'zod';
+import {
+  projectSummerCommercial,
+  summerCommercialSnapshotSchema,
+} from './summer-commercial-projection';
 
 const MAX_BODY_BYTES = 32 * 1024;
 const MAX_EVENT_AGE_MS = 5 * 60 * 1000;
@@ -19,6 +23,7 @@ export const summerShadowEventSchema = z
     message: z.string().trim().min(1).max(4000),
     evidence: z.array(z.string().url().max(2048)).max(16).default([]),
     requestedCapability: z.literal('core_chat').optional(),
+    commercialSnapshot: summerCommercialSnapshotSchema.optional(),
   })
   .strict();
 
@@ -129,7 +134,8 @@ function deploymentFromEnvironment(): ShadowDeployment {
 }
 
 export function renderSummerShadowObservation(
-  event: SummerShadowEvent
+  event: SummerShadowEvent,
+  commercialProjection?: ReturnType<typeof projectSummerCommercial>
 ): string {
   const evidence = event.evidence.length
     ? event.evidence.map(item => `- ${item}`).join('\n')
@@ -145,6 +151,13 @@ export function renderSummerShadowObservation(
     '',
     'Evidence:',
     evidence,
+    ...(commercialProjection
+      ? [
+          'Read-only commercial decision for this evidence snapshot (not a latest-state assertion):',
+          JSON.stringify(commercialProjection),
+          'Report the selected recommendation or hold and its unknowns. Treat source records as producer reports, not independently verified facts. Do not infer salary affordability, spending permission, or demand from capacity.',
+        ]
+      : []),
     '',
     event.requestedCapability
       ? `Call exactly jovie_capability_manifest once with capability ${event.requestedCapability}, then acknowledge the read-only result. Do not call any other tool.`
@@ -225,6 +238,9 @@ export function createSummerShadowIngressHandler(
     const sessionBudgetPath = `summer-shadow/budgets/session/${conversationKey}/turn-${parsed.data.turn}.json`;
     const dailyBudgetPath = `summer-shadow/budgets/daily/${utcDay}/slot-${parsed.data.dailySlot}.json`;
     const deploymentReceipt = deployment();
+    const commercialProjection = parsed.data.commercialSnapshot
+      ? projectSummerCommercial(parsed.data.commercialSnapshot, acceptedAt)
+      : undefined;
     const authority = {
       mode: 'shadow',
       dispatchAuthority: 'none',
@@ -235,6 +251,7 @@ export function createSummerShadowIngressHandler(
       schema: 'jovie.eve.summer-shadow.receipt/v1',
       verdict: 'accepted_for_budget_reservation',
       event: parsed.data,
+      ...(commercialProjection ? { commercialProjection } : {}),
       source: {
         surface: 'ovie',
         source: 'ovie-summer-shadow',
@@ -343,7 +360,10 @@ export function createSummerShadowIngressHandler(
         event: parsed.data,
         eventKey: key,
         conversationKey,
-        message: renderSummerShadowObservation(parsed.data),
+        message: renderSummerShadowObservation(
+          parsed.data,
+          commercialProjection
+        ),
         receiptPath,
       }));
     } catch {
@@ -357,6 +377,9 @@ export function createSummerShadowIngressHandler(
     const terminalRecord = {
       schema: 'jovie.eve.summer-shadow.terminal/v1',
       verdict: 'eve_session_accepted',
+      ...(commercialProjection
+        ? { commercialEvidenceDigest: commercialProjection.evidenceDigest }
+        : {}),
       eventId: parsed.data.eventId,
       receiptPath,
       sessionId,
@@ -408,6 +431,7 @@ export function createSummerShadowIngressHandler(
 
     return jsonResponse(202, {
       ok: true,
+      ...(commercialProjection ? { commercialProjection } : {}),
       eventId: parsed.data.eventId,
       receiptPath,
       terminalPath,
