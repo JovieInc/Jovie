@@ -552,6 +552,68 @@ class OfficialSymphonyContractTests(unittest.TestCase):
             self.assertIn("child-drained-after-rate-limit", result.stdout)
             self.assertTrue(gate.is_file())
 
+    def test_official_runtime_wrapper_forwards_sigterm_to_child_process_group(self):
+        helper = _load_helper()
+        child_script = (
+            "import os, pathlib, signal, sys, time\n"
+            "marker = pathlib.Path(sys.argv[1])\n"
+            "pid_file = pathlib.Path(sys.argv[2])\n"
+            "pid_file.write_text(str(os.getpid()), encoding='utf-8')\n"
+            "def stop(_signum, _frame):\n"
+            "    marker.write_text('terminated', encoding='utf-8')\n"
+            "    raise SystemExit(0)\n"
+            "signal.signal(signal.SIGTERM, stop)\n"
+            "print('child-ready', flush=True)\n"
+            "while True:\n"
+            "    time.sleep(1)\n"
+        )
+        with tempfile.TemporaryDirectory() as tmp:
+            marker = pathlib.Path(tmp) / "child-terminated"
+            pid_file = pathlib.Path(tmp) / "child.pid"
+            wrapper = subprocess.Popen(
+                [
+                    "python3",
+                    str(HELPER_PATH),
+                    "run",
+                    "--gate-file",
+                    str(pathlib.Path(tmp) / "linear-rate-limit.json"),
+                    *_closure_run_args(tmp),
+                    "--max-gate-sleep-seconds",
+                    "0",
+                    "--",
+                    "python3",
+                    "-c",
+                    child_script,
+                    str(marker),
+                    str(pid_file),
+                ],
+                cwd=ROOT,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+                text=True,
+            )
+            child_pid = None
+            try:
+                assert wrapper.stdout is not None
+                self.assertEqual(wrapper.stdout.readline().strip(), "child-ready")
+                child_pid = int(pid_file.read_text(encoding="utf-8"))
+                wrapper.terminate()
+                stdout, stderr = wrapper.communicate(timeout=5)
+                self.assertEqual(wrapper.returncode, 128 + helper.signal.SIGTERM, stderr)
+                self.assertEqual(marker.read_text(encoding="utf-8"), "terminated")
+                with self.assertRaises(ProcessLookupError):
+                    os.kill(child_pid, 0)
+                self.assertEqual(stdout, "")
+            finally:
+                if wrapper.poll() is None:
+                    wrapper.kill()
+                    wrapper.wait(timeout=5)
+                if child_pid is not None:
+                    try:
+                        os.kill(child_pid, helper.signal.SIGKILL)
+                    except ProcessLookupError:
+                        pass
+
     def test_official_runtime_wrapper_pauses_live_scheduler_without_terminating_child(self):
         helper = _load_helper()
         process = subprocess.Popen(

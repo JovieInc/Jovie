@@ -22,6 +22,7 @@ import signal
 import subprocess
 import sys
 import tempfile
+import threading
 import time
 import urllib.error
 import urllib.request
@@ -80,6 +81,8 @@ DEFAULT_DEAD_LETTER_DIR = (
 FLEET_GATE_RECEIPT_MAX_AGE_SECONDS = 600
 FLEET_GATE_RECEIPT_FUTURE_SKEW_SECONDS = 60
 CLOSURE_HOLD_RECHECK_SECONDS = 30
+OFFICIAL_CHILD_SHUTDOWN_GRACE_SECONDS = 20
+OFFICIAL_CHILD_KILL_WAIT_SECONDS = 5
 ISSUE_DEAD_LETTER_SCHEMA = "symphony-issue-dead-letter/v1"
 LINEAR_PERMANENT_ERROR_MAX_ATTEMPTS = 3
 LINEAR_API_STATUS_PATTERN = re.compile(
@@ -1219,6 +1222,43 @@ def record_linear_issue_error(
     return receipt
 
 
+def _forward_signal_to_child_group(
+    process: subprocess.Popen[str],
+    signum: int,
+    *,
+    grace_seconds: float = OFFICIAL_CHILD_SHUTDOWN_GRACE_SECONDS,
+) -> None:
+    """Forward wrapper termination to Symphony's complete process group.
+
+    The systemd unit deliberately targets the Python wrapper as MainPID. A
+    signal sent only to that PID must still reach the BEAM tree, otherwise the
+    wrapper exits while systemd waits until TimeoutStopSec and finally kills
+    the abandoned cgroup. The child owns a new session/process group so this
+    forwarding is exact and cannot signal unrelated user processes.
+    """
+    if process.poll() is not None:
+        return
+    try:
+        os.killpg(process.pid, signum)
+    except ProcessLookupError:
+        return
+    try:
+        process.wait(timeout=max(0.0, grace_seconds))
+        return
+    except subprocess.TimeoutExpired:
+        pass
+    try:
+        os.killpg(process.pid, signal.SIGKILL)
+    except ProcessLookupError:
+        return
+    try:
+        process.wait(timeout=OFFICIAL_CHILD_KILL_WAIT_SECONDS)
+    except subprocess.TimeoutExpired:
+        # systemd remains the final cgroup-level backstop. Do not block the
+        # wrapper beyond its own bounded shutdown budget.
+        return
+
+
 def run_official_binary_once(
     command: list[str],
     *,
@@ -1233,42 +1273,71 @@ def run_official_binary_once(
         text=True,
         errors="replace",
         bufsize=1,
+        start_new_session=True,
     )
     rate_limited = False
+    forwarded_signal: int | None = None
+    forwarding_signal = False
+    previous_handlers: dict[int, Any] = {}
     issue_errors: dict[str, dict[str, Any]] = {}
     dead_letter_noted: set[str] = set()
     last_closure_check = 0.0
+
+    def handle_termination(signum: int, _frame: Any) -> None:
+        nonlocal forwarded_signal, forwarding_signal
+        if forwarded_signal is None:
+            forwarded_signal = signum
+        if forwarding_signal:
+            return
+        forwarding_signal = True
+        try:
+            _forward_signal_to_child_group(process, signum)
+        finally:
+            forwarding_signal = False
+
+    if threading.current_thread() is threading.main_thread():
+        for signum in (signal.SIGTERM, signal.SIGINT):
+            previous_handlers[signum] = signal.getsignal(signum)
+            signal.signal(signum, handle_termination)
+
     assert process.stdout is not None
-    for line in process.stdout:
-        print(line, end="", flush=True)
-        classification = classify_linear_log_line(line)
-        if classification and write_rate_limit_gate(gate_file, classification):
-            # The official scheduler may be supervising active agents. Record the
-            # reset gate and suspend only the scheduler process; do not
-            # terminate the process tree that may contain active Codex jobs.
-            rate_limited = True
-            gate = read_rate_limit_gate(gate_file)
-            _pause_child_for_gate(process, gate, max_gate_sleep_seconds)
-        else:
-            issue_error = classify_linear_issue_error_log_line(line)
-            if issue_error is not None:
-                record_linear_issue_error(
-                    closure.dead_letter_dir,
-                    issue_error,
-                    issue_errors,
-                    dead_letter_noted,
+    try:
+        for line in process.stdout:
+            print(line, end="", flush=True)
+            classification = classify_linear_log_line(line)
+            if classification and write_rate_limit_gate(gate_file, classification):
+                # The official scheduler may be supervising active agents. Record the
+                # reset gate and suspend only the scheduler process; do not
+                # terminate the process tree that may contain active Codex jobs.
+                rate_limited = True
+                gate = read_rate_limit_gate(gate_file)
+                _pause_child_for_gate(process, gate, max_gate_sleep_seconds)
+            else:
+                issue_error = classify_linear_issue_error_log_line(line)
+                if issue_error is not None:
+                    record_linear_issue_error(
+                        closure.dead_letter_dir,
+                        issue_error,
+                        issue_errors,
+                        dead_letter_noted,
+                    )
+            monotonic_now = time.monotonic()
+            if monotonic_now - last_closure_check >= CLOSURE_HOLD_RECHECK_SECONDS:
+                last_closure_check = monotonic_now
+                verdict = read_closure_stop_line(
+                    closure.receipt_path, max_age_seconds=closure.max_receipt_age_seconds
                 )
-        monotonic_now = time.monotonic()
-        if monotonic_now - last_closure_check >= CLOSURE_HOLD_RECHECK_SECONDS:
-            last_closure_check = monotonic_now
-            verdict = read_closure_stop_line(
-                closure.receipt_path, max_age_seconds=closure.max_receipt_age_seconds
-            )
-            if verdict["hold"]:
-                _pause_child_for_closure_hold(
-                    process, closure, verdict, max_gate_sleep_seconds
-                )
-    returncode = process.wait()
+                if verdict["hold"]:
+                    _pause_child_for_closure_hold(
+                        process, closure, verdict, max_gate_sleep_seconds
+                    )
+        returncode = process.wait()
+    finally:
+        for signum, previous in previous_handlers.items():
+            signal.signal(signum, previous)
+        process.stdout.close()
+    if forwarded_signal is not None:
+        return 128 + forwarded_signal
     return RATE_LIMIT_EXIT_CODE if rate_limited else returncode
 
 
