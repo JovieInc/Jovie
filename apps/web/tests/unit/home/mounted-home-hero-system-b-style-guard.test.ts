@@ -66,8 +66,8 @@ describe('mounted homepage hero System B source contract', () => {
       ).not.toMatch(pattern);
     }
 
-    // The homepage owns copy and backdrop; the hero primitive owns the
-    // composition; the existing name search is the only control.
+    // The homepage owns copy; the hero primitive owns the abstract composition;
+    // the existing name search is the only control.
     expect(pageSource).toContain('<HomepageEditorialHero');
     expect(pageSource).not.toContain('HomeTrustSection');
     expect(pageSource).not.toMatch(/statsRow|stats=\{/);
@@ -81,7 +81,7 @@ describe('mounted homepage hero System B source contract', () => {
     for (const className of [
       'homepage-editorial-hero',
       'homepage-editorial-hero__backdrop',
-      'homepage-editorial-hero__scrim',
+      'homepage-editorial-hero__light-well',
       'homepage-editorial-hero__copy',
       'homepage-editorial-hero__headline',
       'homepage-editorial-hero__support',

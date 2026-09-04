@@ -9,7 +9,7 @@ const meta = {
     docs: {
       description: {
         component:
-          'Full-viewport photo hero for the homepage front door: one headline, one support line, and the name search as the only conversion control.',
+          'Centered, image-free homepage front door with a quiet abstract light field, one headline, one support line, and the name search as the only conversion control.',
       },
     },
   },
@@ -25,13 +25,5 @@ export const Default: Story = {
     headline: 'Control how the world sees you.',
     support: 'Find what the internet knows. Turn it into relationships.',
     search: { placeholder: 'Search your name', action: 'Find me' },
-    backdrop: {
-      desktopSrc: '/images/hero/night-desk.webp',
-      desktopWidth: 1536,
-      desktopHeight: 1024,
-      mobileSrc: '/images/hero/night-desk-mobile.webp',
-      mobileWidth: 737,
-      mobileHeight: 1024,
-    },
   },
 };
