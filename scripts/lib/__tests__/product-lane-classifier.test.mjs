@@ -223,7 +223,7 @@ describe('product lane classifier', () => {
   });
 
   it('maps isolated, shared, and operations-only paths', () => {
-    for (const [path, lanes] of [
+    for (const [path, lanes] of /** @type {Array<[string, string[]]>} */ ([
       ['apps/ios/Jovie/App.swift', ['ios']],
       ['apps/desktop/src/main.ts', ['mac']],
       ['apps/web/app/page.tsx', ['web']],
@@ -231,7 +231,7 @@ describe('product lane classifier', () => {
       ['.github/workflows/ios-ci.yml', ['ios']],
       ['.github/workflows/desktop-release.yml', ['mac']],
       ['.github/workflows/production-release.yml', ['web']],
-    ])
+    ]))
       expect(classifyProductLanes([path]).selectedLanes).toEqual(lanes);
     expect(
       classifyProductLanes(['packages/auth-routing/index.ts']).selectedLanes
