@@ -246,6 +246,12 @@ def retain_last_good_source(
     )
     if key == "symphony":
         retained["up"] = False
+        retained["ok"] = False
+        for count in ("running", "retrying", "blocked", "queued"):
+            retained[count] = None
+        retained["totals"] = None
+        for row in retained.get("rows", []):
+            row["stale"] = True
     return retained
 
 
@@ -1126,6 +1132,14 @@ def _normalize_row(item: dict[str, Any], kind: str) -> dict[str, Any]:
         "last_event": _text(item, ("last_event",)) or _text(running, ("last_event",)),
         "error": error,
         "owner": _text(item, ("owner", "agent", "account")) or _text(running, ("owner", "agent")),
+        "session_id": _text(item, ("session_id",)) or _text(running, ("session_id",)),
+        "pid": _int(item.get("codex_app_server_pid") or running.get("codex_app_server_pid")),
+        "last_event_at": item.get("last_event_at") or running.get("last_event_at"),
+        # A selected route/configuration is deliberately not execution evidence.
+        "requested_model": _text(item, ("model", "requested_model")) or _text(running, ("model", "requested_model")),
+        "executed_model": _text(item, ("executed_model",)) or _text(running, ("executed_model",)),
+        "executed_provider": _text(item, ("executed_provider",)) or _text(running, ("executed_provider",)),
+        "executed_account_alias": _text(item, ("executed_account_alias",)) or _text(running, ("executed_account_alias",)),
     }
 
 
@@ -1155,6 +1169,7 @@ def fetch_symphony(url: str, *, timeout: float = 3.0, cap: int | None = None) ->
     retrying_items = _as_list(payload.get("retrying"))
     blocked_items = _as_list(payload.get("blocked"))
     jobs = _as_list(payload.get("jobs") or payload.get("items"))
+    queued_items = _as_list(payload.get("queued"))
     if not running_items and not retrying_items and jobs:
         for item in jobs:
             status = str(item.get("status") or item.get("state") or "").lower()
@@ -1162,11 +1177,14 @@ def fetch_symphony(url: str, *, timeout: float = 3.0, cap: int | None = None) ->
                 retrying_items.append(item)
             elif status in {"blocked", "failed", "fail"}:
                 blocked_items.append(item)
-            elif status not in {"queued", "done", "canceled", "cancelled"}:
+            elif status == "queued":
+                queued_items.append(item)
+            elif status in {"running", "active"}:
                 running_items.append(item)
     rows = (
         [_normalize_row(item, "blocked") for item in blocked_items]
         + [_normalize_row(item, "retrying") for item in retrying_items]
+        + [_normalize_row(item, "queued") for item in queued_items]
         + [_normalize_row(item, "running") for item in running_items]
     )
     def _count(key: str, items: list[dict[str, Any]]) -> int | None:
@@ -1181,7 +1199,7 @@ def fetch_symphony(url: str, *, timeout: float = 3.0, cap: int | None = None) ->
     last_event = next((row["last_event"] for row in rows if row.get("last_event")), last_event)
     return {
         "ok": True, "running": _count("running", running_items), "retrying": _count("retrying", retrying_items),
-        "blocked": _count("blocked", blocked_items), "cap": cap, "rows": rows, "totals": totals,
+        "blocked": _count("blocked", blocked_items), "queued": _count("queued", queued_items), "cap": cap, "rows": rows, "totals": totals,
         "seconds_running": _int(totals.get("seconds_running")) if totals else None,
         "rate_limits": payload.get("rate_limits") if isinstance(payload.get("rate_limits"), dict) else None,
         "hook_failed": hook, "last_event": last_event, "generated_at": payload.get("generated_at"), "up": True,
@@ -1709,6 +1727,8 @@ def _job_row(
         color = _semantic_color(str(health.get("status") or "unknown"))
         glyph = "×" if health.get("status") == "failure" else "✓" if health.get("status") == "healthy" else "?"
         return _cells(color, widths, glyph, dash(row.get("position")), ident, dash(row.get("title")), "-", "-", "-", str(health["label"]), "-")
+    if row.get("stale"):
+        return _rgb(DIM, clip(f"STALE {row.get('id') or UNKNOWN} | historical attempt, current state UNKNOWN", sum(widths.values()) + 14))
     if kind == "retrying":
         return _cells(PINK, widths, "↻", "-", dash(row.get("id")), dash(row.get("error") or row.get("title")), dash(row.get("attempt")), dash(row.get("turn")), compact_tokens(row.get("tokens_total"), row.get("tokens_in"), row.get("tokens_out")), due_label(row.get("due_at"), now=now), short_path(row.get("workspace")))
     if kind == "blocked":
@@ -1736,6 +1756,8 @@ def _compact_job_row(
     kind = str(row.get("kind") or "running")
     ident = dash(row.get("id"))
     title = dash(row.get("title") or row.get("error") or row.get("last_message"))
+    if row.get("stale"):
+        return _rgb(DIM, clip(f"STALE {ident} | {title} | current execution UNKNOWN", width))
     if kind == "mq":
         ident = f"#{row['number']}" if isinstance(row.get("number"), int) else "-"
         if row.get("position") is not None:
@@ -1807,7 +1829,7 @@ def _hero_metrics(
         (
             SHIPPING_DISPLAY_IA["capacity"]["label"],
             agents + (" ? STALE/ERROR" if symphony.get("stale") is True else ""),
-            f"{slots_open} open · active/configured",
+            "usable capacity UNKNOWN · no capacity proof",
             f"Symphony :4041 · agents · point · / {dash(cap)} configured · Updated {symphony_freshness}",
             _semantic_color(worker_slot_health_status(None if running is None or not cap else (running / cap) * 100)),
         ),
@@ -2154,6 +2176,106 @@ def _footer(symphony: dict[str, Any], width: int, *, now: datetime) -> str:
     return pad_visible(_rgb(DIM, clip(" | ".join(parts), width)), width)
 
 
+def read_runtime_context(*, now: datetime) -> dict[str, Any]:
+    """Bounded local reads only; no worker control, provider probes or credentials."""
+    service = UNKNOWN
+    try:
+        result = subprocess.run(["systemctl", "--user", "show", "symphony-elixir.service", "--property=ActiveState", "--value"], capture_output=True, text=True, timeout=1, check=False)
+        if result.returncode == 0 and result.stdout.strip() in {"active", "inactive", "failed", "activating", "deactivating"}:
+            service = result.stdout.strip()
+    except (OSError, subprocess.TimeoutExpired):
+        pass
+    gate = load_json_dict(Path.home() / ".local/state/symphony-elixir/linear-rate-limit.json")
+    reset = _iso(gate.get("resetAt"))
+    recorded = _iso(gate.get("recordedAt"))
+    gate_until = None
+    if gate.get("schema") == "symphony-linear-rate-limit-gate/v1" and recorded and recorded <= now and reset and reset > now:
+        gate_until = reset.isoformat()
+    configured = UNKNOWN
+    try:
+        match = re.search(r"model=[\"']([^\"']+)[\"']", DEFAULT_WORKFLOW.read_text(encoding="utf-8"))
+        if match:
+            configured = match.group(1)
+    except OSError:
+        pass
+    return {"service_state": service, "linear_gate_until": gate_until, "configured_model": configured, "runtime_observed_at": now.isoformat()}
+
+
+def execution_state(row: dict[str, Any], *, now: datetime) -> str:
+    """Only this attempt's live API evidence can establish execution."""
+    if row.get("stale"):
+        return "STALE"
+    kind = row.get("kind")
+    if kind in {"blocked", "retrying", "queued"}:
+        return str(kind).upper()
+    if kind != "running":
+        return UNKNOWN
+    if not row.get("session_id"):
+        return "STARTING / NO SESSION"
+    event_at = _iso(row.get("last_event_at"))
+    if event_at is None:
+        return "SESSION / PROGRESS UNKNOWN"
+    age = (now - event_at).total_seconds()
+    if age < -10 or age > 120:
+        return "SESSION / NO RECENT PROGRESS"
+    if (_int(row.get("tokens_total")) or 0) <= 0:
+        return "SESSION / NO TOKENS"
+    return "RUNNING / RECENT ACTIVITY"
+
+
+def execution_lines(row: dict[str, Any], width: int, *, now: datetime) -> list[str]:
+    stage = execution_state(row, now=now)
+    executed = stage == "RUNNING / RECENT ACTIVITY"
+    model = row.get("executed_model") if executed else None
+    provider = row.get("executed_provider") if executed else None
+    account = row.get("executed_account_alias") if executed else None
+    cause = row.get("error") or row.get("last_event") or UNKNOWN
+    retry = due_label(row.get("due_at"), now=now) if row.get("due_at") else UNKNOWN
+    progress = natural_time(row.get("last_event_at"), now=now)
+    first = f"{row.get('id') or UNKNOWN}  {stage}  |  {row.get('title') or UNKNOWN}"
+    second = f"  Executed: {model or UNKNOWN}  |  provider {provider or UNKNOWN}  |  account {account or UNKNOWN}  |  requested {row.get('requested_model') or UNKNOWN}"
+    third = f"  PID {row.get('pid') or UNKNOWN}  session {row.get('session_id') or UNKNOWN}  |  tokens {row.get('tokens_total') if row.get('tokens_total') is not None else UNKNOWN}  |  progress {progress}  |  {cause}  |  retry {retry}"
+    color = DIM if stage == "STALE" else BLUE if executed else ORANGE
+    return [_rgb(color, clip(first, width), bold=True), _rgb(FG, clip(second, width)), _rgb(DIM, clip(third, width))]
+
+
+def execution_summary(symphony: dict[str, Any], width: int, *, now: datetime) -> list[str]:
+    fresh = symphony.get("ok") and not symphony.get("stale")
+    recent = sum(execution_state(row, now=now) == "RUNNING / RECENT ACTIVITY" for row in symphony.get("rows", [])) if fresh else UNKNOWN
+    source = "FRESH" if fresh else "STALE / UNAVAILABLE"
+    counts = "  ".join(f"{key} {symphony.get(key) if fresh and symphony.get(key) is not None else UNKNOWN}" for key in ("running", "queued", "retrying", "blocked"))
+    action = "Inspect blocked/retrying attempts; worker recovery owner controls intake"
+    if not fresh:
+        action = "Restore official API through runtime owner; cached attempts are not running proof"
+    elif not recent:
+        action = "No recent token activity evidenced; inspect launcher/capacity with runtime owner"
+    if symphony.get("linear_gate_until"):
+        action = f"Linear rate limit gate until {symphony['linear_gate_until']} · runtime owner controls recovery"
+    lines = [
+        f"EXECUTION TRUTH  |  API {source}  |  service {symphony.get('service_state', UNKNOWN)}  |  remediation enabled UNKNOWN",
+        f"Recent session activity {recent} jobs  |  reserved {counts}  |  configured ceiling {symphony.get('cap') if symphony.get('cap') is not None else UNKNOWN} slots  |  usable capacity UNKNOWN",
+        f"NEXT  {action}",
+        f"Source: :4041/api/v1/state · jobs/tokens · snapshot {natural_time(symphony.get('generated_at'), now=now)} · activity window 120s · shipped work requires separate receipts",
+        f"Configuration only: model {symphony.get('configured_model', UNKNOWN)} · WORKFLOW.md | service/gate: systemd + linear-rate-limit.json · observed {natural_time(symphony.get('runtime_observed_at'), now=now)}",
+    ]
+    return [_rgb(ORANGE if not fresh else FG, clip(line, width), bold=index == 0) for index, line in enumerate(lines)]
+
+
+def current_execution_view(symphony: dict[str, Any], *, now: datetime) -> dict[str, Any]:
+    """Fail closed even when an API or direct renderer caller hands us old JSON."""
+    state = copy.deepcopy(symphony)
+    stamp = _iso(state.get("generated_at"))
+    age = (now - stamp).total_seconds() if stamp else None
+    if not state.get("ok") or state.get("stale") or age is None or age < -10 or age > 30:
+        state["ok"] = False
+        state["stale"] = True
+        for key in ("running", "queued", "retrying", "blocked", "totals"):
+            state[key] = None
+        for row in state.get("rows", []):
+            row["stale"] = True
+    return state
+
+
 def render(
     *,
     symphony: dict[str, Any],
@@ -2170,6 +2292,7 @@ def render(
     system_pressure: dict[str, Any] | None = None,
 ) -> str:
     clock = now or _now()
+    symphony = current_execution_view(symphony, now=clock)
     # Direct render callers get the canonical full canvas unless they request a
     # height. The live frame path always supplies the detected terminal size.
     cols, rows = terminal_size(width=width, height=height if height is not None else TARGET_HEIGHT)
@@ -2288,6 +2411,13 @@ def render(
             "",
             _footer(symphony, cols, now=clock),
         ]
+    truth = execution_summary(symphony, cols, now=clock)
+    lines[1:1] = [truth[0], truth[2]] if compact else truth
+    if not compact:
+        work_rows = [line for row in symphony.get("rows", []) for line in [_job_row(row, widths, now=clock, stage_baselines=stage_baselines), *execution_lines(row, cols, now=clock)]]
+        work_rows.extend(_job_row(row, widths, now=clock, stage_baselines=stage_baselines) for row in mq.get("rows", []))
+        if review is not None and review > 0:
+            work_rows.append(_rgb(ORANGE, clip(f"!  REVIEW QUEUE {review}", cols)))
     available = max(0, rows - len(lines) - len(footer))
     if not work_rows and available > 0:
         work_rows = [_rgb(DIM, clip("· No active work receipts", cols))]
@@ -2317,6 +2447,8 @@ def frame(
     clock = _now()
     cap = read_workflow_cap()
     symphony = retain_last_good_source("symphony", fetch_symphony(symphony_url, cap=cap), now=clock)
+    symphony.update(read_runtime_context(now=clock))
+    symphony = current_execution_view(symphony, now=clock)
     mq = retain_last_good_source("mq", fetch_mq(), now=clock)
     linear = retain_last_good_source("linear", fetch_linear_project(), now=clock)
     github_path = Path(os.environ.get("HUD_GITHUB_PATH", str(DEFAULT_GITHUB_STATE)))
