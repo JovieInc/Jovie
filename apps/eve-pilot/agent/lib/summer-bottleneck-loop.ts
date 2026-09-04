@@ -1,15 +1,26 @@
-import { createHash, createHmac, timingSafeEqual } from 'node:crypto';
+import {
+  createHash,
+  createHmac,
+  sign as nodeSign,
+  verify as nodeVerify,
+  timingSafeEqual,
+} from 'node:crypto';
 import { z } from 'zod';
 
 const SHA = /^[0-9a-f]{40}$/u;
+const DIGEST = /^[0-9a-f]{64}$/u;
 const MAX_SIGNAL_AGE_MS = 15 * 60 * 1000;
+const MAX_RECOVERY_AGE_MS = 45 * 60 * 1000;
 const MAX_CLOCK_SKEW_MS = 60 * 1000;
+const MAX_RECONCILED_EVENTS = 25;
+const MAX_SCANNED_EVENTS = 100;
 const PREFIX = 'summer-bottleneck';
 
 const exactSha = z.string().regex(SHA);
 const timestamp = z.string().datetime({ offset: true });
 const sourceFields = {
   observedAt: timestamp,
+  sourceDigest: z.string().regex(DIGEST),
   sourceRevision: exactSha,
 };
 
@@ -62,12 +73,20 @@ export const summerBottleneckSnapshotSchema = z
     schema: z.literal('jovie.eve.summer-bottleneck-snapshot/v1'),
     eventId: z.string().regex(/^[A-Za-z0-9][A-Za-z0-9_-]{7,127}$/u),
     observedAt: timestamp,
+    producerAttestation: z
+      .object({
+        algorithm: z.literal('Ed25519'),
+        keyId: z.string().regex(/^[A-Za-z0-9][A-Za-z0-9._-]{2,63}$/u),
+        signature: z.string().regex(/^[A-Za-z0-9_-]{80,100}$/u),
+      })
+      .strict(),
     sourceVersion: exactSha,
     signals: z
       .object({
         closure: z
           .object({
-            schema: z.literal('jovie-closure-health/v1'),
+            schema: z.literal('jovie.eve.summer-closure-projection/v1'),
+            sourceSchema: z.literal('jovie-closure-health/v1'),
             ...sourceFields,
             status: z.enum(['healthy', 'grace', 'red']),
             blockedSince: timestamp.nullable(),
@@ -76,7 +95,8 @@ export const summerBottleneckSnapshotSchema = z
           .strict(),
         queue: z
           .object({
-            schema: z.literal('github-merge-queue-entry/v1'),
+            schema: z.literal('jovie.eve.summer-queue-projection/v1'),
+            sourceSchema: z.literal('github-merge-queue-entry/v1'),
             ...sourceFields,
             blockedSince: timestamp.nullable(),
             eligibleCleanPrs: z.number().int().nonnegative(),
@@ -85,7 +105,8 @@ export const summerBottleneckSnapshotSchema = z
           .strict(),
         release: z
           .object({
-            schema: z.literal('jovie-controller-snapshot/v1'),
+            schema: z.literal('jovie.eve.summer-release-projection/v1'),
+            sourceSchema: z.literal('jovie-controller-snapshot/v1'),
             ...sourceFields,
             blockedSince: timestamp.nullable(),
             mainSha: exactSha,
@@ -95,7 +116,8 @@ export const summerBottleneckSnapshotSchema = z
           .strict(),
         runner: z
           .object({
-            schema: z.literal('symphony-lease-guard-report/v1'),
+            schema: z.literal('jovie.eve.summer-runner-projection/v1'),
+            sourceSchema: z.literal('symphony-lease-guard-report/v1'),
             ...sourceFields,
             blockedSince: timestamp.nullable(),
             capacityAvailable: z.number().int().nonnegative(),
@@ -106,12 +128,72 @@ export const summerBottleneckSnapshotSchema = z
       })
       .strict(),
   })
-  .strict();
+  .strict()
+  .superRefine((value, context) => {
+    const revisions = [
+      value.signals.closure.sourceRevision,
+      value.signals.queue.sourceRevision,
+      value.signals.release.sourceRevision,
+      value.signals.runner.sourceRevision,
+      value.signals.ciAudit.sourceRevision,
+      value.signals.release.mainSha,
+    ];
+    if (revisions.some(revision => revision !== value.sourceVersion)) {
+      context.addIssue({
+        code: 'custom',
+        message: 'every projection must bind to the exact snapshot source',
+        path: ['sourceVersion'],
+      });
+    }
+  });
 
 export type SummerBottleneckSnapshot = z.infer<
   typeof summerBottleneckSnapshotSchema
 >;
 export type SummerBottleneckRecord = Readonly<Record<string, unknown>>;
+
+function unsignedProducerSnapshot(snapshot: SummerBottleneckRecord) {
+  const { producerAttestation: _attestation, ...unsigned } = snapshot;
+  return unsigned;
+}
+
+export function signSummerBottleneckProducerAttestation(
+  snapshot: SummerBottleneckRecord,
+  privateKey: string,
+  keyId: string
+) {
+  return {
+    algorithm: 'Ed25519' as const,
+    keyId,
+    signature: nodeSign(
+      null,
+      Buffer.from(
+        `jovie.eve.summer-bottleneck-snapshot/v1\0${canonical(
+          unsignedProducerSnapshot(snapshot)
+        )}`
+      ),
+      privateKey
+    ).toString('base64url'),
+  };
+}
+
+export function verifySummerBottleneckProducerAttestation(
+  snapshot: SummerBottleneckSnapshot,
+  keys: ReadonlyMap<string, string>
+): boolean {
+  const publicKey = keys.get(snapshot.producerAttestation.keyId);
+  if (!publicKey) return false;
+  return nodeVerify(
+    null,
+    Buffer.from(
+      `jovie.eve.summer-bottleneck-snapshot/v1\0${canonical(
+        unsignedProducerSnapshot(snapshot)
+      )}`
+    ),
+    publicKey,
+    Buffer.from(snapshot.producerAttestation.signature, 'base64url')
+  );
+}
 
 export type SummerBottleneckStore = {
   create(
@@ -119,12 +201,19 @@ export type SummerBottleneckStore = {
     record: SummerBottleneckRecord
   ): Promise<'created' | 'exists'>;
   read(pathname: string): Promise<SummerBottleneckRecord | null>;
-  list(prefix: string): Promise<
-    readonly {
+  list(
+    prefix: string,
+    options: { readonly cursor?: string; readonly limit: number }
+  ): Promise<{
+    readonly cursor?: string;
+    readonly hasMore: boolean;
+    readonly scanned: number;
+    readonly entries: readonly {
       readonly pathname: string;
       readonly record: SummerBottleneckRecord;
-    }[]
-  >;
+    }[];
+  }>;
+  write(pathname: string, record: SummerBottleneckRecord): Promise<void>;
 };
 
 export type SymphonyRepairTask = {
@@ -155,7 +244,9 @@ export type SummerBottleneckDependencies = {
     readonly status: 'pending' | 'succeeded' | 'failed';
     readonly detail: string;
   }>;
+  readonly receiptSigningKeyId: string;
   readonly receiptSigningKey: string;
+  readonly producerVerificationKeys: ReadonlyMap<string, string>;
   readonly store: SummerBottleneckStore;
 };
 
@@ -197,6 +288,7 @@ function eventKey(eventId: string): string {
 function paths(snapshot: SummerBottleneckSnapshot, fingerprint?: string) {
   const key = eventKey(snapshot.eventId);
   return {
+    conflict: `${PREFIX}/conflicts/${key}.json`,
     event: `${PREFIX}/events/${key}.json`,
     terminal: `${PREFIX}/terminal/${key}.json`,
     ...(fingerprint
@@ -351,26 +443,72 @@ function fingerprintFor(
 
 function signedReceipt(
   receipt: SummerBottleneckRecord,
-  signingKey: string
+  signingKey: string,
+  signingKeyId: string,
+  receiptPath: string
 ): SummerBottleneckRecord {
-  if (!signingKey) throw new Error('receipt signing key is unavailable');
-  const { signature: _existingSignature, ...unsigned } = receipt;
+  if (!signingKey || !/^[A-Za-z0-9][A-Za-z0-9._-]{2,63}$/u.test(signingKeyId)) {
+    throw new Error('receipt signing authority is unavailable');
+  }
+  const schemaDomain = String(receipt.schema);
+  const {
+    signature: _existingSignature,
+    receiptPath: _existingPath,
+    signatureKeyId: _existingKeyId,
+    ...body
+  } = receipt;
+  const unsigned = { ...body, receiptPath, signatureKeyId: signingKeyId };
   const signature = createHmac('sha256', signingKey)
-    .update(`jovie.eve.summer-bottleneck-receipt/v1\0${canonical(unsigned)}`)
+    .update(
+      `jovie.eve.summer-bottleneck-receipt/v1\0${schemaDomain}\0${receiptPath}\0${canonical(
+        unsigned
+      )}`
+    )
     .digest('hex');
   return { ...unsigned, signature: `v1=${signature}` };
 }
 
+function signFor(
+  dependencies: SummerBottleneckDependencies,
+  receipt: SummerBottleneckRecord,
+  receiptPath = `${PREFIX}/ephemeral/${String(receipt.eventId ?? 'runtime')}`
+): SummerBottleneckRecord {
+  return signedReceipt(
+    receipt,
+    dependencies.receiptSigningKey,
+    dependencies.receiptSigningKeyId,
+    receiptPath
+  );
+}
+
 export function verifySummerBottleneckReceipt(
   input: SummerBottleneckRecord,
-  signingKey: string
+  signingKey: string,
+  expectedPath = input.receiptPath
 ): boolean {
   if (!signingKey) return false;
   const signature = input.signature;
   if (typeof signature !== 'string' || !/^v1=[0-9a-f]{64}$/u.test(signature))
     return false;
+  const keyId = input.signatureKeyId;
+  if (
+    typeof keyId !== 'string' ||
+    !/^[A-Za-z0-9][A-Za-z0-9._-]{2,63}$/u.test(keyId)
+  )
+    return false;
+  if (
+    typeof input.receiptPath !== 'string' ||
+    typeof expectedPath !== 'string' ||
+    input.receiptPath !== expectedPath
+  )
+    return false;
   const { signature: _removed, ...unsigned } = input;
-  const expected = signedReceipt(unsigned, signingKey).signature;
+  const expected = signedReceipt(
+    unsigned,
+    signingKey,
+    keyId,
+    expectedPath
+  ).signature;
   if (typeof expected !== 'string') return false;
   const left = Buffer.from(signature);
   const right = Buffer.from(expected);
@@ -382,7 +520,7 @@ async function persistTerminal(
   snapshot: SummerBottleneckSnapshot,
   receipt: SummerBottleneckRecord
 ): Promise<SummerBottleneckRecord> {
-  const signed = signedReceipt(receipt, dependencies.receiptSigningKey);
+  const signed = signFor(dependencies, receipt, paths(snapshot).terminal);
   const result = await dependencies.store.create(
     paths(snapshot).terminal,
     signed
@@ -423,7 +561,6 @@ async function processStoredSnapshot(
   dependencies: SummerBottleneckDependencies
 ): Promise<SummerBottleneckRecord> {
   const now = dependencies.now();
-  validateFreshness(snapshot, now);
   const ranking = rankSummerBottlenecks(snapshot, now);
   const selected = ranking[0] ?? null;
   if (!selected) {
@@ -439,8 +576,19 @@ async function processStoredSnapshot(
   const completed = await dependencies.store.read(recordPaths.outcome!);
   if (completed) {
     if (
+      completed.schema !== 'jovie.eve.summer-bottleneck-outcome/v1' ||
+      completed.terminal !== true ||
+      ![
+        'held-out-of-envelope',
+        'symphony-failed',
+        'symphony-succeeded',
+      ].includes(String(completed.decision)) ||
       completed.fingerprint !== fingerprint ||
-      !verifySummerBottleneckReceipt(completed, dependencies.receiptSigningKey)
+      !verifySummerBottleneckReceipt(
+        completed,
+        dependencies.receiptSigningKey,
+        recordPaths.outcome
+      )
     ) {
       throw new Error('bottleneck outcome conflict');
     }
@@ -452,24 +600,28 @@ async function processStoredSnapshot(
     });
   }
 
-  const claim = signedReceipt(
+  const claim = signFor(
+    dependencies,
     {
       ...baseReceipt(snapshot, dependencies, selected, fingerprint, ranking),
       schema: 'jovie.eve.summer-bottleneck-claim/v1',
       decision: selected.inEnvelope ? 'claimed' : 'held',
       terminal: !selected.inEnvelope,
     },
-    dependencies.receiptSigningKey
+    recordPaths.claim
   );
   const claimWrite = await dependencies.store.create(recordPaths.claim!, claim);
   if (claimWrite === 'exists') {
     const existingClaim = await dependencies.store.read(recordPaths.claim!);
     if (
       !existingClaim ||
+      existingClaim.schema !== 'jovie.eve.summer-bottleneck-claim/v1' ||
+      !['claimed', 'held'].includes(String(existingClaim.decision)) ||
       existingClaim.fingerprint !== fingerprint ||
       !verifySummerBottleneckReceipt(
         existingClaim,
-        dependencies.receiptSigningKey
+        dependencies.receiptSigningKey,
+        recordPaths.claim
       )
     ) {
       throw new Error('bottleneck claim conflict');
@@ -477,7 +629,8 @@ async function processStoredSnapshot(
   }
 
   if (!selected.inEnvelope) {
-    const outcome = signedReceipt(
+    const outcome = signFor(
+      dependencies,
       {
         ...baseReceipt(snapshot, dependencies, selected, fingerprint, ranking),
         schema: 'jovie.eve.summer-bottleneck-outcome/v1',
@@ -489,7 +642,7 @@ async function processStoredSnapshot(
         },
         terminal: true,
       },
-      dependencies.receiptSigningKey
+      recordPaths.outcome
     );
     const outcomeWrite = await dependencies.store.create(
       recordPaths.outcome!,
@@ -528,7 +681,8 @@ async function processStoredSnapshot(
     if (!/^[A-Za-z0-9][A-Za-z0-9:_-]{7,127}$/u.test(dispatched.handle)) {
       throw new Error('Symphony returned an invalid handle');
     }
-    const proposed = signedReceipt(
+    const proposed = signFor(
+      dependencies,
       {
         ...baseReceipt(snapshot, dependencies, selected, fingerprint, ranking),
         schema: 'jovie.eve.summer-bottleneck-dispatch/v1',
@@ -537,7 +691,7 @@ async function processStoredSnapshot(
         symphony: { handle: dispatched.handle },
         terminal: false,
       },
-      dependencies.receiptSigningKey
+      recordPaths.dispatch
     );
     const written = await dependencies.store.create(
       recordPaths.dispatch!,
@@ -555,10 +709,14 @@ async function processStoredSnapshot(
     ?.handle;
   if (
     typeof handle !== 'string' ||
+    dispatchReceipt?.schema !== 'jovie.eve.summer-bottleneck-dispatch/v1' ||
+    dispatchReceipt?.decision !== 'dispatched' ||
+    dispatchReceipt?.terminal !== false ||
     dispatchReceipt?.fingerprint !== fingerprint ||
     !verifySummerBottleneckReceipt(
       dispatchReceipt,
-      dependencies.receiptSigningKey
+      dependencies.receiptSigningKey,
+      recordPaths.dispatch
     )
   ) {
     throw new Error('dispatch receipt is invalid');
@@ -573,29 +731,24 @@ async function processStoredSnapshot(
       idempotencyKey: fingerprint,
     });
   } catch {
-    return signedReceipt(
-      {
-        ...baseReceipt(snapshot, dependencies, selected, fingerprint, ranking),
-        decision: 'pending-observation',
-        symphony: { handle },
-        terminal: false,
-      },
-      dependencies.receiptSigningKey
-    );
+    return signFor(dependencies, {
+      ...baseReceipt(snapshot, dependencies, selected, fingerprint, ranking),
+      decision: 'pending-observation',
+      symphony: { handle },
+      terminal: false,
+    });
   }
   if (observed.status === 'pending') {
-    return signedReceipt(
-      {
-        ...baseReceipt(snapshot, dependencies, selected, fingerprint, ranking),
-        decision: 'pending-symphony',
-        symphony: { handle },
-        terminal: false,
-      },
-      dependencies.receiptSigningKey
-    );
+    return signFor(dependencies, {
+      ...baseReceipt(snapshot, dependencies, selected, fingerprint, ranking),
+      decision: 'pending-symphony',
+      symphony: { handle },
+      terminal: false,
+    });
   }
 
-  const outcome = signedReceipt(
+  const outcome = signFor(
+    dependencies,
     {
       ...baseReceipt(snapshot, dependencies, selected, fingerprint, ranking),
       schema: 'jovie.eve.summer-bottleneck-outcome/v1',
@@ -606,7 +759,7 @@ async function processStoredSnapshot(
       symphony: { handle, detail: observed.detail },
       terminal: true,
     },
-    dependencies.receiptSigningKey
+    recordPaths.outcome
   );
   const outcomeWrite = await dependencies.store.create(
     recordPaths.outcome!,
@@ -627,8 +780,18 @@ export async function ingestSummerBottleneckSnapshot(
   dependencies: SummerBottleneckDependencies
 ): Promise<SummerBottleneckRecord> {
   const snapshot = summerBottleneckSnapshotSchema.parse(input);
+  if (
+    !verifySummerBottleneckProducerAttestation(
+      snapshot,
+      dependencies.producerVerificationKeys
+    )
+  ) {
+    throw new Error('bottleneck producer attestation is invalid');
+  }
   validateFreshness(snapshot, dependencies.now());
-  const eventReceipt = signedReceipt(
+  const eventPath = paths(snapshot).event;
+  const eventReceipt = signFor(
+    dependencies,
     {
       schema: 'jovie.eve.summer-bottleneck-event/v1',
       eventId: snapshot.eventId,
@@ -636,25 +799,21 @@ export async function ingestSummerBottleneckSnapshot(
       sourceVersion: snapshot.sourceVersion,
       snapshotDigest: digest(snapshot),
     },
-    dependencies.receiptSigningKey
+    eventPath
   );
-  const eventPath = paths(snapshot).event;
   if ((await dependencies.store.create(eventPath, eventReceipt)) === 'exists') {
     const existing = await dependencies.store.read(eventPath);
     if (!existing || digest(existing) !== digest(eventReceipt)) {
       throw new Error('bottleneck event conflict');
     }
-    return signedReceipt(
-      {
-        schema: 'jovie.eve.summer-bottleneck-receipt/v1',
-        eventId: snapshot.eventId,
-        decision: 'duplicate-replay-rejected',
-        owner: 'Summer',
-        handle: 'summer',
-        terminal: true,
-      },
-      dependencies.receiptSigningKey
-    );
+    return signFor(dependencies, {
+      schema: 'jovie.eve.summer-bottleneck-receipt/v1',
+      eventId: snapshot.eventId,
+      decision: 'duplicate-replay-rejected',
+      owner: 'Summer',
+      handle: 'summer',
+      terminal: true,
+    });
   }
   return processStoredSnapshot(snapshot, dependencies);
 }
@@ -662,27 +821,224 @@ export async function ingestSummerBottleneckSnapshot(
 export async function reconcileMissedSummerBottleneckEvents(
   dependencies: SummerBottleneckDependencies
 ): Promise<readonly SummerBottleneckRecord[]> {
-  const events = await dependencies.store.list(`${PREFIX}/events/`);
   const reconciled: SummerBottleneckRecord[] = [];
-  for (const entry of [...events]
-    .sort((left, right) => left.pathname.localeCompare(right.pathname))
-    .slice(0, 25)) {
-    const eventReceipt = entry.record;
-    if (
-      !verifySummerBottleneckReceipt(
-        eventReceipt,
-        dependencies.receiptSigningKey
-      )
-    ) {
-      continue;
-    }
-    const parsed = summerBottleneckSnapshotSchema.safeParse(
-      eventReceipt.snapshot
-    );
-    if (!parsed.success) continue;
-    if (entry.pathname !== paths(parsed.data).event) continue;
-    if (await dependencies.store.read(paths(parsed.data).terminal)) continue;
-    reconciled.push(await processStoredSnapshot(parsed.data, dependencies));
+  const cursorPath = `${PREFIX}/recovery-cursor.json`;
+  let storedCursor: SummerBottleneckRecord | null = null;
+  try {
+    storedCursor = await dependencies.store.read(cursorPath);
+  } catch {
+    // A corrupt mutable checkpoint must not block durable event recovery.
   }
+  let cursor =
+    storedCursor?.schema === 'jovie.eve.summer-bottleneck-cursor/v1' &&
+    (typeof storedCursor.cursor === 'string' || storedCursor.cursor === null) &&
+    verifySummerBottleneckReceipt(
+      storedCursor,
+      dependencies.receiptSigningKey,
+      cursorPath
+    )
+      ? (storedCursor.cursor ?? undefined)
+      : undefined;
+  let scanned = 0;
+  let attempted = 0;
+  let hasMore = true;
+  const observedCursors = new Set<string>();
+  while (
+    hasMore &&
+    scanned < MAX_SCANNED_EVENTS &&
+    attempted < MAX_RECONCILED_EVENTS
+  ) {
+    const requestedCursor = cursor;
+    const page = await dependencies.store.list(`${PREFIX}/events/`, {
+      ...(requestedCursor ? { cursor: requestedCursor } : {}),
+      limit: Math.min(
+        MAX_RECONCILED_EVENTS - attempted,
+        MAX_SCANNED_EVENTS - scanned
+      ),
+    });
+    if (
+      page.hasMore &&
+      (!page.cursor ||
+        page.cursor === requestedCursor ||
+        observedCursors.has(page.cursor))
+    ) {
+      reconciled.push(
+        signFor(dependencies, {
+          schema: 'jovie.eve.summer-bottleneck-receipt/v1',
+          decision: 'recovery-cursor-conflict',
+          observedAt: dependencies.now().toISOString(),
+          terminal: false,
+        })
+      );
+      cursor = undefined;
+      hasMore = false;
+      break;
+    }
+    if (page.cursor) observedCursors.add(page.cursor);
+    hasMore = page.hasMore;
+    cursor = page.cursor;
+    scanned += page.scanned;
+    for (const entry of page.entries) {
+      const eventReceipt = entry.record;
+      if (
+        eventReceipt.schema !== 'jovie.eve.summer-bottleneck-event/v1' ||
+        !verifySummerBottleneckReceipt(
+          eventReceipt,
+          dependencies.receiptSigningKey,
+          entry.pathname
+        )
+      ) {
+        continue;
+      }
+      const parsed = summerBottleneckSnapshotSchema.safeParse(
+        eventReceipt.snapshot
+      );
+      if (!parsed.success) continue;
+      if (
+        !verifySummerBottleneckProducerAttestation(
+          parsed.data,
+          dependencies.producerVerificationKeys
+        )
+      ) {
+        continue;
+      }
+      if (entry.pathname !== paths(parsed.data).event) continue;
+      if (
+        eventReceipt.eventId !== parsed.data.eventId ||
+        eventReceipt.sourceVersion !== parsed.data.sourceVersion ||
+        eventReceipt.snapshotDigest !== digest(parsed.data)
+      ) {
+        continue;
+      }
+      let attemptCounted = false;
+      try {
+        let terminal: SummerBottleneckRecord | null;
+        try {
+          terminal = await dependencies.store.read(paths(parsed.data).terminal);
+        } catch {
+          attempted += 1;
+          attemptCounted = true;
+          reconciled.push(
+            signFor(dependencies, {
+              ...baseReceipt(parsed.data, dependencies, null, null),
+              decision: 'recovery-terminal-read-failed',
+              terminal: false,
+            })
+          );
+          continue;
+        }
+        if (terminal) {
+          const source = terminal.source as
+            | { sourceVersion?: unknown; snapshotDigest?: unknown }
+            | undefined;
+          const validTerminal =
+            [
+              'healthy-noop',
+              'held-out-of-envelope',
+              'recovery-expired-noop',
+              'symphony-failed',
+              'symphony-succeeded',
+              'unchanged-noop',
+            ].includes(String(terminal.decision)) &&
+            [
+              'jovie.eve.summer-bottleneck-outcome/v1',
+              'jovie.eve.summer-bottleneck-receipt/v1',
+            ].includes(String(terminal.schema)) &&
+            terminal.eventId === parsed.data.eventId &&
+            terminal.terminal === true &&
+            source?.sourceVersion === parsed.data.sourceVersion &&
+            source.snapshotDigest === digest(parsed.data) &&
+            verifySummerBottleneckReceipt(
+              terminal,
+              dependencies.receiptSigningKey,
+              paths(parsed.data).terminal
+            );
+          if (validTerminal) continue;
+          attempted += 1;
+          attemptCounted = true;
+          const conflict = signFor(
+            dependencies,
+            {
+              ...baseReceipt(parsed.data, dependencies, null, null),
+              observedAt: parsed.data.observedAt,
+              conflictingTerminalDigest: digest(terminal),
+              decision: 'invalid-terminal-conflict',
+              terminal: false,
+            },
+            paths(parsed.data).conflict
+          );
+          const conflictWrite = await dependencies.store.create(
+            paths(parsed.data).conflict,
+            conflict
+          );
+          const persistedConflict =
+            conflictWrite === 'created'
+              ? conflict
+              : await dependencies.store.read(paths(parsed.data).conflict);
+          if (
+            !persistedConflict ||
+            digest(persistedConflict) !== digest(conflict)
+          ) {
+            throw new Error('terminal conflict receipt is itself conflicted');
+          }
+          reconciled.push(persistedConflict);
+          continue;
+        }
+        attempted += 1;
+        attemptCounted = true;
+        const recoveryAgeMs =
+          dependencies.now().getTime() - Date.parse(parsed.data.observedAt);
+        if (
+          !Number.isFinite(recoveryAgeMs) ||
+          recoveryAgeMs < -MAX_CLOCK_SKEW_MS
+        ) {
+          reconciled.push(
+            signFor(dependencies, {
+              ...baseReceipt(parsed.data, dependencies, null, null),
+              decision: 'recovery-clock-conflict',
+              terminal: false,
+            })
+          );
+          continue;
+        }
+        if (recoveryAgeMs > MAX_RECOVERY_AGE_MS) {
+          reconciled.push(
+            await persistTerminal(dependencies, parsed.data, {
+              ...baseReceipt(parsed.data, dependencies, null, null),
+              decision: 'recovery-expired-noop',
+              recoveryAgeMs,
+              terminal: true,
+            })
+          );
+          continue;
+        }
+        reconciled.push(await processStoredSnapshot(parsed.data, dependencies));
+      } catch {
+        if (!attemptCounted) attempted += 1;
+        reconciled.push(
+          signFor(dependencies, {
+            ...baseReceipt(parsed.data, dependencies, null, null),
+            decision: 'recovery-processing-failed',
+            terminal: false,
+          })
+        );
+      }
+    }
+    if (page.scanned === 0 && page.hasMore) {
+      throw new Error('recovery cursor did not advance');
+    }
+  }
+  await dependencies.store.write(
+    cursorPath,
+    signFor(
+      dependencies,
+      {
+        schema: 'jovie.eve.summer-bottleneck-cursor/v1',
+        cursor: hasMore ? (cursor ?? null) : null,
+        observedAt: dependencies.now().toISOString(),
+      },
+      cursorPath
+    )
+  );
   return reconciled;
 }
