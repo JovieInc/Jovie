@@ -10,7 +10,6 @@ import unittest
 from datetime import datetime, timedelta, timezone
 from unittest import mock
 
-
 ROOT = pathlib.Path(__file__).resolve().parents[3]
 MODULE_PATH = ROOT / "scripts/hermes/closure_health.py"
 SPEC = importlib.util.spec_from_file_location("closure_health", MODULE_PATH)
@@ -22,7 +21,6 @@ SPEC.loader.exec_module(MODULE)
 UTC = timezone.utc
 NOW = datetime(2026, 8, 28, 5, 0, tzinfo=UTC)
 DEFAULT_PROMOTION_EVIDENCE = object()
-
 
 def exact_green_promotion_evidence(number: int) -> dict[str, object]:
     return {
@@ -60,7 +58,6 @@ def exact_green_promotion_evidence(number: int) -> dict[str, object]:
         ],
     }
 
-
 def live_required_ruleset() -> list[dict[str, object]]:
     return [
         {
@@ -74,7 +71,6 @@ def live_required_ruleset() -> list[dict[str, object]]:
             },
         }
     ]
-
 
 def exact_named_check_commit(
     number: int, *, check_status: str = "COMPLETED", check_conclusion: str | None = "SUCCESS"
@@ -108,7 +104,6 @@ def exact_named_check_commit(
         }
     return commit
 
-
 def promotion_pr_state(number: int, *, head_oid: str | None = None) -> dict[str, object]:
     return {
         "state": "OPEN",
@@ -126,7 +121,6 @@ def promotion_pr_state(number: int, *, head_oid: str | None = None) -> dict[str,
         "labels": {"totalCount": 0, "nodes": []},
         "mergeQueueEntry": None,
     }
-
 
 def pr(
     number: int,
@@ -198,7 +192,6 @@ def pr(
     payload["files"] = {"totalCount": expected, "nodes": nodes}
     return payload
 
-
 def snapshot(**overrides: object) -> dict[str, object]:
     value: dict[str, object] = {
         "repository": "JovieInc/Jovie",
@@ -230,7 +223,6 @@ def snapshot(**overrides: object) -> dict[str, object]:
     value.update(overrides)
     return value
 
-
 def stack_pr(
     number: int,
     base_ref: str,
@@ -249,9 +241,7 @@ def stack_pr(
         head_ref=f"stack/test-{number}",
     )
 
-
 STACK_BODY = "<!-- stack-integrator: summer-test -->\n<!-- stack-deadline: 2026-09-02T00:00:00Z -->"
-
 
 def stack_health(layers: list[dict[str, object]]) -> tuple[dict[str, object], dict[str, object]]:
     result = MODULE.classify_open_prs(layers, NOW)
@@ -265,7 +255,6 @@ def stack_health(layers: list[dict[str, object]]) -> tuple[dict[str, object], di
         previous=None,
         now=NOW,
     )
-
 
 class ClosureClassificationTests(unittest.TestCase):
     def test_ready_ancestors_are_resolved_but_only_draft_groups_are_enforced(self):
@@ -1100,7 +1089,6 @@ class ClosureClassificationTests(unittest.TestCase):
         self.assertEqual(reasons[6], "malformed-native-queue-entry")
         self.assertEqual(result["expiredHolds"], [3])
 
-
 class ClosureHealthEvaluationTests(unittest.TestCase):
     def test_boundary_offset_timestamp_is_treated_as_missing_history(self):
         self.assertIsNone(MODULE.parse_time("0001-01-01T00:00:00+14:00"))
@@ -1366,7 +1354,6 @@ class ClosureHealthEvaluationTests(unittest.TestCase):
         self.assertIn("closure-observation-unknown", result["reasons"])
         self.assertIn("expired-held-prs", result["reasons"])
         self.assertIsNone(result["openPrs"])
-
 
 class ClosureObservationTests(unittest.TestCase):
     def test_promotion_evidence_binds_compare_checks_and_final_readback(self):
@@ -2339,7 +2326,6 @@ class ClosureObservationTests(unittest.TestCase):
 
         self.assertEqual(result["status"], "recovering")
         self.assertEqual(result["runId"], 44)
-
 
 if __name__ == "__main__":
     unittest.main()
