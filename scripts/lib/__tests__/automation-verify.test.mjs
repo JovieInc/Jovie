@@ -670,6 +670,7 @@ describe('automation-verify affected scope', () => {
         'scripts/lib/__tests__/agent-qc-wires.test.mjs',
         'scripts/lib/__tests__/needs-human-autoclose.test.mjs',
         'scripts/lib/__tests__/production-lane-range.test.mjs',
+        'scripts/lib/__tests__/preview-env-contract.test.mjs',
         'scripts/lib/__tests__/hermes-launchd.test.mjs',
       ],
     });

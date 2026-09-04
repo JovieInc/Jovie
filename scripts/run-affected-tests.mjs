@@ -291,6 +291,7 @@ const CI_CONTROL_SCRIPT_TESTS = [
   'scripts/lib/__tests__/agent-qc-wires.test.mjs',
   'scripts/lib/__tests__/needs-human-autoclose.test.mjs',
   'scripts/lib/__tests__/production-lane-range.test.mjs',
+  'scripts/lib/__tests__/preview-env-contract.test.mjs',
 ];
 const PRODUCT_LANE_FOUNDATION_PRIMARY_INPUTS = new Set([
   'scripts/lib/product-lane-classifier.mjs',
