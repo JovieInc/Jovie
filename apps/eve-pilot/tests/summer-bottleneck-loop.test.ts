@@ -1,3 +1,4 @@
+import { generateKeyPairSync } from 'node:crypto';
 import { describe, expect, it, vi } from 'vitest';
 import {
   ingestSummerBottleneckSnapshot,
@@ -6,12 +7,28 @@ import {
   type SummerBottleneckDependencies,
   type SummerBottleneckRecord,
   type SummerBottleneckStore,
+  signSummerBottleneckProducerAttestation,
   verifySummerBottleneckReceipt,
 } from '../agent/lib/summer-bottleneck-loop';
 
 const NOW = new Date('2026-09-02T08:00:00.000Z');
 const SOURCE = 'a'.repeat(40);
 const KEY = 'synthetic-summer-receipt-signing-key';
+const KEY_ID = 'eve-receipts-2026-09';
+const producerKeys = generateKeyPairSync('ed25519');
+const PRODUCER_PRIVATE_KEY = producerKeys.privateKey
+  .export({
+    format: 'pem',
+    type: 'pkcs8',
+  })
+  .toString();
+const PRODUCER_PUBLIC_KEY = producerKeys.publicKey
+  .export({
+    format: 'pem',
+    type: 'spki',
+  })
+  .toString();
+const PRODUCER_KEY_ID = 'jovie-production-2026-09';
 
 function snapshot(
   overrides: {
@@ -24,44 +41,53 @@ function snapshot(
     ciAudit?: Record<string, unknown>;
   } = {}
 ) {
-  return {
+  const source = overrides.sourceVersion ?? SOURCE;
+  const body = {
     schema: 'jovie.eve.summer-bottleneck-snapshot/v1',
     eventId: overrides.eventId ?? 'evt_bottleneck_0001',
     observedAt: NOW.toISOString(),
-    sourceVersion: overrides.sourceVersion ?? SOURCE,
+    sourceVersion: source,
     signals: {
       closure: {
-        schema: 'jovie-closure-health/v1',
+        schema: 'jovie.eve.summer-closure-projection/v1',
+        sourceSchema: 'jovie-closure-health/v1',
         observedAt: NOW.toISOString(),
-        sourceRevision: SOURCE,
+        sourceDigest: '1'.repeat(64),
+        sourceRevision: source,
         status: 'healthy',
         blockedSince: null,
         openPullRequests: 12,
         ...overrides.closure,
       },
       queue: {
-        schema: 'github-merge-queue-entry/v1',
+        schema: 'jovie.eve.summer-queue-projection/v1',
+        sourceSchema: 'github-merge-queue-entry/v1',
         observedAt: NOW.toISOString(),
-        sourceRevision: SOURCE,
+        sourceDigest: '2'.repeat(64),
+        sourceRevision: source,
         blockedSince: null,
         eligibleCleanPrs: 0,
         queuedPrs: 0,
         ...overrides.queue,
       },
       release: {
-        schema: 'jovie-controller-snapshot/v1',
+        schema: 'jovie.eve.summer-release-projection/v1',
+        sourceSchema: 'jovie-controller-snapshot/v1',
         observedAt: NOW.toISOString(),
-        sourceRevision: SOURCE,
+        sourceDigest: '3'.repeat(64),
+        sourceRevision: source,
         blockedSince: '2026-09-02T07:00:00.000Z',
-        mainSha: SOURCE,
+        mainSha: source,
         productionSha: 'b'.repeat(40),
         unverifiedMerges: 3,
         ...overrides.release,
       },
       runner: {
-        schema: 'symphony-lease-guard-report/v1',
+        schema: 'jovie.eve.summer-runner-projection/v1',
+        sourceSchema: 'symphony-lease-guard-report/v1',
         observedAt: NOW.toISOString(),
-        sourceRevision: SOURCE,
+        sourceDigest: '4'.repeat(64),
+        sourceRevision: source,
         blockedSince: null,
         capacityAvailable: 2,
         queuedWork: 0,
@@ -70,7 +96,8 @@ function snapshot(
       ciAudit: {
         schema: 'jovie-ci-bottleneck-audit/v1',
         observedAt: NOW.toISOString(),
-        sourceRevision: SOURCE,
+        sourceDigest: '5'.repeat(64),
+        sourceRevision: source,
         classes: [
           {
             id: 'merge-group-flake-baseline-ratchet',
@@ -125,6 +152,14 @@ function snapshot(
       },
     },
   };
+  return {
+    ...body,
+    producerAttestation: signSummerBottleneckProducerAttestation(
+      body,
+      PRODUCER_PRIVATE_KEY,
+      PRODUCER_KEY_ID
+    ),
+  };
 }
 
 function memoryStore(records = new Map<string, SummerBottleneckRecord>()) {
@@ -137,10 +172,23 @@ function memoryStore(records = new Map<string, SummerBottleneckRecord>()) {
     async read(pathname) {
       return records.get(pathname) ?? null;
     },
-    async list(prefix) {
-      return [...records.entries()]
+    async list(prefix, options) {
+      const matching = [...records.entries()]
         .filter(([pathname]) => pathname.startsWith(prefix))
-        .map(([pathname, record]) => ({ pathname, record }));
+        .sort(([left], [right]) => left.localeCompare(right));
+      const start = Number(options.cursor ?? 0);
+      const end = Math.min(start + options.limit, matching.length);
+      return {
+        ...(end < matching.length ? { cursor: String(end) } : {}),
+        entries: matching
+          .slice(start, end)
+          .map(([pathname, record]) => ({ pathname, record })),
+        hasMore: end < matching.length,
+        scanned: end - start,
+      };
+    },
+    async write(pathname, record) {
+      records.set(pathname, record);
     },
   };
   return { records, store };
@@ -161,7 +209,9 @@ function harness(
     dispatchToSymphony,
     now: () => NOW,
     observeSymphonyOutcome,
+    producerVerificationKeys: new Map([[PRODUCER_KEY_ID, PRODUCER_PUBLIC_KEY]]),
     receiptSigningKey: KEY,
+    receiptSigningKeyId: KEY_ID,
     store: store.store,
     ...overrides,
   };
@@ -409,7 +459,12 @@ describe('Summer bottleneck loop', () => {
 
     await expect(
       reconcileMissedSummerBottleneckEvents(harness(shared).dependencies)
-    ).rejects.toThrow('bottleneck claim conflict');
+    ).resolves.toEqual([
+      expect.objectContaining({
+        decision: 'recovery-processing-failed',
+        terminal: false,
+      }),
+    ]);
   });
 
   it('accepts an atomic dispatch-receipt race only when the stored receipt is valid', async () => {
@@ -452,7 +507,38 @@ describe('Summer bottleneck loop', () => {
 
     await expect(
       reconcileMissedSummerBottleneckEvents(harness(shared).dependencies)
-    ).rejects.toThrow('dispatch receipt is invalid');
+    ).resolves.toEqual([
+      expect.objectContaining({
+        decision: 'recovery-processing-failed',
+        terminal: false,
+      }),
+    ]);
+  });
+
+  it('rejects a signed claim copied into the outcome path', async () => {
+    const shared = memoryStore();
+    const pending = harness(shared, {
+      dispatchToSymphony: vi.fn(async () => {
+        throw new Error('leave pending');
+      }),
+    });
+    await expect(
+      ingestSummerBottleneckSnapshot(snapshot(), pending.dependencies)
+    ).rejects.toThrow();
+    const claim = [...shared.records.values()].find(
+      record => record.schema === 'jovie.eve.summer-bottleneck-claim/v1'
+    );
+    expect(claim).toBeDefined();
+    shared.records.set(
+      `summer-bottleneck/outcomes/${String(claim?.fingerprint)}.json`,
+      claim!
+    );
+
+    await expect(
+      reconcileMissedSummerBottleneckEvents(harness(shared).dependencies)
+    ).resolves.toEqual([
+      expect.objectContaining({ decision: 'recovery-processing-failed' }),
+    ]);
   });
 
   it('reconciles one missed event after a transient dispatch failure', async () => {
@@ -585,6 +671,72 @@ describe('Summer bottleneck loop', () => {
     ).resolves.toEqual([]);
   });
 
+  it('surfaces a forged terminal instead of treating it as complete', async () => {
+    const shared = memoryStore();
+    const proof = harness(shared);
+    await ingestSummerBottleneckSnapshot(snapshot(), proof.dependencies);
+    const terminalPath = [...shared.records.keys()].find(path =>
+      path.includes('/terminal/')
+    );
+    expect(terminalPath).toBeDefined();
+    shared.records.set(terminalPath!, { terminal: true, signature: 'forged' });
+
+    await expect(
+      reconcileMissedSummerBottleneckEvents(proof.dependencies)
+    ).resolves.toEqual([
+      expect.objectContaining({
+        decision: 'invalid-terminal-conflict',
+        terminal: false,
+      }),
+    ]);
+    expect(
+      [...shared.records.keys()].some(path => path.includes('/conflicts/'))
+    ).toBe(true);
+  });
+
+  it('isolates a forged terminal with an already-conflicting conflict receipt', async () => {
+    const shared = memoryStore();
+    for (const [eventId, sourceVersion] of [
+      ['evt_conflict_poison_0001', 'f'.repeat(40)],
+      ['evt_conflict_poison_0002', '9'.repeat(40)],
+    ] as const) {
+      const failed = harness(shared, {
+        dispatchToSymphony: vi.fn(async () => {
+          throw new Error('leave pending');
+        }),
+      });
+      await expect(
+        ingestSummerBottleneckSnapshot(
+          snapshot({ eventId, sourceVersion }),
+          failed.dependencies
+        )
+      ).rejects.toThrow('leave pending');
+    }
+
+    const firstEventPath = [...shared.records.keys()]
+      .filter(path => path.includes('/events/'))
+      .sort((left, right) => left.localeCompare(right))[0];
+    expect(firstEventPath).toBeDefined();
+    shared.records.set(firstEventPath!.replace('/events/', '/terminal/'), {
+      terminal: true,
+      signature: 'forged',
+    });
+    shared.records.set(firstEventPath!.replace('/events/', '/conflicts/'), {
+      decision: 'different-conflict',
+      signature: 'forged',
+    });
+
+    const recovered = await reconcileMissedSummerBottleneckEvents(
+      harness(shared).dependencies
+    );
+    expect(recovered).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ decision: 'recovery-processing-failed' }),
+        expect.objectContaining({ decision: 'symphony-succeeded' }),
+      ])
+    );
+  });
+
   it('skips forged or path-rebound event records during heartbeat reconciliation', async () => {
     const shared = memoryStore();
     shared.records.set('summer-bottleneck/events/forged.json', {
@@ -631,7 +783,7 @@ describe('Summer bottleneck loop', () => {
     const unsigned = harness(memoryStore(), { receiptSigningKey: '' });
     await expect(
       ingestSummerBottleneckSnapshot(snapshot(), unsigned.dependencies)
-    ).rejects.toThrow('receipt signing key is unavailable');
+    ).rejects.toThrow('receipt signing authority is unavailable');
 
     const badClock = harness(memoryStore(), { now: () => new Date('invalid') });
     await expect(
@@ -655,6 +807,10 @@ describe('Summer bottleneck loop', () => {
       },
     ],
     ['unbound', { sourceVersion: 'not-a-sha' }],
+    [
+      'cross-bound producer revision',
+      { closure: { sourceRevision: 'b'.repeat(40) } },
+    ],
   ])('fails closed for a %s source snapshot', async (_name, change) => {
     const proof = harness();
     await expect(
@@ -663,6 +819,16 @@ describe('Summer bottleneck loop', () => {
         proof.dependencies
       )
     ).rejects.toThrow();
+    expect(proof.dispatchToSymphony).not.toHaveBeenCalled();
+  });
+
+  it('rejects projection mutation without a matching producer attestation', async () => {
+    const forged = snapshot();
+    forged.signals.release.unverifiedMerges = 99;
+    const proof = harness();
+    await expect(
+      ingestSummerBottleneckSnapshot(forged, proof.dependencies)
+    ).rejects.toThrow('bottleneck producer attestation is invalid');
     expect(proof.dispatchToSymphony).not.toHaveBeenCalled();
   });
 });
