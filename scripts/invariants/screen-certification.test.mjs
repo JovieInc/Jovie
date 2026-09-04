@@ -1,6 +1,14 @@
 import assert from 'node:assert/strict';
-import { readFileSync } from 'node:fs';
-import { dirname, resolve } from 'node:path';
+import { createHash } from 'node:crypto';
+import {
+  mkdirSync,
+  mkdtempSync,
+  readFileSync,
+  rmSync,
+  writeFileSync,
+} from 'node:fs';
+import { tmpdir } from 'node:os';
+import { dirname, join, resolve } from 'node:path';
 import { describe, it } from 'node:test';
 import { fileURLToPath } from 'node:url';
 import { readInvariantRegistry } from './registry.mjs';
@@ -23,6 +31,7 @@ import {
   validateRetainedSweeps,
   validateScreenRegistry,
 } from './screen-certification.mjs';
+import { emitScreenProof } from './screen-proof-emit.mjs';
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '../..');
 const HEAD = 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa';
@@ -30,6 +39,8 @@ const gated = () => SCREEN_REGISTRY.filter(entry => !entry.excluded);
 const home = () => SCREEN_REGISTRY.find(e => e.id === 'web.homepage');
 const protectedSources = () => Object.keys(PROTECTED_REVENUE_SCREEN_SOURCES);
 const kindOf = path => classifyScreenPath(path).kind;
+const digestFile = path =>
+  `sha256:${createHash('sha256').update(readFileSync(path)).digest('hex')}`;
 function validExternalProof(screen = gated()[0], headSha = HEAD) {
   return {
     schema: SCREEN_BROWSER_PROOF_SCHEMA,
@@ -85,6 +96,10 @@ describe('JOV-INV-018 screen-certification/v2', () => {
       kindOf(
         'apps/ios/Jovie/Features/Dashboard/PublicProfileBrowserView.swift'
       ),
+      'registered'
+    );
+    assert.equal(
+      kindOf('apps/ios/Jovie/Features/Library/LibrarySurfaceView.swift'),
       'registered'
     );
     assert.equal(kindOf('apps/web/app/(home)/page.tsx'), 'registered');
@@ -169,7 +184,7 @@ describe('JOV-INV-018 screen-certification/v2', () => {
     assert.deepEqual(rows, [['web.homepage', 'evidence-required']]);
   });
 
-  it('does not certify caller-authored proof before trusted artifact verification exists', () => {
+  it('does not certify caller-authored proof without rendered artifact bytes', () => {
     const screen = home();
     const result = runScreenCertification({
       headSha: HEAD,
@@ -181,8 +196,156 @@ describe('JOV-INV-018 screen-certification/v2', () => {
     assert.equal(result.receipt.status, 'blocked');
     assert.match(
       result.receipt.issues.join('\n'),
-      /trusted external artifact verification is not installed/
+      /proof artifactPath is required; caller-authored proof cannot certify/
     );
+  });
+
+  it('certifies when rendered artifact bytes reverify against the proof digest', () => {
+    const screen = home();
+    const artifactRoot = mkdtempSync(join(tmpdir(), 'screen-cert-'));
+    try {
+      writeFileSync(
+        join(artifactRoot, 'homepage-bundle.bin'),
+        'rendered-stills'
+      );
+      const artifactDigest = digestFile(
+        join(artifactRoot, 'homepage-bundle.bin')
+      );
+      const proof = {
+        ...validExternalProof(screen),
+        artifactPath: 'homepage-bundle.bin',
+        artifactDigest,
+      };
+      const result = runScreenCertification({
+        headSha: HEAD,
+        changedFiles: ['apps/web/app/(home)/page.tsx'],
+        proofs: [proof],
+        artifactRoot,
+      });
+      assert.equal(result.ok, true, result.receipt.issues.join('\n'));
+      assert.equal(result.receipt.certified, true);
+      assert.equal(result.receipt.status, 'certified');
+      assert.equal(result.receipt.registrationOnly, false);
+      assert.deepEqual(result.receipt.changedScreens, [
+        {
+          id: 'web.homepage',
+          verdict: 'pass',
+          findings: [],
+          artifactDigest,
+          rendererRunUrl: proof.runUrl,
+        },
+      ]);
+    } finally {
+      rmSync(artifactRoot, { force: true, recursive: true });
+    }
+  });
+
+  it('blocks when artifact bytes are missing, foreign, or digest-mismatched', () => {
+    const screen = home();
+    const artifactRoot = mkdtempSync(join(tmpdir(), 'screen-cert-'));
+    try {
+      writeFileSync(join(artifactRoot, 'bundle.bin'), 'rendered-stills');
+      const base = {
+        ...validExternalProof(screen),
+        artifactDigest: digestFile(join(artifactRoot, 'bundle.bin')),
+      };
+      const run = proof =>
+        runScreenCertification({
+          headSha: HEAD,
+          changedFiles: ['apps/web/app/(home)/page.tsx'],
+          proofs: [proof],
+          artifactRoot,
+        });
+      const missing = run({ ...base, artifactPath: 'absent.bin' });
+      assert.equal(missing.receipt.certified, false);
+      assert.match(
+        missing.receipt.issues.join('\n'),
+        /artifact bytes are unreadable/
+      );
+      const mismatched = run({
+        ...base,
+        artifactPath: 'bundle.bin',
+        artifactDigest: `sha256:${'c'.repeat(64)}`,
+      });
+      assert.equal(mismatched.receipt.certified, false);
+      assert.match(
+        mismatched.receipt.issues.join('\n'),
+        /artifactDigest does not match the rendered artifact bytes/
+      );
+      const escaping = run({ ...base, artifactPath: '../outside.bin' });
+      assert.equal(escaping.receipt.certified, false);
+      assert.match(
+        escaping.receipt.issues.join('\n'),
+        /escapes the artifact root/
+      );
+    } finally {
+      rmSync(artifactRoot, { force: true, recursive: true });
+    }
+  });
+
+  it('emits a certifying proof only from a real render bundle (screen-proof-emit)', () => {
+    const artifactRoot = mkdtempSync(join(tmpdir(), 'screen-proof-emit-'));
+    try {
+      const bundle = join(artifactRoot, 'bundle');
+      mkdirSync(bundle);
+      writeFileSync(join(bundle, 'desktop.png'), 'desktop-still');
+      writeFileSync(join(bundle, 'mobile.png'), 'mobile-still');
+      const screen = home();
+      const measurements = {
+        capturedAt: '2026-09-03T00:00:00.000Z',
+        viewports: screen.viewports.map(id => ({
+          id,
+          decision: 'pass',
+          rendered: true,
+          axe: { violations: 0 },
+          overflow: { maxHorizontalPx: 0 },
+          interaction: { passed: true },
+          cls: { value: 0 },
+        })),
+        activeFlow: { disclosure: false },
+        historyProof: { separate: true, path: 'docs/VISUAL_TESTING_POLICY.md' },
+        visibleActions: ['Find me'],
+      };
+      const proof = emitScreenProof({
+        screenId: screen.id,
+        headSha: HEAD,
+        runUrl: 'https://github.com/JovieInc/Jovie/actions/runs/123456789',
+        bundle: 'bundle',
+        measurements,
+        artifactRoot,
+      });
+      assert.equal(proof.schema, SCREEN_BROWSER_PROOF_SCHEMA);
+      assert.equal(proof.artifactPath, 'bundle');
+      assert.match(proof.artifactDigest, /^sha256:[0-9a-f]{64}$/);
+      const result = runScreenCertification({
+        headSha: HEAD,
+        changedFiles: ['apps/web/app/(home)/page.tsx'],
+        proofs: [proof],
+        artifactRoot,
+      });
+      assert.equal(result.ok, true, result.receipt.issues.join('\n'));
+      assert.equal(result.receipt.certified, true);
+      // The emitter refuses to mint a proof the gate would reject.
+      assert.throws(
+        () =>
+          emitScreenProof({
+            screenId: screen.id,
+            headSha: HEAD,
+            runUrl: 'https://github.com/JovieInc/Jovie/actions/runs/123456789',
+            bundle: 'bundle',
+            measurements: {
+              ...measurements,
+              viewports: measurements.viewports.map((viewport, index) =>
+                index === 0 ? { ...viewport, cls: { value: 0.5 } } : viewport
+              ),
+            },
+            artifactRoot,
+          }),
+        /refusing to emit a non-certifying proof/
+      );
+    } finally {
+      rmSync(artifactRoot, { force: true, recursive: true });
+    }
   });
 
   it('fails closed by default without external evidence', () => {
@@ -326,6 +489,265 @@ describe('JOV-INV-018 screen-certification/v2', () => {
     assert.deepEqual(result.changedScreens, [
       {
         id: 'web.engineering-publication',
+        verdict: 'evidence-required',
+        findings: [],
+      },
+    ]);
+  });
+
+  it('registers the marketing AI landing page for changed-surface certification', () => {
+    const source = 'apps/web/app/(marketing)/ai/page.tsx';
+    const screen = SCREEN_REGISTRY.find(
+      entry => entry.id === 'web.marketing-ai'
+    );
+
+    assert.deepEqual(screen, {
+      id: 'web.marketing-ai',
+      platform: 'web',
+      owner: 'marketing-ai',
+      sources: [source],
+      viewports: ['desktop', 'mobile'],
+    });
+
+    const result = evaluateChangedScreens({
+      changedFiles: [{ path: source, status: 'A' }],
+      headSha: HEAD,
+    });
+    assert.deepEqual(result.issues, []);
+    assert.deepEqual(result.changedScreens, [
+      { id: 'web.marketing-ai', verdict: 'evidence-required', findings: [] },
+    ]);
+  });
+
+  it('registers the alternatives marketing surfaces for changed-surface certification', () => {
+    const source = 'apps/web/app/(marketing)/alternatives/';
+    const screen = SCREEN_REGISTRY.find(
+      entry => entry.id === 'web.marketing-alternatives'
+    );
+
+    assert.deepEqual(screen, {
+      id: 'web.marketing-alternatives',
+      platform: 'web',
+      owner: 'marketing-alternatives',
+      sources: [source],
+      viewports: ['desktop', 'mobile'],
+    });
+
+    const result = evaluateChangedScreens({
+      changedFiles: [
+        {
+          path: 'apps/web/app/(marketing)/alternatives/[slug]/page.tsx',
+          status: 'M',
+        },
+      ],
+      headSha: HEAD,
+    });
+    assert.deepEqual(result.issues, []);
+    assert.deepEqual(result.changedScreens, [
+      {
+        id: 'web.marketing-alternatives',
+        verdict: 'evidence-required',
+        findings: [],
+      },
+    ]);
+  });
+
+  it('registers the marketing download page for changed-surface certification', () => {
+    const source = 'apps/web/app/(marketing)/download/page.tsx';
+    const screen = SCREEN_REGISTRY.find(
+      entry => entry.id === 'web.marketing-download'
+    );
+
+    assert.deepEqual(screen, {
+      id: 'web.marketing-download',
+      platform: 'web',
+      owner: 'marketing-download',
+      sources: [source],
+      viewports: ['desktop', 'mobile'],
+    });
+
+    const result = evaluateChangedScreens({
+      changedFiles: [{ path: source, status: 'M' }],
+      headSha: HEAD,
+    });
+    assert.deepEqual(result.issues, []);
+    assert.deepEqual(result.changedScreens, [
+      {
+        id: 'web.marketing-download',
+        verdict: 'evidence-required',
+        findings: [],
+      },
+    ]);
+  });
+
+  it('registers the marketing investors page for changed-surface certification', () => {
+    const source = 'apps/web/app/(marketing)/investors/page.tsx';
+    const screen = SCREEN_REGISTRY.find(
+      entry => entry.id === 'web.marketing-investors'
+    );
+
+    assert.deepEqual(screen, {
+      id: 'web.marketing-investors',
+      platform: 'web',
+      owner: 'marketing-investors',
+      sources: [source],
+      viewports: ['desktop', 'mobile'],
+    });
+
+    const result = evaluateChangedScreens({
+      changedFiles: [{ path: source, status: 'M' }],
+      headSha: HEAD,
+    });
+    assert.deepEqual(result.issues, []);
+    assert.deepEqual(result.changedScreens, [
+      {
+        id: 'web.marketing-investors',
+        verdict: 'evidence-required',
+        findings: [],
+      },
+    ]);
+  });
+
+  it('registers the marketing launch page for changed-surface certification', () => {
+    const source = 'apps/web/app/(marketing)/launch/page.tsx';
+    const screen = SCREEN_REGISTRY.find(
+      entry => entry.id === 'web.marketing-launch'
+    );
+
+    assert.deepEqual(screen, {
+      id: 'web.marketing-launch',
+      platform: 'web',
+      owner: 'marketing-launch',
+      sources: [source],
+      viewports: ['desktop', 'mobile'],
+    });
+
+    const result = evaluateChangedScreens({
+      changedFiles: [{ path: source, status: 'M' }],
+      headSha: HEAD,
+    });
+    assert.deepEqual(result.issues, []);
+    assert.deepEqual(result.changedScreens, [
+      {
+        id: 'web.marketing-launch',
+        verdict: 'evidence-required',
+        findings: [],
+      },
+    ]);
+  });
+
+  it('registers the marketing not-found page for changed-surface certification', () => {
+    const source = 'apps/web/app/(marketing)/not-found.tsx';
+    const screen = SCREEN_REGISTRY.find(
+      entry => entry.id === 'web.marketing-not-found'
+    );
+
+    assert.deepEqual(screen, {
+      id: 'web.marketing-not-found',
+      platform: 'web',
+      owner: 'marketing-not-found',
+      sources: [source],
+      viewports: ['desktop', 'mobile'],
+    });
+
+    const result = evaluateChangedScreens({
+      changedFiles: [{ path: source, status: 'M' }],
+      headSha: HEAD,
+    });
+    assert.deepEqual(result.issues, []);
+    assert.deepEqual(result.changedScreens, [
+      {
+        id: 'web.marketing-not-found',
+        verdict: 'evidence-required',
+        findings: [],
+      },
+    ]);
+  });
+
+  it('registers the renders marketing surfaces for changed-surface certification', () => {
+    const source = 'apps/web/app/(marketing)/renders/';
+    const screen = SCREEN_REGISTRY.find(
+      entry => entry.id === 'web.marketing-renders'
+    );
+
+    assert.deepEqual(screen, {
+      id: 'web.marketing-renders',
+      platform: 'web',
+      owner: 'marketing-renders',
+      sources: [source],
+      viewports: ['desktop', 'mobile'],
+    });
+
+    const result = evaluateChangedScreens({
+      changedFiles: [
+        { path: 'apps/web/app/(marketing)/renders/page.tsx', status: 'M' },
+        {
+          path: 'apps/web/app/(marketing)/renders/[state]/page.tsx',
+          status: 'M',
+        },
+      ],
+      headSha: HEAD,
+    });
+    assert.deepEqual(result.issues, []);
+    assert.deepEqual(result.changedScreens, [
+      {
+        id: 'web.marketing-renders',
+        verdict: 'evidence-required',
+        findings: [],
+      },
+    ]);
+  });
+
+  it('registers the app shell root not-found page for changed-surface certification', () => {
+    const source = 'apps/web/app/app/not-found.tsx';
+    const screen = SCREEN_REGISTRY.find(
+      entry => entry.id === 'web.app-not-found'
+    );
+
+    assert.deepEqual(screen, {
+      id: 'web.app-not-found',
+      platform: 'web',
+      owner: 'app-shell-not-found',
+      sources: [source],
+      viewports: ['desktop', 'mobile'],
+    });
+
+    const result = evaluateChangedScreens({
+      changedFiles: [{ path: source, status: 'M' }],
+      headSha: HEAD,
+    });
+    assert.deepEqual(result.issues, []);
+    assert.deepEqual(result.changedScreens, [
+      {
+        id: 'web.app-not-found',
+        verdict: 'evidence-required',
+        findings: [],
+      },
+    ]);
+  });
+
+  it('registers the experimental library surface for changed-surface certification', () => {
+    const source = 'apps/web/app/exp/library-v1/page.tsx';
+    const screen = SCREEN_REGISTRY.find(
+      entry => entry.id === 'web.exp-library-v1'
+    );
+
+    assert.deepEqual(screen, {
+      id: 'web.exp-library-v1',
+      platform: 'web',
+      owner: 'exp-library-v1',
+      sources: [source],
+      viewports: ['desktop', 'mobile'],
+    });
+
+    const result = evaluateChangedScreens({
+      changedFiles: [{ path: source, status: 'M' }],
+      headSha: HEAD,
+    });
+    assert.deepEqual(result.issues, []);
+    assert.deepEqual(result.changedScreens, [
+      {
+        id: 'web.exp-library-v1',
         verdict: 'evidence-required',
         findings: [],
       },

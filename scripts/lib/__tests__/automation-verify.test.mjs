@@ -34,6 +34,49 @@ describe('verification child environment', () => {
   });
 });
 
+describe('Summer commissioning affected-test lane', () => {
+  it('selects the fail-closed commissioning suite for every contract input', () => {
+    const plan = buildAffectedTestPlan([
+      'docs/operations/SUMMER_COMMISSIONING.md',
+      'docs/operations/SUMMER_PRODUCT_QUALITY_GOVERNOR.md',
+      'docs/operations/evidence/summer-mac-production-dogfood-2026-09-01.json',
+      'scripts/summer-commissioning/canonical-registry.test.mjs',
+      'scripts/summer-commissioning/commissioning.mjs',
+      'scripts/summer-commissioning/commissioning.test.mjs',
+      'scripts/summer-commissioning/contracts.mjs',
+      'scripts/summer-commissioning/contracts.test.mjs',
+      'scripts/summer-commissioning/product-quality-governor.mjs',
+      'scripts/summer-commissioning/product-quality-governor.test.mjs',
+      'scripts/summer-commissioning/receipt-trust.mjs',
+      'scripts/summer-commissioning/receipt-trust.test.mjs',
+      'scripts/summer-commissioning/registry.json',
+      'scripts/run-affected-tests.mjs',
+      'scripts/lib/__tests__/automation-verify.test.mjs',
+    ]);
+
+    expect(plan.mode).toBe('selected');
+    expect(plan.nodeTests).toEqual([
+      'scripts/summer-commissioning/canonical-registry.test.mjs',
+      'scripts/summer-commissioning/commissioning.test.mjs',
+      'scripts/summer-commissioning/contracts.test.mjs',
+      'scripts/summer-commissioning/product-quality-governor.test.mjs',
+      'scripts/summer-commissioning/receipt-trust.test.mjs',
+    ]);
+    expect(plan.scriptVitestTests).toContain(
+      'scripts/lib/__tests__/automation-verify.test.mjs'
+    );
+  });
+
+  it('fails closed to the full suite when commissioning changes mix scopes', () => {
+    const plan = buildAffectedTestPlan([
+      'scripts/summer-commissioning/commissioning.mjs',
+      'scripts/unrelated.mjs',
+    ]);
+
+    expect(plan.mode).toBe('full');
+  });
+});
+
 const SYMPHONY_THROUGHPUT_CONTROL_MANIFEST = [
   '.husky/pre-push',
   'scripts/automation-verify.sh',
@@ -670,6 +713,7 @@ describe('automation-verify affected scope', () => {
         'scripts/lib/__tests__/agent-qc-wires.test.mjs',
         'scripts/lib/__tests__/needs-human-autoclose.test.mjs',
         'scripts/lib/__tests__/production-lane-range.test.mjs',
+        'scripts/lib/__tests__/preview-env-contract.test.mjs',
         'scripts/lib/__tests__/hermes-launchd.test.mjs',
       ],
     });
@@ -912,6 +956,7 @@ describe('automation-verify affected scope', () => {
       pythonUnittestTests: [
         'scripts/hermes/tests/symphony-additive-router.test.py',
         'scripts/hermes/tests/test-model-router.py',
+        'scripts/hermes/tests/symphony-github-poke.test.py',
       ],
       scriptVitestTests: ['scripts/lib/__tests__/automation-verify.test.mjs'],
     });

@@ -2593,7 +2593,8 @@ body:has(.home-viewport)::-webkit-scrollbar {
   );
 }
 
-.home-composer-action p {
+.home-composer-action-label {
+  display: block;
   margin: 0;
   color: var(--color-text-secondary-token);
   font-family: Inter, system-ui, sans-serif;

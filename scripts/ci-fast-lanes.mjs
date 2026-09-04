@@ -629,6 +629,7 @@ function runStructural() {
     'python3 scripts/hermes/tests/gem-priority-gate.test.py',
     'python3 scripts/hermes/tests/test_evaluate_fleet_gate.py',
     'python3 scripts/hermes/tests/test-model-router.py',
+    'python3 scripts/hermes/tests/symphony-github-poke.test.py',
     'node --test scripts/backlog-orchestrator/__tests__/pre-lease-gates.test.mjs',
     'node --test scripts/backlog-orchestrator/__tests__/gate-next-hold.test.mjs',
     'node --test scripts/backlog-orchestrator/__tests__/ownership-inventory.test.mjs',
@@ -653,6 +654,13 @@ function runStructural() {
     // Target Vitest directly so the deploy contract always executes and fails
     // closed when the file cannot be resolved or contains no tests.
     'pnpm --filter @jovie/web exec vitest run --config=vitest.config.mts tests/unit/ci/deploy-workflow.test.ts',
+    // Blocking UI invariants (Tim lock 2026-08-30, extended 2026-09-03 by
+    // JOV-5951, gbrain ops/reviewed-invariants/blocking-ui-invariants-v1),
+    // governed by certify-only-working-v1: unproven is hidden, not green.
+    // Target Vitest directly so the screen contracts always execute and fail
+    // closed when a file is missing or resolves to zero tests (visual ENOENT
+    // is FAIL, not advisory).
+    'pnpm --filter @jovie/web exec vitest run --config=vitest.config.mts tests/unit/design-system/one-primary-action-per-screen-v1.test.ts tests/unit/design-system/editorial-card-max-v1.test.ts tests/unit/design-system/mac-header-two-lines-v1.test.ts tests/unit/design-system/column-heading-line-clamp-1-v1.test.ts tests/unit/design-system/single-column-one-width-v1.test.ts tests/unit/design-system/one-chrome-layer-v1.test.ts tests/unit/design-system/one-notification-v1.test.ts tests/unit/design-system/one-modal-layer-v1.test.ts',
     'pnpm --filter @jovie/web run test:reliability-detectors',
   ];
   const parts = [

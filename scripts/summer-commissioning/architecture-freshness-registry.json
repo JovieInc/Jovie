@@ -1,0 +1,103 @@
+{
+  "schema": "jovie.architecture-freshness-registry/v1",
+  "registryRevision": "2026-09-02.1",
+  "issue": "JOV-5853",
+  "owner": "Summer runtime / Eve integration",
+  "environment": "repository and Tim White local macOS host",
+  "sourceRevision": "45bd2fd459ae233adbc80ee77581d131f1909fde",
+  "effectiveAt": "2026-09-02T04:32:56Z",
+  "refreshBy": "2026-09-09T04:32:56Z",
+  "evidenceTier": "source-plus-local-runtime",
+  "status": "current",
+  "canonicalRecord": "docs/operations/SUMMER_RUNTIME_RETIREMENT.md",
+  "runtimeTarget": {
+    "name": "Eve",
+    "state": "blocked-source-only",
+    "certified": false,
+    "blocker": "No exact deployed Summer identity, durable session, failure, or recurrence receipt exists."
+  },
+  "retiredComponents": [
+    {
+      "name": "Hermes",
+      "effectiveAt": "2026-09-02T04:32:56Z",
+      "rollbackAllowed": false
+    },
+    {
+      "name": "Trigger.dev",
+      "effectiveAt": "2026-09-02T04:32:56Z",
+      "rollbackAllowed": false
+    }
+  ],
+  "supersedes": [
+    "docs/MEMORY_ADR.md",
+    "docs/AUTOMATION_AUDIT.md",
+    "docs/MEMORY_CORE_ARCHITECTURE.md",
+    "docs/AGENT_OS_ARCHITECTURE.md",
+    "docs/spikes/eve-agent-sdk-fit.md",
+    "gbrain:coordination/company-intelligence-lock-2026-08-18",
+    "gbrain:jovie/coordination/summer-plan-20260822",
+    "gbrain:coordination/summer-singleton-runtime-hardening-2026-08-21",
+    "gbrain:ovie-summer-m1-runtime-bridge-rca-2026-08-22",
+    "gbrain:coordination/summer-closed-loop-proof-audit-2026-08-21",
+    "gbrain:jovie/operations/summer-gateway-emfile-recovery-2026-08-08",
+    "gbrain:operations/summer-hermes-provenance-rca-2026-08-30",
+    "gbrain:jovie-eve-summer-provider-decision"
+  ],
+  "contextDocuments": [
+    {
+      "path": "docs/operations/SUMMER_RUNTIME_RETIREMENT.md",
+      "classification": "current",
+      "requiredMarker": "Hermes and Trigger.dev are retired Jovie tooling"
+    },
+    {
+      "path": "STRATEGY.md",
+      "classification": "current",
+      "requiredMarker": "Eve target unavailable until proven"
+    },
+    {
+      "path": "docs/OVIE_PROGRAM.md",
+      "classification": "current",
+      "requiredMarker": "Hermes and Trigger.dev are retired"
+    },
+    {
+      "path": "docs/OVIE.md",
+      "classification": "current",
+      "requiredMarker": "Hermes and Trigger.dev are retired"
+    },
+    {
+      "path": "apps/eve-pilot/README.md",
+      "classification": "current",
+      "requiredMarker": "Hermes is retired"
+    },
+    {
+      "path": "docs/operations/SUMMER_COMMISSIONING.md",
+      "classification": "current",
+      "requiredMarker": "Founder direction on 2026-09-02 retired Hermes"
+    },
+    {
+      "path": "docs/MEMORY_ADR.md",
+      "classification": "historical",
+      "requiredMarker": "Retirement notice (2026-09-02)"
+    },
+    {
+      "path": "docs/AUTOMATION_AUDIT.md",
+      "classification": "historical",
+      "requiredMarker": "Retirement notice (2026-09-02)"
+    },
+    {
+      "path": "docs/MEMORY_CORE_ARCHITECTURE.md",
+      "classification": "historical",
+      "requiredMarker": "Retirement notice (2026-09-02)"
+    },
+    {
+      "path": "docs/AGENT_OS_ARCHITECTURE.md",
+      "classification": "historical",
+      "requiredMarker": "Retirement notice (2026-09-02)"
+    },
+    {
+      "path": "docs/spikes/eve-agent-sdk-fit.md",
+      "classification": "historical",
+      "requiredMarker": "Retirement notice (2026-09-02)"
+    }
+  ]
+}

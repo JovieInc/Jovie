@@ -7,9 +7,12 @@ import {
   emptyCursor,
   FORBIDDEN_ACTUATION,
   FORBIDDEN_QUERY_KEYS,
+  freshnessDeadline,
   getLastKnownShippingState,
   ingestSourceEvent,
   measuredCount,
+  observationFreshness,
+  parseTimestamp,
   publishShippingState,
   resetShippingStatePublisher,
   SHIP_MEANING_KEYS,
@@ -306,6 +309,23 @@ describe('ovie.shipping-state.v1 contract', () => {
     expect(stale.operationalTasks.syncState).toBe('stale');
     expect(stale.operationalTasks.tasks).toEqual(second.operationalTasks.tasks);
     expect(stale.operationalTasks.deltas).toEqual([]);
+  });
+
+  it('keeps the freshness primitives reused by other projections honest (JOV-5761)', () => {
+    expect(parseTimestamp('not-a-date')).toBeNull();
+    expect(parseTimestamp(T0)).toBe(T0);
+    expect(freshnessDeadline(T0, 10 * 60_000)).toBe('2026-08-22T00:10:00.000Z');
+    expect(
+      observationFreshness(
+        T0,
+        '2026-08-22T00:10:00.000Z',
+        '2026-08-22T00:10:00.001Z',
+        'fresh'
+      )
+    ).toBe('stale');
+    expect(
+      observationFreshness(T0, '2026-08-22T00:10:00.000Z', T0, 'fresh')
+    ).toBe('fresh');
   });
 });
 

@@ -23,6 +23,16 @@ on:
         required: false
         default: false
         type: boolean
+      preview_work_id:
+        description: Linear work id admitting the hosted exception, e.g. JOV-5941.
+        required: false
+        default: ''
+        type: string
+      preview_reason:
+        description: Why hosted isolation is required — evidence normal CI/staging cannot produce.
+        required: false
+        default: ''
+        type: string
 
 permissions:
   contents: read
@@ -1762,6 +1772,26 @@ jobs:
             echo "Neon connection artifact is missing username/password credentials."
             exit 1
           fi
+
+      - name: Emit preview-env admission receipt
+        if: ${{ github.event_name != 'pull_request' || needs.ci-path-changes.outputs.run_neon == 'true' || needs.ci-path-changes.outputs.run_public_lighthouse == 'true' || steps.check-backend.outputs.needs_db == 'true' }}
+        run: |
+          set -euo pipefail
+          node scripts/ci/preview-env-admission.mjs emit-admission \
+            --kind neon-branch \
+            --work-id "${{ github.event.inputs.preview_work_id || 'manual-dispatch' }}" \
+            --sha "${{ github.sha }}" \
+            --policy "manual-dispatch" \
+            --reason "${{ github.event.inputs.preview_reason || 'Manually dispatched database-affecting evidence lane.' }}" \
+            --evidence "Database-affecting proof that cannot be obtained from normal CI or the shared staging database." \
+            --owner "${{ github.actor }}" \
+            --surface "ephemeral Neon branch ${{ steps.sanitize-branch.outputs.name }} (isolated database only)" \
+            --environment "${{ steps.sanitize-branch.outputs.name }}" \
+            --ttl-hours 2 \
+            --cleanup-trigger ttl \
+            --cleanup-proof "Branch absent from the Neon project branch inventory" \
+            --cost-budget "One Neon branch with at most 2h of endpoint compute per dispatch" \
+            --out "$RUNNER_TEMP/preview-env-admission-neon.json"
 
       - name: Upload Neon DB connection artifact
         if: ${{ github.event_name != 'pull_request' || needs.ci-path-changes.outputs.run_neon == 'true' || needs.ci-path-changes.outputs.run_public_lighthouse == 'true' || steps.check-backend.outputs.needs_db == 'true' }}
@@ -5117,6 +5147,26 @@ jobs:
             echo "::error::PR preview is $deployment_state after readiness wait (status $inspect_wait_status); refusing a false-green preview."
             exit 1
           fi
+
+      - name: Emit preview-env admission receipt
+        if: success()
+        run: |
+          set -euo pipefail
+          node scripts/ci/preview-env-admission.mjs emit-admission \
+            --kind vercel-preview \
+            --work-id "${{ github.event.inputs.preview_work_id || 'manual-dispatch' }}" \
+            --sha "${{ github.sha }}" \
+            --policy "manual-dispatch (inputs.run_preview_deploy=true)" \
+            --reason "${{ github.event.inputs.preview_reason || 'Manually dispatched hosted preview for exact-SHA evidence.' }}" \
+            --evidence "Exact production-candidate hosted proof or debugging evidence that normal CI and current staging cannot produce." \
+            --owner "${{ github.actor }}" \
+            --surface "Vercel preview deployment ${{ steps.pr_deploy.outputs.deployment_url }} pinned to the dispatched SHA" \
+            --environment "${{ steps.pr_deploy.outputs.deployment_url }}" \
+            --ttl-hours 24 \
+            --cleanup-trigger pr-closed \
+            --cleanup-proof "No QUEUED/BUILDING preview deployments remain for the ref; vercel-preview-cleanup removed deployments for the closed PR ref" \
+            --cost-budget "One Vercel preview build plus one deployment per dispatch" \
+            --out "$RUNNER_TEMP/preview-env-admission-vercel.json"
 
   # Deep Lighthouse runs only by manual dispatch. Production Lighthouse remains
   # a separate hosted post-deploy release probe.

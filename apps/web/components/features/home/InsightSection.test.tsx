@@ -5,14 +5,17 @@ import { describe, expect, it } from 'vitest';
 import { InsightSection } from './InsightSection';
 
 describe('InsightSection', () => {
-  it('renders the primary insight headline', () => {
+  it('renders bounded action headline and personalization copy', () => {
     render(<InsightSection />);
+
     expect(
       screen.getByRole('heading', {
         level: 2,
-        name: /One action. The right one./i,
+        name: 'One action. The right one.',
       })
-    ).toBeInTheDocument();
+    ).toHaveClass('line-clamp-2');
+    expect(screen.getByText(/single best next step/i)).toBeInTheDocument();
+    expect(screen.getByText(/Every click teaches/i)).toBeInTheDocument();
   });
 
   it('uses canonical spacing tokens for the heading gap', () => {

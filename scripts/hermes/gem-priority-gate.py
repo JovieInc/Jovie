@@ -67,6 +67,10 @@ SEVERE_REASONS = {
     "severe-integrity-incident",
 }
 DEFAULT_GEM_CONCURRENCY = 4
+# Keep in sync with symphony-codex-exhausted.DEFAULT_GROK_MAX / MAX_GROK_MAX.
+# Unbound repair is a deploy hold, not a Grok serial pin (JOV-5913).
+DEFAULT_GROK_MAX = 4
+MAX_GROK_MAX = 10
 LOCAL_REMEDIATION_CONCURRENCY_FLOOR = 1
 CONTROL_PLANE_PREFIXES = (
     "canon/",
@@ -619,6 +623,29 @@ def observe_concurrency(path: Path, now: datetime) -> dict[str, Any]:
         and timedelta(0) <= now - observed_at <= timedelta(hours=24)
     )
     return {**receipt, "accepted": eligible}
+
+
+def grok_kimi_unbound_repair_concurrency(evidence: dict[str, Any]) -> int:
+    """Autoscale unbound-repair slots from live Grok+Kimi OAuth seats.
+
+    Production-unbound is a deploy hold (`deploymentsAllowed: false`), not a
+    serial Grok pin. Codex exhaustion / stale Gem capacity evidence is not a
+    reason to cap Grok/Kimi (JOV-5913).
+    """
+    seats = 0
+    providers = evidence.get("providers")
+    if isinstance(providers, dict):
+        for name in ("grok", "kimi"):
+            provider = providers.get(name)
+            if not isinstance(provider, dict):
+                continue
+            ready = provider.get("ready")
+            if isinstance(ready, int) and not isinstance(ready, bool) and ready > 0:
+                seats += ready
+    baseline = DEFAULT_GROK_MAX
+    if seats <= 0:
+        return baseline
+    return max(1, min(MAX_GROK_MAX, max(baseline, seats)))
 
 
 def validate_independent_review(
@@ -1321,6 +1348,9 @@ def evaluate(signals: dict[str, Any], observed_at: str) -> dict[str, Any]:
         if gem_concurrency > 0
         else LOCAL_REMEDIATION_CONCURRENCY_FLOOR
     )
+    unbound_repair_concurrency = grok_kimi_unbound_repair_concurrency(
+        concurrency_evidence
+    )
     green_ready_prs = queue.get("greenReadyPrs", queue.get("eligiblePrs"))
     queue_target = queue.get("target")
     queue_shape_valid = (
@@ -1392,6 +1422,23 @@ def evaluate(signals: dict[str, Any], observed_at: str) -> dict[str, Any]:
     ):
         promotion_mode = "draft-only"
     elif hold_intake_allowed:
+        promotion_mode = "hold-intake"
+    elif (
+        state == "AMBER"
+        and main.get("status") == "green"
+        and production.get("status") == "green"
+        and integrity.get("status") in {"clear", "resolved"}
+        and closure_health.get("status") == "red"
+        and set(closure_health.get("reasons") or [])
+        <= {"native-queue-empty-with-eligible-over-15m"}
+    ):
+        # An empty native queue with eligible PRs waiting is a FEED signal,
+        # not a stop signal: blocking admission here deadlocks the loop
+        # (queue stays empty because admission is blocked; closure stays red
+        # because the queue is empty; controller then fails on queue-noop).
+        # Live 2026-09-03: 10+ mergeable PRs stranded with an empty queue.
+        # New-issue intake stays closed (closure red); only promotion of
+        # already-green work resumes.
         promotion_mode = "hold-intake"
     else:
         promotion_mode = "blocked"
@@ -1504,7 +1551,7 @@ def evaluate(signals: dict[str, Any], observed_at: str) -> dict[str, Any]:
             if unbound_repair_allowed
             else None,
             "scope": "event-scoped-exact-pr-head-with-bound-repair-attestation",
-            "maxConcurrent": 1,
+            "maxConcurrent": unbound_repair_concurrency,
             "deploymentsAllowed": False,
             "authority": "canonical-merge-queue-controller",
         },

@@ -266,6 +266,8 @@ def _write_null_creator_receipt_drain(
     front_churn: str = "forbid",
     allow_enroll: bool = False,
     merge_group_runs: list[dict[str, object]] | None = None,
+    timeline_events: list[dict[str, object]] | None = None,
+    timeline_fails: bool = False,
 ) -> dict[str, Path]:
     logs = {
         "api": tmp_path / "api-calls",
@@ -274,6 +276,7 @@ def _write_null_creator_receipt_drain(
         "enroll": tmp_path / "enroll",
         "dequeue": tmp_path / "dequeue",
         "jobs": tmp_path / "jobs-scans",
+        "timeline": tmp_path / "timeline-calls",
     }
     for path in logs.values():
         path.write_text("", encoding="utf-8")
@@ -302,6 +305,13 @@ def _write_null_creator_receipt_drain(
     queued_json = "true" if queued else "false"
     merge_group_runs_json = json.dumps(
         merge_group_runs or [], separators=(",", ":")
+    )
+    # `gh api --paginate --slurp` wraps endpoint pages in an outer array.
+    timeline_json = json.dumps([timeline_events or []], separators=(",", ":"))
+    timeline_case = (
+        'echo "timeline read forced to fail" >&2; exit 95'
+        if timeline_fails
+        else f"echo '{timeline_json}'; exit 0"
     )
     if queued:
         entry_state = queue_entry_state or "AWAITING_CHECKS"
@@ -397,6 +407,10 @@ def _write_null_creator_receipt_drain(
               printf '%s\\n' "$2" >>'{logs["api"]}'
               if [[ "$2" == *"/git/ref/heads/main"* ]]; then echo '{"9" * 40}'; exit 0; fi
               if [[ "$2" == *"/actions/workflows/ci.yml/runs"* ]]; then echo '{merge_group_runs_json}'; exit 0; fi
+              if [[ "$2" == *"/issues/{pr}/timeline"* ]]; then
+                printf '%s\\n' "$2" >>'{logs["timeline"]}'
+                {timeline_case}
+              fi
               if [[ "$2" == *"/commits/{head}/status"* ]]; then cat '{status_file}'; exit 0; fi
               if [[ "$2" == "users/jovie-bot%5Bbot%5D" ]]; then cat '{identity_file}'; exit 0; fi
               if [[ "$2" == "repos/JovieInc/Jovie/actions/runs/77" ]]; then cat '{run_file}'; exit 0; fi
@@ -774,6 +788,172 @@ class TestNullCreatorQueueReceiptProvenance:
         assert logs["dequeue"].read_text(encoding="utf-8") == ""
         assert "+jovie-native-unmergeable/v1" not in result.stdout
         assert "null-creator fixture must not enroll" not in result.stderr
+
+
+class TestStarvedGroupDequeue:
+    @staticmethod
+    def _neutral_status(head: str) -> dict[str, object]:
+        return _null_creator_status(
+            head=head,
+            context="ci/pr-ready",
+            state="success",
+            description="pass",
+        )
+
+    @staticmethod
+    def _queued_iso(minutes_ago: int) -> str:
+        return (
+            datetime.now(timezone.utc) - timedelta(minutes=minutes_ago)
+        ).strftime("%Y-%m-%dT%H:%M:%SZ")
+
+    def test_starved_awaiting_checks_entry_is_dequeued(self, tmp_path: Path) -> None:
+        head = "8" * 40
+        logs = _write_null_creator_receipt_drain(
+            tmp_path,
+            pr=16420,
+            head=head,
+            title="Starved merge group front",
+            status=self._neutral_status(head),
+            run=_trusted_autoenroll_run(head=head),
+            queued=True,
+            front_churn="allow",
+            timeline_events=[
+                {
+                    "event": "added_to_merge_queue",
+                    "created_at": self._queued_iso(47),
+                }
+            ],
+        )
+
+        result = _run_bash(
+            _drain_command(
+                tmp_path,
+                backend="native",
+                extra_env=(
+                    "GITHUB_RUN_ID=77 GITHUB_SERVER_URL=https://github.com "
+                    "GITHUB_API_URL=https://api.github.com"
+                ),
+            )
+        )
+
+        assert result.returncode == 0, f"stdout={result.stdout}\nstderr={result.stderr}"
+        assert logs["timeline"].read_text(encoding="utf-8") != ""
+        assert logs["dequeue"].read_text(encoding="utf-8") == "dequeue\n"
+        assert "starved-group" in result.stdout
+        assert "✗ starved-group: AWAITING_CHECKS" in result.stdout
+
+    def test_existing_group_ci_run_leaves_entry_queued(self, tmp_path: Path) -> None:
+        head = "8" * 40
+        base = "9" * 40
+        logs = _write_null_creator_receipt_drain(
+            tmp_path,
+            pr=16420,
+            head=head,
+            title="Group with a live CI run",
+            status=self._neutral_status(head),
+            run=_trusted_autoenroll_run(head=head),
+            queued=True,
+            front_churn="active",
+            merge_group_runs=[
+                {
+                    "id": 88,
+                    "headBranch": f"gh-readonly-queue/main/pr-16420-{base}",
+                    "status": "in_progress",
+                    "conclusion": None,
+                    "headSha": "7" * 40,
+                    "createdAt": "2026-09-03T16:13:03Z",
+                    "updatedAt": "2026-09-03T16:15:46Z",
+                }
+            ],
+            timeline_events=[
+                {
+                    "event": "added_to_merge_queue",
+                    "created_at": self._queued_iso(47),
+                }
+            ],
+        )
+
+        result = _run_bash(
+            _drain_command(
+                tmp_path,
+                backend="native",
+                extra_env=(
+                    "GITHUB_RUN_ID=77 GITHUB_SERVER_URL=https://github.com "
+                    "GITHUB_API_URL=https://api.github.com"
+                ),
+            )
+        )
+
+        assert result.returncode == 0, f"stdout={result.stdout}\nstderr={result.stderr}"
+        assert "DEQUEUE (starved group" in result.stdout
+        # The merge-group run check must short-circuit before the timeline read.
+        assert logs["timeline"].read_text(encoding="utf-8") == ""
+        assert logs["dequeue"].read_text(encoding="utf-8") == ""
+
+    def test_fresh_entry_below_threshold_is_left_alone(self, tmp_path: Path) -> None:
+        head = "8" * 40
+        logs = _write_null_creator_receipt_drain(
+            tmp_path,
+            pr=16420,
+            head=head,
+            title="Recently queued entry",
+            status=self._neutral_status(head),
+            run=_trusted_autoenroll_run(head=head),
+            queued=True,
+            front_churn="allow",
+            timeline_events=[
+                {
+                    "event": "added_to_merge_queue",
+                    "created_at": self._queued_iso(5),
+                }
+            ],
+        )
+
+        result = _run_bash(
+            _drain_command(
+                tmp_path,
+                backend="native",
+                extra_env=(
+                    "GITHUB_RUN_ID=77 GITHUB_SERVER_URL=https://github.com "
+                    "GITHUB_API_URL=https://api.github.com"
+                ),
+            )
+        )
+
+        assert result.returncode == 0, f"stdout={result.stdout}\nstderr={result.stderr}"
+        assert logs["timeline"].read_text(encoding="utf-8") != ""
+        assert logs["dequeue"].read_text(encoding="utf-8") == ""
+        assert "✗ starved-group" not in result.stdout
+
+    def test_timeline_read_failure_never_dequeues(self, tmp_path: Path) -> None:
+        head = "8" * 40
+        logs = _write_null_creator_receipt_drain(
+            tmp_path,
+            pr=16420,
+            head=head,
+            title="Unreadable timeline entry",
+            status=self._neutral_status(head),
+            run=_trusted_autoenroll_run(head=head),
+            queued=True,
+            front_churn="allow",
+            timeline_fails=True,
+        )
+
+        result = _run_bash(
+            _drain_command(
+                tmp_path,
+                backend="native",
+                extra_env=(
+                    "GITHUB_RUN_ID=77 GITHUB_SERVER_URL=https://github.com "
+                    "GITHUB_API_URL=https://api.github.com"
+                ),
+            )
+        )
+
+        assert result.returncode == 0, f"stdout={result.stdout}\nstderr={result.stderr}"
+        assert logs["timeline"].read_text(encoding="utf-8") != ""
+        assert logs["dequeue"].read_text(encoding="utf-8") == ""
+        assert "timeline read failed; leaving queued" in result.stdout
 
 
 class TestExactHeadQueueReceipt:
@@ -3818,6 +3998,319 @@ JSON
         assert "would -queue-deferred" not in result.stdout
         assert "#700" in result.stdout
         assert "{queue-deferred}" in result.stdout
+
+
+# ---------------------------------------------------------------------------
+# Missing-CI recovery (2026-09-03): a non-draft main PR whose required source
+# checks never registered any check-run on its exact head never turns green
+# and never enrolls. The drain re-fires source CI with a bounded, age-gated,
+# per-head-idempotent close+reopen.
+# ---------------------------------------------------------------------------
+
+_MISSING_CI_MARKER = "<!-- bot-comment:missing-ci-recovery -->"
+
+
+def _missing_ci_pr(
+    number: int,
+    head: str,
+    *,
+    draft: bool = False,
+    labels: list[str] | None = None,
+) -> dict[str, object]:
+    return {
+        "n": number,
+        "t": f"Missing CI PR {number}",
+        "draft": draft,
+        "m": "MERGEABLE",
+        "ms": "BLOCKED",
+        "head": f"codex/missing-ci-{number}",
+        "headOid": head,
+        "base": "main",
+        "body": "",
+        "L": labels or [],
+        "fail": [],
+    }
+
+
+def _write_missing_ci_fixture(
+    tmp_path: Path,
+    *,
+    prs: list[dict[str, object]],
+    checks_by_pr: dict[int, str],
+    comments_json: str = "[[]]",
+    committed: str = "2026-09-01T00:00:00Z",
+) -> Path:
+    mutations = tmp_path / "mutations"
+    mutations.write_text("", encoding="utf-8")
+    comments_file = tmp_path / "comments.json"
+    comments_file.write_text(comments_json, encoding="utf-8")
+    checks_cases = "\n".join(
+        f'            if [[ "$3" == "{number}" ]]; then echo \'{checks}\'; exit 0; fi'
+        for number, checks in checks_by_pr.items()
+    )
+    fake_gh = tmp_path / "gh"
+    fake_gh.write_text(
+        textwrap.dedent(
+            f"""\
+            #!/usr/bin/env bash
+            set -euo pipefail
+            if [[ "$1 $2" == "pr list" ]]; then
+              echo '{json.dumps(prs)}'
+              exit 0
+            fi
+            if [[ "$1 $2" == "pr checks" ]]; then
+{checks_cases}
+              echo "unexpected pr checks: $*" >&2
+              exit 2
+            fi
+            if [[ "$1" == "api" ]]; then
+              if [[ "$2" == *"/issues/"*"/comments"* ]]; then
+                cat '{comments_file}'
+                exit 0
+              fi
+              if [[ "$2" == *"/commits/"* ]]; then
+                echo '{committed}'
+                exit 0
+              fi
+              echo "unexpected gh api: $*" >&2
+              exit 2
+            fi
+            if [[ "$1 $2" == "pr comment" || "$1 $2" == "pr close" || "$1 $2" == "pr reopen" ]]; then
+              printf '%s %s\\n' "$2" "$3" >>'{mutations}'
+              exit 0
+            fi
+            echo "unexpected gh args: $*" >&2
+            exit 2
+            """
+        ),
+        encoding="utf-8",
+    )
+    fake_gh.chmod(fake_gh.stat().st_mode | stat.S_IXUSR | stat.S_IXGRP | stat.S_IXOTH)
+    return mutations
+
+
+class TestMissingCiRecovery:
+    def test_missing_ci_head_is_closed_and_reopened_with_marker_comment(
+        self, tmp_path: Path
+    ) -> None:
+        head = "c" * 40
+        mutations = _write_missing_ci_fixture(
+            tmp_path,
+            prs=[_missing_ci_pr(201, head)],
+            checks_by_pr={201: "[]"},
+        )
+
+        result = _run_bash(
+            _drain_command(tmp_path, extra_env="DRAIN_RECOVER_MISSING_CI=1")
+        )
+
+        assert result.returncode == 0, f"stdout={result.stdout}\\nstderr={result.stderr}"
+        assert "=== RECOVER (missing source CI → bounded close+reopen) ===" in result.stdout
+        assert f"closed+reopened to re-trigger source CI at {head}" in result.stdout
+        assert mutations.read_text(encoding="utf-8").splitlines() == [
+            "comment 201",
+            "close 201",
+            "reopen 201",
+        ]
+
+    def test_prior_marker_comment_on_the_same_head_blocks_a_second_attempt(
+        self, tmp_path: Path
+    ) -> None:
+        head = "c" * 40
+        comments = json.dumps(
+            [
+                [
+                    {
+                        "user": {"login": "jovie-bot[bot]"},
+                        "body": f"{_MISSING_CI_MARKER}\nrecovery for head {head}",
+                    }
+                ]
+            ]
+        )
+        mutations = _write_missing_ci_fixture(
+            tmp_path,
+            prs=[_missing_ci_pr(201, head)],
+            checks_by_pr={201: "[]"},
+            comments_json=comments,
+        )
+
+        result = _run_bash(
+            _drain_command(tmp_path, extra_env="DRAIN_RECOVER_MISSING_CI=1")
+        )
+
+        assert result.returncode == 0, f"stdout={result.stdout}\\nstderr={result.stderr}"
+        assert f"close+reopen already attempted at {head}" in result.stdout
+        assert mutations.read_text(encoding="utf-8") == ""
+
+    def test_moved_head_is_remediated_despite_prior_attempt_on_old_head(
+        self, tmp_path: Path
+    ) -> None:
+        old_head = "b" * 40
+        new_head = "c" * 40
+        comments = json.dumps(
+            [
+                [
+                    {
+                        "user": {"login": "jovie-bot[bot]"},
+                        "body": f"{_MISSING_CI_MARKER}\nrecovery for head {old_head}",
+                    }
+                ]
+            ]
+        )
+        mutations = _write_missing_ci_fixture(
+            tmp_path,
+            prs=[_missing_ci_pr(201, new_head)],
+            checks_by_pr={201: "[]"},
+            comments_json=comments,
+        )
+
+        result = _run_bash(
+            _drain_command(tmp_path, extra_env="DRAIN_RECOVER_MISSING_CI=1")
+        )
+
+        assert result.returncode == 0, f"stdout={result.stdout}\\nstderr={result.stderr}"
+        assert "close 201" in mutations.read_text(encoding="utf-8")
+
+    def test_young_head_is_never_interrupted(self, tmp_path: Path) -> None:
+        head = "c" * 40
+        committed = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
+        mutations = _write_missing_ci_fixture(
+            tmp_path,
+            prs=[_missing_ci_pr(201, head)],
+            checks_by_pr={201: "[]"},
+            committed=committed,
+        )
+
+        result = _run_bash(
+            _drain_command(tmp_path, extra_env="DRAIN_RECOVER_MISSING_CI=1")
+        )
+
+        assert result.returncode == 0, f"stdout={result.stdout}\\nstderr={result.stderr}"
+        assert "younger than 120m" in result.stdout
+        assert mutations.read_text(encoding="utf-8") == ""
+
+    def test_terminal_failures_are_not_remediated_as_missing_ci(
+        self, tmp_path: Path
+    ) -> None:
+        head = "c" * 40
+        mutations = _write_missing_ci_fixture(
+            tmp_path,
+            prs=[_missing_ci_pr(201, head)],
+            checks_by_pr={
+                201: '[{"name":"PR Ready","bucket":"fail","state":"FAILURE"}]'
+            },
+        )
+
+        result = _run_bash(
+            _drain_command(tmp_path, extra_env="DRAIN_RECOVER_MISSING_CI=1")
+        )
+
+        assert result.returncode == 0, f"stdout={result.stdout}\\nstderr={result.stderr}"
+        assert "=== BLOCKED (red checks" in result.stdout
+        assert mutations.read_text(encoding="utf-8") == ""
+
+    def test_recovery_is_capped_per_run(self, tmp_path: Path) -> None:
+        prs = [
+            _missing_ci_pr(201, "c" * 40),
+            _missing_ci_pr(202, "d" * 40),
+            _missing_ci_pr(203, "e" * 40),
+        ]
+        mutations = _write_missing_ci_fixture(
+            tmp_path,
+            prs=prs,
+            checks_by_pr={201: "[]", 202: "[]", 203: "[]"},
+        )
+
+        result = _run_bash(
+            _drain_command(tmp_path, extra_env="DRAIN_RECOVER_MISSING_CI=1")
+        )
+
+        assert result.returncode == 0, f"stdout={result.stdout}\\nstderr={result.stderr}"
+        assert "reached missing-CI recovery cap (2)" in result.stdout
+        lines = mutations.read_text(encoding="utf-8").splitlines()
+        assert "close 201" in lines
+        assert "close 202" in lines
+        assert "close 203" not in lines
+        assert "comment 203" not in lines
+
+    def test_drafts_and_hold_labels_are_never_remediated(
+        self, tmp_path: Path
+    ) -> None:
+        prs = [
+            _missing_ci_pr(201, "c" * 40, draft=True),
+            _missing_ci_pr(202, "d" * 40, labels=["queue-deferred"]),
+            _missing_ci_pr(203, "e" * 40, labels=["no-auto"]),
+        ]
+        mutations = _write_missing_ci_fixture(
+            tmp_path,
+            prs=prs,
+            checks_by_pr={202: "[]", 203: "[]"},
+        )
+
+        result = _run_bash(
+            _drain_command(tmp_path, extra_env="DRAIN_RECOVER_MISSING_CI=1")
+        )
+
+        assert result.returncode == 0, f"stdout={result.stdout}\\nstderr={result.stderr}"
+        assert mutations.read_text(encoding="utf-8") == ""
+
+    def test_recovery_is_disabled_by_default(self, tmp_path: Path) -> None:
+        mutations = _write_missing_ci_fixture(
+            tmp_path,
+            prs=[_missing_ci_pr(201, "c" * 40)],
+            checks_by_pr={201: "[]"},
+        )
+
+        result = _run_bash(_drain_command(tmp_path))
+
+        assert result.returncode == 0, f"stdout={result.stdout}\\nstderr={result.stderr}"
+        assert "=== RECOVER (missing source CI" not in result.stdout
+        assert mutations.read_text(encoding="utf-8") == ""
+
+    def test_dry_run_reports_without_mutating(self, tmp_path: Path) -> None:
+        head = "c" * 40
+        mutations = _write_missing_ci_fixture(
+            tmp_path,
+            prs=[_missing_ci_pr(201, head)],
+            checks_by_pr={201: "[]"},
+        )
+
+        result = _run_bash(
+            _drain_command(
+                tmp_path, extra_env="DRY_RUN=1 DRAIN_RECOVER_MISSING_CI=1"
+            )
+        )
+
+        assert result.returncode == 0, f"stdout={result.stdout}\\nstderr={result.stderr}"
+        assert "[dry-run] would comment + close/reopen" in result.stdout
+        assert mutations.read_text(encoding="utf-8") == ""
+
+    def test_recovery_cap_rejects_unbounded_value_before_gh(
+        self, tmp_path: Path
+    ) -> None:
+        called = tmp_path / "called"
+        fake_gh = tmp_path / "gh"
+        fake_gh.write_text(
+            f"#!/usr/bin/env bash\ntouch '{called}'\nexit 99\n",
+            encoding="utf-8",
+        )
+        fake_gh.chmod(fake_gh.stat().st_mode | stat.S_IXUSR)
+
+        result = _run_bash(
+            _drain_command(
+                tmp_path,
+                extra_env=(
+                    "DRAIN_RECOVER_MISSING_CI=1 DRAIN_MISSING_CI_MAX_PER_RUN=3"
+                ),
+            )
+        )
+
+        assert result.returncode == 2
+        assert (
+            "DRAIN_MISSING_CI_MAX_PER_RUN must be an integer from 1 through 2"
+            in result.stderr
+        )
+        assert not called.exists(), "drain invoked gh before bounded-cap preflight"
 
 
 # ---------------------------------------------------------------------------

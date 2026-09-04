@@ -96,8 +96,16 @@ before you open the PR (source: `.github/ci-harness/manifest.json` `riskRules`):
 | Anything else (logic, tests, docs, internal app) | Fast gate only → auto-merges when green. |
 
 - **Want a preview deploy?** Dispatch `CI` on the exact ref with
-  `run_preview_deploy=true`; external Vercel preview status remains
-  informational — see [`release.md`](../.claude/rules/release.md).
+  `run_preview_deploy=true` (optionally `preview_work_id` / `preview_reason`).
+  Hosted previews and ephemeral databases are explicit, expiring exceptions:
+  the Vercel Git integration never builds non-`main`/`production` refs, and
+  every admitted environment is recorded with the
+  `jovie-preview-env-admission/v1` contract and torn down with a
+  `jovie-preview-env-cleanup/v1` receipt (PR close →
+  `neon-ephemeral-branch-cleanup.yml` + `vercel-preview-cleanup.yml`; daily
+  `neon-scheduled-cleanup.yml` reconciles missed events). External Vercel
+  preview status remains informational — see
+  [`release.md`](../.claude/rules/release.md).
 
 ## 3. Merge: autonomous, per-PR, self-healing
 
@@ -138,6 +146,11 @@ Pending, queued, and cancelled check runs are not terminal failures, preventing
 dequeue/re-enroll loops during ordinary CI cancellation or main movement.
 An agent conflict that already carries `needs-conflict-resolution` is reported
 without repeating the same label mutation on every drain pass.
+When a non-draft main PR's required source checks never registered any
+check-run on its exact head (missing, not failing), the drain re-fires source
+CI with a bounded close+reopen: at most two per run, heads at least two hours
+old, and never twice on the same exact head (a bot-comment marker is the
+idempotency record). Terminal red checks still route to the fix agent instead.
 When a merge-group run proves a classified product failure, Gem writes the
 bot-authored `jovie-queue-product-failure/v1` status before dequeue or admission
 refusal. That success status preserves source-head cleanliness while acting as

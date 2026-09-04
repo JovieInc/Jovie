@@ -967,6 +967,40 @@ class DeploymentBindingTests(unittest.TestCase):
         self.assertTrue(receipt["remediationAdmission"]["allowed"])
         self.assertTrue(receipt["remediationAdmission"]["pushAllowed"])
 
+    def test_queue_empty_closure_red_feeds_hold_intake_not_blocked(self):
+        """native-queue-empty-with-eligible is a feed signal: blocking
+        admission deadlocks (queue stays empty BECAUSE admission is blocked).
+        With main/production green and integrity clear, promotion resumes in
+        hold-intake even while the controller signal is failed (today's
+        controller failure was itself caused by the blocked-mode queue-noop)."""
+        signals = dict(GREEN_SIGNALS)
+        signals["controller"] = {
+            "status": "failed",
+            "error": "queue-noop: promotion-mode=blocked",
+        }
+        signals["closureHealth"] = {
+            "schema": "jovie-closure-health/v1",
+            "status": "red",
+            "authority": "Summer",
+            "newIssueIntakeAllowed": False,
+            "promotionContinues": True,
+            "remediationContinues": True,
+            "reasons": ["native-queue-empty-with-eligible-over-15m"],
+        }
+        receipt = self.evaluate(signals)
+        self.assertEqual(receipt["state"], "AMBER")
+        self.assertEqual(receipt["promotionMode"], "hold-intake")
+        # New-issue intake stays closed; only promotion resumes.
+        self.assertFalse(receipt["closureAdmission"]["newIssueIntakeAllowed"])
+
+        # Any additional closure reason keeps the gate blocked.
+        signals["closureHealth"]["reasons"] = [
+            "native-queue-empty-with-eligible-over-15m",
+            "duplicate-issue-lanes-unresolved",
+        ]
+        receipt = self.evaluate(signals)
+        self.assertEqual(receipt["promotionMode"], "blocked")
+
     def test_stale_or_missing_capacity_blocks_new_and_remote_mutation(self):
         for evidence in (
             {**GREEN_SIGNALS["concurrencyEvidence"], "accepted": False},
@@ -1319,7 +1353,7 @@ class DeploymentBindingTests(unittest.TestCase):
                 "mainSha": MAIN_SHA,
                 "deployedSha": "b" * 7,
                 "scope": "event-scoped-exact-pr-head-with-bound-repair-attestation",
-                "maxConcurrent": 1,
+                "maxConcurrent": 4,
                 "deploymentsAllowed": False,
                 "authority": "canonical-merge-queue-controller",
             },
@@ -1328,6 +1362,44 @@ class DeploymentBindingTests(unittest.TestCase):
             "production-deployment-unbound",
             {reason["code"] for reason in receipt["reasons"]},
         )
+
+    def test_unbound_repair_autoscales_from_live_oauth_seats_not_codex(self):
+        signals = dict(GREEN_SIGNALS)
+        signals["production"] = {"status": "green", "deployedSha": "b" * 7}
+        signals["concurrencyEvidence"] = {
+            **GREEN_SIGNALS["concurrencyEvidence"],
+            "accepted": False,
+            "target": 1,
+            "source": "live-oauth-cli-seats",
+            "providers": {
+                "codex": {"ready": 0, "reason": "usageLimitExceeded-excluded"},
+                "grok": {"enrolled": 1, "ready": 1, "reason": "oauth-enrolled"},
+                "kimi": {"enrolled": 1, "ready": 1, "reason": "oauth-enrolled"},
+            },
+        }
+
+        receipt = self.evaluate(signals)
+
+        self.assertEqual(receipt["promotionMode"], "hold-intake")
+        self.assertEqual(receipt["productionUnboundRepairAdmission"]["maxConcurrent"], 4)
+        self.assertFalse(receipt["productionUnboundRepairAdmission"]["deploymentsAllowed"])
+        self.assertEqual(receipt["isolatedPromotionAdmission"]["maxConcurrent"], 1)
+        self.assertEqual(receipt["remediationAdmission"]["maxConcurrent"], 1)
+
+        signals["concurrencyEvidence"] = {
+            **GREEN_SIGNALS["concurrencyEvidence"],
+            "target": 2,
+            "source": "live-oauth-cli-seats",
+            "providers": {
+                "codex": {"ready": 0, "reason": "usageLimitExceeded-excluded"},
+                "grok": {"enrolled": 6, "ready": 6, "reason": "oauth-enrolled"},
+                "kimi": {"enrolled": 2, "ready": 2, "reason": "oauth-enrolled"},
+            },
+        }
+        scaled = self.evaluate(signals)
+        self.assertEqual(scaled["productionUnboundRepairAdmission"]["maxConcurrent"], 8)
+        self.assertFalse(scaled["productionUnboundRepairAdmission"]["deploymentsAllowed"])
+        self.assertEqual(scaled["isolatedPromotionAdmission"]["maxConcurrent"], 1)
 
     def test_unbound_release_does_not_turn_total_open_prs_into_a_fleet_hold(self):
         signals = dict(GREEN_SIGNALS)

@@ -3,9 +3,9 @@ name: Merge Queue Auto-Enroll
 # Event-driven, with ownerless recovery admitted only after exact main/head
 # validation. The existing ownerless-recovery-sweep cron remains the heartbeat.
 # controller-hop-exception: jovie-controller-hop/v1
-# accountable-writer: Shipping-Control
-# necessary-trust-boundary: Ownerless recovery dispatch is admitted only after exact main/head validation by this controller.
-# revisit-trigger: Revisit when native merge queue exposes durable exact-head admission for recovered PRs.
+# accountable-writer: Gem
+# necessary-trust-boundary: GitHub-hosted admission reads with the workflow token while the Jovie Bot token stays isolated to native queue mutations; ownerless recovery dispatch is admitted only after exact main/head validation by this controller.
+# revisit-trigger: Remove REST-to-GraphQL hydration when GitHub exposes mergeability and exact refs through one bounded paginated REST contract.
 #
 # Eligibility changes wake one repo-wide writer mutex. GitHub may replace an
 # older pending run in that mutex, so every surviving clean-admitting pass also
@@ -197,7 +197,17 @@ jobs:
                 admission_reason='ci-not-successful'
                 head_sha=''
               else
-                prs_json="$(gh pr list -R "$REPO" --state open --limit 200 --json number,headRefOid,baseRefName,isDraft)"
+                prs_pages="$(gh api --method GET --paginate --slurp \
+                  "repos/$REPO/pulls?state=open&per_page=100")"
+                prs_json="$(jq -ce '
+                  (if length == 0 then [] elif (.[0] | type) == "array" then add else . end)
+                  | map({
+                    number,
+                    headRefOid: .head.sha,
+                    baseRefName: .base.ref,
+                    isDraft: (.draft == true)
+                  })
+                ' <<<"$prs_pages")"
                 matching_prs=()
                 while IFS= read -r matching_pr; do
                   [[ -n "$matching_pr" ]] && matching_prs+=("$matching_pr")
@@ -350,6 +360,15 @@ jobs:
           # integer re-caps event + recovery admissions per run.
           DRAIN_RECONCILE_MISSED_ADMISSION: ${{ steps.admission.outputs.deferred_release != '1' && (needs.fleet-policy.outputs.mode == 'normal' || needs.fleet-policy.outputs.mode == 'hold-intake' || needs.fleet-policy.outputs.mode == 'draft-only') && '1' || '0' }}
           DRAIN_QUEUE_REENTRY_MAX_PER_RUN: '0'
+          # A non-draft main PR whose required source checks never registered a
+          # check-run on its exact head can never turn green and never enroll
+          # (observed 2026-09-03 across multiple open PRs for 24h+). The drain
+          # re-fires source CI with a bounded close+reopen: at most two per run,
+          # heads at least two hours old, and never twice on the same exact head
+          # (bot-comment marker). Not an admission path, so no fleet-mode gate.
+          DRAIN_RECOVER_MISSING_CI: '1'
+          DRAIN_MISSING_CI_MAX_PER_RUN: '2'
+          DRAIN_MISSING_CI_MIN_AGE_MINUTES: '120'
           # `queue-deferred` has no typed provenance separating a temporary
           # pressure deferral from an explicit repair/human hold. Main-push
           # maintenance must preserve it until an owner explicitly releases it.

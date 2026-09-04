@@ -77,7 +77,12 @@ def test_active_facades_are_linear_only_and_fail_closed() -> None:
     assert "fileLinearIssue" in qa and "fileGithubIssue" not in qa
     golden = read(ROOT / "scripts/golden-path-lock.mjs")
     intake = read(ROOT / "scripts/lib/golden-path-intake.mjs")
-    assert intake.count("mutation CreateGoldenPathLockIssue") == 1
+    shared = read(ROOT / "scripts/lib/linear-issue-intake.mjs")
+    assert "upsertLinearIssueByTitleFingerprint" in intake and "createGithubIssue" not in intake
+    # JOV-5966: fail-closed fingerprint dedupe before create lives in the
+    # shared primitive; the golden-path intake wraps it and skips Triage.
+    assert "createStateName: 'Todo'" in intake
+    assert shared.index("query FindIssueByFingerprint") < shared.index("mutation CreateDedupedLinearIssue")
     assert "createGoldenPathLinearIssue" in golden and "createGithubIssue" not in golden
     observability_linear = read(ROOT / "scripts/observability-issue-linear.mjs")
     assert "upsertLinearIssueByTitleFingerprint" in observability_linear

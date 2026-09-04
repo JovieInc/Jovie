@@ -154,6 +154,20 @@ describe('bounded PR visual review contract', () => {
       'Test-auth 303 did not include a redirect location.'
     );
     expect(capture).toContain('Test-auth handoff ended at');
+    expect(capture).toContain("waitUntil: route.startsWith('/app/')");
+    expect(capture).toContain("'domcontentloaded'");
+    expect(capture).toContain('waitForAuthenticatedShell');
+    expect(capture).toContain('/Inbox|Library|New Chat/');
+  });
+
+  it('skips postgres on the secretless visual-capture shell path', () => {
+    const dashboard = readFileSync(
+      'apps/web/app/app/(shell)/dashboard/actions/dashboard-data.ts',
+      'utf8'
+    );
+    expect(dashboard).toContain('shouldUseVisualCaptureSyntheticDashboard');
+    expect(dashboard).toContain('isVisualCaptureSyntheticAuthEnabled');
+    expect(dashboard).toContain('createE2EDashboardCoreData(clerkUserId)');
   });
 
   it('uses the canonical test-auth environment in the capture workflow', () => {
@@ -554,6 +568,27 @@ describe('fail-closed visual evidence gate (JOV-5459)', () => {
       });
       expect(skipped.ok).toBe(true);
       expect(skipped.status).toBe('skipped');
+    } finally {
+      await rm(dir, { recursive: true, force: true });
+    }
+  });
+
+  it('treats a cancelled capture stage as failure, not success (fail-closed)', async () => {
+    const dir = await mkdtemp(join(tmpdir(), 'visual-gate-'));
+    try {
+      await writeFile(
+        join(dir, 'routing.json'),
+        JSON.stringify({ shouldReview: true })
+      );
+      await writeFile(join(dir, 'manifest.json'), JSON.stringify([]));
+
+      const cancelled = evaluateVisualEvidence({
+        artifactDir: dir,
+        stages: { build: 'success', server: 'success', capture: 'cancelled' },
+      });
+      expect(cancelled.ok).toBe(false);
+      expect(cancelled.status).toBe('unavailable');
+      expect(cancelled.failedStages).toEqual(['capture']);
     } finally {
       await rm(dir, { recursive: true, force: true });
     }

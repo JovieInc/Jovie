@@ -25,6 +25,7 @@ import { DesignProposalReviewPanel } from '@/components/features/admin/design-la
 import { FounderFunnelBand } from '@/components/features/admin/hud/FounderFunnelBand';
 import { FounderMorningWalkCard } from '@/components/features/admin/hud/FounderMorningWalkCard';
 import { HudCashMrrBand } from '@/components/features/admin/hud/HudCashMrrBand';
+import { HudEnvExceptionsPanel } from '@/components/features/admin/hud/HudEnvExceptionsPanel';
 import { HudKpiSubgrid } from '@/components/features/admin/hud/HudKpiSubgrid';
 import { HudNoiseDisclosure } from '@/components/features/admin/hud/HudNoiseDisclosure';
 import {
@@ -1004,6 +1005,16 @@ export function HudDashboardClient({
                 handleSourceRetry={handleSourceRetry}
               />
             </div>
+          </div>
+        );
+      case 'env-exceptions':
+        return (
+          <div
+            key={section.id}
+            className='flex flex-col gap-3'
+            data-testid={section.testId}
+          >
+            <HudEnvExceptionsPanel />
           </div>
         );
       default: {

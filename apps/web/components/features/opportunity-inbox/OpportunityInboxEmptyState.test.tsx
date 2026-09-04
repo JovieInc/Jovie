@@ -1,6 +1,10 @@
 import { render, screen } from '@testing-library/react';
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import { OpportunityInboxEmptyState } from './OpportunityInboxEmptyState';
+
+vi.mock('./FounderReviewRecorder', () => ({
+  FounderReviewRecorder: () => <div data-testid='founder-recorder' />,
+}));
 
 describe('OpportunityInboxEmptyState', () => {
   it('uses the canonical centered empty-state layout with the catalog action', () => {
@@ -37,5 +41,12 @@ describe('OpportunityInboxEmptyState', () => {
       'href',
       '/app/chat'
     );
+  });
+
+  it('turns the canonical empty state into a founder brain-dump session', () => {
+    render(<OpportunityInboxEmptyState founderMode />);
+
+    expect(screen.getByText('Start A Brain Dump')).toBeVisible();
+    expect(screen.getByTestId('founder-recorder')).toBeVisible();
   });
 });

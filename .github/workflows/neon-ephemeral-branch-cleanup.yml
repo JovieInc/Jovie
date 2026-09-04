@@ -21,6 +21,11 @@ jobs:
       NEON_PROJECT_ID: ${{ vars.NEON_PROJECT_ID }}
 
     steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 1
+          persist-credentials: false
+
       - name: Validate Neon configuration
         id: validate
         run: |
@@ -101,11 +106,14 @@ jobs:
             echo "No matching Neon branches found for '$BASE_NAME'"
             exit 0
           fi
+          DELETED_FILE="$RUNNER_TEMP/neon-deleted-branches.txt"
+          : > "$DELETED_FILE"
           DELETED_COUNT=0
           for branch in $MATCHING_BRANCHES; do
             echo "Deleting Neon branch: $branch"
             if pnpm dlx neonctl branches delete "$branch" --project-id "$NEON_PROJECT_ID" 2>/dev/null; then
               echo "  Deleted successfully"
+              echo "$branch" >> "$DELETED_FILE"
               DELETED_COUNT=$((DELETED_COUNT + 1))
             else
               echo "  Failed to delete (may already be deleted)"
@@ -116,6 +124,7 @@ jobs:
             echo "Deleting exactly-matching Neon branch: $EXACT_MATCH"
             if pnpm dlx neonctl branches delete "$EXACT_MATCH" --project-id "$NEON_PROJECT_ID" 2>/dev/null; then
               echo "  Deleted successfully"
+              echo "$EXACT_MATCH" >> "$DELETED_FILE"
               DELETED_COUNT=$((DELETED_COUNT + 1))
             else
               echo "  Failed to delete (may already be deleted)"
@@ -123,3 +132,28 @@ jobs:
           fi
 
           echo "Total branches deleted: $DELETED_COUNT"
+
+      - name: Emit preview-env cleanup receipt
+        if: ${{ always() && steps.validate.outputs.skip != 'true' }}
+        env:
+          PR_MERGED: ${{ github.event.pull_request.merged }}
+        run: |
+          set -euo pipefail
+          if [ "$PR_MERGED" = "true" ]; then
+            CLEANUP_TRIGGER="merged"
+          else
+            CLEANUP_TRIGGER="pr-closed"
+          fi
+          DELETED_FILE="$RUNNER_TEMP/neon-deleted-branches.txt"
+          if [ -s "$DELETED_FILE" ]; then
+            PROOF="Deleted branches: $(paste -sd, "$DELETED_FILE")"
+          else
+            PROOF="No matching branches remained for the closed PR ref"
+          fi
+          node scripts/ci/preview-env-admission.mjs emit-cleanup \
+            --kind neon-branch \
+            --environment "${{ steps.sanitize.outputs.name || 'unknown' }}-*" \
+            --cleanup-trigger "$CLEANUP_TRIGGER" \
+            --proof "$PROOF" \
+            --cleaned-by "neon-ephemeral-branch-cleanup.yml" \
+            --out "$RUNNER_TEMP/preview-env-cleanup-neon.json"
