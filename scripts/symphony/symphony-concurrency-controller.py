@@ -30,10 +30,13 @@ from datetime import datetime, timezone
 from typing import Any
 
 HERMES_DIR = str(pathlib.Path(__file__).resolve().parent)
+CONTRACT_DIR = str(pathlib.Path(os.environ.get("GEM_WORKSPACE", "/home/timwhite/gem-workspace")) / "scripts")
+if CONTRACT_DIR not in sys.path:
+    sys.path.insert(0, CONTRACT_DIR)
 if HERMES_DIR not in sys.path:
     sys.path.insert(0, HERMES_DIR)
 
-from symphony_capacity_evidence import validate_receipt as validate_capacity_receipt  # noqa: E402
+from symphony_proof_context import validate_local_receipt as validate_capacity_receipt  # noqa: E402
 
 
 SCHEMA = "symphony-concurrency/v1"

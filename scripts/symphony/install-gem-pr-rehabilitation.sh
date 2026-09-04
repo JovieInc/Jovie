@@ -26,6 +26,7 @@ readonly -a RELATIVE_SOURCES=(
   scripts/symphony/closure_health.py
   scripts/symphony/gem-ops-hud.py
   scripts/symphony/gem_gate_contract.py
+  scripts/symphony/symphony_proof_context.py
   scripts/symphony/gem-pr-drain.py
   scripts/symphony/gem-repo-drain-cycle.py
   scripts/symphony/gem_repo_registry.py
@@ -41,6 +42,7 @@ readonly -a TARGETS=(
   "${GEM_ROOT}/scripts/closure_health.py"
   "${HOME}/.local/bin/gem-ops-hud"
   "${GEM_ROOT}/scripts/gem_gate_contract.py"
+  "${GEM_ROOT}/scripts/symphony_proof_context.py"
   "${GEM_ROOT}/scripts/gem-pr-drain.py"
   "${GEM_ROOT}/scripts/gem-repo-drain-cycle.py"
   "${GEM_ROOT}/scripts/gem_repo_registry.py"

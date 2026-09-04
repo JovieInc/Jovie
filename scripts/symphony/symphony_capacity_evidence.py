@@ -29,32 +29,18 @@ def utc_now() -> datetime:
 def isoformat(value: datetime) -> str:
     return value.astimezone(timezone.utc).isoformat().replace("+00:00", "Z")
 
-def _inventory_rows(value: object) -> list[dict[str, str]]:
-    rows = value.get("accounts", []) if isinstance(value, dict) else []
-    enrolled: dict[tuple[str, str], dict[str, str]] = {}
-    for row in rows if isinstance(rows, list) else []:
-        if not isinstance(row, dict):
-            continue
-        provider, profile = row.get("provider"), row.get("profile")
-        if (
-            isinstance(provider, str)
-            and PROVIDER_ID.fullmatch(provider)
-            and isinstance(profile, str)
-            and SHA256.fullmatch(profile)
-        ):
-            enrolled[(provider, profile)] = {
-                "provider": provider,
-                "profile": profile,
-                "status": "enrolled",
-            }
-    return [enrolled[key] for key in sorted(enrolled)]
-
-
-def build_receipt(rows: list[object], inventory: object, now: datetime) -> dict[str, Any]:
-    proofs, rejected = accepted_proofs(rows, now)
-    enrolled = _inventory_rows(inventory)
-    enrolled_seats = {(row["provider"], row["profile"]) for row in enrolled}
-    accepted = [proof for proof in proofs if (proof["provider"], proof["profile"]) in enrolled_seats]
+def build_receipt(rows: list[object], inventory: object, now: datetime, *, context: dict | None = None) -> dict[str, Any]:
+    # Inventory carried by an input receipt cannot confer enrollment authority.
+    if context is None:
+        proofs, rejected, enrolled = [], {"trust-context-missing": len(rows)}, []
+    else:
+        proofs, rejected = accepted_proofs(rows, now,
+            expected_runtime=context["runtime"],
+            expected_contract_sha=context["runtime"]["contractSha256"],
+            attestations=context["attestations"])
+        enrolled = context["accounts"]
+    enrolled_seats = {(row["provider"], row["profile"], row["model"]) for row in enrolled}
+    accepted = [proof for proof in proofs if (proof["provider"], proof["profile"], proof["model"]) in enrolled_seats]
     if len(accepted) != len(proofs):
         rejected["not-enrolled"] = len(proofs) - len(accepted)
     proofs = accepted
@@ -69,6 +55,8 @@ def build_receipt(rows: list[object], inventory: object, now: datetime) -> dict[
     return {
         "schema": RECEIPT_SCHEMA,
         "source": SOURCE,
+        "runtime": context["runtime"] if context else None,
+        "contractSha256": context["runtime"]["contractSha256"] if context else None,
         "observedAt": isoformat(now),
         "target": len(proofs),
         "approved": bool(proofs),
@@ -118,7 +106,14 @@ def main() -> int:
         inventory = json.loads(args.inventory.read_text(encoding="utf-8"))
     except (FileNotFoundError, json.JSONDecodeError, OSError):
         inventory = {}
-    receipt = build_receipt(_read_jsonl(args.proof_ledger), inventory, utc_now())
+    from symphony_proof_context import load_context
+    import subprocess
+    now = utc_now()
+    try:
+        context = load_context(now)
+    except (OSError, ValueError, KeyError, TypeError, subprocess.SubprocessError):
+        context = None
+    receipt = build_receipt(_read_jsonl(args.proof_ledger), inventory, now, context=context)
     _write_atomic(args.output, receipt)
     print(json.dumps(receipt, sort_keys=True))
     return 0

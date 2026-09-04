@@ -46,14 +46,15 @@ SPEC.loader.exec_module(REGISTRY)
 class RegistryContractTests(unittest.TestCase):
     def test_canonical_fleet_installer_deploys_execution_capacity_artifacts(self):
         installer = FLEET_INSTALLER.read_text(encoding="utf-8")
-        self.assertIn("scripts/hermes/symphony_capacity_evidence.py", installer)
-        self.assertIn("scripts/hermes/symphony-concurrency-controller.py", installer)
+        self.assertIn("scripts/symphony/symphony_capacity_evidence.py", installer)
+        self.assertIn("scripts/symphony/symphony_proof_context.py", installer)
+        self.assertIn("scripts/symphony/symphony-concurrency-controller.py", installer)
         self.assertIn(
-            "scripts/hermes/systemd/symphony-concurrency-controller.service",
+            "scripts/symphony/systemd/symphony-concurrency-controller.service",
             installer,
         )
         self.assertIn(
-            "scripts/hermes/systemd/symphony-concurrency-controller.timer",
+            "scripts/symphony/systemd/symphony-concurrency-controller.timer",
             installer,
         )
         self.assertIn(
@@ -534,7 +535,7 @@ exit 0
         }
         return paths, env
 
-    def test_repeated_install_retires_and_remasks_legacy_sidecar(self):
+    def test_repeated_install_preserves_separately_owned_sidecar_masks(self):
         with tempfile.TemporaryDirectory() as directory:
             fixture = self._fixture(directory)
             _paths, env = self._runtime(directory)
@@ -542,8 +543,8 @@ exit 0
             self.assertEqual(self._install(fixture, env).returncode, 0)
             calls = pathlib.Path(env["FAKE_SYSTEMCTL_LOG"]).read_text()
         for unit in ("symphony-grok-sidecar.timer", "symphony-grok-sidecar.service"):
-            self.assertEqual(calls.count(f"mask {unit}"), 2)
-            self.assertEqual(calls.count(f"disable --now {unit}"), 2)
+            self.assertEqual(calls.count(f"mask {unit}"), 0)
+            self.assertEqual(calls.count(f"disable --now {unit}"), 0)
 
     def _install(
         self,
@@ -613,6 +614,7 @@ exit 0
             fixture = self._fixture(directory)
             paths, env = self._runtime(directory)
             process = self._install(fixture, env)
+            installed_context = (pathlib.Path(env["GEM_WORKSPACE"]) / "scripts/symphony_proof_context.py").read_bytes()
             installed_policy = paths["policy"].read_bytes()
             installed_closure = paths["closure"].read_bytes()
             installed_registry = paths["registry_module"].read_bytes()
@@ -637,6 +639,7 @@ exit 0
             (HERMES / "config/gem-repo-registry.json").read_bytes(),
         )
         self.assertIn(b"def resolve_registry_path", installed_registry)
+        self.assertEqual(installed_context, (HERMES / "symphony_proof_context.py").read_bytes())
         self.assertTrue(attestation["policy"]["matches"])
         self.assertTrue(attestation["gate"]["matches"])
         self.assertTrue(attestation["closureHealth"]["matches"])

@@ -444,7 +444,7 @@ def test_repaired_generation_runs_only_after_routing_receipt() -> None:
     repaired = RECONCILER.controller_retry_decision(
         {
             "issue_identifier": "JOV-4999",
-            "error": "port_exit 78",
+            "error": "",
             "attempt": 1,
             "generation": "admitted-routing",
         },
@@ -525,6 +525,10 @@ def test_reconciler_consumes_materialized_receipt_once_for_repaired_generation(
     routing_path = workspace / ".symphony-routing.json"
     routing_path.write_text(json.dumps(_routing_receipt()), encoding="utf-8")
     routing_path.chmod(0o600)
+    RECONCILER._reconcile_item(item, "retrying", False)
+    still_blocked = json.loads(receipt_path.read_text(encoding="utf-8"))
+    assert still_blocked["controllerState"] == "blocked"
+    item = {**item, "error": None}
     RECONCILER._reconcile_item(item, "retrying", False)
     admitted = json.loads(receipt_path.read_text(encoding="utf-8"))
     assert admitted["generation"] != parked["generation"]

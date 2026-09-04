@@ -18,13 +18,18 @@ CLOSURE_HEALTH_SCHEMA = "jovie-closure-health/v1"
 CLOSURE_HEALTH_AUTHORITY = "Summer"
 JOVIE_REPO = "JovieInc/Jovie"
 CAPACITY_SCHEMA = "gem-concurrency-evidence/v1"
-PROOF_SCHEMA = "symphony-useful-turn-proof/v1"
+PROOF_SCHEMA = "symphony-useful-turn-proof/v2"
+PROOF_SOURCE = "authenticated-completion-probe/v2"
+RUNTIME_IDENTITY_SCHEMA = "symphony-runtime-identity/v1"
+OFFICIAL_RUNTIME_SERVICE = "symphony-elixir.service"
+CODER_AGENT_PROFILE = "coder"
 CAPACITY_SOURCE = "execution-proven-useful-turns"
 CAPACITY_MAX_AGE = timedelta(hours=24)
 CAPACITY_MAX_TARGET = 40
 SHA256 = re.compile(r"^[0-9a-f]{64}$")
 PROVIDER_ID = re.compile(r"^[a-z][a-z0-9._-]{0,63}$")
 MODEL_ID = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._/-]{0,127}$")
+SOURCE_REVISION = re.compile(r"^[0-9a-f]{40}$")
 ISO_TIMESTAMP = re.compile(r"^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d{1,6})?(?:Z|[+-](\d{2}):(\d{2}))$")
 
 
@@ -45,14 +50,46 @@ def _parse_time(value: object) -> datetime | None:
         return None
 
 
+def validate_runtime_identity(value: object) -> dict[str, str] | None:
+    if not isinstance(value, dict):
+        return None
+    normalized = {
+        "schema": value.get("schema"),
+        "service": value.get("service"),
+        "sourceRevision": value.get("sourceRevision"),
+        "binarySha256": value.get("binarySha256"),
+        "workflowSha256": value.get("workflowSha256"),
+        "contractSha256": value.get("contractSha256"),
+    }
+    if (
+        normalized["schema"] != RUNTIME_IDENTITY_SCHEMA
+        or normalized["service"] != OFFICIAL_RUNTIME_SERVICE
+        or not isinstance(normalized["sourceRevision"], str)
+        or not SOURCE_REVISION.fullmatch(normalized["sourceRevision"])
+        or any(
+            not isinstance(normalized[key], str) or not SHA256.fullmatch(normalized[key])
+            for key in ("binarySha256", "workflowSha256", "contractSha256")
+        )
+    ):
+        return None
+    return normalized
+
+
 def validate_useful_turn_proof(
-    value: object, now: datetime, max_age: timedelta = CAPACITY_MAX_AGE
+    value: object,
+    now: datetime,
+    max_age: timedelta = CAPACITY_MAX_AGE,
+    *,
+    expected_runtime: dict[str, str] | None = None,
+    expected_contract_sha: str | None = None,
 ) -> tuple[dict[str, Any] | None, str]:
     if not isinstance(value, dict) or value.get("schema") != PROOF_SCHEMA:
         return None, "malformed"
     strings = [value.get(key) for key in ("provider", "profile", "model")]
     completed_at = _parse_time(value.get("completedAt"))
-    completion = any(
+    runtime = validate_runtime_identity(value.get("runtime"))
+    completion = all(type(value.get(key, 0)) is int and value.get(key, 0) >= 0
+                     for key in ("outputBytes", "outputTokens")) and any(
         isinstance(value.get(key), int)
         and not isinstance(value.get(key), bool)
         and value.get(key) > 0
@@ -67,6 +104,22 @@ def validate_useful_turn_proof(
         or not MODEL_ID.fullmatch(strings[2])
     ):
         return None, "malformed"
+    if (
+        value.get("producer") != PROOF_SOURCE
+        or value.get("agentProfile") != CODER_AGENT_PROFILE
+        or not isinstance(value.get("probeId"), str)
+        or not SHA256.fullmatch(value["probeId"])
+        or value.get("attested") is not True
+        or runtime is None
+        or not isinstance(value.get("contractSha256"), str)
+        or not SHA256.fullmatch(value["contractSha256"])
+        or value["contractSha256"] != runtime["contractSha256"]
+    ):
+        return None, "unattested"
+    if expected_contract_sha is not None and value["contractSha256"] != expected_contract_sha:
+        return None, "imported-runtime-mismatch"
+    if expected_runtime is not None and runtime != expected_runtime:
+        return None, "runtime-build-mismatch"
     if type(value.get("rc")) is not int or value["rc"] != 0:
         return None, "failed"
     if value.get("useful") is not True:
@@ -90,40 +143,111 @@ def validate_useful_turn_proof(
         "outputDigest": value["outputDigest"],
         "outputBytes": value.get("outputBytes", 0),
         "outputTokens": value.get("outputTokens", 0),
+        "producer": PROOF_SOURCE,
+        "probeId": value["probeId"],
+        "agentProfile": CODER_AGENT_PROFILE,
+        "attested": True,
+        "contractSha256": value["contractSha256"],
+        "runtime": runtime,
     }, "accepted"
 
 
 def accepted_useful_turn_proofs(
-    rows: list[object], now: datetime, max_age: timedelta = CAPACITY_MAX_AGE
+    rows: list[object],
+    now: datetime,
+    max_age: timedelta = CAPACITY_MAX_AGE,
+    *,
+    expected_runtime: dict[str, str] | None = None,
+    expected_contract_sha: str | None = None,
+    attestations: dict[str, object] | None = None,
 ) -> tuple[list[dict[str, Any]], dict[str, int]]:
     by_seat: dict[tuple[str, str], dict[str, Any]] = {}
+    contradictory: set[tuple[str, str]] = set()
+    probe_seats: dict[str, tuple[str, str]] = {}
     rejected: dict[str, int] = {}
     for row in rows:
-        proof, reason = validate_useful_turn_proof(row, now, max_age)
+        proof, reason = validate_useful_turn_proof(
+            row,
+            now,
+            max_age,
+            expected_runtime=expected_runtime,
+            expected_contract_sha=expected_contract_sha,
+        )
         if proof is None:
             rejected[reason] = rejected.get(reason, 0) + 1
             continue
         seat = (proof["provider"], proof["profile"])
+        if attestations is None or attestations.get(proof["probeId"]) != row:
+            rejected["unattested"] = rejected.get("unattested", 0) + 1
+            continue
+        prior_seat = probe_seats.get(proof["probeId"])
+        if prior_seat is not None and prior_seat != seat:
+            by_seat.pop(prior_seat, None)
+            contradictory.update((prior_seat, seat))
+            rejected["substituted-probe"] = rejected.get("substituted-probe", 0) + 1
+            continue
+        probe_seats[proof["probeId"]] = seat
+        if seat in contradictory:
+            rejected["contradictory-seat"] = rejected.get("contradictory-seat", 0) + 1
+            continue
         prior = by_seat.get(seat)
-        if prior is None or _parse_time(proof["completedAt"]) > _parse_time(prior["completedAt"]):
+        if prior is None:
             by_seat[seat] = proof
+            continue
+        binding_fields = ("provider", "profile", "model", "contractSha256", "runtime")
+        if any(prior[field] != proof[field] for field in binding_fields):
+            by_seat.pop(seat, None)
+            contradictory.add(seat)
+            rejected["contradictory-seat"] = rejected.get("contradictory-seat", 0) + 2
+            continue
+        rejected["duplicate-seat"] = rejected.get("duplicate-seat", 0) + 1
+        by_seat.pop(seat, None)
+        contradictory.add(seat)
     return [by_seat[key] for key in sorted(by_seat)], rejected
 
 
 def validate_capacity_receipt(
-    value: object, now: datetime, max_age: timedelta = CAPACITY_MAX_AGE
+    value: object,
+    now: datetime,
+    max_age: timedelta = CAPACITY_MAX_AGE,
+    *,
+    expected_runtime: dict[str, str] | None = None,
+    expected_contract_sha: str | None = None,
+    attestations: dict[str, object] | None = None,
+    enrolled_seats: set[tuple[str, str, str]] | None = None,
 ) -> tuple[bool, str, list[dict[str, Any]]]:
     if not isinstance(value, dict) or value.get("schema") != CAPACITY_SCHEMA:
         return False, "capacity-evidence-malformed", []
     if value.get("source") != CAPACITY_SOURCE:
         return False, "capacity-evidence-source-untrusted", []
+    if expected_runtime is None or expected_contract_sha is None or enrolled_seats is None:
+        return False, "capacity-evidence-trust-context-missing", []
+    runtime = validate_runtime_identity(value.get("runtime"))
+    contract_sha = value.get("contractSha256")
+    if runtime is None or not isinstance(contract_sha, str) or not SHA256.fullmatch(contract_sha):
+        return False, "capacity-evidence-unattested", []
+    if contract_sha != runtime["contractSha256"]:
+        return False, "capacity-evidence-imported-runtime-mismatch", []
+    if expected_contract_sha is not None and contract_sha != expected_contract_sha:
+        return False, "capacity-evidence-imported-runtime-mismatch", []
+    if expected_runtime is not None and runtime != expected_runtime:
+        return False, "capacity-evidence-runtime-build-mismatch", []
     observed_at = _parse_time(value.get("observedAt"))
     if observed_at is None or not timedelta(0) <= now - observed_at <= max_age:
         return False, "capacity-evidence-stale-or-future", []
     rows = value.get("acceptedEvidence")
     if not isinstance(rows, list):
         return False, "capacity-evidence-proof-rows-missing", []
-    proofs, rejected = accepted_useful_turn_proofs(rows, now, max_age)
+    proofs, rejected = accepted_useful_turn_proofs(
+        rows,
+        now,
+        max_age,
+        expected_runtime=runtime,
+        expected_contract_sha=contract_sha,
+        attestations=attestations,
+    )
+    if any((p["provider"], p["profile"], p["model"]) not in enrolled_seats for p in proofs):
+        return False, "capacity-evidence-not-enrolled", []
     target = value.get("target")
     if (
         rejected
@@ -333,6 +457,10 @@ def validate_gate_result(returncode: int, stdout: str, consumer: str) -> dict[st
     if capacity_signal_accepted is not capacity_accepted:
         raise GateContractError("capacity evidence signal and admission disagree")
     if capacity_accepted:
+        from symphony_proof_context import validate_local_receipt
+        accepted, reason, _ = validate_local_receipt(capacity_signal, datetime.now(timezone.utc))
+        if not accepted:
+            raise GateContractError(f"accepted capacity failed local verification: {reason}")
         proof_rows = capacity_signal.get("acceptedEvidence")
         if (
             capacity_signal.get("source") != "execution-proven-useful-turns"
@@ -359,10 +487,16 @@ def validate_gate_result(returncode: int, stdout: str, consumer: str) -> dict[st
             raise GateContractError("unproven capacity must close dispatch")
         if capacity_accepted and gem_maximum < runtime_floor:
             raise GateContractError("accepted capacity is below the configured floor")
+        if capacity_accepted and gem_maximum > capacity_signal["target"]:
+            raise GateContractError("mutation concurrency exceeds verified useful-turn capacity")
         if maximum != gem_maximum:
             raise GateContractError("remediation concurrency contradicts Gem concurrency")
-    elif maximum != 0:
+    elif maximum != 0 or gem_maximum != 0:
         raise GateContractError("RED must close dispatch")
+    if push_allowed and not 1 <= maximum <= CAPACITY_MAX_TARGET:
+        raise GateContractError("allowed remediation concurrency must be 1 through 40")
+    if not push_allowed and maximum != 0:
+        raise GateContractError("denied remediation concurrency must be zero")
     if remediation.get("authority") != "single-pr-writer-exact-head":
         raise GateContractError("remediation authority must require one exact-head writer")
     reasons = receipt.get("reasons")

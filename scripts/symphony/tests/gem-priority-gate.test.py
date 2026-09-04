@@ -358,31 +358,7 @@ def lane_capacity(
         "sharedResources": {},
     }
 
-def capacity_evidence(target: int = 4, observed_at: str | None = None) -> dict[str, object]:
-    observed = observed_at or MODULE.isoformat(MODULE.utc_now())
-    return {
-        "schema": "gem-concurrency-evidence/v1",
-        "source": "execution-proven-useful-turns",
-        "target": target,
-        "approved": target > 0,
-        "severeIncidents": 0,
-        "observedAt": observed,
-        "acceptedEvidence": [
-            {
-                "schema": "symphony-useful-turn-proof/v1",
-                "provider": "openai",
-                "profile": f"{index + 1:064x}",
-                "model": "gpt-5.6-sol",
-                "rc": 0,
-                "useful": True,
-                "completedAt": observed,
-                "outputDigest": hashlib.sha256(str(index).encode()).hexdigest(),
-                "outputBytes": 32,
-                "outputTokens": 8,
-            }
-            for index in range(1, target + 1)
-        ],
-    }
+from proof_fixtures import evidence as capacity_evidence
 
 
 GREEN_SIGNALS: dict[str, object] = {
@@ -1711,17 +1687,7 @@ class IndependentReviewTests(unittest.TestCase):
     def evaluate(self, review: object) -> dict[str, object]:
         signals = dict(GREEN_SIGNALS)
         signals["independentReview"] = review
-        evidence = signals.get("concurrencyEvidence")
-        if isinstance(evidence, dict):
-            observed = MODULE.isoformat(self.NOW)
-            signals["concurrencyEvidence"] = {
-                **evidence,
-                "observedAt": observed,
-                "acceptedEvidence": [
-                    {**proof, "completedAt": observed}
-                    for proof in evidence.get("acceptedEvidence", [])
-                ],
-            }
+        signals["concurrencyEvidence"] = capacity_evidence(4, MODULE.isoformat(self.NOW))
         queue = signals.get("queue")
         if isinstance(queue, dict):
             signals["queue"] = {

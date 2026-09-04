@@ -37,19 +37,10 @@ def now_iso() -> str:
     return datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
 
 
-def capacity_evidence(target: int = 4) -> dict[str, object]:
-    observed = now_iso()
-    return {
-        "schema": "gem-concurrency-evidence/v1", "source": "execution-proven-useful-turns",
-        "target": target, "approved": target > 0, "severeIncidents": 0, "observedAt": observed,
-        "acceptedEvidence": [{
-            "schema": "symphony-useful-turn-proof/v1", "provider": "openai",
-            "profile": f"{index + 1:064x}", "model": "gpt-5.6-sol", "rc": 0,
-            "useful": True, "completedAt": observed,
-            "outputDigest": hashlib.sha256(str(index).encode()).hexdigest(),
-            "outputBytes": 32, "outputTokens": 8,
-        } for index in range(target)],
-    }
+from proof_fixtures import evidence
+
+def capacity_evidence(target=4):
+    return evidence(target, now_iso())
 
 
 def signals(**overrides):

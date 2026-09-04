@@ -1639,6 +1639,17 @@ describe('deterministic Symphony admission boundary', () => {
         const { stdout } = await execFileAsync(
           'python3',
           [
+            '-c',
+            `import json, pathlib, runpy, sys
+sys.path.insert(0, str(pathlib.Path(sys.argv[1]).parent / "tests"))
+from proof_fixtures import evidence
+controller = sys.argv.pop(1)
+sys.argv[0] = controller
+index = sys.argv.index("--evaluate-json") + 1
+signals = json.loads(sys.argv[index])
+signals["concurrencyEvidence"] = evidence(4)
+sys.argv[index] = json.dumps(signals)
+runpy.run_path(controller, run_name="__main__")`,
             controller,
             '--evaluate-json',
             JSON.stringify(controllerSignals),
@@ -1746,9 +1757,12 @@ describe('deterministic Symphony admission boundary', () => {
       productionRed.receipt.isolatedPromotionAdmission.deploymentsAllowed,
       false
     );
-    assert.match(workflowSource, /useful-turn capacity/);
-    assert.match(workflowSource, /Labels\/OAuth are not authority/);
-    assert.match(workflowSource, /max_concurrent_agents: 0/);
+    assert.equal(amber.receipt.signals.concurrencyEvidence.source, 'execution-proven-useful-turns');
+    assert.ok(amber.receipt.signals.concurrencyEvidence.acceptedEvidence.every(proof => proof.schema === 'symphony-useful-turn-proof/v2'));
+    assert.match(
+      await readFile(resolve(ORCHESTRATOR_DIR, '../symphony/WORKFLOW.md'), 'utf8'),
+      /max_concurrent_agents: 0/
+    );
   });
 
   it('stops and never redispatches an agent once its issue reaches In Review', async () => {
@@ -1776,9 +1790,12 @@ describe('deterministic Symphony admission boundary', () => {
     assert.deepEqual(activeStates, ['Todo', 'In Progress']);
     assert.ok(!activeStates.includes('In Review'));
 
-    assert.match(workflowSource, /max_concurrent_agents: 0/);
-    assert.match(workflowSource, /Own one head/);
-    assert.match(workflowSource, /Gem delivers/);
+    assert.match(
+      await readFile(resolve(ORCHESTRATOR_DIR, '../symphony/WORKFLOW.md'), 'utf8'),
+      /max_concurrent_agents: 0/
+    );
+    assert.match(workflowSource, /Never merge or deploy manually/);
+    assert.match(workflowSource, /native controller rechecks before enrollment/);
   });
 
   it('keeps the Gem drain on typed fleet admission and fail-closes exit-code mismatches', async () => {
@@ -1792,6 +1809,8 @@ import json
 import pathlib
 import sys
 sys.path.insert(0, sys.argv[1])
+sys.path.insert(0, str(pathlib.Path(sys.argv[1]) / "tests"))
+from proof_fixtures import evidence
 from gem_gate_contract import GateContractError, drain_state_dir, gate_state_dir, validate_gate_result
 
 receipt = {
@@ -1815,6 +1834,7 @@ receipt = {
     "concurrency": {"gem": {"evidenceAccepted": True, "newMutationAllowed": True, "maxConcurrent": 1, "runtimeFloor": 1}},
     "ownership": {"review": "Gem", "directGemPickup": False},
 }
+receipt["signals"]["concurrencyEvidence"] = {**evidence(1), "accepted": True}
 validate_gate_result(0, json.dumps(receipt), "fleet")
 validate_gate_result(0, json.dumps(receipt), "remediation")
 validate_gate_result(2, json.dumps(receipt), "promotion")
@@ -1910,6 +1930,9 @@ receipt = {
     "concurrency": {"gem": {"evidenceAccepted": False, "newMutationAllowed": False, "maxConcurrent": 0, "runtimeFloor": 1}},
     "ownership": {"review": "Gem", "directGemPickup": False},
 }
+import os
+if receipt["signals"]["concurrencyEvidence"]["accepted"]:
+    receipt["signals"]["concurrencyEvidence"] = {**json.loads(os.environ["TEST_CAPACITY_JSON"]), "accepted": True}
 print(json.dumps(receipt))
 raise SystemExit(0)
 `
@@ -1972,6 +1995,9 @@ receipt = {
     "concurrency": {"gem": {"evidenceAccepted": True, "newMutationAllowed": True, "maxConcurrent": 1, "runtimeFloor": 1}},
     "ownership": {"review": "Gem", "directGemPickup": False},
 }
+import os
+if receipt["signals"]["concurrencyEvidence"]["accepted"]:
+    receipt["signals"]["concurrencyEvidence"] = {**json.loads(os.environ["TEST_CAPACITY_JSON"]), "accepted": True}
 print(json.dumps(receipt))
 raise SystemExit(0)
 `
@@ -1982,6 +2008,12 @@ import json
 import pathlib
 import sys
 consumer = pathlib.Path(sys.argv[1])
+sys.path.insert(0, str(consumer.parent / "tests"))
+from proof_fixtures import evidence
+capacity = evidence(1)
+# Keep the private fixture alive through both gate subprocesses.
+import os
+os.environ["TEST_CAPACITY_JSON"] = json.dumps(capacity)
 spec = importlib.util.spec_from_file_location("gem_pr_drain", consumer)
 module = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(module)

@@ -529,9 +529,10 @@ class StaleCapacityLocalRemediationTests(unittest.TestCase):
                     return b"link\0"
                 return None
 
+            actual_readlink = os.readlink
             with (
                 mock.patch.object(MODULE, "_git_bytes", side_effect=git_bytes),
-                mock.patch.object(MODULE.os, "readlink", return_value="\udcff"),
+                mock.patch.object(MODULE.os, "readlink", side_effect=lambda path, **kw: "\udcff" if pathlib.Path(path).name == "link" else actual_readlink(path, **kw)),
             ):
                 digest = MODULE._workspace_dirty_content_digest(workspace, "?? link")
 

@@ -16,6 +16,7 @@ readonly BACKUP_DIR="${GEM_ROOT}/state/backups/fleet-controller-${STAMP}"
 
 readonly GATE_SOURCE="${SOURCE_ROOT}/scripts/symphony/gem-priority-gate.py"
 readonly CLOSURE_SOURCE="${SOURCE_ROOT}/scripts/symphony/closure_health.py"
+readonly PROOF_CONTEXT_SOURCE="${SOURCE_ROOT}/scripts/symphony/symphony_proof_context.py"
 readonly CONTRACT_SOURCE="${SOURCE_ROOT}/scripts/symphony/gem_gate_contract.py"
 readonly CONSUMER_SOURCE="${SOURCE_ROOT}/scripts/symphony/gem-pr-drain.py"
 readonly REGISTRY_MODULE_SOURCE="${SOURCE_ROOT}/scripts/symphony/gem_repo_registry.py"
@@ -29,6 +30,7 @@ readonly WORKFLOW_SOURCE="${SOURCE_ROOT}/scripts/symphony/WORKFLOW.md"
 readonly SERVICE_UNIT_SOURCE="${SOURCE_ROOT}/scripts/symphony/systemd/symphony-elixir.service"
 readonly GATE_TARGET="${GEM_ROOT}/scripts/gem-priority-gate.py"
 readonly CLOSURE_TARGET="${GEM_ROOT}/scripts/closure_health.py"
+readonly PROOF_CONTEXT_TARGET="${GEM_ROOT}/scripts/symphony_proof_context.py"
 readonly CONTRACT_TARGET="${GEM_ROOT}/scripts/gem_gate_contract.py"
 readonly CONSUMER_TARGET="${GEM_ROOT}/scripts/gem-pr-drain.py"
 readonly REGISTRY_MODULE_TARGET="${GEM_ROOT}/scripts/gem_repo_registry.py"
@@ -89,6 +91,7 @@ for source in \
   "${GATE_SOURCE}" \
   "${CLOSURE_SOURCE}" \
   "${CONTRACT_SOURCE}" \
+  "${PROOF_CONTEXT_SOURCE}" \
   "${CONSUMER_SOURCE}" \
   "${REGISTRY_MODULE_SOURCE}" \
   "${REGISTRY_CONFIG_SOURCE}" \
@@ -107,6 +110,7 @@ git -C "${SOURCE_ROOT}" diff --quiet -- \
   scripts/symphony/gem-priority-gate.py \
   scripts/symphony/closure_health.py \
   scripts/symphony/gem_gate_contract.py \
+  scripts/symphony/symphony_proof_context.py \
   scripts/symphony/gem-pr-drain.py \
   scripts/symphony/gem_repo_registry.py \
   scripts/symphony/config/gem-repo-registry.json \
@@ -122,6 +126,7 @@ git -C "${SOURCE_ROOT}" diff --cached --quiet -- \
   scripts/symphony/gem-priority-gate.py \
   scripts/symphony/closure_health.py \
   scripts/symphony/gem_gate_contract.py \
+  scripts/symphony/symphony_proof_context.py \
   scripts/symphony/gem-pr-drain.py \
   scripts/symphony/gem_repo_registry.py \
   scripts/symphony/config/gem-repo-registry.json \
@@ -151,6 +156,7 @@ python3 -m py_compile \
   "${GATE_SOURCE}" \
   "${CLOSURE_SOURCE}" \
   "${CONTRACT_SOURCE}" \
+  "${PROOF_CONTEXT_SOURCE}" \
   "${CONSUMER_SOURCE}" \
   "${REGISTRY_MODULE_SOURCE}" \
   "${POLICY_SOURCE}" \
@@ -164,6 +170,7 @@ if [[ "${VERIFY_ONLY}" == true ]]; then
     "${GATE_SOURCE}" \
     "${CLOSURE_SOURCE}" \
     "${CONTRACT_SOURCE}" \
+    "${PROOF_CONTEXT_SOURCE}" \
     "${CONSUMER_SOURCE}" \
     "${REGISTRY_MODULE_SOURCE}" \
     "${REGISTRY_CONFIG_SOURCE}" \
@@ -182,6 +189,7 @@ mkdir -p "${BACKUP_DIR}" "${GEM_ROOT}/scripts" "${GEM_ROOT}/config" "$(dirname "
 cp -p "${GATE_TARGET}" "${BACKUP_DIR}/gem-priority-gate.py"
 [[ ! -e "${CLOSURE_TARGET}" ]] || cp -p "${CLOSURE_TARGET}" "${BACKUP_DIR}/closure_health.py"
 cp -p "${CONSUMER_TARGET}" "${BACKUP_DIR}/gem-pr-drain.py"
+[[ ! -e "${PROOF_CONTEXT_TARGET}" ]] || cp -p "${PROOF_CONTEXT_TARGET}" "${BACKUP_DIR}/symphony_proof_context.py"
 [[ ! -e "${CONTRACT_TARGET}" ]] || cp -p "${CONTRACT_TARGET}" "${BACKUP_DIR}/gem_gate_contract.py"
 [[ ! -e "${REGISTRY_MODULE_TARGET}" ]] || \
   cp -p "${REGISTRY_MODULE_TARGET}" "${BACKUP_DIR}/gem_repo_registry.py"
@@ -203,6 +211,7 @@ cp -p "${CONSUMER_TARGET}" "${BACKUP_DIR}/gem-pr-drain.py"
 timer_was_active=false
 concurrency_timer_was_active=false
 closure_existed=false
+proof_context_existed=false
 contract_existed=false
 registry_module_existed=false
 registry_config_existed=false
@@ -215,6 +224,7 @@ workflow_existed=false
 service_unit_existed=false
 install_started=false
 install_complete=false
+[[ ! -e "${PROOF_CONTEXT_TARGET}" ]] || proof_context_existed=true
 [[ ! -e "${CONTRACT_TARGET}" ]] || contract_existed=true
 [[ ! -e "${CLOSURE_TARGET}" ]] || closure_existed=true
 [[ ! -e "${REGISTRY_MODULE_TARGET}" ]] || registry_module_existed=true
@@ -250,6 +260,11 @@ finish_or_rollback() {
         restore_atomic "${BACKUP_DIR}/closure_health.py" "${CLOSURE_TARGET}"
       else
         rm -f "${CLOSURE_TARGET}"
+      fi
+      if [[ "${proof_context_existed}" == true ]]; then
+        restore_atomic "${BACKUP_DIR}/symphony_proof_context.py" "${PROOF_CONTEXT_TARGET}"
+      else
+        rm -f "${PROOF_CONTEXT_TARGET}"
       fi
       if [[ "${contract_existed}" == true ]]; then
         restore_atomic "${BACKUP_DIR}/gem_gate_contract.py" "${CONTRACT_TARGET}"
@@ -338,6 +353,7 @@ install_atomic() {
 install_started=true
 install_atomic "${GATE_SOURCE}" "${GATE_TARGET}" 0755
 install_atomic "${CLOSURE_SOURCE}" "${CLOSURE_TARGET}" 0755
+install_atomic "${PROOF_CONTEXT_SOURCE}" "${PROOF_CONTEXT_TARGET}" 0644
 install_atomic "${CONTRACT_SOURCE}" "${CONTRACT_TARGET}" 0644
 install_atomic "${CONSUMER_SOURCE}" "${CONSUMER_TARGET}" 0755
 install_atomic "${REGISTRY_MODULE_SOURCE}" "${REGISTRY_MODULE_TARGET}" 0755
