@@ -266,6 +266,8 @@ def _write_null_creator_receipt_drain(
     front_churn: str = "forbid",
     allow_enroll: bool = False,
     merge_group_runs: list[dict[str, object]] | None = None,
+    timeline_events: list[dict[str, object]] | None = None,
+    timeline_fails: bool = False,
 ) -> dict[str, Path]:
     logs = {
         "api": tmp_path / "api-calls",
@@ -274,6 +276,7 @@ def _write_null_creator_receipt_drain(
         "enroll": tmp_path / "enroll",
         "dequeue": tmp_path / "dequeue",
         "jobs": tmp_path / "jobs-scans",
+        "timeline": tmp_path / "timeline-calls",
     }
     for path in logs.values():
         path.write_text("", encoding="utf-8")
@@ -302,6 +305,13 @@ def _write_null_creator_receipt_drain(
     queued_json = "true" if queued else "false"
     merge_group_runs_json = json.dumps(
         merge_group_runs or [], separators=(",", ":")
+    )
+    # `gh api --paginate --slurp` wraps endpoint pages in an outer array.
+    timeline_json = json.dumps([timeline_events or []], separators=(",", ":"))
+    timeline_case = (
+        'echo "timeline read forced to fail" >&2; exit 95'
+        if timeline_fails
+        else f"echo '{timeline_json}'; exit 0"
     )
     if queued:
         entry_state = queue_entry_state or "AWAITING_CHECKS"
@@ -397,6 +407,10 @@ def _write_null_creator_receipt_drain(
               printf '%s\\n' "$2" >>'{logs["api"]}'
               if [[ "$2" == *"/git/ref/heads/main"* ]]; then echo '{"9" * 40}'; exit 0; fi
               if [[ "$2" == *"/actions/workflows/ci.yml/runs"* ]]; then echo '{merge_group_runs_json}'; exit 0; fi
+              if [[ "$2" == *"/issues/{pr}/timeline"* ]]; then
+                printf '%s\\n' "$2" >>'{logs["timeline"]}'
+                {timeline_case}
+              fi
               if [[ "$2" == *"/commits/{head}/status"* ]]; then cat '{status_file}'; exit 0; fi
               if [[ "$2" == "users/jovie-bot%5Bbot%5D" ]]; then cat '{identity_file}'; exit 0; fi
               if [[ "$2" == "repos/JovieInc/Jovie/actions/runs/77" ]]; then cat '{run_file}'; exit 0; fi
@@ -774,6 +788,172 @@ class TestNullCreatorQueueReceiptProvenance:
         assert logs["dequeue"].read_text(encoding="utf-8") == ""
         assert "+jovie-native-unmergeable/v1" not in result.stdout
         assert "null-creator fixture must not enroll" not in result.stderr
+
+
+class TestStarvedGroupDequeue:
+    @staticmethod
+    def _neutral_status(head: str) -> dict[str, object]:
+        return _null_creator_status(
+            head=head,
+            context="ci/pr-ready",
+            state="success",
+            description="pass",
+        )
+
+    @staticmethod
+    def _queued_iso(minutes_ago: int) -> str:
+        return (
+            datetime.now(timezone.utc) - timedelta(minutes=minutes_ago)
+        ).strftime("%Y-%m-%dT%H:%M:%SZ")
+
+    def test_starved_awaiting_checks_entry_is_dequeued(self, tmp_path: Path) -> None:
+        head = "8" * 40
+        logs = _write_null_creator_receipt_drain(
+            tmp_path,
+            pr=16420,
+            head=head,
+            title="Starved merge group front",
+            status=self._neutral_status(head),
+            run=_trusted_autoenroll_run(head=head),
+            queued=True,
+            front_churn="allow",
+            timeline_events=[
+                {
+                    "event": "added_to_merge_queue",
+                    "created_at": self._queued_iso(47),
+                }
+            ],
+        )
+
+        result = _run_bash(
+            _drain_command(
+                tmp_path,
+                backend="native",
+                extra_env=(
+                    "GITHUB_RUN_ID=77 GITHUB_SERVER_URL=https://github.com "
+                    "GITHUB_API_URL=https://api.github.com"
+                ),
+            )
+        )
+
+        assert result.returncode == 0, f"stdout={result.stdout}\nstderr={result.stderr}"
+        assert logs["timeline"].read_text(encoding="utf-8") != ""
+        assert logs["dequeue"].read_text(encoding="utf-8") == "dequeue\n"
+        assert "starved-group" in result.stdout
+        assert "✗ starved-group: AWAITING_CHECKS" in result.stdout
+
+    def test_existing_group_ci_run_leaves_entry_queued(self, tmp_path: Path) -> None:
+        head = "8" * 40
+        base = "9" * 40
+        logs = _write_null_creator_receipt_drain(
+            tmp_path,
+            pr=16420,
+            head=head,
+            title="Group with a live CI run",
+            status=self._neutral_status(head),
+            run=_trusted_autoenroll_run(head=head),
+            queued=True,
+            front_churn="active",
+            merge_group_runs=[
+                {
+                    "id": 88,
+                    "headBranch": f"gh-readonly-queue/main/pr-16420-{base}",
+                    "status": "in_progress",
+                    "conclusion": None,
+                    "headSha": "7" * 40,
+                    "createdAt": "2026-09-03T16:13:03Z",
+                    "updatedAt": "2026-09-03T16:15:46Z",
+                }
+            ],
+            timeline_events=[
+                {
+                    "event": "added_to_merge_queue",
+                    "created_at": self._queued_iso(47),
+                }
+            ],
+        )
+
+        result = _run_bash(
+            _drain_command(
+                tmp_path,
+                backend="native",
+                extra_env=(
+                    "GITHUB_RUN_ID=77 GITHUB_SERVER_URL=https://github.com "
+                    "GITHUB_API_URL=https://api.github.com"
+                ),
+            )
+        )
+
+        assert result.returncode == 0, f"stdout={result.stdout}\nstderr={result.stderr}"
+        assert "DEQUEUE (starved group" in result.stdout
+        # The merge-group run check must short-circuit before the timeline read.
+        assert logs["timeline"].read_text(encoding="utf-8") == ""
+        assert logs["dequeue"].read_text(encoding="utf-8") == ""
+
+    def test_fresh_entry_below_threshold_is_left_alone(self, tmp_path: Path) -> None:
+        head = "8" * 40
+        logs = _write_null_creator_receipt_drain(
+            tmp_path,
+            pr=16420,
+            head=head,
+            title="Recently queued entry",
+            status=self._neutral_status(head),
+            run=_trusted_autoenroll_run(head=head),
+            queued=True,
+            front_churn="allow",
+            timeline_events=[
+                {
+                    "event": "added_to_merge_queue",
+                    "created_at": self._queued_iso(5),
+                }
+            ],
+        )
+
+        result = _run_bash(
+            _drain_command(
+                tmp_path,
+                backend="native",
+                extra_env=(
+                    "GITHUB_RUN_ID=77 GITHUB_SERVER_URL=https://github.com "
+                    "GITHUB_API_URL=https://api.github.com"
+                ),
+            )
+        )
+
+        assert result.returncode == 0, f"stdout={result.stdout}\nstderr={result.stderr}"
+        assert logs["timeline"].read_text(encoding="utf-8") != ""
+        assert logs["dequeue"].read_text(encoding="utf-8") == ""
+        assert "✗ starved-group" not in result.stdout
+
+    def test_timeline_read_failure_never_dequeues(self, tmp_path: Path) -> None:
+        head = "8" * 40
+        logs = _write_null_creator_receipt_drain(
+            tmp_path,
+            pr=16420,
+            head=head,
+            title="Unreadable timeline entry",
+            status=self._neutral_status(head),
+            run=_trusted_autoenroll_run(head=head),
+            queued=True,
+            front_churn="allow",
+            timeline_fails=True,
+        )
+
+        result = _run_bash(
+            _drain_command(
+                tmp_path,
+                backend="native",
+                extra_env=(
+                    "GITHUB_RUN_ID=77 GITHUB_SERVER_URL=https://github.com "
+                    "GITHUB_API_URL=https://api.github.com"
+                ),
+            )
+        )
+
+        assert result.returncode == 0, f"stdout={result.stdout}\nstderr={result.stderr}"
+        assert logs["timeline"].read_text(encoding="utf-8") != ""
+        assert logs["dequeue"].read_text(encoding="utf-8") == ""
+        assert "timeline read failed; leaving queued" in result.stdout
 
 
 class TestExactHeadQueueReceipt:
