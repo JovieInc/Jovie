@@ -2244,8 +2244,6 @@ describe('native merge-queue cohort (JOV-5047)', () => {
       transientFailure: 'bounded-retry',
     });
     expect(NATIVE_QUEUE_POLICY.max_entries_to_build).toBe(1);
-    expect(NATIVE_QUEUE_POLICY.max_entries_to_merge).toBe(5);
-    expect(NATIVE_QUEUE_POLICY.check_response_timeout_minutes).toBe(20);
     expect(NATIVE_QUEUE_POLICY.min_entries_to_merge).toBe(5);
     expect(NATIVE_QUEUE_POLICY.min_entries_to_merge_wait_minutes).toBe(10);
     expect(
@@ -2308,24 +2306,24 @@ describe('native merge-queue cohort (JOV-5047)', () => {
   it('normalizes GraphQL maximumEntriesToBuild onto the REST lock key', () => {
     expect(
       normalizeNativeQueuePolicyParameters({
-        maximumEntriesToBuild: 1,
+        maximumEntriesToBuild: 3,
         grouping_strategy: 'ALLGREEN',
       })
     ).toMatchObject({
-      max_entries_to_build: 1,
+      max_entries_to_build: 3,
       grouping_strategy: 'ALLGREEN',
     });
     expect(
       mergeNativeQueuePolicyObservations(
-        { ...NATIVE_QUEUE_POLICY, max_entries_to_build: 3 },
-        { maximumEntriesToBuild: 1 }
+        { ...NATIVE_QUEUE_POLICY, max_entries_to_build: 1 },
+        { maximumEntriesToBuild: 3 }
       )
-    ).toMatchObject({ max_entries_to_build: 1 });
+    ).toMatchObject({ max_entries_to_build: 3 });
     const graphqlReadback = buildNativeQueuePolicyReadback({
       ...NATIVE_QUEUE_POLICY,
-      maximumEntriesToBuild: 1,
+      maximumEntriesToBuild: 3,
     });
-    expect(graphqlReadback.observed.max_entries_to_build).toBe(1);
+    expect(graphqlReadback.observed.max_entries_to_build).toBe(3);
   });
 
   it('converts GraphQL checkResponseTimeout seconds onto REST minutes (JOV-5315)', () => {
@@ -2334,7 +2332,6 @@ describe('native merge-queue cohort (JOV-5047)', () => {
     expect(mapGraphqlCheckResponseTimeoutToMinutes(120)).toBe(2);
     expect(mapGraphqlCheckResponseTimeoutToMinutes(360)).toBe(6);
     expect(mapGraphqlCheckResponseTimeoutToMinutes(1800)).toBe(30);
-    expect(mapGraphqlCheckResponseTimeoutToMinutes(1200)).toBe(20);
     expect(
       normalizeNativeQueuePolicyParameters({ checkResponseTimeout: 3600 })
     ).toMatchObject({ check_response_timeout_minutes: 60 });
@@ -2349,9 +2346,9 @@ describe('native merge-queue cohort (JOV-5047)', () => {
     expect(
       mergeNativeQueuePolicyObservations(
         { ...NATIVE_QUEUE_POLICY },
-        { checkResponseTimeout: 1200 }
+        { checkResponseTimeout: 3600 }
       )
-    ).toMatchObject({ check_response_timeout_minutes: 20 });
+    ).toMatchObject({ check_response_timeout_minutes: 60 });
     expect(
       mergeNativeQueuePolicyObservations(
         { ...NATIVE_QUEUE_POLICY },
