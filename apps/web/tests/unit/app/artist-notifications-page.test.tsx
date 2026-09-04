@@ -47,7 +47,7 @@ describe('ArtistNotificationsPage', () => {
 
     expect(screen.getByTestId('homepage-trust')).toBeInTheDocument();
     expect(
-      screen.getByText('Trusted by artists and teams releasing on')
+      screen.getByText('Built on 15 years across music, media, and technology.')
     ).toBeInTheDocument();
 
     expect(

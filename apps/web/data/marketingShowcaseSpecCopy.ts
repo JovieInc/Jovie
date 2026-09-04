@@ -28,8 +28,8 @@ export interface PlatformSpecTile {
 const LIVE_PROFILE_HREF = TIM_WHITE_PROFILE.publicProfilePath;
 
 export const SHIPPED_SITES_SHOWCASE_COPY = {
-  headline: 'Live Artist Sites',
-  body: 'Real Jovie profiles already shipping. Open one and see the same link change with the moment.',
+  headline: 'All your music, working while you sleep.',
+  body: 'One connected system for releases, links, discovery, audience capture, and updates.',
 } as const;
 
 export const PLATFORM_SPEC_BENTO_COPY = {
@@ -49,14 +49,13 @@ export const SHIPPED_SITE_TILES: readonly ShippedSiteTile[] = [
     kind: 'phone',
   },
   {
-    id: 'tour',
-    name: TIM_WHITE_PROFILE.name,
-    handle: TIM_WHITE_PROFILE.publicProfileDisplay,
-    href: LIVE_PROFILE_HREF,
-    label: 'Nearby Shows',
-    scenarioId: 'tim-white-profile-tour-mobile',
-    alt: "Tim White's Jovie artist profile showing nearby tour dates.",
-    kind: 'phone',
+    id: 'audience-insight',
+    name: 'Audience',
+    handle: 'City signal',
+    label: 'Audience Insight',
+    scenarioId: 'artist-spec-geo-insights-desktop',
+    alt: 'Jovie geo insights showing cities where fan attention is building.',
+    kind: 'desktop',
   },
   {
     id: 'pay',
@@ -79,14 +78,13 @@ export const SHIPPED_SITE_TILES: readonly ShippedSiteTile[] = [
     kind: 'phone',
   },
   {
-    id: 'listen',
-    name: TIM_WHITE_PROFILE.name,
-    handle: TIM_WHITE_PROFILE.publicProfileDisplay,
-    href: LIVE_PROFILE_HREF,
-    label: 'Listen Path',
-    scenarioId: 'tim-white-profile-listen-mobile',
-    alt: "Tim White's Jovie artist profile routing fans to listen.",
-    kind: 'phone',
+    id: 'tracked-routing',
+    name: 'Campaign Links',
+    handle: 'Attribution kept',
+    label: 'Tracked Routing',
+    scenarioId: 'artist-spec-tracked-links-desktop',
+    alt: 'Jovie tracked-link controls for campaign routing.',
+    kind: 'desktop',
   },
   {
     id: 'public-desktop',

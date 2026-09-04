@@ -19,6 +19,17 @@ describe('PricingComparisonChart', () => {
     expect(
       screen.getByText('All limits subject to fair-use guardrails.')
     ).toBeInTheDocument();
+    const decisionBar = screen.getByRole('navigation', {
+      name: 'Choose A Plan',
+    });
+    expect(decisionBar).toHaveAttribute('data-sticky-plan-header', 'true');
+    expect(within(decisionBar).getByText('Free')).toBeInTheDocument();
+    expect(within(decisionBar).getByText('Pro')).toBeInTheDocument();
+    expect(
+      within(decisionBar)
+        .getAllByRole('link', { name: 'Start Free Trial' })
+        .map(link => link.getAttribute('href'))
+    ).toContain('/signup?plan=pro');
 
     const billingSwitch = screen.getByRole('switch', {
       name: 'Toggle Annual Billing',

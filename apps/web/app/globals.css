@@ -945,11 +945,10 @@ body {
      at zero specificity so an explicitly composed heading can override it. */
   .marketing-h1-max-two-lines,
   :where(.home-viewport, .system-b-marketing) :where(h1:not(.sr-only)) {
-    --marketing-h1-descender-reserve: 0.14em;
     display: -webkit-box;
-    max-block-size: calc(2 * 1lh + var(--marketing-h1-descender-reserve));
+    max-block-size: calc(2lh + 0.14em);
     overflow: hidden;
-    padding-block-end: var(--marketing-h1-descender-reserve);
+    padding-block-end: 0.14em;
     -webkit-box-orient: vertical;
     -webkit-line-clamp: 2;
   }

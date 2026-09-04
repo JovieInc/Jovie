@@ -1,12 +1,16 @@
 import type { Metadata } from 'next';
 import { MarketingPricingPlans } from '@/components/features/pricing/MarketingPricingPlans';
-import { PricingRecipeBody } from '@/components/organisms/PricingRecipeBody';
+import {
+  PRICING_FAQ_ITEMS,
+  PricingRecipeBody,
+} from '@/components/organisms/PricingRecipeBody';
 import { APP_NAME, BASE_URL } from '@/constants/app';
 import {
   getVisibleMarketingPricingPlans,
   type MarketingPricingPlan,
 } from '@/data/marketingPricingPlans';
 import { PricingComparisonChart } from '@/features/pricing/PricingComparisonChart';
+import { buildFaqSchema } from '@/lib/constants/schemas';
 import { safeJsonLdStringify } from '@/lib/utils/json-ld';
 
 export const revalidate = false;
@@ -95,15 +99,19 @@ const PRICING_SCHEMA = {
     }),
   },
 };
+const PRICING_FAQ_SCHEMA = buildFaqSchema([...PRICING_FAQ_ITEMS]);
 
 export default function PricingPage() {
   return (
     <PricingRecipeBody
       requestAccessCopy={requestAccessCopy}
       structuredData={
-        <script type='application/ld+json'>
-          {safeJsonLdStringify(PRICING_SCHEMA)}
-        </script>
+        <>
+          <script type='application/ld+json'>
+            {safeJsonLdStringify(PRICING_SCHEMA)}
+          </script>
+          <script type='application/ld+json'>{PRICING_FAQ_SCHEMA}</script>
+        </>
       }
       plans={
         <MarketingPricingPlans mode='expanded' variant='tier-cards-neutral' />

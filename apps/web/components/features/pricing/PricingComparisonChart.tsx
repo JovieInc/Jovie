@@ -1,7 +1,13 @@
 'use client';
 
 import { Check, Minus } from 'lucide-react';
+import Link from 'next/link';
 import { Fragment, useState } from 'react';
+import {
+  getMarketingPlanCtaLabel,
+  getMarketingPlanHref,
+  getVisibleMarketingPricingPlans,
+} from '@/data/marketingPricingPlans';
 import {
   type ComparisonFeature,
   ENTITLEMENT_REGISTRY,
@@ -132,19 +138,21 @@ export function PricingComparisonChart() {
       ? Math.round(max.marketing.price.yearly / 12)
       : (max.marketing.price?.monthly ?? 0);
 
-  const planOptions: { id: PlanColumn; name: string; price: string }[] = [
-    { id: 'free', name: free.marketing.displayName, price: '$0' },
-    { id: 'pro', name: pro.marketing.displayName, price: `$${proPrice}/mo` },
-    ...(maxPlanEnabled
-      ? [
-          {
-            id: 'max' as PlanColumn,
-            name: max.marketing.displayName,
-            price: `$${maxPrice}/mo`,
-          },
-        ]
-      : []),
-  ];
+  const planOptions = getVisibleMarketingPricingPlans()
+    .filter(plan => plan.id !== 'max' || maxPlanEnabled)
+    .map(plan => {
+      const price =
+        plan.id === 'free'
+          ? '$0'
+          : `$${plan.id === 'pro' ? proPrice : maxPrice}/mo`;
+      return {
+        id: plan.id as PlanColumn,
+        name: ENTITLEMENT_REGISTRY[plan.id].marketing.displayName,
+        price,
+        ctaLabel: getMarketingPlanCtaLabel(plan),
+        href: getMarketingPlanHref(plan.id),
+      };
+    });
   const selectedPlanOption =
     planOptions.find(option => option.id === selectedPlan) ?? planOptions[0];
 
@@ -198,6 +206,27 @@ export function PricingComparisonChart() {
           ))}
         </select>
       </div>
+
+      <nav
+        aria-label='Choose A Plan'
+        data-sticky-plan-header='true'
+        className='system-b-pricing-decision-bar'
+      >
+        <span className='system-b-pricing-decision-label'>Choose a plan</span>
+        {planOptions.map(option => (
+          <div
+            key={option.id}
+            data-active={selectedPlan === option.id ? 'true' : undefined}
+            className='system-b-pricing-decision-plan'
+          >
+            <strong>{option.name}</strong>
+            <span>{option.price}</span>
+            <Link href={option.href} prefetch={false}>
+              {option.ctaLabel}
+            </Link>
+          </div>
+        ))}
+      </nav>
 
       <div className='system-b-pricing-table-shell' data-variant='desktop'>
         <table className='system-b-pricing-table'>

@@ -40,12 +40,14 @@ describe('MarketingHeader', () => {
   it('renders marketing center navigation when the center-nav flag is enabled', () => {
     render(<MarketingHeader />);
 
+    expect(screen.getByRole('link', { name: 'Customers' })).toHaveAttribute(
+      'href',
+      '/artists'
+    );
     expect(screen.getByRole('link', { name: 'Product' })).toHaveAttribute(
       'href',
       '/artist-profiles'
     );
-    expect(screen.getByRole('button', { name: /For/ })).toBeVisible();
-    expect(screen.getByRole('button', { name: /Tools/ })).toBeVisible();
     expect(screen.getByRole('link', { name: 'Pricing' })).toHaveAttribute(
       'href',
       '/pricing'
@@ -57,32 +59,30 @@ describe('MarketingHeader', () => {
     );
     // Header utility CTA stays on the /start front door; the waitlist-first
     // contract applies to owned hero/final CTAs, not the shared nav utilities.
-    expect(screen.getByRole('link', { name: 'Find yourself' })).toHaveAttribute(
+    expect(screen.getByRole('link', { name: 'Get started' })).toHaveAttribute(
       'href',
       '/start'
     );
   });
 
-  it('shows flyout menu triggers when center navigation is enabled', () => {
+  it('keeps the public header compact and free of duplicate wordmarks', () => {
     render(<MarketingHeader />);
 
     const navItems = Array.from(
       document.querySelector('.marketing-glass-header__nav')?.children ?? []
     ).map(item => item.textContent);
 
-    expect(navItems).toEqual(['Jovie', 'Product', 'For', 'Tools', 'Pricing']);
+    expect(navItems).toEqual(['Customers', 'Product', 'Pricing']);
     expect(
-      document.querySelector(
-        '.marketing-glass-header__nav .marketing-glass-header__brand-wordmark'
-      )
-    ).toHaveTextContent('Jovie');
+      document.querySelector('.marketing-glass-header__brand-wordmark')
+    ).toBeNull();
     expect(
       screen
         .getByTestId('site-logo-link')
         .querySelector('[data-brand-variant="jovie"]')
     ).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: /For/ })).toBeVisible();
-    expect(screen.getByRole('button', { name: /Tools/ })).toBeVisible();
+    expect(screen.queryByRole('button', { name: /For/ })).toBeNull();
+    expect(screen.queryByRole('button', { name: /Tools/ })).toBeNull();
   });
 
   it('scopes homepage-style header overrides to the artist-profiles route', () => {

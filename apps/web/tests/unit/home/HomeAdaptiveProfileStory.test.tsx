@@ -22,7 +22,7 @@ vi.mock('@/features/home/HomeHeroPhoneComposition', () => ({
 vi.mock('@/features/home/HomeTrustSection', () => ({
   HomeTrustSection: () => (
     <section data-testid='homepage-trust'>
-      Trusted by artists and teams releasing on
+      Built on 15 years across music, media, and technology.
     </section>
   ),
 }));
@@ -108,7 +108,7 @@ describe('HomeAdaptiveProfileStory', () => {
 
     expect(screen.getByTestId('homepage-trust')).toBeInTheDocument();
     expect(
-      screen.getByText('Trusted by artists and teams releasing on')
+      screen.getByText('Built on 15 years across music, media, and technology.')
     ).toBeInTheDocument();
   });
 

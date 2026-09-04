@@ -12,9 +12,7 @@ interface HomeTrustSectionProps {
   readonly className?: string;
   readonly presentation?: 'card' | 'inline-strip' | 'artist-profile';
   readonly logoIds?: readonly TrustLogoAssetId[];
-  /** Label rendered above the logos. Artist-profile and release-notification
-   * surfaces use the default ("Trusted by artists and teams releasing on");
-   * the homepage hero historically used a shorter variant. */
+  /** Label rendered above the logos. */
   readonly label?: ReactNode;
   readonly ariaLabel?: string;
 }
@@ -52,7 +50,7 @@ export function HomeTrustSection({
   variant = 'default',
   className,
   presentation = 'card',
-  label = 'Trusted by artists and teams releasing on',
+  label = 'Built on 15 years across music, media, and technology.',
   ariaLabel,
   logoIds,
 }: Readonly<HomeTrustSectionProps>) {

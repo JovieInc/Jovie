@@ -1,42 +1,37 @@
 import Link from 'next/link';
 import type { ReactNode } from 'react';
+import { HomeTrustSection } from '@/components/features/home/HomeTrustSection';
 import {
+  FaqSection,
   MarketingContainer,
   MarketingHero,
   MarketingPageShell,
 } from '@/components/marketing';
 import { APP_ROUTES } from '@/constants/routes';
+import { ARTIST_PROFILE_SOCIAL_PROOF } from '@/data/socialProof';
 
-const STORY_CARDS = [
+export const PRICING_FAQ_ITEMS = [
   {
-    label: 'Profile',
-    headline: 'Artist profiles built to convert',
-    body: 'One public fan path for streaming, tickets, support, and capture.',
+    question: 'Can I start with a free artist profile?',
+    answer:
+      'Yes. Free includes your public artist profile, smart release links, basic audience signal, and up to 100 contacts.',
   },
   {
-    label: 'Fan',
-    headline: 'Capture fans once. Bring them back automatically.',
-    body: 'Turn profile visits and QR scans into an audience for every drop.',
+    question: 'What does Pro add?',
+    answer:
+      'Pro adds release notifications, presaves, countdown pages, 180-day analytics, unlimited contacts, exports, tips, a verified badge, and 70 AI messages each week.',
+  },
+  {
+    question: 'What is included with Max?',
+    answer:
+      'Max adds release-plan generation, metadata preparation, unlimited analytics, email campaigns, API access, and 250 AI messages each week.',
+  },
+  {
+    question: 'Where can I manage my plan?',
+    answer:
+      'After you sign in, open Settings and choose Billing to view or manage your subscription.',
   },
 ] as const;
-
-function PricingStoryCard({
-  label,
-  headline,
-  body,
-}: Readonly<{
-  label: string;
-  headline: string;
-  body: string;
-}>) {
-  return (
-    <article className='system-b-pricing-story-card'>
-      <p className='system-b-pricing-story-label'>{label}</p>
-      <h2 className='system-b-pricing-story-title'>{headline}</h2>
-      <p className='system-b-pricing-story-body'>{body}</p>
-    </article>
-  );
-}
 
 interface PricingRecipeBodyProps {
   readonly requestAccessCopy: string;
@@ -68,23 +63,19 @@ export function PricingRecipeBody({
           label: 'Explore Artist Profiles',
           href: APP_ROUTES.ARTIST_PROFILES,
         }}
-        media={
-          <div className='system-b-pricing-story-grid'>
-            {STORY_CARDS.map(card => (
-              <PricingStoryCard
-                key={card.label}
-                label={card.label}
-                headline={card.headline}
-                body={card.body}
-              />
-            ))}
-          </div>
-        }
+        align='center'
+        logos={false}
       />
 
       <section aria-label='Plans' className='system-b-pricing-section'>
         <MarketingContainer width='page'>
           <div className='system-b-pricing-plans'>{plans}</div>
+        </MarketingContainer>
+      </section>
+
+      <section aria-label='Experience' className='system-b-pricing-trust'>
+        <MarketingContainer width='page'>
+          <HomeTrustSection variant='compact' presentation='card' />
         </MarketingContainer>
       </section>
 
@@ -110,6 +101,36 @@ export function PricingRecipeBody({
           </div>
         </MarketingContainer>
       </section>
+
+      <section
+        aria-labelledby='pricing-proof-heading'
+        className='system-b-pricing-proof'
+      >
+        <MarketingContainer width='page'>
+          <figure className='system-b-pricing-proof-inner'>
+            <p
+              id='pricing-proof-heading'
+              className='system-b-pricing-proof-label'
+            >
+              Why Jovie exists
+            </p>
+            <blockquote>
+              “{ARTIST_PROFILE_SOCIAL_PROOF.founderQuote?.quote}”
+            </blockquote>
+            <figcaption>
+              {ARTIST_PROFILE_SOCIAL_PROOF.founderQuote?.name},{' '}
+              {ARTIST_PROFILE_SOCIAL_PROOF.founderQuote?.role}
+            </figcaption>
+          </figure>
+        </MarketingContainer>
+      </section>
+
+      <FaqSection
+        items={PRICING_FAQ_ITEMS}
+        heading='Questions, answered'
+        className='system-b-pricing-faq'
+        headingClassName='system-b-pricing-section-title'
+      />
 
       <section
         aria-labelledby='pricing-get-started-heading'

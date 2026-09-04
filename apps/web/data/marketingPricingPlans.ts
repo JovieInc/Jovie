@@ -84,7 +84,7 @@ export const MARKETING_PRICING_PLANS: readonly MarketingPricingPlan[] = [
     price: `$${PLAN_PRICES.max.monthly}`,
     cadence: '/mo',
     badge: 'Full stack',
-    body: 'Your entire release operation, automated end to end.',
+    body: 'Plan releases, prepare metadata, and run campaigns in one workspace.',
     features: [
       'Everything in Pro',
       'Release plan generation',

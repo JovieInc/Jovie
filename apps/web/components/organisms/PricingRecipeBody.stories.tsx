@@ -22,7 +22,7 @@ const meta = {
     docs: {
       description: {
         component:
-          'Exact shared production body for recipe.pricing. The /pricing route retains metadata, schema, and visible-plan data ownership; this story passes the same expanded plan presentation, comparison chart, and data-derived closing copy. No social proof or FAQ is added because the shipped zero-proof route omits them.',
+          'Exact shared production body for recipe.pricing. The route retains schema and visible-plan data ownership; the body composes the plan cards, experience bar, comparison, truthful founder proof, FAQ, and close.',
       },
     },
     pen: {
@@ -31,7 +31,7 @@ const meta = {
       source: 'apps/web/components/organisms/PricingRecipeBody.tsx',
       sourceSha: '00895196e53b823bb0311193b4af29f67b8849c1',
       fixture: 'production-visible-pricing-plans',
-      omissions: ['logo-cloud', 'social-proof', 'faq'],
+      omissions: [],
     },
   },
   tags: ['autodocs'],

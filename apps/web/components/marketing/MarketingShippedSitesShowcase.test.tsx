@@ -34,6 +34,15 @@ describe('MarketingShippedSitesShowcase', () => {
     const tiles = screen.getAllByTestId('shipped-site-tile');
     expect(tiles).toHaveLength(SHIPPED_SITE_TILES.length);
     expect(tiles.length).toBeGreaterThanOrEqual(6);
+    expect(SHIPPED_SITES_SHOWCASE_COPY.headline).toBe(
+      'All your music, working while you sleep.'
+    );
+    expect(
+      SHIPPED_SITE_TILES.filter(tile => tile.kind === 'desktop').length
+    ).toBeGreaterThanOrEqual(3);
+    expect(
+      SHIPPED_SITE_TILES.filter(tile => tile.kind === 'phone').length
+    ).toBeGreaterThanOrEqual(3);
 
     const linkedTiles = tiles.filter(tile => tile.tagName === 'A');
     expect(linkedTiles.length).toBeGreaterThan(0);

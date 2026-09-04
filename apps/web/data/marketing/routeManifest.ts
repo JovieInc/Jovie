@@ -207,15 +207,18 @@ export const MARKETING_ROUTE_MANIFEST: readonly RouteManifestEntry[] = [
       ),
       ...approvedBindings(
         'apps/web/app/(marketing)/pricing/page.tsx',
-        'social-proof',
+        'logo-cloud',
         'comparison',
+        'social-proof',
+        'faq',
         'cta'
       ),
     ],
     bindingEvidence: {
       status: 'verified',
-      source: 'route audit 2026-07-11',
-      notes: 'FAQ recipe beat is not rendered.',
+      source: 'route audit 2026-09-04',
+      notes:
+        'Canonical plan cards lead into the experience logo bar, comparison, founder proof fallback, FAQ, and close.',
     },
     status: 'active',
     specVersion: '1.2.0',
