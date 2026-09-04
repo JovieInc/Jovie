@@ -589,7 +589,6 @@ describe('marketing route manifest integrity', () => {
       'pricing',
       'logo-cloud',
       'comparison',
-      'social-proof',
       'faq',
       'cta',
     ]);

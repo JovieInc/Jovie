@@ -5,6 +5,10 @@ export interface MarketingNavLink {
   readonly label: string;
 }
 
+export interface MarketingNavFlyoutLink extends MarketingNavLink {
+  readonly description: string;
+}
+
 export interface MarketingFooterLink extends MarketingNavLink {
   readonly external?: boolean;
 }
@@ -25,39 +29,89 @@ export const MARKETING_CLI_LINK: MarketingFooterLink = {
 };
 
 export const MARKETING_NAV_LINKS = [
-  { href: APP_ROUTES.ARTISTS, label: 'Customers' },
-  { href: APP_ROUTES.ARTIST_PROFILES, label: 'Product' },
+  { href: APP_ROUTES.PRODUCT, label: 'Product' },
+  { href: APP_ROUTES.FOR, label: 'For' },
+  { href: APP_ROUTES.TOOLS, label: 'Tools' },
   { href: APP_ROUTES.PRICING, label: 'Pricing' },
 ] as const satisfies readonly MarketingNavLink[];
+
+export const MARKETING_PRODUCT_FLYOUT_LINKS = [
+  {
+    href: APP_ROUTES.PRODUCT_PROFILES,
+    label: 'Profiles',
+    description: 'One canonical identity for your work, links, and releases.',
+  },
+  {
+    href: APP_ROUTES.PRODUCT_DISCOVERABILITY,
+    label: 'Discoverability',
+    description: 'Help people and search systems understand what you make.',
+  },
+  {
+    href: APP_ROUTES.PRODUCT_AUDIENCE_INTELLIGENCE,
+    label: 'Audience Intelligence',
+    description: 'See the context behind attention and fan actions.',
+  },
+  {
+    href: APP_ROUTES.PRODUCT_RELATIONSHIPS,
+    label: 'Relationships',
+    description: 'Turn a visit into a direct connection you can keep.',
+  },
+  {
+    href: APP_ROUTES.HOW_IT_WORKS,
+    label: 'How Jovie Works',
+    description: 'Connect your identity, publish it, and learn what moves.',
+  },
+] as const satisfies readonly MarketingNavFlyoutLink[];
 
 export const MARKETING_NAV_UTILITIES = [
   { href: APP_ROUTES.SIGNIN, label: 'Log in' },
   { href: APP_ROUTES.START, label: 'Get started' },
 ] as const satisfies readonly MarketingNavLink[];
 
+export const MARKETING_FOR_FLYOUT_LINKS = [
+  {
+    href: APP_ROUTES.FOR_ARTISTS,
+    label: 'Artists',
+    description: 'Release pages, audience capture, and fan reactivation.',
+  },
+  {
+    href: APP_ROUTES.FOR_FOUNDERS,
+    label: 'Founders',
+    description: 'A compact view of the company and operating principles.',
+  },
+  {
+    href: APP_ROUTES.FOR_CREATORS,
+    label: 'Creators',
+    description: 'Turn profile traffic into durable audience ownership.',
+  },
+  {
+    href: APP_ROUTES.FOR_AUTHORS,
+    label: 'Authors',
+    description: 'Editorial context for launches, profiles, and growth.',
+  },
+] as const satisfies readonly MarketingNavFlyoutLink[];
 export const MARKETING_FOOTER_COLUMNS: readonly MarketingFooterColumn[] = [
   {
     title: 'Product',
     links: [
+      { href: APP_ROUTES.PRODUCT, label: 'Overview' },
       { href: APP_ROUTES.ARTIST_PROFILES, label: 'Artist Profiles' },
-      { href: APP_ROUTES.ARTIST_NOTIFICATIONS, label: 'Notifications' },
-      { href: APP_ROUTES.PAY, label: 'Pay' },
+      { href: APP_ROUTES.PRODUCT_DISCOVERABILITY, label: 'Discoverability' },
+      {
+        href: APP_ROUTES.PRODUCT_AUDIENCE_INTELLIGENCE,
+        label: 'Audience Intelligence',
+      },
+      { href: APP_ROUTES.PRODUCT_RELATIONSHIPS, label: 'Relationships' },
       { href: APP_ROUTES.PRICING, label: 'Pricing' },
     ],
   },
   {
-    title: 'Features',
+    title: 'For',
     links: [
-      {
-        href: `${APP_ROUTES.ARTIST_PROFILES}#capture-every-fan`,
-        label: 'Fan Capture',
-      },
-      {
-        href: `${APP_ROUTES.ARTIST_PROFILES}#bring-them-back-automatically`,
-        label: 'Fan Reactivation',
-      },
-      { href: APP_ROUTES.DEMO_VIDEO, label: 'Product Demo' },
-      { href: APP_ROUTES.LAUNCH, label: 'Release System' },
+      { href: APP_ROUTES.FOR_ARTISTS, label: 'Artists' },
+      { href: APP_ROUTES.FOR_FOUNDERS, label: 'Founders' },
+      { href: APP_ROUTES.FOR_CREATORS, label: 'Creators' },
+      { href: APP_ROUTES.FOR_AUTHORS, label: 'Authors' },
     ],
   },
   {
@@ -73,6 +127,9 @@ export const MARKETING_FOOTER_COLUMNS: readonly MarketingFooterColumn[] = [
   {
     title: 'Resources',
     links: [
+      { href: APP_ROUTES.TOOLS, label: 'Tools' },
+      { href: APP_ROUTES.INTEGRATIONS, label: 'Integrations' },
+      { href: APP_ROUTES.HOW_IT_WORKS, label: 'How Jovie Works' },
       MARKETING_DEVELOPER_LINK,
       MARKETING_CLI_LINK,
       { href: APP_ROUTES.SUPPORT, label: 'Support' },

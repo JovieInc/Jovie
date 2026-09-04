@@ -47,6 +47,11 @@ export const RESERVED_USERNAMES = [
   'engineering',
   'engagement-engine',
   'artist-profiles',
+  'product',
+  'for',
+  'how-it-works',
+  'tools',
+  'integrations',
 
   // Legal/company pages
   'about', // also a profile mode route — see PROFILE_MODE_RESERVED_TOKENS

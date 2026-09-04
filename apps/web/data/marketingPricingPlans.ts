@@ -1,5 +1,5 @@
 import { APP_ROUTES } from '@/constants/routes';
-import { PLAN_PRICES } from '@/lib/config/plan-prices';
+import { ENTITLEMENT_REGISTRY } from '@/lib/entitlements/registry';
 
 /**
  * Canonical plan IDs for the marketing pricing page.
@@ -36,69 +36,37 @@ export interface MarketingPricingPlan {
   readonly ctaHref: string;
 }
 
-export const MARKETING_PRICING_PLANS: readonly MarketingPricingPlan[] = [
-  {
-    id: 'free',
-    name: 'Free',
-    price: '$0',
+const PLAN_PRESENTATION = {
+  free: {
     badge: 'Free forever',
-    body: 'Your artist profile, smart links, and public fan path stay free.',
-    features: [
-      'Artist profile',
-      'Smart release links',
-      'Listen buttons by platform',
-      'Basic audience signal',
-      'Up to 100 contacts',
-      'Manual release creation',
-    ],
     accent: 'cyan',
     ctaLabel: 'Claim your profile',
-    ctaHref: `${APP_ROUTES.SIGNUP}?plan=free`,
   },
-  {
-    id: 'pro',
-    name: 'Pro',
-    price: `$${PLAN_PRICES.pro.monthly}`,
-    cadence: '/mo',
-    badge: 'Recommended',
-    body: 'Fan notifications, presaves, and deeper release analytics.',
-    features: [
-      'Everything in Free',
-      'Release notifications to fans',
-      'Pre-save campaigns',
-      'Pre-release countdown pages',
-      'Extended analytics (180 days)',
-      'Unlimited contacts',
-      'Contact export',
-      'Tips & payments',
-      'Verified badge',
-      'AI assistant (70 messages/week)',
-    ],
-    accent: 'blue',
-    ctaLabel: 'Start Free Trial',
-    ctaHref: `${APP_ROUTES.SIGNUP}?plan=pro`,
-  },
-  {
-    id: 'max',
-    name: 'Max',
-    price: `$${PLAN_PRICES.max.monthly}`,
-    cadence: '/mo',
-    badge: 'Full stack',
-    body: 'Plan releases, prepare metadata, and run campaigns in one workspace.',
-    features: [
-      'Everything in Pro',
-      'Release plan generation',
-      'Metadata submission agent',
-      'Unlimited analytics',
-      'Email campaigns',
-      'API access',
-      'AI assistant (250 messages/week)',
-    ],
-    accent: 'violet',
-    ctaLabel: 'Start Free Trial',
-    ctaHref: `${APP_ROUTES.SIGNUP}?plan=max`,
-  },
-] as const;
+  pro: { badge: 'Recommended', accent: 'blue', ctaLabel: 'Choose Pro' },
+  max: { badge: 'Early access', accent: 'violet', ctaLabel: 'Choose Max' },
+} as const;
+
+export const MARKETING_PRICING_PLANS: readonly MarketingPricingPlan[] =
+  MARKETING_PRICING_PLAN_IDS.map(id => {
+    const entitlement = ENTITLEMENT_REGISTRY[id];
+    const presentation = PLAN_PRESENTATION[id];
+    return {
+      id,
+      name: entitlement.marketing.displayName,
+      price: entitlement.marketing.price
+        ? `$${entitlement.marketing.price.monthly}`
+        : '$0',
+      ...(entitlement.marketing.price ? { cadence: '/mo' } : {}),
+      badge: presentation.badge,
+      body: entitlement.marketing.tagline,
+      // Cards stay scannable; the canonical comparison immediately below
+      // carries the full entitlement matrix.
+      features: entitlement.marketing.features.slice(0, 10),
+      accent: presentation.accent,
+      ctaLabel: presentation.ctaLabel,
+      ctaHref: getMarketingPlanHref(id),
+    };
+  });
 
 export function getMarketingPlanHref(planId: MarketingPricingPlanId): string {
   return `${APP_ROUTES.SIGNUP}?plan=${planId}`;

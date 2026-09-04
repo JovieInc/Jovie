@@ -209,7 +209,6 @@ export const MARKETING_ROUTE_MANIFEST: readonly RouteManifestEntry[] = [
         'apps/web/app/(marketing)/pricing/page.tsx',
         'logo-cloud',
         'comparison',
-        'social-proof',
         'faq',
         'cta'
       ),
@@ -218,7 +217,7 @@ export const MARKETING_ROUTE_MANIFEST: readonly RouteManifestEntry[] = [
       status: 'verified',
       source: 'route audit 2026-09-04',
       notes:
-        'Canonical plan cards lead into the experience logo bar, comparison, founder proof fallback, FAQ, and close.',
+        'Canonical plan cards lead into the experience logo bar, comparison, FAQ, and close. Customer proof is omitted until verified evidence exists.',
     },
     status: 'active',
     specVersion: '1.2.0',
@@ -430,6 +429,82 @@ export const MARKETING_ROUTE_MANIFEST: readonly RouteManifestEntry[] = [
     specVersion: '1.0.0',
     url: '/launch',
   },
+  {
+    glob: '(marketing)/product/[[...slug]]/page.tsx',
+    recipeId: 'feature',
+    renderedSections: approvedBindings(
+      'apps/web/components/marketing/MarketingInformationPage.tsx',
+      'hero',
+      'feature-grid'
+    ),
+    bindingEvidence: {
+      status: 'unverified',
+      source: 'JOV-5997 canonical information architecture',
+      notes:
+        'Typed shared composition serves /product and its four canonical capability routes; browser certification remains separate.',
+    },
+    status: 'active',
+    specVersion: '1.2.0',
+    url: '/product/*',
+    healthCheck: {
+      path: '/product',
+      expected: 'page',
+      waitFor: '#marketing-information-heading',
+      requiresSharedChrome: true,
+    },
+  },
+  {
+    glob: '(marketing)/for/[[...slug]]/page.tsx',
+    recipeId: 'feature',
+    renderedSections: approvedBindings(
+      'apps/web/components/marketing/MarketingInformationPage.tsx',
+      'hero',
+      'feature-grid'
+    ),
+    bindingEvidence: {
+      status: 'unverified',
+      source: 'JOV-5997 canonical information architecture',
+      notes:
+        'Typed shared composition serves /for and its four truthful persona routes; early-access boundaries are explicit in content.',
+    },
+    status: 'active',
+    specVersion: '1.2.0',
+    url: '/for/*',
+    healthCheck: {
+      path: '/for',
+      expected: 'page',
+      waitFor: '#marketing-information-heading',
+      requiresSharedChrome: true,
+    },
+  },
+  ...[
+    ['how-it-works', '/how-it-works'],
+    ['tools', '/tools'],
+    ['integrations', '/integrations'],
+  ].map(([route, url]) => ({
+    glob: `(marketing)/${route}/page.tsx`,
+    recipeId: 'feature' as const,
+    renderedSections: approvedBindings(
+      'apps/web/components/marketing/MarketingInformationPage.tsx',
+      'hero',
+      'feature-grid'
+    ),
+    bindingEvidence: {
+      status: 'unverified' as const,
+      source: 'JOV-5997 canonical information architecture',
+      notes:
+        'Shared typed composition is source-conformant; browser certification remains separate.',
+    },
+    status: 'active' as const,
+    specVersion: '1.2.0',
+    url,
+    healthCheck: {
+      path: url,
+      expected: 'page' as const,
+      waitFor: '#marketing-information-heading',
+      requiresSharedChrome: true,
+    },
+  })),
   {
     glob: '(marketing)/about/page.tsx',
     recipeId: 'seo',

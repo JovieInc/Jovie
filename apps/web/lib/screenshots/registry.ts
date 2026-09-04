@@ -547,6 +547,25 @@ const PUBLIC_EXPORT_VERSION_BY_ID = new Map(
   })
 );
 
+const PUBLIC_EXPORT_PROVENANCE_BY_ID = new Map(
+  (
+    screenshotCatalogManifest as readonly {
+      readonly capturedAt?: string;
+      readonly gitSha?: string | null;
+      readonly id?: string;
+    }[]
+  ).flatMap(entry =>
+    entry.id
+      ? [
+          [
+            entry.id,
+            { capturedAt: entry.capturedAt, gitSha: entry.gitSha },
+          ] as const,
+        ]
+      : []
+  )
+);
+
 function getPublicExportUrl(scenario: ScreenshotScenario) {
   if (!scenario.publicExportPath) {
     throw new Error(
@@ -602,6 +621,11 @@ export interface MarketingExportImage {
   readonly width: number;
   readonly height: number;
   readonly alt: string;
+  readonly route: string;
+  readonly viewport: ScreenshotScenario['viewport'];
+  readonly crop: ScreenshotScenario['captureTarget'];
+  readonly capturedAt?: string;
+  readonly gitSha?: string | null;
 }
 
 export function getMarketingExportScenarios(): readonly ScreenshotScenario[] {
@@ -636,10 +660,16 @@ export function getMarketingExportImage(id: string): MarketingExportImage {
   // actual size we haven't catalogued yet (mostly safe because full-viewport
   // captures are always 1440×900 or 390×844 at deviceScaleFactor 2).
   const viewport = SCREENSHOT_VIEWPORTS[scenario.viewport];
+  const provenance = PUBLIC_EXPORT_PROVENANCE_BY_ID.get(scenario.id);
   return {
     publicUrl: getPublicExportUrl(scenario),
     width: known?.width ?? viewport.width * 2,
     height: known?.height ?? viewport.height * 2,
     alt: scenario.title,
+    route: scenario.route,
+    viewport: scenario.viewport,
+    crop: scenario.captureTarget,
+    capturedAt: provenance?.capturedAt,
+    gitSha: provenance?.gitSha,
   };
 }

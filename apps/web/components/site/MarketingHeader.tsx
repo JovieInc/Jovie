@@ -3,13 +3,19 @@
 
 import { usePathname } from 'next/navigation';
 import type { LogoVariant } from '@/components/atoms/Logo';
-import { HeaderNav, type HeaderNavCta } from '@/components/organisms/HeaderNav';
+import {
+  type HeaderFlyoutMenu,
+  HeaderNav,
+  type HeaderNavCta,
+} from '@/components/organisms/HeaderNav';
 import { APP_ROUTES } from '@/constants/routes';
 import { MARKETING_PEN_CONTRACT_IDS } from '@/data/marketing/penContracts';
 import { MARKETING_CTA_INTENTS } from '@/data/marketingCtaIntents';
 import {
+  MARKETING_FOR_FLYOUT_LINKS,
   MARKETING_NAV_LINKS,
   MARKETING_NAV_UTILITIES,
+  MARKETING_PRODUCT_FLYOUT_LINKS,
   type MarketingNavLink,
 } from '@/data/marketingNavigation';
 import { FEATURE_FLAGS } from '@/lib/flags/marketing-static';
@@ -20,13 +26,50 @@ export interface MarketingHeaderNavLink extends MarketingNavLink {
 }
 export type MarketingHeaderCta = HeaderNavCta;
 
+const NAV_LINK_BY_LABEL = Object.fromEntries(
+  MARKETING_NAV_LINKS.map(link => [link.label, link])
+) as Readonly<
+  Record<(typeof MARKETING_NAV_LINKS)[number]['label'], MarketingNavLink>
+>;
+
 const MARKETING_GLASS_DESKTOP_LINKS: readonly MarketingHeaderNavLink[] = [
-  { href: APP_ROUTES.HOME, label: 'Jovie' },
-  ...MARKETING_NAV_LINKS,
+  { href: NAV_LINK_BY_LABEL.Tools.href, label: NAV_LINK_BY_LABEL.Tools.label },
+  {
+    href: NAV_LINK_BY_LABEL.Pricing.href,
+    label: NAV_LINK_BY_LABEL.Pricing.label,
+  },
+] as const;
+const MARKETING_GLASS_FLYOUTS: readonly HeaderFlyoutMenu[] = [
+  {
+    id: 'product',
+    label: NAV_LINK_BY_LABEL.Product.label,
+    heading: 'One system, many doors',
+    links: MARKETING_PRODUCT_FLYOUT_LINKS,
+  },
+  {
+    id: 'for',
+    label: NAV_LINK_BY_LABEL.For.label,
+    heading: 'One system for every audience',
+    links: MARKETING_FOR_FLYOUT_LINKS,
+  },
 ] as const;
 const MARKETING_GLASS_MOBILE_LINKS: readonly MarketingHeaderNavLink[] = [
   { href: APP_ROUTES.HOME, label: 'Jovie' },
-  ...MARKETING_NAV_LINKS,
+  {
+    href: NAV_LINK_BY_LABEL.Product.href,
+    label: NAV_LINK_BY_LABEL.Product.label,
+  },
+  ...MARKETING_GLASS_FLYOUTS.flatMap(menu =>
+    menu.links.map(link => ({ href: link.href, label: link.label }))
+  ),
+  {
+    href: NAV_LINK_BY_LABEL.Tools.href,
+    label: NAV_LINK_BY_LABEL.Tools.label,
+  },
+  {
+    href: NAV_LINK_BY_LABEL.Pricing.href,
+    label: NAV_LINK_BY_LABEL.Pricing.label,
+  },
 ] as const;
 const DEFAULT_MARKETING_CTA: MarketingHeaderCta = MARKETING_NAV_UTILITIES[1];
 const MARKETING_HEADER_CTA_BY_PATH: Readonly<
@@ -47,6 +90,7 @@ export interface MarketingHeaderProps
   }> {}
 
 interface ResolvedNavConfig {
+  readonly flyoutMenus: readonly HeaderFlyoutMenu[] | undefined;
   readonly mobileNavLinks: readonly MarketingHeaderNavLink[];
   readonly desktopNavLinks: readonly MarketingHeaderNavLink[];
 }
@@ -58,14 +102,20 @@ function resolveNavConfig(
 ): ResolvedNavConfig {
   if (hasSimpleNav) {
     return {
+      flyoutMenus: undefined,
       mobileNavLinks: simpleNavLinks,
       desktopNavLinks: simpleNavLinks,
     };
   }
   if (centerNavDisabled) {
-    return { mobileNavLinks: [], desktopNavLinks: [] };
+    return {
+      flyoutMenus: undefined,
+      mobileNavLinks: [],
+      desktopNavLinks: [],
+    };
   }
   return {
+    flyoutMenus: MARKETING_GLASS_FLYOUTS,
     mobileNavLinks: MARKETING_GLASS_MOBILE_LINKS,
     desktopNavLinks: MARKETING_GLASS_DESKTOP_LINKS,
   };
@@ -130,6 +180,7 @@ export function MarketingHeader({
       includePublicLoginInMobileNav
       containerSize='homepage'
       presentation={presentation}
+      flyoutMenus={navConfig.flyoutMenus}
       publicCta={resolvedPrimaryCta}
       mobileNavLinks={navConfig.mobileNavLinks}
       navLinks={navConfig.desktopNavLinks}

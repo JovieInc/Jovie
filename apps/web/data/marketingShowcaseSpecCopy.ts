@@ -28,8 +28,8 @@ export interface PlatformSpecTile {
 const LIVE_PROFILE_HREF = TIM_WHITE_PROFILE.publicProfilePath;
 
 export const SHIPPED_SITES_SHOWCASE_COPY = {
-  headline: 'All your music, working while you sleep.',
-  body: 'One connected system for releases, links, discovery, audience capture, and updates.',
+  headline: 'All your music, working while you sleep',
+  body: 'Identity, releases, links, discovery, audience capture, and updates stay connected. These are exact product captures, not redrawn UI.',
 } as const;
 
 export const PLATFORM_SPEC_BENTO_COPY = {

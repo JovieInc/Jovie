@@ -40,13 +40,17 @@ describe('MarketingHeader', () => {
   it('renders marketing center navigation when the center-nav flag is enabled', () => {
     render(<MarketingHeader />);
 
-    expect(screen.getByRole('link', { name: 'Customers' })).toHaveAttribute(
-      'href',
-      '/artists'
+    expect(screen.getByRole('button', { name: 'Product' })).toHaveAttribute(
+      'aria-expanded',
+      'false'
     );
-    expect(screen.getByRole('link', { name: 'Product' })).toHaveAttribute(
+    expect(screen.getByRole('button', { name: 'For' })).toHaveAttribute(
+      'aria-expanded',
+      'false'
+    );
+    expect(screen.getByRole('link', { name: 'Tools' })).toHaveAttribute(
       'href',
-      '/artist-profiles'
+      '/tools'
     );
     expect(screen.getByRole('link', { name: 'Pricing' })).toHaveAttribute(
       'href',
@@ -77,7 +81,7 @@ describe('MarketingHeader', () => {
       item => item.textContent
     );
 
-    expect(navItems).toEqual(['Jovie', 'Customers', 'Product', 'Pricing']);
+    expect(navItems).toEqual(['Product', 'For', 'Tools', 'Pricing']);
     expect(headerRow?.children[0]).toContainElement(logoLink);
     expect(headerRow?.children[1]).toBe(navigation);
     expect(
@@ -87,11 +91,8 @@ describe('MarketingHeader', () => {
     expect(
       navigation?.querySelector('.marketing-glass-header__brand-wordmark')
     ).toBeNull();
-    expect(navigation?.querySelector('a[href="/"]')).toHaveClass(
-      'marketing-glass-header__nav-link'
-    );
-    expect(screen.queryByRole('button', { name: /For/ })).toBeNull();
-    expect(screen.queryByRole('button', { name: /Tools/ })).toBeNull();
+    expect(screen.getByRole('button', { name: 'Product' })).toBeVisible();
+    expect(screen.getByRole('button', { name: 'For' })).toBeVisible();
   });
 
   it('scopes homepage-style header overrides to the artist-profiles route', () => {
@@ -195,6 +196,13 @@ describe('MarketingHeader', () => {
       'href',
       '/start'
     );
+  });
+
+  it('keeps the shared marketing header in document flow', () => {
+    render(<MarketingHeader />);
+
+    expect(screen.getByTestId('header-nav')).toHaveClass('absolute');
+    expect(screen.getByTestId('header-nav')).not.toHaveClass('fixed');
   });
 
   it('hides inline glass auth on mobile when a mobile nav is present', () => {

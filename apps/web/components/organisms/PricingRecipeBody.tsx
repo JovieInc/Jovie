@@ -8,7 +8,6 @@ import {
   MarketingPageShell,
 } from '@/components/marketing';
 import { APP_ROUTES } from '@/constants/routes';
-import { ARTIST_PROFILE_SOCIAL_PROOF } from '@/data/socialProof';
 
 export const PRICING_FAQ_ITEMS = [
   {
@@ -102,29 +101,6 @@ export function PricingRecipeBody({
         </MarketingContainer>
       </section>
 
-      <section
-        aria-labelledby='pricing-proof-heading'
-        className='system-b-pricing-proof'
-      >
-        <MarketingContainer width='page'>
-          <figure className='system-b-pricing-proof-inner'>
-            <p
-              id='pricing-proof-heading'
-              className='system-b-pricing-proof-label'
-            >
-              Why Jovie exists
-            </p>
-            <blockquote>
-              “{ARTIST_PROFILE_SOCIAL_PROOF.founderQuote?.quote}”
-            </blockquote>
-            <figcaption>
-              {ARTIST_PROFILE_SOCIAL_PROOF.founderQuote?.name},{' '}
-              {ARTIST_PROFILE_SOCIAL_PROOF.founderQuote?.role}
-            </figcaption>
-          </figure>
-        </MarketingContainer>
-      </section>
-
       <FaqSection
         items={PRICING_FAQ_ITEMS}
         heading='Questions, answered'
@@ -158,7 +134,7 @@ export function PricingRecipeBody({
                 prefetch={false}
                 className='system-b-pricing-secondary-link'
               >
-                Start Pro trial
+                Choose Pro
               </Link>
             </div>
           </div>

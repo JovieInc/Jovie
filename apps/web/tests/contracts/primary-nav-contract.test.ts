@@ -3,8 +3,10 @@ import { dirname, join, relative, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
 import {
+  MARKETING_FOR_FLYOUT_LINKS,
   MARKETING_NAV_LINKS,
   MARKETING_NAV_UTILITIES,
+  MARKETING_PRODUCT_FLYOUT_LINKS,
 } from '@/data/marketingNavigation';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
@@ -44,14 +46,24 @@ function routeFileExistsFor(href: string) {
   }
 
   visit(appRoot);
-  return actualRoutes.has(href);
+  return (
+    actualRoutes.has(href) ||
+    [...actualRoutes].some(route => {
+      const optionalCatchAll = route.match(/^(.*)\/\[\[\.\.\.[^\]]+\]\]$/u);
+      return optionalCatchAll
+        ? href === optionalCatchAll[1] ||
+            href.startsWith(`${optionalCatchAll[1]}/`)
+        : false;
+    })
+  );
 }
 
 describe('primary marketing navigation contract', () => {
   it('keeps the top-level marketing nav labels exact and ordered', () => {
     expect(MARKETING_NAV_LINKS.map(link => link.label)).toEqual([
-      'Customers',
       'Product',
+      'For',
+      'Tools',
       'Pricing',
     ]);
   });
@@ -64,7 +76,12 @@ describe('primary marketing navigation contract', () => {
   });
 
   it('keeps every primary nav link pointed at a route the app can serve', () => {
-    for (const link of [...MARKETING_NAV_LINKS, ...MARKETING_NAV_UTILITIES]) {
+    for (const link of [
+      ...MARKETING_NAV_LINKS,
+      ...MARKETING_PRODUCT_FLYOUT_LINKS,
+      ...MARKETING_FOR_FLYOUT_LINKS,
+      ...MARKETING_NAV_UTILITIES,
+    ]) {
       expect(routeFileExistsFor(link.href), link.href).toBe(true);
     }
   });
@@ -73,6 +90,8 @@ describe('primary marketing navigation contract', () => {
     for (const exportName of [
       'MARKETING_NAV_LINKS',
       'MARKETING_NAV_UTILITIES',
+      'MARKETING_PRODUCT_FLYOUT_LINKS',
+      'MARKETING_FOR_FLYOUT_LINKS',
     ]) {
       expect(headerSource).toContain(exportName);
     }
