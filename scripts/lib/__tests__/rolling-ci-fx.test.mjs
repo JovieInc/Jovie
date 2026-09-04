@@ -1,18 +1,28 @@
 import { spawnSync } from 'node:child_process';
+import { createHash } from 'node:crypto';
 import { resolve } from 'node:path';
 import { describe, expect, it, vi } from 'vitest';
 import {
   normalizeFailureEvents,
   planFailureDispatch,
+  ROLLING_CI_POLICY_VERSION,
   runDispatch,
   TRUSTED_CI_WORKFLOW_PATH,
 } from '../rolling-ci-dispatch.mjs';
 import {
   buildFxPrompt,
+  buildHostedAcceptanceReceipt,
+  buildHostedCommitVariables,
+  buildHostedPrelaunchReceipt,
+  buildHostedRepairPlan,
+  buildHostedTerminalReceipt,
+  classifyHostedReceiptLiveness,
   classifyRunnerFailure,
+  commitHostedRepair,
   FX_EXECUTION_RECEIPT_SCHEMA,
   FX_GITHUB_RUNNER_EXECUTOR,
   findOwnedAgents,
+  isHostedRemediationSelfTrigger,
   launchCursorAgent,
   listCursorAgents,
   planFxLaunch,
@@ -20,6 +30,8 @@ import {
   resolveDispatchWriter,
   resolveFxNamedOutcome,
   resolveWebhookRemediationRoute,
+  validateHostedGateAdmission,
+  validateHostedRepairPath,
 } from '../rolling-ci-fx.mjs';
 import {
   FX_ADAPTER_NAME,
@@ -39,6 +51,25 @@ const trustedSource = {
   workflowPath: TRUSTED_CI_WORKFLOW_PATH,
 };
 const fxAdapter = { name: FX_ADAPTER_NAME, authConfigured: true };
+const gateReceipt = {
+  schema: 'jovie-fleet-gate/v1',
+  observedAt: '2026-08-29T20:00:00.000Z',
+  remediationAdmission: {
+    allowed: true,
+    localAllowed: true,
+    pushAllowed: true,
+    activities: ['bounded-local-diagnostics', 'expected-head-pr-update'],
+    maxConcurrent: 4,
+    authority: 'single-pr-writer-exact-head',
+  },
+  concurrency: {
+    gem: {
+      maxConcurrent: 4,
+      evidenceAccepted: true,
+      newMutationAllowed: true,
+    },
+  },
+};
 const activeReceipt = {
   schema: HANDOFF_SCHEMA,
   pr: 17,
@@ -76,6 +107,330 @@ function dispatch(overrides = {}) {
     ...overrides,
   });
 }
+
+function hostedFixture() {
+  const dispatchResult = dispatch({ writer: 'fx-hosted' });
+  const plan = buildHostedRepairPlan({
+    dispatch: dispatchResult,
+    headRefName: 'codex/repair-proof',
+  });
+  const patchBytes = Buffer.from(
+    'diff --git a/apps/web/lib/proof.ts b/apps/web/lib/proof.ts\n'
+  );
+  const fileBytes = Buffer.from('export const repaired = true;\n');
+  const changes = [
+    {
+      path: 'apps/web/lib/proof.ts',
+      status: 'M',
+      symlink: false,
+      bytes: fileBytes.length,
+      sha256: createHash('sha256').update(fileBytes).digest('hex'),
+    },
+  ];
+  const acceptance = buildHostedAcceptanceReceipt({
+    plan,
+    gateReceipt,
+    patchBytes,
+    changes,
+    executor: {
+      kind: 'cursor-cli',
+      installerSha256: 'f'.repeat(64),
+      version: '2026.08.29',
+    },
+    now: new Date('2026-08-29T20:01:00.000Z'),
+  });
+  return { plan, patchBytes, fileBytes, changes, acceptance };
+}
+
+describe('hosted rolling CI repair policy', () => {
+  it('plans one Jovie-only exact-head repair with policy-version idempotency', () => {
+    const { plan } = hostedFixture();
+    expect(plan).toMatchObject({
+      schema: 'jovie-hosted-ci-repair-plan/v1',
+      policyVersion: ROLLING_CI_POLICY_VERSION,
+      repository: 'JovieInc/Jovie',
+      prNumber: 17,
+      expectedHeadOid: head,
+      producerEvent: 'pull_request',
+      maxConcurrent: 1,
+    });
+    expect(plan.idempotencyKey).toContain(plan.fingerprint);
+    expect(plan.idempotencyKey).toContain(ROLLING_CI_POLICY_VERSION);
+    expect(() =>
+      buildHostedRepairPlan({
+        dispatch: dispatch({
+          repository: 'JovieInc/LogYourBody',
+        }),
+        headRefName: 'codex/nope',
+      })
+    ).toThrow('repository must be JovieInc/Jovie');
+    expect(() =>
+      buildHostedRepairPlan({
+        dispatch: dispatch(),
+        headRefName: 'gh-readonly-queue/main/pr-17-deadbeef',
+      })
+    ).toThrow('main, synthetic, or not a safe branch ref');
+  });
+
+  it('requires a fresh typed gate and clamps effective concurrency to one', () => {
+    expect(
+      validateHostedGateAdmission({
+        receipt: gateReceipt,
+        now: new Date('2026-08-29T20:04:59.000Z'),
+      })
+    ).toMatchObject({ accepted: true, maxConcurrent: 1 });
+    expect(
+      validateHostedGateAdmission({
+        receipt: gateReceipt,
+        now: new Date('2026-08-29T20:05:01.000Z'),
+      })
+    ).toEqual({
+      accepted: false,
+      reason: 'fresh-typed-capacity-not-admitted',
+    });
+    expect(
+      validateHostedGateAdmission({
+        receipt: {
+          ...gateReceipt,
+          remediationAdmission: {
+            ...gateReceipt.remediationAdmission,
+            pushAllowed: false,
+            maxConcurrent: 0,
+          },
+        },
+        now: new Date('2026-08-29T20:01:00.000Z'),
+      }).accepted
+    ).toBe(false);
+  });
+
+  it('strictly denies workflows, secrets, migrations, auth, billing, release, deploy, and tests', () => {
+    expect(validateHostedRepairPath('apps/web/lib/profile.ts').allowed).toBe(
+      true
+    );
+    for (const path of [
+      '.github/workflows/ci.yml',
+      'apps/web/lib/API_SECRET.ts',
+      'apps/web/drizzle/migrations/001.sql',
+      'apps/web/app/auth/callback.ts',
+      'apps/web/lib/auth.ts',
+      'apps/web/lib/oauth-client.ts',
+      'apps/web/app/billing/page.tsx',
+      'apps/web/lib/billing.ts',
+      'apps/web/lib/payment-client.ts',
+      'apps/web/lib/migration.ts',
+      'apps/web/lib/release.ts',
+      'apps/web/lib/deploy.ts',
+      'apps/web/proxy.ts',
+      'apps/web/lib/deployment/release.ts',
+      'apps/web/tests/profile.test.ts',
+      'scripts/lib/rolling-ci-fx.mjs',
+    ]) {
+      expect(validateHostedRepairPath(path), path).toMatchObject({
+        allowed: false,
+      });
+    }
+  });
+
+  it('binds tested artifact bytes to an atomic expected-head update', () => {
+    const { plan, acceptance, patchBytes, fileBytes } = hostedFixture();
+    const variables = buildHostedCommitVariables({
+      plan,
+      acceptance,
+      gateReceipt,
+      patchBytes,
+      fileContents: { 'apps/web/lib/proof.ts': fileBytes },
+      now: new Date('2026-08-29T20:02:00.000Z'),
+    });
+    expect(variables.input).toMatchObject({
+      branch: {
+        repositoryNameWithOwner: 'JovieInc/Jovie',
+        branchName: 'codex/repair-proof',
+      },
+      expectedHeadOid: head,
+    });
+    expect(variables.input.fileChanges.additions).toEqual([
+      {
+        path: 'apps/web/lib/proof.ts',
+        contents: fileBytes.toString('base64'),
+      },
+    ]);
+    expect(() =>
+      buildHostedCommitVariables({
+        plan,
+        acceptance,
+        gateReceipt,
+        patchBytes,
+        fileContents: {
+          'apps/web/lib/proof.ts': Buffer.from('tampered'),
+        },
+        now: new Date('2026-08-29T20:02:00.000Z'),
+      })
+    ).toThrow('immutable artifact hash mismatch');
+  });
+
+  it('performs one real failed-CI to atomic-repair transition', async () => {
+    const { plan, acceptance, patchBytes, fileBytes } = hostedFixture();
+    const request = vi.fn(async (path, options) => {
+      if (path.endsWith('/pulls/17')) {
+        return {
+          state: 'open',
+          base: {
+            ref: 'main',
+            repo: { full_name: 'JovieInc/Jovie' },
+          },
+          head: {
+            ref: 'codex/repair-proof',
+            sha: head,
+            repo: { full_name: 'JovieInc/Jovie', fork: false },
+          },
+        };
+      }
+      if (path.includes('/actions/runs?')) {
+        return {
+          workflow_runs: [
+            {
+              id: 9001,
+              run_attempt: 1,
+              name: 'CI',
+              path: '.github/workflows/ci.yml',
+              event: 'pull_request',
+              head_sha: head,
+              status: 'completed',
+              conclusion: 'failure',
+            },
+          ],
+        };
+      }
+      expect(path).toBe('/graphql');
+      expect(options.body.variables.input.expectedHeadOid).toBe(head);
+      return {
+        data: {
+          createCommitOnBranch: {
+            commit: { oid: 'b'.repeat(40), url: 'https://example.test/commit' },
+          },
+        },
+      };
+    });
+    const result = await commitHostedRepair({
+      plan,
+      acceptance,
+      gateReceipt,
+      patchBytes,
+      fileContents: { 'apps/web/lib/proof.ts': fileBytes },
+      readToken: 'read-token',
+      writeToken: 'write-token',
+      now: new Date('2026-08-29T20:02:00.000Z'),
+      request,
+    });
+    expect(result).toMatchObject({
+      committed: true,
+      outcome: 'repaired',
+      committedHeadOid: 'b'.repeat(40),
+    });
+    expect(request).toHaveBeenCalledTimes(3);
+  });
+
+  it('aborts a green exact head before the writer and never calls GraphQL', async () => {
+    const { plan, acceptance, patchBytes, fileBytes } = hostedFixture();
+    const request = vi.fn(async path => {
+      if (path.endsWith('/pulls/17')) {
+        return {
+          state: 'open',
+          base: {
+            ref: 'main',
+            repo: { full_name: 'JovieInc/Jovie' },
+          },
+          head: {
+            ref: 'codex/repair-proof',
+            sha: head,
+            repo: { full_name: 'JovieInc/Jovie', fork: false },
+          },
+        };
+      }
+      return {
+        workflow_runs: [
+          {
+            id: 9002,
+            run_attempt: 2,
+            name: 'CI',
+            path: '.github/workflows/ci.yml',
+            event: 'pull_request',
+            head_sha: head,
+            status: 'completed',
+            conclusion: 'success',
+          },
+        ],
+      };
+    });
+    await expect(
+      commitHostedRepair({
+        plan,
+        acceptance,
+        gateReceipt,
+        patchBytes,
+        fileContents: { 'apps/web/lib/proof.ts': fileBytes },
+        readToken: 'read-token',
+        writeToken: 'write-token',
+        now: new Date('2026-08-29T20:02:00.000Z'),
+        request,
+      })
+    ).resolves.toEqual({ committed: false, outcome: 'superseded_green' });
+    expect(request).toHaveBeenCalledTimes(2);
+  });
+
+  it('uses typed acceptance and terminal receipts for liveness', () => {
+    const { plan, acceptance } = hostedFixture();
+    const prelaunch = buildHostedPrelaunchReceipt({
+      plan,
+      now: new Date('2026-08-29T20:00:00.000Z'),
+    });
+    expect(
+      classifyHostedReceiptLiveness({
+        plan,
+        prelaunch,
+        now: new Date('2026-08-29T20:01:00.000Z'),
+      })
+    ).toEqual({ live: false, state: 'prelaunch_only' });
+    expect(
+      classifyHostedReceiptLiveness({
+        plan,
+        prelaunch,
+        acceptance,
+        now: new Date('2026-08-29T20:02:00.000Z'),
+      })
+    ).toEqual({ live: true, state: 'accepted' });
+    const terminal = buildHostedTerminalReceipt({
+      plan,
+      acceptance,
+      outcome: 'repaired',
+      committedHeadOid: 'b'.repeat(40),
+      now: new Date('2026-08-29T20:03:00.000Z'),
+    });
+    expect(
+      classifyHostedReceiptLiveness({
+        plan,
+        prelaunch,
+        acceptance,
+        terminal,
+        now: new Date('2026-08-29T20:04:00.000Z'),
+      })
+    ).toEqual({ live: false, state: 'terminal', outcome: 'repaired' });
+  });
+
+  it('blocks only a remediation-generated repeat of the same fingerprint', () => {
+    const { plan } = hostedFixture();
+    const message = `fix(ci): apply bounded hosted remediation\n\nJovie hosted CI remediation for PR #17.\n\nPolicy: ${plan.policyVersion}\nFailure: ${plan.fingerprint}`;
+    expect(
+      isHostedRemediationSelfTrigger({ plan, commitMessage: message })
+    ).toBe(true);
+    expect(
+      isHostedRemediationSelfTrigger({
+        plan,
+        commitMessage: message.replace(plan.fingerprint, 'ci:different'),
+      })
+    ).toBe(false);
+  });
+});
 
 describe('rolling CI FX webhook remediation', () => {
   it('keeps pickup-end implementer routing when no handoff receipt exists', () => {
@@ -146,85 +501,13 @@ describe('rolling CI FX webhook remediation', () => {
     });
   });
 
-  it('launches Cursor-direct repair for a failed merge_group against the source PR', () => {
-    const planned = planFxWebhookRemediation({
-      dispatch: dispatch({
+  it('rejects merge_group before either hosted or cloud FX planning', () => {
+    expect(() =>
+      dispatch({
         writer: FX_ADAPTER_NAME,
         source: { ...trustedSource, producerEvent: 'merge_group' },
-      }),
-      receipt: null,
-      liveHead: head,
-      implementer: 'tim',
-      fxAdapter,
-      cursorApiKey: 'cursor-key',
-      remoteMutationAllowed: true,
-      repository: 'JovieInc/Jovie',
-      prNumber: 16180,
-      headSha: head,
-      sourceHead: 'b'.repeat(40),
-      headRef: 'cursor/arbitrary-values-fix',
-    });
-    expect(planned.launch.action).toBe('launch');
-    expect(planned.launch.request).toMatchObject({
-      repos: [
-        {
-          url: 'https://github.com/JovieInc/Jovie',
-          prUrl: 'https://github.com/JovieInc/Jovie/pull/16180',
-        },
-      ],
-      workOnCurrentBranch: true,
-      autoCreatePR: false,
-    });
-    expect(planned.launch.request).not.toHaveProperty('source');
-    expect(planned.launch.request).not.toHaveProperty('target');
-    expect(planned.launch.request.prompt.text).toContain(
-      'native merge_group CI failure'
-    );
-    expect(planned.launch.request.prompt.text).toContain('PR: #16180');
-    expect(planned.launch.request.prompt.text).toContain(
-      'Do not waive ratchet growth'
-    );
-  });
-
-  it('launches FX for a failed merge_group CI run on the source PR branch', () => {
-    const queueSha = 'c'.repeat(40);
-    const planned = planFxWebhookRemediation({
-      dispatch: dispatch({
-        writer: FX_ADAPTER_NAME,
-        source: { ...trustedSource, producerEvent: 'merge_group' },
-        headSha: queueSha,
-        liveHead: queueSha,
-        checks: [
-          {
-            name: 'ci-fast',
-            conclusion: 'failure',
-            headSha: queueSha,
-            checkSuiteId: 44,
-          },
-        ],
-      }),
-      receipt: null,
-      liveHead: queueSha,
-      implementer: 'tim',
-      fxAdapter,
-      cursorApiKey: 'cursor-key',
-      remoteMutationAllowed: true,
-      repository: 'JovieInc/Jovie',
-      prNumber: 16180,
-      headSha: queueSha,
-      sourceHead: 'b'.repeat(40),
-      headRef: 'cursor/fx-merge-group-remediator-7038',
-    });
-    expect(planned.dispatch.action).toBe('dispatch_implementer');
-    expect(planned.launch.action).toBe('launch');
-    expect(planned.launch.request.repos[0].prUrl).toBe(
-      'https://github.com/JovieInc/Jovie/pull/16180'
-    );
-    expect(planned.launch.request.workOnCurrentBranch).toBe(true);
-    expect(planned.launch.request.autoCreatePR).toBe(false);
-    expect(planned.launch.request.prompt.text).toContain(
-      'native merge_group CI failure'
-    );
+      })
+    ).toThrow('failure source is not an authenticated CI workflow_run');
   });
 
   it('launches Cursor-direct repair against the current PR without a sibling PR', () => {
@@ -592,7 +875,7 @@ describe('rolling CI FX webhook remediation', () => {
     ).toBe(FX_ADAPTER_NAME);
   });
 
-  it('deliberate red: terminalizes merge_group FX when only a remote-writing executor exists', () => {
+  it('deliberate red: rejects merge_group before legacy FX can terminalize it', () => {
     const input = {
       repository: 'JovieInc/Jovie',
       prNumber: 16418,
@@ -626,8 +909,46 @@ describe('rolling CI FX webhook remediation', () => {
       input: JSON.stringify(input),
       encoding: 'utf8',
     });
+    expect(launched.status).not.toBe(0);
+    expect(launched.stderr).toContain(
+      'failure source is not an authenticated CI workflow_run'
+    );
+  });
+
+  it('CLI fails closed instead of launching a remote-writing FX executor', () => {
+    const input = {
+      repository: 'JovieInc/Jovie',
+      prNumber: 17,
+      headSha: head,
+      liveHead: head,
+      headRef: 'fix/ci',
+      workflowRunId: 9001,
+      workflowRunAttempt: 1,
+      failedJobs: [
+        { name: 'ci-fast', steps: ['Typecheck'] },
+        { name: 'runner-bootstrap', steps: ['Set up job'] },
+      ],
+      source: trustedSource,
+      checkSuiteId: 44,
+      checks: [
+        {
+          name: 'ci-fast',
+          conclusion: 'failure',
+          headSha: head,
+          checkSuiteId: 44,
+        },
+      ],
+      writer: 'tim',
+      priorCommentBody: '',
+      conclusion: 'failure',
+      cursorApiKey: 'cursor-key',
+      listCursorAgents: false,
+    };
+    const launched = spawnSync(process.execPath, [CLI], {
+      input: JSON.stringify(input),
+      encoding: 'utf8',
+    });
     expect(launched.status).toBe(0);
-    expect(launched.stderr).not.toContain('writer is required');
     const planned = JSON.parse(launched.stdout);
     expect(planned).toMatchObject({
       route: { route: 'fx' },
@@ -639,15 +960,13 @@ describe('rolling CI FX webhook remediation', () => {
           terminal: true,
           result: 'remote_mutation_not_authorized',
           repository: 'JovieInc/Jovie',
-          prNumber: 16418,
+          prNumber: 17,
           headSha: head,
         },
       },
       dispatch: { mutate: true, action: 'terminal_configuration_incident' },
       outcome: 'blocked_executor',
     });
-    expect(planned.dispatch.state.claim.writer).toBe(FX_ADAPTER_NAME);
-    expect(planned.dispatch.state.claim.status).toBe('terminal');
     const terminalFingerprint = planned.launch.receipt.fingerprint;
     const unrelatedEvent = planned.dispatch.events.find(
       event => event.fingerprint !== terminalFingerprint
@@ -675,7 +994,7 @@ describe('rolling CI FX webhook remediation', () => {
           delivery: `44:2:${terminalFingerprint}`,
         },
         liveHead: head,
-        writer: FX_ADAPTER_NAME,
+        writer: 'tim',
         priorState: planned.dispatch.state,
       })
     ).toMatchObject({
@@ -690,67 +1009,12 @@ describe('rolling CI FX webhook remediation', () => {
           delivery: `44:2:${unrelatedFingerprint}`,
         },
         liveHead: head,
-        writer: FX_ADAPTER_NAME,
+        writer: 'tim',
         priorState: planned.dispatch.state,
       })
     ).toMatchObject({
       action: 'dispatch_implementer',
       mutate: true,
-    });
-
-    const missingAuth = spawnSync(process.execPath, [CLI], {
-      input: JSON.stringify({ ...input, cursorApiKey: '' }),
-      encoding: 'utf8',
-    });
-    expect(missingAuth.status).toBe(0);
-    expect(missingAuth.stderr).not.toContain('writer is required');
-    expect(JSON.parse(missingAuth.stdout)).toMatchObject({
-      route: { route: 'configuration_incident' },
-      launch: { action: 'configuration_incident' },
-      dispatch: { mutate: true },
-      outcome: 'no_key',
-    });
-  });
-
-  it('CLI fails closed instead of launching a remote-writing FX executor', () => {
-    const input = {
-      repository: 'JovieInc/Jovie',
-      prNumber: 17,
-      headSha: head,
-      liveHead: head,
-      headRef: 'fix/ci',
-      workflowRunId: 9001,
-      workflowRunAttempt: 1,
-      failedJobs: [{ name: 'ci-fast', steps: ['Typecheck'] }],
-      source: trustedSource,
-      checkSuiteId: 44,
-      checks: [
-        {
-          name: 'ci-fast',
-          conclusion: 'failure',
-          headSha: head,
-          checkSuiteId: 44,
-        },
-      ],
-      writer: 'tim',
-      priorCommentBody: '',
-      conclusion: 'failure',
-      cursorApiKey: 'cursor-key',
-      listCursorAgents: false,
-    };
-    const launched = spawnSync(process.execPath, [CLI], {
-      input: JSON.stringify(input),
-      encoding: 'utf8',
-    });
-    expect(launched.status).toBe(0);
-    expect(JSON.parse(launched.stdout)).toMatchObject({
-      route: { route: 'fx' },
-      launch: {
-        action: 'configuration_incident',
-        reason: 'fx-safe-executor-unavailable',
-      },
-      dispatch: { mutate: true, action: 'terminal_configuration_incident' },
-      outcome: 'blocked_executor',
     });
     const held = spawnSync(process.execPath, [CLI], {
       input: JSON.stringify({

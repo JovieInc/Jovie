@@ -84,9 +84,16 @@ jobs:
     timeout-minutes: 10
     if: github.event_name == 'pull_request'
     steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - name: Check out exact PR head
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
+          # pull_request defaults to refs/pull/<n>/merge. When main advances,
+          # that synthetic tree contains unrelated landed changes while the
+          # event's base SHA remains older, so repository hygiene can charge
+          # main growth to this PR. Source policy must inspect the exact head.
+          ref: ${{ github.event.pull_request.head.sha }}
           fetch-depth: 1
+          persist-credentials: false
 
       - name: Fetch PR base
         run: git fetch --no-tags --depth=1 origin "${{ github.event.pull_request.base.sha }}"

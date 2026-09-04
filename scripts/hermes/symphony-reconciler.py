@@ -34,7 +34,7 @@ RUNTIME_RECEIPT_SCHEMA = "symphony-runtime-receipt/v1"
 WORKSPACE_REVISION_SCHEMA = "symphony-workspace-revision/v1"
 LAUNCHER_FAILURE_SCHEMA = "symphony-launcher-failure/v1"
 DEFAULT_API = "http://127.0.0.1:4041/api/v1/state"
-DEFAULT_WORKSPACES = "~/symphony-workspaces"
+DEFAULT_WORKSPACES = "~/symphony-elixir-workspaces"
 DEFAULT_STATE = "~/.local/state/symphony-reconciler"
 DEFAULT_CAPABILITY_MANIFEST = "config/symphony-reconciler-capabilities.json"
 DEFAULT_FLEET_GATE_RECEIPT = "/home/timwhite/gem-workspace/state/gem-priority-gate/latest.json"
@@ -53,7 +53,8 @@ CONSUMED_LOCAL_REPAIR_STATUSES = frozenset(
         "repair_not_started",
     }
 )
-SYMPHONY_SERVICE = "symphony-ui-pilot.service"
+SYMPHONY_SERVICE = "symphony-elixir.service"
+SYMPHONY_OWNER = "symphony-elixir"
 REQUIRED_RUNTIME_CAPABILITIES = frozenset(
     {
         "workspace-observation",
@@ -70,7 +71,11 @@ def _stale_capacity_local_remediation_limit(
     receipt_path: pathlib.Path | None = None,
 ) -> tuple[int, str]:
     """Admit only the fail-closed, local-only stale-capacity recovery lane."""
-    path = receipt_path or pathlib.Path(DEFAULT_FLEET_GATE_RECEIPT)
+    path = receipt_path or pathlib.Path(
+        os.path.expanduser(
+            os.environ.get("GEM_FLEET_GATE_RECEIPT", DEFAULT_FLEET_GATE_RECEIPT)
+        )
+    )
     try:
         receipt = json.loads(path.read_text(encoding="utf-8"))
     except (OSError, TypeError, ValueError):
@@ -1645,7 +1650,7 @@ def _reconcile_item(
     terminal_escalation: dict[str, object] | None = None
     receipt_controller_state = decision_state
     authoritative_owner = (
-        "symphony-reconciler" if alternate_permitted else "symphony-ui-pilot"
+        "symphony-reconciler" if alternate_permitted else SYMPHONY_OWNER
     )
     if deterministic_terminal:
         alternate["status"] = "not_permitted"
@@ -1663,7 +1668,7 @@ def _reconcile_item(
             next_retry = previous_retry if previous_retry and previous_retry > _now() else _now()
         policy_retryable = True
         receipt_controller_state = "retrying"
-        authoritative_owner = "symphony-ui-pilot"
+        authoritative_owner = SYMPHONY_OWNER
         if isinstance(previous_alternate, dict):
             for key in ("selection", "summary"):
                 if key in previous_alternate:
@@ -1748,7 +1753,7 @@ def _reconcile_item(
                 transition = "returned_to_normal_loop"
                 next_action = "normal_model_update_test_ready_native_merge"
                 next_retry = _now() + dt.timedelta(minutes=RETRY_MINUTES)
-                authoritative_owner = "symphony-ui-pilot"
+                authoritative_owner = SYMPHONY_OWNER
             else:
                 transition = "github_runner_handoff_required"
                 next_action = "escalate_ci_platform_dependency"

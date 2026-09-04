@@ -320,7 +320,7 @@ const LIBRARY_ASSET_SEEDS: readonly AssetSeed[] = [
       'press-kit',
       'Tim White press photo 01',
       'alt_crop',
-      '/images/avatars/tim-white-founder.jpg',
+      '/images/avatars/tim-white.jpg',
       'Tim White press photo 01',
     ],
     [

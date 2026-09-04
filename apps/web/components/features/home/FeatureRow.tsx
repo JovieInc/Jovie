@@ -27,7 +27,7 @@ export function FeatureRow({
           <div className='reveal-on-scroll grid items-center gap-10 lg:grid-cols-2 lg:gap-16'>
             {/* Left: text */}
             <div className='max-w-120'>
-              <h2 className='marketing-h2-linear text-primary-token'>
+              <h2 className='marketing-h2-linear text-primary-token line-clamp-2'>
                 {heading}
               </h2>
               <p className='marketing-lead-linear mt-4 text-secondary-token'>

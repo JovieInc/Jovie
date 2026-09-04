@@ -40,6 +40,9 @@ STALE_REMOUNT_SECONDS = 90 * 60  # product remounts (JOV-5235) still grok at 54 
 # Held live implement/remount locks are never TTL-expired.
 FALLBACK_LEASE_TTL_SECONDS = STALE_REMOUNT_SECONDS
 FALLBACK_LEASE_DIR = "~/.local/state/symphony-fallback/leases"
+# When Linear rate-limits the shared workspace key, every Linear call pauses
+# for this long instead of stampeding the exhausted budget (JOV drain 2026-09-03).
+LINEAR_BACKOFF_SECONDS = 15 * 60
 FALLBACK_GC_SCHEMA = "symphony-fallback-lease-gc/v1"
 FALLBACK_PICKUP_SCHEMA = "symphony-fallback-pickup/v1"
 FALLBACK_LOCK_NAME = re.compile(r"^((?:JOV|LYB)-\d+)\.lock$")
@@ -64,6 +67,7 @@ TYPED_PICKUP_REFUSE_REASONS = frozenset(
         "no_eligible_issue",
         "blocked",
         "state_not_admitted",
+        "closure_stop_line",
     )
 )
 # The upstream Elixir runtime is the sole owner of :4041 on Gem.  This
@@ -111,6 +115,7 @@ BLOCKED_ADMISSION_LABELS = frozenset(
         "hold",
         "manual-incident",
         "blocked",
+        "no-symphony",
     )
 )
 SUPPORTED_TEAMS = frozenset(("JOV", "LYB"))
@@ -178,7 +183,14 @@ ADMITTED_STATES = frozenset(("todo", "in progress", "in review"))
 # keep flowing on the grok fallback after #16212 emptied the receipt list.
 # Todo still requires a current admission-gate/v1 receipt.
 CONTINUE_WITHOUT_RECEIPT_STATES = frozenset(("in progress", "in review"))
-AUTONOMOUS_HEAD_RE = re.compile(r"^(?:symphony|grok|fallback)/((?:JOV|LYB)-\d+)-fix$")
+# symphony/grok/fallback heads are the autonomous lane's own; codex/fable/fugu
+# heads are GPT-worker-authored. Failed or DIRTY GPT work is adopted by the
+# grok/kimi fallback lane (Tim 2026-09-03: "allow the failed gpt ones to move
+# to grok or kimi"). Codex-lane identifiers are lowercase in branch names.
+AUTONOMOUS_HEAD_RE = re.compile(
+    r"^(?:(?:symphony|grok|fallback)/((?:JOV|LYB)-\d+)-fix"
+    r"|(?:codex|fable|fugu)/((?:jov|lyb)-\d+)(?:-.+)?)$"
+)
 FALLBACK_UNIT_RE = re.compile(
     r"^(?:fallback-ship|grok-ship)-((?:JOV|LYB)-\d+)(?:-[0-9a-f]{12})?\.service$"
 )
@@ -371,6 +383,31 @@ def _fleet_gate_allows_isolated() -> tuple[bool, str]:
     return True, f"fleet_gate_{state.lower()}"
 
 
+def _closure_intake_allowed() -> bool:
+    """Mirror grok-ship-one's new-work gate: closureAdmission.newIssueIntakeAllowed.
+
+    The sidecar must not lease NEW fallback work while the Summer closure
+    stop-line is closed — the leased worker would only die on grok-ship-one's
+    own stop-line check, burning a lease, Linear calls, and a unit launch for
+    nothing (live 2026-09-03: JOV-3583 exit 1 churn). Fail-closed when the
+    receipt is unreadable, matching grok-ship-one.
+    """
+    path = pathlib.Path(
+        os.path.expanduser(
+            os.environ.get(
+                "GEM_FLEET_GATE_RECEIPT",
+                "/home/timwhite/gem-workspace/state/gem-priority-gate/latest.json",
+            )
+        )
+    )
+    try:
+        receipt = json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, TypeError, ValueError):
+        return False
+    closure = receipt.get("closureAdmission")
+    return isinstance(closure, dict) and closure.get("newIssueIntakeAllowed") is True
+
+
 def _grok_units_after_survival_window() -> list[str] | None:
     time.sleep(
         _bounded_seconds(
@@ -475,7 +512,7 @@ def _start_jov_primary() -> bool:
 
 
 def _services_active() -> bool:
-    """JOV Symphony UI is the required owner. LYB is best-effort."""
+    """JOV official Symphony is the required owner. LYB is best-effort."""
     return _jov_active()
 
 
@@ -627,12 +664,52 @@ def _grok_ship_one_executable() -> str | None:
     return str(executable) if executable.is_file() and os.access(executable, os.X_OK) else None
 
 
-def _grok_limit() -> int:
+def _oidc_seat(entry: object) -> bool:
+    if not isinstance(entry, dict):
+        return False
+    return bool(entry.get("refresh_token") or entry.get("key") or entry.get("access_token"))
+
+
+def _grok_oauth_seats() -> int | None:
+    path = pathlib.Path.home() / ".grok" / "auth.json"
     try:
-        value = int(os.environ.get("SYMPHONY_GROK_MAX", DEFAULT_GROK_MAX))
-    except (TypeError, ValueError):
+        payload = json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, TypeError, ValueError):
+        return None
+    if not isinstance(payload, dict):
+        return None
+    return sum(1 for entry in payload.values() if _oidc_seat(entry))
+
+
+def _kimi_oauth_seats() -> int | None:
+    path = pathlib.Path.home() / ".kimi-code" / "credentials" / "kimi-code.json"
+    try:
+        payload = json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, TypeError, ValueError):
+        return None
+    return 1 if _oidc_seat(payload) else 0
+
+
+def _live_oauth_seats() -> int | None:
+    grok = _grok_oauth_seats()
+    kimi = _kimi_oauth_seats()
+    if grok is None and kimi is None:
+        return None
+    return (grok or 0) + (kimi or 0)
+
+
+def _grok_limit() -> int:
+    raw = os.environ.get("SYMPHONY_GROK_MAX")
+    if raw is not None:
+        try:
+            return max(0, min(int(raw), MAX_GROK_MAX))
+        except (TypeError, ValueError):
+            return DEFAULT_GROK_MAX
+    seats = _live_oauth_seats()
+    if seats is None or seats <= 0:
+        # Missing Grok/Kimi files, or Codex-only exhaustion, must not serial-pin.
         return DEFAULT_GROK_MAX
-    return max(0, min(value, MAX_GROK_MAX))
+    return max(1, min(MAX_GROK_MAX, max(DEFAULT_GROK_MAX, seats)))
 
 
 def _dotenv_value(raw: str) -> str | None:
@@ -748,7 +825,48 @@ def _linear_issues_list_request(after: str | None = None) -> dict:
     return {"query": LINEAR_QUERY, "variables": variables}
 
 
+def _linear_backoff_path() -> pathlib.Path:
+    return pathlib.Path(
+        os.path.expanduser(
+            os.environ.get(
+                "SYMPHONY_LINEAR_BACKOFF",
+                "~/.local/state/symphony-fallback/linear-backoff.json",
+            )
+        )
+    )
+
+
+def _linear_backoff_active() -> bool:
+    try:
+        data = json.loads(_linear_backoff_path().read_text(encoding="utf-8"))
+        stamped = float(data.get("epoch", 0))
+    except (OSError, ValueError, TypeError):
+        return False
+    return (time.time() - stamped) < LINEAR_BACKOFF_SECONDS
+
+
+def _linear_note_ratelimited() -> None:
+    path = _linear_backoff_path()
+    try:
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text(json.dumps({"epoch": time.time()}), encoding="utf-8")
+    except OSError:
+        pass
+
+
+def _linear_clear_backoff() -> None:
+    try:
+        _linear_backoff_path().unlink(missing_ok=True)
+    except OSError:
+        pass
+
+
 def _linear_graphql(payload: dict) -> dict | None:
+    # A ratelimited shared Linear budget must not be stampeded by the timer
+    # loop: while a backoff stamp is fresh, skip the network entirely (every
+    # caller already fails closed on None).
+    if _linear_backoff_active():
+        return None
     key = os.environ.get("LINEAR_API_KEY") or _linear_api_key_from_file()
     if not key:
         return None
@@ -760,8 +878,20 @@ def _linear_graphql(payload: dict) -> dict | None:
     try:
         with urllib.request.urlopen(request, timeout=CONTROL_TIMEOUT_SECONDS) as response:
             body = json.load(response)
+    except urllib.error.HTTPError as exc:
+        # Linear signals rate limiting as HTTP 400/429 with a RATELIMITED code
+        # in the error body (observed live 2026-09-03: 2500 req/hr exhausted on
+        # Gem, every worker died on admission re-verify).
+        try:
+            detail = exc.read().decode("utf-8", "replace")
+        except (OSError, ValueError):
+            detail = ""
+        if exc.code == 429 or "RATELIMITED" in detail:
+            _linear_note_ratelimited()
+        return None
     except (OSError, ValueError, TypeError, urllib.error.URLError):
         return None
+    _linear_clear_backoff()
     return body if isinstance(body, dict) else None
 
 
@@ -862,7 +992,7 @@ def _fetch_single_issue(identifier: str) -> dict | None:
 
 
 def _issue_meta(
-    issue: dict, identifier: str, *, require_receipt: bool = True
+    issue: dict, identifier: str, *, require_receipt: bool = True, remount: bool = False
 ) -> tuple[bool, str, dict | None]:
     """Validate one issue against the shared admission predicate and, when
     admitted, produce the meta record grok-ship-one needs to run.
@@ -914,7 +1044,13 @@ def _issue_meta(
         return False, "identifier_mismatch", None
     state_name = str(state.get("name") or "").strip().lower()
     if state_name not in ADMITTED_STATES:
-        return False, "state_not_admitted", None
+        # Remount continues an existing open autonomous PR on GitHub. Linear
+        # reading done/closed while that PR is still open and unmerged is a
+        # state-sync error (e.g. linear-sync marked the issue Done on a partial
+        # sibling merge), not proof the work finished. Canceled/duplicate stay
+        # refused: those are deliberate kills.
+        if not (remount and state_name in {"done", "closed"}):
+            return False, "state_not_admitted", None
     state_nodes = team.get("states")
     states: dict[str, str] = {}
     if isinstance(state_nodes, dict) and isinstance(state_nodes.get("nodes"), list):
@@ -957,6 +1093,7 @@ def check_admission(identifier: str, *, remount: bool = False) -> int:
         issue,
         identifier,
         require_receipt=not remount and not _continue_without_receipt(issue),
+        remount=remount,
     )
     if not ok:
         print(f"not admitted:{reason}", file=sys.stderr)
@@ -1034,7 +1171,9 @@ def _autonomous_open_pr_index(identifiers: list[str] | None = None) -> dict[str,
             match = AUTONOMOUS_HEAD_RE.fullmatch(head)
             if match is None:
                 continue
-            ident = match.group(1)
+            # Group 2 covers the lowercase codex-lane identifier; normalize to
+            # the canonical JOV-/LYB- form used everywhere downstream.
+            ident = (match.group(1) or match.group(2)).upper()
             if wanted is not None and ident not in wanted:
                 continue
             if ident not in index:
@@ -1081,16 +1220,26 @@ def _admitted_or_remount_identifiers() -> list[str] | None:
 
 _REMOUNT_IGNORE_FAILURES = frozenset({"enroll", "PR Ready"})
 
+# drain-pr-queue.sh record_product_failure_receipt tombstones a head whose
+# merge-group-only product checks (iOS build, full unit shards) failed. The
+# tombstone is a SUCCESS commit status (JOV-INV-011), so the source PR stays
+# CLEAN while the enrollment guard refuses re-admission — without an explicit
+# check the sidecar skipped such heads forever (live #16420, 2026-09-03).
+PRODUCT_FAILURE_TOMBSTONE_CONTEXT = "jovie-queue-product-failure/v1"
 
-def _pr_has_failing_check(repo: str, number: int) -> bool:
+
+def _pr_status_check_rollup(repo: str, number: int) -> list | None:
     payload = _gh_json(
         ["gh", "pr", "view", str(number), "--repo", repo, "--json", "statusCheckRollup"]
     )
     if not isinstance(payload, dict):
-        return False
-    checks = payload.get("statusCheckRollup") or []
-    if not isinstance(checks, list):
-        return False
+        return None
+    checks = payload.get("statusCheckRollup")
+    return checks if isinstance(checks, list) else None
+
+
+def _pr_has_failing_check(repo: str, number: int) -> bool:
+    checks = _pr_status_check_rollup(repo, number) or []
     pending = False
     failing = False
     for check in checks:
@@ -1110,6 +1259,19 @@ def _pr_has_failing_check(repo: str, number: int) -> bool:
     return failing and not pending
 
 
+def _pr_has_product_failure_tombstone(repo: str, number: int) -> bool:
+    """True when the head carries the queue controller's product-failure tombstone."""
+    for check in _pr_status_check_rollup(repo, number) or []:
+        if not isinstance(check, dict):
+            continue
+        # Check runs carry name/text; commit statuses carry context/description.
+        name = check.get("name") or check.get("context")
+        description = check.get("description") or check.get("text") or ""
+        if name == PRODUCT_FAILURE_TOMBSTONE_CONTEXT and str(description).startswith("blocked:"):
+            return True
+    return False
+
+
 def _open_pr_verdict(identifier: str, index: dict[str, dict]) -> tuple[str, dict | None]:
     """Return (none|skip|remount, pr). skip = inflight green/pending open PR."""
     pr = index.get(identifier)
@@ -1124,6 +1286,12 @@ def _open_pr_verdict(identifier: str, index: dict[str, dict]) -> tuple[str, dict
     # CLEAN heads are already merge-queue eligible. Remounting them fights
     # github-merge-queue and can knock a green autonomous PR out of the queue.
     if status == "CLEAN" and mergeable != "CONFLICTING":
+        # Exception: a merge-group-only product failure leaves the head
+        # source-CLEAN, but drain-pr-queue.sh tombstones it and the enrollment
+        # guard refuses re-admission, so skip would park the PR forever (live
+        # #16420). The tombstone needs real remediation, not re-enrollment.
+        if _pr_has_product_failure_tombstone(repo, number):
+            return "remount", pr
         return "skip", pr
     # DIRTY/BEHIND after a sibling merge is not product-CI-red, but the head
     # cannot enroll until it merges main. Live #16211 was skipped as inflight
@@ -1256,6 +1424,12 @@ def expire_fallback_lock_decision(
         return "expire", "open_pr_inflight"
     state = (state_name or "").strip().lower()
     if state in DONE_LOCK_STATES:
+        # A live remount of a done/closed issue keeps its lease: the open
+        # DIRTY/CI-red PR proves the work never landed, and expiring the lock
+        # mid-remount would admit a second writer. Canceled/duplicate locks
+        # still expire — those are deliberate kills.
+        if held and pr_verdict == "remount" and state in {"done", "closed"}:
+            return "keep", "live_remount"
         return "expire", {
             "done": "issue_done",
             "closed": "issue_done",
@@ -1465,13 +1639,19 @@ def pickup_refuse_reason(
         return "open_pr_inflight"
     state = (_issue_state_name(issue) or "").strip().lower()
     if state in DONE_LOCK_STATES:
-        return {
-            "done": "issue_done",
-            "closed": "issue_done",
-            "canceled": "issue_canceled",
-            "cancelled": "issue_canceled",
-            "duplicate": "issue_duplicate",
-        }[state]
+        # An open DIRTY/CI-red autonomous PR proves the work never landed:
+        # remounting it continues existing GitHub work and is exempt from the
+        # done/closed refusal (Linear state-sync error, e.g. marked Done on a
+        # partial sibling merge). Canceled/duplicate stay refused — those are
+        # deliberate kills.
+        if not (pr_verdict == "remount" and state in {"done", "closed"}):
+            return {
+                "done": "issue_done",
+                "closed": "issue_done",
+                "canceled": "issue_canceled",
+                "cancelled": "issue_canceled",
+                "duplicate": "issue_duplicate",
+            }[state]
     if held is True:
         return "fallback_lease_held"
     if held is None:
@@ -1544,6 +1724,10 @@ def _launch_fallback_workers(
     lock_count = _fallback_lock_count()
     next_eligible = ""
     first_lease: str | None = None
+    # Mirror grok-ship-one's new-work stop-line so the sidecar never leases
+    # fresh work it would only launch into a refusal. Remounts of existing
+    # open PRs are continuation and stay exempt.
+    closure_intake_open = _closure_intake_allowed()
     for identifier in identifiers:
         if capacity_used >= limit:
             if next_eligible == "":
@@ -1561,6 +1745,16 @@ def _launch_fallback_workers(
         if legacy_unit in active_units or any(unit.startswith(fallback_prefix) for unit in active_units):
             continue
         verdict, _pr = _open_pr_verdict(identifier, open_prs)
+        if verdict != "remount" and not closure_intake_open:
+            _emit_pickup(
+                "refuse",
+                reason="closure_stop_line",
+                identifier=identifier,
+                lock_count=lock_count,
+                next_issue=next_eligible,
+            )
+            print(f"fallback skip {identifier} closure_stop_line", file=sys.stderr, flush=True)
+            continue
         lock_path = _fallback_lease_dir() / f"{identifier}.lock"
         held = _lock_held(lock_path) if lock_path.is_file() else False
         issue = None
@@ -1606,6 +1800,7 @@ def _launch_fallback_workers(
             issue,
             identifier,
             require_receipt=(verdict != "remount" and not _continue_without_receipt(issue)),
+            remount=(verdict == "remount"),
         )
         if not ok:
             reason = meta_reason if meta_reason in TYPED_PICKUP_REFUSE_REASONS else "not_admitted"
@@ -1901,7 +2096,7 @@ def _continue_exhausted_reconcile(
 
     # Exclusive implementation is the fallback lease flock; the Codex launcher
     # exits 78 when that lock is held. Do not stop JOV: fleet-gate observes
-    # :4041 on Gem, and a stopped UI freezes promotion (zero merge-queue slots).
+    # :4041 on Gem, and a stopped scheduler freezes promotion (zero merge-queue slots).
     launched_units, _capacity_used = _launch_fallback_workers(
         identifiers, active, executable, bundle_revision, selection, limit
     )

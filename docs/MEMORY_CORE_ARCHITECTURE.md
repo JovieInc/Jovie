@@ -1,5 +1,7 @@
 # Memory Core Architecture — Product Memory Stack
 
+> **Retirement notice (2026-09-02):** Trigger.dev and Hermes are retired. This document preserves the accepted decision at its original date, but its runner selections are superseded by [`docs/operations/SUMMER_RUNTIME_RETIREMENT.md`](./operations/SUMMER_RUNTIME_RETIREMENT.md).
+
 > Issue: JOV-2705
 > Status: Accepted
 > Date: 2026-06-28

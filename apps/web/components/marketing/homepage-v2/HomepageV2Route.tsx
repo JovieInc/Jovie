@@ -4,7 +4,11 @@ import Image from 'next/image';
 import Link from 'next/link';
 import { DemoPublicProfileSurface } from '@/components/features/demo/DemoPublicProfileSurface';
 import { HomeTrustSection } from '@/components/features/home/HomeTrustSection';
-import { MarketingContainer, MarketingPageShell } from '@/components/marketing';
+import {
+  MarketingContainer,
+  MarketingHero,
+  MarketingPageShell,
+} from '@/components/marketing';
 import { ArtistProfileModeSwitcher } from '@/components/marketing/artist-profile';
 import { ArtistProfilePhoneFrame } from '@/components/marketing/artist-profile/ArtistProfilePhoneFrame';
 import { ArtistProfileSectionHeader } from '@/components/marketing/artist-profile/ArtistProfileSectionHeader';
@@ -74,10 +78,11 @@ function HomepageV2Hero() {
   );
 
   return (
-    <section
-      data-testid='homepage-v2-shell'
+    <MarketingHero
+      variant='unstyled'
+      testId='homepage-v2-shell'
       className='relative overflow-hidden pb-16 pt-23 sm:pb-20 md:pt-25 lg:pb-24'
-      aria-labelledby='homepage-v2-hero-heading'
+      headingId='homepage-v2-hero-heading'
     >
       <div
         aria-hidden='true'
@@ -92,7 +97,7 @@ function HomepageV2Hero() {
             <h1
               id='homepage-v2-hero-heading'
               data-testid='homepage-v2-hero'
-              className='homepage-v2-hero__headline text-4xl font-semibold tracking-tight text-balance text-primary-token sm:text-5xl lg:text-6xl'
+              className='homepage-v2-hero__headline text-4xl font-semibold tracking-tight text-balance text-primary-token sm:text-5xl lg:text-6xl line-clamp-2'
             >
               {HOMEPAGE_V2_COPY.hero.headline}
             </h1>
@@ -181,7 +186,7 @@ function HomepageV2Hero() {
           </div>
         </div>
       </MarketingContainer>
-    </section>
+    </MarketingHero>
   );
 }
 
@@ -237,7 +242,7 @@ export function HomepageV2Spotlight() {
         <div className='mx-auto grid max-w-6xl gap-10 lg:grid-cols-[minmax(16rem,0.36fr)_minmax(0,0.64fr)] lg:items-center xl:gap-16'>
           <div className='homepage-v2-spotlight__copy lg:self-center'>
             <div className='homepage-v2-spotlight__copy'>
-              <h2 className='homepage-story-heading homepage-v2-spotlight__heading'>
+              <h2 className='homepage-story-heading homepage-v2-spotlight__heading line-clamp-2'>
                 <span className='block'>One Link.</span>
                 <span className='block whitespace-nowrap'>Always In Sync.</span>
               </h2>

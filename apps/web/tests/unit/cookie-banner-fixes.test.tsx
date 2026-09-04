@@ -35,12 +35,17 @@ describe('cookie banner coverage receipts', () => {
     );
     expect(bannerSource).toContain('export function CookieBannerSection');
     expect(bannerSource).not.toMatch(/--linear-app-/);
-    expect(
-      readFileSync(
-        resolve(process.cwd(), 'components/organisms/CookieModal.tsx'),
-        'utf8'
-      )
-    ).toContain('export function CookieModal');
+    const modalSource = readFileSync(
+      resolve(process.cwd(), 'components/organisms/CookieModal.tsx'),
+      'utf8'
+    );
+    expect(modalSource).toContain('export function CookieModal');
+    expect(modalSource).toContain('function CookiePreferencesSaveButton');
+    expect(modalSource).toContain(
+      '<CookiePreferencesSaveButton\n' +
+        '              isSaving={isSaving}\n' +
+        '              onSave={save}'
+    );
   });
 });
 

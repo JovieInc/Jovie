@@ -364,6 +364,14 @@ export const TOOL_UI_REGISTRY = {
     successTitle: 'Artist research ready',
     errorTitle: "Couldn't research this artist",
   },
+  surfaceLibraryOpportunities: {
+    label: 'Library opportunities',
+    uiHint: 'artifact',
+    renderer: 'artifact',
+    loadingTitle: 'Checking your Library presence…',
+    successTitle: 'Library opportunities ready',
+    errorTitle: "Couldn't load Library opportunities",
+  },
   assembleArtistProfile: {
     label: 'Profile assembly',
     uiHint: 'artifact',

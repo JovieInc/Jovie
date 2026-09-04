@@ -111,9 +111,10 @@ export function summerShadowKey(value: string): string {
 export function isSummerShadowEnabled(
   environment: Readonly<Record<string, string | undefined>> = process.env
 ): boolean {
+  const vercelEnv = environment.VERCEL_ENV;
   return (
     environment.SUMMER_SHADOW_ENABLED?.trim() === 'true' &&
-    environment.VERCEL_ENV === 'preview'
+    (vercelEnv === 'preview' || vercelEnv === 'production')
   );
 }
 

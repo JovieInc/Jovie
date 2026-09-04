@@ -34,6 +34,49 @@ describe('verification child environment', () => {
   });
 });
 
+describe('Summer commissioning affected-test lane', () => {
+  it('selects the fail-closed commissioning suite for every contract input', () => {
+    const plan = buildAffectedTestPlan([
+      'docs/operations/SUMMER_COMMISSIONING.md',
+      'docs/operations/SUMMER_PRODUCT_QUALITY_GOVERNOR.md',
+      'docs/operations/evidence/summer-mac-production-dogfood-2026-09-01.json',
+      'scripts/summer-commissioning/canonical-registry.test.mjs',
+      'scripts/summer-commissioning/commissioning.mjs',
+      'scripts/summer-commissioning/commissioning.test.mjs',
+      'scripts/summer-commissioning/contracts.mjs',
+      'scripts/summer-commissioning/contracts.test.mjs',
+      'scripts/summer-commissioning/product-quality-governor.mjs',
+      'scripts/summer-commissioning/product-quality-governor.test.mjs',
+      'scripts/summer-commissioning/receipt-trust.mjs',
+      'scripts/summer-commissioning/receipt-trust.test.mjs',
+      'scripts/summer-commissioning/registry.json',
+      'scripts/run-affected-tests.mjs',
+      'scripts/lib/__tests__/automation-verify.test.mjs',
+    ]);
+
+    expect(plan.mode).toBe('selected');
+    expect(plan.nodeTests).toEqual([
+      'scripts/summer-commissioning/canonical-registry.test.mjs',
+      'scripts/summer-commissioning/commissioning.test.mjs',
+      'scripts/summer-commissioning/contracts.test.mjs',
+      'scripts/summer-commissioning/product-quality-governor.test.mjs',
+      'scripts/summer-commissioning/receipt-trust.test.mjs',
+    ]);
+    expect(plan.scriptVitestTests).toContain(
+      'scripts/lib/__tests__/automation-verify.test.mjs'
+    );
+  });
+
+  it('fails closed to the full suite when commissioning changes mix scopes', () => {
+    const plan = buildAffectedTestPlan([
+      'scripts/summer-commissioning/commissioning.mjs',
+      'scripts/unrelated.mjs',
+    ]);
+
+    expect(plan.mode).toBe('full');
+  });
+});
+
 const SYMPHONY_THROUGHPUT_CONTROL_MANIFEST = [
   '.husky/pre-push',
   'scripts/automation-verify.sh',
@@ -134,7 +177,11 @@ const MERGE_QUEUE_CONTROLLER_INPUTS = [
   'scripts/lib/__tests__/merge-queue-guard.test.mjs',
   'scripts/lib/__tests__/pre-land-changelog.test.mjs',
   'scripts/lib/__tests__/pr-check-failures.test.mjs',
+  'scripts/lib/ownerless-recovery-policy.mjs',
+  'scripts/lib/pr-check-failures.mjs',
+  'scripts/lib/upsert-pr-comment.sh',
   'scripts/merge-queue-backend.mjs',
+  'scripts/ownerless-recovery-sweeper.mjs',
   'scripts/tests/test_gh_retry.py',
 ];
 const MERGE_QUEUE_CONTROLLER_SCRIPT_TESTS = [
@@ -143,6 +190,7 @@ const MERGE_QUEUE_CONTROLLER_SCRIPT_TESTS = [
   'scripts/lib/__tests__/merge-group-workflow-contract.test.mjs',
   'scripts/lib/__tests__/merge-queue-backend.test.mjs',
   'scripts/lib/__tests__/merge-queue-guard.test.mjs',
+  'scripts/lib/__tests__/ownerless-recovery-policy.test.mjs',
   'scripts/lib/__tests__/pre-land-changelog.test.mjs',
   'scripts/lib/__tests__/pr-check-failures.test.mjs',
 ];
@@ -229,8 +277,10 @@ const AFFECTED_TEST_SELECTOR_MANIFEST = [
 ];
 const GEM_CHECKIN_HUD_LANE = [
   'scripts/hermes/symphony/WORKFLOW.md',
+  'scripts/hermes/symphony_official_runtime.py',
   'scripts/hermes/gem-checkin-hud.py',
   'scripts/hermes/gem-checkin-tty1.sh',
+  'scripts/hermes/systemd/symphony-elixir.service',
   'scripts/hermes/systemd/symphony-burrito.service',
   'scripts/hermes/systemd/symphony-burrito-update.service',
   'scripts/hermes/systemd/symphony-burrito-update.timer',
@@ -624,12 +674,14 @@ describe('automation-verify affected scope', () => {
       pythonUnittestTests: ['scripts/hermes/tests/gem-priority-gate.test.py'],
       scriptVitestTests: [
         'scripts/lib/__tests__/automation-verify.test.mjs',
+        'scripts/lib/__tests__/pr-visual-capture-path.test.mjs',
         'scripts/lib/__tests__/pr-visual-review.test.mjs',
         'scripts/lib/__tests__/ci-harness.test.mjs',
         'scripts/lib/__tests__/ci-duration-ratchet.test.mjs',
         'scripts/lib/__tests__/ci-branching-guard.test.mjs',
         'scripts/lib/__tests__/merge-queue-guard.test.mjs',
         'scripts/lib/__tests__/pre-land-changelog.test.mjs',
+        'scripts/lib/__tests__/ownerless-recovery-policy.test.mjs',
         'scripts/lib/__tests__/ci-metrics-compute.test.mjs',
         'scripts/lib/__tests__/auto-ready-agent-drafts.test.mjs',
         'scripts/lib/__tests__/eval-main-health-action.test.mjs',
@@ -1107,9 +1159,10 @@ describe('automation-verify affected scope', () => {
       'apps/web/tests/unit/profile/profile-card-layout.test.tsx',
       'apps/web/tests/unit/profile/profile-compact-surface-hero-layout.test.ts',
       'apps/web/tests/unit/design-system/arbitrary-values-ratchet.test.ts',
+      'apps/web/tests/unit/design-system/app-screen-canvas-manifest.test.ts',
       'apps/web/eslint-rules/canonical-ui-label-casing.test.ts',
     ]);
-    expect(plan.selectedTests).toHaveLength(5);
+    expect(plan.selectedTests).toHaveLength(6);
   });
 
   it('maps the seed confirmation boundary diff to focused behavior tests', () => {
@@ -1387,6 +1440,7 @@ describe('automation-verify affected scope', () => {
       'apps/web/tests/unit/events/insert.test.ts',
       'apps/web/tests/unit/testing/seed-test-data-import-boundary.test.ts',
       'apps/web/tests/unit/design-system/arbitrary-values-ratchet.test.ts',
+      'apps/web/tests/unit/design-system/app-screen-canvas-manifest.test.ts',
       ...PREREQUISITE_TRAIN_TESTS,
     ]);
     expect(plan.selectedTests).toEqual([
@@ -1395,6 +1449,7 @@ describe('automation-verify affected scope', () => {
       'apps/web/tests/unit/events/insert.test.ts',
       'apps/web/tests/unit/testing/seed-test-data-import-boundary.test.ts',
       'apps/web/tests/unit/design-system/arbitrary-values-ratchet.test.ts',
+      'apps/web/tests/unit/design-system/app-screen-canvas-manifest.test.ts',
     ]);
     expect(plan.selectedTests).not.toContain(
       'apps/web/tests/e2e/claim-prebuilt.smoke.spec.ts'
@@ -1617,6 +1672,28 @@ describe('automation-verify affected scope', () => {
     );
   });
 
+  it('deliberately selects the canvas guard for a source-only shell component change', () => {
+    const plan = buildAffectedTestPlan([
+      'apps/web/components/features/opportunity-inbox/OpportunityInboxPageClient.tsx',
+    ]);
+
+    expect(plan.mode).toBe('selected');
+    expect(plan.mandatoryTests).toEqual(
+      expect.arrayContaining([
+        'apps/web/tests/unit/design-system/app-screen-canvas-manifest.test.ts',
+      ])
+    );
+  });
+
+  it('selects the canvas guard for app-screen registry contract changes', () => {
+    const plan = buildAffectedTestPlan(['apps/web/data/appScreens/canvas.ts']);
+
+    expect(plan.mode).toBe('selected');
+    expect(plan.selectedTests).toEqual([
+      'apps/web/tests/unit/design-system/app-screen-canvas-manifest.test.ts',
+    ]);
+  });
+
   it('keeps the authenticated accessibility repair on focused unit coverage', () => {
     const plan = buildAffectedTestPlan([
       ...AUTHENTICATED_A11Y_REPAIR_CORE,
@@ -1632,6 +1709,7 @@ describe('automation-verify affected scope', () => {
       'apps/web/tests/unit/onboarding/OnboardingChat.turnstile.test.tsx',
       'apps/web/tests/unit/sidebar-row-alignment.test.tsx',
       'apps/web/tests/unit/design-system/arbitrary-values-ratchet.test.ts',
+      'apps/web/tests/unit/design-system/app-screen-canvas-manifest.test.ts',
     ]);
     expect(plan.scriptVitestTests).toEqual([
       'scripts/lib/__tests__/automation-verify.test.mjs',

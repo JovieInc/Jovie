@@ -12,6 +12,7 @@ import {
   resolveHistoricalLaneEvidence,
   runProductionLaneRange,
   validateLaneEvidenceReceipt,
+  WEB_BIND_REASONS,
 } from '../production-lane-range.mjs';
 
 const sha = character => character.repeat(40);
@@ -79,6 +80,7 @@ describe('production lane range', () => {
       selectedLanes: ['web', 'operations'],
       runWeb: true,
       webEvidenceSha: webSha,
+      webBindReason: WEB_BIND_REASONS.selectedLane,
       commitCount: 2,
     });
   });
@@ -101,9 +103,25 @@ describe('production lane range', () => {
 
     expect(plan.runWeb).toBe(true);
     expect(plan.webEvidenceSha).toBe(currentSha);
+    expect(plan.webBindReason).toBe(WEB_BIND_REASONS.selectedLane);
   });
 
-  it('does not invent a web release for an operations-only range', () => {
+  it('does not invent a web lane for an operations-only range when live already equals current main', () => {
+    const currentSha = sha('a');
+    const plan = planProductionLaneRange({
+      deployedSha: currentSha,
+      currentSha,
+      cumulativeChangedPaths: [],
+      commitsNewestFirst: [],
+    });
+
+    expect(plan.selectedLanes).toEqual([]);
+    expect(plan.runWeb).toBe(false);
+    expect(plan.webEvidenceSha).toBeNull();
+    expect(plan.webBindReason).toBe(WEB_BIND_REASONS.none);
+  });
+
+  it('forces Web/Promote for an operations-only range while live SHA ≠ current main', () => {
     const deployedSha = sha('a');
     const currentSha = sha('b');
     const plan = planProductionLaneRange({
@@ -120,8 +138,31 @@ describe('production lane range', () => {
     });
 
     expect(plan.selectedLanes).toEqual(['operations']);
-    expect(plan.runWeb).toBe(false);
+    expect(plan.runWeb).toBe(true);
     expect(plan.webEvidenceSha).toBeNull();
+    expect(plan.webBindReason).toBe(WEB_BIND_REASONS.liveUnbound);
+  });
+
+  it('forces Web/Promote for SELECTED_LANES=ios while live SHA ≠ current main', () => {
+    const deployedSha = sha('4');
+    const currentSha = sha('5');
+    const plan = planProductionLaneRange({
+      deployedSha,
+      currentSha,
+      cumulativeChangedPaths: ['apps/ios/Jovie/DashboardView.swift'],
+      commitsNewestFirst: [
+        {
+          sha: currentSha,
+          firstParent: deployedSha,
+          changedPaths: ['apps/ios/Jovie/DashboardView.swift'],
+        },
+      ],
+    });
+
+    expect(plan.selectedLanes).toEqual(['ios']);
+    expect(plan.runWeb).toBe(true);
+    expect(plan.webEvidenceSha).toBeNull();
+    expect(plan.webBindReason).toBe(WEB_BIND_REASONS.liveUnbound);
   });
 
   it('retains the exact current Web receipt during marker recovery', () => {
@@ -140,6 +181,7 @@ describe('production lane range', () => {
       selectedLanes: ['web'],
       runWeb: true,
       webEvidenceSha: currentSha,
+      webBindReason: WEB_BIND_REASONS.selectedLane,
     });
 
     expect(() =>
@@ -149,6 +191,26 @@ describe('production lane range', () => {
         currentReceipt,
       })
     ).toThrow('marker recovery requires production to serve current main');
+  });
+
+  it('does not force Web during marker recovery when live already equals current main', () => {
+    const currentSha = sha('c');
+    const currentReceipt = receipt({
+      headSha: currentSha,
+      selectedLanes: ['ios'],
+    });
+    const plan = planProductionMarkerRecovery({
+      deployedSha: currentSha,
+      currentSha,
+      currentReceipt,
+    });
+
+    expect(plan).toMatchObject({
+      selectedLanes: ['ios'],
+      runWeb: false,
+      webEvidenceSha: null,
+      webBindReason: WEB_BIND_REASONS.none,
+    });
   });
 
   it('fails closed when the supplied first-parent range is discontinuous', () => {
@@ -302,6 +364,7 @@ describe('production lane range', () => {
     const root = mkdtempSync(join(tmpdir(), 'jovie-production-range-test-'));
     const jsonPath = join(root, 'range.json');
     const receiptPath = join(root, 'current-receipt.json');
+    const githubOutputPath = join(root, 'github-output.txt');
     try {
       writeFileSync(
         receiptPath,
@@ -323,23 +386,41 @@ describe('production lane range', () => {
         receiptPath,
         '--json-out',
         jsonPath,
+        '--github-output',
+        githubOutputPath,
       ]);
-      expect(result).toMatchObject({
-        ...expectedPlan,
-        webEvidence: expectedPlan.runWeb
+      const expectedWebEvidence =
+        String(expectedPlan.webBindReason) === WEB_BIND_REASONS.liveUnbound
           ? {
               sha: currentSha,
               lane: 'web',
-              source: 'current-main-release-receipt',
+              source: 'live-unbound-bind',
+              selectedLanes: expectedPlan.selectedLanes,
             }
-          : null,
+          : expectedPlan.runWeb
+            ? {
+                sha: currentSha,
+                lane: 'web',
+                source: 'current-main-release-receipt',
+              }
+            : null;
+      expect(result).toMatchObject({
+        ...expectedPlan,
+        webEvidence: expectedWebEvidence,
       });
       expect(JSON.parse(readFileSync(jsonPath, 'utf8'))).toMatchObject({
         deployedSha,
         currentSha,
         selectedLanes: expectedPlan.selectedLanes,
         runWeb: expectedPlan.runWeb,
+        webBindReason: expectedPlan.webBindReason,
       });
+      expect(readFileSync(githubOutputPath, 'utf8')).toContain(
+        `run_web=${expectedPlan.runWeb}`
+      );
+      expect(readFileSync(githubOutputPath, 'utf8')).toContain(
+        `web_bind_reason=${expectedPlan.webBindReason}`
+      );
     } finally {
       rmSync(root, { recursive: true, force: true });
     }
@@ -354,6 +435,10 @@ describe('production lane range', () => {
     expect(productionController).toContain(
       'node scripts/lib/production-lane-range.mjs'
     );
+    expect(productionController).toContain(
+      '[ "$web_bind_reason" = "live_unbound" ]'
+    );
+    expect(productionController).toContain('forcing Web/Promote');
     expect(productionController).toContain('--mode "$lane_range_mode"');
     expect(productionController).toContain(
       'if $lanes == "none" then [] else ($lanes | split(",")) end'

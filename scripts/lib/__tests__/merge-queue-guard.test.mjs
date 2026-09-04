@@ -692,8 +692,7 @@ describe('merge queue telemetry parser', () => {
   it('records queued duration, evictions, requeues, staleness, and speculative reruns', () => {
     const metrics = parseMergeQueueTimeline([
       {
-        event: 'labeled',
-        label: { name: 'merge-queue' },
+        event: 'added_to_merge_queue',
         created_at: '2026-06-20T01:00:00Z',
       },
       {
@@ -707,19 +706,17 @@ describe('merge queue telemetry parser', () => {
         created_at: '2026-06-20T01:30:00Z',
       },
       {
-        event: 'unlabeled',
-        label: { name: 'merge-queue' },
-        actor: { login: 'graphite-app[bot]' },
+        event: 'removed_from_merge_queue',
+        actor: { login: 'jovie-bot[bot]' },
         created_at: '2026-06-20T01:31:00Z',
       },
       {
-        event: 'labeled',
-        label: { name: 'merge-queue' },
+        event: 'added_to_merge_queue',
         created_at: '2026-06-20T02:00:00Z',
       },
       {
         event: 'commented',
-        body: 'CI failed after Graphite speculative rerun',
+        body: 'CI failed after native speculative rerun',
         created_at: '2026-06-20T02:10:00Z',
       },
       {
@@ -743,8 +740,7 @@ describe('merge queue telemetry parser', () => {
         created_at: '2026-06-20T01:00:00Z',
       },
       {
-        event: 'labeled',
-        label: { name: 'merge-queue' },
+        event: 'added_to_merge_queue',
         created_at: '2026-06-20T01:05:00Z',
       },
       {
@@ -1746,14 +1742,7 @@ describe('remediation mutations', () => {
       123,
       'needs-conflict-resolution'
     );
-    expect(labelPrImpl).toHaveBeenCalledWith(
-      'JovieInc/Jovie',
-      123,
-      'merge-queue'
-    );
-    expect(removeLabelPrImpl.mock.invocationCallOrder[0]).toBeLessThan(
-      labelPrImpl.mock.invocationCallOrder[0]
-    );
+    expect(labelPrImpl).not.toHaveBeenCalled();
     expect(commentPrImpl).toHaveBeenCalledOnce();
   });
 });
@@ -2254,7 +2243,7 @@ describe('native merge-queue cohort (JOV-5047)', () => {
       deterministicMemberFailure: 'isolate-and-remove',
       transientFailure: 'bounded-retry',
     });
-    expect(NATIVE_QUEUE_POLICY.max_entries_to_build).toBe(3);
+    expect(NATIVE_QUEUE_POLICY.max_entries_to_build).toBe(1);
     expect(NATIVE_QUEUE_POLICY.min_entries_to_merge).toBe(5);
     expect(NATIVE_QUEUE_POLICY.min_entries_to_merge_wait_minutes).toBe(10);
     expect(
@@ -2365,12 +2354,12 @@ describe('native merge-queue cohort (JOV-5047)', () => {
         { ...NATIVE_QUEUE_POLICY },
         { checkResponseTimeout: null }
       )
-    ).toMatchObject({ check_response_timeout_minutes: 60 });
+    ).toMatchObject({ check_response_timeout_minutes: 20 });
     const secondsReadback = buildNativeQueuePolicyReadback({
       ...NATIVE_QUEUE_POLICY,
-      checkResponseTimeout: 3600,
+      checkResponseTimeout: 1200,
     });
-    expect(secondsReadback.observed.check_response_timeout_minutes).toBe(60);
+    expect(secondsReadback.observed.check_response_timeout_minutes).toBe(20);
     expect(secondsReadback.drift).not.toContain(
       'check_response_timeout_minutes'
     );
@@ -2403,9 +2392,9 @@ describe('native merge-queue cohort (JOV-5047)', () => {
       {
         backend: 'native',
         liveQueueConfiguration: {
-          checkResponseTimeout: 3600,
-          maximumEntriesToBuild: 3,
-          maximumEntriesToMerge: 10,
+          checkResponseTimeout: 1200,
+          maximumEntriesToBuild: 1,
+          maximumEntriesToMerge: 5,
           mergeMethod: 'SQUASH',
           minimumEntriesToMerge: 1,
           minimumEntriesToMergeWaitTime: 0,

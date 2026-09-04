@@ -133,6 +133,12 @@ struct ChatRepositoryTests {
         .assistantDelta(clientTurnId: "PLACEHOLDER", text: "A"),
         .assistantDelta(clientTurnId: "PLACEHOLDER", text: " streamed"),
         .assistantDelta(clientTurnId: "PLACEHOLDER", text: " answer"),
+        .assistantCompleted(
+          clientTurnId: "PLACEHOLDER",
+          conversationId: "conv_stream",
+          turnId: "turn_1",
+          text: "A streamed answer"
+        ),
       ]),
       listConversationsResult: .success([]),
       fetchConversationResult: .failure(MobileChatClientError.requestFailed(statusCode: 404))
@@ -148,8 +154,196 @@ struct ChatRepositoryTests {
     await repository.send(text: "Stream this")
 
     let assistantItem = repository.timeline.first { $0.role == .assistant }
-    #expect(assistantItem?.status == .streaming)
+    // Durable Summer streams must end with a terminal event: a stream that
+    // finishes mid-flight marks the turn failed
+    // (see ovieDurableSummerStatesCoverRedPathsAndResume).
+    #expect(assistantItem?.status == .completed)
     #expect(assistantItem?.content == "A streamed answer")
+  }
+
+  // MARK: - JOV-5874 chat smoothness
+
+  @Test func streamCoalescerBuffersDeltasAndFlushesLifecycleEventsImmediately() {
+    let recorder = StreamBatchRecorder()
+    let coalescer = MobileChatStreamCoalescer(window: .seconds(60)) { batch in
+      recorder.batches.append(batch)
+    }
+
+    coalescer.ingest(.assistantDelta(clientTurnId: "turn", text: "A"))
+    coalescer.ingest(.assistantDelta(clientTurnId: "turn", text: "B"))
+    #expect(recorder.batches.isEmpty)
+
+    coalescer.ingest(
+      .assistantCompleted(clientTurnId: "turn", conversationId: "conv", turnId: "t1", text: "AB")
+    )
+    #expect(recorder.batches.count == 1)
+    #expect(recorder.batches.first?.count == 3)
+
+    coalescer.flush()
+    #expect(recorder.batches.count == 1)
+    #expect(coalescer.flushCount == 1)
+  }
+
+  @Test func streamCoalescerFlushesBufferedDeltasAfterWindowElapses() async {
+    let recorder = StreamBatchRecorder()
+    let coalescer = MobileChatStreamCoalescer(window: .milliseconds(5)) { batch in
+      recorder.batches.append(batch)
+    }
+
+    coalescer.ingest(.assistantDelta(clientTurnId: "turn", text: "A"))
+    coalescer.ingest(.assistantDelta(clientTurnId: "turn", text: "B"))
+    coalescer.ingest(.assistantDelta(clientTurnId: "turn", text: "C"))
+
+    let deadline = ContinuousClock.now.advanced(by: .seconds(2))
+    while recorder.batches.isEmpty, ContinuousClock.now < deadline {
+      await Task.yield()
+      try? await Task.sleep(for: .milliseconds(5))
+    }
+
+    #expect(recorder.batches.count == 1)
+    #expect(recorder.batches.first?.count == 3)
+  }
+
+  @Test func sendCoalescesRapidDeltasAndStillCompletesTheTurn() async {
+    let client = ScriptedChatClient(
+      sendTurnResult: .success([
+        .turnReserved(conversationId: "conv_burst", turnId: "turn_1", clientTurnId: "PLACEHOLDER"),
+        .assistantDelta(clientTurnId: "PLACEHOLDER", text: "one"),
+        .assistantDelta(clientTurnId: "PLACEHOLDER", text: " two"),
+        .assistantDelta(clientTurnId: "PLACEHOLDER", text: " three"),
+        .assistantCompleted(
+          clientTurnId: "PLACEHOLDER",
+          conversationId: "conv_burst",
+          turnId: "turn_1",
+          text: "one two three"
+        ),
+      ]),
+      listConversationsResult: .success([]),
+      fetchConversationResult: .failure(MobileChatClientError.requestFailed(statusCode: 404))
+    )
+    let repository = ChatRepository(
+      client: client,
+      cache: ChatCache(defaults: UserDefaults(suiteName: "ie.jov.Jovie.tests.chat-repo-burst")!),
+      userID: "user_repo_burst",
+      webBaseURL: URL(string: "https://preview.example")!
+    )
+
+    await repository.send(text: "Burst")
+
+    let assistantItem = repository.timeline.first { $0.role == .assistant }
+    #expect(assistantItem?.status == .completed)
+    #expect(assistantItem?.content == "one two three")
+    #expect(repository.isSending == false)
+  }
+
+  @Test func openConversationPaintsCachedMessagesBeforeNetworkFetchLands() async {
+    let cache = ChatCache(defaults: UserDefaults(suiteName: "ie.jov.Jovie.tests.chat-repo-open-cache-first")!)
+    await cache.store(
+      CachedChatSnapshot(
+        conversations: [],
+        messagesByConversationID: [
+          "conv_cached": [
+            MobileConversationMessage(
+              id: "msg_cached",
+              role: "assistant",
+              content: "Cached reply",
+              clientMessageId: "client_cached",
+              turnId: "turn_cached",
+              turnStatus: "completed",
+              createdAt: "2026-05-01T00:00:00.000Z",
+              requiresWebHandoff: false
+            ),
+          ],
+        ],
+        cachedAt: Date(timeIntervalSince1970: 1_700_000_000)
+      ),
+      for: "user_repo_open_cache_first"
+    )
+    let client = GatedFetchChatClient(
+      detail: MobileConversationDetailResponse(
+        conversation: MobileConversationRecord(
+          id: "conv_cached",
+          title: "Fresh title",
+          createdAt: "2026-05-01T00:00:00.000Z",
+          updatedAt: "2026-05-02T00:00:00.000Z"
+        ),
+        messages: [
+          MobileConversationMessage(
+            id: "msg_fresh",
+            role: "assistant",
+            content: "Fresh reply",
+            clientMessageId: "client_fresh",
+            turnId: "turn_fresh",
+            turnStatus: "completed",
+            createdAt: "2026-05-02T00:00:00.000Z",
+            requiresWebHandoff: false
+          ),
+        ],
+        hasMore: false
+      )
+    )
+    let repository = ChatRepository(
+      client: client,
+      cache: cache,
+      userID: "user_repo_open_cache_first",
+      webBaseURL: URL(string: "https://preview.example")!
+    )
+
+    let open = Task { await repository.openConversation("conv_cached") }
+    await client.waitUntilFetchRequested()
+
+    #expect(repository.activeConversationID == "conv_cached")
+    #expect(repository.timeline.map(\.content) == ["Cached reply"])
+
+    client.releaseFetch()
+    await open.value
+
+    #expect(repository.timeline.map(\.content) == ["Fresh reply"])
+    #expect(repository.isOffline == false)
+  }
+
+  @Test func openConversationClearsPreviousThreadOnCacheMissWhileFetching() async {
+    let client = GatedFetchChatClient(
+      detail: MobileConversationDetailResponse(
+        conversation: MobileConversationRecord(
+          id: "conv_b",
+          title: "B",
+          createdAt: "2026-05-02T00:00:00.000Z",
+          updatedAt: "2026-05-02T00:00:00.000Z"
+        ),
+        messages: [],
+        hasMore: false
+      )
+    )
+    let repository = ChatRepository(
+      client: client,
+      cache: ChatCache(defaults: UserDefaults(suiteName: "ie.jov.Jovie.tests.chat-repo-open-cache-miss")!),
+      userID: "user_repo_open_cache_miss",
+      webBaseURL: URL(string: "https://preview.example")!
+    )
+    repository.seedTimelineForUITesting(
+      [
+        MobileChatTimelineItem(
+          id: "assistant:a",
+          role: .assistant,
+          content: "Thread A reply",
+          status: .completed,
+          clientTurnId: "a",
+          requiresWebHandoff: false,
+          handoffURL: nil
+        ),
+      ],
+      activeConversationID: "conv_a"
+    )
+
+    let open = Task { await repository.openConversation("conv_b") }
+    await client.waitUntilFetchRequested()
+
+    #expect(repository.activeConversationID == "conv_b")
+    #expect(repository.timeline.isEmpty)
+
+    client.releaseFetch()
+    await open.value
   }
 
   @Test func sendAppliesWebHandoffEventAndFlagsRequiresWebHandoff() async {
@@ -661,6 +855,62 @@ struct ChatRepositoryTests {
     #expect(repository.timeline.contains { $0.status == .failed })
   }
 
+  @Test func ovieDurableSummerStatesCoverRedPathsAndResume() async {
+    let url = URL(string: "https://preview.example")!
+    func repo(_ suite: String, _ client: MobileChatClientProtocol) -> ChatRepository {
+      ChatRepository(
+        client: client,
+        cache: ChatCache(defaults: UserDefaults(suiteName: suite)!),
+        userID: "user_ov",
+        webBaseURL: url,
+        workspace: .ovie
+      )
+    }
+    func scripted(_ events: Result<[MobileChatStreamEvent], Error>) -> ScriptedChatClient {
+      ScriptedChatClient(
+        sendTurnResult: events,
+        listConversationsResult: .success([]),
+        fetchConversationResult: .failure(MobileChatClientError.requestFailed(statusCode: 404))
+      )
+    }
+    let prompt = "Need a taste decision"
+    let stale = repo("ie.jov.Jovie.tests.chat-ov-stale", scripted(.success([
+      .turnReserved(conversationId: "conv_ov", turnId: "turn_ov", clientTurnId: "PLACEHOLDER"),
+      .turnState(clientTurnId: "PLACEHOLDER", state: "queued", eveWorkId: "ini_eve_1"),
+      .error(code: "SUMMER_TRANSPORT_FAILED", message: "Summer could not complete this turn."),
+      .assistantCompleted(clientTurnId: "PLACEHOLDER", conversationId: "conv_ov", turnId: "turn_ov", text: "stale success"),
+    ])))
+    await stale.send(text: prompt)
+    #expect(stale.timeline.last?.status == .failed && stale.timeline.last?.eveWorkId == "ini_eve_1")
+
+    let order = repo("ie.jov.Jovie.tests.chat-ov-order", scripted(.success([
+      .error(code: "SUMMER_TRANSPORT_FAILED", message: "terminal failure"),
+      .assistantDelta(clientTurnId: "PLACEHOLDER", text: "late"),
+    ])))
+    await order.send(text: prompt)
+    #expect(order.timeline.last?.content == "terminal failure")
+
+    let dropped = repo("ie.jov.Jovie.tests.chat-ov-drop", scripted(.success([
+      .turnState(clientTurnId: "PLACEHOLDER", state: "running", eveWorkId: "ini_eve_1"),
+    ])))
+    await dropped.send(text: prompt)
+    #expect(dropped.timeline.last?.status == .failed)
+
+    let conflict = repo("ie.jov.Jovie.tests.chat-ov-409", scripted(.failure(MobileChatClientError.requestFailed(statusCode: 409))))
+    await conflict.send(text: prompt)
+    #expect(conflict.timeline.last?.status == .retrying)
+
+    let cache = ChatCache(defaults: UserDefaults(suiteName: "ie.jov.Jovie.tests.chat-ov-resume")!)
+    let first = ChatRepository(client: scripted(.success([
+      .assistantCompleted(clientTurnId: "PLACEHOLDER", conversationId: "conv_ov", turnId: "turn_ov", text: "Summer reply"),
+    ])), cache: cache, userID: "user_ov_resume", webBaseURL: url, workspace: .ovie)
+    await first.send(text: prompt)
+    let relaunched = ChatRepository(client: FailingChatClient(), cache: cache, userID: "user_ov_resume", webBaseURL: url, workspace: .ovie)
+    await relaunched.bootstrap()
+    #expect(relaunched.activeConversationID == "conv_ov")
+    #expect(relaunched.timeline.filter { $0.content == "Summer reply" }.count == 1)
+  }
+
   @Test func sendOnTransportFailureMarksOfflineAndDoesNotExpireSession() async {
     let client = ScriptedChatClient(
       sendTurnResult: .failure(MobileChatClientError.transportFailed(code: -1009)),
@@ -850,6 +1100,8 @@ private final class ScriptedChatClient: MobileChatClientProtocol, @unchecked Sen
     switch event {
     case let .turnReserved(conversationId, turnId, _):
       return .turnReserved(conversationId: conversationId, turnId: turnId, clientTurnId: clientTurnId)
+    case let .turnState(_, state, eveWorkId):
+      return .turnState(clientTurnId: clientTurnId, state: state, eveWorkId: eveWorkId)
     case let .assistantDelta(_, text):
       return .assistantDelta(clientTurnId: clientTurnId, text: text)
     case let .assistantCompleted(_, conversationId, turnId, text):
@@ -945,4 +1197,58 @@ private func eyesFreeResponse(
     readback: readback,
     errorCode: errorCode
   )
+}
+
+/// Collects coalescer batches for assertions (JOV-5874).
+@MainActor
+private final class StreamBatchRecorder {
+  var batches: [[MobileChatStreamEvent]] = []
+}
+
+/// Holds `fetchConversation` open until the test releases it, so cache-first
+/// paint can be asserted while the network round trip is still in flight.
+private final class GatedFetchChatClient: MobileChatClientProtocol, @unchecked Sendable {
+  private let detail: MobileConversationDetailResponse
+  private var continuation: CheckedContinuation<Void, Never>?
+  private var fetchRequested = false
+  private var released = false
+
+  init(detail: MobileConversationDetailResponse) {
+    self.detail = detail
+  }
+
+  func listConversations(limit: Int) async throws -> [MobileConversationSummary] {
+    []
+  }
+
+  func fetchConversation(id: String, limit: Int) async throws -> MobileConversationDetailResponse {
+    fetchRequested = true
+    if !released {
+      await withCheckedContinuation { (continuation: CheckedContinuation<Void, Never>) in
+        self.continuation = continuation
+      }
+    }
+    return detail
+  }
+
+  func sendTurn(
+    _ request: MobileChatTurnRequest,
+    onEvent: (@Sendable (MobileChatStreamEvent) async -> Void)?
+  ) async throws -> [MobileChatStreamEvent] {
+    throw MobileChatClientError.requestFailed(statusCode: 500)
+  }
+
+  func waitUntilFetchRequested() async {
+    let deadline = ContinuousClock.now.advanced(by: .seconds(2))
+    while !fetchRequested, ContinuousClock.now < deadline {
+      await Task.yield()
+      try? await Task.sleep(for: .milliseconds(2))
+    }
+  }
+
+  func releaseFetch() {
+    released = true
+    continuation?.resume()
+    continuation = nil
+  }
 }

@@ -390,13 +390,13 @@ export const MARKETING_ROUTE_MANIFEST: readonly RouteManifestEntry[] = [
       'hero',
       'how-it-works',
       'feature-grid',
-      'pricing'
+      'cta'
     ),
     bindingEvidence: {
       status: 'verified',
-      source: 'route implementation 2026-08-28',
+      source: 'route implementation 2026-09-02 (JOV-5862)',
       notes:
-        'Uses canonical System B marketing primitives and a product-callout preview without identity imagery.',
+        'Paste-channel hero with one primary action; no standalone SKU or pricing section. Uses canonical System B marketing primitives without identity imagery.',
     },
     status: 'active',
     specVersion: '1.2.0',
