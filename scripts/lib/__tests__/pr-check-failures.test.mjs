@@ -195,6 +195,45 @@ describe('pr-check-failures', () => {
       }
     });
 
+    it.each([
+      'missing',
+      'equal',
+    ])('retains advisory identity through %s timestamp ambiguity', timestamps => {
+      const clock =
+        timestamps === 'equal'
+          ? {
+              startedAt: '2026-09-04T23:00:00Z',
+              completedAt: '2026-09-04T23:01:00Z',
+            }
+          : {};
+      const attempts = [
+        { ...sweep, ...clock },
+        { ...sweep, ...clock, bucket: 'pass', state: 'SUCCESS' },
+      ];
+      expect(collapseNewestCheckAttempts(attempts).ambiguousNames).toEqual([
+        'sweep',
+      ]);
+      expect(classifyQueueCheckBlockers([...required, ...attempts])).toEqual(
+        []
+      );
+      const safety = attempts.map(check => ({
+        ...check,
+        workflow: 'Real Safety Workflow',
+      }));
+      expect(
+        classifyQueueCheckBlockers([...required, ...attempts, ...safety])
+      ).toContain('sweep (ambiguous latest attempt)');
+      for (const { name } of required) {
+        const others = required.filter(check => check.name !== name);
+        expect(
+          classifyQueueCheckBlockers([
+            ...others,
+            ...attempts.map(check => ({ ...check, name })),
+          ])
+        ).toContain(`${name} (ambiguous latest attempt)`);
+      }
+    });
+
     it('does not make another job in the recovery workflow advisory', () => {
       const safety = { ...sweep, name: 'Release Safety Gate' };
       expect(isAdvisoryCheck(safety)).toBe(false);

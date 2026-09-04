@@ -229,6 +229,7 @@ export function collapseNewestCheckAttempts(checks) {
 
   const collapsed = [];
   const ambiguousNames = [];
+  const ambiguousChecks = [];
   for (const group of groups.values()) {
     const name = normalizeCheckName(group[0]);
     if (group.length === 1) {
@@ -283,6 +284,7 @@ export function collapseNewestCheckAttempts(checks) {
         continue;
       }
       ambiguousNames.push(name);
+      ambiguousChecks.push({ name, workflow: group[0]?.workflow });
       continue;
     }
     for (const attempt of ranked) {
@@ -311,6 +313,7 @@ export function collapseNewestCheckAttempts(checks) {
       const topFailure = top.filter(isTerminalFailure);
       if (topFailure.length > 0 && topSuccess.length > 0) {
         ambiguousNames.push(name);
+        ambiguousChecks.push({ name, workflow: group[0]?.workflow });
         continue;
       }
       if (topFailure.length > 0) {
@@ -327,7 +330,11 @@ export function collapseNewestCheckAttempts(checks) {
     collapsed.push(ranked[0].check);
   }
 
-  return { checks: collapsed, ambiguousNames: ambiguousNames.sort() };
+  return {
+    checks: collapsed,
+    ambiguousNames: ambiguousNames.sort(),
+    ambiguousChecks,
+  };
 }
 
 /** Positive readiness proof shared by auto-ready and queue enrollment. */
@@ -339,9 +346,9 @@ export function classifyQueueCheckBlockers(checks) {
   // newly added safety jobs (for example Brand Scrub) would otherwise be
   // silently ignored until this controller was updated.
   const blockers = new Set(extractTerminalFailures(allChecks));
-  for (const name of latest.ambiguousNames) {
-    if (!isAdvisoryCheckName(name)) {
-      blockers.add(`${name} (ambiguous latest attempt)`);
+  for (const check of latest.ambiguousChecks) {
+    if (!isAdvisoryCheck(check)) {
+      blockers.add(`${normalizeCheckName(check)} (ambiguous latest attempt)`);
     }
   }
 
