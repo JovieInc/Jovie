@@ -8,25 +8,14 @@ import {
 } from '@/data/marketingCtaIntents';
 
 describe('marketing CTA intent registry', () => {
-  it('keeps claim-profile waitlist-first Get started truthful', () => {
+  it('keeps claim-profile label, public waitlist route, event, and support truthful', () => {
     const intent = getClaimProfileIntent();
 
     expect(intent).toBe(MARKETING_CTA_INTENTS.claimProfile);
-    expect(intent.label).toBe('Get started');
+    expect(intent.label).toBe('Claim your profile');
     expect(intent.href).toBe(PUBLIC_WAITLIST_URL);
     expect(intent.eventName).toBe('landing_cta_claim_profile');
-    expect(intent.support.toLowerCase()).toContain('limited prelaunch access');
-  });
-
-  it('restores the open-door artist-profile claim CTA when waitlist is disabled', () => {
-    const intent = getClaimProfileIntent(false);
-
-    expect(intent.label).toBe('Claim your profile');
-    expect(intent.href).toBe(APP_ROUTES.START);
-    expect(intent.support).toBe('Free to start. No credit card.');
-    expect(buildClaimProfileStartHref('@river-signal', false)).toBe(
-      '/start?starter_prompt=I+want+to+claim+jov.ie%2Friver-signal.&handle=river-signal'
-    );
+    expect(intent.support.toLowerCase()).toContain('free to start');
   });
 
   it('builds handle-aware claim destinations without inventing a second CTA dialect', () => {

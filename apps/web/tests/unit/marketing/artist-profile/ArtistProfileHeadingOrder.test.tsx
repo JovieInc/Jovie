@@ -4,7 +4,6 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { ArtistProfileHeroAdaptiveIntro } from '@/components/marketing/artist-profile/ArtistProfileHeroAdaptiveIntro';
 import { ArtistProfileOutcomesCarousel } from '@/components/marketing/artist-profile/ArtistProfileOutcomesCarousel';
 import { ARTIST_PROFILE_COPY } from '@/data/artistProfileCopy';
-import { getClaimProfileIntent } from '@/data/marketingCtaIntents';
 
 const trackHomepageEvent = vi.hoisted(() => vi.fn());
 
@@ -59,7 +58,7 @@ describe('artist-profiles heading order (JOV-2246)', () => {
     });
 
     fireEvent.click(
-      screen.getByRole('link', { name: getClaimProfileIntent().label })
+      screen.getByRole('link', { name: ARTIST_PROFILE_COPY.hero.ctaLabel })
     );
 
     expect(trackHomepageEvent).toHaveBeenCalledWith(

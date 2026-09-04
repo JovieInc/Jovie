@@ -287,7 +287,7 @@ export async function handleProxyRequest(
         return NextResponse.redirect(url);
       }
 
-      // Anonymous /waitlist is a public waitlist-first handoff (JOV-5334 / JOV-5376).
+      // Anonymous /waitlist is the public waitlist-first handoff (JOV-5376).
       // Authenticated pre-receipt recovery stays on the page helper.
 
       // Check if path requires authentication
