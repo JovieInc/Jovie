@@ -455,9 +455,8 @@ describe('executeChatTurn — parity assertions', () => {
         uiMessages: [userMessage('hello')],
         planLimits: paidPlanLimits,
         identity: {
-          id: 'ovie',
-          instructions:
-            'Eve on the Ovie door. Ingest and ack. Do not self-identify as Ovie.',
+          id: 'summer',
+          instructions: 'Summer on the Ovie door.',
         },
       })
     ).rejects.toThrow(/cannot execute the artist Jovie turn/);
