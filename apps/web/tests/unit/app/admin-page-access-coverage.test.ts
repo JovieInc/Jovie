@@ -1,6 +1,6 @@
 import { readdirSync, readFileSync } from 'node:fs';
 import { join, resolve } from 'node:path';
-import ts from 'typescript';
+import ts from 'typescript-legacy';
 import { describe, expect, it } from 'vitest';
 
 const ADMIN_ROOT = resolve(__dirname, '../../../app/app/(shell)/admin');
