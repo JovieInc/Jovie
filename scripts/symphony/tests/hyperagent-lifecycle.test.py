@@ -50,6 +50,10 @@ class HyperagentLifecycleTests(unittest.TestCase):
             "auto_recharge_enabled": False,
             "paying_org": "workspace-a",
             "expected_paying_org": "workspace-a",
+            "issue_id": "JOV-6005",
+            "lease_id": "lease-1",
+            "expected_pr_repository": "JovieInc/Jovie",
+            "required_runtime": "symphony-4041",
             "credits_expire_at": (self.now + timedelta(days=30)).isoformat(),
             "balance_checked_at": (self.now - timedelta(minutes=1)).isoformat(),
             "model_checked_at": (self.now - timedelta(minutes=1)).isoformat(),
@@ -98,7 +102,8 @@ class HyperagentLifecycleTests(unittest.TestCase):
         for field in (
             "account_alias", "expected_account_alias", "workspace_id", "agent_id",
             "agent_name", "model_id", "runtime", "paying_org", "expected_paying_org",
-            "credits_expire_at",
+            "credits_expire_at", "issue_id", "lease_id", "expected_pr_repository",
+            "required_runtime",
             "idempotency_key", "useful_outcome",
             "destination", "expected_destination", "balance_checked_at",
             "model_checked_at",
@@ -186,7 +191,10 @@ class HyperagentLifecycleTests(unittest.TestCase):
         lost = self.observation(transport_lost=True)
         classified = lifecycle.classify_observation(lost, self.now)
         self.assertEqual(classified["state"], "transport_unknown")
-        self.assertEqual(lifecycle.plan_resolution(classified)["action"], "reconcile_original_thread_once")
+        self.assertEqual(
+            lifecycle.plan_resolution(classified)["action"],
+            "reconcile_issue_lifecycle_once",
+        )
         for observed_at in ("bad", (self.now + timedelta(seconds=1)).isoformat()):
             self.assertEqual(lifecycle.classify_observation(self.observation(observed_at=observed_at), self.now)["state"], "unknown")
 
@@ -205,9 +213,12 @@ class HyperagentLifecycleTests(unittest.TestCase):
                 self.observation(provider_error=code, **extra), self.now
             )
             self.assertEqual(classified["state"], "provider_failure")
-            self.assertEqual(
-                lifecycle.plan_resolution(classified)["action"], action,
+            planned_action = (
+                "reconcile_issue_lifecycle_once"
+                if action == "reconcile_original_thread"
+                else action
             )
+            self.assertEqual(lifecycle.plan_resolution(classified)["action"], planned_action)
             self.assertFalse(lifecycle.plan_resolution(classified)["execute"])
             self.assertEqual(
                 lifecycle.plan_resolution(classified).get("requires_journal_reservation"),
@@ -329,8 +340,8 @@ class HyperagentLifecycleTests(unittest.TestCase):
             cost_usd=0.5,
         )
         classified = lifecycle.classify_observation(success, self.now)
-        self.assertEqual(classified["state"], "useful_success")
-        self.assertEqual(lifecycle.plan_resolution(classified)["action"], "record_terminal_receipt")
+        self.assertEqual(classified["state"], "remote_useful_success")
+        self.assertEqual(lifecycle.plan_resolution(classified)["action"], "reconcile_delivery_once")
         for field, value in (
             ("useful_outcome_verified", False), ("final_output_sha256", "short"),
             ("usage_receipt_sha256", "short"), ("route_receipt_sha256", "short"),
@@ -338,13 +349,20 @@ class HyperagentLifecycleTests(unittest.TestCase):
         ):
             failed = lifecycle.classify_observation({**success, field: value}, self.now)
             self.assertEqual(failed["state"], "terminal_unverified")
-            self.assertEqual(lifecycle.plan_resolution(failed)["action"], "reconcile_terminal_receipts_once")
+            self.assertEqual(lifecycle.plan_resolution(failed)["action"], "reconcile_issue_lifecycle_once")
 
     def test_terminal_failure_decline_cancel_and_unknown_remain_distinct(self):
-        expected = {"failed": "terminal_failed", "declined": "declined", "cancelled": "cancelled"}
+        expected = {
+            "failed": "remote_failed", "declined": "remote_declined",
+            "cancelled": "remote_cancelled",
+        }
         for terminal, state in expected.items():
             result = lifecycle.classify_observation(self.observation(is_running=False, terminal_state=terminal), self.now)
             self.assertEqual(result["state"], state)
+            self.assertEqual(
+                lifecycle.plan_resolution(result)["action"],
+                "reconcile_issue_lifecycle_once",
+            )
         self.assertEqual(lifecycle.classify_observation(self.observation(is_running="UNKNOWN"), self.now)["state"], "unknown")
         self.assertEqual(lifecycle.classify_observation({"schema": "wrong"}, self.now)["state"], "unknown")
         self.assertEqual(lifecycle.classify_observation({"schema": lifecycle.SCHEMA}, self.now)["reason"], "missing_job_identity")

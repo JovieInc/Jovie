@@ -19,16 +19,21 @@ import tempfile
 from datetime import datetime, timezone
 
 SCHEMA = "symphony-hyperagent-lifecycle/v1"
-JOURNAL_SCHEMA = "symphony-hyperagent-journal/v1"
+DELIVERY_SCHEMA = "symphony-hyperagent-delivery/v1"
+JOURNAL_SCHEMA = "symphony-hyperagent-journal/v2"
 MAX_OBSERVATION_AGE_SECONDS = 300
-TERMINAL_STATES = frozenset(
-    {"useful_success", "terminal_failed", "declined", "cancelled"}
+TERMINAL_STATES = frozenset({"landed_verified", "delivery_failed"})
+REMOTE_TERMINAL_STATES = frozenset(
+    {"remote_useful_success", "remote_failed", "remote_declined", "remote_cancelled"}
 )
 ACTIVE_STATES = frozenset(
     {
         "accepted", "running", "approval_required", "input_required",
         "memory_decision_required", "stale_status", "transport_unknown",
         "terminal_unverified", "provider_failure", "unknown",
+        "remote_useful_success", "remote_failed", "remote_declined",
+        "remote_cancelled", "delivery_missing", "pr_open",
+        "merged_runtime_unverified",
     }
 )
 PROVIDER_ACTIONS = {
@@ -62,6 +67,40 @@ def _valid_sha256(value):
         and len(value) == 64
         and all(character in "0123456789abcdef" for character in value)
     )
+
+
+def _valid_git_sha(value):
+    return (
+        isinstance(value, str)
+        and len(value) in {40, 64}
+        and all(character in "0123456789abcdef" for character in value)
+    )
+
+
+def _valid_pr_url(value, repository):
+    prefix = f"https://github.com/{repository}/pull/"
+    number = value.removeprefix(prefix) if isinstance(value, str) else ""
+    return (
+        isinstance(value, str)
+        and value.startswith(prefix)
+        and number.isascii()
+        and number.isdecimal()
+    )
+
+
+def _delivery_resolved(remote_state, delivery_state):
+    return delivery_state in {
+        "pr_open", "merged_runtime_unverified", *TERMINAL_STATES,
+    } or (
+        delivery_state == "delivery_missing"
+        and remote_state == "remote_useful_success"
+    )
+
+
+def _aggregate_state(remote_state, delivery_state):
+    return delivery_state if _delivery_resolved(
+        remote_state, delivery_state
+    ) else remote_state
 
 
 def _parse_time(value):
@@ -103,6 +142,10 @@ def validate_dispatch(envelope, now=None):
         "runtime",
         "paying_org",
         "expected_paying_org",
+        "issue_id",
+        "lease_id",
+        "expected_pr_repository",
+        "required_runtime",
         "idempotency_key",
         "request_sha256",
         "useful_outcome",
@@ -265,9 +308,9 @@ def classify_observation(observation, now=None):
         return {"state": "unknown", "reason": "running_state_unknown"}
     terminal = observation.get("terminal_state")
     if terminal in {"declined", "cancelled"}:
-        return {"state": terminal, "reason": "provider_terminal"}
+        return {"state": f"remote_{terminal}", "reason": "provider_terminal", "job": job}
     if terminal == "failed":
-        return {"state": "terminal_failed", "reason": "provider_terminal"}
+        return {"state": "remote_failed", "reason": "provider_terminal", "job": job}
     if (
         terminal == "completed"
         and observation.get("useful_outcome_verified") is True
@@ -277,8 +320,67 @@ def classify_observation(observation, now=None):
         and _valid_sha256(observation.get("destination_receipt_sha256"))
         and _money(observation.get("cost_usd"))
     ):
-        return {"state": "useful_success", "reason": "terminal_receipts_verified"}
+        return {"state": "remote_useful_success", "reason": "remote_receipts_verified", "job": job}
     return {"state": "terminal_unverified", "reason": "useful_or_cost_receipt_missing"}
+
+
+def classify_delivery_observation(observation, now=None):
+    """Classify PR, merge, and exact-runtime evidence independently of remote work."""
+    now = now or datetime.now(timezone.utc)
+    if not isinstance(observation, dict) or observation.get("schema") != DELIVERY_SCHEMA:
+        return {"state": "unknown", "reason": "invalid_delivery_schema"}
+    if not all(
+        isinstance(observation.get(field), str) and observation[field]
+        for field in (
+            "issue_id", "lease_id", "idempotency_key", "expected_pr_repository",
+            "required_runtime",
+        )
+    ):
+        return {"state": "unknown", "reason": "missing_delivery_identity"}
+    observed_at = _parse_time(observation.get("observed_at"))
+    if observed_at is None or observed_at > now:
+        return {"state": "unknown", "reason": "invalid_observed_at"}
+    if (now - observed_at).total_seconds() > MAX_OBSERVATION_AGE_SECONDS:
+        return {"state": "stale_status", "reason": "delivery_observation_expired"}
+    pr_state = observation.get("pr_state")
+    if pr_state == "not_found":
+        return {"state": "delivery_missing", "reason": "reconcile_before_retry"}
+    if pr_state == "closed_unmerged":
+        if (
+            not isinstance(observation.get("failure_owner"), str)
+            or not observation["failure_owner"]
+            or not _valid_sha256(observation.get("failure_receipt_sha256"))
+            or not _valid_pr_url(
+                observation.get("pr_url"), observation["expected_pr_repository"]
+            )
+            or not _valid_git_sha(observation.get("pr_head_sha"))
+        ):
+            return {"state": "unknown", "reason": "failure_ownership_unproven"}
+        return {"state": "delivery_failed", "reason": "pr_closed_unmerged"}
+    if pr_state not in {"open", "merged"}:
+        return {"state": "unknown", "reason": "pr_state_unknown"}
+    if (
+        not _valid_pr_url(
+            observation.get("pr_url"), observation["expected_pr_repository"]
+        )
+        or not _valid_git_sha(observation.get("pr_head_sha"))
+    ):
+        return {"state": "unknown", "reason": "pr_identity_unproven"}
+    if pr_state == "open":
+        return {"state": "pr_open", "reason": "await_merge"}
+    merge_sha = observation.get("merge_sha")
+    runtime = observation.get("runtime")
+    if not _valid_git_sha(merge_sha):
+        return {"state": "unknown", "reason": "merge_identity_unproven"}
+    if not isinstance(runtime, dict):
+        return {"state": "merged_runtime_unverified", "reason": "runtime_evidence_missing"}
+    if (
+        runtime.get("name") != observation["required_runtime"]
+        or runtime.get("sha") != merge_sha
+        or not _valid_sha256(runtime.get("receipt_sha256"))
+    ):
+        return {"state": "merged_runtime_unverified", "reason": "exact_runtime_unproven"}
+    return {"state": "landed_verified", "reason": "merge_and_runtime_receipts_verified"}
 
 
 def _job_authority_matches(classification, authority):
@@ -355,28 +457,41 @@ def plan_resolution(classification, authority=None, oauth_scopes=()):
                 "requires_journal_reservation": True, "id": interaction["id"],
             }
         return {"action": "surface_memory_decision", "execute": False}
-    if state in {"stale_status", "transport_unknown"}:
+    if state in {
+        "stale_status", "transport_unknown", "terminal_unverified", "remote_failed",
+        "remote_declined", "remote_cancelled",
+    }:
         return {
-            "action": "reconcile_original_thread_once", "execute": False,
+            "action": "reconcile_issue_lifecycle_once", "execute": False,
             "requires_journal_reservation": True,
         }
     if state == "provider_failure":
         action = classification.get("action", "hold_unknown")
         result = {"action": action, "execute": False}
         if action == "reconcile_original_thread":
+            result["action"] = "reconcile_issue_lifecycle_once"
             result["requires_journal_reservation"] = True
         return result
     if state == "running":
         return {"action": "observe_same_thread", "execute": False, "read_only": True}
-    if state in TERMINAL_STATES:
+    if state in {"remote_useful_success", "delivery_missing"}:
         return {
-            "action": "record_terminal_receipt", "execute": False,
+            "action": "reconcile_delivery_once", "execute": False,
             "requires_journal_reservation": True,
         }
-    if state == "terminal_unverified":
+    if state == "pr_open":
         return {
-            "action": "reconcile_terminal_receipts_once", "execute": False,
+            "action": "recover_existing_pr", "execute": False,
+            "external_owner": "native_merge_controller",
+        }
+    if state == "merged_runtime_unverified":
+        return {
+            "action": "reconcile_required_runtime_once", "execute": False,
             "requires_journal_reservation": True,
+        }
+    if state in TERMINAL_STATES:
+        return {
+            "action": "record_terminal_receipt", "execute": False, "terminal": True,
         }
     return {"action": "hold_unknown", "execute": False}
 
@@ -429,25 +544,42 @@ class LifecycleJournal:
                 raise LifecycleError("idempotency key identity changed")
             return {"recorded": False, "duplicate": True, "job": existing}
         if any(
-            job["request_sha256"] == envelope["request_sha256"]
+            (
+                job["request_sha256"] == envelope["request_sha256"]
+                or job["issue_id"] == envelope["issue_id"]
+                or job["lease_id"] == envelope["lease_id"]
+            )
             and job["state"] in ACTIVE_STATES
             for job in self.data["jobs"].values()
         ):
             raise LifecycleError("related job is already active")
         job = {
+            "idempotency_key": key,
             "thread_id": thread_id,
+            "issue_id": envelope["issue_id"],
+            "lease_id": envelope["lease_id"],
+            "expected_pr_repository": envelope["expected_pr_repository"],
+            "required_runtime": envelope["required_runtime"],
             "provider": envelope["provider"],
             "model_id": envelope["model_id"],
             "request_sha256": envelope["request_sha256"],
             "account_alias": envelope["account_alias"],
+            "paying_org": envelope["paying_org"],
             "destination": envelope["destination"],
             "per_query_cap_usd": envelope["per_query_cap_usd"],
             "state": "accepted",
+            "remote_state": "accepted",
+            "delivery_state": "unknown",
             "last_revision": -1,
+            "delivery_revision": -1,
             "last_observation_sha256": None,
+            "last_delivery_sha256": None,
             "classification": {"state": "accepted"},
+            "delivery_classification": {"state": "unknown"},
+            "delivery": None,
             "actions": [],
             "retry_attempts": 0,
+            "attempts": [{"number": 1, "thread_id": thread_id, "status": "accepted"}],
         }
         self.data["jobs"][key] = job
         self._save()
@@ -473,12 +605,84 @@ class LifecycleJournal:
             if digest != job["last_observation_sha256"]:
                 raise LifecycleError("observation revision changed content")
             return {"recorded": False, "duplicate": True, "classification": job["classification"]}
-        if job["state"] in TERMINAL_STATES:
-            raise LifecycleError("terminal job cannot receive a new observation")
+        if job["state"] in TERMINAL_STATES or job["remote_state"] in REMOTE_TERMINAL_STATES:
+            raise LifecycleError("terminal remote attempt cannot receive a new observation")
         classification = classify_observation(observation, now)
         job.update(
-            state=classification["state"], last_revision=revision,
+            remote_state=classification["state"], last_revision=revision,
             last_observation_sha256=digest, classification=classification,
+        )
+        job["state"] = _aggregate_state(
+            classification["state"], job["delivery_state"]
+        )
+        self._save()
+        return {"recorded": True, "duplicate": False, "classification": classification}
+
+    @_locked_mutation
+    def observe_delivery(self, key, revision, observation, now=None):
+        job = self.data["jobs"].get(key)
+        if not job:
+            raise LifecycleError("unknown idempotency key")
+        if not isinstance(revision, int) or isinstance(revision, bool) or revision < 0:
+            raise LifecycleError("delivery revision must be a non-negative integer")
+        for field in ("issue_id", "lease_id", "idempotency_key", "expected_pr_repository", "required_runtime"):
+            expected = key if field == "idempotency_key" else job[field]
+            if observation.get(field) != expected:
+                raise LifecycleError("delivery identity changed")
+        digest = hashlib.sha256(
+            json.dumps(observation, sort_keys=True, separators=(",", ":")).encode()
+        ).hexdigest()
+        if revision < job["delivery_revision"]:
+            raise LifecycleError("delivery revision regressed")
+        if revision == job["delivery_revision"]:
+            if digest != job["last_delivery_sha256"]:
+                raise LifecycleError("delivery revision changed content")
+            return {
+                "recorded": False, "duplicate": True,
+                "classification": job["delivery_classification"],
+            }
+        if job["state"] in TERMINAL_STATES:
+            raise LifecycleError("terminal job cannot receive delivery evidence")
+        classification = classify_delivery_observation(observation, now)
+        allowed_from_proven = {
+            "pr_open": {
+                "pr_open", "merged_runtime_unverified", "landed_verified",
+                "delivery_failed",
+            },
+            "merged_runtime_unverified": {
+                "merged_runtime_unverified", "landed_verified",
+            },
+        }
+        if (
+            job["delivery_state"] in allowed_from_proven
+            and classification["state"] not in allowed_from_proven[job["delivery_state"]]
+        ):
+            raise LifecycleError("delivery evidence cannot regress a proven PR state")
+        proven_pr_url = (job["delivery"] or {}).get("pr_url")
+        if (
+            proven_pr_url is not None
+            and observation.get("pr_url") is not None
+            and observation["pr_url"] != proven_pr_url
+        ):
+            raise LifecycleError("delivery PR identity changed")
+        delivery = {}
+        if classification["state"] in {
+            "pr_open", "merged_runtime_unverified", *TERMINAL_STATES,
+        }:
+            delivery = {
+                field: observation.get(field)
+                for field in (
+                    "pr_state", "pr_url", "pr_head_sha", "merge_sha", "runtime",
+                    "failure_owner", "failure_receipt_sha256",
+                )
+                if observation.get(field) is not None
+            }
+        job.update(
+            state=_aggregate_state(job["remote_state"], classification["state"]),
+            delivery_state=classification["state"],
+            delivery_revision=revision, last_delivery_sha256=digest,
+            delivery_classification=classification,
+            delivery={**(job["delivery"] or {}), **delivery},
         )
         self._save()
         return {"recorded": True, "duplicate": False, "classification": classification}
@@ -488,32 +692,63 @@ class LifecycleJournal:
         job = self.data["jobs"].get(key)
         if not job:
             raise LifecycleError("unknown idempotency key")
-        planned = plan_resolution(job["classification"], authority, oauth_scopes)
+        delivery_resolved = _delivery_resolved(
+            job["remote_state"], job["delivery_state"]
+        )
+        classification = (
+            job["delivery_classification"] if delivery_resolved else job["classification"]
+        )
+        planned = plan_resolution(classification, authority, oauth_scopes)
         if planned.get("requires_journal_reservation") is not True:
             raise LifecycleError("current action is not admissible for reservation")
         action = planned["action"]
-        action_id = planned.get("id") or f"{action}:{job['last_revision']}"
+        if (
+            job["attempts"][-1]["status"] == "reserved"
+            and job["attempts"][-1]["thread_id"] is None
+        ):
+            raise LifecycleError("retry thread is not bound")
+        attempt_number = job["attempts"][-1]["number"]
+        suffix = planned.get("id") or (
+            f"{job['last_revision']}:{job['delivery_revision']}"
+        )
+        action_id = f"attempt:{attempt_number}:{action}:{suffix}"
         existing = next((item for item in job["actions"] if item["id"] == action_id), None)
         if existing:
             return {"execute": False, "duplicate": True, "reservation": existing}
-        if action.startswith("reconcile_") and any(
-            item["action"].startswith("reconcile_") for item in job["actions"]
-        ):
-            raise LifecycleError("reconciliation limit reached")
+        if action.startswith("reconcile_"):
+            prior = [
+                item for item in job["actions"]
+                if item["action"] == action
+                and item["attempt_number"] == attempt_number
+            ]
+            incomplete = next(
+                (item for item in prior if item["status"] != "completed"), None
+            )
+            if incomplete:
+                return {
+                    "execute": False, "duplicate": True,
+                    "reservation": incomplete,
+                }
+            if prior:
+                raise LifecycleError("reconciliation limit reached")
         authority_sha256 = hashlib.sha256(
             json.dumps(authority, sort_keys=True, separators=(",", ":")).encode()
         ).hexdigest()
         reservation = {
             "id": action_id, "action": action, "status": "reserved",
             "authority_sha256": authority_sha256,
+            "attempt_number": attempt_number,
             "observation_revision": job["last_revision"],
+            "delivery_revision": job["delivery_revision"],
         }
         job["actions"].append(reservation)
         self._save()
         return {"execute": True, "duplicate": False, "reservation": reservation}
 
     @_locked_mutation
-    def record_action_result(self, key, action_id, provider_receipt_sha256, outcome=None):
+    def record_action_result(
+        self, key, action_id, provider_receipt_sha256, outcome=None, now=None
+    ):
         job = self.data["jobs"].get(key)
         if not job:
             raise LifecycleError("unknown idempotency key")
@@ -522,12 +757,6 @@ class LifecycleJournal:
         reservation = next((item for item in job["actions"] if item["id"] == action_id), None)
         if not reservation:
             raise LifecycleError("action was not reserved")
-        if reservation["action"].startswith("reconcile_") and outcome not in {
-            "provider_absence", "documented_idempotent_replay", "found_existing",
-        }:
-            raise LifecycleError("reconciliation outcome is invalid")
-        if not reservation["action"].startswith("reconcile_") and outcome is not None:
-            raise LifecycleError("non-reconciliation action cannot claim an outcome")
         if reservation["status"] == "completed":
             if (
                 reservation["provider_receipt_sha256"] != provider_receipt_sha256
@@ -535,6 +764,38 @@ class LifecycleJournal:
             ):
                 raise LifecycleError("action receipt changed")
             return {"recorded": False, "duplicate": True}
+        if reservation["action"].startswith("reconcile_"):
+            observed_at = _parse_time(outcome.get("observed_at")) if isinstance(outcome, dict) else None
+            checked_at = now or datetime.now(timezone.utc)
+            if not isinstance(outcome, dict) or not all(
+                outcome.get(field) == job[field] for field in ("issue_id", "lease_id")
+            ) or outcome.get("remote") not in {
+                "absent", "existing", "idempotent_replay",
+            } or outcome.get("pr") not in {
+                "not_found", "open", "merged", "closed_unmerged",
+            } or (
+                observed_at is None
+                or observed_at > checked_at
+                or (checked_at - observed_at).total_seconds() > MAX_OBSERVATION_AGE_SECONDS
+            ):
+                raise LifecycleError("reconciliation outcome is invalid")
+            if outcome["remote"] == "existing" and outcome.get("thread_id") != job["thread_id"]:
+                raise LifecycleError("reconciliation remote identity changed")
+            if outcome["pr"] != "not_found" and (
+                not _valid_pr_url(outcome.get("pr_url"), job["expected_pr_repository"])
+                or not _valid_git_sha(outcome.get("pr_head_sha"))
+            ):
+                raise LifecycleError("reconciliation PR identity is invalid")
+            if outcome["pr"] == "merged" and not _valid_git_sha(outcome.get("merge_sha")):
+                raise LifecycleError("reconciliation merge identity is invalid")
+            if outcome["pr"] == "closed_unmerged" and (
+                not isinstance(outcome.get("failure_owner"), str)
+                or not outcome["failure_owner"]
+                or not _valid_sha256(outcome.get("failure_receipt_sha256"))
+            ):
+                raise LifecycleError("reconciliation failure ownership is invalid")
+        if not reservation["action"].startswith("reconcile_") and outcome is not None:
+            raise LifecycleError("non-reconciliation action cannot claim an outcome")
         reservation.update(
             status="completed", provider_receipt_sha256=provider_receipt_sha256,
             outcome=outcome,
@@ -543,35 +804,82 @@ class LifecycleJournal:
         return {"recorded": True, "duplicate": False}
 
     @_locked_mutation
-    def authorize_retry_once(self, key, authority):
+    def reserve_retry_once(self, key, envelope, now=None):
         job = self.data["jobs"].get(key)
         if not job:
             raise LifecycleError("unknown idempotency key")
-        if job["retry_attempts"] >= 1:
-            raise LifecycleError("retry limit reached")
-        retryable_state = job["state"] in {
-            "stale_status", "transport_unknown", "terminal_unverified",
+        if len(job["attempts"]) > 1:
+            return {"execute": False, "duplicate": True, "attempt": job["attempts"][1]}
+        if validate_dispatch(envelope, now)["decision"] != "PROCEED":
+            raise LifecycleError("retry dispatch envelope is not admissible")
+        for field in (
+            "issue_id", "lease_id", "idempotency_key", "request_sha256", "provider",
+            "model_id", "account_alias", "paying_org", "destination",
+            "expected_pr_repository", "required_runtime",
+        ):
+            if envelope.get(field) != job[field]:
+                raise LifecycleError("retry dispatch identity changed")
+        if envelope["per_query_cap_usd"] > job["per_query_cap_usd"]:
+            raise LifecycleError("retry cap increased")
+        retryable_state = job["remote_state"] in {
+            "stale_status", "transport_unknown", "terminal_unverified", "remote_failed",
+            "remote_declined", "remote_cancelled",
         } or (
-            job["state"] == "provider_failure"
+            job["remote_state"] == "provider_failure"
             and job["classification"].get("action") == "reconcile_original_thread"
         )
         reconciliation = next(
             (
                 item for item in job["actions"]
-                if item["action"].startswith("reconcile_")
-                and item["status"] == "completed" and item.get("outcome") == authority
+                if item["action"] == "reconcile_issue_lifecycle_once"
+                and item["status"] == "completed"
                 and item["observation_revision"] == job["last_revision"]
+                and item["delivery_revision"] == job["delivery_revision"]
             ),
             None,
         )
-        if not retryable_state or not reconciliation or authority not in {
-            "provider_absence", "documented_idempotent_replay",
-        }:
+        outcome = reconciliation.get("outcome") if reconciliation else {}
+        if (
+            not retryable_state
+            or outcome.get("remote") not in {"absent", "idempotent_replay"}
+            or outcome.get("pr") != "not_found"
+        ):
             raise LifecycleError("safe retry authority is unproven")
         job["retry_attempts"] += 1
+        job["attempts"][0].update(
+            status=job["remote_state"], final_revision=job["last_revision"]
+        )
+        attempt = {"number": 2, "thread_id": None, "status": "reserved"}
+        job["attempts"].append(attempt)
         self._save()
-        return {"idempotency_key": key, "attempt": 1, "authority": authority}
+        return {"idempotency_key": key, "execute": True, "duplicate": False, "attempt": attempt}
 
+    @_locked_mutation
+    def bind_retry_thread(self, key, thread_id, provider_receipt_sha256):
+        job = self.data["jobs"].get(key)
+        if not job or len(job.get("attempts", [])) != 2:
+            raise LifecycleError("retry was not reserved")
+        if not isinstance(thread_id, str) or not thread_id or not _valid_sha256(
+            provider_receipt_sha256
+        ):
+            raise LifecycleError("retry thread receipt is invalid")
+        attempt = job["attempts"][1]
+        if attempt["status"] == "accepted":
+            if attempt["thread_id"] != thread_id or attempt["provider_receipt_sha256"] != provider_receipt_sha256:
+                raise LifecycleError("retry thread identity changed")
+            return {"recorded": False, "duplicate": True, "attempt": attempt}
+        attempt.update(
+            thread_id=thread_id, status="accepted",
+            provider_receipt_sha256=provider_receipt_sha256,
+        )
+        job.update(
+            thread_id=thread_id, remote_state="accepted",
+            state=_aggregate_state("accepted", job["delivery_state"]),
+            last_revision=-1, last_observation_sha256=None,
+            classification={"state": "accepted"},
+        )
+        self._save()
+        return {"recorded": True, "duplicate": False, "attempt": attempt}
 
 def main():  # pragma: no cover - exercised by subprocess contract tests
     parser = argparse.ArgumentParser()
