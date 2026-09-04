@@ -1,6 +1,6 @@
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
-import ts from 'typescript';
+import ts from 'typescript-legacy';
 import { describe, expect, it } from 'vitest';
 
 const shellDir = resolve(process.cwd(), 'app/exp/shell-v1');

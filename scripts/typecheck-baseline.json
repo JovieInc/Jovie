@@ -1,8 +1,8 @@
 {
   "schemaVersion": 1,
   "tool": "scripts/typecheck-scripts.mjs",
-  "generatedAt": "2026-08-31T01:24:07.836Z",
-  "totalErrors": 151,
+  "generatedAt": "2026-09-04T00:05:00.000Z",
+  "totalErrors": 225,
   "files": {
     ".github/scripts/verify-main-release-readiness.mjs": {
       "TS2339": 3
@@ -11,10 +11,14 @@
       "TS1470": 2,
       "TS2339": 3
     },
+    "scripts/agent/preflight-lib.mjs": {
+      "TS2322": 4
+    },
     "scripts/agent/preflight.mjs": {
       "TS2339": 2
     },
     "scripts/agent/preflight.test.mjs": {
+      "TS2339": 4,
       "TS2322": 1
     },
     "scripts/audit-test-coverage.ts": {
@@ -24,14 +28,17 @@
       "TS1470": 1
     },
     "scripts/browse-auth.ts": {
-      "TS1470": 1,
-      "TS2304": 2
+      "TS2304": 2,
+      "TS1470": 1
     },
     "scripts/ci/neon-orphan-reaper.mjs": {
       "TS2339": 2
     },
-    "scripts/doc-freshness-lint.mjs": {
-      "TS2339": 10
+    "scripts/component-live-storybook-browser.mjs": {
+      "TS2810": 2
+    },
+    "scripts/desktop-installed-apps-audit.mjs": {
+      "TS2339": 6
     },
     "scripts/ds-offscale-report.mjs": {
       "TS2362": 1
@@ -43,8 +50,8 @@
       "TS2339": 2
     },
     "scripts/generated-artifact-retention.test.mjs": {
-      "TS2339": 1,
-      "TS2362": 1
+      "TS2362": 1,
+      "TS2339": 1
     },
     "scripts/hermes/jobs/agent-config-health.ts": {
       "TS1470": 1
@@ -56,27 +63,36 @@
       "TS1470": 2
     },
     "scripts/hermes/jobs/codex-issue-shipper.ts": {
-      "TS2339": 1,
-      "TS2345": 1
+      "TS2741": 1,
+      "TS2339": 1
     },
     "scripts/hermes/jobs/daily-briefing.ts": {
       "TS1470": 1
     },
     "scripts/hermes/jobs/gbrain-health-summary.ts": {
-      "TS1470": 1,
-      "TS2345": 4
+      "TS2345": 4,
+      "TS1470": 1
     },
     "scripts/hermes/jobs/pr-stuck-monitor.ts": {
       "TS1470": 1
+    },
+    "scripts/invariants/screen-certification.mjs": {
+      "TS2339": 10
+    },
+    "scripts/invariants/screen-certification.test.mjs": {
+      "TS2339": 33
+    },
+    "scripts/invariants/screen-proof-emit.mjs": {
+      "TS2339": 2
     },
     "scripts/knowledge/distill.ts": {
       "TS1470": 1
     },
     "scripts/knowledge/fetch.ts": {
-      "TS1470": 1,
-      "TS2304": 2,
       "TS2307": 1,
-      "TS2584": 8
+      "TS1470": 1,
+      "TS2584": 8,
+      "TS2304": 2
     },
     "scripts/lib/__tests__/agent-config-health.test.mjs": {
       "TS2345": 1
@@ -85,20 +101,37 @@
       "TS2345": 1
     },
     "scripts/lib/__tests__/ci-harness.test.mjs": {
-      "TS2345": 1
+      "TS2741": 1
     },
     "scripts/lib/__tests__/codex-issue-shipper.test.mjs": {
       "TS2345": 3
     },
+    "scripts/lib/__tests__/component-live-storybook-certification.test.mjs": {
+      "TS2810": 1
+    },
+    "scripts/lib/__tests__/gbrain-runtime-assets.test.mjs": {
+      "TS2810": 3
+    },
     "scripts/lib/__tests__/main-release-readiness.test.mjs": {
       "TS2322": 5
     },
-
     "scripts/lib/__tests__/merge-queue-guard.test.mjs": {
       "TS2322": 18
     },
+    "scripts/lib/__tests__/needs-human-autoclose.test.mjs": {
+      "TS2339": 1
+    },
+    "scripts/lib/__tests__/pr-preparation-canary.test.mjs": {
+      "TS2810": 3
+    },
+    "scripts/lib/__tests__/pr-preparation-safety.test.mjs": {
+      "TS2810": 1
+    },
     "scripts/lib/__tests__/qa-swarm.test.mjs": {
       "TS2345": 5
+    },
+    "scripts/lib/__tests__/rolling-ci-handoff.test.mjs": {
+      "TS2339": 2
     },
     "scripts/lib/__tests__/ship-ledger.test.mjs": {
       "TS2339": 4
@@ -125,20 +158,19 @@
       "TS2339": 1
     },
     "scripts/lib/pr-comment-analysis.mjs": {
-      "TS2345": 1
+      "TS2741": 1
+    },
+    "scripts/lib/rolling-ci-handoff.mjs": {
+      "TS2339": 15
     },
     "scripts/linear-claim-issue.mjs": {
-      "TS2339": 3
-    },
-    "scripts/linear-query-todo.mjs": {
       "TS2339": 3
     },
     "scripts/linear-transition-issue.mjs": {
       "TS2339": 3
     },
-
     "scripts/observability-issue-github.mjs": {
-      "TS2345": 1
+      "TS2741": 1
     },
     "scripts/pr-comment-retro.mjs": {
       "TS2339": 1
@@ -150,8 +182,8 @@
       "TS2304": 1
     },
     "scripts/send-changelog-email.mjs": {
-      "TS2307": 2,
-      "TS2339": 2
+      "TS2339": 2,
+      "TS2307": 2
     },
     "scripts/ship-swarm/next-batch.mjs": {
       "TS2339": 3
@@ -160,12 +192,12 @@
       "TS2339": 1
     },
     "scripts/turnstile-config.ts": {
-      "TS1470": 1,
-      "TS2540": 8
+      "TS2540": 8,
+      "TS1470": 1
     },
     "scripts/voice-stack-bake-off/validate-test-script.ts": {
-      "TS1470": 1,
-      "TS2307": 1
+      "TS2307": 1,
+      "TS1470": 1
     }
   }
 }

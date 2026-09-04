@@ -581,6 +581,11 @@ const nextConfig = {
   // See JOV-2322.
   serverExternalPackages: ['@statsig/statsig-node-core'],
   experimental: {
+    // TS 7 (typescript-go) removed lib/typescript.js, which Next.js's jsconfig
+    // loader requires — under 16.2.11 it silently dropped tsconfig paths and
+    // the build failed on unresolved aliases. 16.2.12 reads tsconfig via the
+    // native `tsc --showConfig` CLI when this flag is set (E1150 remedy).
+    useTypeScriptCli: true,
     // GitHub-hosted ubuntu-latest/24.04 runners are 4 vCPU / 16 GB RAM — cap
     // at 4 (was 2, which halved build parallelism; revert to 2 if OOM recurs).
     cpus: process.env.GITHUB_ACTIONS === 'true' ? 4 : undefined,

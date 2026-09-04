@@ -1,6 +1,6 @@
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
-import ts from 'typescript';
+import ts from 'typescript-legacy';
 import { describe, expect, it } from 'vitest';
 
 const CUSTOMER_FACING_COPY_FILES = [

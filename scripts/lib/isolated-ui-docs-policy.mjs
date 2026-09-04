@@ -4,7 +4,7 @@ import { execFileSync, spawnSync } from 'node:child_process';
 import { createHash } from 'node:crypto';
 import { dirname, extname, join, normalize } from 'node:path/posix';
 import { pathToFileURL } from 'node:url';
-import ts from 'typescript';
+import ts from 'typescript-legacy';
 
 export const ISOLATED_UI_DOCS_SCHEMA = 'jovie-isolated-ui-docs/v1';
 export const REQUIRED_ISOLATED_CHECKS = Object.freeze([
