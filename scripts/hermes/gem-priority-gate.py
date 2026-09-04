@@ -38,6 +38,7 @@ from closure_health import (  # noqa: E402 - sibling executable module
 )
 from closure_health import SCHEMA as CLOSURE_HEALTH_SCHEMA  # noqa: E402
 from closure_health import observe_closure_health  # noqa: E402
+from gem_gate_contract import validate_capacity_receipt  # noqa: E402
 
 
 SCHEMA = "jovie-fleet-gate/v1"
@@ -67,10 +68,6 @@ SEVERE_REASONS = {
     "severe-integrity-incident",
 }
 DEFAULT_GEM_CONCURRENCY = 4
-# Keep in sync with symphony-codex-exhausted.DEFAULT_GROK_MAX / MAX_GROK_MAX.
-# Unbound repair is a deploy hold, not a Grok serial pin (JOV-5913).
-DEFAULT_GROK_MAX = 4
-MAX_GROK_MAX = 10
 LOCAL_REMEDIATION_CONCURRENCY_FLOOR = 1
 CONTROL_PLANE_PREFIXES = (
     "canon/",
@@ -587,15 +584,7 @@ def observe_integrity(path: Path) -> dict[str, Any]:
 
 
 def observe_concurrency(path: Path, now: datetime) -> dict[str, Any]:
-    """Read the live-seat capacity receipt (gem-concurrency-evidence/v1).
-
-    Tim lock symphony-concurrency-autoscale-v1: concurrency autoscales from
-    live seats. The receipt's measured ``target`` is accepted as-is when it is
-    approved, fresh, and incident-free — no 1..8 clamp and no clean-run
-    ratchet, both of which were arbitrary caps. Missing, malformed, or stale
-    evidence is reported as unaccepted; ``evaluate`` then degrades to the
-    runtime floor rather than zeroing the factory.
-    """
+    """Accept only fresh, cross-checked useful-turn proof rows."""
     if not path.exists():
         return {
             "schema": CONCURRENCY_SCHEMA,
@@ -616,42 +605,8 @@ def observe_concurrency(path: Path, now: datetime) -> dict[str, Any]:
             "accepted": False,
             "reason": "capacity-evidence-malformed",
         }
-    observed_at = parse_time(receipt.get("observedAt"))
-    target = receipt.get("target")
-    eligible = (
-        receipt.get("schema") == CONCURRENCY_SCHEMA
-        and isinstance(target, int)
-        and not isinstance(target, bool)
-        and target >= LOCAL_REMEDIATION_CONCURRENCY_FLOOR
-        and receipt.get("approved") is True
-        and receipt.get("severeIncidents") == 0
-        and observed_at is not None
-        and timedelta(0) <= now - observed_at <= timedelta(hours=24)
-    )
-    return {**receipt, "accepted": eligible}
-
-
-def grok_kimi_unbound_repair_concurrency(evidence: dict[str, Any]) -> int:
-    """Autoscale unbound-repair slots from live Grok+Kimi OAuth seats.
-
-    Production-unbound is a deploy hold (`deploymentsAllowed: false`), not a
-    serial Grok pin. Codex exhaustion / stale Gem capacity evidence is not a
-    reason to cap Grok/Kimi (JOV-5913).
-    """
-    seats = 0
-    providers = evidence.get("providers")
-    if isinstance(providers, dict):
-        for name in ("grok", "kimi"):
-            provider = providers.get(name)
-            if not isinstance(provider, dict):
-                continue
-            ready = provider.get("ready")
-            if isinstance(ready, int) and not isinstance(ready, bool) and ready > 0:
-                seats += ready
-    baseline = DEFAULT_GROK_MAX
-    if seats <= 0:
-        return baseline
-    return max(1, min(MAX_GROK_MAX, max(baseline, seats)))
+    accepted, reason, proofs = validate_capacity_receipt(receipt, now)
+    return {**receipt, "accepted": accepted, "reason": reason, "acceptedEvidence": proofs}
 
 
 def validate_independent_review(
@@ -1174,16 +1129,20 @@ def evaluate(signals: dict[str, Any], observed_at: str) -> dict[str, Any]:
     closure_health = validate_closure_health(signals.get("closureHealth"))
     closure_intake_allowed = closure_health["newIssueIntakeAllowed"] is True
     concurrency_evidence_value = signals.get("concurrencyEvidence")
-    concurrency_evidence = (
-        concurrency_evidence_value
-        if isinstance(concurrency_evidence_value, dict)
-        and isinstance(concurrency_evidence_value.get("accepted"), bool)
-        else {
-            "schema": CONCURRENCY_SCHEMA,
-            "accepted": False,
-            "reason": "capacity-evidence-missing-malformed-or-stale",
-        }
+    capacity_now = parse_time(observed_at) or utc_now()
+    capacity_accepted, capacity_reason, capacity_proofs = validate_capacity_receipt(
+        concurrency_evidence_value, capacity_now
     )
+    concurrency_evidence = {
+        **(
+            concurrency_evidence_value
+            if isinstance(concurrency_evidence_value, dict)
+            else {"schema": CONCURRENCY_SCHEMA}
+        ),
+        "accepted": capacity_accepted,
+        "reason": capacity_reason,
+        "acceptedEvidence": capacity_proofs,
+    }
     normalized_signals = {
         **signals,
         "closureHealth": closure_health,
@@ -1341,22 +1300,19 @@ def evaluate(signals: dict[str, Any], observed_at: str) -> dict[str, Any]:
     evidence = concurrency_evidence
     capacity_fresh = evidence.get("accepted") is True
     measured_target = evidence.get("target")
-    # symphony-concurrency-autoscale-v1: live seats are the only concurrency
-    # authority and carry no upper clamp. Missing or stale evidence degrades
-    # to the runtime floor (one seat) instead of zeroing the factory.
+    # Useful-turn proofs are the only concurrency authority. The configured
+    # floor remains visible for compatibility but never becomes a usable seat.
     gem_concurrency = (
         measured_target
         if capacity_fresh
         and isinstance(measured_target, int)
         and not isinstance(measured_target, bool)
         and measured_target >= LOCAL_REMEDIATION_CONCURRENCY_FLOOR
-        else LOCAL_REMEDIATION_CONCURRENCY_FLOOR
+        else 0
     )
     capacity_fresh = capacity_fresh and gem_concurrency == measured_target
     remediation_concurrency = gem_concurrency
-    unbound_repair_concurrency = grok_kimi_unbound_repair_concurrency(
-        concurrency_evidence
-    )
+    unbound_repair_concurrency = gem_concurrency
     green_ready_prs = queue.get("greenReadyPrs", queue.get("eligiblePrs"))
     queue_target = queue.get("target")
     queue_shape_valid = (
@@ -1458,7 +1414,7 @@ def evaluate(signals: dict[str, Any], observed_at: str) -> dict[str, Any]:
         work_activities = ["tests", "review"]
     else:
         new_implementation_allowed = (
-            queue_shape_valid and repository_capacity_available
+            capacity_fresh and queue_shape_valid and repository_capacity_available
         )
         work_activities = ["tests", "review"]
         if new_implementation_allowed:
@@ -1482,7 +1438,7 @@ def evaluate(signals: dict[str, Any], observed_at: str) -> dict[str, Any]:
     ]
     # Remediation is liveness: decoupled from capacity evidence and from Summer
     # closure, so duplicate lanes cannot freeze Grok/Kimi remediations.
-    remediation_push_allowed = state != "RED"
+    remediation_push_allowed = state != "RED" and capacity_fresh
     cohort = already_admitted_cohort_semantics(promotion_mode)
     if not closure_intake_allowed:
         cohort = {
@@ -1585,11 +1541,11 @@ def evaluate(signals: dict[str, Any], observed_at: str) -> dict[str, Any]:
                 "runtimeFloor": LOCAL_REMEDIATION_CONCURRENCY_FLOOR,
                 "baseline": DEFAULT_GEM_CONCURRENCY,
                 "evidenceAccepted": capacity_fresh,
-                "newMutationAllowed": True,
+                "newMutationAllowed": state != "RED" and capacity_fresh,
                 "preserveQueuedWork": True,
-                "reason": "live-seat-capacity"
+                "reason": "execution-proven-useful-turns"
                 if capacity_fresh
-                else "capacity-evidence-missing-runtime-floor",
+                else "capacity-evidence-unproven-dispatch-closed",
             },
             "symphonyImplementation": "event-driven-backpressure",
         },
@@ -1801,7 +1757,7 @@ def failed_evaluation_receipt(
                 "focused-tests",
                 "review",
             ],
-            "maxConcurrent": LOCAL_REMEDIATION_CONCURRENCY_FLOOR,
+            "maxConcurrent": 0,
             "authority": "single-pr-writer-exact-head",
         },
         "deploymentAdmission": {

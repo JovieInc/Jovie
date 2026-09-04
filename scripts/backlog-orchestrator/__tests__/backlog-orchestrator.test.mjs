@@ -967,6 +967,32 @@ describe('deterministic Symphony admission boundary', () => {
     };
   }
 
+  function capacityEvidence(
+    target = 4,
+    observedAt = '2026-08-09T05:00:00.000Z'
+  ) {
+    return {
+      schema: admitter.GEM_CONCURRENCY_EVIDENCE_SCHEMA,
+      source: 'execution-proven-useful-turns',
+      target,
+      approved: target > 0,
+      severeIncidents: 0,
+      observedAt,
+      acceptedEvidence: Array.from({ length: target }, (_, index) => ({
+        schema: 'symphony-useful-turn-proof/v1',
+        provider: 'openai',
+        profile: `profile-${index + 1}`,
+        model: 'gpt-5.6-sol',
+        rc: 0,
+        useful: true,
+        completedAt: observedAt,
+        outputDigest: `${index + 1}`.repeat(64).slice(0, 64),
+        outputBytes: 32,
+        outputTokens: 8,
+      })),
+    };
+  }
+
   function fleetEvidence(overrides = {}) {
     return {
       main: {
@@ -1006,15 +1032,7 @@ describe('deterministic Symphony admission boundary', () => {
         scope: admitter.INDEPENDENT_REVIEW_SCOPE,
         observedAt: '2026-08-09T05:00:00.000Z',
       },
-      concurrencyEvidence: {
-        schema: admitter.GEM_CONCURRENCY_EVIDENCE_SCHEMA,
-        target: 4,
-        approved: true,
-        cleanRuns: 1,
-        severeIncidents: 0,
-        observedAt: '2026-08-09T05:00:00.000Z',
-        accepted: true,
-      },
+      concurrencyEvidence: capacityEvidence(),
       observedAt: '2026-08-09T05:00:00.000Z',
       ...overrides,
     };
@@ -1334,14 +1352,7 @@ describe('deterministic Symphony admission boundary', () => {
   it('keeps the bounded concurrency receipt independent from review freshness', () => {
     const fleetGate = admitter.evaluateFleetGate(
       fleetEvidence({
-        concurrencyEvidence: {
-          schema: admitter.GEM_CONCURRENCY_EVIDENCE_SCHEMA,
-          target: 8,
-          approved: true,
-          cleanRuns: 20,
-          severeIncidents: 0,
-          observedAt: '2026-08-09T05:00:00.000Z',
-        },
+        concurrencyEvidence: capacityEvidence(8),
       }),
       { now: '2026-08-09T05:01:00.000Z' }
     );
@@ -1501,77 +1512,66 @@ describe('deterministic Symphony admission boundary', () => {
     assert.ok(stale.reasons.some(reason => reason.code === 'controller-stale'));
   });
 
-  it('runs at the runtime floor when capacity evidence is missing or stale', () => {
-    // symphony-concurrency-autoscale-v1: missing evidence never zeroes the
-    // factory; one seat stays open for leases and remediation.
+  it('closes dispatch when capacity evidence is missing or stale', () => {
     const now = '2026-08-09T05:01:00.000Z';
-    const approved = {
-      schema: admitter.GEM_CONCURRENCY_EVIDENCE_SCHEMA,
-      target: 8,
-      approved: true,
-      severeIncidents: 0,
-      observedAt: '2026-08-09T05:00:00.000Z',
-    };
+    const approved = capacityEvidence(1);
     const missing = admitter.resolveGemConcurrency(null, { now });
     const stale = admitter.resolveGemConcurrency(
       { ...approved, observedAt: '2026-08-07T05:00:00.000Z' },
       { now }
     );
-    assert.equal(missing.maxConcurrent, 1);
+    assert.equal(missing.maxConcurrent, 0);
     assert.equal(missing.evidenceAccepted, false);
-    assert.equal(missing.newMutationAllowed, true);
-    assert.equal(missing.reason, 'capacity-evidence-missing-runtime-floor');
+    assert.equal(missing.newMutationAllowed, false);
+    assert.equal(missing.reason, 'capacity-evidence-unproven-dispatch-closed');
     assert.equal(missing.preserveQueuedWork, true);
-    assert.equal(stale.maxConcurrent, 1);
+    assert.equal(stale.maxConcurrent, 0);
     assert.equal(stale.evidenceAccepted, false);
     const gate = admitter.evaluateFleetGate(
       fleetEvidence({ concurrencyEvidence: null }),
       { now }
     );
     assert.equal(gate.workAdmission.allowed, true);
-    assert.equal(gate.workAdmission.newIssueLeaseAllowed, true);
-    assert.equal(gate.concurrency.gem.maxConcurrent, 1);
+    assert.equal(gate.workAdmission.newIssueLeaseAllowed, false);
+    assert.equal(gate.concurrency.gem.maxConcurrent, 0);
     assert.ok(
-      gate.workAdmission.activities.includes('isolated-implementation')
+      !gate.workAdmission.activities.includes('isolated-implementation')
     );
   });
 
-  it('accepts live-seat capacity as-is without a clamp or clean-run ratchet', () => {
+  it('does not multiply one provider profile by model name', () => {
+    const evidence = capacityEvidence(2);
+    evidence.acceptedEvidence[1].profile = evidence.acceptedEvidence[0].profile;
+    evidence.acceptedEvidence[1].model = 'gpt-5.5';
+    assert.equal(
+      admitter.resolveGemConcurrency(evidence, { now: evidence.observedAt })
+        .maxConcurrent,
+      0
+    );
+  });
+
+  it('rejects OAuth-derived and mismatched capacity evidence', () => {
     const now = '2026-09-02T19:20:00.000Z';
-    const seats = {
-      schema: admitter.GEM_CONCURRENCY_EVIDENCE_SCHEMA,
-      source: 'live-oauth-cli-seats',
-      target: 2,
-      approved: true,
-      severeIncidents: 0,
-      observedAt: '2026-09-02T19:19:00.000Z',
-    };
-    assert.equal(
-      admitter.resolveGemConcurrency(seats, { now }).maxConcurrent,
-      2
-    );
-    assert.equal(
-      admitter.resolveGemConcurrency(seats, { now }).reason,
-      'live-seat-capacity'
-    );
-    for (const target of [8, 12, 40]) {
+    for (const target of [1, 2, 8, 40]) {
       const live = admitter.resolveGemConcurrency(
-        { ...seats, target, cleanRuns: 0 },
+        capacityEvidence(target, '2026-09-02T19:19:00.000Z'),
         { now }
       );
       assert.equal(live.maxConcurrent, target);
       assert.equal(live.evidenceAccepted, true);
     }
-    // A severe incident or an unapproved receipt still degrades to the floor.
+    const useful = capacityEvidence(1, '2026-09-02T19:19:00.000Z');
     assert.equal(
-      admitter.resolveGemConcurrency({ ...seats, severeIncidents: 1 }, { now })
-        .maxConcurrent,
-      1
+      admitter.resolveGemConcurrency(
+        { ...useful, source: 'live-oauth-cli-seats' },
+        { now }
+      ).maxConcurrent,
+      0
     );
     assert.equal(
-      admitter.resolveGemConcurrency({ ...seats, approved: false }, { now })
+      admitter.resolveGemConcurrency({ ...useful, target: 2 }, { now })
         .maxConcurrent,
-      1
+      0
     );
   });
 
@@ -1590,6 +1590,15 @@ describe('deterministic Symphony admission boundary', () => {
         ...controllerSignals.independentReview,
         observedAt: new Date().toISOString(),
       };
+      if (controllerSignals.concurrencyEvidence?.acceptedEvidence) {
+        const observedAt = new Date().toISOString();
+        controllerSignals.concurrencyEvidence.observedAt = observedAt;
+        controllerSignals.concurrencyEvidence.acceptedEvidence =
+          controllerSignals.concurrencyEvidence.acceptedEvidence.map(proof => ({
+            ...proof,
+            completedAt: observedAt,
+          }));
+      }
       if (controllerSignals.queue?.laneCapacity) {
         controllerSignals.queue.laneCapacity.observedAt =
           new Date().toISOString();
@@ -1777,7 +1786,7 @@ from gem_gate_contract import GateContractError, drain_state_dir, gate_state_dir
 receipt = {
     "schema": "jovie-fleet-gate/v1",
     "state": "AMBER",
-    "signals": {"main": {"status": "red", "sha": "a" * 40}, "closureHealth": {"schema": "jovie-closure-health/v1", "status": "healthy", "authority": "Summer", "newIssueIntakeAllowed": True, "promotionContinues": True, "remediationContinues": True, "reasons": []}, "independentReview": {"schema": "jovie-independent-review/v1", "accepted": False, "reason": "independent-review-receipt-missing"}, "concurrencyEvidence": {"accepted": True}},
+    "signals": {"main": {"status": "red", "sha": "a" * 40}, "closureHealth": {"schema": "jovie-closure-health/v1", "status": "healthy", "authority": "Summer", "newIssueIntakeAllowed": True, "promotionContinues": True, "remediationContinues": True, "reasons": []}, "independentReview": {"schema": "jovie-independent-review/v1", "accepted": False, "reason": "independent-review-receipt-missing"}, "concurrencyEvidence": {"accepted": True, "source": "execution-proven-useful-turns", "target": 1, "acceptedEvidence": [{"schema": "symphony-useful-turn-proof/v1", "provider": "openai", "profile": "profile-1", "model": "gpt-5.6-sol", "rc": 0, "useful": True, "completedAt": "2026-09-04T00:00:00Z", "outputDigest": "a" * 64, "outputBytes": 32, "outputTokens": 8}]}},
     "reasons": [{"code": "main-not-green", "layer": "promotion", "severity": "warning", "detail": "main red"}],
     "reviewAdmission": {"allowed": False, "required": True, "authority": "Gem", "scope": "exact-main-head", "headSha": None, "observedAt": None, "reviewId": None, "reviewer": None, "reason": "independent-review-receipt-missing"},
     "closureAdmission": {"allowed": True, "newIssueIntakeAllowed": True, "newImplementationAllowed": True, "fallbackPrGenerationAllowed": True, "authority": "Summer", "promotionContinues": True, "remediationContinues": True},
@@ -1934,7 +1943,7 @@ print(json.dumps(result))
 receipt = {
     "schema": "jovie-fleet-gate/v1",
     "state": "AMBER",
-    "signals": {"main": {"status": "red", "sha": "a" * 40}, "closureHealth": {"schema": "jovie-closure-health/v1", "status": "healthy", "authority": "Summer", "newIssueIntakeAllowed": True, "promotionContinues": True, "remediationContinues": True, "reasons": []}, "independentReview": {"schema": "jovie-independent-review/v1", "accepted": False, "reason": "independent-review-receipt-missing"}, "concurrencyEvidence": {"accepted": True}},
+    "signals": {"main": {"status": "red", "sha": "a" * 40}, "closureHealth": {"schema": "jovie-closure-health/v1", "status": "healthy", "authority": "Summer", "newIssueIntakeAllowed": True, "promotionContinues": True, "remediationContinues": True, "reasons": []}, "independentReview": {"schema": "jovie-independent-review/v1", "accepted": False, "reason": "independent-review-receipt-missing"}, "concurrencyEvidence": {"accepted": True, "source": "execution-proven-useful-turns", "target": 1, "acceptedEvidence": [{"provider": "openai"}]}},
     "reasons": [{"code": "main-not-green", "layer": "promotion", "severity": "warning", "detail": "test"}],
     "reviewAdmission": {"allowed": False, "required": True, "authority": "Gem", "scope": "exact-main-head", "headSha": None, "observedAt": None, "reviewId": None, "reviewer": None, "reason": "independent-review-receipt-missing"},
     "closureAdmission": {"allowed": True, "newIssueIntakeAllowed": True, "newImplementationAllowed": True, "fallbackPrGenerationAllowed": True, "authority": "Summer", "promotionContinues": True, "remediationContinues": True},
