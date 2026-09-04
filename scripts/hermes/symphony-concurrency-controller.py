@@ -72,7 +72,7 @@ def read_json(path: pathlib.Path) -> dict[str, Any]:
 
 def write_json_atomic(path: pathlib.Path, value: dict[str, Any], mode: int = 0o600) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
-    temporary = path.with_name(f".{path.name}.tmp")
+    temporary = path.with_name(f".{path.name}.tmp.{os.getpid()}")
     temporary.write_text(json.dumps(value, indent=2, sort_keys=True) + "\n", encoding="utf-8")
     os.chmod(temporary, mode)
     os.replace(temporary, path)

@@ -28,7 +28,7 @@ class CodexAccountProbeTests(unittest.TestCase):
             (account / "auth.json").write_text("{}\n")
             (account / "config.toml").write_text('model = "test"\n')
         self.codex = self.root / "codex"
-        self.codex.write_text("#!/usr/bin/env bash\nprintf '%s\\n' \"${PROBE_RESPONSE:-SYMPHONY_ACCOUNT_READY}\"\nexit \"${PROBE_EXIT:-0}\"\n")
+        self.codex.write_text("#!/usr/bin/env bash\nprintf '%s\\n' \"${PROBE_RESPONSE:-SYMPHONY_USEFUL_TURN provider-authorization}\"\nexit \"${PROBE_EXIT:-0}\"\n")
         self.codex.chmod(0o755)
 
     def tearDown(self):
@@ -43,13 +43,13 @@ class CodexAccountProbeTests(unittest.TestCase):
 
     def run_probe(self, **extra):
         env = os.environ.copy()
-        env.update({"CODEX_ACCOUNTS_ROOT": str(self.accounts), "CODEX_REAL_BIN": str(self.codex)})
+        env.update({"CODEX_ACCOUNTS_ROOT": str(self.accounts), "CODEX_REAL_BIN": str(self.codex), "SYMPHONY_USEFUL_TURN_LEDGER": str(self.root / "proofs.jsonl")})
         env.update(extra)
         return subprocess.run([str(PROBE)], env=env, capture_output=True, text=True, check=False, timeout=20)
 
     def test_successful_probe_recovers_cooldowns_with_short_lived_receipts(self):
         original = self.write_state()
-        result = self.run_probe(PROBE_RESPONSE="SYMPHONY_ACCOUNT_READY")
+        result = self.run_probe()
         self.assertEqual(result.returncode, 0)
         state = json.loads((self.accounts / "state.json").read_text())
         for account in ("account-a", "account-b"):
@@ -57,6 +57,9 @@ class CodexAccountProbeTests(unittest.TestCase):
             self.assertNotEqual(state["cooldowns"][account], original)
             self.assertEqual(state["readiness"][account]["source"], "authenticated_completion_probe/v1")
             self.assertGreater(state["readiness"][account]["expiresAt"], int(time.time()))
+        proofs = [json.loads(line) for line in (self.root / "proofs.jsonl").read_text().splitlines()]
+        self.assertEqual({proof["profile"] for proof in proofs}, {"account-a", "account-b"})
+        self.assertTrue(all(proof["producer"] == "codex-account-probe/v2" for proof in proofs))
 
     def test_failed_probe_retains_cooldowns_and_creates_no_readiness_receipt(self):
         original = self.write_state()
@@ -74,7 +77,7 @@ class CodexAccountProbeTests(unittest.TestCase):
         descriptor = os.open(locks / "account-a.lock", os.O_RDWR | os.O_CREAT)
         self.addCleanup(os.close, descriptor)
         fcntl.flock(descriptor, fcntl.LOCK_EX | fcntl.LOCK_NB)
-        result = self.run_probe(PROBE_RESPONSE="SYMPHONY_ACCOUNT_READY")
+        result = self.run_probe()
         self.assertEqual(result.returncode, 0)
         state = json.loads((self.accounts / "state.json").read_text())
         self.assertEqual(state["cooldowns"]["account-a"], original)

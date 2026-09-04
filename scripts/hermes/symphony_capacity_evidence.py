@@ -16,9 +16,14 @@ import sys
 from datetime import datetime, timezone
 from typing import Any
 
-HERMES_DIR = str(pathlib.Path(__file__).resolve().parent)
-if HERMES_DIR not in sys.path:
-    sys.path.insert(0, HERMES_DIR)
+HERMES_DIR = pathlib.Path(__file__).resolve().parent
+CONTRACT_DIRS = (
+    HERMES_DIR,
+    pathlib.Path(os.environ.get("GEM_WORKSPACE", "/home/timwhite/gem-workspace")) / "scripts",
+)
+for contract_dir in reversed(CONTRACT_DIRS):
+    if str(contract_dir) not in sys.path:
+        sys.path.insert(0, str(contract_dir))
 
 from gem_gate_contract import (  # noqa: E402 - installed sibling module
     CAPACITY_MAX_TARGET as MAX_TARGET,
@@ -85,7 +90,13 @@ def build_receipt(
 def _read_jsonl(path: pathlib.Path) -> list[object]:
     rows: list[object] = []
     try:
-        lines = path.read_text(encoding="utf-8").splitlines()
+        with path.open("r", encoding="utf-8") as stream:
+            stream.seek(0, os.SEEK_END)
+            start = max(0, stream.tell() - 1_048_576)
+            stream.seek(start)
+            if start:
+                stream.readline()
+            lines = stream.read().splitlines()
     except FileNotFoundError:
         return rows
     for line in lines:
@@ -100,7 +111,7 @@ def _read_jsonl(path: pathlib.Path) -> list[object]:
 
 def _write_atomic(path: pathlib.Path, value: dict[str, Any]) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
-    temporary = path.with_name(f".{path.name}.tmp")
+    temporary = path.with_name(f".{path.name}.tmp.{os.getpid()}")
     temporary.write_text(json.dumps(value, indent=2, sort_keys=True) + "\n", encoding="utf-8")
     os.chmod(temporary, 0o644)
     os.replace(temporary, path)

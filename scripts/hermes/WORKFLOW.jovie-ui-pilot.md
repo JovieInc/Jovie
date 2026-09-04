@@ -27,7 +27,7 @@ hooks:
       git clone --depth 1 https://github.com/JovieInc/Jovie.git .
     fi
 agent:
-  max_concurrent_agents: 40
+  max_concurrent_agents: 0
   max_turns: 24
 codex:
   command: ./scripts/hermes/symphony-codex-router app-server

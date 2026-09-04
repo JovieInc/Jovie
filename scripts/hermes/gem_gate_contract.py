@@ -55,7 +55,7 @@ def validate_useful_turn_proof(
     )
     if not all(isinstance(item, str) and item.strip() for item in strings):
         return None, "malformed"
-    if value.get("rc") != 0:
+    if type(value.get("rc")) is not int or value["rc"] != 0:
         return None, "failed"
     if value.get("useful") is not True:
         return None, "non-useful"
@@ -84,14 +84,14 @@ def validate_useful_turn_proof(
 def accepted_useful_turn_proofs(
     rows: list[object], now: datetime, max_age: timedelta = CAPACITY_MAX_AGE
 ) -> tuple[list[dict[str, Any]], dict[str, int]]:
-    by_seat: dict[tuple[str, str, str], dict[str, Any]] = {}
+    by_seat: dict[tuple[str, str], dict[str, Any]] = {}
     rejected: dict[str, int] = {}
     for row in rows:
         proof, reason = validate_useful_turn_proof(row, now, max_age)
         if proof is None:
             rejected[reason] = rejected.get(reason, 0) + 1
             continue
-        seat = (proof["provider"], proof["profile"], proof["model"])
+        seat = (proof["provider"], proof["profile"])
         prior = by_seat.get(seat)
         if prior is None or proof["completedAt"] > prior["completedAt"]:
             by_seat[seat] = proof
@@ -122,7 +122,8 @@ def validate_capacity_receipt(
         or target > CAPACITY_MAX_TARGET
     ):
         return False, "capacity-evidence-target-proof-mismatch", []
-    if not proofs or value.get("approved") is not True or value.get("severeIncidents") != 0:
+    severe = value.get("severeIncidents")
+    if not proofs or value.get("approved") is not True or type(severe) is not int or severe != 0:
         return False, "capacity-evidence-zero-proof", []
     return True, CAPACITY_SOURCE, proofs
 

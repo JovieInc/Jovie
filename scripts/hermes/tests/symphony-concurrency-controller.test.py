@@ -125,6 +125,21 @@ class UsefulTurnProjectionTests(unittest.TestCase):
         self.assertEqual(receipt["target"], 0)
         self.assertFalse(receipt["approved"])
 
+    def test_models_do_not_multiply_one_credential_seat(self):
+        now = datetime(2026, 9, 4, tzinfo=timezone.utc)
+        first = self.proof(now)
+        second = {**first, "model": "gpt-5.5", "outputDigest": "b" * 64}
+        receipt = CAPACITY.build_receipt([first, second], {}, now)
+        self.assertEqual(receipt["target"], 1)
+
+    def test_boolean_return_code_and_incident_count_fail_closed(self):
+        now = datetime(2026, 9, 4, tzinfo=timezone.utc)
+        proof = {**self.proof(now), "rc": False}
+        self.assertIsNone(CAPACITY.validate_proof(proof, now)[0])
+        receipt = CAPACITY.build_receipt([self.proof(now)], {}, now)
+        receipt["severeIncidents"] = False
+        self.assertFalse(CAPACITY.validate_receipt(receipt, now)[0])
+
 
 class HysteresisTests(unittest.TestCase):
     def decide(self, current: int, low_streak: int, sample: dict | None = None):
@@ -405,22 +420,10 @@ class SystemdActivationTests(unittest.TestCase):
         self.assertEqual(ini_value(text, "Persistent"), "true")
         self.assertEqual(ini_value(text, "WantedBy"), "timers.target")
 
-    def test_installer_installs_and_enables_like_sibling_units(self):
+    def test_legacy_pilot_installer_cannot_activate_official_controller(self):
         text = INSTALLER.read_text(encoding="utf-8")
-        self.assertIn(
-            'CONTROLLER_SRC="$REPO_ROOT/scripts/hermes/symphony-concurrency-controller.py"',
-            text,
-        )
-        self.assertIn('install_one "$CONTROLLER_SRC" "$CONTROLLER_DST" 0755', text)
-        self.assertIn('install_one "$CAPACITY_EVIDENCE_SRC" "$CAPACITY_EVIDENCE_DST" 0755', text)
-        self.assertIn('install_one "$CONTROLLER_SERVICE_SRC" "$CONTROLLER_SERVICE_DST"', text)
-        self.assertIn('install_one "$CONTROLLER_TIMER_SRC" "$CONTROLLER_TIMER_DST"', text)
-        self.assertIn('check_one "$CONTROLLER_SERVICE_SRC" "$CONTROLLER_SERVICE_DST"', text)
-        self.assertIn('check_one "$CONTROLLER_TIMER_SRC" "$CONTROLLER_TIMER_DST"', text)
-        self.assertIn(
-            "systemctl --user enable --now symphony-concurrency-controller.timer",
-            text,
-        )
+        self.assertNotIn('install_one "$CONTROLLER_SRC"', text)
+        self.assertNotIn("enable --now symphony-concurrency-controller.timer", text)
 
 
 if __name__ == "__main__":
