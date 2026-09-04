@@ -4,12 +4,14 @@ export default defineConfig({
   test: {
     coverage: {
       include: [
+        'agent/channels/summer-bottleneck.ts',
         'agent/instructions/summer-shadow.ts',
         'agent/lib/summer-bottleneck-loop.ts',
         'agent/lib/summer-photon-offline-proof.ts',
         'agent/lib/summer-shadow-ingress.ts',
         'agent/lib/vercel-blob-bottleneck-runtime.ts',
         'agent/lib/vercel-blob-shadow-store.ts',
+        'agent/schedules/summer-bottleneck-heartbeat.ts',
       ],
       provider: 'v8',
       reporter: ['text', 'json-summary'],
