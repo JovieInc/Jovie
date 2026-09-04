@@ -74,20 +74,24 @@ describe('public CTA guard', () => {
   it('locks the public HeaderNav primary CTA to the marketing ActionButton size', () => {
     const headerPath = join(ROOT, 'components', 'organisms', 'HeaderNav.tsx');
     const contents = readFileSync(headerPath, 'utf8');
-    const start = contents.indexOf('function PublicAuthActions(');
+    const start = contents.indexOf('function HeaderPrimaryAuthLink(');
     const end = contents.indexOf('function GlassAuthActions(', start);
 
-    expect(start, 'PublicAuthActions source exists').toBeGreaterThanOrEqual(0);
-    expect(end, 'PublicAuthActions source is bounded').toBeGreaterThan(start);
+    expect(start, 'HeaderPrimaryAuthLink source exists').toBeGreaterThanOrEqual(
+      0
+    );
+    expect(end, 'HeaderPrimaryAuthLink source is bounded').toBeGreaterThan(
+      start
+    );
 
-    const publicAuth = contents.slice(start, end);
-    const primaryCta = publicAuth.slice(publicAuth.lastIndexOf('<Button'));
+    const primaryCta = contents.slice(start, end);
 
     // Waitlist-first Get started / Request Access uses the locked 32px pill.
-    // Minimal pill sign-in may stay md; the public primary CTA must not.
-    expect(primaryCta).toContain("size='marketing'");
+    // HeaderPrimaryAuthLink owns the single primary-variant CTA and defaults
+    // to the marketing size; the minimal pill sign-in passes md explicitly.
+    expect(primaryCta).toContain("size = 'marketing'");
     expect(primaryCta).toContain("variant='primary'");
-    expect(primaryCta).not.toMatch(/\bsize='(?:sm|md|lg|xl)'/);
+    expect(primaryCta).not.toMatch(/\bsize='(?:sm|lg|xl)'/);
   });
 
   it('keeps homepage public auth as a labeled text MarketingSignInLink', () => {
@@ -113,11 +117,18 @@ describe('public CTA guard', () => {
     expect(headerNav).toContain(
       "<MarketingSignInLink variant='ghost' label={minimalLabel} />"
     );
+    expect(headerNav).toContain('focus-ring-themed shrink-0 whitespace-nowrap');
+    expect(headerNav).toContain('function HeaderPrimaryAuthLink');
+    expect(headerNav).toContain(
+      "cn('focus-ring-themed shrink-0 whitespace-nowrap', className)"
+    );
+    expect(headerNav).toContain('blur(var(--blur-header))');
+    expect(headerNav).not.toContain('--linear-blur-header');
     expect(headerNav).not.toMatch(
       /minimalAuth[\s\S]*?<Button[\s\S]*?>Get started<\/Button>/
     );
-    expect(headerNav).toMatch(
-      /size='marketing'\s+variant='primary'[\s\S]*?<Link href=\{publicCta\.href\}>\{publicCta\.label\}<\/Link>/
+    expect(headerNav).toContain(
+      '<HeaderPrimaryAuthLink href={publicCta.href} label={publicCta.label} />'
     );
     expect(marketingNavigation).toContain("label: 'Log in'");
     expect(marketingNavigation).toContain("label: 'Find yourself'");

@@ -16,11 +16,11 @@ export function HeroScrollSection() {
         <div className='mx-auto max-w-300'>
           <div className='hero-stagger'>
             <div className='max-w-[44rem] text-center lg:text-left'>
-              <p className='homepage-section-eyebrow'>
+              <span className='homepage-section-eyebrow'>
                 Built for independent artists
-              </p>
+              </span>
 
-              <h1 className='marketing-h1-linear mt-5 max-w-[12ch] text-primary-token lg:text-left'>
+              <h1 className='marketing-h1-linear mt-5 max-w-[12ch] text-primary-token lg:text-left line-clamp-2'>
                 {/* ui-casing-allow: marketing sentence-style headline */}
                 The link your music deserves.
               </h1>
@@ -34,10 +34,10 @@ export function HeroScrollSection() {
                 <ClaimHandleForm size='hero' />
               </div>
 
-              <p className='mt-3.5 text-2xs tracking-wide text-quaternary-token md:mt-4 lg:text-left'>
+              <span className='mt-3.5 block text-2xs tracking-wide text-quaternary-token md:mt-4 lg:text-left'>
                 Private launch access with your artist page and next release
                 ready to go.
-              </p>
+              </span>
             </div>
 
             <div className='relative mt-10 w-full md:mt-13 lg:mt-15'>

@@ -67,6 +67,7 @@ TYPED_PICKUP_REFUSE_REASONS = frozenset(
         "no_eligible_issue",
         "blocked",
         "state_not_admitted",
+        "closure_stop_line",
     )
 )
 # The upstream Elixir runtime is the sole owner of :4041 on Gem.  This
@@ -382,6 +383,31 @@ def _fleet_gate_allows_isolated() -> tuple[bool, str]:
     return True, f"fleet_gate_{state.lower()}"
 
 
+def _closure_intake_allowed() -> bool:
+    """Mirror grok-ship-one's new-work gate: closureAdmission.newIssueIntakeAllowed.
+
+    The sidecar must not lease NEW fallback work while the Summer closure
+    stop-line is closed — the leased worker would only die on grok-ship-one's
+    own stop-line check, burning a lease, Linear calls, and a unit launch for
+    nothing (live 2026-09-03: JOV-3583 exit 1 churn). Fail-closed when the
+    receipt is unreadable, matching grok-ship-one.
+    """
+    path = pathlib.Path(
+        os.path.expanduser(
+            os.environ.get(
+                "GEM_FLEET_GATE_RECEIPT",
+                "/home/timwhite/gem-workspace/state/gem-priority-gate/latest.json",
+            )
+        )
+    )
+    try:
+        receipt = json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, TypeError, ValueError):
+        return False
+    closure = receipt.get("closureAdmission")
+    return isinstance(closure, dict) and closure.get("newIssueIntakeAllowed") is True
+
+
 def _grok_units_after_survival_window() -> list[str] | None:
     time.sleep(
         _bounded_seconds(
@@ -638,12 +664,52 @@ def _grok_ship_one_executable() -> str | None:
     return str(executable) if executable.is_file() and os.access(executable, os.X_OK) else None
 
 
-def _grok_limit() -> int:
+def _oidc_seat(entry: object) -> bool:
+    if not isinstance(entry, dict):
+        return False
+    return bool(entry.get("refresh_token") or entry.get("key") or entry.get("access_token"))
+
+
+def _grok_oauth_seats() -> int | None:
+    path = pathlib.Path.home() / ".grok" / "auth.json"
     try:
-        value = int(os.environ.get("SYMPHONY_GROK_MAX", DEFAULT_GROK_MAX))
-    except (TypeError, ValueError):
+        payload = json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, TypeError, ValueError):
+        return None
+    if not isinstance(payload, dict):
+        return None
+    return sum(1 for entry in payload.values() if _oidc_seat(entry))
+
+
+def _kimi_oauth_seats() -> int | None:
+    path = pathlib.Path.home() / ".kimi-code" / "credentials" / "kimi-code.json"
+    try:
+        payload = json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, TypeError, ValueError):
+        return None
+    return 1 if _oidc_seat(payload) else 0
+
+
+def _live_oauth_seats() -> int | None:
+    grok = _grok_oauth_seats()
+    kimi = _kimi_oauth_seats()
+    if grok is None and kimi is None:
+        return None
+    return (grok or 0) + (kimi or 0)
+
+
+def _grok_limit() -> int:
+    raw = os.environ.get("SYMPHONY_GROK_MAX")
+    if raw is not None:
+        try:
+            return max(0, min(int(raw), MAX_GROK_MAX))
+        except (TypeError, ValueError):
+            return DEFAULT_GROK_MAX
+    seats = _live_oauth_seats()
+    if seats is None or seats <= 0:
+        # Missing Grok/Kimi files, or Codex-only exhaustion, must not serial-pin.
         return DEFAULT_GROK_MAX
-    return max(0, min(value, MAX_GROK_MAX))
+    return max(1, min(MAX_GROK_MAX, max(DEFAULT_GROK_MAX, seats)))
 
 
 def _dotenv_value(raw: str) -> str | None:
@@ -1629,6 +1695,10 @@ def _launch_fallback_workers(
     lock_count = _fallback_lock_count()
     next_eligible = ""
     first_lease: str | None = None
+    # Mirror grok-ship-one's new-work stop-line so the sidecar never leases
+    # fresh work it would only launch into a refusal. Remounts of existing
+    # open PRs are continuation and stay exempt.
+    closure_intake_open = _closure_intake_allowed()
     for identifier in identifiers:
         if capacity_used >= limit:
             if next_eligible == "":
@@ -1646,6 +1716,16 @@ def _launch_fallback_workers(
         if legacy_unit in active_units or any(unit.startswith(fallback_prefix) for unit in active_units):
             continue
         verdict, _pr = _open_pr_verdict(identifier, open_prs)
+        if verdict != "remount" and not closure_intake_open:
+            _emit_pickup(
+                "refuse",
+                reason="closure_stop_line",
+                identifier=identifier,
+                lock_count=lock_count,
+                next_issue=next_eligible,
+            )
+            print(f"fallback skip {identifier} closure_stop_line", file=sys.stderr, flush=True)
+            continue
         lock_path = _fallback_lease_dir() / f"{identifier}.lock"
         held = _lock_held(lock_path) if lock_path.is_file() else False
         issue = None

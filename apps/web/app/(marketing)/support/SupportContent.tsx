@@ -56,7 +56,7 @@ export function SupportChannels() {
   return (
     <MarketingContainer width='prose' className='pb-16'>
       <section>
-        <h2 className='text-2xl font-semibold tracking-tight text-primary-token'>
+        <h2 className='text-2xl font-semibold tracking-tight text-primary-token line-clamp-2'>
           How Can We Help?
         </h2>
         <div className='mt-6 grid gap-6 sm:grid-cols-3'>
@@ -105,7 +105,7 @@ export function SupportCta() {
   return (
     <MarketingContainer width='prose' className='pb-24'>
       <section data-testid='support-cta'>
-        <h2 className='text-2xl font-semibold tracking-tight text-primary-token'>
+        <h2 className='text-2xl font-semibold tracking-tight text-primary-token line-clamp-2'>
           Still Need Help?
         </h2>
         <p className='mt-4 text-base leading-relaxed text-secondary-token'>

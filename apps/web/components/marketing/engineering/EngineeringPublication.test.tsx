@@ -47,6 +47,8 @@ describe('EngineeringPublication', () => {
     expect(
       screen.getByRole('link', { name: 'Public shipping record' })
     ).toHaveAttribute('href', '/engineering/preview/verified-changelog');
+    expect(view.container.querySelector('h1')).toHaveClass('line-clamp-2');
+    expect(view.container.querySelector('h2')).toHaveClass('line-clamp-2');
     view.unmount();
 
     const { container } = render(
@@ -59,6 +61,8 @@ describe('EngineeringPublication', () => {
       'system-b-marketing-route-title'
     );
     expect(container.querySelector('h1')).not.toHaveClass('sm:text-5xl');
+    expect(container.querySelector('h1')).toHaveClass('line-clamp-2');
+    expect(container.querySelector('h2')).toHaveClass('line-clamp-1');
     expect(container.querySelector('.pb-20')).toHaveClass('sm:pb-28');
   });
 });

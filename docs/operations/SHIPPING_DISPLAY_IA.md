@@ -25,6 +25,13 @@ than invent a second task model.
 | Active execution | Current work | Receipt table or semantically equivalent list | Issue ID, title/state, tokens, elapsed time |
 | Source freshness | Updated | Natural relative local time | Exact source receipt remains available in drill-down |
 
+The Summer Kanban projection (`SummerKanbanCard`) follows the same contract:
+each card exposes per-source freshness in the shared observation vocabulary,
+the accountable next action and next proof derived from its routing state, and
+its terminal evidence reference once landed. A terminal card with no recorded
+evidence renders explicit nulls, and a missing source timestamp is `unknown` —
+never fresh, zero, or healthy.
+
 ## Invariants
 
 1. A shared metric keeps the same label, hierarchy, and representation across

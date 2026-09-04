@@ -4,7 +4,31 @@ import { describe, it } from 'node:test';
 import {
   collectLinearConnectionPages,
   fetchTeamActiveIssueSnapshot,
+  LinearTransportError,
 } from '../linear-client.mjs';
+
+// Mirrors the production payload captured from Linear when the fleet-closure
+// snapshot exceeded the 10000 query-complexity ceiling (HTTP 400 INPUT_ERROR).
+function complexityError() {
+  return new LinearTransportError(
+    'Linear GraphQL request failed (http, attempts=1)',
+    {
+      code: 'HTTP',
+      body: JSON.stringify({
+        errors: [
+          {
+            message: 'Query too complex',
+            extensions: {
+              code: 'INPUT_ERROR',
+              userPresentableMessage:
+                'The query is too complex. Complexity: 10226. Maximum allowed complexity: 10000.',
+            },
+          },
+        ],
+      }),
+    }
+  );
+}
 
 describe('exhaustive Linear pagination', () => {
   it('collects every page and emits a complete coverage receipt', async () => {
@@ -135,8 +159,8 @@ describe('exhaustive Linear pagination', () => {
     });
 
     assert.deepEqual(requests, [
-      { teamId: 'team-1', cursor: null },
-      { teamId: 'team-1', cursor: 'page-2' },
+      { teamId: 'team-1', cursor: null, pageSize: 50 },
+      { teamId: 'team-1', cursor: 'page-2', pageSize: 50 },
     ]);
     assert.equal(result.coverage.complete, true);
     assert.equal(result.coverage.scanned, 2);
@@ -165,5 +189,142 @@ describe('exhaustive Linear pagination', () => {
     assert.equal(result.coverage.pages, 21);
     assert.equal(result.coverage.complete, true);
     assert.equal(result.coverage.hasNextPage, false);
+  });
+
+  describe('query-complexity page-size halving', () => {
+    it('retries the same page with a halved page size, then resumes', async () => {
+      const calls = [];
+      const result = await collectLinearConnectionPages(
+        async (cursor, pageSize) => {
+          calls.push([cursor, pageSize]);
+          if (calls.length === 1) throw complexityError();
+          if (!cursor) {
+            return {
+              nodes: [{ id: '1' }],
+              pageInfo: { hasNextPage: true, endCursor: 'page-2' },
+            };
+          }
+          return {
+            nodes: [{ id: '2' }],
+            pageInfo: { hasNextPage: false, endCursor: 'done' },
+          };
+        }
+      );
+
+      // 50 fails against the ceiling; the same cursor is retried at 25 and
+      // the rest of the connection paginates at the reduced size.
+      assert.deepEqual(calls, [
+        [null, 50],
+        [null, 25],
+        ['page-2', 25],
+      ]);
+      assert.deepEqual(
+        result.issues.map(issue => issue.id),
+        ['1', '2']
+      );
+      assert.equal(result.coverage.complete, true);
+      assert.equal(result.coverage.pages, 2);
+    });
+
+    it('fails closed with COMPLEXITY_FLOOR when the floor still fails', async () => {
+      const sizes = [];
+      await assert.rejects(
+        collectLinearConnectionPages(async (_cursor, pageSize) => {
+          sizes.push(pageSize);
+          throw complexityError();
+        }),
+        error => {
+          const err = /** @type {any} */ (error);
+          return (
+            err?.name === 'LinearPaginationError' &&
+            err?.code === 'COMPLEXITY_FLOOR' &&
+            err?.coverage?.complete === false &&
+            err?.coverage?.reason === 'complexity-floor' &&
+            /10000/.test(err?.message) &&
+            err?.cause?.code === 'HTTP'
+          );
+        }
+      );
+      assert.deepEqual(sizes, [50, 25, 12, 6]);
+    });
+
+    it('does not retry a non-complexity HTTP 400', async () => {
+      let calls = 0;
+      await assert.rejects(
+        collectLinearConnectionPages(async () => {
+          calls += 1;
+          throw new LinearTransportError(
+            'Linear GraphQL request failed (http, attempts=1)',
+            {
+              code: 'HTTP',
+              body: JSON.stringify({
+                errors: [
+                  {
+                    message: 'Invalid filter',
+                    extensions: { code: 'INPUT_ERROR' },
+                  },
+                ],
+              }),
+            }
+          );
+        }),
+        error => {
+          const err = /** @type {any} */ (error);
+          return (
+            err?.code === 'PAGE_FETCH_FAILED' && err?.cause?.code === 'HTTP'
+          );
+        }
+      );
+      assert.equal(calls, 1);
+    });
+
+    it('leaves rate-limited failures on the fail-fast path', async () => {
+      let calls = 0;
+      await assert.rejects(
+        collectLinearConnectionPages(async () => {
+          calls += 1;
+          throw new LinearTransportError(
+            'Linear GraphQL request failed (rate_limited, attempts=3)',
+            { code: 'RATE_LIMITED' }
+          );
+        }),
+        error => {
+          const err = /** @type {any} */ (error);
+          return (
+            err?.code === 'PAGE_FETCH_FAILED' &&
+            err?.cause?.code === 'RATE_LIMITED'
+          );
+        }
+      );
+      assert.equal(calls, 1);
+    });
+
+    it('threads the halved page size through the fleet snapshot query', async () => {
+      const requests = [];
+      const queries = [];
+      const result = await fetchTeamActiveIssueSnapshot('team-1', {
+        graphqlImpl: async (query, variables) => {
+          queries.push(query);
+          requests.push(variables);
+          if (requests.length === 1) throw complexityError();
+          return {
+            team: {
+              issues: {
+                nodes: [{ id: 'one' }],
+                pageInfo: { hasNextPage: false, endCursor: 'terminal' },
+              },
+            },
+          };
+        },
+      });
+
+      assert.match(queries[0], /first:\s*\$pageSize/);
+      assert.deepEqual(requests, [
+        { teamId: 'team-1', cursor: null, pageSize: 50 },
+        { teamId: 'team-1', cursor: null, pageSize: 25 },
+      ]);
+      assert.equal(result.coverage.complete, true);
+      assert.equal(result.coverage.scanned, 1);
+    });
   });
 });
