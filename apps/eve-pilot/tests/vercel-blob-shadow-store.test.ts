@@ -19,6 +19,7 @@ import { BlobNotFoundError } from '@vercel/blob';
 import {
   listImmutableShadowRecords,
   persistImmutableShadowRecord,
+  persistShadowCursor,
   readImmutableShadowRecord,
 } from '../agent/lib/vercel-blob-shadow-store';
 
@@ -58,6 +59,22 @@ describe('immutable Summer shadow blob store', () => {
     await expect(
       persistImmutableShadowRecord('summer-shadow/receipts/key.json', {})
     ).resolves.toBe('exists');
+  });
+
+  it('updates only the bounded recovery cursor as mutable state', async () => {
+    blob.put.mockResolvedValue({ pathname: 'recovery-cursor.json' });
+    await persistShadowCursor('summer-bottleneck/recovery-cursor.json', {
+      cursor: 'next-page',
+    });
+    expect(blob.put).toHaveBeenCalledWith(
+      'summer-bottleneck/recovery-cursor.json',
+      JSON.stringify({ cursor: 'next-page' }),
+      expect.objectContaining({
+        access: 'private',
+        addRandomSuffix: false,
+        allowOverwrite: true,
+      })
+    );
   });
 
   it('preserves the write failure when no durable record can be proven', async () => {
@@ -117,23 +134,105 @@ describe('immutable Summer shadow blob store', () => {
       });
 
     await expect(
-      listImmutableShadowRecords('summer-bottleneck/events/')
-    ).resolves.toEqual([
-      {
-        pathname: 'summer-bottleneck/events/a.json',
-        record: { eventId: 'a' },
-      },
-      {
-        pathname: 'summer-bottleneck/events/b.json',
-        record: { eventId: 'b' },
-      },
-    ]);
+      listImmutableShadowRecords('summer-bottleneck/events/', { limit: 100 })
+    ).resolves.toEqual({
+      entries: [
+        {
+          pathname: 'summer-bottleneck/events/a.json',
+          record: { eventId: 'a' },
+        },
+        {
+          pathname: 'summer-bottleneck/events/b.json',
+          record: { eventId: 'b' },
+        },
+      ],
+      hasMore: undefined,
+      scanned: 2,
+    });
     expect(blob.list).toHaveBeenCalledWith(
       expect.objectContaining({
-        limit: 25,
+        limit: 100,
         prefix: 'summer-bottleneck/events/',
       })
     );
+  });
+
+  it('paginates through every immutable record page', async () => {
+    blob.list
+      .mockResolvedValueOnce({
+        blobs: [{ pathname: 'summer-bottleneck/events/a.json' }],
+        cursor: 'page-two',
+        hasMore: true,
+      })
+      .mockResolvedValueOnce({
+        blobs: [{ pathname: 'summer-bottleneck/events/z.json' }],
+        hasMore: false,
+      });
+    blob.get
+      .mockResolvedValueOnce({
+        statusCode: 200,
+        stream: new Response('{"eventId":"a"}').body,
+        blob: { size: 15 },
+      })
+      .mockResolvedValueOnce({
+        statusCode: 200,
+        stream: new Response('{"eventId":"z"}').body,
+        blob: { size: 15 },
+      });
+
+    await expect(
+      listImmutableShadowRecords('summer-bottleneck/events/', { limit: 1 })
+    ).resolves.toMatchObject({ cursor: 'page-two', hasMore: true });
+    await expect(
+      listImmutableShadowRecords('summer-bottleneck/events/', {
+        cursor: 'page-two',
+        limit: 1,
+      })
+    ).resolves.toMatchObject({ hasMore: false });
+    expect(blob.list).toHaveBeenNthCalledWith(
+      2,
+      expect.objectContaining({ cursor: 'page-two', limit: 1 })
+    );
+  });
+
+  it('fails closed when a paginated listing does not advance', async () => {
+    blob.list.mockResolvedValue({ blobs: [], hasMore: true });
+    await expect(
+      listImmutableShadowRecords('summer-bottleneck/events/', { limit: 25 })
+    ).rejects.toThrow('immutable shadow record pagination is invalid');
+  });
+
+  it('isolates one corrupt listed blob and returns later valid records', async () => {
+    blob.list.mockResolvedValue({
+      blobs: [
+        { pathname: 'summer-bottleneck/events/corrupt.json' },
+        { pathname: 'summer-bottleneck/events/valid.json' },
+      ],
+      hasMore: false,
+    });
+    blob.get
+      .mockResolvedValueOnce({
+        statusCode: 200,
+        stream: new Response('{bad-json').body,
+        blob: { size: 9 },
+      })
+      .mockResolvedValueOnce({
+        statusCode: 200,
+        stream: new Response('{"eventId":"valid"}').body,
+        blob: { size: 19 },
+      });
+
+    await expect(
+      listImmutableShadowRecords('summer-bottleneck/events/', { limit: 25 })
+    ).resolves.toMatchObject({
+      entries: [
+        {
+          pathname: 'summer-bottleneck/events/valid.json',
+          record: { eventId: 'valid' },
+        },
+      ],
+      hasMore: false,
+    });
   });
 
   it('fails closed for missing, unavailable, oversized, or malformed records', async () => {

@@ -71,7 +71,6 @@ const SEVERE_INTEGRITY_REASONS = new Set([
 const CAPACITY_POLICY = invariantPolicy('JOV-INV-007');
 const FLEET_AUTHORITY = invariantPolicy('JOV-INV-008');
 const DEFAULT_GEM_CONCURRENCY = CAPACITY_POLICY.baseline;
-const MAX_EVIDENCE_BACKED_GEM_CONCURRENCY = CAPACITY_POLICY.maximum;
 const CONTROLLER_RECEIPT_MAX_AGE_MS = 10 * 60 * 1000;
 const CONCURRENCY_EVIDENCE_MAX_AGE_MS =
   CAPACITY_POLICY.freshnessHours * 60 * 60 * 1000;
@@ -411,9 +410,10 @@ function deploymentBound(mainSha, deployedSha) {
 }
 
 /**
- * Runtime may preserve already-queued work at its safe floor, but a new Linear
- * mutation requires a fresh approved capacity receipt. Missing, malformed, or
- * stale evidence therefore grants zero new leases rather than inventing four.
+ * symphony-concurrency-autoscale-v1: concurrency autoscales from the live-seat
+ * receipt with no upper clamp and no clean-run ratchet. Missing, malformed,
+ * or stale evidence degrades to the runtime floor (one seat) instead of
+ * zeroing the factory; only a RED fleet state blocks mutation.
  */
 export function resolveGemConcurrency(
   evidence,
@@ -424,31 +424,24 @@ export function resolveGemConcurrency(
 ) {
   const nowMs = Date.parse(now);
   const measuredTarget = evidence?.target;
-  const requiredCleanRuns =
-    measuredTarget > DEFAULT_GEM_CONCURRENCY
-      ? CAPACITY_POLICY.cleanRunsForMaximum
-      : 1;
   const evidenceAccepted =
     evidence?.schema === GEM_CONCURRENCY_EVIDENCE_SCHEMA &&
     Number.isInteger(measuredTarget) &&
     measuredTarget >= CAPACITY_POLICY.minimum &&
-    measuredTarget <= MAX_EVIDENCE_BACKED_GEM_CONCURRENCY &&
     evidence?.approved === true &&
-    Number.isInteger(evidence?.cleanRuns) &&
-    evidence.cleanRuns >= requiredCleanRuns &&
     evidence?.severeIncidents === 0 &&
     isFreshTimestamp(evidence?.observedAt, nowMs, maxAgeMs);
 
   return {
-    maxConcurrent: evidenceAccepted ? measuredTarget : 0,
+    maxConcurrent: evidenceAccepted ? measuredTarget : CAPACITY_POLICY.minimum,
     runtimeFloor: CAPACITY_POLICY.minimum,
     baseline: DEFAULT_GEM_CONCURRENCY,
     evidenceAccepted,
-    newMutationAllowed: evidenceAccepted,
+    newMutationAllowed: true,
     preserveQueuedWork: CAPACITY_POLICY.preserveQueuedWork,
     reason: evidenceAccepted
-      ? 'recent-approved-measured-capacity'
-      : 'capacity-evidence-missing-malformed-or-stale',
+      ? 'live-seat-capacity'
+      : 'capacity-evidence-missing-runtime-floor',
   };
 }
 
