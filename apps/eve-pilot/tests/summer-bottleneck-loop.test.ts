@@ -7,7 +7,9 @@ import {
   type SummerBottleneckDependencies,
   type SummerBottleneckRecord,
   type SummerBottleneckStore,
+  type SummerCiImprovementClassId,
   signSummerBottleneckProducerAttestation,
+  summerCiImprovementClassIds,
   verifySummerBottleneckReceipt,
 } from '../agent/lib/summer-bottleneck-loop';
 
@@ -162,6 +164,36 @@ function snapshot(
   };
 }
 
+function ciAuditBottleneckSnapshot(
+  overrides: {
+    readonly eventId?: string;
+    readonly selectedId?: SummerCiImprovementClassId;
+    readonly selectedState?: 'open' | 'partial';
+    readonly sourceVersion?: string;
+  } = {}
+) {
+  const {
+    selectedId = 'merge-group-flake-baseline-ratchet',
+    selectedState = 'open',
+    ...snapshotOverrides
+  } = overrides;
+  const baseline = snapshot(snapshotOverrides);
+  return snapshot({
+    ...snapshotOverrides,
+    release: {
+      blockedSince: null,
+      productionSha: overrides.sourceVersion ?? SOURCE,
+      unverifiedMerges: 0,
+    },
+    ciAudit: {
+      classes: baseline.signals.ciAudit.classes.map(item => ({
+        ...item,
+        state: item.id === selectedId ? selectedState : 'implemented',
+      })),
+    },
+  });
+}
+
 function memoryStore(records = new Map<string, SummerBottleneckRecord>()) {
   const store: SummerBottleneckStore = {
     async create(pathname, record) {
@@ -238,7 +270,8 @@ describe('Summer bottleneck loop', () => {
       },
     });
 
-    expect(rankSummerBottlenecks(input, NOW).map(item => item.id)).toEqual([
+    const ranking = rankSummerBottlenecks(input, NOW);
+    expect(ranking.map(item => item.id)).toEqual([
       'native-queue-starvation',
       'release-certification-starvation',
       'closure-health-red',
@@ -250,6 +283,48 @@ describe('Summer bottleneck loop', () => {
       'obsolete-unaffected-native-lanes',
       'affected-only-unit-selection',
     ]);
+    expect(
+      ranking
+        .filter(item => summerCiImprovementClassIds.some(id => id === item.id))
+        .every(item => item.inEnvelope)
+    ).toBe(true);
+  });
+
+  it.each(
+    summerCiImprovementClassIds
+  )('admits only the bounded source-repair task for CI class %s', async selectedId => {
+    const proof = harness();
+    const expected = snapshot().signals.ciAudit.classes.find(
+      item => item.id === selectedId
+    );
+    if (!expected) throw new Error(`missing CI audit fixture ${selectedId}`);
+    await expect(
+      ingestSummerBottleneckSnapshot(
+        ciAuditBottleneckSnapshot({
+          selectedId,
+          selectedState:
+            selectedId === 'auto-enroll-self-cancel-churn' ? 'partial' : 'open',
+        }),
+        proof.dependencies
+      )
+    ).resolves.toMatchObject({
+      decision: 'symphony-succeeded',
+      selected: { id: selectedId, inEnvelope: true },
+    });
+    expect(proof.dispatchToSymphony).toHaveBeenCalledWith(
+      expect.objectContaining({
+        action: 'remediate-selected-ci-audit-class',
+        authority: 'source-repair-only-no-direct-pr-queue-or-deploy-mutation',
+        selected: {
+          id: selectedId,
+          sourceRevision: SOURCE,
+          sourceDigest: '5'.repeat(64),
+          owner: expected.owner,
+          handle: expected.handle,
+        },
+      }),
+      { idempotencyKey: expect.stringMatching(/^[a-f0-9]{64}$/u) }
+    );
   });
 
   it('dispatches the in-envelope release bottleneck and signs a source-bound terminal receipt', async () => {
@@ -291,11 +366,110 @@ describe('Summer bottleneck loop', () => {
       expect.objectContaining({
         schema: 'jovie-symphony-repair-task/v1',
         action: 'reconcile-release-certification-starvation',
+        authority: 'source-repair-only-no-direct-pr-queue-or-deploy-mutation',
         owner: 'symphony',
         safety: 'exact-source-ci-native-queue-production-gates-remain-required',
+        selected: expect.objectContaining({
+          id: 'release-certification-starvation',
+          sourceRevision: SOURCE,
+          sourceDigest: '3'.repeat(64),
+          owner: 'Summer',
+          handle: 'symphony',
+        }),
       }),
       { idempotencyKey: expect.stringMatching(/^[a-f0-9]{64}$/u) }
     );
+  });
+
+  it('dispatches the selected CI audit class with its exact source and owner binding', async () => {
+    const proof = harness();
+    const first = await ingestSummerBottleneckSnapshot(
+      ciAuditBottleneckSnapshot(),
+      proof.dependencies
+    );
+    const unchanged = await ingestSummerBottleneckSnapshot(
+      ciAuditBottleneckSnapshot({ eventId: 'evt_ci_audit_0002' }),
+      proof.dependencies
+    );
+    const duplicate = await ingestSummerBottleneckSnapshot(
+      ciAuditBottleneckSnapshot(),
+      proof.dependencies
+    );
+
+    expect(first).toMatchObject({
+      decision: 'symphony-succeeded',
+      selected: {
+        id: 'merge-group-flake-baseline-ratchet',
+        inEnvelope: true,
+        owner: 'ci-reliability',
+        handle: 'audit:merge-group-flakes',
+        sourceRevision: SOURCE,
+        sourceDigest: '5'.repeat(64),
+      },
+      terminal: true,
+    });
+    expect(unchanged).toMatchObject({
+      decision: 'unchanged-noop',
+      terminal: true,
+    });
+    expect(duplicate).toMatchObject({
+      decision: 'duplicate-replay-rejected',
+      terminal: true,
+    });
+    expect(proof.dispatchToSymphony).toHaveBeenCalledTimes(1);
+    expect(proof.observeSymphonyOutcome).toHaveBeenCalledTimes(1);
+    expect(proof.dispatchToSymphony).toHaveBeenCalledWith(
+      expect.objectContaining({
+        schema: 'jovie-symphony-repair-task/v1',
+        action: 'remediate-selected-ci-audit-class',
+        authority: 'source-repair-only-no-direct-pr-queue-or-deploy-mutation',
+        selected: {
+          id: 'merge-group-flake-baseline-ratchet',
+          sourceRevision: SOURCE,
+          sourceDigest: '5'.repeat(64),
+          owner: 'ci-reliability',
+          handle: 'audit:merge-group-flakes',
+        },
+        source: {
+          sourceVersion: SOURCE,
+          snapshotDigest: expect.stringMatching(/^[a-f0-9]{64}$/u),
+        },
+      }),
+      { idempotencyKey: expect.stringMatching(/^[a-f0-9]{64}$/u) }
+    );
+  });
+
+  it('recovers a pending CI audit dispatch after restart without redispatching', async () => {
+    const shared = memoryStore();
+    const first = harness(shared, {
+      observeSymphonyOutcome: vi.fn(async () => ({
+        status: 'pending' as const,
+        detail: 'running',
+      })),
+    });
+    await expect(
+      ingestSummerBottleneckSnapshot(
+        ciAuditBottleneckSnapshot(),
+        first.dependencies
+      )
+    ).resolves.toMatchObject({
+      decision: 'pending-symphony',
+      selected: { id: 'merge-group-flake-baseline-ratchet' },
+    });
+
+    const restarted = harness(shared);
+    await expect(
+      reconcileMissedSummerBottleneckEvents(restarted.dependencies)
+    ).resolves.toEqual([
+      expect.objectContaining({
+        decision: 'symphony-succeeded',
+        selected: expect.objectContaining({
+          id: 'merge-group-flake-baseline-ratchet',
+        }),
+      }),
+    ]);
+    expect(restarted.dispatchToSymphony).not.toHaveBeenCalled();
+    expect(restarted.observeSymphonyOutcome).toHaveBeenCalledTimes(1);
   });
 
   it('is a cheap no-op on an unchanged later cadence', async () => {
@@ -566,6 +740,278 @@ describe('Summer bottleneck loop', () => {
     expect(heartbeat.dispatchToSymphony).toHaveBeenCalledTimes(1);
   });
 
+  it('reconciles a freshness-admitted event after a delayed heartbeat', async () => {
+    const shared = memoryStore();
+    const failed = harness(shared, {
+      dispatchToSymphony: vi.fn(async () => {
+        throw new Error('dispatch transport unavailable');
+      }),
+    });
+    await expect(
+      ingestSummerBottleneckSnapshot(snapshot(), failed.dependencies)
+    ).rejects.toThrow('dispatch transport unavailable');
+
+    const delayed = harness(shared, {
+      now: () => new Date(NOW.getTime() + 16 * 60 * 1000),
+    });
+    await expect(
+      reconcileMissedSummerBottleneckEvents(delayed.dependencies)
+    ).resolves.toEqual([
+      expect.objectContaining({ decision: 'symphony-succeeded' }),
+    ]);
+  });
+
+  it('does not strand a pending event behind more than 25 terminal events', async () => {
+    const shared = memoryStore();
+    const proof = harness(shared);
+    for (let index = 0; index < 26; index += 1) {
+      const baseline = snapshot({
+        eventId: `evt_terminal_${String(index).padStart(4, '0')}`,
+      });
+      await ingestSummerBottleneckSnapshot(
+        snapshot({
+          eventId: baseline.eventId,
+          release: {
+            blockedSince: null,
+            productionSha: SOURCE,
+            unverifiedMerges: 0,
+          },
+          ciAudit: {
+            classes: baseline.signals.ciAudit.classes.map(item => ({
+              ...item,
+              state: 'implemented',
+            })),
+          },
+        }),
+        proof.dependencies
+      );
+    }
+    const terminalPaths = [...shared.records.keys()].filter(path =>
+      path.includes('/terminal/')
+    );
+    expect(terminalPaths).toHaveLength(26);
+    shared.records.delete(terminalPaths[25]!);
+
+    await expect(
+      reconcileMissedSummerBottleneckEvents(proof.dependencies)
+    ).resolves.toEqual([
+      expect.objectContaining({ decision: 'healthy-noop', terminal: true }),
+    ]);
+  });
+
+  it('continues recovery after an earlier durable event is corrupted', async () => {
+    const shared = memoryStore();
+    const first = harness(shared, {
+      dispatchToSymphony: vi.fn(async () => {
+        throw new Error('leave first pending');
+      }),
+    });
+    await expect(
+      ingestSummerBottleneckSnapshot(
+        snapshot({ eventId: 'evt_poison_0001' }),
+        first.dependencies
+      )
+    ).rejects.toThrow();
+    const firstClaim = [...shared.records.keys()].find(path =>
+      path.includes('/claims/')
+    );
+    expect(firstClaim).toBeDefined();
+    shared.records.set(firstClaim!, { fingerprint: 'corrupted' });
+
+    const second = harness(shared, {
+      dispatchToSymphony: vi.fn(async () => {
+        throw new Error('leave second pending');
+      }),
+    });
+    await expect(
+      ingestSummerBottleneckSnapshot(
+        snapshot({
+          eventId: 'evt_poison_0002',
+          sourceVersion: 'c'.repeat(40),
+        }),
+        second.dependencies
+      )
+    ).rejects.toThrow();
+
+    const recovered = await reconcileMissedSummerBottleneckEvents(
+      harness(shared).dependencies
+    );
+    expect(recovered).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ decision: 'recovery-processing-failed' }),
+        expect.objectContaining({ decision: 'symphony-succeeded' }),
+      ])
+    );
+  });
+
+  it('advances the durable cursor past 25 poison events', async () => {
+    const shared = memoryStore();
+    for (let index = 0; index < 26; index += 1) {
+      const failed = harness(shared, {
+        dispatchToSymphony: vi.fn(async () => {
+          throw new Error('leave pending');
+        }),
+      });
+      await expect(
+        ingestSummerBottleneckSnapshot(
+          snapshot({
+            eventId: `evt_cursor_${String(index).padStart(4, '0')}`,
+            sourceVersion: index.toString(16).padStart(40, '0'),
+          }),
+          failed.dependencies
+        )
+      ).rejects.toThrow();
+    }
+    const sortedEvents = [...shared.records.entries()]
+      .filter(([path]) => path.includes('/events/'))
+      .sort(([left], [right]) => left.localeCompare(right));
+    const lastEventId = (
+      sortedEvents[25]?.[1].snapshot as { eventId?: unknown } | undefined
+    )?.eventId;
+    expect(lastEventId).toBeTypeOf('string');
+    for (const [path, record] of shared.records) {
+      if (path.includes('/claims/') && record.eventId !== lastEventId) {
+        shared.records.set(path, { fingerprint: 'corrupted' });
+      }
+    }
+
+    const heartbeat = harness(shared);
+    const first = await reconcileMissedSummerBottleneckEvents(
+      heartbeat.dependencies
+    );
+    expect(first).toHaveLength(25);
+    expect(
+      first.every(item => item.decision === 'recovery-processing-failed')
+    ).toBe(true);
+    const second = await reconcileMissedSummerBottleneckEvents(
+      heartbeat.dependencies
+    );
+    expect(second).toEqual([
+      expect.objectContaining({ decision: 'symphony-succeeded' }),
+    ]);
+  });
+
+  it('isolates a terminal read failure and still recovers the next event', async () => {
+    const shared = memoryStore();
+    for (const [eventId, sourceVersion] of [
+      ['evt_terminal_read_0001', 'd'.repeat(40)],
+      ['evt_terminal_read_0002', 'e'.repeat(40)],
+    ] as const) {
+      const failed = harness(shared, {
+        dispatchToSymphony: vi.fn(async () => {
+          throw new Error('leave pending');
+        }),
+      });
+      await expect(
+        ingestSummerBottleneckSnapshot(
+          snapshot({ eventId, sourceVersion }),
+          failed.dependencies
+        )
+      ).rejects.toThrow();
+    }
+    const read = shared.store.read.bind(shared.store);
+    let failedTerminalRead = false;
+    shared.store.read = async pathname => {
+      if (!failedTerminalRead && pathname.includes('/terminal/')) {
+        failedTerminalRead = true;
+        throw new Error('terminal unreadable');
+      }
+      return read(pathname);
+    };
+
+    const recovered = await reconcileMissedSummerBottleneckEvents(
+      harness(shared).dependencies
+    );
+    expect(recovered).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ decision: 'recovery-terminal-read-failed' }),
+        expect.objectContaining({ decision: 'symphony-succeeded' }),
+      ])
+    );
+  });
+
+  it('resets a repeated cursor and recovers on the next heartbeat', async () => {
+    const shared = memoryStore();
+    const failed = harness(shared, {
+      dispatchToSymphony: vi.fn(async () => {
+        throw new Error('leave pending');
+      }),
+    });
+    await expect(
+      ingestSummerBottleneckSnapshot(snapshot(), failed.dependencies)
+    ).rejects.toThrow();
+    const list = shared.store.list.bind(shared.store);
+    let calls = 0;
+    shared.store.list = async (prefix, options) => {
+      calls += 1;
+      if (calls <= 2) {
+        return { cursor: 'repeated', entries: [], hasMore: true, scanned: 1 };
+      }
+      return list(prefix, options);
+    };
+
+    await expect(
+      reconcileMissedSummerBottleneckEvents(harness(shared).dependencies)
+    ).resolves.toEqual([
+      expect.objectContaining({ decision: 'recovery-cursor-conflict' }),
+    ]);
+    await expect(
+      reconcileMissedSummerBottleneckEvents(harness(shared).dependencies)
+    ).resolves.toEqual([
+      expect.objectContaining({ decision: 'symphony-succeeded' }),
+    ]);
+  });
+
+  it('ignores a corrupt recovery cursor and starts safely', async () => {
+    const shared = memoryStore();
+    const failed = harness(shared, {
+      dispatchToSymphony: vi.fn(async () => {
+        throw new Error('leave pending');
+      }),
+    });
+    await expect(
+      ingestSummerBottleneckSnapshot(snapshot(), failed.dependencies)
+    ).rejects.toThrow();
+    const read = shared.store.read.bind(shared.store);
+    shared.store.read = async pathname => {
+      if (pathname.endsWith('/recovery-cursor.json')) {
+        throw new Error('cursor corrupt');
+      }
+      return read(pathname);
+    };
+
+    await expect(
+      reconcileMissedSummerBottleneckEvents(harness(shared).dependencies)
+    ).resolves.toEqual([
+      expect.objectContaining({ decision: 'symphony-succeeded' }),
+    ]);
+  });
+
+  it('terminalizes an expired recovery event without dispatching it', async () => {
+    const shared = memoryStore();
+    const failed = harness(shared, {
+      dispatchToSymphony: vi.fn(async () => {
+        throw new Error('dispatch transport unavailable');
+      }),
+    });
+    await expect(
+      ingestSummerBottleneckSnapshot(snapshot(), failed.dependencies)
+    ).rejects.toThrow();
+    const expired = harness(shared, {
+      now: () => new Date(NOW.getTime() + 46 * 60 * 1000),
+    });
+
+    await expect(
+      reconcileMissedSummerBottleneckEvents(expired.dependencies)
+    ).resolves.toEqual([
+      expect.objectContaining({
+        decision: 'recovery-expired-noop',
+        terminal: true,
+      }),
+    ]);
+    expect(expired.dispatchToSymphony).not.toHaveBeenCalled();
+  });
+
   it('dispatches again on a later cadence only when source-bound state changes', async () => {
     const proof = harness();
     await ingestSummerBottleneckSnapshot(snapshot(), proof.dependencies);
@@ -631,19 +1077,6 @@ describe('Summer bottleneck loop', () => {
         },
       },
       'runner-capacity-starvation',
-    ],
-    [
-      'named CI class',
-      {
-        ciAudit: {
-          classes: snapshot().signals.ciAudit.classes.map((item, index) => ({
-            ...item,
-            blockedSince:
-              index === 0 ? '2026-09-02T04:00:00.000Z' : item.blockedSince,
-          })),
-        },
-      },
-      'merge-group-flake-baseline-ratchet',
     ],
   ])('source-binds and holds the selected %s bottleneck', async (_name, change, expectedId) => {
     const proof = harness();

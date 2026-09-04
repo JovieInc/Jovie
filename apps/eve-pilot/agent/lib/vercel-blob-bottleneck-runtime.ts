@@ -9,6 +9,7 @@ import {
   type SummerBottleneckRecord,
   type SummerBottleneckStore,
   type SymphonyRepairTask,
+  symphonyRepairTaskSchema,
 } from './summer-bottleneck-loop';
 import {
   listImmutableShadowRecords,
@@ -179,7 +180,11 @@ export function createVercelBlobBottleneckDependencies(
     receiptSigningKeyId: security.receiptSigningKeyId,
     producerVerificationKeys: security.producerVerificationKeys,
     async dispatchToSymphony(task: SymphonyRepairTask, { idempotencyKey }) {
-      if (task.taskKey !== idempotencyKey) {
+      const parsedTask = symphonyRepairTaskSchema.safeParse(task);
+      if (!parsedTask.success) {
+        throw new Error('Symphony repair task is outside the bounded contract');
+      }
+      if (parsedTask.data.taskKey !== idempotencyKey) {
         throw new Error('Symphony task key does not match idempotency key');
       }
       const outbox = signRecord(
@@ -189,7 +194,7 @@ export function createVercelBlobBottleneckDependencies(
           destination: 'symphony',
           idempotencyKey,
           status: 'ready',
-          task,
+          task: parsedTask.data,
         },
         security.eveOutboxSigningPrivateKey,
         security.eveOutboxSigningKeyId
