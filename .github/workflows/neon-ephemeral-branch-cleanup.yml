@@ -74,9 +74,10 @@ jobs:
 
       - name: Setup pnpm
         if: steps.guard.outputs.skip != 'true'
+        # No explicit version: packageManager (pnpm@9.15.4) in package.json is
+        # the single source of truth; pinning `version: 9` here makes
+        # pnpm/action-setup fail closed on the dual-version conflict.
         uses: pnpm/action-setup@0977fd99725f1db4007ccb2928dbb4e90d06cc86 # v6.0.10
-        with:
-          version: 9
 
       - name: List and delete matching Neon branches
         if: steps.guard.outputs.skip != 'true'
