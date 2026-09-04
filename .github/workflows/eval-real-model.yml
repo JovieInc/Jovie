@@ -9,7 +9,7 @@
 # - Manual workflow_dispatch
 
 name: Real-Model Eval Lane
-# clock-class: skip-if-unchanged
+# clock-class: upstream-advisory
 
 on:
   schedule:
@@ -31,7 +31,6 @@ on:
 
 permissions:
   contents: read
-  actions: read
 
 concurrency:
   group: eval-real-model-${{ github.workflow }}-${{ github.ref }}
@@ -45,26 +44,8 @@ env:
   BUDGET_CAP_USD: ${{ github.event.inputs.budget_cap_usd || '2.00' }}
 
 jobs:
-  unchanged:
-    name: Skip if no new SHA
-    runs-on: ubuntu-latest
-    timeout-minutes: 2
-    outputs:
-      skip: ${{ steps.gate.outputs.skip }}
-    steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-        with:
-          persist-credentials: false
-          sparse-checkout: .github/actions/skip-if-unchanged
-      - id: gate
-        uses: ./.github/actions/skip-if-unchanged
-        with:
-          workflow: eval-real-model.yml
-
   real-model-eval:
     name: Golden + Adversarial (Helicone)
-    needs: unchanged
-    if: needs.unchanged.outputs.skip != 'true'
     # Live-model work is scheduled/manual and never consumes fixed CI slots.
     runs-on: ubuntu-latest
     timeout-minutes: 20

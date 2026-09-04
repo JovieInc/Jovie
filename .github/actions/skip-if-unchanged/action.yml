@@ -34,7 +34,7 @@ runs:
           echo "::error::skip-if-unchanged requires an exact 40-char SHA"
           exit 1
         fi
-        last="$(gh run list --repo "$REPO" --workflow "$WORKFLOW" --branch main --status success --limit 30 --json headSha,event,conclusion \
+        last="$(gh run list --repo "$REPO" --workflow "$WORKFLOW" --branch main --event schedule --status success --limit 30 --json headSha,conclusion \
           --jq '[.[] | select(.conclusion=="success")] | .[0].headSha // empty')"
         if [[ -n "$last" && "$last" == "$SHA" ]]; then
           echo "skip=true" >> "$GITHUB_OUTPUT"
