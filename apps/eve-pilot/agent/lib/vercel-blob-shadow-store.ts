@@ -74,17 +74,51 @@ export async function readImmutableShadowRecord(
 }
 
 export async function listImmutableShadowRecords(
-  prefix: string
-): Promise<readonly { pathname: string; record: ShadowRecord }[]> {
+  prefix: string,
+  options: { readonly cursor?: string; readonly limit: number }
+): Promise<{
+  readonly cursor?: string;
+  readonly entries: readonly { pathname: string; record: ShadowRecord }[];
+  readonly hasMore: boolean;
+  readonly scanned: number;
+}> {
   const result = await list({
     abortSignal: AbortSignal.timeout(BLOB_OPERATION_TIMEOUT_MS),
-    limit: 25,
+    ...(options.cursor ? { cursor: options.cursor } : {}),
+    limit: options.limit,
     prefix,
   });
   const records: { pathname: string; record: ShadowRecord }[] = [];
   for (const blob of result.blobs) {
-    const record = await readImmutableShadowRecord(blob.pathname);
-    if (record) records.push({ pathname: blob.pathname, record });
+    try {
+      const record = await readImmutableShadowRecord(blob.pathname);
+      if (record) records.push({ pathname: blob.pathname, record });
+    } catch {
+      // One corrupt immutable object must not deny recovery for every later
+      // event. The bottleneck loop still authenticates every returned item.
+    }
   }
-  return records;
+  if (result.hasMore && (!result.cursor || result.cursor === options.cursor)) {
+    throw new Error('immutable shadow record pagination is invalid');
+  }
+  return {
+    ...(result.cursor ? { cursor: result.cursor } : {}),
+    entries: records,
+    hasMore: result.hasMore,
+    scanned: result.blobs.length,
+  };
+}
+
+export async function persistShadowCursor(
+  pathname: string,
+  record: ShadowRecord
+): Promise<void> {
+  await put(pathname, JSON.stringify(record), {
+    abortSignal: AbortSignal.timeout(BLOB_OPERATION_TIMEOUT_MS),
+    access: 'private',
+    addRandomSuffix: false,
+    allowOverwrite: true,
+    cacheControlMaxAge: 60,
+    contentType: 'application/json; charset=utf-8',
+  });
 }
