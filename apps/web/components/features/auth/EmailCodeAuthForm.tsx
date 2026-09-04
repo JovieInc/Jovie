@@ -324,7 +324,7 @@ export function EmailCodeAuthForm({
         </p>
         <Button
           type='button'
-          className={AUTH_CLASSES.authEntryCta}
+          className={AUTH_CLASSES.authCta}
           static
           onClick={handleRequestNewCode}
         >
@@ -358,7 +358,7 @@ export function EmailCodeAuthForm({
         <FormError id='auth-email-code-error' message={errorMessage} />
         <Button
           type='submit'
-          className={AUTH_CLASSES.authEntryCta}
+          className={AUTH_CLASSES.authCta}
           static
           disabled={isPending || code.length < 6}
         >
@@ -429,7 +429,7 @@ export function EmailCodeAuthForm({
       </div>
       <Button
         type='submit'
-        className={AUTH_CLASSES.authEntryCta}
+        className={AUTH_CLASSES.authCta}
         static
         disabled={isPending}
         aria-busy={isPending || undefined}
