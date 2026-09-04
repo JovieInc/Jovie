@@ -1496,7 +1496,7 @@ def _header(
     width: int,
 ) -> str:
     brand = "● JOVIE" if width < 120 else "● JOVIE · SYMPHONY"
-    parts = [_rgb(FG, brand, bold=True), _rgb(DIM, "shipping cockpit"), _rgb(FG, "main")]
+    parts = [_rgb(FG, brand, bold=True), _rgb(DIM, "shipping cockpit"), _rgb(FG, "HUD build")]
     if sha:
         parts.append(_rgb(DIM, sha))
     left = f" {_rgb(DIM, '·')} ".join(parts)

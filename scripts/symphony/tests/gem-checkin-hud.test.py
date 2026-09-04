@@ -238,7 +238,8 @@ class UltrawideHudTests(unittest.TestCase):
         self.assertGreaterEqual(max(len(line) for line in plain.splitlines()), 160)
         self.assertNotIn("─" * 56 + "\n", output)
         self.assertIn("JOVIE", header)
-        self.assertIn("main", header)
+        self.assertIn("HUD build", header)
+        self.assertNotIn("· main ·", header)
         self.assertIn("469d4bb", header)
 
     def test_omits_zero_buckets_and_never_prints_fail_zero(self):
@@ -246,7 +247,7 @@ class UltrawideHudTests(unittest.TestCase):
         for token in ("RUN ", "RETRY 0", "MQ 0", "Review 0", "FAIL 0"):
             self.assertNotIn(token, plain)
         self.assertIn("JOVIE", plain)
-        self.assertIn("main", plain)
+        self.assertIn("HUD build", plain)
 
     def test_running_issue_from_official_state_renders_id_attempt_elapsed(self):
         payload = official_state(
