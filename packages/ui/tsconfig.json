@@ -16,7 +16,6 @@
     "incremental": true,
     "tsBuildInfoFile": ".cache/tsbuildinfo",
     "composite": true,
-    "baseUrl": ".",
     "paths": {
       "@jovie/ui": ["."],
       "@jovie/ui/*": ["./*"]
