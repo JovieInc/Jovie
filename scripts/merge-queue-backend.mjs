@@ -265,11 +265,11 @@ function hasMergeGroupChecksRequested(workflowYaml) {
  * merge-queue enrollment.
  *
  * @param {{
- *   ruleset?: object | null,
- *   repository?: object | null,
+ *   ruleset?: Record<string, any> | null,
+ *   repository?: Record<string, any> | null,
  *   workflowYaml?: string | null,
- *   branchProtectionRef?: object | null,
- *   liveQueueConfiguration?: object | null,
+ *   branchProtectionRef?: Record<string, any> | null,
+ *   liveQueueConfiguration?: Record<string, unknown> | null,
  *   rulesetId?: string,
  *   baseBranch?: string,
  *   allowUnavailableBypassActors?: boolean,
@@ -683,7 +683,7 @@ export async function listPullRequestQueueStates({
  * Authoritative GitHub-native membership for one exact PR head.
  * Auto-merge intent (`autoMergeRequest`) is never treated as a queue receipt.
  *
- * @param {object | null | undefined} state
+ * @param {Record<string, any> | null | undefined} state
  * @param {string} expectedHeadOid
  */
 export function hasAuthoritativeExactHeadQueueReceipt(state, expectedHeadOid) {
@@ -730,7 +730,7 @@ export function enrollmentPostcondition(state, expectedHeadOid) {
 /**
  * Deterministic reason a native exact-head read is not an authoritative receipt.
  *
- * @param {object | null | undefined} state
+ * @param {Record<string, any> | null | undefined} state
  * @param {string} expectedHeadOid
  */
 export function explainExactHeadQueueReceipt(state, expectedHeadOid) {
@@ -791,7 +791,7 @@ export function explainExactHeadQueueReceipt(state, expectedHeadOid) {
  * `q` must already be authoritative native membership, never auto-merge intent.
  *
  * @param {{
- *   snapshot?: object[],
+ *   snapshot?: Record<string, any>[],
  *   admissionPr?: string | number,
  *   admissionHead?: string,
  *   promotionMode?: string,
