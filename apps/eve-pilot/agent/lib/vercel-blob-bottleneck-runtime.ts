@@ -13,6 +13,7 @@ import {
 import {
   listImmutableShadowRecords,
   persistImmutableShadowRecord,
+  persistShadowCursor,
   readImmutableShadowRecord,
 } from './vercel-blob-shadow-store';
 
@@ -140,13 +141,8 @@ export function createVercelBlobBottleneckStore(): SummerBottleneckStore {
   return {
     create: persistImmutableShadowRecord,
     read: readImmutableShadowRecord,
-    async list(prefix) {
-      return (
-        await listImmutableShadowRecords(prefix, {
-          limit: 25,
-        })
-      ).entries;
-    },
+    list: listImmutableShadowRecords,
+    write: persistShadowCursor,
   };
 }
 
@@ -180,6 +176,8 @@ export function createVercelBlobBottleneckDependencies(
     store,
     now: () => new Date(),
     receiptSigningKey: security.receiptSigningKey,
+    receiptSigningKeyId: security.receiptSigningKeyId,
+    producerVerificationKeys: security.producerVerificationKeys,
     async dispatchToSymphony(task: SymphonyRepairTask, { idempotencyKey }) {
       if (task.taskKey !== idempotencyKey) {
         throw new Error('Symphony task key does not match idempotency key');
