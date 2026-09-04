@@ -47,7 +47,7 @@ hooks:
 agent:
   # Configuration ceiling only. The hot-reloaded runtime overlay is 0..40 and
   # dispatches only up to the independently execution-proven useful-turn target.
-  max_concurrent_agents: 40
+  max_concurrent_agents: 0
   max_turns: 20
 codex:
   command: ./scripts/symphony/symphony-codex-router app-server

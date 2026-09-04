@@ -4,25 +4,22 @@
 #
 # The repo is the source of truth for the versioned workflow, the systemd
 # user units, lease guard (JOV-5031), durable stopped-work reconciler, the
-# pressure-driven concurrency controller, and bounded Gem disk/log reclaim.
+# bounded Gem disk/log reclaim. Official concurrency is installed separately.
 # This script materializes them onto the host with timestamped backups and
 # reloads the user systemd manager.
 # It NEVER starts, stops, or restarts symphony-ui-pilot.service and never kills
 # a running process. After daemon-reload it enables and starts only
-# symphony-reconciler.timer, symphony-concurrency-controller.timer, and
-# gem-disk-reclaim.timer so stopped-work reconciliation, bounded concurrency
-# adjustment, and disk-floor monitoring stay active without touching the
+# symphony-reconciler.timer and gem-disk-reclaim.timer so stopped-work
+# reconciliation and disk-floor monitoring stay active without touching the
 # healthy main Symphony listener.
 #
 # Modes:
 #   (default)          install workflow + unit + lease guard + reconciler +
 #                      concurrency controller + disk reclaim monitor,
 #                      daemon-reload, then enable --now
-#                      symphony-reconciler.timer,
-#                      symphony-concurrency-controller.timer, and
-#                      gem-disk-reclaim.timer
+#                      symphony-reconciler.timer and gem-disk-reclaim.timer
 #   --check            verify installed files match the repo sources, allowing
-#                      only the controller-owned 1..8 concurrency overlay; no writes
+#                      only the controller-owned 0..40 concurrency overlay; no writes
 #   --no-daemon-reload install files but skip systemctl --user daemon-reload
 #                      and skip timer activation
 #   --lease-guard-only restore only the executable lease guard atomically;
@@ -47,9 +44,6 @@ DISK_RECLAIM_SRC="$REPO_ROOT/scripts/symphony/gem-disk-reclaim.py"
 DISK_RECLAIM_SERVICE_SRC="$REPO_ROOT/scripts/symphony/systemd/gem-disk-reclaim.service"
 DISK_RECLAIM_TIMER_SRC="$REPO_ROOT/scripts/symphony/systemd/gem-disk-reclaim.timer"
 CONTROLLER_SRC="$REPO_ROOT/scripts/symphony/symphony-concurrency-controller.py"
-CAPACITY_EVIDENCE_SRC="$REPO_ROOT/scripts/symphony/symphony_capacity_evidence.py"
-CONTROLLER_SERVICE_SRC="$REPO_ROOT/scripts/symphony/systemd/symphony-concurrency-controller.service"
-CONTROLLER_TIMER_SRC="$REPO_ROOT/scripts/symphony/systemd/symphony-concurrency-controller.timer"
 WORKFLOW_DST="$TARGET_HOME/symphony-runtime/elixir/WORKFLOW.jovie-ui-pilot.md"
 UNIT_DST="$TARGET_HOME/.config/systemd/user/symphony-ui-pilot.service"
 GUARD_DST="$TARGET_HOME/.local/bin/symphony-lease-guard"
@@ -63,10 +57,6 @@ RECONCILER_TIMER_DST="$TARGET_HOME/.config/systemd/user/symphony-reconciler.time
 DISK_RECLAIM_DST="$TARGET_HOME/.local/bin/gem-disk-reclaim"
 DISK_RECLAIM_SERVICE_DST="$TARGET_HOME/.config/systemd/user/gem-disk-reclaim.service"
 DISK_RECLAIM_TIMER_DST="$TARGET_HOME/.config/systemd/user/gem-disk-reclaim.timer"
-CONTROLLER_DST="$TARGET_HOME/.local/bin/symphony-concurrency-controller"
-CAPACITY_EVIDENCE_DST="$TARGET_HOME/.local/bin/symphony_capacity_evidence.py"
-CONTROLLER_SERVICE_DST="$TARGET_HOME/.config/systemd/user/symphony-concurrency-controller.service"
-CONTROLLER_TIMER_DST="$TARGET_HOME/.config/systemd/user/symphony-concurrency-controller.timer"
 
 CHECK_ONLY=0
 DAEMON_RELOAD=1
@@ -120,7 +110,7 @@ check_one() {
 }
 
 # The pressure controller owns this one bounded runtime overlay. Accept a
-# canonical 1..8 max_concurrent_agents value; every other byte must match source.
+# canonical 0..40 max_concurrent_agents value; every other byte must match source.
 check_workflow() {
   local src="$1" dst="$2"
   if [ ! -f "$dst" ]; then
@@ -145,10 +135,6 @@ if [ "$CHECK_ONLY" -eq 1 ]; then
     check_one "$DISK_RECLAIM_SRC" "$DISK_RECLAIM_DST" || rc=1
     check_one "$DISK_RECLAIM_SERVICE_SRC" "$DISK_RECLAIM_SERVICE_DST" || rc=1
     check_one "$DISK_RECLAIM_TIMER_SRC" "$DISK_RECLAIM_TIMER_DST" || rc=1
-    check_one "$CONTROLLER_SRC" "$CONTROLLER_DST" || rc=1
-    check_one "$CAPACITY_EVIDENCE_SRC" "$CAPACITY_EVIDENCE_DST" || rc=1
-    check_one "$CONTROLLER_SERVICE_SRC" "$CONTROLLER_SERVICE_DST" || rc=1
-    check_one "$CONTROLLER_TIMER_SRC" "$CONTROLLER_TIMER_DST" || rc=1
     if [ -f "$RUNTIME_RECEIPT_DST" ]; then
       if ! SYMPHONY_MODEL_ROUTER="$MODEL_ROUTER_DST" \
         SYMPHONY_MODEL_REGISTRY="$MODEL_REGISTRY_DST" \
@@ -188,10 +174,6 @@ if [ "$LEASE_GUARD_ONLY" -eq 0 ]; then
   install_one "$RECONCILER_TIMER_SRC" "$RECONCILER_TIMER_DST"
   install_one "$DISK_RECLAIM_SERVICE_SRC" "$DISK_RECLAIM_SERVICE_DST"
   install_one "$DISK_RECLAIM_TIMER_SRC" "$DISK_RECLAIM_TIMER_DST"
-  install_one "$CONTROLLER_SRC" "$CONTROLLER_DST" 0755
-  install_one "$CAPACITY_EVIDENCE_SRC" "$CAPACITY_EVIDENCE_DST" 0755
-  install_one "$CONTROLLER_SERVICE_SRC" "$CONTROLLER_SERVICE_DST"
-  install_one "$CONTROLLER_TIMER_SRC" "$CONTROLLER_TIMER_DST"
 fi
 install_one "$GUARD_SRC" "$GUARD_DST" 0755
 
@@ -208,8 +190,6 @@ if [ "$DAEMON_RELOAD" -eq 1 ]; then
     echo "TIMER_ENABLED symphony-reconciler.timer"
     systemctl --user enable --now gem-disk-reclaim.timer
     echo "TIMER_ENABLED gem-disk-reclaim.timer"
-    systemctl --user enable --now symphony-concurrency-controller.timer
-    echo "TIMER_ENABLED symphony-concurrency-controller.timer"
   fi
 fi
 

@@ -645,31 +645,23 @@ exit 0
             attestation["policy"]["installedSha256"],
         )
         self.assertEqual(attestation["workflow"]["matchMode"], "exact")
-        self.assertEqual(attestation["workflow"]["sourceMaxConcurrentAgents"], 40)
-        self.assertEqual(attestation["workflow"]["installedMaxConcurrentAgents"], 40)
+        self.assertEqual(attestation["workflow"]["sourceMaxConcurrentAgents"], 0)
+        self.assertEqual(attestation["workflow"]["installedMaxConcurrentAgents"], 0)
         self.assertEqual(attestation["listener"]["wrapperPid"], 3131)
         self.assertEqual(attestation["listener"]["pid"], 4242)
 
-    def test_install_attests_controller_owned_bounded_concurrency_overlay(self):
+    def test_install_rejects_runtime_overlay_during_exact_install(self):
         with tempfile.TemporaryDirectory() as directory:
             fixture = self._fixture(directory)
             paths, env = self._runtime(directory)
             process = self._install(fixture, env, workflow_overlay="1")
             installed_workflow = paths["workflow"].read_text(encoding="utf-8")
-            attestation = json.loads(paths["attestation"].read_text(encoding="utf-8"))
+            attestation_exists = paths["attestation"].exists()
 
-        self.assertEqual(process.returncode, 0, process.stderr)
-        self.assertIn("max_concurrent_agents: 1", installed_workflow)
-        self.assertTrue(attestation["workflow"]["matches"])
-        self.assertEqual(
-            attestation["workflow"]["matchMode"], "bounded_concurrency_overlay"
-        )
-        self.assertEqual(attestation["workflow"]["sourceMaxConcurrentAgents"], 40)
-        self.assertEqual(attestation["workflow"]["installedMaxConcurrentAgents"], 1)
-        self.assertNotEqual(
-            attestation["workflow"]["sourceSha256"],
-            attestation["workflow"]["installedSha256"],
-        )
+        self.assertNotEqual(process.returncode, 0)
+        self.assertEqual(installed_workflow, "old workflow\n")
+        self.assertFalse(attestation_exists)
+        self.assertIn("refusing stale Gem service attestation", process.stderr)
 
     def test_install_rejects_out_of_bounds_concurrency_overlay(self):
         with tempfile.TemporaryDirectory() as directory:

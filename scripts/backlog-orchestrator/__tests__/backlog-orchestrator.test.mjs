@@ -993,6 +993,17 @@ describe('deterministic Symphony admission boundary', () => {
     };
   }
 
+  it('does not multiply one provider profile by model name', () => {
+    const evidence = capacityEvidence(2);
+    evidence.acceptedEvidence[1].profile = evidence.acceptedEvidence[0].profile;
+    evidence.acceptedEvidence[1].model = 'gpt-5.5';
+    assert.equal(
+      admitter.resolveGemConcurrency(evidence, { now: evidence.observedAt })
+        .maxConcurrent,
+      0
+    );
+  });
+
   function fleetEvidence(overrides = {}) {
     return {
       main: {
@@ -1716,7 +1727,7 @@ describe('deterministic Symphony admission boundary', () => {
     );
     assert.match(workflowSource, /useful-turn capacity/);
     assert.match(workflowSource, /Labels\/OAuth are not authority/);
-    assert.match(workflowSource, /max_concurrent_agents: 40/);
+    assert.match(workflowSource, /max_concurrent_agents: 0/);
   });
 
   it('stops and never redispatches an agent once its issue reaches In Review', async () => {
@@ -1744,7 +1755,7 @@ describe('deterministic Symphony admission boundary', () => {
     assert.deepEqual(activeStates, ['Todo', 'In Progress']);
     assert.ok(!activeStates.includes('In Review'));
 
-    assert.match(workflowSource, /max_concurrent_agents: 40/);
+    assert.match(workflowSource, /max_concurrent_agents: 0/);
     assert.match(workflowSource, /Own one head/);
     assert.match(workflowSource, /Gem delivers/);
   });
