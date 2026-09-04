@@ -55,6 +55,22 @@ proof. It is not registered as an Eve channel and cannot reach Photon or an
 iMessage recipient. Live routing remains unchanged until both existing Photon
 projects and their distinct assigned lines are verified.
 
+`POST /ovie/v1/summer-bottleneck/events` extends the same Jovie-production
+OIDC and private immutable Blob substrate for `SUMMER-COMM-011`. The event is
+the primary engine: it consumes source-bound closure, native-queue,
+release-controller, and runner-capacity metrics; ranks exactly one bottleneck
+by blocked duration, impact, and stable ID; and currently allows only
+release-certification starvation into a typed Symphony repair outbox. All
+other bottlenecks are held with an owner and Ovie escalation. The signed
+ranking also retains all six CI audit classes: merge-group flake ratchets,
+controller-cascade coalescing, auto-enroll self-cancel churn, controller
+check-run pagination caps, obsolete or unaffected native lanes, and
+affected-only unit selection. The authored
+15-minute Eve schedule only reconciles persisted events missing a terminal
+receipt. An unchanged fingerprint is a no-op, and exact source/CI/native queue/
+production gates remain authoritative. The outbox does not itself prove that
+Symphony consumed the task; a cross-bound terminal outcome is required.
+
 The accepted event contract is strict:
 
 ```json

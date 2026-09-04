@@ -1,7 +1,8 @@
-import { BlobNotFoundError, head, put } from '@vercel/blob';
+import { BlobNotFoundError, get, head, list, put } from '@vercel/blob';
 import type { ShadowRecord } from './summer-shadow-ingress';
 
 const BLOB_OPERATION_TIMEOUT_MS = 8_000;
+const MAX_RECORD_BYTES = 64 * 1024;
 
 async function blobExists(pathname: string): Promise<boolean> {
   try {
@@ -43,4 +44,47 @@ export async function persistImmutableShadowRecord(
     }
     throw putError;
   }
+}
+
+export async function readImmutableShadowRecord(
+  pathname: string
+): Promise<ShadowRecord | null> {
+  const result = await get(pathname, {
+    abortSignal: AbortSignal.timeout(BLOB_OPERATION_TIMEOUT_MS),
+    access: 'private',
+    useCache: false,
+  });
+  if (!result) return null;
+  if (
+    result.statusCode !== 200 ||
+    !result.stream ||
+    result.blob.size > MAX_RECORD_BYTES
+  ) {
+    throw new Error('immutable shadow record is unavailable or oversized');
+  }
+  const text = await new Response(result.stream).text();
+  if (Buffer.byteLength(text, 'utf8') > MAX_RECORD_BYTES) {
+    throw new Error('immutable shadow record is oversized');
+  }
+  const parsed: unknown = JSON.parse(text);
+  if (typeof parsed !== 'object' || parsed === null || Array.isArray(parsed)) {
+    throw new Error('immutable shadow record is malformed');
+  }
+  return parsed as ShadowRecord;
+}
+
+export async function listImmutableShadowRecords(
+  prefix: string
+): Promise<readonly { pathname: string; record: ShadowRecord }[]> {
+  const result = await list({
+    abortSignal: AbortSignal.timeout(BLOB_OPERATION_TIMEOUT_MS),
+    limit: 25,
+    prefix,
+  });
+  const records: { pathname: string; record: ShadowRecord }[] = [];
+  for (const blob of result.blobs) {
+    const record = await readImmutableShadowRecord(blob.pathname);
+    if (record) records.push({ pathname: blob.pathname, record });
+  }
+  return records;
 }
