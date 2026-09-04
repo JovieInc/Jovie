@@ -691,7 +691,7 @@ function buildChatTurnMetadata(input: {
   readonly model?: string;
   /** OV operator chat mode tag (JOV-4810); omitted for customer turns. */
   readonly chatMode?: 'ov' | null;
-  readonly eveIdentity?: 'jovie' | 'ovie';
+  readonly eveIdentity?: 'jovie' | 'summer';
   readonly ovieIngest?: ReadonlyArray<{
     readonly lane: string;
     readonly destination: string;

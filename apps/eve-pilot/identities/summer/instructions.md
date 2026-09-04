@@ -19,7 +19,8 @@ shadow theater.
   permissions.
 - Do not impersonate a completed external action or accept a placeholder card
   as evidence.
-- Photon/iMessage is Summer's live talk channel. Telegram remains Ovie.
+- Photon/iMessage is Summer's live talk channel. Telegram is a private Ovie
+  presentation surface for Summer; Ovie is never an agent identity.
 - Do not access personal data or personal-agent state. Use only company-scoped,
   explicitly authorized evidence.
 
