@@ -54,6 +54,7 @@ USER_SYSTEMD_LIB = ROOT / "scripts/hermes/lib/user-systemd-context.sh"
 FLEET_WORKFLOW = ROOT / ".github/workflows/fleet-gate-refresh.yml"
 ACTIVATION_WORKFLOW = ROOT / ".github/workflows/gem-delivery-controller-activation.yml"
 ACTIONLINT_CONFIG = ROOT / ".github/actionlint.yaml"
+TIMER_LIVENESS = ROOT / "scripts/hermes/verify-systemd-timer-cadence.py"
 
 
 def _load_reconciler_module():
@@ -62,6 +63,48 @@ def _load_reconciler_module():
     module = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(module)
     return module
+
+
+def _load_timer_liveness_module():
+    spec = importlib.util.spec_from_file_location("timer_liveness", TIMER_LIVENESS)
+    assert spec and spec.loader
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    return module
+
+
+def test_timer_liveness_rejects_elapsed_infinity_and_stale() -> None:
+    module = _load_timer_liveness_module()
+    healthy = {
+        "ActiveState": "active",
+        "SubState": "waiting",
+        "NextElapseUSecMonotonic": "42s",
+        "LastTriggerUSec": "2026-09-04 12:00:00 UTC",
+    }
+    now = module.parse_systemd_timestamp("2026-09-04 12:03:00 UTC")
+    assert module.timer_snapshot_errors(healthy, now=now, max_age_seconds=300) == []
+    cases = (
+        ({**healthy, "SubState": "elapsed"}, "substate_elapsed"),
+        ({**healthy, "NextElapseUSecMonotonic": "infinity"}, "next_trigger_infinite"),
+        ({**healthy, "LastTriggerUSec": "2026-09-04 11:00:00 UTC"}, "last_trigger_stale"),
+    )
+    for snapshot, reason in cases:
+        assert reason in module.timer_snapshot_errors(
+            snapshot, now=now, max_age_seconds=300
+        )
+
+
+def test_timer_liveness_requires_two_advancing_successful_cycles() -> None:
+    module = _load_timer_liveness_module()
+    cycles = [
+        {"lastTriggerMonotonic": 100, "serviceResult": "success"},
+        {"lastTriggerMonotonic": 200, "serviceResult": "success"},
+    ]
+    assert module.two_cycle_cadence_proven(cycles)
+    assert not module.two_cycle_cadence_proven(cycles[:1])
+    assert not module.two_cycle_cadence_proven(
+        [cycles[0], {**cycles[1], "serviceResult": "failed"}]
+    )
 
 
 def _front_matter_lines() -> list[str]:
@@ -542,7 +585,7 @@ def test_installer_deploys_workflow_and_unit(tmp_path: Path) -> None:
     # Freshly installed state must pass drift detection.
     check = _run_installer(tmp_path, "--check")
     assert check.returncode == 0, check.stdout
-    assert check.stdout.count("OK") == 16
+    assert check.stdout.count("OK") == 17
 
 
 def test_reconciler_records_exact_first_failure_without_escalating(tmp_path: Path) -> None:
@@ -833,6 +876,7 @@ def test_installer_check_fails_closed_for_each_missing_reconciler_artifact(
         tmp_path / ".local/lib/symphony-reconciler/runtime-receipt.json",
         tmp_path / ".config/systemd/user/symphony-reconciler.service",
         tmp_path / ".config/systemd/user/symphony-reconciler.timer",
+        tmp_path / ".local/bin/verify-systemd-timer-cadence",
         tmp_path / ".local/bin/gem-disk-reclaim",
         tmp_path / ".config/systemd/user/gem-disk-reclaim.service",
         tmp_path / ".config/systemd/user/gem-disk-reclaim.timer",
@@ -868,6 +912,14 @@ def test_installer_enables_reconciler_timer_without_restarting_main_service(
     fake_systemctl.write_text(
         "#!/usr/bin/env bash\n"
         "printf 'command=%s\\n' \"$*\" >> \"$SYMPHONY_SYSTEMCTL_LOG\"\n"
+        "if [[ \"$*\" == *'show symphony-reconciler.timer'* ]]; then\n"
+        "  n=0; [[ ! -f \"$SYMPHONY_TIMER_COUNTER\" ]] || n=$(cat \"$SYMPHONY_TIMER_COUNTER\")\n"
+        "  n=$((n + 1)); printf '%s\\n' \"$n\" > \"$SYMPHONY_TIMER_COUNTER\"\n"
+        "  printf 'ActiveState=active\\nSubState=waiting\\nNextElapseUSecMonotonic=42s\\n'\n"
+        "  printf 'LastTriggerUSec=%s\\nLastTriggerUSecMonotonic=%ss\\nFragmentPath=/tmp/timer\\n' \"$(date -u '+%Y-%m-%d %H:%M:%S UTC')\" \"$n\"\n"
+        "elif [[ \"$*\" == *'show symphony-reconciler.service'* ]]; then\n"
+        "  printf 'Result=success\\n'\n"
+        "fi\n"
         "exit 0\n"
     )
     fake_systemctl.chmod(0o755)
@@ -875,6 +927,8 @@ def test_installer_enables_reconciler_timer_without_restarting_main_service(
         os.environ,
         SYMPHONY_UI_PILOT_HOME=str(tmp_path),
         SYMPHONY_SYSTEMCTL_LOG=str(log),
+        SYMPHONY_TIMER_COUNTER=str(tmp_path / "timer-counter"),
+        SYMPHONY_RECONCILER_PROOF_POLL_SECONDS="0.01",
         PATH=f"{bin_dir}:{os.environ['PATH']}",
         XDG_RUNTIME_DIR=str(tmp_path / "run"),
     )
