@@ -1,4 +1,5 @@
 import { notFound } from 'next/navigation';
+import { Suspense } from 'react';
 import { isProfileAdmissionFixtureEnabled } from './guard';
 import { ProfileAdmissionFixtureClient } from './ProfileAdmissionFixtureClient';
 
@@ -11,7 +12,9 @@ export default function ProfileAdmissionFixturePage() {
 
   return (
     <main className='flex h-dvh justify-center overflow-hidden bg-black dark:bg-black'>
-      <ProfileAdmissionFixtureClient />
+      <Suspense fallback={null}>
+        <ProfileAdmissionFixtureClient />
+      </Suspense>
     </main>
   );
 }
