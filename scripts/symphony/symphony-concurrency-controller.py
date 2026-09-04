@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Pressure-driven concurrency controller for the Jovie Symphony runtime.
+"""Pressure-driven Symphony concurrency controller (JOV-INV-007).
 
 The controller is intentionally stdlib-only and runs on the Gem host from the
 existing event-driven fleet refresh. It samples Linux PSI, available memory,
@@ -22,17 +22,24 @@ import os
 import pathlib
 import re
 import subprocess
+import sys
 import time
 import urllib.error
 import urllib.request
 from datetime import datetime, timezone
 from typing import Any
 
+HERMES_DIR = str(pathlib.Path(__file__).resolve().parent)
+if HERMES_DIR not in sys.path:
+    sys.path.insert(0, HERMES_DIR)
+
+from symphony_capacity_evidence import validate_receipt as validate_capacity_receipt  # noqa: E402
+
 
 SCHEMA = "symphony-concurrency/v1"
 STATE_SCHEMA = "symphony-concurrency-state/v1"
-MIN_CONCURRENCY = 1
-MAX_CONCURRENCY = 8
+MIN_CONCURRENCY = 0
+MAX_CONCURRENCY = 40
 LOW_STREAK_REQUIRED = 3
 CHANGE_COOLDOWN_SECONDS = 120
 MIN_AVAILABLE_MEMORY_BYTES = 8 * 1024**3
@@ -78,6 +85,7 @@ def resource_scope(args: argparse.Namespace) -> dict[str, str]:
         "workflow": str(args.workflow),
         "runtimeUrl": str(args.runtime_url),
         "leaseGuard": str(args.lease_guard),
+        "capacityEvidence": str(args.capacity_evidence),
     }
 
 
@@ -142,6 +150,19 @@ def read_provider_capacity(guard_bin: pathlib.Path) -> dict[str, Any] | None:
         typed[key] = item
     typed["state"] = capacity["state"]
     return typed
+
+
+def read_execution_capacity(path: pathlib.Path) -> dict[str, Any] | None:
+    try:
+        value = read_json(path)
+    except (OSError, ValueError, json.JSONDecodeError):
+        return None
+    accepted, reason, proofs = validate_capacity_receipt(
+        value, datetime.now(timezone.utc)
+    )
+    if not accepted:
+        return None
+    return {"source": reason, "target": len(proofs), "acceptedEvidence": proofs}
 
 
 def read_runtime_state(url: str) -> dict[str, Any] | None:
@@ -288,11 +309,12 @@ def choose_target(
     state: dict[str, Any],
     sample: dict[str, Any],
     provider: dict[str, Any] | None,
+    execution_capacity: dict[str, Any] | None,
     runtime: dict[str, Any] | None,
     integrity_allowed: bool,
     now_epoch: float,
 ) -> tuple[int, int, str]:
-    if provider is None or runtime is None or not integrity_allowed:
+    if provider is None or execution_capacity is None or runtime is None or not integrity_allowed:
         reason = "integrity-blocked" if not integrity_allowed else "required-telemetry-unavailable"
         return MIN_CONCURRENCY, 0, reason
     cpu_count = sample.get("cpuCount")
@@ -300,7 +322,12 @@ def choose_target(
         return MIN_CONCURRENCY, 0, "required-telemetry-unavailable"
     provider_ceiling = provider["locked"] + provider["available"]
     host_ceiling = max(MIN_CONCURRENCY, min(MAX_CONCURRENCY, cpu_count - 1))
-    ceiling = max(MIN_CONCURRENCY, min(MAX_CONCURRENCY, provider_ceiling, host_ceiling))
+    ceiling = min(
+        MAX_CONCURRENCY,
+        provider_ceiling,
+        host_ceiling,
+        execution_capacity["target"],
+    )
     pressure = classify_pressure(sample)
     if pressure == "unknown":
         return MIN_CONCURRENCY, 0, "required-telemetry-unavailable"
@@ -333,6 +360,7 @@ def run(args: argparse.Namespace) -> dict[str, Any]:
         "availableMemoryBytes": read_available_memory(proc_root),
     }
     provider = read_provider_capacity(args.lease_guard)
+    execution_capacity = read_execution_capacity(args.capacity_evidence)
     runtime = read_runtime_state(args.runtime_url)
     integrity_allowed, integrity_status = integrity_allows_scale(args.integrity_receipt)
     target, low_streak, reason = choose_target(
@@ -340,6 +368,7 @@ def run(args: argparse.Namespace) -> dict[str, Any]:
         state=state,
         sample=sample,
         provider=provider,
+        execution_capacity=execution_capacity,
         runtime=runtime,
         integrity_allowed=integrity_allowed,
         now_epoch=now_epoch,
@@ -369,6 +398,7 @@ def run(args: argparse.Namespace) -> dict[str, Any]:
         "bounds": {"min": MIN_CONCURRENCY, "max": MAX_CONCURRENCY},
         "sample": sample,
         "provider": provider,
+        "capacityEvidence": execution_capacity,
         "runtime": runtime,
         "utilizationRatio": (
             round(runtime["running"] / target, 4)
@@ -410,6 +440,11 @@ def parse_args() -> argparse.Namespace:
         "--lease-guard",
         type=pathlib.Path,
         default=home / ".local/bin/symphony-lease-guard",
+    )
+    parser.add_argument(
+        "--capacity-evidence",
+        type=pathlib.Path,
+        default=pathlib.Path("/home/timwhite/gem-workspace/state/concurrency.json"),
     )
     parser.add_argument("--proc-root", type=pathlib.Path, default=pathlib.Path("/proc"))
     parser.add_argument("--runtime-url", default="http://127.0.0.1:4041/api/v1/state")

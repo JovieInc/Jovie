@@ -3,13 +3,13 @@ Symphony UI pilot on gem (JOV-4962).
 
 Guards the contract that the orphan beam.smp incident violated:
 - the versioned workflow carries the approved throughput posture
-  (max_concurrent_agents: 4) and the expected admission/server shape;
+  (max_concurrent_agents: 40) and the expected admission/server shape;
 - the versioned systemd user unit owns the runtime with a bounded restart
   policy, a clean stop (beam exits 1 on SIGTERM), and a single-listener guard
   for 127.0.0.1:4041;
 - the install script materializes both onto a target home idempotently, keeps
   timestamped backups, and detects drift in --check mode except the bounded
-  runtime overlay on agent.max_concurrent_agents (1..8);
+  runtime overlay on agent.max_concurrent_agents (0..40);
 - the same installer activates the pressure-driven concurrency controller:
   executable beside the reconciler, a systemd user service+timer pair, and
   enable --now for its timer alongside symphony-reconciler.timer.
@@ -129,10 +129,7 @@ def _unit_sections() -> dict[str, dict[str, str]]:
 
 def test_workflow_restores_approved_concurrency_posture() -> None:
     agent = _section(_front_matter_lines(), "agent")
-    assert _scalar(agent, "max_concurrent_agents") == "4", (
-        "approved throughput posture is 4 concurrent agents; 1 was a "
-        "temporary lease-repair fallback, not a stability target"
-    )
+    assert _scalar(agent, "max_concurrent_agents") == "40"
 
 
 def test_workflow_admission_contract() -> None:
@@ -542,7 +539,7 @@ def test_installer_deploys_workflow_and_unit(tmp_path: Path) -> None:
     # Freshly installed state must pass drift detection.
     check = _run_installer(tmp_path, "--check")
     assert check.returncode == 0, check.stdout
-    assert check.stdout.count("OK") == 16
+    assert check.stdout.count("OK") == 17
 
 
 def test_reconciler_records_exact_first_failure_without_escalating(tmp_path: Path) -> None:
@@ -762,27 +759,27 @@ def test_installer_accepts_only_the_bounded_runtime_concurrency_overlay(tmp_path
     workflow = tmp_path / "symphony-runtime/elixir/WORKFLOW.jovie-ui-pilot.md"
     source = WORKFLOW.read_text()
 
-    for target in range(1, 9):
+    for target in (0, 1, 2, 8, 40):
         _rewrite_installed_concurrency(workflow, str(target))
         accepted = _run_installer(tmp_path, "--check")
         assert accepted.returncode == 0, accepted.stdout
         assert f"OK {workflow}" in accepted.stdout
         assert f"runtime max_concurrent_agents={target}" in accepted.stdout
 
-    for invalid in ("0", "9", "01", "08", "0001", "0008", "not-a-number"):
+    for invalid in ("41", "01", "08", "040", "not-a-number"):
         workflow.write_text(
-            source.replace("  max_concurrent_agents: 4", f"  max_concurrent_agents: {invalid}", 1)
+            source.replace("  max_concurrent_agents: 40", f"  max_concurrent_agents: {invalid}", 1)
         )
         rejected = _run_installer(tmp_path, "--check")
         assert rejected.returncode == 1, invalid
         assert f"DRIFT {workflow}" in rejected.stdout
 
     for malformed in (
-        source.replace("  max_concurrent_agents: 4\n", ""),
-        source.replace("  max_concurrent_agents: 4", "  max_concurrent_workers: 4", 1),
+        source.replace("  max_concurrent_agents: 40\n", ""),
+        source.replace("  max_concurrent_agents: 40", "  max_concurrent_workers: 40", 1),
         source.replace(
-            "  max_concurrent_agents: 4",
-            "  max_concurrent_agents: 4\n  max_concurrent_agents: 4",
+            "  max_concurrent_agents: 40",
+            "  max_concurrent_agents: 40\n  max_concurrent_agents: 40",
             1,
         ),
     ):
@@ -791,7 +788,7 @@ def test_installer_accepts_only_the_bounded_runtime_concurrency_overlay(tmp_path
         assert rejected.returncode == 1
         assert f"DRIFT {workflow}" in rejected.stdout
 
-    runtime = source.replace("  max_concurrent_agents: 4", "  max_concurrent_agents: 1", 1)
+    runtime = source.replace("  max_concurrent_agents: 40", "  max_concurrent_agents: 1", 1)
     workflow.write_text(runtime.replace("  max_turns: 24", "  max_turns: 25", 1))
     other_drift = _run_installer(tmp_path, "--check")
     assert other_drift.returncode == 1

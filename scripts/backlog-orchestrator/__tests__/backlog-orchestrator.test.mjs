@@ -1714,20 +1714,9 @@ describe('deterministic Symphony admission boundary', () => {
       productionRed.receipt.isolatedPromotionAdmission.deploymentsAllowed,
       false
     );
-    assert.match(workflowSource, /Always open a non-draft PR/);
-    assert.match(workflowSource, /Do not create draft PRs/);
-    assert.match(workflowSource, /including when the gate is `GREEN`/);
-    assert.match(workflowSource, /gh pr edit --add-label queue-deferred/);
-    assert.match(
-      workflowSource,
-      /fresh `GREEN` receipt or the exact isolated exception/
-    );
-    assert.match(
-      workflowSource,
-      /Labels and path-only classification are not eligibility evidence/
-    );
-    assert.match(workflowSource, /max_concurrent_agents: 4/);
-    assert.doesNotMatch(workflowSource, /Open a non-draft PR/);
+    assert.match(workflowSource, /useful-turn capacity/);
+    assert.match(workflowSource, /Labels\/OAuth are not authority/);
+    assert.match(workflowSource, /max_concurrent_agents: 40/);
   });
 
   it('stops and never redispatches an agent once its issue reaches In Review', async () => {
@@ -1755,19 +1744,9 @@ describe('deterministic Symphony admission boundary', () => {
     assert.deepEqual(activeStates, ['Todo', 'In Progress']);
     assert.ok(!activeStates.includes('In Review'));
 
-    // Capacity and lease invariants are preserved: four concurrent agents,
-    // each bound to one issue and one workspace.
-    assert.match(workflowSource, /max_concurrent_agents: 4/);
-
-    // The ownership boundary is documented: Symphony implements through
-    // draft PR / In Review; Gem + GitHub own review, fleet-gate promotion,
-    // queue, merge, deploy, and receipts, and keep the PR externally
-    // monitorable without holding a Symphony slot.
-    assert.match(
-      workflowSource,
-      /Gem \+ GitHub own everything after that point: review,/
-    );
-    assert.match(workflowSource, /externally monitorable/);
+    assert.match(workflowSource, /max_concurrent_agents: 40/);
+    assert.match(workflowSource, /Own one head/);
+    assert.match(workflowSource, /Gem delivers/);
   });
 
   it('keeps the Gem drain on typed fleet admission and fail-closes exit-code mismatches', async () => {

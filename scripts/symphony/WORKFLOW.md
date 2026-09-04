@@ -45,7 +45,9 @@ hooks:
       find ./apps ./packages ./workers -mindepth 2 -maxdepth 2 -type d -name node_modules -exec rm -rf {} + 2>/dev/null || true
     fi
 agent:
-  max_concurrent_agents: 8
+  # Configuration ceiling only. The hot-reloaded runtime overlay is 0..40 and
+  # dispatches only up to the independently execution-proven useful-turn target.
+  max_concurrent_agents: 40
   max_turns: 20
 codex:
   command: ./scripts/symphony/symphony-codex-router app-server

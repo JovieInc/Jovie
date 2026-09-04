@@ -47,6 +47,7 @@ DISK_RECLAIM_SRC="$REPO_ROOT/scripts/symphony/gem-disk-reclaim.py"
 DISK_RECLAIM_SERVICE_SRC="$REPO_ROOT/scripts/symphony/systemd/gem-disk-reclaim.service"
 DISK_RECLAIM_TIMER_SRC="$REPO_ROOT/scripts/symphony/systemd/gem-disk-reclaim.timer"
 CONTROLLER_SRC="$REPO_ROOT/scripts/symphony/symphony-concurrency-controller.py"
+CAPACITY_EVIDENCE_SRC="$REPO_ROOT/scripts/symphony/symphony_capacity_evidence.py"
 CONTROLLER_SERVICE_SRC="$REPO_ROOT/scripts/symphony/systemd/symphony-concurrency-controller.service"
 CONTROLLER_TIMER_SRC="$REPO_ROOT/scripts/symphony/systemd/symphony-concurrency-controller.timer"
 WORKFLOW_DST="$TARGET_HOME/symphony-runtime/elixir/WORKFLOW.jovie-ui-pilot.md"
@@ -63,6 +64,7 @@ DISK_RECLAIM_DST="$TARGET_HOME/.local/bin/gem-disk-reclaim"
 DISK_RECLAIM_SERVICE_DST="$TARGET_HOME/.config/systemd/user/gem-disk-reclaim.service"
 DISK_RECLAIM_TIMER_DST="$TARGET_HOME/.config/systemd/user/gem-disk-reclaim.timer"
 CONTROLLER_DST="$TARGET_HOME/.local/bin/symphony-concurrency-controller"
+CAPACITY_EVIDENCE_DST="$TARGET_HOME/.local/bin/symphony_capacity_evidence.py"
 CONTROLLER_SERVICE_DST="$TARGET_HOME/.config/systemd/user/symphony-concurrency-controller.service"
 CONTROLLER_TIMER_DST="$TARGET_HOME/.config/systemd/user/symphony-concurrency-controller.timer"
 
@@ -144,6 +146,7 @@ if [ "$CHECK_ONLY" -eq 1 ]; then
     check_one "$DISK_RECLAIM_SERVICE_SRC" "$DISK_RECLAIM_SERVICE_DST" || rc=1
     check_one "$DISK_RECLAIM_TIMER_SRC" "$DISK_RECLAIM_TIMER_DST" || rc=1
     check_one "$CONTROLLER_SRC" "$CONTROLLER_DST" || rc=1
+    check_one "$CAPACITY_EVIDENCE_SRC" "$CAPACITY_EVIDENCE_DST" || rc=1
     check_one "$CONTROLLER_SERVICE_SRC" "$CONTROLLER_SERVICE_DST" || rc=1
     check_one "$CONTROLLER_TIMER_SRC" "$CONTROLLER_TIMER_DST" || rc=1
     if [ -f "$RUNTIME_RECEIPT_DST" ]; then
@@ -186,6 +189,7 @@ if [ "$LEASE_GUARD_ONLY" -eq 0 ]; then
   install_one "$DISK_RECLAIM_SERVICE_SRC" "$DISK_RECLAIM_SERVICE_DST"
   install_one "$DISK_RECLAIM_TIMER_SRC" "$DISK_RECLAIM_TIMER_DST"
   install_one "$CONTROLLER_SRC" "$CONTROLLER_DST" 0755
+  install_one "$CAPACITY_EVIDENCE_SRC" "$CAPACITY_EVIDENCE_DST" 0755
   install_one "$CONTROLLER_SERVICE_SRC" "$CONTROLLER_SERVICE_DST"
   install_one "$CONTROLLER_TIMER_SRC" "$CONTROLLER_TIMER_DST"
 fi
