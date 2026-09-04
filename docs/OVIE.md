@@ -7,6 +7,10 @@ Canonical program: [`docs/OVIE_PROGRAM.md`](OVIE_PROGRAM.md) (JOV-5214).
 
 `Tim -> Ovie -> Eve intake/ack -> durable Kanban -> Summer -> Symphony -> identified coding worker on Gem Ubuntu`
 
+Hermes and Trigger.dev are retired. Eve is Summer's approved durable target,
+but the Summer identity is unavailable until exact deployment and conversation
+receipts prove it. Ovie must not fall back to a local executor.
+
 ## Canonical Ops contract (JOV-5256)
 
 Packaged-app M1 consumes this exact contract. Do not add a second dashboard,

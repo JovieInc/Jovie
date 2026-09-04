@@ -34,9 +34,9 @@ Tim always talks through Ovie.
 Summer begins as an explicit `ovie-summer-shadow` identity in this Eve app.
 It can observe and report engineering throughput from Ovie, but it has no
 write capability during this phase. Photon, Telegram, and iMessage remain
-bound to Ovie. The dedicated non-production
-`jovie-eve-shadow-staging.vercel.app` deployment accepts only Jovie production
-OIDC at `POST /ovie/v1/summer-shadow/events`. It writes a
+bound to Ovie until a separately proven Summer cutover. The dedicated
+non-production `jovie-eve-shadow-staging.vercel.app` deployment accepts only
+Jovie production OIDC at `POST /ovie/v1/summer-shadow/events`. It writes a
 private immutable Vercel Blob receipt/outbox before Eve dispatch and a second
 terminal receipt before returning `202`. `SUMMER_SHADOW_ENABLED=true` in a
 Vercel Preview deployment is the explicit kill-switch opt-in; every other
@@ -47,8 +47,8 @@ and persistence uncertainty fail closed. The binding conveys
 `dispatchAuthority: none`; it does not expose Linear, Symphony, GitHub, GBrain,
 deployment, or permission mutations. Before Summer may orchestrate mutations,
 the separately gated rate-limit replay path must also pass. Linear remains the
-coordination projection, not delivery truth. Hermes remains available as
-rollback until that proof is complete.
+coordination projection, not delivery truth. Hermes is retired and is not a
+rollback. Missing Eve proof leaves Summer unavailable.
 
 `agent/lib/summer-photon-offline-proof.ts` is a test-only, zero-outbound safety
 proof. It is not registered as an Eve channel and cannot reach Photon or an

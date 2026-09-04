@@ -18,7 +18,8 @@ This replaces traditional ship cycles. The loop runs faster and more autonomousl
 - **Eve** (HyperAgent + Fable 5): Planner / PM, specs issues, routes to build models
 - **Developer** (HyperAgent + Fable 5 -> Haiku): Implements from spec, opens PRs
 - **Codex CLI:** Active coder via ChatGPT sub
-- **Summer / Coder / Coder-Flash:** Hermes fleet for monitoring, analysis, cost management
+- **Summer:** Eve on Vercel is the canonical runtime; unavailable until exact-runtime durable identity, failure, and recurrence receipts prove it
+- **Coder / Coder-Flash:** retired labels; implementation routes through Symphony's identified workers
 
 ### Model Tiers
 | Tier | Model | Provider | Use |
@@ -35,7 +36,7 @@ This replaces traditional ship cycles. The loop runs faster and more autonomousl
 - `apps/web/`: Next.js web application (HUD, marketing, admin)
 - `apps/desktop/`: Electron desktop app
 - `apps/ios/`: Swift iOS app
-- `scripts/hermes/`: Hermes fleet agent code
+- `scripts/hermes/`: legacy-named Symphony/Gem operational tooling; not an active Hermes runtime dependency
 - `docs/solutions/`: Compound engineering solution docs
 - `docs/decisions/`: Architecture decision records
 
