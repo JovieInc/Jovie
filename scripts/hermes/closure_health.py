@@ -1555,22 +1555,38 @@ def _observe_queue_controller(repo: str) -> dict[str, Any]:
     if not isinstance(runs, list) or not runs:
         return {"status": "unknown", "reason": "controller-run-missing"}
     latest = runs[0]
-    status = latest.get("status")
-    conclusion = latest.get("conclusion")
+    # Judge green/failed from the latest completed run, not the latest run:
+    # a busy fleet almost always has an in-progress autoenroll run, and a
+    # busy queue is not a stalled controller. "recovering" is reserved for
+    # the abnormal case where the fetched page has no completed run at all;
+    # the CONTROLLER_RED_AFTER episode threshold guards real stalls.
+    judged = next(
+        (
+            run
+            for run in runs
+            if isinstance(run, dict) and run.get("status") == "completed"
+        ),
+        latest,
+    )
+    status = judged.get("status")
+    conclusion = judged.get("conclusion")
     if status == "completed":
         controller_status = "green" if conclusion == "success" else "failed"
     elif status in {"queued", "in_progress", "waiting", "pending"}:
         controller_status = "recovering"
     else:
         controller_status = "unknown"
-    return {
+    receipt: dict[str, Any] = {
         "status": controller_status,
-        "runId": latest.get("id"),
+        "runId": judged.get("id"),
         "runStatus": status,
         "conclusion": conclusion,
-        "url": latest.get("html_url"),
-        "observedAt": latest.get("updated_at") or latest.get("created_at"),
+        "url": judged.get("html_url"),
+        "observedAt": judged.get("updated_at") or judged.get("created_at"),
     }
+    if judged is not latest and isinstance(latest, dict):
+        receipt["activeRunId"] = latest.get("id")
+    return receipt
 
 
 def observe_closure_health(

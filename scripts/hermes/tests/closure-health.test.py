@@ -1235,6 +1235,134 @@ class ClosureObservationTests(unittest.TestCase):
             result["repairActions"][0]["repository"], "JovieInc/LogYourBody"
         )
 
+    @staticmethod
+    def _controller_runs(*runs: dict[str, object]) -> mock.Mock:
+        return mock.Mock(stdout=MODULE.json.dumps({"workflow_runs": list(runs)}))
+
+    def test_in_progress_latest_run_judges_latest_completed_run(self):
+        completed_success = {
+            "id": 41,
+            "status": "completed",
+            "conclusion": "success",
+            "html_url": "https://example.test/run/41",
+            "updated_at": (NOW - timedelta(minutes=2)).isoformat(),
+        }
+        in_flight = {
+            "id": 42,
+            "status": "in_progress",
+            "conclusion": None,
+            "html_url": "https://example.test/run/42",
+            "updated_at": NOW.isoformat(),
+        }
+        with mock.patch.object(
+            MODULE.subprocess,
+            "run",
+            return_value=self._controller_runs(in_flight, completed_success),
+        ):
+            result = MODULE._observe_queue_controller("JovieInc/Jovie")
+
+        self.assertEqual(result["status"], "green")
+        self.assertEqual(result["runId"], 41)
+        self.assertEqual(result["runStatus"], "completed")
+        self.assertEqual(result["conclusion"], "success")
+        self.assertEqual(result["activeRunId"], 42)
+
+        health = MODULE.evaluate_closure_health(
+            snapshot(controller=result),
+            previous=None,
+            now=NOW,
+        )
+        self.assertEqual(health["status"], "healthy")
+        self.assertNotIn("controller", health["episodes"])
+        self.assertTrue(health["newIssueIntakeAllowed"])
+
+    def test_in_progress_latest_run_keeps_latest_completed_failure_red(self):
+        completed_failure = {
+            "id": 41,
+            "status": "completed",
+            "conclusion": "failure",
+            "html_url": "https://example.test/run/41",
+            "updated_at": (NOW - timedelta(minutes=2)).isoformat(),
+        }
+        in_flight = {
+            "id": 42,
+            "status": "queued",
+            "conclusion": None,
+            "html_url": "https://example.test/run/42",
+            "updated_at": NOW.isoformat(),
+        }
+        with mock.patch.object(
+            MODULE.subprocess,
+            "run",
+            return_value=self._controller_runs(in_flight, completed_failure),
+        ):
+            result = MODULE._observe_queue_controller("JovieInc/Jovie")
+
+        self.assertEqual(result["status"], "failed")
+        self.assertEqual(result["runId"], 41)
+        self.assertEqual(result["activeRunId"], 42)
+
+        stalled = snapshot(controller=result)
+        first = MODULE.evaluate_closure_health(stalled, previous=None, now=NOW)
+        self.assertEqual(first["status"], "grace")
+        self.assertFalse(first["newIssueIntakeAllowed"])
+        later = MODULE.evaluate_closure_health(
+            stalled,
+            previous=first,
+            now=NOW + timedelta(minutes=11),
+        )
+        self.assertEqual(later["status"], "red")
+        self.assertIn("queue-controller-red-over-10m", later["reasons"])
+
+    def test_only_active_runs_stay_recovering_without_completed_evidence(self):
+        runs = [
+            {
+                "id": 42,
+                "status": "in_progress",
+                "conclusion": None,
+                "html_url": "https://example.test/run/42",
+                "updated_at": NOW.isoformat(),
+            },
+            {
+                "id": 41,
+                "status": "queued",
+                "conclusion": None,
+                "html_url": "https://example.test/run/41",
+                "updated_at": (NOW - timedelta(minutes=1)).isoformat(),
+            },
+        ]
+        with mock.patch.object(
+            MODULE.subprocess,
+            "run",
+            return_value=self._controller_runs(*runs),
+        ):
+            result = MODULE._observe_queue_controller("JovieInc/Jovie")
+
+        self.assertEqual(result["status"], "recovering")
+        self.assertEqual(result["runId"], 42)
+        self.assertEqual(result["runStatus"], "in_progress")
+        self.assertNotIn("activeRunId", result)
+
+    def test_missing_runs_fail_closed(self):
+        with mock.patch.object(
+            MODULE.subprocess,
+            "run",
+            return_value=self._controller_runs(),
+        ):
+            result = MODULE._observe_queue_controller("JovieInc/Jovie")
+
+        self.assertEqual(
+            result,
+            {"status": "unknown", "reason": "controller-run-missing"},
+        )
+        health = MODULE.evaluate_closure_health(
+            snapshot(controller=result),
+            previous=None,
+            now=NOW,
+        )
+        self.assertEqual(health["status"], "grace")
+        self.assertFalse(health["newIssueIntakeAllowed"])
+
 
 if __name__ == "__main__":
     unittest.main()
