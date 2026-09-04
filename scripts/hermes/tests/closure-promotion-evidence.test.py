@@ -108,6 +108,7 @@ class ClosurePromotionEvidenceTests(unittest.TestCase):
                         {
                             "data": {
                                 "repository": {
+                                    "main": {"target": {"oid": "b" * 40}},
                                     "pullRequests": {
                                         "totalCount": 1,
                                         "nodes": [
@@ -268,14 +269,16 @@ class ClosurePromotionEvidenceTests(unittest.TestCase):
                 ),
             )
 
-        with self.assertRaisesRegex(ValueError, "wrong pull request head"):
-            MODULE._readback_promotion_batch(
-                "JovieInc/Jovie",
-                [candidate],
-                MODULE.EXPECTED_REQUIRED_CHECKS,
-                time.monotonic() + 5,
-                run_impl=run,
-            )
+        observed = MODULE._readback_promotion_batch(
+            "JovieInc/Jovie",
+            [candidate],
+            MODULE.EXPECTED_REQUIRED_CHECKS,
+            time.monotonic() + 5,
+            run_impl=run,
+        )
+
+        self.assertEqual(observed["baseOid"], "a" * 40)
+        self.assertEqual(observed["prs"][7]["headOid"], "c" * 40)
 
     def test_compare_evidence_rejects_the_wrong_base_identity(self):
         candidate = {"number": 7, "headRefOid": "7" * 40}
