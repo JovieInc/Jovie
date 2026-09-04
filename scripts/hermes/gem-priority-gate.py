@@ -587,6 +587,15 @@ def observe_integrity(path: Path) -> dict[str, Any]:
 
 
 def observe_concurrency(path: Path, now: datetime) -> dict[str, Any]:
+    """Read the live-seat capacity receipt (gem-concurrency-evidence/v1).
+
+    Tim lock symphony-concurrency-autoscale-v1: concurrency autoscales from
+    live seats. The receipt's measured ``target`` is accepted as-is when it is
+    approved, fresh, and incident-free — no 1..8 clamp and no clean-run
+    ratchet, both of which were arbitrary caps. Missing, malformed, or stale
+    evidence is reported as unaccepted; ``evaluate`` then degrades to the
+    runtime floor rather than zeroing the factory.
+    """
     if not path.exists():
         return {
             "schema": CONCURRENCY_SCHEMA,
@@ -609,15 +618,12 @@ def observe_concurrency(path: Path, now: datetime) -> dict[str, Any]:
         }
     observed_at = parse_time(receipt.get("observedAt"))
     target = receipt.get("target")
-    required_clean_runs = 20 if isinstance(target, int) and target > 4 else 1
     eligible = (
         receipt.get("schema") == CONCURRENCY_SCHEMA
         and isinstance(target, int)
         and not isinstance(target, bool)
-        and 1 <= target <= 8
+        and target >= LOCAL_REMEDIATION_CONCURRENCY_FLOOR
         and receipt.get("approved") is True
-        and isinstance(receipt.get("cleanRuns"), int)
-        and receipt["cleanRuns"] >= required_clean_runs
         and receipt.get("severeIncidents") == 0
         and observed_at is not None
         and timedelta(0) <= now - observed_at <= timedelta(hours=24)
@@ -1335,19 +1341,19 @@ def evaluate(signals: dict[str, Any], observed_at: str) -> dict[str, Any]:
     evidence = concurrency_evidence
     capacity_fresh = evidence.get("accepted") is True
     measured_target = evidence.get("target")
+    # symphony-concurrency-autoscale-v1: live seats are the only concurrency
+    # authority and carry no upper clamp. Missing or stale evidence degrades
+    # to the runtime floor (one seat) instead of zeroing the factory.
     gem_concurrency = (
         measured_target
         if capacity_fresh
         and isinstance(measured_target, int)
         and not isinstance(measured_target, bool)
-        and 1 <= measured_target <= 8
-        else 0
-    )
-    remediation_concurrency = (
-        gem_concurrency
-        if gem_concurrency > 0
+        and measured_target >= LOCAL_REMEDIATION_CONCURRENCY_FLOOR
         else LOCAL_REMEDIATION_CONCURRENCY_FLOOR
     )
+    capacity_fresh = capacity_fresh and gem_concurrency == measured_target
+    remediation_concurrency = gem_concurrency
     unbound_repair_concurrency = grok_kimi_unbound_repair_concurrency(
         concurrency_evidence
     )
@@ -1444,16 +1450,15 @@ def evaluate(signals: dict[str, Any], observed_at: str) -> dict[str, Any]:
         promotion_mode = "blocked"
     if state == "RED":
         work_activities: list[str] = []
-    elif not closure_intake_allowed or not capacity_fresh:
+    elif not closure_intake_allowed:
         # Existing validation/review work remains useful, but no new
         # implementation or fallback PR may begin while Summer holds intake
-        # or capacity evidence is missing/stale.
+        # (JOV-INV-011). Capacity evidence no longer gates intake: missing
+        # evidence runs at the runtime floor (symphony-concurrency-autoscale-v1).
         work_activities = ["tests", "review"]
     else:
         new_implementation_allowed = (
-            capacity_fresh
-            and queue_shape_valid
-            and repository_capacity_available
+            queue_shape_valid and repository_capacity_available
         )
         work_activities = ["tests", "review"]
         if new_implementation_allowed:
@@ -1475,7 +1480,9 @@ def evaluate(signals: dict[str, Any], observed_at: str) -> dict[str, Any]:
         "focused-tests",
         "review",
     ]
-    remediation_push_allowed = state != "RED" and capacity_fresh
+    # Remediation is liveness: decoupled from capacity evidence and from Summer
+    # closure, so duplicate lanes cannot freeze Grok/Kimi remediations.
+    remediation_push_allowed = state != "RED"
     cohort = already_admitted_cohort_semantics(promotion_mode)
     if not closure_intake_allowed:
         cohort = {
@@ -1578,11 +1585,11 @@ def evaluate(signals: dict[str, Any], observed_at: str) -> dict[str, Any]:
                 "runtimeFloor": LOCAL_REMEDIATION_CONCURRENCY_FLOOR,
                 "baseline": DEFAULT_GEM_CONCURRENCY,
                 "evidenceAccepted": capacity_fresh,
-                "newMutationAllowed": capacity_fresh,
+                "newMutationAllowed": True,
                 "preserveQueuedWork": True,
-                "reason": "recent-approved-measured-capacity"
+                "reason": "live-seat-capacity"
                 if capacity_fresh
-                else "capacity-evidence-missing-malformed-or-stale",
+                else "capacity-evidence-missing-runtime-floor",
             },
             "symphonyImplementation": "event-driven-backpressure",
         },
@@ -1934,13 +1941,15 @@ def observe_signals(args: argparse.Namespace, now: datetime) -> dict[str, Any]:
     main = observe_main(args.repo)
     concurrency = observe_concurrency(concurrency_path, now)
     measured_target = concurrency.get("target")
+    # Lane budget follows live seats; without accepted evidence it falls to
+    # the runtime floor, never to zero (symphony-concurrency-autoscale-v1).
     default_lane_budget = (
         measured_target
         if concurrency.get("accepted") is True
         and isinstance(measured_target, int)
         and not isinstance(measured_target, bool)
-        and 1 <= measured_target <= 8
-        else 0
+        and measured_target >= LOCAL_REMEDIATION_CONCURRENCY_FLOOR
+        else LOCAL_REMEDIATION_CONCURRENCY_FLOOR
     )
     review_path = (
         args.independent_review_receipt

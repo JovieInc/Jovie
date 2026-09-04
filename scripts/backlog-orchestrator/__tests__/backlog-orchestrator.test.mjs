@@ -1501,13 +1501,14 @@ describe('deterministic Symphony admission boundary', () => {
     assert.ok(stale.reasons.some(reason => reason.code === 'controller-stale'));
   });
 
-  it('blocks a new lease when capacity evidence is missing or stale', () => {
+  it('runs at the runtime floor when capacity evidence is missing or stale', () => {
+    // symphony-concurrency-autoscale-v1: missing evidence never zeroes the
+    // factory; one seat stays open for leases and remediation.
     const now = '2026-08-09T05:01:00.000Z';
     const approved = {
       schema: admitter.GEM_CONCURRENCY_EVIDENCE_SCHEMA,
       target: 8,
       approved: true,
-      cleanRuns: 20,
       severeIncidents: 0,
       observedAt: '2026-08-09T05:00:00.000Z',
     };
@@ -1516,40 +1517,61 @@ describe('deterministic Symphony admission boundary', () => {
       { ...approved, observedAt: '2026-08-07T05:00:00.000Z' },
       { now }
     );
-    assert.equal(missing.maxConcurrent, 0);
-    assert.equal(missing.newMutationAllowed, false);
+    assert.equal(missing.maxConcurrent, 1);
+    assert.equal(missing.evidenceAccepted, false);
+    assert.equal(missing.newMutationAllowed, true);
+    assert.equal(missing.reason, 'capacity-evidence-missing-runtime-floor');
     assert.equal(missing.preserveQueuedWork, true);
-    assert.equal(stale.maxConcurrent, 0);
-    assert.equal(stale.newMutationAllowed, false);
+    assert.equal(stale.maxConcurrent, 1);
+    assert.equal(stale.evidenceAccepted, false);
     const gate = admitter.evaluateFleetGate(
       fleetEvidence({ concurrencyEvidence: null }),
       { now }
     );
     assert.equal(gate.workAdmission.allowed, true);
-    assert.equal(gate.workAdmission.newIssueLeaseAllowed, false);
+    assert.equal(gate.workAdmission.newIssueLeaseAllowed, true);
+    assert.equal(gate.concurrency.gem.maxConcurrent, 1);
     assert.ok(
       gate.workAdmission.activities.includes('isolated-implementation')
     );
   });
 
-  it('accepts only fresh measured capacity and requires twenty clean runs above baseline', () => {
-    const now = '2026-08-09T05:01:00.000Z';
-    const approved = {
+  it('accepts live-seat capacity as-is without a clamp or clean-run ratchet', () => {
+    const now = '2026-09-02T19:20:00.000Z';
+    const seats = {
       schema: admitter.GEM_CONCURRENCY_EVIDENCE_SCHEMA,
-      target: 8,
+      source: 'live-oauth-cli-seats',
+      target: 2,
       approved: true,
-      cleanRuns: 20,
       severeIncidents: 0,
-      observedAt: '2026-08-09T05:00:00.000Z',
+      observedAt: '2026-09-02T19:19:00.000Z',
     };
     assert.equal(
-      admitter.resolveGemConcurrency({ ...approved, cleanRuns: 19 }, { now })
-        .maxConcurrent,
-      0
+      admitter.resolveGemConcurrency(seats, { now }).maxConcurrent,
+      2
     );
     assert.equal(
-      admitter.resolveGemConcurrency(approved, { now }).maxConcurrent,
-      8
+      admitter.resolveGemConcurrency(seats, { now }).reason,
+      'live-seat-capacity'
+    );
+    for (const target of [8, 12, 40]) {
+      const live = admitter.resolveGemConcurrency(
+        { ...seats, target, cleanRuns: 0 },
+        { now }
+      );
+      assert.equal(live.maxConcurrent, target);
+      assert.equal(live.evidenceAccepted, true);
+    }
+    // A severe incident or an unapproved receipt still degrades to the floor.
+    assert.equal(
+      admitter.resolveGemConcurrency({ ...seats, severeIncidents: 1 }, { now })
+        .maxConcurrent,
+      1
+    );
+    assert.equal(
+      admitter.resolveGemConcurrency({ ...seats, approved: false }, { now })
+        .maxConcurrent,
+      1
     );
   });
 
