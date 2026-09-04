@@ -135,6 +135,7 @@ test.describe('Homepage', () => {
     const backdrop = page.getByTestId('homepage-editorial-hero-backdrop');
 
     await expect(backdrop).toHaveAttribute('aria-hidden', 'true');
+    await expect(backdrop).toHaveAttribute('data-hero-layer', 'decorative');
     await expect(backdrop.locator('img')).toHaveCount(1);
     await expect(backdrop.locator('img')).toHaveAttribute('alt', '');
     await expect(backdrop.locator('img')).toHaveAttribute(
@@ -176,7 +177,7 @@ test.describe('Homepage', () => {
       renderedHeight: expect.any(Number),
       renderedWidth: expect.any(Number),
     });
-    expect(imageState.currentSrc).toContain('night-desk');
+    expect(imageState.currentSrc).toContain('night-desk-clean');
 
     // Type sits on top of the photo, inside the viewport.
     const heading = page.getByRole('heading', {
@@ -193,6 +194,11 @@ test.describe('Homepage', () => {
   test('hero reveal is geometry-safe, interactive, and static under reduced motion', async ({
     page,
   }) => {
+    await expect(
+      page
+        .getByTestId('homepage-hero-shell')
+        .locator('[data-hero-layer="active"]')
+    ).toHaveCount(1);
     const copy = page.locator('.homepage-editorial-hero__copy');
     const before = await copy.boundingBox();
     expect(
@@ -207,6 +213,15 @@ test.describe('Homepage', () => {
       .toBe(1);
     expect(await copy.boundingBox()).toEqual(before);
 
+    const hydrationErrors: string[] = [];
+    page.on('console', message => {
+      if (
+        message.type() === 'error' &&
+        message.text().toLowerCase().includes('hydrat')
+      ) {
+        hydrationErrors.push(message.text());
+      }
+    });
     await page.emulateMedia({ reducedMotion: 'reduce' });
     await gotoHomepage(page);
     expect(
@@ -215,6 +230,7 @@ test.describe('Homepage', () => {
         return [style.animationName, style.opacity];
       })
     ).toEqual(['none', '1']);
+    expect(hydrationErrors).toEqual([]);
   });
 
   test('locks the nine certified sections, their order, heading lines, and CLS', async ({

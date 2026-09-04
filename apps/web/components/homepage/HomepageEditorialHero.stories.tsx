@@ -26,10 +26,10 @@ export const Default: Story = {
     support: 'Find what the internet knows. Turn it into relationships.',
     search: { placeholder: 'Search your name', action: 'Find me' },
     backdrop: {
-      desktopSrc: '/images/hero/night-desk.webp',
+      desktopSrc: '/images/hero/night-desk-clean.webp',
       desktopWidth: 1536,
       desktopHeight: 1024,
-      mobileSrc: '/images/hero/night-desk-mobile.webp',
+      mobileSrc: '/images/hero/night-desk-mobile-clean.webp',
       mobileWidth: 737,
       mobileHeight: 1024,
     },
