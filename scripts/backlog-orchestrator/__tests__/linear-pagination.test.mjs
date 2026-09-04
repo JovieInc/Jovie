@@ -132,6 +132,33 @@ describe('exhaustive Linear pagination', () => {
     );
   });
 
+  it('surfaces attempts and resetAt when a page fetch exhausts rate-limit retries', async () => {
+    const cause = new LinearTransportError(
+      'Linear GraphQL request failed (rate_limited, attempts=5)',
+      {
+        code: 'RATE_LIMITED',
+        attempts: 5,
+        metadata: { retryable: false, resetAt: 1_800_000_000_000 },
+      }
+    );
+    await assert.rejects(
+      collectLinearConnectionPages(async () => {
+        throw cause;
+      }),
+      error => {
+        const err = /** @type {any} */ (error);
+        return (
+          err?.name === 'LinearPaginationError' &&
+          err?.code === 'PAGE_FETCH_FAILED' &&
+          err?.attempts === 5 &&
+          err?.resetAt === 1_800_000_000_000 &&
+          err?.cause === cause &&
+          err?.coverage?.reason === 'page-fetch-failed'
+        );
+      }
+    );
+  });
+
   it('binds active inventory to a terminal page, not a result cap', async () => {
     const requests = [];
     const result = await fetchTeamActiveIssueSnapshot('team-1', {

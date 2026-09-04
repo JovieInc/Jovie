@@ -26,6 +26,17 @@ export const LINEAR_MAX_PAGES = 1000;
 // HTTP 400 INPUT_ERROR "Query too complex"; the pagination layer answers by
 // halving the connection page size instead of dying.
 export const LINEAR_QUERY_COMPLEXITY_CEILING = 10_000;
+// Linear reports shared-budget exhaustion as HTTP 400/429 whose GraphQL error
+// extensions carry code RATELIMITED (statusCode 429 embedded). Rate-limited
+// responses retry on their own budget instead of the transient one: the shared
+// 2500 req/h window outlasts any transient backoff, so the waits are longer
+// and capped in total. The total budget stays below the ownerless recovery
+// sweep's 10-minute job timeout so exhaustion still fails with a typed error
+// instead of being killed mid-pagination.
+export const LINEAR_RATE_LIMIT_MAX_ATTEMPTS = 5;
+export const LINEAR_RATE_LIMIT_BASE_MS = 5_000;
+export const LINEAR_RATE_LIMIT_JITTER = 0.25;
+export const LINEAR_RATE_LIMIT_MAX_TOTAL_WAIT_MS = 8 * 60_000;
 export const LINEAR_FLEET_CLOSURE_ISSUE_STATE_NAMES = Object.freeze([
   'Triage',
   'Backlog',
@@ -78,11 +89,13 @@ export class LinearTransportError extends Error {
 
 export class LinearPaginationError extends Error {
   /** @param {string} message @param {any} [options] */
-  constructor(message, { code, coverage, cause } = {}) {
+  constructor(message, { code, coverage, cause, attempts, resetAt } = {}) {
     super(message, { cause });
     this.name = 'LinearPaginationError';
     this.code = code;
     this.coverage = coverage;
+    if (attempts !== undefined) this.attempts = attempts;
+    if (resetAt !== undefined) this.resetAt = resetAt;
   }
 }
 
@@ -203,6 +216,8 @@ export async function collectLinearConnectionPages(
         code: 'PAGE_FETCH_FAILED',
         coverage,
         cause,
+        attempts: cause?.attempts,
+        resetAt: cause?.metadata?.resetAt,
       });
     }
 
@@ -312,6 +327,65 @@ function isTransientNetworkError(error) {
 
 const sleep = ms => new Promise(resolve => setTimeout(resolve, ms));
 
+const RATE_LIMIT_RESET_HEADERS = [
+  'x-ratelimit-requests-reset',
+  'x-ratelimit-complexity-reset',
+];
+
+/**
+ * True only when a 400/429 response body marks the failure as shared-budget
+ * exhaustion (GraphQL error extensions code RATELIMITED, with statusCode 429
+ * embedded). A bare 429 without that code stays on the generic transient path.
+ * @param {number} status @param {any} data
+ */
+function isRateLimitedBody(status, data) {
+  if (status !== 400 && status !== 429) return false;
+  const errors = Array.isArray(data?.errors) ? data.errors : [];
+  return (
+    String(data?.code ?? '').toUpperCase() === 'RATELIMITED' ||
+    errors.some(
+      error =>
+        String(error?.extensions?.code ?? '').toUpperCase() === 'RATELIMITED' ||
+        error?.extensions?.statusCode === 429
+    )
+  );
+}
+
+/** @param {any} raw @param {number} nowMs */
+function parseRetryAfterMs(raw, nowMs) {
+  if (typeof raw !== 'string' || raw.trim() === '') return null;
+  const value = raw.trim();
+  if (/^\d+(\.\d+)?$/.test(value)) return Number(value) * 1000;
+  const dateMs = Date.parse(value);
+  return Number.isNaN(dateMs) ? null : dateMs - nowMs;
+}
+
+/**
+ * Extract wait hints from a rate-limited response: the `Retry-After` header
+ * (delta seconds or HTTP date) and Linear's `X-RateLimit-*-Reset` epoch
+ * headers. When several hints disagree, the latest reset wins — waiting too
+ * long is fail-safe for a shared budget, waiting too short is not.
+ * @param {any} response @param {number} [nowMs]
+ */
+function rateLimitHints(response, nowMs = Date.now()) {
+  const get = name => response?.headers?.get?.(name);
+  let resetAt = null;
+  const retryAfterMs = parseRetryAfterMs(get('retry-after'), nowMs);
+  if (retryAfterMs !== null && retryAfterMs >= 0)
+    resetAt = nowMs + retryAfterMs;
+  for (const name of RATE_LIMIT_RESET_HEADERS) {
+    const value = Number(get(name));
+    if (!Number.isFinite(value) || value <= 0) continue;
+    // Linear documents epoch milliseconds; tolerate epoch seconds.
+    const epochMs = value < 1e11 ? value * 1000 : value;
+    if (resetAt === null || epochMs > resetAt) resetAt = epochMs;
+  }
+  return {
+    retryAfterMs: resetAt === null ? null : Math.max(0, resetAt - nowMs),
+    resetAt,
+  };
+}
+
 /** @param {any[]} errors */
 export function classifyGraphQLErrors(errors) {
   const messages = errors.flatMap(error =>
@@ -340,6 +414,10 @@ export function classifyGraphQLErrors(errors) {
  * Bounded, retrying GraphQL transport. Only the API key is sent as the
  * normal Linear `Authorization` header; it is never logged or exposed in an
  * error. Retry is bounded to network, malformed responses, 429, and 5xx.
+ * Responses whose body carries a RATELIMITED code retry on a separate,
+ * longer budget with exponential backoff + jitter, honoring Retry-After /
+ * X-RateLimit-*-Reset hints, and fail closed once the attempt or total-wait
+ * ceiling is reached.
  */
 export async function graphql(
   query,
@@ -350,10 +428,16 @@ export async function graphql(
     maxAttempts = LINEAR_MAX_ATTEMPTS,
     retryBaseMs = LINEAR_RETRY_BASE_MS,
     sleepImpl = sleep,
+    rateLimitMaxAttempts = LINEAR_RATE_LIMIT_MAX_ATTEMPTS,
+    rateLimitBaseMs = LINEAR_RATE_LIMIT_BASE_MS,
+    rateLimitMaxTotalWaitMs = LINEAR_RATE_LIMIT_MAX_TOTAL_WAIT_MS,
+    randomImpl = Math.random,
   } = {}
 ) {
   const key = requireKey();
   let lastError;
+  let rateLimitAttempts = 0;
+  let rateLimitWaitedMs = 0;
   for (let attempt = 1; attempt <= maxAttempts; attempt += 1) {
     const controller = new AbortController();
     const timer = setTimeout(() => controller.abort(), timeoutMs);
@@ -399,13 +483,18 @@ export async function graphql(
         const error = /** @type {any} */ (
           new Error(`Linear HTTP error (${resp.status})`)
         );
+        const rateLimited = isRateLimitedBody(resp.status, data);
         error.code =
-          resp.status === 429
+          rateLimited || resp.status === 429
             ? 'RATE_LIMITED'
             : resp.status >= 500
               ? 'SERVER'
               : 'HTTP';
-        error.retryable = RETRYABLE_STATUS.has(resp.status);
+        error.retryable = rateLimited || RETRYABLE_STATUS.has(resp.status);
+        if (rateLimited) {
+          error.rateLimited = true;
+          Object.assign(error, rateLimitHints(resp));
+        }
         throw Object.assign(error, { metadata, body: rawBody });
       }
       if (data.errors) {
@@ -430,6 +519,41 @@ export async function graphql(
     } catch (error) {
       const err = /** @type {any} */ (error);
       lastError = err;
+      if (err?.rateLimited) {
+        rateLimitAttempts += 1;
+        const exponentialMs = rateLimitBaseMs * 2 ** (rateLimitAttempts - 1);
+        const jitterMs = Math.floor(
+          exponentialMs * LINEAR_RATE_LIMIT_JITTER * randomImpl()
+        );
+        const delayMs = Math.max(
+          err.retryAfterMs ?? 0,
+          exponentialMs + jitterMs
+        );
+        if (
+          rateLimitAttempts >= rateLimitMaxAttempts ||
+          delayMs > rateLimitMaxTotalWaitMs - rateLimitWaitedMs
+        ) {
+          throw new LinearTransportError(
+            `Linear GraphQL request failed (rate_limited, attempts=${rateLimitAttempts})`,
+            {
+              code: 'RATE_LIMITED',
+              attempts: rateLimitAttempts,
+              metadata: {
+                ...(err?.metadata || {}),
+                retryable: false,
+                resetAt: err.resetAt,
+                waitedMs: rateLimitWaitedMs,
+              },
+              body: err?.body,
+            }
+          );
+        }
+        rateLimitWaitedMs += delayMs;
+        await sleepImpl(delayMs);
+        // Rate-limit retries draw on their own budget, not the transient one.
+        attempt -= 1;
+        continue;
+      }
       const retryable = Boolean(err?.retryable) || isTransientNetworkError(err);
       if (!retryable || attempt === maxAttempts) {
         const code =
