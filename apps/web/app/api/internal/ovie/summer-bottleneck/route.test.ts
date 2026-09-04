@@ -328,4 +328,17 @@ describe('POST /api/internal/ovie/summer-bottleneck', () => {
     await expect(response.json()).resolves.toMatchObject({ code });
     expect(mocks.getVercelOidcToken).not.toHaveBeenCalled();
   });
+
+  it('rejects a declared oversized body before reading its stream', async () => {
+    const response = await POST(
+      new Request('https://jov.ie/api/internal/ovie/summer-bottleneck', {
+        method: 'POST',
+        headers: { 'content-length': String(64 * 1024 + 1) },
+        body: '{}',
+      })
+    );
+
+    expect(response.status).toBe(413);
+    expect(mocks.getVercelOidcToken).not.toHaveBeenCalled();
+  });
 });

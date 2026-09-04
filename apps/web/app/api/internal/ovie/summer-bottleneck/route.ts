@@ -152,11 +152,22 @@ async function readInput(request: Request): Promise<unknown> {
   if (Number.isFinite(declared) && declared > MAX_BODY_BYTES) {
     throw new RangeError('body_too_large');
   }
-  const text = await request.text();
-  if (Buffer.byteLength(text, 'utf8') > MAX_BODY_BYTES) {
-    throw new RangeError('body_too_large');
+  if (!request.body) throw new SyntaxError('body_missing');
+  const reader = request.body.getReader();
+  const decoder = new TextDecoder();
+  let bytes = 0;
+  let text = '';
+  while (true) {
+    const { done, value } = await reader.read();
+    if (done) break;
+    bytes += value.byteLength;
+    if (bytes > MAX_BODY_BYTES) {
+      await reader.cancel();
+      throw new RangeError('body_too_large');
+    }
+    text += decoder.decode(value, { stream: true });
   }
-  return JSON.parse(text);
+  return JSON.parse(text + decoder.decode());
 }
 
 function isFresh(snapshot: UnsignedSnapshot, nowMs = Date.now()): boolean {
