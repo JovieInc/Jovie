@@ -1,14 +1,16 @@
 #!/usr/bin/env node
 /**
- * Fail-closed golden-path lock (JOV-5085): homepage Get started → /start →
+ * Fail-closed golden-path lock (JOV-5085): homepage name search
+ * ("Search your name" + "Find me", JOV-5864 certified homepage) → /start →
  * logged-out first message sends → waitlist write only after verified auth.
  * Missing secrets fail closed. Merge gate never reads E2E_PROD.
  */
 
 export const GOLDEN_PATH_LOCK_SCHEMA = 'jovie-golden-path-lock/v1';
 export const GOLDEN_PATH_PROD_ORIGIN = 'https://jov.ie';
-export const GOLDEN_PATH_CTA_LABEL = 'Get started';
-export const GOLDEN_PATH_START_PATH = '/start';
+export const GOLDEN_PATH_SEARCH_PLACEHOLDER = 'Search your name';
+export const GOLDEN_PATH_CTA_LABEL = 'Find me';
+export const GOLDEN_PATH_PRIMARY_CTA_TEST_ID = 'homepage-primary-cta';
 export const FAKE_RATE_LIMIT_COPY = 'Too many messages';
 export const CURSOR_AGENTS_URL = 'https://api.cursor.com/v0/agents';
 export const JOVIE_GITHUB_REPO = 'https://github.com/JovieInc/Jovie';
@@ -37,9 +39,13 @@ export const GOLDEN_PATH_PATH_PREFIXES = Object.freeze([
   'apps/web/app/signup/',
   'apps/web/app/sign-in/',
   'apps/web/app/sign-up/',
+  'apps/web/data/homepageLaunchCopy.ts',
+  'apps/web/data/homepageCertifiedOptimization.ts',
   'apps/web/data/homepageFrontDoorCta.ts',
   'apps/web/data/marketingCtaIntents.ts',
   'apps/web/lib/flags/marketing-static.ts',
+  'apps/web/components/homepage/',
+  'apps/web/components/features/home/',
   'apps/web/components/features/onboarding/',
   'apps/web/lib/onboarding/',
   'apps/web/lib/chat/',
@@ -88,19 +94,40 @@ export function evaluateHomepageHtml(html) {
       reason: 'homepage HTML was empty',
     };
   }
-  const hasLabel = html.includes(GOLDEN_PATH_CTA_LABEL);
-  const hasStartHref = /href\s*=\s*["'][^"']*\/start(?:[?"']|\/)/i.test(html);
-  if (!hasLabel || !hasStartHref) {
+  // Certified homepage (JOV-5864): the hero's sole conversion is the existing
+  // name search — a "Search your name" input plus a "Find me" submit that
+  // routes into /start. The retired "Get started" link hero must not return.
+  const hasPlaceholder = new RegExp(
+    `placeholder\\s*=\\s*["'][^"']*${GOLDEN_PATH_SEARCH_PLACEHOLDER}[^"']*["']`,
+    'i'
+  ).test(html);
+  const ctaPattern = new RegExp(
+    `data-testid\\s*=\\s*["']${GOLDEN_PATH_PRIMARY_CTA_TEST_ID}["'][^>]*>[\\s\\S]*?${GOLDEN_PATH_CTA_LABEL}\\s*</span>\\s*</button>`,
+    'i'
+  );
+  const hasCtaButton = ctaPattern.test(html);
+  const hasLegacyGetStartedLink =
+    /<a[^>]+href\s*=\s*["'][^"']*\/start(?:[?"']|\/)[^>]*>\s*Get started\s*<\/a>/i.test(
+      html
+    );
+  if (!hasPlaceholder || !hasCtaButton) {
     return {
       id: 'homepage-cta',
       ok: false,
-      reason: `homepage CTA must be "${GOLDEN_PATH_CTA_LABEL}" → ${GOLDEN_PATH_START_PATH}`,
+      reason: `homepage hero must be name search ("${GOLDEN_PATH_SEARCH_PLACEHOLDER}" input + "${GOLDEN_PATH_CTA_LABEL}" submit, JOV-5864)`,
+    };
+  }
+  if (hasLegacyGetStartedLink) {
+    return {
+      id: 'homepage-cta',
+      ok: false,
+      reason: `homepage hero must not carry a competing "Get started" link; "${GOLDEN_PATH_CTA_LABEL}" is the sole hero CTA`,
     };
   }
   return {
     id: 'homepage-cta',
     ok: true,
-    reason: `found ${GOLDEN_PATH_CTA_LABEL} → ${GOLDEN_PATH_START_PATH}`,
+    reason: `found name search ("${GOLDEN_PATH_SEARCH_PLACEHOLDER}" + "${GOLDEN_PATH_CTA_LABEL}")`,
   };
 }
 
@@ -366,14 +393,14 @@ export function buildAutofixPrompt({ fingerprint, checks, origin, receipt }) {
     'P0: the locked golden path is broken in production. Autofix and open a PR.',
     '',
     'Locked path (do not invent a new product flow):',
-    '1. https://jov.ie homepage',
-    '2. Get started → /start',
+    '1. https://jov.ie homepage (JOV-5864 certified: "Search your name" input + "Find me" submit; never restore a Get started hero)',
+    '2. Find me → /start',
     '3. Logged-out first message actually sends (not 401, not a fake rate-limit)',
     '4. Waitlist write only after verified auth',
     '',
     `Fingerprint: ${fingerprint}`,
     `Origin: ${origin ?? GOLDEN_PATH_PROD_ORIGIN}`,
-    `Linear: JOV-5085 (lock) / JOV-5084 (prior 401-as-rate-limit class)`,
+    `Linear: JOV-5085 (lock) / JOV-5084 (prior 401-as-rate-limit class) / JOV-5962 (certified CTA contract)`,
     '',
     'Failed checks:',
     ...(lines.length > 0
@@ -381,7 +408,7 @@ export function buildAutofixPrompt({ fingerprint, checks, origin, receipt }) {
       : ['- (receipt reported failure without check ids)']),
     '',
     'Reproduce without signup secrets:',
-    `- GET ${origin ?? GOLDEN_PATH_PROD_ORIGIN} and require Get started → /start`,
+    `- GET ${origin ?? GOLDEN_PATH_PROD_ORIGIN} and require the hero name search: placeholder "Search your name" + submit button "Find me" (data-testid homepage-primary-cta)`,
     `- POST ${origin ?? GOLDEN_PATH_PROD_ORIGIN}/api/chat with {"messages":[{"role":"user","content":"hi"}]} — must not 401 and must not say "Too many messages"`,
     `- POST ${origin ?? GOLDEN_PATH_PROD_ORIGIN}/api/waitlist unauthenticated — must 401`,
     `- POST ${origin ?? GOLDEN_PATH_PROD_ORIGIN}/api/onboarding/claim unauthenticated — must 401`,
