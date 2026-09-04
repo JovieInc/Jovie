@@ -141,7 +141,10 @@ jobs:
           listener_cmdline="$(tr '\0' ' ' < "/proc/${listener_pid}/cmdline")"
           grep -Fq '.burrito/symphony_erts-' <<<"$listener_cmdline"
           grep -Fq -- '--port 4041' <<<"$listener_cmdline"
-          ! grep -Fq 'symphony-ui-pilot' <<<"$listener_cmdline"
+          if grep -Fq 'symphony-ui-pilot' <<<"$listener_cmdline"; then
+            printf 'official listener cmdline still names symphony-ui-pilot\n' >&2
+            exit 1
+          fi
           systemctl --user is-enabled --quiet gem-disk-reclaim.timer
           systemctl --user is-active --quiet gem-disk-reclaim.timer
           test "$(systemctl --user show gem-disk-reclaim.timer --property=FragmentPath --value)" \
