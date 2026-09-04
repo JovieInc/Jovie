@@ -180,7 +180,7 @@ class UltrawideHudTests(unittest.TestCase):
         self.assertNotIn("receipted this week", plain)
 
     def test_workflow_cap_reads_max_concurrent_agents(self):
-        self.assertEqual(HUD.read_workflow_cap(ROOT / "scripts/symphony/symphony/WORKFLOW.md"), 8)
+        self.assertEqual(HUD.read_workflow_cap(ROOT / "scripts/symphony/WORKFLOW.md"), 8)
 
     def test_official_state_totals_render_tps_runtime_in_out(self):
         state, _ = fetch_state(official_state())

@@ -21,7 +21,7 @@ readonly CONSUMER_SOURCE="${SOURCE_ROOT}/scripts/symphony/gem-pr-drain.py"
 readonly REGISTRY_MODULE_SOURCE="${SOURCE_ROOT}/scripts/symphony/gem_repo_registry.py"
 readonly REGISTRY_CONFIG_SOURCE="${SOURCE_ROOT}/scripts/symphony/config/gem-repo-registry.json"
 readonly POLICY_SOURCE="${SOURCE_ROOT}/scripts/symphony/gem_rehabilitation_policy.py"
-readonly WORKFLOW_SOURCE="${SOURCE_ROOT}/scripts/symphony/symphony/WORKFLOW.md"
+readonly WORKFLOW_SOURCE="${SOURCE_ROOT}/scripts/symphony/WORKFLOW.md"
 readonly SERVICE_UNIT_SOURCE="${SOURCE_ROOT}/scripts/symphony/systemd/symphony-elixir.service"
 readonly GATE_TARGET="${GEM_ROOT}/scripts/gem-priority-gate.py"
 readonly CLOSURE_TARGET="${GEM_ROOT}/scripts/closure_health.py"
@@ -99,7 +99,7 @@ git -C "${SOURCE_ROOT}" diff --quiet -- \
   scripts/symphony/gem_repo_registry.py \
   scripts/symphony/config/gem-repo-registry.json \
   scripts/symphony/gem_rehabilitation_policy.py \
-  scripts/symphony/symphony/WORKFLOW.md \
+  scripts/symphony/WORKFLOW.md \
   scripts/symphony/systemd/symphony-elixir.service \
   scripts/symphony/lib/user-systemd-context.sh
 git -C "${SOURCE_ROOT}" diff --cached --quiet -- \
@@ -111,7 +111,7 @@ git -C "${SOURCE_ROOT}" diff --cached --quiet -- \
   scripts/symphony/config/gem-repo-registry.json \
   scripts/symphony/gem_rehabilitation_policy.py \
   scripts/symphony/lib/user-systemd-context.sh \
-  scripts/symphony/symphony/WORKFLOW.md \
+  scripts/symphony/WORKFLOW.md \
   scripts/symphony/systemd/symphony-elixir.service
 
 SOURCE_REVISION="$(git -C "${SOURCE_ROOT}" rev-parse HEAD)"

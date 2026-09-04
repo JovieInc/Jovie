@@ -15,7 +15,7 @@ ROOT = Path(__file__).resolve().parents[2]
 class OpenAISymphonyInstallTests(unittest.TestCase):
     def test_official_workflow_and_elixir_installer(self) -> None:
         self.assertFalse((ROOT / "WORKFLOW.md").exists())
-        workflow = (ROOT / "scripts/symphony/symphony/WORKFLOW.md").read_text()
+        workflow = (ROOT / "scripts/symphony/WORKFLOW.md").read_text()
         self.assertIn('team_key: "JOV"', workflow)
         self.assertIn("api_key: $LINEAR_API_KEY", workflow)
         self.assertNotIn("project_slug", workflow)

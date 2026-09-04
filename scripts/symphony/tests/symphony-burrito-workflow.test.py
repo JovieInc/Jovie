@@ -20,7 +20,7 @@ from http.server import BaseHTTPRequestHandler, HTTPServer
 from unittest import mock
 
 ROOT = pathlib.Path(__file__).resolve().parents[3]
-WORKFLOW_PATH = ROOT / "scripts/symphony/symphony/WORKFLOW.md"
+WORKFLOW_PATH = ROOT / "scripts/symphony/WORKFLOW.md"
 WORKFLOW = WORKFLOW_PATH.read_text(encoding="utf-8")
 UNIT_PATH = ROOT / "scripts/symphony/systemd/symphony-elixir.service"
 UNIT = UNIT_PATH.read_text(encoding="utf-8")
@@ -1162,7 +1162,7 @@ class OfficialSymphonyContractTests(unittest.TestCase):
         self.assertIn("sha256", UPDATER)
         self.assertIn("symphony-elixir.service", UPDATER)
         self.assertNotIn("enable symphony-burrito.service", UPDATER)
-        self.assertIn("scripts/symphony/symphony/WORKFLOW.md", UPDATER)
+        self.assertIn("scripts/symphony/WORKFLOW.md", UPDATER)
         self.assertIn("SOURCE_INVALID", UPDATER)
         self.assertIn("PROMOTION_RED", UPDATER)
         self.assertIn("http://127.0.0.1:4041/api/v1/state", UPDATER)
