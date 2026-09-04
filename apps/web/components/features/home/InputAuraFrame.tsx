@@ -1,3 +1,4 @@
+// @coverage-via apps/web/tests/unit/home/HeroSpotifySearch.test.tsx
 import type { ReactNode } from 'react';
 import { cn } from '@/lib/utils';
 

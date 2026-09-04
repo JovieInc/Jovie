@@ -21,6 +21,7 @@ export interface MarketingHeaderNavLink extends MarketingNavLink {
 export type MarketingHeaderCta = HeaderNavCta;
 
 const MARKETING_GLASS_DESKTOP_LINKS: readonly MarketingHeaderNavLink[] = [
+  { href: APP_ROUTES.HOME, label: 'Jovie' },
   ...MARKETING_NAV_LINKS,
 ] as const;
 const MARKETING_GLASS_MOBILE_LINKS: readonly MarketingHeaderNavLink[] = [

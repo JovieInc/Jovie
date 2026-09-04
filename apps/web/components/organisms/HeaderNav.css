@@ -108,16 +108,13 @@
 }
 
 .marketing-glass-header__nav {
-  position: absolute;
-  top: 50%;
-  left: 50%;
+  position: static;
   gap: 0.1rem;
   margin-left: 0;
   padding: 0;
   border: 0;
   border-radius: 0;
   background: transparent;
-  transform: translate(-50%, -50%);
 }
 
 .marketing-glass-header__nav-item {
@@ -202,6 +199,10 @@
 .marketing-glass-header__cta:focus-visible {
   border-color: rgb(38 38 40);
   background: rgb(38 38 40);
+}
+
+.marketing-glass-header button[aria-controls="mobile-nav-panel"] {
+  color: var(--marketing-glass-text);
 }
 
 .marketing-glass-header__flyout {

@@ -606,13 +606,13 @@ export function HeaderNav({
             />
           </div>
 
-          {isHomepagePresentation ? navLinksMarkup : null}
+          {isHomepagePresentation || isMarketingGlass ? navLinksMarkup : null}
 
           {/* Spacer pushes nav + auth to the right */}
           <div className='flex-1' aria-hidden='true' />
 
           {/* Nav links - desktop only, right-aligned */}
-          {isHomepagePresentation ? null : navLinksMarkup}
+          {isHomepagePresentation || isMarketingGlass ? null : navLinksMarkup}
 
           {/* Divider between nav and auth - desktop only */}
           {hasDesktopNavLinks &&

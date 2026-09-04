@@ -2,6 +2,7 @@ import { render, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { HeroSpotifySearch } from '@/components/features/home/HeroSpotifySearch';
+import { InputAuraFrame } from '@/components/features/home/InputAuraFrame';
 import type { ArtistSearchState, SpotifyArtistResult } from '@/lib/queries';
 
 // jsdom doesn't implement scrollIntoView
@@ -102,6 +103,19 @@ describe('HeroSpotifySearch', () => {
   });
 
   describe('rendering', () => {
+    it('keeps the search aura contained and static', () => {
+      render(
+        <InputAuraFrame>
+          <span>Search control</span>
+        </InputAuraFrame>
+      );
+
+      const frame = screen.getByText('Search control').parentElement;
+      expect(frame).toHaveAttribute('data-aura-contained', 'true');
+      expect(frame).toHaveAttribute('data-aura-motion', 'static');
+      expect(frame).toHaveClass('isolate', 'rounded-xl');
+    });
+
     it('renders search input', () => {
       renderComponent();
       expect(getInput()).toBeInTheDocument();

@@ -65,22 +65,31 @@ describe('MarketingHeader', () => {
     );
   });
 
-  it('keeps the public header compact and free of duplicate wordmarks', () => {
+  it('keeps the registered mark and ordinary navigation in one left cluster', () => {
     render(<MarketingHeader />);
 
-    const navItems = Array.from(
-      document.querySelector('.marketing-glass-header__nav')?.children ?? []
-    ).map(item => item.textContent);
+    const headerRow = document.querySelector(
+      '.marketing-glass-header__shell > div'
+    );
+    const logoLink = screen.getByTestId('site-logo-link');
+    const navigation = document.querySelector('.marketing-glass-header__nav');
+    const navItems = Array.from(navigation?.children ?? []).map(
+      item => item.textContent
+    );
 
-    expect(navItems).toEqual(['Customers', 'Product', 'Pricing']);
+    expect(navItems).toEqual(['Jovie', 'Customers', 'Product', 'Pricing']);
+    expect(headerRow?.children[0]).toContainElement(logoLink);
+    expect(headerRow?.children[1]).toBe(navigation);
     expect(
-      document.querySelector('.marketing-glass-header__brand-wordmark')
+      logoLink.querySelector('[data-brand-variant="jovie"]')
+    ).toBeVisible();
+    expect(logoLink.querySelector('svg[aria-label="Jovie logo"]')).toBeNull();
+    expect(
+      navigation?.querySelector('.marketing-glass-header__brand-wordmark')
     ).toBeNull();
-    expect(
-      screen
-        .getByTestId('site-logo-link')
-        .querySelector('[data-brand-variant="jovie"]')
-    ).toBeInTheDocument();
+    expect(navigation?.querySelector('a[href="/"]')).toHaveClass(
+      'marketing-glass-header__nav-link'
+    );
     expect(screen.queryByRole('button', { name: /For/ })).toBeNull();
     expect(screen.queryByRole('button', { name: /Tools/ })).toBeNull();
   });
@@ -174,9 +183,7 @@ describe('MarketingHeader', () => {
       'href',
       '/pricing'
     );
-    expect(
-      document.querySelector('.marketing-glass-header__brand-wordmark')
-    ).toBeNull();
+    expect(screen.getByTestId('site-logo-link')).toHaveAttribute('href', '/');
   });
 
   it('accepts a page-owned CTA contract without creating a header variant', () => {
