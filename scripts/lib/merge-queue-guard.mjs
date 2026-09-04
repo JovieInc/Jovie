@@ -503,6 +503,8 @@ export const FORBIDDEN_PINNED_JOB_CONTEXTS = Object.freeze([
   'Layout Guard',
   'CI / Build + Layout (combined)',
   'Build + Layout (combined)',
+  'CI / iOS Fast Unit + Coverage (combined)',
+  'iOS Fast Unit + Coverage (combined)',
   'CI / iOS Build + Test (combined)',
   'iOS Build + Test (combined)',
   'CI / Mac Build + Test (combined)',

@@ -7,8 +7,9 @@ export const PRODUCT_LANES = ['ios', 'mac', 'web'];
 
 const GATE_RECEIPTS = {
   ios: {
-    tests: 'pnpm run ios:lint && pnpm run ios:test',
-    artifact: 'ios-screenshots',
+    tests:
+      'pnpm run ios:lint && bash apps/ios/scripts/run-unit-tests.sh && bash apps/ios/scripts/check_coverage.sh',
+    artifact: 'ios-test-results-<merge-group-head-sha>-<run-attempt>',
     releaseWorkflow: '.github/workflows/ios-testflight.yml',
   },
   mac: {
@@ -111,9 +112,13 @@ const RULES = /** @type {Array<[string, string, string[], RegExp]>} */ ([
 ]);
 
 const ALL_LANES = [...PRODUCT_LANES, 'operations', 'cross-product'];
+const JS_WORKSPACE_PRODUCTS = ['mac', 'web'];
 const OPERATIONS_ONLY_PACKAGE_SCRIPTS = new Set(['invariants:check']);
 const OPERATIONS_ONLY_INVARIANT_ADDITION =
   /^python3 scripts\/hermes\/tests\/[a-z0-9-]+\.test\.py$/;
+const IOS_PACKAGE_SCRIPT = /^(?:ios:|ci:ios-|test:auth:ios$)/;
+const IOS_PACKAGE_COMMAND = /(?:apps\/ios\/|\bxcodebuild\b|\bfastlane ios\b)/;
+const PACKAGE_MANAGER_COMMAND = /\b(?:pnpm|npm|yarn)\s+([^;&|\n]+)/g;
 
 const normalizePath = path =>
   String(path ?? '')
@@ -131,8 +136,11 @@ export class ProductLaneClassificationError extends Error {
   }
 }
 
-function sharedPackageClassification(rule = 'shared-js-workspace') {
-  return [rule, 'shared-contract', PRODUCT_LANES];
+function sharedPackageClassification(
+  rule = 'shared-js-workspace',
+  affectedProducts = JS_WORKSPACE_PRODUCTS
+) {
+  return [rule, 'shared-contract', affectedProducts];
 }
 
 function isOperationsOnlyInvariantChange(beforeCommand, afterCommand) {
@@ -164,9 +172,69 @@ function isOperationsOnlyInvariantChange(beforeCommand, afterCommand) {
   );
 }
 
+function packageScriptInvocations(command, scripts) {
+  return [...command.matchAll(PACKAGE_MANAGER_COMMAND)].flatMap(match => {
+    const tokens = match[1]
+      .trim()
+      .split(/\s+/)
+      .map(token => token.replace(/^["']|["']$/g, ''));
+    const runIndex = tokens.findIndex(
+      token => token === 'run' || token === 'run-script'
+    );
+    if (runIndex >= 0 && tokens[runIndex + 1]) return [tokens[runIndex + 1]];
+
+    const directScript = tokens.find(token => Object.hasOwn(scripts, token));
+    return directScript ? [directScript] : [];
+  });
+}
+
+function scriptReferencesIos(script, scripts, visited = new Set()) {
+  if (IOS_PACKAGE_SCRIPT.test(script)) return true;
+  if (visited.has(script)) return false;
+  const nextVisited = new Set(visited);
+  nextVisited.add(script);
+
+  const command = scripts[script];
+  if (typeof command !== 'string') return false;
+  if (IOS_PACKAGE_COMMAND.test(command)) return true;
+
+  return packageScriptInvocations(command, scripts).some(invocation =>
+    scriptReferencesIos(invocation, scripts, nextVisited)
+  );
+}
+
+function scriptDependsOn(script, target, scripts, visited = new Set()) {
+  if (script === target) return true;
+  if (visited.has(script)) return false;
+  const nextVisited = new Set(visited);
+  nextVisited.add(script);
+
+  const command = scripts[script];
+  if (typeof command !== 'string') return false;
+  return packageScriptInvocations(command, scripts).some(invocation =>
+    scriptDependsOn(invocation, target, scripts, nextVisited)
+  );
+}
+
+function scriptChangeAffectsIos(script, scripts) {
+  if (scriptReferencesIos(script, scripts)) return true;
+  return Object.keys(scripts).some(candidate => {
+    const command = scripts[candidate];
+    const isIosEntryPoint =
+      IOS_PACKAGE_SCRIPT.test(candidate) ||
+      (typeof command === 'string' && IOS_PACKAGE_COMMAND.test(command));
+    return (
+      isIosEntryPoint && scriptDependsOn(candidate, script, scripts, new Set())
+    );
+  });
+}
+
 export function classifyPackageJsonChange(beforeSource, afterSource) {
   if (typeof beforeSource !== 'string' || typeof afterSource !== 'string') {
-    return sharedPackageClassification('shared-js-workspace-unresolved');
+    return sharedPackageClassification(
+      'shared-js-workspace-unresolved',
+      PRODUCT_LANES
+    );
   }
 
   let before;
@@ -175,26 +243,35 @@ export function classifyPackageJsonChange(beforeSource, afterSource) {
     before = JSON.parse(beforeSource);
     after = JSON.parse(afterSource);
   } catch {
-    return sharedPackageClassification('shared-js-workspace-unresolved');
+    return sharedPackageClassification(
+      'shared-js-workspace-unresolved',
+      PRODUCT_LANES
+    );
   }
   if (!isJsonObject(before) || !isJsonObject(after)) {
-    return sharedPackageClassification('shared-js-workspace-unresolved');
+    return sharedPackageClassification(
+      'shared-js-workspace-unresolved',
+      PRODUCT_LANES
+    );
   }
 
   const changedTopLevelKeys = [
     ...new Set([...Object.keys(before), ...Object.keys(after)]),
   ].filter(key => !isDeepStrictEqual(before[key], after[key]));
-  if (
-    changedTopLevelKeys.length !== 1 ||
-    changedTopLevelKeys[0] !== 'scripts'
-  ) {
+  const hasNonScriptChanges = changedTopLevelKeys.some(
+    key => key !== 'scripts'
+  );
+  if (!changedTopLevelKeys.includes('scripts')) {
     return sharedPackageClassification();
   }
 
   const beforeScripts = before.scripts ?? {};
   const afterScripts = after.scripts ?? {};
   if (!isJsonObject(beforeScripts) || !isJsonObject(afterScripts)) {
-    return sharedPackageClassification('shared-js-workspace-unresolved');
+    return sharedPackageClassification(
+      'shared-js-workspace-unresolved',
+      PRODUCT_LANES
+    );
   }
   const changedScripts = [
     ...new Set([...Object.keys(beforeScripts), ...Object.keys(afterScripts)]),
@@ -208,27 +285,40 @@ export function classifyPackageJsonChange(beforeSource, afterSource) {
       (afterScripts[script] !== undefined &&
         typeof afterScripts[script] !== 'string')
   );
-  if (
-    changedScripts.length === 0 ||
-    hasInvalidChangedScriptValue ||
-    changedScripts.some(script => !OPERATIONS_ONLY_PACKAGE_SCRIPTS.has(script))
-  ) {
+  if (changedScripts.length === 0 || hasInvalidChangedScriptValue) {
     return sharedPackageClassification(
       hasInvalidChangedScriptValue
         ? 'shared-js-workspace-unresolved'
-        : 'shared-js-workspace'
+        : 'shared-js-workspace',
+      hasInvalidChangedScriptValue ? PRODUCT_LANES : JS_WORKSPACE_PRODUCTS
     );
   }
   if (
-    !isOperationsOnlyInvariantChange(
-      beforeScripts['invariants:check'],
-      afterScripts['invariants:check']
-    )
+    changedScripts.every(script => OPERATIONS_ONLY_PACKAGE_SCRIPTS.has(script))
   ) {
-    return sharedPackageClassification();
+    if (
+      isOperationsOnlyInvariantChange(
+        beforeScripts['invariants:check'],
+        afterScripts['invariants:check']
+      )
+    ) {
+      return hasNonScriptChanges
+        ? sharedPackageClassification()
+        : ['operations-package-scripts', 'operations-tooling', []];
+    }
+    return sharedPackageClassification('shared-js-workspace', PRODUCT_LANES);
   }
 
-  return ['operations-package-scripts', 'operations-tooling', []];
+  const changesIosCommand = changedScripts.some(script => {
+    return (
+      scriptChangeAffectsIos(script, beforeScripts) ||
+      scriptChangeAffectsIos(script, afterScripts)
+    );
+  });
+  return sharedPackageClassification(
+    'shared-js-workspace',
+    changesIosCommand ? PRODUCT_LANES : JS_WORKSPACE_PRODUCTS
+  );
 }
 
 /**

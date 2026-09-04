@@ -14,6 +14,10 @@ const iosWorkflowSource = readFileSync(
   path.join(repoRoot, '.github/workflows/ios-ci.yml'),
   'utf8'
 );
+const unitTestRunnerSource = readFileSync(
+  path.join(scriptDir, 'run-unit-tests.sh'),
+  'utf8'
+);
 
 test('xcodebuild wrapper prints phase timing and bounded timeout diagnostics', () => {
   assert.match(runXcodebuildSource, /run_phase_with_optional_timeout/);
@@ -30,25 +34,36 @@ test('xcodebuild wrapper prints phase timing and bounded timeout diagnostics', (
   );
 });
 
-test('iOS CI exposes focused reproduction while preserving measured build-test headroom', () => {
-  const buildStepTimeout = iosWorkflowSource.match(
-    /- name: Build and test[\s\S]*?timeout-minutes: ([0-9]+)/
+test('iOS CI bounds the fast gate and preserves full release regression headroom', () => {
+  const fastStepTimeout = iosWorkflowSource.match(
+    /- name: Run fast unit and coverage gate[\s\S]*?timeout-minutes: ([0-9]+)/
   );
-  const jobTimeout = iosWorkflowSource.match(
-    /name: Build And Test[\s\S]*?timeout-minutes: ([0-9]+)/
+  const fullStepTimeout = iosWorkflowSource.match(
+    /- name: Run full simulator regression[\s\S]*?timeout-minutes: ([0-9]+)/
   );
-  const internalTimeout = iosWorkflowSource.match(
-    /xcodebuild_timeout_seconds:[\s\S]*?default: '([0-9]+)'/
+  const fastInternalTimeout = iosWorkflowSource.match(
+    /- name: Run fast unit and coverage gate[\s\S]*?JOVIE_IOS_XCODEBUILD_TIMEOUT_SECONDS: "([0-9]+)"/
+  );
+  const fullInternalTimeout = iosWorkflowSource.match(
+    /- name: Run full simulator regression[\s\S]*?JOVIE_IOS_XCODEBUILD_TIMEOUT_SECONDS: "([0-9]+)"/
   );
 
-  assert.equal(Number(buildStepTimeout?.[1]), 30);
-  assert.equal(Number(jobTimeout?.[1]), 50);
-  assert.equal(Number(internalTimeout?.[1]), 1680);
+  assert.equal(Number(fastStepTimeout?.[1]), 15);
+  assert.equal(Number(fullStepTimeout?.[1]), 30);
+  assert.equal(Number(fastInternalTimeout?.[1]), 840);
+  assert.equal(Number(fullInternalTimeout?.[1]), 1680);
   assert.ok(
-    Number(internalTimeout?.[1]) < Number(buildStepTimeout?.[1]) * 60,
-    'internal xcodebuild timeout must fire before the GitHub action step timeout'
+    Number(fastInternalTimeout?.[1]) < Number(fastStepTimeout?.[1]) * 60,
+    'fast internal timeout must fire before the GitHub action step timeout'
   );
-  assert.match(iosWorkflowSource, /only_testing:/);
-  assert.match(iosWorkflowSource, /JOVIE_IOS_ONLY_TESTING/);
-  assert.match(iosWorkflowSource, /-only-testing:\$JOVIE_IOS_ONLY_TESTING/);
+  assert.ok(
+    Number(fullInternalTimeout?.[1]) < Number(fullStepTimeout?.[1]) * 60,
+    'full internal timeout must fire before the GitHub action step timeout'
+  );
+  assert.match(
+    iosWorkflowSource,
+    /timeout-minutes: \$\{\{ inputs\.full-regression && 55 \|\| 18 \}\}/
+  );
+  assert.match(unitTestRunnerSource, /JOVIE_IOS_SCHEME="JovieUnitTests"/);
+  assert.match(unitTestRunnerSource, /-only-testing:JovieTests/);
 });
