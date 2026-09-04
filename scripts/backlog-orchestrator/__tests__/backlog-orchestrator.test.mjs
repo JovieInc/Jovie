@@ -1578,11 +1578,11 @@ describe('deterministic Symphony admission boundary', () => {
   it('versions the Gem controller and mechanically holds AMBER drafts from promotion', async () => {
     const controller = resolve(
       ORCHESTRATOR_DIR,
-      '../hermes/gem-priority-gate.py'
+      '../symphony/gem-priority-gate.py'
     );
     const workflow = resolve(
       ORCHESTRATOR_DIR,
-      '../hermes/WORKFLOW.jovie-ui-pilot.md'
+      '../symphony/WORKFLOW.jovie-ui-pilot.md'
     );
     const runController = async (signals, consumer = 'fleet') => {
       const controllerSignals = JSON.parse(JSON.stringify(signals));
@@ -1733,7 +1733,7 @@ describe('deterministic Symphony admission boundary', () => {
   it('stops and never redispatches an agent once its issue reaches In Review', async () => {
     const workflow = resolve(
       ORCHESTRATOR_DIR,
-      '../hermes/WORKFLOW.jovie-ui-pilot.md'
+      '../symphony/WORKFLOW.jovie-ui-pilot.md'
     );
     const workflowSource = await readFile(workflow, 'utf8');
     const frontmatter = workflowSource.match(/^---\n([\s\S]*?)\n---\n/);
@@ -1771,9 +1771,9 @@ describe('deterministic Symphony admission boundary', () => {
   });
 
   it('keeps the Gem drain on typed fleet admission and fail-closes exit-code mismatches', async () => {
-    const hermesDir = resolve(ORCHESTRATOR_DIR, '../hermes');
+    const symphonyDir = resolve(ORCHESTRATOR_DIR, '../symphony');
     const consumer = await readFile(
-      resolve(hermesDir, 'gem-pr-drain.py'),
+      resolve(symphonyDir, 'gem-pr-drain.py'),
       'utf8'
     );
     const contractProbe = `
@@ -1853,7 +1853,7 @@ else:
     raise AssertionError("invalid remediation authority must fail closed")
 `;
 
-    await execFileAsync('python3', ['-c', contractProbe, hermesDir]);
+    await execFileAsync('python3', ['-c', contractProbe, symphonyDir]);
     assert.match(consumer, /"--consumer",\s*"remediation"/);
     assert.match(
       consumer,
@@ -1923,7 +1923,7 @@ print(json.dumps(result))
 `;
     const update = await execFileAsync(
       'python3',
-      ['-c', updateProbe, resolve(hermesDir, 'gem-pr-drain.py')],
+      ['-c', updateProbe, resolve(symphonyDir, 'gem-pr-drain.py')],
       {
         env: {
           ...process.env,
@@ -1997,7 +1997,7 @@ print(json.dumps({"behind": behind, "clean": clean, "calls": calls}))
 `;
     const allowed = await execFileAsync(
       'python3',
-      ['-c', allowedProbe, resolve(hermesDir, 'gem-pr-drain.py')],
+      ['-c', allowedProbe, resolve(symphonyDir, 'gem-pr-drain.py')],
       {
         env: {
           ...process.env,

@@ -12,16 +12,16 @@ const REPO_ROOT = resolve(import.meta.dirname, '..', '..', '..');
 const read = rel => readFileSync(resolve(REPO_ROOT, rel), 'utf8');
 
 const OPS_NOTIFY_CONSUMERS = [
-  'scripts/hermes/jobs/agentcookie-sync.ts',
-  'scripts/hermes/jobs/pipeline-scoreboard.ts',
-  'scripts/hermes/jobs/gbrain-health-summary.ts',
-  'scripts/hermes/jobs/gstack-nightly-upgrade.ts',
-  'scripts/hermes/jobs/codex-issue-shipper.ts',
+  'scripts/symphony/jobs/agentcookie-sync.ts',
+  'scripts/symphony/jobs/pipeline-scoreboard.ts',
+  'scripts/symphony/jobs/gbrain-health-summary.ts',
+  'scripts/symphony/jobs/gstack-nightly-upgrade.ts',
+  'scripts/symphony/jobs/codex-issue-shipper.ts',
 ];
 
 describe('hermes ops-notify import contract (JOV-4331)', () => {
   it('exports sendOpsAlert (not notifyOps)', async () => {
-    const mod = await import('../../hermes/lib/ops-notify.ts');
+    const mod = await import('../../symphony/lib/ops-notify.ts');
     expect(typeof mod.sendOpsAlert).toBe('function');
     // Avoid `mod.notifyOps` — TS2339 on the scripts typecheck lane.
     expect(Object.hasOwn(mod, 'notifyOps')).toBe(false);
@@ -71,13 +71,15 @@ describe('scripts typecheck baseline no longer pins the fixed TS2305s', () => {
     const files = baseline.files;
     // pipeline-scoreboard had TS2305 as its only error, so the file entry
     // leaves the baseline entirely.
-    expect(files['scripts/hermes/jobs/pipeline-scoreboard.ts']).toBeUndefined();
+    expect(
+      files['scripts/symphony/jobs/pipeline-scoreboard.ts']
+    ).toBeUndefined();
     // The others keep their unrelated baselined errors; only TS2305 leaves.
     expect(
-      files['scripts/hermes/jobs/agentcookie-sync.ts']?.TS2305
+      files['scripts/symphony/jobs/agentcookie-sync.ts']?.TS2305
     ).toBeUndefined();
     expect(
-      files['scripts/hermes/jobs/gbrain-health-summary.ts']?.TS2305
+      files['scripts/symphony/jobs/gbrain-health-summary.ts']?.TS2305
     ).toBeUndefined();
     expect(
       files['scripts/github-transition-issue.mjs']?.TS2305

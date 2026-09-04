@@ -87,12 +87,12 @@ const SYMPHONY_THROUGHPUT_CONTROL_MANIFEST = [
   'scripts/backlog-orchestrator/backlog-orchestrator.mjs',
   'scripts/backlog-orchestrator/deterministic-gates.mjs',
   'scripts/backlog-orchestrator/gate-next-hold.mjs',
-  'scripts/hermes/codex-rotate',
-  'scripts/hermes/codex-account-probe.sh',
-  'scripts/hermes/symphony-lease-guard',
-  'scripts/hermes/tests/codex-account-probe.test.py',
-  'scripts/hermes/tests/codex-rotate.test.py',
-  'scripts/hermes/tests/symphony-lease-guard.test.py',
+  'scripts/symphony/codex-rotate',
+  'scripts/symphony/codex-account-probe.sh',
+  'scripts/symphony/symphony-lease-guard',
+  'scripts/symphony/tests/codex-account-probe.test.py',
+  'scripts/symphony/tests/codex-rotate.test.py',
+  'scripts/symphony/tests/symphony-lease-guard.test.py',
   'scripts/lib/__tests__/automation-verify.test.mjs',
   'scripts/lib/__tests__/pre-push-gate.test.mjs',
   'scripts/run-affected-tests.mjs',
@@ -113,12 +113,12 @@ const CI_UI_DRIFT_GUARDRAIL_INPUTS = [
 const FLEET_PROMOTION_GATE_LANE = [
   '.github/actions/evaluate-fleet-gate/action.yml',
   'apps/web/tests/unit/api/health/deploy.critical.test.ts',
-  'scripts/hermes/evaluate-fleet-gate.sh',
-  'scripts/hermes/fleet_admission_receipt.py',
-  'scripts/hermes/gem-priority-gate.py',
-  'scripts/hermes/tests/gem-priority-gate.test.py',
-  'scripts/hermes/tests/test_evaluate_fleet_gate.py',
-  'scripts/hermes/tests/test_fleet_admission_receipt.py',
+  'scripts/symphony/evaluate-fleet-gate.sh',
+  'scripts/symphony/fleet_admission_receipt.py',
+  'scripts/symphony/gem-priority-gate.py',
+  'scripts/symphony/tests/gem-priority-gate.test.py',
+  'scripts/symphony/tests/test_evaluate_fleet_gate.py',
+  'scripts/symphony/tests/test_fleet_admission_receipt.py',
   'scripts/lib/__tests__/automation-verify.test.mjs',
   'scripts/run-affected-tests.mjs',
 ];
@@ -128,36 +128,36 @@ const GEM_PR_REHABILITATION_LANE = [
   '.github/workflows/gem-delivery-controller-activation.yml',
   '.github/workflows/ci.yml',
   'docs/PR_FLOW.md',
-  'scripts/hermes/config/gem-repo-registry.json',
-  'scripts/hermes/config/model-registry.json',
-  'scripts/hermes/closure_health.py',
-  'scripts/hermes/gem-disk-reclaim.py',
-  'scripts/hermes/gem-pr-drain.py',
-  'scripts/hermes/gem-ops-hud.py',
-  'scripts/hermes/gem-priority-gate.py',
-  'scripts/hermes/gem-repo-drain-cycle.py',
-  'scripts/hermes/gem_gate_contract.py',
-  'scripts/hermes/gem_repo_registry.py',
-  'scripts/hermes/gem_rehabilitation_policy.py',
-  'scripts/hermes/install-gem-fleet-controller.sh',
-  'scripts/hermes/install-gem-pr-rehabilitation.sh',
-  'scripts/hermes/install-symphony-ui-pilot.sh',
-  'scripts/hermes/model-router.py',
-  'scripts/hermes/symphony-reconciler.py',
-  'scripts/hermes/systemd/gem-disk-reclaim.service',
-  'scripts/hermes/systemd/gem-disk-reclaim.timer',
-  'scripts/hermes/systemd/gem-pr-drain.service',
-  'scripts/hermes/systemd/gem-pr-drain.timer',
-  'scripts/hermes/tests/test_gem_disk_reclaim.py',
-  'scripts/hermes/tests/gem-pr-drain.test.py',
-  'scripts/hermes/tests/gem-ops-hud.test.py',
-  'scripts/hermes/tests/gem-pr-rehabilitation-contract.test.py',
-  'scripts/hermes/tests/gem-priority-gate.test.py',
-  'scripts/hermes/tests/gem-rehabilitation-policy.test.py',
-  'scripts/hermes/tests/closure-health.test.py',
-  'scripts/hermes/tests/symphony-reconciler.test.py',
+  'scripts/symphony/config/gem-repo-registry.json',
+  'scripts/symphony/config/model-registry.json',
+  'scripts/symphony/closure_health.py',
+  'scripts/symphony/gem-disk-reclaim.py',
+  'scripts/symphony/gem-pr-drain.py',
+  'scripts/symphony/gem-ops-hud.py',
+  'scripts/symphony/gem-priority-gate.py',
+  'scripts/symphony/gem-repo-drain-cycle.py',
+  'scripts/symphony/gem_gate_contract.py',
+  'scripts/symphony/gem_repo_registry.py',
+  'scripts/symphony/gem_rehabilitation_policy.py',
+  'scripts/symphony/install-gem-fleet-controller.sh',
+  'scripts/symphony/install-gem-pr-rehabilitation.sh',
+  'scripts/symphony/install-symphony-ui-pilot.sh',
+  'scripts/symphony/model-router.py',
+  'scripts/symphony/symphony-reconciler.py',
+  'scripts/symphony/systemd/gem-disk-reclaim.service',
+  'scripts/symphony/systemd/gem-disk-reclaim.timer',
+  'scripts/symphony/systemd/gem-pr-drain.service',
+  'scripts/symphony/systemd/gem-pr-drain.timer',
+  'scripts/symphony/tests/test_gem_disk_reclaim.py',
+  'scripts/symphony/tests/gem-pr-drain.test.py',
+  'scripts/symphony/tests/gem-ops-hud.test.py',
+  'scripts/symphony/tests/gem-pr-rehabilitation-contract.test.py',
+  'scripts/symphony/tests/gem-priority-gate.test.py',
+  'scripts/symphony/tests/gem-rehabilitation-policy.test.py',
+  'scripts/symphony/tests/closure-health.test.py',
+  'scripts/symphony/tests/symphony-reconciler.test.py',
   'scripts/backlog-orchestrator/__tests__/backlog-orchestrator.test.mjs',
-  'scripts/hermes/tests/test-model-router.py',
+  'scripts/symphony/tests/test-model-router.py',
   'scripts/tests/test_symphony_ui_pilot_runtime.py',
   'scripts/ci-fast-lanes.mjs',
   'scripts/lib/__tests__/automation-verify.test.mjs',
@@ -170,10 +170,10 @@ const MERGE_QUEUE_CONTROLLER_INPUTS = [
   'docs/PR_FLOW.md',
   'scripts/ci-merge-queue-check.mjs',
   'scripts/drain-pr-queue.sh',
-  'scripts/hermes/evaluate-fleet-gate.sh',
-  'scripts/hermes/fleet_admission_receipt.py',
-  'scripts/hermes/tests/test_evaluate_fleet_gate.py',
-  'scripts/hermes/tests/test_fleet_admission_receipt.py',
+  'scripts/symphony/evaluate-fleet-gate.sh',
+  'scripts/symphony/fleet_admission_receipt.py',
+  'scripts/symphony/tests/test_evaluate_fleet_gate.py',
+  'scripts/symphony/tests/test_fleet_admission_receipt.py',
   'scripts/lib/merge-queue-guard.mjs',
   'scripts/lib/pre-land-changelog.mjs',
   'scripts/lib/resolve-merge-group-path-diff.mjs',
@@ -282,17 +282,17 @@ const AFFECTED_TEST_SELECTOR_MANIFEST = [
   'scripts/lib/__tests__/automation-verify.test.mjs',
 ];
 const GEM_CHECKIN_HUD_LANE = [
-  'scripts/hermes/symphony/WORKFLOW.md',
-  'scripts/hermes/symphony_official_runtime.py',
-  'scripts/hermes/gem-checkin-hud.py',
-  'scripts/hermes/gem-checkin-tty1.sh',
-  'scripts/hermes/systemd/symphony-elixir.service',
-  'scripts/hermes/systemd/symphony-burrito.service',
-  'scripts/hermes/systemd/symphony-burrito-update.service',
-  'scripts/hermes/systemd/symphony-burrito-update.timer',
-  'scripts/hermes/update-symphony-burrito.sh',
-  'scripts/hermes/tests/gem-checkin-hud.test.py',
-  'scripts/hermes/tests/symphony-burrito-workflow.test.py',
+  'scripts/symphony/WORKFLOW.md',
+  'scripts/symphony/symphony_official_runtime.py',
+  'scripts/symphony/gem-checkin-hud.py',
+  'scripts/symphony/gem-checkin-tty1.sh',
+  'scripts/symphony/systemd/symphony-elixir.service',
+  'scripts/symphony/systemd/symphony-burrito.service',
+  'scripts/symphony/systemd/symphony-burrito-update.service',
+  'scripts/symphony/systemd/symphony-burrito-update.timer',
+  'scripts/symphony/update-symphony-burrito.sh',
+  'scripts/symphony/tests/gem-checkin-hud.test.py',
+  'scripts/symphony/tests/symphony-burrito-workflow.test.py',
   '.github/workflows/reusable-ci-lint.yml',
   ...AFFECTED_TEST_SELECTOR_MANIFEST,
 ];
@@ -328,21 +328,21 @@ const ROLLING_CI_FX_CACHE_GC_LANE = [
 ];
 const EVENT_DRIVEN_SHIPPER_PRIMARY_MANIFEST = [
   '.github/workflows/fleet-gate-refresh.yml',
-  'scripts/hermes/launchd/README.md',
-  'scripts/hermes/launchd/co.jovie.hermes.cron-codex-issue-shipper.plist.template',
-  'scripts/hermes/shipper-gated-entrypoint.py',
-  'scripts/hermes/tests/gem-priority-gate.test.py',
+  'scripts/symphony/launchd/README.md',
+  'scripts/symphony/launchd/co.jovie.hermes.cron-codex-issue-shipper.plist.template',
+  'scripts/symphony/shipper-gated-entrypoint.py',
+  'scripts/symphony/tests/gem-priority-gate.test.py',
   'scripts/lib/__tests__/hermes-launchd.test.mjs',
 ];
 const DELIVERY_LIVENESS_LANE = [
-  'scripts/hermes/jobs/codex-issue-shipper.ts',
-  'scripts/hermes/jobs/delivery-liveness-watchdog.ts',
-  'scripts/hermes/launchd/README.md',
-  'scripts/hermes/launchd/co.jovie.hermes.delivery-liveness-watchdog.plist.template',
-  'scripts/hermes/lib/__tests__/codex-issue-shipper-routing.test.ts',
-  'scripts/hermes/lib/__tests__/delivery-liveness.test.ts',
-  'scripts/hermes/lib/codex-issue-shipper.ts',
-  'scripts/hermes/lib/delivery-liveness.ts',
+  'scripts/symphony/jobs/codex-issue-shipper.ts',
+  'scripts/symphony/jobs/delivery-liveness-watchdog.ts',
+  'scripts/symphony/launchd/README.md',
+  'scripts/symphony/launchd/co.jovie.hermes.delivery-liveness-watchdog.plist.template',
+  'scripts/symphony/lib/__tests__/codex-issue-shipper-routing.test.ts',
+  'scripts/symphony/lib/__tests__/delivery-liveness.test.ts',
+  'scripts/symphony/lib/codex-issue-shipper.ts',
+  'scripts/symphony/lib/delivery-liveness.ts',
   'scripts/lib/__tests__/codex-issue-shipper.test.mjs',
 ];
 const PR_SIZE_GUARD_MANIFEST = [
@@ -359,15 +359,15 @@ const PERFORMANCE_PROFILER_REPAIR_PRIMARY_MANIFEST = [
   'apps/web/tests/unit/ci/deploy-workflow.test.ts',
   'apps/web/tests/unit/design-system/arbitrary-values-ratchet.test.ts',
   'apps/web/tests/unit/lib/feature-flags-registry.test.ts',
-  'scripts/hermes/jobs/ci-failure-diagnosis.ts',
-  'scripts/hermes/lib/__tests__/ci-failure-diagnosis.test.ts',
+  'scripts/symphony/jobs/ci-failure-diagnosis.ts',
+  'scripts/symphony/lib/__tests__/ci-failure-diagnosis.test.ts',
 ];
 const PERFORMANCE_PROFILER_REPAIR_ANCHORS = [
   'apps/web/scripts/test-performance-guard.ts',
   'apps/web/scripts/test-performance-profiler.test.ts',
   'apps/web/scripts/test-performance-profiler.ts',
-  'scripts/hermes/jobs/ci-failure-diagnosis.ts',
-  'scripts/hermes/lib/__tests__/ci-failure-diagnosis.test.ts',
+  'scripts/symphony/jobs/ci-failure-diagnosis.ts',
+  'scripts/symphony/lib/__tests__/ci-failure-diagnosis.test.ts',
 ];
 const PERFORMANCE_PROFILER_REPAIR_MANIFEST = [
   ...PERFORMANCE_PROFILER_REPAIR_PRIMARY_MANIFEST,
@@ -382,8 +382,8 @@ const SCANNER_LOAD_REPAIR_PRIMARY_MANIFEST = [
   'apps/web/tests/unit/design-system/arbitrary-values-ratchet.test.ts',
   'apps/web/tests/unit/design-system/destructive-confirm-dialog-audit.test.ts',
   'apps/web/tests/unit/metrics-layer-guard-logic.ts',
-  'scripts/hermes/jobs/ci-failure-diagnosis.ts',
-  'scripts/hermes/lib/__tests__/ci-failure-diagnosis.test.ts',
+  'scripts/symphony/jobs/ci-failure-diagnosis.ts',
+  'scripts/symphony/lib/__tests__/ci-failure-diagnosis.test.ts',
   'scripts/lib/__tests__/merge-queue-backend.test.mjs',
 ];
 const SCANNER_LOAD_REPAIR_MANIFEST = [
@@ -423,8 +423,8 @@ const CASE_SENSITIVE_LOWERCASE_CHAT_INPUT_PATTERNS = [
 const GOLDEN_PATH_SMOKE_CONTRACT_REPAIR_DIFF = [
   'apps/web/tests/e2e/golden-path.spec.ts',
   'apps/web/tests/unit/ci/deploy-workflow.test.ts',
-  'scripts/hermes/jobs/ci-failure-diagnosis.ts',
-  'scripts/hermes/lib/__tests__/ci-failure-diagnosis.test.ts',
+  'scripts/symphony/jobs/ci-failure-diagnosis.ts',
+  'scripts/symphony/lib/__tests__/ci-failure-diagnosis.test.ts',
   ...AFFECTED_TEST_SELECTOR_MANIFEST,
 ];
 const PERSISTED_AUTH_FIXTURE_REPAIR_CORE = [
@@ -440,11 +440,11 @@ const PERSISTED_AUTH_FIXTURE_REPAIR_CORE = [
   'apps/web/tests/unit/lib/auth/dev-test-auth.server.test.ts',
   'apps/web/tests/unit/lib/auth/test-mode.test.ts',
   'apps/web/tests/unit/lib/testing/test-user-provision.server.test.ts',
-  'scripts/hermes/jobs/ci-failure-diagnosis.ts',
-  'scripts/hermes/jobs/ci-failure-monitor.ts',
-  'scripts/hermes/lib/__tests__/ci-failure-diagnosis.test.ts',
-  'scripts/hermes/lib/ci-failure-classifier.ts',
-  'scripts/hermes/lib/__tests__/ci-failure-classifier.test.ts',
+  'scripts/symphony/jobs/ci-failure-diagnosis.ts',
+  'scripts/symphony/jobs/ci-failure-monitor.ts',
+  'scripts/symphony/lib/__tests__/ci-failure-diagnosis.test.ts',
+  'scripts/symphony/lib/ci-failure-classifier.ts',
+  'scripts/symphony/lib/__tests__/ci-failure-classifier.test.ts',
 ];
 const PERSISTED_AUTH_FIXTURE_REPAIR_DIFF = [
   ...PERSISTED_AUTH_FIXTURE_REPAIR_CORE,
@@ -454,8 +454,8 @@ const MOBILE_OVERFLOW_NAVIGATION_RACE_MANIFEST = [
   'apps/web/tests/e2e/mobile-overflow.spec.ts',
   'apps/web/tests/e2e/utils/mobile-overflow.ts',
   'apps/web/tests/unit/e2e/mobile-overflow-navigation.test.ts',
-  'scripts/hermes/jobs/ci-failure-diagnosis.ts',
-  'scripts/hermes/lib/__tests__/ci-failure-diagnosis.test.ts',
+  'scripts/symphony/jobs/ci-failure-diagnosis.ts',
+  'scripts/symphony/lib/__tests__/ci-failure-diagnosis.test.ts',
   'scripts/run-affected-tests.mjs',
   'scripts/lib/__tests__/automation-verify.test.mjs',
 ];
@@ -467,8 +467,8 @@ const RUNNER_IO_PRESSURE_MANIFEST = [
   '.github/runner-host/ci-runner-autoscaler.service.snapshot',
   '.github/runner-host/install-io-pressure-guard.sh',
   'apps/web/tests/unit/ci/runner-io-pressure.test.ts',
-  'scripts/hermes/jobs/ci-failure-diagnosis.ts',
-  'scripts/hermes/lib/__tests__/ci-failure-diagnosis.test.ts',
+  'scripts/symphony/jobs/ci-failure-diagnosis.ts',
+  'scripts/symphony/lib/__tests__/ci-failure-diagnosis.test.ts',
   'scripts/run-affected-tests.mjs',
   'scripts/lib/__tests__/automation-verify.test.mjs',
 ];
@@ -481,8 +481,8 @@ const RUNNER_IO_PRESSURE_V2_MANIFEST = [
   '.github/workflows/runner-autoscaler-canary.yml',
   'apps/web/tests/unit/ci/runner-autoscaler-canary-workflow.test.ts',
   'apps/web/tests/unit/ci/runner-io-pressure.test.ts',
-  'scripts/hermes/jobs/ci-failure-diagnosis.ts',
-  'scripts/hermes/lib/__tests__/ci-failure-diagnosis.test.ts',
+  'scripts/symphony/jobs/ci-failure-diagnosis.ts',
+  'scripts/symphony/lib/__tests__/ci-failure-diagnosis.test.ts',
   'scripts/run-affected-tests.mjs',
   'scripts/lib/__tests__/automation-verify.test.mjs',
 ];
@@ -500,8 +500,8 @@ const RUNNER_PREREQUISITE_CONTRACT_MANIFEST = [
   '.github/runner-image/verify-prerequisites.mjs',
   '.github/workflows/ci.yml',
   'apps/web/tests/unit/ci/runner-setup-action.test.ts',
-  'scripts/hermes/jobs/ci-failure-diagnosis.ts',
-  'scripts/hermes/lib/__tests__/ci-failure-diagnosis.test.ts',
+  'scripts/symphony/jobs/ci-failure-diagnosis.ts',
+  'scripts/symphony/lib/__tests__/ci-failure-diagnosis.test.ts',
   'scripts/run-affected-tests.mjs',
   'scripts/lib/__tests__/automation-verify.test.mjs',
 ];
@@ -514,16 +514,16 @@ const LAYOUT_GUARD_CONTRACT_MANIFEST = [
   '.github/scripts/layout-guard-manifest.mjs',
   '.github/scripts/layout-guard-manifest.test.mjs',
   '.github/workflows/ci.yml',
-  'scripts/hermes/jobs/ci-failure-diagnosis.ts',
-  'scripts/hermes/lib/__tests__/ci-failure-diagnosis.test.ts',
+  'scripts/symphony/jobs/ci-failure-diagnosis.ts',
+  'scripts/symphony/lib/__tests__/ci-failure-diagnosis.test.ts',
   'scripts/run-affected-tests.mjs',
   'scripts/lib/__tests__/automation-verify.test.mjs',
 ];
 const NEON_ATTEMPT_ARTIFACT_MANIFEST = [
   '.github/workflows/ci.yml',
   'apps/web/tests/unit/ci/deploy-workflow.test.ts',
-  'scripts/hermes/jobs/ci-failure-diagnosis.ts',
-  'scripts/hermes/lib/__tests__/ci-failure-diagnosis.test.ts',
+  'scripts/symphony/jobs/ci-failure-diagnosis.ts',
+  'scripts/symphony/lib/__tests__/ci-failure-diagnosis.test.ts',
   'scripts/run-affected-tests.mjs',
   'scripts/lib/__tests__/automation-verify.test.mjs',
 ];
@@ -637,7 +637,7 @@ describe('automation-verify affected scope', () => {
       'apps/web/tests/unit/ci/runner-io-pressure.test.ts',
     ]);
     expect(plan.scriptVitestTests).toEqual([
-      'scripts/hermes/lib/__tests__/ci-failure-diagnosis.test.ts',
+      'scripts/symphony/lib/__tests__/ci-failure-diagnosis.test.ts',
       'scripts/lib/__tests__/automation-verify.test.mjs',
     ]);
   });
@@ -651,7 +651,7 @@ describe('automation-verify affected scope', () => {
       'apps/web/tests/unit/ci/runner-io-pressure.test.ts',
     ]);
     expect(plan.scriptVitestTests).toEqual([
-      'scripts/hermes/lib/__tests__/ci-failure-diagnosis.test.ts',
+      'scripts/symphony/lib/__tests__/ci-failure-diagnosis.test.ts',
       'scripts/lib/__tests__/automation-verify.test.mjs',
     ]);
   });
@@ -677,7 +677,7 @@ describe('automation-verify affected scope', () => {
       mode: 'selected',
       relatedFiles: [],
       selectedTests: [],
-      pythonUnittestTests: ['scripts/hermes/tests/gem-priority-gate.test.py'],
+      pythonUnittestTests: ['scripts/symphony/tests/gem-priority-gate.test.py'],
       scriptVitestTests: [
         'scripts/lib/__tests__/automation-verify.test.mjs',
         'scripts/lib/__tests__/pr-visual-capture-path.test.mjs',
@@ -738,7 +738,7 @@ describe('automation-verify affected scope', () => {
     expect(
       buildAffectedTestPlan([
         ...EVENT_DRIVEN_SHIPPER_PRIMARY_MANIFEST,
-        'scripts/hermes/unknown-shipper-control.py',
+        'scripts/symphony/unknown-shipper-control.py',
       ]).mode
     ).toBe('full');
   });
@@ -751,8 +751,8 @@ describe('automation-verify affected scope', () => {
       relatedFiles: [],
       selectedTests: [],
       scriptVitestTests: [
-        'scripts/hermes/lib/__tests__/codex-issue-shipper-routing.test.ts',
-        'scripts/hermes/lib/__tests__/delivery-liveness.test.ts',
+        'scripts/symphony/lib/__tests__/codex-issue-shipper-routing.test.ts',
+        'scripts/symphony/lib/__tests__/delivery-liveness.test.ts',
         'scripts/lib/__tests__/codex-issue-shipper.test.mjs',
         'scripts/lib/__tests__/hermes-launchd.test.mjs',
       ],
@@ -761,16 +761,16 @@ describe('automation-verify affected scope', () => {
 
   it('keeps a focused delivery-liveness follow-up on the same contracts', () => {
     const plan = buildAffectedTestPlan([
-      'scripts/hermes/jobs/delivery-liveness-watchdog.ts',
-      'scripts/hermes/launchd/README.md',
-      'scripts/hermes/lib/__tests__/delivery-liveness.test.ts',
-      'scripts/hermes/lib/delivery-liveness.ts',
+      'scripts/symphony/jobs/delivery-liveness-watchdog.ts',
+      'scripts/symphony/launchd/README.md',
+      'scripts/symphony/lib/__tests__/delivery-liveness.test.ts',
+      'scripts/symphony/lib/delivery-liveness.ts',
     ]);
 
     expect(plan.mode).toBe('selected');
     expect(plan.scriptVitestTests).toEqual([
-      'scripts/hermes/lib/__tests__/codex-issue-shipper-routing.test.ts',
-      'scripts/hermes/lib/__tests__/delivery-liveness.test.ts',
+      'scripts/symphony/lib/__tests__/codex-issue-shipper-routing.test.ts',
+      'scripts/symphony/lib/__tests__/delivery-liveness.test.ts',
       'scripts/lib/__tests__/codex-issue-shipper.test.mjs',
       'scripts/lib/__tests__/hermes-launchd.test.mjs',
     ]);
@@ -780,7 +780,7 @@ describe('automation-verify affected scope', () => {
     expect(
       buildAffectedTestPlan([
         ...DELIVERY_LIVENESS_LANE,
-        'scripts/hermes/lib/unknown-delivery-control.ts',
+        'scripts/symphony/lib/unknown-delivery-control.ts',
       ]).mode
     ).toBe('full');
   });
@@ -799,9 +799,9 @@ describe('automation-verify affected scope', () => {
         'scripts/lib/__tests__/pre-push-gate.test.mjs',
       ],
       pythonUnittestTests: [
-        'scripts/hermes/tests/codex-account-probe.test.py',
-        'scripts/hermes/tests/codex-rotate.test.py',
-        'scripts/hermes/tests/symphony-lease-guard.test.py',
+        'scripts/symphony/tests/codex-account-probe.test.py',
+        'scripts/symphony/tests/codex-rotate.test.py',
+        'scripts/symphony/tests/symphony-lease-guard.test.py',
       ],
     });
     expect(
@@ -857,10 +857,10 @@ describe('automation-verify affected scope', () => {
 
   it('selects the fleet promotion gate regression lane', () => {
     for (const files of [
-      ['scripts/hermes/gem-priority-gate.py'],
+      ['scripts/symphony/gem-priority-gate.py'],
       [
-        'scripts/hermes/gem-priority-gate.py',
-        'scripts/hermes/tests/gem-priority-gate.test.py',
+        'scripts/symphony/gem-priority-gate.py',
+        'scripts/symphony/tests/gem-priority-gate.test.py',
       ],
       FLEET_PROMOTION_GATE_LANE,
     ]) {
@@ -870,17 +870,19 @@ describe('automation-verify affected scope', () => {
           'apps/web/tests/unit/api/health/deploy.critical.test.ts',
         ],
         pythonTests: [
-          'scripts/hermes/tests/test_evaluate_fleet_gate.py',
-          'scripts/hermes/tests/test_fleet_admission_receipt.py',
+          'scripts/symphony/tests/test_evaluate_fleet_gate.py',
+          'scripts/symphony/tests/test_fleet_admission_receipt.py',
         ],
-        pythonUnittestTests: ['scripts/hermes/tests/gem-priority-gate.test.py'],
+        pythonUnittestTests: [
+          'scripts/symphony/tests/gem-priority-gate.test.py',
+        ],
         scriptVitestTests: ['scripts/lib/__tests__/automation-verify.test.mjs'],
       });
     }
     expect(
       buildAffectedTestPlan([
-        'scripts/hermes/gem-priority-gate.py',
-        'scripts/hermes/unknown-fleet-peer.py',
+        'scripts/symphony/gem-priority-gate.py',
+        'scripts/symphony/unknown-fleet-peer.py',
       ]).mode
     ).toBe('full');
   });
@@ -890,8 +892,8 @@ describe('automation-verify affected scope', () => {
       mode: 'selected',
       selectedTests: [],
       pythonUnittestTests: [
-        'scripts/hermes/tests/gem-checkin-hud.test.py',
-        'scripts/hermes/tests/symphony-burrito-workflow.test.py',
+        'scripts/symphony/tests/gem-checkin-hud.test.py',
+        'scripts/symphony/tests/symphony-burrito-workflow.test.py',
       ],
       scriptVitestTests: ['scripts/lib/__tests__/automation-verify.test.mjs'],
     });
@@ -910,15 +912,15 @@ describe('automation-verify affected scope', () => {
       selectedTests: [],
       pythonTests: ['scripts/tests/test_symphony_ui_pilot_runtime.py'],
       pythonUnittestTests: [
-        'scripts/hermes/tests/closure-health.test.py',
-        'scripts/hermes/tests/test_gem_disk_reclaim.py',
-        'scripts/hermes/tests/gem-priority-gate.test.py',
-        'scripts/hermes/tests/gem-pr-drain.test.py',
-        'scripts/hermes/tests/gem-ops-hud.test.py',
-        'scripts/hermes/tests/gem-pr-rehabilitation-contract.test.py',
-        'scripts/hermes/tests/gem-rehabilitation-policy.test.py',
-        'scripts/hermes/tests/symphony-reconciler.test.py',
-        'scripts/hermes/tests/test-model-router.py',
+        'scripts/symphony/tests/closure-health.test.py',
+        'scripts/symphony/tests/test_gem_disk_reclaim.py',
+        'scripts/symphony/tests/gem-priority-gate.test.py',
+        'scripts/symphony/tests/gem-pr-drain.test.py',
+        'scripts/symphony/tests/gem-ops-hud.test.py',
+        'scripts/symphony/tests/gem-pr-rehabilitation-contract.test.py',
+        'scripts/symphony/tests/gem-rehabilitation-policy.test.py',
+        'scripts/symphony/tests/symphony-reconciler.test.py',
+        'scripts/symphony/tests/test-model-router.py',
       ],
       scriptVitestTests: [
         'scripts/lib/__tests__/automation-verify.test.mjs',
@@ -935,13 +937,13 @@ describe('automation-verify affected scope', () => {
 
   it('maps model-router-only changes to the Gem rehabilitation contracts', () => {
     const plan = buildAffectedTestPlan([
-      'scripts/hermes/model-router.py',
-      'scripts/hermes/config/model-registry.json',
-      'scripts/hermes/tests/test-model-router.py',
+      'scripts/symphony/model-router.py',
+      'scripts/symphony/config/model-registry.json',
+      'scripts/symphony/tests/test-model-router.py',
     ]);
     expect(plan.mode).toBe('selected');
     expect(plan.pythonUnittestTests).toContain(
-      'scripts/hermes/tests/test-model-router.py'
+      'scripts/symphony/tests/test-model-router.py'
     );
     expect(plan.scriptVitestTests).toContain(
       'scripts/lib/__tests__/automation-verify.test.mjs'
@@ -950,21 +952,21 @@ describe('automation-verify affected scope', () => {
 
   it('maps the additive Symphony router boundary to its two regression suites', () => {
     const plan = buildAffectedTestPlan([
-      'scripts/hermes/config/model-registry.json',
-      'scripts/hermes/model-router.py',
-      'scripts/hermes/symphony-codex-exhausted.py',
-      'scripts/hermes/tests/symphony-additive-router.test.py',
-      'scripts/hermes/tests/symphony-codex-auth-fallback.test.py',
-      'scripts/hermes/tests/test-model-router.py',
+      'scripts/symphony/config/model-registry.json',
+      'scripts/symphony/model-router.py',
+      'scripts/symphony/symphony-codex-exhausted.py',
+      'scripts/symphony/tests/symphony-additive-router.test.py',
+      'scripts/symphony/tests/symphony-codex-auth-fallback.test.py',
+      'scripts/symphony/tests/test-model-router.py',
       'scripts/run-affected-tests.mjs',
       'scripts/lib/__tests__/automation-verify.test.mjs',
     ]);
     expect(plan).toMatchObject({
       mode: 'selected',
       pythonUnittestTests: [
-        'scripts/hermes/tests/symphony-additive-router.test.py',
-        'scripts/hermes/tests/test-model-router.py',
-        'scripts/hermes/tests/symphony-github-poke.test.py',
+        'scripts/symphony/tests/symphony-additive-router.test.py',
+        'scripts/symphony/tests/test-model-router.py',
+        'scripts/symphony/tests/symphony-github-poke.test.py',
       ],
       scriptVitestTests: ['scripts/lib/__tests__/automation-verify.test.mjs'],
     });
@@ -973,18 +975,18 @@ describe('automation-verify affected scope', () => {
   it('does not narrow arbitrary edits to the legacy Symphony controller suite', () => {
     expect(
       buildAffectedTestPlan([
-        'scripts/hermes/tests/symphony-codex-auth-fallback.test.py',
+        'scripts/symphony/tests/symphony-codex-auth-fallback.test.py',
       ]).mode
     ).toBe('full');
   });
 
   it('routes a closure-health source-only repair to its Python regression suite', () => {
     expect(
-      buildAffectedTestPlan(['scripts/hermes/closure_health.py'])
+      buildAffectedTestPlan(['scripts/symphony/closure_health.py'])
     ).toMatchObject({
       mode: 'selected',
       pythonUnittestTests: expect.arrayContaining([
-        'scripts/hermes/tests/closure-health.test.py',
+        'scripts/symphony/tests/closure-health.test.py',
       ]),
       scriptVitestTests: expect.arrayContaining([
         'scripts/lib/__tests__/automation-verify.test.mjs',
@@ -1002,11 +1004,11 @@ describe('automation-verify affected scope', () => {
       '.github/workflows/delivery-control-receipts.yml',
       '.github/workflows/fleet-gate-refresh.yml',
       'canon/invariants.jsonl',
-      'scripts/hermes/closure_health.py',
-      'scripts/hermes/gem-ops-hud.py',
-      'scripts/hermes/tests/closure-health.test.py',
-      'scripts/hermes/tests/gem-priority-gate.test.py',
-      'scripts/hermes/tests/gem-ops-hud.test.py',
+      'scripts/symphony/closure_health.py',
+      'scripts/symphony/gem-ops-hud.py',
+      'scripts/symphony/tests/closure-health.test.py',
+      'scripts/symphony/tests/gem-priority-gate.test.py',
+      'scripts/symphony/tests/gem-ops-hud.test.py',
       'scripts/lib/ownerless-recovery-policy.mjs',
       'scripts/lib/__tests__/ownerless-recovery-policy.test.mjs',
       'scripts/lib/__tests__/queue-deferred-release.test.mjs',
@@ -1019,9 +1021,9 @@ describe('automation-verify affected scope', () => {
       selectedTests: [],
       pythonTests: ['scripts/tests/test_agent_workflow_hygiene.py'],
       pythonUnittestTests: [
-        'scripts/hermes/tests/closure-health.test.py',
-        'scripts/hermes/tests/gem-priority-gate.test.py',
-        'scripts/hermes/tests/gem-ops-hud.test.py',
+        'scripts/symphony/tests/closure-health.test.py',
+        'scripts/symphony/tests/gem-priority-gate.test.py',
+        'scripts/symphony/tests/gem-ops-hud.test.py',
       ],
       scriptVitestTests: [
         'scripts/lib/__tests__/automation-verify.test.mjs',
@@ -1108,13 +1110,13 @@ describe('automation-verify affected scope', () => {
 
   it('keeps reconciler-only changes inside the bounded rehabilitation lane', () => {
     for (const changedPath of [
-      'scripts/hermes/symphony-reconciler.py',
-      'scripts/hermes/tests/symphony-reconciler.test.py',
+      'scripts/symphony/symphony-reconciler.py',
+      'scripts/symphony/tests/symphony-reconciler.test.py',
     ]) {
       const plan = buildAffectedTestPlan([changedPath]);
       expect(plan.mode).toBe('selected');
       expect(plan.pythonUnittestTests).toContain(
-        'scripts/hermes/tests/symphony-reconciler.test.py'
+        'scripts/symphony/tests/symphony-reconciler.test.py'
       );
     }
   });
@@ -1122,13 +1124,13 @@ describe('automation-verify affected scope', () => {
   it('routes fleet controller installer repairs to the Gem rehabilitation lane', () => {
     expect(
       buildAffectedTestPlan([
-        'scripts/hermes/install-gem-fleet-controller.sh',
-        'scripts/hermes/tests/gem-pr-rehabilitation-contract.test.py',
+        'scripts/symphony/install-gem-fleet-controller.sh',
+        'scripts/symphony/tests/gem-pr-rehabilitation-contract.test.py',
       ])
     ).toMatchObject({
       mode: 'selected',
       pythonUnittestTests: expect.arrayContaining([
-        'scripts/hermes/tests/gem-pr-rehabilitation-contract.test.py',
+        'scripts/symphony/tests/gem-pr-rehabilitation-contract.test.py',
       ]),
       scriptVitestTests: expect.arrayContaining([
         'scripts/lib/__tests__/automation-verify.test.mjs',
@@ -1341,8 +1343,8 @@ describe('automation-verify affected scope', () => {
     expect(plan.mode).toBe('selected');
     expect(plan.scriptVitestTests).toEqual(MERGE_QUEUE_CONTROLLER_SCRIPT_TESTS);
     expect(plan.pythonTests).toEqual([
-      'scripts/hermes/tests/test_evaluate_fleet_gate.py',
-      'scripts/hermes/tests/test_fleet_admission_receipt.py',
+      'scripts/symphony/tests/test_evaluate_fleet_gate.py',
+      'scripts/symphony/tests/test_fleet_admission_receipt.py',
       'scripts/tests/test_gh_retry.py',
     ]);
     expect(plan.selectedTests).toEqual([]);
@@ -1389,8 +1391,8 @@ describe('automation-verify affected scope', () => {
     expect(plan.mode).toBe('selected');
     expect(plan.scriptVitestTests).toEqual(MERGE_QUEUE_CONTROLLER_SCRIPT_TESTS);
     expect(plan.pythonTests).toEqual([
-      'scripts/hermes/tests/test_evaluate_fleet_gate.py',
-      'scripts/hermes/tests/test_fleet_admission_receipt.py',
+      'scripts/symphony/tests/test_evaluate_fleet_gate.py',
+      'scripts/symphony/tests/test_fleet_admission_receipt.py',
       'scripts/tests/test_gh_retry.py',
     ]);
   });
@@ -1643,7 +1645,7 @@ describe('automation-verify affected scope', () => {
     ]);
     expect(plan.scriptVitestTests).toEqual([
       'scripts/lib/__tests__/automation-verify.test.mjs',
-      'scripts/hermes/lib/__tests__/ci-failure-diagnosis.test.ts',
+      'scripts/symphony/lib/__tests__/ci-failure-diagnosis.test.ts',
     ]);
     expect(plan.selectedTests).not.toContain(
       'apps/web/tests/e2e/golden-path.spec.ts'
@@ -1763,8 +1765,8 @@ describe('automation-verify affected scope', () => {
     ]);
     expect(plan.scriptVitestTests).toEqual([
       'scripts/lib/__tests__/automation-verify.test.mjs',
-      'scripts/hermes/lib/__tests__/ci-failure-classifier.test.ts',
-      'scripts/hermes/lib/__tests__/ci-failure-diagnosis.test.ts',
+      'scripts/symphony/lib/__tests__/ci-failure-classifier.test.ts',
+      'scripts/symphony/lib/__tests__/ci-failure-diagnosis.test.ts',
     ]);
   });
 
@@ -1859,7 +1861,7 @@ describe('automation-verify affected scope', () => {
     ]);
     expect(plan.scriptVitestTests).toEqual([
       'scripts/lib/__tests__/automation-verify.test.mjs',
-      'scripts/hermes/lib/__tests__/ci-failure-diagnosis.test.ts',
+      'scripts/symphony/lib/__tests__/ci-failure-diagnosis.test.ts',
     ]);
     expect(buildSelectedTestCommands(plan, '2')).toEqual([
       [
@@ -1873,7 +1875,7 @@ describe('automation-verify affected scope', () => {
           'vitest.config.mts',
           'run',
           'lib/__tests__/automation-verify.test.mjs',
-          'hermes/lib/__tests__/ci-failure-diagnosis.test.ts',
+          'symphony/lib/__tests__/ci-failure-diagnosis.test.ts',
           '--maxWorkers',
           '2',
         ],
@@ -1912,7 +1914,7 @@ describe('automation-verify affected scope', () => {
       'apps/web/tests/unit/lib/feature-flags-registry.test.ts',
     ]);
     expect(plan.scriptVitestTests).toEqual([
-      'scripts/hermes/lib/__tests__/ci-failure-diagnosis.test.ts',
+      'scripts/symphony/lib/__tests__/ci-failure-diagnosis.test.ts',
       ...(manifest.length === PERFORMANCE_PROFILER_REPAIR_MANIFEST.length
         ? ['scripts/lib/__tests__/automation-verify.test.mjs']
         : []),
@@ -1935,7 +1937,7 @@ describe('automation-verify affected scope', () => {
       'apps/web/tests/unit/design-system/destructive-confirm-dialog-audit.test.ts',
     ]);
     expect(plan.scriptVitestTests).toEqual([
-      'scripts/hermes/lib/__tests__/ci-failure-diagnosis.test.ts',
+      'scripts/symphony/lib/__tests__/ci-failure-diagnosis.test.ts',
       'scripts/lib/__tests__/merge-queue-backend.test.mjs',
       ...(manifest.length === SCANNER_LOAD_REPAIR_MANIFEST.length
         ? ['scripts/lib/__tests__/automation-verify.test.mjs']
@@ -1979,7 +1981,7 @@ describe('automation-verify affected scope', () => {
     ]);
     expect(plan.scriptVitestTests).toEqual([
       'scripts/lib/__tests__/automation-verify.test.mjs',
-      'scripts/hermes/lib/__tests__/ci-failure-diagnosis.test.ts',
+      'scripts/symphony/lib/__tests__/ci-failure-diagnosis.test.ts',
     ]);
   });
 
@@ -1992,7 +1994,7 @@ describe('automation-verify affected scope', () => {
     ]);
     expect(plan.scriptVitestTests).toEqual([
       'scripts/lib/__tests__/automation-verify.test.mjs',
-      'scripts/hermes/lib/__tests__/ci-failure-diagnosis.test.ts',
+      'scripts/symphony/lib/__tests__/ci-failure-diagnosis.test.ts',
     ]);
   });
 
@@ -2010,7 +2012,7 @@ describe('automation-verify affected scope', () => {
     expect(
       buildAffectedTestPlan([
         ...NEON_ATTEMPT_ARTIFACT_MANIFEST,
-        'scripts/hermes/lib/unknown-neon-artifact-helper.ts',
+        'scripts/symphony/lib/unknown-neon-artifact-helper.ts',
       ]).mode
     ).toBe('full');
   });
@@ -2041,7 +2043,7 @@ describe('automation-verify affected scope', () => {
     expect(
       buildAffectedTestPlan([
         ...MOBILE_OVERFLOW_NAVIGATION_RACE_MANIFEST,
-        'scripts/hermes/lib/unknown-mobile-overflow-helper.ts',
+        'scripts/symphony/lib/unknown-mobile-overflow-helper.ts',
       ]).mode
     ).toBe('full');
   });
@@ -2079,7 +2081,7 @@ describe('automation-verify affected scope', () => {
     expect(
       buildAffectedTestPlan([
         ...PERFORMANCE_PROFILER_REPAIR_PRIMARY_MANIFEST,
-        'scripts/hermes/lib/unknown-profiler-helper.ts',
+        'scripts/symphony/lib/unknown-profiler-helper.ts',
       ]).mode
     ).toBe('full');
   });
@@ -2092,7 +2094,7 @@ describe('automation-verify affected scope', () => {
       'apps/web/tests/unit/ci/runner-setup-action.test.ts',
     ]);
     expect(plan.scriptVitestTests).toEqual([
-      'scripts/hermes/lib/__tests__/ci-failure-diagnosis.test.ts',
+      'scripts/symphony/lib/__tests__/ci-failure-diagnosis.test.ts',
       'scripts/lib/__tests__/automation-verify.test.mjs',
       'scripts/lib/__tests__/ci-harness.test.mjs',
       'scripts/lib/__tests__/ci-duration-ratchet.test.mjs',
@@ -2114,7 +2116,7 @@ describe('automation-verify affected scope', () => {
     ]);
     expect(plan.scriptVitestTests).toEqual([
       'scripts/lib/__tests__/automation-verify.test.mjs',
-      'scripts/hermes/lib/__tests__/ci-failure-diagnosis.test.ts',
+      'scripts/symphony/lib/__tests__/ci-failure-diagnosis.test.ts',
       'scripts/lib/__tests__/ci-harness.test.mjs',
       'scripts/lib/__tests__/ci-duration-ratchet.test.mjs',
       'scripts/lib/__tests__/ci-branching-guard.test.mjs',
