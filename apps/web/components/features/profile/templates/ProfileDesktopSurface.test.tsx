@@ -1,5 +1,6 @@
 import { render, screen, within } from '@testing-library/react';
 import React from 'react';
+import { renderToString } from 'react-dom/server';
 import { describe, expect, it, vi } from 'vitest';
 import type { PublicContact } from '@/types/contacts';
 import type { Artist } from '@/types/db';
@@ -151,6 +152,32 @@ const contentPrefs: Record<NotificationContentType, boolean> = {
 };
 
 describe('ProfileDesktopSurface', () => {
+  it('publishes readiness only after the desktop surface hydrates', () => {
+    const surface = (
+      <ProfileDesktopSurface
+        artist={artist}
+        socialLinks={[]}
+        contacts={contacts}
+        drawerOpen={false}
+        drawerView='menu'
+        onDrawerOpenChange={vi.fn()}
+        onDrawerViewChange={vi.fn()}
+        onOpenMenu={vi.fn()}
+        onPlayClick={vi.fn()}
+        profileHref='/timwhite'
+      />
+    );
+    expect(renderToString(surface)).not.toContain(
+      'data-interactive-ready="true"'
+    );
+    const view = render(surface);
+    expect(screen.getByTestId('profile-desktop-surface')).toHaveAttribute(
+      'data-interactive-ready',
+      'true'
+    );
+    view.unmount();
+    expect(screen.queryByTestId('profile-desktop-surface')).toBeNull();
+  });
   it('renders the desktop shell and primary navigation', () => {
     render(
       <ProfileDesktopSurface
@@ -234,6 +261,39 @@ describe('ProfileDesktopSurface', () => {
       'data-priority',
       'true'
     );
+  });
+
+  it('omits fan-capture actions when fan capture is disabled', () => {
+    render(
+      <ProfileDesktopSurface
+        artist={artist}
+        socialLinks={[]}
+        contacts={contacts}
+        photoDownloadSizes={[]}
+        drawerOpen={false}
+        drawerView='menu'
+        activeMode='subscribe'
+        onModeSelect={vi.fn()}
+        onDrawerOpenChange={vi.fn()}
+        onDrawerViewChange={vi.fn()}
+        onOpenMenu={vi.fn()}
+        onPlayClick={vi.fn()}
+        profileHref='/timwhite'
+        allowFanCapture={false}
+        isSubscribed={false}
+        contentPrefs={contentPrefs}
+        onTogglePref={vi.fn()}
+        onUnsubscribe={vi.fn()}
+      />
+    );
+
+    expect(
+      screen.queryByRole('button', { name: 'Alerts' })
+    ).not.toBeInTheDocument();
+    expect(
+      screen.queryByTestId('mock-desktop-alerts-cta')
+    ).not.toBeInTheDocument();
+    expect(screen.getByTestId('profile-desktop-surface')).toBeInTheDocument();
   });
 
   // Regression: JOV-4103 — desktop hero must render social media icons.
