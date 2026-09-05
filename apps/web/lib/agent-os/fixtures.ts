@@ -59,7 +59,6 @@ type FixtureSeed = {
   readonly modelRoute?: AgentRunModelRoute;
   readonly allowedActions?: readonly AgentRunAction[];
   readonly forbiddenActions?: readonly AgentRunAction[];
-  readonly humanApprovalReason?: string;
   readonly linearIssue?: FixtureIssueLink;
   readonly pullRequest?: number;
   readonly verificationGates: readonly VerificationGate[];
@@ -90,16 +89,6 @@ function noHumanGate(): AgentRunArtifact['humanGate'] {
     required: false,
     status: 'not_required',
     reason: null,
-    reviewer: null,
-    reviewedAt: null,
-  };
-}
-
-function pendingHumanGate(reason: string): AgentRunArtifact['humanGate'] {
-  return {
-    required: true,
-    status: 'pending',
-    reason,
     reviewer: null,
     reviewedAt: null,
   };
@@ -141,9 +130,7 @@ function fixtureArtifact(input: FixtureArtifactInput): AgentRunArtifact {
 
 function artifactFromSeed(seed: FixtureSeed): AgentRunArtifact {
   const modelRoute = seed.modelRoute ?? 'deterministic';
-  const humanGate = seed.humanApprovalReason
-    ? pendingHumanGate(seed.humanApprovalReason)
-    : noHumanGate();
+  const humanGate = noHumanGate();
   const [inputTokens, outputTokens] = seed.costTokens ?? [0, 0];
 
   return fixtureArtifact({
@@ -226,9 +213,9 @@ const AGENT_OS_ADMIN_FIXTURE_SEEDS: readonly FixtureSeed[] = [
     sourceRunId: '8282',
     kind: 'code_review',
     status: 'review',
-    title: 'Review GStack ship evidence',
+    title: 'Verify GStack ship evidence',
     summary:
-      'Ready PR requires recorded exhaustive QA, review, ship, and land evidence before non-dry-run AgentOS dispatch is allowed.',
+      'Ready PR requires recorded exhaustive QA, automated review, ship, and land evidence before non-dry-run AgentOS dispatch is allowed.',
     modelRoute: 'codex-cli',
     allowedActions: ['read', 'summarize', 'draft'],
     forbiddenActions: [
@@ -240,8 +227,6 @@ const AGENT_OS_ADMIN_FIXTURE_SEEDS: readonly FixtureSeed[] = [
       'change_billing',
       'change_security',
     ],
-    humanApprovalReason:
-      'Human approval required before AgentOS moves beyond dry-run.',
     linearIssue: {
       id: 'JOV-1926',
       slug: 'agentos-enforce-gstack-gates-before-non-dry-run-agents',
@@ -249,7 +234,7 @@ const AGENT_OS_ADMIN_FIXTURE_SEEDS: readonly FixtureSeed[] = [
     pullRequest: 8282,
     verificationGates: [
       gate('gstack.qa.exhaustive', 'passed', 'Focused QA evidence recorded.'),
-      gate('gstack.review', 'passed', 'Bot and human review threads resolved.'),
+      gate('gstack.review', 'passed', 'Automated review threads resolved.'),
       gate('gstack.ship', 'passed', 'Ship gate evidence recorded.'),
       gate('gstack.land-and-deploy', 'running', 'Landing sequence active.'),
     ],
@@ -258,29 +243,56 @@ const AGENT_OS_ADMIN_FIXTURE_SEEDS: readonly FixtureSeed[] = [
     updatedAt: '2026-05-08T22:20:00.000Z',
   },
   {
-    id: 'agentos-run-blocked-needs-human',
+    id: 'agentos-run-post-land-certification',
     source: 'github',
     sourceRunId: '75105012999',
     kind: 'deploy_readiness',
-    status: 'blocked',
-    title: 'Agent PR needs human review',
+    status: 'running',
+    title: 'Feature-flag certification',
     summary:
-      'An agent-authored PR has the needs-human label set, blocking automatic merge progression until an operator clears it.',
+      'The change is landed flag-off while product certification controls rollout.',
     allowedActions: ['read', 'summarize', 'draft'],
     forbiddenActions: ['deploy', 'merge', 'mutate_production_data'],
-    humanApprovalReason:
-      'Operator must review and remove the needs-human label to resume.',
     linearIssue: {
       id: 'JOV-1994',
       slug: 'agentos-enforce-gstack-gates-before-non-dry-run-agents',
     },
     verificationGates: [
-      gate('github.ci', 'blocked', 'needs-human label is blocking auto-merge.'),
+      gate(
+        'gstack.land-and-deploy',
+        'passed',
+        'Change landed through native MQ with its feature flag disabled.'
+      ),
+      gate(
+        'sentry.canary',
+        'running',
+        'Post-land product certification is active before flag rollout.'
+      ),
     ],
     costNotes: 'Infra status only.',
-    blockedReason:
-      'PR cannot progress past review until a human removes the blocking label.',
     updatedAt: '2026-05-08T22:40:00.000Z',
+  },
+  {
+    id: 'agentos-run-blocked-canary',
+    source: 'sentry',
+    sourceRunId: 'canary_agentos_001',
+    kind: 'deploy_readiness',
+    status: 'blocked',
+    title: 'Canary invariant failed',
+    summary:
+      'The automated canary stopped rollout and queued remediation after a recurrence check failed.',
+    allowedActions: ['read', 'classify', 'summarize', 'dispatch_agent'],
+    forbiddenActions: ['deploy', 'mutate_production_data'],
+    blockedReason: 'Automated canary recurrence check failed.',
+    verificationGates: [
+      gate(
+        'sentry.canary',
+        'failed',
+        'Runtime recurrence exceeded the release threshold.'
+      ),
+    ],
+    costNotes: 'Automated remediation route.',
+    updatedAt: '2026-05-08T22:50:00.000Z',
   },
   {
     id: 'agentos-run-failed-unsafe-payload',

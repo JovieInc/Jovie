@@ -15,7 +15,7 @@ afterAll(() => {
 });
 
 describe('AgentOsRunsPanel', () => {
-  it('renders fixture runs with status, approval, and gate details', async () => {
+  it('renders full-auto fixture runs with status and gate details', async () => {
     render(<AgentOsRunsPanel artifacts={AGENT_OS_ADMIN_FIXTURE_ARTIFACTS} />);
 
     expect(screen.getByTestId('agent-os-runs-panel')).toBeInTheDocument();
@@ -25,7 +25,7 @@ describe('AgentOsRunsPanel', () => {
       screen.getAllByText('Main post-merge verification').length
     ).toBeGreaterThan(0);
     expect(
-      screen.getAllByText('Agent PR needs human review').length
+      screen.getAllByText('Feature-flag certification').length
     ).toBeGreaterThan(0);
     expect(
       screen.getAllByText('Unsafe dispatch payload rejected').length
@@ -46,7 +46,8 @@ describe('AgentOsRunsPanel', () => {
     }
 
     expect(screen.getByText('Approval Queue')).toBeInTheDocument();
-    expect(screen.getAllByText('Review Required').length).toBeGreaterThan(0);
+    expect(screen.getByText('No approvals waiting.')).toBeInTheDocument();
+    expect(screen.queryByText('Review Required')).not.toBeInTheDocument();
 
     const drawer = screen.getByTestId('agent-os-artifact-drawer');
     expect(drawer).toHaveTextContent('WDK health dry run');
@@ -59,18 +60,18 @@ describe('AgentOsRunsPanel', () => {
     await userEvent.click(
       within(
         screen.getByTestId(
-          'agent-os-board-card-agentos-run-blocked-needs-human'
+          'agent-os-board-card-agentos-run-post-land-certification'
         )
-      ).getByRole('button', { name: 'Agent PR needs human review' })
+      ).getByRole('button', { name: 'Feature-flag certification' })
     );
 
     expect(screen.getByTestId('agent-os-artifact-drawer')).toHaveTextContent(
-      'Agent PR needs human review'
+      'Feature-flag certification'
     );
 
     await userEvent.click(
       screen.getByRole('button', {
-        name: 'Inspect Agent PR needs human review',
+        name: 'Inspect Feature-flag certification',
       })
     );
 
