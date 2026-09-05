@@ -2392,8 +2392,7 @@ body:has(.home-viewport)::-webkit-scrollbar {
   isolation: isolate;
   overflow: clip;
   border-top: 1px solid var(--homepage-chapter-rule);
-  padding-block: clamp(var(--space-24), 10vw, var(--space-32))
-    clamp(var(--space-16), 8vw, var(--space-24));
+  padding-block: clamp(var(--space-32), 14vw, calc(var(--space-24) * 2));
 }
 
 .homepage-close::before {
@@ -2486,7 +2485,7 @@ body:has(.home-viewport)::-webkit-scrollbar {
   }
 
   .homepage-close {
-    padding-block: var(--space-24) var(--space-16);
+    padding-block: var(--space-32);
   }
 
   .homepage-close__mark {
