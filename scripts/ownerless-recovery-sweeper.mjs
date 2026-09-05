@@ -1,5 +1,6 @@
 #!/usr/bin/env node
 import { execFile } from 'node:child_process';
+import { readFileSync } from 'node:fs';
 import { promisify } from 'node:util';
 import { TODO_STATE_ID } from './backlog-orchestrator/stale-lease-guard.mjs';
 import {
@@ -8,6 +9,9 @@ import {
   findOfficialSymphonyLease,
   hasCompletePatch,
   hasFleetClosureRemediationLease,
+  isRecoveryHoldLabel,
+  MINIMUM_OWNERLESS_MS,
+  ownerlessSince,
   renderFleetClosureRemediationLease,
   renderPrFleetClosureAudit,
   renderRecoveryReceipt,
@@ -92,6 +96,79 @@ export async function recoveryIssueSnapshot(
 
 async function linearClient() {
   return import('./backlog-orchestrator/linear-client.mjs');
+}
+
+export function readRecoveryEvent(
+  environment = process.env,
+  readEventFile = readFileSync
+) {
+  const name = environment.GITHUB_EVENT_NAME || 'manual';
+  if (name !== 'pull_request') return { name, payload: {} };
+  const path = environment.GITHUB_EVENT_PATH;
+  if (!path) throw new Error('Pull-request recovery event context is missing');
+  return { name, payload: JSON.parse(readEventFile(path, 'utf8')) };
+}
+
+export async function recoveryEventDecision(
+  { name, payload = {} },
+  {
+    now = Date.now(),
+    readTimeline = number =>
+      pages(`repos/${repo}/issues/${number}/timeline?per_page=100`),
+  } = {}
+) {
+  if (name === 'manual' || name === 'workflow_dispatch') {
+    return { required: true, reason: 'explicit-audit' };
+  }
+  if (name !== 'pull_request') {
+    return { required: false, reason: 'unrelated-event' };
+  }
+  if (!['opened', 'reopened', 'unlabeled'].includes(payload.action)) {
+    return { required: false, reason: 'unrelated-pr-action' };
+  }
+  const pr = payload.pull_request;
+  if (!pr || typeof pr.draft !== 'boolean' || !pr.base?.ref) {
+    throw new Error('Pull-request recovery eligibility is indeterminate');
+  }
+  if (pr.draft || pr.state !== 'open' || pr.base.ref !== 'main') {
+    return { required: false, reason: 'not-ready-main-pr' };
+  }
+  // Opening/reopening a ready PR retains the full closure/ownership audit.
+  if (payload.action !== 'unlabeled') {
+    return { required: true, reason: 'ready-pr-opened-or-reopened' };
+  }
+  if (!isRecoveryHoldLabel(payload.label?.name)) {
+    return { required: false, reason: 'unrelated-label-removed' };
+  }
+  if (
+    (pr.labels ?? []).some(label => isRecoveryHoldLabel(label.name ?? label))
+  ) {
+    return { required: false, reason: 'recovery-still-held' };
+  }
+  if ((pr.assignees ?? []).length > 0) {
+    return { required: false, reason: 'assigned-pr' };
+  }
+  const created = Date.parse(pr.created_at);
+  if (!Number.isFinite(created) || !Number.isInteger(pr.number)) {
+    throw new Error('Pull-request recovery age is indeterminate');
+  }
+  if (now - created < MINIMUM_OWNERLESS_MS) {
+    return { required: false, reason: 'ownerless-under-threshold' };
+  }
+  // A conflict-label removal after rebase is not a fresh ownerless hour.
+  // Reuse the canonical assignment timeline rule before any tracker scan.
+  const ownershipStart = ownerlessSince(pr, await readTimeline(pr.number));
+  if (ownershipStart === null) {
+    return { required: false, reason: 'ownerless-under-threshold' };
+  }
+  const since = Date.parse(ownershipStart);
+  if (!Number.isFinite(since)) {
+    throw new Error('Pull-request ownership timeline is indeterminate');
+  }
+  if (now - since < MINIMUM_OWNERLESS_MS) {
+    return { required: false, reason: 'ownerless-under-threshold' };
+  }
+  return { required: true, reason: 'eligible-recovery-hold-released' };
 }
 
 export async function fetchOfficialSymphonyState({
@@ -614,10 +691,21 @@ export async function processFleetClosureRemediationIntents(
 }
 
 export async function run({
+  eventContext = readRecoveryEvent(),
+  readEventTimeline,
+  now = Date.now(),
   resolvePolicyHead = resolveExactMainPolicyHead,
   readOpenPulls = openPulls,
   readIssueSnapshot = linearActiveIssueSnapshot,
 } = {}) {
+  const event = await recoveryEventDecision(eventContext, {
+    readTimeline: readEventTimeline,
+    now,
+  });
+  if (!event.required) {
+    console.log(`Ownerless recovery skipped: ${event.reason}`);
+    return;
+  }
   const mainSha = await resolvePolicyHead();
   const snapshotStartedAt = new Date().toISOString();
   const open = await readOpenPulls('main');
