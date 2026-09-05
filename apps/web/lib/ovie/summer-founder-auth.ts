@@ -26,9 +26,8 @@ export function founderPrincipalHash(userId: string): string {
 export function summerConversationAttestation(
   rawBody: string
 ): Record<string, string> | null {
-  const privateKeyRaw =
-    env.SUMMER_BOTTLENECK_PRODUCER_SIGNING_PRIVATE_KEY?.trim();
-  const keyId = env.SUMMER_BOTTLENECK_PRODUCER_SIGNING_KEY_ID?.trim();
+  const privateKeyRaw = env.SUMMER_CONVERSATION_SIGNING_PRIVATE_KEY?.trim();
+  const keyId = env.SUMMER_CONVERSATION_SIGNING_KEY_ID?.trim();
   if (!privateKeyRaw || !keyId || !KEY_ID.test(keyId)) return null;
   try {
     const privateKey = createPrivateKey(

@@ -8,6 +8,7 @@ import {
   readConversationResult,
   renderConversation,
   verifyConversationAttestation,
+  verifyFounderPrincipal,
 } from '../agent/lib/summer-web-conversation';
 
 const id = (n: number) => `sum_${String(n).padStart(24, '0')}`;
@@ -16,6 +17,7 @@ const input = (n = 1): ConversationInput => ({
   conversationId: 'summer-session-current',
   previousEventId: null,
   principalHash: 'a'.repeat(43),
+  deploymentId: 'dpl_test',
   message: 'Are you Summer?',
   history: [],
 });
@@ -40,6 +42,8 @@ function fixture() {
     dispatch,
     authenticate: vi.fn(async () => ({ subject: 'jovie-production' })),
     verifyAttestation: vi.fn(() => true),
+    verifyPrincipal: vi.fn(() => true),
+    verifyDeployment: vi.fn(() => true),
     enabled: () => true,
     now: () => new Date('2026-09-05T03:00:00Z'),
   };
@@ -79,7 +83,7 @@ function stream(text: string) {
 }
 
 describe('authenticated persistent Summer conversation', () => {
-  it('requires a domain-separated signature from the assigned producer authority', () => {
+  it('requires a domain-separated signature from the dedicated conversation authority', () => {
     const { privateKey, publicKey } = generateKeyPairSync('ed25519');
     const rawBody = JSON.stringify(input());
     const signature = sign(
@@ -94,7 +98,7 @@ describe('authenticated persistent Summer conversation', () => {
       },
     });
     const environment = {
-      SUMMER_BOTTLENECK_PRODUCER_VERIFICATION_KEYS_JSON: JSON.stringify({
+      SUMMER_CONVERSATION_VERIFICATION_KEYS_JSON: JSON.stringify({
         'producer-test': publicKey.export({ type: 'spki', format: 'pem' }),
       }),
     };
@@ -104,6 +108,12 @@ describe('authenticated persistent Summer conversation', () => {
     expect(
       verifyConversationAttestation(request, `${rawBody} `, environment)
     ).toBe(false);
+    expect(
+      verifyFounderPrincipal(input().principalHash, {
+        SUMMER_CONVERSATION_FOUNDER_PRINCIPAL_HASH: input().principalHash,
+      })
+    ).toBe(true);
+    expect(verifyFounderPrincipal(input().principalHash, {})).toBe(false);
   });
   it('rejects auth before parsing and disables admission without dispatch', async () => {
     const f = fixture();
@@ -123,6 +133,21 @@ describe('authenticated persistent Summer conversation', () => {
     expect(f.dispatch).not.toHaveBeenCalled();
     expect(f.store.persist).not.toHaveBeenCalled();
   });
+  it('rejects principal or deployment drift before durable admission', async () => {
+    const f = fixture();
+    const wrongPrincipal = createConversationIngress({
+      ...f.deps,
+      verifyPrincipal: () => false,
+    });
+    expect((await f.send(input(), wrongPrincipal)).status).toBe(403);
+    const wrongDeployment = createConversationIngress({
+      ...f.deps,
+      verifyDeployment: () => false,
+    });
+    expect((await f.send(input(), wrongDeployment)).status).toBe(403);
+    expect(f.dispatch).not.toHaveBeenCalled();
+    expect(f.store.persist).not.toHaveBeenCalled();
+  });
   it('admits once, returns durable acceptance on retry, rejects conflicting content', async () => {
     const f = fixture();
     const admitted = await f.send(input());
@@ -137,6 +162,12 @@ describe('authenticated persistent Summer conversation', () => {
       sessionId: 'ses_summer',
       dailySlot: 1,
     });
+    const durableIntent = f.records.get(conversationPath('intents', id(1)));
+    expect(durableIntent).toMatchObject({
+      eventId: id(1),
+      principalHash: input().principalHash,
+    });
+    expect(JSON.stringify(durableIntent)).not.toContain('Are you Summer?');
   });
   it('never repeats a dispatch after uncertain acceptance', async () => {
     const f = fixture();
@@ -176,15 +207,26 @@ describe('authenticated persistent Summer conversation', () => {
       code: 'daily_turn_budget_exhausted',
       limit: 25,
       resetAt: '2026-09-06T00:00:00.000Z',
+      checkpoint: {
+        eventId: id(1),
+        principalHash: input().principalHash,
+        status: 'rejected_budget',
+      },
     });
     expect((await f.send(input())).status).toBe(429);
     expect(f.dispatch).not.toHaveBeenCalled();
+    expect(f.records.get(conversationPath('results', id(1)))).toMatchObject({
+      eventId: id(1),
+      status: 'rejected_budget',
+    });
 
     const nextDay = createConversationIngress({
       ...f.deps,
       now: () => new Date('2026-09-06T03:00:00Z'),
     });
-    expect((await f.send(input(), nextDay)).status).toBe(202);
+    expect(
+      (await f.send({ ...input(2), previousEventId: id(1) }, nextDay)).status
+    ).toBe(202);
     expect(f.dispatch).toHaveBeenCalledOnce();
   });
 

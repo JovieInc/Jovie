@@ -2,7 +2,7 @@ import { getVercelOidcToken } from '@vercel/oidc';
 import { NextResponse } from 'next/server';
 import { z } from 'zod';
 import { verifyCronRequest } from '@/lib/cron/auth';
-import { EVE_SHADOW_ORIGIN } from '@/lib/ovie/summer-shadow-client';
+import { getEveShadowOrigin } from '@/lib/ovie/summer-shadow-client';
 import { logger } from '@/lib/utils/logger';
 
 export const runtime = 'nodejs';
@@ -92,7 +92,7 @@ export async function POST(request: Request): Promise<NextResponse> {
     // Do not retry an uncertain submission. The caller can inspect the Eve
     // receipt by event ID, while Eve's immutable path rejects a duplicate.
     upstream = await fetch(
-      new URL('/ovie/v1/summer-shadow/events', EVE_SHADOW_ORIGIN),
+      new URL('/ovie/v1/summer-shadow/events', getEveShadowOrigin()),
       {
         method: 'POST',
         headers: {
@@ -194,7 +194,7 @@ export async function GET(request: Request): Promise<Response> {
       eventId !== null
         ? `/ovie/v1/summer-shadow/commercial/${encodeURIComponent(eventId)}`
         : `/ovie/v1/summer-shadow/sessions/${encodeURIComponent(sessionId ?? '')}/stream`,
-      EVE_SHADOW_ORIGIN
+      getEveShadowOrigin()
     );
     if (eventId === null) {
       upstreamUrl.searchParams.set('conversationId', conversationId ?? '');

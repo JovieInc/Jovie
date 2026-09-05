@@ -1,4 +1,4 @@
-import { createHash, verify } from 'node:crypto';
+import { createHash, timingSafeEqual, verify } from 'node:crypto';
 import { z } from 'zod';
 import {
   isSummerShadowEnabled,
@@ -19,6 +19,7 @@ export const conversationInputSchema = z
     conversationId: z.literal(SUMMER_CONVERSATION_ID),
     previousEventId: eventIdSchema.nullable(),
     principalHash: z.string().regex(/^[A-Za-z0-9_-]{43}$/u),
+    deploymentId: z.string().regex(/^dpl_[A-Za-z0-9]+$/u),
     message: z.string().trim().min(1).max(4000),
     history: z
       .array(
@@ -34,6 +35,7 @@ const acceptedRecordSchema = z
   .object({
     eventId: eventIdSchema,
     conversationId: z.literal(SUMMER_CONVERSATION_ID),
+    principalHash: z.string().regex(/^[A-Za-z0-9_-]{43}$/u),
     sessionId: z.string().regex(/^ses_/u),
     startIndex: z.number().int().nonnegative().safe(),
     model: z.literal(SUMMER_CONVERSATION_MODEL),
@@ -50,6 +52,16 @@ const terminalResultSchema = acceptedRecordSchema
     nextStartIndex: z.number().int().nonnegative().safe(),
   })
   .strict();
+const budgetCheckpointSchema = z
+  .object({
+    eventId: eventIdSchema,
+    conversationId: z.literal(SUMMER_CONVERSATION_ID),
+    principalHash: z.string().regex(/^[A-Za-z0-9_-]{43}$/u),
+    sessionId: z.string().regex(/^ses_/u).nullable(),
+    nextStartIndex: z.number().int().nonnegative().safe(),
+    status: z.literal('rejected_budget'),
+  })
+  .strict();
 const rejectedRecordSchema = z.discriminatedUnion('code', [
   z.object({ code: z.literal('conversation_busy') }).strict(),
   z
@@ -57,6 +69,7 @@ const rejectedRecordSchema = z.discriminatedUnion('code', [
       code: z.literal('daily_turn_budget_exhausted'),
       limit: z.literal(SUMMER_SHADOW_MAX_TURNS_PER_UTC_DAY),
       resetAt: z.string().datetime(),
+      checkpoint: budgetCheckpointSchema,
     })
     .strict(),
 ]);
@@ -79,7 +92,7 @@ export function verifyConversationAttestation(
     return false;
   try {
     const parsed: unknown = JSON.parse(
-      environment.SUMMER_BOTTLENECK_PRODUCER_VERIFICATION_KEYS_JSON ?? ''
+      environment.SUMMER_CONVERSATION_VERIFICATION_KEYS_JSON ?? ''
     );
     if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed))
       return false;
@@ -94,6 +107,14 @@ export function verifyConversationAttestation(
   } catch {
     return false;
   }
+}
+export function verifyFounderPrincipal(
+  principalHash: string,
+  environment: Readonly<Record<string, string | undefined>> = process.env
+): boolean {
+  const expected = environment.SUMMER_CONVERSATION_FOUNDER_PRINCIPAL_HASH;
+  if (!expected || !/^[A-Za-z0-9_-]{43}$/u.test(expected)) return false;
+  return timingSafeEqual(Buffer.from(principalHash), Buffer.from(expected));
 }
 export const conversationPath = (kind: string, id: string) =>
   `summer-shadow/conversation/${kind}/${id}.json`;
@@ -139,6 +160,8 @@ export function createConversationIngress(
     enabled?: () => boolean;
     now?: () => Date;
     verifyAttestation?: (request: Request, rawBody: string) => boolean;
+    verifyPrincipal?: (principalHash: string) => boolean;
+    verifyDeployment?: (deploymentId: string) => boolean;
   }
 ) {
   return async (request: Request): Promise<Response> => {
@@ -157,6 +180,18 @@ export function createConversationIngress(
         )
       )
         return json({ ok: false, code: 'invalid_founder_attestation' }, 403);
+      if (
+        !(deps.verifyPrincipal ?? verifyFounderPrincipal)(input.principalHash)
+      )
+        return json({ ok: false, code: 'invalid_founder_principal' }, 403);
+      if (
+        !(
+          deps.verifyDeployment ??
+          (deploymentId =>
+            deploymentId === process.env.VERCEL_DEPLOYMENT_ID?.trim())
+        )(input.deploymentId)
+      )
+        return json({ ok: false, code: 'invalid_deployment_binding' }, 403);
     } catch (error) {
       if (error instanceof ShadowBodyTooLargeError)
         return json({ ok: false, code: 'history_or_message_too_large' }, 413);
@@ -212,12 +247,20 @@ export function createConversationIngress(
         : null;
       if (
         input.previousEventId &&
-        (!previous || previous.conversationId !== input.conversationId)
+        (!previous ||
+          previous.conversationId !== input.conversationId ||
+          previous.principalHash !== input.principalHash)
       )
         return json({ ok: false, code: 'previous_turn_not_terminal' }, 409);
       if (
         !existing &&
-        (await deps.persist(intentPath, { digest, input })) !== 'created'
+        (await deps.persist(intentPath, {
+          digest,
+          eventId: input.eventId,
+          conversationId: input.conversationId,
+          previousEventId: input.previousEventId,
+          principalHash: input.principalHash,
+        })) !== 'created'
       )
         return json({ ok: false, code: 'dispatch_unknown' }, 503);
 
@@ -305,12 +348,47 @@ export function createConversationIngress(
           code: 'daily_turn_budget_exhausted',
           limit: SUMMER_SHADOW_MAX_TURNS_PER_UTC_DAY,
           resetAt,
+          checkpoint: {
+            eventId: input.eventId,
+            conversationId: input.conversationId,
+            principalHash: input.principalHash,
+            sessionId:
+              typeof previous?.sessionId === 'string'
+                ? previous.sessionId
+                : null,
+            nextStartIndex:
+              typeof previous?.nextStartIndex === 'number'
+                ? previous.nextStartIndex
+                : 0,
+            status: 'rejected_budget' as const,
+          },
         };
+        const resultPath = conversationPath('results', input.eventId);
+        if (
+          (await deps.persist(resultPath, rejected.checkpoint)) !== 'created'
+        ) {
+          const persisted = await deps.read(resultPath);
+          if (JSON.stringify(persisted) !== JSON.stringify(rejected.checkpoint))
+            return json({ ok: false, code: 'budget_checkpoint_unknown' }, 503);
+        }
+        if (
+          (await deps.persist(
+            conversationPath('rejected', input.eventId),
+            rejected
+          )) !== 'created'
+        ) {
+          const persisted = rejectedRecordSchema.safeParse(
+            await deps.read(conversationPath('rejected', input.eventId))
+          );
+          if (!persisted.success)
+            return json({ ok: false, code: 'rejection_unavailable' }, 503);
+        }
         return json({ ok: false, ...rejected }, 429);
       }
       const admission = {
         eventId: input.eventId,
         conversationId: input.conversationId,
+        principalHash: input.principalHash,
         startIndex:
           typeof previous?.nextStartIndex === 'number'
             ? previous.nextStartIndex
@@ -348,6 +426,7 @@ export function createConversationIngress(
       const accepted = {
         eventId: admission.eventId,
         conversationId: admission.conversationId,
+        principalHash: admission.principalHash,
         sessionId,
         startIndex: admission.startIndex,
         model: admission.model,

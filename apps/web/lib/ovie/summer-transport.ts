@@ -30,6 +30,7 @@ import {
   findTurnByClientId,
   loadCurrentSummerSession,
   openCurrentSummerSession,
+  type SummerEveCheckpoint,
   type SummerEveReceipt,
   type SummerSessionIdentity,
   type SummerToolReceipt,
@@ -71,6 +72,7 @@ export type SummerSpeakInput = {
 
 export type SummerSpeakEvent =
   | { readonly type: 'receipt'; readonly receipt: SummerEveReceipt }
+  | { readonly type: 'checkpoint'; readonly checkpoint: SummerEveCheckpoint }
   | { readonly type: 'notice'; readonly text: string; readonly code: string }
   | { readonly type: 'text-delta'; readonly text: string }
   | {
@@ -298,9 +300,11 @@ export async function* runOvieSummerTurn(input: {
   yield { type: 'state', state: 'streaming' };
   let assistantText = '';
   let eveReceipt: SummerEveReceipt | undefined;
-  const previousEveReceipt = [...session.turns]
+  let eveCheckpoint: SummerEveCheckpoint | undefined;
+  const previousEveBinding = [...session.turns]
     .reverse()
-    .find(turn => turn.eveReceipt)?.eveReceipt;
+    .map(turn => turn.eveReceipt ?? turn.eveCheckpoint)
+    .find(Boolean);
   let toolReceipt: SummerToolReceipt | null = null;
   let terminal:
     | 'completed'
@@ -315,8 +319,8 @@ export async function* runOvieSummerTurn(input: {
       conversationId: session.identity.sessionId,
       clientTurnId: input.clientTurnId ?? binding.correlationId,
       receipts: input.receipts,
-      previousEveEventId: previousEveReceipt?.eventId,
-      previousEveSessionId: previousEveReceipt?.sessionId,
+      previousEveEventId: previousEveBinding?.eventId,
+      previousEveSessionId: previousEveBinding?.sessionId ?? undefined,
       principalHash: input.principalHash,
       history: session.turns.flatMap(turn => [
         { role: 'user' as const, text: turn.userText },
@@ -330,6 +334,10 @@ export async function* runOvieSummerTurn(input: {
       }
       if (event.type === 'receipt') {
         eveReceipt = event.receipt;
+        continue;
+      }
+      if (event.type === 'checkpoint') {
+        eveCheckpoint = event.checkpoint;
         continue;
       }
       if (event.type === 'notice') {
@@ -383,7 +391,10 @@ export async function* runOvieSummerTurn(input: {
   // Canceled streams are not durable session turns. Eve keeps the work;
   // reconnect with the same clientTurnId waits for completion
   // instead of replaying an empty canceled row.
-  if (terminal !== 'canceled' && terminal !== 'unavailable') {
+  if (
+    terminal !== 'canceled' &&
+    (terminal !== 'unavailable' || Boolean(eveCheckpoint))
+  ) {
     await appendSummerTurn(input.store, {
       clientTurnId: input.clientTurnId ?? null,
       userText: input.userText,
@@ -394,6 +405,7 @@ export async function* runOvieSummerTurn(input: {
       state: terminal,
       toolReceipt,
       ...(eveReceipt ? { eveReceipt } : {}),
+      ...(eveCheckpoint ? { eveCheckpoint } : {}),
       createdAt: new Date().toISOString(),
     });
   }

@@ -40,9 +40,15 @@ export type SummerEveReceipt = {
   readonly turnId: string;
   readonly nextStartIndex: number;
 };
+export type SummerEveCheckpoint = {
+  readonly eventId: string;
+  readonly sessionId: string | null;
+  readonly nextStartIndex: number;
+};
 
 export type SummerPersistedTurn = {
   readonly eveReceipt?: SummerEveReceipt;
+  readonly eveCheckpoint?: SummerEveCheckpoint;
   readonly turnIndex: number;
   readonly clientTurnId: string | null;
   readonly userText: string;

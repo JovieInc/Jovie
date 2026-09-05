@@ -60,11 +60,8 @@ async function collect(value = input) {
   return events;
 }
 beforeEach(() => {
-  vi.stubEnv(
-    'SUMMER_BOTTLENECK_PRODUCER_SIGNING_PRIVATE_KEY',
-    signingPrivateKey
-  );
-  vi.stubEnv('SUMMER_BOTTLENECK_PRODUCER_SIGNING_KEY_ID', 'producer-test');
+  vi.stubEnv('SUMMER_CONVERSATION_SIGNING_PRIVATE_KEY', signingPrivateKey);
+  vi.stubEnv('SUMMER_CONVERSATION_SIGNING_KEY_ID', 'producer-test');
   vi.stubEnv('OVIE_SUMMER_EVE_EXPECTED_DEPLOYMENT_ID', 'dpl_test');
   fetchShadow.mockReset();
   fetchShadow
@@ -124,6 +121,10 @@ describe('Ovie speaks through durable Eve Summer', () => {
       history: [],
     });
     expect(fetchShadow.mock.calls[0]?.[1]?.headers).toMatchObject({
+      'x-jovie-summer-key-id': 'producer-test',
+      'x-jovie-summer-signature': expect.stringMatching(/^ed25519=/u),
+    });
+    expect(fetchShadow.mock.calls[1]?.[1]?.headers).toMatchObject({
       'x-jovie-summer-key-id': 'producer-test',
       'x-jovie-summer-signature': expect.stringMatching(/^ed25519=/u),
     });
@@ -199,11 +200,30 @@ describe('Ovie speaks through durable Eve Summer', () => {
         {
           code: 'daily_turn_budget_exhausted',
           resetAt: '2026-09-06T00:00:00Z',
+          checkpoint: {
+            eventId,
+            conversationId: 'summer-session-current',
+            principalHash: input.principalHash,
+            sessionId: null,
+            nextStartIndex: 0,
+            status: 'rejected_budget',
+          },
         },
         { status: 429 }
       )
     );
     expect(await collect()).toEqual([
+      {
+        type: 'checkpoint',
+        checkpoint: {
+          eventId,
+          conversationId: 'summer-session-current',
+          principalHash: input.principalHash,
+          sessionId: null,
+          nextStartIndex: 0,
+          status: 'rejected_budget',
+        },
+      },
       {
         type: 'notice',
         text: "Summer's daily conversation allowance is used up. It resets at 2026-09-06T00:00:00Z.",

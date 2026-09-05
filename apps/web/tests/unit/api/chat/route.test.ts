@@ -363,10 +363,10 @@ describe('POST /api/chat guard wiring', () => {
       '00000000-0000-4000-8000-000000000123'
     );
     vi.stubEnv(
-      'SUMMER_BOTTLENECK_PRODUCER_SIGNING_PRIVATE_KEY',
+      'SUMMER_CONVERSATION_SIGNING_PRIVATE_KEY',
       summerSigningPrivateKey
     );
-    vi.stubEnv('SUMMER_BOTTLENECK_PRODUCER_SIGNING_KEY_ID', 'producer-test');
+    vi.stubEnv('SUMMER_CONVERSATION_SIGNING_KEY_ID', 'producer-test');
     vi.stubEnv('OVIE_SUMMER_EVE_EXPECTED_DEPLOYMENT_ID', 'dpl_test');
     hoisted.tryHandleAnonymousOnboardingChatMock.mockResolvedValue(null);
     hoisted.getOptionalAuthMock.mockResolvedValue({

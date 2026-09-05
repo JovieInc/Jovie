@@ -275,6 +275,56 @@ describe('Summer transport (JOV-5212)', () => {
     ).toBe(true);
   });
 
+  it('persists a budget checkpoint so the next client turn advances the predecessor', async () => {
+    const store = new MemoryOperatingStore();
+    const seenPrevious: Array<string | undefined> = [];
+    const speaker: SummerSpeaker = {
+      id: 'summer',
+      runtime: 'eve',
+      async *speak(input) {
+        seenPrevious.push(input.previousEveEventId);
+        if (seenPrevious.length === 1) {
+          yield {
+            type: 'checkpoint',
+            checkpoint: {
+              eventId: 'sum_budget_checkpoint',
+              sessionId: null,
+              nextStartIndex: 0,
+            },
+          };
+          yield { type: 'error', state: 'unavailable' };
+          return;
+        }
+        yield { type: 'text-delta', text: 'Allowance restored.' };
+      },
+    };
+
+    await collect(
+      runOvieSummerTurn({
+        receipts: [RECEIPT],
+        userText: 'first',
+        speaker,
+        store,
+        clientTurnId: 'budgeted',
+      })
+    );
+    await collect(
+      runOvieSummerTurn({
+        receipts: [RECEIPT],
+        userText: 'next day',
+        speaker,
+        store,
+        clientTurnId: 'after-reset',
+      })
+    );
+
+    expect(seenPrevious).toEqual([undefined, 'sum_budget_checkpoint']);
+    expect((await loadCurrentSummerSession(store))?.turns[0]).toMatchObject({
+      state: 'unavailable',
+      eveCheckpoint: { eventId: 'sum_budget_checkpoint', sessionId: null },
+    });
+  });
+
   it('surfaces cancel, disable, and reconnect without forking the session', async () => {
     const store = new MemoryOperatingStore();
     const speaker = scriptedSummer({ hangUntilAbort: true });

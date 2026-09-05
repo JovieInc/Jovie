@@ -23,6 +23,14 @@ describe('Summer production OIDC transport', () => {
       fetchSummerShadow('/ovie/v1/summer-shadow/events')
     ).rejects.toThrow('production_origin_required');
     vi.stubEnv('VERCEL_ENV', 'production');
+    vi.stubEnv('OVIE_SUMMER_EVE_DEPLOYMENT_ORIGIN', '');
+    await expect(
+      fetchSummerShadow('/ovie/v1/summer-shadow/events')
+    ).rejects.toThrow('exact_eve_deployment_required');
+    vi.stubEnv(
+      'OVIE_SUMMER_EVE_DEPLOYMENT_ORIGIN',
+      'https://jovie-eve-shadow-abc123-jovie.vercel.app'
+    );
     await expect(fetchSummerShadow('https://other.test')).rejects.toThrow(
       'invalid_shadow_path'
     );
@@ -30,6 +38,10 @@ describe('Summer production OIDC transport', () => {
   });
   it('uses the fixed origin, short-lived OIDC, no redirects and no mutation retries', async () => {
     vi.stubEnv('VERCEL_ENV', 'production');
+    vi.stubEnv(
+      'OVIE_SUMMER_EVE_DEPLOYMENT_ORIGIN',
+      'https://jovie-eve-shadow-abc123-jovie.vercel.app'
+    );
     await fetchSummerShadow('/ovie/v1/summer-shadow/events', {
       method: 'POST',
       body: '{}',
@@ -37,7 +49,7 @@ describe('Summer production OIDC transport', () => {
     expect(getVercelOidcToken).toHaveBeenCalledOnce();
     expect(boundedFetch).toHaveBeenCalledWith(
       new URL(
-        'https://jovie-eve-shadow.vercel.app/ovie/v1/summer-shadow/events'
+        'https://jovie-eve-shadow-abc123-jovie.vercel.app/ovie/v1/summer-shadow/events'
       ),
       expect.objectContaining({
         method: 'POST',

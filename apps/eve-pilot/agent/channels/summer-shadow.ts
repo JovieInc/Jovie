@@ -126,6 +126,12 @@ export default defineChannel<SummerShadowChannelState>({
       async (request, { params, attachSession, resolveSession }) => {
         const auth = await routeAuth(request, ovieSummerShadowOidcAuth);
         if (auth instanceof Response) return auth;
+        const resultPath = `/ovie/v1/summer-shadow/conversation/events/${params.eventId}/result`;
+        if (!verifyConversationAttestation(request, `GET\0${resultPath}`))
+          return Response.json(
+            { ok: false, code: 'invalid_founder_attestation' },
+            { status: 403, headers: { 'cache-control': 'no-store' } }
+          );
         try {
           return await readConversationResult({
             eventId: params.eventId,

@@ -19,6 +19,14 @@ const resultSchema = z.object({
   nextStartIndex: z.number().int().nonnegative(),
   model: z.literal('zai/glm-5.3-flash'),
 });
+const budgetCheckpointSchema = z.object({
+  eventId: z.string(),
+  conversationId: z.literal('summer-session-current'),
+  principalHash: z.string(),
+  sessionId: z.string().nullable(),
+  nextStartIndex: z.number().int().nonnegative(),
+  status: z.literal('rejected_budget'),
+});
 const prefix = '/ovie/v1/summer-shadow/conversation/events';
 const MAX_RESPONSE_BYTES = 128 * 1024;
 const MAX_MIGRATION_HISTORY_BYTES = 20 * 1024;
@@ -88,11 +96,14 @@ export function createEveSummerSpeaker(
       try {
         if (!input.clientTurnId) throw new Error('client_turn_id_required');
         if (!input.principalHash) throw new Error('founder_principal_required');
+        const deploymentId = env.OVIE_SUMMER_EVE_EXPECTED_DEPLOYMENT_ID?.trim();
+        if (!deploymentId) throw new Error('exact_eve_deployment_required');
         const rawBody = JSON.stringify({
           eventId,
           conversationId: 'summer-session-current',
           previousEventId: input.previousEveEventId ?? null,
           principalHash: input.principalHash,
+          deploymentId,
           message: input.userText,
           history: input.previousEveEventId
             ? []
@@ -116,6 +127,15 @@ export function createEveSummerSpeaker(
             admission.code === 'daily_turn_budget_exhausted' &&
             typeof admission.resetAt === 'string'
           ) {
+            const checkpoint = budgetCheckpointSchema.parse(
+              admission.checkpoint
+            );
+            if (
+              checkpoint.eventId !== eventId ||
+              checkpoint.principalHash !== input.principalHash
+            )
+              throw new Error('summer_checkpoint_drift');
+            yield { type: 'checkpoint', checkpoint };
             yield {
               type: 'notice',
               text: `Summer's daily conversation allowance is used up. It resets at ${admission.resetAt}.`,
@@ -125,10 +145,16 @@ export function createEveSummerSpeaker(
           yield { type: 'error', state: 'unavailable' };
           return;
         }
-        const terminalResponse = await fetchShadow(
-          `${prefix}/${eventId}/result`,
-          { signal: input.signal }
+        const terminalPath = `${prefix}/${eventId}/result`;
+        const terminalAttestation = summerConversationAttestation(
+          `GET\0${terminalPath}`
         );
+        if (!terminalAttestation)
+          throw new Error('founder_attestation_unavailable');
+        const terminalResponse = await fetchShadow(terminalPath, {
+          signal: input.signal,
+          headers: terminalAttestation,
+        });
         assertExpectedEveDeployment(terminalResponse);
         const terminal = await body(terminalResponse);
         if (!terminalResponse.ok) {
