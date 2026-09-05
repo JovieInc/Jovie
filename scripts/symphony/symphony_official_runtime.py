@@ -1082,7 +1082,11 @@ def validate_bounded_repair_admission(
         raise ValueError("fleet-local-repair-not-admitted")
     concurrency = fleet_payload.get("concurrency")
     gem = concurrency.get("gem") if isinstance(concurrency, dict) else None
-    if not isinstance(gem, dict) or not isinstance(gem.get("runtimeFloor"), int) or gem["runtimeFloor"] < 1:
+    if (
+        not isinstance(gem, dict)
+        or isinstance(gem.get("runtimeFloor"), bool)
+        or gem.get("runtimeFloor") != 1
+    ):
         raise ValueError("fleet-runtime-floor-missing")
     if pathlib.Path(str(manifest.get("fleetGatePath"))).resolve() != fleet_path.resolve():
         raise ValueError("recovery-manifest-fleet-path-mismatch")
