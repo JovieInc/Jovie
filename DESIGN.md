@@ -166,15 +166,13 @@ of redefining them.
   - Raw durations and easings in route code are forbidden (enforced in Wave 4).
 - **Canonical button variants:** `primary`, `secondary`, `tertiary`, `ghost`,
   and `link`. Destructive styling is a `destructive` prop, not a variant.
-- **Canonical button sizes:** `sm` = 28px, `md` = 36px, `lg` = 44px;
-  `icon` uses the `md` control height with equal width.
-- **Marketing pill controls (founder-locked 2026-08-12):** the visible pill is
-  32px high inside a 44px minimum hit target. This is a marketing-language
-  contract, not a redefinition of the generic app button scale.
+- **Canonical text button size (founder-approved 2026-09-05):** `sm`,
+  `marketing`, `md`, and `lg` share one 28px visible control, typography, and
+  padding inside a 44px minimum hit target across apps and marketing.
+  `icon` remains a distinct 36px square utility control with a 44px hit target.
 - **Touch targets (founder-locked 2026-08-20):** enlarge the hit **container**,
   never the visible item. Compact controls keep their visual height; the 44px
-  floor is an invisible `::before`/`::after` (or wrapping hit area). `h-11` on
-  the control itself is only for controls that are already the large size.
+  floor is an invisible `::before`/`::after` (or wrapping hit area).
 - **Marketing O-mark (founder-locked 2026-08-12):** render the visible mark at
   32px and align it to the same control geometry.
 

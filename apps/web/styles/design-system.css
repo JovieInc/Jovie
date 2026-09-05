@@ -1017,8 +1017,8 @@ html[data-profile-initial-mode]
   --color-border-subtle: oklch(0% 0 0 / 5%);
   --color-border-default: oklch(0% 0 0 / 8%);
   --color-border-strong: oklch(0% 0 0 / 15%);
-  --color-border-focus: #7170ff;
-  /* Linear accent for focus */
+  --color-border-focus: #2563ff;
+  /* One canonical blue focus color in both modes. */
 
   /* Accent palette rotation */
   --color-accent-gray: #7f7f85;
@@ -1213,7 +1213,7 @@ html[data-profile-initial-mode]
   /* Focus ring — Jovie/Linear keyboard focus token.
      Light literal (identical to the legacy linear border-focus light value);
      dark is fully overridden by the :root.dark Noir Ion mapping below. */
-  --color-focus-ring: rgba(0, 0, 0, 0.28);
+  --color-focus-ring: var(--color-border-focus);
   --focus-ring-width: 1px;
   --focus-ring-offset: 0px;
 
@@ -1335,7 +1335,7 @@ html[data-profile-initial-mode]
   --color-border-subtle: var(--noir-ion-border-subtle);
   --color-border-default: var(--noir-ion-border-default);
   --color-border-strong: var(--noir-ion-border-strong);
-  --color-border-focus: var(--noir-ion-ion);
+  --color-border-focus: #2563ff;
   /* Ion focus */
 
   /* Accent palette rotation — Noir Ion semantics
@@ -1508,7 +1508,7 @@ html[data-profile-initial-mode]
     var(--noir-ion-text-primary)
   );
   --color-link-visited: var(--noir-ion-ultra);
-  --color-focus-ring: var(--noir-ion-focus-ring);
+  --color-focus-ring: var(--color-border-focus);
   --state-disabled-opacity: 0.5;
   --state-partial-opacity: 0.62;
   --state-offline-bg: var(--color-warning-subtle);
@@ -2500,23 +2500,24 @@ html:not(.dark) .smart-link-powered-by {
 /* Keyboard focus fallback — canonical visible focus ring (WCAG SC 2.4.7).
    Design-system consistent recipe used across shell/chrome (smallwin + a11y polish):
      focus-visible:outline-none
-     focus-visible:ring-2 focus-visible:ring-(--linear-border-focus)/55
+     focus-visible:ring-2 focus-visible:ring-focus
      focus-visible:ring-offset-2 focus-visible:ring-offset-(--linear-bg-page)
    Box-shadow equivalent ensures global application to any :focus-visible without
    explicit treatment. :where() keeps specificity at 0 so component-level overrides
    (stronger CTA rings, public-action-*, Clerk, surface-specific offsets, input borders)
    win cleanly. Eliminates all browser default outline artifacts.
-   Subtle gray ring provides visible keyboard focus on every surface without
-   clashing with Linear/Jovie app accents. Primary marketing CTAs and key actions
-   layer explicit stronger variants on top where emphasis is required. */
-:where(:focus-visible) {
-  outline: none;
-  box-shadow:
-    0 0 0 2px var(--linear-bg-page),
-    0 0 0 4px color-mix(in oklab, var(--linear-border-focus) 55%, transparent);
-  transition:
-    box-shadow 150ms cubic-bezier(0.32, 0.72, 0, 1),
-    border-color 150ms cubic-bezier(0.32, 0.72, 0, 1);
+   The canonical focus color retains non-text contrast. The base cascade layer
+   lets component utilities own explicit focus geometry and treatments. */
+@layer base {
+  :where(:focus-visible) {
+    outline: none;
+    box-shadow:
+      0 0 0 2px var(--linear-bg-page),
+      0 0 0 4px var(--color-border-focus);
+    transition:
+      box-shadow 150ms cubic-bezier(0.32, 0.72, 0, 1),
+      border-color 150ms cubic-bezier(0.32, 0.72, 0, 1);
+  }
 }
 
 /* FAQ REDUCED MOTION START
