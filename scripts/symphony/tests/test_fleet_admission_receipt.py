@@ -170,10 +170,11 @@ class FleetAdmissionReceiptTests(unittest.TestCase):
         self.assertEqual(projection["promotionMode"], source["promotionMode"])
         self.assertEqual(projection["state"], source["state"])
 
-    def test_normal_isolated_draft_hold_and_blocked_preserve_admission_fields(self):
+    def test_all_promotion_modes_preserve_admission_fields(self):
         cases = [
             ({}, "normal"),
             ({"production": {"status": "red", "deployedSha": SHA}}, "isolated-only"),
+            ({"controller": {"status": "failed"}}, "controller-repair-only"),
             ({"main": {"status": "red", "sha": SHA}}, "draft-only"),
             ({"production": {"status": "green", "deployedSha": "b" * 40}}, "hold-intake"),
             ({"integrity": {"status": "active", "reason": "credential-compromise", "detail": "keys leaked"}}, "blocked"),
@@ -204,6 +205,10 @@ class FleetAdmissionReceiptTests(unittest.TestCase):
                 self.assertEqual(
                     projection["productionUnboundRepairAdmission"]["allowed"],
                     _source["productionUnboundRepairAdmission"]["allowed"],
+                )
+                self.assertEqual(
+                    projection["controllerRepairAdmission"]["allowed"],
+                    _source["controllerRepairAdmission"]["allowed"],
                 )
                 self.assertEqual(
                     projection["signals"]["main"]["sha"],
