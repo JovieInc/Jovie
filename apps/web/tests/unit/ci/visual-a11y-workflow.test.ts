@@ -177,6 +177,7 @@ describe('CI accessibility and visual gate contracts (JOV-4060)', () => {
     expect(visualJob).toContain('- name: Cleanup Neon branch');
     expect(visualJob).toContain('if: always()');
 
+    expect(compareJob).toContain("github.event_name == 'pull_request'");
     expect(compareJob).toContain("github.event_name == 'merge_group'");
     expect(compareJob).toContain(
       'node scripts/visual-snapshot-compare.mjs compare'
@@ -188,7 +189,11 @@ describe('CI accessibility and visual gate contracts (JOV-4060)', () => {
     expect(mergeReadyJob).toContain(
       'VISUAL_COMPARE_RESULT="${{ needs.ci-visual-snapshot-compare.result }}"'
     );
-    expect(prReadyJob).not.toContain('ci-visual-snapshot-compare');
+    expect(prReadyJob).toContain('ci-visual-snapshot-compare');
+    expect(prReadyJob).toContain(
+      'VISUAL_COMPARE_RESULT="${{ needs.ci-visual-snapshot-compare.result }}"'
+    );
+    expect(prReadyJob).toContain('"$VISUAL_COMPARE_RESULT" != "success"');
   });
 
   it('scopes chat visual interactions to the active visible composer', () => {

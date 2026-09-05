@@ -501,6 +501,8 @@ describe('merge_group workflow contract', () => {
       'RUN_TEST="${{ needs.ci-path-changes.outputs.run_test }}"'
     );
     expect(sourceAggregate).not.toContain('ci-unit-tests');
+    expect(sourceAggregate).toContain('ci-visual-snapshot-compare');
+    expect(sourceAggregate).toContain('"$VISUAL_COMPARE_RESULT" != "success"');
     expect(sourceAggregate).toContain(
       'All deterministic source PR checks passed.'
     );
@@ -1680,6 +1682,7 @@ ${selectedGateScript}`,
       'ci-fast',
       'ci-secret-scan',
       'ci-golden-path-lock',
+      'ci-visual-snapshot-compare',
       'drizzle-migration-guard',
       'ci-integration-ready',
       'ci-pr-ready',

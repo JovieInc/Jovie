@@ -384,6 +384,7 @@ describe('pr-check-failures', () => {
       'CI Risk Classifier',
       'Secret Scan (gitleaks + trufflehog)',
       'Golden Path Lock',
+      'Visual Snapshot Compare',
       'Migration Guard',
     ]);
     expect(ADVISORY_CHECK_NAMES).toContain('Preview Deploy');

@@ -1,9 +1,10 @@
 /**
- * Fail-closed visual snapshot compare (JOV-5459).
+ * Fail-closed visual snapshot compare (JOV-5459 / JOV-5960).
  *
  * Compare mode treats a missing baseline / ENOENT as FAIL. Refresh mode is the
  * only path allowed to pass --update-snapshots and self-heal missing files.
- * Advisory success is never a valid compare outcome.
+ * Advisory success is never a valid compare outcome. A skipped GitHub job
+ * result is never a pass — homepage/marketing PRs must not green on skip.
  */
 
 export const VISUAL_COMPARE_MODE = 'compare';
@@ -15,6 +16,20 @@ export const VISUAL_SNAPSHOT_SPECS = Object.freeze([
   'apps/web/tests/e2e/chat-visual.spec.ts',
   'apps/web/tests/e2e/admin-visual-regression.spec.ts',
   'apps/web/tests/e2e/storybook-elevation.spec.ts',
+]);
+
+/** Public homepage + marketing surfaces that must never skip visual compare. */
+export const HOMEPAGE_MARKETING_PATH_PATTERNS = Object.freeze([
+  /^apps\/web\/app\/\(home\)\//,
+  /^apps\/web\/app\/\(marketing\)\//,
+  /^apps\/web\/components\/features\/home\//,
+  /^apps\/web\/components\/features\/marketing\//,
+  /^apps\/web\/components\/homepage\//,
+  /^apps\/web\/components\/marketing\//,
+  /^apps\/web\/data\/homepageFrontDoorCta\.ts$/,
+  /^apps\/web\/data\/marketingCtaIntents\.ts$/,
+  /^apps\/web\/lib\/flags\/marketing-static\.ts$/,
+  /^apps\/web\/tests\/e2e\/visual-regression\.spec\.ts$/,
 ]);
 
 const STATIC_SCREENSHOT_NAME = /toHaveScreenshot\(\s*(['"`])([^$'"`\n]+)\1/g;
@@ -68,6 +83,59 @@ export function isMissingBaselineSignal(error = {}) {
   const code = error?.code ?? error?.errnoException?.code;
   const message = String(error?.message ?? error ?? '');
   return code === 'ENOENT' || MISSING_SNAPSHOT_MESSAGE.test(message);
+}
+
+/**
+ * @param {string} [filePath]
+ * @returns {boolean}
+ */
+export function isHomepageMarketingPath(filePath = '') {
+  const normalized = String(filePath).replaceAll('\\', '/');
+  return HOMEPAGE_MARKETING_PATH_PATTERNS.some(pattern =>
+    pattern.test(normalized)
+  );
+}
+
+/**
+ * @param {readonly string[]} [files]
+ * @returns {boolean}
+ */
+export function touchesHomepageMarketing(files = []) {
+  return files.some(file => isHomepageMarketingPath(file));
+}
+
+/**
+ * GitHub job conclusions for Visual Snapshot Compare.
+ * Skip / not_run / empty is never a pass. Homepage/marketing diffs use a
+ * dedicated reason so skip-as-green cannot land another Find-me-style PR.
+ *
+ * @param {{
+ *   result?: string,
+ *   homepageMarketingTouched?: boolean,
+ * }} [input]
+ * @returns {VisualSnapshotOutcome}
+ */
+export function classifyVisualGateJobResult({
+  result,
+  homepageMarketingTouched = false,
+} = {}) {
+  if (result === 'success') {
+    return { ok: true, status: 'pass', reason: 'matched' };
+  }
+  if (result === 'skipped' || result === 'not_run' || !result) {
+    return {
+      ok: false,
+      status: 'fail',
+      reason: homepageMarketingTouched
+        ? 'homepage-marketing-skip-must-not-pass'
+        : 'skip-must-not-pass',
+    };
+  }
+  return {
+    ok: false,
+    status: 'fail',
+    reason: result === 'failure' ? 'compare-failed' : 'compare-not-success',
+  };
 }
 
 /**
@@ -240,6 +308,11 @@ export function assertVisualCompareWorkflowContract({
     if (compareJob.includes('continue-on-error')) {
       issues.push('compare job must not be advisory continue-on-error');
     }
+    if (!compareJob.includes("github.event_name == 'pull_request'")) {
+      issues.push(
+        'compare job must run on pull_request (skip-as-green is forbidden)'
+      );
+    }
     if (!compareJob.includes("github.event_name == 'merge_group'")) {
       issues.push('compare job must run on merge_group');
     }
@@ -252,9 +325,27 @@ export function assertVisualCompareWorkflowContract({
   if (!mergeReady.includes('ci-visual-snapshot-compare')) {
     issues.push('merge-group PR Ready must require visual snapshot compare');
   }
+  if (
+    !mergeReady.includes('VISUAL_COMPARE_RESULT') ||
+    !mergeReady.includes('"Visual Snapshot Compare:$VISUAL_COMPARE_RESULT"')
+  ) {
+    issues.push(
+      'merge-group PR Ready must fail when visual snapshot compare is skipped'
+    );
+  }
   const sourceReady = extractJobBlock(ciYaml, 'ci-pr-ready');
-  if (sourceReady.includes('ci-visual-snapshot-compare')) {
-    issues.push('source PR Ready must stay fast (no visual snapshot compare)');
+  if (!sourceReady.includes('ci-visual-snapshot-compare')) {
+    issues.push(
+      'source PR Ready must require visual snapshot compare (skip ≠ pass)'
+    );
+  }
+  if (
+    !sourceReady.includes('VISUAL_COMPARE_RESULT') ||
+    !sourceReady.includes('"$VISUAL_COMPARE_RESULT" != "success"')
+  ) {
+    issues.push(
+      'source PR Ready must fail when visual snapshot compare is skipped'
+    );
   }
 
   return issues;

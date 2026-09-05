@@ -1245,7 +1245,11 @@ jobs:
     name: Visual Snapshot Compare
     # JOV-5459: missing baseline/ENOENT is FAIL, not advisory. No Neon and no
     # Playwright. Snapshot refresh stays on visual-regression.yml.
-    if: github.event_name == 'merge_group'
+    # JOV-5960: run on source PRs too. A skipped required check is GitHub-green
+    # and that is how homepage/marketing PRs landed past visual invariants.
+    if: >-
+      github.event_name == 'pull_request' ||
+      github.event_name == 'merge_group'
     runs-on: ubuntu-latest
     timeout-minutes: 5
     steps:
@@ -5366,7 +5370,7 @@ jobs:
     # GitHub's merge_group producer reuses the same required context name for
     # combined-head unit/build/layout evidence. Migration Guard, Fork PR Gate,
     # and PR Size Guard remain separately required ruleset contexts.
-    needs: [ci-path-changes, ci-risk-classifier, ci-fast, ci-secret-scan, ci-golden-path-lock]
+    needs: [ci-path-changes, ci-risk-classifier, ci-fast, ci-secret-scan, ci-golden-path-lock, ci-visual-snapshot-compare]
     if: ${{ always() && github.event_name == 'pull_request' && github.event.pull_request.base.ref == 'main' }}
     runs-on: ubuntu-latest
     timeout-minutes: 2
@@ -5379,6 +5383,7 @@ jobs:
           FAST_RESULT="${{ needs.ci-fast.result }}"
           SECRET_SCAN_RESULT="${{ needs.ci-secret-scan.result }}"
           GOLDEN_PATH_LOCK_RESULT="${{ needs.ci-golden-path-lock.result }}"
+          VISUAL_COMPARE_RESULT="${{ needs.ci-visual-snapshot-compare.result }}"
           RISK_RESULT="${{ needs.ci-risk-classifier.result }}"
           RISK_LEVEL="${{ needs.ci-risk-classifier.outputs.risk_level }}"
           RISK_RULES="${{ needs.ci-risk-classifier.outputs.matched_rule_ids }}"
@@ -5394,10 +5399,12 @@ jobs:
             echo "| ci-fast (typecheck/biome/eslint/guardrails/structural) | $FAST_RESULT | \`pnpm run typecheck && pnpm run biome:check\` |"
             echo "| Secret Scan | $SECRET_SCAN_RESULT | \`./scripts/security/scan-secrets.sh ci-pr origin/main\` |"
             echo "| Golden Path Lock | $GOLDEN_PATH_LOCK_RESULT | \`node scripts/golden-path-lock.mjs merge-gate\` |"
+            echo "| Visual Snapshot Compare | $VISUAL_COMPARE_RESULT | \`node scripts/visual-snapshot-compare.mjs compare\` |"
             echo "| Risk classifier | $RISK_RESULT | \`pnpm ci:harness:check\` |"
             echo
             echo "Risk level: ${RISK_LEVEL:-low}; matched rules: ${RISK_RULES:-none}"
             echo "Heavy evidence is manual, scheduled, or event-driven and never starts from this source-PR gate."
+            echo "Visual Snapshot Compare skip is not a pass (JOV-5960)."
           } >> "$GITHUB_STEP_SUMMARY"
 
           if [[ "$PATH_RESULT" != "success" ]]; then
@@ -5410,6 +5417,10 @@ jobs:
           fi
           if [[ "$GOLDEN_PATH_LOCK_RESULT" != "success" ]]; then
             echo "❌ Golden Path Lock did not pass (result: $GOLDEN_PATH_LOCK_RESULT)"
+            exit 1
+          fi
+          if [[ "$VISUAL_COMPARE_RESULT" != "success" ]]; then
+            echo "❌ Visual Snapshot Compare did not pass (result: $VISUAL_COMPARE_RESULT). Skip is not green."
             exit 1
           fi
           if [[ "$RISK_RESULT" != "success" ]]; then
