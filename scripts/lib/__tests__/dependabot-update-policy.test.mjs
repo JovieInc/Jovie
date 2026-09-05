@@ -89,13 +89,6 @@ describe('Dependabot event policy', () => {
     ],
     ['Dependabot self-close', { action: 'closed', actor: 'dependabot[bot]' }],
     [
-      'durably held close',
-      {
-        action: 'closed',
-        pullRequest: pullRequest({ labels: [{ name: 'no-auto' }] }),
-      },
-    ],
-    [
       'non-Dependabot author',
       { pullRequest: pullRequest({ user: { login: 'user' } }) },
     ],
@@ -120,10 +113,6 @@ describe('Dependabot event policy', () => {
 
   it.each([
     ['closed major', { action: 'closed' }],
-    [
-      'already-held major',
-      { pullRequest: pullRequest({ labels: ['needs-human'] }) },
-    ],
   ])('does not reopen or repeat the hold for an %s', (_name, overrides) => {
     expect(
       classify({
@@ -131,6 +120,25 @@ describe('Dependabot event policy', () => {
         ...overrides,
       }).decision
     ).toBe('noop');
+  });
+
+  it.each([
+    'needs-human',
+    'human-review-required',
+    'no-auto',
+  ])('ignores retired hold label %s', label => {
+    expect(
+      classify({
+        action: 'closed',
+        pullRequest: pullRequest({ labels: [label] }),
+      }).decision
+    ).toBe('reopen-recreate');
+    expect(
+      classify({
+        updateType: 'version-update:semver-major',
+        pullRequest: pullRequest({ labels: [label] }),
+      }).decision
+    ).toBe('hold-major');
   });
 
   it('clears the conflict hold only after Dependabot publishes a recreated head', () => {

@@ -40,8 +40,7 @@ describe('tasteLabelsOn', () => {
   });
 });
 
-describe('evaluateTasteLabel — mis-applied (acceptance: guard red-fails)', () => {
-  // The owner screenshot set (2026-06-26): each of these was WRONG to gate.
+describe('evaluateTasteLabel — retired pre-landing holds', () => {
   it.each([
     ['#12021 chore', 'chore: update product screenshots', 'needs-human-taste'],
     [
@@ -83,49 +82,50 @@ describe('evaluateTasteLabel — mis-applied (acceptance: guard red-fails)', () 
       'needs-human-taste',
     ]);
   });
-});
 
-describe('evaluateTasteLabel — correctly retained (acceptance: legit taste KEPT)', () => {
-  it('keeps taste on a material UX feat (#11988 collapse homepage to hero)', () => {
+  it('removes taste from a material UX feat', () => {
     const result = evaluateTasteLabel({
       title: 'feat(home): collapse homepage to hero + minimal footer',
       labels: ['needs-human-taste'],
     });
-    expect(result.ok).toBe(true);
+    expect(result.ok).toBe(false);
+    expect(result.offendingLabels).toEqual(['needs-human-taste']);
   });
 
-  it('keeps taste on an untyped design-pass title (#11984 library right rail)', () => {
+  it('removes taste from an untyped design-pass title', () => {
     const result = evaluateTasteLabel({
       title: 'JOV-3120: Library right rail definitive design pass',
       labels: ['needs:taste'],
     });
-    expect(result.ok).toBe(true);
+    expect(result.ok).toBe(false);
+    expect(result.offendingLabels).toEqual(['needs:taste']);
   });
 
-  it(`keeps taste on a chore when ${MATERIAL_UX_MARKER} is present (explicit override)`, () => {
+  it(`removes taste even when ${MATERIAL_UX_MARKER} is present`, () => {
     const result = evaluateTasteLabel({
       title: 'chore: refresh marketing screenshots',
       labels: ['needs-human-taste', MATERIAL_UX_MARKER],
     });
-    expect(result.ok).toBe(true);
-    expect(result.offendingLabels).toEqual([]);
+    expect(result.ok).toBe(false);
+    expect(result.offendingLabels).toEqual(['needs-human-taste']);
   });
 
-  it('honors the ux:material override case-insensitively', () => {
+  it('treats ux:material as classifier metadata, never a hold override', () => {
     const result = evaluateTasteLabel({
       title: 'refactor!: rebuild the nav',
       labels: ['needs:taste', 'UX:Material'],
     });
-    expect(result.ok).toBe(true);
-    expect(result.offendingLabels).toEqual([]);
+    expect(result.ok).toBe(false);
+    expect(result.offendingLabels).toEqual(['needs:taste']);
   });
 
-  it('keeps taste on a title with no conventional-commit type (conservative)', () => {
+  it('removes taste from a title with no conventional-commit type', () => {
     const result = evaluateTasteLabel({
       title: 'fix:no-space-so-not-a-conventional-prefix',
       labels: ['needs:taste'],
     });
-    expect(result.ok).toBe(true);
+    expect(result.ok).toBe(false);
+    expect(result.offendingLabels).toEqual(['needs:taste']);
   });
 
   it('passes when no taste label is present', () => {

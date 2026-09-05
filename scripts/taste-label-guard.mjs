@@ -7,7 +7,7 @@
  *   sweep    [--apply] [--limit <n>]                          # all open PRs with a taste label
  *
  * Without --apply, fix-pr/sweep are dry-runs (print only). With --apply they
- * remove the mis-applied taste label and leave one idempotent comment.
+ * remove every retired taste hold and leave one idempotent comment.
  */
 import { execFileSync } from 'node:child_process';
 import { appendFileSync } from 'node:fs';
@@ -40,11 +40,11 @@ function gh(args) {
 
 function commentBody(result) {
   return [
-    '**Taste gate auto-cleared.**',
+    '**Retired taste hold auto-cleared.**',
     result.reason,
     '',
     `Removed: ${result.offendingLabels.map(label => `\`${label}\``).join(', ')}.`,
-    `If this PR makes a material, subjective UX change only a human can judge, add the \`${MATERIAL_UX_MARKER}\` label and re-apply the taste label.`,
+    `Use \`${MATERIAL_UX_MARKER}\` for automated classification only. Steer taste before PR creation or certify the landed feature behind a flag.`,
   ].join('\n');
 }
 
@@ -163,7 +163,7 @@ function main() {
         if (!result.ok) violations += 1;
       }
       console.log(
-        `Done. ${violations} mis-applied taste label(s)${apply ? ' cleared' : ' (dry-run — pass --apply to clear)'}.`
+        `Done. ${violations} retired taste label set(s)${apply ? ' cleared' : ' (dry-run — pass --apply to clear)'}.`
       );
       break;
     }

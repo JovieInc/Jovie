@@ -38,7 +38,7 @@ jobs:
             --json number,title,headRefName,headRefOid,isDraft,labels,updatedAt,autoMergeRequest,mergeStateStatus)
           AGENT_PRS=$(echo "$PRS" | jq '[.[] | select((.headRefName | test("^(linear/|claude/|codegen-bot/|codex/)"; "i")) or (.headRefName | test("(^|/)jov-[0-9]+"; "i")))]')
           SYSTEMIC_PRS=$(gh pr list --repo "$GH_REPO" --state open --label systemic-blocker --limit 50 --json number,title,headRefName,updatedAt)
-          NEEDS_HUMAN_PRS=$(gh pr list --repo "$GH_REPO" --state open --label needs-human --limit 50 --json number,title,headRefName,updatedAt)
+          RETIRED_HOLD_PRS=$(echo "$PRS" | jq '[.[] | select([.labels[].name] | any(. == "needs-human" or . == "needs-human-review" or . == "human-review-required" or . == "no-auto" or . == "no-auto-merge" or . == "no-automerge" or . == "needs:taste" or . == "needs-human-taste"))]')
           CI_RUNS=$(gh run list --repo "$GH_REPO" --workflow CI --status completed --limit 30 --json databaseId,conclusion,createdAt,displayTitle,event,headBranch,url)
 
           {
@@ -50,7 +50,7 @@ jobs:
             echo
             echo "- Open agent PRs: $(echo "$AGENT_PRS" | jq 'length')"
             echo "- Systemic blocker PRs: $(echo "$SYSTEMIC_PRS" | jq 'length')"
-            echo "- Needs-human PRs: $(echo "$NEEDS_HUMAN_PRS" | jq 'length')"
+            echo "- Retired hold-label violations: $(echo "$RETIRED_HOLD_PRS" | jq 'length')"
             echo "- Recent failed CI runs: $(echo "$CI_RUNS" | jq '[.[] | select(.conclusion != "success")] | length')"
             echo "- Backlog: Linear is canonical. GitHub Issues are historical and are not counted here."
             echo
@@ -83,9 +83,9 @@ jobs:
             echo
             echo "$SYSTEMIC_PRS" | jq -r '.[] | "- #\(.number) \(.title) (`\(.headRefName)`, updated \(.updatedAt))"' || true
             echo
-            echo "## Needs-Human Stops"
+            echo "## Retired Hold-Label Violations"
             echo
-            echo "$NEEDS_HUMAN_PRS" | jq -r '.[] | "- #\(.number) \(.title) (`\(.headRefName)`, updated \(.updatedAt))"' || true
+            echo "$RETIRED_HOLD_PRS" | jq -r '.[] | "- #\(.number) \(.title) (`\(.headRefName)`, updated \(.updatedAt)); remove: \([.labels[].name | select(. == \"needs-human\" or . == \"needs-human-review\" or . == \"human-review-required\" or . == \"no-auto\" or . == \"no-auto-merge\" or . == \"no-automerge\" or . == \"needs:taste\" or . == \"needs-human-taste\")] | join(\", \))"' || true
             echo
             echo "## Recent CI Failures"
             echo

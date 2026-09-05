@@ -58,8 +58,8 @@ This system eliminates human intervention for routine CodeRabbit feedback while 
 │    │  Pass     Fail  │
 │    │    │         │  │
 │    │    ▼         ▼  │
-│    │  Commit   Escalate │
-│    │  & Push   (needs-human) │
+│    │  Commit   Record + retry │
+│    │  & Push   autonomously │
 └────┴────┴─────────┴──┘
 ```
 
@@ -87,7 +87,7 @@ Each fix attempt is tracked via labels:
 
 1. **First attempt**: Agent fixes issues, validation runs
 2. **If validation fails**: Retry with error context
-3. **If retry fails**: Escalate to human (`needs-human` label)
+3. **If retry fails**: Record the exact failure and release the lease for a bounded autonomous retry
 
 ### SHA Reset
 
@@ -118,9 +118,9 @@ All three must pass for fixes to be committed.
 
 When automation fails:
 
-1. `needs-human` label is added to PR
-2. Comment posted explaining what happened
-3. Workflow stops - no infinite loops
+1. A durable failure receipt records what happened
+2. The lease is released for bounded autonomous remediation
+3. Retry budgets prevent infinite loops
 
 ## Security
 
@@ -155,8 +155,7 @@ Test the helper scripts locally:
 
 ### Failure Indicators
 
-- `needs-human` label added
-- Comment explaining failure
+- Durable failure receipt and retry metadata
 - No new commits after workflow run
 
 ## Troubleshooting
