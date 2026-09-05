@@ -1,4 +1,5 @@
 import { render, screen } from '@testing-library/react';
+import type { ComponentPropsWithoutRef } from 'react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import {
   renderDashboardNav,
@@ -6,11 +7,11 @@ import {
 } from '@/tests/utils/dashboard-nav-test-support';
 
 vi.mock('next/link', async () => {
-  const React = await import('react');
+  const { forwardRef } = await import('react');
   return {
-    default: React.forwardRef<
+    default: forwardRef<
       HTMLAnchorElement,
-      React.ComponentPropsWithoutRef<'a'> & { readonly prefetch?: boolean }
+      ComponentPropsWithoutRef<'a'> & { readonly prefetch?: boolean }
     >(function TestLink({ prefetch, ...props }, ref) {
       return <a {...props} data-prefetch={String(prefetch)} ref={ref} />;
     }),

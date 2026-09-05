@@ -44,7 +44,10 @@ const dashboardData: DashboardData = {
 const meta = {
   title: 'Dashboard/Navigation/Customer Rail',
   component: DashboardNav,
-  parameters: { layout: 'fullscreen' },
+  parameters: {
+    layout: 'fullscreen',
+    jovie: { uncoveredProps: ['isLoading'] },
+  },
   decorators: [
     Story => (
       <QueryClientProvider client={queryClient}>
