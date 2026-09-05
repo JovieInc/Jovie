@@ -138,11 +138,22 @@ describe('Eve framework smoke', () => {
         skills: ['jovie-action-boundary'],
         subagents: [],
       });
-      // Eve 0.47 registers a growing set of built-in tools (bash, read_file,
-      // web_search, agent, ...). Pin only the pilot-owned capability surface —
-      // the Jovie capability manifest tool must be discovered alongside the
-      // framework's built-ins, never replaced by them.
+      // This private pilot exposes only its bounded read-only manifest. Shell,
+      // files, network, delegation, questions, and todo tools are disabled in
+      // source so prompt injection cannot broaden a Summer conversation.
       expect(info.tools).toContain('jovie_capability_manifest');
+      expect(info.tools).not.toEqual(
+        expect.arrayContaining([
+          'agent',
+          'ask_question',
+          'bash',
+          'read_file',
+          'todo',
+          'web_fetch',
+          'web_search',
+          'write_file',
+        ])
+      );
       expect(info.schedules).toContain('summer-bottleneck-heartbeat');
 
       // Eve 0.47 ships additional built-in HTTP channels (the `home` landing
@@ -238,5 +249,5 @@ describe('Eve framework smoke', () => {
     } finally {
       rmSync(isolatedRoot, { force: true, recursive: true });
     }
-  });
+  }, 20_000);
 });

@@ -583,4 +583,30 @@ describe('POST /api/chat guard wiring', () => {
     expect(hoisted.reserveChatTurnMock).not.toHaveBeenCalled();
     expect(hoisted.fetchSummerShadowMock).toHaveBeenCalledTimes(2);
   });
+
+  it('rejects OV turns without a stable client turn id before Eve dispatch', async () => {
+    hoisted.isAdminMock.mockResolvedValue(true);
+
+    const response = await POST(
+      chatRequest(
+        validBody({
+          chatMode: 'ov',
+          messages: [
+            {
+              id: 'm1',
+              role: 'user',
+              parts: [{ type: 'text', text: 'status of the kanban' }],
+            },
+          ],
+        })
+      )
+    );
+
+    expect(response.status).toBe(400);
+    expect(await response.json()).toMatchObject({
+      error: 'clientTurnId is required for live OV chat',
+    });
+    expect(hoisted.fetchSummerShadowMock).not.toHaveBeenCalled();
+    expect(hoisted.executeChatTurnMock).not.toHaveBeenCalled();
+  });
 });

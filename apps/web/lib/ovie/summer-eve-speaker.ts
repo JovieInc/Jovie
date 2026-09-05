@@ -18,9 +18,45 @@ const resultSchema = z.object({
   model: z.literal('zai/glm-5.3-flash'),
 });
 const prefix = '/ovie/v1/summer-shadow/conversation/events';
+const MAX_RESPONSE_BYTES = 128 * 1024;
+const MAX_MIGRATION_HISTORY_BYTES = 20 * 1024;
+const MAX_MIGRATION_HISTORY_ENTRIES = 200;
+
+function boundedMigrationHistory(
+  history: readonly { role: 'user' | 'assistant'; text: string }[]
+) {
+  const bounded = history.slice(-MAX_MIGRATION_HISTORY_ENTRIES);
+  while (
+    bounded.length > 0 &&
+    new TextEncoder().encode(JSON.stringify(bounded)).byteLength >
+      MAX_MIGRATION_HISTORY_BYTES
+  ) {
+    bounded.shift();
+  }
+  return bounded;
+}
+
 async function body(response: Response): Promise<Record<string, unknown>> {
-  const text = await response.text();
-  if (text.length > 128 * 1024) throw new Error('oversized_summer_response');
+  const declaredLength = response.headers.get('content-length');
+  if (declaredLength && Number(declaredLength) > MAX_RESPONSE_BYTES)
+    throw new Error('oversized_summer_response');
+  const reader = response.body?.getReader();
+  const decoder = new TextDecoder();
+  let bytes = 0;
+  let text = '';
+  if (reader) {
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      bytes += value.byteLength;
+      if (bytes > MAX_RESPONSE_BYTES) {
+        await reader.cancel().catch(() => {});
+        throw new Error('oversized_summer_response');
+      }
+      text += decoder.decode(value, { stream: true });
+    }
+    text += decoder.decode();
+  }
   const value: unknown = JSON.parse(text);
   if (!value || typeof value !== 'object' || Array.isArray(value))
     throw new Error('invalid_summer_response');
@@ -48,7 +84,9 @@ export function createEveSummerSpeaker(
             conversationId: 'summer-session-current',
             previousEventId: input.previousEveEventId ?? null,
             message: input.userText,
-            history: input.previousEveEventId ? [] : input.history,
+            history: input.previousEveEventId
+              ? []
+              : boundedMigrationHistory(input.history),
           }),
         });
         const admission = await body(response);

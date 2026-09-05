@@ -2,6 +2,8 @@ import { createHash } from 'node:crypto';
 import { z } from 'zod';
 import {
   isSummerShadowEnabled,
+  readBoundedShadowBody,
+  ShadowBodyTooLargeError,
   type ShadowRecord,
   SUMMER_SHADOW_MAX_TURNS_PER_UTC_DAY,
 } from './summer-shadow-ingress';
@@ -25,6 +27,35 @@ export const conversationInputSchema = z
   })
   .strict();
 export type ConversationInput = z.infer<typeof conversationInputSchema>;
+const acceptedRecordSchema = z
+  .object({
+    eventId: eventIdSchema,
+    conversationId: z.literal(SUMMER_CONVERSATION_ID),
+    sessionId: z.string().regex(/^ses_/u),
+    startIndex: z.number().int().nonnegative().safe(),
+    model: z.literal(SUMMER_CONVERSATION_MODEL),
+    dailySlot: z.number().int().min(1).max(SUMMER_SHADOW_MAX_TURNS_PER_UTC_DAY),
+    utcDay: z.string().regex(/^\d{4}-\d{2}-\d{2}$/u),
+  })
+  .strict();
+const terminalResultSchema = acceptedRecordSchema
+  .extend({
+    turnId: z.string().min(1),
+    responseText: z.string().max(64 * 1024),
+    status: z.enum(['completed', 'failed']),
+    nextStartIndex: z.number().int().nonnegative().safe(),
+  })
+  .strict();
+const rejectedRecordSchema = z.discriminatedUnion('code', [
+  z.object({ code: z.literal('conversation_busy') }).strict(),
+  z
+    .object({
+      code: z.literal('daily_turn_budget_exhausted'),
+      limit: z.literal(SUMMER_SHADOW_MAX_TURNS_PER_UTC_DAY),
+      resetAt: z.string().datetime(),
+    })
+    .strict(),
+]);
 export type ConversationStore = {
   read(path: string): Promise<ShadowRecord | null>;
   persist(path: string, record: ShadowRecord): Promise<'created' | 'exists'>;
@@ -72,11 +103,11 @@ export function createConversationIngress(
       return json({ ok: false, code: 'shadow_disabled' }, 503);
     let input: ConversationInput;
     try {
-      const text = await request.text();
-      if (Buffer.byteLength(text) > 32 * 1024)
-        return json({ ok: false, code: 'history_or_message_too_large' }, 413);
+      const text = await readBoundedShadowBody(request);
       input = conversationInputSchema.parse(JSON.parse(text));
-    } catch {
+    } catch (error) {
+      if (error instanceof ShadowBodyTooLargeError)
+        return json({ ok: false, code: 'history_or_message_too_large' }, 413);
       return json({ ok: false, code: 'invalid_conversation' }, 422);
     }
     if (input.previousEventId && input.history.length)
@@ -93,11 +124,28 @@ export function createConversationIngress(
         const accepted = await deps.read(
           conversationPath('accepted', input.eventId)
         );
-        if (accepted) return json({ ok: true, accepted, replay: true }, 200);
+        const parsedAccepted = acceptedRecordSchema.safeParse(accepted);
+        if (
+          parsedAccepted.success &&
+          parsedAccepted.data.eventId === input.eventId
+        )
+          return json(
+            { ok: true, accepted: parsedAccepted.data, replay: true },
+            200
+          );
+        if (accepted)
+          return json({ ok: false, code: 'accepted_turn_unavailable' }, 503);
         const rejected = await deps.read(
           conversationPath('rejected', input.eventId)
         );
-        if (rejected) return json({ ok: false, ...rejected }, 429);
+        const parsedRejected = rejectedRecordSchema.safeParse(rejected);
+        if (parsedRejected.success)
+          return json(
+            { ok: false, ...parsedRejected.data },
+            parsedRejected.data.code === 'conversation_busy' ? 409 : 429
+          );
+        if (rejected)
+          return json({ ok: false, code: 'rejection_unavailable' }, 503);
         return json(
           { ok: false, code: 'dispatch_unknown', eventId: input.eventId },
           503
@@ -162,8 +210,22 @@ export function createConversationIngress(
           conversationPath('successors', input.previousEventId ?? 'root'),
           { eventId: input.eventId }
         )) !== 'created'
-      )
+      ) {
+        const rejected = { code: 'conversation_busy' } as const;
+        if (
+          (await deps.persist(
+            conversationPath('rejected', input.eventId),
+            rejected
+          )) !== 'created'
+        ) {
+          const persisted = await deps.read(
+            conversationPath('rejected', input.eventId)
+          );
+          if (!rejectedRecordSchema.safeParse(persisted).success)
+            return json({ ok: false, code: 'rejection_unavailable' }, 503);
+        }
         return json({ ok: false, code: 'conversation_busy' }, 409);
+      }
       const sessionId = await deps.dispatch(
         input,
         renderConversation(input),
@@ -186,8 +248,19 @@ export function createConversationIngress(
           conversationPath('accepted', input.eventId),
           accepted
         )) !== 'created'
-      )
-        return json({ ok: false, code: 'acceptance_persistence_unknown' }, 503);
+      ) {
+        const persisted = acceptedRecordSchema.safeParse(
+          await deps.read(conversationPath('accepted', input.eventId))
+        );
+        if (
+          !persisted.success ||
+          JSON.stringify(persisted.data) !== JSON.stringify(accepted)
+        )
+          return json(
+            { ok: false, code: 'acceptance_persistence_unknown' },
+            503
+          );
+      }
       return json({ ok: true, accepted }, 202);
     } catch {
       return json(
@@ -212,25 +285,27 @@ export async function readConversationResult(input: {
     return json({ ok: false, code: 'invalid_event_id' }, 422);
   const resultPath = conversationPath('results', input.eventId);
   const existing = await input.store.read(resultPath);
-  if (existing) return json({ ok: true, result: existing });
+  if (existing) {
+    const parsed = terminalResultSchema.safeParse(existing);
+    return parsed.success && parsed.data.eventId === input.eventId
+      ? json({ ok: true, result: parsed.data })
+      : json({ ok: false, code: 'terminal_unavailable' }, 503);
+  }
   const accepted = await input.store.read(
     conversationPath('accepted', input.eventId)
   );
-  if (
-    !accepted ||
-    typeof accepted.sessionId !== 'string' ||
-    !Number.isSafeInteger(accepted.startIndex) ||
-    accepted.model !== SUMMER_CONVERSATION_MODEL
-  )
+  const parsedAccepted = acceptedRecordSchema.safeParse(accepted);
+  if (!parsedAccepted.success || parsedAccepted.data.eventId !== input.eventId)
     return json({ ok: false, code: 'accepted_turn_unavailable' }, 503);
+  const acceptedTurn = parsedAccepted.data;
   const reader = (
-    await input.stream(accepted.sessionId, Number(accepted.startIndex))
+    await input.stream(acceptedTurn.sessionId, acceptedTurn.startIndex)
   ).getReader();
   const decoder = new TextDecoder();
   let buffer = '',
     turnId: string | null = null,
     responseText = '';
-  let nextStartIndex = Number(accepted.startIndex),
+  let nextStartIndex = acceptedTurn.startIndex,
     bytes = 0;
   const signal = input.signal ?? AbortSignal.timeout(40_000);
   const abort = () => {
@@ -287,7 +362,7 @@ export async function readConversationResult(input: {
               ? 'completed'
               : 'failed';
           const result = {
-            ...accepted,
+            ...acceptedTurn,
             turnId,
             responseText: status === 'completed' ? responseText : '',
             status,

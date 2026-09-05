@@ -2487,6 +2487,7 @@ export async function POST(req: Request) {
     );
   }
   const userText = extractLastUserText(uiMessages);
+  const clientTurnId = normalizeClientId(body.clientTurnId);
   // JOV-5215/5216/5214: bind Eve pack + persist/ack dump to Summer Kanban
   // before any model. OV door must not fall through to artist Jovie chat.
   const ovieStore = getOvieOperatingStore();
@@ -2501,7 +2502,6 @@ export async function POST(req: Request) {
     store: ovieStore,
   });
   assertOvieDoorDoesNotUseArtistJovieGeneration(chatMode, generation.kind);
-  const clientTurnId = normalizeClientId(body.clientTurnId);
   const clientMessageId = normalizeClientId(body.clientMessageId);
   const source = normalizeChatTurnSource(body.source);
   const toolIntent = normalizeToolIntent(body.toolIntent);
@@ -2770,6 +2770,12 @@ export async function POST(req: Request) {
       generation.state === 'fresh' &&
       isSummerTransportEnabled() &&
       speaker !== null;
+    if (summerLive && !clientTurnId) {
+      return NextResponse.json(
+        { error: 'clientTurnId is required for live OV chat', requestId },
+        { status: 400, headers: { ...corsHeaders, 'x-request-id': requestId } }
+      );
+    }
     if (summerLive && speaker && summerSession) {
       const firstReceipt = ovieIngestReceipts[0];
       return createSummerAssistantStreamResponse({

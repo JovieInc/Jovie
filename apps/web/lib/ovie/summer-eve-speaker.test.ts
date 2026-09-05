@@ -94,6 +94,39 @@ describe('Ovie speaks through durable Eve Summer', () => {
       JSON.parse(String(fetchShadow.mock.calls[0]?.[1]?.body))
     ).toMatchObject({ previousEventId: 'previous', history: [] });
   });
+  it('bounds the one-time legacy history import to Eve ingress limits', async () => {
+    await collect({
+      ...input,
+      history: Array.from({ length: 220 }, (_, index) => ({
+        role: index % 2 === 0 ? ('user' as const) : ('assistant' as const),
+        text: `legacy-${index}-${'x'.repeat(500)}`,
+      })),
+    });
+    const posted = JSON.parse(String(fetchShadow.mock.calls[0]?.[1]?.body)) as {
+      history: { text: string }[];
+    };
+    expect(posted.history.length).toBeLessThanOrEqual(200);
+    expect(
+      new TextEncoder().encode(JSON.stringify(posted.history)).byteLength
+    ).toBeLessThanOrEqual(20 * 1024);
+    expect(posted.history.at(-1)?.text).toContain('legacy-219-');
+  });
+  it('fails closed while reading an oversized chunked Eve response', async () => {
+    fetchShadow.mockReset().mockResolvedValue(
+      new Response(
+        new ReadableStream<Uint8Array>({
+          start(controller) {
+            controller.enqueue(
+              new TextEncoder().encode('x'.repeat(129 * 1024))
+            );
+            controller.close();
+          },
+        })
+      )
+    );
+    expect(await collect()).toEqual([{ type: 'error', state: 'unknown' }]);
+    expect(fetchShadow).toHaveBeenCalledOnce();
+  });
   it('fails closed on wrong event, session, model, or malformed terminal response', async () => {
     for (const bad of [
       { ...result, eventId: 'wrong' },

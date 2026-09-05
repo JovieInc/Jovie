@@ -117,6 +117,9 @@ describe('authenticated persistent Summer conversation', () => {
     const responses = await Promise.all([f.send(input(1)), f.send(input(2))]);
     expect(responses.map(r => r.status).sort()).toEqual([202, 409]);
     expect(f.dispatch).toHaveBeenCalledOnce();
+    const busyIndex = responses.findIndex(response => response.status === 409);
+    expect((await f.send(input(busyIndex + 1))).status).toBe(409);
+    expect(f.dispatch).toHaveBeenCalledOnce();
   });
   it('shares the commercial UTC budget and exposes its reset without dispatch', async () => {
     const f = fixture();
@@ -316,6 +319,37 @@ describe('Eve terminal stream receipts', () => {
         stream: async () => stream(events(input())),
       })
     ).rejects.toThrow('storage');
+  });
+  it('fails closed on corrupt immutable acceptance or terminal records', async () => {
+    const f = fixture();
+    await f.send(input());
+    f.records.set(conversationPath('accepted', id(1)), {
+      eventId: id(2),
+      sessionId: 'ses_wrong',
+    });
+    expect(
+      (
+        await readConversationResult({
+          store: f.store,
+          eventId: id(1),
+          stream: async () => stream(events(input())),
+        })
+      ).status
+    ).toBe(503);
+    f.records.set(conversationPath('results', id(1)), {
+      eventId: id(2),
+      status: 'completed',
+      responseText: 'wrong turn',
+    });
+    expect(
+      (
+        await readConversationResult({
+          store: f.store,
+          eventId: id(1),
+          stream: async () => stream(events(input())),
+        })
+      ).status
+    ).toBe(503);
   });
   it('rejects malformed, oversized, and mismatched-turn streams', async () => {
     const f = fixture();
