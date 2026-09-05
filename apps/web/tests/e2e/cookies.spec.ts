@@ -72,84 +72,6 @@ async function openHomepageWithBanner(
   await waitForHydration(page);
 }
 
-async function mountBannerFixtureWhenGlobalChromeIsSuppressed(
-  page: import('@playwright/test').Page
-): Promise<void> {
-  await page.evaluate(() => {
-    if (document.querySelector('[data-testid="cookie-banner"]')) return;
-
-    const banner = document.createElement('aside');
-    banner.setAttribute('aria-label', 'Cookie Consent');
-    banner.dataset.testid = 'cookie-banner';
-    banner.className =
-      'cookie-banner-card fixed bottom-4 right-4 z-[60] w-[calc(100vw-2rem)] max-w-85 sm:max-w-95';
-
-    const surface = document.createElement('div');
-    surface.className =
-      'rounded-2xl border border-(--app-shell-frame-seam) bg-surface-1 px-4 py-3 shadow-card';
-    const content = document.createElement('div');
-    content.className = 'min-w-0';
-    const copy = document.createElement('p');
-    copy.className = 'text-xs leading-snug text-secondary-token';
-    copy.append(
-      'Essential cookies keep Jovie working. Choose whether to allow analytics and marketing cookies. '
-    );
-    const privacy = document.createElement('a');
-    privacy.href = '/legal/privacy';
-    privacy.className =
-      'underline hover:opacity-80 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-accent';
-    privacy.textContent = 'Privacy';
-    copy.append(privacy);
-
-    const actionsMargin = document.createElement('div');
-    actionsMargin.className = 'mt-3';
-    const actions = document.createElement('div');
-    actions.className =
-      'cookie-actions--compact flex shrink-0 flex-row flex-wrap items-center';
-    actions.dataset.testid = 'cookie-actions';
-    actions.style.gap = '4px';
-
-    for (const [label, testId, kind] of [
-      ['Reject all', 'cookie-action-reject-all', 'choice'],
-      ['Accept all', 'cookie-action-accept-all', 'choice'],
-      ['Customize', 'cookie-action-customize', 'customize'],
-    ] as const) {
-      const action = document.createElement('button');
-      action.type = 'button';
-      action.textContent = label;
-      action.dataset.testid = testId;
-      action.className = `min-w-0 flex-1 transition-opacity hover:opacity-80 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-accent sm:flex-none cookie-action--${kind}`;
-      Object.assign(action.style, {
-        backgroundColor:
-          kind === 'choice'
-            ? 'var(--linear-btn-primary-bg)'
-            : 'var(--linear-bg-button)',
-        color:
-          kind === 'choice'
-            ? 'var(--linear-btn-primary-fg)'
-            : 'var(--linear-text-primary)',
-        border:
-          kind === 'choice'
-            ? '1px solid var(--linear-btn-primary-bg)'
-            : '1px solid var(--linear-border-default)',
-        borderRadius: 'var(--radius-sm)',
-        fontSize: '12px',
-        fontWeight: 'var(--linear-font-weight-medium)',
-        padding: kind === 'choice' ? '6px 8px' : '6px',
-        whiteSpace: 'nowrap',
-        height: '44px',
-      });
-      actions.append(action);
-    }
-
-    actionsMargin.append(actions);
-    content.append(copy, actionsMargin);
-    surface.append(content);
-    banner.append(surface);
-    document.body.append(banner);
-  });
-}
-
 test.describe('Cookie banner @smoke', () => {
   test('cookie banner appears for new visitors', async ({ page }) => {
     test.setTimeout(90_000);
@@ -211,10 +133,6 @@ test.describe('Cookie banner @smoke', () => {
       document.cookie = 'jv_cc_required=1; path=/; SameSite=Lax';
     });
     await openHomepageWithBanner(page);
-    // Standard managed E2E servers set NEXT_DISABLE_TOOLBAR=1, which suppresses
-    // all global chrome including CookieBannerMount. In that mode, render the
-    // exact banner DOM/classes so this remains a CSS geometry contract.
-    await mountBannerFixtureWhenGlobalChromeIsSuppressed(page);
 
     for (const viewport of [
       { width: 320, height: 568 },
