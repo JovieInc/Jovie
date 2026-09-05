@@ -90,6 +90,31 @@ BOUNDED_REPAIR_MAX_SECONDS = 900
 BOUNDED_REPAIR_ADMISSION_FIELDS = frozenset(
     {"remediationAdmission", "workAdmission"}
 )
+BOUNDED_REPAIR_ENVIRONMENT_NAMES = frozenset(
+    {
+        "CODEX_HOME",
+        "DBUS_SESSION_BUS_ADDRESS",
+        "HOME",
+        "LANG",
+        "LC_ALL",
+        "LC_CTYPE",
+        "LINEAR_API_KEY",
+        "LOGNAME",
+        "PATH",
+        "SHELL",
+        "SSL_CERT_DIR",
+        "SSL_CERT_FILE",
+        "SYMPHONY_INSTALL_DIR",
+        "TERM",
+        "TMPDIR",
+        "USER",
+        "XDG_CACHE_HOME",
+        "XDG_CONFIG_HOME",
+        "XDG_DATA_HOME",
+        "XDG_RUNTIME_DIR",
+        "XDG_STATE_HOME",
+    }
+)
 RUNTIME_OUTPUT_QUEUE_MAX_LINES = 256
 DEFAULT_SHUTDOWN_GRACE_SECONDS = 10.0
 MAX_SHUTDOWN_GRACE_SECONDS = 12.0
@@ -236,21 +261,19 @@ def _front_matter(text: str) -> str:
     return parts[0][4:]
 
 
-def _section(lines: list[str], name: str) -> list[str]:
+def _section(lines: list[str], name: str, *, indent: int = 0) -> list[str]:
+    pattern = re.compile(rf"^{' ' * indent}{re.escape(name)}:\s*$")
+    starts = [index for index, line in enumerate(lines) if pattern.match(line)]
+    if not starts:
+        raise ValueError(f"missing section {name}")
+    if len(starts) != 1:
+        raise ValueError(f"duplicate section {name}")
     out: list[str] = []
-    inside = False
-    section_indent = -1
-    for line in lines:
-        match = re.match(rf"^(\s*){re.escape(name)}:\s*$", line)
-        if match:
-            inside = True
-            section_indent = len(match.group(1))
-            continue
-        if inside:
-            indent = len(line) - len(line.lstrip())
-            if line.strip() and indent <= section_indent:
-                break
-            out.append(line)
+    for line in lines[starts[0] + 1 :]:
+        line_indent = len(line) - len(line.lstrip())
+        if line.strip() and line_indent <= indent:
+            break
+        out.append(line)
     return out
 
 
@@ -261,44 +284,51 @@ def _literal_hook(front: str, name: str) -> tuple[str, ...] | None:
     return tuple(line[4:] for line in match.group(1).splitlines())
 
 
-def _scalar(body: list[str], key: str) -> str:
+def _scalar(body: list[str], key: str, *, indent: int = 2) -> str:
+    values: list[str] = []
     for line in body:
-        match = re.match(rf"^\s+{re.escape(key)}:\s*(.+?)\s*$", line)
+        match = re.match(rf"^{' ' * indent}{re.escape(key)}:\s*(.+?)\s*$", line)
         if match:
-            return match.group(1).strip().strip('"').strip("'")
-    raise ValueError(f"missing scalar {key}")
+            values.append(match.group(1).strip().strip('"').strip("'"))
+    if not values:
+        raise ValueError(f"missing scalar {key}")
+    if len(values) != 1:
+        raise ValueError(f"duplicate scalar {key}")
+    return values[0]
 
 
-def _list_items(body: list[str], key: str) -> tuple[str, ...]:
+def _list_items(body: list[str], key: str, *, indent: int = 2) -> tuple[str, ...]:
     items: list[str] = []
     inside = False
-    key_indent: int | None = None
+    matches = 0
     for line in body:
-        match = re.match(rf"^(\s+){re.escape(key)}:\s*$", line)
+        match = re.match(rf"^{' ' * indent}{re.escape(key)}:\s*$", line)
         if match:
+            matches += 1
+            if matches > 1:
+                raise ValueError(f"duplicate list {key}")
             inside = True
-            key_indent = len(match.group(1))
             continue
         if inside:
-            item = re.match(r"^(\s+)-\s*(.+?)\s*$", line)
-            if item and (key_indent is None or len(item.group(1)) > key_indent):
-                items.append(item.group(2).strip().strip('"').strip("'"))
+            item = re.match(rf"^{' ' * (indent + 2)}-\s*(.+?)\s*$", line)
+            if item:
+                items.append(item.group(1).strip().strip('"').strip("'"))
                 continue
-            if line.strip() and (key_indent is None or len(line) - len(line.lstrip()) <= key_indent):
+            if line.strip() and len(line) - len(line.lstrip()) <= indent:
                 break
     return tuple(items)
 
 
-def _int_scalar(body: list[str], key: str) -> int:
-    raw = _scalar(body, key)
+def _int_scalar(body: list[str], key: str, *, indent: int = 2) -> int:
+    raw = _scalar(body, key, indent=indent)
     try:
         return int(raw)
     except ValueError as exc:
         raise ValueError(f"{key} must be an integer") from exc
 
 
-def _bool_scalar(body: list[str], key: str) -> bool:
-    raw = _scalar(body, key)
+def _bool_scalar(body: list[str], key: str, *, indent: int = 2) -> bool:
+    raw = _scalar(body, key, indent=indent)
     if raw == "true":
         return True
     if raw == "false":
@@ -355,25 +385,36 @@ def parse_workflow(path: pathlib.Path) -> WorkflowContract:
     workspace = _section(lines, "workspace")
     agent = _section(lines, "agent")
     codex = _section(lines, "codex")
-    turn_sandbox = _section(codex, "turn_sandbox_policy")
+    provider = _section(tracker, "provider", indent=2)
+    turn_sandbox = _section(codex, "turn_sandbox_policy", indent=2)
     server = _section(lines, "server")
-    team_match = re.search(r'^\s+team_key:\s*"?([^"\n]+?)"?\s*$', front, re.M)
-    project_match = re.search(r'^\s+project_slug:\s*"?([^"\n]+?)"?\s*$', front, re.M)
-    api_key_match = re.search(r"^\s+api_key:\s*(.+?)\s*$", front, re.M)
-    if not team_match:
-        raise ValueError("missing tracker.provider.team_key")
-    team_key = team_match.group(1).strip()
+    try:
+        team_key = _scalar(provider, "team_key", indent=4)
+    except ValueError as exc:
+        if str(exc) == "missing scalar team_key":
+            raise ValueError("missing tracker.provider.team_key") from exc
+        raise
     if not TEAM_KEY_PATTERN.fullmatch(team_key):
         raise ValueError(f"malformed tracker.provider.team_key:{team_key}")
-    if not api_key_match:
-        raise ValueError("missing tracker.provider.api_key")
+    try:
+        api_key = _scalar(provider, "api_key", indent=4)
+    except ValueError as exc:
+        if str(exc) == "missing scalar api_key":
+            raise ValueError("missing tracker.provider.api_key") from exc
+        raise
+    try:
+        project_slug = _scalar(provider, "project_slug", indent=4)
+    except ValueError as exc:
+        if str(exc) != "missing scalar project_slug":
+            raise
+        project_slug = None
     after_create = ""
     if "after_create:" in front:
         after_create = front.split("after_create:", 1)[1].split("\nagent:", 1)[0]
     return WorkflowContract(
         team_key=team_key,
-        api_key=api_key_match.group(1).strip(),
-        project_slug=project_match.group(1).strip() if project_match else None,
+        api_key=api_key,
+        project_slug=project_slug,
         required_labels=_list_items(tracker, "required_labels"),
         excluded_labels=_list_items(tracker, "excluded_labels"),
         active_states=_list_items(tracker, "active_states"),
@@ -384,8 +425,8 @@ def parse_workflow(path: pathlib.Path) -> WorkflowContract:
         max_turns=_int_scalar(agent, "max_turns"),
         codex_command=_scalar(codex, "command"),
         thread_sandbox=_scalar(codex, "thread_sandbox"),
-        turn_sandbox_type=_scalar(turn_sandbox, "type"),
-        network_access=_bool_scalar(turn_sandbox, "networkAccess"),
+        turn_sandbox_type=_scalar(turn_sandbox, "type", indent=4),
+        network_access=_bool_scalar(turn_sandbox, "networkAccess", indent=4),
         server_port=_int_scalar(server, "port"),
         after_create=after_create,
     )
@@ -1172,7 +1213,9 @@ def validate_bounded_repair_admission(
     if pathlib.Path(workflow.workspace_root) != workspace_root:
         raise ValueError("recovery-workflow-workspace-root-mismatch")
     expected_agent_command = (
-        f"{runtime_path} recovery-agent --manifest {manifest_path} -- "
+        f"{runtime_path} recovery-agent --manifest {manifest_path} "
+        f"--issue-identifier {issue} --issue-id {issue_id} "
+        f"--workspace {workspace_root / issue} -- "
         f"{router_path} app-server"
     )
     if workflow.codex_command != expected_agent_command:
@@ -1243,8 +1286,24 @@ def claim_bounded_repair(admission: BoundedRepairAdmission) -> None:
         raise
 
 
+def _bounded_repair_environment(*, include_linear: bool) -> dict[str, str]:
+    allowed = {
+        name: value
+        for name, value in os.environ.items()
+        if name in BOUNDED_REPAIR_ENVIRONMENT_NAMES or name.startswith("LC_")
+    }
+    if not include_linear:
+        allowed.pop("LINEAR_API_KEY", None)
+    return allowed
+
+
 def run_bounded_repair_agent(
-    manifest_path: pathlib.Path, command: list[str]
+    manifest_path: pathlib.Path,
+    command: list[str],
+    *,
+    issue_identifier: str,
+    issue_id: str,
+    workspace: pathlib.Path,
 ) -> int:
     """Claim and exec the sole issue agent from its exact Symphony workspace."""
     try:
@@ -1266,6 +1325,12 @@ def run_bounded_repair_agent(
         expected_workspace = (
             admission.workspace_root / admission.issue_identifier
         ).resolve()
+        if issue_identifier != admission.issue_identifier:
+            raise ValueError("recovery-agent-issue-identifier-mismatch")
+        if issue_id != admission.issue_id:
+            raise ValueError("recovery-agent-issue-id-mismatch")
+        if workspace.resolve() != expected_workspace:
+            raise ValueError("recovery-agent-workspace-argument-mismatch")
         if pathlib.Path.cwd().resolve() != expected_workspace:
             raise ValueError("recovery-agent-workspace-mismatch")
         expected_command = [str(admission.router_path), "app-server"]
@@ -1281,16 +1346,7 @@ def run_bounded_repair_agent(
             flush=True,
         )
         return CLOSURE_HOLD_EXIT_CODE
-    sanitized = dict(os.environ)
-    for name in (
-        "GITHUB_TOKEN",
-        "GH_TOKEN",
-        "LINEAR_API_KEY",
-        "OPENAI_API_KEY",
-        "ANTHROPIC_API_KEY",
-        "XAI_API_KEY",
-    ):
-        sanitized.pop(name, None)
+    sanitized = _bounded_repair_environment(include_linear=False)
     sanitized["SYMPHONY_RECOVERY_ISSUE_IDENTIFIER"] = admission.issue_identifier
     sanitized["SYMPHONY_RECOVERY_ISSUE_ID"] = admission.issue_id
     os.execve(command[0], command, sanitized)
@@ -1771,6 +1827,11 @@ def run_official_binary_once(
         *command,
     ]
     try:
+        child_environment = (
+            _bounded_repair_environment(include_linear=True)
+            if closure.recovery_manifest_path is not None
+            else None
+        )
         process = subprocess.Popen(
             launcher,
             stdout=subprocess.PIPE,
@@ -1780,6 +1841,7 @@ def run_official_binary_once(
             bufsize=1,
             start_new_session=True,
             pass_fds=(launch_read,),
+            env=child_environment,
         )
     except BaseException:
         os.close(launch_read)
@@ -2418,6 +2480,9 @@ def main(argv: list[str] | None = None) -> int:
 
     recovery_agent_parser = sub.add_parser("recovery-agent")
     recovery_agent_parser.add_argument("--manifest", type=pathlib.Path, required=True)
+    recovery_agent_parser.add_argument("--issue-identifier", required=True)
+    recovery_agent_parser.add_argument("--issue-id", required=True)
+    recovery_agent_parser.add_argument("--workspace", type=pathlib.Path, required=True)
     recovery_agent_parser.add_argument("agent_command", nargs=argparse.REMAINDER)
 
     args = parser.parse_args(argv)
@@ -2507,7 +2572,13 @@ def main(argv: list[str] | None = None) -> int:
         command = args.agent_command
         if command and command[0] == "--":
             command = command[1:]
-        return run_bounded_repair_agent(args.manifest, command)
+        return run_bounded_repair_agent(
+            args.manifest,
+            command,
+            issue_identifier=args.issue_identifier,
+            issue_id=args.issue_id,
+            workspace=args.workspace,
+        )
 
     raise AssertionError(f"unhandled command {args.command}")
 

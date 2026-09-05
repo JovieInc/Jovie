@@ -131,6 +131,8 @@ def _bounded_repair_fixture(tmp, helper, *, lifetime_seconds=600):
         "test -z \"${GITHUB_TOKEN+x}\"\n"
         "test -z \"${GH_TOKEN+x}\"\n"
         "test -z \"${LINEAR_API_KEY+x}\"\n"
+        "test -z \"${AWS_SECRET_ACCESS_KEY+x}\"\n"
+        "test -z \"${UNRELATED_RECOVERY_SECRET+x}\"\n"
         "test \"$SYMPHONY_RECOVERY_ISSUE_IDENTIFIER\" = JOV-9999\n"
         "test \"$SYMPHONY_RECOVERY_ISSUE_ID\" = 12345678-1234-1234-1234-123456789abc\n"
         "echo bounded-repair-ran\n",
@@ -140,15 +142,25 @@ def _bounded_repair_fixture(tmp, helper, *, lifetime_seconds=600):
     workflow.write_text(
         workflow.read_text(encoding="utf-8").replace(
             "./scripts/symphony/symphony-codex-router app-server",
-            f"{HELPER_PATH} recovery-agent --manifest {manifest_path} -- {router} app-server",
+            f"{HELPER_PATH} recovery-agent --manifest {manifest_path} "
+            "--issue-identifier JOV-9999 "
+            "--issue-id 12345678-1234-1234-1234-123456789abc "
+            f"--workspace {issue_workspace} -- {router} app-server",
         ),
         encoding="utf-8",
     )
     binary = root / "binary"
     binary.write_text(
         "#!/bin/sh\n"
+        "test -z \"${GITHUB_TOKEN+x}\"\n"
+        "test -z \"${GH_TOKEN+x}\"\n"
+        "test -z \"${AWS_SECRET_ACCESS_KEY+x}\"\n"
+        "test -z \"${UNRELATED_RECOVERY_SECRET+x}\"\n"
         f"cd {issue_workspace}\n"
-        f"exec {HELPER_PATH} recovery-agent --manifest {manifest_path} -- {router} app-server\n",
+        f"exec {HELPER_PATH} recovery-agent --manifest {manifest_path} "
+        "--issue-identifier JOV-9999 "
+        "--issue-id 12345678-1234-1234-1234-123456789abc "
+        f"--workspace {issue_workspace} -- {router} app-server\n",
         encoding="utf-8",
     )
     binary.chmod(0o700)
@@ -1468,6 +1480,8 @@ while True: time.sleep(1)
                 "GITHUB_TOKEN": "must-not-reach-agent",
                 "GH_TOKEN": "must-not-reach-agent",
                 "LINEAR_API_KEY": "must-not-reach-agent",
+                "AWS_SECRET_ACCESS_KEY": "must-not-reach-agent",
+                "UNRELATED_RECOVERY_SECRET": "must-not-reach-agent",
             },
         ):
             gate, _fleet, manifest_path, _manifest, command = _bounded_repair_fixture(
@@ -1536,6 +1550,12 @@ while True: time.sleep(1)
                 "recovery-agent",
                 "--manifest",
                 str(manifest_path),
+                "--issue-identifier",
+                "JOV-9999",
+                "--issue-id",
+                "12345678-1234-1234-1234-123456789abc",
+                "--workspace",
+                str(pathlib.Path(manifest["workspaceRoot"]) / "JOV-9999"),
                 "--",
                 str(router),
                 "app-server",
@@ -1565,6 +1585,53 @@ while True: time.sleep(1)
                     for stdout, _stderr in results),
                 1,
             )
+
+    def test_bounded_repair_agent_binds_issue_uuid_identifier_and_workspace(self):
+        helper = _load_helper()
+        variants = {
+            "different-issue": ("JOV-9998", "12345678-1234-1234-1234-123456789abc", None, "recovery-agent-issue-identifier-mismatch"),
+            "different-uuid": ("JOV-9999", "aaaaaaaa-1234-1234-1234-123456789abc", None, "recovery-agent-issue-id-mismatch"),
+            "different-workspace-argument": ("JOV-9999", "12345678-1234-1234-1234-123456789abc", "JOV-9998", "recovery-agent-workspace-argument-mismatch"),
+            "different-cwd": ("JOV-9999", "12345678-1234-1234-1234-123456789abc", None, "recovery-agent-workspace-mismatch"),
+        }
+        for name, (identifier, issue_id, workspace_name, reason) in variants.items():
+            with self.subTest(name=name), tempfile.TemporaryDirectory() as tmp, mock.patch.dict(
+                os.environ, {"CODEX_HOME": "/tmp/codex-fourth"}
+            ):
+                _gate, _fleet, manifest_path, manifest, _command = (
+                    _bounded_repair_fixture(tmp, helper)
+                )
+                root = pathlib.Path(manifest["workspaceRoot"])
+                expected_workspace = root / "JOV-9999"
+                supplied_workspace = root / (workspace_name or "JOV-9999")
+                supplied_workspace.mkdir(exist_ok=True)
+                cwd = root / "JOV-9998" if name == "different-cwd" else expected_workspace
+                cwd.mkdir(exist_ok=True)
+                router = pathlib.Path(manifest["artifacts"]["router"]["path"])
+                result = subprocess.run(
+                    [
+                        sys.executable,
+                        str(HELPER_PATH),
+                        "recovery-agent",
+                        "--manifest",
+                        str(manifest_path),
+                        "--issue-identifier",
+                        identifier,
+                        "--issue-id",
+                        issue_id,
+                        "--workspace",
+                        str(supplied_workspace),
+                        "--",
+                        str(router),
+                        "app-server",
+                    ],
+                    cwd=cwd,
+                    capture_output=True,
+                    text=True,
+                )
+                self.assertEqual(result.returncode, helper.CLOSURE_HOLD_EXIT_CODE)
+                self.assertIn(reason, result.stdout)
+                self.assertFalse(pathlib.Path(manifest["claimPath"]).exists())
 
     def test_bounded_repair_refusal_matrix_fails_closed(self):
         helper = _load_helper()
@@ -1630,6 +1697,11 @@ while True: time.sleep(1)
                 "max_turns: 99\nreview_metadata:\n  max_turns: 1",
                 "max-turns-not-one",
             ),
+            "duplicate-max-turns": (
+                "max_turns: 1",
+                "max_turns: 1\n  max_turns: 1",
+                "duplicate scalar max_turns",
+            ),
             "network": (
                 "networkAccess: false",
                 "networkAccess: true\nreview_metadata:\n  networkAccess: false",
@@ -1664,6 +1736,36 @@ while True: time.sleep(1)
                         fleet_path=gate,
                         fleet_payload=fleet,
                     )
+
+    def test_bounded_repair_workflow_root_must_match_manifest_and_launch_binding(self):
+        helper = _load_helper()
+        with tempfile.TemporaryDirectory() as tmp, mock.patch.dict(
+            os.environ, {"CODEX_HOME": "/tmp/codex-fourth"}
+        ):
+            gate, fleet, manifest_path, manifest, _command = _bounded_repair_fixture(
+                tmp, helper
+            )
+            workflow = pathlib.Path(manifest["artifacts"]["workflow"]["path"])
+            workflow.write_text(
+                workflow.read_text(encoding="utf-8").replace(
+                    f"root: {manifest['workspaceRoot']}",
+                    f"root: {pathlib.Path(tmp) / 'unrelated-workspaces'}",
+                ),
+                encoding="utf-8",
+            )
+            manifest["artifacts"]["workflow"]["sha256"] = hashlib.sha256(
+                workflow.read_bytes()
+            ).hexdigest()
+            manifest_path.write_text(json.dumps(manifest), encoding="utf-8")
+            manifest_path.chmod(0o600)
+            with self.assertRaisesRegex(
+                ValueError, "recovery-workflow-workspace-root-mismatch"
+            ):
+                helper.validate_bounded_repair_admission(
+                    manifest_path,
+                    fleet_path=gate,
+                    fleet_payload=fleet,
+                )
 
     @unittest.skipUnless(sys.platform.startswith("linux"), "Linux subreaper proof")
     def test_bounded_repair_expiry_terminates_root_and_detached_descendant(self):
