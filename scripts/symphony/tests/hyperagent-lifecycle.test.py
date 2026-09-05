@@ -42,6 +42,7 @@ class HyperagentLifecycleTests(unittest.TestCase):
             "request_sha256": "a" * 64,
             "useful_outcome": "one verified local artifact",
             "destination": "local-artifact",
+            "expected_destination": "local-artifact",
             "balance_usd": 20.0,
             "per_query_cap_usd": 1.0,
             "period_cap_usd": 10.0,
@@ -99,7 +100,8 @@ class HyperagentLifecycleTests(unittest.TestCase):
             "agent_name", "model_id", "runtime", "paying_org", "expected_paying_org",
             "credits_expire_at",
             "idempotency_key", "useful_outcome",
-            "destination", "balance_checked_at", "model_checked_at",
+            "destination", "expected_destination", "balance_checked_at",
+            "model_checked_at",
         ):
             changed = {**self.envelope, field: ""}
             self.assertEqual(lifecycle.validate_dispatch(changed, self.now)["decision"], "HOLD")
@@ -116,6 +118,7 @@ class HyperagentLifecycleTests(unittest.TestCase):
             ("authenticated", False, "authentication_unproven"),
             ("account_alias", "other", "account_mismatch"),
             ("paying_org", "other", "payer_mismatch"),
+            ("destination", "other", "destination_mismatch"),
             ("oauth_scopes", ["threads:read"], "thread_scopes_unproven"),
             ("invocation_surface", "web", "surface_mismatch"),
             ("agent_mode", "ask_first", "ask_first_mcp_incompatible"),
@@ -156,6 +159,26 @@ class HyperagentLifecycleTests(unittest.TestCase):
         ):
             decision = lifecycle.validate_dispatch({**self.envelope, field: value}, self.now)
             self.assertIn(code, [reason["code"] for reason in decision["reasons"]])
+
+    def test_nonfinite_balance_and_cost_receipts_fail_closed(self):
+        for value in (float("inf"), float("-inf"), float("nan")):
+            with self.subTest(balance=value):
+                result = lifecycle.validate_dispatch(
+                    {**self.envelope, "balance_usd": value}, self.now
+                )
+                self.assertIn("invalid_money", [item["code"] for item in result["reasons"]])
+
+            with self.subTest(cost=value):
+                observation = self.observation(
+                    is_running=False, terminal_state="completed",
+                    useful_outcome_verified=True, final_output_sha256="d" * 64,
+                    usage_receipt_sha256="e" * 64, cost_usd=value,
+                )
+                self.assertEqual(
+                    lifecycle.classify_observation(observation, self.now)["state"],
+                    "terminal_unverified",
+                )
+        self.assertEqual(lifecycle.validate_dispatch(self.envelope, self.now)["decision"], "PROCEED")
 
     def test_observation_age_and_transport_loss_reconcile_the_original(self):
         stale = self.observation(observed_at=(self.now - timedelta(minutes=6)).isoformat())

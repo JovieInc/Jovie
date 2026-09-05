@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import math
 import pathlib
 from datetime import datetime, timezone
 
@@ -48,7 +49,12 @@ def _parse_time(value):
 
 
 def _money(value):
-    return isinstance(value, (int, float)) and not isinstance(value, bool) and value >= 0
+    return (
+        isinstance(value, (int, float))
+        and not isinstance(value, bool)
+        and math.isfinite(value)
+        and value >= 0
+    )
 
 
 def _codes(reasons):
@@ -75,6 +81,7 @@ def validate_dispatch(envelope, now=None):
         "request_sha256",
         "useful_outcome",
         "destination",
+        "expected_destination",
         "balance_checked_at",
         "model_checked_at",
         "credits_expire_at",
@@ -92,6 +99,8 @@ def validate_dispatch(envelope, now=None):
         reasons.append(("account_mismatch", "account_alias"))
     if envelope.get("paying_org") != envelope.get("expected_paying_org"):
         reasons.append(("payer_mismatch", "paying_org"))
+    if envelope.get("destination") != envelope.get("expected_destination"):
+        reasons.append(("destination_mismatch", "destination"))
     scopes = envelope.get("oauth_scopes")
     if not isinstance(scopes, list) or not {"threads:read", "threads:write"}.issubset(
         set(scopes)
