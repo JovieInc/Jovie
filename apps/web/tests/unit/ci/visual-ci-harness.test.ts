@@ -226,26 +226,20 @@ describe('visual CI harness', () => {
     expect(helperEnd).toBeGreaterThan(helperStart);
 
     const helper = source.slice(helperStart, helperEnd);
-    const gotoStart = helper.indexOf('await page.goto(');
+    const gotoStart = helper.indexOf("await page.goto('/', {");
     const gotoEnd = helper.indexOf('\n  });', gotoStart);
 
     expect(gotoStart).toBeGreaterThanOrEqual(0);
     expect(gotoEnd).toBeGreaterThan(gotoStart);
 
     const gotoCall = helper.slice(gotoStart, gotoEnd);
-    expect(gotoCall).toContain(
-      "mode === 'signin' ? APP_ROUTES.HOME : APP_ROUTES.BRAND"
-    );
     expect(gotoCall).toContain("waitUntil: 'domcontentloaded'");
     expect(gotoCall).not.toContain("waitUntil: 'networkidle'");
     expect(source.match(/waitUntil: 'domcontentloaded'/g)).toHaveLength(3);
     expect(source).not.toContain("waitUntil: 'networkidle'");
-    expect(helper).toContain('await waitForHydration(page');
     expect(helper).toContain("await page.waitForLoadState('networkidle'");
     expect(helper).toContain('page.locator(`a[href="${APP_ROUTES.SIGNIN}"]`)');
-    expect(helper).toContain(
-      "getByRole('link', { name: /start free trial/i })"
-    );
+    expect(helper).not.toContain("getByRole('link', { name:");
   });
 
   it('gates Storybook screenshots on rendered stories, not network idle', () => {
