@@ -79,4 +79,4 @@ jobs:
           JOVIE_AGENT_VERCEL_TOKEN: ${{ secrets.JOVIE_AGENT_VERCEL_TOKEN }}
           JOVIE_AGENT_VERCEL_PROJECT_ID: ${{ vars.JOVIE_AGENT_VERCEL_PROJECT_ID }}
           JOVIE_AGENT_VERCEL_TEAM_ID: ${{ vars.JOVIE_AGENT_VERCEL_TEAM_ID }}
-        run: node scripts/jovie-release.mjs
+        run: pnpm run release

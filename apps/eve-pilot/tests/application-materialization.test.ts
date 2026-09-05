@@ -18,6 +18,12 @@ describe('independent application source export', () => {
       expect(receipt.sourceCommit).toMatch(/^[a-f0-9]{40}$/u);
       expect(existsSync(join(destination, 'pnpm-lock.yaml'))).toBe(true);
       expect(existsSync(join(destination, '.env'))).toBe(false);
+      expect(
+        JSON.parse(readFileSync(join(destination, 'package.json'), 'utf8'))
+          .scripts.release
+      ).toBe(
+        identity === 'jovie' ? 'node scripts/jovie-release.mjs' : undefined
+      );
       const other = identity === 'summer' ? 'jovie' : 'summer';
       expect(existsSync(join(destination, `identities/${other}`))).toBe(false);
       for (const [path, hash] of Object.entries(receipt.files)) {

@@ -89,6 +89,7 @@ export function materializeApp(identity, destination, source = pilot) {
   manifest.name =
     identity === 'summer' ? '@jovieinc/summer-runtime' : '@jovie/jovie-agent';
   manifest.private = true;
+  if (identity === 'jovie') manifest.scripts.release = 'node scripts/jovie-release.mjs';
   manifest.scripts['test:built'] =
     `node scripts/check-built-app.mjs ${identity}`;
   manifest.scripts['test:coverage'] =
