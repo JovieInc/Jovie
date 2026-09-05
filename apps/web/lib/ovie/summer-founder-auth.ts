@@ -14,7 +14,7 @@ export type FounderSummerAuthorization =
 export function authorizeFounderSummerUser(
   userId: string | null
 ): FounderSummerAuthorization {
-  const founderUserId = env.OVIE_SUMMER_FOUNDER_CLERK_USER_ID?.trim();
+  const founderUserId = env.OVIE_SUMMER_FOUNDER_APP_USER_ID?.trim();
   if (!founderUserId) return 'unconfigured';
   return userId === founderUserId ? 'authorized' : 'forbidden';
 }

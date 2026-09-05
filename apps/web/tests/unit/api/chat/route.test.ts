@@ -358,14 +358,20 @@ describe('POST /api/chat guard wiring', () => {
 
   beforeEach(() => {
     vi.clearAllMocks();
-    vi.stubEnv('OVIE_SUMMER_FOUNDER_CLERK_USER_ID', 'user_123');
+    vi.stubEnv(
+      'OVIE_SUMMER_FOUNDER_APP_USER_ID',
+      '00000000-0000-4000-8000-000000000123'
+    );
     vi.stubEnv(
       'SUMMER_BOTTLENECK_PRODUCER_SIGNING_PRIVATE_KEY',
       summerSigningPrivateKey
     );
     vi.stubEnv('SUMMER_BOTTLENECK_PRODUCER_SIGNING_KEY_ID', 'producer-test');
+    vi.stubEnv('OVIE_SUMMER_EVE_EXPECTED_DEPLOYMENT_ID', 'dpl_test');
     hoisted.tryHandleAnonymousOnboardingChatMock.mockResolvedValue(null);
-    hoisted.getOptionalAuthMock.mockResolvedValue({ userId: 'user_123' });
+    hoisted.getOptionalAuthMock.mockResolvedValue({
+      userId: '00000000-0000-4000-8000-000000000123',
+    });
     hoisted.resolveChatAccountContextMock.mockResolvedValue(
       makeAccountContext()
     );
@@ -448,7 +454,7 @@ describe('POST /api/chat guard wiring', () => {
     // Wiring: the limiter must be consulted with the canonical userId + plan
     // from the entitlement resolver, not values from the request body.
     expect(hoisted.checkAiChatRateLimitForPlanMock).toHaveBeenCalledWith(
-      'user_123',
+      '00000000-0000-4000-8000-000000000123',
       'pro'
     );
     expect(hoisted.executeChatTurnMock).not.toHaveBeenCalled();
@@ -477,7 +483,7 @@ describe('POST /api/chat guard wiring', () => {
     expect(body.message).not.toBe('Daily chat limit reached');
     expect(body.message).toMatch(/billing/i);
     expect(hoisted.checkAiChatRateLimitForPlanMock).toHaveBeenCalledWith(
-      'user_123',
+      '00000000-0000-4000-8000-000000000123',
       'free'
     );
   });
@@ -491,10 +497,13 @@ describe('POST /api/chat guard wiring', () => {
     const body = await response.json();
     expect(body.errorCode).toBe('CHAT_DISABLED');
 
-    expect(hoisted.checkGatesForUserMock).toHaveBeenCalledWith('user_123', [
-      { key: 'ai_chat_disabled', defaultValue: false },
-      { key: 'ai_chat_force_light', defaultValue: false },
-    ]);
+    expect(hoisted.checkGatesForUserMock).toHaveBeenCalledWith(
+      '00000000-0000-4000-8000-000000000123',
+      [
+        { key: 'ai_chat_disabled', defaultValue: false },
+        { key: 'ai_chat_force_light', defaultValue: false },
+      ]
+    );
     expect(hoisted.checkAiChatRateLimitForPlanMock).not.toHaveBeenCalled();
     expect(hoisted.executeChatTurnMock).not.toHaveBeenCalled();
   });
@@ -544,24 +553,35 @@ describe('POST /api/chat guard wiring', () => {
   it('streams bound current Summer on OV turns without artist Jovie generation', async () => {
     hoisted.isAdminMock.mockResolvedValue(true);
     hoisted.fetchSummerShadowMock
-      .mockResolvedValueOnce(Response.json({ ok: true }, { status: 202 }))
       .mockResolvedValueOnce(
-        Response.json({
-          ok: true,
-          result: {
-            eventId: ovieSummerTurnId({
-              conversationId: 'summer-session:current',
-              clientTurnId: 'ov-turn-1',
-            }),
-            conversationId: 'summer-session-current',
-            sessionId: 'ses_current',
-            turnId: 'turn_1',
-            responseText: 'Summer current session.',
-            status: 'completed',
-            nextStartIndex: 3,
-            model: 'zai/glm-5.3-flash',
+        Response.json(
+          { ok: true },
+          {
+            status: 202,
+            headers: { 'x-jovie-eve-deployment-id': 'dpl_test' },
+          }
+        )
+      )
+      .mockResolvedValueOnce(
+        Response.json(
+          {
+            ok: true,
+            result: {
+              eventId: ovieSummerTurnId({
+                conversationId: 'summer-session:current',
+                clientTurnId: 'ov-turn-1',
+              }),
+              conversationId: 'summer-session-current',
+              sessionId: 'ses_current',
+              turnId: 'turn_1',
+              responseText: 'Summer current session.',
+              status: 'completed',
+              nextStartIndex: 3,
+              model: 'zai/glm-5.3-flash',
+            },
           },
-        })
+          { headers: { 'x-jovie-eve-deployment-id': 'dpl_test' } }
+        )
       );
 
     const response = await POST(
@@ -623,7 +643,10 @@ describe('POST /api/chat guard wiring', () => {
 
   it('rejects a non-founder admin before the live Eve request', async () => {
     hoisted.isAdminMock.mockResolvedValue(true);
-    vi.stubEnv('OVIE_SUMMER_FOUNDER_CLERK_USER_ID', 'founder_user');
+    vi.stubEnv(
+      'OVIE_SUMMER_FOUNDER_APP_USER_ID',
+      '00000000-0000-4000-8000-000000000999'
+    );
 
     const response = await POST(
       chatRequest(
@@ -643,11 +666,12 @@ describe('POST /api/chat guard wiring', () => {
 
     expect(response.status).toBe(403);
     expect(hoisted.fetchSummerShadowMock).not.toHaveBeenCalled();
+    expect(hoisted.getOvieOperatingStoreMock).not.toHaveBeenCalled();
   });
 
   it('fails closed when the founder identity binding is unconfigured', async () => {
     hoisted.isAdminMock.mockResolvedValue(true);
-    vi.stubEnv('OVIE_SUMMER_FOUNDER_CLERK_USER_ID', '');
+    vi.stubEnv('OVIE_SUMMER_FOUNDER_APP_USER_ID', '');
 
     const response = await POST(
       chatRequest(

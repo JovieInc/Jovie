@@ -125,7 +125,10 @@ describe('authenticated persistent Summer conversation', () => {
   });
   it('admits once, returns durable acceptance on retry, rejects conflicting content', async () => {
     const f = fixture();
-    expect((await f.send(input())).status).toBe(202);
+    const admitted = await f.send(input());
+    expect(admitted.status).toBe(202);
+    expect(admitted.headers.get('x-jovie-eve-deployment-id')).toBe('local');
+    expect(admitted.headers.get('x-jovie-eve-commit-sha')).toBe('local');
     expect((await f.send(input())).status).toBe(200);
     expect((await f.send({ ...input(), message: 'Changed' })).status).toBe(409);
     expect(f.dispatch).toHaveBeenCalledOnce();
@@ -147,6 +150,16 @@ describe('authenticated persistent Summer conversation', () => {
     const responses = await Promise.all([f.send(input(1)), f.send(input(2))]);
     expect(responses.map(r => r.status).sort()).toEqual([202, 409]);
     expect(f.dispatch).toHaveBeenCalledOnce();
+    expect(
+      [...f.records.keys()].filter(path => path.includes('/budgets/daily/'))
+    ).toHaveLength(1);
+    const admittedEventIds = [...f.records.entries()]
+      .filter(([path]) => path.includes('/budgets/daily/'))
+      .map(([, record]) => record.eventId);
+    const winningIndex = responses.findIndex(
+      response => response.status === 202
+    );
+    expect(admittedEventIds).toEqual([id(winningIndex + 1)]);
     const busyIndex = responses.findIndex(response => response.status === 409);
     expect((await f.send(input(busyIndex + 1))).status).toBe(409);
     expect(f.dispatch).toHaveBeenCalledOnce();
@@ -166,6 +179,88 @@ describe('authenticated persistent Summer conversation', () => {
     });
     expect((await f.send(input())).status).toBe(429);
     expect(f.dispatch).not.toHaveBeenCalled();
+
+    const nextDay = createConversationIngress({
+      ...f.deps,
+      now: () => new Date('2026-09-06T03:00:00Z'),
+    });
+    expect((await f.send(input(), nextDay)).status).toBe(202);
+    expect(f.dispatch).toHaveBeenCalledOnce();
+  });
+
+  it('resumes the fenced winner after a crash before budget reservation', async () => {
+    const f = fixture();
+    const read = f.deps.read;
+    let interrupted = false;
+    f.deps.read = vi.fn(async path => {
+      if (!interrupted && path.includes('/budgets/daily/')) {
+        interrupted = true;
+        throw new Error('blob read interrupted');
+      }
+      return read(path);
+    });
+
+    expect((await f.send(input())).status).toBe(503);
+    expect(f.dispatch).not.toHaveBeenCalled();
+    expect((await f.send(input())).status).toBe(202);
+    expect(f.dispatch).toHaveBeenCalledOnce();
+  });
+  it('reuses its slot after a crash before admission persistence', async () => {
+    const f = fixture();
+    const persist = f.deps.persist;
+    let interrupted = false;
+    f.deps.persist = vi.fn(async (path, record) => {
+      if (!interrupted && path.includes('/admissions/')) {
+        interrupted = true;
+        throw new Error('admission write interrupted');
+      }
+      return persist(path, record);
+    });
+
+    expect((await f.send(input())).status).toBe(503);
+    expect(f.dispatch).not.toHaveBeenCalled();
+    expect((await f.send(input())).status).toBe(202);
+    expect(f.dispatch).toHaveBeenCalledOnce();
+    expect(
+      [...f.records.keys()].filter(path => path.includes('/budgets/daily/'))
+    ).toHaveLength(1);
+  });
+  it('allows only the immutable admission creator to dispatch', async () => {
+    const f = fixture();
+    const read = f.deps.read;
+    let interrupted = false;
+    f.deps.read = vi.fn(async path => {
+      if (!interrupted && path.includes('/budgets/daily/')) {
+        interrupted = true;
+        throw new Error('blob read interrupted');
+      }
+      return read(path);
+    });
+    expect((await f.send(input())).status).toBe(503);
+
+    const persist = f.deps.persist;
+    let firstAdmissionReady: (() => void) | undefined;
+    let admissionCalls = 0;
+    f.deps.persist = vi.fn(async (path, record) => {
+      if (path.includes('/admissions/')) {
+        admissionCalls++;
+        if (admissionCalls === 1)
+          await new Promise<void>(resolve => {
+            firstAdmissionReady = resolve;
+          });
+        else firstAdmissionReady?.();
+      }
+      return persist(path, record);
+    });
+
+    const responses = await Promise.all([f.send(input()), f.send(input())]);
+    expect(responses.map(response => response.status).sort()).toEqual([
+      202, 503,
+    ]);
+    expect(f.dispatch).toHaveBeenCalledOnce();
+    expect(
+      [...f.records.keys()].filter(path => path.includes('/budgets/daily/'))
+    ).toHaveLength(1);
   });
   it('continues the same session after five turns and across UTC days', async () => {
     const f = fixture();
@@ -351,6 +446,22 @@ describe('Eve terminal stream receipts', () => {
       sessionId: 'ses_summer',
     });
     expect(f.dispatch).toHaveBeenCalledOnce();
+  });
+  it('does not certify recovery until the exact event marker is visible', async () => {
+    const f = fixture();
+    await f.send(input());
+    f.records.delete(conversationPath('accepted', id(1)));
+
+    const response = await readConversationResult({
+      store: f.store,
+      eventId: id(1),
+      recoverSession: async () => 'ses_summer',
+      stream: async () => stream(events(input(9), 'Older answer', 'turn_old')),
+    });
+
+    expect(response.status).toBe(503);
+    expect(await response.json()).toMatchObject({ code: 'turn_pending' });
+    expect(f.records.has(conversationPath('accepted', id(1)))).toBe(false);
   });
   it('cannot return success before durable terminal storage', async () => {
     const f = fixture();

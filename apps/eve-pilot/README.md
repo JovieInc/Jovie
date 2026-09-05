@@ -47,6 +47,10 @@ Production OV chat uses the same OIDC-protected Summer shadow channel:
 - `GET /ovie/v1/summer-shadow/conversation/events/:eventId/result` returns only
   the terminal result bound to that admitted Eve turn and persists a replay-safe
   receipt for reconnects.
+- Both routes require the exact founder app-user binding plus a domain-separated
+  Ed25519 body attestation. Responses identify the immutable Vercel deployment
+  so Jovie can reject a mutable alias that no longer points at the approved
+  build.
 
 These routes document source behavior, not commissioning proof. Summer remains
 unavailable until the exact deployment and conversation receipts in

@@ -42,6 +42,17 @@ const signingPrivateKey = generateKeyPairSync('ed25519').privateKey.export({
   type: 'pkcs8',
   format: 'pem',
 });
+const eveResponse = (
+  body: unknown,
+  init?: Omit<ResponseInit, 'headers'> & { headers?: HeadersInit }
+) =>
+  Response.json(body, {
+    ...init,
+    headers: {
+      'x-jovie-eve-deployment-id': 'dpl_test',
+      ...init?.headers,
+    },
+  });
 async function collect(value = input) {
   const events = [];
   for await (const e of createEveSummerSpeaker(fetchShadow).speak(value))
@@ -54,12 +65,13 @@ beforeEach(() => {
     signingPrivateKey
   );
   vi.stubEnv('SUMMER_BOTTLENECK_PRODUCER_SIGNING_KEY_ID', 'producer-test');
+  vi.stubEnv('OVIE_SUMMER_EVE_EXPECTED_DEPLOYMENT_ID', 'dpl_test');
   fetchShadow.mockReset();
   fetchShadow
     .mockResolvedValueOnce(
-      Response.json({ ok: true, accepted: { eventId } }, { status: 202 })
+      eveResponse({ ok: true, accepted: { eventId } }, { status: 202 })
     )
-    .mockResolvedValueOnce(Response.json({ ok: true, result }));
+    .mockResolvedValueOnce(eveResponse({ ok: true, result }));
 });
 afterEach(() => vi.unstubAllEnvs());
 describe('Ovie speaks through durable Eve Summer', () => {
@@ -143,11 +155,25 @@ describe('Ovie speaks through durable Eve Summer', () => {
             );
             controller.close();
           },
-        })
+        }),
+        { headers: { 'x-jovie-eve-deployment-id': 'dpl_test' } }
       )
     );
     expect(await collect()).toEqual([{ type: 'error', state: 'unknown' }]);
     expect(fetchShadow).toHaveBeenCalledOnce();
+  });
+  it('rejects an unconfigured or mismatched Eve deployment identity', async () => {
+    vi.stubEnv('OVIE_SUMMER_EVE_EXPECTED_DEPLOYMENT_ID', 'dpl_expected');
+    expect(await collect()).toEqual([{ type: 'error', state: 'unknown' }]);
+    expect(fetchShadow).toHaveBeenCalledOnce();
+
+    fetchShadow.mockReset().mockResolvedValueOnce(
+      new Response('{}', {
+        headers: { 'x-jovie-eve-deployment-id': 'dpl_expected' },
+      })
+    );
+    vi.stubEnv('OVIE_SUMMER_EVE_EXPECTED_DEPLOYMENT_ID', '');
+    expect(await collect()).toEqual([{ type: 'error', state: 'unknown' }]);
   });
   it('fails closed on wrong event, session, model, or malformed terminal response', async () => {
     for (const bad of [
@@ -158,8 +184,8 @@ describe('Ovie speaks through durable Eve Summer', () => {
     ]) {
       fetchShadow
         .mockReset()
-        .mockResolvedValueOnce(Response.json({ ok: true }))
-        .mockResolvedValueOnce(Response.json({ result: bad }));
+        .mockResolvedValueOnce(eveResponse({ ok: true }))
+        .mockResolvedValueOnce(eveResponse({ result: bad }));
       const events = await collect({
         ...input,
         previousEveSessionId: 'ses_summer',
@@ -169,7 +195,7 @@ describe('Ovie speaks through durable Eve Summer', () => {
   });
   it('surfaces budget exhaustion with reset time and never invokes another provider', async () => {
     fetchShadow.mockReset().mockResolvedValueOnce(
-      Response.json(
+      eveResponse(
         {
           code: 'daily_turn_budget_exhausted',
           resetAt: '2026-09-06T00:00:00Z',
@@ -190,9 +216,9 @@ describe('Ovie speaks through durable Eve Summer', () => {
   it('keeps failed and uncertain results explicit', async () => {
     fetchShadow
       .mockReset()
-      .mockResolvedValueOnce(Response.json({ ok: true }))
+      .mockResolvedValueOnce(eveResponse({ ok: true }))
       .mockResolvedValueOnce(
-        Response.json({
+        eveResponse({
           result: { ...result, status: 'failed', responseText: '' },
         })
       );
@@ -207,12 +233,12 @@ describe('Ovie speaks through durable Eve Summer', () => {
     fetchShadow
       .mockReset()
       .mockResolvedValueOnce(
-        Response.json(
+        eveResponse(
           { code: 'conversation_persistence_or_dispatch_unknown' },
           { status: 503 }
         )
       )
-      .mockResolvedValueOnce(Response.json({ result }));
+      .mockResolvedValueOnce(eveResponse({ result }));
     expect(await collect()).toContainEqual({
       type: 'text-delta',
       text: result.responseText,

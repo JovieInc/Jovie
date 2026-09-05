@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { env } from '@/lib/env-server';
 import { ovieSummerTurnId } from '@/lib/ovie/summer-conversation';
 import { summerConversationAttestation } from '@/lib/ovie/summer-founder-auth';
 import { CURRENT_SUMMER_SESSION_ID } from '@/lib/ovie/summer-session';
@@ -22,6 +23,15 @@ const prefix = '/ovie/v1/summer-shadow/conversation/events';
 const MAX_RESPONSE_BYTES = 128 * 1024;
 const MAX_MIGRATION_HISTORY_BYTES = 20 * 1024;
 const MAX_MIGRATION_HISTORY_ENTRIES = 200;
+
+function assertExpectedEveDeployment(response: Response): void {
+  const expected = env.OVIE_SUMMER_EVE_EXPECTED_DEPLOYMENT_ID?.trim();
+  if (
+    !expected ||
+    response.headers.get('x-jovie-eve-deployment-id') !== expected
+  )
+    throw new Error('unverified_eve_deployment');
+}
 
 function boundedMigrationHistory(
   history: readonly { role: 'user' | 'assistant'; text: string }[]
@@ -96,6 +106,7 @@ export function createEveSummerSpeaker(
           headers: attestation,
           body: rawBody,
         });
+        assertExpectedEveDeployment(response);
         const admission = await body(response);
         const recoverableAdmission =
           admission.code === 'dispatch_unknown' ||
@@ -118,6 +129,7 @@ export function createEveSummerSpeaker(
           `${prefix}/${eventId}/result`,
           { signal: input.signal }
         );
+        assertExpectedEveDeployment(terminalResponse);
         const terminal = await body(terminalResponse);
         if (!terminalResponse.ok) {
           yield { type: 'error', state: 'unknown' };

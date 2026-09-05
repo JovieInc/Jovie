@@ -100,7 +100,16 @@ export const conversationPath = (kind: string, id: string) =>
 export const conversationMarker = (eventId: string) =>
   `[summer-web-event:${eventId}]`;
 const json = (body: ShadowRecord, status = 200) =>
-  Response.json(body, { status, headers: { 'cache-control': 'no-store' } });
+  Response.json(body, {
+    status,
+    headers: {
+      'cache-control': 'no-store',
+      'x-jovie-eve-deployment-id':
+        process.env.VERCEL_DEPLOYMENT_ID?.trim() || 'local',
+      'x-jovie-eve-commit-sha':
+        process.env.VERCEL_GIT_COMMIT_SHA?.trim() || 'local',
+    },
+  });
 
 export function renderConversation(input: ConversationInput): string {
   return [
@@ -189,10 +198,14 @@ export function createConversationIngress(
           );
         if (rejected)
           return json({ ok: false, code: 'rejection_unavailable' }, 503);
-        return json(
-          { ok: false, code: 'dispatch_unknown', eventId: input.eventId },
-          503
+        const admission = await deps.read(
+          conversationPath('admissions', input.eventId)
         );
+        if (admission)
+          return json(
+            { ok: false, code: 'dispatch_unknown', eventId: input.eventId },
+            503
+          );
       }
       const previous = input.previousEventId
         ? await deps.read(conversationPath('results', input.previousEventId))
@@ -202,34 +215,86 @@ export function createConversationIngress(
         (!previous || previous.conversationId !== input.conversationId)
       )
         return json({ ok: false, code: 'previous_turn_not_terminal' }, 409);
-      if ((await deps.persist(intentPath, { digest, input })) !== 'created')
+      if (
+        !existing &&
+        (await deps.persist(intentPath, { digest, input })) !== 'created'
+      )
         return json({ ok: false, code: 'dispatch_unknown' }, 503);
+
+      // Claim the predecessor before charging the shared daily budget. A losing
+      // concurrent successor is rejected without consuming a slot. The winning
+      // event can resume this immutable fence after a crash or UTC-day rollover.
+      const successorPath = conversationPath(
+        'successors',
+        input.previousEventId ?? 'root'
+      );
+      if (
+        (await deps.persist(successorPath, { eventId: input.eventId })) !==
+        'created'
+      ) {
+        const successor = await deps.read(successorPath);
+        if (!successor || typeof successor.eventId !== 'string')
+          return json(
+            { ok: false, code: 'successor_persistence_unknown' },
+            503
+          );
+        if (successor.eventId !== input.eventId) {
+          const rejected = { code: 'conversation_busy' } as const;
+          if (
+            (await deps.persist(
+              conversationPath('rejected', input.eventId),
+              rejected
+            )) !== 'created'
+          ) {
+            const persisted = await deps.read(
+              conversationPath('rejected', input.eventId)
+            );
+            if (!rejectedRecordSchema.safeParse(persisted).success)
+              return json({ ok: false, code: 'rejection_unavailable' }, 503);
+          }
+          return json({ ok: false, code: 'conversation_busy' }, 409);
+        }
+      }
       const now = (deps.now ?? (() => new Date()))();
       const day = now.toISOString().slice(0, 10);
       let dailySlot: number | null = null;
       for (let slot = 1; slot <= SUMMER_SHADOW_MAX_TURNS_PER_UTC_DAY; slot++) {
         const path = `summer-shadow/budgets/daily/${day}/slot-${slot}.json`;
         const record = await deps.read(path);
-        if (record) continue;
+        if (record) {
+          if (record.eventId !== input.eventId) continue;
+          if (
+            record.utcDay === day &&
+            record.source === 'summer-web-conversation'
+          ) {
+            dailySlot = slot;
+            break;
+          }
+          return json({ ok: false, code: 'budget_reservation_unknown' }, 503);
+        }
         // Only a confirmed create grants admission; uncertain writes cannot dispatch.
-        if (
-          (await deps.persist(path, {
-            eventId: input.eventId,
-            utcDay: day,
-            source: 'summer-web-conversation',
-          })) === 'created'
-        ) {
+        const budgetRecord = {
+          eventId: input.eventId,
+          utcDay: day,
+          source: 'summer-web-conversation',
+        };
+        if ((await deps.persist(path, budgetRecord)) === 'created') {
           dailySlot = slot;
           break;
         }
         const occupied = await deps.read(path);
+        if (!occupied || typeof occupied.eventId !== 'string')
+          return json({ ok: false, code: 'budget_reservation_unknown' }, 503);
+        if (occupied.eventId !== input.eventId) continue;
         if (
-          occupied &&
-          typeof occupied.eventId === 'string' &&
-          occupied.eventId !== input.eventId
-        )
-          continue;
-        // Same event or unreadable ownership means an uncertain write. Never acquire a second slot.
+          occupied.utcDay === budgetRecord.utcDay &&
+          occupied.source === budgetRecord.source
+        ) {
+          dailySlot = slot;
+          break;
+        }
+        // Unreadable or mismatched same-event ownership is ambiguous. Never
+        // acquire a second slot or dispatch through an unproven reservation.
         return json({ ok: false, code: 'budget_reservation_unknown' }, 503);
       }
       if (dailySlot === null) {
@@ -241,33 +306,7 @@ export function createConversationIngress(
           limit: SUMMER_SHADOW_MAX_TURNS_PER_UTC_DAY,
           resetAt,
         };
-        await deps.persist(
-          conversationPath('rejected', input.eventId),
-          rejected
-        );
         return json({ ok: false, ...rejected }, 429);
-      }
-      // Immutable predecessor fence prevents simultaneous sends being folded into one Eve turn.
-      if (
-        (await deps.persist(
-          conversationPath('successors', input.previousEventId ?? 'root'),
-          { eventId: input.eventId }
-        )) !== 'created'
-      ) {
-        const rejected = { code: 'conversation_busy' } as const;
-        if (
-          (await deps.persist(
-            conversationPath('rejected', input.eventId),
-            rejected
-          )) !== 'created'
-        ) {
-          const persisted = await deps.read(
-            conversationPath('rejected', input.eventId)
-          );
-          if (!rejectedRecordSchema.safeParse(persisted).success)
-            return json({ ok: false, code: 'rejection_unavailable' }, 503);
-        }
-        return json({ ok: false, code: 'conversation_busy' }, 409);
       }
       const admission = {
         eventId: input.eventId,
@@ -280,12 +319,11 @@ export function createConversationIngress(
         dailySlot,
         utcDay: day,
       };
-      if (
-        (await deps.persist(
-          conversationPath('admissions', input.eventId),
-          admission
-        )) !== 'created'
-      ) {
+      const admissionWrite = await deps.persist(
+        conversationPath('admissions', input.eventId),
+        admission
+      );
+      if (admissionWrite !== 'created') {
         const persisted = admissionRecordSchema.safeParse(
           await deps.read(conversationPath('admissions', input.eventId))
         );
@@ -297,6 +335,10 @@ export function createConversationIngress(
             { ok: false, code: 'admission_persistence_unknown' },
             503
           );
+        return json(
+          { ok: false, code: 'dispatch_unknown', eventId: input.eventId },
+          503
+        );
       }
       const sessionId = await deps.dispatch(
         input,
@@ -365,6 +407,7 @@ export async function readConversationResult(input: {
     conversationPath('accepted', input.eventId)
   );
   let parsedAccepted = acceptedRecordSchema.safeParse(accepted);
+  let recoveredAcceptance = false;
   if (!parsedAccepted.success && input.recoverSession) {
     const admission = admissionRecordSchema.safeParse(
       await input.store.read(conversationPath('admissions', input.eventId))
@@ -375,23 +418,8 @@ export async function readConversationResult(input: {
       );
       if (sessionId) {
         const recovered = { ...admission.data, sessionId };
-        const acceptedPath = conversationPath('accepted', input.eventId);
-        if (
-          (await input.store.persist(acceptedPath, recovered)) !== 'created'
-        ) {
-          const existingAccepted = acceptedRecordSchema.safeParse(
-            await input.store.read(acceptedPath)
-          );
-          if (
-            !existingAccepted.success ||
-            JSON.stringify(existingAccepted.data) !== JSON.stringify(recovered)
-          )
-            return json(
-              { ok: false, code: 'acceptance_recovery_unknown' },
-              503
-            );
-        }
         parsedAccepted = acceptedRecordSchema.safeParse(recovered);
+        recoveredAcceptance = true;
       }
     }
   }
@@ -444,6 +472,24 @@ export async function readConversationResult(input: {
           )
             throw new Error('turn_binding_conflict');
           turnId = data.turnId;
+          if (recoveredAcceptance) {
+            const acceptedPath = conversationPath('accepted', input.eventId);
+            if (
+              (await input.store.persist(acceptedPath, acceptedTurn)) !==
+              'created'
+            ) {
+              const existingAccepted = acceptedRecordSchema.safeParse(
+                await input.store.read(acceptedPath)
+              );
+              if (
+                !existingAccepted.success ||
+                JSON.stringify(existingAccepted.data) !==
+                  JSON.stringify(acceptedTurn)
+              )
+                throw new Error('acceptance_recovery_unknown');
+            }
+            recoveredAcceptance = false;
+          }
         }
         if (!turnId || data.turnId !== turnId) continue;
         if (

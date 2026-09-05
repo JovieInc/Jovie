@@ -136,7 +136,11 @@ export const ServerEnvSchema = z.object({
   BLOB_WEBHOOK_PUBLIC_KEY: z.string().optional(),
   SUMMER_BOTTLENECK_PRODUCER_SIGNING_PRIVATE_KEY: z.string().optional(),
   SUMMER_BOTTLENECK_PRODUCER_SIGNING_KEY_ID: z.string().optional(),
-  OVIE_SUMMER_FOUNDER_CLERK_USER_ID: z.string().optional(),
+  OVIE_SUMMER_FOUNDER_APP_USER_ID: z.string().uuid().optional(),
+  OVIE_SUMMER_EVE_EXPECTED_DEPLOYMENT_ID: z
+    .string()
+    .regex(/^dpl_[A-Za-z0-9]+$/u)
+    .optional(),
 
   // Telegram Bot (for asset ingestion webhook)
   TELEGRAM_BOT_TOKEN: z.string().optional(),
@@ -495,7 +499,8 @@ export const ENV_KEYS = [
   'BLOB_WEBHOOK_PUBLIC_KEY',
   'SUMMER_BOTTLENECK_PRODUCER_SIGNING_PRIVATE_KEY',
   'SUMMER_BOTTLENECK_PRODUCER_SIGNING_KEY_ID',
-  'OVIE_SUMMER_FOUNDER_CLERK_USER_ID',
+  'OVIE_SUMMER_FOUNDER_APP_USER_ID',
+  'OVIE_SUMMER_EVE_EXPECTED_DEPLOYMENT_ID',
   'TELEGRAM_BOT_TOKEN',
   'TELEGRAM_WEBHOOK_SECRET',
   'STRIPE_SECRET_KEY',
