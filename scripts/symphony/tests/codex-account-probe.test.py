@@ -64,6 +64,30 @@ class CodexAccountProbeTests(unittest.TestCase):
             state["readiness"]["account-a"]["expiresAt"], int(time.time())
         )
 
+    def test_config_only_provider_directory_does_not_poison_account_inventory(self):
+        provider = self.accounts / "oss-local"
+        provider.mkdir()
+        (provider / "config.toml").write_text('model_provider = "oss-local"\n')
+        self.write_state()
+
+        result = self.run_probe(PROBE_RESPONSE="SYMPHONY_ACCOUNT_READY")
+
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertEqual(result.stdout.strip(), "RECOVERED account-a")
+
+    def test_credentials_without_account_config_still_fail_closed(self):
+        malformed = self.accounts / "partial-account"
+        malformed.mkdir()
+        (malformed / "auth.json").write_text('{"auth_mode":"chatgpt"}\n')
+        original = self.write_state()
+
+        result = self.run_probe(PROBE_RESPONSE="SYMPHONY_ACCOUNT_READY")
+
+        self.assertEqual(result.returncode, 76)
+        state = json.loads((self.accounts / "state.json").read_text())
+        self.assertEqual(state["cooldowns"]["account-a"], original)
+        self.assertNotIn("readiness", state)
+
     def test_unrecognized_failure_is_indeterminate_and_preserves_cooldowns(self):
         original = self.write_state()
         result = self.run_probe(PROBE_EXIT="1")

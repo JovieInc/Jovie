@@ -309,7 +309,14 @@ def configured_inventory():
         config_path = account_file(account, "config.toml")
         if auth_path is None and config_path is None:
             continue
-        if account_path(account.name) is None or auth_path is None or config_path is None:
+        # Provider adapters can legitimately keep config under ACCOUNTS_ROOT
+        # without representing a selectable ChatGPT account. They must not
+        # poison discovery of real accounts. A directory with credentials but
+        # no config remains malformed and fails closed; a config-only directory
+        # can never become a probe candidate because it is absent from inventory.
+        if auth_path is None:
+            continue
+        if account_path(account.name) is None or config_path is None:
             return None
         auth_identity = (auth_path.stat().st_dev, auth_path.stat().st_ino)
         config_identity = (config_path.stat().st_dev, config_path.stat().st_ino)
