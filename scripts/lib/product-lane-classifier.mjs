@@ -39,6 +39,12 @@ const GATE_RECEIPTS = {
 
 const RULES = /** @type {Array<[string, string, string[], RegExp]>} */ ([
   [
+    'shared-agent-transport',
+    'shared-contract',
+    ['web'],
+    /^packages\/agent-transport-contracts\//,
+  ],
+  [
     'shared-release-version',
     'shared-contract',
     PRODUCT_LANES,
