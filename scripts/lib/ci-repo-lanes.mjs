@@ -153,6 +153,8 @@ const SHARED_ROOT_FILES = new Set([
 ]);
 
 const TYPECHECK_ROOT_FILES = new Set([
+  // Route projection changes the generated TypeScript graph before compilation.
+  'apps/ovie/scripts/routes.mjs',
   'package.json',
   'pnpm-lock.yaml',
   'pnpm-workspace.yaml',

@@ -85,6 +85,8 @@ export const ServerEnvSchema = z.object({
   // the flip commit adds preview/prod fail-fast validation rules)
   BETTER_AUTH_SECRET: z.string().optional(),
   BETTER_AUTH_URL: z.string().url().optional(),
+  // Opt-in exact private app origin; auth validates protocol and origin shape.
+  OVIE_WEB_ORIGIN: z.string().url().optional(),
   AUTH_GOOGLE_CLIENT_ID: z.string().optional(),
   AUTH_GOOGLE_CLIENT_SECRET: z.string().optional(),
   AUTH_APPLE_CLIENT_ID: z.string().optional(),
@@ -473,6 +475,7 @@ export const ENV_KEYS = [
   'NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY',
   'BETTER_AUTH_SECRET',
   'BETTER_AUTH_URL',
+  'OVIE_WEB_ORIGIN',
   'AUTH_GOOGLE_CLIENT_ID',
   'AUTH_GOOGLE_CLIENT_SECRET',
   'AUTH_APPLE_CLIENT_ID',
