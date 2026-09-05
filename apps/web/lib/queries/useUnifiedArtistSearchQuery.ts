@@ -75,6 +75,7 @@ export function useUnifiedArtistSearchQuery<TResult>(
     isLoading,
     isFetching,
     error: queryError,
+    refetch,
   } = useQuery<TResult[]>({
     queryKey: queryKey(debouncedQuery, limit),
     queryFn: ({ signal }) => searchFn(debouncedQuery, limit, signal),
@@ -148,6 +149,7 @@ export function useUnifiedArtistSearchQuery<TResult>(
     (searchQuery: string) => {
       asyncDebouncer.cancel();
       setInputQuery(searchQuery);
+      setIsPending(false);
       const trimmed = searchQuery.trim();
 
       if (trimmed.length < minQueryLength) {
@@ -155,9 +157,23 @@ export function useUnifiedArtistSearchQuery<TResult>(
         return;
       }
 
+      if (trimmed === debouncedQuery) {
+        if (queryError && !isFetching) {
+          void refetch();
+        }
+        return;
+      }
+
       setDebouncedQuery(trimmed);
     },
-    [asyncDebouncer, minQueryLength]
+    [
+      asyncDebouncer,
+      debouncedQuery,
+      isFetching,
+      minQueryLength,
+      queryError,
+      refetch,
+    ]
   );
 
   const clear = useCallback(() => {

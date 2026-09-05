@@ -13,6 +13,7 @@ const queryClient = new QueryClient({
   defaultOptions: {
     queries: {
       retry: false,
+      retryDelay: 0,
       gcTime: 0,
     },
   },
@@ -164,6 +165,112 @@ describe('useArtistSearchQuery', () => {
     });
 
     expect(result.current.error).toBe('Search failed');
+  });
+
+  it('retries the same query after a timeout without clearing the query', async () => {
+    const timeoutError = new DOMException(
+      'The operation was aborted',
+      'AbortError'
+    );
+    mockFetch
+      .mockRejectedValueOnce(timeoutError)
+      .mockRejectedValueOnce(timeoutError)
+      .mockRejectedValueOnce(timeoutError)
+      .mockResolvedValueOnce({
+        ok: true,
+        json: () =>
+          Promise.resolve([
+            {
+              id: 'tim-white',
+              name: 'Tim White',
+              url: 'https://open.spotify.com/artist/tim-white',
+              popularity: 42,
+            },
+          ]),
+      });
+
+    const { result } = renderHook(() => useArtistSearchQuery(), {
+      wrapper: TestWrapper,
+    });
+
+    act(() => {
+      result.current.searchImmediate('tim white');
+    });
+
+    await waitFor(() => {
+      expect(result.current.state).toBe('error');
+    });
+    expect(mockFetch).toHaveBeenCalledTimes(3);
+
+    act(() => {
+      result.current.searchImmediate('tim white');
+    });
+
+    await waitFor(() => {
+      expect(result.current.state).toBe('success');
+    });
+    expect(mockFetch).toHaveBeenCalledTimes(4);
+    expect(result.current.query).toBe('tim white');
+    expect(result.current.results[0]?.name).toBe('Tim White');
+  });
+
+  it('keeps a same-query retry actionable when the retry also fails', async () => {
+    const failedResponse = () =>
+      new Response(JSON.stringify({ error: 'Search failed' }), {
+        status: 400,
+        statusText: 'Bad Request',
+      });
+    mockFetch
+      .mockResolvedValueOnce(failedResponse())
+      .mockResolvedValueOnce(failedResponse());
+
+    const { result } = renderHook(() => useArtistSearchQuery(), {
+      wrapper: TestWrapper,
+    });
+
+    act(() => {
+      result.current.searchImmediate('tim white');
+    });
+    await waitFor(() => {
+      expect(result.current.state).toBe('error');
+    });
+
+    act(() => {
+      result.current.searchImmediate('tim white');
+    });
+    await waitFor(() => {
+      expect(mockFetch).toHaveBeenCalledTimes(2);
+      expect(result.current.state).toBe('error');
+    });
+
+    expect(result.current.query).toBe('tim white');
+    expect(result.current.error).toBe('Search failed');
+  });
+
+  it('clears pending debounce state when searchImmediate takes over', async () => {
+    mockFetch.mockResolvedValueOnce({
+      ok: true,
+      json: () => Promise.resolve([]),
+    });
+
+    const { result } = renderHook(
+      () => useArtistSearchQuery({ debounceMs: 60_000 }),
+      { wrapper: TestWrapper }
+    );
+
+    act(() => {
+      result.current.search('tim white');
+    });
+    expect(result.current.isPending).toBe(true);
+
+    act(() => {
+      result.current.searchImmediate('tim white');
+    });
+
+    expect(result.current.isPending).toBe(false);
+    await waitFor(() => {
+      expect(result.current.state).toBe('empty');
+    });
   });
 
   it('should handle rate limit error', async () => {
