@@ -1479,6 +1479,7 @@ jobs:
             'apps/web/components/features/home/homepage-profile-preview-fixture.ts' \
             'apps/web/components/features/release/SmartLinkProviderButton.tsx' \
             'apps/web/components/features/profile/**' \
+            'apps/web/components/providers/QueryProvider*' \
             'apps/web/components/organisms/CookieBannerMount.tsx' \
             'apps/web/components/organisms/CookieBannerSection.tsx' \
             'apps/web/lib/cookies/**' \

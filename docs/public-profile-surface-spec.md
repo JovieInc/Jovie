@@ -504,9 +504,13 @@ The template reads the 768px and 1180px breakpoints, dynamically imports
 `ProfileDesktopSurface`, and passes both compact and desktop compositions to
 `PublicProfileLayoutShell`. At widths below 1180px, the compact surface owns
 the route. At widths of 1180px and above, the desktop surface owns the route.
-The browser admission suite verifies 1179px, 1180px, and 1512px plus live
-resize ownership and the labeled embedded-preview exception. Desktop source
-parity is therefore **proven in branch source and automated browser coverage**.
+The browser admission selector covers 1179px, 1180px, and 1512px, live
+resize ownership, the labeled embedded-preview exception, SSR readiness, and
+visible-banner geometry. Its fixture exercises claimed, unclaimed, and owner
+component policies. Actual public-route and authenticated dashboard-preview
+certification requires separate current-head runtime evidence; fixture results
+do not establish that acceptance. Public ISR does not resolve authenticated
+owner identity.
 
 ---
 
