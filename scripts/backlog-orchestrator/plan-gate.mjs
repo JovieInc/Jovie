@@ -136,7 +136,7 @@ export function validatePlanCandidate(issue, evidence) {
     hasProtectedAdmissionLabel(issue) ||
     labelsOf(issue).includes('synthetic')
   )
-    return 'protected-or-human-review';
+    return 'protected-policy';
   if (
     SYNTHETIC_PATTERN.test(`${labelsOf(issue).join(' ')} ${issueText(issue)}`)
   )

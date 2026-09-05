@@ -94,6 +94,10 @@ RUNTIME_NAMES = (
     "cursor-agent-std",
     "model-router.py",
     "model-registry.json",
+    "writer-owned-pr-promote.sh",
+    "writer-owned-pr-promotion.mjs",
+    "queue-deferral-receipt.mjs",
+    "upsert-pr-comment.sh",
 )
 LAUNCHER_NAMES = (*LEGACY_RUNTIME_NAMES, "grok-ship-one", "cursor-agent-std")
 # Labels are derived audit evidence, never independent admission blockers.
@@ -102,17 +106,11 @@ REQUIRED_ADMISSION_LABELS = frozenset()
 ADMISSION_GATE_PREFIX = "<!-- admission-gate/v1 -->"
 ADMISSION_GATE_SUFFIX = "<!--/admission-gate-->"
 ADMISSION_GATE_SCHEMA = "admission-gate/v1"
-# Single source of truth for the Grok sidecar admission predicate. `blocked` is
-# included because human-review flags (needs-human / needs:human / blocked / hold)
-# must gate out of auto-ship; reconcile and grok-ship-one both use this set.
+# Single source of truth for the Grok sidecar admission predicate. Only active
+# machine, incident, and dead-letter holds gate dispatch. Legacy human-review,
+# taste, decision, and no-auto labels are inert (JOV-INV-028).
 BLOCKED_ADMISSION_LABELS = frozenset(
     (
-        "human-review-required",
-        "needs:human",
-        "needs-human",
-        "needs:decision",
-        "needs-decision",
-        "decision-required",
         "held",
         "hold",
         "manual-incident",
@@ -1034,8 +1032,8 @@ def admission_decision(
     pre-launch verification, and grok-ship-one's check-admission command.
 
     An issue is admitted only when a current admission-gate/v1 receipt matches
-    this revision and no blocked/human-review label is present. Labels are
-    derived audit evidence, never a second waitlist.
+    this revision and no active machine or incident hold is present. Legacy
+    human-review labels are audit residue, never a second waitlist.
     """
     if not IDENTIFIER.fullmatch(identifier):
         return False, "invalid_identifier"
@@ -2579,9 +2577,29 @@ def _artifacts() -> dict[str, pathlib.Path]:
     registry = root / "model-registry.json"
     if not registry.is_file():
         registry = root / "config" / "model-registry.json"
+    scripts = root.parent
+
+    def packaged_or_source(name: str, source: pathlib.Path) -> pathlib.Path:
+        packaged = root / name
+        return packaged if packaged.is_file() else source
+
     return {
         **{name: root / name for name in (*LEGACY_RUNTIME_NAMES, "grok-ship-one", "cursor-agent-std", "model-router.py")},
         "model-registry.json": registry,
+        "writer-owned-pr-promote.sh": packaged_or_source(
+            "writer-owned-pr-promote.sh", scripts / "writer-owned-pr-promote.sh"
+        ),
+        "writer-owned-pr-promotion.mjs": packaged_or_source(
+            "writer-owned-pr-promotion.mjs",
+            scripts / "lib" / "writer-owned-pr-promotion.mjs",
+        ),
+        "queue-deferral-receipt.mjs": packaged_or_source(
+            "queue-deferral-receipt.mjs",
+            scripts / "lib" / "queue-deferral-receipt.mjs",
+        ),
+        "upsert-pr-comment.sh": packaged_or_source(
+            "upsert-pr-comment.sh", scripts / "lib" / "upsert-pr-comment.sh"
+        ),
     }
 
 
@@ -2649,6 +2667,24 @@ def _valid_bundle_file(name: str, path: pathlib.Path) -> bool:
     if name == "model-router.py":
         try:
             return not path.is_symlink() and path.is_file() and path.read_bytes().startswith(b"#!")
+        except OSError:
+            return False
+    if name == "writer-owned-pr-promotion.mjs":
+        try:
+            return (
+                not path.is_symlink()
+                and path.is_file()
+                and b"jovie-writer-pr-proof/v1" in path.read_bytes()
+            )
+        except OSError:
+            return False
+    if name == "queue-deferral-receipt.mjs":
+        try:
+            return (
+                not path.is_symlink()
+                and path.is_file()
+                and b"jovie-queue-deferral/v1" in path.read_bytes()
+            )
         except OSError:
             return False
     return _valid_runtime_file(path)
@@ -2732,7 +2768,11 @@ def install(destination_root: str | None) -> int:
         _fsync_directory(state)
         release = pathlib.Path(tempfile.mkdtemp(prefix=".install-", dir=releases))
         for name, data in contents.items():
-            if name in ("model-router.py", "model-registry.json"):
+            if name in (
+                "model-router.py",
+                "model-registry.json",
+                "writer-owned-pr-promotion.mjs",
+            ):
                 (release / name).write_bytes(data)
                 os.chmod(release / name, 0o644)
             else:

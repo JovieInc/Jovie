@@ -36,8 +36,6 @@ const HOMEMADE_WRAPPER_MARKERS = Object.freeze([
   'pinned-upstream-openai-wrapper',
 ]);
 
-const TASTE_TEXT =
-  /\b(?:taste|brand voice|founder[- ]steer|design[- ]direction|visual identity|steering)\b/i;
 const EXTERNAL_MESSAGE_TEXT =
   /\b(?:telegram|slack message|send email|outbound email|tweet|dm blast|publish externally)\b/i;
 const CREDENTIAL_TEXT =
@@ -50,7 +48,7 @@ const EPIC_TEXT = /\b(?:epic(?:-only)?|workstream|bundle|multi[- ]issue)\b/i;
 
 const EXCLUSION_BY_ADMISSION = Object.freeze({
   'tim-owned': 'human-taste-or-steering',
-  'protected-policy': 'human-taste-or-steering',
+  'protected-policy': 'machine-hold',
   'sensitive-or-external-work': 'credential-or-provisioning',
   'parent-or-bundle': 'broad-epic',
   'stale-or-invalid-created-at': 'stale-or-ambiguous',
@@ -217,8 +215,6 @@ function explicitExclusion(issue) {
   const text = issueText(issue);
   const labels = labelsOf(issue);
   if (labels.includes('type:epic') || EPIC_TEXT.test(text)) return 'broad-epic';
-  if (TASTE_TEXT.test(text) || labels.includes('needs-decision'))
-    return 'human-taste-or-steering';
   if (EXTERNAL_MESSAGE_TEXT.test(text)) return 'external-messages';
   if (CREDENTIAL_TEXT.test(text)) return 'credential-or-provisioning';
   if (MONEY_TEXT.test(text)) return 'money';
