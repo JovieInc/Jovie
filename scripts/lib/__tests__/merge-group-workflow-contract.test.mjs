@@ -448,6 +448,44 @@ describe('merge_group workflow contract', () => {
     }
   });
 
+  it('requires Ovie coverage and an independent build in the selected web gate', () => {
+    const units = getJobBlock(CI_WORKFLOW, 'ci-unit-tests');
+    const build = getJobBlock(CI_WORKFLOW, 'ci-build-layout');
+    const ovieTests = units.slice(
+      units.indexOf(
+        '      - name: Run Ovie route and private-boundary coverage'
+      ),
+      units.indexOf('      - name: Preserve Ovie coverage evidence')
+    );
+    expect(ovieTests).toContain("matrix.shard == '1/10'");
+    expect(ovieTests).toContain('pnpm --filter @jovie/ovie test');
+    expect(ovieTests).not.toContain('continue-on-error');
+    const ovieBuild = build.slice(
+      build.indexOf('      - name: Build independent Ovie app'),
+      build.indexOf('      - name: Build exact combined head')
+    );
+    expect(ovieBuild).toContain('pnpm --filter @jovie/ovie typecheck');
+    expect(ovieBuild).toContain('pnpm --filter @jovie/ovie build');
+    expect(ovieBuild).toContain('test -f apps/ovie/.next/BUILD_ID');
+    expect(ovieBuild).toContain(
+      'test -f apps/ovie/.next/standalone/apps/ovie/server.js'
+    );
+    expect(ovieBuild).not.toContain('continue-on-error');
+    expect(ovieBuild).not.toContain('@jovie/web');
+    expect(ovieBuild).toContain(
+      'test ! -d apps/ovie/.next/standalone/apps/docs/app'
+    );
+    // Both checks remain inside jobs already required by the merge-group
+    // aggregate; neither allocates a heavy source-PR lane.
+    for (const job of [units, build]) {
+      const header = job.slice(0, job.indexOf('    runs-on:'));
+      expect(header).toContain(
+        "needs.ci-path-changes.outputs.run_web == 'true'"
+      );
+      expect(header).not.toContain("github.event_name == 'pull_request'");
+    }
+  });
+
   it('fans real combined-head checks into PR Ready without PR metadata or deploy evidence', () => {
     const aggregate = getJobBlock(CI_WORKFLOW, 'ci-merge-group-ready');
     const sourceAggregate = getJobBlock(CI_WORKFLOW, 'ci-pr-ready');
