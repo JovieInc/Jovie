@@ -127,15 +127,23 @@ def _load_state() -> dict:
         raise StateReconcileRequired(
             f"{SCHEMA} reason=state-unreadable path={path}"
         ) from exc
-    if not isinstance(raw, dict) or not isinstance(raw.get("tombstones"), dict):
+    if (
+        not isinstance(raw, dict)
+        or raw.get("schema") not in (None, SCHEMA)
+        or not isinstance(raw.get("tombstones"), dict)
+        or (raw.get("schema") == SCHEMA and not isinstance(raw.get("counters"), dict))
+    ):
         raise StateReconcileRequired(f"{SCHEMA} reason=state-schema-mismatch path={path}")
     counters = raw.get("counters")
     merged = _default_counters()
     if isinstance(counters, dict):
         for key in merged:
             value = counters.get(key)
-            if isinstance(value, int) and value >= 0:
-                merged[key] = value
+            if not isinstance(value, int) or value < 0:
+                raise StateReconcileRequired(
+                    f"{SCHEMA} reason=counter-schema-mismatch path={path} key={key}"
+                )
+            merged[key] = value
     tombstones = {}
     for identifier, entry in raw["tombstones"].items():
         if (
@@ -156,6 +164,10 @@ def _load_state() -> dict:
                 "observedAt": entry["observedAt"],
                 "issueUpdatedAtEpoch": entry["issueUpdatedAtEpoch"],
             }
+        else:
+            raise StateReconcileRequired(
+                f"{SCHEMA} reason=tombstone-schema-mismatch path={path} key={identifier}"
+            )
     return {"schema": SCHEMA, "tombstones": tombstones, "counters": merged}
 
 

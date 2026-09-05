@@ -277,6 +277,46 @@ class CheckCommandTests(unittest.TestCase):
         self.assertEqual(rc, 2)
         self.assertIn("state-missing", stderr.getvalue())
 
+    def test_schema_mismatch_requires_reconciliation(self):
+        state_file = pathlib.Path(self.tmp.name) / "leases.json"
+        state_file.write_text(
+            json.dumps({"schema": "wrong/v1", "tombstones": {}, "counters": {}}),
+            encoding="utf-8",
+        )
+        stderr = io.StringIO()
+        with (
+            mock.patch.object(MODULE, "_fetch_issue", return_value=make_issue("JOV-5031", "In Progress", 1000)),
+            mock.patch.object(MODULE, "_active_states", return_value=ACTIVE),
+            contextlib.redirect_stderr(stderr),
+            contextlib.redirect_stdout(io.StringIO()),
+        ):
+            rc = MODULE.check("JOV-5031")
+        self.assertEqual(rc, 2)
+        self.assertIn("state-schema-mismatch", stderr.getvalue())
+
+    def test_malformed_tombstone_requires_reconciliation(self):
+        state_file = pathlib.Path(self.tmp.name) / "leases.json"
+        state_file.write_text(
+            json.dumps(
+                {
+                    "schema": MODULE.SCHEMA,
+                    "tombstones": {"JOV-5031": {"state": "Done"}},
+                    "counters": MODULE._default_counters(),
+                }
+            ),
+            encoding="utf-8",
+        )
+        stderr = io.StringIO()
+        with (
+            mock.patch.object(MODULE, "_fetch_issue", return_value=make_issue("JOV-5031", "In Progress", 1000)),
+            mock.patch.object(MODULE, "_active_states", return_value=ACTIVE),
+            contextlib.redirect_stderr(stderr),
+            contextlib.redirect_stdout(io.StringIO()),
+        ):
+            rc = MODULE.check("JOV-5031")
+        self.assertEqual(rc, 2)
+        self.assertIn("tombstone-schema-mismatch", stderr.getvalue())
+
     def test_check_rejects_malformed_identifier(self):
         with contextlib.redirect_stderr(io.StringIO()):
             rc = MODULE.check("bad identifier!")
