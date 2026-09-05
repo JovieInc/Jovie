@@ -30,6 +30,10 @@ CODEX_ROUTER_SRC="${REPO_ROOT}/scripts/symphony/symphony-codex-router"
 CODEX_ROUTER_DST="${TARGET_HOME}/.local/bin/symphony-codex-router-hotfix"
 CODEX_PROBE_SRC="${REPO_ROOT}/scripts/symphony/codex-account-probe.sh"
 CODEX_PROBE_DST="${TARGET_HOME}/.local/bin/codex-account-probe"
+SAFE_RESTART_SRC="${REPO_ROOT}/scripts/symphony/symphony-elixir-safe-restart"
+SAFE_RESTART_DST="${TARGET_HOME}/.local/bin/symphony-elixir-safe-restart"
+FROZEN_TRANSITION_SRC="${REPO_ROOT}/scripts/symphony/symphony-frozen-generation-transition"
+FROZEN_TRANSITION_DST="${TARGET_HOME}/.local/bin/symphony-frozen-generation-transition"
 LOG_DIR="${TARGET_HOME}/symphony-elixir-logs"
 STATE_DIR="${TARGET_HOME}/.local/state/symphony-elixir"
 STATE_URL="${SYMPHONY_STATE_URL:-http://127.0.0.1:4041/api/v1/state}"
@@ -408,6 +412,8 @@ if [ "$DRY_RUN" -eq 1 ]; then
   echo "AGENT_ROUTER $AGENT_ROUTER_DST"
   echo "CURSOR_ADAPTER $CURSOR_ADAPTER_DST"
   echo "CODEX_ROUTER $CODEX_ROUTER_DST"
+  echo "SAFE_RESTART $SAFE_RESTART_DST"
+  echo "FROZEN_TRANSITION $FROZEN_TRANSITION_DST"
   echo "UNIT $UNIT_DST"
   echo "WORKFLOW $WORKFLOW_DST"
   echo "SERVICE $SERVICE_NAME"
@@ -426,6 +432,8 @@ if [ "$CHECK_ONLY" -eq 1 ]; then
   check_one "$CURSOR_ADAPTER_SRC" "$CURSOR_ADAPTER_DST" || rc=1
   check_one "$CODEX_ROUTER_SRC" "$CODEX_ROUTER_DST" || rc=1
   check_one "$CODEX_PROBE_SRC" "$CODEX_PROBE_DST" || rc=1
+  check_one "$SAFE_RESTART_SRC" "$SAFE_RESTART_DST" || rc=1
+  check_one "$FROZEN_TRANSITION_SRC" "$FROZEN_TRANSITION_DST" || rc=1
   exit "$rc"
 fi
 
@@ -469,6 +477,8 @@ cleanup() {
       restore_target cursor-adapter "$CURSOR_ADAPTER_DST" 0755
       restore_target codex-router "$CODEX_ROUTER_DST" 0755
       restore_target codex-probe "$CODEX_PROBE_DST" 0755
+      restore_target safe-restart "$SAFE_RESTART_DST" 0755
+      restore_target frozen-transition "$FROZEN_TRANSITION_DST" 0755
       restore_target unit "$UNIT_DST" 0644
       restore_target workflow "$WORKFLOW_DST" 0644
     fi
@@ -525,6 +535,8 @@ backup_target agent-router "$AGENT_ROUTER_DST"
 backup_target cursor-adapter "$CURSOR_ADAPTER_DST"
 backup_target codex-router "$CODEX_ROUTER_DST"
 backup_target codex-probe "$CODEX_PROBE_DST"
+backup_target safe-restart "$SAFE_RESTART_DST"
+backup_target frozen-transition "$FROZEN_TRANSITION_DST"
 backup_target unit "$UNIT_DST"
 backup_target workflow "$WORKFLOW_DST"
 promotion_started=1
@@ -537,6 +549,8 @@ install_one "$AGENT_ROUTER_SRC" "$AGENT_ROUTER_DST" 0755
 install_one "$CURSOR_ADAPTER_SRC" "$CURSOR_ADAPTER_DST" 0755
 install_one "$CODEX_ROUTER_SRC" "$CODEX_ROUTER_DST" 0755
 install_one "$CODEX_PROBE_SRC" "$CODEX_PROBE_DST" 0755
+install_one "$SAFE_RESTART_SRC" "$SAFE_RESTART_DST" 0755
+install_one "$FROZEN_TRANSITION_SRC" "$FROZEN_TRANSITION_DST" 0755
 install_one "$UNIT_SRC" "$UNIT_DST"
 install_one "$WORKFLOW_SRC" "$WORKFLOW_DST"
 
