@@ -757,19 +757,19 @@ def test_installer_backs_up_and_detects_drift(tmp_path: Path) -> None:
     assert _run_installer(tmp_path, "--check").returncode == 0
 
 
-def test_installer_accepts_only_the_bounded_runtime_concurrency_overlay(tmp_path: Path) -> None:
+def test_installer_accepts_only_canonical_positive_runtime_concurrency_overlay(tmp_path: Path) -> None:
     assert _run_installer(tmp_path, "--no-daemon-reload").returncode == 0
     workflow = tmp_path / "symphony-runtime/elixir/WORKFLOW.jovie-ui-pilot.md"
     source = WORKFLOW.read_text()
 
-    for target in range(1, 9):
+    for target in (*range(1, 9), 9, 41, 128):
         _rewrite_installed_concurrency(workflow, str(target))
         accepted = _run_installer(tmp_path, "--check")
         assert accepted.returncode == 0, accepted.stdout
         assert f"OK {workflow}" in accepted.stdout
         assert f"runtime max_concurrent_agents={target}" in accepted.stdout
 
-    for invalid in ("0", "9", "01", "08", "0001", "0008", "not-a-number"):
+    for invalid in ("0", "-1", "1.5", "01", "08", "0001", "0008", "not-a-number"):
         workflow.write_text(
             source.replace("  max_concurrent_agents: 4", f"  max_concurrent_agents: {invalid}", 1)
         )
