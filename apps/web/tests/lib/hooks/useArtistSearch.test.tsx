@@ -168,26 +168,19 @@ describe('useArtistSearchQuery', () => {
   });
 
   it('coalesces same-frame retries after a timeout without clearing the query', async () => {
-    const timeoutError = new DOMException(
-      'The operation was aborted',
-      'AbortError'
-    );
-    mockFetch
-      .mockRejectedValueOnce(timeoutError)
-      .mockRejectedValueOnce(timeoutError)
-      .mockRejectedValueOnce(timeoutError)
-      .mockResolvedValueOnce({
-        ok: true,
-        json: () =>
-          Promise.resolve([
-            {
-              id: 'tim-white',
-              name: 'Tim White',
-              url: 'https://open.spotify.com/artist/tim-white',
-              popularity: 42,
-            },
-          ]),
-      });
+    const results = [
+      {
+        id: 'tim-white',
+        name: 'Tim White',
+        url: 'https://open.spotify.com/artist/tim-white',
+        popularity: 42,
+      },
+    ];
+    const successfulResponse = () => ({
+      ok: true,
+      json: () => Promise.resolve(results),
+    });
+    mockFetch.mockResolvedValueOnce(successfulResponse());
 
     const { result } = renderHook(() => useArtistSearchQuery(), {
       wrapper: TestWrapper,
@@ -195,22 +188,52 @@ describe('useArtistSearchQuery', () => {
 
     act(() => {
       result.current.searchImmediate('tim white');
-      result.current.searchImmediate('tim white');
     });
-
-    await waitFor(() => {
-      expect(result.current.state).toBe('error');
-    });
-    expect(mockFetch).toHaveBeenCalledTimes(3);
-
-    act(() => {
-      result.current.searchImmediate('tim white');
-    });
-
     await waitFor(() => {
       expect(result.current.state).toBe('success');
     });
-    expect(mockFetch).toHaveBeenCalledTimes(4);
+
+    const timeoutError = new DOMException(
+      'The operation was aborted',
+      'AbortError'
+    );
+    mockFetch
+      .mockRejectedValueOnce(timeoutError)
+      .mockRejectedValueOnce(timeoutError)
+      .mockRejectedValueOnce(timeoutError);
+    await act(async () => {
+      await queryClient.refetchQueries();
+    });
+    await waitFor(() => {
+      expect(result.current.state).toBe('error');
+    });
+
+    let resolveRetry:
+      | ((response: ReturnType<typeof successfulResponse>) => void)
+      | undefined;
+    const retryResponse = new Promise<ReturnType<typeof successfulResponse>>(
+      resolve => {
+        resolveRetry = resolve;
+      }
+    );
+    mockFetch.mockReturnValue(retryResponse);
+
+    act(() => {
+      result.current.searchImmediate('tim white');
+      result.current.searchImmediate('tim white');
+    });
+
+    expect(mockFetch).toHaveBeenCalledTimes(5);
+    const retrySignal = mockFetch.mock.calls[4]?.[1]?.signal as
+      | AbortSignal
+      | undefined;
+    expect(retrySignal?.aborted).toBe(false);
+
+    resolveRetry?.(successfulResponse());
+    await waitFor(() => {
+      expect(result.current.state).toBe('success');
+    });
+    expect(mockFetch).toHaveBeenCalledTimes(5);
     expect(result.current.query).toBe('tim white');
     expect(result.current.results[0]?.name).toBe('Tim White');
   });
