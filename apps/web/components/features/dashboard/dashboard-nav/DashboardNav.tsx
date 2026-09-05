@@ -1,5 +1,7 @@
 'use client';
 
+// @coverage-via apps/web/tests/components/dashboard/DashboardNav.interaction.test.tsx
+
 import { useQueryClient } from '@tanstack/react-query';
 import { usePathname, useRouter } from 'next/navigation';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
