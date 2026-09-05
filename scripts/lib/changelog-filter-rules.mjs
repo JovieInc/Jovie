@@ -39,6 +39,16 @@ const VENDOR_PATTERNS = VENDOR_NAMES.map(
 
 /** Infrastructure, dev tooling, admin, and business-sensitive patterns. */
 const INTERNAL_PATTERNS = [
+  // Local development and operator implementation are not product updates.
+  /\b(?:localhost|127\.0\.0\.1|loopback|Chromium|SwiftUI|invalidAuthURL)\b/i,
+  /\bhot[- ]reload\b/i,
+  /\b(?:merge[- ]queue|worktrees?|kiosk token|TV HUD)\b/i,
+  /\/(?:hud(?:-tv)?|app\/ov)(?:[/?\s`.]|$)/i,
+  /\b(?:lib|scripts|packages)\/[\w/-]+/,
+  /\b(?:context_facts|suggested_actions|external_objects|context_fact_kind)\b/,
+  /\b[A-Z][A-Z0-9]*(?:_[A-Z0-9]+)+\b/,
+  /\b(?:wire tokens|Summer classifies|founder walks)\b/i,
+  /\b(?:System B|infra train|train integration)\b|^VERSION:/i,
   /\[\s*internal\s*\]/i,
 
   // Staging/infra URLs

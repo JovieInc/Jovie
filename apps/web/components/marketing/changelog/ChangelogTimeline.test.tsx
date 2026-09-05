@@ -73,34 +73,46 @@ describe('ChangelogTimeline', () => {
   });
 
   it('bounds the initial release list and progressively exposes every update', () => {
-    const releases = Array.from({ length: 8 }, (_, index) => ({
+    const releases = Array.from({ length: 52 }, (_, index) => ({
       ...RELEASES[0],
-      version: `26.8.${8 - index}`,
-      date: `2026-08-${String(8 - index).padStart(2, '0')}`,
+      version: `26.8.${52 - index}`,
     }));
     const { container } = render(<ChangelogTimeline releases={releases} />);
 
-    expect(container.querySelectorAll('article')).toHaveLength(1);
+    expect(container.querySelectorAll('article')).toHaveLength(25);
     expect(
-      screen.getByRole('button', { name: 'Show 5 More Updates' })
+      screen.getByRole('button', { name: 'Read More — 25 Updates' })
     ).toBeVisible();
     expect(screen.queryByText('v26.8.1')).not.toBeInTheDocument();
 
     fireEvent.click(
-      screen.getByRole('button', { name: 'Show 5 More Updates' })
+      screen.getByRole('button', { name: 'Read More — 25 Updates' })
     );
-    expect(container.querySelectorAll('article')).toHaveLength(6);
+    expect(container.querySelectorAll('article')).toHaveLength(50);
     expect(
-      screen.getByRole('button', { name: 'Show 2 More Updates' })
+      screen.getByRole('button', { name: 'Read More — 2 Updates' })
     ).toBeVisible();
 
-    fireEvent.click(
-      screen.getByRole('button', { name: 'Show 2 More Updates' })
-    );
-    expect(container.querySelectorAll('article')).toHaveLength(8);
+    const finalButton = screen.getByRole('button', {
+      name: 'Read More — 2 Updates',
+    });
+    finalButton.focus();
+    fireEvent.click(finalButton);
+    expect(container.querySelectorAll('article')).toHaveLength(52);
     expect(screen.getByText('v26.8.1')).toBeVisible();
-    expect(screen.getByText('Showing 8 of 8 updates')).toBeVisible();
-    expect(screen.queryByRole('button', { name: /More Updates/ })).toBeNull();
+    expect(screen.getByText('Showing 52 of 52 updates')).toBeVisible();
+    expect(screen.getByText('Showing 52 of 52 updates')).toHaveFocus();
+    expect(screen.queryByRole('button', { name: /Read More/ })).toBeNull();
+  });
+
+  it('shows all 25 entries without unnecessary pagination', () => {
+    const releases = Array.from({ length: 25 }, (_, index) => ({
+      ...RELEASES[0],
+      version: `26.8.${index}`,
+    }));
+    const { container } = render(<ChangelogTimeline releases={releases} />);
+    expect(container.querySelectorAll('article')).toHaveLength(25);
+    expect(screen.queryByRole('button', { name: /Read More/ })).toBeNull();
   });
 });
 

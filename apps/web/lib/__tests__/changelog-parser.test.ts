@@ -1,4 +1,8 @@
+import { execFileSync } from 'node:child_process';
+import { resolve } from 'node:path';
+import { pathToFileURL } from 'node:url';
 import { describe, expect, it } from 'vitest';
+import { isInternalEntry } from '../changelog-filter-rules';
 import {
   changelogInlineText,
   parseChangelog,
@@ -32,6 +36,79 @@ const BASIC_CHANGELOG = `# Changelog
 `;
 
 describe('parseChangelog', () => {
+  it('keeps web and publishing safety rules equivalent in the web CI suite', () => {
+    const entries = [
+      'Local waits for localhost:3100 while Chromium compiles the server.',
+      'SwiftUI retries invalidAuthURL when no window is available.',
+      'Ovie opens /hud with the kiosk token.',
+      'The connector writes lib/connectors/enrichment and context_facts.',
+      'SMS uses OUTBOUND_SMS_ENABLED to enable the provider.',
+      'The merge queue reuses a worktree for its runner.',
+      'Your profile keeps your privacy choices.',
+      'Team admins can now manage subscription billing.',
+      'Users can now revoke personal API tokens.',
+      'Your agent can help plan a release.',
+      'The conductor can preview a turbo mix.',
+    ];
+    const output = execFileSync(
+      process.execPath,
+      [
+        '--input-type=module',
+        '-e',
+        'const {isInternalEntry}=await import(process.argv[1]); process.stdout.write(JSON.stringify(JSON.parse(process.argv[2]).map(isInternalEntry)));',
+        pathToFileURL(
+          resolve(process.cwd(), '../../scripts/lib/changelog-filter-rules.mjs')
+        ).href,
+        JSON.stringify(entries),
+      ],
+      { encoding: 'utf8' }
+    );
+    const expected = [
+      true,
+      true,
+      true,
+      true,
+      true,
+      true,
+      false,
+      false,
+      false,
+      false,
+      false,
+    ];
+    expect(entries.map(isInternalEntry)).toEqual(expected);
+    expect(JSON.parse(output)).toEqual(expected);
+  });
+  it.each([
+    'Local waits for localhost:3100 while Chromium compiles the server.',
+    'SwiftUI retries invalidAuthURL when no window is available.',
+    'Ovie opens /hud with the kiosk token.',
+    'The connector writes lib/connectors/enrichment and context_facts.',
+    'SMS uses OUTBOUND_SMS_ENABLED to enable the provider.',
+    'The merge queue reuses a worktree for its runner.',
+  ])('filters operational bullets and summaries: %s', internal => {
+    const releases = parseChangelog(
+      `## [1.0.0] - 2026-03-20\n> ${internal}\n### Fixed\n- ${internal}\n- Your profile keeps your privacy choices.\n`
+    );
+    expect(releases).toHaveLength(1);
+    expect(releases[0].summary).toBe('');
+    expect(releases[0].sections.fixed).toEqual([
+      'Your profile keeps your privacy choices.',
+    ]);
+  });
+  it.each([
+    'Merch confirmation actions use a neutral System B primary button surface.',
+    'Infra train version bump for desktop release guard.',
+    'VERSION: bumps train integration so desktop security ships with DMG handling.',
+  ])('filters implementation copy observed in the rendered timeline: %s', internal => {
+    const releases = parseChangelog(
+      `## [1.0.0] - 2026-03-20\n> ${internal}\n### Fixed\n- ${internal}\n- Your profile keeps your privacy choices.\n`
+    );
+    expect(releases[0].summary).toBe('');
+    expect(releases[0].sections.fixed).toEqual([
+      'Your profile keeps your privacy choices.',
+    ]);
+  });
   it('parses releases with version and date', () => {
     const releases = parseChangelog(BASIC_CHANGELOG);
     expect(releases).toHaveLength(2);
