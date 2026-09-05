@@ -5,11 +5,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { useAuthSafe } from '@/hooks/useJovieAuth';
 import { buildAudioBlobPath } from '@/lib/audio/blob-path';
 import {
-  getAudioFormatByFileName,
-  getCanonicalAudioMimeType,
-  isSupportedAudioFile,
   resolveAudioUploadMime,
-  SUPPORTED_AUDIO_MIME_TYPES,
   validateAudioUpload,
 } from '@/lib/audio/constants';
 import type { AudioEntityInference } from '@/lib/chat/infer-audio-entity';
@@ -18,6 +14,17 @@ import {
   isHeicLikeMimeType,
 } from '@/lib/images/heic-conversion';
 import {
+  buildFileBlobPath,
+  CHAT_FILE_ACCEPT,
+  CHAT_FILE_BATCH_MAX_SIZE_BYTES,
+  CHAT_FILE_MAX_FILES_PER_MESSAGE,
+  type ChatFileKind,
+  detectChatFileKind,
+  getCanonicalMimeTypeByFileName,
+  resolveChatFileUploadMime,
+  validateChatFileUpload,
+} from '@/lib/media/file-policy';
+import {
   canTransitionMediaLifecycle,
   isMediaLifecycleState,
   type MediaLifecycleState,
@@ -25,46 +32,16 @@ import {
 import type { FileUIPart } from '../types';
 
 // ── Constants ──────────────────────────────────────────────────────────
+// Kinds, MIME aliases, sizes and Blob paths come from the ONE file policy
+// (`@/lib/media/file-policy`); nothing is duplicated here.
 
-/** Maximum number of files per chat message. */
-const MAX_FILES_PER_MESSAGE = 20;
-
-/** Maximum file size for non-audio files (500 MB — covers large video masters). */
-const CHAT_FILE_MAX_SIZE = 500 * 1024 * 1024;
-
-/** Maximum total batch size (5 GB). */
-const CHAT_BATCH_MAX_SIZE = 5 * 1024 * 1024 * 1024;
-
-/** Accepted MIME types for the file input. */
-const ACCEPTED_TYPES = [
-  'image/jpeg',
-  'image/png',
-  'image/webp',
-  'image/avif',
-  'image/heic',
-  'image/heif',
-  'image/gif',
-  'image/tiff',
-  ...SUPPORTED_AUDIO_MIME_TYPES,
-  'video/mp4',
-  'video/quicktime',
-  'video/webm',
-  'video/x-msvideo',
-  'application/zip',
-  'application/x-zip-compressed',
-  'application/pdf',
-  'text/plain',
-].join(',');
+const MAX_FILES_PER_MESSAGE = CHAT_FILE_MAX_FILES_PER_MESSAGE;
+const CHAT_BATCH_MAX_SIZE = CHAT_FILE_BATCH_MAX_SIZE_BYTES;
+const ACCEPTED_TYPES = CHAT_FILE_ACCEPT;
 
 // ── Types ──────────────────────────────────────────────────────────────
 
-export type FileKind =
-  | 'image'
-  | 'audio'
-  | 'video'
-  | 'archive'
-  | 'document'
-  | 'other';
+export type FileKind = ChatFileKind;
 
 export type FileUploadStatus =
   | 'queued'
@@ -147,27 +124,7 @@ function generateId(): string {
 }
 
 function detectKind(file: File): FileKind {
-  if (file.type.startsWith('image/')) return 'image';
-  if (file.type.startsWith('audio/') || isSupportedAudioFile(file))
-    return 'audio';
-  if (file.type.startsWith('video/')) return 'video';
-  if (
-    file.type === 'application/zip' ||
-    file.type === 'application/x-zip-compressed'
-  )
-    return 'archive';
-  if (file.type === 'application/pdf' || file.type === 'text/plain')
-    return 'document';
-  const ext = file.name.split('.').pop()?.toLowerCase() ?? '';
-  if (getAudioFormatByFileName(file.name)) return 'audio';
-  if (['mp4', 'mov', 'webm', 'avi'].includes(ext)) return 'video';
-  if (
-    ['png', 'jpg', 'jpeg', 'webp', 'avif', 'heic', 'gif', 'tiff'].includes(ext)
-  )
-    return 'image';
-  if (ext === 'zip') return 'archive';
-  if (ext === 'pdf') return 'document';
-  return 'other';
+  return detectChatFileKind(file);
 }
 
 function buildKindLabel(file: File, kind: FileKind): string {
@@ -240,16 +197,9 @@ function shouldSkipZipEntry(name: string): boolean {
 }
 
 function guessMimeFromExtension(ext: string): string {
-  const audioMime = getCanonicalAudioMimeType(`file.${ext}`);
-  if (audioMime) return audioMime;
-  if (['mp4', 'mov', 'webm', 'avi'].includes(ext)) {
-    return `video/${ext === 'mov' ? 'quicktime' : ext}`;
-  }
-  if (['png', 'jpg', 'jpeg', 'webp', 'avif', 'gif', 'tiff'].includes(ext)) {
-    return `image/${ext === 'jpg' ? 'jpeg' : ext}`;
-  }
-  if (ext === 'pdf') return 'application/pdf';
-  return 'application/octet-stream';
+  return (
+    getCanonicalMimeTypeByFileName(`file.${ext}`) ?? 'application/octet-stream'
+  );
 }
 
 function isZipFile(file: File): boolean {
@@ -305,7 +255,8 @@ type UploadFileUpdater = (id: string, patch: Partial<PendingFile>) => void;
 async function uploadImageAttachment(
   file: File,
   id: string,
-  updateFile: UploadFileUpdater
+  updateFile: UploadFileUpdater,
+  userId: string
 ): Promise<void> {
   updateFile(id, { status: 'uploading', progress: 0 });
   let previewUrl: string | undefined;
@@ -323,17 +274,27 @@ async function uploadImageAttachment(
       }
     }
 
+    const uploadMime = resolveChatFileUploadMime(processedFile);
+    if (!uploadMime) {
+      throw new Error('Unsupported image file type');
+    }
+
     previewUrl = URL.createObjectURL(processedFile);
-    const blob = await uploadPresigned(processedFile.name, processedFile, {
-      access: 'public',
-      handleUploadUrl: '/api/chat/files/upload-token',
-    });
+    const blob = await uploadPresigned(
+      buildFileBlobPath('chat', userId, processedFile.name),
+      processedFile,
+      {
+        access: 'public',
+        handleUploadUrl: '/api/chat/files/upload-token',
+        contentType: uploadMime,
+      }
+    );
     updateFile(id, {
       status: 'ready',
       progress: 100,
       blobUrl: blob.url,
       previewUrl,
-      mediaType: processedFile.type,
+      mediaType: uploadMime,
     });
   } catch (err) {
     if (previewUrl?.startsWith('blob:')) {
@@ -425,18 +386,29 @@ async function uploadAudioAttachment(
 async function uploadGenericAttachment(
   file: File,
   id: string,
-  updateFile: UploadFileUpdater
+  updateFile: UploadFileUpdater,
+  userId: string
 ): Promise<void> {
   updateFile(id, { status: 'uploading', progress: 0 });
   try {
-    const blob = await uploadPresigned(file.name, file, {
-      access: 'public',
-      handleUploadUrl: '/api/chat/files/upload-token',
-    });
+    const uploadMime = resolveChatFileUploadMime(file);
+    if (!uploadMime) {
+      throw new Error('Unsupported file type');
+    }
+    const blob = await uploadPresigned(
+      buildFileBlobPath('chat', userId, file.name),
+      file,
+      {
+        access: 'public',
+        handleUploadUrl: '/api/chat/files/upload-token',
+        contentType: uploadMime,
+      }
+    );
     updateFile(id, {
       status: 'ready',
       progress: 100,
       blobUrl: blob.url,
+      mediaType: uploadMime,
     });
   } catch (err) {
     updateFile(id, {
@@ -469,29 +441,28 @@ async function expandRawFiles(
 async function buildPendingCandidate(
   file: File,
   seenHashes: Map<string, string>
-): Promise<{ candidate: PendingFile; file: File } | null> {
+): Promise<{ candidate: PendingFile; file: File }> {
   const kind = detectKind(file);
-  if (kind === 'audio') {
-    const validation = validateAudioUpload(file);
-    if (!validation.ok) {
-      return {
-        file,
-        candidate: {
-          id: generateId(),
-          name: file.name,
-          size: file.size,
-          mediaType: file.type || 'application/octet-stream',
-          kind,
-          progress: 0,
-          speed: 0,
-          status: 'failed',
-          error: validation.message,
-          kindLabel: buildKindLabel(file, kind),
-        },
-      };
-    }
-  } else if (file.size > CHAT_FILE_MAX_SIZE) {
-    return null;
+  // Named failing rule + CTA for both audio (audio-contracts) and files (file
+  // policy) so nothing is skipped silently (JOV-3688).
+  const validation =
+    kind === 'audio' ? validateAudioUpload(file) : validateChatFileUpload(file);
+  if (!validation.ok) {
+    return {
+      file,
+      candidate: {
+        id: generateId(),
+        name: file.name,
+        size: file.size,
+        mediaType: file.type || 'application/octet-stream',
+        kind,
+        progress: 0,
+        speed: 0,
+        status: 'failed',
+        error: validation.message,
+        kindLabel: buildKindLabel(file, kind),
+      },
+    };
   }
 
   let hashPrefix: string | undefined;
@@ -611,7 +582,7 @@ export function useChatFileAttachments({
   const uploadSingleFile = useCallback(
     async (file: File, id: string, kind: FileKind) => {
       if (kind === 'image') {
-        await uploadImageAttachment(file, id, updateFile);
+        await uploadImageAttachment(file, id, updateFile, userId ?? 'unknown');
         return;
       }
       if (kind === 'audio') {
@@ -624,7 +595,7 @@ export function useChatFileAttachments({
         );
         return;
       }
-      await uploadGenericAttachment(file, id, updateFile);
+      await uploadGenericAttachment(file, id, updateFile, userId ?? 'unknown');
     },
     [onAudioUploaded, updateFile, userId]
   );
@@ -647,12 +618,6 @@ export function useChatFileAttachments({
         }
 
         const built = await buildPendingCandidate(file, seenHashes);
-        if (!built) {
-          onError(
-            `${file.name} exceeds ${formatBytes(CHAT_FILE_MAX_SIZE)}. Skipped.`
-          );
-          continue;
-        }
         if (built.candidate.status === 'failed') {
           onError(built.candidate.error ?? `Could not attach ${file.name}.`);
         }
