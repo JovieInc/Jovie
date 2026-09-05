@@ -4,6 +4,11 @@ settings:
   autoInstallPeers: true
   excludeLinksFromLockfile: false
 
+patchedDependencies:
+  eve@0.47.7:
+    hash: 4va23je5pyhhye7kujavfzafiq
+    path: patches/eve@0.47.7.patch
+
 importers:
 
   .:
@@ -22,7 +27,7 @@ importers:
         version: 3.25.0(zod@4.3.6)
       eve:
         specifier: 0.47.7
-        version: 0.47.7(@opentelemetry/api@1.9.1)(@vercel/blob@2.8.0)(ai@7.0.58(zod@4.3.6))(braintrust@3.25.0(zod@4.3.6))(chokidar@4.0.0)(dotenv@16.6.1)(just-bash@3.4.2)(lru-cache@11.5.2)(microsandbox@0.6.16)(vite@8.1.5(@types/node@26.2.0)(esbuild@0.28.1)(tsx@4.21.0)(yaml@2.9.0))
+        version: 0.47.7(patch_hash=4va23je5pyhhye7kujavfzafiq)(@opentelemetry/api@1.9.1)(@vercel/blob@2.8.0)(ai@7.0.58(zod@4.3.6))(braintrust@3.25.0(zod@4.3.6))(chokidar@4.0.0)(dotenv@16.6.1)(just-bash@3.4.2)(lru-cache@11.5.2)(microsandbox@0.6.16)(vite@8.1.5(@types/node@26.2.0)(esbuild@0.28.1)(tsx@4.21.0)(yaml@2.9.0))
       just-bash:
         specifier: 3.4.2
         version: 3.4.2
@@ -4741,7 +4746,7 @@ snapshots:
 
   etag@1.8.1: {}
 
-  eve@0.47.7(@opentelemetry/api@1.9.1)(@vercel/blob@2.8.0)(ai@7.0.58(zod@4.3.6))(braintrust@3.25.0(zod@4.3.6))(chokidar@4.0.0)(dotenv@16.6.1)(just-bash@3.4.2)(lru-cache@11.5.2)(microsandbox@0.6.16)(vite@8.1.5(@types/node@26.2.0)(esbuild@0.28.1)(tsx@4.21.0)(yaml@2.9.0)):
+  eve@0.47.7(patch_hash=4va23je5pyhhye7kujavfzafiq)(@opentelemetry/api@1.9.1)(@vercel/blob@2.8.0)(ai@7.0.58(zod@4.3.6))(braintrust@3.25.0(zod@4.3.6))(chokidar@4.0.0)(dotenv@16.6.1)(just-bash@3.4.2)(lru-cache@11.5.2)(microsandbox@0.6.16)(vite@8.1.5(@types/node@26.2.0)(esbuild@0.28.1)(tsx@4.21.0)(yaml@2.9.0)):
     dependencies:
       ai: 7.0.58(zod@4.3.6)
       nitro: 3.0.260610-beta(@vercel/blob@2.8.0)(chokidar@4.0.0)(dotenv@16.6.1)(lru-cache@11.5.2)(vite@8.1.5(@types/node@26.2.0)(esbuild@0.28.1)(tsx@4.21.0)(yaml@2.9.0))
