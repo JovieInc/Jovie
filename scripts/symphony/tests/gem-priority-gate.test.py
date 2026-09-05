@@ -1375,7 +1375,6 @@ class DeploymentBindingTests(unittest.TestCase):
         for status, reasons in (
             ("grace", []),
             ("red", ["queue-controller-red-over-10m"]),
-            ("red", ["closure-observation-unknown"]),
         ):
             with self.subTest(status=status):
                 signals = dict(GREEN_SIGNALS)
@@ -1394,6 +1393,24 @@ class DeploymentBindingTests(unittest.TestCase):
                 self.assertEqual(receipt["promotionMode"], "controller-repair-only")
                 self.assertTrue(receipt["controllerRepairAdmission"]["allowed"])
                 self.assertFalse(receipt["closureAdmission"]["newIssueIntakeAllowed"])
+
+    def test_unknown_closure_observation_blocks_controller_repair(self):
+        now = MODULE.datetime(2026, 8, 19, 22, 40, tzinfo=MODULE.UTC)
+        signals = dict(GREEN_SIGNALS)
+        signals["independentReview"] = {
+            **GREEN_SIGNALS["independentReview"],
+            "observedAt": MODULE.isoformat(now),
+        }
+        signals["controller"] = {"status": "failed"}
+        signals["closureHealth"] = {
+            **GREEN_SIGNALS["closureHealth"],
+            "status": "red",
+            "newIssueIntakeAllowed": False,
+            "reasons": ["closure-observation-unknown"],
+        }
+        receipt = MODULE.evaluate(signals, MODULE.isoformat(now))
+        self.assertEqual(receipt["promotionMode"], "blocked")
+        self.assertFalse(receipt["controllerRepairAdmission"]["allowed"])
 
     def test_unrelated_closure_debt_still_blocks_controller_repair(self):
         now = MODULE.datetime(2026, 8, 19, 22, 40, tzinfo=MODULE.UTC)

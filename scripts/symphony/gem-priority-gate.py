@@ -1390,7 +1390,6 @@ def evaluate(signals: dict[str, Any], observed_at: str) -> dict[str, Any]:
             and closure_reasons
             <= {
                 "queue-controller-red-over-10m",
-                "closure-observation-unknown",
             }
             and closure_health.get("newIssueIntakeAllowed") is False
         )
