@@ -1,13 +1,20 @@
 import 'server-only';
 import { getVercelOidcToken } from '@vercel/oidc';
 import { env } from '@/lib/env-server';
+import { ServerEnvSchema } from '@/lib/env-server-schema';
 import { boundedFetch } from '@/lib/http/bounded-fetch';
 
 /** Existing production Jovie OIDC boundary, shared by cron observations and founder conversation. */
 export function getEveShadowOrigin(): string {
   const deploymentOrigin = env.OVIE_SUMMER_EVE_DEPLOYMENT_ORIGIN?.trim();
   if (!deploymentOrigin) throw new Error('exact_eve_deployment_required');
-  return deploymentOrigin;
+  const parsed =
+    ServerEnvSchema.shape.OVIE_SUMMER_EVE_DEPLOYMENT_ORIGIN.safeParse(
+      deploymentOrigin
+    );
+  if (!parsed.success || !parsed.data)
+    throw new Error('invalid_eve_deployment_origin');
+  return parsed.data;
 }
 
 export async function fetchSummerShadow(
