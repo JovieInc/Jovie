@@ -1,3 +1,4 @@
+import { createHash, generateKeyPairSync } from 'node:crypto';
 import {
   afterEach,
   beforeAll,
@@ -10,11 +11,10 @@ import {
 import type { ChatAccountContext } from '@/lib/chat/account-context';
 import { getEntitlements } from '@/lib/entitlements/registry';
 import { MemoryOperatingStore } from '@/lib/ovie/mcp/store';
+import { ovieSummerTurnId } from '@/lib/ovie/summer-conversation';
 import {
-  bindCurrentSummerSpeaker,
   disableSummerTransport,
   resetSummerTransportRuntime,
-  type SummerSpeaker,
 } from '@/lib/ovie/summer-transport';
 
 const hoisted = vi.hoisted(() => ({
@@ -30,7 +30,14 @@ const hoisted = vi.hoisted(() => ({
   persistTerminalAssistantMessageMock: vi.fn(),
   isAdminMock: vi.fn(),
   getOvieOperatingStoreMock: vi.fn(),
+  fetchSummerShadowMock: vi.fn(),
 }));
+const summerSigningPrivateKey = generateKeyPairSync(
+  'ed25519'
+).privateKey.export({ type: 'pkcs8', format: 'pem' });
+const founderPrincipalHash = createHash('sha256')
+  .update('00000000-0000-4000-8000-000000000123')
+  .digest('base64url');
 
 vi.mock('@/app/api/chat/onboarding-handler', () => ({
   tryHandleAnonymousOnboardingChat:
@@ -44,6 +51,10 @@ vi.mock('@/lib/auth/cached', () => ({
 
 vi.mock('@/lib/admin/roles', () => ({
   isAdmin: hoisted.isAdminMock,
+}));
+
+vi.mock('@/lib/ovie/summer-shadow-client', () => ({
+  fetchSummerShadow: hoisted.fetchSummerShadowMock,
 }));
 
 vi.mock('@/lib/ovie/mcp/runtime-store', () => ({
@@ -350,8 +361,20 @@ describe('POST /api/chat guard wiring', () => {
 
   beforeEach(() => {
     vi.clearAllMocks();
+    vi.stubEnv(
+      'OVIE_SUMMER_FOUNDER_APP_USER_ID',
+      '00000000-0000-4000-8000-000000000123'
+    );
+    vi.stubEnv(
+      'SUMMER_CONVERSATION_SIGNING_PRIVATE_KEY',
+      summerSigningPrivateKey
+    );
+    vi.stubEnv('SUMMER_CONVERSATION_SIGNING_KEY_ID', 'producer-test');
+    vi.stubEnv('OVIE_SUMMER_EVE_EXPECTED_DEPLOYMENT_ID', 'dpl_test');
     hoisted.tryHandleAnonymousOnboardingChatMock.mockResolvedValue(null);
-    hoisted.getOptionalAuthMock.mockResolvedValue({ userId: 'user_123' });
+    hoisted.getOptionalAuthMock.mockResolvedValue({
+      userId: '00000000-0000-4000-8000-000000000123',
+    });
     hoisted.resolveChatAccountContextMock.mockResolvedValue(
       makeAccountContext()
     );
@@ -371,6 +394,7 @@ describe('POST /api/chat guard wiring', () => {
 
   afterEach(() => {
     resetSummerTransportRuntime();
+    vi.unstubAllEnvs();
   });
 
   it('returns 401 for unauthenticated requests without touching billing, rate limits, or the LLM', async () => {
@@ -433,7 +457,7 @@ describe('POST /api/chat guard wiring', () => {
     // Wiring: the limiter must be consulted with the canonical userId + plan
     // from the entitlement resolver, not values from the request body.
     expect(hoisted.checkAiChatRateLimitForPlanMock).toHaveBeenCalledWith(
-      'user_123',
+      '00000000-0000-4000-8000-000000000123',
       'pro'
     );
     expect(hoisted.executeChatTurnMock).not.toHaveBeenCalled();
@@ -462,7 +486,7 @@ describe('POST /api/chat guard wiring', () => {
     expect(body.message).not.toBe('Daily chat limit reached');
     expect(body.message).toMatch(/billing/i);
     expect(hoisted.checkAiChatRateLimitForPlanMock).toHaveBeenCalledWith(
-      'user_123',
+      '00000000-0000-4000-8000-000000000123',
       'free'
     );
   });
@@ -476,10 +500,13 @@ describe('POST /api/chat guard wiring', () => {
     const body = await response.json();
     expect(body.errorCode).toBe('CHAT_DISABLED');
 
-    expect(hoisted.checkGatesForUserMock).toHaveBeenCalledWith('user_123', [
-      { key: 'ai_chat_disabled', defaultValue: false },
-      { key: 'ai_chat_force_light', defaultValue: false },
-    ]);
+    expect(hoisted.checkGatesForUserMock).toHaveBeenCalledWith(
+      '00000000-0000-4000-8000-000000000123',
+      [
+        { key: 'ai_chat_disabled', defaultValue: false },
+        { key: 'ai_chat_force_light', defaultValue: false },
+      ]
+    );
     expect(hoisted.checkAiChatRateLimitForPlanMock).not.toHaveBeenCalled();
     expect(hoisted.executeChatTurnMock).not.toHaveBeenCalled();
   });
@@ -490,6 +517,7 @@ describe('POST /api/chat guard wiring', () => {
     expect(response.status).toBe(403);
     const body = await response.json();
     expect(body.error).toBe('Admin role required for OV chat mode');
+    expect(hoisted.fetchSummerShadowMock).not.toHaveBeenCalled();
     expect(hoisted.executeChatTurnMock).not.toHaveBeenCalled();
     expect(hoisted.checkAiChatRateLimitForPlanMock).not.toHaveBeenCalled();
   });
@@ -527,14 +555,38 @@ describe('POST /api/chat guard wiring', () => {
 
   it('streams bound current Summer on OV turns without artist Jovie generation', async () => {
     hoisted.isAdminMock.mockResolvedValue(true);
-    const speaker: SummerSpeaker = {
-      id: 'summer',
-      runtime: 'mac',
-      async *speak() {
-        yield { type: 'text-delta', text: 'Summer current session.' };
-      },
-    };
-    bindCurrentSummerSpeaker(speaker);
+    hoisted.fetchSummerShadowMock
+      .mockResolvedValueOnce(
+        Response.json(
+          { ok: true },
+          {
+            status: 202,
+            headers: { 'x-jovie-eve-deployment-id': 'dpl_test' },
+          }
+        )
+      )
+      .mockResolvedValueOnce(
+        Response.json(
+          {
+            ok: true,
+            result: {
+              eventId: ovieSummerTurnId({
+                conversationId: 'summer-session:current',
+                clientTurnId: 'ov-turn-1',
+              }),
+              conversationId: 'summer-session-current',
+              principalHash: founderPrincipalHash,
+              sessionId: 'ses_current',
+              turnId: 'turn_1',
+              responseText: 'Summer current session.',
+              status: 'completed',
+              nextStartIndex: 3,
+              model: 'zai/glm-5.3-flash',
+            },
+          },
+          { headers: { 'x-jovie-eve-deployment-id': 'dpl_test' } }
+        )
+      );
 
     const response = await POST(
       chatRequest(
@@ -564,5 +616,84 @@ describe('POST /api/chat guard wiring', () => {
     expect(body.toLowerCase()).not.toMatch(/i am ovie/);
     expect(hoisted.executeChatTurnMock).not.toHaveBeenCalled();
     expect(hoisted.reserveChatTurnMock).not.toHaveBeenCalled();
+    expect(hoisted.fetchSummerShadowMock).toHaveBeenCalledTimes(2);
+  });
+
+  it('rejects OV turns without a stable client turn id before Eve dispatch', async () => {
+    hoisted.isAdminMock.mockResolvedValue(true);
+
+    const response = await POST(
+      chatRequest(
+        validBody({
+          chatMode: 'ov',
+          messages: [
+            {
+              id: 'm1',
+              role: 'user',
+              parts: [{ type: 'text', text: 'status of the kanban' }],
+            },
+          ],
+        })
+      )
+    );
+
+    expect(response.status).toBe(400);
+    expect(await response.json()).toMatchObject({
+      error: 'clientTurnId is required for live OV chat',
+    });
+    expect(hoisted.fetchSummerShadowMock).not.toHaveBeenCalled();
+    expect(hoisted.executeChatTurnMock).not.toHaveBeenCalled();
+  });
+
+  it('rejects a non-founder admin before the live Eve request', async () => {
+    hoisted.isAdminMock.mockResolvedValue(true);
+    vi.stubEnv(
+      'OVIE_SUMMER_FOUNDER_APP_USER_ID',
+      '00000000-0000-4000-8000-000000000999'
+    );
+
+    const response = await POST(
+      chatRequest(
+        validBody({
+          chatMode: 'ov',
+          clientTurnId: 'ov-turn-not-founder',
+          messages: [
+            {
+              id: 'm1',
+              role: 'user',
+              parts: [{ type: 'text', text: 'private founder status' }],
+            },
+          ],
+        })
+      )
+    );
+
+    expect(response.status).toBe(403);
+    expect(hoisted.fetchSummerShadowMock).not.toHaveBeenCalled();
+    expect(hoisted.getOvieOperatingStoreMock).not.toHaveBeenCalled();
+  });
+
+  it('fails closed when the founder identity binding is unconfigured', async () => {
+    hoisted.isAdminMock.mockResolvedValue(true);
+    vi.stubEnv('OVIE_SUMMER_FOUNDER_APP_USER_ID', '');
+
+    const response = await POST(
+      chatRequest(
+        validBody({
+          chatMode: 'ov',
+          clientTurnId: 'ov-turn-unconfigured',
+          messages: [
+            {
+              id: 'm1',
+              role: 'user',
+              parts: [{ type: 'text', text: 'private founder status' }],
+            },
+          ],
+        })
+      )
+    );
+
+    expect(response.status).toBe(503);
+    expect(hoisted.fetchSummerShadowMock).not.toHaveBeenCalled();
   });
 });
