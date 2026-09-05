@@ -8,10 +8,12 @@ import io
 import os
 import pathlib
 import re
+import signal
 import socket
 import subprocess
 import tempfile
 import threading
+import time
 import unittest
 import importlib.util
 import json
@@ -589,6 +591,70 @@ class OfficialSymphonyContractTests(unittest.TestCase):
         self.assertEqual(slept, 20)
         self.assertEqual(sleeps, [20])
         self.assertEqual(kills, [(process.pid, helper.signal.SIGSTOP), (process.pid, helper.signal.SIGCONT)])
+
+    def test_official_runtime_wrapper_forwards_term_to_child_process_group(self):
+        child_program = r"""
+import pathlib, signal, subprocess, sys, time
+child_receipt = pathlib.Path(sys.argv[1])
+grandchild_receipt = pathlib.Path(sys.argv[2])
+grandchild_program = '''
+import pathlib, signal, sys, time
+receipt = pathlib.Path(sys.argv[1])
+signal.signal(signal.SIGTERM, lambda *_: (receipt.write_text("term"), sys.exit(0)))
+print("grandchild-ready", flush=True)
+while True: time.sleep(1)
+'''
+subprocess.Popen([sys.executable, "-c", grandchild_program, str(grandchild_receipt)])
+signal.signal(signal.SIGTERM, lambda *_: (child_receipt.write_text("term"), sys.exit(0)))
+print("child-ready", flush=True)
+while True: time.sleep(1)
+"""
+        with tempfile.TemporaryDirectory() as tmp:
+            child_receipt = pathlib.Path(tmp) / "child-term"
+            grandchild_receipt = pathlib.Path(tmp) / "grandchild-term"
+            process = subprocess.Popen(
+                [
+                    "python3",
+                    str(HELPER_PATH),
+                    "run",
+                    "--gate-file",
+                    str(pathlib.Path(tmp) / "linear-rate-limit.json"),
+                    *_closure_run_args(tmp),
+                    "--max-gate-sleep-seconds",
+                    "0",
+                    "--",
+                    "python3",
+                    "-c",
+                    child_program,
+                    str(child_receipt),
+                    str(grandchild_receipt),
+                ],
+                cwd=ROOT,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.STDOUT,
+                text=True,
+            )
+            try:
+                assert process.stdout is not None
+                ready = {
+                    process.stdout.readline().strip(),
+                    process.stdout.readline().strip(),
+                }
+                self.assertEqual(ready, {"child-ready", "grandchild-ready"})
+                os.kill(process.pid, signal.SIGTERM)
+                process.wait(timeout=5)
+                for _ in range(50):
+                    if child_receipt.is_file() and grandchild_receipt.is_file():
+                        break
+                    time.sleep(0.02)
+                self.assertEqual(child_receipt.read_text(), "term")
+                self.assertEqual(grandchild_receipt.read_text(), "term")
+            finally:
+                if process.poll() is None:
+                    process.kill()
+                    process.wait(timeout=5)
+                if process.stdout is not None:
+                    process.stdout.close()
 
     def test_unit_binds_closure_stop_line_gate(self):
         helper = _load_helper()

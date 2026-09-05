@@ -49,6 +49,43 @@ class OpenAISymphonyInstallTests(unittest.TestCase):
         self.assertIn("symphony-elixir.service", updater)
         self.assertIn('SUM_NAME="${BIN_NAME}.sha256"', updater)
 
+    def test_workflow_runtime_references_are_canonical_and_executable(self) -> None:
+        workflow = (ROOT / "scripts/symphony/WORKFLOW.md").read_text()
+        references = set(
+            re.findall(
+                r"(?:\./)?(scripts/symphony/symphony-[A-Za-z0-9._-]+)",
+                workflow,
+            )
+        )
+        self.assertEqual(
+            references,
+            {
+                "scripts/symphony/symphony-codex-router",
+                "scripts/symphony/symphony-nvme-package-cache.sh",
+            },
+        )
+        self.assertNotIn("scripts/hermes/symphony-", workflow)
+        for reference in references:
+            target = ROOT / reference
+            self.assertTrue(target.is_file(), reference)
+            self.assertTrue(target.stat().st_mode & 0o111, reference)
+
+    def test_activation_promotes_config_before_attempting_runtime_restart(self) -> None:
+        activation = (
+            ROOT / ".github/workflows/gem-delivery-controller-activation.yml"
+        ).read_text()
+        config_only = (
+            "bash scripts/symphony/update-symphony-burrito.sh "
+            "--skip-binary --no-restart"
+        )
+        activate = "bash scripts/symphony/update-symphony-burrito.sh --skip-binary"
+        self.assertIn(config_only, activation)
+        config_index = activation.index(config_only)
+        activation_index = activation.index(
+            activate, config_index + len(config_only)
+        )
+        self.assertLess(config_index, activation_index)
+
     def test_homemade_issue_pickup_is_disabled(self) -> None:
         self.assertFalse(
             (ROOT / ".github/workflows/jovie-intake-controller.yml").exists()

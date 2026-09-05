@@ -64,6 +64,11 @@ jobs:
           GEM_CONTROLLER_EXPECTED_REVISION: ${{ github.event.workflow_run.head_sha }}
         run: |
           set -euo pipefail
+          # Commit source-owned configuration independently of runtime
+          # activation. If activation is intentionally held or fails, the
+          # updater's rollback snapshot is now the exact production config,
+          # so a retired workflow cannot be restored.
+          bash scripts/symphony/update-symphony-burrito.sh --skip-binary --no-restart
           bash scripts/symphony/update-symphony-burrito.sh --skip-binary
           bash scripts/symphony/install-gem-fleet-controller.sh
           bash scripts/symphony/install-gem-pr-rehabilitation.sh

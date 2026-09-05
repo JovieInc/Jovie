@@ -1233,42 +1233,66 @@ def run_official_binary_once(
         text=True,
         errors="replace",
         bufsize=1,
+        start_new_session=True,
     )
+    previous_handlers: dict[signal.Signals, Any] = {}
+
+    def forward_signal(signum: int, _frame: Any) -> None:
+        """Forward service-manager termination to the complete child tree."""
+        if process.poll() is not None:
+            return
+        try:
+            # A scheduler held by a rate/closure gate must be resumed before
+            # it can observe the terminating signal.
+            os.killpg(process.pid, signal.SIGCONT)
+            os.killpg(process.pid, signum)
+        except ProcessLookupError:
+            pass
+
+    for forwarded in (signal.SIGTERM, signal.SIGINT):
+        previous_handlers[forwarded] = signal.getsignal(forwarded)
+        signal.signal(forwarded, forward_signal)
     rate_limited = False
     issue_errors: dict[str, dict[str, Any]] = {}
     dead_letter_noted: set[str] = set()
     last_closure_check = 0.0
-    assert process.stdout is not None
-    for line in process.stdout:
-        print(line, end="", flush=True)
-        classification = classify_linear_log_line(line)
-        if classification and write_rate_limit_gate(gate_file, classification):
-            # The official scheduler may be supervising active agents. Record the
-            # reset gate and suspend only the scheduler process; do not
-            # terminate the process tree that may contain active Codex jobs.
-            rate_limited = True
-            gate = read_rate_limit_gate(gate_file)
-            _pause_child_for_gate(process, gate, max_gate_sleep_seconds)
-        else:
-            issue_error = classify_linear_issue_error_log_line(line)
-            if issue_error is not None:
-                record_linear_issue_error(
-                    closure.dead_letter_dir,
-                    issue_error,
-                    issue_errors,
-                    dead_letter_noted,
+    try:
+        assert process.stdout is not None
+        for line in process.stdout:
+            print(line, end="", flush=True)
+            classification = classify_linear_log_line(line)
+            if classification and write_rate_limit_gate(gate_file, classification):
+                # The official scheduler may be supervising active agents. Record the
+                # reset gate and suspend only the scheduler process; do not
+                # terminate the process tree that may contain active Codex jobs.
+                rate_limited = True
+                gate = read_rate_limit_gate(gate_file)
+                _pause_child_for_gate(process, gate, max_gate_sleep_seconds)
+            else:
+                issue_error = classify_linear_issue_error_log_line(line)
+                if issue_error is not None:
+                    record_linear_issue_error(
+                        closure.dead_letter_dir,
+                        issue_error,
+                        issue_errors,
+                        dead_letter_noted,
+                    )
+            monotonic_now = time.monotonic()
+            if monotonic_now - last_closure_check >= CLOSURE_HOLD_RECHECK_SECONDS:
+                last_closure_check = monotonic_now
+                verdict = read_closure_stop_line(
+                    closure.receipt_path, max_age_seconds=closure.max_receipt_age_seconds
                 )
-        monotonic_now = time.monotonic()
-        if monotonic_now - last_closure_check >= CLOSURE_HOLD_RECHECK_SECONDS:
-            last_closure_check = monotonic_now
-            verdict = read_closure_stop_line(
-                closure.receipt_path, max_age_seconds=closure.max_receipt_age_seconds
-            )
-            if verdict["hold"]:
-                _pause_child_for_closure_hold(
-                    process, closure, verdict, max_gate_sleep_seconds
-                )
-    returncode = process.wait()
+                if verdict["hold"]:
+                    _pause_child_for_closure_hold(
+                        process, closure, verdict, max_gate_sleep_seconds
+                    )
+        returncode = process.wait()
+    finally:
+        if process.stdout is not None:
+            process.stdout.close()
+        for forwarded, previous in previous_handlers.items():
+            signal.signal(forwarded, previous)
     return RATE_LIMIT_EXIT_CODE if rate_limited else returncode
 
 
