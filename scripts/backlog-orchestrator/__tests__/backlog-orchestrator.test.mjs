@@ -252,6 +252,9 @@ describe('reconciliation idempotency', () => {
     let nextUpdatedAt = issue.updatedAt;
     const calls = { comments: [] };
     const client = {
+      async fetchIssue() {
+        return reread();
+      },
       async addComment(issueId, body) {
         calls.comments.push({ issueId, body });
         issue.comments.nodes.push({
@@ -306,7 +309,7 @@ describe('deterministic triage routing', () => {
     );
   });
 
-  it('routes incidents, follow-ups, and ready work out of Triage', () => {
+  it('preserves protected incidents while routing unowned follow-ups and ready work', () => {
     const states = { backlogStateId: 'backlog-id', todoStateId: 'todo-id' };
     const classification = { category: 'triageable' };
     assert.equal(
@@ -315,7 +318,7 @@ describe('deterministic triage routing', () => {
         classification,
         states
       ).desiredStateId,
-      'todo-id'
+      null
     );
     const followup = triageRouter.routeTriageIssue(
       makeIssue({ description: '## Follow-up\nCurrent issue: JOV-42' }),
@@ -372,6 +375,9 @@ describe('deterministic triage routing', () => {
     const receipt = await reconcileIssues({
       issues: [issue],
       client: {
+        async fetchIssue() {
+          return structuredClone(issue);
+        },
         async transitionIssue(issueId, stateId) {
           transitions.push({ issueId, stateId });
         },
@@ -2317,5 +2323,283 @@ print(json.dumps({"behind": behind, "clean": clean, "calls": calls}))
     assert.equal(client.calls.labels.length, 1);
     assert.equal(client.calls.comments.length, 1);
     assert.equal(client.calls.rereads, 4);
+  });
+});
+
+describe('triage ownership fence', () => {
+  const states = { backlogStateId: 'backlog-id', todoStateId: 'todo-id' };
+  function fixture(overrides = {}) {
+    let live = makeIssue({
+      identifier: 'JOV-6034',
+      labels: ['agent-ready'],
+      ...overrides,
+    });
+    const writes = [];
+    const client = {
+      async fetchIssue() {
+        return structuredClone(live);
+      },
+      async addComment(_id, body) {
+        writes.push('comment');
+        live.comments.nodes.push({ body, createdAt: '2026-09-05T21:00:00Z' });
+        return { success: true };
+      },
+      async setIssueParent(_id, parentId) {
+        writes.push('parent');
+        live.parent = { id: parentId, identifier: 'JOV-42', title: 'Parent' };
+        return { success: true };
+      },
+      async transitionIssue(_id, id) {
+        writes.push('transition');
+        live.state = {
+          id,
+          name: id === 'todo-id' ? 'Todo' : 'Backlog',
+          type: 'unstarted',
+        };
+        return { success: true };
+      },
+    };
+    return {
+      client,
+      writes,
+      read: () => structuredClone(live),
+      change: patch => {
+        live = { ...live, ...patch };
+      },
+    };
+  }
+  async function run(f, snapshot = f.read()) {
+    return reconcileIssues({ issues: [snapshot], client: f.client, ...states });
+  }
+
+  for (const [name, overrides] of [
+    ['protected direct task', { labels: ['agent-ready', 'codex-in-progress'] }],
+    ['assigned direct owner', { assignee: { id: 'tim', name: 'Tim White' } }],
+    [
+      'canonical active claim',
+      {
+        state: 'In Progress',
+        labels: ['agent-ready', 'symphony', 'admission-approved'],
+      },
+    ],
+    [
+      'canonical queued claim',
+      { state: 'Todo', labels: ['symphony', 'admission-approved'] },
+    ],
+    ['ambiguous in-flight ownership', { state: 'In Progress' }],
+    ['review handoff', { state: 'In Review' }],
+    [
+      'active PR',
+      { pullRequestUrl: 'https://github.com/JovieInc/Jovie/pull/1' },
+    ],
+    ['terminal issue', { state: 'Done' }],
+  ]) {
+    it(`makes zero writes for ${name}`, async () => {
+      const f = fixture(overrides);
+      const receipt = await run(f);
+      assert.deepEqual(f.writes, []);
+      assert.equal(receipt.skipped, 1);
+      assert.equal(receipt.mutations, 0);
+      assert.equal(
+        triageRouter.routeTriageIssue(
+          f.read(),
+          { category: 'triageable' },
+          states
+        ).desiredStateId,
+        null
+      );
+    });
+  }
+
+  it('does not mistake expired machine evidence or handoff prose for release authority', async () => {
+    const f = fixture({
+      state: 'In Progress',
+      updatedAt: '2026-09-03T12:00:00Z',
+      comments: [
+        {
+          body: 'machine-agent completed; process: 12 workspace: /work branch: codex/old; handoff to triage',
+          createdAt: '2026-08-01T00:00:00Z',
+        },
+      ],
+    });
+    assert.equal(
+      staleLease.classifyStaleLease(f.read(), { now: '2026-09-05T12:00:00Z' })
+        .eligible,
+      true
+    );
+    await run(f);
+    assert.deepEqual(f.writes, []);
+    // Existing recovery/owner actually released the Linear lease to Todo.
+    f.change({ state: { id: 'todo-id', name: 'Todo', type: 'unstarted' } });
+    await run(f);
+    await run(f);
+    assert.deepEqual(f.writes, ['comment']);
+  });
+
+  it('rejects a newly claimed issue read immediately before the first write', async () => {
+    const f = fixture();
+    const snapshot = f.read();
+    f.change({ state: { id: 'active', name: 'In Progress' } });
+    const receipt = await run(f, snapshot);
+    assert.deepEqual(f.writes, []);
+    assert.equal(receipt.failed, 1);
+    assert.match(receipt.results[0].reason, /ownership/);
+  });
+
+  it('stops remaining writes when ownership changes after classification', async () => {
+    const f = fixture();
+    const add = f.client.addComment;
+    f.client.addComment = async (...args) => {
+      await add(...args);
+      f.change({ assignee: { id: 'direct-owner' } });
+      return { success: true };
+    };
+    const receipt = await run(f);
+    assert.deepEqual(f.writes, ['comment']);
+    assert.equal(receipt.failed, 1);
+    await run(f);
+    assert.deepEqual(f.writes, ['comment']);
+  });
+
+  it('rechecks this issue after parent resolution and never attaches a competing parent', async () => {
+    const f = fixture({ description: '## Follow-up\nCurrent issue: JOV-42' });
+    const read = f.client.fetchIssue;
+    f.client.fetchIssue = async id => {
+      if (id === 'JOV-42') {
+        f.change({ labels: { nodes: [{ name: 'codex-in-progress' }] } });
+        return { id: 'parent-id', identifier: 'JOV-42', title: 'Parent' };
+      }
+      return read();
+    };
+    const receipt = await run(f);
+    assert.deepEqual(f.writes, ['comment']);
+    assert.equal(receipt.results[0].reason, 'protected-policy');
+  });
+
+  it('completes an unowned parent route once and does not rewrite provider instructions', async () => {
+    const f = fixture({
+      description:
+        '## Follow-up\nCurrent issue: JOV-42\nOld Ops triage: Grok/Kimi only',
+    });
+    const before = f.read().description;
+    const read = f.client.fetchIssue;
+    f.client.fetchIssue = async id =>
+      id === 'JOV-42'
+        ? { id: 'parent-id', identifier: 'JOV-42', title: 'Parent' }
+        : read();
+    const receipt = await run(f);
+    assert.equal(receipt.failed, 0);
+    assert.deepEqual(f.writes, ['comment', 'parent', 'transition']);
+    await run(f);
+    assert.deepEqual(f.writes, ['comment', 'parent', 'transition']);
+    assert.equal(f.read().description, before);
+  });
+
+  for (const [name, reader] of [
+    [
+      'unavailable',
+      async () => {
+        throw new Error('read unavailable');
+      },
+    ],
+    ['missing', async () => null],
+    ['wrong issue', async () => makeIssue({ identifier: 'JOV-999' })],
+  ]) {
+    it(`fails closed on ${name} ownership read`, async () => {
+      const f = fixture();
+      f.client.fetchIssue = reader;
+      assert.equal((await run(f)).failed, 1);
+      assert.deepEqual(f.writes, []);
+    });
+  }
+
+  it('rejects changed routing content even beyond the old classification fingerprint prefix', async () => {
+    const f = fixture({ description: 'x'.repeat(250) });
+    const snapshot = f.read();
+    f.change({ description: `${snapshot.description}\nCurrent issue: JOV-42` });
+    const receipt = await run(f, snapshot);
+    assert.equal(receipt.results[0].reason, 'reconciliation-snapshot-changed');
+    assert.deepEqual(f.writes, []);
+  });
+
+  it('uses fresh persisted classification to deduplicate a stale retry snapshot', async () => {
+    const f = fixture({ labels: [] });
+    const snapshot = f.read();
+    await run(f, snapshot);
+    await run(f, snapshot);
+    assert.deepEqual(f.writes, ['comment']);
+  });
+
+  it('makes zero writes when ownership evidence is known to be incomplete', async () => {
+    const f = fixture();
+    f.change({ comments: { nodes: [], pageInfo: { hasNextPage: true } } });
+    const receipt = await run(f);
+    assert.equal(receipt.results[0].reason, 'nested-evidence-incomplete');
+    assert.deepEqual(f.writes, []);
+  });
+
+  it('reconciles a lost comment acknowledgment without posting it twice', async () => {
+    const f = fixture();
+    const snapshot = f.read();
+    const add = f.client.addComment;
+    f.client.addComment = async (...args) => {
+      await add(...args);
+      throw new Error('response lost after persistence');
+    };
+    assert.equal((await run(f, snapshot)).failed, 1);
+    assert.deepEqual(f.writes, ['comment']);
+    assert.equal((await run(f, snapshot)).failed, 0);
+    assert.deepEqual(f.writes, ['comment', 'transition']);
+    await run(f);
+    assert.deepEqual(f.writes, ['comment', 'transition']);
+  });
+
+  it('reports failed mutations and never continues into the next side effect', async () => {
+    const f = fixture();
+    f.client.addComment = async () => ({ commentCreate: { success: false } });
+    const receipt = await run(f);
+    assert.equal(receipt.failed, 1);
+    assert.equal(receipt.mutations, 0);
+    assert.deepEqual(f.writes, []);
+  });
+});
+
+describe('unowned triage routes preserve existing admission boundaries', () => {
+  const states = { todoStateId: 'todo-id', backlogStateId: 'backlog-id' };
+  it('routes an unprotected controller recovery and defers ready work with dependencies', () => {
+    assert.equal(
+      triageRouter.routeTriageIssue(
+        makeIssue({ title: '[production controller] manual recovery' }),
+        { category: 'triageable' },
+        states
+      ).reason,
+      'incident-lane'
+    );
+    const blocked = makeIssue({
+      labels: ['agent-ready'],
+      relations: [{ type: 'blocked_by' }],
+    });
+    assert.equal(
+      triageRouter.routeTriageIssue(blocked, { category: 'triageable' }, states)
+        .reason,
+      'blocked-by-relation'
+    );
+  });
+  it('routes duplicate and obsolete classifications without taking a protected epic', () => {
+    for (const category of ['duplicate', 'obsolete']) {
+      assert.equal(
+        triageRouter.routeTriageIssue(makeIssue(), { category }, states)
+          .desiredStateId,
+        'backlog-id'
+      );
+    }
+    assert.equal(
+      triageRouter.routeTriageIssue(
+        makeIssue({ labels: ['agent-ready', 'type:epic'] }),
+        { category: 'triageable' },
+        states
+      ).desiredStateId,
+      null
+    );
   });
 });

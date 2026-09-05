@@ -1,3 +1,6 @@
+import { classifyAdmissionDisposition } from './admission-disposition.mjs';
+import { preAdmissionDecision } from './admission-policy.mjs';
+
 const AGENT_READY_LABELS = new Set(['agent-ready', 'ready-for-intake']);
 const BLOCKED_RELATIONS = new Set(['blocked_by', 'blockedBy']);
 const FOLLOWUP_PARENT_PATTERNS = [
@@ -27,18 +30,49 @@ export function extractFollowupParentIdentifier(issue) {
   return null;
 }
 
+/** Triage does not release leases; the existing recovery/handoff path owns that. */
+export function triageOwnershipDecision(issue) {
+  const policy = preAdmissionDecision(issue);
+  if (!policy.allowed) return { allowed: false, reason: policy.reason.code };
+  if (issue.assignee) return { allowed: false, reason: 'already-assigned' };
+  const { ownership, evidence } = classifyAdmissionDisposition(issue);
+  if (evidence.nestedEvidenceIncomplete) {
+    return { allowed: false, reason: 'nested-evidence-incomplete' };
+  }
+  if (ownership.status !== 'unowned') {
+    return { allowed: false, reason: `ownership-${ownership.status}` };
+  }
+  if (evidence.activePullRequest) {
+    return { allowed: false, reason: 'active-pull-request' };
+  }
+  if (!['Triage', 'Backlog', 'Todo'].includes(issue.state?.name)) {
+    return { allowed: false, reason: 'not-unclaimed-intake' };
+  }
+  return { allowed: true, reason: null };
+}
+
 export function routeTriageIssue(
   issue,
   classification,
   { backlogStateId = null, todoStateId = null } = {}
 ) {
+  const ownership = triageOwnershipDecision(issue);
+  if (!ownership.allowed) {
+    return {
+      category: 'owned',
+      desiredStateId: null,
+      parentIdentifier: null,
+      reason: ownership.reason,
+      agentReady: false,
+    };
+  }
   const labels = labelNames(issue);
   const title = issue.title || '';
   const description = issue.description || '';
   const isAgentReady = [...AGENT_READY_LABELS].some(label => labels.has(label));
-  const isIncident =
-    labels.has('incident') ||
-    /^\[production controller\]\s*manual recovery/i.test(title);
+  const isIncident = /^\[production controller\]\s*manual recovery/i.test(
+    title
+  );
   const parentIdentifier = extractFollowupParentIdentifier(issue);
   const isFollowup = Boolean(
     issue.parent ||
@@ -46,7 +80,6 @@ export function routeTriageIssue(
       /follow[- ]?up/i.test(title) ||
       /^##\s*follow[- ]?up/im.test(description)
   );
-  const isEpic = labels.has('type:epic');
 
   if (isIncident) {
     return {
@@ -78,14 +111,12 @@ export function routeTriageIssue(
       agentReady: isAgentReady,
     };
   }
-  if (isAgentReady && (hasBlockedBy(issue) || isEpic)) {
+  if (isAgentReady && hasBlockedBy(issue)) {
     return {
       category: 'blocked-ready',
       desiredStateId: backlogStateId,
       parentIdentifier,
-      reason: hasBlockedBy(issue)
-        ? 'blocked-by-relation'
-        : 'epic-not-leaseable',
+      reason: 'blocked-by-relation',
       agentReady: true,
     };
   }

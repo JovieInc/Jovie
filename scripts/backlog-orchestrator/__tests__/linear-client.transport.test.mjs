@@ -439,6 +439,7 @@ describe('Gem reconciliation idempotency', () => {
     };
     let calls = 0;
     const client = {
+      fetchIssue: async () => structuredClone(issue),
       addComment: async (_id, body) => {
         calls += 1;
         issue.comments.nodes.push({ body });
