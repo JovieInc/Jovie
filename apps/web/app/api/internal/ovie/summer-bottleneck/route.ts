@@ -3,14 +3,16 @@ import { NextResponse } from 'next/server';
 import { z } from 'zod';
 import { verifyCronRequest } from '@/lib/cron/auth';
 import { env } from '@/lib/env';
+import { boundedFetch } from '@/lib/http/bounded-fetch';
 import { signSummerBottleneckSnapshot } from '@/lib/ovie/summer-bottleneck-producer';
+import { summerProductPathsSchema } from '@/lib/ovie/summer-product-paths';
+import { getEveShadowOrigin } from '@/lib/ovie/summer-shadow-client';
 import { logger } from '@/lib/utils/logger';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
 
-const EVE_BOTTLENECK_URL =
-  'https://jovie-eve-shadow-qj7qmxggt-jovie.vercel.app/ovie/v1/summer-bottleneck/events';
+const EVE_BOTTLENECK_PATH = '/ovie/v1/summer-bottleneck/events';
 const MAX_BODY_BYTES = 64 * 1024;
 const MAX_SIGNAL_AGE_MS = 15 * 60 * 1000;
 const MAX_CLOCK_SKEW_MS = 60 * 1000;
@@ -120,6 +122,7 @@ const unsignedSnapshotSchema = z
           })
           .strict(),
         ciAudit: ciAuditSchema,
+        productPaths: summerProductPathsSchema.optional(),
       })
       .strict(),
   })
@@ -132,6 +135,9 @@ const unsignedSnapshotSchema = z
       value.signals.runner.sourceRevision,
       value.signals.ciAudit.sourceRevision,
       value.signals.release.mainSha,
+      ...(value.signals.productPaths
+        ? [value.signals.productPaths.sourceRevision]
+        : []),
     ];
     if (revisions.some(revision => revision !== value.sourceVersion)) {
       context.addIssue({
@@ -225,6 +231,13 @@ export async function POST(request: Request): Promise<NextResponse> {
     return json({ ok: false, code: 'stale_bottleneck_snapshot' }, 422);
   }
 
+  let destination: URL;
+  try {
+    destination = new URL(EVE_BOTTLENECK_PATH, getEveShadowOrigin());
+  } catch {
+    return json({ ok: false, code: 'eve_destination_unavailable' }, 503);
+  }
+
   const body = signSummerBottleneckSnapshot(
     parsed.data,
     env.SUMMER_BOTTLENECK_PRODUCER_SIGNING_PRIVATE_KEY,
@@ -249,14 +262,18 @@ export async function POST(request: Request): Promise<NextResponse> {
   let upstream: Response;
   try {
     // No retry: an uncertain submission is resolved by Eve's immutable event ID.
-    upstream = await fetch(EVE_BOTTLENECK_URL, {
+    upstream = await boundedFetch(destination, {
       method: 'POST',
       headers: {
         authorization: `Bearer ${oidcToken}`,
+        'x-vercel-trusted-oidc-idp-token': oidcToken,
         'content-type': 'application/json',
       },
       body: JSON.stringify(body),
-      signal: AbortSignal.timeout(15_000),
+      redirect: 'error',
+      timeoutMs: 15_000,
+      retry: { maxRetries: 0, baseDelayMs: 0 },
+      context: 'Summer bottleneck snapshot',
     });
   } catch {
     return json({ ok: false, code: 'eve_bottleneck_unavailable' }, 503);
