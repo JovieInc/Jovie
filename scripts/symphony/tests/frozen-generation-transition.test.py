@@ -42,6 +42,8 @@ def save(value):
 
 args = [arg for arg in sys.argv[1:] if arg != "--user"]
 command = args.pop(0)
+with pathlib.Path(os.environ["SHADOW_SYSTEMD_LOG"]).open("a") as handle:
+    handle.write(json.dumps([command, *args]) + "\n")
 if command == "list-units":
     state = load()
     print("symphony-elixir.service loaded active running Official")
@@ -69,11 +71,25 @@ elif command == "show":
 elif command == "kill":
     state = load()
     requested = next(value.split("=", 1)[1] for value in args if value.startswith("--signal="))
+    whom = next(value.split("=", 1)[1] for value in args if value.startswith("--kill-whom="))
     signo = getattr(signal, "SIG" + requested)
-    try:
-        os.kill(state["mainPid"], signo)
-    except ProcessLookupError:
-        pass
+    cgroup_procs = pathlib.Path(os.environ["SHADOW_CGROUP_PROCS"])
+    if requested == "KILL" and whom == "all":
+        cgroup_is_empty = not cgroup_procs.read_text().split()
+        if (cgroup_is_empty and state.get("failKillWhenEmpty")) or (not cgroup_is_empty and state.get("failKillWithLiveCgroup")):
+            print("Failed to send signal SIGKILL to auxiliary processes: Invalid argument", file=sys.stderr)
+            raise SystemExit(1)
+    if not (requested == "TERM" and state.get("ignoreTerm")):
+        try:
+            os.kill(state["mainPid"], signo)
+        except ProcessLookupError:
+            pass
+    if requested == "TERM" and state.get("emptyAfterTerm"):
+        cgroup_procs.write_text("")
+        state["mainPid"] = 0
+        save(state)
+    elif requested == "KILL" and whom == "all":
+        cgroup_procs.write_text("")
 elif command == "thaw":
     state = load()
     process = subprocess.Popen([os.environ["SHADOW_NEW_BINARY"]], cwd=os.environ["SHADOW_WORKSPACE"],
@@ -181,6 +197,8 @@ class FrozenTransitionShadowTest(unittest.TestCase):
             "freezerState": "frozen", "otherFrozen": False,
         }))
         self.fake_systemctl = self.executable("systemctl", FAKE_SYSTEMCTL)
+        self.systemd_log = self.root / "systemd.log"
+        self.systemd_log.touch()
         self.receipt = self.state_dir / "receipts/test.json"
         self.manifest = self.make_manifest()
         self.env_patch = mock.patch.dict(os.environ, {
@@ -188,6 +206,8 @@ class FrozenTransitionShadowTest(unittest.TestCase):
             "SHADOW_NEW_BINARY": str(self.installed_binary),
             "SHADOW_WORKSPACE": str(self.workspace),
             "SHADOW_NEW_MARKER": str(self.new_marker),
+            "SHADOW_CGROUP_PROCS": str(cgroup / "cgroup.procs"),
+            "SHADOW_SYSTEMD_LOG": str(self.systemd_log),
         })
         self.env_patch.start()
         self.addCleanup(self.env_patch.stop)
@@ -271,6 +291,33 @@ class FrozenTransitionShadowTest(unittest.TestCase):
         self.assertEqual(self.old_workflow.read_text(), "new workflow\n")
         self.assertEqual((self.provider_root / "current").resolve(), self.new_provider.resolve())
         self.assertEqual(json.loads(self.receipt.read_text())["status"], "succeeded")
+
+    def test_term_empty_cgroup_skips_redundant_kill_and_starts_new_generation(self):
+        state = json.loads(self.systemd_state.read_text())
+        state.update(emptyAfterTerm=True, failKillWhenEmpty=True)
+        self.systemd_state.write_text(json.dumps(state))
+
+        receipt = self.run_transition()
+        self.addCleanup(self.kill_process, receipt["new"]["mainPid"])
+
+        calls = [json.loads(line) for line in self.systemd_log.read_text().splitlines()]
+        self.assertFalse(any("--signal=KILL" in call for call in calls))
+        self.assertEqual(receipt["status"], "succeeded")
+        self.assertNotEqual(receipt["new"]["mainPid"], self.old_process.pid)
+        self.assertEqual(receipt["protected"]["mainPid"], 424242)
+
+    def test_kill_failure_with_live_cgroup_fails_closed(self):
+        state = json.loads(self.systemd_state.read_text())
+        state.update(ignoreTerm=True, failKillWithLiveCgroup=True)
+        self.systemd_state.write_text(json.dumps(state))
+
+        with self.assertRaisesRegex(MODULE.TransitionError, "still has live processes"):
+            self.run_transition()
+
+        self.assertEqual(json.loads(self.systemd_state.read_text())["freezerState"], "frozen")
+        self.assertEqual(json.loads(self.receipt.read_text())["status"], "failed-closed")
+        self.assertEqual(self.installed_binary.read_bytes(), self.old_binary.read_bytes())
+        self.assertEqual((self.provider_root / "current").resolve(), self.old_provider.resolve())
 
     def test_other_frozen_user_service_refuses_before_asset_mutation(self):
         state = json.loads(self.systemd_state.read_text())
