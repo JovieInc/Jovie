@@ -165,6 +165,11 @@ class WorkflowContract:
     poll_interval_ms: int
     workspace_root: str
     max_concurrent_agents: int
+    max_turns: int
+    codex_command: str
+    thread_sandbox: str
+    turn_sandbox_type: str
+    network_access: bool
     server_port: int
     after_create: str
 
@@ -196,7 +201,10 @@ class BoundedRepairAdmission:
     manifest_path: pathlib.Path
     claim_path: pathlib.Path
     issue_identifier: str
+    issue_id: str
     required_label: str
+    workspace_root: pathlib.Path
+    router_path: pathlib.Path
     expires_at: dt.datetime
     scheduler_command: tuple[str, ...]
 
@@ -231,12 +239,16 @@ def _front_matter(text: str) -> str:
 def _section(lines: list[str], name: str) -> list[str]:
     out: list[str] = []
     inside = False
+    section_indent = -1
     for line in lines:
-        if re.match(rf"^{re.escape(name)}:\s*$", line):
+        match = re.match(rf"^(\s*){re.escape(name)}:\s*$", line)
+        if match:
             inside = True
+            section_indent = len(match.group(1))
             continue
         if inside:
-            if line and not line.startswith(" "):
+            indent = len(line) - len(line.lstrip())
+            if line.strip() and indent <= section_indent:
                 break
             out.append(line)
     return out
@@ -283,6 +295,15 @@ def _int_scalar(body: list[str], key: str) -> int:
         return int(raw)
     except ValueError as exc:
         raise ValueError(f"{key} must be an integer") from exc
+
+
+def _bool_scalar(body: list[str], key: str) -> bool:
+    raw = _scalar(body, key)
+    if raw == "true":
+        return True
+    if raw == "false":
+        return False
+    raise ValueError(f"{key} must be a boolean")
 
 
 def _non_negative_int(value: str, *, name: str) -> int:
@@ -333,6 +354,8 @@ def parse_workflow(path: pathlib.Path) -> WorkflowContract:
     polling = _section(lines, "polling")
     workspace = _section(lines, "workspace")
     agent = _section(lines, "agent")
+    codex = _section(lines, "codex")
+    turn_sandbox = _section(codex, "turn_sandbox_policy")
     server = _section(lines, "server")
     team_match = re.search(r'^\s+team_key:\s*"?([^"\n]+?)"?\s*$', front, re.M)
     project_match = re.search(r'^\s+project_slug:\s*"?([^"\n]+?)"?\s*$', front, re.M)
@@ -358,6 +381,11 @@ def parse_workflow(path: pathlib.Path) -> WorkflowContract:
         poll_interval_ms=_int_scalar(polling, "interval_ms"),
         workspace_root=_scalar(workspace, "root"),
         max_concurrent_agents=_int_scalar(agent, "max_concurrent_agents"),
+        max_turns=_int_scalar(agent, "max_turns"),
+        codex_command=_scalar(codex, "command"),
+        thread_sandbox=_scalar(codex, "thread_sandbox"),
+        turn_sandbox_type=_scalar(turn_sandbox, "type"),
+        network_access=_bool_scalar(turn_sandbox, "networkAccess"),
         server_port=_int_scalar(server, "port"),
         after_create=after_create,
     )
@@ -1056,7 +1084,9 @@ def validate_bounded_repair_admission(
     label = manifest.get("requiredLabel")
     if not isinstance(issue, str) or not re.fullmatch(r"JOV-[1-9][0-9]*", issue):
         raise ValueError("recovery-manifest-issue-invalid")
-    if not isinstance(issue_id, str) or not re.fullmatch(r"[0-9a-fA-F-]{32,36}", issue_id):
+    if not isinstance(issue_id, str) or not re.fullmatch(
+        r"[0-9a-fA-F]{8}(?:-[0-9a-fA-F]{4}){3}-[0-9a-fA-F]{12}", issue_id
+    ):
         raise ValueError("recovery-manifest-issue-id-invalid")
     if (
         not isinstance(label, str)
@@ -1111,7 +1141,7 @@ def validate_bounded_repair_admission(
     artifacts = manifest.get("artifacts")
     runtime_path = _bounded_repair_artifact(artifacts, "runtime")
     workflow_path = _bounded_repair_artifact(artifacts, "workflow")
-    _bounded_repair_artifact(artifacts, "router")
+    router_path = _bounded_repair_artifact(artifacts, "router")
     _bounded_repair_artifact(artifacts, "binary")
     account_path = _bounded_repair_artifact(artifacts, "accountEnv", private=True)
     if runtime_path.resolve() != pathlib.Path(__file__).resolve():
@@ -1127,16 +1157,25 @@ def validate_bounded_repair_admission(
         raise ValueError("recovery-workflow-required-label-mismatch")
     if workflow.max_concurrent_agents != 1:
         raise ValueError("recovery-workflow-max-concurrent-not-one")
-    front = _front_matter(workflow_path.read_text(encoding="utf-8"))
-    if not re.search(r"^\s+max_turns:\s*1\s*$", front, re.M):
+    if workflow.max_turns != 1:
         raise ValueError("recovery-workflow-max-turns-not-one")
-    if not re.search(r"^\s+networkAccess:\s*false\s*$", front, re.M):
+    if workflow.thread_sandbox != "read-only":
+        raise ValueError("recovery-workflow-thread-sandbox-not-read-only")
+    if workflow.turn_sandbox_type != "readOnly":
+        raise ValueError("recovery-workflow-turn-sandbox-not-read-only")
+    if workflow.network_access is not False:
         raise ValueError("recovery-workflow-network-not-false")
-    if not re.search(
-        rf"^\s+command:\s*{re.escape(str(_bounded_repair_artifact(artifacts, 'router')))} app-server\s*$",
-        front,
-        re.M,
-    ):
+    workspace_raw = manifest.get("workspaceRoot")
+    if not isinstance(workspace_raw, str) or not pathlib.Path(workspace_raw).is_absolute():
+        raise ValueError("recovery-manifest-workspace-root-invalid")
+    workspace_root = pathlib.Path(workspace_raw)
+    if pathlib.Path(workflow.workspace_root) != workspace_root:
+        raise ValueError("recovery-workflow-workspace-root-mismatch")
+    expected_agent_command = (
+        f"{runtime_path} recovery-agent --manifest {manifest_path} -- "
+        f"{router_path} app-server"
+    )
+    if workflow.codex_command != expected_agent_command:
         raise ValueError("recovery-workflow-router-mismatch")
 
     command = manifest.get("schedulerCommand")
@@ -1159,7 +1198,10 @@ def validate_bounded_repair_admission(
         manifest_path=manifest_path,
         claim_path=claim_path,
         issue_identifier=issue,
+        issue_id=issue_id,
         required_label=label,
+        workspace_root=workspace_root,
+        router_path=router_path,
         expires_at=expires_at,
         scheduler_command=tuple(command),
     )
@@ -1169,6 +1211,8 @@ def claim_bounded_repair(admission: BoundedRepairAdmission) -> None:
     payload = {
         "schema": "symphony-bounded-repair-claim/v1",
         "issueIdentifier": admission.issue_identifier,
+        "issueId": admission.issue_id,
+        "workspace": str(admission.workspace_root / admission.issue_identifier),
         "manifestPath": str(admission.manifest_path),
         "claimedAt": _iso(_now()),
     }
@@ -1194,6 +1238,60 @@ def claim_bounded_repair(admission: BoundedRepairAdmission) -> None:
         except OSError:
             pass
         raise
+
+
+def run_bounded_repair_agent(
+    manifest_path: pathlib.Path, command: list[str]
+) -> int:
+    """Claim and exec the sole issue agent from its exact Symphony workspace."""
+    try:
+        _require_private_regular_file(manifest_path, field="recovery-manifest")
+        manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+        fleet_path = pathlib.Path(str(manifest.get("fleetGatePath")))
+        verdict = read_closure_stop_line(
+            fleet_path, recovery_manifest_path=manifest_path
+        )
+        if verdict["hold"]:
+            raise ValueError(str(verdict["reason"]))
+        fleet_payload = json.loads(fleet_path.read_text(encoding="utf-8"))
+        admission = validate_bounded_repair_admission(
+            manifest_path,
+            fleet_path=fleet_path,
+            fleet_payload=fleet_payload,
+            require_unclaimed=True,
+        )
+        expected_workspace = (
+            admission.workspace_root / admission.issue_identifier
+        ).resolve()
+        if pathlib.Path.cwd().resolve() != expected_workspace:
+            raise ValueError("recovery-agent-workspace-mismatch")
+        expected_command = [str(admission.router_path), "app-server"]
+        if command != expected_command:
+            raise ValueError("recovery-agent-command-mismatch")
+        claim_bounded_repair(admission)
+    except (OSError, json.JSONDecodeError, ValueError) as exc:
+        print(
+            json.dumps(
+                {"kind": "bounded_repair_agent_refused", "reason": str(exc)},
+                sort_keys=True,
+            ),
+            flush=True,
+        )
+        return CLOSURE_HOLD_EXIT_CODE
+    sanitized = dict(os.environ)
+    for name in (
+        "GITHUB_TOKEN",
+        "GH_TOKEN",
+        "LINEAR_API_KEY",
+        "OPENAI_API_KEY",
+        "ANTHROPIC_API_KEY",
+        "XAI_API_KEY",
+    ):
+        sanitized.pop(name, None)
+    sanitized["SYMPHONY_RECOVERY_ISSUE_IDENTIFIER"] = admission.issue_identifier
+    sanitized["SYMPHONY_RECOVERY_ISSUE_ID"] = admission.issue_id
+    os.execve(command[0], command, sanitized)
+    raise AssertionError("execve returned")
 
 
 def read_closure_stop_line(
@@ -2045,7 +2143,6 @@ def run_official_binary(
         raise ValueError("missing official Symphony command after --")
     gate_sleep_used = 0
     closure_sleep_used = 0
-    recovery_claimed = False
     while True:
         verdict = read_closure_stop_line(
             closure.receipt_path,
@@ -2120,19 +2217,18 @@ def run_official_binary(
                 _print_gate_wait_exhausted(gate, max_gate_sleep_seconds)
                 return RATE_LIMIT_EXIT_CODE
             continue
-        if closure.recovery_manifest_path is not None and not recovery_claimed:
+        if closure.recovery_manifest_path is not None:
             try:
                 fleet_payload = json.loads(
                     closure.receipt_path.read_text(encoding="utf-8")
                 )
-                admission = validate_bounded_repair_admission(
+                validate_bounded_repair_admission(
                     closure.recovery_manifest_path,
                     fleet_path=closure.receipt_path,
                     fleet_payload=fleet_payload,
                     expected_command=command,
                     require_unclaimed=True,
                 )
-                claim_bounded_repair(admission)
             except (OSError, json.JSONDecodeError, ValueError) as exc:
                 print(
                     json.dumps(
@@ -2145,7 +2241,6 @@ def run_official_binary(
                     flush=True,
                 )
                 return CLOSURE_HOLD_EXIT_CODE
-            recovery_claimed = True
         returncode = run_official_binary_once(
             command,
             gate_file=gate_file,
@@ -2154,7 +2249,7 @@ def run_official_binary(
         )
         if returncode != RATE_LIMIT_EXIT_CODE:
             return returncode
-        if recovery_claimed:
+        if closure.recovery_manifest_path is not None:
             return returncode
         gate = read_rate_limit_gate(gate_file)
         if not gate["active"]:
@@ -2318,6 +2413,10 @@ def main(argv: list[str] | None = None) -> int:
     )
     run_parser.add_argument("binary_command", nargs=argparse.REMAINDER)
 
+    recovery_agent_parser = sub.add_parser("recovery-agent")
+    recovery_agent_parser.add_argument("--manifest", type=pathlib.Path, required=True)
+    recovery_agent_parser.add_argument("agent_command", nargs=argparse.REMAINDER)
+
     args = parser.parse_args(argv)
 
     if args.command == "budget-check":
@@ -2400,6 +2499,12 @@ def main(argv: list[str] | None = None) -> int:
             ),
             max_gate_sleep_seconds=args.max_gate_sleep_seconds,
         )
+
+    if args.command == "recovery-agent":
+        command = args.agent_command
+        if command and command[0] == "--":
+            command = command[1:]
+        return run_bounded_repair_agent(args.manifest, command)
 
     raise AssertionError(f"unhandled command {args.command}")
 
