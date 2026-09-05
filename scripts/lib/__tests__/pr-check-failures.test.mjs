@@ -98,6 +98,8 @@ describe('pr-check-failures', () => {
       state: 'FAILURE',
       name: 'enroll',
       workflow: 'Merge Queue Auto-Enroll',
+      workflowDatabaseId: 299216194,
+      appSlug: 'github-actions',
     };
 
     expect(isAdvisoryCheck(controllerFailure)).toBe(true);
@@ -140,6 +142,8 @@ describe('pr-check-failures', () => {
       state: 'FAILURE',
       name: 'Refresh persisted fleet gate receipt',
       workflow: 'Fleet Gate Refresh',
+      workflowDatabaseId: 333356913,
+      appSlug: 'github-actions',
     };
 
     expect(isAdvisoryCheck(fleetRefreshFailure)).toBe(true);
@@ -170,6 +174,8 @@ describe('pr-check-failures', () => {
     const sweep = {
       name: 'sweep',
       workflow: 'Ownerless Recovery Sweep',
+      workflowDatabaseId: 335815543,
+      appSlug: 'github-actions',
       bucket: 'fail',
       state: 'FAILURE',
     };

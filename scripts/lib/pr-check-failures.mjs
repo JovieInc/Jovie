@@ -104,22 +104,23 @@ export const ADVISORY_CHECK_NAMES = Object.freeze(
 // label or transient queue mutation. Treating its `enroll` job as a source-CI
 // failure creates a feedback loop: the next controller run sees its own red
 // receipt, dequeues an otherwise green PR, and keeps it stranded. Scope this
-// by workflow identity rather than by the generic job names so an unrelated
-// `enroll` safety check still fails closed.
+// by the immutable repository workflow id plus the GitHub Actions app identity,
+// rather than PR-mutable display names, so an unrelated `enroll` safety check
+// still fails closed.
 export const ADVISORY_CHECK_WORKFLOWS = Object.freeze([
-  'Merge Queue Auto-Enroll',
+  Object.freeze({ id: 299216194, name: 'Merge Queue Auto-Enroll' }),
   // Fleet policy is enforced independently before native admission. This
   // workflow only refreshes the persisted controller receipt, so a transient
   // refresh failure must not masquerade as product CI and eject an already
   // admitted exact head from the queue.
-  'Fleet Gate Refresh',
+  Object.freeze({ id: 333356913, name: 'Fleet Gate Refresh' }),
 ]);
 
 const ADVISORY_CHECK_IDENTITIES = new Set([
   // Recovery dispatch is an operational controller, not source validation.
-  // Scope this narrowly: another job in this workflow, or another workflow's
-  // job also named `sweep`, must still fail closed.
-  'Ownerless Recovery Sweep\0sweep',
+  // Scope this to its immutable repository workflow id, trusted app, and exact
+  // job: another job or a PR-mutable lookalike must still fail closed.
+  '335815543\0Ownerless Recovery Sweep\0sweep',
 ]);
 
 export const REQUIRED_CHECK_NAMES = Object.freeze(
@@ -148,6 +149,8 @@ export function isAdvisoryCheckName(name) {
 export function isAdvisoryCheck(check) {
   const name = normalizeCheckName(check);
   const workflow = check?.workflow ?? '';
+  const workflowId = Number(check?.workflowDatabaseId);
+  const trustedWorkflowApp = check?.appSlug === 'github-actions';
   if (
     REQUIRED_CHECK_NAMES.some(required => required.names.includes(name)) ||
     MERGE_GATE_CHECK_NAMES.includes(name)
@@ -156,8 +159,11 @@ export function isAdvisoryCheck(check) {
   }
   return (
     isAdvisoryCheckName(name) ||
-    ADVISORY_CHECK_WORKFLOWS.includes(workflow) ||
-    ADVISORY_CHECK_IDENTITIES.has(`${workflow}\0${name}`)
+    (trustedWorkflowApp &&
+      (ADVISORY_CHECK_WORKFLOWS.some(
+        identity => identity.id === workflowId && identity.name === workflow
+      ) ||
+        ADVISORY_CHECK_IDENTITIES.has(`${workflowId}\0${workflow}\0${name}`)))
   );
 }
 
@@ -226,17 +232,15 @@ export function collapseNewestCheckAttempts(checks) {
     const name = normalizeCheckName(check);
     // A rerun can supersede only the same workflow/job identity. Keep the
     // public check name intact for required status/check-context matching.
-    const identity = JSON.stringify([check?.workflow || null, name]);
-    const group = groups.get(identity) ?? [];
+    const key = `${check?.appSlug ?? ''}\0${check?.workflowDatabaseId ?? ''}\0${check?.workflow ?? ''}\0${name}`;
+    const group = groups.get(key) ?? [];
     group.push(check);
-    groups.set(identity, group);
+    groups.set(key, group);
   }
 
   const collapsed = [];
-  const ambiguousNames = [];
   const ambiguousChecks = [];
   for (const group of groups.values()) {
-    const name = normalizeCheckName(group[0]);
     if (group.length === 1) {
       collapsed.push(group[0]);
       continue;
@@ -286,7 +290,6 @@ export function collapseNewestCheckAttempts(checks) {
       attempt => attempt.startedAt === null || attempt.observedAt === null
     );
     if (missingTimestamps) {
-      ambiguousNames.push(name);
       ambiguousChecks.push(group[0]);
       continue;
     }
@@ -312,7 +315,6 @@ export function collapseNewestCheckAttempts(checks) {
       const topSuccess = top.filter(isSuccessfulCheck);
       const topFailure = top.filter(isTerminalFailure);
       if (topFailure.length > 0 && topSuccess.length > 0) {
-        ambiguousNames.push(name);
         ambiguousChecks.push(top[0]);
         continue;
       }
@@ -332,8 +334,8 @@ export function collapseNewestCheckAttempts(checks) {
 
   return {
     checks: collapsed,
-    ambiguousNames: ambiguousNames.sort(),
     ambiguousChecks,
+    ambiguousNames: ambiguousChecks.map(normalizeCheckName).sort(),
   };
 }
 

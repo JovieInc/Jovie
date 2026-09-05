@@ -147,7 +147,17 @@ function createNativeRunner({
   states = [],
   checkPages = [],
   listPages = null,
-  enableResult = ok({ data: {} }),
+  enableResult = ok({
+    data: {
+      enablePullRequestAutoMerge: {
+        pullRequest: {
+          id: PR_ID,
+          headRefOid: HEAD,
+          autoMergeRequest: { enabledAt: '2026-07-15T00:00:00Z' },
+        },
+      },
+    },
+  }),
   viewerPayload = /** @type {unknown} */ ({
     data: { viewer: { login: CANONICAL_NATIVE_MUTATION_ACTOR } },
   }),
@@ -1832,6 +1842,34 @@ describe('native enrollment', () => {
     expect(wait).toHaveBeenCalledTimes(1);
   });
 
+  it('does not disable an auto-merge intent that appeared after its mutation failed', async () => {
+    const otherActorIntent = prState({
+      autoMergeRequest: { enabledAt: '2026-07-15T00:00:01Z' },
+    });
+    const runner = createNativeRunner({
+      states: [prState(), otherActorIntent],
+      enableResult: {
+        code: 1,
+        stdout: '',
+        stderr: 'GraphQL transport closed before dispatch',
+      },
+    });
+
+    await expect(
+      enroll(runner, { postconditionAttempts: 1 })
+    ).rejects.toMatchObject({
+      code: 'enrollment_postcondition_failed',
+      details: {
+        compensated: false,
+        compensationState: null,
+        state: { autoMergeRequest: otherActorIntent.autoMergeRequest },
+      },
+    });
+    expect(invokedEnrollment(runner)).toBe(true);
+    expect(invokedDequeue(runner)).toBe(false);
+    expect(invokedAutoMergeDisable(runner)).toBe(false);
+  });
+
   it('refuses a changed head before invoking the enrollment mutation', async () => {
     const runner = createNativeRunner({
       states: [prState({ headRefOid: OTHER_HEAD })],
@@ -2617,20 +2655,15 @@ describe('native dequeue', () => {
     expect(invokedDequeue(runner)).toBe(false);
   });
 
-  it('detects a head race after dequeue and restores an eligible replacement head', async () => {
+  it('detects a head race after dequeue without enrolling the replacement head', async () => {
     const held = prState({
       isInMergeQueue: true,
       mergeQueueEntry: QUEUE_ENTRY,
       labels: { nodes: [{ name: 'hold' }] },
     });
     const replacementOut = prState({ headRefOid: OTHER_HEAD });
-    const replacementQueued = prState({
-      headRefOid: OTHER_HEAD,
-      isInMergeQueue: true,
-      mergeQueueEntry: QUEUE_ENTRY,
-    });
     const runner = createNativeRunner({
-      states: [held, held, replacementOut, replacementOut, replacementQueued],
+      states: [held, held, replacementOut],
     });
 
     await expect(
@@ -2645,13 +2678,10 @@ describe('native dequeue', () => {
       details: {
         expectedHeadOid: HEAD,
         state: { headRefOid: OTHER_HEAD, queued: false },
-        restoration: {
-          receipt: { state: { headRefOid: OTHER_HEAD, queued: true } },
-        },
       },
     });
     expect(invokedDequeue(runner)).toBe(true);
-    expect(invokedEnrollment(runner)).toBe(true);
+    expect(invokedEnrollment(runner)).toBe(false);
   });
 
   it('suppresses a stale dequeue when the exact head recovered eligibility', async () => {

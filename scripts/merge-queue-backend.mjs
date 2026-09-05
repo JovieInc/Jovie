@@ -47,7 +47,7 @@ const MAX_SOURCE_CHECK_CONTEXT_PAGES = 20;
 const PULL_REQUEST_INVENTORY_FIELDS = `id number state isDraft title body mergeable mergeStateStatus headRefName headRefOid baseRefName labels(first:100){nodes{name} pageInfo{hasNextPage}} isInMergeQueue mergeQueueEntry { id state position } autoMergeRequest { enabledAt } reviewDecision`;
 const HUMAN_QUEUE_INTENT_FIELDS = `reviews(last:100){nodes{state submittedAt commit{oid} author{__typename}} pageInfo{hasPreviousPage}} timelineItems(last:100,itemTypes:[ADDED_TO_MERGE_QUEUE_EVENT,REMOVED_FROM_MERGE_QUEUE_EVENT]){nodes{__typename ... on AddedToMergeQueueEvent{createdAt actor{__typename}} ... on RemovedFromMergeQueueEvent{createdAt actor{__typename} reason}} pageInfo{hasPreviousPage}}`;
 const PULL_REQUEST_STATE_FIELDS = `${PULL_REQUEST_INVENTORY_FIELDS} ${HUMAN_QUEUE_INTENT_FIELDS}`;
-const SOURCE_CHECK_CONTEXT_FIELDS = `nodes{__typename ... on CheckRun{name status conclusion startedAt completedAt checkSuite{workflowRun{workflow{name}}}} ... on StatusContext{context state createdAt}} pageInfo{hasNextPage endCursor}`;
+const SOURCE_CHECK_CONTEXT_FIELDS = `nodes{__typename ... on CheckRun{name status conclusion startedAt completedAt checkSuite{app{slug} workflowRun{workflow{databaseId name}}}} ... on StatusContext{context state createdAt}} pageInfo{hasNextPage endCursor}`;
 const SOURCE_CHECK_STATE_FIELDS = `commits(last:1){nodes{commit{oid statusCheckRollup{contexts(first:100){${SOURCE_CHECK_CONTEXT_FIELDS}}}}}}`;
 const REQUIRED_NATIVE_STATE_FIELDS =
   `id number state isDraft headRefOid labels isInMergeQueue mergeQueueEntry autoMergeRequest`.split(
@@ -96,7 +96,7 @@ const LIVE_QUEUE_CONFIGURATION_QUERY = `query MergeQueueLiveConfiguration($owner
 const NATIVE_MUTATION_ACTOR_QUERY =
   'query MergeQueueNativeMutationActor { viewer { login } }';
 const DEQUEUE_PULL_REQUEST_MUTATION = `mutation DequeuePullRequest($id:ID!){dequeuePullRequest(input:{id:$id}){mergeQueueEntry{id}}}`;
-const ENABLE_AUTO_MERGE_MUTATION = `mutation EnablePullRequestAutoMerge($pullRequestId:ID!,$mergeMethod:PullRequestMergeMethod!){enablePullRequestAutoMerge(input:{pullRequestId:$pullRequestId,mergeMethod:$mergeMethod}){pullRequest{id}}}`;
+const ENABLE_AUTO_MERGE_MUTATION = `mutation EnablePullRequestAutoMerge($pullRequestId:ID!,$mergeMethod:PullRequestMergeMethod!){enablePullRequestAutoMerge(input:{pullRequestId:$pullRequestId,mergeMethod:$mergeMethod}){pullRequest{id headRefOid autoMergeRequest{enabledAt}}}}`;
 const DISABLE_AUTO_MERGE_MUTATION = `mutation DisablePullRequestAutoMerge($pullRequestId:ID!){disablePullRequestAutoMerge(input:{pullRequestId:$pullRequestId}){pullRequest{id}}}`;
 
 function backendError(code, message, details = {}) {
@@ -598,6 +598,9 @@ function normalizeSourceCheckState(pr) {
         state,
         bucket: bucketForState(state),
         workflow: context.checkSuite?.workflowRun?.workflow?.name ?? '',
+        workflowDatabaseId:
+          context.checkSuite?.workflowRun?.workflow?.databaseId ?? null,
+        appSlug: context.checkSuite?.app?.slug ?? '',
         startedAt: context.startedAt,
         completedAt: context.completedAt,
       };
@@ -1594,9 +1597,13 @@ export async function enrollPullRequest({
       state: before,
     };
   }
-  const shouldRemoveAutoMergeIntent = before.autoMergeRequest === null;
+  let createdAutoMergeIntent = null;
+  const ownsCreatedAutoMergeIntent = state =>
+    createdAutoMergeIntent !== null &&
+    state?.id === createdAutoMergeIntent.pullRequestId &&
+    state?.autoMergeRequest?.enabledAt === createdAutoMergeIntent.enabledAt;
   const disableCreatedAutoMergeIntent = async state => {
-    if (!shouldRemoveAutoMergeIntent || state?.autoMergeRequest === null) {
+    if (!ownsCreatedAutoMergeIntent(state)) {
       return state;
     }
     await runGraphqlMutation(
@@ -1618,12 +1625,25 @@ export async function enrollPullRequest({
 
   let mutationError = null;
   try {
-    await runGraphqlMutation(
+    const mutationPayload = await runGraphqlMutation(
       mutationRunner,
       ENABLE_AUTO_MERGE_MUTATION,
       { pullRequestId: before.id, mergeMethod: 'SQUASH' },
       `enrolling PR #${parsedNumber} with ${resolvedBackend}`
     );
+    const mutationState =
+      mutationPayload?.data?.enablePullRequestAutoMerge?.pullRequest;
+    if (
+      before.autoMergeRequest === null &&
+      mutationState?.headRefOid?.toLowerCase() === expectedHead &&
+      typeof mutationState?.autoMergeRequest?.enabledAt === 'string'
+    ) {
+      createdAutoMergeIntent = {
+        pullRequestId: mutationState.id,
+        enabledAt: mutationState.autoMergeRequest.enabledAt,
+        headRefOid: mutationState.headRefOid.toLowerCase(),
+      };
+    }
   } catch (error) {
     mutationError = error;
   }
@@ -1641,12 +1661,12 @@ export async function enrollPullRequest({
     if (
       rejectedState?.isInMergeQueue === true ||
       rejectedState?.mergeQueueEntry != null ||
-      (shouldRemoveAutoMergeIntent && rejectedState?.autoMergeRequest != null)
+      ownsCreatedAutoMergeIntent(rejectedState)
     ) {
       let compensation;
       try {
         if (
-          shouldRemoveAutoMergeIntent &&
+          ownsCreatedAutoMergeIntent(rejectedState) &&
           rejectedState.headRefOid.toLowerCase() !== expectedHead
         ) {
           compensation = {
@@ -1667,8 +1687,7 @@ export async function enrollPullRequest({
           if (
             compensation.skipped === true &&
             compensation.reason === 'head-changed' &&
-            shouldRemoveAutoMergeIntent &&
-            compensation.state?.autoMergeRequest != null
+            ownsCreatedAutoMergeIntent(compensation.state)
           ) {
             compensation = {
               changed: true,
@@ -1724,7 +1743,7 @@ export async function enrollPullRequest({
   }
   let compensationState = null;
   if (
-    shouldRemoveAutoMergeIntent &&
+    ownsCreatedAutoMergeIntent(observation.state) &&
     observation.state?.autoMergeRequest != null &&
     observation.state?.isInMergeQueue !== true &&
     observation.state?.mergeQueueEntry == null
@@ -1767,7 +1786,7 @@ export async function enrollPullRequest({
 }
 
 async function runGraphqlMutation(runner, query, variables, description) {
-  assertGraphqlResponse(
+  return assertGraphqlResponse(
     await runGhJson(runner, graphqlArgs(query, variables), description),
     description
   );
@@ -1878,13 +1897,10 @@ export async function dequeuePullRequest({
     if (!requireIneligible || state.headRefOid.toLowerCase() === expectedHead) {
       return;
     }
-    const restoration = dequeuePostcondition(state)
-      ? await restoreQueueState(state)
-      : { notNeeded: true };
     throw backendError(
       'head_changed_during_dequeue',
       `PR #${parsedNumber} head changed during ${phase}; exact-head dequeue cannot be proven`,
-      { expectedHeadOid: expectedHead, state, restoration }
+      { expectedHeadOid: expectedHead, state }
     );
   };
 
