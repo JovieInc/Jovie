@@ -457,6 +457,7 @@ candidate_tmp=""
 update_lock=""
 promotion_started=0
 promotion_complete=0
+cleanup_pending=""
 official_was_active=0
 official_stopped_for_promotion=0
 official_pid_before=""
@@ -557,8 +558,33 @@ restore_target() {
   fi
 }
 
+promotion_cleanup_is_committed() {
+  [ -n "$cleanup_pending" ] || return 1
+  CLEANUP_PENDING="$cleanup_pending" ROLLBACK_DIR="$rollback_dir" python3 - "$STATE_DIR" <<'PY'
+import os, pathlib, sys
+root = pathlib.Path(sys.argv[1])
+marker = pathlib.Path(os.environ["CLEANUP_PENDING"])
+transaction = pathlib.Path(os.environ["ROLLBACK_DIR"])
+tombstone = root / ".promotion-transaction.removing"
+hold = root / "promotion-held.json"
+if (marker != root / ".promotion-transaction.cleanup-pending" or
+        transaction != root / "promotion-transaction" or
+        not marker.is_file() or
+        marker.read_text() != "symphony-promotion-cleanup-pending/v1\n" or
+        transaction.exists() or tombstone.exists() or hold.exists()):
+    raise SystemExit(1)
+PY
+}
+
 cleanup() {
   local status="$?"
+  if [ "$status" -ne 0 ] && [ "$promotion_complete" -eq 0 ] &&
+     [ "$promotion_started" -eq 1 ] && [ "$files_promoted" -eq 1 ] &&
+     promotion_cleanup_is_committed; then
+    promotion_complete=1
+    rollback_dir=""
+    echo "PROMOTION_COMMITTED candidate verified; cleanup acknowledgement pending" >&2
+  fi
   if [ "$status" -ne 0 ] && [ "$promotion_complete" -eq 0 ]; then
     if [ "$promotion_started" -eq 1 ]; then
       if [ "$files_promoted" -eq 1 ] && [ "$rollback_safe" -eq 0 ]; then

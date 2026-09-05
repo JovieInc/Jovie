@@ -1997,6 +1997,24 @@ while True: time.sleep(1)
                 "\"polling\":{\"checking\":false,\"next_poll_in_ms\":10000}}'\n"
             )
             curl.chmod(0o755)
+            python = fake_bin / "python3"
+            python.write_text(
+                "#!/usr/bin/env bash\n"
+                f"real={sys.executable!s}\n"
+                "if [ \"${1:-}\" != - ]; then exec \"$real\" \"$@\"; fi\n"
+                "payload=$(mktemp)\n"
+                "trap 'rm -f \"$payload\" \"$payload.injected\"' EXIT\n"
+                "cat > \"$payload\"\n"
+                "if [ \"${FAIL_FINALIZE_AFTER_REMOVE:-0}\" = 1 ] && "
+                "grep -q 'shutil.rmtree(tombstone)' \"$payload\"; then\n"
+                "  sed 's/    shutil.rmtree(tombstone)/    shutil.rmtree(tombstone)\\n"
+                "    raise OSError(\"injected post-delete fsync failure\")/' "
+                "\"$payload\" > \"$payload.injected\"\n"
+                "  exec \"$real\" \"$payload.injected\" \"${@:2}\"\n"
+                "fi\n"
+                "exec \"$real\" \"$payload\" \"${@:2}\"\n"
+            )
+            python.chmod(0o755)
             runtime = root / "runtime"
             runtime.mkdir()
             bus = socket.socket(socket.AF_UNIX)
@@ -2109,6 +2127,45 @@ while True: time.sleep(1)
 
             for path, expected in unsafe_prior.items():
                 path.write_bytes(expected)
+            (root / "allow-restart-once").touch()
+            committed_cleanup_failure = subprocess.run(
+                ["bash", str(updater), "--skip-binary"],
+                cwd=ROOT,
+                env={**env, "FAIL_FINALIZE_AFTER_REMOVE": "1"},
+                capture_output=True,
+                text=True,
+            )
+            self.assertNotEqual(committed_cleanup_failure.returncode, 0)
+            self.assertIn("PROMOTION_COMMITTED", committed_cleanup_failure.stderr)
+            self.assertNotIn("PROMOTION_ROLLED_BACK", committed_cleanup_failure.stderr)
+            marker = (
+                target_home
+                / ".local/state/symphony-elixir/.promotion-transaction.cleanup-pending"
+            )
+            self.assertEqual(
+                marker.read_text(), "symphony-promotion-cleanup-pending/v1\n"
+            )
+            self.assertFalse(transaction.exists())
+            self.assertFalse(
+                (target_home / ".local/state/symphony-elixir/.promotion-transaction.removing").exists()
+            )
+            self.assertFalse(hold.exists())
+            for path, expected in safe_prior.items():
+                self.assertEqual(path.read_bytes(), expected)
+
+            acknowledged = subprocess.run(
+                ["bash", str(updater), "--skip-binary", "--no-restart"],
+                cwd=ROOT,
+                env=env,
+                capture_output=True,
+                text=True,
+            )
+            self.assertEqual(acknowledged.returncode, 0, acknowledged.stderr)
+            self.assertIn("RECOVERED_TRANSACTION_CLEANUP", acknowledged.stdout)
+            self.assertFalse(marker.exists())
+
+            for path, expected in unsafe_prior.items():
+                path.write_bytes(expected)
 
             activation = subprocess.run(
                 ["bash", str(updater), "--skip-binary"],
@@ -2124,7 +2181,7 @@ while True: time.sleep(1)
             restart_events = [
                 row for row in events if "restart symphony-elixir.service" in row
             ]
-            self.assertEqual(len(restart_events), 2, events)
+            self.assertEqual(len(restart_events), 3, events)
             for path, expected in safe_prior.items():
                 self.assertEqual(path.read_bytes(), expected)
             self.assertNotIn("scripts/hermes/symphony-", workflow.read_text())
