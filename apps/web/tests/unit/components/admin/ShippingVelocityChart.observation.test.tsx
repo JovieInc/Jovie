@@ -8,6 +8,10 @@ import {
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { ShippingVelocityChart } from '@/components/features/admin/ShippingVelocityChart';
 
+vi.mock('@/components/features/admin/ShippingVelocityCanvas', () => ({
+  ShippingVelocityCanvas: () => null,
+}));
+
 const INITIAL_BUCKET = {
   date: '2026-08-20',
   merged: 1,
@@ -59,7 +63,9 @@ describe('ShippingVelocityChart observation states', () => {
         screen.getByTestId('hud-shipping-velocity-observation')
       ).toHaveAttribute('data-state', 'not_configured');
     });
-    expect(screen.queryByText('No PRs in this period')).not.toBeInTheDocument();
+    expect(
+      screen.queryByText('No Pull Requests in this period')
+    ).not.toBeInTheDocument();
     expect(
       screen.queryByRole('button', { name: 'Retry' })
     ).not.toBeInTheDocument();
