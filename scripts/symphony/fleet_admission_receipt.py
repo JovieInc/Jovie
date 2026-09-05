@@ -12,7 +12,14 @@ CLOSURE_HEALTH_SCHEMA = "jovie-closure-health/v1"
 # Keep in sync with gem-priority-gate.MAX_GROK_MAX / symphony-codex-exhausted.MAX_GROK_MAX.
 UNBOUND_REPAIR_MAX_CONCURRENT_CEILING = 40
 PROMOTION_MODES = frozenset(
-    {"normal", "isolated-only", "draft-only", "hold-intake", "blocked"}
+    {
+        "normal",
+        "isolated-only",
+        "controller-repair-only",
+        "draft-only",
+        "hold-intake",
+        "blocked",
+    }
 )
 STATES = frozenset({"GREEN", "AMBER", "RED"})
 INTEGRITY_STATUSES = frozenset({"clear", "resolved", "active", "invalid"})
@@ -220,6 +227,72 @@ def _project_unbound_repair(value: object, promotion_mode: str) -> dict[str, Any
     return projected
 
 
+def _project_controller_repair(value: object, promotion_mode: str) -> dict[str, Any]:
+    if value is None:
+        if promotion_mode == "controller-repair-only":
+            raise AdmissionProjectionError(
+                "controller-repair-only requires controllerRepairAdmission"
+            )
+        return {
+            "allowed": False,
+            "condition": None,
+            "mainSha": None,
+            "deployedSha": None,
+            "scope": None,
+            "maxConcurrent": 0,
+            "deploymentsAllowed": False,
+            "runtimeActivationAllowed": False,
+        }
+    admission = _require_mapping(value, "controllerRepairAdmission")
+    allowed = _require_bool(
+        admission.get("allowed"), "controllerRepairAdmission.allowed"
+    )
+    projected = {
+        "allowed": allowed,
+        "condition": admission.get("condition"),
+        "mainSha": admission.get("mainSha"),
+        "deployedSha": admission.get("deployedSha"),
+        "scope": admission.get("scope"),
+        "maxConcurrent": admission.get("maxConcurrent"),
+        "deploymentsAllowed": _require_bool(
+            admission.get("deploymentsAllowed"),
+            "controllerRepairAdmission.deploymentsAllowed",
+        ),
+        "runtimeActivationAllowed": _require_bool(
+            admission.get("runtimeActivationAllowed"),
+            "controllerRepairAdmission.runtimeActivationAllowed",
+        ),
+    }
+    if projected["deploymentsAllowed"] is not False or projected["runtimeActivationAllowed"] is not False:
+        raise AdmissionProjectionError("controller repair cannot authorize deployment or runtime")
+    if allowed:
+        if promotion_mode != "controller-repair-only":
+            raise AdmissionProjectionError("controller repair authority contradicts promotionMode")
+        if projected["condition"] != "controller-failure":
+            raise AdmissionProjectionError("allowed controller repair condition is invalid")
+        if projected["scope"] != "trusted-comment-exact-repository-pr-head-main-path-set":
+            raise AdmissionProjectionError("allowed controller repair scope is invalid")
+        if projected["maxConcurrent"] != 1:
+            raise AdmissionProjectionError("allowed controller repair must have maxConcurrent 1")
+        _hex_sha(projected["mainSha"], "controllerRepairAdmission.mainSha")
+        deployed = projected["deployedSha"]
+        if not isinstance(deployed, str) or len(deployed) < 7:
+            raise AdmissionProjectionError("allowed controller repair deployedSha is invalid")
+    elif promotion_mode == "controller-repair-only":
+        raise AdmissionProjectionError("controller-repair-only requires allowed repair authority")
+    elif projected["scope"] not in {
+        None,
+        "trusted-comment-exact-repository-pr-head-main-path-set",
+    }:
+        raise AdmissionProjectionError("denied controller repair scope is invalid")
+    elif any(
+        projected[field] is not None
+        for field in ("condition", "mainSha", "deployedSha")
+    ) or projected["maxConcurrent"] != 0:
+        raise AdmissionProjectionError("denied controller repair must not carry authority")
+    return projected
+
+
 def _project_closure_admission(value: object) -> dict[str, Any]:
     admission = _require_mapping(value, "closureAdmission")
     intake = _require_bool(
@@ -329,6 +402,9 @@ def project_fleet_admission_receipt(receipt: object) -> dict[str, Any]:
         "isolatedPromotionAdmission": isolated,
         "productionUnboundRepairAdmission": _project_unbound_repair(
             source.get("productionUnboundRepairAdmission"), promotion_mode
+        ),
+        "controllerRepairAdmission": _project_controller_repair(
+            source.get("controllerRepairAdmission"), promotion_mode
         ),
         "closureAdmission": closure_admission,
         "alreadyAdmittedCohort": _project_cohort(
