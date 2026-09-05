@@ -104,10 +104,7 @@ def _production_unbound_hold_receipt(
             "integrity": {"status": "clear"},
         },
         "promotionAdmission": {"allowed": False},
-        "isolatedPromotionAdmission": {
-            "allowed": False,
-            "deploymentsAllowed": False,
-        },
+        "isolatedPromotionAdmission": {"allowed": False, "deploymentsAllowed": False},
         "productionUnboundRepairAdmission": {
             "allowed": True,
             "condition": "production-deployment-unbound",
@@ -134,25 +131,11 @@ def _controller_repair_receipt() -> dict[str, object]:
             "main": {"status": "green", "sha": "a" * 40},
             "production": {"status": "green", "deployedSha": "b" * 40},
             "controller": {"status": "failed"},
-            "queue": {
-                "status": "known",
-                "eligiblePrs": 2,
-                "greenReadyPrs": 2,
-                "target": 15,
-            },
+            "queue": {"status": "known", "eligiblePrs": 2, "greenReadyPrs": 2, "target": 15},
             "integrity": {"status": "clear"},
         },
         "reasons": [
-            {
-                "code": "controller-failure",
-                "layer": "controller",
-                "severity": "warning",
-            },
-            {
-                "code": "production-deployment-unbound",
-                "layer": "promotion",
-                "severity": "warning",
-            },
+            {"code": "controller-failure", "layer": "controller", "severity": "warning"},
         ],
         "promotionAdmission": {"allowed": False},
         "isolatedPromotionAdmission": {
@@ -170,11 +153,7 @@ def _controller_repair_receipt() -> dict[str, object]:
             "deploymentsAllowed": False,
             "runtimeActivationAllowed": False,
         },
-        "alreadyAdmittedCohort": {
-            "preserve": True,
-            "newIntakeAllowed": False,
-            "semantics": "preserve-cohort-and-admit-one-controller-repair",
-        },
+        "alreadyAdmittedCohort": {"preserve": True, "newIntakeAllowed": False},
     }
 
 
@@ -2503,12 +2482,21 @@ JSON
             assert matches(changed).returncode == 3
 
     @pytest.mark.parametrize(
-        ("actor", "live_hold", "live_head_changed", "expected_enroll"),
+        (
+            "actor",
+            "live_hold",
+            "live_head_changed",
+            "live_main_sha",
+            "expected_enroll",
+            "expected_returncode",
+        ),
         [
-            ("jovie-bot[bot]", False, False, True),
-            ("untrusted-user", False, False, False),
-            ("jovie-bot[bot]", True, False, False),
-            ("jovie-bot[bot]", False, True, False),
+            ("jovie-bot[bot]", False, False, "a" * 40, True, 0),
+            ("untrusted-user", False, False, "a" * 40, False, 0),
+            ("jovie-bot[bot]", True, False, "a" * 40, False, 0),
+            ("jovie-bot[bot]", False, True, "a" * 40, False, 0),
+            ("jovie-bot[bot]", False, False, "b" * 40, False, 0),
+            ("jovie-bot[bot]", False, False, "", False, 1),
         ],
     )
     def test_controller_repair_mode_admits_only_trusted_exact_candidate(
@@ -2517,7 +2505,9 @@ JSON
         actor: str,
         live_hold: bool,
         live_head_changed: bool,
+        live_main_sha: str,
         expected_enroll: bool,
+        expected_returncode: int,
     ) -> None:
         head = "f" * 40
         live_head = "d" * 40 if live_head_changed else head
@@ -2554,6 +2544,7 @@ JSON
         encoded_receipt = base64.b64encode(
             json.dumps(_controller_repair_receipt()).encode()
         ).decode()
+        main_ref_response = f"echo '{live_main_sha}'; exit 0" if live_main_sha else "exit 1"
         fake_gh = tmp_path / "gh"
         fake_gh.write_text(
             textwrap.dedent(
@@ -2576,6 +2567,9 @@ JSON
                   body=$(printf '%s' '{encoded_body}' | base64 --decode)
                   jq -nc --arg actor '{actor}' --arg body "$body" '[[{{user:{{login:$actor}},body:$body}}]]'
                   exit 0
+                fi
+                if [[ "$1" == "api" && " $* " == *" repos/JovieInc/Jovie/git/ref/heads/main "* ]]; then
+                  {main_ref_response}
                 fi
                 if [[ "$1" == "api" ]]; then exit 1; fi
                 if [[ "$1 $2" == "pr view" ]]; then
@@ -2608,12 +2602,7 @@ JSON
             )
         )
 
-        # Dry-run reports the selector decision without turning a rejected
-        # candidate into a mutation failure. The enrollment line is the
-        # authoritative observable for this fixture.
-        assert result.returncode == 0, (
-            f"stdout={result.stdout}\nstderr={result.stderr}"
-        )
+        assert result.returncode == expected_returncode, result.stderr
         assert ("[dry-run] would +merge-queue on #904" in result.stdout) is expected_enroll
         assert "would +merge-queue on #905" not in result.stdout
         assert "would -merge-queue on #905" not in result.stdout
@@ -2627,6 +2616,10 @@ JSON
             assert "eligibility changed; refusing enrollment for #904" in result.stdout
         if live_head_changed:
             assert "event admission scope no longer matches #904" in result.stdout
+        if live_main_sha and live_main_sha != "a" * 40:
+            assert "main moved from attested" in result.stdout
+        if not live_main_sha:
+            assert "current main SHA is unavailable" in result.stderr
 
     def test_blocked_receipt_dry_run_preserves_clean_queued_pr(
         self, tmp_path: Path

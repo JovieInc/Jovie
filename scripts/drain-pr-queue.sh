@@ -1169,7 +1169,7 @@ enroll_if_still_eligible() {  # enroll_if_still_eligible <num> [authorized-pr au
         and (.isDraft | not)
         and .baseRefName == "main"
         and ([.labels[].name] | any(
-          . == "needs-conflict-resolution" or . == "fast"
+          . == "hold" or . == "needs-conflict-resolution" or . == "fast"
           or '"$NO_AUTO_HOLD_JQ"'
         ) | not)
       ' <<<"$current" >/dev/null; then
@@ -1186,7 +1186,7 @@ enroll_if_still_eligible() {  # enroll_if_still_eligible <num> [authorized-pr au
     and .mergeable == "MERGEABLE"
     and .baseRefName == "main"
     and ([.labels[].name] | any(
-      . == "needs-conflict-resolution"
+      . == "hold" or . == "needs-conflict-resolution"
       or . == "fast" or ($backend == "test-label-fixture" and . == "merge-queue")
       or '"$NO_AUTO_HOLD_JQ"'
     ) | not)
@@ -1330,6 +1330,13 @@ enroll_if_still_eligible() {  # enroll_if_still_eligible <num> [authorized-pr au
     echo "    ⏸ fleet mode $DRAIN_PROMOTION_MODE forbids queue enrollment"
     return 2
   fi
+  if [[ "$DRAIN_PROMOTION_MODE" == "controller-repair-only" ]]; then
+    local current_main_sha
+    current_main_sha="$(gh_retry api "repos/${REPO}/git/ref/heads/main" --jq '.object.sha' 2>/dev/null \
+      | tr '[:upper:]' '[:lower:]')" || current_main_sha=""
+    if [[ ! "$current_main_sha" =~ ^[0-9a-f]{40}$ ]]; then echo "    !! current main SHA is unavailable; refusing controller-repair enrollment" >&2; return 1; fi
+    if [[ "$current_main_sha" != "$repair_main_sha" ]]; then echo "    ⏸ main moved from attested $repair_main_sha to $current_main_sha; refusing controller-repair enrollment"; return 2; fi
+  fi
   if [[ "$DRY_RUN" == "1" ]]; then
     if [[ "$MERGE_QUEUE_BACKEND" == "test-label-fixture" ]]; then
       echo "    [dry-run] would +merge-queue on #$n"
@@ -1389,7 +1396,7 @@ enroll_if_still_eligible() {  # enroll_if_still_eligible <num> [authorized-pr au
       and .baseRefName == "main"
       and ((.headRefOid // "") | ascii_downcase) == $expected_head
       and ([.labels[].name] | any(
-        . == "queue-deferred" or . == "needs-conflict-resolution"
+        . == "hold" or . == "queue-deferred" or . == "needs-conflict-resolution"
         or . == "fast"
         or '"$NO_AUTO_HOLD_JQ"'
       ) | not)
@@ -2017,7 +2024,7 @@ if [[ "$DRAIN_PROMOTION_MODE" == "isolated-only" || "$DRAIN_FREEZE_EXISTING_QUEU
         | select(.draft | not)
         | select(.m == "MERGEABLE")
         | select(.fail | length == 0)
-        | select(([.L[]] | any(. == "queue-deferred" or '"$NO_AUTO_HOLD_JQ"')) | not)
+        | select(([.L[]] | any(. == "hold" or . == "queue-deferred" or '"$NO_AUTO_HOLD_JQ"')) | not)
         | .n ] | sort | first // empty')"
     [[ -n "$ISOLATED_KEEP_PR" ]] && echo "  preserving exact isolated PR #$ISOLATED_KEEP_PR (WIP 1)"
   elif [[ "$DRAIN_PROMOTION_MODE" == "controller-repair-only" ]]; then
@@ -2425,7 +2432,7 @@ done < <(echo "$SNAP" | jq -c --arg admission_pr "$DRAIN_ADMISSION_PR" --arg pro
   | select(.base=="main")
   | select(.fail|length==0)
   | select(.q | not)
-  | select([.L[]] | any(.=="needs-conflict-resolution" or .=="fast" or '"$NO_AUTO_HOLD_JQ"') | not)
+  | select([.L[]] | any(.=="hold" or .=="needs-conflict-resolution" or .=="fast" or '"$NO_AUTO_HOLD_JQ"') | not)
   | select(
       ([.L[]] | index("queue-deferred") == null)
       or ((.n | tostring) == $admission_pr)
