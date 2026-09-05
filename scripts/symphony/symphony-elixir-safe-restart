@@ -1,0 +1,103 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+service=symphony-elixir.service
+api_url=http://127.0.0.1:4041/api/v1/state
+workspace_roots=(
+  /home/timwhite/code/symphony-workspaces
+  /home/timwhite/symphony-elixir-workspaces
+  /srv/worktrees/jovie
+)
+check_only=false
+maintenance_manifest=""
+
+if [[ "${1:-}" == "--maintenance-replace" && $# -eq 2 ]]; then
+  maintenance_manifest="$2"
+elif [[ "${1:-}" == "--check-only" ]]; then
+  check_only=true
+elif [[ $# -ne 0 ]]; then
+  echo "usage: symphony-elixir-safe-restart [--check-only] [--maintenance-replace MANIFEST]" >&2
+  exit 64
+fi
+
+exec 9>"/run/user/$(id -u)/symphony-elixir-safe-restart.lock"
+flock -n 9 || {
+  echo "another safe restart check is already running" >&2
+  exit 65
+}
+
+if [[ -n "$maintenance_manifest" ]]; then
+  helper="${SYMPHONY_FROZEN_TRANSITION_HELPER:-$(dirname "$0")/symphony-frozen-generation-transition}"
+  exec python3 "$helper" --manifest "$maintenance_manifest" --lease-fd 9
+fi
+
+state=$(curl -fsS "$api_url")
+running=$(jq -er '.running | length' <<<"$state")
+retrying=$(jq -er '.retrying | length' <<<"$state")
+blocked=$(jq -er '.blocked | length' <<<"$state")
+live_count=$((running + retrying + blocked))
+
+if [[ "$live_count" -ne 0 ]]; then
+  echo "refusing restart: running=$running retrying=$retrying blocked=$blocked" >&2
+  exit 20
+fi
+
+refs=$(
+  {
+    for workspace_root in "${workspace_roots[@]}"; do
+      sudo find /proc/[0-9]*/cwd /proc/[0-9]*/fd \
+        -lname "$workspace_root/*" 2>/dev/null || true
+    done
+  } | wc -l
+)
+if [[ "$refs" -ne 0 ]]; then
+  echo "refusing restart: api is idle but process_refs=$refs" >&2
+  exit 21
+fi
+
+if [[ "$(systemctl --user show "$service" -p RefuseManualStop --value)" != yes ]]; then
+  echo "refusing restart: $service is missing RefuseManualStop=yes" >&2
+  exit 22
+fi
+
+old_pid=$(systemctl --user show "$service" -p MainPID --value)
+if [[ -z "$old_pid" || "$old_pid" == 0 ]]; then
+  echo "refusing restart: service main PID is unavailable" >&2
+  exit 23
+fi
+
+if [[ "$check_only" == true ]]; then
+  echo "safe restart preconditions passed: pid=$old_pid running=0 retrying=0 blocked=0 process_refs=0"
+  exit 0
+fi
+
+systemctl --user kill --signal=TERM --kill-whom=main "$service"
+
+unit_path="/org/freedesktop/systemd1/unit/${service//-/_2d}"
+unit_path="${unit_path//./_2e}"
+timeout_stop_usec=$(
+  busctl --user get-property \
+    org.freedesktop.systemd1 \
+    "$unit_path" \
+    org.freedesktop.systemd1.Service \
+    TimeoutStopUSec 2>/dev/null | awk '$1 == "t" {print $2}'
+)
+if [[ "$timeout_stop_usec" =~ ^[0-9]+$ ]]; then
+  wait_seconds=$(((timeout_stop_usec + 999999) / 1000000 + 60))
+else
+  wait_seconds=180
+fi
+
+for _ in $(seq 1 "$wait_seconds"); do
+  sleep 1
+  new_pid=$(systemctl --user show "$service" -p MainPID --value)
+  if [[ -n "$new_pid" && "$new_pid" != 0 && "$new_pid" != "$old_pid" ]] && \
+     systemctl --user is-active --quiet "$service" && \
+     curl -fsS "$api_url" >/dev/null 2>&1; then
+    echo "safe restart complete: old_pid=$old_pid new_pid=$new_pid"
+    exit 0
+  fi
+done
+
+echo "restart did not return healthy within ${wait_seconds} seconds" >&2
+exit 24

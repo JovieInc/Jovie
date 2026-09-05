@@ -48,6 +48,12 @@ class OpenAISymphonyInstallTests(unittest.TestCase):
         self.assertIn("github.com/JovieInc/symphony/releases/download", updater)
         self.assertIn("symphony-elixir.service", updater)
         self.assertIn('SUM_NAME="${BIN_NAME}.sha256"', updater)
+        self.assertIn("symphony-elixir-safe-restart", updater)
+        self.assertIn("symphony-frozen-generation-transition", updater)
+        safe_restart = (ROOT / "scripts/symphony/symphony-elixir-safe-restart").read_text()
+        self.assertIn("--maintenance-replace", safe_restart)
+        self.assertIn("symphony-frozen-generation-transition", safe_restart)
+        self.assertIn("--lease-fd 9", safe_restart)
 
     def test_homemade_issue_pickup_is_disabled(self) -> None:
         self.assertFalse(
