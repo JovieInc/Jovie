@@ -18,6 +18,46 @@ ROOT = pathlib.Path(__file__).resolve().parents[3]
 LAUNCHER = ROOT / "scripts/symphony/codex-rotate"
 
 
+class CodexAccountEligibilityTests(unittest.TestCase):
+    def test_authentication_and_effective_provider_filter(self):
+        # Execute the production heredoc, so the gate traces the actual selector.
+        source = LAUNCHER.read_text().split("python3 - <<'PY'\n", 1)[1].split("\nPY", 1)[0]
+        namespace = {"__name__": "account_order", "__file__": str(LAUNCHER) + ":account_order"}
+        import contextlib
+        import io
+        from unittest import mock
+        with tempfile.TemporaryDirectory() as temporary:
+            root = pathlib.Path(temporary)
+            account = root / "candidate"
+            account.mkdir()
+            state = root / "state.json"
+            state.write_text('{}')
+            with mock.patch.dict(os.environ, ACCOUNTS_ROOT=str(root), STATE_FILE=str(state)), contextlib.redirect_stdout(io.StringIO()):
+                exec(compile(source, str(LAUNCHER) + ":account_order", "exec"), namespace)
+            eligible = namespace["codex_account"]
+            for auth, config, expected in [
+                ('{"auth_mode":"chatgpt"}', 'model = "test"', True),
+                ('{"auth_mode":"chatgpt"}', 'model_provider = "openai"', True),
+                ('{"auth_mode":"chatgpt"}', 'model_provider = "openrouter"', False),
+                ('{"auth_mode":"apikey"}', '', False),
+                ('{}', '', False),
+                ('[]', '', False),
+                ('broken', '', False),
+                ('{"auth_mode":"chatgpt"}', 'invalid = [', False),
+                ('{"auth_mode":"chatgpt"}', 'profile = "other"\n[profiles.other]\nmodel_provider = "openrouter"', False),
+                ('{"auth_mode":"chatgpt"}', 'profile = "other"\n[profiles.other]\nmodel_provider = "openai"', True),
+                ('{"auth_mode":"chatgpt"}', 'profile = "missing"', False),
+                ('{"auth_mode":"chatgpt"}', 'profile = []', False),
+                ('{"auth_mode":"chatgpt"}', 'profile = "other"\nprofiles = []', False),
+            ]:
+                with self.subTest(auth=auth, config=config):
+                    (account / "auth.json").write_text(auth)
+                    (account / "config.toml").write_text(config)
+                    self.assertEqual(eligible(account), expected)
+            (account / "config.toml").unlink()
+            self.assertFalse(eligible(account))
+
+
 @unittest.skipUnless(shutil.which("flock"), "requires util-linux flock")
 class CodexRotateTests(unittest.TestCase):
     def setUp(self):
@@ -28,7 +68,7 @@ class CodexRotateTests(unittest.TestCase):
         for name in ("account-a", "account-b"):
             account = self.accounts / name
             account.mkdir()
-            (account / "auth.json").write_text("{}\n")
+            (account / "auth.json").write_text('{"auth_mode":"chatgpt"}\n')
             (account / "config.toml").write_text('model = "test"\n')
         (self.accounts / "state.json").write_text(
             json.dumps({"active": "account-a", "cooldowns": {}, "last_error": {}})
@@ -84,6 +124,32 @@ class CodexRotateTests(unittest.TestCase):
         fcntl.flock(descriptor, fcntl.LOCK_EX | fcntl.LOCK_NB)
         self.addCleanup(os.close, descriptor)
         return descriptor
+
+    def test_active_openrouter_profile_is_never_launched(self):
+        (self.accounts / "account-a/config.toml").write_text('model_provider = "openrouter"\n')
+        result = self.start(FAKE_CODEX_SLEEP=0)
+        self.assertEqual(result.wait(timeout=5), 0)
+        self.assertFalse((self.events / "account-a.started").exists())
+        self.assertTrue((self.events / "account-b.started").exists())
+        self.assertFalse((self.accounts / "locks/account-a.lock").exists())
+
+    def test_compatible_account_cooldown_order_is_preserved(self):
+        cooldowns = {"account-a": int(time.time()) + 600}
+        (self.accounts / "state.json").write_text(json.dumps({"active": "account-a", "cooldowns": cooldowns}))
+        result = self.start(FAKE_CODEX_SLEEP=0)
+        self.assertEqual(result.wait(timeout=5), 0)
+        self.assertFalse((self.events / "account-a.started").exists())
+        self.assertTrue((self.events / "account-b.started").exists())
+        self.assertEqual(json.loads((self.accounts / "state.json").read_text())["cooldowns"], cooldowns)
+
+    def test_no_codex_accounts_does_not_launch_or_change_state(self):
+        for name in ("account-a", "account-b"):
+            (self.accounts / name / "auth.json").write_text('{"auth_mode":"apikey"}\n')
+        before = (self.accounts / "state.json").read_bytes()
+        result = self.start(CODEX_ACCOUNT_WAIT_SECONDS=0)
+        self.assertEqual(result.wait(timeout=5), 75)
+        self.assertEqual(list(self.events.iterdir()), [])
+        self.assertEqual((self.accounts / "state.json").read_bytes(), before)
 
     def test_concurrent_launches_lease_distinct_accounts(self):
         first = self.start()
