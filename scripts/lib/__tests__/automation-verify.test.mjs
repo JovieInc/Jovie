@@ -201,9 +201,11 @@ const MERGE_QUEUE_CONTROLLER_SCRIPT_TESTS = [
   'scripts/lib/__tests__/pr-check-failures.test.mjs',
 ];
 const MERGE_GROUP_ADMISSION_INPUTS = [
+  'scripts/lib/merge-group-size-bootstrap-contract.mjs',
   'scripts/lib/merge-group-admission.mjs',
   'scripts/lib/__tests__/merge-group-admission.test.mjs',
   'scripts/lib/__tests__/merge-group-member-policy.test.mjs',
+  'scripts/lib/__tests__/merge-group-size-bootstrap-contract.test.mjs',
 ];
 const MERGE_GROUP_ADMISSION_COMPANIONS = [
   '.github/workflows/ci.yml',
@@ -218,6 +220,7 @@ const MERGE_GROUP_ADMISSION_SCRIPT_TESTS = [
   'scripts/lib/__tests__/automation-verify.test.mjs',
   'scripts/lib/__tests__/merge-group-admission.test.mjs',
   'scripts/lib/__tests__/merge-group-member-policy.test.mjs',
+  'scripts/lib/__tests__/merge-group-size-bootstrap-contract.test.mjs',
   'scripts/lib/__tests__/merge-group-workflow-contract.test.mjs',
 ];
 
@@ -704,6 +707,7 @@ describe('automation-verify affected scope', () => {
         'scripts/lib/__tests__/ci-repo-lanes.test.mjs',
         'scripts/lib/__tests__/merge-group-admission.test.mjs',
         'scripts/lib/__tests__/merge-group-member-policy.test.mjs',
+        'scripts/lib/__tests__/merge-group-size-bootstrap-contract.test.mjs',
         'scripts/lib/__tests__/merge-group-workflow-contract.test.mjs',
         'scripts/lib/__tests__/lockfile-specifier-preflight.test.mjs',
         'scripts/lib/__tests__/sentry-autofix-workflow-contract.test.mjs',
