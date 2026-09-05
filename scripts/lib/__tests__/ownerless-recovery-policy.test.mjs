@@ -3,6 +3,8 @@ import { describe, expect, it } from 'vitest';
 import {
   classifyQueueOwnership,
   countsAsRecoveryFailure,
+  recoveryIssueSnapshot,
+  run,
 } from '../../ownerless-recovery-sweeper.mjs';
 import {
   buildPrFleetClosureAudit,
@@ -107,5 +109,64 @@ describe('ownerless recovery policy', () => {
     expect(
       readFileSync(new URL('../upsert-pr-comment.sh', import.meta.url), 'utf8')
     ).toContain('${4:+:$4}');
+  });
+});
+
+describe('tracker scan admission', () => {
+  it('does not read Linear for empty or draft-only PR inventories', async () => {
+    for (const open of [[], [{ draft: true }], [{ isDraft: true }]]) {
+      expect(
+        await recoveryIssueSnapshot(open, () => {
+          throw new Error('unexpected tracker read');
+        })
+      ).toBeNull();
+    }
+  });
+  it('returns from the actual sweep before tracker reads when all PRs are drafts', async () => {
+    await run({
+      resolvePolicyHead: async () => main,
+      readOpenPulls: async base => {
+        expect(base).toBe('main');
+        return [{ draft: true }];
+      },
+      readIssueSnapshot: async () => {
+        throw new Error('unexpected tracker read');
+      },
+    });
+  });
+  it('preserves exhaustive evidence and propagates unknown for real recovery demand', async () => {
+    const snapshot = {
+      issues: [],
+      coverage: {
+        complete: true,
+        pages: 1,
+        scanned: 0,
+        hasNextPage: false,
+        endCursor: null,
+        reason: null,
+      },
+    };
+    expect(
+      await recoveryIssueSnapshot([{ draft: false }], async () => snapshot)
+    ).toBe(snapshot);
+    await expect(
+      recoveryIssueSnapshot([{ draft: false }], async () => {
+        throw new Error('quota exhausted');
+      })
+    ).rejects.toThrow('quota exhausted');
+  });
+  it('skips draft scans while preserving existing workflow triggers', () => {
+    const workflow = readFileSync(
+      new URL(
+        '../../../.github/workflows/ownerless-recovery-sweep.yml',
+        import.meta.url
+      ),
+      'utf8'
+    );
+    expect(workflow).toMatch(/types: \[opened, reopened, unlabeled\]/);
+    expect(workflow).not.toContain('ready_for_review');
+    expect(workflow).toMatch(
+      /if: github.event_name != 'pull_request' \|\| github.event.pull_request.draft == false/
+    );
   });
 });
