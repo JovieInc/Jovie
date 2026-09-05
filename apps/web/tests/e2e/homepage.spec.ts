@@ -91,6 +91,15 @@ test.describe('Homepage', () => {
     expect(heroBox?.height ?? 0).toBeGreaterThanOrEqual(
       (viewport?.height ?? 0) - 1
     );
+
+    const searchBox = await hero
+      .getByTestId('homepage-editorial-hero-search')
+      .boundingBox();
+    const inputBox = await hero
+      .getByPlaceholder('Search your name')
+      .boundingBox();
+    expect(searchBox?.width ?? 0).toBeCloseTo(640, 0);
+    expect(inputBox?.width ?? 0).toBeGreaterThanOrEqual(420);
   });
 
   test('header uses the canonical marketing shell with full navigation', async ({
@@ -487,10 +496,51 @@ test.describe('Homepage', () => {
     const searchBounds = await search.boundingBox();
     const viewportWidth = page.viewportSize()?.width ?? 0;
 
+    const [heroInlinePadding, searchMaterial] = await Promise.all([
+      page.getByTestId('homepage-hero-shell').evaluate(element => {
+        const style = getComputedStyle(element);
+        return (
+          Number.parseFloat(style.paddingLeft) +
+          Number.parseFloat(style.paddingRight)
+        );
+      }),
+      search.locator('.homepage-name-search').evaluate(element => {
+        const field = element.querySelector<HTMLElement>(
+          '.homepage-name-search__field'
+        );
+        const glow = element.querySelector<HTMLElement>(
+          ":scope > .group\\/aura > [aria-hidden='true']"
+        );
+        if (!(field && glow)) return null;
+        const fieldBounds = field.getBoundingClientRect();
+        const glowBounds = glow.getBoundingClientRect();
+        return {
+          fieldLeft: fieldBounds.left,
+          fieldRight: fieldBounds.right,
+          glowLeft: glowBounds.left,
+          glowRight: glowBounds.right,
+          glowClipPath: getComputedStyle(glow).clipPath,
+        };
+      }),
+    ]);
+
     expect(searchBounds?.x ?? -1).toBeGreaterThanOrEqual(0);
     expect(
       (searchBounds?.x ?? 0) + (searchBounds?.width ?? 0)
     ).toBeLessThanOrEqual(viewportWidth + 1);
+    expect(searchBounds?.width ?? 0).toBeGreaterThanOrEqual(
+      viewportWidth - heroInlinePadding - 1
+    );
+    expect(searchMaterial).not.toBeNull();
+    expect(searchMaterial?.glowLeft).toBeCloseTo(
+      searchMaterial?.fieldLeft ?? Number.NaN,
+      0
+    );
+    expect(searchMaterial?.glowRight).toBeCloseTo(
+      searchMaterial?.fieldRight ?? Number.NaN,
+      0
+    );
+    expect(searchMaterial?.glowClipPath).not.toBe('none');
     await expect(page.getByTestId('homepage-primary-cta')).toBeVisible();
 
     await page.evaluate(() => {
@@ -526,6 +576,7 @@ test.describe('Homepage', () => {
     test.setTimeout(240_000);
 
     const viewports = [
+      { width: 320, height: 568 },
       { width: 375, height: 812 },
       { width: 390, height: 844 },
       { width: 430, height: 932 },
