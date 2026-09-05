@@ -82,3 +82,7 @@ Node 24 or later. Isolated from the monorepo Node 22 CI runner.
 - It does not privileged-write gbrain or heal Symphony.
 - It does not join LYB Eve.
 - It does not revive the retired Gem OpenClaw agent.
+
+## Repository separation
+
+See [Summer repository separation](../../docs/operations/SUMMER_REPOSITORY_SEPARATION.md) for independently buildable application exports and the private Summer destination. The existing source remains recovery material until verified cutover; this is not commissioning proof.

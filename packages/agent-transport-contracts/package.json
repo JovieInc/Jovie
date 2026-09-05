@@ -1,0 +1,8 @@
+{
+  "name": "@jovie/agent-transport-contracts",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": "./index.ts"
+  }
+}

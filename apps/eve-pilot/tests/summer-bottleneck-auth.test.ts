@@ -1,6 +1,6 @@
 import { generateKeyPairSync } from 'node:crypto';
 import { describe, expect, it, vi } from 'vitest';
-import { signSummerBottleneckSnapshot } from '../../web/lib/ovie/summer-bottleneck-producer';
+import { signSummerBottleneckSnapshot } from '../../../packages/agent-transport-contracts/index';
 import {
   handleSummerBottleneckRequest,
   JOVIE_PRODUCTION_OIDC_SUBJECT,
