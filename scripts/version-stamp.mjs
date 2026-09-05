@@ -24,6 +24,7 @@
 import { existsSync, readdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { isInternalEntry } from './lib/changelog-filter-rules.mjs';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const ROOT = join(__dirname, '..');
@@ -144,7 +145,9 @@ export function promoteChangelog(changelog, nextVersion, dateISO) {
     }
   }
 
-  const unreleasedBody = lines.slice(unreleasedIndex + 1, unreleasedEnd);
+  const unreleasedBody = lines
+    .slice(unreleasedIndex + 1, unreleasedEnd)
+    .map(tagPromotedInternalEntry);
   const withoutUnreleased = [
     ...lines.slice(0, unreleasedIndex),
     ...lines.slice(unreleasedEnd),
@@ -168,6 +171,28 @@ export function promoteChangelog(changelog, nextVersion, dateISO) {
   );
 
   return withoutUnreleased.join('\n');
+}
+
+function tagPromotedInternalEntry(line) {
+  const bullet = /^(\s*[-*+]\s+)(.*)$/.exec(line);
+  if (
+    bullet &&
+    isInternalEntry(bullet[2]) &&
+    !/\[\s*internal\s*\]/i.test(bullet[2])
+  ) {
+    return `${bullet[1]}[internal] ${bullet[2]}`;
+  }
+
+  const summary = /^(\s*>\s?)(.*)$/.exec(line);
+  if (
+    summary &&
+    isInternalEntry(summary[2]) &&
+    !/\[\s*internal\s*\]/i.test(summary[2])
+  ) {
+    return `${summary[1]}${summary[2]} [internal]`;
+  }
+
+  return line;
 }
 
 /**
