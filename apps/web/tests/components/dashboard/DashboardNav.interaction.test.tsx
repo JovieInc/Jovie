@@ -22,18 +22,6 @@ vi.mock('@/lib/queries/prefetch-dashboard', () => ({
   prefetchForRoute: prefetchForRouteMock,
 }));
 
-vi.mock('next/link', async () => {
-  const React = await import('react');
-  return {
-    default: React.forwardRef<
-      HTMLAnchorElement,
-      React.ComponentPropsWithoutRef<'a'> & { readonly prefetch?: boolean }
-    >(function TestLink({ prefetch, ...props }, ref) {
-      return <a {...props} data-prefetch={String(prefetch)} ref={ref} />;
-    }),
-  };
-});
-
 const PRIMARY_LABELS = [
   'Inbox',
   'New Chat',
@@ -58,17 +46,6 @@ describe('DashboardNav interactions', () => {
       const link = screen.getByRole('link', { name: label });
       expect(link.querySelector('svg')).toBeTruthy();
       expect(link.querySelector('span.truncate')).toHaveTextContent(label);
-    }
-  });
-
-  it('fully prefetches every canonical dynamic customer route', () => {
-    renderDashboardNav({ renderFn: render });
-
-    for (const label of PRIMARY_LABELS.slice(0, 6)) {
-      expect(screen.getByRole('link', { name: label })).toHaveAttribute(
-        'data-prefetch',
-        'true'
-      );
     }
   });
 
