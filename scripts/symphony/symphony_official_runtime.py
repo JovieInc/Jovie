@@ -87,6 +87,8 @@ FLEET_GATE_RECEIPT_FUTURE_SKEW_SECONDS = 60
 CLOSURE_HOLD_RECHECK_SECONDS = 30
 BOUNDED_REPAIR_SCHEMA = "symphony-bounded-repair-admission/v1"
 BOUNDED_REPAIR_MAX_SECONDS = 900
+BOUNDED_REPAIR_MODEL = "gpt-5.3-codex-spark"
+BOUNDED_REPAIR_MODEL_LIMIT_ID = "codex_bengalfox"
 BOUNDED_REPAIR_ADMISSION_FIELDS = frozenset(
     {"remediationAdmission", "workAdmission"}
 )
@@ -1084,6 +1086,18 @@ def _bounded_repair_artifact(
     return path
 
 
+def _bounded_repair_router_script(codex_cli: pathlib.Path) -> str:
+    return (
+        "#!/bin/sh\n"
+        "set -eu\n"
+        f"exec {codex_cli} "
+        f"-c 'model=\"{BOUNDED_REPAIR_MODEL}\"' "
+        "-c 'model_reasoning_effort=\"high\"' "
+        "-c 'shell_environment_policy.inherit=\"none\"' "
+        "app-server --strict-config --stdio\n"
+    )
+
+
 def validate_bounded_repair_admission(
     manifest_path: pathlib.Path,
     *,
@@ -1120,6 +1134,12 @@ def validate_bounded_repair_admission(
         raise ValueError("recovery-manifest-new-intake-not-false")
     if manifest.get("pushAllowed") is not False:
         raise ValueError("recovery-manifest-push-not-false")
+    if manifest.get("model") != BOUNDED_REPAIR_MODEL:
+        raise ValueError("recovery-manifest-model-mismatch")
+    if manifest.get("modelRateLimitId") != BOUNDED_REPAIR_MODEL_LIMIT_ID:
+        raise ValueError("recovery-manifest-model-limit-mismatch")
+    if manifest.get("modelFallbackAllowed") is not False:
+        raise ValueError("recovery-manifest-model-fallback-not-false")
 
     issue = manifest.get("issueIdentifier")
     issue_id = manifest.get("issueId")
@@ -1185,6 +1205,7 @@ def validate_bounded_repair_admission(
     workflow_path = _bounded_repair_artifact(artifacts, "workflow")
     router_path = _bounded_repair_artifact(artifacts, "router")
     _bounded_repair_artifact(artifacts, "binary")
+    codex_cli_path = _bounded_repair_artifact(artifacts, "codexCli")
     account_path = _bounded_repair_artifact(artifacts, "accountEnv", private=True)
     if runtime_path.resolve() != pathlib.Path(__file__).resolve():
         raise ValueError("recovery-manifest-runtime-path-mismatch")
@@ -1193,6 +1214,10 @@ def validate_bounded_repair_admission(
         raise ValueError("recovery-manifest-account-home-mismatch")
     if os.environ.get("CODEX_HOME") != account_home:
         raise ValueError("recovery-process-account-home-mismatch")
+    if router_path.read_text(encoding="utf-8") != _bounded_repair_router_script(
+        codex_cli_path
+    ):
+        raise ValueError("recovery-router-not-exact-spark-no-fallback")
 
     workflow = parse_workflow(workflow_path)
     if workflow.required_labels != (label,):

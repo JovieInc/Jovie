@@ -125,8 +125,8 @@ def _bounded_repair_fixture(tmp, helper, *, lifetime_seconds=600):
         .replace("networkAccess: true", "networkAccess: false"),
         encoding="utf-8",
     )
-    router = root / "router"
-    router.write_text(
+    codex_cli = root / "codex"
+    codex_cli.write_text(
         "#!/bin/sh\n"
         "test -z \"${GITHUB_TOKEN+x}\"\n"
         "test -z \"${GH_TOKEN+x}\"\n"
@@ -138,6 +138,9 @@ def _bounded_repair_fixture(tmp, helper, *, lifetime_seconds=600):
         "echo bounded-repair-ran\n",
         encoding="utf-8",
     )
+    codex_cli.chmod(0o700)
+    router = root / "router"
+    router.write_text(helper._bounded_repair_router_script(codex_cli), encoding="utf-8")
     router.chmod(0o700)
     workflow.write_text(
         workflow.read_text(encoding="utf-8").replace(
@@ -196,6 +199,7 @@ def _bounded_repair_fixture(tmp, helper, *, lifetime_seconds=600):
         "workflow": workflow,
         "router": router,
         "binary": binary,
+        "codexCli": codex_cli,
         "accountEnv": account,
     }
     manifest = {
@@ -211,6 +215,9 @@ def _bounded_repair_fixture(tmp, helper, *, lifetime_seconds=600):
         "maxConcurrent": 1,
         "newIssueIntakeAllowed": False,
         "pushAllowed": False,
+        "model": helper.BOUNDED_REPAIR_MODEL,
+        "modelRateLimitId": helper.BOUNDED_REPAIR_MODEL_LIMIT_ID,
+        "modelFallbackAllowed": False,
         "fleetGatePath": str(gate),
         "sourceRoot": str(source),
         "sourceCommit": commit,
@@ -1539,14 +1546,14 @@ while True: time.sleep(1)
             _gate, _fleet, manifest_path, manifest, _command = (
                 _bounded_repair_fixture(tmp, helper)
             )
-            router = pathlib.Path(manifest["artifacts"]["router"]["path"])
-            router.write_text(
+            codex_cli = pathlib.Path(manifest["artifacts"]["codexCli"]["path"])
+            codex_cli.write_text(
                 "#!/bin/sh\nsleep 0.2\necho bounded-repair-ran\n",
                 encoding="utf-8",
             )
-            router.chmod(0o700)
-            manifest["artifacts"]["router"]["sha256"] = hashlib.sha256(
-                router.read_bytes()
+            codex_cli.chmod(0o700)
+            manifest["artifacts"]["codexCli"]["sha256"] = hashlib.sha256(
+                codex_cli.read_bytes()
             ).hexdigest()
             manifest_path.write_text(json.dumps(manifest), encoding="utf-8")
             manifest_path.chmod(0o600)
@@ -1563,7 +1570,7 @@ while True: time.sleep(1)
                 "--workspace",
                 str(pathlib.Path(manifest["workspaceRoot"]) / "JOV-9999"),
                 "--",
-                str(router),
+                str(pathlib.Path(manifest["artifacts"]["router"]["path"])),
                 "app-server",
             ]
             workspace = pathlib.Path(manifest["workspaceRoot"]) / "JOV-9999"
@@ -1652,9 +1659,13 @@ while True: time.sleep(1)
             "wrong-account": lambda manifest, fleet: manifest.update(accountHome="/tmp/other"),
             "bad-account-hash": lambda manifest, fleet: manifest["artifacts"]["accountEnv"].update(sha256="0" * 64),
             "wrong-activity": lambda manifest, fleet: manifest.update(activity="focused-tests"),
+            "wrong-model": lambda manifest, fleet: manifest.update(model="gpt-5.6-luna"),
+            "wrong-model-limit": lambda manifest, fleet: manifest.update(modelRateLimitId="codex"),
+            "fallback-enabled": lambda manifest, fleet: manifest.update(modelFallbackAllowed=True),
             "wrong-workspace": lambda manifest, fleet: manifest.update(workspaceRoot="/tmp/other"),
             "wrong-command": lambda manifest, fleet: manifest.update(schedulerCommand=["false"]),
             "bad-hash": lambda manifest, fleet: manifest["artifacts"]["workflow"].update(sha256="0" * 64),
+            "bad-codex-hash": lambda manifest, fleet: manifest["artifacts"]["codexCli"].update(sha256="0" * 64),
             "local-revoked": lambda manifest, fleet: fleet["remediationAdmission"].update(localAllowed=False),
             "activity-revoked": lambda manifest, fleet: fleet["remediationAdmission"].update(activities=[]),
             "floor-zero": lambda manifest, fleet: fleet["concurrency"]["gem"].update(runtimeFloor=0),
@@ -1767,6 +1778,35 @@ while True: time.sleep(1)
             manifest_path.chmod(0o600)
             with self.assertRaisesRegex(
                 ValueError, "recovery-workflow-workspace-root-mismatch"
+            ):
+                helper.validate_bounded_repair_admission(
+                    manifest_path,
+                    fleet_path=gate,
+                    fleet_payload=fleet,
+                )
+
+    def test_bounded_repair_router_is_exact_spark_without_fallback(self):
+        helper = _load_helper()
+        with tempfile.TemporaryDirectory() as tmp, mock.patch.dict(
+            os.environ, {"CODEX_HOME": "/tmp/codex-fourth"}
+        ):
+            gate, fleet, manifest_path, manifest, _command = _bounded_repair_fixture(
+                tmp, helper
+            )
+            router = pathlib.Path(manifest["artifacts"]["router"]["path"])
+            router.write_text(
+                router.read_text(encoding="utf-8").replace(
+                    helper.BOUNDED_REPAIR_MODEL, "gpt-5.6-luna"
+                ),
+                encoding="utf-8",
+            )
+            manifest["artifacts"]["router"]["sha256"] = hashlib.sha256(
+                router.read_bytes()
+            ).hexdigest()
+            manifest_path.write_text(json.dumps(manifest), encoding="utf-8")
+            manifest_path.chmod(0o600)
+            with self.assertRaisesRegex(
+                ValueError, "recovery-router-not-exact-spark-no-fallback"
             ):
                 helper.validate_bounded_repair_admission(
                     manifest_path,
