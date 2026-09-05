@@ -51,6 +51,50 @@ const baseProps = {
 };
 
 describe('VirtualizedTableRow', () => {
+  it('measures intrinsic virtual row height and keeps columns constrained across rows', () => {
+    const measureElement = vi.fn();
+    const refs = new Map<number, HTMLTableRowElement>();
+    const { rerender } = render(
+      <table>
+        <tbody>
+          <VirtualizedTableRow
+            {...baseProps}
+            row={createRow('1', 'Long creator name', false, 'always')}
+            rowRefsMap={refs}
+            shouldVirtualize
+            virtualStart={0}
+            measureElement={measureElement}
+          />
+        </tbody>
+      </table>
+    );
+    const row = screen.getByRole('row');
+    expect(measureElement).toHaveBeenCalledWith(row);
+    expect(refs.get(0)).toBe(row);
+    // Absolute table rows otherwise retain the 40px shell height while their
+    // cells grow beyond it, and min-content text expands each row separately.
+    expect(row).toHaveStyle({
+      display: 'table',
+      tableLayout: 'fixed',
+      height: 'auto',
+    });
+    expect(row).toHaveAttribute('data-index', '0');
+    rerender(
+      <table>
+        <tbody>
+          <VirtualizedTableRow
+            {...baseProps}
+            rowRefsMap={refs}
+            shouldVirtualize={false}
+            measureElement={measureElement}
+          />
+        </tbody>
+      </table>
+    );
+    expect(screen.getByRole('row').style.position).toBe('');
+    expect(screen.getByRole('row').style.height).toBe('');
+  });
+
   it('forwards extra HTML props onto the <tr> element', () => {
     render(
       <table>

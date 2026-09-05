@@ -182,6 +182,10 @@ function VirtualizedTableRowComponent<TData>({
         shouldVirtualize && virtualStart !== undefined
           ? {
               position: 'absolute',
+              display: 'table',
+              tableLayout: 'fixed',
+              height: 'auto',
+              minHeight: '40px',
               top: 0,
               left: 0,
               width: '100%',
