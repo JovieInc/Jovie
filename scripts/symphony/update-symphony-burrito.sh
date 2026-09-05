@@ -45,6 +45,7 @@ CHECK_ONLY=0
 RUNTIME_READBACK=0
 PROVIDER_ONLY=0
 PROVIDER_ROLLBACK=0
+PROVIDER_STAGE=0
 RETIRE_LEGACY=0
 MIN_RESTART_NEXT_POLL_MS="${SYMPHONY_MIN_RESTART_NEXT_POLL_MS:-5000}"
 # Genuinely retired units only. The grok/kimi sidecar
@@ -60,7 +61,7 @@ LEGACY_UNITS=(
   symphony-burrito-update.timer
 )
 
-usage() { echo "usage: $0 [--dry-run] [--check] [--no-restart] [--skip-binary] [--retire-legacy] [--runtime-readback] [--provider-runtime-only] [--provider-runtime-rollback]" >&2; }
+usage() { echo "usage: $0 [--dry-run] [--check] [--no-restart] [--skip-binary] [--retire-legacy] [--runtime-readback] [--provider-runtime-only] [--provider-runtime-rollback] [--stage-provider-runtime]" >&2; }
 
 for arg in "$@"; do
   case "$arg" in
@@ -72,18 +73,23 @@ for arg in "$@"; do
     --runtime-readback) RUNTIME_READBACK=1 ;;
     --provider-runtime-only) PROVIDER_ONLY=1 ;;
     --provider-runtime-rollback) PROVIDER_ONLY=1; PROVIDER_ROLLBACK=1 ;;
+    --stage-provider-runtime) PROVIDER_ONLY=1; PROVIDER_STAGE=1 ;;
     -h|--help) usage; exit 0 ;;
     *) usage; exit 2 ;;
   esac
 done
 
 if [ "$PROVIDER_ONLY" -eq 1 ]; then
+  if [ "$PROVIDER_STAGE" -eq 1 ] && [ "$PROVIDER_ROLLBACK" -eq 1 ]; then
+    echo "PROVIDER_RED staging and rollback are separate operations" >&2
+    exit 2
+  fi
   if [ "$RETIRE_LEGACY" -eq 1 ] || [ "$RUNTIME_READBACK" -eq 1 ] || [ "$CHECK_ONLY" -eq 1 ]; then
     echo "PROVIDER_RED incompatible operation flags" >&2
     exit 2
   fi
   exec python3 "$REPO_ROOT/scripts/symphony/provider_runtime_promotion.py" \
-    "$REPO_ROOT" "$TARGET_HOME" "$STATE_DIR" "$PROVIDER_ROLLBACK" "$DRY_RUN"
+    "$REPO_ROOT" "$TARGET_HOME" "$STATE_DIR" "$PROVIDER_ROLLBACK" "$DRY_RUN" "$PROVIDER_STAGE"
 fi
 
 if [ "$RESTART" -eq 1 ]; then
