@@ -68,6 +68,7 @@ html[data-desktop-runtime="electron"] {
   --electron-traffic-light-y: 17px;
   --electron-sidebar-width: var(--app-shell-sidebar-width);
   --electron-sidebar-collapsed-width: 52px;
+  --electron-controls-width: 188px;
 }
 
 html[data-desktop-runtime="electron"] body {
@@ -87,7 +88,6 @@ html[data-desktop-runtime="electron"] [data-app-shell-frame="true"] {
 /* Electron titlebar owns top inset; do not stack a second top gap. */
 html[data-desktop-runtime="electron"]
 [data-app-shell-body="true"][data-electron-top-gap-owner="titlebar"] {
-  padding-top: 0;
   transition-property: gap, padding-right, padding-bottom, padding-left;
 }
 
@@ -133,6 +133,87 @@ html[data-desktop-runtime="electron"] [data-app-shell-frame="true"]
   [data-electron-titlebar="true"] {
   padding-left: var(--app-shell-gap);
   grid-template-columns: var(--electron-sidebar-width) minmax(0, 1fr);
+}
+
+html[data-desktop-runtime="electron"]
+  [data-app-shell-frame="true"]
+  [data-electron-titlebar="true"] {
+  position: absolute;
+  inset: 0 auto auto 0;
+  width: var(--electron-controls-width);
+  height: calc(2 * (var(--electron-traffic-light-y) + 6px));
+  grid-template-columns: minmax(0, 1fr);
+  padding: 0 0 0 var(--app-shell-gap);
+  background: transparent;
+}
+
+html[data-desktop-runtime="electron"]
+  [data-app-shell-frame="true"]
+  [data-testid="electron-titlebar-main-cell"] {
+  display: none;
+}
+
+html[data-desktop-runtime="electron"] [data-app-shell-body="true"] {
+  padding-top: calc(
+    var(--electron-traffic-light-y) +
+    6px -
+    var(--app-shell-header-height-compact) /
+    2 -
+    1px
+  );
+}
+
+html[data-desktop-runtime="electron"] [data-app-shell-sidebar-mount="true"] {
+  padding-top: calc(
+    var(--electron-traffic-light-y) +
+    6px +
+    var(--app-shell-header-height-compact) /
+    2 +
+    1px
+  );
+  box-sizing: border-box;
+}
+
+html[data-desktop-runtime="electron"]
+  [data-app-shell-main-content="true"]
+  > header {
+  height: var(--app-shell-header-height-compact);
+  min-height: var(--app-shell-header-height-compact);
+  -webkit-app-region: drag;
+}
+
+html[data-desktop-runtime="electron"]
+  [data-app-shell-main-content="true"]
+  > header
+  > div {
+  box-sizing: border-box;
+  height: 100%;
+  padding-block: 0;
+}
+
+html[data-desktop-runtime="electron"]
+  [data-app-shell-frame="true"]:has([data-collapsible="offcanvas"])
+  [data-app-shell-main-content="true"]
+  > header {
+  padding-left: var(--electron-controls-width);
+}
+
+html[data-desktop-runtime="electron"]
+  [data-app-shell-frame="true"]:has([data-collapsible="icon"])
+  [data-app-shell-main-content="true"]
+  > header {
+  padding-left: calc(
+    var(--electron-controls-width) -
+    var(--electron-sidebar-collapsed-width)
+  );
+}
+
+@media (width < 1024px) {
+  html[data-desktop-runtime="electron"]
+    [data-app-shell-main-content="true"]
+    > header {
+    padding-left: var(--electron-controls-width);
+  }
 }
 
 /* Marketing pages use document scrolling rather than app-shell scroll panes.

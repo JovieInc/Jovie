@@ -2,15 +2,13 @@
  * Geometry tests for the Electron titlebar.
  *
  * These tests run in the browser (not in an actual Electron shell) and verify:
- * 1. The titlebar DOM structure — sidebar-cell contains back/forward,
- *    sidebar toggle + update pill; main-cell is a plain drag region (no header —
- *    page headers moved into
- *    the elevated content card below).
+ * 1. The titlebar DOM structure — sidebar-cell contains back/forward and the
+ *    sidebar toggle; main-cell remains an empty drag region. Build diagnostics
+ *    live in the native About surface rather than the workspace row.
  * 2. No duplicate sidebar toggles — Electron gets exactly one titlebar toggle
  *    and zero web sidebar-header controls.
- * 3. The sidebar-cell width equals the CSS sidebar-width token, confirming rail alignment.
- *    (In a real Electron run the canonical shell CSS `padding-left` rule takes effect;
- *    in the browser we verify the column structure is present and correctly attributed.)
+ * 3. The compact native-controls cell uses its dedicated width token while the
+ *    content rail keeps the canonical sidebar width.
  *
  * Run:
  *   doppler run --project jovie-web --config dev -- env E2E_USE_TEST_AUTH_BYPASS=1 \
@@ -110,8 +108,8 @@ test('titlebar DOM has a single sidebar toggle and an empty main-cell drag regio
     timeout: 30_000,
   });
 
-  // The titlebar row is hidden in the browser (display:none unless inside Electron).
-  // Verify structural correctness by checking the DOM regardless of visibility.
+  // The test forces the Electron marker, so verify the live visible structure
+  // and keep the same selectors usable in a packaged-shell run.
   const titlebarRow = page.locator('[data-testid="electron-titlebar-row"]');
   await expect(titlebarRow).toBeAttached({ timeout: 10_000 });
 
@@ -186,7 +184,7 @@ test('no duplicate sidebar dock button and titlebar toggle on the same page', as
   await expect(titlebarToggle).toBeAttached();
 });
 
-test('titlebar sidebar-cell width matches CSS sidebar-width token (rail alignment)', async ({
+test('titlebar sidebar-cell width matches the compact controls token', async ({
   page,
 }) => {
   // Skip outside the explicit dev-auth E2E lane; titlebar token checks need a bypassed Clerk session.
@@ -218,37 +216,36 @@ test('titlebar sidebar-cell width matches CSS sidebar-width token (rail alignmen
       trafficLightY: readPx('--electron-traffic-light-y'),
       sidebarWidth: readPx('--electron-sidebar-width'),
       collapsedSidebarWidth: readPx('--electron-sidebar-collapsed-width'),
+      controlsWidth: readPx('--electron-controls-width'),
     };
   });
 
-  // If we can read the token, check the sidebar column width matches.
+  // If we can read the token, check the compact controls column width matches.
   expect(tokens.titlebarHeight).toBe(40);
   expect(tokens.trafficLightSafeWidth).toBe(72);
   expect(tokens.trafficLightX).toBe(20);
   expect(tokens.trafficLightY).toBe(17);
   expect(tokens.collapsedSidebarWidth).toBe(52);
 
-  if (tokens.sidebarWidth !== null && tokens.sidebarWidth > 0) {
+  if (tokens.controlsWidth !== null && tokens.controlsWidth > 0) {
     const sidebarCell = page.locator(
       '[data-testid="electron-titlebar-sidebar-cell"]'
     );
     const box = await sidebarCell.boundingBox();
 
-    // The titlebar is hidden in the browser (display:none), so boundingBox will be null.
-    // This is expected — we only assert column alignment geometry inside Electron.
-    // The structural tests above already validate the DOM layout.
-    // Here we only check the token resolves to a non-zero positive value.
+    // In the browser-only fallback this can be null; the structural checks above
+    // still validate the DOM. In an Electron run, assert the measured width.
     expect(
       tokens.sidebarWidth,
       'sidebar width token is a positive pixel value'
     ).toBeGreaterThan(0);
 
     if (box !== null) {
-      // Inside Electron, the titlebar IS visible — verify the sidebar-cell width
-      // matches the token value within 1px tolerance (allows for sub-pixel rounding).
+      // Inside Electron, the titlebar is visible — verify the compact control
+      // cell width matches its token within 1px tolerance.
       expect(
-        Math.abs(box.width - tokens.sidebarWidth),
-        `titlebar sidebar-cell width (${box.width}px) matches sidebar-width token (${tokens.sidebarWidth}px)`
+        Math.abs(box.width - tokens.controlsWidth),
+        `titlebar sidebar-cell width (${box.width}px) matches controls-width token (${tokens.controlsWidth}px)`
       ).toBeLessThanOrEqual(1);
     }
   }
@@ -326,7 +323,7 @@ test('Electron shell keeps one control contract across chat, calendar, tasks, li
       const mainPlaneBox = mainPlane.getBoundingClientRect();
       return {
         bodyPaddingTop: Number.parseFloat(getComputedStyle(body).paddingTop),
-        titlebarBottom: titlebarBox.bottom,
+        titlebarTop: titlebarBox.top,
         bodyTop: bodyBox.top,
         sidebarTop: sidebarBox.top,
         mainPlaneTop: mainPlaneBox.top,
@@ -336,19 +333,22 @@ test('Electron shell keeps one control contract across chat, calendar, tasks, li
     expect(geometry, `${route} exposes shell geometry`).not.toBeNull();
     expect(
       geometry?.bodyPaddingTop,
-      `${route} has no second top-gap owner`
-    ).toBe(0);
+      `${route} reserves only the measured optical control offset`
+    ).toBe(4);
     expect(
-      Math.abs((geometry?.titlebarBottom ?? 0) - (geometry?.bodyTop ?? 0)),
-      `${route} body begins at the titlebar boundary`
+      Math.abs((geometry?.titlebarTop ?? 0) - (geometry?.bodyTop ?? 0)),
+      `${route} native controls begin at the shell origin`
     ).toBeLessThanOrEqual(1);
     expect(
       Math.abs((geometry?.sidebarTop ?? 0) - (geometry?.bodyTop ?? 0)),
       `${route} sidebar aligns to the body grid`
     ).toBeLessThanOrEqual(1);
     expect(
-      Math.abs((geometry?.mainPlaneTop ?? 0) - (geometry?.bodyTop ?? 0)),
-      `${route} main plane aligns to the body grid`
+      Math.abs(
+        (geometry?.mainPlaneTop ?? 0) -
+          ((geometry?.bodyTop ?? 0) + (geometry?.bodyPaddingTop ?? 0))
+      ),
+      `${route} main plane starts after the measured optical offset`
     ).toBeLessThanOrEqual(1);
 
     if (route === APP_ROUTES.CHAT) {
