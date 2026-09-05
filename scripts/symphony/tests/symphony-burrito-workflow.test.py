@@ -8,6 +8,7 @@ import io
 import os
 import pathlib
 import re
+import shutil
 import socket
 import subprocess
 import tempfile
@@ -24,7 +25,8 @@ WORKFLOW_PATH = ROOT / "scripts/symphony/WORKFLOW.md"
 WORKFLOW = WORKFLOW_PATH.read_text(encoding="utf-8")
 UNIT_PATH = ROOT / "scripts/symphony/systemd/symphony-elixir.service"
 UNIT = UNIT_PATH.read_text(encoding="utf-8")
-UPDATER = (ROOT / "scripts/symphony/update-symphony-burrito.sh").read_text(encoding="utf-8")
+UPDATER_PATH = ROOT / "scripts/symphony/update-symphony-burrito.sh"
+UPDATER = UPDATER_PATH.read_text(encoding="utf-8")
 HELPER_PATH = ROOT / "scripts/symphony/symphony_official_runtime.py"
 LIVE_TEAM_KEY = "JOV"
 TOKEN_RE = re.compile(r"lin_(?:api_|oauth_)?[A-Za-z0-9]{12,}|api_key:\s*(?!\$LINEAR_API_KEY\b)\S+")
@@ -152,6 +154,24 @@ class OfficialSymphonyContractTests(unittest.TestCase):
         self.assertIn("SuccessExitStatus=0 1", UNIT)
         self.assertIn("StandardOutput=journal", UNIT)
         self.assertNotIn("tty1", UNIT)
+        self.assertIn(
+            'ENV_REPORTER_SRC="${REPO_ROOT}/scripts/lib/environment-file-names.mjs"',
+            UPDATER,
+        )
+        self.assertIn(
+            'ENV_REPORTER_DST="${TARGET_HOME}/.local/bin/symphony-environment-file-names"',
+            UPDATER,
+        )
+        self.assertIn(
+            'install_one "$ENV_REPORTER_SRC" "$ENV_REPORTER_DST" 0755',
+            UPDATER,
+        )
+        self.assertIn(
+            'check_one "$ENV_REPORTER_SRC" "$ENV_REPORTER_DST"',
+            UPDATER,
+        )
+        self.assertIn('node "$ENV_REPORTER_SRC" "$ACCOUNT_ENV"', UPDATER)
+        self.assertIn('node "$ENV_REPORTER_SRC" "$SIGNING_ENV"', UPDATER)
         result = helper.validate_source(
             repo_root=ROOT,
             workflow_path=WORKFLOW_PATH,
@@ -172,6 +192,60 @@ class OfficialSymphonyContractTests(unittest.TestCase):
         )
         self.assertFalse(missing_count["ok"], missing_count)
         self.assertIn("linear_active_issue_count_missing", missing_count["errors"])
+
+    def test_check_mode_rejects_non_executable_environment_reporter(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            target_home = pathlib.Path(tmp)
+            bin_dir = target_home / ".local/bin"
+            config_dir = target_home / ".config/symphony"
+            systemd_dir = target_home / ".config/systemd/user"
+            account_home = target_home / ".codex-accounts/default"
+            bin_dir.mkdir(parents=True)
+            config_dir.mkdir(parents=True)
+            systemd_dir.mkdir(parents=True)
+            account_home.mkdir(parents=True)
+
+            reporter = bin_dir / "symphony-environment-file-names"
+            shutil.copyfile(HELPER_PATH, bin_dir / "symphony-official-runtime")
+            shutil.copyfile(
+                ROOT / "scripts/lib/environment-file-names.mjs", reporter
+            )
+            shutil.copyfile(UNIT_PATH, systemd_dir / "symphony-elixir.service")
+            shutil.copyfile(WORKFLOW_PATH, config_dir / "WORKFLOW.md")
+            reporter.chmod(0o644)
+            account_env = config_dir / "codex-account.env"
+            account_env.write_text(f"CODEX_HOME={account_home}\n", encoding="utf-8")
+            account_env.chmod(0o600)
+            sentinel = "MULTILINE_SIGNER_CONTENT_MUST_NEVER_PRINT"
+            signing_env = config_dir / "summer-bottleneck-signing.env"
+            signing_env.write_text(
+                "SAFE=value\n"
+                'SIGNING_PRIVATE_KEY="-----BEGIN PRIVATE KEY-----\n'
+                f"{sentinel}\n"
+                '-----END PRIVATE KEY-----"\n',
+                encoding="utf-8",
+            )
+            signing_env.chmod(0o600)
+
+            result = subprocess.run(
+                [str(UPDATER_PATH), "--check", "--skip-binary", "--no-restart"],
+                check=False,
+                capture_output=True,
+                env={
+                    **os.environ,
+                    "SYMPHONY_ELIXIR_HOME": str(target_home),
+                    "SYMPHONY_LINEAR_ACTIVE_ISSUES": "100",
+                },
+                text=True,
+            )
+
+            self.assertNotEqual(result.returncode, 0, result.stdout)
+            self.assertIn(
+                "environment_variable_name=SIGNING_PRIVATE_KEY", result.stdout
+            )
+            self.assertIn(f"NOT_EXECUTABLE {reporter}", result.stdout)
+            self.assertNotIn(sentinel, f"{result.stdout}{result.stderr}")
+            self.assertNotIn("PRIVATE KEY", f"{result.stdout}{result.stderr}")
 
     def test_budget_fails_for_five_second_polling_or_unbounded_concurrency(self):
         helper = _load_helper()

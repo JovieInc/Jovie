@@ -1,3 +1,8 @@
+#!/usr/bin/env node
+
+import { readFile } from 'node:fs/promises';
+import { pathToFileURL } from 'node:url';
+
 const ASSIGNMENT = /^([A-Za-z_][A-Za-z0-9_]*)\s*=(.*)$/u;
 
 function findClosingQuote(value, quote) {
@@ -57,4 +62,40 @@ export function environmentVariableNames(contents) {
 
   if (quote) throw new Error('unterminated quoted environment assignment');
   return names;
+}
+
+export function renderEnvironmentVariableNameDiagnostics(contents) {
+  const names = environmentVariableNames(contents);
+  if (names.length === 0) return '';
+  return `${names.map(name => `environment_variable_name=${name}`).join('\n')}\n`;
+}
+
+export async function runEnvironmentVariableNameDiagnostics(
+  args,
+  {
+    read = readFile,
+    writeOut = value => process.stdout.write(value),
+    writeError = value => process.stderr.write(value),
+  } = {}
+) {
+  if (args.length !== 1) {
+    writeError('usage: symphony-environment-file-names <environment-file>\n');
+    return 64;
+  }
+
+  try {
+    const contents = await read(args[0], 'utf8');
+    writeOut(renderEnvironmentVariableNameDiagnostics(contents));
+    return 0;
+  } catch {
+    writeError('environment_file_diagnostic=unavailable\n');
+    return 1;
+  }
+}
+
+const entrypoint = process.argv[1];
+if (entrypoint && import.meta.url === pathToFileURL(entrypoint).href) {
+  process.exitCode = await runEnvironmentVariableNameDiagnostics(
+    process.argv.slice(2)
+  );
 }
