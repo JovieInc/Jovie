@@ -92,6 +92,97 @@ def _closure_run_args(tmp):
     ]
 
 
+def _bounded_repair_fixture(tmp, helper, *, lifetime_seconds=600):
+    root = pathlib.Path(tmp)
+    source = root / "source"
+    source.mkdir()
+    subprocess.run(["git", "init", "-q", str(source)], check=True)
+    subprocess.run(["git", "-C", str(source), "config", "user.email", "test@example.com"], check=True)
+    subprocess.run(["git", "-C", str(source), "config", "user.name", "Test"], check=True)
+    (source / "README").write_text("bounded repair\n", encoding="utf-8")
+    subprocess.run(["git", "-C", str(source), "add", "README"], check=True)
+    subprocess.run(["git", "-C", str(source), "commit", "-qm", "fixture"], check=True)
+    commit = subprocess.run(
+        ["git", "-C", str(source), "rev-parse", "HEAD"],
+        capture_output=True, text=True, check=True,
+    ).stdout.strip()
+    label = "symphony-recovery-jov-9999-test"
+    workflow = root / "WORKFLOW.repair.md"
+    workflow.write_text(
+        WORKFLOW.replace(
+            "  excluded_labels:\n",
+            f"  required_labels:\n    - {label}\n  excluded_labels:\n",
+        )
+        .replace("max_concurrent_agents: 8", "max_concurrent_agents: 1")
+        .replace("max_turns: 20", "max_turns: 1")
+        .replace("networkAccess: true", "networkAccess: false"),
+        encoding="utf-8",
+    )
+    router = root / "router"
+    router.write_text("router\n", encoding="utf-8")
+    workflow.write_text(
+        workflow.read_text(encoding="utf-8").replace(
+            "./scripts/symphony/symphony-codex-router app-server",
+            f"{router} app-server",
+        ),
+        encoding="utf-8",
+    )
+    binary = root / "binary"
+    binary.write_text("#!/bin/sh\necho bounded-repair-ran\n", encoding="utf-8")
+    binary.chmod(0o700)
+    account = root / "codex-account.env"
+    account.write_text("CODEX_HOME=/tmp/codex-fourth\n", encoding="utf-8")
+    account.chmod(0o600)
+    gate = root / "fleet-gate.json"
+    fleet = _fleet_gate_payload(status="red", intake=False)
+    fleet.update(
+        remediationAdmission={
+            "allowed": True,
+            "localAllowed": True,
+            "activities": ["isolated-pr-repair", "focused-tests"],
+        },
+        concurrency={"gem": {"runtimeFloor": 1, "maxConcurrent": 0}},
+    )
+    gate.write_text(json.dumps(fleet), encoding="utf-8")
+    now = dt.datetime.now(dt.timezone.utc)
+    command = [str(binary), "--repair-canary", str(workflow)]
+    artifact_paths = {
+        "runtime": HELPER_PATH,
+        "workflow": workflow,
+        "router": router,
+        "binary": binary,
+        "accountEnv": account,
+    }
+    manifest = {
+        "schema": helper.BOUNDED_REPAIR_SCHEMA,
+        "status": "authorized",
+        "issuedAt": (now - dt.timedelta(seconds=1)).isoformat(),
+        "expiresAt": (now + dt.timedelta(seconds=lifetime_seconds)).isoformat(),
+        "issueIdentifier": "JOV-9999",
+        "issueId": "12345678-1234-1234-1234-123456789abc",
+        "requiredLabel": label,
+        "admissionField": "remediationAdmission",
+        "activity": "isolated-pr-repair",
+        "maxConcurrent": 1,
+        "newIssueIntakeAllowed": False,
+        "pushAllowed": False,
+        "fleetGatePath": str(gate),
+        "sourceRoot": str(source),
+        "sourceCommit": commit,
+        "accountHome": "/tmp/codex-fourth",
+        "schedulerCommand": command,
+        "claimPath": str(root / "repair.claim.json"),
+        "artifacts": {
+            name: {"path": str(path), "sha256": hashlib.sha256(path.read_bytes()).hexdigest()}
+            for name, path in artifact_paths.items()
+        },
+    }
+    manifest_path = root / "repair-admission.json"
+    manifest_path.write_text(json.dumps(manifest), encoding="utf-8")
+    manifest_path.chmod(0o600)
+    return gate, fleet, manifest_path, manifest, command
+
+
 class OfficialSymphonyContractTests(unittest.TestCase):
     def test_live_queue_budget_and_no_root_workflow(self):
         """Official runtime is ~/.config/symphony/WORKFLOW.md; product clone is not a Symphony config."""
@@ -1335,6 +1426,138 @@ while True: time.sleep(1)
             verdict = helper.read_closure_stop_line(closure_gate)
             self.assertFalse(verdict["hold"])
             self.assertEqual(verdict["reason"], "closure-health-green")
+
+    def test_bounded_repair_admits_one_exact_job_while_canonical_closure_is_red(self):
+        helper = _load_helper()
+        with tempfile.TemporaryDirectory() as tmp, mock.patch.dict(
+            os.environ, {"CODEX_HOME": "/tmp/codex-fourth"}
+        ):
+            gate, _fleet, manifest_path, _manifest, command = _bounded_repair_fixture(
+                tmp, helper
+            )
+            canonical_bytes = gate.read_bytes()
+            ordinary = helper.read_closure_stop_line(gate)
+            self.assertTrue(ordinary["hold"])
+            self.assertEqual(ordinary["reason"], "closure-health-not-green")
+            bounded = helper.read_closure_stop_line(
+                gate, recovery_manifest_path=manifest_path
+            )
+            self.assertFalse(bounded["hold"])
+            self.assertEqual(bounded["reason"], "bounded-local-repair")
+            self.assertEqual(bounded["issueIdentifier"], "JOV-9999")
+
+            args = [
+                "python3", str(HELPER_PATH), "run",
+                "--gate-file", str(pathlib.Path(tmp) / "rate.json"),
+                "--closure-gate-file", str(gate),
+                "--closure-hold-receipt", str(pathlib.Path(tmp) / "hold.json"),
+                "--dead-letter-dir", str(pathlib.Path(tmp) / "dead"),
+                "--recovery-manifest", str(manifest_path),
+                "--max-gate-sleep-seconds", "0", "--", *command,
+            ]
+            first = subprocess.run(args, cwd=ROOT, capture_output=True, text=True)
+            self.assertEqual(first.returncode, 0, first.stderr + first.stdout)
+            self.assertIn("bounded-repair-ran", first.stdout)
+            claim = json.loads((pathlib.Path(tmp) / "repair.claim.json").read_text())
+            self.assertEqual(claim["issueIdentifier"], "JOV-9999")
+            self.assertEqual(gate.read_bytes(), canonical_bytes)
+
+            second = subprocess.run(args, cwd=ROOT, capture_output=True, text=True)
+            self.assertEqual(second.returncode, helper.CLOSURE_HOLD_EXIT_CODE)
+            self.assertNotIn("bounded-repair-ran", second.stdout)
+            self.assertIn("recovery-manifest-already-claimed", second.stdout)
+
+    def test_bounded_repair_refusal_matrix_fails_closed(self):
+        helper = _load_helper()
+        mutations = {
+            "wrong-label": lambda manifest, fleet: manifest.update(requiredLabel="repair"),
+            "max-two": lambda manifest, fleet: manifest.update(maxConcurrent=2),
+            "new-intake": lambda manifest, fleet: manifest.update(newIssueIntakeAllowed=True),
+            "push": lambda manifest, fleet: manifest.update(pushAllowed=True),
+            "wrong-source": lambda manifest, fleet: manifest.update(sourceCommit="0" * 40),
+            "wrong-account": lambda manifest, fleet: manifest.update(accountHome="/tmp/other"),
+            "wrong-command": lambda manifest, fleet: manifest.update(schedulerCommand=["false"]),
+            "bad-hash": lambda manifest, fleet: manifest["artifacts"]["workflow"].update(sha256="0" * 64),
+            "local-revoked": lambda manifest, fleet: fleet["remediationAdmission"].update(localAllowed=False),
+            "activity-revoked": lambda manifest, fleet: fleet["remediationAdmission"].update(activities=[]),
+            "floor-zero": lambda manifest, fleet: fleet["concurrency"]["gem"].update(runtimeFloor=0),
+            "stale-gate": lambda manifest, fleet: fleet.update(observedAt="2020-01-01T00:00:00Z"),
+            "future-gate": lambda manifest, fleet: fleet.update(observedAt="2099-01-01T00:00:00Z"),
+            "expired": lambda manifest, fleet: manifest.update(expiresAt="2020-01-01T00:00:00+00:00"),
+            "manifest-mode": lambda manifest, fleet: manifest.update(),
+        }
+        for name, mutate in mutations.items():
+            with self.subTest(name=name), tempfile.TemporaryDirectory() as tmp, mock.patch.dict(
+                os.environ, {"CODEX_HOME": "/tmp/codex-fourth"}
+            ):
+                gate, fleet, manifest_path, manifest, command = _bounded_repair_fixture(
+                    tmp, helper
+                )
+                mutate(manifest, fleet)
+                gate.write_text(json.dumps(fleet), encoding="utf-8")
+                manifest_path.write_text(json.dumps(manifest), encoding="utf-8")
+                manifest_path.chmod(0o644 if name == "manifest-mode" else 0o600)
+                if name == "wrong-command":
+                    with self.assertRaisesRegex(ValueError, "command-mismatch"):
+                        helper.validate_bounded_repair_admission(
+                            manifest_path,
+                            fleet_path=gate,
+                            fleet_payload=fleet,
+                            expected_command=command,
+                        )
+                    continue
+                verdict = helper.read_closure_stop_line(
+                    gate, recovery_manifest_path=manifest_path
+                )
+                self.assertTrue(verdict["hold"], name)
+                if name in {"stale-gate", "future-gate"}:
+                    self.assertEqual(
+                        verdict["reason"],
+                        "fleet-gate-receipt-stale" if name == "stale-gate" else "fleet-gate-receipt-future",
+                    )
+                else:
+                    self.assertTrue(verdict["reason"].startswith("bounded-repair-refused:"))
+
+    @unittest.skipUnless(sys.platform.startswith("linux"), "Linux subreaper proof")
+    def test_bounded_repair_expiry_terminates_root_and_detached_descendant(self):
+        helper = _load_helper()
+        with tempfile.TemporaryDirectory() as tmp, mock.patch.dict(
+            os.environ, {"CODEX_HOME": "/tmp/codex-fourth"}
+        ):
+            gate, _fleet, manifest_path, _manifest, _command = _bounded_repair_fixture(
+                tmp, helper, lifetime_seconds=1
+            )
+            child_pid_path = pathlib.Path(tmp) / "child.pid"
+            script = (
+                "import os,pathlib,time; "
+                "pid=os.fork(); "
+                f"path=pathlib.Path({str(child_pid_path)!r}); "
+                "(os.setsid(),path.write_text(str(os.getpid())),time.sleep(60)) if pid==0 "
+                "else (print('root-ready',flush=True),time.sleep(60))"
+            )
+            closure = helper.ClosureStopLine(
+                receipt_path=gate,
+                hold_receipt_path=pathlib.Path(tmp) / "hold.json",
+                dead_letter_dir=pathlib.Path(tmp) / "dead",
+                recovery_manifest_path=manifest_path,
+            )
+            old_recheck = helper.CLOSURE_HOLD_RECHECK_SECONDS
+            helper.CLOSURE_HOLD_RECHECK_SECONDS = 0.05
+            try:
+                started = time.monotonic()
+                with contextlib.redirect_stdout(io.StringIO()):
+                    helper.run_official_binary_once(
+                        [sys.executable, "-c", script],
+                        gate_file=pathlib.Path(tmp) / "rate.json",
+                        closure=closure,
+                        max_gate_sleep_seconds=0,
+                    )
+                self.assertLess(time.monotonic() - started, 8)
+            finally:
+                helper.CLOSURE_HOLD_RECHECK_SECONDS = old_recheck
+            child_pid = int(child_pid_path.read_text())
+            with self.assertRaises(ProcessLookupError):
+                os.kill(child_pid, 0)
 
     def test_closure_stop_line_missing_stale_future_or_tampered_fails_closed(self):
         helper = _load_helper()
