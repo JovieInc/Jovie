@@ -1357,9 +1357,12 @@ def run_official_binary_once(
     shutdown_grace = min(MAX_SHUTDOWN_GRACE_SECONDS, shutdown_grace)
     if sys.platform.startswith("linux"):
         try:
-            ctypes.CDLL(None, use_errno=True).prctl(36, 1, 0, 0, 0)
-        except (AttributeError, OSError):
-            pass
+            libc = ctypes.CDLL(None, use_errno=True)
+            if libc.prctl(36, 1, 0, 0, 0) != 0:
+                errno = ctypes.get_errno()
+                raise OSError(errno, os.strerror(errno))
+        except AttributeError as exc:
+            raise RuntimeError("Linux child-subreaper support is unavailable") from exc
     process = subprocess.Popen(
         command,
         stdout=subprocess.PIPE,
@@ -1565,9 +1568,8 @@ def run_official_binary_once(
                     _pause_child_for_closure_hold(
                         process, closure, verdict, max_gate_sleep_seconds, shutdown
                     )
-        if shutdown.is_set():
-            terminate_tree()
         returncode = process.wait()
+        terminate_tree()
     finally:
         if shutdown.is_set() and process.poll() is None:
             terminate_tree()

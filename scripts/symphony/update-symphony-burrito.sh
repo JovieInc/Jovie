@@ -444,9 +444,11 @@ official_stopped_for_promotion=0
 official_pid_before=""
 files_promoted=0
 rollback_safe=1
+rollback_restart_verified=1
 
 write_promotion_hold() {
-  CANDIDATE_DIR="$candidate_dir" ROLLBACK_DIR="$rollback_dir" python3 - "$STATE_DIR" <<'PY'
+  local reason="${1:-prior_config_unsafe}"
+  CANDIDATE_DIR="$candidate_dir" ROLLBACK_DIR="$rollback_dir" PROMOTION_HOLD_REASON="$reason" python3 - "$STATE_DIR" <<'PY'
 import json, os, pathlib, sys
 root = pathlib.Path(sys.argv[1])
 target = root / "promotion-held.json"
@@ -454,7 +456,7 @@ temporary = root / ".promotion-held.tmp"
 value = {
     "schema": "symphony-promotion-hold/v1",
     "status": "held",
-    "reason": "prior_config_unsafe",
+    "reason": os.environ["PROMOTION_HOLD_REASON"],
     "candidate": os.environ["CANDIDATE_DIR"],
     "transaction": os.environ["ROLLBACK_DIR"],
 }
@@ -501,14 +503,23 @@ cleanup() {
         restore_target workflow "$WORKFLOW_DST" 0644
       fi
     fi
-    if [ "$RESTART" -eq 1 ] || [ "$RETIRE_LEGACY" -eq 1 ]; then
-      systemctl --user daemon-reload >/dev/null 2>&1 || true
-      if [ "$RESTART" -eq 1 ] && [ "$official_stopped_for_promotion" -eq 1 ] && [ "$rollback_safe" -eq 1 ]; then
-        systemctl --user restart "$SERVICE_NAME" >/dev/null 2>&1 || true
+    if [ "$RESTART" -eq 1 ] || [ "$RETIRE_LEGACY" -eq 1 ] || [ "$official_stopped_for_promotion" -eq 1 ]; then
+      if ! systemctl --user daemon-reload >/dev/null 2>&1; then
+        rollback_restart_verified=0
+      fi
+      if [ "$official_stopped_for_promotion" -eq 1 ] && [ "$rollback_safe" -eq 1 ]; then
+        if ! systemctl --user restart "$SERVICE_NAME" >/dev/null 2>&1; then
+          rollback_restart_verified=0
+        fi
+      fi
+      if [ "$rollback_restart_verified" -eq 0 ] && [ "$promotion_started" -eq 1 ]; then
+        write_promotion_hold rollback_restart_failed
       fi
     fi
     if [ "$files_promoted" -eq 1 ] && [ "$rollback_safe" -eq 0 ]; then
       echo "PROMOTION_HELD candidate files retained offline; unsafe prior config not restored" >&2
+    elif [ "$promotion_started" -eq 1 ] && [ "$rollback_restart_verified" -eq 0 ]; then
+      echo "PROMOTION_HELD official files restored but service restart is unverified" >&2
     elif [ "$promotion_started" -eq 1 ]; then
       echo "PROMOTION_ROLLED_BACK official files restored; legacy units remain fail-closed" >&2
     elif [ "$official_stopped_for_promotion" -eq 1 ]; then
@@ -516,7 +527,7 @@ cleanup() {
     fi
   fi
   [ -z "$tmpdir" ] || rm -rf "$tmpdir"
-  if [ "$promotion_complete" -eq 1 ] || { [ "$status" -ne 0 ] && [ "$promotion_started" -eq 1 ] && [ "$rollback_safe" -eq 1 ]; }; then
+  if [ "$promotion_complete" -eq 1 ] || { [ "$status" -ne 0 ] && [ "$promotion_started" -eq 1 ] && [ "$rollback_safe" -eq 1 ] && [ "$rollback_restart_verified" -eq 1 ]; }; then
     [ -z "$rollback_dir" ] || rm -rf "$rollback_dir"
   fi
   if [ -n "$candidate_tmp" ]; then
@@ -570,7 +581,9 @@ PY
   prepare_systemd_context
   systemctl --user daemon-reload
   if [ -f "$rollback_dir/was-active" ]; then
+    official_stopped_for_promotion=1
     systemctl --user restart "$SERVICE_NAME"
+    official_stopped_for_promotion=0
   fi
   rm -rf "$rollback_dir"
   rollback_dir=""
