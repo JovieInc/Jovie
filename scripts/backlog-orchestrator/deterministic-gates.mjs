@@ -108,7 +108,7 @@ export function validateDeterministicPlanCandidate(
   // this deterministic policy. Readiness, plan, and admission labels are
   // durable evidence written by the control plane, not a human prerequisite.
   // Explicit opt-out, ownership, and security labels remain fail-closed below.
-  if (hasProtectedAdmissionLabel(issue)) return 'protected-or-human-review';
+  if (hasProtectedAdmissionLabel(issue)) return 'protected-policy';
   if (admissionGateReceipt(issue)) return 'already-admitted';
   if ((issue.children?.nodes || []).length > 0) return 'parent-or-bundle';
 

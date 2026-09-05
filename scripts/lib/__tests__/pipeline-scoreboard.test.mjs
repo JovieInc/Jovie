@@ -866,11 +866,11 @@ describe('pipeline scoreboard compute', () => {
       mergeEvidence: completeEvidence,
     });
 
-    expect(scoreboard.funnel.ready).toBe(1);
+    expect(scoreboard.funnel.ready).toBe(3);
     expect(scoreboard.funnel.claimed).toBe(1);
     expect(scoreboard.funnel.blocked).toBe(2);
     expect(scoreboard.funnel.deltas).toEqual({
-      ready: -2,
+      ready: 0,
       claimed: 1,
       inProgress: 1,
       blocked: 1,

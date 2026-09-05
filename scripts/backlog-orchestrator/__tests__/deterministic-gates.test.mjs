@@ -201,23 +201,38 @@ Change the public page CTA.
     }
   });
 
-  it('rejects every explicit human hold before plan or admission approval', () => {
-    for (const label of [
-      'needs-human',
-      'held',
-      'decision-required',
-      'manual-incident',
-    ]) {
+  it('ignores legacy human and taste labels while preserving machine holds', () => {
+    for (const label of ['held', 'manual-incident']) {
       const candidate = issue({ labels: { nodes: [{ name: label }] } });
       assert.equal(
         deterministicGates.validateDeterministicPlanCandidate(candidate),
-        'protected-or-human-review'
+        'protected-policy'
       );
       assert.equal(
         admissionGate.validateAdmissionCandidate(
           plannedIssue({ labels: { nodes: [{ name: label }] } })
         ),
-        'protected-or-human-review'
+        'protected-policy'
+      );
+    }
+    for (const label of [
+      'needs-human',
+      'human-review-required',
+      'needs:taste',
+      'needs-human-taste',
+      'decision-required',
+      'no-auto',
+    ]) {
+      const candidate = issue({ labels: { nodes: [{ name: label }] } });
+      assert.equal(
+        deterministicGates.validateDeterministicPlanCandidate(candidate),
+        null
+      );
+      assert.equal(
+        admissionGate.validateAdmissionCandidate(
+          plannedIssue({ labels: { nodes: [{ name: label }] } })
+        ),
+        null
       );
     }
   });

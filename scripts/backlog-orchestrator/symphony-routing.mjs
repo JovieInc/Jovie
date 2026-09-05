@@ -47,8 +47,14 @@ const TIER_POLICY = Object.freeze({
     usageClass: 'premium-included',
   },
 });
-const ACTIVE_STATES = new Set(['todo', 'in progress', 'merging', 'rework']);
-const HANDOFF_STATES = new Set(['human review', 'in review']);
+const ACTIVE_STATES = new Set([
+  'todo',
+  'in progress',
+  'human review',
+  'merging',
+  'rework',
+]);
+const HANDOFF_STATES = new Set(['in review']);
 const TERMINAL_STATES = new Set([
   'done',
   'closed',

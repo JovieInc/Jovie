@@ -1542,7 +1542,7 @@ class ClosureObservationTests(unittest.TestCase):
             self.assertIn(f"context(name:{json.dumps(name)})", fields)
             self.assertIn(f"checkName:{json.dumps(name)}", fields)
 
-    def test_final_atomic_readback_applies_lifecycle_hard_stop(self):
+    def test_final_atomic_readback_ignores_legacy_human_label(self):
         candidate = pr(25, title="fix: lifecycle JOV-125", promotion_evidence=None)
         initial_pr = {
             **promotion_pr_state(25),
@@ -1552,7 +1552,7 @@ class ClosureObservationTests(unittest.TestCase):
         }
         final_pr = {
             **initial_pr,
-            "isDraft": True,
+            "isDraft": False,
             "labels": {"totalCount": 1, "nodes": [{"name": "needs-human"}]},
             "mergeQueueEntry": {
                 "position": 1,
@@ -1588,8 +1588,8 @@ class ClosureObservationTests(unittest.TestCase):
             )[0]
 
         disposition = MODULE.classify_open_prs([observed], NOW)["dispositions"][0]
-        self.assertEqual(disposition["state"], "held")
-        self.assertEqual(disposition["reason"], "needs-human")
+        self.assertEqual(disposition["state"], "queued")
+        self.assertEqual(disposition["reason"], "native-queue-entry")
 
     def test_final_atomic_readback_drops_a_now_closed_pr(self):
         candidate = pr(26, title="fix: closed JOV-126", promotion_evidence=None)

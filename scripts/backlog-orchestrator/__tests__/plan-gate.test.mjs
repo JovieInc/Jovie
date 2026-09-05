@@ -117,7 +117,7 @@ describe('plan-gate/v1', () => {
     const cases = [
       ['unverified', {}, { verified: false }],
       ['Tim-owned', { assignee: { id: 'tim', name: 'Tim White' } }, {}],
-      ['protected', { labels: { nodes: [{ name: 'needs-human' }] } }, {}],
+      ['protected', { labels: { nodes: [{ name: 'hold' }] } }, {}],
       ['credential', { title: 'Rotate API credential' }, {}],
       ['synthetic', { labels: { nodes: [{ name: 'synthetic' }] } }, {}],
       ['ambiguous', { state: { name: 'In Progress' } }, {}],

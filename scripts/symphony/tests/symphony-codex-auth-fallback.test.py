@@ -14,6 +14,7 @@ import json
 import os
 import pathlib
 import re
+import shutil
 import stat
 import subprocess
 import sys
@@ -34,9 +35,26 @@ GROK_SHIP = SOURCE_DIR / "grok-ship-one"
 CURSOR_STD = SOURCE_DIR / "cursor-agent-std"
 MODEL_ROUTER = SOURCE_DIR / "model-router.py"
 MODEL_REGISTRY = SOURCE_DIR / "config/model-registry.json"
-RUNTIME_ARTIFACTS = (WRAPPER, CONTROLLER, SIDECAR, GROK_SHIP, CURSOR_STD, MODEL_ROUTER, MODEL_REGISTRY)
+PROMOTION_SCRIPT = ROOT / "scripts/writer-owned-pr-promote.sh"
+PROMOTION_LIB = ROOT / "scripts/lib/writer-owned-pr-promotion.mjs"
+QUEUE_DEFERRAL_LIB = ROOT / "scripts/lib/queue-deferral-receipt.mjs"
+UPSERT_PR_COMMENT = ROOT / "scripts/lib/upsert-pr-comment.sh"
+RUNTIME_ARTIFACTS = (
+    WRAPPER,
+    CONTROLLER,
+    SIDECAR,
+    GROK_SHIP,
+    CURSOR_STD,
+    MODEL_ROUTER,
+    MODEL_REGISTRY,
+    PROMOTION_SCRIPT,
+    PROMOTION_LIB,
+    QUEUE_DEFERRAL_LIB,
+    UPSERT_PR_COMMENT,
+)
 RUNTIME_NAMES = tuple(path.name for path in RUNTIME_ARTIFACTS)
 LAUNCHER_NAMES = (WRAPPER.name, CONTROLLER.name, SIDECAR.name, GROK_SHIP.name, CURSOR_STD.name)
+NODE_BIN_DIR = str(pathlib.Path(shutil.which("node") or "/usr/bin/node").parent)
 
 
 def _load_python_module(name: str, path: pathlib.Path):
@@ -318,11 +336,7 @@ class GrokLinearHandler(http.server.BaseHTTPRequestHandler):
             labels = self.__class__.labels.get(identifier) or []
             comments = (
                 []
-                if (
-                    "needs-human" in labels
-                    or "blocked" in labels
-                    or identifier in self.__class__.omit_receipt
-                )
+                if "blocked" in labels or identifier in self.__class__.omit_receipt
                 else [{"body": admission_comment(identifier, title, description)}]
             )
             response = {
@@ -425,7 +439,7 @@ class FallbackTests(unittest.TestCase):
                 env.pop(key)
         env.update({
             "HOME": str(self.home),
-            "PATH": f"{self.bin}:/usr/bin:/bin",
+            "PATH": f"{self.bin}:{NODE_BIN_DIR}:/usr/bin:/bin",
             "GEM_CODEX_ACCOUNTS_STATE": str(self.state),
             "GEM_CODEX_CANARY_TIMEOUT_SECONDS": "1.0",
             "GEM_GROK_CANARY_TIMEOUT_SECONDS": "1.0",
@@ -461,6 +475,78 @@ class FallbackTests(unittest.TestCase):
         return env
 
     def command(self, name, body):
+        if name == "gh":
+            # Grok shipper now performs an exact-head GraphQL promotion readback
+            # after these tests' mocked agent creates or updates a PR. Keep that
+            # boundary realistic instead of letting each narrow Git/Grok test's
+            # scalar fallback masquerade as GraphQL JSON.
+            body = r'''
+                if [ "${1:-}" = api ] && [ "${2:-}" = graphql ]; then
+                  number=16211
+                  for arg in "$@"; do
+                    case "$arg" in number=*) number="${arg#number=}";; esac
+                  done
+                  /usr/bin/python3 - "$number" <<'PY'
+import json
+import sys
+
+number = int(sys.argv[1])
+head = "b" * 40
+gate_ids = (
+    "exact-head",
+    "writer",
+    "required-tests",
+    "review-sweep",
+    "ticket-evidence",
+    "pr-evidence",
+    "writer-promotion-path",
+)
+receipt = {
+    "schema": "jovie-writer-pr-proof/v1",
+    "issuedAt": "2026-08-14T19:00:00Z",
+    "issueId": "JOV-7",
+    "prNumber": number,
+    "headSha": head,
+    "writerLogin": "test-writer",
+    "ownership": "author-owned",
+    "evidence": {
+        "requiredTests": "passed: mocked focused tests",
+        "reviewSweep": "complete: mocked review sweep",
+        "ticketEvidence": "attached: mocked Linear evidence",
+        "prEvidence": "attached: mocked PR evidence",
+    },
+    "promotion": {
+        "path": "writer-owned-pr-promote",
+        "readyAndNativeIntent": "same-bounded-action",
+        "reconciliationRequired": False,
+    },
+    "gates": [
+        {"id": gate_id, "passed": True, "evidence": "mocked proof"}
+        for gate_id in gate_ids
+    ],
+    "proofComplete": True,
+    "blockedBy": [],
+}
+body = f"<!-- jovie-writer-pr-proof/v1\n{json.dumps(receipt, indent=2)}\n-->"
+print(json.dumps({
+    "number": number,
+    "state": "OPEN",
+    "draft": False,
+    "head": head,
+    "body": body,
+    "labels": [],
+    "autoMerge": True,
+    "queued": False,
+    "mergeQueueEntry": None,
+}))
+PY
+                  exit 0
+                fi
+                if [ "${1:-}" = api ] && [ "${2:-}" = user ]; then
+                  printf '%s\n' test-writer
+                  exit 0
+                fi
+            ''' + body
         path = self.bin / name
         path.write_text("#!/bin/sh\nset -eu\n" + textwrap.dedent(body))
         path.chmod(0o755)
@@ -516,6 +602,8 @@ class FallbackTests(unittest.TestCase):
             source = source_dir / name
             if name == MODEL_REGISTRY.name and not source.is_file():
                 source = source_dir / "config" / name
+            if not source.is_file():
+                source = next(path for path in RUNTIME_ARTIFACTS if path.name == name)
             self.assertEqual((release / name).read_bytes(), source.read_bytes())
             if name in LAUNCHER_NAMES:
                 self.assertTrue((destination / name).is_file())
@@ -1380,10 +1468,7 @@ class FallbackTests(unittest.TestCase):
     def _issue_node(self, identifier, *labels, receipt=None, title=None, description=None, state="Todo"):
         title = title if title is not None else f"Ship {identifier}"
         description = description if description is not None else "Bounded admitted work."
-        blocked = any(
-            label.lower() in {"needs:human", "needs-human", "hold", "blocked", "human-review-required"}
-            for label in labels
-        )
+        blocked = any(label.lower() in {"hold", "held", "blocked", "manual-incident"} for label in labels)
         include_receipt = receipt if receipt is not None else not blocked
         comments = []
         if include_receipt:
@@ -1420,7 +1505,7 @@ class FallbackTests(unittest.TestCase):
         ]
         with mock.patch.dict(os.environ, {"LINEAR_API_KEY": "linear-secret", "LINEAR_API_URL": url}):
             identifiers = module._linear_identifiers()
-        self.assertEqual(identifiers, ["JOV-21", "LYB-23", "JOV-25"])
+        self.assertEqual(identifiers, ["JOV-21", "JOV-22", "LYB-23", "JOV-25"])
         self.assertEqual(len(LinearHandler.requests), 2)
         first = json.loads(LinearHandler.requests[0][1])
         second = json.loads(LinearHandler.requests[1][1])
@@ -1562,18 +1647,27 @@ class FallbackTests(unittest.TestCase):
                 with mock.patch.dict(os.environ, {"SYMPHONY_GROK_MAX": "0"}):
                     self.assertEqual(module._grok_limit(), 0)
 
-    def test_default_grok_limit_is_four_and_blocked_labels_are_gates(self):
+    def test_default_grok_limit_and_only_machine_labels_gate_admission(self):
         module = self.load_controller_module()
         self.assertEqual(module.DEFAULT_GROK_MAX, 4)
         self.assertEqual(module.MAX_GROK_MAX, 10)
         self.assertEqual(module.DEFAULT_KIMI_MAX, 4)
         self.assertEqual(module.MAX_KIMI_MAX, 10)
         self.assertIn("blocked", module.BLOCKED_ADMISSION_LABELS)
-        self.assertIn("needs-human", module.BLOCKED_ADMISSION_LABELS)
-        self.assertIn("needs:human", module.BLOCKED_ADMISSION_LABELS)
         self.assertIn("no-symphony", module.BLOCKED_ADMISSION_LABELS)
-        for label in ("held", "decision-required", "manual-incident"):
+        for label in ("held", "manual-incident"):
             self.assertIn(label, module.BLOCKED_ADMISSION_LABELS)
+        for label in (
+            "needs-human",
+            "needs:human",
+            "human-review-required",
+            "needs:taste",
+            "needs-human-taste",
+            "needs-decision",
+            "decision-required",
+            "no-auto",
+        ):
+            self.assertNotIn(label, module.BLOCKED_ADMISSION_LABELS)
         # admission_decision is one predicate shared front-to-back.
         comment = admission_comment("JOV-1", "Ship JOV-1", "Bounded admitted work.")
         ok, _reason = module.admission_decision(
@@ -1595,7 +1689,7 @@ class FallbackTests(unittest.TestCase):
         )
         self.assertFalse(ok)
         self.assertEqual(reason, "blocked")
-        for label in ("held", "decision-required", "manual-incident"):
+        for label in ("held", "manual-incident"):
             ok, reason = module.admission_decision(
                 "JOV",
                 "JOV-1",
@@ -1606,6 +1700,26 @@ class FallbackTests(unittest.TestCase):
             )
             self.assertFalse(ok)
             self.assertEqual(reason, "blocked")
+        for label in (
+            "needs-human",
+            "needs:human",
+            "human-review-required",
+            "needs:taste",
+            "needs-human-taste",
+            "needs-decision",
+            "decision-required",
+            "no-auto",
+        ):
+            ok, reason = module.admission_decision(
+                "JOV",
+                "JOV-1",
+                {label},
+                title="Ship JOV-1",
+                description="Bounded admitted work.",
+                comments=[{"body": comment}],
+            )
+            self.assertTrue(ok, (label, reason))
+            self.assertEqual(reason, "admitted")
         labels_only, reason = module.admission_decision(
             "JOV",
             "JOV-2",
@@ -1641,8 +1755,8 @@ class FallbackTests(unittest.TestCase):
             description=description,
             comments=[{"body": current}],
         )
-        self.assertFalse(ok)
-        self.assertEqual(reason, "blocked")
+        self.assertTrue(ok, reason)
+        self.assertEqual(reason, "admitted")
         recovered, reason = module.admission_decision(
             "JOV",
             "JOV-9",
@@ -1664,12 +1778,11 @@ class FallbackTests(unittest.TestCase):
         meta = json.loads(admitted.stdout)
         self.assertEqual(meta["in_progress_state_id"], "JOV-progress")
         self.assertEqual(meta["in_review_state_id"], "JOV-review")
-        # JOV-1 was flagged needs-human AFTER listing -> rejected by the SAME gate.
-        blocked = self.run_controller("check-admission", "JOV-1",
+        # A legacy human-review label added after listing remains non-blocking.
+        labeled = self.run_controller("check-admission", "JOV-1",
                                       LINEAR_API_KEY="linear-secret", LINEAR_API_URL=url)
-        self.assertEqual(blocked.returncode, 1)
-        self.assertIn("not admitted:blocked", blocked.stderr)
-        # JOV-4 carries needs:human and is missing required admission labels.
+        self.assertEqual(labeled.returncode, 0, labeled.stderr)
+        # JOV-4 carries needs:human but is missing a required admission receipt.
         missing = self.run_controller("check-admission", "JOV-4",
                                       LINEAR_API_KEY="linear-secret", LINEAR_API_URL=url)
         self.assertEqual(missing.returncode, 1)
@@ -1677,7 +1790,7 @@ class FallbackTests(unittest.TestCase):
 
     def test_reconcile_skips_issue_flag_as_not_admitted_between_list_and_launch(self):
         # The list query sees candidates as admitted, but the launch-time re-check
-        # (via single_issue_labels) finds blocked/needs-human added by a guard.
+        # (via single_issue_labels) finds an active machine block added by a guard.
         self.set_all_accounts_cooldown()
         self.command("codex-rotate", "exit 1")
         self.command(
@@ -3520,8 +3633,9 @@ class FallbackTests(unittest.TestCase):
 
     def test_grok_ship_one_delegates_admission_and_respects_blocked(self):
         # grok-ship-one must not keep its own copy of the admission predicate:
-        # it delegates to the controller's check-admission. A blocked/needs-human
-        # issue is refused before any workspace/grok activity.
+        # it delegates to the controller's check-admission. A machine-blocked
+        # issue is refused before any workspace/grok activity; the legacy human
+        # label is incidental.
         created = self.root / "pr-created"
         self.command("git", 'printf "git %s\\n" "$*" >> "$GEM_EVENTS"')
         self.command("gh", "echo 0")

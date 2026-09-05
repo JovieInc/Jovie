@@ -152,13 +152,17 @@ describe('official Symphony backlog remediation', () => {
     );
   });
 
-  it('excludes taste, external messages, credentials, money, compliance, epics, and stale work', () => {
+  it('keeps taste work eligible while excluding machine safety boundaries', () => {
+    for (const candidate of [
+      issue('JOV-19', { title: 'Founder steering on brand voice' }),
+      issue('JOV-20', { labels: ['needs-decision', 'needs:taste'] }),
+    ]) {
+      const result = classifyRemediationCandidate(candidate, { now: NOW });
+      assert.equal(result.selected, true, result.reason);
+    }
+
     /** @type {Array<[object, string]>} */
     const cases = [
-      [
-        issue('JOV-20', { title: 'Founder steering on brand voice' }),
-        'human-taste-or-steering',
-      ],
       [
         issue('JOV-21', { title: 'Send a Telegram outreach blast' }),
         'external-messages',

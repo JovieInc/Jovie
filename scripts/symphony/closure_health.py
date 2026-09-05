@@ -74,7 +74,7 @@ EXPLICIT_ISSUE_MARKER = re.compile(
     r"<!--\s*linear-issue-(?:id|identifier)\s*:\s*((?:JOV|LYB)-\d+)\s*-->",
     re.IGNORECASE,
 )
-HOLD_LABELS = {"hold", "gated", "queue-deferred", "needs-human"}
+HOLD_LABELS = {"hold", "gated", "queue-deferred"}
 CLOSE_LABELS = {"duplicate"}
 ACTIVE_WRITER_STATES = frozenset({"repair", "promote", "queued"})
 CHANGED_FILES_PAGE = 100
