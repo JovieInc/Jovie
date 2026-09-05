@@ -4,7 +4,7 @@ import { Badge } from '@jovie/ui/atoms/badge';
 import { Button } from '@jovie/ui/atoms/button';
 import Link from 'next/link';
 import type { ReactNode } from 'react';
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 import type {
   ChangelogInlineNode,
   ChangelogRelease,
@@ -12,8 +12,8 @@ import type {
 } from '@/lib/changelog-parser';
 import { parseChangelogInline } from '@/lib/changelog-parser';
 
-const INITIAL_RELEASE_COUNT = 1;
-const RELEASE_BATCH_SIZE = 5;
+const INITIAL_RELEASE_COUNT = 25;
+const RELEASE_BATCH_SIZE = 25;
 
 const SECTION_LABELS: Record<
   keyof ChangelogSection,
@@ -101,6 +101,7 @@ export interface ChangelogTimelineProps {
  * without copying the production timeline markup.
  */
 export function ChangelogTimeline({ releases }: ChangelogTimelineProps) {
+  const statusRef = useRef<HTMLSpanElement>(null);
   const [requestedVisibleCount, setRequestedVisibleCount] = useState(
     INITIAL_RELEASE_COUNT
   );
@@ -214,17 +215,25 @@ export function ChangelogTimeline({ releases }: ChangelogTimelineProps) {
               variant='secondary'
               size='md'
               aria-controls='changelog-release-list'
-              onClick={() =>
+              onClick={() => {
+                if (remainingCount <= RELEASE_BATCH_SIZE) {
+                  statusRef.current?.focus({ preventScroll: true });
+                }
                 setRequestedVisibleCount(current =>
                   Math.min(current + RELEASE_BATCH_SIZE, releases.length)
-                )
-              }
+                );
+              }}
             >
-              Show {nextBatchCount} More Update
+              Read More — {nextBatchCount} Update
               {nextBatchCount === 1 ? '' : 's'}
             </Button>
           )}
-          <span className='text-xs text-tertiary-token' aria-live='polite'>
+          <span
+            ref={statusRef}
+            tabIndex={-1}
+            className='text-xs text-tertiary-token'
+            aria-live='polite'
+          >
             Showing {visibleCount} of {releases.length} updates
           </span>
         </div>

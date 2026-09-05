@@ -74,6 +74,43 @@ test('promoteChangelog moves Unreleased above older releases and opens fresh Unr
   assert.equal(firstDated?.[1], '26.6.62');
 });
 
+test('promoteChangelog tags newly promoted operational bullets and summaries only', () => {
+  const changelog = `# Changelog
+
+## [Unreleased]
+
+> Improved profile sharing.
+> Hardened merge queue receipts.
+> Existing operational summary [internal]
+
+### Fixed
+- Customer profiles load more reliably.
+- Fixed localhost startup routing.
+- [internal] Kept existing release diagnostics.
+
+## [26.8.1] - 2026-09-03
+
+> Hardened webhook dispatch with Redis-backed dedupe.
+
+### Fixed
+- Existing SwiftUI release note.
+`;
+
+  const promoted = promoteChangelog(changelog, '26.9.0', '2026-09-05');
+
+  assert.match(promoted, /> Improved profile sharing\./);
+  assert.match(promoted, /> Hardened merge queue receipts\. \[internal\]/);
+  assert.match(promoted, /> Existing operational summary \[internal\]/);
+  assert.match(promoted, /- Customer profiles load more reliably\./);
+  assert.match(promoted, /- \[internal\] Fixed localhost startup routing\./);
+  assert.match(promoted, /- \[internal\] Kept existing release diagnostics\./);
+  assert.ok(!promoted.includes('[internal] [internal]'));
+  assert.match(
+    promoted,
+    /## \[26\.8\.1\] - 2026-09-03\n\n> Hardened webhook dispatch with Redis-backed dedupe\.\n\n### Fixed\n- Existing SwiftUI release note\./
+  );
+});
+
 test('planStamp writes the complete version fan-out for main release path', () => {
   const writes = planStamp({
     currentVersion: '26.6.61',
