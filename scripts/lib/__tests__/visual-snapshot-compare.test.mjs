@@ -118,6 +118,68 @@ describe('visual snapshot compare (JOV-5459)', () => {
     ]);
   });
 
+  it('fails closed when a homepage PR could skip the compare (JOV-5960)', () => {
+    const visualRegressionYaml = readFileSync(
+      resolve(REPO_ROOT, '.github/workflows/visual-regression.yml'),
+      'utf8'
+    );
+    const compareJob = [
+      '  ci-visual-snapshot-compare:',
+      '    name: Visual Snapshot Compare',
+      '    needs: [ci-path-changes]',
+      "    if: github.event_name == 'merge_group'",
+      '    steps:',
+      '      - run: node scripts/visual-snapshot-compare.mjs compare',
+    ].join('\n');
+    const mergeReady = [
+      '  ci-merge-group-ready:',
+      '    needs: [ci-visual-snapshot-compare]',
+    ].join('\n');
+    const fastSourceReady = [
+      '  ci-pr-ready:',
+      '    needs: [ci-path-changes, ci-fast]',
+      '    steps:',
+      '      - run: echo ok',
+    ].join('\n');
+    const issues = assertVisualCompareWorkflowContract({
+      visualRegressionYaml,
+      ciYaml: [compareJob, mergeReady, fastSourceReady].join('\n'),
+    });
+    expect(issues).toContain(
+      'compare job must run on homepage pull_request paths (run_homepage_visual)'
+    );
+    expect(issues).toContain(
+      'source PR Ready must require visual snapshot compare on homepage paths'
+    );
+    expect(issues).toContain(
+      'source PR Ready must fail closed when a homepage PR skips visual snapshot compare'
+    );
+
+    const gatedCompareJob = compareJob.replace(
+      "    if: github.event_name == 'merge_group'",
+      [
+        '    if: >-',
+        "      github.event_name == 'merge_group' ||",
+        "      needs.ci-path-changes.outputs.run_homepage_visual == 'true'",
+      ].join('\n')
+    );
+    const gatedSourceReady = [
+      '  ci-pr-ready:',
+      '    needs: [ci-path-changes, ci-fast, ci-visual-snapshot-compare]',
+      '    steps:',
+      '      - run: |',
+      '          RUN_HOMEPAGE_VISUAL="${{ needs.ci-path-changes.outputs.run_homepage_visual }}"',
+      '          VISUAL_COMPARE_RESULT="${{ needs.ci-visual-snapshot-compare.result }}"',
+      '          if [[ "$RUN_HOMEPAGE_VISUAL" == "true" && "$VISUAL_COMPARE_RESULT" != "success" ]]; then exit 1; fi',
+    ].join('\n');
+    expect(
+      assertVisualCompareWorkflowContract({
+        visualRegressionYaml,
+        ciYaml: [gatedCompareJob, mergeReady, gatedSourceReady].join('\n'),
+      })
+    ).toEqual([]);
+  });
+
   it('passes the committed snapshot inventory and workflow contract', () => {
     const visualRegressionYaml = readFileSync(
       resolve(REPO_ROOT, '.github/workflows/visual-regression.yml'),

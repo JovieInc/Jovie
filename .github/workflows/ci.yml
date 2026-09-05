@@ -485,6 +485,9 @@ jobs:
       run_golden_eval_set: ${{ steps.detect.outputs.run_golden_eval_set || 'false' }}
       run_e2e: ${{ steps.detect.outputs.run_e2e || 'false' }}
       run_golden_path: ${{ steps.detect.outputs.run_golden_path || 'false' }}
+      # JOV-5960: selects the source-lane visual snapshot compare on homepage
+      # PRs so a skipped compare can never read as green there.
+      run_homepage_visual: ${{ steps.detect.outputs.run_homepage_visual || 'false' }}
       run_drizzle: ${{ steps.detect.outputs.run_drizzle || 'false' }}
       run_neon: ${{ steps.detect.outputs.run_neon || 'false' }}
       run_ios: ${{ steps.detect.outputs.run_ios || 'false' }}
@@ -862,6 +865,17 @@ jobs:
             echo "run_golden_path=true" >> "$GITHUB_OUTPUT"
           else
             echo "run_golden_path=false" >> "$GITHUB_OUTPUT"
+          fi
+
+          # Homepage visual surface (JOV-5960). Any change to the mounted
+          # homepage surface, its stylesheet, its locked copy, the homepage
+          # visual spec, or its committed baselines selects the source-lane
+          # visual snapshot compare so a skipped compare cannot read as green.
+          HOMEPAGE_VISUAL_PATTERN='^(apps/web/app/\(home\)/|apps/web/app/globals\.css|apps/web/components/homepage/|apps/web/components/features/home/|apps/web/data/homepageLaunchCopy\.ts|apps/web/tests/e2e/visual-regression\.spec\.ts|apps/web/tests/e2e/__snapshots__/visual-regression\.spec\.ts/)'
+          if echo "$CHANGED_FILES" | grep -q -E "$HOMEPAGE_VISUAL_PATTERN"; then
+            echo "run_homepage_visual=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "run_homepage_visual=false" >> "$GITHUB_OUTPUT"
           fi
 
           # Drizzle paths
@@ -1245,7 +1259,15 @@ jobs:
     name: Visual Snapshot Compare
     # JOV-5459: missing baseline/ENOENT is FAIL, not advisory. No Neon and no
     # Playwright. Snapshot refresh stays on visual-regression.yml.
-    if: github.event_name == 'merge_group'
+    # JOV-5960: homepage PRs also run this compare on the source lane; source
+    # PR Ready fails closed when it is skipped there.
+    needs: [ci-path-changes]
+    if: >-
+      github.event_name == 'merge_group' ||
+      (
+        github.event_name == 'pull_request' &&
+        needs.ci-path-changes.outputs.run_homepage_visual == 'true'
+      )
     runs-on: ubuntu-latest
     timeout-minutes: 5
     steps:
@@ -5366,7 +5388,7 @@ jobs:
     # GitHub's merge_group producer reuses the same required context name for
     # combined-head unit/build/layout evidence. Migration Guard, Fork PR Gate,
     # and PR Size Guard remain separately required ruleset contexts.
-    needs: [ci-path-changes, ci-risk-classifier, ci-fast, ci-secret-scan, ci-golden-path-lock]
+    needs: [ci-path-changes, ci-risk-classifier, ci-fast, ci-secret-scan, ci-golden-path-lock, ci-visual-snapshot-compare]
     if: ${{ always() && github.event_name == 'pull_request' && github.event.pull_request.base.ref == 'main' }}
     runs-on: ubuntu-latest
     timeout-minutes: 2
@@ -5382,6 +5404,8 @@ jobs:
           RISK_RESULT="${{ needs.ci-risk-classifier.result }}"
           RISK_LEVEL="${{ needs.ci-risk-classifier.outputs.risk_level }}"
           RISK_RULES="${{ needs.ci-risk-classifier.outputs.matched_rule_ids }}"
+          RUN_HOMEPAGE_VISUAL="${{ needs.ci-path-changes.outputs.run_homepage_visual }}"
+          VISUAL_COMPARE_RESULT="${{ needs.ci-visual-snapshot-compare.result }}"
 
           {
             echo "### PR Ready"
@@ -5395,6 +5419,7 @@ jobs:
             echo "| Secret Scan | $SECRET_SCAN_RESULT | \`./scripts/security/scan-secrets.sh ci-pr origin/main\` |"
             echo "| Golden Path Lock | $GOLDEN_PATH_LOCK_RESULT | \`node scripts/golden-path-lock.mjs merge-gate\` |"
             echo "| Risk classifier | $RISK_RESULT | \`pnpm ci:harness:check\` |"
+            echo "| Visual Snapshot Compare (homepage PRs) | $VISUAL_COMPARE_RESULT | \`node scripts/visual-snapshot-compare.mjs compare\` |"
             echo
             echo "Risk level: ${RISK_LEVEL:-low}; matched rules: ${RISK_RULES:-none}"
             echo "Heavy evidence is manual, scheduled, or event-driven and never starts from this source-PR gate."
@@ -5419,6 +5444,13 @@ jobs:
 
           if [[ "$FAST_RESULT" != "success" ]]; then
             echo "❌ ci-fast did not pass (result: $FAST_RESULT)"
+            exit 1
+          fi
+
+          # JOV-5960: on homepage PRs the visual snapshot compare runs on the
+          # source lane and skipped is not green (JOV-5960).
+          if [[ "$RUN_HOMEPAGE_VISUAL" == "true" && "$VISUAL_COMPARE_RESULT" != "success" ]]; then
+            echo "❌ Visual Snapshot Compare did not pass on a homepage PR; skipped is not green (JOV-5960) (result: $VISUAL_COMPARE_RESULT)"
             exit 1
           fi
 
