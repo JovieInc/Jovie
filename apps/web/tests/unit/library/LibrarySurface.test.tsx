@@ -26,6 +26,7 @@ import {
   ShellSidebarOverrideProvider,
   useShellSidebarOverride,
 } from '@/contexts/ShellSidebarOverrideContext';
+import type { LibraryPostReleaseBundle } from '@/lib/library/post-release-types';
 
 Element.prototype.scrollIntoView = vi.fn();
 
@@ -161,6 +162,7 @@ function buildAsset(
 ): LibraryReleaseAsset {
   return {
     id: 'release-1',
+    source: { provider: 'discography', canonicalId: 'release-1' },
     title: 'Take Me Over',
     artist: 'Tim White',
     artworkUrl: 'https://cdn.example.com/artwork.jpg',
@@ -199,6 +201,47 @@ function buildAsset(
     ...overrides,
   };
 }
+
+const postReleaseBundle: LibraryPostReleaseBundle = {
+  downloads: [
+    {
+      id: 'download-1',
+      releaseId: 'release-1',
+      title: 'Radio edit',
+      fileName: 'radio-edit.wav',
+    },
+  ],
+  findings: [
+    {
+      id: 'finding-1',
+      subjectType: 'artist',
+      subjectId: 'profile-1',
+      kind: 'repair',
+      issueType: 'dead_link',
+      platform: 'Genius',
+      title: 'Replace dead artist link',
+      currentUrl: 'https://genius.com/artists/tim-white',
+      expectedUrl: 'https://jov.ie/tim',
+      actionMode: 'direct_update',
+      status: 'open',
+      collisionDisposition: null,
+      draftRequest: null,
+    },
+  ],
+  rightsholders: [
+    {
+      id: 'evidence-1',
+      subjectType: 'release',
+      subjectId: 'release-1',
+      partyName: 'Tim White',
+      role: 'writer',
+      domain: 'composition',
+      evidenceClass: 'observed',
+      source: 'songview',
+      shareBps: null,
+    },
+  ],
+};
 
 function RightPanelOutlet() {
   return useRightPanel();
@@ -888,6 +931,7 @@ describe('LibrarySurface', () => {
       drawer.queryByTestId('library-approval-status-release-1')
     ).not.toBeInTheDocument();
     // Editable approval lives exactly once under Details.
+    fireEvent.click(drawer.getByRole('button', { name: 'Details' }));
     expect(
       drawer.getByRole('button', { name: 'Approval Status' })
     ).toBeInTheDocument();
@@ -901,6 +945,7 @@ describe('LibrarySurface', () => {
 
     fireEvent.click(screen.getByTestId('library-release-row-release-1'));
 
+    fireEvent.click(screen.getByRole('button', { name: 'Details' }));
     const trigger = screen.getByTestId(
       'library-approval-status-select-release-1'
     );
@@ -931,11 +976,11 @@ describe('LibrarySurface', () => {
         name: 'More actions',
       })
     ).toBeInTheDocument();
-    // Approval status stays a single accessible editor in the default-open
-    // Details section while the drawer sections remain single-open.
+    expect(drawer.getByTestId('library-post-release-panel')).toBeDefined();
+    expect(drawer.getByText('No attested download is live')).toBeDefined();
     expect(
-      drawer.getByRole('button', { name: 'Approval Status' })
-    ).toBeInTheDocument();
+      drawer.queryByRole('button', { name: 'Approval Status' })
+    ).not.toBeInTheDocument();
     fireEvent.click(drawer.getByRole('button', { name: 'Providers' }));
     expect(drawer.getByRole('link', { name: /Spotify/u })).toHaveAttribute(
       'href',
@@ -958,6 +1003,21 @@ describe('LibrarySurface', () => {
       'aria-hidden',
       'true'
     );
+  });
+
+  it('mounts post-release presence controls from the selected asset drawer', () => {
+    renderLibrary([buildAsset()], {
+      profileId: 'profile-1',
+      postReleaseBundle,
+    });
+
+    fireEvent.click(screen.getByTestId('library-release-row-release-1'));
+
+    const drawer = within(screen.getByTestId('library-asset-drawer'));
+    expect(drawer.getByTestId('library-post-release-panel')).toBeDefined();
+    expect(drawer.getByText('1 attested file live')).toBeInTheDocument();
+    expect(drawer.getByText('Replace dead artist link')).toBeInTheDocument();
+    expect(drawer.getAllByText('Tim White').length).toBeGreaterThan(0);
   });
 
   it('copies the canonical share URL from the drawer overflow menu', async () => {

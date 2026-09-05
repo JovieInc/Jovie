@@ -104,6 +104,8 @@ web.start|web|organism.onboarding-chat|apps/web/app/(dynamic)/start/page.tsx|des
 web.app-root|web|screen.root|apps/web/app/app/(shell)/page.tsx|desktop,mobile
 web.jovie-work|web|screen.jovie.work|apps/web/app/app/(shell)/jovie-work/page.tsx|desktop,mobile
 web.settings-billing|web|screen.settings.billing|apps/web/app/app/(shell)/settings/billing/page.tsx|desktop,mobile
+web.profile-download|web|profile-download-gate|apps/web/app/[username]/[slug]/download/page.tsx|desktop,mobile
+web.dashboard-downloads|web|dashboard-downloads|apps/web/app/app/(shell)/dashboard/releases/[releaseId]/downloads/page.tsx|desktop,mobile
 web.onboarding-checkout|web|onboarding-checkout|apps/web/app/onboarding/checkout/page.tsx|desktop,mobile
 web.billing-success|web|billing-success|apps/web/app/billing/success/page.tsx|desktop,mobile
 web.root-error-boundary|web|screen.errors.root|apps/web/app/error.tsx,apps/web/app/global-error.tsx|desktop,mobile

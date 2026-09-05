@@ -18,6 +18,7 @@ import {
   or,
 } from 'drizzle-orm';
 import { db } from '@/lib/db';
+import { optimizationExperiments } from '@/lib/db/schema/library-content-graph';
 import { creatorProfiles, userProfileClaims } from '@/lib/db/schema/profiles';
 import type {
   YoutubeThumbnailVersion,
@@ -31,6 +32,7 @@ import {
   youtubeVideoReleaseLinks,
   youtubeVideos,
 } from '@/lib/db/schema/youtube-library';
+import type { YouTubeOptimizationSnapshot } from './optimization-types';
 import type { YouTubeMetricWindow } from './types';
 
 const MAX_LIST_LIMIT = 100;
@@ -46,10 +48,10 @@ export interface PublicVideoListItem {
   readonly url: string;
   readonly publishedAt: string | null;
   readonly durationSeconds: number | null;
+  readonly privacyStatus: string | null;
   readonly contentType: YoutubeVideo['contentType'];
   readonly classificationConfidence: number | null;
   readonly thumbnailUrl: string | null;
-  readonly privacyStatus?: string | null;
   /** Present only when a link is approved. */
   readonly releaseLink: {
     isrc: string | null;
@@ -148,10 +150,10 @@ function toPublicItem(
     url: video.url,
     publishedAt: toIso(video.publishedAt),
     durationSeconds: video.durationSeconds,
+    privacyStatus: video.privacyStatus,
     contentType: video.contentType,
     classificationConfidence: toNumber(video.classificationConfidence),
     thumbnailUrl,
-    privacyStatus: video.privacyStatus,
     releaseLink:
       link && link.status === 'approved'
         ? { isrc: link.isrc, releaseId: link.releaseId }
@@ -181,6 +183,23 @@ export async function listVideosForProfile(
     MAX_LIST_LIMIT
   );
 
+  return queryVideosForProfile(input, limit);
+}
+
+/**
+ * Authenticated Library projection. Unlike the public/MCP helper, this does
+ * not silently truncate a creator's imported channel history.
+ */
+export async function listLibraryVideosForProfile(input: {
+  readonly creatorProfileId: string;
+}): Promise<PublicVideoListItem[]> {
+  return queryVideosForProfile(input, null);
+}
+
+async function queryVideosForProfile(
+  input: Omit<ListVideosForProfileInput, 'limit'>,
+  limit: number | null
+): Promise<PublicVideoListItem[]> {
   let experimentVideoPks: Set<string> | null = null;
   if (input.experimentId) {
     const rows = await db
@@ -210,7 +229,7 @@ export async function listVideosForProfile(
     conditions.push(inArray(youtubeVideos.id, [...experimentVideoPks]));
   }
 
-  const rows = await db
+  const baseQuery = db
     .select({ video: youtubeVideos, link: youtubeVideoReleaseLinks })
     .from(youtubeVideos)
     .leftJoin(
@@ -218,17 +237,20 @@ export async function listVideosForProfile(
       eq(youtubeVideoReleaseLinks.videoId, youtubeVideos.id)
     )
     .where(and(...conditions))
-    .orderBy(desc(youtubeVideos.publishedAt))
-    .limit(limit);
+    .orderBy(desc(youtubeVideos.publishedAt));
+  const rows = limit === null ? await baseQuery : await baseQuery.limit(limit);
 
   const videoPks = rows.map(r => r.video.id);
-  const versions =
-    videoPks.length > 0
-      ? await db
-          .select()
-          .from(youtubeThumbnailVersions)
-          .where(inArray(youtubeThumbnailVersions.videoId, videoPks))
-      : [];
+  const versions: YoutubeThumbnailVersion[] = [];
+  for (let index = 0; index < videoPks.length; index += 500) {
+    const batch = videoPks.slice(index, index + 500);
+    versions.push(
+      ...(await db
+        .select()
+        .from(youtubeThumbnailVersions)
+        .where(inArray(youtubeThumbnailVersions.videoId, batch)))
+    );
+  }
   const thumbnails = pickDisplayThumbnails(versions);
 
   return rows
@@ -375,6 +397,73 @@ export async function getThumbnailHistory(input: {
     swappedAt: toIso(r.swappedAt),
     detectedAt: r.detectedAt.toISOString(),
   }));
+}
+
+export async function getYouTubeOptimizationSnapshotForProfile(input: {
+  readonly creatorProfileId: string;
+  readonly videoId: string;
+}): Promise<YouTubeOptimizationSnapshot | null> {
+  const [video] = await db
+    .select({ id: youtubeVideos.id })
+    .from(youtubeVideos)
+    .where(
+      and(
+        eq(youtubeVideos.id, input.videoId),
+        eq(youtubeVideos.creatorProfileId, input.creatorProfileId)
+      )
+    )
+    .limit(1);
+  if (!video) return null;
+
+  const [thumbnails, metrics, experiments] = await Promise.all([
+    db
+      .select()
+      .from(youtubeThumbnailVersions)
+      .where(eq(youtubeThumbnailVersions.videoId, video.id))
+      .orderBy(desc(youtubeThumbnailVersions.detectedAt)),
+    db
+      .select()
+      .from(youtubeVideoMetricSnapshots)
+      .where(eq(youtubeVideoMetricSnapshots.videoId, video.id))
+      .orderBy(desc(youtubeVideoMetricSnapshots.capturedAt)),
+    db
+      .select()
+      .from(optimizationExperiments)
+      .where(
+        and(
+          eq(optimizationExperiments.creatorProfileId, input.creatorProfileId),
+          eq(optimizationExperiments.subjectType, 'youtube_video'),
+          eq(optimizationExperiments.subjectId, video.id)
+        )
+      )
+      .orderBy(desc(optimizationExperiments.createdAt)),
+  ]);
+
+  return {
+    thumbnails: thumbnails.map(thumbnail => ({
+      id: thumbnail.id,
+      kind: thumbnail.kind,
+      imageUrl: thumbnail.imageUrl,
+      approvalStatus: thumbnail.approvalStatus,
+      experimentId: thumbnail.experimentId,
+      detectedAt: thumbnail.detectedAt.toISOString(),
+    })),
+    metrics: metrics.map(metric => ({
+      window: metric.window,
+      views: metric.views,
+      watchTimeMinutes: toNumber(metric.watchTimeMinutes),
+      avgViewDurationSeconds: toNumber(metric.avgViewDurationSeconds),
+      capturedAt: metric.capturedAt.toISOString(),
+    })),
+    experiments: experiments.map(experiment => ({
+      id: experiment.id,
+      objective: experiment.objective,
+      status: experiment.status,
+      winnerVariantKey: experiment.winnerVariantKey,
+      variants: experiment.variants,
+      decisionEvidence: experiment.decisionEvidence ?? null,
+    })),
+  };
 }
 
 /**

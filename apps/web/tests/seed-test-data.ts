@@ -11,7 +11,7 @@
 /* eslint-disable no-restricted-imports */
 import { neon } from '@neondatabase/serverless';
 import { Redis } from '@upstash/redis';
-import { and, eq, not } from 'drizzle-orm';
+import { and, sql as drizzleSql, eq, not } from 'drizzle-orm';
 import { drizzle } from 'drizzle-orm/neon-http';
 import * as schema from '@/lib/db/schema';
 import { deriveConfirmationStatus } from '@/lib/events/confirmation-status';
@@ -60,6 +60,32 @@ export function buildPublicReleaseApprovalSeedRow(
     assetId: releaseId,
     itemKind: 'release',
     approvalStatus: 'approved',
+  };
+}
+
+export function buildPublicPromoDownloadSeedRow(input: {
+  readonly creatorProfileId: string;
+  readonly releaseId: string;
+  readonly attestedByUserId: string;
+  readonly attestedAt: Date;
+}): typeof promoDownloads.$inferInsert {
+  return {
+    creatorProfileId: input.creatorProfileId,
+    releaseId: input.releaseId,
+    title: 'Neon Skyline Radio Edit',
+    slug: 'neon-skyline-radio-edit',
+    description: 'Deterministic promo download fixture for public QA.',
+    fileUrl: 'fixtures/promo-downloads/neon-skyline-radio-edit.mp3',
+    fileName: 'neon-skyline-radio-edit.mp3',
+    fileMimeType: 'audio/mpeg',
+    fileSizeBytes: 4_600_000,
+    artworkUrl: DEFAULT_TEST_RELEASE_ARTWORK_URL,
+    isActive: true,
+    rightsControlAttested: true,
+    rightsControlAttestedBy: input.attestedByUserId,
+    rightsControlAttestedAt: input.attestedAt,
+    position: 0,
+    metadata: { fixture: true },
   };
 }
 
@@ -1696,25 +1722,43 @@ async function seedReleasesForProfile(
 
   const promoReleaseId = existingBySlug.get('neon-skyline');
   if (promoReleaseId) {
+    const [profileOwner] = await db
+      .select({ userId: creatorProfiles.userId })
+      .from(creatorProfiles)
+      .where(eq(creatorProfiles.id, profileId))
+      .limit(1);
+    const ownerUserId = profileOwner?.userId;
+
+    if (!ownerUserId) {
+      console.warn(
+        '    ⚠ Skipping active promo download fixture because profile has no owner to attest rights control'
+      );
+      return;
+    }
+
     try {
+      const attestedAt = new Date();
       await db
         .insert(promoDownloads)
-        .values({
-          creatorProfileId: profileId,
-          releaseId: promoReleaseId,
-          title: 'Neon Skyline Radio Edit',
-          slug: 'neon-skyline-radio-edit',
-          description: 'Deterministic promo download fixture for public QA.',
-          fileUrl: 'fixtures/promo-downloads/neon-skyline-radio-edit.mp3',
-          fileName: 'neon-skyline-radio-edit.mp3',
-          fileMimeType: 'audio/mpeg',
-          fileSizeBytes: 4_600_000,
-          artworkUrl: DEFAULT_TEST_RELEASE_ARTWORK_URL,
-          isActive: false,
-          position: 0,
-          metadata: { fixture: true },
-        })
-        .onConflictDoNothing();
+        .values(
+          buildPublicPromoDownloadSeedRow({
+            creatorProfileId: profileId,
+            releaseId: promoReleaseId,
+            attestedByUserId: ownerUserId,
+            attestedAt,
+          })
+        )
+        .onConflictDoUpdate({
+          target: [promoDownloads.releaseId, promoDownloads.slug],
+          set: {
+            isActive: true,
+            rightsControlAttested: true,
+            rightsControlAttestedBy: ownerUserId,
+            rightsControlAttestedAt: attestedAt,
+            updatedAt: attestedAt,
+          },
+          setWhere: drizzleSql`${promoDownloads.rightsControlAttested} = false`,
+        });
       console.log('    ✓ Ensured promo download fixture for Neon Skyline');
     } catch (error) {
       if (isMissingPromoDownloadsRelationError(error)) {

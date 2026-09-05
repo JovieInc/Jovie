@@ -1,5 +1,9 @@
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+import {
+  PROMO_DOWNLOAD_RIGHTS_ATTESTATION_LABEL,
+  PROMO_DOWNLOAD_RIGHTS_REQUIRED_ERROR,
+} from '@/lib/promo-downloads/rights-attestation';
 
 const mocks = vi.hoisted(() => ({
   fetch: vi.fn(),
@@ -30,6 +34,14 @@ const promoDownload = {
   isActive: true,
   position: 1,
 };
+
+function attestRecordingControl() {
+  fireEvent.click(
+    screen.getByRole('checkbox', {
+      name: PROMO_DOWNLOAD_RIGHTS_ATTESTATION_LABEL,
+    })
+  );
+}
 
 describe('PromoDownloadsPage', () => {
   beforeEach(() => {
@@ -69,6 +81,7 @@ describe('PromoDownloadsPage', () => {
 
     render(<PromoDownloadsPage />);
     await screen.findByText('No Downloads Yet');
+    attestRecordingControl();
 
     const file = new File(['audio'], 'radio-edit.mp3', {
       type: 'audio/mpeg',
@@ -99,6 +112,7 @@ describe('PromoDownloadsPage', () => {
 
     render(<PromoDownloadsPage />);
     await screen.findByText('No Downloads Yet');
+    attestRecordingControl();
 
     fireEvent.change(
       screen.getByLabelText('Upload Promo Download Audio File'),
@@ -114,6 +128,29 @@ describe('PromoDownloadsPage', () => {
     ).toBeInTheDocument();
     expect(mocks.upload).not.toHaveBeenCalled();
     expect(mocks.fetch).toHaveBeenCalledTimes(1);
+  });
+
+  it('requires recording-control attestation before opening the file picker', async () => {
+    mocks.fetch.mockResolvedValueOnce(emptyListResponse);
+
+    render(<PromoDownloadsPage />);
+    await screen.findByText('No Downloads Yet');
+
+    fireEvent.change(
+      screen.getByLabelText('Upload Promo Download Audio File'),
+      {
+        target: {
+          files: [
+            new File(['audio'], 'radio-edit.mp3', { type: 'audio/mpeg' }),
+          ],
+        },
+      }
+    );
+
+    expect(
+      await screen.findByText(PROMO_DOWNLOAD_RIGHTS_REQUIRED_ERROR)
+    ).toBeInTheDocument();
+    expect(mocks.upload).not.toHaveBeenCalled();
   });
 
   it('updates visibility and deletes the release-scoped row', async () => {

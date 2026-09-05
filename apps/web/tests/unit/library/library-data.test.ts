@@ -65,6 +65,7 @@ describe('library data', () => {
 
     expect(assets).toEqual([
       {
+        source: { provider: 'discography', canonicalId: 'release-1' },
         id: 'release-1',
         title: 'Test Release',
         artist: 'Test Artist',
