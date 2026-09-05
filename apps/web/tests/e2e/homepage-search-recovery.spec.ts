@@ -1,6 +1,7 @@
 import type { Page, Route } from '@playwright/test';
 import {
   assertExactNavigationUrl,
+  primeVercelBypassCookie,
   requireExactNavigationOrigin,
 } from '../helpers/vercel-preview';
 import { expect, test } from './setup';
@@ -63,6 +64,7 @@ async function interceptWrites(page: Page): Promise<void> {
 
 async function gotoHomepage(page: Page): Promise<void> {
   await interceptWrites(page);
+  await primeVercelBypassCookie(page, process.env.BASE_URL, '/');
   await page.goto('/', {
     waitUntil: 'domcontentloaded',
     timeout: SMOKE_TIMEOUTS.NAVIGATION,
