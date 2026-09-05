@@ -1,0 +1,11 @@
+.next/
+node_modules/
+coverage/
+*.tsbuildinfo
+next-env.d.ts
+# Explicit route projection: implementations remain shared, never copied.
+app/(operator)/app/admin/
+app/api/
+app/hud/
+app/.well-known/workflow/
+route-inventory.json
