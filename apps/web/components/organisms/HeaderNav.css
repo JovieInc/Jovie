@@ -11,9 +11,9 @@
  * mounts. Next.js dedupes CSS imports across mount points, so importing
  * this from a `'use client'` component is the canonical pattern.
  *
- * NOTE: rules here MUST stay scoped to the marketing-glass-header BEM
- * tree. Any change that affects other surfaces belongs in globals.css
- * or design-system.css.
+ * NOTE: rendered rules here MUST stay scoped to the marketing-glass-header
+ * BEM tree. The shell's geometry variables are also exposed to the homepage
+ * root so its content can align to the header without duplicating values.
  */
 
 .artist-profiles-home-header[data-presentation="homepage-embedded"] nav {
@@ -65,13 +65,32 @@
   height: var(--space-5);
 }
 
-.marketing-glass-header {
-  --marketing-glass-top: clamp(0.42rem, 0.8vw, 0.62rem);
-  --marketing-glass-height: 2.72rem;
+.marketing-glass-header,
+.home-viewport {
   --marketing-glass-gutter: max(
     clamp(0.9rem, 2vw, 1.5rem),
     calc(var(--homepage-page-gutter, 1.75rem) - 0.75rem)
   );
+  --marketing-glass-shell-max: 90rem;
+  --marketing-glass-shell-padding-inline: clamp(1.35rem, 2.3vw, 2rem);
+  --marketing-glass-shell-border-width: var(--space-px);
+  --marketing-glass-content-max: calc(
+    var(--marketing-glass-shell-max) -
+    var(--marketing-glass-shell-padding-inline) -
+    var(--marketing-glass-shell-padding-inline) -
+    var(--marketing-glass-shell-border-width) -
+    var(--marketing-glass-shell-border-width)
+  );
+  --marketing-glass-content-gutter: calc(
+    var(--marketing-glass-gutter) +
+    var(--marketing-glass-shell-padding-inline) +
+    var(--marketing-glass-shell-border-width)
+  );
+}
+
+.marketing-glass-header {
+  --marketing-glass-top: clamp(0.42rem, 0.8vw, 0.62rem);
+  --marketing-glass-height: 2.72rem;
   --marketing-glass-shell: transparent;
   --marketing-glass-shell-scrolled: rgba(12, 13, 15, 0.74);
   --marketing-glass-border: rgba(255, 255, 255, 0.1);
@@ -89,12 +108,12 @@
   display: flex;
   min-height: var(--marketing-glass-height);
   max-width: min(
-    90rem,
+    var(--marketing-glass-shell-max),
     calc(100vw - var(--marketing-glass-gutter) * 2)
   ) !important;
   align-items: center;
-  padding-inline: clamp(1.35rem, 2.3vw, 2rem) !important;
-  border: 1px solid transparent;
+  padding-inline: var(--marketing-glass-shell-padding-inline) !important;
+  border: var(--marketing-glass-shell-border-width) solid transparent;
   border-radius: 999px;
   background: var(--marketing-glass-shell);
   box-shadow: none;
@@ -126,16 +145,13 @@
 }
 
 .marketing-glass-header__nav {
-  position: absolute;
-  top: 50%;
-  left: 50%;
+  position: static;
   gap: 0.1rem;
   margin-left: 0;
   padding: 0;
   border: 0;
   border-radius: 0;
   background: transparent;
-  transform: translate(-50%, -50%);
 }
 
 .marketing-glass-header__nav-item {
@@ -357,14 +373,18 @@
 }
 
 @media (max-width: 767px) {
+  .marketing-glass-header,
+  .home-viewport {
+    --marketing-glass-gutter: 1rem;
+    --marketing-glass-shell-padding-inline: 0.82rem;
+  }
+
   .marketing-glass-header {
     --marketing-glass-top: 0.6rem;
     --marketing-glass-height: 3.15rem;
-    --marketing-glass-gutter: 1rem;
   }
 
   .marketing-glass-header__shell {
     min-height: var(--marketing-glass-height);
-    padding-inline: 0.82rem !important;
   }
 }

@@ -43,3 +43,16 @@ type Story = StoryObj<typeof meta>;
 export const AboveProfileNavigation: Story = {
   render: () => <RequiredConsentFixture />,
 };
+
+export const FloatingPage: Story = {
+  parameters: {
+    nextjs: {
+      appDirectory: true,
+      navigation: {
+        pathname: '/',
+        query: {},
+      },
+    },
+  },
+  render: () => <RequiredConsentFixture />,
+};

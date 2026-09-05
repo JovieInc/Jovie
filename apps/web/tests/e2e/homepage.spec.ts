@@ -1,4 +1,5 @@
 import { PUBLIC_WAITLIST_URL } from '@/data/homepageFrontDoorCta';
+import { primeVercelBypassCookie } from '../helpers/vercel-preview';
 import { expect, test } from './setup';
 import { SMOKE_TIMEOUTS, waitForHydration } from './utils/smoke-test-utils';
 
@@ -35,6 +36,7 @@ async function hasNextDevTransientOverlay(page: PlaywrightPage) {
 }
 
 async function gotoHomepage(page: PlaywrightPage) {
+  await primeVercelBypassCookie(page, process.env.BASE_URL);
   for (let attempt = 0; attempt < 3; attempt += 1) {
     await page.goto('/', {
       waitUntil: 'domcontentloaded',
@@ -102,6 +104,101 @@ test.describe('Homepage', () => {
     expect(inputBox?.width ?? 0).toBeGreaterThanOrEqual(420);
   });
 
+  test('keeps both name searches calm inside with a border-only aura', async ({
+    page,
+  }) => {
+    const readMaterial = async (testId: string) =>
+      page
+        .getByTestId(testId)
+        .locator('.homepage-name-search')
+        .evaluate(async root => {
+          const field = root.querySelector<HTMLElement>(
+            '.homepage-name-search__field'
+          );
+          const input = root.querySelector<HTMLInputElement>('input');
+          const submit = root.querySelector<HTMLButtonElement>(
+            '.homepage-name-search__submit'
+          );
+          const aura = root.querySelector<HTMLElement>(
+            ":scope > .group\\/aura > [aria-hidden='true']"
+          );
+          if (!(field && input && submit && aura)) return null;
+
+          input.focus();
+          await new Promise(resolve => setTimeout(resolve, 250));
+          const fieldBounds = field.getBoundingClientRect();
+          const submitBounds = submit.getBoundingClientRect();
+          const fieldStyle = getComputedStyle(field);
+          const auraStyle = getComputedStyle(aura);
+          const auraPaint = getComputedStyle(aura, '::before');
+          const auraBounds = aura.getBoundingClientRect();
+          const submitTarget = getComputedStyle(submit, '::before');
+
+          return {
+            auraBackgroundImage: auraPaint.backgroundImage,
+            auraPaintSide: Math.min(
+              Number.parseFloat(auraPaint.width),
+              Number.parseFloat(auraPaint.height)
+            ),
+            auraRequiredSide: Math.hypot(auraBounds.width, auraBounds.height),
+            auraMaskComposite: auraStyle.maskComposite,
+            auraTransitionDuration: auraStyle.transitionDuration,
+            fieldBackgroundColor: fieldStyle.backgroundColor,
+            fieldBackgroundImage: fieldStyle.backgroundImage,
+            fieldBorderRightWidth: fieldStyle.borderRightWidth,
+            fieldHeight: fieldBounds.height,
+            fieldOutlineColor: fieldStyle.outlineColor,
+            fieldOutlineStyle: fieldStyle.outlineStyle,
+            fieldOutlineWidth: fieldStyle.outlineWidth,
+            fieldPaddingRight: fieldStyle.paddingRight,
+            insetBottom: fieldBounds.bottom - submitBounds.bottom,
+            insetRight: fieldBounds.right - submitBounds.right,
+            insetTop: submitBounds.top - fieldBounds.top,
+            submitHeight: submitBounds.height,
+            submitTargetHeight: submitTarget.height,
+          };
+        });
+
+    for (const mode of [
+      { width: 1280, height: 800, reducedMotion: 'no-preference' as const },
+      { width: 390, height: 844, reducedMotion: 'no-preference' as const },
+      { width: 1280, height: 800, reducedMotion: 'reduce' as const },
+    ]) {
+      await page.setViewportSize({ width: mode.width, height: mode.height });
+      await page.emulateMedia({ reducedMotion: mode.reducedMotion });
+      await gotoHomepage(page);
+
+      for (const testId of [
+        'homepage-editorial-hero-search',
+        'homepage-close-search',
+      ]) {
+        const material = await readMaterial(testId);
+        expect(material).not.toBeNull();
+        expect(material?.fieldBackgroundImage).toBe('none');
+        expect(material?.fieldBackgroundColor).not.toBe('rgba(0, 0, 0, 0)');
+        expect(material?.auraBackgroundImage).not.toBe('none');
+        expect(material?.auraMaskComposite).toMatch(/exclude|xor/);
+        expect(material?.fieldOutlineStyle).toBe('solid');
+        expect(material?.fieldOutlineWidth).not.toBe('0px');
+        expect(material?.fieldOutlineColor).not.toBe('rgba(0, 0, 0, 0)');
+        expect(material?.fieldHeight).toBeCloseTo(56, 0);
+        expect(material?.auraPaintSide).toBeGreaterThanOrEqual(
+          material?.auraRequiredSide ?? Number.POSITIVE_INFINITY
+        );
+        expect(material?.submitHeight).toBeCloseTo(28, 0);
+        expect(material?.fieldPaddingRight).toBe('13px');
+        expect(material?.fieldBorderRightWidth).toBe('1px');
+        expect(material?.insetTop).toBeCloseTo(14, 0);
+        expect(material?.insetRight).toBeCloseTo(14, 0);
+        expect(material?.insetBottom).toBeCloseTo(14, 0);
+        expect(material?.submitTargetHeight).toBe('44px');
+        if (mode.reducedMotion === 'reduce') {
+          expect(material?.auraTransitionDuration).toBe('0s');
+        }
+      }
+    }
+  });
+
   test('header uses the canonical marketing shell with full navigation', async ({
     page,
   }) => {
@@ -136,6 +233,165 @@ test.describe('Homepage', () => {
     await expect(header.getByRole('button', { name: 'For' })).toBeVisible();
     await expect(header.getByRole('button', { name: 'Tools' })).toBeVisible();
     await expect(toolsFlyout).toHaveCount(0);
+  });
+
+  test('aligns every outer content box to the visible header anchors', async ({
+    page,
+  }) => {
+    test.setTimeout(120_000);
+
+    for (const viewport of [
+      {
+        width: 320,
+        height: 760,
+        expectedLeft: 30.109,
+        expectedRight: 289.891,
+        closeInset: 128,
+      },
+      {
+        width: 390,
+        height: 844,
+        expectedLeft: 30.109,
+        expectedRight: 359.891,
+        closeInset: 128,
+      },
+      {
+        width: 1440,
+        height: 900,
+        expectedLeft: 57,
+        expectedRight: 1383,
+        closeInset: 192,
+      },
+      {
+        width: 1920,
+        height: 1080,
+        expectedLeft: 273,
+        expectedRight: 1647,
+        closeInset: 192,
+      },
+    ] as const) {
+      await page.setViewportSize(viewport);
+      await page.evaluate(async () => {
+        await document.fonts.ready;
+        await new Promise<void>(resolve =>
+          requestAnimationFrame(() => requestAnimationFrame(() => resolve()))
+        );
+      });
+
+      const isMobile = viewport.width <= 767;
+      const rightAnchor = isMobile
+        ? page.getByRole('button', { name: 'Open menu' })
+        : page.getByRole('link', { name: 'Find yourself', exact: true });
+      await expect(page.getByTestId('site-logo-link')).toBeVisible();
+      await expect(rightAnchor).toBeVisible();
+
+      const geometry = await page.evaluate(mobile => {
+        const required = <ElementType extends Element>(selector: string) => {
+          const element = document.querySelector<ElementType>(selector);
+          if (!element)
+            throw new Error(`Missing homepage geometry: ${selector}`);
+          return element;
+        };
+        const rect = (element: Element) => {
+          const bounds = element.getBoundingClientRect();
+          return {
+            left: bounds.left,
+            right: bounds.right,
+            width: bounds.width,
+          };
+        };
+
+        const logo = required<HTMLElement>('[data-testid="site-logo-link"]');
+        const action = required<HTMLElement>(
+          mobile
+            ? 'button[aria-label="Open menu"]'
+            : '.marketing-glass-header__cta'
+        );
+        const close = required<HTMLElement>('.homepage-close');
+        const closeInner = required<HTMLElement>('.homepage-close__inner');
+        const closeBounds = close.getBoundingClientRect();
+        const closeInnerBounds = closeInner.getBoundingClientRect();
+        const closeStyle = getComputedStyle(close);
+        const boxes = [
+          {
+            name: 'hero',
+            ...rect(required('.homepage-editorial-hero__copy')),
+          },
+          {
+            name: 'proof',
+            ...rect(required('.homepage-certified-proof__statement')),
+          },
+          ...Array.from(
+            document.querySelectorAll('.homepage-certified-section__inner')
+          ).map((element, index) => ({
+            name: `feature-${index + 1}`,
+            ...rect(element),
+          })),
+          { name: 'close', ...rect(closeInner) },
+          {
+            name: 'footer',
+            ...rect(required('[data-testid="marketing-footer"] > div')),
+          },
+        ];
+
+        return {
+          anchors: {
+            left: logo.getBoundingClientRect().left,
+            right: action.getBoundingClientRect().right,
+          },
+          boxes,
+          close: {
+            topInset:
+              closeInnerBounds.top -
+              closeBounds.top -
+              Number.parseFloat(closeStyle.borderTopWidth),
+            bottomInset:
+              closeBounds.bottom -
+              closeInnerBounds.bottom -
+              Number.parseFloat(closeStyle.borderBottomWidth),
+          },
+          innerWidths: {
+            hero: required(
+              '.homepage-editorial-hero__search'
+            ).getBoundingClientRect().width,
+            close: required('.homepage-close__search').getBoundingClientRect()
+              .width,
+          },
+          overflow:
+            document.documentElement.scrollWidth -
+            document.documentElement.clientWidth,
+        };
+      }, isMobile);
+
+      expect(geometry.anchors.left).toBeCloseTo(viewport.expectedLeft, 0);
+      expect(geometry.anchors.right).toBeCloseTo(viewport.expectedRight, 0);
+      expect(geometry.boxes).toHaveLength(10);
+      for (const box of geometry.boxes) {
+        expect(
+          Math.abs(box.left - geometry.anchors.left),
+          `${box.name} left edge at ${viewport.width}px`
+        ).toBeLessThanOrEqual(1);
+        expect(
+          Math.abs(box.right - geometry.anchors.right),
+          `${box.name} right edge at ${viewport.width}px`
+        ).toBeLessThanOrEqual(1);
+      }
+      expect(geometry.overflow).toBeLessThanOrEqual(1);
+      expect(geometry.close.topInset).toBeCloseTo(viewport.closeInset, 0);
+      expect(geometry.close.bottomInset).toBeCloseTo(viewport.closeInset, 0);
+      expect(
+        Math.abs(geometry.close.topInset - geometry.close.bottomInset)
+      ).toBeLessThanOrEqual(1);
+      expect(geometry.innerWidths.hero).toBeLessThanOrEqual(641);
+      expect(geometry.innerWidths.close).toBeLessThanOrEqual(481);
+
+      if (!isMobile) {
+        const heroBox = geometry.boxes.find(box => box.name === 'hero');
+        const closeBox = geometry.boxes.find(box => box.name === 'close');
+        expect(geometry.innerWidths.hero).toBeLessThan(heroBox?.width ?? 0);
+        expect(geometry.innerWidths.close).toBeLessThan(closeBox?.width ?? 0);
+      }
+    }
   });
 
   test('hero backdrop is an image-free abstract field with centered content', async ({
@@ -389,7 +645,8 @@ test.describe('Homepage', () => {
     await expect(
       close.getByRole('heading', { level: 2, name: 'See what the world sees.' })
     ).toBeVisible();
-    await expect(close.getByText('Start with your name.')).toBeVisible();
+    await expect(close.getByText('Start with your name.')).toHaveCount(0);
+    await expect(close.getByTestId('homepage-close-mark')).toHaveCount(0);
     await expect(close.getByPlaceholder('Search your name')).toBeVisible();
     await expect(
       close.getByRole('button', { name: 'Find me', exact: true })

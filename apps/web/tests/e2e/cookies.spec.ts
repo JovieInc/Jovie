@@ -17,6 +17,7 @@
  */
 
 import { expect, test } from '@playwright/test';
+import { primeVercelBypassCookie } from '../helpers/vercel-preview';
 import { SMOKE_TIMEOUTS, waitForHydration } from './utils/smoke-test-utils';
 
 /** The cookie name the middleware uses to flag consent-required regions */
@@ -29,6 +30,7 @@ async function openHomepageWithBanner(
   page: import('@playwright/test').Page
 ): Promise<void> {
   const baseUrl = process.env.BASE_URL ?? 'http://localhost:3100';
+  await primeVercelBypassCookie(page, baseUrl);
 
   // Remove stored consent so the banner renders even on repeat runs
   await page.addInitScript(() => {
@@ -105,6 +107,100 @@ test.describe('Cookie banner @smoke', () => {
         `${actionName} misses the 44px touch height`
       ).toBeGreaterThanOrEqual(44);
     }
+  });
+
+  test('visible consent stays clear of the homepage primary action from 320px through desktop', async ({
+    page,
+  }) => {
+    test.setTimeout(90_000);
+
+    await page.setViewportSize({ width: 320, height: 568 });
+    await page.addInitScript(() => {
+      const target = window as Window & { __cookieBannerCls?: number };
+      target.__cookieBannerCls = 0;
+      new PerformanceObserver(list => {
+        for (const entry of list.getEntries()) {
+          const shift = entry as PerformanceEntry & {
+            hadRecentInput: boolean;
+            value: number;
+          };
+          if (!shift.hadRecentInput) {
+            target.__cookieBannerCls =
+              (target.__cookieBannerCls ?? 0) + shift.value;
+          }
+        }
+      }).observe({ type: 'layout-shift', buffered: true });
+    });
+    await page.addInitScript(() => {
+      document.cookie = 'jv_cc_required=1; path=/; SameSite=Lax';
+    });
+    await openHomepageWithBanner(page);
+
+    for (const viewport of [
+      { width: 320, height: 568 },
+      { width: 390, height: 844 },
+      { width: 1440, height: 900 },
+    ]) {
+      await page.setViewportSize(viewport);
+      await page.evaluate(
+        () =>
+          new Promise<void>(resolve =>
+            requestAnimationFrame(() => requestAnimationFrame(() => resolve()))
+          )
+      );
+
+      const banner = page.getByTestId('cookie-banner');
+      const primaryAction = page.getByTestId('homepage-editorial-hero-search');
+      await expect(banner).toBeVisible();
+      await expect(primaryAction).toBeVisible();
+
+      const [bannerBox, primaryActionBox] = await Promise.all([
+        banner.boundingBox(),
+        primaryAction.boundingBox(),
+      ]);
+      expect(bannerBox, `${viewport.width}px banner has no box`).not.toBeNull();
+      expect(
+        primaryActionBox,
+        `${viewport.width}px primary action has no box`
+      ).not.toBeNull();
+      expect(
+        bannerBox!.y >= primaryActionBox!.y + primaryActionBox!.height ||
+          primaryActionBox!.y >= bannerBox!.y + bannerBox!.height,
+        `${viewport.width}px consent banner overlaps the homepage primary action`
+      ).toBe(true);
+    }
+
+    await page.setViewportSize({ width: 320, height: 568 });
+    const heroInput = page.getByPlaceholder('Search your name').first();
+    const heroSubmit = page.getByRole('button', { name: 'Find me' }).first();
+    await heroInput.focus();
+    await page.keyboard.press('Tab');
+    await expect(heroSubmit).toBeFocused();
+    expect(
+      await heroSubmit.evaluate(element => element.matches(':focus-visible'))
+    ).toBe(true);
+
+    const banner = page.getByTestId('cookie-banner');
+    await banner.getByRole('link', { name: 'Privacy' }).focus();
+    for (const actionName of ['Reject all', 'Accept all', 'Customize']) {
+      await page.keyboard.press('Tab');
+      const action = banner.getByRole('button', {
+        name: actionName,
+        exact: true,
+      });
+      await expect(action).toBeFocused();
+      expect(
+        await action.evaluate(element => element.matches(':focus-visible'))
+      ).toBe(true);
+    }
+
+    expect(
+      await page.evaluate(
+        () =>
+          (window as Window & { __cookieBannerCls?: number })
+            .__cookieBannerCls ?? 0
+      )
+    ).toBeLessThanOrEqual(0.01);
   });
 
   test('Accept all button is clickable and persists every optional category', async ({
