@@ -458,8 +458,11 @@ candidate_tmp=""
 update_lock=""
 promotion_started=0
 promotion_complete=0
+finalization_started=0
+recovery_cleanup_started=0
 cleanup_pending=""
 finalized_receipt=""
+recovered_receipt=""
 official_was_active=0
 official_stopped_for_promotion=0
 official_pid_before=""
@@ -580,6 +583,32 @@ finally:
 PY
 }
 
+write_recovered_prior_receipt() {
+  local cleanup_status="$1"
+  CLEANUP_STATUS="$cleanup_status" ROLLBACK_DIR="$rollback_dir" \
+    python3 - "$STATE_DIR" <<'PY'
+import json, os, pathlib, sys
+root = pathlib.Path(sys.argv[1])
+receipt = root / "promotion-recovered.json"
+temporary = root / ".promotion-recovered.json.tmp"
+payload = {
+    "schema": "symphony-promotion-recovered/v1",
+    "status": "restored-prior",
+    "cleanupStatus": os.environ["CLEANUP_STATUS"],
+    "transaction": os.environ["ROLLBACK_DIR"],
+}
+temporary.write_text(json.dumps(payload, sort_keys=True) + "\n")
+with temporary.open("rb") as handle:
+    os.fsync(handle.fileno())
+os.replace(temporary, receipt)
+descriptor = os.open(root, os.O_RDONLY)
+try:
+    os.fsync(descriptor)
+finally:
+    os.close(descriptor)
+PY
+}
+
 finalized_cleanup_pending() {
   [ -n "$finalized_receipt" ] && [ -n "$rollback_dir" ] || return 1
   FINALIZED_RECEIPT="$finalized_receipt" ROLLBACK_DIR="$rollback_dir" python3 - "$STATE_DIR" <<'PY'
@@ -610,6 +639,27 @@ if (receipt != root / "promotion-finalized.json" or
 PY
 }
 
+recovered_prior_cleanup_pending() {
+  [ -n "$recovered_receipt" ] && [ -n "$rollback_dir" ] || return 1
+  RECOVERED_RECEIPT="$recovered_receipt" ROLLBACK_DIR="$rollback_dir" python3 - "$STATE_DIR" <<'PY'
+import json, os, pathlib, sys
+root = pathlib.Path(sys.argv[1])
+receipt = pathlib.Path(os.environ["RECOVERED_RECEIPT"])
+transaction = pathlib.Path(os.environ["ROLLBACK_DIR"])
+try:
+    payload = json.loads(receipt.read_text())
+except (OSError, ValueError):
+    raise SystemExit(1)
+if (receipt != root / "promotion-recovered.json" or
+        transaction != root / "promotion-transaction" or
+        payload.get("schema") != "symphony-promotion-recovered/v1" or
+        payload.get("status") != "restored-prior" or
+        payload.get("cleanupStatus") != "pending" or
+        payload.get("transaction") != str(transaction)):
+    raise SystemExit(1)
+PY
+}
+
 backup_target() {
   local key="$1" target="$2"
   if [ -e "$target" ] || [ -L "$target" ]; then
@@ -630,7 +680,11 @@ restore_target() {
 
 cleanup() {
   local status="$?"
-  if [ "$status" -ne 0 ] && [ "$promotion_complete" -eq 0 ]; then
+  if [ "$status" -ne 0 ] && [ "$recovery_cleanup_started" -eq 1 ]; then
+    echo "RECOVERED_PRIOR_CLEANUP_FAILED restored prior state retained; inspect transaction cleanup before retry" >&2
+  elif [ "$status" -ne 0 ] && [ "$finalization_started" -eq 1 ]; then
+    echo "PROMOTION_COMMITTED_CLEANUP_FAILED verified official state retained; inspect transaction cleanup before retry" >&2
+  elif [ "$status" -ne 0 ] && [ "$promotion_complete" -eq 0 ]; then
     if [ "$promotion_started" -eq 1 ]; then
       if [ "$files_promoted" -eq 1 ] && [ "$rollback_safe" -eq 0 ]; then
         write_promotion_hold
@@ -668,7 +722,9 @@ cleanup() {
     fi
   fi
   [ -z "$tmpdir" ] || rm -rf "$tmpdir"
-  if [ "$status" -ne 0 ] && [ "$promotion_started" -eq 1 ] &&
+  if [ "$status" -ne 0 ] && [ "$finalization_started" -eq 0 ] &&
+     [ "$recovery_cleanup_started" -eq 0 ] &&
+     [ "$promotion_started" -eq 1 ] &&
      [ "$rollback_safe" -eq 1 ] && [ "$rollback_restart_verified" -eq 1 ]; then
     if [ -n "$rollback_dir" ]; then
       if ! finalize_rollback_transaction; then
@@ -703,6 +759,7 @@ fi
 rollback_dir="$STATE_DIR/promotion-transaction"
 cleanup_pending="$STATE_DIR/.promotion-transaction.cleanup-pending"
 finalized_receipt="$STATE_DIR/promotion-finalized.json"
+recovered_receipt="$STATE_DIR/promotion-recovered.json"
 if finalized_cleanup_pending; then
   if ! finalize_rollback_transaction; then
     echo "PROMOTION_COMMITTED cleanup acknowledgement remains pending" >&2
@@ -710,6 +767,18 @@ if finalized_cleanup_pending; then
   fi
   write_finalized_receipt complete
   echo "RECOVERED_TRANSACTION_CLEANUP"
+fi
+if recovered_prior_cleanup_pending; then
+  recovery_cleanup_started=1
+  if ! finalize_rollback_transaction; then
+    echo "RECOVERED_PRIOR cleanup acknowledgement remains pending" >&2
+    exit 0
+  fi
+  write_recovered_prior_receipt complete
+  recovery_cleanup_started=0
+  rollback_dir=""
+  echo "RECOVERED_TRANSACTION_CLEANUP"
+  exit 0
 fi
 if [ -e "$cleanup_pending" ]; then
   if ! finalize_rollback_transaction; then
@@ -758,7 +827,11 @@ PY
     verify_official_restarted
     official_stopped_for_promotion=0
   fi
+  write_recovered_prior_receipt pending
+  recovery_cleanup_started=1
   finalize_rollback_transaction
+  write_recovered_prior_receipt complete
+  recovery_cleanup_started=0
   rollback_dir=""
   promotion_started=0
   echo "RECOVERED_INCOMPLETE_PROMOTION"
@@ -960,11 +1033,10 @@ elif [ "$RETIRE_LEGACY" -eq 1 ]; then
 fi
 
 write_finalized_receipt pending
-promotion_complete=1
-if finalize_rollback_transaction; then
-  write_finalized_receipt complete
-else
-  echo "PROMOTION_COMMITTED candidate verified; cleanup acknowledgement pending" >&2
-fi
+finalization_started=1
+finalize_rollback_transaction
+write_finalized_receipt complete
+finalization_started=0
 rollback_dir=""
+promotion_complete=1
 echo "DONE"

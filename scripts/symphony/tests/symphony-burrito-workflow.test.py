@@ -2816,6 +2816,51 @@ while True: time.sleep(1)
             workflow.write_bytes(WORKFLOW_PATH.read_bytes())
             helper.write_bytes(HELPER_PATH.read_bytes())
             (root / "allow-restart-once").touch()
+            recovered_cleanup_failure = subprocess.run(
+                ["bash", str(updater), "--skip-binary", "--no-restart"],
+                cwd=ROOT,
+                env={**env, "FAIL_FINALIZE_AFTER_REMOVE": "1"},
+                capture_output=True,
+                text=True,
+            )
+            self.assertNotEqual(recovered_cleanup_failure.returncode, 0)
+            self.assertIn(
+                "RECOVERED_PRIOR_CLEANUP_FAILED",
+                recovered_cleanup_failure.stderr,
+            )
+            self.assertNotIn(
+                "PROMOTION_COMMITTED_CLEANUP_FAILED",
+                recovered_cleanup_failure.stderr,
+            )
+            marker = (
+                target_home
+                / ".local/state/symphony-elixir/.promotion-transaction.cleanup-pending"
+            )
+            self.assertEqual(
+                marker.read_text(), "symphony-promotion-cleanup-pending/v1\n"
+            )
+            recovered_receipt = json.loads(
+                (
+                    target_home
+                    / ".local/state/symphony-elixir/promotion-recovered.json"
+                ).read_text()
+            )
+            self.assertEqual(recovered_receipt["status"], "restored-prior")
+            self.assertEqual(recovered_receipt["cleanupStatus"], "pending")
+            self.assertEqual(recovered_receipt["transaction"], str(transaction))
+            events_before_recovery_acknowledgement = (
+                root / "systemctl-events"
+            ).read_text().splitlines()
+            self.assertEqual(
+                len(
+                    [
+                        row
+                        for row in events_before_recovery_acknowledgement
+                        if "restart symphony-elixir.service" in row
+                    ]
+                ),
+                1,
+            )
             config_only = subprocess.run(
                 ["bash", str(updater), "--skip-binary", "--no-restart"],
                 cwd=ROOT,
@@ -2824,8 +2869,20 @@ while True: time.sleep(1)
                 text=True,
             )
             self.assertEqual(config_only.returncode, 0, config_only.stderr)
-            self.assertIn("RECOVERED_INCOMPLETE_PROMOTION", config_only.stdout)
-            self.assertIn("DONE_STAGED_NO_LIVE_MUTATION", config_only.stdout)
+            self.assertIn("RECOVERED_TRANSACTION_CLEANUP", config_only.stdout)
+            self.assertNotIn("DONE_STAGED_NO_LIVE_MUTATION", config_only.stdout)
+            self.assertFalse(marker.exists())
+            recovered_receipt = json.loads(
+                (
+                    target_home
+                    / ".local/state/symphony-elixir/promotion-recovered.json"
+                ).read_text()
+            )
+            self.assertEqual(recovered_receipt["cleanupStatus"], "complete")
+            self.assertEqual(
+                (root / "systemctl-events").read_text().splitlines(),
+                events_before_recovery_acknowledgement,
+            )
             self.assertFalse(hold.exists())
             for path, expected in safe_prior.items():
                 self.assertEqual(path.read_bytes(), expected)
@@ -3242,13 +3299,14 @@ while True: time.sleep(1)
         self.assertIn("os.fsync(descriptor)", helper)
         self.assertNotIn('rm -rf "$rollback_dir"', UPDATER)
         self.assertIn("symphony-promotion-finalized/v1", UPDATER)
+        self.assertIn("symphony-promotion-recovered/v1", UPDATER)
         self.assertLess(
             UPDATER.rindex("write_finalized_receipt pending\n"),
             UPDATER.rindex("promotion_complete=1\n"),
         )
         self.assertLess(
-            UPDATER.rindex("promotion_complete=1\n"),
-            UPDATER.rindex("if finalize_rollback_transaction; then\n"),
+            UPDATER.rindex("write_finalized_receipt complete\n"),
+            UPDATER.rindex('rollback_dir=""\n'),
         )
         self.assertLess(UPDATER.rindex("finalize_rollback_transaction\n"),
                         UPDATER.rindex('echo "DONE"'))
