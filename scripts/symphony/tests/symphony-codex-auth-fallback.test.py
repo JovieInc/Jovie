@@ -34,9 +34,26 @@ GROK_SHIP = SOURCE_DIR / "grok-ship-one"
 CURSOR_STD = SOURCE_DIR / "cursor-agent-std"
 MODEL_ROUTER = SOURCE_DIR / "model-router.py"
 MODEL_REGISTRY = SOURCE_DIR / "config/model-registry.json"
-RUNTIME_ARTIFACTS = (WRAPPER, CONTROLLER, SIDECAR, GROK_SHIP, CURSOR_STD, MODEL_ROUTER, MODEL_REGISTRY)
+ACCOUNT_PROBE = SOURCE_DIR / "codex-account-probe.sh"
+RUNTIME_ARTIFACTS = (
+    WRAPPER,
+    CONTROLLER,
+    SIDECAR,
+    ACCOUNT_PROBE,
+    GROK_SHIP,
+    CURSOR_STD,
+    MODEL_ROUTER,
+    MODEL_REGISTRY,
+)
 RUNTIME_NAMES = tuple(path.name for path in RUNTIME_ARTIFACTS)
-LAUNCHER_NAMES = (WRAPPER.name, CONTROLLER.name, SIDECAR.name, GROK_SHIP.name, CURSOR_STD.name)
+LAUNCHER_NAMES = (
+    WRAPPER.name,
+    CONTROLLER.name,
+    SIDECAR.name,
+    ACCOUNT_PROBE.name,
+    GROK_SHIP.name,
+    CURSOR_STD.name,
+)
 
 
 def _load_python_module(name: str, path: pathlib.Path):
@@ -412,11 +429,30 @@ class FallbackTests(unittest.TestCase):
         for account in ("jovie", "meetjovie"):
             account_dir = self.root / account
             account_dir.mkdir()
-            (account_dir / "auth.json").write_text("{}\n")
+            (account_dir / "auth.json").write_text('{"auth_mode":"chatgpt"}\n')
+            (account_dir / "config.toml").write_text('model = "gpt-5.6-luna"\n')
+        self.cooldown_probe = self.command("account-probe-no-ready", "exit 75")
         self.events = self.root / "events.log"
 
     def tearDown(self):
         self.tmp.cleanup()
+
+    def canonical_recovery(self, account="jovie"):
+        now = int(time.time())
+        state = json.loads(self.state.read_text())
+        state["active"] = account
+        state["cooldowns"][account] = now
+        state.setdefault("last_error", {}).pop(account, None)
+        state.setdefault("readiness", {})[account] = {
+            "checkedAt": now,
+            "expiresAt": now + 600,
+            "source": "authenticated_completion_probe/v1",
+            "requiredForNextLaunch": True,
+        }
+        self.state.write_text(json.dumps(state))
+        return subprocess.CompletedProcess(
+            [], 0, f"RECOVERED {account}\n".encode(), b""
+        )
 
     def env(self, **overrides):
         env = os.environ.copy()
@@ -427,6 +463,7 @@ class FallbackTests(unittest.TestCase):
             "HOME": str(self.home),
             "PATH": f"{self.bin}:/usr/bin:/bin",
             "GEM_CODEX_ACCOUNTS_STATE": str(self.state),
+            "GEM_CODEX_ACCOUNT_PROBE_BIN": str(self.cooldown_probe),
             "GEM_CODEX_CANARY_TIMEOUT_SECONDS": "1.0",
             "GEM_GROK_CANARY_TIMEOUT_SECONDS": "1.0",
             "SYMPHONY_GROK_SURVIVAL_SECONDS": "0.01",
@@ -626,6 +663,8 @@ class FallbackTests(unittest.TestCase):
             "executable_missing",
             "probe_failed",
             "missing_ready_evidence",
+            "cooldown_refresh_indeterminate",
+            "cooldown_state_changed",
         ):
             controls: list[list[str]] = []
             with self.subTest(reason=reason):
@@ -1275,6 +1314,629 @@ class FallbackTests(unittest.TestCase):
         result = self.run_controller(GEM_CODEX_ROTATE_BIN=canary, GEM_EVENTS=self.events)
         self.assertEqual((result.stdout, result.returncode), ("no\n", 1))
         self.assertEqual(self.events.read_text(), "--config shell_environment_policy.inherit=none --config model=gpt-5.6-luna exec --sandbox read-only --skip-git-repo-check Reply with exactly: GEM_MODEL_READY\n")
+
+    def test_manual_reset_refreshes_stale_chatgpt_cooldown(self):
+        module = self.load_controller_module()
+        future = int(time.time()) + 3600
+        self.state.write_text(json.dumps({
+            "active": None,
+            "cooldowns": {"jovie": future, "meetjovie": future + 1},
+            "last_error": {"jovie": {"reason": "limit_or_auth"}},
+        }))
+        openrouter = self.root / "openrouter"
+        openrouter.mkdir()
+        (openrouter / "auth.json").write_text("{}\n")
+        with (
+            mock.patch.dict(
+                os.environ,
+                {"GEM_CODEX_ACCOUNT_PROBE_BIN": "/usr/bin/true"},
+            ),
+            mock.patch.object(module, "_state_path", return_value=self.state),
+            mock.patch.object(
+                module,
+                "_captured_process_group",
+                side_effect=lambda *_args, **_kwargs: self.canonical_recovery(),
+            ) as run,
+        ):
+            self.assertEqual(module.codex_canary_ready(), (True, "reset_cooldown_refreshed"))
+        refreshed = json.loads(self.state.read_text())
+        self.assertEqual(refreshed["active"], "jovie")
+        self.assertLessEqual(refreshed["cooldowns"]["jovie"], int(time.time()))
+        self.assertNotIn("jovie", refreshed["last_error"])
+        self.assertEqual(
+            refreshed["readiness"]["jovie"]["source"],
+            "authenticated_completion_probe/v1",
+        )
+        self.assertEqual(run.call_args.args[0], ["/usr/bin/true"])
+        self.assertEqual(
+            run.call_args.args[2]["CODEX_ACCOUNT_PROBE_MAX_RECOVERIES"],
+            "1",
+        )
+
+    def test_controller_consumes_canonical_probe_readiness_receipt(self):
+        module = self.load_controller_module()
+        future = int(time.time()) + 3600
+        self.state.write_text(json.dumps({
+            "active": None,
+            "cooldowns": {"jovie": future, "meetjovie": future + 1},
+            "last_error": {"jovie": {"reason": "old"}},
+        }))
+        codex = self.command(
+            "canonical-ready",
+            "printf 'SYMPHONY_ACCOUNT_READY\\n'",
+        )
+        with (
+            mock.patch.dict(os.environ, {
+                "GEM_CODEX_ACCOUNT_PROBE_BIN": str(ACCOUNT_PROBE),
+                "GEM_CODEX_BIN": str(codex),
+            }),
+            mock.patch.object(module, "_state_path", return_value=self.state),
+        ):
+            self.assertEqual(
+                module.codex_canary_ready(),
+                (True, "reset_cooldown_refreshed"),
+            )
+        refreshed = json.loads(self.state.read_text())
+        self.assertEqual(refreshed["active"], "jovie")
+        self.assertLessEqual(refreshed["cooldowns"]["jovie"], int(time.time()))
+        self.assertEqual(
+            refreshed["readiness"]["jovie"]["source"],
+            "authenticated_completion_probe/v1",
+        )
+        self.assertNotIn("jovie", refreshed["last_error"])
+
+    def test_controller_rejects_state_symlink_alias_identity(self):
+        module = self.load_controller_module()
+        alias = self.root / "state-alias.json"
+        alias.symlink_to(self.state)
+        with mock.patch.dict(
+            os.environ,
+            {"GEM_CODEX_ACCOUNTS_STATE": str(alias)},
+        ):
+            self.assertEqual(module.codex_canary_ready(), (False, "unknown_state"))
+        self.assertFalse(pathlib.Path(f"{alias}.lock").exists())
+
+    def test_cooldown_refresh_ignores_untyped_accounts_and_uses_expiry_order(self):
+        module = self.load_controller_module()
+        future = int(time.time()) + 3600
+        self.state.write_text(json.dumps({
+            "active": None,
+            "cooldowns": {"jovie": future + 1, "meetjovie": future},
+            "last_error": {},
+        }))
+        openrouter = self.root / "openrouter"
+        openrouter.mkdir()
+        (openrouter / "auth.json").write_text("{}\n")
+        with (
+            mock.patch.dict(
+                os.environ,
+                {"GEM_CODEX_ACCOUNT_PROBE_BIN": "/usr/bin/true"},
+            ),
+            mock.patch.object(module, "_state_path", return_value=self.state),
+            mock.patch.object(
+                module,
+                "_captured_process_group",
+                side_effect=lambda *_args, **_kwargs: self.canonical_recovery(
+                    "meetjovie"
+                ),
+            ) as run,
+        ):
+            self.assertEqual(module.codex_canary_ready(), (True, "reset_cooldown_refreshed"))
+        self.assertEqual(run.call_count, 1)
+        self.assertLessEqual(
+            json.loads(self.state.read_text())["cooldowns"]["meetjovie"],
+            int(time.time()),
+        )
+
+    def test_exact_marker_is_required_before_cooldown_is_cleared(self):
+        module = self.load_controller_module()
+        future = int(time.time()) + 3600
+        original = {
+            "active": None,
+            "cooldowns": {"jovie": future, "meetjovie": future + 1},
+            "last_error": {},
+        }
+        self.state.write_text(json.dumps(original))
+        codex = self.command("ambiguous-probe", "printf 'SYMPHONY_ACCOUNT_READY extra\\n'")
+        with (
+            mock.patch.dict(os.environ, {
+                "GEM_CODEX_ACCOUNT_PROBE_BIN": str(ACCOUNT_PROBE),
+                "GEM_CODEX_BIN": str(codex),
+            }),
+            mock.patch.object(module, "_state_path", return_value=self.state),
+        ):
+            self.assertEqual(module.codex_canary_ready(), (False, "cooldown_refresh_indeterminate"))
+        self.assertEqual(json.loads(self.state.read_text()), original)
+
+    def test_multiline_marker_is_ambiguous_and_preserves_cooldowns(self):
+        module = self.load_controller_module()
+        future = int(time.time()) + 3600
+        original = {
+            "active": None,
+            "cooldowns": {"jovie": future, "meetjovie": future + 1},
+            "last_error": {},
+        }
+        self.state.write_text(json.dumps(original))
+        codex = self.command(
+            "multiline-probe",
+            "printf 'SYMPHONY_ACCOUNT_READY\\nprovider warning\\n'",
+        )
+        with (
+            mock.patch.dict(os.environ, {
+                "GEM_CODEX_ACCOUNT_PROBE_BIN": str(ACCOUNT_PROBE),
+                "GEM_CODEX_BIN": str(codex),
+            }),
+            mock.patch.object(module, "_state_path", return_value=self.state),
+        ):
+            self.assertEqual(module.codex_canary_ready(), (False, "cooldown_refresh_indeterminate"))
+        self.assertEqual(json.loads(self.state.read_text()), original)
+
+    def test_newer_cooldown_wins_race_with_successful_probe(self):
+        module = self.load_controller_module()
+        future = int(time.time()) + 3600
+        original = {
+            "active": None,
+            "cooldowns": {"jovie": future, "meetjovie": future + 1},
+            "last_error": {},
+        }
+        self.state.write_text(json.dumps(original))
+
+        def record_new_failure(*_args, **_kwargs):
+            newer = dict(original)
+            newer["cooldowns"] = dict(original["cooldowns"], jovie=future + 7200)
+            self.state.write_text(json.dumps(newer))
+            return subprocess.CompletedProcess([], 0, b"RECOVERED jovie\n", b"")
+
+        with (
+            mock.patch.dict(os.environ, {"GEM_CODEX_ACCOUNT_PROBE_BIN": "/usr/bin/true"}),
+            mock.patch.object(module, "_state_path", return_value=self.state),
+            mock.patch.object(module, "_captured_process_group", side_effect=record_new_failure),
+        ):
+            self.assertEqual(
+                module.codex_canary_ready(),
+                (False, "cooldown_refresh_indeterminate"),
+            )
+        self.assertEqual(json.loads(self.state.read_text())["cooldowns"]["jovie"], future + 7200)
+
+    def test_same_cooldown_with_newer_active_and_error_wins_race(self):
+        module = self.load_controller_module()
+        future = int(time.time()) + 3600
+        original = {
+            "active": None,
+            "cooldowns": {"jovie": future, "meetjovie": future + 1},
+            "last_error": {"jovie": {"reason": "old"}},
+        }
+        self.state.write_text(json.dumps(original))
+        newer = {
+            **original,
+            "active": "meetjovie",
+            "last_error": {"jovie": {"reason": "newer", "at": future}},
+        }
+
+        def concurrent_writer(*_args, **_kwargs):
+            self.state.write_text(json.dumps(newer))
+            return subprocess.CompletedProcess([], 0, b"RECOVERED jovie\n", b"")
+
+        with (
+            mock.patch.dict(os.environ, {"GEM_CODEX_ACCOUNT_PROBE_BIN": "/usr/bin/true"}),
+            mock.patch.object(module, "_state_path", return_value=self.state),
+            mock.patch.object(module, "_captured_process_group", side_effect=concurrent_writer),
+        ):
+            self.assertEqual(
+                module.codex_canary_ready(),
+                (False, "cooldown_refresh_indeterminate"),
+            )
+        self.assertEqual(json.loads(self.state.read_text()), newer)
+
+    def test_held_account_leases_skip_probe_and_preserve_state(self):
+        module = self.load_controller_module()
+        future = int(time.time()) + 3600
+        original = {
+            "active": None,
+            "cooldowns": {"jovie": future, "meetjovie": future + 1},
+            "last_error": {},
+        }
+        self.state.write_text(json.dumps(original))
+        locks = self.root / "locks"
+        locks.mkdir()
+        descriptors = []
+        for account in ("jovie", "meetjovie"):
+            descriptor = os.open(locks / f"{account}.lock", os.O_RDWR | os.O_CREAT, 0o600)
+            fcntl.flock(descriptor, fcntl.LOCK_EX | fcntl.LOCK_NB)
+            descriptors.append(descriptor)
+        self.addCleanup(lambda: [os.close(descriptor) for descriptor in descriptors])
+        codex = self.command(
+            "held-lease-probe",
+            'printf "launched\\n" >> "$GEM_EVENTS"; printf "SYMPHONY_ACCOUNT_READY\\n"',
+        )
+        with (
+            mock.patch.dict(
+                os.environ,
+                {
+                    "GEM_CODEX_ACCOUNT_PROBE_BIN": str(ACCOUNT_PROBE),
+                    "GEM_CODEX_BIN": str(codex),
+                    "GEM_EVENTS": str(self.events),
+                },
+            ),
+            mock.patch.object(module, "_state_path", return_value=self.state),
+        ):
+            self.assertEqual(
+                module.codex_canary_ready(),
+                (False, "cooldown_refresh_indeterminate"),
+            )
+        self.assertFalse(self.events.exists())
+        self.assertEqual(json.loads(self.state.read_text()), original)
+
+    def test_reset_probe_uses_one_overall_timeout_budget(self):
+        module = self.load_controller_module()
+        future = int(time.time()) + 3600
+        original = {
+            "active": None,
+            "cooldowns": {"jovie": future, "meetjovie": future + 1},
+            "last_error": {},
+        }
+        self.state.write_text(json.dumps(original))
+        with (
+            mock.patch.dict(os.environ, {"GEM_CODEX_ACCOUNT_PROBE_BIN": "/usr/bin/true"}),
+            mock.patch.object(module, "_state_path", return_value=self.state),
+            mock.patch.object(module, "_timeout_seconds", return_value=1.0),
+            mock.patch.object(
+                module,
+                "_captured_process_group",
+                return_value=None,
+            ) as run,
+        ):
+            self.assertEqual(
+                module.codex_canary_ready(),
+                (False, "cooldown_refresh_indeterminate"),
+            )
+        self.assertEqual(run.call_count, 1)
+        self.assertLessEqual(run.call_args.args[1], 1.0)
+        self.assertEqual(json.loads(self.state.read_text()), original)
+
+    def test_probe_claim_without_readiness_receipt_fails_closed(self):
+        module = self.load_controller_module()
+        future = int(time.time()) + 3600
+        original = {
+            "active": None,
+            "cooldowns": {"jovie": future, "meetjovie": future + 1},
+            "last_error": {},
+        }
+        self.state.write_text(json.dumps(original))
+        ready = subprocess.CompletedProcess([], 0, b"RECOVERED jovie\n", b"")
+        with (
+            mock.patch.dict(os.environ, {"GEM_CODEX_ACCOUNT_PROBE_BIN": "/usr/bin/true"}),
+            mock.patch.object(module, "_state_path", return_value=self.state),
+            mock.patch.object(module, "_captured_process_group", return_value=ready),
+        ):
+            self.assertEqual(
+                module.codex_canary_ready(),
+                (False, "cooldown_refresh_indeterminate"),
+            )
+        self.assertEqual(json.loads(self.state.read_text()), original)
+
+    def test_probe_claim_requires_recovered_account_to_remain_active(self):
+        module = self.load_controller_module()
+        future = int(time.time()) + 3600
+        self.state.write_text(json.dumps({
+            "active": None,
+            "cooldowns": {"jovie": future, "meetjovie": future + 1},
+            "last_error": {},
+        }))
+
+        def mismatched_identity(*_args, **_kwargs):
+            now = int(time.time())
+            state = json.loads(self.state.read_text())
+            state["active"] = "meetjovie"
+            state["cooldowns"]["jovie"] = now
+            state["readiness"] = {"jovie": {
+                "checkedAt": now,
+                "expiresAt": now + 60,
+                "source": "authenticated_completion_probe/v1",
+                "requiredForNextLaunch": True,
+            }}
+            self.state.write_text(json.dumps(state))
+            return subprocess.CompletedProcess([], 0, b"RECOVERED jovie\n", b"")
+
+        with (
+            mock.patch.dict(os.environ, {"GEM_CODEX_ACCOUNT_PROBE_BIN": "/usr/bin/true"}),
+            mock.patch.object(module, "_state_path", return_value=self.state),
+            mock.patch.object(module, "_captured_process_group", side_effect=mismatched_identity),
+        ):
+            self.assertEqual(
+                module.codex_canary_ready(),
+                (False, "cooldown_refresh_indeterminate"),
+            )
+
+    def test_probe_process_group_timeout_has_no_late_mutation_or_survivors(self):
+        module = self.load_controller_module()
+        late = self.root / "late"
+        pids = self.root / "probe-pids"
+        codex = self.bin / "nested-codex-tree"
+        codex.write_text(
+            "#!/usr/bin/env python3\n"
+            "import os, pathlib, signal, time\n"
+            "signal.signal(signal.SIGTERM, signal.SIG_IGN)\n"
+            "pathlib.Path(os.environ['PID_FILE']).write_text(str(os.getpid()))\n"
+            "time.sleep(2)\n"
+            "pathlib.Path(os.environ['LATE_FILE']).write_text('late')\n"
+            "time.sleep(30)\n"
+        )
+        codex.chmod(0o755)
+        future = int(time.time()) + 3600
+        self.state.write_text(json.dumps({
+            "active": None,
+            "cooldowns": {"jovie": future, "meetjovie": future + 1},
+            "last_error": {},
+        }))
+        env = os.environ.copy()
+        env.update({
+            "CODEX_ACCOUNTS_ROOT": str(self.root),
+            "CODEX_ACCOUNTS_STATE": str(self.state),
+            "CODEX_REAL_BIN": str(codex),
+            "CODEX_ACCOUNT_PROBE_TIMEOUT": "30",
+            "CODEX_ACCOUNT_PROBE_TOTAL_TIMEOUT": "30",
+            "CODEX_ACCOUNT_PROBE_DEADLINE_EPOCH": str(time.time() + 0.5),
+            "PID_FILE": str(pids),
+            "LATE_FILE": str(late),
+        })
+        started = time.monotonic()
+        result = module._captured_process_group([str(ACCOUNT_PROBE)], 0.5, env)
+        self.assertIsNotNone(result)
+        assert result is not None
+        self.assertEqual(result.returncode, 76)
+        self.assertLess(time.monotonic() - started, 4.0)
+        self.assertTrue(pids.exists())
+        time.sleep(2.2)
+        self.assertFalse(late.exists())
+        for raw_pid in pids.read_text().split():
+            with self.assertRaises(ProcessLookupError):
+                os.kill(int(raw_pid), 0)
+
+    @unittest.skipUnless(sys.platform.startswith("linux"), "requires Linux subreaper")
+    def test_outer_probe_domain_reaps_completed_double_fork(self):
+        module = self.load_controller_module()
+        pid_file = self.root / "outer-late.pid"
+        late = self.root / "outer-late"
+        cgroup_file = self.root / "outer-late.cgroup"
+        probe = self.bin / "double-fork-probe"
+        probe.write_text(
+            "#!/usr/bin/env python3\n"
+            "import os,pathlib,signal,time\n"
+            "pathlib.Path(os.environ['CGROUP_FILE']).write_text(pathlib.Path('/proc/self/cgroup').read_text())\n"
+            "pid=os.fork()\n"
+            "if pid == 0:\n"
+            "    os.setsid()\n"
+            "    grand=os.fork()\n"
+            "    if grand == 0:\n"
+            "        pathlib.Path(os.environ['PID_FILE']).write_text(str(os.getpid()))\n"
+            "        signal.signal(signal.SIGTERM, signal.SIG_IGN)\n"
+            "        time.sleep(1.5)\n"
+            "        pathlib.Path(os.environ['LATE_FILE']).write_text('late')\n"
+            "        time.sleep(30)\n"
+            "    os._exit(0)\n"
+            "deadline=time.time()+1\n"
+            "while not pathlib.Path(os.environ['PID_FILE']).exists() and time.time()<deadline: time.sleep(.01)\n"
+            "raise SystemExit(76)\n"
+        )
+        probe.chmod(0o755)
+        env = {
+            **os.environ,
+            "PID_FILE": str(pid_file),
+            "LATE_FILE": str(late),
+            "CGROUP_FILE": str(cgroup_file),
+        }
+        started = time.monotonic()
+        result = module._captured_process_group([str(probe)], 1, env)
+        self.assertIsNotNone(result)
+        assert result is not None
+        self.assertEqual(result.returncode, 76)
+        self.assertLess(time.monotonic() - started, 1.5)
+        self.assertTrue(pid_file.exists())
+        self.assertIn("symphony-codex-controller-", cgroup_file.read_text())
+        time.sleep(1.7)
+        self.assertFalse(late.exists())
+        with self.assertRaises(ProcessLookupError):
+            os.kill(int(pid_file.read_text()), 0)
+
+    def test_timeout_parser_rejects_nonfinite_and_nonpositive_values(self):
+        module = self.load_controller_module()
+        for raw in ("nan", "inf", "-inf", "0", "-1"):
+            with self.subTest(raw=raw), mock.patch.dict(
+                os.environ, {"GEM_CODEX_CANARY_TIMEOUT_SECONDS": raw}
+            ):
+                self.assertEqual(module._timeout_seconds(), module.DEFAULT_TIMEOUT_SECONDS)
+
+    def test_clean_nonready_with_changed_state_is_indeterminate(self):
+        module = self.load_controller_module()
+        future = int(time.time()) + 3600
+        original = {
+            "active": None,
+            "cooldowns": {"jovie": future, "meetjovie": future + 1},
+            "last_error": {},
+        }
+        self.state.write_text(json.dumps(original))
+
+        def concurrent_recovery(*_args, **_kwargs):
+            changed = json.loads(self.state.read_text())
+            changed["cooldowns"]["jovie"] = int(time.time())
+            self.state.write_text(json.dumps(changed))
+            return subprocess.CompletedProcess([], 75, b"", b"")
+
+        with (
+            mock.patch.dict(os.environ, {"GEM_CODEX_ACCOUNT_PROBE_BIN": "/usr/bin/true"}),
+            mock.patch.object(module, "_state_path", return_value=self.state),
+            mock.patch.object(module, "_captured_process_group", side_effect=concurrent_recovery),
+        ):
+            self.assertEqual(
+                module.codex_canary_ready(),
+                (False, "cooldown_state_changed"),
+            )
+
+    def test_concurrent_state_corruption_or_deletion_fails_closed(self):
+        module = self.load_controller_module()
+        future = int(time.time()) + 3600
+        original = {
+            "active": None,
+            "cooldowns": {"jovie": future, "meetjovie": future + 1},
+            "last_error": {},
+        }
+        ready = subprocess.CompletedProcess([], 0, b"RECOVERED jovie\n", b"")
+        for mutation in (
+            "malformed",
+            "deleted",
+            "invalid-cooldowns",
+            "invalid-errors",
+        ):
+            with self.subTest(mutation=mutation):
+                self.state.write_text(json.dumps(original))
+
+                def mutate_state(*_args, **_kwargs):
+                    if mutation == "malformed":
+                        self.state.write_text("{not-json\n")
+                    elif mutation == "deleted":
+                        self.state.unlink()
+                    elif mutation == "invalid-cooldowns":
+                        self.state.write_text(json.dumps({
+                            **original,
+                            "cooldowns": [],
+                        }))
+                    else:
+                        self.state.write_text(json.dumps({
+                            **original,
+                            "last_error": [],
+                        }))
+                    return ready
+
+                with (
+                    mock.patch.dict(os.environ, {"GEM_CODEX_ACCOUNT_PROBE_BIN": "/usr/bin/true"}),
+                    mock.patch.object(module, "_state_path", return_value=self.state),
+                    mock.patch.object(module, "_captured_process_group", side_effect=mutate_state),
+                ):
+                    self.assertEqual(
+                        module.codex_canary_ready(),
+                        (False, "cooldown_refresh_indeterminate"),
+                    )
+
+    def test_failed_reset_probe_preserves_all_cooldowns(self):
+        module = self.load_controller_module()
+        future = int(time.time()) + 3600
+        original = {
+            "active": None,
+            "cooldowns": {"jovie": future, "meetjovie": future + 1},
+            "last_error": {},
+        }
+        self.state.write_text(json.dumps(original))
+        limited = subprocess.CompletedProcess([], 75, b"", b"")
+        with (
+            mock.patch.dict(os.environ, {"GEM_CODEX_ACCOUNT_PROBE_BIN": "/usr/bin/true"}),
+            mock.patch.object(module, "_state_path", return_value=self.state),
+            mock.patch.object(module, "_captured_process_group", return_value=limited),
+        ):
+            self.assertEqual(module.codex_canary_ready(), (False, "all_accounts_cooldown"))
+        self.assertEqual(json.loads(self.state.read_text()), original)
+
+    def test_missing_reset_probe_executable_preserves_all_cooldowns(self):
+        module = self.load_controller_module()
+        future = int(time.time()) + 3600
+        original = {
+            "active": None,
+            "cooldowns": {"jovie": future, "meetjovie": future + 1},
+            "last_error": {},
+        }
+        self.state.write_text(json.dumps(original))
+        with (
+            mock.patch.dict(
+                os.environ,
+                {"GEM_CODEX_ACCOUNT_PROBE_BIN": str(self.root / "missing")},
+            ),
+            mock.patch.object(module, "_state_path", return_value=self.state),
+        ):
+            self.assertEqual(
+                module.codex_canary_ready(),
+                (False, "cooldown_refresh_indeterminate"),
+            )
+        self.assertEqual(json.loads(self.state.read_text()), original)
+
+    def test_reset_probe_timeout_preserves_all_cooldowns(self):
+        module = self.load_controller_module()
+        future = int(time.time()) + 3600
+        original = {
+            "active": None,
+            "cooldowns": {"jovie": future, "meetjovie": future + 1},
+            "last_error": {},
+        }
+        self.state.write_text(json.dumps(original))
+        with (
+            mock.patch.dict(os.environ, {"GEM_CODEX_ACCOUNT_PROBE_BIN": "/usr/bin/true"}),
+            mock.patch.object(module, "_state_path", return_value=self.state),
+            mock.patch.object(
+                module,
+                "_captured_process_group",
+                return_value=None,
+            ),
+        ):
+            self.assertEqual(
+                module.codex_canary_ready(),
+                (False, "cooldown_refresh_indeterminate"),
+            )
+        self.assertEqual(json.loads(self.state.read_text()), original)
+
+    def test_malformed_account_auth_fails_closed_before_reset_probe(self):
+        module = self.load_controller_module()
+        future = int(time.time()) + 3600
+        self.state.write_text(json.dumps({
+            "active": None,
+            "cooldowns": {"jovie": future, "meetjovie": future + 1},
+            "last_error": {},
+        }))
+        (self.root / "jovie" / "auth.json").write_text("not-json\n")
+        with (
+            mock.patch.object(module, "_state_path", return_value=self.state),
+            mock.patch.object(module.subprocess, "run") as run,
+        ):
+            self.assertEqual(module.codex_canary_ready(), (False, "unknown_accounts"))
+        run.assert_not_called()
+
+    def test_non_object_account_auth_fails_closed_before_reset_probe(self):
+        module = self.load_controller_module()
+        future = int(time.time()) + 3600
+        self.state.write_text(json.dumps({
+            "active": None,
+            "cooldowns": {"jovie": future, "meetjovie": future + 1},
+            "last_error": {},
+        }))
+        for malformed in ([], None, "chatgpt", 1):
+            with self.subTest(malformed=malformed):
+                (self.root / "jovie" / "auth.json").write_text(json.dumps(malformed))
+                with (
+                    mock.patch.object(module, "_state_path", return_value=self.state),
+                    mock.patch.object(module.subprocess, "run") as run,
+                ):
+                    self.assertEqual(module.codex_canary_ready(), (False, "unknown_accounts"))
+                run.assert_not_called()
+
+    def test_zero_chatgpt_inventory_never_falls_through_to_rotate(self):
+        module = self.load_controller_module()
+        for account in ("jovie", "meetjovie"):
+            (self.root / account / "auth.json").write_text('{"auth_mode":"api"}\n')
+        with (
+            mock.patch.object(module, "_state_path", return_value=self.state),
+            mock.patch.object(module, "_captured") as captured,
+        ):
+            self.assertEqual(module.codex_canary_ready(), (False, "no_chatgpt_accounts"))
+        captured.assert_not_called()
+
+    def test_incomplete_chatgpt_inventory_never_falls_through_to_rotate(self):
+        module = self.load_controller_module()
+        for account in ("jovie", "meetjovie"):
+            (self.root / account / "config.toml").unlink()
+        with (
+            mock.patch.object(module, "_state_path", return_value=self.state),
+            mock.patch.object(module, "_captured") as captured,
+        ):
+            self.assertEqual(module.codex_canary_ready(), (False, "no_chatgpt_accounts"))
+        captured.assert_not_called()
 
     def test_probe_ambiguity_fails_closed(self):
         canary = self.command("codex-rotate", "sleep 1; echo GEM_MODEL_READY")
