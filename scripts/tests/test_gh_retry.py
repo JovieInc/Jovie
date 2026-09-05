@@ -2492,6 +2492,18 @@ JSON
         ),
         [
             ("trusted-reviewer", "MEMBER", False, False, "a" * 40, True, 0),
+            ("trusted-reviewer-revoked", "MEMBER", False, False, "a" * 40, False, 0),
+            ("trusted-reviewer-reapproved", "MEMBER", False, False, "a" * 40, True, 0),
+            (
+                "trusted-reviewer-comment-preserved",
+                "MEMBER",
+                False,
+                False,
+                "a" * 40,
+                True,
+                0,
+            ),
+            ("trusted-reviewer-dismissed", "MEMBER", False, False, "a" * 40, False, 0),
             ("jovie-bot[bot]", "NONE", False, False, "a" * 40, False, 0),
             ("itstimwhite", "OWNER", False, False, "a" * 40, False, 0),
             ("trusted-reviewer", "MEMBER", True, False, "a" * 40, False, 0),
@@ -2536,14 +2548,57 @@ JSON
             "deploymentsAllowed": False,
             "runtimeActivationAllowed": False,
         }
-        body = (
-            "<!-- jovie-controller-repair-attestation/v1 -->\n```json\n"
-            + json.dumps(attestation)
-            + "\n```"
-        )
-        encoded_body = base64.b64encode(body.encode()).decode()
+        def attestation_body(review_id: int) -> str:
+            candidate = {
+                **attestation,
+                "reviewId": f"github-review-{review_id}",
+            }
+            return (
+                "<!-- jovie-controller-repair-attestation/v1 -->\n```json\n"
+                + json.dumps(candidate)
+                + "\n```"
+            )
+
+        body = attestation_body(17219)
         encoded_receipt = base64.b64encode(
             json.dumps(_controller_repair_receipt()).encode()
+        ).decode()
+        review_records = [
+            {
+                "id": 17219,
+                "state": "APPROVED",
+                "commit_id": head,
+                "submitted_at": "2026-09-05T09:00:00Z",
+                "author_association": association,
+                "user": {"login": reviewer},
+                "body": body,
+            }
+        ]
+        review_transitions = {
+            "trusted-reviewer-revoked": ("CHANGES_REQUESTED",),
+            "trusted-reviewer-reapproved": ("CHANGES_REQUESTED", "APPROVED"),
+            "trusted-reviewer-comment-preserved": ("COMMENTED", "PENDING"),
+            "trusted-reviewer-dismissed": ("DISMISSED",),
+        }.get(reviewer, ())
+        for offset, state in enumerate(review_transitions, start=1):
+            review_id = 17219 + offset
+            review_records.append(
+                {
+                    "id": review_id,
+                    "state": state,
+                    "commit_id": head,
+                    "submitted_at": f"2026-09-05T09:{offset:02d}:00Z",
+                    "author_association": association,
+                    "user": {"login": reviewer},
+                    "body": (
+                        attestation_body(review_id)
+                        if state == "APPROVED"
+                        else f"{state} follow-up review."
+                    ),
+                }
+            )
+        encoded_reviews = base64.b64encode(
+            json.dumps([review_records]).encode()
         ).decode()
         main_ref_response = f"echo '{live_main_sha}'; exit 0" if live_main_sha else "exit 1"
         fake_gh = tmp_path / "gh"
@@ -2565,8 +2620,7 @@ JSON
                   exit 0
                 fi
                 if [[ "$1" == "api" && "$2" == *"/pulls/904/reviews" ]]; then
-                  body=$(printf '%s' '{encoded_body}' | base64 --decode)
-                  jq -nc --arg reviewer '{reviewer}' --arg association '{association}' --arg body "$body" --arg commit '{head}' '[[{{id:17219,state:"APPROVED",commit_id:$commit,author_association:$association,user:{{login:$reviewer}},body:$body}}]]'
+                  printf '%s' '{encoded_reviews}' | base64 --decode
                   exit 0
                 fi
                 if [[ "$1" == "api" && "$2" == *"/pulls/904" ]]; then
@@ -2612,7 +2666,12 @@ JSON
         assert "would +merge-queue on #905" not in result.stdout
         assert "would -merge-queue on #905" in result.stdout
         assert "=== RECOVER (bounded exact-head native admission) ===" not in result.stdout
-        if reviewer in {"jovie-bot[bot]", "itstimwhite"}:
+        if reviewer in {
+            "jovie-bot[bot]",
+            "itstimwhite",
+            "trusted-reviewer-revoked",
+            "trusted-reviewer-dismissed",
+        }:
             assert (
                 "authenticated exact-scope controller repair approval is absent or stale"
                 in result.stdout

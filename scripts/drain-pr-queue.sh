@@ -493,6 +493,12 @@ controller_repair_review_for_pr() {  # <pr> <head>
   jq -c --arg marker "$CONTROLLER_REPAIR_ATTESTATION_MARKER" \
     --arg author "$author" --arg head "$head" '
     [ .[][]?
+      | select(.state | IN("APPROVED", "CHANGES_REQUESTED", "DISMISSED"))
+    ]
+    | group_by(.user.login)
+    | map(sort_by(.submitted_at // "", .id) | last)
+    | sort_by(.submitted_at // "", .id)
+    | [ .[]
       | select(.state == "APPROVED")
       | select(((.commit_id // "") | ascii_downcase) == $head)
       | select(.author_association | IN("OWNER", "MEMBER", "COLLABORATOR"))
