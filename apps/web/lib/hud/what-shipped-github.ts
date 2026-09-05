@@ -9,6 +9,10 @@ import {
   type WhatShippedItem,
   type WhatShippedResponse,
 } from '@/lib/hud/what-shipped';
+import {
+  WHAT_SHIPPED_FEED_CACHE_TTL_SECONDS,
+  WHAT_SHIPPED_MAX_ITEMS,
+} from '@/lib/hud/what-shipped-policy';
 import { getRedis } from '@/lib/redis';
 import { logger } from '@/lib/utils/logger';
 
@@ -23,9 +27,7 @@ import { logger } from '@/lib/utils/logger';
  */
 
 const MERGED_WINDOW_MS = 24 * 60 * 60 * 1000;
-const MAX_ITEMS = 10;
 const FEED_CACHE_KEY = 'hud:what-shipped:github-feed:v1';
-const FEED_CACHE_TTL_SECONDS = 60;
 
 interface GitHubPullSummary {
   readonly number: number;
@@ -66,7 +68,9 @@ async function writeCachedFeed(feed: WhatShippedResponse): Promise<void> {
   if (!redis) return;
 
   try {
-    await redis.set(FEED_CACHE_KEY, feed, { ex: FEED_CACHE_TTL_SECONDS });
+    await redis.set(FEED_CACHE_KEY, feed, {
+      ex: WHAT_SHIPPED_FEED_CACHE_TTL_SECONDS,
+    });
   } catch (error) {
     logger.error('[hud/what-shipped-github] Redis write failed', error);
   }
@@ -114,7 +118,7 @@ async function fetchRecentlyMergedPulls(
     .sort(
       (a, b) => Date.parse(b.merged_at ?? '') - Date.parse(a.merged_at ?? '')
     )
-    .slice(0, MAX_ITEMS);
+    .slice(0, WHAT_SHIPPED_MAX_ITEMS);
 }
 
 /**
