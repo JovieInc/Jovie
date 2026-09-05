@@ -95,9 +95,6 @@ def _closure_run_args(tmp):
 def _bounded_repair_fixture(tmp, helper, *, lifetime_seconds=600):
     root = pathlib.Path(tmp)
     manifest_path = root / "repair-admission.json"
-    workspace_root = root / "workspaces"
-    issue_workspace = workspace_root / "JOV-9999"
-    issue_workspace.mkdir(parents=True)
     source = root / "source"
     source.mkdir()
     subprocess.run(["git", "init", "-q", str(source)], check=True)
@@ -110,6 +107,9 @@ def _bounded_repair_fixture(tmp, helper, *, lifetime_seconds=600):
         ["git", "-C", str(source), "rev-parse", "HEAD"],
         capture_output=True, text=True, check=True,
     ).stdout.strip()
+    workspace_root = root / f"workspace-JOV-9999-{commit[:12]}"
+    workspace_root.mkdir()
+    issue_workspace = workspace_root / "JOV-9999"
     label = "symphony-recovery-jov-9999-test"
     workflow = root / "WORKFLOW.repair.md"
     workflow.write_text(
@@ -156,6 +156,7 @@ def _bounded_repair_fixture(tmp, helper, *, lifetime_seconds=600):
         "test -z \"${GH_TOKEN+x}\"\n"
         "test -z \"${AWS_SECRET_ACCESS_KEY+x}\"\n"
         "test -z \"${UNRELATED_RECOVERY_SECRET+x}\"\n"
+        f"mkdir -p {issue_workspace}\n"
         f"cd {issue_workspace}\n"
         f"exec {HELPER_PATH} recovery-agent --manifest {manifest_path} "
         "--issue-identifier JOV-9999 "
@@ -1484,7 +1485,7 @@ while True: time.sleep(1)
                 "UNRELATED_RECOVERY_SECRET": "must-not-reach-agent",
             },
         ):
-            gate, _fleet, manifest_path, _manifest, command = _bounded_repair_fixture(
+            gate, _fleet, manifest_path, manifest, command = _bounded_repair_fixture(
                 tmp, helper
             )
             canonical_bytes = gate.read_bytes()
@@ -1516,7 +1517,12 @@ while True: time.sleep(1)
                 claim["issueId"], "12345678-1234-1234-1234-123456789abc"
             )
             self.assertEqual(
-                claim["workspace"], str(pathlib.Path(tmp) / "workspaces/JOV-9999")
+                claim["workspace"],
+                str(
+                    manifest_path.parent
+                    / f"workspace-JOV-9999-{manifest['sourceCommit'][:12]}"
+                    / "JOV-9999"
+                ),
             )
             self.assertEqual(gate.read_bytes(), canonical_bytes)
 
@@ -1561,6 +1567,7 @@ while True: time.sleep(1)
                 "app-server",
             ]
             workspace = pathlib.Path(manifest["workspaceRoot"]) / "JOV-9999"
+            workspace.mkdir()
             processes = [
                 subprocess.Popen(
                     agent_command,
@@ -1766,6 +1773,78 @@ while True: time.sleep(1)
                     fleet_path=gate,
                     fleet_payload=fleet,
                 )
+
+    def test_bounded_repair_rejects_shared_or_nonempty_root_before_scheduler(self):
+        helper = _load_helper()
+        for variant, expected_reason in {
+            "nonempty": "recovery-workspace-root-not-empty",
+            "shared": "recovery-workspace-root-not-packet-local",
+        }.items():
+            with self.subTest(variant=variant), tempfile.TemporaryDirectory() as tmp, mock.patch.dict(
+                os.environ, {"CODEX_HOME": "/tmp/codex-fourth"}
+            ):
+                gate, _fleet, manifest_path, manifest, command = _bounded_repair_fixture(
+                    tmp, helper
+                )
+                original_root = pathlib.Path(manifest["workspaceRoot"])
+                if variant == "nonempty":
+                    (original_root / "unrelated-workspace").mkdir()
+                    expected_workspace = original_root / "JOV-9999"
+                else:
+                    shared_root = pathlib.Path(tmp) / "symphony-elixir-workspaces"
+                    shared_root.mkdir()
+                    expected_workspace = shared_root / "JOV-9999"
+                    workflow = pathlib.Path(manifest["artifacts"]["workflow"]["path"])
+                    workflow.write_text(
+                        workflow.read_text(encoding="utf-8").replace(
+                            str(original_root), str(shared_root)
+                        ),
+                        encoding="utf-8",
+                    )
+                    binary = pathlib.Path(manifest["artifacts"]["binary"]["path"])
+                    binary.write_text(
+                        binary.read_text(encoding="utf-8").replace(
+                            str(original_root), str(shared_root)
+                        ),
+                        encoding="utf-8",
+                    )
+                    binary.chmod(0o700)
+                    manifest["workspaceRoot"] = str(shared_root)
+                    for name in ("workflow", "binary"):
+                        path = pathlib.Path(manifest["artifacts"][name]["path"])
+                        manifest["artifacts"][name]["sha256"] = hashlib.sha256(
+                            path.read_bytes()
+                        ).hexdigest()
+                manifest_path.write_text(json.dumps(manifest), encoding="utf-8")
+                manifest_path.chmod(0o600)
+                result = subprocess.run(
+                    [
+                        sys.executable,
+                        str(HELPER_PATH),
+                        "run",
+                        "--gate-file",
+                        str(pathlib.Path(tmp) / "rate.json"),
+                        "--closure-gate-file",
+                        str(gate),
+                        "--closure-hold-receipt",
+                        str(pathlib.Path(tmp) / "hold.json"),
+                        "--dead-letter-dir",
+                        str(pathlib.Path(tmp) / "dead"),
+                        "--recovery-manifest",
+                        str(manifest_path),
+                        "--max-gate-sleep-seconds",
+                        "0",
+                        "--",
+                        *command,
+                    ],
+                    cwd=ROOT,
+                    capture_output=True,
+                    text=True,
+                )
+                self.assertEqual(result.returncode, helper.CLOSURE_HOLD_EXIT_CODE)
+                self.assertIn(expected_reason, result.stdout)
+                self.assertFalse(expected_workspace.exists())
+                self.assertFalse(pathlib.Path(manifest["claimPath"]).exists())
 
     @unittest.skipUnless(sys.platform.startswith("linux"), "Linux subreaper proof")
     def test_bounded_repair_expiry_terminates_root_and_detached_descendant(self):
