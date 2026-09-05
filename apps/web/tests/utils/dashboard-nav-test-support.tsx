@@ -12,9 +12,11 @@ import { AppFlagProvider } from '@/lib/flags/client';
 import { APP_FLAG_DEFAULTS, type AppFlagSnapshot } from '@/lib/flags/contracts';
 
 export const mockUsePathname = vi.fn<() => string>(() => APP_ROUTES.CHAT);
-export const mockUseChatConversationsQuery = vi.fn(() => ({
-  data: undefined,
-}));
+export const mockUseChatConversationsQuery = vi.fn(
+  (_options?: { readonly limit?: number; readonly enabled?: boolean }) => ({
+    data: undefined,
+  })
+);
 export const mockToastInfo = vi.fn();
 export const mockShowPendingShell = vi.fn();
 export const mockClearPendingShell = vi.fn();
