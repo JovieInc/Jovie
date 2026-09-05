@@ -116,7 +116,11 @@ export function ShippingStatistics() {
               <tr>
                 {['Stage', 'Count', 'Source', 'State', 'Source timestamp'].map(
                   label => (
-                    <th key={label} scope='col' className='p-2'>
+                    <th
+                      key={label}
+                      scope='col'
+                      className='p-2 whitespace-nowrap'
+                    >
                       {label}
                     </th>
                   )
@@ -126,7 +130,7 @@ export function ShippingStatistics() {
             <tbody>
               {rows.map(row => (
                 <tr key={row.label} className='border-t border-subtle'>
-                  <th scope='row' className='p-2 font-medium'>
+                  <th scope='row' className='p-2 font-medium whitespace-nowrap'>
                     {row.label}
                   </th>
                   <td className='p-2'>
