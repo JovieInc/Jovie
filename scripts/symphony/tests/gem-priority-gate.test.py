@@ -1401,8 +1401,7 @@ class DeploymentBindingTests(unittest.TestCase):
         receipt = MODULE.evaluate(signals, MODULE.isoformat(now))
         self.assertEqual(receipt["promotionMode"], "hold-intake")
 
-    def test_failed_controller_observation_preserves_qualified_source_admission(self):
-        now = MODULE.datetime(2026, 8, 19, 22, 40, tzinfo=MODULE.UTC)
+    def test_failed_controller_observation_preserves_qualified_source_admission(self):        now = MODULE.datetime(2026, 8, 19, 22, 40, tzinfo=MODULE.UTC)
         signals = dict(GREEN_SIGNALS)
         signals["production"] = {"status": "green", "deployedSha": "b" * 40}
         signals["independentReview"] = {
@@ -1415,8 +1414,7 @@ class DeploymentBindingTests(unittest.TestCase):
         }
         receipt = MODULE.evaluate(signals, MODULE.isoformat(now))
         self.assertEqual(receipt["promotionMode"], "hold-intake")
-        self.assertFalse(receipt["controllerRepairAdmission"]["allowed"])
-        self.assertFalse(receipt["promotionAdmission"]["allowed"])
+        self.assertFalse(receipt["controllerRepairAdmission"]["allowed"])        self.assertFalse(receipt["promotionAdmission"]["allowed"])
         self.assertTrue(receipt["alreadyAdmittedCohort"]["preserve"])
         self.assertFalse(receipt["alreadyAdmittedCohort"]["newIntakeAllowed"])
         self.assertTrue(receipt_satisfies_autoenroll(receipt))
@@ -1435,8 +1433,7 @@ class DeploymentBindingTests(unittest.TestCase):
                     "no-merge-progress-over-1h",
                     "queue-controller-red-over-10m",
                 ],
-            ),
-        ):
+            ),        ):
             with self.subTest(status=status):
                 signals = dict(GREEN_SIGNALS)
                 signals["independentReview"] = {
@@ -1455,8 +1452,7 @@ class DeploymentBindingTests(unittest.TestCase):
                 self.assertFalse(receipt["controllerRepairAdmission"]["allowed"])
                 self.assertFalse(receipt["closureAdmission"]["newIssueIntakeAllowed"])
 
-    def test_unknown_closure_observation_blocks_controller_repair(self):
-        now = MODULE.datetime(2026, 8, 19, 22, 40, tzinfo=MODULE.UTC)
+    def test_unknown_closure_observation_blocks_controller_repair(self):        now = MODULE.datetime(2026, 8, 19, 22, 40, tzinfo=MODULE.UTC)
         signals = dict(GREEN_SIGNALS)
         signals["independentReview"] = {
             **GREEN_SIGNALS["independentReview"],
@@ -1491,8 +1487,7 @@ class DeploymentBindingTests(unittest.TestCase):
             ],
         }
         receipt = MODULE.evaluate(signals, MODULE.isoformat(now))
-        self.assertEqual(receipt["promotionMode"], "hold-intake")
-        self.assertFalse(receipt["controllerRepairAdmission"]["allowed"])
+        self.assertEqual(receipt["promotionMode"], "hold-intake")        self.assertFalse(receipt["controllerRepairAdmission"]["allowed"])
 
     def test_queue_observation_does_not_reuse_stale_or_auth_last_known(self):
         timeout = subprocess.CalledProcessError(
@@ -1853,7 +1848,7 @@ class DeploymentBindingTests(unittest.TestCase):
                 "condition": None,
                 "mainSha": None,
                 "deployedSha": None,
-                "scope": "trusted-comment-exact-repository-pr-head-main-path-set",
+                "scope": "github-approved-exact-repository-pr-head-main-path-set",
                 "maxConcurrent": 0,
                 "deploymentsAllowed": False,
                 "runtimeActivationAllowed": False,

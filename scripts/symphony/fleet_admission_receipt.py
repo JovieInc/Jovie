@@ -282,7 +282,7 @@ def _project_controller_repair(value: object, promotion_mode: str) -> dict[str, 
             raise AdmissionProjectionError("controller repair authority contradicts promotionMode")
         if projected["condition"] != "controller-failure":
             raise AdmissionProjectionError("allowed controller repair condition is invalid")
-        if projected["scope"] != "trusted-comment-exact-repository-pr-head-main-path-set":
+        if projected["scope"] != "github-approved-exact-repository-pr-head-main-path-set":
             raise AdmissionProjectionError("allowed controller repair scope is invalid")
         if projected["maxConcurrent"] != 1:
             raise AdmissionProjectionError("allowed controller repair must have maxConcurrent 1")
@@ -294,7 +294,7 @@ def _project_controller_repair(value: object, promotion_mode: str) -> dict[str, 
         raise AdmissionProjectionError("controller-repair-only requires allowed repair authority")
     elif projected["scope"] not in {
         None,
-        "trusted-comment-exact-repository-pr-head-main-path-set",
+        "github-approved-exact-repository-pr-head-main-path-set",
     }:
         raise AdmissionProjectionError("denied controller repair scope is invalid")
     elif any(
@@ -431,7 +431,6 @@ def _validate_controller_repair_projection(projected: dict[str, Any]) -> None:
     )
     if not closure_allowed:
         raise AdmissionProjectionError("controller repair closure evidence is unsafe")
-
 
 def _project_closure_admission(value: object) -> dict[str, Any]:
     admission = _require_mapping(value, "closureAdmission")
