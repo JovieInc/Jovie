@@ -55,7 +55,10 @@ describe('Summer production OIDC transport', () => {
         method: 'POST',
         redirect: 'error',
         retry: { maxRetries: 0, baseDelayMs: 0 },
-        headers: expect.objectContaining({ authorization: 'Bearer test-oidc' }),
+        headers: expect.objectContaining({
+          authorization: 'Bearer test-oidc',
+          'x-vercel-trusted-oidc-idp-token': 'test-oidc',
+        }),
       })
     );
   });

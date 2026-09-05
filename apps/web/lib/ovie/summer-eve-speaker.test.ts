@@ -276,6 +276,25 @@ describe('Ovie speaks through durable Eve Summer', () => {
     });
     expect(fetchShadow).toHaveBeenCalledTimes(2);
   });
+  it('renders an explicit pending receipt when the exact Eve marker is not visible yet', async () => {
+    fetchShadow
+      .mockReset()
+      .mockResolvedValueOnce(
+        eveResponse({ code: 'dispatch_unknown' }, { status: 503 })
+      )
+      .mockResolvedValueOnce(
+        eveResponse({ code: 'turn_pending', eventId }, { status: 503 })
+      );
+    expect(await collect()).toEqual([
+      {
+        type: 'notice',
+        text: 'Summer is still reconciling this turn. Your message will not be sent again; reopen this conversation to check for the exact Eve result.',
+        code: 'summer_turn_pending',
+      },
+      { type: 'error', state: 'unknown' },
+    ]);
+    expect(fetchShadow).toHaveBeenCalledTimes(2);
+  });
   it('imports prior Mac history once without forking or discarding turns', async () => {
     const store = new MemoryOperatingStore();
     const session = await openCurrentSummerSession(store);

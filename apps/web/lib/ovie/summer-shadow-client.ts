@@ -24,6 +24,7 @@ export async function fetchSummerShadow(
     headers: {
       ...init.headers,
       authorization: `Bearer ${token}`,
+      'x-vercel-trusted-oidc-idp-token': token,
       'content-type': 'application/json',
     },
     redirect: 'error',

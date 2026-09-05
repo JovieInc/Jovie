@@ -32,6 +32,8 @@ const prefix = '/ovie/v1/summer-shadow/conversation/events';
 const MAX_RESPONSE_BYTES = 128 * 1024;
 const MAX_MIGRATION_HISTORY_BYTES = 20 * 1024;
 const MAX_MIGRATION_HISTORY_ENTRIES = 200;
+const PENDING_RECOVERY_TEXT =
+  'Summer is still reconciling this turn. Your message will not be sent again; reopen this conversation to check for the exact Eve result.';
 
 function assertExpectedEveDeployment(response: Response): void {
   const expected = env.OVIE_SUMMER_EVE_EXPECTED_DEPLOYMENT_ID?.trim();
@@ -163,6 +165,16 @@ export function createEveSummerSpeaker(
         assertExpectedEveDeployment(terminalResponse);
         const terminal = await body(terminalResponse);
         if (!terminalResponse.ok) {
+          if (
+            terminal.code === 'turn_pending' ||
+            terminal.code === 'accepted_turn_unavailable'
+          ) {
+            yield {
+              type: 'notice',
+              text: PENDING_RECOVERY_TEXT,
+              code: 'summer_turn_pending',
+            };
+          }
           yield { type: 'error', state: 'unknown' };
           return;
         }
