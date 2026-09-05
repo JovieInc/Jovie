@@ -184,9 +184,14 @@ class PromotionTests(unittest.TestCase):
         self.assertEqual(self.run_helper()[0], 0)
         (self.source / "cursor-appserver-adapter.py").write_text("invalid Python syntax !")
         self.assertEqual(self.run_helper()[0], 10)
+        (self.source / "symphony-agent-router").unlink()
+        current = (self.store / "current").resolve()
+        status, output = self.run_helper(rollback=1, dry=1)
+        self.assertEqual(status, 0, output)
+        self.assertIn("PROVIDER_ROLLBACK_DRY_RUN", output)
+        self.assertEqual((self.store / "current").resolve(), current)
         self.assertEqual(self.run_helper(rollback=1)[0], 0)
         self.assertEqual(self.launch("symphony-codex-entry"), "old:old\nold\nold")
-        (self.source / "symphony-agent-router").unlink()
         self.assertEqual(self.run_helper()[0], 10)
 
     def test_updater_provider_mode_avoids_tracker_and_service_actions(self):

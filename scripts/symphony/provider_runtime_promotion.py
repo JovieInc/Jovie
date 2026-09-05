@@ -80,7 +80,11 @@ try:
             else:
                 subprocess.run(["bash", "-n", str(source)], check=True)
     if dry_run:
-        print("PROVIDER_DRY_RUN " + json.dumps({name: digest(path) for name, path in sources.items()}, sort_keys=True))
+        if rollback:
+            target = (root / "previous").resolve(strict=True)
+            print("PROVIDER_ROLLBACK_DRY_RUN " + json.dumps(verify(target), sort_keys=True))
+        else:
+            print("PROVIDER_DRY_RUN " + json.dumps({name: digest(path) for name, path in sources.items()}, sort_keys=True))
         raise SystemExit(0)
     root.mkdir(parents=True, exist_ok=True, mode=0o700)
     with (root / "promotion.lock").open("a+") as lock:
