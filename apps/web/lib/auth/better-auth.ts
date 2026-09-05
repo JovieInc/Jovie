@@ -33,6 +33,7 @@ import { captureError } from '@/lib/error-tracking';
 import { logger } from '@/lib/utils/logger';
 import { generateAppleClientSecret } from './apple-client-secret';
 import { oauthProviderErrorReturn } from './oauth-provider-error-return';
+import { resolveOvieWebOrigin } from './ovie-web-origin';
 import { provisionAppUser } from './provision';
 import {
   AUTH_RATE_LIMIT_RULES,
@@ -87,7 +88,14 @@ export function resolveTrustedOrigins(): string[] {
   const vercelOrigins = [env.VERCEL_URL, env.VERCEL_BRANCH_URL]
     .map(originFromVercelHost)
     .filter((origin): origin is string => Boolean(origin));
-  return [...new Set([...STATIC_TRUSTED_ORIGINS, ...vercelOrigins])];
+  const ovieOrigin = resolveOvieWebOrigin(env.OVIE_WEB_ORIGIN, env);
+  return [
+    ...new Set([
+      ...STATIC_TRUSTED_ORIGINS,
+      ...vercelOrigins,
+      ...(ovieOrigin ? [ovieOrigin.origin] : []),
+    ]),
+  ];
 }
 
 /**
@@ -170,6 +178,7 @@ function resolveLoopbackHostPatterns(): string[] {
 
 function resolveBaseUrl(): NonNullable<BetterAuthOptions['baseURL']> {
   const localBetterAuthUrl = resolveLocalBetterAuthUrl();
+  const ovieOrigin = resolveOvieWebOrigin(env.OVIE_WEB_ORIGIN, env);
 
   return {
     allowedHosts: [
@@ -184,6 +193,7 @@ function resolveBaseUrl(): NonNullable<BetterAuthOptions['baseURL']> {
           ...resolveLoopbackHostPatterns(),
           env.VERCEL_URL,
           env.VERCEL_BRANCH_URL,
+          ovieOrigin?.host,
         ].filter((host): host is string => Boolean(host))
       ),
     ],
