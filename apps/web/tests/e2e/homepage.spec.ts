@@ -146,10 +146,16 @@ test.describe('Homepage', () => {
           const fieldStyle = getComputedStyle(field);
           const auraStyle = getComputedStyle(aura);
           const auraPaint = getComputedStyle(aura, '::before');
+          const auraBounds = aura.getBoundingClientRect();
           const submitTarget = getComputedStyle(submit, '::before');
 
           return {
             auraBackgroundImage: auraPaint.backgroundImage,
+            auraPaintSide: Math.min(
+              Number.parseFloat(auraPaint.width),
+              Number.parseFloat(auraPaint.height)
+            ),
+            auraRequiredSide: Math.hypot(auraBounds.width, auraBounds.height),
             auraMaskComposite: auraStyle.maskComposite,
             auraTransitionDuration: auraStyle.transitionDuration,
             fieldBackgroundColor: fieldStyle.backgroundColor,
@@ -191,6 +197,9 @@ test.describe('Homepage', () => {
         expect(material?.fieldOutlineWidth).not.toBe('0px');
         expect(material?.fieldOutlineColor).not.toBe('rgba(0, 0, 0, 0)');
         expect(material?.fieldHeight).toBeCloseTo(56, 0);
+        expect(material?.auraPaintSide).toBeGreaterThanOrEqual(
+          material?.auraRequiredSide ?? Number.POSITIVE_INFINITY
+        );
         expect(material?.submitHeight).toBeCloseTo(28, 0);
         expect(material?.fieldPaddingRight).toBe('13px');
         expect(material?.fieldBorderRightWidth).toBe('1px');
@@ -635,11 +644,17 @@ test.describe('Homepage', () => {
     await expect(
       close.getByRole('heading', { name: 'Take control of your presence.' })
     ).toBeVisible();
+    await expect(close.getByText('Start with your name.')).toHaveCount(0);
+    await expect(close.getByTestId('homepage-close-mark')).toHaveCount(0);
     if (FEATURE_FLAGS.WAITLIST_ENABLED) {
       await expect(
         close.getByRole('link', { name: 'Request access' })
       ).toHaveAttribute('href', PUBLIC_WAITLIST_URL);
     } else {
+      await expect(close.getByPlaceholder('Search your name')).toBeVisible();
+      await expect(
+        close.getByRole('button', { name: 'Find me', exact: true })
+      ).toBeEnabled();
       await close.getByRole('button', { name: 'Find your profile' }).click();
       await expect(page.getByPlaceholder('Search your name')).toBeFocused();
     }
