@@ -340,4 +340,32 @@ describe('Symphony launcher closed loop', () => {
       rmSync(env.root, { recursive: true, force: true });
     }
   });
+
+  it('backs off without a terminal block when authenticated accounts are cooling down', () => {
+    const env = fixture();
+    try {
+      const { issue } = issueWithReceipt('Add profile validation');
+      writeFileSync(
+        join(env.accounts, 'state.json'),
+        JSON.stringify({
+          active: null,
+          cooldowns: { acct1: Math.floor(Date.now() / 1000) + 3600 },
+        })
+      );
+      assert.throws(
+        () => runRouter(env, issue),
+        error => {
+          assert.equal(/** @type {any} */ (error).status, 75);
+          assert.match(
+            String(/** @type {any} */ (error).stderr),
+            /CAPACITY_UNAVAILABLE.*class=provider-capacity.*retryable=true/
+          );
+          return true;
+        }
+      );
+      assert.throws(() => readFileSync(env.rotateLog, 'utf8'));
+    } finally {
+      rmSync(env.root, { recursive: true, force: true });
+    }
+  });
 });
