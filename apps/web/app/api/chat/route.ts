@@ -161,7 +161,7 @@ import {
   assertOvieDoorDoesNotUseArtistJovieGeneration,
   OVIE_PROGRAM,
 } from '@/lib/ovie/program';
-import { bindCurrentSummerQueueSpeaker } from '@/lib/ovie/summer-queue-speaker';
+import { bindEveSummerSpeaker } from '@/lib/ovie/summer-eve-speaker';
 import { createSummerAssistantStreamResponse } from '@/lib/ovie/summer-stream';
 import {
   getBoundSummerSpeaker,
@@ -2491,7 +2491,7 @@ export async function POST(req: Request) {
   // before any model. OV door must not fall through to artist Jovie chat.
   const ovieStore = getOvieOperatingStore();
   if (chatMode === 'ov' && isSummerTransportEnabled()) {
-    bindCurrentSummerQueueSpeaker(ovieStore);
+    bindEveSummerSpeaker();
   }
   const {
     eveTurn,

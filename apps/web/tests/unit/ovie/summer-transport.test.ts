@@ -119,7 +119,7 @@ describe('Summer transport (JOV-5212)', () => {
         runtime: 'mac',
         async *speak() {},
       })
-    ).toThrow(/current Mac Summer/);
+    ).toThrow(/current Summer runtime/);
     expect(() => denyEveAction('summer-answer')).toThrow(EveAuthorityError);
   });
 

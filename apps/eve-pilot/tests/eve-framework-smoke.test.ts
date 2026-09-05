@@ -202,6 +202,22 @@ describe('Eve framework smoke', () => {
           'summer-shadow',
           'defineChannel',
           'POST',
+          '/ovie/v1/summer-shadow/conversation/events'
+        )
+      ).toBe(true);
+      expect(
+        hasChannel(
+          'summer-shadow',
+          'defineChannel',
+          'GET',
+          '/ovie/v1/summer-shadow/conversation/events/:eventId/result'
+        )
+      ).toBe(true);
+      expect(
+        hasChannel(
+          'summer-shadow',
+          'defineChannel',
+          'POST',
           '/ovie/v1/summer-shadow/events'
         )
       ).toBe(true);

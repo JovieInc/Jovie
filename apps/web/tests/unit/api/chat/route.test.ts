@@ -10,11 +10,10 @@ import {
 import type { ChatAccountContext } from '@/lib/chat/account-context';
 import { getEntitlements } from '@/lib/entitlements/registry';
 import { MemoryOperatingStore } from '@/lib/ovie/mcp/store';
+import { ovieSummerTurnId } from '@/lib/ovie/summer-conversation';
 import {
-  bindCurrentSummerSpeaker,
   disableSummerTransport,
   resetSummerTransportRuntime,
-  type SummerSpeaker,
 } from '@/lib/ovie/summer-transport';
 
 const hoisted = vi.hoisted(() => ({
@@ -30,6 +29,7 @@ const hoisted = vi.hoisted(() => ({
   persistTerminalAssistantMessageMock: vi.fn(),
   isAdminMock: vi.fn(),
   getOvieOperatingStoreMock: vi.fn(),
+  fetchSummerShadowMock: vi.fn(),
 }));
 
 vi.mock('@/app/api/chat/onboarding-handler', () => ({
@@ -44,6 +44,10 @@ vi.mock('@/lib/auth/cached', () => ({
 
 vi.mock('@/lib/admin/roles', () => ({
   isAdmin: hoisted.isAdminMock,
+}));
+
+vi.mock('@/lib/ovie/summer-shadow-client', () => ({
+  fetchSummerShadow: hoisted.fetchSummerShadowMock,
 }));
 
 vi.mock('@/lib/ovie/mcp/runtime-store', () => ({
@@ -490,6 +494,7 @@ describe('POST /api/chat guard wiring', () => {
     expect(response.status).toBe(403);
     const body = await response.json();
     expect(body.error).toBe('Admin role required for OV chat mode');
+    expect(hoisted.fetchSummerShadowMock).not.toHaveBeenCalled();
     expect(hoisted.executeChatTurnMock).not.toHaveBeenCalled();
     expect(hoisted.checkAiChatRateLimitForPlanMock).not.toHaveBeenCalled();
   });
@@ -527,14 +532,26 @@ describe('POST /api/chat guard wiring', () => {
 
   it('streams bound current Summer on OV turns without artist Jovie generation', async () => {
     hoisted.isAdminMock.mockResolvedValue(true);
-    const speaker: SummerSpeaker = {
-      id: 'summer',
-      runtime: 'mac',
-      async *speak() {
-        yield { type: 'text-delta', text: 'Summer current session.' };
-      },
-    };
-    bindCurrentSummerSpeaker(speaker);
+    hoisted.fetchSummerShadowMock
+      .mockResolvedValueOnce(Response.json({ ok: true }, { status: 202 }))
+      .mockResolvedValueOnce(
+        Response.json({
+          ok: true,
+          result: {
+            eventId: ovieSummerTurnId({
+              conversationId: 'summer-session:current',
+              clientTurnId: 'ov-turn-1',
+            }),
+            conversationId: 'summer-session-current',
+            sessionId: 'ses_current',
+            turnId: 'turn_1',
+            responseText: 'Summer current session.',
+            status: 'completed',
+            nextStartIndex: 3,
+            model: 'zai/glm-5.3-flash',
+          },
+        })
+      );
 
     const response = await POST(
       chatRequest(
@@ -564,5 +581,6 @@ describe('POST /api/chat guard wiring', () => {
     expect(body.toLowerCase()).not.toMatch(/i am ovie/);
     expect(hoisted.executeChatTurnMock).not.toHaveBeenCalled();
     expect(hoisted.reserveChatTurnMock).not.toHaveBeenCalled();
+    expect(hoisted.fetchSummerShadowMock).toHaveBeenCalledTimes(2);
   });
 });

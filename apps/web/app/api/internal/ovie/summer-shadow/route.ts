@@ -2,12 +2,12 @@ import { getVercelOidcToken } from '@vercel/oidc';
 import { NextResponse } from 'next/server';
 import { z } from 'zod';
 import { verifyCronRequest } from '@/lib/cron/auth';
+import { EVE_SHADOW_ORIGIN } from '@/lib/ovie/summer-shadow-client';
 import { logger } from '@/lib/utils/logger';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
 
-const EVE_SHADOW_ORIGIN = 'https://jovie-eve-shadow-staging.vercel.app';
 const MAX_BODY_BYTES = 32 * 1024;
 const NO_STORE_HEADERS = { 'Cache-Control': 'no-store' } as const;
 
