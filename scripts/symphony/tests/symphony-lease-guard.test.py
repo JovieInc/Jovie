@@ -109,6 +109,12 @@ class ConcurrentCheckTests(unittest.TestCase):
         context = multiprocessing.get_context("fork")
         barrier = context.Barrier(2)
         with tempfile.TemporaryDirectory() as directory:
+            state_dir = pathlib.Path(directory)
+            state_dir.mkdir(parents=True, exist_ok=True)
+            (state_dir / "leases.json").write_text(
+                json.dumps(MODULE._empty_state()), encoding="utf-8"
+            )
+
             def worker(identifier):
                 def fetch(_identifier):
                     barrier.wait(timeout=5)
@@ -145,6 +151,11 @@ class CheckCommandTests(unittest.TestCase):
         )
         self.env.start()
         self.addCleanup(self.env.stop)
+        state_dir = pathlib.Path(self.tmp.name)
+        state_dir.mkdir(parents=True, exist_ok=True)
+        (state_dir / "leases.json").write_text(
+            json.dumps(MODULE._empty_state()), encoding="utf-8"
+        )
 
     def run_check(self, identifier: str, issue: dict | None) -> int:
         stderr = io.StringIO()
@@ -236,6 +247,35 @@ class CheckCommandTests(unittest.TestCase):
         state = self.load_state()
         self.assertEqual(state["counters"]["indeterminate"], 1)
         self.assertEqual(state["tombstones"], {})
+
+    def test_corrupt_ledger_requires_reconciliation(self):
+        state_file = pathlib.Path(self.tmp.name) / "leases.json"
+        state_file.write_text("{not-json\n", encoding="utf-8")
+        stderr = io.StringIO()
+        with (
+            mock.patch.object(MODULE, "_fetch_issue", return_value=make_issue("JOV-5031", "In Progress", 1000)),
+            mock.patch.object(MODULE, "_active_states", return_value=ACTIVE),
+            contextlib.redirect_stderr(stderr),
+            contextlib.redirect_stdout(io.StringIO()),
+        ):
+            rc = MODULE.check("JOV-5031")
+        self.assertEqual(rc, 2)
+        self.assertIn("LEASE_RECONCILE_REQUIRED", stderr.getvalue())
+        self.assertEqual(state_file.read_text(), "{not-json\n")
+
+    def test_missing_ledger_requires_reconciliation(self):
+        state_file = pathlib.Path(self.tmp.name) / "leases.json"
+        state_file.unlink()
+        stderr = io.StringIO()
+        with (
+            mock.patch.object(MODULE, "_fetch_issue", return_value=make_issue("JOV-5031", "In Progress", 1000)),
+            mock.patch.object(MODULE, "_active_states", return_value=ACTIVE),
+            contextlib.redirect_stderr(stderr),
+            contextlib.redirect_stdout(io.StringIO()),
+        ):
+            rc = MODULE.check("JOV-5031")
+        self.assertEqual(rc, 2)
+        self.assertIn("state-missing", stderr.getvalue())
 
     def test_check_rejects_malformed_identifier(self):
         with contextlib.redirect_stderr(io.StringIO()):
@@ -437,6 +477,7 @@ class ReportTests(unittest.TestCase):
                     "CODEX_ACCOUNTS_ROOT": str(pathlib.Path(tmp) / "no-accounts"),
                 },
             ):
+                self.assertEqual(MODULE.initialize(), 0)
                 stdout = io.StringIO()
                 with contextlib.redirect_stdout(stdout):
                     rc = MODULE.report()

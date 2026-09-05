@@ -38,9 +38,29 @@ lock_path.touch(mode=0o600, exist_ok=True)
 with lock_path.open("r+") as lock:
     fcntl.flock(lock, fcntl.LOCK_EX)
     try:
-        state = json.loads(state_path.read_text()) if state_path.exists() else {}
-    except (OSError, json.JSONDecodeError):
-        state = {}
+        state = json.loads(state_path.read_text()) if state_path.exists() else {
+            "schema": "symphony-provider-cooldowns/v1",
+            "providers": {},
+        }
+    except (OSError, json.JSONDecodeError) as exc:
+        print(
+            "CAPACITY_RECONCILE_REQUIRED "
+            "schema=symphony-provider-cooldowns/v1 reason=state-unreadable",
+            file=sys.stderr,
+        )
+        raise SystemExit(75) from exc
+    if (
+        not isinstance(state, dict)
+        or state.get("schema") not in (None, "symphony-provider-cooldowns/v1")
+        or not isinstance(state.get("providers"), dict)
+    ):
+        print(
+            "CAPACITY_RECONCILE_REQUIRED "
+            "schema=symphony-provider-cooldowns/v1 reason=state-schema-mismatch",
+            file=sys.stderr,
+        )
+        raise SystemExit(75)
+    state["schema"] = "symphony-provider-cooldowns/v1"
     providers = state.setdefault("providers", {})
     if action == "mark":
         now = datetime.datetime.now(datetime.timezone.utc)
@@ -54,6 +74,11 @@ with lock_path.open("r+") as lock:
     temporary.write_text(json.dumps(state, sort_keys=True) + "\n")
     temporary.chmod(0o600)
     os.replace(temporary, state_path)
+    directory_descriptor = os.open(state_path.parent, os.O_RDONLY | os.O_DIRECTORY)
+    try:
+        os.fsync(directory_descriptor)
+    finally:
+        os.close(directory_descriptor)
 PY
 }
 
@@ -74,11 +99,40 @@ lock_path.touch(mode=0o600, exist_ok=True)
 with lock_path.open("r+") as lock:
     fcntl.flock(lock, fcntl.LOCK_SH)
     try:
-        raw = json.loads(state_path.read_text()) if state_path.exists() else {}
-        value = raw.get("providers", {}).get(provider, {}).get("unavailableUntil")
-        deadline = datetime.datetime.fromisoformat(value.replace("Z", "+00:00")) if value else None
-    except (OSError, ValueError, TypeError, json.JSONDecodeError):
-        deadline = None
+        raw = json.loads(state_path.read_text()) if state_path.exists() else {
+            "schema": "symphony-provider-cooldowns/v1",
+            "providers": {},
+        }
+        if (
+            not isinstance(raw, dict)
+            or raw.get("schema") not in (None, "symphony-provider-cooldowns/v1")
+            or not isinstance(raw.get("providers"), dict)
+        ):
+            raise RuntimeError("state-schema-mismatch")
+        raw["schema"] = "symphony-provider-cooldowns/v1"
+        provider_state = raw.get("providers", {}).get(provider)
+        if provider_state is not None and not isinstance(provider_state, dict):
+            raise RuntimeError("provider-state-schema-mismatch")
+        value = (provider_state or {}).get("unavailableUntil")
+        deadline = (
+            datetime.datetime.fromisoformat(value.replace("Z", "+00:00"))
+            if value
+            else None
+        )
+    except (
+        OSError,
+        ValueError,
+        TypeError,
+        AttributeError,
+        json.JSONDecodeError,
+        RuntimeError,
+    ) as exc:
+        print(
+            "CAPACITY_RECONCILE_REQUIRED "
+            f"schema=symphony-provider-cooldowns/v1 reason={exc}",
+            file=sys.stderr,
+        )
+        raise SystemExit(75) from exc
 raise SystemExit(0 if deadline and deadline > datetime.datetime.now(datetime.timezone.utc) else 1)
 PY
 }
@@ -145,7 +199,13 @@ fi
 # inventory are authenticated, read-only pre-start evidence. Definite probe
 # failures enter one shared cooldown so concurrent issues do not stampede an
 # unavailable provider. Symphony remains the only owner of later retries.
-if ! provider_is_cooling cursor; then
+if provider_is_cooling cursor; then
+  :
+else
+  provider_status=$?
+  if [ "$provider_status" -ne 1 ]; then
+    exit "$provider_status"
+  fi
   if [ -x "$cursor" ] && [ -x "$cursor_adapter" ] &&
      "$cursor" status 2>/dev/null | grep -q 'Logged in' &&
      "$cursor" models 2>/dev/null | awk -v model="$model" '$1 == model { found=1 } END { exit !found }'; then

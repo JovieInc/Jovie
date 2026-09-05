@@ -32,6 +32,7 @@ import os
 import pathlib
 import re
 import sys
+import tempfile
 import time
 import urllib.error
 import urllib.request
@@ -61,6 +62,10 @@ query($id: String!) {
 """
 
 
+class StateReconcileRequired(RuntimeError):
+    """The durable lease ledger exists but cannot be trusted."""
+
+
 def _state_dir() -> pathlib.Path:
     return pathlib.Path(
         os.path.expanduser(os.environ.get("SYMPHONY_LEASE_GUARD_STATE_DIR", DEFAULT_STATE_DIR))
@@ -80,6 +85,10 @@ def _default_counters() -> dict[str, int]:
         "reopened": 0,
         "indeterminate": 0,
     }
+
+
+def _empty_state() -> dict:
+    return {"schema": SCHEMA, "tombstones": {}, "counters": _default_counters()}
 
 
 def _repository_for_identifier(identifier: str) -> str:
@@ -109,12 +118,17 @@ def _normalized_tombstone_key(key: str, entry: dict) -> tuple[str, str, str] | N
 
 
 def _load_state() -> dict:
+    path = _state_file()
+    if not path.exists():
+        raise StateReconcileRequired(f"{SCHEMA} reason=state-missing path={path}")
     try:
-        raw = json.loads(_state_file().read_text(encoding="utf-8"))
-    except (OSError, TypeError, ValueError):
-        raw = None
+        raw = json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, TypeError, ValueError) as exc:
+        raise StateReconcileRequired(
+            f"{SCHEMA} reason=state-unreadable path={path}"
+        ) from exc
     if not isinstance(raw, dict) or not isinstance(raw.get("tombstones"), dict):
-        raw = {"tombstones": {}}
+        raise StateReconcileRequired(f"{SCHEMA} reason=state-schema-mismatch path={path}")
     counters = raw.get("counters")
     merged = _default_counters()
     if isinstance(counters, dict):
@@ -158,10 +172,25 @@ def _state_transaction():
 def _save_state(state: dict) -> None:
     """Publish while the caller holds _state_transaction."""
     state_dir = _state_dir()
-    temporary = state_dir / ".leases.json.tmp"
-    temporary.write_text(json.dumps(state, indent=2, sort_keys=True) + "\n", encoding="utf-8")
-    os.chmod(temporary, 0o600)
-    os.replace(temporary, state_dir / "leases.json")
+    descriptor, temporary_name = tempfile.mkstemp(
+        prefix=".leases.json.", dir=state_dir
+    )
+    temporary = pathlib.Path(temporary_name)
+    try:
+        with os.fdopen(descriptor, "w", encoding="utf-8") as handle:
+            handle.write(json.dumps(state, indent=2, sort_keys=True) + "\n")
+            handle.flush()
+            os.fsync(handle.fileno())
+        os.chmod(temporary, 0o600)
+        os.replace(temporary, state_dir / "leases.json")
+        directory_descriptor = os.open(state_dir, os.O_RDONLY | os.O_DIRECTORY)
+        try:
+            os.fsync(directory_descriptor)
+        finally:
+            os.close(directory_descriptor)
+    finally:
+        if temporary.exists():
+            temporary.unlink()
 
 
 def _active_states() -> frozenset[str]:
@@ -346,41 +375,64 @@ def check(identifier: str) -> int:
     # ledger after it completes so stale responses see every committed fence.
     issue = _fetch_issue(identifier)
     active_states = _active_states()
-    with _state_transaction():
-        state = _load_state()
-        counters = state["counters"]
-        counters["checks"] += 1
-        repository = _repository_for_identifier(identifier)
-        key = _tombstone_key(identifier, repository)
-        decision, reason, tombstone, clear = lease_decision(
-            identifier, issue, state["tombstones"].get(key), active_states, time.time()
-        )
-        if tombstone is not None:
-            tombstone = {
-                **tombstone,
-                "repository": repository,
-                "identifier": identifier,
-            }
-        if clear:
-            state["tombstones"].pop(key, None)
-        elif tombstone is not None:
-            state["tombstones"][key] = tombstone
-        counter_key = {
-            ("suppress", "indeterminate"): "indeterminate",
-            ("admit", "active"): "admitted",
-            ("admit", "reopened"): "reopened",
-        }.get((decision, reason))
-        if counter_key is None:
-            counter_key = (
-                "suppressedStaleSnapshot" if reason == "stale_snapshot" else "suppressedNonActive"
+    try:
+        with _state_transaction():
+            state = _load_state()
+            counters = state["counters"]
+            counters["checks"] += 1
+            repository = _repository_for_identifier(identifier)
+            key = _tombstone_key(identifier, repository)
+            decision, reason, tombstone, clear = lease_decision(
+                identifier, issue, state["tombstones"].get(key), active_states, time.time()
             )
-        counters[counter_key] += 1
-        _save_state(state)
+            if tombstone is not None:
+                tombstone = {
+                    **tombstone,
+                    "repository": repository,
+                    "identifier": identifier,
+                }
+            if clear:
+                state["tombstones"].pop(key, None)
+            elif tombstone is not None:
+                state["tombstones"][key] = tombstone
+            counter_key = {
+                ("suppress", "indeterminate"): "indeterminate",
+                ("admit", "active"): "admitted",
+                ("admit", "reopened"): "reopened",
+            }.get((decision, reason))
+            if counter_key is None:
+                counter_key = (
+                    "suppressedStaleSnapshot"
+                    if reason == "stale_snapshot"
+                    else "suppressedNonActive"
+                )
+            counters[counter_key] += 1
+            _save_state(state)
+    except StateReconcileRequired as exc:
+        print(f"LEASE_RECONCILE_REQUIRED reason={exc}", file=sys.stderr)
+        return 2
     if decision == "admit":
         print(f"LEASE_ADMITTED reason={reason} identifier={identifier}")
         return 0
     print(f"LEASE_SUPPRESSED reason={reason} identifier={identifier}", file=sys.stderr)
     return 1
+
+
+def initialize() -> int:
+    """Explicitly bootstrap a missing ledger; never overwrite existing state."""
+    try:
+        with _state_transaction():
+            path = _state_file()
+            if path.exists():
+                _load_state()
+                print(f"LEASE_STATE_PRESENT path={path}")
+                return 0
+            _save_state(_empty_state())
+    except StateReconcileRequired as exc:
+        print(f"LEASE_RECONCILE_REQUIRED reason={exc}", file=sys.stderr)
+        return 2
+    print(f"LEASE_STATE_INITIALIZED path={_state_file()}")
+    return 0
 
 
 def _proc_root() -> pathlib.Path:
@@ -574,7 +626,20 @@ def fallback_lock_census() -> dict:
 
 
 def report() -> int:
-    state = _load_state()
+    try:
+        state = _load_state()
+    except StateReconcileRequired as exc:
+        print(
+            json.dumps(
+                {
+                    "schema": REPORT_SCHEMA,
+                    "status": "reconcile-required",
+                    "reason": str(exc),
+                },
+                sort_keys=True,
+            )
+        )
+        return 2
     receipt = {
         "schema": REPORT_SCHEMA,
         "ts": datetime.now(timezone.utc).isoformat().replace("+00:00", "Z"),
@@ -591,9 +656,11 @@ def report() -> int:
 
 def main() -> int:
     parser = argparse.ArgumentParser()
-    parser.add_argument("command", choices=("check", "report"))
+    parser.add_argument("command", choices=("check", "report", "initialize"))
     parser.add_argument("identifier", nargs="?")
     args = parser.parse_args()
+    if args.command == "initialize":
+        return initialize()
     if args.command == "report":
         return report()
     if not args.identifier:

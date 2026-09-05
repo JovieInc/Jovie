@@ -816,5 +816,41 @@ class StaleCapacityLocalRemediationTests(unittest.TestCase):
         )
 
 
+class ProviderCapacityRecoveryTests(unittest.TestCase):
+    def test_exit_75_is_typed_provider_capacity(self):
+        failure = MODULE.classify_launcher_failure("{:port_exit, 75}")
+        self.assertEqual(failure["class"], MODULE.PROVIDER_CAPACITY_CLASS)
+        self.assertEqual(failure["code"], "capacity-unavailable")
+        self.assertTrue(failure["retryable"])
+        self.assertEqual(failure["maxAttempts"], MODULE.PROVIDER_CAPACITY_MAX_ATTEMPTS)
+
+    def test_capacity_budget_escalates_without_terminalizing_issue(self):
+        decision = MODULE.controller_retry_decision(
+            {
+                "issue_identifier": "JOV-5034",
+                "error": "{:port_exit, 75}",
+                "attempt": MODULE.PROVIDER_CAPACITY_MAX_ATTEMPTS,
+            }
+        )
+        self.assertEqual(decision["state"], "capacity_incident")
+        self.assertTrue(decision["retryable"])
+        self.assertTrue(decision["handoff"])
+        self.assertEqual(
+            decision["handoffReason"], "shared-provider-capacity-incident"
+        )
+        self.assertTrue(decision["failure"]["escalateSharedIncident"])
+        self.assertNotEqual(decision["state"], "blocked")
+
+    def test_corrupt_receipt_requires_reconciliation(self):
+        with tempfile.TemporaryDirectory() as tmp, mock.patch.dict(
+            os.environ, {"SYMPHONY_RECONCILER_STATE": tmp}
+        ):
+            receipt_path = pathlib.Path(tmp) / "receipts" / "JOV-5034.json"
+            receipt_path.parent.mkdir(parents=True)
+            receipt_path.write_text("{not-json\n", encoding="utf-8")
+            with self.assertRaises(MODULE.ReconcileRequired):
+                MODULE._read_receipt("JOV-5034")
+
+
 if __name__ == "__main__":
     unittest.main()
