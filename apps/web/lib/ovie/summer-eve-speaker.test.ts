@@ -1,4 +1,5 @@
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { generateKeyPairSync } from 'node:crypto';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 vi.mock('@/lib/ovie/summer-shadow-client', () => ({
   fetchSummerShadow: vi.fn(),
@@ -17,6 +18,7 @@ import { runOvieSummerTurn, type SummerSpeakInput } from './summer-transport';
 
 const input: SummerSpeakInput = {
   clientTurnId: 'client_1',
+  principalHash: 'a'.repeat(43),
   userText: 'Hello Summer',
   history: [],
 };
@@ -36,6 +38,10 @@ const result = {
 };
 const fetchShadow =
   vi.fn<(path: string, init?: RequestInit) => Promise<Response>>();
+const signingPrivateKey = generateKeyPairSync('ed25519').privateKey.export({
+  type: 'pkcs8',
+  format: 'pem',
+});
 async function collect(value = input) {
   const events = [];
   for await (const e of createEveSummerSpeaker(fetchShadow).speak(value))
@@ -43,6 +49,11 @@ async function collect(value = input) {
   return events;
 }
 beforeEach(() => {
+  vi.stubEnv(
+    'SUMMER_BOTTLENECK_PRODUCER_SIGNING_PRIVATE_KEY',
+    signingPrivateKey
+  );
+  vi.stubEnv('SUMMER_BOTTLENECK_PRODUCER_SIGNING_KEY_ID', 'producer-test');
   fetchShadow.mockReset();
   fetchShadow
     .mockResolvedValueOnce(
@@ -50,6 +61,7 @@ beforeEach(() => {
     )
     .mockResolvedValueOnce(Response.json({ ok: true, result }));
 });
+afterEach(() => vi.unstubAllEnvs());
 describe('Ovie speaks through durable Eve Summer', () => {
   it('delivers the matching terminal answer and receipt through canonical persistence', async () => {
     const store = new MemoryOperatingStore();
@@ -59,6 +71,7 @@ describe('Ovie speaks through durable Eve Summer', () => {
       speaker: createEveSummerSpeaker(fetchShadow),
       userText: input.userText,
       clientTurnId: input.clientTurnId,
+      principalHash: input.principalHash,
       receipts: [],
     }))
       events.push(e);
@@ -77,6 +90,7 @@ describe('Ovie speaks through durable Eve Summer', () => {
       speaker: createEveSummerSpeaker(fetchShadow),
       userText: input.userText,
       clientTurnId: input.clientTurnId,
+      principalHash: input.principalHash,
       receipts: [],
     }))
       replay.push(e);
@@ -92,7 +106,15 @@ describe('Ovie speaks through durable Eve Summer', () => {
     });
     expect(
       JSON.parse(String(fetchShadow.mock.calls[0]?.[1]?.body))
-    ).toMatchObject({ previousEventId: 'previous', history: [] });
+    ).toMatchObject({
+      previousEventId: 'previous',
+      principalHash: input.principalHash,
+      history: [],
+    });
+    expect(fetchShadow.mock.calls[0]?.[1]?.headers).toMatchObject({
+      'x-jovie-summer-key-id': 'producer-test',
+      'x-jovie-summer-signature': expect.stringMatching(/^ed25519=/u),
+    });
   });
   it('bounds the one-time legacy history import to Eve ingress limits', async () => {
     await collect({
@@ -180,6 +202,22 @@ describe('Ovie speaks through durable Eve Summer', () => {
     });
     fetchShadow.mockReset().mockRejectedValue(new Error('timeout'));
     expect(await collect()).toEqual([{ type: 'error', state: 'unknown' }]);
+  });
+  it('reconciles an uncertain POST through the durable result endpoint without redispatch', async () => {
+    fetchShadow
+      .mockReset()
+      .mockResolvedValueOnce(
+        Response.json(
+          { code: 'conversation_persistence_or_dispatch_unknown' },
+          { status: 503 }
+        )
+      )
+      .mockResolvedValueOnce(Response.json({ result }));
+    expect(await collect()).toContainEqual({
+      type: 'text-delta',
+      text: result.responseText,
+    });
+    expect(fetchShadow).toHaveBeenCalledTimes(2);
   });
   it('imports prior Mac history once without forking or discarding turns', async () => {
     const store = new MemoryOperatingStore();

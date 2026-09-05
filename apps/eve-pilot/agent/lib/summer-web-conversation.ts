@@ -1,4 +1,4 @@
-import { createHash } from 'node:crypto';
+import { createHash, verify } from 'node:crypto';
 import { z } from 'zod';
 import {
   isSummerShadowEnabled,
@@ -10,12 +10,15 @@ import {
 
 export const SUMMER_CONVERSATION_ID = 'summer-session-current';
 export const SUMMER_CONVERSATION_MODEL = 'zai/glm-5.3-flash';
+const ATTESTATION_DOMAIN = 'jovie.eve.summer-conversation/v1';
+const keyIdSchema = z.string().regex(/^[A-Za-z0-9][A-Za-z0-9._-]{2,63}$/u);
 const eventIdSchema = z.string().regex(/^sum_[A-Za-z0-9_-]{24}$/u);
 export const conversationInputSchema = z
   .object({
     eventId: eventIdSchema,
     conversationId: z.literal(SUMMER_CONVERSATION_ID),
     previousEventId: eventIdSchema.nullable(),
+    principalHash: z.string().regex(/^[A-Za-z0-9_-]{43}$/u),
     message: z.string().trim().min(1).max(4000),
     history: z
       .array(
@@ -38,6 +41,7 @@ const acceptedRecordSchema = z
     utcDay: z.string().regex(/^\d{4}-\d{2}-\d{2}$/u),
   })
   .strict();
+const admissionRecordSchema = acceptedRecordSchema.omit({ sessionId: true });
 const terminalResultSchema = acceptedRecordSchema
   .extend({
     turnId: z.string().min(1),
@@ -60,6 +64,37 @@ export type ConversationStore = {
   read(path: string): Promise<ShadowRecord | null>;
   persist(path: string, record: ShadowRecord): Promise<'created' | 'exists'>;
 };
+
+export function verifyConversationAttestation(
+  request: Request,
+  rawBody: string,
+  environment: Readonly<Record<string, string | undefined>> = process.env
+): boolean {
+  const keyId = request.headers.get('x-jovie-summer-key-id');
+  const signature = request.headers.get('x-jovie-summer-signature');
+  if (
+    !keyIdSchema.safeParse(keyId).success ||
+    !signature?.startsWith('ed25519=')
+  )
+    return false;
+  try {
+    const parsed: unknown = JSON.parse(
+      environment.SUMMER_BOTTLENECK_PRODUCER_VERIFICATION_KEYS_JSON ?? ''
+    );
+    if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed))
+      return false;
+    const publicKey = (parsed as Record<string, unknown>)[String(keyId)];
+    if (typeof publicKey !== 'string' || publicKey.trim() === '') return false;
+    return verify(
+      null,
+      Buffer.from(`${ATTESTATION_DOMAIN}\0${rawBody}`),
+      publicKey,
+      Buffer.from(signature.slice('ed25519='.length), 'base64url')
+    );
+  } catch {
+    return false;
+  }
+}
 export const conversationPath = (kind: string, id: string) =>
   `summer-shadow/conversation/${kind}/${id}.json`;
 export const conversationMarker = (eventId: string) =>
@@ -94,6 +129,7 @@ export function createConversationIngress(
     ): Promise<string>;
     enabled?: () => boolean;
     now?: () => Date;
+    verifyAttestation?: (request: Request, rawBody: string) => boolean;
   }
 ) {
   return async (request: Request): Promise<Response> => {
@@ -105,6 +141,13 @@ export function createConversationIngress(
     try {
       const text = await readBoundedShadowBody(request);
       input = conversationInputSchema.parse(JSON.parse(text));
+      if (
+        !(deps.verifyAttestation ?? verifyConversationAttestation)(
+          request,
+          text
+        )
+      )
+        return json({ ok: false, code: 'invalid_founder_attestation' }, 403);
     } catch (error) {
       if (error instanceof ShadowBodyTooLargeError)
         return json({ ok: false, code: 'history_or_message_too_large' }, 413);
@@ -226,15 +269,9 @@ export function createConversationIngress(
         }
         return json({ ok: false, code: 'conversation_busy' }, 409);
       }
-      const sessionId = await deps.dispatch(
-        input,
-        renderConversation(input),
-        typeof previous?.sessionId === 'string' ? previous.sessionId : null
-      );
-      const accepted = {
+      const admission = {
         eventId: input.eventId,
         conversationId: input.conversationId,
-        sessionId,
         startIndex:
           typeof previous?.nextStartIndex === 'number'
             ? previous.nextStartIndex
@@ -242,6 +279,38 @@ export function createConversationIngress(
         model: SUMMER_CONVERSATION_MODEL,
         dailySlot,
         utcDay: day,
+      };
+      if (
+        (await deps.persist(
+          conversationPath('admissions', input.eventId),
+          admission
+        )) !== 'created'
+      ) {
+        const persisted = admissionRecordSchema.safeParse(
+          await deps.read(conversationPath('admissions', input.eventId))
+        );
+        if (
+          !persisted.success ||
+          JSON.stringify(persisted.data) !== JSON.stringify(admission)
+        )
+          return json(
+            { ok: false, code: 'admission_persistence_unknown' },
+            503
+          );
+      }
+      const sessionId = await deps.dispatch(
+        input,
+        renderConversation(input),
+        typeof previous?.sessionId === 'string' ? previous.sessionId : null
+      );
+      const accepted = {
+        eventId: admission.eventId,
+        conversationId: admission.conversationId,
+        sessionId,
+        startIndex: admission.startIndex,
+        model: admission.model,
+        dailySlot: admission.dailySlot,
+        utcDay: admission.utcDay,
       };
       if (
         (await deps.persist(
@@ -280,6 +349,7 @@ export async function readConversationResult(input: {
     startIndex: number
   ): Promise<ReadableStream<Uint8Array>>;
   signal?: AbortSignal;
+  recoverSession?: (conversationId: string) => Promise<string | null>;
 }): Promise<Response> {
   if (!eventIdSchema.safeParse(input.eventId).success)
     return json({ ok: false, code: 'invalid_event_id' }, 422);
@@ -294,7 +364,37 @@ export async function readConversationResult(input: {
   const accepted = await input.store.read(
     conversationPath('accepted', input.eventId)
   );
-  const parsedAccepted = acceptedRecordSchema.safeParse(accepted);
+  let parsedAccepted = acceptedRecordSchema.safeParse(accepted);
+  if (!parsedAccepted.success && input.recoverSession) {
+    const admission = admissionRecordSchema.safeParse(
+      await input.store.read(conversationPath('admissions', input.eventId))
+    );
+    if (admission.success && admission.data.eventId === input.eventId) {
+      const sessionId = await input.recoverSession(
+        admission.data.conversationId
+      );
+      if (sessionId) {
+        const recovered = { ...admission.data, sessionId };
+        const acceptedPath = conversationPath('accepted', input.eventId);
+        if (
+          (await input.store.persist(acceptedPath, recovered)) !== 'created'
+        ) {
+          const existingAccepted = acceptedRecordSchema.safeParse(
+            await input.store.read(acceptedPath)
+          );
+          if (
+            !existingAccepted.success ||
+            JSON.stringify(existingAccepted.data) !== JSON.stringify(recovered)
+          )
+            return json(
+              { ok: false, code: 'acceptance_recovery_unknown' },
+              503
+            );
+        }
+        parsedAccepted = acceptedRecordSchema.safeParse(recovered);
+      }
+    }
+  }
   if (!parsedAccepted.success || parsedAccepted.data.eventId !== input.eventId)
     return json({ ok: false, code: 'accepted_turn_unavailable' }, 503);
   const acceptedTurn = parsedAccepted.data;

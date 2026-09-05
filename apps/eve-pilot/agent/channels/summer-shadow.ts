@@ -16,6 +16,7 @@ import {
   conversationPath,
   createConversationIngress,
   readConversationResult,
+  verifyConversationAttestation,
 } from '../lib/summer-web-conversation';
 import {
   persistImmutableShadowRecord,
@@ -88,6 +89,7 @@ export default defineChannel<SummerShadowChannelState>({
         if (auth instanceof Response) return auth;
         return createConversationIngress({
           authenticate: async () => auth,
+          verifyAttestation: verifyConversationAttestation,
           read: readImmutableShadowRecord,
           persist: persistImmutableShadowRecord,
           async dispatch(input, message, previousSessionId) {
@@ -121,7 +123,7 @@ export default defineChannel<SummerShadowChannelState>({
     ),
     GET(
       '/ovie/v1/summer-shadow/conversation/events/:eventId/result',
-      async (request, { params, attachSession }) => {
+      async (request, { params, attachSession, resolveSession }) => {
         const auth = await routeAuth(request, ovieSummerShadowOidcAuth);
         if (auth instanceof Response) return auth;
         try {
@@ -143,6 +145,9 @@ export default defineChannel<SummerShadowChannelState>({
                   },
                 })
               ),
+            recoverSession: async conversationId =>
+              (await resolveSession(`conversation:${conversationId}`))?.id ??
+              null,
           });
         } catch {
           return Response.json(

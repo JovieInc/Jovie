@@ -162,6 +162,10 @@ import {
   OVIE_PROGRAM,
 } from '@/lib/ovie/program';
 import { bindEveSummerSpeaker } from '@/lib/ovie/summer-eve-speaker';
+import {
+  authorizeFounderSummerUser,
+  founderPrincipalHash,
+} from '@/lib/ovie/summer-founder-auth';
 import { createSummerAssistantStreamResponse } from '@/lib/ovie/summer-stream';
 import {
   getBoundSummerSpeaker,
@@ -2776,6 +2780,22 @@ export async function POST(req: Request) {
         { status: 400, headers: { ...corsHeaders, 'x-request-id': requestId } }
       );
     }
+    const founderAuthorization = authorizeFounderSummerUser(userId);
+    if (summerLive && founderAuthorization !== 'authorized') {
+      return NextResponse.json(
+        {
+          error:
+            founderAuthorization === 'unconfigured'
+              ? 'Founder Summer identity is not configured'
+              : 'Founder Summer access required',
+          requestId,
+        },
+        {
+          status: founderAuthorization === 'unconfigured' ? 503 : 403,
+          headers: { ...corsHeaders, 'x-request-id': requestId },
+        }
+      );
+    }
     if (summerLive && speaker && summerSession) {
       const firstReceipt = ovieIngestReceipts[0];
       return createSummerAssistantStreamResponse({
@@ -2786,6 +2806,7 @@ export async function POST(req: Request) {
           store: ovieStore,
           signal: req.signal,
           clientTurnId,
+          principalHash: founderPrincipalHash(userId),
         }),
         requestId,
         corsHeaders,

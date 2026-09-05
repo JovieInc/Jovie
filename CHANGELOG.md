@@ -11,7 +11,7 @@ and this project uses [Calendar Versioning](https://calver.org/) (`YY.M.PATCH`).
 
 - [internal] **Ovie can continue the current Summer conversation through Eve without falling back to customer Jovie chat (JOV-6021):** production OIDC admission preserves the durable session and history, binds each streamed answer to its current turn, rejects conflicting or concurrent submissions, and records replay-safe receipts.
 
-- [internal] **Private Summer turns now fail closed at their trust and resource boundaries:** Eve’s shell, file, network, and delegation tools are disabled; request, response, history, acceptance, and terminal records are bounded and schema-checked; live OV chat requires a stable client turn ID.
+- [internal] **Private Summer turns now fail closed at their trust and resource boundaries:** the live route requires the configured founder identity and a domain-separated signature from Jovie’s assigned producer authority, targets the protected Eve production alias, and reconciles uncertain dispatches from durable admission records. Eve’s shell, file, network, and delegation tools are disabled; request, response, history, acceptance, and terminal records are bounded and schema-checked.
 
 ## [26.8.2] - 2026-08-31
 

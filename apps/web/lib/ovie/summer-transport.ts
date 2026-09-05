@@ -57,6 +57,7 @@ export type SummerSpeaker = {
 export type SummerSpeakInput = {
   readonly previousEveEventId?: string;
   readonly previousEveSessionId?: string;
+  readonly principalHash?: string;
   readonly userText: string;
   readonly conversationId?: string;
   readonly clientTurnId?: string;
@@ -259,6 +260,7 @@ export async function* runOvieSummerTurn(input: {
   readonly store: OperatingStore;
   readonly signal?: AbortSignal;
   readonly clientTurnId?: string | null;
+  readonly principalHash?: string;
 }): AsyncGenerator<SummerTurnEvent> {
   if (input.speaker.id !== 'summer') {
     denyEveAction('summer-answer');
@@ -315,6 +317,7 @@ export async function* runOvieSummerTurn(input: {
       receipts: input.receipts,
       previousEveEventId: previousEveReceipt?.eventId,
       previousEveSessionId: previousEveReceipt?.sessionId,
+      principalHash: input.principalHash,
       history: session.turns.flatMap(turn => [
         { role: 'user' as const, text: turn.userText },
         { role: 'assistant' as const, text: turn.assistantText },

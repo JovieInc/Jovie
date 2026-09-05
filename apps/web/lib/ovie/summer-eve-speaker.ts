@@ -1,5 +1,6 @@
 import { z } from 'zod';
 import { ovieSummerTurnId } from '@/lib/ovie/summer-conversation';
+import { summerConversationAttestation } from '@/lib/ovie/summer-founder-auth';
 import { CURRENT_SUMMER_SESSION_ID } from '@/lib/ovie/summer-session';
 import { fetchSummerShadow } from '@/lib/ovie/summer-shadow-client';
 import {
@@ -76,21 +77,30 @@ export function createEveSummerSpeaker(
       });
       try {
         if (!input.clientTurnId) throw new Error('client_turn_id_required');
+        if (!input.principalHash) throw new Error('founder_principal_required');
+        const rawBody = JSON.stringify({
+          eventId,
+          conversationId: 'summer-session-current',
+          previousEventId: input.previousEveEventId ?? null,
+          principalHash: input.principalHash,
+          message: input.userText,
+          history: input.previousEveEventId
+            ? []
+            : boundedMigrationHistory(input.history),
+        });
+        const attestation = summerConversationAttestation(rawBody);
+        if (!attestation) throw new Error('founder_attestation_unavailable');
         const response = await fetchShadow(prefix, {
           method: 'POST',
           signal: input.signal,
-          body: JSON.stringify({
-            eventId,
-            conversationId: 'summer-session-current',
-            previousEventId: input.previousEveEventId ?? null,
-            message: input.userText,
-            history: input.previousEveEventId
-              ? []
-              : boundedMigrationHistory(input.history),
-          }),
+          headers: attestation,
+          body: rawBody,
         });
         const admission = await body(response);
-        if (!response.ok) {
+        const recoverableAdmission =
+          admission.code === 'dispatch_unknown' ||
+          admission.code === 'conversation_persistence_or_dispatch_unknown';
+        if (!response.ok && !recoverableAdmission) {
           if (
             admission.code === 'daily_turn_budget_exhausted' &&
             typeof admission.resetAt === 'string'

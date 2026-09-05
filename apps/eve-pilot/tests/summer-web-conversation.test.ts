@@ -1,3 +1,4 @@
+import { generateKeyPairSync, sign } from 'node:crypto';
 import { describe, expect, it, vi } from 'vitest';
 import type { ShadowRecord } from '../agent/lib/summer-shadow-ingress';
 import {
@@ -6,6 +7,7 @@ import {
   createConversationIngress,
   readConversationResult,
   renderConversation,
+  verifyConversationAttestation,
 } from '../agent/lib/summer-web-conversation';
 
 const id = (n: number) => `sum_${String(n).padStart(24, '0')}`;
@@ -13,6 +15,7 @@ const input = (n = 1): ConversationInput => ({
   eventId: id(n),
   conversationId: 'summer-session-current',
   previousEventId: null,
+  principalHash: 'a'.repeat(43),
   message: 'Are you Summer?',
   history: [],
 });
@@ -36,6 +39,7 @@ function fixture() {
     ...store,
     dispatch,
     authenticate: vi.fn(async () => ({ subject: 'jovie-production' })),
+    verifyAttestation: vi.fn(() => true),
     enabled: () => true,
     now: () => new Date('2026-09-05T03:00:00Z'),
   };
@@ -75,6 +79,32 @@ function stream(text: string) {
 }
 
 describe('authenticated persistent Summer conversation', () => {
+  it('requires a domain-separated signature from the assigned producer authority', () => {
+    const { privateKey, publicKey } = generateKeyPairSync('ed25519');
+    const rawBody = JSON.stringify(input());
+    const signature = sign(
+      null,
+      Buffer.from(`jovie.eve.summer-conversation/v1\0${rawBody}`),
+      privateKey
+    ).toString('base64url');
+    const request = new Request('https://eve.test/conversation', {
+      headers: {
+        'x-jovie-summer-key-id': 'producer-test',
+        'x-jovie-summer-signature': `ed25519=${signature}`,
+      },
+    });
+    const environment = {
+      SUMMER_BOTTLENECK_PRODUCER_VERIFICATION_KEYS_JSON: JSON.stringify({
+        'producer-test': publicKey.export({ type: 'spki', format: 'pem' }),
+      }),
+    };
+    expect(verifyConversationAttestation(request, rawBody, environment)).toBe(
+      true
+    );
+    expect(
+      verifyConversationAttestation(request, `${rawBody} `, environment)
+    ).toBe(false);
+  });
   it('rejects auth before parsing and disables admission without dispatch', async () => {
     const f = fixture();
     const denied = createConversationIngress({
@@ -301,6 +331,25 @@ describe('Eve terminal stream receipts', () => {
         })
       ).status
     ).toBe(200);
+    expect(f.dispatch).toHaveBeenCalledOnce();
+  });
+  it('recovers missing acceptance from durable admission and the canonical Eve session', async () => {
+    const f = fixture();
+    await f.send(input());
+    f.records.delete(conversationPath('accepted', id(1)));
+    const recoverSession = vi.fn(async () => 'ses_summer');
+    const response = await readConversationResult({
+      store: f.store,
+      eventId: id(1),
+      recoverSession,
+      stream: async () => stream(events(input())),
+    });
+    expect(response.status).toBe(200);
+    expect(recoverSession).toHaveBeenCalledWith('summer-session-current');
+    expect(f.records.get(conversationPath('accepted', id(1)))).toMatchObject({
+      eventId: id(1),
+      sessionId: 'ses_summer',
+    });
     expect(f.dispatch).toHaveBeenCalledOnce();
   });
   it('cannot return success before durable terminal storage', async () => {

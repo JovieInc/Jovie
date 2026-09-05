@@ -2,7 +2,7 @@ import 'server-only';
 import { getVercelOidcToken } from '@vercel/oidc';
 import { boundedFetch } from '@/lib/http/bounded-fetch';
 
-export const EVE_SHADOW_ORIGIN = 'https://jovie-eve-shadow-staging.vercel.app';
+export const EVE_SHADOW_ORIGIN = 'https://jovie-eve-shadow.vercel.app';
 /** Existing production Jovie OIDC boundary, shared by cron observations and founder conversation. */
 export async function fetchSummerShadow(
   path: string,

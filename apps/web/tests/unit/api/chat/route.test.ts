@@ -1,3 +1,4 @@
+import { generateKeyPairSync } from 'node:crypto';
 import {
   afterEach,
   beforeAll,
@@ -31,6 +32,9 @@ const hoisted = vi.hoisted(() => ({
   getOvieOperatingStoreMock: vi.fn(),
   fetchSummerShadowMock: vi.fn(),
 }));
+const summerSigningPrivateKey = generateKeyPairSync(
+  'ed25519'
+).privateKey.export({ type: 'pkcs8', format: 'pem' });
 
 vi.mock('@/app/api/chat/onboarding-handler', () => ({
   tryHandleAnonymousOnboardingChat:
@@ -354,6 +358,12 @@ describe('POST /api/chat guard wiring', () => {
 
   beforeEach(() => {
     vi.clearAllMocks();
+    vi.stubEnv('OVIE_SUMMER_FOUNDER_CLERK_USER_ID', 'user_123');
+    vi.stubEnv(
+      'SUMMER_BOTTLENECK_PRODUCER_SIGNING_PRIVATE_KEY',
+      summerSigningPrivateKey
+    );
+    vi.stubEnv('SUMMER_BOTTLENECK_PRODUCER_SIGNING_KEY_ID', 'producer-test');
     hoisted.tryHandleAnonymousOnboardingChatMock.mockResolvedValue(null);
     hoisted.getOptionalAuthMock.mockResolvedValue({ userId: 'user_123' });
     hoisted.resolveChatAccountContextMock.mockResolvedValue(
@@ -375,6 +385,7 @@ describe('POST /api/chat guard wiring', () => {
 
   afterEach(() => {
     resetSummerTransportRuntime();
+    vi.unstubAllEnvs();
   });
 
   it('returns 401 for unauthenticated requests without touching billing, rate limits, or the LLM', async () => {
@@ -608,5 +619,53 @@ describe('POST /api/chat guard wiring', () => {
     });
     expect(hoisted.fetchSummerShadowMock).not.toHaveBeenCalled();
     expect(hoisted.executeChatTurnMock).not.toHaveBeenCalled();
+  });
+
+  it('rejects a non-founder admin before the live Eve request', async () => {
+    hoisted.isAdminMock.mockResolvedValue(true);
+    vi.stubEnv('OVIE_SUMMER_FOUNDER_CLERK_USER_ID', 'founder_user');
+
+    const response = await POST(
+      chatRequest(
+        validBody({
+          chatMode: 'ov',
+          clientTurnId: 'ov-turn-not-founder',
+          messages: [
+            {
+              id: 'm1',
+              role: 'user',
+              parts: [{ type: 'text', text: 'private founder status' }],
+            },
+          ],
+        })
+      )
+    );
+
+    expect(response.status).toBe(403);
+    expect(hoisted.fetchSummerShadowMock).not.toHaveBeenCalled();
+  });
+
+  it('fails closed when the founder identity binding is unconfigured', async () => {
+    hoisted.isAdminMock.mockResolvedValue(true);
+    vi.stubEnv('OVIE_SUMMER_FOUNDER_CLERK_USER_ID', '');
+
+    const response = await POST(
+      chatRequest(
+        validBody({
+          chatMode: 'ov',
+          clientTurnId: 'ov-turn-unconfigured',
+          messages: [
+            {
+              id: 'm1',
+              role: 'user',
+              parts: [{ type: 'text', text: 'private founder status' }],
+            },
+          ],
+        })
+      )
+    );
+
+    expect(response.status).toBe(503);
+    expect(hoisted.fetchSummerShadowMock).not.toHaveBeenCalled();
   });
 });

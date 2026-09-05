@@ -37,7 +37,7 @@ describe('Summer production OIDC transport', () => {
     expect(getVercelOidcToken).toHaveBeenCalledOnce();
     expect(boundedFetch).toHaveBeenCalledWith(
       new URL(
-        'https://jovie-eve-shadow-staging.vercel.app/ovie/v1/summer-shadow/events'
+        'https://jovie-eve-shadow.vercel.app/ovie/v1/summer-shadow/events'
       ),
       expect.objectContaining({
         method: 'POST',
