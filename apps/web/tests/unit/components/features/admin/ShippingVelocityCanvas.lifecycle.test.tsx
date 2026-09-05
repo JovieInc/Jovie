@@ -53,8 +53,11 @@ describe('ShippingVelocityCanvas lifecycle', () => {
     chartState.instances.length = 0;
     chartState.register.mockClear();
     document.documentElement.className = '';
+    const fontStyle = document.createElement('style');
+    fontStyle.textContent = 'canvas { font-family: Inter, sans-serif; }';
+    document.head.append(fontStyle);
     document.documentElement.style.cssText =
-      '--color-accent-blue: rgb(30, 64, 175); --color-accent-purple: rgb(126, 34, 206); --color-accent-gray: rgb(75, 85, 99); --color-text-secondary-token: rgb(55, 65, 81); --color-border-subtle: rgb(209, 213, 219);';
+      'font-family: Inter, sans-serif; --color-accent-blue: rgb(30, 64, 175); --color-accent-purple: rgb(126, 34, 206); --color-accent-gray: rgb(75, 85, 99); --color-text-secondary-token: rgb(55, 65, 81); --color-border-subtle: rgb(209, 213, 219);';
   });
 
   it('mounts responsively, exposes the data table, and rebuilds on theme changes', async () => {
@@ -74,6 +77,7 @@ describe('ShippingVelocityCanvas lifecycle', () => {
     const config = chartState.instances[0]?.config as {
       options?: {
         animation?: boolean;
+        font?: { family?: string };
         onClick?: (
           event: unknown,
           elements: Array<{ datasetIndex: number }>
@@ -83,6 +87,7 @@ describe('ShippingVelocityCanvas lifecycle', () => {
     };
     expect(config.options).toMatchObject({
       animation: false,
+      font: { family: 'Inter, sans-serif' },
       responsive: true,
     });
     config.options?.onClick?.({}, []);

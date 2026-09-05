@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
-import { shippingChartData } from '@/components/features/admin/ShippingVelocityCanvas';
+import { shippingChartData } from './ShippingVelocityCanvas';
 
-describe('shippingChartData', () => {
+describe('ShippingVelocityCanvas', () => {
   const rows = [
     {
       date: '2026-09-01',
@@ -19,21 +19,13 @@ describe('shippingChartData', () => {
     },
   ];
 
-  it('maps authoritative daily buckets to the three chart series', () => {
+  it('maps daily buckets to labelled source series', () => {
     const chart = shippingChartData(rows, ['blue', 'purple', 'gray'], false);
 
     expect(chart.labels).toEqual(['2026-09-01', '2026-09-02']);
     expect(chart.datasets).toMatchObject([
-      {
-        label: 'Merged Pull Requests',
-        data: [2, 0],
-        borderColor: 'blue',
-      },
-      {
-        label: 'Opened Pull Requests',
-        data: [4, 1],
-        borderColor: 'purple',
-      },
+      { label: 'Merged Pull Requests', data: [2, 0], borderColor: 'blue' },
+      { label: 'Opened Pull Requests', data: [4, 1], borderColor: 'purple' },
       {
         label: 'Closed Without Merge',
         data: [1, 0],
@@ -43,7 +35,7 @@ describe('shippingChartData', () => {
     ]);
   });
 
-  it('keeps the closed series visible only when requested', () => {
+  it('shows closed pull requests only when requested', () => {
     expect(
       shippingChartData(rows, ['blue', 'purple', 'gray'], true).datasets[2]
     ).toMatchObject({ hidden: false });
