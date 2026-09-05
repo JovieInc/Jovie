@@ -26,7 +26,7 @@ main.jov.ie  jov.ie
 - **production**: Live production environment
   - Only accepts PRs from `main`
   - Requires: Full CI (build + tests + E2E)
-  - **Manual approval required** for merge
+  - Automated release and canary gates control promotion
   - Deploys to [jov.ie](https://jov.ie) automatically
 
 ## 📋 **Active Workflows**
@@ -204,7 +204,7 @@ main.jov.ie  jov.ie
 - ✅ Least-privilege credentials
 - ✅ Does not execute untrusted PR code
 - ✅ Does not expose secrets to agent
-- ✅ Clear escalation path (`needs-human` label)
+- ✅ Bounded autonomous retry with a durable failure receipt
 
 **Agent Constraints:**
 
@@ -216,10 +216,9 @@ main.jov.ie  jov.ie
 
 **Escalation:**
 
-When automation fails after 2 attempts:
-- `needs-human` label added to PR
-- Comment posted explaining failure
-- Workflow stops cleanly
+When automation fails after 2 attempts, it records the exact failure, releases
+the lease, and re-enters bounded autonomous remediation. It never creates a
+human-review hold.
 
 ---
 
@@ -252,7 +251,7 @@ Push to main
 │   └── Canary health check
 └── promote
     └── Create PR (main → production)
-        └── Manual review required
+        └── Automated release gates; optional post-land certification behind a flag
 ```
 
 ### **Production Deployment**
