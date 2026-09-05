@@ -3249,6 +3249,35 @@ describe('exact-head queue receipt proof', () => {
     });
   });
 
+  it('admits only an attested controller repair in controller-repair-only mode', () => {
+    expect(
+      explainExactHeadAdmissionSelector({
+        snapshot: [{ ...selectorRow, controllerRepair: true }],
+        admissionPr: 16068,
+        admissionHead: HEAD,
+        promotionMode: 'controller-repair-only',
+        enrollSlots: 1,
+      })
+    ).toEqual({
+      observed: true,
+      queued: false,
+      eligible: true,
+      reason: 'eligible',
+    });
+    expect(
+      explainExactHeadAdmissionSelector({
+        snapshot: [{ ...selectorRow, controllerRepair: false }],
+        admissionPr: 16068,
+        admissionHead: HEAD,
+        promotionMode: 'controller-repair-only',
+        enrollSlots: 1,
+      })
+    ).toMatchObject({
+      eligible: false,
+      reason: 'promotion-mode=controller-repair-only',
+    });
+  });
+
   it('does not treat snapshot auto-merge intent as queued membership', () => {
     expect(
       explainExactHeadAdmissionSelector({
