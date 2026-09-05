@@ -1,22 +1,19 @@
 import { render, screen } from '@testing-library/react';
-import type { ComponentPropsWithoutRef } from 'react';
+import React from 'react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import {
   renderDashboardNav,
   resetDashboardNavTestMocks,
 } from '@/tests/utils/dashboard-nav-test-support';
 
-vi.mock('next/link', async () => {
-  const { forwardRef } = await import('react');
-  return {
-    default: forwardRef<
-      HTMLAnchorElement,
-      ComponentPropsWithoutRef<'a'> & { readonly prefetch?: boolean }
-    >(function TestLink({ prefetch, ...props }, ref) {
-      return <a {...props} data-prefetch={String(prefetch)} ref={ref} />;
-    }),
-  };
-});
+vi.mock('next/link', () => ({
+  default: React.forwardRef<
+    HTMLAnchorElement,
+    React.ComponentPropsWithoutRef<'a'> & { readonly prefetch?: boolean }
+  >(function TestLink({ prefetch, ...props }, ref) {
+    return <a {...props} data-prefetch={String(prefetch)} ref={ref} />;
+  }),
+}));
 
 describe('DashboardNav route warming', () => {
   afterEach(() => resetDashboardNavTestMocks());
