@@ -194,6 +194,23 @@ test.describe('public profile browser admission', () => {
     );
   });
 
+  test('deliberate red detects reserved space without a rendered banner', async ({
+    page,
+  }) => {
+    await installPublicRouteMocks(page);
+    await page.setViewportSize({ width: 1512, height: 932 });
+    await page.goto('/renders/profile-admission?layout=public&state=claimed');
+    await waitForSettledProfileLayout(page, 'desktop');
+    expect((await auditPublicProfileLayout(page)).violations).toEqual([]);
+    await page.getByTestId('profile-desktop-surface').evaluate(surface => {
+      surface.style.marginTop = '68px';
+    });
+    const audit = await auditPublicProfileLayout(page);
+    expect(audit.violations.map(violation => violation.code)).toContain(
+      'banner_reserved_geometry'
+    );
+  });
+
   test('live resize transfers ownership exactly at 1180', async ({ page }) => {
     await installPublicRouteMocks(page);
     await page.setViewportSize({ width: 1179, height: 932 });

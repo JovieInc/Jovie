@@ -110,7 +110,11 @@ export function ProfileAdmissionFixtureClient({
 
   if (searchParams.get('violation') === 'phantom-banner') {
     return (
-      <div data-testid='public-profile-layout-shell' data-layout='desktop'>
+      <div
+        data-testid='public-profile-layout-shell'
+        data-layout='desktop'
+        style={{ width: '100%' }}
+      >
         <div
           data-testid='profile-desktop-shell'
           style={{ height: 600, width: '100%' }}

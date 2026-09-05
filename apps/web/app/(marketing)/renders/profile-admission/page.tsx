@@ -1,4 +1,5 @@
 import { notFound } from 'next/navigation';
+import { Suspense } from 'react';
 import { isProfileAdmissionFixtureEnabled } from './guard';
 import { ProfileAdmissionFixtureClient } from './ProfileAdmissionFixtureClient';
 
@@ -12,10 +13,19 @@ export default async function ProfileAdmissionFixturePage({
   searchParams: Promise<Record<string, string | string[] | undefined>>;
 }>) {
   if (!isProfileAdmissionFixtureEnabled()) notFound();
+  const params = await searchParams;
 
   return (
     <main className='flex h-dvh justify-center overflow-hidden bg-black dark:bg-black'>
-      <ProfileAdmissionFixtureClient params={await searchParams} />
+      <Suspense
+        fallback={
+          <div role='status' aria-busy='true'>
+            Loading profile…
+          </div>
+        }
+      >
+        <ProfileAdmissionFixtureClient params={params} />
+      </Suspense>
     </main>
   );
 }
