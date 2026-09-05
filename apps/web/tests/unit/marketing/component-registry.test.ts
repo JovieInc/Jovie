@@ -1133,6 +1133,9 @@ describe('canonical shared source atom registry', () => {
         type: ['text', 'password', 'search', 'number'],
       },
     });
+    expect(DESIGN_SYSTEM_COMPONENT_IDS).toEqual(
+      expect.arrayContaining(['atom.skeleton', 'molecule.loading-skeleton'])
+    );
     expect(DESIGN_SYSTEM_COMPONENT_REGISTRY.map(entry => entry.id)).toEqual(
       DESIGN_SYSTEM_COMPONENT_IDS
     );
