@@ -585,6 +585,7 @@ describe('ci-fast bounded parallel workflow', () => {
       "node --test --test-name-pattern='keeps the Gem drain on typed fleet admission' scripts/backlog-orchestrator/__tests__/backlog-orchestrator.test.mjs"
     );
     for (const gemContractCommand of [
+      'python3 scripts/symphony/tests/run-hud-proof-gate.py',
       'python3 scripts/symphony/tests/test_gem_disk_reclaim.py',
       'python3 scripts/symphony/tests/gem-pr-drain.test.py',
       'python3 scripts/symphony/tests/gem-pr-rehabilitation-contract.test.py',
