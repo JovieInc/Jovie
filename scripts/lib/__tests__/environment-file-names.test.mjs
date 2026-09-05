@@ -2,7 +2,7 @@ import { spawnSync } from 'node:child_process';
 import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { resolve } from 'node:path';
-import { afterEach, describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import {
   environmentVariableNames,
   renderEnvironmentVariableNameDiagnostics,
@@ -64,6 +64,84 @@ describe('environmentVariableNames', () => {
 
     expect(error).toBeInstanceOf(Error);
     expect(String(error)).not.toContain(SENTINEL);
+  });
+
+  it.each([
+    [
+      'unquoted continuation',
+      'PRIVATE=first\\\nSECRET_CONTINUATION=payload\nAFTER=ok\n',
+    ],
+    [
+      'unquoted CRLF continuation',
+      'PRIVATE=first\\\r\nSECRET_CONTINUATION=payload\r\n',
+    ],
+    ['dangling unquoted escape', 'PRIVATE=first\\'],
+    [
+      'unterminated escaped quote',
+      'PRIVATE="first\\"\nSECRET_CONTINUATION=payload\n',
+    ],
+  ])('fails closed at the CLI for %s', (_name, contents) => {
+    const result = spawnSync(
+      process.execPath,
+      [CLI, writeEnvironmentFile(contents)],
+      {
+        encoding: 'utf8',
+        env: {},
+      }
+    );
+    expect(result.status).toBe(1);
+    expect(result.stdout).toBe('');
+    expect(result.stderr).toBe('environment_file_diagnostic=unavailable\n');
+    expect(() => environmentVariableNames(contents)).toThrow();
+  });
+
+  it.each([
+    '"',
+    "'",
+  ])('keeps %s quoted continuation assignments private', quote => {
+    const contents = `PRIVATE=${quote}first\\\nSECRET_CONTINUATION=payload\n${quote}\nAFTER=ok\n`;
+    expect(environmentVariableNames(contents)).toEqual(['PRIVATE', 'AFTER']);
+    const result = spawnSync(
+      process.execPath,
+      [CLI, writeEnvironmentFile(contents)],
+      {
+        encoding: 'utf8',
+        env: {},
+      }
+    );
+    expect(result.status).toBe(0);
+    expect(result.stdout).toBe(
+      'environment_variable_name=PRIVATE\nenvironment_variable_name=AFTER\n'
+    );
+    expect(result.stderr).toBe('');
+  });
+
+  it('uses the real file reader and output streams without leaking values', async () => {
+    const output = vi
+      .spyOn(process.stdout, 'write')
+      .mockImplementation(() => true);
+    const errors = vi
+      .spyOn(process.stderr, 'write')
+      .mockImplementation(() => true);
+    try {
+      expect(
+        await runEnvironmentVariableNameDiagnostics([
+          writeEnvironmentFile('SAFE=private-value'),
+        ])
+      ).toBe(0);
+      expect(output).toHaveBeenCalledWith('environment_variable_name=SAFE\n');
+      expect(await runEnvironmentVariableNameDiagnostics([])).toBe(64);
+      expect(errors).toHaveBeenCalledWith(
+        'usage: symphony-environment-file-names <environment-file>\n'
+      );
+    } finally {
+      output.mockRestore();
+      errors.mockRestore();
+    }
+  });
+
+  it('renders no rows for empty input', () => {
+    expect(renderEnvironmentVariableNameDiagnostics('')).toBe('');
   });
 
   it('rejects non-text input with a constant error', () => {

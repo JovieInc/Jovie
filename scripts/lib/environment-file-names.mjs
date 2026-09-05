@@ -52,6 +52,11 @@ export function environmentVariableNames(contents) {
 
     const value = assignment[2].trimStart();
     const opening = value[0];
+    // Unquoted backslash-newline joins the next physical line to this value.
+    // Reject this syntax rather than risk emitting continuation data as a name.
+    if (opening !== '"' && opening !== "'" && value.endsWith('\\')) {
+      throw new Error('unsupported environment continuation');
+    }
     if (
       (opening === '"' || opening === "'") &&
       !findClosingQuote(value.slice(1), opening)
