@@ -2068,6 +2068,7 @@ body:has(.home-viewport)::-webkit-scrollbar {
   position: relative;
   z-index: 1;
   display: flex;
+  min-width: 0;
   width: min(var(--homepage-grid-max), 100%);
   flex-direction: column;
   align-items: center;
@@ -4144,19 +4145,21 @@ body:has(.home-viewport)::-webkit-scrollbar {
   color: var(--color-text-primary-token);
 }
 
-.home-viewport .system-b-mounted-home-footer > div {
+.home-viewport .marketing-footer-premium > div {
   /* Lock the footer onto the shared homepage content column: the box spans
-     --ds-public-content-max inside --homepage-page-gutter gutters, matching
-     the hero media, trust strip, and workspace grid lines. */
+     the header-derived grid, matching the hero and story sections. */
   width: min(
-    var(--ds-public-content-max),
-    calc(100% - var(--homepage-page-gutter) * 2)
+    var(--homepage-grid-max),
+    calc(100% - var(--homepage-grid-gutter) * 2)
   );
   max-width: none;
   margin-inline: auto;
+  padding-inline: 0;
+}
+
+.home-viewport .system-b-mounted-home-footer > div {
   padding-block: clamp(var(--space-12), 4.5vw, var(--space-16))
     clamp(var(--space-8), 3vw, var(--space-12));
-  padding-inline: 0;
 }
 
 .home-viewport .system-b-mounted-home-footer .grid {
@@ -5216,8 +5219,8 @@ body:has(.home-viewport)::-webkit-scrollbar {
    ============================================ */
 
 .home-viewport {
-  --homepage-grid-max: var(--ds-public-content-max);
-  --homepage-grid-gutter: var(--homepage-page-gutter);
+  --homepage-grid-max: var(--marketing-glass-content-max);
+  --homepage-grid-gutter: var(--marketing-glass-content-gutter);
   --homepage-chapter-space: clamp(
     calc(var(--space-24) + var(--space-2)),
     8.5vw,
@@ -5765,16 +5768,15 @@ body:has(.home-viewport)::-webkit-scrollbar {
 /* ============================================
    HOMEPAGE GRID SPINE SYSTEM B START
    Page-level spine contract: one content column, one gutter.
-   Every mounted section's content edges resolve to
-   var(--ds-public-content-max) inside var(--homepage-page-gutter)
-   gutters at every breakpoint. Wrappers stay neutral — they apply
-   no max-width or inline padding of their own; each section's own
-   System B block owns its column.
+   Every mounted section's content edges resolve to the header-derived
+   --homepage-grid-max and --homepage-grid-gutter aliases at every
+   breakpoint. Wrappers stay neutral — they apply no max-width or inline
+   padding of their own; each section's own System B block owns its column.
    ============================================ */
 
 .home-viewport {
-  --homepage-grid-max: var(--ds-public-content-max);
-  --homepage-grid-gutter: var(--homepage-page-gutter);
+  --homepage-grid-max: var(--marketing-glass-content-max);
+  --homepage-grid-gutter: var(--marketing-glass-content-gutter);
 }
 
 .homepage-story-stack,
