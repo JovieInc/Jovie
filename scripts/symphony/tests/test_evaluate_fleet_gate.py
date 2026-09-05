@@ -203,6 +203,30 @@ class EvaluateFleetGateWrapperTests(unittest.TestCase):
         self.assertEqual(outputs["promotion_allowed"], "true")
         self.assertTrue(receipt["remediationAdmission"]["pushAllowed"])
 
+    def test_live_unknown_closure_projects_controller_repair_without_reopening_intake(self):
+        closure = {
+            "schema": "jovie-closure-health/v1",
+            "status": "red",
+            "authority": "Summer",
+            "newIssueIntakeAllowed": False,
+            "promotionContinues": True,
+            "remediationContinues": True,
+            "reasons": ["closure-observation-unknown"],
+        }
+
+        code, outputs, receipt = run_wrapper(
+            signals(controller={"status": "failed"}, closureHealth=closure)
+        )
+
+        self.assertEqual(code, 0)
+        self.assertEqual(outputs["mode"], "controller-repair-only")
+        self.assertEqual(outputs["new_issue_intake_allowed"], "false")
+        self.assertTrue(receipt["controllerRepairAdmission"]["allowed"])
+        projection = json.loads(base64.b64decode(outputs["receipt_b64"]))
+        self.assertEqual(projection["promotionMode"], "controller-repair-only")
+        self.assertTrue(projection["controllerRepairAdmission"]["allowed"])
+        self.assertFalse(projection["closureAdmission"]["newIssueIntakeAllowed"])
+
     def test_unknown_main_with_exact_sha_is_schema_valid_and_blocks_promotion(self):
         code, outputs, receipt = run_wrapper(
             signals(main={"status": "unknown", "sha": SHA})
