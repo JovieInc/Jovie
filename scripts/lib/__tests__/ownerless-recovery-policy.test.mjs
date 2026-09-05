@@ -135,7 +135,17 @@ describe('tracker scan admission', () => {
     });
   });
   it('preserves exhaustive evidence and propagates unknown for real recovery demand', async () => {
-    const snapshot = { issues: [], coverage: { complete: true } };
+    const snapshot = {
+      issues: [],
+      coverage: {
+        complete: true,
+        pages: 1,
+        scanned: 0,
+        hasNextPage: false,
+        endCursor: null,
+        reason: null,
+      },
+    };
     expect(
       await recoveryIssueSnapshot([{ draft: false }], async () => snapshot)
     ).toBe(snapshot);
