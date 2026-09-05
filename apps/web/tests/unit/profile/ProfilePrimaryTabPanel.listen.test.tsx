@@ -149,7 +149,7 @@ describe('ProfilePrimaryTabPanel listen mode', () => {
     expect(screen.queryByTestId('mock-releases-view')).not.toBeInTheDocument();
   });
 
-  it('keeps the preview music CTA at 32px inside a 44px target', () => {
+  it('keeps the preview music CTA at 28px inside a 44px target', () => {
     render(
       <ProfilePrimaryTabPanel
         mode='listen'
@@ -168,7 +168,7 @@ describe('ProfilePrimaryTabPanel listen mode', () => {
     const alertsCta = screen.getByRole('button', {
       name: 'Turn On Music Alerts',
     });
-    expect(alertsCta).toHaveClass('h-8');
+    expect(alertsCta).toHaveClass('h-7');
     expect(alertsCta.className).toContain('before:h-11');
     expect(alertsCta.className).toContain('before:min-w-11');
   });

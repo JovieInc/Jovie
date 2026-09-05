@@ -30,7 +30,7 @@
 ## Canonical Invariants
 
 - `no-serif-product-source` — Product source uses Inter and Satoshi only; serif media requires an exact approved exception.
-- `marketing-pill-32-visible-44-target` — Marketing pills are 32px visible inside a 44px minimum hit target.
+- `text-button-28-visible-44-target` — Text Button size names share one equivalent 28px visible control, typography, and padding inside a 44px minimum hit target.
 - `marketing-o-mark-32` — The marketing O-mark is visibly 32px and control-aligned.
 - `semantic-accent-only` — Accent color communicates semantic state or a named data category, never decoration.
 - `decorative-icons-unboxed` — Decorative icons and emoji have no border, ring, circle, or badge plate.
@@ -102,7 +102,7 @@ Contract tokens below are the semantic surface for AI edits. DSP brand colors an
 - `--color-bg-surface-3`: #ebecef
 - `--color-bg-tooltip`: #101012
 - `--color-border-default`: oklch(0% 0 0 / 8%)
-- `--color-border-focus`: #7170ff
+- `--color-border-focus`: #2563ff
 - `--color-border-strong`: oklch(0% 0 0 / 15%)
 - `--color-border-subtle`: oklch(0% 0 0 / 5%)
 - `--color-btn-primary-bg`: oklch(10% 0 0)

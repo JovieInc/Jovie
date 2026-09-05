@@ -20,7 +20,7 @@ import { Spinner } from './spinner';
 
 const BUTTON_VARIANT_CLASSES: Record<ButtonVariant, string> = {
   primary:
-    'border border-btn-primary bg-btn-primary text-btn-primary-foreground shadow-button-inset hover:border-btn-primary-hover hover:bg-btn-primary-hover',
+    'border border-btn-primary bg-btn-primary text-btn-primary-foreground shadow-button-inset hover:border-(--color-btn-primary-hover) hover:bg-(--color-btn-primary-hover)',
   secondary:
     'border-0 bg-btn-secondary text-btn-secondary-foreground shadow-none hover:bg-(--color-btn-secondary-hover)',
   tertiary:
@@ -35,14 +35,16 @@ const BUTTON_VARIANT_CLASSES: Record<ButtonVariant, string> = {
 const ICON_HIT_TARGET_44 =
   'before:absolute before:left-1/2 before:top-1/2 before:h-11 before:w-11 before:-translate-x-1/2 before:-translate-y-1/2 before:content-[""]';
 
+// Every text size name is a compatibility alias for the founder-selected
+// 28px control, with one typography/padding contract and a 44px hit target.
+const TEXT_BUTTON_CLASSES =
+  'h-7 px-2.5 text-xs before:absolute before:left-1/2 before:top-1/2 before:h-11 before:min-w-11 before:w-full before:-translate-x-1/2 before:-translate-y-1/2 before:content-[""]';
+
 const BUTTON_SIZE_CLASSES: Record<ButtonSize, string> = {
-  sm: 'h-7 px-2.5 text-xs before:absolute before:left-1/2 before:top-1/2 before:h-11 before:min-w-11 before:w-full before:-translate-x-1/2 before:-translate-y-1/2 before:content-[""]',
-  // Founder-approved marketing text contract: 32px visible control inside a
-  // 44px minimum hit target without changing surrounding layout.
-  marketing:
-    'h-8 px-3 text-xs before:absolute before:left-1/2 before:top-1/2 before:h-11 before:min-w-11 before:w-full before:-translate-x-1/2 before:-translate-y-1/2 before:content-[""]',
-  md: 'h-9 px-3 text-app before:absolute before:left-1/2 before:top-1/2 before:h-11 before:min-w-11 before:w-full before:-translate-x-1/2 before:-translate-y-1/2 before:content-[""]',
-  lg: 'h-11 px-5 text-sm before:absolute before:left-1/2 before:top-1/2 before:h-11 before:min-w-11 before:w-full before:-translate-x-1/2 before:-translate-y-1/2 before:content-[""]',
+  sm: TEXT_BUTTON_CLASSES,
+  marketing: TEXT_BUTTON_CLASSES,
+  md: TEXT_BUTTON_CLASSES,
+  lg: TEXT_BUTTON_CLASSES,
   icon: `h-9 w-9 px-0 ${ICON_HIT_TARGET_44}`,
   'icon-xs': `h-6 w-6 px-0 ${ICON_HIT_TARGET_44}`,
   'icon-sm': `h-7 w-7 px-0 ${ICON_HIT_TARGET_44}`,
@@ -53,7 +55,7 @@ const BUTTON_SIZE_CLASSES: Record<ButtonSize, string> = {
 };
 
 const buttonVariants = cva(
-  'relative inline-flex items-center justify-center rounded-full text-app [font-weight:var(--font-weight-medium)] tracking-normal transition-[background-color,border-color,color,box-shadow,opacity,transform] duration-subtle ease-subtle motion-reduce:transition-none focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus/55 focus-visible:ring-offset-2 focus-visible:ring-offset-surface-page disabled:pointer-events-none disabled:opacity-[var(--state-disabled-opacity)] disabled:text-(--color-text-disabled-token)',
+  'relative inline-flex items-center justify-center rounded-full text-app [font-weight:var(--font-weight-medium)] tracking-normal transition-[background-color,border-color,color,box-shadow,opacity,transform] duration-subtle ease-subtle motion-reduce:transition-none focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus focus-visible:ring-offset-2 focus-visible:ring-offset-surface-page aria-disabled:pointer-events-none aria-disabled:opacity-[var(--state-disabled-opacity)] aria-disabled:text-(--color-text-disabled-token)',
   {
     variants: {
       variant: {
@@ -79,7 +81,12 @@ const buttonVariants = cva(
           'icon-xl',
         ],
         className:
-          'h-auto min-h-0 w-auto min-w-0 px-0 py-0 before:hidden disabled:opacity-60',
+          'h-auto min-h-0 w-auto min-w-0 px-0 py-0 before:hidden aria-disabled:opacity-60',
+      },
+      {
+        variant: 'link',
+        size: ['icon', 'icon-xs', 'icon-sm', 'icon-md', 'icon-lg', 'icon-xl'],
+        className: `before:block ${ICON_HIT_TARGET_44}`,
       },
     ],
     defaultVariants: {
@@ -169,10 +176,21 @@ function getDataState(loading: boolean, isDisabled: boolean): string {
   return 'idle';
 }
 
-function ButtonLoadingSpinner() {
+function ButtonLoadingSpinner({
+  primary,
+  destructive,
+}: {
+  primary: boolean;
+  destructive: boolean;
+}) {
   return (
     <span className='absolute inset-0 flex items-center justify-center'>
-      <Spinner size='sm' tone='primary' label='Loading' />
+      <Spinner
+        size='sm'
+        tone={primary ? 'inverse' : 'primary'}
+        className={primary && destructive ? 'text-error-foreground' : undefined}
+        label='Loading'
+      />
     </span>
   );
 }
@@ -266,16 +284,36 @@ const Button = React.forwardRef<HTMLButtonElement, ButtonProps>(
       // Next's server renderer can pass an opaque lazy child across the RSC
       // boundary. Radix Slot resolves that representation itself, while
       // React.Children.only rejects it before Slot gets the chance.
+      const preventDisabledActivation = (event: React.SyntheticEvent) => {
+        event.preventDefault();
+        event.stopPropagation();
+      };
+      const disabledChildProps = isDisabled
+        ? {
+            'aria-disabled': true,
+            ...(loading ? { 'aria-busy': true } : {}),
+            onClickCapture: preventDisabledActivation,
+            onAuxClickCapture: preventDisabledActivation,
+          }
+        : null;
       const contractChild =
-        penContractProps &&
+        (penContractProps || disabledChildProps) &&
         React.isValidElement<{
           'data-pen-contract'?: string;
         }>(children)
-          ? React.cloneElement(children, penContractProps)
+          ? React.cloneElement(children, {
+              ...penContractProps,
+              ...disabledChildProps,
+            })
           : children;
 
       return (
-        <Comp {...props} {...sharedProps} {...penContractProps}>
+        <Comp
+          {...props}
+          {...sharedProps}
+          {...penContractProps}
+          {...disabledChildProps}
+        >
           {contractChild}
         </Comp>
       );
@@ -291,7 +329,12 @@ const Button = React.forwardRef<HTMLButtonElement, ButtonProps>(
 
     return (
       <Comp {...props} {...sharedProps} {...buttonProps} {...penContractProps}>
-        {loading && <ButtonLoadingSpinner />}
+        {loading && (
+          <ButtonLoadingSpinner
+            primary={normalizedVariant.variant === 'primary'}
+            destructive={normalizedVariant.destructive}
+          />
+        )}
         <ButtonContent loading={loading}>{children}</ButtonContent>
       </Comp>
     );
