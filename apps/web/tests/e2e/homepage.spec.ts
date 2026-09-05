@@ -4,6 +4,7 @@ import {
   evaluateAcceptanceEvidence,
   evaluateRelationalGrid,
 } from '../../../../scripts/component-rendered-invariant-policy.mjs';
+import { primeVercelBypassCookie } from '../helpers/vercel-preview';
 import { expect, test } from './setup';
 import { SMOKE_TIMEOUTS, waitForHydration } from './utils/smoke-test-utils';
 
@@ -40,6 +41,7 @@ async function hasNextDevTransientOverlay(page: PlaywrightPage) {
 }
 
 async function gotoHomepage(page: PlaywrightPage) {
+  await primeVercelBypassCookie(page, process.env.BASE_URL);
   for (let attempt = 0; attempt < 3; attempt += 1) {
     await page.goto('/', {
       waitUntil: 'domcontentloaded',
