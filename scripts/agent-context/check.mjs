@@ -19,7 +19,9 @@ export function evaluate(root) {
   const sizes = {};
   for (const [file, limit] of [
     ...Object.entries(budgets),
-    ...references.map(file => [file, Infinity]),
+    ...references.map(
+      file => /** @type {[string, number]} */ ([file, Infinity])
+    ),
   ]) {
     const path = resolve(root, file);
     if (!existsSync(path)) {
